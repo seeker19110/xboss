@@ -1,73 +1,83 @@
-// lib/db/schema.ts
-import { pgTable, serial, text, integer, date, boolean, real, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, decimal, timestamp, boolean, pgEnum } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 
+// Enums
+export const statusEnum = pgEnum("status", ["ChuanBi", "DangThiCong", "DaHoanThanh", "DaNghiemThu", "DangTre", "DongLoi"]);
+
+// Projects
 export const projects = pgTable("projects", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
+  code: text("code").unique(),
+  investor: text("investor"),
   contractor: text("contractor"),
-  startDate: date("start_date"),
-  endDate: date("end_date"),
-  status: text("status").default("In Progress"),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const towers = pgTable("towers", {
   id: serial("id").primaryKey(),
   projectId: integer("project_id").references(() => projects.id),
-  name: text("name").notNull(),
+  name: text("name").notNull(), // Tháp A, Tháp B...
+  description: text("description"),
 });
 
-export const floors = pgTable("floors", {
+export const sheetTypes = pgTable("sheet_types", {
   id: serial("id").primaryKey(),
-  towerId: integer("tower_id").references(() => towers.id),
-  floorNumber: text("floor_number").notNull(),
+  code: text("code").unique().notNull(), // OGTĐ, OGHL, OGCH, ODNN Zone 1...
+  name: text("name").notNull(),
+  description: text("description"),
 });
 
+// Main Work Tracking
 export const workPackages = pgTable("work_packages", {
   id: serial("id").primaryKey(),
-  floorId: integer("floor_id").references(() => floors.id),
-  code: text("code"),
-  description: text("description"),
-  sheetType: text("sheet_type"),
+  projectId: integer("project_id").references(() => projects.id),
+  towerId: integer("tower_id").references(() => towers.id),
+  sheetTypeId: integer("sheet_type_id").references(() => sheetTypes.id),
+  code: text("code").notNull(), // A9, H12, etc.
+  name: text("name").notNull(), // Thi công trục đứng ống gió 9F
+  floor: text("floor"), // 9F, 12F...
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  days: integer("days"),
+  progress: decimal("progress", { precision: 10, scale: 4 }).default("0"),
+  status: statusEnum("status").default("ChuanBi"),
+  note: text("note"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const tasks = pgTable("tasks", {
-  id: serial("id").primaryKey(),
-  packageId: integer("package_id").references(() => workPackages.id),
-  name: text("name").notNull(),
-  startDate: date("start_date"),
-  endDate: date("end_date"),
-  progressPercent: real("progress_percent").default(0),
-  status: text("status").default("Chuẩn bị"),
-  assignedTo: integer("assigned_to"),
-  remarks: text("remarks"),
-});
-
+// Chi tiết tiến độ theo kích thước / vị trí
 export const progressDimensions = pgTable("progress_dimensions", {
   id: serial("id").primaryKey(),
-  taskId: integer("task_id").references(() => tasks.id),
-  dimensionCode: text("dimension_code"),
-  completed: boolean("completed").default(false),
-  progressValue: real("progress_value"),
+  workPackageId: integer("work_package_id").references(() => workPackages.id),
+  dimensionCode: text("dimension_code").notNull(), // 1300x700 X3-X4 Y5-Y6
+  progress: decimal("progress", { precision: 10, scale: 4 }).default("0"),
+  isCompleted: boolean("is_completed").default(false),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const taskHistory = pgTable("task_history", {
   id: serial("id").primaryKey(),
-  taskId: integer("task_id").references(() => tasks.id),
-  progressPercent: real("progress_percent"),
+  workPackageId: integer("work_package_id").references(() => workPackages.id),
+  oldProgress: decimal("old_progress"),
+  newProgress: decimal("new_progress"),
   status: text("status"),
-  updatedBy: integer("updated_by"),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  note: text("note"),
+  changedBy: text("changed_by"),
+  changedAt: timestamp("changed_at").defaultNow(),
 });
 
-export const materials = pgTable("materials", {
-  id: serial("id").primaryKey(),
-  taskId: integer("task_id").references(() => tasks.id),
-  name: text("name"),
-  quantityPlanned: real("quantity_planned"),
-  quantityUsed: real("quantity_used"),
-  unit: text("unit"),
-  status: text("status"),
-});
+// Relations
+export const workPackagesRelations = relations(workPackages, ({ one, many }) => ({
+  project: one(projects),
+  tower: one(towers),
+  sheetType: one(sheetTypes),
+  dimensions: many(progressDimensions),
+  history: many(taskHistory),
+}));
 
-export type Project = typeof projects.$inferSelect;
-export type Task = typeof tasks.$inferSelect;
+export const progressDimensionsRelations = relations(progressDimensions, ({ one }) => ({
+  workPackage: one(workPackages),
+}));
