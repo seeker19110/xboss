@@ -7,11 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:generate": "drizzle-kit generate",
-    "db:push": "drizzle-kit push",
-    "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio",
-    "db:seed": "tsx scripts/seed.ts"
+    "db:seed": "tsx scripts/seed.ts",
+    "db:seed:sample": "tsx scripts/seed-sample.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
@@ -35,7 +32,7 @@
     "@tailwindcss/postcss": "^4.0.0",
     "dotenv": "^16.4.5",
     "drizzle-kit": "^0.30.6",
-    "eslint": "^9.12.0",
+    "eslint": "^8.57.1",
     "eslint-config-next": "^14.2.15",
     "tailwindcss": "^4.0.0",
     "tsx": "^4.19.1",

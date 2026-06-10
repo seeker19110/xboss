@@ -1,0 +1,16 @@
+services:
+  xboss:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      # ⚠️ ĐỔI thành chuỗi ngẫu nhiên dài (ký session đăng nhập).
+      - XBOSS_SECRET=doi-thanh-chuoi-bi-mat-that-dai
+      - XBOSS_DB=/app/data/xboss.db
+      - PORT=3000
+    volumes:
+      - xboss-data:/app/data   # DB lưu bền, không mất khi rebuild
+    restart: unless-stopped
+
+volumes:
+  xboss-data:

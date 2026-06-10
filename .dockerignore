@@ -1,0 +1,9 @@
+node_modules
+.next
+npm-debug.log
+xboss.db
+xboss.db-wal
+xboss.db-shm
+.git
+.env.local
+*.md

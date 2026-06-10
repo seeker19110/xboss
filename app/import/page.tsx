@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Upload, FileSpreadsheet, ArrowLeft, CheckCircle2, XCircle } from 'lucide-react';
 
 type Result = {
@@ -11,6 +11,15 @@ export default function ImportPage() {
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
+  const [allowed, setAllowed] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch('/api/auth/me').then(async r => {
+      if (!r.ok) { window.location.href = '/login'; return; }
+      const j = await r.json();
+      setAllowed(j.user?.role === 'admin' || j.user?.role === 'pm');
+    });
+  }, []);
 
   async function handleUpload() {
     if (!file) return;
@@ -35,6 +44,11 @@ export default function ImportPage() {
       </header>
 
       <main className="p-6 max-w-2xl mx-auto">
+        {allowed === false && (
+          <div className="rounded-xl border border-amber-800 bg-amber-950/40 text-amber-300 p-4 mb-4 text-sm">
+            Bạn không có quyền import (chỉ Admin/PM). Đăng nhập bằng tài khoản Admin hoặc PM để dùng chức năng này.
+          </div>
+        )}
         <label className="block border-2 border-dashed border-zinc-700 rounded-xl p-10 text-center cursor-pointer hover:border-emerald-600 transition">
           <input type="file" accept=".xlsx,.xls" className="hidden"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)} />

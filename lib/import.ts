@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
-import { db, projects, towers, sheetTypes, workPackages, tasks } from "@/lib/db";
-import { eq, and } from "drizzle-orm";
+import { run, queryOne, query } from "@/lib/db";
 import { toStatusSlug, parseProgress } from "@/lib/status";
+import { deriveStatus, recomputePackage } from "@/lib/recompute";
 
 export const SHEET_MAP: Record<string, { code: string; name: string; responsible?: string }> = {
   "TRACKING OGTĐ": { code: "OGTĐ", name: "Ống gió trục đứng", responsible: "Mr. Thừa" },
@@ -11,42 +11,80 @@ export const SHEET_MAP: Record<string, { code: string; name: string; responsible
   "TRACKING ODNN Zone 2": { code: "ODNN Zone 2", name: "Ống đồng nước ngưng Zone 2", responsible: "Mr. Thắng" },
 };
 
-// Excel serial hoặc Date hoặc ISO string → Date | null
-export function toDate(v: unknown): Date | null {
+const HEADER_ROW = 2;   // dòng tiêu đề (index 2 = dòng 3)
+const DATA_START = 5;   // dữ liệu bắt đầu từ index 5
+const DIM_START = 9;    // cột dimension đầu tiên
+
+export function toISO(v: unknown): string | null {
   if (v == null || v === "") return null;
-  if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
-  if (typeof v === "number" && !isNaN(v)) {
-    return new Date(Math.round((v - 25569) * 86400 * 1000));
-  }
-  const d = new Date(String(v));
-  return isNaN(d.getTime()) ? null : d;
+  let d: Date;
+  if (v instanceof Date) d = v;
+  else if (typeof v === "number" && !isNaN(v)) d = new Date(Math.round((v - 25569) * 86400 * 1000));
+  else d = new Date(String(v));
+  return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
 }
 
-const intStt = (s: string) => /^\d+$/.test(s);          // "1", "2" → work package
+const intStt = (s: string) => /^\d+$/.test(s);
 const floorOf = (name: string) => name.match(/(\d+F)\b/)?.[1] ?? null;
 
+// ô checkbox đã hoàn thành?
+function isChecked(v: unknown): boolean {
+  if (v === true || v === 1) return true;
+  if (typeof v === "string") return ["x", "1", "true", "✓", "đã lắp"].includes(v.trim().toLowerCase());
+  return false;
+}
+function isBoolCell(v: unknown): boolean {
+  return typeof v === "boolean" || v === 0 || v === 1;
+}
+function cleanLabel(v: unknown): string | null {
+  if (v == null || String(v).trim() === "") return null;
+  return String(v).replace(/\n/g, " ").replace(/\s+/g, " ").trim().replace(/^\d+\s+/, "");
+}
+
+type DimDef = { col: number; label: string; index: number };
+
+// Đọc tiêu đề → danh sách cột dimension (xử lý header gộp ô như OGHL).
+function parseDimDefs(rows: unknown[][]): DimDef[] {
+  const header = rows[HEADER_ROW] ?? [];
+  let linkCol = header.length;
+  for (let c = DIM_START; c < header.length; c++) {
+    if (header[c] != null && String(header[c]).toLowerCase().includes("link")) { linkCol = c; break; }
+  }
+  const defs: DimDef[] = [];
+  let group = "", sub = 0, idx = 0;
+  for (let c = DIM_START; c < linkCol; c++) {
+    const cleaned = cleanLabel(header[c]);
+    let label: string;
+    if (cleaned) { group = cleaned; sub = 1; label = group; }
+    else { sub++; label = group ? `${group} (${sub})` : `Cột ${c}`; }
+    defs.push({ col: c, label, index: ++idx });
+  }
+  return defs;
+}
+
 export type ImportStats = {
-  totalRows: number;
-  packages: number;
-  tasks: number;
-  errors: string[];
-  sheets: string[];
+  totalRows: number; packages: number; tasks: number; dimensions: number; errors: string[]; sheets: string[];
 };
 
-export async function importWorkbook(workbook: XLSX.WorkBook): Promise<ImportStats> {
-  const stats: ImportStats = { totalRows: 0, packages: 0, tasks: 0, errors: [], sheets: [] };
+type Row = { id: number };
 
-  // Project + Tower
-  let [project] = await db.select().from(projects).where(eq(projects.name, "TT AVIO Tháp A"));
-  if (!project) {
-    [project] = await db.insert(projects)
-      .values({ name: "TT AVIO Tháp A", code: "AVIO-A" }).returning();
-  }
-  let [tower] = await db.select().from(towers).where(eq(towers.projectId, project.id));
-  if (!tower) {
-    [tower] = await db.insert(towers)
-      .values({ projectId: project.id, name: "Tháp A" }).returning();
-  }
+function getOrCreateProject(): number {
+  const p = queryOne<Row>(`SELECT id FROM projects WHERE name = ?`, "TT AVIO Tháp A");
+  if (p) return p.id;
+  return Number(run(`INSERT INTO projects (name, code) VALUES (?, ?)`, "TT AVIO Tháp A", "AVIO-A").lastInsertRowid);
+}
+function getOrCreateTower(projectId: number): number {
+  const t = queryOne<Row>(`SELECT id FROM towers WHERE project_id = ?`, projectId);
+  if (t) return t.id;
+  return Number(run(`INSERT INTO towers (project_id, name) VALUES (?, ?)`, projectId, "Tháp A").lastInsertRowid);
+}
+
+export async function importWorkbook(workbook: XLSX.WorkBook): Promise<ImportStats> {
+  const stats: ImportStats = { totalRows: 0, packages: 0, tasks: 0, dimensions: 0, errors: [], sheets: [] };
+
+  const projectId = getOrCreateProject();
+  const towerId = getOrCreateTower(projectId);
+  const touchedPkgs = new Set<number>();
 
   for (const sheetName of workbook.SheetNames) {
     const info = SHEET_MAP[sheetName];
@@ -55,22 +93,18 @@ export async function importWorkbook(workbook: XLSX.WorkBook): Promise<ImportSta
 
     const ws = workbook.Sheets[sheetName];
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null }) as unknown[][];
+    const dimDefs = parseDimDefs(rows);
 
-    // Sheet type
-    let [st] = await db.select().from(sheetTypes)
-      .where(and(eq(sheetTypes.towerId, tower.id), eq(sheetTypes.code, info.code)));
+    let st = queryOne<Row>(`SELECT id FROM sheet_types WHERE tower_id = ? AND code = ?`, towerId, info.code);
     if (!st) {
-      [st] = await db.insert(sheetTypes)
-        .values({ towerId: tower.id, code: info.code, name: info.name, responsible: info.responsible })
-        .returning();
+      st = { id: Number(run(`INSERT INTO sheet_types (tower_id, code, name, responsible) VALUES (?, ?, ?, ?)`,
+        towerId, info.code, info.name, info.responsible ?? null).lastInsertRowid) };
     }
 
     let currentPkgId: number | null = null;
     let currentPkgCode = "";
 
-    // Cột: 0=CODE 1=STT 2=CHI TIẾT 3=GHI CHÚ 4=bắt đầu 5=số ngày 6=kết thúc 7=% tiến độ
-    // Data thật từ row index 5 trở đi (bỏ tiêu đề + group "A").
-    for (let i = 5; i < rows.length; i++) {
+    for (let i = DATA_START; i < rows.length; i++) {
       const row = rows[i];
       if (!row) continue;
 
@@ -79,63 +113,79 @@ export async function importWorkbook(workbook: XLSX.WorkBook): Promise<ImportSta
       const name = String(row[2] ?? "").trim();
       if (!name) continue;
 
-      // Bỏ group cấp cao "A - THI CÔNG..." (stt là chữ cái đơn, không có code dạng A1)
       const isTopGroup = /^[A-Z]+$/.test(stt) && !/^[A-Z]+\d/.test(code);
       if (isTopGroup) continue;
 
       stats.totalRows++;
-      const startDate = toDate(row[4]);
+      const startDate = toISO(row[4]);
       const durationDays = row[5] != null ? parseInt(String(row[5])) || null : null;
-      const endDate = toDate(row[6]);
-      const status = toStatusSlug(row[3]);
-      const progress = parseProgress(row[7]);
+      const endDate = toISO(row[6]);
+      const ghiChu = toStatusSlug(row[3]);
 
       try {
-        // Work package: có CODE (không dấu phẩy) VÀ STT là số nguyên ("1","2"...).
         const isPkg = !!code && !code.includes(",") && intStt(stt);
-        // Sub-header trong nhóm (vd "Trực Đứng Nước Ngưng 1F"): không code, không stt → bỏ.
-        const isSubHeader = !code && !stt;
-        if (isSubHeader) continue;
 
         if (isPkg) {
-          const wpCode = code || `${info.code}-${stt || i}`;
-          let [wp] = await db.select().from(workPackages)
-            .where(and(eq(workPackages.sheetTypeId, st.id), eq(workPackages.code, wpCode)));
-          if (!wp) {
-            [wp] = await db.insert(workPackages).values({
-              sheetTypeId: st.id, code: wpCode, seqNo: stt || null,
-              floorLabel: floorOf(name), name, startDate, endDate,
-              durationDays, status, progress,
-            }).returning();
+          const wpCode = code;
+          const existing = queryOne<Row>(`SELECT id FROM work_packages WHERE sheet_type_id = ? AND code = ?`, st.id, wpCode);
+          if (!existing) {
+            currentPkgId = Number(run(
+              `INSERT INTO work_packages (sheet_type_id, code, seq_no, floor_label, name, start_date, end_date, duration_days, status, progress)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+              st.id, wpCode, stt, floorOf(name), name, startDate, endDate, durationDays, ghiChu).lastInsertRowid);
             stats.packages++;
           } else {
-            await db.update(workPackages)
-              .set({ status, progress, startDate, endDate, durationDays })
-              .where(eq(workPackages.id, wp.id));
+            run(`UPDATE work_packages SET start_date = ?, end_date = ?, duration_days = ? WHERE id = ?`,
+              startDate, endDate, durationDays, existing.id);
+            currentPkgId = existing.id;
           }
-          currentPkgId = wp.id;
           currentPkgCode = wpCode;
+          touchedPkgs.add(currentPkgId);
         } else if (currentPkgId) {
-          const taskCode = code || `${currentPkgCode},${stt}`;
-          const [existing] = await db.select().from(tasks)
-            .where(and(eq(tasks.packageId, currentPkgId), eq(tasks.code, taskCode)));
-          if (!existing) {
-            await db.insert(tasks).values({
-              packageId: currentPkgId, code: taskCode, seqNo: stt, name,
-              note: row[3] != null ? String(row[3]) : null,
-              status, startDate, endDate, durationDays, progressPercent: progress,
-            });
-          } else {
-            await db.update(tasks)
-              .set({ status, progressPercent: progress, startDate, endDate, durationDays })
-              .where(eq(tasks.id, existing.id));
+          // Hàng task (kể cả sub-header có dữ liệu lưới nhưng không có CODE).
+          const hasDimData = dimDefs.length > 0 && dimDefs.some((d) => isBoolCell(row[d.col]));
+          const taskCode = code || `${currentPkgCode},${stt || "r" + i}`;
+
+          let progress = parseProgress(row[7]);
+          if (hasDimData) {
+            const done = dimDefs.filter((d) => isChecked(row[d.col])).length;
+            progress = Math.round((done / dimDefs.length) * 100) / 100;
           }
-          stats.tasks++;
+          const status = deriveStatus(progress, endDate, ghiChu);
+
+          let taskId: number;
+          const existing = queryOne<Row>(`SELECT id FROM tasks WHERE package_id = ? AND code = ?`, currentPkgId, taskCode);
+          if (!existing) {
+            taskId = Number(run(
+              `INSERT INTO tasks (package_id, code, seq_no, name, note, status, start_date, end_date, duration_days, progress_percent)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              currentPkgId, taskCode, stt || null, name, row[3] != null ? String(row[3]) : null,
+              status, startDate, endDate, durationDays, progress).lastInsertRowid);
+            stats.tasks++;
+          } else {
+            taskId = existing.id;
+            run(`UPDATE tasks SET status = ?, progress_percent = ?, start_date = ?, end_date = ?, duration_days = ? WHERE id = ?`,
+              status, progress, startDate, endDate, durationDays, taskId);
+            run(`DELETE FROM progress_dimensions WHERE task_id = ?`, taskId);
+          }
+
+          if (hasDimData) {
+            for (const d of dimDefs) {
+              const checked = isChecked(row[d.col]) ? 1 : 0;
+              run(`INSERT INTO progress_dimensions (task_id, dimension_label, installed, value) VALUES (?, ?, ?, ?)`,
+                taskId, d.label, checked, checked);
+              stats.dimensions++;
+            }
+          }
         }
       } catch (err) {
         stats.errors.push(`Dòng ${i + 1} (${sheetName}): ${(err as Error).message}`);
       }
     }
   }
+
+  // Tính lại % cho từng work package = trung bình các sub-task.
+  for (const pkgId of touchedPkgs) recomputePackage(pkgId);
+
   return stats;
 }
