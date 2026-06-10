@@ -1,72 +1,89 @@
-# XBoss - Hệ thống quản lý thi công MEP
+# XBoss — Hệ thống quản lý thi công MEP
 
-**Web App quản lý tiến độ thi công Ống gió & MEP cho dự án AVIO Tháp A**
+Web app quản lý tiến độ thi công ACMV cho dự án **TT AVIO Tháp A**, thay thế bộ file Excel tracking bằng giao diện realtime, đa người dùng, mobile-friendly.
 
-## Pha 0: Khởi tạo - HOÀN THÀNH ✅
+> 📄 Xem đặc tả kỹ thuật đầy đủ tại [`spec.md`](./spec.md)
 
-**Mục tiêu**: Xây dựng nền tảng rõ ràng, chuẩn hóa dữ liệu.
+---
 
-### Deliverables Đạt Được:
-- ✅ Repo Next.js 14 + TypeScript + Tailwind
-- ✅ Data Mapping từ Excel AVIO
-- ✅ ERD Database
-- ✅ User Stories cơ bản
-- ✅ Sample data & Import prototype plan
+## Yêu cầu hệ thống
 
-### 1. Data Analysis & Mapping từ Excel "GIA THÀNH - TT AVIO.xlsx"
+- Node.js 20+
+- Git
+- Tài khoản [Supabase](https://supabase.com) (free tier)
 
-**Main Sheets**:
-- **DashBoard**: Danh sách công việc trễ hạn
-- **TRACKING OGTĐ**: Ống gió trực đứng
-- **OGHL**: Ống gió hành lang
-- **OGCH**: Ống gió căn hộ
-- **ODNN**: Ống đồng nước ngưng
+---
 
-**Mapping chính**:
-- `CODE` + `TẦNG` → unique identifier cho Task/WorkPackage
-- `CHI TIẾT CÔNG VIỆC` → Task name
-- `NGÀY BẮT ĐẦU`, `NGÀY KẾT THÚC` → Dates (convert Excel serial number)
-- `% TIẾN ĐỘ` → progress_percent (0-1)
-- Các cột sau → Progress Dimensions (JSONB hoặc separate table)
-- `SHEET` → sheet_type (OGTĐ, OGHL...)
+## Cài đặt & Chạy local
 
-**Excel Date Convert Example**:
-```ts
-const excelSerialToDate = (serial: number): Date => {
-  const utc_days = Math.floor(serial - 25569);
-  return new Date(utc_days * 86400 * 1000);
-};
+```bash
+# 1. Clone repo
+git clone https://github.com/your-org/xboss.git
+cd xboss
+
+# 2. Cài dependencies
+npm install
+
+# 3. Tạo file môi trường
+cp .env.example .env.local
+# Điền NEXT_PUBLIC_SUPABASE_URL và NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+# 4. Chạy migration DB
+npm run db:migrate
+
+# 5. Seed data mẫu (từ file Excel AVIO)
+npm run db:seed
+
+# 6. Khởi động dev server
+npm run dev
 ```
 
-### 2. Database ERD (Text)
+Mở trình duyệt: [http://localhost:3000](http://localhost:3000)
+
+---
+
+## Cấu trúc thư mục
+
 ```
-projects (1) ── (N) towers
-towers (1) ── (N) floors
-floors (1) ── (N) work_packages
-work_packages (1) ── (N) tasks
-tasks (1) ── (N) progress_dimensions
-tasks (1) ── (N) materials
-tasks (1) ── (N) task_history
+xboss/
+├── app/                  # Next.js App Router (pages + API routes)
+│   ├── api/              # API endpoints
+│   ├── dashboard/        # Trang Dashboard
+│   ├── tracking/         # Trang Tracking per sheet
+│   └── import/           # Trang Import Excel
+├── components/           # UI components (shadcn/ui + custom)
+├── lib/                  # Utilities, DB client, helpers
+├── drizzle/              # Schema + migrations
+├── data/                 # Excel mapping config, seed files
+├── docs/                 # ERD, wireframes
+├── scripts/              # Import/seed scripts
+├── spec.md               # Đặc tả kỹ thuật đầy đủ
+└── .env.example
 ```
 
-### 3. User Stories (User Stories cơ bản)
-**US-01**: Là PM, tôi muốn import Excel để đồng bộ dữ liệu tiến độ.
-**US-02**: Là Engineer, tôi muốn xem dashboard với KPI % hoàn thành theo tầng/tháp.
-**US-03**: Là Site staff, tôi muốn update tiến độ task realtime qua mobile.
-**US-04**: Hệ thống tự động highlight task trễ hạn (Red).
+---
 
-**Acceptance Criteria**: Import thành công ≥95% records, Drill-down mượt, Role-based access.
+## Scripts
 
-### 4. Setup Repo
-- Next.js 14 App Router
-- Tailwind CSS
-- TypeScript
-- Sẵn sàng thêm: shadcn/ui, Drizzle, Supabase, TanStack Table
+| Command | Mô tả |
+|---|---|
+| `npm run dev` | Chạy dev server |
+| `npm run build` | Build production |
+| `npm run db:migrate` | Chạy migrations |
+| `npm run db:seed` | Seed data từ Excel AVIO |
+| `npm run test` | Chạy unit tests |
+| `npm run test:e2e` | Chạy E2E tests (Playwright) |
 
-### Next Action (Pha 1)
-- Tạo Drizzle Schema
-- Implement Excel Import API
+---
 
-**Repo sẵn sàng deploy lên Vercel + Supabase.**
+## Tech Stack
 
-Hãy tiếp tục với **Pha 1: DB & Import**!
+Next.js 14 · TypeScript · Tailwind · shadcn/ui · Drizzle ORM · Supabase · TanStack Table · Recharts · SheetJS
+
+---
+
+## Tài liệu
+
+- [`spec.md`](./spec.md) — Database schema, API endpoints, User Stories, logic nghiệp vụ
+- [`docs/ERD.md`](./docs/ERD.md) — Entity Relationship Diagram
+- [`data/excel-mapping.json`](./data/excel-mapping.json) — Mapping cột Excel → DB fields
