@@ -277,6 +277,13 @@ function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged }: { pkgId: numb
     load();
   }
 
+  async function approveTask(t: GridTask, approve: boolean) {
+    if (!window.confirm(approve ? `Duyệt nghiệm thu "${t.code} — ${t.name}"?` : `Huỷ nghiệm thu "${t.code}"?`)) return;
+    const res = await fetch(`/api/tasks/${t.id}/approve`, { method: approve ? 'POST' : 'DELETE' });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); window.alert(j.error ?? 'Lỗi không xác định'); return; }
+    load(); onChanged();
+  }
+
   async function renameColumn(oldLabel: string) {
     const newLabel = window.prompt('Đổi tên cột (áp dụng toàn sheet):', oldLabel);
     if (!newLabel || newLabel === oldLabel) return;
@@ -356,6 +363,15 @@ function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged }: { pkgId: numb
                     className={`flex items-center gap-0.5 ${t.photoCount > 0 ? 'text-sky-400 hover:text-sky-300' : 'text-zinc-600 hover:text-sky-400'}`}>
                     <Camera className="w-3 h-3" />{t.photoCount > 0 && <span className="text-[10px]">{t.photoCount}</span>}
                   </button>
+                  {t.status === 'nghiem_thu' ? (
+                    <span className="flex items-center gap-1 text-[10px] text-teal-300 bg-teal-950 px-1.5 py-0.5 rounded">
+                      ✓ Đã NT
+                      {canEdit && <button onClick={() => approveTask(t, false)} title="Huỷ nghiệm thu" className="text-teal-500 hover:text-red-400"><X className="w-2.5 h-2.5" /></button>}
+                    </span>
+                  ) : canEdit && t.progressPercent >= 1 && (
+                    <button onClick={() => approveTask(t, true)} title="Duyệt nghiệm thu (task đã 100%)"
+                      className="text-[10px] text-teal-400 border border-teal-800 bg-teal-950/50 hover:bg-teal-900/60 px-1.5 py-0.5 rounded">Nghiệm thu</button>
+                  )}
                   {canEdit ? (
                     <select value={t.assignedTo ?? ''} onChange={e => assignTask(t.id, e.target.value)}
                       title="Giao task cho người làm"

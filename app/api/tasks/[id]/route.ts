@@ -15,6 +15,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const body = await req.json().catch(() => ({}));
 
+  // nghiem_thu chỉ đặt/huỷ qua /api/tasks/:id/approve — đảm bảo có audit trong task_history.
+  if (body.status === "nghiem_thu")
+    return NextResponse.json({ error: "Dùng POST /api/tasks/:id/approve để nghiệm thu" }, { status: 422 });
+
   // BOQCODE: duy nhất toàn cục (cả nhóm lẫn task); chuỗi rỗng = xoá mã.
   if (body.boqCode !== undefined) {
     const boq = String(body.boqCode ?? "").trim();

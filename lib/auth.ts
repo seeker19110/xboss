@@ -105,6 +105,7 @@ export const CAN = {
   viewDashboard: (r?: Role) => r !== "subcon",
   manageUsers: (r?: Role) => r === "admin",
   assign: (r?: Role) => r === "admin" || r === "pm", // gán task cho người làm
+  approve: (r?: Role) => r === "admin" || r === "pm", // duyệt/huỷ nghiệm thu
 };
 
 // Sub-con chỉ được thao tác trên task được giao cho mình.
