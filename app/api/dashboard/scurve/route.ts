@@ -11,14 +11,17 @@ const DAY_MS = 86400_000;
 const toDate = (iso: string) => new Date(iso + "T00:00:00Z").getTime();
 const toISO = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
-// GET /api/dashboard/scurve?sheet=OGTĐ (tuỳ chọn — bỏ trống = toàn dự án)
+// GET /api/dashboard/scurve?sheet=OGTĐ&baseline=<id> (đều tuỳ chọn)
 // S-curve: đường kế hoạch (nội suy tuyến tính start→end mỗi task)
 // vs đường thực tế (tái dựng % từng ngày từ task_history).
+// Có ?baseline= → đường kế hoạch dùng ngày đã chốt trong baseline thay vì ngày hiện tại,
+// để đo độ lệch so với kế hoạch gốc kể cả khi PM đã dời ngày.
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
   const sheet = req.nextUrl.searchParams.get("sheet");
+  const baselineId = parseInt(req.nextUrl.searchParams.get("baseline") ?? "");
   const sheetFilter = sheet ? `AND st.code = ?` : "";
   const params = sheet ? [sheet] : [];
 
@@ -30,6 +33,18 @@ export async function GET(req: NextRequest) {
        JOIN sheet_types st ON wp.sheet_type_id = st.id
       WHERE 1=1 ${sheetFilter}`, ...params);
   if (tasks.length === 0) return NextResponse.json({ points: [], sheets: [] });
+
+  // Ngày kế hoạch lấy từ baseline đã chốt (nếu chọn) — task tạo sau baseline giữ ngày hiện tại.
+  if (!isNaN(baselineId)) {
+    const blDates = await query<{ taskId: number; startDate: string | null; endDate: string | null }>(
+      `SELECT task_id AS "taskId", start_date AS "startDate", end_date AS "endDate"
+         FROM baseline_tasks WHERE baseline_id = ?`, baselineId);
+    const byTask = new Map(blDates.map((b) => [b.taskId, b]));
+    for (const t of tasks) {
+      const b = byTask.get(t.id);
+      if (b) { t.startDate = b.startDate; t.endDate = b.endDate; }
+    }
+  }
 
   const hist = await query<HistRow>(
     `SELECT h.task_id AS "taskId", h.old_progress AS "oldProgress",

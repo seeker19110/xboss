@@ -170,6 +170,39 @@ CREATE TABLE IF NOT EXISTS material_transactions (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Baseline kế hoạch: snapshot ngày BĐ/KT + % của mọi task tại một thời điểm,
+-- để S-curve so được kế hoạch gốc vs kế hoạch đã điều chỉnh vs thực tế.
+CREATE TABLE IF NOT EXISTS baselines (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  note TEXT,
+  created_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS baseline_tasks (
+  id SERIAL PRIMARY KEY,
+  baseline_id INTEGER REFERENCES baselines(id) ON DELETE CASCADE,
+  task_id INTEGER REFERENCES tasks(id),
+  start_date DATE,
+  end_date DATE,
+  progress_percent DOUBLE PRECISION DEFAULT 0,
+  UNIQUE (baseline_id, task_id)
+);
+
+-- Biên bản nghiệm thu / tài liệu đính kèm task (PDF hoặc ảnh) — file trong data/uploads/.
+CREATE TABLE IF NOT EXISTS task_documents (
+  id SERIAL PRIMARY KEY,
+  task_id INTEGER REFERENCES tasks(id),
+  file_name TEXT NOT NULL,
+  original_name TEXT,
+  mime_type TEXT,
+  size_bytes INTEGER,
+  caption TEXT,
+  uploaded_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Migration nhẹ (idempotent) cho DB đã tồn tại.
 ALTER TABLE notifications ADD COLUMN IF NOT EXISTS material_id INTEGER REFERENCES materials(id);
 -- Dedup thông báo vật tư: UNIQUE(user,task,type) không áp dụng được khi task_id NULL
@@ -202,6 +235,8 @@ CREATE INDEX IF NOT EXISTS idx_tasks_end ON tasks(end_date);
 CREATE INDEX IF NOT EXISTS idx_wp_sheet ON work_packages(sheet_type_id);
 CREATE INDEX IF NOT EXISTS idx_dims_task ON progress_dimensions(task_id);
 CREATE INDEX IF NOT EXISTS idx_history_task ON task_history(task_id);
+CREATE INDEX IF NOT EXISTS idx_baseline_tasks ON baseline_tasks(baseline_id);
+CREATE INDEX IF NOT EXISTS idx_documents_task ON task_documents(task_id);
 `;
 
 export function getPool(): Pool {
