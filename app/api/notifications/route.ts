@@ -31,6 +31,25 @@ export async function GET() {
       user.id, t.id, `[${t.sheetType}] ${t.code} — ${t.name} đã quá hạn ${t.endDate}`);
   }
 
+  // Sắp đến hạn: deadline còn ≤3 ngày mà tiến độ < 70% → cảnh báo sớm trước khi thành trễ.
+  const soon = new Date(Date.now() + 3 * 86400_000).toISOString().slice(0, 10);
+  const DUE_SOON_COND = `t.end_date IS NOT NULL AND t.end_date >= ? AND t.end_date <= ?
+        AND t.progress_percent < 0.7 AND t.status NOT IN ('hoan_thanh','nghiem_thu')`;
+  const dueSoon = await query<{ id: number; code: string; name: string; endDate: string; sheetType: string }>(
+    `SELECT t.id, t.code, t.name, t.end_date AS "endDate", st.code AS "sheetType"
+       FROM tasks t
+       JOIN work_packages wp ON t.package_id = wp.id
+       JOIN sheet_types st ON wp.sheet_type_id = st.id
+      WHERE ${DUE_SOON_COND} ${subconFilter}`, today, soon);
+
+  for (const t of dueSoon) {
+    await run(
+      `INSERT INTO notifications (user_id, task_id, type, message)
+       VALUES (?, ?, 'due_soon', ?)
+       ON CONFLICT (user_id, task_id, type) DO NOTHING`,
+      user.id, t.id, `⏳ [${t.sheetType}] ${t.code} — ${t.name} sắp đến hạn ${t.endDate} (tiến độ < 70%)`);
+  }
+
   // Task hết trễ (hoặc không còn được giao cho mình) → dọn thông báo cũ chưa đọc.
   await run(
     `DELETE FROM notifications
@@ -40,6 +59,14 @@ export async function GET() {
            WHERE t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_percent < 1
              AND t.status NOT IN ('hoan_thanh','nghiem_thu') ${subconFilter})`,
     user.id, today);
+
+  // Task không còn "sắp đến hạn" (đã xong, đã qua hạn thành trễ, hoặc đổi deadline) → dọn tương tự.
+  await run(
+    `DELETE FROM notifications
+      WHERE user_id = ? AND type = 'due_soon' AND is_read = 0
+        AND task_id NOT IN (
+          SELECT t.id FROM tasks t WHERE ${DUE_SOON_COND} ${subconFilter})`,
+    user.id, today, soon);
 
   const items = await query<{
     id: number; taskId: number | null; type: string; message: string; isRead: number; createdAt: string;

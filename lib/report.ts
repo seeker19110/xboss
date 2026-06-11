@@ -12,6 +12,7 @@ export type DailyReport = {
   totalDelayed: number;
   newDelayed: DelayedRow[];   // mới quá hạn trong 24h (end_date = hôm qua)
   topDelayed: DelayedRow[];   // trễ lâu nhất
+  dueSoon: DelayedRow[];      // còn ≤3 ngày tới hạn mà tiến độ < 70%
   kpi: KpiRow[];
 };
 
@@ -35,6 +36,13 @@ export async function buildDailyReport(): Promise<DailyReport> {
   const newDelayed = all.filter((r) => r.endDate === yesterday);
   const topDelayed = all.slice(0, 15);
 
+  // Sắp đến hạn (≤3 ngày, tiến độ < 70%) — cảnh báo sớm để còn kịp xử lý.
+  const soon = new Date(Date.now() + 3 * 86400_000).toISOString().slice(0, 10);
+  const dueSoon = await query<DelayedRow>(
+    `${select} WHERE t.end_date IS NOT NULL AND t.end_date >= ? AND t.end_date <= ?
+        AND t.progress_percent < 0.7 AND t.status NOT IN ('hoan_thanh','nghiem_thu')
+      ORDER BY t.end_date LIMIT 20`, today, soon);
+
   const kpi = await query<KpiRow>(
     `SELECT st.code AS "sheetType", COUNT(t.id) AS total,
             COALESCE(AVG(t.progress_percent), 0) AS "avgProgress",
@@ -44,7 +52,7 @@ export async function buildDailyReport(): Promise<DailyReport> {
        LEFT JOIN tasks t ON t.package_id = wp.id
       GROUP BY st.id, st.code ORDER BY st.id`, today);
 
-  return { date: today, totalDelayed: all.length, newDelayed, topDelayed, kpi };
+  return { date: today, totalDelayed: all.length, newDelayed, topDelayed, dueSoon, kpi };
 }
 
 const pct = (v: number) => `${Math.round((v ?? 0) * 100)}%`;
@@ -79,6 +87,11 @@ export function reportToTelegramText(r: DailyReport, appUrl?: string): string {
   if (r.topDelayed.length) {
     lines.push("", `⏰ <b>Trễ lâu nhất</b>`);
     for (const t of r.topDelayed.slice(0, 5))
+      lines.push(`· <code>${esc(t.code)}</code> ${esc(t.name)} — hạn ${t.endDate} (${pct(t.progressPercent)})`);
+  }
+  if (r.dueSoon.length) {
+    lines.push("", `⏳ <b>Sắp đến hạn ≤3 ngày, tiến độ &lt;70% (${r.dueSoon.length})</b>`);
+    for (const t of r.dueSoon.slice(0, 8))
       lines.push(`· <code>${esc(t.code)}</code> ${esc(t.name)} — hạn ${t.endDate} (${pct(t.progressPercent)})`);
   }
   if (appUrl) lines.push("", `<a href="${appUrl}">→ Mở XBoss Dashboard</a>`);
@@ -134,6 +147,12 @@ export function reportToHtml(r: DailyReport, appUrl?: string): string {
   <table style="border-collapse:collapse;width:100%">
     <tr><th ${th}>Mã</th><th ${th}>Công việc</th><th ${th}>Hệ · Tầng</th><th ${th}>Hạn</th><th ${th}>%</th></tr>
     ${rowsHtml(r.topDelayed)}
+  </table>
+
+  <h3 style="margin:20px 0 8px">⏳ Sắp đến hạn ≤3 ngày, tiến độ &lt;70% (${r.dueSoon.length})</h3>
+  <table style="border-collapse:collapse;width:100%">
+    <tr><th ${th}>Mã</th><th ${th}>Công việc</th><th ${th}>Hệ · Tầng</th><th ${th}>Hạn</th><th ${th}>%</th></tr>
+    ${rowsHtml(r.dueSoon)}
   </table>
 
   ${appUrl ? `<p style="margin:20px 0"><a href="${appUrl}" style="color:#059669">→ Mở XBoss Dashboard</a></p>` : ""}
