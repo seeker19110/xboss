@@ -150,6 +150,10 @@ CREATE TABLE IF NOT EXISTS materials (
 );
 
 -- Migration nhẹ (idempotent) cho DB đã tồn tại.
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS material_id INTEGER REFERENCES materials(id);
+-- Dedup thông báo vật tư: UNIQUE(user,task,type) không áp dụng được khi task_id NULL
+-- (Postgres coi NULL khác nhau) → cần unique index riêng theo material_id.
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_notif_material ON notifications(user_id, material_id, type) WHERE material_id IS NOT NULL;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assigned_to INTEGER REFERENCES users(id);
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS boq_code TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS drawing_url TEXT;

@@ -69,6 +69,16 @@ export default function MaterialsPage() {
       <main className="p-6 max-w-5xl mx-auto space-y-4">
         {error && <div className="rounded-lg border border-red-800 bg-red-950/40 text-red-300 px-4 py-2.5 text-sm">{error}</div>}
 
+        {(() => {
+          const over = materials.filter(m => m.qtyPlanned > 0 && m.qtyUsed > m.qtyPlanned);
+          return over.length > 0 && (
+            <div className="rounded-lg border border-red-800 bg-red-950/40 text-red-300 px-4 py-2.5 text-sm flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span><b>{over.length}</b> vật tư đang dùng vượt định mức: {over.slice(0, 5).map(m => m.name).join(', ')}{over.length > 5 ? '…' : ''}</span>
+            </div>
+          );
+        })()}
+
         {canEdit && (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2">

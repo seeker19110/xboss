@@ -68,6 +68,32 @@ export async function GET() {
           SELECT t.id FROM tasks t WHERE ${DUE_SOON_COND} ${subconFilter})`,
     user.id, today, soon);
 
+  // Vật tư dùng vượt định mức → cảnh báo cho Admin/PM/Kỹ sư (subcon không quản vật tư).
+  if (user.role !== "subcon") {
+    const overMats = await query<{ id: number; name: string; unit: string | null; qtyPlanned: number; qtyUsed: number; sheetCode: string | null }>(
+      `SELECT m.id, m.name, m.unit, m.qty_planned AS "qtyPlanned", m.qty_used AS "qtyUsed", st.code AS "sheetCode"
+         FROM materials m
+         LEFT JOIN sheet_types st ON m.sheet_type_id = st.id
+        WHERE m.qty_planned > 0 AND m.qty_used > m.qty_planned`);
+
+    for (const m of overMats) {
+      await run(
+        `INSERT INTO notifications (user_id, material_id, type, message)
+         VALUES (?, ?, 'material_over', ?)
+         ON CONFLICT (user_id, material_id, type) WHERE material_id IS NOT NULL DO NOTHING`,
+        user.id, m.id,
+        `📦 Vật tư "${m.name}"${m.sheetCode ? ` [${m.sheetCode}]` : ""} vượt định mức: ${m.qtyUsed}/${m.qtyPlanned}${m.unit ? ` ${m.unit}` : ""}`);
+    }
+
+    // Đã điều chỉnh định mức/số dùng về ngưỡng an toàn (hoặc vật tư bị xoá) → dọn cảnh báo chưa đọc.
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'material_over' AND is_read = 0
+          AND material_id NOT IN (
+            SELECT id FROM materials WHERE qty_planned > 0 AND qty_used > qty_planned)`,
+      user.id);
+  }
+
   const items = await query<{
     id: number; taskId: number | null; type: string; message: string; isRead: number; createdAt: string;
   }>(
