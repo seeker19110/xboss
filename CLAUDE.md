@@ -42,6 +42,7 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy lint + typecheck + test +
 ### Auth (`lib/auth.ts`)
 
 - Phiên stateless: cookie `xboss_session` = `userId.exp.HMAC` — không có bảng session.
+- Login có rate limit in-memory (`lib/ratelimit.ts`): 5 lần sai/15 phút theo IP+email, 20/IP → 429 + `Retry-After`. Đếm trong process — multi-instance cần chuyển sang DB/Redis.
 - 4 vai trò: `admin | pm | engineer | subcon`. Quyền tập trung trong map `CAN`; subcon chỉ thao tác task được gán (`canTouchTask`).
 - **Các trang chỉ redirect client-side khi 401 — API route là ranh giới bảo mật duy nhất.** Mọi route handler mới phải gọi `getCurrentUser()` và trả 401 khi chưa đăng nhập (pattern xem `app/api/dashboard/route.ts`).
 
@@ -53,7 +54,8 @@ Project → Tower → SheetType (5 sheet) → WorkPackage → Task → ProgressD
 
 - 5 sheet cố định, mapping slug URL ↔ mã DB trong `lib/sheets.ts` (`ogtd`, `oghl`, `ogch`, `odnn1`, `odnn2`). ODNN Zone 1/2 dùng chung mã hàng `A{n}` — phân biệt bằng sheet.
 - `ProgressDimension` = ô checkbox trong lưới tracking (mỗi kích thước ống hoặc mỗi căn hộ).
-- BOQCODE (`lib/boq.ts`): mã duy nhất **toàn hệ thống trên cả tasks lẫn work_packages** — khi sửa/tạo phải check `boqTakenBy` trước.
+- BOQCODE (`lib/boq.ts`): mã duy nhất **toàn hệ thống trên tasks, work_packages lẫn materials** — khi sửa/tạo phải check `boqTakenBy` trước.
+- Vật tư: mọi thay đổi `qty_used` ghi vào `material_transactions` (delta ±, người ghi) — qua `POST /api/materials/:id/transactions` hoặc tự động khi PATCH `qtyUsed` trực tiếp.
 
 ### Chuỗi tính toán tiến độ (`lib/recompute.ts`)
 
