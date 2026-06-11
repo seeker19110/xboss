@@ -25,7 +25,7 @@ export default function ReportPage() {
     <div className="min-h-screen bg-white text-zinc-900">
       <div className="no-print sticky top-0 bg-zinc-100 border-b border-zinc-300 px-6 py-3 flex items-center gap-3">
         <a href="/" className="text-zinc-600 hover:text-zinc-900"><ArrowLeft className="w-5 h-5" /></a>
-        <span className="text-sm text-zinc-600">Báo cáo in — dùng nút bên phải rồi chọn "Save as PDF"</span>
+        <span className="text-sm text-zinc-600">Báo cáo in — dùng nút bên phải rồi chọn &ldquo;Save as PDF&rdquo;</span>
         <button onClick={() => window.print()} className="ml-auto flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg text-sm">
           <Printer className="w-4 h-4" /> In / Lưu PDF
         </button>
