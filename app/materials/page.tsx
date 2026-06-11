@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
-import { ArrowLeft, Package, Plus, Trash2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Package, Plus, Trash2, AlertTriangle, History, X } from 'lucide-react';
 
 type Material = {
   id: number; sheetTypeId: number | null; boqCode: string | null; name: string; unit: string | null;
@@ -21,6 +21,7 @@ export default function MaterialsPage() {
   const [canDelete, setCanDelete] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({ boqCode: '', name: '', unit: '', qtyPlanned: '', sheetTypeId: '' });
+  const [historyMat, setHistoryMat] = useState<Material | null>(null);
 
   const load = useCallback(() => {
     const q = sheetFilter ? `?sheetTypeId=${sheetFilter}` : '';
@@ -174,7 +175,9 @@ export default function MaterialsPage() {
                         <span className={`px-2 py-0.5 rounded text-xs ${STATUS_CLS[m.status] ?? 'bg-zinc-800'}`}>{STATUS_LABEL[m.status] ?? m.status}</span>
                       )}
                     </td>
-                    <td className="p-3 text-right">
+                    <td className="p-3 text-right whitespace-nowrap">
+                      <button onClick={() => setHistoryMat(m)} title="Lịch sử nhập/xuất"
+                        className="text-zinc-500 hover:text-emerald-400 mr-2"><History className="w-4 h-4" /></button>
                       {canDelete && (
                         <button onClick={() => remove(m)} title="Xoá" className="text-zinc-500 hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
                       )}
@@ -189,6 +192,115 @@ export default function MaterialsPage() {
           </table>
         </div>
       </main>
+
+      {historyMat && (
+        <MaterialHistoryModal material={historyMat} canEdit={canEdit}
+          onClose={() => { setHistoryMat(null); load(); }} />
+      )}
+    </div>
+  );
+}
+
+type Transaction = {
+  id: number; delta: number; qtyAfter: number; note: string | null;
+  createdAt: string; userName: string | null;
+};
+
+// Lịch sử nhập/xuất của 1 vật tư + form ghi giao dịch mới (delta ±).
+function MaterialHistoryModal({ material, canEdit, onClose }: {
+  material: Material; canEdit: boolean; onClose: () => void;
+}) {
+  const [items, setItems] = useState<Transaction[] | null>(null);
+  const [qtyUsed, setQtyUsed] = useState(material.qtyUsed);
+  const [delta, setDelta] = useState('');
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(() => {
+    fetch(`/api/materials/${material.id}/transactions`).then(r => r.json()).then(j => setItems(j.transactions ?? []));
+  }, [material.id]);
+  useEffect(() => { load(); }, [load]);
+
+  async function add(sign: 1 | -1) {
+    const d = (Number(delta) || 0) * sign;
+    if (!d) return;
+    setBusy(true); setError('');
+    const res = await fetch(`/api/materials/${material.id}/transactions`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ delta: d, note: note.trim() || undefined }),
+    });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); setError(j.error ?? 'Lỗi không xác định'); }
+    else { const j = await res.json(); setQtyUsed(j.qtyAfter); setDelta(''); setNote(''); }
+    setBusy(false); load();
+  }
+
+  const over = material.qtyPlanned > 0 && qtyUsed > material.qtyPlanned;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-lg max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2">
+          <History className="w-4 h-4 text-emerald-400" />
+          <div className="min-w-0">
+            <h3 className="font-semibold text-sm truncate">Nhập/xuất — {material.name}{material.unit ? ` (${material.unit})` : ''}</h3>
+            <p className="text-xs text-zinc-500">
+              {material.boqCode && <span className="font-mono text-amber-400 mr-2">{material.boqCode}</span>}
+              Đã dùng <span className={over ? 'text-red-400 font-medium' : 'text-zinc-300'}>{qtyUsed}</span>
+              {material.qtyPlanned > 0 && <> / định mức {material.qtyPlanned}</>}
+            </p>
+          </div>
+          <button onClick={onClose} className="ml-auto text-zinc-400 hover:text-white shrink-0"><X className="w-4 h-4" /></button>
+        </div>
+
+        {canEdit && (
+          <div className="px-4 py-3 border-b border-zinc-800 bg-zinc-950/50">
+            {error && <p className="text-xs text-red-400 mb-2">{error}</p>}
+            <div className="flex gap-2">
+              <input type="number" min="0" step="any" placeholder="Số lượng" value={delta}
+                onChange={e => setDelta(e.target.value)}
+                className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm w-28 outline-none focus:border-emerald-600" />
+              <input placeholder="Ghi chú (vd: xuất cho tầng 24F)" value={note} onChange={e => setNote(e.target.value)}
+                className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm flex-1 outline-none focus:border-emerald-600" />
+              <button onClick={() => add(1)} disabled={busy || !Number(delta)} title="Ghi dùng thêm (+)"
+                className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 rounded-lg px-3 py-1.5 text-sm font-medium">+</button>
+              <button onClick={() => add(-1)} disabled={busy || !Number(delta)} title="Điều chỉnh giảm (−)"
+                className="bg-zinc-700 hover:bg-zinc-600 disabled:opacity-40 rounded-lg px-3 py-1.5 text-sm font-medium">−</button>
+            </div>
+          </div>
+        )}
+
+        <div className="overflow-auto p-4">
+          {items === null && <p className="text-sm text-zinc-500">Đang tải...</p>}
+          {items?.length === 0 && <p className="text-sm text-zinc-500">Chưa có giao dịch nào. Ghi nhập/xuất ở ô phía trên để truy vết được số liệu.</p>}
+          {!!items?.length && (
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-zinc-500 border-b border-zinc-800 text-left">
+                  <th className="py-1.5 pr-2">Thời điểm</th>
+                  <th className="py-1.5 pr-2">Người ghi</th>
+                  <th className="py-1.5 pr-2 text-right">±</th>
+                  <th className="py-1.5 pr-2 text-right">Còn lại sau</th>
+                  <th className="py-1.5">Ghi chú</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map(t => (
+                  <tr key={t.id} className="border-b border-zinc-800/50">
+                    <td className="py-1.5 pr-2 text-zinc-400 whitespace-nowrap">{new Date(t.createdAt).toLocaleString('vi-VN')}</td>
+                    <td className="py-1.5 pr-2 text-zinc-300">{t.userName ?? '—'}</td>
+                    <td className={`py-1.5 pr-2 text-right font-medium ${t.delta >= 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      {t.delta >= 0 ? `+${t.delta}` : t.delta}
+                    </td>
+                    <td className="py-1.5 pr-2 text-right text-zinc-300">{t.qtyAfter}</td>
+                    <td className="py-1.5 text-zinc-500">{t.note ?? ''}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

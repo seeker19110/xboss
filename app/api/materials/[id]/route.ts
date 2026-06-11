@@ -18,7 +18,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const m = await queryOne(`SELECT id FROM materials WHERE id = ?`, id);
+  const m = await queryOne<{ id: number; qty_used: number }>(
+    `SELECT id, qty_used FROM materials WHERE id = ?`, id);
   if (!m) return NextResponse.json({ error: "Không tìm thấy vật tư" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
@@ -51,6 +52,19 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   vals.push(id);
   await run(`UPDATE materials SET ${sets.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, ...vals);
+
+  // Sửa trực tiếp số đã dùng cũng phải truy vết được — ghi giao dịch với delta chênh lệch.
+  if (body.qtyUsed !== undefined) {
+    const newQty = Number(body.qtyUsed) || 0;
+    const delta = newQty - (m.qty_used ?? 0);
+    if (delta !== 0) {
+      await run(
+        `INSERT INTO material_transactions (material_id, delta, qty_after, note, created_by)
+         VALUES (?, ?, ?, 'Sửa trực tiếp tổng đã dùng', ?)`,
+        id, delta, newQty, user.id);
+    }
+  }
+
   const material = await queryOne(
     `SELECT id, name, unit, qty_planned AS "qtyPlanned", qty_used AS "qtyUsed", status, note FROM materials WHERE id = ?`, id);
   return NextResponse.json({ material });

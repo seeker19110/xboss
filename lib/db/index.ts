@@ -158,6 +158,18 @@ CREATE TABLE IF NOT EXISTS materials (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Lịch sử nhập/xuất vật tư: mọi thay đổi qty_used đều ghi 1 giao dịch
+-- (delta ± , số sau thay đổi, ai ghi, lúc nào) — truy vết được khi số liệu lệch.
+CREATE TABLE IF NOT EXISTS material_transactions (
+  id SERIAL PRIMARY KEY,
+  material_id INTEGER REFERENCES materials(id),
+  delta DOUBLE PRECISION NOT NULL,
+  qty_after DOUBLE PRECISION NOT NULL,
+  note TEXT,
+  created_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Migration nhẹ (idempotent) cho DB đã tồn tại.
 ALTER TABLE notifications ADD COLUMN IF NOT EXISTS material_id INTEGER REFERENCES materials(id);
 -- Dedup thông báo vật tư: UNIQUE(user,task,type) không áp dụng được khi task_id NULL
@@ -181,6 +193,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uniq_materials_boq ON materials(boq_code) WHER
 CREATE INDEX IF NOT EXISTS idx_materials_sheet ON materials(sheet_type_id);
 CREATE INDEX IF NOT EXISTS idx_photos_task ON task_photos(task_id);
 CREATE INDEX IF NOT EXISTS idx_comments_task ON task_comments(task_id);
+CREATE INDEX IF NOT EXISTS idx_mat_trans ON material_transactions(material_id);
 
 CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_to);
 CREATE INDEX IF NOT EXISTS idx_notif_user ON notifications(user_id, is_read);
