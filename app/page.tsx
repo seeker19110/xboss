@@ -7,6 +7,7 @@ import NotificationBell from '@/app/components/NotificationBell';
 import FloorHeatmap from '@/app/components/FloorHeatmap';
 import ForecastCards from '@/app/components/ForecastCards';
 import SCurveChart from '@/app/components/SCurveChart';
+import GlobalSearch from '@/app/components/GlobalSearch';
 import { DELAY_REASON_LABEL } from '@/lib/delay';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -103,6 +104,7 @@ export default function Dashboard() {
           <h1 className="text-xl font-bold">🏗️ XBoss</h1>
           <p className="text-xs text-zinc-500">{projectName ?? 'Quản lý tiến độ thi công MEP'}</p>
         </div>
+        <GlobalSearch />
         <div className="flex items-center gap-2">
           <NotificationBell />
           {canImport && (
