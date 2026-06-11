@@ -6,6 +6,7 @@ import { SHEET_SLUGS, slugFromCode } from '@/lib/sheets';
 import NotificationBell from '@/app/components/NotificationBell';
 import FloorHeatmap from '@/app/components/FloorHeatmap';
 import ForecastCards from '@/app/components/ForecastCards';
+import SCurveChart from '@/app/components/SCurveChart';
 
 const STATUS_LABEL: Record<string, string> = {
   chuan_bi: 'Chuẩn bị', dang_thi_cong: 'Đang thi công',
@@ -163,6 +164,9 @@ export default function Dashboard() {
 
         {/* Dự báo hoàn thành */}
         <ForecastCards />
+
+        {/* S-curve kế hoạch vs thực tế */}
+        <SCurveChart />
 
         {/* Bar chart */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-8">
