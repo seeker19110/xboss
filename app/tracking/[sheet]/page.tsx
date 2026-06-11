@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { ArrowLeft, Search, ChevronRight, ChevronDown, Pencil, Check, X, History, UserCheck, RefreshCw, Link2, Camera, Trash2, Upload, MessageSquare, Send } from 'lucide-react';
+import { ArrowLeft, Search, ChevronRight, ChevronDown, Pencil, Check, X, History, UserCheck, RefreshCw, Link2, Camera, Trash2, Upload, MessageSquare, Send, WifiOff, CloudUpload } from 'lucide-react';
+import { useOfflineTickQueue } from '@/app/components/offlineQueue';
 
 const STATUS_LABEL: Record<string, string> = {
   chuan_bi: 'Chuẩn bị', dang_thi_cong: 'Đang thi công',
@@ -42,9 +43,12 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
     fetch(`/api/tasks?sheet=${sheet}`).then(r => r.json()).then((d: Data) => {
       setData(d);
       if (d?.version) versionRef.current = d.version;
-    }).finally(() => setLoading(false));
+    }).catch(() => { /* mất mạng — giữ dữ liệu đang hiển thị */ }).finally(() => setLoading(false));
   }, [sheet]);
   useEffect(() => { load(); }, [load]);
+
+  // Hàng đợi offline: tick khi mất mạng được gửi lại tự động lúc có mạng.
+  const { pending: offlinePending, online, enqueue } = useOfflineTickQueue(load);
 
   // Đồng bộ đa người dùng: poll watermark; người khác sửa → tự reload + toast.
   useEffect(() => {
@@ -191,7 +195,7 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
               </div>
               <span className={`px-2 py-0.5 rounded text-xs w-28 text-center shrink-0 ${STATUS_CLS[p.status] ?? STATUS_CLS.chuan_bi}`}>{STATUS_LABEL[p.status] ?? p.status}</span>
             </div>
-            {expanded[p.id] && <PkgGrid pkgId={p.id} canEdit={canEdit} users={users} refreshKey={refreshKey} onChanged={load} />}
+            {expanded[p.id] && <PkgGrid pkgId={p.id} canEdit={canEdit} users={users} refreshKey={refreshKey} onChanged={load} onOfflineTick={enqueue} />}
           </div>
         ))}
         {packages.length === 0 && (
@@ -204,6 +208,15 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
           <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Dữ liệu vừa được người khác cập nhật — đã làm mới
         </div>
       )}
+
+      {(!online || offlinePending > 0) && (
+        <div className={`fixed bottom-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-full text-sm shadow-xl border ${
+          online ? 'bg-sky-900/95 border-sky-700 text-sky-200' : 'bg-amber-900/95 border-amber-700 text-amber-200'}`}>
+          {online
+            ? <><CloudUpload className="w-3.5 h-3.5 animate-pulse" /> Đang gửi lại {offlinePending} thay đổi đã lưu offline...</>
+            : <><WifiOff className="w-3.5 h-3.5" /> Mất mạng — thao tác vẫn được lưu{offlinePending > 0 ? ` (${offlinePending} chờ gửi)` : ''}, tự đồng bộ khi có mạng</>}
+        </div>
+      )}
     </div>
   );
 }
@@ -212,7 +225,7 @@ type Cell = { id: number; installed: boolean };
 type GridTask = { id: number; code: string; name: string; status: string; progressPercent: number; boqCode: string | null; drawingUrl: string | null; assignedTo: number | null; assigneeName: string | null; photoCount: number; commentCount: number; cells: Record<string, Cell> };
 type Grid = { columns: string[]; tasks: GridTask[] };
 
-function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged }: { pkgId: number; canEdit: boolean; users: AppUser[]; refreshKey: number; onChanged: () => void }) {
+function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged, onOfflineTick }: { pkgId: number; canEdit: boolean; users: AppUser[]; refreshKey: number; onChanged: () => void; onOfflineTick: (dimId: number, installed: boolean) => void }) {
   const [grid, setGrid] = useState<Grid | null>(null);
   const [editTask, setEditTask] = useState<{ id: number; value: string } | null>(null);
   const [historyTask, setHistoryTask] = useState<GridTask | null>(null);
@@ -220,7 +233,8 @@ function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged }: { pkgId: numb
   const [commentsTask, setCommentsTask] = useState<GridTask | null>(null);
 
   const load = useCallback(() => {
-    fetch(`/api/workpackages/${pkgId}/dimensions`).then(r => r.json()).then(setGrid);
+    fetch(`/api/workpackages/${pkgId}/dimensions`).then(r => r.json()).then(setGrid)
+      .catch(() => { /* mất mạng — giữ lưới đang hiển thị */ });
   }, [pkgId]);
   // refreshKey tăng khi phát hiện người khác cập nhật → tải lại lưới checkbox.
   useEffect(() => { load(); }, [load, refreshKey]);
@@ -230,19 +244,24 @@ function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged }: { pkgId: numb
       ...g, tasks: g.tasks.map(t => t.id === task.id
         ? { ...t, cells: { ...t.cells, [label]: { ...cell, installed: !cell.installed } } } : t),
     }));
-    const res = await fetch(`/api/dimensions/${cell.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ installed: !cell.installed }),
-    });
-    const j = await res.json().catch(() => null);
-    if (j?.task) setGrid(g => g && ({ ...g, tasks: g.tasks.map(t => t.id === task.id ? { ...t, progressPercent: j.task.progress, status: j.task.status } : t) }));
+    try {
+      const res = await fetch(`/api/dimensions/${cell.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ installed: !cell.installed }),
+      });
+      const j = await res.json().catch(() => null);
+      if (j?.task) setGrid(g => g && ({ ...g, tasks: g.tasks.map(t => t.id === task.id ? { ...t, progressPercent: j.task.progress, status: j.task.status } : t) }));
+    } catch {
+      // Mất mạng — giữ UI lạc quan, xếp hàng gửi lại khi online.
+      onOfflineTick(cell.id, !cell.installed);
+    }
     onChanged();
   }
 
   async function setAllInRow(task: GridTask, value: boolean) {
-    const ids = Object.values(task.cells).map(c => c.id);
-    await Promise.all(ids.map(id => fetch(`/api/dimensions/${id}`, {
+    const cells = Object.values(task.cells);
+    await Promise.all(cells.map(c => fetch(`/api/dimensions/${c.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ installed: value }),
-    })));
+    }).catch(() => onOfflineTick(c.id, value))));
     load(); onChanged();
   }
 
