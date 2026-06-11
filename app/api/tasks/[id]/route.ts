@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 // PATCH /api/tasks/:id  → sửa nội dung task (tên, code, ngày, status, ghi chú). Admin/PM.
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  if (!CAN.editStructure(getCurrentUser()?.role))
+  if (!CAN.editStructure((await getCurrentUser())?.role))
     return NextResponse.json({ error: "Không có quyền chỉnh sửa (chỉ Admin/PM)" }, { status: 403 });
 
   const id = parseInt(params.id);
@@ -25,7 +25,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!sets.length) return NextResponse.json({ error: "Không có trường để cập nhật" }, { status: 400 });
 
   vals.push(id);
-  run(`UPDATE tasks SET ${sets.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, ...vals);
-  const task = queryOne(`SELECT id, code, name, status FROM tasks WHERE id = ?`, id);
+  await run(`UPDATE tasks SET ${sets.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, ...vals);
+  const task = await queryOne(`SELECT id, code, name, status FROM tasks WHERE id = ?`, id);
   return NextResponse.json({ task });
 }

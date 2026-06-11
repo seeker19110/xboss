@@ -8,7 +8,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const dimensions = query(
+  const dimensions = await query(
     `SELECT id, dimension_label AS label, installed, value
        FROM progress_dimensions WHERE task_id = ? ORDER BY id`, id);
 

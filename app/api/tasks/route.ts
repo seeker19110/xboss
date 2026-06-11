@@ -16,16 +16,16 @@ export async function GET(req: NextRequest) {
   const code = codeFromSlug(slug);
   if (!code) return NextResponse.json({ error: "Sheet không hợp lệ" }, { status: 404 });
 
-  const st = queryOne<Sheet>(`SELECT id, code, name, responsible FROM sheet_types WHERE code = ?`, code);
+  const st = await queryOne<Sheet>(`SELECT id, code, name, responsible FROM sheet_types WHERE code = ?`, code);
   if (!st) return NextResponse.json({ sheet: { code, name: code }, packages: [] });
 
-  const pkgs = query<Pkg>(
-    `SELECT id, code, seq_no AS seqNo, floor_label AS floorLabel, name, status, progress
+  const pkgs = await query<Pkg>(
+    `SELECT id, code, seq_no AS "seqNo", floor_label AS "floorLabel", name, status, progress
        FROM work_packages WHERE sheet_type_id = ? ORDER BY id`, st.id);
 
-  const tasks = query<Task>(
-    `SELECT t.id, t.package_id AS packageId, t.code, t.name, t.status,
-            t.end_date AS endDate, t.progress_percent AS progressPercent
+  const tasks = await query<Task>(
+    `SELECT t.id, t.package_id AS "packageId", t.code, t.name, t.status,
+            t.end_date AS "endDate", t.progress_percent AS "progressPercent"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
       WHERE wp.sheet_type_id = ?

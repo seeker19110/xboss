@@ -17,18 +17,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (isNaN(progress)) return NextResponse.json({ error: "Thiếu progress" }, { status: 400 });
   progress = Math.min(Math.max(progress, 0), 1);
 
-  const task = queryOne<Task>(`SELECT id, package_id, status, end_date, progress_percent FROM tasks WHERE id = ?`, id);
+  const task = await queryOne<Task>(`SELECT id, package_id, status, end_date, progress_percent FROM tasks WHERE id = ?`, id);
   if (!task) return NextResponse.json({ error: "Không tìm thấy task" }, { status: 404 });
 
   const status: StatusSlug = body.status ?? deriveStatus(progress, task.end_date, task.status);
 
-  run(`UPDATE tasks SET progress_percent = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+  await run(`UPDATE tasks SET progress_percent = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
     progress, status, id);
-  run(`INSERT INTO task_history (task_id, old_progress, new_progress, status, note, changed_by)
+  await run(`INSERT INTO task_history (task_id, old_progress, new_progress, status, note, changed_by)
        VALUES (?, ?, ?, ?, ?, ?)`,
     id, task.progress_percent ?? 0, progress, status, body.note ?? null, body.changedBy ?? "web");
 
-  recomputePackage(task.package_id);
+  await recomputePackage(task.package_id);
 
   return NextResponse.json({ id, progressPercent: progress, status });
 }

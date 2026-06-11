@@ -1,95 +1,109 @@
 # Triển khai XBoss lên VPS/Server (production)
 
-Ứng dụng dùng **SQLite (node:sqlite)** — dữ liệu nằm trong 1 file, không cần DB server riêng.
-Yêu cầu: **Node.js ≥ 22.5** (khuyến nghị **Node 24** để khỏi cần cờ thử nghiệm).
+Ứng dụng dùng **PostgreSQL** — cấu hình qua biến môi trường `DATABASE_URL`
+(Supabase free tier hoặc Postgres tự host đều được). Schema tự khởi tạo khi app chạy lần đầu.
 
 ---
 
-## Cách A — Docker (khuyến nghị)
+## Cách A — Docker Compose (khuyến nghị, kèm Postgres)
 
-Đơn giản, cố định Node 24, DB lưu trên volume bền (không mất khi rebuild).
+`docker-compose.yml` đã gồm sẵn service Postgres 17 + volume bền.
 
 ```bash
 # 1. Tải mã nguồn lên server (git clone hoặc scp), rồi vào thư mục
 cd xboss
 
-# 2. Mở docker-compose.yml, ĐỔI XBOSS_SECRET thành chuỗi ngẫu nhiên dài
-#    (ví dụ tạo bằng: openssl rand -hex 32)
+# 2. Mở docker-compose.yml:
+#    - ĐỔI XBOSS_SECRET thành chuỗi ngẫu nhiên dài (openssl rand -hex 32)
+#    - ĐỔI POSTGRES_PASSWORD (và cập nhật DATABASE_URL tương ứng)
+#    - Nếu dùng Supabase: thay DATABASE_URL bằng chuỗi Supabase, xoá service db
 
 # 3. Build + chạy nền
 docker compose up -d --build
 
-# 4. Xem log (lần đầu sẽ tự seed dữ liệu từ Excel)
-docker compose logs -f
+# 4. Nạp dữ liệu lần đầu từ file Excel (đặt trong attachments/)
+docker compose exec xboss npm run db:seed
+
+# 5. Xem log
+docker compose logs -f xboss
 ```
 
 Truy cập: `http://<IP-server>:3000`
 
-Cập nhật phiên bản mới: `git pull` rồi `docker compose up -d --build` (DB giữ nguyên trong volume `xboss-data`).
+Cập nhật phiên bản mới: `git pull` rồi `docker compose up -d --build` (dữ liệu giữ nguyên trong volume `xboss-pgdata`).
 
 ---
 
-## Cách B — Không Docker (Node + pm2)
+## Cách B — Không Docker (Node ≥ 20 + pm2 + Supabase)
 
 ```bash
-# Cài Node 24 (qua nvm hoặc nodesource), rồi:
 cd xboss
 npm install
+
+# Tạo file môi trường
+cp .env.example .env.local       # điền DATABASE_URL + XBOSS_SECRET
+
 npm run build
-npm run db:seed                 # nạp dữ liệu lần đầu
+npm run db:seed                  # nạp dữ liệu lần đầu từ Excel
 
 # Chạy nền bằng pm2
 npm install -g pm2
-XBOSS_SECRET="chuoi-bi-mat-dai" pm2 start npm --name xboss -- start
-pm2 save && pm2 startup         # tự khởi động lại khi reboot
+pm2 start npm --name xboss -- start
+pm2 save && pm2 startup          # tự khởi động lại khi reboot
 ```
 
 Mặc định lắng nghe cổng 3000. Đổi cổng: `PORT=8080 pm2 start ...`.
-Cho phép truy cập từ máy khác trong LAN: mở cổng tường lửa, dùng IP server.
-
-> Node 22.x: thêm `NODE_OPTIONS=--experimental-sqlite` trước lệnh chạy. Node 24+: không cần.
 
 ---
 
-## HTTPS / tên miền (tùy chọn)
+## Cách C — Vercel + Supabase (không cần server)
 
-Đặt sau Nginx/Caddy reverse proxy. Ví dụ Nginx:
+1. Push repo lên GitHub.
+2. Vercel → New Project → import repo.
+3. Environment Variables: thêm `DATABASE_URL` (Supabase) + `XBOSS_SECRET`.
+4. Deploy. Seed dữ liệu chạy từ máy local: `npm run db:seed` (trỏ cùng DATABASE_URL).
 
-```nginx
-server {
-  server_name xboss.example.com;
-  location / {
-    proxy_pass http://127.0.0.1:3000;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-For $remote_addr;
-  }
-}
+---
+
+## Di trú từ bản SQLite cũ
+
+Nếu trước đây chạy bản SQLite (file `xboss.db`), chuyển toàn bộ dữ liệu sang Postgres:
+
+```bash
+# DATABASE_URL trong .env.local trỏ tới Postgres đích (cần Node ≥ 22.5 để đọc SQLite)
+npx tsx scripts/migrate-sqlite-to-pg.ts
 ```
 
-Rồi dùng `certbot --nginx` để cấp SSL miễn phí.
+Script giữ nguyên ID, tự chỉnh sequence và đối chiếu số dòng từng bảng sau khi copy.
+
+---
+
+## HTTPS (tuỳ chọn)
+
+Đặt Nginx/Caddy làm reverse proxy trước cổng 3000, rồi dùng `certbot --nginx` cấp SSL miễn phí.
 
 ---
 
 ## ✅ Checklist trước khi chạy thật
 
 - [ ] Đổi `XBOSS_SECRET` thành chuỗi ngẫu nhiên dài (bảo mật cookie đăng nhập).
-- [ ] Đổi mật khẩu 4 tài khoản demo (admin/pm/engineer/subcon) — xem mục dưới.
-- [ ] Sao lưu định kỳ file DB (volume `xboss-data` hoặc `xboss.db`).
-- [ ] Đảm bảo Node ≥ 22.5 trên server.
+- [ ] Đổi mật khẩu 4 tài khoản demo (admin/pm/engineer/subcon).
+- [ ] Đổi `POSTGRES_PASSWORD` nếu dùng Postgres trong compose.
+- [ ] Sao lưu định kỳ DB (Supabase tự backup; Postgres tự host: `pg_dump`).
 
-### Đổi mật khẩu / thêm người dùng
+### Tài khoản mặc định
 
-Tạm thời tài khoản được seed tự động lần đầu. Để đổi mật khẩu hoặc thêm user thật,
-có thể thêm một trang quản lý người dùng (chưa làm) — báo nếu bạn cần, sẽ bổ sung.
+Khi DB chưa có user nào, hệ thống tự tạo: `admin@xboss.vn/admin123`, `pm@xboss.vn/pm123`,
+`engineer@xboss.vn/eng123`, `subcon@xboss.vn/sub123`.
+**Đổi mật khẩu hoặc xoá user demo ngay sau lần đăng nhập đầu trên production.**
 
 ---
 
 ## Sao lưu & phục hồi DB
 
 ```bash
-# Docker
-docker compose cp xboss:/app/data/xboss.db ./backup-$(date +%F).db
+# Postgres trong Docker compose
+docker compose exec db pg_dump -U xboss xboss > backup-$(date +%F).sql
 
-# Không Docker
-cp xboss.db backup-$(date +%F).db
+# Supabase: Dashboard → Database → Backups (tự động hằng ngày trên free tier)
 ```

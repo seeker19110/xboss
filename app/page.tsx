@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { AlertTriangle, Clock, Upload, LayoutGrid, ChevronRight, FileDown, Printer, LogOut } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { SHEET_SLUGS, slugFromCode } from '@/lib/sheets';
+import NotificationBell from '@/app/components/NotificationBell';
 
 const STATUS_LABEL: Record<string, string> = {
   chuan_bi: 'Chuẩn bị', dang_thi_cong: 'Đang thi công',
@@ -29,6 +30,8 @@ export default function Dashboard() {
   const [data, setData] = useState<{ delayedTasks: DelayedTask[]; kpi: KPI[]; totalDelayed: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [sheetFilter, setSheetFilter] = useState('');
+  const [floorFilter, setFloorFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [me, setMe] = useState<Me | null>(null);
 
   useEffect(() => {
@@ -53,7 +56,13 @@ export default function Dashboard() {
   const chartData = (data?.kpi ?? []).map(k => ({
     name: k.sheetType, value: Math.round((k.avgProgress ?? 0) * 100), delayed: k.delayed,
   }));
-  const delayed = (data?.delayedTasks ?? []).filter(t => !sheetFilter || t.sheetType === sheetFilter);
+  const floors = [...new Set((data?.delayedTasks ?? []).map(t => t.floorLabel).filter(Boolean))]
+    .sort((a, b) => parseInt(a) - parseInt(b));
+  const statuses = [...new Set((data?.delayedTasks ?? []).map(t => t.status).filter(Boolean))];
+  const delayed = (data?.delayedTasks ?? []).filter(t =>
+    (!sheetFilter || t.sheetType === sheetFilter)
+    && (!floorFilter || t.floorLabel === floorFilter)
+    && (!statusFilter || t.status === statusFilter));
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -63,6 +72,7 @@ export default function Dashboard() {
           <p className="text-xs text-zinc-500">AVIO Tháp A — ACMV Tracking</p>
         </div>
         <div className="flex items-center gap-2">
+          <NotificationBell />
           {canImport && (
             <a href="/api/export/excel" className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-3 py-2 rounded-lg text-sm font-medium transition">
               <FileDown className="w-4 h-4" /> Excel
@@ -150,11 +160,23 @@ export default function Dashboard() {
             <h2 className="font-semibold flex items-center gap-2">
               <Clock className="w-4 h-4 text-red-400" /> Danh sách công việc đang trễ
             </h2>
-            <select value={sheetFilter} onChange={e => setSheetFilter(e.target.value)}
-              className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm outline-none">
-              <option value="">Tất cả sheet</option>
-              {data?.kpi.map(k => <option key={k.sheetType} value={k.sheetType}>{k.sheetType}</option>)}
-            </select>
+            <div className="flex flex-wrap gap-2">
+              <select value={sheetFilter} onChange={e => setSheetFilter(e.target.value)}
+                className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm outline-none">
+                <option value="">Tất cả sheet</option>
+                {data?.kpi.map(k => <option key={k.sheetType} value={k.sheetType}>{k.sheetType}</option>)}
+              </select>
+              <select value={floorFilter} onChange={e => setFloorFilter(e.target.value)}
+                className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm outline-none">
+                <option value="">Tất cả tầng</option>
+                {floors.map(f => <option key={f} value={f}>{f}</option>)}
+              </select>
+              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+                className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm outline-none">
+                <option value="">Tất cả trạng thái</option>
+                {statuses.map(s => <option key={s} value={s}>{STATUS_LABEL[s] ?? s}</option>)}
+              </select>
+            </div>
           </div>
           <div className="overflow-auto">
             <table className="w-full text-sm">

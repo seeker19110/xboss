@@ -2,15 +2,14 @@
 
 Web app quản lý tiến độ thi công ACMV cho dự án **TT AVIO Tháp A**, thay thế bộ file Excel tracking bằng giao diện realtime, đa người dùng, mobile-friendly.
 
-> 📄 Xem đặc tả kỹ thuật đầy đủ tại [`spec.md`](./spec.md)
+> 📄 Xem đặc tả kỹ thuật đầy đủ tại [`spec.md`](./spec.md) · Hướng dẫn triển khai tại [`DEPLOY.md`](./DEPLOY.md)
 
 ---
 
 ## Yêu cầu hệ thống
 
-- Node.js 20+
-- Git
-- Tài khoản [Supabase](https://supabase.com) (free tier) — hoặc bất kỳ Postgres nào
+- Node.js **20+**
+- PostgreSQL — tài khoản [Supabase](https://supabase.com) (free tier) hoặc Postgres tự host
 
 ---
 
@@ -26,19 +25,43 @@ npm install
 
 # 3. Tạo file môi trường
 cp .env.example .env.local
-# Điền DATABASE_URL (Postgres) + NEXT_PUBLIC_SUPABASE_* nếu dùng Supabase
+# Điền DATABASE_URL (Postgres/Supabase) + XBOSS_SECRET
 
-# 4. Tạo bảng trong DB (generate đã có sẵn, chỉ cần migrate)
-npm run db:migrate
-
-# 5. Seed data từ file Excel AVIO (đặt trong attachments/)
+# 4. (Tuỳ chọn) Seed data từ file Excel AVIO (đặt trong attachments/)
 npm run db:seed
 
-# 6. Khởi động dev server
+# 5. Khởi động dev server
 npm run dev
 ```
 
 Mở trình duyệt: [http://localhost:3000](http://localhost:3000)
+
+Schema tự khởi tạo khi app chạy lần đầu — không cần bước migrate riêng.
+
+### Tài khoản mặc định
+
+Khi DB chưa có user, hệ thống tự tạo 4 tài khoản demo:
+
+| Email | Mật khẩu | Vai trò |
+|---|---|---|
+| `admin@xboss.vn` | `admin123` | Admin |
+| `pm@xboss.vn` | `pm123` | PM |
+| `engineer@xboss.vn` | `eng123` | Kỹ sư |
+| `subcon@xboss.vn` | `sub123` | Thầu phụ |
+
+> ⚠️ Đổi mật khẩu (hoặc xoá user demo) trước khi đưa lên production. Đặt `XBOSS_SECRET` để ký cookie phiên.
+
+---
+
+## Tính năng chính
+
+- **Dashboard**: KPI cards per sheet, bar chart tiến độ, bảng công việc trễ (lọc theo sheet / tầng / trạng thái)
+- **Tracking sheet** (`/tracking/ogtd|oghl|ogch|odnn1|odnn2`): drill-down nhóm → task → lưới checkbox theo kích thước ống / căn hộ, tự tính lại % khi toggle
+- **Thông báo trễ hạn** 🔔: chuông trên header, tự phát hiện task quá deadline
+- **Lịch sử tiến độ**: mọi thay đổi % được ghi `task_history` (ai, lúc nào) — xem qua `GET /api/tasks/:id/history`
+- **Import Excel**: upload file tracking gốc, parse 5 sheet, upsert không trùng lặp
+- **Export**: Excel (KPI + danh sách trễ) và báo cáo in PDF (`/report`)
+- **RBAC**: Admin/PM được import/export/sửa cấu trúc; Kỹ sư/Thầu phụ cập nhật tiến độ
 
 ---
 
@@ -48,17 +71,33 @@ Mở trình duyệt: [http://localhost:3000](http://localhost:3000)
 xboss/
 ├── app/
 │   ├── page.tsx              # Dashboard (trang chủ)
-│   ├── import/page.tsx       # Trang upload & import Excel
-│   └── api/
-│       ├── dashboard/        # GET danh sách trễ + KPI
-│       └── import/excel/     # POST import file .xlsx
+│   ├── login/page.tsx        # Đăng nhập
+│   ├── import/page.tsx       # Upload & import Excel
+│   ├── report/page.tsx       # Báo cáo in PDF
+│   ├── tracking/[sheet]/     # Bảng tracking + lưới checkbox
+│   ├── components/           # UI components (NotificationBell...)
+│   └── api/                  # REST API routes
+│       ├── auth/             # login / logout / me
+│       ├── dashboard/        # KPI + danh sách trễ
+│       ├── tasks/            # CRUD + progress + history + dimensions
+│       ├── workpackages/     # Nhóm công việc + lưới dimensions
+│       ├── dimensions/       # Toggle checkbox, đổi tên cột
+│       ├── notifications/    # Thông báo trễ hạn
+│       ├── import/excel/     # POST import file .xlsx
+│       └── export/excel/     # GET xuất Excel
 ├── lib/
-│   ├── db/                   # Drizzle client + schema
-│   ├── import.ts             # Logic parse Excel (dùng chung API + seed)
-│   └── status.ts             # Chuẩn hóa trạng thái + % tiến độ
-├── drizzle/migrations/       # SQL migrations (đã generate)
+│   ├── db/index.ts           # PostgreSQL (pg Pool) + schema tự khởi tạo
+│   ├── auth.ts               # Session cookie (HMAC) + RBAC
+│   ├── import.ts             # Parse Excel (dùng chung API + seed)
+│   ├── recompute.ts          # Tính lại % task/package + derive status
+│   ├── status.ts             # Chuẩn hóa trạng thái + % tiến độ
+│   └── sheets.ts             # Map slug URL ↔ mã sheet
+├── tests/                    # Unit tests (node:test)
+├── scripts/
+│   ├── seed.ts               # Seed từ Excel
+│   ├── seed-sample.ts        # Seed dữ liệu mẫu
+│   └── migrate-sqlite-to-pg.ts  # Di trú dữ liệu từ bản SQLite cũ
 ├── attachments/              # File Excel nguồn
-├── scripts/seed.ts           # Seed từ Excel
 └── spec.md                   # Đặc tả kỹ thuật
 ```
 
@@ -70,10 +109,13 @@ xboss/
 |---|---|
 | `npm run dev` | Chạy dev server |
 | `npm run build` | Build production |
-| `npm run db:generate` | Generate migration từ schema |
-| `npm run db:migrate` | Áp dụng migrations |
+| `npm test` | Chạy unit tests (logic status / recompute / import) |
+| `npm run typecheck` | Kiểm tra TypeScript |
 | `npm run db:seed` | Seed data từ Excel AVIO |
-| `npm run db:studio` | Mở Drizzle Studio |
+| `npm run db:seed:sample` | Seed data mẫu |
+| `npx tsx scripts/migrate-sqlite-to-pg.ts` | Di trú dữ liệu từ file `xboss.db` (bản cũ) sang Postgres |
+
+Test tích hợp DB chỉ chạy khi đặt `TEST_DATABASE_URL` (trỏ tới Postgres test riêng); không có thì tự skip để không đụng DB thật.
 
 ---
 
@@ -85,8 +127,10 @@ Trạng thái (`status`) chuẩn hóa dạng slug: `chuan_bi`, `dang_thi_cong`, 
 
 Một task bị coi là **trễ** khi: `end_date < hôm nay` **và** `progress < 100%` **và** chưa `hoan_thanh`/`nghiem_thu`.
 
+% tiến độ tự tính: task = số ô đã lắp / tổng ô; work package = trung bình các task con.
+
 ---
 
 ## Tech Stack
 
-Next.js 14 · TypeScript · Tailwind v4 · Drizzle ORM · Postgres/Supabase · TanStack Table · Recharts · SheetJS
+Next.js 14 · TypeScript · Tailwind v4 · PostgreSQL (Supabase) · node-postgres (`pg`) · Recharts · SheetJS · Lucide

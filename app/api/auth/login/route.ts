@@ -5,11 +5,11 @@ import { verifyPassword, makeToken, ensureDefaultUsers, COOKIE, COOKIE_MAX_AGE }
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  ensureDefaultUsers();
+  await ensureDefaultUsers();
   const { email, password } = await req.json().catch(() => ({}));
   if (!email || !password) return NextResponse.json({ error: "Thiếu email/mật khẩu" }, { status: 400 });
 
-  const u = queryOne<{ id: number; name: string; email: string; role: string; password_hash: string }>(
+  const u = await queryOne<{ id: number; name: string; email: string; role: string; password_hash: string }>(
     `SELECT id, name, email, role, password_hash FROM users WHERE email = ?`, String(email).toLowerCase().trim());
   if (!u || !verifyPassword(password, u.password_hash)) {
     return NextResponse.json({ error: "Email hoặc mật khẩu không đúng" }, { status: 401 });

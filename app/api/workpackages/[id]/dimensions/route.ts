@@ -11,12 +11,12 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   const pkgId = parseInt(params.id);
   if (isNaN(pkgId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const tasks = query<TaskRow>(
-    `SELECT id, code, name, status, progress_percent AS progressPercent
+  const tasks = await query<TaskRow>(
+    `SELECT id, code, name, status, progress_percent AS "progressPercent"
        FROM tasks WHERE package_id = ? ORDER BY id`, pkgId);
 
-  const dims = query<DimRow>(
-    `SELECT pd.id, pd.task_id AS taskId, pd.dimension_label AS label, pd.installed
+  const dims = await query<DimRow>(
+    `SELECT pd.id, pd.task_id AS "taskId", pd.dimension_label AS label, pd.installed
        FROM progress_dimensions pd
        JOIN tasks t ON pd.task_id = t.id
       WHERE t.package_id = ?

@@ -1,5 +1,3 @@
-import type { statusEnum } from "./db/schema";
-
 export type StatusSlug =
   | "chuan_bi" | "dang_thi_cong" | "hoan_thanh" | "nghiem_thu" | "tre";
 

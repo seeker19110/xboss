@@ -22,6 +22,8 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [query, setQuery] = useState('');
+  const [floorFilter, setFloorFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [canEdit, setCanEdit] = useState(false);
   const [editPkg, setEditPkg] = useState<{ id: number; value: string } | null>(null);
 
@@ -44,8 +46,12 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
 
   if (loading) return <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">Đang tải...</div>;
 
+  const floors = [...new Set((data?.packages ?? []).map(p => p.floorLabel).filter((f): f is string => !!f))]
+    .sort((a, b) => parseInt(a) - parseInt(b));
   const packages = (data?.packages ?? []).filter(p =>
-    !query || p.code.toLowerCase().includes(query.toLowerCase()) || p.name.toLowerCase().includes(query.toLowerCase()));
+    (!query || p.code.toLowerCase().includes(query.toLowerCase()) || p.name.toLowerCase().includes(query.toLowerCase()))
+    && (!floorFilter || p.floorLabel === floorFilter)
+    && (!statusFilter || p.status === statusFilter));
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -64,6 +70,16 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Tìm nhóm/tầng..."
             className="bg-zinc-900 border border-zinc-800 rounded-lg pl-8 pr-3 py-1.5 text-sm w-56 outline-none focus:border-emerald-600" />
         </div>
+        <select value={floorFilter} onChange={e => setFloorFilter(e.target.value)}
+          className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm outline-none">
+          <option value="">Tất cả tầng</option>
+          {floors.map(f => <option key={f} value={f}>{f}</option>)}
+        </select>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+          className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm outline-none">
+          <option value="">Tất cả trạng thái</option>
+          {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
         <span className="text-xs text-zinc-500 ml-auto">{packages.length} nhóm · bấm vào nhóm để mở lưới checkbox</span>
       </div>
 
@@ -89,13 +105,13 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
                   {canEdit && <button onClick={() => setEditPkg({ id: p.id, value: p.name })} className="text-zinc-600 hover:text-emerald-400"><Pencil className="w-3.5 h-3.5" /></button>}
                 </span>
               )}
-              <span className="text-xs text-zinc-500">{p.floorLabel || ''}</span>
-              <span className="text-xs text-zinc-500">{p.tasks.length} task</span>
-              <div className="flex items-center gap-2 w-32">
+              <span className="text-xs text-zinc-500 w-10 text-right shrink-0">{p.floorLabel || ''}</span>
+              <span className="text-xs text-zinc-500 w-14 text-right shrink-0">{p.tasks.length} task</span>
+              <div className="flex items-center gap-2 w-36 shrink-0">
                 <div className="bg-zinc-800 rounded-full h-1.5 flex-1"><div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: `${(p.progress ?? 0) * 100}%` }} /></div>
                 <span className="text-zinc-400 text-sm w-10 text-right">{Math.round((p.progress ?? 0) * 100)}%</span>
               </div>
-              <span className={`px-2 py-0.5 rounded text-xs ${STATUS_CLS[p.status] ?? STATUS_CLS.chuan_bi}`}>{STATUS_LABEL[p.status] ?? p.status}</span>
+              <span className={`px-2 py-0.5 rounded text-xs w-28 text-center shrink-0 ${STATUS_CLS[p.status] ?? STATUS_CLS.chuan_bi}`}>{STATUS_LABEL[p.status] ?? p.status}</span>
             </div>
             {expanded[p.id] && <PkgGrid pkgId={p.id} canEdit={canEdit} onChanged={load} />}
           </div>
@@ -167,8 +183,8 @@ function PkgGrid({ pkgId, canEdit, onChanged }: { pkgId: number; canEdit: boolea
       <table className="text-xs border-collapse">
         <thead>
           <tr className="bg-zinc-950">
-            <th className="sticky left-0 z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-left min-w-[200px]">Công việc</th>
-            <th className="sticky left-[200px] z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-center w-14">%</th>
+            <th className="sticky left-0 z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-left w-[240px] min-w-[240px] max-w-[240px]">Công việc</th>
+            <th className="sticky left-[240px] z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-center w-14 min-w-[56px] max-w-[56px]">%</th>
             {grid.columns.map(col => (
               <th key={col} className="border-b border-zinc-800 align-bottom p-1 h-28 w-8">
                 <div className="mx-auto whitespace-nowrap text-[10px] text-zinc-400 hover:text-emerald-400 cursor-default"
@@ -182,7 +198,7 @@ function PkgGrid({ pkgId, canEdit, onChanged }: { pkgId: number; canEdit: boolea
         <tbody>
           {grid.tasks.map(t => (
             <tr key={t.id} className="hover:bg-zinc-800/30">
-              <td className="sticky left-0 z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1">
+              <td className="sticky left-0 z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 w-[240px] min-w-[240px] max-w-[240px]">
                 {editTask?.id === t.id ? (
                   <span className="flex items-center gap-1">
                     <input autoFocus value={editTask.value} onChange={e => setEditTask({ id: t.id, value: e.target.value })}
@@ -191,10 +207,10 @@ function PkgGrid({ pkgId, canEdit, onChanged }: { pkgId: number; canEdit: boolea
                     <button onClick={() => saveTaskName(t.id, editTask.value)} className="text-emerald-400"><Check className="w-3.5 h-3.5" /></button>
                   </span>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-zinc-500">{t.code}</span>
-                    <span className="truncate max-w-[120px]" title={t.name}>{t.name}</span>
-                    {canEdit && <button onClick={() => setEditTask({ id: t.id, value: t.name })} className="text-zinc-600 hover:text-emerald-400"><Pencil className="w-3 h-3" /></button>}
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-mono text-zinc-500 shrink-0">{t.code}</span>
+                    <span className="truncate flex-1" title={t.name}>{t.name}</span>
+                    {canEdit && <button onClick={() => setEditTask({ id: t.id, value: t.name })} className="shrink-0 text-zinc-600 hover:text-emerald-400"><Pencil className="w-3 h-3" /></button>}
                   </div>
                 )}
                 <div className="flex gap-2 mt-0.5">
@@ -202,7 +218,7 @@ function PkgGrid({ pkgId, canEdit, onChanged }: { pkgId: number; canEdit: boolea
                   <button onClick={() => setAllInRow(t, false)} className="text-[10px] text-zinc-500 hover:underline">Bỏ</button>
                 </div>
               </td>
-              <td className="sticky left-[200px] z-10 bg-zinc-900 border-b border-r border-zinc-800 px-1 py-1 text-center">
+              <td className="sticky left-[240px] z-10 bg-zinc-900 border-b border-r border-zinc-800 px-1 py-1 text-center w-14 min-w-[56px] max-w-[56px]">
                 <span className={Math.round(t.progressPercent * 100) === 100 ? 'text-emerald-400' : 'text-zinc-300'}>{Math.round((t.progressPercent ?? 0) * 100)}%</span>
               </td>
               {grid.columns.map(col => {

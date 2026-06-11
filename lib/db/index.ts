@@ -1,45 +1,46 @@
-// DB layer dùng node:sqlite (có sẵn trong Node 22.5+/24) — không cần cài thêm,
-// không cần build native, chạy hoàn toàn offline. File DB: ./xboss.db
-import { DatabaseSync } from "node:sqlite";
-import path from "node:path";
+// DB layer dùng PostgreSQL (pg Pool) — cấu hình qua DATABASE_URL.
+// Giữ nguyên API helper (query/queryOne/run) như bản SQLite cũ nhưng async;
+// placeholder viết dạng `?` và được chuyển tự động sang $1..$n.
+import { Pool, types } from "pg";
 
-const DB_PATH = process.env.XBOSS_DB ?? path.join(process.cwd(), "xboss.db");
+// DATE (oid 1082) → giữ nguyên chuỗi 'YYYY-MM-DD' (code so sánh ngày dạng chuỗi).
+types.setTypeParser(1082, (v) => v);
+// BIGINT (COUNT/SUM) và NUMERIC → number để frontend tính toán được.
+types.setTypeParser(20, (v) => Number(v));
+types.setTypeParser(1700, (v) => parseFloat(v));
 
-const g = globalThis as unknown as { __xbossDb?: DatabaseSync };
+const g = globalThis as unknown as { __xbossPool?: Pool; __xbossSchemaReady?: Promise<unknown> };
 
-const SCHEMA = `
-PRAGMA journal_mode = WAL;
-PRAGMA foreign_keys = ON;
-
+export const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'engineer',
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS projects (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
   code TEXT UNIQUE,
   investor TEXT,
   contractor TEXT,
-  start_date TEXT,
-  end_date TEXT,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  start_date DATE,
+  end_date DATE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS towers (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   project_id INTEGER REFERENCES projects(id),
   name TEXT NOT NULL,
   description TEXT
 );
 
 CREATE TABLE IF NOT EXISTS sheet_types (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   tower_id INTEGER REFERENCES towers(id),
   code TEXT NOT NULL,
   name TEXT NOT NULL,
@@ -48,81 +49,125 @@ CREATE TABLE IF NOT EXISTS sheet_types (
 );
 
 CREATE TABLE IF NOT EXISTS work_packages (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   sheet_type_id INTEGER REFERENCES sheet_types(id),
   code TEXT NOT NULL,
   seq_no TEXT,
   floor_label TEXT,
   name TEXT NOT NULL,
-  start_date TEXT,
-  end_date TEXT,
+  start_date DATE,
+  end_date DATE,
   duration_days INTEGER,
   status TEXT DEFAULT 'chuan_bi',
-  progress REAL DEFAULT 0,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  progress DOUBLE PRECISION DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE (sheet_type_id, code)
 );
 
 CREATE TABLE IF NOT EXISTS tasks (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   package_id INTEGER REFERENCES work_packages(id),
   code TEXT NOT NULL,
   seq_no TEXT,
   name TEXT NOT NULL,
   note TEXT,
   status TEXT DEFAULT 'chuan_bi',
-  start_date TEXT,
-  end_date TEXT,
+  start_date DATE,
+  end_date DATE,
   duration_days INTEGER,
-  progress_percent REAL DEFAULT 0,
-  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  progress_percent DOUBLE PRECISION DEFAULT 0,
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE (package_id, code)
 );
 
 CREATE TABLE IF NOT EXISTS progress_dimensions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   task_id INTEGER REFERENCES tasks(id),
   dimension_label TEXT NOT NULL,
   installed INTEGER DEFAULT 0,
-  value REAL,
-  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  value DOUBLE PRECISION,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS task_history (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   task_id INTEGER REFERENCES tasks(id),
-  old_progress REAL,
-  new_progress REAL,
+  old_progress DOUBLE PRECISION,
+  new_progress DOUBLE PRECISION,
   status TEXT,
   note TEXT,
   changed_by TEXT,
-  changed_at TEXT DEFAULT CURRENT_TIMESTAMP
+  changed_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS notifications (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id),
+  task_id INTEGER REFERENCES tasks(id),
+  type TEXT NOT NULL DEFAULT 'delayed',
+  message TEXT NOT NULL,
+  is_read INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (user_id, task_id, type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_notif_user ON notifications(user_id, is_read);
 CREATE INDEX IF NOT EXISTS idx_tasks_package ON tasks(package_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_end ON tasks(end_date);
 CREATE INDEX IF NOT EXISTS idx_wp_sheet ON work_packages(sheet_type_id);
+CREATE INDEX IF NOT EXISTS idx_dims_task ON progress_dimensions(task_id);
+CREATE INDEX IF NOT EXISTS idx_history_task ON task_history(task_id);
 `;
 
-export function getDb(): DatabaseSync {
-  if (g.__xbossDb) return g.__xbossDb;
-  const database = new DatabaseSync(DB_PATH);
-  database.exec(SCHEMA);
-  g.__xbossDb = database;
-  return database;
+export function getPool(): Pool {
+  if (!g.__xbossPool) {
+    const url = process.env.DATABASE_URL;
+    if (!url) throw new Error("Thiếu DATABASE_URL — cấu hình chuỗi kết nối Postgres trong .env.local");
+    g.__xbossPool = new Pool({ connectionString: url, max: 10 });
+  }
+  return g.__xbossPool;
 }
 
-export const db = getDb();
+// Tự khởi tạo schema 1 lần mỗi process (CREATE TABLE IF NOT EXISTS — idempotent).
+function ensureSchema(): Promise<unknown> {
+  if (!g.__xbossSchemaReady) {
+    g.__xbossSchemaReady = getPool().query(SCHEMA).catch((err) => {
+      g.__xbossSchemaReady = undefined; // cho phép thử lại nếu lần đầu lỗi mạng
+      throw err;
+    });
+  }
+  return g.__xbossSchemaReady;
+}
 
-// Helper nhỏ gọn cho query.
-export const query = <T = Record<string, unknown>>(sql: string, ...params: unknown[]): T[] =>
-  db.prepare(sql).all(...(params as never[])) as T[];
+// Chuyển placeholder `?` → $1..$n (SQL trong codebase không chứa '?' trong literal).
+const toPg = (sql: string) => {
+  let i = 0;
+  return sql.replace(/\?/g, () => `$${++i}`);
+};
 
-export const queryOne = <T = Record<string, unknown>>(sql: string, ...params: unknown[]): T | undefined =>
-  db.prepare(sql).get(...(params as never[])) as T | undefined;
+export async function query<T = Record<string, unknown>>(sql: string, ...params: unknown[]): Promise<T[]> {
+  await ensureSchema();
+  const r = await getPool().query(toPg(sql), params);
+  return r.rows as T[];
+}
 
-export const run = (sql: string, ...params: unknown[]) =>
-  db.prepare(sql).run(...(params as never[]));
+export async function queryOne<T = Record<string, unknown>>(sql: string, ...params: unknown[]): Promise<T | undefined> {
+  const rows = await query<T>(sql, ...params);
+  return rows[0];
+}
+
+export async function run(sql: string, ...params: unknown[]): Promise<{ changes: number }> {
+  await ensureSchema();
+  const r = await getPool().query(toPg(sql), params);
+  return { changes: r.rowCount ?? 0 };
+}
+
+// INSERT trả về id (thay cho lastInsertRowid của SQLite).
+export async function insertId(sql: string, ...params: unknown[]): Promise<number> {
+  await ensureSchema();
+  const r = await getPool().query(toPg(sql) + " RETURNING id", params);
+  return Number(r.rows[0].id);
+}
 
 // Hôm nay dạng ISO (YYYY-MM-DD) để so sánh chuỗi ngày.
 export const todayISO = () => new Date().toISOString().slice(0, 10);

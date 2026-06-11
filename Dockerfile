@@ -1,4 +1,4 @@
-# XBoss — production image (Node 24 có sẵn node:sqlite)
+# XBoss — production image (PostgreSQL qua DATABASE_URL)
 FROM node:24-bookworm-slim
 
 WORKDIR /app
@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install --no-audit --no-fund
 
-# Copy mã nguồn + file Excel nguồn (để seed).
+# Copy mã nguồn + file Excel nguồn (để seed khi cần).
 COPY . .
 
 # Build production.
@@ -15,11 +15,8 @@ RUN npm run build
 
 ENV NODE_ENV=production
 ENV PORT=3000
-ENV XBOSS_DB=/app/data/xboss.db
 
 EXPOSE 3000
 
-# Seed DB lần đầu (nếu chưa có) rồi khởi động.
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
-ENTRYPOINT ["/docker-entrypoint.sh"]
+# Schema tự khởi tạo khi app chạy lần đầu; seed dữ liệu bằng: npm run db:seed
+CMD ["npm", "start"]

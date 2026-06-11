@@ -42,12 +42,12 @@ function parseToken(token: string): number | null {
 }
 
 // ===== Người dùng hiện tại =====
-export function getCurrentUser(): User | null {
+export async function getCurrentUser(): Promise<User | null> {
   const token = cookies().get(COOKIE)?.value;
   if (!token) return null;
   const uid = parseToken(token);
   if (!uid) return null;
-  const u = queryOne<User>(`SELECT id, name, email, role FROM users WHERE id = ?`, uid);
+  const u = await queryOne<User>(`SELECT id, name, email, role FROM users WHERE id = ?`, uid);
   return u ?? null;
 }
 
@@ -60,11 +60,11 @@ const DEFAULTS: { name: string; email: string; pw: string; role: Role }[] = [
   { name: "Kỹ sư", email: "engineer@xboss.vn", pw: "eng123", role: "engineer" },
   { name: "Thầu phụ", email: "subcon@xboss.vn", pw: "sub123", role: "subcon" },
 ];
-export function ensureDefaultUsers(): void {
-  const c = queryOne<{ n: number }>(`SELECT COUNT(*) AS n FROM users`);
-  if (c && c.n > 0) return;
+export async function ensureDefaultUsers(): Promise<void> {
+  const c = await queryOne<{ n: number }>(`SELECT COUNT(*) AS n FROM users`);
+  if (c && Number(c.n) > 0) return;
   for (const u of DEFAULTS) {
-    run(`INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)`,
+    await run(`INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?) ON CONFLICT (email) DO NOTHING`,
       u.name, u.email, hashPassword(u.pw), u.role);
   }
 }

@@ -1,5 +1,6 @@
 // Dữ liệu mẫu mô phỏng cấu trúc Excel AVIO Tháp A (chạy khi chưa có file Excel thật).
-import { db, run, todayISO } from "../lib/db";
+import "./env";
+import { run, insertId, todayISO } from "../lib/db";
 import type { StatusSlug } from "../lib/status";
 
 const SHEETS = [
@@ -29,37 +30,33 @@ function deriveStatus(progress: number, endDate: string): StatusSlug {
   return "chuan_bi";
 }
 
-function main() {
+async function main() {
   console.log("🌱 Seeding dữ liệu mẫu AVIO Tháp A...");
 
   // Reset (theo thứ tự FK).
-  for (const t of ["progress_dimensions", "task_history", "tasks", "work_packages", "sheet_types", "towers", "projects"]) {
-    run(`DELETE FROM ${t}`);
+  for (const t of ["notifications", "progress_dimensions", "task_history", "tasks", "work_packages", "sheet_types", "towers", "projects"]) {
+    await run(`DELETE FROM ${t}`);
   }
 
-  const pr = run(`INSERT INTO projects (name, code, investor, contractor) VALUES (?, ?, ?, ?)`,
+  const projectId = await insertId(`INSERT INTO projects (name, code, investor, contractor) VALUES (?, ?, ?, ?)`,
     "TT AVIO Tháp A", "AVIO-A", "AVIO", "MEP Co.");
-  const projectId = Number(pr.lastInsertRowid);
-  const tw = run(`INSERT INTO towers (project_id, name) VALUES (?, ?)`, projectId, "Tháp A");
-  const towerId = Number(tw.lastInsertRowid);
+  const towerId = await insertId(`INSERT INTO towers (project_id, name) VALUES (?, ?)`, projectId, "Tháp A");
 
   let totalWp = 0, totalTask = 0, totalDim = 0;
   let seed = 7;
   const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
 
   for (const s of SHEETS) {
-    const stR = run(`INSERT INTO sheet_types (tower_id, code, name, responsible) VALUES (?, ?, ?, ?)`,
+    const stId = await insertId(`INSERT INTO sheet_types (tower_id, code, name, responsible) VALUES (?, ?, ?, ?)`,
       towerId, s.code, s.name, s.responsible);
-    const stId = Number(stR.lastInsertRowid);
 
     for (let f = 1; f <= s.floors; f++) {
       const wpCode = `${s.prefix}${f}`;
-      const wpR = run(
+      const wpId = await insertId(
         `INSERT INTO work_packages (sheet_type_id, code, seq_no, floor_label, name, start_date, end_date, duration_days, status, progress)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         stId, wpCode, String(f), `${f}F`, `${s.name} tầng ${f}F`,
         isoDays(-60 + f * 5), isoDays(-60 + f * 5 + 20), 20, "chuan_bi", 0);
-      const wpId = Number(wpR.lastInsertRowid);
       totalWp++;
 
       let wpSum = 0;
@@ -68,29 +65,29 @@ function main() {
         const progress = Math.min(1, Math.round(base * 4) / 4);
         const end = isoDays(-40 + f * 6 + k * 2);
         const status = deriveStatus(progress, end);
-        const tR = run(
+        const taskId = await insertId(
           `INSERT INTO tasks (package_id, code, seq_no, name, status, start_date, end_date, duration_days, progress_percent)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           wpId, `${wpCode},${String(k).padStart(2, "0")}`, `${f}.${String(k).padStart(2, "0")}`,
           pick(SUB_NAMES, k - 1), status, isoDays(-40 + f * 6 + k * 2 - 5), end, 5, progress);
-        const taskId = Number(tR.lastInsertRowid);
         totalTask++;
         wpSum += progress;
 
         const completed = Math.round(progress * s.dims.length);
         for (let di = 0; di < s.dims.length; di++) {
-          run(`INSERT INTO progress_dimensions (task_id, dimension_label, installed, value) VALUES (?, ?, ?, ?)`,
+          await run(`INSERT INTO progress_dimensions (task_id, dimension_label, installed, value) VALUES (?, ?, ?, ?)`,
             taskId, s.dims[di], di < completed ? 1 : 0, di < completed ? 1 : 0);
           totalDim++;
         }
       }
       const wpProgress = Math.round((wpSum / s.subs) * 100) / 100;
-      run(`UPDATE work_packages SET progress = ?, status = ? WHERE id = ?`,
+      await run(`UPDATE work_packages SET progress = ?, status = ? WHERE id = ?`,
         wpProgress, deriveStatus(wpProgress, isoDays(-60 + f * 5 + 20)), wpId);
     }
   }
 
   console.log(`✅ ${SHEETS.length} sheet types, ${totalWp} work packages, ${totalTask} tasks, ${totalDim} dimensions.`);
+  process.exit(0);
 }
 
-main();
+main().catch((err) => { console.error("❌ Seed lỗi:", err); process.exit(1); });

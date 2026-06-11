@@ -6,10 +6,10 @@ export const dynamic = "force-dynamic";
 // Danh sách sheet type + KPI tổng hợp.
 export async function GET() {
   const today = todayISO();
-  const sheets = query(
+  const sheets = await query(
     `SELECT st.id, st.code, st.name, st.responsible,
             COUNT(t.id) AS total,
-            COALESCE(AVG(t.progress_percent), 0) AS avgProgress,
+            COALESCE(AVG(t.progress_percent), 0) AS "avgProgress",
             COALESCE(SUM(CASE WHEN t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_percent < 1
                               AND t.status NOT IN ('hoan_thanh','nghiem_thu') THEN 1 ELSE 0 END), 0) AS delayed
        FROM sheet_types st

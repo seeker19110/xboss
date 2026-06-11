@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 // PATCH /api/workpackages/:id  → sửa nhóm công việc (tên, code, tầng, ngày). Admin/PM.
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  if (!CAN.editStructure(getCurrentUser()?.role))
+  if (!CAN.editStructure((await getCurrentUser())?.role))
     return NextResponse.json({ error: "Không có quyền chỉnh sửa (chỉ Admin/PM)" }, { status: 403 });
 
   const id = parseInt(params.id);
@@ -25,7 +25,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!sets.length) return NextResponse.json({ error: "Không có trường để cập nhật" }, { status: 400 });
 
   vals.push(id);
-  run(`UPDATE work_packages SET ${sets.join(", ")} WHERE id = ?`, ...vals);
-  const wp = queryOne(`SELECT id, code, name, floor_label AS floorLabel FROM work_packages WHERE id = ?`, id);
+  await run(`UPDATE work_packages SET ${sets.join(", ")} WHERE id = ?`, ...vals);
+  const wp = await queryOne(`SELECT id, code, name, floor_label AS "floorLabel" FROM work_packages WHERE id = ?`, id);
   return NextResponse.json({ workPackage: wp });
 }

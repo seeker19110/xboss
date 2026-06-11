@@ -8,3 +8,8 @@ node_modules/
 /out
 next-env.d.ts
 *.tsbuildinfo
+
+# SQLite cũ (đã chuyển sang Postgres) — giữ file local làm backup
+xboss.db
+xboss.db-shm
+xboss.db-wal

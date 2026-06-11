@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import { run, queryOne, query } from "@/lib/db";
+import { run, queryOne, insertId } from "@/lib/db";
 import { toStatusSlug, parseProgress } from "@/lib/status";
 import { deriveStatus, recomputePackage } from "@/lib/recompute";
 
@@ -33,9 +33,6 @@ function isChecked(v: unknown): boolean {
   if (typeof v === "string") return ["x", "1", "true", "✓", "đã lắp"].includes(v.trim().toLowerCase());
   return false;
 }
-function isBoolCell(v: unknown): boolean {
-  return typeof v === "boolean" || v === 0 || v === 1;
-}
 function cleanLabel(v: unknown): string | null {
   if (v == null || String(v).trim() === "") return null;
   return String(v).replace(/\n/g, " ").replace(/\s+/g, " ").trim().replace(/^\d+\s+/, "");
@@ -68,22 +65,22 @@ export type ImportStats = {
 
 type Row = { id: number };
 
-function getOrCreateProject(): number {
-  const p = queryOne<Row>(`SELECT id FROM projects WHERE name = ?`, "TT AVIO Tháp A");
+async function getOrCreateProject(): Promise<number> {
+  const p = await queryOne<Row>(`SELECT id FROM projects WHERE name = ?`, "TT AVIO Tháp A");
   if (p) return p.id;
-  return Number(run(`INSERT INTO projects (name, code) VALUES (?, ?)`, "TT AVIO Tháp A", "AVIO-A").lastInsertRowid);
+  return insertId(`INSERT INTO projects (name, code) VALUES (?, ?)`, "TT AVIO Tháp A", "AVIO-A");
 }
-function getOrCreateTower(projectId: number): number {
-  const t = queryOne<Row>(`SELECT id FROM towers WHERE project_id = ?`, projectId);
+async function getOrCreateTower(projectId: number): Promise<number> {
+  const t = await queryOne<Row>(`SELECT id FROM towers WHERE project_id = ?`, projectId);
   if (t) return t.id;
-  return Number(run(`INSERT INTO towers (project_id, name) VALUES (?, ?)`, projectId, "Tháp A").lastInsertRowid);
+  return insertId(`INSERT INTO towers (project_id, name) VALUES (?, ?)`, projectId, "Tháp A");
 }
 
 export async function importWorkbook(workbook: XLSX.WorkBook): Promise<ImportStats> {
   const stats: ImportStats = { totalRows: 0, packages: 0, tasks: 0, dimensions: 0, errors: [], sheets: [] };
 
-  const projectId = getOrCreateProject();
-  const towerId = getOrCreateTower(projectId);
+  const projectId = await getOrCreateProject();
+  const towerId = await getOrCreateTower(projectId);
   const touchedPkgs = new Set<number>();
 
   for (const sheetName of workbook.SheetNames) {
@@ -95,10 +92,10 @@ export async function importWorkbook(workbook: XLSX.WorkBook): Promise<ImportSta
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null }) as unknown[][];
     const dimDefs = parseDimDefs(rows);
 
-    let st = queryOne<Row>(`SELECT id FROM sheet_types WHERE tower_id = ? AND code = ?`, towerId, info.code);
+    let st = await queryOne<Row>(`SELECT id FROM sheet_types WHERE tower_id = ? AND code = ?`, towerId, info.code);
     if (!st) {
-      st = { id: Number(run(`INSERT INTO sheet_types (tower_id, code, name, responsible) VALUES (?, ?, ?, ?)`,
-        towerId, info.code, info.name, info.responsible ?? null).lastInsertRowid) };
+      st = { id: await insertId(`INSERT INTO sheet_types (tower_id, code, name, responsible) VALUES (?, ?, ?, ?)`,
+        towerId, info.code, info.name, info.responsible ?? null) };
     }
 
     let currentPkgId: number | null = null;
@@ -127,52 +124,53 @@ export async function importWorkbook(workbook: XLSX.WorkBook): Promise<ImportSta
 
         if (isPkg) {
           const wpCode = code;
-          const existing = queryOne<Row>(`SELECT id FROM work_packages WHERE sheet_type_id = ? AND code = ?`, st.id, wpCode);
+          const existing = await queryOne<Row>(`SELECT id FROM work_packages WHERE sheet_type_id = ? AND code = ?`, st.id, wpCode);
           if (!existing) {
-            currentPkgId = Number(run(
+            currentPkgId = await insertId(
               `INSERT INTO work_packages (sheet_type_id, code, seq_no, floor_label, name, start_date, end_date, duration_days, status, progress)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-              st.id, wpCode, stt, floorOf(name), name, startDate, endDate, durationDays, ghiChu).lastInsertRowid);
+              st.id, wpCode, stt, floorOf(name), name, startDate, endDate, durationDays, ghiChu);
             stats.packages++;
           } else {
-            run(`UPDATE work_packages SET start_date = ?, end_date = ?, duration_days = ? WHERE id = ?`,
+            await run(`UPDATE work_packages SET start_date = ?, end_date = ?, duration_days = ? WHERE id = ?`,
               startDate, endDate, durationDays, existing.id);
             currentPkgId = existing.id;
           }
           currentPkgCode = wpCode;
           touchedPkgs.add(currentPkgId);
         } else if (currentPkgId) {
-          // Hàng task (kể cả sub-header có dữ liệu lưới nhưng không có CODE).
-          const hasDimData = dimDefs.length > 0 && dimDefs.some((d) => isBoolCell(row[d.col]));
+          // Hàng task. Sheet có cột dimension thì MỌI task đều có lưới checkbox —
+          // ô trống nghĩa là chưa lắp, không phải "không có lưới".
+          const hasGrid = dimDefs.length > 0;
           const taskCode = code || `${currentPkgCode},${stt || "r" + i}`;
 
           let progress = parseProgress(row[7]);
-          if (hasDimData) {
+          if (hasGrid) {
             const done = dimDefs.filter((d) => isChecked(row[d.col])).length;
             progress = Math.round((done / dimDefs.length) * 100) / 100;
           }
           const status = deriveStatus(progress, endDate, ghiChu);
 
           let taskId: number;
-          const existing = queryOne<Row>(`SELECT id FROM tasks WHERE package_id = ? AND code = ?`, currentPkgId, taskCode);
+          const existing = await queryOne<Row>(`SELECT id FROM tasks WHERE package_id = ? AND code = ?`, currentPkgId, taskCode);
           if (!existing) {
-            taskId = Number(run(
+            taskId = await insertId(
               `INSERT INTO tasks (package_id, code, seq_no, name, note, status, start_date, end_date, duration_days, progress_percent)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
               currentPkgId, taskCode, stt || null, name, row[3] != null ? String(row[3]) : null,
-              status, startDate, endDate, durationDays, progress).lastInsertRowid);
+              status, startDate, endDate, durationDays, progress);
             stats.tasks++;
           } else {
             taskId = existing.id;
-            run(`UPDATE tasks SET status = ?, progress_percent = ?, start_date = ?, end_date = ?, duration_days = ? WHERE id = ?`,
+            await run(`UPDATE tasks SET status = ?, progress_percent = ?, start_date = ?, end_date = ?, duration_days = ? WHERE id = ?`,
               status, progress, startDate, endDate, durationDays, taskId);
-            run(`DELETE FROM progress_dimensions WHERE task_id = ?`, taskId);
+            await run(`DELETE FROM progress_dimensions WHERE task_id = ?`, taskId);
           }
 
-          if (hasDimData) {
+          if (hasGrid) {
             for (const d of dimDefs) {
               const checked = isChecked(row[d.col]) ? 1 : 0;
-              run(`INSERT INTO progress_dimensions (task_id, dimension_label, installed, value) VALUES (?, ?, ?, ?)`,
+              await run(`INSERT INTO progress_dimensions (task_id, dimension_label, installed, value) VALUES (?, ?, ?, ?)`,
                 taskId, d.label, checked, checked);
               stats.dimensions++;
             }
@@ -185,7 +183,7 @@ export async function importWorkbook(workbook: XLSX.WorkBook): Promise<ImportSta
   }
 
   // Tính lại % cho từng work package = trung bình các sub-task.
-  for (const pkgId of touchedPkgs) recomputePackage(pkgId);
+  for (const pkgId of touchedPkgs) await recomputePackage(pkgId);
 
   return stats;
 }

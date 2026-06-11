@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
-    const role = getCurrentUser()?.role;
+    const role = (await getCurrentUser())?.role;
     if (!CAN.import(role)) return NextResponse.json({ error: "Bạn không có quyền import (chỉ Admin/PM)" }, { status: 403 });
 
     const formData = await request.formData();

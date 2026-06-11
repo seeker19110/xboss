@@ -6,11 +6,28 @@ services:
     environment:
       # ⚠️ ĐỔI thành chuỗi ngẫu nhiên dài (ký session đăng nhập).
       - XBOSS_SECRET=doi-thanh-chuoi-bi-mat-that-dai
-      - XBOSS_DB=/app/data/xboss.db
+      # Trỏ tới Postgres: dùng service db bên dưới, hoặc thay bằng chuỗi Supabase.
+      - DATABASE_URL=postgres://xboss:xboss@db:5432/xboss
       - PORT=3000
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      - POSTGRES_USER=xboss
+      - POSTGRES_PASSWORD=xboss   # ⚠️ đổi khi chạy production
+      - POSTGRES_DB=xboss
     volumes:
-      - xboss-data:/app/data   # DB lưu bền, không mất khi rebuild
+      - xboss-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U xboss -d xboss"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
 
 volumes:
-  xboss-data:
+  xboss-pgdata:
