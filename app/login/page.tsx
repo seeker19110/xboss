@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { LogIn } from 'lucide-react';
 
 const DEMO = [
@@ -14,6 +14,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState('admin123');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [projectName, setProjectName] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/project').then(r => r.ok ? r.json() : null).then(j => setProjectName(j?.name ?? null));
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -31,7 +36,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold">🏗️ XBoss</h1>
-          <p className="text-sm text-zinc-500">AVIO Tháp A — ACMV Tracking</p>
+          <p className="text-sm text-zinc-500">{projectName ?? 'Quản lý tiến độ thi công MEP'}</p>
         </div>
         <form onSubmit={submit} className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4">
           <div>

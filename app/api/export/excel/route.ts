@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
-import { query, todayISO } from "@/lib/db";
+import { query, queryOne, todayISO } from "@/lib/db";
 import { STATUS_LABEL } from "@/lib/status";
 import { getCurrentUser, CAN } from "@/lib/auth";
 
@@ -43,6 +43,10 @@ export async function GET() {
     "Tiến độ TB": Math.round((k.avgProgress ?? 0) * 100) + "%", "Số trễ": k.delayed,
   }));
 
+  // Tên file theo mã dự án trong DB (fallback "XBoss" khi chưa seed).
+  const project = await queryOne<{ code: string | null }>(`SELECT code FROM projects ORDER BY id LIMIT 1`);
+  const fileTag = (project?.code ?? "XBoss").replace(/[^\w-]/g, "-");
+
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(kpiRows), "KPI");
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(delayedRows.length ? delayedRows : [{ "Thông báo": "Không có công việc trễ" }]), "Công việc trễ");
@@ -51,7 +55,7 @@ export async function GET() {
   return new NextResponse(new Uint8Array(buf), {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="XBoss-AVIO-${today}.xlsx"`,
+      "Content-Disposition": `attachment; filename="XBoss-${fileTag}-${today}.xlsx"`,
     },
   });
 }

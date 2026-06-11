@@ -36,6 +36,11 @@ export default function Dashboard() {
   const [floorFilter, setFloorFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [me, setMe] = useState<Me | null>(null);
+  const [projectName, setProjectName] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/project').then(r => r.ok ? r.json() : null).then(j => setProjectName(j?.name ?? null));
+  }, []);
 
   useEffect(() => {
     fetch('/api/auth/me').then(async r => {
@@ -72,7 +77,7 @@ export default function Dashboard() {
       <header className="border-b border-zinc-800 px-6 py-4 flex justify-between items-center">
         <div>
           <h1 className="text-xl font-bold">🏗️ XBoss</h1>
-          <p className="text-xs text-zinc-500">AVIO Tháp A — ACMV Tracking</p>
+          <p className="text-xs text-zinc-500">{projectName ?? 'Quản lý tiến độ thi công MEP'}</p>
         </div>
         <div className="flex items-center gap-2">
           <NotificationBell />

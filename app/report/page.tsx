@@ -23,10 +23,12 @@ function fmtDate(d: string | null) {
 export default function ReportPage() {
   const [data, setData] = useState<{ delayedTasks: DelayedTask[]; kpi: KPI[]; totalDelayed: number } | null>(null);
   const [forecast, setForecast] = useState<Forecast[]>([]);
+  const [projectName, setProjectName] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/dashboard').then(r => r.json()).then(setData);
     fetch('/api/dashboard/forecast').then(r => r.ok ? r.json() : null).then(j => setForecast(j?.forecast ?? []));
+    fetch('/api/project').then(r => r.ok ? r.json() : null).then(j => setProjectName(j?.name ?? null));
   }, []);
 
   return (
@@ -42,7 +44,7 @@ export default function ReportPage() {
       <div className="max-w-4xl mx-auto p-8">
         <div className="border-b-2 border-zinc-900 pb-4 mb-6">
           <h1 className="text-2xl font-bold">BÁO CÁO TIẾN ĐỘ THI CÔNG ACMV</h1>
-          <p className="text-zinc-600">TT AVIO — Tháp A · Ngày: {new Date().toLocaleDateString('vi-VN')}</p>
+          <p className="text-zinc-600">{projectName ?? 'XBoss'} · Ngày: {new Date().toLocaleDateString('vi-VN')}</p>
         </div>
 
         <h2 className="font-bold text-lg mb-3">1. Tổng quan KPI</h2>

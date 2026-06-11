@@ -1,5 +1,5 @@
 // Tổng hợp báo cáo trễ hạn hằng ngày (dùng cho email cron + xem trước).
-import { query, todayISO } from "@/lib/db";
+import { query, queryOne, todayISO } from "@/lib/db";
 import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
 
 export type DelayedRow = {
@@ -9,6 +9,7 @@ export type DelayedRow = {
 export type KpiRow = { sheetType: string; total: number; avgProgress: number; delayed: number };
 export type DailyReport = {
   date: string;
+  projectName: string | null;
   totalDelayed: number;
   newDelayed: DelayedRow[];   // mới quá hạn trong 24h (end_date = hôm qua)
   topDelayed: DelayedRow[];   // trễ lâu nhất
@@ -52,7 +53,9 @@ export async function buildDailyReport(): Promise<DailyReport> {
        LEFT JOIN tasks t ON t.package_id = wp.id
       GROUP BY st.id, st.code ORDER BY st.id`, today);
 
-  return { date: today, totalDelayed: all.length, newDelayed, topDelayed, dueSoon, kpi };
+  const project = await queryOne<{ name: string }>(`SELECT name FROM projects ORDER BY id LIMIT 1`);
+
+  return { date: today, projectName: project?.name ?? null, totalDelayed: all.length, newDelayed, topDelayed, dueSoon, kpi };
 }
 
 const pct = (v: number) => `${Math.round((v ?? 0) * 100)}%`;
@@ -123,7 +126,7 @@ export function reportToHtml(r: DailyReport, appUrl?: string): string {
   const th = `style="padding:6px 8px;text-align:left;background:#f4f4f5;font-size:12px;color:#555"`;
   return `<!doctype html><html><body style="font-family:Segoe UI,Arial,sans-serif;color:#222;max-width:720px;margin:0 auto">
   <h2 style="margin:16px 0 4px">🏗️ XBoss — Báo cáo trễ hạn ${r.date}</h2>
-  <p style="margin:0 0 16px;color:#666">AVIO Tháp A · Tổng cộng <b style="color:#c00">${r.totalDelayed}</b> công việc đang trễ
+  <p style="margin:0 0 16px;color:#666">${esc(r.projectName ?? "XBoss")} · Tổng cộng <b style="color:#c00">${r.totalDelayed}</b> công việc đang trễ
   · <b>${r.newDelayed.length}</b> mới quá hạn trong 24h</p>
 
   <h3 style="margin:16px 0 8px">📊 KPI theo hệ</h3>
