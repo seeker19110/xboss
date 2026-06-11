@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    # Postgres riêng cho test tích hợp (recompute.test.ts cần TEST_DATABASE_URL).
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: xboss_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Cài dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test (kèm test tích hợp trên Postgres)
+        run: npm test
+        env:
+          TEST_DATABASE_URL: postgres://ci:ci@localhost:5432/xboss_test
+
+      - name: Build
+        run: npm run build
+        env:
+          # Build không kết nối DB (Pool khởi tạo lazy) — chỉ cần biến tồn tại.
+          DATABASE_URL: postgres://ci:ci@localhost:5432/xboss_test
