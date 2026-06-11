@@ -28,6 +28,7 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy lint + typecheck + test +
 - `XBOSS_SECRET` — ký cookie phiên. **Bắt buộc trong production**: thiếu sẽ throw lúc ký/xác minh token (chủ đích fail-fast, build vẫn chạy được).
 - `XBOSS_ADMIN_PASSWORD` — production + DB trống chỉ tạo 1 admin với mật khẩu này (không seed 4 tài khoản demo như dev).
 - `CRON_SECRET` — bảo vệ `/api/cron/daily-report`, chỉ nhận qua header `Authorization: Bearer` (không qua query param).
+- `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` — (tuỳ chọn) gửi báo cáo trễ hạn hằng ngày qua Telegram, song song với email SMTP.
 
 ## Kiến trúc
 
@@ -56,6 +57,24 @@ Project → Tower → SheetType (5 sheet) → WorkPackage → Task → ProgressD
 ### Chuỗi tính toán tiến độ (`lib/recompute.ts`)
 
 Tick checkbox dimension → `recomputeTask` (% = số ô checked / tổng ô) → `deriveStatus` → `recomputePackage` (% nhóm = trung bình các task) → ghi `task_history` nếu % đổi. Status là enum slug trong `lib/status.ts` (`chuan_bi | dang_thi_cong | hoan_thanh | tre | nghiem_thu`); `toStatusSlug` map mọi biến thể tiếng Việt có dấu/không dấu từ Excel. Quy tắc: `nghiem_thu` không bao giờ bị hạ cấp tự động; `tre` suy ra từ `end_date < hôm nay && progress < 1`.
+
+**Nghiệm thu 2 bước:** `nghiem_thu` chỉ đặt/huỷ được qua `POST/DELETE /api/tasks/:id/approve` (quyền `CAN.approve` = Admin/PM, task phải đạt 100%, ghi audit vào `task_history`). PATCH task thường chặn `status=nghiem_thu`.
+
+### Tính năng kèm theo task
+
+- **Ảnh hiện trường** (`task_photos`): file lưu `data/uploads/` (ngoài git), tên file do server sinh (`lib/photos.ts`), chỉ nhận mime ảnh, max 10MB. Route: `/api/tasks/:id/photos`, `/api/photos/:id`.
+- **Bình luận** (`task_comments`): `/api/tasks/:id/comments` — bình luận mới upsert notification type `comment` cho người được giao + người từng bình luận.
+- **Thông báo** (`/api/notifications`): đồng bộ on-fetch 4 loại — `delayed`, `due_soon` (hạn ≤3 ngày, progress <70%), `comment`, `material_over` (vật tư vượt định mức, dedup theo cột `material_id` + unique index một phần). Loại nào hết điều kiện thì tự dọn bản ghi chưa đọc.
+
+### Dashboard & báo cáo
+
+- S-curve (`/api/dashboard/scurve`): đường kế hoạch nội suy start→end từng task; đường thực tế tái dựng từ `task_history` (nền trước sự kiện đầu = `old_progress`).
+- Trang `/report` là bản in-friendly (window.print → PDF); `/my-tasks` liệt kê task theo `assigned_to`.
+- Tên dự án/tháp đọc từ DB qua `/api/project` (public, fallback khi DB trống) — không hard-code trong UI/email/tên file export.
+
+### Offline (PWA)
+
+`public/sw.js`: API GET network-first + fallback cache (trừ `/api/photos/`). Tick checkbox khi mất mạng được xếp hàng trong localStorage (`app/components/offlineQueue.ts` — `useOfflineTickQueue`) và tự PATCH lại khi online; 4xx bị bỏ để không kẹt hàng đợi. Đổi logic cache nhớ tăng version `CACHE` trong sw.js.
 
 ### Frontend
 
