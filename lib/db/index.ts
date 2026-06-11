@@ -128,6 +128,14 @@ CREATE TABLE IF NOT EXISTS task_photos (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS task_comments (
+  id SERIAL PRIMARY KEY,
+  task_id INTEGER REFERENCES tasks(id),
+  user_id INTEGER REFERENCES users(id),
+  body TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS materials (
   id SERIAL PRIMARY KEY,
   sheet_type_id INTEGER REFERENCES sheet_types(id),
@@ -154,6 +162,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uniq_wp_boq ON work_packages(boq_code) WHERE b
 
 CREATE INDEX IF NOT EXISTS idx_materials_sheet ON materials(sheet_type_id);
 CREATE INDEX IF NOT EXISTS idx_photos_task ON task_photos(task_id);
+CREATE INDEX IF NOT EXISTS idx_comments_task ON task_comments(task_id);
 
 CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_to);
 CREATE INDEX IF NOT EXISTS idx_notif_user ON notifications(user_id, is_read);
