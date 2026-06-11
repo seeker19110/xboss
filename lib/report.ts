@@ -62,6 +62,50 @@ function rowsHtml(rows: DelayedRow[]): string {
     </tr>`).join("");
 }
 
+// Bản rút gọn cho Telegram (parse_mode HTML — chỉ hỗ trợ b/i/a/code, giới hạn 4096 ký tự).
+export function reportToTelegramText(r: DailyReport, appUrl?: string): string {
+  const lines: string[] = [
+    `🏗️ <b>XBoss — Báo cáo trễ hạn ${r.date}</b>`,
+    `Tổng cộng <b>${r.totalDelayed}</b> việc đang trễ · <b>${r.newDelayed.length}</b> mới quá hạn trong 24h`,
+    "",
+    "📊 <b>KPI theo hệ</b>",
+    ...r.kpi.map((k) => `· ${esc(k.sheetType)}: ${pct(k.avgProgress)} — ${k.delayed > 0 ? `⚠ ${k.delayed} trễ` : "✓ không trễ"}`),
+  ];
+  if (r.newDelayed.length) {
+    lines.push("", `🆕 <b>Mới quá hạn (${r.newDelayed.length})</b>`);
+    for (const t of r.newDelayed.slice(0, 10))
+      lines.push(`· <code>${esc(t.code)}</code> ${esc(t.name)} — hạn ${t.endDate} (${pct(t.progressPercent)})`);
+  }
+  if (r.topDelayed.length) {
+    lines.push("", `⏰ <b>Trễ lâu nhất</b>`);
+    for (const t of r.topDelayed.slice(0, 5))
+      lines.push(`· <code>${esc(t.code)}</code> ${esc(t.name)} — hạn ${t.endDate} (${pct(t.progressPercent)})`);
+  }
+  if (appUrl) lines.push("", `<a href="${appUrl}">→ Mở XBoss Dashboard</a>`);
+  // Telegram giới hạn 4096 ký tự/tin — cắt an toàn.
+  return lines.join("\n").slice(0, 4000);
+}
+
+// Gửi tin nhắn qua Telegram Bot API. Trả về lỗi dạng chuỗi (null = thành công).
+export async function sendTelegram(text: string): Promise<string | null> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatIds = (process.env.TELEGRAM_CHAT_ID ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  if (!token || chatIds.length === 0) return "Chưa cấu hình TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID";
+
+  for (const chatId of chatIds) {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      return `Telegram API lỗi ${res.status} (chat ${chatId}): ${body.slice(0, 200)}`;
+    }
+  }
+  return null;
+}
+
 export function reportToHtml(r: DailyReport, appUrl?: string): string {
   const th = `style="padding:6px 8px;text-align:left;background:#f4f4f5;font-size:12px;color:#555"`;
   return `<!doctype html><html><body style="font-family:Segoe UI,Arial,sans-serif;color:#222;max-width:720px;margin:0 auto">

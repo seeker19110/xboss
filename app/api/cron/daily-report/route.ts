@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { query } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
-import { buildDailyReport, reportToHtml } from "@/lib/report";
+import { buildDailyReport, reportToHtml, reportToTelegramText, sendTelegram } from "@/lib/report";
 
 export const dynamic = "force-dynamic";
 
@@ -28,11 +28,18 @@ export async function GET(req: NextRequest) {
     to = rows.map((r) => r.email);
   }
 
+  // Kênh Telegram (tuỳ chọn) — gửi song song với email, kênh nào cấu hình thì gửi kênh đó.
+  const telegramError = await sendTelegram(reportToTelegramText(report, process.env.APP_URL));
+  const telegramSent = telegramError === null;
+
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
   if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
-    // Chưa cấu hình SMTP → trả về nội dung để xem trước (không gửi).
+    // Chưa cấu hình SMTP → trả về nội dung để xem trước (không gửi email).
     return NextResponse.json({
-      sent: false,
+      sent: telegramSent,
+      emailSent: false,
+      telegramSent,
+      telegramError: telegramSent ? undefined : telegramError,
       reason: "Chưa cấu hình SMTP_HOST / SMTP_USER / SMTP_PASS — trả về preview",
       wouldSendTo: to,
       report,
@@ -53,5 +60,9 @@ export async function GET(req: NextRequest) {
     html,
   });
 
-  return NextResponse.json({ sent: true, to, totalDelayed: report.totalDelayed, newDelayed: report.newDelayed.length });
+  return NextResponse.json({
+    sent: true, emailSent: true, to, telegramSent,
+    telegramError: telegramSent ? undefined : telegramError,
+    totalDelayed: report.totalDelayed, newDelayed: report.newDelayed.length,
+  });
 }
