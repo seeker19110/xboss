@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
+import { boqTakenBy } from "@/lib/boq";
 
 export const dynamic = "force-dynamic";
 
@@ -24,9 +25,19 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (body.status !== undefined && !STATUSES.includes(String(body.status)))
     return NextResponse.json({ error: "Trạng thái không hợp lệ" }, { status: 400 });
 
+  // BOQCODE duy nhất toàn hệ thống (nhóm + task + vật tư); chuỗi rỗng = xoá mã.
+  if (body.boqCode !== undefined) {
+    const boq = String(body.boqCode ?? "").trim();
+    body.boqCode = boq || null;
+    if (boq) {
+      const usedBy = await boqTakenBy(boq, { table: "materials", id });
+      if (usedBy) return NextResponse.json({ error: `Mã BOQ "${boq}" đã được dùng bởi ${usedBy}` }, { status: 409 });
+    }
+  }
+
   const fields: Record<string, string> = {
     name: "name", unit: "unit", qtyPlanned: "qty_planned",
-    qtyUsed: "qty_used", status: "status", note: "note",
+    qtyUsed: "qty_used", status: "status", note: "note", boqCode: "boq_code",
   };
   const sets: string[] = [];
   const vals: unknown[] = [];

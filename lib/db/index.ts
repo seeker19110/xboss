@@ -171,9 +171,12 @@ ALTER TABLE tasks ADD COLUMN IF NOT EXISTS drawing_url TEXT;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS boq_code TEXT;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS drawing_url TEXT;
 
+ALTER TABLE materials ADD COLUMN IF NOT EXISTS boq_code TEXT;
+
 -- BOQCODE duy nhất (NULL = chưa gán, không tính trùng).
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_tasks_boq ON tasks(boq_code) WHERE boq_code IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_wp_boq ON work_packages(boq_code) WHERE boq_code IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_materials_boq ON materials(boq_code) WHERE boq_code IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_materials_sheet ON materials(sheet_type_id);
 CREATE INDEX IF NOT EXISTS idx_photos_task ON task_photos(task_id);

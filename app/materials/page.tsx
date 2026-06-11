@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { ArrowLeft, Package, Plus, Trash2, AlertTriangle } from 'lucide-react';
 
 type Material = {
-  id: number; sheetTypeId: number | null; name: string; unit: string | null;
+  id: number; sheetTypeId: number | null; boqCode: string | null; name: string; unit: string | null;
   qtyPlanned: number; qtyUsed: number; status: string; note: string | null; sheetCode: string | null;
 };
 type Sheet = { id: number; code: string; name: string };
@@ -20,7 +20,7 @@ export default function MaterialsPage() {
   const [canEdit, setCanEdit] = useState(false);
   const [canDelete, setCanDelete] = useState(false);
   const [error, setError] = useState('');
-  const [form, setForm] = useState({ name: '', unit: '', qtyPlanned: '', sheetTypeId: '' });
+  const [form, setForm] = useState({ boqCode: '', name: '', unit: '', qtyPlanned: '', sheetTypeId: '' });
 
   const load = useCallback(() => {
     const q = sheetFilter ? `?sheetTypeId=${sheetFilter}` : '';
@@ -49,10 +49,16 @@ export default function MaterialsPage() {
   const addMaterial = () => api('/api/materials', {
     method: 'POST',
     body: JSON.stringify({ ...form, sheetTypeId: Number(form.sheetTypeId || sheetFilter), qtyPlanned: Number(form.qtyPlanned) || 0 }),
-  }, () => setForm({ name: '', unit: '', qtyPlanned: '', sheetTypeId: '' }));
+  }, () => setForm({ boqCode: '', name: '', unit: '', qtyPlanned: '', sheetTypeId: '' }));
 
   const patch = (id: number, body: object) => api(`/api/materials/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
   const remove = (m: Material) => { if (window.confirm(`Xoá vật tư "${m.name}"?`)) api(`/api/materials/${m.id}`, { method: 'DELETE' }); };
+
+  function editBoq(m: Material) {
+    const v = window.prompt('Mã BOQ của vật tư (duy nhất toàn hệ thống — tránh trùng mã đặt hàng; để trống = xoá mã):', m.boqCode ?? '');
+    if (v === null) return;
+    patch(m.id, { boqCode: v });
+  }
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -81,7 +87,10 @@ export default function MaterialsPage() {
 
         {canEdit && (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+              <input placeholder="Mã BOQ" value={form.boqCode} onChange={e => setForm(f => ({ ...f, boqCode: e.target.value }))}
+                title="Mã BOQ duy nhất toàn hệ thống — tránh trùng mã khi đặt hàng (tuỳ chọn)"
+                className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm font-mono outline-none focus:border-amber-600" />
               <input placeholder="Tên vật tư *" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                 className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600 col-span-2 md:col-span-1" />
               <input placeholder="Đơn vị (m, cái...)" value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))}
@@ -105,6 +114,7 @@ export default function MaterialsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-zinc-400 border-b border-zinc-800">
+                <th className="text-left p-3">Mã BOQ</th>
                 <th className="text-left p-3">Vật tư</th>
                 <th className="text-left p-3">Hệ</th>
                 <th className="text-right p-3">Định mức</th>
@@ -120,6 +130,13 @@ export default function MaterialsPage() {
                 const over = m.qtyPlanned > 0 && m.qtyUsed > m.qtyPlanned;
                 return (
                   <tr key={m.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/40">
+                    <td className="p-3">
+                      <button onClick={() => canEdit && editBoq(m)}
+                        title={canEdit ? `${m.boqCode ?? 'Chưa gán mã BOQ'} — bấm để sửa` : m.boqCode ?? 'Chưa gán mã BOQ'}
+                        className={`font-mono text-xs ${m.boqCode ? 'text-amber-400' : 'text-zinc-600'} ${canEdit ? 'hover:underline cursor-pointer' : 'cursor-default'}`}>
+                        {m.boqCode ?? '—'}
+                      </button>
+                    </td>
                     <td className="p-3">
                       <span className="font-medium">{m.name}</span>
                       {m.unit && <span className="text-zinc-500 text-xs ml-1">({m.unit})</span>}
@@ -166,7 +183,7 @@ export default function MaterialsPage() {
                 );
               })}
               {materials.length === 0 && (
-                <tr><td colSpan={7} className="p-8 text-center text-zinc-500">Chưa có vật tư nào{canEdit ? ' — thêm ở ô phía trên' : ''}.</td></tr>
+                <tr><td colSpan={8} className="p-8 text-center text-zinc-500">Chưa có vật tư nào{canEdit ? ' — thêm ở ô phía trên' : ''}.</td></tr>
               )}
             </tbody>
           </table>
