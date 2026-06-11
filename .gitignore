@@ -9,6 +9,9 @@ node_modules/
 next-env.d.ts
 *.tsbuildinfo
 
+# Ảnh hiện trường upload từ app — không đưa vào git
+data/uploads/
+
 # SQLite cũ (đã chuyển sang Postgres) — giữ file local làm backup
 xboss.db
 xboss.db-shm

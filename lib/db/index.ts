@@ -116,6 +116,18 @@ CREATE TABLE IF NOT EXISTS notifications (
   UNIQUE (user_id, task_id, type)
 );
 
+CREATE TABLE IF NOT EXISTS task_photos (
+  id SERIAL PRIMARY KEY,
+  task_id INTEGER REFERENCES tasks(id),
+  file_name TEXT NOT NULL,
+  original_name TEXT,
+  mime_type TEXT,
+  size_bytes INTEGER,
+  caption TEXT,
+  uploaded_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS materials (
   id SERIAL PRIMARY KEY,
   sheet_type_id INTEGER REFERENCES sheet_types(id),
@@ -141,6 +153,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uniq_tasks_boq ON tasks(boq_code) WHERE boq_co
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_wp_boq ON work_packages(boq_code) WHERE boq_code IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_materials_sheet ON materials(sheet_type_id);
+CREATE INDEX IF NOT EXISTS idx_photos_task ON task_photos(task_id);
 
 CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_to);
 CREATE INDEX IF NOT EXISTS idx_notif_user ON notifications(user_id, is_read);

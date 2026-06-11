@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { ArrowLeft, Search, ChevronRight, ChevronDown, Pencil, Check, X, History, UserCheck, RefreshCw, Link2 } from 'lucide-react';
+import { ArrowLeft, Search, ChevronRight, ChevronDown, Pencil, Check, X, History, UserCheck, RefreshCw, Link2, Camera, Trash2, Upload } from 'lucide-react';
 
 const STATUS_LABEL: Record<string, string> = {
   chuan_bi: 'Chuẩn bị', dang_thi_cong: 'Đang thi công',
@@ -209,13 +209,14 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
 }
 
 type Cell = { id: number; installed: boolean };
-type GridTask = { id: number; code: string; name: string; status: string; progressPercent: number; boqCode: string | null; drawingUrl: string | null; assignedTo: number | null; assigneeName: string | null; cells: Record<string, Cell> };
+type GridTask = { id: number; code: string; name: string; status: string; progressPercent: number; boqCode: string | null; drawingUrl: string | null; assignedTo: number | null; assigneeName: string | null; photoCount: number; cells: Record<string, Cell> };
 type Grid = { columns: string[]; tasks: GridTask[] };
 
 function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged }: { pkgId: number; canEdit: boolean; users: AppUser[]; refreshKey: number; onChanged: () => void }) {
   const [grid, setGrid] = useState<Grid | null>(null);
   const [editTask, setEditTask] = useState<{ id: number; value: string } | null>(null);
   const [historyTask, setHistoryTask] = useState<GridTask | null>(null);
+  const [photosTask, setPhotosTask] = useState<GridTask | null>(null);
 
   const load = useCallback(() => {
     fetch(`/api/workpackages/${pkgId}/dimensions`).then(r => r.json()).then(setGrid);
@@ -351,6 +352,10 @@ function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged }: { pkgId: numb
                   <button onClick={() => setAllInRow(t, false)} className="text-[10px] text-zinc-500 hover:underline">Bỏ</button>
                   <button onClick={() => setHistoryTask(t)} title="Lịch sử tiến độ"
                     className="text-zinc-600 hover:text-emerald-400"><History className="w-3 h-3" /></button>
+                  <button onClick={() => setPhotosTask(t)} title="Ảnh hiện trường"
+                    className={`flex items-center gap-0.5 ${t.photoCount > 0 ? 'text-sky-400 hover:text-sky-300' : 'text-zinc-600 hover:text-sky-400'}`}>
+                    <Camera className="w-3 h-3" />{t.photoCount > 0 && <span className="text-[10px]">{t.photoCount}</span>}
+                  </button>
                   {canEdit ? (
                     <select value={t.assignedTo ?? ''} onChange={e => assignTask(t.id, e.target.value)}
                       title="Giao task cho người làm"
@@ -384,6 +389,7 @@ function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged }: { pkgId: numb
         </tbody>
       </table>
       {historyTask && <HistoryModal task={historyTask} onClose={() => setHistoryTask(null)} />}
+      {photosTask && <PhotosModal task={photosTask} onClose={() => { setPhotosTask(null); load(); }} />}
     </div>
   );
 }
@@ -392,6 +398,107 @@ type HistoryItem = {
   id: number; oldProgress: number | null; newProgress: number | null;
   status: string | null; note: string | null; changedBy: string | null; changedAt: string;
 };
+
+type Photo = {
+  id: number; originalName: string | null; mimeType: string; sizeBytes: number;
+  caption: string | null; createdAt: string; uploadedBy: number | null; uploaderName: string | null;
+};
+
+// Gallery ảnh hiện trường của task: xem, upload (chụp từ mobile), xoá.
+function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => void }) {
+  const [photos, setPhotos] = useState<Photo[] | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+  const [me, setMe] = useState<{ id: number; role: string } | null>(null);
+  const [viewer, setViewer] = useState<Photo | null>(null);
+
+  const load = useCallback(() => {
+    fetch(`/api/tasks/${task.id}/photos`).then(r => r.json()).then(j => setPhotos(j.photos ?? []));
+  }, [task.id]);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    fetch('/api/auth/me').then(r => r.ok ? r.json() : null).then(j => j && setMe({ id: j.user.id, role: j.user.role }));
+  }, []);
+
+  async function upload(file: File) {
+    setUploading(true); setError('');
+    const fd = new FormData();
+    fd.append('file', file);
+    const caption = window.prompt('Ghi chú cho ảnh (tuỳ chọn):') ?? '';
+    if (caption.trim()) fd.append('caption', caption.trim());
+    const res = await fetch(`/api/tasks/${task.id}/photos`, { method: 'POST', body: fd });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setError(j.error ?? 'Upload thất bại');
+    }
+    setUploading(false); load();
+  }
+
+  async function remove(p: Photo) {
+    if (!window.confirm('Xoá ảnh này?')) return;
+    const res = await fetch(`/api/photos/${p.id}`, { method: 'DELETE' });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); setError(j.error ?? 'Không xoá được'); return; }
+    load();
+  }
+
+  const canDelete = (p: Photo) => me && (p.uploadedBy === me.id || me.role === 'admin' || me.role === 'pm');
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2">
+          <Camera className="w-4 h-4 text-sky-400" />
+          <div className="min-w-0">
+            <h3 className="font-semibold text-sm truncate">Ảnh hiện trường — {task.name}</h3>
+            <p className="text-xs text-zinc-500 font-mono">{task.code} · {photos?.length ?? 0} ảnh</p>
+          </div>
+          <label className="ml-auto shrink-0 flex items-center gap-1.5 bg-sky-900/60 hover:bg-sky-800/60 border border-sky-800 text-sky-200 px-3 py-1.5 rounded-lg text-xs cursor-pointer">
+            <Upload className="w-3.5 h-3.5" /> {uploading ? 'Đang tải lên...' : 'Thêm ảnh'}
+            <input type="file" accept="image/*" capture="environment" className="hidden" disabled={uploading}
+              onChange={e => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ''; }} />
+          </label>
+          <button onClick={onClose} className="text-zinc-400 hover:text-white shrink-0"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="overflow-auto p-4">
+          {error && <p className="text-sm text-red-400 mb-3">{error}</p>}
+          {photos === null && <p className="text-sm text-zinc-500">Đang tải...</p>}
+          {photos?.length === 0 && (
+            <p className="text-sm text-zinc-500">Chưa có ảnh nào. Chụp ảnh hiện trường làm bằng chứng thi công/nghiệm thu.</p>
+          )}
+          {!!photos?.length && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {photos.map(p => (
+                <div key={p.id} className="bg-zinc-950/60 border border-zinc-800 rounded-lg overflow-hidden group">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={`/api/photos/${p.id}`} alt={p.caption ?? p.originalName ?? `Ảnh #${p.id}`}
+                    className="w-full h-32 object-cover cursor-zoom-in" loading="lazy" onClick={() => setViewer(p)} />
+                  <div className="px-2 py-1.5 flex items-start gap-1">
+                    <div className="min-w-0 flex-1">
+                      {p.caption && <p className="text-xs truncate" title={p.caption}>{p.caption}</p>}
+                      <p className="text-[10px] text-zinc-500 truncate">
+                        {p.uploaderName ?? '—'} · {new Date(p.createdAt).toLocaleString('vi-VN')}
+                      </p>
+                    </div>
+                    {canDelete(p) && (
+                      <button onClick={() => remove(p)} title="Xoá ảnh"
+                        className="text-zinc-600 hover:text-red-400 shrink-0 opacity-0 group-hover:opacity-100 transition"><Trash2 className="w-3.5 h-3.5" /></button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      {viewer && (
+        <div className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4" onClick={e => { e.stopPropagation(); setViewer(null); }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`/api/photos/${viewer.id}`} alt={viewer.caption ?? ''} className="max-w-full max-h-full object-contain rounded-lg" />
+        </div>
+      )}
+    </div>
+  );
+}
 
 function HistoryModal({ task, onClose }: { task: GridTask; onClose: () => void }) {
   const [items, setItems] = useState<HistoryItem[] | null>(null);
