@@ -58,26 +58,49 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
   // Hàng đợi offline: tick khi mất mạng được gửi lại tự động lúc có mạng.
   const { pending: offlinePending, online, enqueue } = useOfflineTickQueue(load);
 
-  // Đồng bộ đa người dùng: poll watermark; người khác sửa → tự reload + toast.
+  // Đồng bộ đa người dùng: SSE (/api/events, độ trễ ~3s) — lỗi/timeout thì
+  // fallback về poll watermark 10s như trước. Người khác sửa → tự reload + toast.
   useEffect(() => {
-    const t = setInterval(async () => {
+    let es: EventSource | null = null;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+    let stopped = false;
+
+    const applyVersion = (v: string) => {
       if (document.hidden || editingRef.current) return;
-      try {
-        const r = await fetch(`/api/tasks/version?sheet=${sheet}`);
-        if (!r.ok) return;
-        const j = await r.json();
-        if (versionRef.current && j.v !== versionRef.current) {
-          versionRef.current = j.v;
-          load();
-          setRefreshKey(k => k + 1);
-          setSyncToast(true);
-          setTimeout(() => setSyncToast(false), 3500);
-        } else {
-          versionRef.current = j.v;
-        }
-      } catch { /* mạng chập chờn — thử lại lần poll sau */ }
-    }, SYNC_POLL_MS);
-    return () => clearInterval(t);
+      if (versionRef.current && v !== versionRef.current) {
+        versionRef.current = v;
+        load();
+        setRefreshKey(k => k + 1);
+        setSyncToast(true);
+        setTimeout(() => setSyncToast(false), 3500);
+      } else {
+        versionRef.current = v;
+      }
+    };
+
+    const startPolling = () => {
+      if (pollTimer || stopped) return;
+      pollTimer = setInterval(async () => {
+        if (document.hidden || editingRef.current) return;
+        try {
+          const r = await fetch(`/api/tasks/version?sheet=${sheet}`);
+          if (!r.ok) return;
+          applyVersion((await r.json()).v);
+        } catch { /* mạng chập chờn — thử lại lần poll sau */ }
+      }, SYNC_POLL_MS);
+    };
+
+    if (typeof EventSource !== 'undefined') {
+      es = new EventSource(`/api/events?sheet=${sheet}`);
+      es.addEventListener('version', e => {
+        try { applyVersion(JSON.parse((e as MessageEvent).data).v); } catch { /* payload lạ — bỏ qua */ }
+      });
+      es.onerror = () => { es?.close(); es = null; startPolling(); };
+    } else {
+      startPolling();
+    }
+
+    return () => { stopped = true; es?.close(); if (pollTimer) clearInterval(pollTimer); };
   }, [sheet, load]);
   useEffect(() => {
     fetch('/api/auth/me').then(r => r.ok ? r.json() : null).then(j => {
