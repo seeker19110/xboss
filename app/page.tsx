@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Clock, Upload, LayoutGrid, ChevronRight, FileDown, Printer, LogOut, Users, KeyRound, Package, CalendarRange } from 'lucide-react';
+import { AlertTriangle, Clock, Upload, LayoutGrid, ChevronRight, FileDown, Printer, LogOut, Users, KeyRound, Package, CalendarRange, ClipboardList } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { SHEET_SLUGS, slugFromCode } from '@/lib/sheets';
 import NotificationBell from '@/app/components/NotificationBell';
@@ -114,6 +114,11 @@ export default function Dashboard() {
               <ChevronRight className="w-3.5 h-3.5 text-zinc-600" />
             </a>
           ))}
+          <a href="/my-tasks"
+            className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm transition">
+            <ClipboardList className="w-4 h-4 text-violet-400" /> Việc của tôi
+            <ChevronRight className="w-3.5 h-3.5 text-zinc-600" />
+          </a>
           <a href="/materials"
             className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm transition">
             <Package className="w-4 h-4 text-sky-400" /> Vật tư
