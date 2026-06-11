@@ -50,11 +50,13 @@ CREATE TABLE IF NOT EXISTS sheet_types (
 
 CREATE TABLE IF NOT EXISTS work_packages (
   id SERIAL PRIMARY KEY,
+  boq_code TEXT,
   sheet_type_id INTEGER REFERENCES sheet_types(id),
   code TEXT NOT NULL,
   seq_no TEXT,
   floor_label TEXT,
   name TEXT NOT NULL,
+  drawing_url TEXT,
   start_date DATE,
   end_date DATE,
   duration_days INTEGER,
@@ -66,16 +68,19 @@ CREATE TABLE IF NOT EXISTS work_packages (
 
 CREATE TABLE IF NOT EXISTS tasks (
   id SERIAL PRIMARY KEY,
+  boq_code TEXT,
   package_id INTEGER REFERENCES work_packages(id),
   code TEXT NOT NULL,
   seq_no TEXT,
   name TEXT NOT NULL,
   note TEXT,
+  drawing_url TEXT,
   status TEXT DEFAULT 'chuan_bi',
   start_date DATE,
   end_date DATE,
   duration_days INTEGER,
   progress_percent DOUBLE PRECISION DEFAULT 0,
+  assigned_to INTEGER REFERENCES users(id),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE (package_id, code)
 );
@@ -111,6 +116,33 @@ CREATE TABLE IF NOT EXISTS notifications (
   UNIQUE (user_id, task_id, type)
 );
 
+CREATE TABLE IF NOT EXISTS materials (
+  id SERIAL PRIMARY KEY,
+  sheet_type_id INTEGER REFERENCES sheet_types(id),
+  task_id INTEGER REFERENCES tasks(id),
+  name TEXT NOT NULL,
+  unit TEXT,
+  qty_planned DOUBLE PRECISION DEFAULT 0,
+  qty_used DOUBLE PRECISION DEFAULT 0,
+  status TEXT DEFAULT 'dat_hang',
+  note TEXT,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Migration nhẹ (idempotent) cho DB đã tồn tại.
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assigned_to INTEGER REFERENCES users(id);
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS boq_code TEXT;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS drawing_url TEXT;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS boq_code TEXT;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS drawing_url TEXT;
+
+-- BOQCODE duy nhất (NULL = chưa gán, không tính trùng).
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_tasks_boq ON tasks(boq_code) WHERE boq_code IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_wp_boq ON work_packages(boq_code) WHERE boq_code IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_materials_sheet ON materials(sheet_type_id);
+
+CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_to);
 CREATE INDEX IF NOT EXISTS idx_notif_user ON notifications(user_id, is_read);
 CREATE INDEX IF NOT EXISTS idx_tasks_package ON tasks(package_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_end ON tasks(end_date);

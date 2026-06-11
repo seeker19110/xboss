@@ -13,13 +13,15 @@ export async function GET() {
   const today = todayISO();
 
   // Task đang trễ mà user này chưa có thông báo → tạo mới (UNIQUE chặn trùng).
+  // Sub-con chỉ nhận thông báo cho task được giao.
+  const subconFilter = user.role === "subcon" ? `AND t.assigned_to = ${user.id}` : "";
   const delayed = await query<{ id: number; code: string; name: string; endDate: string; sheetType: string }>(
     `SELECT t.id, t.code, t.name, t.end_date AS "endDate", st.code AS "sheetType"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
       WHERE t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_percent < 1
-        AND t.status NOT IN ('hoan_thanh','nghiem_thu')`, today);
+        AND t.status NOT IN ('hoan_thanh','nghiem_thu') ${subconFilter}`, today);
 
   for (const t of delayed) {
     await run(
@@ -29,14 +31,14 @@ export async function GET() {
       user.id, t.id, `[${t.sheetType}] ${t.code} — ${t.name} đã quá hạn ${t.endDate}`);
   }
 
-  // Task hết trễ (đã hoàn thành/nghiệm thu) → dọn thông báo cũ chưa đọc.
+  // Task hết trễ (hoặc không còn được giao cho mình) → dọn thông báo cũ chưa đọc.
   await run(
     `DELETE FROM notifications
       WHERE user_id = ? AND type = 'delayed' AND is_read = 0
         AND task_id NOT IN (
           SELECT t.id FROM tasks t
            WHERE t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_percent < 1
-             AND t.status NOT IN ('hoan_thanh','nghiem_thu'))`,
+             AND t.status NOT IN ('hoan_thanh','nghiem_thu') ${subconFilter})`,
     user.id, today);
 
   const items = await query<{

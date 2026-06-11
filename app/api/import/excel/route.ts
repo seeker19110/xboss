@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
-import { importWorkbook } from "@/lib/import";
+import { importWorkbook, analyzeWorkbook } from "@/lib/import";
 import { getCurrentUser, CAN } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
+// POST /api/import/excel  (formData: file, mode?)
+// mode = "preview" → chỉ phân tích, KHÔNG ghi DB. Mặc định → import thật.
 export async function POST(request: NextRequest) {
   try {
     const role = (await getCurrentUser())?.role;
@@ -16,6 +18,15 @@ export async function POST(request: NextRequest) {
 
     const buffer = await file.arrayBuffer();
     const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+
+    if (formData.get("mode") === "preview") {
+      const preview = analyzeWorkbook(workbook);
+      if (preview.sheets.length === 0) {
+        return NextResponse.json({ error: "File không chứa sheet TRACKING nào nhận diện được" }, { status: 400 });
+      }
+      return NextResponse.json({ preview });
+    }
+
     const stats = await importWorkbook(workbook);
 
     return NextResponse.json({

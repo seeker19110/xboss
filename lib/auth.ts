@@ -76,4 +76,14 @@ export const CAN = {
   editProgress: (r?: Role) => r === "admin" || r === "pm" || r === "engineer" || r === "subcon",
   editStructure: (r?: Role) => r === "admin" || r === "pm", // sửa tên/code/trục/căn hộ
   viewDashboard: (r?: Role) => r !== "subcon",
+  manageUsers: (r?: Role) => r === "admin",
+  assign: (r?: Role) => r === "admin" || r === "pm", // gán task cho người làm
 };
+
+// Sub-con chỉ được thao tác trên task được giao cho mình.
+export async function canTouchTask(user: User, taskId: number): Promise<boolean> {
+  if (user.role !== "subcon") return true;
+  const t = await queryOne<{ assigned_to: number | null }>(
+    `SELECT assigned_to FROM tasks WHERE id = ?`, taskId);
+  return t?.assigned_to === user.id;
+}

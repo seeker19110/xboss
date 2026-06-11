@@ -1,9 +1,11 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Clock, Upload, LayoutGrid, ChevronRight, FileDown, Printer, LogOut } from 'lucide-react';
+import { AlertTriangle, Clock, Upload, LayoutGrid, ChevronRight, FileDown, Printer, LogOut, Users, KeyRound, Package, CalendarRange } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { SHEET_SLUGS, slugFromCode } from '@/lib/sheets';
 import NotificationBell from '@/app/components/NotificationBell';
+import FloorHeatmap from '@/app/components/FloorHeatmap';
+import ForecastCards from '@/app/components/ForecastCards';
 
 const STATUS_LABEL: Record<string, string> = {
   chuan_bi: 'Chuẩn bị', dang_thi_cong: 'Đang thi công',
@@ -92,6 +94,10 @@ export default function Dashboard() {
                 <p className="text-sm font-medium leading-tight">{me.name}</p>
                 <p className="text-xs text-emerald-400 leading-tight">{ROLE_LABEL[me.role] ?? me.role}</p>
               </div>
+              {me.role === 'admin' && (
+                <a href="/users" title="Quản lý người dùng" className="text-zinc-400 hover:text-emerald-400"><Users className="w-4 h-4" /></a>
+              )}
+              <a href="/password" title="Đổi mật khẩu" className="text-zinc-400 hover:text-amber-400"><KeyRound className="w-4 h-4" /></a>
               <button onClick={logout} title="Đăng xuất" className="text-zinc-400 hover:text-red-400"><LogOut className="w-4 h-4" /></button>
             </div>
           )}
@@ -108,6 +114,16 @@ export default function Dashboard() {
               <ChevronRight className="w-3.5 h-3.5 text-zinc-600" />
             </a>
           ))}
+          <a href="/materials"
+            className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm transition">
+            <Package className="w-4 h-4 text-sky-400" /> Vật tư
+            <ChevronRight className="w-3.5 h-3.5 text-zinc-600" />
+          </a>
+          <a href="/gantt"
+            className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm transition">
+            <CalendarRange className="w-4 h-4 text-amber-400" /> Gantt
+            <ChevronRight className="w-3.5 h-3.5 text-zinc-600" />
+          </a>
         </div>
 
         {/* KPI Cards */}
@@ -136,6 +152,12 @@ export default function Dashboard() {
               : <div key={k.sheetType} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">{inner}</div>;
           })}
         </div>
+
+        {/* Heatmap tầng × sheet */}
+        <FloorHeatmap />
+
+        {/* Dự báo hoàn thành */}
+        <ForecastCards />
 
         {/* Bar chart */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-8">

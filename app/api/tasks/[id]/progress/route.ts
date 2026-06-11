@@ -1,16 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { deriveStatus, recomputePackage } from "@/lib/recompute";
+import { getCurrentUser, canTouchTask } from "@/lib/auth";
 import type { StatusSlug } from "@/lib/status";
 
 export const dynamic = "force-dynamic";
 
 type Task = { id: number; package_id: number; status: string | null; end_date: string | null; progress_percent: number | null };
 
-// PATCH /api/tasks/:id/progress  body: { progress: 0..1, status?, note?, changedBy? }
+// PATCH /api/tasks/:id/progress  body: { progress: 0..1, status?, note? }
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  if (!(await canTouchTask(user, id)))
+    return NextResponse.json({ error: "Bạn chỉ được cập nhật task được giao cho mình" }, { status: 403 });
 
   const body = await req.json().catch(() => ({}));
   let progress = Number(body.progress);
@@ -26,7 +33,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     progress, status, id);
   await run(`INSERT INTO task_history (task_id, old_progress, new_progress, status, note, changed_by)
        VALUES (?, ?, ?, ?, ?, ?)`,
-    id, task.progress_percent ?? 0, progress, status, body.note ?? null, body.changedBy ?? "web");
+    id, task.progress_percent ?? 0, progress, status, body.note ?? null, user.name);
 
   await recomputePackage(task.package_id);
 

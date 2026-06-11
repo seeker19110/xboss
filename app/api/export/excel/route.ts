@@ -13,8 +13,8 @@ export async function GET() {
 
   const today = todayISO();
 
-  const delayed = await query<{ code: string; name: string; status: string; startDate: string | null; endDate: string | null; progressPercent: number; floorLabel: string | null; sheetType: string }>(
-    `SELECT t.code, t.name, t.status, t.start_date AS "startDate", t.end_date AS "endDate",
+  const delayed = await query<{ boqCode: string | null; code: string; name: string; status: string; startDate: string | null; endDate: string | null; progressPercent: number; floorLabel: string | null; sheetType: string }>(
+    `SELECT t.boq_code AS "boqCode", t.code, t.name, t.status, t.start_date AS "startDate", t.end_date AS "endDate",
             t.progress_percent AS "progressPercent", wp.floor_label AS "floorLabel", st.code AS "sheetType"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
@@ -33,7 +33,7 @@ export async function GET() {
       GROUP BY st.id, st.code ORDER BY st.id`, today);
 
   const delayedRows = delayed.map((d) => ({
-    "Mã": d.code, "Chi tiết công việc": d.name, "Sheet": d.sheetType,
+    "BOQCODE": d.boqCode ?? "", "Mã": d.code, "Chi tiết công việc": d.name, "Sheet": d.sheetType,
     "Tầng": d.floorLabel ?? "", "Bắt đầu": d.startDate ?? "", "Kết thúc": d.endDate ?? "",
     "% Tiến độ": Math.round((d.progressPercent ?? 0) * 100) + "%",
     "Trạng thái": STATUS_LABEL[d.status as keyof typeof STATUS_LABEL] ?? d.status,

@@ -1,0 +1,16 @@
+{
+  "name": "XBoss — ACMV Tracking",
+  "short_name": "XBoss",
+  "description": "Quản lý tiến độ thi công ACMV — TT AVIO Tháp A",
+  "lang": "vi",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

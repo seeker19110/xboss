@@ -2,6 +2,7 @@ import * as XLSX from "xlsx";
 import { run, queryOne, insertId } from "@/lib/db";
 import { toStatusSlug, parseProgress } from "@/lib/status";
 import { deriveStatus, recomputePackage } from "@/lib/recompute";
+import { makeBoq } from "@/lib/boq";
 
 export const SHEET_MAP: Record<string, { code: string; name: string; responsible?: string }> = {
   "TRACKING OGTĐ": { code: "OGTĐ", name: "Ống gió trục đứng", responsible: "Mr. Thừa" },
@@ -40,28 +41,100 @@ function cleanLabel(v: unknown): string | null {
 
 type DimDef = { col: number; label: string; index: number };
 
-// Đọc tiêu đề → danh sách cột dimension (xử lý header gộp ô như OGHL).
-function parseDimDefs(rows: unknown[][]): DimDef[] {
+// Lấy URL hợp lệ từ ô Excel (cột Link Bản vẽ BBNT).
+function urlOf(v: unknown): string | null {
+  const s = String(v ?? "").trim();
+  return /^https?:\/\//i.test(s) ? s : null;
+}
+
+// Đọc tiêu đề → danh sách cột dimension + vị trí cột Link (xử lý header gộp ô như OGHL).
+function parseDimDefs(rows: unknown[][]): { defs: DimDef[]; linkCol: number } {
   const header = rows[HEADER_ROW] ?? [];
-  let linkCol = header.length;
+  let linkCol = -1;
   for (let c = DIM_START; c < header.length; c++) {
     if (header[c] != null && String(header[c]).toLowerCase().includes("link")) { linkCol = c; break; }
   }
+  const end = linkCol === -1 ? header.length : linkCol;
   const defs: DimDef[] = [];
   let group = "", sub = 0, idx = 0;
-  for (let c = DIM_START; c < linkCol; c++) {
+  for (let c = DIM_START; c < end; c++) {
     const cleaned = cleanLabel(header[c]);
     let label: string;
     if (cleaned) { group = cleaned; sub = 1; label = group; }
     else { sub++; label = group ? `${group} (${sub})` : `Cột ${c}`; }
     defs.push({ col: c, label, index: ++idx });
   }
-  return defs;
+  return { defs, linkCol };
 }
 
 export type ImportStats = {
   totalRows: number; packages: number; tasks: number; dimensions: number; errors: string[]; sheets: string[];
 };
+
+// ===== Preview (dry-run): phân tích file, KHÔNG ghi DB =====
+export type SheetPreview = {
+  sheetName: string; code: string; label: string;
+  packages: number; tasks: number; dimColumns: number;
+  warnings: string[];
+};
+export type PreviewResult = {
+  sheets: SheetPreview[];
+  unknownSheets: string[];   // sheet trong file không nằm trong SHEET_MAP (bỏ qua khi import)
+  totalPackages: number; totalTasks: number; totalWarnings: number;
+};
+
+export function analyzeWorkbook(workbook: XLSX.WorkBook): PreviewResult {
+  const result: PreviewResult = { sheets: [], unknownSheets: [], totalPackages: 0, totalTasks: 0, totalWarnings: 0 };
+
+  for (const sheetName of workbook.SheetNames) {
+    const info = SHEET_MAP[sheetName];
+    if (!info) {
+      if (sheetName.toUpperCase().includes("TRACKING")) result.unknownSheets.push(sheetName);
+      continue;
+    }
+
+    const ws = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null }) as unknown[][];
+    const { defs: dimDefs } = parseDimDefs(rows);
+    const sp: SheetPreview = { sheetName, code: info.code, label: info.name, packages: 0, tasks: 0, dimColumns: dimDefs.length, warnings: [] };
+
+    let hasPkg = false;
+    for (let i = DATA_START; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row) continue;
+      const code = String(row[0] ?? "").trim();
+      const stt = String(row[1] ?? "").trim();
+      const name = String(row[2] ?? "").trim();
+      if (!name) continue;
+      const isTopGroup = /^[A-Z]+$/.test(stt) && !/^[A-Z]+\d/.test(code);
+      if (isTopGroup) continue;
+
+      const startDate = toISO(row[4]);
+      const endDate = toISO(row[6]);
+      if (row[4] != null && row[4] !== "" && !startDate)
+        sp.warnings.push(`Dòng ${i + 1}: ngày bắt đầu không đọc được ("${String(row[4]).slice(0, 20)}")`);
+      if (row[6] != null && row[6] !== "" && !endDate)
+        sp.warnings.push(`Dòng ${i + 1}: ngày kết thúc không đọc được ("${String(row[6]).slice(0, 20)}")`);
+      if (startDate && endDate && startDate > endDate)
+        sp.warnings.push(`Dòng ${i + 1}: ngày bắt đầu (${startDate}) sau ngày kết thúc (${endDate})`);
+
+      const isPkg = !!code && !code.includes(",") && intStt(stt);
+      if (isPkg) { sp.packages++; hasPkg = true; }
+      else if (hasPkg) sp.tasks++;
+      else sp.warnings.push(`Dòng ${i + 1}: task "${name.slice(0, 30)}" đứng trước nhóm đầu tiên — sẽ bị bỏ qua`);
+    }
+
+    if (dimDefs.length === 0)
+      sp.warnings.push(`Không nhận diện được cột lưới checkbox — task sẽ chỉ có % tổng`);
+
+    result.sheets.push(sp);
+    result.totalPackages += sp.packages;
+    result.totalTasks += sp.tasks;
+    result.totalWarnings += sp.warnings.length;
+  }
+
+  return result;
+}
 
 type Row = { id: number };
 
@@ -90,7 +163,7 @@ export async function importWorkbook(workbook: XLSX.WorkBook): Promise<ImportSta
 
     const ws = workbook.Sheets[sheetName];
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null }) as unknown[][];
-    const dimDefs = parseDimDefs(rows);
+    const { defs: dimDefs, linkCol } = parseDimDefs(rows);
 
     let st = await queryOne<Row>(`SELECT id FROM sheet_types WHERE tower_id = ? AND code = ?`, towerId, info.code);
     if (!st) {
@@ -122,18 +195,21 @@ export async function importWorkbook(workbook: XLSX.WorkBook): Promise<ImportSta
       try {
         const isPkg = !!code && !code.includes(",") && intStt(stt);
 
+        const drawingUrl = linkCol >= 0 ? urlOf(row[linkCol]) : null;
+
         if (isPkg) {
           const wpCode = code;
           const existing = await queryOne<Row>(`SELECT id FROM work_packages WHERE sheet_type_id = ? AND code = ?`, st.id, wpCode);
           if (!existing) {
             currentPkgId = await insertId(
-              `INSERT INTO work_packages (sheet_type_id, code, seq_no, floor_label, name, start_date, end_date, duration_days, status, progress)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-              st.id, wpCode, stt, floorOf(name), name, startDate, endDate, durationDays, ghiChu);
+              `INSERT INTO work_packages (boq_code, sheet_type_id, code, seq_no, floor_label, name, start_date, end_date, duration_days, status, progress, drawing_url)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+              makeBoq(info.code, wpCode), st.id, wpCode, stt, floorOf(name), name, startDate, endDate, durationDays, ghiChu, drawingUrl);
             stats.packages++;
           } else {
-            await run(`UPDATE work_packages SET start_date = ?, end_date = ?, duration_days = ? WHERE id = ?`,
-              startDate, endDate, durationDays, existing.id);
+            // Giữ nguyên boq_code (người dùng có thể đã sửa tay).
+            await run(`UPDATE work_packages SET start_date = ?, end_date = ?, duration_days = ?, drawing_url = COALESCE(?, drawing_url) WHERE id = ?`,
+              startDate, endDate, durationDays, drawingUrl, existing.id);
             currentPkgId = existing.id;
           }
           currentPkgCode = wpCode;
@@ -155,15 +231,16 @@ export async function importWorkbook(workbook: XLSX.WorkBook): Promise<ImportSta
           const existing = await queryOne<Row>(`SELECT id FROM tasks WHERE package_id = ? AND code = ?`, currentPkgId, taskCode);
           if (!existing) {
             taskId = await insertId(
-              `INSERT INTO tasks (package_id, code, seq_no, name, note, status, start_date, end_date, duration_days, progress_percent)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-              currentPkgId, taskCode, stt || null, name, row[3] != null ? String(row[3]) : null,
-              status, startDate, endDate, durationDays, progress);
+              `INSERT INTO tasks (boq_code, package_id, code, seq_no, name, note, status, start_date, end_date, duration_days, progress_percent, drawing_url)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              makeBoq(info.code, taskCode), currentPkgId, taskCode, stt || null, name, row[3] != null ? String(row[3]) : null,
+              status, startDate, endDate, durationDays, progress, drawingUrl);
             stats.tasks++;
           } else {
             taskId = existing.id;
-            await run(`UPDATE tasks SET status = ?, progress_percent = ?, start_date = ?, end_date = ?, duration_days = ? WHERE id = ?`,
-              status, progress, startDate, endDate, durationDays, taskId);
+            // Giữ nguyên boq_code (người dùng có thể đã sửa tay).
+            await run(`UPDATE tasks SET status = ?, progress_percent = ?, start_date = ?, end_date = ?, duration_days = ?, drawing_url = COALESCE(?, drawing_url) WHERE id = ?`,
+              status, progress, startDate, endDate, durationDays, drawingUrl, taskId);
             await run(`DELETE FROM progress_dimensions WHERE task_id = ?`, taskId);
           }
 

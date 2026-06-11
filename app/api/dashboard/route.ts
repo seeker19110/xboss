@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
 import { query, todayISO } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+
   const today = todayISO();
 
-  // Task trễ: end_date < hôm nay AND progress < 1 AND chưa hoàn thành/nghiệm thu
+  // Task trễ: end_date < hôm nay AND progress < 1 AND chưa hoàn thành/nghiệm thu.
+  // Sub-con chỉ thấy task được giao cho mình.
+  const subconFilter = user.role === "subcon" ? `AND t.assigned_to = ${user.id}` : "";
   const delayedTasks = await query(
     `SELECT t.id, t.code, t.name, t.status,
             t.start_date AS "startDate", t.end_date AS "endDate",
@@ -18,7 +24,7 @@ export async function GET() {
        JOIN sheet_types st ON wp.sheet_type_id = st.id
       WHERE t.end_date IS NOT NULL AND t.end_date < ?
         AND t.progress_percent < 1
-        AND t.status NOT IN ('hoan_thanh','nghiem_thu')
+        AND t.status NOT IN ('hoan_thanh','nghiem_thu') ${subconFilter}
       ORDER BY t.end_date`,
     today,
   );

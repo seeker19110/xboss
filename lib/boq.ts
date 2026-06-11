@@ -1,0 +1,27 @@
+import { queryOne } from "@/lib/db";
+import { slugFromCode } from "@/lib/sheets";
+
+// Sinh BOQCODE mặc định: <SLUG-SHEET>-<mã hàng>, vd: OGTD-A1, OGCH-OGCH4,06
+export function makeBoq(sheetCode: string, rowCode: string): string {
+  const prefix = (slugFromCode(sheetCode) ?? sheetCode).toUpperCase();
+  return `${prefix}-${rowCode}`;
+}
+
+// BOQCODE phải duy nhất trên TOÀN BỘ các hàng (cả nhóm lẫn task).
+// Trả về mô tả nơi đang dùng mã, hoặc null nếu chưa ai dùng.
+export async function boqTakenBy(
+  boq: string,
+  exclude?: { table: "tasks" | "work_packages"; id: number },
+): Promise<string | null> {
+  const t = await queryOne<{ id: number; code: string; name: string }>(
+    `SELECT id, code, name FROM tasks WHERE boq_code = ?`, boq);
+  if (t && !(exclude?.table === "tasks" && exclude.id === t.id))
+    return `task ${t.code} — ${t.name}`;
+
+  const w = await queryOne<{ id: number; code: string; name: string }>(
+    `SELECT id, code, name FROM work_packages WHERE boq_code = ?`, boq);
+  if (w && !(exclude?.table === "work_packages" && exclude.id === w.id))
+    return `nhóm ${w.code} — ${w.name}`;
+
+  return null;
+}

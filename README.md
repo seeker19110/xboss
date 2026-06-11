@@ -55,12 +55,20 @@ Khi DB chưa có user, hệ thống tự tạo 4 tài khoản demo:
 
 ## Tính năng chính
 
-- **Dashboard**: KPI cards per sheet, bar chart tiến độ, bảng công việc trễ (lọc theo sheet / tầng / trạng thái)
-- **Tracking sheet** (`/tracking/ogtd|oghl|ogch|odnn1|odnn2`): drill-down nhóm → task → lưới checkbox theo kích thước ống / căn hộ, tự tính lại % khi toggle
+- **BOQCODE**: mỗi hàng (nhóm + task) có mã BOQ **duy nhất toàn hệ thống**, hiển thị ở cột đầu lưới tracking, Admin/PM sửa được — hệ thống chặn nhập trùng và chỉ rõ mã đang bị hàng nào dùng
+- **Dashboard**: KPI cards per sheet, **heatmap tiến độ tầng × hệ** (bấm ô mở thẳng sheet tại tầng đó), **dự báo ngày hoàn thành** từng hệ (ngoại suy tốc độ 14 ngày), bar chart, bảng công việc trễ (lọc theo sheet / tầng / trạng thái)
+- **Gantt** (`/gantt`): timeline các nhóm theo ngày bắt đầu/kết thúc, màu theo trạng thái, % hoàn thành phủ trong thanh, vạch hôm nay, mốc tháng
+- **Tracking sheet** (`/tracking/ogtd|oghl|ogch|odnn1|odnn2`): drill-down nhóm → task → lưới checkbox theo kích thước ống / căn hộ, tự tính lại % khi toggle; **tự đồng bộ khi người khác cập nhật** (poll 10s + toast)
 - **Thông báo trễ hạn** 🔔: chuông trên header, tự phát hiện task quá deadline
-- **Lịch sử tiến độ**: mọi thay đổi % được ghi `task_history` (ai, lúc nào) — xem qua `GET /api/tasks/:id/history`
-- **Import Excel**: upload file tracking gốc, parse 5 sheet, upsert không trùng lặp
+- **Lịch sử tiến độ**: mọi thay đổi % được ghi `task_history` (ai, lúc nào) — xem timeline qua nút 🕐 trên từng task
+- **Import Excel 2 bước**: upload → xem trước (số nhóm/task/cảnh báo từng sheet, chưa ghi DB) → xác nhận import
 - **Export**: Excel (KPI + danh sách trễ) và báo cáo in PDF (`/report`)
+- **Quản lý người dùng** (`/users`, Admin): thêm/xoá user, đổi vai trò, đặt lại mật khẩu; mọi người tự đổi mật khẩu tại `/password`
+- **Giao task** (Admin/PM): gán task cho người làm ngay trên lưới tracking; thầu phụ chỉ thấy và chỉ được cập nhật task của mình, thông báo trễ cũng lọc theo
+- **Quản lý vật tư** (`/materials`): định mức / đã dùng theo hệ, trạng thái đặt hàng → về kho → đã dùng, cảnh báo vượt định mức
+- **Link bản vẽ / BBNT**: gắn link bản vẽ nghiệm thu cho từng nhóm và task (icon 🔗 trong lưới); import tự đọc cột Link từ Excel
+- **PWA**: cài được lên màn hình chính điện thoại (Add to Home Screen), asset cache offline qua service worker
+- **Email báo cáo hằng ngày** 8:00 sáng: tổng hợp KPI + việc mới trễ gửi Admin/PM (cấu hình SMTP trong `.env`; Vercel Cron có sẵn trong `vercel.json`, VPS dùng crontab gọi `/api/cron/daily-report` với `CRON_SECRET`)
 - **RBAC**: Admin/PM được import/export/sửa cấu trúc; Kỹ sư/Thầu phụ cập nhật tiến độ
 
 ---

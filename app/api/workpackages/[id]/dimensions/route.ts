@@ -1,19 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-type TaskRow = { id: number; code: string; name: string; status: string; progressPercent: number };
+type TaskRow = { id: number; code: string; name: string; status: string; progressPercent: number; boqCode: string | null; drawingUrl: string | null; assignedTo: number | null; assigneeName: string | null };
 type DimRow = { id: number; taskId: number; label: string; installed: number };
 
 // GET /api/workpackages/:id/dimensions → ma trận sub-task × dimension (kiểu lưới Excel).
+// Sub-con chỉ thấy task được giao cho mình.
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+
   const pkgId = parseInt(params.id);
   if (isNaN(pkgId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  const subconFilter = user.role === "subcon" ? `AND t.assigned_to = ${user.id}` : "";
   const tasks = await query<TaskRow>(
-    `SELECT id, code, name, status, progress_percent AS "progressPercent"
-       FROM tasks WHERE package_id = ? ORDER BY id`, pkgId);
+    `SELECT t.id, t.code, t.name, t.status, t.progress_percent AS "progressPercent",
+            t.boq_code AS "boqCode", t.drawing_url AS "drawingUrl",
+            t.assigned_to AS "assignedTo", u.name AS "assigneeName"
+       FROM tasks t
+       LEFT JOIN users u ON t.assigned_to = u.id
+      WHERE t.package_id = ? ${subconFilter} ORDER BY t.id`, pkgId);
 
   const dims = await query<DimRow>(
     `SELECT pd.id, pd.task_id AS "taskId", pd.dimension_label AS label, pd.installed
