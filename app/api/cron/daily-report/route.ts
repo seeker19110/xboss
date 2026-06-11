@@ -8,11 +8,12 @@ export const dynamic = "force-dynamic";
 
 // GET /api/cron/daily-report
 // Gọi bởi cron (Vercel Cron / crontab) lúc 8:00 sáng VN, hoặc Admin/PM gọi tay để xem trước.
-// Xác thực: Authorization: Bearer <CRON_SECRET> | ?secret=<CRON_SECRET> | session Admin/PM.
+// Xác thực: Authorization: Bearer <CRON_SECRET> | session Admin/PM.
+// (Không nhận secret qua query param — URL bị ghi vào access log.)
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
   const auth = req.headers.get("authorization");
-  const bySecret = !!secret && (auth === `Bearer ${secret}` || req.nextUrl.searchParams.get("secret") === secret);
+  const bySecret = !!secret && auth === `Bearer ${secret}`;
   const bySession = CAN.export((await getCurrentUser())?.role ?? undefined);
   if (!bySecret && !bySession)
     return NextResponse.json({ error: "Không có quyền (cần CRON_SECRET hoặc đăng nhập Admin/PM)" }, { status: 401 });

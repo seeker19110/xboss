@@ -3,8 +3,18 @@ import { cookies } from "next/headers";
 import { queryOne, run } from "@/lib/db";
 
 export const COOKIE = "xboss_session";
-const SECRET = process.env.XBOSS_SECRET ?? "xboss-dev-secret-change-me";
 const SESSION_DAYS = 7;
+
+// Fallback chỉ dành cho dev — production bắt buộc đặt XBOSS_SECRET,
+// nếu không ai cũng có thể tự ký cookie phiên (kể cả phiên admin).
+// Kiểm tra lúc dùng (không phải lúc import) để next build không cần secret.
+function getSecret(): string {
+  const s = process.env.XBOSS_SECRET;
+  if (s) return s;
+  if (process.env.NODE_ENV === "production")
+    throw new Error("XBOSS_SECRET chưa được cấu hình — bắt buộc khi chạy production.");
+  return "xboss-dev-secret-change-me";
+}
 
 export type Role = "admin" | "pm" | "engineer" | "subcon";
 export type User = { id: number; name: string; email: string; role: Role };
@@ -25,7 +35,7 @@ export function verifyPassword(pw: string, stored: string): boolean {
 
 // ===== Cookie phiên (stateless, ký HMAC) =====
 function sign(payload: string): string {
-  return createHmac("sha256", SECRET).update(payload).digest("hex");
+  return createHmac("sha256", getSecret()).update(payload).digest("hex");
 }
 export function makeToken(userId: number): string {
   const exp = Date.now() + SESSION_DAYS * 86400_000;
@@ -36,7 +46,10 @@ function parseToken(token: string): number | null {
   const parts = token.split(".");
   if (parts.length !== 3) return null;
   const [uid, exp, mac] = parts;
-  if (sign(`${uid}.${exp}`) !== mac) return null;
+  const expected = Buffer.from(sign(`${uid}.${exp}`), "hex");
+  let given: Buffer;
+  try { given = Buffer.from(mac, "hex"); } catch { return null; }
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
   if (Number(exp) < Date.now()) return null;
   return Number(uid);
 }

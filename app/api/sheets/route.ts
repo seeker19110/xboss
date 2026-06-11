@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { query, todayISO } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 // Danh sách sheet type + KPI tổng hợp.
 export async function GET() {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+
   const today = todayISO();
   const sheets = await query(
     `SELECT st.id, st.code, st.name, st.responsible,
