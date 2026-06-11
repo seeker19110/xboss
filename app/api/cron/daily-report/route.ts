@@ -3,6 +3,7 @@ import nodemailer from "nodemailer";
 import { query } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { buildDailyReport, reportToHtml, reportToTelegramText, sendTelegram } from "@/lib/report";
+import { sendPushToAll } from "@/lib/push";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,16 @@ export async function GET(req: NextRequest) {
   const telegramError = await sendTelegram(reportToTelegramText(report, process.env.APP_URL));
   const telegramSent = telegramError === null;
 
+  // Web Push tóm tắt tới mọi thiết bị đã đăng ký (no-op nếu chưa cấu hình VAPID).
+  let pushSent = 0;
+  if (report.totalDelayed > 0) {
+    pushSent = await sendPushToAll({
+      title: `🏗️ ${report.totalDelayed} việc đang trễ`,
+      body: `${report.newDelayed.length} mới quá hạn trong 24h · ${report.dueSoon.length} sắp đến hạn`,
+      url: "/",
+    }).catch(() => 0);
+  }
+
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
   if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
     // Chưa cấu hình SMTP → trả về nội dung để xem trước (không gửi email).
@@ -40,6 +51,7 @@ export async function GET(req: NextRequest) {
       emailSent: false,
       telegramSent,
       telegramError: telegramSent ? undefined : telegramError,
+      pushSent,
       reason: "Chưa cấu hình SMTP_HOST / SMTP_USER / SMTP_PASS — trả về preview",
       wouldSendTo: to,
       report,
@@ -62,7 +74,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     sent: true, emailSent: true, to, telegramSent,
-    telegramError: telegramSent ? undefined : telegramError,
+    telegramError: telegramSent ? undefined : telegramError, pushSent,
     totalDelayed: report.totalDelayed, newDelayed: report.newDelayed.length,
   });
 }

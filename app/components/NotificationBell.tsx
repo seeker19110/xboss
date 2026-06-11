@@ -1,16 +1,72 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { Bell, CheckCheck } from 'lucide-react';
+import { Bell, CheckCheck, BellRing, BellOff } from 'lucide-react';
 
 type Notif = { id: number; taskId: number | null; type: string; message: string; isRead: number; createdAt: string };
 
 const POLL_MS = 30_000;
 
+// VAPID public key (base64url) → Uint8Array cho pushManager.subscribe.
+function urlBase64ToUint8Array(base64: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64.length % 4)) % 4);
+  const raw = atob((base64 + padding).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+type PushState = 'unavailable' | 'off' | 'on' | 'denied' | 'busy';
+
 export default function NotificationBell() {
   const [items, setItems] = useState<Notif[]>([]);
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
+  const [push, setPush] = useState<PushState>('unavailable');
+  const keyRef = useRef<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+
+  // Kiểm tra khả năng Web Push: cần SW đã đăng ký (production) + VAPID key trên server.
+  useEffect(() => {
+    (async () => {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (!reg) return; // dev hoặc SW chưa sẵn sàng
+      const r = await fetch('/api/push/subscribe').catch(() => null);
+      const key = r?.ok ? (await r.json()).key : null;
+      if (!key) return; // server chưa cấu hình VAPID
+      keyRef.current = key;
+      if (Notification.permission === 'denied') { setPush('denied'); return; }
+      const sub = await reg.pushManager.getSubscription();
+      setPush(sub ? 'on' : 'off');
+    })();
+  }, []);
+
+  async function togglePush() {
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg || !keyRef.current) return;
+    setPush('busy');
+    try {
+      const existing = await reg.pushManager.getSubscription();
+      if (existing) {
+        await fetch('/api/push/subscribe', {
+          method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ endpoint: existing.endpoint }),
+        });
+        await existing.unsubscribe();
+        setPush('off');
+        return;
+      }
+      if ((await Notification.requestPermission()) !== 'granted') { setPush('denied'); return; }
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(keyRef.current) as BufferSource,
+      });
+      const res = await fetch('/api/push/subscribe', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sub.toJSON()),
+      });
+      if (!res.ok) { await sub.unsubscribe(); setPush('off'); return; }
+      setPush('on');
+    } catch { setPush('off'); }
+  }
 
   async function load() {
     const r = await fetch('/api/notifications').catch(() => null);
@@ -80,6 +136,22 @@ export default function NotificationBell() {
               </button>
             ))}
           </div>
+          {push !== 'unavailable' && (
+            <div className="px-4 py-2.5 border-t border-zinc-800 bg-zinc-950/50">
+              {push === 'denied' ? (
+                <p className="text-xs text-zinc-500 flex items-center gap-1.5">
+                  <BellOff className="w-3.5 h-3.5" /> Thông báo đẩy bị chặn — bật lại trong cài đặt trình duyệt
+                </p>
+              ) : (
+                <button onClick={togglePush} disabled={push === 'busy'}
+                  className={`flex items-center gap-1.5 text-xs transition ${push === 'on' ? 'text-emerald-400 hover:text-zinc-400' : 'text-zinc-400 hover:text-emerald-400'}`}>
+                  {push === 'on'
+                    ? <><BellRing className="w-3.5 h-3.5" /> Đang nhận thông báo đẩy trên thiết bị này — bấm để tắt</>
+                    : <><Bell className="w-3.5 h-3.5" /> {push === 'busy' ? 'Đang xử lý...' : 'Bật thông báo đẩy trên thiết bị này'}</>}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
