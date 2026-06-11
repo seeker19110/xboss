@@ -107,8 +107,9 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
 
   const floors = [...new Set((data?.packages ?? []).map(p => p.floorLabel).filter((f): f is string => !!f))]
     .sort((a, b) => parseInt(a) - parseInt(b));
+  const q = query.toLowerCase();
   const packages = (data?.packages ?? []).filter(p =>
-    (!query || p.code.toLowerCase().includes(query.toLowerCase()) || p.name.toLowerCase().includes(query.toLowerCase()))
+    (!q || p.code.toLowerCase().includes(q) || p.name.toLowerCase().includes(q) || (p.boqCode ?? '').toLowerCase().includes(q))
     && (!floorFilter || p.floorLabel === floorFilter)
     && (!statusFilter || p.status === statusFilter));
 
@@ -145,30 +146,31 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
       <main className="p-4 space-y-2">
         {packages.map(p => (
           <div key={p.id} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-            <div className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/60">
-              <button onClick={() => setExpanded(s => ({ ...s, [p.id]: !s[p.id] }))} className="flex items-center gap-2 text-left">
-                {expanded[p.id] ? <ChevronDown className="w-4 h-4 text-zinc-400" /> : <ChevronRight className="w-4 h-4 text-zinc-400" />}
-                <span className="font-mono text-emerald-400 w-20">{p.code}</span>
-              </button>
-              <button onClick={() => canEdit && editPkgBoq(p)}
-                title={canEdit ? 'BOQCODE — bấm để sửa' : `BOQCODE: ${p.boqCode ?? 'chưa gán'}`}
-                className={`font-mono text-[10px] px-1.5 py-0.5 rounded bg-zinc-800/80 max-w-[130px] truncate shrink-0 ${canEdit ? 'text-amber-400 hover:bg-zinc-700 cursor-pointer' : 'text-amber-400/70 cursor-default'}`}>
-                {p.boqCode ?? '—'}
-              </button>
+            {/* Bấm bất kỳ đâu trên hàng để mở/đóng lưới; các nút bên trong stopPropagation. */}
+            <div onClick={() => setExpanded(s => ({ ...s, [p.id]: !s[p.id] }))}
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/60 cursor-pointer select-none">
+              {expanded[p.id] ? <ChevronDown className="w-4 h-4 text-zinc-400 shrink-0" /> : <ChevronRight className="w-4 h-4 text-zinc-400 shrink-0" />}
+              <span className="font-mono text-emerald-400 shrink-0 max-w-[180px] truncate" title={`BOQCODE: ${p.boqCode ?? p.code} (mã Excel: ${p.code})`}>
+                {p.boqCode ?? p.code}
+              </span>
+              {canEdit && (
+                <button onClick={e => { e.stopPropagation(); editPkgBoq(p); }} title="Sửa BOQCODE"
+                  className="text-zinc-600 hover:text-amber-400 shrink-0"><Pencil className="w-3 h-3" /></button>
+              )}
               {(p.drawingUrl || canEdit) && (
                 p.drawingUrl ? (
-                  <span className="flex items-center shrink-0">
+                  <span className="flex items-center shrink-0" onClick={e => e.stopPropagation()}>
                     <a href={p.drawingUrl} target="_blank" rel="noreferrer" title={`Bản vẽ: ${p.drawingUrl}`}
                       className="text-sky-400 hover:text-sky-300"><Link2 className="w-3.5 h-3.5" /></a>
                     {canEdit && <button onClick={() => editPkgDrawing(p)} title="Sửa link bản vẽ" className="text-zinc-600 hover:text-emerald-400 ml-0.5"><Pencil className="w-3 h-3" /></button>}
                   </span>
                 ) : (
-                  <button onClick={() => editPkgDrawing(p)} title="Thêm link bản vẽ / BBNT"
+                  <button onClick={e => { e.stopPropagation(); editPkgDrawing(p); }} title="Thêm link bản vẽ / BBNT"
                     className="text-zinc-700 hover:text-sky-400 shrink-0"><Link2 className="w-3.5 h-3.5" /></button>
                 )
               )}
               {editPkg?.id === p.id ? (
-                <span className="flex items-center gap-1 flex-1">
+                <span className="flex items-center gap-1 flex-1" onClick={e => e.stopPropagation()}>
                   <input autoFocus value={editPkg.value} onChange={e => setEditPkg({ id: p.id, value: e.target.value })}
                     onKeyDown={e => { if (e.key === 'Enter') savePkgName(p.id, editPkg.value); if (e.key === 'Escape') setEditPkg(null); }}
                     className="bg-zinc-800 border border-emerald-600 rounded px-2 py-1 text-sm flex-1 outline-none" />
@@ -176,9 +178,9 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
                   <button onClick={() => setEditPkg(null)} className="text-zinc-500"><X className="w-4 h-4" /></button>
                 </span>
               ) : (
-                <span className="font-medium flex-1 flex items-center gap-2">
-                  {p.name}
-                  {canEdit && <button onClick={() => setEditPkg({ id: p.id, value: p.name })} className="text-zinc-600 hover:text-emerald-400"><Pencil className="w-3.5 h-3.5" /></button>}
+                <span className="font-medium flex-1 flex items-center gap-2 min-w-0">
+                  <span className="truncate">{p.name}</span>
+                  {canEdit && <button onClick={e => { e.stopPropagation(); setEditPkg({ id: p.id, value: p.name }); }} className="text-zinc-600 hover:text-emerald-400 shrink-0"><Pencil className="w-3.5 h-3.5" /></button>}
                 </span>
               )}
               <span className="text-xs text-zinc-500 w-10 text-right shrink-0">{p.floorLabel || ''}</span>
@@ -295,8 +297,8 @@ function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged }: { pkgId: numb
         <thead>
           <tr className="bg-zinc-950">
             <th className="sticky left-0 z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-left w-[110px] min-w-[110px] max-w-[110px]">BOQ</th>
-            <th className="sticky left-[110px] z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-left w-[240px] min-w-[240px] max-w-[240px]">Công việc</th>
-            <th className="sticky left-[350px] z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-center w-14 min-w-[56px] max-w-[56px]">%</th>
+            <th className="sticky left-[110px] z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-left w-[360px] min-w-[360px] max-w-[360px]">Công việc</th>
+            <th className="sticky left-[470px] z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-center w-14 min-w-[56px] max-w-[56px]">%</th>
             {grid.columns.map(col => (
               <th key={col} className="border-b border-zinc-800 align-bottom p-1 h-28 w-8">
                 <div className="mx-auto whitespace-nowrap text-[10px] text-zinc-400 hover:text-emerald-400 cursor-default"
@@ -329,12 +331,12 @@ function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged }: { pkgId: numb
                   )
                 )}
               </td>
-              <td className="sticky left-[110px] z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 w-[240px] min-w-[240px] max-w-[240px]">
+              <td className="sticky left-[110px] z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 w-[360px] min-w-[360px] max-w-[360px]">
                 {editTask?.id === t.id ? (
                   <span className="flex items-center gap-1">
                     <input autoFocus value={editTask.value} onChange={e => setEditTask({ id: t.id, value: e.target.value })}
                       onKeyDown={e => { if (e.key === 'Enter') saveTaskName(t.id, editTask.value); if (e.key === 'Escape') setEditTask(null); }}
-                      className="bg-zinc-800 border border-emerald-600 rounded px-1 py-0.5 text-xs w-44 outline-none" />
+                      className="bg-zinc-800 border border-emerald-600 rounded px-1 py-0.5 text-xs w-72 outline-none" />
                     <button onClick={() => saveTaskName(t.id, editTask.value)} className="text-emerald-400"><Check className="w-3.5 h-3.5" /></button>
                   </span>
                 ) : (
@@ -363,7 +365,7 @@ function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged }: { pkgId: numb
                   )}
                 </div>
               </td>
-              <td className="sticky left-[350px] z-10 bg-zinc-900 border-b border-r border-zinc-800 px-1 py-1 text-center w-14 min-w-[56px] max-w-[56px]">
+              <td className="sticky left-[470px] z-10 bg-zinc-900 border-b border-r border-zinc-800 px-1 py-1 text-center w-14 min-w-[56px] max-w-[56px]">
                 <span className={Math.round(t.progressPercent * 100) === 100 ? 'text-emerald-400' : 'text-zinc-300'}>{Math.round((t.progressPercent ?? 0) * 100)}%</span>
               </td>
               {grid.columns.map(col => {

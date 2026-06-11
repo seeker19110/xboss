@@ -1,10 +1,11 @@
 import { queryOne } from "@/lib/db";
 import { slugFromCode } from "@/lib/sheets";
 
-// Sinh BOQCODE mặc định: <SLUG-SHEET>-<mã hàng>, vd: OGTD-A1, OGCH-OGCH4,06
+// Sinh BOQCODE mặc định: <SLUG-SHEET>-<mã hàng>, phân tách thống nhất bằng "-"
+// (dấu "," trong mã Excel được đổi thành "-"), vd: OGTD-A1, OGCH-OGCH4-06, ODNN1-A1-r7
 export function makeBoq(sheetCode: string, rowCode: string): string {
   const prefix = (slugFromCode(sheetCode) ?? sheetCode).toUpperCase();
-  return `${prefix}-${rowCode}`;
+  return `${prefix}-${rowCode.replace(/,/g, "-")}`;
 }
 
 // BOQCODE phải duy nhất trên TOÀN BỘ các hàng (cả nhóm lẫn task).
