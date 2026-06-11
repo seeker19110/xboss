@@ -1,6 +1,6 @@
 // Service worker XBoss — network-first cho trang + API GET, cache-first cho asset tĩnh.
 // Mất mạng (hầm, tầng kỹ thuật) vẫn xem được dữ liệu tracking đã tải lần cuối.
-const CACHE = "xboss-v3";
+const CACHE = "xboss-v4";
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => {
@@ -38,9 +38,9 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== location.origin) return;
   // API GET → network-first, mất mạng thì trả bản cache gần nhất.
-  // Trừ: ảnh (nặng) và SSE /api/events (stream — không cache được).
+  // Trừ: ảnh/tài liệu (nặng) và SSE /api/events (stream — không cache được).
   if (url.pathname.startsWith("/api/")) {
-    if (url.pathname.startsWith("/api/photos/") || url.pathname.startsWith("/api/events")) return;
+    if (url.pathname.startsWith("/api/photos/") || url.pathname.startsWith("/api/documents/") || url.pathname.startsWith("/api/events")) return;
     e.respondWith(
       fetch(e.request)
         .then((res) => {

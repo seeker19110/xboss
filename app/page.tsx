@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Clock, Upload, LayoutGrid, ChevronRight, FileDown, Printer, LogOut, Users, KeyRound, Package, CalendarRange, ClipboardList, CalendarClock } from 'lucide-react';
+import { AlertTriangle, Clock, Upload, LayoutGrid, ChevronRight, FileDown, Printer, LogOut, Users, KeyRound, Package, CalendarRange, ClipboardList, CalendarClock, CheckSquare } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { SHEET_SLUGS, slugFromCode } from '@/lib/sheets';
 import NotificationBell from '@/app/components/NotificationBell';
@@ -159,6 +159,11 @@ export default function Dashboard() {
           <a href="/gantt"
             className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm transition">
             <CalendarRange className="w-4 h-4 text-amber-400" /> Gantt
+            <ChevronRight className="w-3.5 h-3.5 text-zinc-600" />
+          </a>
+          <a href="/approvals"
+            className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm transition">
+            <CheckSquare className="w-4 h-4 text-emerald-400" /> Nghiệm thu
             <ChevronRight className="w-3.5 h-3.5 text-zinc-600" />
           </a>
           <a href="/lookahead"

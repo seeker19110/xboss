@@ -20,6 +20,18 @@ export function extForMime(mime: string): string | null {
   return MIME_EXT[mime] ?? null;
 }
 
+// Tài liệu đính kèm (biên bản nghiệm thu): PDF hoặc ảnh, tối đa 20MB.
+export const MAX_DOC_BYTES = 20 * 1024 * 1024;
+const DOC_MIME_EXT: Record<string, string> = { ...MIME_EXT, "application/pdf": ".pdf" };
+
+export function extForDocMime(mime: string): string | null {
+  return DOC_MIME_EXT[mime] ?? null;
+}
+
+export function newDocFileName(taskId: number, mime: string): string {
+  return `d${taskId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime]}`;
+}
+
 export function ensureUploadDir(): string {
   if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
   return UPLOAD_DIR;
