@@ -17,6 +17,7 @@ export async function GET() {
     `SELECT t.id, t.code, t.name, t.status,
             t.start_date AS "startDate", t.end_date AS "endDate",
             t.progress_percent AS "progressPercent",
+            t.delay_reason AS "delayReason", t.delay_note AS "delayNote",
             wp.floor_label AS "floorLabel", wp.code AS "packageCode",
             st.code AS "sheetType"
        FROM tasks t

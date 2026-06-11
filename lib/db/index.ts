@@ -155,6 +155,8 @@ ALTER TABLE notifications ADD COLUMN IF NOT EXISTS material_id INTEGER REFERENCE
 -- (Postgres coi NULL khác nhau) → cần unique index riêng theo material_id.
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_notif_material ON notifications(user_id, material_id, type) WHERE material_id IS NOT NULL;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assigned_to INTEGER REFERENCES users(id);
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS delay_reason TEXT;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS delay_note TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS boq_code TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS drawing_url TEXT;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS boq_code TEXT;

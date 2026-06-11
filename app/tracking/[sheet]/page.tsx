@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { ArrowLeft, Search, ChevronRight, ChevronDown, Pencil, Check, X, History, UserCheck, RefreshCw, Link2, Camera, Trash2, Upload, MessageSquare, Send, WifiOff, CloudUpload } from 'lucide-react';
 import { useOfflineTickQueue } from '@/app/components/offlineQueue';
+import { DELAY_REASON_LABEL } from '@/lib/delay';
 
 const STATUS_LABEL: Record<string, string> = {
   chuan_bi: 'Chuẩn bị', dang_thi_cong: 'Đang thi công',
@@ -222,7 +223,7 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
 }
 
 type Cell = { id: number; installed: boolean };
-type GridTask = { id: number; code: string; name: string; status: string; progressPercent: number; boqCode: string | null; drawingUrl: string | null; assignedTo: number | null; assigneeName: string | null; photoCount: number; commentCount: number; cells: Record<string, Cell> };
+type GridTask = { id: number; code: string; name: string; status: string; progressPercent: number; boqCode: string | null; drawingUrl: string | null; assignedTo: number | null; assigneeName: string | null; photoCount: number; commentCount: number; delayReason: string | null; cells: Record<string, Cell> };
 type Grid = { columns: string[]; tasks: GridTask[] };
 
 function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged, onOfflineTick }: { pkgId: number; canEdit: boolean; users: AppUser[]; refreshKey: number; onChanged: () => void; onOfflineTick: (dimId: number, installed: boolean) => void }) {
@@ -294,6 +295,17 @@ function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged, onOfflineTick }
     await fetch(`/api/tasks/${t.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ drawingUrl: v.trim() || null }),
     });
+    load();
+  }
+
+  async function setDelayReason(t: GridTask, reason: string) {
+    let note: string | null = null;
+    if (reason === 'khac') note = window.prompt('Ghi chú lý do trễ:') ?? null;
+    const res = await fetch(`/api/tasks/${t.id}/delay-reason`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: reason || null, note }),
+    });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); window.alert(j.error ?? 'Lỗi không xác định'); }
     load();
   }
 
@@ -395,6 +407,15 @@ function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged, onOfflineTick }
                   ) : canEdit && t.progressPercent >= 1 && (
                     <button onClick={() => approveTask(t, true)} title="Duyệt nghiệm thu (task đã 100%)"
                       className="text-[10px] text-teal-400 border border-teal-800 bg-teal-950/50 hover:bg-teal-900/60 px-1.5 py-0.5 rounded">Nghiệm thu</button>
+                  )}
+                  {t.status === 'tre' && (
+                    <select value={t.delayReason ?? ''} onChange={e => setDelayReason(t, e.target.value)}
+                      title="Nguyên nhân trễ — giúp PM thống kê và xử lý"
+                      className={`text-[10px] rounded px-1 py-0.5 outline-none border max-w-[110px] ${t.delayReason
+                        ? 'bg-red-950/60 border-red-900 text-red-300' : 'bg-zinc-800 border-zinc-700 text-zinc-500'}`}>
+                      <option value="">— Lý do trễ? —</option>
+                      {Object.entries(DELAY_REASON_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    </select>
                   )}
                   {canEdit ? (
                     <select value={t.assignedTo ?? ''} onChange={e => assignTask(t.id, e.target.value)}

@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-type TaskRow = { id: number; code: string; name: string; status: string; progressPercent: number; boqCode: string | null; drawingUrl: string | null; assignedTo: number | null; assigneeName: string | null; photoCount: number; commentCount: number };
+type TaskRow = { id: number; code: string; name: string; status: string; progressPercent: number; boqCode: string | null; drawingUrl: string | null; assignedTo: number | null; assigneeName: string | null; photoCount: number; commentCount: number; delayReason: string | null };
 type DimRow = { id: number; taskId: number; label: string; installed: number };
 
 // GET /api/workpackages/:id/dimensions → ma trận sub-task × dimension (kiểu lưới Excel).
@@ -20,7 +20,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   const tasks = await query<TaskRow>(
     `SELECT t.id, t.code, t.name, t.status, t.progress_percent AS "progressPercent",
             t.boq_code AS "boqCode", t.drawing_url AS "drawingUrl",
-            t.assigned_to AS "assignedTo", u.name AS "assigneeName",
+            t.assigned_to AS "assignedTo", u.name AS "assigneeName", t.delay_reason AS "delayReason",
             (SELECT COUNT(*) FROM task_photos p WHERE p.task_id = t.id) AS "photoCount",
             (SELECT COUNT(*) FROM task_comments c WHERE c.task_id = t.id) AS "commentCount"
        FROM tasks t

@@ -7,6 +7,7 @@ import NotificationBell from '@/app/components/NotificationBell';
 import FloorHeatmap from '@/app/components/FloorHeatmap';
 import ForecastCards from '@/app/components/ForecastCards';
 import SCurveChart from '@/app/components/SCurveChart';
+import { DELAY_REASON_LABEL } from '@/lib/delay';
 
 const STATUS_LABEL: Record<string, string> = {
   chuan_bi: 'Chuẩn bị', dang_thi_cong: 'Đang thi công',
@@ -17,6 +18,7 @@ type DelayedTask = {
   id: number; name: string; status: string;
   startDate: string; endDate: string;
   progressPercent: number; floorLabel: string; sheetType: string;
+  delayReason: string | null; delayNote: string | null;
 };
 type KPI = { sheetType: string; total: number; avgProgress: number; delayed: number };
 type Me = { id: number; name: string; email: string; role: string };
@@ -35,6 +37,7 @@ export default function Dashboard() {
   const [sheetFilter, setSheetFilter] = useState('');
   const [floorFilter, setFloorFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [reasonFilter, setReasonFilter] = useState(''); // slug | '__none' (chưa gán) | ''
   const [me, setMe] = useState<Me | null>(null);
   const [projectName, setProjectName] = useState<string | null>(null);
 
@@ -70,7 +73,28 @@ export default function Dashboard() {
   const delayed = (data?.delayedTasks ?? []).filter(t =>
     (!sheetFilter || t.sheetType === sheetFilter)
     && (!floorFilter || t.floorLabel === floorFilter)
-    && (!statusFilter || t.status === statusFilter));
+    && (!statusFilter || t.status === statusFilter)
+    && (!reasonFilter || (reasonFilter === '__none' ? !t.delayReason : t.delayReason === reasonFilter)));
+
+  // Pareto nguyên nhân trễ (trên toàn bộ task trễ, không theo filter bảng).
+  const allDelayed = data?.delayedTasks ?? [];
+  const reasonCounts = Object.keys(DELAY_REASON_LABEL)
+    .map(slug => ({ slug, label: DELAY_REASON_LABEL[slug as keyof typeof DELAY_REASON_LABEL], count: allDelayed.filter(t => t.delayReason === slug).length }))
+    .filter(r => r.count > 0)
+    .sort((a, b) => b.count - a.count);
+  const noReason = allDelayed.filter(t => !t.delayReason).length;
+  const maxReason = Math.max(1, ...reasonCounts.map(r => r.count), noReason);
+
+  async function setReason(taskId: number, reason: string) {
+    const res = await fetch(`/api/tasks/${taskId}/delay-reason`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: reason || null }),
+    });
+    if (!res.ok) return;
+    setData(d => d && ({
+      ...d, delayedTasks: d.delayedTasks.map(t => t.id === taskId ? { ...t, delayReason: reason || null } : t),
+    }));
+  }
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -190,6 +214,40 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Pareto nguyên nhân trễ */}
+        {allDelayed.length > 0 && (reasonCounts.length > 0 || noReason > 0) && (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-8">
+            <h2 className="font-semibold mb-1 text-sm text-zinc-300 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-400" /> Nguyên nhân trễ (Pareto)
+            </h2>
+            <p className="text-xs text-zinc-600 mb-3">Gán lý do trên lưới tracking hoặc bảng dưới · bấm thanh để lọc bảng trễ theo lý do</p>
+            <div className="space-y-1.5">
+              {reasonCounts.map(r => (
+                <button key={r.slug} onClick={() => setReasonFilter(f => f === r.slug ? '' : r.slug)}
+                  className={`w-full flex items-center gap-2 group ${reasonFilter === r.slug ? 'opacity-100' : reasonFilter ? 'opacity-40' : ''}`}>
+                  <span className="text-xs text-zinc-400 w-28 text-right shrink-0">{r.label}</span>
+                  <span className="flex-1 bg-zinc-800/60 rounded h-5 overflow-hidden">
+                    <span className="block h-full bg-amber-600/80 group-hover:bg-amber-500 rounded transition-all"
+                      style={{ width: `${(r.count / maxReason) * 100}%` }} />
+                  </span>
+                  <span className="text-xs text-zinc-300 w-16 text-left shrink-0">{r.count} ({Math.round((r.count / allDelayed.length) * 100)}%)</span>
+                </button>
+              ))}
+              {noReason > 0 && (
+                <button onClick={() => setReasonFilter(f => f === '__none' ? '' : '__none')}
+                  className={`w-full flex items-center gap-2 group ${reasonFilter === '__none' ? 'opacity-100' : reasonFilter ? 'opacity-40' : ''}`}>
+                  <span className="text-xs text-zinc-500 w-28 text-right shrink-0">Chưa gán lý do</span>
+                  <span className="flex-1 bg-zinc-800/60 rounded h-5 overflow-hidden">
+                    <span className="block h-full bg-zinc-600 group-hover:bg-zinc-500 rounded transition-all"
+                      style={{ width: `${(noReason / maxReason) * 100}%` }} />
+                  </span>
+                  <span className="text-xs text-zinc-500 w-16 text-left shrink-0">{noReason} ({Math.round((noReason / allDelayed.length) * 100)}%)</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Bảng trễ */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
           <div className="p-4 border-b border-zinc-800 flex flex-wrap gap-3 justify-between items-center">
@@ -223,6 +281,7 @@ export default function Dashboard() {
                   <th className="text-left p-3">KẾT THÚC</th>
                   <th className="text-left p-3">% TIẾN ĐỘ</th>
                   <th className="text-left p-3">SHEET</th>
+                  <th className="text-left p-3">NGUYÊN NHÂN</th>
                   <th className="text-left p-3">TRẠNG THÁI</th>
                 </tr>
               </thead>
@@ -239,11 +298,23 @@ export default function Dashboard() {
                       </div>
                     </td>
                     <td className="p-3"><span className="px-2 py-0.5 bg-zinc-800 rounded text-xs">{t.sheetType}</span></td>
+                    <td className="p-3" title={t.delayNote ?? undefined}>
+                      {me && me.role !== 'subcon' ? (
+                        <select value={t.delayReason ?? ''} onChange={e => setReason(t.id, e.target.value)}
+                          className={`text-xs rounded px-1.5 py-1 outline-none border max-w-[130px] ${t.delayReason
+                            ? 'bg-amber-950/60 border-amber-900 text-amber-300' : 'bg-zinc-800 border-zinc-700 text-zinc-500'}`}>
+                          <option value="">— Chưa gán —</option>
+                          {Object.entries(DELAY_REASON_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                        </select>
+                      ) : (
+                        <span className="text-xs text-zinc-400">{t.delayReason ? DELAY_REASON_LABEL[t.delayReason as keyof typeof DELAY_REASON_LABEL] : '—'}</span>
+                      )}
+                    </td>
                     <td className="p-3"><span className="px-2 py-0.5 bg-red-950 text-red-400 rounded text-xs">{STATUS_LABEL[t.status] ?? 'Đang trễ'}</span></td>
                   </tr>
                 ))}
                 {delayed.length === 0 && (
-                  <tr><td colSpan={6} className="p-8 text-center text-zinc-500">Không có công việc trễ. Hãy import file Excel nếu chưa có dữ liệu.</td></tr>
+                  <tr><td colSpan={7} className="p-8 text-center text-zinc-500">Không có công việc trễ. Hãy import file Excel nếu chưa có dữ liệu.</td></tr>
                 )}
               </tbody>
             </table>
