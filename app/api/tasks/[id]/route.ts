@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { boqTakenBy } from "@/lib/boq";
+import { recomputeTask } from "@/lib/recompute";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   vals.push(id);
   await run(`UPDATE tasks SET ${sets.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, ...vals);
+
+  // Đổi deadline có thể đổi trạng thái trễ (tre ⇄ dang_thi_cong) → tính lại.
+  if (body.endDate !== undefined || body.startDate !== undefined) await recomputeTask(id);
+
   const task = await queryOne(`SELECT id, code, name, status, boq_code AS "boqCode", drawing_url AS "drawingUrl" FROM tasks WHERE id = ?`, id);
   return NextResponse.json({ task });
 }

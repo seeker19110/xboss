@@ -21,6 +21,13 @@ type AppUser = { id: number; name: string; role: string };
 
 const SYNC_POLL_MS = 10_000;
 
+// Ngày rút gọn d/M cho dòng task (đỡ chiếm chỗ trên lưới).
+const fmtShortDate = (d: string | null) => {
+  if (!d) return '?';
+  const dt = new Date(d);
+  return isNaN(dt.getTime()) ? '?' : `${dt.getDate()}/${dt.getMonth() + 1}`;
+};
+
 export default function TrackingPage({ params }: { params: { sheet: string } }) {
   const { sheet } = params;
   const [data, setData] = useState<Data | null>(null);
@@ -223,7 +230,7 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
 }
 
 type Cell = { id: number; installed: boolean };
-type GridTask = { id: number; code: string; name: string; status: string; progressPercent: number; boqCode: string | null; drawingUrl: string | null; assignedTo: number | null; assigneeName: string | null; photoCount: number; commentCount: number; delayReason: string | null; cells: Record<string, Cell> };
+type GridTask = { id: number; code: string; name: string; status: string; progressPercent: number; boqCode: string | null; drawingUrl: string | null; assignedTo: number | null; assigneeName: string | null; photoCount: number; commentCount: number; delayReason: string | null; startDate: string | null; endDate: string | null; cells: Record<string, Cell> };
 type Grid = { columns: string[]; tasks: GridTask[] };
 
 function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged, onOfflineTick }: { pkgId: number; canEdit: boolean; users: AppUser[]; refreshKey: number; onChanged: () => void; onOfflineTick: (dimId: number, installed: boolean) => void }) {
@@ -232,6 +239,9 @@ function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged, onOfflineTick }
   const [historyTask, setHistoryTask] = useState<GridTask | null>(null);
   const [photosTask, setPhotosTask] = useState<GridTask | null>(null);
   const [commentsTask, setCommentsTask] = useState<GridTask | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  // Mục tiêu sửa ngày: 1 task hoặc danh sách task đã chọn (bulk).
+  const [datesTarget, setDatesTarget] = useState<{ ids: number[]; init: { start: string; end: string } } | null>(null);
 
   const load = useCallback(() => {
     fetch(`/api/workpackages/${pkgId}/dimensions`).then(r => r.json()).then(setGrid)
@@ -298,6 +308,31 @@ function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged, onOfflineTick }
     load();
   }
 
+  function toggleSelect(id: number) {
+    setSelected(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }
+
+  // Lưu ngày cho 1 hoặc nhiều task — ô để trống = giữ nguyên giá trị cũ.
+  async function saveDates(ids: number[], start: string, end: string) {
+    const body: Record<string, string> = {};
+    if (start) body.startDate = start;
+    if (end) body.endDate = end;
+    if (!Object.keys(body).length) { setDatesTarget(null); return; }
+    await Promise.all(ids.map(id => fetch(`/api/tasks/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    })));
+    setDatesTarget(null); setSelected(new Set()); load(); onChanged();
+  }
+
+  async function bulkAssign(value: string) {
+    if (!value) return;
+    await Promise.all([...selected].map(id => fetch(`/api/tasks/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assignedTo: value === 'none' ? null : Number(value) }),
+    })));
+    setSelected(new Set()); load();
+  }
+
   async function setDelayReason(t: GridTask, reason: string) {
     let note: string | null = null;
     if (reason === 'khac') note = window.prompt('Ghi chú lý do trễ:') ?? null;
@@ -333,6 +368,20 @@ function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged, onOfflineTick }
 
   return (
     <div className="border-t border-zinc-800 overflow-auto max-h-[70vh]">
+      {canEdit && selected.size > 0 && (
+        <div className="sticky top-0 left-0 z-30 flex flex-wrap items-center gap-2 bg-zinc-950 border-b border-emerald-900 px-3 py-2 text-xs">
+          <span className="text-emerald-400 font-medium">{selected.size} task đã chọn</span>
+          <select defaultValue="" onChange={e => { bulkAssign(e.target.value); e.target.value = ''; }}
+            className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 outline-none text-zinc-300">
+            <option value="" disabled>Gán cho...</option>
+            <option value="none">— Bỏ gán —</option>
+            {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+          </select>
+          <button onClick={() => setDatesTarget({ ids: [...selected], init: { start: '', end: '' } })}
+            className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded px-2 py-1 text-zinc-300">📅 Đặt ngày</button>
+          <button onClick={() => setSelected(new Set())} className="text-zinc-500 hover:text-zinc-300 ml-auto">Bỏ chọn</button>
+        </div>
+      )}
       <table className="text-xs border-collapse">
         <thead>
           <tr className="bg-zinc-950">
@@ -381,12 +430,22 @@ function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged, onOfflineTick }
                   </span>
                 ) : (
                   <div className="flex items-center gap-2 min-w-0">
+                    {canEdit && (
+                      <input type="checkbox" checked={selected.has(t.id)} onChange={() => toggleSelect(t.id)}
+                        title="Chọn để gán/đặt ngày hàng loạt"
+                        className="w-3 h-3 accent-emerald-500 cursor-pointer shrink-0" />
+                    )}
                     <span className="font-mono text-zinc-500 shrink-0">{t.code}</span>
                     <span className="truncate flex-1" title={t.name}>{t.name}</span>
                     {canEdit && <button onClick={() => setEditTask({ id: t.id, value: t.name })} className="shrink-0 text-zinc-600 hover:text-emerald-400"><Pencil className="w-3 h-3" /></button>}
                   </div>
                 )}
                 <div className="flex items-center gap-2 mt-0.5">
+                  <button onClick={() => canEdit && setDatesTarget({ ids: [t.id], init: { start: t.startDate ?? '', end: t.endDate ?? '' } })}
+                    title={canEdit ? 'Sửa ngày bắt đầu / kết thúc' : `${t.startDate ?? '?'} → ${t.endDate ?? '?'}`}
+                    className={`text-[10px] whitespace-nowrap ${t.status === 'tre' ? 'text-red-400' : 'text-zinc-500'} ${canEdit ? 'hover:text-emerald-400 hover:underline cursor-pointer' : 'cursor-default'}`}>
+                    📅 {fmtShortDate(t.startDate)}→{fmtShortDate(t.endDate)}
+                  </button>
                   <button onClick={() => setAllInRow(t, true)} className="text-[10px] text-emerald-500 hover:underline">Tất cả</button>
                   <button onClick={() => setAllInRow(t, false)} className="text-[10px] text-zinc-500 hover:underline">Bỏ</button>
                   <button onClick={() => setHistoryTask(t)} title="Lịch sử tiến độ"
@@ -452,6 +511,7 @@ function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged, onOfflineTick }
       {historyTask && <HistoryModal task={historyTask} onClose={() => setHistoryTask(null)} />}
       {photosTask && <PhotosModal task={photosTask} onClose={() => { setPhotosTask(null); load(); }} />}
       {commentsTask && <CommentsModal task={commentsTask} onClose={() => { setCommentsTask(null); load(); }} />}
+      {datesTarget && <DatesModal target={datesTarget} onSave={saveDates} onClose={() => setDatesTarget(null)} />}
     </div>
   );
 }
@@ -558,6 +618,53 @@ function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => void })
           <img src={`/api/photos/${viewer.id}`} alt={viewer.caption ?? ''} className="max-w-full max-h-full object-contain rounded-lg" />
         </div>
       )}
+    </div>
+  );
+}
+
+// Modal sửa ngày bắt đầu/kết thúc — dùng cho 1 task hoặc nhiều task đã chọn.
+// Ô để trống = giữ nguyên giá trị hiện tại của từng task.
+function DatesModal({ target, onSave, onClose }: {
+  target: { ids: number[]; init: { start: string; end: string } };
+  onSave: (ids: number[], start: string, end: string) => void;
+  onClose: () => void;
+}) {
+  const [start, setStart] = useState(target.init.start);
+  const [end, setEnd] = useState(target.init.end);
+  const [saving, setSaving] = useState(false);
+  const bulk = target.ids.length > 1;
+  const invalid = !!start && !!end && end < start;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+        <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2">
+          <h3 className="font-semibold text-sm">📅 {bulk ? `Đặt ngày cho ${target.ids.length} task` : 'Sửa ngày bắt đầu / kết thúc'}</h3>
+          <button onClick={onClose} className="ml-auto text-zinc-400 hover:text-white"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="p-4 space-y-3">
+          {bulk && <p className="text-xs text-zinc-500">Ô để trống sẽ giữ nguyên ngày hiện tại của từng task.</p>}
+          <div>
+            <label className="text-xs text-zinc-400">Ngày bắt đầu</label>
+            <input type="date" value={start} onChange={e => setStart(e.target.value)}
+              className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600 [color-scheme:dark]" />
+          </div>
+          <div>
+            <label className="text-xs text-zinc-400">Ngày kết thúc (deadline)</label>
+            <input type="date" value={end} onChange={e => setEnd(e.target.value)}
+              className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600 [color-scheme:dark]" />
+          </div>
+          {invalid && <p className="text-xs text-red-400">Ngày kết thúc phải sau ngày bắt đầu.</p>}
+          <div className="flex gap-2 pt-1">
+            <button onClick={() => { setSaving(true); onSave(target.ids, start, end); }}
+              disabled={saving || invalid || (!start && !end)}
+              className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-zinc-800 disabled:text-zinc-500 rounded-lg py-2 text-sm font-medium transition">
+              {saving ? 'Đang lưu...' : 'Lưu'}
+            </button>
+            <button onClick={onClose} className="px-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm">Huỷ</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
