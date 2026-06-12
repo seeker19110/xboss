@@ -682,17 +682,17 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
           {/* ── Hàng header cột (chỉ khi mở và có dữ liệu) ── */}
           {showTable && (
             <tr className="bg-zinc-950">
-              <th className={`${stkBoq} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-center text-zinc-500 font-medium`}
+              <th className={`${stkBoq} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium`}
                 style={{ left: 0 }}>BOQ</th>
-              <th className={`${stkCode} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-center text-zinc-500 font-medium`}
+              <th className={`${stkCode} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium`}
                 style={{ left: LEFT_CODE }}>Mã</th>
-              <th className={`${stkName} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-left text-zinc-500 font-medium`}
+              <th className={`${stkName} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium`}
                 style={{ left: isMobile ? 0 : LEFT_NAME }}>Công việc</th>
-              <th className={`${stkPct} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-center text-zinc-500 font-medium`}
+              <th className={`${stkPct} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium`}
                 style={{ left: LEFT_PCT }}>%</th>
               {grid.columns.map(col => (
-                <th key={col} className="border-b border-zinc-800 p-0 overflow-hidden" style={{ width: W_DIM }}>
-                  <div className="flex items-end justify-center" style={{ height: 88 }}>
+                <th key={col} className="border-b border-zinc-800 p-0 overflow-hidden align-middle" style={{ width: W_DIM }}>
+                  <div className="flex items-center justify-center" style={{ height: 88 }}>
                     <div className="text-[10px] text-zinc-500 hover:text-emerald-400 cursor-default overflow-hidden"
                       style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', maxHeight: 84, lineHeight: '1.2' }}
                       title={canEdit ? `${col} — bấm để đổi tên` : col}
