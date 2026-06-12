@@ -525,7 +525,8 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
   const noData = expanded && grid && grid.columns.length === 0;
 
   // Chiều rộng cột — định nghĩa 1 chỗ, dùng chung cho hàng nhóm lẫn bảng task
-  const W_BOQ  = 110;
+  const showBoq = canEdit; // BOQ chỉ hiển thị cho Admin/PM
+  const W_BOQ  = showBoq ? 110 : 0;
   const W_CODE = 80;
   const W_NAME = isMobile ? 150 : 280;
   const W_PCT  = 56;
@@ -558,7 +559,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
       {/* ── Bảng duy nhất: hàng nhóm + header cột + task rows ── */}
       <table className="text-xs border-collapse table-fixed" style={{ width: 'max-content', minWidth: '100%' }}>
         <colgroup>
-          <col style={{ width: W_BOQ }} />
+          {showBoq && <col style={{ width: W_BOQ }} />}
           <col style={{ width: W_CODE }} />
           <col style={{ width: W_NAME }} />
           <col style={{ width: W_PCT }} />
@@ -568,29 +569,34 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
         <thead>
           {/* ── Hàng tiêu đề nhóm ── */}
           <tr className="bg-zinc-900 hover:bg-zinc-800 border-b border-zinc-800 cursor-pointer select-none group">
-            {/* Cột BOQ */}
-            <td className={`${stkBoq} z-20 bg-inherit border-r border-zinc-800 px-2 py-3.5 align-middle`}
-              style={{ left: 0, width: W_BOQ, minWidth: W_BOQ }}
-              onClick={onToggle}>
-              <div className="flex items-center gap-1">
-                {expanded
-                  ? <ChevronDown className="w-4 h-4 text-zinc-400 shrink-0" />
-                  : <ChevronRight className="w-4 h-4 text-zinc-400 shrink-0" />}
-                <span className="font-mono text-xs text-emerald-400 truncate flex-1"
-                  title={`BOQCODE: ${pkg.boqCode ?? pkg.code} (mã Excel: ${pkg.code})`}>
-                  {pkg.boqCode ?? pkg.code}
-                </span>
-                {canEdit && (
-                  <button onClick={e => { e.stopPropagation(); editPkgBoq(); }} title="Sửa BOQCODE"
-                    className="text-zinc-700 hover:text-amber-400 shrink-0"><Pencil className="w-3 h-3" /></button>
-                )}
-              </div>
-            </td>
+            {/* Cột BOQ — chỉ Admin/PM */}
+            {showBoq && (
+              <td className={`${stkBoq} z-20 bg-inherit border-r border-zinc-800 px-2 py-3.5 align-middle`}
+                style={{ left: 0, width: W_BOQ, minWidth: W_BOQ }}
+                onClick={onToggle}>
+                <div className="flex items-center gap-1">
+                  {expanded
+                    ? <ChevronDown className="w-4 h-4 text-zinc-400 shrink-0" />
+                    : <ChevronRight className="w-4 h-4 text-zinc-400 shrink-0" />}
+                  <span className="font-mono text-xs text-emerald-400 truncate flex-1"
+                    title={`BOQCODE: ${pkg.boqCode ?? pkg.code} (mã Excel: ${pkg.code})`}>
+                    {pkg.boqCode ?? pkg.code}
+                  </span>
+                  {canEdit && (
+                    <button onClick={e => { e.stopPropagation(); editPkgBoq(); }} title="Sửa BOQCODE"
+                      className="text-zinc-700 hover:text-amber-400 shrink-0"><Pencil className="w-3 h-3" /></button>
+                  )}
+                </div>
+              </td>
+            )}
 
             {/* Cột Tầng/Mã */}
             <td className={`${stkCode} z-20 bg-inherit border-r border-zinc-800 px-1 py-3.5 text-center align-middle`}
               style={{ left: LEFT_CODE, width: W_CODE, minWidth: W_CODE }}
               onClick={onToggle}>
+              {!showBoq && (expanded
+                ? <ChevronDown className="w-4 h-4 text-zinc-400 inline mr-1 shrink-0" />
+                : <ChevronRight className="w-4 h-4 text-zinc-400 inline mr-1 shrink-0" />)}
               <span className="text-xs text-zinc-500">{pkg.floorLabel ?? ''}</span>
             </td>
 
@@ -682,8 +688,8 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
           {/* ── Hàng header cột (chỉ khi mở và có dữ liệu) ── */}
           {showTable && (
             <tr className="bg-zinc-950">
-              <th className={`${stkBoq} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium`}
-                style={{ left: 0 }}>BOQ</th>
+              {showBoq && <th className={`${stkBoq} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium`}
+                style={{ left: 0 }}>BOQ</th>}
               <th className={`${stkCode} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium`}
                 style={{ left: LEFT_CODE }}>Mã</th>
               <th className={`${stkName} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium`}
@@ -726,26 +732,28 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
             {grid.tasks.map((t, ti) => (
               <Fragment key={t.id}>
               <tr className="hover:bg-zinc-800/30 transition-colors">
-                <td className={`${stkBoq} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 text-center align-top overflow-hidden`}
-                  style={{ left: 0 }}>
-                  <button onClick={() => canEdit && editTaskBoq(t)}
-                    title={canEdit ? `${t.boqCode ?? 'Chưa gán'} — bấm để sửa` : t.boqCode ?? 'Chưa gán'}
-                    className={`font-mono text-[10px] truncate block w-full text-center ${canEdit ? 'text-amber-400 hover:underline cursor-pointer' : 'text-amber-400/70 cursor-default'}`}>
-                    {t.boqCode ?? '—'}
-                  </button>
-                  {(t.drawingUrl || canEdit) && (
-                    t.drawingUrl ? (
-                      <span className="flex items-center justify-center gap-0.5 mt-0.5">
-                        <a href={t.drawingUrl} target="_blank" rel="noreferrer" title={`Bản vẽ: ${t.drawingUrl}`}
-                          className="text-sky-400 hover:text-sky-300"><Link2 className="w-3 h-3" /></a>
-                        {canEdit && <button onClick={() => editTaskDrawing(t)} className="text-zinc-600 hover:text-emerald-400"><Pencil className="w-2.5 h-2.5" /></button>}
-                      </span>
-                    ) : (
-                      <button onClick={() => editTaskDrawing(t)} title="Thêm link bản vẽ / BBNT"
-                        className="block mx-auto mt-0.5 text-zinc-700 hover:text-sky-400"><Link2 className="w-3 h-3" /></button>
-                    )
-                  )}
-                </td>
+                {showBoq && (
+                  <td className={`${stkBoq} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 text-center align-top overflow-hidden`}
+                    style={{ left: 0 }}>
+                    <button onClick={() => canEdit && editTaskBoq(t)}
+                      title={canEdit ? `${t.boqCode ?? 'Chưa gán'} — bấm để sửa` : t.boqCode ?? 'Chưa gán'}
+                      className={`font-mono text-[10px] truncate block w-full text-center ${canEdit ? 'text-amber-400 hover:underline cursor-pointer' : 'text-amber-400/70 cursor-default'}`}>
+                      {t.boqCode ?? '—'}
+                    </button>
+                    {(t.drawingUrl || canEdit) && (
+                      t.drawingUrl ? (
+                        <span className="flex items-center justify-center gap-0.5 mt-0.5">
+                          <a href={t.drawingUrl} target="_blank" rel="noreferrer" title={`Bản vẽ: ${t.drawingUrl}`}
+                            className="text-sky-400 hover:text-sky-300"><Link2 className="w-3 h-3" /></a>
+                          {canEdit && <button onClick={() => editTaskDrawing(t)} className="text-zinc-600 hover:text-emerald-400"><Pencil className="w-2.5 h-2.5" /></button>}
+                        </span>
+                      ) : (
+                        <button onClick={() => editTaskDrawing(t)} title="Thêm link bản vẽ / BBNT"
+                          className="block mx-auto mt-0.5 text-zinc-700 hover:text-sky-400"><Link2 className="w-3 h-3" /></button>
+                      )
+                    )}
+                  </td>
+                )}
                 <td className={`${stkCode} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 text-center align-top overflow-hidden`}
                   style={{ left: LEFT_CODE }}>
                   <div className="flex items-center justify-center gap-1">
