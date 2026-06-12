@@ -692,9 +692,9 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                 style={{ left: LEFT_PCT }}>%</th>
               {grid.columns.map(col => (
                 <th key={col} className="border-b border-zinc-800 p-0 overflow-hidden align-middle" style={{ width: W_DIM }}>
-                  <div className="flex items-center justify-center" style={{ height: 88 }}>
+                  <div className="flex items-center justify-center py-2">
                     <div className="text-[10px] text-zinc-500 hover:text-emerald-400 cursor-default overflow-hidden"
-                      style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', maxHeight: 84, lineHeight: '1.2' }}
+                      style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', lineHeight: '1.2' }}
                       title={canEdit ? `${col} — bấm để đổi tên` : col}
                       onClick={() => canEdit && renameColumn(col)}>{col}</div>
                   </div>
