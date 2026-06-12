@@ -133,16 +133,6 @@ export default function Dashboard() {
       </AppHeader>
 
       <main className="p-4 sm:p-6">
-        {/* Nav vào các sheet tracking */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          {sheets.map(s => (
-            <a key={s.slug} href={`/tracking/${s.slug}`} title={s.name}
-              className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm transition">
-              <LayoutGrid className="w-4 h-4 text-emerald-400" /> {s.code}
-              <ChevronRight className="w-3.5 h-3.5 text-zinc-600" />
-            </a>
-          ))}
-        </div>
 
         {/* KPI Cards — cuộn ngang, không xuống hàng */}
         <div className="overflow-x-auto mb-4">
