@@ -300,6 +300,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
   const [grid, setGrid] = useState<Grid | null>(null);
   const [editName, setEditName] = useState<string | null>(null);
   const [editFloor, setEditFloor] = useState<string | null>(null);
+  const [editDays, setEditDays] = useState<string | null>(null);
   const [showDatesModal, setShowDatesModal] = useState(false);
   const [editTask, setEditTask] = useState<{ id: number; value: string } | null>(null);
   const [historyTask, setHistoryTask] = useState<GridTask | null>(null);
@@ -333,6 +334,19 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ drawingUrl: v.trim() || null }),
     });
     onChanged();
+  }
+
+  async function savePkgDays(val: string) {
+    const n = parseInt(val);
+    if (!pkg.startDate || isNaN(n) || n < 1) { setEditDays(null); return; }
+    const end = new Date(pkg.startDate);
+    end.setDate(end.getDate() + n - 1);
+    const endDate = end.toISOString().slice(0, 10);
+    await fetch(`/api/workpackages/${pkg.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endDate }),
+    });
+    setEditDays(null); onChanged();
   }
 
   async function savePkgFloor(floor: string) {
@@ -676,28 +690,45 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
               className="px-3 py-3.5 align-middle" style={{ minWidth: 520 }}
               onClick={e => { if (!(e.target as Element).closest('button,a')) onToggle(); }}>
               <div className="flex items-center gap-3">
-                <button onClick={e => { e.stopPropagation(); if (canEdit) setShowDatesModal(true); }}
-                  title={canEdit ? 'Sửa ngày nhóm' : `${pkg.startDate ?? '?'} → ${pkg.endDate ?? '?'}`}
-                  className={`flex items-center gap-1 shrink-0 ${canEdit ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
-                  <span className="flex flex-col items-center w-14">
+                <div className="flex items-center gap-1 shrink-0">
+                  {/* Bắt đầu + Kết thúc → mở modal */}
+                  <button onClick={e => { e.stopPropagation(); if (canEdit) setShowDatesModal(true); }}
+                    title={canEdit ? 'Sửa ngày nhóm' : `${pkg.startDate ?? '?'} → ${pkg.endDate ?? '?'}`}
+                    className={`flex flex-col items-center w-14 ${canEdit ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
                     <span className="text-[9px] text-zinc-600 leading-none">Bắt đầu</span>
                     <span className="text-[13px] text-zinc-500 leading-snug">{fmtShortDate(pkg.startDate)}</span>
-                  </span>
+                  </button>
                   <span className="w-1.5 text-zinc-700 self-end pb-0.5">|</span>
-                  <span className="flex flex-col items-center w-[52px]">
-                    <span className="text-[9px] text-zinc-600 leading-none">Số ngày</span>
-                    <span className="text-[13px] text-zinc-600 leading-snug">
-                      {diffDays(pkg.startDate, pkg.endDate) != null
-                        ? `${diffDays(pkg.startDate, pkg.endDate)}n`
-                        : <CalendarDays className="w-[14px] h-[14px] text-zinc-700 inline" />}
+                  {/* Số ngày → inline edit */}
+                  {editDays !== null ? (
+                    <span className="flex flex-col items-center w-[52px]" onClick={e => e.stopPropagation()}>
+                      <span className="text-[9px] text-zinc-600 leading-none">Số ngày</span>
+                      <input autoFocus type="number" min={1} value={editDays}
+                        onChange={e => setEditDays(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') savePkgDays(editDays); if (e.key === 'Escape') setEditDays(null); }}
+                        onBlur={() => savePkgDays(editDays)}
+                        className="bg-zinc-800 border border-emerald-600 rounded px-1 py-0 text-[13px] w-full text-center outline-none font-mono" />
                     </span>
-                  </span>
+                  ) : (
+                    <button onClick={e => { e.stopPropagation(); if (canEdit) setEditDays(String(diffDays(pkg.startDate, pkg.endDate) ?? '')); }}
+                      title={canEdit ? 'Sửa số ngày' : ''}
+                      className={`flex flex-col items-center w-[52px] ${canEdit ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
+                      <span className="text-[9px] text-zinc-600 leading-none">Số ngày</span>
+                      <span className="text-[13px] text-zinc-600 leading-snug">
+                        {diffDays(pkg.startDate, pkg.endDate) != null
+                          ? `${diffDays(pkg.startDate, pkg.endDate)}n`
+                          : <CalendarDays className="w-[14px] h-[14px] text-zinc-700 inline" />}
+                      </span>
+                    </button>
+                  )}
                   <span className="w-1.5 text-zinc-700 self-end pb-0.5">|</span>
-                  <span className="flex flex-col items-center w-14">
+                  <button onClick={e => { e.stopPropagation(); if (canEdit) setShowDatesModal(true); }}
+                    title={canEdit ? 'Sửa ngày nhóm' : `${pkg.startDate ?? '?'} → ${pkg.endDate ?? '?'}`}
+                    className={`flex flex-col items-center w-14 ${canEdit ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
                     <span className="text-[9px] text-zinc-600 leading-none">Kết thúc</span>
                     <span className="text-[13px] text-zinc-500 leading-snug">{fmtShortDate(pkg.endDate)}</span>
-                  </span>
-                </button>
+                  </button>
+                </div>
                 <span className="text-[13px] text-zinc-500 w-[67px] text-right shrink-0">{pkg.tasks.length} task</span>
                 <div className="flex items-center gap-2 w-44 shrink-0">
                   <div className="bg-zinc-800 rounded-full h-2 flex-1">
