@@ -91,7 +91,8 @@ export default function AppDialogs() {
       pending.current.push(r);
       setCurrent(c => {
         if (c) return c; // đang mở dialog khác — xếp hàng
-        const next = pending.current.shift()!;
+        const next = pending.current.shift();
+        if (!next) return c;
         setValue(next.kind === 'prompt' ? next.defaultValue : '');
         return next;
       });
