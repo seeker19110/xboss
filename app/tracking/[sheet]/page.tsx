@@ -678,16 +678,25 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
               <div className="flex items-center gap-3">
                 <button onClick={e => { e.stopPropagation(); if (canEdit) setShowDatesModal(true); }}
                   title={canEdit ? 'Sửa ngày nhóm' : `${pkg.startDate ?? '?'} → ${pkg.endDate ?? '?'}`}
-                  className={`flex items-center gap-1 text-[13px] shrink-0 ${canEdit ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
-                  <span className="w-14 text-center text-zinc-500">{fmtShortDate(pkg.startDate)}</span>
-                  <span className="w-1.5 text-zinc-700">|</span>
-                  <span className="w-[67px] text-center text-zinc-600">
-                    {diffDays(pkg.startDate, pkg.endDate) != null
-                      ? `${diffDays(pkg.startDate, pkg.endDate)}n`
-                      : <CalendarDays className="w-[14px] h-[14px] text-zinc-700 inline" />}
+                  className={`flex items-center gap-1 shrink-0 ${canEdit ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
+                  <span className="flex flex-col items-center w-14">
+                    <span className="text-[9px] text-zinc-600 leading-none">BĐ</span>
+                    <span className="text-[13px] text-zinc-500 leading-snug">{fmtShortDate(pkg.startDate)}</span>
                   </span>
-                  <span className="w-1.5 text-zinc-700">|</span>
-                  <span className="w-14 text-center text-zinc-500">{fmtShortDate(pkg.endDate)}</span>
+                  <span className="w-1.5 text-zinc-700 self-end pb-0.5">|</span>
+                  <span className="flex flex-col items-center w-[52px]">
+                    <span className="text-[9px] text-zinc-600 leading-none">Ngày</span>
+                    <span className="text-[13px] text-zinc-600 leading-snug">
+                      {diffDays(pkg.startDate, pkg.endDate) != null
+                        ? `${diffDays(pkg.startDate, pkg.endDate)}n`
+                        : <CalendarDays className="w-[14px] h-[14px] text-zinc-700 inline" />}
+                    </span>
+                  </span>
+                  <span className="w-1.5 text-zinc-700 self-end pb-0.5">|</span>
+                  <span className="flex flex-col items-center w-14">
+                    <span className="text-[9px] text-zinc-600 leading-none">KT</span>
+                    <span className="text-[13px] text-zinc-500 leading-snug">{fmtShortDate(pkg.endDate)}</span>
+                  </span>
                 </button>
                 <span className="text-[13px] text-zinc-500 w-[67px] text-right shrink-0">{pkg.tasks.length} task</span>
                 <div className="flex items-center gap-2 w-44 shrink-0">
