@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
-import { ArrowLeft, Package, Plus, Trash2, AlertTriangle, History, X } from 'lucide-react';
+import { ArrowLeft, Package, Plus, Trash2, AlertTriangle, History, X, ChevronUp, ChevronDown } from 'lucide-react';
 
 type Material = {
   id: number; sheetTypeId: number | null; boqCode: string | null; name: string; unit: string | null;
@@ -54,6 +54,20 @@ export default function MaterialsPage() {
 
   const patch = (id: number, body: object) => api(`/api/materials/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
   const remove = (m: Material) => { if (window.confirm(`Xoá vật tư "${m.name}"?`)) api(`/api/materials/${m.id}`, { method: 'DELETE' }); };
+
+  const moveMaterial = (m: Material, direction: 'up' | 'down') =>
+    api(`/api/materials/${m.id}/move`, { method: 'PATCH', body: JSON.stringify({ direction }) });
+
+  const insertAfter = (m: Material) => {
+    const sheetTypeId = m.sheetTypeId ?? (sheetFilter ? Number(sheetFilter) : undefined);
+    if (!sheetTypeId) { setError('Chọn hệ trước khi chèn hàng'); return; }
+    const name = window.prompt('Tên vật tư mới:');
+    if (!name?.trim()) return;
+    api('/api/materials', {
+      method: 'POST',
+      body: JSON.stringify({ name: name.trim(), sheetTypeId, afterId: m.id }),
+    });
+  };
 
   function editBoq(m: Material) {
     const v = window.prompt('Mã BOQ của vật tư (duy nhất toàn hệ thống — tránh trùng mã đặt hàng; để trống = xoá mã):', m.boqCode ?? '');
@@ -126,7 +140,7 @@ export default function MaterialsPage() {
               </tr>
             </thead>
             <tbody>
-              {materials.map(m => {
+              {materials.map((m, mi) => {
                 const ratio = m.qtyPlanned > 0 ? m.qtyUsed / m.qtyPlanned : 0;
                 const over = m.qtyPlanned > 0 && m.qtyUsed > m.qtyPlanned;
                 return (
@@ -178,6 +192,16 @@ export default function MaterialsPage() {
                     <td className="p-3 text-right whitespace-nowrap">
                       <button onClick={() => setHistoryMat(m)} title="Lịch sử nhập/xuất"
                         className="text-zinc-500 hover:text-emerald-400 mr-2"><History className="w-4 h-4" /></button>
+                      {canEdit && (
+                        <>
+                          <button onClick={() => moveMaterial(m, 'up')} disabled={mi === 0} title="Di chuyển lên"
+                            className="text-zinc-600 hover:text-zinc-300 disabled:opacity-20 mr-1"><ChevronUp className="w-4 h-4" /></button>
+                          <button onClick={() => moveMaterial(m, 'down')} disabled={mi === materials.length - 1} title="Di chuyển xuống"
+                            className="text-zinc-600 hover:text-zinc-300 disabled:opacity-20 mr-1"><ChevronDown className="w-4 h-4" /></button>
+                          <button onClick={() => insertAfter(m)} title="Chèn vật tư mới sau hàng này"
+                            className="text-zinc-600 hover:text-emerald-400 mr-2"><Plus className="w-4 h-4" /></button>
+                        </>
+                      )}
                       {canDelete && (
                         <button onClick={() => remove(m)} title="Xoá" className="text-zinc-500 hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
                       )}

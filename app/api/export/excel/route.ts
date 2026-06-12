@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
        JOIN sheet_types st ON wp.sheet_type_id = st.id
        LEFT JOIN users u ON t.assigned_to = u.id
       ${sheetFilter}
-      ORDER BY st.id, wp.id, t.id`, ...sheetParams);
+      ORDER BY st.id, wp.sort_order, wp.id, t.sort_order, t.id`, ...sheetParams);
 
   const allDims = await query<DimRow>(
     `SELECT d.task_id AS "taskId", d.dimension_label AS label, d.installed
@@ -112,7 +112,7 @@ export async function GET(req: NextRequest) {
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
       ${sheetFilter}
-      ORDER BY d.task_id, d.id`, ...sheetParams);
+      ORDER BY d.task_id, d.sort_order, d.id`, ...sheetParams);
 
   const delayedRows = delayed.map((d) => ({
     "BOQCODE": d.boqCode ?? "", "Mã": d.code, "Chi tiết công việc": d.name, "Sheet": d.sheetType,

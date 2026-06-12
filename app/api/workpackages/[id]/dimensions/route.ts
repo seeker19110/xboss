@@ -26,14 +26,14 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
             (SELECT COUNT(*) FROM task_comments c WHERE c.task_id = t.id) AS "commentCount"
        FROM tasks t
        LEFT JOIN users u ON t.assigned_to = u.id
-      WHERE t.package_id = ? ${subconFilter} ORDER BY t.id`, pkgId);
+      WHERE t.package_id = ? ${subconFilter} ORDER BY t.sort_order, t.id`, pkgId);
 
   const dims = await query<DimRow>(
     `SELECT pd.id, pd.task_id AS "taskId", pd.dimension_label AS label, pd.installed
        FROM progress_dimensions pd
        JOIN tasks t ON pd.task_id = t.id
       WHERE t.package_id = ?
-      ORDER BY pd.id`, pkgId);
+      ORDER BY pd.sort_order, pd.id`, pkgId);
 
   // Cột = nhãn dimension theo thứ tự xuất hiện đầu tiên.
   const columns: string[] = [];

@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
   const pkgs = await query<Pkg>(
     `SELECT id, code, seq_no AS "seqNo", floor_label AS "floorLabel", name, status, progress,
             boq_code AS "boqCode", drawing_url AS "drawingUrl"
-       FROM work_packages WHERE sheet_type_id = ? ORDER BY id`, st.id);
+       FROM work_packages WHERE sheet_type_id = ? ORDER BY sort_order, id`, st.id);
 
   const subconFilter = user.role === "subcon" ? `AND t.assigned_to = ${user.id}` : "";
   const tasks = await query<Task>(
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
        JOIN work_packages wp ON t.package_id = wp.id
        LEFT JOIN users u ON t.assigned_to = u.id
       WHERE wp.sheet_type_id = ? ${subconFilter}
-      ORDER BY t.code`, st.id);
+      ORDER BY t.sort_order, t.id`, st.id);
 
   const byPkg = new Map<number, Task[]>();
   for (const t of tasks) {

@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS work_packages (
   duration_days INTEGER,
   status TEXT DEFAULT 'chuan_bi',
   progress DOUBLE PRECISION DEFAULT 0,
+  sort_order INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE (sheet_type_id, code)
 );
@@ -81,6 +82,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   duration_days INTEGER,
   progress_percent DOUBLE PRECISION DEFAULT 0,
   assigned_to INTEGER REFERENCES users(id),
+  sort_order INTEGER DEFAULT 0,
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE (package_id, code)
 );
@@ -91,6 +93,7 @@ CREATE TABLE IF NOT EXISTS progress_dimensions (
   dimension_label TEXT NOT NULL,
   installed INTEGER DEFAULT 0,
   value DOUBLE PRECISION,
+  sort_order INTEGER DEFAULT 0,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -155,6 +158,7 @@ CREATE TABLE IF NOT EXISTS materials (
   qty_used DOUBLE PRECISION DEFAULT 0,
   status TEXT DEFAULT 'dat_hang',
   note TEXT,
+  sort_order INTEGER DEFAULT 0,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -217,6 +221,17 @@ ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS boq_code TEXT;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS drawing_url TEXT;
 
 ALTER TABLE materials ADD COLUMN IF NOT EXISTS boq_code TEXT;
+
+-- sort_order: thứ tự hiển thị hàng/cột (tách khỏi id để chèn ở bất kỳ vị trí).
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+ALTER TABLE materials ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+ALTER TABLE progress_dimensions ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+-- Seed sort_order cho dữ liệu cũ (id là thứ tự gốc khi import Excel).
+UPDATE work_packages SET sort_order = id WHERE sort_order = 0;
+UPDATE tasks SET sort_order = id WHERE sort_order = 0;
+UPDATE materials SET sort_order = id WHERE sort_order = 0;
+UPDATE progress_dimensions SET sort_order = id WHERE sort_order = 0;
 
 -- BOQCODE duy nhất (NULL = chưa gán, không tính trùng).
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_tasks_boq ON tasks(boq_code) WHERE boq_code IS NOT NULL;

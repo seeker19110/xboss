@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, insertId } from "@/lib/db";
+import { query, queryOne, insertId, run } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
 import { boqTakenBy } from "@/lib/boq";
 
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
        FROM materials m
        LEFT JOIN sheet_types st ON m.sheet_type_id = st.id
        ${filter}
-      ORDER BY m.id DESC`);
+      ORDER BY m.sort_order, m.id`);
 
   return NextResponse.json({ materials });
 }
@@ -49,11 +49,26 @@ export async function POST(req: NextRequest) {
     if (usedBy) return NextResponse.json({ error: `Mã BOQ "${boqCode}" đã được dùng bởi ${usedBy}` }, { status: 409 });
   }
 
+  // afterId: chèn sau vật tư có id này (null = thêm vào cuối).
+  const afterId = body.afterId ? Number(body.afterId) : null;
+  let sortOrder: number;
+
+  if (afterId) {
+    const after = await queryOne<{ sort_order: number }>(
+      `SELECT sort_order FROM materials WHERE id = ? AND sheet_type_id = ?`, afterId, sheetTypeId);
+    if (!after) return NextResponse.json({ error: "afterId không hợp lệ" }, { status: 400 });
+    sortOrder = after.sort_order + 1;
+    await run(`UPDATE materials SET sort_order = sort_order + 1 WHERE sheet_type_id = ? AND sort_order >= ?`, sheetTypeId, sortOrder);
+  } else {
+    const maxRow = await queryOne<{ m: number | null }>(`SELECT MAX(sort_order) AS m FROM materials WHERE sheet_type_id = ?`, sheetTypeId);
+    sortOrder = (maxRow?.m ?? 0) + 1;
+  }
+
   const id = await insertId(
-    `INSERT INTO materials (sheet_type_id, boq_code, name, unit, qty_planned, qty_used, status, note)
-     VALUES (?, ?, ?, ?, ?, 0, 'dat_hang', ?)`,
+    `INSERT INTO materials (sheet_type_id, boq_code, name, unit, qty_planned, qty_used, status, note, sort_order)
+     VALUES (?, ?, ?, ?, ?, 0, 'dat_hang', ?, ?)`,
     sheetTypeId, boqCode, name, body.unit ? String(body.unit).trim() : null,
-    Number(body.qtyPlanned) || 0, body.note ? String(body.note) : null);
+    Number(body.qtyPlanned) || 0, body.note ? String(body.note) : null, sortOrder);
 
   return NextResponse.json({ id }, { status: 201 });
 }

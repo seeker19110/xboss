@@ -1,6 +1,6 @@
 'use client';
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { ArrowLeft, Search, ChevronRight, ChevronDown, Pencil, Check, X, History, UserCheck, RefreshCw, Link2, Camera, Trash2, Upload, MessageSquare, Send, WifiOff, CloudUpload } from 'lucide-react';
+import { useEffect, useState, useCallback, useRef, Fragment } from 'react';
+import { ArrowLeft, Search, ChevronRight, ChevronDown, Pencil, Check, X, History, UserCheck, RefreshCw, Link2, Camera, Trash2, Upload, MessageSquare, Send, WifiOff, CloudUpload, Plus, ChevronUp, ChevronDown as ChevronDownIcon, Columns } from 'lucide-react';
 import { useOfflineTickQueue } from '@/app/components/offlineQueue';
 import { DELAY_REASON_LABEL } from '@/lib/delay';
 
@@ -16,7 +16,7 @@ const STATUS_CLS: Record<string, string> = {
 
 type Task = { id: number; code: string; name: string; status: string; endDate: string | null; progressPercent: number };
 type Pkg = { id: number; code: string; floorLabel: string | null; name: string; status: string; progress: number; tasks: Task[]; boqCode: string | null; drawingUrl: string | null };
-type Data = { sheet: { code: string; name: string; responsible?: string }; packages: Pkg[]; version?: string };
+type Data = { sheet: { id?: number; code: string; name: string; responsible?: string }; packages: Pkg[]; version?: string };
 type AppUser = { id: number; name: string; role: string };
 
 const SYNC_POLL_MS = 10_000;
@@ -119,6 +119,29 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
     setEditPkg(null); load();
   }
 
+  async function addPackageAfter(afterPkg: Pkg | null) {
+    const sheetTypeId = data?.sheet?.id;
+    if (!sheetTypeId) { window.alert('Không lấy được sheetTypeId'); return; }
+    const code = window.prompt('Mã nhóm mới (ví dụ: A10):');
+    if (!code?.trim()) return;
+    const name = window.prompt('Tên nhóm:');
+    if (!name?.trim()) return;
+    const floorLabel = window.prompt('Tầng (tuỳ chọn, để trống bỏ qua):') ?? '';
+    const res = await fetch('/api/workpackages', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sheetTypeId, code: code.trim(), name: name.trim(), floorLabel: floorLabel.trim() || undefined, afterId: afterPkg?.id }),
+    });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); window.alert(j.error ?? 'Lỗi không xác định'); return; }
+    load();
+  }
+
+  async function movePackage(p: Pkg, direction: 'up' | 'down') {
+    await fetch(`/api/workpackages/${p.id}/move`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ direction }),
+    });
+    load();
+  }
+
   async function editPkgBoq(p: Pkg) {
     const v = window.prompt('BOQCODE của nhóm (duy nhất toàn hệ thống, để trống = xoá mã):', p.boqCode ?? '');
     if (v === null) return;
@@ -179,7 +202,14 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
       </div>
 
       <main className="p-4 space-y-2">
-        {packages.map(p => (
+        {canEdit && (
+          <button onClick={() => addPackageAfter(null)}
+            title="Thêm nhóm mới vào đầu danh sách"
+            className="w-full flex items-center justify-center gap-1.5 border border-dashed border-zinc-700 hover:border-emerald-600 hover:text-emerald-400 text-zinc-600 rounded-xl py-1.5 text-xs transition">
+            <Plus className="w-3.5 h-3.5" /> Thêm nhóm
+          </button>
+        )}
+        {packages.map((p, pi) => (
           <div key={p.id} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
             {/* Bấm bất kỳ đâu trên hàng để mở/đóng lưới; các nút bên trong stopPropagation. */}
             <div onClick={() => setExpanded(s => ({ ...s, [p.id]: !s[p.id] }))}
@@ -225,8 +255,23 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
                 <span className="text-zinc-400 text-sm w-10 text-right">{Math.round((p.progress ?? 0) * 100)}%</span>
               </div>
               <span className={`px-2 py-0.5 rounded text-xs w-28 text-center shrink-0 ${STATUS_CLS[p.status] ?? STATUS_CLS.chuan_bi}`}>{STATUS_LABEL[p.status] ?? p.status}</span>
+              {canEdit && (
+                <span className="flex items-center gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
+                  <button onClick={() => movePackage(p, 'up')} title="Di chuyển lên" disabled={pi === 0}
+                    className="p-0.5 text-zinc-600 hover:text-zinc-300 disabled:opacity-30"><ChevronUp className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => movePackage(p, 'down')} title="Di chuyển xuống" disabled={pi === packages.length - 1}
+                    className="p-0.5 text-zinc-600 hover:text-zinc-300 disabled:opacity-30"><ChevronDownIcon className="w-3.5 h-3.5" /></button>
+                </span>
+              )}
             </div>
             {expanded[p.id] && <PkgGrid pkgId={p.id} canEdit={canEdit} users={users} refreshKey={refreshKey} onChanged={load} onOfflineTick={enqueue} />}
+            {canEdit && (
+              <button onClick={() => addPackageAfter(p)}
+                title="Chèn nhóm mới ngay dưới nhóm này"
+                className="w-full flex items-center justify-center gap-1 border-t border-dashed border-zinc-800 hover:border-emerald-700 hover:bg-emerald-950/20 hover:text-emerald-500 text-zinc-700 py-1 text-[10px] transition">
+                <Plus className="w-3 h-3" /> chèn nhóm sau
+              </button>
+            )}
           </div>
         ))}
         {packages.length === 0 && (
@@ -384,6 +429,51 @@ function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged, onOfflineTick }
     load(); onChanged();
   }
 
+  async function deleteColumn(label: string) {
+    if (!window.confirm(`Xoá cột "${label}" và toàn bộ dữ liệu checkbox trong cột này?`)) return;
+    const res = await fetch(`/api/workpackages/${pkgId}/dimensions/column?label=${encodeURIComponent(label)}`, { method: 'DELETE' });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); window.alert(j.error ?? 'Lỗi không xác định'); return; }
+    load(); onChanged();
+  }
+
+  async function addColumnAfter(afterLabel: string | null) {
+    const label = window.prompt(afterLabel ? `Tên cột mới (chèn sau "${afterLabel}"):` : 'Tên cột mới (thêm vào cuối):');
+    if (!label?.trim()) return;
+    const res = await fetch(`/api/workpackages/${pkgId}/dimensions/column`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: label.trim(), afterLabel: afterLabel ?? undefined }),
+    });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); window.alert(j.error ?? 'Lỗi không xác định'); return; }
+    load(); onChanged();
+  }
+
+  async function moveColumn(label: string, direction: 'left' | 'right') {
+    await fetch(`/api/workpackages/${pkgId}/dimensions/column/move`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label, direction }),
+    });
+    load();
+  }
+
+  async function addTaskAfter(afterTask: GridTask | null) {
+    const code = window.prompt('Mã task mới (ví dụ: A1,10):');
+    if (!code?.trim()) return;
+    const name = window.prompt('Tên task:');
+    if (!name?.trim()) return;
+    const res = await fetch(`/api/workpackages/${pkgId}/tasks`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: code.trim(), name: name.trim(), afterId: afterTask?.id }),
+    });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); window.alert(j.error ?? 'Lỗi không xác định'); return; }
+    load(); onChanged();
+  }
+
+  async function moveTask(t: GridTask, direction: 'up' | 'down') {
+    await fetch(`/api/tasks/${t.id}/move`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ direction }),
+    });
+    load();
+  }
+
   if (!grid) return <div className="px-4 py-3 text-sm text-zinc-500">Đang tải lưới...</div>;
   if (grid.columns.length === 0) {
     return <div className="px-4 py-3 text-sm text-zinc-500 border-t border-zinc-800">Nhóm này chưa có dữ liệu lưới. {grid.tasks.length} task.</div>;
@@ -411,19 +501,51 @@ function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged, onOfflineTick }
             <th className="sticky left-0 z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-left w-[110px] min-w-[110px] max-w-[110px]">BOQ</th>
             <th className="sticky left-[110px] z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-left w-[360px] min-w-[360px] max-w-[360px]">Công việc</th>
             <th className="sticky left-[470px] z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-center w-14 min-w-[56px] max-w-[56px]">%</th>
-            {grid.columns.map(col => (
+            {grid.columns.map((col, ci) => (
               <th key={col} className="border-b border-zinc-800 align-bottom p-1 h-28 w-8">
                 <div className="mx-auto whitespace-nowrap text-[10px] text-zinc-400 hover:text-emerald-400 cursor-default"
                   style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
-                  title={canEdit ? 'Bấm để đổi tên' : col}
+                  title={canEdit ? 'Bấm để đổi tên / click ← → để di chuyển' : col}
                   onClick={() => canEdit && renameColumn(col)}>{col}</div>
+                {canEdit && (
+                  <div className="flex justify-center gap-0.5 mt-0.5">
+                    <button onClick={() => moveColumn(col, 'left')} disabled={ci === 0} title="Di chuyển cột sang trái"
+                      className="text-zinc-700 hover:text-zinc-400 disabled:opacity-20 text-[8px]">←</button>
+                    <button onClick={() => addColumnAfter(col)} title={`Chèn cột mới sau "${col}"`}
+                      className="text-zinc-700 hover:text-emerald-400 text-[8px]">+</button>
+                    <button onClick={() => moveColumn(col, 'right')} disabled={ci === grid.columns.length - 1} title="Di chuyển cột sang phải"
+                      className="text-zinc-700 hover:text-zinc-400 disabled:opacity-20 text-[8px]">→</button>
+                    <button onClick={() => deleteColumn(col)} title={`Xoá cột "${col}"`}
+                      className="text-zinc-700 hover:text-red-400 text-[8px]">✕</button>
+                  </div>
+                )}
               </th>
             ))}
+            {canEdit && (
+              <th className="border-b border-zinc-800 align-bottom p-1 w-8">
+                <button onClick={() => addColumnAfter(grid.columns[grid.columns.length - 1] ?? null)}
+                  title="Thêm cột mới vào cuối"
+                  className="w-6 h-6 flex items-center justify-center text-zinc-600 hover:text-emerald-400 hover:bg-emerald-950/40 rounded mx-auto">
+                  <Columns className="w-3 h-3" />
+                </button>
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
-          {grid.tasks.map(t => (
-            <tr key={t.id} className="hover:bg-zinc-800/30">
+          {canEdit && (
+            <tr>
+              <td colSpan={3 + grid.columns.length + (canEdit ? 1 : 0)} className="p-0">
+                <button onClick={() => addTaskAfter(null)}
+                  className="w-full text-[10px] text-zinc-700 hover:text-emerald-500 hover:bg-emerald-950/20 py-0.5 flex items-center justify-center gap-1 transition">
+                  <Plus className="w-3 h-3" /> thêm task đầu nhóm
+                </button>
+              </td>
+            </tr>
+          )}
+          {grid.tasks.map((t, ti) => (
+            <Fragment key={t.id}>
+            <tr className="hover:bg-zinc-800/30">
               <td className="sticky left-0 z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 w-[110px] min-w-[110px] max-w-[110px]">
                 <button onClick={() => canEdit && editTaskBoq(t)}
                   title={canEdit ? `${t.boqCode ?? 'Chưa gán'} — bấm để sửa` : t.boqCode ?? 'Chưa gán'}
@@ -515,6 +637,14 @@ function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged, onOfflineTick }
               </td>
               <td className="sticky left-[470px] z-10 bg-zinc-900 border-b border-r border-zinc-800 px-1 py-1 text-center w-14 min-w-[56px] max-w-[56px]">
                 <span className={Math.round(t.progressPercent * 100) === 100 ? 'text-emerald-400' : 'text-zinc-300'}>{Math.round((t.progressPercent ?? 0) * 100)}%</span>
+                {canEdit && (
+                  <div className="flex justify-center gap-0.5 mt-0.5">
+                    <button onClick={() => moveTask(t, 'up')} disabled={ti === 0} title="Lên"
+                      className="text-zinc-700 hover:text-zinc-300 disabled:opacity-20"><ChevronUp className="w-3 h-3" /></button>
+                    <button onClick={() => moveTask(t, 'down')} disabled={ti === grid.tasks.length - 1} title="Xuống"
+                      className="text-zinc-700 hover:text-zinc-300 disabled:opacity-20"><ChevronDownIcon className="w-3 h-3" /></button>
+                  </div>
+                )}
               </td>
               {grid.columns.map(col => {
                 const cell = t.cells[col];
@@ -527,7 +657,19 @@ function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged, onOfflineTick }
                   </td>
                 );
               })}
+              {canEdit && <td className="border-b border-zinc-800/60" />}
             </tr>
+            {canEdit && (
+              <tr>
+                <td colSpan={3 + grid.columns.length + 1} className="p-0">
+                  <button onClick={() => addTaskAfter(t)}
+                    className="w-full text-[10px] text-zinc-700 hover:text-emerald-500 hover:bg-emerald-950/20 py-0.5 flex items-center justify-center gap-1 transition">
+                    <Plus className="w-3 h-3" /> chèn task sau
+                  </button>
+                </td>
+              </tr>
+            )}
+            </Fragment>
           ))}
         </tbody>
       </table>
