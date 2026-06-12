@@ -527,7 +527,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
   // Chiều rộng cột — định nghĩa 1 chỗ, dùng chung cho hàng nhóm lẫn bảng task
   const showBoq = canEdit; // BOQ chỉ hiển thị cho Admin/PM
   const W_BOQ  = showBoq ? 110 : 0;
-  const W_CODE = 80;
+  const W_CODE = 48;
   const W_NAME = isMobile ? 150 : 280;
   const W_PCT  = 56;
   // 44px = tối thiểu theo Apple/Google HIG — ngón tay bấm được dễ dàng ngoài công trường
