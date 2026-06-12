@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback, useRef, Fragment } from 'react';
-import { Search, ChevronRight, ChevronDown, Pencil, Check, X, History, UserCheck, RefreshCw, Link2, Camera, Trash2, Upload, MessageSquare, Send, WifiOff, CloudUpload, ChevronUp, ChevronDown as ChevronDownIcon, Columns, Copy, RotateCcw, CalendarDays } from 'lucide-react';
+import { Search, ChevronRight, ChevronDown, Pencil, Check, X, History, RefreshCw, Link2, Camera, Trash2, Upload, MessageSquare, Send, WifiOff, CloudUpload, ChevronUp, ChevronDown as ChevronDownIcon, Columns, Copy, RotateCcw, CalendarDays } from 'lucide-react';
 import { useOfflineTickQueue } from '@/app/components/offlineQueue';
 import AppHeader from '@/app/components/AppHeader';
 import { Modal, appAlert, appConfirm, appPrompt } from '@/app/components/dialogs';
@@ -21,7 +21,6 @@ const STATUS_CLS: Record<string, string> = {
 type Task = { id: number; code: string; name: string; status: string; endDate: string | null; progressPercent: number };
 type Pkg = { id: number; code: string; floorLabel: string | null; name: string; status: string; progress: number; tasks: Task[]; boqCode: string | null; drawingUrl: string | null; startDate: string | null; endDate: string | null };
 type Data = { sheet: { id?: number; code: string; name: string; responsible?: string; slug?: string }; packages: Pkg[]; version?: string };
-type AppUser = { id: number; name: string; role: string };
 
 const SYNC_POLL_MS = 10_000;
 
@@ -67,7 +66,6 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
   const [isAdmin, setIsAdmin] = useState(false);
   const [sheetModal, setSheetModal] = useState<{ name: string; code: string; slug: string; responsible: string } | null>(null);
   const [sheetErr, setSheetErr] = useState('');
-  const [users, setUsers] = useState<AppUser[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [syncToast, setSyncToast] = useState(false);
   const versionRef = useRef<string | null>(null);
@@ -135,7 +133,6 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
       const editable = role === 'admin' || role === 'pm';
       setCanEdit(editable);
       setIsAdmin(role === 'admin');
-      if (editable) fetch('/api/users').then(r => r.ok ? r.json() : null).then(x => setUsers(x?.users ?? []));
     });
   }, []);
 
@@ -217,7 +214,7 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
               pkg={p} pkgIdx={pi} pkgCount={packages.length}
               expanded={!!expanded[p.id]}
               onToggle={() => setExpanded(s => ({ ...s, [p.id]: !s[p.id] }))}
-              canEdit={canEdit} users={users} refreshKey={refreshKey} isMobile={isMobile}
+              canEdit={canEdit} refreshKey={refreshKey} isMobile={isMobile}
               onChanged={load} onOfflineTick={enqueue}
             />
           </div>
@@ -292,12 +289,12 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
 }
 
 type Cell = { id: number; installed: boolean };
-type GridTask = { id: number; code: string; name: string; status: string; progressPercent: number; boqCode: string | null; drawingUrl: string | null; assignedTo: number | null; assigneeName: string | null; photoCount: number; commentCount: number; delayReason: string | null; startDate: string | null; endDate: string | null; cells: Record<string, Cell> };
+type GridTask = { id: number; code: string; name: string; status: string; progressPercent: number; boqCode: string | null; drawingUrl: string | null; photoCount: number; commentCount: number; delayReason: string | null; startDate: string | null; endDate: string | null; cells: Record<string, Cell> };
 type Grid = { columns: string[]; tasks: GridTask[] };
 
-function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, users, refreshKey, isMobile, onChanged, onOfflineTick }: {
+function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKey, isMobile, onChanged, onOfflineTick }: {
   pkg: Pkg; pkgIdx: number; pkgCount: number; expanded: boolean; onToggle: () => void;
-  canEdit: boolean; users: AppUser[]; refreshKey: number; isMobile: boolean;
+  canEdit: boolean; refreshKey: number; isMobile: boolean;
   onChanged: () => void; onOfflineTick: (dimId: number, installed: boolean) => void;
 }) {
   const [grid, setGrid] = useState<Grid | null>(null);
@@ -411,14 +408,6 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, users, re
     setEditTask(null); load();
   }
 
-  async function assignTask(id: number, value: string) {
-    await fetch(`/api/tasks/${id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ assignedTo: value ? Number(value) : null }),
-    });
-    load();
-  }
-
   async function editTaskBoq(t: GridTask) {
     const v = await appPrompt('BOQCODE (duy nhất toàn hệ thống, để trống = xoá mã)', t.boqCode ?? '', { mono: true });
     if (v === null) return;
@@ -453,18 +442,6 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, users, re
     const failed = results.filter(ok => !ok).length;
     if (failed) appAlert(`Không lưu được ngày cho ${failed}/${ids.length} task — thử lại sau.`);
     setDatesTarget(null); setSelected(new Set()); load(); onChanged();
-  }
-
-  async function bulkAssign(value: string) {
-    if (!value) return;
-    const ids = [...selected];
-    const results = await Promise.all(ids.map(id => fetch(`/api/tasks/${id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ assignedTo: value === 'none' ? null : Number(value) }),
-    }).then(r => r.ok).catch(() => false)));
-    const failed = results.filter(ok => !ok).length;
-    if (failed) appAlert(`Không gán được ${failed}/${ids.length} task — thử lại sau.`);
-    setSelected(new Set()); load();
   }
 
   async function setDelayReason(t: GridTask, reason: string) {
@@ -570,12 +547,6 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, users, re
       {canEdit && selected.size > 0 && (
         <div className="sticky top-0 left-0 z-30 flex flex-wrap items-center gap-2 bg-zinc-950 border-b border-emerald-900 px-3 py-2 text-xs">
           <span className="text-emerald-400 font-medium">{selected.size} task đã chọn</span>
-          <select defaultValue="" onChange={e => { bulkAssign(e.target.value); e.target.value = ''; }}
-            className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 outline-none text-zinc-300">
-            <option value="" disabled>Gán cho...</option>
-            <option value="none">— Bỏ gán —</option>
-            {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-          </select>
           <button onClick={() => setDatesTarget({ ids: [...selected], init: { start: '', end: '' } })}
             className="flex items-center gap-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded px-2 py-1 text-zinc-300">
             <CalendarDays className="w-3.5 h-3.5" /> Đặt ngày
@@ -849,18 +820,6 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, users, re
                         <option value="">— Lý do trễ? —</option>
                         {Object.entries(DELAY_REASON_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                       </select>
-                    )}
-                    {canEdit ? (
-                      <select value={t.assignedTo ?? ''} onChange={e => assignTask(t.id, e.target.value)}
-                        title="Giao task cho người làm"
-                        className="ml-auto mr-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] px-1 py-0.5 max-w-[100px] outline-none text-zinc-400">
-                        <option value="">— Giao —</option>
-                        {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                      </select>
-                    ) : t.assigneeName && (
-                      <span className="ml-auto flex items-center gap-0.5 text-[10px] text-sky-400 truncate max-w-[100px]" title={`Giao cho ${t.assigneeName}`}>
-                        <UserCheck className="w-3 h-3 shrink-0" />{t.assigneeName}
-                      </span>
                     )}
                   </div>
                 </td>

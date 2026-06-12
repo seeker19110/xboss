@@ -1,12 +1,15 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, CheckSquare, FileText, Paperclip, Upload, X } from 'lucide-react';
+import { CheckSquare, FileText, Paperclip, Upload, X } from 'lucide-react';
+import AppHeader from '@/app/components/AppHeader';
+import { Modal, appAlert, appConfirm } from '@/app/components/dialogs';
+import { PageSkeleton } from '@/app/components/Skeleton';
 
 type ApprovalTask = {
   id: number; boqCode: string | null; code: string; name: string; status: string;
   endDate: string | null; progressPercent: number;
   floorLabel: string | null; wpName: string; sheetType: string;
-  assignee: string | null; docCount: number;
+  docCount: number;
 };
 type Doc = {
   id: number; originalName: string | null; mimeType: string;
@@ -63,7 +66,7 @@ export default function ApprovalsPage() {
     setBusy(false);
     if (!r.ok) {
       const j = await r.json().catch(() => null);
-      alert(j?.error ?? 'Upload thất bại');
+      appAlert(j?.error ?? 'Upload thất bại');
       return;
     }
     setPending(p => p.map(t => t.id === taskId ? { ...t, docCount: t.docCount + 1 } : t));
@@ -72,9 +75,9 @@ export default function ApprovalsPage() {
   }
 
   async function deleteDoc(docId: number) {
-    if (!window.confirm('Xoá tài liệu này?')) return;
+    if (!await appConfirm('Xoá tài liệu này?', { danger: true, confirmLabel: 'Xoá' })) return;
     const r = await fetch(`/api/documents/${docId}`, { method: 'DELETE' });
-    if (!r.ok) { alert((await r.json().catch(() => null))?.error ?? 'Không xoá được'); return; }
+    if (!r.ok) { appAlert((await r.json().catch(() => null))?.error ?? 'Không xoá được'); return; }
     setDocs(d => d.filter(x => x.id !== docId));
     if (openDocs !== null) {
       setPending(p => p.map(t => t.id === openDocs ? { ...t, docCount: Math.max(0, t.docCount - 1) } : t));
@@ -84,24 +87,24 @@ export default function ApprovalsPage() {
 
   async function approveSelected() {
     if (selected.size === 0) return;
-    if (!window.confirm(`Duyệt nghiệm thu ${selected.size} công việc?`)) return;
+    if (!await appConfirm(`Duyệt nghiệm thu ${selected.size} công việc?`, { confirmLabel: 'Duyệt' })) return;
     setBusy(true);
     const r = await fetch('/api/approvals', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ taskIds: [...selected] }),
     });
     setBusy(false);
-    if (!r.ok) { alert((await r.json().catch(() => null))?.error ?? 'Duyệt thất bại'); return; }
+    if (!r.ok) { appAlert((await r.json().catch(() => null))?.error ?? 'Duyệt thất bại'); return; }
     const j = await r.json();
-    if (j.skipped?.length) alert(`Bỏ qua ${j.skipped.length} task:\n` + j.skipped.map((s: { id: number; reason: string }) => `#${s.id}: ${s.reason}`).join('\n'));
+    if (j.skipped?.length) appAlert(`Bỏ qua ${j.skipped.length} task:\n` + j.skipped.map((s: { id: number; reason: string }) => `#${s.id}: ${s.reason}`).join('\n'));
     setSelected(new Set());
     load();
   }
 
   async function unapprove(taskId: number) {
-    if (!window.confirm('Huỷ nghiệm thu task này?')) return;
+    if (!await appConfirm('Huỷ nghiệm thu task này?', { danger: true, confirmLabel: 'Huỷ nghiệm thu' })) return;
     const r = await fetch(`/api/tasks/${taskId}/approve`, { method: 'DELETE' });
-    if (!r.ok) { alert((await r.json().catch(() => null))?.error ?? 'Không huỷ được'); return; }
+    if (!r.ok) { appAlert((await r.json().catch(() => null))?.error ?? 'Không huỷ được'); return; }
     load();
   }
 
@@ -112,7 +115,7 @@ export default function ApprovalsPage() {
   });
   const allSelected = pending.length > 0 && selected.size === pending.length;
 
-  if (loading) return <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">Đang tải...</div>;
+  if (loading) return <PageSkeleton />;
 
   const docsTask = [...pending, ...approved].find(t => t.id === openDocs);
 
@@ -128,7 +131,6 @@ export default function ApprovalsPage() {
         <td className="p-3 font-mono text-xs text-zinc-400">{t.boqCode ?? t.code}</td>
         <td className="p-3 font-medium">{t.name}<p className="text-xs text-zinc-500">{t.wpName}</p></td>
         <td className="p-3 text-zinc-400 text-xs">{t.sheetType}{t.floorLabel ? ` · ${t.floorLabel}` : ''}</td>
-        <td className="p-3 text-zinc-400 text-xs">{t.assignee ?? '—'}</td>
         <td className="p-3">
           <button onClick={() => loadDocs(t.id)}
             className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg border transition ${t.docCount > 0
@@ -158,19 +160,15 @@ export default function ApprovalsPage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <input ref={fileRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={onFileChosen} />
-      <header className="border-b border-zinc-800 px-6 py-4 flex items-center gap-3">
-        <a href="/" className="text-zinc-400 hover:text-white"><ArrowLeft className="w-5 h-5" /></a>
-        <div>
-          <h1 className="text-xl font-bold flex items-center gap-2"><CheckSquare className="w-5 h-5 text-emerald-400" /> Nghiệm thu</h1>
-          <p className="text-xs text-zinc-500">Task đạt 100% chờ duyệt · đính kèm biên bản nghiệm thu (PDF/ảnh) · duyệt theo lô</p>
-        </div>
+      <AppHeader back title={<><CheckSquare className="w-5 h-5 text-emerald-400" /> Nghiệm thu</>}
+        subtitle="Task đạt 100% chờ duyệt · đính kèm biên bản nghiệm thu (PDF/ảnh) · duyệt theo lô">
         {canApprove && selected.size > 0 && (
           <button onClick={approveSelected} disabled={busy}
-            className="ml-auto flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-4 py-2 rounded-lg text-sm font-medium transition">
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-4 py-2 rounded-lg text-sm font-medium transition">
             <CheckSquare className="w-4 h-4" /> Duyệt {selected.size} task
           </button>
         )}
-      </header>
+      </AppHeader>
 
       <main className="p-6 space-y-8">
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
@@ -192,7 +190,6 @@ export default function ApprovalsPage() {
                   <th className="text-left p-3">MÃ</th>
                   <th className="text-left p-3">CÔNG VIỆC</th>
                   <th className="text-left p-3">HỆ · TẦNG</th>
-                  <th className="text-left p-3">NGƯỜI LÀM</th>
                   <th className="text-left p-3">BIÊN BẢN</th>
                   <th className="text-left p-3"></th>
                 </tr>
@@ -200,7 +197,7 @@ export default function ApprovalsPage() {
               <tbody>
                 {pending.map(t => row(t, true))}
                 {pending.length === 0 && (
-                  <tr><td colSpan={7} className="p-8 text-center text-zinc-500">Không có task nào đạt 100% chờ nghiệm thu.</td></tr>
+                  <tr><td colSpan={6} className="p-8 text-center text-zinc-500">Không có task nào đạt 100% chờ nghiệm thu.</td></tr>
                 )}
               </tbody>
             </table>
@@ -218,7 +215,6 @@ export default function ApprovalsPage() {
                   <th className="text-left p-3">MÃ</th>
                   <th className="text-left p-3">CÔNG VIỆC</th>
                   <th className="text-left p-3">HỆ · TẦNG</th>
-                  <th className="text-left p-3">NGƯỜI LÀM</th>
                   <th className="text-left p-3">BIÊN BẢN</th>
                   <th className="text-left p-3"></th>
                 </tr>
@@ -226,7 +222,7 @@ export default function ApprovalsPage() {
               <tbody>
                 {approved.map(t => row(t, false))}
                 {approved.length === 0 && (
-                  <tr><td colSpan={6} className="p-8 text-center text-zinc-500">Chưa có task nào được nghiệm thu.</td></tr>
+                  <tr><td colSpan={5} className="p-8 text-center text-zinc-500">Chưa có task nào được nghiệm thu.</td></tr>
                 )}
               </tbody>
             </table>
@@ -236,8 +232,7 @@ export default function ApprovalsPage() {
 
       {/* Modal danh sách tài liệu */}
       {openDocs !== null && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setOpenDocs(null)}>
-          <div className="bg-zinc-900 border border-zinc-700 rounded-xl max-w-lg w-full max-h-[80vh] overflow-auto" onClick={e => e.stopPropagation()}>
+        <Modal onClose={() => setOpenDocs(null)} className="max-w-lg max-h-[80vh] overflow-auto">
             <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
               <h3 className="font-semibold text-sm flex items-center gap-2">
                 <FileText className="w-4 h-4 text-emerald-400" /> Biên bản — {docsTask?.name ?? `#${openDocs}`}
@@ -262,8 +257,7 @@ export default function ApprovalsPage() {
                 <Upload className="w-4 h-4" /> Upload biên bản (PDF/ảnh, max 20MB)
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

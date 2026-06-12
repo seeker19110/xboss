@@ -20,7 +20,7 @@ type DelayedTask = {
   id: number; name: string; status: string;
   startDate: string; endDate: string;
   progressPercent: number; floorLabel: string; sheetType: string; sheetSlug: string | null;
-  delayReason: string | null; delayNote: string | null; assigneeName: string | null;
+  delayReason: string | null; delayNote: string | null;
 };
 type KPI = { sheetType: string; sheetSlug: string | null; total: number; avgProgress: number; delayed: number };
 type SheetNav = { id: number; code: string; name: string; slug: string };
@@ -269,7 +269,6 @@ export default function Dashboard() {
                   <th className="text-left p-3">TẦNG</th>
                   <th className="text-left p-3">KẾT THÚC</th>
                   <th className="text-left p-3">% TIẾN ĐỘ</th>
-                  <th className="text-left p-3">NGƯỜI LÀM</th>
                   <th className="text-left p-3">SHEET</th>
                   <th className="text-left p-3">NGUYÊN NHÂN</th>
                   <th className="text-left p-3">TRẠNG THÁI</th>
@@ -295,7 +294,6 @@ export default function Dashboard() {
                         <span>{Math.round((t.progressPercent ?? 0) * 100)}%</span>
                       </div>
                     </td>
-                    <td className="p-3 text-zinc-400 text-xs">{t.assigneeName ?? '—'}</td>
                     <td className="p-3"><span className="px-2 py-0.5 bg-zinc-800 rounded text-xs">{t.sheetType}</span></td>
                     <td className="p-3" title={t.delayNote ?? undefined}>
                       {me && me.role !== 'subcon' ? (
@@ -314,7 +312,7 @@ export default function Dashboard() {
                   );
                 })}
                 {delayed.length === 0 && (
-                  <tr><td colSpan={8} className="p-8 text-center text-zinc-500">Không có công việc trễ. Hãy import file Excel nếu chưa có dữ liệu.</td></tr>
+                  <tr><td colSpan={7} className="p-8 text-center text-zinc-500">Không có công việc trễ. Hãy import file Excel nếu chưa có dữ liệu.</td></tr>
                 )}
               </tbody>
             </table>

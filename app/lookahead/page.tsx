@@ -12,7 +12,7 @@ type LTask = {
   id: number; code: string; name: string; status: string;
   startDate: string | null; endDate: string | null; progressPercent: number;
   floorLabel: string | null; packageCode: string; sheetType: string;
-  assigneeName: string | null; delayReason: string | null;
+  delayReason: string | null;
 };
 type Data = { days: number; from: string; until: string; starting: LTask[]; due: LTask[] };
 
@@ -43,7 +43,6 @@ function TaskTable({ tasks, dateCol }: { tasks: LTask[]; dateCol: 'startDate' | 
           <th className="p-2 w-16">Tầng</th>
           <th className="p-2 w-24">{dateCol === 'startDate' ? 'Bắt đầu' : 'Đến hạn'}</th>
           <th className="p-2 w-14">%</th>
-          <th className="p-2 w-28">Phụ trách</th>
           <th className="p-2 w-28">Ghi chú</th>
         </tr>
       </thead>
@@ -55,7 +54,6 @@ function TaskTable({ tasks, dateCol }: { tasks: LTask[]; dateCol: 'startDate' | 
             <td className="p-2">{t.floorLabel ?? '—'}</td>
             <td className={`p-2 ${dateCol === 'endDate' && t.status === 'tre' ? 'text-red-600 font-medium' : ''}`}>{fmtDate(t[dateCol])}</td>
             <td className="p-2">{Math.round((t.progressPercent ?? 0) * 100)}%</td>
-            <td className="p-2 text-zinc-600">{t.assigneeName ?? '—'}</td>
             <td className="p-2 text-xs text-zinc-500">
               {t.status === 'tre'
                 ? `Đang trễ${t.delayReason ? ` · ${DELAY_REASON_LABEL[t.delayReason as keyof typeof DELAY_REASON_LABEL] ?? t.delayReason}` : ''}`
