@@ -96,7 +96,7 @@ export default function AppHeader({ title, subtitle, back, children, search = tr
       )}
       {/* Hàng nav: scroll ngang + fade báo hiệu có thêm mục */}
       <div className="relative">
-        <nav className="px-4 sm:px-6 pb-2 flex gap-1 overflow-x-auto scrollbar-none"
+        <nav className="px-4 sm:px-6 pb-3 flex gap-1.5 overflow-x-auto scrollbar-none"
           style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
           aria-label="Điều hướng chính">
           {NAV.map(n => {
@@ -104,16 +104,16 @@ export default function AppHeader({ title, subtitle, back, children, search = tr
             const Icon = n.icon;
             return (
               <a key={n.href} href={n.href}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs whitespace-nowrap transition ${active
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap transition ${active
                   ? 'bg-zinc-800 text-white font-medium' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'}`}
                 aria-current={active ? 'page' : undefined}>
-                <Icon className={`w-3.5 h-3.5 ${n.color}`} /> {n.label}
+                <Icon className={`w-5 h-5 ${n.color}`} /> {n.label}
               </a>
             );
           })}
         </nav>
         {/* Fade báo hiệu còn mục bị cắt bên phải */}
-        <div className="pointer-events-none absolute right-0 top-0 bottom-2 w-8 bg-gradient-to-l from-zinc-950 to-transparent sm:hidden" aria-hidden />
+        <div className="pointer-events-none absolute right-0 top-0 bottom-3 w-8 bg-gradient-to-l from-zinc-950 to-transparent sm:hidden" aria-hidden />
       </div>
     </header>
   );
