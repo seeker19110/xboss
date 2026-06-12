@@ -12,27 +12,29 @@ export async function GET() {
 
   // Task trễ: end_date < hôm nay AND progress < 1 AND chưa hoàn thành/nghiệm thu.
   // Sub-con chỉ thấy task được giao cho mình.
-  const subconFilter = user.role === "subcon" ? `AND t.assigned_to = ${user.id}` : "";
+  const subconFilter = user.role === "subcon" ? " AND t.assigned_to = ?" : "";
   const delayedTasks = await query(
     `SELECT t.id, t.code, t.name, t.status,
             t.start_date AS "startDate", t.end_date AS "endDate",
             t.progress_percent AS "progressPercent",
             t.delay_reason AS "delayReason", t.delay_note AS "delayNote",
             wp.floor_label AS "floorLabel", wp.code AS "packageCode",
-            st.code AS "sheetType"
+            st.code AS "sheetType", st.slug AS "sheetSlug",
+            u.name AS "assigneeName"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
+       LEFT JOIN users u ON t.assigned_to = u.id
       WHERE t.end_date IS NOT NULL AND t.end_date < ?
         AND t.progress_percent < 1
-        AND t.status NOT IN ('hoan_thanh','nghiem_thu') ${subconFilter}
+        AND t.status NOT IN ('hoan_thanh','nghiem_thu')${subconFilter}
       ORDER BY t.end_date`,
-    today,
+    ...(user.role === "subcon" ? [today, user.id] : [today]),
   );
 
   // KPI theo từng sheet
   const kpi = await query(
-    `SELECT st.code AS "sheetType",
+    `SELECT st.code AS "sheetType", st.slug AS "sheetSlug",
             COUNT(t.id) AS total,
             COALESCE(AVG(t.progress_percent), 0) AS "avgProgress",
             COALESCE(SUM(CASE WHEN t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_percent < 1
@@ -40,7 +42,7 @@ export async function GET() {
        FROM sheet_types st
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
-      GROUP BY st.id, st.code
+      GROUP BY st.id, st.code, st.slug
       ORDER BY st.id`,
     today,
   );

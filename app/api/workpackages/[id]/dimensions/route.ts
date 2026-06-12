@@ -16,7 +16,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   const pkgId = parseInt(params.id);
   if (isNaN(pkgId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const subconFilter = user.role === "subcon" ? `AND t.assigned_to = ${user.id}` : "";
+  const subconFilter = user.role === "subcon" ? " AND t.assigned_to = ?" : "";
   const tasks = await query<TaskRow>(
     `SELECT t.id, t.code, t.name, t.status, t.progress_percent AS "progressPercent",
             t.boq_code AS "boqCode", t.drawing_url AS "drawingUrl",
@@ -26,7 +26,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
             (SELECT COUNT(*) FROM task_comments c WHERE c.task_id = t.id) AS "commentCount"
        FROM tasks t
        LEFT JOIN users u ON t.assigned_to = u.id
-      WHERE t.package_id = ? ${subconFilter} ORDER BY t.sort_order, t.id`, pkgId);
+      WHERE t.package_id = ?${subconFilter} ORDER BY t.sort_order, t.id`,
+    ...(user.role === "subcon" ? [pkgId, user.id] : [pkgId]));
 
   const dims = await query<DimRow>(
     `SELECT pd.id, pd.task_id AS "taskId", pd.dimension_label AS label, pd.installed

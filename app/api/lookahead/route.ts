@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   const days = Math.min(60, Math.max(1, parseInt(req.nextUrl.searchParams.get("days") ?? "14") || 14));
   const today = todayISO();
   const until = new Date(Date.now() + days * 86400_000).toISOString().slice(0, 10);
-  const subconFilter = user.role === "subcon" ? `AND t.assigned_to = ${user.id}` : "";
+  const subconFilter = user.role === "subcon" ? " AND t.assigned_to = ?" : "";
 
   const select = `SELECT t.id, t.code, t.name, t.status,
             t.start_date AS "startDate", t.end_date AS "endDate",
@@ -36,15 +36,17 @@ export async function GET(req: NextRequest) {
   const starting = await query<LookaheadTask>(
     `${select}
       WHERE t.start_date IS NOT NULL AND t.start_date >= ? AND t.start_date <= ?
-        AND t.progress_percent = 0 AND t.status NOT IN ('hoan_thanh','nghiem_thu') ${subconFilter}
-      ORDER BY t.start_date, st.id, t.id`, today, until);
+        AND t.progress_percent = 0 AND t.status NOT IN ('hoan_thanh','nghiem_thu')${subconFilter}
+      ORDER BY t.start_date, st.id, t.id`,
+    ...(user.role === "subcon" ? [today, until, user.id] : [today, until]));
 
   // Đến hạn: end_date trong cửa sổ, chưa xong.
   const due = await query<LookaheadTask>(
     `${select}
       WHERE t.end_date IS NOT NULL AND t.end_date >= ? AND t.end_date <= ?
-        AND t.progress_percent < 1 AND t.status NOT IN ('hoan_thanh','nghiem_thu') ${subconFilter}
-      ORDER BY t.end_date, st.id, t.id`, today, until);
+        AND t.progress_percent < 1 AND t.status NOT IN ('hoan_thanh','nghiem_thu')${subconFilter}
+      ORDER BY t.end_date, st.id, t.id`,
+    ...(user.role === "subcon" ? [today, until, user.id] : [today, until]));
 
   return NextResponse.json({ days, from: today, until, starting, due });
 }

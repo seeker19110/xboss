@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
             start_date AS "startDate", end_date AS "endDate"
        FROM work_packages WHERE sheet_type_id = ? ORDER BY sort_order, id`, st.id);
 
-  const subconFilter = user.role === "subcon" ? `AND t.assigned_to = ${user.id}` : "";
+  const subconFilter = user.role === "subcon" ? " AND t.assigned_to = ?" : "";
   const tasks = await query<Task>(
     `SELECT t.id, t.package_id AS "packageId", t.code, t.name, t.status,
             t.end_date AS "endDate", t.progress_percent AS "progressPercent",
@@ -36,8 +36,9 @@ export async function GET(req: NextRequest) {
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        LEFT JOIN users u ON t.assigned_to = u.id
-      WHERE wp.sheet_type_id = ? ${subconFilter}
-      ORDER BY t.sort_order, t.id`, st.id);
+      WHERE wp.sheet_type_id = ?${subconFilter}
+      ORDER BY t.sort_order, t.id`,
+    ...(user.role === "subcon" ? [st.id, user.id] : [st.id]));
 
   const byPkg = new Map<number, Task[]>();
   for (const t of tasks) {

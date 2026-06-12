@@ -14,14 +14,16 @@ export async function GET() {
 
   // Task đang trễ mà user này chưa có thông báo → tạo mới (UNIQUE chặn trùng).
   // Sub-con chỉ nhận thông báo cho task được giao.
-  const subconFilter = user.role === "subcon" ? `AND t.assigned_to = ${user.id}` : "";
+  const isSubcon = user.role === "subcon";
+  const subconFilter = isSubcon ? " AND t.assigned_to = ?" : "";
   const delayed = await query<{ id: number; code: string; name: string; endDate: string; sheetType: string }>(
     `SELECT t.id, t.code, t.name, t.end_date AS "endDate", st.code AS "sheetType"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
       WHERE t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_percent < 1
-        AND t.status NOT IN ('hoan_thanh','nghiem_thu') ${subconFilter}`, today);
+        AND t.status NOT IN ('hoan_thanh','nghiem_thu')${subconFilter}`,
+    ...(isSubcon ? [today, user.id] : [today]));
 
   for (const t of delayed) {
     await run(
@@ -40,7 +42,8 @@ export async function GET() {
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
-      WHERE ${DUE_SOON_COND} ${subconFilter}`, today, soon);
+      WHERE ${DUE_SOON_COND}${subconFilter}`,
+    ...(isSubcon ? [today, soon, user.id] : [today, soon]));
 
   for (const t of dueSoon) {
     await run(
@@ -57,16 +60,16 @@ export async function GET() {
         AND task_id NOT IN (
           SELECT t.id FROM tasks t
            WHERE t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_percent < 1
-             AND t.status NOT IN ('hoan_thanh','nghiem_thu') ${subconFilter})`,
-    user.id, today);
+             AND t.status NOT IN ('hoan_thanh','nghiem_thu')${subconFilter})`,
+    ...(isSubcon ? [user.id, today, user.id] : [user.id, today]));
 
   // Task không còn "sắp đến hạn" (đã xong, đã qua hạn thành trễ, hoặc đổi deadline) → dọn tương tự.
   await run(
     `DELETE FROM notifications
       WHERE user_id = ? AND type = 'due_soon' AND is_read = 0
         AND task_id NOT IN (
-          SELECT t.id FROM tasks t WHERE ${DUE_SOON_COND} ${subconFilter})`,
-    user.id, today, soon);
+          SELECT t.id FROM tasks t WHERE ${DUE_SOON_COND}${subconFilter})`,
+    ...(isSubcon ? [user.id, today, soon, user.id] : [user.id, today, soon]));
 
   // Vật tư dùng vượt định mức → cảnh báo cho Admin/PM/Kỹ sư (subcon không quản vật tư).
   if (user.role !== "subcon") {

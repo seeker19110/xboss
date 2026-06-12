@@ -17,6 +17,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const body = await req.json().catch(() => ({}));
 
+  // drawingUrl: chỉ chấp nhận http/https hoặc null (chặn javascript: XSS).
+  if (body.drawingUrl !== undefined && body.drawingUrl !== null) {
+    const url = String(body.drawingUrl).trim();
+    if (url && !/^https?:\/\//i.test(url))
+      return NextResponse.json({ error: "Link bản vẽ phải bắt đầu bằng http:// hoặc https://" }, { status: 422 });
+    body.drawingUrl = url || null;
+  }
+
   // BOQCODE: duy nhất toàn cục (cả nhóm lẫn task); chuỗi rỗng = xoá mã.
   if (body.boqCode !== undefined) {
     const boq = String(body.boqCode ?? "").trim();
