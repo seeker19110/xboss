@@ -142,40 +142,45 @@ export default function Dashboard() {
               <ChevronRight className="w-3.5 h-3.5 text-zinc-600" />
             </a>
           ))}
-          {canImport && (
-            <button onClick={() => { setNewSheetErr(''); setNewSheet({ name: '', slug: '', code: '', copyFromId: sheets[sheets.length - 1]?.id ?? '' }); }}
-              className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 border border-dashed border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-400 hover:text-emerald-400 transition">
-              <Plus className="w-4 h-4" /> Thêm trang tracking
-            </button>
-          )}
         </div>
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
-          <div className="bg-red-950 border border-red-800 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <AlertTriangle className="w-4 h-4 text-red-400" />
-              <span className="text-xs text-red-400 uppercase">Tổng trễ</span>
+        {/* KPI Cards — cuộn ngang, không xuống hàng */}
+        <div className="overflow-x-auto mb-4">
+          <div className="flex gap-4" style={{ minWidth: 'max-content' }}>
+            <div className="bg-red-950 border border-red-800 rounded-xl p-4 w-40 shrink-0">
+              <div className="flex items-center gap-2 mb-1">
+                <AlertTriangle className="w-4 h-4 text-red-400" />
+                <span className="text-xs text-red-400 uppercase">Tổng trễ</span>
+              </div>
+              <p className="text-3xl font-bold text-red-300">{data?.totalDelayed ?? 0}</p>
             </div>
-            <p className="text-3xl font-bold text-red-300">{data?.totalDelayed ?? 0}</p>
+            {data?.kpi.map(k => {
+              const slug = k.sheetSlug ?? slugFromCode(k.sheetType);
+              const inner = (
+                <>
+                  <p className="text-xs text-zinc-400 uppercase mb-1 truncate">{k.sheetType}</p>
+                  <p className="text-2xl font-bold">{Math.round((k.avgProgress ?? 0) * 100)}%</p>
+                  <p className="text-xs text-zinc-500 mt-1">{k.delayed} trễ / {k.total}</p>
+                  <div className="mt-2 bg-zinc-800 rounded-full h-1.5">
+                    <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: `${(k.avgProgress ?? 0) * 100}%` }} />
+                  </div>
+                </>
+              );
+              return slug
+                ? <a key={k.sheetType} href={`/tracking/${slug}`} className="bg-zinc-900 border border-zinc-800 hover:border-emerald-700 rounded-xl p-4 w-40 shrink-0 transition">{inner}</a>
+                : <div key={k.sheetType} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 w-40 shrink-0">{inner}</div>;
+            })}
           </div>
-          {data?.kpi.map(k => {
-            const slug = k.sheetSlug ?? slugFromCode(k.sheetType);
-            const inner = (
-              <>
-                <p className="text-xs text-zinc-400 uppercase mb-1 truncate">{k.sheetType}</p>
-                <p className="text-2xl font-bold">{Math.round((k.avgProgress ?? 0) * 100)}%</p>
-                <p className="text-xs text-zinc-500 mt-1">{k.delayed} trễ / {k.total}</p>
-                <div className="mt-2 bg-zinc-800 rounded-full h-1.5">
-                  <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: `${(k.avgProgress ?? 0) * 100}%` }} />
-                </div>
-              </>
-            );
-            return slug
-              ? <a key={k.sheetType} href={`/tracking/${slug}`} className="bg-zinc-900 border border-zinc-800 hover:border-emerald-700 rounded-xl p-4 transition">{inner}</a>
-              : <div key={k.sheetType} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">{inner}</div>;
-          })}
         </div>
+
+        {/* Nút thêm trang tracking — card lớn toàn chiều rộng */}
+        {canImport && (
+          <button onClick={() => { setNewSheetErr(''); setNewSheet({ name: '', slug: '', code: '', copyFromId: sheets[sheets.length - 1]?.id ?? '' }); }}
+            className="w-full flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 border border-dashed border-zinc-700 hover:border-emerald-600 rounded-xl p-5 text-zinc-400 hover:text-emerald-400 transition mb-8">
+            <Plus className="w-5 h-5" />
+            <span className="text-sm font-medium">Thêm trang tracking</span>
+          </button>
+        )}
 
         {/* Heatmap tầng × sheet */}
         <FloorHeatmap />
