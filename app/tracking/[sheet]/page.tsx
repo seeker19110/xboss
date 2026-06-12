@@ -590,7 +590,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
               </td>
             )}
 
-            {/* Cột Tầng/Mã */}
+            {/* Cột STT */}
             <td className={`${stkCode} z-20 bg-inherit border-r border-zinc-800 px-1 py-3.5 text-center align-middle`}
               style={{ left: LEFT_CODE, width: W_CODE, minWidth: W_CODE }}
               onClick={onToggle}>
@@ -691,7 +691,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
               {showBoq && <th className={`${stkBoq} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium`}
                 style={{ left: 0 }}>BOQ</th>}
               <th className={`${stkCode} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium`}
-                style={{ left: LEFT_CODE }}>Mã</th>
+                style={{ left: LEFT_CODE }}>STT</th>
               <th className={`${stkName} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium`}
                 style={{ left: isMobile ? 0 : LEFT_NAME }}>Công việc</th>
               <th className={`${stkPct} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium`}
