@@ -139,12 +139,12 @@ export default function FloorHeatmap() {
         </div>
       )}
 
-      <div className="overflow-auto">
-        <div className={`mx-auto w-max flex items-start ${multi ? 'gap-[10vw]' : ''}`}>
-          {towers.map(t => {
-            const tr = towerList.find(r => r.name === t.name);
-            return (
-              <div key={t.name}>
+      <div className={multi ? 'grid gap-4' : 'overflow-auto'} style={multi ? { gridTemplateColumns: `repeat(${towers.length}, minmax(0, 1fr))` } : {}}>
+        {multi
+          ? towers.map(t => {
+              const tr = towerList.find(r => r.name === t.name);
+              return (
+                <div key={t.name} className="overflow-auto min-w-0">
                 {multi && (
                   <div className="text-center mb-2 flex items-center justify-center gap-1.5">
                     {editId === tr?.id ? (
@@ -178,8 +178,12 @@ export default function FloorHeatmap() {
                 <TowerTable tower={t} byKey={byKey} />
               </div>
             );
-          })}
-        </div>
+            })
+          : /* single tower — cuộn ngang như cũ */
+            <div className="mx-auto w-max">
+              <TowerTable tower={towers[0]} byKey={byKey} />
+            </div>
+        }
       </div>
     </div>
   );
