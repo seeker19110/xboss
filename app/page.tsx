@@ -160,17 +160,15 @@ export default function Dashboard() {
                 ? <a key={k.sheetType} href={`/tracking/${slug}`} className="bg-zinc-900 border border-zinc-800 hover:border-emerald-700 rounded-xl p-4 w-40 shrink-0 transition">{inner}</a>
                 : <div key={k.sheetType} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 w-40 shrink-0">{inner}</div>;
             })}
+            {canImport && (
+              <button onClick={() => { setNewSheetErr(''); setNewSheet({ name: '', slug: '', code: '', copyFromId: sheets[sheets.length - 1]?.id ?? '' }); }}
+                className="bg-zinc-900 hover:bg-zinc-800 border border-dashed border-zinc-700 hover:border-emerald-600 rounded-xl p-4 w-40 shrink-0 flex flex-col items-center justify-center gap-2 text-zinc-500 hover:text-emerald-400 transition">
+                <Plus className="w-6 h-6" />
+                <span className="text-xs text-center">Thêm trang tracking</span>
+              </button>
+            )}
           </div>
         </div>
-
-        {/* Nút thêm trang tracking — card lớn toàn chiều rộng */}
-        {canImport && (
-          <button onClick={() => { setNewSheetErr(''); setNewSheet({ name: '', slug: '', code: '', copyFromId: sheets[sheets.length - 1]?.id ?? '' }); }}
-            className="w-full flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 border border-dashed border-zinc-700 hover:border-emerald-600 rounded-xl p-5 text-zinc-400 hover:text-emerald-400 transition mb-8">
-            <Plus className="w-5 h-5" />
-            <span className="text-sm font-medium">Thêm trang tracking</span>
-          </button>
-        )}
 
         {/* Heatmap tầng × sheet */}
         <FloorHeatmap />
