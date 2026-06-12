@@ -527,7 +527,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
   // Chiều rộng cột — định nghĩa 1 chỗ, dùng chung cho hàng nhóm lẫn bảng task
   const showBoq = canEdit; // BOQ chỉ hiển thị cho Admin/PM
   const W_BOQ  = showBoq ? 110 : 0;
-  const W_CODE = canEdit ? 60 : 44;
+  const W_CODE = canEdit ? 70 : 58;
   const W_NAME = isMobile ? 150 : 280;
   const W_PCT  = 56;
   // 44px = tối thiểu theo Apple/Google HIG — ngón tay bấm được dễ dàng ngoài công trường
@@ -755,7 +755,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                   </td>
                 )}
                 <td className={`${stkCode} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 text-center align-top overflow-hidden`}
-                  style={{ left: LEFT_CODE }}>
+                  style={{ left: LEFT_CODE, width: W_CODE, minWidth: W_CODE }}>
                   <div className="flex items-center justify-center gap-1">
                     {canEdit && (
                       <input type="checkbox" checked={selected.has(t.id)} onChange={() => toggleSelect(t.id)}
