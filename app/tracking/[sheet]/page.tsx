@@ -299,6 +299,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
 }) {
   const [grid, setGrid] = useState<Grid | null>(null);
   const [editName, setEditName] = useState<string | null>(null);
+  const [editFloor, setEditFloor] = useState<string | null>(null);
   const [showDatesModal, setShowDatesModal] = useState(false);
   const [editTask, setEditTask] = useState<{ id: number; value: string } | null>(null);
   const [historyTask, setHistoryTask] = useState<GridTask | null>(null);
@@ -332,6 +333,14 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ drawingUrl: v.trim() || null }),
     });
     onChanged();
+  }
+
+  async function savePkgFloor(floor: string) {
+    await fetch(`/api/workpackages/${pkg.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ floorLabel: floor.trim() || null }),
+    });
+    setEditFloor(null); onChanged();
   }
 
   async function savePkgName(name: string) {
@@ -593,11 +602,31 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
             {/* Cột STT */}
             <td className={`${stkCode} z-20 bg-inherit border-r border-zinc-800 px-1 py-3.5 text-center align-middle`}
               style={{ left: LEFT_CODE, width: W_CODE, minWidth: W_CODE }}
-              onClick={onToggle}>
-              {!showBoq && (expanded
+              onClick={e => { if (!(e.target as Element).closest('button,input')) onToggle(); }}>
+              {!showBoq && editFloor === null && (expanded
                 ? <ChevronDown className="w-4 h-4 text-zinc-400 inline mr-1 shrink-0" />
                 : <ChevronRight className="w-4 h-4 text-zinc-400 inline mr-1 shrink-0" />)}
-              <span className="text-xs text-zinc-500">{pkg.floorLabel ?? ''}</span>
+              {editFloor !== null ? (
+                <span className="flex flex-col items-center gap-0.5" onClick={e => e.stopPropagation()}>
+                  <input autoFocus value={editFloor} onChange={e => setEditFloor(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') savePkgFloor(editFloor); if (e.key === 'Escape') setEditFloor(null); }}
+                    className="bg-zinc-800 border border-emerald-600 rounded px-1 py-0.5 text-xs w-full text-center outline-none font-mono" />
+                  <span className="flex gap-1">
+                    <button onClick={() => savePkgFloor(editFloor)} className="text-emerald-400"><Check className="w-3 h-3" /></button>
+                    <button onClick={() => setEditFloor(null)} className="text-zinc-500"><X className="w-3 h-3" /></button>
+                  </span>
+                </span>
+              ) : (
+                <span className="group/floor inline-flex items-center gap-0.5">
+                  <span className="text-xs text-zinc-500">{pkg.floorLabel ?? ''}</span>
+                  {canEdit && (
+                    <button onClick={e => { e.stopPropagation(); setEditFloor(pkg.floorLabel ?? ''); }}
+                      title="Sửa tầng" className="opacity-0 group-hover/floor:opacity-100 text-zinc-600 hover:text-emerald-400">
+                      <Pencil className="w-2.5 h-2.5" />
+                    </button>
+                  )}
+                </span>
+              )}
             </td>
 
             {/* Cột Tên nhóm */}
