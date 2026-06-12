@@ -6,7 +6,7 @@ import { slugFromCode } from '@/lib/sheets';
 
 type Hit = {
   kind: 'task' | 'package';
-  id: number; code: string; name: string; boqCode: string | null;
+  id: number; code: string; name: string; boqCode: string | null; sheetSlug?: string | null;
   status: string | null; progress: number;
   floorLabel: string | null; sheetType: string;
 };
@@ -17,7 +17,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 function hitUrl(h: Hit): string {
-  const slug = slugFromCode(h.sheetType);
+  const slug = h.sheetSlug ?? slugFromCode(h.sheetType);
   if (!slug) return '/';
   return `/tracking/${slug}${h.floorLabel ? `?floor=${encodeURIComponent(h.floorLabel)}` : ''}`;
 }
@@ -63,7 +63,7 @@ export default function GlobalSearch() {
   }
 
   return (
-    <div className="relative flex-1 max-w-md hidden sm:block" ref={boxRef}>
+    <div className="relative w-full max-w-md" ref={boxRef}>
       <Search className="w-4 h-4 absolute left-3 top-2.5 text-zinc-500 pointer-events-none" />
       <input value={q} onChange={e => { setQ(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)} onKeyDown={onKeyDown}

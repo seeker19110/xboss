@@ -1,7 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ClipboardList, AlertTriangle, CheckCircle2, Camera, ChevronRight } from 'lucide-react';
+import { ClipboardList, AlertTriangle, CheckCircle2, Camera, ChevronRight } from 'lucide-react';
 import { slugFromCode } from '@/lib/sheets';
+import AppHeader from '@/app/components/AppHeader';
+import { PageSkeleton } from '@/app/components/Skeleton';
 
 const STATUS_LABEL: Record<string, string> = {
   chuan_bi: 'Chuẩn bị', dang_thi_cong: 'Đang thi công',
@@ -17,7 +19,7 @@ type MyTask = {
   id: number; code: string; name: string; status: string;
   startDate: string | null; endDate: string | null; progressPercent: number;
   photoCount: number; packageCode: string; packageName: string;
-  floorLabel: string | null; sheetType: string;
+  floorLabel: string | null; sheetType: string; sheetSlug?: string | null;
 };
 type Data = { tasks: MyTask[]; summary: { total: number; delayed: number; done: number } };
 
@@ -47,7 +49,7 @@ export default function MyTasksPage() {
     }).finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">Đang tải...</div>;
+  if (loading) return <PageSkeleton />;
 
   const tasks = (data?.tasks ?? []).filter(t => {
     if (filter === 'delayed') return t.status === 'tre';
@@ -59,14 +61,8 @@ export default function MyTasksPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <header className="border-b border-zinc-800 px-6 py-4 flex items-center gap-3">
-        <a href="/" className="text-zinc-400 hover:text-white"><ArrowLeft className="w-5 h-5" /></a>
-        <ClipboardList className="w-5 h-5 text-emerald-400" />
-        <div>
-          <h1 className="text-lg font-bold">Việc của tôi</h1>
-          <p className="text-xs text-zinc-500">Các task được giao cho bạn, sắp theo deadline</p>
-        </div>
-      </header>
+      <AppHeader back title={<><ClipboardList className="w-5 h-5 text-emerald-400" /> Việc của tôi</>}
+        subtitle="Các task được giao cho bạn · sắp theo deadline" />
 
       <main className="p-6 max-w-4xl mx-auto">
         <div className="grid grid-cols-3 gap-3 mb-6">
@@ -97,7 +93,7 @@ export default function MyTasksPage() {
 
         <div className="space-y-2">
           {tasks.map(t => {
-            const slug = slugFromCode(t.sheetType);
+            const slug = t.sheetSlug ?? slugFromCode(t.sheetType);
             const left = daysLeft(t.endDate);
             const urgent = left !== null && left <= 3 && t.progressPercent < 1 && t.status !== 'nghiem_thu';
             const href = slug ? `/tracking/${slug}${t.floorLabel ? `?floor=${encodeURIComponent(t.floorLabel)}` : ''}` : '#';

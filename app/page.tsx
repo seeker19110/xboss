@@ -1,13 +1,14 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Clock, Upload, LayoutGrid, ChevronRight, FileDown, Printer, LogOut, Users, KeyRound, Package, CalendarRange, ClipboardList, CalendarClock, CheckSquare } from 'lucide-react';
+import { AlertTriangle, Clock, Upload, LayoutGrid, ChevronRight, FileDown, Printer, Plus, ExternalLink } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { SHEET_SLUGS, slugFromCode } from '@/lib/sheets';
-import NotificationBell from '@/app/components/NotificationBell';
+import { slugFromCode, toSlug } from '@/lib/sheets';
+import AppHeader from '@/app/components/AppHeader';
 import FloorHeatmap from '@/app/components/FloorHeatmap';
 import ForecastCards from '@/app/components/ForecastCards';
 import SCurveChart from '@/app/components/SCurveChart';
-import GlobalSearch from '@/app/components/GlobalSearch';
+import { Modal } from '@/app/components/dialogs';
+import { PageSkeleton } from '@/app/components/Skeleton';
 import { DELAY_REASON_LABEL } from '@/lib/delay';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -18,13 +19,12 @@ const STATUS_LABEL: Record<string, string> = {
 type DelayedTask = {
   id: number; name: string; status: string;
   startDate: string; endDate: string;
-  progressPercent: number; floorLabel: string; sheetType: string;
-  delayReason: string | null; delayNote: string | null;
+  progressPercent: number; floorLabel: string; sheetType: string; sheetSlug: string | null;
+  delayReason: string | null; delayNote: string | null; assigneeName: string | null;
 };
-type KPI = { sheetType: string; total: number; avgProgress: number; delayed: number };
+type KPI = { sheetType: string; sheetSlug: string | null; total: number; avgProgress: number; delayed: number };
+type SheetNav = { id: number; code: string; name: string; slug: string };
 type Me = { id: number; name: string; email: string; role: string };
-
-const ROLE_LABEL: Record<string, string> = { admin: 'Admin', pm: 'PM', engineer: 'Kỹ sư', subcon: 'Thầu phụ' };
 
 function fmtDate(d: string | null) {
   if (!d) return '—';
@@ -40,6 +40,9 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState('');
   const [reasonFilter, setReasonFilter] = useState(''); // slug | '__none' (chưa gán) | ''
   const [me, setMe] = useState<Me | null>(null);
+  const [sheets, setSheets] = useState<SheetNav[]>([]);
+  const [newSheet, setNewSheet] = useState<{ name: string; slug: string; code: string; copyFromId: number | '' } | null>(null);
+  const [newSheetErr, setNewSheetErr] = useState('');
   const [projectName, setProjectName] = useState<string | null>(null);
 
   useEffect(() => {
@@ -53,15 +56,12 @@ export default function Dashboard() {
       setMe(j.user);
       const d = await fetch('/api/dashboard').then(r => r.json());
       setData(d);
+      const sh = await fetch('/api/sheets').then(r => r.ok ? r.json() : null);
+      setSheets(sh?.sheets ?? []);
     }).finally(() => setLoading(false));
   }, []);
 
-  async function logout() {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    window.location.href = '/login';
-  }
-
-  if (loading) return <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">Đang tải...</div>;
+  if (loading) return <PageSkeleton />;
 
   const canImport = me?.role === 'admin' || me?.role === 'pm';
 
@@ -86,6 +86,23 @@ export default function Dashboard() {
   const noReason = allDelayed.filter(t => !t.delayReason).length;
   const maxReason = Math.max(1, ...reasonCounts.map(r => r.count), noReason);
 
+  // Link tới sheet tracking + filter tầng — cùng logic với GlobalSearch.
+  const trackingUrl = (t: DelayedTask) => {
+    const slug = t.sheetSlug ?? slugFromCode(t.sheetType);
+    return slug ? `/tracking/${slug}${t.floorLabel ? `?floor=${encodeURIComponent(t.floorLabel)}` : ''}` : null;
+  };
+
+  async function createSheet() {
+    if (!newSheet?.name.trim()) return;
+    const res = await fetch('/api/sheets', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newSheet.name.trim(), code: newSheet.code.trim() || undefined, slug: newSheet.slug.trim() || undefined, copyFromId: newSheet.copyFromId || undefined }),
+    });
+    const j = await res.json().catch(() => null);
+    if (!res.ok) { setNewSheetErr(j?.error ?? 'Không tạo được trang'); return; }
+    window.location.href = `/tracking/${j.sheet.slug}`;
+  }
+
   async function setReason(taskId: number, reason: string) {
     const res = await fetch(`/api/tasks/${taskId}/delay-reason`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -99,83 +116,43 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <header className="border-b border-zinc-800 px-6 py-4 flex justify-between items-center">
-        <div>
-          <h1 className="text-xl font-bold">🏗️ XBoss</h1>
-          <p className="text-xs text-zinc-500">{projectName ?? 'Quản lý tiến độ thi công MEP'}</p>
-        </div>
-        <GlobalSearch />
-        <div className="flex items-center gap-2">
-          <NotificationBell />
-          {canImport && (
-            <a href="/api/export/excel" className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-3 py-2 rounded-lg text-sm font-medium transition">
-              <FileDown className="w-4 h-4" /> Excel
-            </a>
-          )}
-          <a href="/report" className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-3 py-2 rounded-lg text-sm font-medium transition">
-            <Printer className="w-4 h-4" /> PDF
+      <AppHeader title="🏗️ XBoss" subtitle={projectName ?? 'Quản lý tiến độ thi công MEP'}>
+        {canImport && (
+          <a href="/api/export/excel" className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-3 py-2 rounded-lg text-sm font-medium transition">
+            <FileDown className="w-4 h-4" /> <span className="hidden sm:inline">Excel</span>
           </a>
-          {canImport && (
-            <a href="/import" className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-lg text-sm font-medium transition">
-              <Upload className="w-4 h-4" /> Import Excel
-            </a>
-          )}
-          {me && (
-            <div className="flex items-center gap-2 ml-2 pl-3 border-l border-zinc-800">
-              <div className="text-right">
-                <p className="text-sm font-medium leading-tight">{me.name}</p>
-                <p className="text-xs text-emerald-400 leading-tight">{ROLE_LABEL[me.role] ?? me.role}</p>
-              </div>
-              {me.role === 'admin' && (
-                <a href="/users" title="Quản lý người dùng" className="text-zinc-400 hover:text-emerald-400"><Users className="w-4 h-4" /></a>
-              )}
-              <a href="/password" title="Đổi mật khẩu" className="text-zinc-400 hover:text-amber-400"><KeyRound className="w-4 h-4" /></a>
-              <button onClick={logout} title="Đăng xuất" className="text-zinc-400 hover:text-red-400"><LogOut className="w-4 h-4" /></button>
-            </div>
-          )}
-        </div>
-      </header>
+        )}
+        <a href="/report" className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-3 py-2 rounded-lg text-sm font-medium transition">
+          <Printer className="w-4 h-4" /> <span className="hidden sm:inline">PDF</span>
+        </a>
+        {canImport && (
+          <a href="/import" className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition">
+            <Upload className="w-4 h-4" /> <span className="hidden sm:inline">Import Excel</span>
+          </a>
+        )}
+      </AppHeader>
 
-      <main className="p-6">
+      <main className="p-4 sm:p-6">
         {/* Nav vào các sheet tracking */}
         <div className="flex flex-wrap gap-2 mb-6">
-          {SHEET_SLUGS.map(s => (
-            <a key={s.slug} href={`/tracking/${s.slug}`}
+          {sheets.map(s => (
+            <a key={s.slug} href={`/tracking/${s.slug}`} title={s.name}
               className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm transition">
               <LayoutGrid className="w-4 h-4 text-emerald-400" /> {s.code}
               <ChevronRight className="w-3.5 h-3.5 text-zinc-600" />
             </a>
           ))}
-          <a href="/my-tasks"
-            className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm transition">
-            <ClipboardList className="w-4 h-4 text-violet-400" /> Việc của tôi
-            <ChevronRight className="w-3.5 h-3.5 text-zinc-600" />
-          </a>
-          <a href="/materials"
-            className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm transition">
-            <Package className="w-4 h-4 text-sky-400" /> Vật tư
-            <ChevronRight className="w-3.5 h-3.5 text-zinc-600" />
-          </a>
-          <a href="/gantt"
-            className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm transition">
-            <CalendarRange className="w-4 h-4 text-amber-400" /> Gantt
-            <ChevronRight className="w-3.5 h-3.5 text-zinc-600" />
-          </a>
-          <a href="/approvals"
-            className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm transition">
-            <CheckSquare className="w-4 h-4 text-emerald-400" /> Nghiệm thu
-            <ChevronRight className="w-3.5 h-3.5 text-zinc-600" />
-          </a>
-          <a href="/lookahead"
-            className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm transition">
-            <CalendarClock className="w-4 h-4 text-rose-400" /> Kế hoạch 2 tuần
-            <ChevronRight className="w-3.5 h-3.5 text-zinc-600" />
-          </a>
+          {canImport && (
+            <button onClick={() => { setNewSheetErr(''); setNewSheet({ name: '', slug: '', code: '', copyFromId: sheets[sheets.length - 1]?.id ?? '' }); }}
+              className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 border border-dashed border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-400 hover:text-emerald-400 transition">
+              <Plus className="w-4 h-4" /> Thêm trang tracking
+            </button>
+          )}
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
-          <div className="bg-red-950 border border-red-800 rounded-xl p-4 col-span-2 md:col-span-1">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
+          <div className="bg-red-950 border border-red-800 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-1">
               <AlertTriangle className="w-4 h-4 text-red-400" />
               <span className="text-xs text-red-400 uppercase">Tổng trễ</span>
@@ -183,7 +160,7 @@ export default function Dashboard() {
             <p className="text-3xl font-bold text-red-300">{data?.totalDelayed ?? 0}</p>
           </div>
           {data?.kpi.map(k => {
-            const slug = slugFromCode(k.sheetType);
+            const slug = k.sheetSlug ?? slugFromCode(k.sheetType);
             const inner = (
               <>
                 <p className="text-xs text-zinc-400 uppercase mb-1 truncate">{k.sheetType}</p>
@@ -232,12 +209,12 @@ export default function Dashboard() {
             <h2 className="font-semibold mb-1 text-sm text-zinc-300 flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-400" /> Nguyên nhân trễ (Pareto)
             </h2>
-            <p className="text-xs text-zinc-600 mb-3">Gán lý do trên lưới tracking hoặc bảng dưới · bấm thanh để lọc bảng trễ theo lý do</p>
+            <p className="text-xs text-zinc-400 mb-3">Gán lý do trên lưới tracking hoặc bảng dưới · bấm thanh để lọc bảng trễ theo lý do</p>
             <div className="space-y-1.5">
               {reasonCounts.map(r => (
                 <button key={r.slug} onClick={() => setReasonFilter(f => f === r.slug ? '' : r.slug)}
                   className={`w-full flex items-center gap-2 group ${reasonFilter === r.slug ? 'opacity-100' : reasonFilter ? 'opacity-40' : ''}`}>
-                  <span className="text-xs text-zinc-400 w-28 text-right shrink-0">{r.label}</span>
+                  <span className="text-xs text-zinc-400 w-20 sm:w-28 text-right shrink-0 truncate" title={r.label}>{r.label}</span>
                   <span className="flex-1 bg-zinc-800/60 rounded h-5 overflow-hidden">
                     <span className="block h-full bg-amber-600/80 group-hover:bg-amber-500 rounded transition-all"
                       style={{ width: `${(r.count / maxReason) * 100}%` }} />
@@ -248,7 +225,7 @@ export default function Dashboard() {
               {noReason > 0 && (
                 <button onClick={() => setReasonFilter(f => f === '__none' ? '' : '__none')}
                   className={`w-full flex items-center gap-2 group ${reasonFilter === '__none' ? 'opacity-100' : reasonFilter ? 'opacity-40' : ''}`}>
-                  <span className="text-xs text-zinc-500 w-28 text-right shrink-0">Chưa gán lý do</span>
+                  <span className="text-xs text-zinc-400 w-20 sm:w-28 text-right shrink-0">Chưa gán lý do</span>
                   <span className="flex-1 bg-zinc-800/60 rounded h-5 overflow-hidden">
                     <span className="block h-full bg-zinc-600 group-hover:bg-zinc-500 rounded transition-all"
                       style={{ width: `${(noReason / maxReason) * 100}%` }} />
@@ -267,17 +244,17 @@ export default function Dashboard() {
               <Clock className="w-4 h-4 text-red-400" /> Danh sách công việc đang trễ
             </h2>
             <div className="flex flex-wrap gap-2">
-              <select value={sheetFilter} onChange={e => setSheetFilter(e.target.value)}
+              <select value={sheetFilter} onChange={e => setSheetFilter(e.target.value)} aria-label="Lọc theo sheet"
                 className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm outline-none">
                 <option value="">Tất cả sheet</option>
                 {data?.kpi.map(k => <option key={k.sheetType} value={k.sheetType}>{k.sheetType}</option>)}
               </select>
-              <select value={floorFilter} onChange={e => setFloorFilter(e.target.value)}
+              <select value={floorFilter} onChange={e => setFloorFilter(e.target.value)} aria-label="Lọc theo tầng"
                 className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm outline-none">
                 <option value="">Tất cả tầng</option>
                 {floors.map(f => <option key={f} value={f}>{f}</option>)}
               </select>
-              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="Lọc theo trạng thái"
                 className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm outline-none">
                 <option value="">Tất cả trạng thái</option>
                 {statuses.map(s => <option key={s} value={s}>{STATUS_LABEL[s] ?? s}</option>)}
@@ -285,22 +262,31 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="overflow-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[700px]">
               <thead>
                 <tr className="text-xs text-zinc-400 border-b border-zinc-800">
                   <th className="text-left p-3">CHI TIẾT</th>
                   <th className="text-left p-3">TẦNG</th>
                   <th className="text-left p-3">KẾT THÚC</th>
                   <th className="text-left p-3">% TIẾN ĐỘ</th>
+                  <th className="text-left p-3">NGƯỜI LÀM</th>
                   <th className="text-left p-3">SHEET</th>
                   <th className="text-left p-3">NGUYÊN NHÂN</th>
                   <th className="text-left p-3">TRẠNG THÁI</th>
                 </tr>
               </thead>
               <tbody>
-                {delayed.map(t => (
+                {delayed.map(t => {
+                  const url = trackingUrl(t);
+                  return (
                   <tr key={t.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/50">
-                    <td className="p-3 font-medium">{t.name}</td>
+                    <td className="p-3 font-medium">
+                      {url ? (
+                        <a href={url} title="Mở trên lưới tracking" className="hover:text-emerald-400 group">
+                          {t.name} <ExternalLink className="w-3 h-3 inline text-zinc-600 group-hover:text-emerald-400" />
+                        </a>
+                      ) : t.name}
+                    </td>
                     <td className="p-3 text-zinc-400">{t.floorLabel || '—'}</td>
                     <td className="p-3 text-red-400">{fmtDate(t.endDate)}</td>
                     <td className="p-3">
@@ -309,11 +295,12 @@ export default function Dashboard() {
                         <span>{Math.round((t.progressPercent ?? 0) * 100)}%</span>
                       </div>
                     </td>
+                    <td className="p-3 text-zinc-400 text-xs">{t.assigneeName ?? '—'}</td>
                     <td className="p-3"><span className="px-2 py-0.5 bg-zinc-800 rounded text-xs">{t.sheetType}</span></td>
                     <td className="p-3" title={t.delayNote ?? undefined}>
                       {me && me.role !== 'subcon' ? (
-                        <select value={t.delayReason ?? ''} onChange={e => setReason(t.id, e.target.value)}
-                          className={`text-xs rounded px-1.5 py-1 outline-none border max-w-[130px] ${t.delayReason
+                        <select value={t.delayReason ?? ''} onChange={e => setReason(t.id, e.target.value)} aria-label="Nguyên nhân trễ"
+                          className={`text-xs rounded px-1.5 py-1 outline-none border w-full max-w-[160px] ${t.delayReason
                             ? 'bg-amber-950/60 border-amber-900 text-amber-300' : 'bg-zinc-800 border-zinc-700 text-zinc-500'}`}>
                           <option value="">— Chưa gán —</option>
                           {Object.entries(DELAY_REASON_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -324,15 +311,58 @@ export default function Dashboard() {
                     </td>
                     <td className="p-3"><span className="px-2 py-0.5 bg-red-950 text-red-400 rounded text-xs">{STATUS_LABEL[t.status] ?? 'Đang trễ'}</span></td>
                   </tr>
-                ))}
+                  );
+                })}
                 {delayed.length === 0 && (
-                  <tr><td colSpan={7} className="p-8 text-center text-zinc-500">Không có công việc trễ. Hãy import file Excel nếu chưa có dữ liệu.</td></tr>
+                  <tr><td colSpan={8} className="p-8 text-center text-zinc-500">Không có công việc trễ. Hãy import file Excel nếu chưa có dữ liệu.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         </div>
       </main>
+
+      {/* Modal tạo trang tracking mới */}
+      {newSheet && (
+        <Modal onClose={() => setNewSheet(null)}>
+          <div className="p-5">
+            <h3 className="font-semibold mb-3 flex items-center gap-2"><Plus className="w-4 h-4 text-emerald-400" /> Thêm trang tracking</h3>
+            <label className="block text-xs text-zinc-400 mb-1">Tên trang</label>
+            <input autoFocus value={newSheet.name}
+              onChange={e => setNewSheet(ns => ns && ({ ...ns, name: e.target.value, slug: toSlug(e.target.value), code: e.target.value }))}
+              placeholder="VD: Ống nước cấp Zone 3"
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm mb-3 outline-none focus:border-emerald-600" />
+            <label className="block text-xs text-zinc-400 mb-1">Mã sheet (hiển thị trên Dashboard/Excel)</label>
+            <input value={newSheet.code}
+              onChange={e => setNewSheet(ns => ns && ({ ...ns, code: e.target.value }))}
+              placeholder="VD: ONC Z3"
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm mb-3 outline-none focus:border-emerald-600" />
+            <label className="block text-xs text-zinc-400 mb-1">Đường dẫn</label>
+            <div className="flex items-center gap-1 mb-1">
+              <span className="text-sm text-zinc-500">/tracking/</span>
+              <input value={newSheet.slug}
+                onChange={e => setNewSheet(ns => ns && ({ ...ns, slug: e.target.value }))}
+                placeholder="ong-nuoc-cap-zone-3"
+                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600 font-mono" />
+            </div>
+            <p className="text-[11px] text-zinc-500 mb-3">Chỉ dùng chữ thường a-z, số và gạch nối. Tự sinh từ tên, sửa được.</p>
+            <label className="block text-xs text-zinc-400 mb-1">Sao chép cấu trúc từ</label>
+            <select value={newSheet.copyFromId}
+              onChange={e => setNewSheet(ns => ns && ({ ...ns, copyFromId: e.target.value ? Number(e.target.value) : '' }))}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm mb-1 outline-none focus:border-emerald-600">
+              <option value="">— Trang trống —</option>
+              {sheets.map(s => <option key={s.id} value={s.id}>{s.code} — {s.name}</option>)}
+            </select>
+            <p className="text-[11px] text-zinc-500 mb-3">Copy nguyên nhóm, công việc và cột checkbox của trang nguồn — tiến độ reset về 0, BOQCODE không copy.</p>
+            {newSheetErr && <p className="text-xs text-red-400 mb-2">{newSheetErr}</p>}
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setNewSheet(null)} className="px-3 py-1.5 text-sm bg-zinc-800 hover:bg-zinc-700 rounded-lg">Huỷ</button>
+              <button onClick={createSheet} disabled={!newSheet.name.trim()}
+                className="px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg font-medium">Tạo trang</button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

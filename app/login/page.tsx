@@ -55,17 +55,19 @@ export default function LoginPage() {
             <LogIn className="w-4 h-4" /> {busy ? 'Đang đăng nhập...' : 'Đăng nhập'}
           </button>
         </form>
-        <div className="mt-4 text-xs text-zinc-500">
-          <p className="mb-1">Tài khoản demo (bấm để điền):</p>
-          <div className="grid grid-cols-2 gap-2">
-            {DEMO.map(d => (
-              <button key={d.email} onClick={() => { setEmail(d.email); setPassword(d.pw); }}
-                className="text-left bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1.5 hover:border-emerald-700">
-                <span className="text-emerald-400">{d.role}</span><br />{d.email}
-              </button>
-            ))}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-4 text-xs text-zinc-500">
+            <p className="mb-1">Tài khoản demo (bấm để điền):</p>
+            <div className="grid grid-cols-2 gap-2">
+              {DEMO.map(d => (
+                <button key={d.email} onClick={() => { setEmail(d.email); setPassword(d.pw); }}
+                  className="text-left bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1.5 hover:border-emerald-700">
+                  <span className="text-emerald-400">{d.role}</span><br />{d.email}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

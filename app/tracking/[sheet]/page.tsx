@@ -1,7 +1,10 @@
 'use client';
 import { useEffect, useState, useCallback, useRef, Fragment } from 'react';
-import { ArrowLeft, Search, ChevronRight, ChevronDown, Pencil, Check, X, History, UserCheck, RefreshCw, Link2, Camera, Trash2, Upload, MessageSquare, Send, WifiOff, CloudUpload, ChevronUp, ChevronDown as ChevronDownIcon, Columns, Copy, RotateCcw, CalendarDays } from 'lucide-react';
+import { Search, ChevronRight, ChevronDown, Pencil, Check, X, History, UserCheck, RefreshCw, Link2, Camera, Trash2, Upload, MessageSquare, Send, WifiOff, CloudUpload, ChevronUp, ChevronDown as ChevronDownIcon, Columns, Copy, RotateCcw, CalendarDays } from 'lucide-react';
 import { useOfflineTickQueue } from '@/app/components/offlineQueue';
+import AppHeader from '@/app/components/AppHeader';
+import { Modal, appAlert, appConfirm, appPrompt } from '@/app/components/dialogs';
+import { PageSkeleton } from '@/app/components/Skeleton';
 import { DELAY_REASON_LABEL } from '@/lib/delay';
 import { toSlug } from '@/lib/sheets';
 
@@ -21,6 +24,20 @@ type Data = { sheet: { id?: number; code: string; name: string; responsible?: st
 type AppUser = { id: number; name: string; role: string };
 
 const SYNC_POLL_MS = 10_000;
+
+// Màn hẹp (điện thoại ngoài công trường): 4 cột sticky chiếm 526px sẽ nuốt hết
+// viewport — thu lại chỉ giữ cột tên task sticky để vẫn tick checkbox được.
+function useIsMobile() {
+  const [mobile, setMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const onChange = () => setMobile(mq.matches);
+    onChange();
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return mobile;
+}
 
 // Ngày rút gọn d/M cho dòng task (đỡ chiếm chỗ trên lưới).
 const fmtShortDate = (d: string | null) => {
@@ -54,6 +71,7 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
   const [refreshKey, setRefreshKey] = useState(0);
   const [syncToast, setSyncToast] = useState(false);
   const versionRef = useRef<string | null>(null);
+  const isMobile = useIsMobile();
 
   const load = useCallback(() => {
     fetch(`/api/tasks?sheet=${sheet}`).then(r => r.json()).then((d: Data) => {
@@ -136,13 +154,13 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
 
   async function deleteSheet() {
     if (!data?.sheet.id) return;
-    if (!confirm(`Xoá trang "${data.sheet.name}" cùng TOÀN BỘ nhóm, task, checkbox và vật tư của nó? Không hoàn tác được.`)) return;
+    if (!await appConfirm(`Xoá trang "${data.sheet.name}" cùng TOÀN BỘ nhóm, task, checkbox và vật tư của nó? Không hoàn tác được.`, { danger: true, confirmLabel: 'Xoá trang' })) return;
     const res = await fetch(`/api/sheets/${data.sheet.id}`, { method: 'DELETE' });
     if (!res.ok) { const j = await res.json().catch(() => null); setSheetErr(j?.error ?? 'Không xoá được'); return; }
     window.location.href = '/';
   }
 
-  if (loading) return <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">Đang tải...</div>;
+  if (loading) return <PageSkeleton />;
 
   const floors = [...new Set((data?.packages ?? []).map(p => p.floorLabel).filter((f): f is string => !!f))]
     .sort((a, b) => parseInt(a) - parseInt(b));
@@ -154,24 +172,24 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <header className="border-b border-zinc-800 px-6 py-4 flex items-center gap-3">
-        <a href="/" className="text-zinc-400 hover:text-white"><ArrowLeft className="w-5 h-5" /></a>
-        <div>
-          <h1 className="text-lg font-bold flex items-center gap-2">
+      <AppHeader back search={false}
+        title={
+          <>
             {data?.sheet.name ?? sheet}
             {canEdit && data?.sheet.id && (
               <button onClick={() => { setSheetErr(''); setSheetModal({
                   name: data.sheet.name, code: data.sheet.code,
                   slug: data.sheet.slug ?? sheet, responsible: data.sheet.responsible ?? '' }); }}
-                title="Đổi tên / đường dẫn trang" className="text-zinc-600 hover:text-amber-400">
+                title="Đổi tên / đường dẫn trang" aria-label="Đổi tên / đường dẫn trang"
+                className="text-zinc-600 hover:text-amber-400">
                 <Pencil className="w-3.5 h-3.5" />
               </button>
             )}
-          </h1>
-          <p className="text-xs text-zinc-500">{data?.sheet.code} {data?.sheet.responsible ? `· ${data.sheet.responsible}` : ''}</p>
-        </div>
-        {canEdit && <span className="ml-auto text-xs bg-emerald-950 text-emerald-400 px-2 py-1 rounded">Chế độ chỉnh sửa (Admin/PM)</span>}
-      </header>
+          </>
+        }
+        subtitle={`${data?.sheet.code ?? ''} ${data?.sheet.responsible ? `· ${data.sheet.responsible}` : ''}`}>
+        {canEdit && <span className="text-xs bg-emerald-950 text-emerald-400 px-2 py-1 rounded hidden sm:inline">Chế độ chỉnh sửa (Admin/PM)</span>}
+      </AppHeader>
 
       <div className="px-6 py-3 flex flex-wrap gap-3 items-center border-b border-zinc-800/60">
         <div className="relative">
@@ -199,7 +217,7 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
               pkg={p} pkgIdx={pi} pkgCount={packages.length}
               expanded={!!expanded[p.id]}
               onToggle={() => setExpanded(s => ({ ...s, [p.id]: !s[p.id] }))}
-              canEdit={canEdit} users={users} refreshKey={refreshKey}
+              canEdit={canEdit} users={users} refreshKey={refreshKey} isMobile={isMobile}
               onChanged={load} onOfflineTick={enqueue}
             />
           </div>
@@ -210,14 +228,16 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
       </main>
 
       {syncToast && (
-        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-emerald-900/95 border border-emerald-700 text-emerald-200 px-4 py-2 rounded-full text-sm shadow-xl">
+        <div className="fixed left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-emerald-900/95 border border-emerald-700 text-emerald-200 px-4 py-2 rounded-full text-sm shadow-xl"
+          style={{ bottom: 'max(1.25rem, env(safe-area-inset-bottom, 0px) + 0.5rem)' }}>
           <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Dữ liệu vừa được người khác cập nhật — đã làm mới
         </div>
       )}
 
       {(!online || offlinePending > 0) && (
-        <div className={`fixed bottom-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-full text-sm shadow-xl border ${
-          online ? 'bg-sky-900/95 border-sky-700 text-sky-200' : 'bg-amber-900/95 border-amber-700 text-amber-200'}`}>
+        <div className={`fixed left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-full text-sm shadow-xl border ${
+          online ? 'bg-sky-900/95 border-sky-700 text-sky-200' : 'bg-amber-900/95 border-amber-700 text-amber-200'}`}
+          style={{ bottom: 'max(4rem, env(safe-area-inset-bottom, 0px) + 3.5rem)' }}>
           {online
             ? <><CloudUpload className="w-3.5 h-3.5 animate-pulse" /> Đang gửi lại {offlinePending} thay đổi đã lưu offline...</>
             : <><WifiOff className="w-3.5 h-3.5" /> Mất mạng — thao tác vẫn được lưu{offlinePending > 0 ? ` (${offlinePending} chờ gửi)` : ''}, tự đồng bộ khi có mạng</>}
@@ -226,8 +246,8 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
 
       {/* Modal đổi tên / đường dẫn trang */}
       {sheetModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setSheetModal(null)}>
-          <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-5 w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
+        <Modal onClose={() => setSheetModal(null)}>
+          <div className="p-5">
             <h3 className="font-semibold mb-3 flex items-center gap-2"><Pencil className="w-4 h-4 text-amber-400" /> Cài đặt trang tracking</h3>
             <label className="block text-xs text-zinc-400 mb-1">Tên trang</label>
             <input autoFocus value={sheetModal.name}
@@ -246,7 +266,7 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
               <button onClick={() => setSheetModal(m => m && ({ ...m, slug: toSlug(m.name) }))}
                 title="Sinh lại từ tên" className="text-xs text-zinc-500 hover:text-emerald-400 px-1">↻</button>
             </div>
-            <p className="text-[11px] text-zinc-600 mb-3">Chỉ dùng chữ thường a-z, số và gạch nối. Đổi đường dẫn sẽ chuyển trang sang URL mới (link cũ hết hiệu lực).</p>
+            <p className="text-[11px] text-zinc-500 mb-3">Chỉ dùng chữ thường a-z, số và gạch nối. Đổi đường dẫn sẽ chuyển trang sang URL mới (link cũ hết hiệu lực).</p>
             <label className="block text-xs text-zinc-400 mb-1">Người phụ trách</label>
             <input value={sheetModal.responsible}
               onChange={e => setSheetModal(m => m && ({ ...m, responsible: e.target.value }))}
@@ -265,7 +285,7 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
               </div>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );
@@ -275,9 +295,9 @@ type Cell = { id: number; installed: boolean };
 type GridTask = { id: number; code: string; name: string; status: string; progressPercent: number; boqCode: string | null; drawingUrl: string | null; assignedTo: number | null; assigneeName: string | null; photoCount: number; commentCount: number; delayReason: string | null; startDate: string | null; endDate: string | null; cells: Record<string, Cell> };
 type Grid = { columns: string[]; tasks: GridTask[] };
 
-function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, users, refreshKey, onChanged, onOfflineTick }: {
+function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, users, refreshKey, isMobile, onChanged, onOfflineTick }: {
   pkg: Pkg; pkgIdx: number; pkgCount: number; expanded: boolean; onToggle: () => void;
-  canEdit: boolean; users: AppUser[]; refreshKey: number;
+  canEdit: boolean; users: AppUser[]; refreshKey: number; isMobile: boolean;
   onChanged: () => void; onOfflineTick: (dimId: number, installed: boolean) => void;
 }) {
   const [grid, setGrid] = useState<Grid | null>(null);
@@ -299,17 +319,17 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, users, re
   // ── Hàm thao tác nhóm (pkg) ──────────────────────────────────────────────
 
   async function editPkgBoq() {
-    const v = window.prompt('BOQCODE của nhóm (duy nhất toàn hệ thống, để trống = xoá mã):', pkg.boqCode ?? '');
+    const v = await appPrompt('BOQCODE của nhóm (duy nhất toàn hệ thống, để trống = xoá mã)', pkg.boqCode ?? '', { mono: true });
     if (v === null) return;
     const res = await fetch(`/api/workpackages/${pkg.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ boqCode: v }),
     });
-    if (!res.ok) { const j = await res.json().catch(() => ({})); window.alert(j.error ?? 'Lỗi không xác định'); return; }
+    if (!res.ok) { const j = await res.json().catch(() => ({})); appAlert(j.error ?? 'Lỗi không xác định'); return; }
     onChanged();
   }
 
   async function editPkgDrawing() {
-    const v = window.prompt('Link bản vẽ / BBNT của nhóm (để trống = xoá):', pkg.drawingUrl ?? '');
+    const v = await appPrompt('Link bản vẽ / BBNT của nhóm (để trống = xoá)', pkg.drawingUrl ?? '');
     if (v === null) return;
     await fetch(`/api/workpackages/${pkg.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ drawingUrl: v.trim() || null }),
@@ -340,22 +360,22 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, users, re
   }
 
   async function copyPkg() {
-    const code = window.prompt('Mã nhóm mới:', `${pkg.code}_copy`);
+    const code = await appPrompt('Mã nhóm mới', `${pkg.code}_copy`, { mono: true });
     if (!code?.trim()) return;
-    const name = window.prompt('Tên nhóm mới:', `${pkg.name} (bản sao)`);
+    const name = await appPrompt('Tên nhóm mới', `${pkg.name} (bản sao)`);
     if (!name?.trim()) return;
     const res = await fetch(`/api/workpackages/${pkg.id}/copy`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code: code.trim(), name: name.trim(), afterId: pkg.id }),
     });
-    if (!res.ok) { const j = await res.json().catch(() => ({})); window.alert(j.error ?? 'Lỗi không xác định'); return; }
+    if (!res.ok) { const j = await res.json().catch(() => ({})); appAlert(j.error ?? 'Lỗi không xác định'); return; }
     onChanged();
   }
 
   async function deletePkg() {
-    if (!window.confirm(`Xoá nhóm "${pkg.code} — ${pkg.name}"?\n\nToàn bộ ${pkg.tasks.length} task và dữ liệu liên quan sẽ bị xoá vĩnh viễn.`)) return;
+    if (!await appConfirm(`Xoá nhóm "${pkg.code} — ${pkg.name}"?\n\nToàn bộ ${pkg.tasks.length} task và dữ liệu liên quan sẽ bị xoá vĩnh viễn.`, { danger: true, confirmLabel: 'Xoá nhóm' })) return;
     const res = await fetch(`/api/workpackages/${pkg.id}`, { method: 'DELETE' });
-    if (!res.ok) { const j = await res.json().catch(() => ({})); window.alert(j.error ?? 'Lỗi không xác định'); return; }
+    if (!res.ok) { const j = await res.json().catch(() => ({})); appAlert(j.error ?? 'Lỗi không xác định'); return; }
     onChanged();
   }
 
@@ -400,17 +420,17 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, users, re
   }
 
   async function editTaskBoq(t: GridTask) {
-    const v = window.prompt('BOQCODE (duy nhất toàn hệ thống, để trống = xoá mã):', t.boqCode ?? '');
+    const v = await appPrompt('BOQCODE (duy nhất toàn hệ thống, để trống = xoá mã)', t.boqCode ?? '', { mono: true });
     if (v === null) return;
     const res = await fetch(`/api/tasks/${t.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ boqCode: v }),
     });
-    if (!res.ok) { const j = await res.json().catch(() => ({})); window.alert(j.error ?? 'Lỗi không xác định'); return; }
+    if (!res.ok) { const j = await res.json().catch(() => ({})); appAlert(j.error ?? 'Lỗi không xác định'); return; }
     load();
   }
 
   async function editTaskDrawing(t: GridTask) {
-    const v = window.prompt('Link bản vẽ / BBNT (để trống = xoá):', t.drawingUrl ?? '');
+    const v = await appPrompt('Link bản vẽ / BBNT (để trống = xoá)', t.drawingUrl ?? '');
     if (v === null) return;
     await fetch(`/api/tasks/${t.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ drawingUrl: v.trim() || null }),
@@ -427,41 +447,46 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, users, re
     if (start) body.startDate = start;
     if (end) body.endDate = end;
     if (!Object.keys(body).length) { setDatesTarget(null); return; }
-    await Promise.all(ids.map(id => fetch(`/api/tasks/${id}`, {
+    const results = await Promise.all(ids.map(id => fetch(`/api/tasks/${id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-    })));
+    }).then(r => r.ok).catch(() => false)));
+    const failed = results.filter(ok => !ok).length;
+    if (failed) appAlert(`Không lưu được ngày cho ${failed}/${ids.length} task — thử lại sau.`);
     setDatesTarget(null); setSelected(new Set()); load(); onChanged();
   }
 
   async function bulkAssign(value: string) {
     if (!value) return;
-    await Promise.all([...selected].map(id => fetch(`/api/tasks/${id}`, {
+    const ids = [...selected];
+    const results = await Promise.all(ids.map(id => fetch(`/api/tasks/${id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ assignedTo: value === 'none' ? null : Number(value) }),
-    })));
+    }).then(r => r.ok).catch(() => false)));
+    const failed = results.filter(ok => !ok).length;
+    if (failed) appAlert(`Không gán được ${failed}/${ids.length} task — thử lại sau.`);
     setSelected(new Set()); load();
   }
 
   async function setDelayReason(t: GridTask, reason: string) {
     let note: string | null = null;
-    if (reason === 'khac') note = window.prompt('Ghi chú lý do trễ:') ?? null;
+    if (reason === 'khac') note = await appPrompt('Ghi chú lý do trễ');
     const res = await fetch(`/api/tasks/${t.id}/delay-reason`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reason: reason || null, note }),
     });
-    if (!res.ok) { const j = await res.json().catch(() => ({})); window.alert(j.error ?? 'Lỗi không xác định'); }
+    if (!res.ok) { const j = await res.json().catch(() => ({})); appAlert(j.error ?? 'Lỗi không xác định'); }
     load();
   }
 
   async function approveTask(t: GridTask, approve: boolean) {
-    if (!window.confirm(approve ? `Duyệt nghiệm thu "${t.code} — ${t.name}"?` : `Huỷ nghiệm thu "${t.code}"?`)) return;
+    if (!await appConfirm(approve ? `Duyệt nghiệm thu "${t.code} — ${t.name}"?` : `Huỷ nghiệm thu "${t.code}"?`, approve ? { confirmLabel: 'Duyệt' } : { danger: true, confirmLabel: 'Huỷ nghiệm thu' })) return;
     const res = await fetch(`/api/tasks/${t.id}/approve`, { method: approve ? 'POST' : 'DELETE' });
-    if (!res.ok) { const j = await res.json().catch(() => ({})); window.alert(j.error ?? 'Lỗi không xác định'); return; }
+    if (!res.ok) { const j = await res.json().catch(() => ({})); appAlert(j.error ?? 'Lỗi không xác định'); return; }
     load(); onChanged();
   }
 
   async function renameColumn(oldLabel: string) {
-    const newLabel = window.prompt('Đổi tên cột (áp dụng toàn sheet):', oldLabel);
+    const newLabel = await appPrompt('Đổi tên cột (áp dụng toàn sheet)', oldLabel);
     if (!newLabel || newLabel === oldLabel) return;
     await fetch('/api/dimensions/rename', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -471,33 +496,33 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, users, re
   }
 
   async function addColumnAfter(afterLabel: string | null) {
-    const label = window.prompt(afterLabel ? `Tên cột mới (chèn sau "${afterLabel}"):` : 'Tên cột mới (thêm vào cuối):');
+    const label = await appPrompt(afterLabel ? `Tên cột mới (chèn sau "${afterLabel}")` : 'Tên cột mới (thêm vào cuối)');
     if (!label?.trim()) return;
     const res = await fetch(`/api/workpackages/${pkg.id}/dimensions/column`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ label: label.trim(), afterLabel: afterLabel ?? undefined }),
     });
-    if (!res.ok) { const j = await res.json().catch(() => ({})); window.alert(j.error ?? 'Lỗi không xác định'); return; }
+    if (!res.ok) { const j = await res.json().catch(() => ({})); appAlert(j.error ?? 'Lỗi không xác định'); return; }
     load(); onChanged();
   }
 
   async function deleteTask(t: GridTask) {
-    if (!window.confirm(`Xoá task "${t.code} — ${t.name}"?\n\nToàn bộ ảnh, bình luận, lịch sử liên quan sẽ bị xoá vĩnh viễn.`)) return;
+    if (!await appConfirm(`Xoá task "${t.code} — ${t.name}"?\n\nToàn bộ ảnh, bình luận, lịch sử liên quan sẽ bị xoá vĩnh viễn.`, { danger: true, confirmLabel: 'Xoá task' })) return;
     const res = await fetch(`/api/tasks/${t.id}`, { method: 'DELETE' });
-    if (!res.ok) { const j = await res.json().catch(() => ({})); window.alert(j.error ?? 'Lỗi không xác định'); return; }
+    if (!res.ok) { const j = await res.json().catch(() => ({})); appAlert(j.error ?? 'Lỗi không xác định'); return; }
     load(); onChanged();
   }
 
   async function copyTask(t: GridTask) {
-    const code = window.prompt('Mã task mới:', `${t.code}_copy`);
+    const code = await appPrompt('Mã task mới', `${t.code}_copy`, { mono: true });
     if (!code?.trim()) return;
-    const name = window.prompt('Tên task mới:', `${t.name} (bản sao)`);
+    const name = await appPrompt('Tên task mới', `${t.name} (bản sao)`);
     if (!name?.trim()) return;
     const res = await fetch(`/api/tasks/${t.id}/copy`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code: code.trim(), name: name.trim(), afterId: t.id }),
     });
-    if (!res.ok) { const j = await res.json().catch(() => ({})); window.alert(j.error ?? 'Lỗi không xác định'); return; }
+    if (!res.ok) { const j = await res.json().catch(() => ({})); appAlert(j.error ?? 'Lỗi không xác định'); return; }
     load(); onChanged();
   }
 
@@ -522,6 +547,23 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, users, re
   const showTable = expanded && grid && grid.columns.length > 0;
   const noData = expanded && grid && grid.columns.length === 0;
 
+  // Chiều rộng cột — định nghĩa 1 chỗ, dùng chung cho hàng nhóm lẫn bảng task
+  const W_BOQ  = 110;
+  const W_CODE = 80;
+  const W_NAME = isMobile ? 150 : 280;
+  const W_PCT  = 56;
+  // 44px = tối thiểu theo Apple/Google HIG — ngón tay bấm được dễ dàng ngoài công trường
+  const W_DIM  = 44;
+  const W_ACT  = 88;
+  // Sticky left offset tính tự động từ các hằng số trên
+  const LEFT_CODE = W_BOQ;
+  const LEFT_NAME = W_BOQ + W_CODE;
+  const LEFT_PCT  = W_BOQ + W_CODE + W_NAME;
+  const stkBoq  = isMobile ? '' : 'sticky';
+  const stkCode = isMobile ? '' : 'sticky';
+  const stkName = isMobile ? 'sticky' : 'sticky';
+  const stkPct  = isMobile ? '' : 'sticky';
+
   return (
     <div className={`overflow-auto${expanded ? ' max-h-[70vh]' : ''}`}>
       {/* Thanh bulk-action — hiển thị khi đang chọn nhiều task */}
@@ -535,143 +577,160 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, users, re
             {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
           <button onClick={() => setDatesTarget({ ids: [...selected], init: { start: '', end: '' } })}
-            className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded px-2 py-1 text-zinc-300">📅 Đặt ngày</button>
+            className="flex items-center gap-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded px-2 py-1 text-zinc-300">
+            <CalendarDays className="w-3.5 h-3.5" /> Đặt ngày
+          </button>
           <button onClick={() => setSelected(new Set())} className="text-zinc-500 hover:text-zinc-300 ml-auto">Bỏ chọn</button>
         </div>
       )}
 
-      {/* ── Hàng tiêu đề nhóm — căn thẳng với cột bảng task bên dưới ── */}
-      <div className="flex items-stretch min-w-max bg-zinc-900 hover:bg-zinc-800 border-b border-zinc-800 cursor-pointer select-none group">
-        {/* Cột BOQ (110px) — sticky left-0 */}
-        <div className="sticky left-0 z-20 bg-inherit w-[110px] min-w-[110px] flex items-center gap-1 px-2 py-3.5 border-r border-zinc-800"
-          onClick={onToggle}>
-          {expanded
-            ? <ChevronDown className="w-4 h-4 text-zinc-400 shrink-0" />
-            : <ChevronRight className="w-4 h-4 text-zinc-400 shrink-0" />}
-          <span className="font-mono text-xs text-emerald-400 truncate flex-1"
-            title={`BOQCODE: ${pkg.boqCode ?? pkg.code} (mã Excel: ${pkg.code})`}>
-            {pkg.boqCode ?? pkg.code}
-          </span>
-          {canEdit && (
-            <button onClick={e => { e.stopPropagation(); editPkgBoq(); }} title="Sửa BOQCODE"
-              className="text-zinc-700 hover:text-amber-400 shrink-0"><Pencil className="w-3 h-3" /></button>
-          )}
-        </div>
+      {/* ── Bảng duy nhất: hàng nhóm + header cột + task rows ── */}
+      <table className="text-xs border-collapse table-fixed" style={{ width: 'max-content', minWidth: '100%' }}>
+        <colgroup>
+          <col style={{ width: W_BOQ }} />
+          <col style={{ width: W_CODE }} />
+          <col style={{ width: W_NAME }} />
+          <col style={{ width: W_PCT }} />
+          {grid?.columns.map(col => <col key={col} style={{ width: W_DIM }} />)}
+          {showTable && canEdit && <col style={{ width: W_ACT }} />}
+        </colgroup>
+        <thead>
+          {/* ── Hàng tiêu đề nhóm ── */}
+          <tr className="bg-zinc-900 hover:bg-zinc-800 border-b border-zinc-800 cursor-pointer select-none group">
+            {/* Cột BOQ */}
+            <td className={`${stkBoq} z-20 bg-inherit border-r border-zinc-800 px-2 py-3.5 align-middle`}
+              style={{ left: 0, width: W_BOQ, minWidth: W_BOQ }}
+              onClick={onToggle}>
+              <div className="flex items-center gap-1">
+                {expanded
+                  ? <ChevronDown className="w-4 h-4 text-zinc-400 shrink-0" />
+                  : <ChevronRight className="w-4 h-4 text-zinc-400 shrink-0" />}
+                <span className="font-mono text-xs text-emerald-400 truncate flex-1"
+                  title={`BOQCODE: ${pkg.boqCode ?? pkg.code} (mã Excel: ${pkg.code})`}>
+                  {pkg.boqCode ?? pkg.code}
+                </span>
+                {canEdit && (
+                  <button onClick={e => { e.stopPropagation(); editPkgBoq(); }} title="Sửa BOQCODE"
+                    className="text-zinc-700 hover:text-amber-400 shrink-0"><Pencil className="w-3 h-3" /></button>
+                )}
+              </div>
+            </td>
 
-        {/* Cột Tầng/Mã (80px) — sticky left-110px */}
-        <div className="sticky left-[110px] z-20 bg-inherit w-[80px] min-w-[80px] flex items-center justify-center px-1 py-3.5 border-r border-zinc-800"
-          onClick={onToggle}>
-          <span className="text-xs text-zinc-500 text-center">{pkg.floorLabel ?? ''}</span>
-        </div>
+            {/* Cột Tầng/Mã */}
+            <td className={`${stkCode} z-20 bg-inherit border-r border-zinc-800 px-1 py-3.5 text-center align-middle`}
+              style={{ left: LEFT_CODE, width: W_CODE, minWidth: W_CODE }}
+              onClick={onToggle}>
+              <span className="text-xs text-zinc-500">{pkg.floorLabel ?? ''}</span>
+            </td>
 
-        {/* Cột Công việc / Tên nhóm (280px) — sticky left-190px */}
-        <div className="sticky left-[190px] z-20 bg-inherit w-[280px] min-w-[280px] flex items-center px-2 py-3.5 border-r border-zinc-800 gap-1"
-          onClick={e => { if (!(e.target as Element).closest('button,input,a')) onToggle(); }}>
-          {editName !== null ? (
-            <span className="flex items-center gap-1 flex-1" onClick={e => e.stopPropagation()}>
-              <input autoFocus value={editName} onChange={e => setEditName(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') savePkgName(editName); if (e.key === 'Escape') setEditName(null); }}
-                className="bg-zinc-800 border border-emerald-600 rounded px-2 py-1 text-sm flex-1 outline-none" />
-              <button onClick={() => savePkgName(editName)} className="text-emerald-400"><Check className="w-4 h-4" /></button>
-              <button onClick={() => setEditName(null)} className="text-zinc-500"><X className="w-4 h-4" /></button>
-            </span>
-          ) : (
-            <span className="text-sm font-medium truncate flex-1">{pkg.name}</span>
-          )}
-          {canEdit && editName === null && (
-            <button onClick={e => { e.stopPropagation(); setEditName(pkg.name); }} title="Sửa tên nhóm"
-              className="text-zinc-700 hover:text-emerald-400 shrink-0"><Pencil className="w-3 h-3" /></button>
-          )}
-          {(pkg.drawingUrl || canEdit) && editName === null && (
-            pkg.drawingUrl ? (
-              <span className="flex items-center gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
-                <a href={pkg.drawingUrl} target="_blank" rel="noreferrer" title={`Bản vẽ: ${pkg.drawingUrl}`}
-                  className="text-sky-400 hover:text-sky-300"><Link2 className="w-3.5 h-3.5" /></a>
-                {canEdit && <button onClick={() => editPkgDrawing()} className="text-zinc-600 hover:text-emerald-400 ml-0.5"><Pencil className="w-2.5 h-2.5" /></button>}
-              </span>
-            ) : (
-              <button onClick={e => { e.stopPropagation(); editPkgDrawing(); }} title="Thêm link bản vẽ / BBNT"
-                className="text-zinc-700 hover:text-sky-400 shrink-0"><Link2 className="w-3.5 h-3.5" /></button>
-            )
-          )}
-        </div>
+            {/* Cột Tên nhóm */}
+            <td className={`${stkName} z-20 bg-inherit border-r border-zinc-800 px-2 py-3.5 align-middle overflow-hidden`}
+              style={{ left: isMobile ? 0 : LEFT_NAME, width: W_NAME, minWidth: W_NAME, maxWidth: W_NAME }}
+              onClick={e => { if (!(e.target as Element).closest('button,input,a')) onToggle(); }}>
+              {editName !== null ? (
+                <span className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                  <input autoFocus value={editName} onChange={e => setEditName(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') savePkgName(editName); if (e.key === 'Escape') setEditName(null); }}
+                    className="bg-zinc-800 border border-emerald-600 rounded px-2 py-1 text-sm flex-1 outline-none" />
+                  <button onClick={() => savePkgName(editName)} className="text-emerald-400"><Check className="w-4 h-4" /></button>
+                  <button onClick={() => setEditName(null)} className="text-zinc-500"><X className="w-4 h-4" /></button>
+                </span>
+              ) : (
+                <div className="flex items-center gap-1 min-w-0">
+                  <span className="text-sm font-medium truncate flex-1">{pkg.name}</span>
+                  {canEdit && editName === null && (
+                    <button onClick={e => { e.stopPropagation(); setEditName(pkg.name); }} title="Sửa tên nhóm"
+                      className="text-zinc-700 hover:text-emerald-400 shrink-0"><Pencil className="w-3 h-3" /></button>
+                  )}
+                  {(pkg.drawingUrl || canEdit) && editName === null && (
+                    pkg.drawingUrl ? (
+                      <span className="flex items-center gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
+                        <a href={pkg.drawingUrl} target="_blank" rel="noreferrer" title={`Bản vẽ: ${pkg.drawingUrl}`}
+                          className="text-sky-400 hover:text-sky-300"><Link2 className="w-3.5 h-3.5" /></a>
+                        {canEdit && <button onClick={() => editPkgDrawing()} className="text-zinc-600 hover:text-emerald-400 ml-0.5"><Pencil className="w-2.5 h-2.5" /></button>}
+                      </span>
+                    ) : (
+                      <button onClick={e => { e.stopPropagation(); editPkgDrawing(); }} title="Thêm link bản vẽ / BBNT"
+                        className="text-zinc-700 hover:text-sky-400 shrink-0"><Link2 className="w-3.5 h-3.5" /></button>
+                    )
+                  )}
+                </div>
+              )}
+            </td>
 
-        {/* Cột % tiến độ (56px) — sticky left-470px */}
-        <div className="sticky left-[470px] z-20 bg-inherit w-[56px] min-w-[56px] flex items-center justify-center px-1 py-3.5 border-r border-zinc-800"
-          onClick={onToggle}>
-          <span className="text-sm font-semibold text-zinc-300">{Math.round((pkg.progress ?? 0) * 100)}%</span>
-        </div>
+            {/* Cột % */}
+            <td className={`${stkPct} z-20 bg-inherit border-r border-zinc-800 px-1 py-3.5 text-center align-middle`}
+              style={{ left: LEFT_PCT, width: W_PCT, minWidth: W_PCT }}
+              onClick={onToggle}>
+              <span className="text-sm font-semibold text-zinc-300">{Math.round((pkg.progress ?? 0) * 100)}%</span>
+            </td>
 
-        {/* Phần cuộn: ngày, task count, thanh tiến độ, trạng thái, nút hành động */}
-        <div className="flex-1 min-w-[520px] flex items-center gap-3 px-3 py-3.5"
-          onClick={e => { if (!(e.target as Element).closest('button,a')) onToggle(); }}>
-          {/* 3 cột ngày: bắt đầu | số ngày | kết thúc */}
-          <button onClick={e => { e.stopPropagation(); if (canEdit) setShowDatesModal(true); }}
-            title={canEdit ? 'Sửa ngày nhóm' : `${pkg.startDate ?? '?'} → ${pkg.endDate ?? '?'}`}
-            className={`flex items-center gap-1 text-[13px] shrink-0 ${canEdit ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
-            <span className="w-14 text-center text-zinc-500">{fmtShortDate(pkg.startDate)}</span>
-            <span className="w-1.5 text-zinc-700">|</span>
-            <span className="w-[67px] text-center text-zinc-600">
-              {diffDays(pkg.startDate, pkg.endDate) != null
-                ? `${diffDays(pkg.startDate, pkg.endDate)}n`
-                : <CalendarDays className="w-[14px] h-[14px] text-zinc-700 inline" />}
-            </span>
-            <span className="w-1.5 text-zinc-700">|</span>
-            <span className="w-14 text-center text-zinc-500">{fmtShortDate(pkg.endDate)}</span>
-          </button>
-          <span className="text-[13px] text-zinc-500 w-[67px] text-right shrink-0">{pkg.tasks.length} task</span>
-          <div className="flex items-center gap-2 w-44 shrink-0">
-            <div className="bg-zinc-800 rounded-full h-2 flex-1">
-              <div className="bg-emerald-500 h-2 rounded-full" style={{ width: `${(pkg.progress ?? 0) * 100}%` }} />
-            </div>
-          </div>
-          <span className={`px-2.5 py-0.5 rounded text-[13px] w-32 text-center shrink-0 ${STATUS_CLS[pkg.status] ?? STATUS_CLS.chuan_bi}`}>
-            {STATUS_LABEL[pkg.status] ?? pkg.status}
-          </span>
-          {canEdit && (
-            <span className="flex items-center gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
-              <button onClick={() => movePkg('up')} title="Di chuyển lên" disabled={pkgIdx === 0}
-                className="p-0.5 text-zinc-600 hover:text-zinc-300 disabled:opacity-30"><ChevronUp className="w-[17px] h-[17px]" /></button>
-              <button onClick={() => movePkg('down')} title="Di chuyển xuống" disabled={pkgIdx === pkgCount - 1}
-                className="p-0.5 text-zinc-600 hover:text-zinc-300 disabled:opacity-30"><ChevronDownIcon className="w-[17px] h-[17px]" /></button>
-              <button onClick={() => copyPkg()} title="Sao chép nhóm này"
-                className="p-0.5 text-zinc-600 hover:text-sky-400"><Copy className="w-[17px] h-[17px]" /></button>
-              <button onClick={() => deletePkg()} title="Xoá nhóm này"
-                className="p-0.5 text-zinc-600 hover:text-red-400"><Trash2 className="w-[17px] h-[17px]" /></button>
-            </span>
-          )}
-        </div>
-      </div>
+            {/* Phần cuộn: ngày, task count, thanh tiến độ, trạng thái, nút hành động */}
+            <td colSpan={showTable && grid ? grid.columns.length + (canEdit ? 1 : 0) : undefined}
+              className="px-3 py-3.5 align-middle" style={{ minWidth: 520 }}
+              onClick={e => { if (!(e.target as Element).closest('button,a')) onToggle(); }}>
+              <div className="flex items-center gap-3">
+                <button onClick={e => { e.stopPropagation(); if (canEdit) setShowDatesModal(true); }}
+                  title={canEdit ? 'Sửa ngày nhóm' : `${pkg.startDate ?? '?'} → ${pkg.endDate ?? '?'}`}
+                  className={`flex items-center gap-1 text-[13px] shrink-0 ${canEdit ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
+                  <span className="w-14 text-center text-zinc-500">{fmtShortDate(pkg.startDate)}</span>
+                  <span className="w-1.5 text-zinc-700">|</span>
+                  <span className="w-[67px] text-center text-zinc-600">
+                    {diffDays(pkg.startDate, pkg.endDate) != null
+                      ? `${diffDays(pkg.startDate, pkg.endDate)}n`
+                      : <CalendarDays className="w-[14px] h-[14px] text-zinc-700 inline" />}
+                  </span>
+                  <span className="w-1.5 text-zinc-700">|</span>
+                  <span className="w-14 text-center text-zinc-500">{fmtShortDate(pkg.endDate)}</span>
+                </button>
+                <span className="text-[13px] text-zinc-500 w-[67px] text-right shrink-0">{pkg.tasks.length} task</span>
+                <div className="flex items-center gap-2 w-44 shrink-0">
+                  <div className="bg-zinc-800 rounded-full h-2 flex-1">
+                    <div className="bg-emerald-500 h-2 rounded-full" style={{ width: `${(pkg.progress ?? 0) * 100}%` }} />
+                  </div>
+                </div>
+                <span className={`px-2.5 py-0.5 rounded text-[13px] w-32 text-center shrink-0 ${STATUS_CLS[pkg.status] ?? STATUS_CLS.chuan_bi}`}>
+                  {STATUS_LABEL[pkg.status] ?? pkg.status}
+                </span>
+                {canEdit && (
+                  <span className="flex items-center gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
+                    <button onClick={() => movePkg('up')} title="Di chuyển lên" disabled={pkgIdx === 0}
+                      className="p-0.5 text-zinc-600 hover:text-zinc-300 disabled:opacity-30"><ChevronUp className="w-[17px] h-[17px]" /></button>
+                    <button onClick={() => movePkg('down')} title="Di chuyển xuống" disabled={pkgIdx === pkgCount - 1}
+                      className="p-0.5 text-zinc-600 hover:text-zinc-300 disabled:opacity-30"><ChevronDownIcon className="w-[17px] h-[17px]" /></button>
+                    <button onClick={() => copyPkg()} title="Sao chép nhóm này"
+                      className="p-0.5 text-zinc-600 hover:text-sky-400"><Copy className="w-[17px] h-[17px]" /></button>
+                    <button onClick={() => deletePkg()} title="Xoá nhóm này"
+                      className="p-0.5 text-zinc-600 hover:text-red-400"><Trash2 className="w-[17px] h-[17px]" /></button>
+                  </span>
+                )}
+              </div>
+            </td>
+          </tr>
 
-      {/* Thông báo khi nhóm mở nhưng chưa có dữ liệu lưới */}
-      {noData && (
-        <div className="px-4 py-3 text-sm text-zinc-500">Nhóm này chưa có dữ liệu lưới. {grid.tasks.length} task.</div>
-      )}
-      {expanded && !grid && (
-        <div className="px-4 py-3 text-sm text-zinc-500">Đang tải lưới...</div>
-      )}
-
-      {/* Bảng lưới checkbox task */}
-      {showTable && (
-        <table className="text-xs border-collapse min-w-full">
-          <thead>
+          {/* ── Hàng header cột (chỉ khi mở và có dữ liệu) ── */}
+          {showTable && (
             <tr className="bg-zinc-950">
-              <th className="sticky left-0 z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-center w-[110px] min-w-[110px] max-w-[110px]">BOQ</th>
-              <th className="sticky left-[110px] z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-center w-[80px] min-w-[80px] max-w-[80px]">Mã</th>
-              <th className="sticky left-[190px] z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-center w-[280px] min-w-[280px] max-w-[280px]">Công việc</th>
-              <th className="sticky left-[470px] z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-center w-14 min-w-[56px] max-w-[56px]">%</th>
+              <th className={`${stkBoq} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-center text-zinc-500 font-medium`}
+                style={{ left: 0 }}>BOQ</th>
+              <th className={`${stkCode} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-center text-zinc-500 font-medium`}
+                style={{ left: LEFT_CODE }}>Mã</th>
+              <th className={`${stkName} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-left text-zinc-500 font-medium`}
+                style={{ left: isMobile ? 0 : LEFT_NAME }}>Công việc</th>
+              <th className={`${stkPct} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-center text-zinc-500 font-medium`}
+                style={{ left: LEFT_PCT }}>%</th>
               {grid.columns.map(col => (
-                <th key={col} className="border-b border-zinc-800 p-0 w-8">
-                  <div className="flex items-center justify-center py-1">
-                    <div className="whitespace-nowrap text-[10px] text-zinc-400 hover:text-emerald-400 cursor-default"
-                      style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
-                      title={canEdit ? 'Bấm để đổi tên' : col}
+                <th key={col} className="border-b border-zinc-800 p-0 overflow-hidden" style={{ width: W_DIM }}>
+                  <div className="flex items-end justify-center" style={{ height: 88 }}>
+                    <div className="text-[10px] text-zinc-500 hover:text-emerald-400 cursor-default overflow-hidden"
+                      style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', maxHeight: 84, lineHeight: '1.2' }}
+                      title={canEdit ? `${col} — bấm để đổi tên` : col}
                       onClick={() => canEdit && renameColumn(col)}>{col}</div>
                   </div>
                 </th>
               ))}
               {canEdit && (
-                <th className="border-b border-zinc-800 align-middle p-1 w-[88px] min-w-[88px]">
+                <th className="border-b border-zinc-800 align-bottom pb-2 text-center" style={{ width: W_ACT }}>
                   <button onClick={() => addColumnAfter(grid.columns[grid.columns.length - 1] ?? null)}
                     title="Thêm cột mới vào cuối"
                     className="w-6 h-6 flex items-center justify-center text-zinc-600 hover:text-emerald-400 hover:bg-emerald-950/40 rounded mx-auto">
@@ -680,12 +739,24 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, users, re
                 </th>
               )}
             </tr>
-          </thead>
-          <tbody>
+          )}
+        </thead>
+
+        {/* Thông báo loading / no data */}
+        {expanded && !grid && (
+          <tbody><tr><td colSpan={4} className="px-4 py-3 text-sm text-zinc-500">Đang tải lưới...</td></tr></tbody>
+        )}
+        {noData && (
+          <tbody><tr><td colSpan={4} className="px-4 py-3 text-sm text-zinc-500">Nhóm này chưa có dữ liệu lưới. {grid.tasks.length} task.</td></tr></tbody>
+        )}
+
+        {showTable && (
+        <tbody>
             {grid.tasks.map((t, ti) => (
               <Fragment key={t.id}>
-              <tr className="hover:bg-zinc-800/30">
-                <td className="sticky left-0 z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 w-[110px] min-w-[110px] max-w-[110px] text-center">
+              <tr className="hover:bg-zinc-800/30 transition-colors">
+                <td className={`${stkBoq} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 text-center align-top overflow-hidden`}
+                  style={{ left: 0 }}>
                   <button onClick={() => canEdit && editTaskBoq(t)}
                     title={canEdit ? `${t.boqCode ?? 'Chưa gán'} — bấm để sửa` : t.boqCode ?? 'Chưa gán'}
                     className={`font-mono text-[10px] truncate block w-full text-center ${canEdit ? 'text-amber-400 hover:underline cursor-pointer' : 'text-amber-400/70 cursor-default'}`}>
@@ -704,7 +775,8 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, users, re
                     )
                   )}
                 </td>
-                <td className="sticky left-[110px] z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 text-center w-[80px] min-w-[80px] max-w-[80px]">
+                <td className={`${stkCode} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 text-center align-top overflow-hidden`}
+                  style={{ left: LEFT_CODE }}>
                   <div className="flex items-center justify-center gap-1">
                     {canEdit && (
                       <input type="checkbox" checked={selected.has(t.id)} onChange={() => toggleSelect(t.id)}
@@ -714,7 +786,8 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, users, re
                     <span className="font-mono text-zinc-400 text-[10px]">{t.code}</span>
                   </div>
                 </td>
-                <td className="sticky left-[190px] z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 w-[280px] min-w-[280px] max-w-[280px]">
+                <td className={`${stkName} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 overflow-hidden`}
+                  style={{ left: isMobile ? 0 : LEFT_NAME, width: W_NAME, minWidth: W_NAME, maxWidth: W_NAME }}>
                   {editTask?.id === t.id ? (
                     <span className="flex items-center gap-1">
                       <input autoFocus value={editTask.value} onChange={e => setEditTask({ id: t.id, value: e.target.value })}
@@ -737,8 +810,8 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, users, re
                         <span className="flex items-center gap-1">
                           <button onClick={() => canEdit && setDatesTarget({ ids: [t.id], init: { start: t.startDate ?? '', end: t.endDate ?? '' } })}
                             title={canEdit ? (inherited ? 'Kế thừa từ nhóm — bấm để đặt ngày riêng' : 'Sửa ngày bắt đầu / kết thúc') : `${effStart ?? '?'} → ${effEnd ?? '?'}`}
-                            className={`text-[10px] whitespace-nowrap ${t.status === 'tre' ? 'text-red-400' : inherited ? 'text-zinc-600 italic' : 'text-zinc-500'} ${canEdit ? 'hover:text-emerald-400 hover:underline cursor-pointer' : 'cursor-default'}`}>
-                            📅 {fmtShortDate(effStart)}→{fmtShortDate(effEnd)}{inherited && ' ↑'}
+                            className={`flex items-center gap-0.5 text-[10px] whitespace-nowrap ${t.status === 'tre' ? 'text-red-400' : inherited ? 'text-zinc-500 italic' : 'text-zinc-400'} ${canEdit ? 'hover:text-emerald-400 hover:underline cursor-pointer' : 'cursor-default'}`}>
+                            <CalendarDays className="w-3 h-3 shrink-0" /> {fmtShortDate(effStart)}→{fmtShortDate(effEnd)}{inherited && ' ↑'}
                           </button>
                           {t.startDate && canEdit && (
                             <button onClick={() => resetTaskDates(t)} title="Về kế thừa ngày từ nhóm"
@@ -791,17 +864,20 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, users, re
                     )}
                   </div>
                 </td>
-                <td className="sticky left-[470px] z-10 bg-zinc-900 border-b border-r border-zinc-800 px-1 py-1 text-center w-14 min-w-[56px] max-w-[56px]">
+                <td className={`${stkPct} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-1 py-1 text-center align-top overflow-hidden`}
+                  style={{ left: LEFT_PCT }}>
                   <span className={Math.round(t.progressPercent * 100) === 100 ? 'text-emerald-400' : 'text-zinc-300'}>{Math.round((t.progressPercent ?? 0) * 100)}%</span>
                 </td>
                 {grid.columns.map(col => {
                   const cell = t.cells[col];
                   return (
-                    <td key={col} className="border-b border-zinc-800/60 text-center align-middle p-0.5">
+                    <td key={col} className="border-b border-zinc-800/60 text-center align-middle p-0">
                       {cell ? (
-                        <input type="checkbox" checked={cell.installed} onChange={() => toggle(cell, t, col)}
-                          className="w-4 h-4 accent-emerald-500 cursor-pointer" />
-                      ) : <span className="text-zinc-700">·</span>}
+                        <label className="flex items-center justify-center w-full h-full min-h-[44px] cursor-pointer">
+                          <input type="checkbox" checked={cell.installed} onChange={() => toggle(cell, t, col)}
+                            className="w-4 h-4 accent-emerald-500 cursor-pointer" />
+                        </label>
+                      ) : <span className="flex items-center justify-center min-h-[44px] text-zinc-700">·</span>}
                     </td>
                   );
                 })}
@@ -823,8 +899,8 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, users, re
               </Fragment>
             ))}
           </tbody>
-        </table>
-      )}
+        )}
+      </table>
 
       {historyTask && <HistoryModal task={historyTask} onClose={() => setHistoryTask(null)} />}
       {photosTask && <PhotosModal task={photosTask} onClose={() => { setPhotosTask(null); load(); }} />}
@@ -865,7 +941,7 @@ function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => void })
     setUploading(true); setError('');
     const fd = new FormData();
     fd.append('file', file);
-    const caption = window.prompt('Ghi chú cho ảnh (tuỳ chọn):') ?? '';
+    const caption = await appPrompt('Ghi chú cho ảnh (tuỳ chọn)', '', { placeholder: 'VD: đã lắp xong nhánh trục 24F' }) ?? '';
     if (caption.trim()) fd.append('caption', caption.trim());
     const res = await fetch(`/api/tasks/${task.id}/photos`, { method: 'POST', body: fd });
     if (!res.ok) {
@@ -876,7 +952,7 @@ function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => void })
   }
 
   async function remove(p: Photo) {
-    if (!window.confirm('Xoá ảnh này?')) return;
+    if (!await appConfirm('Xoá ảnh này?', { danger: true, confirmLabel: 'Xoá ảnh' })) return;
     const res = await fetch(`/api/photos/${p.id}`, { method: 'DELETE' });
     if (!res.ok) { const j = await res.json().catch(() => ({})); setError(j.error ?? 'Không xoá được'); return; }
     load();
@@ -885,8 +961,7 @@ function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => void })
   const canDelete = (p: Photo) => me && (p.uploadedBy === me.id || me.role === 'admin' || me.role === 'pm');
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <Modal onClose={onClose} className="max-w-2xl max-h-[85vh] flex flex-col">
         <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2">
           <Camera className="w-4 h-4 text-sky-400" />
           <div className="min-w-0">
@@ -930,14 +1005,13 @@ function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => void })
             </div>
           )}
         </div>
-      </div>
       {viewer && (
         <div className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4" onClick={e => { e.stopPropagation(); setViewer(null); }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={`/api/photos/${viewer.id}`} alt={viewer.caption ?? ''} className="max-w-full max-h-full object-contain rounded-lg" />
         </div>
       )}
-    </div>
+    </Modal>
   );
 }
 
@@ -958,8 +1032,7 @@ function PkgDatesModal({ pkg, onSave, onClose }: {
   })();
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+    <Modal onClose={onClose} className="max-w-sm">
         <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2">
           <CalendarDays className="w-4 h-4 text-emerald-400" />
           <h3 className="font-semibold text-sm">Ngày thi công — {pkg.code}</h3>
@@ -980,7 +1053,7 @@ function PkgDatesModal({ pkg, onSave, onClose }: {
             <p className="text-xs text-zinc-400 text-center">⏱ <b className="text-white">{days}</b> ngày thi công</p>
           )}
           {invalid && <p className="text-xs text-red-400">Ngày kết thúc phải sau ngày bắt đầu.</p>}
-          <p className="text-[11px] text-zinc-600">Task con chưa có ngày riêng sẽ hiển thị ngày này (kế thừa).</p>
+          <p className="text-[11px] text-zinc-500">Task con chưa có ngày riêng sẽ hiển thị ngày này (kế thừa).</p>
           <div className="flex gap-2 pt-1">
             <button onClick={() => { setSaving(true); onSave(start, end); }}
               disabled={saving || invalid}
@@ -990,8 +1063,7 @@ function PkgDatesModal({ pkg, onSave, onClose }: {
             <button onClick={onClose} className="px-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm">Huỷ</button>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -1007,8 +1079,7 @@ function DatesModal({ target, onSave, onClose }: {
   const invalid = !!start && !!end && end < start;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+    <Modal onClose={onClose} className="max-w-sm">
         <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2">
           <h3 className="font-semibold text-sm">📅 {bulk ? `Đặt ngày cho ${target.ids.length} task` : 'Sửa ngày bắt đầu / kết thúc'}</h3>
           <button onClick={onClose} className="ml-auto text-zinc-400 hover:text-white"><X className="w-4 h-4" /></button>
@@ -1035,8 +1106,7 @@ function DatesModal({ target, onSave, onClose }: {
             <button onClick={onClose} className="px-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm">Huỷ</button>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -1076,7 +1146,7 @@ function CommentsModal({ task, onClose }: { task: GridTask; onClose: () => void 
   }
 
   async function remove(c: Comment) {
-    if (!window.confirm('Xoá bình luận này?')) return;
+    if (!await appConfirm('Xoá bình luận này?', { danger: true, confirmLabel: 'Xoá' })) return;
     await fetch(`/api/comments/${c.id}`, { method: 'DELETE' });
     load();
   }
@@ -1084,8 +1154,7 @@ function CommentsModal({ task, onClose }: { task: GridTask; onClose: () => void 
   const canDelete = (c: Comment) => me && (c.userId === me.id || me.role === 'admin' || me.role === 'pm');
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-lg max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <Modal onClose={onClose} className="max-w-lg max-h-[85vh] flex flex-col">
         <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2">
           <MessageSquare className="w-4 h-4 text-violet-400" />
           <div className="min-w-0">
@@ -1125,8 +1194,7 @@ function CommentsModal({ task, onClose }: { task: GridTask; onClose: () => void 
             </button>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -1140,8 +1208,7 @@ function HistoryModal({ task, onClose }: { task: GridTask; onClose: () => void }
   const pct = (v: number | null) => `${Math.round((v ?? 0) * 100)}%`;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <Modal onClose={onClose} className="max-w-lg max-h-[80vh] flex flex-col">
         <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2">
           <History className="w-4 h-4 text-emerald-400" />
           <div className="min-w-0">
@@ -1176,7 +1243,6 @@ function HistoryModal({ task, onClose }: { task: GridTask; onClose: () => void }
             </ol>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
