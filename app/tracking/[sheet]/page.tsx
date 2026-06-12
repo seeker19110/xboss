@@ -1,8 +1,9 @@
 'use client';
 import { useEffect, useState, useCallback, useRef, Fragment } from 'react';
-import { ArrowLeft, Search, ChevronRight, ChevronDown, Pencil, Check, X, History, UserCheck, RefreshCw, Link2, Camera, Trash2, Upload, MessageSquare, Send, WifiOff, CloudUpload, Plus, ChevronUp, ChevronDown as ChevronDownIcon, Columns } from 'lucide-react';
+import { ArrowLeft, Search, ChevronRight, ChevronDown, Pencil, Check, X, History, UserCheck, RefreshCw, Link2, Camera, Trash2, Upload, MessageSquare, Send, WifiOff, CloudUpload, ChevronUp, ChevronDown as ChevronDownIcon, Columns, Copy, RotateCcw, CalendarDays } from 'lucide-react';
 import { useOfflineTickQueue } from '@/app/components/offlineQueue';
 import { DELAY_REASON_LABEL } from '@/lib/delay';
+import { toSlug } from '@/lib/sheets';
 
 const STATUS_LABEL: Record<string, string> = {
   chuan_bi: 'Chuẩn bị', dang_thi_cong: 'Đang thi công',
@@ -15,8 +16,8 @@ const STATUS_CLS: Record<string, string> = {
 };
 
 type Task = { id: number; code: string; name: string; status: string; endDate: string | null; progressPercent: number };
-type Pkg = { id: number; code: string; floorLabel: string | null; name: string; status: string; progress: number; tasks: Task[]; boqCode: string | null; drawingUrl: string | null };
-type Data = { sheet: { id?: number; code: string; name: string; responsible?: string }; packages: Pkg[]; version?: string };
+type Pkg = { id: number; code: string; floorLabel: string | null; name: string; status: string; progress: number; tasks: Task[]; boqCode: string | null; drawingUrl: string | null; startDate: string | null; endDate: string | null };
+type Data = { sheet: { id?: number; code: string; name: string; responsible?: string; slug?: string }; packages: Pkg[]; version?: string };
 type AppUser = { id: number; name: string; role: string };
 
 const SYNC_POLL_MS = 10_000;
@@ -26,6 +27,13 @@ const fmtShortDate = (d: string | null) => {
   if (!d) return '?';
   const dt = new Date(d);
   return isNaN(dt.getTime()) ? '?' : `${dt.getDate()}/${dt.getMonth() + 1}`;
+};
+
+// Số ngày thi công (bao gồm 2 đầu).
+const diffDays = (s: string | null, e: string | null) => {
+  if (!s || !e) return null;
+  const d = Math.round((new Date(e).getTime() - new Date(s).getTime()) / 86400000);
+  return d >= 0 ? d + 1 : null;
 };
 
 export default function TrackingPage({ params }: { params: { sheet: string } }) {
@@ -39,13 +47,13 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
     typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('floor') ?? '' : '');
   const [statusFilter, setStatusFilter] = useState('');
   const [canEdit, setCanEdit] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [sheetModal, setSheetModal] = useState<{ name: string; code: string; slug: string; responsible: string } | null>(null);
+  const [sheetErr, setSheetErr] = useState('');
   const [users, setUsers] = useState<AppUser[]>([]);
-  const [editPkg, setEditPkg] = useState<{ id: number; value: string } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [syncToast, setSyncToast] = useState(false);
   const versionRef = useRef<string | null>(null);
-  const editingRef = useRef(false);
-  editingRef.current = editPkg !== null;
 
   const load = useCallback(() => {
     fetch(`/api/tasks?sheet=${sheet}`).then(r => r.json()).then((d: Data) => {
@@ -66,7 +74,7 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
     let stopped = false;
 
     const applyVersion = (v: string) => {
-      if (document.hidden || editingRef.current) return;
+      if (document.hidden) return;
       if (versionRef.current && v !== versionRef.current) {
         versionRef.current = v;
         load();
@@ -81,7 +89,7 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
     const startPolling = () => {
       if (pollTimer || stopped) return;
       pollTimer = setInterval(async () => {
-        if (document.hidden || editingRef.current) return;
+        if (document.hidden) return;
         try {
           const r = await fetch(`/api/tasks/version?sheet=${sheet}`);
           if (!r.ok) return;
@@ -108,57 +116,30 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
       const role = j?.user?.role;
       const editable = role === 'admin' || role === 'pm';
       setCanEdit(editable);
+      setIsAdmin(role === 'admin');
       if (editable) fetch('/api/users').then(r => r.ok ? r.json() : null).then(x => setUsers(x?.users ?? []));
     });
   }, []);
 
-  async function savePkgName(id: number, name: string) {
-    await fetch(`/api/workpackages/${id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
+  // Đổi tên / mã / đường dẫn của trang tracking (sheet) — slug đổi thì chuyển sang URL mới.
+  async function saveSheet() {
+    if (!sheetModal || !data?.sheet.id) return;
+    const res = await fetch(`/api/sheets/${data.sheet.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: sheetModal.name, code: sheetModal.code, slug: sheetModal.slug, responsible: sheetModal.responsible }),
     });
-    setEditPkg(null); load();
+    const j = await res.json().catch(() => null);
+    if (!res.ok) { setSheetErr(j?.error ?? 'Không lưu được'); return; }
+    if (j.sheet.slug !== sheet) { window.location.href = `/tracking/${j.sheet.slug}`; return; }
+    setSheetModal(null); load();
   }
 
-  async function addPackageAfter(afterPkg: Pkg | null) {
-    const sheetTypeId = data?.sheet?.id;
-    if (!sheetTypeId) { window.alert('Không lấy được sheetTypeId'); return; }
-    const code = window.prompt('Mã nhóm mới (ví dụ: A10):');
-    if (!code?.trim()) return;
-    const name = window.prompt('Tên nhóm:');
-    if (!name?.trim()) return;
-    const floorLabel = window.prompt('Tầng (tuỳ chọn, để trống bỏ qua):') ?? '';
-    const res = await fetch('/api/workpackages', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sheetTypeId, code: code.trim(), name: name.trim(), floorLabel: floorLabel.trim() || undefined, afterId: afterPkg?.id }),
-    });
-    if (!res.ok) { const j = await res.json().catch(() => ({})); window.alert(j.error ?? 'Lỗi không xác định'); return; }
-    load();
-  }
-
-  async function movePackage(p: Pkg, direction: 'up' | 'down') {
-    await fetch(`/api/workpackages/${p.id}/move`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ direction }),
-    });
-    load();
-  }
-
-  async function editPkgBoq(p: Pkg) {
-    const v = window.prompt('BOQCODE của nhóm (duy nhất toàn hệ thống, để trống = xoá mã):', p.boqCode ?? '');
-    if (v === null) return;
-    const res = await fetch(`/api/workpackages/${p.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ boqCode: v }),
-    });
-    if (!res.ok) { const j = await res.json().catch(() => ({})); window.alert(j.error ?? 'Lỗi không xác định'); return; }
-    load();
-  }
-
-  async function editPkgDrawing(p: Pkg) {
-    const v = window.prompt('Link bản vẽ / BBNT của nhóm (để trống = xoá):', p.drawingUrl ?? '');
-    if (v === null) return;
-    await fetch(`/api/workpackages/${p.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ drawingUrl: v.trim() || null }),
-    });
-    load();
+  async function deleteSheet() {
+    if (!data?.sheet.id) return;
+    if (!confirm(`Xoá trang "${data.sheet.name}" cùng TOÀN BỘ nhóm, task, checkbox và vật tư của nó? Không hoàn tác được.`)) return;
+    const res = await fetch(`/api/sheets/${data.sheet.id}`, { method: 'DELETE' });
+    if (!res.ok) { const j = await res.json().catch(() => null); setSheetErr(j?.error ?? 'Không xoá được'); return; }
+    window.location.href = '/';
   }
 
   if (loading) return <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">Đang tải...</div>;
@@ -176,7 +157,17 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
       <header className="border-b border-zinc-800 px-6 py-4 flex items-center gap-3">
         <a href="/" className="text-zinc-400 hover:text-white"><ArrowLeft className="w-5 h-5" /></a>
         <div>
-          <h1 className="text-lg font-bold">{data?.sheet.name ?? sheet}</h1>
+          <h1 className="text-lg font-bold flex items-center gap-2">
+            {data?.sheet.name ?? sheet}
+            {canEdit && data?.sheet.id && (
+              <button onClick={() => { setSheetErr(''); setSheetModal({
+                  name: data.sheet.name, code: data.sheet.code,
+                  slug: data.sheet.slug ?? sheet, responsible: data.sheet.responsible ?? '' }); }}
+                title="Đổi tên / đường dẫn trang" className="text-zinc-600 hover:text-amber-400">
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </h1>
           <p className="text-xs text-zinc-500">{data?.sheet.code} {data?.sheet.responsible ? `· ${data.sheet.responsible}` : ''}</p>
         </div>
         {canEdit && <span className="ml-auto text-xs bg-emerald-950 text-emerald-400 px-2 py-1 rounded">Chế độ chỉnh sửa (Admin/PM)</span>}
@@ -202,80 +193,19 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
       </div>
 
       <main className="p-4 space-y-2">
-        {canEdit && (
-          <button onClick={() => addPackageAfter(null)}
-            title="Thêm nhóm mới vào đầu danh sách"
-            className="w-full flex items-center justify-center gap-1.5 border border-dashed border-zinc-700 hover:border-emerald-600 hover:text-emerald-400 text-zinc-600 rounded-xl py-1.5 text-xs transition">
-            <Plus className="w-3.5 h-3.5" /> Thêm nhóm
-          </button>
-        )}
         {packages.map((p, pi) => (
           <div key={p.id} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-            {/* Bấm bất kỳ đâu trên hàng để mở/đóng lưới; các nút bên trong stopPropagation. */}
-            <div onClick={() => setExpanded(s => ({ ...s, [p.id]: !s[p.id] }))}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/60 cursor-pointer select-none">
-              {expanded[p.id] ? <ChevronDown className="w-4 h-4 text-zinc-400 shrink-0" /> : <ChevronRight className="w-4 h-4 text-zinc-400 shrink-0" />}
-              <span className="font-mono text-emerald-400 shrink-0 max-w-[180px] truncate" title={`BOQCODE: ${p.boqCode ?? p.code} (mã Excel: ${p.code})`}>
-                {p.boqCode ?? p.code}
-              </span>
-              {canEdit && (
-                <button onClick={e => { e.stopPropagation(); editPkgBoq(p); }} title="Sửa BOQCODE"
-                  className="text-zinc-600 hover:text-amber-400 shrink-0"><Pencil className="w-3 h-3" /></button>
-              )}
-              {(p.drawingUrl || canEdit) && (
-                p.drawingUrl ? (
-                  <span className="flex items-center shrink-0" onClick={e => e.stopPropagation()}>
-                    <a href={p.drawingUrl} target="_blank" rel="noreferrer" title={`Bản vẽ: ${p.drawingUrl}`}
-                      className="text-sky-400 hover:text-sky-300"><Link2 className="w-3.5 h-3.5" /></a>
-                    {canEdit && <button onClick={() => editPkgDrawing(p)} title="Sửa link bản vẽ" className="text-zinc-600 hover:text-emerald-400 ml-0.5"><Pencil className="w-3 h-3" /></button>}
-                  </span>
-                ) : (
-                  <button onClick={e => { e.stopPropagation(); editPkgDrawing(p); }} title="Thêm link bản vẽ / BBNT"
-                    className="text-zinc-700 hover:text-sky-400 shrink-0"><Link2 className="w-3.5 h-3.5" /></button>
-                )
-              )}
-              {editPkg?.id === p.id ? (
-                <span className="flex items-center gap-1 flex-1" onClick={e => e.stopPropagation()}>
-                  <input autoFocus value={editPkg.value} onChange={e => setEditPkg({ id: p.id, value: e.target.value })}
-                    onKeyDown={e => { if (e.key === 'Enter') savePkgName(p.id, editPkg.value); if (e.key === 'Escape') setEditPkg(null); }}
-                    className="bg-zinc-800 border border-emerald-600 rounded px-2 py-1 text-sm flex-1 outline-none" />
-                  <button onClick={() => savePkgName(p.id, editPkg.value)} className="text-emerald-400"><Check className="w-4 h-4" /></button>
-                  <button onClick={() => setEditPkg(null)} className="text-zinc-500"><X className="w-4 h-4" /></button>
-                </span>
-              ) : (
-                <span className="font-medium flex-1 flex items-center gap-2 min-w-0">
-                  <span className="truncate">{p.name}</span>
-                  {canEdit && <button onClick={e => { e.stopPropagation(); setEditPkg({ id: p.id, value: p.name }); }} className="text-zinc-600 hover:text-emerald-400 shrink-0"><Pencil className="w-3.5 h-3.5" /></button>}
-                </span>
-              )}
-              <span className="text-xs text-zinc-500 w-10 text-right shrink-0">{p.floorLabel || ''}</span>
-              <span className="text-xs text-zinc-500 w-14 text-right shrink-0">{p.tasks.length} task</span>
-              <div className="flex items-center gap-2 w-36 shrink-0">
-                <div className="bg-zinc-800 rounded-full h-1.5 flex-1"><div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: `${(p.progress ?? 0) * 100}%` }} /></div>
-                <span className="text-zinc-400 text-sm w-10 text-right">{Math.round((p.progress ?? 0) * 100)}%</span>
-              </div>
-              <span className={`px-2 py-0.5 rounded text-xs w-28 text-center shrink-0 ${STATUS_CLS[p.status] ?? STATUS_CLS.chuan_bi}`}>{STATUS_LABEL[p.status] ?? p.status}</span>
-              {canEdit && (
-                <span className="flex items-center gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
-                  <button onClick={() => movePackage(p, 'up')} title="Di chuyển lên" disabled={pi === 0}
-                    className="p-0.5 text-zinc-600 hover:text-zinc-300 disabled:opacity-30"><ChevronUp className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => movePackage(p, 'down')} title="Di chuyển xuống" disabled={pi === packages.length - 1}
-                    className="p-0.5 text-zinc-600 hover:text-zinc-300 disabled:opacity-30"><ChevronDownIcon className="w-3.5 h-3.5" /></button>
-                </span>
-              )}
-            </div>
-            {expanded[p.id] && <PkgGrid pkgId={p.id} canEdit={canEdit} users={users} refreshKey={refreshKey} onChanged={load} onOfflineTick={enqueue} />}
-            {canEdit && (
-              <button onClick={() => addPackageAfter(p)}
-                title="Chèn nhóm mới ngay dưới nhóm này"
-                className="w-full flex items-center justify-center gap-1 border-t border-dashed border-zinc-800 hover:border-emerald-700 hover:bg-emerald-950/20 hover:text-emerald-500 text-zinc-700 py-1 text-[10px] transition">
-                <Plus className="w-3 h-3" /> chèn nhóm sau
-              </button>
-            )}
+            <PkgGrid
+              pkg={p} pkgIdx={pi} pkgCount={packages.length}
+              expanded={!!expanded[p.id]}
+              onToggle={() => setExpanded(s => ({ ...s, [p.id]: !s[p.id] }))}
+              canEdit={canEdit} users={users} refreshKey={refreshKey}
+              onChanged={load} onOfflineTick={enqueue}
+            />
           </div>
         ))}
         {packages.length === 0 && (
-          <div className="p-8 text-center text-zinc-500 bg-zinc-900 border border-zinc-800 rounded-xl">Không có dữ liệu. Hãy import file Excel trước.</div>
+          <div className="p-8 text-center text-zinc-500 bg-zinc-900 border border-zinc-800 rounded-xl">{'Không có dữ liệu. Hãy import file Excel hoặc copy từ trang khác.'}</div>
         )}
       </main>
 
@@ -293,6 +223,50 @@ export default function TrackingPage({ params }: { params: { sheet: string } }) 
             : <><WifiOff className="w-3.5 h-3.5" /> Mất mạng — thao tác vẫn được lưu{offlinePending > 0 ? ` (${offlinePending} chờ gửi)` : ''}, tự đồng bộ khi có mạng</>}
         </div>
       )}
+
+      {/* Modal đổi tên / đường dẫn trang */}
+      {sheetModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setSheetModal(null)}>
+          <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-5 w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
+            <h3 className="font-semibold mb-3 flex items-center gap-2"><Pencil className="w-4 h-4 text-amber-400" /> Cài đặt trang tracking</h3>
+            <label className="block text-xs text-zinc-400 mb-1">Tên trang</label>
+            <input autoFocus value={sheetModal.name}
+              onChange={e => setSheetModal(m => m && ({ ...m, name: e.target.value }))}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm mb-3 outline-none focus:border-emerald-600" />
+            <label className="block text-xs text-zinc-400 mb-1">Mã sheet (hiển thị trên Dashboard/Excel)</label>
+            <input value={sheetModal.code}
+              onChange={e => setSheetModal(m => m && ({ ...m, code: e.target.value }))}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm mb-3 outline-none focus:border-emerald-600" />
+            <label className="block text-xs text-zinc-400 mb-1">Đường dẫn</label>
+            <div className="flex items-center gap-1 mb-1">
+              <span className="text-sm text-zinc-500">/tracking/</span>
+              <input value={sheetModal.slug}
+                onChange={e => setSheetModal(m => m && ({ ...m, slug: e.target.value }))}
+                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600 font-mono" />
+              <button onClick={() => setSheetModal(m => m && ({ ...m, slug: toSlug(m.name) }))}
+                title="Sinh lại từ tên" className="text-xs text-zinc-500 hover:text-emerald-400 px-1">↻</button>
+            </div>
+            <p className="text-[11px] text-zinc-600 mb-3">Chỉ dùng chữ thường a-z, số và gạch nối. Đổi đường dẫn sẽ chuyển trang sang URL mới (link cũ hết hiệu lực).</p>
+            <label className="block text-xs text-zinc-400 mb-1">Người phụ trách</label>
+            <input value={sheetModal.responsible}
+              onChange={e => setSheetModal(m => m && ({ ...m, responsible: e.target.value }))}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm mb-3 outline-none focus:border-emerald-600" />
+            {sheetErr && <p className="text-xs text-red-400 mb-2">{sheetErr}</p>}
+            <div className="flex items-center gap-2">
+              {isAdmin && (
+                <button onClick={deleteSheet} className="flex items-center gap-1 px-3 py-1.5 text-sm text-red-400 hover:bg-red-950/60 rounded-lg">
+                  <Trash2 className="w-3.5 h-3.5" /> Xoá trang
+                </button>
+              )}
+              <div className="ml-auto flex gap-2">
+                <button onClick={() => setSheetModal(null)} className="px-3 py-1.5 text-sm bg-zinc-800 hover:bg-zinc-700 rounded-lg">Huỷ</button>
+                <button onClick={saveSheet} disabled={!sheetModal.name.trim() || !sheetModal.code.trim()}
+                  className="px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg font-medium">Lưu</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -301,22 +275,91 @@ type Cell = { id: number; installed: boolean };
 type GridTask = { id: number; code: string; name: string; status: string; progressPercent: number; boqCode: string | null; drawingUrl: string | null; assignedTo: number | null; assigneeName: string | null; photoCount: number; commentCount: number; delayReason: string | null; startDate: string | null; endDate: string | null; cells: Record<string, Cell> };
 type Grid = { columns: string[]; tasks: GridTask[] };
 
-function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged, onOfflineTick }: { pkgId: number; canEdit: boolean; users: AppUser[]; refreshKey: number; onChanged: () => void; onOfflineTick: (dimId: number, installed: boolean) => void }) {
+function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, users, refreshKey, onChanged, onOfflineTick }: {
+  pkg: Pkg; pkgIdx: number; pkgCount: number; expanded: boolean; onToggle: () => void;
+  canEdit: boolean; users: AppUser[]; refreshKey: number;
+  onChanged: () => void; onOfflineTick: (dimId: number, installed: boolean) => void;
+}) {
   const [grid, setGrid] = useState<Grid | null>(null);
+  const [editName, setEditName] = useState<string | null>(null);
+  const [showDatesModal, setShowDatesModal] = useState(false);
   const [editTask, setEditTask] = useState<{ id: number; value: string } | null>(null);
   const [historyTask, setHistoryTask] = useState<GridTask | null>(null);
   const [photosTask, setPhotosTask] = useState<GridTask | null>(null);
   const [commentsTask, setCommentsTask] = useState<GridTask | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  // Mục tiêu sửa ngày: 1 task hoặc danh sách task đã chọn (bulk).
   const [datesTarget, setDatesTarget] = useState<{ ids: number[]; init: { start: string; end: string } } | null>(null);
 
   const load = useCallback(() => {
-    fetch(`/api/workpackages/${pkgId}/dimensions`).then(r => r.json()).then(setGrid)
+    fetch(`/api/workpackages/${pkg.id}/dimensions`).then(r => r.json()).then(setGrid)
       .catch(() => { /* mất mạng — giữ lưới đang hiển thị */ });
-  }, [pkgId]);
-  // refreshKey tăng khi phát hiện người khác cập nhật → tải lại lưới checkbox.
-  useEffect(() => { load(); }, [load, refreshKey]);
+  }, [pkg.id]);
+  useEffect(() => { if (expanded) load(); }, [load, refreshKey, expanded]);
+
+  // ── Hàm thao tác nhóm (pkg) ──────────────────────────────────────────────
+
+  async function editPkgBoq() {
+    const v = window.prompt('BOQCODE của nhóm (duy nhất toàn hệ thống, để trống = xoá mã):', pkg.boqCode ?? '');
+    if (v === null) return;
+    const res = await fetch(`/api/workpackages/${pkg.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ boqCode: v }),
+    });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); window.alert(j.error ?? 'Lỗi không xác định'); return; }
+    onChanged();
+  }
+
+  async function editPkgDrawing() {
+    const v = window.prompt('Link bản vẽ / BBNT của nhóm (để trống = xoá):', pkg.drawingUrl ?? '');
+    if (v === null) return;
+    await fetch(`/api/workpackages/${pkg.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ drawingUrl: v.trim() || null }),
+    });
+    onChanged();
+  }
+
+  async function savePkgName(name: string) {
+    await fetch(`/api/workpackages/${pkg.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
+    });
+    setEditName(null); onChanged();
+  }
+
+  async function savePkgDates(start: string, end: string) {
+    await fetch(`/api/workpackages/${pkg.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ startDate: start || null, endDate: end || null }),
+    });
+    setShowDatesModal(false); onChanged();
+  }
+
+  async function movePkg(direction: 'up' | 'down') {
+    await fetch(`/api/workpackages/${pkg.id}/move`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ direction }),
+    });
+    onChanged();
+  }
+
+  async function copyPkg() {
+    const code = window.prompt('Mã nhóm mới:', `${pkg.code}_copy`);
+    if (!code?.trim()) return;
+    const name = window.prompt('Tên nhóm mới:', `${pkg.name} (bản sao)`);
+    if (!name?.trim()) return;
+    const res = await fetch(`/api/workpackages/${pkg.id}/copy`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: code.trim(), name: name.trim(), afterId: pkg.id }),
+    });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); window.alert(j.error ?? 'Lỗi không xác định'); return; }
+    onChanged();
+  }
+
+  async function deletePkg() {
+    if (!window.confirm(`Xoá nhóm "${pkg.code} — ${pkg.name}"?\n\nToàn bộ ${pkg.tasks.length} task và dữ liệu liên quan sẽ bị xoá vĩnh viễn.`)) return;
+    const res = await fetch(`/api/workpackages/${pkg.id}`, { method: 'DELETE' });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); window.alert(j.error ?? 'Lỗi không xác định'); return; }
+    onChanged();
+  }
+
+  // ── Hàm thao tác task ────────────────────────────────────────────────────
 
   async function toggle(cell: Cell, task: GridTask, label: string) {
     setGrid(g => g && ({
@@ -330,7 +373,6 @@ function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged, onOfflineTick }
       const j = await res.json().catch(() => null);
       if (j?.task) setGrid(g => g && ({ ...g, tasks: g.tasks.map(t => t.id === task.id ? { ...t, progressPercent: j.task.progress, status: j.task.status } : t) }));
     } catch {
-      // Mất mạng — giữ UI lạc quan, xếp hàng gửi lại khi online.
       onOfflineTick(cell.id, !cell.installed);
     }
     onChanged();
@@ -380,7 +422,6 @@ function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged, onOfflineTick }
     setSelected(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   }
 
-  // Lưu ngày cho 1 hoặc nhiều task — ô để trống = giữ nguyên giá trị cũ.
   async function saveDates(ids: number[], start: string, end: string) {
     const body: Record<string, string> = {};
     if (start) body.startDate = start;
@@ -424,22 +465,15 @@ function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged, onOfflineTick }
     if (!newLabel || newLabel === oldLabel) return;
     await fetch('/api/dimensions/rename', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ packageId: pkgId, oldLabel, newLabel }),
+      body: JSON.stringify({ packageId: pkg.id, oldLabel, newLabel }),
     });
-    load(); onChanged();
-  }
-
-  async function deleteColumn(label: string) {
-    if (!window.confirm(`Xoá cột "${label}" và toàn bộ dữ liệu checkbox trong cột này?`)) return;
-    const res = await fetch(`/api/workpackages/${pkgId}/dimensions/column?label=${encodeURIComponent(label)}`, { method: 'DELETE' });
-    if (!res.ok) { const j = await res.json().catch(() => ({})); window.alert(j.error ?? 'Lỗi không xác định'); return; }
     load(); onChanged();
   }
 
   async function addColumnAfter(afterLabel: string | null) {
     const label = window.prompt(afterLabel ? `Tên cột mới (chèn sau "${afterLabel}"):` : 'Tên cột mới (thêm vào cuối):');
     if (!label?.trim()) return;
-    const res = await fetch(`/api/workpackages/${pkgId}/dimensions/column`, {
+    const res = await fetch(`/api/workpackages/${pkg.id}/dimensions/column`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ label: label.trim(), afterLabel: afterLabel ?? undefined }),
     });
@@ -447,21 +481,21 @@ function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged, onOfflineTick }
     load(); onChanged();
   }
 
-  async function moveColumn(label: string, direction: 'left' | 'right') {
-    await fetch(`/api/workpackages/${pkgId}/dimensions/column/move`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label, direction }),
-    });
-    load();
+  async function deleteTask(t: GridTask) {
+    if (!window.confirm(`Xoá task "${t.code} — ${t.name}"?\n\nToàn bộ ảnh, bình luận, lịch sử liên quan sẽ bị xoá vĩnh viễn.`)) return;
+    const res = await fetch(`/api/tasks/${t.id}`, { method: 'DELETE' });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); window.alert(j.error ?? 'Lỗi không xác định'); return; }
+    load(); onChanged();
   }
 
-  async function addTaskAfter(afterTask: GridTask | null) {
-    const code = window.prompt('Mã task mới (ví dụ: A1,10):');
+  async function copyTask(t: GridTask) {
+    const code = window.prompt('Mã task mới:', `${t.code}_copy`);
     if (!code?.trim()) return;
-    const name = window.prompt('Tên task:');
+    const name = window.prompt('Tên task mới:', `${t.name} (bản sao)`);
     if (!name?.trim()) return;
-    const res = await fetch(`/api/workpackages/${pkgId}/tasks`, {
+    const res = await fetch(`/api/tasks/${t.id}/copy`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: code.trim(), name: name.trim(), afterId: afterTask?.id }),
+      body: JSON.stringify({ code: code.trim(), name: name.trim(), afterId: t.id }),
     });
     if (!res.ok) { const j = await res.json().catch(() => ({})); window.alert(j.error ?? 'Lỗi không xác định'); return; }
     load(); onChanged();
@@ -474,13 +508,23 @@ function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged, onOfflineTick }
     load();
   }
 
-  if (!grid) return <div className="px-4 py-3 text-sm text-zinc-500">Đang tải lưới...</div>;
-  if (grid.columns.length === 0) {
-    return <div className="px-4 py-3 text-sm text-zinc-500 border-t border-zinc-800">Nhóm này chưa có dữ liệu lưới. {grid.tasks.length} task.</div>;
+  async function resetTaskDates(t: GridTask) {
+    await fetch(`/api/tasks/${t.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ startDate: null, endDate: null }),
+    });
+    load(); onChanged();
   }
 
+  // ── Render ───────────────────────────────────────────────────────────────
+
+  // Khi chưa mở hoặc chưa tải xong lưới, chỉ hiển thị hàng tiêu đề nhóm.
+  const showTable = expanded && grid && grid.columns.length > 0;
+  const noData = expanded && grid && grid.columns.length === 0;
+
   return (
-    <div className="border-t border-zinc-800 overflow-auto max-h-[70vh]">
+    <div className={`overflow-auto${expanded ? ' max-h-[70vh]' : ''}`}>
+      {/* Thanh bulk-action — hiển thị khi đang chọn nhiều task */}
       {canEdit && selected.size > 0 && (
         <div className="sticky top-0 left-0 z-30 flex flex-wrap items-center gap-2 bg-zinc-950 border-b border-emerald-900 px-3 py-2 text-xs">
           <span className="text-emerald-400 font-medium">{selected.size} task đã chọn</span>
@@ -495,188 +539,298 @@ function PkgGrid({ pkgId, canEdit, users, refreshKey, onChanged, onOfflineTick }
           <button onClick={() => setSelected(new Set())} className="text-zinc-500 hover:text-zinc-300 ml-auto">Bỏ chọn</button>
         </div>
       )}
-      <table className="text-xs border-collapse">
-        <thead>
-          <tr className="bg-zinc-950">
-            <th className="sticky left-0 z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-left w-[110px] min-w-[110px] max-w-[110px]">BOQ</th>
-            <th className="sticky left-[110px] z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-left w-[360px] min-w-[360px] max-w-[360px]">Công việc</th>
-            <th className="sticky left-[470px] z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-center w-14 min-w-[56px] max-w-[56px]">%</th>
-            {grid.columns.map((col, ci) => (
-              <th key={col} className="border-b border-zinc-800 align-bottom p-1 h-28 w-8">
-                <div className="mx-auto whitespace-nowrap text-[10px] text-zinc-400 hover:text-emerald-400 cursor-default"
-                  style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
-                  title={canEdit ? 'Bấm để đổi tên / click ← → để di chuyển' : col}
-                  onClick={() => canEdit && renameColumn(col)}>{col}</div>
-                {canEdit && (
-                  <div className="flex justify-center gap-0.5 mt-0.5">
-                    <button onClick={() => moveColumn(col, 'left')} disabled={ci === 0} title="Di chuyển cột sang trái"
-                      className="text-zinc-700 hover:text-zinc-400 disabled:opacity-20 text-[8px]">←</button>
-                    <button onClick={() => addColumnAfter(col)} title={`Chèn cột mới sau "${col}"`}
-                      className="text-zinc-700 hover:text-emerald-400 text-[8px]">+</button>
-                    <button onClick={() => moveColumn(col, 'right')} disabled={ci === grid.columns.length - 1} title="Di chuyển cột sang phải"
-                      className="text-zinc-700 hover:text-zinc-400 disabled:opacity-20 text-[8px]">→</button>
-                    <button onClick={() => deleteColumn(col)} title={`Xoá cột "${col}"`}
-                      className="text-zinc-700 hover:text-red-400 text-[8px]">✕</button>
-                  </div>
-                )}
-              </th>
-            ))}
-            {canEdit && (
-              <th className="border-b border-zinc-800 align-bottom p-1 w-8">
-                <button onClick={() => addColumnAfter(grid.columns[grid.columns.length - 1] ?? null)}
-                  title="Thêm cột mới vào cuối"
-                  className="w-6 h-6 flex items-center justify-center text-zinc-600 hover:text-emerald-400 hover:bg-emerald-950/40 rounded mx-auto">
-                  <Columns className="w-3 h-3" />
-                </button>
-              </th>
-            )}
-          </tr>
-        </thead>
-        <tbody>
+
+      {/* ── Hàng tiêu đề nhóm — căn thẳng với cột bảng task bên dưới ── */}
+      <div className="flex items-stretch min-w-max bg-zinc-900 hover:bg-zinc-800 border-b border-zinc-800 cursor-pointer select-none group">
+        {/* Cột BOQ (110px) — sticky left-0 */}
+        <div className="sticky left-0 z-20 bg-inherit w-[110px] min-w-[110px] flex items-center gap-1 px-2 py-3.5 border-r border-zinc-800"
+          onClick={onToggle}>
+          {expanded
+            ? <ChevronDown className="w-4 h-4 text-zinc-400 shrink-0" />
+            : <ChevronRight className="w-4 h-4 text-zinc-400 shrink-0" />}
+          <span className="font-mono text-xs text-emerald-400 truncate flex-1"
+            title={`BOQCODE: ${pkg.boqCode ?? pkg.code} (mã Excel: ${pkg.code})`}>
+            {pkg.boqCode ?? pkg.code}
+          </span>
           {canEdit && (
-            <tr>
-              <td colSpan={3 + grid.columns.length + (canEdit ? 1 : 0)} className="p-0">
-                <button onClick={() => addTaskAfter(null)}
-                  className="w-full text-[10px] text-zinc-700 hover:text-emerald-500 hover:bg-emerald-950/20 py-0.5 flex items-center justify-center gap-1 transition">
-                  <Plus className="w-3 h-3" /> thêm task đầu nhóm
-                </button>
-              </td>
-            </tr>
+            <button onClick={e => { e.stopPropagation(); editPkgBoq(); }} title="Sửa BOQCODE"
+              className="text-zinc-700 hover:text-amber-400 shrink-0"><Pencil className="w-3 h-3" /></button>
           )}
-          {grid.tasks.map((t, ti) => (
-            <Fragment key={t.id}>
-            <tr className="hover:bg-zinc-800/30">
-              <td className="sticky left-0 z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 w-[110px] min-w-[110px] max-w-[110px]">
-                <button onClick={() => canEdit && editTaskBoq(t)}
-                  title={canEdit ? `${t.boqCode ?? 'Chưa gán'} — bấm để sửa` : t.boqCode ?? 'Chưa gán'}
-                  className={`font-mono text-[10px] truncate block max-w-full text-left ${canEdit ? 'text-amber-400 hover:underline cursor-pointer' : 'text-amber-400/70 cursor-default'}`}>
-                  {t.boqCode ?? '—'}
-                </button>
-                {(t.drawingUrl || canEdit) && (
-                  t.drawingUrl ? (
-                    <span className="flex items-center gap-0.5 mt-0.5">
-                      <a href={t.drawingUrl} target="_blank" rel="noreferrer" title={`Bản vẽ: ${t.drawingUrl}`}
-                        className="text-sky-400 hover:text-sky-300"><Link2 className="w-3 h-3" /></a>
-                      {canEdit && <button onClick={() => editTaskDrawing(t)} className="text-zinc-600 hover:text-emerald-400"><Pencil className="w-2.5 h-2.5" /></button>}
-                    </span>
-                  ) : (
-                    <button onClick={() => editTaskDrawing(t)} title="Thêm link bản vẽ / BBNT"
-                      className="block mt-0.5 text-zinc-700 hover:text-sky-400"><Link2 className="w-3 h-3" /></button>
-                  )
-                )}
-              </td>
-              <td className="sticky left-[110px] z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 w-[360px] min-w-[360px] max-w-[360px]">
-                {editTask?.id === t.id ? (
-                  <span className="flex items-center gap-1">
-                    <input autoFocus value={editTask.value} onChange={e => setEditTask({ id: t.id, value: e.target.value })}
-                      onKeyDown={e => { if (e.key === 'Enter') saveTaskName(t.id, editTask.value); if (e.key === 'Escape') setEditTask(null); }}
-                      className="bg-zinc-800 border border-emerald-600 rounded px-1 py-0.5 text-xs w-72 outline-none" />
-                    <button onClick={() => saveTaskName(t.id, editTask.value)} className="text-emerald-400"><Check className="w-3.5 h-3.5" /></button>
-                  </span>
-                ) : (
-                  <div className="flex items-center gap-2 min-w-0">
+        </div>
+
+        {/* Cột Tầng/Mã (80px) — sticky left-110px */}
+        <div className="sticky left-[110px] z-20 bg-inherit w-[80px] min-w-[80px] flex items-center justify-center px-1 py-3.5 border-r border-zinc-800"
+          onClick={onToggle}>
+          <span className="text-xs text-zinc-500 text-center">{pkg.floorLabel ?? ''}</span>
+        </div>
+
+        {/* Cột Công việc / Tên nhóm (280px) — sticky left-190px */}
+        <div className="sticky left-[190px] z-20 bg-inherit w-[280px] min-w-[280px] flex items-center px-2 py-3.5 border-r border-zinc-800 gap-1"
+          onClick={e => { if (!(e.target as Element).closest('button,input,a')) onToggle(); }}>
+          {editName !== null ? (
+            <span className="flex items-center gap-1 flex-1" onClick={e => e.stopPropagation()}>
+              <input autoFocus value={editName} onChange={e => setEditName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') savePkgName(editName); if (e.key === 'Escape') setEditName(null); }}
+                className="bg-zinc-800 border border-emerald-600 rounded px-2 py-1 text-sm flex-1 outline-none" />
+              <button onClick={() => savePkgName(editName)} className="text-emerald-400"><Check className="w-4 h-4" /></button>
+              <button onClick={() => setEditName(null)} className="text-zinc-500"><X className="w-4 h-4" /></button>
+            </span>
+          ) : (
+            <span className="text-sm font-medium truncate flex-1">{pkg.name}</span>
+          )}
+          {canEdit && editName === null && (
+            <button onClick={e => { e.stopPropagation(); setEditName(pkg.name); }} title="Sửa tên nhóm"
+              className="text-zinc-700 hover:text-emerald-400 shrink-0"><Pencil className="w-3 h-3" /></button>
+          )}
+          {(pkg.drawingUrl || canEdit) && editName === null && (
+            pkg.drawingUrl ? (
+              <span className="flex items-center gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
+                <a href={pkg.drawingUrl} target="_blank" rel="noreferrer" title={`Bản vẽ: ${pkg.drawingUrl}`}
+                  className="text-sky-400 hover:text-sky-300"><Link2 className="w-3.5 h-3.5" /></a>
+                {canEdit && <button onClick={() => editPkgDrawing()} className="text-zinc-600 hover:text-emerald-400 ml-0.5"><Pencil className="w-2.5 h-2.5" /></button>}
+              </span>
+            ) : (
+              <button onClick={e => { e.stopPropagation(); editPkgDrawing(); }} title="Thêm link bản vẽ / BBNT"
+                className="text-zinc-700 hover:text-sky-400 shrink-0"><Link2 className="w-3.5 h-3.5" /></button>
+            )
+          )}
+        </div>
+
+        {/* Cột % tiến độ (56px) — sticky left-470px */}
+        <div className="sticky left-[470px] z-20 bg-inherit w-[56px] min-w-[56px] flex items-center justify-center px-1 py-3.5 border-r border-zinc-800"
+          onClick={onToggle}>
+          <span className="text-sm font-semibold text-zinc-300">{Math.round((pkg.progress ?? 0) * 100)}%</span>
+        </div>
+
+        {/* Phần cuộn: ngày, task count, thanh tiến độ, trạng thái, nút hành động */}
+        <div className="flex-1 min-w-[520px] flex items-center gap-3 px-3 py-3.5"
+          onClick={e => { if (!(e.target as Element).closest('button,a')) onToggle(); }}>
+          {/* 3 cột ngày: bắt đầu | số ngày | kết thúc */}
+          <button onClick={e => { e.stopPropagation(); if (canEdit) setShowDatesModal(true); }}
+            title={canEdit ? 'Sửa ngày nhóm' : `${pkg.startDate ?? '?'} → ${pkg.endDate ?? '?'}`}
+            className={`flex items-center gap-1 text-[13px] shrink-0 ${canEdit ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
+            <span className="w-14 text-center text-zinc-500">{fmtShortDate(pkg.startDate)}</span>
+            <span className="w-1.5 text-zinc-700">|</span>
+            <span className="w-[67px] text-center text-zinc-600">
+              {diffDays(pkg.startDate, pkg.endDate) != null
+                ? `${diffDays(pkg.startDate, pkg.endDate)}n`
+                : <CalendarDays className="w-[14px] h-[14px] text-zinc-700 inline" />}
+            </span>
+            <span className="w-1.5 text-zinc-700">|</span>
+            <span className="w-14 text-center text-zinc-500">{fmtShortDate(pkg.endDate)}</span>
+          </button>
+          <span className="text-[13px] text-zinc-500 w-[67px] text-right shrink-0">{pkg.tasks.length} task</span>
+          <div className="flex items-center gap-2 w-44 shrink-0">
+            <div className="bg-zinc-800 rounded-full h-2 flex-1">
+              <div className="bg-emerald-500 h-2 rounded-full" style={{ width: `${(pkg.progress ?? 0) * 100}%` }} />
+            </div>
+          </div>
+          <span className={`px-2.5 py-0.5 rounded text-[13px] w-32 text-center shrink-0 ${STATUS_CLS[pkg.status] ?? STATUS_CLS.chuan_bi}`}>
+            {STATUS_LABEL[pkg.status] ?? pkg.status}
+          </span>
+          {canEdit && (
+            <span className="flex items-center gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
+              <button onClick={() => movePkg('up')} title="Di chuyển lên" disabled={pkgIdx === 0}
+                className="p-0.5 text-zinc-600 hover:text-zinc-300 disabled:opacity-30"><ChevronUp className="w-[17px] h-[17px]" /></button>
+              <button onClick={() => movePkg('down')} title="Di chuyển xuống" disabled={pkgIdx === pkgCount - 1}
+                className="p-0.5 text-zinc-600 hover:text-zinc-300 disabled:opacity-30"><ChevronDownIcon className="w-[17px] h-[17px]" /></button>
+              <button onClick={() => copyPkg()} title="Sao chép nhóm này"
+                className="p-0.5 text-zinc-600 hover:text-sky-400"><Copy className="w-[17px] h-[17px]" /></button>
+              <button onClick={() => deletePkg()} title="Xoá nhóm này"
+                className="p-0.5 text-zinc-600 hover:text-red-400"><Trash2 className="w-[17px] h-[17px]" /></button>
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Thông báo khi nhóm mở nhưng chưa có dữ liệu lưới */}
+      {noData && (
+        <div className="px-4 py-3 text-sm text-zinc-500">Nhóm này chưa có dữ liệu lưới. {grid.tasks.length} task.</div>
+      )}
+      {expanded && !grid && (
+        <div className="px-4 py-3 text-sm text-zinc-500">Đang tải lưới...</div>
+      )}
+
+      {/* Bảng lưới checkbox task */}
+      {showTable && (
+        <table className="text-xs border-collapse min-w-full">
+          <thead>
+            <tr className="bg-zinc-950">
+              <th className="sticky left-0 z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-center w-[110px] min-w-[110px] max-w-[110px]">BOQ</th>
+              <th className="sticky left-[110px] z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-center w-[80px] min-w-[80px] max-w-[80px]">Mã</th>
+              <th className="sticky left-[190px] z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-center w-[280px] min-w-[280px] max-w-[280px]">Công việc</th>
+              <th className="sticky left-[470px] z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-1 text-center w-14 min-w-[56px] max-w-[56px]">%</th>
+              {grid.columns.map(col => (
+                <th key={col} className="border-b border-zinc-800 p-0 w-8">
+                  <div className="flex items-center justify-center py-1">
+                    <div className="whitespace-nowrap text-[10px] text-zinc-400 hover:text-emerald-400 cursor-default"
+                      style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+                      title={canEdit ? 'Bấm để đổi tên' : col}
+                      onClick={() => canEdit && renameColumn(col)}>{col}</div>
+                  </div>
+                </th>
+              ))}
+              {canEdit && (
+                <th className="border-b border-zinc-800 align-middle p-1 w-[88px] min-w-[88px]">
+                  <button onClick={() => addColumnAfter(grid.columns[grid.columns.length - 1] ?? null)}
+                    title="Thêm cột mới vào cuối"
+                    className="w-6 h-6 flex items-center justify-center text-zinc-600 hover:text-emerald-400 hover:bg-emerald-950/40 rounded mx-auto">
+                    <Columns className="w-3 h-3" />
+                  </button>
+                </th>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {grid.tasks.map((t, ti) => (
+              <Fragment key={t.id}>
+              <tr className="hover:bg-zinc-800/30">
+                <td className="sticky left-0 z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 w-[110px] min-w-[110px] max-w-[110px] text-center">
+                  <button onClick={() => canEdit && editTaskBoq(t)}
+                    title={canEdit ? `${t.boqCode ?? 'Chưa gán'} — bấm để sửa` : t.boqCode ?? 'Chưa gán'}
+                    className={`font-mono text-[10px] truncate block w-full text-center ${canEdit ? 'text-amber-400 hover:underline cursor-pointer' : 'text-amber-400/70 cursor-default'}`}>
+                    {t.boqCode ?? '—'}
+                  </button>
+                  {(t.drawingUrl || canEdit) && (
+                    t.drawingUrl ? (
+                      <span className="flex items-center justify-center gap-0.5 mt-0.5">
+                        <a href={t.drawingUrl} target="_blank" rel="noreferrer" title={`Bản vẽ: ${t.drawingUrl}`}
+                          className="text-sky-400 hover:text-sky-300"><Link2 className="w-3 h-3" /></a>
+                        {canEdit && <button onClick={() => editTaskDrawing(t)} className="text-zinc-600 hover:text-emerald-400"><Pencil className="w-2.5 h-2.5" /></button>}
+                      </span>
+                    ) : (
+                      <button onClick={() => editTaskDrawing(t)} title="Thêm link bản vẽ / BBNT"
+                        className="block mx-auto mt-0.5 text-zinc-700 hover:text-sky-400"><Link2 className="w-3 h-3" /></button>
+                    )
+                  )}
+                </td>
+                <td className="sticky left-[110px] z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 text-center w-[80px] min-w-[80px] max-w-[80px]">
+                  <div className="flex items-center justify-center gap-1">
                     {canEdit && (
                       <input type="checkbox" checked={selected.has(t.id)} onChange={() => toggleSelect(t.id)}
                         title="Chọn để gán/đặt ngày hàng loạt"
                         className="w-3 h-3 accent-emerald-500 cursor-pointer shrink-0" />
                     )}
-                    <span className="font-mono text-zinc-500 shrink-0">{t.code}</span>
-                    <span className="truncate flex-1" title={t.name}>{t.name}</span>
-                    {canEdit && <button onClick={() => setEditTask({ id: t.id, value: t.name })} className="shrink-0 text-zinc-600 hover:text-emerald-400"><Pencil className="w-3 h-3" /></button>}
+                    <span className="font-mono text-zinc-400 text-[10px]">{t.code}</span>
                   </div>
-                )}
-                <div className="flex items-center gap-2 mt-0.5">
-                  <button onClick={() => canEdit && setDatesTarget({ ids: [t.id], init: { start: t.startDate ?? '', end: t.endDate ?? '' } })}
-                    title={canEdit ? 'Sửa ngày bắt đầu / kết thúc' : `${t.startDate ?? '?'} → ${t.endDate ?? '?'}`}
-                    className={`text-[10px] whitespace-nowrap ${t.status === 'tre' ? 'text-red-400' : 'text-zinc-500'} ${canEdit ? 'hover:text-emerald-400 hover:underline cursor-pointer' : 'cursor-default'}`}>
-                    📅 {fmtShortDate(t.startDate)}→{fmtShortDate(t.endDate)}
-                  </button>
-                  <button onClick={() => setAllInRow(t, true)} className="text-[10px] text-emerald-500 hover:underline">Tất cả</button>
-                  <button onClick={() => setAllInRow(t, false)} className="text-[10px] text-zinc-500 hover:underline">Bỏ</button>
-                  <button onClick={() => setHistoryTask(t)} title="Lịch sử tiến độ"
-                    className="text-zinc-600 hover:text-emerald-400"><History className="w-3 h-3" /></button>
-                  <button onClick={() => setPhotosTask(t)} title="Ảnh hiện trường"
-                    className={`flex items-center gap-0.5 ${t.photoCount > 0 ? 'text-sky-400 hover:text-sky-300' : 'text-zinc-600 hover:text-sky-400'}`}>
-                    <Camera className="w-3 h-3" />{t.photoCount > 0 && <span className="text-[10px]">{t.photoCount}</span>}
-                  </button>
-                  <button onClick={() => setCommentsTask(t)} title="Bình luận / trao đổi"
-                    className={`flex items-center gap-0.5 ${t.commentCount > 0 ? 'text-violet-400 hover:text-violet-300' : 'text-zinc-600 hover:text-violet-400'}`}>
-                    <MessageSquare className="w-3 h-3" />{t.commentCount > 0 && <span className="text-[10px]">{t.commentCount}</span>}
-                  </button>
-                  {t.status === 'nghiem_thu' ? (
-                    <span className="flex items-center gap-1 text-[10px] text-teal-300 bg-teal-950 px-1.5 py-0.5 rounded">
-                      ✓ Đã NT
-                      {canEdit && <button onClick={() => approveTask(t, false)} title="Huỷ nghiệm thu" className="text-teal-500 hover:text-red-400"><X className="w-2.5 h-2.5" /></button>}
-                    </span>
-                  ) : canEdit && t.progressPercent >= 1 && (
-                    <button onClick={() => approveTask(t, true)} title="Duyệt nghiệm thu (task đã 100%)"
-                      className="text-[10px] text-teal-400 border border-teal-800 bg-teal-950/50 hover:bg-teal-900/60 px-1.5 py-0.5 rounded">Nghiệm thu</button>
-                  )}
-                  {t.status === 'tre' && (
-                    <select value={t.delayReason ?? ''} onChange={e => setDelayReason(t, e.target.value)}
-                      title="Nguyên nhân trễ — giúp PM thống kê và xử lý"
-                      className={`text-[10px] rounded px-1 py-0.5 outline-none border max-w-[110px] ${t.delayReason
-                        ? 'bg-red-950/60 border-red-900 text-red-300' : 'bg-zinc-800 border-zinc-700 text-zinc-500'}`}>
-                      <option value="">— Lý do trễ? —</option>
-                      {Object.entries(DELAY_REASON_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                    </select>
-                  )}
-                  {canEdit ? (
-                    <select value={t.assignedTo ?? ''} onChange={e => assignTask(t.id, e.target.value)}
-                      title="Giao task cho người làm"
-                      className="ml-auto bg-zinc-800 border border-zinc-700 rounded text-[10px] px-1 py-0.5 max-w-[100px] outline-none text-zinc-400">
-                      <option value="">— Giao —</option>
-                      {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                    </select>
-                  ) : t.assigneeName && (
-                    <span className="ml-auto flex items-center gap-0.5 text-[10px] text-sky-400 truncate max-w-[100px]" title={`Giao cho ${t.assigneeName}`}>
-                      <UserCheck className="w-3 h-3 shrink-0" />{t.assigneeName}
-                    </span>
-                  )}
-                </div>
-              </td>
-              <td className="sticky left-[470px] z-10 bg-zinc-900 border-b border-r border-zinc-800 px-1 py-1 text-center w-14 min-w-[56px] max-w-[56px]">
-                <span className={Math.round(t.progressPercent * 100) === 100 ? 'text-emerald-400' : 'text-zinc-300'}>{Math.round((t.progressPercent ?? 0) * 100)}%</span>
-                {canEdit && (
-                  <div className="flex justify-center gap-0.5 mt-0.5">
-                    <button onClick={() => moveTask(t, 'up')} disabled={ti === 0} title="Lên"
-                      className="text-zinc-700 hover:text-zinc-300 disabled:opacity-20"><ChevronUp className="w-3 h-3" /></button>
-                    <button onClick={() => moveTask(t, 'down')} disabled={ti === grid.tasks.length - 1} title="Xuống"
-                      className="text-zinc-700 hover:text-zinc-300 disabled:opacity-20"><ChevronDownIcon className="w-3 h-3" /></button>
-                  </div>
-                )}
-              </td>
-              {grid.columns.map(col => {
-                const cell = t.cells[col];
-                return (
-                  <td key={col} className="border-b border-zinc-800/60 text-center p-0.5">
-                    {cell ? (
-                      <input type="checkbox" checked={cell.installed} onChange={() => toggle(cell, t, col)}
-                        className="w-4 h-4 accent-emerald-500 cursor-pointer" />
-                    ) : <span className="text-zinc-700">·</span>}
-                  </td>
-                );
-              })}
-              {canEdit && <td className="border-b border-zinc-800/60" />}
-            </tr>
-            {canEdit && (
-              <tr>
-                <td colSpan={3 + grid.columns.length + 1} className="p-0">
-                  <button onClick={() => addTaskAfter(t)}
-                    className="w-full text-[10px] text-zinc-700 hover:text-emerald-500 hover:bg-emerald-950/20 py-0.5 flex items-center justify-center gap-1 transition">
-                    <Plus className="w-3 h-3" /> chèn task sau
-                  </button>
                 </td>
+                <td className="sticky left-[190px] z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 w-[280px] min-w-[280px] max-w-[280px]">
+                  {editTask?.id === t.id ? (
+                    <span className="flex items-center gap-1">
+                      <input autoFocus value={editTask.value} onChange={e => setEditTask({ id: t.id, value: e.target.value })}
+                        onKeyDown={e => { if (e.key === 'Enter') saveTaskName(t.id, editTask.value); if (e.key === 'Escape') setEditTask(null); }}
+                        className="bg-zinc-800 border border-emerald-600 rounded px-1 py-0.5 text-xs w-full outline-none" />
+                      <button onClick={() => saveTaskName(t.id, editTask.value)} className="text-emerald-400"><Check className="w-3.5 h-3.5" /></button>
+                    </span>
+                  ) : (
+                    <div className="flex items-center gap-1 min-w-0">
+                      <span className="truncate flex-1" title={t.name}>{t.name}</span>
+                      {canEdit && <button onClick={() => setEditTask({ id: t.id, value: t.name })} className="shrink-0 text-zinc-600 hover:text-emerald-400"><Pencil className="w-3 h-3" /></button>}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 mt-0.5">
+                    {(() => {
+                      const effStart = t.startDate ?? pkg.startDate;
+                      const effEnd = t.endDate ?? pkg.endDate;
+                      const inherited = !t.startDate && !!pkg.startDate;
+                      return (
+                        <span className="flex items-center gap-1">
+                          <button onClick={() => canEdit && setDatesTarget({ ids: [t.id], init: { start: t.startDate ?? '', end: t.endDate ?? '' } })}
+                            title={canEdit ? (inherited ? 'Kế thừa từ nhóm — bấm để đặt ngày riêng' : 'Sửa ngày bắt đầu / kết thúc') : `${effStart ?? '?'} → ${effEnd ?? '?'}`}
+                            className={`text-[10px] whitespace-nowrap ${t.status === 'tre' ? 'text-red-400' : inherited ? 'text-zinc-600 italic' : 'text-zinc-500'} ${canEdit ? 'hover:text-emerald-400 hover:underline cursor-pointer' : 'cursor-default'}`}>
+                            📅 {fmtShortDate(effStart)}→{fmtShortDate(effEnd)}{inherited && ' ↑'}
+                          </button>
+                          {t.startDate && canEdit && (
+                            <button onClick={() => resetTaskDates(t)} title="Về kế thừa ngày từ nhóm"
+                              className="text-zinc-700 hover:text-amber-400 shrink-0"><RotateCcw className="w-3 h-3" /></button>
+                          )}
+                        </span>
+                      );
+                    })()}
+                    <button onClick={() => setAllInRow(t, true)} className="text-[10px] text-emerald-500 hover:underline">Tất cả</button>
+                    <button onClick={() => setAllInRow(t, false)} className="text-[10px] text-zinc-500 hover:underline">Bỏ</button>
+                    <button onClick={() => setHistoryTask(t)} title="Lịch sử tiến độ"
+                      className="text-zinc-600 hover:text-emerald-400"><History className="w-3 h-3" /></button>
+                    <button onClick={() => setPhotosTask(t)} title="Ảnh hiện trường"
+                      className={`flex items-center gap-0.5 ${t.photoCount > 0 ? 'text-sky-400 hover:text-sky-300' : 'text-zinc-600 hover:text-sky-400'}`}>
+                      <Camera className="w-3 h-3" />{t.photoCount > 0 && <span className="text-[10px]">{t.photoCount}</span>}
+                    </button>
+                    <button onClick={() => setCommentsTask(t)} title="Bình luận / trao đổi"
+                      className={`flex items-center gap-0.5 ${t.commentCount > 0 ? 'text-violet-400 hover:text-violet-300' : 'text-zinc-600 hover:text-violet-400'}`}>
+                      <MessageSquare className="w-3 h-3" />{t.commentCount > 0 && <span className="text-[10px]">{t.commentCount}</span>}
+                    </button>
+                    {t.status === 'nghiem_thu' ? (
+                      <span className="flex items-center gap-1 text-[10px] text-teal-300 bg-teal-950 px-1.5 py-0.5 rounded">
+                        ✓ Đã NT
+                        {canEdit && <button onClick={() => approveTask(t, false)} title="Huỷ nghiệm thu" className="text-teal-500 hover:text-red-400"><X className="w-2.5 h-2.5" /></button>}
+                      </span>
+                    ) : canEdit && t.progressPercent >= 1 && (
+                      <button onClick={() => approveTask(t, true)} title="Duyệt nghiệm thu (task đã 100%)"
+                        className="text-[10px] text-teal-400 border border-teal-800 bg-teal-950/50 hover:bg-teal-900/60 px-1.5 py-0.5 rounded">Nghiệm thu</button>
+                    )}
+                    {t.status === 'tre' && (
+                      <select value={t.delayReason ?? ''} onChange={e => setDelayReason(t, e.target.value)}
+                        title="Nguyên nhân trễ — giúp PM thống kê và xử lý"
+                        className={`text-[10px] rounded px-1 py-0.5 outline-none border max-w-[110px] ${t.delayReason
+                          ? 'bg-red-950/60 border-red-900 text-red-300' : 'bg-zinc-800 border-zinc-700 text-zinc-500'}`}>
+                        <option value="">— Lý do trễ? —</option>
+                        {Object.entries(DELAY_REASON_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                      </select>
+                    )}
+                    {canEdit ? (
+                      <select value={t.assignedTo ?? ''} onChange={e => assignTask(t.id, e.target.value)}
+                        title="Giao task cho người làm"
+                        className="ml-auto mr-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] px-1 py-0.5 max-w-[100px] outline-none text-zinc-400">
+                        <option value="">— Giao —</option>
+                        {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                      </select>
+                    ) : t.assigneeName && (
+                      <span className="ml-auto flex items-center gap-0.5 text-[10px] text-sky-400 truncate max-w-[100px]" title={`Giao cho ${t.assigneeName}`}>
+                        <UserCheck className="w-3 h-3 shrink-0" />{t.assigneeName}
+                      </span>
+                    )}
+                  </div>
+                </td>
+                <td className="sticky left-[470px] z-10 bg-zinc-900 border-b border-r border-zinc-800 px-1 py-1 text-center w-14 min-w-[56px] max-w-[56px]">
+                  <span className={Math.round(t.progressPercent * 100) === 100 ? 'text-emerald-400' : 'text-zinc-300'}>{Math.round((t.progressPercent ?? 0) * 100)}%</span>
+                </td>
+                {grid.columns.map(col => {
+                  const cell = t.cells[col];
+                  return (
+                    <td key={col} className="border-b border-zinc-800/60 text-center align-middle p-0.5">
+                      {cell ? (
+                        <input type="checkbox" checked={cell.installed} onChange={() => toggle(cell, t, col)}
+                          className="w-4 h-4 accent-emerald-500 cursor-pointer" />
+                      ) : <span className="text-zinc-700">·</span>}
+                    </td>
+                  );
+                })}
+                {canEdit && (
+                  <td className="border-b border-zinc-800/60 text-center align-middle p-1 w-[88px] min-w-[88px]">
+                    <div className="flex justify-center items-center gap-0.5">
+                      <button onClick={() => moveTask(t, 'up')} disabled={ti === 0} title="Lên"
+                        className="text-zinc-700 hover:text-zinc-300 disabled:opacity-20"><ChevronUp className="w-3 h-3" /></button>
+                      <button onClick={() => moveTask(t, 'down')} disabled={ti === grid.tasks.length - 1} title="Xuống"
+                        className="text-zinc-700 hover:text-zinc-300 disabled:opacity-20"><ChevronDownIcon className="w-3 h-3" /></button>
+                      <button onClick={() => copyTask(t)} title="Sao chép task"
+                        className="text-zinc-700 hover:text-sky-400"><Copy className="w-3 h-3" /></button>
+                      <button onClick={() => deleteTask(t)} title="Xoá task"
+                        className="text-zinc-700 hover:text-red-400"><Trash2 className="w-3 h-3" /></button>
+                    </div>
+                  </td>
+                )}
               </tr>
-            )}
-            </Fragment>
-          ))}
-        </tbody>
-      </table>
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      )}
+
       {historyTask && <HistoryModal task={historyTask} onClose={() => setHistoryTask(null)} />}
       {photosTask && <PhotosModal task={photosTask} onClose={() => { setPhotosTask(null); load(); }} />}
       {commentsTask && <CommentsModal task={commentsTask} onClose={() => { setCommentsTask(null); load(); }} />}
       {datesTarget && <DatesModal target={datesTarget} onSave={saveDates} onClose={() => setDatesTarget(null)} />}
+      {showDatesModal && <PkgDatesModal pkg={pkg} onSave={savePkgDates} onClose={() => setShowDatesModal(false)} />}
     </div>
   );
 }
@@ -787,8 +941,60 @@ function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => void })
   );
 }
 
-// Modal sửa ngày bắt đầu/kết thúc — dùng cho 1 task hoặc nhiều task đã chọn.
-// Ô để trống = giữ nguyên giá trị hiện tại của từng task.
+// Modal sửa ngày bắt đầu / kết thúc cho toàn nhóm công việc.
+function PkgDatesModal({ pkg, onSave, onClose }: {
+  pkg: Pkg;
+  onSave: (start: string, end: string) => void;
+  onClose: () => void;
+}) {
+  const [start, setStart] = useState(pkg.startDate ?? '');
+  const [end, setEnd] = useState(pkg.endDate ?? '');
+  const [saving, setSaving] = useState(false);
+  const invalid = !!start && !!end && end < start;
+  const days = (() => {
+    if (!start || !end) return null;
+    const d = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 86400000);
+    return d >= 0 ? d + 1 : null;
+  })();
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+        <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2">
+          <CalendarDays className="w-4 h-4 text-emerald-400" />
+          <h3 className="font-semibold text-sm">Ngày thi công — {pkg.code}</h3>
+          <button onClick={onClose} className="ml-auto text-zinc-400 hover:text-white"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="p-4 space-y-3">
+          <div>
+            <label className="text-xs text-zinc-400">Ngày bắt đầu</label>
+            <input type="date" value={start} onChange={e => setStart(e.target.value)}
+              className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600 [color-scheme:dark]" />
+          </div>
+          <div>
+            <label className="text-xs text-zinc-400">Ngày kết thúc</label>
+            <input type="date" value={end} onChange={e => setEnd(e.target.value)}
+              className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600 [color-scheme:dark]" />
+          </div>
+          {days != null && (
+            <p className="text-xs text-zinc-400 text-center">⏱ <b className="text-white">{days}</b> ngày thi công</p>
+          )}
+          {invalid && <p className="text-xs text-red-400">Ngày kết thúc phải sau ngày bắt đầu.</p>}
+          <p className="text-[11px] text-zinc-600">Task con chưa có ngày riêng sẽ hiển thị ngày này (kế thừa).</p>
+          <div className="flex gap-2 pt-1">
+            <button onClick={() => { setSaving(true); onSave(start, end); }}
+              disabled={saving || invalid}
+              className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-zinc-800 disabled:text-zinc-500 rounded-lg py-2 text-sm font-medium transition">
+              {saving ? 'Đang lưu...' : 'Lưu'}
+            </button>
+            <button onClick={onClose} className="px-4 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm">Huỷ</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DatesModal({ target, onSave, onClose }: {
   target: { ids: number[]; init: { start: string; end: string } };
   onSave: (ids: number[], start: string, end: string) => void;
