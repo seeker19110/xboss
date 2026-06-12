@@ -680,12 +680,12 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                   title={canEdit ? 'Sửa ngày nhóm' : `${pkg.startDate ?? '?'} → ${pkg.endDate ?? '?'}`}
                   className={`flex items-center gap-1 shrink-0 ${canEdit ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
                   <span className="flex flex-col items-center w-14">
-                    <span className="text-[9px] text-zinc-600 leading-none">BĐ</span>
+                    <span className="text-[9px] text-zinc-600 leading-none">Bắt đầu</span>
                     <span className="text-[13px] text-zinc-500 leading-snug">{fmtShortDate(pkg.startDate)}</span>
                   </span>
                   <span className="w-1.5 text-zinc-700 self-end pb-0.5">|</span>
                   <span className="flex flex-col items-center w-[52px]">
-                    <span className="text-[9px] text-zinc-600 leading-none">Ngày</span>
+                    <span className="text-[9px] text-zinc-600 leading-none">Số ngày</span>
                     <span className="text-[13px] text-zinc-600 leading-snug">
                       {diffDays(pkg.startDate, pkg.endDate) != null
                         ? `${diffDays(pkg.startDate, pkg.endDate)}n`
@@ -694,7 +694,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                   </span>
                   <span className="w-1.5 text-zinc-700 self-end pb-0.5">|</span>
                   <span className="flex flex-col items-center w-14">
-                    <span className="text-[9px] text-zinc-600 leading-none">KT</span>
+                    <span className="text-[9px] text-zinc-600 leading-none">Kết thúc</span>
                     <span className="text-[13px] text-zinc-500 leading-snug">{fmtShortDate(pkg.endDate)}</span>
                   </span>
                 </button>
