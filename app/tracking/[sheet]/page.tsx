@@ -762,7 +762,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                         title="Chọn để gán/đặt ngày hàng loạt"
                         className="w-3 h-3 accent-emerald-500 cursor-pointer shrink-0" />
                     )}
-                    <span className="font-mono text-zinc-400 text-[10px]">{t.code}</span>
+                    <span className="font-mono text-zinc-400 text-[10px]">{String(ti + 1).padStart(2, '0')}</span>
                   </div>
                 </td>
                 <td className={`${stkName} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 overflow-hidden`}
