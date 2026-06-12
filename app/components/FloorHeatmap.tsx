@@ -56,6 +56,8 @@ function TowerTable({ tower, byKey }: { tower: Tower; byKey: Map<string, CellDat
   );
 }
 
+const DEFAULT_TITLE = 'Bản đồ tiến độ theo tầng';
+
 export default function FloorHeatmap() {
   const [data, setData] = useState<Data | null>(null);
   const [towerList, setTowerList] = useState<TowerRow[]>([]);
@@ -64,6 +66,9 @@ export default function FloorHeatmap() {
   const [editName, setEditName] = useState('');
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
+  const [title, setTitle] = useState(DEFAULT_TITLE);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
 
   function reload() {
     fetch('/api/dashboard/floors').then(r => r.ok ? r.json() : null).then(setData);
@@ -76,7 +81,20 @@ export default function FloorHeatmap() {
       const role = j?.user?.role;
       setCanEdit(role === 'admin' || role === 'pm');
     });
+    fetch('/api/project').then(r => r.ok ? r.json() : null).then(j => {
+      if (j?.project?.heatmapTitle) setTitle(j.project.heatmapTitle);
+    });
   }, []);
+
+  async function saveTitle() {
+    const val = titleDraft.trim();
+    await fetch('/api/project', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ heatmapTitle: val || null }),
+    });
+    setTitle(val || DEFAULT_TITLE);
+    setEditingTitle(false);
+  }
 
   async function saveName(id: number) {
     if (!editName.trim()) { setEditId(null); return; }
@@ -116,8 +134,26 @@ export default function FloorHeatmap() {
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-8">
       <div className="flex items-center gap-2 mb-1">
         <Building2 className="w-4 h-4 text-emerald-400 shrink-0" />
-        <h2 className="font-semibold text-sm text-zinc-300">Bản đồ tiến độ theo tầng</h2>
-        {canEdit && (
+        {editingTitle ? (
+          <>
+            <input autoFocus value={titleDraft} onChange={e => setTitleDraft(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') saveTitle(); if (e.key === 'Escape') setEditingTitle(false); }}
+              className="bg-zinc-800 border border-emerald-600 rounded px-2 py-0.5 text-sm font-semibold outline-none w-64" />
+            <button onClick={saveTitle} className="text-emerald-400"><Check className="w-4 h-4" /></button>
+            <button onClick={() => setEditingTitle(false)} className="text-zinc-500"><X className="w-4 h-4" /></button>
+          </>
+        ) : (
+          <>
+            <h2 className="font-semibold text-sm text-zinc-300">{title}</h2>
+            {canEdit && (
+              <button onClick={() => { setTitleDraft(title === DEFAULT_TITLE ? '' : title); setEditingTitle(true); }}
+                title="Sửa tiêu đề" className="text-zinc-600 hover:text-emerald-400 transition">
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </>
+        )}
+        {canEdit && !editingTitle && (
           <button onClick={() => { setAdding(true); setNewName(''); }}
             title="Thêm tháp mới"
             className="ml-1 text-zinc-600 hover:text-emerald-400 transition">

@@ -231,7 +231,32 @@ ALTER TABLE progress_dimensions ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFA
 UPDATE work_packages SET sort_order = id WHERE sort_order = 0;
 UPDATE tasks SET sort_order = id WHERE sort_order = 0;
 UPDATE materials SET sort_order = id WHERE sort_order = 0;
+
+-- Sheet tracking động: slug URL lưu trong DB (đổi tên/đường dẫn, tạo sheet mới).
+ALTER TABLE sheet_types ADD COLUMN IF NOT EXISTS slug TEXT;
+-- Backfill slug cho 5 sheet gốc theo mapping cũ trong lib/sheets.ts.
+UPDATE sheet_types SET slug = CASE code
+  WHEN 'OGTĐ' THEN 'ogtd' WHEN 'OGHL' THEN 'oghl' WHEN 'OGCH' THEN 'ogch'
+  WHEN 'ODNN Zone 1' THEN 'odnn1' WHEN 'ODNN Zone 2' THEN 'odnn2' END
+ WHERE slug IS NULL;
+UPDATE sheet_types SET slug = 'sheet-' || id WHERE slug IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_sheet_slug ON sheet_types(slug);
 UPDATE progress_dimensions SET sort_order = id WHERE sort_order = 0;
+
+-- Phân công theo hệ: 1 user quản lý cả sheet; nhóm/task kế thừa tự động
+-- cho đến khi gán thủ công (assigned_manual = TRUE).
+ALTER TABLE sheet_types ADD COLUMN IF NOT EXISTS manager_id INTEGER REFERENCES users(id);
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS assigned_to INTEGER REFERENCES users(id);
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS assigned_manual BOOLEAN NOT NULL DEFAULT FALSE;
+-- tasks.assigned_manual: backfill 1 lần — task đã gán trước đây coi là gán thủ công
+-- (DO block để UPDATE chỉ chạy đúng lúc thêm cột, không lặp lại mỗi lần boot).
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_name = 'tasks' AND column_name = 'assigned_manual') THEN
+    ALTER TABLE tasks ADD COLUMN assigned_manual BOOLEAN NOT NULL DEFAULT FALSE;
+    UPDATE tasks SET assigned_manual = TRUE WHERE assigned_to IS NOT NULL;
+  END IF;
+END $$;
 
 -- BOQCODE duy nhất (NULL = chưa gán, không tính trùng).
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_tasks_boq ON tasks(boq_code) WHERE boq_code IS NOT NULL;
@@ -252,6 +277,22 @@ CREATE INDEX IF NOT EXISTS idx_dims_task ON progress_dimensions(task_id);
 CREATE INDEX IF NOT EXISTS idx_history_task ON task_history(task_id);
 CREATE INDEX IF NOT EXISTS idx_baseline_tasks ON baseline_tasks(baseline_id);
 CREATE INDEX IF NOT EXISTS idx_documents_task ON task_documents(task_id);
+
+-- Audit log phân công: ai gán ai vào hệ/nhóm/task, lúc nào.
+CREATE TABLE IF NOT EXISTS assignment_log (
+  id SERIAL PRIMARY KEY,
+  level TEXT NOT NULL,       -- 'sheet' | 'package' | 'task'
+  target_id INTEGER NOT NULL,
+  target_label TEXT,
+  prev_user_id INTEGER REFERENCES users(id),
+  new_user_id INTEGER REFERENCES users(id),
+  changed_by INTEGER REFERENCES users(id),
+  is_manual BOOLEAN,
+  changed_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_asgn_log_target ON assignment_log(level, target_id);
+CREATE INDEX IF NOT EXISTS idx_asgn_log_changed ON assignment_log(changed_at DESC);
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS heatmap_title TEXT;
 `;
 
 export function getPool(): Pool {
