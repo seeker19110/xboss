@@ -137,12 +137,10 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
   const inputCls = "no-print outline-none border-b border-gray-300 bg-transparent w-full text-[10px] text-center py-[2px] focus:border-gray-500";
   const inputLeftCls = "no-print outline-none border-b border-gray-300 bg-transparent w-full text-[10px] py-[2px] focus:border-gray-500";
 
-  const InfoField = ({ label, value, onChange, placeholder = '', labelWidth = '78px', style }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; labelWidth?: string; style?: React.CSSProperties }) => (
+  const InfoField = ({ label, value, onChange: _onChange, placeholder: _placeholder, labelWidth = '78px', style }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; labelWidth?: string; style?: React.CSSProperties }) => (
     <div className="flex items-baseline gap-2 text-[10px] min-w-0 py-[2px]" style={style}>
       <span className="shrink-0 text-gray-600 whitespace-nowrap" style={{ width: labelWidth }}>{label}</span>
-      <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-        className="no-print min-w-0 flex-1 outline-none border-b border-gray-300 bg-transparent py-[1px] focus:border-gray-500 placeholder:text-gray-300" />
-      <span className="print-only min-w-0 flex-1 border-b border-gray-200 min-h-[14px] break-words">{value}</span>
+      <span className="min-w-0 flex-1 border-b border-gray-200 min-h-[14px] break-words">{value}</span>
     </div>
   );
 
