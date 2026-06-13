@@ -423,10 +423,20 @@ export default function MaterialsPage() {
                         )}
 
                         {key === 'name' && (
-                          <div>
-                            <span className="font-medium">{m.name}</span>
+                          <div className="flex items-center gap-2 min-w-0">
+                            {canAdmin ? (
+                              <input
+                                defaultValue={m.name}
+                                key={`name-${m.id}`}
+                                onBlur={e => e.target.value.trim() && e.target.value !== m.name && patch(m.id, { name: e.target.value.trim() })}
+                                onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') { (e.target as HTMLInputElement).value = m.name; (e.target as HTMLInputElement).blur(); } }}
+                                className="font-medium bg-transparent border border-transparent hover:border-zinc-700 focus:border-emerald-600 focus:bg-zinc-800 rounded px-1 py-0.5 outline-none w-full min-w-0"
+                              />
+                            ) : (
+                              <span className="font-medium truncate">{m.name}</span>
+                            )}
                             {m.qtyPlanned > 0 && m.qtyUsed > m.qtyPlanned && (
-                              <span className="ml-2 inline-flex items-center gap-1 text-[10px] text-red-400">
+                              <span className="inline-flex items-center gap-1 text-[10px] text-red-400 shrink-0">
                                 <AlertTriangle className="w-3 h-3" /> vượt ĐM
                               </span>
                             )}
