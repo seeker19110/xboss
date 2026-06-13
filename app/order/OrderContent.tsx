@@ -137,7 +137,7 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
   const inputCls = "no-print outline-none border-b border-gray-300 bg-transparent w-full text-[10px] text-center py-[2px] focus:border-gray-500";
   const inputLeftCls = "no-print outline-none border-b border-gray-300 bg-transparent w-full text-[10px] py-[2px] focus:border-gray-500";
 
-  const InfoField = ({ label, value, onChange, placeholder = '', labelWidth = '108px', style }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; labelWidth?: string; style?: React.CSSProperties }) => (
+  const InfoField = ({ label, value, onChange, placeholder = '', labelWidth = '78px', style }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; labelWidth?: string; style?: React.CSSProperties }) => (
     <div className="flex items-baseline gap-2 text-[10px] min-w-0 py-[2px]" style={style}>
       <span className="shrink-0 text-gray-600 whitespace-nowrap" style={{ width: labelWidth }}>{label}</span>
       <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
