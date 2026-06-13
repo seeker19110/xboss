@@ -52,7 +52,7 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy lint + typecheck + test +
 Project → Tower → SheetType (5 sheet) → WorkPackage → Task → ProgressDimension
 ```
 
-- 5 sheet cố định, mapping slug URL ↔ mã DB trong `lib/sheets.ts` (`ogtd`, `oghl`, `ogch`, `odnn1`, `odnn2`). ODNN Zone 1/2 dùng chung mã hàng `A{n}` — phân biệt bằng sheet.
+- Sheet (trang tracking) **động**: slug URL lưu ở cột `sheet_types.slug` (unique). Tạo sheet mới qua `POST /api/sheets`, đổi tên/mã/slug qua `PATCH /api/sheets/:id` (Admin/PM), xoá kèm toàn bộ dữ liệu qua `DELETE` (chỉ Admin). Mapping tĩnh trong `lib/sheets.ts` chỉ còn dùng để backfill 5 sheet gốc (`ogtd`, `oghl`, `ogch`, `odnn1`, `odnn2`) và làm fallback client. ODNN Zone 1/2 dùng chung mã hàng `A{n}` — phân biệt bằng sheet.
 - `ProgressDimension` = ô checkbox trong lưới tracking (mỗi kích thước ống hoặc mỗi căn hộ).
 - BOQCODE (`lib/boq.ts`): mã duy nhất **toàn hệ thống trên tasks, work_packages lẫn materials** — khi sửa/tạo phải check `boqTakenBy` trước.
 - Vật tư: mọi thay đổi `qty_used` ghi vào `material_transactions` (delta ±, người ghi) — qua `POST /api/materials/:id/transactions` hoặc tự động khi PATCH `qtyUsed` trực tiếp.

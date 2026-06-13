@@ -22,7 +22,8 @@ export async function GET() {
 // POST /api/users  body: { name, email, password, role } → tạo user mới (Admin).
 export async function POST(req: NextRequest) {
   const me = await getCurrentUser();
-  if (!CAN.manageUsers(me?.role))
+  if (!me) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (!CAN.manageUsers(me.role))
     return NextResponse.json({ error: "Chỉ Admin được tạo người dùng" }, { status: 403 });
 
   const body = await req.json().catch(() => ({}));

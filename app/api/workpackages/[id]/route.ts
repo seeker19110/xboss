@@ -9,7 +9,9 @@ export const dynamic = "force-dynamic";
 
 // PATCH /api/workpackages/:id  → sửa nhóm công việc (tên, code, BOQ, tầng, ngày). Admin/PM.
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  if (!CAN.editStructure((await getCurrentUser())?.role))
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (!CAN.editStructure(user.role))
     return NextResponse.json({ error: "Không có quyền chỉnh sửa (chỉ Admin/PM)" }, { status: 403 });
 
   const id = parseInt(params.id);
@@ -49,6 +51,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   vals.push(id);
   await run(`UPDATE work_packages SET ${sets.join(", ")} WHERE id = ?`, ...vals);
+  // Bump updated_at của tất cả task trong nhóm → sheetVersion đổi → client refresh.
+  await run(`UPDATE tasks SET updated_at = CURRENT_TIMESTAMP WHERE package_id = ?`, id);
   const wp = await queryOne(`SELECT id, code, name, floor_label AS "floorLabel", boq_code AS "boqCode", drawing_url AS "drawingUrl" FROM work_packages WHERE id = ?`, id);
   return NextResponse.json({ workPackage: wp });
 }

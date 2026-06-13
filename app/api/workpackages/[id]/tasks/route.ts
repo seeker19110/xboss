@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { boqTakenBy } from "@/lib/boq";
+import { inheritedAssigneeFor } from "@/lib/assignments";
 
 export const dynamic = "force-dynamic";
 
@@ -47,10 +48,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     sortOrder = (maxRow?.m ?? 0) + 1;
   }
 
+  // Task mới kế thừa người phụ trách nhóm (gán thủ công sau sẽ thoát kế thừa).
+  const inherited = await inheritedAssigneeFor(pkgId);
+
   const id = await insertId(
-    `INSERT INTO tasks (package_id, code, name, boq_code, sort_order, status, progress_percent)
-     VALUES (?, ?, ?, ?, ?, 'chuan_bi', 0)`,
-    pkgId, code, name, boqCode, sortOrder);
+    `INSERT INTO tasks (package_id, code, name, boq_code, sort_order, status, progress_percent, assigned_to)
+     VALUES (?, ?, ?, ?, ?, 'chuan_bi', 0, ?)`,
+    pkgId, code, name, boqCode, sortOrder, inherited);
 
   return NextResponse.json({ id }, { status: 201 });
 }

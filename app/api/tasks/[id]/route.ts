@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { boqTakenBy } from "@/lib/boq";
-import { recomputeTask } from "@/lib/recompute";
+import { recomputeTask, recomputePackage } from "@/lib/recompute";
+import { assignTask } from "@/lib/assignments";
 import { unlink } from "fs/promises";
 import { join } from "path";
 
@@ -45,7 +46,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   // (null = đưa về kế thừa người phụ trách nhóm/hệ).
   let assignedHandled = false;
   if (body.assignedTo !== undefined) {
-    const { assignTask } = await import("@/lib/assignments");
     await assignTask(id, body.assignedTo === null ? null : Number(body.assignedTo), me!.id);
     assignedHandled = true;
   }
@@ -108,8 +108,6 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   await run(`DELETE FROM progress_dimensions WHERE task_id = ?`, id);
   await run(`DELETE FROM tasks WHERE id = ?`, id);
 
-  // Cập nhật lại tiến độ nhóm.
-  const { recomputePackage } = await import("@/lib/recompute");
   await recomputePackage(task.package_id);
 
   return NextResponse.json({ deleted: id });

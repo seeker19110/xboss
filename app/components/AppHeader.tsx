@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import NotificationBell from '@/app/components/NotificationBell';
 import GlobalSearch from '@/app/components/GlobalSearch';
+import ThemeToggle from '@/app/components/ThemeToggle';
 
 type Me = { id: number; name: string; email: string; role: string };
 const ROLE_LABEL: Record<string, string> = { admin: 'Admin', pm: 'PM', engineer: 'Kỹ sư', subcon: 'Thầu phụ' };
@@ -53,6 +54,7 @@ export default function AppHeader({ title, subtitle, back, children, search = tr
         {search && <div className="hidden sm:block flex-1 max-w-md"><GlobalSearch /></div>}
         <div className="flex items-center gap-2 ml-auto sm:ml-0 shrink-0">
           {children}
+          <ThemeToggle />
           <NotificationBell />
           {me && (
             <div className="flex items-center gap-2 ml-1 pl-3 border-l border-zinc-800">

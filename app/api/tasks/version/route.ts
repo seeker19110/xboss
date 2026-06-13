@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { codeFromSlug } from "@/lib/sheets";
 import { getCurrentUser } from "@/lib/auth";
 import { sheetVersion } from "@/lib/version";
 
@@ -11,8 +10,7 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
   const slug = req.nextUrl.searchParams.get("sheet");
-  const code = slug ? codeFromSlug(slug) : null;
-  if (!code) return NextResponse.json({ error: "Sheet không hợp lệ" }, { status: 400 });
+  if (!slug) return NextResponse.json({ error: "Sheet không hợp lệ" }, { status: 400 });
 
-  return NextResponse.json({ v: await sheetVersion(code) });
+  return NextResponse.json({ v: await sheetVersion(slug) });
 }

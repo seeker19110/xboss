@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { LogIn } from 'lucide-react';
+import ThemeToggle from '@/app/components/ThemeToggle';
 
 const DEMO = [
   { role: 'Admin', email: 'admin@xboss.vn', pw: 'admin123' },
@@ -32,7 +33,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center p-4">
+    <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center p-4 relative">
+      <div className="absolute top-4 right-4"><ThemeToggle /></div>
       <div className="w-full max-w-sm">
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold">🏗️ XBoss</h1>

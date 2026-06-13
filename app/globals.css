@@ -1,14 +1,51 @@
 @import "tailwindcss";
 
-:root { --background: #ffffff; --foreground: #171717; }
+:root { --background: #0a0a0a; --foreground: #ededed; }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root { --background: #0a0a0a; --foreground: #ededed; }
+/* Chế độ tối (mặc định) — script trong layout gắn class theo localStorage('xboss_theme') */
+html.dark { color-scheme: dark; }
+
+/* Chế độ sáng: đảo thang zinc + white/black để toàn bộ UI (viết theo dark) tự đổi màu,
+   không phải sửa từng class trong các page. Các màu nhấn -300/-400 đậm lại cho đủ tương phản. */
+html.light {
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #171717;
+  --color-white: #18181b;
+  --color-black: #ffffff;
+  --color-zinc-50: #18181b;
+  --color-zinc-100: #27272a;
+  --color-zinc-200: #3f3f46;
+  --color-zinc-300: #52525b;
+  --color-zinc-400: #52525b;
+  --color-zinc-500: #71717a;
+  --color-zinc-600: #a1a1aa;
+  --color-zinc-700: #d4d4d8;
+  --color-zinc-800: #e4e4e7;
+  --color-zinc-900: #f4f4f5;
+  --color-zinc-950: #fafafa;
+  --color-emerald-300: #047857; --color-emerald-400: #059669;
+  --color-sky-300: #0369a1;     --color-sky-400: #0284c7;
+  --color-amber-300: #b45309;   --color-amber-400: #d97706;
+  --color-violet-300: #6d28d9;  --color-violet-400: #7c3aed;
+  --color-rose-300: #be123c;    --color-rose-400: #e11d48;
+  --color-teal-300: #0f766e;    --color-teal-400: #0d9488;
+  --color-red-300: #b91c1c;     --color-red-400: #dc2626;
+  --color-blue-300: #1d4ed8;    --color-blue-400: #2563eb;
+  --color-orange-300: #c2410c;  --color-orange-400: #ea580c;
+  --color-yellow-300: #a16207;  --color-yellow-400: #ca8a04;
+  --color-cyan-300: #0e7490;    --color-cyan-400: #0891b2;
+  --color-purple-300: #7e22ce;  --color-purple-400: #9333ea;
+  --color-green-300: #15803d;   --color-green-400: #16a34a;
+  --color-indigo-300: #4338ca;  --color-indigo-400: #4f46e5;
+  --color-pink-300: #be185d;    --color-pink-400: #db2777;
+  --color-lime-300: #4d7c0f;    --color-lime-400: #65a30d;
+  --color-fuchsia-300: #a21caf; --color-fuchsia-400: #c026d3;
 }
 
 body {

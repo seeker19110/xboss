@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, insertId } from "@/lib/db";
 import { getCurrentUser, canTouchTask } from "@/lib/auth";
 import { sendPushToUsers } from "@/lib/push";
-import { slugFromCode } from "@/lib/sheets";
 
 export const dynamic = "force-dynamic";
 
@@ -64,12 +63,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   // Web Push tới điện thoại người liên quan (no-op nếu chưa cấu hình VAPID).
   if (recipients.length > 0) {
-    const sheet = await queryOne<{ code: string }>(
-      `SELECT st.code FROM tasks t
+    const sheet = await queryOne<{ slug: string | null }>(
+      `SELECT st.slug FROM tasks t
          JOIN work_packages wp ON t.package_id = wp.id
          JOIN sheet_types st ON wp.sheet_type_id = st.id
         WHERE t.id = ?`, taskId);
-    const slug = sheet ? slugFromCode(sheet.code) : null;
+    const slug = sheet?.slug ?? null;
     await sendPushToUsers(recipients, {
       title: `💬 ${user.name} — ${task.code}`,
       body: preview,

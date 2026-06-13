@@ -802,7 +802,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
               <Fragment key={t.id}>
               <tr className="hover:bg-zinc-800/30 transition-colors">
                 {showBoq && (
-                  <td className={`${stkBoq} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 text-center align-top overflow-hidden`}
+                  <td className={`${stkBoq} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 text-center align-middle overflow-hidden`}
                     style={{ left: 0 }}>
                     <button onClick={() => canEdit && editTaskBoq(t)}
                       title={canEdit ? `${t.boqCode ?? 'Chưa gán'} — bấm để sửa` : t.boqCode ?? 'Chưa gán'}
@@ -823,7 +823,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                     )}
                   </td>
                 )}
-                <td className={`${stkCode} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 text-center align-top overflow-hidden`}
+                <td className={`${stkCode} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 text-center align-middle overflow-hidden`}
                   style={{ left: LEFT_CODE, width: W_CODE, minWidth: W_CODE }}>
                   <div className="flex items-center justify-center gap-1">
                     {canEdit && (
@@ -834,7 +834,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                     <span className="font-mono text-zinc-400 text-[10px]">{String(ti + 1).padStart(2, '0')}</span>
                   </div>
                 </td>
-                <td className={`${stkName} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 overflow-hidden`}
+                <td className={`${stkName} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 align-middle overflow-hidden`}
                   style={{ left: isMobile ? 0 : LEFT_NAME, width: W_NAME, minWidth: W_NAME, maxWidth: W_NAME }}>
                   {editTask?.id === t.id ? (
                     <span className="flex items-center gap-1">
@@ -900,7 +900,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                     )}
                   </div>
                 </td>
-                <td className={`${stkPct} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-1 py-1 text-center align-top overflow-hidden`}
+                <td className={`${stkPct} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-1 py-1 text-center align-middle overflow-hidden`}
                   style={{ left: LEFT_PCT }}>
                   <span className={Math.round(t.progressPercent * 100) === 100 ? 'text-emerald-400' : 'text-zinc-300'}>{Math.round((t.progressPercent ?? 0) * 100)}%</span>
                 </td>

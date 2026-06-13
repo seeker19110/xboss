@@ -12,6 +12,10 @@ next-env.d.ts
 # Ảnh hiện trường upload từ app — không đưa vào git
 data/uploads/
 
+# Binary + log của cloudflared tunnel — chạy local, không đưa vào git
+cloudflared.exe
+cloudflared-*.txt
+
 # SQLite cũ (đã chuyển sang Postgres) — giữ file local làm backup
 xboss.db
 xboss.db-shm

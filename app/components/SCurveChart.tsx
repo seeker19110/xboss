@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { TrendingUp, Flag } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts';
+import { appAlert, appPrompt } from '@/app/components/dialogs';
 
 type Point = { date: string; planned: number | null; actual: number | null };
 type Data = { points: Point[]; sheets: string[]; today?: string };
@@ -35,7 +36,7 @@ export default function SCurveChart() {
   }, [sheet, baseline]);
 
   async function snapshotBaseline() {
-    const name = window.prompt('Tên baseline (vd: "Kế hoạch hợp đồng", "Điều chỉnh đợt 1"):');
+    const name = await appPrompt('Tên baseline', '', { placeholder: 'VD: Kế hoạch hợp đồng, Điều chỉnh đợt 1' });
     if (name === null) return;
     setSaving(true);
     const res = await fetch('/api/baselines', {
@@ -45,7 +46,7 @@ export default function SCurveChart() {
     setSaving(false);
     if (!res.ok) {
       const j = await res.json().catch(() => null);
-      alert(j?.error ?? 'Không chốt được baseline');
+      appAlert(j?.error ?? 'Không chốt được baseline');
       return;
     }
     const j = await res.json();
@@ -78,7 +79,7 @@ export default function SCurveChart() {
           </button>
         </div>
       </div>
-      <p className="text-xs text-zinc-600 mb-3">
+      <p className="text-xs text-zinc-500 mb-3">
         {baseline
           ? 'Đường kế hoạch theo ngày đã chốt trong baseline — thấy được độ lệch so với kế hoạch gốc kể cả khi đã dời ngày'
           : 'Đường kế hoạch nội suy từ ngày bắt đầu/kết thúc của từng task · đường thực tế tái dựng từ lịch sử cập nhật'}
@@ -89,7 +90,7 @@ export default function SCurveChart() {
             <XAxis dataKey="date" stroke="#71717a" fontSize={10} tickFormatter={fmtTick} minTickGap={40} />
             <YAxis stroke="#71717a" fontSize={11} domain={[0, 100]} unit="%" />
             <Tooltip
-              contentStyle={{ background: '#18181b', border: '1px solid #3f3f46', borderRadius: 8, fontSize: 12 }}
+              contentStyle={{ background: 'var(--color-zinc-900)', border: '1px solid var(--color-zinc-700)', color: 'var(--foreground)', borderRadius: 8, fontSize: 12 }}
               labelFormatter={(d) => new Date(String(d)).toLocaleDateString('vi-VN')}
               formatter={(v, name) => [`${v ?? '—'}%`, name === 'planned' ? 'Kế hoạch' : 'Thực tế']} />
             <Legend formatter={(v) => v === 'planned' ? 'Kế hoạch' : 'Thực tế'} wrapperStyle={{ fontSize: 12 }} />

@@ -1,7 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, insertId, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
-import { sheetVersion } from "@/lib/version";
 import { boqTakenBy } from "@/lib/boq";
 
 export const dynamic = "force-dynamic";
@@ -49,10 +48,6 @@ export async function POST(req: NextRequest) {
     `INSERT INTO work_packages (sheet_type_id, code, name, floor_label, boq_code, sort_order, status, progress)
      VALUES (?, ?, ?, ?, ?, ?, 'chuan_bi', 0)`,
     sheetTypeId, code, name, body.floorLabel ? String(body.floorLabel).trim() : null, boqCode, sortOrder);
-
-  // Bump version Ä‘á»ƒ SSE thÃ´ng bÃ¡o ngÆ°á»i khÃ¡c.
-  const st = await queryOne<{ code: string }>(`SELECT code FROM sheet_types WHERE id = ?`, sheetTypeId);
-  if (st) await sheetVersion(st.code);
 
   return NextResponse.json({ id }, { status: 201 });
 }

@@ -12,7 +12,7 @@ export async function GET() {
   const bars = await query(
     `SELECT wp.id, wp.code, wp.name, wp.floor_label AS "floorLabel",
             wp.start_date AS "startDate", wp.end_date AS "endDate",
-            wp.progress, wp.status, st.code AS "sheetType"
+            wp.progress, wp.status, st.code AS "sheetType", st.slug AS "sheetSlug"
        FROM work_packages wp
        JOIN sheet_types st ON wp.sheet_type_id = st.id
       WHERE wp.start_date IS NOT NULL AND wp.end_date IS NOT NULL

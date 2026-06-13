@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
 
   recordLoginSuccess(ip, emailNorm);
   const res = NextResponse.json({ user: { id: u.id, name: u.name, email: u.email, role: u.role } });
-  res.cookies.set(COOKIE, makeToken(u.id), {
+  res.cookies.set(COOKIE, makeToken(u.id, u.password_hash), {
     httpOnly: true, path: "/", maxAge: COOKIE_MAX_AGE, sameSite: "lax",
   });
   return res;

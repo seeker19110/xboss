@@ -37,21 +37,39 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const fields: Record<string, string> = {
-    name: "name", unit: "unit", qtyPlanned: "qty_planned",
-    qtyUsed: "qty_used", status: "status", note: "note", boqCode: "boq_code",
+    name: "name", unit: "unit", qtyBoq: "qty_boq", qtyPlanned: "qty_planned",
+    qtyUsed: "qty_used", qtyStock: "qty_stock", minStockLevel: "min_stock_level",
+    status: "status", note: "note", boqCode: "boq_code",
   };
   const sets: string[] = [];
   const vals: unknown[] = [];
   for (const [key, col] of Object.entries(fields)) {
     if (body[key] !== undefined) {
       sets.push(`${col} = ?`);
-      vals.push(key.startsWith("qty") ? Number(body[key]) || 0 : body[key]);
+      const isQty = key === "qtyBoq" || key === "qtyPlanned" || key === "qtyUsed" || key === "qtyStock" || key === "minStockLevel";
+      vals.push(isQty ? Number(body[key]) || 0 : body[key]);
     }
   }
   if (!sets.length) return NextResponse.json({ error: "Không có trường để cập nhật" }, { status: 400 });
 
+  // Lọc cặp (set, val) để dùng khi fallback không có cột qty_boq
+  const safeIdxs = sets.map((s, i) => ({ s, v: vals[i], keep: !s.includes("qty_boq") }));
   vals.push(id);
-  await run(`UPDATE materials SET ${sets.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, ...vals);
+  try {
+    await run(`UPDATE materials SET ${sets.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, ...vals);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("PATCH /api/materials error:", msg);
+    if (msg.includes("qty_boq")) {
+      const fallbackSets = safeIdxs.filter(x => x.keep).map(x => x.s);
+      const fallbackVals = safeIdxs.filter(x => x.keep).map(x => x.v);
+      if (fallbackSets.length) {
+        await run(`UPDATE materials SET ${fallbackSets.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, ...fallbackVals, id);
+      }
+    } else {
+      return NextResponse.json({ error: `Lỗi DB: ${msg}` }, { status: 500 });
+    }
+  }
 
   // Sửa trực tiếp số đã dùng cũng phải truy vết được — ghi giao dịch với delta chênh lệch.
   if (body.qtyUsed !== undefined) {
@@ -70,11 +88,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return NextResponse.json({ material });
 }
 
-// DELETE /api/materials/:id (Admin/PM)
+// DELETE /api/materials/:id (Admin only)
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
-  if (!user || !(user.role === "admin" || user.role === "pm"))
-    return NextResponse.json({ error: "Chỉ Admin/PM được xoá vật tư" }, { status: 403 });
+  if (!user || user.role !== "admin")
+    return NextResponse.json({ error: "Chỉ Admin được xoá vật tư" }, { status: 403 });
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });

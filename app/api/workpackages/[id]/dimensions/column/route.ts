@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne, run, insertId } from "@/lib/db";
+import { query, queryOne, run, insertId, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -78,4 +78,56 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
        AND task_id IN (SELECT id FROM tasks WHERE package_id = ?)`, label, pkgId);
 
   return NextResponse.json({ deleted: changes });
+}
+
+// PATCH /api/workpackages/:id/dimensions/column
+// body: { action: "copy", label, newLabel, afterLabel? }
+// Tạo cột mới là bản sao cột label (checkbox reset về unchecked).
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (!CAN.editStructure(user.role)) return NextResponse.json({ error: "Chỉ Admin/PM mới copy được cột" }, { status: 403 });
+
+  const pkgId = parseInt(params.id);
+  if (isNaN(pkgId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  const body = await req.json().catch(() => ({}));
+  if (body.action !== "copy") return NextResponse.json({ error: "action không hợp lệ" }, { status: 400 });
+
+  const label = String(body.label ?? "").trim();
+  const newLabel = String(body.newLabel ?? "").trim();
+  if (!label || !newLabel) return NextResponse.json({ error: "Thiếu label / newLabel" }, { status: 400 });
+
+  const tasks = await query<{ id: number }>(
+    `SELECT id FROM tasks WHERE package_id = ? ORDER BY sort_order, id`, pkgId);
+  if (tasks.length === 0) return NextResponse.json({ error: "Nhóm chưa có task" }, { status: 400 });
+
+  // Kiểm tra tên cột mới chưa tồn tại.
+  const existing = await queryOne(
+    `SELECT id FROM progress_dimensions WHERE task_id = ? AND dimension_label = ?`, tasks[0].id, newLabel);
+  if (existing) return NextResponse.json({ error: `Cột "${newLabel}" đã tồn tại` }, { status: 409 });
+
+  // Lấy sort_order của cột gốc.
+  const srcRef = await queryOne<{ sort_order: number }>(
+    `SELECT sort_order FROM progress_dimensions WHERE task_id = ? AND dimension_label = ?`, tasks[0].id, label);
+  if (!srcRef) return NextResponse.json({ error: `Cột "${label}" không tồn tại` }, { status: 404 });
+
+  const afterLabel = String(body.afterLabel ?? label).trim();
+  const afterRef = await queryOne<{ sort_order: number }>(
+    `SELECT sort_order FROM progress_dimensions WHERE task_id = ? AND dimension_label = ?`, tasks[0].id, afterLabel);
+  const sortOrder = (afterRef?.sort_order ?? srcRef.sort_order) + 1;
+
+  await withTransaction(async () => {
+    await run(
+      `UPDATE progress_dimensions SET sort_order = sort_order + 1
+         WHERE task_id IN (SELECT id FROM tasks WHERE package_id = ?) AND sort_order >= ?`,
+      pkgId, sortOrder);
+    for (const t of tasks) {
+      await insertId(
+        `INSERT INTO progress_dimensions (task_id, dimension_label, installed, sort_order) VALUES (?, ?, 0, ?)`,
+        t.id, newLabel, sortOrder);
+    }
+  });
+
+  return NextResponse.json({ created: tasks.length, label: newLabel, sortOrder }, { status: 201 });
 }

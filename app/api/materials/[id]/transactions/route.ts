@@ -16,6 +16,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   const transactions = await query(
     `SELECT t.id, t.delta, t.qty_after AS "qtyAfter", t.note,
+            COALESCE(t.type, 'dieu_chinh') AS type,
             t.created_at AS "createdAt", u.name AS "userName"
        FROM material_transactions t
        LEFT JOIN users u ON t.created_by = u.id
@@ -47,8 +48,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: "Số lượng (delta) phải là số khác 0" }, { status: 400 });
   const note = String(body.note ?? "").trim().slice(0, 300) || null;
 
-  const qtyAfter = Math.max(0, (m.qty_used ?? 0) + delta);
-  await run(`UPDATE materials SET qty_used = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, qtyAfter, id);
+  // Cập nhật atomic — tránh race condition khi nhiều request đồng thời ghi qty_used.
+  await run(
+    `UPDATE materials SET qty_used = GREATEST(0, qty_used + ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    delta, id);
+  const updated = await queryOne<{ qty_used: number }>(
+    `SELECT qty_used FROM materials WHERE id = ?`, id);
+  const qtyAfter = updated?.qty_used ?? 0;
+
   const txId = await insertId(
     `INSERT INTO material_transactions (material_id, delta, qty_after, note, created_by)
      VALUES (?, ?, ?, ?, ?)`,

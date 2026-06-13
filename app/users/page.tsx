@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
-import { ArrowLeft, UserPlus, Trash2, KeyRound, Users } from 'lucide-react';
+import { UserPlus, Trash2, KeyRound, Users } from 'lucide-react';
+import AppHeader from '@/app/components/AppHeader';
+import { appConfirm, appPrompt } from '@/app/components/dialogs';
 
 type User = { id: number; name: string; email: string; role: string; createdAt: string };
 const ROLE_LABEL: Record<string, string> = { admin: 'Admin', pm: 'PM', engineer: 'Kỹ sư', subcon: 'Thầu phụ' };
@@ -51,7 +53,7 @@ export default function UsersPage() {
   }
 
   async function resetPassword(u: User) {
-    const pw = window.prompt(`Mật khẩu mới cho ${u.email} (≥ 6 ký tự):`);
+    const pw = await appPrompt(`Mật khẩu mới cho ${u.email} (≥ 6 ký tự)`);
     if (!pw) return;
     const res = await fetch(`/api/users/${u.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw }),
@@ -60,7 +62,7 @@ export default function UsersPage() {
   }
 
   async function removeUser(u: User) {
-    if (!window.confirm(`Xoá người dùng ${u.email}?`)) return;
+    if (!await appConfirm(`Xoá người dùng ${u.email}?`, { danger: true, confirmLabel: 'Xoá' })) return;
     const res = await fetch(`/api/users/${u.id}`, { method: 'DELETE' });
     await handle(res, `Đã xoá ${u.email}`);
   }
@@ -75,10 +77,7 @@ export default function UsersPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <header className="border-b border-zinc-800 px-6 py-4 flex items-center gap-3">
-        <a href="/" className="text-zinc-400 hover:text-white"><ArrowLeft className="w-5 h-5" /></a>
-        <h1 className="text-lg font-bold flex items-center gap-2"><Users className="w-5 h-5" /> Quản lý người dùng</h1>
-      </header>
+      <AppHeader back title={<><Users className="w-5 h-5" /> Quản lý người dùng</>} />
 
       <main className="p-6 max-w-3xl mx-auto space-y-6">
         {error && <div className="rounded-lg border border-red-800 bg-red-950/40 text-red-300 px-4 py-2.5 text-sm">{error}</div>}
@@ -139,7 +138,7 @@ export default function UsersPage() {
           </table>
         </div>
 
-        <p className="text-xs text-zinc-600">Không thể xoá / hạ cấp Admin cuối cùng. Người dùng tự đổi mật khẩu tại <a href="/password" className="text-emerald-400 hover:underline">/password</a>.</p>
+        <p className="text-xs text-zinc-500">Không thể xoá / hạ cấp Admin cuối cùng. Người dùng tự đổi mật khẩu tại <a href="/password" className="text-emerald-400 hover:underline">/password</a>.</p>
       </main>
     </div>
   );

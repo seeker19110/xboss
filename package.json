@@ -3,19 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -H 0.0.0.0",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -H 0.0.0.0",
     "lint": "next lint",
     "test": "tsx --test tests/status.test.ts tests/import.test.ts tests/recompute.test.ts tests/ratelimit.test.ts",
     "typecheck": "tsc --noEmit",
     "db:seed": "tsx scripts/seed.ts",
-    "db:seed:sample": "tsx scripts/seed-sample.ts",
-    "db:migrate:from-sqlite": "tsx scripts/migrate-sqlite-to-pg.ts"
+    "db:seed:sample": "tsx scripts/seed-sample.ts"
   },
   "dependencies": {
-    "@tanstack/react-table": "^8.21.3",
-    "clsx": "^2.1.1",
     "lucide-react": "^0.441.0",
     "next": "^14.2.15",
     "nodemailer": "^8.0.11",
@@ -23,7 +20,6 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "recharts": "^3.8.1",
-    "tailwind-merge": "^2.5.2",
     "web-push": "^3.6.7",
     "xlsx": "^0.18.5"
   },

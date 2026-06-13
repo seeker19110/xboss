@@ -7,7 +7,9 @@ export const dynamic = "force-dynamic";
 // POST /api/dimensions/rename  body: { packageId, oldLabel, newLabel }
 // Đổi tên cột (trục/căn hộ) cho TOÀN sheet chứa work package đó.
 export async function POST(req: NextRequest) {
-  if (!CAN.editStructure((await getCurrentUser())?.role))
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (!CAN.editStructure(user.role))
     return NextResponse.json({ error: "Không có quyền chỉnh sửa (chỉ Admin/PM)" }, { status: 403 });
 
   const { packageId, oldLabel, newLabel } = await req.json().catch(() => ({}));

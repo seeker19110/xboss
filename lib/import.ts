@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import { run, queryOne, insertId } from "@/lib/db";
+import { slugFromCode, toSlug } from "@/lib/sheets";
 import { toStatusSlug, parseProgress } from "@/lib/status";
 import { deriveStatus, recomputePackage } from "@/lib/recompute";
 import { makeBoq } from "@/lib/boq";
@@ -167,8 +168,8 @@ export async function importWorkbook(workbook: XLSX.WorkBook): Promise<ImportSta
 
     let st = await queryOne<Row>(`SELECT id FROM sheet_types WHERE tower_id = ? AND code = ?`, towerId, info.code);
     if (!st) {
-      st = { id: await insertId(`INSERT INTO sheet_types (tower_id, code, name, responsible) VALUES (?, ?, ?, ?)`,
-        towerId, info.code, info.name, info.responsible ?? null) };
+      st = { id: await insertId(`INSERT INTO sheet_types (tower_id, code, name, responsible, slug) VALUES (?, ?, ?, ?, ?)`,
+        towerId, info.code, info.name, info.responsible ?? null, slugFromCode(info.code) ?? toSlug(info.code)) };
     }
 
     let currentPkgId: number | null = null;

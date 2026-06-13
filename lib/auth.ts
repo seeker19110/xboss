@@ -34,34 +34,42 @@ export function verifyPassword(pw: string, stored: string): boolean {
 }
 
 // ===== Cookie phiên (stateless, ký HMAC) =====
+// Token format: `userId.exp.pwFrag.HMAC(userId.exp.pwFrag)`
+// pwFrag = 12 ký tự đầu của password_hash — đổi mật khẩu là token cũ tự hết hiệu lực.
 function sign(payload: string): string {
   return createHmac("sha256", getSecret()).update(payload).digest("hex");
 }
-export function makeToken(userId: number): string {
+export function makeToken(userId: number, passwordHash: string): string {
   const exp = Date.now() + SESSION_DAYS * 86400_000;
-  const payload = `${userId}.${exp}`;
+  const pwFrag = passwordHash.slice(0, 12);
+  const payload = `${userId}.${exp}.${pwFrag}`;
   return `${payload}.${sign(payload)}`;
 }
-function parseToken(token: string): number | null {
+function parseToken(token: string): { uid: number; pwFrag: string } | null {
   const parts = token.split(".");
-  if (parts.length !== 3) return null;
-  const [uid, exp, mac] = parts;
-  const expected = Buffer.from(sign(`${uid}.${exp}`), "hex");
+  if (parts.length !== 4) return null;
+  const [uid, exp, pwFrag, mac] = parts;
+  const expected = Buffer.from(sign(`${uid}.${exp}.${pwFrag}`), "hex");
   let given: Buffer;
   try { given = Buffer.from(mac, "hex"); } catch { return null; }
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
   if (Number(exp) < Date.now()) return null;
-  return Number(uid);
+  return { uid: Number(uid), pwFrag };
 }
 
 // ===== Người dùng hiện tại =====
 export async function getCurrentUser(): Promise<User | null> {
   const token = cookies().get(COOKIE)?.value;
   if (!token) return null;
-  const uid = parseToken(token);
-  if (!uid) return null;
-  const u = await queryOne<User>(`SELECT id, name, email, role FROM users WHERE id = ?`, uid);
-  return u ?? null;
+  const parsed = parseToken(token);
+  if (!parsed) return null;
+  const u = await queryOne<User & { password_hash: string }>(
+    `SELECT id, name, email, role, password_hash FROM users WHERE id = ?`, parsed.uid);
+  if (!u) return null;
+  // Fragment không khớp → mật khẩu đã đổi, phiên cũ không còn hợp lệ.
+  if (!u.password_hash.startsWith(parsed.pwFrag)) return null;
+  const { password_hash: _, ...user } = u;
+  return user as User;
 }
 
 export const COOKIE_MAX_AGE = SESSION_DAYS * 86400;

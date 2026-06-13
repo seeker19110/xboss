@@ -22,7 +22,7 @@ export async function GET() {
             t.progress_percent AS "progressPercent",
             (SELECT COUNT(*) FROM task_photos p WHERE p.task_id = t.id) AS "photoCount",
             wp.code AS "packageCode", wp.name AS "packageName",
-            wp.floor_label AS "floorLabel", st.code AS "sheetType"
+            wp.floor_label AS "floorLabel", st.code AS "sheetType", st.slug AS "sheetSlug"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id

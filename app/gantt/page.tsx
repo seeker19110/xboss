@@ -1,11 +1,13 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, CalendarRange } from 'lucide-react';
+import { CalendarRange } from 'lucide-react';
 import { slugFromCode } from '@/lib/sheets';
+import AppHeader from '@/app/components/AppHeader';
+import { PageSkeleton } from '@/app/components/Skeleton';
 
 type Bar = {
   id: number; code: string; name: string; floorLabel: string | null;
-  startDate: string; endDate: string; progress: number; status: string; sheetType: string;
+  startDate: string; endDate: string; progress: number; status: string; sheetType: string; sheetSlug: string | null;
 };
 
 const STATUS_BAR: Record<string, string> = {
@@ -48,7 +50,7 @@ export default function GanttPage() {
     return { list, min, max, months };
   }, [bars, sheetFilter]);
 
-  if (!bars || !view) return <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">Đang tải...</div>;
+  if (!bars || !view) return <PageSkeleton />;
 
   const sheets = [...new Set(bars.map(b => b.sheetType))];
   const span = view.max - view.min || 1;
@@ -58,15 +60,13 @@ export default function GanttPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <header className="border-b border-zinc-800 px-6 py-4 flex items-center gap-3">
-        <a href="/" className="text-zinc-400 hover:text-white"><ArrowLeft className="w-5 h-5" /></a>
-        <h1 className="text-lg font-bold flex items-center gap-2"><CalendarRange className="w-5 h-5 text-emerald-400" /> Gantt — Tiến độ theo nhóm</h1>
-        <select value={sheetFilter} onChange={e => setSheetFilter(e.target.value)}
-          className="ml-auto bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm outline-none">
+      <AppHeader back title={<><CalendarRange className="w-5 h-5 text-emerald-400" /> Gantt — Tiến độ theo nhóm</>}>
+        <select value={sheetFilter} onChange={e => setSheetFilter(e.target.value)} aria-label="Lọc theo hệ"
+          className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm outline-none">
           <option value="">Tất cả hệ</option>
           {sheets.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
-      </header>
+      </AppHeader>
 
       <div className="px-6 py-2 flex flex-wrap gap-3 text-xs text-zinc-400 border-b border-zinc-800/60">
         {Object.entries(STATUS_LABEL).map(([k, v]) => (
@@ -86,7 +86,7 @@ export default function GanttPage() {
 
           {groups.map(sheet => {
             const rows = view.list.filter(b => b.sheetType === sheet);
-            const slug = slugFromCode(sheet);
+            const slug = rows[0]?.sheetSlug ?? slugFromCode(sheet);
             return (
               <section key={sheet} className="mb-6">
                 <h2 className="text-sm font-semibold text-emerald-400 my-2">

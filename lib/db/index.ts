@@ -1,7 +1,8 @@
 // DB layer dùng PostgreSQL (pg Pool) — cấu hình qua DATABASE_URL.
 // Giữ nguyên API helper (query/queryOne/run) như bản SQLite cũ nhưng async;
 // placeholder viết dạng `?` và được chuyển tự động sang $1..$n.
-import { Pool, types } from "pg";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { Pool, PoolClient, types } from "pg";
 
 // DATE (oid 1082) → giữ nguyên chuỗi 'YYYY-MM-DD' (code so sánh ngày dạng chuỗi).
 types.setTypeParser(1082, (v) => v);
@@ -10,6 +11,9 @@ types.setTypeParser(20, (v) => Number(v));
 types.setTypeParser(1700, (v) => parseFloat(v));
 
 const g = globalThis as unknown as { __xbossPool?: Pool; __xbossSchemaReady?: Promise<unknown> };
+
+// Transaction context: query/run/insertId tự dùng client này nếu đang trong withTransaction.
+const txStorage = new AsyncLocalStorage<PoolClient>();
 
 export const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -154,6 +158,7 @@ CREATE TABLE IF NOT EXISTS materials (
   task_id INTEGER REFERENCES tasks(id),
   name TEXT NOT NULL,
   unit TEXT,
+  qty_boq DOUBLE PRECISION DEFAULT 0,
   qty_planned DOUBLE PRECISION DEFAULT 0,
   qty_used DOUBLE PRECISION DEFAULT 0,
   status TEXT DEFAULT 'dat_hang',
@@ -293,6 +298,123 @@ CREATE TABLE IF NOT EXISTS assignment_log (
 CREATE INDEX IF NOT EXISTS idx_asgn_log_target ON assignment_log(level, target_id);
 CREATE INDEX IF NOT EXISTS idx_asgn_log_changed ON assignment_log(changed_at DESC);
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS heatmap_title TEXT;
+ALTER TABLE materials ADD COLUMN IF NOT EXISTS qty_boq DOUBLE PRECISION DEFAULT 0;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS material_col_labels TEXT;
+
+-- ===== QUẢN LÝ VẬT TƯ MỞ RỘNG =====
+
+-- Nhà cung cấp
+CREATE TABLE IF NOT EXISTS suppliers (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  phone TEXT,
+  email TEXT,
+  address TEXT,
+  note TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Yêu cầu mua vật tư (Purchase Request)
+CREATE TABLE IF NOT EXISTS purchase_requests (
+  id SERIAL PRIMARY KEY,
+  pr_code TEXT UNIQUE,
+  material_id INTEGER REFERENCES materials(id),
+  qty_requested DOUBLE PRECISION NOT NULL,
+  note TEXT,
+  status TEXT DEFAULT 'pending',
+  requested_by INTEGER REFERENCES users(id),
+  reviewed_by INTEGER REFERENCES users(id),
+  reviewed_at TIMESTAMPTZ,
+  review_note TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Đơn đặt hàng (Purchase Order)
+CREATE TABLE IF NOT EXISTS purchase_orders (
+  id SERIAL PRIMARY KEY,
+  po_code TEXT UNIQUE,
+  supplier_id INTEGER REFERENCES suppliers(id),
+  status TEXT DEFAULT 'draft',
+  expected_date DATE,
+  note TEXT,
+  created_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Chi tiết đơn hàng
+CREATE TABLE IF NOT EXISTS po_items (
+  id SERIAL PRIMARY KEY,
+  po_id INTEGER REFERENCES purchase_orders(id) ON DELETE CASCADE,
+  material_id INTEGER REFERENCES materials(id),
+  pr_id INTEGER REFERENCES purchase_requests(id),
+  qty_ordered DOUBLE PRECISION NOT NULL,
+  qty_received DOUBLE PRECISION DEFAULT 0,
+  unit_price DOUBLE PRECISION,
+  note TEXT
+);
+
+-- Phiếu nhập kho
+CREATE TABLE IF NOT EXISTS warehouse_receipts (
+  id SERIAL PRIMARY KEY,
+  receipt_code TEXT UNIQUE,
+  po_id INTEGER REFERENCES purchase_orders(id),
+  received_by INTEGER REFERENCES users(id),
+  received_at TIMESTAMPTZ DEFAULT NOW(),
+  note TEXT
+);
+
+-- Chi tiết phiếu nhập kho
+CREATE TABLE IF NOT EXISTS receipt_items (
+  id SERIAL PRIMARY KEY,
+  receipt_id INTEGER REFERENCES warehouse_receipts(id) ON DELETE CASCADE,
+  material_id INTEGER REFERENCES materials(id),
+  po_item_id INTEGER REFERENCES po_items(id),
+  qty_received DOUBLE PRECISION NOT NULL,
+  note TEXT
+);
+
+-- Mở rộng suppliers: thông tin 3 bên (mua / bán / nhận hàng)
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS buyer_company TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS buyer_project TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS buyer_address TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS buyer_rep TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS buyer_title TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS buyer_phone TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS seller_rep TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS receiver_company TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS receiver_address TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS receiver_rep TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS receiver_phone TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS receiver_subcon TEXT;
+
+-- Mở rộng materials: tồn kho thực + ngưỡng cảnh báo
+ALTER TABLE materials ADD COLUMN IF NOT EXISTS qty_stock DOUBLE PRECISION DEFAULT 0;
+ALTER TABLE materials ADD COLUMN IF NOT EXISTS min_stock_level DOUBLE PRECISION DEFAULT 0;
+
+-- Mở rộng material_transactions: loại giao dịch + gắn task + gắn phiếu nhập
+ALTER TABLE material_transactions ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'dieu_chinh';
+ALTER TABLE material_transactions ADD COLUMN IF NOT EXISTS task_id INTEGER REFERENCES tasks(id);
+ALTER TABLE material_transactions ADD COLUMN IF NOT EXISTS receipt_item_id INTEGER REFERENCES receipt_items(id);
+
+-- Tiêu đề phân loại nhà cung cấp (vd: "Nhà Cung Cấp Ống Gió")
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS title TEXT;
+
+-- Thông tin giao hàng (section E trong đơn đặt hàng)
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS delivery_time TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS delivery_contact TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS delivery_phone TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS delivery_note TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS delivery_order TEXT;
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_pr_material ON purchase_requests(material_id);
+CREATE INDEX IF NOT EXISTS idx_pr_status ON purchase_requests(status);
+CREATE INDEX IF NOT EXISTS idx_po_status ON purchase_orders(status);
+CREATE INDEX IF NOT EXISTS idx_po_items_po ON po_items(po_id);
+CREATE INDEX IF NOT EXISTS idx_po_items_mat ON po_items(material_id);
+CREATE INDEX IF NOT EXISTS idx_receipt_po ON warehouse_receipts(po_id);
+CREATE INDEX IF NOT EXISTS idx_receipt_items ON receipt_items(receipt_id);
+CREATE INDEX IF NOT EXISTS idx_mat_trans_type ON material_transactions(type);
 `;
 
 export function getPool(): Pool {
@@ -323,7 +445,8 @@ const toPg = (sql: string) => {
 
 export async function query<T = Record<string, unknown>>(sql: string, ...params: unknown[]): Promise<T[]> {
   await ensureSchema();
-  const r = await getPool().query(toPg(sql), params);
+  const tx = txStorage.getStore();
+  const r = tx ? await tx.query(toPg(sql), params) : await getPool().query(toPg(sql), params);
   return r.rows as T[];
 }
 
@@ -334,16 +457,39 @@ export async function queryOne<T = Record<string, unknown>>(sql: string, ...para
 
 export async function run(sql: string, ...params: unknown[]): Promise<{ changes: number }> {
   await ensureSchema();
-  const r = await getPool().query(toPg(sql), params);
+  const tx = txStorage.getStore();
+  const r = tx ? await tx.query(toPg(sql), params) : await getPool().query(toPg(sql), params);
   return { changes: r.rowCount ?? 0 };
 }
 
 // INSERT trả về id (thay cho lastInsertRowid của SQLite).
 export async function insertId(sql: string, ...params: unknown[]): Promise<number> {
   await ensureSchema();
-  const r = await getPool().query(toPg(sql) + " RETURNING id", params);
+  const tx = txStorage.getStore();
+  const r = tx
+    ? await tx.query(toPg(sql) + " RETURNING id", params)
+    : await getPool().query(toPg(sql) + " RETURNING id", params);
   return Number(r.rows[0].id);
 }
 
-// Hôm nay dạng ISO (YYYY-MM-DD) để so sánh chuỗi ngày.
-export const todayISO = () => new Date().toISOString().slice(0, 10);
+// Bọc nhiều thao tác ghi vào 1 transaction — COMMIT khi fn thành công, ROLLBACK khi throw.
+// Mọi query/run/insertId bên trong fn tự dùng cùng client (qua AsyncLocalStorage).
+export async function withTransaction<T>(fn: () => Promise<T>): Promise<T> {
+  await ensureSchema();
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    const result = await txStorage.run(client, fn);
+    await client.query("COMMIT");
+    return result;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// Hôm nay dạng ISO (YYYY-MM-DD) theo giờ Việt Nam (UTC+7, không có DST) —
+// dùng UTC sẽ lệch ranh giới ngày 7 tiếng (0h–7h sáng trạng thái "trễ" tính sai).
+export const todayISO = () => new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);

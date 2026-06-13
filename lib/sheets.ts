@@ -7,10 +7,21 @@ export const SHEET_SLUGS: { slug: string; code: string; name: string }[] = [
   { slug: "odnn2", code: "ODNN Zone 2", name: "Ống đồng nước ngưng Zone 2" },
 ];
 
-export function codeFromSlug(slug: string): string | null {
-  return SHEET_SLUGS.find((s) => s.slug === slug)?.code ?? null;
-}
-
 export function slugFromCode(code: string): string | null {
   return SHEET_SLUGS.find((s) => s.code === code)?.slug ?? null;
 }
+
+// Sinh slug URL từ tên/mã tiếng Việt: bỏ dấu, thường hoá, chỉ giữ a-z0-9 và gạch nối.
+export function toSlug(input: string): string {
+  return input
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[đĐ]/g, (c) => (c === "đ" ? "d" : "D"))
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 50);
+}
+
+// Slug hợp lệ: 1-50 ký tự a-z0-9 và gạch nối.
+export const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,49}$/;

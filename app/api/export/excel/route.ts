@@ -3,7 +3,6 @@ import * as XLSX from "xlsx";
 import { query, queryOne, todayISO } from "@/lib/db";
 import { STATUS_LABEL } from "@/lib/status";
 import { getCurrentUser, CAN } from "@/lib/auth";
-import { codeFromSlug } from "@/lib/sheets";
 
 export const dynamic = "force-dynamic";
 
@@ -66,7 +65,9 @@ export async function GET(req: NextRequest) {
   if (!CAN.export(role)) return NextResponse.json({ error: "Bạn không có quyền export (chỉ Admin/PM)" }, { status: 403 });
 
   const slug = req.nextUrl.searchParams.get("sheet");
-  const onlySheet = slug ? codeFromSlug(slug) : null;
+  const onlySheet = slug
+    ? (await queryOne<{ code: string }>(`SELECT code FROM sheet_types WHERE slug = ?`, slug))?.code ?? null
+    : null;
   if (slug && !onlySheet) return NextResponse.json({ error: `Sheet không hợp lệ: ${slug}` }, { status: 400 });
 
   const today = todayISO();
