@@ -225,31 +225,31 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
           <div className="mb-3 space-y-2 text-[10px]">
             <div className="bg-sky-50 border border-sky-200 rounded px-3 py-2 space-y-1">
               <p className="font-bold text-sky-800 uppercase text-[9px] tracking-wide mb-1">A. Thông tin bên mua hàng</p>
-              <div className="grid gap-y-1 [&>*]:min-w-0" style={{ gridTemplateColumns: '62% 35%', columnGap: '3%' }}>
+              <div className="grid gap-y-1 [&>*]:min-w-0" style={{ gridTemplateColumns: '1fr auto', columnGap: '24px' }}>
                 <InfoField label="Tên công ty:" value={buyer.company} onChange={v => setBuyer(b => ({ ...b, company: v }))} placeholder="…" />
-                <InfoField label="Đại diện:" value={buyer.rep} onChange={v => setBuyer(b => ({ ...b, rep: v }))} placeholder="…" labelWidth="56px" style={{ paddingLeft: '80px' }} />
+                <InfoField label="Đại diện:" value={buyer.rep} onChange={v => setBuyer(b => ({ ...b, rep: v }))} placeholder="…" labelWidth="56px" />
                 <InfoField label="Tên công trình:" value={buyer.project} onChange={v => setBuyer(b => ({ ...b, project: v }))} placeholder="…" />
-                <InfoField label="Chức vụ:" value={buyer.title} onChange={v => setBuyer(b => ({ ...b, title: v }))} placeholder="…" labelWidth="56px" style={{ paddingLeft: '80px' }} />
+                <InfoField label="Chức vụ:" value={buyer.title} onChange={v => setBuyer(b => ({ ...b, title: v }))} placeholder="…" labelWidth="56px" />
                 <InfoField label="Địa chỉ giao hàng:" value={buyer.address} onChange={v => setBuyer(b => ({ ...b, address: v }))} placeholder="…" />
-                <InfoField label="Phone:" value={buyer.phone} onChange={v => setBuyer(b => ({ ...b, phone: v }))} placeholder="…" labelWidth="56px" style={{ paddingLeft: '80px' }} />
+                <InfoField label="Phone:" value={buyer.phone} onChange={v => setBuyer(b => ({ ...b, phone: v }))} placeholder="…" labelWidth="56px" />
               </div>
             </div>
             <div className="bg-amber-50 border border-amber-200 rounded px-3 py-2 space-y-1">
               <p className="font-bold text-amber-800 uppercase text-[9px] tracking-wide mb-1">B. Thông tin bên bán hàng</p>
-              <div className="grid gap-y-1 [&>*]:min-w-0" style={{ gridTemplateColumns: '62% 35%', columnGap: '3%' }}>
+              <div className="grid gap-y-1 [&>*]:min-w-0" style={{ gridTemplateColumns: '1fr auto', columnGap: '24px' }}>
                 <InfoField label="Tên công ty:" value={seller.company} onChange={v => setSeller(s => ({ ...s, company: v }))} placeholder="…" />
-                <InfoField label="Đại diện:" value={seller.rep} onChange={v => setSeller(s => ({ ...s, rep: v }))} placeholder="…" labelWidth="56px" style={{ paddingLeft: '80px' }} />
+                <InfoField label="Đại diện:" value={seller.rep} onChange={v => setSeller(s => ({ ...s, rep: v }))} placeholder="…" labelWidth="56px" />
                 <InfoField label="Địa chỉ:" value={seller.address} onChange={v => setSeller(s => ({ ...s, address: v }))} placeholder="…" />
-                <InfoField label="Phone:" value={seller.phone} onChange={v => setSeller(s => ({ ...s, phone: v }))} placeholder="…" labelWidth="56px" style={{ paddingLeft: '80px' }} />
+                <InfoField label="Phone:" value={seller.phone} onChange={v => setSeller(s => ({ ...s, phone: v }))} placeholder="…" labelWidth="56px" />
               </div>
             </div>
             <div className="bg-green-50 border border-green-200 rounded px-3 py-2 space-y-1">
               <p className="font-bold text-green-800 uppercase text-[9px] tracking-wide mb-1">C. Thông tin bên nhận hàng</p>
-              <div className="grid gap-y-1 [&>*]:min-w-0" style={{ gridTemplateColumns: '62% 35%', columnGap: '3%' }}>
+              <div className="grid gap-y-1 [&>*]:min-w-0" style={{ gridTemplateColumns: '1fr auto', columnGap: '24px' }}>
                 <InfoField label="Tên công ty:" value={receiver.company} onChange={v => setReceiver(r => ({ ...r, company: v }))} placeholder="…" />
-                <InfoField label="Đại diện:" value={receiver.rep} onChange={v => setReceiver(r => ({ ...r, rep: v }))} placeholder="…" labelWidth="56px" style={{ paddingLeft: '80px' }} />
+                <InfoField label="Đại diện:" value={receiver.rep} onChange={v => setReceiver(r => ({ ...r, rep: v }))} placeholder="…" labelWidth="56px" />
                 <InfoField label="Địa chỉ giao hàng:" value={receiver.address} onChange={v => setReceiver(r => ({ ...r, address: v }))} placeholder="…" />
-                <InfoField label="Phone:" value={receiver.phone} onChange={v => setReceiver(r => ({ ...r, phone: v }))} placeholder="…" labelWidth="56px" style={{ paddingLeft: '80px' }} />
+                <InfoField label="Phone:" value={receiver.phone} onChange={v => setReceiver(r => ({ ...r, phone: v }))} placeholder="…" labelWidth="56px" />
                 <InfoField label="Nhà thầu phụ:" value={receiver.subcon} onChange={v => setReceiver(r => ({ ...r, subcon: v }))} placeholder="…" />
               </div>
             </div>
