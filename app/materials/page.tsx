@@ -62,7 +62,7 @@ export default function MaterialsPage() {
   const [canAdmin, setCanAdmin] = useState(false);
   const [error, setError] = useState('');
   const [historyMat, setHistoryMat] = useState<Material | null>(null);
-  const [showAddModal, setShowAddModal] = useState(false);
+
   const [search, setSearch] = useState('');
   const [hiddenCols, setHiddenCols] = useState<Set<ColKey>>(new Set());
   const [colMenu, setColMenu] = useState<ColKey | null>(null);
@@ -94,7 +94,7 @@ export default function MaterialsPage() {
       setRole(role ?? '');
       setUserId(j.user?.id ?? null);
       setCanEdit(role === 'admin' || role === 'pm' || role === 'engineer');
-      setCanDelete(role === 'admin');
+      setCanDelete(role === 'admin' || role === 'pm');
       setCanAdmin(role === 'admin' || role === 'pm');
     });
     fetch('/api/sheets').then(r => r.json()).then(j => setSheets(j.sheets ?? []));
@@ -333,16 +333,10 @@ export default function MaterialsPage() {
             <Plus className="w-4 h-4" /> Đặt hàng
           </a>
           {canEdit && (
-            <>
-              <button onClick={() => setShowAddModal(true)}
-                className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 rounded-xl px-4 py-2.5 text-sm font-medium transition shrink-0">
-                <Plus className="w-4 h-4" /> Thêm vật tư
-              </button>
-              <a href="/materials/import"
-                className="flex items-center gap-1.5 border border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-white rounded-xl px-4 py-2.5 text-sm font-medium transition shrink-0">
-                <FileUp className="w-4 h-4" /> Import Excel
-              </a>
-            </>
+            <a href="/materials/import"
+              className="flex items-center gap-1.5 border border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-white rounded-xl px-4 py-2.5 text-sm font-medium transition shrink-0">
+              <FileUp className="w-4 h-4" /> Import Excel
+            </a>
           )}
         </div>
 
@@ -530,7 +524,7 @@ export default function MaterialsPage() {
               {filtered.length === 0 && (
                 <tr>
                   <td colSpan={visibleCols.length + 1} className="p-8 text-center text-zinc-500">
-                    {q ? `Không tìm thấy vật tư nào khớp "${search}"` : `Chưa có vật tư nào${canEdit ? ' — bấm "+ Thêm vật tư"' : ''}.`}
+                    {q ? `Không tìm thấy vật tư nào khớp "${search}"` : 'Chưa có vật tư nào — hãy Import Excel để thêm dữ liệu.'}
                   </td>
                 </tr>
               )}
@@ -631,115 +625,11 @@ export default function MaterialsPage() {
         </Modal>
       )}
 
-      {showAddModal && (
-        <AddMaterialModal
-          sheets={sheets} sheetFilter={sheetFilter}
-          onClose={() => setShowAddModal(false)}
-          onAdded={() => { setShowAddModal(false); load(); }}
-        />
-      )}
-
       {historyMat && (
         <MaterialHistoryModal material={historyMat} canEdit={canEdit}
           onClose={() => { setHistoryMat(null); load(); }} />
       )}
     </div>
-  );
-}
-
-// ─── Modal thêm vật tư mới ───────────────────────────────────────────────────
-
-function AddMaterialModal({ sheets, sheetFilter, onClose, onAdded }: {
-  sheets: Sheet[]; sheetFilter: string; onClose: () => void; onAdded: () => void;
-}) {
-  const [form, setForm] = useState({ boqCode: '', name: '', unit: '', qtyBoq: '', qtyPlanned: '', sheetTypeId: sheetFilter });
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  async function submit() {
-    if (!form.name.trim()) { setError('Tên vật tư không được để trống'); return; }
-    if (!form.sheetTypeId) { setError('Chọn hệ cho vật tư'); return; }
-    setBusy(true); setError('');
-    const res = await fetch('/api/materials', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...form,
-        sheetTypeId: Number(form.sheetTypeId),
-        qtyBoq: Number(form.qtyBoq) || 0,
-        qtyPlanned: Number(form.qtyPlanned) || 0,
-      }),
-    });
-    const j = await res.json().catch(() => ({}));
-    if (!res.ok) { setError(j.error ?? 'Lỗi không xác định'); setBusy(false); return; }
-    onAdded();
-  }
-
-  return (
-    <Modal onClose={onClose} className="max-w-md">
-      <div className="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
-        <h3 className="font-semibold text-sm flex items-center gap-2">
-          <Plus className="w-4 h-4 text-emerald-400" /> Thêm vật tư mới
-        </h3>
-        <button onClick={onClose} className="text-zinc-400 hover:text-white"><X className="w-4 h-4" /></button>
-      </div>
-      <div className="p-5 space-y-3">
-        {error && <p className="text-xs text-red-400 bg-red-950/30 border border-red-900 rounded-lg px-3 py-2">{error}</p>}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <label className="text-xs text-zinc-400">Mã BOQ</label>
-            <input value={form.boqCode} onChange={e => setForm(f => ({ ...f, boqCode: e.target.value }))}
-              placeholder="tuỳ chọn"
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm font-mono outline-none focus:border-amber-600" />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-zinc-400">ĐVT</label>
-            <select value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600">
-              <option value="">— Chọn —</option>
-              {DVT_OPTIONS.map(v => <option key={v} value={v}>{v}</option>)}
-            </select>
-          </div>
-        </div>
-        <div className="space-y-1">
-          <label className="text-xs text-zinc-400">Tên vật tư <span className="text-red-400">*</span></label>
-          <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-            onKeyDown={e => e.key === 'Enter' && submit()}
-            placeholder="Nhập tên vật tư..."
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600" />
-        </div>
-        <div className="space-y-1">
-          <label className="text-xs text-zinc-400">Hệ <span className="text-red-400">*</span></label>
-          <select value={form.sheetTypeId} onChange={e => setForm(f => ({ ...f, sheetTypeId: e.target.value }))}
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600">
-            <option value="">— Chọn hệ —</option>
-            {sheets.map(s => <option key={s.id} value={s.id}>{s.code} — {s.name}</option>)}
-          </select>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <label className="text-xs text-zinc-400">Định mức BOQ</label>
-            <input type="number" min="0" value={form.qtyBoq} onChange={e => setForm(f => ({ ...f, qtyBoq: e.target.value }))}
-              placeholder="0"
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-600" />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-zinc-400">Định mức Tháp A</label>
-            <input type="number" min="0" value={form.qtyPlanned} onChange={e => setForm(f => ({ ...f, qtyPlanned: e.target.value }))}
-              placeholder="0"
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600" />
-          </div>
-        </div>
-        <div className="flex gap-2 pt-1">
-          <button onClick={submit} disabled={busy}
-            className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg py-2.5 text-sm font-medium transition">
-            <Plus className="w-4 h-4" /> {busy ? 'Đang lưu...' : 'Thêm vật tư'}
-          </button>
-          <button onClick={onClose} className="px-4 border border-zinc-700 hover:border-zinc-500 rounded-lg text-sm text-zinc-400 hover:text-white transition">
-            Huỷ
-          </button>
-        </div>
-      </div>
-    </Modal>
   );
 }
 
