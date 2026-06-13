@@ -408,7 +408,7 @@ export default function MaterialsPage() {
                 const diff = (m.qtyBoq ?? 0) - (m.qtyPlanned ?? 0);
                 const hasBothQty = (m.qtyBoq ?? 0) > 0;
                 return (
-                  <tr key={m.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/40 group/row">
+                  <tr key={m.id} className={`border-b border-zinc-800/50 hover:bg-zinc-700/40 group/row ${mi % 2 === 0 ? 'bg-zinc-900' : 'bg-zinc-800/30'}`}>
                     {visibleCols.map(key => (
                       <td key={key} className={`px-3 py-2 align-middle whitespace-nowrap ${key === 'name' ? 'text-left w-full' : 'text-center'}`}>
 
