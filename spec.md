@@ -304,10 +304,19 @@ Mã duy nhất **toàn hệ thống** trên `tasks`, `work_packages`, `materials
 | `/order` | Đơn đặt hàng: chọn nhà cung cấp → điền bảng vật tư → in A4 |
 | `/approvals` | Danh sách task chờ nghiệm thu + đã nghiệm thu, upload biên bản |
 | `/lookahead` | Kế hoạch 7/14/21 ngày: task sắp bắt đầu + đến hạn |
+| `/gantt` | Gantt chart toàn bộ task theo timeline |
 | `/my-tasks` | Tasks được gán cho user hiện tại |
 | `/report` | Bản in-friendly (window.print → PDF) |
 | `/login` | Đăng nhập |
-| `/admin/users` | Quản lý người dùng (Admin) |
+| `/password` | Đổi mật khẩu |
+| `/users` | Quản lý người dùng (Admin) |
+| `/admin` | Admin panel: audit log, phân công hàng loạt |
+| `/materials/suppliers` | Danh sách nhà cung cấp |
+| `/materials/purchase-requests` | Yêu cầu mua vật tư (PR) |
+| `/materials/purchase-orders` | Đơn đặt hàng (PO) |
+| `/materials/reports` | Báo cáo tồn kho, xuất nhập vật tư |
+| `/materials/import` | Import vật tư từ Excel |
+| `/order` | Đơn đặt hàng in được: chọn NCC → điền bảng vật tư → in A4 |
 
 ---
 
@@ -322,6 +331,8 @@ Mã duy nhất **toàn hệ thống** trên `tasks`, `work_packages`, `materials
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | tuỳ chọn | Gửi báo cáo trễ hạn qua Telegram |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | tuỳ chọn | Web Push |
 | `SMTP_*` | tuỳ chọn | Gửi email báo cáo |
+
+> **Chi tiết token**: `xboss_session` = `userId.exp.pwFrag.HMAC` — `pwFrag` là 12 ký tự đầu của `password_hash`, nên đổi mật khẩu tự vô hiệu hoá mọi token cũ. Hết hạn sau 7 ngày.
 
 ---
 

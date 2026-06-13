@@ -207,10 +207,64 @@ Ghi delta ±qty mỗi lần thay đổi `qty_used`.
 | created_by | FK → users |
 
 ### `suppliers`
-Nhà cung cấp, kèm thông tin 3 bên cho đơn đặt hàng (buyer/seller/receiver) và thông tin giao hàng.
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| id | SERIAL PK | |
+| name | TEXT | Tên nhà cung cấp |
+| title | TEXT | Phân loại (vd "Nhà Cung Cấp Ống Gió") |
+| phone / email / address | TEXT | Liên hệ |
+| note | TEXT | |
+| buyer_company / buyer_project / buyer_address | TEXT | Bên mua (điền sẵn vào đơn ĐH) |
+| buyer_rep / buyer_title / buyer_phone | TEXT | Đại diện bên mua |
+| seller_rep | TEXT | Đại diện bên bán |
+| receiver_company / receiver_address | TEXT | Bên nhận hàng |
+| receiver_rep / receiver_phone / receiver_subcon | TEXT | Đại diện bên nhận |
+| delivery_time / delivery_contact / delivery_phone | TEXT | Thông tin giao hàng |
+| delivery_note / delivery_order | TEXT | |
 
-### `purchase_requests` → `purchase_orders` → `po_items` → `warehouse_receipts` → `receipt_items`
-Chuỗi PR → PO → nhập kho đầy đủ.
+### `purchase_requests` (PR — Yêu cầu mua)
+| Cột | Kiểu |
+|---|---|
+| pr_code | TEXT UNIQUE |
+| material_id | FK → materials |
+| qty_requested | DOUBLE |
+| status | TEXT | `pending \| approved \| rejected` |
+| requested_by / reviewed_by | FK → users |
+| reviewed_at / review_note | |
+
+### `purchase_orders` (PO — Đơn đặt hàng)
+| Cột | Kiểu |
+|---|---|
+| po_code | TEXT UNIQUE |
+| supplier_id | FK → suppliers |
+| status | TEXT | `draft \| sent \| received` |
+| expected_date | DATE |
+| created_by | FK → users |
+
+### `po_items` (Chi tiết PO)
+| Cột | Kiểu |
+|---|---|
+| po_id | FK → purchase_orders |
+| material_id | FK → materials |
+| pr_id | FK → purchase_requests |
+| qty_ordered / qty_received | DOUBLE |
+| unit_price | DOUBLE |
+
+### `warehouse_receipts` (Phiếu nhập kho)
+| Cột | Kiểu |
+|---|---|
+| receipt_code | TEXT UNIQUE |
+| po_id | FK → purchase_orders |
+| received_by | FK → users |
+| received_at | TIMESTAMPTZ |
+
+### `receipt_items` (Chi tiết phiếu nhập)
+| Cột | Kiểu |
+|---|---|
+| receipt_id | FK → warehouse_receipts |
+| material_id | FK → materials |
+| po_item_id | FK → po_items |
+| qty_received | DOUBLE |
 
 ---
 
