@@ -428,8 +428,17 @@ export default function MaterialsPage() {
                               <input
                                 defaultValue={m.name}
                                 key={`name-${m.id}`}
-                                onBlur={e => e.target.value.trim() && e.target.value !== m.name && patch(m.id, { name: e.target.value.trim() })}
-                                onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') { (e.target as HTMLInputElement).value = m.name; (e.target as HTMLInputElement).blur(); } }}
+                                onKeyDown={e => {
+                                  if (e.key === 'Escape') { (e.target as HTMLInputElement).value = m.name; (e.target as HTMLInputElement).blur(); }
+                                  if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                                }}
+                                onBlur={async e => {
+                                  const newName = e.target.value.trim();
+                                  if (!newName || newName === m.name) { e.target.value = m.name; return; }
+                                  const ok = await appConfirm(`Đổi tên "${m.name}" thành "${newName}"?`, { confirmLabel: 'Đổi tên' });
+                                  if (ok) { patch(m.id, { name: newName }); }
+                                  else { e.target.value = m.name; }
+                                }}
                                 className="font-medium bg-transparent border border-transparent hover:border-zinc-700 focus:border-emerald-600 focus:bg-zinc-800 rounded px-1 py-0.5 outline-none w-full min-w-0"
                               />
                             ) : (
