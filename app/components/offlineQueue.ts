@@ -57,7 +57,22 @@ export function useOfflineTickQueue(onFlushed?: () => void) {
     // Phòng trường hợp sự kiện 'online' không bắn (một số WebView) — thử gửi định kỳ.
     const t = setInterval(() => { if (navigator.onLine) flush(); }, 30_000);
     flush();
-    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); clearInterval(t); };
+
+    // Cảnh báo khi đóng tab/tải lại trang mà còn tick chưa gửi để tránh mất dữ liệu.
+    const beforeUnload = (e: BeforeUnloadEvent) => {
+      if (readQueue().length > 0) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', beforeUnload);
+
+    return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('offline', off);
+      window.removeEventListener('beforeunload', beforeUnload);
+      clearInterval(t);
+    };
   }, [flush]);
 
   return { pending, online, enqueue };

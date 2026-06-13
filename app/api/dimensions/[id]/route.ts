@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, run } from "@/lib/db";
+import { queryOne, run, withTransaction } from "@/lib/db";
 import { recomputeTask } from "@/lib/recompute";
 import { getCurrentUser, canTouchTask } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 // PATCH /api/dimensions/:id  body: { installed: boolean }  → toggle + tính lại % task/package.
+// Bọc trong transaction: update dimension + recompute phải atomic để tránh
+// 2 tick đồng thời tính sai % (đọc cùng snapshot rồi cả 2 cùng ghi).
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -22,9 +24,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!(await canTouchTask(user, dim.task_id)))
     return NextResponse.json({ error: "Bạn chỉ được cập nhật task được giao cho mình" }, { status: 403 });
 
-  await run(`UPDATE progress_dimensions SET installed = ?, value = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-    installed, installed, id);
+  const result = await withTransaction(async () => {
+    await run(`UPDATE progress_dimensions SET installed = ?, value = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      installed, installed, id);
+    return recomputeTask(dim.task_id, user.name);
+  });
 
-  const result = await recomputeTask(dim.task_id, user.name);
   return NextResponse.json({ id, installed: !!installed, task: result });
 }

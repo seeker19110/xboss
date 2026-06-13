@@ -16,6 +16,10 @@ export async function POST(request: NextRequest) {
     const file = formData.get("file") as File | null;
     if (!file) return NextResponse.json({ error: "Không tìm thấy file" }, { status: 400 });
 
+    const MAX_BYTES = 20 * 1024 * 1024; // 20 MB
+    if (file.size > MAX_BYTES)
+      return NextResponse.json({ error: `File quá lớn (tối đa 20 MB, file hiện tại ${(file.size / 1024 / 1024).toFixed(1)} MB)` }, { status: 413 });
+
     const buffer = await file.arrayBuffer();
     const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
 
