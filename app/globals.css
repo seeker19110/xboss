@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-:root { --background: #0a0a0a; --foreground: #ededed; }
+:root { --background: #0a0a0a; --foreground: #c7deff; }
 
 @theme inline {
   --color-background: var(--background);
@@ -8,7 +8,10 @@
 }
 
 /* Chế độ tối (mặc định) — script trong layout gắn class theo localStorage('xboss_theme') */
-html.dark { color-scheme: dark; }
+html.dark {
+  color-scheme: dark;
+  --color-white: #c7deff;
+}
 
 /* Chế độ sáng: đảo thang zinc + white/black để toàn bộ UI (viết theo dark) tự đổi màu,
    không phải sửa từng class trong các page. Các màu nhấn -300/-400 đậm lại cho đủ tương phản. */
