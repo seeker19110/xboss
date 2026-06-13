@@ -425,12 +425,14 @@ export default function MaterialsPage() {
                         {key === 'name' && (
                           <div className="flex items-center gap-2 min-w-0">
                             {canAdmin ? (
-                              <input
+                              <textarea
                                 defaultValue={m.name}
                                 key={`name-${m.id}`}
+                                rows={m.name.includes('\n') ? m.name.split('\n').length : 1}
+                                onInput={e => { const t = e.target as HTMLTextAreaElement; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; }}
                                 onKeyDown={e => {
-                                  if (e.key === 'Escape') { (e.target as HTMLInputElement).value = m.name; (e.target as HTMLInputElement).blur(); }
-                                  if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                                  if (e.key === 'Escape') { const t = e.target as HTMLTextAreaElement; t.value = m.name; t.blur(); }
+                                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); (e.target as HTMLTextAreaElement).blur(); }
                                 }}
                                 onBlur={async e => {
                                   const newName = e.target.value.trim();
@@ -439,7 +441,7 @@ export default function MaterialsPage() {
                                   if (ok) { patch(m.id, { name: newName }); }
                                   else { e.target.value = m.name; }
                                 }}
-                                className="font-medium bg-transparent border border-transparent hover:border-zinc-700 focus:border-emerald-600 focus:bg-zinc-800 rounded px-1 py-0.5 outline-none w-full min-w-0"
+                                className="font-medium bg-transparent border border-transparent hover:border-zinc-700 focus:border-emerald-600 focus:bg-zinc-800 rounded px-1 py-0.5 outline-none w-full min-w-0 resize-none overflow-hidden leading-snug"
                               />
                             ) : (
                               <span className="font-medium truncate">{m.name}</span>
