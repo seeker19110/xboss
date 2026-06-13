@@ -56,7 +56,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (user.role !== "admin") return NextResponse.json({ error: "Chỉ Admin được xoá sheet" }, { status: 403 });
+  if (!CAN.editStructure(user.role)) return NextResponse.json({ error: "Chỉ Admin/PM được xoá sheet" }, { status: 403 });
 
   const id = Number(params.id);
   const st = await queryOne(`SELECT id FROM sheet_types WHERE id = ?`, id);

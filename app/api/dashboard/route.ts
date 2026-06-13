@@ -34,7 +34,7 @@ export async function GET() {
 
   // KPI theo từng sheet
   const kpi = await query(
-    `SELECT st.code AS "sheetType", st.slug AS "sheetSlug",
+    `SELECT st.id AS "sheetId", st.code AS "sheetType", st.slug AS "sheetSlug",
             COUNT(t.id) AS total,
             COALESCE(AVG(t.progress_percent), 0) AS "avgProgress",
             COALESCE(SUM(CASE WHEN t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_percent < 1

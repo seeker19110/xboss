@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Clock, Upload, LayoutGrid, ChevronRight, FileDown, Printer, Plus, ExternalLink } from 'lucide-react';
+import { AlertTriangle, Clock, Upload, LayoutGrid, ChevronRight, FileDown, Printer, Plus, ExternalLink, Trash2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { slugFromCode, toSlug } from '@/lib/sheets';
 import AppHeader from '@/app/components/AppHeader';
@@ -22,7 +22,7 @@ type DelayedTask = {
   progressPercent: number; floorLabel: string; sheetType: string; sheetSlug: string | null;
   delayReason: string | null; delayNote: string | null;
 };
-type KPI = { sheetType: string; sheetSlug: string | null; total: number; avgProgress: number; delayed: number };
+type KPI = { sheetId: number; sheetType: string; sheetSlug: string | null; total: number; avgProgress: number; delayed: number };
 type SheetNav = { id: number; code: string; name: string; slug: string };
 type Me = { id: number; name: string; email: string; role: string };
 
@@ -103,6 +103,13 @@ export default function Dashboard() {
     window.location.href = `/tracking/${j.sheet.slug}`;
   }
 
+  async function deleteSheet(sheetId: number, sheetName: string) {
+    if (!confirm(`Xoá trang "${sheetName}"?\n\nToàn bộ nhóm, công việc, tiến độ và vật tư của trang này sẽ bị xoá vĩnh viễn. Thao tác không thể hoàn tác.`)) return;
+    const res = await fetch(`/api/sheets/${sheetId}`, { method: 'DELETE' });
+    if (!res.ok) { alert((await res.json().catch(() => null))?.error ?? 'Xoá thất bại'); return; }
+    window.location.reload();
+  }
+
   async function setReason(taskId: number, reason: string) {
     const res = await fetch(`/api/tasks/${taskId}/delay-reason`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -156,9 +163,21 @@ export default function Dashboard() {
                   </div>
                 </>
               );
-              return slug
-                ? <a key={k.sheetType} href={`/tracking/${slug}`} className="bg-zinc-900 border border-zinc-800 hover:border-emerald-700 rounded-xl p-4 w-40 shrink-0 transition">{inner}</a>
+              const card = slug
+                ? <a key={k.sheetType} href={`/tracking/${slug}`} className="block bg-zinc-900 border border-zinc-800 hover:border-emerald-700 rounded-xl p-4 w-40 shrink-0 transition">{inner}</a>
                 : <div key={k.sheetType} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 w-40 shrink-0">{inner}</div>;
+              if (!canImport) return card;
+              return (
+                <div key={k.sheetType} className="relative group/card shrink-0 w-40">
+                  {card}
+                  <button
+                    onClick={e => { e.preventDefault(); deleteSheet(k.sheetId, k.sheetType); }}
+                    title="Xoá trang tracking này"
+                    className="absolute top-1.5 right-1.5 p-1 rounded bg-zinc-800/80 text-zinc-500 hover:bg-red-900/80 hover:text-red-400 opacity-0 group-hover/card:opacity-100 transition">
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              );
             })}
             {canImport && (
               <button onClick={() => { setNewSheetErr(''); setNewSheet({ name: '', slug: '', code: '', copyFromId: sheets[sheets.length - 1]?.id ?? '' }); }}
