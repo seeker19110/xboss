@@ -425,17 +425,17 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
 
       <style>{`
         @media print {
-          body { background: white !important; }
+          body * { visibility: hidden !important; }
+          .a4-page, .a4-page * { visibility: visible !important; }
+          .a4-page { position: fixed !important; inset: 0 !important; width: 100% !important; min-height: auto !important; box-shadow: none !important; padding: 10mm !important; }
           .no-print { display: none !important; }
-          .no-print-bg { background: white !important; padding: 0 !important; }
-          .a4-page { box-shadow: none !important; width: 100% !important; min-height: auto !important; }
           .print-only { display: block !important; }
-          table input { display: none !important; }
+          table input, table textarea { display: none !important; }
         }
         @media screen {
           .print-only { display: none !important; }
         }
-        @page { size: A4 portrait; margin: 10mm; }
+        @page { size: A4 portrait; margin: 0; }
       `}</style>
     </>
   );
