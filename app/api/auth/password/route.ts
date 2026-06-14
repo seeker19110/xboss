@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
-import { getCurrentUser, hashPassword, verifyPassword } from "@/lib/auth";
+import { getCurrentUser, hashPassword, verifyPassword, makeToken, COOKIE, COOKIE_MAX_AGE } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +21,15 @@ export async function PATCH(req: NextRequest) {
   if (!u || !verifyPassword(oldPassword, u.password_hash))
     return NextResponse.json({ error: "Mật khẩu hiện tại không đúng" }, { status: 401 });
 
-  await run(`UPDATE users SET password_hash = ? WHERE id = ?`, hashPassword(newPassword), me.id);
-  return NextResponse.json({ ok: true });
+  const newHash = hashPassword(newPassword);
+  await run(`UPDATE users SET password_hash = ? WHERE id = ?`, newHash, me.id);
+
+  // pwFrag đổi → token cũ hết hiệu lực; cấp lại cookie để giữ phiên hiện tại
+  // (các phiên khác trên thiết bị khác vẫn bị huỷ — đúng ý đồ bảo mật).
+  const res = NextResponse.json({ ok: true });
+  res.cookies.set(COOKIE, makeToken(me.id, newHash), {
+    httpOnly: true, path: "/", maxAge: COOKIE_MAX_AGE, sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+  return res;
 }

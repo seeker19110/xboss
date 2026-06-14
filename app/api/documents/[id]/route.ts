@@ -6,7 +6,7 @@ import { photoPath } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
 
-type DocRow = { id: number; file_name: string; mime_type: string; original_name: string | null; uploaded_by: number | null };
+type DocRow = { id: number; file_name: string; mime_type: string; original_name: string | null; uploaded_by: number | null; floor_approval_id: number | null; link_url: string | null };
 
 // GET /api/documents/:id → trả về nội dung file biên bản/tài liệu (cần đăng nhập).
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
@@ -17,8 +17,16 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const doc = await queryOne<DocRow>(
-    `SELECT id, file_name, mime_type, original_name, uploaded_by FROM task_documents WHERE id = ?`, id);
+    `SELECT id, file_name, mime_type, original_name, uploaded_by, floor_approval_id, link_url FROM task_documents WHERE id = ?`, id);
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
+
+  if (doc.link_url) {
+    // Chỉ redirect tới http(s) — chặn open redirect / scheme lạ (javascript:, data:).
+    let safe = false;
+    try { const u = new URL(doc.link_url); safe = u.protocol === "https:" || u.protocol === "http:"; } catch { /* URL hỏng */ }
+    if (!safe) return NextResponse.json({ error: "Link không hợp lệ" }, { status: 400 });
+    return NextResponse.redirect(doc.link_url, { status: 302 });
+  }
 
   const path = photoPath(doc.file_name);
   if (!path) return NextResponse.json({ error: "Tên file không hợp lệ" }, { status: 400 });
@@ -30,6 +38,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   return new NextResponse(new Uint8Array(buf), {
     headers: {
       "Content-Type": doc.mime_type,
+      "X-Content-Type-Options": "nosniff", // chặn browser sniff nội dung khác mime
       "Content-Disposition": `inline; filename="${encodeURIComponent(doc.original_name ?? doc.file_name)}"`,
       "Cache-Control": "private, max-age=86400", // file bất biến theo id — cache 1 ngày
     },
@@ -45,15 +54,18 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const doc = await queryOne<DocRow>(
-    `SELECT id, file_name, mime_type, original_name, uploaded_by FROM task_documents WHERE id = ?`, id);
+    `SELECT id, file_name, mime_type, original_name, uploaded_by, floor_approval_id FROM task_documents WHERE id = ?`, id);
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
   if (doc.uploaded_by !== user.id && !CAN.editStructure(user.role))
     return NextResponse.json({ error: "Chỉ người upload hoặc Admin/PM được xoá tài liệu" }, { status: 403 });
 
   await run(`DELETE FROM task_documents WHERE id = ?`, id);
-  const path = photoPath(doc.file_name);
-  if (path) await unlink(path).catch(() => { /* file đã mất trên đĩa — bỏ qua */ });
+  // Chỉ xoá file vật lý với document upload (link document có file_name = '' — không có file)
+  if (doc.file_name) {
+    const path = photoPath(doc.file_name);
+    if (path) await unlink(path).catch(() => { /* file đã mất trên đĩa — bỏ qua */ });
+  }
 
   return NextResponse.json({ deleted: id });
 }

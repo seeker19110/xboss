@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
   const res = NextResponse.json({ user: { id: u.id, name: u.name, email: u.email, role: u.role } });
   res.cookies.set(COOKIE, makeToken(u.id, u.password_hash), {
     httpOnly: true, path: "/", maxAge: COOKIE_MAX_AGE, sameSite: "lax",
+    secure: process.env.NODE_ENV === "production", // dev qua HTTP vẫn set được
   });
   return res;
 }

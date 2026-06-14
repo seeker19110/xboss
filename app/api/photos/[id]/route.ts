@@ -30,6 +30,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   return new NextResponse(new Uint8Array(buf), {
     headers: {
       "Content-Type": photo.mime_type,
+      "X-Content-Type-Options": "nosniff", // chặn browser sniff nội dung khác mime
       "Cache-Control": "private, max-age=86400", // ảnh bất biến theo id — cache 1 ngày
     },
   });
