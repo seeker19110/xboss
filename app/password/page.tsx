@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
 import { ArrowLeft, KeyRound } from 'lucide-react';
 
 export default function PasswordPage() {
@@ -26,7 +27,7 @@ export default function PasswordPage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <header className="border-b border-zinc-800 px-6 py-4 flex items-center gap-3">
-        <a href="/" className="text-zinc-400 hover:text-white"><ArrowLeft className="w-5 h-5" /></a>
+        <Link href="/" className="text-zinc-400 hover:text-white"><ArrowLeft className="w-5 h-5" /></Link>
         <h1 className="text-lg font-bold flex items-center gap-2"><KeyRound className="w-5 h-5" /> Đổi mật khẩu</h1>
       </header>
 

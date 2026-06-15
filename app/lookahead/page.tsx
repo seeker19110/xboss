@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { ArrowLeft, Printer, CalendarClock } from 'lucide-react';
 import { DELAY_REASON_LABEL } from '@/lib/delay';
 
@@ -84,7 +85,7 @@ export default function LookaheadPage() {
   return (
     <div className="min-h-screen bg-white text-zinc-900">
       <div className="no-print sticky top-0 bg-zinc-100 border-b border-zinc-300 px-6 py-3 flex items-center gap-3">
-        <a href="/" className="text-zinc-600 hover:text-zinc-900"><ArrowLeft className="w-5 h-5" /></a>
+        <Link href="/" className="text-zinc-600 hover:text-zinc-900"><ArrowLeft className="w-5 h-5" /></Link>
         <span className="text-sm text-zinc-600">Kế hoạch ngắn hạn cho họp giao ban — in hoặc lưu PDF</span>
         <select value={days} onChange={e => setDays(Number(e.target.value))}
           className="ml-auto border border-zinc-300 rounded-lg px-3 py-2 text-sm bg-white">

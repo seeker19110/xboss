@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Upload, FileSpreadsheet, ArrowLeft, CheckCircle2, XCircle, Eye, AlertTriangle } from 'lucide-react';
 
 type SheetPreview = {
@@ -69,7 +70,7 @@ export default function ImportPage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <header className="border-b border-zinc-800 px-6 py-4 flex items-center gap-3">
-        <a href="/" className="text-zinc-400 hover:text-white"><ArrowLeft className="w-5 h-5" /></a>
+        <Link href="/" className="text-zinc-400 hover:text-white"><ArrowLeft className="w-5 h-5" /></Link>
         <h1 className="text-lg font-bold flex items-center gap-2"><Upload className="w-5 h-5" /> Import Excel</h1>
         <span className="text-xs text-zinc-500 ml-auto">Bước 1: chọn file → Bước 2: xem trước → Bước 3: xác nhận</span>
       </header>
@@ -180,7 +181,7 @@ export default function ImportPage() {
                 <ul className="mt-1 space-y-0.5">{result.errors.slice(0, 20).map((e, i) => <li key={i}>{e}</li>)}</ul>
               </details>
             )}
-            <a href="/" className="inline-block mt-3 text-emerald-400 hover:underline text-sm">→ Xem Dashboard</a>
+            <Link href="/" className="inline-block mt-3 text-emerald-400 hover:underline text-sm">→ Xem Dashboard</Link>
           </div>
         )}
       </main>
