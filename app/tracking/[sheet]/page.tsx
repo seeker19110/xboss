@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useCallback, useRef, Fragment } from 'react';
+import { useEffect, useState, useCallback, useRef, Fragment, use } from 'react';
 import { Search, ChevronRight, ChevronDown, Pencil, Check, X, History, RefreshCw, Link2, Camera, Trash2, Upload, MessageSquare, Send, WifiOff, CloudUpload, ChevronUp, ChevronDown as ChevronDownIcon, Columns, Copy, RotateCcw, CalendarDays, FileText } from 'lucide-react';
 import { useOfflineTickQueue } from '@/app/components/offlineQueue';
 import AppHeader from '@/app/components/AppHeader';
@@ -53,8 +53,8 @@ const diffDays = (s: string | null, e: string | null) => {
   return d >= 0 ? d + 1 : null;
 };
 
-export default function TrackingPage({ params }: { params: { sheet: string } }) {
-  const { sheet } = params;
+export default function TrackingPage({ params }: { params: Promise<{ sheet: string }> }) {
+  const { sheet } = use(params);
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});

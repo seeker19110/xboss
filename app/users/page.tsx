@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
 import { UserPlus, Trash2, KeyRound, Users } from 'lucide-react';
 import AppHeader from '@/app/components/AppHeader';
 import { appConfirm, appPrompt } from '@/app/components/dialogs';
@@ -71,7 +72,7 @@ export default function UsersPage() {
   if (me && me.role !== 'admin') {
     return (
       <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
-        <p className="text-zinc-400">Chỉ Admin được truy cập trang này. <a href="/" className="text-emerald-400 hover:underline">← Về Dashboard</a></p>
+        <p className="text-zinc-400">Chỉ Admin được truy cập trang này. <Link href="/" className="text-emerald-400 hover:underline">← Về Dashboard</Link></p>
       </div>
     );
   }

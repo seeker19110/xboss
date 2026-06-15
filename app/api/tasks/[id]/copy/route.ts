@@ -7,7 +7,8 @@ export const dynamic = "force-dynamic";
 // POST /api/tasks/:id/copy
 // Tạo bản sao task (code mới, không copy ảnh/bình luận/lịch sử).
 // Body tuỳ chọn: { code?, name?, afterId? }
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editStructure(user.role)) return NextResponse.json({ error: "Chỉ Admin/PM mới copy được task" }, { status: 403 });

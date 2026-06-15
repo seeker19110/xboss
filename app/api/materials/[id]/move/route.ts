@@ -6,7 +6,8 @@ export const dynamic = "force-dynamic";
 
 // PATCH /api/materials/:id/move  body: { direction: 'up' | 'down' }
 // Hoán đổi sort_order với vật tư liền kề trong cùng sheet (hoặc toàn bộ nếu không có filter).
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editProgress(user.role)) return NextResponse.json({ error: "Chỉ Admin/PM/Kỹ sư mới di chuyển được" }, { status: 403 });

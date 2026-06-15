@@ -5,7 +5,8 @@ import { getCurrentUser, CAN } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 // DELETE /api/comments/:id → xoá bình luận. Tác giả hoặc Admin/PM.
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 

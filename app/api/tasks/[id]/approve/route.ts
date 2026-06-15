@@ -14,7 +14,8 @@ type TaskRow = {
 // Trạng thái nghiem_thu chỉ đặt được qua endpoint này — có audit trong task_history.
 
 // POST /api/tasks/:id/approve → duyệt nghiệm thu (Admin/PM, task phải đạt 100%).
-export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.approve(user.role))
@@ -41,7 +42,8 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 }
 
 // DELETE /api/tasks/:id/approve → huỷ nghiệm thu (Admin/PM) — trạng thái quay về suy ra từ tiến độ.
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.approve(user.role))

@@ -5,7 +5,8 @@ import { getCurrentUser, CAN } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 // PATCH /api/towers/:id  body: { name } → đổi tên tháp.
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!CAN.editStructure(user?.role))
     return NextResponse.json({ error: "Chỉ Admin/PM" }, { status: 403 });
@@ -22,7 +23,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 // DELETE /api/towers/:id → xoá tháp (chỉ khi không còn sheet nào thuộc tháp).
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!CAN.editStructure(user?.role))
     return NextResponse.json({ error: "Chỉ Admin/PM" }, { status: 403 });

@@ -60,7 +60,7 @@ function parseToken(token: string): { uid: number; pwFrag: string } | null {
 
 // ===== Người dùng hiện tại =====
 export async function getCurrentUser(): Promise<User | null> {
-  const token = cookies().get(COOKIE)?.value;
+  const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
   const parsed = parseToken(token);
   if (!parsed) return null;

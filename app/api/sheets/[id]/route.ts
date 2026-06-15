@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 type Sheet = { id: number; code: string; name: string; responsible: string | null; slug: string };
 
 // PATCH /api/sheets/:id — đổi tên / mã / đường dẫn / người phụ trách (Admin/PM).
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editStructure(user.role)) return NextResponse.json({ error: "Bạn không có quyền sửa sheet (chỉ Admin/PM)" }, { status: 403 });
@@ -53,7 +54,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 // DELETE /api/sheets/:id — xoá sheet kèm toàn bộ nhóm/task/dimension/vật tư (chỉ Admin).
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editStructure(user.role)) return NextResponse.json({ error: "Chỉ Admin/PM được xoá sheet" }, { status: 403 });

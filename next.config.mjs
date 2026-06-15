@@ -1,8 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    serverComponentsExternalPackages: ["pg", "better-sqlite3"],
-  },
+  serverExternalPackages: ["pg", "better-sqlite3"],
   async headers() {
     return [
       {

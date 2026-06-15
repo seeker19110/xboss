@@ -9,7 +9,8 @@ const STATUSES = ["dat_hang", "ve_kho", "da_dung"];
 const canEditMaterials = (r?: Role) => r === "admin" || r === "pm" || r === "engineer";
 
 // PATCH /api/materials/:id  body: { name?, unit?, qtyPlanned?, qtyUsed?, status?, note? }
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!canEditMaterials(user.role))
@@ -89,7 +90,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 // DELETE /api/materials/:id (Admin only)
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user || user.role !== "admin")
     return NextResponse.json({ error: "Chỉ Admin được xoá vật tư" }, { status: 403 });

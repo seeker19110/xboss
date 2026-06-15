@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 // PATCH /api/dimensions/:id  body: { installed: boolean }  → toggle + tính lại % task/package.
 // Bọc trong transaction: update dimension + recompute phải atomic để tránh
 // 2 tick đồng thời tính sai % (đọc cùng snapshot rồi cả 2 cùng ghi).
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 

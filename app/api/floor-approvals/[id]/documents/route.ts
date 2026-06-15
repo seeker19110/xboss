@@ -8,7 +8,8 @@ import { ensureUploadDir, extForDocMime, newFloorDocFileName, MAX_DOC_BYTES } fr
 export const dynamic = "force-dynamic";
 
 // GET /api/floor-approvals/:id/documents → danh sách biên bản của tầng.
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
@@ -28,7 +29,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 // POST /api/floor-approvals/:id/documents
 //   — multipart (field "file"): upload PDF/ảnh, max 20MB
 //   — JSON { url, caption? }: lưu link ngoài (Google Drive, v.v.)
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editProgress(user.role))

@@ -7,7 +7,8 @@ export const dynamic = "force-dynamic";
 const canEditMaterials = (r?: Role) => r === "admin" || r === "pm" || r === "engineer";
 
 // GET /api/materials/:id/transactions → lịch sử nhập/xuất (mới nhất trước).
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
@@ -29,7 +30,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 // POST /api/materials/:id/transactions  body: { delta, note? }
 // Ghi 1 lần nhập/xuất: delta dương = dùng thêm, âm = điều chỉnh giảm.
 // qty_used của vật tư được cộng dồn (không âm).
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!canEditMaterials(user.role))

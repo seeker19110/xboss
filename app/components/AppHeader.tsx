@@ -2,6 +2,7 @@
 // Header dùng chung cho mọi trang: tiêu đề + điều khiển riêng của trang (children),
 // cụm bên phải (tìm kiếm, chuông, user menu) và hàng nav cố định highlight trang hiện tại.
 import { useEffect, useState, type ReactNode } from 'react';
+import Link from 'next/link';
 import {
   ArrowLeft, LayoutDashboard, ClipboardList, Package, CalendarRange,
   CheckSquare, CalendarClock, Users, KeyRound, LogOut, ShieldCheck,
@@ -46,7 +47,7 @@ export default function AppHeader({ title, subtitle, back, children, search = tr
     <header className="border-b border-zinc-800 print:hidden">
       {/* Hàng 1: tiêu đề + actions + user menu */}
       <div className="px-4 sm:px-6 py-3 flex items-center gap-x-3 gap-y-2 flex-wrap">
-        {back && <a href="/" aria-label="Về Dashboard" className="text-zinc-400 hover:text-white shrink-0"><ArrowLeft className="w-5 h-5" /></a>}
+        {back && <Link href="/" aria-label="Về Dashboard" className="text-zinc-400 hover:text-white shrink-0"><ArrowLeft className="w-5 h-5" /></Link>}
         <div className="min-w-0 flex-1">
           <h1 className="text-lg font-bold flex items-center gap-2 truncate">{title ?? '🏗️ XBoss'}</h1>
           {subtitle && <p className="text-xs text-zinc-400 truncate">{subtitle}</p>}

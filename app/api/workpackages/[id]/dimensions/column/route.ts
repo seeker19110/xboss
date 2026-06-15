@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 // POST /api/workpackages/:id/dimensions/column
 // body: { label, afterLabel? }
 // Thêm cột dimension mới (tạo progress_dimension row cho mọi task trong package).
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editStructure(user.role)) return NextResponse.json({ error: "Chỉ Admin/PM mới thêm được cột" }, { status: 403 });
@@ -63,7 +64,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
 // DELETE /api/workpackages/:id/dimensions/column?label=xxx
 // Xoá toàn bộ progress_dimensions theo nhãn trong package này.
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editStructure(user.role)) return NextResponse.json({ error: "Chỉ Admin/PM mới xoá được cột" }, { status: 403 });
@@ -89,7 +91,8 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 // PATCH /api/workpackages/:id/dimensions/column
 // body: { action: "copy", label, newLabel, afterLabel? }
 // Tạo cột mới là bản sao cột label (checkbox reset về unchecked).
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editStructure(user.role)) return NextResponse.json({ error: "Chỉ Admin/PM mới copy được cột" }, { status: 403 });

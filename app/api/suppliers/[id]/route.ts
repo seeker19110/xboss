@@ -17,7 +17,8 @@ const FIELD_MAP: Record<string, string> = {
   deliveryPhone: "delivery_phone", deliveryNote: "delivery_note", deliveryOrder: "delivery_order",
 };
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!canManage(user.role))
@@ -55,7 +56,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return NextResponse.json({ supplier });
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user || user.role !== "admin")
     return NextResponse.json({ error: "Chỉ Admin được xoá nhà cung cấp" }, { status: 403 });

@@ -8,7 +8,8 @@ const canReceive = (r?: Role) => r === "admin" || r === "pm" || r === "engineer"
 
 // POST /api/purchase-orders/:id/receive  body: { note?, items: [{poItemId, qtyReceived, note?}] }
 // Tạo phiếu nhập kho, cập nhật qty_stock + po_items.qty_received
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!canReceive(user.role))

@@ -9,7 +9,8 @@ export const dynamic = "force-dynamic";
 // POST /api/workpackages/:id/tasks
 // body: { code, name, boqCode?, afterId? }
 // afterId: chèn sau task có id này; null = thêm vào cuối.
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editStructure(user.role)) return NextResponse.json({ error: "Chỉ Admin/PM mới thêm được task" }, { status: 403 });

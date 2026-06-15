@@ -8,7 +8,8 @@ import { ensureUploadDir, extForDocMime, newDocFileName, MAX_DOC_BYTES } from "@
 export const dynamic = "force-dynamic";
 
 // GET /api/tasks/:id/documents → danh sách biên bản/tài liệu đính kèm task.
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
@@ -27,7 +28,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
 // POST /api/tasks/:id/documents → upload biên bản nghiệm thu (multipart: file, caption?).
 // PDF hoặc ảnh, max 20MB. Mọi vai trò sửa tiến độ đều upload được; subcon chỉ task được giao.
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editProgress(user.role))
