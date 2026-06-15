@@ -7,7 +7,8 @@ export const dynamic = "force-dynamic";
 // POST /api/workpackages/:id/copy
 // Tạo bản sao nhóm cùng tất cả tasks và cấu trúc cột (checkbox reset về unchecked).
 // Body tuỳ chọn: { code?, name?, floorLabel?, afterId? }
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editStructure(user.role)) return NextResponse.json({ error: "Chỉ Admin/PM mới copy được nhóm" }, { status: 403 });

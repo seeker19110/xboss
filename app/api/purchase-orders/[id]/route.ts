@@ -7,7 +7,8 @@ export const dynamic = "force-dynamic";
 const canManage = (r?: Role) => r === "admin" || r === "pm";
 
 // GET /api/purchase-orders/:id → chi tiết PO + danh sách items
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
@@ -41,7 +42,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 }
 
 // PATCH /api/purchase-orders/:id  body: { status?, supplierId?, expectedDate?, note? }
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!canManage(user.role))
@@ -74,7 +76,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user || user.role !== "admin")
     return NextResponse.json({ error: "Chỉ Admin được xoá đơn hàng" }, { status: 403 });

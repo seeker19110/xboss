@@ -9,7 +9,8 @@ export const dynamic = "force-dynamic";
 type DocRow = { id: number; file_name: string; mime_type: string; original_name: string | null; uploaded_by: number | null; floor_approval_id: number | null; link_url: string | null };
 
 // GET /api/documents/:id → trả về nội dung file biên bản/tài liệu (cần đăng nhập).
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
@@ -46,7 +47,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 }
 
 // DELETE /api/documents/:id → xoá tài liệu. Người upload hoặc Admin/PM.
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 

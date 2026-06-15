@@ -6,7 +6,8 @@ import { sendPushToUsers } from "@/lib/push";
 export const dynamic = "force-dynamic";
 
 // GET /api/tasks/:id/comments → danh sách bình luận (mới nhất cuối — đọc như chat).
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
@@ -23,7 +24,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 }
 
 // POST /api/tasks/:id/comments  body: { body } → thêm bình luận + thông báo cho người liên quan.
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 

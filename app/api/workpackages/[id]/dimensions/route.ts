@@ -9,7 +9,8 @@ type DimRow = { id: number; taskId: number; label: string; installed: number };
 
 // GET /api/workpackages/:id/dimensions → ma trận sub-task × dimension (kiểu lưới Excel).
 // Sub-con chỉ thấy task được giao cho mình.
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 

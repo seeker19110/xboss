@@ -7,7 +7,8 @@ export const dynamic = "force-dynamic";
 // PATCH /api/workpackages/:id/dimensions/column/move
 // body: { label, direction: 'left' | 'right' }
 // Hoán đổi sort_order cột dimension với cột liền kề.
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editStructure(user.role)) return NextResponse.json({ error: "Chỉ Admin/PM mới di chuyển được" }, { status: 403 });

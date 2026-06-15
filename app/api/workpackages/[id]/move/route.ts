@@ -6,7 +6,8 @@ export const dynamic = "force-dynamic";
 
 // PATCH /api/workpackages/:id/move  body: { direction: 'up' | 'down' }
 // Hoán đổi sort_order với nhóm liền kề trong cùng sheet.
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editStructure(user.role)) return NextResponse.json({ error: "Chỉ Admin/PM mới di chuyển được" }, { status: 403 });

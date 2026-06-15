@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback, useMemo } from 'react';
+import Link from 'next/link';
 import {
   ShieldCheck, ChevronRight, ChevronDown, RotateCcw,
   Users, AlertCircle, History, Filter, ChevronsUpDown, ChevronsDown,
@@ -152,7 +153,7 @@ export default function AdminPage() {
   if (me && me.role !== 'admin' && me.role !== 'pm') {
     return (
       <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
-        <p className="text-zinc-400">Chỉ Admin/PM được truy cập. <a href="/" className="text-emerald-400 hover:underline">← Dashboard</a></p>
+        <p className="text-zinc-400">Chỉ Admin/PM được truy cập. <Link href="/" className="text-emerald-400 hover:underline">← Dashboard</Link></p>
       </div>
     );
   }

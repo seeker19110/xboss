@@ -10,7 +10,8 @@ const canIssue = (r?: Role) => r === "admin" || r === "pm" || r === "engineer";
 // Xuất vật tư ra công trường: giảm qty_stock, tăng qty_used.
 // Check tồn kho bên trong transaction với FOR UPDATE để tránh race condition
 // khi nhiều request xuất cùng lúc vượt quá số dư.
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!canIssue(user.role))

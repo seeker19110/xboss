@@ -10,7 +10,8 @@ import { join } from "path";
 export const dynamic = "force-dynamic";
 
 // PATCH /api/tasks/:id  → sửa nội dung task (tên, code, BOQ, ngày, status, ghi chú). Admin/PM.
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const me = await getCurrentUser();
   if (!CAN.editStructure(me?.role))
     return NextResponse.json({ error: "Không có quyền chỉnh sửa (chỉ Admin/PM)" }, { status: 403 });
@@ -78,7 +79,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 // DELETE /api/tasks/:id — xoá task và toàn bộ dữ liệu liên quan. Admin/PM.
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editStructure(user.role)) return NextResponse.json({ error: "Chỉ Admin/PM mới xoá được task" }, { status: 403 });

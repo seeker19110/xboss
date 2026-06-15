@@ -12,7 +12,8 @@ export const dynamic = "force-dynamic";
 type WP = { id: number; drawingUrl: string | null; drawingFileName: string | null; drawingOriginalName: string | null };
 
 // GET /api/workpackages/:id/drawing → phục vụ file bản vẽ đã upload.
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
@@ -51,7 +52,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 }
 
 // POST /api/workpackages/:id/drawing → upload file bản vẽ (PDF hoặc ảnh, tối đa 20MB).
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editProgress(user.role))
@@ -94,7 +96,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 }
 
 // DELETE /api/workpackages/:id/drawing → xoá file bản vẽ đã upload.
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editProgress(user.role))

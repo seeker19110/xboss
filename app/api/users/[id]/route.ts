@@ -5,7 +5,8 @@ import { getCurrentUser, CAN, hashPassword, ROLES, type Role } from "@/lib/auth"
 export const dynamic = "force-dynamic";
 
 // PATCH /api/users/:id  body: { name?, role?, password? } → sửa user (Admin).
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const me = await getCurrentUser();
   if (!me || !CAN.manageUsers(me.role))
     return NextResponse.json({ error: "Chỉ Admin được sửa người dùng" }, { status: 403 });
@@ -47,7 +48,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 // DELETE /api/users/:id → xoá user (Admin). Không xoá chính mình / admin cuối.
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const me = await getCurrentUser();
   if (!me || !CAN.manageUsers(me.role))
     return NextResponse.json({ error: "Chỉ Admin được xoá người dùng" }, { status: 403 });

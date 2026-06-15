@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 // DELETE /api/floor-approvals/:id → huỷ nghiệm thu tầng (Admin/PM).
 // Xoá bản ghi floor_approval (cascade xoá biên bản đính kèm),
 // đặt lại trạng thái task về trạng thái tính từ tiến độ.
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.approve(user.role))

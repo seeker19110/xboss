@@ -9,7 +9,8 @@ export const dynamic = "force-dynamic";
 type Task = { id: number; package_id: number; status: string | null; end_date: string | null; progress_percent: number | null };
 
 // PATCH /api/tasks/:id/progress  body: { progress: 0..1, status?, note? }
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 

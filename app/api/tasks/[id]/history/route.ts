@@ -5,7 +5,8 @@ import { getCurrentUser } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 // GET /api/tasks/:id/history → lịch sử thay đổi tiến độ (mới nhất trước).
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 

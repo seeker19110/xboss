@@ -8,7 +8,8 @@ import { ensureUploadDir, extForMime, newPhotoFileName, MAX_PHOTO_BYTES } from "
 export const dynamic = "force-dynamic";
 
 // GET /api/tasks/:id/photos → danh sách ảnh hiện trường của task.
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
@@ -27,7 +28,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
 // POST /api/tasks/:id/photos → upload ảnh (multipart: file, caption?).
 // Mọi vai trò được cập nhật tiến độ đều được upload; subcon chỉ cho task được giao.
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editProgress(user.role))

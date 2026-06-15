@@ -9,7 +9,8 @@ export const dynamic = "force-dynamic";
 type PhotoRow = { id: number; file_name: string; mime_type: string; uploaded_by: number | null };
 
 // GET /api/photos/:id → trả về nội dung file ảnh (cần đăng nhập).
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
@@ -37,7 +38,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 }
 
 // DELETE /api/photos/:id → xoá ảnh. Người upload hoặc Admin/PM.
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 

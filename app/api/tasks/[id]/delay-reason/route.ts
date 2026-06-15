@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 // POST /api/tasks/:id/delay-reason  body: { reason: slug | null, note? }
 // Gán nguyên nhân trễ — mọi vai trò cập nhật tiến độ được gán (người tại hiện trường
 // biết lý do rõ nhất); subcon chỉ cho task được giao. reason=null xoá tag.
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editProgress(user.role))

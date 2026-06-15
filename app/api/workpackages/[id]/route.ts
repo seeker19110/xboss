@@ -8,7 +8,8 @@ import { join } from "path";
 export const dynamic = "force-dynamic";
 
 // PATCH /api/workpackages/:id  → sửa nhóm công việc (tên, code, BOQ, tầng, ngày). Admin/PM.
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editStructure(user.role))
@@ -60,7 +61,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 // DELETE /api/workpackages/:id — xoá nhóm cùng toàn bộ tasks và dữ liệu liên quan. Admin/PM.
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+  const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editStructure(user.role)) return NextResponse.json({ error: "Chỉ Admin/PM mới xoá được nhóm" }, { status: 403 });
