@@ -28,6 +28,15 @@ export async function GET() {
       ORDER BY tw.id, st.id`,
     ...(user.role === "subcon" ? [today, user.id] : [today]));
 
+  // RF trên cùng, tầng số giảm dần, B_n xuống cuối — parseInt("RF"/"B1F") = NaN nên phải xử lý riêng.
+  const floorOrder = (f: string) => {
+    const up = f.toUpperCase();
+    if (up === "RF") return 9999;        // tầng mái → cao nhất
+    if (up.startsWith("B")) return -parseInt(up.slice(1)) || -1; // B1F → -1, B2F → -2
+    return parseInt(f) || 0;
+  };
+  const sortFloors = (a: string, b: string) => floorOrder(b) - floorOrder(a);
+
   // Mỗi tháp có danh sách sheet + tầng riêng (tầng cao trên cùng — giống toà nhà).
   const towerNames = [...new Set(cells.map((c) => c.tower ?? ""))];
   const towers = towerNames.map((name) => {
@@ -35,12 +44,12 @@ export async function GET() {
     return {
       name,
       sheets: [...new Set(tc.map((c) => c.sheetType))],
-      floors: [...new Set(tc.map((c) => c.floor))].sort((a, b) => parseInt(b) - parseInt(a)),
+      floors: [...new Set(tc.map((c) => c.floor))].sort(sortFloors),
     };
   });
 
   // Giữ floors/sheets phẳng cho tương thích cũ.
-  const floors = [...new Set(cells.map((c) => c.floor))].sort((a, b) => parseInt(b) - parseInt(a));
+  const floors = [...new Set(cells.map((c) => c.floor))].sort(sortFloors);
   const sheets = [...new Set(cells.map((c) => c.sheetType))];
 
   return NextResponse.json({ towers, floors, sheets, cells });
