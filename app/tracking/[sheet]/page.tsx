@@ -416,12 +416,20 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
     setEditName(null); onChanged();
   }
 
-  async function savePkgDates(start: string, end: string) {
+  async function savePkgDates(start: string, end: string, syncTasks: boolean) {
     await fetch(`/api/workpackages/${pkg.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ startDate: start || null, endDate: end || null }),
     });
-    setShowDatesModal(false); onChanged();
+    // Đồng bộ toàn bộ task con về ngày nhóm: xoá ngày riêng để task kế thừa
+    // ngày của nhóm (từ đó về sau sửa ngày nhóm sẽ tự cập nhật mọi task).
+    if (syncTasks) {
+      await Promise.all(pkg.tasks.map(t => fetch(`/api/tasks/${t.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ startDate: null, endDate: null }),
+      }).catch(() => {})));
+    }
+    setShowDatesModal(false); load(); onChanged();
   }
 
   async function movePkg(direction: 'up' | 'down') {
@@ -1159,11 +1167,12 @@ function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => void })
 // Modal sửa ngày bắt đầu / kết thúc cho toàn nhóm công việc.
 function PkgDatesModal({ pkg, onSave, onClose }: {
   pkg: Pkg;
-  onSave: (start: string, end: string) => void;
+  onSave: (start: string, end: string, syncTasks: boolean) => void;
   onClose: () => void;
 }) {
   const [start, setStart] = useState(pkg.startDate ?? '');
   const [end, setEnd] = useState(pkg.endDate ?? '');
+  const [syncTasks, setSyncTasks] = useState(false);
   const [saving, setSaving] = useState(false);
   const invalid = !!start && !!end && end < start;
   const days = (() => {
@@ -1195,8 +1204,15 @@ function PkgDatesModal({ pkg, onSave, onClose }: {
           )}
           {invalid && <p className="text-xs text-red-400">Ngày kết thúc phải sau ngày bắt đầu.</p>}
           <p className="text-[11px] text-zinc-500">Task con chưa có ngày riêng sẽ hiển thị ngày này (kế thừa).</p>
+          <label className="flex items-start gap-2 text-xs text-zinc-300 cursor-pointer bg-zinc-800/40 border border-zinc-700 rounded-lg px-3 py-2">
+            <input type="checkbox" checked={syncTasks} onChange={e => setSyncTasks(e.target.checked)}
+              className="w-3.5 h-3.5 accent-emerald-500 mt-0.5 shrink-0" />
+            <span>Đồng bộ ngày cho <b>toàn bộ {pkg.tasks.length} task</b> trong nhóm
+              <span className="block text-[11px] text-zinc-500">Xoá ngày riêng của task để tất cả kế thừa ngày nhóm. Sau đó vẫn sửa được ngày từng task.</span>
+            </span>
+          </label>
           <div className="flex gap-2 pt-1">
-            <button onClick={() => { setSaving(true); onSave(start, end); }}
+            <button onClick={() => { setSaving(true); onSave(start, end, syncTasks); }}
               disabled={saving || invalid}
               className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-zinc-800 disabled:text-zinc-500 rounded-lg py-2 text-sm font-medium transition">
               {saving ? 'Đang lưu...' : 'Lưu'}
