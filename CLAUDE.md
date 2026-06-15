@@ -6,7 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 XBoss — web app quản lý tiến độ thi công MEP/ACMV (dự án TT AVIO Tháp A), thay thế file Excel tracking. Next.js 14 App Router + TypeScript + Tailwind 4 + PostgreSQL (Supabase hoặc tự host). Toàn bộ UI, comment code và commit message viết bằng **tiếng Việt**. Đặc tả đầy đủ trong `spec.md`, ERD trong `docs/ERD.md`, hướng dẫn deploy trong `DEPLOY.md`.
 
-> **Persona kỹ sư full-stack, tiêu chuẩn code & quy trình làm việc: xem `ENGINEERING.md`.** File này tập trung mô tả kiến trúc; `ENGINEERING.md` quy định vai trò, chuẩn code, workflow và checklist bảo mật/chất lượng.
+## Vai trò & nguyên tắc
+
+Làm việc với vai trò **kỹ sư full-stack senior**, làm chủ toàn bộ stack XBoss (Next.js App Router, React, TypeScript strict, Tailwind, PostgreSQL raw SQL, PWA). Nguyên tắc:
+
+- **Đọc trước khi sửa, tái dùng trước khi viết mới**: ưu tiên utility sẵn có trong `lib/*`; thay đổi tối thiểu, đúng trọng tâm, diff nhỏ dễ review.
+- **Clean Code / KISS / DRY / YAGNI**: đơn giản, không lặp, không over-engineer; viết code bám đúng phong cách và cách đặt tên của code xung quanh.
+- **Security-first, fail-fast, idempotent**: API là ranh giới bảo mật duy nhất (xem Auth); thiếu cấu hình bắt buộc thì throw sớm; thao tác DB lặp lại không gây tác dụng phụ.
 
 ## Lệnh thường dùng
 
@@ -108,3 +114,17 @@ Parse file tracking gốc (sheet OGTĐ/OGHL/OGCH/ODNN) thành WBS — chứa log
 
 - Commit message: conventional prefix (`fix:`, `feat:`, `chore:`, `ci:`) + mô tả tiếng Việt, dòng đầu nói rõ thay đổi gì ở đâu.
 - Khi thêm API route mới: luôn có check auth + `export const dynamic = "force-dynamic"`.
+- TypeScript strict, import nội bộ qua alias `@/*`, tránh `any` tuỳ tiện.
+- SQL luôn dùng helper `lib/db` với placeholder `?` — **không nối chuỗi để chèn giá trị**.
+
+## Quy trình & Definition of Done
+
+Luồng chuẩn: hiểu yêu cầu → khám phá & tái dùng → code → cập nhật test khi đổi logic → `npm run lint` + `npm run typecheck` (+ `npm test` khi có thể) → commit → push branch → mở **PR draft**.
+
+Trước khi push, đảm bảo:
+
+- [ ] `npm run lint` và `npm run typecheck` xanh; `npm run build` chạy được; test liên quan pass.
+- [ ] Route handler mới gọi `getCurrentUser()` và trả 401 khi chưa đăng nhập; kiểm quyền qua `CAN` / `canTouchTask`.
+- [ ] Validate input; không lộ secret; thao tác nhạy cảm có rate-limit; endpoint cron bảo vệ bằng `CRON_SECRET` qua header Bearer.
+- [ ] File test chạm DB import `tests/setup.ts` **đầu tiên**; đã tự review diff đúng phạm vi.
+- [ ] CI (`.github/workflows/ci.yml`) xanh: `npm audit` → lint → typecheck → test (Postgres 16) → build.
