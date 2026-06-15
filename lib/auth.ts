@@ -20,6 +20,24 @@ function getSecret(): string {
 
 export type User = { id: number; name: string; email: string; role: Role };
 
+// So sánh chuỗi chống timing-attack (dùng cho secret tĩnh: CRON_SECRET, bearer token).
+// Khác độ dài → trả false ngay; cùng độ dài → so sánh constant-time.
+export function safeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ab.length !== bb.length) return false;
+  return timingSafeEqual(ab, bb);
+}
+
+// Xác thực header Authorization: Bearer <CRON_SECRET> theo kiểu constant-time.
+export function checkCronSecret(authHeader: string | null): boolean {
+  const secret = process.env.CRON_SECRET;
+  if (!secret || !authHeader) return false;
+  const prefix = "Bearer ";
+  if (!authHeader.startsWith(prefix)) return false;
+  return safeEqual(authHeader.slice(prefix.length), secret);
+}
+
 // ===== Mật khẩu (scrypt) =====
 export function hashPassword(pw: string): string {
   const salt = randomBytes(16).toString("hex");

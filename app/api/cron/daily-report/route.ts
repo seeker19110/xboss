@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { query } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentUser, CAN, checkCronSecret } from "@/lib/auth";
 import { buildDailyReport, reportToHtml, reportToTelegramText, sendTelegram } from "@/lib/report";
 import { sendPushToAll } from "@/lib/push";
 
@@ -12,9 +12,7 @@ export const dynamic = "force-dynamic";
 // Xác thực: Authorization: Bearer <CRON_SECRET> | session Admin/PM.
 // (Không nhận secret qua query param — URL bị ghi vào access log.)
 export async function GET(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  const auth = req.headers.get("authorization");
-  const bySecret = !!secret && auth === `Bearer ${secret}`;
+  const bySecret = checkCronSecret(req.headers.get("authorization"));
   const bySession = CAN.export((await getCurrentUser())?.role ?? undefined);
   if (!bySecret && !bySession)
     return NextResponse.json({ error: "Không có quyền (cần CRON_SECRET hoặc đăng nhập Admin/PM)" }, { status: 401 });

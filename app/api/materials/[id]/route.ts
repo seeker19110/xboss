@@ -68,7 +68,7 @@ export async function PATCH(req: NextRequest, { params: paramsP }: { params: Pro
         await run(`UPDATE materials SET ${fallbackSets.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, ...fallbackVals, id);
       }
     } else {
-      return NextResponse.json({ error: `Lỗi DB: ${msg}` }, { status: 500 });
+      return NextResponse.json({ error: "Lỗi máy chủ khi cập nhật vật tư" }, { status: 500 });
     }
   }
 

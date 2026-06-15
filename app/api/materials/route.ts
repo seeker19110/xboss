@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
         sheetTypeId, boqCode, name, body.unit ? String(body.unit).trim() : null,
         Number(body.qtyPlanned) || 0, body.note ? String(body.note) : null, sortOrder);
     } else {
-      return NextResponse.json({ error: `Lỗi DB: ${msg}` }, { status: 500 });
+      return NextResponse.json({ error: "Lỗi máy chủ khi lưu vật tư" }, { status: 500 });
     }
   }
 

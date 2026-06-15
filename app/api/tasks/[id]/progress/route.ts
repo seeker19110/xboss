@@ -28,7 +28,18 @@ export async function PATCH(req: NextRequest, { params: paramsP }: { params: Pro
   const task = await queryOne<Task>(`SELECT id, package_id, status, end_date, progress_percent FROM tasks WHERE id = ?`, id);
   if (!task) return NextResponse.json({ error: "Không tìm thấy task" }, { status: 404 });
 
-  const status: StatusSlug = body.status ?? deriveStatus(progress, task.end_date, task.status);
+  // status từ client chỉ nhận các slug hợp lệ, KHÔNG nhận nghiem_thu —
+  // nghiệm thu bắt buộc đi qua POST /api/tasks/:id/approve (kiểm quyền + 100% + audit).
+  // Thiếu chốt này thì subcon/engineer có thể tự nghiệm thu qua route progress.
+  const ALLOWED_STATUS: StatusSlug[] = ["chuan_bi", "dang_thi_cong", "hoan_thanh", "tre"];
+  let status: StatusSlug;
+  if (body.status !== undefined) {
+    if (!ALLOWED_STATUS.includes(body.status))
+      return NextResponse.json({ error: "Trạng thái không hợp lệ (nghiệm thu phải qua /approve)" }, { status: 422 });
+    status = body.status;
+  } else {
+    status = deriveStatus(progress, task.end_date, task.status);
+  }
 
   await run(`UPDATE tasks SET progress_percent = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
     progress, status, id);

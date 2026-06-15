@@ -9,9 +9,32 @@ export function Modal({ onClose, children, className = 'max-w-md', zIndex = 'z-5
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // onClose thường là hàm inline (tham chiếu đổi mỗi lần parent render).
+  // Giữ trong ref để listener keydown luôn gọi bản mới mà KHÔNG phải đăng ký lại
+  // effect — nếu effect chạy lại mỗi render thì setTimeout sẽ focus lại nút đầu
+  // tiên và cướp focus khỏi ô input đang gõ ("chữ nhảy ra ngoài, phải click lại").
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // Khoá scroll nền + focus phần tử đầu tiên — CHỈ chạy 1 lần lúc mount.
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const t = setTimeout(() => {
+      // Không cướp focus nếu người dùng đã focus sẵn vào phần tử trong modal.
+      if (panelRef.current?.contains(document.activeElement)) return;
+      const first = panelRef.current?.querySelector<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      first?.focus();
+    }, 50);
+    return () => { document.body.style.overflow = prev; clearTimeout(t); };
+  }, []);
+
+  // Listener Escape + Tab-trap — đăng ký 1 lần, đọc onClose qua ref.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { onClose(); return; }
+      if (e.key === 'Escape') { onCloseRef.current(); return; }
       if (e.key === 'Tab' && panelRef.current) {
         const focusable = panelRef.current.querySelectorAll<HTMLElement>(
           'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
@@ -24,17 +47,8 @@ export function Modal({ onClose, children, className = 'max-w-md', zIndex = 'z-5
       }
     };
     document.addEventListener('keydown', onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    // Focus vào phần tử đầu tiên khi modal mở
-    const t = setTimeout(() => {
-      const first = panelRef.current?.querySelector<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      );
-      first?.focus();
-    }, 50);
-    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev; clearTimeout(t); };
-  }, [onClose]);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
 
   return (
     <div className={`fixed inset-0 ${zIndex} bg-black/60 flex items-center justify-center p-4`}

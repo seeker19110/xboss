@@ -11,8 +11,8 @@ export async function GET(req: NextRequest) {
   if (!CAN.assign(me.role))
     return NextResponse.json({ error: "Không có quyền xem audit" }, { status: 403 });
 
-  const limit = Math.min(Number(req.nextUrl.searchParams.get("limit") ?? "50"), 200);
-  const offset = Number(req.nextUrl.searchParams.get("offset") ?? "0");
+  const limit = Math.min(Math.max(Number(req.nextUrl.searchParams.get("limit")) || 50, 1), 200);
+  const offset = Math.max(Number(req.nextUrl.searchParams.get("offset")) || 0, 0);
 
   const rows = await query(
     `SELECT al.id, al.level, al.target_label AS "targetLabel",

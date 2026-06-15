@@ -1,7 +1,7 @@
 // Lưu trữ ảnh hiện trường — file nằm trong data/uploads/ (ngoài git),
 // metadata trong bảng task_photos. Tên file do server sinh, không tin client.
 import { mkdirSync, existsSync } from "node:fs";
-import { join, normalize } from "node:path";
+import { join, normalize, sep } from "node:path";
 import { randomBytes } from "node:crypto";
 
 export const UPLOAD_DIR = join(process.cwd(), "data", "uploads");
@@ -57,6 +57,7 @@ export function newPhotoFileName(taskId: number, mime: string): string {
 // nhưng vẫn kiểm tra phòng dữ liệu DB bị sửa tay).
 export function photoPath(fileName: string): string | null {
   const p = normalize(join(UPLOAD_DIR, fileName));
-  if (!p.startsWith(UPLOAD_DIR)) return null;
+  // Bắt buộc nằm TRONG UPLOAD_DIR — thêm separator để 'data/uploads-evil' không lọt.
+  if (p !== UPLOAD_DIR && !p.startsWith(UPLOAD_DIR + sep)) return null;
   return p;
 }
