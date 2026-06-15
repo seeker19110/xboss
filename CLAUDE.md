@@ -8,7 +8,7 @@ XBoss — web app quản lý tiến độ thi công MEP/ACMV (dự án TT AVIO T
 
 ## Vai trò & nguyên tắc
 
-Làm việc với vai trò **kỹ sư full-stack senior**, làm chủ toàn bộ stack XBoss (Next.js App Router, React, TypeScript strict, Tailwind, PostgreSQL raw SQL, PWA). Nguyên tắc:
+Làm việc với vai trò **kỹ sư full-stack senior kiêm chuyên gia thiết kế UI/UX**, làm chủ toàn bộ stack XBoss (Next.js App Router, React, TypeScript strict, Tailwind, PostgreSQL raw SQL, PWA) lẫn thiết kế giao diện (xem **Thiết kế giao diện (UI/UX)** trong phần Kiến trúc). Nguyên tắc:
 
 - **Đọc trước khi sửa, tái dùng trước khi viết mới**: ưu tiên utility sẵn có trong `lib/*`; thay đổi tối thiểu, đúng trọng tâm, diff nhỏ dễ review.
 - **Clean Code / KISS / DRY / YAGNI**: đơn giản, không lặp, không over-engineer; viết code bám đúng phong cách và cách đặt tên của code xung quanh.
@@ -105,6 +105,30 @@ Tick checkbox dimension → `recomputeTask` (% = số ô checked / tổng ô) �
 Tất cả page là `'use client'`, fetch dữ liệu từ `/api/*`, không dùng server component cho dữ liệu. Khi API trả 401, page redirect về `/login`.
 
 Đồng bộ đa người dùng ở trang tracking: SSE `/api/events?sheet=` (server kiểm watermark `sheetVersion` mỗi 3s, đẩy event `version` khi đổi + refresh ~30s); EventSource lỗi/bị serverless cắt → client tự fallback về poll `/api/tasks/version` 10s. `/api/events` bị loại trừ khỏi cache trong sw.js.
+
+### Thiết kế giao diện (UI/UX)
+
+Làm việc với vai trò **chuyên gia thiết kế** — giao diện phải đẹp, hiện đại, nhất quán và phục vụ tốt bối cảnh thật: kỹ sư/thầu phụ dùng trên điện thoại tại công trường, PM xem dashboard, dữ liệu dày (lưới tracking, bảng, biểu đồ). Bám hệ design có sẵn, không tự phát minh phong cách mới.
+
+**Hệ màu & theme (bắt buộc tuân thủ):**
+- **Dark-first**: viết class Tailwind theo chế độ tối; chế độ sáng **tự đảo màu** qua override biến CSS trong `app/globals.css` (`html.light`). **Không dùng biến thể `dark:` và không hardcode mã hex** trong component — nếu không sẽ vỡ cơ chế đảo màu.
+- Dùng thang **`zinc`** cho nền/chữ/viền và màu nhấn ở mức **`-300`/`-400`** (emerald/sky/amber/violet/rose/red...); light mode đã làm đậm các mức này cho đủ tương phản.
+- Màu trạng thái nhất quán theo enum `lib/status.ts` (vd `tre` = đỏ/rose, `hoan_thanh`/`nghiem_thu` = xanh) — dùng cùng bảng màu ở mọi nơi (badge, biểu đồ, heatmap).
+- Theme lưu ở `localStorage('xboss_theme')`, chuyển bằng `ThemeToggle`.
+
+**Thư viện & component:**
+- Icon: **`lucide-react`** (đồng bộ `size`/`strokeWidth`). Biểu đồ: **`recharts`** (`SCurveChart`, `ForecastCards`). Tái dùng component trong `app/components/*` trước khi tạo mới (`AppHeader`, `NotificationBell`, `GlobalSearch`, `FloorHeatmap`, `dialogs`).
+- Loading: dùng **`Skeleton`** (`app/components/Skeleton.tsx`) thay vì màn hình trắng; trạng thái rỗng/ lỗi có thông điệp rõ ràng bằng tiếng Việt.
+
+**Responsive & công trường (mobile-first):**
+- Vùng chạm tối thiểu ~40px; nav cuộn ngang dùng tiện ích `.scrollbar-none`.
+- Lưới/bảng dữ liệu dày: header dính (sticky), cho cuộn ngang, giữ cột mã/tên dễ đọc; ưu tiên đọc nhanh hơn trang trí.
+- PWA: hiển thị trạng thái offline/hàng đợi tick (xem Offline), thao tác vẫn mượt khi mạng yếu.
+
+**Khả năng tiếp cận & in ấn:**
+- Đảm bảo tương phản đủ ở **cả hai theme**; có trạng thái focus rõ cho bàn phím; dùng `aria-label`/alt hợp lý; không truyền tải thông tin **chỉ** bằng màu (kèm icon/nhãn).
+- Trang in (`/report`) phải sạch khi `window.print()` → PDF (ẩn nav/nút, layout vừa khổ giấy).
+- Mọi nhãn, thông báo, tooltip bằng **tiếng Việt**.
 
 ### Import Excel (`lib/import.ts`)
 
