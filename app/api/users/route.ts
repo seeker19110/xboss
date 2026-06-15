@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, insertId } from "@/lib/db";
-import { getCurrentUser, CAN, hashPassword, type Role } from "@/lib/auth";
+import { getCurrentUser, CAN, hashPassword, ROLES, type Role } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
-
-const ROLES: Role[] = ["admin", "pm", "engineer", "subcon"];
 
 // GET /api/users → danh sách user.
 // Admin: quản lý. PM: cần danh sách để gán task (chỉ trả thông tin cơ bản).

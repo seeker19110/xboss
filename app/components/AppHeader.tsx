@@ -9,9 +9,10 @@ import {
 import NotificationBell from '@/app/components/NotificationBell';
 import GlobalSearch from '@/app/components/GlobalSearch';
 import ThemeToggle from '@/app/components/ThemeToggle';
+import { ROLE_LABELS } from '@/lib/roles';
 
 type Me = { id: number; name: string; email: string; role: string };
-const ROLE_LABEL: Record<string, string> = { admin: 'Admin', pm: 'PM', engineer: 'Kỹ sư', subcon: 'Thầu phụ' };
+const ROLE_LABEL: Record<string, string> = ROLE_LABELS;
 
 const NAV = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard, color: 'text-emerald-400' },

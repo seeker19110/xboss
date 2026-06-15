@@ -7,6 +7,7 @@ import { Modal, appAlert, appConfirm, appPrompt } from '@/app/components/dialogs
 import { PageSkeleton } from '@/app/components/Skeleton';
 import { DELAY_REASON_LABEL } from '@/lib/delay';
 import { toSlug } from '@/lib/sheets';
+import { ROLE_LABELS } from '@/lib/roles';
 
 const STATUS_LABEL: Record<string, string> = {
   chuan_bi: 'Chuẩn bị', dang_thi_cong: 'Đang thi công',
@@ -1272,7 +1273,7 @@ type Comment = {
   userId: number | null; userName: string | null; userRole: string | null;
 };
 
-const ROLE_BADGE: Record<string, string> = { admin: 'Admin', pm: 'PM', engineer: 'Kỹ sư', subcon: 'Thầu phụ' };
+const ROLE_BADGE: Record<string, string> = ROLE_LABELS;
 
 // Trao đổi trên task: PM hỏi — người thi công trả lời ngay trong app.
 function CommentsModal({ task, onClose }: { task: GridTask; onClose: () => void }) {

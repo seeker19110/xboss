@@ -3,9 +3,10 @@ import { useEffect, useState, useCallback } from 'react';
 import { UserPlus, Trash2, KeyRound, Users } from 'lucide-react';
 import AppHeader from '@/app/components/AppHeader';
 import { appConfirm, appPrompt } from '@/app/components/dialogs';
+import { ROLE_LABELS } from '@/lib/roles';
 
 type User = { id: number; name: string; email: string; role: string; createdAt: string };
-const ROLE_LABEL: Record<string, string> = { admin: 'Admin', pm: 'PM', engineer: 'Kỹ sư', subcon: 'Thầu phụ' };
+const ROLE_LABEL: Record<string, string> = ROLE_LABELS;
 
 export default function UsersPage() {
   const [me, setMe] = useState<{ id: number; role: string } | null>(null);

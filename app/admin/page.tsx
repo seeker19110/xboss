@@ -5,6 +5,7 @@ import {
   Users, AlertCircle, History, Filter, ChevronsUpDown, ChevronsDown,
 } from 'lucide-react';
 import AppHeader from '@/app/components/AppHeader';
+import { ROLE_LABELS } from '@/lib/roles';
 
 type User = { id: number; name: string; role: string };
 type Sheet = { id: number; code: string; name: string; slug: string; managerId: number | null; managerName: string | null };
@@ -13,7 +14,7 @@ type Task = { id: number; packageId: number; code: string; name: string; assigne
 type Workload = Record<number, { total: number; delayed: number }>;
 type AuditRow = { id: number; level: string; targetLabel: string; isManual: boolean; changedAt: string; prevUser: string | null; newUser: string | null; changedBy: string | null };
 
-const ROLE_LABEL: Record<string, string> = { admin: 'Admin', pm: 'PM', engineer: 'Kỹ sư', subcon: 'Thầu phụ' };
+const ROLE_LABEL: Record<string, string> = ROLE_LABELS;
 const LEVEL_LABEL: Record<string, string> = { sheet: 'Hệ', package: 'Nhóm', task: 'Task' };
 
 function fmtDt(s: string) {

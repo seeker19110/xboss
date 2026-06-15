@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
-import { getCurrentUser, CAN, hashPassword, type Role } from "@/lib/auth";
+import { getCurrentUser, CAN, hashPassword, ROLES, type Role } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
-
-const ROLES: Role[] = ["admin", "pm", "engineer", "subcon"];
 
 // PATCH /api/users/:id  body: { name?, role?, password? } → sửa user (Admin).
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {

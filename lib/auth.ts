@@ -1,6 +1,8 @@
 import { scryptSync, randomBytes, createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { queryOne, run } from "@/lib/db";
+import { ROLES, ROLE_LABELS, VIEW_ONLY_ROLES, type Role } from "@/lib/roles";
+export { ROLES, ROLE_LABELS, VIEW_ONLY_ROLES, type Role };
 
 export const COOKIE = "xboss_session";
 const SESSION_DAYS = 7;
@@ -16,7 +18,6 @@ function getSecret(): string {
   return "xboss-dev-secret-change-me";
 }
 
-export type Role = "admin" | "pm" | "engineer" | "subcon";
 export type User = { id: number; name: string; email: string; role: Role };
 
 // ===== Mật khẩu (scrypt) =====
