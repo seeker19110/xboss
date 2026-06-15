@@ -32,9 +32,21 @@ export function newDocFileName(taskId: number, mime: string): string {
   return `d${taskId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime]}`;
 }
 
+export function newFloorDocFileName(floorApprovalId: number, mime: string): string {
+  return `fa${floorApprovalId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime]}`;
+}
+
 export function ensureUploadDir(): string {
   if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
   return UPLOAD_DIR;
+}
+
+export function newBbntFileName(wpId: number, mime: string): string {
+  return `wp${wpId}-bbnt-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime] ?? MIME_EXT[mime] ?? '.bin'}`;
+}
+
+export function newDrawingFileName(wpId: number, mime: string): string {
+  return `wp${wpId}-drw-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime] ?? '.bin'}`;
 }
 
 export function newPhotoFileName(taskId: number, mime: string): string {

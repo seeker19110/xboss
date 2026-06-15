@@ -141,10 +141,10 @@ export default function Dashboard() {
 
       <main className="p-4 sm:p-6">
 
-        {/* KPI Cards — cuộn ngang, không xuống hàng */}
-        <div className="overflow-x-auto mb-4">
-          <div className="flex gap-4" style={{ minWidth: 'max-content' }}>
-            <div className="bg-red-950 border border-red-800 rounded-xl p-4 w-40 shrink-0">
+        {/* KPI Cards — tự xuống hàng theo bề rộng */}
+        <div className="mb-4">
+          <div className="flex flex-wrap gap-4">
+            <div className="bg-red-950 border border-red-800 rounded-xl p-4 w-40 grow sm:grow-0">
               <div className="flex items-center gap-2 mb-1">
                 <AlertTriangle className="w-4 h-4 text-red-400" />
                 <span className="text-xs text-red-400 uppercase">Tổng trễ</span>
@@ -164,12 +164,13 @@ export default function Dashboard() {
                 </>
               );
               const card = slug
-                ? <a key={k.sheetType} href={`/tracking/${slug}`} className="block bg-zinc-900 border border-zinc-800 hover:border-emerald-700 rounded-xl p-4 w-40 shrink-0 transition">{inner}</a>
-                : <div key={k.sheetType} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 w-40 shrink-0">{inner}</div>;
+                ? <a key={k.sheetType} href={`/tracking/${slug}`} className="block bg-zinc-900 border border-zinc-800 hover:border-emerald-700 rounded-xl p-4 w-40 grow sm:grow-0 transition">{inner}</a>
+                : <div key={k.sheetType} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 w-40 grow sm:grow-0">{inner}</div>;
               if (!canImport) return card;
+              const cardFull = <div className="w-full [&>*]:w-full">{card}</div>;
               return (
-                <div key={k.sheetType} className="relative group/card shrink-0 w-40">
-                  {card}
+                <div key={k.sheetType} className="relative group/card w-40 grow sm:grow-0">
+                  {cardFull}
                   <button
                     onClick={e => { e.preventDefault(); deleteSheet(k.sheetId, k.sheetType); }}
                     title="Xoá trang tracking này"
@@ -181,7 +182,7 @@ export default function Dashboard() {
             })}
             {canImport && (
               <button onClick={() => { setNewSheetErr(''); setNewSheet({ name: '', slug: '', code: '', copyFromId: sheets[sheets.length - 1]?.id ?? '' }); }}
-                className="bg-zinc-900 hover:bg-zinc-800 border border-dashed border-zinc-700 hover:border-emerald-600 rounded-xl p-4 w-40 shrink-0 flex flex-col items-center justify-center gap-2 text-zinc-500 hover:text-emerald-400 transition">
+                className="bg-zinc-900 hover:bg-zinc-800 border border-dashed border-zinc-700 hover:border-emerald-600 rounded-xl p-4 w-40 grow sm:grow-0 flex flex-col items-center justify-center gap-2 text-zinc-500 hover:text-emerald-400 transition">
                 <Plus className="w-6 h-6" />
                 <span className="text-xs text-center">Thêm trang tracking</span>
               </button>
@@ -290,7 +291,7 @@ export default function Dashboard() {
                 {delayed.map(t => {
                   const url = trackingUrl(t);
                   return (
-                  <tr key={t.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/50">
+                  <tr key={t.id} className="border-b border-zinc-800/50 odd:bg-zinc-900/50 even:bg-zinc-800/20 hover:bg-zinc-700/40 transition-colors">
                     <td className="p-3 font-medium">
                       {url ? (
                         <a href={url} title="Mở trên lưới tracking" className="hover:text-emerald-400 group">

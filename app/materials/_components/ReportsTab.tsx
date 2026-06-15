@@ -122,7 +122,7 @@ export default function ReportsTab({ active }: { active: boolean }) {
                     {r.needsStock.map(m => {
                       const days = Math.ceil((new Date(m.earliestStart).getTime() - Date.now()) / 86400000);
                       return (
-                        <tr key={m.id} className="hover:bg-zinc-800/40 transition-colors">
+                        <tr key={m.id} className="odd:bg-zinc-900/50 even:bg-zinc-800/20 hover:bg-zinc-700/40 transition-colors">
                           <td className="py-2.5 px-3">
                             <div className="font-medium text-zinc-100">{m.name}</div>
                             {m.boqCode && <div className="text-zinc-500 font-mono">{m.boqCode}</div>}
@@ -178,7 +178,7 @@ export default function ReportsTab({ active }: { active: boolean }) {
                 {r.stockSummary.map(row => {
                   const pct = Number(row.totalPlanned) > 0 ? (Number(row.totalUsed) / Number(row.totalPlanned) * 100) : 0;
                   return (
-                    <tr key={row.sheetCode} className="hover:bg-zinc-800/40">
+                    <tr key={row.sheetCode} className="odd:bg-zinc-900/50 even:bg-zinc-800/20 hover:bg-zinc-700/40 transition-colors">
                       <td className="py-2.5 px-3 font-medium text-zinc-100">{row.sheetCode}</td>
                       <td className="py-2.5 px-3 text-right">{row.totalItems}</td>
                       <td className="py-2.5 px-3 text-right text-zinc-300">{Number(row.totalPlanned).toLocaleString('vi')}</td>
@@ -209,7 +209,7 @@ export default function ReportsTab({ active }: { active: boolean }) {
                 </tr></thead>
                 <tbody className="divide-y divide-zinc-800">
                   {r.overBudget.map(x => (
-                    <tr key={x.id} className="hover:bg-zinc-800/40">
+                    <tr key={x.id} className="odd:bg-zinc-900/50 even:bg-zinc-800/20 hover:bg-zinc-700/40 transition-colors">
                       <td className="py-2.5 px-3"><div className="font-medium text-zinc-100">{x.name}</div>{x.boqCode && <div className="text-zinc-500 font-mono">{x.boqCode}</div>}</td>
                       <td className="py-2.5 px-3 text-zinc-400">{x.sheetCode}</td>
                       <td className="py-2.5 px-3 text-right text-zinc-400">{x.unit ?? '—'}</td>
@@ -236,7 +236,7 @@ export default function ReportsTab({ active }: { active: boolean }) {
                 </tr></thead>
                 <tbody className="divide-y divide-zinc-800">
                   {r.lowStock.map(x => (
-                    <tr key={x.id} className="hover:bg-zinc-800/40">
+                    <tr key={x.id} className="odd:bg-zinc-900/50 even:bg-zinc-800/20 hover:bg-zinc-700/40 transition-colors">
                       <td className="py-2.5 px-3"><div className="font-medium text-zinc-100">{x.name}</div>{x.boqCode && <div className="text-zinc-500 font-mono">{x.boqCode}</div>}</td>
                       <td className="py-2.5 px-3 text-zinc-400">{x.sheetCode}</td>
                       <td className="py-2.5 px-3 text-right text-zinc-400">{x.unit ?? '—'}</td>
@@ -262,7 +262,7 @@ export default function ReportsTab({ active }: { active: boolean }) {
                 </tr></thead>
                 <tbody className="divide-y divide-zinc-800">
                   {r.warehouseAge.map(x => (
-                    <tr key={x.id} className="hover:bg-zinc-800/40">
+                    <tr key={x.id} className="odd:bg-zinc-900/50 even:bg-zinc-800/20 hover:bg-zinc-700/40 transition-colors">
                       <td className="py-2.5 px-3"><div className="font-medium text-zinc-100">{x.name}</div>{x.boqCode && <div className="text-zinc-500 font-mono">{x.boqCode}</div>}</td>
                       <td className="py-2.5 px-3 text-zinc-400">{x.sheetCode}</td>
                       <td className="py-2.5 px-3 text-right text-zinc-400">{x.unit ?? '—'}</td>
@@ -292,7 +292,7 @@ export default function ReportsTab({ active }: { active: boolean }) {
                   </tr></thead>
                   <tbody className="divide-y divide-zinc-800">
                     {r.noTaskIssues.map(x => (
-                      <tr key={x.txId} className="hover:bg-zinc-800/40">
+                      <tr key={x.txId} className="odd:bg-zinc-900/50 even:bg-zinc-800/20 hover:bg-zinc-700/40 transition-colors">
                         <td className="py-2.5 px-3 font-medium text-zinc-100">{x.materialName}</td>
                         <td className="py-2.5 px-3 text-right text-orange-400 font-bold">{x.delta}</td>
                         <td className="py-2.5 px-3 text-zinc-400">{x.createdByName}</td>

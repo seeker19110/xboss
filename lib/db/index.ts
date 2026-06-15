@@ -224,6 +224,11 @@ ALTER TABLE tasks ADD COLUMN IF NOT EXISTS boq_code TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS drawing_url TEXT;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS boq_code TEXT;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS drawing_url TEXT;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS drawing_file_name TEXT;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS drawing_original_name TEXT;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS bbnt_url TEXT;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS bbnt_file_name TEXT;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS bbnt_original_name TEXT;
 
 ALTER TABLE materials ADD COLUMN IF NOT EXISTS boq_code TEXT;
 
@@ -415,6 +420,27 @@ CREATE INDEX IF NOT EXISTS idx_po_items_mat ON po_items(material_id);
 CREATE INDEX IF NOT EXISTS idx_receipt_po ON warehouse_receipts(po_id);
 CREATE INDEX IF NOT EXISTS idx_receipt_items ON receipt_items(receipt_id);
 CREATE INDEX IF NOT EXISTS idx_mat_trans_type ON material_transactions(type);
+
+-- Nghiệm thu theo tầng × hệ: mỗi (sheet_type, floor_label) có 1 bản ghi khi được duyệt.
+CREATE TABLE IF NOT EXISTS floor_approvals (
+  id SERIAL PRIMARY KEY,
+  sheet_type_id INTEGER NOT NULL REFERENCES sheet_types(id),
+  floor_label TEXT NOT NULL,
+  is_approved BOOLEAN NOT NULL DEFAULT FALSE,
+  approved_by INTEGER REFERENCES users(id),
+  approved_by_name TEXT,
+  approved_at TIMESTAMPTZ,
+  UNIQUE(sheet_type_id, floor_label)
+);
+ALTER TABLE floor_approvals ADD COLUMN IF NOT EXISTS is_approved BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE floor_approvals ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS idx_floor_approvals_sheet ON floor_approvals(sheet_type_id);
+
+-- task_documents dùng chung cho cả tài liệu gắn task lẫn gắn floor_approval.
+ALTER TABLE task_documents ADD COLUMN IF NOT EXISTS floor_approval_id INTEGER REFERENCES floor_approvals(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_documents_floor ON task_documents(floor_approval_id);
+-- Cho phép lưu link ngoài (Google Drive, v.v.) thay vì file upload.
+ALTER TABLE task_documents ADD COLUMN IF NOT EXISTS link_url TEXT;
 `;
 
 export function getPool(): Pool {

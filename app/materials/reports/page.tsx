@@ -118,7 +118,7 @@ export default function MaterialReportsPage() {
                       {report.stockSummary.map(row => {
                         const pct = row.totalPlanned > 0 ? (row.totalUsed / row.totalPlanned * 100).toFixed(1) : '—';
                         return (
-                          <tr key={row.sheetCode} className="border-b border-zinc-700/50 hover:bg-zinc-700/20">
+                          <tr key={row.sheetCode} className="border-b border-zinc-700/50 odd:bg-zinc-900/50 even:bg-zinc-800/20 hover:bg-zinc-700/30 transition-colors">
                             <td className="py-3 pr-4 font-medium text-zinc-100">{row.sheetCode} <span className="text-zinc-400 text-xs">({row.sheetName})</span></td>
                             <td className="py-3 pr-4 text-right">{row.totalItems}</td>
                             <td className="py-3 pr-4 text-right text-zinc-300">{row.totalPlanned?.toFixed(1) ?? '0'}</td>
@@ -157,7 +157,7 @@ export default function MaterialReportsPage() {
                       </thead>
                       <tbody>
                         {report.overBudget.map(r => (
-                          <tr key={r.id} className="border-b border-zinc-700/50 hover:bg-zinc-700/20">
+                          <tr key={r.id} className="border-b border-zinc-700/50 odd:bg-zinc-900/50 even:bg-zinc-800/20 hover:bg-zinc-700/30 transition-colors">
                             <td className="py-3 pr-4">
                               <div className="font-medium text-zinc-100">{r.name}</div>
                               {r.boqCode && <div className="text-xs text-zinc-500">{r.boqCode}</div>}
@@ -197,7 +197,7 @@ export default function MaterialReportsPage() {
                       </thead>
                       <tbody>
                         {report.lowStock.map(r => (
-                          <tr key={r.id} className="border-b border-zinc-700/50 hover:bg-zinc-700/20">
+                          <tr key={r.id} className="border-b border-zinc-700/50 odd:bg-zinc-900/50 even:bg-zinc-800/20 hover:bg-zinc-700/30 transition-colors">
                             <td className="py-3 pr-4">
                               <div className="font-medium text-zinc-100">{r.name}</div>
                               {r.boqCode && <div className="text-xs text-zinc-500">{r.boqCode}</div>}
@@ -236,7 +236,7 @@ export default function MaterialReportsPage() {
                       </thead>
                       <tbody>
                         {report.warehouseAge.map(r => (
-                          <tr key={r.id} className="border-b border-zinc-700/50 hover:bg-zinc-700/20">
+                          <tr key={r.id} className="border-b border-zinc-700/50 odd:bg-zinc-900/50 even:bg-zinc-800/20 hover:bg-zinc-700/30 transition-colors">
                             <td className="py-3 pr-4">
                               <div className="font-medium text-zinc-100">{r.name}</div>
                               {r.boqCode && <div className="text-xs text-zinc-500">{r.boqCode}</div>}
@@ -278,7 +278,7 @@ export default function MaterialReportsPage() {
                         </thead>
                         <tbody>
                           {report.noTaskIssues.map(r => (
-                            <tr key={r.txId} className="border-b border-zinc-700/50 hover:bg-zinc-700/20">
+                            <tr key={r.txId} className="border-b border-zinc-700/50 odd:bg-zinc-900/50 even:bg-zinc-800/20 hover:bg-zinc-700/30 transition-colors">
                               <td className="py-3 pr-4 font-medium text-zinc-100">{r.materialName}</td>
                               <td className="py-3 pr-4 text-right text-orange-400 font-semibold">{r.delta}</td>
                               <td className="py-3 pr-4 text-zinc-400">{r.createdByName}</td>

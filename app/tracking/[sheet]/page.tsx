@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback, useRef, Fragment } from 'react';
-import { Search, ChevronRight, ChevronDown, Pencil, Check, X, History, RefreshCw, Link2, Camera, Trash2, Upload, MessageSquare, Send, WifiOff, CloudUpload, ChevronUp, ChevronDown as ChevronDownIcon, Columns, Copy, RotateCcw, CalendarDays } from 'lucide-react';
+import { Search, ChevronRight, ChevronDown, Pencil, Check, X, History, RefreshCw, Link2, Camera, Trash2, Upload, MessageSquare, Send, WifiOff, CloudUpload, ChevronUp, ChevronDown as ChevronDownIcon, Columns, Copy, RotateCcw, CalendarDays, FileText } from 'lucide-react';
 import { useOfflineTickQueue } from '@/app/components/offlineQueue';
 import AppHeader from '@/app/components/AppHeader';
 import { Modal, appAlert, appConfirm, appPrompt } from '@/app/components/dialogs';
@@ -19,7 +19,7 @@ const STATUS_CLS: Record<string, string> = {
 };
 
 type Task = { id: number; code: string; name: string; status: string; endDate: string | null; progressPercent: number };
-type Pkg = { id: number; code: string; floorLabel: string | null; name: string; status: string; progress: number; tasks: Task[]; boqCode: string | null; drawingUrl: string | null; startDate: string | null; endDate: string | null };
+type Pkg = { id: number; code: string; floorLabel: string | null; name: string; status: string; progress: number; tasks: Task[]; boqCode: string | null; drawingUrl: string | null; bbntUrl: string | null; startDate: string | null; endDate: string | null };
 type Data = { sheet: { id?: number; code: string; name: string; responsible?: string; slug?: string }; packages: Pkg[]; version?: string };
 
 const SYNC_POLL_MS = 10_000;
@@ -308,6 +308,8 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
   const [commentsTask, setCommentsTask] = useState<GridTask | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [datesTarget, setDatesTarget] = useState<{ ids: number[]; init: { start: string; end: string } } | null>(null);
+  const drawingInputRef = useRef<HTMLInputElement>(null);
+  const bbntInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(() => {
     fetch(`/api/workpackages/${pkg.id}/dimensions`).then(r => r.json()).then(setGrid)
@@ -327,12 +329,62 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
     onChanged();
   }
 
-  async function editPkgDrawing() {
-    const v = await appPrompt('Link bản vẽ / BBNT của nhóm (để trống = xoá)', pkg.drawingUrl ?? '');
+  async function editPkgDrawingLink() {
+    const current = pkg.drawingUrl?.startsWith('/api/workpackages/') ? '' : (pkg.drawingUrl ?? '');
+    const v = await appPrompt('Link bản vẽ (Google Drive, SharePoint…)', current);
     if (v === null) return;
+    const url = v.trim();
+    if (url) {
+      await fetch(`/api/workpackages/${pkg.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ drawingUrl: url }),
+      });
+    } else {
+      await fetch(`/api/workpackages/${pkg.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ drawingUrl: null }),
+      });
+    }
+    onChanged();
+  }
+
+  async function uploadDrawingFile(file: File) {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`/api/workpackages/${pkg.id}/drawing`, { method: 'POST', body: form });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); appAlert(j.error ?? 'Lỗi upload bản vẽ'); return; }
+    onChanged();
+  }
+
+  async function removeDrawing() {
+    if (!await appConfirm('Xoá bản vẽ của nhóm này?')) return;
+    await fetch(`/api/workpackages/${pkg.id}/drawing`, { method: 'DELETE' });
+    onChanged();
+  }
+
+  async function editBbntLink() {
+    const current = pkg.bbntUrl?.startsWith('/api/workpackages/') ? '' : (pkg.bbntUrl ?? '');
+    const v = await appPrompt('Link biên bản nghiệm thu (Google Drive, SharePoint…)', current);
+    if (v === null) return;
+    const url = v.trim();
     await fetch(`/api/workpackages/${pkg.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ drawingUrl: v.trim() || null }),
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bbntUrl: url || null }),
     });
+    onChanged();
+  }
+
+  async function uploadBbntFile(file: File) {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`/api/workpackages/${pkg.id}/bbnt`, { method: 'POST', body: form });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); appAlert(j.error ?? 'Lỗi upload biên bản'); return; }
+    onChanged();
+  }
+
+  async function removeBbnt() {
+    if (!await appConfirm('Xoá biên bản nghiệm thu của nhóm này?')) return;
+    await fetch(`/api/workpackages/${pkg.id}/bbnt`, { method: 'DELETE' });
     onChanged();
   }
 
@@ -662,18 +714,6 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                     <button onClick={e => { e.stopPropagation(); setEditName(pkg.name); }} title="Sửa tên nhóm"
                       className="text-zinc-700 hover:text-emerald-400 shrink-0"><Pencil className="w-3 h-3" /></button>
                   )}
-                  {(pkg.drawingUrl || canEdit) && editName === null && (
-                    pkg.drawingUrl ? (
-                      <span className="flex items-center gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
-                        <a href={pkg.drawingUrl} target="_blank" rel="noreferrer" title={`Bản vẽ: ${pkg.drawingUrl}`}
-                          className="text-sky-400 hover:text-sky-300"><Link2 className="w-3.5 h-3.5" /></a>
-                        {canEdit && <button onClick={() => editPkgDrawing()} className="text-zinc-600 hover:text-emerald-400 ml-0.5"><Pencil className="w-2.5 h-2.5" /></button>}
-                      </span>
-                    ) : (
-                      <button onClick={e => { e.stopPropagation(); editPkgDrawing(); }} title="Thêm link bản vẽ / BBNT"
-                        className="text-zinc-700 hover:text-sky-400 shrink-0"><Link2 className="w-3.5 h-3.5" /></button>
-                    )
-                  )}
                 </div>
               )}
             </td>
@@ -738,13 +778,65 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                 <span className={`px-2.5 py-0.5 rounded text-[13px] w-32 text-center shrink-0 ${STATUS_CLS[pkg.status] ?? STATUS_CLS.chuan_bi}`}>
                   {STATUS_LABEL[pkg.status] ?? pkg.status}
                 </span>
+                {/* Bản vẽ */}
+                <span className="flex flex-col items-center shrink-0 border-l border-zinc-800 pl-3 ml-1" onClick={e => e.stopPropagation()}>
+                  <span className="text-[9px] text-zinc-600 leading-none mb-0.5">Bản vẽ</span>
+                  <span className="flex items-center gap-1">
+                    {pkg.drawingUrl ? (
+                      <a href={pkg.drawingUrl} target="_blank" rel="noreferrer" title="Xem bản vẽ"
+                        className="text-sky-400 hover:text-sky-300"><FileText className="w-3.5 h-3.5" /></a>
+                    ) : (
+                      <FileText className="w-3.5 h-3.5 text-zinc-700" />
+                    )}
+                    {canEdit && (
+                      <>
+                        <button onClick={() => drawingInputRef.current?.click()} title="Upload PDF bản vẽ"
+                          className="text-zinc-600 hover:text-sky-400"><Upload className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => editPkgDrawingLink()} title="Gán link bản vẽ"
+                          className="text-zinc-600 hover:text-sky-400"><Link2 className="w-3.5 h-3.5" /></button>
+                        {pkg.drawingUrl ? (
+                          <button onClick={() => removeDrawing()} title="Xoá bản vẽ"
+                            className="text-zinc-700 hover:text-red-400"><X className="w-3 h-3" /></button>
+                        ) : (
+                          <span className="w-3 h-3 inline-block" />
+                        )}
+                      </>
+                    )}
+                  </span>
+                </span>
+                <input ref={drawingInputRef} type="file" accept=".pdf,image/*" className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) { uploadDrawingFile(f); e.target.value = ''; } }} />
+                {/* Biên Bản Nghiệm Thu */}
+                <span className="flex flex-col items-center shrink-0 border-l border-zinc-800 pl-3" onClick={e => e.stopPropagation()}>
+                  <span className="text-[9px] text-zinc-600 leading-none mb-0.5">Biên bản NT</span>
+                  <span className="flex items-center gap-1">
+                    {pkg.bbntUrl ? (
+                      <a href={pkg.bbntUrl} target="_blank" rel="noreferrer" title="Xem biên bản nghiệm thu"
+                        className="text-emerald-400 hover:text-emerald-300"><FileText className="w-3.5 h-3.5" /></a>
+                    ) : (
+                      <FileText className="w-3.5 h-3.5 text-zinc-700" />
+                    )}
+                    {canEdit && (
+                      <>
+                        <button onClick={() => bbntInputRef.current?.click()} title="Upload biên bản nghiệm thu"
+                          className="text-zinc-600 hover:text-emerald-400"><Upload className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => editBbntLink()} title="Gán link biên bản"
+                          className="text-zinc-600 hover:text-emerald-400"><Link2 className="w-3.5 h-3.5" /></button>
+                        {pkg.bbntUrl ? (
+                          <button onClick={() => removeBbnt()} title="Xoá biên bản"
+                            className="text-zinc-700 hover:text-red-400"><X className="w-3 h-3" /></button>
+                        ) : (
+                          <span className="w-3 h-3 inline-block" />
+                        )}
+                      </>
+                    )}
+                  </span>
+                </span>
+                <input ref={bbntInputRef} type="file" accept=".pdf,image/*" className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) { uploadBbntFile(f); e.target.value = ''; } }} />
                 {canEdit && (
                   <span className="flex items-center gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
-                    <button onClick={() => movePkg('up')} title="Di chuyển lên" disabled={pkgIdx === 0}
-                      className="p-0.5 text-zinc-600 hover:text-zinc-300 disabled:opacity-30"><ChevronUp className="w-[17px] h-[17px]" /></button>
-                    <button onClick={() => movePkg('down')} title="Di chuyển xuống" disabled={pkgIdx === pkgCount - 1}
-                      className="p-0.5 text-zinc-600 hover:text-zinc-300 disabled:opacity-30"><ChevronDownIcon className="w-[17px] h-[17px]" /></button>
-                    <button onClick={() => copyPkg()} title="Sao chép nhóm này"
+<button onClick={() => copyPkg()} title="Sao chép nhóm này"
                       className="p-0.5 text-zinc-600 hover:text-sky-400"><Copy className="w-[17px] h-[17px]" /></button>
                     <button onClick={() => deletePkg()} title="Xoá nhóm này"
                       className="p-0.5 text-zinc-600 hover:text-red-400"><Trash2 className="w-[17px] h-[17px]" /></button>

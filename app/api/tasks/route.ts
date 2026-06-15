@@ -6,7 +6,7 @@ import { sheetVersion } from "@/lib/version";
 export const dynamic = "force-dynamic";
 
 type Sheet = { id: number; code: string; name: string; responsible: string | null; slug: string };
-type Pkg = { id: number; code: string; seqNo: string | null; floorLabel: string | null; name: string; status: string; progress: number; boqCode: string | null; drawingUrl: string | null; startDate: string | null; endDate: string | null };
+type Pkg = { id: number; code: string; seqNo: string | null; floorLabel: string | null; name: string; status: string; progress: number; boqCode: string | null; drawingUrl: string | null; bbntUrl: string | null; startDate: string | null; endDate: string | null };
 type Task = { id: number; packageId: number; code: string; name: string; status: string; endDate: string | null; progressPercent: number; boqCode: string | null; drawingUrl: string | null; assignedTo: number | null; assigneeName: string | null };
 
 // GET /api/tasks?sheet=ogtd  → work packages (kèm sub-tasks) của 1 sheet.
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 
   const pkgs = await query<Pkg>(
     `SELECT id, code, seq_no AS "seqNo", floor_label AS "floorLabel", name, status, progress,
-            boq_code AS "boqCode", drawing_url AS "drawingUrl",
+            boq_code AS "boqCode", drawing_url AS "drawingUrl", bbnt_url AS "bbntUrl",
             start_date AS "startDate", end_date AS "endDate"
        FROM work_packages WHERE sheet_type_id = ? ORDER BY sort_order, id`, st.id);
 

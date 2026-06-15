@@ -312,7 +312,7 @@ export default function AdminPage() {
                 </thead>
                 <tbody className="divide-y divide-zinc-800">
                   {audit.map(row => (
-                    <tr key={row.id} className="hover:bg-zinc-900/40">
+                    <tr key={row.id} className="odd:bg-zinc-900/50 even:bg-zinc-800/20 hover:bg-zinc-700/40 transition-colors">
                       <td className="px-4 py-2 text-zinc-400 whitespace-nowrap">{fmtDt(row.changedAt)}</td>
                       <td className="px-4 py-2 text-zinc-300">{LEVEL_LABEL[row.level] ?? row.level}</td>
                       <td className="px-4 py-2 font-mono text-xs text-zinc-200">{row.targetLabel}</td>

@@ -48,7 +48,7 @@ function TaskTable({ tasks, dateCol }: { tasks: LTask[]; dateCol: 'startDate' | 
       </thead>
       <tbody>
         {tasks.map(t => (
-          <tr key={t.id} className="border-b border-zinc-200">
+          <tr key={t.id} className="border-b border-zinc-200 odd:bg-white even:bg-zinc-50">
             <td className="p-2 font-mono text-xs">{t.code}</td>
             <td className="p-2">{t.name}</td>
             <td className="p-2">{t.floorLabel ?? '—'}</td>

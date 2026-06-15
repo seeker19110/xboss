@@ -117,7 +117,7 @@ export default function UsersPage() {
             </thead>
             <tbody>
               {users.map(u => (
-                <tr key={u.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/40">
+                <tr key={u.id} className="border-b border-zinc-800/50 odd:bg-zinc-900/50 even:bg-zinc-800/20 hover:bg-zinc-700/40 transition-colors">
                   <td className="p-3 font-medium">{u.name}{me?.id === u.id && <span className="ml-2 text-[10px] text-emerald-400">(bạn)</span>}</td>
                   <td className="p-3 text-zinc-400">{u.email}</td>
                   <td className="p-3">

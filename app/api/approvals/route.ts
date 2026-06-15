@@ -1,39 +1,57 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne, run } from "@/lib/db";
+import { query, queryOne, run, insertId, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { recomputePackage } from "@/lib/recompute";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/approvals → danh sách task chờ nghiệm thu (đạt 100%, chưa duyệt)
-// + task đã nghiệm thu gần đây, kèm số biên bản đính kèm.
+// GET /api/approvals → danh sách tầng theo hệ: chờ nghiệm thu + đã nghiệm thu.
+// Mỗi nhóm (sheet_type × floor_label) là 1 dòng với số task, số đã hoàn thành, trạng thái duyệt.
 export async function GET() {
+  try {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
-  const select = `SELECT t.id, t.boq_code AS "boqCode", t.code, t.name, t.status,
-            t.end_date AS "endDate", t.progress_percent AS "progressPercent",
-            wp.floor_label AS "floorLabel", wp.name AS "wpName", st.code AS "sheetType",
-            u.name AS assignee,
-            (SELECT COUNT(*) FROM task_documents d WHERE d.task_id = t.id) AS "docCount"
-       FROM tasks t
-       JOIN work_packages wp ON t.package_id = wp.id
-       JOIN sheet_types st ON wp.sheet_type_id = st.id
-       LEFT JOIN users u ON t.assigned_to = u.id`;
+  const groups = await query<{
+    sheetTypeId: number; sheetType: string; floorLabel: string; wpName: string | null;
+    totalTasks: number; doneTasks: number;
+    approvalId: number | null; isApproved: boolean;
+    approvedByName: string | null; approvedAt: string | null;
+    docCount: number;
+  }>(`
+    SELECT
+      st.id AS "sheetTypeId",
+      st.code AS "sheetType",
+      wp.floor_label AS "floorLabel",
+      MIN(wp.name) AS "wpName",
+      COUNT(DISTINCT t.id)::int AS "totalTasks",
+      COUNT(DISTINCT CASE WHEN t.progress_percent >= 1 THEN t.id END)::int AS "doneTasks",
+      fa.id AS "approvalId",
+      COALESCE(fa.is_approved, FALSE) AS "isApproved",
+      fa.approved_by_name AS "approvedByName",
+      fa.approved_at AS "approvedAt",
+      (SELECT COUNT(*) FROM task_documents d WHERE d.floor_approval_id = fa.id)::int AS "docCount"
+    FROM work_packages wp
+    JOIN sheet_types st ON wp.sheet_type_id = st.id
+    JOIN tasks t ON t.package_id = wp.id
+    LEFT JOIN floor_approvals fa ON fa.sheet_type_id = st.id AND fa.floor_label = wp.floor_label
+    WHERE wp.floor_label IS NOT NULL AND wp.floor_label != ''
+    GROUP BY st.id, st.code, wp.floor_label, fa.id, fa.is_approved, fa.approved_by_name, fa.approved_at
+    ORDER BY st.id, wp.floor_label
+  `);
 
-  const pending = await query(
-    `${select} WHERE t.progress_percent >= 1 AND t.status != 'nghiem_thu'
-      ORDER BY st.id, wp.id, t.id`);
-
-  const approved = await query(
-    `${select} WHERE t.status = 'nghiem_thu'
-      ORDER BY t.updated_at DESC LIMIT 100`);
+  const pending = groups.filter(g => !g.isApproved);
+  const approved = groups.filter(g => g.isApproved);
 
   return NextResponse.json({ pending, approved, canApprove: CAN.approve(user.role) });
+  } catch (err) {
+    console.error("[GET /api/approvals]", err);
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
 }
 
-// POST /api/approvals { taskIds: number[] } → duyệt nghiệm thu hàng loạt (Admin/PM).
-// Mỗi task áp dụng đúng quy tắc của /api/tasks/:id/approve: phải đạt 100%, ghi audit.
+// POST /api/approvals { sheetTypeId, floorLabel } → duyệt nghiệm thu toàn bộ tầng (Admin/PM).
+// Điều kiện: tất cả task trong tầng đó phải đạt 100%.
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -41,34 +59,79 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Chỉ Admin/PM được duyệt nghiệm thu" }, { status: 403 });
 
   const body = await req.json().catch(() => null);
-  const taskIds: number[] = Array.isArray(body?.taskIds)
-    ? body.taskIds.map((v: unknown) => parseInt(String(v))).filter((n: number) => !isNaN(n))
-    : [];
-  if (taskIds.length === 0)
-    return NextResponse.json({ error: "Thiếu taskIds" }, { status: 400 });
-  if (taskIds.length > 200)
-    return NextResponse.json({ error: "Tối đa 200 task mỗi lần" }, { status: 422 });
+  const sheetTypeId = parseInt(String(body?.sheetTypeId ?? ""));
+  const floorLabel = String(body?.floorLabel ?? "").trim();
+  if (isNaN(sheetTypeId) || !floorLabel)
+    return NextResponse.json({ error: "Thiếu sheetTypeId hoặc floorLabel" }, { status: 400 });
 
-  const approved: number[] = [];
-  const skipped: { id: number; reason: string }[] = [];
-  const packageIds = new Set<number>();
+  let approvalId: number;
+  let taskCount: number;
 
-  for (const id of taskIds) {
-    const task = await queryOne<{ id: number; package_id: number; status: string; progress_percent: number }>(
-      `SELECT id, package_id, status, progress_percent FROM tasks WHERE id = ?`, id);
-    if (!task) { skipped.push({ id, reason: "Không tìm thấy" }); continue; }
-    if (task.status === "nghiem_thu") { skipped.push({ id, reason: "Đã nghiệm thu rồi" }); continue; }
-    if ((task.progress_percent ?? 0) < 1) { skipped.push({ id, reason: "Chưa đạt 100%" }); continue; }
+  try {
+    const result = await withTransaction(async () => {
+      // Khoá và kiểm tra lại trạng thái nghiệm thu bên trong transaction
+      const existing = await queryOne<{ id: number; is_approved: boolean }>(
+        `SELECT id, is_approved FROM floor_approvals WHERE sheet_type_id = ? AND floor_label = ? FOR UPDATE`,
+        sheetTypeId, floorLabel);
+      if (existing?.is_approved)
+        throw Object.assign(new Error("Tầng này đã được nghiệm thu rồi"), { status: 409 });
 
-    await run(`UPDATE tasks SET status = 'nghiem_thu', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, id);
-    await run(`INSERT INTO task_history (task_id, old_progress, new_progress, status, note, changed_by)
-         VALUES (?, ?, ?, 'nghiem_thu', ?, ?)`,
-      id, task.progress_percent, task.progress_percent, `Nghiệm thu (duyệt lô) bởi ${user.name}`, user.name);
-    approved.push(id);
-    packageIds.add(task.package_id);
+      // Khoá và đọc lại tiến độ task trong transaction để tránh TOCTOU
+      const tasks = await query<{ id: number; package_id: number; progress_percent: number }>(
+        `SELECT t.id, t.package_id, t.progress_percent
+           FROM tasks t
+           JOIN work_packages wp ON t.package_id = wp.id
+          WHERE wp.sheet_type_id = ? AND wp.floor_label = ?
+          FOR UPDATE OF t`, sheetTypeId, floorLabel);
+
+      if (tasks.length === 0)
+        throw Object.assign(new Error("Không tìm thấy task nào trong tầng này"), { status: 404 });
+
+      const notDone = tasks.filter(t => (t.progress_percent ?? 0) < 1);
+      if (notDone.length > 0)
+        throw Object.assign(
+          new Error(`Còn ${notDone.length} task chưa đạt 100% — không thể nghiệm thu tầng`),
+          { status: 422 });
+
+      // Tạo hoặc cập nhật floor_approval thành chính thức
+      let aid: number;
+      if (existing) {
+        await run(
+          `UPDATE floor_approvals SET is_approved = TRUE, approved_by = ?, approved_by_name = ?, approved_at = NOW()
+           WHERE id = ?`, user.id, user.name, existing.id);
+        aid = existing.id;
+      } else {
+        aid = await insertId(
+          `INSERT INTO floor_approvals (sheet_type_id, floor_label, is_approved, approved_by, approved_by_name, approved_at)
+           VALUES (?, ?, TRUE, ?, ?, NOW())`,
+          sheetTypeId, floorLabel, user.id, user.name);
+      }
+
+      // Đặt toàn bộ task thành nghiem_thu + ghi audit
+      for (const t of tasks) {
+        await run(`UPDATE tasks SET status = 'nghiem_thu', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, t.id);
+        await run(
+          `INSERT INTO task_history (task_id, old_progress, new_progress, status, note, changed_by)
+           VALUES (?, ?, ?, 'nghiem_thu', ?, ?)`,
+          t.id, t.progress_percent, t.progress_percent,
+          `Nghiệm thu tầng ${floorLabel} bởi ${user.name}`, user.name);
+      }
+
+      return { aid, tasks };
+    });
+
+    approvalId = result.aid;
+    taskCount = result.tasks.length;
+
+    // recomputePackage chạy ngoài transaction (chỉ đọc/ghi bảng progress — không cần ACID chặt)
+    const packageIds = new Set(result.tasks.map(t => t.package_id));
+    for (const pid of packageIds) await recomputePackage(pid);
+
+  } catch (err: unknown) {
+    const e = err as { message?: string; status?: number };
+    const status = e.status ?? 500;
+    return NextResponse.json({ error: e.message ?? String(err) }, { status });
   }
 
-  for (const pid of packageIds) await recomputePackage(pid);
-
-  return NextResponse.json({ approved, skipped });
+  return NextResponse.json({ approvalId, taskCount });
 }
