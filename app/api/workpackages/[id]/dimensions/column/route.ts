@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, insertId, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { recomputeTask, recomputePackage } from "@/lib/recompute";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +77,11 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const { changes } = await run(
     `DELETE FROM progress_dimensions WHERE dimension_label = ?
        AND task_id IN (SELECT id FROM tasks WHERE package_id = ?)`, label, pkgId);
+
+  // Xoá cột làm đổi tổng số ô → tính lại % của mọi task + nhóm.
+  const tasks = await query<{ id: number }>(`SELECT id FROM tasks WHERE package_id = ?`, pkgId);
+  for (const t of tasks) await recomputeTask(t.id, user.name);
+  await recomputePackage(pkgId);
 
   return NextResponse.json({ deleted: changes });
 }

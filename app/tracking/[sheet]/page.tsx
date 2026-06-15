@@ -558,6 +558,13 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
     load(); onChanged();
   }
 
+  async function deleteColumn(label: string) {
+    if (!await appConfirm(`Xoá cột "${label}" khỏi nhóm này?\n\nToàn bộ trạng thái tick của cột này sẽ bị xoá vĩnh viễn.`, { danger: true, confirmLabel: 'Xoá cột' })) return;
+    const res = await fetch(`/api/workpackages/${pkg.id}/dimensions/column?label=${encodeURIComponent(label)}`, { method: 'DELETE' });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); appAlert(j.error ?? 'Lỗi không xác định'); return; }
+    load(); onChanged();
+  }
+
   async function deleteTask(t: GridTask) {
     if (!await appConfirm(`Xoá task "${t.code} — ${t.name}"?\n\nToàn bộ ảnh, bình luận, lịch sử liên quan sẽ bị xoá vĩnh viễn.`, { danger: true, confirmLabel: 'Xoá task' })) return;
     const res = await fetch(`/api/tasks/${t.id}`, { method: 'DELETE' });
@@ -858,12 +865,18 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
               <th className={`${stkPct} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium`}
                 style={{ left: LEFT_PCT }}>%</th>
               {grid.columns.map(col => (
-                <th key={col} className="border-b border-zinc-800 p-0 overflow-hidden align-middle" style={{ width: W_DIM }}>
-                  <div className="flex items-center justify-center py-2">
+                <th key={col} className="group/col border-b border-zinc-800 p-0 overflow-hidden align-middle" style={{ width: W_DIM }}>
+                  <div className="flex flex-col items-center py-2 gap-1">
                     <div className="text-[10px] text-zinc-500 hover:text-emerald-400 cursor-default overflow-hidden"
                       style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', lineHeight: '1.2' }}
                       title={canEdit ? `${col} — bấm để đổi tên` : col}
                       onClick={() => canEdit && renameColumn(col)}>{col}</div>
+                    {canEdit && (
+                      <button onClick={() => deleteColumn(col)} title={`Xoá cột "${col}"`}
+                        className="opacity-0 group-hover/col:opacity-100 text-zinc-700 hover:text-red-400 shrink-0">
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    )}
                   </div>
                 </th>
               ))}
