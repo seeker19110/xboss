@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 XBoss — web app quản lý tiến độ thi công MEP/ACMV (dự án TT AVIO Tháp A), thay thế file Excel tracking. Next.js 14 App Router + TypeScript + Tailwind 4 + PostgreSQL (Supabase hoặc tự host). Toàn bộ UI, comment code và commit message viết bằng **tiếng Việt**. Đặc tả đầy đủ trong `spec.md`, ERD trong `docs/ERD.md`, hướng dẫn deploy trong `DEPLOY.md`.
 
+> **Persona kỹ sư full-stack, tiêu chuẩn code & quy trình làm việc: xem `ENGINEERING.md`.** File này tập trung mô tả kiến trúc; `ENGINEERING.md` quy định vai trò, chuẩn code, workflow và checklist bảo mật/chất lượng.
+
 ## Lệnh thường dùng
 
 ```bash
