@@ -51,7 +51,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetch('/api/auth/me').then(async r => {
-      if (!r.ok) { window.location.href = '/login'; return; }
+      if (r.status === 401) { window.location.href = '/login'; return; }
       const j = await r.json();
       setMe(j.user);
       const d = await fetch('/api/dashboard').then(r => r.json());
@@ -205,11 +205,11 @@ export default function Dashboard() {
           <div style={{ width: '100%', height: 240 }}>
             <ResponsiveContainer>
               <BarChart data={chartData} margin={{ top: 8, right: 8, bottom: 8, left: -16 }}>
-                <XAxis dataKey="name" stroke="#71717a" fontSize={11} />
-                <YAxis stroke="#71717a" fontSize={11} domain={[0, 100]} unit="%" />
-                <Tooltip contentStyle={{ background: '#18181b', border: '1px solid #3f3f46', borderRadius: 8, color: '#fff' }} formatter={(v) => [`${v}%`, 'Tiến độ']} />
+                <XAxis dataKey="name" stroke="var(--color-zinc-500)" fontSize={11} />
+                <YAxis stroke="var(--color-zinc-500)" fontSize={11} domain={[0, 100]} unit="%" />
+                <Tooltip contentStyle={{ background: 'var(--color-zinc-900)', border: '1px solid var(--color-zinc-700)', borderRadius: 8, color: 'var(--foreground)' }} formatter={(v) => [`${v}%`, 'Tiến độ']} />
                 <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                  {chartData.map((d, i) => <Cell key={i} fill={d.delayed > 0 ? '#f59e0b' : '#10b981'} />)}
+                  {chartData.map((d, i) => <Cell key={i} fill={d.delayed > 0 ? 'var(--color-amber-400)' : 'var(--color-emerald-400)'} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>

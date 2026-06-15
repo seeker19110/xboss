@@ -38,7 +38,7 @@ export default function MaterialReportsPage() {
 
   useEffect(() => {
     fetch('/api/auth/me').then(async r => {
-      if (!r.ok) { window.location.href = '/login'; return; }
+      if (r.status === 401) { window.location.href = '/login'; return; }
     });
     setLoading(true);
     fetch('/api/materials/reports')

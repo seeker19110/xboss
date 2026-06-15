@@ -61,15 +61,17 @@ export async function DELETE(_req: NextRequest, { params: paramsP }: { params: P
   if (!CAN.editStructure(user.role)) return NextResponse.json({ error: "Chỉ Admin/PM được xoá sheet" }, { status: 403 });
 
   const id = Number(params.id);
+  if (Number.isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
   const st = await queryOne(`SELECT id FROM sheet_types WHERE id = ?`, id);
   if (!st) return NextResponse.json({ error: "Không tìm thấy sheet" }, { status: 404 });
 
   // FK không có ON DELETE CASCADE — xoá thủ công theo thứ tự phụ thuộc.
-  const taskIds = `SELECT t.id FROM tasks t JOIN work_packages wp ON t.package_id = wp.id WHERE wp.sheet_type_id = ${id}`;
+  // Tên bảng lấy từ danh sách cố định; id luôn truyền qua placeholder ?.
+  const taskIdsSql = `SELECT t.id FROM tasks t JOIN work_packages wp ON t.package_id = wp.id WHERE wp.sheet_type_id = ?`;
   for (const tbl of ["progress_dimensions", "task_history", "task_photos", "task_comments", "task_documents", "baseline_tasks"]) {
-    await run(`DELETE FROM ${tbl} WHERE task_id IN (${taskIds})`);
+    await run(`DELETE FROM ${tbl} WHERE task_id IN (${taskIdsSql})`, id);
   }
-  await run(`DELETE FROM notifications WHERE task_id IN (${taskIds})`);
+  await run(`DELETE FROM notifications WHERE task_id IN (${taskIdsSql})`, id);
   await run(`DELETE FROM notifications WHERE material_id IN (SELECT id FROM materials WHERE sheet_type_id = ?)`, id);
   await run(`DELETE FROM material_transactions WHERE material_id IN (SELECT id FROM materials WHERE sheet_type_id = ?)`, id);
   await run(`DELETE FROM materials WHERE sheet_type_id = ?`, id);
