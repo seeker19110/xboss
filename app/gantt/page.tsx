@@ -29,7 +29,7 @@ export default function GanttPage() {
 
   useEffect(() => {
     fetch('/api/gantt').then(async r => {
-      if (!r.ok) { window.location.href = '/login'; return; }
+      if (r.status === 401) { window.location.href = '/login'; return; }
       setBars((await r.json()).bars ?? []);
     });
   }, []);

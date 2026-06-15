@@ -78,21 +78,20 @@ export async function DELETE(_req: NextRequest, { params: paramsP }: { params: P
     const taskIds = tasks.map(t => t.id);
     const uploadDir = join(process.cwd(), "data", "uploads");
     const photos = await query<{ file_name: string }>(
-      `SELECT file_name FROM task_photos WHERE task_id = ANY(ARRAY[${taskIds.join(",")}]::int[])`);
+      `SELECT file_name FROM task_photos WHERE task_id = ANY(?)`, taskIds);
     const docs = await query<{ file_name: string }>(
-      `SELECT file_name FROM task_documents WHERE task_id = ANY(ARRAY[${taskIds.join(",")}]::int[])`);
+      `SELECT file_name FROM task_documents WHERE task_id = ANY(?)`, taskIds);
     for (const f of [...photos, ...docs]) {
       await unlink(join(uploadDir, f.file_name)).catch(() => {});
     }
-    const inList = taskIds.join(",");
-    await run(`DELETE FROM notifications WHERE task_id = ANY(ARRAY[${inList}]::int[])`);
-    await run(`DELETE FROM baseline_tasks WHERE task_id = ANY(ARRAY[${inList}]::int[])`);
-    await run(`DELETE FROM task_photos WHERE task_id = ANY(ARRAY[${inList}]::int[])`);
-    await run(`DELETE FROM task_documents WHERE task_id = ANY(ARRAY[${inList}]::int[])`);
-    await run(`DELETE FROM task_comments WHERE task_id = ANY(ARRAY[${inList}]::int[])`);
-    await run(`DELETE FROM task_history WHERE task_id = ANY(ARRAY[${inList}]::int[])`);
-    await run(`DELETE FROM materials WHERE task_id = ANY(ARRAY[${inList}]::int[])`);
-    await run(`DELETE FROM progress_dimensions WHERE task_id = ANY(ARRAY[${inList}]::int[])`);
+    await run(`DELETE FROM notifications WHERE task_id = ANY(?)`, taskIds);
+    await run(`DELETE FROM baseline_tasks WHERE task_id = ANY(?)`, taskIds);
+    await run(`DELETE FROM task_photos WHERE task_id = ANY(?)`, taskIds);
+    await run(`DELETE FROM task_documents WHERE task_id = ANY(?)`, taskIds);
+    await run(`DELETE FROM task_comments WHERE task_id = ANY(?)`, taskIds);
+    await run(`DELETE FROM task_history WHERE task_id = ANY(?)`, taskIds);
+    await run(`DELETE FROM materials WHERE task_id = ANY(?)`, taskIds);
+    await run(`DELETE FROM progress_dimensions WHERE task_id = ANY(?)`, taskIds);
     await run(`DELETE FROM tasks WHERE package_id = ?`, id);
   }
 

@@ -87,16 +87,16 @@ export default function SCurveChart() {
       <div style={{ width: '100%', height: 260 }}>
         <ResponsiveContainer>
           <LineChart data={data.points} margin={{ top: 8, right: 8, bottom: 8, left: -16 }}>
-            <XAxis dataKey="date" stroke="#71717a" fontSize={10} tickFormatter={fmtTick} minTickGap={40} />
-            <YAxis stroke="#71717a" fontSize={11} domain={[0, 100]} unit="%" />
+            <XAxis dataKey="date" stroke="var(--color-zinc-500)" fontSize={10} tickFormatter={fmtTick} minTickGap={40} />
+            <YAxis stroke="var(--color-zinc-500)" fontSize={11} domain={[0, 100]} unit="%" />
             <Tooltip
               contentStyle={{ background: 'var(--color-zinc-900)', border: '1px solid var(--color-zinc-700)', color: 'var(--foreground)', borderRadius: 8, fontSize: 12 }}
               labelFormatter={(d) => new Date(String(d)).toLocaleDateString('vi-VN')}
               formatter={(v, name) => [`${v ?? '—'}%`, name === 'planned' ? 'Kế hoạch' : 'Thực tế']} />
             <Legend formatter={(v) => v === 'planned' ? 'Kế hoạch' : 'Thực tế'} wrapperStyle={{ fontSize: 12 }} />
-            {data.today && <ReferenceLine x={data.today} stroke="#f59e0b" strokeDasharray="4 4" />}
-            <Line type="monotone" dataKey="planned" stroke="#71717a" strokeDasharray="6 4" dot={false} strokeWidth={2} connectNulls />
-            <Line type="monotone" dataKey="actual" stroke="#10b981" dot={false} strokeWidth={2.5} />
+            {data.today && <ReferenceLine x={data.today} stroke="var(--color-amber-400)" strokeDasharray="4 4" />}
+            <Line type="monotone" dataKey="planned" stroke="var(--color-zinc-500)" strokeDasharray="6 4" dot={false} strokeWidth={2} connectNulls />
+            <Line type="monotone" dataKey="actual" stroke="var(--color-emerald-400)" dot={false} strokeWidth={2.5} />
           </LineChart>
         </ResponsiveContainer>
       </div>

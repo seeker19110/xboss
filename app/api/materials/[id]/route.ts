@@ -53,23 +53,12 @@ export async function PATCH(req: NextRequest, { params: paramsP }: { params: Pro
   }
   if (!sets.length) return NextResponse.json({ error: "Không có trường để cập nhật" }, { status: 400 });
 
-  // Lọc cặp (set, val) để dùng khi fallback không có cột qty_boq
-  const safeIdxs = sets.map((s, i) => ({ s, v: vals[i], keep: !s.includes("qty_boq") }));
   vals.push(id);
   try {
     await run(`UPDATE materials SET ${sets.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, ...vals);
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("PATCH /api/materials error:", msg);
-    if (msg.includes("qty_boq")) {
-      const fallbackSets = safeIdxs.filter(x => x.keep).map(x => x.s);
-      const fallbackVals = safeIdxs.filter(x => x.keep).map(x => x.v);
-      if (fallbackSets.length) {
-        await run(`UPDATE materials SET ${fallbackSets.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, ...fallbackVals, id);
-      }
-    } else {
-      return NextResponse.json({ error: "Lỗi máy chủ khi cập nhật vật tư" }, { status: 500 });
-    }
+    console.error("PATCH /api/materials error:", e instanceof Error ? e.message : String(e));
+    return NextResponse.json({ error: "Lỗi máy chủ khi cập nhật vật tư" }, { status: 500 });
   }
 
   // Sửa trực tiếp số đã dùng cũng phải truy vết được — ghi giao dịch với delta chênh lệch.

@@ -63,7 +63,7 @@ export default function PurchaseOrdersPage() {
 
   useEffect(() => {
     fetch('/api/auth/me').then(async r => {
-      if (!r.ok) { window.location.href = '/login'; return; }
+      if (r.status === 401) { window.location.href = '/login'; return; }
       const j = await r.json();
       setCanManage(j.user?.role === 'admin' || j.user?.role === 'pm');
     });
