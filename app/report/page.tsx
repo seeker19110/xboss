@@ -49,7 +49,7 @@ export default function ReportPage() {
         </div>
 
         <h2 className="font-bold text-lg mb-3">1. Tổng quan KPI</h2>
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
           <div className="border border-red-300 bg-red-50 rounded-lg p-3">
             <p className="text-xs text-red-600 uppercase">Tổng công việc trễ</p>
             <p className="text-3xl font-bold text-red-700">{data?.totalDelayed ?? 0}</p>

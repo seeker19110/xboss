@@ -57,3 +57,7 @@ body {
 /* Ẩn scrollbar trên nav cuộn ngang (iOS/Android) */
 .scrollbar-none { scrollbar-width: none; }
 .scrollbar-none::-webkit-scrollbar { display: none; }
+
+/* Safe area padding cho thiết bị có notch/home indicator (iPhone X+, Android notch) */
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.safe-top    { padding-top:    env(safe-area-inset-top,    0px); }

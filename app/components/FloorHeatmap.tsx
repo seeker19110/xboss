@@ -39,7 +39,7 @@ function TowerTable({ tower, byKey }: { tower: Tower; byKey: Map<string, CellDat
               const inner = (
                 <div className="flex items-center justify-center gap-1 h-8 px-2 text-xs font-medium">
                   {Math.round(c.progress * 100)}%
-                  {c.delayed > 0 && <span className="text-[9px] bg-red-600/80 text-white rounded px-1">{c.delayed}</span>}
+                  {c.delayed > 0 && <span className="text-[10px] leading-none bg-red-600/80 text-white rounded px-1">{c.delayed}</span>}
                 </div>
               );
               return (

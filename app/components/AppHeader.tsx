@@ -73,25 +73,25 @@ export default function AppHeader({ title, subtitle, back, children, search = tr
               </div>
               {(me.role === 'admin' || me.role === 'pm') && (
                 <a href="/admin" title="Quản trị — phân công công việc" aria-label="Quản trị"
-                  className="text-zinc-400 hover:text-emerald-400">
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-emerald-400 hover:bg-zinc-800 transition">
                   <ShieldCheck className="w-4 h-4" />
                   <span className="sr-only">Quản trị</span>
                 </a>
               )}
               {me.role === 'admin' && (
                 <a href="/users" title="Quản lý người dùng" aria-label="Quản lý người dùng"
-                  className="text-zinc-400 hover:text-emerald-400">
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-emerald-400 hover:bg-zinc-800 transition">
                   <Users className="w-4 h-4" />
                   <span className="sr-only">Quản lý người dùng</span>
                 </a>
               )}
               <a href="/password" title="Đổi mật khẩu" aria-label="Đổi mật khẩu"
-                className="text-zinc-400 hover:text-amber-400">
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 transition">
                 <KeyRound className="w-4 h-4" />
                 <span className="sr-only">Đổi mật khẩu</span>
               </a>
               <button onClick={logout} title="Đăng xuất" aria-label="Đăng xuất"
-                className="text-zinc-400 hover:text-red-400">
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-zinc-800 transition">
                 <LogOut className="w-4 h-4" />
                 <span className="sr-only">Đăng xuất</span>
               </button>

@@ -64,11 +64,11 @@ export default function GlobalSearch() {
 
   return (
     <div className="relative w-full max-w-md" ref={boxRef}>
-      <Search className="w-4 h-4 absolute left-3 top-2.5 text-zinc-500 pointer-events-none" />
+      <Search className="w-4 h-4 absolute left-3 top-3 text-zinc-500 pointer-events-none" />
       <input value={q} onChange={e => { setQ(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)} onKeyDown={onKeyDown}
         placeholder="Tìm mã task / BOQCODE / tên công việc..."
-        className="w-full bg-zinc-900 border border-zinc-800 rounded-lg pl-9 pr-3 py-2 text-sm outline-none focus:border-emerald-600" />
+        className="w-full bg-zinc-900 border border-zinc-800 rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:border-emerald-600 h-10" />
 
       {open && q.trim().length >= 2 && (
         <div className="absolute left-0 right-0 mt-2 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden">
@@ -84,8 +84,8 @@ export default function GlobalSearch() {
                   : <ListTodo className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
                 <span className="font-mono text-emerald-400 text-xs shrink-0">{h.boqCode ?? h.code}</span>
                 <span className="truncate flex-1">{h.name}</span>
-                <span className="text-[10px] text-zinc-500 shrink-0">{h.sheetType}{h.floorLabel ? ` · ${h.floorLabel}` : ''}</span>
-                <span className={`text-[10px] shrink-0 w-9 text-right ${h.status === 'tre' ? 'text-red-400' : 'text-zinc-400'}`}
+                <span className="text-xs text-zinc-500 shrink-0">{h.sheetType}{h.floorLabel ? ` · ${h.floorLabel}` : ''}</span>
+                <span className={`text-xs shrink-0 w-9 text-right ${h.status === 'tre' ? 'text-red-400' : 'text-zinc-400'}`}
                   title={h.status ? STATUS_LABEL[h.status] ?? h.status : ''}>
                   {Math.round((h.progress ?? 0) * 100)}%
                 </span>

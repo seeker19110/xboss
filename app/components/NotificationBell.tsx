@@ -132,7 +132,7 @@ export default function NotificationBell() {
               <button key={n.id} onClick={() => !n.isRead && markRead(n.id)}
                 className={`w-full text-left px-4 py-2.5 border-b border-zinc-800/60 text-sm transition ${n.isRead ? 'text-zinc-500' : 'text-zinc-200 bg-red-950/20 hover:bg-zinc-800/60'}`}>
                 <span className="block">{n.message}</span>
-                <span className="text-[11px] text-zinc-600">{new Date(n.createdAt).toLocaleString('vi-VN')}</span>
+                <span className="text-xs text-zinc-600">{new Date(n.createdAt).toLocaleString('vi-VN')}</span>
               </button>
             ))}
           </div>
