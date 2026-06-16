@@ -310,7 +310,6 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
   const [commentsTask, setCommentsTask] = useState<GridTask | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [datesTarget, setDatesTarget] = useState<{ ids: number[]; init: { start: string; end: string } } | null>(null);
-  const [collapseVariants, setCollapseVariants] = useState(false);
   const drawingInputRef = useRef<HTMLInputElement>(null);
   const bbntInputRef = useRef<HTMLInputElement>(null);
 
@@ -616,11 +615,21 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
   // Khi chưa mở hoặc chưa tải xong lưới, chỉ hiển thị hàng tiêu đề nhóm.
   const showTable = expanded && grid && grid.columns.length > 0;
   const noData = expanded && grid && grid.columns.length === 0;
-  // Thu gọn: ẩn các cột biến thể (hậu tố " (2)", " (3)"...) — chỉ giữ cột gốc.
-  const hasVariants = grid ? grid.columns.some(c => / \(\d+\)$/.test(c)) : false;
-  const visibleColumns = grid
-    ? (collapseVariants ? grid.columns.filter(c => !/ \(\d+\)$/.test(c)) : grid.columns)
-    : [];
+  const variantColumns = grid ? grid.columns.filter(c => / \(\d+\)$/.test(c)) : [];
+  const hasVariants = variantColumns.length > 0;
+  const visibleColumns = grid ? grid.columns : [];
+
+  async function deleteVariantColumns() {
+    if (!grid || variantColumns.length === 0) return;
+    if (!await appConfirm(
+      `Xoá ${variantColumns.length} cột biến thể (${variantColumns.slice(0, 3).map(c => c.match(/ \((\d+)\)$/)?.[1]).join(', ')}...)?` +
+      '\n\nThao tác này xoá toàn bộ dữ liệu checkbox trong các cột đó và không thể hoàn tác.'
+    )) return;
+    for (const col of variantColumns) {
+      await fetch(`/api/workpackages/${pkg.id}/dimensions/column?label=${encodeURIComponent(col)}`, { method: 'DELETE' });
+    }
+    load(); onChanged();
+  }
 
   // Chiều rộng cột — định nghĩa 1 chỗ, dùng chung cho hàng nhóm lẫn bảng task
   const showBoq = canEdit; // BOQ chỉ hiển thị cho Admin/PM
@@ -898,11 +907,11 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
               ))}
               <th className="border-b border-zinc-800 align-bottom pb-2 text-center" style={{ width: W_ACT }}>
                 <div className="flex flex-col items-center gap-1">
-                  {hasVariants && (
-                    <button onClick={() => setCollapseVariants(v => !v)}
-                      title={collapseVariants ? 'Hiện tất cả cột (bao gồm biến thể)' : 'Thu gọn — ẩn cột biến thể (2)(3)(4)'}
-                      className={`w-6 h-6 flex items-center justify-center rounded ${collapseVariants ? 'text-emerald-400 bg-emerald-950/50' : 'text-zinc-600 hover:text-emerald-400 hover:bg-emerald-950/40'}`}>
-                      <span className="text-[10px] font-bold leading-none">{collapseVariants ? '④' : '①'}</span>
+                  {canEdit && hasVariants && (
+                    <button onClick={deleteVariantColumns}
+                      title={`Xoá ${variantColumns.length} cột biến thể (2)(3)(4) khỏi DB`}
+                      className="w-6 h-6 flex items-center justify-center text-zinc-600 hover:text-red-400 hover:bg-red-950/40 rounded">
+                      <Trash2 className="w-3 h-3" />
                     </button>
                   )}
                   {canEdit && (
