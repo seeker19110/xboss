@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from 'next/server';
 // Middleware chạy Edge Runtime — chỉ intercept /api/ (trừ chính endpoint traffic/ingest).
 // Fire-and-forget POST đến ingest để ghi ring buffer trong Node.js runtime.
 // Không await → không làm trễ request gốc.
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const path = req.nextUrl.pathname;
   // Bỏ qua endpoint ingest để tránh vòng lặp vô hạn và các route traffic
   if (!path.startsWith('/api/admin/traffic/')) {
