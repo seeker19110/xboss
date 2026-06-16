@@ -310,6 +310,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
   const [commentsTask, setCommentsTask] = useState<GridTask | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [datesTarget, setDatesTarget] = useState<{ ids: number[]; init: { start: string; end: string } } | null>(null);
+  const [collapseVariants, setCollapseVariants] = useState(false);
   const drawingInputRef = useRef<HTMLInputElement>(null);
   const bbntInputRef = useRef<HTMLInputElement>(null);
 
@@ -615,6 +616,11 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
   // Khi chưa mở hoặc chưa tải xong lưới, chỉ hiển thị hàng tiêu đề nhóm.
   const showTable = expanded && grid && grid.columns.length > 0;
   const noData = expanded && grid && grid.columns.length === 0;
+  // Thu gọn: ẩn các cột biến thể (hậu tố " (2)", " (3)"...) — chỉ giữ cột gốc.
+  const hasVariants = grid ? grid.columns.some(c => / \(\d+\)$/.test(c)) : false;
+  const visibleColumns = grid
+    ? (collapseVariants ? grid.columns.filter(c => !/ \(\d+\)$/.test(c)) : grid.columns)
+    : [];
 
   // Chiều rộng cột — định nghĩa 1 chỗ, dùng chung cho hàng nhóm lẫn bảng task
   const showBoq = canEdit; // BOQ chỉ hiển thị cho Admin/PM
@@ -655,8 +661,8 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
           <col style={{ width: W_CODE }} />
           <col style={{ width: W_NAME }} />
           <col style={{ width: W_PCT }} />
-          {grid?.columns.map(col => <col key={col} style={{ width: W_DIM }} />)}
-          {showTable && canEdit && <col style={{ width: W_ACT }} />}
+          {visibleColumns.map(col => <col key={col} style={{ width: W_DIM }} />)}
+          {showTable && (canEdit || hasVariants) && <col style={{ width: W_ACT }} />}
         </colgroup>
         <thead>
           {/* ── Hàng tiêu đề nhóm ── */}
@@ -874,7 +880,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                 style={{ left: isMobile ? 0 : LEFT_NAME }}>Công việc</th>
               <th className={`${stkPct} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium`}
                 style={{ left: LEFT_PCT }}>%</th>
-              {grid.columns.map(col => (
+              {visibleColumns.map(col => (
                 <th key={col} className="group/col border-b border-zinc-800 p-0 overflow-hidden align-middle" style={{ width: W_DIM }}>
                   <div className="flex flex-col items-center py-2 gap-1">
                     <div className="text-[10px] text-zinc-500 hover:text-emerald-400 cursor-default overflow-hidden"
@@ -890,15 +896,24 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                   </div>
                 </th>
               ))}
-              {canEdit && (
-                <th className="border-b border-zinc-800 align-bottom pb-2 text-center" style={{ width: W_ACT }}>
-                  <button onClick={() => addColumnAfter(grid.columns[grid.columns.length - 1] ?? null)}
-                    title="Thêm cột mới vào cuối"
-                    className="w-6 h-6 flex items-center justify-center text-zinc-600 hover:text-emerald-400 hover:bg-emerald-950/40 rounded mx-auto">
-                    <Columns className="w-3 h-3" />
-                  </button>
-                </th>
-              )}
+              <th className="border-b border-zinc-800 align-bottom pb-2 text-center" style={{ width: W_ACT }}>
+                <div className="flex flex-col items-center gap-1">
+                  {hasVariants && (
+                    <button onClick={() => setCollapseVariants(v => !v)}
+                      title={collapseVariants ? 'Hiện tất cả cột (bao gồm biến thể)' : 'Thu gọn — ẩn cột biến thể (2)(3)(4)'}
+                      className={`w-6 h-6 flex items-center justify-center rounded ${collapseVariants ? 'text-emerald-400 bg-emerald-950/50' : 'text-zinc-600 hover:text-emerald-400 hover:bg-emerald-950/40'}`}>
+                      <span className="text-[10px] font-bold leading-none">{collapseVariants ? '④' : '①'}</span>
+                    </button>
+                  )}
+                  {canEdit && (
+                    <button onClick={() => addColumnAfter(grid.columns[grid.columns.length - 1] ?? null)}
+                      title="Thêm cột mới vào cuối"
+                      className="w-6 h-6 flex items-center justify-center text-zinc-600 hover:text-emerald-400 hover:bg-emerald-950/40 rounded">
+                      <Columns className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              </th>
             </tr>
           )}
         </thead>
@@ -1019,7 +1034,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                   style={{ left: LEFT_PCT }}>
                   <span className={Math.round(t.progressPercent * 100) === 100 ? 'text-emerald-400' : 'text-zinc-300'}>{Math.round((t.progressPercent ?? 0) * 100)}%</span>
                 </td>
-                {grid.columns.map(col => {
+                {visibleColumns.map(col => {
                   const cell = t.cells[col];
                   return (
                     <td key={col} className="border-b border-zinc-800/60 text-center align-middle p-0">
@@ -1032,18 +1047,20 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                     </td>
                   );
                 })}
-                {canEdit && (
+                {(canEdit || hasVariants) && (
                   <td className="border-b border-zinc-800/60 text-center align-middle p-1 w-[88px] min-w-[88px]">
-                    <div className="flex justify-center items-center gap-0.5">
-                      <button onClick={() => moveTask(t, 'up')} disabled={ti === 0} title="Lên"
-                        className="text-zinc-700 hover:text-zinc-300 disabled:opacity-20"><ChevronUp className="w-3 h-3" /></button>
-                      <button onClick={() => moveTask(t, 'down')} disabled={ti === grid.tasks.length - 1} title="Xuống"
-                        className="text-zinc-700 hover:text-zinc-300 disabled:opacity-20"><ChevronDownIcon className="w-3 h-3" /></button>
-                      <button onClick={() => copyTask(t)} title="Sao chép task"
-                        className="text-zinc-700 hover:text-sky-400"><Copy className="w-3 h-3" /></button>
-                      <button onClick={() => deleteTask(t)} title="Xoá task"
-                        className="text-zinc-700 hover:text-red-400"><Trash2 className="w-3 h-3" /></button>
-                    </div>
+                    {canEdit && (
+                      <div className="flex justify-center items-center gap-0.5">
+                        <button onClick={() => moveTask(t, 'up')} disabled={ti === 0} title="Lên"
+                          className="text-zinc-700 hover:text-zinc-300 disabled:opacity-20"><ChevronUp className="w-3 h-3" /></button>
+                        <button onClick={() => moveTask(t, 'down')} disabled={ti === grid.tasks.length - 1} title="Xuống"
+                          className="text-zinc-700 hover:text-zinc-300 disabled:opacity-20"><ChevronDownIcon className="w-3 h-3" /></button>
+                        <button onClick={() => copyTask(t)} title="Sao chép task"
+                          className="text-zinc-700 hover:text-sky-400"><Copy className="w-3 h-3" /></button>
+                        <button onClick={() => deleteTask(t)} title="Xoá task"
+                          className="text-zinc-700 hover:text-red-400"><Trash2 className="w-3 h-3" /></button>
+                      </div>
+                    )}
                   </td>
                 )}
               </tr>
