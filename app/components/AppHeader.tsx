@@ -5,7 +5,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft, LayoutDashboard, ClipboardList, Package, CalendarRange,
-  CheckSquare, CalendarClock, Users, KeyRound, LogOut, ShieldCheck,
+  CheckSquare, CalendarClock, Users, KeyRound, LogOut, ShieldCheck, Bell,
 } from 'lucide-react';
 import NotificationBell from '@/app/components/NotificationBell';
 import GlobalSearch from '@/app/components/GlobalSearch';
@@ -22,6 +22,7 @@ const NAV = [
   { href: '/gantt', label: 'Gantt', icon: CalendarRange, color: 'text-amber-400' },
   { href: '/approvals', label: 'Nghiệm thu', icon: CheckSquare, color: 'text-teal-400' },
   { href: '/lookahead', label: 'Kế hoạch 2 tuần', icon: CalendarClock, color: 'text-rose-400' },
+  { href: '/notifications', label: 'Thông báo', icon: Bell, color: 'text-amber-400' },
 ];
 
 export default function AppHeader({ title, subtitle, back, children, search = true }: {

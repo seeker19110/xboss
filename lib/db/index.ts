@@ -307,6 +307,12 @@ ALTER TABLE materials ADD COLUMN IF NOT EXISTS qty_boq DOUBLE PRECISION DEFAULT 
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS material_col_labels TEXT;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS ui_texts TEXT;
 
+-- Tuỳ chọn thông báo riêng của từng user (JSON: { delayed, due_soon, upcoming_start, activity_progress, activity_photo, activity_document, activity_comment, material_over } = boolean)
+CREATE TABLE IF NOT EXISTS notification_prefs (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  prefs   TEXT NOT NULL DEFAULT '{}'
+);
+
 -- ===== QUẢN LÝ VẬT TƯ MỞ RỘNG =====
 
 -- Nhà cung cấp
