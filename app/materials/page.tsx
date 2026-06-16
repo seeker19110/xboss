@@ -22,16 +22,17 @@ type Material = {
 };
 type Sheet = { id: number; code: string; name: string };
 
-const STATUS_LABEL: Record<string, string> = {
-  dat_hang: 'Đã đặt hàng', ve_kho: 'Về kho', da_dung: 'Đã dùng',
-};
-const STATUS_CLS: Record<string, string> = {
-  dat_hang: 'bg-amber-950 text-amber-300',
-  ve_kho: 'bg-blue-950 text-blue-300',
-  da_dung: 'bg-emerald-950 text-emerald-300',
-};
-
 const DVT_OPTIONS = ['Cái', 'Mét', 'm2', 'Ống'];
+
+// Cột "Trạng thái" = so sánh Định mức Tháp A với Định mức BOQ.
+// Cần có Định mức BOQ ( > 0) mới so sánh; Tháp A vượt BOQ ⇒ "Vượt ĐM".
+function budgetStatus(m: Material): 'none' | 'over' | 'within' {
+  if ((m.qtyBoq ?? 0) <= 0) return 'none';
+  return (m.qtyPlanned ?? 0) > (m.qtyBoq ?? 0) ? 'over' : 'within';
+}
+const BUDGET_LABEL: Record<'none' | 'over' | 'within', string> = {
+  none: '—', over: 'Vượt ĐM', within: 'Trong ĐM',
+};
 
 type ColKey = 'boqCode' | 'stt' | 'name' | 'unit' | 'qtyBoq' | 'qtyPlanned' | 'diff' | 'status' | 'note';
 
@@ -186,7 +187,7 @@ export default function MaterialsPage() {
         case 'qtyBoq': return String(m.qtyBoq ?? 0);
         case 'qtyPlanned': return String(m.qtyPlanned);
         case 'diff': return String((m.qtyBoq ?? 0) - (m.qtyPlanned ?? 0));
-        case 'status': return STATUS_LABEL[m.status] ?? m.status;
+        case 'status': return BUDGET_LABEL[budgetStatus(m)];
         case 'note': return m.note ?? '';
         default: return '';
       }
@@ -360,7 +361,7 @@ export default function MaterialsPage() {
                         <button onClick={() => setEditingLabel(null)} title="Huỷ" className="text-zinc-500 hover:text-zinc-300"><X className="w-3 h-3" /></button>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-center gap-1 px-3 py-2.5">
+                      <div className={`flex items-center gap-1 px-3 py-2.5 ${key === 'name' || key === 'boqCode' ? 'justify-start' : 'justify-center'}`}>
                         <span className={copied === key ? 'text-emerald-400' : ''}>{colLabels[key]}</span>
                         <button onClick={() => setColMenu(prev => prev === key ? null : key)}
                           className="opacity-0 group-hover/th:opacity-100 transition-opacity text-zinc-600 hover:text-zinc-300 ml-0.5"
@@ -408,7 +409,7 @@ export default function MaterialsPage() {
                 return (
                   <tr key={m.id} className={`border-b border-zinc-800/50 hover:bg-zinc-700/40 group/row ${mi % 2 === 0 ? 'bg-zinc-900' : 'bg-zinc-800/30'}`}>
                     {visibleCols.map(key => (
-                      <td key={key} className={`px-3 py-2 align-middle whitespace-nowrap ${key === 'name' ? 'text-left w-full' : 'text-center'}`}>
+                      <td key={key} className={`px-3 py-2 align-middle whitespace-nowrap ${key === 'name' ? 'text-left w-full' : key === 'boqCode' ? 'text-left' : 'text-center'}`}>
 
                         {key === 'stt' && <span className="text-zinc-500 text-xs">{mi + 1}</span>}
 
@@ -492,19 +493,19 @@ export default function MaterialsPage() {
                           </span>
                         )}
 
-                        {key === 'status' && (
-                          canEdit ? (
-                            <select value={m.status}
-                              onChange={e => patch(m.id, { status: e.target.value })}
-                              className={`bg-transparent border border-transparent hover:border-zinc-700 focus:border-emerald-600 focus:bg-zinc-800 rounded px-1 py-0.5 text-xs outline-none text-center ${STATUS_CLS[m.status] ?? ''}`}>
-                              {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                            </select>
-                          ) : (
-                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_CLS[m.status] ?? 'bg-zinc-800 text-zinc-400'}`}>
-                              {STATUS_LABEL[m.status] ?? m.status}
+                        {key === 'status' && (() => {
+                          const bs = budgetStatus(m);
+                          if (bs === 'none') return <span className="text-zinc-600 text-xs">—</span>;
+                          return bs === 'over' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-rose-950 text-rose-300">
+                              <AlertTriangle className="w-3 h-3" /> Vượt ĐM
                             </span>
-                          )
-                        )}
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-emerald-950 text-emerald-300">
+                              <Check className="w-3 h-3" /> Trong ĐM
+                            </span>
+                          );
+                        })()}
 
                         {key === 'note' && (
                           canEdit ? (
