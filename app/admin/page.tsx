@@ -1,9 +1,10 @@
 'use client';
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import {
   ShieldCheck, ChevronRight, ChevronDown, RotateCcw,
   Users, AlertCircle, History, Filter, ChevronsUpDown, ChevronsDown,
+  Activity, Circle,
 } from 'lucide-react';
 import AppHeader from '@/app/components/AppHeader';
 import { ROLE_LABELS } from '@/lib/roles';
@@ -14,6 +15,7 @@ type Pkg = { id: number; sheetId: number; code: string; name: string; floorLabel
 type Task = { id: number; packageId: number; code: string; name: string; assignedTo: number | null; assignedManual: boolean; assigneeName: string | null };
 type Workload = Record<number, { total: number; delayed: number }>;
 type AuditRow = { id: number; level: string; targetLabel: string; isManual: boolean; changedAt: string; prevUser: string | null; newUser: string | null; changedBy: string | null };
+type TrafficEntry = { id: number; ts: number; method: string; path: string; ip: string; ua: string };
 
 const ROLE_LABEL: Record<string, string> = ROLE_LABELS;
 const LEVEL_LABEL: Record<string, string> = { sheet: 'Hệ', package: 'Nhóm', task: 'Task' };
@@ -25,7 +27,10 @@ function fmtDt(s: string) {
 
 export default function AdminPage() {
   const [me, setMe] = useState<{ id: number; role: string } | null>(null);
-  const [tab, setTab] = useState<'assign' | 'audit'>('assign');
+  const [tab, setTab] = useState<'assign' | 'audit' | 'traffic'>('assign');
+  const [traffic, setTraffic] = useState<TrafficEntry[]>([]);
+  const [trafficLive, setTrafficLive] = useState(false);
+  const trafficLatestRef = useRef(0);
   const [users, setUsers] = useState<User[]>([]);
   const [sheets, setSheets] = useState<Sheet[]>([]);
   const [packages, setPackages] = useState<Pkg[]>([]);
@@ -70,6 +75,26 @@ export default function AdminPage() {
   useEffect(() => {
     if (tab === 'audit') loadAudit(auditPage);
   }, [tab, auditPage, loadAudit]);
+
+  // SSE traffic: kết nối khi chuyển sang tab traffic (chỉ Admin), đóng khi rời.
+  useEffect(() => {
+    if (tab !== 'traffic' || me?.role !== 'admin') return;
+    setTrafficLive(true);
+    const since = trafficLatestRef.current;
+    const es = new EventSource(`/api/admin/traffic/events${since ? `?since=${since}` : ''}`);
+    es.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data) as { entries: TrafficEntry[]; latestId: number };
+        if (msg.latestId) trafficLatestRef.current = msg.latestId;
+        setTraffic(prev => {
+          const merged = [...msg.entries, ...prev].slice(0, 300);
+          return merged;
+        });
+      } catch { /* bỏ qua frame lỗi */ }
+    };
+    es.onerror = () => setTrafficLive(false);
+    return () => { es.close(); setTrafficLive(false); };
+  }, [tab, me?.role]);
 
   function flash(msg: string) { setOkMsg(msg); setError(''); setTimeout(() => setOkMsg(''), 3000); }
 
@@ -164,10 +189,14 @@ export default function AdminPage() {
     <div className="min-h-screen bg-zinc-950 text-white">
       <AppHeader back title={<><ShieldCheck className="w-5 h-5 text-emerald-400" /> Quản trị</>} search={false}>
         <nav className="flex gap-1">
-          {([['assign', 'Phân công'], ['audit', 'Lịch sử']] as const).map(([key, label]) => (
-            <button key={key} onClick={() => setTab(key)}
-              className={`px-3 py-1 rounded text-sm ${tab === key ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-white'}`}>
-              {key === 'audit' && <History className="w-3.5 h-3.5 inline mr-1" />}{label}
+          {([['assign', 'Phân công', null], ['audit', 'Lịch sử', 'audit'], ['traffic', 'Traffic', 'traffic']] as const)
+            .filter(([key]) => key !== 'traffic' || me?.role === 'admin')
+            .map(([key, label, icon]) => (
+            <button key={key} onClick={() => setTab(key as 'assign' | 'audit' | 'traffic')}
+              className={`px-3 py-1 rounded text-sm flex items-center gap-1 ${tab === key ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-white'}`}>
+              {icon === 'audit' && <History className="w-3.5 h-3.5" />}
+              {icon === 'traffic' && <Activity className="w-3.5 h-3.5" />}
+              {label}
             </button>
           ))}
         </nav>
@@ -344,6 +373,58 @@ export default function AdminPage() {
                   className="px-3 py-1 text-sm rounded border border-zinc-700 disabled:opacity-30 hover:bg-zinc-800">Sau →</button>
               </div>
             )}
+          </div>
+        )}
+        {/* ========== TAB TRAFFIC ========== */}
+        {tab === 'traffic' && me?.role === 'admin' && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Circle className={`w-2.5 h-2.5 ${trafficLive ? 'text-emerald-400 animate-pulse' : 'text-zinc-600'}`} fill="currentColor" />
+              <span className="text-sm text-zinc-400">
+                {trafficLive ? 'Đang nhận live — ' : 'Ngắt kết nối — '}
+                <b className="text-white">{traffic.length}</b> request gần nhất
+              </span>
+              <button onClick={() => setTraffic([])} className="ml-auto text-xs text-zinc-500 hover:text-red-400 px-2 py-1 border border-zinc-800 rounded">
+                Xóa
+              </button>
+            </div>
+            <div className="rounded-lg border border-zinc-800 overflow-hidden overflow-x-auto">
+              <table className="w-full text-sm min-w-[640px]">
+                <thead className="bg-zinc-900 text-zinc-400 text-xs uppercase sticky top-0">
+                  <tr>
+                    <th className="px-3 py-2 text-left w-36">Thời gian</th>
+                    <th className="px-3 py-2 text-left w-16">Method</th>
+                    <th className="px-3 py-2 text-left">Endpoint</th>
+                    <th className="px-3 py-2 text-left w-32">IP</th>
+                    <th className="px-3 py-2 text-left w-48">User-Agent</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-800/60">
+                  {traffic.length === 0 && (
+                    <tr><td colSpan={5} className="px-4 py-8 text-center text-zinc-600">
+                      Chưa có traffic. Thực hiện bất kỳ thao tác nào để thấy request xuất hiện ở đây.
+                    </td></tr>
+                  )}
+                  {traffic.map(t => (
+                    <tr key={t.id} className="odd:bg-zinc-900/40 hover:bg-zinc-800/50 transition-colors">
+                      <td className="px-3 py-1.5 text-zinc-500 text-xs whitespace-nowrap font-mono">
+                        {new Date(t.ts).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 })}
+                      </td>
+                      <td className="px-3 py-1.5 whitespace-nowrap">
+                        <span className={`text-xs font-bold font-mono ${t.method === 'GET' ? 'text-sky-400' : t.method === 'POST' ? 'text-emerald-400' : t.method === 'DELETE' ? 'text-red-400' : 'text-amber-400'}`}>
+                          {t.method}
+                        </span>
+                      </td>
+                      <td className="px-3 py-1.5 font-mono text-xs text-zinc-200 max-w-xs truncate" title={t.path}>{t.path}</td>
+                      <td className="px-3 py-1.5 text-xs text-zinc-500 font-mono">{t.ip || '—'}</td>
+                      <td className="px-3 py-1.5 text-xs text-zinc-600 truncate max-w-[12rem]" title={t.ua}>
+                        {t.ua ? t.ua.replace(/\s*\([^)]*\)/g, '').trim().slice(0, 60) : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </main>
