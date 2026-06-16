@@ -40,17 +40,32 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "File không đúng định dạng Excel (.xlsx/.xls)" }, { status: 400 });
   }
 
-  const ws = wb.Sheets[wb.SheetNames[0]];
+  // Ưu tiên sheet "Data-BOQ" nếu có, ngược lại lấy sheet đầu tiên
+  const sheetName = wb.SheetNames.includes("Data-BOQ") ? "Data-BOQ" : wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" });
 
   if (!rows.length) return NextResponse.json({ error: "File không có dữ liệu" }, { status: 400 });
 
-  // Kiểm tra tiêu đề cột
-  const firstRow = rows[0];
-  if (!("Tên vật tư *" in firstRow) || !("Mã hệ *" in firstRow)) {
+  // Chuẩn hoá key: trim khoảng trắng thừa ở đầu/cuối
+  const normalizedRows = rows.map(r =>
+    Object.fromEntries(Object.entries(r).map(([k, v]) => [k.trim(), v]))
+  );
+
+  // Phát hiện format: template cũ hay BOQ gốc
+  const firstRow = normalizedRows[0];
+  const isBOQFormat = !("Tên vật tư *" in firstRow) && ("MÔ TẢ" in firstRow || "MO TA" in firstRow);
+
+  if (!isBOQFormat && !("Tên vật tư *" in firstRow)) {
     return NextResponse.json({
-      error: "File không đúng cấu trúc mẫu. Vui lòng tải mẫu mới và nhập lại.",
+      error: "File không đúng cấu trúc. Cần có cột 'Tên vật tư *' (template mẫu) hoặc 'MÔ TẢ' (file BOQ gốc).",
     }, { status: 400 });
+  }
+
+  // Helper đọc trường theo format
+  function getField(row: Record<string, unknown>, templateKey: string, boqKey: string): string {
+    if (isBOQFormat) return String(row[boqKey] ?? "").trim();
+    return String(row[templateKey] ?? "").trim();
   }
 
   // Danh sách hệ (sheet_types) để tra mã → id
@@ -66,8 +81,14 @@ export async function POST(req: NextRequest) {
   // Nếu mode=replace: xoá toàn bộ vật tư của các hệ sẽ import (xác định sau khi đọc file)
   // Để an toàn, chỉ xoá hệ nào có trong file
   const sheetIdsInFile = new Set<number>();
-  for (const raw of rows) {
-    const sheetCode = String(raw["Mã hệ *"] ?? "").trim().toLowerCase();
+  for (const raw of normalizedRows) {
+    let sheetCode: string;
+    if (isBOQFormat) {
+      // Trích prefix từ MãBOQ: "DHKK-A.I.1.0" → "DHKK"
+      sheetCode = String(raw["MãBOQ"] ?? "").split("-")[0].toLowerCase();
+    } else {
+      sheetCode = String(raw["Mã hệ *"] ?? "").trim().toLowerCase();
+    }
     const sheetId = sheetMap.get(sheetCode);
     if (sheetId) sheetIdsInFile.add(sheetId);
   }
@@ -78,23 +99,52 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  for (let i = 0; i < rows.length; i++) {
-    const raw = rows[i];
+  for (let i = 0; i < normalizedRows.length; i++) {
+    const raw = normalizedRows[i];
     const rowNum = i + 2; // +2 vì hàng 1 là tiêu đề, i bắt đầu từ 0
-    const name = String(raw["Tên vật tư *"] ?? "").trim();
+    const name = getField(raw, "Tên vật tư *", "MÔ TẢ");
 
     if (!name) { skipped++; results.push({ row: rowNum, name: "—", status: "skip", message: "Bỏ qua (không có tên)" }); continue; }
 
-    const sheetCode = String(raw["Mã hệ *"] ?? "").trim().toLowerCase();
+    // Xác định mã hệ
+    let sheetCode: string;
+    if (isBOQFormat) {
+      const boqPrefix = String(raw["MãBOQ"] ?? "").split("-")[0].toLowerCase();
+      sheetCode = boqPrefix;
+    } else {
+      sheetCode = String(raw["Mã hệ *"] ?? "").trim().toLowerCase();
+    }
     const sheetId = sheetMap.get(sheetCode);
     if (!sheetId) {
       errors++;
-      results.push({ row: rowNum, name, status: "error", message: `Mã hệ "${raw["Mã hệ *"]}" không tồn tại` });
+      const displayCode = isBOQFormat
+        ? String(raw["MãBOQ"] ?? "").split("-")[0]
+        : String(raw["Mã hệ *"] ?? "");
+      results.push({ row: rowNum, name, status: "error", message: `Mã hệ "${displayCode}" không tồn tại trong hệ thống` });
       continue;
     }
 
-    const boqCode = String(raw["Mã BOQ"] ?? "").trim() || null;
+    const boqCode = getField(raw, "Mã BOQ", "MãBOQ") || null;
+
+    const unit = getField(raw, "ĐVT", "Đơn vị") || null;
+    const qtyBoq = parseFloat(String(raw[isBOQFormat ? "KHỐI LƯỢNG BOQ" : "Định mức BOQ"] ?? "")) || 0;
+    const qtyPlanned = parseFloat(String(raw[isBOQFormat ? "KL Định Mức" : "Định mức Tháp A"] ?? "")) || 0;
+    const noteRaw = getField(raw, "Ghi chú", "GHI CHÚ");
+    const note = noteRaw || null;
+
+    // Nếu mã BOQ đã tồn tại ở vật tư → cập nhật khối lượng
     if (boqCode) {
+      const existing = await queryOne<{ id: number }>(
+        `SELECT id FROM materials WHERE boq_code = ?`, boqCode);
+      if (existing) {
+        await run(
+          `UPDATE materials SET qty_boq=?, qty_planned=? WHERE id=?`,
+          qtyBoq, qtyPlanned, existing.id);
+        inserted++;
+        results.push({ row: rowNum, name, status: "ok", message: "Cập nhật khối lượng" });
+        continue;
+      }
+      // Trùng với task/work_package → báo lỗi để sửa
       const taken = await boqTakenBy(boqCode);
       if (taken) {
         errors++;
@@ -103,19 +153,38 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const unit = String(raw["ĐVT"] ?? "").trim() || null;
-    const qtyBoq = parseFloat(String(raw["Định mức BOQ"] ?? "")) || 0;
-    const qtyPlanned = parseFloat(String(raw["Định mức Tháp A"] ?? "")) || 0;
-    const noteRaw = String(raw["Ghi chú"] ?? "").trim();
-    const note = noteRaw || null;
-
-    let status = String(raw["Trạng thái"] ?? "").trim();
+    let status = getField(raw, "Trạng thái", "Trạng thái");
     if (!VALID_STATUSES.includes(status)) status = "dat_hang";
 
-    // sort_order: thêm vào cuối hệ đó
-    const maxRow = await queryOne<{ m: number | null }>(
-      `SELECT MAX(sort_order) AS m FROM materials WHERE sheet_type_id = ?`, sheetId);
-    const sortOrder = (maxRow?.m ?? 0) + 1;
+    // Tìm vị trí chèn: dựa theo phân cấp mã BOQ
+    // "DHKK-A.I.2.0" → thử prefix "DHKK-A.I.2" → "DHKK-A.I" → "DHKK-A" → cuối cùng
+    let insertAfter: number | null = null;
+    if (boqCode) {
+      let prefix = boqCode;
+      while (insertAfter === null) {
+        const sep = Math.max(prefix.lastIndexOf("."), prefix.lastIndexOf("-"));
+        if (sep <= 0) break;
+        prefix = prefix.slice(0, sep);
+        const anchor = await queryOne<{ m: number | null }>(
+          `SELECT MAX(sort_order) AS m FROM materials WHERE sheet_type_id = ? AND boq_code LIKE ?`,
+          sheetId, prefix + "%");
+        if (anchor?.m != null) insertAfter = anchor.m;
+      }
+    }
+
+    let sortOrder: number;
+    if (insertAfter !== null) {
+      // Đẩy các hàng phía sau xuống 1
+      await run(
+        `UPDATE materials SET sort_order = sort_order + 1 WHERE sheet_type_id = ? AND sort_order > ?`,
+        sheetId, insertAfter);
+      sortOrder = insertAfter + 1;
+    } else {
+      // Không có anchor → thêm vào cuối
+      const maxRow = await queryOne<{ m: number | null }>(
+        `SELECT MAX(sort_order) AS m FROM materials WHERE sheet_type_id = ?`, sheetId);
+      sortOrder = (maxRow?.m ?? 0) + 1;
+    }
 
     try {
       await insertId(
