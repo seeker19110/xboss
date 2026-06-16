@@ -10,18 +10,19 @@ import {
 import NotificationBell from '@/app/components/NotificationBell';
 import GlobalSearch from '@/app/components/GlobalSearch';
 import ThemeToggle from '@/app/components/ThemeToggle';
+import EditableText from '@/app/components/EditableText';
 import { ROLE_LABELS } from '@/lib/roles';
 
 type Me = { id: number; name: string; email: string; role: string };
 const ROLE_LABEL: Record<string, string> = ROLE_LABELS;
 
 const NAV = [
-  { href: '/', label: 'Dashboard', icon: LayoutDashboard, color: 'text-emerald-400' },
-  { href: '/my-tasks', label: 'Việc của tôi', icon: ClipboardList, color: 'text-violet-400' },
-  { href: '/materials', label: 'Vật tư', icon: Package, color: 'text-sky-400' },
-  { href: '/gantt', label: 'Gantt', icon: CalendarRange, color: 'text-amber-400' },
-  { href: '/approvals', label: 'Nghiệm thu', icon: CheckSquare, color: 'text-teal-400' },
-  { href: '/lookahead', label: 'Kế hoạch 2 tuần', icon: CalendarClock, color: 'text-rose-400' },
+  { href: '/', tkey: 'nav.dashboard', label: 'Dashboard', icon: LayoutDashboard, color: 'text-emerald-400' },
+  { href: '/my-tasks', tkey: 'nav.my_tasks', label: 'Việc của tôi', icon: ClipboardList, color: 'text-violet-400' },
+  { href: '/materials', tkey: 'nav.materials', label: 'Vật tư', icon: Package, color: 'text-sky-400' },
+  { href: '/gantt', tkey: 'nav.gantt', label: 'Gantt', icon: CalendarRange, color: 'text-amber-400' },
+  { href: '/approvals', tkey: 'nav.approvals', label: 'Nghiệm thu', icon: CheckSquare, color: 'text-teal-400' },
+  { href: '/lookahead', tkey: 'nav.lookahead', label: 'Kế hoạch 2 tuần', icon: CalendarClock, color: 'text-rose-400' },
 ];
 
 export default function AppHeader({ title, subtitle, back, children, search = true }: {
@@ -115,7 +116,8 @@ export default function AppHeader({ title, subtitle, back, children, search = tr
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap transition ${active
                   ? 'bg-zinc-800 text-white font-medium' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'}`}
                 aria-current={active ? 'page' : undefined}>
-                <Icon className={`w-5 h-5 ${n.color}`} /> {n.label}
+                <Icon className={`w-5 h-5 ${n.color}`} />
+              <EditableText tkey={n.tkey}>{n.label}</EditableText>
               </a>
             );
           })}
