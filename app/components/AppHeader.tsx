@@ -22,7 +22,6 @@ const NAV = [
   { href: '/gantt', label: 'Gantt', icon: CalendarRange, color: 'text-amber-400' },
   { href: '/approvals', label: 'Nghiệm thu', icon: CheckSquare, color: 'text-teal-400' },
   { href: '/lookahead', label: 'Kế hoạch 2 tuần', icon: CalendarClock, color: 'text-rose-400' },
-  { href: '/notifications', label: 'Thông báo', icon: Bell, color: 'text-amber-400' },
 ];
 
 export default function AppHeader({ title, subtitle, back, children, search = true }: {
