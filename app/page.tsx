@@ -162,7 +162,7 @@ export default function Dashboard() {
 
           {/* Banner trễ */}
           {(data?.totalDelayed ?? 0) > 0 && (
-            <div className="flex items-center gap-4 bg-red-950/60 border border-red-900/60 rounded-xl px-5 py-4 mb-4">
+            <a href="#delayed-table" className="flex items-center gap-4 bg-red-950/60 border border-red-900/60 rounded-xl px-5 py-4 mb-4 hover:bg-red-950/80 transition">
               <div className="p-2.5 bg-red-900/50 rounded-lg shrink-0">
                 <TrendingDown className="w-5 h-5 text-red-400" />
               </div>
@@ -170,11 +170,10 @@ export default function Dashboard() {
                 <p className="text-xs text-red-400/80 uppercase tracking-wide font-medium mb-0.5">Tổng công việc đang trễ</p>
                 <p className="text-4xl font-bold text-red-300 leading-none">{data?.totalDelayed ?? 0}</p>
               </div>
-              <a href="#delayed-table"
-                className="flex items-center gap-1 text-xs text-red-400/70 hover:text-red-300 transition shrink-0">
+              <span className="flex items-center gap-1 text-xs text-red-400/70 hover:text-red-300 transition shrink-0">
                 Xem chi tiết <ChevronRight className="w-3.5 h-3.5" />
-              </a>
-            </div>
+              </span>
+            </a>
           )}
 
           {/* Grid sheet cards */}
