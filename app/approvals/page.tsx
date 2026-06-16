@@ -266,8 +266,7 @@ export default function ApprovalsPage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <input ref={fileRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={onFileChosen} />
-      <AppHeader back title={<><CheckSquare className="w-5 h-5 text-emerald-400" /> Nghiệm thu</>}
-        subtitle="Nghiệm thu theo tầng · hệ — 1 tầng · 1 biên bản · duyệt toàn bộ task trong tầng" />
+      <AppHeader title={<><CheckSquare className="w-5 h-5 text-emerald-400" /> Nghiệm thu</>} />
 
       <main className="p-6 space-y-8">
         {/* Chờ nghiệm thu */}
