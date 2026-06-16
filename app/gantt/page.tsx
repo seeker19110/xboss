@@ -60,7 +60,7 @@ export default function GanttPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <AppHeader back title={<><CalendarRange className="w-5 h-5 text-emerald-400" /> Gantt — Tiến độ theo nhóm</>}>
+      <AppHeader>
         <select value={sheetFilter} onChange={e => setSheetFilter(e.target.value)} aria-label="Lọc theo hệ"
           className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm outline-none">
           <option value="">Tất cả hệ</option>
