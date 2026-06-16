@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readFile, unlink } from "node:fs/promises";
 import { queryOne, run } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentUser, canTouchTask, CAN } from "@/lib/auth";
 import { photoPath } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
 
-type DocRow = { id: number; file_name: string; mime_type: string; original_name: string | null; uploaded_by: number | null; floor_approval_id: number | null; link_url: string | null };
+type DocRow = { id: number; file_name: string; mime_type: string; original_name: string | null; uploaded_by: number | null; floor_approval_id: number | null; link_url: string | null; task_id: number };
 
-// GET /api/documents/:id → trả về nội dung file biên bản/tài liệu (cần đăng nhập).
+// GET /api/documents/:id → trả về nội dung file biên bản/tài liệu (cần đăng nhập + có quyền xem task).
 export async function GET(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
   const params = await paramsP;
   const user = await getCurrentUser();
@@ -18,8 +18,11 @@ export async function GET(_req: NextRequest, { params: paramsP }: { params: Prom
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const doc = await queryOne<DocRow>(
-    `SELECT id, file_name, mime_type, original_name, uploaded_by, floor_approval_id, link_url FROM task_documents WHERE id = ?`, id);
+    `SELECT id, file_name, mime_type, original_name, uploaded_by, floor_approval_id, link_url, task_id FROM task_documents WHERE id = ?`, id);
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
+
+  if (!(await canTouchTask(user, doc.task_id)))
+    return NextResponse.json({ error: "Không có quyền xem tài liệu này" }, { status: 403 });
 
   if (doc.link_url) {
     // Chỉ redirect tới http(s) — chặn open redirect / scheme lạ (javascript:, data:).

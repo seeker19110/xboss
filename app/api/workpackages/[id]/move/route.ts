@@ -23,10 +23,11 @@ export async function PATCH(req: NextRequest, { params: paramsP }: { params: Pro
     `SELECT sort_order, sheet_type_id FROM work_packages WHERE id = ?`, id);
   if (!cur) return NextResponse.json({ error: "Nhóm không tồn tại" }, { status: 404 });
 
-  const op = dir === "up" ? `< ${cur.sort_order} ORDER BY sort_order DESC` : `> ${cur.sort_order} ORDER BY sort_order ASC`;
   const neighbor = await queryOne<{ id: number; sort_order: number }>(
-    `SELECT id, sort_order FROM work_packages WHERE sheet_type_id = ? AND sort_order ${op} LIMIT 1`,
-    cur.sheet_type_id);
+    dir === "up"
+      ? `SELECT id, sort_order FROM work_packages WHERE sheet_type_id = ? AND sort_order < ? ORDER BY sort_order DESC LIMIT 1`
+      : `SELECT id, sort_order FROM work_packages WHERE sheet_type_id = ? AND sort_order > ? ORDER BY sort_order ASC LIMIT 1`,
+    cur.sheet_type_id, cur.sort_order);
 
   if (!neighbor) return NextResponse.json({ ok: false, message: "Đã ở đầu/cuối danh sách" });
 

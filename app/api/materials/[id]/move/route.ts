@@ -23,10 +23,20 @@ export async function PATCH(req: NextRequest, { params: paramsP }: { params: Pro
     `SELECT sort_order, sheet_type_id FROM materials WHERE id = ?`, id);
   if (!cur) return NextResponse.json({ error: "Vật tư không tồn tại" }, { status: 404 });
 
-  const sheetFilter = cur.sheet_type_id != null ? `AND sheet_type_id = ${cur.sheet_type_id}` : `AND sheet_type_id IS NULL`;
-  const op = dir === "up" ? `< ${cur.sort_order} ORDER BY sort_order DESC` : `> ${cur.sort_order} ORDER BY sort_order ASC`;
-  const neighbor = await queryOne<{ id: number; sort_order: number }>(
-    `SELECT id, sort_order FROM materials WHERE sort_order ${op} ${sheetFilter} LIMIT 1`);
+  let neighbor: { id: number; sort_order: number } | undefined;
+  if (cur.sheet_type_id != null) {
+    neighbor = await queryOne<{ id: number; sort_order: number }>(
+      dir === "up"
+        ? `SELECT id, sort_order FROM materials WHERE sheet_type_id = ? AND sort_order < ? ORDER BY sort_order DESC LIMIT 1`
+        : `SELECT id, sort_order FROM materials WHERE sheet_type_id = ? AND sort_order > ? ORDER BY sort_order ASC LIMIT 1`,
+      cur.sheet_type_id, cur.sort_order);
+  } else {
+    neighbor = await queryOne<{ id: number; sort_order: number }>(
+      dir === "up"
+        ? `SELECT id, sort_order FROM materials WHERE sheet_type_id IS NULL AND sort_order < ? ORDER BY sort_order DESC LIMIT 1`
+        : `SELECT id, sort_order FROM materials WHERE sheet_type_id IS NULL AND sort_order > ? ORDER BY sort_order ASC LIMIT 1`,
+      cur.sort_order);
+  }
 
   if (!neighbor) return NextResponse.json({ ok: false, message: "Đã ở đầu/cuối danh sách" });
 

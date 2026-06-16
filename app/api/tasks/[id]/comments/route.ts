@@ -13,6 +13,8 @@ export async function GET(_req: NextRequest, { params: paramsP }: { params: Prom
 
   const taskId = parseInt(params.id);
   if (isNaN(taskId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+  if (!(await canTouchTask(user, taskId)))
+    return NextResponse.json({ error: "Không có quyền xem bình luận này" }, { status: 403 });
 
   const comments = await query(
     `SELECT c.id, c.body, c.created_at AS "createdAt",

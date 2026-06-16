@@ -39,6 +39,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Import Error:", error);
-    return NextResponse.json({ error: (error as Error).message || "Lỗi server" }, { status: 500 });
+    return NextResponse.json({ error: "Lỗi xử lý file — vui lòng kiểm tra định dạng Excel" }, { status: 500 });
   }
 }
