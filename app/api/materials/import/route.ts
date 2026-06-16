@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { query, queryOne, insertId, run } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
-import { boqTakenBy } from "@/lib/boq";
 
 export const dynamic = "force-dynamic";
 
@@ -158,13 +157,6 @@ export async function POST(req: NextRequest) {
           name, unit, qtyBoq, qtyPlanned, note, sortOrder, existing.id);
         inserted++;
         results.push({ row: rowNum, name, status: "ok", message: "Cập nhật" });
-        continue;
-      }
-      // Trùng với task/work_package → báo lỗi để sửa
-      const taken = await boqTakenBy(boqCode);
-      if (taken) {
-        errors++;
-        results.push({ row: rowNum, name, status: "error", message: `Mã BOQ "${boqCode}" đã dùng bởi ${taken}` });
         continue;
       }
     }
