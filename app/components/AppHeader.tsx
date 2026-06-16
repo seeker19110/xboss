@@ -11,6 +11,7 @@ import NotificationBell from '@/app/components/NotificationBell';
 import GlobalSearch from '@/app/components/GlobalSearch';
 import ThemeToggle from '@/app/components/ThemeToggle';
 import EditableText from '@/app/components/EditableText';
+import OnlineUsers from '@/app/components/OnlineUsers';
 import { ROLE_LABELS } from '@/lib/roles';
 
 type Me = { id: number; name: string; email: string; role: string };
@@ -62,6 +63,7 @@ export default function AppHeader({ title, subtitle, back, children, search = tr
         <div className="flex items-center gap-2 ml-auto sm:ml-0 shrink-0">
           {children}
           <ThemeToggle />
+          <OnlineUsers isAdmin={me?.role === 'admin'} />
           <NotificationBell />
           {me && (
             <div className="flex items-center gap-2 ml-1 pl-3 border-l border-zinc-800">
