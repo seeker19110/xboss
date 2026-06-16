@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Printer, ArrowLeft } from 'lucide-react';
+import { Printer, ArrowLeft, Download } from 'lucide-react';
 
 const STATUS_LABEL: Record<string, string> = {
   chuan_bi: 'Chuẩn bị', dang_thi_cong: 'Đang thi công',
@@ -37,9 +37,15 @@ export default function ReportPage() {
       <div className="no-print sticky top-0 bg-zinc-100 border-b border-zinc-300 px-6 py-3 flex items-center gap-3">
         <Link href="/" className="text-zinc-600 hover:text-zinc-900"><ArrowLeft className="w-5 h-5" /></Link>
         <span className="text-sm text-zinc-600">Báo cáo in — dùng nút bên phải rồi chọn &ldquo;Save as PDF&rdquo;</span>
-        <button onClick={() => window.print()} className="ml-auto flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg text-sm">
-          <Printer className="w-4 h-4" /> In / Lưu PDF
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <a href="/api/export/pdf" download
+            className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm transition">
+            <Download className="w-4 h-4" /> Tải PDF
+          </a>
+          <button onClick={() => window.print()} className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg text-sm">
+            <Printer className="w-4 h-4" /> In
+          </button>
+        </div>
       </div>
 
       <div className="max-w-4xl mx-auto p-8">

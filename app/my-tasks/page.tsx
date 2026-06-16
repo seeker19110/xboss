@@ -4,7 +4,7 @@ import {
   ClipboardList, AlertTriangle, CheckCircle2, ChevronRight, ExternalLink,
   Bell, Activity, Clock, CalendarClock, Package, Settings, Check,
   TrendingUp, Camera, FileText, MessageSquare, ChevronDown,
-  RefreshCw, Users,
+  RefreshCw, Users, Share2,
 } from 'lucide-react';
 import { slugFromCode } from '@/lib/sheets';
 import AppHeader from '@/app/components/AppHeader';
@@ -264,6 +264,17 @@ export default function MyTasksPage() {
   const [segment, setSegment] = useState<Segment>('tasks');
   const [feedTab, setFeedTab] = useState<FeedTab>('activity');
   const [savingPref, setSavingPref] = useState<PrefKey | null>(null);
+  const [taskFilter, setTaskFilter] = useState<'all' | 'active' | 'delayed' | 'done'>('all');
+  const [copied, setCopied] = useState<number | null>(null);
+
+  function copyTaskLink(t: MyTask) {
+    const slug = t.sheetSlug ?? slugFromCode(t.sheetType);
+    const url = slug ? `${window.location.origin}/tracking/${slug}?search=${encodeURIComponent(t.code)}` : window.location.href;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(t.id);
+      setTimeout(() => setCopied(null), 1800);
+    });
+  }
 
   useEffect(() => {
     fetch('/api/my-tasks').then(async r => {
@@ -303,12 +314,20 @@ export default function MyTasksPage() {
   const s = taskData?.summary;
   const tasks = taskData?.tasks ?? [];
 
+  // Lọc task theo filter
+  const filteredTasks = tasks.filter(t => {
+    if (taskFilter === 'all') return true;
+    if (taskFilter === 'delayed') return t.status === 'tre';
+    if (taskFilter === 'done') return t.progressPercent >= 1;
+    return t.status !== 'tre' && t.progressPercent < 1; // active
+  });
+
   // Nhóm task theo sheet
   const bySheet = new Map<string, {
     slug: string | null; total: number; delayed: number; done: number; avgProgress: number;
     tasks: MyTask[];
   }>();
-  for (const t of tasks) {
+  for (const t of filteredTasks) {
     if (!bySheet.has(t.sheetType))
       bySheet.set(t.sheetType, { slug: t.sheetSlug ?? slugFromCode(t.sheetType), total: 0, delayed: 0, done: 0, avgProgress: 0, tasks: [] });
     const g = bySheet.get(t.sheetType)!;
@@ -385,6 +404,30 @@ export default function MyTasksPage() {
         {/* ══════════════════ SEGMENT: CÔNG VIỆC ══════════════════ */}
         {segment === 'tasks' && (
           <>
+            {/* Filter */}
+            <div className="flex gap-1.5 flex-wrap">
+              {([
+                { key: 'all',     label: 'Tất cả',    count: tasks.length },
+                { key: 'active',  label: 'Đang làm',  count: tasks.filter(t => t.status !== 'tre' && t.progressPercent < 1).length },
+                { key: 'delayed', label: 'Trễ',       count: tasks.filter(t => t.status === 'tre').length },
+                { key: 'done',    label: 'Hoàn thành',count: tasks.filter(t => t.progressPercent >= 1).length },
+              ] as const).map(f => (
+                <button key={f.key} onClick={() => setTaskFilter(f.key)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition border ${
+                    taskFilter === f.key
+                      ? f.key === 'delayed' ? 'bg-red-900/60 border-red-700 text-red-200'
+                        : f.key === 'done'  ? 'bg-emerald-900/60 border-emerald-700 text-emerald-200'
+                        : 'bg-zinc-700 border-zinc-600 text-white'
+                      : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                  }`}>
+                  {f.label}
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${taskFilter === f.key ? 'bg-white/20' : 'bg-zinc-800'}`}>
+                    {f.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+
             {bySheet.size === 0 ? (
               <div className="py-16 text-center text-zinc-500 bg-zinc-900 border border-zinc-800 rounded-xl">
                 <ClipboardList className="w-10 h-10 mx-auto mb-3 opacity-20" />
@@ -427,10 +470,8 @@ export default function MyTasksPage() {
                           const pctTask = Math.round(t.progressPercent * 100);
                           const slug = t.sheetSlug ?? slugFromCode(t.sheetType);
                           return (
-                            <a key={t.id}
-                              href={slug ? `/tracking/${slug}?search=${encodeURIComponent(t.code)}` : '#'}
-                              className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/40 transition group/row">
-                              <div className="flex-1 min-w-0">
+                            <div key={t.id} className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/40 transition group/row">
+                              <a href={slug ? `/tracking/${slug}?search=${encodeURIComponent(t.code)}` : '#'} className="flex-1 min-w-0">
                                 <div className="flex items-start gap-1.5 flex-wrap">
                                   <span className="font-mono text-[11px] text-zinc-600 shrink-0 mt-0.5">{t.code}</span>
                                   <span className="text-sm text-zinc-200 flex-1 leading-snug">{t.name}</span>
@@ -444,14 +485,22 @@ export default function MyTasksPage() {
                                     <span className="text-[11px] text-zinc-600">· hạn {fmtDate(t.endDate)}</span>
                                   )}
                                 </div>
-                              </div>
+                              </a>
                               <div className="shrink-0 flex items-center gap-2">
                                 <span className={`text-xs font-medium ${STATUS_COLOR[t.status] ?? 'text-zinc-500'}`}>
                                   {STATUS_LABEL[t.status] ?? t.status}
                                 </span>
-                                <ExternalLink className="w-3 h-3 text-zinc-700 group-hover/row:text-zinc-400 transition" />
+                                <button onClick={() => copyTaskLink(t)} title="Sao chép link task"
+                                  className="p-1 text-zinc-700 hover:text-sky-400 transition rounded">
+                                  {copied === t.id
+                                    ? <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                    : <Share2 className="w-3.5 h-3.5" />}
+                                </button>
+                                <a href={slug ? `/tracking/${slug}?search=${encodeURIComponent(t.code)}` : '#'}>
+                                  <ExternalLink className="w-3 h-3 text-zinc-700 group-hover/row:text-zinc-400 transition" />
+                                </a>
                               </div>
-                            </a>
+                            </div>
                           );
                         })}
                       </div>

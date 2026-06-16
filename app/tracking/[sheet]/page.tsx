@@ -1098,6 +1098,32 @@ type Photo = {
   caption: string | null; createdAt: string; uploadedBy: number | null; uploaderName: string | null;
 };
 
+// Nén ảnh về ~20% dung lượng: scale max 1920px + JPEG quality 0.45 ≈ 15-25% kích thước gốc.
+async function compressImage(file: File): Promise<File> {
+  if (!file.type.startsWith('image/') || file.type === 'image/gif') return file;
+  return new Promise(resolve => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const MAX = 1920;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
+        else { width = Math.round(width * MAX / height); height = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(blob => {
+        resolve(blob ? new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }) : file);
+      }, 'image/jpeg', 0.45);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
 // Gallery ảnh hiện trường của task: xem, upload (chụp từ mobile), xoá.
 function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => void }) {
   const [photos, setPhotos] = useState<Photo[] | null>(null);
@@ -1114,8 +1140,10 @@ function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => void })
     fetch('/api/auth/me').then(r => r.ok ? r.json() : null).then(j => j && setMe({ id: j.user.id, role: j.user.role }));
   }, []);
 
-  async function upload(file: File) {
+  async function upload(rawFile: File) {
     setUploading(true); setError('');
+    // Nén ảnh về ~20% dung lượng gốc trước khi upload
+    const file = await compressImage(rawFile);
     const fd = new FormData();
     fd.append('file', file);
     const caption = await appPrompt('Ghi chú cho ảnh (tuỳ chọn)', '', { placeholder: 'VD: đã lắp xong nhánh trục 24F' }) ?? '';
