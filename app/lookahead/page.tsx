@@ -128,7 +128,7 @@ export default function LookaheadPage() {
           </div>
         ))}
 
-        <p className="text-xs text-zinc-400 mt-8">Xuất từ XBoss · {new Date().toLocaleString('vi-VN')}</p>
+        <p className="text-xs text-zinc-400 mt-8" suppressHydrationWarning>Xuất từ XBoss · {new Date().toLocaleString('vi-VN')}</p>
       </div>
 
       <style jsx global>{`

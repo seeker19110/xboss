@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import "./globals.css";
 import PwaRegister from "@/app/components/PwaRegister";
 import AppDialogs from "@/app/components/dialogs";
@@ -21,10 +22,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="vi" className="h-full antialiased dark" suppressHydrationWarning>
       <head>
-        {/* Gắn class theme trước khi render để không nháy màu (mặc định dark) */}
-        <script dangerouslySetInnerHTML={{ __html:
-          `try{var t=localStorage.getItem('xboss_theme');if(t==='light'){var e=document.documentElement;e.classList.remove('dark');e.classList.add('light');}}catch(_){}`
-        }} />
+        <Script id="theme-init" strategy="beforeInteractive">{`try{var t=localStorage.getItem('xboss_theme');if(t==='light'){var e=document.documentElement;e.classList.remove('dark');e.classList.add('light');}}catch(_){}`}</Script>
       </head>
       <body className="min-h-full flex flex-col">
         <PwaRegister />
