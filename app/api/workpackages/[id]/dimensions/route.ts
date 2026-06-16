@@ -8,7 +8,6 @@ type TaskRow = { id: number; code: string; name: string; status: string; progres
 type DimRow = { id: number; taskId: number; label: string; installed: number };
 
 // GET /api/workpackages/:id/dimensions → ma trận sub-task × dimension (kiểu lưới Excel).
-// Sub-con chỉ thấy task được giao cho mình.
 export async function GET(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
   const params = await paramsP;
   const user = await getCurrentUser();
@@ -17,7 +16,6 @@ export async function GET(_req: NextRequest, { params: paramsP }: { params: Prom
   const pkgId = parseInt(params.id);
   if (isNaN(pkgId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const subconFilter = user.role === "subcon" ? " AND t.assigned_to = ?" : "";
   const tasks = await query<TaskRow>(
     `SELECT t.id, t.code, t.name, t.status, t.progress_percent AS "progressPercent",
             t.boq_code AS "boqCode", t.drawing_url AS "drawingUrl",
@@ -27,8 +25,8 @@ export async function GET(_req: NextRequest, { params: paramsP }: { params: Prom
             (SELECT COUNT(*) FROM task_comments c WHERE c.task_id = t.id) AS "commentCount"
        FROM tasks t
        LEFT JOIN users u ON t.assigned_to = u.id
-      WHERE t.package_id = ?${subconFilter} ORDER BY t.sort_order, t.id`,
-    ...(user.role === "subcon" ? [pkgId, user.id] : [pkgId]));
+      WHERE t.package_id = ? ORDER BY t.sort_order, t.id`,
+    pkgId);
 
   const dims = await query<DimRow>(
     `SELECT pd.id, pd.task_id AS "taskId", pd.dimension_label AS label, pd.installed

@@ -11,7 +11,6 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
   const today = todayISO();
-  const subconFilter = user.role === "subcon" ? " AND t.assigned_to = ?" : "";
 
   const cells = await query<{ tower: string | null; sheetType: string; sheetSlug: string | null; floor: string; progress: number; tasks: number; delayed: number }>(
     `SELECT tw.name AS tower, st.code AS "sheetType", st.slug AS "sheetSlug", wp.floor_label AS floor,
@@ -23,10 +22,10 @@ export async function GET() {
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
        LEFT JOIN towers tw ON st.tower_id = tw.id
-      WHERE wp.floor_label IS NOT NULL${subconFilter}
+      WHERE wp.floor_label IS NOT NULL
       GROUP BY tw.id, tw.name, st.code, st.slug, st.id, wp.floor_label
       ORDER BY tw.id, st.id`,
-    ...(user.role === "subcon" ? [today, user.id] : [today]));
+    today);
 
   // RF trên cùng, tầng số giảm dần, B_n xuống cuối — parseInt("RF"/"B1F") = NaN nên phải xử lý riêng.
   const floorOrder = (f: string) => {

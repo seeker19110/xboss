@@ -11,8 +11,6 @@ export async function GET() {
   const today = todayISO();
 
   // Task trễ: end_date < hôm nay AND progress < 1 AND chưa hoàn thành/nghiệm thu.
-  // Sub-con chỉ thấy task được giao cho mình.
-  const subconFilter = user.role === "subcon" ? " AND t.assigned_to = ?" : "";
   const delayedTasks = await query(
     `SELECT t.id, t.code, t.name, t.status,
             t.start_date AS "startDate", t.end_date AS "endDate",
@@ -27,9 +25,9 @@ export async function GET() {
        LEFT JOIN users u ON t.assigned_to = u.id
       WHERE t.end_date IS NOT NULL AND t.end_date < ?
         AND t.progress_percent < 1
-        AND t.status NOT IN ('hoan_thanh','nghiem_thu')${subconFilter}
+        AND t.status NOT IN ('hoan_thanh','nghiem_thu')
       ORDER BY t.end_date`,
-    ...(user.role === "subcon" ? [today, user.id] : [today]),
+    today,
   );
 
   // KPI theo từng sheet

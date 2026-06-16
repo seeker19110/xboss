@@ -27,7 +27,6 @@ export async function GET(req: NextRequest) {
             start_date AS "startDate", end_date AS "endDate"
        FROM work_packages WHERE sheet_type_id = ? ORDER BY sort_order, id`, st.id);
 
-  const subconFilter = user.role === "subcon" ? " AND t.assigned_to = ?" : "";
   const tasks = await query<Task>(
     `SELECT t.id, t.package_id AS "packageId", t.code, t.name, t.status,
             t.end_date AS "endDate", t.progress_percent AS "progressPercent",
@@ -36,9 +35,9 @@ export async function GET(req: NextRequest) {
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        LEFT JOIN users u ON t.assigned_to = u.id
-      WHERE wp.sheet_type_id = ?${subconFilter}
+      WHERE wp.sheet_type_id = ?
       ORDER BY t.sort_order, t.id`,
-    ...(user.role === "subcon" ? [st.id, user.id] : [st.id]));
+    st.id);
 
   const byPkg = new Map<number, Task[]>();
   for (const t of tasks) {
@@ -46,9 +45,7 @@ export async function GET(req: NextRequest) {
     byPkg.get(t.packageId)!.push(t);
   }
 
-  let packages = pkgs.map((p) => ({ ...p, tasks: byPkg.get(p.id) ?? [] }));
-  // Sub-con: ẩn nhóm không có task nào của mình.
-  if (user.role === "subcon") packages = packages.filter((p) => p.tasks.length > 0);
+  const packages = pkgs.map((p) => ({ ...p, tasks: byPkg.get(p.id) ?? [] }));
 
   return NextResponse.json({ sheet: st, packages, version: await sheetVersion(slug) });
 }

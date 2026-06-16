@@ -21,7 +21,6 @@ export async function GET(req: NextRequest) {
   if (q.length < 2) return NextResponse.json({ hits: [] });
   const pattern = `%${q}%`;
 
-  const subconFilter = user.role === "subcon" ? " AND t.assigned_to = ?" : "";
   const tasks = await query<SearchHit>(
     `SELECT 'task' AS kind, t.id, t.code, t.name, t.boq_code AS "boqCode",
             t.status, t.progress_percent AS progress,
@@ -29,12 +28,11 @@ export async function GET(req: NextRequest) {
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
-      WHERE (t.code ILIKE ? OR t.name ILIKE ? OR t.boq_code ILIKE ?)${subconFilter}
+      WHERE (t.code ILIKE ? OR t.name ILIKE ? OR t.boq_code ILIKE ?)
       ORDER BY st.id, t.code LIMIT 15`,
-    ...(user.role === "subcon" ? [pattern, pattern, pattern, user.id] : [pattern, pattern, pattern]));
+    pattern, pattern, pattern);
 
-  // Subcon không cần kết quả nhóm (không thao tác được mức nhóm).
-  const packages = user.role === "subcon" ? [] : await query<SearchHit>(
+  const packages = await query<SearchHit>(
     `SELECT 'package' AS kind, wp.id, wp.code, wp.name, wp.boq_code AS "boqCode",
             wp.status, wp.progress, wp.floor_label AS "floorLabel", st.code AS "sheetType", st.slug AS "sheetSlug"
        FROM work_packages wp
