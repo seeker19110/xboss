@@ -28,7 +28,7 @@ export async function GET() {
   const offset = 7 * 3600_000;
   const due5   = new Date(Date.now() + offset + 5 * 86400_000).toISOString().slice(0, 10);
   const start7 = new Date(Date.now() + offset + 7 * 86400_000).toISOString().slice(0, 10);
-  const ago48h = new Date(Date.now() - 48 * 3600_000).toISOString();
+  const ago48h = new Date(0).toISOString(); // không giới hạn thời gian
 
   // Prefs của user
   const prefRow = await queryOne<{ prefs: string }>(

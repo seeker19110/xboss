@@ -306,7 +306,7 @@ export default function NotificationsPage() {
   };
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode; count: number; color: string }[] = [
-    { key: 'activity', label: 'Hoạt động 48h',  icon: <Activity className="w-4 h-4" />,      count: activityCount,          color: 'text-emerald-400' },
+    { key: 'activity', label: 'Hoạt động',  icon: <Activity className="w-4 h-4" />,      count: activityCount,          color: 'text-emerald-400' },
     { key: 'overdue',  label: 'Quá hạn',         icon: <AlertTriangle className="w-4 h-4" />, count: overdue.length,         color: 'text-red-400' },
     { key: 'due_soon', label: 'Sắp đến hạn',     icon: <Clock className="w-4 h-4" />,         count: dueSoon.length,         color: 'text-amber-400' },
     { key: 'upcoming', label: 'Sắp thi công',    icon: <CalendarClock className="w-4 h-4" />, count: upcomingStart.length,   color: 'text-sky-400' },
@@ -368,7 +368,7 @@ export default function NotificationsPage() {
         {tab === 'activity' && (
           <div className="space-y-3">
             <p className="text-xs text-zinc-500">
-              Hoạt động trong 48 giờ qua{fullAccess ? ' — toàn dự án' : ' — công việc của bạn'}, nhóm theo hệ.
+              Toàn bộ hoạt động{fullAccess ? ' — toàn dự án' : ' — công việc của bạn'}, nhóm theo hệ.
             </p>
             {recentActivity.length === 0
               ? <Empty icon={<Activity className="w-10 h-10" />} label="Chưa có hoạt động nào trong 48 giờ qua" />
@@ -465,7 +465,7 @@ export default function NotificationsPage() {
               <PrefRow prefKey="due_soon"        label="Sắp đến hạn (5 ngày)"      desc="Cảnh báo sớm task đến hạn trong 5 ngày tới" prefs={prefs} onToggle={togglePref} />
               <PrefRow prefKey="upcoming_start"  label="Sắp thi công (7 ngày)"     desc="Công việc bắt đầu trong 7 ngày tới để chuẩn bị nhân lực, vật tư" prefs={prefs} onToggle={togglePref} />
 
-              <div className="text-xs font-semibold text-zinc-500 uppercase tracking-wide pb-2 pt-4">Hoạt động 48h qua</div>
+              <div className="text-xs font-semibold text-zinc-500 uppercase tracking-wide pb-2 pt-4">Hoạt động</div>
               <PrefRow prefKey="activity_progress" label="Cập nhật tiến độ"         desc="Ai đó tick checkbox hoặc sửa % tiến độ" prefs={prefs} onToggle={togglePref} />
               <PrefRow prefKey="activity_photo"    label="Ảnh hiện trường"          desc="Ảnh công trường mới được tải lên" prefs={prefs} onToggle={togglePref} />
               <PrefRow prefKey="activity_document" label="Bản vẽ / tài liệu"        desc="Biên bản nghiệm thu hoặc file tài liệu mới" prefs={prefs} onToggle={togglePref} />
