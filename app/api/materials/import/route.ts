@@ -106,54 +106,41 @@ export async function POST(req: NextRequest) {
   let skipped = 0;
   let errors = 0;
 
-  // Nếu mode=replace: xoá toàn bộ vật tư của các hệ sẽ import (xác định sau khi đọc file)
-  // Để an toàn, chỉ xoá hệ nào có trong file
-  const sheetIdsInFile = new Set<number>();
-  if (!isBOQFormat && defaultSheetId) {
-    sheetIdsInFile.add(defaultSheetId);
-  } else {
-    for (const raw of normalizedRows) {
-      const prefix = String(raw[boqCodeCol] ?? "").split("-")[0].toLowerCase();
-      const sid = sheetMap.get(prefix);
-      if (sid) sheetIdsInFile.add(sid);
-    }
+  // mode=replace với template format: xoá vật tư của hệ được chọn
+  if (mode === "replace" && !isBOQFormat && defaultSheetId) {
+    await run(`DELETE FROM materials WHERE sheet_type_id = ?`, defaultSheetId);
   }
 
-  if (mode === "replace" && sheetIdsInFile.size > 0) {
-    for (const sid of sheetIdsInFile) {
-      await run(`DELETE FROM materials WHERE sheet_type_id = ?`, sid);
+  // sort_order counter: null key = vật tư không có hệ
+  const sortCounters = new Map<number | null, number>();
+  const getCounter = async (sid: number | null): Promise<number> => {
+    if (!sortCounters.has(sid)) {
+      if (mode === "replace" || sid === null) {
+        sortCounters.set(sid, 1);
+      } else {
+        const maxRow = await queryOne<{ m: number | null }>(
+          `SELECT MAX(sort_order) AS m FROM materials WHERE sheet_type_id ${sid === null ? "IS NULL" : "= ?"}`,
+          ...(sid !== null ? [sid] : []));
+        sortCounters.set(sid, (maxRow?.m ?? 0) + 1);
+      }
     }
-  }
-
-  // Khởi tạo counter sort_order theo từng hệ (tiếp nối sau hàng cuối nếu append)
-  const sortCounters = new Map<number, number>();
-  for (const sid of sheetIdsInFile) {
-    if (mode === "replace") {
-      sortCounters.set(sid, 1);
-    } else {
-      const maxRow = await queryOne<{ m: number | null }>(
-        `SELECT MAX(sort_order) AS m FROM materials WHERE sheet_type_id = ?`, sid);
-      sortCounters.set(sid, (maxRow?.m ?? 0) + 1);
-    }
-  }
+    const val = sortCounters.get(sid)!;
+    sortCounters.set(sid, val + 1);
+    return val;
+  };
 
   for (let i = 0; i < normalizedRows.length; i++) {
     const raw = normalizedRows[i];
-    const rowNum = i + 2; // +2 vì hàng 1 là tiêu đề, i bắt đầu từ 0
+    const rowNum = i + 2;
     const name = getField(raw, "Tên vật tư *", boqNameCol ?? "Vật tư");
 
     if (!name) { skipped++; results.push({ row: rowNum, name: "—", status: "skip", message: "Bỏ qua (không có tên)" }); continue; }
 
-    // Xác định sheetId: template dùng defaultSheetId, BOQ dùng prefix mã
-    let sheetId: number | undefined;
+    // Xác định sheetId: template dùng defaultSheetId, BOQ thử prefix rồi fallback null
+    let sheetId: number | null;
     if (isBOQFormat) {
       const boqPrefix = String(raw[boqCodeCol] ?? "").split("-")[0].toLowerCase();
-      sheetId = sheetMap.get(boqPrefix);
-      if (!sheetId) {
-        errors++;
-        results.push({ row: rowNum, name, status: "error", message: `Mã hệ "${boqPrefix.toUpperCase()}" không tồn tại trong hệ thống` });
-        continue;
-      }
+      sheetId = sheetMap.get(boqPrefix) ?? defaultSheetId ?? null;
     } else {
       sheetId = defaultSheetId!;
     }
@@ -169,8 +156,7 @@ export async function POST(req: NextRequest) {
     const note = noteRaw || null;
 
     // sort_order theo thứ tự dòng trong file
-    const sortOrder = sortCounters.get(sheetId)!;
-    sortCounters.set(sheetId, sortOrder + 1);
+    const sortOrder = await getCounter(sheetId);
 
     // Nếu mã BOQ đã tồn tại ở vật tư → cập nhật số liệu + sort_order
     if (boqCode) {
