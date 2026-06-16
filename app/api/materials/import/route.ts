@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
   if (!file) return NextResponse.json({ error: "Thiếu file" }, { status: 400 });
 
   const mode = String(form.get("mode") ?? "append"); // append | replace
+  const defaultSheetId = parseInt(String(form.get("sheetId") ?? "")) || null;
 
   const buf = Buffer.from(await file.arrayBuffer());
   let wb: XLSX.WorkBook;
@@ -62,6 +63,11 @@ export async function POST(req: NextRequest) {
     }, { status: 400 });
   }
 
+  // Template format mà không chọn hệ → báo lỗi sớm
+  if (!isBOQFormat && !defaultSheetId) {
+    return NextResponse.json({ error: "Vui lòng chọn hệ trước khi import." }, { status: 400 });
+  }
+
   // Helper đọc trường theo format
   function getField(row: Record<string, unknown>, templateKey: string, boqKey: string): string {
     if (isBOQFormat) return String(row[boqKey] ?? "").trim();
@@ -81,21 +87,31 @@ export async function POST(req: NextRequest) {
   // Nếu mode=replace: xoá toàn bộ vật tư của các hệ sẽ import (xác định sau khi đọc file)
   // Để an toàn, chỉ xoá hệ nào có trong file
   const sheetIdsInFile = new Set<number>();
-  for (const raw of normalizedRows) {
-    let sheetCode: string;
-    if (isBOQFormat) {
-      // Trích prefix từ MãBOQ: "DHKK-A.I.1.0" → "DHKK"
-      sheetCode = String(raw["MãBOQ"] ?? "").split("-")[0].toLowerCase();
-    } else {
-      sheetCode = String(raw["Mã hệ *"] ?? "").trim().toLowerCase();
+  if (!isBOQFormat && defaultSheetId) {
+    sheetIdsInFile.add(defaultSheetId);
+  } else {
+    for (const raw of normalizedRows) {
+      const prefix = String(raw["MãBOQ"] ?? "").split("-")[0].toLowerCase();
+      const sid = sheetMap.get(prefix);
+      if (sid) sheetIdsInFile.add(sid);
     }
-    const sheetId = sheetMap.get(sheetCode);
-    if (sheetId) sheetIdsInFile.add(sheetId);
   }
 
   if (mode === "replace" && sheetIdsInFile.size > 0) {
     for (const sid of sheetIdsInFile) {
       await run(`DELETE FROM materials WHERE sheet_type_id = ?`, sid);
+    }
+  }
+
+  // Khởi tạo counter sort_order theo từng hệ (tiếp nối sau hàng cuối nếu append)
+  const sortCounters = new Map<number, number>();
+  for (const sid of sheetIdsInFile) {
+    if (mode === "replace") {
+      sortCounters.set(sid, 1);
+    } else {
+      const maxRow = await queryOne<{ m: number | null }>(
+        `SELECT MAX(sort_order) AS m FROM materials WHERE sheet_type_id = ?`, sid);
+      sortCounters.set(sid, (maxRow?.m ?? 0) + 1);
     }
   }
 
@@ -106,22 +122,18 @@ export async function POST(req: NextRequest) {
 
     if (!name) { skipped++; results.push({ row: rowNum, name: "—", status: "skip", message: "Bỏ qua (không có tên)" }); continue; }
 
-    // Xác định mã hệ
-    let sheetCode: string;
+    // Xác định sheetId: template dùng defaultSheetId, BOQ dùng prefix mã
+    let sheetId: number | undefined;
     if (isBOQFormat) {
       const boqPrefix = String(raw["MãBOQ"] ?? "").split("-")[0].toLowerCase();
-      sheetCode = boqPrefix;
+      sheetId = sheetMap.get(boqPrefix);
+      if (!sheetId) {
+        errors++;
+        results.push({ row: rowNum, name, status: "error", message: `Mã hệ "${boqPrefix.toUpperCase()}" không tồn tại trong hệ thống` });
+        continue;
+      }
     } else {
-      sheetCode = String(raw["Mã hệ *"] ?? "").trim().toLowerCase();
-    }
-    const sheetId = sheetMap.get(sheetCode);
-    if (!sheetId) {
-      errors++;
-      const displayCode = isBOQFormat
-        ? String(raw["MãBOQ"] ?? "").split("-")[0]
-        : String(raw["Mã hệ *"] ?? "");
-      results.push({ row: rowNum, name, status: "error", message: `Mã hệ "${displayCode}" không tồn tại trong hệ thống` });
-      continue;
+      sheetId = defaultSheetId!;
     }
 
     const boqCode = getField(raw, "Mã BOQ", "MãBOQ") || null;
@@ -132,16 +144,20 @@ export async function POST(req: NextRequest) {
     const noteRaw = getField(raw, "Ghi chú", "GHI CHÚ");
     const note = noteRaw || null;
 
-    // Nếu mã BOQ đã tồn tại ở vật tư → cập nhật khối lượng
+    // sort_order theo thứ tự dòng trong file
+    const sortOrder = sortCounters.get(sheetId)!;
+    sortCounters.set(sheetId, sortOrder + 1);
+
+    // Nếu mã BOQ đã tồn tại ở vật tư → cập nhật số liệu + sort_order
     if (boqCode) {
       const existing = await queryOne<{ id: number }>(
         `SELECT id FROM materials WHERE boq_code = ?`, boqCode);
       if (existing) {
         await run(
-          `UPDATE materials SET qty_boq=?, qty_planned=? WHERE id=?`,
-          qtyBoq, qtyPlanned, existing.id);
+          `UPDATE materials SET name=?, unit=?, qty_boq=?, qty_planned=?, note=?, sort_order=? WHERE id=?`,
+          name, unit, qtyBoq, qtyPlanned, note, sortOrder, existing.id);
         inserted++;
-        results.push({ row: rowNum, name, status: "ok", message: "Cập nhật khối lượng" });
+        results.push({ row: rowNum, name, status: "ok", message: "Cập nhật" });
         continue;
       }
       // Trùng với task/work_package → báo lỗi để sửa
@@ -155,36 +171,6 @@ export async function POST(req: NextRequest) {
 
     let status = getField(raw, "Trạng thái", "Trạng thái");
     if (!VALID_STATUSES.includes(status)) status = "dat_hang";
-
-    // Tìm vị trí chèn: dựa theo phân cấp mã BOQ
-    // "DHKK-A.I.2.0" → thử prefix "DHKK-A.I.2" → "DHKK-A.I" → "DHKK-A" → cuối cùng
-    let insertAfter: number | null = null;
-    if (boqCode) {
-      let prefix = boqCode;
-      while (insertAfter === null) {
-        const sep = Math.max(prefix.lastIndexOf("."), prefix.lastIndexOf("-"));
-        if (sep <= 0) break;
-        prefix = prefix.slice(0, sep);
-        const anchor = await queryOne<{ m: number | null }>(
-          `SELECT MAX(sort_order) AS m FROM materials WHERE sheet_type_id = ? AND boq_code LIKE ?`,
-          sheetId, prefix + "%");
-        if (anchor?.m != null) insertAfter = anchor.m;
-      }
-    }
-
-    let sortOrder: number;
-    if (insertAfter !== null) {
-      // Đẩy các hàng phía sau xuống 1
-      await run(
-        `UPDATE materials SET sort_order = sort_order + 1 WHERE sheet_type_id = ? AND sort_order > ?`,
-        sheetId, insertAfter);
-      sortOrder = insertAfter + 1;
-    } else {
-      // Không có anchor → thêm vào cuối
-      const maxRow = await queryOne<{ m: number | null }>(
-        `SELECT MAX(sort_order) AS m FROM materials WHERE sheet_type_id = ?`, sheetId);
-      sortOrder = (maxRow?.m ?? 0) + 1;
-    }
 
     try {
       await insertId(

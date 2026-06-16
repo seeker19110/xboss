@@ -17,11 +17,11 @@ export async function GET() {
   const wb = XLSX.utils.book_new();
 
   // ── Tab "Vật tư" — dữ liệu nhập ─────────────────────────────────────────
-  const headers = ["Mã BOQ", "Tên vật tư *", "ĐVT", "Mã hệ *", "Định mức BOQ", "Định mức Tháp A", "Trạng thái", "Ghi chú"];
+  const headers = ["Mã BOQ", "Tên vật tư *", "ĐVT", "Định mức BOQ", "Định mức Tháp A", "Trạng thái", "Ghi chú"];
   const example = [
-    ["AF1", "Ống đồng Ø15", "Mét", "OGTD", 120, 115, "dat_hang", "Tầng 1-5"],
-    ["AF2", "Co đồng 90°",  "Cái", "OGTD",  40,  38, "ve_kho",   ""],
-    ["",    "Van bi Ø15",   "Cái", "OGHL",  20,  20, "da_dung",  ""],
+    ["AF1", "Ống đồng Ø15", "Mét", 120, 115, "dat_hang", "Tầng 1-5"],
+    ["AF2", "Co đồng 90°",  "Cái",  40,  38, "ve_kho",   ""],
+    ["",    "Van bi Ø15",   "Cái",  20,  20, "da_dung",  ""],
   ];
 
   const wsData = [headers, ...example];
@@ -29,7 +29,7 @@ export async function GET() {
 
   // Độ rộng cột
   ws["!cols"] = [
-    { wch: 12 }, { wch: 30 }, { wch: 10 }, { wch: 12 },
+    { wch: 12 }, { wch: 30 }, { wch: 10 },
     { wch: 16 }, { wch: 18 }, { wch: 14 }, { wch: 25 },
   ];
 
@@ -48,18 +48,18 @@ export async function GET() {
     ["Cột", "Bắt buộc", "Mô tả"],
     ["Mã BOQ",           "Không", "Mã duy nhất toàn hệ thống. Để trống nếu chưa có."],
     ["Tên vật tư *",     "Có",    "Tên vật tư (không được để trống)."],
-    ["ĐVT",              "Không", `Đơn vị tính: Cái, Mét, m2, Ống hoặc tự nhập.`],
-    ["Mã hệ *",          "Có",    `Mã hệ (sheet). Các hệ hiện có: ${sheetList}`],
+    ["ĐVT",              "Không", "Đơn vị tính: Cái, Mét, m2, Ống hoặc tự nhập."],
     ["Định mức BOQ",     "Không", "Định mức theo hợp đồng BOQ gốc. Số nguyên hoặc thập phân."],
     ["Định mức Tháp A",  "Không", "Định mức bóc lại thực tế Tháp A."],
     ["Trạng thái",       "Không", "dat_hang | ve_kho | da_dung (mặc định: dat_hang)"],
     ["Ghi chú",          "Không", "Ghi chú tự do."],
     [""],
     ["Lưu ý:"],
+    ["- Hệ được chọn trên giao diện import — không cần cột riêng trong file."],
     ["- Hàng tiêu đề (hàng 1) không được xóa hoặc đổi thứ tự cột."],
     ["- Mã BOQ nếu nhập phải là duy nhất trong toàn hệ thống (không trùng với task hoặc nhóm công việc)."],
-    ["- Mã hệ phải khớp chính xác với mã đã có trong hệ thống (phân biệt hoa/thường)."],
     ["- Các hàng trống (không có tên vật tư) sẽ bị bỏ qua."],
+    [`- Hệ hiện có: ${sheetList}`],
   ]);
   guide["!cols"] = [{ wch: 18 }, { wch: 10 }, { wch: 65 }];
   XLSX.utils.book_append_sheet(wb, guide, "Hướng dẫn");

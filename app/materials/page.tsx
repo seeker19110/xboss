@@ -33,14 +33,13 @@ const STATUS_CLS: Record<string, string> = {
 
 const DVT_OPTIONS = ['Cái', 'Mét', 'm2', 'Ống'];
 
-type ColKey = 'boqCode' | 'stt' | 'name' | 'unit' | 'sheet' | 'qtyBoq' | 'qtyPlanned' | 'diff' | 'status' | 'note';
+type ColKey = 'boqCode' | 'stt' | 'name' | 'unit' | 'qtyBoq' | 'qtyPlanned' | 'diff' | 'status' | 'note';
 
 const DEFAULT_LABELS: Record<ColKey, string> = {
   boqCode:    'Mã BOQ',
   stt:        'STT',
   name:       'Vật tư',
   unit:       'ĐVT',
-  sheet:      'Hệ',
   qtyBoq:     'Định mức BOQ',
   qtyPlanned: 'Định mức Tháp A',
   diff:       'Chênh lệch ĐM',
@@ -184,11 +183,10 @@ export default function MaterialsPage() {
         case 'boqCode': return m.boqCode ?? '';
         case 'name': return m.name;
         case 'unit': return m.unit ?? '';
-        case 'sheet': return m.sheetCode ?? '';
         case 'qtyBoq': return String(m.qtyBoq ?? 0);
         case 'qtyPlanned': return String(m.qtyPlanned);
         case 'diff': return String((m.qtyBoq ?? 0) - (m.qtyPlanned ?? 0));
-        case 'status': return m.qtyPlanned > 0 && m.qtyUsed > m.qtyPlanned ? 'Vượt ĐM' : 'Trong ĐM';
+        case 'status': return STATUS_LABEL[m.status] ?? m.status;
         case 'note': return m.note ?? '';
         default: return '';
       }
@@ -468,10 +466,6 @@ export default function MaterialsPage() {
                           )
                         )}
 
-                        {key === 'sheet' && (
-                          <span className="px-2 py-0.5 bg-zinc-800 rounded text-xs">{m.sheetCode ?? '—'}</span>
-                        )}
-
                         {key === 'qtyBoq' && (
                           canEdit ? (
                             <input type="number" min="0" defaultValue={m.qtyBoq ?? 0} key={`b${m.id}-${m.qtyBoq}`}
@@ -498,14 +492,19 @@ export default function MaterialsPage() {
                           </span>
                         )}
 
-                        {key === 'status' && (() => {
-                          const over = m.qtyPlanned > 0 && m.qtyUsed > m.qtyPlanned;
-                          return (
-                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${over ? 'bg-red-900/60 text-red-300' : 'bg-emerald-900/50 text-emerald-300'}`}>
-                              {over ? 'Vượt ĐM' : 'Trong ĐM'}
+                        {key === 'status' && (
+                          canEdit ? (
+                            <select value={m.status}
+                              onChange={e => patch(m.id, { status: e.target.value })}
+                              className={`bg-transparent border border-transparent hover:border-zinc-700 focus:border-emerald-600 focus:bg-zinc-800 rounded px-1 py-0.5 text-xs outline-none text-center ${STATUS_CLS[m.status] ?? ''}`}>
+                              {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                            </select>
+                          ) : (
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_CLS[m.status] ?? 'bg-zinc-800 text-zinc-400'}`}>
+                              {STATUS_LABEL[m.status] ?? m.status}
                             </span>
-                          );
-                        })()}
+                          )
+                        )}
 
                         {key === 'note' && (
                           canEdit ? (

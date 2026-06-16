@@ -1,19 +1,26 @@
 'use client';
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Package, Upload, Download, FileSpreadsheet, CheckCircle, XCircle, AlertTriangle, ArrowLeft, RotateCcw } from 'lucide-react';
 import AppHeader from '@/app/components/AppHeader';
 
 type RowResult = { row: number; name: string; status: 'ok' | 'skip' | 'error'; message?: string };
 type ImportResult = { inserted: number; skipped: number; errors: number; results: RowResult[] };
+type SheetType = { id: number; code: string; name: string };
 
 export default function ImportMaterialsPage() {
   const [file, setFile] = useState<File | null>(null);
   const [mode, setMode] = useState<'append' | 'replace'>('append');
+  const [sheetId, setSheetId] = useState('');
+  const [sheets, setSheets] = useState<SheetType[]>([]);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch('/api/sheets').then(r => r.json()).then(d => setSheets(d.sheets ?? d ?? [])).catch(() => {});
+  }, []);
 
   function onDrop(e: React.DragEvent) {
     e.preventDefault(); setDragOver(false);
@@ -32,6 +39,7 @@ export default function ImportMaterialsPage() {
     const form = new FormData();
     form.append('file', file);
     form.append('mode', mode);
+    if (sheetId) form.append('sheetId', sheetId);
     const res = await fetch('/api/materials/import', { method: 'POST', body: form });
     const j = await res.json().catch(() => ({}));
     if (!res.ok) { setError(j.error ?? 'Lỗi không xác định'); setBusy(false); return; }
@@ -88,6 +96,25 @@ export default function ImportMaterialsPage() {
           {error && (
             <div className="flex items-center gap-2 rounded-lg border border-red-800 bg-red-950/40 text-red-300 px-4 py-2.5 text-sm">
               <AlertTriangle className="w-4 h-4 shrink-0" />{error}
+            </div>
+          )}
+
+          {/* Chọn hệ (tuỳ chọn — bỏ qua nếu file BOQ tự nhận diện) */}
+          {sheets.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-zinc-400 font-medium">
+                Hệ <span className="text-zinc-600">(để trống nếu file BOQ — tự nhận diện từ mã)</span>
+              </p>
+              <select
+                value={sheetId}
+                onChange={e => setSheetId(e.target.value)}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500"
+              >
+                <option value="">— Tự nhận diện từ file BOQ —</option>
+                {sheets.map(s => (
+                  <option key={s.id} value={String(s.id)}>{s.code} — {s.name}</option>
+                ))}
+              </select>
             </div>
           )}
 
