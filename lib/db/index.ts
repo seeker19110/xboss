@@ -305,6 +305,7 @@ CREATE INDEX IF NOT EXISTS idx_asgn_log_changed ON assignment_log(changed_at DES
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS heatmap_title TEXT;
 ALTER TABLE materials ADD COLUMN IF NOT EXISTS qty_boq DOUBLE PRECISION DEFAULT 0;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS material_col_labels TEXT;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS ui_texts TEXT;
 
 -- ===== QUẢN LÝ VẬT TƯ MỞ RỘNG =====
 

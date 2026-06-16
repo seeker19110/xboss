@@ -9,6 +9,7 @@ import ForecastCards from '@/app/components/ForecastCards';
 import SCurveChart from '@/app/components/SCurveChart';
 import { Modal } from '@/app/components/dialogs';
 import { PageSkeleton } from '@/app/components/Skeleton';
+import EditableText from '@/app/components/EditableText';
 import { DELAY_REASON_LABEL } from '@/lib/delay';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -201,7 +202,7 @@ export default function Dashboard() {
 
         {/* Bar chart */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-8">
-          <h2 className="font-semibold mb-4 text-sm text-zinc-300">% Tiến độ trung bình theo Sheet</h2>
+          <h2 className="font-semibold mb-4 text-sm text-zinc-300"><EditableText tkey="dashboard.chart.title">% Tiến độ trung bình theo Sheet</EditableText></h2>
           <div style={{ width: '100%', height: 240 }}>
             <ResponsiveContainer>
               <BarChart data={chartData} margin={{ top: 8, right: 8, bottom: 8, left: -16 }}>
@@ -220,7 +221,7 @@ export default function Dashboard() {
         {allDelayed.length > 0 && (reasonCounts.length > 0 || noReason > 0) && (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-8">
             <h2 className="font-semibold mb-1 text-sm text-zinc-300 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-400" /> Nguyên nhân trễ (Pareto)
+              <AlertTriangle className="w-4 h-4 text-amber-400" /> <EditableText tkey="dashboard.pareto.title">Nguyên nhân trễ (Pareto)</EditableText>
             </h2>
             <p className="text-xs text-zinc-400 mb-3">Gán lý do trên lưới tracking hoặc bảng dưới · bấm thanh để lọc bảng trễ theo lý do</p>
             <div className="space-y-1.5">
@@ -254,7 +255,7 @@ export default function Dashboard() {
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
           <div className="p-4 border-b border-zinc-800 flex flex-wrap gap-3 justify-between items-center">
             <h2 className="font-semibold flex items-center gap-2">
-              <Clock className="w-4 h-4 text-red-400" /> Danh sách công việc đang trễ
+              <Clock className="w-4 h-4 text-red-400" /> <EditableText tkey="dashboard.delayed.title">Danh sách công việc đang trễ</EditableText>
             </h2>
             <div className="flex flex-wrap gap-2">
               <select value={sheetFilter} onChange={e => setSheetFilter(e.target.value)} aria-label="Lọc theo sheet"

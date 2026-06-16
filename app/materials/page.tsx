@@ -6,6 +6,7 @@ import {
   Building2, ShoppingCart, ClipboardList, BarChart2, ArrowDownToLine,
 } from 'lucide-react';
 import AppHeader from '@/app/components/AppHeader';
+import EditableText from '@/app/components/EditableText';
 import { Modal, appConfirm, appPrompt } from '@/app/components/dialogs';
 import SuppliersTab from './_components/SuppliersTab';
 import PurchaseRequestsTab from './_components/PurchaseRequestsTab';
@@ -237,7 +238,7 @@ export default function MaterialsPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <AppHeader back title={<><Package className="w-5 h-5 text-emerald-400" /> Quản lý vật tư</>}>
+      <AppHeader back title={<><Package className="w-5 h-5 text-emerald-400" /> <EditableText tkey="materials.title">Quản lý vật tư</EditableText></>}>
         <select value={sheetFilter} onChange={e => setSheetFilter(e.target.value)} aria-label="Lọc theo hệ"
           className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm outline-none">
           <option value="">Tất cả hệ</option>

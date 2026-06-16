@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useRef, Fragment, use } from 'react';
 import { Search, ChevronRight, ChevronDown, Pencil, Check, X, History, RefreshCw, Link2, Camera, Trash2, Upload, MessageSquare, Send, WifiOff, CloudUpload, ChevronUp, ChevronDown as ChevronDownIcon, Columns, Copy, RotateCcw, CalendarDays, FileText } from 'lucide-react';
 import { useOfflineTickQueue } from '@/app/components/offlineQueue';
 import AppHeader from '@/app/components/AppHeader';
+import EditableText from '@/app/components/EditableText';
 import { Modal, appAlert, appConfirm, appPrompt } from '@/app/components/dialogs';
 import { PageSkeleton } from '@/app/components/Skeleton';
 import { DELAY_REASON_LABEL } from '@/lib/delay';
@@ -246,7 +247,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
       {sheetModal && (
         <Modal onClose={() => setSheetModal(null)}>
           <div className="p-5">
-            <h3 className="font-semibold mb-3 flex items-center gap-2"><Pencil className="w-4 h-4 text-amber-400" /> Cài đặt trang tracking</h3>
+            <h3 className="font-semibold mb-3 flex items-center gap-2"><Pencil className="w-4 h-4 text-amber-400" /> <EditableText tkey="tracking.settings.title">Cài đặt trang tracking</EditableText></h3>
             <label className="block text-xs text-zinc-400 mb-1">Tên trang</label>
             <input autoFocus value={sheetModal.name}
               onChange={e => setSheetModal(m => m && ({ ...m, name: e.target.value }))}
