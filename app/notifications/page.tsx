@@ -349,7 +349,15 @@ export default function NotificationsPage() {
   }
 
   if (loading) return <PageSkeleton />;
-  if (!feed) return null;
+  if (!feed) return (
+    <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center gap-3 text-zinc-500">
+      <Bell className="w-10 h-10 opacity-20" />
+      <p className="text-sm">Không tải được thông báo. Vui lòng thử lại.</p>
+      <button onClick={() => load()} className="text-xs border border-zinc-700 rounded-lg px-3 py-1.5 hover:border-zinc-500 transition">
+        Tải lại
+      </button>
+    </div>
+  );
 
   const { overdue, dueSoon, upcomingStart, recentActivity, materialOver, fullAccess, role, prefs } = feed;
   const activityCount = recentActivity.reduce((s, g) => s + g.events.length, 0);

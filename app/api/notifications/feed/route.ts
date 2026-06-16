@@ -223,7 +223,9 @@ export async function GET() {
 
   const recentActivity = [...bySheet.values()].map(g => ({
     ...g,
-    events: g.events.sort((a,b) => b.at.localeCompare(a.at)),
+    events: g.events
+      .map(e => ({ ...e, at: e.at instanceof Date ? e.at.toISOString() : e.at }))
+      .sort((a,b) => (b.at ?? "").localeCompare(a.at ?? "")),
   })).sort((a,b) => (b.events[0]?.at ?? "").localeCompare(a.events[0]?.at ?? ""));
 
   // Vật tư vượt định mức — chỉ fullAccess
