@@ -410,7 +410,7 @@ export default function MaterialsPage() {
                 return (
                   <tr key={m.id} className={`border-b border-zinc-800/50 hover:bg-zinc-700/40 group/row ${mi % 2 === 0 ? 'bg-zinc-900' : 'bg-zinc-800/30'}`}>
                     {visibleCols.map(key => (
-                      <td key={key} className={`px-3 py-2 align-middle whitespace-nowrap ${key === 'name' ? 'text-left w-full' : key === 'boqCode' ? 'text-left' : 'text-center'}`}>
+                      <td key={key} className={`px-3 py-2 align-middle ${key === 'name' ? 'text-left w-full' : 'whitespace-nowrap ' + (key === 'boqCode' ? 'text-left' : 'text-center')}`}>
 
                         {key === 'stt' && <span className="text-zinc-500 text-xs">{mi + 1}</span>}
 
@@ -428,7 +428,8 @@ export default function MaterialsPage() {
                               <textarea
                                 defaultValue={m.name}
                                 key={`name-${m.id}`}
-                                rows={m.name.includes('\n') ? m.name.split('\n').length : 1}
+                                rows={1}
+                                ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                                 onInput={e => { const t = e.target as HTMLTextAreaElement; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; }}
                                 onKeyDown={e => {
                                   if (e.key === 'Escape') { const t = e.target as HTMLTextAreaElement; t.value = m.name; t.blur(); }
@@ -444,7 +445,7 @@ export default function MaterialsPage() {
                                 className="font-medium bg-transparent border border-transparent hover:border-zinc-700 focus:border-emerald-600 focus:bg-zinc-800 rounded px-1 py-0.5 outline-none w-full min-w-0 resize-none overflow-hidden leading-snug"
                               />
                             ) : (
-                              <span className="font-medium truncate">{m.name}</span>
+                              <span className="font-medium whitespace-pre-wrap">{m.name}</span>
                             )}
                             {m.qtyPlanned > 0 && m.qtyUsed > m.qtyPlanned && (
                               <span className="inline-flex items-center gap-1 text-[10px] text-red-400 shrink-0">
