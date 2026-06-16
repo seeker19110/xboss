@@ -448,6 +448,9 @@ ALTER TABLE task_documents ADD COLUMN IF NOT EXISTS floor_approval_id INTEGER RE
 CREATE INDEX IF NOT EXISTS idx_documents_floor ON task_documents(floor_approval_id);
 -- Cho phép lưu link ngoài (Google Drive, v.v.) thay vì file upload.
 ALTER TABLE task_documents ADD COLUMN IF NOT EXISTS link_url TEXT;
+
+-- Đơn giá hợp đồng theo task (dùng tính giá trị hoàn thành = unit_price × progress_percent).
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS unit_price NUMERIC(15,2) DEFAULT 0;
 `;
 
 export function getPool(): Pool {
