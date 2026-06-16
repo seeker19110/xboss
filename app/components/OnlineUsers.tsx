@@ -56,10 +56,11 @@ export default function OnlineUsers({ isAdmin }: { isAdmin: boolean }) {
         aria-label={`${count} người đang online`}
         className="relative flex items-center gap-1.5 text-zinc-400 hover:text-emerald-400 transition-colors"
       >
-        <Wifi className="w-4 h-4" />
-        <span className="text-xs font-medium tabular-nums">{count}</span>
+        <Wifi className="w-5 h-5" />
         {count > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 animate-pulse" aria-hidden />
+          <span className="absolute -top-1 -right-2 min-w-[1.1rem] h-[1.1rem] px-0.5 flex items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold text-white leading-none tabular-nums" aria-hidden>
+            {count}
+          </span>
         )}
       </button>
 
