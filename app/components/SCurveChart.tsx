@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { TrendingUp, Flag } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts';
 import { appAlert, appPrompt } from '@/app/components/dialogs';
+import EditableText from '@/app/components/EditableText';
 
 type Point = { date: string; planned: number | null; actual: number | null };
 type Data = { points: Point[]; sheets: string[]; today?: string };
@@ -60,7 +61,7 @@ export default function SCurveChart() {
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-8">
       <div className="flex items-center gap-2 mb-1 flex-wrap">
         <h2 className="font-semibold text-sm text-zinc-300 flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-emerald-400" /> S-curve: Kế hoạch vs Thực tế
+          <TrendingUp className="w-4 h-4 text-emerald-400" /> <EditableText tkey="scurve.title">S-curve: Kế hoạch vs Thực tế</EditableText>
         </h2>
         <div className="ml-auto flex items-center gap-2">
           <select value={baseline} onChange={e => setBaseline(e.target.value)}
