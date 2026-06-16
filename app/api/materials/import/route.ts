@@ -47,18 +47,25 @@ export async function POST(req: NextRequest) {
 
   if (!rows.length) return NextResponse.json({ error: "File không có dữ liệu" }, { status: 400 });
 
-  // Chuẩn hoá key: trim khoảng trắng thừa ở đầu/cuối
+  // Chuẩn hoá key: trim khoảng trắng + bỏ dấu ngoặc kép thừa + NFC
   const normalizedRows = rows.map(r =>
-    Object.fromEntries(Object.entries(r).map(([k, v]) => [k.trim(), v]))
+    Object.fromEntries(
+      Object.entries(r).map(([k, v]) => [k.trim().replace(/^"+|"+$/g, "").trim().normalize("NFC"), v])
+    )
   );
 
-  // Phát hiện format: template cũ hay BOQ gốc
+  // Cột tên vật tư trong file BOQ có thể là "Vật tư", "MÔ TẢ", "MO TA"
+  const BOQ_NAME_COLS = ["Vật tư", "MÔ TẢ", "MO TA"];
   const firstRow = normalizedRows[0];
-  const isBOQFormat = !("Tên vật tư *" in firstRow) && ("MÔ TẢ" in firstRow || "MO TA" in firstRow);
+  const boqNameCol = BOQ_NAME_COLS.find(c => c in firstRow) ?? null;
+  const isBOQFormat = !("Tên vật tư *" in firstRow) && boqNameCol !== null;
+
+  // Cột mã BOQ trong file BOQ có thể là "Mã BOQ" hoặc "MãBOQ"
+  const boqCodeCol = ("Mã BOQ" in firstRow ? "Mã BOQ" : "MãBOQ");
 
   if (!isBOQFormat && !("Tên vật tư *" in firstRow)) {
     return NextResponse.json({
-      error: "File không đúng cấu trúc. Cần có cột 'Tên vật tư *' (template mẫu) hoặc 'MÔ TẢ' (file BOQ gốc).",
+      error: "File không đúng cấu trúc. Cần có cột 'Tên vật tư *' (template mẫu) hoặc 'Vật tư' / 'MÔ TẢ' (file BOQ gốc).",
     }, { status: 400 });
   }
 
@@ -66,6 +73,22 @@ export async function POST(req: NextRequest) {
   if (!isBOQFormat && !defaultSheetId) {
     return NextResponse.json({ error: "Vui lòng chọn hệ trước khi import." }, { status: 400 });
   }
+
+  // Tìm cột trong firstRow theo danh sách ưu tiên (case-insensitive, NFC)
+  function findCol(candidates: string[]): string | null {
+    const keys = Object.keys(firstRow).map(k => k.toLowerCase());
+    for (const c of candidates) {
+      const idx = keys.indexOf(c.toLowerCase());
+      if (idx >= 0) return Object.keys(firstRow)[idx];
+    }
+    return null;
+  }
+
+  const boqQtyCol    = findCol(["ĐỊnh Mức BOQ", "KHỐI LƯỢNG BOQ", "Định mức BOQ", "KL BOQ"]);
+  const plannedCol   = findCol(["Định mức Tháp A", "KL Định Mức", "KL Định mức", "Định mức tháp A"]);
+  const unitColBOQ   = findCol(["ĐVT", "Đơn vị", "DVT"]);
+  const noteColBOQ   = findCol(["GHI CHÚ", "Ghi chú", "Ghi chu"]);
+  const statusColBOQ = findCol(["Trạng Thái", "Trạng thái", "TRANG THAI"]);
 
   // Helper đọc trường theo format
   function getField(row: Record<string, unknown>, templateKey: string, boqKey: string): string {
@@ -90,7 +113,7 @@ export async function POST(req: NextRequest) {
     sheetIdsInFile.add(defaultSheetId);
   } else {
     for (const raw of normalizedRows) {
-      const prefix = String(raw["MãBOQ"] ?? "").split("-")[0].toLowerCase();
+      const prefix = String(raw[boqCodeCol] ?? "").split("-")[0].toLowerCase();
       const sid = sheetMap.get(prefix);
       if (sid) sheetIdsInFile.add(sid);
     }
@@ -117,14 +140,14 @@ export async function POST(req: NextRequest) {
   for (let i = 0; i < normalizedRows.length; i++) {
     const raw = normalizedRows[i];
     const rowNum = i + 2; // +2 vì hàng 1 là tiêu đề, i bắt đầu từ 0
-    const name = getField(raw, "Tên vật tư *", "MÔ TẢ");
+    const name = getField(raw, "Tên vật tư *", boqNameCol ?? "Vật tư");
 
     if (!name) { skipped++; results.push({ row: rowNum, name: "—", status: "skip", message: "Bỏ qua (không có tên)" }); continue; }
 
     // Xác định sheetId: template dùng defaultSheetId, BOQ dùng prefix mã
     let sheetId: number | undefined;
     if (isBOQFormat) {
-      const boqPrefix = String(raw["MãBOQ"] ?? "").split("-")[0].toLowerCase();
+      const boqPrefix = String(raw[boqCodeCol] ?? "").split("-")[0].toLowerCase();
       sheetId = sheetMap.get(boqPrefix);
       if (!sheetId) {
         errors++;
@@ -135,12 +158,14 @@ export async function POST(req: NextRequest) {
       sheetId = defaultSheetId!;
     }
 
-    const boqCode = getField(raw, "Mã BOQ", "MãBOQ") || null;
+    const boqCode = getField(raw, "Mã BOQ", boqCodeCol) || null;
 
-    const unit = getField(raw, "ĐVT", "Đơn vị") || null;
-    const qtyBoq = parseFloat(String(raw[isBOQFormat ? "KHỐI LƯỢNG BOQ" : "Định mức BOQ"] ?? "")) || 0;
-    const qtyPlanned = parseFloat(String(raw[isBOQFormat ? "KL Định Mức" : "Định mức Tháp A"] ?? "")) || 0;
-    const noteRaw = getField(raw, "Ghi chú", "GHI CHÚ");
+    const unit = isBOQFormat ? String(raw[unitColBOQ ?? "ĐVT"] ?? "").trim() || null
+      : String(raw["ĐVT"] ?? "").trim() || null;
+    const qtyBoq = parseFloat(String(raw[isBOQFormat ? (boqQtyCol ?? "") : "Định mức BOQ"] ?? "")) || 0;
+    const qtyPlanned = parseFloat(String(raw[isBOQFormat ? (plannedCol ?? "") : "Định mức Tháp A"] ?? "")) || 0;
+    const noteRaw = isBOQFormat ? String(raw[noteColBOQ ?? "GHI CHÚ"] ?? "").trim()
+      : String(raw["Ghi chú"] ?? "").trim();
     const note = noteRaw || null;
 
     // sort_order theo thứ tự dòng trong file
@@ -161,7 +186,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    let status = getField(raw, "Trạng thái", "Trạng thái");
+    let status = isBOQFormat ? String(raw[statusColBOQ ?? "Trạng Thái"] ?? "").trim()
+      : String(raw["Trạng thái"] ?? "").trim();
     if (!VALID_STATUSES.includes(status)) status = "dat_hang";
 
     try {
