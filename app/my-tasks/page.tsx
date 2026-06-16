@@ -337,7 +337,7 @@ export default function MyTasksPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <AppHeader back title={<><ClipboardList className="w-5 h-5 text-violet-400" /> Việc của tôi</>} />
+      <AppHeader back title="Việc của tôi" />
 
       <main className="max-w-3xl mx-auto px-4 py-5 space-y-5">
 
