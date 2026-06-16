@@ -16,11 +16,12 @@ export async function recomputeTask(taskId: number, changedBy?: string): Promise
     `SELECT id, package_id, end_date, status, progress_percent FROM tasks WHERE id = ?`, taskId);
   if (!task) return null;
 
-  const dims = await query<{ installed: number }>(`SELECT installed FROM progress_dimensions WHERE task_id = ?`, taskId);
+  const dimCount = await queryOne<{ checked: number; total: number }>(
+    `SELECT COUNT(*) FILTER (WHERE installed = 1) AS checked, COUNT(*) AS total
+       FROM progress_dimensions WHERE task_id = ?`, taskId);
   let progress = task.progress_percent ?? 0;
-  if (dims.length > 0) {
-    const done = dims.filter((d) => d.installed).length;
-    progress = Math.round((done / dims.length) * 100) / 100;
+  if (dimCount && dimCount.total > 0) {
+    progress = Math.round((dimCount.checked / dimCount.total) * 100) / 100;
   }
   const status = deriveStatus(progress, task.end_date, task.status);
   await run(`UPDATE tasks SET progress_percent = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,

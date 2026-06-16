@@ -107,15 +107,19 @@ export async function POST(req: NextRequest) {
           sheetTypeId, floorLabel, user.id, user.name);
       }
 
-      // Đặt toàn bộ task thành nghiem_thu + ghi audit
-      for (const t of tasks) {
-        await run(`UPDATE tasks SET status = 'nghiem_thu', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, t.id);
-        await run(
-          `INSERT INTO task_history (task_id, old_progress, new_progress, status, note, changed_by)
-           VALUES (?, ?, ?, 'nghiem_thu', ?, ?)`,
-          t.id, t.progress_percent, t.progress_percent,
-          `Nghiệm thu tầng ${floorLabel} bởi ${user.name}`, user.name);
-      }
+      // Đặt toàn bộ task thành nghiem_thu — bulk UPDATE để tránh N+1 sequential queries.
+      const taskIds = tasks.map((t) => t.id);
+      await run(
+        `UPDATE tasks SET status = 'nghiem_thu', updated_at = CURRENT_TIMESTAMP WHERE id = ANY(?)`,
+        taskIds);
+
+      // Bulk INSERT audit history trong 1 câu lệnh.
+      const note = `Nghiệm thu tầng ${floorLabel} bởi ${user.name}`;
+      const ph = tasks.map(() => "(?, ?, ?, 'nghiem_thu', ?, ?)").join(", ");
+      const vals = tasks.flatMap((t) => [t.id, t.progress_percent, t.progress_percent, note, user.name]);
+      await run(
+        `INSERT INTO task_history (task_id, old_progress, new_progress, status, note, changed_by) VALUES ${ph}`,
+        ...vals);
 
       return { aid, tasks };
     });
@@ -123,9 +127,9 @@ export async function POST(req: NextRequest) {
     approvalId = result.aid;
     taskCount = result.tasks.length;
 
-    // recomputePackage chạy ngoài transaction (chỉ đọc/ghi bảng progress — không cần ACID chặt)
+    // recomputePackage chạy ngoài transaction, song song để giảm latency.
     const packageIds = new Set(result.tasks.map(t => t.package_id));
-    for (const pid of packageIds) await recomputePackage(pid);
+    await Promise.all([...packageIds].map((pid) => recomputePackage(pid)));
 
   } catch (err: unknown) {
     const e = err as { message?: string; status?: number };

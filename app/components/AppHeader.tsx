@@ -40,6 +40,10 @@ export default function AppHeader({ title, subtitle, back, children, search = tr
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' });
+    // Xóa cache API của SW để user khác trên cùng thiết bị không thấy dữ liệu phiên này.
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHE' });
+    }
     window.location.href = '/login';
   }
 

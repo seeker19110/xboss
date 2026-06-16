@@ -34,7 +34,8 @@ export async function GET() {
   }
 
   // Sắp đến hạn: deadline còn ≤3 ngày mà tiến độ < 70% → cảnh báo sớm trước khi thành trễ.
-  const soon = new Date(Date.now() + 3 * 86400_000).toISOString().slice(0, 10);
+  // Cộng offset UTC+7 để đồng nhất với todayISO() — tránh window rỗng 7 giờ/ngày khi today > soon.
+  const soon = new Date(Date.now() + 7 * 3600_000 + 3 * 86400_000).toISOString().slice(0, 10);
   const DUE_SOON_COND = `t.end_date IS NOT NULL AND t.end_date >= ? AND t.end_date <= ?
         AND t.progress_percent < 0.7 AND t.status NOT IN ('hoan_thanh','nghiem_thu')`;
   const dueSoon = await query<{ id: number; code: string; name: string; endDate: string; sheetType: string }>(

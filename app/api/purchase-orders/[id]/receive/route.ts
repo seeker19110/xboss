@@ -72,13 +72,13 @@ export async function POST(req: NextRequest, { params: paramsP }: { params: Prom
         `UPDATE materials SET qty_stock = COALESCE(qty_stock, 0) + ?, updated_at = NOW() WHERE id = ?`,
         qty, poItem.material_id);
 
-      // Ghi transaction loại nhap_kho
+      // Ghi transaction loại nhap_kho — qty_after = qty_used để nhất quán với các endpoint khác.
       const mat = await queryOne<{ qty_stock: number; qty_used: number }>(
         `SELECT qty_stock, qty_used FROM materials WHERE id = ?`, poItem.material_id);
       await insertId(
         `INSERT INTO material_transactions (material_id, delta, qty_after, type, receipt_item_id, note, created_by)
          VALUES (?, ?, ?, 'nhap_kho', ?, ?, ?)`,
-        poItem.material_id, qty, (mat?.qty_stock ?? 0),
+        poItem.material_id, qty, (mat?.qty_used ?? 0),
         riId, `Nhập kho từ ${receiptCode}`, user.id);
 
       // Cập nhật qty_received trong po_items

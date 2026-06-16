@@ -34,6 +34,23 @@ self.addEventListener("notificationclick", (e) => {
   );
 });
 
+// Logout: xóa tất cả cache API để user khác không thấy dữ liệu của phiên cũ (tablet chia sẻ).
+self.addEventListener("message", (e) => {
+  if (e.data?.type === "CLEAR_CACHE") {
+    e.waitUntil(
+      caches.open(CACHE).then((cache) =>
+        cache.keys().then((keys) =>
+          Promise.all(
+            keys
+              .filter((r) => new URL(r.url).pathname.startsWith("/api/"))
+              .map((r) => cache.delete(r))
+          )
+        )
+      )
+    );
+  }
+});
+
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== location.origin) return;

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne, run } from "@/lib/db";
+import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { boqTakenBy } from "@/lib/boq";
 import { recomputeTask, recomputePackage } from "@/lib/recompute";
@@ -13,7 +13,8 @@ export const dynamic = "force-dynamic";
 export async function PATCH(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
   const params = await paramsP;
   const me = await getCurrentUser();
-  if (!CAN.editStructure(me?.role))
+  if (!me) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (!CAN.editStructure(me.role))
     return NextResponse.json({ error: "Không có quyền chỉnh sửa (chỉ Admin/PM)" }, { status: 403 });
 
   const id = parseInt(params.id);
@@ -47,7 +48,7 @@ export async function PATCH(req: NextRequest, { params: paramsP }: { params: Pro
   // (null = đưa về kế thừa người phụ trách nhóm/hệ).
   let assignedHandled = false;
   if (body.assignedTo !== undefined) {
-    await assignTask(id, body.assignedTo === null ? null : Number(body.assignedTo), me!.id);
+    await assignTask(id, body.assignedTo === null ? null : Number(body.assignedTo), me.id);
     assignedHandled = true;
   }
 
@@ -91,24 +92,30 @@ export async function DELETE(_req: NextRequest, { params: paramsP }: { params: P
   const task = await queryOne<{ id: number; package_id: number }>(`SELECT id, package_id FROM tasks WHERE id = ?`, id);
   if (!task) return NextResponse.json({ error: "Task không tồn tại" }, { status: 404 });
 
-  // Xoá file ảnh và tài liệu đính kèm khỏi disk.
+  // Đọc file trước khi xoá DB — tên file do server sinh nên không cần kiểm tra traversal.
   const uploadDir = join(process.cwd(), "data", "uploads");
   const photos = await query<{ file_name: string }>(`SELECT file_name FROM task_photos WHERE task_id = ?`, id);
   const docs = await query<{ file_name: string }>(`SELECT file_name FROM task_documents WHERE task_id = ?`, id);
+
+  // Xoá toàn bộ dữ liệu liên quan trong 1 transaction — không để lại trạng thái nửa chừng.
+  await withTransaction(async () => {
+    await run(`DELETE FROM notifications WHERE task_id = ?`, id);
+    await run(`DELETE FROM baseline_tasks WHERE task_id = ?`, id);
+    await run(`DELETE FROM task_photos WHERE task_id = ?`, id);
+    await run(`DELETE FROM task_documents WHERE task_id = ?`, id);
+    await run(`DELETE FROM task_comments WHERE task_id = ?`, id);
+    await run(`DELETE FROM task_history WHERE task_id = ?`, id);
+    // material_transactions trước materials (FK: material_transactions.material_id → materials.id).
+    await run(`DELETE FROM material_transactions WHERE material_id IN (SELECT id FROM materials WHERE task_id = ?)`, id);
+    await run(`DELETE FROM materials WHERE task_id = ?`, id);
+    await run(`DELETE FROM progress_dimensions WHERE task_id = ?`, id);
+    await run(`DELETE FROM tasks WHERE id = ?`, id);
+  });
+
+  // Xoá file sau khi DB commit thành công — file mồ côi trên disk ít hại hơn row mồ côi trong DB.
   for (const f of [...photos, ...docs]) {
     await unlink(join(uploadDir, f.file_name)).catch(() => {/* file đã xoá hoặc không tồn tại */});
   }
-
-  // Xoá theo thứ tự FK.
-  await run(`DELETE FROM notifications WHERE task_id = ?`, id);
-  await run(`DELETE FROM baseline_tasks WHERE task_id = ?`, id);
-  await run(`DELETE FROM task_photos WHERE task_id = ?`, id);
-  await run(`DELETE FROM task_documents WHERE task_id = ?`, id);
-  await run(`DELETE FROM task_comments WHERE task_id = ?`, id);
-  await run(`DELETE FROM task_history WHERE task_id = ?`, id);
-  await run(`DELETE FROM materials WHERE task_id = ?`, id);
-  await run(`DELETE FROM progress_dimensions WHERE task_id = ?`, id);
-  await run(`DELETE FROM tasks WHERE id = ?`, id);
 
   await recomputePackage(task.package_id);
 

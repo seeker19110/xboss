@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, run } from "@/lib/db";
+import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { deriveStatus, recomputePackage } from "@/lib/recompute";
 
@@ -24,20 +24,30 @@ export async function POST(_req: NextRequest, { params: paramsP }: { params: Pro
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const task = await queryOne<TaskRow>(
-    `SELECT id, package_id, status, progress_percent, end_date, name FROM tasks WHERE id = ?`, id);
-  if (!task) return NextResponse.json({ error: "Không tìm thấy task" }, { status: 404 });
-  if (task.status === "nghiem_thu")
-    return NextResponse.json({ error: "Task đã được nghiệm thu rồi" }, { status: 409 });
-  if ((task.progress_percent ?? 0) < 1)
-    return NextResponse.json({ error: "Task chưa hoàn thành 100% — không thể nghiệm thu" }, { status: 422 });
+  // FOR UPDATE để tránh 2 PM approve đồng thời tạo duplicate audit record.
+  let packageId: number;
+  try {
+    packageId = await withTransaction(async () => {
+      const task = await queryOne<TaskRow>(
+        `SELECT id, package_id, status, progress_percent, end_date, name FROM tasks WHERE id = ? FOR UPDATE`, id);
+      if (!task) throw Object.assign(new Error("Không tìm thấy task"), { status: 404 });
+      if (task.status === "nghiem_thu")
+        throw Object.assign(new Error("Task đã được nghiệm thu rồi"), { status: 409 });
+      if ((task.progress_percent ?? 0) < 1)
+        throw Object.assign(new Error("Task chưa hoàn thành 100% — không thể nghiệm thu"), { status: 422 });
 
-  await run(`UPDATE tasks SET status = 'nghiem_thu', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, id);
-  await run(`INSERT INTO task_history (task_id, old_progress, new_progress, status, note, changed_by)
-       VALUES (?, ?, ?, 'nghiem_thu', ?, ?)`,
-    id, task.progress_percent, task.progress_percent, `Nghiệm thu bởi ${user.name}`, user.name);
-  await recomputePackage(task.package_id);
+      await run(`UPDATE tasks SET status = 'nghiem_thu', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, id);
+      await run(`INSERT INTO task_history (task_id, old_progress, new_progress, status, note, changed_by)
+           VALUES (?, ?, ?, 'nghiem_thu', ?, ?)`,
+        id, task.progress_percent, task.progress_percent, `Nghiệm thu bởi ${user.name}`, user.name);
+      return task.package_id;
+    });
+  } catch (err: unknown) {
+    const e = err as { message?: string; status?: number };
+    return NextResponse.json({ error: e.message ?? String(err) }, { status: e.status ?? 500 });
+  }
 
+  await recomputePackage(packageId);
   return NextResponse.json({ id, status: "nghiem_thu" });
 }
 

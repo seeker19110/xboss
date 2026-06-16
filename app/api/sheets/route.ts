@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne, insertId, withTransaction, todayISO } from "@/lib/db";
+import { query, queryOne, run, insertId, withTransaction, todayISO } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { toSlug, SLUG_RE } from "@/lib/sheets";
 
@@ -97,10 +97,12 @@ export async function POST(req: NextRequest) {
 
             const dims = await query<{ dimension_label: string; sort_order: number }>(
               `SELECT dimension_label, sort_order FROM progress_dimensions WHERE task_id = ? ORDER BY sort_order`, t.id);
-            for (const d of dims) {
-              await insertId(
-                `INSERT INTO progress_dimensions (task_id, dimension_label, installed, sort_order) VALUES (?, ?, 0, ?)`,
-                newTaskId, d.dimension_label, d.sort_order);
+            if (dims.length > 0) {
+              const ph = dims.map(() => "(?, ?, 0, ?)").join(", ");
+              const vals = dims.flatMap((d) => [newTaskId, d.dimension_label, d.sort_order]);
+              await run(
+                `INSERT INTO progress_dimensions (task_id, dimension_label, installed, sort_order) VALUES ${ph}`,
+                ...vals);
             }
           }
         }

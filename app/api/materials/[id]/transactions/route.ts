@@ -57,11 +57,13 @@ export async function POST(req: NextRequest, { params: paramsP }: { params: Prom
   const updated = await queryOne<{ qty_used: number }>(
     `SELECT qty_used FROM materials WHERE id = ?`, id);
   const qtyAfter = updated?.qty_used ?? 0;
+  // Khi GREATEST(0,...) clip âm về 0, actual_delta nhỏ hơn delta gốc — ghi số thực để audit đúng.
+  const actualDelta = qtyAfter - m.qty_used;
 
   const txId = await insertId(
     `INSERT INTO material_transactions (material_id, delta, qty_after, note, created_by)
      VALUES (?, ?, ?, ?, ?)`,
-    id, delta, qtyAfter, note, user.id);
+    id, actualDelta, qtyAfter, note, user.id);
 
-  return NextResponse.json({ id: txId, materialId: id, delta, qtyAfter }, { status: 201 });
+  return NextResponse.json({ id: txId, materialId: id, delta: actualDelta, qtyAfter }, { status: 201 });
 }
