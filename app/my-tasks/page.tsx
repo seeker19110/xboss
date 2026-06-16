@@ -337,7 +337,7 @@ export default function MyTasksPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <AppHeader back title="Việc của tôi" />
+      <AppHeader />
 
       <main className="max-w-3xl mx-auto px-4 py-5 space-y-5">
 
