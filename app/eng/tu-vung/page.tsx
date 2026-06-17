@@ -196,7 +196,7 @@ export default function VocabularyPage() {
                 <div className="text-2xl font-bold text-indigo-300">{card.meaning_vi}</div>
                 {card.example_en && (
                   <div className="mt-2 space-y-1">
-                    <p className="text-sm text-zinc-300 italic">"{card.example_en}"</p>
+                    <p className="text-sm text-zinc-300 italic">&ldquo;{card.example_en}&rdquo;</p>
                     <p className="text-xs text-zinc-500">({card.example_vi})</p>
                   </div>
                 )}
