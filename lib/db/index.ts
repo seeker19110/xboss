@@ -554,12 +554,16 @@ export async function run(sql: string, ...params: unknown[]): Promise<{ changes:
 }
 
 // INSERT trả về id (thay cho lastInsertRowid của SQLite).
+// Không append RETURNING id nếu SQL đã có sẵn (vd: INSERT ON CONFLICT ... RETURNING id).
 export async function insertId(sql: string, ...params: unknown[]): Promise<number> {
   await ensureSchema();
+  const pgSql = toPg(sql);
+  const needsReturning = !/returning\s+id\s*$/i.test(pgSql.trim());
+  const finalSql = needsReturning ? pgSql + " RETURNING id" : pgSql;
   const tx = txStorage.getStore();
   const r = tx
-    ? await tx.query(toPg(sql) + " RETURNING id", params)
-    : await getPool().query(toPg(sql) + " RETURNING id", params);
+    ? await tx.query(finalSql, params)
+    : await getPool().query(finalSql, params);
   return Number(r.rows[0].id);
 }
 
