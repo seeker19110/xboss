@@ -521,6 +521,31 @@ CREATE TABLE IF NOT EXISTS package_dependencies (
 );
 CREATE INDEX IF NOT EXISTS idx_pkg_dep_succ ON package_dependencies(successor_id);
 CREATE INDEX IF NOT EXISTS idx_pkg_dep_pred ON package_dependencies(predecessor_id);
+
+-- Bản vẽ 3D IFC: file lưu data/uploads/, metadata trong DB.
+CREATE TABLE IF NOT EXISTS ifc_files (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  file_name TEXT NOT NULL,
+  file_size BIGINT DEFAULT 0,
+  uploaded_by INTEGER REFERENCES users(id),
+  uploaded_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Trạng thái lắp đặt từng cấu kiện theo GlobalId IFC (sync với hiện trường).
+-- chua_lap = chưa lắp (mặc định) | dang_lap = đang lắp | hoan_thanh = đã lắp xong
+CREATE TABLE IF NOT EXISTS ifc_element_status (
+  id SERIAL PRIMARY KEY,
+  ifc_file_id INTEGER NOT NULL REFERENCES ifc_files(id) ON DELETE CASCADE,
+  global_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'chua_lap',
+  note TEXT,
+  updated_by INTEGER REFERENCES users(id),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(ifc_file_id, global_id)
+);
+CREATE INDEX IF NOT EXISTS idx_ifc_elem_file ON ifc_element_status(ifc_file_id);
+CREATE INDEX IF NOT EXISTS idx_ifc_files_uploaded ON ifc_files(uploaded_at DESC);
 `;
 
 export function getPool(): Pool {

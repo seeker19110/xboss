@@ -1,6 +1,6 @@
 {
   "name": "xboss",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
@@ -10,7 +10,8 @@
     "test": "tsx --test tests/status.test.ts tests/import.test.ts tests/recompute.test.ts tests/ratelimit.test.ts tests/cpm.test.ts tests/auth.test.ts",
     "typecheck": "tsc --noEmit",
     "db:seed": "tsx scripts/seed.ts",
-    "db:seed:sample": "tsx scripts/seed-sample.ts"
+    "db:seed:sample": "tsx scripts/seed-sample.ts",
+    "postinstall": "node -e \"const{cp,mkdir}=require('fs/promises');mkdir('public/wasm',{recursive:true}).then(()=>Promise.allSettled([cp('node_modules/web-ifc/web-ifc.wasm','public/wasm/web-ifc.wasm'),cp('node_modules/web-ifc/web-ifc-mt.wasm','public/wasm/web-ifc-mt.wasm')])).catch(()=>{})\" 2>/dev/null || true"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.5.1",
@@ -23,7 +24,9 @@
     "react-dom": "^19.2.7",
     "recharts": "^3.8.1",
     "web-push": "^3.6.7",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+    "xlsx": "^0.18.5",
+    "three": "^0.177.0",
+    "web-ifc": "^0.0.68"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.1",
@@ -38,6 +41,7 @@
     "eslint-config-next": "^16.2.9",
     "tailwindcss": "^4.3.1",
     "tsx": "^4.19.1",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "@types/three": "^0.177.0"
   }
 }

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {
   ArrowLeft, LayoutDashboard, ClipboardList, Package, CalendarRange,
   CheckSquare, CalendarClock, Users, KeyRound, LogOut, ShieldCheck, Bell,
-  Layers, DollarSign,
+  Layers, DollarSign, Box,
 } from 'lucide-react';
 import NotificationBell from '@/app/components/NotificationBell';
 import GlobalSearch from '@/app/components/GlobalSearch';
@@ -27,6 +27,7 @@ const NAV = [
   { href: '/lookahead', tkey: 'nav.lookahead', label: 'Kế hoạch 2 tuần', icon: CalendarClock, color: 'text-rose-400' },
   { href: '/timeline', tkey: 'nav.timeline', label: 'Timeline tầng', icon: Layers, color: 'text-indigo-400' },
   { href: '/payments', tkey: 'nav.payments', label: 'Thanh toán', icon: DollarSign, color: 'text-emerald-400' },
+  { href: '/viewer', tkey: 'nav.viewer', label: 'Bản vẽ 3D', icon: Box, color: 'text-violet-400' },
 ];
 
 export default function AppHeader({ title, subtitle, back, children, search = true }: {

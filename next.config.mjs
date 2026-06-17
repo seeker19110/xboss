@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverExternalPackages: ["pg", "better-sqlite3"],
+  serverExternalPackages: ["pg", "better-sqlite3", "web-ifc"],
+  // Turbopack config (Next.js 16 mặc định) — empty để không báo lỗi
+  turbopack: {},
   async headers() {
     return [
       {

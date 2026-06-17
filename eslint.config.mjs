@@ -11,6 +11,8 @@ const config = [
       'react-hooks/refs': 'off',
       'react-hooks/purity': 'off',
       'react-hooks/incompatible-library': 'off',
+      // Three.js refs mutation (mesh.visible, material.color) là hợp lệ trong scene 3D
+      'react-hooks/immutability': 'off',
     },
   },
 ]
