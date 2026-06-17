@@ -4,7 +4,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   Package, Plus, Trash2, AlertTriangle, History, X,
   ChevronUp, ChevronDown, Copy, EyeOff, Eye, ClipboardCopy, Pencil, Check, FileUp, Search,
-  Building2, ShoppingCart, ClipboardList, BarChart2, ArrowDownToLine,
+  Building2, ShoppingCart, ClipboardList, BarChart2, ArrowDownToLine, PenLine, LockOpen,
 } from 'lucide-react';
 import AppHeader from '@/app/components/AppHeader';
 import EditableText from '@/app/components/EditableText';
@@ -68,6 +68,7 @@ export default function MaterialsPage() {
   const [canEdit, setCanEdit] = useState(false);
   const [canDelete, setCanDelete] = useState(false);
   const [canAdmin, setCanAdmin] = useState(false);
+  const [editMode, setEditMode] = useState(false);
   const [error, setError] = useState('');
   const [historyMat, setHistoryMat] = useState<Material | null>(null);
 
@@ -454,7 +455,15 @@ export default function MaterialsPage() {
                     )}
                   </th>
                 ))}
-                <th className="w-6" />
+                {canEdit && (
+                  <th className="w-10 px-2 text-center align-middle">
+                    <button onClick={() => setEditMode(v => !v)}
+                      title={editMode ? 'Tắt chế độ chỉnh sửa' : 'Bật chế độ chỉnh sửa'}
+                      className={`p-1.5 rounded-lg transition-colors ${editMode ? 'bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30' : 'text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800'}`}>
+                      {editMode ? <PenLine className="w-3.5 h-3.5" /> : <LockOpen className="w-3.5 h-3.5" />}
+                    </button>
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -475,16 +484,16 @@ export default function MaterialsPage() {
                         {key === 'stt' && <span className="text-zinc-500 text-xs">{globalIdx + 1}</span>}
 
                         {key === 'boqCode' && (
-                          <button onClick={() => canEdit && editBoq(m)}
-                            title={canEdit ? `${m.boqCode ?? 'Chưa gán mã BOQ'} — bấm để sửa` : (m.boqCode ?? 'Chưa gán mã BOQ')}
-                            className={`font-mono text-xs ${m.boqCode ? 'text-amber-400' : 'text-zinc-600'} ${canEdit ? 'hover:underline cursor-pointer' : 'cursor-default'}`}>
+                          <button onClick={() => canEdit && editMode && editBoq(m)}
+                            title={canEdit && editMode ? `${m.boqCode ?? 'Chưa gán mã BOQ'} — bấm để sửa` : (m.boqCode ?? 'Chưa gán mã BOQ')}
+                            className={`font-mono text-xs ${m.boqCode ? 'text-amber-400' : 'text-zinc-600'} ${canEdit && editMode ? 'hover:underline cursor-pointer' : 'cursor-default'}`}>
                             {m.boqCode ?? '—'}
                           </button>
                         )}
 
                         {key === 'name' && (
                           <div className="flex items-center gap-2 min-w-0">
-                            {canAdmin ? (
+                            {canAdmin && editMode ? (
                               <textarea
                                 defaultValue={m.name}
                                 key={`name-${m.id}`}
@@ -516,7 +525,7 @@ export default function MaterialsPage() {
                         )}
 
                         {key === 'unit' && (
-                          canEdit ? (
+                          canEdit && editMode ? (
                             <select value={m.unit ?? ''}
                               onChange={e => patch(m.id, { unit: e.target.value || null })}
                               className="bg-transparent border border-transparent hover:border-zinc-700 focus:border-emerald-600 focus:bg-zinc-800 rounded px-1 py-0.5 text-xs outline-none text-zinc-300 text-center">
@@ -530,7 +539,7 @@ export default function MaterialsPage() {
                         )}
 
                         {key === 'qtyBoq' && (
-                          canEdit ? (
+                          canEdit && editMode ? (
                             <input type="number" min="0" defaultValue={m.qtyBoq ?? 0} key={`b${m.id}-${m.qtyBoq}`}
                               onBlur={e => Number(e.target.value) !== (m.qtyBoq ?? 0) && patch(m.id, { qtyBoq: Number(e.target.value) })}
                               className="w-20 bg-transparent border border-transparent hover:border-zinc-700 focus:border-amber-600 focus:bg-zinc-800 rounded px-1 py-0.5 text-center outline-none text-amber-300" />
@@ -540,7 +549,7 @@ export default function MaterialsPage() {
                         )}
 
                         {key === 'qtyPlanned' && (
-                          canEdit ? (
+                          canEdit && editMode ? (
                             <input type="number" min="0" defaultValue={m.qtyPlanned} key={`p${m.id}-${m.qtyPlanned}`}
                               onBlur={e => Number(e.target.value) !== m.qtyPlanned && patch(m.id, { qtyPlanned: Number(e.target.value) })}
                               className="w-20 bg-transparent border border-transparent hover:border-zinc-700 focus:border-emerald-600 focus:bg-zinc-800 rounded px-1 py-0.5 text-center outline-none" />
@@ -570,7 +579,7 @@ export default function MaterialsPage() {
                         })()}
 
                         {key === 'note' && (
-                          canEdit ? (
+                          canEdit && editMode ? (
                             <input defaultValue={m.note ?? ''} key={`n${m.id}`}
                               onBlur={e => e.target.value !== (m.note ?? '') && patch(m.id, { note: e.target.value || null })}
                               placeholder="—"
@@ -581,26 +590,28 @@ export default function MaterialsPage() {
                         )}
                       </td>
                     ))}
-                    {/* Actions — hiện khi hover */}
+                    {/* Actions — hiện khi hover, chỉ hiện đủ khi editMode */}
+                    {canEdit && (
                     <td className="px-1 py-2 whitespace-nowrap">
                       <div className="flex items-center gap-0 opacity-0 group-hover/row:opacity-100 transition-opacity">
                         <button onClick={() => setHistoryMat(m)} title="Lịch sử nhập/xuất"
                           className="text-zinc-500 hover:text-emerald-400 p-2"><History className="w-3.5 h-3.5" /></button>
-                        {canEdit && (m.qtyStock ?? 0) > 0 && (
+                        {editMode && (m.qtyStock ?? 0) > 0 && (
                           <button onClick={() => { setIssueMat(m); setIssueQty(''); setIssueNote(''); }}
                             title="Xuất kho ra công trường"
                             className="text-zinc-500 hover:text-blue-400 p-2"><ArrowDownToLine className="w-3.5 h-3.5" /></button>
                         )}
-                        {canEdit && (
+                        {editMode && (
                           <button onClick={() => copyRow(m)} title="Nhân đôi hàng"
                             className="text-zinc-500 hover:text-sky-400 p-2"><Copy className="w-3.5 h-3.5" /></button>
                         )}
-                        {canDelete && (
+                        {editMode && canDelete && (
                           <button onClick={() => remove(m)} title="Xoá hàng"
                             className="text-zinc-500 hover:text-red-400 p-2"><Trash2 className="w-3.5 h-3.5" /></button>
                         )}
                       </div>
                     </td>
+                    )}
                   </tr>
                 );
               })}
