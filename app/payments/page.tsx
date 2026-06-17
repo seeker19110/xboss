@@ -157,12 +157,22 @@ export default function PaymentsPage() {
   const floorEntries = [...byFloor.entries()]
     .sort(([a], [b]) => sortFloor(b) - sortFloor(a));
 
-  // View theo hệ (tổng hợp)
-  const bySheet = new Map<string, FloorRow[]>();
+  // View theo người phụ trách: người → (hệ → các tầng).
+  const NONE = '__none__';
+  const byPerson = new Map<string, Map<string, FloorRow[]>>();
   for (const r of filtered) {
-    const list = bySheet.get(r.sheetType) ?? [];
-    list.push(r); bySheet.set(r.sheetType, list);
+    const person = r.responsible?.trim() || NONE;
+    let sheetsMap = byPerson.get(person);
+    if (!sheetsMap) { sheetsMap = new Map(); byPerson.set(person, sheetsMap); }
+    const list = sheetsMap.get(r.sheetType) ?? [];
+    list.push(r); sheetsMap.set(r.sheetType, list);
   }
+  // Sắp xếp: người có tên trước (A→Z), nhóm chưa phân công cuối cùng.
+  const personEntries = [...byPerson.entries()].sort(([a], [b]) => {
+    if (a === NONE) return 1;
+    if (b === NONE) return -1;
+    return a.localeCompare(b, 'vi');
+  });
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -227,7 +237,7 @@ export default function PaymentsPage() {
             </button>
             <button onClick={() => setViewMode('subcon')}
               className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition ${viewMode === 'subcon' ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-zinc-200'}`}>
-              <Users className="w-3.5 h-3.5 shrink-0" /> Nhà thầu phụ
+              <Users className="w-3.5 h-3.5 shrink-0" /> Người phụ trách
             </button>
           </div>
           <select value={sheetFilter} onChange={e => setSheetFilter(e.target.value)}
@@ -264,76 +274,77 @@ export default function PaymentsPage() {
           </div>
         )}
 
-        {/* ══ VIEW: THEO HỆ ══ */}
+        {/* ══ VIEW: NGƯỜI PHỤ TRÁCH ══ */}
         {viewMode === 'subcon' && (
           <div className="space-y-3">
-            {[...bySheet.entries()].map(([sheet, rows]) => {
-              const sheetContract = rows.reduce((s, r) => s + r.contractValue, 0);
-              const sheetEarned   = rows.reduce((s, r) => s + r.contractValue * r.progress, 0);
-              const pct = sheetContract > 0 ? sheetEarned / sheetContract * 100 : 0;
-              const avgProgress = rows.length ? rows.reduce((s, r) => s + r.progress, 0) / rows.length : 0;
-              const slug = rows[0]?.sheetSlug;
-              const sheetTypeId = rows[0]?.sheetTypeId;
-              const responsible = rows[0]?.responsible ?? '';
+            {personEntries.map(([person, sheetsMap]) => {
+              const allRows = [...sheetsMap.values()].flat();
+              const pContract = allRows.reduce((s, r) => s + r.contractValue, 0);
+              const pEarned   = allRows.reduce((s, r) => s + r.contractValue * r.progress, 0);
+              const pPct = pContract > 0 ? pEarned / pContract * 100 : 0;
+              const pAvg = allRows.length ? allRows.reduce((s, r) => s + r.progress, 0) / allRows.length : 0;
+              const sheetList = [...sheetsMap.entries()];
+              const isNone = person === NONE;
               return (
-                <div key={sheet} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-                  <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800">
-                    <span className="text-xs font-bold bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded-full shrink-0">{sheet}</span>
+                <div key={person} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+                  {/* Header người phụ trách */}
+                  <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800 bg-zinc-900/60">
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-sm font-bold ${isNone ? 'bg-zinc-800 text-zinc-500' : 'bg-emerald-900/60 text-emerald-300'}`}>
+                      {isNone ? '?' : person.trim().charAt(0).toUpperCase()}
+                    </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-                          <div className="h-1.5 rounded-full bg-emerald-500" style={{ width: `${Math.min(avgProgress * 100, 100)}%` }} />
-                        </div>
-                        <span className="text-xs font-bold tabular-nums text-zinc-200 shrink-0">{Math.round(avgProgress * 100)}%</span>
-                      </div>
-                      <div className="flex items-center gap-3 mt-0.5">
-                        <span className="text-[11px] text-zinc-500">HĐ: {fmtVND(sheetContract)}</span>
-                        <span className="text-[11px] text-emerald-500">Xong: {fmtVND(sheetEarned)}</span>
-                        {sheetContract > 0 && <span className="text-[11px] text-zinc-500">{pct.toFixed(1)}%</span>}
+                      <p className={`text-sm font-bold truncate ${isNone ? 'text-zinc-500 italic' : 'text-white'}`}>
+                        {isNone ? 'Chưa phân công' : person}
+                      </p>
+                      <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                        <span className="text-[11px] text-zinc-500">{sheetList.length} hệ · TB {Math.round(pAvg * 100)}%</span>
+                        <span className="text-[11px] text-zinc-500">HĐ: {fmtVND(pContract)}</span>
+                        {pContract > 0 && <span className="text-[11px] text-emerald-500">Xong: {fmtVND(pEarned)} ({pPct.toFixed(1)}%)</span>}
                       </div>
                     </div>
-                    {slug && (
-                      <a href={`/tracking/${slug}`} className="text-xs text-zinc-500 hover:text-zinc-200 shrink-0 px-2 py-1 rounded border border-zinc-800 hover:border-zinc-600 transition">
-                        Tracking
-                      </a>
-                    )}
                   </div>
-                  {/* Người phụ trách / nhà thầu phụ */}
-                  <div className="flex items-center gap-2 px-4 py-2.5 border-b border-zinc-800/60 bg-zinc-900/40">
-                    <Users className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-                    <span className="text-[11px] text-zinc-500 shrink-0">Phụ trách:</span>
-                    {canEdit ? (
-                      <>
-                        <input
-                          type="text" list="payment-people"
-                          defaultValue={responsible}
-                          onBlur={e => { if (sheetTypeId != null && e.target.value.trim() !== responsible) saveResponsible(sheetTypeId, e.target.value); }}
-                          onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-                          placeholder="Chọn hoặc nhập tên nhà thầu phụ"
-                          className="flex-1 sm:max-w-xs text-xs bg-zinc-800 border border-zinc-700 focus:border-sky-500 rounded px-2 py-1.5 text-zinc-200 focus:outline-none"
-                        />
-                        {savingResp === sheetTypeId && <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400 shrink-0" />}
-                      </>
-                    ) : (
-                      <span className="text-xs text-zinc-300 truncate">{responsible || '—'}</span>
-                    )}
-                  </div>
+                  {/* Danh sách hệ người này phụ trách */}
                   <div className="divide-y divide-zinc-800/40">
-                    {rows.sort((a, b) => sortFloor(b.floorLabel) - sortFloor(a.floorLabel)).map(r => {
-                      const earned = r.contractValue * r.progress;
+                    {sheetList.map(([sheet, rows]) => {
+                      const sContract = rows.reduce((s, r) => s + r.contractValue, 0);
+                      const sEarned   = rows.reduce((s, r) => s + r.contractValue * r.progress, 0);
+                      const sAvg = rows.length ? rows.reduce((s, r) => s + r.progress, 0) / rows.length : 0;
+                      const sDelayed = rows.reduce((s, r) => s + r.delayed, 0);
+                      const slug = rows[0]?.sheetSlug;
+                      const sheetTypeId = rows[0]?.sheetTypeId;
+                      const responsible = rows[0]?.responsible ?? '';
                       return (
-                        <div key={r.floorLabel} className="flex items-center gap-3 px-4 py-2.5 hover:bg-zinc-800/30 transition">
-                          <span className="text-sm font-bold text-zinc-300 w-12 shrink-0">{r.floorLabel}</span>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 bg-zinc-800 rounded-full h-1 overflow-hidden">
-                                <div className={`h-1 rounded-full ${r.progress >= 1 ? 'bg-emerald-500' : r.delayed > 0 ? 'bg-red-500' : 'bg-sky-500'}`}
-                                  style={{ width: `${Math.min(r.progress * 100, 100)}%` }} />
+                        <div key={sheet} className="px-4 py-3 hover:bg-zinc-800/20 transition">
+                          <div className="flex items-center gap-3">
+                            <a href={slug ? `/tracking/${slug}` : '#'}
+                              className="text-xs font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2 py-0.5 rounded-full shrink-0 transition">{sheet}</a>
+                            <div className="flex-1 min-w-0 flex items-center gap-2">
+                              <div className="flex-1 bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                                <div className={`h-1.5 rounded-full ${sAvg >= 1 ? 'bg-emerald-500' : sDelayed > 0 ? 'bg-red-500' : 'bg-sky-500'}`}
+                                  style={{ width: `${Math.min(sAvg * 100, 100)}%` }} />
                               </div>
-                              <span className="text-xs tabular-nums text-zinc-400 shrink-0 w-8 text-right">{Math.round(r.progress * 100)}%</span>
+                              <span className="text-xs font-bold tabular-nums text-zinc-300 shrink-0 w-8 text-right">{Math.round(sAvg * 100)}%</span>
                             </div>
+                            <span className="text-[11px] text-zinc-500 shrink-0 hidden sm:inline">{rows.length} tầng</span>
                           </div>
-                          <span className="text-xs tabular-nums text-emerald-300 shrink-0 w-16 text-right">{earned > 0 ? fmtVND(earned) : '—'}</span>
+                          <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                            <span className="text-[11px] text-zinc-500">HĐ: {fmtVND(sContract)}</span>
+                            {sEarned > 0 && <span className="text-[11px] text-emerald-400">Xong: {fmtVND(sEarned)}</span>}
+                            {sDelayed > 0 && <span className="text-[11px] text-red-400">{sDelayed} trễ</span>}
+                            {canEdit && (
+                              <div className="flex items-center gap-1.5 ml-auto">
+                                <span className="text-[10px] text-zinc-600 shrink-0">Đổi phụ trách:</span>
+                                <input type="text" list="payment-people" key={responsible}
+                                  defaultValue={responsible}
+                                  onBlur={e => { if (sheetTypeId != null && e.target.value.trim() !== responsible) saveResponsible(sheetTypeId, e.target.value); }}
+                                  onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                                  placeholder="Tên người phụ trách"
+                                  className="w-40 text-xs bg-zinc-800 border border-zinc-700 focus:border-sky-500 rounded px-2 py-1 text-zinc-200 focus:outline-none"
+                                />
+                                {savingResp === sheetTypeId && <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400 shrink-0" />}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
@@ -341,6 +352,12 @@ export default function PaymentsPage() {
                 </div>
               );
             })}
+            {personEntries.length === 0 && (
+              <div className="py-14 text-center text-zinc-500 bg-zinc-900 border border-zinc-800 rounded-xl">
+                <Users className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                <p className="text-sm">Chưa có dữ liệu.</p>
+              </div>
+            )}
           </div>
         )}
       </main>
