@@ -11,6 +11,7 @@ import { PageSkeleton } from '@/app/components/Skeleton';
 
 type FloorRow = {
   sheetTypeId: number; sheetType: string; sheetSlug: string | null;
+  responsible: string | null;
   floorLabel: string; progress: number; taskCount: number; delayed: number;
   contractValue: number;
 };
@@ -60,6 +61,8 @@ export default function PaymentsPage() {
   const [saving, setSaving] = useState(false);
   const [sheetFilter, setSheetFilter] = useState('all');
   const [viewMode, setViewMode] = useState<'floor' | 'subcon'>('floor');
+  const [people, setPeople] = useState<string[]>([]);   // gợi ý người phụ trách
+  const [savingResp, setSavingResp] = useState<number | null>(null);
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -69,12 +72,35 @@ export default function PaymentsPage() {
     if (dr.status === 401) { window.location.href = '/login'; return; }
     const d: Data = await dr.json();
     const me = mr.ok ? (await mr.json())?.user : null;
+    const editor = me?.role === 'admin' || me?.role === 'pm';
     setData(d);
-    setCanEdit(me?.role === 'admin' || me?.role === 'pm');
+    setCanEdit(editor);
     setLoading(false);
+    // Gợi ý: tên người dùng (Admin/PM mới có quyền đọc) + tên đã nhập sẵn.
+    if (editor) {
+      const ur = await fetch('/api/users');
+      const users: { name: string }[] = ur.ok ? (await ur.json())?.users ?? [] : [];
+      const fromData = d.rows.map(r => r.responsible).filter(Boolean) as string[];
+      setPeople([...new Set([...users.map(u => u.name), ...fromData])].sort());
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  async function saveResponsible(sheetTypeId: number, value: string) {
+    const responsible = value.trim();
+    setSavingResp(sheetTypeId);
+    await fetch(`/api/sheets/${sheetTypeId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ responsible }),
+    });
+    setSavingResp(null);
+    setData(prev => prev ? {
+      ...prev,
+      rows: prev.rows.map(r => r.sheetTypeId === sheetTypeId ? { ...r, responsible: responsible || null } : r),
+    } : prev);
+    if (responsible) setPeople(p => p.includes(responsible) ? p : [...p, responsible].sort());
+  }
 
   async function saveEdits(pending: Record<EditKey, string>, rows: FloorRow[]) {
     const rowMap = new Map(rows.map(r => [editKey(r), r]));
@@ -161,6 +187,11 @@ export default function PaymentsPage() {
 
       <main className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-5 space-y-4">
 
+        {/* Gợi ý người phụ trách (dùng chung cho mọi ô nhập) */}
+        <datalist id="payment-people">
+          {people.map(p => <option key={p} value={p} />)}
+        </datalist>
+
         {/* KPI */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
           <KpiCard label="Tổng giá trị HĐ" value={fmtVND(filteredContract)}
@@ -242,6 +273,8 @@ export default function PaymentsPage() {
               const pct = sheetContract > 0 ? sheetEarned / sheetContract * 100 : 0;
               const avgProgress = rows.length ? rows.reduce((s, r) => s + r.progress, 0) / rows.length : 0;
               const slug = rows[0]?.sheetSlug;
+              const sheetTypeId = rows[0]?.sheetTypeId;
+              const responsible = rows[0]?.responsible ?? '';
               return (
                 <div key={sheet} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
                   <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800">
@@ -263,6 +296,26 @@ export default function PaymentsPage() {
                       <a href={`/tracking/${slug}`} className="text-xs text-zinc-500 hover:text-zinc-200 shrink-0 px-2 py-1 rounded border border-zinc-800 hover:border-zinc-600 transition">
                         Tracking
                       </a>
+                    )}
+                  </div>
+                  {/* Người phụ trách / nhà thầu phụ */}
+                  <div className="flex items-center gap-2 px-4 py-2.5 border-b border-zinc-800/60 bg-zinc-900/40">
+                    <Users className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                    <span className="text-[11px] text-zinc-500 shrink-0">Phụ trách:</span>
+                    {canEdit ? (
+                      <>
+                        <input
+                          type="text" list="payment-people"
+                          defaultValue={responsible}
+                          onBlur={e => { if (sheetTypeId != null && e.target.value.trim() !== responsible) saveResponsible(sheetTypeId, e.target.value); }}
+                          onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                          placeholder="Chọn hoặc nhập tên nhà thầu phụ"
+                          className="flex-1 sm:max-w-xs text-xs bg-zinc-800 border border-zinc-700 focus:border-sky-500 rounded px-2 py-1.5 text-zinc-200 focus:outline-none"
+                        />
+                        {savingResp === sheetTypeId && <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400 shrink-0" />}
+                      </>
+                    ) : (
+                      <span className="text-xs text-zinc-300 truncate">{responsible || '—'}</span>
                     )}
                   </div>
                   <div className="divide-y divide-zinc-800/40">

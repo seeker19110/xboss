@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 
 type FloorRow = {
   sheetTypeId: number; sheetType: string; sheetSlug: string | null;
+  responsible: string | null;
   floorLabel: string;
   progress: number; taskCount: number; delayed: number;
   contractValue: number;
@@ -18,6 +19,7 @@ export async function GET(_req: NextRequest) {
 
   const rows = await query<FloorRow>(`
     SELECT st.id AS "sheetTypeId", st.code AS "sheetType", st.slug AS "sheetSlug",
+           st.responsible AS responsible,
            wp.floor_label AS "floorLabel",
            COALESCE(AVG(t.progress_percent), 0) AS progress,
            COUNT(DISTINCT t.id)::int AS "taskCount",
@@ -29,7 +31,7 @@ export async function GET(_req: NextRequest) {
       LEFT JOIN floor_contracts fc
              ON fc.sheet_type_id = st.id AND fc.floor_label = wp.floor_label
      WHERE wp.floor_label IS NOT NULL AND wp.floor_label != ''
-     GROUP BY st.id, st.code, st.slug, wp.floor_label, fc.contract_value
+     GROUP BY st.id, st.code, st.slug, st.responsible, wp.floor_label, fc.contract_value
      ORDER BY st.id, wp.floor_label`);
 
   const totalContract = rows.reduce((s, r) => s + r.contractValue, 0);
