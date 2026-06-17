@@ -142,7 +142,7 @@ export default function PrintPage() {
         {/* ── Header ── */}
         <div className="flex items-start gap-6 mb-4">
           {/* Logo — bấm để tải lên (Admin/PM); in ra chỉ còn ảnh */}
-          <div className="shrink-0 w-24 h-20 relative group">
+          <div className="shrink-0 w-32 h-36 relative group">
             {logo ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={logo} alt="Logo nhà thầu" className="w-full h-full object-contain" />
@@ -175,7 +175,7 @@ export default function PrintPage() {
             <p className="text-sm">Tên NTP: <strong>TỔ ĐỘI THI CÔNG {person.toUpperCase()}</strong></p>
             <p className="text-sm">Ngày {fmtDate(billDate)}</p>
             <p className="text-sm font-bold flex items-center justify-center gap-2">
-              <span>KỲ BILL:</span>
+              <span>KỲ BILL THỨ:</span>
               {/* Sửa được trên màn hình, in ra chỉ còn chữ */}
               <input type="text" value={periodLabel}
                 onChange={e => setPeriodLabel(e.target.value)}
