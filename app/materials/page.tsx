@@ -525,19 +525,19 @@ export default function MaterialsPage() {
                     <td className="px-1 py-2 whitespace-nowrap">
                       <div className="flex items-center gap-0 opacity-0 group-hover/row:opacity-100 transition-opacity">
                         <button onClick={() => setHistoryMat(m)} title="Lịch sử nhập/xuất"
-                          className="text-zinc-500 hover:text-emerald-400 p-1"><History className="w-3.5 h-3.5" /></button>
+                          className="text-zinc-500 hover:text-emerald-400 p-2"><History className="w-3.5 h-3.5" /></button>
                         {canEdit && (m.qtyStock ?? 0) > 0 && (
                           <button onClick={() => { setIssueMat(m); setIssueQty(''); setIssueNote(''); }}
                             title="Xuất kho ra công trường"
-                            className="text-zinc-500 hover:text-blue-400 p-1"><ArrowDownToLine className="w-3.5 h-3.5" /></button>
+                            className="text-zinc-500 hover:text-blue-400 p-2"><ArrowDownToLine className="w-3.5 h-3.5" /></button>
                         )}
                         {canEdit && (
                           <button onClick={() => copyRow(m)} title="Nhân đôi hàng"
-                            className="text-zinc-500 hover:text-sky-400 p-1"><Copy className="w-3.5 h-3.5" /></button>
+                            className="text-zinc-500 hover:text-sky-400 p-2"><Copy className="w-3.5 h-3.5" /></button>
                         )}
                         {canDelete && (
                           <button onClick={() => remove(m)} title="Xoá hàng"
-                            className="text-zinc-500 hover:text-red-400 p-1"><Trash2 className="w-3.5 h-3.5" /></button>
+                            className="text-zinc-500 hover:text-red-400 p-2"><Trash2 className="w-3.5 h-3.5" /></button>
                         )}
                       </div>
                     </td>

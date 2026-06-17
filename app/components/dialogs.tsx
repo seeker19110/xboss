@@ -53,7 +53,7 @@ export function Modal({ onClose, children, className = 'max-w-md', zIndex = 'z-5
   return (
     <div className={`fixed inset-0 ${zIndex} bg-black/60 flex items-center justify-center p-4`}
       role="dialog" aria-modal="true" onClick={onClose}>
-      <div ref={panelRef} className={`bg-zinc-900 border border-zinc-700 rounded-xl w-full ${className}`}
+      <div ref={panelRef} className={`bg-zinc-900 border border-zinc-700 rounded-xl w-full max-h-[90vh] overflow-y-auto ${className}`}
         onClick={e => e.stopPropagation()}>
         {children}
       </div>

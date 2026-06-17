@@ -268,7 +268,7 @@ export default function ApprovalsPage() {
       <input ref={fileRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={onFileChosen} />
       <AppHeader />
 
-      <main className="p-6 space-y-8">
+      <main className="p-4 sm:p-6 space-y-8">
         {/* Chờ nghiệm thu */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
           <div className="p-4 border-b border-zinc-800">
@@ -277,8 +277,8 @@ export default function ApprovalsPage() {
             </h2>
             <p className="text-xs text-zinc-500 mt-0.5">Chỉ duyệt được khi tất cả task trong tầng đạt 100%</p>
           </div>
-          <div className="overflow-auto">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[560px]">
               <thead>
                 <tr className="text-xs text-zinc-400 border-b border-zinc-800">
                   <th className="text-left p-3">HỆ</th>
@@ -308,8 +308,8 @@ export default function ApprovalsPage() {
               Đã nghiệm thu ({approved.length} tầng · hệ)
             </h2>
           </div>
-          <div className="overflow-auto">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[560px]">
               <thead>
                 <tr className="text-xs text-zinc-400 border-b border-zinc-800">
                   <th className="text-left p-3">HỆ</th>
