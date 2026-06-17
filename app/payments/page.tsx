@@ -23,6 +23,7 @@ type Bill = {
   id: number; responsible: string; type: BillType; period: string | null;
   amount: number; description: string | null; paidDate: string;
   progressSnapshot: number; note: string | null;
+  unit: string | null; quantity: number | null; labor: number | null;
   sheetTypeId: number | null; floorLabel: string | null; pctThisPeriod: number;
   createdBy: number | null; createdByName: string | null; createdAt: string;
 };
@@ -34,12 +35,13 @@ type FloorData = {
 type AddInput = {
   responsible: string; type: BillType; amount: number; paidDate: string;
   period: string | null; description: string | null; progressSnapshot: number; note: string | null;
+  unit?: string | null; quantity?: number | null; labor?: number | null;
   sheetTypeId?: number | null; floorLabel?: string | null; pctThisPeriod?: number;
 };
 
 // Edit key: `${sheetTypeId}__${floorLabel}`
 type EditKey = string;
-type DraftBillRow = { key: number; sheetTypeId: number | null; floorLabel: string; pct: string };
+type DraftBillRow = { key: number; sheetTypeId: number | null; floorLabel: string; pct: string; unit: string; quantity: string; labor: string };
 type DraftLineRow = { key: number; description: string; amount: string };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -150,6 +152,7 @@ export default function PaymentsPage() {
       period: input.period, amount, description: input.description,
       paidDate: input.paidDate, progressSnapshot: input.progressSnapshot,
       note: input.note,
+      unit: input.unit ?? null, quantity: input.quantity ?? null, labor: input.labor ?? null,
       sheetTypeId: input.sheetTypeId ?? null,
       floorLabel: input.floorLabel ?? null,
       pctThisPeriod: input.pctThisPeriod ?? 0,
@@ -163,6 +166,14 @@ export default function PaymentsPage() {
     if (!confirm('Xoá bill thanh toán này?')) return;
     const res = await fetch(`/api/payments/bills/${id}`, { method: 'DELETE' });
     if (res.ok) setBills(prev => prev.filter(b => b.id !== id));
+  }
+
+  async function patchBill(id: number, patch: { unit?: string | null; quantity?: number | null; labor?: number | null }) {
+    setBills(prev => prev.map(b => b.id === id ? { ...b, ...patch } : b));
+    await fetch(`/api/payments/bills/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
   }
 
   async function saveEdits(pending: Record<EditKey, string>, rows: FloorRow[]) {
@@ -405,7 +416,7 @@ export default function PaymentsPage() {
                   {!isNone && (
                     <BillsSection person={person} bills={personBills} earned={pEarned}
                       progress={pAvg} canEdit={canEdit}
-                      onAdd={addBill} onDelete={deleteBill} />
+                      onAdd={addBill} onDelete={deleteBill} onPatch={patchBill} />
                   )}
                 </div>
               );
@@ -427,14 +438,15 @@ export default function PaymentsPage() {
 // Bảng thanh toán inline: Section A (tầng), Section B (phát sinh), TU (tạm ứng).
 
 let _draftKey = 0;
-function newDraftBill(): DraftBillRow { return { key: ++_draftKey, sheetTypeId: null, floorLabel: '', pct: '' }; }
+function newDraftBill(): DraftBillRow { return { key: ++_draftKey, sheetTypeId: null, floorLabel: '', pct: '', unit: 'LS', quantity: '', labor: '' }; }
 function newDraftLine(): DraftLineRow { return { key: ++_draftKey, description: '', amount: '' }; }
 
-function BillsSection({ person, bills, earned, progress, canEdit, onAdd, onDelete }: {
+function BillsSection({ person, bills, earned, progress, canEdit, onAdd, onDelete, onPatch }: {
   person: string; bills: Bill[]; earned: number; progress: number;
   canEdit: boolean;
   onAdd: (input: AddInput) => Promise<{ ok: boolean; amount?: number }>;
   onDelete: (id: number) => void;
+  onPatch: (id: number, patch: { unit?: string | null; quantity?: number | null; labor?: number | null }) => void;
 }) {
   const [open, setOpen] = useState(true);
   const [floors, setFloors] = useState<FloorData[]>([]);
@@ -491,6 +503,9 @@ function BillsSection({ person, bills, earned, progress, canEdit, onAdd, onDelet
       const { ok } = await onAdd({
         responsible: person, type: 'bill', amount: 0, paidDate,
         period: periodVal, description: null, progressSnapshot: progress, note: null,
+        unit: d.unit.trim() || 'LS',
+        quantity: d.quantity.trim() ? parseFloat(d.quantity.replace(/[^\d.]/g, '')) : null,
+        labor: d.labor.trim() ? parseFloat(d.labor.replace(/[^\d.]/g, '')) : null,
         sheetTypeId: d.sheetTypeId, floorLabel: d.floorLabel, pctThisPeriod: pct,
       });
       if (!ok) { setBusy(false); return; }
@@ -517,7 +532,7 @@ function BillsSection({ person, bills, earned, progress, canEdit, onAdd, onDelet
     setBusy(false);
   }
 
-  const COL = canEdit ? 8 : 7;
+  const COL = canEdit ? 11 : 10;
   const inputCls = 'bg-zinc-800 border border-zinc-700 focus:outline-none text-zinc-200 rounded px-1.5 py-1 text-[11px]';
 
   return (
@@ -565,14 +580,17 @@ function BillsSection({ person, bills, earned, progress, canEdit, onAdd, onDelet
 
           {/* ── Bảng chính ── */}
           <div className="overflow-x-auto">
-            <table className="w-full text-[11px] min-w-[640px] border-collapse">
+            <table className="w-full text-[11px] min-w-[820px] border-collapse">
               <thead>
                 <tr style={{ background: '#4472c4' }} className="text-white text-center">
                   <th className="px-1 py-1.5 w-8">STT</th>
                   <th className="px-2 py-1.5 text-left">Diễn giải / Tầng</th>
                   <th className="px-1 py-1.5 w-20">Hệ</th>
                   <th className="px-2 py-1.5 w-24 text-right">Giá trị HĐ</th>
-                  <th className="px-1 py-1.5 w-16 text-center">% kỳ</th>
+                  <th className="px-1 py-1.5 w-14 text-center">% kỳ</th>
+                  <th className="px-1 py-1.5 w-12 text-center">ĐVT</th>
+                  <th className="px-1 py-1.5 w-14 text-center">KL</th>
+                  <th className="px-2 py-1.5 w-24 text-right">Nhân công</th>
                   <th className="px-2 py-1.5 w-28 text-right">Thành tiền</th>
                   <th className="px-2 py-1.5 w-28">Lũy kế</th>
                   {canEdit && <th className="w-7" />}
@@ -602,6 +620,33 @@ function BillsSection({ person, bills, earned, progress, canEdit, onAdd, onDelet
                         <td className="px-1 py-1.5 text-center text-zinc-300 tabular-nums">
                           {b.pctThisPeriod > 0 ? `${Math.round(b.pctThisPeriod * 100)}%` : '—'}
                         </td>
+                        {canEdit ? (
+                          <>
+                            <td className="px-1 py-1">
+                              <input type="text" defaultValue={b.unit ?? 'LS'}
+                                onBlur={e => { const v = e.target.value.trim() || 'LS'; if (v !== (b.unit ?? 'LS')) onPatch(b.id, { unit: v }); }}
+                                className={`${inputCls} w-full text-center`} />
+                            </td>
+                            <td className="px-1 py-1">
+                              <input type="text" inputMode="decimal" defaultValue={b.quantity != null ? String(b.quantity) : ''}
+                                placeholder="—"
+                                onBlur={e => { const t = e.target.value.trim(); const v = t ? parseFloat(t.replace(/[^\d.]/g, '')) : null; onPatch(b.id, { quantity: v }); }}
+                                className={`${inputCls} w-full text-center tabular-nums`} />
+                            </td>
+                            <td className="px-1 py-1">
+                              <input type="text" inputMode="numeric" defaultValue={b.labor != null ? b.labor.toLocaleString('vi-VN') : ''}
+                                placeholder="—"
+                                onBlur={e => { const t = e.target.value.trim(); const v = t ? parseFloat(t.replace(/[^\d.]/g, '')) : null; onPatch(b.id, { labor: v }); }}
+                                className={`${inputCls} w-full text-right tabular-nums`} />
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="px-1 py-1.5 text-center text-zinc-400">{b.unit ?? 'LS'}</td>
+                            <td className="px-1 py-1.5 text-center text-zinc-400 tabular-nums">{b.quantity != null ? b.quantity.toLocaleString('vi-VN') : '—'}</td>
+                            <td className="px-2 py-1.5 text-right text-zinc-400 tabular-nums">{b.labor != null && b.labor > 0 ? fmtVND(b.labor) : '—'}</td>
+                          </>
+                        )}
                         <td className="px-2 py-1.5 text-right text-sky-300 font-semibold tabular-nums">{fmtVND(b.amount)}</td>
                         <td className="px-2 py-1.5">
                           {fl && (
@@ -675,6 +720,24 @@ function BillsSection({ person, bills, earned, progress, canEdit, onAdd, onDelet
                           placeholder="0"
                           className={`${inputCls} focus:border-sky-500 w-full text-center tabular-nums`} />
                       </td>
+                      <td className="px-1 py-1">
+                        <input type="text" value={d.unit}
+                          onChange={e => setDraftA(p => p.map(r => r.key === d.key ? { ...r, unit: e.target.value } : r))}
+                          placeholder="LS"
+                          className={`${inputCls} focus:border-sky-500 w-full text-center`} />
+                      </td>
+                      <td className="px-1 py-1">
+                        <input type="text" inputMode="decimal" value={d.quantity}
+                          onChange={e => setDraftA(p => p.map(r => r.key === d.key ? { ...r, quantity: e.target.value } : r))}
+                          placeholder="—"
+                          className={`${inputCls} focus:border-sky-500 w-full text-center tabular-nums`} />
+                      </td>
+                      <td className="px-1 py-1">
+                        <input type="text" inputMode="numeric" value={d.labor}
+                          onChange={e => setDraftA(p => p.map(r => r.key === d.key ? { ...r, labor: e.target.value } : r))}
+                          placeholder="—"
+                          className={`${inputCls} focus:border-sky-500 w-full text-right tabular-nums`} />
+                      </td>
                       <td className="px-2 py-1 text-right text-sky-400 font-medium tabular-nums">{amt > 0 ? fmtVND(amt) : '—'}</td>
                       <td className="px-2 py-1">
                         {pctAfter > 0 && (
@@ -706,28 +769,28 @@ function BillsSection({ person, bills, earned, progress, canEdit, onAdd, onDelet
                 {/* GTTHTC */}
                 <tr style={{ background: '#fff2cc' }} className="border-t border-zinc-700/50">
                   <td className="px-1 py-1.5 text-center text-[10px] font-bold text-amber-800">GTTHTC</td>
-                  <td className="px-2 py-1.5 font-bold text-amber-800" colSpan={4}>TỔNG GIÁ TRỊ CÔNG VIỆC HOÀN THÀNH (CHƯA VAT)</td>
+                  <td className="px-2 py-1.5 font-bold text-amber-800" colSpan={7}>TỔNG GIÁ TRỊ CÔNG VIỆC HOÀN THÀNH (CHƯA VAT)</td>
                   <td className="px-2 py-1.5 text-right font-bold text-amber-800 tabular-nums" colSpan={canEdit ? 3 : 2}>{fmtVND(totalBills)}</td>
                 </tr>
 
                 {/* GL */}
                 <tr style={{ background: '#fff2cc' }}>
                   <td className="px-1 py-1.5 text-center text-[10px] text-zinc-600">(GL)</td>
-                  <td className="px-2 py-1.5 text-zinc-600" colSpan={4}>TIỀN GIỮ LẠI (NẾU CÓ)</td>
+                  <td className="px-2 py-1.5 text-zinc-600" colSpan={7}>TIỀN GIỮ LẠI (NẾU CÓ)</td>
                   <td className="px-2 py-1.5 text-right text-zinc-600 tabular-nums" colSpan={canEdit ? 3 : 2}>{fmtVND(0)}</td>
                 </tr>
 
                 {/* ═══ TẠM ỨNG ═══ */}
                 <tr style={{ background: '#ede9fe' }}>
                   <td className="px-1 py-1.5 text-center text-[10px] font-bold text-violet-800">(TU)</td>
-                  <td className="px-2 py-1.5 font-bold text-violet-800" colSpan={4}>TẠM ỨNG</td>
+                  <td className="px-2 py-1.5 font-bold text-violet-800" colSpan={7}>TẠM ỨNG</td>
                   <td className="px-2 py-1.5 text-right font-bold text-violet-700 tabular-nums" colSpan={canEdit ? 3 : 2}>{fmtVND(totalAdvs)}</td>
                 </tr>
 
                 {advRows.map((b, i) => (
                   <tr key={b.id} className="border-b border-zinc-800/40 hover:bg-zinc-800/20">
                     <td className="px-1 py-1.5 text-center text-zinc-500">{i + 1}</td>
-                    <td className="px-2 py-1.5 text-zinc-300" colSpan={4}>{b.description ?? '—'}{b.period && <span className="ml-1.5 text-[10px] text-zinc-500">[{b.period}]</span>}</td>
+                    <td className="px-2 py-1.5 text-zinc-300" colSpan={7}>{b.description ?? '—'}{b.period && <span className="ml-1.5 text-[10px] text-zinc-500">[{b.period}]</span>}</td>
                     <td className="px-2 py-1.5 text-right text-violet-300 font-semibold tabular-nums">{fmtVND(b.amount)}</td>
                     <td className="px-2 py-1.5 text-zinc-500 text-[10px]">{fmtDate(b.paidDate)}</td>
                     {canEdit && <td className="px-1 py-1.5 text-center"><button onClick={() => onDelete(b.id)}><Trash2 className="w-3.5 h-3.5 text-zinc-700 hover:text-red-400" /></button></td>}
@@ -737,7 +800,7 @@ function BillsSection({ person, bills, earned, progress, canEdit, onAdd, onDelet
                 {draftTU.map(d => (
                   <tr key={d.key} className="border-b border-zinc-700/40 bg-zinc-900/50">
                     <td className="px-1 py-1 text-center text-zinc-600">·</td>
-                    <td className="px-1 py-1" colSpan={4}>
+                    <td className="px-1 py-1" colSpan={7}>
                       <input type="text" value={d.description}
                         onChange={e => setDraftTU(p => p.map(r => r.key === d.key ? { ...r, description: e.target.value } : r))}
                         placeholder="Ghi chú tạm ứng (tuỳ chọn)"
@@ -767,21 +830,21 @@ function BillsSection({ person, bills, earned, progress, canEdit, onAdd, onDelet
                 {/* HU */}
                 <tr style={{ background: '#fff2cc' }}>
                   <td className="px-1 py-1.5 text-center text-[10px] text-zinc-600">(HU)</td>
-                  <td className="px-2 py-1.5 text-zinc-600" colSpan={4}>KHẤU TRỪ TẠM ỨNG</td>
+                  <td className="px-2 py-1.5 text-zinc-600" colSpan={7}>KHẤU TRỪ TẠM ỨNG</td>
                   <td className="px-2 py-1.5 text-right text-violet-600 tabular-nums" colSpan={canEdit ? 3 : 2}>{totalAdvs > 0 ? `(${fmtVND(totalAdvs)})` : fmtVND(0)}</td>
                 </tr>
 
                 {/* ═══ PHÁT SINH ═══ */}
                 <tr style={{ background: '#fef3c7' }} className="border-t border-zinc-700/40">
                   <td className="px-1 py-1.5 text-center text-[10px] font-bold text-amber-700">PS</td>
-                  <td className="px-2 py-1.5 font-bold text-amber-700" colSpan={4}>KHOẢN PHÁT SINH</td>
+                  <td className="px-2 py-1.5 font-bold text-amber-700" colSpan={7}>KHOẢN PHÁT SINH</td>
                   <td className="px-2 py-1.5 text-right font-bold text-amber-700 tabular-nums" colSpan={canEdit ? 3 : 2}>{fmtVND(totalItems)}</td>
                 </tr>
 
                 {itemRows.map((b, i) => (
                   <tr key={b.id} className="border-b border-zinc-800/40 hover:bg-zinc-800/20">
                     <td className="px-1 py-1.5 text-center text-zinc-500">{i + 1}</td>
-                    <td className="px-2 py-1.5 text-zinc-300" colSpan={4}>{b.description}{b.period && <span className="ml-1.5 text-[10px] text-zinc-500">[{b.period}]</span>}</td>
+                    <td className="px-2 py-1.5 text-zinc-300" colSpan={7}>{b.description}{b.period && <span className="ml-1.5 text-[10px] text-zinc-500">[{b.period}]</span>}</td>
                     <td className="px-2 py-1.5 text-right text-amber-300 font-semibold tabular-nums">{fmtVND(b.amount)}</td>
                     <td className="px-2 py-1.5 text-zinc-500 text-[10px]">{fmtDate(b.paidDate)}</td>
                     {canEdit && <td className="px-1 py-1.5 text-center"><button onClick={() => onDelete(b.id)}><Trash2 className="w-3.5 h-3.5 text-zinc-700 hover:text-red-400" /></button></td>}
@@ -791,7 +854,7 @@ function BillsSection({ person, bills, earned, progress, canEdit, onAdd, onDelet
                 {draftB.map((d, idx) => (
                   <tr key={d.key} className="border-b border-zinc-700/40 bg-zinc-900/50">
                     <td className="px-1 py-1 text-center text-zinc-600">·</td>
-                    <td className="px-1 py-1" colSpan={4}>
+                    <td className="px-1 py-1" colSpan={7}>
                       <input type="text" value={d.description}
                         onChange={e => setDraftB(p => p.map(r => r.key === d.key ? { ...r, description: e.target.value } : r))}
                         placeholder={`Khoản phát sinh ${idx + 1} *`}
@@ -821,21 +884,21 @@ function BillsSection({ person, bills, earned, progress, canEdit, onAdd, onDelet
                 {/* GTTTK */}
                 <tr style={{ background: '#fff2cc' }} className="border-t border-zinc-700/50">
                   <td className="px-1 py-1.5 text-center text-[10px] font-bold text-amber-800">(GTTTK)</td>
-                  <td className="px-2 py-1.5 font-bold text-amber-800" colSpan={4}>TỔNG GIÁ TRỊ ĐƯỢC THANH TOÁN ĐẾN KỲ NÀY</td>
+                  <td className="px-2 py-1.5 font-bold text-amber-800" colSpan={7}>TỔNG GIÁ TRỊ ĐƯỢC THANH TOÁN ĐẾN KỲ NÀY</td>
                   <td className="px-2 py-1.5 text-right font-bold text-amber-800 tabular-nums" colSpan={canEdit ? 3 : 2}>{fmtVND(netTotal)}</td>
                 </tr>
 
                 {/* GTTTKT */}
                 <tr style={{ background: '#fff2cc' }}>
                   <td className="px-1 py-1.5 text-center text-[10px] text-zinc-600">(GTTTKT)</td>
-                  <td className="px-2 py-1.5 text-zinc-600" colSpan={4}>TỔNG GIÁ TRỊ ĐÃ THANH TOÁN ĐẾN KỲ TRƯỚC (GỒM TẠM ỨNG)</td>
+                  <td className="px-2 py-1.5 text-zinc-600" colSpan={7}>TỔNG GIÁ TRỊ ĐÃ THANH TOÁN ĐẾN KỲ TRƯỚC (GỒM TẠM ỨNG)</td>
                   <td className="px-2 py-1.5 text-right text-zinc-500 tabular-nums" colSpan={canEdit ? 3 : 2}>{fmtVND(0)}</td>
                 </tr>
 
                 {/* DNTT */}
                 <tr style={{ background: '#e2efda' }} className="border-t-2 border-zinc-600">
                   <td className="px-1 py-2 text-center text-[10px] font-bold text-green-900">(DNTT)</td>
-                  <td className="px-2 py-2 font-bold text-green-900" colSpan={4}>ĐỀ NGHỊ THANH TOÁN (CÓ VAT)</td>
+                  <td className="px-2 py-2 font-bold text-green-900" colSpan={7}>ĐỀ NGHỊ THANH TOÁN (CÓ VAT)</td>
                   <td className="px-2 py-2 text-right font-bold text-green-800 tabular-nums text-sm" colSpan={canEdit ? 3 : 2}>{fmtVND(netTotal)}</td>
                 </tr>
 

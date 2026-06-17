@@ -470,6 +470,9 @@ CREATE TABLE IF NOT EXISTS payment_bills (
   paid_date DATE NOT NULL,
   progress_snapshot NUMERIC(5,4) DEFAULT 0,
   note TEXT,
+  unit TEXT DEFAULT 'LS',
+  quantity NUMERIC(15,3),
+  labor NUMERIC(15,2),
   created_by INTEGER REFERENCES users(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   CONSTRAINT payment_bills_type_chk CHECK (type IN ('bill','advance','item'))
@@ -482,6 +485,9 @@ ALTER TABLE payment_bills ADD CONSTRAINT payment_bills_type_chk CHECK (type IN (
 ALTER TABLE payment_bills ADD COLUMN IF NOT EXISTS sheet_type_id INTEGER REFERENCES sheet_types(id);
 ALTER TABLE payment_bills ADD COLUMN IF NOT EXISTS floor_label TEXT;
 ALTER TABLE payment_bills ADD COLUMN IF NOT EXISTS pct_this_period NUMERIC(5,4) DEFAULT 0;
+ALTER TABLE payment_bills ADD COLUMN IF NOT EXISTS unit TEXT DEFAULT 'LS';
+ALTER TABLE payment_bills ADD COLUMN IF NOT EXISTS quantity NUMERIC(15,3);
+ALTER TABLE payment_bills ADD COLUMN IF NOT EXISTS labor NUMERIC(15,2);
 `;
 
 export function getPool(): Pool {

@@ -10,6 +10,7 @@ type Bill = {
   id: number; responsible: string; type: BillType; period: string | null;
   amount: number; description: string | null; paidDate: string;
   progressSnapshot: number; note: string | null;
+  unit: string | null; quantity: number | null; labor: number | null;
   sheetTypeId: number | null; floorLabel: string | null; pctThisPeriod: number;
   createdBy: number | null; createdByName: string | null; createdAt: string;
 };
@@ -23,7 +24,7 @@ export async function GET(_req: NextRequest) {
            pb.amount, pb.description,
            pb.paid_date        AS "paidDate",
            pb.progress_snapshot AS "progressSnapshot",
-           pb.note,
+           pb.note, pb.unit, pb.quantity, pb.labor,
            pb.sheet_type_id   AS "sheetTypeId",
            pb.floor_label     AS "floorLabel",
            COALESCE(pb.pct_this_period, 0) AS "pctThisPeriod",
@@ -67,6 +68,12 @@ export async function POST(req: NextRequest) {
   if (!Number.isFinite(progress) || progress < 0) progress = 0;
   if (progress > 1) progress = 1;
 
+  const unit = (b?.unit ?? "").trim() || (type === "bill" ? "LS" : type === "item" ? "Lô" : null);
+  let quantity = b?.quantity != null && b.quantity !== "" ? Number(b.quantity) : null;
+  if (quantity != null && (!Number.isFinite(quantity) || quantity < 0)) quantity = null;
+  let labor = b?.labor != null && b.labor !== "" ? Number(b.labor) : null;
+  if (labor != null && (!Number.isFinite(labor) || labor < 0)) labor = null;
+
   // Tính amount: nếu type=bill + có floor → amount = contractValue × pct
   let amount = Number(b?.amount);
   if (type === "bill" && sheetTypeId && floorLabel && pctThisPeriod > 0) {
@@ -94,10 +101,12 @@ export async function POST(req: NextRequest) {
   const id = await insertId(`
     INSERT INTO payment_bills
            (responsible, type, period, amount, description, paid_date,
-            progress_snapshot, note, sheet_type_id, floor_label, pct_this_period, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            progress_snapshot, note, unit, quantity, labor,
+            sheet_type_id, floor_label, pct_this_period, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     responsible, type, period, amount, description, paidDate,
-    progress, note, sheetTypeId, floorLabel, pctThisPeriod, user.id);
+    progress, note, unit, quantity, labor,
+    sheetTypeId, floorLabel, pctThisPeriod, user.id);
 
   return NextResponse.json({ ok: true, id, amount });
 }

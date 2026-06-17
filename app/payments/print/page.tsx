@@ -9,6 +9,7 @@ type Bill = {
   id: number; responsible: string; type: BillType; period: string | null;
   amount: number; description: string | null; paidDate: string;
   note: string | null;
+  unit: string | null; quantity: number | null; labor: number | null;
 };
 type ProjectInfo = {
   name: string | null; code: string | null; tower: string | null;
@@ -146,9 +147,9 @@ export default function PrintPage() {
                 <tr key={b.id} className="hover:bg-yellow-50">
                   <td className="border border-black px-1 py-1.5 text-center">{stt}</td>
                   <td className="border border-black px-2 py-1.5">{b.description ?? 'Thanh toán tiến độ'}</td>
-                  <td className="border border-black px-1 py-1.5 text-center">LS</td>
-                  <td className="border border-black px-1 py-1.5 text-center">—</td>
-                  <td className="border border-black px-2 py-1.5 text-right">—</td>
+                  <td className="border border-black px-1 py-1.5 text-center">{b.unit ?? 'LS'}</td>
+                  <td className="border border-black px-1 py-1.5 text-center">{b.quantity != null ? b.quantity.toLocaleString('vi-VN') : '—'}</td>
+                  <td className="border border-black px-2 py-1.5 text-right">{b.labor != null && b.labor > 0 ? fmtVND(b.labor) : '—'}</td>
                   <td className="border border-black px-2 py-1.5 text-right font-medium">{fmtVND(b.amount)}</td>
                   <td className="border border-black px-2 py-1.5 text-[11px]">{b.note ?? ''}</td>
                 </tr>
@@ -165,9 +166,9 @@ export default function PrintPage() {
                 <tr key={b.id} className="hover:bg-yellow-50">
                   <td className="border border-black px-1 py-1.5 text-center">{stt}</td>
                   <td className="border border-black px-2 py-1.5">{b.description}</td>
-                  <td className="border border-black px-1 py-1.5 text-center">Lô</td>
-                  <td className="border border-black px-1 py-1.5 text-center">—</td>
-                  <td className="border border-black px-2 py-1.5 text-right">{fmtVND(b.amount)}</td>
+                  <td className="border border-black px-1 py-1.5 text-center">{b.unit ?? 'Lô'}</td>
+                  <td className="border border-black px-1 py-1.5 text-center">{b.quantity != null ? b.quantity.toLocaleString('vi-VN') : '—'}</td>
+                  <td className="border border-black px-2 py-1.5 text-right">{b.labor != null && b.labor > 0 ? fmtVND(b.labor) : fmtVND(b.amount)}</td>
                   <td className="border border-black px-2 py-1.5 text-right text-red-700">({fmtVND(b.amount)})</td>
                   <td className="border border-black px-2 py-1.5 text-[11px]">{b.note ?? ''}</td>
                 </tr>
