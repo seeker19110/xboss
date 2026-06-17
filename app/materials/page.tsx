@@ -416,7 +416,7 @@ export default function MaterialsPage() {
                         <button onClick={() => setEditingLabel(null)} title="Huỷ" className="text-zinc-500 hover:text-zinc-300"><X className="w-3 h-3" /></button>
                       </div>
                     ) : (
-                      <div className={`flex items-center gap-1 px-2 py-2 ${key === 'name' || key === 'boqCode' ? 'justify-start' : 'justify-center'} ${['qtyBoq','qtyPlanned','diff'].includes(key) ? 'flex-col leading-tight text-center' : ''}`}>
+                      <div className={`flex items-center gap-1 px-2 py-2 ${key === 'name' || key === 'boqCode' ? 'justify-start' : 'justify-center'} ${['qtyBoq','qtyPlanned','diff'].includes(key) ? 'flex-col justify-center leading-tight text-center h-full' : ''}`}>
                         <span className={copied === key ? 'text-emerald-400' : ''}>{colLabels[key]}</span>
                         <button onClick={() => setColMenu(prev => prev === key ? null : key)}
                           className="opacity-0 group-hover/th:opacity-100 transition-opacity text-zinc-600 hover:text-zinc-300 ml-0.5"
@@ -470,7 +470,7 @@ export default function MaterialsPage() {
                 return (
                   <tr key={m.id} className={`border-b border-zinc-800/50 hover:bg-zinc-700/40 group/row ${mi % 2 === 0 ? 'bg-zinc-900' : 'bg-zinc-800/30'}`}>
                     {visibleCols.map(key => (
-                      <td key={key} className={`px-3 py-2 align-middle ${key === 'name' ? 'text-left w-full' : 'whitespace-nowrap ' + (key === 'boqCode' ? 'text-left' : 'text-center')}`}>
+                      <td key={key} className={`px-3 py-2 align-middle ${key === 'name' ? 'text-left w-full min-w-[120px]' : 'whitespace-nowrap ' + (key === 'boqCode' ? 'text-left' : 'text-center')}`}>
 
                         {key === 'stt' && <span className="text-zinc-500 text-xs">{globalIdx + 1}</span>}
 
@@ -502,7 +502,7 @@ export default function MaterialsPage() {
                                   if (ok) { patch(m.id, { name: newName }); }
                                   else { e.target.value = m.name; }
                                 }}
-                                className="font-medium bg-transparent border border-transparent hover:border-zinc-700 focus:border-emerald-600 focus:bg-zinc-800 rounded px-1 py-0.5 outline-none w-full min-w-0 resize-none overflow-hidden leading-snug"
+                                className="font-medium bg-transparent border border-transparent hover:border-zinc-700 focus:border-emerald-600 focus:bg-zinc-800 rounded px-1 py-0.5 outline-none w-full min-w-0 resize-none overflow-hidden leading-snug break-words"
                               />
                             ) : (
                               <span className="font-medium whitespace-pre-wrap">{m.name}</span>
