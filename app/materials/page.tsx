@@ -80,7 +80,6 @@ export default function MaterialsPage() {
   const [boqEditMat, setBoqEditMat] = useState<Material | null>(null);
   const [boqDraft, setBoqDraft] = useState('');
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
   const [issueMat, setIssueMat] = useState<Material | null>(null);
   const [issueQty, setIssueQty] = useState('');
   const [issueNote, setIssueNote] = useState('');
@@ -144,8 +143,6 @@ export default function MaterialsPage() {
     });
   }, []);
   useEffect(() => { load(); }, [load]);
-  // Reset về trang 1 khi đổi filter hoặc tìm kiếm
-  useEffect(() => { setPage(1); }, [sheetFilter, search]);
 
   // Đóng menu cột khi click ngoài
   useEffect(() => {
@@ -274,10 +271,6 @@ export default function MaterialsPage() {
       )
     : materials;
 
-  const PAGE_SIZE = 100;
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const safePage = Math.min(page, totalPages || 1);
-  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -456,8 +449,8 @@ export default function MaterialsPage() {
               </tr>
             </thead>
             <tbody>
-              {paginated.map((m, mi) => {
-                const globalIdx = (safePage - 1) * PAGE_SIZE + mi;
+              {filtered.map((m, mi) => {
+                const globalIdx = mi;
                 const diff = (m.qtyBoq ?? 0) - (m.qtyPlanned ?? 0);
                 const hasBothQty = (m.qtyBoq ?? 0) > 0;
                 return (
@@ -597,7 +590,7 @@ export default function MaterialsPage() {
                   </tr>
                 );
               })}
-              {paginated.length === 0 && (
+              {filtered.length === 0 && (
                 <tr>
                   <td colSpan={visibleCols.length + 1} className="p-8 text-center text-zinc-500">
                     {q ? `Không tìm thấy vật tư nào khớp "${search}"` : 'Chưa có vật tư nào — hãy Import Excel để thêm dữ liệu.'}
@@ -608,43 +601,6 @@ export default function MaterialsPage() {
           </table>
         </div>
 
-        {/* Thanh phân trang — chỉ hiện khi có hơn 1 trang */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between text-xs text-zinc-500">
-            <span>
-              Hiển thị <span className="text-white">{(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)}</span> / {filtered.length} vật tư
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                disabled={safePage <= 1}
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                className="px-2.5 py-1.5 rounded-lg border border-zinc-700 hover:border-zinc-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
-                ← Trước
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
-                .reduce<(number | '...')[]>((acc, p, idx, arr) => {
-                  if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('...');
-                  acc.push(p);
-                  return acc;
-                }, [])
-                .map((p, i) =>
-                  p === '...'
-                    ? <span key={`e${i}`} className="px-1">…</span>
-                    : <button key={p} onClick={() => setPage(p as number)}
-                        className={`px-2.5 py-1.5 rounded-lg border transition-colors ${safePage === p ? 'border-emerald-600 text-emerald-400' : 'border-zinc-700 hover:border-zinc-500'}`}>
-                        {p}
-                      </button>
-                )}
-              <button
-                disabled={safePage >= totalPages}
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                className="px-2.5 py-1.5 rounded-lg border border-zinc-700 hover:border-zinc-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
-                Sau →
-              </button>
-            </div>
-          </div>
-        )}
         </>}
       </main>
 
