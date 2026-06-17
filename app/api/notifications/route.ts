@@ -72,6 +72,36 @@ export async function GET() {
           SELECT t.id FROM tasks t WHERE ${DUE_SOON_COND}${subconFilter})`,
     ...(isSubcon ? [user.id, today, soon, user.id] : [user.id, today, soon]));
 
+  // Task đình trệ: đang thi công, chưa xong, còn hạn (end_date ≥ hôm nay) nhưng KHÔNG có
+  // cập nhật tiến độ nào trong 7 ngày → nhắc người liên quan cập nhật. Khác "trễ" (đã quá hạn).
+  const STALLED_COND = `t.status = 'dang_thi_cong' AND t.progress_percent < 1
+        AND (t.end_date IS NULL OR t.end_date >= ?)
+        AND NOT EXISTS (SELECT 1 FROM task_history h
+                          WHERE h.task_id = t.id AND h.changed_at > NOW() - INTERVAL '7 days')`;
+  const stalled = await query<{ id: number; code: string; name: string; sheetType: string }>(
+    `SELECT t.id, t.code, t.name, st.code AS "sheetType"
+       FROM tasks t
+       JOIN work_packages wp ON t.package_id = wp.id
+       JOIN sheet_types st ON wp.sheet_type_id = st.id
+      WHERE ${STALLED_COND}${subconFilter}`,
+    ...(isSubcon ? [today, user.id] : [today]));
+
+  for (const t of stalled) {
+    await run(
+      `INSERT INTO notifications (user_id, task_id, type, message)
+       VALUES (?, ?, 'stalled', ?)
+       ON CONFLICT (user_id, task_id, type) DO NOTHING`,
+      user.id, t.id, `🕒 [${t.sheetType}] ${t.code} — ${t.name} chưa cập nhật tiến độ 7 ngày, hãy kiểm tra`);
+  }
+
+  // Hết đình trệ (đã cập nhật, đã xong, hoặc đã thành trễ) → dọn thông báo chưa đọc.
+  await run(
+    `DELETE FROM notifications
+      WHERE user_id = ? AND type = 'stalled' AND is_read = 0
+        AND task_id NOT IN (
+          SELECT t.id FROM tasks t WHERE ${STALLED_COND}${subconFilter})`,
+    ...(isSubcon ? [user.id, today, user.id] : [user.id, today]));
+
   // Vật tư dùng vượt định mức → cảnh báo cho Admin/PM/Kỹ sư (subcon không quản vật tư).
   if (user.role !== "subcon") {
     const overMats = await query<{ id: number; name: string; unit: string | null; qtyPlanned: number; qtyUsed: number; sheetCode: string | null }>(

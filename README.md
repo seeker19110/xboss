@@ -1,8 +1,8 @@
-# XBoss — Hệ thống quản lý thi công MEP
+# XBoss — Hệ thống quản lý thi công MEP/ACMV
 
-Web app quản lý tiến độ thi công ACMV cho dự án **TT AVIO Tháp A**, thay thế bộ file Excel tracking bằng giao diện realtime, đa người dùng, mobile-friendly.
+Web app quản lý tiến độ thi công MEP/ACMV cho dự án **TT AVIO Tháp A**, thay thế bộ file Excel tracking bằng giao diện realtime, đa người dùng, mobile-friendly, hoạt động được khi mạng yếu (PWA offline).
 
-> 📄 Xem đặc tả kỹ thuật đầy đủ tại [`spec.md`](./spec.md) · Hướng dẫn triển khai tại [`DEPLOY.md`](./DEPLOY.md)
+> 📄 Đặc tả kỹ thuật đầy đủ tại [`spec.md`](./spec.md) · ERD tại [`docs/ERD.md`](./docs/ERD.md) · Hướng dẫn triển khai tại [`DEPLOY.md`](./DEPLOY.md)
 
 ---
 
@@ -25,9 +25,9 @@ npm install
 
 # 3. Tạo file môi trường
 cp .env.example .env.local
-# Điền DATABASE_URL (Postgres/Supabase) + XBOSS_SECRET
+# Tối thiểu: DATABASE_URL (Postgres/Supabase) + XBOSS_SECRET
 
-# 4. (Tuỳ chọn) Seed data từ file Excel AVIO (đặt trong attachments/)
+# 4. (Tuỳ chọn) Seed data từ file Excel AVIO gốc (đặt trong attachments/)
 npm run db:seed
 
 # 5. Khởi động dev server
@@ -36,11 +36,11 @@ npm run dev
 
 Mở trình duyệt: [http://localhost:3000](http://localhost:3000)
 
-Schema tự khởi tạo khi app chạy lần đầu — không cần bước migrate riêng.
+Schema **tự khởi tạo** khi app chạy query đầu tiên (`CREATE TABLE IF NOT EXISTS`, idempotent) — không có bước migrate riêng. Đổi schema bảng đã tồn tại phải tự `ALTER` hoặc viết script backfill trong `scripts/`.
 
-### Tài khoản mặc định
+### Tài khoản mặc định (dev)
 
-Khi DB chưa có user, hệ thống tự tạo 4 tài khoản demo:
+Khi DB chưa có user, môi trường **dev** tự tạo 4 tài khoản demo:
 
 | Email | Mật khẩu | Vai trò |
 |---|---|---|
@@ -49,27 +49,57 @@ Khi DB chưa có user, hệ thống tự tạo 4 tài khoản demo:
 | `engineer@xboss.vn` | `eng123` | Kỹ sư |
 | `subcon@xboss.vn` | `sub123` | Thầu phụ |
 
-> ⚠️ Đổi mật khẩu (hoặc xoá user demo) trước khi đưa lên production. Đặt `XBOSS_SECRET` để ký cookie phiên.
+> ⚠️ **Production**: nếu DB trống, hệ thống chỉ tạo **1 admin** với mật khẩu lấy từ `XBOSS_ADMIN_PASSWORD` (không seed 4 tài khoản demo). Bắt buộc đặt `XBOSS_SECRET` để ký cookie phiên.
+
+---
+
+## Biến môi trường
+
+| Biến | Bắt buộc | Mô tả |
+|---|---|---|
+| `DATABASE_URL` | ✅ khi chạy app | Chuỗi kết nối Postgres |
+| `XBOSS_SECRET` | ✅ production | Ký cookie phiên (HMAC); thiếu → throw lúc ký/xác minh token |
+| `XBOSS_ADMIN_PASSWORD` | production | Mật khẩu admin khởi tạo khi DB trống |
+| `CRON_SECRET` | tuỳ chọn | Bảo vệ endpoint cron, nhận qua header `Authorization: Bearer` |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | tuỳ chọn | Gửi báo cáo trễ hạn qua Telegram (song song email SMTP) |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | tuỳ chọn | Web Push; sinh bằng `npx web-push generate-vapid-keys`. Thiếu → nút bật push tự ẩn |
+| SMTP (`SMTP_HOST`...) | tuỳ chọn | Gửi email báo cáo hằng ngày / tuần |
+| `TEST_DATABASE_URL` | tuỳ chọn | Postgres test riêng cho test tích hợp (không có thì test tự skip) |
 
 ---
 
 ## Tính năng chính
 
-- **BOQCODE**: mỗi hàng (nhóm + task) có mã BOQ **duy nhất toàn hệ thống**, hiển thị ở cột đầu lưới tracking, Admin/PM sửa được — hệ thống chặn nhập trùng và chỉ rõ mã đang bị hàng nào dùng
-- **Dashboard**: KPI cards per sheet, **heatmap tiến độ tầng × hệ** (bấm ô mở thẳng sheet tại tầng đó), **dự báo ngày hoàn thành** từng hệ (ngoại suy tốc độ 14 ngày), bar chart, bảng công việc trễ (lọc theo sheet / tầng / trạng thái)
-- **Gantt** (`/gantt`): timeline các nhóm theo ngày bắt đầu/kết thúc, màu theo trạng thái, % hoàn thành phủ trong thanh, vạch hôm nay, mốc tháng
-- **Tracking sheet** (`/tracking/ogtd|oghl|ogch|odnn1|odnn2`): drill-down nhóm → task → lưới checkbox theo kích thước ống / căn hộ, tự tính lại % khi toggle; **tự đồng bộ khi người khác cập nhật** (poll 10s + toast)
-- **Thông báo trễ hạn** 🔔: chuông trên header, tự phát hiện task quá deadline
-- **Lịch sử tiến độ**: mọi thay đổi % được ghi `task_history` (ai, lúc nào) — xem timeline qua nút 🕐 trên từng task
-- **Import Excel 2 bước**: upload → xem trước (số nhóm/task/cảnh báo từng sheet, chưa ghi DB) → xác nhận import
-- **Export**: Excel (KPI + danh sách trễ) và báo cáo in PDF (`/report`)
-- **Quản lý người dùng** (`/users`, Admin): thêm/xoá user, đổi vai trò, đặt lại mật khẩu; mọi người tự đổi mật khẩu tại `/password`
-- **Giao task** (Admin/PM): gán task cho người làm ngay trên lưới tracking; thầu phụ chỉ thấy và chỉ được cập nhật task của mình, thông báo trễ cũng lọc theo
-- **Quản lý vật tư** (`/materials`): định mức / đã dùng theo hệ, trạng thái đặt hàng → về kho → đã dùng, cảnh báo vượt định mức
-- **Link bản vẽ / BBNT**: gắn link bản vẽ nghiệm thu cho từng nhóm và task (icon 🔗 trong lưới); import tự đọc cột Link từ Excel
-- **PWA**: cài được lên màn hình chính điện thoại (Add to Home Screen), asset cache offline qua service worker
-- **Email báo cáo hằng ngày** 8:00 sáng: tổng hợp KPI + việc mới trễ gửi Admin/PM (cấu hình SMTP trong `.env`; Vercel Cron có sẵn trong `vercel.json`, VPS dùng crontab gọi `/api/cron/daily-report` với `CRON_SECRET`)
-- **RBAC**: Admin/PM được import/export/sửa cấu trúc; Kỹ sư/Thầu phụ cập nhật tiến độ
+### Tracking & tính toán tiến độ
+- **Sheet động**: trang tracking không hardcode — tạo/đổi tên/xoá sheet qua UI (Admin/PM), slug lưu ở `sheet_types.slug`. 5 sheet gốc: OGTĐ, OGHL, OGCH, ODNN Zone 1/2.
+- **Lưới checkbox**: drill-down nhóm → task → ô tiến độ theo kích thước ống / căn hộ; tick ô → tự tính lại % task → % nhóm → ghi `task_history`.
+- **Đồng bộ realtime đa người dùng**: SSE (`/api/events`) đẩy event khi sheet đổi; lỗi/serverless cắt → tự fallback poll `/api/tasks/version`. Mất mạng: tick được xếp hàng trong localStorage và tự gửi lại khi online.
+- **BOQCODE**: mã duy nhất **toàn hệ thống** trên tasks/work_packages/materials — chặn nhập trùng, chỉ rõ mã đang bị ai dùng.
+- **Sửa hàng loạt** (Admin/PM): sửa ngày BĐ/KT qua modal; chọn nhiều task → gán người / đặt ngày hàng loạt.
+
+### Dashboard & báo cáo
+- **Dashboard**: KPI per sheet, **SPI** (chỉ số tiến độ), heatmap tầng × hệ (bấm ô mở thẳng sheet tại tầng), **dự báo ngày hoàn thành** từng hệ, cảnh báo task đình trệ, panel **Pareto nguyên nhân trễ**.
+- **S-curve** (`/api/dashboard/scurve`): đường kế hoạch nội suy + đường thực tế tái dựng từ `task_history`; nhận `?baseline=<id>` để so với kế hoạch đã chốt.
+- **Baseline kế hoạch**: chốt snapshot ngày + % toàn bộ task để đo độ lệch khi PM dời ngày.
+- **Gantt** (`/gantt`): timeline nhóm theo ngày, màu theo trạng thái, % phủ trong thanh, vạch hôm nay; **phụ thuộc giữa nhóm việc + đường găng CPM** + vẽ mũi tên phụ thuộc + cảnh báo "bị chặn".
+- **Lookahead** (`/lookahead`): kế hoạch in 7/14/21 ngày — task sắp bắt đầu + đến hạn, nhóm theo hệ.
+- **Export Excel**: tab KPI + việc trễ + 1 tab tracking đầy đủ mỗi sheet; báo cáo in PDF (`/report`).
+- **Báo cáo hằng ngày / hằng tuần**: email + Telegram, gọi qua cron (`CRON_SECRET`); Vercel Cron có sẵn trong `vercel.json`, VPS dùng crontab.
+
+### Nghiệm thu & tài liệu
+- **Nghiệm thu 2 bước**: `nghiem_thu` chỉ đặt/huỷ qua `/api/tasks/:id/approve` (Admin/PM, task 100%, ghi audit). Duyệt theo lô tại `/approvals` + upload **biên bản nghiệm thu** (PDF/ảnh).
+- **Ảnh hiện trường** & **link bản vẽ/BBNT** gắn cho từng task/nhóm.
+
+### Cộng tác & thông báo
+- **Bình luận** trên từng task (kèm notification cho người liên quan).
+- **Thông báo** 🔔: tự đồng bộ 4 loại — `delayed`, `due_soon`, `comment`, `material_over`.
+- **Web Push** (per thiết bị) + **tìm kiếm toàn cục** (mã/BOQCODE/tên, nhảy tới sheet + filter tầng).
+- **Nguyên nhân trễ**: danh mục 6 lý do, gán theo task; hiển thị Pareto trên dashboard.
+
+### Quản lý & phân quyền
+- **Vật tư** (`/materials`): định mức / đã dùng theo hệ, vòng đời đặt hàng → về kho → đã dùng; mọi thay đổi `qty_used` ghi `material_transactions`; cảnh báo vượt định mức.
+- **RBAC**: 4 vai trò `admin | pm | engineer | subcon` (map `CAN`); subcon chỉ thao tác task được gán. Quản lý user tại `/users`; tự đổi mật khẩu tại `/password`.
+- **PWA**: cài lên màn hình chính, cache offline qua service worker; `/my-tasks` lọc theo người được giao.
 
 ---
 
@@ -79,34 +109,31 @@ Khi DB chưa có user, hệ thống tự tạo 4 tài khoản demo:
 xboss/
 ├── app/
 │   ├── page.tsx              # Dashboard (trang chủ)
-│   ├── login/page.tsx        # Đăng nhập
-│   ├── import/page.tsx       # Upload & import Excel
-│   ├── report/page.tsx       # Báo cáo in PDF
-│   ├── tracking/[sheet]/     # Bảng tracking + lưới checkbox
-│   ├── components/           # UI components (NotificationBell...)
-│   └── api/                  # REST API routes
-│       ├── auth/             # login / logout / me
-│       ├── dashboard/        # KPI + danh sách trễ
-│       ├── tasks/            # CRUD + progress + history + dimensions
-│       ├── workpackages/     # Nhóm công việc + lưới dimensions
-│       ├── dimensions/       # Toggle checkbox, đổi tên cột
-│       ├── notifications/    # Thông báo trễ hạn
-│       ├── import/excel/     # POST import file .xlsx
-│       └── export/excel/     # GET xuất Excel
+│   ├── login/ password/      # Đăng nhập / đổi mật khẩu
+│   ├── tracking/[sheet]/     # Lưới tracking động + checkbox
+│   ├── gantt/ lookahead/     # Gantt CPM + kế hoạch ngắn hạn
+│   ├── approvals/ materials/ # Nghiệm thu theo lô + vật tư
+│   ├── report/ my-tasks/     # Báo cáo in PDF + task của tôi
+│   ├── users/                # Quản lý người dùng (Admin)
+│   ├── components/           # AppHeader, NotificationBell, GlobalSearch, SCurveChart, FloorHeatmap...
+│   └── api/                  # REST API routes (đều force-dynamic + check auth)
+│       ├── auth/ dashboard/ tasks/ workpackages/ dimensions/
+│       ├── sheets/ baselines/ approvals/ notifications/ push/
+│       ├── events/ search/ lookahead/ materials/
+│       ├── import/excel/ export/excel/ project/
+│       └── cron/             # daily-report / weekly-report
 ├── lib/
 │   ├── db/index.ts           # PostgreSQL (pg Pool) + schema tự khởi tạo
-│   ├── auth.ts               # Session cookie (HMAC) + RBAC
+│   ├── auth.ts  ratelimit.ts # Session cookie (HMAC) + RBAC + rate limit
 │   ├── import.ts             # Parse Excel (dùng chung API + seed)
 │   ├── recompute.ts          # Tính lại % task/package + derive status
-│   ├── status.ts             # Chuẩn hóa trạng thái + % tiến độ
-│   └── sheets.ts             # Map slug URL ↔ mã sheet
-├── tests/                    # Unit tests (node:test)
-├── scripts/
-│   ├── seed.ts               # Seed từ Excel
-│   ├── seed-sample.ts        # Seed dữ liệu mẫu
-│   └── migrate-sqlite-to-pg.ts  # Di trú dữ liệu từ bản SQLite cũ
+│   ├── status.ts  delay.ts   # Chuẩn hóa trạng thái + danh mục lý do trễ
+│   ├── boq.ts  sheets.ts     # BOQCODE duy nhất + map slug sheet
+│   └── push.ts  photos.ts    # Web Push + lưu ảnh hiện trường
+├── tests/                    # node:test qua tsx (setup.ts import đầu tiên)
+├── scripts/                  # seed + backfill (boq, dims) + migrate
 ├── attachments/              # File Excel nguồn
-└── spec.md                   # Đặc tả kỹ thuật
+└── spec.md / docs/ERD.md     # Đặc tả + ERD
 ```
 
 ---
@@ -115,15 +142,15 @@ xboss/
 
 | Command | Mô tả |
 |---|---|
-| `npm run dev` | Chạy dev server |
-| `npm run build` | Build production |
-| `npm test` | Chạy unit tests (logic status / recompute / import) |
-| `npm run typecheck` | Kiểm tra TypeScript |
-| `npm run db:seed` | Seed data từ Excel AVIO |
-| `npm run db:seed:sample` | Seed data mẫu |
-| `npx tsx scripts/migrate-sqlite-to-pg.ts` | Di trú dữ liệu từ file `xboss.db` (bản cũ) sang Postgres |
+| `npm run dev` | Chạy dev server (cần `.env.local`) |
+| `npm run build` | Build production (pool kết nối lazy — không cần DB thật) |
+| `npm run lint` | `next lint` |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm test` | Unit tests (status / recompute / import) |
+| `npx tsx --test tests/status.test.ts` | Chạy 1 file test |
+| `npm run db:seed` | Seed từ Excel AVIO trong `attachments/` |
 
-Test tích hợp DB chỉ chạy khi đặt `TEST_DATABASE_URL` (trỏ tới Postgres test riêng); không có thì tự skip để không đụng DB thật.
+Test tích hợp (`recompute.test.ts`) chỉ chạy khi đặt `TEST_DATABASE_URL`; không có thì tự skip. CI (`.github/workflows/ci.yml`) chạy `npm audit` → lint → typecheck → test (Postgres 16 service) → build trên mỗi push/PR.
 
 ---
 
@@ -131,14 +158,14 @@ Test tích hợp DB chỉ chạy khi đặt `TEST_DATABASE_URL` (trỏ tới Pos
 
 `projects → towers → sheet_types → work_packages → tasks → progress_dimensions`
 
-Trạng thái (`status`) chuẩn hóa dạng slug: `chuan_bi`, `dang_thi_cong`, `hoan_thanh`, `nghiem_thu`, `tre`. Chuỗi tiếng Việt từ Excel ("Chuẩn bị", "Đang thi công"...) được map tự động trong `lib/status.ts`.
+Trạng thái (`status`) là slug: `chuan_bi`, `dang_thi_cong`, `hoan_thanh`, `tre`, `nghiem_thu`. Chuỗi tiếng Việt từ Excel được map tự động trong `lib/status.ts`.
 
-Một task bị coi là **trễ** khi: `end_date < hôm nay` **và** `progress < 100%` **và** chưa `hoan_thanh`/`nghiem_thu`.
+Quy tắc: cột `DATE` giữ nguyên **chuỗi** `'YYYY-MM-DD'` (so sánh ngày bằng so sánh chuỗi). Một task **trễ** khi `end_date < hôm nay` **và** `progress < 100%` **và** chưa `hoan_thanh`/`nghiem_thu`. `nghiem_thu` không bao giờ bị hạ cấp tự động.
 
-% tiến độ tự tính: task = số ô đã lắp / tổng ô; work package = trung bình các task con.
+% tiến độ: task = số ô đã tick / tổng ô; work package = trung bình các task con.
 
 ---
 
 ## Tech Stack
 
-Next.js 14 · TypeScript · Tailwind v4 · PostgreSQL (Supabase) · node-postgres (`pg`) · Recharts · SheetJS · Lucide
+Next.js 14 (App Router) · TypeScript strict · Tailwind v4 (dark-first) · PostgreSQL · node-postgres (`pg`) · Recharts · SheetJS · Lucide · Web Push · PWA

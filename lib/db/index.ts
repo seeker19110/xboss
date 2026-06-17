@@ -489,6 +489,19 @@ ALTER TABLE payment_bills ADD COLUMN IF NOT EXISTS pct_this_period NUMERIC(5,4) 
 ALTER TABLE payment_bills ADD COLUMN IF NOT EXISTS unit TEXT DEFAULT 'LS';
 ALTER TABLE payment_bills ADD COLUMN IF NOT EXISTS quantity NUMERIC(15,3);
 ALTER TABLE payment_bills ADD COLUMN IF NOT EXISTS labor NUMERIC(15,2);
+
+-- Phụ thuộc giữa nhóm việc (Finish-to-Start): nhóm trước (predecessor) xong mới tới nhóm sau (successor).
+CREATE TABLE IF NOT EXISTS package_dependencies (
+  id SERIAL PRIMARY KEY,
+  predecessor_id INTEGER NOT NULL REFERENCES work_packages(id) ON DELETE CASCADE,
+  successor_id INTEGER NOT NULL REFERENCES work_packages(id) ON DELETE CASCADE,
+  created_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (predecessor_id, successor_id),
+  CONSTRAINT package_dep_no_self CHECK (predecessor_id <> successor_id)
+);
+CREATE INDEX IF NOT EXISTS idx_pkg_dep_succ ON package_dependencies(successor_id);
+CREATE INDEX IF NOT EXISTS idx_pkg_dep_pred ON package_dependencies(predecessor_id);
 `;
 
 export function getPool(): Pool {

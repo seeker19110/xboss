@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne, run, insertId } from "@/lib/db";
+import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -50,12 +50,13 @@ export async function POST(req: NextRequest, { params: paramsP }: { params: Prom
     return NextResponse.json({ error: "Số lượng (delta) phải là số khác 0" }, { status: 400 });
   const note = String(body.note ?? "").trim().slice(0, 300) || null;
 
-  // Cập nhật atomic — tránh race condition khi nhiều request đồng thời ghi qty_used.
-  await run(
-    `UPDATE materials SET qty_used = GREATEST(0, qty_used + ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-    delta, id);
+  // Cập nhật atomic + lấy luôn số dư sau cập nhật bằng RETURNING — tránh race
+  // condition khi nhiều request đồng thời (SELECT riêng có thể đọc giá trị của
+  // request khác, làm sai qty_after/actual_delta trong audit).
   const updated = await queryOne<{ qty_used: number }>(
-    `SELECT qty_used FROM materials WHERE id = ?`, id);
+    `UPDATE materials SET qty_used = GREATEST(0, qty_used + ?), updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? RETURNING qty_used`,
+    delta, id);
   const qtyAfter = updated?.qty_used ?? 0;
   // Khi GREATEST(0,...) clip âm về 0, actual_delta nhỏ hơn delta gốc — ghi số thực để audit đúng.
   const actualDelta = qtyAfter - m.qty_used;
