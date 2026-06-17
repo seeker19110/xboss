@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   DollarSign, Users, Download, Save, Loader2,
   ChevronDown, ChevronRight, AlertTriangle, AlertCircle,
-  Receipt, Plus, Trash2, X, Wallet,
+  Receipt, Plus, Trash2, X, Wallet, Printer,
 } from 'lucide-react';
 import AppHeader from '@/app/components/AppHeader';
 import { PageSkeleton } from '@/app/components/Skeleton';
@@ -369,6 +369,15 @@ export default function PaymentsPage() {
                         {paid > 0 && <span className="text-[11px] text-sky-400">Đã TT: {fmtVND(paid)}</span>}
                       </div>
                     </div>
+                    {!isNone && (
+                      <a href={`/payments/print?person=${encodeURIComponent(person)}`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="shrink-0 flex items-center gap-1 text-[11px] border border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-zinc-200 px-2 py-1 rounded-lg transition"
+                        title="In bảng kê thanh toán">
+                        <Printer className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">In</span>
+                      </a>
+                    )}
                   </div>
                   {/* Danh sách hệ người này phụ trách */}
                   <div className="divide-y divide-zinc-800/40">

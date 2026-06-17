@@ -8,13 +8,15 @@ export const dynamic = "force-dynamic";
 // Public (chỉ trả tên hiển thị) — dùng cho header, trang login, báo cáo.
 export async function GET() {
   try {
-    const project = await queryOne<{ name: string; code: string | null; heatmap_title: string | null }>(
-      `SELECT name, code, heatmap_title FROM projects ORDER BY id LIMIT 1`);
+    const project = await queryOne<{ name: string; code: string | null; heatmap_title: string | null; investor: string | null; contractor: string | null }>(
+      `SELECT name, code, heatmap_title, investor, contractor FROM projects ORDER BY id LIMIT 1`);
     const tower = await queryOne<{ name: string }>(`SELECT name FROM towers ORDER BY id LIMIT 1`);
     return NextResponse.json({
       name: project?.name ?? null,
       code: project?.code ?? null,
       tower: tower?.name ?? null,
+      investor: project?.investor ?? null,
+      contractor: project?.contractor ?? null,
       project: { heatmapTitle: project?.heatmap_title ?? null },
     });
   } catch {
