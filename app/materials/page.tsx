@@ -13,6 +13,12 @@ import PurchaseRequestsTab from './_components/PurchaseRequestsTab';
 import PurchaseOrdersTab from './_components/PurchaseOrdersTab';
 import ReportsTab from './_components/ReportsTab';
 import OrderContent from '@/app/order/OrderContent';
+import { Skeleton } from '@/app/components/Skeleton';
+
+// Cache in-memory ngoài component — sống qua tab-switch, mất khi reload trang.
+// Khác localStorage: không serialize/deserialize JSON → gán reference O(1).
+let materialsCache: { key: string; data: Material[]; ts: number } | null = null;
+const CACHE_TTL = 30_000; // 30 giây — sau đó fetch lại background
 
 type Material = {
   id: number; sheetTypeId: number | null; boqCode: string | null;
@@ -73,41 +79,73 @@ export default function MaterialsPage() {
   const [copied, setCopied] = useState<string | null>(null);
   const [boqEditMat, setBoqEditMat] = useState<Material | null>(null);
   const [boqDraft, setBoqDraft] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
   const [issueMat, setIssueMat] = useState<Material | null>(null);
   const [issueQty, setIssueQty] = useState('');
   const [issueNote, setIssueNote] = useState('');
   const colMenuRef = useRef<HTMLDivElement>(null);
   const labelInputRef = useRef<HTMLInputElement>(null);
 
-  const load = useCallback(() => {
+  const load = useCallback((revalidate = false) => {
+    const cacheKey = sheetFilter;
+    const now = Date.now();
+
+    // Cache còn hợp lệ (cùng filter, trong TTL) và không cần revalidate → hiển thị ngay.
+    if (!revalidate && materialsCache && materialsCache.key === cacheKey && now - materialsCache.ts < CACHE_TTL) {
+      setMaterials(materialsCache.data);
+      setLoading(false);
+      return;
+    }
+
+    // Có cache cũ (cùng filter) → hiển thị ngay để tránh màn hình trắng, fetch mới ở background.
+    if (materialsCache && materialsCache.key === cacheKey) {
+      setMaterials(materialsCache.data);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
     const q = sheetFilter ? `?sheetTypeId=${sheetFilter}` : '';
     fetch(`/api/materials${q}`)
       .then(r => r.json().catch(() => ({ materials: [] })))
-      .then(j => setMaterials(j.materials ?? []))
-      .catch(() => setMaterials([]));
+      .then(j => {
+        const data: Material[] = j.materials ?? [];
+        materialsCache = { key: cacheKey, data, ts: Date.now() };
+        setMaterials(data);
+        setLoading(false);
+      })
+      .catch(() => { setMaterials([]); setLoading(false); });
   }, [sheetFilter]);
 
+  // Gộp 3 fetch khởi tạo thành Promise.all để khai thác HTTP/2 multiplexing.
   useEffect(() => {
-    fetch('/api/auth/me').then(async r => {
-      if (r.status === 401) { window.location.href = '/login'; return; }
-      const j = await r.json();
-      const role = j.user?.role;
+    Promise.all([
+      fetch('/api/auth/me'),
+      fetch('/api/sheets'),
+      fetch('/api/materials/columns'),
+    ]).then(async ([meRes, sheetsRes, colsRes]) => {
+      if (meRes.status === 401) { window.location.href = '/login'; return; }
+      const [meJ, sheetsJ, colsJ] = await Promise.all([
+        meRes.json(),
+        sheetsRes.json(),
+        colsRes.json().catch(() => ({})),
+      ]);
+      const role = meJ.user?.role;
       setRole(role ?? '');
-      setUserId(j.user?.id ?? null);
+      setUserId(meJ.user?.id ?? null);
       setCanEdit(role === 'admin' || role === 'pm' || role === 'engineer');
       setCanDelete(role === 'admin' || role === 'pm');
       setCanAdmin(role === 'admin' || role === 'pm');
+      setSheets(sheetsJ.sheets ?? []);
+      if (colsJ.labels && typeof colsJ.labels === 'object') {
+        setColLabels(prev => ({ ...prev, ...colsJ.labels }));
+      }
     });
-    fetch('/api/sheets').then(r => r.json()).then(j => setSheets(j.sheets ?? []));
-    fetch('/api/materials/columns')
-      .then(r => r.json().catch(() => ({})))
-      .then(j => {
-        if (j.labels && typeof j.labels === 'object') {
-          setColLabels(prev => ({ ...prev, ...j.labels }));
-        }
-      });
   }, []);
   useEffect(() => { load(); }, [load]);
+  // Reset về trang 1 khi đổi filter hoặc tìm kiếm
+  useEffect(() => { setPage(1); }, [sheetFilter, search]);
 
   // Đóng menu cột khi click ngoài
   useEffect(() => {
@@ -127,7 +165,7 @@ export default function MaterialsPage() {
     setError('');
     const res = await fetch(path, { ...init, headers: { 'Content-Type': 'application/json', ...init.headers } });
     if (!res.ok) { const j = await res.json().catch(() => ({})); setError(j.error ?? 'Lỗi không xác định'); return; }
-    okFn?.(); load();
+    okFn?.(); load(true); // revalidate: bỏ qua cache sau khi mutate
   }
 
   const patch = (id: number, body: object) =>
@@ -235,6 +273,11 @@ export default function MaterialsPage() {
         (m.unit ?? '').toLowerCase().includes(q)
       )
     : materials;
+
+  const PAGE_SIZE = 100;
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const safePage = Math.min(page, totalPages || 1);
+  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -347,7 +390,16 @@ export default function MaterialsPage() {
           </p>
         )}
 
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-auto" ref={colMenuRef}>
+        {/* Skeleton khi chưa có dữ liệu lần đầu */}
+        {loading && materials.length === 0 && (
+          <div className="space-y-1.5">
+            {Array.from({ length: 8 }, (_, i) => (
+              <Skeleton key={i} className={`h-10 w-full ${i === 0 ? 'h-12' : ''}`} />
+            ))}
+          </div>
+        )}
+
+        <div className={`bg-zinc-900 border border-zinc-800 rounded-xl overflow-auto ${loading && materials.length === 0 ? 'hidden' : ''}`} ref={colMenuRef}>
           <table className="w-full text-sm border-collapse table-auto">
             <thead>
               <tr className="border-b border-zinc-800 bg-zinc-900/80">
@@ -404,7 +456,8 @@ export default function MaterialsPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((m, mi) => {
+              {paginated.map((m, mi) => {
+                const globalIdx = (safePage - 1) * PAGE_SIZE + mi;
                 const diff = (m.qtyBoq ?? 0) - (m.qtyPlanned ?? 0);
                 const hasBothQty = (m.qtyBoq ?? 0) > 0;
                 return (
@@ -412,7 +465,7 @@ export default function MaterialsPage() {
                     {visibleCols.map(key => (
                       <td key={key} className={`px-3 py-2 align-middle ${key === 'name' ? 'text-left w-full' : 'whitespace-nowrap ' + (key === 'boqCode' ? 'text-left' : 'text-center')}`}>
 
-                        {key === 'stt' && <span className="text-zinc-500 text-xs">{mi + 1}</span>}
+                        {key === 'stt' && <span className="text-zinc-500 text-xs">{globalIdx + 1}</span>}
 
                         {key === 'boqCode' && (
                           <button onClick={() => canEdit && editBoq(m)}
@@ -544,7 +597,7 @@ export default function MaterialsPage() {
                   </tr>
                 );
               })}
-              {filtered.length === 0 && (
+              {paginated.length === 0 && (
                 <tr>
                   <td colSpan={visibleCols.length + 1} className="p-8 text-center text-zinc-500">
                     {q ? `Không tìm thấy vật tư nào khớp "${search}"` : 'Chưa có vật tư nào — hãy Import Excel để thêm dữ liệu.'}
@@ -554,6 +607,44 @@ export default function MaterialsPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Thanh phân trang — chỉ hiện khi có hơn 1 trang */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between text-xs text-zinc-500">
+            <span>
+              Hiển thị <span className="text-white">{(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)}</span> / {filtered.length} vật tư
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                disabled={safePage <= 1}
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                className="px-2.5 py-1.5 rounded-lg border border-zinc-700 hover:border-zinc-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                ← Trước
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+                .reduce<(number | '...')[]>((acc, p, idx, arr) => {
+                  if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('...');
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, i) =>
+                  p === '...'
+                    ? <span key={`e${i}`} className="px-1">…</span>
+                    : <button key={p} onClick={() => setPage(p as number)}
+                        className={`px-2.5 py-1.5 rounded-lg border transition-colors ${safePage === p ? 'border-emerald-600 text-emerald-400' : 'border-zinc-700 hover:border-zinc-500'}`}>
+                        {p}
+                      </button>
+                )}
+              <button
+                disabled={safePage >= totalPages}
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                className="px-2.5 py-1.5 rounded-lg border border-zinc-700 hover:border-zinc-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                Sau →
+              </button>
+            </div>
+          </div>
+        )}
         </>}
       </main>
 
