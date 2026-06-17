@@ -406,7 +406,7 @@ export default function MaterialsPage() {
             <thead className="sticky top-0 z-10">
               <tr className="border-b border-zinc-800 bg-zinc-900">
                 {visibleCols.map(key => (
-                  <th key={key} className={`text-center text-xs text-zinc-400 font-semibold p-0 align-middle relative group/th ${key === 'name' ? 'w-full' : ''} ${['qtyBoq','qtyPlanned','diff'].includes(key) ? 'whitespace-normal w-20' : 'whitespace-nowrap'}`}>
+                  <th key={key} className={`text-center text-xs text-zinc-400 font-semibold p-0 align-middle relative group/th ${key === 'name' ? 'w-full' : ''} ${['qtyBoq','qtyPlanned','diff'].includes(key) ? 'whitespace-normal w-[88px]' : 'whitespace-nowrap'}`}>
                     {editingLabel === key ? (
                       <div className="flex items-center justify-center gap-1 px-2 py-1.5">
                         <input ref={labelInputRef} value={labelDraft} onChange={e => setLabelDraft(e.target.value)}
@@ -470,7 +470,7 @@ export default function MaterialsPage() {
                 return (
                   <tr key={m.id} className={`border-b border-zinc-800/50 hover:bg-zinc-700/40 group/row ${mi % 2 === 0 ? 'bg-zinc-900' : 'bg-zinc-800/30'}`}>
                     {visibleCols.map(key => (
-                      <td key={key} className={`px-3 py-2 align-middle ${key === 'name' ? 'text-left w-full min-w-[120px]' : 'whitespace-nowrap ' + (key === 'boqCode' ? 'text-left' : 'text-center')}`}>
+                      <td key={key} className={`px-3 py-2 align-middle ${key === 'name' ? 'text-left w-full max-w-0' : 'whitespace-nowrap ' + (key === 'boqCode' ? 'text-left' : 'text-center')}`}>
 
                         {key === 'stt' && <span className="text-zinc-500 text-xs">{globalIdx + 1}</span>}
 
@@ -502,10 +502,10 @@ export default function MaterialsPage() {
                                   if (ok) { patch(m.id, { name: newName }); }
                                   else { e.target.value = m.name; }
                                 }}
-                                className="font-medium bg-transparent border border-transparent hover:border-zinc-700 focus:border-emerald-600 focus:bg-zinc-800 rounded px-1 py-0.5 outline-none w-full min-w-0 resize-none overflow-hidden leading-snug break-words"
+                                className="font-medium bg-transparent border border-transparent hover:border-zinc-700 focus:border-emerald-600 focus:bg-zinc-800 rounded px-1 py-0.5 outline-none w-full min-w-0 resize-none overflow-hidden leading-snug truncate focus:whitespace-pre-wrap focus:overflow-auto"
                               />
                             ) : (
-                              <span className="font-medium whitespace-pre-wrap">{m.name}</span>
+                              <span className="font-medium truncate" title={m.name}>{m.name}</span>
                             )}
                             {m.qtyPlanned > 0 && m.qtyUsed > m.qtyPlanned && (
                               <span className="inline-flex items-center gap-1 text-[10px] text-red-400 shrink-0">
