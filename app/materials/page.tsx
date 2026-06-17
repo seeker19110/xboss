@@ -277,7 +277,7 @@ export default function MaterialsPage() {
     count: filtered.length,
     getScrollElement: () => colMenuRef.current,
     estimateSize: () => 40,
-    overscan: 8,
+    overscan: 12,
   });
 
   return (
