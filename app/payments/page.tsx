@@ -409,6 +409,10 @@ type AddInput = {
   progressSnapshot: number; note: string | null;
 };
 
+type ItemLine = { key: number; description: string; amount: string };
+let _lineKey = 0;
+function newLine(): ItemLine { return { key: ++_lineKey, description: '', amount: '' }; }
+
 function emptyForm() {
   return { period: '', amount: '', description: '', note: '', paidDate: todayISO() };
 }
@@ -423,6 +427,8 @@ function BillsSection({ person, bills, earned, progress, canEdit, onAdd, onDelet
   // 'bill' | 'advance' | 'item' | null (null = đóng form)
   const [activeForm, setActiveForm] = useState<BillType | null>(null);
   const [f, setF] = useState(emptyForm());
+  // Danh sách dòng phát sinh (chỉ dùng khi activeForm === 'item')
+  const [itemLines, setItemLines] = useState<ItemLine[]>([newLine()]);
   const [busy, setBusy] = useState(false);
 
   const billRows    = bills.filter(b => b.type === 'bill');
@@ -438,25 +444,43 @@ function BillsSection({ person, bills, earned, progress, canEdit, onAdd, onDelet
   const remain = earned - sumBills;   // nghiệm thu còn chờ thanh toán
 
   function openForm(type: BillType) {
-    setActiveForm(prev => prev === type ? null : type);
+    const closing = activeForm === type;
+    setActiveForm(closing ? null : type);
     setF(emptyForm());
+    setItemLines([newLine()]);
     setOpen(true);
   }
 
   async function submit() {
     if (!activeForm) return;
-    const amt = parseFloat(f.amount.replace(/[^\d.]/g, '')) || 0;
-    if (amt <= 0) { alert('Nhập số tiền hợp lệ'); return; }
-    if (activeForm === 'item' && !f.description.trim()) { alert('Nhập nội dung khoản phát sinh'); return; }
     setBusy(true);
-    const ok = await onAdd({
-      responsible: person, type: activeForm, amount: amt,
-      paidDate: f.paidDate, period: f.period.trim() || null,
-      description: f.description.trim() || null,
-      progressSnapshot: progress, note: f.note.trim() || null,
-    });
+    if (activeForm === 'item') {
+      // Submit từng dòng một; bỏ qua dòng trống hoàn toàn
+      const valid = itemLines.filter(l => l.description.trim() || l.amount.trim());
+      if (!valid.length) { alert('Nhập ít nhất một khoản phát sinh'); setBusy(false); return; }
+      for (const l of valid) {
+        const amt = parseFloat(l.amount.replace(/[^\d.]/g, '')) || 0;
+        if (!l.description.trim()) { alert('Thiếu nội dung cho một khoản'); setBusy(false); return; }
+        if (amt <= 0) { alert(`"${l.description}" chưa có giá trị hợp lệ`); setBusy(false); return; }
+        const ok = await onAdd({
+          responsible: person, type: 'item', amount: amt,
+          paidDate: f.paidDate, period: f.period.trim() || null,
+          description: l.description.trim(), progressSnapshot: progress, note: null,
+        });
+        if (!ok) { setBusy(false); return; }
+      }
+      setItemLines([newLine()]); setF(emptyForm()); setActiveForm(null);
+    } else {
+      const amt = parseFloat(f.amount.replace(/[^\d.]/g, '')) || 0;
+      if (amt <= 0) { alert('Nhập số tiền hợp lệ'); setBusy(false); return; }
+      const ok = await onAdd({
+        responsible: person, type: activeForm, amount: amt,
+        paidDate: f.paidDate, period: f.period.trim() || null,
+        description: null, progressSnapshot: progress, note: f.note.trim() || null,
+      });
+      if (ok) { setF(emptyForm()); setActiveForm(null); }
+    }
     setBusy(false);
-    if (ok) { setF(emptyForm()); setActiveForm(null); }
   }
 
   const hasAny = bills.length > 0;
@@ -519,32 +543,81 @@ function BillsSection({ person, bills, earned, progress, canEdit, onAdd, onDelet
 
       {/* ── Form nhập ── */}
       {activeForm && canEdit && (
-        <div className="px-4 pb-3 pt-0 space-y-2 border-t border-zinc-800/60">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 pt-2">
-            {typeLabel[activeForm]} mới
-            {activeForm === 'advance' && ' · sẽ trừ khỏi thanh toán kỳ này'}
-            {activeForm === 'item' && ' · khoản phát sinh (+ thêm vào / − khấu trừ)'}
-          </p>
-          <div className="grid grid-cols-2 gap-2">
+        <div className="px-4 pb-3 pt-0 border-t border-zinc-800/60">
+          {/* Header kỳ + ngày — dùng chung cho mọi loại */}
+          <div className="grid grid-cols-2 gap-2 pt-2 pb-2">
             <input type="text" value={f.period} onChange={e => setF(p => ({ ...p, period: e.target.value }))}
               placeholder="Kỳ / đợt (vd: Đợt 1)"
               className="text-xs bg-zinc-800 border border-zinc-700 focus:border-sky-500 rounded px-2 py-1.5 text-zinc-200 focus:outline-none" />
             <input type="date" value={f.paidDate} onChange={e => setF(p => ({ ...p, paidDate: e.target.value }))}
               className="text-xs bg-zinc-800 border border-zinc-700 focus:border-sky-500 rounded px-2 py-1.5 text-zinc-200 focus:outline-none" />
           </div>
-          {activeForm === 'item' && (
-            <input type="text" value={f.description} onChange={e => setF(p => ({ ...p, description: e.target.value }))}
-              placeholder="Nội dung khoản phát sinh *"
-              className="w-full text-xs bg-zinc-800 border border-zinc-700 focus:border-amber-500 rounded px-2 py-1.5 text-zinc-200 focus:outline-none" />
+
+          {/* Form bill / tạm ứng */}
+          {activeForm !== 'item' && (
+            <div className="space-y-2">
+              <input type="text" inputMode="numeric" value={f.amount}
+                onChange={e => setF(p => ({ ...p, amount: e.target.value }))}
+                placeholder="Số tiền (đ)"
+                className="w-full text-right text-sm bg-zinc-800 border border-zinc-700 focus:border-sky-500 rounded px-2 py-1.5 text-zinc-200 focus:outline-none tabular-nums" />
+              <input type="text" value={f.note} onChange={e => setF(p => ({ ...p, note: e.target.value }))}
+                placeholder="Ghi chú (tuỳ chọn)"
+                className="w-full text-xs bg-zinc-800 border border-zinc-700 focus:border-sky-500 rounded px-2 py-1.5 text-zinc-200 focus:outline-none" />
+            </div>
           )}
-          <input type="text" inputMode="numeric" value={f.amount}
-            onChange={e => setF(p => ({ ...p, amount: e.target.value }))}
-            placeholder={activeForm === 'item' ? 'Giá trị (đ) — luôn dương' : 'Số tiền (đ)'}
-            className="w-full text-right text-sm bg-zinc-800 border border-zinc-700 focus:border-sky-500 rounded px-2 py-1.5 text-zinc-200 focus:outline-none tabular-nums" />
-          <input type="text" value={f.note} onChange={e => setF(p => ({ ...p, note: e.target.value }))}
-            placeholder="Ghi chú (tuỳ chọn)"
-            className="w-full text-xs bg-zinc-800 border border-zinc-700 focus:border-sky-500 rounded px-2 py-1.5 text-zinc-200 focus:outline-none" />
-          <div className="flex items-center justify-between">
+
+          {/* Form phát sinh — nhiều dòng */}
+          {activeForm === 'item' && (
+            <div className="space-y-1.5">
+              {/* Header cột */}
+              <div className="grid grid-cols-[1fr_130px_28px] gap-1.5 px-0.5">
+                <span className="text-[10px] text-zinc-600 font-semibold">Nội dung</span>
+                <span className="text-[10px] text-zinc-600 font-semibold text-right">Giá trị (đ)</span>
+                <span />
+              </div>
+              {/* Các dòng */}
+              {itemLines.map((line, idx) => (
+                <div key={line.key} className="grid grid-cols-[1fr_130px_28px] gap-1.5 items-center">
+                  <input
+                    type="text"
+                    value={line.description}
+                    onChange={e => setItemLines(ls => ls.map(l => l.key === line.key ? { ...l, description: e.target.value } : l))}
+                    placeholder={`Khoản ${idx + 1}`}
+                    className="text-xs bg-zinc-800 border border-zinc-700 focus:border-amber-500 rounded px-2 py-1.5 text-zinc-200 focus:outline-none min-w-0"
+                  />
+                  <input
+                    type="text" inputMode="numeric"
+                    value={line.amount}
+                    onChange={e => setItemLines(ls => ls.map(l => l.key === line.key ? { ...l, amount: e.target.value } : l))}
+                    placeholder="0"
+                    className="text-right text-xs bg-zinc-800 border border-zinc-700 focus:border-amber-500 rounded px-2 py-1.5 text-zinc-200 focus:outline-none tabular-nums min-w-0"
+                  />
+                  <button
+                    onClick={() => setItemLines(ls => ls.length > 1 ? ls.filter(l => l.key !== line.key) : ls)}
+                    className="flex items-center justify-center text-zinc-700 hover:text-red-400 transition h-7 w-7"
+                    aria-label="Xoá dòng">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+              {/* Nút thêm dòng + tổng preview */}
+              <div className="flex items-center justify-between pt-0.5">
+                <button onClick={() => setItemLines(ls => [...ls, newLine()])}
+                  className="flex items-center gap-1 text-[11px] text-amber-400 hover:text-amber-300 transition">
+                  <Plus className="w-3.5 h-3.5" />
+                  Thêm dòng
+                </button>
+                {itemLines.some(l => l.amount) && (
+                  <span className="text-[11px] text-amber-300 tabular-nums font-semibold">
+                    Tổng: {fmtVND(itemLines.reduce((s, l) => s + (parseFloat(l.amount.replace(/[^\d.]/g, '')) || 0), 0))}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Footer: ghi nhận */}
+          <div className="flex items-center justify-between mt-2.5">
             <span className="text-[10px] text-zinc-600">Chốt NT: {Math.round(progress * 100)}%</span>
             <button onClick={submit} disabled={busy}
               className="flex items-center gap-1.5 text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg transition">
