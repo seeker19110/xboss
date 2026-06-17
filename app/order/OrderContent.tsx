@@ -109,10 +109,17 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
   }
 
   function onBoqChange(uid: string, val: string) {
-    updateRow(uid, { boqCode: val, linked: false });
     setBoqSearch(val.trim() ? { uid, term: val } : null);
     const mat = findByBoq(val);
-    if (mat) applyMaterial(uid, mat);
+    if (mat) {
+      applyMaterial(uid, mat);
+    } else {
+      setRows(prev => prev.map(r => {
+        if (r.uid !== uid) return r;
+        const clear = r.linked ? { name: '', dvt: '', qtyBoq: '', qtyPlanned: '', qtyUsed: '' } : {};
+        return { ...r, boqCode: val, linked: false, ...clear };
+      }));
+    }
   }
 
   function addRow() {
@@ -124,7 +131,10 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
   }
 
   function removeRow(uid: string) {
-    setRows(prev => prev.filter(r => r.uid !== uid));
+    setRows(prev => {
+      const next = prev.filter(r => r.uid !== uid);
+      return next.map((r, i) => ({ ...r, stt: String(i + 1) }));
+    });
   }
 
   function remaining(r: OrderRow) {
@@ -263,7 +273,7 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
             <table className="w-full border-collapse text-[10px]">
               <thead>
                 <tr className="bg-gray-100">
-                  <th className="no-print border border-gray-400 px-1 py-1 text-center w-14">Mã BOQ</th>
+                  <th className="no-print border border-gray-400 px-1 py-1 text-center w-20">Mã BOQ</th>
                   <th className="border border-gray-400 px-1 py-1 text-center w-7">STT</th>
                   <th className="border border-gray-400 px-1.5 py-1 text-center">Mô tả / Tên vật tư</th>
                   <th className="border border-gray-400 px-1 py-1 text-center w-9">ĐVT</th>
