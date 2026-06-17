@@ -459,6 +459,26 @@ CREATE TABLE IF NOT EXISTS floor_contracts (
   UNIQUE(sheet_type_id, floor_label)
 );
 CREATE INDEX IF NOT EXISTS idx_floor_contracts_sheet ON floor_contracts(sheet_type_id);
+
+CREATE TABLE IF NOT EXISTS payment_bills (
+  id SERIAL PRIMARY KEY,
+  responsible TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT 'bill',
+  period TEXT,
+  amount NUMERIC(15,2) NOT NULL DEFAULT 0,
+  description TEXT,
+  paid_date DATE NOT NULL,
+  progress_snapshot NUMERIC(5,4) DEFAULT 0,
+  note TEXT,
+  created_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT payment_bills_type_chk CHECK (type IN ('bill','advance','item'))
+);
+CREATE INDEX IF NOT EXISTS idx_payment_bills_resp ON payment_bills(responsible);
+ALTER TABLE payment_bills ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'bill';
+ALTER TABLE payment_bills ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE payment_bills DROP CONSTRAINT IF EXISTS payment_bills_type_chk;
+ALTER TABLE payment_bills ADD CONSTRAINT payment_bills_type_chk CHECK (type IN ('bill','advance','item'));
 `;
 
 export function getPool(): Pool {
