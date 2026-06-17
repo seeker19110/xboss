@@ -95,7 +95,7 @@ export default function TimelinePage() {
     <div className="min-h-screen bg-zinc-950 text-white">
       <AppHeader title="Timeline tầng" back />
 
-      <main className="px-3 sm:px-4 py-4 space-y-4 max-w-full">
+      <main className="px-3 sm:px-6 py-4 space-y-4 max-w-5xl mx-auto w-full">
 
         {/* Controls */}
         <div className="flex items-center gap-2 flex-wrap">
