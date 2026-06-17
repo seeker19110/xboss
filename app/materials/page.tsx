@@ -406,7 +406,7 @@ export default function MaterialsPage() {
             <thead className="sticky top-0 z-10">
               <tr className="border-b border-zinc-800 bg-zinc-900">
                 {visibleCols.map(key => (
-                  <th key={key} className={`text-center text-xs text-zinc-400 font-semibold p-0 whitespace-nowrap relative group/th ${key === 'name' ? 'w-full' : ''}`}>
+                  <th key={key} className={`text-center text-xs text-zinc-400 font-semibold p-0 relative group/th ${key === 'name' ? 'w-full' : ''} ${['qtyBoq','qtyPlanned','diff'].includes(key) ? 'whitespace-normal min-w-[64px]' : 'whitespace-nowrap'}`}>
                     {editingLabel === key ? (
                       <div className="flex items-center justify-center gap-1 px-2 py-1.5">
                         <input ref={labelInputRef} value={labelDraft} onChange={e => setLabelDraft(e.target.value)}
@@ -416,7 +416,7 @@ export default function MaterialsPage() {
                         <button onClick={() => setEditingLabel(null)} title="Huỷ" className="text-zinc-500 hover:text-zinc-300"><X className="w-3 h-3" /></button>
                       </div>
                     ) : (
-                      <div className={`flex items-center gap-1 px-3 py-2.5 ${key === 'name' || key === 'boqCode' ? 'justify-start' : 'justify-center'}`}>
+                      <div className={`flex items-center gap-1 px-2 py-2 ${key === 'name' || key === 'boqCode' ? 'justify-start' : 'justify-center'} ${['qtyBoq','qtyPlanned','diff'].includes(key) ? 'flex-col leading-tight text-center' : ''}`}>
                         <span className={copied === key ? 'text-emerald-400' : ''}>{colLabels[key]}</span>
                         <button onClick={() => setColMenu(prev => prev === key ? null : key)}
                           className="opacity-0 group-hover/th:opacity-100 transition-opacity text-zinc-600 hover:text-zinc-300 ml-0.5"
