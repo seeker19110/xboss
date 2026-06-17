@@ -252,7 +252,7 @@ export default function MaterialsPage() {
         )}
       </AppHeader>
 
-      <main className="p-6 max-w-7xl mx-auto space-y-4">
+      <main className="p-4 sm:p-6 w-full space-y-4">
         {/* Tab bar */}
         <div className="flex gap-1 border-b border-zinc-800 pb-0 overflow-x-auto">
           {[
