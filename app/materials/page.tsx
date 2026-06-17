@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback, useRef, useDeferredValue } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   Package, Plus, Trash2, AlertTriangle, History, X,
   ChevronUp, ChevronDown, Copy, EyeOff, Eye, ClipboardCopy, Pencil, Check, FileUp, Search,
@@ -272,6 +273,12 @@ export default function MaterialsPage() {
       )
     : materials;
 
+  const rowVirtualizer = useVirtualizer({
+    count: filtered.length,
+    getScrollElement: () => colMenuRef.current,
+    estimateSize: () => 40,
+    overscan: 8,
+  });
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -393,10 +400,11 @@ export default function MaterialsPage() {
           </div>
         )}
 
-        <div className={`bg-zinc-900 border border-zinc-800 rounded-xl overflow-auto ${loading && materials.length === 0 ? 'hidden' : ''}`} ref={colMenuRef}>
+        <div className={`bg-zinc-900 border border-zinc-800 rounded-xl overflow-auto ${loading && materials.length === 0 ? 'hidden' : ''}`}
+          ref={colMenuRef} style={{ maxHeight: 'calc(100vh - 13rem)' }}>
           <table className="w-full text-sm border-collapse table-auto">
-            <thead>
-              <tr className="border-b border-zinc-800 bg-zinc-900/80">
+            <thead className="sticky top-0 z-10">
+              <tr className="border-b border-zinc-800 bg-zinc-900">
                 {visibleCols.map(key => (
                   <th key={key} className={`text-center text-xs text-zinc-400 font-semibold p-0 whitespace-nowrap relative group/th ${key === 'name' ? 'w-full' : ''}`}>
                     {editingLabel === key ? (
@@ -450,7 +458,12 @@ export default function MaterialsPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((m, mi) => {
+              {rowVirtualizer.getVirtualItems().length > 0 && rowVirtualizer.getVirtualItems()[0].start > 0 && (
+                <tr><td style={{ height: rowVirtualizer.getVirtualItems()[0].start }} /></tr>
+              )}
+              {rowVirtualizer.getVirtualItems().map(vRow => {
+                const m = filtered[vRow.index];
+                const mi = vRow.index;
                 const globalIdx = mi;
                 const diff = (m.qtyBoq ?? 0) - (m.qtyPlanned ?? 0);
                 const hasBothQty = (m.qtyBoq ?? 0) > 0;
@@ -591,6 +604,13 @@ export default function MaterialsPage() {
                   </tr>
                 );
               })}
+              {(() => {
+                const items = rowVirtualizer.getVirtualItems();
+                const paddingBottom = items.length > 0
+                  ? rowVirtualizer.getTotalSize() - items[items.length - 1].end
+                  : 0;
+                return paddingBottom > 0 ? <tr><td style={{ height: paddingBottom }} /></tr> : null;
+              })()}
               {filtered.length === 0 && (
                 <tr>
                   <td colSpan={visibleCols.length + 1} className="p-8 text-center text-zinc-500">
