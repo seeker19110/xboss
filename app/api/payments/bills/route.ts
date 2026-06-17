@@ -27,12 +27,14 @@ export async function GET(_req: NextRequest) {
            pb.note, pb.unit, pb.quantity, pb.labor,
            pb.sheet_type_id   AS "sheetTypeId",
            pb.floor_label     AS "floorLabel",
+           st.code            AS "sheetCode",
            COALESCE(pb.pct_this_period, 0) AS "pctThisPeriod",
            pb.created_by      AS "createdBy",
            u.name             AS "createdByName",
            pb.created_at      AS "createdAt"
       FROM payment_bills pb
       LEFT JOIN users u ON u.id = pb.created_by
+      LEFT JOIN sheet_types st ON st.id = pb.sheet_type_id
      ORDER BY pb.paid_date ASC, pb.id ASC`);
 
   return NextResponse.json({ bills });
