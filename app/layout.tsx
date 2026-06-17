@@ -35,7 +35,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           {' '}·{' '}
           <a href="mailto:liendv@live.com" className="hover:text-zinc-400 transition">liendv@live.com</a>
           {' '}·{' '}
-          <a href="tel:+84977819110" className="hover:text-zinc-400 transition">0849 778 19 110</a>
+          <a href="tel:+849778 19 110" className="hover:text-zinc-400 transition">+849 778 19 110</a>
         </footer>
       </body>
     </html>
