@@ -276,7 +276,7 @@ export default function MaterialsPage() {
   const rowVirtualizer = useVirtualizer({
     count: filtered.length,
     getScrollElement: () => colMenuRef.current,
-    estimateSize: () => 40,
+    estimateSize: () => 56,
     overscan: 12,
   });
 
@@ -404,9 +404,9 @@ export default function MaterialsPage() {
           ref={colMenuRef} style={{ maxHeight: 'calc(100vh - 13rem)' }}>
           <table className="w-full text-sm border-collapse table-auto">
             <thead className="sticky top-0 z-10">
-              <tr className="border-b border-zinc-800 bg-zinc-900 h-10">
+              <tr className="border-b border-zinc-800 bg-zinc-900">
                 {visibleCols.map(key => (
-                  <th key={key} className={`text-center text-xs text-zinc-400 font-semibold p-0 align-middle relative group/th ${key === 'name' ? 'w-full min-w-[250px]' : ''} ${['qtyBoq','qtyPlanned','diff'].includes(key) ? 'whitespace-normal w-[112px]' : 'whitespace-nowrap'}`}>
+                  <th key={key} className={`text-center text-xs text-zinc-400 font-semibold p-0 align-middle whitespace-nowrap relative group/th ${key === 'name' ? 'w-full min-w-[250px]' : ''}`}>
                     {editingLabel === key ? (
                       <div className="flex items-center justify-center gap-1 px-2 py-1.5">
                         <input ref={labelInputRef} value={labelDraft} onChange={e => setLabelDraft(e.target.value)}
@@ -416,7 +416,7 @@ export default function MaterialsPage() {
                         <button onClick={() => setEditingLabel(null)} title="Huỷ" className="text-zinc-500 hover:text-zinc-300"><X className="w-3 h-3" /></button>
                       </div>
                     ) : (
-                      <div className={`h-full flex items-center gap-1 px-2 ${key === 'name' || key === 'boqCode' ? 'justify-start' : 'justify-center'} ${['qtyBoq','qtyPlanned','diff'].includes(key) ? 'flex-col leading-tight text-center' : ''}`}>
+                      <div className={`flex items-center gap-1 px-3 py-2.5 ${key === 'name' || key === 'boqCode' ? 'justify-start' : 'justify-center'}`}>
                         <span className={copied === key ? 'text-emerald-400' : ''}>{colLabels[key]}</span>
                         <button onClick={() => setColMenu(prev => prev === key ? null : key)}
                           className="opacity-0 group-hover/th:opacity-100 transition-opacity text-zinc-600 hover:text-zinc-300 ml-0.5"
@@ -502,10 +502,10 @@ export default function MaterialsPage() {
                                   if (ok) { patch(m.id, { name: newName }); }
                                   else { e.target.value = m.name; }
                                 }}
-                                className="font-medium bg-transparent border border-transparent hover:border-zinc-700 focus:border-emerald-600 focus:bg-zinc-800 rounded px-1 py-0.5 outline-none w-full min-w-0 resize-none overflow-hidden leading-snug truncate focus:whitespace-pre-wrap focus:overflow-auto"
+                                className="font-medium bg-transparent border border-transparent hover:border-zinc-700 focus:border-emerald-600 focus:bg-zinc-800 rounded px-1 py-0.5 outline-none w-full min-w-0 resize-none overflow-hidden leading-snug"
                               />
                             ) : (
-                              <span className="font-medium truncate" title={m.name}>{m.name}</span>
+                              <span className="font-medium whitespace-pre-wrap break-words">{m.name}</span>
                             )}
                             {m.qtyPlanned > 0 && m.qtyUsed > m.qtyPlanned && (
                               <span className="inline-flex items-center gap-1 text-[10px] text-red-400 shrink-0">
