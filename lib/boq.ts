@@ -1,4 +1,4 @@
-import { queryOne } from "@/lib/db";
+import { query } from "@/lib/db";
 import { slugFromCode } from "@/lib/sheets";
 
 // Sinh BOQCODE mặc định: <SLUG-SHEET>-<mã hàng>, phân tách thống nhất bằng "-"
@@ -15,20 +15,21 @@ export async function boqTakenBy(
   boq: string,
   exclude?: { table: "tasks" | "work_packages" | "materials"; id: number },
 ): Promise<string | null> {
-  const t = await queryOne<{ id: number; code: string; name: string }>(
-    `SELECT id, code, name FROM tasks WHERE boq_code = ?`, boq);
-  if (t && !(exclude?.table === "tasks" && exclude.id === t.id))
-    return `task ${t.code} — ${t.name}`;
+  const rows = await query<{ kind: string; id: number; code: string | null; name: string }>(
+    `(SELECT 'task'    AS kind, id, code, name FROM tasks         WHERE boq_code = ?)
+     UNION ALL
+     (SELECT 'package' AS kind, id, code, name FROM work_packages WHERE boq_code = ?)
+     UNION ALL
+     (SELECT 'material' AS kind, id, NULL,  name FROM materials   WHERE boq_code = ?)`,
+    boq, boq, boq);
 
-  const w = await queryOne<{ id: number; code: string; name: string }>(
-    `SELECT id, code, name FROM work_packages WHERE boq_code = ?`, boq);
-  if (w && !(exclude?.table === "work_packages" && exclude.id === w.id))
-    return `nhóm ${w.code} — ${w.name}`;
-
-  const m = await queryOne<{ id: number; name: string }>(
-    `SELECT id, name FROM materials WHERE boq_code = ?`, boq);
-  if (m && !(exclude?.table === "materials" && exclude.id === m.id))
-    return `vật tư ${m.name}`;
-
+  for (const r of rows) {
+    if (r.kind === "task"     && !(exclude?.table === "tasks"          && exclude.id === r.id))
+      return `task ${r.code} — ${r.name}`;
+    if (r.kind === "package"  && !(exclude?.table === "work_packages"  && exclude.id === r.id))
+      return `nhóm ${r.code} — ${r.name}`;
+    if (r.kind === "material" && !(exclude?.table === "materials"       && exclude.id === r.id))
+      return `vật tư ${r.name}`;
+  }
   return null;
 }

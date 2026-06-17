@@ -47,6 +47,17 @@ export async function POST(req: NextRequest, { params: paramsP }: { params: Prom
     `SELECT id, material_id, qty_ordered, qty_received FROM po_items WHERE po_id = ?`, poId);
   const poItemMap = new Map(poItems.map(p => [p.id, p]));
 
+  // Pre-fetch qty_used của tất cả vật tư liên quan (1 query thay vì N query trong loop)
+  const neededMatIds = [...new Set(
+    items.map(i => poItemMap.get(Number(i.poItemId))?.material_id).filter((id): id is number => id != null)
+  )];
+  const matRows = neededMatIds.length > 0
+    ? await query<{ id: number; qty_used: number }>(
+        `SELECT id, qty_used FROM materials WHERE id IN (${neededMatIds.map(() => '?').join(',')})`,
+        ...neededMatIds)
+    : [];
+  const matMap = new Map(matRows.map(m => [m.id, m]));
+
   const receiptId = await withTransaction(async () => {
     const rid = await insertId(
       `INSERT INTO warehouse_receipts (receipt_code, po_id, received_by, note)
@@ -73,8 +84,7 @@ export async function POST(req: NextRequest, { params: paramsP }: { params: Prom
         qty, poItem.material_id);
 
       // Ghi transaction loại nhap_kho — qty_after = qty_used để nhất quán với các endpoint khác.
-      const mat = await queryOne<{ qty_stock: number; qty_used: number }>(
-        `SELECT qty_stock, qty_used FROM materials WHERE id = ?`, poItem.material_id);
+      const mat = matMap.get(poItem.material_id);
       await insertId(
         `INSERT INTO material_transactions (material_id, delta, qty_after, type, receipt_item_id, note, created_by)
          VALUES (?, ?, ?, 'nhap_kho', ?, ?, ?)`,

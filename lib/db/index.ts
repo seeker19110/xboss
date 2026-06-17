@@ -288,6 +288,18 @@ CREATE INDEX IF NOT EXISTS idx_history_task ON task_history(task_id);
 CREATE INDEX IF NOT EXISTS idx_baseline_tasks ON baseline_tasks(baseline_id);
 CREATE INDEX IF NOT EXISTS idx_documents_task ON task_documents(task_id);
 
+-- Index cho sort/filter theo thời gian (notification feed, S-curve, dashboard)
+CREATE INDEX IF NOT EXISTS idx_history_changed_at ON task_history(changed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tasks_updated_at ON tasks(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_materials_updated_at ON materials(updated_at DESC);
+
+-- Trigram index cho tìm kiếm ILIKE %term% (cần extension pg_trgm — có sẵn trên Postgres 9.1+)
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX IF NOT EXISTS idx_tasks_name_trgm ON tasks USING gin(name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_tasks_code_trgm ON tasks USING gin(code gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_wp_name_trgm ON work_packages USING gin(name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_wp_code_trgm ON work_packages USING gin(code gin_trgm_ops);
+
 -- Audit log phân công: ai gán ai vào hệ/nhóm/task, lúc nào.
 CREATE TABLE IF NOT EXISTS assignment_log (
   id SERIAL PRIMARY KEY,

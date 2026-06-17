@@ -19,12 +19,19 @@ export async function GET(req: NextRequest) {
             po.created_at AS "createdAt",
             s.id AS "supplierId", s.name AS "supplierName",
             u.name AS "createdByName",
-            (SELECT COUNT(*) FROM po_items WHERE po_id = po.id) AS "itemCount",
-            (SELECT SUM(qty_ordered) FROM po_items WHERE po_id = po.id) AS "totalOrdered",
-            (SELECT SUM(qty_received) FROM po_items WHERE po_id = po.id) AS "totalReceived"
+            COALESCE(pi.item_count, 0) AS "itemCount",
+            COALESCE(pi.total_ordered, 0) AS "totalOrdered",
+            COALESCE(pi.total_received, 0) AS "totalReceived"
        FROM purchase_orders po
        LEFT JOIN suppliers s ON po.supplier_id = s.id
        LEFT JOIN users u ON po.created_by = u.id
+       LEFT JOIN (
+         SELECT po_id,
+                COUNT(*) AS item_count,
+                SUM(qty_ordered) AS total_ordered,
+                SUM(qty_received) AS total_received
+           FROM po_items GROUP BY po_id
+       ) pi ON pi.po_id = po.id
        ${status ? "WHERE po.status = ?" : ""}
       ORDER BY po.created_at DESC`,
     ...(status ? [status] : []));

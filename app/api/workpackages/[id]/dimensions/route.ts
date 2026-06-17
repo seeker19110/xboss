@@ -21,10 +21,12 @@ export async function GET(_req: NextRequest, { params: paramsP }: { params: Prom
             t.boq_code AS "boqCode", t.drawing_url AS "drawingUrl",
             t.assigned_to AS "assignedTo", u.name AS "assigneeName", t.delay_reason AS "delayReason",
             t.start_date AS "startDate", t.end_date AS "endDate",
-            (SELECT COUNT(*) FROM task_photos p WHERE p.task_id = t.id) AS "photoCount",
-            (SELECT COUNT(*) FROM task_comments c WHERE c.task_id = t.id) AS "commentCount"
+            COALESCE(pc.cnt, 0) AS "photoCount",
+            COALESCE(cc.cnt, 0) AS "commentCount"
        FROM tasks t
        LEFT JOIN users u ON t.assigned_to = u.id
+       LEFT JOIN (SELECT task_id, COUNT(*) AS cnt FROM task_photos GROUP BY task_id) pc ON pc.task_id = t.id
+       LEFT JOIN (SELECT task_id, COUNT(*) AS cnt FROM task_comments GROUP BY task_id) cc ON cc.task_id = t.id
       WHERE t.package_id = ? ORDER BY t.sort_order, t.id`,
     pkgId);
 

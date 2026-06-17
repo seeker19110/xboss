@@ -52,17 +52,16 @@ export default function Dashboard() {
   const [projectName, setProjectName] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/project').then(r => r.ok ? r.json() : null).then(j => setProjectName(j?.name ?? null));
-  }, []);
-
-  useEffect(() => {
-    fetch('/api/auth/me').then(async r => {
-      if (r.status === 401) { window.location.href = '/login'; return; }
-      const j = await r.json();
-      setMe(j.user);
-      const d = await fetch('/api/dashboard').then(r => r.json());
-      setData(d);
-      const sh = await fetch('/api/sheets').then(r => r.ok ? r.json() : null);
+    Promise.all([
+      fetch('/api/project').then(r => r.ok ? r.json() : null),
+      fetch('/api/auth/me').then(r => { if (r.status === 401) window.location.href = '/login'; return r.ok ? r.json() : null; }),
+      fetch('/api/dashboard').then(r => r.ok ? r.json() : null),
+      fetch('/api/sheets').then(r => r.ok ? r.json() : null),
+    ]).then(([proj, meData, dash, sh]) => {
+      if (!meData) return;
+      setProjectName(proj?.name ?? null);
+      setMe(meData.user);
+      setData(dash);
       setSheets(sh?.sheets ?? []);
     }).finally(() => setLoading(false));
   }, []);
