@@ -741,6 +741,11 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                 </span>
               ) : (
                 <div className="flex items-center gap-1 min-w-0">
+                  {/* Mobile: cột BOQ/STT (chứa chevron) không sticky nên trôi mất khi cuộn ngang —
+                      nhân đôi chevron vào cột tên (luôn hiển thị) để luôn có chỗ bấm thu gọn nhóm. */}
+                  {isMobile && (expanded
+                    ? <ChevronDown className="w-4 h-4 text-zinc-400 shrink-0" />
+                    : <ChevronRight className="w-4 h-4 text-zinc-400 shrink-0" />)}
                   <span className="text-sm font-medium truncate flex-1">{pkg.name}</span>
                   {canEdit && editName === null && (
                     <button onClick={e => { e.stopPropagation(); setEditName(pkg.name); }} title="Sửa tên nhóm"
