@@ -10,6 +10,7 @@ import AppHeader from '@/app/components/AppHeader';
 import FloorHeatmap from '@/app/components/FloorHeatmap';
 import ForecastCards from '@/app/components/ForecastCards';
 import SpiCards from '@/app/components/SpiCards';
+import BlockedPanel from '@/app/components/BlockedPanel';
 import SCurveChart from '@/app/components/SCurveChart';
 import { Modal } from '@/app/components/dialogs';
 import { PageSkeleton } from '@/app/components/Skeleton';
@@ -234,6 +235,9 @@ export default function Dashboard() {
 
         {/* ── Heatmap tầng × sheet ── */}
         <FloorHeatmap />
+
+        {/* ── Việc bị chặn (phụ thuộc chưa thông) ── */}
+        <BlockedPanel />
 
         {/* ── Chỉ số tiến độ (SPI) ── */}
         <SpiCards />
