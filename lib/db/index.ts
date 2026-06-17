@@ -306,6 +306,7 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS heatmap_title TEXT;
 ALTER TABLE materials ADD COLUMN IF NOT EXISTS qty_boq DOUBLE PRECISION DEFAULT 0;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS material_col_labels TEXT;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS ui_texts TEXT;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS logo TEXT;
 
 -- Tuỳ chọn thông báo riêng của từng user (JSON: { delayed, due_soon, upcoming_start, activity_progress, activity_photo, activity_document, activity_comment, material_over } = boolean)
 CREATE TABLE IF NOT EXISTS notification_prefs (

@@ -13,7 +13,7 @@ type Bill = {
 };
 type ProjectInfo = {
   name: string | null; code: string | null; tower: string | null;
-  investor: string | null; contractor: string | null;
+  investor: string | null; contractor: string | null; logo: string | null;
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -31,9 +31,12 @@ function fmtDate(d: string) {
 
 export default function PrintPage() {
   const [bills, setBills] = useState<Bill[]>([]);
-  const [project, setProject] = useState<ProjectInfo>({ name: null, code: null, tower: null, investor: null, contractor: null });
+  const [project, setProject] = useState<ProjectInfo>({ name: null, code: null, tower: null, investor: null, contractor: null, logo: null });
   const [loading, setLoading] = useState(true);
   const [periodLabel, setPeriodLabel] = useState('');
+  const [canEdit, setCanEdit] = useState(false);
+  const [logo, setLogo] = useState<string | null>(null);
+  const [savingLogo, setSavingLogo] = useState(false);
 
   // Đọc query params phía client
   const params = typeof window !== 'undefined'
@@ -44,13 +47,17 @@ export default function PrintPage() {
 
   useEffect(() => {
     async function load() {
-      const [br, pr] = await Promise.all([
+      const [br, pr, mr] = await Promise.all([
         fetch('/api/payments/bills'),
         fetch('/api/project'),
+        fetch('/api/auth/me'),
       ]);
       if (br.status === 401) { window.location.href = '/login'; return; }
       const { bills: all }: { bills: Bill[] } = await br.json();
       const proj: ProjectInfo = pr.ok ? await pr.json() : {};
+      const me = mr.ok ? (await mr.json())?.user : null;
+      setCanEdit(me?.role === 'admin' || me?.role === 'pm');
+      setLogo(proj.logo ?? null);
       // Lọc theo người + kỳ (nếu có)
       const filtered = all.filter(b =>
         b.responsible === person &&
@@ -85,6 +92,35 @@ export default function PrintPage() {
   const tuAmount = advances.reduce((s, b) => s + b.amount, 0); // Tạm ứng
   const gtttk   = gtthtc - sumB - tuAmount;                    // Được TT kỳ này
 
+  async function uploadLogo(file: File) {
+    if (!file.type.startsWith('image/')) { alert('Chỉ nhận file ảnh'); return; }
+    if (file.size > 2 * 1024 * 1024) { alert('Ảnh tối đa 2MB'); return; }
+    const dataUrl: string = await new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result as string);
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+    setSavingLogo(true);
+    const res = await fetch('/api/project', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ logo: dataUrl }),
+    });
+    setSavingLogo(false);
+    if (res.ok) setLogo(dataUrl);
+    else alert((await res.json().catch(() => null))?.error ?? 'Lưu logo thất bại');
+  }
+
+  async function removeLogo() {
+    setSavingLogo(true);
+    await fetch('/api/project', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ logo: null }),
+    });
+    setSavingLogo(false);
+    setLogo(null);
+  }
+
   // STT counter chỉ cho dòng dữ liệu thật
   let stt = 0;
 
@@ -104,9 +140,28 @@ export default function PrintPage() {
 
         {/* ── Header ── */}
         <div className="flex items-start gap-6 mb-4">
-          {/* Logo placeholder */}
-          <div className="shrink-0 w-24 h-20 flex items-center justify-center border-2 border-zinc-300 rounded text-[10px] text-zinc-400 text-center leading-tight print:border-zinc-400">
-            LOGO<br />M&amp;E<br />CONTRACTOR
+          {/* Logo — bấm để tải lên (Admin/PM); in ra chỉ còn ảnh */}
+          <div className="shrink-0 w-24 h-20 relative group">
+            {logo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logo} alt="Logo nhà thầu" className="w-full h-full object-contain" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center border-2 border-zinc-300 rounded text-[10px] text-zinc-400 text-center leading-tight print:border-zinc-400">
+                LOGO<br />M&amp;E<br />CONTRACTOR
+              </div>
+            )}
+            {canEdit && (
+              <div className="print:hidden absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/85 opacity-0 group-hover:opacity-100 transition rounded">
+                <label className="cursor-pointer text-[10px] font-semibold text-blue-700 hover:underline">
+                  {savingLogo ? 'Đang lưu…' : logo ? 'Đổi logo' : 'Tải logo'}
+                  <input type="file" accept="image/*" className="hidden" disabled={savingLogo}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) uploadLogo(f); e.target.value = ''; }} />
+                </label>
+                {logo && !savingLogo && (
+                  <button onClick={removeLogo} className="text-[10px] text-red-600 hover:underline">Xoá</button>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex-1 text-center">
             <h1 className="text-xl font-bold uppercase tracking-wide mb-1">Bảng Khối Lượng Thanh Toán</h1>
