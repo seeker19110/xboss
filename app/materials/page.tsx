@@ -47,7 +47,7 @@ type ColKey = 'boqCode' | 'stt' | 'name' | 'unit' | 'qtyBoq' | 'qtyPlanned' | 'd
 const DEFAULT_LABELS: Record<ColKey, string> = {
   boqCode:    'Mã BOQ',
   stt:        'STT',
-  name:       'Vật tư',
+  name:       'Mô Tả',
   unit:       'ĐVT',
   qtyBoq:     'Định mức BOQ',
   qtyPlanned: 'Định mức Tháp A',
@@ -417,7 +417,7 @@ export default function MaterialsPage() {
                         <button onClick={() => setEditingLabel(null)} title="Huỷ" className="text-zinc-500 hover:text-zinc-300"><X className="w-3 h-3" /></button>
                       </div>
                     ) : (
-                      <div className={`flex items-center gap-1 px-3 py-2.5 ${key === 'name' || key === 'boqCode' ? 'justify-start' : 'justify-center'}`}>
+                      <div className="flex items-center justify-center gap-1 px-3 py-2.5">
                         <span className={copied === key ? 'text-emerald-400' : ''}>{colLabels[key]}</span>
                         <button onClick={() => setColMenu(prev => prev === key ? null : key)}
                           className="opacity-0 group-hover/th:opacity-100 transition-opacity text-zinc-600 hover:text-zinc-300 ml-0.5"
