@@ -33,6 +33,7 @@ export default function PrintPage() {
   const [bills, setBills] = useState<Bill[]>([]);
   const [project, setProject] = useState<ProjectInfo>({ name: null, code: null, tower: null, investor: null, contractor: null });
   const [loading, setLoading] = useState(true);
+  const [periodLabel, setPeriodLabel] = useState('');
 
   // Đọc query params phía client
   const params = typeof window !== 'undefined'
@@ -60,6 +61,7 @@ export default function PrintPage() {
       filtered.sort((a, b) => order[a.type] - order[b.type]);
       setBills(filtered);
       setProject(proj);
+      setPeriodLabel(period || filtered[0]?.period || '');
       setLoading(false);
     }
     load();
@@ -75,7 +77,6 @@ export default function PrintPage() {
 
   // Lấy ngày bill đầu tiên (hoặc hôm nay)
   const billDate  = bills[0]?.paidDate ?? new Date().toISOString().slice(0, 10);
-  const periodLabel = period || bills[0]?.period || '—';
 
   // Tính toán
   const sumA    = billRows.reduce((s, b) => s + b.amount, 0);  // Section A
@@ -117,7 +118,15 @@ export default function PrintPage() {
             )}
             <p className="text-sm">Tên NTP: <strong>TỔ ĐỘI THI CÔNG {person.toUpperCase()}</strong></p>
             <p className="text-sm">Ngày {fmtDate(billDate)}</p>
-            <p className="text-sm font-bold">KỲ BILL: {periodLabel.toUpperCase()}</p>
+            <p className="text-sm font-bold flex items-center justify-center gap-2">
+              <span>KỲ BILL:</span>
+              {/* Sửa được trên màn hình, in ra chỉ còn chữ */}
+              <input type="text" value={periodLabel}
+                onChange={e => setPeriodLabel(e.target.value)}
+                placeholder="VD: Đợt 1"
+                className="print:hidden border border-zinc-300 rounded px-2 py-0.5 text-sm font-bold uppercase text-center w-40 focus:outline-none focus:border-blue-500" />
+              <span className="hidden print:inline">{(periodLabel || '—').toUpperCase()}</span>
+            </p>
           </div>
         </div>
 
