@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useCallback, useRef, Fragment, use } from 'react';
+import { useEffect, useState, useCallback, useRef, Fragment, use, useDeferredValue } from 'react';
 import { Search, ChevronRight, ChevronDown, Pencil, Check, X, History, RefreshCw, Link2, Camera, Trash2, Upload, MessageSquare, Send, WifiOff, CloudUpload, ChevronUp, ChevronDown as ChevronDownIcon, Columns, Copy, RotateCcw, CalendarDays, FileText } from 'lucide-react';
 import { useOfflineTickQueue } from '@/app/components/offlineQueue';
 import AppHeader from '@/app/components/AppHeader';
@@ -60,6 +60,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [query, setQuery] = useState('');
+  const deferredQuery = useDeferredValue(query);
   // ?floor=4F trên URL (từ heatmap Dashboard) → mở sẵn filter tầng.
   const [floorFilter, setFloorFilter] = useState(() =>
     typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('floor') ?? '' : '');
@@ -163,7 +164,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
 
   const floors = [...new Set((data?.packages ?? []).map(p => p.floorLabel).filter((f): f is string => !!f))]
     .sort((a, b) => parseInt(a) - parseInt(b));
-  const q = query.toLowerCase();
+  const q = deferredQuery.toLowerCase();
   const packages = (data?.packages ?? []).filter(p =>
     (!q || p.code.toLowerCase().includes(q) || p.name.toLowerCase().includes(q) || (p.boqCode ?? '').toLowerCase().includes(q))
     && (!floorFilter || p.floorLabel === floorFilter)
