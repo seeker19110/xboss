@@ -519,17 +519,29 @@ export function getPool(): Pool {
   return g.__xbossPool;
 }
 
+// Trigram index cho ILIKE search — cần superuser để CREATE EXTENSION.
+// Chạy best-effort: bỏ qua nếu DB user thiếu quyền (42501).
+const SCHEMA_TRGM = `
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX IF NOT EXISTS idx_tasks_name_trgm ON tasks USING gin(name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_tasks_code_trgm ON tasks USING gin(code gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_wp_name_trgm ON work_packages USING gin(name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_wp_code_trgm ON work_packages USING gin(code gin_trgm_ops);
+`;
+
 // Tự khởi tạo schema 1 lần mỗi process (CREATE TABLE IF NOT EXISTS — idempotent).
 function ensureSchema(): Promise<unknown> {
   if (!g.__xbossSchemaReady) {
-    g.__xbossSchemaReady = getPool().query(SCHEMA).catch((err: { code?: string }) => {
-      // Race condition: hai process test chạy song song cùng tạo bảng,
-      // một cái thắng, cái kia bị lỗi unique trên pg_type (23505) hoặc
-      // duplicate table (42P07) — schema đã được tạo bởi process kia → ok.
-      if (err.code === '23505' || err.code === '42P07') return;
-      g.__xbossSchemaReady = undefined; // cho phép thử lại nếu lần đầu lỗi mạng
-      throw err;
-    });
+    g.__xbossSchemaReady = getPool().query(SCHEMA)
+      .then(() => getPool().query(SCHEMA_TRGM).catch(() => { /* thiếu quyền CREATE EXTENSION — bỏ qua */ }))
+      .catch((err: { code?: string }) => {
+        // Race condition: hai process test chạy song song cùng tạo bảng,
+        // một cái thắng, cái kia bị lỗi unique trên pg_type (23505) hoặc
+        // duplicate table (42P07) — schema đã được tạo bởi process kia → ok.
+        if (err.code === '23505' || err.code === '42P07') return;
+        g.__xbossSchemaReady = undefined; // cho phép thử lại nếu lần đầu lỗi mạng
+        throw err;
+      });
   }
   return g.__xbossSchemaReady;
 }
