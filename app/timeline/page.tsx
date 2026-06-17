@@ -131,6 +131,7 @@ export default function TimelinePage() {
             { cls: 'bg-emerald-700/80', label: '80–99%' },
             { cls: 'bg-emerald-600', label: '100%' },
             { cls: 'bg-red-900/70', label: 'Trễ' },
+            { cls: 'bg-zinc-900 border border-dashed border-zinc-700/60', label: 'Không có' },
           ].map(l => (
             <span key={l.label} className="flex items-center gap-1 shrink-0">
               <span className={`inline-block w-3 h-3 sm:w-4 sm:h-4 rounded ${l.cls}`} />
@@ -187,7 +188,8 @@ export default function TimelinePage() {
                           return (
                             <td key={s.code} className="text-center py-0.5">
                               {p < 0 ? (
-                                <span className="inline-block w-14 sm:w-16 h-8 rounded bg-zinc-900 border border-zinc-800/30" />
+                                <span className="inline-flex items-center justify-center w-14 sm:w-16 h-8 rounded bg-zinc-900 border border-dashed border-zinc-800/60 text-zinc-700 text-xs select-none"
+                                  title={`${floor} · ${s.code} · không có công việc`}>–</span>
                               ) : (
                                 <a href={href}
                                   className={`inline-flex flex-col items-center justify-center w-14 sm:w-16 h-8 rounded text-[10px] font-bold tabular-nums transition active:opacity-60 hover:opacity-80 ${progressColor(p, cell?.delayed ?? 0)}`}
@@ -257,7 +259,8 @@ export default function TimelinePage() {
                             return (
                               <td key={w} className="text-center py-0.5">
                                 {p < 0 ? (
-                                  <span className="inline-block w-7 sm:w-8 h-7 sm:h-8 rounded bg-zinc-900 opacity-20" />
+                                  <span className="inline-flex items-center justify-center w-7 sm:w-8 h-7 sm:h-8 rounded bg-zinc-900 border border-dashed border-zinc-800/50 text-zinc-700 text-[9px] select-none"
+                                    title={`${floor} · ${fmtWeek(w)} · không có dữ liệu`}>–</span>
                                 ) : (
                                   <span className={`inline-flex items-center justify-center w-7 sm:w-8 h-7 sm:h-8 rounded text-[9px] sm:text-[10px] font-bold tabular-nums ${historyColor(p)}`}
                                     title={`${floor} · ${fmtWeek(w)} · ${Math.round(p * 100)}%`}>
