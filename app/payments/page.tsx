@@ -23,11 +23,24 @@ type Bill = {
   id: number; responsible: string; type: BillType; period: string | null;
   amount: number; description: string | null; paidDate: string;
   progressSnapshot: number; note: string | null;
+  sheetTypeId: number | null; floorLabel: string | null; pctThisPeriod: number;
   createdBy: number | null; createdByName: string | null; createdAt: string;
+};
+type FloorData = {
+  sheetTypeId: number; sheetType: string; floorLabel: string; contractValue: number;
+  pctPaid: number;
+  history: { period: string | null; pctThisPeriod: number; amount: number; paidDate: string }[];
+};
+type AddInput = {
+  responsible: string; type: BillType; amount: number; paidDate: string;
+  period: string | null; description: string | null; progressSnapshot: number; note: string | null;
+  sheetTypeId?: number | null; floorLabel?: string | null; pctThisPeriod?: number;
 };
 
 // Edit key: `${sheetTypeId}__${floorLabel}`
 type EditKey = string;
+type DraftBillRow = { key: number; sheetTypeId: number | null; floorLabel: string; pct: string };
+type DraftLineRow = { key: number; description: string; amount: string };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -120,11 +133,7 @@ export default function PaymentsPage() {
     if (responsible) setPeople(p => p.includes(responsible) ? p : [...p, responsible].sort());
   }
 
-  async function addBill(input: {
-    responsible: string; type: BillType; amount: number; paidDate: string;
-    period: string | null; description: string | null;
-    progressSnapshot: number; note: string | null;
-  }) {
+  async function addBill(input: AddInput): Promise<{ ok: boolean; amount?: number }> {
     const res = await fetch('/api/payments/bills', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -132,17 +141,22 @@ export default function PaymentsPage() {
     if (!res.ok) {
       const e = await res.json().catch(() => null);
       alert(e?.error ?? 'Không lưu được mục thanh toán');
-      return false;
+      return { ok: false };
     }
-    const { id } = await res.json();
+    const { id, amount: savedAmount } = await res.json();
+    const amount = savedAmount ?? input.amount;
     setBills(prev => [...prev, {
       id, responsible: input.responsible, type: input.type,
-      period: input.period, amount: input.amount, description: input.description,
+      period: input.period, amount, description: input.description,
       paidDate: input.paidDate, progressSnapshot: input.progressSnapshot,
-      note: input.note, createdBy: null, createdByName: null,
+      note: input.note,
+      sheetTypeId: input.sheetTypeId ?? null,
+      floorLabel: input.floorLabel ?? null,
+      pctThisPeriod: input.pctThisPeriod ?? 0,
+      createdBy: null, createdByName: null,
       createdAt: new Date().toISOString(),
     }]);
-    return true;
+    return { ok: true, amount };
   }
 
   async function deleteBill(id: number) {
@@ -410,299 +424,424 @@ export default function PaymentsPage() {
 }
 
 // ── BillsSection ─────────────────────────────────────────────────────────────────
-// Thanh toán, tạm ứng và khoản phát sinh của một người phụ trách.
+// Bảng thanh toán inline: Section A (tầng), Section B (phát sinh), TU (tạm ứng).
 
-type AddInput = {
-  responsible: string; type: BillType; amount: number; paidDate: string;
-  period: string | null; description: string | null;
-  progressSnapshot: number; note: string | null;
-};
-
-type ItemLine = { key: number; description: string; amount: string };
-let _lineKey = 0;
-function newLine(): ItemLine { return { key: ++_lineKey, description: '', amount: '' }; }
-
-function emptyForm() {
-  return { period: '', amount: '', description: '', note: '', paidDate: todayISO() };
-}
+let _draftKey = 0;
+function newDraftBill(): DraftBillRow { return { key: ++_draftKey, sheetTypeId: null, floorLabel: '', pct: '' }; }
+function newDraftLine(): DraftLineRow { return { key: ++_draftKey, description: '', amount: '' }; }
 
 function BillsSection({ person, bills, earned, progress, canEdit, onAdd, onDelete }: {
   person: string; bills: Bill[]; earned: number; progress: number;
   canEdit: boolean;
-  onAdd: (input: AddInput) => Promise<boolean>;
+  onAdd: (input: AddInput) => Promise<{ ok: boolean; amount?: number }>;
   onDelete: (id: number) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  // 'bill' | 'advance' | 'item' | null (null = đóng form)
-  const [activeForm, setActiveForm] = useState<BillType | null>(null);
-  const [f, setF] = useState(emptyForm());
-  // Danh sách dòng phát sinh (chỉ dùng khi activeForm === 'item')
-  const [itemLines, setItemLines] = useState<ItemLine[]>([newLine()]);
+  const [open, setOpen] = useState(true);
+  const [floors, setFloors] = useState<FloorData[]>([]);
+  const [period, setPeriod] = useState('');
+  const [paidDate, setPaidDate] = useState(todayISO());
+  const [draftA, setDraftA] = useState<DraftBillRow[]>([]);
+  const [draftB, setDraftB] = useState<DraftLineRow[]>([]);
+  const [draftTU, setDraftTU] = useState<DraftLineRow[]>([]);
   const [busy, setBusy] = useState(false);
+  const [expandHist, setExpandHist] = useState<number | null>(null);
 
-  const billRows    = bills.filter(b => b.type === 'bill');
-  const advanceRows = bills.filter(b => b.type === 'advance');
-  const itemRows    = bills.filter(b => b.type === 'item');
+  useEffect(() => {
+    fetch(`/api/payments/floors?person=${encodeURIComponent(person)}`)
+      .then(r => r.json()).then(d => setFloors(d.floors ?? []));
+  }, [person, bills]); // reload khi bills thay đổi
 
-  const sumBills    = billRows.reduce((s, b) => s + b.amount, 0);
-  const sumAdvance  = advanceRows.reduce((s, b) => s + b.amount, 0);
-  // phát sinh: amount dương = tăng thêm, âm = khấu trừ (lưu tuyệt đối, dấu trong description)
-  const sumItems    = itemRows.reduce((s, b) => s + b.amount, 0);
-  // Thanh toán kỳ này = bill − tạm ứng ± phát sinh
-  const netThisPeriod = sumBills - sumAdvance + sumItems;
-  const remain = earned - sumBills;   // nghiệm thu còn chờ thanh toán
+  const billRows = bills.filter(b => b.type === 'bill');
+  const itemRows = bills.filter(b => b.type === 'item');
+  const advRows  = bills.filter(b => b.type === 'advance');
+  const sumBills = billRows.reduce((s, b) => s + b.amount, 0);
+  const sumItems = itemRows.reduce((s, b) => s + b.amount, 0);
+  const sumAdvs  = advRows.reduce((s, b) => s + b.amount, 0);
 
-  function openForm(type: BillType) {
-    const closing = activeForm === type;
-    setActiveForm(closing ? null : type);
-    setF(emptyForm());
-    setItemLines([newLine()]);
-    setOpen(true);
+  // Tính draft A amounts
+  function draftAmount(d: DraftBillRow) {
+    const fl = floors.find(f => f.sheetTypeId === d.sheetTypeId && f.floorLabel === d.floorLabel);
+    const pct = parseFloat(d.pct) / 100 || 0;
+    return (fl?.contractValue ?? 0) * pct;
   }
+  const sumDraftA  = draftA.reduce((s, d) => s + draftAmount(d), 0);
+  const sumDraftB  = draftB.reduce((s, d) => s + (parseFloat(d.amount.replace(/[^\d.]/g, '')) || 0), 0);
+  const sumDraftTU = draftTU.reduce((s, d) => s + (parseFloat(d.amount.replace(/[^\d.]/g, '')) || 0), 0);
+  const hasDrafts  = draftA.length > 0 || draftB.length > 0 || draftTU.length > 0;
 
-  async function submit() {
-    if (!activeForm) return;
+  const totalBills = sumBills + sumDraftA;
+  const totalItems = sumItems + sumDraftB;
+  const totalAdvs  = sumAdvs + sumDraftTU;
+  const netTotal   = totalBills - totalAdvs + totalItems;
+  const remain     = earned - sumBills;
+
+  // Floors đã chọn trong draftA (để disable trong các dòng khác)
+  const draftFloorKeys = new Set(draftA.map(d => `${d.sheetTypeId}__${d.floorLabel}`));
+
+  async function submitAll() {
     setBusy(true);
-    if (activeForm === 'item') {
-      // Submit từng dòng một; bỏ qua dòng trống hoàn toàn
-      const valid = itemLines.filter(l => l.description.trim() || l.amount.trim());
-      if (!valid.length) { alert('Nhập ít nhất một khoản phát sinh'); setBusy(false); return; }
-      for (const l of valid) {
-        const amt = parseFloat(l.amount.replace(/[^\d.]/g, '')) || 0;
-        if (!l.description.trim()) { alert('Thiếu nội dung cho một khoản'); setBusy(false); return; }
-        if (amt <= 0) { alert(`"${l.description}" chưa có giá trị hợp lệ`); setBusy(false); return; }
-        const ok = await onAdd({
-          responsible: person, type: 'item', amount: amt,
-          paidDate: f.paidDate, period: f.period.trim() || null,
-          description: l.description.trim(), progressSnapshot: progress, note: null,
-        });
-        if (!ok) { setBusy(false); return; }
-      }
-      setItemLines([newLine()]); setF(emptyForm()); setActiveForm(null);
-    } else {
-      const amt = parseFloat(f.amount.replace(/[^\d.]/g, '')) || 0;
-      if (amt <= 0) { alert('Nhập số tiền hợp lệ'); setBusy(false); return; }
-      const ok = await onAdd({
-        responsible: person, type: activeForm, amount: amt,
-        paidDate: f.paidDate, period: f.period.trim() || null,
-        description: null, progressSnapshot: progress, note: f.note.trim() || null,
+    const periodVal = period.trim() || null;
+
+    for (const d of draftA) {
+      if (!d.sheetTypeId || !d.floorLabel) continue;
+      const pct = parseFloat(d.pct) / 100 || 0;
+      if (pct <= 0) { alert(`Chọn % thanh toán cho tầng ${d.floorLabel}`); setBusy(false); return; }
+      const fl = floors.find(f => f.sheetTypeId === d.sheetTypeId && f.floorLabel === d.floorLabel);
+      if ((fl?.pctPaid ?? 0) + pct > 1.001) { alert(`Tầng ${d.floorLabel} vượt 100%`); setBusy(false); return; }
+      const { ok } = await onAdd({
+        responsible: person, type: 'bill', amount: 0, paidDate,
+        period: periodVal, description: null, progressSnapshot: progress, note: null,
+        sheetTypeId: d.sheetTypeId, floorLabel: d.floorLabel, pctThisPeriod: pct,
       });
-      if (ok) { setF(emptyForm()); setActiveForm(null); }
+      if (!ok) { setBusy(false); return; }
     }
+    for (const d of draftB) {
+      if (!d.description.trim()) continue;
+      const amt = parseFloat(d.amount.replace(/[^\d.]/g, '')) || 0;
+      if (amt <= 0) { alert(`"${d.description}" chưa có giá trị`); setBusy(false); return; }
+      const { ok } = await onAdd({
+        responsible: person, type: 'item', amount: amt, paidDate,
+        period: periodVal, description: d.description.trim(), progressSnapshot: progress, note: null,
+      });
+      if (!ok) { setBusy(false); return; }
+    }
+    for (const d of draftTU) {
+      const amt = parseFloat(d.amount.replace(/[^\d.]/g, '')) || 0;
+      if (amt <= 0) continue;
+      await onAdd({
+        responsible: person, type: 'advance', amount: amt, paidDate,
+        period: periodVal, description: d.description.trim() || null, progressSnapshot: progress, note: null,
+      });
+    }
+    setDraftA([]); setDraftB([]); setDraftTU([]);
     setBusy(false);
   }
 
-  const hasAny = bills.length > 0;
-
-  // Nhãn + màu theo type
-  const typeLabel: Record<BillType, string> = { bill: 'Thanh toán', advance: 'Tạm ứng', item: 'Phát sinh' };
-  const typeColor: Record<BillType, string> = {
-    bill: 'text-sky-300', advance: 'text-violet-300', item: 'text-amber-300',
-  };
-  const typeBadge: Record<BillType, string> = {
-    bill: 'bg-sky-900/60 text-sky-300', advance: 'bg-violet-900/60 text-violet-300', item: 'bg-amber-900/50 text-amber-300',
-  };
+  const COL = canEdit ? 8 : 7;
+  const inputCls = 'bg-zinc-800 border border-zinc-700 focus:outline-none text-zinc-200 rounded px-1.5 py-1 text-[11px]';
 
   return (
-    <div className="border-t border-zinc-800 bg-zinc-950/40">
-
-      {/* ── Tóm tắt + nút hành động ── */}
-      <div className="px-4 py-2.5 space-y-2">
-        {/* Hàng 1: toggle + số liệu */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={() => setOpen(o => !o)}
-            className="flex items-center gap-1.5 text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition shrink-0">
-            <Receipt className="w-3.5 h-3.5 text-sky-400" />
-            Thanh toán
-            {hasAny && <span className="text-zinc-600">({bills.length})</span>}
-            {hasAny && (open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />)}
-          </button>
-          {sumBills > 0 && <span className="text-[11px] text-sky-400 tabular-nums shrink-0">TT: {fmtVND(sumBills)}</span>}
-          {sumAdvance > 0 && <span className="text-[11px] text-violet-400 tabular-nums shrink-0">TU: −{fmtVND(sumAdvance)}</span>}
-          {sumItems !== 0 && <span className="text-[11px] text-amber-400 tabular-nums shrink-0">PS: {sumItems >= 0 ? '' : '−'}{fmtVND(Math.abs(sumItems))}</span>}
-          {(sumBills > 0 || sumAdvance > 0 || sumItems !== 0) && (
-            <span className="text-[11px] font-bold tabular-nums text-emerald-400 shrink-0">
-              = {fmtVND(netThisPeriod)}
-            </span>
-          )}
-          {earned > 0 && sumBills > 0 && (
-            <span className={`text-[11px] shrink-0 ml-auto ${remain > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
-              {remain > 0 ? `Còn chờ: ${fmtVND(remain)}` : 'Nghiệm thu đủ'}
-            </span>
-          )}
-        </div>
-
-        {/* Hàng 2: các nút thêm mới */}
-        {canEdit && (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {(['bill', 'advance', 'item'] as BillType[]).map(t => (
-              <button key={t} onClick={() => openForm(t)}
-                className={`flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg border transition shrink-0 ${
-                  activeForm === t
-                    ? 'bg-zinc-700 border-zinc-500 text-white'
-                    : 'bg-zinc-800/60 border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-500'
-                }`}>
-                {activeForm === t ? <X className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
-                {typeLabel[t]}
-              </button>
-            ))}
-          </div>
+    <div className="border-t border-zinc-800">
+      {/* ── Summary bar + toggle ── */}
+      <div className="flex items-center gap-2 px-4 py-2 flex-wrap">
+        <button onClick={() => setOpen(o => !o)}
+          className="flex items-center gap-1.5 text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition shrink-0">
+          <Receipt className="w-3.5 h-3.5 text-sky-400" />
+          Bảng thanh toán
+          {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+        </button>
+        {sumBills > 0 && <span className="text-[11px] text-sky-400 tabular-nums">TT: {fmtVND(sumBills)}</span>}
+        {sumAdvs > 0  && <span className="text-[11px] text-violet-400 tabular-nums">TU: −{fmtVND(sumAdvs)}</span>}
+        {sumItems > 0 && <span className="text-[11px] text-amber-400 tabular-nums">PS: {fmtVND(sumItems)}</span>}
+        {(sumBills + sumAdvs + sumItems) > 0 &&
+          <span className="text-[11px] font-bold text-emerald-400 tabular-nums">= {fmtVND(sumBills - sumAdvs + sumItems)}</span>}
+        {earned > 0 && sumBills > 0 && (
+          <span className={`text-[11px] ml-auto shrink-0 ${remain > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
+            {remain > 0 ? `Còn chờ TT: ${fmtVND(remain)}` : 'Nghiệm thu đủ ✓'}
+          </span>
         )}
       </div>
 
-      {/* ── Form nhập ── */}
-      {activeForm && canEdit && (
-        <div className="px-4 pb-3 pt-0 border-t border-zinc-800/60">
-          {/* Header kỳ + ngày — dùng chung cho mọi loại */}
-          <div className="grid grid-cols-2 gap-2 pt-2 pb-2">
-            <input type="text" value={f.period} onChange={e => setF(p => ({ ...p, period: e.target.value }))}
-              placeholder="Kỳ / đợt (vd: Đợt 1)"
-              className="text-xs bg-zinc-800 border border-zinc-700 focus:border-sky-500 rounded px-2 py-1.5 text-zinc-200 focus:outline-none" />
-            <input type="date" value={f.paidDate} onChange={e => setF(p => ({ ...p, paidDate: e.target.value }))}
-              className="text-xs bg-zinc-800 border border-zinc-700 focus:border-sky-500 rounded px-2 py-1.5 text-zinc-200 focus:outline-none" />
-          </div>
-
-          {/* Form bill / tạm ứng */}
-          {activeForm !== 'item' && (
-            <div className="space-y-2">
-              <input type="text" inputMode="numeric" value={f.amount}
-                onChange={e => setF(p => ({ ...p, amount: e.target.value }))}
-                placeholder="Số tiền (đ)"
-                className="w-full text-right text-sm bg-zinc-800 border border-zinc-700 focus:border-sky-500 rounded px-2 py-1.5 text-zinc-200 focus:outline-none tabular-nums" />
-              <input type="text" value={f.note} onChange={e => setF(p => ({ ...p, note: e.target.value }))}
-                placeholder="Ghi chú (tuỳ chọn)"
-                className="w-full text-xs bg-zinc-800 border border-zinc-700 focus:border-sky-500 rounded px-2 py-1.5 text-zinc-200 focus:outline-none" />
-            </div>
-          )}
-
-          {/* Form phát sinh — nhiều dòng */}
-          {activeForm === 'item' && (
-            <div className="space-y-1.5">
-              {/* Header cột */}
-              <div className="grid grid-cols-[1fr_130px_28px] gap-1.5 px-0.5">
-                <span className="text-[10px] text-zinc-600 font-semibold">Nội dung</span>
-                <span className="text-[10px] text-zinc-600 font-semibold text-right">Giá trị (đ)</span>
-                <span />
-              </div>
-              {/* Các dòng */}
-              {itemLines.map((line, idx) => (
-                <div key={line.key} className="grid grid-cols-[1fr_130px_28px] gap-1.5 items-center">
-                  <input
-                    type="text"
-                    value={line.description}
-                    onChange={e => setItemLines(ls => ls.map(l => l.key === line.key ? { ...l, description: e.target.value } : l))}
-                    placeholder={`Khoản ${idx + 1}`}
-                    className="text-xs bg-zinc-800 border border-zinc-700 focus:border-amber-500 rounded px-2 py-1.5 text-zinc-200 focus:outline-none min-w-0"
-                  />
-                  <input
-                    type="text" inputMode="numeric"
-                    value={line.amount}
-                    onChange={e => setItemLines(ls => ls.map(l => l.key === line.key ? { ...l, amount: e.target.value } : l))}
-                    placeholder="0"
-                    className="text-right text-xs bg-zinc-800 border border-zinc-700 focus:border-amber-500 rounded px-2 py-1.5 text-zinc-200 focus:outline-none tabular-nums min-w-0"
-                  />
-                  <button
-                    onClick={() => setItemLines(ls => ls.length > 1 ? ls.filter(l => l.key !== line.key) : ls)}
-                    className="flex items-center justify-center text-zinc-700 hover:text-red-400 transition h-7 w-7"
-                    aria-label="Xoá dòng">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-              {/* Nút thêm dòng + tổng preview */}
-              <div className="flex items-center justify-between pt-0.5">
-                <button onClick={() => setItemLines(ls => [...ls, newLine()])}
-                  className="flex items-center gap-1 text-[11px] text-amber-400 hover:text-amber-300 transition">
-                  <Plus className="w-3.5 h-3.5" />
-                  Thêm dòng
-                </button>
-                {itemLines.some(l => l.amount) && (
-                  <span className="text-[11px] text-amber-300 tabular-nums font-semibold">
-                    Tổng: {fmtVND(itemLines.reduce((s, l) => s + (parseFloat(l.amount.replace(/[^\d.]/g, '')) || 0), 0))}
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Footer: ghi nhận */}
-          <div className="flex items-center justify-between mt-2.5">
-            <span className="text-[10px] text-zinc-600">Chốt NT: {Math.round(progress * 100)}%</span>
-            <button onClick={submit} disabled={busy}
-              className="flex items-center gap-1.5 text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg transition">
-              {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wallet className="w-3.5 h-3.5" />}
-              Ghi nhận
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Danh sách gộp theo nhóm ── */}
-      {open && hasAny && (
+      {open && (
         <div className="border-t border-zinc-800/60">
-          {([
-            { type: 'bill' as BillType, rows: billRows, sum: sumBills },
-            { type: 'advance' as BillType, rows: advanceRows, sum: sumAdvance },
-            { type: 'item' as BillType, rows: itemRows, sum: sumItems },
-          ]).filter(g => g.rows.length > 0).map(({ type, rows: gRows, sum }) => (
-            <div key={type} className="border-t border-zinc-800/40 first:border-0">
-              {/* Sub-header nhóm */}
-              <div className="flex items-center gap-2 px-4 py-1.5 bg-zinc-900/40">
-                <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${typeBadge[type]}`}>
-                  {typeLabel[type]}
-                </span>
-                <span className={`text-[11px] font-bold tabular-nums ml-auto ${typeColor[type]}`}>
-                  {type === 'advance' ? '−' : ''}{fmtVND(Math.abs(sum))}
-                </span>
-              </div>
-              {/* Các dòng */}
-              <div className="divide-y divide-zinc-800/30">
-                {gRows.map((b, i) => (
-                  <div key={b.id} className="flex items-center gap-2 px-4 py-2">
-                    <span className="text-[10px] text-zinc-600 w-4 shrink-0 tabular-nums">{i + 1}</span>
-                    <div className="flex-1 min-w-0 space-y-0.5">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {b.period && (
-                          <span className="text-[10px] font-semibold bg-zinc-800 text-zinc-300 px-1.5 py-0.5 rounded">{b.period}</span>
-                        )}
-                        {b.description && (
-                          <span className="text-xs text-zinc-300 truncate">{b.description}</span>
-                        )}
-                        <span className={`text-xs font-bold tabular-nums shrink-0 ${typeColor[type]}`}>
-                          {type === 'advance' ? '−' : ''}{fmtFull(b.amount)}
-                        </span>
-                        <span className="text-[10px] text-zinc-600 shrink-0">{fmtDate(b.paidDate)}</span>
-                        {b.progressSnapshot > 0 && (
-                          <span className="text-[10px] text-zinc-700 shrink-0">@{Math.round(b.progressSnapshot * 100)}%</span>
-                        )}
-                      </div>
-                      {b.note && <p className="text-[10px] text-zinc-600 truncate">{b.note}</p>}
-                    </div>
-                    {canEdit && (
-                      <button onClick={() => onDelete(b.id)}
-                        className="shrink-0 text-zinc-700 hover:text-red-400 transition" aria-label="Xoá">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-
-          {/* Tổng kết kỳ */}
-          {(sumBills > 0 || sumAdvance > 0 || sumItems !== 0) && (
-            <div className="border-t border-zinc-700/60 px-4 py-2.5 bg-zinc-900/60">
-              <div className="flex items-center justify-between flex-wrap gap-2 text-xs tabular-nums">
-                <div className="flex items-center gap-3 flex-wrap text-zinc-500">
-                  {sumBills > 0 && <span>TT: <span className="text-sky-300">{fmtVND(sumBills)}</span></span>}
-                  {sumAdvance > 0 && <span>− TU: <span className="text-violet-300">{fmtVND(sumAdvance)}</span></span>}
-                  {sumItems !== 0 && <span>{sumItems >= 0 ? '+ ' : '− '}PS: <span className="text-amber-300">{fmtVND(Math.abs(sumItems))}</span></span>}
-                </div>
-                <span className="font-bold text-emerald-300">= {fmtVND(netThisPeriod)}</span>
-              </div>
+          {/* ── Kỳ + Ngày + Ghi nhận ── */}
+          {canEdit && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-zinc-900/50 border-b border-zinc-800/60 flex-wrap">
+              <span className="text-[10px] text-zinc-600 font-semibold uppercase tracking-wide shrink-0">Kỳ:</span>
+              <input type="text" value={period} onChange={e => setPeriod(e.target.value)}
+                placeholder="VD: Đợt 1, Tháng 6…"
+                className={`${inputCls} w-32 focus:border-sky-500`} />
+              <input type="date" value={paidDate} onChange={e => setPaidDate(e.target.value)}
+                className={`${inputCls} focus:border-sky-500`} />
+              {hasDrafts && (
+                <button onClick={submitAll} disabled={busy}
+                  className="ml-auto flex items-center gap-1.5 text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg transition shrink-0">
+                  {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wallet className="w-3.5 h-3.5" />}
+                  Ghi nhận kỳ này
+                </button>
+              )}
             </div>
           )}
+
+          {/* ── Bảng chính ── */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-[11px] min-w-[640px] border-collapse">
+              <thead>
+                <tr style={{ background: '#4472c4' }} className="text-white text-center">
+                  <th className="px-1 py-1.5 w-8">STT</th>
+                  <th className="px-2 py-1.5 text-left">Diễn giải / Tầng</th>
+                  <th className="px-1 py-1.5 w-20">Hệ</th>
+                  <th className="px-2 py-1.5 w-24 text-right">Giá trị HĐ</th>
+                  <th className="px-1 py-1.5 w-16 text-center">% kỳ</th>
+                  <th className="px-2 py-1.5 w-28 text-right">Thành tiền</th>
+                  <th className="px-2 py-1.5 w-28">Lũy kế</th>
+                  {canEdit && <th className="w-7" />}
+                </tr>
+              </thead>
+              <tbody>
+
+                {/* ═══ SECTION A ═══ */}
+                <tr style={{ background: '#d9e1f2' }}>
+                  <td className="px-1 py-1 text-center font-bold text-blue-900">A</td>
+                  <td className="px-2 py-1 font-bold text-blue-900" colSpan={COL - 1}>CÔNG VIỆC HOÀN THÀNH</td>
+                </tr>
+
+                {billRows.map((b, i) => {
+                  const fl = floors.find(f => f.sheetTypeId === b.sheetTypeId && f.floorLabel === b.floorLabel);
+                  const isExp = expandHist === b.id;
+                  return (
+                    <>
+                      <tr key={b.id} className="border-b border-zinc-800/40 hover:bg-zinc-800/20">
+                        <td className="px-1 py-1.5 text-center text-zinc-500">{i + 1}</td>
+                        <td className="px-2 py-1.5 font-medium text-zinc-200">
+                          {b.floorLabel ?? b.description ?? 'Thanh toán tiến độ'}
+                          {b.period && <span className="ml-1.5 text-[10px] text-zinc-500">[{b.period}]</span>}
+                        </td>
+                        <td className="px-1 py-1.5 text-center text-zinc-400">{fl?.sheetType ?? '—'}</td>
+                        <td className="px-2 py-1.5 text-right text-zinc-400 tabular-nums">{fl ? fmtVND(fl.contractValue) : '—'}</td>
+                        <td className="px-1 py-1.5 text-center text-zinc-300 tabular-nums">
+                          {b.pctThisPeriod > 0 ? `${Math.round(b.pctThisPeriod * 100)}%` : '—'}
+                        </td>
+                        <td className="px-2 py-1.5 text-right text-sky-300 font-semibold tabular-nums">{fmtVND(b.amount)}</td>
+                        <td className="px-2 py-1.5">
+                          {fl && (
+                            <button onClick={() => setExpandHist(isExp ? null : b.id)}
+                              className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-300 transition">
+                              Lũy kế: <span className={fl.pctPaid >= 1 ? 'text-emerald-400 font-bold' : 'text-sky-400'}>{Math.round(fl.pctPaid * 100)}%</span>
+                              {isExp ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                            </button>
+                          )}
+                        </td>
+                        {canEdit && (
+                          <td className="px-1 py-1.5 text-center">
+                            <button onClick={() => onDelete(b.id)} className="text-zinc-700 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
+                          </td>
+                        )}
+                      </tr>
+                      {isExp && fl && (
+                        <tr key={`h${b.id}`} className="bg-zinc-900/70">
+                          <td colSpan={COL} className="px-6 py-2">
+                            <div className="flex items-center gap-3 flex-wrap text-[10px]">
+                              {fl.history.map((h, hi) => (
+                                <span key={hi} className="text-zinc-400">
+                                  <span className="text-zinc-500">{h.period ?? `Kỳ ${hi + 1}`}:</span>{' '}
+                                  <span className="text-sky-400 font-medium">{Math.round(h.pctThisPeriod * 100)}%</span>
+                                  {' '}({fmtVND(h.amount)}) · {fmtDate(h.paidDate)}
+                                </span>
+                              ))}
+                              <span className="font-bold text-zinc-200 ml-auto">Tổng: {Math.round(fl.pctPaid * 100)}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  );
+                })}
+
+                {/* Draft bill rows */}
+                {draftA.map(d => {
+                  const fl = floors.find(f => f.sheetTypeId === d.sheetTypeId && f.floorLabel === d.floorLabel);
+                  const pct = parseFloat(d.pct) / 100 || 0;
+                  const amt = draftAmount(d);
+                  const pctAfter = (fl?.pctPaid ?? 0) + pct;
+                  return (
+                    <tr key={d.key} className="border-b border-zinc-700/40 bg-zinc-900/50">
+                      <td className="px-1 py-1 text-center text-zinc-600">·</td>
+                      <td className="px-1 py-1" colSpan={2}>
+                        <select
+                          value={d.sheetTypeId && d.floorLabel ? `${d.sheetTypeId}__${d.floorLabel}` : ''}
+                          onChange={e => {
+                            const [sid, fl] = e.target.value.split('__');
+                            setDraftA(p => p.map(r => r.key === d.key ? { ...r, sheetTypeId: sid ? parseInt(sid) : null, floorLabel: fl ?? '' } : r));
+                          }}
+                          className={`${inputCls} focus:border-sky-500 w-full`}>
+                          <option value="">— Chọn tầng —</option>
+                          {floors.map(f => {
+                            const k = `${f.sheetTypeId}__${f.floorLabel}`;
+                            const used = draftA.some(r => r.key !== d.key && `${r.sheetTypeId}__${r.floorLabel}` === k);
+                            return (
+                              <option key={k} value={k} disabled={f.pctPaid >= 1 || used}>
+                                {f.floorLabel} — {f.sheetType} · {fmtVND(f.contractValue)}đ
+                                {f.pctPaid >= 1 ? ' (100% ✓)' : f.pctPaid > 0 ? ` · đã ${Math.round(f.pctPaid * 100)}%` : ''}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </td>
+                      <td className="px-2 py-1 text-right text-zinc-500 tabular-nums">{fl ? fmtVND(fl.contractValue) : '—'}</td>
+                      <td className="px-1 py-1">
+                        <input type="text" inputMode="numeric" value={d.pct}
+                          onChange={e => setDraftA(p => p.map(r => r.key === d.key ? { ...r, pct: e.target.value } : r))}
+                          placeholder="0"
+                          className={`${inputCls} focus:border-sky-500 w-full text-center tabular-nums`} />
+                      </td>
+                      <td className="px-2 py-1 text-right text-sky-400 font-medium tabular-nums">{amt > 0 ? fmtVND(amt) : '—'}</td>
+                      <td className="px-2 py-1">
+                        {pctAfter > 0 && (
+                          <span className={`text-[10px] font-medium ${pctAfter > 1.001 ? 'text-red-400' : 'text-emerald-400'}`}>
+                            → {Math.round(pctAfter * 100)}%{pctAfter > 1.001 ? ' ⚠ Vượt!' : ''}
+                          </span>
+                        )}
+                      </td>
+                      {canEdit && (
+                        <td className="px-1 py-1 text-center">
+                          <button onClick={() => setDraftA(p => p.filter(r => r.key !== d.key))}><X className="w-3.5 h-3.5 text-zinc-600 hover:text-red-400" /></button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+
+                {canEdit && (
+                  <tr>
+                    <td colSpan={COL} className="px-3 py-1.5">
+                      <button onClick={() => setDraftA(p => [...p, newDraftBill()])}
+                        className="flex items-center gap-1 text-[11px] text-sky-500 hover:text-sky-300 transition">
+                        <Plus className="w-3.5 h-3.5" /> Thêm tầng
+                      </button>
+                    </td>
+                  </tr>
+                )}
+
+                {/* GTTHTC */}
+                <tr style={{ background: '#fff2cc' }} className="border-t border-zinc-700/50">
+                  <td className="px-1 py-1.5 text-center text-[10px] font-bold text-amber-800">GTTHTC</td>
+                  <td className="px-2 py-1.5 font-bold text-amber-800" colSpan={4}>TỔNG GIÁ TRỊ CÔNG VIỆC HOÀN THÀNH (CHƯA VAT)</td>
+                  <td className="px-2 py-1.5 text-right font-bold text-amber-800 tabular-nums" colSpan={canEdit ? 3 : 2}>{fmtVND(totalBills)}</td>
+                </tr>
+
+                {/* GL */}
+                <tr style={{ background: '#fff2cc' }}>
+                  <td className="px-1 py-1.5 text-center text-[10px] text-zinc-600">(GL)</td>
+                  <td className="px-2 py-1.5 text-zinc-600" colSpan={4}>TIỀN GIỮ LẠI (NẾU CÓ)</td>
+                  <td className="px-2 py-1.5 text-right text-zinc-600 tabular-nums" colSpan={canEdit ? 3 : 2}>{fmtVND(0)}</td>
+                </tr>
+
+                {/* ═══ TẠM ỨNG ═══ */}
+                <tr style={{ background: '#ede9fe' }}>
+                  <td className="px-1 py-1.5 text-center text-[10px] font-bold text-violet-800">(TU)</td>
+                  <td className="px-2 py-1.5 font-bold text-violet-800" colSpan={4}>TẠM ỨNG</td>
+                  <td className="px-2 py-1.5 text-right font-bold text-violet-700 tabular-nums" colSpan={canEdit ? 3 : 2}>{fmtVND(totalAdvs)}</td>
+                </tr>
+
+                {advRows.map((b, i) => (
+                  <tr key={b.id} className="border-b border-zinc-800/40 hover:bg-zinc-800/20">
+                    <td className="px-1 py-1.5 text-center text-zinc-500">{i + 1}</td>
+                    <td className="px-2 py-1.5 text-zinc-300" colSpan={4}>{b.description ?? '—'}{b.period && <span className="ml-1.5 text-[10px] text-zinc-500">[{b.period}]</span>}</td>
+                    <td className="px-2 py-1.5 text-right text-violet-300 font-semibold tabular-nums">{fmtVND(b.amount)}</td>
+                    <td className="px-2 py-1.5 text-zinc-500 text-[10px]">{fmtDate(b.paidDate)}</td>
+                    {canEdit && <td className="px-1 py-1.5 text-center"><button onClick={() => onDelete(b.id)}><Trash2 className="w-3.5 h-3.5 text-zinc-700 hover:text-red-400" /></button></td>}
+                  </tr>
+                ))}
+
+                {draftTU.map(d => (
+                  <tr key={d.key} className="border-b border-zinc-700/40 bg-zinc-900/50">
+                    <td className="px-1 py-1 text-center text-zinc-600">·</td>
+                    <td className="px-1 py-1" colSpan={4}>
+                      <input type="text" value={d.description}
+                        onChange={e => setDraftTU(p => p.map(r => r.key === d.key ? { ...r, description: e.target.value } : r))}
+                        placeholder="Ghi chú tạm ứng (tuỳ chọn)"
+                        className={`${inputCls} focus:border-violet-500 w-full`} />
+                    </td>
+                    <td className="px-1 py-1">
+                      <input type="text" inputMode="numeric" value={d.amount}
+                        onChange={e => setDraftTU(p => p.map(r => r.key === d.key ? { ...r, amount: e.target.value } : r))}
+                        placeholder="0 đ"
+                        className={`${inputCls} focus:border-violet-500 w-full text-right tabular-nums`} />
+                    </td>
+                    <td />{canEdit && <td className="px-1 py-1 text-center"><button onClick={() => setDraftTU(p => p.filter(r => r.key !== d.key))}><X className="w-3.5 h-3.5 text-zinc-600 hover:text-red-400" /></button></td>}
+                  </tr>
+                ))}
+
+                {canEdit && (
+                  <tr>
+                    <td colSpan={COL} className="px-3 py-1.5">
+                      <button onClick={() => setDraftTU(p => [...p, newDraftLine()])}
+                        className="flex items-center gap-1 text-[11px] text-violet-500 hover:text-violet-300 transition">
+                        <Plus className="w-3.5 h-3.5" /> Thêm tạm ứng
+                      </button>
+                    </td>
+                  </tr>
+                )}
+
+                {/* HU */}
+                <tr style={{ background: '#fff2cc' }}>
+                  <td className="px-1 py-1.5 text-center text-[10px] text-zinc-600">(HU)</td>
+                  <td className="px-2 py-1.5 text-zinc-600" colSpan={4}>KHẤU TRỪ TẠM ỨNG</td>
+                  <td className="px-2 py-1.5 text-right text-violet-600 tabular-nums" colSpan={canEdit ? 3 : 2}>{totalAdvs > 0 ? `(${fmtVND(totalAdvs)})` : fmtVND(0)}</td>
+                </tr>
+
+                {/* ═══ PHÁT SINH ═══ */}
+                <tr style={{ background: '#fef3c7' }} className="border-t border-zinc-700/40">
+                  <td className="px-1 py-1.5 text-center text-[10px] font-bold text-amber-700">PS</td>
+                  <td className="px-2 py-1.5 font-bold text-amber-700" colSpan={4}>KHOẢN PHÁT SINH</td>
+                  <td className="px-2 py-1.5 text-right font-bold text-amber-700 tabular-nums" colSpan={canEdit ? 3 : 2}>{fmtVND(totalItems)}</td>
+                </tr>
+
+                {itemRows.map((b, i) => (
+                  <tr key={b.id} className="border-b border-zinc-800/40 hover:bg-zinc-800/20">
+                    <td className="px-1 py-1.5 text-center text-zinc-500">{i + 1}</td>
+                    <td className="px-2 py-1.5 text-zinc-300" colSpan={4}>{b.description}{b.period && <span className="ml-1.5 text-[10px] text-zinc-500">[{b.period}]</span>}</td>
+                    <td className="px-2 py-1.5 text-right text-amber-300 font-semibold tabular-nums">{fmtVND(b.amount)}</td>
+                    <td className="px-2 py-1.5 text-zinc-500 text-[10px]">{fmtDate(b.paidDate)}</td>
+                    {canEdit && <td className="px-1 py-1.5 text-center"><button onClick={() => onDelete(b.id)}><Trash2 className="w-3.5 h-3.5 text-zinc-700 hover:text-red-400" /></button></td>}
+                  </tr>
+                ))}
+
+                {draftB.map((d, idx) => (
+                  <tr key={d.key} className="border-b border-zinc-700/40 bg-zinc-900/50">
+                    <td className="px-1 py-1 text-center text-zinc-600">·</td>
+                    <td className="px-1 py-1" colSpan={4}>
+                      <input type="text" value={d.description}
+                        onChange={e => setDraftB(p => p.map(r => r.key === d.key ? { ...r, description: e.target.value } : r))}
+                        placeholder={`Khoản phát sinh ${idx + 1} *`}
+                        className={`${inputCls} focus:border-amber-500 w-full`} />
+                    </td>
+                    <td className="px-1 py-1">
+                      <input type="text" inputMode="numeric" value={d.amount}
+                        onChange={e => setDraftB(p => p.map(r => r.key === d.key ? { ...r, amount: e.target.value } : r))}
+                        placeholder="0 đ"
+                        className={`${inputCls} focus:border-amber-500 w-full text-right tabular-nums`} />
+                    </td>
+                    <td />{canEdit && <td className="px-1 py-1 text-center"><button onClick={() => setDraftB(p => p.filter(r => r.key !== d.key))}><X className="w-3.5 h-3.5 text-zinc-600 hover:text-red-400" /></button></td>}
+                  </tr>
+                ))}
+
+                {canEdit && (
+                  <tr>
+                    <td colSpan={COL} className="px-3 py-1.5">
+                      <button onClick={() => setDraftB(p => [...p, newDraftLine()])}
+                        className="flex items-center gap-1 text-[11px] text-amber-500 hover:text-amber-300 transition">
+                        <Plus className="w-3.5 h-3.5" /> Thêm khoản phát sinh
+                      </button>
+                    </td>
+                  </tr>
+                )}
+
+                {/* GTTTK */}
+                <tr style={{ background: '#fff2cc' }} className="border-t border-zinc-700/50">
+                  <td className="px-1 py-1.5 text-center text-[10px] font-bold text-amber-800">(GTTTK)</td>
+                  <td className="px-2 py-1.5 font-bold text-amber-800" colSpan={4}>TỔNG GIÁ TRỊ ĐƯỢC THANH TOÁN ĐẾN KỲ NÀY</td>
+                  <td className="px-2 py-1.5 text-right font-bold text-amber-800 tabular-nums" colSpan={canEdit ? 3 : 2}>{fmtVND(netTotal)}</td>
+                </tr>
+
+                {/* GTTTKT */}
+                <tr style={{ background: '#fff2cc' }}>
+                  <td className="px-1 py-1.5 text-center text-[10px] text-zinc-600">(GTTTKT)</td>
+                  <td className="px-2 py-1.5 text-zinc-600" colSpan={4}>TỔNG GIÁ TRỊ ĐÃ THANH TOÁN ĐẾN KỲ TRƯỚC (GỒM TẠM ỨNG)</td>
+                  <td className="px-2 py-1.5 text-right text-zinc-500 tabular-nums" colSpan={canEdit ? 3 : 2}>{fmtVND(0)}</td>
+                </tr>
+
+                {/* DNTT */}
+                <tr style={{ background: '#e2efda' }} className="border-t-2 border-zinc-600">
+                  <td className="px-1 py-2 text-center text-[10px] font-bold text-green-900">(DNTT)</td>
+                  <td className="px-2 py-2 font-bold text-green-900" colSpan={4}>ĐỀ NGHỊ THANH TOÁN (CÓ VAT)</td>
+                  <td className="px-2 py-2 text-right font-bold text-green-800 tabular-nums text-sm" colSpan={canEdit ? 3 : 2}>{fmtVND(netTotal)}</td>
+                </tr>
+
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

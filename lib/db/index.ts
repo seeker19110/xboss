@@ -479,6 +479,9 @@ ALTER TABLE payment_bills ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'b
 ALTER TABLE payment_bills ADD COLUMN IF NOT EXISTS description TEXT;
 ALTER TABLE payment_bills DROP CONSTRAINT IF EXISTS payment_bills_type_chk;
 ALTER TABLE payment_bills ADD CONSTRAINT payment_bills_type_chk CHECK (type IN ('bill','advance','item'));
+ALTER TABLE payment_bills ADD COLUMN IF NOT EXISTS sheet_type_id INTEGER REFERENCES sheet_types(id);
+ALTER TABLE payment_bills ADD COLUMN IF NOT EXISTS floor_label TEXT;
+ALTER TABLE payment_bills ADD COLUMN IF NOT EXISTS pct_this_period NUMERIC(5,4) DEFAULT 0;
 `;
 
 export function getPool(): Pool {
