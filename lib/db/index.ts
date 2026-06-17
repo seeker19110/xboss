@@ -449,8 +449,16 @@ CREATE INDEX IF NOT EXISTS idx_documents_floor ON task_documents(floor_approval_
 -- Cho phép lưu link ngoài (Google Drive, v.v.) thay vì file upload.
 ALTER TABLE task_documents ADD COLUMN IF NOT EXISTS link_url TEXT;
 
--- Đơn giá hợp đồng theo task (dùng tính giá trị hoàn thành = unit_price × progress_percent).
-ALTER TABLE tasks ADD COLUMN IF NOT EXISTS unit_price NUMERIC(15,2) DEFAULT 0;
+-- Giá trị hợp đồng theo tầng × hệ (payment tính ở cấp tầng, không theo từng task).
+CREATE TABLE IF NOT EXISTS floor_contracts (
+  id SERIAL PRIMARY KEY,
+  sheet_type_id INTEGER NOT NULL REFERENCES sheet_types(id),
+  floor_label TEXT NOT NULL,
+  contract_value NUMERIC(15,2) DEFAULT 0,
+  note TEXT,
+  UNIQUE(sheet_type_id, floor_label)
+);
+CREATE INDEX IF NOT EXISTS idx_floor_contracts_sheet ON floor_contracts(sheet_type_id);
 `;
 
 export function getPool(): Pool {

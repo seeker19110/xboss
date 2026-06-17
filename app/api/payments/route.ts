@@ -4,52 +4,60 @@ import { query, run } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-type PaymentRow = {
-  id: number; boqCode: string | null; code: string; name: string;
-  sheetType: string; sheetSlug: string | null; floorLabel: string | null;
-  progressPercent: number; unitPrice: number;
-  assigneeId: number | null; assigneeName: string | null;
+type FloorRow = {
+  sheetTypeId: number; sheetType: string; sheetSlug: string | null;
+  floorLabel: string;
+  progress: number; taskCount: number; delayed: number;
+  contractValue: number;
 };
 
-// GET /api/payments — danh sách task kèm đơn giá và giá trị hoàn thành, nhóm theo sheet.
+// GET /api/payments — giá trị hợp đồng + tiến độ theo tầng × hệ.
 export async function GET(_req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
-  const rows = await query<PaymentRow>(`
-    SELECT t.id, t.boq_code AS "boqCode", t.code, t.name,
-           st.code AS "sheetType", st.slug AS "sheetSlug",
+  const rows = await query<FloorRow>(`
+    SELECT st.id AS "sheetTypeId", st.code AS "sheetType", st.slug AS "sheetSlug",
            wp.floor_label AS "floorLabel",
-           t.progress_percent AS "progressPercent",
-           COALESCE(t.unit_price, 0) AS "unitPrice",
-           t.assigned_to AS "assigneeId", u.name AS "assigneeName"
-      FROM tasks t
-      JOIN work_packages wp ON t.package_id = wp.id
+           COALESCE(AVG(t.progress_percent), 0) AS progress,
+           COUNT(DISTINCT t.id)::int AS "taskCount",
+           COALESCE(SUM(CASE WHEN t.status = 'tre' THEN 1 ELSE 0 END), 0)::int AS delayed,
+           COALESCE(fc.contract_value, 0) AS "contractValue"
+      FROM work_packages wp
       JOIN sheet_types st ON wp.sheet_type_id = st.id
-      LEFT JOIN users u ON t.assigned_to = u.id
-     ORDER BY st.id, wp.sort_order, t.sort_order`);
+      LEFT JOIN tasks t ON t.package_id = wp.id
+      LEFT JOIN floor_contracts fc
+             ON fc.sheet_type_id = st.id AND fc.floor_label = wp.floor_label
+     WHERE wp.floor_label IS NOT NULL AND wp.floor_label != ''
+     GROUP BY st.id, st.code, st.slug, wp.floor_label, fc.contract_value
+     ORDER BY st.id, wp.floor_label`);
 
-  const totalContract = rows.reduce((s, r) => s + r.unitPrice, 0);
-  const totalEarned   = rows.reduce((s, r) => s + r.unitPrice * r.progressPercent, 0);
+  const totalContract = rows.reduce((s, r) => s + r.contractValue, 0);
+  const totalEarned   = rows.reduce((s, r) => s + r.contractValue * r.progress, 0);
 
   return NextResponse.json({ rows, totalContract, totalEarned });
 }
 
-// PATCH /api/payments — cập nhật đơn giá 1 hoặc nhiều task.
-// Body: { updates: [{ id, unitPrice }] }
+// PATCH /api/payments — cập nhật giá trị HĐ theo tầng × hệ (upsert).
+// Body: { updates: [{ sheetTypeId, floorLabel, contractValue }] }
 export async function PATCH(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editStructure(user.role))
-    return NextResponse.json({ error: "Chỉ Admin/PM được sửa đơn giá" }, { status: 403 });
+    return NextResponse.json({ error: "Chỉ Admin/PM được sửa giá trị hợp đồng" }, { status: 403 });
 
   const body = await req.json().catch(() => null);
-  const updates: { id: number; unitPrice: number }[] = body?.updates ?? [];
+  const updates: { sheetTypeId: number; floorLabel: string; contractValue: number }[] = body?.updates ?? [];
   if (!updates.length) return NextResponse.json({ ok: true });
 
   for (const u of updates) {
-    if (!Number.isFinite(u.unitPrice) || u.unitPrice < 0) continue;
-    await run(`UPDATE tasks SET unit_price = ? WHERE id = ?`, u.unitPrice, u.id);
+    if (!Number.isFinite(u.contractValue) || u.contractValue < 0) continue;
+    await run(`
+      INSERT INTO floor_contracts (sheet_type_id, floor_label, contract_value)
+           VALUES (?, ?, ?)
+      ON CONFLICT (sheet_type_id, floor_label)
+      DO UPDATE SET contract_value = EXCLUDED.contract_value`,
+      u.sheetTypeId, u.floorLabel, u.contractValue);
   }
   return NextResponse.json({ ok: true, updated: updates.length });
 }
