@@ -194,8 +194,8 @@ export default function PurchaseRequestsTab({ role, userId, materials }: {
       {showAdd && (
         <div className="bg-zinc-800 border border-amber-700/40 rounded-lg p-4">
           <p className="text-sm font-medium text-amber-300 mb-3">Yêu cầu mua vật tư mới</p>
-          <div className="grid grid-cols-3 gap-3 mb-3">
-            <div className="col-span-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+            <div className="sm:col-span-3">
               <label className="text-xs text-zinc-400 mb-1 block">Vật tư *</label>
               <select value={addDraft.materialId} onChange={e => setAddDraft(d => ({ ...d, materialId: e.target.value }))}
                 className="w-full bg-zinc-700 border border-zinc-600 rounded px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-amber-500">
@@ -209,7 +209,7 @@ export default function PurchaseRequestsTab({ role, userId, materials }: {
                 onChange={e => setAddDraft(d => ({ ...d, qtyRequested: e.target.value }))}
                 className="w-full bg-zinc-700 border border-zinc-600 rounded px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-amber-500" />
             </div>
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <label className="text-xs text-zinc-400 mb-1 block">Lý do / Ghi chú</label>
               <input type="text" value={addDraft.note} onChange={e => setAddDraft(d => ({ ...d, note: e.target.value }))}
                 className="w-full bg-zinc-700 border border-zinc-600 rounded px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-amber-500" />
@@ -236,7 +236,7 @@ export default function PurchaseRequestsTab({ role, userId, materials }: {
           </div>
 
           {/* Thông tin PO */}
-          <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
             <div>
               <label className="text-xs text-zinc-400 mb-1 block">Nhà cung cấp</label>
               <select value={newPO.supplierId} onChange={e => setNewPO(p => ({ ...p, supplierId: e.target.value }))}
@@ -267,7 +267,7 @@ export default function PurchaseRequestsTab({ role, userId, materials }: {
             </div>
 
             {/* Header */}
-            <div className="grid grid-cols-12 gap-2 px-2 mb-1 text-xs text-zinc-500">
+            <div className="hidden sm:grid grid-cols-12 gap-2 px-2 mb-1 text-xs text-zinc-500">
               <div className="col-span-3">Từ PR</div>
               <div className="col-span-4">Vật tư</div>
               <div className="col-span-2 text-right">SL đặt</div>
@@ -279,7 +279,7 @@ export default function PurchaseRequestsTab({ role, userId, materials }: {
               {poItems.map((item, i) => {
                 const linkedPR = requests.find(p => p.id === Number(item.prId));
                 return (
-                  <div key={i} className="grid grid-cols-12 gap-2 items-center bg-zinc-700/30 rounded px-2 py-2">
+                  <div key={i} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-zinc-700/30 rounded px-2 py-2">
                     {/* Chọn PR */}
                     <div className="col-span-3">
                       <select value={item.prId} onChange={e => selectPR(i, e.target.value)}

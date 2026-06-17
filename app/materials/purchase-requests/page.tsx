@@ -130,8 +130,8 @@ export default function PurchaseRequestsPage() {
         {showAdd && (
           <div className="mb-5 bg-zinc-800 border border-amber-700/50 rounded-lg p-5">
             <h2 className="font-semibold mb-4 text-amber-300">Yêu cầu mua vật tư mới</h2>
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className="col-span-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div className="sm:col-span-2">
                 <label className="text-xs text-zinc-400 mb-1 block">Vật tư *</label>
                 <select value={addDraft.materialId} onChange={e => setAddDraft(d => ({ ...d, materialId: e.target.value }))}
                   className="w-full bg-zinc-700 border border-zinc-600 rounded px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-amber-500">

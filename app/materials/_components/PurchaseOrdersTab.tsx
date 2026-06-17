@@ -255,7 +255,7 @@ export default function PurchaseOrdersTab({ role, materials }: { role: string; m
               <h3 className="font-bold">Tạo đơn đặt hàng mới</h3>
               <button onClick={() => setShowCreate(false)} className="text-zinc-400 hover:text-zinc-100"><X className="w-5 h-5" /></button>
             </div>
-            <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
               <div>
                 <label className="text-xs text-zinc-400 mb-1 block">Nhà cung cấp</label>
                 <select value={newPO.supplierId} onChange={e => setNewPO(p => ({ ...p, supplierId: e.target.value }))}
@@ -269,7 +269,7 @@ export default function PurchaseOrdersTab({ role, materials }: { role: string; m
                 <input type="date" value={newPO.expectedDate} onChange={e => setNewPO(p => ({ ...p, expectedDate: e.target.value }))}
                   className="w-full bg-zinc-700 border border-zinc-600 rounded px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-blue-500" />
               </div>
-              <div className="col-span-2">
+              <div className="sm:col-span-2">
                 <label className="text-xs text-zinc-400 mb-1 block">Ghi chú đơn hàng</label>
                 <input type="text" value={newPO.note} onChange={e => setNewPO(p => ({ ...p, note: e.target.value }))}
                   className="w-full bg-zinc-700 border border-zinc-600 rounded px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-blue-500" />
@@ -283,7 +283,7 @@ export default function PurchaseOrdersTab({ role, materials }: { role: string; m
               </div>
               <div className="space-y-2">
                 {newPO.items.map((item, i) => (
-                  <div key={i} className="grid grid-cols-12 gap-2 items-end bg-zinc-700/40 rounded p-2.5">
+                  <div key={i} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end bg-zinc-700/40 rounded p-2.5">
                     <div className="col-span-3">
                       <label className="text-xs text-zinc-400 mb-1 block">Từ PR</label>
                       <select value={item.prId} onChange={e => selectPR(i, e.target.value)}

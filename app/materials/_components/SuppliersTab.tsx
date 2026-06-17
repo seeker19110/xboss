@@ -47,7 +47,7 @@ function PartyForm({ d, set }: { d: SupplierDraft; set: (fn: (d: SupplierDraft) 
           placeholder="vd: Nhà Cung Cấp Ống Gió, Nhà Cung Cấp Ống Đồng + Cách Nhiệt..."
           className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm text-zinc-100 outline-none focus:border-emerald-500 placeholder:text-zinc-600" />
       </div>
-    <div className="grid grid-cols-3 gap-x-4 gap-y-2">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2">
       {/* Bên mua */}
       <div className="space-y-2 border border-sky-700/50 bg-sky-950/20 rounded p-2">
         <p className="text-[10px] font-bold text-sky-400 uppercase tracking-wide">Bên mua hàng</p>
@@ -294,7 +294,7 @@ export default function SuppliersTab({ role }: { role: string }) {
               </div>
             ) : (
               <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 grid grid-cols-3 gap-4 text-xs">
+                <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
                   <div className="space-y-0.5">
                     <p className="text-[10px] font-bold text-sky-400 uppercase tracking-wide mb-1">Bên mua</p>
                     {s.buyerCompany && <p className="text-zinc-200 font-medium">{s.buyerCompany}</p>}
