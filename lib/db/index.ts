@@ -516,7 +516,11 @@ export function getPool(): Pool {
 // Tự khởi tạo schema 1 lần mỗi process (CREATE TABLE IF NOT EXISTS — idempotent).
 function ensureSchema(): Promise<unknown> {
   if (!g.__xbossSchemaReady) {
-    g.__xbossSchemaReady = getPool().query(SCHEMA).catch((err) => {
+    g.__xbossSchemaReady = getPool().query(SCHEMA).catch((err: { code?: string }) => {
+      // Race condition: hai process test chạy song song cùng tạo bảng,
+      // một cái thắng, cái kia bị lỗi unique trên pg_type (23505) hoặc
+      // duplicate table (42P07) — schema đã được tạo bởi process kia → ok.
+      if (err.code === '23505' || err.code === '42P07') return;
       g.__xbossSchemaReady = undefined; // cho phép thử lại nếu lần đầu lỗi mạng
       throw err;
     });
