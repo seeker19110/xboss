@@ -196,7 +196,7 @@ export default function PaymentsPage() {
             </button>
             <button onClick={() => setViewMode('subcon')}
               className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition ${viewMode === 'subcon' ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-zinc-200'}`}>
-              <Users className="w-3.5 h-3.5 shrink-0" /> Theo hệ
+              <Users className="w-3.5 h-3.5 shrink-0" /> Nhà thầu phụ
             </button>
           </div>
           <select value={sheetFilter} onChange={e => setSheetFilter(e.target.value)}
@@ -302,7 +302,7 @@ function FloorGroup({ floor, rows, canEdit, edits, onEdit }: {
   canEdit: boolean; edits: Record<string, string>;
   onEdit: (row: FloorRow, val: string) => void;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
 
   const totalContract = rows.reduce((s, r) => s + r.contractValue, 0);
   const totalEarned   = rows.reduce((s, r) => s + r.contractValue * r.progress, 0);
