@@ -29,6 +29,14 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <PwaRegister />
         <AppDialogs />
         {children}
+        <footer className="mt-auto py-3 px-4 text-center text-[10px] text-zinc-600 border-t border-zinc-900 print:hidden">
+          © {new Date().getFullYear()} XBoss — Phát triển bởi{' '}
+          <span className="text-zinc-500 font-medium">Seeker</span>
+          {' '}·{' '}
+          <a href="mailto:liendv@live.com" className="hover:text-zinc-400 transition">liendv@live.com</a>
+          {' '}·{' '}
+          <a href="tel:+84977819110" className="hover:text-zinc-400 transition">0849 778 19 110</a>
+        </footer>
       </body>
     </html>
   );
