@@ -305,49 +305,11 @@ export default function PaymentsPage() {
                   </div>
                   {/* Danh sách hệ người này phụ trách */}
                   <div className="divide-y divide-zinc-800/40">
-                    {sheetList.map(([sheet, rows]) => {
-                      const sContract = rows.reduce((s, r) => s + r.contractValue, 0);
-                      const sEarned   = rows.reduce((s, r) => s + r.contractValue * r.progress, 0);
-                      const sAvg = rows.length ? rows.reduce((s, r) => s + r.progress, 0) / rows.length : 0;
-                      const sDelayed = rows.reduce((s, r) => s + r.delayed, 0);
-                      const slug = rows[0]?.sheetSlug;
-                      const sheetTypeId = rows[0]?.sheetTypeId;
-                      const responsible = rows[0]?.responsible ?? '';
-                      return (
-                        <div key={sheet} className="px-4 py-3 hover:bg-zinc-800/20 transition">
-                          <div className="flex items-center gap-3">
-                            <a href={slug ? `/tracking/${slug}` : '#'}
-                              className="text-xs font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2 py-0.5 rounded-full shrink-0 transition">{sheet}</a>
-                            <div className="flex-1 min-w-0 flex items-center gap-2">
-                              <div className="flex-1 bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-                                <div className={`h-1.5 rounded-full ${sAvg >= 1 ? 'bg-emerald-500' : sDelayed > 0 ? 'bg-red-500' : 'bg-sky-500'}`}
-                                  style={{ width: `${Math.min(sAvg * 100, 100)}%` }} />
-                              </div>
-                              <span className="text-xs font-bold tabular-nums text-zinc-300 shrink-0 w-8 text-right">{Math.round(sAvg * 100)}%</span>
-                            </div>
-                            <span className="text-[11px] text-zinc-500 shrink-0 hidden sm:inline">{rows.length} tầng</span>
-                          </div>
-                          <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                            <span className="text-[11px] text-zinc-500">HĐ: {fmtVND(sContract)}</span>
-                            {sEarned > 0 && <span className="text-[11px] text-emerald-400">Xong: {fmtVND(sEarned)}</span>}
-                            {sDelayed > 0 && <span className="text-[11px] text-red-400">{sDelayed} trễ</span>}
-                            {canEdit && (
-                              <div className="flex items-center gap-1.5 ml-auto">
-                                <span className="text-[10px] text-zinc-600 shrink-0">Đổi phụ trách:</span>
-                                <input type="text" list="payment-people" key={responsible}
-                                  defaultValue={responsible}
-                                  onBlur={e => { if (sheetTypeId != null && e.target.value.trim() !== responsible) saveResponsible(sheetTypeId, e.target.value); }}
-                                  onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-                                  placeholder="Tên người phụ trách"
-                                  className="w-40 text-xs bg-zinc-800 border border-zinc-700 focus:border-sky-500 rounded px-2 py-1 text-zinc-200 focus:outline-none"
-                                />
-                                {savingResp === sheetTypeId && <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400 shrink-0" />}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {sheetList.map(([sheet, rows]) => (
+                      <PersonSheetRow key={sheet} sheet={sheet} rows={rows}
+                        canEdit={canEdit} edits={edits} onEdit={handleEdit}
+                        savingResp={savingResp} onSaveResponsible={saveResponsible} />
+                    ))}
                   </div>
                 </div>
               );
@@ -361,6 +323,112 @@ export default function PaymentsPage() {
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+// ── PersonSheetRow ───────────────────────────────────────────────────────────────
+// Một hệ trong view "Người phụ trách": mở rộng để liệt kê & nhập giá trị từng tầng.
+
+function PersonSheetRow({ sheet, rows, canEdit, edits, onEdit, savingResp, onSaveResponsible }: {
+  sheet: string; rows: FloorRow[];
+  canEdit: boolean; edits: Record<string, string>;
+  onEdit: (row: FloorRow, val: string) => void;
+  savingResp: number | null;
+  onSaveResponsible: (sheetTypeId: number, value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const sContract = rows.reduce((s, r) => s + r.contractValue, 0);
+  const sEarned   = rows.reduce((s, r) => s + r.contractValue * r.progress, 0);
+  const sAvg = rows.length ? rows.reduce((s, r) => s + r.progress, 0) / rows.length : 0;
+  const sDelayed = rows.reduce((s, r) => s + r.delayed, 0);
+  const slug = rows[0]?.sheetSlug;
+  const sheetTypeId = rows[0]?.sheetTypeId;
+  const responsible = rows[0]?.responsible ?? '';
+
+  // Tầng sắp xếp từ cao xuống thấp (RF → … → hầm).
+  const floorRows = [...rows].sort((a, b) => sortFloor(b.floorLabel) - sortFloor(a.floorLabel));
+
+  return (
+    <div>
+      <div className="px-4 py-3 hover:bg-zinc-800/20 transition">
+        <div className="flex items-center gap-3">
+          <button onClick={() => setOpen(o => !o)} className="shrink-0 text-zinc-500 hover:text-zinc-300 transition">
+            {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          </button>
+          <a href={slug ? `/tracking/${slug}` : '#'}
+            className="text-xs font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2 py-0.5 rounded-full shrink-0 transition">{sheet}</a>
+          <div className="flex-1 min-w-0 flex items-center gap-2">
+            <div className="flex-1 bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+              <div className={`h-1.5 rounded-full ${sAvg >= 1 ? 'bg-emerald-500' : sDelayed > 0 ? 'bg-red-500' : 'bg-sky-500'}`}
+                style={{ width: `${Math.min(sAvg * 100, 100)}%` }} />
+            </div>
+            <span className="text-xs font-bold tabular-nums text-zinc-300 shrink-0 w-8 text-right">{Math.round(sAvg * 100)}%</span>
+          </div>
+          <span className="text-[11px] text-zinc-500 shrink-0 hidden sm:inline">{rows.length} tầng</span>
+        </div>
+        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+          <span className="text-[11px] text-zinc-500">HĐ: {fmtVND(sContract)}</span>
+          {sEarned > 0 && <span className="text-[11px] text-emerald-400">Xong: {fmtVND(sEarned)}</span>}
+          {sDelayed > 0 && <span className="text-[11px] text-red-400">{sDelayed} trễ</span>}
+          {canEdit && (
+            <div className="flex items-center gap-1.5 ml-auto">
+              <span className="text-[10px] text-zinc-600 shrink-0">Đổi phụ trách:</span>
+              <input type="text" list="payment-people" key={responsible}
+                defaultValue={responsible}
+                onBlur={e => { if (sheetTypeId != null && e.target.value.trim() !== responsible) onSaveResponsible(sheetTypeId, e.target.value); }}
+                onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                placeholder="Tên người phụ trách"
+                className="w-40 text-xs bg-zinc-800 border border-zinc-700 focus:border-sky-500 rounded px-2 py-1 text-zinc-200 focus:outline-none"
+              />
+              {savingResp === sheetTypeId && <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400 shrink-0" />}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Chi tiết từng tầng — nhập giá trị HĐ */}
+      {open && (
+        <div className="border-t border-zinc-800/60 bg-zinc-950/40 divide-y divide-zinc-800/40">
+          {floorRows.map(r => {
+            const key = editKey(r);
+            const displayVal = edits[key] !== undefined ? edits[key] : (r.contractValue > 0 ? r.contractValue.toLocaleString('vi-VN') : '');
+            const earned = r.contractValue * r.progress;
+            const href = r.sheetSlug ? `/tracking/${r.sheetSlug}?floor=${encodeURIComponent(r.floorLabel)}` : '#';
+            return (
+              <div key={r.floorLabel} className="pl-10 pr-4 py-2.5">
+                <div className="flex items-center gap-3">
+                  <a href={href} className="text-xs font-bold text-zinc-300 hover:text-sky-300 shrink-0 w-12 transition">{r.floorLabel}</a>
+                  <div className="flex-1 min-w-0 flex items-center gap-2">
+                    <div className="flex-1 bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                      <div className={`h-1.5 rounded-full ${r.progress >= 1 ? 'bg-emerald-500' : r.delayed > 0 ? 'bg-red-500' : 'bg-sky-500'}`}
+                        style={{ width: `${Math.min(r.progress * 100, 100)}%` }} />
+                    </div>
+                    <span className={`text-xs font-bold tabular-nums shrink-0 w-8 text-right ${r.progress >= 1 ? 'text-emerald-400' : r.delayed > 0 ? 'text-red-400' : 'text-zinc-300'}`}>
+                      {Math.round(r.progress * 100)}%
+                    </span>
+                    {r.delayed > 0 && <span className="text-[10px] text-red-400 shrink-0">{r.delayed} trễ</span>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <span className="text-[11px] text-zinc-600 shrink-0">Giá trị HĐ:</span>
+                  {canEdit ? (
+                    <input type="text" inputMode="numeric" value={displayVal}
+                      onChange={e => onEdit(r, e.target.value)}
+                      placeholder="Nhập giá trị (đ)"
+                      className="flex-1 sm:max-w-[160px] text-right text-xs bg-zinc-800 border border-zinc-700 focus:border-sky-500 rounded px-2 py-1.5 text-zinc-200 focus:outline-none tabular-nums"
+                    />
+                  ) : (
+                    <span className="text-xs text-zinc-400 tabular-nums">{r.contractValue > 0 ? fmtFull(r.contractValue) : '—'}</span>
+                  )}
+                  {earned > 0 && <span className="text-xs text-emerald-300 tabular-nums ml-auto shrink-0">= {fmtVND(earned)}</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
