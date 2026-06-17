@@ -12,6 +12,7 @@ type Bill = {
   progressSnapshot: number; note: string | null;
   unit: string | null; quantity: number | null; labor: number | null;
   sheetTypeId: number | null; floorLabel: string | null; pctThisPeriod: number;
+  workPackageName: string | null;
   createdBy: number | null; createdByName: string | null; createdAt: string;
 };
 
@@ -29,12 +30,18 @@ export async function GET(_req: NextRequest) {
            pb.floor_label     AS "floorLabel",
            st.code            AS "sheetCode",
            COALESCE(pb.pct_this_period, 0) AS "pctThisPeriod",
+           wp.name            AS "workPackageName",
            pb.created_by      AS "createdBy",
            u.name             AS "createdByName",
            pb.created_at      AS "createdAt"
       FROM payment_bills pb
       LEFT JOIN users u ON u.id = pb.created_by
       LEFT JOIN sheet_types st ON st.id = pb.sheet_type_id
+      LEFT JOIN LATERAL (
+        SELECT name FROM work_packages
+        WHERE sheet_type_id = pb.sheet_type_id AND floor_label = pb.floor_label
+        LIMIT 1
+      ) wp ON pb.sheet_type_id IS NOT NULL AND pb.floor_label IS NOT NULL
      ORDER BY pb.paid_date ASC, pb.id ASC`);
 
   return NextResponse.json({ bills });

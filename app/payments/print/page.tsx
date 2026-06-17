@@ -10,7 +10,7 @@ type Bill = {
   amount: number; description: string | null; paidDate: string;
   note: string | null;
   unit: string | null; quantity: number | null; labor: number | null;
-  floorLabel: string | null; sheetCode: string | null;
+  floorLabel: string | null; sheetCode: string | null; workPackageName: string | null;
 };
 type ProjectInfo = {
   name: string | null; code: string | null; tower: string | null;
@@ -211,7 +211,7 @@ export default function PrintPage() {
               return (
                 <tr key={b.id} className="hover:bg-yellow-50">
                   <td className="border border-black px-1 py-1.5 text-center">{stt}</td>
-                  <td className="border border-black px-2 py-1.5">{b.description ?? [b.sheetCode, b.floorLabel ? `tầng ${b.floorLabel}` : ''].filter(Boolean).join(' ') || 'Thanh toán tiến độ'}</td>
+                  <td className="border border-black px-2 py-1.5">{b.description ?? b.workPackageName ?? [b.sheetCode, b.floorLabel ? `tầng ${b.floorLabel}` : ''].filter(Boolean).join(' ') || 'Thanh toán tiến độ'}</td>
                   <td className="border border-black px-1 py-1.5 text-center">{b.unit ?? 'LS'}</td>
                   <td className="border border-black px-1 py-1.5 text-center">{b.quantity != null ? b.quantity.toLocaleString('vi-VN') : '—'}</td>
                   <td className="border border-black px-2 py-1.5 text-right">{b.labor != null && b.labor > 0 ? fmtVND(b.labor) : '—'}</td>
