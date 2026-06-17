@@ -1,16 +1,20 @@
 import { NextResponse } from "next/server";
 import { query, todayISO } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { computeCpm } from "@/lib/cpm";
 
 export const dynamic = "force-dynamic";
 
+const DAY_MS = 86400_000;
+const d2n = (s: string) => new Date(s + "T00:00:00Z").getTime();
+
 // GET /api/gantt → work packages có ngày bắt đầu/kết thúc cho timeline,
-// kèm phụ thuộc (deps) và danh sách việc trước chưa xong làm nhóm bị "chặn" (blocked).
+// kèm phụ thuộc (deps), nhóm bị "chặn" (blocked) và đường găng CPM (critical).
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
-  const bars = await query<{ id: number; startDate: string | null; progress: number }>(
+  const bars = await query<{ id: number; startDate: string | null; endDate: string | null; progress: number }>(
     `SELECT wp.id, wp.code, wp.name, wp.floor_label AS "floorLabel",
             wp.start_date AS "startDate", wp.end_date AS "endDate",
             wp.progress, wp.status, st.code AS "sheetType", st.slug AS "sheetSlug"
@@ -41,5 +45,17 @@ export async function GET() {
   }
 
   const blocked = [...blockedBy.entries()].map(([id, preds]) => ({ id, preds }));
-  return NextResponse.json({ bars, deps, blocked });
+
+  // Đường găng (CPM): thời lượng nhóm = số ngày từ BĐ→KT (tối thiểu 1).
+  const cpmNodes = bars
+    .filter((b) => b.startDate && b.endDate)
+    .map((b) => ({ id: b.id, duration: Math.max(1, (d2n(b.endDate!) - d2n(b.startDate!)) / DAY_MS + 1) }));
+  const cpm = computeCpm(cpmNodes, deps);
+
+  return NextResponse.json({
+    bars, deps, blocked,
+    critical: [...cpm.criticalNodes],
+    criticalDeps: [...cpm.criticalEdges],
+    float: Object.fromEntries(cpm.float),
+  });
 }

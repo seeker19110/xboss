@@ -1,6 +1,6 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
-import { CalendarRange, Link2, X, Ban } from 'lucide-react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Link2, X, Ban, Activity } from 'lucide-react';
 import { slugFromCode } from '@/lib/sheets';
 import AppHeader from '@/app/components/AppHeader';
 import { PageSkeleton } from '@/app/components/Skeleton';
@@ -13,6 +13,7 @@ type Bar = {
 type Dep = { id: number; predecessorId: number; successorId: number };
 type Blocked = { id: number; preds: string[] };
 type Me = { role: string };
+type Arrow = { id: number; x1: number; y1: number; x2: number; y2: number; critical: boolean };
 
 const STATUS_BAR: Record<string, string> = {
   chuan_bi: 'bg-zinc-600', dang_thi_cong: 'bg-blue-600',
@@ -31,15 +32,23 @@ export default function GanttPage() {
   const [bars, setBars] = useState<Bar[] | null>(null);
   const [deps, setDeps] = useState<Dep[]>([]);
   const [blocked, setBlocked] = useState<Blocked[]>([]);
+  const [critical, setCritical] = useState<number[]>([]);
+  const [criticalDeps, setCriticalDeps] = useState<number[]>([]);
+  const [floatDays, setFloatDays] = useState<Record<string, number>>({});
   const [me, setMe] = useState<Me | null>(null);
   const [sheetFilter, setSheetFilter] = useState('');
   const [depFor, setDepFor] = useState<Bar | null>(null); // nhóm đang sửa phụ thuộc
+  const [arrows, setArrows] = useState<Arrow[]>([]);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const barRefs = useRef<Map<number, HTMLElement>>(new Map());
 
   async function load() {
     const r = await fetch('/api/gantt');
     if (r.status === 401) { window.location.href = '/login'; return; }
     const j = await r.json();
     setBars(j.bars ?? []); setDeps(j.deps ?? []); setBlocked(j.blocked ?? []);
+    setCritical(j.critical ?? []); setCriticalDeps(j.criticalDeps ?? []); setFloatDays(j.float ?? {});
   }
 
   useEffect(() => {
@@ -49,6 +58,8 @@ export default function GanttPage() {
 
   const canEdit = me?.role === 'admin' || me?.role === 'pm';
   const blockedMap = useMemo(() => new Map(blocked.map(b => [b.id, b.preds])), [blocked]);
+  const criticalSet = useMemo(() => new Set(critical), [critical]);
+  const criticalDepSet = useMemo(() => new Set(criticalDeps), [criticalDeps]);
 
   const view = useMemo(() => {
     if (!bars) return null;
@@ -65,6 +76,33 @@ export default function GanttPage() {
     }
     return { list, min, max, months };
   }, [bars, sheetFilter]);
+
+  // Vẽ mũi tên phụ thuộc: đo vị trí thật của thanh bar sau khi render (tránh lệ thuộc % px).
+  useLayoutEffect(() => {
+    function recompute() {
+      const cont = containerRef.current;
+      if (!cont) return;
+      const cr = cont.getBoundingClientRect();
+      const out: Arrow[] = [];
+      for (const d of deps) {
+        const pe = barRefs.current.get(d.predecessorId);
+        const se = barRefs.current.get(d.successorId);
+        if (!pe || !se) continue; // không cùng hiển thị (đang lọc hệ khác)
+        const p = pe.getBoundingClientRect(), s = se.getBoundingClientRect();
+        out.push({
+          id: d.id, critical: criticalDepSet.has(d.id),
+          x1: p.right - cr.left, y1: p.top - cr.top + p.height / 2,
+          x2: s.left - cr.left, y2: s.top - cr.top + s.height / 2,
+        });
+      }
+      setArrows(out);
+    }
+    recompute();
+    const ro = new ResizeObserver(recompute);
+    if (containerRef.current) ro.observe(containerRef.current);
+    window.addEventListener('resize', recompute);
+    return () => { ro.disconnect(); window.removeEventListener('resize', recompute); };
+  }, [view, deps, criticalDepSet, sheetFilter, bars]);
 
   if (!bars || !view) return <PageSkeleton />;
 
@@ -89,11 +127,32 @@ export default function GanttPage() {
           <span key={k} className="flex items-center gap-1.5"><span className={`w-3 h-2 rounded-sm ${STATUS_BAR[k]}`} /> {v}</span>
         ))}
         <span className="flex items-center gap-1.5"><span className="w-px h-3 bg-amber-400" /> Hôm nay</span>
-        <span className="flex items-center gap-1.5"><Ban className="w-3 h-3 text-rose-400" /> Bị chặn (việc trước chưa xong)</span>
+        <span className="flex items-center gap-1.5"><Ban className="w-3 h-3 text-rose-400" /> Bị chặn</span>
+        <span className="flex items-center gap-1.5"><Activity className="w-3 h-3 text-amber-400" /> Đường găng</span>
       </div>
 
       <main className="p-4 overflow-auto">
-        <div className="min-w-[800px]">
+        <div ref={containerRef} className="min-w-[800px] relative">
+          {/* Lớp mũi tên phụ thuộc (phủ toàn khu, không chắn chuột) */}
+          <svg className="absolute inset-0 w-full h-full pointer-events-none z-20 overflow-visible">
+            <defs>
+              <marker id="ah" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                <path d="M0,0 L6,3 L0,6 Z" className="fill-zinc-500" />
+              </marker>
+              <marker id="ahc" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                <path d="M0,0 L6,3 L0,6 Z" className="fill-amber-400" />
+              </marker>
+            </defs>
+            {arrows.map(a => (
+              <path key={a.id}
+                d={`M ${a.x1} ${a.y1} C ${a.x1 + 18} ${a.y1}, ${a.x2 - 18} ${a.y2}, ${a.x2} ${a.y2}`}
+                fill="none"
+                className={a.critical ? 'stroke-amber-400/80' : 'stroke-zinc-500/50'}
+                strokeWidth={a.critical ? 1.6 : 1}
+                markerEnd={`url(#${a.critical ? 'ahc' : 'ah'})`} />
+            ))}
+          </svg>
+
           {/* Trục thời gian */}
           <div className="relative h-6 ml-56 mr-2 border-b border-zinc-800">
             {view.months.map(m => (
@@ -115,10 +174,13 @@ export default function GanttPage() {
                     const l = pos(d2n(b.startDate));
                     const w = Math.max(pos(d2n(b.endDate) + DAY) - l, 0.5);
                     const preds = blockedMap.get(b.id);
+                    const isCritical = criticalSet.has(b.id);
+                    const fl = floatDays[String(b.id)];
                     return (
                       <div key={b.id} className="flex items-center group hover:bg-zinc-900/70 rounded">
                         <div className="w-56 shrink-0 pr-3 text-right flex items-center justify-end gap-1.5">
                           {preds && <span title={`Chờ việc trước: ${preds.join(', ')}`}><Ban className="w-3 h-3 text-rose-400 shrink-0" /></span>}
+                          {isCritical && <span title="Trên đường găng"><Activity className="w-3 h-3 text-amber-400 shrink-0" /></span>}
                           <span className="font-mono text-xs text-zinc-400">{b.code}</span>
                           <span className="text-[10px] text-zinc-600">{b.floorLabel ?? ''}</span>
                           {canEdit && (
@@ -137,9 +199,13 @@ export default function GanttPage() {
                           {today >= view.min && today <= view.max && (
                             <span className="absolute top-0 bottom-0 w-px bg-amber-400/80 z-10" style={{ left: `${pos(today)}%` }} />
                           )}
-                          <a href={slug ? `/tracking/${slug}` : '#'}
-                            title={`${b.code} — ${b.name}\n${fmt(b.startDate)} → ${fmt(b.endDate)} · ${Math.round(b.progress * 100)}% · ${STATUS_LABEL[b.status] ?? b.status}${preds ? `\n⛔ Chờ việc trước: ${preds.join(', ')}` : ''}`}
-                            className={`absolute top-0.5 bottom-0.5 rounded-sm ${STATUS_BAR[b.status] ?? 'bg-zinc-600'} opacity-80 hover:opacity-100 transition ${preds ? 'ring-1 ring-rose-400' : ''}`}
+                          <a ref={el => { if (el) barRefs.current.set(b.id, el); else barRefs.current.delete(b.id); }}
+                            href={slug ? `/tracking/${slug}` : '#'}
+                            title={`${b.code} — ${b.name}\n${fmt(b.startDate)} → ${fmt(b.endDate)} · ${Math.round(b.progress * 100)}% · ${STATUS_LABEL[b.status] ?? b.status}`
+                              + (isCritical ? '\n★ Trên đường găng (không được trễ)' : fl !== undefined ? `\nĐộ trễ cho phép: ${fl} ngày` : '')
+                              + (preds ? `\n⛔ Chờ việc trước: ${preds.join(', ')}` : '')}
+                            className={`absolute top-0.5 bottom-0.5 rounded-sm ${STATUS_BAR[b.status] ?? 'bg-zinc-600'} opacity-80 hover:opacity-100 transition`
+                              + (preds ? ' ring-1 ring-rose-400' : '') + (isCritical ? ' outline outline-1 outline-amber-400' : '')}
                             style={{ left: `${l}%`, width: `${w}%` }}>
                             {/* % hoàn thành phủ bên trong */}
                             <span className="absolute inset-y-0 left-0 bg-white/25 rounded-sm" style={{ width: `${(b.progress ?? 0) * 100}%` }} />
