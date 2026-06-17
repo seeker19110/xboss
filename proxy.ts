@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server';
+import { TRAFFIC_TOKEN_HEADER, trafficToken } from '@/lib/traffic-token';
 
 // Middleware chạy Edge Runtime — chỉ intercept /api/ (trừ chính endpoint traffic/ingest).
 // Fire-and-forget POST đến ingest để ghi ring buffer trong Node.js runtime.
@@ -10,7 +11,7 @@ export function proxy(req: NextRequest) {
     const ingestUrl = new URL('/api/admin/traffic/ingest', req.url);
     fetch(ingestUrl.toString(), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', [TRAFFIC_TOKEN_HEADER]: trafficToken() },
       body: JSON.stringify({
         method: req.method,
         path,
