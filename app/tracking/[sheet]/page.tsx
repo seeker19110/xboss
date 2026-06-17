@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useCallback, useRef, Fragment, use } from 'react';
+import { useEffect, useState, useCallback, useRef, Fragment, use, useDeferredValue } from 'react';
 import { Search, ChevronRight, ChevronDown, Pencil, Check, X, History, RefreshCw, Link2, Camera, Trash2, Upload, MessageSquare, Send, WifiOff, CloudUpload, ChevronUp, ChevronDown as ChevronDownIcon, Columns, Copy, RotateCcw, CalendarDays, FileText } from 'lucide-react';
 import { useOfflineTickQueue } from '@/app/components/offlineQueue';
 import AppHeader from '@/app/components/AppHeader';
@@ -163,7 +163,8 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
 
   const floors = [...new Set((data?.packages ?? []).map(p => p.floorLabel).filter((f): f is string => !!f))]
     .sort((a, b) => parseInt(a) - parseInt(b));
-  const q = query.toLowerCase();
+  const deferredQuery = useDeferredValue(query);
+  const q = deferredQuery.toLowerCase();
   const packages = (data?.packages ?? []).filter(p =>
     (!q || p.code.toLowerCase().includes(q) || p.name.toLowerCase().includes(q) || (p.boqCode ?? '').toLowerCase().includes(q))
     && (!floorFilter || p.floorLabel === floorFilter)

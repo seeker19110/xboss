@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useDeferredValue } from 'react';
 import { Printer, ArrowLeft, Plus, Trash2, X } from 'lucide-react';
 
 type Supplier = {
@@ -91,10 +91,11 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
     return materials.find(m => (m.boqCode ?? '').toLowerCase() === code.trim().toLowerCase());
   }, [materials]);
 
+  const deferredBoqTerm = useDeferredValue(boqSearch?.term ?? '');
   const suggestions = boqSearch
     ? materials.filter(m => m.boqCode && (
-        m.boqCode.toLowerCase().includes(boqSearch.term.toLowerCase()) ||
-        m.name.toLowerCase().includes(boqSearch.term.toLowerCase())
+        m.boqCode.toLowerCase().includes(deferredBoqTerm.toLowerCase()) ||
+        m.name.toLowerCase().includes(deferredBoqTerm.toLowerCase())
       )).slice(0, 8)
     : [];
 
