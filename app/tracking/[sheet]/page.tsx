@@ -60,6 +60,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [query, setQuery] = useState('');
+  const deferredQuery = useDeferredValue(query);
   // ?floor=4F trên URL (từ heatmap Dashboard) → mở sẵn filter tầng.
   const [floorFilter, setFloorFilter] = useState(() =>
     typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('floor') ?? '' : '');
@@ -163,7 +164,6 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
 
   const floors = [...new Set((data?.packages ?? []).map(p => p.floorLabel).filter((f): f is string => !!f))]
     .sort((a, b) => parseInt(a) - parseInt(b));
-  const deferredQuery = useDeferredValue(query);
   const q = deferredQuery.toLowerCase();
   const packages = (data?.packages ?? []).filter(p =>
     (!q || p.code.toLowerCase().includes(q) || p.name.toLowerCase().includes(q) || (p.boqCode ?? '').toLowerCase().includes(q))
