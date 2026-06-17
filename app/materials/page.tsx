@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useDeferredValue } from 'react';
 import {
   Package, Plus, Trash2, AlertTriangle, History, X,
   ChevronUp, ChevronDown, Copy, EyeOff, Eye, ClipboardCopy, Pencil, Check, FileUp, Search,
@@ -261,7 +261,8 @@ export default function MaterialsPage() {
 
   const visibleCols = ALL_COL_KEYS.filter(k => !hiddenCols.has(k));
 
-  const q = search.trim().toLowerCase();
+  const deferredSearch = useDeferredValue(search);
+  const q = deferredSearch.trim().toLowerCase();
   const filtered = q
     ? materials.filter(m =>
         (m.boqCode ?? '').toLowerCase().includes(q) ||
