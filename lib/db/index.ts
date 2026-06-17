@@ -293,6 +293,19 @@ CREATE INDEX IF NOT EXISTS idx_history_changed_at ON task_history(changed_at DES
 CREATE INDEX IF NOT EXISTS idx_tasks_updated_at ON tasks(updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_materials_updated_at ON materials(updated_at DESC);
 
+-- Full-text search cho tên (built-in, không cần extension): dùng dictionary 'simple'
+-- để giữ nguyên từ tiếng Việt (không stemming), GIN index phủ cả tasks lẫn work_packages.
+CREATE INDEX IF NOT EXISTS idx_tasks_fts ON tasks
+  USING gin(to_tsvector('simple', coalesce(name, '')));
+CREATE INDEX IF NOT EXISTS idx_wp_fts ON work_packages
+  USING gin(to_tsvector('simple', coalesce(name, '')));
+
+-- Prefix index cho mã (code, boq_code): ILIKE 'term%' (không dấu '%' đầu) dùng được B-tree.
+CREATE INDEX IF NOT EXISTS idx_tasks_code_lower ON tasks(lower(code));
+CREATE INDEX IF NOT EXISTS idx_tasks_boq_lower ON tasks(lower(boq_code)) WHERE boq_code IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_wp_code_lower ON work_packages(lower(code));
+CREATE INDEX IF NOT EXISTS idx_wp_boq_lower ON work_packages(lower(boq_code)) WHERE boq_code IS NOT NULL;
+
 
 -- Audit log phân công: ai gán ai vào hệ/nhóm/task, lúc nào.
 CREATE TABLE IF NOT EXISTS assignment_log (
@@ -519,29 +532,17 @@ export function getPool(): Pool {
   return g.__xbossPool;
 }
 
-// Trigram index cho ILIKE search — cần superuser để CREATE EXTENSION.
-// Chạy best-effort: bỏ qua nếu DB user thiếu quyền (42501).
-const SCHEMA_TRGM = `
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-CREATE INDEX IF NOT EXISTS idx_tasks_name_trgm ON tasks USING gin(name gin_trgm_ops);
-CREATE INDEX IF NOT EXISTS idx_tasks_code_trgm ON tasks USING gin(code gin_trgm_ops);
-CREATE INDEX IF NOT EXISTS idx_wp_name_trgm ON work_packages USING gin(name gin_trgm_ops);
-CREATE INDEX IF NOT EXISTS idx_wp_code_trgm ON work_packages USING gin(code gin_trgm_ops);
-`;
-
 // Tự khởi tạo schema 1 lần mỗi process (CREATE TABLE IF NOT EXISTS — idempotent).
 function ensureSchema(): Promise<unknown> {
   if (!g.__xbossSchemaReady) {
-    g.__xbossSchemaReady = getPool().query(SCHEMA)
-      .then(() => getPool().query(SCHEMA_TRGM).catch(() => { /* thiếu quyền CREATE EXTENSION — bỏ qua */ }))
-      .catch((err: { code?: string }) => {
-        // Race condition: hai process test chạy song song cùng tạo bảng,
-        // một cái thắng, cái kia bị lỗi unique trên pg_type (23505) hoặc
-        // duplicate table (42P07) — schema đã được tạo bởi process kia → ok.
-        if (err.code === '23505' || err.code === '42P07') return;
-        g.__xbossSchemaReady = undefined; // cho phép thử lại nếu lần đầu lỗi mạng
-        throw err;
-      });
+    g.__xbossSchemaReady = getPool().query(SCHEMA).catch((err: { code?: string }) => {
+      // Race condition: hai process test chạy song song cùng tạo bảng,
+      // một cái thắng, cái kia bị lỗi unique trên pg_type (23505) hoặc
+      // duplicate table (42P07) — schema đã được tạo bởi process kia → ok.
+      if (err.code === '23505' || err.code === '42P07') return;
+      g.__xbossSchemaReady = undefined; // cho phép thử lại nếu lần đầu lỗi mạng
+      throw err;
+    });
   }
   return g.__xbossSchemaReady;
 }
