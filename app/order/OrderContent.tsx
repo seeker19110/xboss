@@ -191,6 +191,8 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
               <p className="print-only text-[15px] font-bold text-teal-700 flex-1">{docTitle}</p>
               <label className="no-print relative flex items-center justify-center w-32 h-10 border border-dashed border-teal-300 rounded cursor-pointer hover:border-teal-500 hover:bg-teal-50/50 shrink-0 overflow-hidden group">
                 {logoSrc
+                  // Logo là data-URI từ localStorage — next/image không tối ưu được, dùng <img> trực tiếp.
+                  // eslint-disable-next-line @next/next/no-img-element
                   ? <img src={logoSrc} alt="logo" className="max-h-full max-w-full object-contain" />
                   : <span className="text-[9px] text-teal-400 group-hover:text-teal-600 select-none">+ Chèn logo</span>
                 }
@@ -209,6 +211,7 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
                   </button>
                 )}
               </label>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               {logoSrc && <img src={logoSrc} alt="logo" className="print-only max-h-10 max-w-[8rem] object-contain shrink-0" />}
             </div>
             <div className="bg-teal-50 border border-teal-100 rounded px-2 py-[3px] flex items-center gap-2 text-[10px] text-teal-700 italic">

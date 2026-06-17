@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { CheckSquare, FileText, Paperclip, Upload, X, CheckCircle2, Clock, Link2, Image } from 'lucide-react';
+import { CheckSquare, FileText, Paperclip, Upload, X, CheckCircle2, Clock, Link2, Image as ImageIcon } from 'lucide-react';
 import AppHeader from '@/app/components/AppHeader';
 import { Modal, appAlert, appConfirm } from '@/app/components/dialogs';
 import { PageSkeleton } from '@/app/components/Skeleton';
@@ -359,7 +359,7 @@ export default function ApprovalsPage() {
                     {isLink
                       ? <Link2 className="w-4 h-4 text-blue-400 shrink-0" />
                       : isImg
-                        ? <Image className="w-4 h-4 text-emerald-400 shrink-0" />
+                        ? <ImageIcon className="w-4 h-4 text-emerald-400 shrink-0" />
                         : <FileText className="w-4 h-4 text-zinc-400 shrink-0" />}
                     <a href={href} target="_blank" rel="noreferrer"
                       className={`text-sm hover:underline truncate flex-1 ${isLink ? 'text-blue-400' : 'text-emerald-400'}`}>
