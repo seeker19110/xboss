@@ -21,7 +21,7 @@ export async function GET() {
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
       GROUP BY st.id, st.code, st.name, st.responsible, st.slug
-      ORDER BY st.id`,
+      ORDER BY st.sort_order, st.id`,
     today,
   );
   return NextResponse.json({ sheets });
@@ -118,4 +118,21 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ sheet: { id: sheetId, code, name, responsible, slug }, copiedTasks: copied }, { status: 201 });
+}
+
+// PUT /api/sheets — lưu thứ tự mới cho các sheet (Admin/PM).
+// body: { ids: number[] } — mảng sheetId theo thứ tự mong muốn.
+export async function PUT(req: NextRequest) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (!CAN.editStructure(user.role)) return NextResponse.json({ error: "Chỉ Admin/PM được sắp xếp thứ tự" }, { status: 403 });
+
+  const body = await req.json().catch(() => ({}));
+  const ids: unknown[] = Array.isArray(body.ids) ? body.ids : [];
+  if (ids.length === 0) return NextResponse.json({ error: "ids rỗng" }, { status: 400 });
+
+  for (let i = 0; i < ids.length; i++) {
+    await run(`UPDATE sheet_types SET sort_order = ? WHERE id = ?`, i + 1, Number(ids[i]));
+  }
+  return NextResponse.json({ ok: true });
 }

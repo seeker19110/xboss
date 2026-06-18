@@ -256,6 +256,8 @@ UPDATE progress_dimensions SET sort_order = id WHERE sort_order = 0;
 -- Phân công theo hệ: 1 user quản lý cả sheet; nhóm/task kế thừa tự động
 -- cho đến khi gán thủ công (assigned_manual = TRUE).
 ALTER TABLE sheet_types ADD COLUMN IF NOT EXISTS manager_id INTEGER REFERENCES users(id);
+ALTER TABLE sheet_types ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0;
+UPDATE sheet_types SET sort_order = id WHERE sort_order = 0;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS assigned_to INTEGER REFERENCES users(id);
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS assigned_manual BOOLEAN NOT NULL DEFAULT FALSE;
 -- tasks.assigned_manual: backfill 1 lần — task đã gán trước đây coi là gán thủ công

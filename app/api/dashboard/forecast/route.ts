@@ -29,7 +29,7 @@ export async function GET() {
        FROM sheet_types st
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
-      GROUP BY st.id, st.code ORDER BY st.id`);
+      GROUP BY st.id, st.code ORDER BY st.sort_order, st.id`);
 
   const today = todayISO();
   const forecast = rows.map((r) => {

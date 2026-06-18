@@ -1,8 +1,8 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle, Clock, Upload, ChevronRight,
-  FileDown, Printer, Plus, ExternalLink, Trash2, TrendingDown,
+  FileDown, Printer, Plus, ExternalLink, Trash2, TrendingDown, GripVertical,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { slugFromCode, toSlug } from '@/lib/sheets';
@@ -50,6 +50,9 @@ export default function Dashboard() {
   const [newSheet, setNewSheet] = useState<{ name: string; slug: string; code: string; copyFromId: number | '' } | null>(null);
   const [newSheetErr, setNewSheetErr] = useState('');
   const [projectName, setProjectName] = useState<string | null>(null);
+  const [kpiOrder, setKpiOrder] = useState<KPI[]>([]);
+  const dragIdx = useRef<number | null>(null);
+  const dragOverIdx = useRef<number | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -62,6 +65,7 @@ export default function Dashboard() {
       setProjectName(proj?.name ?? null);
       setMe(meData.user);
       setData(dash);
+      setKpiOrder(dash?.kpi ?? []);
       setSheets(sh?.sheets ?? []);
     }).finally(() => setLoading(false));
   }, []);
@@ -111,6 +115,22 @@ export default function Dashboard() {
     const res = await fetch(`/api/sheets/${sheetId}`, { method: 'DELETE' });
     if (!res.ok) { alert((await res.json().catch(() => null))?.error ?? 'Xoá thất bại'); return; }
     window.location.reload();
+  }
+
+  function onDragStart(i: number) { dragIdx.current = i; }
+  function onDragOver(e: React.DragEvent, i: number) { e.preventDefault(); dragOverIdx.current = i; }
+  function onDrop() {
+    const from = dragIdx.current;
+    const to = dragOverIdx.current;
+    if (from === null || to === null || from === to) return;
+    const next = [...kpiOrder];
+    next.splice(to, 0, next.splice(from, 1)[0]);
+    setKpiOrder(next);
+    dragIdx.current = null; dragOverIdx.current = null;
+    fetch('/api/sheets', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: next.map(k => k.sheetId) }),
+    });
   }
 
   async function setReason(taskId: number, reason: string) {
@@ -177,9 +197,9 @@ export default function Dashboard() {
             </a>
           )}
 
-          {/* Grid sheet cards */}
+          {/* Grid sheet cards — draggable để sắp xếp (Admin/PM) */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {data?.kpi.map(k => {
+            {kpiOrder.map((k, i) => {
               const slug = k.sheetSlug ?? slugFromCode(k.sheetType);
               const pct = Math.round((k.avgProgress ?? 0) * 100);
               const hasDelay = k.delayed > 0;
@@ -213,18 +233,29 @@ export default function Dashboard() {
               }`;
 
               return (
-                <div key={k.sheetType} className="relative group/wrap">
+                <div key={k.sheetId}
+                  className="relative group/wrap"
+                  draggable={canImport}
+                  onDragStart={() => onDragStart(i)}
+                  onDragOver={e => onDragOver(e, i)}
+                  onDrop={onDrop}>
                   {slug
                     ? <a href={`/tracking/${slug}`} className={cardCls}>{cardContent}</a>
                     : <div className={cardCls}>{cardContent}</div>
                   }
                   {canImport && (
-                    <button
-                      onClick={e => { e.preventDefault(); deleteSheet(k.sheetId, k.sheetType); }}
-                      title="Xoá trang tracking"
-                      className="absolute top-2 right-2 p-1 rounded-md bg-zinc-800/80 text-zinc-600 hover:bg-red-900/80 hover:text-red-400 opacity-0 group-hover/wrap:opacity-100 transition z-10">
-                      <Trash2 className="w-3 h-3" />
-                    </button>
+                    <>
+                      {/* Tay cầm kéo */}
+                      <div className="absolute top-2 left-2 p-0.5 text-zinc-700 group-hover/wrap:text-zinc-500 cursor-grab active:cursor-grabbing transition z-10 pointer-events-none">
+                        <GripVertical className="w-3.5 h-3.5" />
+                      </div>
+                      <button
+                        onClick={e => { e.preventDefault(); deleteSheet(k.sheetId, k.sheetType); }}
+                        title="Xoá trang tracking"
+                        className="absolute top-2 right-2 p-1 rounded-md bg-zinc-800/80 text-zinc-600 hover:bg-red-900/80 hover:text-red-400 opacity-0 group-hover/wrap:opacity-100 transition z-10">
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </>
                   )}
                 </div>
               );

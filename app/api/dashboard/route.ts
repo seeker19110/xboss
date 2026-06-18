@@ -41,7 +41,7 @@ export async function GET() {
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
       GROUP BY st.id, st.code, st.slug
-      ORDER BY st.id`,
+      ORDER BY st.sort_order, st.id`,
     today,
   );
 

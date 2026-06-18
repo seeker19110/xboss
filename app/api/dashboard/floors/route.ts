@@ -24,7 +24,7 @@ export async function GET() {
        LEFT JOIN towers tw ON st.tower_id = tw.id
       WHERE wp.floor_label IS NOT NULL
       GROUP BY tw.id, tw.name, st.code, st.slug, st.id, wp.floor_label
-      ORDER BY tw.id, st.id`,
+      ORDER BY tw.id, st.sort_order, st.id`,
     today);
 
   // RF trên cùng, tầng số giảm dần, B_n xuống cuối — parseInt("RF"/"B1F") = NaN nên phải xử lý riêng.
