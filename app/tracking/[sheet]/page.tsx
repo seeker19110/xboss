@@ -167,6 +167,27 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
     });
   }, []);
 
+  // Trước khi in: ghi đè width cột cố định qua JS (!important CSS không override inline style trong Chrome print).
+  useEffect(() => {
+    const PRINT_WIDTHS: Record<string, string> = {
+      'col-boq': '70px', 'col-stt': '32px', 'col-name': '190px',
+      'col-pct': '26px', 'col-date': '40px', 'col-days': '26px', 'col-dim': '48px',
+    };
+    const saved = new Map<HTMLElement, string>();
+    const before = () => {
+      Object.entries(PRINT_WIDTHS).forEach(([cls, w]) => {
+        document.querySelectorAll<HTMLElement>(`col.${cls}`).forEach(el => {
+          saved.set(el, el.style.width);
+          el.style.width = w;
+        });
+      });
+    };
+    const after = () => { saved.forEach((w, el) => { el.style.width = w; }); saved.clear(); };
+    window.addEventListener('beforeprint', before);
+    window.addEventListener('afterprint', after);
+    return () => { window.removeEventListener('beforeprint', before); window.removeEventListener('afterprint', after); };
+  }, []);
+
   // Đổi tên / mã / đường dẫn của trang tracking (sheet) — slug đổi thì chuyển sang URL mới.
   async function saveSheet() {
     if (!sheetModal || !data?.sheet.id) return;
@@ -341,12 +362,14 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
           .no-print { display: none !important; }
           body { background: #fff !important; color: #000 !important; }
           @page { margin: 8mm; size: A3 landscape; }
-          /* Cột ẩn: thu về 0 nhưng KHÔNG display:none — tránh lệch cột trong table-fixed */
+          /* Cột ẩn: thu về 0, ẩn nội dung — KHÔNG display:none để tránh lệch cột table-fixed */
           col.print-hidden-col { width: 0 !important; min-width: 0 !important; }
           th.print-hidden-col, td.print-hidden-col {
             width: 0 !important; min-width: 0 !important; max-width: 0 !important;
-            padding: 0 !important; border: none !important; overflow: hidden !important;
+            padding: 0 !important; border: none !important;
+            font-size: 0 !important; color: transparent !important; line-height: 0 !important;
           }
+          th.print-hidden-col *, td.print-hidden-col * { display: none !important; }
           /* Thu nhỏ cột cố định khi in A3 ngang */
           col.col-boq  { width: 70px  !important; }
           col.col-stt  { width: 32px  !important; }
