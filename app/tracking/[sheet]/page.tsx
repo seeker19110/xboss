@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback, useRef, Fragment, use, useDeferredValue } from 'react';
-import { Search, ChevronRight, ChevronDown, Pencil, Check, X, History, RefreshCw, Link2, Camera, Trash2, Upload, MessageSquare, Send, WifiOff, CloudUpload, ChevronUp, ChevronDown as ChevronDownIcon, Columns, Copy, RotateCcw, CalendarDays, FileText } from 'lucide-react';
+import { Search, ChevronRight, ChevronDown, Pencil, Check, X, History, RefreshCw, Link2, Camera, Trash2, Upload, MessageSquare, Send, WifiOff, CloudUpload, ChevronUp, ChevronDown as ChevronDownIcon, Columns, Copy, RotateCcw, CalendarDays, FileText, Printer, Eye, EyeOff } from 'lucide-react';
 import { useOfflineTickQueue } from '@/app/components/offlineQueue';
 import AppHeader from '@/app/components/AppHeader';
 import EditableText from '@/app/components/EditableText';
@@ -77,6 +77,16 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
   const [refreshKey, setRefreshKey] = useState(0);
   const [syncToast, setSyncToast] = useState(false);
   const versionRef = useRef<string | null>(null);
+  const [printPanel, setPrintPanel] = useState(false);
+  const [printTitle, setPrintTitle] = useState('');
+  const [hiddenPrintCols, setHiddenPrintCols] = useState<Set<string>>(new Set());
+  const [allSheetCols, setAllSheetCols] = useState<string[]>([]);
+  const handleColsLoaded = useCallback((cols: string[]) => {
+    setAllSheetCols(prev => {
+      const merged = [...new Set([...prev, ...cols])];
+      return merged.length !== prev.length ? merged : prev;
+    });
+  }, []);
   const isMobile = useIsMobile();
   // canProgress = bất kỳ role nào không phải xem thuần (engineer, subcon, pm, admin)
   const { editMode, toggle: toggleEditMode } = useEditMode(canProgress || canEdit);
@@ -198,10 +208,55 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
           </>
         }
         subtitle={`${data?.sheet.code ?? ''} ${data?.sheet.responsible ? `· ${data.sheet.responsible}` : ''}`}>
+        <button onClick={() => { setPrintTitle(prev => prev || `${data?.sheet.name ?? ''}${data?.sheet.responsible ? ' - ' + data.sheet.responsible : ''}`); setPrintPanel(p => !p); }}
+          title="In PDF / Xuất bảng tracking" className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm bg-zinc-800 hover:bg-zinc-700 text-zinc-300">
+          <Printer className="w-4 h-4" /> <span className="hidden sm:inline">In PDF</span>
+        </button>
         <EditModeToggle canEdit={canProgress || canEdit} editMode={editMode} onToggle={toggleEditMode} />
       </AppHeader>
 
-      <div className="px-6 py-3 flex flex-wrap gap-3 items-center border-b border-zinc-800/60">
+      {/* ── Panel in PDF (ẩn khi in thật) ── */}
+      {printPanel && (
+        <div className="no-print px-6 py-4 bg-zinc-900 border-b border-zinc-700 space-y-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-xs text-zinc-400 shrink-0">Tiêu đề bảng in:</span>
+            <input value={printTitle} onChange={e => setPrintTitle(e.target.value)}
+              className="flex-1 min-w-60 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm outline-none focus:border-emerald-600 font-semibold uppercase" />
+            <button onClick={() => window.print()}
+              className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-medium shrink-0">
+              <Printer className="w-4 h-4" /> In / Lưu PDF
+            </button>
+            <button onClick={() => setPrintPanel(false)} className="text-zinc-500 hover:text-zinc-300"><X className="w-4 h-4" /></button>
+          </div>
+          {allSheetCols.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-zinc-500 shrink-0">Ẩn cột khi in:</span>
+              {allSheetCols.map(col => {
+                const hidden = hiddenPrintCols.has(col);
+                return (
+                  <button key={col} onClick={() => setHiddenPrintCols(s => { const n = new Set(s); hidden ? n.delete(col) : n.add(col); return n; })}
+                    className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] border transition ${hidden ? 'bg-zinc-800 border-zinc-700 text-zinc-500 line-through' : 'bg-zinc-700 border-zinc-600 text-zinc-200'}`}>
+                    {hidden ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />} {col}
+                  </button>
+                );
+              })}
+              {hiddenPrintCols.size > 0 && (
+                <button onClick={() => setHiddenPrintCols(new Set())} className="text-xs text-zinc-500 hover:text-emerald-400">Bỏ ẩn tất cả</button>
+              )}
+            </div>
+          )}
+          <p className="text-[11px] text-zinc-600">Mở rộng các nhóm cần in trước, sau đó bấm &quot;In / Lưu PDF&quot;. Khổ giấy đề xuất: A3 ngang.</p>
+        </div>
+      )}
+
+      {/* Tiêu đề chỉ hiện khi in */}
+      {printTitle && (
+        <div className="hidden print:block w-full bg-[#808080] py-3 text-center">
+          <span className="text-white font-bold uppercase tracking-wide text-sm">{printTitle}</span>
+        </div>
+      )}
+
+      <div className="px-6 py-3 flex flex-wrap gap-3 items-center border-b border-zinc-800/60 no-print">
         <div className="relative">
           <Search className="w-4 h-4 absolute left-2.5 top-2.5 text-zinc-500" />
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Tìm nhóm/tầng..."
@@ -229,6 +284,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
               onToggle={() => setExpanded(s => ({ ...s, [p.id]: !s[p.id] }))}
               canEdit={canEdit} editMode={editMode} refreshKey={refreshKey} isMobile={isMobile}
               onChanged={load} onOfflineTick={enqueue}
+              hiddenPrintCols={hiddenPrintCols} onColsLoaded={handleColsLoaded}
             />
           </div>
         ))}
@@ -255,6 +311,20 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
       )}
 
       {/* Modal đổi tên / đường dẫn trang */}
+      <style>{`
+        @media print {
+          .no-print { display: none !important; }
+          body { background: #fff !important; color: #000 !important; }
+          @page { margin: 8mm; size: A3 landscape; }
+          .print-hidden-col { display: none !important; }
+          table { border-collapse: collapse !important; font-size: 9pt !important; }
+          th, td { border: 1px solid #ccc !important; background: #fff !important; color: #000 !important; padding: 3px 5px !important; }
+          thead th { background: #f0f0f0 !important; font-weight: bold !important; }
+          input[type="checkbox"] { width: 12px !important; height: 12px !important; }
+          .print-pkg-header td { background: #e8e8e8 !important; font-weight: bold !important; }
+        }
+      `}</style>
+
       {sheetModal && (
         <Modal onClose={() => setSheetModal(null)}>
           <div className="p-5">
@@ -332,10 +402,11 @@ type Cell = { id: number; installed: boolean };
 type GridTask = { id: number; code: string; name: string; status: string; progressPercent: number; boqCode: string | null; drawingUrl: string | null; photoCount: number; commentCount: number; delayReason: string | null; startDate: string | null; endDate: string | null; cells: Record<string, Cell> };
 type Grid = { columns: string[]; tasks: GridTask[] };
 
-function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode, refreshKey, isMobile, onChanged, onOfflineTick }: {
+function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode, refreshKey, isMobile, onChanged, onOfflineTick, hiddenPrintCols, onColsLoaded }: {
   pkg: Pkg; pkgIdx: number; pkgCount: number; expanded: boolean; onToggle: () => void;
   canEdit: boolean; editMode: boolean; refreshKey: number; isMobile: boolean;
   onChanged: () => void; onOfflineTick: (dimId: number, installed: boolean) => void;
+  hiddenPrintCols: Set<string>; onColsLoaded: (cols: string[]) => void;
 }) {
   const [grid, setGrid] = useState<Grid | null>(null);
   const [editName, setEditName] = useState<string | null>(null);
@@ -365,9 +436,11 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
   }
 
   const load = useCallback(() => {
-    fetch(`/api/workpackages/${pkg.id}/dimensions`).then(r => r.json()).then(setGrid)
-      .catch(() => { /* mất mạng — giữ lưới đang hiển thị */ });
-  }, [pkg.id]);
+    fetch(`/api/workpackages/${pkg.id}/dimensions`).then(r => r.json()).then((g: Grid) => {
+      setGrid(g);
+      if (g?.columns?.length) onColsLoaded(g.columns);
+    }).catch(() => { /* mất mạng — giữ lưới đang hiển thị */ });
+  }, [pkg.id, onColsLoaded]);
   useEffect(() => { if (expanded) load(); }, [load, refreshKey, expanded]);
 
   // ── Hàm thao tác nhóm (pkg) ──────────────────────────────────────────────
@@ -947,7 +1020,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
               <th className={`${stkPct} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium`}
                 style={{ left: LEFT_PCT }}>%</th>
               {visibleColumns.map(col => (
-                <th key={col} className="group/col border-b border-zinc-800 p-0 overflow-hidden align-middle" style={{ width: W_DIM }}>
+                <th key={col} className={`group/col border-b border-zinc-800 p-0 overflow-hidden align-middle${hiddenPrintCols.has(col) ? ' print-hidden-col' : ''}`} style={{ width: W_DIM }}>
                   <div className="flex flex-col items-center py-2 gap-1">
                     <div className="text-[10px] text-zinc-500 hover:text-emerald-400 cursor-default overflow-hidden"
                       style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', lineHeight: '1.2' }}
@@ -1107,7 +1180,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
                 {visibleColumns.map(col => {
                   const cell = t.cells[col];
                   return (
-                    <td key={col} className="border-b border-zinc-800/60 text-center align-middle p-0">
+                    <td key={col} className={`border-b border-zinc-800/60 text-center align-middle p-0${hiddenPrintCols.has(col) ? ' print-hidden-col' : ''}`}>
                       {cell ? (
                         <label className={`flex items-center justify-center w-full h-full min-h-[44px] ${editMode ? 'cursor-pointer' : 'cursor-default'}`}>
                           <input type="checkbox" checked={cell.installed} onChange={() => editMode && toggle(cell, t, col)}
