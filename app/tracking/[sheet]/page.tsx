@@ -297,6 +297,17 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
   );
 }
 
+// Render tên có định dạng: **đậm** và __mảnh__
+function renderName(text: string): React.ReactNode {
+  const parts = text.split(/(\*\*[^*]*\*\*|__[^_]*__)/g);
+  if (parts.length === 1) return text;
+  return <>{parts.map((p, i) => {
+    if (p.startsWith('**') && p.endsWith('**')) return <strong key={i}>{p.slice(2, -2)}</strong>;
+    if (p.startsWith('__') && p.endsWith('__')) return <span key={i} className="font-light">{p.slice(2, -2)}</span>;
+    return <Fragment key={i}>{p}</Fragment>;
+  })}</>;
+}
+
 type Cell = { id: number; installed: boolean };
 type GridTask = { id: number; code: string; name: string; status: string; progressPercent: number; boqCode: string | null; drawingUrl: string | null; photoCount: number; commentCount: number; delayReason: string | null; startDate: string | null; endDate: string | null; cells: Record<string, Cell> };
 type Grid = { columns: string[]; tasks: GridTask[] };
@@ -319,6 +330,19 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
   const [datesTarget, setDatesTarget] = useState<{ ids: number[]; init: { start: string; end: string } } | null>(null);
   const drawingInputRef = useRef<HTMLInputElement>(null);
   const bbntInputRef = useRef<HTMLInputElement>(null);
+  const editTaskInputRef = useRef<HTMLInputElement>(null);
+  const editPkgInputRef = useRef<HTMLInputElement>(null);
+
+  function wrapSel(ref: React.RefObject<HTMLInputElement | null>, marker: string, getValue: () => string, setValue: (v: string) => void) {
+    const el = ref.current;
+    if (!el) return;
+    const s = el.selectionStart ?? 0;
+    const e = el.selectionEnd ?? 0;
+    const v = getValue();
+    const newVal = v.slice(0, s) + marker + v.slice(s, e) + marker + v.slice(e);
+    setValue(newVal);
+    requestAnimationFrame(() => { el.setSelectionRange(s + marker.length, e + marker.length); el.focus(); });
+  }
 
   const load = useCallback(() => {
     fetch(`/api/workpackages/${pkg.id}/dimensions`).then(r => r.json()).then(setGrid)
@@ -659,7 +683,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
   const stkPct  = isMobile ? '' : 'sticky';
 
   return (
-    <div className={`overflow-auto${expanded ? ' max-h-[70vh]' : ''}`}>
+    <div className="overflow-x-auto">
       {/* Thanh bulk-action — hiển thị khi đang chọn nhiều task */}
       {ce && selected.size > 0 && (
         <div className="sticky top-0 left-0 z-30 flex flex-wrap items-center gap-2 bg-zinc-950 border-b border-emerald-900 px-3 py-2 text-xs">
@@ -742,15 +766,19 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
               onClick={e => { if (!(e.target as Element).closest('button,input,a')) onToggle(); }}>
               {editName !== null ? (
                 <span className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                  <input autoFocus value={editName} onChange={e => setEditName(e.target.value)}
+                  <input ref={editPkgInputRef} autoFocus value={editName} onChange={e => setEditName(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') savePkgName(editName); if (e.key === 'Escape') setEditName(null); }}
                     className="bg-zinc-800 border border-emerald-600 rounded px-2 py-1 text-sm flex-1 outline-none" />
+                  <button onMouseDown={e => { e.preventDefault(); wrapSel(editPkgInputRef, '**', () => editName, v => setEditName(v)); }}
+                    title="Bôi đậm (**text**)" className="shrink-0 text-xs font-bold text-zinc-400 hover:text-white px-0.5">B</button>
+                  <button onMouseDown={e => { e.preventDefault(); wrapSel(editPkgInputRef, '__', () => editName, v => setEditName(v)); }}
+                    title="Chữ mảnh (__text__)" className="shrink-0 text-xs font-light text-zinc-400 hover:text-white px-0.5">T</button>
                   <button onClick={() => savePkgName(editName)} className="text-emerald-400"><Check className="w-4 h-4" /></button>
                   <button onClick={() => setEditName(null)} className="text-zinc-500"><X className="w-4 h-4" /></button>
                 </span>
               ) : (
                 <div className="flex items-center gap-1 min-w-0">
-                  <span className="text-sm font-medium truncate flex-1">{pkg.name}</span>
+                  <span className="text-sm font-medium truncate flex-1">{renderName(pkg.name)}</span>
                   {ce && editName === null && (
                     <button onClick={e => { e.stopPropagation(); setEditName(pkg.name); }} title="Sửa tên nhóm"
                       className="text-zinc-700 hover:text-emerald-400 shrink-0"><Pencil className="w-3 h-3" /></button>
@@ -986,14 +1014,18 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
                   style={{ left: isMobile ? 0 : LEFT_NAME, width: W_NAME, minWidth: W_NAME, maxWidth: W_NAME }}>
                   {editTask?.id === t.id ? (
                     <span className="flex items-center gap-1">
-                      <input autoFocus value={editTask.value} onChange={e => setEditTask({ id: t.id, value: e.target.value })}
+                      <input ref={editTaskInputRef} autoFocus value={editTask.value} onChange={e => setEditTask({ id: t.id, value: e.target.value })}
                         onKeyDown={e => { if (e.key === 'Enter') saveTaskName(t.id, editTask.value); if (e.key === 'Escape') setEditTask(null); }}
                         className="bg-zinc-800 border border-emerald-600 rounded px-1 py-0.5 text-xs w-full outline-none" />
+                      <button onMouseDown={e => { e.preventDefault(); wrapSel(editTaskInputRef, '**', () => editTask.value, v => setEditTask(et => et && ({ ...et, value: v }))); }}
+                        title="Bôi đậm (**text**)" className="shrink-0 text-xs font-bold text-zinc-400 hover:text-white px-0.5">B</button>
+                      <button onMouseDown={e => { e.preventDefault(); wrapSel(editTaskInputRef, '__', () => editTask.value, v => setEditTask(et => et && ({ ...et, value: v }))); }}
+                        title="Chữ mảnh (__text__)" className="shrink-0 text-xs font-light text-zinc-400 hover:text-white px-0.5">T</button>
                       <button onClick={() => saveTaskName(t.id, editTask.value)} className="text-emerald-400"><Check className="w-3.5 h-3.5" /></button>
                     </span>
                   ) : (
                     <div className="flex items-center gap-1 min-w-0">
-                      <span className="truncate flex-1" title={t.name}>{t.name}</span>
+                      <span className="truncate flex-1" title={t.name}>{renderName(t.name)}</span>
                       {ce && <button onClick={() => setEditTask({ id: t.id, value: t.name })} className="shrink-0 text-zinc-600 hover:text-emerald-400"><Pencil className="w-3 h-3" /></button>}
                     </div>
                   )}
