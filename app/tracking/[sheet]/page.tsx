@@ -50,6 +50,16 @@ const fmtShortDate = (d: string | null) => {
   return isNaN(dt.getTime()) ? '?' : `${dt.getDate()}/${dt.getMonth() + 1}`;
 };
 
+const fmtColDate = (d: string | null) => {
+  if (!d) return '';
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return '';
+  const dd = String(dt.getDate()).padStart(2, '0');
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
+  const yy = String(dt.getFullYear()).slice(-2);
+  return `${dd}/${mm}/${yy}`;
+};
+
 // Số ngày thi công (bao gồm 2 đầu).
 const diffDays = (s: string | null, e: string | null) => {
   if (!s || !e) return null;
@@ -230,7 +240,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-zinc-500 shrink-0">Ẩn cột khi in:</span>
-            {(['BOQ', 'STT', 'Công việc', '%'] as const).map(col => {
+            {(['BOQ', 'STT', 'Công việc', '%', 'Ngày BĐ', 'Số ngày', 'Ngày KT'] as const).map(col => {
               const hidden = hiddenPrintCols.has(col);
               return (
                 <button key={col} onClick={() => setHiddenPrintCols(s => { const n = new Set(s); hidden ? n.delete(col) : n.add(col); return n; })}
@@ -777,8 +787,10 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
   const W_CODE = canEdit ? 70 : 58;
   const W_NAME = isMobile ? 150 : 280;
   const W_PCT  = 56;
-  // 44px = tối thiểu theo Apple/Google HIG — ngón tay bấm được dễ dàng ngoài công trường
-  const W_DIM  = 44;
+  const W_DATE = 54; // Ngày BĐ / Ngày KT
+  const W_DAYS = 44; // Số ngày thi công
+  // 80px đủ cho tên kích thước ống nằm ngang (vd "1300X700 X1-X6")
+  const W_DIM  = 80;
   const W_ACT  = 88;
   // Sticky left offset tính tự động từ các hằng số trên
   const LEFT_CODE = W_BOQ;
@@ -810,6 +822,9 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
           <col style={{ width: W_CODE }} className={hiddenPrintCols.has('STT') ? 'print-hidden-col' : ''} />
           <col style={{ width: W_NAME }} className={hiddenPrintCols.has('Công việc') ? 'print-hidden-col' : ''} />
           <col style={{ width: W_PCT }} className={hiddenPrintCols.has('%') ? 'print-hidden-col' : ''} />
+          <col style={{ width: W_DATE }} className={hiddenPrintCols.has('Ngày BĐ') ? 'print-hidden-col' : ''} />
+          <col style={{ width: W_DAYS }} className={hiddenPrintCols.has('Số ngày') ? 'print-hidden-col' : ''} />
+          <col style={{ width: W_DATE }} className={hiddenPrintCols.has('Ngày KT') ? 'print-hidden-col' : ''} />
           {visibleColumns.map(col => <col key={col} style={{ width: W_DIM }} className={hiddenPrintCols.has(col) ? 'print-hidden-col' : ''} />)}
           {showTable && (ce || hasVariants) && <col style={{ width: W_ACT }} />}
         </colgroup>
@@ -902,7 +917,8 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
             </td>
 
             {/* Phần cuộn: ngày, task count, thanh tiến độ, trạng thái, nút hành động */}
-            <td colSpan={visibleColumns.length + 1 || undefined}
+            {/* +3 cho Ngày BĐ / Số ngày / Ngày KT */}
+            <td colSpan={visibleColumns.length + 3 + 1 || undefined}
               className="px-3 py-3.5 align-middle" style={{ minWidth: 520 }}
               onClick={e => { if (!(e.target as Element).closest('button,a')) onToggle(); }}>
               <div className="flex items-center gap-3">
@@ -1033,11 +1049,13 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
                 style={{ left: isMobile ? 0 : LEFT_NAME }}>Công việc</th>
               <th className={`${stkPct} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium${hpc('%')}`}
                 style={{ left: LEFT_PCT }}>%</th>
+              <th className={`border-b border-r border-zinc-800 px-1 py-2 text-center align-middle text-zinc-500 font-medium text-[10px]${hpc('Ngày BĐ')}`} style={{ width: W_DATE }}>Ngày BĐ</th>
+              <th className={`border-b border-r border-zinc-800 px-1 py-2 text-center align-middle text-zinc-500 font-medium text-[10px]${hpc('Số ngày')}`} style={{ width: W_DAYS }}>Số ngày</th>
+              <th className={`border-b border-r border-zinc-800 px-1 py-2 text-center align-middle text-zinc-500 font-medium text-[10px]${hpc('Ngày KT')}`} style={{ width: W_DATE }}>Ngày KT</th>
               {visibleColumns.map(col => (
                 <th key={col} className={`group/col border-b border-zinc-800 p-0 overflow-hidden align-middle${hiddenPrintCols.has(col) ? ' print-hidden-col' : ''}`} style={{ width: W_DIM }}>
                   <div className="flex flex-col items-center py-2 gap-1">
-                    <div className="dim-col-label text-[10px] text-zinc-500 hover:text-emerald-400 cursor-default overflow-hidden"
-                      style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', lineHeight: '1.2' }}
+                    <div className="dim-col-label text-[10px] text-zinc-500 hover:text-emerald-400 cursor-default text-center leading-tight break-words"
                       title={ce ? `${col} — bấm để đổi tên` : col}
                       onClick={() => ce && renameColumn(col)}>{col}</div>
                     {ce && (
@@ -1144,9 +1162,9 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
                       return (
                         <span className="flex items-center gap-1">
                           <button onClick={() => ce && setDatesTarget({ ids: [t.id], init: { start: t.startDate ?? '', end: t.endDate ?? '' } })}
-                            title={ce ? (inherited ? 'Kế thừa từ nhóm — bấm để đặt ngày riêng' : 'Sửa ngày bắt đầu / kết thúc') : `${effStart ?? '?'} → ${effEnd ?? '?'}`}
-                            className={`flex items-center gap-0.5 text-[10px] whitespace-nowrap ${t.status === 'tre' ? 'text-red-400' : inherited ? 'text-zinc-500 italic' : 'text-zinc-400'} ${ce ? 'hover:text-emerald-400 hover:underline cursor-pointer' : 'cursor-default'}`}>
-                            <CalendarDays className="w-3 h-3 shrink-0" /> {fmtShortDate(effStart)}→{fmtShortDate(effEnd)}{inherited && ' ↑'}
+                            title={`${effStart ?? '?'} → ${effEnd ?? '?'}${inherited ? ' (kế thừa từ nhóm)' : ''}${ce ? ' — bấm để sửa' : ''}`}
+                            className={`flex items-center gap-0.5 ${t.status === 'tre' ? 'text-red-400' : inherited ? 'text-zinc-600' : 'text-zinc-500'} ${ce ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
+                            <CalendarDays className="w-3 h-3 shrink-0" />{inherited && <span className="text-[9px]">↑</span>}
                           </button>
                           {t.startDate && ce && (
                             <button onClick={() => resetTaskDates(t)} title="Về kế thừa ngày từ nhóm"
@@ -1191,6 +1209,19 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
                   style={{ left: LEFT_PCT }}>
                   <span className={Math.round(t.progressPercent * 100) === 100 ? 'text-emerald-400' : 'text-zinc-300'}>{Math.round((t.progressPercent ?? 0) * 100)}%</span>
                 </td>
+                {/* ── Ngày BĐ / Số ngày / Ngày KT ── */}
+                {(() => {
+                  const effStart = t.startDate ?? pkg.startDate;
+                  const effEnd   = t.endDate   ?? pkg.endDate;
+                  const days     = diffDays(effStart, effEnd);
+                  const inherited = !t.startDate && !!pkg.startDate;
+                  const cls = `border-b border-r border-zinc-800 px-1 py-1 text-center align-middle text-[10px] whitespace-nowrap ${inherited ? 'text-zinc-600 italic' : 'text-zinc-400'}`;
+                  return (<>
+                    <td className={cls + hpc('Ngày BĐ')} style={{ width: W_DATE }}>{fmtColDate(effStart)}</td>
+                    <td className={`border-b border-r border-zinc-800 px-1 py-1 text-center align-middle text-[10px] text-zinc-400${hpc('Số ngày')}`} style={{ width: W_DAYS }}>{days ?? ''}</td>
+                    <td className={cls + hpc('Ngày KT')} style={{ width: W_DATE }}>{fmtColDate(effEnd)}</td>
+                  </>);
+                })()}
                 {visibleColumns.map(col => {
                   const cell = t.cells[col];
                   return (
