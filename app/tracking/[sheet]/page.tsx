@@ -341,10 +341,22 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
           .no-print { display: none !important; }
           body { background: #fff !important; color: #000 !important; }
           @page { margin: 8mm; size: A3 landscape; }
+          /* Cột ẩn: thu về 0 nhưng KHÔNG display:none — tránh lệch cột trong table-fixed */
           col.print-hidden-col { width: 0 !important; min-width: 0 !important; }
-          th.print-hidden-col, td.print-hidden-col { display: none !important; width: 0 !important; padding: 0 !important; border: none !important; overflow: hidden !important; }
-          table { border-collapse: collapse !important; font-size: 9pt !important; }
-          th, td { border: 1px solid #ccc !important; background: #fff !important; color: #000 !important; padding: 3px 5px !important; }
+          th.print-hidden-col, td.print-hidden-col {
+            width: 0 !important; min-width: 0 !important; max-width: 0 !important;
+            padding: 0 !important; border: none !important; overflow: hidden !important;
+          }
+          /* Thu nhỏ cột cố định khi in A3 ngang */
+          col.col-boq  { width: 70px  !important; }
+          col.col-stt  { width: 32px  !important; }
+          col.col-name { width: 190px !important; }
+          col.col-pct  { width: 26px  !important; }
+          col.col-date { width: 40px  !important; }
+          col.col-days { width: 26px  !important; }
+          col.col-dim  { width: 48px  !important; }
+          table { border-collapse: collapse !important; font-size: 8.5pt !important; }
+          th, td { border: 1px solid #ccc !important; background: #fff !important; color: #000 !important; padding: 2px 4px !important; }
           thead th { background: #f0f0f0 !important; font-weight: bold !important; }
           input[type="checkbox"] { width: 12px !important; height: 12px !important; }
           .print-pkg-header td { background: #e8e8e8 !important; font-weight: bold !important; }
@@ -824,14 +836,14 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
       {/* ── Bảng duy nhất: hàng nhóm + header cột + task rows ── */}
       <table className="text-xs border-collapse table-fixed" style={{ width: 'max-content' }}>
         <colgroup>
-          {showBoq && <col style={{ width: W_BOQ }} className={hiddenPrintCols.has('BOQ') ? 'print-hidden-col' : ''} />}
-          <col style={{ width: W_CODE }} className={hiddenPrintCols.has('STT') ? 'print-hidden-col' : ''} />
-          <col style={{ width: W_NAME }} className={hiddenPrintCols.has('Công việc') ? 'print-hidden-col' : ''} />
-          <col style={{ width: W_PCT }} className={hiddenPrintCols.has('%') ? 'print-hidden-col' : ''} />
-          <col style={{ width: W_DATE }} className={hiddenPrintCols.has('Ngày BĐ') ? 'print-hidden-col' : ''} />
-          <col style={{ width: W_DAYS }} className={hiddenPrintCols.has('Số ngày') ? 'print-hidden-col' : ''} />
-          <col style={{ width: W_DATE }} className={hiddenPrintCols.has('Ngày KT') ? 'print-hidden-col' : ''} />
-          {visibleColumns.map(col => <col key={col} style={{ width: W_DIM }} className={hiddenPrintCols.has(col) ? 'print-hidden-col' : ''} />)}
+          {showBoq && <col style={{ width: W_BOQ }} className={`col-boq${hiddenPrintCols.has('BOQ') ? ' print-hidden-col' : ''}`} />}
+          <col style={{ width: W_CODE }} className={`col-stt${hiddenPrintCols.has('STT') ? ' print-hidden-col' : ''}`} />
+          <col style={{ width: W_NAME }} className={`col-name${hiddenPrintCols.has('Công việc') ? ' print-hidden-col' : ''}`} />
+          <col style={{ width: W_PCT }} className={`col-pct${hiddenPrintCols.has('%') ? ' print-hidden-col' : ''}`} />
+          <col style={{ width: W_DATE }} className={`col-date${hiddenPrintCols.has('Ngày BĐ') ? ' print-hidden-col' : ''}`} />
+          <col style={{ width: W_DAYS }} className={`col-days${hiddenPrintCols.has('Số ngày') ? ' print-hidden-col' : ''}`} />
+          <col style={{ width: W_DATE }} className={`col-date${hiddenPrintCols.has('Ngày KT') ? ' print-hidden-col' : ''}`} />
+          {visibleColumns.map(col => <col key={col} style={{ width: W_DIM }} className={`col-dim${hiddenPrintCols.has(col) ? ' print-hidden-col' : ''}`} />)}
           {showTable && (ce || hasVariants) && <col style={{ width: W_ACT }} />}
         </colgroup>
         <thead>
