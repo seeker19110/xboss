@@ -293,23 +293,29 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
         <span className="text-xs text-zinc-500 ml-auto">{packages.length} nhóm · bấm vào nhóm để mở lưới checkbox</span>
       </div>
 
-      <main className="p-4 space-y-2">
-        {packages.map((p, pi) => (
-          <div key={p.id} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-            <PkgGrid
-              pkg={p} pkgIdx={pi} pkgCount={packages.length}
-              expanded={!!expanded[p.id]}
-              onToggle={() => setExpanded(s => ({ ...s, [p.id]: !s[p.id] }))}
-              canEdit={canEdit} editMode={editMode} refreshKey={refreshKey} isMobile={isMobile}
-              onChanged={load} onOfflineTick={enqueue}
-              hiddenPrintCols={hiddenPrintCols} onColsLoaded={handleColsLoaded}
-              sheetCols={allSheetCols}
-            />
+      <main className="p-4">
+        {/* Vùng cuộn ngang chung — tất cả nhóm chia sẻ 1 scrollbar,
+            cột căn thẳng nhau khi mở/đóng nhóm */}
+        <div className="overflow-x-auto scrollbar-none">
+          <div className="space-y-2" style={{ width: 'max-content', minWidth: '100%' }}>
+            {packages.map((p, pi) => (
+              <div key={p.id} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+                <PkgGrid
+                  pkg={p} pkgIdx={pi} pkgCount={packages.length}
+                  expanded={!!expanded[p.id]}
+                  onToggle={() => setExpanded(s => ({ ...s, [p.id]: !s[p.id] }))}
+                  canEdit={canEdit} editMode={editMode} refreshKey={refreshKey} isMobile={isMobile}
+                  onChanged={load} onOfflineTick={enqueue}
+                  hiddenPrintCols={hiddenPrintCols} onColsLoaded={handleColsLoaded}
+                  sheetCols={allSheetCols}
+                />
+              </div>
+            ))}
+            {packages.length === 0 && (
+              <div className="p-8 text-center text-zinc-500 bg-zinc-900 border border-zinc-800 rounded-xl">{'Không có dữ liệu. Hãy import file Excel hoặc copy từ trang khác.'}</div>
+            )}
           </div>
-        ))}
-        {packages.length === 0 && (
-          <div className="p-8 text-center text-zinc-500 bg-zinc-900 border border-zinc-800 rounded-xl">{'Không có dữ liệu. Hãy import file Excel hoặc copy từ trang khác.'}</div>
-        )}
+        </div>
       </main>
 
       {syncToast && (
@@ -802,7 +808,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
   const stkPct  = isMobile ? '' : 'sticky';
 
   return (
-    <div className="overflow-x-auto">
+    <>
       {/* Thanh bulk-action — hiển thị khi đang chọn nhiều task */}
       {ce && selected.size > 0 && (
         <div className="sticky top-0 left-0 z-30 flex flex-wrap items-center gap-2 bg-zinc-950 border-b border-emerald-900 px-3 py-2 text-xs">
@@ -816,7 +822,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
       )}
 
       {/* ── Bảng duy nhất: hàng nhóm + header cột + task rows ── */}
-      <table className="text-xs border-collapse table-fixed" style={{ width: 'max-content', minWidth: '100%' }}>
+      <table className="text-xs border-collapse table-fixed" style={{ width: 'max-content' }}>
         <colgroup>
           {showBoq && <col style={{ width: W_BOQ }} className={hiddenPrintCols.has('BOQ') ? 'print-hidden-col' : ''} />}
           <col style={{ width: W_CODE }} className={hiddenPrintCols.has('STT') ? 'print-hidden-col' : ''} />
@@ -1271,7 +1277,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
       {commentsTask && <CommentsModal task={commentsTask} onClose={() => { setCommentsTask(null); load(); }} />}
       {datesTarget && <DatesModal target={datesTarget} onSave={saveDates} onClose={() => setDatesTarget(null)} />}
       {showDatesModal && <PkgDatesModal pkg={pkg} onSave={savePkgDates} onClose={() => setShowDatesModal(false)} />}
-    </div>
+    </>
   );
 }
 
