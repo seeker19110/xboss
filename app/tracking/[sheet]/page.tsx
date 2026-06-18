@@ -620,8 +620,8 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
   }
 
   async function deleteColumn(label: string) {
-    if (!await appConfirm(`Xoá cột "${label}" khỏi nhóm này?\n\nToàn bộ trạng thái tick của cột này sẽ bị xoá vĩnh viễn.`, { danger: true, confirmLabel: 'Xoá cột' })) return;
-    const res = await fetch(`/api/workpackages/${pkg.id}/dimensions/column?label=${encodeURIComponent(label)}`, { method: 'DELETE' });
+    if (!await appConfirm(`Xoá cột "${label}" khỏi TẤT CẢ nhóm trong trang này?\n\nToàn bộ trạng thái tick của cột này ở mọi nhóm sẽ bị xoá vĩnh viễn.`, { danger: true, confirmLabel: 'Xoá cột toàn trang' })) return;
+    const res = await fetch(`/api/workpackages/${pkg.id}/dimensions/column?label=${encodeURIComponent(label)}&allGroups=true`, { method: 'DELETE' });
     if (!res.ok) { const j = await res.json().catch(() => ({})); appAlert(j.error ?? 'Lỗi không xác định'); return; }
     load(); onChanged();
   }
@@ -677,7 +677,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
       '\n\nThao tác này xoá toàn bộ dữ liệu checkbox trong các cột đó và không thể hoàn tác.'
     )) return;
     for (const col of variantColumns) {
-      await fetch(`/api/workpackages/${pkg.id}/dimensions/column?label=${encodeURIComponent(col)}`, { method: 'DELETE' });
+      await fetch(`/api/workpackages/${pkg.id}/dimensions/column?label=${encodeURIComponent(col)}&allGroups=true`, { method: 'DELETE' });
     }
     load(); onChanged();
   }

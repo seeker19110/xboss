@@ -62,8 +62,9 @@ export async function POST(req: NextRequest, { params: paramsP }: { params: Prom
   return NextResponse.json({ created: ids.length, label, sortOrder }, { status: 201 });
 }
 
-// DELETE /api/workpackages/:id/dimensions/column?label=xxx
-// Xoá toàn bộ progress_dimensions theo nhãn trong package này.
+// DELETE /api/workpackages/:id/dimensions/column?label=xxx[&allGroups=true]
+// Xoá toàn bộ progress_dimensions theo nhãn.
+// allGroups=true → xoá khỏi mọi nhóm trong cùng sheet; mặc định chỉ nhóm hiện tại.
 export async function DELETE(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
   const params = await paramsP;
   const user = await getCurrentUser();
@@ -76,16 +77,33 @@ export async function DELETE(req: NextRequest, { params: paramsP }: { params: Pr
   const label = req.nextUrl.searchParams.get("label");
   if (!label) return NextResponse.json({ error: "Thiếu tham số label" }, { status: 400 });
 
-  const { changes } = await run(
-    `DELETE FROM progress_dimensions WHERE dimension_label = ?
-       AND task_id IN (SELECT id FROM tasks WHERE package_id = ?)`, label, pkgId);
+  const allGroups = req.nextUrl.searchParams.get("allGroups") === "true";
 
-  // Xoá cột làm đổi tổng số ô → tính lại % của mọi task + nhóm.
-  const tasks = await query<{ id: number }>(`SELECT id FROM tasks WHERE package_id = ?`, pkgId);
-  for (const t of tasks) await recomputeTask(t.id, user.name);
-  await recomputePackage(pkgId);
+  let affectedPkgIds: number[];
+  if (allGroups) {
+    // Lấy sheet_type_id của nhóm hiện tại rồi tìm mọi nhóm cùng sheet.
+    const pkg = await queryOne<{ sheet_type_id: number }>(`SELECT sheet_type_id FROM work_packages WHERE id = ?`, pkgId);
+    if (!pkg) return NextResponse.json({ error: "Nhóm không tồn tại" }, { status: 404 });
+    const siblings = await query<{ id: number }>(`SELECT id FROM work_packages WHERE sheet_type_id = ?`, pkg.sheet_type_id);
+    affectedPkgIds = siblings.map(r => r.id);
+  } else {
+    affectedPkgIds = [pkgId];
+  }
 
-  return NextResponse.json({ deleted: changes });
+  let totalDeleted = 0;
+  for (const pid of affectedPkgIds) {
+    const { changes } = await run(
+      `DELETE FROM progress_dimensions WHERE dimension_label = ?
+         AND task_id IN (SELECT id FROM tasks WHERE package_id = ?)`, label, pid);
+    totalDeleted += changes;
+
+    // Tính lại % cho mọi task + nhóm bị ảnh hưởng.
+    const tasks = await query<{ id: number }>(`SELECT id FROM tasks WHERE package_id = ?`, pid);
+    for (const t of tasks) await recomputeTask(t.id, user.name);
+    await recomputePackage(pid);
+  }
+
+  return NextResponse.json({ deleted: totalDeleted, groups: affectedPkgIds.length });
 }
 
 // PATCH /api/workpackages/:id/dimensions/column
