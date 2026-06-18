@@ -324,12 +324,14 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
           .no-print { display: none !important; }
           body { background: #fff !important; color: #000 !important; }
           @page { margin: 8mm; size: A3 landscape; }
-          .print-hidden-col { display: none !important; }
+          col.print-hidden-col { visibility: collapse !important; }
+          th.print-hidden-col, td.print-hidden-col { display: none !important; }
           table { border-collapse: collapse !important; font-size: 9pt !important; }
           th, td { border: 1px solid #ccc !important; background: #fff !important; color: #000 !important; padding: 3px 5px !important; }
           thead th { background: #f0f0f0 !important; font-weight: bold !important; }
           input[type="checkbox"] { width: 12px !important; height: 12px !important; }
           .print-pkg-header td { background: #e8e8e8 !important; font-weight: bold !important; }
+          .dim-col-label { writing-mode: horizontal-tb !important; transform: none !important; text-align: center !important; word-break: break-all !important; font-size: 7pt !important; }
         }
       `}</style>
 
@@ -805,7 +807,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
           <col style={{ width: W_CODE }} className={hiddenPrintCols.has('STT') ? 'print-hidden-col' : ''} />
           <col style={{ width: W_NAME }} className={hiddenPrintCols.has('Công việc') ? 'print-hidden-col' : ''} />
           <col style={{ width: W_PCT }} className={hiddenPrintCols.has('%') ? 'print-hidden-col' : ''} />
-          {visibleColumns.map(col => <col key={col} style={{ width: W_DIM }} />)}
+          {visibleColumns.map(col => <col key={col} style={{ width: W_DIM }} className={hiddenPrintCols.has(col) ? 'print-hidden-col' : ''} />)}
           {showTable && (ce || hasVariants) && <col style={{ width: W_ACT }} />}
         </colgroup>
         <thead>
@@ -1031,7 +1033,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
               {visibleColumns.map(col => (
                 <th key={col} className={`group/col border-b border-zinc-800 p-0 overflow-hidden align-middle${hiddenPrintCols.has(col) ? ' print-hidden-col' : ''}`} style={{ width: W_DIM }}>
                   <div className="flex flex-col items-center py-2 gap-1">
-                    <div className="text-[10px] text-zinc-500 hover:text-emerald-400 cursor-default overflow-hidden"
+                    <div className="dim-col-label text-[10px] text-zinc-500 hover:text-emerald-400 cursor-default overflow-hidden"
                       style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', lineHeight: '1.2' }}
                       title={ce ? `${col} — bấm để đổi tên` : col}
                       onClick={() => ce && renameColumn(col)}>{col}</div>
