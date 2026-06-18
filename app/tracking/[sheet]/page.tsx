@@ -916,51 +916,58 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
               <span className="text-sm font-semibold text-zinc-300">{Math.round((pkg.progress ?? 0) * 100)}%</span>
             </td>
 
-            {/* Phần cuộn: ngày, task count, thanh tiến độ, trạng thái, nút hành động */}
-            {/* +3 cho Ngày BĐ / Số ngày / Ngày KT */}
-            <td colSpan={visibleColumns.length + 3 + 1 || undefined}
-              className="px-3 py-3.5 align-middle" style={{ minWidth: 520 }}
+            {/* ── Ngày BĐ / Số ngày / Ngày KT — 3 ô riêng căn thẳng với cột task bên dưới ── */}
+            <td className={`border-r border-zinc-800 px-1 py-3.5 text-center align-middle${hpc('Ngày BĐ')}`}
+              style={{ width: W_DATE, minWidth: W_DATE }}
+              onClick={e => { if (!(e.target as Element).closest('button,input')) onToggle(); }}>
+              <button onClick={e => { e.stopPropagation(); if (ce) setShowDatesModal(true); }}
+                title={ce ? 'Sửa ngày nhóm' : (pkg.startDate ?? '?')}
+                className={`flex flex-col items-center w-full ${ce ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
+                <span className="text-[9px] text-zinc-600 leading-none">Bắt đầu</span>
+                <span className="text-[13px] text-zinc-500 leading-snug">{fmtShortDate(pkg.startDate)}</span>
+              </button>
+            </td>
+            <td className={`border-r border-zinc-800 px-1 py-3.5 text-center align-middle${hpc('Số ngày')}`}
+              style={{ width: W_DAYS, minWidth: W_DAYS }}
+              onClick={e => { if (!(e.target as Element).closest('button,input')) onToggle(); }}>
+              {editDays !== null ? (
+                <span className="flex flex-col items-center gap-0.5" onClick={e => e.stopPropagation()}>
+                  <span className="text-[9px] text-zinc-600 leading-none">Số ngày</span>
+                  <input autoFocus type="number" min={1} value={editDays}
+                    onChange={e => setEditDays(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') savePkgDays(editDays); if (e.key === 'Escape') setEditDays(null); }}
+                    onBlur={() => savePkgDays(editDays)}
+                    className="bg-zinc-800 border border-emerald-600 rounded px-0.5 py-0 text-[11px] w-full text-center outline-none font-mono" />
+                </span>
+              ) : (
+                <button onClick={e => { e.stopPropagation(); if (ce) setEditDays(String(diffDays(pkg.startDate, pkg.endDate) ?? '')); }}
+                  title={ce ? 'Sửa số ngày' : ''}
+                  className={`flex flex-col items-center w-full ${ce ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
+                  <span className="text-[9px] text-zinc-600 leading-none">Số ngày</span>
+                  <span className="text-[13px] text-zinc-600 leading-snug">
+                    {diffDays(pkg.startDate, pkg.endDate) != null
+                      ? `${diffDays(pkg.startDate, pkg.endDate)}n`
+                      : <CalendarDays className="w-[14px] h-[14px] text-zinc-700 inline" />}
+                  </span>
+                </button>
+              )}
+            </td>
+            <td className={`border-r border-zinc-800 px-1 py-3.5 text-center align-middle${hpc('Ngày KT')}`}
+              style={{ width: W_DATE, minWidth: W_DATE }}
+              onClick={e => { if (!(e.target as Element).closest('button,input')) onToggle(); }}>
+              <button onClick={e => { e.stopPropagation(); if (ce) setShowDatesModal(true); }}
+                title={ce ? 'Sửa ngày nhóm' : (pkg.endDate ?? '?')}
+                className={`flex flex-col items-center w-full ${ce ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
+                <span className="text-[9px] text-zinc-600 leading-none">Kết thúc</span>
+                <span className="text-[13px] text-zinc-500 leading-snug">{fmtShortDate(pkg.endDate)}</span>
+              </button>
+            </td>
+
+            {/* ── Task count, tiến độ, trạng thái, bản vẽ, bbnt, actions ── */}
+            <td colSpan={visibleColumns.length + (showTable && (ce || hasVariants) ? 1 : 0) || 1}
+              className="px-3 py-3.5 align-middle" style={{ minWidth: 420 }}
               onClick={e => { if (!(e.target as Element).closest('button,a')) onToggle(); }}>
               <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1 shrink-0">
-                  {/* Bắt đầu + Kết thúc → mở modal */}
-                  <button onClick={e => { e.stopPropagation(); if (ce) setShowDatesModal(true); }}
-                    title={ce ? 'Sửa ngày nhóm' : `${pkg.startDate ?? '?'} → ${pkg.endDate ?? '?'}`}
-                    className={`flex flex-col items-center w-14 ${ce ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
-                    <span className="text-[9px] text-zinc-600 leading-none">Bắt đầu</span>
-                    <span className="text-[13px] text-zinc-500 leading-snug">{fmtShortDate(pkg.startDate)}</span>
-                  </button>
-                  <span className="w-1.5 text-zinc-700 self-end pb-0.5">|</span>
-                  {/* Số ngày → inline edit */}
-                  {editDays !== null ? (
-                    <span className="flex flex-col items-center w-[52px]" onClick={e => e.stopPropagation()}>
-                      <span className="text-[9px] text-zinc-600 leading-none">Số ngày</span>
-                      <input autoFocus type="number" min={1} value={editDays}
-                        onChange={e => setEditDays(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') savePkgDays(editDays); if (e.key === 'Escape') setEditDays(null); }}
-                        onBlur={() => savePkgDays(editDays)}
-                        className="bg-zinc-800 border border-emerald-600 rounded px-1 py-0 text-[13px] w-full text-center outline-none font-mono" />
-                    </span>
-                  ) : (
-                    <button onClick={e => { e.stopPropagation(); if (ce) setEditDays(String(diffDays(pkg.startDate, pkg.endDate) ?? '')); }}
-                      title={ce ? 'Sửa số ngày' : ''}
-                      className={`flex flex-col items-center w-[52px] ${ce ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
-                      <span className="text-[9px] text-zinc-600 leading-none">Số ngày</span>
-                      <span className="text-[13px] text-zinc-600 leading-snug">
-                        {diffDays(pkg.startDate, pkg.endDate) != null
-                          ? `${diffDays(pkg.startDate, pkg.endDate)}n`
-                          : <CalendarDays className="w-[14px] h-[14px] text-zinc-700 inline" />}
-                      </span>
-                    </button>
-                  )}
-                  <span className="w-1.5 text-zinc-700 self-end pb-0.5">|</span>
-                  <button onClick={e => { e.stopPropagation(); if (ce) setShowDatesModal(true); }}
-                    title={ce ? 'Sửa ngày nhóm' : `${pkg.startDate ?? '?'} → ${pkg.endDate ?? '?'}`}
-                    className={`flex flex-col items-center w-14 ${ce ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
-                    <span className="text-[9px] text-zinc-600 leading-none">Kết thúc</span>
-                    <span className="text-[13px] text-zinc-500 leading-snug">{fmtShortDate(pkg.endDate)}</span>
-                  </button>
-                </div>
                 <span className="text-[13px] text-zinc-500 w-[67px] text-right shrink-0">{pkg.tasks.length} task</span>
                 <div className="flex items-center gap-2 w-44 shrink-0">
                   <div className="bg-zinc-800 rounded-full h-2 flex-1">
