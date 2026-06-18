@@ -786,11 +786,11 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
   const W_BOQ  = showBoq ? 110 : 0;
   const W_CODE = canEdit ? 70 : 58;
   const W_NAME = isMobile ? 150 : 280;
-  const W_PCT  = 56;
-  const W_DATE = 54; // Ngày BĐ / Ngày KT
-  const W_DAYS = 44; // Số ngày thi công
-  // 80px đủ cho tên kích thước ống nằm ngang (vd "1300X700 X1-X6")
-  const W_DIM  = 80;
+  const W_PCT  = 40;
+  const W_DATE = 52; // Ngày BĐ / Ngày KT
+  const W_DAYS = 36; // Số ngày thi công
+  // 60px đủ cho tên kích thước ống 2 dòng (vd "1300X700" / "X1-X6")
+  const W_DIM  = 60;
   const W_ACT  = 88;
   // Sticky left offset tính tự động từ các hằng số trên
   const LEFT_CODE = W_BOQ;
