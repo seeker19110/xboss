@@ -4,7 +4,7 @@ import Link from 'next/link';
 import {
   ShieldCheck, ChevronRight, ChevronDown, RotateCcw,
   Users, AlertCircle, History, Filter, ChevronsUpDown, ChevronsDown,
-  Activity, Circle,
+  Activity, Circle, CalendarClock,
 } from 'lucide-react';
 import AppHeader from '@/app/components/AppHeader';
 import { ROLE_LABELS } from '@/lib/roles';
@@ -200,6 +200,9 @@ export default function AdminPage() {
             </button>
           ))}
         </nav>
+        <a href="/lookahead" className="flex items-center gap-1.5 text-sm text-zinc-400 hover:text-rose-400 shrink-0">
+          <CalendarClock className="w-4 h-4" /> Kế hoạch 2 tuần
+        </a>
         {me?.role === 'admin' && (
           <a href="/users" className="flex items-center gap-1.5 text-sm text-zinc-400 hover:text-emerald-400 shrink-0">
             <Users className="w-4 h-4" /> Người dùng

@@ -1,11 +1,8 @@
 'use client';
-// Header dùng chung cho mọi trang: tiêu đề + điều khiển riêng của trang (children),
-// cụm bên phải (tìm kiếm, chuông, user menu) và hàng nav cố định highlight trang hiện tại.
 import { useEffect, useState, type ReactNode } from 'react';
-import Link from 'next/link';
 import {
-  ArrowLeft, LayoutDashboard, ClipboardList, Package, CalendarRange,
-  CheckSquare, CalendarClock, Users, KeyRound, LogOut, ShieldCheck, Bell,
+  LayoutDashboard, ClipboardList, Package,
+  CheckSquare, Users, KeyRound, LogOut, ShieldCheck,
   Layers, DollarSign,
 } from 'lucide-react';
 import NotificationBell from '@/app/components/NotificationBell';
@@ -19,21 +16,19 @@ type Me = { id: number; name: string; email: string; role: string };
 const ROLE_LABEL: Record<string, string> = ROLE_LABELS;
 
 const NAV = [
-  { href: '/', tkey: 'nav.dashboard', label: 'Dashboard', icon: LayoutDashboard, color: 'text-emerald-400' },
+  { href: '/', tkey: 'nav.dashboard', label: 'ACMV', icon: LayoutDashboard, color: 'text-emerald-400' },
   { href: '/my-tasks', tkey: 'nav.my_tasks', label: 'Việc của tôi', icon: ClipboardList, color: 'text-violet-400' },
   { href: '/materials', tkey: 'nav.materials', label: 'Vật tư', icon: Package, color: 'text-sky-400' },
-  { href: '/gantt', tkey: 'nav.gantt', label: 'Gantt', icon: CalendarRange, color: 'text-amber-400' },
   { href: '/approvals', tkey: 'nav.approvals', label: 'Nghiệm thu', icon: CheckSquare, color: 'text-teal-400' },
-  { href: '/lookahead', tkey: 'nav.lookahead', label: 'Kế hoạch 2 tuần', icon: CalendarClock, color: 'text-rose-400' },
   { href: '/timeline', tkey: 'nav.timeline', label: 'Timeline tầng', icon: Layers, color: 'text-indigo-400' },
   { href: '/payments', tkey: 'nav.payments', label: 'Thanh toán', icon: DollarSign, color: 'text-emerald-400' },
 ];
 
-export default function AppHeader({ title, subtitle, back, children, search = true }: {
+export default function AppHeader({ title, subtitle, children, search = true }: {
   title?: ReactNode; subtitle?: ReactNode;
-  back?: boolean;          // hiện mũi tên về Dashboard (trang con)
-  search?: boolean;        // ẩn GlobalSearch nếu trang chật chỗ
-  children?: ReactNode;    // điều khiển riêng của trang (nút export, filter...)
+  back?: boolean;       // giữ prop để không vỡ trang gọi cũ — không dùng nữa
+  search?: boolean;
+  children?: ReactNode;
 }) {
   const [me, setMe] = useState<Me | null>(null);
   const [path, setPath] = useState('');
@@ -45,7 +40,6 @@ export default function AppHeader({ title, subtitle, back, children, search = tr
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' });
-    // Xóa cache API của SW để user khác trên cùng thiết bị không thấy dữ liệu phiên này.
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHE' });
     }
@@ -54,82 +48,88 @@ export default function AppHeader({ title, subtitle, back, children, search = tr
 
   return (
     <header className="border-b border-zinc-800 print:hidden">
-      {/* Hàng 1: tiêu đề + actions + user menu */}
-      <div className="px-4 sm:px-6 py-3 flex items-center gap-x-3 gap-y-2 flex-wrap">
-        {back && <Link href="/" aria-label="Về Dashboard" className="text-zinc-400 hover:text-white shrink-0"><ArrowLeft className="w-5 h-5" /></Link>}
-        <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-bold flex items-center gap-2 truncate">{title ?? '🏗️ XBoss'}</h1>
-          {subtitle && <p className="text-xs text-zinc-400 truncate">{subtitle}</p>}
-        </div>
-        {/* Search ẩn trên mobile — hiện ở hàng 2 */}
-        {search && <div className="hidden sm:block flex-1 max-w-md"><GlobalSearch /></div>}
-        <div className="flex items-center gap-2 ml-auto sm:ml-0 shrink-0">
+      {/* Hàng duy nhất: brand · nav · [title trang con] · controls */}
+      <div className="flex items-center gap-1 px-3 h-12 min-w-0">
+
+        {/* Brand */}
+        <a href="/" className="shrink-0 flex items-center gap-1.5 mr-1 text-white hover:opacity-80">
+          <span className="font-bold text-sm leading-none">XBoss</span>
+        </a>
+
+        {/* Nav chính — cuộn ngang khi chật, ẩn label trên mobile */}
+        <nav className="flex items-center gap-0.5 overflow-x-auto scrollbar-none shrink-0"
+          style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
+          aria-label="Điều hướng chính">
+          {NAV.map(n => {
+            const active = path === n.href || (n.href !== '/' && path.startsWith(n.href));
+            const Icon = n.icon;
+            return (
+              <a key={n.href} href={n.href}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs whitespace-nowrap transition ${active
+                  ? 'bg-zinc-800 text-white font-medium' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'}`}
+                aria-current={active ? 'page' : undefined}>
+                <Icon className={`w-4 h-4 shrink-0 ${n.color}`} />
+                <span className="hidden sm:inline"><EditableText tkey={n.tkey}>{n.label}</EditableText></span>
+              </a>
+            );
+          })}
+        </nav>
+
+        {/* Tiêu đề trang con (tracking, admin…) */}
+        {title && (
+          <div className="min-w-0 flex-1 px-2 border-l border-zinc-800 ml-1">
+            <div className="text-sm font-semibold truncate flex items-center gap-1.5">{title}</div>
+            {subtitle && <p className="text-[11px] text-zinc-400 truncate leading-none">{subtitle}</p>}
+          </div>
+        )}
+
+        {/* Spacer khi không có title */}
+        {!title && <div className="flex-1 min-w-0" />}
+
+        {/* Controls bên phải */}
+        <div className="flex items-center gap-1 shrink-0 ml-1">
+          {search && <div className="hidden sm:block w-52 lg:w-72"><GlobalSearch /></div>}
           {children}
           <ThemeToggle />
           <OnlineUsers isAdmin={me?.role === 'admin'} />
           <NotificationBell />
           {me && (
-            <div className="flex items-center gap-2 ml-1 pl-3 border-l border-zinc-800">
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-medium leading-tight">{me.name}</p>
-                <p className="text-xs text-emerald-400 leading-tight">{ROLE_LABEL[me.role] ?? me.role}</p>
+            <div className="flex items-center gap-0.5 ml-1 pl-2 border-l border-zinc-800">
+              <div className="text-right hidden lg:block mr-1">
+                <p className="text-xs font-medium leading-tight">{me.name}</p>
+                <p className="text-[10px] text-emerald-400 leading-tight">{ROLE_LABEL[me.role] ?? me.role}</p>
               </div>
               {(me.role === 'admin' || me.role === 'pm') && (
-                <a href="/admin" title="Quản trị — phân công công việc" aria-label="Quản trị"
-                  className="p-2 rounded-lg text-zinc-400 hover:text-emerald-400 hover:bg-zinc-800 transition">
+                <a href="/admin" title="Quản trị" aria-label="Quản trị"
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-emerald-400 hover:bg-zinc-800 transition">
                   <ShieldCheck className="w-4 h-4" />
-                  <span className="sr-only">Quản trị</span>
                 </a>
               )}
               {me.role === 'admin' && (
                 <a href="/users" title="Quản lý người dùng" aria-label="Quản lý người dùng"
-                  className="p-2 rounded-lg text-zinc-400 hover:text-emerald-400 hover:bg-zinc-800 transition">
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-emerald-400 hover:bg-zinc-800 transition">
                   <Users className="w-4 h-4" />
-                  <span className="sr-only">Quản lý người dùng</span>
                 </a>
               )}
               <a href="/password" title="Đổi mật khẩu" aria-label="Đổi mật khẩu"
                 className="p-1.5 rounded-lg text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 transition">
                 <KeyRound className="w-4 h-4" />
-                <span className="sr-only">Đổi mật khẩu</span>
               </a>
               <button onClick={logout} title="Đăng xuất" aria-label="Đăng xuất"
-                className="p-2 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-zinc-800 transition">
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-zinc-800 transition">
                 <LogOut className="w-4 h-4" />
-                <span className="sr-only">Đăng xuất</span>
               </button>
             </div>
           )}
         </div>
       </div>
-      {/* Hàng 2 (mobile only): search */}
+
+      {/* Mobile: search hàng 2 */}
       {search && (
-        <div className="sm:hidden px-4 pb-2">
+        <div className="sm:hidden px-3 pb-2">
           <GlobalSearch />
         </div>
       )}
-      {/* Hàng nav: scroll ngang + fade báo hiệu có thêm mục */}
-      <div className="relative">
-        <nav className="px-4 sm:px-6 pb-3 flex gap-1.5 overflow-x-auto scrollbar-none"
-          style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
-          aria-label="Điều hướng chính">
-          {NAV.map(n => {
-            const active = path === n.href;
-            const Icon = n.icon;
-            return (
-              <a key={n.href} href={n.href}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap transition ${active
-                  ? 'bg-zinc-800 text-white font-medium' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'}`}
-                aria-current={active ? 'page' : undefined}>
-                <Icon className={`w-5 h-5 ${n.color}`} />
-              <EditableText tkey={n.tkey}>{n.label}</EditableText>
-              </a>
-            );
-          })}
-        </nav>
-        {/* Fade báo hiệu còn mục bị cắt bên phải */}
-        <div className="pointer-events-none absolute right-0 top-0 bottom-3 w-8 bg-gradient-to-l from-zinc-950 to-transparent sm:hidden" aria-hidden />
-      </div>
     </header>
   );
 }
