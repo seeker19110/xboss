@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import AppHeader from '@/app/components/AppHeader';
 import EditableText from '@/app/components/EditableText';
+import EditModeToggle from '@/app/components/EditModeToggle';
 import { Modal, appConfirm, appPrompt } from '@/app/components/dialogs';
 import SuppliersTab from './_components/SuppliersTab';
 import PurchaseRequestsTab from './_components/PurchaseRequestsTab';
@@ -295,6 +296,7 @@ export default function MaterialsPage() {
             <Eye className="w-3.5 h-3.5" /> Hiện {hiddenCols.size} cột
           </button>
         )}
+        <EditModeToggle canEdit={canEdit} editMode={editMode} onToggle={() => setEditMode(v => !v)} />
       </AppHeader>
 
       <main className="p-4 sm:p-6 w-full space-y-4">

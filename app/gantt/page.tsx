@@ -5,6 +5,8 @@ import { slugFromCode } from '@/lib/sheets';
 import AppHeader from '@/app/components/AppHeader';
 import { PageSkeleton } from '@/app/components/Skeleton';
 import { Modal, appAlert } from '@/app/components/dialogs';
+import { useEditMode } from '@/app/components/useEditMode';
+import EditModeToggle from '@/app/components/EditModeToggle';
 
 type Bar = {
   id: number; code: string; name: string; floorLabel: string | null;
@@ -57,6 +59,7 @@ export default function GanttPage() {
   }, []);
 
   const canEdit = me?.role === 'admin' || me?.role === 'pm';
+  const { editMode, toggle: toggleEditMode } = useEditMode(canEdit);
   const blockedMap = useMemo(() => new Map(blocked.map(b => [b.id, b.preds])), [blocked]);
   const criticalSet = useMemo(() => new Set(critical), [critical]);
   const criticalDepSet = useMemo(() => new Set(criticalDeps), [criticalDeps]);
@@ -120,6 +123,7 @@ export default function GanttPage() {
           <option value="">Tất cả hệ</option>
           {sheets.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
+        <EditModeToggle canEdit={canEdit} editMode={editMode} onToggle={toggleEditMode} />
       </AppHeader>
 
       <div className="px-6 py-2 flex flex-wrap gap-3 text-xs text-zinc-400 border-b border-zinc-800/60">
@@ -183,7 +187,7 @@ export default function GanttPage() {
                           {isCritical && <span title="Trên đường găng"><Activity className="w-3 h-3 text-amber-400 shrink-0" /></span>}
                           <span className="font-mono text-xs text-zinc-400">{b.code}</span>
                           <span className="text-[10px] text-zinc-600">{b.floorLabel ?? ''}</span>
-                          {canEdit && (
+                          {editMode && (
                             <button onClick={() => setDepFor(b)} aria-label={`Sửa phụ thuộc ${b.code}`}
                               className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-sky-400 transition">
                               <Link2 className="w-3.5 h-3.5" />

@@ -8,6 +8,8 @@ import { Modal, appAlert, appConfirm, appPrompt } from '@/app/components/dialogs
 import { PageSkeleton } from '@/app/components/Skeleton';
 import { DELAY_REASON_LABEL } from '@/lib/delay';
 import { toSlug } from '@/lib/sheets';
+import { useEditMode } from '@/app/components/useEditMode';
+import EditModeToggle from '@/app/components/EditModeToggle';
 import { ROLE_LABELS } from '@/lib/roles';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -66,6 +68,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
     typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('floor') ?? '' : '');
   const [statusFilter, setStatusFilter] = useState('');
   const [canEdit, setCanEdit] = useState(false);
+  const [canProgress, setCanProgress] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [sheetModal, setSheetModal] = useState<{ name: string; code: string; slug: string; responsible: string } | null>(null);
   const [sheetErr, setSheetErr] = useState('');
@@ -73,6 +76,8 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
   const [syncToast, setSyncToast] = useState(false);
   const versionRef = useRef<string | null>(null);
   const isMobile = useIsMobile();
+  // canProgress = bất kỳ role nào không phải xem thuần (engineer, subcon, pm, admin)
+  const { editMode, toggle: toggleEditMode } = useEditMode(canProgress || canEdit);
 
   const load = useCallback(() => {
     fetch(`/api/tasks?sheet=${sheet}`).then(r => r.json()).then((d: Data) => {
@@ -135,6 +140,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
       const role = j?.user?.role;
       const editable = role === 'admin' || role === 'pm';
       setCanEdit(editable);
+      setCanProgress(!['bch', 'cdt', 'viewer'].includes(role ?? ''));
       setIsAdmin(role === 'admin');
     });
   }, []);
@@ -176,7 +182,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
         title={
           <>
             {data?.sheet.name ?? sheet}
-            {canEdit && data?.sheet.id && (
+            {canEdit && editMode && data?.sheet.id && (
               <button onClick={() => { setSheetErr(''); setSheetModal({
                   name: data.sheet.name, code: data.sheet.code,
                   slug: data.sheet.slug ?? sheet, responsible: data.sheet.responsible ?? '' }); }}
@@ -188,7 +194,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
           </>
         }
         subtitle={`${data?.sheet.code ?? ''} ${data?.sheet.responsible ? `· ${data.sheet.responsible}` : ''}`}>
-        {canEdit && <span className="text-xs bg-emerald-950 text-emerald-400 px-2 py-1 rounded hidden sm:inline">Chế độ chỉnh sửa (Admin/PM)</span>}
+        <EditModeToggle canEdit={canProgress || canEdit} editMode={editMode} onToggle={toggleEditMode} />
       </AppHeader>
 
       <div className="px-6 py-3 flex flex-wrap gap-3 items-center border-b border-zinc-800/60">
@@ -217,7 +223,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
               pkg={p} pkgIdx={pi} pkgCount={packages.length}
               expanded={!!expanded[p.id]}
               onToggle={() => setExpanded(s => ({ ...s, [p.id]: !s[p.id] }))}
-              canEdit={canEdit} refreshKey={refreshKey} isMobile={isMobile}
+              canEdit={canEdit} editMode={editMode} refreshKey={refreshKey} isMobile={isMobile}
               onChanged={load} onOfflineTick={enqueue}
             />
           </div>
@@ -295,9 +301,9 @@ type Cell = { id: number; installed: boolean };
 type GridTask = { id: number; code: string; name: string; status: string; progressPercent: number; boqCode: string | null; drawingUrl: string | null; photoCount: number; commentCount: number; delayReason: string | null; startDate: string | null; endDate: string | null; cells: Record<string, Cell> };
 type Grid = { columns: string[]; tasks: GridTask[] };
 
-function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKey, isMobile, onChanged, onOfflineTick }: {
+function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode, refreshKey, isMobile, onChanged, onOfflineTick }: {
   pkg: Pkg; pkgIdx: number; pkgCount: number; expanded: boolean; onToggle: () => void;
-  canEdit: boolean; refreshKey: number; isMobile: boolean;
+  canEdit: boolean; editMode: boolean; refreshKey: number; isMobile: boolean;
   onChanged: () => void; onOfflineTick: (dimId: number, installed: boolean) => void;
 }) {
   const [grid, setGrid] = useState<Grid | null>(null);
@@ -633,7 +639,9 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
   }
 
   // Chiều rộng cột — định nghĩa 1 chỗ, dùng chung cho hàng nhóm lẫn bảng task
-  const showBoq = canEdit; // BOQ chỉ hiển thị cho Admin/PM
+  // ce = canEdit && editMode — dùng để gate toàn bộ nút sửa trong lưới
+  const ce = canEdit && editMode;
+  const showBoq = canEdit; // BOQ chỉ hiển thị cho Admin/PM (luôn hiện, kể cả khi chỉ xem)
   const W_BOQ  = showBoq ? 110 : 0;
   const W_CODE = canEdit ? 70 : 58;
   const W_NAME = isMobile ? 150 : 280;
@@ -653,7 +661,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
   return (
     <div className={`overflow-auto${expanded ? ' max-h-[70vh]' : ''}`}>
       {/* Thanh bulk-action — hiển thị khi đang chọn nhiều task */}
-      {canEdit && selected.size > 0 && (
+      {ce && selected.size > 0 && (
         <div className="sticky top-0 left-0 z-30 flex flex-wrap items-center gap-2 bg-zinc-950 border-b border-emerald-900 px-3 py-2 text-xs">
           <span className="text-emerald-400 font-medium">{selected.size} task đã chọn</span>
           <button onClick={() => setDatesTarget({ ids: [...selected], init: { start: '', end: '' } })}
@@ -672,7 +680,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
           <col style={{ width: W_NAME }} />
           <col style={{ width: W_PCT }} />
           {visibleColumns.map(col => <col key={col} style={{ width: W_DIM }} />)}
-          {showTable && (canEdit || hasVariants) && <col style={{ width: W_ACT }} />}
+          {showTable && (ce || hasVariants) && <col style={{ width: W_ACT }} />}
         </colgroup>
         <thead>
           {/* ── Hàng tiêu đề nhóm ── */}
@@ -690,7 +698,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                     title={`BOQCODE: ${pkg.boqCode ?? pkg.code} (mã Excel: ${pkg.code})`}>
                     {pkg.boqCode ?? pkg.code}
                   </span>
-                  {canEdit && (
+                  {ce && (
                     <button onClick={e => { e.stopPropagation(); editPkgBoq(); }} title="Sửa BOQCODE"
                       className="text-zinc-700 hover:text-amber-400 shrink-0"><Pencil className="w-3 h-3" /></button>
                   )}
@@ -718,7 +726,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
               ) : (
                 <span className="group/floor inline-flex items-center gap-0.5">
                   <span className="text-xs text-zinc-500">{pkg.floorLabel ?? ''}</span>
-                  {canEdit && (
+                  {ce && (
                     <button onClick={e => { e.stopPropagation(); setEditFloor(pkg.floorLabel ?? ''); }}
                       title="Sửa tầng" className="opacity-0 group-hover/floor:opacity-100 text-zinc-600 hover:text-emerald-400">
                       <Pencil className="w-2.5 h-2.5" />
@@ -743,7 +751,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
               ) : (
                 <div className="flex items-center gap-1 min-w-0">
                   <span className="text-sm font-medium truncate flex-1">{pkg.name}</span>
-                  {canEdit && editName === null && (
+                  {ce && editName === null && (
                     <button onClick={e => { e.stopPropagation(); setEditName(pkg.name); }} title="Sửa tên nhóm"
                       className="text-zinc-700 hover:text-emerald-400 shrink-0"><Pencil className="w-3 h-3" /></button>
                   )}
@@ -759,15 +767,15 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
             </td>
 
             {/* Phần cuộn: ngày, task count, thanh tiến độ, trạng thái, nút hành động */}
-            <td colSpan={showTable && grid ? grid.columns.length + (canEdit ? 1 : 0) : undefined}
+            <td colSpan={showTable && grid ? grid.columns.length + (ce ? 1 : 0) : undefined}
               className="px-3 py-3.5 align-middle" style={{ minWidth: 520 }}
               onClick={e => { if (!(e.target as Element).closest('button,a')) onToggle(); }}>
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1 shrink-0">
                   {/* Bắt đầu + Kết thúc → mở modal */}
-                  <button onClick={e => { e.stopPropagation(); if (canEdit) setShowDatesModal(true); }}
-                    title={canEdit ? 'Sửa ngày nhóm' : `${pkg.startDate ?? '?'} → ${pkg.endDate ?? '?'}`}
-                    className={`flex flex-col items-center w-14 ${canEdit ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
+                  <button onClick={e => { e.stopPropagation(); if (ce) setShowDatesModal(true); }}
+                    title={ce ? 'Sửa ngày nhóm' : `${pkg.startDate ?? '?'} → ${pkg.endDate ?? '?'}`}
+                    className={`flex flex-col items-center w-14 ${ce ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
                     <span className="text-[9px] text-zinc-600 leading-none">Bắt đầu</span>
                     <span className="text-[13px] text-zinc-500 leading-snug">{fmtShortDate(pkg.startDate)}</span>
                   </button>
@@ -783,9 +791,9 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                         className="bg-zinc-800 border border-emerald-600 rounded px-1 py-0 text-[13px] w-full text-center outline-none font-mono" />
                     </span>
                   ) : (
-                    <button onClick={e => { e.stopPropagation(); if (canEdit) setEditDays(String(diffDays(pkg.startDate, pkg.endDate) ?? '')); }}
-                      title={canEdit ? 'Sửa số ngày' : ''}
-                      className={`flex flex-col items-center w-[52px] ${canEdit ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
+                    <button onClick={e => { e.stopPropagation(); if (ce) setEditDays(String(diffDays(pkg.startDate, pkg.endDate) ?? '')); }}
+                      title={ce ? 'Sửa số ngày' : ''}
+                      className={`flex flex-col items-center w-[52px] ${ce ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
                       <span className="text-[9px] text-zinc-600 leading-none">Số ngày</span>
                       <span className="text-[13px] text-zinc-600 leading-snug">
                         {diffDays(pkg.startDate, pkg.endDate) != null
@@ -795,9 +803,9 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                     </button>
                   )}
                   <span className="w-1.5 text-zinc-700 self-end pb-0.5">|</span>
-                  <button onClick={e => { e.stopPropagation(); if (canEdit) setShowDatesModal(true); }}
-                    title={canEdit ? 'Sửa ngày nhóm' : `${pkg.startDate ?? '?'} → ${pkg.endDate ?? '?'}`}
-                    className={`flex flex-col items-center w-14 ${canEdit ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
+                  <button onClick={e => { e.stopPropagation(); if (ce) setShowDatesModal(true); }}
+                    title={ce ? 'Sửa ngày nhóm' : `${pkg.startDate ?? '?'} → ${pkg.endDate ?? '?'}`}
+                    className={`flex flex-col items-center w-14 ${ce ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
                     <span className="text-[9px] text-zinc-600 leading-none">Kết thúc</span>
                     <span className="text-[13px] text-zinc-500 leading-snug">{fmtShortDate(pkg.endDate)}</span>
                   </button>
@@ -821,7 +829,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                     ) : (
                       <FileText className="w-3.5 h-3.5 text-zinc-700" />
                     )}
-                    {canEdit && (
+                    {ce && (
                       <>
                         <button onClick={() => drawingInputRef.current?.click()} title="Upload PDF bản vẽ"
                           className="text-zinc-600 hover:text-sky-400"><Upload className="w-3.5 h-3.5" /></button>
@@ -849,7 +857,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                     ) : (
                       <FileText className="w-3.5 h-3.5 text-zinc-700" />
                     )}
-                    {canEdit && (
+                    {ce && (
                       <>
                         <button onClick={() => bbntInputRef.current?.click()} title="Upload biên bản nghiệm thu"
                           className="text-zinc-600 hover:text-emerald-400"><Upload className="w-3.5 h-3.5" /></button>
@@ -867,7 +875,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                 </span>
                 <input ref={bbntInputRef} type="file" accept=".pdf,image/*" className="hidden"
                   onChange={e => { const f = e.target.files?.[0]; if (f) { uploadBbntFile(f); e.target.value = ''; } }} />
-                {canEdit && (
+                {ce && (
                   <span className="flex items-center gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
 <button onClick={() => copyPkg()} title="Sao chép nhóm này"
                       className="p-0.5 text-zinc-600 hover:text-sky-400"><Copy className="w-[17px] h-[17px]" /></button>
@@ -895,9 +903,9 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                   <div className="flex flex-col items-center py-2 gap-1">
                     <div className="text-[10px] text-zinc-500 hover:text-emerald-400 cursor-default overflow-hidden"
                       style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', lineHeight: '1.2' }}
-                      title={canEdit ? `${col} — bấm để đổi tên` : col}
-                      onClick={() => canEdit && renameColumn(col)}>{col}</div>
-                    {canEdit && (
+                      title={ce ? `${col} — bấm để đổi tên` : col}
+                      onClick={() => ce && renameColumn(col)}>{col}</div>
+                    {ce && (
                       <button onClick={() => deleteColumn(col)} title={`Xoá cột "${col}"`}
                         className="opacity-0 group-hover/col:opacity-100 text-zinc-700 hover:text-red-400 shrink-0">
                         <Trash2 className="w-3 h-3" />
@@ -908,14 +916,14 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
               ))}
               <th className="border-b border-zinc-800 align-bottom pb-2 text-center" style={{ width: W_ACT }}>
                 <div className="flex flex-col items-center gap-1">
-                  {canEdit && hasVariants && (
+                  {ce && hasVariants && (
                     <button onClick={deleteVariantColumns}
                       title={`Xoá ${variantColumns.length} cột biến thể (2)(3)(4) khỏi DB`}
                       className="w-6 h-6 flex items-center justify-center text-zinc-600 hover:text-red-400 hover:bg-red-950/40 rounded">
                       <Trash2 className="w-3 h-3" />
                     </button>
                   )}
-                  {canEdit && (
+                  {ce && (
                     <button onClick={() => addColumnAfter(grid.columns[grid.columns.length - 1] ?? null)}
                       title="Thêm cột mới vào cuối"
                       className="w-6 h-6 flex items-center justify-center text-zinc-600 hover:text-emerald-400 hover:bg-emerald-950/40 rounded">
@@ -944,17 +952,17 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                 {showBoq && (
                   <td className={`${stkBoq} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 text-center align-middle overflow-hidden`}
                     style={{ left: 0 }}>
-                    <button onClick={() => canEdit && editTaskBoq(t)}
-                      title={canEdit ? `${t.boqCode ?? 'Chưa gán'} — bấm để sửa` : t.boqCode ?? 'Chưa gán'}
-                      className={`font-mono text-[10px] truncate block w-full text-center ${canEdit ? 'text-amber-400 hover:underline cursor-pointer' : 'text-amber-400/70 cursor-default'}`}>
+                    <button onClick={() => ce && editTaskBoq(t)}
+                      title={ce ? `${t.boqCode ?? 'Chưa gán'} — bấm để sửa` : t.boqCode ?? 'Chưa gán'}
+                      className={`font-mono text-[10px] truncate block w-full text-center ${ce ? 'text-amber-400 hover:underline cursor-pointer' : 'text-amber-400/70 cursor-default'}`}>
                       {t.boqCode ?? '—'}
                     </button>
-                    {(t.drawingUrl || canEdit) && (
+                    {(t.drawingUrl || ce) && (
                       t.drawingUrl ? (
                         <span className="flex items-center justify-center gap-0.5 mt-0.5">
                           <a href={t.drawingUrl} target="_blank" rel="noreferrer" title={`Bản vẽ: ${t.drawingUrl}`}
                             className="text-sky-400 hover:text-sky-300"><Link2 className="w-3 h-3" /></a>
-                          {canEdit && <button onClick={() => editTaskDrawing(t)} className="text-zinc-600 hover:text-emerald-400"><Pencil className="w-2.5 h-2.5" /></button>}
+                          {ce && <button onClick={() => editTaskDrawing(t)} className="text-zinc-600 hover:text-emerald-400"><Pencil className="w-2.5 h-2.5" /></button>}
                         </span>
                       ) : (
                         <button onClick={() => editTaskDrawing(t)} title="Thêm link bản vẽ / BBNT"
@@ -966,7 +974,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                 <td className={`${stkCode} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 text-center align-middle overflow-hidden`}
                   style={{ left: LEFT_CODE, width: W_CODE, minWidth: W_CODE }}>
                   <div className="flex items-center justify-center gap-1">
-                    {canEdit && (
+                    {ce && (
                       <input type="checkbox" checked={selected.has(t.id)} onChange={() => toggleSelect(t.id)}
                         title="Chọn để gán/đặt ngày hàng loạt"
                         className="w-3 h-3 accent-emerald-500 cursor-pointer shrink-0" />
@@ -986,7 +994,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                   ) : (
                     <div className="flex items-center gap-1 min-w-0">
                       <span className="truncate flex-1" title={t.name}>{t.name}</span>
-                      {canEdit && <button onClick={() => setEditTask({ id: t.id, value: t.name })} className="shrink-0 text-zinc-600 hover:text-emerald-400"><Pencil className="w-3 h-3" /></button>}
+                      {ce && <button onClick={() => setEditTask({ id: t.id, value: t.name })} className="shrink-0 text-zinc-600 hover:text-emerald-400"><Pencil className="w-3 h-3" /></button>}
                     </div>
                   )}
                   <div className="flex items-center gap-2 mt-0.5">
@@ -996,20 +1004,20 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                       const inherited = !t.startDate && !!pkg.startDate;
                       return (
                         <span className="flex items-center gap-1">
-                          <button onClick={() => canEdit && setDatesTarget({ ids: [t.id], init: { start: t.startDate ?? '', end: t.endDate ?? '' } })}
-                            title={canEdit ? (inherited ? 'Kế thừa từ nhóm — bấm để đặt ngày riêng' : 'Sửa ngày bắt đầu / kết thúc') : `${effStart ?? '?'} → ${effEnd ?? '?'}`}
-                            className={`flex items-center gap-0.5 text-[10px] whitespace-nowrap ${t.status === 'tre' ? 'text-red-400' : inherited ? 'text-zinc-500 italic' : 'text-zinc-400'} ${canEdit ? 'hover:text-emerald-400 hover:underline cursor-pointer' : 'cursor-default'}`}>
+                          <button onClick={() => ce && setDatesTarget({ ids: [t.id], init: { start: t.startDate ?? '', end: t.endDate ?? '' } })}
+                            title={ce ? (inherited ? 'Kế thừa từ nhóm — bấm để đặt ngày riêng' : 'Sửa ngày bắt đầu / kết thúc') : `${effStart ?? '?'} → ${effEnd ?? '?'}`}
+                            className={`flex items-center gap-0.5 text-[10px] whitespace-nowrap ${t.status === 'tre' ? 'text-red-400' : inherited ? 'text-zinc-500 italic' : 'text-zinc-400'} ${ce ? 'hover:text-emerald-400 hover:underline cursor-pointer' : 'cursor-default'}`}>
                             <CalendarDays className="w-3 h-3 shrink-0" /> {fmtShortDate(effStart)}→{fmtShortDate(effEnd)}{inherited && ' ↑'}
                           </button>
-                          {t.startDate && canEdit && (
+                          {t.startDate && ce && (
                             <button onClick={() => resetTaskDates(t)} title="Về kế thừa ngày từ nhóm"
                               className="text-zinc-700 hover:text-amber-400 shrink-0"><RotateCcw className="w-3 h-3" /></button>
                           )}
                         </span>
                       );
                     })()}
-                    <button onClick={() => setAllInRow(t, true)} className="text-[10px] text-emerald-500 hover:underline">Tất cả</button>
-                    <button onClick={() => setAllInRow(t, false)} className="text-[10px] text-zinc-500 hover:underline">Bỏ</button>
+                    {editMode && <button onClick={() => setAllInRow(t, true)} className="text-[10px] text-emerald-500 hover:underline">Tất cả</button>}
+                    {editMode && <button onClick={() => setAllInRow(t, false)} className="text-[10px] text-zinc-500 hover:underline">Bỏ</button>}
                     <button onClick={() => setHistoryTask(t)} title="Lịch sử tiến độ"
                       className="text-zinc-600 hover:text-emerald-400"><History className="w-3 h-3" /></button>
                     <button onClick={() => setPhotosTask(t)} title="Ảnh hiện trường"
@@ -1023,9 +1031,9 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                     {t.status === 'nghiem_thu' ? (
                       <span className="flex items-center gap-1 text-[10px] text-teal-300 bg-teal-950 px-1.5 py-0.5 rounded">
                         ✓ Đã NT
-                        {canEdit && <button onClick={() => approveTask(t, false)} title="Huỷ nghiệm thu" className="text-teal-500 hover:text-red-400"><X className="w-2.5 h-2.5" /></button>}
+                        {ce && <button onClick={() => approveTask(t, false)} title="Huỷ nghiệm thu" className="text-teal-500 hover:text-red-400"><X className="w-2.5 h-2.5" /></button>}
                       </span>
-                    ) : canEdit && t.progressPercent >= 1 && (
+                    ) : ce && t.progressPercent >= 1 && (
                       <button onClick={() => approveTask(t, true)} title="Duyệt nghiệm thu (task đã 100%)"
                         className="text-[10px] text-teal-400 border border-teal-800 bg-teal-950/50 hover:bg-teal-900/60 px-1.5 py-0.5 rounded">Nghiệm thu</button>
                     )}
@@ -1049,17 +1057,18 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, refreshKe
                   return (
                     <td key={col} className="border-b border-zinc-800/60 text-center align-middle p-0">
                       {cell ? (
-                        <label className="flex items-center justify-center w-full h-full min-h-[44px] cursor-pointer">
-                          <input type="checkbox" checked={cell.installed} onChange={() => toggle(cell, t, col)}
-                            className="w-4 h-4 accent-emerald-500 cursor-pointer" />
+                        <label className={`flex items-center justify-center w-full h-full min-h-[44px] ${editMode ? 'cursor-pointer' : 'cursor-default'}`}>
+                          <input type="checkbox" checked={cell.installed} onChange={() => editMode && toggle(cell, t, col)}
+                            disabled={!editMode}
+                            className={`w-4 h-4 accent-emerald-500 ${editMode ? 'cursor-pointer' : 'cursor-default opacity-60'}`} />
                         </label>
                       ) : <span className="flex items-center justify-center min-h-[44px] text-zinc-700">·</span>}
                     </td>
                   );
                 })}
-                {(canEdit || hasVariants) && (
+                {(ce || hasVariants) && (
                   <td className="border-b border-zinc-800/60 text-center align-middle p-1 w-[88px] min-w-[88px]">
-                    {canEdit && (
+                    {ce && (
                       <div className="flex justify-center items-center gap-0.5">
                         <button onClick={() => moveTask(t, 'up')} disabled={ti === 0} title="Lên"
                           className="text-zinc-700 hover:text-zinc-300 disabled:opacity-20"><ChevronUp className="w-3 h-3" /></button>

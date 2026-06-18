@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import AppHeader from '@/app/components/AppHeader';
 import { PageSkeleton } from '@/app/components/Skeleton';
+import { useEditMode } from '@/app/components/useEditMode';
+import EditModeToggle from '@/app/components/EditModeToggle';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -86,6 +88,7 @@ export default function PaymentsPage() {
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
   const [canEdit, setCanEdit] = useState(false);
+  const { editMode, toggle: toggleEditMode } = useEditMode(canEdit);
   const [edits, setEdits] = useState<Record<EditKey, string>>({});
   const [saving, setSaving] = useState(false);
   const [sheetFilter, setSheetFilter] = useState('all');
@@ -260,13 +263,14 @@ export default function PaymentsPage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <AppHeader title="Thanh toán tiến độ">
+        <EditModeToggle canEdit={canEdit} editMode={editMode} onToggle={toggleEditMode} />
         {saving && (
           <span className="flex items-center gap-1.5 text-xs text-amber-400 shrink-0">
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
             <span className="hidden sm:inline">Đang lưu...</span>
           </span>
         )}
-        {canEdit && Object.keys(edits).length > 0 && !saving && (
+        {editMode && Object.keys(edits).length > 0 && !saving && (
           <button onClick={() => data && saveEdits(edits, data.rows)}
             className="flex items-center gap-1.5 text-xs bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg transition shrink-0">
             <Save className="w-3.5 h-3.5" /><span className="hidden sm:inline">Lưu ngay</span>
@@ -333,7 +337,7 @@ export default function PaymentsPage() {
             <option value="all">Tất cả hệ</option>
             {sheets.map(s => <option key={s.code} value={s.code}>{s.code}</option>)}
           </select>
-          {canEdit && (
+          {editMode && (
             <p className="text-[10px] text-zinc-600 hidden sm:block">
               Bấm vào ô giá trị để nhập, tự lưu sau 1.5s
             </p>
@@ -345,13 +349,19 @@ export default function PaymentsPage() {
           <div className="space-y-2">
             {floorEntries.map(([floor, rows]) => (
               <FloorGroup key={floor} floor={floor} rows={rows}
-                canEdit={canEdit} edits={edits} onEdit={handleEdit} />
+                canEdit={editMode} edits={edits} onEdit={handleEdit} />
             ))}
             {floorEntries.length === 0 && (
               <div className="py-14 text-center text-zinc-500 bg-zinc-900 border border-zinc-800 rounded-xl">
                 <DollarSign className="w-10 h-10 mx-auto mb-3 opacity-20" />
                 <p className="text-sm">Chưa có dữ liệu tầng.</p>
               </div>
+            )}
+            {canEdit && !editMode && (
+              <p className="text-xs text-zinc-600 text-center pt-1">
+                <AlertCircle className="w-3 h-3 inline mr-1" />
+                Bấm <strong>Chỉ xem</strong> để mở khoá nhập liệu.
+              </p>
             )}
             {!canEdit && (
               <p className="text-xs text-zinc-600 text-center pt-1">
@@ -408,14 +418,14 @@ export default function PaymentsPage() {
                   <div className="divide-y divide-zinc-800/40">
                     {sheetList.map(([sheet, rows]) => (
                       <PersonSheetRow key={sheet} sheet={sheet} rows={rows}
-                        canEdit={canEdit} edits={edits} onEdit={handleEdit}
+                        canEdit={editMode} edits={edits} onEdit={handleEdit}
                         savingResp={savingResp} onSaveResponsible={saveResponsible} />
                     ))}
                   </div>
                   {/* Bills thanh toán của người này */}
                   {!isNone && (
                     <BillsSection person={person} bills={personBills} earned={pEarned}
-                      progress={pAvg} canEdit={canEdit}
+                      progress={pAvg} canEdit={editMode}
                       onAdd={addBill} onDelete={deleteBill} onPatch={patchBill} />
                   )}
                 </div>
