@@ -228,23 +228,31 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
             </button>
             <button onClick={() => setPrintPanel(false)} className="text-zinc-500 hover:text-zinc-300"><X className="w-4 h-4" /></button>
           </div>
-          {allSheetCols.length > 0 && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-zinc-500 shrink-0">Ẩn cột khi in:</span>
-              {allSheetCols.map(col => {
-                const hidden = hiddenPrintCols.has(col);
-                return (
-                  <button key={col} onClick={() => setHiddenPrintCols(s => { const n = new Set(s); hidden ? n.delete(col) : n.add(col); return n; })}
-                    className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] border transition ${hidden ? 'bg-zinc-800 border-zinc-700 text-zinc-500 line-through' : 'bg-zinc-700 border-zinc-600 text-zinc-200'}`}>
-                    {hidden ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />} {col}
-                  </button>
-                );
-              })}
-              {hiddenPrintCols.size > 0 && (
-                <button onClick={() => setHiddenPrintCols(new Set())} className="text-xs text-zinc-500 hover:text-emerald-400">Bỏ ẩn tất cả</button>
-              )}
-            </div>
-          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-zinc-500 shrink-0">Ẩn cột khi in:</span>
+            {(['BOQ', 'STT', 'Công việc', '%'] as const).map(col => {
+              const hidden = hiddenPrintCols.has(col);
+              return (
+                <button key={col} onClick={() => setHiddenPrintCols(s => { const n = new Set(s); hidden ? n.delete(col) : n.add(col); return n; })}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] border transition ${hidden ? 'bg-zinc-800 border-zinc-700 text-zinc-500 line-through' : 'bg-zinc-700 border-zinc-600 text-zinc-200'}`}>
+                  {hidden ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />} {col}
+                </button>
+              );
+            })}
+            {allSheetCols.length > 0 && <span className="text-zinc-700 text-[11px]">|</span>}
+            {allSheetCols.map(col => {
+              const hidden = hiddenPrintCols.has(col);
+              return (
+                <button key={col} onClick={() => setHiddenPrintCols(s => { const n = new Set(s); hidden ? n.delete(col) : n.add(col); return n; })}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] border transition ${hidden ? 'bg-zinc-800 border-zinc-700 text-zinc-500 line-through' : 'bg-zinc-700 border-zinc-600 text-zinc-200'}`}>
+                  {hidden ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />} {col}
+                </button>
+              );
+            })}
+            {hiddenPrintCols.size > 0 && (
+              <button onClick={() => setHiddenPrintCols(new Set())} className="text-xs text-zinc-500 hover:text-emerald-400">Bỏ ẩn tất cả</button>
+            )}
+          </div>
           <p className="text-[11px] text-zinc-600">Mở rộng các nhóm cần in trước, sau đó bấm &quot;In / Lưu PDF&quot;. Khổ giấy đề xuất: A3 ngang.</p>
         </div>
       )}
@@ -758,6 +766,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
   // Chiều rộng cột — định nghĩa 1 chỗ, dùng chung cho hàng nhóm lẫn bảng task
   // ce = canEdit && editMode — dùng để gate toàn bộ nút sửa trong lưới
   const ce = canEdit && editMode;
+  const hpc = (col: string) => hiddenPrintCols.has(col) ? ' print-hidden-col' : '';
   const showBoq = canEdit; // BOQ chỉ hiển thị cho Admin/PM (luôn hiện, kể cả khi chỉ xem)
   const W_BOQ  = showBoq ? 110 : 0;
   const W_CODE = canEdit ? 70 : 58;
@@ -792,10 +801,10 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
       {/* ── Bảng duy nhất: hàng nhóm + header cột + task rows ── */}
       <table className="text-xs border-collapse table-fixed" style={{ width: 'max-content', minWidth: '100%' }}>
         <colgroup>
-          {showBoq && <col style={{ width: W_BOQ }} />}
-          <col style={{ width: W_CODE }} />
-          <col style={{ width: W_NAME }} />
-          <col style={{ width: W_PCT }} />
+          {showBoq && <col style={{ width: W_BOQ }} className={hiddenPrintCols.has('BOQ') ? 'print-hidden-col' : ''} />}
+          <col style={{ width: W_CODE }} className={hiddenPrintCols.has('STT') ? 'print-hidden-col' : ''} />
+          <col style={{ width: W_NAME }} className={hiddenPrintCols.has('Công việc') ? 'print-hidden-col' : ''} />
+          <col style={{ width: W_PCT }} className={hiddenPrintCols.has('%') ? 'print-hidden-col' : ''} />
           {visibleColumns.map(col => <col key={col} style={{ width: W_DIM }} />)}
           {showTable && (ce || hasVariants) && <col style={{ width: W_ACT }} />}
         </colgroup>
@@ -804,7 +813,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
           <tr className="bg-zinc-900 hover:bg-zinc-800 border-b border-zinc-800 cursor-pointer select-none group">
             {/* Cột BOQ — chỉ Admin/PM */}
             {showBoq && (
-              <td className={`${stkBoq} z-20 bg-inherit border-r border-zinc-800 px-2 py-3.5 align-middle`}
+              <td className={`${stkBoq} z-20 bg-inherit border-r border-zinc-800 px-2 py-3.5 align-middle${hpc('BOQ')}`}
                 style={{ left: 0, width: W_BOQ, minWidth: W_BOQ }}
                 onClick={onToggle}>
                 <div className="flex items-center gap-1">
@@ -824,7 +833,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
             )}
 
             {/* Cột STT */}
-            <td className={`${stkCode} z-20 bg-inherit border-r border-zinc-800 px-1 py-3.5 text-center align-middle`}
+            <td className={`${stkCode} z-20 bg-inherit border-r border-zinc-800 px-1 py-3.5 text-center align-middle${hpc('STT')}`}
               style={{ left: LEFT_CODE, width: W_CODE, minWidth: W_CODE }}
               onClick={e => { if (!(e.target as Element).closest('button,input')) onToggle(); }}>
               {!showBoq && editFloor === null && (expanded
@@ -854,7 +863,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
             </td>
 
             {/* Cột Tên nhóm */}
-            <td className={`${stkName} z-20 bg-inherit border-r border-zinc-800 px-2 py-3.5 align-middle overflow-hidden`}
+            <td className={`${stkName} z-20 bg-inherit border-r border-zinc-800 px-2 py-3.5 align-middle overflow-hidden${hpc('Công việc')}`}
               style={{ left: isMobile ? 0 : LEFT_NAME, width: W_NAME, minWidth: W_NAME, maxWidth: W_NAME }}
               onClick={e => { if (!(e.target as Element).closest('button,input,a')) onToggle(); }}>
               {editName !== null ? (
@@ -881,7 +890,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
             </td>
 
             {/* Cột % */}
-            <td className={`${stkPct} z-20 bg-inherit border-r border-zinc-800 px-1 py-3.5 text-center align-middle`}
+            <td className={`${stkPct} z-20 bg-inherit border-r border-zinc-800 px-1 py-3.5 text-center align-middle${hpc('%')}`}
               style={{ left: LEFT_PCT, width: W_PCT, minWidth: W_PCT }}
               onClick={onToggle}>
               <span className="text-sm font-semibold text-zinc-300">{Math.round((pkg.progress ?? 0) * 100)}%</span>
@@ -1011,13 +1020,13 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
           {/* ── Hàng header cột (chỉ khi mở và có dữ liệu) ── */}
           {showTable && (
             <tr className="bg-zinc-950">
-              {showBoq && <th className={`${stkBoq} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium`}
+              {showBoq && <th className={`${stkBoq} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium${hpc('BOQ')}`}
                 style={{ left: 0 }}>BOQ</th>}
-              <th className={`${stkCode} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium`}
+              <th className={`${stkCode} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium${hpc('STT')}`}
                 style={{ left: LEFT_CODE }}>STT</th>
-              <th className={`${stkName} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium`}
+              <th className={`${stkName} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium${hpc('Công việc')}`}
                 style={{ left: isMobile ? 0 : LEFT_NAME }}>Công việc</th>
-              <th className={`${stkPct} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium`}
+              <th className={`${stkPct} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium${hpc('%')}`}
                 style={{ left: LEFT_PCT }}>%</th>
               {visibleColumns.map(col => (
                 <th key={col} className={`group/col border-b border-zinc-800 p-0 overflow-hidden align-middle${hiddenPrintCols.has(col) ? ' print-hidden-col' : ''}`} style={{ width: W_DIM }}>
@@ -1071,7 +1080,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
               <Fragment key={t.id}>
               <tr className="hover:bg-zinc-800/30 transition-colors">
                 {showBoq && (
-                  <td className={`${stkBoq} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 text-center align-middle overflow-hidden`}
+                  <td className={`${stkBoq} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 text-center align-middle overflow-hidden${hpc('BOQ')}`}
                     style={{ left: 0 }}>
                     <button onClick={() => ce && editTaskBoq(t)}
                       title={ce ? `${t.boqCode ?? 'Chưa gán'} — bấm để sửa` : t.boqCode ?? 'Chưa gán'}
@@ -1092,7 +1101,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
                     )}
                   </td>
                 )}
-                <td className={`${stkCode} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 text-center align-middle overflow-hidden`}
+                <td className={`${stkCode} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 text-center align-middle overflow-hidden${hpc('STT')}`}
                   style={{ left: LEFT_CODE, width: W_CODE, minWidth: W_CODE }}>
                   <div className="flex items-center justify-center gap-1">
                     {ce && (
@@ -1103,7 +1112,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
                     <span className="font-mono text-zinc-400 text-[10px]">{String(ti + 1).padStart(2, '0')}</span>
                   </div>
                 </td>
-                <td className={`${stkName} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 align-middle overflow-hidden`}
+                <td className={`${stkName} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 align-middle overflow-hidden${hpc('Công việc')}`}
                   style={{ left: isMobile ? 0 : LEFT_NAME, width: W_NAME, minWidth: W_NAME, maxWidth: W_NAME }}>
                   {editTask?.id === t.id ? (
                     <span className="flex items-center gap-1">
@@ -1173,7 +1182,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
                     )}
                   </div>
                 </td>
-                <td className={`${stkPct} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-1 py-1 text-center align-middle overflow-hidden`}
+                <td className={`${stkPct} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-1 py-1 text-center align-middle overflow-hidden${hpc('%')}`}
                   style={{ left: LEFT_PCT }}>
                   <span className={Math.round(t.progressPercent * 100) === 100 ? 'text-emerald-400' : 'text-zinc-300'}>{Math.round((t.progressPercent ?? 0) * 100)}%</span>
                 </td>
