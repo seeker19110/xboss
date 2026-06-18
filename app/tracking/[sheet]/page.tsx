@@ -335,8 +335,8 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
           .no-print { display: none !important; }
           body { background: #fff !important; color: #000 !important; }
           @page { margin: 8mm; size: A3 landscape; }
-          col.print-hidden-col { visibility: collapse !important; }
-          th.print-hidden-col, td.print-hidden-col { display: none !important; }
+          col.print-hidden-col { width: 0 !important; min-width: 0 !important; }
+          th.print-hidden-col, td.print-hidden-col { display: none !important; width: 0 !important; padding: 0 !important; border: none !important; overflow: hidden !important; }
           table { border-collapse: collapse !important; font-size: 9pt !important; }
           th, td { border: 1px solid #ccc !important; background: #fff !important; color: #000 !important; padding: 3px 5px !important; }
           thead th { background: #f0f0f0 !important; font-weight: bold !important; }
