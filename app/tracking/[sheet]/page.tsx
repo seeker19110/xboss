@@ -293,6 +293,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
               canEdit={canEdit} editMode={editMode} refreshKey={refreshKey} isMobile={isMobile}
               onChanged={load} onOfflineTick={enqueue}
               hiddenPrintCols={hiddenPrintCols} onColsLoaded={handleColsLoaded}
+              sheetCols={allSheetCols}
             />
           </div>
         ))}
@@ -412,11 +413,12 @@ type Cell = { id: number; installed: boolean };
 type GridTask = { id: number; code: string; name: string; status: string; progressPercent: number; boqCode: string | null; drawingUrl: string | null; photoCount: number; commentCount: number; delayReason: string | null; startDate: string | null; endDate: string | null; cells: Record<string, Cell> };
 type Grid = { columns: string[]; tasks: GridTask[] };
 
-function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode, refreshKey, isMobile, onChanged, onOfflineTick, hiddenPrintCols, onColsLoaded }: {
+function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode, refreshKey, isMobile, onChanged, onOfflineTick, hiddenPrintCols, onColsLoaded, sheetCols }: {
   pkg: Pkg; pkgIdx: number; pkgCount: number; expanded: boolean; onToggle: () => void;
   canEdit: boolean; editMode: boolean; refreshKey: number; isMobile: boolean;
   onChanged: () => void; onOfflineTick: (dimId: number, installed: boolean) => void;
   hiddenPrintCols: Set<string>; onColsLoaded: (cols: string[]) => void;
+  sheetCols: string[];
 }) {
   const [grid, setGrid] = useState<Grid | null>(null);
   const [editName, setEditName] = useState<string | null>(null);
@@ -751,7 +753,8 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
   const noData = expanded && grid && grid.columns.length === 0;
   const variantColumns = grid ? grid.columns.filter(c => / \(\d+\)$/.test(c)) : [];
   const hasVariants = variantColumns.length > 0;
-  const visibleColumns = grid ? grid.columns : [];
+  // Khi chưa tải grid dùng sheetCols (từ các nhóm đã mở) để colgroup đồng nhất chiều rộng.
+  const visibleColumns = grid ? grid.columns : sheetCols;
 
   async function deleteVariantColumns() {
     if (!grid || variantColumns.length === 0) return;
@@ -899,7 +902,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
             </td>
 
             {/* Phần cuộn: ngày, task count, thanh tiến độ, trạng thái, nút hành động */}
-            <td colSpan={showTable && grid ? grid.columns.length + (ce ? 1 : 0) : undefined}
+            <td colSpan={visibleColumns.length + 1 || undefined}
               className="px-3 py-3.5 align-middle" style={{ minWidth: 520 }}
               onClick={e => { if (!(e.target as Element).closest('button,a')) onToggle(); }}>
               <div className="flex items-center gap-3">
