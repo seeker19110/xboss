@@ -24,7 +24,8 @@ const STATUS_CLS: Record<string, string> = {
 
 type Task = { id: number; code: string; name: string; status: string; endDate: string | null; progressPercent: number };
 type Pkg = { id: number; code: string; floorLabel: string | null; name: string; status: string; progress: number; tasks: Task[]; boqCode: string | null; drawingUrl: string | null; bbntUrl: string | null; startDate: string | null; endDate: string | null };
-type Data = { sheet: { id?: number; code: string; name: string; responsible?: string; slug?: string }; packages: Pkg[]; version?: string };
+type Data = { sheet: { id?: number; code: string; name: string; responsible?: string; managerId?: number | null; slug?: string }; packages: Pkg[]; version?: string };
+type UserItem = { id: number; name: string; role: string };
 
 const SYNC_POLL_MS = 10_000;
 
@@ -70,7 +71,8 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
   const [canEdit, setCanEdit] = useState(false);
   const [canProgress, setCanProgress] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [sheetModal, setSheetModal] = useState<{ name: string; code: string; slug: string; responsible: string } | null>(null);
+  const [sheetModal, setSheetModal] = useState<{ name: string; code: string; slug: string; responsible: string; managerId: number | null } | null>(null);
+  const [sheetUsers, setSheetUsers] = useState<UserItem[]>([]);
   const [sheetErr, setSheetErr] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [syncToast, setSyncToast] = useState(false);
@@ -150,7 +152,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
     if (!sheetModal || !data?.sheet.id) return;
     const res = await fetch(`/api/sheets/${data.sheet.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: sheetModal.name, code: sheetModal.code, slug: sheetModal.slug, responsible: sheetModal.responsible }),
+      body: JSON.stringify({ name: sheetModal.name, code: sheetModal.code, slug: sheetModal.slug, responsible: sheetModal.responsible, managerId: sheetModal.managerId }),
     });
     const j = await res.json().catch(() => null);
     if (!res.ok) { setSheetErr(j?.error ?? 'Không lưu được'); return; }
@@ -185,7 +187,9 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
             {canEdit && editMode && data?.sheet.id && (
               <button onClick={() => { setSheetErr(''); setSheetModal({
                   name: data.sheet.name, code: data.sheet.code,
-                  slug: data.sheet.slug ?? sheet, responsible: data.sheet.responsible ?? '' }); }}
+                  slug: data.sheet.slug ?? sheet, responsible: data.sheet.responsible ?? '',
+                  managerId: data.sheet.managerId ?? null });
+                  fetch('/api/users').then(r => r.ok ? r.json() : { users: [] }).then(j => setSheetUsers(j.users ?? [])); }}
                 title="Đổi tên / đường dẫn trang" aria-label="Đổi tên / đường dẫn trang"
                 className="text-zinc-600 hover:text-amber-400">
                 <Pencil className="w-3.5 h-3.5" />
@@ -274,8 +278,24 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
             </div>
             <p className="text-[11px] text-zinc-500 mb-3">Chỉ dùng chữ thường a-z, số và gạch nối. Đổi đường dẫn sẽ chuyển trang sang URL mới (link cũ hết hiệu lực).</p>
             <label className="block text-xs text-zinc-400 mb-1">Người phụ trách</label>
+            {sheetUsers.length > 0 && (
+              <select
+                value={sheetModal.managerId ?? ''}
+                onChange={e => {
+                  const id = e.target.value ? Number(e.target.value) : null;
+                  const user = sheetUsers.find(u => u.id === id);
+                  setSheetModal(m => m && ({ ...m, managerId: id, responsible: user ? user.name : m.responsible }));
+                }}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm mb-2 outline-none focus:border-emerald-600">
+                <option value="">— Chọn từ danh sách người dùng —</option>
+                {sheetUsers.map(u => (
+                  <option key={u.id} value={u.id}>{u.name} · {ROLE_LABELS[u.role as keyof typeof ROLE_LABELS] ?? u.role}</option>
+                ))}
+              </select>
+            )}
             <input value={sheetModal.responsible}
-              onChange={e => setSheetModal(m => m && ({ ...m, responsible: e.target.value }))}
+              onChange={e => setSheetModal(m => m && ({ ...m, responsible: e.target.value, managerId: null }))}
+              placeholder="hoặc nhập tên tự do..."
               className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm mb-3 outline-none focus:border-emerald-600" />
             {sheetErr && <p className="text-xs text-red-400 mb-2">{sheetErr}</p>}
             <div className="flex items-center gap-2">

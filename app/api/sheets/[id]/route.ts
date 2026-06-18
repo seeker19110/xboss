@@ -5,7 +5,7 @@ import { SLUG_RE } from "@/lib/sheets";
 
 export const dynamic = "force-dynamic";
 
-type Sheet = { id: number; code: string; name: string; responsible: string | null; slug: string };
+type Sheet = { id: number; code: string; name: string; responsible: string | null; slug: string; managerId: number | null };
 
 // PATCH /api/sheets/:id — đổi tên / mã / đường dẫn / người phụ trách (Admin/PM).
 export async function PATCH(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
@@ -15,7 +15,7 @@ export async function PATCH(req: NextRequest, { params: paramsP }: { params: Pro
   if (!CAN.editStructure(user.role)) return NextResponse.json({ error: "Bạn không có quyền sửa sheet (chỉ Admin/PM)" }, { status: 403 });
 
   const id = Number(params.id);
-  const st = await queryOne<Sheet>(`SELECT id, code, name, responsible, slug FROM sheet_types WHERE id = ?`, id);
+  const st = await queryOne<Sheet>(`SELECT id, code, name, responsible, slug, manager_id AS "managerId" FROM sheet_types WHERE id = ?`, id);
   if (!st) return NextResponse.json({ error: "Không tìm thấy sheet" }, { status: 404 });
 
   const body = await req.json().catch(() => null);
@@ -46,10 +46,16 @@ export async function PATCH(req: NextRequest, { params: paramsP }: { params: Pro
   if (body.responsible !== undefined) {
     sets.push("responsible = ?"); vals.push(String(body.responsible).trim() || null);
   }
+  if (body.managerId !== undefined) {
+    const mid = body.managerId === null ? null : Number(body.managerId);
+    if (mid !== null && (isNaN(mid) || !await queryOne(`SELECT id FROM users WHERE id = ?`, mid)))
+      return NextResponse.json({ error: "Người dùng không tồn tại" }, { status: 400 });
+    sets.push("manager_id = ?"); vals.push(mid);
+  }
   if (!sets.length) return NextResponse.json({ error: "Không có gì để cập nhật" }, { status: 400 });
 
   await run(`UPDATE sheet_types SET ${sets.join(", ")} WHERE id = ?`, ...vals, id);
-  const updated = await queryOne<Sheet>(`SELECT id, code, name, responsible, slug FROM sheet_types WHERE id = ?`, id);
+  const updated = await queryOne<Sheet>(`SELECT id, code, name, responsible, slug, manager_id AS "managerId" FROM sheet_types WHERE id = ?`, id);
   return NextResponse.json({ sheet: updated });
 }
 
