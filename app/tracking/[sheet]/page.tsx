@@ -176,7 +176,8 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
     const saved = new Map<HTMLElement, string>();
     const before = () => {
       Object.entries(PRINT_WIDTHS).forEach(([cls, w]) => {
-        document.querySelectorAll<HTMLElement>(`col.${cls}`).forEach(el => {
+        // Chỉ ghi đè col KHÔNG ẩn — col đang ẩn giữ nguyên width:0 từ CSS
+        document.querySelectorAll<HTMLElement>(`col.${cls}:not(.print-hidden-col)`).forEach(el => {
           saved.set(el, el.style.width);
           el.style.width = w;
         });
@@ -362,14 +363,6 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
           .no-print { display: none !important; }
           body { background: #fff !important; color: #000 !important; }
           @page { margin: 8mm; size: A3 landscape; }
-          /* Cột ẩn: thu về 0, ẩn nội dung — KHÔNG display:none để tránh lệch cột table-fixed */
-          col.print-hidden-col { width: 0 !important; min-width: 0 !important; }
-          th.print-hidden-col, td.print-hidden-col {
-            width: 0 !important; min-width: 0 !important; max-width: 0 !important;
-            padding: 0 !important; border: none !important;
-            font-size: 0 !important; color: transparent !important; line-height: 0 !important;
-          }
-          th.print-hidden-col *, td.print-hidden-col * { display: none !important; }
           /* Thu nhỏ cột cố định khi in A3 ngang */
           col.col-boq  { width: 70px  !important; }
           col.col-stt  { width: 32px  !important; }
@@ -378,6 +371,14 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
           col.col-date { width: 40px  !important; }
           col.col-days { width: 26px  !important; }
           col.col-dim  { width: 48px  !important; }
+          /* Cột ẩn — đặt SAU các rule col-* để thắng khi cùng specificity (0,1,1) */
+          col.print-hidden-col { width: 0 !important; min-width: 0 !important; }
+          th.print-hidden-col, td.print-hidden-col {
+            width: 0 !important; min-width: 0 !important; max-width: 0 !important;
+            padding: 0 !important; border: none !important; overflow: hidden !important;
+            font-size: 0 !important; color: transparent !important; line-height: 0 !important;
+          }
+          th.print-hidden-col *, td.print-hidden-col * { display: none !important; }
           table { border-collapse: collapse !important; font-size: 8.5pt !important; }
           th, td { border: 1px solid #ccc !important; background: #fff !important; color: #000 !important; padding: 2px 4px !important; }
           thead th { background: #f0f0f0 !important; font-weight: bold !important; }
