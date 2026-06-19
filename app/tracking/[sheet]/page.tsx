@@ -476,8 +476,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
   const [historyTask, setHistoryTask] = useState<GridTask | null>(null);
   const [photosTask, setPhotosTask] = useState<GridTask | null>(null);
   const [commentsTask, setCommentsTask] = useState<GridTask | null>(null);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [datesTarget, setDatesTarget] = useState<{ ids: number[]; init: { start: string; end: string } } | null>(null);
+const [datesTarget, setDatesTarget] = useState<{ ids: number[]; init: { start: string; end: string } } | null>(null);
   const drawingInputRef = useRef<HTMLInputElement>(null);
   const bbntInputRef = useRef<HTMLInputElement>(null);
   const editTaskInputRef = useRef<HTMLInputElement>(null);
@@ -695,11 +694,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
     load();
   }
 
-  function toggleSelect(id: number) {
-    setSelected(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-  }
-
-  async function saveDates(ids: number[], start: string, end: string) {
+async function saveDates(ids: number[], start: string, end: string) {
     const body: Record<string, string> = {};
     if (start) body.startDate = start;
     if (end) body.endDate = end;
@@ -709,7 +704,7 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
     }).then(r => r.ok).catch(() => false)));
     const failed = results.filter(ok => !ok).length;
     if (failed) appAlert(`Không lưu được ngày cho ${failed}/${ids.length} task — thử lại sau.`);
-    setDatesTarget(null); setSelected(new Set()); load(); onChanged();
+    setDatesTarget(null); load(); onChanged();
   }
 
   async function setDelayReason(t: GridTask, reason: string) {
@@ -840,17 +835,6 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
 
   return (
     <>
-      {/* Thanh bulk-action — hiển thị khi đang chọn nhiều task */}
-      {ce && selected.size > 0 && (
-        <div className="sticky top-0 left-0 z-30 flex flex-wrap items-center gap-2 bg-zinc-950 border-b border-emerald-900 px-3 py-2 text-xs">
-          <span className="text-emerald-400 font-medium">{selected.size} task đã chọn</span>
-          <button onClick={() => setDatesTarget({ ids: [...selected], init: { start: '', end: '' } })}
-            className="flex items-center gap-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded px-2 py-1 text-zinc-300">
-            <CalendarDays className="w-3.5 h-3.5" /> Đặt ngày
-          </button>
-          <button onClick={() => setSelected(new Set())} className="text-zinc-500 hover:text-zinc-300 ml-auto">Bỏ chọn</button>
-        </div>
-      )}
 
       {/* ── Bảng duy nhất: hàng nhóm + header cột + task rows ── */}
       <table className="text-xs border-collapse table-fixed" style={{ width: 'max-content' }}>
@@ -1171,11 +1155,6 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
                 <td className={`${stkCode} z-10 bg-zinc-900 border-b border-r border-zinc-800 px-2 py-1 text-center align-middle overflow-hidden${hpc('STT')}`}
                   style={{ left: LEFT_CODE, width: W_CODE, minWidth: W_CODE }}>
                   <div className="flex items-center justify-center gap-1">
-                    {ce && (
-                      <input type="checkbox" checked={selected.has(t.id)} onChange={() => toggleSelect(t.id)}
-                        title="Chọn để gán/đặt ngày hàng loạt"
-                        className="w-3 h-3 accent-emerald-500 cursor-pointer shrink-0" />
-                    )}
                     <span className="font-mono text-zinc-400 text-[10px]">{String(ti + 1).padStart(2, '0')}</span>
                   </div>
                 </td>
@@ -1199,24 +1178,6 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
                     </div>
                   )}
                   <div className="flex items-center gap-2 mt-0.5">
-                    {(() => {
-                      const effStart = t.startDate ?? pkg.startDate;
-                      const effEnd = t.endDate ?? pkg.endDate;
-                      const inherited = !t.startDate && !!pkg.startDate;
-                      return (
-                        <span className="flex items-center gap-1">
-                          <button onClick={() => ce && setDatesTarget({ ids: [t.id], init: { start: t.startDate ?? '', end: t.endDate ?? '' } })}
-                            title={`${effStart ?? '?'} → ${effEnd ?? '?'}${inherited ? ' (kế thừa từ nhóm)' : ''}${ce ? ' — bấm để sửa' : ''}`}
-                            className={`flex items-center gap-0.5 ${t.status === 'tre' ? 'text-red-400' : inherited ? 'text-zinc-600' : 'text-zinc-500'} ${ce ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
-                            <CalendarDays className="w-3 h-3 shrink-0" />{inherited && <span className="text-[9px]">↑</span>}
-                          </button>
-                          {t.startDate && ce && (
-                            <button onClick={() => resetTaskDates(t)} title="Về kế thừa ngày từ nhóm"
-                              className="text-zinc-700 hover:text-amber-400 shrink-0"><RotateCcw className="w-3 h-3" /></button>
-                          )}
-                        </span>
-                      );
-                    })()}
                     {editMode && <button onClick={() => setAllInRow(t, true)} className="text-[10px] text-emerald-500 hover:underline">Tất cả</button>}
                     {editMode && <button onClick={() => setAllInRow(t, false)} className="text-[10px] text-zinc-500 hover:underline">Bỏ</button>}
                     <button onClick={() => setHistoryTask(t)} title="Lịch sử tiến độ"
@@ -1259,11 +1220,18 @@ function PkgGrid({ pkg, pkgIdx, pkgCount, expanded, onToggle, canEdit, editMode,
                   const effEnd   = t.endDate   ?? pkg.endDate;
                   const days     = diffDays(effStart, effEnd);
                   const inherited = !t.startDate && !!pkg.startDate;
-                  const cls = `border-b border-r border-zinc-800 px-1 py-1 text-center align-middle text-[10px] whitespace-nowrap ${inherited ? 'text-zinc-600 italic' : 'text-zinc-400'}`;
+                  const openDates = () => ce && setDatesTarget({ ids: [t.id], init: { start: t.startDate ?? '', end: t.endDate ?? '' } });
+                  const baseCell = `border-b border-r border-zinc-800 px-1 py-1 text-center align-middle text-[10px] whitespace-nowrap`;
+                  const dateCls = `${baseCell} ${inherited ? 'text-zinc-600 italic' : 'text-zinc-400'} ${ce ? 'cursor-pointer hover:bg-zinc-800' : ''}`;
                   return (<>
-                    <td className={cls + hpc('Ngày BĐ')} style={{ width: W_DATE }}>{fmtColDate(effStart)}</td>
-                    <td className={`border-b border-r border-zinc-800 px-1 py-1 text-center align-middle text-[10px] text-zinc-400${hpc('Số ngày')}`} style={{ width: W_DAYS }}>{days ?? ''}</td>
-                    <td className={cls + hpc('Ngày KT')} style={{ width: W_DATE }}>{fmtColDate(effEnd)}</td>
+                    <td className={dateCls + hpc('Ngày BĐ')} style={{ width: W_DATE }} onClick={openDates}>
+                      <span className="flex flex-col items-center gap-0">
+                        {fmtColDate(effStart)}
+                        {t.startDate && ce && <RotateCcw className="w-2.5 h-2.5 text-zinc-700 hover:text-amber-400 mt-0.5" onClick={e => { e.stopPropagation(); resetTaskDates(t); }} />}
+                      </span>
+                    </td>
+                    <td className={`${baseCell} text-zinc-400${hpc('Số ngày')} ${ce ? 'cursor-pointer hover:bg-zinc-800' : ''}`} style={{ width: W_DAYS }} onClick={openDates}>{days ?? ''}</td>
+                    <td className={dateCls + hpc('Ngày KT')} style={{ width: W_DATE }} onClick={openDates}>{fmtColDate(effEnd)}</td>
                   </>);
                 })()}
                 {visibleColumns.map(col => {
