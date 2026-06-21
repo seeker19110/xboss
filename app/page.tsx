@@ -289,8 +289,8 @@ export default function Dashboard() {
                 <XAxis dataKey="name" stroke="var(--color-zinc-600)" fontSize={11} tickLine={false} axisLine={false} />
                 <YAxis stroke="var(--color-zinc-600)" fontSize={11} domain={[0, 100]} unit="%" tickLine={false} axisLine={false} />
                 <Tooltip
-                  cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-                  contentStyle={{ background: '#18181b', border: '1px solid #3f3f46', borderRadius: 8, color: '#fff', fontSize: 12 }}
+                  cursor={{ fill: 'var(--color-zinc-800)' }}
+                  contentStyle={{ background: 'var(--color-zinc-900)', border: '1px solid var(--color-zinc-700)', borderRadius: 8, color: 'var(--foreground)', fontSize: 12 }}
                   formatter={(v) => [`${v}%`, 'Tiến độ']}
                 />
                 <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={60}>
