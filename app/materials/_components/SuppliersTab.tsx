@@ -271,7 +271,7 @@ export default function SuppliersTab({ role }: { role: string }) {
                   )}
                   {canManage && (
                     <button onClick={() => startEditTitle(s)}
-                      className="opacity-0 group-hover/title:opacity-100 transition-opacity p-1 rounded hover:bg-zinc-700 text-zinc-500 hover:text-emerald-400 shrink-0"
+                      className="opacity-100 sm:opacity-0 sm:group-hover/title:opacity-100 transition-opacity p-1 rounded hover:bg-zinc-700 text-zinc-500 hover:text-emerald-400 shrink-0"
                       title="Sửa tiêu đề">
                       <Pencil className="w-3 h-3" />
                     </button>

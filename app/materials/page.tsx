@@ -422,7 +422,7 @@ export default function MaterialsPage() {
                       <div className="flex items-center justify-center gap-1 px-3 py-2.5">
                         <span className={copied === key ? 'text-emerald-400' : ''}>{colLabels[key]}</span>
                         <button onClick={() => setColMenu(prev => prev === key ? null : key)}
-                          className="opacity-0 group-hover/th:opacity-100 transition-opacity text-zinc-600 hover:text-zinc-300 ml-0.5"
+                          className="opacity-100 sm:opacity-0 sm:group-hover/th:opacity-100 transition-opacity text-zinc-600 hover:text-zinc-300 ml-0.5"
                           title="Tuỳ chọn cột">
                           <svg className="w-3 h-3" viewBox="0 0 12 12" fill="currentColor">
                             <circle cx="6" cy="2" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="6" cy="10" r="1.2"/>
@@ -595,7 +595,7 @@ export default function MaterialsPage() {
                     {/* Actions — hiện khi hover, chỉ hiện đủ khi editMode */}
                     {canEdit && (
                     <td className="px-1 py-2 whitespace-nowrap">
-                      <div className="flex items-center gap-0 opacity-0 group-hover/row:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-0 opacity-100 sm:opacity-0 sm:group-hover/row:opacity-100 transition-opacity">
                         <button onClick={() => setHistoryMat(m)} title="Lịch sử nhập/xuất"
                           className="text-zinc-500 hover:text-emerald-400 p-2"><History className="w-3.5 h-3.5" /></button>
                         {editMode && (m.qtyStock ?? 0) > 0 && (
