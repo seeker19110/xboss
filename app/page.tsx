@@ -252,7 +252,7 @@ export default function Dashboard() {
                       <button
                         onClick={e => { e.preventDefault(); deleteSheet(k.sheetId, k.sheetType); }}
                         title="Xoá trang tracking"
-                        className="absolute top-2 right-2 p-1 rounded-md bg-zinc-800/80 text-zinc-600 hover:bg-red-900/80 hover:text-red-400 opacity-0 group-hover/wrap:opacity-100 transition z-10">
+                        className="absolute top-2 right-2 p-1 rounded-md bg-zinc-800/80 text-zinc-600 hover:bg-red-900/80 hover:text-red-400 opacity-100 sm:opacity-0 sm:group-hover/wrap:opacity-100 transition z-10">
                         <Trash2 className="w-3 h-3" />
                       </button>
                     </>

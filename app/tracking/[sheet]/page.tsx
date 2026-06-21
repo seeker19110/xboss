@@ -895,7 +895,7 @@ async function saveDates(ids: number[], start: string, end: string) {
                   <span className="text-xs text-zinc-500">{pkg.floorLabel ?? ''}</span>
                   {ce && (
                     <button onClick={e => { e.stopPropagation(); setEditFloor(pkg.floorLabel ?? ''); }}
-                      title="Sửa tầng" className="opacity-0 group-hover/floor:opacity-100 text-zinc-600 hover:text-emerald-400">
+                      title="Sửa tầng" className="opacity-100 sm:opacity-0 sm:group-hover/floor:opacity-100 text-zinc-600 hover:text-emerald-400">
                       <Pencil className="w-2.5 h-2.5" />
                     </button>
                   )}
@@ -1088,7 +1088,7 @@ async function saveDates(ids: number[], start: string, end: string) {
                       onClick={() => ce && renameColumn(col)}>{col}</div>
                     {ce && (
                       <button onClick={() => deleteColumn(col)} title={`Xoá cột "${col}"`}
-                        className="opacity-0 group-hover/col:opacity-100 text-zinc-700 hover:text-red-400 shrink-0">
+                        className="opacity-100 sm:opacity-0 sm:group-hover/col:opacity-100 text-zinc-700 hover:text-red-400 shrink-0">
                         <Trash2 className="w-3 h-3" />
                       </button>
                     )}
@@ -1394,7 +1394,7 @@ function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => void })
                     </div>
                     {canDelete(p) && (
                       <button onClick={() => remove(p)} title="Xoá ảnh"
-                        className="text-zinc-600 hover:text-red-400 shrink-0 opacity-0 group-hover:opacity-100 transition"><Trash2 className="w-3.5 h-3.5" /></button>
+                        className="text-zinc-600 hover:text-red-400 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition"><Trash2 className="w-3.5 h-3.5" /></button>
                     )}
                   </div>
                 </div>
@@ -1579,7 +1579,7 @@ function CommentsModal({ task, onClose }: { task: GridTask; onClose: () => void 
                 <span className="text-zinc-600">{new Date(c.createdAt).toLocaleString('vi-VN')}</span>
                 {canDelete(c) && (
                   <button onClick={() => remove(c)} title="Xoá"
-                    className="ml-auto text-zinc-700 hover:text-red-400 opacity-0 group-hover:opacity-100 transition"><Trash2 className="w-3 h-3" /></button>
+                    className="ml-auto text-zinc-700 hover:text-red-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition"><Trash2 className="w-3 h-3" /></button>
                 )}
               </div>
               <p className="text-sm mt-1 whitespace-pre-wrap break-words">{c.body}</p>

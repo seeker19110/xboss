@@ -189,7 +189,7 @@ export default function GanttPage() {
                           <span className="text-[10px] text-zinc-600">{b.floorLabel ?? ''}</span>
                           {editMode && (
                             <button onClick={() => setDepFor(b)} aria-label={`Sửa phụ thuộc ${b.code}`}
-                              className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-sky-400 transition">
+                              className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 text-zinc-500 hover:text-sky-400 transition">
                               <Link2 className="w-3.5 h-3.5" />
                             </button>
                           )}
