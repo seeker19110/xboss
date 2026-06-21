@@ -592,7 +592,7 @@ function BillsSection({ person, bills, earned, progress, canEdit, onAdd, onDelet
           <div className="overflow-x-auto">
             <table className="w-full text-[11px] min-w-[820px] border-collapse">
               <thead>
-                <tr style={{ background: '#4472c4' }} className="text-white text-center">
+                <tr className="bg-zinc-800 text-zinc-100 text-center">
                   <th className="px-1 py-1.5 w-8">STT</th>
                   <th className="px-2 py-1.5 text-left">Diễn giải / Tầng</th>
                   <th className="px-1 py-1.5 w-20">Hệ</th>
@@ -609,9 +609,9 @@ function BillsSection({ person, bills, earned, progress, canEdit, onAdd, onDelet
               <tbody>
 
                 {/* ═══ SECTION A ═══ */}
-                <tr style={{ background: '#d9e1f2' }}>
-                  <td className="px-1 py-1 text-center font-bold text-blue-900">A</td>
-                  <td className="px-2 py-1 font-bold text-blue-900" colSpan={COL - 1}>CÔNG VIỆC HOÀN THÀNH</td>
+                <tr className="bg-sky-400/10">
+                  <td className="px-1 py-1 text-center font-bold text-sky-300">A</td>
+                  <td className="px-2 py-1 font-bold text-sky-300" colSpan={COL - 1}>CÔNG VIỆC HOÀN THÀNH</td>
                 </tr>
 
                 {billRows.map((b, i) => {
@@ -777,24 +777,24 @@ function BillsSection({ person, bills, earned, progress, canEdit, onAdd, onDelet
                 )}
 
                 {/* GTTHTC */}
-                <tr style={{ background: '#fff2cc' }} className="border-t border-zinc-700/50">
-                  <td className="px-1 py-1.5 text-center text-[10px] font-bold text-amber-800">GTTHTC</td>
-                  <td className="px-2 py-1.5 font-bold text-amber-800" colSpan={7}>TỔNG GIÁ TRỊ CÔNG VIỆC HOÀN THÀNH (CHƯA VAT)</td>
-                  <td className="px-2 py-1.5 text-right font-bold text-amber-800 tabular-nums" colSpan={canEdit ? 3 : 2}>{fmtVND(totalBills)}</td>
+                <tr className="bg-amber-400/10 border-t border-zinc-700/50">
+                  <td className="px-1 py-1.5 text-center text-[10px] font-bold text-amber-300">GTTHTC</td>
+                  <td className="px-2 py-1.5 font-bold text-amber-300" colSpan={7}>TỔNG GIÁ TRỊ CÔNG VIỆC HOÀN THÀNH (CHƯA VAT)</td>
+                  <td className="px-2 py-1.5 text-right font-bold text-amber-300 tabular-nums" colSpan={canEdit ? 3 : 2}>{fmtVND(totalBills)}</td>
                 </tr>
 
                 {/* GL */}
-                <tr style={{ background: '#fff2cc' }}>
+                <tr className="bg-amber-400/10">
                   <td className="px-1 py-1.5 text-center text-[10px] text-zinc-600">(GL)</td>
                   <td className="px-2 py-1.5 text-zinc-600" colSpan={7}>TIỀN GIỮ LẠI (NẾU CÓ)</td>
                   <td className="px-2 py-1.5 text-right text-zinc-600 tabular-nums" colSpan={canEdit ? 3 : 2}>{fmtVND(0)}</td>
                 </tr>
 
                 {/* ═══ TẠM ỨNG ═══ */}
-                <tr style={{ background: '#ede9fe' }}>
-                  <td className="px-1 py-1.5 text-center text-[10px] font-bold text-violet-800">(TU)</td>
-                  <td className="px-2 py-1.5 font-bold text-violet-800" colSpan={7}>TẠM ỨNG</td>
-                  <td className="px-2 py-1.5 text-right font-bold text-violet-700 tabular-nums" colSpan={canEdit ? 3 : 2}>{fmtVND(totalAdvs)}</td>
+                <tr className="bg-violet-400/10">
+                  <td className="px-1 py-1.5 text-center text-[10px] font-bold text-violet-300">(TU)</td>
+                  <td className="px-2 py-1.5 font-bold text-violet-300" colSpan={7}>TẠM ỨNG</td>
+                  <td className="px-2 py-1.5 text-right font-bold text-violet-300 tabular-nums" colSpan={canEdit ? 3 : 2}>{fmtVND(totalAdvs)}</td>
                 </tr>
 
                 {advRows.map((b, i) => (
@@ -838,17 +838,17 @@ function BillsSection({ person, bills, earned, progress, canEdit, onAdd, onDelet
                 )}
 
                 {/* HU */}
-                <tr style={{ background: '#fff2cc' }}>
+                <tr className="bg-amber-400/10">
                   <td className="px-1 py-1.5 text-center text-[10px] text-zinc-600">(HU)</td>
                   <td className="px-2 py-1.5 text-zinc-600" colSpan={7}>KHẤU TRỪ TẠM ỨNG</td>
-                  <td className="px-2 py-1.5 text-right text-violet-600 tabular-nums" colSpan={canEdit ? 3 : 2}>{totalAdvs > 0 ? `(${fmtVND(totalAdvs)})` : fmtVND(0)}</td>
+                  <td className="px-2 py-1.5 text-right text-violet-300 tabular-nums" colSpan={canEdit ? 3 : 2}>{totalAdvs > 0 ? `(${fmtVND(totalAdvs)})` : fmtVND(0)}</td>
                 </tr>
 
                 {/* ═══ PHÁT SINH ═══ */}
-                <tr style={{ background: '#fef3c7' }} className="border-t border-zinc-700/40">
-                  <td className="px-1 py-1.5 text-center text-[10px] font-bold text-amber-700">PS</td>
-                  <td className="px-2 py-1.5 font-bold text-amber-700" colSpan={7}>KHOẢN PHÁT SINH</td>
-                  <td className="px-2 py-1.5 text-right font-bold text-amber-700 tabular-nums" colSpan={canEdit ? 3 : 2}>{fmtVND(totalItems)}</td>
+                <tr className="bg-amber-400/10 border-t border-zinc-700/40">
+                  <td className="px-1 py-1.5 text-center text-[10px] font-bold text-amber-300">PS</td>
+                  <td className="px-2 py-1.5 font-bold text-amber-300" colSpan={7}>KHOẢN PHÁT SINH</td>
+                  <td className="px-2 py-1.5 text-right font-bold text-amber-300 tabular-nums" colSpan={canEdit ? 3 : 2}>{fmtVND(totalItems)}</td>
                 </tr>
 
                 {itemRows.map((b, i) => (
@@ -892,24 +892,24 @@ function BillsSection({ person, bills, earned, progress, canEdit, onAdd, onDelet
                 )}
 
                 {/* GTTTK */}
-                <tr style={{ background: '#fff2cc' }} className="border-t border-zinc-700/50">
-                  <td className="px-1 py-1.5 text-center text-[10px] font-bold text-amber-800">(GTTTK)</td>
-                  <td className="px-2 py-1.5 font-bold text-amber-800" colSpan={7}>TỔNG GIÁ TRỊ ĐƯỢC THANH TOÁN ĐẾN KỲ NÀY</td>
-                  <td className="px-2 py-1.5 text-right font-bold text-amber-800 tabular-nums" colSpan={canEdit ? 3 : 2}>{fmtVND(netTotal)}</td>
+                <tr className="bg-amber-400/10 border-t border-zinc-700/50">
+                  <td className="px-1 py-1.5 text-center text-[10px] font-bold text-amber-300">(GTTTK)</td>
+                  <td className="px-2 py-1.5 font-bold text-amber-300" colSpan={7}>TỔNG GIÁ TRỊ ĐƯỢC THANH TOÁN ĐẾN KỲ NÀY</td>
+                  <td className="px-2 py-1.5 text-right font-bold text-amber-300 tabular-nums" colSpan={canEdit ? 3 : 2}>{fmtVND(netTotal)}</td>
                 </tr>
 
                 {/* GTTTKT */}
-                <tr style={{ background: '#fff2cc' }}>
+                <tr className="bg-amber-400/10">
                   <td className="px-1 py-1.5 text-center text-[10px] text-zinc-600">(GTTTKT)</td>
                   <td className="px-2 py-1.5 text-zinc-600" colSpan={7}>TỔNG GIÁ TRỊ ĐÃ THANH TOÁN ĐẾN KỲ TRƯỚC (GỒM TẠM ỨNG)</td>
                   <td className="px-2 py-1.5 text-right text-zinc-500 tabular-nums" colSpan={canEdit ? 3 : 2}>{fmtVND(0)}</td>
                 </tr>
 
                 {/* DNTT */}
-                <tr style={{ background: '#e2efda' }} className="border-t-2 border-zinc-600">
-                  <td className="px-1 py-2 text-center text-[10px] font-bold text-green-900">(DNTT)</td>
-                  <td className="px-2 py-2 font-bold text-green-900" colSpan={7}>ĐỀ NGHỊ THANH TOÁN (CÓ VAT)</td>
-                  <td className="px-2 py-2 text-right font-bold text-green-800 tabular-nums text-sm" colSpan={canEdit ? 3 : 2}>{fmtVND(netTotal)}</td>
+                <tr className="bg-emerald-400/10 border-t-2 border-zinc-600">
+                  <td className="px-1 py-2 text-center text-[10px] font-bold text-emerald-300">(DNTT)</td>
+                  <td className="px-2 py-2 font-bold text-emerald-300" colSpan={7}>ĐỀ NGHỊ THANH TOÁN (CÓ VAT)</td>
+                  <td className="px-2 py-2 text-right font-bold text-emerald-300 tabular-nums text-sm" colSpan={canEdit ? 3 : 2}>{fmtVND(netTotal)}</td>
                 </tr>
 
               </tbody>
