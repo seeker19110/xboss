@@ -83,7 +83,7 @@ export default function EditableText({ tkey, children, className }: {
         <button
           onClick={e => { e.preventDefault(); e.stopPropagation(); setDraft(value); setEditing(true); }}
           title="Sửa text (Admin)"
-          className="opacity-0 group-hover/et:opacity-100 transition-opacity text-zinc-500 hover:text-emerald-400 shrink-0">
+          className="opacity-100 sm:opacity-0 sm:group-hover/et:opacity-100 transition-opacity text-zinc-500 hover:text-emerald-400 shrink-0">
           <Pencil className="w-3 h-3" />
         </button>
       )}
