@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useCallback, useRef, useDeferredValue } from 'react';
+import { useEffect, useState, useCallback, useRef, useDeferredValue, useMemo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   Package, Plus, Trash2, AlertTriangle, History, X,
@@ -16,6 +16,8 @@ import PurchaseOrdersTab from './_components/PurchaseOrdersTab';
 import ReportsTab from './_components/ReportsTab';
 import OrderContent from '@/app/order/OrderContent';
 import { Skeleton } from '@/app/components/Skeleton';
+import SpreadsheetGrid, { type GridColumn, type GridEdit } from '@/app/components/SpreadsheetGrid';
+import { Table2 } from 'lucide-react';
 
 // Cache in-memory ngoài component — sống qua tab-switch, mất khi reload trang.
 // Khác localStorage: không serialize/deserialize JSON → gán reference O(1).
@@ -70,6 +72,8 @@ export default function MaterialsPage() {
   const [canDelete, setCanDelete] = useState(false);
   const [canAdmin, setCanAdmin] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  // Chế độ "Bảng tính" (Excel/GG Sheet): lưới sửa nhanh copy/paste/fill — bật/tắt riêng.
+  const [sheetMode, setSheetMode] = useState(false);
   const [error, setError] = useState('');
   const [historyMat, setHistoryMat] = useState<Material | null>(null);
 
@@ -275,6 +279,63 @@ export default function MaterialsPage() {
       )
     : materials;
 
+  // Cấu hình cột cho lưới bảng tính. Cột dẫn xuất (stt/diff/status) chỉ đọc;
+  // còn lại sửa được khi có quyền. STT cần chỉ số dòng → tra qua idxMap.
+  const idxMap = useMemo(() => {
+    const m = new Map<number, number>();
+    filtered.forEach((mat, i) => m.set(mat.id, i + 1));
+    return m;
+  }, [filtered]);
+
+  const gridColumns: GridColumn<Material>[] = useMemo(() => {
+    // Trong chế độ bảng tính, bản thân lưới là affordance sửa — không cần editMode.
+    const editableBy = (admin: boolean) => admin ? canAdmin : canEdit;
+    const defs: Record<ColKey, GridColumn<Material>> = {
+      boqCode: { key: 'boqCode', label: colLabels.boqCode, width: 90, type: 'text', editable: editableBy(false),
+        get: m => m.boqCode ?? '', toPatch: raw => ({ boqCode: raw.trim().toUpperCase() }) },
+      stt: { key: 'stt', label: colLabels.stt, width: 50, type: 'readonly', align: 'center',
+        get: m => idxMap.get(m.id) ?? '' },
+      name: { key: 'name', label: colLabels.name, width: 280, type: 'text', editable: editableBy(true),
+        get: m => m.name, toPatch: raw => raw.trim() ? { name: raw.trim() } : null },
+      unit: { key: 'unit', label: colLabels.unit, width: 80, type: 'select', editable: editableBy(false),
+        options: [{ value: '', label: '—' }, ...DVT_OPTIONS.map(v => ({ value: v, label: v }))],
+        get: m => m.unit ?? '', toPatch: raw => ({ unit: raw.trim() || null }) },
+      qtyBoq: { key: 'qtyBoq', label: colLabels.qtyBoq, width: 110, type: 'number', editable: editableBy(false),
+        get: m => m.qtyBoq ?? 0, toPatch: raw => ({ qtyBoq: Number(raw) || 0 }) },
+      qtyPlanned: { key: 'qtyPlanned', label: colLabels.qtyPlanned, width: 120, type: 'number', editable: editableBy(false),
+        get: m => m.qtyPlanned ?? 0, toPatch: raw => ({ qtyPlanned: Number(raw) || 0 }) },
+      diff: { key: 'diff', label: colLabels.diff, width: 100, type: 'readonly', align: 'right',
+        get: m => ((m.qtyBoq ?? 0) > 0 ? (m.qtyBoq ?? 0) - (m.qtyPlanned ?? 0) : '—') },
+      status: { key: 'status', label: colLabels.status, width: 110, type: 'readonly', align: 'center',
+        get: m => BUDGET_LABEL[budgetStatus(m)] },
+      note: { key: 'note', label: colLabels.note, width: 180, type: 'text', editable: editableBy(false),
+        get: m => m.note ?? '', toPatch: raw => ({ note: raw.trim() || null }) },
+    };
+    return visibleCols.map(k => defs[k]);
+  }, [visibleCols, colLabels, idxMap, canAdmin, canEdit]);
+
+  // Cột dính: các cột dẫn đầu trong nhóm mã/STT/tên.
+  const stickyCount = useMemo(() => {
+    let n = 0;
+    for (const k of visibleCols) { if (['boqCode', 'stt', 'name'].includes(k)) n++; else break; }
+    return n;
+  }, [visibleCols]);
+
+  const commitGrid = useCallback(async (edits: GridEdit[]) => {
+    setError('');
+    const res = await fetch('/api/materials/batch', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updates: edits.map(e => ({ id: e.rowId, patch: e.patch })) }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      const msg = j.error ?? 'Lỗi lưu';
+      setError(msg);
+      throw new Error(msg);
+    }
+    load(true); // revalidate sau khi sửa
+  }, [load]);
+
   const rowVirtualizer = useVirtualizer({
     count: filtered.length,
     getScrollElement: () => colMenuRef.current,
@@ -375,6 +436,14 @@ export default function MaterialsPage() {
               </button>
             )}
           </div>
+          {canEdit && (
+            <button onClick={() => setSheetMode(v => !v)}
+              title={sheetMode ? 'Tắt chế độ bảng tính' : 'Bật chế độ bảng tính (copy/paste/fill như Excel)'}
+              className={`flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-medium transition shrink-0 border ${
+                sheetMode ? 'bg-sky-600/20 border-sky-600 text-sky-300' : 'border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-white'}`}>
+              <Table2 className="w-4 h-4" /> Bảng tính
+            </button>
+          )}
           <a href="/order"
             className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 rounded-xl px-4 py-2.5 text-sm font-medium transition shrink-0">
             <Plus className="w-4 h-4" /> Đặt hàng
@@ -403,7 +472,31 @@ export default function MaterialsPage() {
           </div>
         )}
 
-        <div className={`bg-zinc-900 border border-zinc-800 rounded-xl overflow-auto ${loading && materials.length === 0 ? 'hidden' : ''}`}
+        {/* Chế độ bảng tính: lưới sửa nhanh copy/paste/fill, dữ liệu vẫn lưu Postgres */}
+        {sheetMode && !(loading && materials.length === 0) && (
+          <>
+            <p className="text-xs text-zinc-500 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span>Mẹo: click ô để chọn, <b>Enter</b>/gõ để sửa, <b>Ctrl/⌘+C</b> sao chép, <b>Ctrl/⌘+V</b> dán, <b>Ctrl/⌘+D</b> điền xuống, kéo chọn vùng.</span>
+              {filtered.length > 0 && <span>{filtered.length} dòng</span>}
+            </p>
+            <SpreadsheetGrid<Material>
+              rows={filtered}
+              columns={gridColumns}
+              rowKey={m => m.id}
+              onCommit={commitGrid}
+              readOnly={!canEdit}
+              stickyCols={stickyCount}
+              maxBodyHeight={Math.round(typeof window !== 'undefined' ? window.innerHeight * 0.7 : 600)}
+            />
+            {filtered.length === 0 && (
+              <p className="p-8 text-center text-zinc-500 text-sm">
+                {q ? `Không tìm thấy vật tư nào khớp "${search}"` : 'Chưa có vật tư nào — hãy Import Excel để thêm dữ liệu.'}
+              </p>
+            )}
+          </>
+        )}
+
+        <div className={`bg-zinc-900 border border-zinc-800 rounded-xl overflow-auto ${(loading && materials.length === 0) || sheetMode ? 'hidden' : ''}`}
           ref={colMenuRef} style={{ maxHeight: 'calc(100vh - 13rem)' }}>
           <table className="w-full text-sm border-collapse table-auto">
             <thead className="sticky top-0 z-10">

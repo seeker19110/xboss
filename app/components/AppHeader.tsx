@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState, type ReactNode } from 'react';
+import Link from 'next/link';
 import {
   LayoutDashboard, ClipboardList, Package,
   CheckSquare, Users, KeyRound, LogOut, ShieldCheck,
@@ -52,9 +53,9 @@ export default function AppHeader({ title, subtitle, children, search = true }: 
       <div className="flex items-center gap-1 px-3 h-12 min-w-0">
 
         {/* Brand */}
-        <a href="/" className="shrink-0 flex items-center gap-1.5 mr-1 text-white hover:opacity-80">
+        <Link href="/" className="shrink-0 flex items-center gap-1.5 mr-1 text-white hover:opacity-80">
           <span className="font-bold text-sm leading-none">XBoss</span>
-        </a>
+        </Link>
 
         {/* Nav chính — cuộn ngang khi chật, ẩn label trên mobile */}
         <nav className="flex items-center gap-0.5 overflow-x-auto scrollbar-none shrink-0"
