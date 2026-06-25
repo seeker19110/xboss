@@ -27,12 +27,12 @@ export type GridColumn<Row> = {
   render?: (row: Row) => React.ReactNode;
 };
 
-export type GridEdit = { rowId: number; patch: Record<string, unknown> };
+export type GridEdit = { rowId: number | string; patch: Record<string, unknown> };
 
 type Props<Row> = {
   rows: Row[];
   columns: GridColumn<Row>[];
-  rowKey: (r: Row) => number;
+  rowKey: (r: Row) => number | string;
   onCommit: (edits: GridEdit[]) => Promise<void> | void;
   readOnly?: boolean;
   stickyCols?: number;            // số cột trái dính (mã/tên)
@@ -92,7 +92,8 @@ export default function SpreadsheetGrid<Row>({
 
   // Gom các ô (r,c,raw) → edit theo rowId rồi gọi onCommit 1 lần.
   const commitCells = useCallback(async (cells: { r: number; c: number; raw: string }[]) => {
-    const byRow = new Map<number, Record<string, unknown>>();
+    const byRow = new Map<string, Record<string, unknown>>();
+    const rowIdMap = new Map<string, number | string>(); // key → original id
     const touched: string[] = [];
     for (const { r, c, raw } of cells) {
       const col = columns[c];
@@ -101,11 +102,13 @@ export default function SpreadsheetGrid<Row>({
       const patch = col.toPatch(raw, row);
       if (!patch) continue;
       const id = rowKey(row);
-      byRow.set(id, { ...(byRow.get(id) ?? {}), ...patch });
+      const k = String(id);
+      byRow.set(k, { ...(byRow.get(k) ?? {}), ...patch });
+      rowIdMap.set(k, id);
       touched.push(keyOf(r, c));
     }
     if (byRow.size === 0) return;
-    const edits: GridEdit[] = [...byRow.entries()].map(([rowId, patch]) => ({ rowId, patch }));
+    const edits: GridEdit[] = [...byRow.entries()].map(([k, patch]) => ({ rowId: rowIdMap.get(k)!, patch }));
 
     setSaving(prev => { const n = new Set(prev); touched.forEach(k => n.add(k)); return n; });
     setErrors(prev => { const n = new Map(prev); touched.forEach(k => n.delete(k)); return n; });

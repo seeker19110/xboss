@@ -1,6 +1,7 @@
 'use client';
-import { useEffect, useState, useCallback, useDeferredValue } from 'react';
-import { Printer, ArrowLeft, Plus, Trash2, X } from 'lucide-react';
+import { useEffect, useState, useCallback, useDeferredValue, useMemo } from 'react';
+import { Printer, ArrowLeft, Plus, Trash2, X, Table2 } from 'lucide-react';
+import SpreadsheetGrid, { type GridColumn, type GridEdit } from '@/app/components/SpreadsheetGrid';
 
 type Supplier = {
   id: number; name: string;
@@ -68,6 +69,8 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
   };
   const logoInputRef = useCallback((el: HTMLInputElement | null) => { if (el) el.value = ''; }, []);
   const [boqSearch, setBoqSearch] = useState<{ uid: string; term: string } | null>(null);
+  // Chế độ bảng tính: paste nhiều dòng từ Excel trực tiếp vào bảng order.
+  const [sheetMode, setSheetMode] = useState(false);
 
   useEffect(() => {
     fetch('/api/project').then(r => r.json()).then(j => setProject(j));
@@ -145,6 +148,47 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
     return String(Math.max(0, planned - used - order));
   }
 
+  // Cấu hình cột cho lưới bảng tính. onCommit cập nhật local state (không gọi API).
+  const orderGridColumns: GridColumn<OrderRow>[] = useMemo(() => [
+    { key: 'boqCode', label: 'Mã BOQ', width: 90, type: 'text',
+      get: r => r.boqCode, toPatch: raw => ({ boqCode: raw.trim().toUpperCase() }) },
+    { key: 'stt', label: 'STT', width: 50, type: 'text', align: 'center',
+      get: r => r.stt, toPatch: raw => ({ stt: raw.trim() }) },
+    { key: 'name', label: 'Tên vật tư', width: 260, type: 'text',
+      get: r => r.name, toPatch: raw => ({ name: raw.trim() }) },
+    { key: 'dvt', label: 'ĐVT', width: 60, type: 'text', align: 'center',
+      get: r => r.dvt, toPatch: raw => ({ dvt: raw.trim() }) },
+    { key: 'qtyBoq', label: 'ĐM BOQ', width: 70, type: 'readonly', align: 'right',
+      get: r => r.qtyBoq },
+    { key: 'qtyPlanned', label: 'ĐM Tháp', width: 75, type: 'readonly', align: 'right',
+      get: r => r.qtyPlanned },
+    { key: 'qtyUsed', label: 'Đã dùng', width: 70, type: 'readonly', align: 'right',
+      get: r => r.qtyUsed },
+    { key: 'orderQty', label: 'KL đặt hàng', width: 90, type: 'number', align: 'right',
+      get: r => r.orderQty, toPatch: raw => ({ orderQty: raw.trim() }) },
+    { key: 'note', label: 'Ghi chú', width: 160, type: 'text',
+      get: r => r.note, toPatch: raw => ({ note: raw.trim() }) },
+  ], []);
+
+  // commit: cập nhật rows local, nếu boqCode khớp vật tư thì auto-fill các trường liên kết.
+  const commitOrderGrid = useCallback((edits: GridEdit[]) => {
+    const byUid = new Map<string, Record<string, string>>();
+    for (const e of edits) {
+      const k = String(e.rowId);
+      byUid.set(k, { ...(byUid.get(k) ?? {}), ...Object.fromEntries(Object.entries(e.patch).map(([f, v]) => [f, String(v ?? '')])) });
+    }
+    setRows(prev => prev.map(r => {
+      const p = byUid.get(r.uid);
+      if (!p) return r;
+      if (p.boqCode !== undefined) {
+        const mat = findByBoq(p.boqCode);
+        if (mat) return { ...r, ...p, name: mat.name, dvt: mat.unit ?? '', qtyBoq: String(mat.qtyBoq ?? 0), qtyPlanned: String(mat.qtyPlanned ?? 0), qtyUsed: String(mat.qtyUsed ?? 0), linked: true };
+        return { ...r, ...p, linked: false };
+      }
+      return { ...r, ...p };
+    }));
+  }, [findByBoq]);
+
   const inputCls = "no-print outline-none border-b border-gray-300 bg-transparent w-full text-[10px] text-center py-[2px] focus:border-gray-500";
   const inputLeftCls = "no-print outline-none border-b border-gray-300 bg-transparent w-full text-[10px] py-[2px] focus:border-gray-500";
 
@@ -179,6 +223,11 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
               {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           )}
+          <button onClick={() => setSheetMode(v => !v)}
+            title={sheetMode ? 'Tắt chế độ bảng tính' : 'Bật bảng tính: nhập/paste từ Excel'}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition border ${sheetMode ? 'bg-sky-600/20 border-sky-600 text-sky-300' : 'border-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-white'}`}>
+            <Table2 className="w-4 h-4" /> Bảng tính
+          </button>
           <button onClick={addRow}
             className="flex items-center gap-1.5 border border-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-white rounded-lg px-3 py-1.5 text-sm transition">
             <Plus className="w-4 h-4" /> Thêm hàng
@@ -189,6 +238,25 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
           </button>
         </div>
       </div>
+
+      {/* Panel bảng tính — nhập/paste từ Excel, phản chiếu ngay vào form A4 bên dưới */}
+      {sheetMode && (
+        <div className="no-print bg-zinc-900 border-b border-zinc-800 px-4 py-4 space-y-2">
+          <p className="text-xs text-zinc-400 flex flex-wrap items-center gap-x-3">
+            <span className="text-zinc-300 font-medium">Nhập nhanh từ Excel</span>
+            <span>Click ô để chọn, gõ để sửa, <b>Enter</b> xuống dòng, <b>Ctrl/⌘+V</b> dán cả vùng, <b>Ctrl/⌘+D</b> điền xuống.</span>
+            <span className="text-zinc-500">Cột BOQ Code tự tra vật tư và điền ĐM/ĐVT. Thay đổi ở đây phản chiếu ngay vào form in bên dưới.</span>
+          </p>
+          <SpreadsheetGrid<OrderRow>
+            rows={rows}
+            columns={orderGridColumns}
+            rowKey={r => r.uid}
+            onCommit={commitOrderGrid}
+            stickyCols={1}
+            maxBodyHeight={320}
+          />
+        </div>
+      )}
 
       {/* Trang A4 */}
       <div className="no-print-bg min-h-screen bg-zinc-900 py-8 px-4 flex justify-center" onClick={() => setBoqSearch(null)}>

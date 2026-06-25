@@ -1,8 +1,9 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
-import { ClipboardList, Plus, ChevronDown, ChevronRight, Truck, Check, X, Package, AlertCircle } from 'lucide-react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import { ClipboardList, Plus, ChevronDown, ChevronRight, Truck, Check, X, Package, AlertCircle, Table2 } from 'lucide-react';
 import AppHeader from '@/app/components/AppHeader';
 import { appConfirm } from '@/app/components/dialogs';
+import SpreadsheetGrid, { type GridColumn, type GridEdit } from '@/app/components/SpreadsheetGrid';
 
 type PO = {
   id: number; poCode: string; status: string;
@@ -17,7 +18,7 @@ type POItem = {
 };
 type Supplier = { id: number; name: string };
 type PRItem = { id: number; prCode: string; materialId: number; materialName: string; unit: string | null; qtyRequested: number };
-type Material = { id: number; name: string; unit: string | null; sheetCode: string | null };
+type Material = { id: number; name: string; unit: string | null; sheetCode: string | null; boqCode?: string | null };
 
 const STATUS_LABEL: Record<string, string> = {
   draft: 'Nháp', confirmed: 'Đã xác nhận', partial: 'Nhập một phần',
@@ -178,6 +179,64 @@ export default function PurchaseOrdersPage() {
       return { ...p, items };
     });
   };
+
+  // Chế độ bảng tính cho "Danh sách vật tư": dán nhiều dòng từ Excel cho nhanh.
+  const [gridMode, setGridMode] = useState(false);
+
+  const resolveMaterialId = useCallback((raw: string): string => {
+    const t = raw.trim();
+    if (!t) return '';
+    const byBoq = materials.find(m => (m.boqCode ?? '').toLowerCase() === t.toLowerCase());
+    if (byBoq) return String(byBoq.id);
+    const byName = materials.find(m => m.name.toLowerCase() === t.toLowerCase());
+    if (byName) return String(byName.id);
+    const byPartial = materials.find(m => m.name.toLowerCase().includes(t.toLowerCase()));
+    return byPartial ? String(byPartial.id) : '';
+  }, [materials]);
+
+  const materialLabel = useCallback((id: string): string => {
+    const m = materials.find(x => String(x.id) === id);
+    if (!m) return '';
+    return m.boqCode ? `[${m.boqCode}] ${m.name}` : m.name;
+  }, [materials]);
+
+  type POGridRow = { _i: number; materialId: string; qtyOrdered: string; unitPrice: string; note: string };
+  const gridColumns: GridColumn<POGridRow>[] = useMemo(() => [
+    { key: 'material', label: 'Vật tư (mã BOQ / tên)', width: 260, type: 'text',
+      get: r => materialLabel(r.materialId), toPatch: raw => ({ materialId: resolveMaterialId(raw) }) },
+    { key: 'qtyOrdered', label: 'SL đặt', width: 90, type: 'number', align: 'right',
+      get: r => r.qtyOrdered, toPatch: raw => ({ qtyOrdered: raw.trim() }) },
+    { key: 'unitPrice', label: 'Đơn giá', width: 110, type: 'number', align: 'right',
+      get: r => r.unitPrice, toPatch: raw => ({ unitPrice: raw.trim() }) },
+    { key: 'note', label: 'Ghi chú', width: 160, type: 'text',
+      get: r => r.note, toPatch: raw => ({ note: raw.trim() }) },
+  ], [materialLabel, resolveMaterialId]);
+
+  const gridRows: POGridRow[] = useMemo(() => {
+    const base = newPO.items.map((it, i) => ({ _i: i, materialId: it.materialId, qtyOrdered: it.qtyOrdered, unitPrice: it.unitPrice, note: it.note }));
+    const total = Math.max(base.length + 3, 8);
+    for (let i = base.length; i < total; i++) base.push({ _i: i, materialId: '', qtyOrdered: '', unitPrice: '', note: '' });
+    return base;
+  }, [newPO.items]);
+
+  const commitGrid = useCallback((edits: GridEdit[]) => {
+    setNewPO(p => {
+      const items = [...p.items];
+      for (const e of edits) {
+        const i = Number(e.rowId);
+        while (items.length <= i) items.push({ materialId: '', prId: '', qtyOrdered: '', unitPrice: '', note: '' });
+        const patch = e.patch as Partial<Record<'materialId' | 'qtyOrdered' | 'unitPrice' | 'note', unknown>>;
+        items[i] = {
+          ...items[i],
+          ...(patch.materialId !== undefined ? { materialId: String(patch.materialId) } : {}),
+          ...(patch.qtyOrdered !== undefined ? { qtyOrdered: String(patch.qtyOrdered) } : {}),
+          ...(patch.unitPrice !== undefined ? { unitPrice: String(patch.unitPrice) } : {}),
+          ...(patch.note !== undefined ? { note: String(patch.note) } : {}),
+        };
+      }
+      return { ...p, items };
+    });
+  }, []);
 
   return (
     <div className="min-h-screen bg-zinc-900 text-zinc-100">
@@ -365,11 +424,33 @@ export default function PurchaseOrdersPage() {
             <div className="mb-3">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm font-semibold text-zinc-300">Danh sách vật tư</span>
-                <button onClick={addItem} className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300">
-                  <Plus className="w-4 h-4" /> Thêm dòng
-                </button>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setGridMode(v => !v)}
+                    title={gridMode ? 'Về chế độ nhập từng dòng' : 'Bật bảng tính: dán nhiều dòng từ Excel'}
+                    className={`flex items-center gap-1 text-sm ${gridMode ? 'text-sky-300' : 'text-zinc-400 hover:text-zinc-200'}`}>
+                    <Table2 className="w-4 h-4" /> Bảng tính
+                  </button>
+                  {!gridMode && (
+                    <button onClick={addItem} className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300">
+                      <Plus className="w-4 h-4" /> Thêm dòng
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="space-y-2">
+              {gridMode && (
+                <div className="space-y-1.5 mb-1">
+                  <p className="text-xs text-zinc-500">Dán cột mã BOQ (hoặc tên vật tư), SL, đơn giá, ghi chú từ Excel. <b>Ctrl/⌘+V</b> dán cả vùng, <b>Enter</b> xuống dòng, <b>Ctrl/⌘+D</b> điền xuống. Vật tư không khớp sẽ để trống.</p>
+                  <SpreadsheetGrid<POGridRow>
+                    rows={gridRows}
+                    columns={gridColumns}
+                    rowKey={r => r._i}
+                    onCommit={commitGrid}
+                    stickyCols={1}
+                    maxBodyHeight={300}
+                  />
+                </div>
+              )}
+              <div className={`space-y-2${gridMode ? ' hidden' : ''}`}>
                 {newPO.items.map((item, i) => (
                   <div key={i} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end bg-zinc-700/40 rounded p-3">
                     <div className="col-span-3">

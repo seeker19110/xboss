@@ -1,18 +1,6 @@
-'use client';
-import { Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-import OrderContent from './OrderContent';
+import { redirect } from 'next/navigation';
 
-function OrderPageInner() {
-  const searchParams = useSearchParams();
-  const isEmbed = searchParams.get('embed') === '1';
-  return <OrderContent isEmbed={isEmbed} />;
-}
-
+// Trang đơn đặt hàng đã chuyển sang /materials/PurchaseOrders.
 export default function OrderPage() {
-  return (
-    <Suspense>
-      <OrderPageInner />
-    </Suspense>
-  );
+  redirect('/materials/PurchaseOrders');
 }
