@@ -19,8 +19,8 @@ export async function PATCH(req: NextRequest, { params: paramsP }: { params: Pro
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const m = await queryOne<{ id: number; qty_used: number }>(
-    `SELECT id, qty_used FROM materials WHERE id = ?`, id);
+  const m = await queryOne<{ id: number; qty_used: number; qty_stock: number }>(
+    `SELECT id, qty_used, COALESCE(qty_stock, 0) AS qty_stock FROM materials WHERE id = ?`, id);
   if (!m) return NextResponse.json({ error: "Không tìm thấy vật tư" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
@@ -70,6 +70,18 @@ export async function PATCH(req: NextRequest, { params: paramsP }: { params: Pro
         `INSERT INTO material_transactions (material_id, delta, qty_after, note, created_by)
          VALUES (?, ?, ?, 'Sửa trực tiếp tổng đã dùng', ?)`,
         id, delta, newQty, user.id);
+    }
+  }
+
+  // Điều chỉnh tồn kho trực tiếp cũng phải truy vết (nhất quán với nhập/xuất kho).
+  if (body.qtyStock !== undefined) {
+    const newStock = Number(body.qtyStock) || 0;
+    const delta = newStock - (m.qty_stock ?? 0);
+    if (delta !== 0) {
+      await run(
+        `INSERT INTO material_transactions (material_id, delta, qty_after, type, note, created_by)
+         VALUES (?, ?, ?, 'dieu_chinh_kho', 'Điều chỉnh tồn kho trực tiếp', ?)`,
+        id, delta, newStock, user.id);
     }
   }
 
