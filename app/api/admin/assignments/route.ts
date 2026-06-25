@@ -78,7 +78,12 @@ export async function POST(req: NextRequest) {
     if (!u) return NextResponse.json({ error: "Người dùng không tồn tại" }, { status: 404 });
   }
 
-  const table = level === "sheet" ? "sheet_types" : level === "package" ? "work_packages" : "tasks";
+  const tableMap = new Map<string, string>([
+    ["sheet", "sheet_types"],
+    ["package", "work_packages"],
+    ["task", "tasks"],
+  ]);
+  const table = tableMap.get(level)!;
   const target = await queryOne(`SELECT id FROM ${table} WHERE id = ?`, id);
   if (!target) return NextResponse.json({ error: "Đối tượng không tồn tại" }, { status: 404 });
 
