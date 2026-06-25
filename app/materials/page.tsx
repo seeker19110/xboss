@@ -12,9 +12,7 @@ import EditModeToggle from '@/app/components/EditModeToggle';
 import { Modal, appConfirm, appPrompt } from '@/app/components/dialogs';
 import SuppliersTab from './_components/SuppliersTab';
 import PurchaseRequestsTab from './_components/PurchaseRequestsTab';
-import PurchaseOrdersTab from './_components/PurchaseOrdersTab';
 import ReportsTab from './_components/ReportsTab';
-import OrderContent from '@/app/order/OrderContent';
 import { Skeleton } from '@/app/components/Skeleton';
 import SpreadsheetGrid, { type GridColumn, type GridEdit } from '@/app/components/SpreadsheetGrid';
 import { Table2 } from 'lucide-react';
@@ -62,7 +60,7 @@ const DEFAULT_LABELS: Record<ColKey, string> = {
 const ALL_COL_KEYS: ColKey[] = ['boqCode', 'stt', 'name', 'unit', 'qtyBoq', 'qtyPlanned', 'diff', 'status', 'note'];
 
 export default function MaterialsPage() {
-  const [activeTab, setActiveTab] = useState<'materials' | 'suppliers' | 'requests' | 'orders' | 'reports' | 'order_form'>('materials');
+  const [activeTab, setActiveTab] = useState<'materials' | 'suppliers' | 'requests' | 'reports'>('materials');
   const [role, setRole] = useState('');
   const [userId, setUserId] = useState<number | null>(null);
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -365,10 +363,8 @@ export default function MaterialsPage() {
         <div className="flex gap-1 border-b border-zinc-800 pb-0 overflow-x-auto">
           {[
             { key: 'materials' as const, icon: <Package className="w-3.5 h-3.5" />, label: 'Định Mức BOQ' },
-            { key: 'order_form' as const, icon: <ClipboardList className="w-3.5 h-3.5" />, label: 'Đơn đặt hàng' },
             { key: 'suppliers' as const, icon: <Building2 className="w-3.5 h-3.5" />, label: 'Nhà cung cấp' },
             { key: 'requests' as const, icon: <ShoppingCart className="w-3.5 h-3.5" />, label: 'Yêu cầu mua' },
-            { key: 'orders' as const, icon: <ClipboardList className="w-3.5 h-3.5" />, label: 'Quản lý đơn hàng' },
             { key: 'reports' as const, icon: <BarChart2 className="w-3.5 h-3.5" />, label: 'Báo cáo kho' },
           ].map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key)}
@@ -380,17 +376,20 @@ export default function MaterialsPage() {
               {t.icon} {t.label}
             </button>
           ))}
+          {/* Tách sang trang riêng: form đơn đặt hàng (in PDF) + quản lý PO */}
+          <a href="/materials/PurchaseOrders"
+            className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-zinc-400 hover:text-zinc-200 transition-colors">
+            <ClipboardList className="w-3.5 h-3.5" /> Đơn đặt hàng
+          </a>
+          <a href="/materials/purchase-orders"
+            className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-zinc-400 hover:text-zinc-200 transition-colors">
+            <ClipboardList className="w-3.5 h-3.5" /> Quản lý đơn hàng
+          </a>
         </div>
 
         {/* Nội dung các tab phụ */}
-        {activeTab === 'order_form' && (
-          <div className="-mx-6 -mb-6">
-            <OrderContent isEmbed />
-          </div>
-        )}
         {activeTab === 'suppliers' && <SuppliersTab role={role} />}
         {activeTab === 'requests' && <PurchaseRequestsTab role={role} userId={userId} materials={materials} />}
-        {activeTab === 'orders' && <PurchaseOrdersTab role={role} materials={materials} />}
         <ReportsTab active={activeTab === 'reports'} />
 
         {activeTab === 'materials' && <>
@@ -444,7 +443,7 @@ export default function MaterialsPage() {
               <Table2 className="w-4 h-4" /> Bảng tính
             </button>
           )}
-          <a href="/order"
+          <a href="/materials/PurchaseOrders"
             className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 rounded-xl px-4 py-2.5 text-sm font-medium transition shrink-0">
             <Plus className="w-4 h-4" /> Đặt hàng
           </a>

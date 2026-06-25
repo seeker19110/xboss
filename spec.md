@@ -301,7 +301,7 @@ Mã duy nhất **toàn hệ thống** trên `tasks`, `work_packages`, `materials
 | `/` | Dashboard: KPI cards, biểu đồ tiến độ per sheet, bảng trễ, Pareto nguyên nhân trễ |
 | `/tracking/[slug]` | Lưới tracking: nhóm → task → checkbox dimension, filter tầng/trạng thái |
 | `/materials` | Quản lý vật tư: bảng, sửa inline tên, xóa từng dòng (Admin/PM) |
-| `/order` | Đơn đặt hàng: chọn nhà cung cấp → điền bảng vật tư → in A4 |
+| `/materials/PurchaseOrders` | Đơn đặt hàng: chọn nhà cung cấp → điền bảng vật tư → in A4 (`/order` redirect về đây) |
 | `/approvals` | Danh sách task chờ nghiệm thu + đã nghiệm thu, upload biên bản |
 | `/lookahead` | Kế hoạch 7/14/21 ngày: task sắp bắt đầu + đến hạn |
 | `/gantt` | Gantt chart toàn bộ task theo timeline |
@@ -316,7 +316,7 @@ Mã duy nhất **toàn hệ thống** trên `tasks`, `work_packages`, `materials
 | `/materials/purchase-orders` | Đơn đặt hàng (PO) |
 | `/materials/reports` | Báo cáo tồn kho, xuất nhập vật tư |
 | `/materials/import` | Import vật tư từ Excel |
-| `/order` | Đơn đặt hàng in được: chọn NCC → điền bảng vật tư → in A4 |
+| `/materials/PurchaseOrders` | Đơn đặt hàng in được: chọn NCC → điền bảng vật tư → in A4 |
 
 ---
 
