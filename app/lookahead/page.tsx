@@ -2,12 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Printer, CalendarClock } from 'lucide-react';
-import { DELAY_REASON_LABEL } from '@/lib/delay';
-
-const STATUS_LABEL: Record<string, string> = {
-  chuan_bi: 'Chuẩn bị', dang_thi_cong: 'Đang thi công',
-  hoan_thanh: 'Hoàn thành', nghiem_thu: 'Đã nghiệm thu', tre: 'Đang trễ',
-};
+import { LookaheadTable } from '@/app/components/LookaheadTable';
 
 type LTask = {
   id: number; code: string; name: string; status: string;
@@ -32,39 +27,6 @@ function groupBySheet(tasks: LTask[]): { sheet: string; tasks: LTask[] }[] {
     g.tasks.push(t);
   }
   return groups;
-}
-
-function TaskTable({ tasks, dateCol }: { tasks: LTask[]; dateCol: 'startDate' | 'endDate' }) {
-  return (
-    <table className="w-full text-sm border-collapse mb-4">
-      <thead>
-        <tr className="bg-zinc-100 border-y border-zinc-300 text-left">
-          <th className="p-2 w-24">Mã</th>
-          <th className="p-2">Công việc</th>
-          <th className="p-2 w-16">Tầng</th>
-          <th className="p-2 w-24">{dateCol === 'startDate' ? 'Bắt đầu' : 'Đến hạn'}</th>
-          <th className="p-2 w-14">%</th>
-          <th className="p-2 w-28">Ghi chú</th>
-        </tr>
-      </thead>
-      <tbody>
-        {tasks.map(t => (
-          <tr key={t.id} className="border-b border-zinc-200 odd:bg-white even:bg-zinc-50">
-            <td className="p-2 font-mono text-xs">{t.code}</td>
-            <td className="p-2">{t.name}</td>
-            <td className="p-2">{t.floorLabel ?? '—'}</td>
-            <td className={`p-2 ${dateCol === 'endDate' && t.status === 'tre' ? 'text-red-600 font-medium' : ''}`}>{fmtDate(t[dateCol])}</td>
-            <td className="p-2">{Math.round((t.progressPercent ?? 0) * 100)}%</td>
-            <td className="p-2 text-xs text-zinc-500">
-              {t.status === 'tre'
-                ? `Đang trễ${t.delayReason ? ` · ${DELAY_REASON_LABEL[t.delayReason as keyof typeof DELAY_REASON_LABEL] ?? t.delayReason}` : ''}`
-                : STATUS_LABEL[t.status] ?? ''}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
 }
 
 export default function LookaheadPage() {
@@ -114,7 +76,7 @@ export default function LookaheadPage() {
         {groupBySheet(data?.starting ?? []).map(g => (
           <div key={g.sheet} className="mb-2 avoid-break">
             <h3 className="font-semibold text-sm bg-zinc-50 border-l-4 border-zinc-900 pl-2 py-1 mb-1">{g.sheet} ({g.tasks.length})</h3>
-            <TaskTable tasks={g.tasks} dateCol="startDate" />
+            <LookaheadTable tasks={g.tasks} dateCol="startDate" />
           </div>
         ))}
 
@@ -124,7 +86,7 @@ export default function LookaheadPage() {
         {groupBySheet(data?.due ?? []).map(g => (
           <div key={g.sheet} className="mb-2 avoid-break">
             <h3 className="font-semibold text-sm bg-zinc-50 border-l-4 border-zinc-900 pl-2 py-1 mb-1">{g.sheet} ({g.tasks.length})</h3>
-            <TaskTable tasks={g.tasks} dateCol="endDate" />
+            <LookaheadTable tasks={g.tasks} dateCol="endDate" />
           </div>
         ))}
 
