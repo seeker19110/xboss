@@ -78,6 +78,10 @@ export default function SpreadsheetGrid<Row>({
   // Ngăn xếp Undo/Redo: mỗi mục là lô ô đã đổi kèm giá trị cũ + mới (theo rowKey).
   const [undoStack, setUndoStack] = useState<{ rowKey: number | string; c: number; oldRaw: string; newRaw: string }[][]>([]);
   const [redoStack, setRedoStack] = useState<{ rowKey: number | string; c: number; oldRaw: string; newRaw: string }[][]>([]);
+  const [pinned, setPinned] = useState<Set<string>>(new Set());      // rowKey các dòng được ghim
+  const [hiddenCols, setHiddenCols] = useState<Set<number>>(new Set()); // chỉ số cột bị ẩn nhanh
+  const [wrap, setWrap] = useState(false);                            // xuống dòng (wrap text) trong ô
+  const [extraRects, setExtraRects] = useState<Rect[]>([]);          // các vùng chọn rời (Ctrl/Cmd+click)
   const gridRef = useRef<HTMLDivElement>(null);
   const filterMenuRef = useRef<HTMLDivElement>(null);
   const editRef = useRef<HTMLInputElement | HTMLSelectElement>(null);
@@ -94,8 +98,25 @@ export default function SpreadsheetGrid<Row>({
     return typeof col.editable === 'function' ? col.editable(row) : col.editable !== false;
   }, [columns, readOnly]);
 
+  const inOneRect = (rc: Rect, r: number, c: number) =>
+    r >= rc.r0 && r <= rc.r1 && c >= rc.c0 && c <= rc.c1;
+  // Ô thuộc vùng chọn = vùng hiện tại HOẶC một trong các vùng rời (Ctrl/Cmd+click).
   const inRect = (r: number, c: number) =>
-    r >= rect.r0 && r <= rect.r1 && c >= rect.c0 && c <= rect.c1;
+    inOneRect(rect, r, c) || extraRects.some(rc => inOneRect(rc, r, c));
+
+  // Tập ô (đã loại trùng) của toàn bộ vùng chọn — dùng cho xoá/định dạng/thống kê.
+  const selectedCells = useCallback((): { r: number; c: number }[] => {
+    const seen = new Set<string>();
+    const out: { r: number; c: number }[] = [];
+    for (const rc of [rect, ...extraRects]) {
+      for (let r = rc.r0; r <= rc.r1; r++)
+        for (let c = rc.c0; c <= rc.c1; c++) {
+          const k = keyOf(r, c);
+          if (!seen.has(k)) { seen.add(k); out.push({ r, c }); }
+        }
+    }
+    return out;
+  }, [rect, extraRects]);
 
   useEffect(() => {
     if (editing && editRef.current) {
@@ -123,6 +144,7 @@ export default function SpreadsheetGrid<Row>({
   }, [nRows, nCols]);
 
   const move = useCallback((dr: number, dc: number, extend: boolean) => {
+    setExtraRects([]); // điều hướng bàn phím → bỏ các vùng chọn rời
     setActive(a => {
       const r = Math.max(0, Math.min(nRows - 1, a.r + dr));
       const c = Math.max(0, Math.min(nCols - 1, a.c + dc));
@@ -249,11 +271,8 @@ export default function SpreadsheetGrid<Row>({
   }, [rect, columns, rows, commitCells]);
 
   const clearSelection = useCallback(() => {
-    const cells: { r: number; c: number; raw: string }[] = [];
-    for (let r = rect.r0; r <= rect.r1; r++)
-      for (let c = rect.c0; c <= rect.c1; c++) cells.push({ r, c, raw: '' });
-    commitCells(cells);
-  }, [rect, commitCells]);
+    commitCells(selectedCells().map(({ r, c }) => ({ r, c, raw: '' })));
+  }, [selectedCells, commitCells]);
 
   // Re-commit 1 lô ô theo rowKey (dùng cho undo/redo); không ghi lại lịch sử.
   const recommit = useCallback((batch: { rowKey: number | string; c: number; raw: string }[]) => {
@@ -365,8 +384,14 @@ export default function SpreadsheetGrid<Row>({
         activeFilters.every(([c, set]) => set.has(String(columns[Number(c)]?.get(r) ?? '')))
       );
     }
+    // Đưa các dòng được ghim lên đầu (giữ thứ tự tương đối — stable partition).
+    if (pinned.size) {
+      const pin: Row[] = [], rest: Row[] = [];
+      for (const r of result) (pinned.has(String(rowKey(r))) ? pin : rest).push(r);
+      result = [...pin, ...rest];
+    }
     return result;
-  }, [rows, columns, sortBy, search, colFilters]);
+  }, [rows, columns, sortBy, search, colFilters, pinned, rowKey]);
 
   // Tập giá trị phân biệt của 1 cột (cho dropdown filter).
   const distinctValues = useCallback((c: number) => {
@@ -378,18 +403,16 @@ export default function SpreadsheetGrid<Row>({
   // Thống kê vùng chọn (đếm / tổng / trung bình các ô số) — thanh trạng thái kiểu GSheet.
   const selectionStats = useMemo(() => {
     let count = 0, numCount = 0, sum = 0;
-    for (let r = rect.r0; r <= rect.r1; r++) {
-      for (let c = rect.c0; c <= rect.c1; c++) {
-        const row = rows[r];
-        if (!row) continue;
-        count++;
-        const v = columns[c]?.get(row);
-        const n = typeof v === 'number' ? v : parseFloat(String(v ?? ''));
-        if (!isNaN(n) && String(v ?? '').trim() !== '') { numCount++; sum += n; }
-      }
+    for (const { r, c } of selectedCells()) {
+      const row = rows[r];
+      if (!row) continue;
+      count++;
+      const v = columns[c]?.get(row);
+      const n = typeof v === 'number' ? v : parseFloat(String(v ?? ''));
+      if (!isNaN(n) && String(v ?? '').trim() !== '') { numCount++; sum += n; }
     }
     return { count, numCount, sum, avg: numCount ? sum / numCount : 0 };
-  }, [rect, rows, columns]);
+  }, [selectedCells, rows, columns]);
 
   const doReplace = useCallback(() => {
     if (!search.trim()) return;
@@ -428,6 +451,53 @@ export default function SpreadsheetGrid<Row>({
     a.click();
     URL.revokeObjectURL(url);
   }, [columns, sortedAndFiltered]);
+
+  // Xuất Excel đúng những gì đang thấy: cột hiển thị (bỏ cột ẩn), thứ tự sau
+  // sort/filter, freeze + AutoFilter. Màu: dò token Tailwind trong cellClass
+  // (rose/red→đỏ, emerald/green→xanh, amber→vàng, sky/blue→xanh dương) — best-effort.
+  const exportXLSX = useCallback(async () => {
+    const ExcelJS = (await import('exceljs')).default;
+    const cols = columns.filter((_, c) => !hiddenCols.has(c));
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Bảng tính');
+    ws.columns = cols.map(c => ({ width: Math.min(Math.max((c.width ?? 120) / 7, 8), 50) }));
+    const header = ws.addRow(cols.map(c => c.label));
+    header.eachCell(cell => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF27272A' } };
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    });
+    const FILL: { test: RegExp; argb: string; fg: string }[] = [
+      { test: /rose|red/, argb: 'FFFEE2E2', fg: 'FF991B1B' },
+      { test: /emerald|green/, argb: 'FFD1FAE5', fg: 'FF065F46' },
+      { test: /amber|yellow/, argb: 'FFFEF3C7', fg: 'FF92400E' },
+      { test: /sky|blue/, argb: 'FFE0F2FE', fg: 'FF075985' },
+    ];
+    for (const row of sortedAndFiltered) {
+      const xr = ws.addRow(cols.map(c => {
+        const v = c.get(row);
+        return typeof v === 'boolean' ? (v ? '✓' : '') : v ?? '';
+      }));
+      cols.forEach((c, i) => {
+        const cls = c.cellClass?.(row);
+        if (!cls) return;
+        const m = FILL.find(f => f.test.test(cls));
+        if (m) {
+          const cell = xr.getCell(i + 1);
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: m.argb } };
+          cell.font = { color: { argb: m.fg } };
+        }
+      });
+    }
+    ws.views = [{ state: 'frozen', xSplit: freezeCols, ySplit: 1 }];
+    ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: cols.length } };
+    const buf = await wb.xlsx.writeBuffer();
+    const url = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `bang-tinh-${new Date().toISOString().split('T')[0]}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [columns, hiddenCols, sortedAndFiltered, freezeCols]);
 
   const autoFitColumn = useCallback((c: number) => {
     let maxLen = columns[c]?.label.length ?? 0;
@@ -473,9 +543,14 @@ export default function SpreadsheetGrid<Row>({
             {clipboard && <span className="ml-3 text-zinc-500">{clipboard.cut ? '✂️ Cắt' : '📋 Sao chép'}</span>}
           </div>
           <div className="flex items-center gap-2 text-[10px] text-zinc-500">
+            <button onClick={() => setWrap(w => !w)} className={wrap ? 'text-sky-400' : 'hover:text-zinc-300'} title="Xuống dòng trong ô (wrap text)">↕️ Wrap</button>
+            {hiddenCols.size > 0 && (
+              <button onClick={() => setHiddenCols(new Set())} className="text-amber-400 hover:text-amber-300" title="Hiện lại các cột đã ẩn">👁 {hiddenCols.size} cột ẩn</button>
+            )}
             <button onClick={() => setShowShortcuts(!showShortcuts)} className="hover:text-zinc-300">⌨️ Ctrl/?</button>
             <button onClick={() => setShowSearch(!showSearch)} className="hover:text-zinc-300">🔍 Ctrl/F</button>
-            <button onClick={exportCSV} className="hover:text-zinc-300">💾 Ctrl/S</button>
+            <button onClick={exportCSV} className="hover:text-zinc-300">💾 CSV</button>
+            <button onClick={exportXLSX} className="hover:text-zinc-300" title="Xuất Excel đúng filter/sort + màu">📤 Excel</button>
           </div>
         </div>
 
@@ -562,7 +637,7 @@ export default function SpreadsheetGrid<Row>({
         <table className="border-collapse text-sm" style={{ tableLayout: 'fixed' }}>
           <thead className="sticky top-0 z-20">
             <tr>
-              {columns.map((col, c) => (
+              {columns.map((col, c) => hiddenCols.has(c) ? null : (
                 <th
                   key={col.key}
                   className={`bg-zinc-900 text-zinc-300 font-medium border-b border-r border-zinc-800 px-2 py-1.5 text-left relative group ${c < freezeCols ? 'sticky z-30' : ''}`}
@@ -589,6 +664,14 @@ export default function SpreadsheetGrid<Row>({
                     >
                       ▾
                     </button>
+                    {/* Ẩn nhanh cột này */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setHiddenCols(prev => new Set(prev).add(c)); }}
+                      className="shrink-0 px-0.5 text-zinc-600 hover:text-rose-300 opacity-0 group-hover:opacity-100 transition"
+                      title="Ẩn cột này" aria-label={`Ẩn cột ${col.label}`}
+                    >
+                      ⊘
+                    </button>
                     <div
                       onMouseDown={() => setResizingCol(c)}
                       onDoubleClick={() => autoFitColumn(c)}
@@ -612,9 +695,11 @@ export default function SpreadsheetGrid<Row>({
           <tbody>
             {sortedAndFiltered.map((row, displayR) => {
               const r = rows.indexOf(row);
+              const isPinned = pinned.has(String(rowKey(row)));
               return (
                 <tr key={rowKey(row)}>
                   {columns.map((col, c) => {
+                    if (hiddenCols.has(c)) return null;
                     const k = keyOf(r, c);
                     const isActive = active.r === r && active.c === c;
                     const selected = inRect(r, c);
@@ -625,21 +710,29 @@ export default function SpreadsheetGrid<Row>({
                     const condClass = col.cellClass?.(row) ?? '';
                     // Kẻ hàng xen kẽ 2 màu (zebra): dùng token zinc để light mode ra
                     // dải xám sáng (~#EEEEEE/#CCCCCC), dark mode tự đảo — không hardcode hex.
-                    const rowBg = displayR % 2 === 0 ? 'bg-zinc-950' : 'bg-zinc-800';
+                    const rowBg = isPinned ? 'bg-amber-950/30' : displayR % 2 === 0 ? 'bg-zinc-950' : 'bg-zinc-800';
                     return (
                       <td
                         key={col.key}
                         role="gridcell"
                         aria-selected={selected}
                         onMouseDown={(e) => {
+                          gridRef.current?.focus();
+                          if (e.ctrlKey || e.metaKey) {
+                            // Ctrl/Cmd+click: thêm 1 vùng chọn rời, giữ các vùng trước.
+                            setExtraRects(prev => [...prev, rect]);
+                            setActive({ r, c }); setAnchor({ r, c }); setDragging(true);
+                            return;
+                          }
+                          setExtraRects([]); // click thường → bỏ các vùng rời
                           if (e.shiftKey) { setActive({ r, c }); }
                           else { setActive({ r, c }); setAnchor({ r, c }); setDragging(true); }
-                          gridRef.current?.focus();
                         }}
                         onMouseEnter={() => { if (dragging) setActive({ r, c }); }}
                         onDoubleClick={() => startEdit()}
                         className={[
-                          'border-b border-r border-zinc-800 px-2 py-1 whitespace-nowrap relative',
+                          'border-b border-r border-zinc-800 px-2 py-1 relative',
+                          wrap ? 'whitespace-normal break-words align-top' : 'whitespace-nowrap',
                           align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left',
                           c < freezeCols ? `sticky z-10 ${rowBg}` : rowBg,
                           condClass,
@@ -651,11 +744,15 @@ export default function SpreadsheetGrid<Row>({
                         style={{ width: colWidth(c), minWidth: colWidth(c), left: c < freezeCols ? leftOffsets[c] : undefined }}
                         title={err ?? undefined}
                       >
+                        {/* Đánh dấu dòng ghim ở ô đầu tiên hiển thị */}
+                        {isPinned && c === [...Array(nCols).keys()].find(i => !hiddenCols.has(i)) && (
+                          <span className="absolute left-0.5 top-1/2 -translate-y-1/2 text-amber-400 text-[10px]" aria-label="Dòng ghim">📌</span>
+                        )}
                         {editing && isActive ? (
                           <CellEditor col={col} value={draft} setValue={setDraft} editRef={editRef}
                             onDone={finishEdit} />
                         ) : (
-                          <span className="block overflow-hidden text-ellipsis">
+                          <span className={wrap ? 'block' : 'block overflow-hidden text-ellipsis'}>
                             {col.type === 'checkbox'
                               ? (col.get(row) ? '✓' : '')
                               : col.render ? col.render(row) : displayValue(col.get(row))}
@@ -756,6 +853,23 @@ export default function SpreadsheetGrid<Row>({
             className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700 text-left"
           >
             📋 Sao chép
+          </button>
+          {/* Ghim / bỏ ghim các dòng trong vùng chọn (ô đầu vùng quyết định trạng thái) */}
+          <button
+            onClick={() => {
+              const ids = Array.from({ length: rect.r1 - rect.r0 + 1 }, (_, i) => rows[rect.r0 + i])
+                .filter(Boolean).map(row => String(rowKey(row)));
+              const allPinned = ids.every(id => pinned.has(id));
+              setPinned(prev => {
+                const n = new Set(prev);
+                ids.forEach(id => allPinned ? n.delete(id) : n.add(id));
+                return n;
+              });
+              setContextMenu(null);
+            }}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700 text-left"
+          >
+            📌 Ghim / bỏ ghim dòng
           </button>
           {!readOnly && (
             <>
