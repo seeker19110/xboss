@@ -167,6 +167,11 @@ export default function PurchaseOrdersPage() {
 
   const addItem = () => setNewPO(p => ({ ...p, items: [...p.items, { materialId: '', prId: '', qtyOrdered: '', unitPrice: '', note: '' }] }));
   const removeItem = (i: number) => setNewPO(p => ({ ...p, items: p.items.filter((_, idx) => idx !== i) }));
+  // Xoá nhiều dòng (theo _i = chỉ số item) trong lưới bảng tính — bỏ qua dòng đệm rỗng.
+  const removeGridRows = (ids: (number | string)[]) => {
+    const del = new Set(ids.map(Number));
+    setNewPO(p => ({ ...p, items: p.items.filter((_, idx) => !del.has(idx)) }));
+  };
   const updateItem = (i: number, key: string, v: string) =>
     setNewPO(p => { const items = [...p.items]; (items[i] as Record<string, string>)[key] = v; return { ...p, items }; });
 
@@ -447,6 +452,9 @@ export default function PurchaseOrdersPage() {
                     onCommit={commitGrid}
                     stickyCols={1}
                     maxBodyHeight={300}
+                    onAddRow={addItem}
+                    onDeleteRows={removeGridRows}
+                    growRowsOnPaste
                   />
                 </div>
               )}

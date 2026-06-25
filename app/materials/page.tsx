@@ -178,6 +178,18 @@ export default function MaterialsPage() {
       api(`/api/materials/${m.id}`, { method: 'DELETE' });
   };
 
+  // Xoá nhiều dòng đang chọn trong lưới bảng tính.
+  const removeRows = useCallback(async (ids: (number | string)[]) => {
+    if (!ids.length) return;
+    if (!await appConfirm(`Xoá ${ids.length} vật tư đang chọn?`, { danger: true, confirmLabel: 'Xoá' })) return;
+    setError('');
+    const results = await Promise.all(ids.map(id =>
+      fetch(`/api/materials/${id}`, { method: 'DELETE' }).then(r => r.ok).catch(() => false)));
+    const failed = results.filter(ok => !ok).length;
+    if (failed) setError(`Không xoá được ${failed}/${ids.length} vật tư.`);
+    load(true);
+  }, [load]);
+
   const copyRow = (m: Material) => {
     const sheetTypeId = m.sheetTypeId;
     if (!sheetTypeId) { setError('Vật tư không có hệ — không thể nhân đôi'); return; }
@@ -276,6 +288,15 @@ export default function MaterialsPage() {
         (m.unit ?? '').toLowerCase().includes(q)
       )
     : materials;
+
+  // Thêm 1 dòng vật tư trống vào cuối lưới bảng tính. Cần biết hệ (sheetTypeId):
+  // ưu tiên filter đang chọn, nếu không lấy theo dòng cuối đang hiển thị.
+  const addBlankRow = useCallback(async () => {
+    const sheetTypeId = sheetFilter ? Number(sheetFilter) : filtered[filtered.length - 1]?.sheetTypeId;
+    if (!sheetTypeId) { setError('Chọn hệ (ở góc trên) trước khi thêm dòng mới'); return; }
+    await api('/api/materials', { method: 'POST', body: JSON.stringify({ name: 'Vật tư mới', sheetTypeId }) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheetFilter, filtered]);
 
   // Cấu hình cột cho lưới bảng tính. Cột dẫn xuất (stt/diff/status) chỉ đọc;
   // còn lại sửa được khi có quyền. STT cần chỉ số dòng → tra qua idxMap.
@@ -486,6 +507,8 @@ export default function MaterialsPage() {
               readOnly={!canEdit}
               stickyCols={stickyCount}
               maxBodyHeight={Math.round(typeof window !== 'undefined' ? window.innerHeight * 0.7 : 600)}
+              onAddRow={canEdit ? addBlankRow : undefined}
+              onDeleteRows={canDelete ? removeRows : undefined}
             />
             {filtered.length === 0 && (
               <p className="p-8 text-center text-zinc-500 text-sm">
