@@ -10,6 +10,65 @@
 /* Chế độ tối (mặc định) — script trong layout gắn class theo localStorage('xboss_theme') */
 html.dark { color-scheme: dark; }
 
+/* ─── Theme xanh dương (King Blue / Dark Blue / Navy) ───────────────────────
+   Cùng cơ chế như light mode: chỉ ghi đè thang `zinc` (nền/chữ/viền) sang
+   tông xanh + đổi --background/--foreground. Các màu nhấn -300/-400 (status,
+   biểu đồ) giữ nguyên độ tươi để hiển thị tốt trên nền tối. */
+
+/* King Blue — xanh hoàng gia rực rỡ, mặt thẻ xanh đậm nổi bật (theme chủ đạo) */
+html.kingblue {
+  color-scheme: dark;
+  --background: #0a1f4d;
+  --foreground: #eaf2ff;
+  --color-zinc-950: #0d2459;
+  --color-zinc-900: #123075;
+  --color-zinc-800: #1a3f94;
+  --color-zinc-700: #2451b5;
+  --color-zinc-600: #3a6bd0;
+  --color-zinc-500: #5d87de;
+  --color-zinc-400: #8aabec;
+  --color-zinc-300: #b3c9f4;
+  --color-zinc-200: #d4e2fa;
+  --color-zinc-100: #e8f0fd;
+  --color-zinc-50:  #f4f8fe;
+}
+
+/* Dark Blue — xanh dương đậm, dịu hơn King Blue */
+html.darkblue {
+  color-scheme: dark;
+  --background: #0c1a2e;
+  --foreground: #dbeafe;
+  --color-zinc-950: #0f2138;
+  --color-zinc-900: #152b48;
+  --color-zinc-800: #1e3a5f;
+  --color-zinc-700: #2a4d73;
+  --color-zinc-600: #3b6188;
+  --color-zinc-500: #5a7ca0;
+  --color-zinc-400: #8aacc8;
+  --color-zinc-300: #b6d3e8;
+  --color-zinc-200: #d7e8f5;
+  --color-zinc-100: #eaf3fb;
+  --color-zinc-50:  #f5fafd;
+}
+
+/* Navy — xanh hải quân thâm trầm nhất, tông slate xanh-xám */
+html.navy {
+  color-scheme: dark;
+  --background: #060b18;
+  --foreground: #e2e8f0;
+  --color-zinc-950: #0b1220;
+  --color-zinc-900: #111c30;
+  --color-zinc-800: #1c2a44;
+  --color-zinc-700: #2c3e5e;
+  --color-zinc-600: #475569;
+  --color-zinc-500: #64748b;
+  --color-zinc-400: #94a3b8;
+  --color-zinc-300: #cbd5e1;
+  --color-zinc-200: #e2e8f0;
+  --color-zinc-100: #f1f5f9;
+  --color-zinc-50:  #f8fafc;
+}
+
 /* Chế độ sáng: đảo thang zinc + white/black để toàn bộ UI (viết theo dark) tự đổi màu,
    không phải sửa từng class trong các page. Các màu nhấn -300/-400 đậm lại cho đủ tương phản. */
 html.light {
