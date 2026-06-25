@@ -12,6 +12,7 @@ import ThemeToggle from '@/app/components/ThemeToggle';
 import EditableText from '@/app/components/EditableText';
 import OnlineUsers from '@/app/components/OnlineUsers';
 import { ROLE_LABELS } from '@/lib/roles';
+import { fetchMe, invalidateMe } from '@/app/lib/me';
 
 type Me = { id: number; name: string; email: string; role: string };
 const ROLE_LABEL: Record<string, string> = ROLE_LABELS;
@@ -36,10 +37,11 @@ export default function AppHeader({ title, subtitle, children, search = true }: 
 
   useEffect(() => {
     setPath(window.location.pathname);
-    fetch('/api/auth/me').then(r => r.ok ? r.json() : null).then(j => setMe(j?.user ?? null));
+    fetchMe().then(u => setMe(u));
   }, []);
 
   async function logout() {
+    invalidateMe();
     await fetch('/api/auth/logout', { method: 'POST' });
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHE' });
