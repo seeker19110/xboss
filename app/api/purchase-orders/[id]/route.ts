@@ -89,6 +89,13 @@ export async function DELETE(_req: NextRequest, { params: paramsP }: { params: P
     `SELECT status FROM purchase_orders WHERE id = ?`, id);
   if (!po) return NextResponse.json({ error: "Không tìm thấy đơn hàng" }, { status: 404 });
 
+  // Đã nhập kho (một phần/đủ) thì tồn kho đã cộng vào vật tư + có phiếu nhập gắn kèm —
+  // xoá sẽ tạo tồn ảo và phiếu nhập mồ côi. Phải huỷ đơn thay vì xoá.
+  const received = await queryOne<{ id: number }>(
+    `SELECT id FROM po_items WHERE po_id = ? AND qty_received > 0 LIMIT 1`, id);
+  if (received || po.status === "partial" || po.status === "received")
+    return NextResponse.json({ error: "Đơn hàng đã nhập kho, không thể xoá — hãy huỷ đơn" }, { status: 409 });
+
   await run(`DELETE FROM po_items WHERE po_id = ?`, id);
   await run(`DELETE FROM purchase_orders WHERE id = ?`, id);
   return NextResponse.json({ ok: true });

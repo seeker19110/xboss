@@ -58,7 +58,9 @@ export async function POST(req: NextRequest, { params: paramsP }: { params: Prom
     : [];
   const matMap = new Map(matRows.map(m => [m.id, m]));
 
-  const receiptId = await withTransaction(async () => {
+  let receiptId: number;
+  try {
+    receiptId = await withTransaction(async (): Promise<number> => {
     const rid = await insertId(
       `INSERT INTO warehouse_receipts (receipt_code, po_id, received_by, note)
        VALUES (?, ?, ?, ?)`,
@@ -70,6 +72,15 @@ export async function POST(req: NextRequest, { params: paramsP }: { params: Prom
       if (!poItem) continue;
       const qty = Math.max(0, Number(item.qtyReceived));
       if (qty === 0) continue;
+
+      // Khoá dòng po_item trong transaction để đọc qty_received hiện tại chính xác
+      // (chống race khi 2 phiếu nhập đồng thời cùng vượt số đã đặt).
+      const locked = await queryOne<{ qty_ordered: number; qty_received: number }>(
+        `SELECT qty_ordered, qty_received FROM po_items WHERE id = ? FOR UPDATE`, poItem.id);
+      if (!locked) continue;
+      // Throw (không return) để rollback toàn bộ phiếu nhập đang dở — return sẽ COMMIT.
+      if (locked.qty_received + qty > locked.qty_ordered)
+        throw new Error(`OVERRECEIVE:Nhập vượt số đặt cho 1 vật tư (đã đặt ${locked.qty_ordered}, đã nhận ${locked.qty_received}, nhận thêm ${qty})`);
 
       // Tạo receipt_item
       const riId = await insertId(
@@ -114,8 +125,15 @@ export async function POST(req: NextRequest, { params: paramsP }: { params: Prom
         poItem.material_id);
     }
 
-    return rid;
-  });
+      return rid;
+    });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.startsWith("OVERRECEIVE:"))
+      return NextResponse.json({ error: msg.slice("OVERRECEIVE:".length) }, { status: 409 });
+    console.error("POST /api/purchase-orders/:id/receive error:", msg);
+    return NextResponse.json({ error: "Lỗi máy chủ khi nhập kho" }, { status: 500 });
+  }
 
   return NextResponse.json({ receiptId, receiptCode }, { status: 201 });
 }

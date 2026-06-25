@@ -106,6 +106,6 @@ export async function GET() {
   return NextResponse.json({ stockSummary, overBudget, lowStock, warehouseAge, noTaskIssues, needsStock });
   } catch (e) {
     console.error('[reports]', e);
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Lỗi máy chủ khi tổng hợp báo cáo vật tư" }, { status: 500 });
   }
 }
