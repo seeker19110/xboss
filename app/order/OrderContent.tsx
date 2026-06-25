@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback, useDeferredValue, useMemo } from 'react';
-import { Printer, ArrowLeft, Plus, Trash2, X, Table2 } from 'lucide-react';
+import { Printer, ArrowLeft, Plus } from 'lucide-react';
 import SpreadsheetGrid, { type GridColumn, type GridEdit } from '@/app/components/SpreadsheetGrid';
 
 type Supplier = {
@@ -69,8 +69,6 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
   };
   const logoInputRef = useCallback((el: HTMLInputElement | null) => { if (el) el.value = ''; }, []);
   const [boqSearch, setBoqSearch] = useState<{ uid: string; term: string } | null>(null);
-  // Chế độ bảng tính: paste nhiều dòng từ Excel trực tiếp vào bảng order.
-  const [sheetMode, setSheetMode] = useState(false);
 
   useEffect(() => {
     fetch('/api/project').then(r => r.json()).then(j => setProject(j));
@@ -189,8 +187,6 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
     }));
   }, [findByBoq]);
 
-  const inputCls = "no-print outline-none border-b border-gray-300 bg-transparent w-full text-[10px] text-center py-[2px] focus:border-gray-500";
-  const inputLeftCls = "no-print outline-none border-b border-gray-300 bg-transparent w-full text-[10px] py-[2px] focus:border-gray-500";
 
   const InfoField = ({ label, value, onChange: _onChange, placeholder: _placeholder, labelWidth = '78px', style }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; labelWidth?: string; style?: React.CSSProperties }) => (
     <div className="flex items-baseline gap-2 text-[10px] min-w-0 py-[2px]" style={style}>
@@ -223,11 +219,6 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
               {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           )}
-          <button onClick={() => setSheetMode(v => !v)}
-            title={sheetMode ? 'Tắt chế độ bảng tính' : 'Bật bảng tính: nhập/paste từ Excel'}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition border ${sheetMode ? 'bg-sky-600/20 border-sky-600 text-sky-300' : 'border-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-white'}`}>
-            <Table2 className="w-4 h-4" /> Bảng tính
-          </button>
           <button onClick={addRow}
             className="flex items-center gap-1.5 border border-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-white rounded-lg px-3 py-1.5 text-sm transition">
             <Plus className="w-4 h-4" /> Thêm hàng
@@ -239,24 +230,6 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
         </div>
       </div>
 
-      {/* Panel bảng tính — nhập/paste từ Excel, phản chiếu ngay vào form A4 bên dưới */}
-      {sheetMode && (
-        <div className="no-print bg-zinc-900 border-b border-zinc-800 px-4 py-4 space-y-2">
-          <p className="text-xs text-zinc-400 flex flex-wrap items-center gap-x-3">
-            <span className="text-zinc-300 font-medium">Nhập nhanh từ Excel</span>
-            <span>Click ô để chọn, gõ để sửa, <b>Enter</b> xuống dòng, <b>Ctrl/⌘+V</b> dán cả vùng, <b>Ctrl/⌘+D</b> điền xuống.</span>
-            <span className="text-zinc-500">Cột BOQ Code tự tra vật tư và điền ĐM/ĐVT. Thay đổi ở đây phản chiếu ngay vào form in bên dưới.</span>
-          </p>
-          <SpreadsheetGrid<OrderRow>
-            rows={rows}
-            columns={orderGridColumns}
-            rowKey={r => r.uid}
-            onCommit={commitOrderGrid}
-            stickyCols={1}
-            maxBodyHeight={320}
-          />
-        </div>
-      )}
 
       {/* Trang A4 */}
       <div className="no-print-bg min-h-screen bg-zinc-900 py-8 px-4 flex justify-center" onClick={() => setBoqSearch(null)}>
@@ -336,108 +309,74 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
             <p className="font-bold text-[10px] uppercase pt-1">D. Chi tiết đơn hàng:</p>
           </div>
 
-          {/* Bảng đặt hàng */}
-          <div className="relative" onClick={e => e.stopPropagation()}>
-            <table className="w-full border-collapse text-[10px]">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="no-print border border-gray-400 px-1 py-1 text-center w-20">Mã BOQ</th>
-                  <th className="border border-gray-400 px-1 py-1 text-center w-7">STT</th>
-                  <th className="border border-gray-400 px-1.5 py-1 text-center">Mô tả / Tên vật tư</th>
-                  <th className="border border-gray-400 px-1 py-1 text-center w-9">ĐVT</th>
-                  <th className="no-print border border-gray-400 px-1 py-1 text-center w-12">ĐM BOQ</th>
-                  <th className="border border-gray-400 px-1 py-1 text-center w-12">ĐM Tháp</th>
-                  <th className="border border-gray-400 px-1 py-1 text-center w-14">KL đã đặt hàng</th>
-                  <th className="border border-gray-400 px-1 py-1 text-center w-14">KL đặt hàng</th>
-                  <th className="no-print border border-gray-400 px-1 py-1 text-center w-12">KL còn lại</th>
-                  <th className="border border-gray-400 px-1 py-1 text-center w-12">% Đặt hàng</th>
-                  <th className="border border-gray-400 px-1 py-1 text-center w-14">% Tiến độ ĐH</th>
-                  <th className="border border-gray-400 px-1.5 py-1 text-center w-20">Ghi chú</th>
-                  <th className="no-print border border-gray-400 px-1 py-1 w-6"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => {
-                  const rem = remaining(r);
-                  const remNum = parseFloat(rem);
-                  const planned = parseFloat(r.qtyPlanned) || 0;
-                  const used    = parseFloat(r.qtyUsed)    || 0;
-                  const order   = parseFloat(r.orderQty)   || 0;
-                  const pctOrder    = planned > 0 ? Math.round(order / planned * 100) : null;
-                  const pctProgress = planned > 0 ? Math.round((used + order) / planned * 100) : null;
-                  const showSuggestions = boqSearch?.uid === r.uid && suggestions.length > 0;
-                  return (
-                    <tr key={r.uid} className="group/row hover:bg-gray-50">
-                      <td className="no-print border border-gray-300 px-1 py-0.5 relative">
-                        <input value={r.boqCode}
-                          onChange={e => onBoqChange(r.uid, e.target.value)}
-                          onClick={e => { e.stopPropagation(); if (r.boqCode) setBoqSearch({ uid: r.uid, term: r.boqCode }); }}
-                          placeholder="Nhập mã…"
-                          className={`outline-none border-b border-gray-300 bg-transparent w-full text-[10px] text-center py-[2px] focus:border-blue-400 font-mono ${r.linked ? 'text-amber-600 font-semibold' : ''}`} />
-                        {showSuggestions && (
-                          <div className="absolute left-0 top-full z-50 bg-white border border-gray-300 shadow-lg rounded w-56 max-h-40 overflow-auto">
-                            {suggestions.map(m => (
-                              <button key={m.id} onMouseDown={e => { e.preventDefault(); applyMaterial(r.uid, m); }}
-                                className="w-full text-left px-2 py-1.5 text-[10px] hover:bg-blue-50 border-b border-gray-100">
-                                <span className="font-mono font-semibold text-amber-600 mr-1">{m.boqCode}</span>
-                                <span className="text-gray-700">{m.name}</span>
-                                {m.sheetCode && <span className="text-gray-400 ml-1">[{m.sheetCode}]</span>}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </td>
-                      <td className="border border-gray-300 px-1 py-0.5">
-                        <input value={r.stt} onChange={e => updateRow(r.uid, { stt: e.target.value })} className={inputCls} />
-                        <span className="print-only block text-center">{r.stt}</span>
-                      </td>
-                      <td className="border border-gray-300 px-1 py-0.5">
-                        <input value={r.name} onChange={e => updateRow(r.uid, { name: e.target.value })}
-                          placeholder={r.linked ? '' : 'Nhập tên hoặc điền mã BOQ…'}
-                          className={`${inputLeftCls} placeholder:text-gray-300`} />
-                        <span className="print-only block">{r.name}</span>
-                      </td>
-                      <td className="border border-gray-300 px-1 py-0.5">
-                        <input value={r.dvt} onChange={e => updateRow(r.uid, { dvt: e.target.value })} className={inputCls} />
-                        <span className="print-only block text-center">{r.dvt}</span>
-                      </td>
-                      <td className="no-print border border-gray-300 px-1 py-0.5 text-center text-gray-600">{r.qtyBoq || ''}</td>
-                      <td className="border border-gray-300 px-1 py-0.5 text-center text-gray-600">{r.qtyPlanned || ''}</td>
-                      <td className="border border-gray-300 px-1 py-0.5 text-center text-gray-600">{r.qtyUsed || ''}</td>
-                      <td className="border border-gray-300 px-1 py-0.5">
-                        <input type="number" min="0" value={r.orderQty}
-                          onChange={e => updateRow(r.uid, { orderQty: e.target.value })}
-                          placeholder="0"
-                          className={`${inputCls} placeholder:text-gray-300`} />
-                        <span className="print-only block text-center">{r.orderQty}</span>
-                      </td>
-                      <td className={`no-print border border-gray-300 px-1 py-0.5 text-center font-medium ${rem && remNum <= 0 ? 'text-red-600' : 'text-gray-700'}`}>{rem}</td>
-                      <td className={`border border-gray-300 px-1 py-0.5 text-center font-medium ${pctOrder !== null && pctOrder > 100 ? 'text-red-600' : 'text-gray-700'}`}>
-                        {pctOrder !== null ? `${pctOrder}%` : ''}
-                      </td>
-                      <td className={`border border-gray-300 px-1 py-0.5 text-center font-medium ${pctProgress !== null && pctProgress > 100 ? 'text-red-600' : pctProgress !== null && pctProgress >= 100 ? 'text-green-600' : 'text-gray-700'}`}>
-                        {pctProgress !== null ? `${pctProgress}%` : ''}
-                      </td>
-                      <td className="border border-gray-300 px-1 py-0.5">
-                        <input value={r.note} onChange={e => updateRow(r.uid, { note: e.target.value })} className={inputLeftCls} />
-                        <span className="print-only block">{r.note}</span>
-                      </td>
-                      <td className="no-print border border-gray-300 px-0.5 py-0.5 text-center">
-                        <button onClick={() => removeRow(r.uid)}
-                          className="opacity-0 group-hover/row:opacity-100 text-gray-300 hover:text-red-500 transition">
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          {/* Bảng đặt hàng — tích hợp SpreadsheetGrid */}
+          <div className="relative no-print" onClick={e => e.stopPropagation()}>
+            <div className="mb-2">
+              <p className="text-[10px] text-gray-600 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span>Click ô để chỉnh sửa, <b>Enter</b> xuống dòng, <b>Ctrl/⌘+V</b> dán cả vùng, <b>Ctrl/⌘+D</b> điền xuống.</span>
+                <span className="text-gray-500">Cột Mã BOQ tự tra vật tư và điền ĐM/ĐVT.</span>
+              </p>
+            </div>
+            <SpreadsheetGrid<OrderRow>
+              rows={rows}
+              columns={orderGridColumns}
+              rowKey={r => r.uid}
+              onCommit={commitOrderGrid}
+              stickyCols={1}
+              maxBodyHeight={400}
+            />
             <button onClick={addRow}
-              className="no-print mt-1 flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-700 transition">
+              className="mt-2 flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-700 transition">
               <Plus className="w-3 h-3" /> Thêm hàng
             </button>
           </div>
+
+          {/* Bảng in — hiển thị khi in PDF */}
+          <table className="print-only w-full border-collapse text-[10px]">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="border border-gray-400 px-1 py-1 text-center w-20">Mã BOQ</th>
+                <th className="border border-gray-400 px-1 py-1 text-center w-7">STT</th>
+                <th className="border border-gray-400 px-1.5 py-1 text-center">Mô tả / Tên vật tư</th>
+                <th className="border border-gray-400 px-1 py-1 text-center w-9">ĐVT</th>
+                <th className="border border-gray-400 px-1 py-1 text-center w-12">ĐM Tháp</th>
+                <th className="border border-gray-400 px-1 py-1 text-center w-14">KL đã đặt hàng</th>
+                <th className="border border-gray-400 px-1 py-1 text-center w-14">KL đặt hàng</th>
+                <th className="border border-gray-400 px-1 py-1 text-center w-12">% Đặt hàng</th>
+                <th className="border border-gray-400 px-1 py-1 text-center w-14">% Tiến độ ĐH</th>
+                <th className="border border-gray-400 px-1.5 py-1 text-center w-20">Ghi chú</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => {
+                const rem = remaining(r);
+                const remNum = parseFloat(rem);
+                const planned = parseFloat(r.qtyPlanned) || 0;
+                const used    = parseFloat(r.qtyUsed)    || 0;
+                const order   = parseFloat(r.orderQty)   || 0;
+                const pctOrder    = planned > 0 ? Math.round(order / planned * 100) : null;
+                const pctProgress = planned > 0 ? Math.round((used + order) / planned * 100) : null;
+                return (
+                  <tr key={r.uid} className="border-b border-gray-300">
+                    <td className="border border-gray-300 px-1 py-0.5 text-center">{r.boqCode}</td>
+                    <td className="border border-gray-300 px-1 py-0.5 text-center">{r.stt}</td>
+                    <td className="border border-gray-300 px-1 py-0.5">{r.name}</td>
+                    <td className="border border-gray-300 px-1 py-0.5 text-center">{r.dvt}</td>
+                    <td className="border border-gray-300 px-1 py-0.5 text-center text-gray-600">{r.qtyPlanned || ''}</td>
+                    <td className="border border-gray-300 px-1 py-0.5 text-center text-gray-600">{r.qtyUsed || ''}</td>
+                    <td className="border border-gray-300 px-1 py-0.5 text-center">{r.orderQty}</td>
+                    <td className="border border-gray-300 px-1 py-0.5 text-center font-medium">
+                      {pctOrder !== null ? `${pctOrder}%` : ''}
+                    </td>
+                    <td className="border border-gray-300 px-1 py-0.5 text-center font-medium">
+                      {pctProgress !== null ? `${pctProgress}%` : ''}
+                    </td>
+                    <td className="border border-gray-300 px-1 py-0.5">{r.note}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
 
           {/* Thông tin giao hàng */}
           <div className="mt-4 border border-teal-200 rounded text-[10px]">
