@@ -625,7 +625,7 @@ export default function SpreadsheetGrid<Row>({
                     const condClass = col.cellClass?.(row) ?? '';
                     // Kẻ hàng xen kẽ 2 màu (zebra): dùng token zinc để light mode ra
                     // dải xám sáng (~#EEEEEE/#CCCCCC), dark mode tự đảo — không hardcode hex.
-                    const rowBg = displayR % 2 === 0 ? 'bg-zinc-950' : 'bg-zinc-900';
+                    const rowBg = displayR % 2 === 0 ? 'bg-zinc-950' : 'bg-zinc-800';
                     return (
                       <td
                         key={col.key}
