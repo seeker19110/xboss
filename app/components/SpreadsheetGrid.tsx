@@ -256,7 +256,7 @@ export default function SpreadsheetGrid<Row>({
   useEffect(() => {
     function handleMouseMove(e: MouseEvent) {
       if (resizingCol === null) return;
-      const newW = Math.max(60, (e as any).clientX - (gridRef.current?.getBoundingClientRect().left ?? 0));
+      const newW = Math.max(60, e.clientX - (gridRef.current?.getBoundingClientRect().left ?? 0));
       setColWidths(prev => ({ ...prev, [resizingCol]: newW }));
     }
     function handleMouseUp() {
