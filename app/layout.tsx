@@ -23,7 +23,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="vi" className="h-full antialiased dark" suppressHydrationWarning>
       <head>
-        <Script id="theme-init" strategy="beforeInteractive">{`try{var t=localStorage.getItem('xboss_theme');if(t==='light'){var e=document.documentElement;e.classList.remove('dark');e.classList.add('light');}}catch(_){}`}</Script>
+        <Script id="theme-init" strategy="beforeInteractive">{`try{var T=['dark','light','kingblue','darkblue','navy'];var t=localStorage.getItem('xboss_theme');if(t&&T.indexOf(t)>=0&&t!=='dark'){var e=document.documentElement;e.classList.remove('dark');e.classList.add(t);}}catch(_){}`}</Script>
       </head>
       <body className="min-h-full flex flex-col">
         <PwaRegister />
