@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.5.1",
+    "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.14.3",
     "lucide-react": "^1.18.0",
     "next": "^16.2.9",
@@ -23,7 +24,7 @@
     "react-dom": "^19.2.7",
     "recharts": "^3.8.1",
     "web-push": "^3.6.7",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+    "xlsx": "npm:@e965/xlsx@^0.20.3"
   },
   "overrides": {
     "postcss": ">=8.5.10"

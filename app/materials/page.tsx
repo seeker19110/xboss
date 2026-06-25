@@ -377,7 +377,7 @@ export default function MaterialsPage() {
             </button>
           ))}
           {/* Tách sang trang riêng: form đơn đặt hàng (in PDF) + quản lý PO */}
-          <a href="/materials/PurchaseOrders"
+          <a href="/materials/order-form"
             className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-zinc-400 hover:text-zinc-200 transition-colors">
             <ClipboardList className="w-3.5 h-3.5" /> Đơn đặt hàng
           </a>
@@ -443,7 +443,7 @@ export default function MaterialsPage() {
               <Table2 className="w-4 h-4" /> Bảng tính
             </button>
           )}
-          <a href="/materials/PurchaseOrders"
+          <a href="/materials/order-form"
             className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 rounded-xl px-4 py-2.5 text-sm font-medium transition shrink-0">
             <Plus className="w-4 h-4" /> Đặt hàng
           </a>

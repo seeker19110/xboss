@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { query, todayISO } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, CAN } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +11,7 @@ const WINDOW_DAYS = 14; // cửa sổ tính tốc độ
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (!CAN.viewDashboard(user.role)) return NextResponse.json({ error: "Thầu phụ không có quyền xem dashboard" }, { status: 403 });
 
   const rows = await query<{
     sheetType: string; totalTasks: number; avgProgress: number;

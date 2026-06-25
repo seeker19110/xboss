@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { query, todayISO } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, CAN } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +28,7 @@ function plannedRatio(start: string, end: string, today: number): number {
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (!CAN.viewDashboard(user.role)) return NextResponse.json({ error: "Thầu phụ không có quyền xem dashboard" }, { status: 403 });
 
   const rows = await query<Row>(
     `SELECT st.code AS "sheetType", t.start_date AS "startDate",
