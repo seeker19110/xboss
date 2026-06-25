@@ -3,8 +3,9 @@
 // (vật tư, tracking...). Dữ liệu vẫn ở Postgres: mọi thay đổi ô gom thành danh
 // sách edit và đẩy lên qua callback `onCommit` (gọi endpoint batch của trang).
 //
-// Tính năng: điều hướng bàn phím, chọn vùng (shift+click / shift+mũi tên),
-// copy/paste TSV (tương thích Excel), fill-down (Ctrl+D), xoá vùng (Delete).
+// Tính năng: điều hướng bàn phím, chọn vùng (shift+click/drag/mũi tên),
+// copy/paste/cut TSV (tương thích Excel), fill-down (Ctrl+D), xoá (Delete),
+// select all (Ctrl+A), context menu (right-click), hiển thị số lượng ô chọn.
 // Theme: chỉ dùng token Tailwind (zinc + nhấn -400), không hex, không `dark:`
 // để giữ cơ chế đảo màu sáng/tối trong globals.css.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -52,8 +53,11 @@ export default function SpreadsheetGrid<Row>({
   const [dragging, setDragging] = useState(false);
   const [saving, setSaving] = useState<Set<string>>(new Set());
   const [errors, setErrors] = useState<Map<string, string>>(new Map());
+  const [clipboard, setClipboard] = useState<{ matrix: (string | number | boolean | null)[][]; cut: boolean } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const editRef = useRef<HTMLInputElement | HTMLSelectElement>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
 
   const nCols = columns.length;
   const nRows = rows.length;
@@ -75,6 +79,19 @@ export default function SpreadsheetGrid<Row>({
       if (editRef.current instanceof HTMLInputElement) editRef.current.select();
     }
   }, [editing]);
+
+  // Đóng context menu khi click ngoài
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setContextMenu(null);
+      }
+    }
+    if (contextMenu) {
+      document.addEventListener('click', handleClick);
+      return () => document.removeEventListener('click', handleClick);
+    }
+  }, [contextMenu]);
 
   // Giữ ô active trong phạm vi khi rows/cols đổi (lọc, xoá hàng...).
   useEffect(() => {
@@ -155,8 +172,25 @@ export default function SpreadsheetGrid<Row>({
       for (let c = rect.c0; c <= rect.c1; c++) line.push(columns[c]?.get(rows[r]) ?? '');
       matrix.push(line);
     }
+    setClipboard({ matrix, cut: false });
     navigator.clipboard?.writeText(serializeTSV(matrix)).catch(() => { /* clipboard bị chặn */ });
   }, [rect, columns, rows]);
+
+  const cutSelection = useCallback(() => {
+    const matrix: (string | number | boolean | null)[][] = [];
+    for (let r = rect.r0; r <= rect.r1; r++) {
+      const line: (string | number | boolean | null)[] = [];
+      for (let c = rect.c0; c <= rect.c1; c++) line.push(columns[c]?.get(rows[r]) ?? '');
+      matrix.push(line);
+    }
+    setClipboard({ matrix, cut: true });
+    navigator.clipboard?.writeText(serializeTSV(matrix)).catch(() => { /* clipboard bị chặn */ });
+  }, [rect, columns, rows]);
+
+  const selectAll = useCallback(() => {
+    setAnchor({ r: 0, c: 0 });
+    setActive({ r: Math.max(0, nRows - 1), c: Math.max(0, nCols - 1) });
+  }, [nRows, nCols]);
 
   const pasteAt = useCallback(async (text: string) => {
     const matrix = parseTSV(text);
@@ -187,7 +221,9 @@ export default function SpreadsheetGrid<Row>({
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (editing) return; // input tự xử lý
     const mod = e.ctrlKey || e.metaKey;
+    if (mod && e.key.toLowerCase() === 'a') { e.preventDefault(); selectAll(); return; }
     if (mod && e.key.toLowerCase() === 'c') { e.preventDefault(); copySelection(); return; }
+    if (mod && e.key.toLowerCase() === 'x') { e.preventDefault(); cutSelection(); return; }
     if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); fillDown(); return; }
     if (mod) return; // để paste (onPaste) và phím hệ thống khác chạy
     switch (e.key) {
@@ -213,87 +249,164 @@ export default function SpreadsheetGrid<Row>({
     return out;
   }, [columns, stickyCols]);
 
+  const selectionCount = useMemo(() => {
+    let count = 0;
+    for (let r = rect.r0; r <= rect.r1; r++) {
+      for (let c = rect.c0; c <= rect.c1; c++) count++;
+    }
+    return count;
+  }, [rect]);
+
   return (
-    <div
-      ref={gridRef}
-      tabIndex={0}
-      onKeyDown={onKeyDown}
-      onPaste={readOnly ? undefined : (e) => { e.preventDefault(); pasteAt(e.clipboardData.getData('text/plain')); }}
-      onMouseUp={() => setDragging(false)}
-      className="overflow-auto outline-none rounded-lg border border-zinc-800 focus-visible:ring-1 focus-visible:ring-sky-400"
-      style={maxBodyHeight ? { maxHeight: maxBodyHeight } : undefined}
-      role="grid"
-      aria-rowcount={nRows + 1}
-    >
-      <table className="border-collapse text-sm" style={{ tableLayout: 'fixed' }}>
-        <thead className="sticky top-0 z-20">
-          <tr>
-            {columns.map((col, c) => (
-              <th
-                key={col.key}
-                className={`bg-zinc-900 text-zinc-300 font-medium border-b border-r border-zinc-800 px-2 py-1.5 text-left ${c < stickyCols ? 'sticky z-30' : ''}`}
-                style={{ width: colWidth(c), minWidth: colWidth(c), left: c < stickyCols ? leftOffsets[c] : undefined }}
-              >
-                {col.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, r) => (
-            <tr key={rowKey(row)}>
-              {columns.map((col, c) => {
-                const k = keyOf(r, c);
-                const isActive = active.r === r && active.c === c;
-                const selected = inRect(r, c);
-                const isSaving = saving.has(k);
-                const err = errors.get(k);
-                const editableHere = isEditable(c, row);
-                const align = col.align ?? (col.type === 'number' ? 'right' : col.type === 'checkbox' ? 'center' : 'left');
-                return (
-                  <td
-                    key={col.key}
-                    role="gridcell"
-                    aria-selected={selected}
-                    onMouseDown={(e) => {
-                      if (e.shiftKey) { setActive({ r, c }); }
-                      else { setActive({ r, c }); setAnchor({ r, c }); setDragging(true); }
-                      gridRef.current?.focus();
-                    }}
-                    onMouseEnter={() => { if (dragging) setActive({ r, c }); }}
-                    onDoubleClick={() => startEdit()}
-                    className={[
-                      'border-b border-r border-zinc-800 px-2 py-1 whitespace-nowrap relative',
-                      align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left',
-                      c < stickyCols ? 'sticky z-10 bg-zinc-950' : 'bg-zinc-950',
-                      selected ? 'bg-sky-950/40' : '',
-                      isActive ? 'ring-1 ring-inset ring-sky-400' : '',
-                      err ? 'ring-1 ring-inset ring-rose-400' : '',
-                      editableHere ? 'cursor-cell' : 'text-zinc-400',
-                    ].join(' ')}
-                    style={{ width: colWidth(c), minWidth: colWidth(c), left: c < stickyCols ? leftOffsets[c] : undefined }}
-                    title={err ?? undefined}
-                  >
-                    {editing && isActive ? (
-                      <CellEditor col={col} value={draft} setValue={setDraft} editRef={editRef}
-                        onDone={finishEdit} />
-                    ) : (
-                      <span className="block overflow-hidden text-ellipsis">
-                        {col.type === 'checkbox'
-                          ? (col.get(row) ? '✓' : '')
-                          : col.render ? col.render(row) : displayValue(col.get(row))}
-                      </span>
-                    )}
-                    {isSaving && (
-                      <Loader2 className="w-3 h-3 animate-spin text-sky-400 absolute right-1 top-1/2 -translate-y-1/2" aria-label="Đang lưu" />
-                    )}
-                  </td>
-                );
-              })}
+    <div className="relative">
+      <div className="flex items-center justify-between bg-zinc-900/50 border-b border-zinc-800 px-3 py-1.5 text-xs text-zinc-400">
+        <div>
+          {selectionCount > 1 && <span>{selectionCount} ô được chọn</span>}
+          {clipboard && <span className="ml-3 text-zinc-500">{clipboard.cut ? '✂️ Cắt' : '📋 Sao chép'}</span>}
+        </div>
+        <div className="text-[10px] text-zinc-500">Ctrl/⌘+A: Chọn tất cả | C: Sao chép | X: Cắt | V: Dán | D: Điền xuống</div>
+      </div>
+      <div
+        ref={gridRef}
+        tabIndex={0}
+        onKeyDown={onKeyDown}
+        onPaste={readOnly ? undefined : (e) => { e.preventDefault(); pasteAt(e.clipboardData.getData('text/plain')); }}
+        onMouseUp={() => setDragging(false)}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          if (!readOnly) setContextMenu({ x: e.clientX, y: e.clientY });
+        }}
+        className="overflow-auto outline-none rounded-lg border border-zinc-800 focus-visible:ring-1 focus-visible:ring-sky-400"
+        style={maxBodyHeight ? { maxHeight: maxBodyHeight } : undefined}
+        role="grid"
+        aria-rowcount={nRows + 1}
+      >
+        <table className="border-collapse text-sm" style={{ tableLayout: 'fixed' }}>
+          <thead className="sticky top-0 z-20">
+            <tr>
+              {columns.map((col, c) => (
+                <th
+                  key={col.key}
+                  className={`bg-zinc-900 text-zinc-300 font-medium border-b border-r border-zinc-800 px-2 py-1.5 text-left ${c < stickyCols ? 'sticky z-30' : ''}`}
+                  style={{ width: colWidth(c), minWidth: colWidth(c), left: c < stickyCols ? leftOffsets[c] : undefined }}
+                >
+                  {col.label}
+                </th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((row, r) => (
+              <tr key={rowKey(row)}>
+                {columns.map((col, c) => {
+                  const k = keyOf(r, c);
+                  const isActive = active.r === r && active.c === c;
+                  const selected = inRect(r, c);
+                  const isSaving = saving.has(k);
+                  const err = errors.get(k);
+                  const editableHere = isEditable(c, row);
+                  const align = col.align ?? (col.type === 'number' ? 'right' : col.type === 'checkbox' ? 'center' : 'left');
+                  return (
+                    <td
+                      key={col.key}
+                      role="gridcell"
+                      aria-selected={selected}
+                      onMouseDown={(e) => {
+                        if (e.shiftKey) { setActive({ r, c }); }
+                        else { setActive({ r, c }); setAnchor({ r, c }); setDragging(true); }
+                        gridRef.current?.focus();
+                      }}
+                      onMouseEnter={() => { if (dragging) setActive({ r, c }); }}
+                      onDoubleClick={() => startEdit()}
+                      className={[
+                        'border-b border-r border-zinc-800 px-2 py-1 whitespace-nowrap relative',
+                        align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left',
+                        c < stickyCols ? 'sticky z-10 bg-zinc-950' : 'bg-zinc-950',
+                        selected ? 'bg-sky-950/40' : '',
+                        isActive ? 'ring-1 ring-inset ring-sky-400' : '',
+                        err ? 'ring-1 ring-inset ring-rose-400' : '',
+                        editableHere ? 'cursor-cell' : 'text-zinc-400',
+                      ].join(' ')}
+                      style={{ width: colWidth(c), minWidth: colWidth(c), left: c < stickyCols ? leftOffsets[c] : undefined }}
+                      title={err ?? undefined}
+                    >
+                      {editing && isActive ? (
+                        <CellEditor col={col} value={draft} setValue={setDraft} editRef={editRef}
+                          onDone={finishEdit} />
+                      ) : (
+                        <span className="block overflow-hidden text-ellipsis">
+                          {col.type === 'checkbox'
+                            ? (col.get(row) ? '✓' : '')
+                            : col.render ? col.render(row) : displayValue(col.get(row))}
+                        </span>
+                      )}
+                      {isSaving && (
+                        <Loader2 className="w-3 h-3 animate-spin text-sky-400 absolute right-1 top-1/2 -translate-y-1/2" aria-label="Đang lưu" />
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="fixed bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl py-1 z-50 min-w-[180px]"
+          style={{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }}
+        >
+          <button
+            onClick={() => { copySelection(); setContextMenu(null); }}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700 text-left"
+          >
+            📋 Sao chép
+          </button>
+          {!readOnly && (
+            <>
+              <button
+                onClick={() => { cutSelection(); setContextMenu(null); }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700 text-left"
+              >
+                ✂️ Cắt
+              </button>
+              {clipboard && (
+                <button
+                  onClick={() => { pasteAt(serializeTSV(clipboard.matrix)); setContextMenu(null); }}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700 text-left"
+                >
+                  📌 Dán
+                </button>
+              )}
+              <div className="border-t border-zinc-700 my-1" />
+              <button
+                onClick={() => { clearSelection(); setContextMenu(null); }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700 text-left"
+              >
+                🗑️ Xoá
+              </button>
+              {rect.r0 !== rect.r1 && (
+                <button
+                  onClick={() => { fillDown(); setContextMenu(null); }}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700 text-left"
+                >
+                  ⬇️ Điền xuống
+                </button>
+              )}
+              <div className="border-t border-zinc-700 my-1" />
+              <button
+                onClick={() => { selectAll(); setContextMenu(null); }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700 text-left"
+              >
+                ⬚ Chọn tất cả
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
