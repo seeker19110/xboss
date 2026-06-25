@@ -326,6 +326,7 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
               maxBodyHeight={400}
               onAddRow={addRow}
               onDeleteRows={ids => ids.forEach(id => removeRow(String(id)))}
+              growRowsOnPaste
             />
             <button onClick={addRow}
               className="mt-2 flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-700 transition">

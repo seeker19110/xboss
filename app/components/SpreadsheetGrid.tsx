@@ -46,6 +46,9 @@ type Props<Row> = {
   // Tuỳ chọn thêm/xoá dòng: chỉ hiện nút khi trang cha cấp callback (model có hỗ trợ).
   onAddRow?: () => Promise<void> | void;
   onDeleteRows?: (rowIds: (number | string)[]) => Promise<void> | void;
+  // Khi dán vượt số dòng hiện có: tự thêm dòng mới (qua onAddRow) rồi điền tiếp.
+  // Chỉ bật cho lưới state-local (Đơn hàng/PO) — không dùng cho lưới ghi DB.
+  growRowsOnPaste?: boolean;
 };
 
 type Pos = { r: number; c: number };
@@ -53,7 +56,7 @@ const keyOf = (r: number, c: number) => `${r}:${c}`;
 
 export default function SpreadsheetGrid<Row>({
   rows, columns, rowKey, onCommit, readOnly = false, stickyCols = 1, maxBodyHeight,
-  onAddRow, onDeleteRows,
+  onAddRow, onDeleteRows, growRowsOnPaste = false,
 }: Props<Row>) {
   const [active, setActive] = useState<Pos>({ r: 0, c: 0 });
   const [anchor, setAnchor] = useState<Pos>({ r: 0, c: 0 }); // đầu vùng chọn
@@ -84,6 +87,8 @@ export default function SpreadsheetGrid<Row>({
   const [extraRects, setExtraRects] = useState<Rect[]>([]);          // các vùng chọn rời (Ctrl/Cmd+click)
   const gridRef = useRef<HTMLDivElement>(null);
   const filterMenuRef = useRef<HTMLDivElement>(null);
+  // Dán còn dở: chờ parent thêm đủ dòng (qua onAddRow) rồi mới điền nốt.
+  const pendingPaste = useRef<{ matrix: string[][]; r: number; c: number } | null>(null);
   const editRef = useRef<HTMLInputElement | HTMLSelectElement>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
@@ -254,10 +259,25 @@ export default function SpreadsheetGrid<Row>({
   const pasteAt = useCallback(async (text: string) => {
     const matrix = parseTSV(text);
     if (!matrix.length) return;
+    // Dán vượt số dòng hiện có → thêm dòng mới rồi điền nốt (chỉ lưới state-local).
+    const needed = active.r + matrix.length - nRows;
+    if (growRowsOnPaste && onAddRow && needed > 0) {
+      pendingPaste.current = { matrix, r: active.r, c: active.c };
+      for (let i = 0; i < needed; i++) await onAddRow();
+      return;
+    }
     const cells = spreadPaste(matrix, active.r, active.c)
       .filter(({ r, c }) => r < nRows && c < nCols);
     await commitCells(cells);
-  }, [active, nRows, nCols, commitCells]);
+  }, [active, nRows, nCols, commitCells, growRowsOnPaste, onAddRow]);
+
+  // Khi parent đã thêm đủ dòng cho lần dán còn dở → điền dữ liệu vào.
+  useEffect(() => {
+    const p = pendingPaste.current;
+    if (!p || nRows < p.r + p.matrix.length) return;
+    pendingPaste.current = null;
+    commitCells(spreadPaste(p.matrix, p.r, p.c).filter(({ c }) => c < nCols));
+  }, [nRows, nCols, commitCells]);
 
   const fillDown = useCallback(() => {
     if (rect.r0 === rect.r1) return;

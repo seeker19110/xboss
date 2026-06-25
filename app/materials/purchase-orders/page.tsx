@@ -454,6 +454,7 @@ export default function PurchaseOrdersPage() {
                     maxBodyHeight={300}
                     onAddRow={addItem}
                     onDeleteRows={removeGridRows}
+                    growRowsOnPaste
                   />
                 </div>
               )}
