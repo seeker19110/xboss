@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, insertId, todayISO } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { nextSeqCode, withUniqueRetry } from "@/lib/seqcode";
 
 export const dynamic = "force-dynamic";
 
@@ -51,19 +52,17 @@ export async function POST(req: NextRequest) {
   const mat = await queryOne(`SELECT id FROM materials WHERE id = ?`, materialId);
   if (!mat) return NextResponse.json({ error: "Vật tư không tồn tại" }, { status: 404 });
 
-  // Sinh mã PR: PR-YYYYMM-NNN
+  // Sinh mã PR: PR-YYYYMM-NNN — retry nếu đụng mã do tạo đồng thời.
   const ym = todayISO().slice(0, 7).replace("-", "");
-  const last = await queryOne<{ pr_code: string }>(
-    `SELECT pr_code FROM purchase_requests WHERE pr_code LIKE ? ORDER BY pr_code DESC LIMIT 1`,
-    `PR-${ym}-%`);
-  const seq = last ? parseInt(last.pr_code.split("-")[2]) + 1 : 1;
-  const prCode = `PR-${ym}-${String(seq).padStart(3, "0")}`;
-
-  const id = await insertId(
-    `INSERT INTO purchase_requests (pr_code, material_id, qty_requested, note, requested_by)
-     VALUES (?, ?, ?, ?, ?)`,
-    prCode, materialId, qtyRequested,
-    body.note ? String(body.note).trim() : null,
-    user.id);
+  const { id, prCode } = await withUniqueRetry(async () => {
+    const prCode = await nextSeqCode("purchase_requests", "pr_code", `PR-${ym}-`);
+    const id = await insertId(
+      `INSERT INTO purchase_requests (pr_code, material_id, qty_requested, note, requested_by)
+       VALUES (?, ?, ?, ?, ?)`,
+      prCode, materialId, qtyRequested,
+      body.note ? String(body.note).trim() : null,
+      user.id);
+    return { id, prCode };
+  });
   return NextResponse.json({ id, prCode }, { status: 201 });
 }

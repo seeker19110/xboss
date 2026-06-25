@@ -40,8 +40,8 @@ export async function PATCH(req: NextRequest) {
         const patch = (u.patch && typeof u.patch === "object" ? u.patch : {}) as Record<string, unknown>;
         if (isNaN(id)) throw new Error("ID không hợp lệ");
 
-        const m = await queryOne<{ id: number; qty_used: number }>(
-          `SELECT id, qty_used FROM materials WHERE id = ?`, id);
+        const m = await queryOne<{ id: number; qty_used: number; qty_stock: number }>(
+          `SELECT id, qty_used, COALESCE(qty_stock, 0) AS qty_stock FROM materials WHERE id = ?`, id);
         if (!m) throw new Error(`Không tìm thấy vật tư #${id}`);
 
         if (patch.status !== undefined && !STATUSES.includes(String(patch.status)))
@@ -77,6 +77,16 @@ export async function PATCH(req: NextRequest) {
               `INSERT INTO material_transactions (material_id, delta, qty_after, note, created_by)
                VALUES (?, ?, ?, 'Sửa hàng loạt (lưới)', ?)`,
               id, delta, newQty, user.id);
+          }
+        }
+        if (patch.qtyStock !== undefined) {
+          const newStock = Number(patch.qtyStock) || 0;
+          const delta = newStock - (m.qty_stock ?? 0);
+          if (delta !== 0) {
+            await run(
+              `INSERT INTO material_transactions (material_id, delta, qty_after, type, note, created_by)
+               VALUES (?, ?, ?, 'dieu_chinh_kho', 'Điều chỉnh tồn kho (lưới)', ?)`,
+              id, delta, newStock, user.id);
           }
         }
         count++;

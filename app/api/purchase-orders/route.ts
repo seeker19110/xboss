@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne, insertId, run, withTransaction, todayISO } from "@/lib/db";
+import { query, insertId, run, withTransaction, todayISO } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
+import { nextSeqCode, withUniqueRetry } from "@/lib/seqcode";
 
 export const dynamic = "force-dynamic";
 
@@ -51,15 +52,10 @@ export async function POST(req: NextRequest) {
     Array.isArray(body.items) ? body.items : [];
   if (!items.length) return NextResponse.json({ error: "Đơn hàng phải có ít nhất 1 vật tư" }, { status: 400 });
 
-  // Sinh mã PO: PO-YYYYMM-NNN
+  // Sinh mã PO: PO-YYYYMM-NNN — retry toàn bộ (gen + transaction) nếu đụng mã.
   const ym = todayISO().slice(0, 7).replace("-", "");
-  const last = await queryOne<{ po_code: string }>(
-    `SELECT po_code FROM purchase_orders WHERE po_code LIKE ? ORDER BY po_code DESC LIMIT 1`,
-    `PO-${ym}-%`);
-  const seq = last ? parseInt(last.po_code.split("-")[2]) + 1 : 1;
-  const poCode = `PO-${ym}-${String(seq).padStart(3, "0")}`;
-
-  const poId = await withTransaction(async () => {
+  const { poId, poCode } = await withUniqueRetry(() => withTransaction(async () => {
+    const poCode = await nextSeqCode("purchase_orders", "po_code", `PO-${ym}-`);
     const id = await insertId(
       `INSERT INTO purchase_orders (po_code, supplier_id, expected_date, note, created_by)
        VALUES (?, ?, ?, ?, ?)`,
@@ -88,8 +84,8 @@ export async function POST(req: NextRequest) {
       await run(`UPDATE purchase_requests SET status = 'ordered' WHERE id = ?`, prId);
     }
 
-    return id;
-  });
+    return { poId: id, poCode };
+  }));
 
   return NextResponse.json({ id: poId, poCode }, { status: 201 });
 }
