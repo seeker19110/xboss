@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, run } from "@/lib/db";
+import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { SLUG_RE } from "@/lib/sheets";
 
@@ -73,16 +73,20 @@ export async function DELETE(_req: NextRequest, { params: paramsP }: { params: P
 
   // FK không có ON DELETE CASCADE — xoá thủ công theo thứ tự phụ thuộc.
   // Tên bảng lấy từ danh sách cố định; id luôn truyền qua placeholder ?.
+  // Bọc transaction: xoá nhiều bảng phụ thuộc, lỗi giữa chừng phải rollback
+  // toàn bộ để không để lại dữ liệu mồ côi (orphan).
   const taskIdsSql = `SELECT t.id FROM tasks t JOIN work_packages wp ON t.package_id = wp.id WHERE wp.sheet_type_id = ?`;
-  for (const tbl of ["progress_dimensions", "task_history", "task_photos", "task_comments", "task_documents", "baseline_tasks"]) {
-    await run(`DELETE FROM ${tbl} WHERE task_id IN (${taskIdsSql})`, id);
-  }
-  await run(`DELETE FROM notifications WHERE task_id IN (${taskIdsSql})`, id);
-  await run(`DELETE FROM notifications WHERE material_id IN (SELECT id FROM materials WHERE sheet_type_id = ?)`, id);
-  await run(`DELETE FROM material_transactions WHERE material_id IN (SELECT id FROM materials WHERE sheet_type_id = ?)`, id);
-  await run(`DELETE FROM materials WHERE sheet_type_id = ?`, id);
-  await run(`DELETE FROM tasks WHERE package_id IN (SELECT id FROM work_packages WHERE sheet_type_id = ?)`, id);
-  await run(`DELETE FROM work_packages WHERE sheet_type_id = ?`, id);
-  await run(`DELETE FROM sheet_types WHERE id = ?`, id);
+  await withTransaction(async () => {
+    for (const tbl of ["progress_dimensions", "task_history", "task_photos", "task_comments", "task_documents", "baseline_tasks"]) {
+      await run(`DELETE FROM ${tbl} WHERE task_id IN (${taskIdsSql})`, id);
+    }
+    await run(`DELETE FROM notifications WHERE task_id IN (${taskIdsSql})`, id);
+    await run(`DELETE FROM notifications WHERE material_id IN (SELECT id FROM materials WHERE sheet_type_id = ?)`, id);
+    await run(`DELETE FROM material_transactions WHERE material_id IN (SELECT id FROM materials WHERE sheet_type_id = ?)`, id);
+    await run(`DELETE FROM materials WHERE sheet_type_id = ?`, id);
+    await run(`DELETE FROM tasks WHERE package_id IN (SELECT id FROM work_packages WHERE sheet_type_id = ?)`, id);
+    await run(`DELETE FROM work_packages WHERE sheet_type_id = ?`, id);
+    await run(`DELETE FROM sheet_types WHERE id = ?`, id);
+  });
   return NextResponse.json({ ok: true });
 }

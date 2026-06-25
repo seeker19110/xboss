@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, todayISO } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, CAN } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +19,7 @@ const toISO = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (!CAN.viewDashboard(user.role)) return NextResponse.json({ error: "Thầu phụ không có quyền xem dashboard" }, { status: 403 });
 
   const sheet = req.nextUrl.searchParams.get("sheet");
   const baselineId = parseInt(req.nextUrl.searchParams.get("baseline") ?? "");
