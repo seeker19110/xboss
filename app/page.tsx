@@ -1,21 +1,25 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import {
   AlertTriangle, Clock, Upload, ChevronRight,
   FileDown, Printer, Plus, ExternalLink, Trash2, TrendingDown, GripVertical,
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { slugFromCode, toSlug } from '@/lib/sheets';
 import AppHeader from '@/app/components/AppHeader';
-import FloorHeatmap from '@/app/components/FloorHeatmap';
-import ForecastCards from '@/app/components/ForecastCards';
-import SpiCards from '@/app/components/SpiCards';
-import BlockedPanel from '@/app/components/BlockedPanel';
-import SCurveChart from '@/app/components/SCurveChart';
 import { Modal } from '@/app/components/dialogs';
-import { PageSkeleton } from '@/app/components/Skeleton';
+import { PageSkeleton, Skeleton } from '@/app/components/Skeleton';
 import EditableText from '@/app/components/EditableText';
 import { DELAY_REASON_LABEL } from '@/lib/delay';
+import { fetchMe, type Me } from '@/app/lib/me';
+
+// Lazy-load các component nặng (recharts, nhiều fetch) — chỉ load khi đã render shell
+const FloorHeatmap = dynamic(() => import('@/app/components/FloorHeatmap'), { ssr: false, loading: () => <Skeleton className="h-48 rounded-xl" /> });
+const BlockedPanel = dynamic(() => import('@/app/components/BlockedPanel'), { ssr: false, loading: () => <Skeleton className="h-24 rounded-xl" /> });
+const SpiCards = dynamic(() => import('@/app/components/SpiCards'), { ssr: false, loading: () => <Skeleton className="h-28 rounded-xl" /> });
+const ForecastCards = dynamic(() => import('@/app/components/ForecastCards'), { ssr: false, loading: () => <Skeleton className="h-28 rounded-xl" /> });
+const SCurveChart = dynamic(() => import('@/app/components/SCurveChart'), { ssr: false, loading: () => <Skeleton className="h-64 rounded-xl" /> });
+const DashboardBarChart = dynamic(() => import('@/app/components/DashboardBarChart'), { ssr: false, loading: () => <Skeleton className="h-56 rounded-xl" /> });
 
 const STATUS_LABEL: Record<string, string> = {
   chuan_bi: 'Chuẩn bị', dang_thi_cong: 'Đang thi công',
@@ -30,7 +34,6 @@ type DelayedTask = {
 };
 type KPI = { sheetId: number; sheetType: string; sheetSlug: string | null; total: number; avgProgress: number; delayed: number };
 type SheetNav = { id: number; code: string; name: string; slug: string };
-type Me = { id: number; name: string; email: string; role: string };
 
 function fmtDate(d: string | null) {
   if (!d) return '—';
@@ -57,13 +60,13 @@ export default function Dashboard() {
   useEffect(() => {
     Promise.all([
       fetch('/api/project').then(r => r.ok ? r.json() : null),
-      fetch('/api/auth/me').then(r => { if (r.status === 401) window.location.href = '/login'; return r.ok ? r.json() : null; }),
+      fetchMe(),
       fetch('/api/dashboard').then(r => r.ok ? r.json() : null),
       fetch('/api/sheets').then(r => r.ok ? r.json() : null),
     ]).then(([proj, meData, dash, sh]) => {
       if (!meData) return;
       setProjectName(proj?.name ?? null);
-      setMe(meData.user);
+      setMe(meData);
       setData(dash);
       setKpiOrder(dash?.kpi ?? []);
       setSheets(sh?.sheets ?? []);
@@ -279,29 +282,7 @@ export default function Dashboard() {
         <SCurveChart />
 
         {/* ── Bar chart tiến độ ── */}
-        <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-          <h2 className="text-sm font-semibold text-zinc-200 mb-4">
-            <EditableText tkey="dashboard.chart.title">% Tiến độ trung bình theo Sheet</EditableText>
-          </h2>
-          <div style={{ width: '100%', height: 220 }}>
-            <ResponsiveContainer>
-              <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 4, left: -20 }}>
-                <XAxis dataKey="name" stroke="var(--color-zinc-600)" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis stroke="var(--color-zinc-600)" fontSize={11} domain={[0, 100]} unit="%" tickLine={false} axisLine={false} />
-                <Tooltip
-                  cursor={{ fill: 'var(--color-zinc-800)' }}
-                  contentStyle={{ background: 'var(--color-zinc-900)', border: '1px solid var(--color-zinc-700)', borderRadius: 8, color: 'var(--foreground)', fontSize: 12 }}
-                  formatter={(v) => [`${v}%`, 'Tiến độ']}
-                />
-                <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={60}>
-                  {chartData.map((d, i) => (
-                    <Cell key={i} fill={d.delayed > 0 ? 'var(--color-amber-500)' : 'var(--color-emerald-500)'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </section>
+        <DashboardBarChart data={chartData} />
 
         {/* ── Pareto nguyên nhân trễ ── */}
         {allDelayed.length > 0 && (reasonCounts.length > 0 || noReason > 0) && (

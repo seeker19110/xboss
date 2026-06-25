@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Building2, Plus, Pencil, Trash2, Check, X } from 'lucide-react';
 import { slugFromCode } from '@/lib/sheets';
+import { fetchMe } from '@/app/lib/me';
 
 type CellData = { tower: string | null; sheetType: string; floor: string; progress: number; tasks: number; delayed: number; sheetSlug?: string | null };
 type Tower = { name: string; sheets: string[]; floors: string[] };
@@ -77,10 +78,7 @@ export default function FloorHeatmap() {
 
   useEffect(() => {
     reload();
-    fetch('/api/auth/me').then(r => r.ok ? r.json() : null).then(j => {
-      const role = j?.user?.role;
-      setCanEdit(role === 'admin' || role === 'pm');
-    });
+    fetchMe().then(u => setCanEdit(u?.role === 'admin' || u?.role === 'pm'));
     fetch('/api/project').then(r => r.ok ? r.json() : null).then(j => {
       if (j?.project?.heatmapTitle) setTitle(j.project.heatmapTitle);
     });

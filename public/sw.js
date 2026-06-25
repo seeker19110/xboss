@@ -1,6 +1,6 @@
 // Service worker XBoss — network-first cho trang + API GET, cache-first cho asset tĩnh.
 // Mất mạng (hầm, tầng kỹ thuật) vẫn xem được dữ liệu tracking đã tải lần cuối.
-const CACHE = "xboss-v4";
+const CACHE = "xboss-v5";
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => {

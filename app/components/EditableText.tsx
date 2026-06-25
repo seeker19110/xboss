@@ -6,6 +6,7 @@
 // Kho override tải 1 lần, chia sẻ cho mọi component qua store ngoài React.
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Pencil, Check, X } from 'lucide-react';
+import { fetchMe } from '@/app/lib/me';
 
 let cache: Record<string, string> | null = null;
 let isAdmin = false;
@@ -17,10 +18,10 @@ function ensureLoaded() {
   if (cache || loading) return;
   loading = Promise.all([
     fetch('/api/ui-texts').then(r => (r.ok ? r.json() : { texts: {} })).catch(() => ({ texts: {} })),
-    fetch('/api/auth/me').then(r => (r.ok ? r.json() : null)).catch(() => null),
+    fetchMe(),
   ]).then(([t, me]) => {
     cache = t && typeof t.texts === 'object' && t.texts ? t.texts : {};
-    isAdmin = me?.user?.role === 'admin';
+    isAdmin = me?.role === 'admin';
     emit();
   });
 }

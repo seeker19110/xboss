@@ -1,8 +1,17 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   serverExternalPackages: ["pg", "better-sqlite3"],
+  images: {
+    formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 3600,
+  },
   async headers() {
     return [
+      // Manifest + icons — cache 1 ngày
+      {
+        source: "/:file(manifest\\.webmanifest|icon.*\\.png|icon\\.svg|sw\\.js)",
+        headers: [{ key: "Cache-Control", value: "public, max-age=86400" }],
+      },
       {
         source: "/:path*",
         headers: [
@@ -15,8 +24,7 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              // Next.js inline scripts + HMR cần unsafe-inline; production nên dùng nonce nhưng phức tạp hơn
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              "script-src 'self' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
               "font-src 'self'",
