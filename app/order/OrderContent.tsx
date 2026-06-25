@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback, useDeferredValue, useMemo } from 'react';
-import { Printer, ArrowLeft, Plus } from 'lucide-react';
+import { Printer, ArrowLeft, Plus, X } from 'lucide-react';
 import SpreadsheetGrid, { type GridColumn, type GridEdit } from '@/app/components/SpreadsheetGrid';
 
 type Supplier = {
