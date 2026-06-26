@@ -32,6 +32,25 @@ Truy cập: `http://<IP-server>:3000`
 
 Cập nhật phiên bản mới: `git pull` rồi `docker compose up -d --build` (dữ liệu giữ nguyên trong volume `xboss-pgdata`).
 
+### Script một lệnh: `deploy.sh`
+
+`deploy.sh` gói toàn bộ Cách A lại — VPS **luôn chạy nhánh `main`**: script tự
+`git fetch` + `reset --hard origin/main`, build lại image, khởi động qua Compose,
+và **tự seed dữ liệu ở lần deploy đầu** (phát hiện qua volume `xboss-pgdata`).
+Chạy lại nhiều lần an toàn (idempotent).
+
+```bash
+cd xboss
+./deploy.sh            # cập nhật: kéo main mới nhất + build + up
+./deploy.sh --seed     # ép chạy lại db:seed sau khi up
+./deploy.sh --no-pull  # build code đang có sẵn trên VPS, không git pull
+```
+
+> ⚠️ `reset --hard` sẽ **xoá mọi sửa đổi cục bộ** trên VPS để khớp đúng
+> `origin/main` — đừng sửa file trực tiếp trên server, hãy đổi cấu hình qua biến
+> môi trường hoặc file `.env`. Nhớ đổi `XBOSS_SECRET` trong `docker-compose.yml`
+> (script sẽ cảnh báo nếu vẫn để giá trị mặc định).
+
 ---
 
 ## Cách B — Không Docker (Node ≥ 20 + pm2 + Supabase)
