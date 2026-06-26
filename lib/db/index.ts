@@ -523,6 +523,22 @@ CREATE TABLE IF NOT EXISTS package_dependencies (
 );
 CREATE INDEX IF NOT EXISTS idx_pkg_dep_succ ON package_dependencies(successor_id);
 CREATE INDEX IF NOT EXISTS idx_pkg_dep_pred ON package_dependencies(predecessor_id);
+
+-- Trạng thái đồng bộ vật tư ↔ Google Sheet: snapshot trường đã đồng bộ lần trước
+-- để 3-way merge biết phía nào (DB / Sheet) đã thay đổi từ lần sync gần nhất.
+CREATE TABLE IF NOT EXISTS material_sync (
+  material_id INTEGER PRIMARY KEY REFERENCES materials(id) ON DELETE CASCADE,
+  synced_fields TEXT,
+  last_synced_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Khoá chống chạy chồng (nút thủ công + cron): 1 hàng mỗi tác vụ. Acquire bằng
+-- INSERT ... ON CONFLICT có điều kiện thời gian (an toàn với pool, không cần giữ
+-- kết nối); tự phục hồi sau 10 phút nếu tiến trình giữ khoá chết giữa chừng.
+CREATE TABLE IF NOT EXISTS sync_locks (
+  name TEXT PRIMARY KEY,
+  locked_at TIMESTAMPTZ
+);
 `;
 
 export function getPool(): Pool {

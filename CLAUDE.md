@@ -38,6 +38,7 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy lint + typecheck + test +
 - `CRON_SECRET` — bảo vệ `/api/cron/daily-report`, chỉ nhận qua header `Authorization: Bearer` (không qua query param).
 - `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` — (tuỳ chọn) gửi báo cáo trễ hạn hằng ngày qua Telegram, song song với email SMTP.
 - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` — (tuỳ chọn) Web Push; sinh key bằng `npx web-push generate-vapid-keys`. Thiếu key → nút bật push tự ẩn, mọi hàm gửi trong `lib/push.ts` là no-op.
+- `GOOGLE_SERVICE_ACCOUNT_JSON` (hoặc cặp `GOOGLE_SA_EMAIL` + `GOOGLE_SA_PRIVATE_KEY`) + `GOOGLE_SHEET_ID` + `GOOGLE_SHEET_TAB` — (tuỳ chọn) đồng bộ hai chiều bảng vật tư ↔ Google Sheet. Thiếu cấu hình → `lib/google-sheets.ts` throw fail-fast khi gọi sync (build vẫn chạy).
 
 ## Kiến trúc
 
@@ -64,6 +65,7 @@ Project → Tower → SheetType (5 sheet) → WorkPackage → Task → ProgressD
 - `ProgressDimension` = ô checkbox trong lưới tracking (mỗi kích thước ống hoặc mỗi căn hộ).
 - BOQCODE (`lib/boq.ts`): mã duy nhất **toàn hệ thống trên tasks, work_packages lẫn materials** — khi sửa/tạo phải check `boqTakenBy` trước.
 - Vật tư: mọi thay đổi `qty_used` ghi vào `material_transactions` (delta ±, người ghi) — qua `POST /api/materials/:id/transactions` hoặc tự động khi PATCH `qtyUsed` trực tiếp.
+- **Đồng bộ Google Sheet (`lib/material-sync.ts` + `lib/google-sheets.ts`):** đồng bộ **hai chiều** `materials` ↔ một Google Sheet bằng Service Account. Khớp dòng theo cột `ID`; 3-way merge dựa snapshot bảng `material_sync` (chỉ DB đổi → đẩy ra Sheet, chỉ Sheet đổi → kéo vào DB, cả hai đổi → xung đột, **DB ưu tiên** qua `CONFLICT_POLICY`). Chỉ các trường định nghĩa (`SYNCED_FIELDS`: boqCode/name/unit/qtyBoq/qtyPlanned/status/note) là hai chiều; `qty_used`/`qty_stock`/`min_stock_level` chỉ DB→Sheet (giữ nguyên audit). Chống chạy chồng bằng bảng khoá `sync_locks`. Điểm vào: `POST /api/materials/sync` (nút Admin/PM trên `/materials`) và `GET /api/cron/sync-sheets` (cron, xác thực `CRON_SECRET` Bearer hoặc session Admin/PM). Logic merge thuần `decideMerge` test ở `tests/material-sync.test.ts`.
 
 ### Chuỗi tính toán tiến độ (`lib/recompute.ts`)
 
