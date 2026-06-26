@@ -14,9 +14,12 @@ BRANCH="main"
 echo "==> 1/5 Lấy code mới từ origin/$BRANCH"
 git fetch origin
 
-echo "==> 2/5 Ép code về đúng origin/$BRANCH (xóa mọi sửa tay trên file đã commit)"
-# Lưu ý: lệnh này KHÔNG đụng tới .env.local (đã nằm trong .gitignore), nên secret an toàn.
+echo "==> 2/5 Ép code về đúng origin/$BRANCH — 100% code từ GitHub"
+# reset --hard: xóa mọi sửa tay trên file đã commit.
+# clean -fd  : xóa thêm file/thư mục chưa track (build cũ, file rác...).
+# Cả hai đều KHÔNG đụng tới file trong .gitignore (vd: .env.local, data/), nên secret an toàn.
 git reset --hard "origin/$BRANCH"
+git clean -fd
 
 echo "==> 3/5 Cài thư viện theo package-lock.json"
 npm ci
