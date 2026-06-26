@@ -35,7 +35,7 @@ export async function GET(_req: NextRequest, { params: paramsP }: { params: Prom
     headers: {
       "Content-Type": photo.mime_type,
       "X-Content-Type-Options": "nosniff", // chặn browser sniff nội dung khác mime
-      "Cache-Control": "private, max-age=86400", // ảnh bất biến theo id — cache 1 ngày
+      "Cache-Control": "private, max-age=31536000, immutable", // ảnh bất biến theo id — cache 1 năm
     },
   });
 }

@@ -44,7 +44,7 @@ export async function GET(_req: NextRequest, { params: paramsP }: { params: Prom
       "Content-Type": doc.mime_type,
       "X-Content-Type-Options": "nosniff", // chặn browser sniff nội dung khác mime
       "Content-Disposition": `inline; filename="${encodeURIComponent(doc.original_name ?? doc.file_name)}"`,
-      "Cache-Control": "private, max-age=86400", // file bất biến theo id — cache 1 ngày
+      "Cache-Control": "private, max-age=31536000, immutable", // file bất biến theo id — cache 1 năm
     },
   });
 }
