@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start -H 0.0.0.0",
     "lint": "eslint .",
-    "test": "tsx --test tests/status.test.ts tests/import.test.ts tests/recompute.test.ts tests/ratelimit.test.ts tests/cpm.test.ts tests/auth.test.ts",
+    "test": "tsx --test tests/status.test.ts tests/import.test.ts tests/recompute.test.ts tests/ratelimit.test.ts tests/cpm.test.ts tests/auth.test.ts tests/material-sync.test.ts",
     "typecheck": "tsc --noEmit",
     "db:seed": "tsx scripts/seed.ts",
     "db:seed:sample": "tsx scripts/seed-sample.ts"
@@ -17,6 +17,7 @@
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.14.3",
     "exceljs": "^4.4.0",
+    "google-auth-library": "^10.9.0",
     "lucide-react": "^1.18.0",
     "next": "^16.2.9",
     "nodemailer": "^9.0.1",

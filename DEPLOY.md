@@ -107,3 +107,38 @@ docker compose exec db pg_dump -U xboss xboss > backup-$(date +%F).sql
 
 # Supabase: Dashboard → Database → Backups (tự động hằng ngày trên free tier)
 ```
+
+---
+
+## Đồng bộ hai chiều bảng vật tư ↔ Google Sheet (tuỳ chọn)
+
+Cho phép xem/sửa vật tư trên Google Sheet mà vẫn khớp DB. Sửa ở phía nào cũng được
+gộp lại; khi cùng một dòng đổi ở **cả hai** phía thì **DB ưu tiên** (xung đột được
+liệt kê trong kết quả). Cột `Đã dùng`/`Tồn kho`/`Ngưỡng tối thiểu` chỉ DB→Sheet.
+
+**Thiết lập một lần:**
+
+1. Vào [Google Cloud Console](https://console.cloud.google.com) → tạo project →
+   **APIs & Services → Enable APIs** → bật **Google Sheets API**.
+2. **IAM & Admin → Service Accounts** → tạo service account → **Keys → Add key →
+   JSON** → tải file JSON về.
+3. Mở Google Sheet cần đồng bộ → **Share** → cấp quyền **Editor** cho email service
+   account (dạng `...@...iam.gserviceaccount.com`).
+4. Đặt biến môi trường (xem `.env.example`):
+   - `GOOGLE_SERVICE_ACCOUNT_JSON` = nguyên nội dung file JSON (1 dòng).
+   - `GOOGLE_SHEET_ID` = đoạn giữa `/d/` và `/edit` trong URL Sheet.
+   - `GOOGLE_SHEET_TAB` = tên tab (mặc định `VatTu`).
+
+> Thiếu cấu hình → nút/cron báo lỗi rõ ràng, không ảnh hưởng phần còn lại của app.
+
+**Chạy đồng bộ:**
+
+- **Thủ công:** Admin/PM bấm nút **"Đồng bộ Google Sheet"** trên trang `/materials`.
+- **Tự động (cron):** gọi định kỳ — dùng chung `CRON_SECRET`:
+
+  ```bash
+  curl -H "Authorization: Bearer $CRON_SECRET" https://<APP_URL>/api/cron/sync-sheets
+  ```
+
+  Ví dụ crontab mỗi giờ: `0 * * * * curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://<APP_URL>/api/cron/sync-sheets`
+  (hoặc khai báo trong `vercel.json` nếu deploy Vercel).

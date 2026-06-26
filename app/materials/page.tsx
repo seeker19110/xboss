@@ -15,7 +15,7 @@ import PurchaseRequestsTab from './_components/PurchaseRequestsTab';
 import ReportsTab from './_components/ReportsTab';
 import { Skeleton } from '@/app/components/Skeleton';
 import SpreadsheetGrid, { type GridColumn, type GridEdit } from '@/app/components/SpreadsheetGrid';
-import { Table2 } from 'lucide-react';
+import { Table2, RefreshCw } from 'lucide-react';
 
 // Cache in-memory ngoài component — sống qua tab-switch, mất khi reload trang.
 // Khác localStorage: không serialize/deserialize JSON → gán reference O(1).
@@ -59,6 +59,13 @@ const DEFAULT_LABELS: Record<ColKey, string> = {
 
 const ALL_COL_KEYS: ColKey[] = ['boqCode', 'stt', 'name', 'unit', 'qtyBoq', 'qtyPlanned', 'diff', 'status', 'note'];
 
+// Kết quả đồng bộ Google Sheet (khớp SyncSummary ở lib/material-sync).
+type SyncSummary = {
+  pushed: number; pulled: number; created: number; total: number;
+  conflicts: { id: number; name: string; winner: 'db' | 'sheet' }[];
+  skipped: { row: number; reason: string }[];
+};
+
 export default function MaterialsPage() {
   const [activeTab, setActiveTab] = useState<'materials' | 'suppliers' | 'requests' | 'reports'>('materials');
   const [role, setRole] = useState('');
@@ -74,6 +81,9 @@ export default function MaterialsPage() {
   const [sheetMode, setSheetMode] = useState(false);
   const [error, setError] = useState('');
   const [historyMat, setHistoryMat] = useState<Material | null>(null);
+  // Đồng bộ Google Sheet (hai chiều)
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<SyncSummary | null>(null);
 
   const [search, setSearch] = useState('');
   const [hiddenCols, setHiddenCols] = useState<Set<ColKey>>(new Set());
@@ -172,6 +182,24 @@ export default function MaterialsPage() {
 
   const patch = (id: number, body: object) =>
     api(`/api/materials/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+
+  // Đồng bộ hai chiều vật tư ↔ Google Sheet (Admin/PM).
+  async function runSync() {
+    if (!await appConfirm('Đồng bộ hai chiều vật tư với Google Sheet?\nThay đổi ở cả hai phía sẽ được gộp (DB ưu tiên khi xung đột).', { confirmLabel: 'Đồng bộ' })) return;
+    setError('');
+    setSyncing(true);
+    try {
+      const res = await fetch('/api/materials/sync', { method: 'POST' });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(j.error ?? 'Lỗi đồng bộ Google Sheet'); return; }
+      setSyncResult(j.summary as SyncSummary);
+      load(true);
+    } catch {
+      setError('Không kết nối được máy chủ để đồng bộ.');
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   const remove = async (m: Material) => {
     if (await appConfirm(`Xoá vật tư "${m.name}"?`, { danger: true, confirmLabel: 'Xoá' }))
@@ -474,6 +502,13 @@ export default function MaterialsPage() {
               <FileUp className="w-4 h-4" /> Import Excel
             </a>
           )}
+          {canAdmin && (
+            <button onClick={runSync} disabled={syncing}
+              title="Đồng bộ hai chiều bảng vật tư với Google Sheet"
+              className="flex items-center gap-1.5 border border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-white rounded-xl px-4 py-2.5 text-sm font-medium transition shrink-0 disabled:opacity-50">
+              <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} /> {syncing ? 'Đang đồng bộ…' : 'Đồng bộ Google Sheet'}
+            </button>
+          )}
         </div>
 
         {/* Badge kết quả tìm kiếm */}
@@ -752,6 +787,58 @@ export default function MaterialsPage() {
 
         </>}
       </main>
+
+      {/* Modal kết quả đồng bộ Google Sheet */}
+      {syncResult && (
+        <Modal onClose={() => setSyncResult(null)} className="max-w-md">
+          <div className="px-5 py-4 border-b border-zinc-800 flex items-center gap-2">
+            <RefreshCw className="w-4 h-4 text-emerald-400" />
+            <h3 className="font-semibold text-sm flex-1">Kết quả đồng bộ Google Sheet</h3>
+            <button onClick={() => setSyncResult(null)} className="text-zinc-400 hover:text-white"><X className="w-4 h-4" /></button>
+          </div>
+          <div className="p-5 space-y-4 text-sm">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg bg-zinc-800/50 px-3 py-2">
+                <div className="text-xs text-zinc-500">Đẩy ra Sheet</div>
+                <div className="text-lg font-semibold text-sky-300">{syncResult.pushed}</div>
+              </div>
+              <div className="rounded-lg bg-zinc-800/50 px-3 py-2">
+                <div className="text-xs text-zinc-500">Kéo về DB</div>
+                <div className="text-lg font-semibold text-emerald-300">{syncResult.pulled}</div>
+              </div>
+              <div className="rounded-lg bg-zinc-800/50 px-3 py-2">
+                <div className="text-xs text-zinc-500">Tạo mới từ Sheet</div>
+                <div className="text-lg font-semibold text-violet-300">{syncResult.created}</div>
+              </div>
+              <div className="rounded-lg bg-zinc-800/50 px-3 py-2">
+                <div className="text-xs text-zinc-500">Tổng vật tư</div>
+                <div className="text-lg font-semibold text-zinc-200">{syncResult.total}</div>
+              </div>
+            </div>
+            {syncResult.conflicts.length > 0 && (
+              <div>
+                <div className="text-xs font-medium text-amber-400 mb-1.5 flex items-center gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5" /> {syncResult.conflicts.length} xung đột (DB ưu tiên)
+                </div>
+                <ul className="space-y-1 max-h-40 overflow-y-auto text-xs text-zinc-400">
+                  {syncResult.conflicts.map(c => <li key={c.id}>• {c.name}</li>)}
+                </ul>
+              </div>
+            )}
+            {syncResult.skipped.length > 0 && (
+              <div>
+                <div className="text-xs font-medium text-zinc-400 mb-1.5">{syncResult.skipped.length} dòng bỏ qua</div>
+                <ul className="space-y-1 max-h-40 overflow-y-auto text-xs text-zinc-500">
+                  {syncResult.skipped.map((s, i) => <li key={i}>• Dòng {s.row}: {s.reason}</li>)}
+                </ul>
+              </div>
+            )}
+            {syncResult.conflicts.length === 0 && syncResult.skipped.length === 0 && (
+              <p className="text-xs text-zinc-500">Đồng bộ hoàn tất, không có xung đột.</p>
+            )}
+          </div>
+        </Modal>
+      )}
 
       {/* Modal sửa mã BOQ */}
       {boqEditMat && (
