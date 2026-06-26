@@ -1,6 +1,6 @@
 // Service worker XBoss — network-first cho trang + API GET, cache-first cho asset tĩnh.
 // Mất mạng (hầm, tầng kỹ thuật) vẫn xem được dữ liệu tracking đã tải lần cuối.
-const CACHE = "xboss-v5";
+const CACHE = "xboss-v6";
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => {
@@ -54,20 +54,22 @@ self.addEventListener("message", (e) => {
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== location.origin) return;
-  // API GET → network-first, mất mạng thì trả bản cache gần nhất.
-  // Trừ: ảnh/tài liệu (nặng) và SSE /api/events (stream — không cache được).
+  // API GET → stale-while-revalidate: trả cache ngay nếu có, cập nhật ngầm từ mạng.
+  // Mất mạng hoàn toàn → trả bản cache gần nhất.
+  // Trừ: ảnh/tài liệu (cache riêng bởi browser) và SSE /api/events (stream).
   if (url.pathname.startsWith("/api/")) {
     if (url.pathname.startsWith("/api/photos/") || url.pathname.startsWith("/api/documents/") || url.pathname.startsWith("/api/events")) return;
     e.respondWith(
-      fetch(e.request)
-        .then((res) => {
-          if (res.ok) {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(e.request, copy));
-          }
-          return res;
+      caches.open(CACHE).then((cache) =>
+        cache.match(e.request).then((cached) => {
+          const networkFetch = fetch(e.request).then((res) => {
+            if (res.ok) cache.put(e.request, res.clone());
+            return res;
+          }).catch(() => cached ?? Response.error());
+          // Có cache → trả ngay + cập nhật ngầm; không có cache → chờ mạng
+          return cached ?? networkFetch;
         })
-        .catch(() => caches.match(e.request).then((hit) => hit ?? Response.error()))
+      )
     );
     return;
   }
