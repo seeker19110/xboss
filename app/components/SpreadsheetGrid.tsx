@@ -83,7 +83,7 @@ export default function SpreadsheetGrid<Row>({
   const [redoStack, setRedoStack] = useState<{ rowKey: number | string; c: number; oldRaw: string; newRaw: string }[][]>([]);
   const [pinned, setPinned] = useState<Set<string>>(new Set());      // rowKey các dòng được ghim
   const [hiddenCols, setHiddenCols] = useState<Set<number>>(new Set()); // chỉ số cột bị ẩn nhanh
-  const [wrap, setWrap] = useState(false);                            // xuống dòng (wrap text) trong ô
+  const [wrap, setWrap] = useState(true);                             // xuống dòng (wrap text) trong ô
   const [extraRects, setExtraRects] = useState<Rect[]>([]);          // các vùng chọn rời (Ctrl/Cmd+click)
   const gridRef = useRef<HTMLDivElement>(null);
   const filterMenuRef = useRef<HTMLDivElement>(null);
@@ -557,12 +557,12 @@ export default function SpreadsheetGrid<Row>({
   return (
     <div className="relative">
       <div className="bg-zinc-900/50 border-b border-zinc-800 space-y-2 px-3 py-2">
-        <div className="flex items-center justify-between text-xs text-zinc-400">
+        <div className="flex items-center justify-between text-sm text-zinc-400">
           <div>
             {selectionCount > 1 && <span>{selectionCount} ô được chọn</span>}
             {clipboard && <span className="ml-3 text-zinc-500">{clipboard.cut ? '✂️ Cắt' : '📋 Sao chép'}</span>}
           </div>
-          <div className="flex items-center gap-2 text-[10px] text-zinc-500">
+          <div className="flex items-center gap-2 text-xs text-zinc-500">
             <button onClick={() => setWrap(w => !w)} className={wrap ? 'text-sky-400' : 'hover:text-zinc-300'} title="Xuống dòng trong ô (wrap text)">↕️ Wrap</button>
             {hiddenCols.size > 0 && (
               <button onClick={() => setHiddenCols(new Set())} className="text-amber-400 hover:text-amber-300" title="Hiện lại các cột đã ẩn">👁 {hiddenCols.size} cột ẩn</button>
@@ -576,7 +576,7 @@ export default function SpreadsheetGrid<Row>({
 
         {/* Thanh công cụ: undo/redo, căn lề, đóng băng cột, thêm/xoá dòng */}
         {!readOnly && (
-          <div className="flex items-center gap-1 flex-wrap text-zinc-300">
+          <div className="flex items-center gap-1 flex-wrap text-zinc-300 text-base">
             <ToolBtn onClick={undo} disabled={!undoStack.length} title="Hoàn tác (Ctrl+Z)">↶</ToolBtn>
             <ToolBtn onClick={redo} disabled={!redoStack.length} title="Làm lại (Ctrl+Y)">↷</ToolBtn>
             <span className="w-px h-4 bg-zinc-700 mx-1" />
@@ -585,7 +585,7 @@ export default function SpreadsheetGrid<Row>({
             <ToolBtn onClick={() => setColAlign('right')} title="Căn phải cột">⇥</ToolBtn>
             <span className="w-px h-4 bg-zinc-700 mx-1" />
             <ToolBtn onClick={() => setFreezeCols(n => Math.max(0, n - 1))} disabled={freezeCols <= 0} title="Bớt cột đóng băng">❄−</ToolBtn>
-            <span className="text-[10px] text-zinc-500 px-1">đóng băng {freezeCols} cột</span>
+            <span className="text-xs text-zinc-500 px-1">đóng băng {freezeCols} cột</span>
             <ToolBtn onClick={() => setFreezeCols(n => Math.min(nCols, n + 1))} disabled={freezeCols >= nCols} title="Thêm cột đóng băng">❄+</ToolBtn>
             {(onAddRow || onDeleteRows) && <span className="w-px h-4 bg-zinc-700 mx-1" />}
             {onAddRow && <ToolBtn onClick={() => onAddRow()} title="Thêm dòng mới">＋ dòng</ToolBtn>}
@@ -602,7 +602,7 @@ export default function SpreadsheetGrid<Row>({
               >🗑 dòng</ToolBtn>
             )}
             {Object.keys(colFilters).some(c => colFilters[Number(c)]?.size) && (
-              <button onClick={() => setColFilters({})} className="ml-1 text-[10px] text-sky-400 hover:text-sky-300">Xoá lọc</button>
+              <button onClick={() => setColFilters({})} className="ml-1 text-xs text-sky-400 hover:text-sky-300">Xoá lọc</button>
             )}
           </div>
         )}
@@ -730,7 +730,7 @@ export default function SpreadsheetGrid<Row>({
                     const condClass = col.cellClass?.(row) ?? '';
                     // Kẻ hàng xen kẽ 2 màu (zebra): dùng token zinc để light mode ra
                     // dải xám sáng (~#EEEEEE/#CCCCCC), dark mode tự đảo — không hardcode hex.
-                    const rowBg = isPinned ? 'bg-amber-950/30' : displayR % 2 === 0 ? 'bg-zinc-950' : 'bg-zinc-800';
+                    const rowBg = isPinned ? 'bg-amber-950/30' : displayR % 2 === 0 ? 'bg-zinc-50' : 'bg-zinc-100';
                     return (
                       <td
                         key={col.key}
@@ -766,7 +766,7 @@ export default function SpreadsheetGrid<Row>({
                       >
                         {/* Đánh dấu dòng ghim ở ô đầu tiên hiển thị */}
                         {isPinned && c === [...Array(nCols).keys()].find(i => !hiddenCols.has(i)) && (
-                          <span className="absolute left-0.5 top-1/2 -translate-y-1/2 text-amber-400 text-[10px]" aria-label="Dòng ghim">📌</span>
+                          <span className="absolute left-0.5 top-1/2 -translate-y-1/2 text-amber-400 text-lg" aria-label="Dòng ghim">📌</span>
                         )}
                         {editing && isActive ? (
                           <CellEditor col={col} value={draft} setValue={setDraft} editRef={editRef}
@@ -779,7 +779,7 @@ export default function SpreadsheetGrid<Row>({
                           </span>
                         )}
                         {isSaving && (
-                          <Loader2 className="w-3 h-3 animate-spin text-sky-400 absolute right-1 top-1/2 -translate-y-1/2" aria-label="Đang lưu" />
+                          <Loader2 className="w-6 h-6 animate-spin text-sky-400 absolute right-1 top-1/2 -translate-y-1/2" aria-label="Đang lưu" />
                         )}
                       </td>
                     );
@@ -943,7 +943,7 @@ function ToolBtn({ onClick, disabled, title, children }: {
 }) {
   return (
     <button onClick={onClick} disabled={disabled} title={title}
-      className="px-1.5 py-0.5 rounded text-xs bg-zinc-800 hover:bg-zinc-700 disabled:opacity-30 disabled:hover:bg-zinc-800 border border-zinc-700">
+      className="px-1.5 py-0.5 rounded text-sm bg-zinc-800 hover:bg-zinc-700 disabled:opacity-30 disabled:hover:bg-zinc-800 border border-zinc-700">
       {children}
     </button>
   );
