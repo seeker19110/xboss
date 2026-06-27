@@ -186,7 +186,7 @@ export default function PurchaseOrdersPage() {
   };
 
   // Chế độ bảng tính cho "Danh sách vật tư": dán nhiều dòng từ Excel cho nhanh.
-  const [gridMode, setGridMode] = useState(false);
+  const [gridMode, setGridMode] = useState(true);
 
   const resolveMaterialId = useCallback((raw: string): string => {
     const t = raw.trim();
