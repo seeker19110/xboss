@@ -649,7 +649,7 @@ export default function SpreadsheetGrid<Row>({
           e.preventDefault();
           if (!readOnly) setContextMenu({ x: e.clientX, y: e.clientY });
         }}
-        className="overflow-auto outline-none rounded-lg border border-zinc-800 focus-visible:ring-1 focus-visible:ring-sky-400"
+        className="overflow-auto outline-none rounded-lg border border-zinc-800 focus-visible:ring-1 focus-visible:ring-sky-400 select-none"
         style={maxBodyHeight ? { maxHeight: maxBodyHeight } : undefined}
         role="grid"
         aria-rowcount={nRows + 1}
@@ -731,6 +731,9 @@ export default function SpreadsheetGrid<Row>({
                     // Kẻ hàng xen kẽ 2 màu (zebra): dùng token zinc để light mode ra
                     // dải xám sáng (~#EEEEEE/#CCCCCC), dark mode tự đảo — không hardcode hex.
                     const rowBg = isPinned ? 'bg-amber-950/30' : displayR % 2 === 0 ? 'bg-white' : 'bg-zinc-200';
+                    // Nền ô: ô trong vùng chọn tô xanh nổi rõ (thắng zebra/định dạng
+                    // điều kiện vì chỉ 1 màu nền được áp), còn lại giữ zebra/cellClass.
+                    const cellBg = selected ? 'bg-sky-300' : (condClass || rowBg);
                     return (
                       <td
                         key={col.key}
@@ -754,9 +757,7 @@ export default function SpreadsheetGrid<Row>({
                           'border-b border-r border-zinc-800 px-2 py-1 relative text-blue-950',
                           wrap ? 'whitespace-normal break-words align-top' : 'whitespace-nowrap',
                           align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left',
-                          c < freezeCols ? `sticky z-10 ${rowBg}` : rowBg,
-                          condClass,
-                          selected ? 'bg-sky-950/40' : '',
+                          c < freezeCols ? `sticky z-10 ${cellBg}` : cellBg,
                           isActive ? 'ring-1 ring-inset ring-sky-400' : '',
                           err ? 'ring-1 ring-inset ring-rose-400' : '',
                           editableHere ? 'cursor-cell' : '',
@@ -1014,7 +1015,7 @@ function CellEditor<Row>({ col, value, setValue, editRef, onDone }: {
   editRef: React.RefObject<HTMLInputElement | HTMLSelectElement | null>;
   onDone: (commit: boolean, advance?: 0 | 1) => void;
 }) {
-  const base = 'absolute inset-0 w-full h-full px-2 bg-zinc-900 text-white outline-none ring-1 ring-inset ring-sky-400';
+  const base = 'absolute inset-0 w-full h-full px-2 bg-zinc-900 text-white outline-none ring-1 ring-inset ring-sky-400 select-text';
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') { e.preventDefault(); onDone(true, 1); }
     else if (e.key === 'Escape') { e.preventDefault(); onDone(false, 0); }
