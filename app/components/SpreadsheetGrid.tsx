@@ -557,12 +557,12 @@ export default function SpreadsheetGrid<Row>({
   return (
     <div className="relative">
       <div className="bg-zinc-900/50 border-b border-zinc-800 space-y-2 px-3 py-2">
-        <div className="flex items-center justify-between text-sm text-zinc-400">
+        <div className="flex items-center justify-between text-base text-zinc-400">
           <div>
             {selectionCount > 1 && <span>{selectionCount} ô được chọn</span>}
             {clipboard && <span className="ml-3 text-zinc-500">{clipboard.cut ? '✂️ Cắt' : '📋 Sao chép'}</span>}
           </div>
-          <div className="flex items-center gap-2 text-xs text-zinc-500">
+          <div className="flex items-center gap-2 text-sm text-zinc-500">
             <button onClick={() => setWrap(w => !w)} className={wrap ? 'text-sky-400' : 'hover:text-zinc-300'} title="Xuống dòng trong ô (wrap text)">↕️ Wrap</button>
             {hiddenCols.size > 0 && (
               <button onClick={() => setHiddenCols(new Set())} className="text-amber-400 hover:text-amber-300" title="Hiện lại các cột đã ẩn">👁 {hiddenCols.size} cột ẩn</button>
@@ -576,7 +576,7 @@ export default function SpreadsheetGrid<Row>({
 
         {/* Thanh công cụ: undo/redo, căn lề, đóng băng cột, thêm/xoá dòng */}
         {!readOnly && (
-          <div className="flex items-center gap-1 flex-wrap text-zinc-300 text-base">
+          <div className="flex items-center gap-1 flex-wrap text-zinc-300 text-lg">
             <ToolBtn onClick={undo} disabled={!undoStack.length} title="Hoàn tác (Ctrl+Z)">↶</ToolBtn>
             <ToolBtn onClick={redo} disabled={!redoStack.length} title="Làm lại (Ctrl+Y)">↷</ToolBtn>
             <span className="w-px h-4 bg-zinc-700 mx-1" />
@@ -585,7 +585,7 @@ export default function SpreadsheetGrid<Row>({
             <ToolBtn onClick={() => setColAlign('right')} title="Căn phải cột">⇥</ToolBtn>
             <span className="w-px h-4 bg-zinc-700 mx-1" />
             <ToolBtn onClick={() => setFreezeCols(n => Math.max(0, n - 1))} disabled={freezeCols <= 0} title="Bớt cột đóng băng">❄−</ToolBtn>
-            <span className="text-xs text-zinc-500 px-1">đóng băng {freezeCols} cột</span>
+            <span className="text-sm text-zinc-500 px-1">đóng băng {freezeCols} cột</span>
             <ToolBtn onClick={() => setFreezeCols(n => Math.min(nCols, n + 1))} disabled={freezeCols >= nCols} title="Thêm cột đóng băng">❄+</ToolBtn>
             {(onAddRow || onDeleteRows) && <span className="w-px h-4 bg-zinc-700 mx-1" />}
             {onAddRow && <ToolBtn onClick={() => onAddRow()} title="Thêm dòng mới">＋ dòng</ToolBtn>}
@@ -751,7 +751,7 @@ export default function SpreadsheetGrid<Row>({
                         onMouseEnter={() => { if (dragging) setActive({ r, c }); }}
                         onDoubleClick={() => startEdit()}
                         className={[
-                          'border-b border-r border-zinc-800 px-2 py-1 relative',
+                          'border-b border-r border-zinc-800 px-2 py-1 relative text-blue-950',
                           wrap ? 'whitespace-normal break-words align-top' : 'whitespace-nowrap',
                           align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left',
                           c < freezeCols ? `sticky z-10 ${rowBg}` : rowBg,
@@ -759,14 +759,14 @@ export default function SpreadsheetGrid<Row>({
                           selected ? 'bg-sky-950/40' : '',
                           isActive ? 'ring-1 ring-inset ring-sky-400' : '',
                           err ? 'ring-1 ring-inset ring-rose-400' : '',
-                          editableHere ? 'cursor-cell' : 'text-zinc-400',
+                          editableHere ? 'cursor-cell' : '',
                         ].join(' ')}
                         style={{ width: colWidth(c), minWidth: colWidth(c), left: c < freezeCols ? leftOffsets[c] : undefined }}
                         title={err ?? undefined}
                       >
                         {/* Đánh dấu dòng ghim ở ô đầu tiên hiển thị */}
                         {isPinned && c === [...Array(nCols).keys()].find(i => !hiddenCols.has(i)) && (
-                          <span className="absolute left-0.5 top-1/2 -translate-y-1/2 text-amber-400 text-lg" aria-label="Dòng ghim">📌</span>
+                          <span className="absolute left-0.5 top-1/2 -translate-y-1/2 text-amber-400 text-2xl" aria-label="Dòng ghim">📌</span>
                         )}
                         {editing && isActive ? (
                           <CellEditor col={col} value={draft} setValue={setDraft} editRef={editRef}
@@ -779,7 +779,7 @@ export default function SpreadsheetGrid<Row>({
                           </span>
                         )}
                         {isSaving && (
-                          <Loader2 className="w-6 h-6 animate-spin text-sky-400 absolute right-1 top-1/2 -translate-y-1/2" aria-label="Đang lưu" />
+                          <Loader2 className="w-9 h-9 animate-spin text-sky-400 absolute right-1 top-1/2 -translate-y-1/2" aria-label="Đang lưu" />
                         )}
                       </td>
                     );
@@ -943,7 +943,7 @@ function ToolBtn({ onClick, disabled, title, children }: {
 }) {
   return (
     <button onClick={onClick} disabled={disabled} title={title}
-      className="px-1.5 py-0.5 rounded text-sm bg-zinc-800 hover:bg-zinc-700 disabled:opacity-30 disabled:hover:bg-zinc-800 border border-zinc-700">
+      className="px-1.5 py-0.5 rounded text-base bg-zinc-800 hover:bg-zinc-700 disabled:opacity-30 disabled:hover:bg-zinc-800 border border-zinc-700">
       {children}
     </button>
   );

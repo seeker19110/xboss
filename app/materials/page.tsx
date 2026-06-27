@@ -78,7 +78,7 @@ export default function MaterialsPage() {
   const [canAdmin, setCanAdmin] = useState(false);
   const [editMode, setEditMode] = useState(false);
   // Chế độ "Bảng tính" (Excel/GG Sheet): lưới sửa nhanh copy/paste/fill — bật/tắt riêng.
-  const [sheetMode, setSheetMode] = useState(false);
+  const [sheetMode, setSheetMode] = useState(true);
   const [error, setError] = useState('');
   const [historyMat, setHistoryMat] = useState<Material | null>(null);
   // Đồng bộ Google Sheet (hai chiều)
