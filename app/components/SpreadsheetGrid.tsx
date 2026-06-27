@@ -772,7 +772,7 @@ export default function SpreadsheetGrid<Row>({
                           <CellEditor col={col} value={draft} setValue={setDraft} editRef={editRef}
                             onDone={finishEdit} />
                         ) : (
-                          <span className={wrap ? 'block' : 'block overflow-hidden text-ellipsis'}>
+                          <span className={`${wrap ? 'block' : 'block overflow-hidden text-ellipsis'} text-blue-900`}>
                             {col.type === 'checkbox'
                               ? (col.get(row) ? '✓' : '')
                               : col.render ? col.render(row) : displayValue(col.get(row))}
