@@ -678,7 +678,7 @@ export default function SpreadsheetGrid<Row>({
                     {/* Nút filter per-cột (AutoFilter) */}
                     <button
                       onClick={(e) => { e.stopPropagation(); setFilterMenu(filterMenu === c ? null : c); }}
-                      className={`shrink-0 px-0.5 ${colFilters[c]?.size ? 'text-sky-400' : 'text-zinc-600 hover:text-zinc-300'}`}
+                      className={`shrink-0 px-0.5 text-5xl leading-none ${colFilters[c]?.size ? 'text-sky-400' : 'text-zinc-600 hover:text-zinc-300'}`}
                       title="Lọc theo cột"
                       aria-label={`Lọc cột ${col.label}`}
                     >
