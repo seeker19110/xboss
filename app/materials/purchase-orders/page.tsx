@@ -209,9 +209,9 @@ export default function PurchaseOrdersPage() {
   const gridColumns: GridColumn<POGridRow>[] = useMemo(() => [
     { key: 'material', label: 'Vật tư (mã BOQ / tên)', width: 260, type: 'text',
       get: r => materialLabel(r.materialId), toPatch: raw => ({ materialId: resolveMaterialId(raw) }) },
-    { key: 'qtyOrdered', label: 'SL đặt', width: 90, type: 'number', align: 'right',
+    { key: 'qtyOrdered', label: 'SL đặt', width: 90, type: 'number',
       get: r => r.qtyOrdered, toPatch: raw => ({ qtyOrdered: raw.trim() }) },
-    { key: 'unitPrice', label: 'Đơn giá', width: 110, type: 'number', align: 'right',
+    { key: 'unitPrice', label: 'Đơn giá', width: 110, type: 'number',
       get: r => r.unitPrice, toPatch: raw => ({ unitPrice: raw.trim() }) },
     { key: 'note', label: 'Ghi chú', width: 160, type: 'text',
       get: r => r.note, toPatch: raw => ({ note: raw.trim() }) },

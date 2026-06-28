@@ -351,7 +351,7 @@ export default function MaterialsPage() {
         get: m => m.qtyBoq ?? 0, toPatch: raw => ({ qtyBoq: Number(raw) || 0 }) },
       qtyPlanned: { key: 'qtyPlanned', label: colLabels.qtyPlanned, width: 120, type: 'number', editable: editableBy(false),
         get: m => m.qtyPlanned ?? 0, toPatch: raw => ({ qtyPlanned: Number(raw) || 0 }) },
-      diff: { key: 'diff', label: colLabels.diff, width: 100, type: 'readonly', align: 'right',
+      diff: { key: 'diff', label: colLabels.diff, width: 100, type: 'readonly',
         get: m => ((m.qtyBoq ?? 0) > 0 ? (m.qtyBoq ?? 0) - (m.qtyPlanned ?? 0) : '—') },
       status: { key: 'status', label: colLabels.status, width: 110, type: 'readonly', align: 'center',
         get: m => BUDGET_LABEL[budgetStatus(m)] },
