@@ -11,7 +11,7 @@
 // Theme: chỉ dùng token Tailwind (zinc + nhấn -400), không hex, không `dark:`
 // để giữ cơ chế đảo màu sáng/tối trong globals.css.
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, ChevronUp, ChevronDown, ListFilter, EyeOff, GripVertical } from 'lucide-react';
+import { Loader2, ChevronUp, ChevronDown, ListFilter, EyeOff, GripVertical, Pencil, Eye } from 'lucide-react';
 import { serializeTSV, parseTSV, normalizeRect, spreadPaste, type Rect } from '@/lib/grid';
 
 export type GridColumn<Row> = {
@@ -84,6 +84,7 @@ export default function SpreadsheetGrid<Row>({
   const [pinned, setPinned] = useState<Set<string>>(new Set());      // rowKey các dòng được ghim
   const [hiddenCols, setHiddenCols] = useState<Set<number>>(new Set()); // chỉ số cột bị ẩn nhanh
   const [wrap, setWrap] = useState(true);                             // xuống dòng (wrap text) trong ô
+  const [viewOnly, setViewOnly] = useState(false);                   // tự khoá "chỉ xem" (tắt/bật chỉnh sửa)
   const [extraRects, setExtraRects] = useState<Rect[]>([]);          // các vùng chọn rời (Ctrl/Cmd+click)
   const gridRef = useRef<HTMLDivElement>(null);
   const filterMenuRef = useRef<HTMLDivElement>(null);
@@ -98,12 +99,16 @@ export default function SpreadsheetGrid<Row>({
   const nRows = rows.length;
   const rect: Rect = useMemo(() => normalizeRect(anchor, active), [anchor, active]);
 
+  // Chế độ chỉ-xem hiệu lực = prop `readOnly` (do quyền) HOẶC tự khoá "chỉ xem".
+  // Dùng chung một biến để tái dụng đúng cơ chế read-only sẵn có của lưới.
+  const ro = readOnly || viewOnly;
+
   const isEditable = useCallback((c: number, row: Row) => {
-    if (readOnly) return false;
+    if (ro) return false;
     const col = columns[c];
     if (!col || col.type === 'readonly') return false;
     return typeof col.editable === 'function' ? col.editable(row) : col.editable !== false;
-  }, [columns, readOnly]);
+  }, [columns, ro]);
 
   const inOneRect = (rc: Rect, r: number, c: number) =>
     r >= rc.r0 && r <= rc.r1 && c >= rc.c0 && c <= rc.c1;
@@ -567,6 +572,22 @@ export default function SpreadsheetGrid<Row>({
             {clipboard && <span className="ml-3 text-zinc-500">{clipboard.cut ? '✂️ Cắt' : '📋 Sao chép'}</span>}
           </div>
           <div className="flex items-center gap-2 text-sm text-zinc-500">
+            {/* Tắt/bật chỉnh sửa ↔ chỉ xem — chỉ hiện khi trang cha cho phép sửa.
+                Khoá tạm dùng đúng cơ chế read-only sẵn có (qua biến `ro`). */}
+            {!readOnly && (
+              <>
+                <button
+                  onClick={() => setViewOnly(v => !v)}
+                  className={`inline-flex items-center gap-1 ${viewOnly ? 'text-amber-400 hover:text-amber-300' : 'text-emerald-400 hover:text-emerald-300'}`}
+                  title={viewOnly ? 'Đang ở chế độ chỉ xem — bấm để bật chỉnh sửa' : 'Đang ở chế độ chỉnh sửa — bấm để khoá chỉ xem'}
+                  aria-pressed={viewOnly}
+                >
+                  {viewOnly ? <Eye size={14} /> : <Pencil size={14} />}
+                  {viewOnly ? 'Chỉ xem' : 'Chỉnh sửa'}
+                </button>
+                <span className="w-px h-4 bg-zinc-700" />
+              </>
+            )}
             <button onClick={() => setWrap(w => !w)} className={wrap ? 'text-sky-400' : 'hover:text-zinc-300'} title="Xuống dòng trong ô (wrap text)">↕️ Wrap</button>
             {hiddenCols.size > 0 && (
               <button onClick={() => setHiddenCols(new Set())} className="text-amber-400 hover:text-amber-300" title="Hiện lại các cột đã ẩn">👁 {hiddenCols.size} cột ẩn</button>
@@ -579,7 +600,7 @@ export default function SpreadsheetGrid<Row>({
         </div>
 
         {/* Thanh công cụ: undo/redo, căn lề, đóng băng cột, thêm/xoá dòng */}
-        {!readOnly && (
+        {!ro && (
           <div className="flex items-center gap-1 flex-wrap text-zinc-300 text-lg">
             <ToolBtn onClick={undo} disabled={!undoStack.length} title="Hoàn tác (Ctrl+Z)">↶</ToolBtn>
             <ToolBtn onClick={redo} disabled={!redoStack.length} title="Làm lại (Ctrl+Y)">↷</ToolBtn>
@@ -647,11 +668,11 @@ export default function SpreadsheetGrid<Row>({
         ref={gridRef}
         tabIndex={0}
         onKeyDown={onKeyDown}
-        onPaste={readOnly ? undefined : (e) => { e.preventDefault(); pasteAt(e.clipboardData.getData('text/plain')); }}
+        onPaste={ro ? undefined : (e) => { e.preventDefault(); pasteAt(e.clipboardData.getData('text/plain')); }}
         onMouseUp={() => setDragging(false)}
         onContextMenu={(e) => {
           e.preventDefault();
-          if (!readOnly) setContextMenu({ x: e.clientX, y: e.clientY });
+          if (!ro) setContextMenu({ x: e.clientX, y: e.clientY });
         }}
         className="overflow-auto outline-none rounded-lg border border-zinc-800 focus-visible:ring-1 focus-visible:ring-sky-400 select-none"
         style={maxBodyHeight ? { maxHeight: maxBodyHeight } : undefined}
@@ -911,7 +932,7 @@ export default function SpreadsheetGrid<Row>({
           >
             📌 Ghim / bỏ ghim dòng
           </button>
-          {!readOnly && (
+          {!ro && (
             <>
               <button
                 onClick={() => { cutSelection(); setContextMenu(null); }}
