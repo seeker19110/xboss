@@ -1,0 +1,15 @@
+# Cấu hình gitleaks — mở rộng bộ mặc định, thêm allowlist cho secret TEST của E2E.
+# Các giá trị này chỉ dùng cho DB ephemeral trong CI/local, KHÔNG phải bí mật thật.
+# Biến tên chứa "SECRET" khiến rule generic-api-key báo nhầm (xem .github/workflows/e2e.yml).
+# Allowlist theo giá trị secret nên áp dụng cho MỌI commit (inline `gitleaks:allow` chỉ
+# che được commit chứa comment, không che commit gốc đã introduce).
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Secret/mật khẩu test cho E2E (DB ephemeral, không phải bí mật thật)"
+regexes = [
+  '''e2e-ci-secret-khong-bi-mat''',
+  '''e2e-ci-admin-pw''',
+]

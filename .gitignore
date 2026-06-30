@@ -36,4 +36,5 @@ xboss.tar.gz
 /test-results/
 /playwright-report/
 /playwright/.cache/
+/playwright/.auth/
 .lighthouseci/

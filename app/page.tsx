@@ -151,18 +151,18 @@ export default function Dashboard() {
     <div className="min-h-screen bg-zinc-950 text-white">
       <AppHeader title="🏗️ XBoss" subtitle={projectName ?? 'Quản lý tiến độ thi công MEP'}>
         {canImport && (
-          <a href="/api/export/excel"
+          <a href="/api/export/excel" aria-label="Xuất Excel"
             className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-3 py-2 rounded-lg text-sm font-medium transition">
             <FileDown className="w-4 h-4" /> <span className="hidden sm:inline">Excel</span>
           </a>
         )}
-        <a href="/report"
+        <a href="/report" aria-label="Xem báo cáo PDF"
           className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-3 py-2 rounded-lg text-sm font-medium transition">
           <Printer className="w-4 h-4" /> <span className="hidden sm:inline">PDF</span>
         </a>
         {canImport && (
-          <a href="/import"
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition">
+          <a href="/import" aria-label="Import Excel"
+            className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition">
             <Upload className="w-4 h-4" /> <span className="hidden sm:inline">Import Excel</span>
           </a>
         )}
@@ -174,11 +174,11 @@ export default function Dashboard() {
         <section>
           {/* Tổng trễ — banner nổi bật */}
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">Tổng quan tiến độ</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-400">Tổng quan tiến độ</h2>
             {canImport && (
               <button
                 onClick={() => { setNewSheetErr(''); setNewSheet({ name: '', slug: '', code: '', copyFromId: sheets[sheets.length - 1]?.id ?? '' }); }}
-                className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-emerald-400 transition">
+                className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-emerald-400 transition">
                 <Plus className="w-3.5 h-3.5" /> Thêm trang
               </button>
             )}
@@ -191,10 +191,10 @@ export default function Dashboard() {
                 <TrendingDown className="w-5 h-5 text-red-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-red-400/80 uppercase tracking-wide font-medium mb-0.5">Tổng công việc đang trễ</p>
+                <p className="text-xs text-red-400 uppercase tracking-wide font-medium mb-0.5">Tổng công việc đang trễ</p>
                 <p className="text-4xl font-bold text-red-300 leading-none">{data?.totalDelayed ?? 0}</p>
               </div>
-              <span className="flex items-center gap-1 text-xs text-red-400/70 hover:text-red-300 transition shrink-0">
+              <span className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 transition shrink-0">
                 Xem chi tiết <ChevronRight className="w-3.5 h-3.5" />
               </span>
             </a>
@@ -218,7 +218,7 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <p className="text-3xl font-bold leading-none">{pct}%</p>
-                    <p className="text-[11px] text-zinc-500 mt-1">{k.total} công việc</p>
+                    <p className="text-[11px] text-zinc-400 mt-1">{k.total} công việc</p>
                   </div>
                   <div className="mt-auto">
                     <div className="bg-zinc-800 rounded-full h-2 overflow-hidden">
@@ -293,7 +293,7 @@ export default function Dashboard() {
                 <EditableText tkey="dashboard.pareto.title">Nguyên nhân trễ (Pareto)</EditableText>
               </h2>
             </div>
-            <p className="text-xs text-zinc-500 mb-4">Bấm thanh để lọc bảng trễ theo lý do</p>
+            <p className="text-xs text-zinc-400 mb-4">Bấm thanh để lọc bảng trễ theo lý do</p>
             <div className="space-y-2">
               {reasonCounts.map(r => (
                 <button key={r.slug} onClick={() => setReasonFilter(f => f === r.slug ? '' : r.slug)}
@@ -304,20 +304,20 @@ export default function Dashboard() {
                       style={{ width: `${(r.count / maxReason) * 100}%` }} />
                   </div>
                   <span className="text-xs text-zinc-300 w-20 text-left shrink-0 tabular-nums">
-                    {r.count} <span className="text-zinc-500">({Math.round((r.count / allDelayed.length) * 100)}%)</span>
+                    {r.count} <span className="text-zinc-400">({Math.round((r.count / allDelayed.length) * 100)}%)</span>
                   </span>
                 </button>
               ))}
               {noReason > 0 && (
                 <button onClick={() => setReasonFilter(f => f === '__none' ? '' : '__none')}
                   className={`w-full flex items-center gap-3 group transition ${reasonFilter === '__none' ? 'opacity-100' : reasonFilter ? 'opacity-40' : ''}`}>
-                  <span className="text-xs text-zinc-500 w-24 sm:w-32 text-right shrink-0">Chưa gán lý do</span>
+                  <span className="text-xs text-zinc-400 w-24 sm:w-32 text-right shrink-0">Chưa gán lý do</span>
                   <div className="flex-1 bg-zinc-800 rounded-full h-2 overflow-hidden">
                     <div className="h-2 bg-zinc-600 group-hover:bg-zinc-500 rounded-full transition-all"
                       style={{ width: `${(noReason / maxReason) * 100}%` }} />
                   </div>
-                  <span className="text-xs text-zinc-500 w-20 text-left shrink-0 tabular-nums">
-                    {noReason} <span className="text-zinc-600">({Math.round((noReason / allDelayed.length) * 100)}%)</span>
+                  <span className="text-xs text-zinc-400 w-20 text-left shrink-0 tabular-nums">
+                    {noReason} <span className="text-zinc-400">({Math.round((noReason / allDelayed.length) * 100)}%)</span>
                   </span>
                 </button>
               )}
@@ -332,7 +332,7 @@ export default function Dashboard() {
             <h2 className="flex items-center gap-2 font-semibold text-sm shrink-0">
               <Clock className="w-4 h-4 text-red-400" />
               <EditableText tkey="dashboard.delayed.title">Danh sách công việc đang trễ</EditableText>
-              <span className="ml-1 text-xs font-normal text-zinc-500">({delayed.length})</span>
+              <span className="ml-1 text-xs font-normal text-zinc-400">({delayed.length})</span>
             </h2>
             <div className="flex flex-wrap gap-2 sm:ml-auto">
               {[
@@ -341,6 +341,7 @@ export default function Dashboard() {
                 { value: statusFilter, onChange: setStatusFilter, placeholder: 'Tất cả trạng thái', options: statuses.map(s => ({ v: s, l: STATUS_LABEL[s] ?? s })) },
               ].map((sel, i) => (
                 <select key={i} value={sel.value} onChange={e => sel.onChange(e.target.value)}
+                  aria-label={sel.placeholder}
                   className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-zinc-500 transition">
                   <option value="">{sel.placeholder}</option>
                   {sel.options.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
@@ -353,7 +354,7 @@ export default function Dashboard() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[680px]">
               <thead>
-                <tr className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 border-b border-zinc-800/80">
+                <tr className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400 border-b border-zinc-800/80">
                   <th className="text-left px-5 py-3">Công việc</th>
                   <th className="text-left px-4 py-3">Tầng</th>
                   <th className="text-left px-4 py-3">Hạn</th>
@@ -397,7 +398,7 @@ export default function Dashboard() {
                             className={`text-xs rounded-md px-2 py-1.5 outline-none border w-full max-w-[160px] transition ${
                               t.delayReason
                                 ? 'bg-amber-950/50 border-amber-900/60 text-amber-300'
-                                : 'bg-zinc-800 border-zinc-700 text-zinc-500 hover:border-zinc-600'
+                                : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-600'
                             }`}>
                             <option value="">— Chưa gán —</option>
                             {Object.entries(DELAY_REASON_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -413,7 +414,7 @@ export default function Dashboard() {
                 })}
                 {delayed.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-5 py-12 text-center text-zinc-500 text-sm">
+                    <td colSpan={6} className="px-5 py-12 text-center text-zinc-400 text-sm">
                       Không có công việc trễ.{' '}
                       {canImport && <a href="/import" className="text-emerald-400 hover:underline">Import file Excel</a>}
                       {!canImport && 'Hãy liên hệ Admin/PM để cập nhật dữ liệu.'}
@@ -452,13 +453,13 @@ export default function Dashboard() {
               <div>
                 <label className="block text-xs text-zinc-400 mb-1">Đường dẫn</label>
                 <div className="flex items-center gap-1">
-                  <span className="text-sm text-zinc-500 shrink-0">/tracking/</span>
+                  <span className="text-sm text-zinc-400 shrink-0">/tracking/</span>
                   <input value={newSheet.slug}
                     onChange={e => setNewSheet(ns => ns && ({ ...ns, slug: e.target.value }))}
                     placeholder="ong-nuoc-cap-zone-3"
                     className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600 font-mono transition" />
                 </div>
-                <p className="text-[11px] text-zinc-600 mt-1">Chỉ dùng chữ thường a–z, số và gạch nối.</p>
+                <p className="text-[11px] text-zinc-400 mt-1">Chỉ dùng chữ thường a–z, số và gạch nối.</p>
               </div>
               <div>
                 <label className="block text-xs text-zinc-400 mb-1">Sao chép cấu trúc từ</label>
@@ -468,7 +469,7 @@ export default function Dashboard() {
                   <option value="">— Trang trống —</option>
                   {sheets.map(s => <option key={s.id} value={s.id}>{s.code} — {s.name}</option>)}
                 </select>
-                <p className="text-[11px] text-zinc-600 mt-1">Copy nhóm + công việc, tiến độ reset về 0.</p>
+                <p className="text-[11px] text-zinc-400 mt-1">Copy nhóm + công việc, tiến độ reset về 0.</p>
               </div>
             </div>
             {newSheetErr && <p className="text-xs text-red-400 mt-3">{newSheetErr}</p>}
@@ -476,7 +477,7 @@ export default function Dashboard() {
               <button onClick={() => setNewSheet(null)}
                 className="px-4 py-2 text-sm bg-zinc-800 hover:bg-zinc-700 rounded-lg transition">Huỷ</button>
               <button onClick={createSheet} disabled={!newSheet.name.trim()}
-                className="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 rounded-lg font-semibold transition">
+                className="px-4 py-2 text-sm bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 rounded-lg font-semibold transition">
                 Tạo trang
               </button>
             </div>

@@ -15,7 +15,7 @@ function cellClass(progress: number, delayed: number): string {
   if (progress >= 0.7) return 'bg-emerald-800 text-emerald-100' + ring;
   if (progress >= 0.4) return 'bg-amber-800 text-amber-100' + ring;
   if (progress > 0) return 'bg-red-900 text-red-200' + ring;
-  return 'bg-zinc-800 text-zinc-500' + ring;
+  return 'bg-zinc-800 text-zinc-300' + ring;
 }
 
 function TowerTable({ tower, byKey }: { tower: Tower; byKey: Map<string, CellData> }) {
@@ -23,7 +23,7 @@ function TowerTable({ tower, byKey }: { tower: Tower; byKey: Map<string, CellDat
     <table className="border-separate" style={{ borderSpacing: 3 }}>
       <thead>
         <tr>
-          <th className="text-xs text-zinc-500 font-normal text-right pr-2 sticky left-0 bg-zinc-900">Tầng</th>
+          <th className="text-xs text-zinc-400 font-normal text-right pr-2 sticky left-0 bg-zinc-900">Tầng</th>
           {tower.sheets.map(s => (
             <th key={s} className="text-[11px] text-zinc-400 font-medium px-1 pb-1 whitespace-nowrap min-w-[88px]">{s}</th>
           ))}
@@ -159,7 +159,7 @@ export default function FloorHeatmap() {
           </button>
         )}
       </div>
-      <p className="text-xs text-zinc-600 mb-3">Màu theo % hoàn thành · viền đỏ = có task trễ · bấm ô để mở sheet tại tầng đó</p>
+      <p className="text-xs text-zinc-400 mb-3">Màu theo % hoàn thành · viền đỏ = có task trễ · bấm ô để mở sheet tại tầng đó</p>
 
       {/* Form thêm tháp */}
       {adding && (

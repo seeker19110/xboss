@@ -70,6 +70,7 @@ export default function AppHeader({ title, subtitle, children, search = true }: 
               <a key={n.href} href={n.href}
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs whitespace-nowrap transition ${active
                   ? 'bg-zinc-800 text-white font-medium' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'}`}
+                aria-label={n.label}
                 aria-current={active ? 'page' : undefined}>
                 <Icon className={`w-4 h-4 shrink-0 ${n.color}`} />
                 <span className="hidden sm:inline"><EditableText tkey={n.tkey}>{n.label}</EditableText></span>
