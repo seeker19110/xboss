@@ -1,0 +1,9 @@
+node_modules
+.next
+out
+build
+coverage
+_framework-dropins
+package-lock.json
+data/uploads
+*.tar.gz
