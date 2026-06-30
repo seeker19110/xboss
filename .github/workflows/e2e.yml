@@ -36,8 +36,9 @@ jobs:
       # DATABASE_URL cho bước build (pool lazy — chỉ cần biến tồn tại).
       DATABASE_URL: postgres://ci:ci@localhost:5432/xboss_test
       # Secret ký phiên (production) + mật khẩu admin tạo lần đầu — giá trị test, DB ephemeral.
-      XBOSS_SECRET: e2e-ci-secret-khong-bi-mat
-      XBOSS_ADMIN_PASSWORD: e2e-ci-admin-pw
+      # gitleaks:allow — không phải secret thật (biến tên có "SECRET" nên generic-api-key báo nhầm).
+      XBOSS_SECRET: e2e-ci-secret-khong-bi-mat # gitleaks:allow
+      XBOSS_ADMIN_PASSWORD: e2e-ci-admin-pw # gitleaks:allow
 
     steps:
       - uses: actions/checkout@v4
