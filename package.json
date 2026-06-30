@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start -H 0.0.0.0",
     "lint": "eslint .",
-    "test": "tsx --test tests/status.test.ts tests/import.test.ts tests/recompute.test.ts tests/ratelimit.test.ts tests/cpm.test.ts tests/auth.test.ts tests/material-sync.test.ts tests/grid.test.ts",
+    "test": "tsx --test tests/status.test.ts tests/import.test.ts tests/recompute.test.ts tests/ratelimit.test.ts tests/cpm.test.ts tests/auth.test.ts tests/material-sync.test.ts tests/grid.test.ts tests/env.test.ts",
     "typecheck": "tsc --noEmit",
     "db:seed": "tsx scripts/seed.ts",
     "db:seed:sample": "tsx scripts/seed-sample.ts"
@@ -26,7 +26,8 @@
     "react-dom": "^19.2.7",
     "recharts": "^3.8.1",
     "web-push": "^3.6.7",
-    "xlsx": "npm:@e965/xlsx@^0.20.3"
+    "xlsx": "npm:@e965/xlsx@^0.20.3",
+    "zod": "^4.4.3"
   },
   "overrides": {
     "postcss": ">=8.5.10"

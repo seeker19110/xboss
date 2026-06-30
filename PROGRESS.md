@@ -16,7 +16,7 @@
 ## Tiếp theo
 - **Quyết định Lớp 2 (cần xác nhận người dùng — đợt sau):**
   - Hàng rào tooling: Prettier + Husky + lint-staged + commitlint (thêm dev-dep + hook commit; lưu ý workflow commit tiếng Việt qua `git commit -F`).
-  - `lib/env.ts` (Zod) validate biến môi trường lúc khởi động.
+  - ~~`lib/env.ts` (Zod) validate biến môi trường~~ → đã thêm (lazy + memoized, wiring vào `getPool`; `lib/auth` giữ prod-check riêng).
   - Lighthouse CI + Playwright E2E (desktop + mobile) + axe a11y; ngưỡng coverage.
   - ~~secret-scan (gitleaks)~~ → đã thêm. **CodeQL bị chặn** (repo private, chưa có GHAS — xem `SECURITY.md`). Sentry observability (cần DSN).
 - **KHÔNG đổi (đang chạy tốt, không big-bang):** hệ theme class-based, PWA `sw.js`, test runner `node:test`, ESLint flat config, CSDL raw SQL.
