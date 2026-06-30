@@ -21,7 +21,7 @@
 - **Quyết định Lớp 2 (cần xác nhận người dùng — đợt sau):**
   - ~~Hàng rào tooling: Prettier + Husky + lint-staged + commitlint~~ → đã thêm. pre-commit format/lint **chỉ file staged** (không format cả repo); commit-msg chặn sai conventional. `git commit -F` tiếng Việt vẫn dùng bình thường (commitlint đã tắt `subject-case`).
   - ~~`lib/env.ts` (Zod) validate biến môi trường~~ → đã thêm (lazy + memoized, wiring vào `getPool`; `lib/auth` giữ prod-check riêng).
-  - Lighthouse CI + Playwright E2E (desktop + mobile) + axe a11y; ngưỡng coverage.
+  - ~~Lighthouse CI + Playwright E2E (desktop + mobile) + axe a11y~~ → đã thêm (smoke + axe `/login`; Lighthouse warn-only baseline). Còn lại: E2E luồng đăng nhập thật (cần seed DB test) + ngưỡng coverage (`node:test` chưa có sẵn — cân nhắc `c8`).
   - ~~secret-scan (gitleaks)~~ → đã thêm. **CodeQL bị chặn** (repo private, chưa có GHAS — xem `SECURITY.md`). Sentry observability (cần DSN).
 - **KHÔNG đổi (đang chạy tốt, không big-bang):** hệ theme class-based, PWA `sw.js`, test runner `node:test`, ESLint flat config, CSDL raw SQL.
 
@@ -35,7 +35,8 @@
 
 - **Rate-limit in-memory** (`lib/ratelimit.ts`) đếm theo process → sai khi multi-instance; cần chuyển DB/Redis.
 - **Không có hệ migrate** — đổi schema bảng đã tồn tại phải `ALTER` tay / script backfill; `docs/ERD.md` cập nhật tay.
-- **Chưa có** Lighthouse CI / E2E / axe a11y / env validation / observability (Lớp 2 khung — chờ quyết định).
+- **Nợ a11y tương phản màu (HỆ THỐNG):** axe trên `/login` báo 3 lỗi contrast serious — chữ `text-zinc-500` trên nền tối + **nút chính trắng/`emerald-600` dùng khắp app** (~3.65:1 < 4.5). Cần một đợt chỉnh **design-token** riêng rồi: (a) mở lại rule `color-contrast` trong `e2e/login.spec.ts`; (b) siết assertion Lighthouse từ `warn` lên `error`. Chưa làm vì sửa đúng = đổi giao diện toàn cục.
+- **Observability (Sentry)** chưa có (cần DSN) — Lớp 2 còn lại.
 - ~~`grid.test.ts` không nằm trong lệnh `npm test`~~ → đã thêm đợt này.
 - ~~CI dùng Node 20 trong khi `.nvmrc` = 22~~ → đã đồng bộ về 22 đợt này.
 - CLAUDE.md từng ghi `.eslintrc.json` (next/core-web-vitals) — thực tế đã là `eslint.config.mjs` flat config; cần sửa mô tả khi đụng tới.
