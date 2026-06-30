@@ -303,16 +303,18 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
             className="bg-zinc-900 border border-zinc-800 rounded-lg pl-8 pr-3 py-1.5 text-sm w-56 outline-none focus:border-emerald-600" />
         </div>
         <select value={floorFilter} onChange={e => setFloorFilter(e.target.value)}
+          aria-label="Lọc theo tầng"
           className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm outline-none">
           <option value="">Tất cả tầng</option>
           {floors.map(f => <option key={f} value={f}>{f}</option>)}
         </select>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+          aria-label="Lọc theo trạng thái"
           className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm outline-none">
           <option value="">Tất cả trạng thái</option>
           {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
-        <span className="text-xs text-zinc-500 ml-auto">{packages.length} nhóm · bấm vào nhóm để mở lưới checkbox</span>
+        <span className="text-xs text-zinc-400 ml-auto">{packages.length} nhóm · bấm vào nhóm để mở lưới checkbox</span>
       </div>
 
       <main className="p-4">
@@ -892,7 +894,7 @@ async function saveDates(ids: number[], start: string, end: string) {
                 </span>
               ) : (
                 <span className="group/floor inline-flex items-center gap-0.5">
-                  <span className="text-xs text-zinc-500">{pkg.floorLabel ?? ''}</span>
+                  <span className="text-xs text-zinc-400">{pkg.floorLabel ?? ''}</span>
                   {ce && (
                     <button onClick={e => { e.stopPropagation(); setEditFloor(pkg.floorLabel ?? ''); }}
                       title="Sửa tầng" className="opacity-100 sm:opacity-0 sm:group-hover/floor:opacity-100 text-zinc-600 hover:text-emerald-400">
@@ -944,8 +946,8 @@ async function saveDates(ids: number[], start: string, end: string) {
               <button onClick={e => { e.stopPropagation(); if (ce) setShowDatesModal(true); }}
                 title={ce ? 'Sửa ngày nhóm' : (pkg.startDate ?? '?')}
                 className={`flex flex-col items-center w-full ${ce ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
-                <span className="text-[9px] text-zinc-600 leading-none">Bắt đầu</span>
-                <span className="text-[13px] text-zinc-500 leading-snug">{fmtShortDate(pkg.startDate)}</span>
+                <span className="text-[9px] text-zinc-400 leading-none">Bắt đầu</span>
+                <span className="text-[13px] text-zinc-400 leading-snug">{fmtShortDate(pkg.startDate)}</span>
               </button>
             </td>
             <td className={`border-r border-zinc-800 px-1 py-3.5 text-center align-middle${hpc('Số ngày')}`}
@@ -953,7 +955,7 @@ async function saveDates(ids: number[], start: string, end: string) {
               onClick={e => { if (!(e.target as Element).closest('button,input')) onToggle(); }}>
               {editDays !== null ? (
                 <span className="flex flex-col items-center gap-0.5" onClick={e => e.stopPropagation()}>
-                  <span className="text-[9px] text-zinc-600 leading-none">Số ngày</span>
+                  <span className="text-[9px] text-zinc-400 leading-none">Số ngày</span>
                   <input autoFocus type="number" min={1} value={editDays}
                     onChange={e => setEditDays(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') savePkgDays(editDays); if (e.key === 'Escape') setEditDays(null); }}
@@ -964,8 +966,8 @@ async function saveDates(ids: number[], start: string, end: string) {
                 <button onClick={e => { e.stopPropagation(); if (ce) setEditDays(String(diffDays(pkg.startDate, pkg.endDate) ?? '')); }}
                   title={ce ? 'Sửa số ngày' : ''}
                   className={`flex flex-col items-center w-full ${ce ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
-                  <span className="text-[9px] text-zinc-600 leading-none">Số ngày</span>
-                  <span className="text-[13px] text-zinc-600 leading-snug">
+                  <span className="text-[9px] text-zinc-400 leading-none">Số ngày</span>
+                  <span className="text-[13px] text-zinc-400 leading-snug">
                     {diffDays(pkg.startDate, pkg.endDate) != null
                       ? `${diffDays(pkg.startDate, pkg.endDate)}n`
                       : <CalendarDays className="w-[14px] h-[14px] text-zinc-700 inline" />}
@@ -979,8 +981,8 @@ async function saveDates(ids: number[], start: string, end: string) {
               <button onClick={e => { e.stopPropagation(); if (ce) setShowDatesModal(true); }}
                 title={ce ? 'Sửa ngày nhóm' : (pkg.endDate ?? '?')}
                 className={`flex flex-col items-center w-full ${ce ? 'hover:text-emerald-400 cursor-pointer' : 'cursor-default'}`}>
-                <span className="text-[9px] text-zinc-600 leading-none">Kết thúc</span>
-                <span className="text-[13px] text-zinc-500 leading-snug">{fmtShortDate(pkg.endDate)}</span>
+                <span className="text-[9px] text-zinc-400 leading-none">Kết thúc</span>
+                <span className="text-[13px] text-zinc-400 leading-snug">{fmtShortDate(pkg.endDate)}</span>
               </button>
             </td>
 
@@ -989,7 +991,7 @@ async function saveDates(ids: number[], start: string, end: string) {
               className="px-3 py-3.5 align-middle" style={{ minWidth: 420 }}
               onClick={e => { if (!(e.target as Element).closest('button,a')) onToggle(); }}>
               <div className="flex items-center gap-3">
-                <span className="text-[13px] text-zinc-500 w-[67px] text-right shrink-0">{pkg.tasks.length} task</span>
+                <span className="text-[13px] text-zinc-400 w-[67px] text-right shrink-0">{pkg.tasks.length} task</span>
                 <div className="flex items-center gap-2 w-44 shrink-0">
                   <div className="bg-zinc-800 rounded-full h-2 flex-1">
                     <div className="bg-emerald-500 h-2 rounded-full" style={{ width: `${(pkg.progress ?? 0) * 100}%` }} />
@@ -1000,7 +1002,7 @@ async function saveDates(ids: number[], start: string, end: string) {
                 </span>
                 {/* Bản vẽ */}
                 <span className="flex flex-col items-center shrink-0 border-l border-zinc-800 pl-3 ml-1" onClick={e => e.stopPropagation()}>
-                  <span className="text-[9px] text-zinc-600 leading-none mb-0.5">Bản vẽ</span>
+                  <span className="text-[9px] text-zinc-400 leading-none mb-0.5">Bản vẽ</span>
                   <span className="flex items-center gap-1">
                     {pkg.drawingUrl ? (
                       <a href={pkg.drawingUrl} target="_blank" rel="noreferrer" title="Xem bản vẽ"
@@ -1028,7 +1030,7 @@ async function saveDates(ids: number[], start: string, end: string) {
                   onChange={e => { const f = e.target.files?.[0]; if (f) { uploadDrawingFile(f); e.target.value = ''; } }} />
                 {/* Biên Bản Nghiệm Thu */}
                 <span className="flex flex-col items-center shrink-0 border-l border-zinc-800 pl-3" onClick={e => e.stopPropagation()}>
-                  <span className="text-[9px] text-zinc-600 leading-none mb-0.5">Biên bản NT</span>
+                  <span className="text-[9px] text-zinc-400 leading-none mb-0.5">Biên bản NT</span>
                   <span className="flex items-center gap-1">
                     {pkg.bbntUrl ? (
                       <a href={pkg.bbntUrl} target="_blank" rel="noreferrer" title="Xem biên bản nghiệm thu"
