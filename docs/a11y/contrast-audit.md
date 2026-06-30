@@ -2,7 +2,7 @@
 
 > Mục tiêu: dọn **nợ a11y tương phản màu** (PROGRESS.md › Nợ kỹ thuật) một cách **có bằng chứng, theo từng trang**, không sửa hàng loạt mù (tránh big-bang). Tài liệu này là **backlog remediation có thứ tự** + **quy trình ground-truth**.
 >
-> Trạng thái: **audit xong** (2026-06-30). Phần đã sửa & verify: `/login` + footer toàn cục (PR #43). Phần còn lại: xếp ưu tiên bên dưới, dọn dần khi mở rộng axe E2E.
+> Trạng thái: **audit xong** + **hạ tầng axe sau-auth xong** (2026-06-30). Đã sửa & verify bằng axe: `/login` + footer (PR #43), **Dashboard `/` + `AppHeader`** (desktop + mobile). Phần còn lại: xếp ưu tiên bên dưới, dọn dần từng trang qua axe E2E.
 
 ## 1. Phương pháp & vì sao "grep" chỉ là ứng viên
 
@@ -101,22 +101,22 @@ File chứa nút FAIL: `payments/page.tsx`, `materials/reports/page.tsx` + `_com
 
 Đếm thật (`zinc-500` + `zinc-600`). Ưu tiên = **độ phủ người dùng × mật độ**. Global chrome (header/footer/dialog) hiển thị **mọi trang** → ưu tiên cao nhất.
 
-| #      | Trang / Component                                                                                                                                               | z-500 | z-600 |     Σ | Ghi chú remediation                                                   |
-| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----: | ----: | ----: | --------------------------------------------------------------------- |
-| ✅ P0  | `app/layout.tsx` (footer) + `/login`                                                                                                                            |     — |     — |     — | **Xong** (PR #43), axe color-contrast đã bật làm cổng cứng            |
-| **P1** | **Global chrome**: `AppHeader`_, `NotificationBell` (3+1), `GlobalSearch` (4), `ThemeToggle` (1), `OnlineUsers` (3+1), `dialogs`_                               |    11 |     3 |    14 | Hiện mọi trang → fix 1 lần lợi toàn app                               |
-| **P1** | `app/page.tsx` (Dashboard — landing sau login)                                                                                                                  |    13 |     5 |    18 | Nhiều icon hover (`group-hover`) — soi kỹ, không đổi state idle       |
-| P2     | `app/tracking/[sheet]/page.tsx` (lưới chính)                                                                                                                    |    46 |    28 |    74 | Mật độ cao nhất; **nhiều** icon/affordance hover → phân loại cẩn thận |
-| P2     | `app/payments/page.tsx`                                                                                                                                         |    25 |    21 |    46 | + 2 nút accent chữ trắng                                              |
-| P2     | `app/my-tasks/page.tsx`                                                                                                                                         |    15 |    18 |    33 | + 1 nút; nhiều `hover:text-zinc-400`                                  |
-| P2     | `app/materials/page.tsx` (+ `_components/*`)                                                                                                                    | 26+19 |   6+5 | 32+30 | + 1 nút; 3 tab con                                                    |
-| P3     | `app/admin/page.tsx`                                                                                                                                            |    18 |     5 |    23 | Admin-only                                                            |
-| P3     | `app/notifications/page.tsx`                                                                                                                                    |    18 |     5 |    23 |                                                                       |
-| P3     | `gantt` (7+3), `timeline` (7+3), `lookahead` (2+3)+`LookaheadTable` (1+2)                                                                                       |    17 |    11 |    28 | Trang biểu đồ/kế hoạch                                                |
-| P3     | `approvals` (7+3), `import` (5+1), `report` (4+3), `users` (2+0)                                                                                                |    18 |     7 |    25 |                                                                       |
-| P3     | `materials/*` phụ: `reports`, `import`, `purchase-orders`, `purchase-requests`                                                                                  |    19 |     4 |    23 |                                                                       |
-| P3     | Component lẻ: `FloorHeatmap` (5+5), `SpreadsheetGrid` (6), `SpiCards` (3+1), `ForecastCards` (2+3), `EditableText` (3), `BlockedPanel` (2+1), `SCurveChart` (1) |    22 |    10 |    32 | Theo trang chứa nó                                                    |
-| —      | `payments/print` (1), `materials/purchase-requests` (1)                                                                                                         |     2 |     0 |     2 | Đuôi dài                                                              |
+| #     | Trang / Component                                                                                                                                                       | z-500 | z-600 |     Σ | Ghi chú remediation                                                     |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----: | ----: | ----: | ----------------------------------------------------------------------- |
+| ✅ P0 | `app/layout.tsx` (footer) + `/login`                                                                                                                                    |     — |     — |     — | **Xong** (PR #43), axe color-contrast đã bật làm cổng cứng              |
+| 🟡 P1 | **Global chrome**: `AppHeader` (✅ link-name + qua axe trên Dashboard), `NotificationBell` (3+1), `GlobalSearch` (4), `ThemeToggle` (1), `OnlineUsers` (3+1), `dialogs` |    11 |     3 |    14 | AppHeader xong; còn lại verify khi phủ trang chứa                       |
+| ✅ P1 | `app/page.tsx` (Dashboard — landing sau login)                                                                                                                          |    13 |     5 |    18 | **Xong** — axe desktop+mobile xanh (contrast + link-name + select-name) |
+| P2    | `app/tracking/[sheet]/page.tsx` (lưới chính)                                                                                                                            |    46 |    28 |    74 | Mật độ cao nhất; **nhiều** icon/affordance hover → phân loại cẩn thận   |
+| P2    | `app/payments/page.tsx`                                                                                                                                                 |    25 |    21 |    46 | + 2 nút accent chữ trắng                                                |
+| P2    | `app/my-tasks/page.tsx`                                                                                                                                                 |    15 |    18 |    33 | + 1 nút; nhiều `hover:text-zinc-400`                                    |
+| P2    | `app/materials/page.tsx` (+ `_components/*`)                                                                                                                            | 26+19 |   6+5 | 32+30 | + 1 nút; 3 tab con                                                      |
+| P3    | `app/admin/page.tsx`                                                                                                                                                    |    18 |     5 |    23 | Admin-only                                                              |
+| P3    | `app/notifications/page.tsx`                                                                                                                                            |    18 |     5 |    23 |                                                                         |
+| P3    | `gantt` (7+3), `timeline` (7+3), `lookahead` (2+3)+`LookaheadTable` (1+2)                                                                                               |    17 |    11 |    28 | Trang biểu đồ/kế hoạch                                                  |
+| P3    | `approvals` (7+3), `import` (5+1), `report` (4+3), `users` (2+0)                                                                                                        |    18 |     7 |    25 |                                                                         |
+| P3    | `materials/*` phụ: `reports`, `import`, `purchase-orders`, `purchase-requests`                                                                                          |    19 |     4 |    23 |                                                                         |
+| P3    | Component lẻ: `FloorHeatmap` (5+5), `SpreadsheetGrid` (6), `SpiCards` (3+1), `ForecastCards` (2+3), `EditableText` (3), `BlockedPanel` (2+1), `SCurveChart` (1)         |    22 |    10 |    32 | Theo trang chứa nó                                                      |
+| —     | `payments/print` (1), `materials/purchase-requests` (1)                                                                                                                 |     2 |     0 |     2 | Đuôi dài                                                                |
 
 \* `AppHeader`/`dialogs` không có `text-zinc-500/600` trực tiếp nhưng thuộc global chrome — kiểm bằng axe khi phủ trang đầu tiên.
 
@@ -124,21 +124,28 @@ File chứa nút FAIL: `payments/page.tsx`, `materials/reports/page.tsx` + `_com
 
 `color-contrast` đã bật trong `e2e/login.spec.ts` → cổng cứng cho `/login` + footer. Mở rộng sang trang khác:
 
-### Bước 0 (chặn) — hạ tầng E2E có đăng nhập
+### Bước 0 (chặn) — hạ tầng E2E có đăng nhập ✅ **ĐÃ XONG**
 
-Hầu hết trang **sau auth** (401 → redirect `/login`), nên axe không chạm được nếu chưa đăng nhập. Cần (đã ghi PROGRESS "E2E luồng đăng nhập thật — cần seed DB test"):
+Hầu hết trang **sau auth** (401 → redirect `/login`), nên axe không chạm được nếu chưa đăng nhập. Đã dựng:
 
-- Postgres test (CI đã có service 16) + seed tối thiểu (1 dự án, vài task) — tái dùng `tests/setup.ts` + `npm run db:seed`/script seed gọn.
-- Playwright **fixture đăng nhập** (storage state) dùng `XBOSS_ADMIN_PASSWORD` → 1 lần login, tái dùng cookie cho mọi spec.
+- `e2e/global-setup.ts` — seed dữ liệu mẫu (`scripts/seed-sample.ts`) vào DB test 1 lần khi có `E2E_DATABASE_URL`.
+- `e2e/auth.setup.ts` — đăng nhập admin (tạo qua `ensureDefaultUsers` + `XBOSS_ADMIN_PASSWORD`), lưu `storageState` (`playwright/.auth/admin.json`, không commit).
+- `playwright.config.ts` — tách project **public** (login, không cần DB) / **setup** / **authed-desktop|mobile** (storageState). Nhánh sau-auth chỉ bật khi có `E2E_DATABASE_URL` (mirror quy ước `TEST_DATABASE_URL`).
+- `.github/workflows/e2e.yml` — thêm service Postgres 16 + `E2E_DATABASE_URL`/`XBOSS_SECRET`/`XBOSS_ADMIN_PASSWORD`.
 
 ### Bước 1..n — mỗi trang một spec, theo thứ tự §4
 
-Cho mỗi trang (bắt đầu **P1 global chrome → Dashboard**):
+Cho mỗi trang (đã làm: **Dashboard `/` + AppHeader**, `e2e/authed/dashboard.spec.ts`):
 
-1. Viết `e2e/<trang>.spec.ts`: `goto` → chờ nội dung chính → `AxeBuilder().withTags([...]).analyze()` → assert **không** vi phạm `serious/critical` (như `login.spec`).
+1. Viết `e2e/authed/<trang>.spec.ts`: `goto` → chờ nội dung chính → `AxeBuilder().withTags([...]).analyze()` → assert **không** vi phạm `serious/critical` (như `login.spec`).
 2. Chạy axe → thu **danh sách lỗi thật** (đã lọc hết nhiễu ở §1).
 3. Sửa đúng các node axe báo, theo **quy tắc §2/§3**. **Không** đụng state hover/idle/icon trừ khi axe báo.
-4. Axe xanh lại (desktop + mobile) → commit trang đó. Diff nhỏ, review nhanh.
+4. Axe xanh lại (**desktop + mobile**) → commit trang đó. Diff nhỏ, review nhanh.
+
+> **axe bắt cả lỗi a11y NGOÀI contrast** (thứ grep không thấy) — đã xác nhận trên Dashboard:
+> `link-name` (nút export + nav icon-only ẩn label trên mobile → thiếu tên) và `select-name`
+> (select lọc thiếu `aria-label`). ⇒ **chỉ phủ axe mới là ground-truth**, không chỉ riêng contrast.
+> Lưu ý render thật Tailwind v4: `emerald-600` ra `#009966` → chữ trắng chỉ 3.65:1 (khớp dự đoán §3).
 
 ### Bước cuối
 
@@ -146,9 +153,9 @@ Sau khi phủ axe các trang chính → **siết Lighthouse a11y `warn`→`error
 
 ## 6. Tóm tắt hành động
 
-1. **Ngay được (không chờ Bước 0):** sửa **global chrome P1** + **Dashboard `/page.tsx`** theo §2/§3 (đây là các ca body-text-tĩnh rõ ràng) — nhưng vẫn nên kèm axe sau khi có fixture để chốt; nếu chưa có fixture thì giới hạn ở các chuỗi text tĩnh chắc chắn, diff nhỏ, theo từng trang.
-2. **Mở khoá phần lớn backlog:** làm **Bước 0** (fixture login + seed) — đây là việc lớn nhất kế tiếp.
-3. **Sửa ~10 nút accent FAIL** (§3) gộp theo trang khi chạm trang đó.
-4. Đuôi dài P3 dọn dần.
+1. ~~**Bước 0** (fixture login + seed)~~ → **xong**.
+2. ~~**Global chrome (AppHeader) + Dashboard `/`**~~ → **xong** (axe desktop + mobile xanh).
+3. **Tiếp:** remediate trang kế theo §4 (tracking grid → payments → my-tasks → materials…), mỗi trang một spec authed. Gộp **~10 nút accent FAIL** (§3) khi chạm trang chứa.
+4. Đuôi dài P3 dọn dần → siết Lighthouse a11y `warn`→`error`.
 
 > Nguyên tắc xuyên suốt: **axe là ground-truth, code-audit chỉ là ứng viên; dọn theo từng trang, không big-bang.**
