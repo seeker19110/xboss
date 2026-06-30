@@ -22,7 +22,7 @@ Mục tiêu phản hồi: xác nhận trong vòng **72 giờ**; thống nhất m
 | Chống dò mật khẩu | Rate-limit login in-memory (`lib/ratelimit.ts`): 5 lần sai/15 phút theo IP+email, 20/IP → 429 + `Retry-After`. |
 | SQL injection | Truy vấn **tham số hoá** bắt buộc qua helper `lib/db` (placeholder `?` → `$n`) — không nối chuỗi giá trị. |
 | Phụ thuộc | `npm audit --audit-level=high` trong CI (`.github/workflows/ci.yml`) + Dependabot (cập nhật hằng tuần). |
-| Bí mật | Dùng biến môi trường; `.env*` bị `.gitignore` chặn. Cron bảo vệ bằng `CRON_SECRET` qua header `Authorization: Bearer` (không qua query param). |
+| Bí mật | Dùng biến môi trường; `.env*` bị `.gitignore` chặn. **gitleaks** (`.github/workflows/secret-scan.yml`) quét diff/commit mỗi push & PR. Cron bảo vệ bằng `CRON_SECRET` qua header `Authorization: Bearer` (không qua query param). |
 | Upload | Ảnh/biên bản giới hạn mime + dung lượng (`lib/photos.ts`), lưu ngoài git (`data/uploads/`). |
 
 > **Lưu ý phân quyền:** XBoss **không dùng RLS Postgres** — kiểm soát truy cập ở tầng API
@@ -31,8 +31,13 @@ Mục tiêu phản hồi: xác nhận trong vòng **72 giờ**; thống nhất m
 
 ## Hàng rào bảo mật DỰ KIẾN (Lớp 2 khung — chưa bật)
 
-Chưa thiết lập, nằm trong lộ trình (xem `PROGRESS.md` mục "Tiếp theo"): CodeQL (SAST),
-gitleaks (quét bí mật), `lib/env.ts` (Zod) validate biến môi trường lúc khởi động.
+Nằm trong lộ trình (xem `PROGRESS.md` mục "Tiếp theo"):
+
+- **CodeQL (SAST)** — **bị chặn** vì repo đang **private** và chưa có GitHub Advanced Security.
+  Để bật: đưa repo **public** (CodeQL miễn phí) **hoặc** mua GHAS, rồi bật **Settings → Code security &
+  analysis → Code scanning**. Khi đủ điều kiện, thêm `.github/workflows/codeql.yml`
+  (mẫu sẵn trong `_framework-dropins/.github/workflows/codeql.yml`).
+- `lib/env.ts` (Zod) — validate biến môi trường lúc khởi động (PR riêng).
 
 ## Nguyên tắc bất biến (không bao giờ phá)
 
