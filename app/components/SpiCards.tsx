@@ -7,7 +7,7 @@ type Data = { spi: Spi[]; overall: Spi & { sheetType?: string } };
 
 // Màu theo ngưỡng SPI: ≥1 đúng/vượt tiến độ, 0.9–1 hơi chậm, <0.9 chậm đáng kể.
 function tone(spi: number | null) {
-  if (spi === null) return { text: 'text-zinc-500', ring: 'border-zinc-800', label: 'Chưa đủ dữ liệu' };
+  if (spi === null) return { text: 'text-zinc-400', ring: 'border-zinc-800', label: 'Chưa đủ dữ liệu' };
   if (spi >= 1) return { text: 'text-emerald-400', ring: 'border-emerald-500/30', label: 'Đúng/vượt tiến độ' };
   if (spi >= 0.9) return { text: 'text-amber-400', ring: 'border-amber-500/30', label: 'Hơi chậm' };
   return { text: 'text-rose-400', ring: 'border-rose-500/30', label: 'Chậm đáng kể' };
@@ -31,7 +31,7 @@ export default function SpiCards() {
       <h2 className="font-semibold mb-1 text-sm text-zinc-300 flex items-center gap-2">
         <Gauge className="w-4 h-4 text-sky-400" /> Chỉ số tiến độ (SPI)
       </h2>
-      <p className="text-xs text-zinc-600 mb-3">
+      <p className="text-xs text-zinc-400 mb-3">
         SPI = % thực tế ÷ % kế hoạch tại hôm nay. ≥ 1 đúng/vượt kế hoạch · 0.9–1 hơi chậm · &lt; 0.9 chậm đáng kể.
       </p>
 
@@ -40,7 +40,7 @@ export default function SpiCards() {
           <p className="text-xs text-zinc-400 uppercase mb-1">Toàn dự án</p>
           <p className={`text-3xl font-bold ${o.text}`}>{data.overall.spi === null ? '—' : data.overall.spi.toFixed(2)}</p>
           <p className={`text-xs mt-1 font-medium ${o.text}`}>{o.label}</p>
-          <p className="text-[11px] text-zinc-500 mt-1">Thực tế {pct(data.overall.actual)} · Kế hoạch {pct(data.overall.planned)}</p>
+          <p className="text-[11px] text-zinc-400 mt-1">Thực tế {pct(data.overall.actual)} · Kế hoạch {pct(data.overall.planned)}</p>
         </div>
       </div>
 
@@ -51,7 +51,7 @@ export default function SpiCards() {
             <div key={s.sheetType} className={`bg-zinc-950/60 border ${t.ring} rounded-lg p-3`}>
               <p className="text-xs text-zinc-400 uppercase truncate mb-1">{s.sheetType}</p>
               <p className={`text-xl font-bold ${t.text}`}>{s.spi === null ? '—' : s.spi.toFixed(2)}</p>
-              <p className="text-[11px] text-zinc-500 mt-1">TT {pct(s.actual)} · KH {pct(s.planned)}</p>
+              <p className="text-[11px] text-zinc-400 mt-1">TT {pct(s.actual)} · KH {pct(s.planned)}</p>
             </div>
           );
         })}

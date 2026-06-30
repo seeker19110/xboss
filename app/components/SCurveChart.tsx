@@ -65,11 +65,13 @@ export default function SCurveChart() {
         </h2>
         <div className="ml-auto flex items-center gap-2">
           <select value={baseline} onChange={e => setBaseline(e.target.value)}
+            aria-label="Chọn baseline so sánh"
             className="bg-zinc-950 border border-zinc-800 rounded-lg px-2 py-1 text-xs outline-none text-zinc-300">
             <option value="">Kế hoạch hiện tại</option>
             {baselines.map(b => <option key={b.id} value={b.id}>📌 {b.name}</option>)}
           </select>
           <select value={sheet} onChange={e => setSheet(e.target.value)}
+            aria-label="Lọc S-curve theo sheet"
             className="bg-zinc-950 border border-zinc-800 rounded-lg px-2 py-1 text-xs outline-none text-zinc-300">
             <option value="">Toàn dự án</option>
             {data.sheets.map(s => <option key={s} value={s}>{s}</option>)}
@@ -80,7 +82,7 @@ export default function SCurveChart() {
           </button>
         </div>
       </div>
-      <p className="text-xs text-zinc-500 mb-3">
+      <p className="text-xs text-zinc-400 mb-3">
         {baseline
           ? 'Đường kế hoạch theo ngày đã chốt trong baseline — thấy được độ lệch so với kế hoạch gốc kể cả khi đã dời ngày'
           : 'Đường kế hoạch nội suy từ ngày bắt đầu/kết thúc của từng task · đường thực tế tái dựng từ lịch sử cập nhật'}
