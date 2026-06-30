@@ -23,3 +23,11 @@ cloudflared-*.txt
 xboss.db
 xboss.db-shm
 xboss.db-wal
+
+# Bộ khung tạm — staging để tự merge, không commit (xem docs/framework/AP-DUNG-vao-du-an-co-san.md)
+_framework-dropins/
+*.framework-new
+
+# Tarball backup nặng — không commit
+xboss.tar.gz
+.env.example.framework-new
