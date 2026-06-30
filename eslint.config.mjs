@@ -1,6 +1,8 @@
 import nextConfig from 'eslint-config-next/core-web-vitals'
 
 const config = [
+  // Bộ khung tạm (staging để tự merge) — không lint, xem .gitignore
+  { ignores: ['_framework-dropins/**'] },
   ...nextConfig,
   {
     rules: {

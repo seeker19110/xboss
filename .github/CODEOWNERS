@@ -1,0 +1,13 @@
+# Chủ sở hữu mã nguồn — tự gán reviewer cho mọi PR (ăn khớp với branch protection).
+# Cú pháp: <mẫu đường dẫn>  <@user hoặc @org/team>
+
+# Mặc định: chủ repo review mọi thay đổi.
+*                         @seeker19110
+
+# Khu vực nhạy cảm — nên review kỹ hơn.
+/.github/                 @seeker19110
+/lib/auth.ts              @seeker19110
+/lib/db/                  @seeker19110
+/docs/framework/          @seeker19110
+/docs/adr/                @seeker19110
+/CLAUDE.md                @seeker19110

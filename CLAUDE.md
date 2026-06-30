@@ -4,7 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Dự án
 
-XBoss — web app quản lý tiến độ thi công MEP/ACMV (dự án TT AVIO Tháp A), thay thế file Excel tracking. Next.js 16 App Router (React 19) + TypeScript + Tailwind 4 + PostgreSQL (Supabase hoặc tự host). Toàn bộ UI, comment code và commit message viết bằng **tiếng Việt**. Đặc tả đầy đủ trong `spec.md`, ERD trong `docs/ERD.md`, hướng dẫn deploy trong `DEPLOY.md`.
+XBoss — web app quản lý tiến độ thi công MEP/ACMV (dự án TT AVIO Tháp A), thay thế file Excel tracking. Next.js 16 App Router (React 19) + TypeScript + Tailwind 4 + PostgreSQL **tự host, raw SQL** (không Supabase/ORM — xem `docs/adr/0001-postgres-raw-sql.md`). Toàn bộ UI, comment code và commit message viết bằng **tiếng Việt**. Đặc tả đầy đủ trong `spec.md`, ERD trong `docs/ERD.md`, hướng dẫn deploy trong `DEPLOY.md`.
+
+## Tài liệu dự án & khung (đọc khi liên quan)
+
+- `PROJECT.md` — *cái gì* cần xây (vấn đề, MVP, schema, kiến trúc, DoD), viết ngược từ code. **Đọc trước việc liên quan tính năng/thiết kế.**
+- `PROGRESS.md` — đang ở giai đoạn nào, đã xong/đang làm/tiếp theo, **nợ kỹ thuật**. Cập nhật sau mỗi mốc.
+- `docs/adr/` — các quyết định kỹ thuật. **Đọc trước khi đề xuất thay đổi kiến trúc lớn** (vd đừng đề xuất thêm Supabase/ORM/vitest — đã có ADR giải thích lý do giữ hiện trạng).
+- `docs/framework/` — bộ khung quy trình/chất lượng (tham khảo dài, đọc đúng phần cần). Áp dụng brownfield theo `AP-DUNG-vao-du-an-co-san.md`.
+- `docs/ops/` — vận hành sự cố production (`incident-response.md`).
 
 ## Vai trò & nguyên tắc
 
