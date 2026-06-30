@@ -35,7 +35,10 @@
 
 - **Rate-limit in-memory** (`lib/ratelimit.ts`) đếm theo process → sai khi multi-instance; cần chuyển DB/Redis.
 - **Không có hệ migrate** — đổi schema bảng đã tồn tại phải `ALTER` tay / script backfill; `docs/ERD.md` cập nhật tay.
-- **Nợ a11y tương phản màu (HỆ THỐNG):** axe trên `/login` báo 3 lỗi contrast serious — chữ `text-zinc-500` trên nền tối + **nút chính trắng/`emerald-600` dùng khắp app** (~3.65:1 < 4.5). Cần một đợt chỉnh **design-token** riêng rồi: (a) mở lại rule `color-contrast` trong `e2e/login.spec.ts`; (b) siết assertion Lighthouse từ `warn` lên `error`. Chưa làm vì sửa đúng = đổi giao diện toàn cục.
+- **Nợ a11y tương phản màu (HỆ THỐNG, đang dọn dần):**
+  - ~~`/login` + footer toàn cục (3 lỗi serious)~~ → **đã sửa & verify bằng axe**: `/login` (subtitle zinc-500→zinc-400, nút emerald-600→emerald-700) + footer layout (zinc-600/500→zinc-400/200). **Rule `color-contrast` đã bật lại** trong `e2e/login.spec.ts` → giờ là cổng cứng (E2E sẽ đỏ nếu tái phạm).
+  - **Còn lại (app-wide):** ~399 chỗ `text-zinc-500/600` + ~43 nút `bg-emerald-600/500` (và amber/sky/blue-500/600 chữ trắng) ở các trang khác. Dọn dần **theo từng trang** khi mở rộng axe E2E (axe là ground-truth) — không sửa hàng loạt mù (tránh big-bang).
+  - Sau khi phủ axe thêm trang: siết assertion Lighthouse a11y từ `warn` lên `error`.
 - **Observability (Sentry)** chưa có (cần DSN) — Lớp 2 còn lại.
 - ~~`grid.test.ts` không nằm trong lệnh `npm test`~~ → đã thêm đợt này.
 - ~~CI dùng Node 20 trong khi `.nvmrc` = 22~~ → đã đồng bộ về 22 đợt này.

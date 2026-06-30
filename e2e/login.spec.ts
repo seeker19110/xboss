@@ -19,11 +19,6 @@ test.describe("Trang đăng nhập", () => {
 
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-      // NỢ KỸ THUẬT: tạm bỏ "color-contrast" — nợ thiết kế HỆ THỐNG (chữ zinc-500 trên
-      // nền tối, nút chính trắng/emerald-600 dùng khắp app). Sửa bằng một đợt chỉnh
-      // design-token riêng rồi mở lại rule này (xem PROGRESS.md). Gate vẫn chặn các lỗi
-      // a11y cấu trúc khác (label, ARIA, role, thứ tự heading...).
-      .disableRules(["color-contrast"])
       .analyze();
 
     // Cổng khởi đầu: chặn mức serious/critical; mức minor để dọn dần.
