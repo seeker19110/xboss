@@ -23,19 +23,25 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="vi" className="h-full antialiased dark" suppressHydrationWarning>
       <head>
-        <Script id="theme-init" strategy="beforeInteractive">{`try{var T=['dark','light','kingblue','darkblue','navy'];var t=localStorage.getItem('xboss_theme');if(t&&T.indexOf(t)>=0&&t!=='dark'){var e=document.documentElement;e.classList.remove('dark');e.classList.add(t);}}catch(_){}`}</Script>
+        <Script
+          id="theme-init"
+          strategy="beforeInteractive"
+        >{`try{var T=['dark','light','kingblue','darkblue','navy'];var t=localStorage.getItem('xboss_theme');if(t&&T.indexOf(t)>=0&&t!=='dark'){var e=document.documentElement;e.classList.remove('dark');e.classList.add(t);}}catch(_){}`}</Script>
       </head>
       <body className="min-h-full flex flex-col">
         <PwaRegister />
         <AppDialogs />
         {children}
-        <footer className="mt-auto py-3 px-4 text-center text-[10px] text-zinc-600 border-t border-zinc-900 print:hidden">
-          © {new Date().getFullYear()} XBoss — Phát triển bởi{' '}
-          <span className="text-zinc-500 font-medium">Seeker</span>
-          {' '}·{' '}
-          <a href="mailto:liendv@live.com" className="hover:text-zinc-400 transition">liendv@live.com</a>
-          {' '}·{' '}
-          <a href="tel:+849778 19 110" className="hover:text-zinc-400 transition">+849 778 19 110</a>
+        <footer className="mt-auto py-3 px-4 text-center text-[10px] text-zinc-400 border-t border-zinc-900 print:hidden">
+          © {new Date().getFullYear()} XBoss — Phát triển bởi{" "}
+          <span className="text-zinc-200 font-medium">Seeker</span> ·{" "}
+          <a href="mailto:liendv@live.com" className="hover:text-zinc-200 transition">
+            liendv@live.com
+          </a>{" "}
+          ·{" "}
+          <a href="tel:+849778 19 110" className="hover:text-zinc-200 transition">
+            +849 778 19 110
+          </a>
         </footer>
       </body>
     </html>
