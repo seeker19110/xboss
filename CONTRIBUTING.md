@@ -46,15 +46,25 @@ npm run build        # build production
 npm run lint         # next lint
 npm run typecheck    # tsc --noEmit
 npm test             # node:test qua tsx
+npm run format       # prettier --write . (định dạng toàn bộ — chạy khi cần)
+npm run format:check # prettier --check . (kiểm định dạng, không sửa)
 ```
+
+## Hàng rào tự động (Husky — đừng vô hiệu hoá)
+
+- **pre-commit**: `lint-staged` chạy `eslint --fix` + `prettier --write` **chỉ trên file đang sửa**
+  (không format cả repo — dọn dần theo "đụng đâu dọn đó").
+- **commit-msg**: `commitlint` chặn commit sai chuẩn conventional.
+- Cài tự động qua `npm install` (script `prepare`). Bỏ qua tạm 1 lần (khi thật cần): `git commit --no-verify`.
+- typecheck/test/build **không** chạy ở pre-commit (để commit nhanh) — CI lo phần đó.
 
 ## Quy ước commit
 
-| Prefix  | Dùng khi |
-|---------|----------|
-| `feat:` | thêm tính năng |
-| `fix:`  | sửa lỗi |
-| `chore:`| việc lặt vặt, cấu hình, dọn dẹp |
-| `ci:`   | thay đổi CI/CD |
-| `docs:` | tài liệu |
-| `refactor:` | tái cấu trúc không đổi hành vi |
+| Prefix      | Dùng khi                        |
+| ----------- | ------------------------------- |
+| `feat:`     | thêm tính năng                  |
+| `fix:`      | sửa lỗi                         |
+| `chore:`    | việc lặt vặt, cấu hình, dọn dẹp |
+| `ci:`       | thay đổi CI/CD                  |
+| `docs:`     | tài liệu                        |
+| `refactor:` | tái cấu trúc không đổi hành vi  |

@@ -9,8 +9,11 @@
     "lint": "eslint .",
     "test": "tsx --test tests/status.test.ts tests/import.test.ts tests/recompute.test.ts tests/ratelimit.test.ts tests/cpm.test.ts tests/auth.test.ts tests/material-sync.test.ts tests/grid.test.ts tests/env.test.ts",
     "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "db:seed": "tsx scripts/seed.ts",
-    "db:seed:sample": "tsx scripts/seed-sample.ts"
+    "db:seed:sample": "tsx scripts/seed-sample.ts",
+    "prepare": "husky || true"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.5.1",
@@ -33,6 +36,8 @@
     "postcss": ">=8.5.10"
   },
   "devDependencies": {
+    "@commitlint/cli": "^21.1.0",
+    "@commitlint/config-conventional": "^21.1.0",
     "@tailwindcss/postcss": "^4.3.1",
     "@types/node": "^22.19.21",
     "@types/nodemailer": "^8.0.1",
@@ -43,6 +48,9 @@
     "dotenv": "^17.4.2",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.9",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.8",
+    "prettier": "^3.9.4",
     "tailwindcss": "^4.3.1",
     "tsx": "^4.19.1",
     "typescript": "^6.0.3"
