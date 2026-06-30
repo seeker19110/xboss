@@ -18,6 +18,7 @@
 
 ## Tiếp theo
 
+- **PHIÊN TỚI — Workflow audit tương phản màu (a11y) toàn UI:** fan-out đọc 42 file UI (18 component + 24 page) đối chiếu WCAG AA → backlog remediation có thứ tự cho ~399 `text-zinc-500/600` + ~43 nút accent chữ trắng. Bao gồm **audit lại** phần `/login` + footer đã sửa ở PR #43. Ground-truth = mở rộng axe E2E sang từng trang (code-audit chỉ là ứng viên).
 - **Quyết định Lớp 2 (cần xác nhận người dùng — đợt sau):**
   - ~~Hàng rào tooling: Prettier + Husky + lint-staged + commitlint~~ → đã thêm. pre-commit format/lint **chỉ file staged** (không format cả repo); commit-msg chặn sai conventional. `git commit -F` tiếng Việt vẫn dùng bình thường (commitlint đã tắt `subject-case`).
   - ~~`lib/env.ts` (Zod) validate biến môi trường~~ → đã thêm (lazy + memoized, wiring vào `getPool`; `lib/auth` giữ prod-check riêng).
