@@ -3,6 +3,7 @@
 // placeholder viết dạng `?` và được chuyển tự động sang $1..$n.
 import { AsyncLocalStorage } from "node:async_hooks";
 import { Pool, PoolClient, types } from "pg";
+import { getServerEnv } from "@/lib/env";
 
 // DATE (oid 1082) → giữ nguyên chuỗi 'YYYY-MM-DD' (code so sánh ngày dạng chuỗi).
 types.setTypeParser(1082, (v) => v);
@@ -543,8 +544,7 @@ CREATE TABLE IF NOT EXISTS sync_locks (
 
 export function getPool(): Pool {
   if (!g.__xbossPool) {
-    const url = process.env.DATABASE_URL;
-    if (!url) throw new Error("Thiếu DATABASE_URL — cấu hình chuỗi kết nối Postgres trong .env.local");
+    const url = getServerEnv().DATABASE_URL;
     g.__xbossPool = new Pool({ connectionString: url, max: 10 });
   }
   return g.__xbossPool;
