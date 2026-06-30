@@ -31,3 +31,9 @@ _framework-dropins/
 # Tarball backup nặng — không commit
 xboss.tar.gz
 .env.example.framework-new
+
+# Playwright (E2E) + Lighthouse CI — artifact sinh ra khi chạy
+/test-results/
+/playwright-report/
+/playwright/.cache/
+.lighthouseci/

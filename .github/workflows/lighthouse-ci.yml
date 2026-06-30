@@ -1,0 +1,30 @@
+name: Lighthouse CI
+
+# Đo BASELINE hiệu năng/a11y/SEO trên /login mỗi PR (xem lighthouserc.json).
+# Hiện không chặn merge (assertion 'warn' + continue-on-error) — đo để cải thiện dần.
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgres://x:x@127.0.0.1:5432/x
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Cài dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Chạy Lighthouse CI
+        run: npx --yes @lhci/cli@0.15.x autorun
+        continue-on-error: true
