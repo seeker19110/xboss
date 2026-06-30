@@ -18,7 +18,8 @@
 
 ## Tiếp theo
 
-- **PHIÊN TỚI — Workflow audit tương phản màu (a11y) toàn UI:** fan-out đọc 42 file UI (18 component + 24 page) đối chiếu WCAG AA → backlog remediation có thứ tự cho ~399 `text-zinc-500/600` + ~43 nút accent chữ trắng. Bao gồm **audit lại** phần `/login` + footer đã sửa ở PR #43. Ground-truth = mở rộng axe E2E sang từng trang (code-audit chỉ là ứng viên).
+- ~~**Workflow audit tương phản màu (a11y) toàn UI**~~ → **đã xong** (`docs/a11y/contrast-audit.md` + `scripts/contrast-check.ts`). Đã tính tương phản WCAG cho `text-zinc-300/400/500/600` × nền `zinc-*` trên **cả 6 theme** + nút accent chữ trắng → rút **quy tắc thay thế đúng mọi theme** + **backlog remediation có thứ tự** (P1 global chrome → Dashboard → tracking → …). Phát hiện: ước tính cũ over-count (grep bắt cả icon hover/idle, code dev-only, accent đã đạt AA như `red-600`/`blue-600`) → nút accent FAIL thật chỉ ~10 (không phải ~43). Audit lại `/login`: còn 1 `text-zinc-500` nhưng nằm trong `NODE_ENV==='development'` → không render production, axe không bắt (đúng).
+- **PHIÊN TỚI — Bước 0 mở khoá remediation: hạ tầng E2E có đăng nhập.** Hầu hết trang sau auth (401→/login) nên axe chưa chạm được nếu chưa login. Cần fixture đăng nhập Playwright (storage state qua `XBOSS_ADMIN_PASSWORD`) + seed DB test gọn → rồi mở rộng axe `color-contrast` **từng trang** theo backlog, sửa đúng node axe báo (không big-bang). Chi tiết quy trình ở `docs/a11y/contrast-audit.md` §5.
 - **Quyết định Lớp 2 (cần xác nhận người dùng — đợt sau):**
   - ~~Hàng rào tooling: Prettier + Husky + lint-staged + commitlint~~ → đã thêm. pre-commit format/lint **chỉ file staged** (không format cả repo); commit-msg chặn sai conventional. `git commit -F` tiếng Việt vẫn dùng bình thường (commitlint đã tắt `subject-case`).
   - ~~`lib/env.ts` (Zod) validate biến môi trường~~ → đã thêm (lazy + memoized, wiring vào `getPool`; `lib/auth` giữ prod-check riêng).
@@ -36,9 +37,10 @@
 
 - **Rate-limit in-memory** (`lib/ratelimit.ts`) đếm theo process → sai khi multi-instance; cần chuyển DB/Redis.
 - **Không có hệ migrate** — đổi schema bảng đã tồn tại phải `ALTER` tay / script backfill; `docs/ERD.md` cập nhật tay.
-- **Nợ a11y tương phản màu (HỆ THỐNG, đang dọn dần):**
+- **Nợ a11y tương phản màu (HỆ THỐNG, đang dọn dần) — đã có audit + backlog: `docs/a11y/contrast-audit.md`:**
   - ~~`/login` + footer toàn cục (3 lỗi serious)~~ → **đã sửa & verify bằng axe**: `/login` (subtitle zinc-500→zinc-400, nút emerald-600→emerald-700) + footer layout (zinc-600/500→zinc-400/200). **Rule `color-contrast` đã bật lại** trong `e2e/login.spec.ts` → giờ là cổng cứng (E2E sẽ đỏ nếu tái phạm).
-  - **Còn lại (app-wide):** ~399 chỗ `text-zinc-500/600` + ~43 nút `bg-emerald-600/500` (và amber/sky/blue-500/600 chữ trắng) ở các trang khác. Dọn dần **theo từng trang** khi mở rộng axe E2E (axe là ground-truth) — không sửa hàng loạt mù (tránh big-bang).
+  - ~~Audit toàn UI~~ → **xong**: bảng tương phản tính được (6 theme) + quy tắc (`zinc-600`/`zinc-500` body-text luôn fail → `zinc-400`; `zinc-400` fail trên nền `zinc-700` → `zinc-300`; nút accent chữ trắng → `-700`) + **backlog có thứ tự** (audit §4). Tái lập bằng `npx tsx scripts/contrast-check.ts`.
+  - **Còn lại (app-wide):** ~272 `text-zinc-500` + ~127 `text-zinc-600` (ứng viên, lọc bớt icon hover/idle + dev-only) + ~10 nút accent chữ trắng FAIL thật. Dọn dần **theo từng trang** khi mở rộng axe E2E (axe là ground-truth) — không big-bang. **Chặn:** cần hạ tầng E2E có đăng nhập trước (audit §5 Bước 0).
   - Sau khi phủ axe thêm trang: siết assertion Lighthouse a11y từ `warn` lên `error`.
 - **Observability (Sentry)** chưa có (cần DSN) — Lớp 2 còn lại.
 - ~~`grid.test.ts` không nằm trong lệnh `npm test`~~ → đã thêm đợt này.
