@@ -47,9 +47,10 @@ export default function LookaheadPage() {
   return (
     <div className="min-h-screen bg-white text-zinc-900">
       <div className="no-print sticky top-0 bg-zinc-100 border-b border-zinc-300 px-6 py-3 flex items-center gap-3">
-        <Link href="/" className="text-zinc-600 hover:text-zinc-900"><ArrowLeft className="w-5 h-5" /></Link>
+        <Link href="/" aria-label="Về trang chủ" className="text-zinc-600 hover:text-zinc-900"><ArrowLeft className="w-5 h-5" /></Link>
         <span className="text-sm text-zinc-600">Kế hoạch ngắn hạn cho họp giao ban — in hoặc lưu PDF</span>
         <select value={days} onChange={e => setDays(Number(e.target.value))}
+          aria-label="Số ngày kế hoạch"
           className="ml-auto border border-zinc-300 rounded-lg px-3 py-2 text-sm bg-white">
           <option value={7}>7 ngày</option>
           <option value={14}>14 ngày</option>
@@ -71,8 +72,8 @@ export default function LookaheadPage() {
         </div>
 
         <h2 className="font-bold text-lg mb-1">1. Công việc sắp bắt đầu ({data?.starting.length ?? 0})</h2>
-        <p className="text-xs text-zinc-500 mb-3">Chuẩn bị mặt bằng, vật tư, nhân lực trước ngày bắt đầu.</p>
-        {data?.starting.length === 0 && <p className="text-sm text-zinc-400 mb-6">Không có công việc nào bắt đầu trong giai đoạn này.</p>}
+        <p className="text-xs text-zinc-600 mb-3">Chuẩn bị mặt bằng, vật tư, nhân lực trước ngày bắt đầu.</p>
+        {data?.starting.length === 0 && <p className="text-sm text-zinc-600 mb-6">Không có công việc nào bắt đầu trong giai đoạn này.</p>}
         {groupBySheet(data?.starting ?? []).map(g => (
           <div key={g.sheet} className="mb-2 avoid-break">
             <h3 className="font-semibold text-sm bg-zinc-50 border-l-4 border-zinc-900 pl-2 py-1 mb-1">{g.sheet} ({g.tasks.length})</h3>
@@ -81,8 +82,8 @@ export default function LookaheadPage() {
         ))}
 
         <h2 className="font-bold text-lg mb-1 mt-8 page-break">2. Công việc đến hạn ({data?.due.length ?? 0})</h2>
-        <p className="text-xs text-zinc-500 mb-3">Phải hoàn thành trong giai đoạn này — ưu tiên dòng đang trễ (đỏ).</p>
-        {data?.due.length === 0 && <p className="text-sm text-zinc-400 mb-6">Không có deadline nào trong giai đoạn này.</p>}
+        <p className="text-xs text-zinc-600 mb-3">Phải hoàn thành trong giai đoạn này — ưu tiên dòng đang trễ (đỏ).</p>
+        {data?.due.length === 0 && <p className="text-sm text-zinc-600 mb-6">Không có deadline nào trong giai đoạn này.</p>}
         {groupBySheet(data?.due ?? []).map(g => (
           <div key={g.sheet} className="mb-2 avoid-break">
             <h3 className="font-semibold text-sm bg-zinc-50 border-l-4 border-zinc-900 pl-2 py-1 mb-1">{g.sheet} ({g.tasks.length})</h3>
@@ -90,7 +91,7 @@ export default function LookaheadPage() {
           </div>
         ))}
 
-        <p className="text-xs text-zinc-400 mt-8" suppressHydrationWarning>Xuất từ XBoss · {new Date().toLocaleString('vi-VN')}</p>
+        <p className="text-xs text-zinc-600 mt-8" suppressHydrationWarning>Xuất từ XBoss · {new Date().toLocaleString('vi-VN')}</p>
       </div>
 
       <style jsx global>{`

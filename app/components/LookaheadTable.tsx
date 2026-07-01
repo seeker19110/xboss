@@ -91,7 +91,7 @@ export function LookaheadTable({ tasks, dateCol }: TableProps) {
           const status = info.getValue();
           const delayReason = info.row.original.delayReason;
           return (
-            <span className="text-xs text-zinc-500">
+            <span className="text-xs text-zinc-600">
               {status === 'tre'
                 ? `Đang trễ${delayReason ? ` · ${DELAY_REASON_LABEL[delayReason as keyof typeof DELAY_REASON_LABEL] ?? delayReason}` : ''}`
                 : STATUS_LABEL[status] ?? ''}
@@ -115,7 +115,7 @@ export function LookaheadTable({ tasks, dateCol }: TableProps) {
   });
 
   return (
-    <div className="overflow-x-auto mb-4">
+    <div className="overflow-x-auto mb-4" tabIndex={0} role="region" aria-label="Bảng công việc (cuộn ngang)">
       <table className="w-full text-sm border-collapse">
         <thead>
           {table.getHeaderGroups().map((headerGroup) => (

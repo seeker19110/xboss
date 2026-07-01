@@ -23,7 +23,8 @@
   - Sửa Dashboard (`app/page.tsx`) theo node axe báo: `text-zinc-500/600` body-text → `zinc-400`; nút `bg-emerald-600` chữ trắng → `emerald-700`; bỏ opacity `text-red-400/80,/70`; thêm `aria-label` cho 3 nút export icon-only + select lọc.
   - Sửa **global chrome** `AppHeader` (mọi trang): nav link icon-only trên mobile thiếu tên → thêm `aria-label`. **axe bắt được cả lỗi NGOÀI contrast** (`link-name` mobile, `select-name`) — thứ grep không thấy → khẳng định axe = ground-truth.
 - ~~**Lưới tracking** (`/tracking/[sheet]`)~~ → **đã remediate & verify bằng axe** (`e2e/authed/tracking.spec.ts`, desktop + mobile, view mặc định): nhãn ngày/tầng/số task/nhãn nhỏ `zinc-500/600`→`zinc-400`, 2 select lọc +`aria-label`. 13/13 e2e xanh.
-- **PHIÊN TỚI — remediate trang kế theo backlog** (audit §4): payments / my-tasks / materials. Mỗi trang: thêm `e2e/authed/<trang>.spec.ts`, chạy axe lấy node lỗi, sửa, axe xanh lại. (my-tasks/payments cần seed gán task/tạo dữ liệu để render đủ.) Khi phủ đủ trang chính → siết Lighthouse a11y `warn`→`error`.
+- ~~**my-tasks / payments / materials**~~ → **xong** (qua #48/#49). ~~**lookahead / timeline**~~ → **xong** (đợt này, `e2e/authed/{lookahead,timeline}.spec.ts`, axe desktop+mobile).
+- **PHIÊN TỚI — remediate trang kế theo backlog** (audit §4): gantt / admin / notifications / approvals. Mỗi trang: thêm `e2e/authed/<trang>.spec.ts`, chạy axe lấy node lỗi, sửa, axe xanh lại. Khi phủ đủ trang chính → siết Lighthouse a11y `warn`→`error`.
 - **Quyết định Lớp 2 (cần xác nhận người dùng — đợt sau):**
   - ~~Hàng rào tooling: Prettier + Husky + lint-staged + commitlint~~ → đã thêm. pre-commit format/lint **chỉ file staged** (không format cả repo); commit-msg chặn sai conventional. `git commit -F` tiếng Việt vẫn dùng bình thường (commitlint đã tắt `subject-case`).
   - ~~`lib/env.ts` (Zod) validate biến môi trường~~ → đã thêm (lazy + memoized, wiring vào `getPool`; `lib/auth` giữ prod-check riêng).
@@ -46,7 +47,7 @@
   - ~~Audit toàn UI~~ → **xong**: bảng tương phản tính được (6 theme) + quy tắc (`zinc-600`/`zinc-500` body-text luôn fail → `zinc-400`; `zinc-400` fail trên nền `zinc-700` → `zinc-300`; nút accent chữ trắng → `-700`) + **backlog có thứ tự** (audit §4). Tái lập bằng `npx tsx scripts/contrast-check.ts`.
   - ~~Hạ tầng E2E sau-auth (Bước 0)~~ → **xong** (xem mục "Tiếp theo"). ~~Dashboard `/` + `AppHeader`~~ → **đã remediate & verify bằng axe** (desktop + mobile).
   - ~~tracking grid~~ → **đã remediate & verify bằng axe** (desktop + mobile).
-  - **Còn lại (app-wide):** payments, my-tasks, materials… (đã trừ Dashboard/AppHeader/tracking) — ứng viên `text-zinc-500/600` còn lại + nút accent FAIL. Dọn dần **theo từng trang** qua axe E2E (axe là ground-truth) — không big-bang. Quy trình: audit §5 Bước 1..n.
+  - **Còn lại (app-wide):** gantt, admin, notifications, approvals… (đã trừ Dashboard/AppHeader/tracking/my-tasks/payments/materials/lookahead/timeline) — ứng viên `text-zinc-500/600` còn lại + nút accent FAIL. Dọn dần **theo từng trang** qua axe E2E (axe là ground-truth) — không big-bang. Quy trình: audit §5 Bước 1..n.
   - Sau khi phủ axe thêm trang: siết assertion Lighthouse a11y từ `warn` lên `error`.
 - **Observability (Sentry)** chưa có (cần DSN) — Lớp 2 còn lại.
 - ~~`grid.test.ts` không nằm trong lệnh `npm test`~~ → đã thêm đợt này.
