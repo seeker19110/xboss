@@ -45,8 +45,9 @@
   - ~~`/login` + footer toàn cục (3 lỗi serious)~~ → **đã sửa & verify bằng axe**: `/login` (subtitle zinc-500→zinc-400, nút emerald-600→emerald-700) + footer layout (zinc-600/500→zinc-400/200). **Rule `color-contrast` đã bật lại** trong `e2e/login.spec.ts` → giờ là cổng cứng (E2E sẽ đỏ nếu tái phạm).
   - ~~Audit toàn UI~~ → **xong**: bảng tương phản tính được (6 theme) + quy tắc (`zinc-600`/`zinc-500` body-text luôn fail → `zinc-400`; `zinc-400` fail trên nền `zinc-700` → `zinc-300`; nút accent chữ trắng → `-700`) + **backlog có thứ tự** (audit §4). Tái lập bằng `npx tsx scripts/contrast-check.ts`.
   - ~~Hạ tầng E2E sau-auth (Bước 0)~~ → **xong** (xem mục "Tiếp theo"). ~~Dashboard `/` + `AppHeader`~~ → **đã remediate & verify bằng axe** (desktop + mobile).
-  - ~~tracking grid~~ → **đã remediate & verify bằng axe** (desktop + mobile).
-  - **Còn lại (app-wide):** payments, my-tasks, materials… (đã trừ Dashboard/AppHeader/tracking) — ứng viên `text-zinc-500/600` còn lại + nút accent FAIL. Dọn dần **theo từng trang** qua axe E2E (axe là ground-truth) — không big-bang. Quy trình: audit §5 Bước 1..n.
+  - ~~tracking grid~~ + ~~payments~~ + ~~my-tasks~~ + ~~materials~~ (P2) → **đã remediate & verify bằng axe** (tracking/payments/my-tasks/materials qua các PR trước).
+  - ~~admin (P3)~~ → **đã remediate & verify bằng axe** (`e2e/authed/admin.spec.ts`): desktop phủ 3 tab (Phân công/Lịch sử/Traffic), mobile phủ tab Phân công; meta hệ/badge/cell bảng `zinc-500/600`→`zinc-400`, +`aria-label` 2 nút toggle chevron + UserSelect (`button-name`/`select-name`). Tab header không reachable trên mobile (AppHeader tràn ngang — vấn đề layout riêng, ngoài phạm vi contrast).
+  - **Còn lại (P3):** notifications, gantt, timeline, lookahead, approvals, import, report, users, materials/* phụ… — ứng viên `text-zinc-500/600` còn lại. Dọn dần **theo từng trang** qua axe E2E (axe là ground-truth) — không big-bang. Quy trình: audit §5 Bước 1..n.
   - Sau khi phủ axe thêm trang: siết assertion Lighthouse a11y từ `warn` lên `error`.
 - **Observability (Sentry)** chưa có (cần DSN) — Lớp 2 còn lại.
 - ~~`grid.test.ts` không nằm trong lệnh `npm test`~~ → đã thêm đợt này.

@@ -163,6 +163,7 @@ export default function AdminPage() {
       <select
         value={value ?? ''}
         onChange={e => onChange(e.target.value === '' ? null : Number(e.target.value))}
+        aria-label="Gán người phụ trách"
         className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm w-[200px] shrink-0"
       >
         <option value="">— Kế thừa / chưa gán —</option>
@@ -246,7 +247,7 @@ export default function AdminPage() {
               return (
                 <div key={sheet.id} className={`border rounded-lg overflow-hidden ${sheetUnassigned && filterUnassigned ? 'border-amber-800/50' : 'border-zinc-800'}`}>
                   <div className="flex items-center gap-3 px-4 py-3 bg-zinc-900/70 flex-wrap">
-                    <button onClick={() => toggle(openSheets, sheet.id, setOpenSheets)} className="text-zinc-400 hover:text-white shrink-0">
+                    <button onClick={() => toggle(openSheets, sheet.id, setOpenSheets)} aria-label="Mở rộng / thu gọn hệ" className="text-zinc-400 hover:text-white shrink-0">
                       {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                     </button>
                     <div className="flex-1 min-w-0">
@@ -254,8 +255,8 @@ export default function AdminPage() {
                         {sheet.code} — {sheet.name}
                         {sheetUnassigned && <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
                       </p>
-                      <p className="text-xs text-zinc-500 flex items-center gap-2">
-                        {pkgs.length} nhóm · Quản lý: {sheet.managerName ?? <span className="text-zinc-600">chưa gán</span>}
+                      <p className="text-xs text-zinc-400 flex items-center gap-2">
+                        {pkgs.length} nhóm · Quản lý: {sheet.managerName ?? <span className="text-zinc-400">chưa gán</span>}
                         {sheet.managerId && <WorkloadBadge userId={sheet.managerId} />}
                       </p>
                     </div>
@@ -275,7 +276,7 @@ export default function AdminPage() {
                         return (
                           <div key={pkg.id}>
                             <div className="flex items-center gap-3 pl-10 pr-4 py-2 bg-zinc-950 flex-wrap">
-                              <button onClick={() => toggle(openPkgs, pkg.id, setOpenPkgs)} className="text-zinc-500 hover:text-white shrink-0">
+                              <button onClick={() => toggle(openPkgs, pkg.id, setOpenPkgs)} aria-label="Mở rộng / thu gọn nhóm" className="text-zinc-500 hover:text-white shrink-0">
                                 {pOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                               </button>
                               <div className="flex-1 min-w-0">
@@ -286,7 +287,7 @@ export default function AdminPage() {
                               </div>
                               {pkg.assignedManual
                                 ? <span className="text-[11px] text-amber-400 border border-amber-900 rounded px-1.5 py-0.5 shrink-0">thủ công</span>
-                                : <span className="text-[11px] text-zinc-500 border border-zinc-800 rounded px-1.5 py-0.5 shrink-0">kế thừa</span>}
+                                : <span className="text-[11px] text-zinc-400 border border-zinc-800 rounded px-1.5 py-0.5 shrink-0">kế thừa</span>}
                               {pkg.assignedManual && (
                                 <button title="Về kế thừa từ quản lý hệ" onClick={() => assign('package', pkg.id, null, `nhóm ${pkg.code}`)}
                                   className="text-zinc-500 hover:text-emerald-400 shrink-0"><RotateCcw className="w-3.5 h-3.5" /></button>
@@ -300,7 +301,7 @@ export default function AdminPage() {
                                 <p className="flex-1 min-w-0 text-sm text-zinc-300 truncate">{t.code} — {t.name}</p>
                                 {t.assignedManual
                                   ? <span className="text-[11px] text-amber-400 border border-amber-900 rounded px-1.5 py-0.5 shrink-0">thủ công</span>
-                                  : <span className="text-[11px] text-zinc-500 border border-zinc-800 rounded px-1.5 py-0.5 shrink-0">kế thừa</span>}
+                                  : <span className="text-[11px] text-zinc-400 border border-zinc-800 rounded px-1.5 py-0.5 shrink-0">kế thừa</span>}
                                 {t.assignedManual && (
                                   <button title="Về kế thừa từ nhóm" onClick={() => assign('task', t.id, null, `task ${t.code}`)}
                                     className="text-zinc-500 hover:text-emerald-400 shrink-0"><RotateCcw className="w-3.5 h-3.5" /></button>
@@ -312,7 +313,7 @@ export default function AdminPage() {
                           </div>
                         );
                       })}
-                      {pkgs.length === 0 && <p className="pl-10 py-3 text-sm text-zinc-500">Sheet chưa có nhóm công việc.</p>}
+                      {pkgs.length === 0 && <p className="pl-10 py-3 text-sm text-zinc-400">Sheet chưa có nhóm công việc.</p>}
                     </div>
                   )}
                 </div>
@@ -320,7 +321,7 @@ export default function AdminPage() {
             })}
 
             {sheets.length === 0 && (
-              <p className="text-center text-zinc-500 py-12">
+              <p className="text-center text-zinc-400 py-12">
                 {filterUnassigned ? 'Tất cả task đã được gán người phụ trách 🎉' : 'Chưa có sheet nào.'}
               </p>
             )}
@@ -350,18 +351,18 @@ export default function AdminPage() {
                       <td className="px-4 py-2 text-zinc-400 whitespace-nowrap">{fmtDt(row.changedAt)}</td>
                       <td className="px-4 py-2 text-zinc-300">{LEVEL_LABEL[row.level] ?? row.level}</td>
                       <td className="px-4 py-2 font-mono text-xs text-zinc-200">{row.targetLabel}</td>
-                      <td className="px-4 py-2 text-zinc-500">{row.prevUser ?? <span className="text-zinc-700">—</span>}</td>
-                      <td className="px-4 py-2 text-emerald-400">{row.newUser ?? <span className="text-zinc-500">bỏ gán</span>}</td>
+                      <td className="px-4 py-2 text-zinc-400">{row.prevUser ?? <span className="text-zinc-700">—</span>}</td>
+                      <td className="px-4 py-2 text-emerald-400">{row.newUser ?? <span className="text-zinc-400">bỏ gán</span>}</td>
                       <td className="px-4 py-2 text-zinc-400">{row.changedBy}</td>
                       <td className="px-4 py-2">
                         {row.isManual
                           ? <span className="text-[11px] text-amber-400 border border-amber-900 rounded px-1.5 py-0.5">thủ công</span>
-                          : <span className="text-[11px] text-zinc-500 border border-zinc-800 rounded px-1.5 py-0.5">kế thừa</span>}
+                          : <span className="text-[11px] text-zinc-400 border border-zinc-800 rounded px-1.5 py-0.5">kế thừa</span>}
                       </td>
                     </tr>
                   ))}
                   {audit.length === 0 && (
-                    <tr><td colSpan={7} className="px-4 py-8 text-center text-zinc-600">Chưa có lịch sử phân công.</td></tr>
+                    <tr><td colSpan={7} className="px-4 py-8 text-center text-zinc-400">Chưa có lịch sử phân công.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -369,7 +370,7 @@ export default function AdminPage() {
             {/* Phân trang audit */}
             {auditTotal > AUDIT_LIMIT && (
               <div className="flex items-center justify-end gap-2">
-                <span className="text-xs text-zinc-500">Trang {auditPage + 1} / {Math.ceil(auditTotal / AUDIT_LIMIT)}</span>
+                <span className="text-xs text-zinc-400">Trang {auditPage + 1} / {Math.ceil(auditTotal / AUDIT_LIMIT)}</span>
                 <button disabled={auditPage === 0} onClick={() => setAuditPage(p => p - 1)}
                   className="px-3 py-1 text-sm rounded border border-zinc-700 disabled:opacity-30 hover:bg-zinc-800">← Trước</button>
                 <button disabled={(auditPage + 1) * AUDIT_LIMIT >= auditTotal} onClick={() => setAuditPage(p => p + 1)}
@@ -387,7 +388,7 @@ export default function AdminPage() {
                 {trafficLive ? 'Đang nhận live — ' : 'Ngắt kết nối — '}
                 <b className="text-white">{traffic.length}</b> request gần nhất
               </span>
-              <button onClick={() => setTraffic([])} className="ml-auto text-xs text-zinc-500 hover:text-red-400 px-2 py-1 border border-zinc-800 rounded">
+              <button onClick={() => setTraffic([])} className="ml-auto text-xs text-zinc-400 hover:text-red-400 px-2 py-1 border border-zinc-800 rounded">
                 Xóa
               </button>
             </div>
@@ -404,13 +405,13 @@ export default function AdminPage() {
                 </thead>
                 <tbody className="divide-y divide-zinc-800/60">
                   {traffic.length === 0 && (
-                    <tr><td colSpan={5} className="px-4 py-8 text-center text-zinc-600">
+                    <tr><td colSpan={5} className="px-4 py-8 text-center text-zinc-400">
                       Chưa có traffic. Thực hiện bất kỳ thao tác nào để thấy request xuất hiện ở đây.
                     </td></tr>
                   )}
                   {traffic.map(t => (
                     <tr key={t.id} className="odd:bg-zinc-900/40 hover:bg-zinc-800/50 transition-colors">
-                      <td className="px-3 py-1.5 text-zinc-500 text-xs whitespace-nowrap font-mono">
+                      <td className="px-3 py-1.5 text-zinc-400 text-xs whitespace-nowrap font-mono">
                         {new Date(t.ts).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 })}
                       </td>
                       <td className="px-3 py-1.5 whitespace-nowrap">
@@ -419,8 +420,8 @@ export default function AdminPage() {
                         </span>
                       </td>
                       <td className="px-3 py-1.5 font-mono text-xs text-zinc-200 max-w-xs truncate" title={t.path}>{t.path}</td>
-                      <td className="px-3 py-1.5 text-xs text-zinc-500 font-mono">{t.ip || '—'}</td>
-                      <td className="px-3 py-1.5 text-xs text-zinc-600 truncate max-w-[12rem]" title={t.ua}>
+                      <td className="px-3 py-1.5 text-xs text-zinc-400 font-mono">{t.ip || '—'}</td>
+                      <td className="px-3 py-1.5 text-xs text-zinc-400 truncate max-w-[12rem]" title={t.ua}>
                         {t.ua ? t.ua.replace(/\s*\([^)]*\)/g, '').trim().slice(0, 60) : '—'}
                       </td>
                     </tr>
