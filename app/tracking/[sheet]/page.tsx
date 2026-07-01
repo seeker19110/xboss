@@ -1071,21 +1071,21 @@ async function saveDates(ids: number[], start: string, end: string) {
           {/* ── Hàng header cột (chỉ khi mở và có dữ liệu) ── */}
           {showTable && (
             <tr className="bg-zinc-950">
-              {showBoq && <th className={`${stkBoq} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium${hpc('BOQ')}`}
+              {showBoq && <th className={`${stkBoq} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-400 font-medium${hpc('BOQ')}`}
                 style={{ left: 0 }}>BOQ</th>}
-              <th className={`${stkCode} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium${hpc('STT')}`}
+              <th className={`${stkCode} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-400 font-medium${hpc('STT')}`}
                 style={{ left: LEFT_CODE }}>STT</th>
-              <th className={`${stkName} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium${hpc('Công việc')}`}
+              <th className={`${stkName} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-400 font-medium${hpc('Công việc')}`}
                 style={{ left: isMobile ? 0 : LEFT_NAME }}>Công việc</th>
-              <th className={`${stkPct} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-500 font-medium${hpc('%')}`}
+              <th className={`${stkPct} z-20 bg-zinc-950 border-b border-r border-zinc-800 px-2 py-2 text-center align-middle text-zinc-400 font-medium${hpc('%')}`}
                 style={{ left: LEFT_PCT }}>%</th>
-              <th className={`border-b border-r border-zinc-800 px-1 py-2 text-center align-middle text-zinc-500 font-medium text-[10px]${hpc('Ngày BĐ')}`} style={{ width: W_DATE }}>Ngày BĐ</th>
-              <th className={`border-b border-r border-zinc-800 px-1 py-2 text-center align-middle text-zinc-500 font-medium text-[10px]${hpc('Số ngày')}`} style={{ width: W_DAYS }}>Số ngày</th>
-              <th className={`border-b border-r border-zinc-800 px-1 py-2 text-center align-middle text-zinc-500 font-medium text-[10px]${hpc('Ngày KT')}`} style={{ width: W_DATE }}>Ngày KT</th>
+              <th className={`border-b border-r border-zinc-800 px-1 py-2 text-center align-middle text-zinc-400 font-medium text-[10px]${hpc('Ngày BĐ')}`} style={{ width: W_DATE }}>Ngày BĐ</th>
+              <th className={`border-b border-r border-zinc-800 px-1 py-2 text-center align-middle text-zinc-400 font-medium text-[10px]${hpc('Số ngày')}`} style={{ width: W_DAYS }}>Số ngày</th>
+              <th className={`border-b border-r border-zinc-800 px-1 py-2 text-center align-middle text-zinc-400 font-medium text-[10px]${hpc('Ngày KT')}`} style={{ width: W_DATE }}>Ngày KT</th>
               {visibleColumns.map(col => (
                 <th key={col} className={`group/col border-b border-zinc-800 p-0 overflow-hidden align-middle${hiddenPrintCols.has(col) ? ' print-hidden-col' : ''}`} style={{ width: W_DIM }}>
                   <div className="flex flex-col items-center py-2 gap-1">
-                    <div className="dim-col-label text-[10px] text-zinc-500 hover:text-emerald-400 cursor-default text-center leading-tight break-words"
+                    <div className="dim-col-label text-[10px] text-zinc-400 hover:text-emerald-400 cursor-default text-center leading-tight break-words"
                       title={ce ? `${col} — bấm để đổi tên` : col}
                       onClick={() => ce && renameColumn(col)}>{col}</div>
                     {ce && (
@@ -1205,7 +1205,7 @@ async function saveDates(ids: number[], start: string, end: string) {
                       <select value={t.delayReason ?? ''} onChange={e => setDelayReason(t, e.target.value)}
                         title="Nguyên nhân trễ — giúp PM thống kê và xử lý"
                         className={`text-[10px] rounded px-1 py-0.5 outline-none border max-w-[110px] ${t.delayReason
-                          ? 'bg-red-950/60 border-red-900 text-red-300' : 'bg-zinc-800 border-zinc-700 text-zinc-500'}`}>
+                          ? 'bg-red-950/60 border-red-900 text-red-300' : 'bg-zinc-800 border-zinc-700 text-zinc-300'}`}>
                         <option value="">— Lý do trễ? —</option>
                         {Object.entries(DELAY_REASON_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                       </select>
@@ -1243,7 +1243,7 @@ async function saveDates(ids: number[], start: string, end: string) {
                       {cell ? (
                         <label className={`flex items-center justify-center w-full h-full min-h-[44px] ${editMode ? 'cursor-pointer' : 'cursor-default'}`}>
                           <input type="checkbox" checked={cell.installed} onChange={() => editMode && toggle(cell, t, col)}
-                            disabled={!editMode}
+                            disabled={!editMode} aria-label={`${col} · ${t.name}`}
                             className={`w-4 h-4 accent-emerald-500 ${editMode ? 'cursor-pointer' : 'cursor-default opacity-60'}`} />
                         </label>
                       ) : <span className="flex items-center justify-center min-h-[44px] text-zinc-700">·</span>}

@@ -3,6 +3,9 @@ import AxeBuilder from "@axe-core/playwright";
 
 // Lưới tracking (/tracking/[sheet]) — trang dày dữ liệu nhất (audit a11y §4, ưu tiên cao nhất).
 // Seed tạo sẵn 5 sheet + task + dimension nên lưới render đầy đủ. Dùng sheet "ogtd".
+// Quét axe khi đã MỞ 1 nhóm để lộ header cột lưới + nhãn cột dimension + checkbox — các phần
+// này chỉ render khi bung nhóm, nếu chỉ quét view đóng sẽ bỏ sót lỗi (contrast header + checkbox
+// thiếu tên).
 
 async function gotoSheet(page: Page) {
   await page.goto("/tracking/ogtd");
@@ -10,6 +13,11 @@ async function gotoSheet(page: Page) {
   await expect(page.getByRole("button", { name: /In PDF/ })).toBeVisible({ timeout: 15_000 });
   // Lưới đã nạp xong (không còn placeholder "Đang tải lưới…").
   await expect(page.getByText("Đang tải lưới")).toBeHidden();
+  // Mở nhóm đầu → lộ lưới (fetch async): header cột "Công việc" hiện ra = lưới đã render xong.
+  await page.getByText("Ống gió trục đứng tầng 1F").click();
+  await expect(page.getByRole("columnheader", { name: "Công việc" })).toBeVisible({
+    timeout: 15_000,
+  });
 }
 
 test.describe("Lưới tracking (sau đăng nhập)", () => {
