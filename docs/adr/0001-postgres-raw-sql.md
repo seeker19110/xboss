@@ -10,6 +10,7 @@ Bộ khung tham chiếu (`docs/framework/`) giả định stack **Next.js + Tail
 ## Quyết định
 
 Giữ tầng CSDL hiện tại:
+
 - Helper mỏng `lib/db` (placeholder `?` → `$1..$n`, parser kiểu tuỳ chỉnh: cột `DATE` giữ chuỗi `'YYYY-MM-DD'`).
 - **Schema tự khởi tạo** bằng `CREATE TABLE IF NOT EXISTS` khi query đầu chạy (idempotent).
 - Đổi schema bảng đã tồn tại → `ALTER` tay hoặc script backfill trong `scripts/`.
@@ -30,4 +31,4 @@ Giữ tầng CSDL hiện tại:
 
 - **Tích cực:** đơn giản, không vendor lock-in, build không cần DB thật (pool lazy).
 - **Đánh đổi / rủi ro:** không có lịch sử migration → đổi schema phải kỷ luật tay; `docs/ERD.md` cập nhật thủ công; phân quyền sai ở API là điểm yếu duy nhất (phải test kỹ — xem `tests/auth.test.ts`).
-- **Việc tiếp theo:** nếu sau này cần nhiều người/nhiều môi trường, cân nhắc baseline schema hiện tại thành migration đầu tiên (xem `AP-DUNG-vao-du-an-co-san.md`, Bước 2).
+- **Việc tiếp theo:** ~~nếu sau này cần nhiều người/nhiều môi trường, cân nhắc baseline schema hiện tại thành migration đầu tiên~~ → **đã làm** ở **ADR-0003** (hệ migrate SQL nhẹ: `migrations/0001_baseline.sql` + `schema_migrations` + runner tự áp lúc boot). Vẫn giữ raw SQL, không ORM.

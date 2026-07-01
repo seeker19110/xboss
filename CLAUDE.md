@@ -8,7 +8,7 @@ XBoss — web app quản lý tiến độ thi công MEP/ACMV (dự án TT AVIO T
 
 ## Tài liệu dự án & khung (đọc khi liên quan)
 
-- `PROJECT.md` — *cái gì* cần xây (vấn đề, MVP, schema, kiến trúc, DoD), viết ngược từ code. **Đọc trước việc liên quan tính năng/thiết kế.**
+- `PROJECT.md` — _cái gì_ cần xây (vấn đề, MVP, schema, kiến trúc, DoD), viết ngược từ code. **Đọc trước việc liên quan tính năng/thiết kế.**
 - `PROGRESS.md` — đang ở giai đoạn nào, đã xong/đang làm/tiếp theo, **nợ kỹ thuật**. Cập nhật sau mỗi mốc.
 - `docs/adr/` — các quyết định kỹ thuật. **Đọc trước khi đề xuất thay đổi kiến trúc lớn** (vd đừng đề xuất thêm Supabase/ORM/vitest — đã có ADR giải thích lý do giữ hiện trạng).
 - `docs/framework/` — bộ khung quy trình/chất lượng (tham khảo dài, đọc đúng phần cần). Áp dụng brownfield theo `AP-DUNG-vao-du-an-co-san.md`.
@@ -53,7 +53,7 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy lint + typecheck + test +
 ### Lớp DB (`lib/db/index.ts`)
 
 - Helper `query/queryOne/run/insertId` — placeholder viết dạng `?`, tự chuyển sang `$1..$n` của pg.
-- **Schema tự khởi tạo** khi query đầu tiên chạy (`CREATE TABLE IF NOT EXISTS`, idempotent, không có hệ migrate). Muốn đổi schema bảng đã tồn tại phải tự `ALTER` hoặc viết script backfill trong `scripts/` (xem `backfill-boq.ts`, `backfill-dims.ts` làm mẫu).
+- **Schema qua hệ migrate SQL nhẹ** (`migrations/*.sql` đánh số + bảng `schema_migrations` + runner `lib/db/migrate.ts`, xem ADR-0003): `ensureSchema()` tự áp migration chưa chạy khi query đầu tiên (advisory lock chống chạy chồng), hoặc chủ động qua `npm run db:migrate`. **Đổi schema = thêm file `migrations/000N_*.sql` mới** (append-only, không sửa file đã áp production); vẫn idempotent (`IF NOT EXISTS`). Backfill dữ liệu phức tạp vẫn có thể viết script trong `scripts/` (xem `backfill-boq.ts`, `backfill-dims.ts`).
 - Type parser tuỳ chỉnh: cột `DATE` giữ nguyên **chuỗi** `'YYYY-MM-DD'` — toàn bộ code so sánh ngày bằng so sánh chuỗi (vd `end_date < todayISO()`). BIGINT/NUMERIC parse thành number.
 
 ### Auth (`lib/auth.ts`)
@@ -121,21 +121,25 @@ Tất cả page là `'use client'`, fetch dữ liệu từ `/api/*`, không dùn
 Làm việc với vai trò **chuyên gia thiết kế** — giao diện phải đẹp, hiện đại, nhất quán và phục vụ tốt bối cảnh thật: kỹ sư/thầu phụ dùng trên điện thoại tại công trường, PM xem dashboard, dữ liệu dày (lưới tracking, bảng, biểu đồ). Bám hệ design có sẵn, không tự phát minh phong cách mới.
 
 **Hệ màu & theme (bắt buộc tuân thủ):**
+
 - **Dark-first**: viết class Tailwind theo chế độ tối; chế độ sáng **tự đảo màu** qua override biến CSS trong `app/globals.css` (`html.light`). **Không dùng biến thể `dark:` và không hardcode mã hex** trong component — nếu không sẽ vỡ cơ chế đảo màu.
 - Dùng thang **`zinc`** cho nền/chữ/viền và màu nhấn ở mức **`-300`/`-400`** (emerald/sky/amber/violet/rose/red...); light mode đã làm đậm các mức này cho đủ tương phản.
 - Màu trạng thái nhất quán theo enum `lib/status.ts` (vd `tre` = đỏ/rose, `hoan_thanh`/`nghiem_thu` = xanh) — dùng cùng bảng màu ở mọi nơi (badge, biểu đồ, heatmap).
 - Theme lưu ở `localStorage('xboss_theme')`, chuyển bằng `ThemeToggle`.
 
 **Thư viện & component:**
+
 - Icon: **`lucide-react`** (đồng bộ `size`/`strokeWidth`). Biểu đồ: **`recharts`** (`SCurveChart`, `ForecastCards`). Tái dùng component trong `app/components/*` trước khi tạo mới (`AppHeader`, `NotificationBell`, `GlobalSearch`, `FloorHeatmap`, `dialogs`).
 - Loading: dùng **`Skeleton`** (`app/components/Skeleton.tsx`) thay vì màn hình trắng; trạng thái rỗng/ lỗi có thông điệp rõ ràng bằng tiếng Việt.
 
 **Responsive & công trường (mobile-first):**
+
 - Vùng chạm tối thiểu ~40px; nav cuộn ngang dùng tiện ích `.scrollbar-none`.
 - Lưới/bảng dữ liệu dày: header dính (sticky), cho cuộn ngang, giữ cột mã/tên dễ đọc; ưu tiên đọc nhanh hơn trang trí.
 - PWA: hiển thị trạng thái offline/hàng đợi tick (xem Offline), thao tác vẫn mượt khi mạng yếu.
 
 **Khả năng tiếp cận & in ấn:**
+
 - Đảm bảo tương phản đủ ở **cả hai theme**; có trạng thái focus rõ cho bàn phím; dùng `aria-label`/alt hợp lý; không truyền tải thông tin **chỉ** bằng màu (kèm icon/nhãn).
 - Trang in (`/report`) phải sạch khi `window.print()` → PDF (ẩn nav/nút, layout vừa khổ giấy).
 - Mọi nhãn, thông báo, tooltip bằng **tiếng Việt**.
