@@ -20,21 +20,21 @@ test("listMigrationFiles: chỉ .sql, sắp theo số thứ tự, có baseline",
 
 // ===== Test tích hợp (cần Postgres riêng: đặt TEST_DATABASE_URL) =====
 
+// KHÔNG drop schema ở đây: node:test chạy các file test song song trên cùng DB test,
+// DROP SCHEMA sẽ xoá dữ liệu của test khác đang chạy (đua). Thay vào đó kiểm trên DB
+// đã migrate (trạng thái thực tế: bất kỳ test chạm DB nào cũng đã kích hoạt ensureSchema).
 test(
-  "runMigrations: áp baseline, ghi schema_migrations, chạy lại là no-op",
+  "runMigrations: áp đủ file, ghi schema_migrations, chạy lại là no-op (idempotent)",
   { skip: !HAS_TEST_DB },
   async () => {
     const { getPool } = await import("@/lib/db");
     const { runMigrations } = await import("@/lib/db/migrate");
     const pool = getPool();
 
-    // Dọn sạch để test từ đầu (drop mọi bảng của DB test).
-    await pool.query(`DROP SCHEMA public CASCADE; CREATE SCHEMA public;`);
+    // Đảm bảo mọi migration đã áp (an toàn khi gọi lặp).
+    await runMigrations(pool);
 
-    const firstRun = await runMigrations(pool);
-    assert.ok(firstRun.includes("0001_baseline.sql"), "lần đầu phải áp baseline");
-
-    // schema_migrations ghi nhận đúng các file đã áp.
+    // schema_migrations ghi nhận đúng, đủ danh sách file.
     const applied = await pool.query<{ name: string }>(
       "SELECT name FROM schema_migrations ORDER BY name",
     );
@@ -50,7 +50,7 @@ test(
     );
     assert.equal(tbl.rowCount, 1, "bảng tasks phải tồn tại sau migrate");
 
-    // Chạy lại: không áp gì thêm (idempotent).
+    // Chạy lại: không áp gì thêm (idempotent) — thuộc tính cốt lõi của hệ migrate.
     const secondRun = await runMigrations(pool);
     assert.deepEqual(secondRun, [], "chạy lại không áp migration nào");
   },
