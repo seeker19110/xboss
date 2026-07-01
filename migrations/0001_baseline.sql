@@ -1,0 +1,526 @@
+-- 0001_baseline.sql — Baseline schema XBoss (trích từ lib/db SCHEMA gốc).
+-- Idempotent (CREATE TABLE IF NOT EXISTS / ALTER ... IF NOT EXISTS) nên áp lại
+-- trên DB production đang chạy là an toàn: chỉ ghi nhận baseline đã áp.
+CREATE TABLE IF NOT EXISTS users (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'engineer',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS projects (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  code TEXT UNIQUE,
+  investor TEXT,
+  contractor TEXT,
+  start_date DATE,
+  end_date DATE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS towers (
+  id SERIAL PRIMARY KEY,
+  project_id INTEGER REFERENCES projects(id),
+  name TEXT NOT NULL,
+  description TEXT
+);
+
+CREATE TABLE IF NOT EXISTS sheet_types (
+  id SERIAL PRIMARY KEY,
+  tower_id INTEGER REFERENCES towers(id),
+  code TEXT NOT NULL,
+  name TEXT NOT NULL,
+  responsible TEXT,
+  UNIQUE (tower_id, code)
+);
+
+CREATE TABLE IF NOT EXISTS work_packages (
+  id SERIAL PRIMARY KEY,
+  boq_code TEXT,
+  sheet_type_id INTEGER REFERENCES sheet_types(id),
+  code TEXT NOT NULL,
+  seq_no TEXT,
+  floor_label TEXT,
+  name TEXT NOT NULL,
+  drawing_url TEXT,
+  start_date DATE,
+  end_date DATE,
+  duration_days INTEGER,
+  status TEXT DEFAULT 'chuan_bi',
+  progress DOUBLE PRECISION DEFAULT 0,
+  sort_order INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (sheet_type_id, code)
+);
+
+CREATE TABLE IF NOT EXISTS tasks (
+  id SERIAL PRIMARY KEY,
+  boq_code TEXT,
+  package_id INTEGER REFERENCES work_packages(id),
+  code TEXT NOT NULL,
+  seq_no TEXT,
+  name TEXT NOT NULL,
+  note TEXT,
+  drawing_url TEXT,
+  status TEXT DEFAULT 'chuan_bi',
+  start_date DATE,
+  end_date DATE,
+  duration_days INTEGER,
+  progress_percent DOUBLE PRECISION DEFAULT 0,
+  assigned_to INTEGER REFERENCES users(id),
+  sort_order INTEGER DEFAULT 0,
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (package_id, code)
+);
+
+CREATE TABLE IF NOT EXISTS progress_dimensions (
+  id SERIAL PRIMARY KEY,
+  task_id INTEGER REFERENCES tasks(id),
+  dimension_label TEXT NOT NULL,
+  installed INTEGER DEFAULT 0,
+  value DOUBLE PRECISION,
+  sort_order INTEGER DEFAULT 0,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS task_history (
+  id SERIAL PRIMARY KEY,
+  task_id INTEGER REFERENCES tasks(id),
+  old_progress DOUBLE PRECISION,
+  new_progress DOUBLE PRECISION,
+  status TEXT,
+  note TEXT,
+  changed_by TEXT,
+  changed_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id),
+  task_id INTEGER REFERENCES tasks(id),
+  type TEXT NOT NULL DEFAULT 'delayed',
+  message TEXT NOT NULL,
+  is_read INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (user_id, task_id, type)
+);
+
+CREATE TABLE IF NOT EXISTS task_photos (
+  id SERIAL PRIMARY KEY,
+  task_id INTEGER REFERENCES tasks(id),
+  file_name TEXT NOT NULL,
+  original_name TEXT,
+  mime_type TEXT,
+  size_bytes INTEGER,
+  caption TEXT,
+  uploaded_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS task_comments (
+  id SERIAL PRIMARY KEY,
+  task_id INTEGER REFERENCES tasks(id),
+  user_id INTEGER REFERENCES users(id),
+  body TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id),
+  endpoint TEXT UNIQUE NOT NULL,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS materials (
+  id SERIAL PRIMARY KEY,
+  sheet_type_id INTEGER REFERENCES sheet_types(id),
+  task_id INTEGER REFERENCES tasks(id),
+  name TEXT NOT NULL,
+  unit TEXT,
+  qty_boq DOUBLE PRECISION DEFAULT 0,
+  qty_planned DOUBLE PRECISION DEFAULT 0,
+  qty_used DOUBLE PRECISION DEFAULT 0,
+  status TEXT DEFAULT 'dat_hang',
+  note TEXT,
+  sort_order INTEGER DEFAULT 0,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Lịch sử nhập/xuất vật tư: mọi thay đổi qty_used đều ghi 1 giao dịch
+-- (delta ± , số sau thay đổi, ai ghi, lúc nào) — truy vết được khi số liệu lệch.
+CREATE TABLE IF NOT EXISTS material_transactions (
+  id SERIAL PRIMARY KEY,
+  material_id INTEGER REFERENCES materials(id),
+  delta DOUBLE PRECISION NOT NULL,
+  qty_after DOUBLE PRECISION NOT NULL,
+  note TEXT,
+  created_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Baseline kế hoạch: snapshot ngày BĐ/KT + % của mọi task tại một thời điểm,
+-- để S-curve so được kế hoạch gốc vs kế hoạch đã điều chỉnh vs thực tế.
+CREATE TABLE IF NOT EXISTS baselines (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  note TEXT,
+  created_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS baseline_tasks (
+  id SERIAL PRIMARY KEY,
+  baseline_id INTEGER REFERENCES baselines(id) ON DELETE CASCADE,
+  task_id INTEGER REFERENCES tasks(id),
+  start_date DATE,
+  end_date DATE,
+  progress_percent DOUBLE PRECISION DEFAULT 0,
+  UNIQUE (baseline_id, task_id)
+);
+
+-- Biên bản nghiệm thu / tài liệu đính kèm task (PDF hoặc ảnh) — file trong data/uploads/.
+CREATE TABLE IF NOT EXISTS task_documents (
+  id SERIAL PRIMARY KEY,
+  task_id INTEGER REFERENCES tasks(id),
+  file_name TEXT NOT NULL,
+  original_name TEXT,
+  mime_type TEXT,
+  size_bytes INTEGER,
+  caption TEXT,
+  uploaded_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Migration nhẹ (idempotent) cho DB đã tồn tại.
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS material_id INTEGER REFERENCES materials(id);
+-- Dedup thông báo vật tư: UNIQUE(user,task,type) không áp dụng được khi task_id NULL
+-- (Postgres coi NULL khác nhau) → cần unique index riêng theo material_id.
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_notif_material ON notifications(user_id, material_id, type) WHERE material_id IS NOT NULL;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assigned_to INTEGER REFERENCES users(id);
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS delay_reason TEXT;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS delay_note TEXT;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS boq_code TEXT;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS drawing_url TEXT;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS boq_code TEXT;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS drawing_url TEXT;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS drawing_file_name TEXT;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS drawing_original_name TEXT;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS bbnt_url TEXT;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS bbnt_file_name TEXT;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS bbnt_original_name TEXT;
+
+ALTER TABLE materials ADD COLUMN IF NOT EXISTS boq_code TEXT;
+
+-- sort_order: thứ tự hiển thị hàng/cột (tách khỏi id để chèn ở bất kỳ vị trí).
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+ALTER TABLE materials ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+ALTER TABLE progress_dimensions ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+-- Seed sort_order cho dữ liệu cũ (id là thứ tự gốc khi import Excel).
+UPDATE work_packages SET sort_order = id WHERE sort_order = 0;
+UPDATE tasks SET sort_order = id WHERE sort_order = 0;
+UPDATE materials SET sort_order = id WHERE sort_order = 0;
+
+-- Sheet tracking động: slug URL lưu trong DB (đổi tên/đường dẫn, tạo sheet mới).
+ALTER TABLE sheet_types ADD COLUMN IF NOT EXISTS slug TEXT;
+-- Backfill slug cho 5 sheet gốc theo mapping cũ trong lib/sheets.ts.
+UPDATE sheet_types SET slug = CASE code
+  WHEN 'OGTĐ' THEN 'ogtd' WHEN 'OGHL' THEN 'oghl' WHEN 'OGCH' THEN 'ogch'
+  WHEN 'ODNN Zone 1' THEN 'odnn1' WHEN 'ODNN Zone 2' THEN 'odnn2' END
+ WHERE slug IS NULL;
+UPDATE sheet_types SET slug = 'sheet-' || id WHERE slug IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_sheet_slug ON sheet_types(slug);
+UPDATE progress_dimensions SET sort_order = id WHERE sort_order = 0;
+
+-- Phân công theo hệ: 1 user quản lý cả sheet; nhóm/task kế thừa tự động
+-- cho đến khi gán thủ công (assigned_manual = TRUE).
+ALTER TABLE sheet_types ADD COLUMN IF NOT EXISTS manager_id INTEGER REFERENCES users(id);
+ALTER TABLE sheet_types ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0;
+UPDATE sheet_types SET sort_order = id WHERE sort_order = 0;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS assigned_to INTEGER REFERENCES users(id);
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS assigned_manual BOOLEAN NOT NULL DEFAULT FALSE;
+-- tasks.assigned_manual: backfill 1 lần — task đã gán trước đây coi là gán thủ công
+-- (DO block để UPDATE chỉ chạy đúng lúc thêm cột, không lặp lại mỗi lần boot).
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_name = 'tasks' AND column_name = 'assigned_manual') THEN
+    ALTER TABLE tasks ADD COLUMN assigned_manual BOOLEAN NOT NULL DEFAULT FALSE;
+    UPDATE tasks SET assigned_manual = TRUE WHERE assigned_to IS NOT NULL;
+  END IF;
+END $$;
+
+-- BOQCODE duy nhất (NULL = chưa gán, không tính trùng).
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_tasks_boq ON tasks(boq_code) WHERE boq_code IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_wp_boq ON work_packages(boq_code) WHERE boq_code IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_materials_boq ON materials(boq_code) WHERE boq_code IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_materials_sheet ON materials(sheet_type_id);
+CREATE INDEX IF NOT EXISTS idx_photos_task ON task_photos(task_id);
+CREATE INDEX IF NOT EXISTS idx_comments_task ON task_comments(task_id);
+CREATE INDEX IF NOT EXISTS idx_mat_trans ON material_transactions(material_id);
+
+CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_to);
+CREATE INDEX IF NOT EXISTS idx_notif_user ON notifications(user_id, is_read);
+CREATE INDEX IF NOT EXISTS idx_tasks_package ON tasks(package_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_end ON tasks(end_date);
+CREATE INDEX IF NOT EXISTS idx_wp_sheet ON work_packages(sheet_type_id);
+CREATE INDEX IF NOT EXISTS idx_dims_task ON progress_dimensions(task_id);
+CREATE INDEX IF NOT EXISTS idx_history_task ON task_history(task_id);
+CREATE INDEX IF NOT EXISTS idx_baseline_tasks ON baseline_tasks(baseline_id);
+CREATE INDEX IF NOT EXISTS idx_documents_task ON task_documents(task_id);
+
+-- Index cho sort/filter theo thời gian (notification feed, S-curve, dashboard)
+CREATE INDEX IF NOT EXISTS idx_history_changed_at ON task_history(changed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tasks_updated_at ON tasks(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_materials_updated_at ON materials(updated_at DESC);
+
+-- Full-text search cho tên (built-in, không cần extension): dùng dictionary 'simple'
+-- để giữ nguyên từ tiếng Việt (không stemming), GIN index phủ cả tasks lẫn work_packages.
+CREATE INDEX IF NOT EXISTS idx_tasks_fts ON tasks
+  USING gin(to_tsvector('simple', coalesce(name, '')));
+CREATE INDEX IF NOT EXISTS idx_wp_fts ON work_packages
+  USING gin(to_tsvector('simple', coalesce(name, '')));
+
+-- Prefix index cho mã (code, boq_code): ILIKE 'term%' (không dấu '%' đầu) dùng được B-tree.
+CREATE INDEX IF NOT EXISTS idx_tasks_code_lower ON tasks(lower(code));
+CREATE INDEX IF NOT EXISTS idx_tasks_boq_lower ON tasks(lower(boq_code)) WHERE boq_code IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_wp_code_lower ON work_packages(lower(code));
+CREATE INDEX IF NOT EXISTS idx_wp_boq_lower ON work_packages(lower(boq_code)) WHERE boq_code IS NOT NULL;
+
+
+-- Audit log phân công: ai gán ai vào hệ/nhóm/task, lúc nào.
+CREATE TABLE IF NOT EXISTS assignment_log (
+  id SERIAL PRIMARY KEY,
+  level TEXT NOT NULL,       -- 'sheet' | 'package' | 'task'
+  target_id INTEGER NOT NULL,
+  target_label TEXT,
+  prev_user_id INTEGER REFERENCES users(id),
+  new_user_id INTEGER REFERENCES users(id),
+  changed_by INTEGER REFERENCES users(id),
+  is_manual BOOLEAN,
+  changed_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_asgn_log_target ON assignment_log(level, target_id);
+CREATE INDEX IF NOT EXISTS idx_asgn_log_changed ON assignment_log(changed_at DESC);
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS heatmap_title TEXT;
+ALTER TABLE materials ADD COLUMN IF NOT EXISTS qty_boq DOUBLE PRECISION DEFAULT 0;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS material_col_labels TEXT;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS ui_texts TEXT;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS logo TEXT;
+
+-- Tuỳ chọn thông báo riêng của từng user (JSON: { delayed, due_soon, upcoming_start, activity_progress, activity_photo, activity_document, activity_comment, material_over } = boolean)
+CREATE TABLE IF NOT EXISTS notification_prefs (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  prefs   TEXT NOT NULL DEFAULT '{}'
+);
+
+-- ===== QUẢN LÝ VẬT TƯ MỞ RỘNG =====
+
+-- Nhà cung cấp
+CREATE TABLE IF NOT EXISTS suppliers (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  phone TEXT,
+  email TEXT,
+  address TEXT,
+  note TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Yêu cầu mua vật tư (Purchase Request)
+CREATE TABLE IF NOT EXISTS purchase_requests (
+  id SERIAL PRIMARY KEY,
+  pr_code TEXT UNIQUE,
+  material_id INTEGER REFERENCES materials(id),
+  qty_requested DOUBLE PRECISION NOT NULL,
+  note TEXT,
+  status TEXT DEFAULT 'pending',
+  requested_by INTEGER REFERENCES users(id),
+  reviewed_by INTEGER REFERENCES users(id),
+  reviewed_at TIMESTAMPTZ,
+  review_note TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Đơn đặt hàng (Purchase Order)
+CREATE TABLE IF NOT EXISTS purchase_orders (
+  id SERIAL PRIMARY KEY,
+  po_code TEXT UNIQUE,
+  supplier_id INTEGER REFERENCES suppliers(id),
+  status TEXT DEFAULT 'draft',
+  expected_date DATE,
+  note TEXT,
+  created_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Chi tiết đơn hàng
+CREATE TABLE IF NOT EXISTS po_items (
+  id SERIAL PRIMARY KEY,
+  po_id INTEGER REFERENCES purchase_orders(id) ON DELETE CASCADE,
+  material_id INTEGER REFERENCES materials(id),
+  pr_id INTEGER REFERENCES purchase_requests(id),
+  qty_ordered DOUBLE PRECISION NOT NULL,
+  qty_received DOUBLE PRECISION DEFAULT 0,
+  unit_price DOUBLE PRECISION,
+  note TEXT
+);
+
+-- Phiếu nhập kho
+CREATE TABLE IF NOT EXISTS warehouse_receipts (
+  id SERIAL PRIMARY KEY,
+  receipt_code TEXT UNIQUE,
+  po_id INTEGER REFERENCES purchase_orders(id),
+  received_by INTEGER REFERENCES users(id),
+  received_at TIMESTAMPTZ DEFAULT NOW(),
+  note TEXT
+);
+
+-- Chi tiết phiếu nhập kho
+CREATE TABLE IF NOT EXISTS receipt_items (
+  id SERIAL PRIMARY KEY,
+  receipt_id INTEGER REFERENCES warehouse_receipts(id) ON DELETE CASCADE,
+  material_id INTEGER REFERENCES materials(id),
+  po_item_id INTEGER REFERENCES po_items(id),
+  qty_received DOUBLE PRECISION NOT NULL,
+  note TEXT
+);
+
+-- Mở rộng suppliers: thông tin 3 bên (mua / bán / nhận hàng)
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS buyer_company TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS buyer_project TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS buyer_address TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS buyer_rep TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS buyer_title TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS buyer_phone TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS seller_rep TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS receiver_company TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS receiver_address TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS receiver_rep TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS receiver_phone TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS receiver_subcon TEXT;
+
+-- Mở rộng materials: tồn kho thực + ngưỡng cảnh báo
+ALTER TABLE materials ADD COLUMN IF NOT EXISTS qty_stock DOUBLE PRECISION DEFAULT 0;
+ALTER TABLE materials ADD COLUMN IF NOT EXISTS min_stock_level DOUBLE PRECISION DEFAULT 0;
+
+-- Mở rộng material_transactions: loại giao dịch + gắn task + gắn phiếu nhập
+ALTER TABLE material_transactions ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'dieu_chinh';
+ALTER TABLE material_transactions ADD COLUMN IF NOT EXISTS task_id INTEGER REFERENCES tasks(id);
+ALTER TABLE material_transactions ADD COLUMN IF NOT EXISTS receipt_item_id INTEGER REFERENCES receipt_items(id);
+
+-- Tiêu đề phân loại nhà cung cấp (vd: "Nhà Cung Cấp Ống Gió")
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS title TEXT;
+
+-- Thông tin giao hàng (section E trong đơn đặt hàng)
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS delivery_time TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS delivery_contact TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS delivery_phone TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS delivery_note TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS delivery_order TEXT;
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_pr_material ON purchase_requests(material_id);
+CREATE INDEX IF NOT EXISTS idx_pr_status ON purchase_requests(status);
+CREATE INDEX IF NOT EXISTS idx_po_status ON purchase_orders(status);
+CREATE INDEX IF NOT EXISTS idx_po_items_po ON po_items(po_id);
+CREATE INDEX IF NOT EXISTS idx_po_items_mat ON po_items(material_id);
+CREATE INDEX IF NOT EXISTS idx_receipt_po ON warehouse_receipts(po_id);
+CREATE INDEX IF NOT EXISTS idx_receipt_items ON receipt_items(receipt_id);
+CREATE INDEX IF NOT EXISTS idx_mat_trans_type ON material_transactions(type);
+
+-- Nghiệm thu theo tầng × hệ: mỗi (sheet_type, floor_label) có 1 bản ghi khi được duyệt.
+CREATE TABLE IF NOT EXISTS floor_approvals (
+  id SERIAL PRIMARY KEY,
+  sheet_type_id INTEGER NOT NULL REFERENCES sheet_types(id),
+  floor_label TEXT NOT NULL,
+  is_approved BOOLEAN NOT NULL DEFAULT FALSE,
+  approved_by INTEGER REFERENCES users(id),
+  approved_by_name TEXT,
+  approved_at TIMESTAMPTZ,
+  UNIQUE(sheet_type_id, floor_label)
+);
+ALTER TABLE floor_approvals ADD COLUMN IF NOT EXISTS is_approved BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE floor_approvals ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS idx_floor_approvals_sheet ON floor_approvals(sheet_type_id);
+
+-- task_documents dùng chung cho cả tài liệu gắn task lẫn gắn floor_approval.
+ALTER TABLE task_documents ADD COLUMN IF NOT EXISTS floor_approval_id INTEGER REFERENCES floor_approvals(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_documents_floor ON task_documents(floor_approval_id);
+-- Cho phép lưu link ngoài (Google Drive, v.v.) thay vì file upload.
+ALTER TABLE task_documents ADD COLUMN IF NOT EXISTS link_url TEXT;
+
+-- Giá trị hợp đồng theo tầng × hệ (payment tính ở cấp tầng, không theo từng task).
+CREATE TABLE IF NOT EXISTS floor_contracts (
+  id SERIAL PRIMARY KEY,
+  sheet_type_id INTEGER NOT NULL REFERENCES sheet_types(id),
+  floor_label TEXT NOT NULL,
+  contract_value NUMERIC(15,2) DEFAULT 0,
+  note TEXT,
+  UNIQUE(sheet_type_id, floor_label)
+);
+CREATE INDEX IF NOT EXISTS idx_floor_contracts_sheet ON floor_contracts(sheet_type_id);
+
+CREATE TABLE IF NOT EXISTS payment_bills (
+  id SERIAL PRIMARY KEY,
+  responsible TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT 'bill',
+  period TEXT,
+  amount NUMERIC(15,2) NOT NULL DEFAULT 0,
+  description TEXT,
+  paid_date DATE NOT NULL,
+  progress_snapshot NUMERIC(5,4) DEFAULT 0,
+  note TEXT,
+  unit TEXT DEFAULT 'LS',
+  quantity NUMERIC(15,3),
+  labor NUMERIC(15,2),
+  created_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT payment_bills_type_chk CHECK (type IN ('bill','advance','item'))
+);
+CREATE INDEX IF NOT EXISTS idx_payment_bills_resp ON payment_bills(responsible);
+ALTER TABLE payment_bills ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'bill';
+ALTER TABLE payment_bills ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE payment_bills DROP CONSTRAINT IF EXISTS payment_bills_type_chk;
+ALTER TABLE payment_bills ADD CONSTRAINT payment_bills_type_chk CHECK (type IN ('bill','advance','item'));
+ALTER TABLE payment_bills ADD COLUMN IF NOT EXISTS sheet_type_id INTEGER REFERENCES sheet_types(id);
+ALTER TABLE payment_bills ADD COLUMN IF NOT EXISTS floor_label TEXT;
+ALTER TABLE payment_bills ADD COLUMN IF NOT EXISTS pct_this_period NUMERIC(5,4) DEFAULT 0;
+ALTER TABLE payment_bills ADD COLUMN IF NOT EXISTS unit TEXT DEFAULT 'LS';
+ALTER TABLE payment_bills ADD COLUMN IF NOT EXISTS quantity NUMERIC(15,3);
+ALTER TABLE payment_bills ADD COLUMN IF NOT EXISTS labor NUMERIC(15,2);
+
+-- Phụ thuộc giữa nhóm việc (Finish-to-Start): nhóm trước (predecessor) xong mới tới nhóm sau (successor).
+CREATE TABLE IF NOT EXISTS package_dependencies (
+  id SERIAL PRIMARY KEY,
+  predecessor_id INTEGER NOT NULL REFERENCES work_packages(id) ON DELETE CASCADE,
+  successor_id INTEGER NOT NULL REFERENCES work_packages(id) ON DELETE CASCADE,
+  created_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (predecessor_id, successor_id),
+  CONSTRAINT package_dep_no_self CHECK (predecessor_id <> successor_id)
+);
+CREATE INDEX IF NOT EXISTS idx_pkg_dep_succ ON package_dependencies(successor_id);
+CREATE INDEX IF NOT EXISTS idx_pkg_dep_pred ON package_dependencies(predecessor_id);
+
+-- Trạng thái đồng bộ vật tư ↔ Google Sheet: snapshot trường đã đồng bộ lần trước
+-- để 3-way merge biết phía nào (DB / Sheet) đã thay đổi từ lần sync gần nhất.
+CREATE TABLE IF NOT EXISTS material_sync (
+  material_id INTEGER PRIMARY KEY REFERENCES materials(id) ON DELETE CASCADE,
+  synced_fields TEXT,
+  last_synced_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Khoá chống chạy chồng (nút thủ công + cron): 1 hàng mỗi tác vụ. Acquire bằng
+-- INSERT ... ON CONFLICT có điều kiện thời gian (an toàn với pool, không cần giữ
+-- kết nối); tự phục hồi sau 10 phút nếu tiến trình giữ khoá chết giữa chừng.
+CREATE TABLE IF NOT EXISTS sync_locks (
+  name TEXT PRIMARY KEY,
+  locked_at TIMESTAMPTZ
+);

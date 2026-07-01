@@ -1,7 +1,10 @@
 # Triển khai XBoss lên VPS/Server (production)
 
 Ứng dụng dùng **PostgreSQL** — cấu hình qua biến môi trường `DATABASE_URL`
-(Supabase free tier hoặc Postgres tự host đều được). Schema tự khởi tạo khi app chạy lần đầu.
+(Supabase free tier hoặc Postgres tự host đều được). Schema áp qua hệ migrate SQL
+(`migrations/*.sql`, xem `docs/adr/0003-migrations.md`): app **tự áp migration chưa chạy khi
+khởi động lần đầu**, hoặc chủ động chạy `npm run db:migrate` trước khi start. Đổi schema về sau
+= thêm file `migrations/000N_*.sql` mới (append-only).
 
 ---
 

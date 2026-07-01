@@ -40,7 +40,7 @@
 ## Nợ kỹ thuật (chỗ "làm tạm" cần quay lại)
 
 - **Rate-limit in-memory** (`lib/ratelimit.ts`) đếm theo process → sai khi multi-instance; cần chuyển DB/Redis.
-- **Không có hệ migrate** — đổi schema bảng đã tồn tại phải `ALTER` tay / script backfill; `docs/ERD.md` cập nhật tay.
+- ~~**Không có hệ migrate**~~ → **đã có** (ADR-0003): hệ migrate SQL nhẹ `migrations/*.sql` đánh số + `schema_migrations` + runner `lib/db/migrate.ts` (tự áp lúc boot / `npm run db:migrate`). Baseline = `0001_baseline.sql`. Đổi schema từ nay = thêm file mới (append-only). **Còn lại:** `docs/ERD.md` vẫn cập nhật tay.
 - **Nợ a11y tương phản màu (HỆ THỐNG, đang dọn dần) — đã có audit + backlog: `docs/a11y/contrast-audit.md`:**
   - ~~`/login` + footer toàn cục (3 lỗi serious)~~ → **đã sửa & verify bằng axe**: `/login` (subtitle zinc-500→zinc-400, nút emerald-600→emerald-700) + footer layout (zinc-600/500→zinc-400/200). **Rule `color-contrast` đã bật lại** trong `e2e/login.spec.ts` → giờ là cổng cứng (E2E sẽ đỏ nếu tái phạm).
   - ~~Audit toàn UI~~ → **xong**: bảng tương phản tính được (6 theme) + quy tắc (`zinc-600`/`zinc-500` body-text luôn fail → `zinc-400`; `zinc-400` fail trên nền `zinc-700` → `zinc-300`; nút accent chữ trắng → `-700`) + **backlog có thứ tự** (audit §4). Tái lập bằng `npx tsx scripts/contrast-check.ts`.
