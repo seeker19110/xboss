@@ -1,18 +1,15 @@
-'use client';
-import { useEffect, useState } from 'react';
-import { Building2 } from 'lucide-react';
-import AppHeader from '@/app/components/AppHeader';
-import SuppliersTab from '@/app/materials/_components/SuppliersTab';
+"use client";
+import { useEffect, useState } from "react";
+import { Building2 } from "lucide-react";
+import AppHeader from "@/app/components/AppHeader";
+import SuppliersTab from "@/app/materials/_components/SuppliersTab";
+import { fetchMe } from "@/app/lib/me";
 
 export default function SuppliersPage() {
-  const [role, setRole] = useState('');
+  const [role, setRole] = useState("");
 
   useEffect(() => {
-    fetch('/api/auth/me').then(async r => {
-      if (r.status === 401) { window.location.href = '/login'; return; }
-      const j = await r.json();
-      setRole(j.user?.role ?? '');
-    });
+    fetchMe().then((user) => setRole(user?.role ?? ""));
   }, []);
 
   return (

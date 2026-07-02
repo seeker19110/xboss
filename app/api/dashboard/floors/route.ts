@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query, todayISO } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { sortFloorsDesc } from "@/lib/floors";
 
 export const dynamic = "force-dynamic";
 
@@ -9,11 +10,20 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.viewDashboard(user.role)) return NextResponse.json({ error: "Thầu phụ không có quyền xem dashboard" }, { status: 403 });
+  if (!CAN.viewDashboard(user.role))
+    return NextResponse.json({ error: "Thầu phụ không có quyền xem dashboard" }, { status: 403 });
 
   const today = todayISO();
 
-  const cells = await query<{ tower: string | null; sheetType: string; sheetSlug: string | null; floor: string; progress: number; tasks: number; delayed: number }>(
+  const cells = await query<{
+    tower: string | null;
+    sheetType: string;
+    sheetSlug: string | null;
+    floor: string;
+    progress: number;
+    tasks: number;
+    delayed: number;
+  }>(
     `SELECT tw.name AS tower, st.code AS "sheetType", st.slug AS "sheetSlug", wp.floor_label AS floor,
             COALESCE(AVG(t.progress_percent), 0) AS progress,
             COUNT(t.id) AS tasks,
@@ -26,16 +36,8 @@ export async function GET() {
       WHERE wp.floor_label IS NOT NULL
       GROUP BY tw.id, tw.name, st.code, st.slug, st.id, wp.floor_label
       ORDER BY tw.id, st.sort_order, st.id`,
-    today);
-
-  // RF trên cùng, tầng số giảm dần, B_n xuống cuối — parseInt("RF"/"B1F") = NaN nên phải xử lý riêng.
-  const floorOrder = (f: string) => {
-    const up = f.toUpperCase();
-    if (up === "RF") return 9999;        // tầng mái → cao nhất
-    if (up.startsWith("B")) return -parseInt(up.slice(1)) || -1; // B1F → -1, B2F → -2
-    return parseInt(f) || 0;
-  };
-  const sortFloors = (a: string, b: string) => floorOrder(b) - floorOrder(a);
+    today,
+  );
 
   // Mỗi tháp có danh sách sheet + tầng riêng (tầng cao trên cùng — giống toà nhà).
   const towerNames = [...new Set(cells.map((c) => c.tower ?? ""))];
@@ -44,12 +46,12 @@ export async function GET() {
     return {
       name,
       sheets: [...new Set(tc.map((c) => c.sheetType))],
-      floors: [...new Set(tc.map((c) => c.floor))].sort(sortFloors),
+      floors: [...new Set(tc.map((c) => c.floor))].sort(sortFloorsDesc),
     };
   });
 
   // Giữ floors/sheets phẳng cho tương thích cũ.
-  const floors = [...new Set(cells.map((c) => c.floor))].sort(sortFloors);
+  const floors = [...new Set(cells.map((c) => c.floor))].sort(sortFloorsDesc);
   const sheets = [...new Set(cells.map((c) => c.sheetType))];
 
   return NextResponse.json({ towers, floors, sheets, cells });

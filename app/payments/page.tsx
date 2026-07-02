@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { PageSkeleton } from "@/app/components/Skeleton";
+import { fetchMe } from "@/app/lib/me";
 import { useEditMode } from "@/app/components/useEditMode";
 import EditModeToggle from "@/app/components/EditModeToggle";
 
@@ -173,9 +174,9 @@ export default function PaymentsPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [dr, mr, br] = await Promise.all([
+    const [dr, me, br] = await Promise.all([
       fetch("/api/payments"),
-      fetch("/api/auth/me"),
+      fetchMe(),
       fetch("/api/payments/bills"),
     ]);
     if (dr.status === 401) {
@@ -184,7 +185,6 @@ export default function PaymentsPage() {
     }
     const d: Data = await dr.json();
     setBills(br.ok ? ((await br.json())?.bills ?? []) : []);
-    const me = mr.ok ? (await mr.json())?.user : null;
     const editor = me?.role === "admin" || me?.role === "pm";
     setData(d);
     setCanEdit(editor);

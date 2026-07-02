@@ -27,6 +27,7 @@ import {
   LockOpen,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
+import { fetchMe } from "@/app/lib/me";
 import EditableText from "@/app/components/EditableText";
 import EditModeToggle from "@/app/components/EditModeToggle";
 import { Modal, appConfirm, appPrompt } from "@/app/components/dialogs";
@@ -191,31 +192,25 @@ export default function MaterialsPage() {
 
   // Gộp 3 fetch khởi tạo thành Promise.all để khai thác HTTP/2 multiplexing.
   useEffect(() => {
-    Promise.all([
-      fetch("/api/auth/me"),
-      fetch("/api/sheets"),
-      fetch("/api/materials/columns"),
-    ]).then(async ([meRes, sheetsRes, colsRes]) => {
-      if (meRes.status === 401) {
-        window.location.href = "/login";
-        return;
-      }
-      const [meJ, sheetsJ, colsJ] = await Promise.all([
-        meRes.json(),
-        sheetsRes.json(),
-        colsRes.json().catch(() => ({})),
-      ]);
-      const role = meJ.user?.role;
-      setRole(role ?? "");
-      setUserId(meJ.user?.id ?? null);
-      setCanEdit(role === "admin" || role === "pm" || role === "engineer");
-      setCanDelete(role === "admin" || role === "pm");
-      setCanAdmin(role === "admin" || role === "pm");
-      setSheets(sheetsJ.sheets ?? []);
-      if (colsJ.labels && typeof colsJ.labels === "object") {
-        setColLabels((prev) => ({ ...prev, ...colsJ.labels }));
-      }
-    });
+    Promise.all([fetchMe(), fetch("/api/sheets"), fetch("/api/materials/columns")]).then(
+      async ([user, sheetsRes, colsRes]) => {
+        if (!user) return;
+        const [sheetsJ, colsJ] = await Promise.all([
+          sheetsRes.json(),
+          colsRes.json().catch(() => ({})),
+        ]);
+        const role = user.role;
+        setRole(role ?? "");
+        setUserId(user.id ?? null);
+        setCanEdit(role === "admin" || role === "pm" || role === "engineer");
+        setCanDelete(role === "admin" || role === "pm");
+        setCanAdmin(role === "admin" || role === "pm");
+        setSheets(sheetsJ.sheets ?? []);
+        if (colsJ.labels && typeof colsJ.labels === "object") {
+          setColLabels((prev) => ({ ...prev, ...colsJ.labels }));
+        }
+      },
+    );
   }, []);
   useEffect(() => {
     load();
