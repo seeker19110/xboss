@@ -11,16 +11,7 @@
 // Theme: chỉ dùng token Tailwind (zinc + nhấn -400), không hex, không `dark:`
 // để giữ cơ chế đảo màu sáng/tối trong globals.css.
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Loader2,
-  ChevronUp,
-  ChevronDown,
-  ListFilter,
-  EyeOff,
-  GripVertical,
-  Pencil,
-  Eye,
-} from "lucide-react";
+import { Loader2, ChevronUp, ChevronDown, ListFilter, EyeOff, GripVertical } from "lucide-react";
 import { serializeTSV, parseTSV, normalizeRect, spreadPaste, type Rect } from "@/lib/grid";
 
 export type GridColumn<Row> = {
@@ -50,6 +41,10 @@ type Props<Row> = {
   rowKey: (r: Row) => number | string;
   onCommit: (edits: GridEdit[]) => Promise<void> | void;
   readOnly?: boolean;
+  // Chế độ chỉnh sửa do trang cha điều khiển (vd nút "Chỉ xem"/"Đang sửa" trên AppHeader) —
+  // false = khoá sửa ô + ẩn thanh công cụ, đồng bộ với 1 nút duy nhất thay vì lưới tự có khoá riêng.
+  // Không truyền = luôn ở chế độ chỉnh sửa (trang chưa có khái niệm này).
+  editMode?: boolean;
   stickyCols?: number; // số cột trái dính (mã/tên) — mặc định ban đầu
   maxBodyHeight?: number; // px; cuộn dọc bên trong, header dính
   // Tuỳ chọn thêm/xoá dòng: chỉ hiện nút khi trang cha cấp callback (model có hỗ trợ).
@@ -69,6 +64,7 @@ export default function SpreadsheetGrid<Row>({
   rowKey,
   onCommit,
   readOnly = false,
+  editMode = true,
   stickyCols = 1,
   maxBodyHeight,
   onAddRow,
@@ -110,7 +106,6 @@ export default function SpreadsheetGrid<Row>({
   const [pinned, setPinned] = useState<Set<string>>(new Set()); // rowKey các dòng được ghim
   const [hiddenCols, setHiddenCols] = useState<Set<number>>(new Set()); // chỉ số cột bị ẩn nhanh
   const [wrap, setWrap] = useState(true); // xuống dòng (wrap text) trong ô
-  const [viewOnly, setViewOnly] = useState(false); // tự khoá "chỉ xem" (tắt/bật chỉnh sửa)
   const [extraRects, setExtraRects] = useState<Rect[]>([]); // các vùng chọn rời (Ctrl/Cmd+click)
   const gridRef = useRef<HTMLDivElement>(null);
   const filterMenuRef = useRef<HTMLDivElement>(null);
@@ -125,9 +120,9 @@ export default function SpreadsheetGrid<Row>({
   const nRows = rows.length;
   const rect: Rect = useMemo(() => normalizeRect(anchor, active), [anchor, active]);
 
-  // Chế độ chỉ-xem hiệu lực = prop `readOnly` (do quyền) HOẶC tự khoá "chỉ xem".
-  // Dùng chung một biến để tái dụng đúng cơ chế read-only sẵn có của lưới.
-  const ro = readOnly || viewOnly;
+  // Chế độ chỉ-xem hiệu lực = prop `readOnly` (do quyền) HOẶC trang cha đang ở "Chỉ xem"
+  // (qua prop `editMode`, đồng bộ với nút Chỉ xem/Đang sửa trên AppHeader — không tự có khoá riêng).
+  const ro = readOnly || !editMode;
 
   const isEditable = useCallback(
     (c: number, row: Row) => {
@@ -443,12 +438,12 @@ export default function SpreadsheetGrid<Row>({
     }
     if (mod && e.key.toLowerCase() === "f") {
       e.preventDefault();
-      setShowSearch(!showSearch);
+      if (!ro) setShowSearch(!showSearch);
       return;
     }
     if (mod && e.key.toLowerCase() === "h") {
       e.preventDefault();
-      setShowSearch(true);
+      if (!ro) setShowSearch(true);
       return;
     }
     if (mod && e.key.toLowerCase() === "s") {
@@ -755,75 +750,60 @@ export default function SpreadsheetGrid<Row>({
 
   return (
     <div className="relative">
-      <div className="bg-zinc-900/50 border-b border-zinc-800 space-y-2 px-3 py-2">
-        <div className="flex items-center justify-between text-base text-zinc-400">
-          <div>
-            {selectionCount > 1 && <span>{selectionCount} ô được chọn</span>}
-            {clipboard && (
-              <span className="ml-3 text-zinc-500">{clipboard.cut ? "✂️ Cắt" : "📋 Sao chép"}</span>
-            )}
-          </div>
-          <div className="flex items-center gap-2 text-sm text-zinc-400">
-            {/* Tắt/bật chỉnh sửa ↔ chỉ xem — chỉ hiện khi trang cha cho phép sửa.
-                Khoá tạm dùng đúng cơ chế read-only sẵn có (qua biến `ro`). */}
-            {!readOnly && (
-              <>
-                <button
-                  onClick={() => setViewOnly((v) => !v)}
-                  className={`inline-flex items-center gap-1 ${viewOnly ? "text-amber-400 hover:text-amber-300" : "text-emerald-400 hover:text-emerald-300"}`}
-                  title={
-                    viewOnly
-                      ? "Đang ở chế độ chỉ xem — bấm để bật chỉnh sửa"
-                      : "Đang ở chế độ chỉnh sửa — bấm để khoá chỉ xem"
-                  }
-                  aria-pressed={viewOnly}
-                >
-                  {viewOnly ? <Eye size={14} /> : <Pencil size={14} />}
-                  {viewOnly ? "Chỉ xem" : "Chỉnh sửa"}
-                </button>
-                <span className="w-px h-4 bg-zinc-700" />
-              </>
-            )}
-            <button
-              onClick={() => setWrap((w) => !w)}
-              className={wrap ? "text-sky-400" : "hover:text-zinc-300"}
-              title="Xuống dòng trong ô (wrap text)"
-            >
-              ↕️ Wrap
-            </button>
-            {hiddenCols.size > 0 && (
-              <button
-                onClick={() => setHiddenCols(new Set())}
-                className="text-amber-400 hover:text-amber-300"
-                title="Hiện lại các cột đã ẩn"
-              >
-                👁 {hiddenCols.size} cột ẩn
-              </button>
-            )}
-            <button
-              onClick={() => setShowShortcuts(!showShortcuts)}
-              className="hover:text-zinc-300"
-            >
-              ⌨️ Ctrl/?
-            </button>
-            <button onClick={() => setShowSearch(!showSearch)} className="hover:text-zinc-300">
-              🔍 Ctrl/F
-            </button>
-            <button onClick={exportCSV} className="hover:text-zinc-300">
-              💾 CSV
-            </button>
-            <button
-              onClick={exportXLSX}
-              className="hover:text-zinc-300"
-              title="Xuất Excel đúng filter/sort + màu"
-            >
-              📤 Excel
-            </button>
-          </div>
+      {/* Trạng thái chọn/clipboard — chế độ chỉnh sửa (khoá + ẩn/hiện công cụ bên dưới) do
+          trang cha điều khiển qua prop `editMode` (nút Chỉ xem/Đang sửa trên AppHeader),
+          lưới không tự có khoá riêng để tránh 2 nút trùng chức năng. */}
+      {(selectionCount > 1 || clipboard) && (
+        <div className="bg-zinc-900/50 border-b border-zinc-800 px-3 py-1.5 flex items-center justify-end gap-3 text-sm text-zinc-400">
+          {selectionCount > 1 && <span>{selectionCount} ô được chọn</span>}
+          {clipboard && (
+            <span className="text-zinc-500">{clipboard.cut ? "✂️ Cắt" : "📋 Sao chép"}</span>
+          )}
         </div>
+      )}
+      {!ro && (
+        <div className="bg-zinc-900/50 border-b border-zinc-800 space-y-2 px-3 py-2">
+          <div className="flex items-center justify-end text-base text-zinc-400">
+            <div className="flex items-center gap-2 text-sm text-zinc-400">
+              <button
+                onClick={() => setWrap((w) => !w)}
+                className={wrap ? "text-sky-400" : "hover:text-zinc-300"}
+                title="Xuống dòng trong ô (wrap text)"
+              >
+                ↕️ Wrap
+              </button>
+              {hiddenCols.size > 0 && (
+                <button
+                  onClick={() => setHiddenCols(new Set())}
+                  className="text-amber-400 hover:text-amber-300"
+                  title="Hiện lại các cột đã ẩn"
+                >
+                  👁 {hiddenCols.size} cột ẩn
+                </button>
+              )}
+              <button
+                onClick={() => setShowShortcuts(!showShortcuts)}
+                className="hover:text-zinc-300"
+              >
+                ⌨️ Ctrl/?
+              </button>
+              <button onClick={() => setShowSearch(!showSearch)} className="hover:text-zinc-300">
+                🔍 Ctrl/F
+              </button>
+              <button onClick={exportCSV} className="hover:text-zinc-300">
+                💾 CSV
+              </button>
+              <button
+                onClick={exportXLSX}
+                className="hover:text-zinc-300"
+                title="Xuất Excel đúng filter/sort + màu"
+              >
+                📤 Excel
+              </button>
+            </div>
+          </div>
 
-        {/* Thanh công cụ: undo/redo, căn lề, đóng băng cột, thêm/xoá dòng */}
-        {!ro && (
+          {/* Thanh công cụ: undo/redo, căn lề, đóng băng cột, thêm/xoá dòng */}
           <div className="flex items-center gap-1 flex-wrap text-zinc-300 text-lg">
             <ToolBtn onClick={undo} disabled={!undoStack.length} title="Hoàn tác (Ctrl+Z)">
               ↶
@@ -889,37 +869,40 @@ export default function SpreadsheetGrid<Row>({
               </button>
             )}
           </div>
-        )}
 
-        {showSearch && (
-          <div className="flex items-center gap-2 bg-zinc-800 rounded p-2">
-            <input
-              type="text"
-              placeholder="Tìm kiếm..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 bg-zinc-700 border border-zinc-600 rounded px-2 py-1 text-sm text-white outline-none focus:border-sky-500"
-            />
-            <input
-              type="text"
-              placeholder="Thay thế bằng..."
-              value={replace}
-              onChange={(e) => setReplace(e.target.value)}
-              className="flex-1 bg-zinc-700 border border-zinc-600 rounded px-2 py-1 text-sm text-white outline-none focus:border-sky-500"
-            />
-            <button
-              onClick={doReplace}
-              disabled={!search.trim()}
-              className="bg-amber-700 hover:bg-amber-600 disabled:opacity-40 rounded px-3 py-1 text-sm font-medium"
-            >
-              Thay thế
-            </button>
-            <button onClick={() => setShowSearch(false)} className="text-zinc-400 hover:text-white">
-              ✕
-            </button>
-          </div>
-        )}
-      </div>
+          {showSearch && (
+            <div className="flex items-center gap-2 bg-zinc-800 rounded p-2">
+              <input
+                type="text"
+                placeholder="Tìm kiếm..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="flex-1 bg-zinc-700 border border-zinc-600 rounded px-2 py-1 text-sm text-white outline-none focus:border-sky-500"
+              />
+              <input
+                type="text"
+                placeholder="Thay thế bằng..."
+                value={replace}
+                onChange={(e) => setReplace(e.target.value)}
+                className="flex-1 bg-zinc-700 border border-zinc-600 rounded px-2 py-1 text-sm text-white outline-none focus:border-sky-500"
+              />
+              <button
+                onClick={doReplace}
+                disabled={!search.trim()}
+                className="bg-amber-700 hover:bg-amber-600 disabled:opacity-40 rounded px-3 py-1 text-sm font-medium"
+              >
+                Thay thế
+              </button>
+              <button
+                onClick={() => setShowSearch(false)}
+                className="text-zinc-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       <div
         ref={gridRef}
         tabIndex={0}
@@ -957,7 +940,7 @@ export default function SpreadsheetGrid<Row>({
                   <th
                     key={col.key}
                     role="columnheader"
-                    className={`bg-zinc-900 text-zinc-300 font-medium border-b border-r border-zinc-800 px-1.5 py-1.5 text-center relative ${c < freezeCols ? "sticky z-30" : ""}`}
+                    className={`bg-zinc-100 text-zinc-700 font-medium border-b border-r border-zinc-300 px-1.5 py-1.5 text-center relative ${c < freezeCols ? "sticky z-30" : ""}`}
                     style={{
                       width: colWidth(c),
                       minWidth: colWidth(c),
@@ -975,7 +958,7 @@ export default function SpreadsheetGrid<Row>({
                               : { col: c, asc: true },
                           )
                         }
-                        className="inline-flex items-center gap-0.5 min-w-0 hover:text-sky-400"
+                        className="inline-flex items-center gap-0.5 min-w-0 hover:text-sky-600"
                         title="Bấm để sắp xếp"
                       >
                         <span className="truncate">{col.label}</span>
@@ -992,7 +975,7 @@ export default function SpreadsheetGrid<Row>({
                           e.stopPropagation();
                           setFilterMenu(filterMenu === c ? null : c);
                         }}
-                        className={`shrink-0 ${colFilters[c]?.size ? "text-sky-400" : "text-zinc-500 hover:text-zinc-200"}`}
+                        className={`shrink-0 ${colFilters[c]?.size ? "text-sky-600" : "text-zinc-500 hover:text-zinc-800"}`}
                         title="Lọc theo cột"
                         aria-label={`Lọc cột ${col.label}`}
                       >
@@ -1004,7 +987,7 @@ export default function SpreadsheetGrid<Row>({
                           e.stopPropagation();
                           setHiddenCols((prev) => new Set(prev).add(c));
                         }}
-                        className="shrink-0 text-zinc-500 hover:text-rose-400"
+                        className="shrink-0 text-zinc-500 hover:text-rose-600"
                         title="Ẩn cột này"
                         aria-label={`Ẩn cột ${col.label}`}
                       >
@@ -1021,7 +1004,7 @@ export default function SpreadsheetGrid<Row>({
                           setResizingCol(c);
                         }}
                         onDoubleClick={() => autoFitColumn(c)}
-                        className="shrink-0 cursor-col-resize text-zinc-400 hover:text-sky-400"
+                        className="shrink-0 cursor-col-resize text-zinc-500 hover:text-sky-600"
                         title="Kéo để chỉnh chiều rộng, double-click để auto-fit"
                         aria-label={`Chỉnh chiều rộng cột ${col.label}`}
                       >
