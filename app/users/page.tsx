@@ -52,41 +52,58 @@ export default function UsersPage() {
   async function createUser() {
     setBusy(true);
     setError("");
-    const res = await fetch("/api/users", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    if (await handle(res, `Đã tạo ${form.email}`))
-      setForm({ name: "", email: "", password: "", role: "engineer" });
-    setBusy(false);
+    try {
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (await handle(res, `Đã tạo ${form.email}`))
+        setForm({ name: "", email: "", password: "", role: "engineer" });
+    } catch {
+      setError("Mất kết nối mạng — vui lòng thử lại");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function changeRole(u: User, role: string) {
-    const res = await fetch(`/api/users/${u.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ role }),
-    });
-    await handle(res, `Đã đổi vai trò ${u.email} → ${ROLE_LABEL[role]}`);
+    try {
+      const res = await fetch(`/api/users/${u.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
+      await handle(res, `Đã đổi vai trò ${u.email} → ${ROLE_LABEL[role]}`);
+    } catch {
+      setError("Mất kết nối mạng — vui lòng thử lại");
+    }
   }
 
   async function resetPassword(u: User) {
     const pw = await appPrompt(`Mật khẩu mới cho ${u.email} (≥ 6 ký tự)`);
     if (!pw) return;
-    const res = await fetch(`/api/users/${u.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: pw }),
-    });
-    await handle(res, `Đã đặt lại mật khẩu cho ${u.email}`);
+    try {
+      const res = await fetch(`/api/users/${u.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pw }),
+      });
+      await handle(res, `Đã đặt lại mật khẩu cho ${u.email}`);
+    } catch {
+      setError("Mất kết nối mạng — vui lòng thử lại");
+    }
   }
 
   async function removeUser(u: User) {
     if (!(await appConfirm(`Xoá người dùng ${u.email}?`, { danger: true, confirmLabel: "Xoá" })))
       return;
-    const res = await fetch(`/api/users/${u.id}`, { method: "DELETE" });
-    await handle(res, `Đã xoá ${u.email}`);
+    try {
+      const res = await fetch(`/api/users/${u.id}`, { method: "DELETE" });
+      await handle(res, `Đã xoá ${u.email}`);
+    } catch {
+      setError("Mất kết nối mạng — vui lòng thử lại");
+    }
   }
 
   if (me && me.role !== "admin") {

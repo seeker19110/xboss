@@ -7,10 +7,20 @@ import { getCurrentUser, CAN } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 type TrackTask = {
-  taskId: number; boqCode: string | null; code: string; name: string; status: string;
-  startDate: string | null; endDate: string | null; progressPercent: number;
-  assignee: string | null; wpId: number; wpCode: string; wpName: string;
-  floorLabel: string | null; sheetCode: string;
+  taskId: number;
+  boqCode: string | null;
+  code: string;
+  name: string;
+  status: string;
+  startDate: string | null;
+  endDate: string | null;
+  progressPercent: number;
+  assignee: string | null;
+  wpId: number;
+  wpCode: string;
+  wpName: string;
+  floorLabel: string | null;
+  sheetCode: string;
 };
 type DimRow = { taskId: number; label: string; installed: number };
 
@@ -20,11 +30,11 @@ const safeTabName = (s: string) => s.replace(/[\\/?*[\]:]/g, "-").slice(0, 31);
 // Tô màu nền/chữ ô trạng thái — bám bảng màu trạng thái dùng trong UI nhưng
 // dùng tông nhạt cho nền giấy trắng của Excel (đọc rõ khi in/mở bằng Excel).
 const STATUS_FILL: Record<StatusSlug, { bg: string; fg: string }> = {
-  tre: { bg: "FFFEE2E2", fg: "FF991B1B" },             // đỏ
-  hoan_thanh: { bg: "FFD1FAE5", fg: "FF065F46" },      // emerald
-  nghiem_thu: { bg: "FFCCFBF1", fg: "FF115E59" },      // teal
-  dang_thi_cong: { bg: "FFE0F2FE", fg: "FF075985" },   // sky
-  chuan_bi: { bg: "FFF4F4F5", fg: "FF3F3F46" },        // zinc
+  tre: { bg: "FFFEE2E2", fg: "FF991B1B" }, // đỏ
+  hoan_thanh: { bg: "FFD1FAE5", fg: "FF065F46" }, // emerald
+  nghiem_thu: { bg: "FFCCFBF1", fg: "FF115E59" }, // teal
+  dang_thi_cong: { bg: "FFE0F2FE", fg: "FF075985" }, // sky
+  chuan_bi: { bg: "FFF4F4F5", fg: "FF3F3F46" }, // zinc
 };
 const GROUP_FILL = "FFE4E4E7"; // nền hàng nhóm (work package) — zinc-200
 const HEADER_FILL = "FF27272A"; // nền header — zinc-800
@@ -53,14 +63,33 @@ function buildTrackingTab(ws: ExcelJS.Worksheet, tasks: TrackTask[], dims: DimRo
   for (const d of dims) {
     if (!dimsByTask.has(d.taskId)) dimsByTask.set(d.taskId, new Map());
     dimsByTask.get(d.taskId)!.set(d.label, d.installed);
-    if (!seen.has(d.label)) { seen.add(d.label); dimLabels.push(d.label); }
+    if (!seen.has(d.label)) {
+      seen.add(d.label);
+      dimLabels.push(d.label);
+    }
   }
 
-  const fixed = ["BOQCODE", "Mã", "Chi tiết công việc", "Tầng", "Người phụ trách",
-    "Bắt đầu", "Kết thúc", "% Tiến độ", "Trạng thái"];
+  const fixed = [
+    "BOQCODE",
+    "Mã",
+    "Chi tiết công việc",
+    "Tầng",
+    "Người phụ trách",
+    "Bắt đầu",
+    "Kết thúc",
+    "% Tiến độ",
+    "Trạng thái",
+  ];
   ws.columns = [
-    { width: 12 }, { width: 9 }, { width: 42 }, { width: 7 }, { width: 18 },
-    { width: 12 }, { width: 12 }, { width: 10 }, { width: 14 },
+    { width: 12 },
+    { width: 9 },
+    { width: 42 },
+    { width: 7 },
+    { width: 18 },
+    { width: 12 },
+    { width: 12 },
+    { width: 10 },
+    { width: 14 },
     ...dimLabels.map(() => ({ width: 6 })),
   ];
   const PROGRESS_COL = 8; // cột "% Tiến độ" (1-based)
@@ -82,8 +111,13 @@ function buildTrackingTab(ws: ExcelJS.Worksheet, tasks: TrackTask[], dims: DimRo
     const taskDims = dimsByTask.get(t.taskId);
     const status = t.status as StatusSlug;
     const row = ws.addRow([
-      t.boqCode ?? "", t.code, t.name, t.floorLabel ?? "", t.assignee ?? "",
-      t.startDate ?? "", t.endDate ?? "",
+      t.boqCode ?? "",
+      t.code,
+      t.name,
+      t.floorLabel ?? "",
+      t.assignee ?? "",
+      t.startDate ?? "",
+      t.endDate ?? "",
       t.progressPercent ?? 0,
       STATUS_LABEL[status] ?? t.status,
       ...dimLabels.map((l) => {
@@ -120,18 +154,35 @@ function buildTrackingTab(ws: ExcelJS.Worksheet, tasks: TrackTask[], dims: DimRo
 // GET /api/export/excel[?sheet=ogtd] → file .xlsx gồm tab "KPI" + "Công việc trễ"
 // + 1 tab tracking đầy đủ cho mỗi sheet (hoặc chỉ sheet được chọn).
 export async function GET(req: NextRequest) {
-  const role = (await getCurrentUser())?.role;
-  if (!CAN.export(role)) return NextResponse.json({ error: "Bạn không có quyền export (chỉ Admin/PM)" }, { status: 403 });
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (!CAN.export(user.role))
+    return NextResponse.json(
+      { error: "Bạn không có quyền export (chỉ Admin/PM)" },
+      { status: 403 },
+    );
 
   const slug = req.nextUrl.searchParams.get("sheet");
   const onlySheet = slug
-    ? (await queryOne<{ code: string }>(`SELECT code FROM sheet_types WHERE slug = ?`, slug))?.code ?? null
+    ? ((await queryOne<{ code: string }>(`SELECT code FROM sheet_types WHERE slug = ?`, slug))
+        ?.code ?? null)
     : null;
-  if (slug && !onlySheet) return NextResponse.json({ error: `Sheet không hợp lệ: ${slug}` }, { status: 400 });
+  if (slug && !onlySheet)
+    return NextResponse.json({ error: `Sheet không hợp lệ: ${slug}` }, { status: 400 });
 
   const today = todayISO();
 
-  const delayed = await query<{ boqCode: string | null; code: string; name: string; status: string; startDate: string | null; endDate: string | null; progressPercent: number; floorLabel: string | null; sheetType: string }>(
+  const delayed = await query<{
+    boqCode: string | null;
+    code: string;
+    name: string;
+    status: string;
+    startDate: string | null;
+    endDate: string | null;
+    progressPercent: number;
+    floorLabel: string | null;
+    sheetType: string;
+  }>(
     `SELECT t.boq_code AS "boqCode", t.code, t.name, t.status, t.start_date AS "startDate", t.end_date AS "endDate",
             t.progress_percent AS "progressPercent", wp.floor_label AS "floorLabel", st.code AS "sheetType"
        FROM tasks t
@@ -139,16 +190,25 @@ export async function GET(req: NextRequest) {
        JOIN sheet_types st ON wp.sheet_type_id = st.id
       WHERE t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_percent < 1
         AND t.status NOT IN ('hoan_thanh','nghiem_thu')
-      ORDER BY st.code, t.end_date`, today);
+      ORDER BY st.code, t.end_date`,
+    today,
+  );
 
-  const kpi = await query<{ sheetType: string; total: number; avgProgress: number; delayed: number }>(
+  const kpi = await query<{
+    sheetType: string;
+    total: number;
+    avgProgress: number;
+    delayed: number;
+  }>(
     `SELECT st.code AS "sheetType", COUNT(t.id) AS total,
             COALESCE(AVG(t.progress_percent),0) AS "avgProgress",
             COALESCE(SUM(CASE WHEN t.end_date < ? AND t.progress_percent < 1 AND t.status NOT IN ('hoan_thanh','nghiem_thu') THEN 1 ELSE 0 END),0) AS delayed
        FROM sheet_types st
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
-      GROUP BY st.id, st.code ORDER BY st.id`, today);
+      GROUP BY st.id, st.code ORDER BY st.id`,
+    today,
+  );
 
   // Toàn bộ task theo sheet (cho các tab tracking) — thứ tự như lưới trên web.
   const sheetFilter = onlySheet ? "WHERE st.code = ?" : "";
@@ -163,7 +223,9 @@ export async function GET(req: NextRequest) {
        JOIN sheet_types st ON wp.sheet_type_id = st.id
        LEFT JOIN users u ON t.assigned_to = u.id
       ${sheetFilter}
-      ORDER BY st.id, wp.sort_order, wp.id, t.sort_order, t.id`, ...sheetParams);
+      ORDER BY st.id, wp.sort_order, wp.id, t.sort_order, t.id`,
+    ...sheetParams,
+  );
 
   const allDims = await query<DimRow>(
     `SELECT d.task_id AS "taskId", d.dimension_label AS label, d.installed
@@ -172,7 +234,9 @@ export async function GET(req: NextRequest) {
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
       ${sheetFilter}
-      ORDER BY d.task_id, d.sort_order, d.id`, ...sheetParams);
+      ORDER BY d.task_id, d.sort_order, d.id`,
+    ...sheetParams,
+  );
 
   const wb = new ExcelJS.Workbook();
 
@@ -188,15 +252,44 @@ export async function GET(req: NextRequest) {
 
   // Tab Công việc trễ.
   const delWs = wb.addWorksheet("Công việc trễ");
-  delWs.columns = [{ width: 12 }, { width: 9 }, { width: 42 }, { width: 8 }, { width: 7 },
-    { width: 12 }, { width: 12 }, { width: 10 }, { width: 14 }];
-  styleHeader(delWs.addRow(["BOQCODE", "Mã", "Chi tiết công việc", "Sheet", "Tầng",
-    "Bắt đầu", "Kết thúc", "% Tiến độ", "Trạng thái"]));
+  delWs.columns = [
+    { width: 12 },
+    { width: 9 },
+    { width: 42 },
+    { width: 8 },
+    { width: 7 },
+    { width: 12 },
+    { width: 12 },
+    { width: 10 },
+    { width: 14 },
+  ];
+  styleHeader(
+    delWs.addRow([
+      "BOQCODE",
+      "Mã",
+      "Chi tiết công việc",
+      "Sheet",
+      "Tầng",
+      "Bắt đầu",
+      "Kết thúc",
+      "% Tiến độ",
+      "Trạng thái",
+    ]),
+  );
   if (delayed.length) {
     for (const d of delayed) {
       const status = d.status as StatusSlug;
-      const row = delWs.addRow([d.boqCode ?? "", d.code, d.name, d.sheetType, d.floorLabel ?? "",
-        d.startDate ?? "", d.endDate ?? "", d.progressPercent ?? 0, STATUS_LABEL[status] ?? d.status]);
+      const row = delWs.addRow([
+        d.boqCode ?? "",
+        d.code,
+        d.name,
+        d.sheetType,
+        d.floorLabel ?? "",
+        d.startDate ?? "",
+        d.endDate ?? "",
+        d.progressPercent ?? 0,
+        STATUS_LABEL[status] ?? d.status,
+      ]);
       row.getCell(8).numFmt = "0%";
       const style = STATUS_FILL[status];
       if (style) {
@@ -221,7 +314,9 @@ export async function GET(req: NextRequest) {
   }
 
   // Tên file theo mã dự án trong DB (fallback "XBoss" khi chưa seed).
-  const project = await queryOne<{ code: string | null }>(`SELECT code FROM projects ORDER BY id LIMIT 1`);
+  const project = await queryOne<{ code: string | null }>(
+    `SELECT code FROM projects ORDER BY id LIMIT 1`,
+  );
   const fileTag = (project?.code ?? "XBoss").replace(/[^\w-]/g, "-");
 
   const buf = await wb.xlsx.writeBuffer();

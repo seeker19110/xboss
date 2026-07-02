@@ -156,30 +156,35 @@ export default function PurchaseOrdersPage() {
       return;
     }
     setSaving(true);
-    const r = await fetch("/api/purchase-orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        supplierId: newPO.supplierId ? Number(newPO.supplierId) : null,
-        expectedDate: newPO.expectedDate || null,
-        note: newPO.note || null,
-        items: validItems.map((i) => ({
-          materialId: Number(i.materialId),
-          prId: i.prId ? Number(i.prId) : undefined,
-          qtyOrdered: Number(i.qtyOrdered),
-          unitPrice: i.unitPrice ? Number(i.unitPrice) : undefined,
-          note: i.note || undefined,
-        })),
-      }),
-    });
-    setSaving(false);
-    if (r.ok) {
-      setShowCreate(false);
-      resetNewPO();
-      load();
-    } else {
-      const j = await r.json();
-      setError(j.error ?? "Lỗi tạo PO");
+    try {
+      const r = await fetch("/api/purchase-orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          supplierId: newPO.supplierId ? Number(newPO.supplierId) : null,
+          expectedDate: newPO.expectedDate || null,
+          note: newPO.note || null,
+          items: validItems.map((i) => ({
+            materialId: Number(i.materialId),
+            prId: i.prId ? Number(i.prId) : undefined,
+            qtyOrdered: Number(i.qtyOrdered),
+            unitPrice: i.unitPrice ? Number(i.unitPrice) : undefined,
+            note: i.note || undefined,
+          })),
+        }),
+      });
+      if (r.ok) {
+        setShowCreate(false);
+        resetNewPO();
+        load();
+      } else {
+        const j = await r.json();
+        setError(j.error ?? "Lỗi tạo PO");
+      }
+    } catch {
+      setError("Mất kết nối mạng — vui lòng thử lại");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -215,48 +220,61 @@ export default function PurchaseOrdersPage() {
       return;
     }
     setSaving(true);
-    const r = await fetch(`/api/purchase-orders/${showReceive.id}/receive`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ note: receiveNote || null, items }),
-    });
-    setSaving(false);
-    if (r.ok) {
-      setShowReceive(null);
-      setExpandedItems((prev) => {
-        const n = { ...prev };
-        delete n[showReceive.id];
-        return n;
+    try {
+      const r = await fetch(`/api/purchase-orders/${showReceive.id}/receive`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note: receiveNote || null, items }),
       });
-      load();
-    } else {
-      const j = await r.json();
-      setError(j.error ?? "Lỗi nhập kho");
+      if (r.ok) {
+        setShowReceive(null);
+        setExpandedItems((prev) => {
+          const n = { ...prev };
+          delete n[showReceive.id];
+          return n;
+        });
+        load();
+      } else {
+        const j = await r.json();
+        setError(j.error ?? "Lỗi nhập kho");
+      }
+    } catch {
+      setError("Mất kết nối mạng — vui lòng thử lại");
+    } finally {
+      setSaving(false);
     }
   };
 
   const updateStatus = async (po: PO, status: string) => {
     const label = status === "confirmed" ? "xác nhận" : status === "cancelled" ? "huỷ" : status;
     if (!(await appConfirm(`${label} đơn hàng ${po.poCode}?`))) return;
-    const r = await fetch(`/api/purchase-orders/${po.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    if (r.ok) load();
-    else {
-      const j = await r.json();
-      setError(j.error ?? "Lỗi cập nhật");
+    try {
+      const r = await fetch(`/api/purchase-orders/${po.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (r.ok) load();
+      else {
+        const j = await r.json();
+        setError(j.error ?? "Lỗi cập nhật");
+      }
+    } catch {
+      setError("Mất kết nối mạng — vui lòng thử lại");
     }
   };
 
   const deletePO = async (po: PO) => {
     if (!(await appConfirm(`Xoá đơn hàng ${po.poCode}?`))) return;
-    const r = await fetch(`/api/purchase-orders/${po.id}`, { method: "DELETE" });
-    if (r.ok) load();
-    else {
-      const j = await r.json();
-      setError(j.error ?? "Lỗi xoá");
+    try {
+      const r = await fetch(`/api/purchase-orders/${po.id}`, { method: "DELETE" });
+      if (r.ok) load();
+      else {
+        const j = await r.json();
+        setError(j.error ?? "Lỗi xoá");
+      }
+    } catch {
+      setError("Mất kết nối mạng — vui lòng thử lại");
     }
   };
 
@@ -427,7 +445,7 @@ export default function PurchaseOrdersPage() {
         {error && (
           <div className="mb-4 p-3 bg-red-900/50 border border-red-700 rounded text-sm flex justify-between">
             {error}{" "}
-            <button onClick={() => setError("")}>
+            <button onClick={() => setError("")} aria-label="Đóng thông báo lỗi">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -475,6 +493,11 @@ export default function PurchaseOrdersPage() {
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <button
                         onClick={() => toggleExpand(po.id)}
+                        aria-label={
+                          expanded === po.id
+                            ? `Thu gọn đơn hàng ${po.poCode}`
+                            : `Mở rộng đơn hàng ${po.poCode}`
+                        }
                         className="text-zinc-400 hover:text-zinc-100 shrink-0"
                       >
                         {expanded === po.id ? (
@@ -548,6 +571,7 @@ export default function PurchaseOrdersPage() {
                         {canManage && po.status === "draft" && (
                           <button
                             onClick={() => deletePO(po)}
+                            aria-label={`Xoá đơn hàng ${po.poCode}`}
                             className="p-1.5 rounded hover:bg-red-900/50 text-zinc-400 hover:text-red-400"
                           >
                             <X className="w-4 h-4" />
@@ -556,6 +580,7 @@ export default function PurchaseOrdersPage() {
                         {canManage && (po.status === "confirmed" || po.status === "partial") && (
                           <button
                             onClick={() => updateStatus(po, "cancelled")}
+                            aria-label={`Huỷ đơn hàng ${po.poCode}`}
                             className="p-1.5 rounded hover:bg-red-900/50 text-zinc-400 hover:text-red-400"
                           >
                             <AlertCircle className="w-4 h-4" />
@@ -638,6 +663,7 @@ export default function PurchaseOrdersPage() {
               <h3 className="font-bold text-lg">Tạo đơn đặt hàng mới</h3>
               <button
                 onClick={() => setShowCreate(false)}
+                aria-label="Đóng"
                 className="text-zinc-400 hover:text-zinc-100"
               >
                 <X className="w-5 h-5" />
@@ -787,6 +813,7 @@ export default function PurchaseOrdersPage() {
                       {newPO.items.length > 1 && (
                         <button
                           onClick={() => removeItem(i)}
+                          aria-label={`Xoá dòng ${i + 1}`}
                           className="p-1 text-zinc-400 hover:text-red-400"
                         >
                           <X className="w-4 h-4" />
@@ -831,6 +858,7 @@ export default function PurchaseOrdersPage() {
               </div>
               <button
                 onClick={() => setShowReceive(null)}
+                aria-label="Đóng"
                 className="text-zinc-400 hover:text-zinc-100"
               >
                 <X className="w-5 h-5" />

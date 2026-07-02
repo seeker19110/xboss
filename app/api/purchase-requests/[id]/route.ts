@@ -7,7 +7,10 @@ export const dynamic = "force-dynamic";
 const canApprove = (r?: Role) => r === "admin" || r === "pm";
 
 // PATCH /api/purchase-requests/:id  body: { action: 'approve'|'reject', reviewNote? }
-export async function PATCH(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+export async function PATCH(
+  req: NextRequest,
+  { params: paramsP }: { params: Promise<{ id: string }> },
+) {
   const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -15,8 +18,10 @@ export async function PATCH(req: NextRequest, { params: paramsP }: { params: Pro
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const pr = await queryOne<{ id: number; status: string }>(
-    `SELECT id, status FROM purchase_requests WHERE id = ?`, id);
+  const pr = await queryOne<{ id: number; status: string; requested_by: number }>(
+    `SELECT id, status, requested_by FROM purchase_requests WHERE id = ?`,
+    id,
+  );
   if (!pr) return NextResponse.json({ error: "Không tìm thấy yêu cầu" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
@@ -27,26 +32,45 @@ export async function PATCH(req: NextRequest, { params: paramsP }: { params: Pro
     if (!canApprove(user.role))
       return NextResponse.json({ error: "Chỉ Admin/PM được duyệt yêu cầu" }, { status: 403 });
     if (pr.status !== "pending")
-      return NextResponse.json({ error: "Yêu cầu không còn ở trạng thái chờ duyệt" }, { status: 409 });
+      return NextResponse.json(
+        { error: "Yêu cầu không còn ở trạng thái chờ duyệt" },
+        { status: 409 },
+      );
 
     const newStatus = action === "approve" ? "approved" : "rejected";
     await run(
       `UPDATE purchase_requests SET status = ?, reviewed_by = ?, reviewed_at = NOW(), review_note = ? WHERE id = ?`,
-      newStatus, user.id, body.reviewNote ? String(body.reviewNote).trim() : null, id);
+      newStatus,
+      user.id,
+      body.reviewNote ? String(body.reviewNote).trim() : null,
+      id,
+    );
 
     return NextResponse.json({ ok: true, status: newStatus });
   }
 
-  // Sửa note (người tạo, khi còn pending)
+  // Sửa note (người tạo hoặc Admin/PM, khi còn pending)
   if (body.note !== undefined && pr.status === "pending") {
-    await run(`UPDATE purchase_requests SET note = ? WHERE id = ?`, String(body.note).trim() || null, id);
+    if (pr.requested_by !== user.id && user.role !== "admin" && user.role !== "pm")
+      return NextResponse.json(
+        { error: "Chỉ người tạo yêu cầu được sửa ghi chú" },
+        { status: 403 },
+      );
+    await run(
+      `UPDATE purchase_requests SET note = ? WHERE id = ?`,
+      String(body.note).trim() || null,
+      id,
+    );
     return NextResponse.json({ ok: true });
   }
 
   return NextResponse.json({ error: "Hành động không hợp lệ" }, { status: 400 });
 }
 
-export async function DELETE(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+export async function DELETE(
+  _req: NextRequest,
+  { params: paramsP }: { params: Promise<{ id: string }> },
+) {
   const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -55,7 +79,9 @@ export async function DELETE(_req: NextRequest, { params: paramsP }: { params: P
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const pr = await queryOne<{ requested_by: number; status: string }>(
-    `SELECT requested_by, status FROM purchase_requests WHERE id = ?`, id);
+    `SELECT requested_by, status FROM purchase_requests WHERE id = ?`,
+    id,
+  );
   if (!pr) return NextResponse.json({ error: "Không tìm thấy yêu cầu" }, { status: 404 });
 
   if (pr.requested_by !== user.id && user.role !== "admin" && user.role !== "pm")

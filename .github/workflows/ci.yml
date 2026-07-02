@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+# Least-privilege: workflow chỉ cần đọc code, không cần ghi gì lên GitHub.
+permissions:
+  contents: read
+
 jobs:
   ci:
     runs-on: ubuntu-latest

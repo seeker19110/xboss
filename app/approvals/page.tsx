@@ -1,25 +1,48 @@
-'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { CheckSquare, FileText, Paperclip, Upload, X, CheckCircle2, Clock, Link2, Image as ImageIcon } from 'lucide-react';
-import AppHeader from '@/app/components/AppHeader';
-import { Modal, appAlert, appConfirm } from '@/app/components/dialogs';
-import { PageSkeleton } from '@/app/components/Skeleton';
+"use client";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  CheckSquare,
+  FileText,
+  Paperclip,
+  Upload,
+  X,
+  CheckCircle2,
+  Clock,
+  Link2,
+  Image as ImageIcon,
+} from "lucide-react";
+import AppHeader from "@/app/components/AppHeader";
+import { Modal, appAlert, appConfirm } from "@/app/components/dialogs";
+import { PageSkeleton } from "@/app/components/Skeleton";
 
 type FloorGroup = {
-  sheetTypeId: number; sheetType: string; floorLabel: string; wpName: string | null;
-  totalTasks: number; doneTasks: number;
-  approvalId: number | null; isApproved: boolean;
-  approvedByName: string | null; approvedAt: string | null;
+  sheetTypeId: number;
+  sheetType: string;
+  floorLabel: string;
+  wpName: string | null;
+  totalTasks: number;
+  doneTasks: number;
+  approvalId: number | null;
+  isApproved: boolean;
+  approvedByName: string | null;
+  approvedAt: string | null;
   docCount: number;
 };
 type Doc = {
-  id: number; originalName: string | null; mimeType: string | null;
-  sizeBytes: number | null; caption: string | null; uploaderName: string | null;
-  createdAt: string; linkUrl: string | null;
+  id: number;
+  originalName: string | null;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  caption: string | null;
+  uploaderName: string | null;
+  createdAt: string;
+  linkUrl: string | null;
 };
 
-const fmtSize = (b: number) => b > 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)}MB` : `${Math.round(b / 1024)}KB`;
-const fmtDate = (s: string) => new Date(s).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+const fmtSize = (b: number) =>
+  b > 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)}MB` : `${Math.round(b / 1024)}KB`;
+const fmtDate = (s: string) =>
+  new Date(s).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
 
 export default function ApprovalsPage() {
   const [pending, setPending] = useState<FloorGroup[]>([]);
@@ -29,15 +52,18 @@ export default function ApprovalsPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [openDocs, setOpenDocs] = useState<{ approvalId: number; label: string } | null>(null);
   const [docs, setDocs] = useState<Doc[]>([]);
-  const [linkInput, setLinkInput] = useState('');
-  const [linkCaption, setLinkCaption] = useState('');
+  const [linkInput, setLinkInput] = useState("");
+  const [linkCaption, setLinkCaption] = useState("");
   const [showLinkForm, setShowLinkForm] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const uploadApprovalRef = useRef<number | null>(null);
 
   const load = useCallback(async () => {
-    const r = await fetch('/api/approvals');
-    if (r.status === 401) { window.location.href = '/login'; return; }
+    const r = await fetch("/api/approvals");
+    if (r.status === 401) {
+      window.location.href = "/login";
+      return;
+    }
     if (!r.ok) {
       const err = await r.json().catch(() => ({ error: `Lỗi server (${r.status})` }));
       appAlert(err.error ?? `Lỗi server (${r.status})`);
@@ -51,20 +77,30 @@ export default function ApprovalsPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   async function getOrCreateApprovalId(g: FloorGroup): Promise<number | null> {
     if (g.approvalId) return g.approvalId;
-    const r = await fetch('/api/floor-approvals', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+    const r = await fetch("/api/floor-approvals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sheetTypeId: g.sheetTypeId, floorLabel: g.floorLabel }),
     });
-    if (!r.ok) { appAlert((await r.json().catch(() => null))?.error ?? 'Lỗi tạo biên bản'); return null; }
+    if (!r.ok) {
+      appAlert((await r.json().catch(() => null))?.error ?? "Lỗi tạo biên bản");
+      return null;
+    }
     const j = await r.json();
     // Cập nhật local state để lần sau không phải tạo lại
-    setPending(p => p.map(x =>
-      x.sheetTypeId === g.sheetTypeId && x.floorLabel === g.floorLabel
-        ? { ...x, approvalId: j.id } : x));
+    setPending((p) =>
+      p.map((x) =>
+        x.sheetTypeId === g.sheetTypeId && x.floorLabel === g.floorLabel
+          ? { ...x, approvalId: j.id }
+          : x,
+      ),
+    );
     return j.id;
   }
 
@@ -72,8 +108,8 @@ export default function ApprovalsPage() {
     setOpenDocs({ approvalId, label });
     setDocs([]);
     setShowLinkForm(false);
-    setLinkInput('');
-    setLinkCaption('');
+    setLinkInput("");
+    setLinkCaption("");
     const r = await fetch(`/api/floor-approvals/${approvalId}/documents`);
     if (r.ok) setDocs((await r.json()).documents ?? []);
   }
@@ -83,16 +119,21 @@ export default function ApprovalsPage() {
     if (!approvalId || !linkInput.trim()) return;
     setBusy(`upload-${approvalId}`);
     const r = await fetch(`/api/floor-approvals/${approvalId}/documents`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url: linkInput.trim(), caption: linkCaption.trim() || null }),
     });
     setBusy(null);
-    if (!r.ok) { appAlert((await r.json().catch(() => null))?.error ?? 'Thêm link thất bại'); return; }
-    const bumpDoc = (list: FloorGroup[]) => list.map(g => g.approvalId === approvalId ? { ...g, docCount: g.docCount + 1 } : g);
-    setPending(bumpDoc); setApproved(bumpDoc);
-    setLinkInput('');
-    setLinkCaption('');
+    if (!r.ok) {
+      appAlert((await r.json().catch(() => null))?.error ?? "Thêm link thất bại");
+      return;
+    }
+    const bumpDoc = (list: FloorGroup[]) =>
+      list.map((g) => (g.approvalId === approvalId ? { ...g, docCount: g.docCount + 1 } : g));
+    setPending(bumpDoc);
+    setApproved(bumpDoc);
+    setLinkInput("");
+    setLinkCaption("");
     setShowLinkForm(false);
     loadDocs(approvalId, openDocs.label);
   }
@@ -121,8 +162,8 @@ export default function ApprovalsPage() {
     setOpenDocs({ approvalId, label: g.wpName ?? `${g.sheetType} · ${g.floorLabel}` });
     setDocs([]);
     setShowLinkForm(true);
-    setLinkInput('');
-    setLinkCaption('');
+    setLinkInput("");
+    setLinkCaption("");
     const r = await fetch(`/api/floor-approvals/${approvalId}/documents`);
     if (r.ok) setDocs((await r.json()).documents ?? []);
   }
@@ -130,58 +171,86 @@ export default function ApprovalsPage() {
   async function onFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     const approvalId = uploadApprovalRef.current;
-    e.target.value = '';
+    e.target.value = "";
     if (!file || !approvalId) return;
     const fd = new FormData();
-    fd.append('file', file);
+    fd.append("file", file);
     setBusy(`upload-${approvalId}`);
-    const r = await fetch(`/api/floor-approvals/${approvalId}/documents`, { method: 'POST', body: fd });
+    const r = await fetch(`/api/floor-approvals/${approvalId}/documents`, {
+      method: "POST",
+      body: fd,
+    });
     setBusy(null);
-    if (!r.ok) { appAlert((await r.json().catch(() => null))?.error ?? 'Upload thất bại'); return; }
-    const bumpDoc = (list: FloorGroup[]) => list.map(g => g.approvalId === approvalId ? { ...g, docCount: g.docCount + 1 } : g);
-    setPending(bumpDoc); setApproved(bumpDoc);
+    if (!r.ok) {
+      appAlert((await r.json().catch(() => null))?.error ?? "Upload thất bại");
+      return;
+    }
+    const bumpDoc = (list: FloorGroup[]) =>
+      list.map((g) => (g.approvalId === approvalId ? { ...g, docCount: g.docCount + 1 } : g));
+    setPending(bumpDoc);
+    setApproved(bumpDoc);
     if (openDocs?.approvalId === approvalId) loadDocs(approvalId, openDocs.label);
   }
 
   async function deleteDoc(docId: number) {
-    if (!await appConfirm('Xoá biên bản này?', { danger: true, confirmLabel: 'Xoá' })) return;
-    const r = await fetch(`/api/documents/${docId}`, { method: 'DELETE' });
-    if (!r.ok) { appAlert((await r.json().catch(() => null))?.error ?? 'Không xoá được'); return; }
-    setDocs(d => d.filter(x => x.id !== docId));
+    if (!(await appConfirm("Xoá biên bản này?", { danger: true, confirmLabel: "Xoá" }))) return;
+    const r = await fetch(`/api/documents/${docId}`, { method: "DELETE" });
+    if (!r.ok) {
+      appAlert((await r.json().catch(() => null))?.error ?? "Không xoá được");
+      return;
+    }
+    setDocs((d) => d.filter((x) => x.id !== docId));
     if (openDocs) {
       const { approvalId, label } = openDocs;
-      const dropDoc = (list: FloorGroup[]) => list.map(g => g.approvalId === approvalId ? { ...g, docCount: Math.max(0, g.docCount - 1) } : g);
-      setPending(dropDoc); setApproved(dropDoc);
+      const dropDoc = (list: FloorGroup[]) =>
+        list.map((g) =>
+          g.approvalId === approvalId ? { ...g, docCount: Math.max(0, g.docCount - 1) } : g,
+        );
+      setPending(dropDoc);
+      setApproved(dropDoc);
       loadDocs(approvalId, label);
     }
   }
 
   async function approveFloor(g: FloorGroup) {
     const key = `${g.sheetTypeId}-${g.floorLabel}`;
-    if (!await appConfirm(
-      `Duyệt nghiệm thu tầng ${g.floorLabel} — hệ ${g.sheetType}?\n(${g.totalTasks} task sẽ được đánh dấu đã nghiệm thu)`,
-      { confirmLabel: 'Duyệt nghiệm thu' }
-    )) return;
+    if (
+      !(await appConfirm(
+        `Duyệt nghiệm thu tầng ${g.floorLabel} — hệ ${g.sheetType}?\n(${g.totalTasks} task sẽ được đánh dấu đã nghiệm thu)`,
+        { confirmLabel: "Duyệt nghiệm thu" },
+      ))
+    )
+      return;
     setBusy(`approve-${key}`);
-    const r = await fetch('/api/approvals', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+    const r = await fetch("/api/approvals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sheetTypeId: g.sheetTypeId, floorLabel: g.floorLabel }),
     });
     setBusy(null);
-    if (!r.ok) { appAlert((await r.json().catch(() => null))?.error ?? 'Duyệt thất bại'); return; }
+    if (!r.ok) {
+      appAlert((await r.json().catch(() => null))?.error ?? "Duyệt thất bại");
+      return;
+    }
     load();
   }
 
   async function unapproveFloor(g: FloorGroup) {
     if (!g.approvalId) return;
-    if (!await appConfirm(
-      `Huỷ nghiệm thu tầng ${g.floorLabel} — hệ ${g.sheetType}?\nBiên bản đã đính kèm sẽ được giữ lại.`,
-      { danger: true, confirmLabel: 'Huỷ nghiệm thu' }
-    )) return;
+    if (
+      !(await appConfirm(
+        `Huỷ nghiệm thu tầng ${g.floorLabel} — hệ ${g.sheetType}?\nBiên bản đã đính kèm sẽ được giữ lại.`,
+        { danger: true, confirmLabel: "Huỷ nghiệm thu" },
+      ))
+    )
+      return;
     setBusy(`unapprove-${g.approvalId}`);
-    const r = await fetch(`/api/floor-approvals/${g.approvalId}`, { method: 'DELETE' });
+    const r = await fetch(`/api/floor-approvals/${g.approvalId}`, { method: "DELETE" });
     setBusy(null);
-    if (!r.ok) { appAlert((await r.json().catch(() => null))?.error ?? 'Không huỷ được'); return; }
+    if (!r.ok) {
+      appAlert((await r.json().catch(() => null))?.error ?? "Không huỷ được");
+      return;
+    }
     load();
   }
 
@@ -189,22 +258,32 @@ export default function ApprovalsPage() {
 
   function row(g: FloorGroup, isPending: boolean) {
     const key = `${g.sheetTypeId}-${g.floorLabel}`;
-    const isBusy = busy === `approve-${key}` || busy === `unapprove-${g.approvalId}` || busy === `upload-${g.approvalId}`;
+    const isBusy =
+      busy === `approve-${key}` ||
+      busy === `unapprove-${g.approvalId}` ||
+      busy === `upload-${g.approvalId}`;
     const allDone = g.doneTasks === g.totalTasks;
-    const pct = g.totalTasks > 0 ? Math.round(g.doneTasks / g.totalTasks * 100) : 0;
+    const pct = g.totalTasks > 0 ? Math.round((g.doneTasks / g.totalTasks) * 100) : 0;
 
     return (
-      <tr key={key} className="border-b border-zinc-800/50 odd:bg-zinc-900/50 even:bg-zinc-800/20 hover:bg-zinc-700/40 transition-colors">
+      <tr
+        key={key}
+        className="border-b border-zinc-800/50 odd:bg-zinc-900/50 even:bg-zinc-800/20 hover:bg-zinc-700/40 transition-colors"
+      >
         <td className="p-3 font-medium text-sm">{g.sheetType}</td>
         <td className="p-3 text-sm">{g.floorLabel}</td>
-        <td className="p-3 text-sm text-zinc-300">{g.wpName ?? '—'}</td>
+        <td className="p-3 text-sm text-zinc-300">{g.wpName ?? "—"}</td>
         <td className="p-3">
           <div className="flex items-center gap-2">
             <div className="w-20 h-1.5 bg-zinc-700 rounded-full overflow-hidden">
-              <div className={`h-full rounded-full transition-all ${allDone ? 'bg-emerald-500' : 'bg-blue-500'}`}
-                style={{ width: `${pct}%` }} />
+              <div
+                className={`h-full rounded-full transition-all ${allDone ? "bg-emerald-500" : "bg-blue-500"}`}
+                style={{ width: `${pct}%` }}
+              />
             </div>
-            <span className={`text-xs font-medium ${allDone ? 'text-emerald-400' : 'text-zinc-400'}`}>
+            <span
+              className={`text-xs font-medium ${allDone ? "text-emerald-400" : "text-zinc-400"}`}
+            >
               {g.doneTasks}/{g.totalTasks}
               {allDone && <CheckCircle2 className="w-3 h-3 inline ml-1" />}
             </span>
@@ -212,25 +291,38 @@ export default function ApprovalsPage() {
         </td>
         {!isPending && (
           <td className="p-3 text-xs text-zinc-400">
-            {g.approvedByName ? `${g.approvedByName}` : '—'}
+            {g.approvedByName ? `${g.approvedByName}` : "—"}
             {g.approvedAt && <span className="block text-zinc-600">{fmtDate(g.approvedAt)}</span>}
           </td>
         )}
         {/* Cột Biên bản — hiện cho cả pending và approved */}
         <td className="p-3">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <button onClick={() => openDocsForGroup(g)} disabled={isBusy}
-              className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg border transition ${g.docCount > 0
-                ? 'bg-emerald-950/60 border-emerald-900 text-emerald-300 hover:bg-emerald-900/60'
-                : 'bg-zinc-800 border-zinc-700 text-zinc-500 hover:bg-zinc-700'}`}>
+            <button
+              onClick={() => openDocsForGroup(g)}
+              disabled={isBusy}
+              className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg border transition ${
+                g.docCount > 0
+                  ? "bg-emerald-950/60 border-emerald-900 text-emerald-300 hover:bg-emerald-900/60"
+                  : "bg-zinc-800 border-zinc-700 text-zinc-500 hover:bg-zinc-700"
+              }`}
+            >
               <Paperclip className="w-3 h-3" /> {g.docCount} biên bản
             </button>
-            <button onClick={() => pickFileForGroup(g)} disabled={isBusy} title="Upload PDF/ảnh"
-              className="flex items-center gap-1 text-xs bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 border border-zinc-700 rounded-lg px-2 py-1 transition">
+            <button
+              onClick={() => pickFileForGroup(g)}
+              disabled={isBusy}
+              title="Upload PDF/ảnh"
+              className="flex items-center gap-1 text-xs bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 border border-zinc-700 rounded-lg px-2 py-1 transition"
+            >
               <Upload className="w-3 h-3" />
             </button>
-            <button onClick={() => openLinkFormForGroup(g)} disabled={isBusy} title="Thêm link"
-              className="flex items-center gap-1 text-xs bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 border border-zinc-700 rounded-lg px-2 py-1 transition">
+            <button
+              onClick={() => openLinkFormForGroup(g)}
+              disabled={isBusy}
+              title="Thêm link"
+              className="flex items-center gap-1 text-xs bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 border border-zinc-700 rounded-lg px-2 py-1 transition"
+            >
               <Link2 className="w-3 h-3" />
             </button>
           </div>
@@ -240,8 +332,11 @@ export default function ApprovalsPage() {
           <div className="flex gap-1.5 flex-wrap items-center">
             {isPending ? (
               canApprove && allDone ? (
-                <button onClick={() => approveFloor(g)} disabled={isBusy}
-                  className="flex items-center gap-1 text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-lg px-2.5 py-1.5 transition font-medium">
+                <button
+                  onClick={() => approveFloor(g)}
+                  disabled={isBusy}
+                  className="flex items-center gap-1 text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-lg px-2.5 py-1.5 transition font-medium"
+                >
                   <CheckSquare className="w-3 h-3" /> Duyệt nghiệm thu
                 </button>
               ) : (
@@ -250,9 +345,13 @@ export default function ApprovalsPage() {
                 </span>
               )
             ) : (
-              canApprove && g.approvalId && (
-                <button onClick={() => unapproveFloor(g)} disabled={isBusy}
-                  className="text-xs bg-red-950/60 hover:bg-red-900/60 disabled:opacity-50 border border-red-900 text-red-300 rounded-lg px-2 py-1 transition">
+              canApprove &&
+              g.approvalId && (
+                <button
+                  onClick={() => unapproveFloor(g)}
+                  disabled={isBusy}
+                  className="text-xs bg-red-950/60 hover:bg-red-900/60 disabled:opacity-50 border border-red-900 text-red-300 rounded-lg px-2 py-1 transition"
+                >
                   Huỷ NT
                 </button>
               )
@@ -265,17 +364,23 @@ export default function ApprovalsPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <input ref={fileRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={onFileChosen} />
+      <input
+        ref={fileRef}
+        type="file"
+        accept="application/pdf,image/*"
+        className="hidden"
+        onChange={onFileChosen}
+      />
       <AppHeader />
 
       <main className="p-4 sm:p-6 space-y-8">
         {/* Chờ nghiệm thu */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
           <div className="p-4 border-b border-zinc-800">
-            <h2 className="font-semibold text-sm">
-              Chờ nghiệm thu ({pending.length} tầng · hệ)
-            </h2>
-            <p className="text-xs text-zinc-500 mt-0.5">Chỉ duyệt được khi tất cả task trong tầng đạt 100%</p>
+            <h2 className="font-semibold text-sm">Chờ nghiệm thu ({pending.length} tầng · hệ)</h2>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              Chỉ duyệt được khi tất cả task trong tầng đạt 100%
+            </p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[560px]">
@@ -290,11 +395,13 @@ export default function ApprovalsPage() {
                 </tr>
               </thead>
               <tbody>
-                {pending.map(g => row(g, true))}
+                {pending.map((g) => row(g, true))}
                 {pending.length === 0 && (
-                  <tr><td colSpan={6} className="p-8 text-center text-zinc-500">
-                    Không có tầng nào chờ nghiệm thu — tất cả đã được duyệt hoặc chưa đủ tiến độ.
-                  </td></tr>
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-zinc-500">
+                      Không có tầng nào chờ nghiệm thu — tất cả đã được duyệt hoặc chưa đủ tiến độ.
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
@@ -322,9 +429,13 @@ export default function ApprovalsPage() {
                 </tr>
               </thead>
               <tbody>
-                {approved.map(g => row(g, false))}
+                {approved.map((g) => row(g, false))}
                 {approved.length === 0 && (
-                  <tr><td colSpan={7} className="p-8 text-center text-zinc-500">Chưa có tầng nào được nghiệm thu.</td></tr>
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-zinc-500">
+                      Chưa có tầng nào được nghiệm thu.
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
@@ -339,11 +450,17 @@ export default function ApprovalsPage() {
             <h3 className="font-semibold text-sm flex items-center gap-2">
               <FileText className="w-4 h-4 text-emerald-400" /> Biên bản — {openDocs.label}
             </h3>
-            <button onClick={() => setOpenDocs(null)} className="text-zinc-400 hover:text-white"><X className="w-4 h-4" /></button>
+            <button
+              onClick={() => setOpenDocs(null)}
+              aria-label="Đóng"
+              className="text-zinc-400 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
           <div className="p-4 space-y-2">
-            {docs.map(d => {
-              const isImg = d.mimeType?.startsWith('image/');
+            {docs.map((d) => {
+              const isImg = d.mimeType?.startsWith("image/");
               const isLink = !!d.linkUrl;
               const href = isLink ? d.linkUrl! : `/api/documents/${d.id}`;
               return (
@@ -352,25 +469,39 @@ export default function ApprovalsPage() {
                   {isImg && !isLink && (
                     <a href={href} target="_blank" rel="noreferrer" className="block">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={href} alt={d.originalName ?? ''} className="w-full max-h-48 object-cover object-top" />
+                      <img
+                        src={href}
+                        alt={d.originalName ?? ""}
+                        className="w-full max-h-48 object-cover object-top"
+                      />
                     </a>
                   )}
                   <div className="flex items-center gap-2 px-3 py-2">
-                    {isLink
-                      ? <Link2 className="w-4 h-4 text-blue-400 shrink-0" />
-                      : isImg
-                        ? <ImageIcon className="w-4 h-4 text-emerald-400 shrink-0" />
-                        : <FileText className="w-4 h-4 text-zinc-400 shrink-0" />}
-                    <a href={href} target="_blank" rel="noreferrer"
-                      className={`text-sm hover:underline truncate flex-1 ${isLink ? 'text-blue-400' : 'text-emerald-400'}`}>
+                    {isLink ? (
+                      <Link2 className="w-4 h-4 text-blue-400 shrink-0" />
+                    ) : isImg ? (
+                      <ImageIcon className="w-4 h-4 text-emerald-400 shrink-0" />
+                    ) : (
+                      <FileText className="w-4 h-4 text-zinc-400 shrink-0" />
+                    )}
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={`text-sm hover:underline truncate flex-1 ${isLink ? "text-blue-400" : "text-emerald-400"}`}
+                    >
                       {d.caption || d.originalName || (isLink ? d.linkUrl : `Tài liệu #${d.id}`)}
                     </a>
                     {!isLink && d.sizeBytes != null && (
                       <span className="text-xs text-zinc-500 shrink-0">{fmtSize(d.sizeBytes)}</span>
                     )}
-                    <span className="text-xs text-zinc-600 shrink-0">{d.uploaderName ?? '—'}</span>
+                    <span className="text-xs text-zinc-600 shrink-0">{d.uploaderName ?? "—"}</span>
                     {canApprove && (
-                      <button onClick={() => deleteDoc(d.id)} className="text-zinc-500 hover:text-red-400 shrink-0">
+                      <button
+                        onClick={() => deleteDoc(d.id)}
+                        aria-label="Xoá biên bản"
+                        className="text-zinc-500 hover:text-red-400 shrink-0"
+                      >
                         <X className="w-3.5 h-3.5" />
                       </button>
                     )}
@@ -378,34 +509,55 @@ export default function ApprovalsPage() {
                 </div>
               );
             })}
-            {docs.length === 0 && <p className="text-sm text-zinc-500 text-center py-4">Chưa có biên bản nào.</p>}
+            {docs.length === 0 && (
+              <p className="text-sm text-zinc-500 text-center py-4">Chưa có biên bản nào.</p>
+            )}
 
             {/* Form thêm link */}
             {showLinkForm ? (
               <div className="space-y-2 pt-1">
-                <input value={linkInput} onChange={e => setLinkInput(e.target.value)}
+                <input
+                  value={linkInput}
+                  onChange={(e) => setLinkInput(e.target.value)}
                   placeholder="https://drive.google.com/..."
-                  className="w-full bg-zinc-800 border border-zinc-600 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500" />
-                <input value={linkCaption} onChange={e => setLinkCaption(e.target.value)}
+                  className="w-full bg-zinc-800 border border-zinc-600 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500"
+                />
+                <input
+                  value={linkCaption}
+                  onChange={(e) => setLinkCaption(e.target.value)}
                   placeholder="Tên hiển thị (tuỳ chọn)"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500" />
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500"
+                />
                 <div className="flex gap-2">
-                  <button onClick={submitLink} disabled={!linkInput.trim() || !!busy}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg py-2 text-sm font-medium transition">
+                  <button
+                    onClick={submitLink}
+                    disabled={!linkInput.trim() || !!busy}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg py-2 text-sm font-medium transition"
+                  >
                     Thêm link
                   </button>
-                  <button onClick={() => setShowLinkForm(false)}
-                    className="px-4 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-sm">Huỷ</button>
+                  <button
+                    onClick={() => setShowLinkForm(false)}
+                    className="px-4 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-sm"
+                  >
+                    Huỷ
+                  </button>
                 </div>
               </div>
             ) : (
               <div className="flex gap-2 pt-1">
-                <button onClick={() => pickFile(openDocs.approvalId)} disabled={!!busy}
-                  className="flex-1 flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 border border-zinc-700 rounded-lg px-3 py-2 text-sm transition">
+                <button
+                  onClick={() => pickFile(openDocs.approvalId)}
+                  disabled={!!busy}
+                  className="flex-1 flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 border border-zinc-700 rounded-lg px-3 py-2 text-sm transition"
+                >
                   <Upload className="w-4 h-4" /> Upload PDF/ảnh
                 </button>
-                <button onClick={() => setShowLinkForm(true)} disabled={!!busy}
-                  className="flex-1 flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 border border-zinc-700 rounded-lg px-3 py-2 text-sm transition">
+                <button
+                  onClick={() => setShowLinkForm(true)}
+                  disabled={!!busy}
+                  className="flex-1 flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 border border-zinc-700 rounded-lg px-3 py-2 text-sm transition"
+                >
                   <Link2 className="w-4 h-4" /> Thêm link
                 </button>
               </div>

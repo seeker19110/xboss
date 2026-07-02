@@ -17,7 +17,8 @@ function ensureVapid(): void {
   webpush.setVapidDetails(
     process.env.VAPID_SUBJECT ?? "mailto:admin@xboss.vn",
     process.env.VAPID_PUBLIC_KEY!,
-    process.env.VAPID_PRIVATE_KEY!);
+    process.env.VAPID_PRIVATE_KEY!,
+  );
   vapidReady = true;
 }
 
@@ -28,12 +29,22 @@ async function sendToSubs(subs: SubRow[], payload: PushPayload): Promise<number>
   for (const s of subs) {
     try {
       await webpush.sendNotification(
-        { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, body);
+        { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+        body,
+      );
       sent++;
     } catch (err) {
       // 404/410 = subscription chết (user gỡ quyền/đổi trình duyệt) → dọn khỏi DB.
       const code = (err as { statusCode?: number }).statusCode;
-      if (code === 404 || code === 410) await run(`DELETE FROM push_subscriptions WHERE id = ?`, s.id);
+      if (code === 404 || code === 410)
+        await run(`DELETE FROM push_subscriptions WHERE id = ?`, s.id);
+      // Lỗi khác (VAPID sai, quota, timeout...) không nên bị nuốt im lặng — dự án chưa
+      // có observability (Sentry), nên đây là dấu vết duy nhất để phát hiện push gửi hỏng.
+      else
+        console.error(
+          `[push] gửi thất bại tới subscription #${s.id} (mã lỗi ${code ?? "?"}):`,
+          err,
+        );
     }
   }
   return sent;
@@ -45,7 +56,8 @@ export async function sendPushToUsers(userIds: number[], payload: PushPayload): 
   const placeholders = userIds.map(() => "?").join(",");
   const subs = await query<SubRow>(
     `SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id IN (${placeholders})`,
-    ...userIds);
+    ...userIds,
+  );
   return sendToSubs(subs, payload);
 }
 

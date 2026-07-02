@@ -181,24 +181,28 @@ export default function AdminPage() {
     userId: number | null,
     label: string,
   ) {
-    const res = await fetch("/api/admin/assignments", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ level, id, userId }),
-    });
-    const j = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setError(j.error ?? "Lỗi không xác định");
-      return;
+    try {
+      const res = await fetch("/api/admin/assignments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ level, id, userId }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(j.error ?? "Lỗi không xác định");
+        return;
+      }
+      flash(
+        userId === null
+          ? level === "sheet"
+            ? `Đã bỏ quản lý ${label}`
+            : `${label} trở về kế thừa`
+          : `Đã phân công ${label}`,
+      );
+      loadAssign(filterUnassigned);
+    } catch {
+      setError("Mất kết nối mạng — vui lòng thử lại");
     }
-    flash(
-      userId === null
-        ? level === "sheet"
-          ? `Đã bỏ quản lý ${label}`
-          : `${label} trở về kế thừa`
-        : `Đã phân công ${label}`,
-    );
-    loadAssign(filterUnassigned);
   }
 
   function toggleFilter() {
@@ -403,6 +407,7 @@ export default function AdminPage() {
                   <div className="flex items-center gap-3 px-4 py-3 bg-zinc-900/70 flex-wrap">
                     <button
                       onClick={() => toggle(openSheets, sheet.id, setOpenSheets)}
+                      aria-label={open ? `Thu gọn hệ ${sheet.code}` : `Mở rộng hệ ${sheet.code}`}
                       className="text-zinc-400 hover:text-white shrink-0"
                     >
                       {open ? (
@@ -450,6 +455,9 @@ export default function AdminPage() {
                             <div className="flex items-center gap-3 pl-10 pr-4 py-2 bg-zinc-950 flex-wrap">
                               <button
                                 onClick={() => toggle(openPkgs, pkg.id, setOpenPkgs)}
+                                aria-label={
+                                  pOpen ? `Thu gọn nhóm ${pkg.code}` : `Mở rộng nhóm ${pkg.code}`
+                                }
                                 className="text-zinc-500 hover:text-white shrink-0"
                               >
                                 {pOpen ? (

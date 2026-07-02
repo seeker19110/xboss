@@ -33,7 +33,8 @@ function readCredentials(): SheetCredentials {
   const privateKey = process.env.GOOGLE_SA_PRIVATE_KEY?.trim();
   if (!email || !privateKey)
     throw new Error(
-      "Thiếu cấu hình Google Sheets — cần GOOGLE_SERVICE_ACCOUNT_JSON hoặc cặp GOOGLE_SA_EMAIL + GOOGLE_SA_PRIVATE_KEY.");
+      "Thiếu cấu hình Google Sheets — cần GOOGLE_SERVICE_ACCOUNT_JSON hoặc cặp GOOGLE_SA_EMAIL + GOOGLE_SA_PRIVATE_KEY.",
+    );
   return { email, privateKey: normalizeKey(privateKey) };
 }
 
@@ -53,8 +54,6 @@ export type SheetClient = {
   readRows(): Promise<string[][]>;
   /** Ghi đè vùng A1 bắt đầu từ ô trên-trái bằng `rows`. */
   writeRows(startCell: string, rows: (string | number)[][]): Promise<void>;
-  /** Xoá sạch nội dung tab (giữ tab). */
-  clear(): Promise<void>;
   tab: string;
 };
 
@@ -95,9 +94,6 @@ export async function getSheetClient(): Promise<SheetClient> {
         method: "PUT",
         body: JSON.stringify({ values: rows }),
       });
-    },
-    async clear() {
-      await call(`/values/${range("A1:Z100000")}:clear`, { method: "POST" });
     },
   };
 }

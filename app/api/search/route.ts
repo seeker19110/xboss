@@ -6,16 +6,23 @@ export const dynamic = "force-dynamic";
 
 export type SearchHit = {
   kind: "task" | "package";
-  id: number; code: string; name: string; boqCode: string | null;
-  status: string | null; progress: number;
-  floorLabel: string | null; sheetType: string; sheetSlug: string | null;
+  id: number;
+  code: string;
+  name: string;
+  boqCode: string | null;
+  status: string | null;
+  progress: number;
+  floorLabel: string | null;
+  sheetType: string;
+  sheetSlug: string | null;
 };
 
 // GET /api/search?q= → tìm task + nhóm theo mã / BOQCODE / tên.
 // Chiến lược tìm kiếm (không cần pg_trgm extension):
 //   - code / boq_code: prefix match lower(code) LIKE 'term%' — dùng B-tree index
 //   - name: plainto_tsquery('simple', ...) trên tsvector GIN index — built-in Postgres
-// Subcon chỉ tìm thấy task được giao cho mình.
+// Mọi vai trò tìm thấy toàn bộ task/nhóm (giống lưới tracking — subcon cần ngữ cảnh
+// tầng/nhóm xung quanh việc của mình, xem app/api/tasks/route.ts). Không lọc theo assigned_to.
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -40,7 +47,10 @@ export async function GET(req: NextRequest) {
            OR lower(t.boq_code) LIKE ?
            OR to_tsvector('simple', coalesce(t.name, '')) @@ plainto_tsquery('simple', ?)
         ORDER BY st.id, t.code LIMIT 15`,
-      prefix, prefix, ftsQuery),
+      prefix,
+      prefix,
+      ftsQuery,
+    ),
 
     query<SearchHit>(
       `SELECT 'package' AS kind, wp.id, wp.code, wp.name, wp.boq_code AS "boqCode",
@@ -52,7 +62,10 @@ export async function GET(req: NextRequest) {
            OR lower(wp.boq_code) LIKE ?
            OR to_tsvector('simple', coalesce(wp.name, '')) @@ plainto_tsquery('simple', ?)
         ORDER BY st.id, wp.code LIMIT 10`,
-      prefix, prefix, ftsQuery),
+      prefix,
+      prefix,
+      ftsQuery,
+    ),
   ]);
 
   return NextResponse.json({ hits: [...packages, ...tasks] });

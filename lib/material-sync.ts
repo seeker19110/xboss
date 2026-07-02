@@ -278,6 +278,12 @@ export async function runMaterialSync(sheetClient?: SheetClient): Promise<SyncSu
 
     const dbIds = new Set(dbMaterials.map((m) => m.id));
 
+    // Snapshot chỉ được CHỐT (ghi DB) sau khi bước 4 ghi thành công lên Sheet thật.
+    // Ghi sớm (như bản cũ) khiến snapshot coi như "đã đồng bộ" dù ô Sheet vật lý chưa
+    // đổi — nếu bước ghi Sheet cuối hàm lỗi mạng, lần sync kế tiếp sẽ thấy sheet lệch
+    // snapshot và tự "pull" giá trị Sheet cũ đè lại DB, âm thầm hoàn tác thay đổi hợp lệ.
+    const pendingSnapshots: { id: number; fields: MaterialFields }[] = [];
+
     // 1) Đối chiếu từng vật tư DB với dòng Sheet tương ứng.
     for (const m of dbMaterials) {
       const dbF = dbToFields(m);
@@ -287,7 +293,7 @@ export async function runMaterialSync(sheetClient?: SheetClient): Promise<SyncSu
       if (!sheetRow) {
         // Chưa có trên Sheet → sẽ được append khi ghi lại toàn bộ; lưu snapshot.
         summary.pushed++;
-        await saveSnapshot(m.id, dbF);
+        pendingSnapshots.push({ id: m.id, fields: dbF });
         continue;
       }
 
@@ -308,7 +314,7 @@ export async function runMaterialSync(sheetClient?: SheetClient): Promise<SyncSu
       }
       // noop mà snapshot cũ đã khớp winner → khỏi ghi lại (đa số vật tư không đổi mỗi lần sync).
       if (decision !== "noop" || !snap || !fieldsEqual(snap, winner)) {
-        await saveSnapshot(m.id, winner);
+        pendingSnapshots.push({ id: m.id, fields: winner });
       }
     }
 
@@ -379,15 +385,25 @@ export async function runMaterialSync(sheetClient?: SheetClient): Promise<SyncSu
         sortOrder,
       );
 
-      await saveSnapshot(newId, normalizeFields({ ...f, boqCode: boqCode ?? "" }));
+      pendingSnapshots.push({
+        id: newId,
+        fields: normalizeFields({ ...f, boqCode: boqCode ?? "" }),
+      });
       summary.created++;
     }
 
-    // 4) Ghi đè toàn bộ tab bằng dữ liệu DB đã gộp (header + mọi vật tư).
+    // 4) Ghi đè toàn bộ tab bằng dữ liệu DB đã gộp (header + mọi vật tư) — MỘT lệnh
+    // ghi duy nhất (không clear() trước) để tránh cửa sổ Sheet trống nếu lỗi mạng giữa
+    // chừng (trước đây clear() thành công nhưng writeRows() lỗi sẽ xoá trắng cả tab).
+    // Đệm dòng rỗng nếu dữ liệu mới ít dòng hơn Sheet cũ để vẫn "xoá" phần dư thừa.
     const finalMaterials = await loadDbMaterials();
     const out: (string | number)[][] = [HEADER, ...finalMaterials.map(dbToSheetRow)];
-    await client.clear();
+    const emptyRow: string[] = new Array(HEADER.length).fill("");
+    while (out.length < sheetRows.length) out.push(emptyRow);
     await client.writeRows("A1", out);
+
+    // Sheet đã ghi thành công — giờ mới chốt snapshot cho lần đồng bộ kế tiếp.
+    for (const { id, fields } of pendingSnapshots) await saveSnapshot(id, fields);
 
     summary.total = finalMaterials.length;
     return summary;
