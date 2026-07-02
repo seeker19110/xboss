@@ -1,4 +1,5 @@
-// Service worker XBoss — network-first cho trang + API GET, cache-first cho asset tĩnh.
+// Service worker XBoss — network-first cho trang, stale-while-revalidate cho API GET,
+// cache-first cho asset tĩnh.
 // Mất mạng (hầm, tầng kỹ thuật) vẫn xem được dữ liệu tracking đã tải lần cuối.
 const CACHE = "xboss-v6";
 

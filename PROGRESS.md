@@ -16,6 +16,13 @@
 
 - Áp khung brownfield Bước 0 → Lớp 1 (đợt này, nhánh `chore/ap-dung-khung-brownfield`).
 
+## Đợt audit toàn dự án (2026-07)
+
+- **Phân quyền:** bịt 3 route sửa tiến độ thiếu `CAN.editProgress` (`tasks/:id/progress`, `dimensions/:id`, `dimensions/batch` — vai trò chỉ-xem BCH/CĐT/Viewer trước đây sửa được tiến độ); `materials/:id/move` về đúng nhóm quyền Admin/PM/Kỹ sư; `purchase-requests` POST chặn vai trò chỉ-xem.
+- **Múi giờ:** thêm `daysFromTodayISO()` (lib/db) — mọi phép cộng/trừ ngày (báo cáo ngày/tuần, lookahead, forecast, notifications) đồng nhất UTC+7 với `todayISO()`, hết lệch 1 ngày lúc 0h–7h sáng; `changed_at::date` (S-curve, báo cáo tuần) ép rõ `AT TIME ZONE 'Asia/Ho_Chi_Minh'`.
+- **Validation:** PATCH `tasks/:id` + `tasks/batch` chỉ nhận status slug hợp lệ + ngày `YYYY-MM-DD` + tên không rỗng (422 thay vì 500/dữ liệu rác).
+- **Dependency:** override `uuid` ≥ 11.1.1 dưới `exceljs` (GHSA-w5hq-g745-h8pq) — `npm audit` về 0; export Excel verify vẫn hoạt động.
+
 ## Tiếp theo
 
 - ~~**Workflow audit tương phản màu (a11y) toàn UI**~~ → **đã xong** (`docs/a11y/contrast-audit.md` + `scripts/contrast-check.ts`). Đã tính tương phản WCAG cho `text-zinc-300/400/500/600` × nền `zinc-*` trên **cả 6 theme** + nút accent chữ trắng → rút **quy tắc thay thế đúng mọi theme** + **backlog remediation có thứ tự** (P1 global chrome → Dashboard → tracking → …). Phát hiện: ước tính cũ over-count (grep bắt cả icon hover/idle, code dev-only, accent đã đạt AA như `red-600`/`blue-600`) → nút accent FAIL thật chỉ ~10 (không phải ~43). Audit lại `/login`: còn 1 `text-zinc-500` nhưng nằm trong `NODE_ENV==='development'` → không render production, axe không bắt (đúng).

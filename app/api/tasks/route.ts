@@ -10,7 +10,8 @@ type Pkg = { id: number; code: string; seqNo: string | null; floorLabel: string 
 type Task = { id: number; packageId: number; code: string; name: string; status: string; endDate: string | null; progressPercent: number; boqCode: string | null; drawingUrl: string | null; assignedTo: number | null; assigneeName: string | null };
 
 // GET /api/tasks?sheet=ogtd  → work packages (kèm sub-tasks) của 1 sheet.
-// Sub-con chỉ thấy task được giao cho mình.
+// Mọi vai trò xem được cả lưới (subcon cần ngữ cảnh tầng/nhóm); quyền GHI
+// mới giới hạn theo task được giao (canTouchTask ở các route PATCH).
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
