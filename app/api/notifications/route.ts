@@ -16,41 +16,67 @@ export async function GET() {
   // Sub-con chỉ nhận thông báo cho task được giao.
   const isSubcon = user.role === "subcon";
   const subconFilter = isSubcon ? " AND t.assigned_to = ?" : "";
-  const delayed = await query<{ id: number; code: string; name: string; endDate: string; sheetType: string }>(
+  const delayed = await query<{
+    id: number;
+    code: string;
+    name: string;
+    endDate: string;
+    sheetType: string;
+  }>(
     `SELECT t.id, t.code, t.name, t.end_date AS "endDate", st.code AS "sheetType"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
       WHERE t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_percent < 1
         AND t.status NOT IN ('hoan_thanh','nghiem_thu')${subconFilter}`,
-    ...(isSubcon ? [today, user.id] : [today]));
+    ...(isSubcon ? [today, user.id] : [today]),
+  );
 
-  for (const t of delayed) {
+  if (delayed.length > 0) {
+    const values = delayed.map(() => `(?, ?, 'delayed', ?)`).join(", ");
+    const params = delayed.flatMap((t) => [
+      user.id,
+      t.id,
+      `[${t.sheetType}] ${t.code} — ${t.name} đã quá hạn ${t.endDate}`,
+    ]);
     await run(
-      `INSERT INTO notifications (user_id, task_id, type, message)
-       VALUES (?, ?, 'delayed', ?)
+      `INSERT INTO notifications (user_id, task_id, type, message) VALUES ${values}
        ON CONFLICT (user_id, task_id, type) DO NOTHING`,
-      user.id, t.id, `[${t.sheetType}] ${t.code} — ${t.name} đã quá hạn ${t.endDate}`);
+      ...params,
+    );
   }
 
   // Sắp đến hạn: deadline còn ≤3 ngày mà tiến độ < 70% → cảnh báo sớm trước khi thành trễ.
   const soon = daysFromTodayISO(3);
   const DUE_SOON_COND = `t.end_date IS NOT NULL AND t.end_date >= ? AND t.end_date <= ?
         AND t.progress_percent < 0.7 AND t.status NOT IN ('hoan_thanh','nghiem_thu')`;
-  const dueSoon = await query<{ id: number; code: string; name: string; endDate: string; sheetType: string }>(
+  const dueSoon = await query<{
+    id: number;
+    code: string;
+    name: string;
+    endDate: string;
+    sheetType: string;
+  }>(
     `SELECT t.id, t.code, t.name, t.end_date AS "endDate", st.code AS "sheetType"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
       WHERE ${DUE_SOON_COND}${subconFilter}`,
-    ...(isSubcon ? [today, soon, user.id] : [today, soon]));
+    ...(isSubcon ? [today, soon, user.id] : [today, soon]),
+  );
 
-  for (const t of dueSoon) {
+  if (dueSoon.length > 0) {
+    const values = dueSoon.map(() => `(?, ?, 'due_soon', ?)`).join(", ");
+    const params = dueSoon.flatMap((t) => [
+      user.id,
+      t.id,
+      `⏳ [${t.sheetType}] ${t.code} — ${t.name} sắp đến hạn ${t.endDate} (tiến độ < 70%)`,
+    ]);
     await run(
-      `INSERT INTO notifications (user_id, task_id, type, message)
-       VALUES (?, ?, 'due_soon', ?)
+      `INSERT INTO notifications (user_id, task_id, type, message) VALUES ${values}
        ON CONFLICT (user_id, task_id, type) DO NOTHING`,
-      user.id, t.id, `⏳ [${t.sheetType}] ${t.code} — ${t.name} sắp đến hạn ${t.endDate} (tiến độ < 70%)`);
+      ...params,
+    );
   }
 
   // Task hết trễ (hoặc không còn được giao cho mình) → dọn thông báo cũ chưa đọc.
@@ -61,7 +87,8 @@ export async function GET() {
           SELECT t.id FROM tasks t
            WHERE t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_percent < 1
              AND t.status NOT IN ('hoan_thanh','nghiem_thu')${subconFilter})`,
-    ...(isSubcon ? [user.id, today, user.id] : [user.id, today]));
+    ...(isSubcon ? [user.id, today, user.id] : [user.id, today]),
+  );
 
   // Task không còn "sắp đến hạn" (đã xong, đã qua hạn thành trễ, hoặc đổi deadline) → dọn tương tự.
   await run(
@@ -69,7 +96,8 @@ export async function GET() {
       WHERE user_id = ? AND type = 'due_soon' AND is_read = 0
         AND task_id NOT IN (
           SELECT t.id FROM tasks t WHERE ${DUE_SOON_COND}${subconFilter})`,
-    ...(isSubcon ? [user.id, today, soon, user.id] : [user.id, today, soon]));
+    ...(isSubcon ? [user.id, today, soon, user.id] : [user.id, today, soon]),
+  );
 
   // Task đình trệ: đang thi công, chưa xong, còn hạn (end_date ≥ hôm nay) nhưng KHÔNG có
   // cập nhật tiến độ nào trong 7 ngày → nhắc người liên quan cập nhật. Khác "trễ" (đã quá hạn).
@@ -83,14 +111,21 @@ export async function GET() {
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
       WHERE ${STALLED_COND}${subconFilter}`,
-    ...(isSubcon ? [today, user.id] : [today]));
+    ...(isSubcon ? [today, user.id] : [today]),
+  );
 
-  for (const t of stalled) {
+  if (stalled.length > 0) {
+    const values = stalled.map(() => `(?, ?, 'stalled', ?)`).join(", ");
+    const params = stalled.flatMap((t) => [
+      user.id,
+      t.id,
+      `🕒 [${t.sheetType}] ${t.code} — ${t.name} chưa cập nhật tiến độ 7 ngày, hãy kiểm tra`,
+    ]);
     await run(
-      `INSERT INTO notifications (user_id, task_id, type, message)
-       VALUES (?, ?, 'stalled', ?)
+      `INSERT INTO notifications (user_id, task_id, type, message) VALUES ${values}
        ON CONFLICT (user_id, task_id, type) DO NOTHING`,
-      user.id, t.id, `🕒 [${t.sheetType}] ${t.code} — ${t.name} chưa cập nhật tiến độ 7 ngày, hãy kiểm tra`);
+      ...params,
+    );
   }
 
   // Hết đình trệ (đã cập nhật, đã xong, hoặc đã thành trễ) → dọn thông báo chưa đọc.
@@ -99,23 +134,37 @@ export async function GET() {
       WHERE user_id = ? AND type = 'stalled' AND is_read = 0
         AND task_id NOT IN (
           SELECT t.id FROM tasks t WHERE ${STALLED_COND}${subconFilter})`,
-    ...(isSubcon ? [user.id, today, user.id] : [user.id, today]));
+    ...(isSubcon ? [user.id, today, user.id] : [user.id, today]),
+  );
 
   // Vật tư dùng vượt định mức → cảnh báo cho Admin/PM/Kỹ sư (subcon không quản vật tư).
   if (user.role !== "subcon") {
-    const overMats = await query<{ id: number; name: string; unit: string | null; qtyPlanned: number; qtyUsed: number; sheetCode: string | null }>(
+    const overMats = await query<{
+      id: number;
+      name: string;
+      unit: string | null;
+      qtyPlanned: number;
+      qtyUsed: number;
+      sheetCode: string | null;
+    }>(
       `SELECT m.id, m.name, m.unit, m.qty_planned AS "qtyPlanned", m.qty_used AS "qtyUsed", st.code AS "sheetCode"
          FROM materials m
          LEFT JOIN sheet_types st ON m.sheet_type_id = st.id
-        WHERE m.qty_planned > 0 AND m.qty_used > m.qty_planned`);
+        WHERE m.qty_planned > 0 AND m.qty_used > m.qty_planned`,
+    );
 
-    for (const m of overMats) {
+    if (overMats.length > 0) {
+      const values = overMats.map(() => `(?, ?, 'material_over', ?)`).join(", ");
+      const params = overMats.flatMap((m) => [
+        user.id,
+        m.id,
+        `📦 Vật tư "${m.name}"${m.sheetCode ? ` [${m.sheetCode}]` : ""} vượt định mức: ${m.qtyUsed}/${m.qtyPlanned}${m.unit ? ` ${m.unit}` : ""}`,
+      ]);
       await run(
-        `INSERT INTO notifications (user_id, material_id, type, message)
-         VALUES (?, ?, 'material_over', ?)
+        `INSERT INTO notifications (user_id, material_id, type, message) VALUES ${values}
          ON CONFLICT (user_id, material_id, type) WHERE material_id IS NOT NULL DO NOTHING`,
-        user.id, m.id,
-        `📦 Vật tư "${m.name}"${m.sheetCode ? ` [${m.sheetCode}]` : ""} vượt định mức: ${m.qtyUsed}/${m.qtyPlanned}${m.unit ? ` ${m.unit}` : ""}`);
+        ...params,
+      );
     }
 
     // Đã điều chỉnh định mức/số dùng về ngưỡng an toàn (hoặc vật tư bị xoá) → dọn cảnh báo chưa đọc.
@@ -124,15 +173,23 @@ export async function GET() {
         WHERE user_id = ? AND type = 'material_over' AND is_read = 0
           AND material_id NOT IN (
             SELECT id FROM materials WHERE qty_planned > 0 AND qty_used > qty_planned)`,
-      user.id);
+      user.id,
+    );
   }
 
   const items = await query<{
-    id: number; taskId: number | null; type: string; message: string; isRead: number; createdAt: string;
+    id: number;
+    taskId: number | null;
+    type: string;
+    message: string;
+    isRead: number;
+    createdAt: string;
   }>(
     `SELECT id, task_id AS "taskId", type, message, is_read AS "isRead", created_at AS "createdAt"
        FROM notifications WHERE user_id = ?
-      ORDER BY is_read ASC, created_at DESC, id DESC LIMIT 50`, user.id);
+      ORDER BY is_read ASC, created_at DESC, id DESC LIMIT 50`,
+    user.id,
+  );
 
   const unread = items.filter((n) => !n.isRead).length;
   return NextResponse.json({ notifications: items, unread });

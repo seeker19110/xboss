@@ -70,7 +70,11 @@ function parseToken(token: string): { uid: number; pwFrag: string } | null {
   const [uid, exp, pwFrag, mac] = parts;
   const expected = Buffer.from(sign(`${uid}.${exp}.${pwFrag}`), "hex");
   let given: Buffer;
-  try { given = Buffer.from(mac, "hex"); } catch { return null; }
+  try {
+    given = Buffer.from(mac, "hex");
+  } catch {
+    return null;
+  }
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
   if (Number(exp) < Date.now()) return null;
   return { uid: Number(uid), pwFrag };
@@ -83,7 +87,9 @@ export async function getCurrentUser(): Promise<User | null> {
   const parsed = parseToken(token);
   if (!parsed) return null;
   const u = await queryOne<User & { password_hash: string }>(
-    `SELECT id, name, email, role, password_hash FROM users WHERE id = ?`, parsed.uid);
+    `SELECT id, name, email, role, password_hash FROM users WHERE id = ?`,
+    parsed.uid,
+  );
   if (!u) return null;
   // Fragment không khớp → mật khẩu đã đổi, phiên cũ không còn hợp lệ.
   if (!u.password_hash.startsWith(parsed.pwFrag)) return null;
@@ -100,27 +106,48 @@ const DEFAULTS: { name: string; email: string; pw: string; role: Role }[] = [
   { name: "Kỹ sư", email: "engineer@xboss.vn", pw: "eng123", role: "engineer" },
   { name: "Thầu phụ", email: "subcon@xboss.vn", pw: "sub123", role: "subcon" },
 ];
+// Đã xác nhận DB có user trong process này → khỏi query lại (hàm được gọi trên mọi
+// request /api/auth/me, nhưng chỉ cần thật sự kiểm tra DB 1 lần lúc boot).
+let defaultUsersEnsured = false;
 export async function ensureDefaultUsers(): Promise<void> {
+  if (defaultUsersEnsured) return;
   const c = await queryOne<{ n: number }>(`SELECT COUNT(*) AS n FROM users`);
-  if (c && Number(c.n) > 0) return;
+  if (c && Number(c.n) > 0) {
+    defaultUsersEnsured = true;
+    return;
+  }
 
   // Production: không seed 4 tài khoản mật khẩu yếu — chỉ tạo admin
   // với mật khẩu lấy từ XBOSS_ADMIN_PASSWORD (đặt trước khi deploy lần đầu).
   if (process.env.NODE_ENV === "production") {
     const pw = process.env.XBOSS_ADMIN_PASSWORD;
     if (!pw) {
-      console.warn("[xboss] DB chưa có user và XBOSS_ADMIN_PASSWORD chưa đặt — bỏ qua seed (không tạo tài khoản mặc định trong production).");
+      console.warn(
+        "[xboss] DB chưa có user và XBOSS_ADMIN_PASSWORD chưa đặt — bỏ qua seed (không tạo tài khoản mặc định trong production).",
+      );
       return;
     }
-    await run(`INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?) ON CONFLICT (email) DO NOTHING`,
-      "Quản trị", "admin@xboss.vn", hashPassword(pw), "admin");
+    await run(
+      `INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?) ON CONFLICT (email) DO NOTHING`,
+      "Quản trị",
+      "admin@xboss.vn",
+      hashPassword(pw),
+      "admin",
+    );
+    defaultUsersEnsured = true;
     return;
   }
 
   for (const u of DEFAULTS) {
-    await run(`INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?) ON CONFLICT (email) DO NOTHING`,
-      u.name, u.email, hashPassword(u.pw), u.role);
+    await run(
+      `INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?) ON CONFLICT (email) DO NOTHING`,
+      u.name,
+      u.email,
+      hashPassword(u.pw),
+      u.role,
+    );
   }
+  defaultUsersEnsured = true;
 }
 
 // Quyền theo vai trò (rút gọn từ §8 spec).
@@ -139,6 +166,8 @@ export const CAN = {
 export async function canTouchTask(user: User, taskId: number): Promise<boolean> {
   if (user.role !== "subcon") return true;
   const t = await queryOne<{ assigned_to: number | null }>(
-    `SELECT assigned_to FROM tasks WHERE id = ?`, taskId);
+    `SELECT assigned_to FROM tasks WHERE id = ?`,
+    taskId,
+  );
   return t?.assigned_to === user.id;
 }
