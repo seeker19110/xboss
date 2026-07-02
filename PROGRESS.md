@@ -46,16 +46,12 @@
 
 ## Nợ kỹ thuật (chỗ "làm tạm" cần quay lại)
 
-- **Rate-limit in-memory** (`lib/ratelimit.ts`) đếm theo process → sai khi multi-instance; cần chuyển DB/Redis.
+- ~~**Rate-limit in-memory**~~ → **đã có** (đợt audit 2026-07): chuyển từ Map trong process sang bảng Postgres `login_rate_limits` (`migrations/0002_login_rate_limit.sql`), đúng khi chạy nhiều instance — upsert atomic qua `ON CONFLICT`, không còn race đọc-rồi-ghi.
 - ~~**Không có hệ migrate**~~ → **đã có** (ADR-0003): hệ migrate SQL nhẹ `migrations/*.sql` đánh số + `schema_migrations` + runner `lib/db/migrate.ts` (tự áp lúc boot / `npm run db:migrate`). Baseline = `0001_baseline.sql`. Đổi schema từ nay = thêm file mới (append-only). **Còn lại:** `docs/ERD.md` vẫn cập nhật tay.
-- **Nợ a11y tương phản màu (HỆ THỐNG, đang dọn dần) — đã có audit + backlog: `docs/a11y/contrast-audit.md`:**
-  - ~~`/login` + footer toàn cục (3 lỗi serious)~~ → **đã sửa & verify bằng axe**: `/login` (subtitle zinc-500→zinc-400, nút emerald-600→emerald-700) + footer layout (zinc-600/500→zinc-400/200). **Rule `color-contrast` đã bật lại** trong `e2e/login.spec.ts` → giờ là cổng cứng (E2E sẽ đỏ nếu tái phạm).
-  - ~~Audit toàn UI~~ → **xong**: bảng tương phản tính được (6 theme) + quy tắc (`zinc-600`/`zinc-500` body-text luôn fail → `zinc-400`; `zinc-400` fail trên nền `zinc-700` → `zinc-300`; nút accent chữ trắng → `-700`) + **backlog có thứ tự** (audit §4). Tái lập bằng `npx tsx scripts/contrast-check.ts`.
-  - ~~Hạ tầng E2E sau-auth (Bước 0)~~ → **xong** (xem mục "Tiếp theo"). ~~Dashboard `/` + `AppHeader`~~ → **đã remediate & verify bằng axe** (desktop + mobile).
-  - ~~tracking grid~~ → **đã remediate & verify bằng axe** (desktop + mobile).
-  - **Còn lại (app-wide):** payments, my-tasks, materials… (đã trừ Dashboard/AppHeader/tracking) — ứng viên `text-zinc-500/600` còn lại + nút accent FAIL. Dọn dần **theo từng trang** qua axe E2E (axe là ground-truth) — không big-bang. Quy trình: audit §5 Bước 1..n.
-  - Sau khi phủ axe thêm trang: siết assertion Lighthouse a11y từ `warn` lên `error`.
-- **Observability (Sentry)** chưa có (cần DSN) — Lớp 2 còn lại.
+- **Nợ a11y tương phản màu (HỆ THỐNG) — đã có audit + backlog: `docs/a11y/contrast-audit.md`:**
+  - ~~`/login` + footer toàn cục~~, ~~Dashboard `/` + `AppHeader`~~, ~~tracking grid~~, ~~payments~~, ~~my-tasks~~, ~~materials~~ → **tất cả đã remediate & verify bằng axe** (`e2e/authed/*.spec.ts`, desktop + mobile) — hết trang trong backlog §4 (PR #48/#49 đã đóng nốt payments/my-tasks/materials; doc này trước đó chưa cập nhật theo).
+  - Còn lại: siết assertion Lighthouse a11y (`lighthouserc.json`, hiện chỉ đo `/login`) từ `warn` lên `error` — cân nhắc riêng vì ảnh hưởng gate CI toàn cục.
+- **Observability (Sentry)** chưa có — cần `SENTRY_DSN` (secret) từ người vận hành trước khi wiring được, không tự thêm được trong đợt audit này.
 - ~~`grid.test.ts` không nằm trong lệnh `npm test`~~ → đã thêm đợt này.
 - ~~CI dùng Node 20 trong khi `.nvmrc` = 22~~ → đã đồng bộ về 22 đợt này.
 - CLAUDE.md từng ghi `.eslintrc.json` (next/core-web-vitals) — thực tế đã là `eslint.config.mjs` flat config; cần sửa mô tả khi đụng tới.
