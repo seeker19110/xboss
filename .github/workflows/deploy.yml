@@ -1,0 +1,25 @@
+name: Deploy to VPS
+
+# Chỉ deploy SAU KHI workflow CI chạy xong và PASS trên main — tránh deploy
+# code chưa qua lint/typecheck/test/build.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            cd /var/www/xboss
+            bash deploy.sh
