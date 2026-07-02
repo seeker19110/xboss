@@ -15,30 +15,40 @@ function clientIp(req: NextRequest): string {
 export async function POST(req: NextRequest) {
   await ensureDefaultUsers();
   const { email, password } = await req.json().catch(() => ({}));
-  if (!email || !password) return NextResponse.json({ error: "Thiếu email/mật khẩu" }, { status: 400 });
+  if (!email || !password)
+    return NextResponse.json({ error: "Thiếu email/mật khẩu" }, { status: 400 });
 
   const emailNorm = String(email).toLowerCase().trim();
   const ip = clientIp(req);
 
   // Chống brute-force: 5 lần sai/15 phút theo IP+email (20/IP).
-  const wait = loginBlockedSeconds(ip, emailNorm);
+  const wait = await loginBlockedSeconds(ip, emailNorm);
   if (wait > 0) {
     return NextResponse.json(
       { error: `Sai mật khẩu quá nhiều lần — thử lại sau ${Math.ceil(wait / 60)} phút` },
-      { status: 429, headers: { "Retry-After": String(wait) } });
+      { status: 429, headers: { "Retry-After": String(wait) } },
+    );
   }
 
-  const u = await queryOne<{ id: number; name: string; email: string; role: string; password_hash: string }>(
-    `SELECT id, name, email, role, password_hash FROM users WHERE email = ?`, emailNorm);
+  const u = await queryOne<{
+    id: number;
+    name: string;
+    email: string;
+    role: string;
+    password_hash: string;
+  }>(`SELECT id, name, email, role, password_hash FROM users WHERE email = ?`, emailNorm);
   if (!u || !verifyPassword(password, u.password_hash)) {
-    recordLoginFailure(ip, emailNorm);
+    await recordLoginFailure(ip, emailNorm);
     return NextResponse.json({ error: "Email hoặc mật khẩu không đúng" }, { status: 401 });
   }
 
-  recordLoginSuccess(ip, emailNorm);
+  await recordLoginSuccess(ip, emailNorm);
   const res = NextResponse.json({ user: { id: u.id, name: u.name, email: u.email, role: u.role } });
   res.cookies.set(COOKIE, makeToken(u.id, u.password_hash), {
-    httpOnly: true, path: "/", maxAge: COOKIE_MAX_AGE, sameSite: "lax",
+    httpOnly: true,
+    path: "/",
+    maxAge: COOKIE_MAX_AGE,
+    sameSite: "lax",
     secure: process.env.NODE_ENV === "production", // dev qua HTTP vẫn set được
   });
   return res;
