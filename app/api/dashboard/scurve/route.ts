@@ -49,7 +49,8 @@ export async function GET(req: NextRequest) {
 
   const hist = await query<HistRow>(
     `SELECT h.task_id AS "taskId", h.old_progress AS "oldProgress",
-            h.new_progress AS "newProgress", h.changed_at::date::text AS day
+            h.new_progress AS "newProgress",
+            (h.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date::text AS day
        FROM task_history h
        JOIN tasks t ON h.task_id = t.id
        JOIN work_packages wp ON t.package_id = wp.id

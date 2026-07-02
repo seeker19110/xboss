@@ -1,5 +1,5 @@
 // Tổng hợp báo cáo trễ hạn hằng ngày (dùng cho email cron + xem trước).
-import { query, queryOne, todayISO } from "@/lib/db";
+import { query, queryOne, todayISO, daysFromTodayISO } from "@/lib/db";
 import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
 
 export type DelayedRow = {
@@ -22,7 +22,7 @@ const DELAY_COND = `t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_per
 
 export async function buildDailyReport(): Promise<DailyReport> {
   const today = todayISO();
-  const yesterday = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
+  const yesterday = daysFromTodayISO(-1);
 
   const select = `SELECT t.code, t.name, t.status, t.end_date AS "endDate",
             t.progress_percent AS "progressPercent",
@@ -38,7 +38,7 @@ export async function buildDailyReport(): Promise<DailyReport> {
   const topDelayed = all.slice(0, 15);
 
   // Sắp đến hạn (≤3 ngày, tiến độ < 70%) — cảnh báo sớm để còn kịp xử lý.
-  const soon = new Date(Date.now() + 3 * 86400_000).toISOString().slice(0, 10);
+  const soon = daysFromTodayISO(3);
   const dueSoon = await query<DelayedRow>(
     `${select} WHERE t.end_date IS NOT NULL AND t.end_date >= ? AND t.end_date <= ?
         AND t.progress_percent < 0.7 AND t.status NOT IN ('hoan_thanh','nghiem_thu')
@@ -47,7 +47,7 @@ export async function buildDailyReport(): Promise<DailyReport> {
   const kpi = await query<KpiRow>(
     `SELECT st.code AS "sheetType", COUNT(t.id) AS total,
             COALESCE(AVG(t.progress_percent), 0) AS "avgProgress",
-            COALESCE(SUM(CASE WHEN ${DELAY_COND.replace(/t\./g, "t.")} THEN 1 ELSE 0 END), 0) AS delayed
+            COALESCE(SUM(CASE WHEN ${DELAY_COND} THEN 1 ELSE 0 END), 0) AS delayed
        FROM sheet_types st
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
@@ -82,7 +82,7 @@ export type WeeklyReport = {
 
 export async function buildWeeklyReport(): Promise<WeeklyReport> {
   const today = todayISO();
-  const weekFrom = new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10);
+  const weekFrom = daysFromTodayISO(-7);
 
   type TaskRow = { id: number; progress: number; sheetType: string };
   const tasks = await query<TaskRow>(
@@ -97,7 +97,8 @@ export async function buildWeeklyReport(): Promise<WeeklyReport> {
   type HistRow = { taskId: number; oldProgress: number | null; newProgress: number | null; day: string };
   const hist = await query<HistRow>(
     `SELECT task_id AS "taskId", old_progress AS "oldProgress",
-            new_progress AS "newProgress", changed_at::date::text AS day
+            new_progress AS "newProgress",
+            (changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date::text AS day
        FROM task_history ORDER BY task_id, changed_at`);
 
   const prevProgress = new Map<number, number>();
@@ -123,14 +124,14 @@ export async function buildWeeklyReport(): Promise<WeeklyReport> {
   // Đạt 100% trong tuần: sự kiện history đầu tiên chạm new_progress >= 1 nằm trong 7 ngày qua.
   const completed = await query<CompletedRow>(
     `SELECT t.code, t.name, st.code AS "sheetType", wp.floor_label AS "floorLabel",
-            MIN(h.changed_at::date)::text AS day
+            MIN((h.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)::text AS day
        FROM task_history h
        JOIN tasks t ON h.task_id = t.id
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
       WHERE h.new_progress >= 1 AND t.progress_percent >= 1
       GROUP BY t.id, t.code, t.name, st.code, wp.floor_label
-     HAVING MIN(h.changed_at::date)::text > ?
+     HAVING MIN((h.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)::text > ?
       ORDER BY day DESC LIMIT 30`, weekFrom);
 
   // KPI theo sheet: % trung bình hiện tại vs 7 ngày trước + số trễ.

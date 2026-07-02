@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, todayISO } from "@/lib/db";
+import { query, todayISO, daysFromTodayISO } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 
   const days = Math.min(60, Math.max(1, parseInt(req.nextUrl.searchParams.get("days") ?? "14") || 14));
   const today = todayISO();
-  const until = new Date(Date.now() + days * 86400_000).toISOString().slice(0, 10);
+  const until = daysFromTodayISO(days);
 
   const select = `SELECT t.id, t.code, t.name, t.status,
             t.start_date AS "startDate", t.end_date AS "endDate",
