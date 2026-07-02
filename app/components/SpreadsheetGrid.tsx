@@ -6,12 +6,11 @@
 // Tính năng: điều hướng bàn phím, chọn vùng (shift+click/drag/mũi tên),
 // copy/paste/cut TSV, fill-down (Ctrl+D), xoá, select all (Ctrl+A),
 // context menu (right-click), sort by column, search/replace (Ctrl+F/H),
-// resize columns (drag header), auto-fit (double-click header),
 // export CSV (Ctrl+S), keyboard shortcuts guide (Ctrl+?).
 // Theme: chỉ dùng token Tailwind (zinc + nhấn -400), không hex, không `dark:`
 // để giữ cơ chế đảo màu sáng/tối trong globals.css.
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, ChevronUp, ChevronDown, ListFilter, EyeOff, GripVertical } from "lucide-react";
+import { Loader2, ChevronUp, ChevronDown, ListFilter } from "lucide-react";
 import { serializeTSV, parseTSV, normalizeRect, spreadPaste, type Rect } from "@/lib/grid";
 
 export type GridColumn<Row> = {
@@ -83,13 +82,11 @@ export default function SpreadsheetGrid<Row>({
     cut: boolean;
   } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
-  const [colWidths, setColWidths] = useState<Record<number, number>>({});
   const [sortBy, setSortBy] = useState<{ col: number; asc: boolean } | null>(null);
   const [search, setSearch] = useState("");
   const [replace, setReplace] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
-  const [resizingCol, setResizingCol] = useState<number | null>(null);
   const [freezeCols, setFreezeCols] = useState(stickyCols); // số cột đóng băng (chỉnh được)
   const [colFilters, setColFilters] = useState<Record<number, Set<string>>>({}); // filter per-cột (AutoFilter)
   const [filterMenu, setFilterMenu] = useState<number | null>(null); // cột đang mở dropdown filter
@@ -104,13 +101,10 @@ export default function SpreadsheetGrid<Row>({
     { rowKey: number | string; c: number; oldRaw: string; newRaw: string }[][]
   >([]);
   const [pinned, setPinned] = useState<Set<string>>(new Set()); // rowKey các dòng được ghim
-  const [hiddenCols, setHiddenCols] = useState<Set<number>>(new Set()); // chỉ số cột bị ẩn nhanh
   const [wrap, setWrap] = useState(true); // xuống dòng (wrap text) trong ô
   const [extraRects, setExtraRects] = useState<Rect[]>([]); // các vùng chọn rời (Ctrl/Cmd+click)
   const gridRef = useRef<HTMLDivElement>(null);
   const filterMenuRef = useRef<HTMLDivElement>(null);
-  // Mốc đầu khi kéo chỉnh rộng cột (resize theo delta → grip nằm đâu cũng đúng).
-  const resizeStart = useRef<{ startX: number; startW: number } | null>(null);
   // Dán còn dở: chờ parent thêm đủ dòng (qua onAddRow) rồi mới điền nốt.
   const pendingPaste = useRef<{ matrix: string[][]; r: number; c: number } | null>(null);
   const editRef = useRef<HTMLInputElement | HTMLSelectElement>(null);
@@ -513,31 +507,7 @@ export default function SpreadsheetGrid<Row>({
     }
   };
 
-  useEffect(() => {
-    function handleMouseMove(e: MouseEvent) {
-      if (resizingCol === null || !resizeStart.current) return;
-      const { startX, startW } = resizeStart.current;
-      const newW = Math.max(60, startW + (e.clientX - startX));
-      setColWidths((prev) => ({ ...prev, [resizingCol]: newW }));
-    }
-    function handleMouseUp() {
-      setResizingCol(null);
-      resizeStart.current = null;
-    }
-    if (resizingCol !== null) {
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
-      return () => {
-        document.removeEventListener("mousemove", handleMouseMove);
-        document.removeEventListener("mouseup", handleMouseUp);
-      };
-    }
-  }, [resizingCol]);
-
-  const colWidth = useCallback(
-    (c: number) => colWidths[c] ?? columns[c]?.width ?? 120,
-    [colWidths, columns],
-  );
+  const colWidth = useCallback((c: number) => columns[c]?.width ?? 120, [columns]);
 
   const sortedAndFiltered = useMemo(() => {
     let result = rows;
@@ -653,12 +623,12 @@ export default function SpreadsheetGrid<Row>({
     URL.revokeObjectURL(url);
   }, [columns, sortedAndFiltered]);
 
-  // Xuất Excel đúng những gì đang thấy: cột hiển thị (bỏ cột ẩn), thứ tự sau
-  // sort/filter, freeze + AutoFilter. Màu: dò token Tailwind trong cellClass
-  // (rose/red→đỏ, emerald/green→xanh, amber→vàng, sky/blue→xanh dương) — best-effort.
+  // Xuất Excel đúng những gì đang thấy: thứ tự sau sort/filter, freeze + AutoFilter.
+  // Màu: dò token Tailwind trong cellClass (rose/red→đỏ, emerald/green→xanh,
+  // amber→vàng, sky/blue→xanh dương) — best-effort.
   const exportXLSX = useCallback(async () => {
     const ExcelJS = (await import("exceljs")).default;
-    const cols = columns.filter((_, c) => !hiddenCols.has(c));
+    const cols = columns;
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("Bảng tính");
     ws.columns = cols.map((c) => ({ width: Math.min(Math.max((c.width ?? 120) / 7, 8), 50) }));
@@ -704,29 +674,18 @@ export default function SpreadsheetGrid<Row>({
     a.download = `bang-tinh-${new Date().toISOString().split("T")[0]}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [columns, hiddenCols, sortedAndFiltered, freezeCols]);
+  }, [columns, sortedAndFiltered, freezeCols]);
 
-  const autoFitColumn = useCallback(
-    (c: number) => {
-      let maxLen = columns[c]?.label.length ?? 0;
-      for (const row of rows) {
-        const len = String(columns[c]?.get(row) ?? "").length;
-        if (len > maxLen) maxLen = len;
-      }
-      setColWidths((prev) => ({ ...prev, [c]: Math.min(maxLen * 8 + 16, 400) }));
-    },
-    [columns, rows],
-  );
   // Vị trí trái (px) cho các cột dính — cộng dồn bề rộng các cột dính trước nó.
   const leftOffsets = useMemo(() => {
     const out: number[] = [];
     let acc = 0;
     for (let c = 0; c < columns.length; c++) {
       out.push(acc);
-      if (c < freezeCols) acc += colWidths[c] ?? columns[c]?.width ?? 120;
+      if (c < freezeCols) acc += columns[c]?.width ?? 120;
     }
     return out;
-  }, [columns, freezeCols, colWidths]);
+  }, [columns, freezeCols]);
 
   // Đóng dropdown filter khi click ra ngoài.
   useEffect(() => {
@@ -772,15 +731,6 @@ export default function SpreadsheetGrid<Row>({
               >
                 ↕️ Wrap
               </button>
-              {hiddenCols.size > 0 && (
-                <button
-                  onClick={() => setHiddenCols(new Set())}
-                  className="text-amber-400 hover:text-amber-300"
-                  title="Hiện lại các cột đã ẩn"
-                >
-                  👁 {hiddenCols.size} cột ẩn
-                </button>
-              )}
               <button
                 onClick={() => setShowShortcuts(!showShortcuts)}
                 className="hover:text-zinc-300"
@@ -935,97 +885,65 @@ export default function SpreadsheetGrid<Row>({
         >
           <thead className="sticky top-0 z-20" role="rowgroup">
             <tr role="row">
-              {columns.map((col, c) =>
-                hiddenCols.has(c) ? null : (
-                  <th
-                    key={col.key}
-                    role="columnheader"
-                    className={`bg-zinc-100 text-zinc-700 font-medium border-b border-r border-zinc-300 px-1.5 py-1.5 text-center relative ${c < freezeCols ? "sticky z-30" : ""}`}
-                    style={{
-                      width: colWidth(c),
-                      minWidth: colWidth(c),
-                      left: c < freezeCols ? leftOffsets[c] : undefined,
-                    }}
-                  >
-                    {/* Hàng trên cùng: nhãn + mọi công cụ theo cột (sắp xếp, lọc, ẩn,
-                      chỉnh rộng) căn giữa và luôn hiển thị. */}
-                    <div className="flex items-center justify-center gap-1">
-                      <button
-                        onClick={() =>
-                          setSortBy(
-                            sortBy?.col === c && sortBy.asc
-                              ? { col: c, asc: false }
-                              : { col: c, asc: true },
-                          )
-                        }
-                        className="inline-flex items-center gap-0.5 min-w-0 hover:text-sky-600"
-                        title="Bấm để sắp xếp"
-                      >
-                        <span className="truncate">{col.label}</span>
-                        {sortBy?.col === c &&
-                          (sortBy.asc ? (
-                            <ChevronUp size={12} className="shrink-0" />
-                          ) : (
-                            <ChevronDown size={12} className="shrink-0" />
-                          ))}
-                      </button>
-                      {/* Lọc theo cột (AutoFilter) */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setFilterMenu(filterMenu === c ? null : c);
-                        }}
-                        className={`shrink-0 ${colFilters[c]?.size ? "text-sky-600" : "text-zinc-500 hover:text-zinc-800"}`}
-                        title="Lọc theo cột"
-                        aria-label={`Lọc cột ${col.label}`}
-                      >
-                        <ListFilter size={12} />
-                      </button>
-                      {/* Ẩn cột này */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setHiddenCols((prev) => new Set(prev).add(c));
-                        }}
-                        className="shrink-0 text-zinc-500 hover:text-rose-600"
-                        title="Ẩn cột này"
-                        aria-label={`Ẩn cột ${col.label}`}
-                      >
-                        <EyeOff size={12} />
-                      </button>
-                      {/* Chỉnh chiều rộng cột: kéo để resize, double-click để auto-fit */}
-                      <span
-                        role="separator"
-                        aria-orientation="vertical"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          resizeStart.current = { startX: e.clientX, startW: colWidth(c) };
-                          setResizingCol(c);
-                        }}
-                        onDoubleClick={() => autoFitColumn(c)}
-                        className="shrink-0 cursor-col-resize text-zinc-500 hover:text-sky-600"
-                        title="Kéo để chỉnh chiều rộng, double-click để auto-fit"
-                        aria-label={`Chỉnh chiều rộng cột ${col.label}`}
-                      >
-                        <GripVertical size={12} />
-                      </span>
-                    </div>
-                    {filterMenu === c && (
-                      <ColumnFilter
-                        ref={filterMenuRef}
-                        values={distinctValues(c)}
-                        selected={colFilters[c] ?? new Set()}
-                        onApply={(set) => {
-                          setColFilters((prev) => ({ ...prev, [c]: set }));
-                          setFilterMenu(null);
-                        }}
-                        onClose={() => setFilterMenu(null)}
-                      />
-                    )}
-                  </th>
-                ),
-              )}
+              {columns.map((col, c) => (
+                <th
+                  key={col.key}
+                  role="columnheader"
+                  className={`bg-zinc-100 text-zinc-700 font-medium border-b border-r border-zinc-300 px-1.5 py-1.5 text-center relative ${c < freezeCols ? "sticky z-30" : ""}`}
+                  style={{
+                    width: colWidth(c),
+                    minWidth: colWidth(c),
+                    left: c < freezeCols ? leftOffsets[c] : undefined,
+                  }}
+                >
+                  {/* Hàng trên cùng: nhãn + công cụ theo cột (sắp xếp, lọc) căn giữa. */}
+                  <div className="flex items-center justify-center gap-1">
+                    <button
+                      onClick={() =>
+                        setSortBy(
+                          sortBy?.col === c && sortBy.asc
+                            ? { col: c, asc: false }
+                            : { col: c, asc: true },
+                        )
+                      }
+                      className="inline-flex items-center gap-0.5 min-w-0 hover:text-sky-600"
+                      title="Bấm để sắp xếp"
+                    >
+                      <span className="truncate">{col.label}</span>
+                      {sortBy?.col === c &&
+                        (sortBy.asc ? (
+                          <ChevronUp size={12} className="shrink-0" />
+                        ) : (
+                          <ChevronDown size={12} className="shrink-0" />
+                        ))}
+                    </button>
+                    {/* Lọc theo cột (AutoFilter) */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFilterMenu(filterMenu === c ? null : c);
+                      }}
+                      className={`shrink-0 ${colFilters[c]?.size ? "text-sky-600" : "text-zinc-500 hover:text-zinc-800"}`}
+                      title="Lọc theo cột"
+                      aria-label={`Lọc cột ${col.label}`}
+                    >
+                      <ListFilter size={12} />
+                    </button>
+                  </div>
+                  {filterMenu === c && (
+                    <ColumnFilter
+                      ref={filterMenuRef}
+                      values={distinctValues(c)}
+                      selected={colFilters[c] ?? new Set()}
+                      onApply={(set) => {
+                        setColFilters((prev) => ({ ...prev, [c]: set }));
+                        setFilterMenu(null);
+                      }}
+                      onClose={() => setFilterMenu(null)}
+                    />
+                  )}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody role="rowgroup">
@@ -1035,7 +953,6 @@ export default function SpreadsheetGrid<Row>({
               return (
                 <tr key={rowKey(row)} role="row">
                   {columns.map((col, c) => {
-                    if (hiddenCols.has(c)) return null;
                     const k = keyOf(r, c);
                     const isActive = active.r === r && active.c === c;
                     const selected = inRect(r, c);
@@ -1104,16 +1021,15 @@ export default function SpreadsheetGrid<Row>({
                         }}
                         title={err ?? undefined}
                       >
-                        {/* Đánh dấu dòng ghim ở ô đầu tiên hiển thị */}
-                        {isPinned &&
-                          c === [...Array(nCols).keys()].find((i) => !hiddenCols.has(i)) && (
-                            <span
-                              className="absolute left-0.5 top-1/2 -translate-y-1/2 text-amber-400 text-2xl"
-                              aria-label="Dòng ghim"
-                            >
-                              📌
-                            </span>
-                          )}
+                        {/* Đánh dấu dòng ghim ở ô đầu tiên */}
+                        {isPinned && c === 0 && (
+                          <span
+                            className="absolute left-0.5 top-1/2 -translate-y-1/2 text-amber-400 text-2xl"
+                            aria-label="Dòng ghim"
+                          >
+                            📌
+                          </span>
+                        )}
                         {editing && isActive ? (
                           <CellEditor
                             col={col}
@@ -1256,8 +1172,7 @@ export default function SpreadsheetGrid<Row>({
                 <div className="font-semibold text-sky-300 mb-2">Cột</div>
                 <div className="space-y-1 text-zinc-300">
                   <div>Bấm nhãn cột trên header để sắp xếp (A→Z hoặc Z→A)</div>
-                  <div>Mỗi header có nút: lọc, ẩn cột, và grip kéo chỉnh chiều rộng</div>
-                  <div>Kéo grip ⋮ để đổi chiều rộng, double-click grip để auto-fit</div>
+                  <div>Mỗi header có nút lọc theo cột</div>
                 </div>
               </div>
               <div>
