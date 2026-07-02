@@ -171,3 +171,13 @@ export async function canTouchTask(user: User, taskId: number): Promise<boolean>
   );
   return t?.assigned_to === user.id;
 }
+
+// Sub-con chỉ được thao tác (bbnt/bản vẽ...) trên nhóm công việc được giao cho mình.
+export async function canTouchPackage(user: User, packageId: number): Promise<boolean> {
+  if (user.role !== "subcon") return true;
+  const wp = await queryOne<{ assigned_to: number | null }>(
+    `SELECT assigned_to FROM work_packages WHERE id = ?`,
+    packageId,
+  );
+  return wp?.assigned_to === user.id;
+}

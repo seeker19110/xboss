@@ -375,25 +375,35 @@ function DependencyModal({
   async function add() {
     if (!pick) return;
     setBusy(true);
-    const res = await fetch(`/api/packages/${pkg.id}/dependencies`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ predecessorId: Number(pick) }),
-    });
-    setBusy(false);
-    if (!res.ok) {
-      await appAlert((await res.json().catch(() => null))?.error ?? "Không thêm được");
-      return;
+    try {
+      const res = await fetch(`/api/packages/${pkg.id}/dependencies`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ predecessorId: Number(pick) }),
+      });
+      if (!res.ok) {
+        await appAlert((await res.json().catch(() => null))?.error ?? "Không thêm được");
+        return;
+      }
+      setPick("");
+      await onChanged();
+    } catch {
+      await appAlert("Mất kết nối mạng — vui lòng thử lại");
+    } finally {
+      setBusy(false);
     }
-    setPick("");
-    await onChanged();
   }
 
   async function remove(depId: number) {
     setBusy(true);
-    await fetch(`/api/package-dependencies/${depId}`, { method: "DELETE" });
-    setBusy(false);
-    await onChanged();
+    try {
+      await fetch(`/api/package-dependencies/${depId}`, { method: "DELETE" });
+      await onChanged();
+    } catch {
+      await appAlert("Mất kết nối mạng — vui lòng thử lại");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (

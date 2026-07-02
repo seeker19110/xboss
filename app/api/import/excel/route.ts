@@ -9,8 +9,13 @@ export const dynamic = "force-dynamic";
 // mode = "preview" → chỉ phân tích, KHÔNG ghi DB. Mặc định → import thật.
 export async function POST(request: NextRequest) {
   try {
-    const role = (await getCurrentUser())?.role;
-    if (!CAN.import(role)) return NextResponse.json({ error: "Bạn không có quyền import (chỉ Admin/PM)" }, { status: 403 });
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    if (!CAN.import(user.role))
+      return NextResponse.json(
+        { error: "Bạn không có quyền import (chỉ Admin/PM)" },
+        { status: 403 },
+      );
 
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
@@ -18,7 +23,12 @@ export async function POST(request: NextRequest) {
 
     const MAX_BYTES = 20 * 1024 * 1024; // 20 MB
     if (file.size > MAX_BYTES)
-      return NextResponse.json({ error: `File quá lớn (tối đa 20 MB, file hiện tại ${(file.size / 1024 / 1024).toFixed(1)} MB)` }, { status: 413 });
+      return NextResponse.json(
+        {
+          error: `File quá lớn (tối đa 20 MB, file hiện tại ${(file.size / 1024 / 1024).toFixed(1)} MB)`,
+        },
+        { status: 413 },
+      );
 
     const buffer = await file.arrayBuffer();
     const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
@@ -26,7 +36,10 @@ export async function POST(request: NextRequest) {
     if (formData.get("mode") === "preview") {
       const preview = analyzeWorkbook(workbook);
       if (preview.sheets.length === 0) {
-        return NextResponse.json({ error: "File không chứa sheet TRACKING nào nhận diện được" }, { status: 400 });
+        return NextResponse.json(
+          { error: "File không chứa sheet TRACKING nào nhận diện được" },
+          { status: 400 },
+        );
       }
       return NextResponse.json({ preview });
     }
@@ -39,6 +52,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Import Error:", error);
-    return NextResponse.json({ error: "Lỗi xử lý file — vui lòng kiểm tra định dạng Excel" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Lỗi xử lý file — vui lòng kiểm tra định dạng Excel" },
+      { status: 500 },
+    );
   }
 }

@@ -5,10 +5,14 @@ import { getCurrentUser, CAN } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 // PATCH /api/towers/:id  body: { name } → đổi tên tháp.
-export async function PATCH(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+export async function PATCH(
+  req: NextRequest,
+  { params: paramsP }: { params: Promise<{ id: string }> },
+) {
   const params = await paramsP;
   const user = await getCurrentUser();
-  if (!CAN.editStructure(user?.role))
+  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (!CAN.editStructure(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM" }, { status: 403 });
 
   const id = parseInt(params.id);
@@ -23,17 +27,23 @@ export async function PATCH(req: NextRequest, { params: paramsP }: { params: Pro
 }
 
 // DELETE /api/towers/:id → xoá tháp (chỉ khi không còn sheet nào thuộc tháp).
-export async function DELETE(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+export async function DELETE(
+  _req: NextRequest,
+  { params: paramsP }: { params: Promise<{ id: string }> },
+) {
   const params = await paramsP;
   const user = await getCurrentUser();
-  if (!CAN.editStructure(user?.role))
+  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (!CAN.editStructure(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM" }, { status: 403 });
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const hasSheets = await queryOne<{ n: number }>(
-    `SELECT COUNT(*) AS n FROM sheet_types WHERE tower_id = ?`, id);
+    `SELECT COUNT(*) AS n FROM sheet_types WHERE tower_id = ?`,
+    id,
+  );
   if ((hasSheets?.n ?? 0) > 0)
     return NextResponse.json({ error: "Tháp còn sheet — xoá hết sheet trước" }, { status: 409 });
 

@@ -96,52 +96,66 @@ export default function PurchaseRequestsPage() {
       return;
     }
     setSaving(true);
-    const r = await fetch("/api/purchase-requests", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        materialId: Number(addDraft.materialId),
-        qtyRequested: Number(addDraft.qtyRequested),
-        note: addDraft.note,
-      }),
-    });
-    setSaving(false);
-    if (r.ok) {
-      setShowAdd(false);
-      setAddDraft({ materialId: "", qtyRequested: "", note: "" });
-      load();
-    } else {
-      const j = await r.json();
-      setError(j.error ?? "Lỗi tạo yêu cầu");
+    try {
+      const r = await fetch("/api/purchase-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          materialId: Number(addDraft.materialId),
+          qtyRequested: Number(addDraft.qtyRequested),
+          note: addDraft.note,
+        }),
+      });
+      if (r.ok) {
+        setShowAdd(false);
+        setAddDraft({ materialId: "", qtyRequested: "", note: "" });
+        load();
+      } else {
+        const j = await r.json();
+        setError(j.error ?? "Lỗi tạo yêu cầu");
+      }
+    } catch {
+      setError("Mất kết nối mạng — vui lòng thử lại");
+    } finally {
+      setSaving(false);
     }
   };
 
   const review = async (action: "approve" | "reject") => {
     if (!reviewModal) return;
     setSaving(true);
-    const r = await fetch(`/api/purchase-requests/${reviewModal.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, reviewNote }),
-    });
-    setSaving(false);
-    if (r.ok) {
-      setReviewModal(null);
-      setReviewNote("");
-      load();
-    } else {
-      const j = await r.json();
-      setError(j.error ?? "Lỗi duyệt");
+    try {
+      const r = await fetch(`/api/purchase-requests/${reviewModal.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, reviewNote }),
+      });
+      if (r.ok) {
+        setReviewModal(null);
+        setReviewNote("");
+        load();
+      } else {
+        const j = await r.json();
+        setError(j.error ?? "Lỗi duyệt");
+      }
+    } catch {
+      setError("Mất kết nối mạng — vui lòng thử lại");
+    } finally {
+      setSaving(false);
     }
   };
 
   const deletePR = async (id: number, code: string) => {
     if (!(await appConfirm(`Xoá yêu cầu ${code}?`))) return;
-    const r = await fetch(`/api/purchase-requests/${id}`, { method: "DELETE" });
-    if (r.ok) load();
-    else {
-      const j = await r.json();
-      setError(j.error ?? "Lỗi xoá");
+    try {
+      const r = await fetch(`/api/purchase-requests/${id}`, { method: "DELETE" });
+      if (r.ok) load();
+      else {
+        const j = await r.json();
+        setError(j.error ?? "Lỗi xoá");
+      }
+    } catch {
+      setError("Mất kết nối mạng — vui lòng thử lại");
     }
   };
 
@@ -170,7 +184,7 @@ export default function PurchaseRequestsPage() {
         {error && (
           <div className="mb-4 p-3 bg-red-900/50 border border-red-700 rounded text-sm flex justify-between">
             {error}{" "}
-            <button onClick={() => setError("")}>
+            <button onClick={() => setError("")} aria-label="Đóng thông báo lỗi">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -314,6 +328,7 @@ export default function PurchaseRequestsPage() {
                   {(userId === pr.requestedBy || canApprove) && pr.status !== "ordered" && (
                     <button
                       onClick={() => deletePR(pr.id, pr.prCode)}
+                      aria-label={`Xoá yêu cầu ${pr.prCode}`}
                       className="p-1.5 rounded hover:bg-red-900/50 text-zinc-400 hover:text-red-400"
                     >
                       <X className="w-4 h-4" />

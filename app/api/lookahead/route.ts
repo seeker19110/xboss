@@ -5,19 +5,31 @@ import { getCurrentUser } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 export type LookaheadTask = {
-  id: number; code: string; name: string; status: string;
-  startDate: string | null; endDate: string | null; progressPercent: number;
-  floorLabel: string | null; packageCode: string; sheetType: string;
-  assigneeName: string | null; delayReason: string | null;
+  id: number;
+  code: string;
+  name: string;
+  status: string;
+  startDate: string | null;
+  endDate: string | null;
+  progressPercent: number;
+  floorLabel: string | null;
+  packageCode: string;
+  sheetType: string;
+  assigneeName: string | null;
+  delayReason: string | null;
 };
 
 // GET /api/lookahead?days=14 → kế hoạch ngắn hạn cho họp giao ban:
-// task sắp bắt đầu + task đến hạn trong N ngày tới. Subcon chỉ thấy task được giao.
+// task sắp bắt đầu + task đến hạn trong N ngày tới. Mọi vai trò thấy toàn bộ (giống
+// lưới tracking — subcon cần ngữ cảnh tầng/nhóm, xem app/api/tasks/route.ts).
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
-  const days = Math.min(60, Math.max(1, parseInt(req.nextUrl.searchParams.get("days") ?? "14") || 14));
+  const days = Math.min(
+    60,
+    Math.max(1, parseInt(req.nextUrl.searchParams.get("days") ?? "14") || 14),
+  );
   const today = todayISO();
   const until = daysFromTodayISO(days);
 
@@ -37,7 +49,9 @@ export async function GET(req: NextRequest) {
       WHERE t.start_date IS NOT NULL AND t.start_date >= ? AND t.start_date <= ?
         AND t.progress_percent = 0 AND t.status NOT IN ('hoan_thanh','nghiem_thu')
       ORDER BY t.start_date, st.id, t.id`,
-    today, until);
+    today,
+    until,
+  );
 
   // Đến hạn: end_date trong cửa sổ, chưa xong.
   const due = await query<LookaheadTask>(
@@ -45,7 +59,9 @@ export async function GET(req: NextRequest) {
       WHERE t.end_date IS NOT NULL AND t.end_date >= ? AND t.end_date <= ?
         AND t.progress_percent < 1 AND t.status NOT IN ('hoan_thanh','nghiem_thu')
       ORDER BY t.end_date, st.id, t.id`,
-    today, until);
+    today,
+    until,
+  );
 
   return NextResponse.json({ days, from: today, until, starting, due });
 }

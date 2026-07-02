@@ -12,8 +12,7 @@ Bộ khung tham chiếu (`docs/framework/`) giả định stack **Next.js + Tail
 Giữ tầng CSDL hiện tại:
 
 - Helper mỏng `lib/db` (placeholder `?` → `$1..$n`, parser kiểu tuỳ chỉnh: cột `DATE` giữ chuỗi `'YYYY-MM-DD'`).
-- **Schema tự khởi tạo** bằng `CREATE TABLE IF NOT EXISTS` khi query đầu chạy (idempotent).
-- Đổi schema bảng đã tồn tại → `ALTER` tay hoặc script backfill trong `scripts/`.
+- **Schema qua hệ migrate SQL nhẹ** (`migrations/*.sql` đánh số + `schema_migrations` + runner tự áp lúc boot — xem ADR-0003); đổi schema = thêm file migration mới (append-only), không `ALTER` tay ngoài luồng đó. Backfill dữ liệu phức tạp vẫn viết script trong `scripts/`.
 - Phân quyền ở **tầng API** (`CAN` / `canTouchTask`), **không dùng RLS**.
 
 ## Lý do
