@@ -44,6 +44,15 @@ export async function PATCH(req: NextRequest) {
 
         if (patch.status === "nghiem_thu")
           throw new Error("Dùng duyệt nghiệm thu để đặt trạng thái này");
+        // Cùng quy tắc validate với PATCH đơn: status là slug hợp lệ, ngày đúng dạng.
+        if (patch.status !== undefined && !["chuan_bi", "dang_thi_cong", "hoan_thanh", "tre"].includes(patch.status as string))
+          throw new Error(`Trạng thái không hợp lệ ở task #${id}`);
+        for (const k of ["startDate", "endDate"] as const) {
+          if (patch[k] !== undefined && patch[k] !== null && !/^\d{4}-\d{2}-\d{2}$/.test(String(patch[k])))
+            throw new Error(`Ngày không hợp lệ ở task #${id} (cần dạng YYYY-MM-DD)`);
+        }
+        if (patch.name !== undefined && !String(patch.name ?? "").trim())
+          throw new Error(`Tên không hợp lệ ở task #${id} (không được để trống)`);
 
         if (patch.boqCode !== undefined) {
           const boq = String(patch.boqCode ?? "").trim();
