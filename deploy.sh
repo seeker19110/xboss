@@ -27,7 +27,7 @@ npm ci
 echo "==> 4/5 Build app"
 npm run build
 
-echo "==> 5/5 Khởi động lại app qua PM2 (kèm nạp lại biến môi trường)"
-pm2 restart xboss --update-env
+echo "==> 5/5 Reload app qua PM2 (graceful, kèm nạp lại biến môi trường)"
+pm2 reload xboss --update-env
 
 echo "==> Xong! Deploy hoàn tất."
