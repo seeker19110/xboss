@@ -11,16 +11,7 @@
 // Theme: chỉ dùng token Tailwind (zinc + nhấn -400), không hex, không `dark:`
 // để giữ cơ chế đảo màu sáng/tối trong globals.css.
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Loader2,
-  ChevronUp,
-  ChevronDown,
-  ListFilter,
-  EyeOff,
-  GripVertical,
-  Pencil,
-  Eye,
-} from "lucide-react";
+import { Loader2, ChevronUp, ChevronDown, ListFilter, EyeOff, GripVertical } from "lucide-react";
 import { serializeTSV, parseTSV, normalizeRect, spreadPaste, type Rect } from "@/lib/grid";
 
 export type GridColumn<Row> = {
@@ -50,6 +41,10 @@ type Props<Row> = {
   rowKey: (r: Row) => number | string;
   onCommit: (edits: GridEdit[]) => Promise<void> | void;
   readOnly?: boolean;
+  // Chế độ chỉnh sửa do trang cha điều khiển (vd nút "Chỉ xem"/"Đang sửa" trên AppHeader) —
+  // false = khoá sửa ô + ẩn thanh công cụ, đồng bộ với 1 nút duy nhất thay vì lưới tự có khoá riêng.
+  // Không truyền = luôn ở chế độ chỉnh sửa (trang chưa có khái niệm này).
+  editMode?: boolean;
   stickyCols?: number; // số cột trái dính (mã/tên) — mặc định ban đầu
   maxBodyHeight?: number; // px; cuộn dọc bên trong, header dính
   // Tuỳ chọn thêm/xoá dòng: chỉ hiện nút khi trang cha cấp callback (model có hỗ trợ).
@@ -69,6 +64,7 @@ export default function SpreadsheetGrid<Row>({
   rowKey,
   onCommit,
   readOnly = false,
+  editMode = true,
   stickyCols = 1,
   maxBodyHeight,
   onAddRow,
@@ -110,8 +106,6 @@ export default function SpreadsheetGrid<Row>({
   const [pinned, setPinned] = useState<Set<string>>(new Set()); // rowKey các dòng được ghim
   const [hiddenCols, setHiddenCols] = useState<Set<number>>(new Set()); // chỉ số cột bị ẩn nhanh
   const [wrap, setWrap] = useState(true); // xuống dòng (wrap text) trong ô
-  // Mặc định "chỉ xem" (thanh công cụ ẩn theo) — bấm nút mới mở khoá chỉnh sửa + hiện công cụ.
-  const [viewOnly, setViewOnly] = useState(true);
   const [extraRects, setExtraRects] = useState<Rect[]>([]); // các vùng chọn rời (Ctrl/Cmd+click)
   const gridRef = useRef<HTMLDivElement>(null);
   const filterMenuRef = useRef<HTMLDivElement>(null);
@@ -126,9 +120,9 @@ export default function SpreadsheetGrid<Row>({
   const nRows = rows.length;
   const rect: Rect = useMemo(() => normalizeRect(anchor, active), [anchor, active]);
 
-  // Chế độ chỉ-xem hiệu lực = prop `readOnly` (do quyền) HOẶC tự khoá "chỉ xem".
-  // Dùng chung một biến để tái dụng đúng cơ chế read-only sẵn có của lưới.
-  const ro = readOnly || viewOnly;
+  // Chế độ chỉ-xem hiệu lực = prop `readOnly` (do quyền) HOẶC trang cha đang ở "Chỉ xem"
+  // (qua prop `editMode`, đồng bộ với nút Chỉ xem/Đang sửa trên AppHeader — không tự có khoá riêng).
+  const ro = readOnly || !editMode;
 
   const isEditable = useCallback(
     (c: number, row: Row) => {
@@ -756,33 +750,17 @@ export default function SpreadsheetGrid<Row>({
 
   return (
     <div className="relative">
-      {/* Thanh trên cùng luôn hiện: nút Chỉnh sửa/Chỉ xem — bấm để vừa mở khoá chỉnh sửa
-          vừa hiện toàn bộ thanh công cụ bên dưới (mặc định "chỉ xem": công cụ ẩn, gọn lưới). */}
-      <div className="bg-zinc-900/50 border-b border-zinc-800 px-3 py-1.5 flex items-center justify-between text-sm text-zinc-400">
-        <div>
-          {!readOnly && (
-            <button
-              onClick={() => setViewOnly((v) => !v)}
-              className={`inline-flex items-center gap-1 ${viewOnly ? "text-amber-400 hover:text-amber-300" : "text-emerald-400 hover:text-emerald-300"}`}
-              title={
-                viewOnly
-                  ? "Đang ở chế độ chỉ xem (công cụ đang ẩn) — bấm để bật chỉnh sửa + hiện công cụ"
-                  : "Đang ở chế độ chỉnh sửa (công cụ đang hiện) — bấm để khoá chỉ xem"
-              }
-              aria-pressed={viewOnly}
-            >
-              {viewOnly ? <Eye size={14} /> : <Pencil size={14} />}
-              {viewOnly ? "Chỉ xem" : "Chỉnh sửa"}
-            </button>
-          )}
-        </div>
-        <div className="flex items-center gap-3">
+      {/* Trạng thái chọn/clipboard — chế độ chỉnh sửa (khoá + ẩn/hiện công cụ bên dưới) do
+          trang cha điều khiển qua prop `editMode` (nút Chỉ xem/Đang sửa trên AppHeader),
+          lưới không tự có khoá riêng để tránh 2 nút trùng chức năng. */}
+      {(selectionCount > 1 || clipboard) && (
+        <div className="bg-zinc-900/50 border-b border-zinc-800 px-3 py-1.5 flex items-center justify-end gap-3 text-sm text-zinc-400">
           {selectionCount > 1 && <span>{selectionCount} ô được chọn</span>}
           {clipboard && (
             <span className="text-zinc-500">{clipboard.cut ? "✂️ Cắt" : "📋 Sao chép"}</span>
           )}
         </div>
-      </div>
+      )}
       {!ro && (
         <div className="bg-zinc-900/50 border-b border-zinc-800 space-y-2 px-3 py-2">
           <div className="flex items-center justify-end text-base text-zinc-400">

@@ -467,7 +467,8 @@ export default function MaterialsPage() {
   }, [filtered]);
 
   const gridColumns: GridColumn<Material>[] = useMemo(() => {
-    // Trong chế độ bảng tính, bản thân lưới là affordance sửa — không cần editMode.
+    // editable ở đây chỉ xét quyền theo vai trò; khoá theo editMode (nút Chỉ xem/Đang
+    // sửa) do SpreadsheetGrid tự áp chung qua prop `editMode` — không lặp lại ở đây.
     const editableBy = (admin: boolean) => (admin ? canAdmin : canEdit);
     const defs: Record<ColKey, GridColumn<Material>> = {
       boqCode: {
@@ -830,6 +831,7 @@ export default function MaterialsPage() {
                   rowKey={(m) => m.id}
                   onCommit={commitGrid}
                   readOnly={!canEdit}
+                  editMode={editMode}
                   stickyCols={stickyCount}
                   maxBodyHeight={Math.round(
                     typeof window !== "undefined" ? window.innerHeight * 0.7 : 600,
