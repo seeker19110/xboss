@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { recomputeTask } from "@/lib/recompute";
-import { getCurrentUser, canTouchTask } from "@/lib/auth";
+import { getCurrentUser, canTouchTask, CAN } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +12,9 @@ export async function PATCH(req: NextRequest, { params: paramsP }: { params: Pro
   const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  // Vai trò chỉ-xem (BCH/CĐT/Viewer) không được tick ô tiến độ.
+  if (!CAN.editProgress(user.role))
+    return NextResponse.json({ error: "Không có quyền cập nhật tiến độ" }, { status: 403 });
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });

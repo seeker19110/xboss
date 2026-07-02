@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, run, withTransaction } from "@/lib/db";
 import { recomputeTask } from "@/lib/recompute";
-import { getCurrentUser, canTouchTask } from "@/lib/auth";
+import { getCurrentUser, canTouchTask, CAN } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +13,9 @@ const MAX_IDS = 1000;
 export async function PATCH(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  // Vai trò chỉ-xem (BCH/CĐT/Viewer) không được tick ô tiến độ.
+  if (!CAN.editProgress(user.role))
+    return NextResponse.json({ error: "Không có quyền cập nhật tiến độ" }, { status: 403 });
 
   const body = await req.json().catch(() => ({}));
   const ids = Array.isArray(body.ids)
