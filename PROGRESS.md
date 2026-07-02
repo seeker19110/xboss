@@ -16,6 +16,13 @@
 
 - Áp khung brownfield Bước 0 → Lớp 1 (đợt này, nhánh `chore/ap-dung-khung-brownfield`).
 
+## Đợt audit toàn dự án (2026-07)
+
+- **Phân quyền:** bịt 3 route sửa tiến độ thiếu `CAN.editProgress` (`tasks/:id/progress`, `dimensions/:id`, `dimensions/batch` — vai trò chỉ-xem BCH/CĐT/Viewer trước đây sửa được tiến độ); `materials/:id/move` về đúng nhóm quyền Admin/PM/Kỹ sư; `purchase-requests` POST chặn vai trò chỉ-xem.
+- **Múi giờ:** thêm `daysFromTodayISO()` (lib/db) — mọi phép cộng/trừ ngày (báo cáo ngày/tuần, lookahead, forecast, notifications) đồng nhất UTC+7 với `todayISO()`, hết lệch 1 ngày lúc 0h–7h sáng; `changed_at::date` (S-curve, báo cáo tuần) ép rõ `AT TIME ZONE 'Asia/Ho_Chi_Minh'`.
+- **Validation:** PATCH `tasks/:id` + `tasks/batch` chỉ nhận status slug hợp lệ + ngày `YYYY-MM-DD` + tên không rỗng (422 thay vì 500/dữ liệu rác).
+- **Dependency:** override `uuid` ≥ 11.1.1 dưới `exceljs` (GHSA-w5hq-g745-h8pq) — `npm audit` về 0; export Excel verify vẫn hoạt động.
+
 ## Tiếp theo
 
 - ~~**Workflow audit tương phản màu (a11y) toàn UI**~~ → **đã xong** (`docs/a11y/contrast-audit.md` + `scripts/contrast-check.ts`). Đã tính tương phản WCAG cho `text-zinc-300/400/500/600` × nền `zinc-*` trên **cả 6 theme** + nút accent chữ trắng → rút **quy tắc thay thế đúng mọi theme** + **backlog remediation có thứ tự** (P1 global chrome → Dashboard → tracking → …). Phát hiện: ước tính cũ over-count (grep bắt cả icon hover/idle, code dev-only, accent đã đạt AA như `red-600`/`blue-600`) → nút accent FAIL thật chỉ ~10 (không phải ~43). Audit lại `/login`: còn 1 `text-zinc-500` nhưng nằm trong `NODE_ENV==='development'` → không render production, axe không bắt (đúng).
@@ -39,16 +46,12 @@
 
 ## Nợ kỹ thuật (chỗ "làm tạm" cần quay lại)
 
-- **Rate-limit in-memory** (`lib/ratelimit.ts`) đếm theo process → sai khi multi-instance; cần chuyển DB/Redis.
+- ~~**Rate-limit in-memory**~~ → **đã có** (đợt audit 2026-07): chuyển từ Map trong process sang bảng Postgres `login_rate_limits` (`migrations/0002_login_rate_limit.sql`), đúng khi chạy nhiều instance — upsert atomic qua `ON CONFLICT`, không còn race đọc-rồi-ghi.
 - ~~**Không có hệ migrate**~~ → **đã có** (ADR-0003): hệ migrate SQL nhẹ `migrations/*.sql` đánh số + `schema_migrations` + runner `lib/db/migrate.ts` (tự áp lúc boot / `npm run db:migrate`). Baseline = `0001_baseline.sql`. Đổi schema từ nay = thêm file mới (append-only). **Còn lại:** `docs/ERD.md` vẫn cập nhật tay.
-- **Nợ a11y tương phản màu (HỆ THỐNG, đang dọn dần) — đã có audit + backlog: `docs/a11y/contrast-audit.md`:**
-  - ~~`/login` + footer toàn cục (3 lỗi serious)~~ → **đã sửa & verify bằng axe**: `/login` (subtitle zinc-500→zinc-400, nút emerald-600→emerald-700) + footer layout (zinc-600/500→zinc-400/200). **Rule `color-contrast` đã bật lại** trong `e2e/login.spec.ts` → giờ là cổng cứng (E2E sẽ đỏ nếu tái phạm).
-  - ~~Audit toàn UI~~ → **xong**: bảng tương phản tính được (6 theme) + quy tắc (`zinc-600`/`zinc-500` body-text luôn fail → `zinc-400`; `zinc-400` fail trên nền `zinc-700` → `zinc-300`; nút accent chữ trắng → `-700`) + **backlog có thứ tự** (audit §4). Tái lập bằng `npx tsx scripts/contrast-check.ts`.
-  - ~~Hạ tầng E2E sau-auth (Bước 0)~~ → **xong** (xem mục "Tiếp theo"). ~~Dashboard `/` + `AppHeader`~~ → **đã remediate & verify bằng axe** (desktop + mobile).
-  - ~~tracking grid~~ → **đã remediate & verify bằng axe** (desktop + mobile).
-  - **Còn lại (app-wide):** payments, my-tasks, materials… (đã trừ Dashboard/AppHeader/tracking) — ứng viên `text-zinc-500/600` còn lại + nút accent FAIL. Dọn dần **theo từng trang** qua axe E2E (axe là ground-truth) — không big-bang. Quy trình: audit §5 Bước 1..n.
-  - Sau khi phủ axe thêm trang: siết assertion Lighthouse a11y từ `warn` lên `error`.
-- **Observability (Sentry)** chưa có (cần DSN) — Lớp 2 còn lại.
+- **Nợ a11y tương phản màu (HỆ THỐNG) — đã có audit + backlog: `docs/a11y/contrast-audit.md`:**
+  - ~~`/login` + footer toàn cục~~, ~~Dashboard `/` + `AppHeader`~~, ~~tracking grid~~, ~~payments~~, ~~my-tasks~~, ~~materials~~ → **tất cả đã remediate & verify bằng axe** (`e2e/authed/*.spec.ts`, desktop + mobile) — hết trang trong backlog §4 (PR #48/#49 đã đóng nốt payments/my-tasks/materials; doc này trước đó chưa cập nhật theo).
+  - Còn lại: siết assertion Lighthouse a11y (`lighthouserc.json`, hiện chỉ đo `/login`) từ `warn` lên `error` — cân nhắc riêng vì ảnh hưởng gate CI toàn cục.
+- **Observability (Sentry)** chưa có — cần `SENTRY_DSN` (secret) từ người vận hành trước khi wiring được, không tự thêm được trong đợt audit này.
 - ~~`grid.test.ts` không nằm trong lệnh `npm test`~~ → đã thêm đợt này.
 - ~~CI dùng Node 20 trong khi `.nvmrc` = 22~~ → đã đồng bộ về 22 đợt này.
 - CLAUDE.md từng ghi `.eslintrc.json` (next/core-web-vitals) — thực tế đã là `eslint.config.mjs` flat config; cần sửa mô tả khi đụng tới.

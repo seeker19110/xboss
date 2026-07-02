@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { query, todayISO } from "@/lib/db";
+import { query, todayISO, daysFromTodayISO } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -42,7 +42,7 @@ export async function GET() {
     if (remaining <= 0.0001) { eta = today; daysLeft = 0; }
     else if (ratePerDay > 0) {
       daysLeft = Math.ceil(remaining / ratePerDay);
-      if (daysLeft < 3650) eta = new Date(Date.now() + daysLeft * 86400_000).toISOString().slice(0, 10);
+      if (daysLeft < 3650) eta = daysFromTodayISO(daysLeft);
       else { eta = null; daysLeft = null; } // tốc độ quá chậm → coi như chưa dự báo được
     }
     // Lệch so deadline: dương = dự kiến trễ.

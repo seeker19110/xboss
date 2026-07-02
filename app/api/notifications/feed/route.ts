@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { query, queryOne, todayISO } from "@/lib/db";
+import { query, queryOne, todayISO, daysFromTodayISO } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import type { Prefs } from "@/app/api/notifications/prefs/route";
 
@@ -24,10 +24,8 @@ export async function GET() {
   const assignedFilter = fullAccess ? "" : " AND t.assigned_to = ?";
   const args = (base: unknown[]) => fullAccess ? base : [...base, user.id];
 
-  // Offset UTC+7
-  const offset = 7 * 3600_000;
-  const due5   = new Date(Date.now() + offset + 5 * 86400_000).toISOString().slice(0, 10);
-  const start7 = new Date(Date.now() + offset + 7 * 86400_000).toISOString().slice(0, 10);
+  const due5   = daysFromTodayISO(5);
+  const start7 = daysFromTodayISO(7);
   const ago48h = new Date(0).toISOString(); // không giới hạn thời gian
 
   // Prefs của user

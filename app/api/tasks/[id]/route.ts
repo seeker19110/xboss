@@ -25,6 +25,18 @@ export async function PATCH(req: NextRequest, { params: paramsP }: { params: Pro
   // nghiem_thu chỉ đặt/huỷ qua /api/tasks/:id/approve — đảm bảo có audit trong task_history.
   if (body.status === "nghiem_thu")
     return NextResponse.json({ error: "Dùng POST /api/tasks/:id/approve để nghiệm thu" }, { status: 422 });
+  // status chỉ nhận slug hợp lệ — chặn chuỗi tự do lọt vào DB.
+  if (body.status !== undefined && !["chuan_bi", "dang_thi_cong", "hoan_thanh", "tre"].includes(body.status))
+    return NextResponse.json({ error: "Trạng thái không hợp lệ" }, { status: 422 });
+
+  // Ngày phải đúng dạng YYYY-MM-DD (hoặc null = xoá) — chuỗi sai để Postgres từ chối sẽ thành lỗi 500.
+  for (const k of ["startDate", "endDate"] as const) {
+    if (body[k] !== undefined && body[k] !== null && !/^\d{4}-\d{2}-\d{2}$/.test(String(body[k])))
+      return NextResponse.json({ error: "Ngày phải có dạng YYYY-MM-DD" }, { status: 422 });
+  }
+
+  if (body.name !== undefined && !String(body.name ?? "").trim())
+    return NextResponse.json({ error: "Tên task không được để trống" }, { status: 422 });
 
   // drawingUrl: chỉ chấp nhận http/https hoặc null (chặn javascript: XSS).
   if (body.drawingUrl !== undefined && body.drawingUrl !== null) {

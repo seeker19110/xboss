@@ -59,7 +59,7 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy lint + typecheck + test +
 ### Auth (`lib/auth.ts`)
 
 - Phiên stateless: cookie `xboss_session` = `userId.exp.HMAC` — không có bảng session.
-- Login có rate limit in-memory (`lib/ratelimit.ts`): 5 lần sai/15 phút theo IP+email, 20/IP → 429 + `Retry-After`. Đếm trong process — multi-instance cần chuyển sang DB/Redis.
+- Login có rate limit lưu Postgres (`lib/ratelimit.ts`, bảng `login_rate_limits`): 5 lần sai/15 phút theo IP+email, 20/IP → 429 + `Retry-After`. Upsert atomic qua `ON CONFLICT` nên đúng khi chạy nhiều instance.
 - 4 vai trò: `admin | pm | engineer | subcon`. Quyền tập trung trong map `CAN`; subcon chỉ thao tác task được gán (`canTouchTask`).
 - **Các trang chỉ redirect client-side khi 401 — API route là ranh giới bảo mật duy nhất.** Mọi route handler mới phải gọi `getCurrentUser()` và trả 401 khi chưa đăng nhập (pattern xem `app/api/dashboard/route.ts`).
 
