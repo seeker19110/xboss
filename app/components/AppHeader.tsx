@@ -32,14 +32,16 @@ const NAV = [
     icon: Package,
     color: "text-sky-400",
   },
-  {
-    href: "/approvals",
-    tkey: "nav.approvals",
-    label: "Nghiệm thu",
-    icon: CheckSquare,
-    color: "text-teal-400",
-  },
 ];
+
+// Nghiệm thu chuyển xuống hàng dưới cùng ô tìm kiếm — đỡ chật hàng nav chính trên mobile.
+const APPROVALS_NAV = {
+  href: "/approvals",
+  tkey: "nav.approvals",
+  label: "Nghiệm thu",
+  icon: CheckSquare,
+  color: "text-teal-400",
+};
 
 export default function AppHeader({
   title,
@@ -110,11 +112,6 @@ export default function AppHeader({
 
         {/* Controls bên phải */}
         <div className="flex items-center gap-1 shrink-0 ml-1">
-          {search && (
-            <div className="hidden sm:block w-52 lg:w-72">
-              <GlobalSearch />
-            </div>
-          )}
           {children}
           <ThemeToggle />
           <OnlineUsers isAdmin={me?.role === "admin"} />
@@ -135,12 +132,29 @@ export default function AppHeader({
         </div>
       </div>
 
-      {/* Mobile: search hàng 2 */}
-      {search && (
-        <div className="sm:hidden px-3 pb-2">
-          <GlobalSearch />
-        </div>
-      )}
+      {/* Hàng dưới: tìm kiếm + Nghiệm thu */}
+      <div className="flex items-center gap-2 px-3 pb-2">
+        {search && (
+          <div className="flex-1 min-w-0">
+            <GlobalSearch />
+          </div>
+        )}
+        <a
+          href="/approvals"
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs whitespace-nowrap transition shrink-0 ${
+            path === APPROVALS_NAV.href || path.startsWith(APPROVALS_NAV.href)
+              ? "bg-zinc-800 text-white font-medium"
+              : "text-zinc-400 hover:text-white hover:bg-zinc-900"
+          }`}
+          aria-label={APPROVALS_NAV.label}
+          aria-current={path.startsWith(APPROVALS_NAV.href) ? "page" : undefined}
+        >
+          <APPROVALS_NAV.icon className={`w-4 h-4 shrink-0 ${APPROVALS_NAV.color}`} />
+          <span className="hidden sm:inline">
+            <EditableText tkey={APPROVALS_NAV.tkey}>{APPROVALS_NAV.label}</EditableText>
+          </span>
+        </a>
+      </div>
     </header>
   );
 }
