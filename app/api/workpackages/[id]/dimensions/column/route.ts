@@ -62,20 +62,44 @@ export async function POST(
     sortOrder = (maxRow?.m ?? 0) + 1;
   }
 
-  // Tạo progress_dimension mới cho mọi task — 1 câu multi-row INSERT thay vì N round trip.
-  const ph = tasks.map(() => "(?, ?, 0, ?)").join(", ");
-  const vals = tasks.flatMap((t) => [t.id, label, sortOrder]);
+  // Chỉ tạo dòng cho task CHƯA có nhãn này — tránh trùng (task_id, dimension_label) khi các
+  // task trong nhóm đã lệch bộ cột (vd task thêm sau chưa có đủ cột). Dòng trùng bị lưới
+  // GET /dimensions "che" (gộp theo nhãn, chỉ hiện 1 ô) nhưng vẫn tính vào mẫu số % —
+  // sai vĩnh viễn và không sửa được qua UI (không có checkbox nào trỏ tới dòng thừa).
+  const already = await query<{ task_id: number }>(
+    `SELECT task_id FROM progress_dimensions
+      WHERE dimension_label = ? AND task_id IN (${tasks.map(() => "?").join(", ")})`,
+    label,
+    ...tasks.map((t) => t.id),
+  );
+  const alreadySet = new Set(already.map((r) => r.task_id));
+  const targetTasks = tasks.filter((t) => !alreadySet.has(t.id));
+  if (targetTasks.length === 0)
+    return NextResponse.json(
+      { error: `Cột "${label}" đã tồn tại ở mọi task trong nhóm` },
+      { status: 409 },
+    );
+
+  // Tạo progress_dimension mới cho các task còn thiếu — 1 câu multi-row INSERT thay vì N round trip.
+  // ON CONFLICT DO NOTHING: lưới an toàn ở tầng DB (uq_progress_dimensions_task_label, xem
+  // migrations/0004) chống race khi 2 request thêm cùng nhãn gần như đồng thời.
+  const ph = targetTasks.map(() => "(?, ?, 0, ?)").join(", ");
+  const vals = targetTasks.flatMap((t) => [t.id, label, sortOrder]);
   await run(
-    `INSERT INTO progress_dimensions (task_id, dimension_label, installed, sort_order) VALUES ${ph}`,
+    `INSERT INTO progress_dimensions (task_id, dimension_label, installed, sort_order) VALUES ${ph}
+       ON CONFLICT (task_id, dimension_label) DO NOTHING`,
     ...vals,
   );
 
   // Thêm cột làm tăng mẫu số mỗi task — phải tính lại % task + nhóm, nếu không %
   // hiển thị vẫn giữ giá trị cũ (cao hơn thực tế) cho tới khi ai đó tick 1 ô.
-  for (const t of tasks) await recomputeTask(t.id, user.name);
+  for (const t of targetTasks) await recomputeTask(t.id, user.name);
   await recomputePackage(pkgId);
 
-  return NextResponse.json({ created: tasks.length, label, sortOrder }, { status: 201 });
+  return NextResponse.json(
+    { created: targetTasks.length, skipped: tasks.length - targetTasks.length, label, sortOrder },
+    { status: 201 },
+  );
 }
 
 // DELETE /api/workpackages/:id/dimensions/column?label=xxx[&allGroups=true]
@@ -166,13 +190,18 @@ export async function PATCH(
   );
   if (tasks.length === 0) return NextResponse.json({ error: "Nhóm chưa có task" }, { status: 400 });
 
-  // Kiểm tra tên cột mới chưa tồn tại.
-  const existing = await queryOne(
-    `SELECT id FROM progress_dimensions WHERE task_id = ? AND dimension_label = ?`,
-    tasks[0].id,
+  // Task nào đã có nhãn mới thì bỏ qua — tránh trùng (task_id, dimension_label) khi các task
+  // trong nhóm đã lệch bộ cột (xem giải thích ở POST cùng file). Chỉ 409 khi MỌI task đã có
+  // sẵn nhãn mới (thật sự trùng cột), còn lệch một phần thì tự sửa (chỉ tạo cho task còn thiếu).
+  const already = await query<{ task_id: number }>(
+    `SELECT task_id FROM progress_dimensions
+      WHERE dimension_label = ? AND task_id IN (${tasks.map(() => "?").join(", ")})`,
     newLabel,
+    ...tasks.map((t) => t.id),
   );
-  if (existing)
+  const alreadySet = new Set(already.map((r) => r.task_id));
+  const targetTasks = tasks.filter((t) => !alreadySet.has(t.id));
+  if (targetTasks.length === 0)
     return NextResponse.json({ error: `Cột "${newLabel}" đã tồn tại` }, { status: 409 });
 
   // Lấy sort_order của cột gốc.
@@ -198,17 +227,28 @@ export async function PATCH(
       pkgId,
       sortOrder,
     );
-    const ph = tasks.map(() => "(?, ?, 0, ?)").join(", ");
-    const vals = tasks.flatMap((t) => [t.id, newLabel, sortOrder]);
+    const ph = targetTasks.map(() => "(?, ?, 0, ?)").join(", ");
+    const vals = targetTasks.flatMap((t) => [t.id, newLabel, sortOrder]);
+    // ON CONFLICT DO NOTHING: lưới an toàn ở tầng DB (uq_progress_dimensions_task_label,
+    // xem migrations/0004) chống race khi 2 request copy cùng nhãn gần như đồng thời.
     await run(
-      `INSERT INTO progress_dimensions (task_id, dimension_label, installed, sort_order) VALUES ${ph}`,
+      `INSERT INTO progress_dimensions (task_id, dimension_label, installed, sort_order) VALUES ${ph}
+         ON CONFLICT (task_id, dimension_label) DO NOTHING`,
       ...vals,
     );
   });
 
   // Cột mới (copy) cũng tăng mẫu số mỗi task — tính lại % task + nhóm như khi thêm cột.
-  for (const t of tasks) await recomputeTask(t.id, user.name);
+  for (const t of targetTasks) await recomputeTask(t.id, user.name);
   await recomputePackage(pkgId);
 
-  return NextResponse.json({ created: tasks.length, label: newLabel, sortOrder }, { status: 201 });
+  return NextResponse.json(
+    {
+      created: targetTasks.length,
+      skipped: tasks.length - targetTasks.length,
+      label: newLabel,
+      sortOrder,
+    },
+    { status: 201 },
+  );
 }
