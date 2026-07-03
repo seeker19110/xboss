@@ -7,18 +7,32 @@ export const dynamic = "force-dynamic";
 export type BillType = "bill" | "advance" | "item";
 
 type Bill = {
-  id: number; responsible: string; type: BillType; period: string | null;
-  amount: number; description: string | null; paidDate: string;
-  progressSnapshot: number; note: string | null;
-  unit: string | null; quantity: number | null; labor: number | null;
-  sheetTypeId: number | null; floorLabel: string | null; pctThisPeriod: number;
+  id: number;
+  responsible: string;
+  type: BillType;
+  period: string | null;
+  amount: number;
+  description: string | null;
+  paidDate: string;
+  progressSnapshot: number;
+  note: string | null;
+  unit: string | null;
+  quantity: number | null;
+  labor: number | null;
+  sheetTypeId: number | null;
+  floorLabel: string | null;
+  pctThisPeriod: number;
   workPackageName: string | null;
-  createdBy: number | null; createdByName: string | null; createdAt: string;
+  createdBy: number | null;
+  createdByName: string | null;
+  createdAt: string;
 };
 
 export async function GET(_req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (!CAN.viewPayments(user.role))
+    return NextResponse.json({ error: "Chỉ Admin/PM/BCH được xem thanh toán" }, { status: 403 });
 
   const bills = await query<Bill>(`
     SELECT pb.id, pb.responsible, pb.type, pb.period,
@@ -65,12 +79,12 @@ export async function POST(req: NextRequest) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(paidDate))
     return NextResponse.json({ error: "Ngày không hợp lệ (YYYY-MM-DD)" }, { status: 400 });
 
-  const period       = (b?.period ?? "").trim() || null;
-  const description  = (b?.description ?? "").trim() || null;
-  const note         = (b?.note ?? "").trim() || null;
-  const sheetTypeId  = b?.sheetTypeId ? Number(b.sheetTypeId) : null;
-  const floorLabel   = b?.floorLabel ? String(b.floorLabel).trim() : null;
-  let pctThisPeriod  = Number(b?.pctThisPeriod ?? 0);
+  const period = (b?.period ?? "").trim() || null;
+  const description = (b?.description ?? "").trim() || null;
+  const note = (b?.note ?? "").trim() || null;
+  const sheetTypeId = b?.sheetTypeId ? Number(b.sheetTypeId) : null;
+  const floorLabel = b?.floorLabel ? String(b.floorLabel).trim() : null;
+  let pctThisPeriod = Number(b?.pctThisPeriod ?? 0);
   if (!Number.isFinite(pctThisPeriod) || pctThisPeriod < 0) pctThisPeriod = 0;
   if (pctThisPeriod > 1) pctThisPeriod = 1;
   let progress = Number(b?.progressSnapshot ?? 0);
@@ -87,35 +101,60 @@ export async function POST(req: NextRequest) {
   let amount = Number(b?.amount);
   if (type === "bill" && sheetTypeId && floorLabel && pctThisPeriod > 0) {
     // Kiểm tra tổng % đã thanh toán (không vượt 100%)
-    const sumRow = await queryOne<{ total: number }>(`
+    const sumRow = await queryOne<{ total: number }>(
+      `
       SELECT COALESCE(SUM(pct_this_period), 0) AS total
         FROM payment_bills
        WHERE type = 'bill' AND sheet_type_id = ? AND floor_label = ?`,
-      sheetTypeId, floorLabel);
+      sheetTypeId,
+      floorLabel,
+    );
     const pctPaid = sumRow?.total ?? 0;
     if (pctPaid + pctThisPeriod > 1.0001)
-      return NextResponse.json({ error: `Tầng ${floorLabel} đã thanh toán ${Math.round(pctPaid * 100)}%, không thể thêm ${Math.round(pctThisPeriod * 100)}% (vượt 100%)` }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: `Tầng ${floorLabel} đã thanh toán ${Math.round(pctPaid * 100)}%, không thể thêm ${Math.round(pctThisPeriod * 100)}% (vượt 100%)`,
+        },
+        { status: 400 },
+      );
 
     // Lấy contract_value
-    const fc = await queryOne<{ contractValue: number }>(`
+    const fc = await queryOne<{ contractValue: number }>(
+      `
       SELECT COALESCE(contract_value, 0) AS "contractValue"
         FROM floor_contracts WHERE sheet_type_id = ? AND floor_label = ?`,
-      sheetTypeId, floorLabel);
+      sheetTypeId,
+      floorLabel,
+    );
     amount = (fc?.contractValue ?? 0) * pctThisPeriod;
   }
 
   if (!Number.isFinite(amount) || amount <= 0)
     return NextResponse.json({ error: "Số tiền không hợp lệ" }, { status: 400 });
 
-  const id = await insertId(`
+  const id = await insertId(
+    `
     INSERT INTO payment_bills
            (responsible, type, period, amount, description, paid_date,
             progress_snapshot, note, unit, quantity, labor,
             sheet_type_id, floor_label, pct_this_period, created_by)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    responsible, type, period, amount, description, paidDate,
-    progress, note, unit, quantity, labor,
-    sheetTypeId, floorLabel, pctThisPeriod, user.id);
+    responsible,
+    type,
+    period,
+    amount,
+    description,
+    paidDate,
+    progress,
+    note,
+    unit,
+    quantity,
+    labor,
+    sheetTypeId,
+    floorLabel,
+    pctThisPeriod,
+    user.id,
+  );
 
   return NextResponse.json({ ok: true, id, amount });
 }

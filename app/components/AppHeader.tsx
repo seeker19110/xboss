@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useState, type ReactNode } from "react";
-import Link from "next/link";
-import { LayoutDashboard, ClipboardList, Package, CheckSquare, DollarSign } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Package, CheckSquare } from "lucide-react";
 import NotificationBell from "@/app/components/NotificationBell";
 import GlobalSearch from "@/app/components/GlobalSearch";
 import ThemeToggle from "@/app/components/ThemeToggle";
@@ -40,13 +39,6 @@ const NAV = [
     icon: CheckSquare,
     color: "text-teal-400",
   },
-  {
-    href: "/payments",
-    tkey: "nav.payments",
-    label: "Thanh toán",
-    icon: DollarSign,
-    color: "text-emerald-400",
-  },
 ];
 
 export default function AppHeader({
@@ -71,16 +63,8 @@ export default function AppHeader({
 
   return (
     <header className="sticky top-0 z-40 bg-zinc-950 border-b border-zinc-800 print:hidden">
-      {/* Hàng duy nhất: brand · nav · [title trang con] · controls */}
+      {/* Hàng duy nhất: nav · [title trang con] · controls */}
       <div className="flex items-center gap-1 px-3 h-12 min-w-0">
-        {/* Brand */}
-        <Link
-          href="/"
-          className="shrink-0 flex items-center gap-1.5 mr-1 text-white hover:opacity-80"
-        >
-          <span className="font-bold text-sm leading-none">XBoss</span>
-        </Link>
-
         {/* Nav chính — cuộn ngang khi chật, ẩn label trên mobile */}
         <nav
           className="flex items-center gap-0.5 overflow-x-auto scrollbar-none min-w-0"

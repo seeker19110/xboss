@@ -21,8 +21,11 @@ import {
   RefreshCw,
   Users,
   Share2,
+  DollarSign,
 } from "lucide-react";
 import { slugFromCode } from "@/lib/sheets";
+import { PAYMENT_VIEW_ROLES, type Role } from "@/lib/roles";
+import { fetchMe } from "@/app/lib/me";
 import AppHeader from "@/app/components/AppHeader";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { DELAY_REASON_LABEL } from "@/lib/delay";
@@ -404,6 +407,7 @@ export default function MyTasksPage() {
   const [savingPref, setSavingPref] = useState<PrefKey | null>(null);
   const [taskFilter, setTaskFilter] = useState<"all" | "active" | "delayed" | "done">("all");
   const [copied, setCopied] = useState<number | null>(null);
+  const [myRole, setMyRole] = useState<string | null>(null);
 
   function copyTaskLink(t: MyTask) {
     const slug = t.sheetSlug ?? slugFromCode(t.sheetType);
@@ -426,6 +430,7 @@ export default function MyTasksPage() {
         setTaskData(await r.json());
       })
       .finally(() => setLoadingTasks(false));
+    fetchMe().then((u) => setMyRole(u?.role ?? null));
   }, []);
 
   const loadFeed = useCallback(async (silent = false) => {
@@ -591,6 +596,25 @@ export default function MyTasksPage() {
             <p className="text-3xl font-bold text-emerald-300">{s?.done ?? 0}</p>
           </div>
         </div>
+
+        {/* ── Thanh toán tiến độ — chỉ Admin/PM/BCH ── */}
+        {myRole && PAYMENT_VIEW_ROLES.includes(myRole as Role) && (
+          <a
+            href="/payments"
+            className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3.5 hover:border-emerald-700 transition group"
+          >
+            <span className="p-2 bg-emerald-950/60 rounded-lg shrink-0">
+              <DollarSign className="w-5 h-5 text-emerald-400" />
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-sm font-semibold">Thanh toán tiến độ</span>
+              <span className="block text-[11px] text-zinc-400 truncate">
+                Giá trị hợp đồng &amp; khối lượng hoàn thành theo tầng · hệ
+              </span>
+            </span>
+            <ChevronRight className="w-4 h-4 text-zinc-500 group-hover:text-emerald-400 transition shrink-0" />
+          </a>
+        )}
 
         {/* ── Segment control ── */}
         <div className="flex gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-xl">

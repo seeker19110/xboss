@@ -1,8 +1,8 @@
 import { scryptSync, randomBytes, createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { queryOne, run } from "@/lib/db";
-import { ROLES, ROLE_LABELS, VIEW_ONLY_ROLES, type Role } from "@/lib/roles";
-export { ROLES, ROLE_LABELS, VIEW_ONLY_ROLES, type Role };
+import { ROLES, ROLE_LABELS, VIEW_ONLY_ROLES, PAYMENT_VIEW_ROLES, type Role } from "@/lib/roles";
+export { ROLES, ROLE_LABELS, VIEW_ONLY_ROLES, PAYMENT_VIEW_ROLES, type Role };
 
 export const COOKIE = "xboss_session";
 const SESSION_DAYS = 7;
@@ -160,6 +160,7 @@ export const CAN = {
   manageUsers: (r?: Role) => r === "admin",
   assign: (r?: Role) => r === "admin" || r === "pm", // gán task cho người làm
   approve: (r?: Role) => r === "admin" || r === "pm", // duyệt/huỷ nghiệm thu
+  viewPayments: (r?: Role) => !!r && PAYMENT_VIEW_ROLES.includes(r), // xem trang thanh toán
 };
 
 // Sub-con chỉ được thao tác trên task được giao cho mình.

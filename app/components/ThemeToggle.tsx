@@ -1,23 +1,23 @@
-'use client';
+"use client";
 // Bộ chọn giao diện — mọi vai trò đều dùng được.
 // Lựa chọn lưu trong localStorage('xboss_theme'), script trong layout đọc lại khi tải trang.
-import { useEffect, useRef, useState } from 'react';
-import { Sun, Moon, Crown, Droplet, Anchor, Palette, Check } from 'lucide-react';
+import { useEffect, useRef, useState } from "react";
+import { Sun, Moon, Crown, Droplet, Anchor, Palette, Check } from "lucide-react";
 
-type Theme = 'dark' | 'light' | 'kingblue' | 'darkblue' | 'navy';
+type Theme = "dark" | "light" | "kingblue" | "darkblue" | "navy";
 
 const THEMES: { id: Theme; label: string; icon: typeof Sun; swatch: string }[] = [
-  { id: 'dark',     label: 'Tối',       icon: Moon,    swatch: '#18181b' },
-  { id: 'light',    label: 'Sáng',      icon: Sun,     swatch: '#ffffff' },
-  { id: 'kingblue', label: 'King Blue', icon: Crown,   swatch: '#1a3f94' },
-  { id: 'darkblue', label: 'Dark Blue', icon: Droplet, swatch: '#1e3a5f' },
-  { id: 'navy',     label: 'Navy',      icon: Anchor,  swatch: '#111c30' },
+  { id: "dark", label: "Tối", icon: Moon, swatch: "#18181b" },
+  { id: "light", label: "Sáng", icon: Sun, swatch: "#ffffff" },
+  { id: "kingblue", label: "King Blue", icon: Crown, swatch: "#1a3f94" },
+  { id: "darkblue", label: "Dark Blue", icon: Droplet, swatch: "#1e3a5f" },
+  { id: "navy", label: "Navy", icon: Anchor, swatch: "#111c30" },
 ];
 
-const CLASSES: Theme[] = ['dark', 'light', 'kingblue', 'darkblue', 'navy'];
+const CLASSES: Theme[] = ["dark", "light", "kingblue", "darkblue", "navy"];
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>('dark');
+  const [theme, setTheme] = useState<Theme>("dark");
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -32,15 +32,19 @@ export default function ThemeToggle() {
     function onDoc(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
 
   function pick(next: Theme) {
     const el = document.documentElement;
     el.classList.remove(...CLASSES);
     el.classList.add(next);
-    try { localStorage.setItem('xboss_theme', next); } catch { /* private mode */ }
+    try {
+      localStorage.setItem("xboss_theme", next);
+    } catch {
+      /* private mode */
+    }
     setTheme(next);
     setOpen(false);
   }
@@ -66,7 +70,9 @@ export default function ThemeToggle() {
           role="menu"
           className="absolute right-0 mt-2 w-44 rounded-xl border border-zinc-800 bg-zinc-950 shadow-xl p-1 z-50"
         >
-          <p className="px-3 pt-1.5 pb-1 text-[10px] uppercase tracking-wide text-zinc-500">Giao diện</p>
+          <p className="px-3 pt-1.5 pb-1 text-[10px] uppercase tracking-wide text-zinc-500">
+            Giao diện
+          </p>
           {THEMES.map((t) => {
             const Icon = t.icon;
             const active = t.id === theme;
@@ -77,7 +83,7 @@ export default function ThemeToggle() {
                 aria-checked={active}
                 onClick={() => pick(t.id)}
                 className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition
-                  ${active ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-300 hover:bg-zinc-900'}`}
+                  ${active ? "bg-zinc-800 text-zinc-100" : "text-zinc-300 hover:bg-zinc-900"}`}
               >
                 <span
                   className="w-4 h-4 rounded-full border border-zinc-700 shrink-0"

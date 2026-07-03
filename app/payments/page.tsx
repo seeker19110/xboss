@@ -160,6 +160,7 @@ function KpiCard({
 export default function PaymentsPage() {
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
+  const [forbidden, setForbidden] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
   const { editMode, toggle: toggleEditMode } = useEditMode(canEdit);
   const [edits, setEdits] = useState<Record<EditKey, string>>({});
@@ -181,6 +182,11 @@ export default function PaymentsPage() {
     ]);
     if (dr.status === 401) {
       window.location.href = "/login";
+      return;
+    }
+    if (dr.status === 403) {
+      setForbidden(true);
+      setLoading(false);
       return;
     }
     const d: Data = await dr.json();
@@ -325,6 +331,19 @@ export default function PaymentsPage() {
   }
 
   if (loading) return <PageSkeleton />;
+  if (forbidden)
+    return (
+      <div className="min-h-screen bg-zinc-950 text-white">
+        <AppHeader title="Thanh toán tiến độ" />
+        <main className="max-w-xl mx-auto px-4 py-16 text-center space-y-3">
+          <p className="text-lg font-semibold">Không có quyền truy cập</p>
+          <p className="text-sm text-zinc-400">Trang thanh toán chỉ dành cho Admin, PM và BCH.</p>
+          <a href="/my-tasks" className="inline-block text-sm text-emerald-400 hover:underline">
+            ← Về Việc của tôi
+          </a>
+        </main>
+      </div>
+    );
   if (!data) return null;
 
   const sheets = [...new Map(data.rows.map((r) => [r.sheetType, r.sheetSlug])).entries()].map(

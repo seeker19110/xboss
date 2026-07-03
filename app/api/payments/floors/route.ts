@@ -1,15 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, CAN } from "@/lib/auth";
 import { query } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 type FloorBase = {
-  sheetTypeId: number; sheetType: string; floorLabel: string; contractValue: number;
+  sheetTypeId: number;
+  sheetType: string;
+  floorLabel: string;
+  contractValue: number;
 };
 type BillHistory = {
-  sheetTypeId: number; floorLabel: string; period: string | null;
-  pctThisPeriod: number; amount: number; paidDate: string;
+  sheetTypeId: number;
+  floorLabel: string;
+  period: string | null;
+  pctThisPeriod: number;
+  amount: number;
+  paidDate: string;
 };
 
 // GET /api/payments/floors?person=X
@@ -17,12 +24,15 @@ type BillHistory = {
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (!CAN.viewPayments(user.role))
+    return NextResponse.json({ error: "Chỉ Admin/PM/BCH được xem thanh toán" }, { status: 403 });
 
   const person = req.nextUrl.searchParams.get("person")?.trim() ?? "";
   if (!person) return NextResponse.json({ floors: [] });
 
   const [floorRows, histRows] = await Promise.all([
-    query<FloorBase>(`
+    query<FloorBase>(
+      `
       SELECT st.id AS "sheetTypeId", st.code AS "sheetType",
              wp.floor_label AS "floorLabel",
              COALESCE(fc.contract_value, 0) AS "contractValue"
@@ -33,16 +43,21 @@ export async function GET(req: NextRequest) {
        WHERE st.responsible = ?
          AND wp.floor_label IS NOT NULL AND wp.floor_label <> ''
        GROUP BY st.id, st.code, wp.floor_label, fc.contract_value
-       ORDER BY st.id, wp.floor_label`, person),
+       ORDER BY st.id, wp.floor_label`,
+      person,
+    ),
 
-    query<BillHistory>(`
+    query<BillHistory>(
+      `
       SELECT sheet_type_id AS "sheetTypeId", floor_label AS "floorLabel",
              period, pct_this_period AS "pctThisPeriod",
              amount, paid_date AS "paidDate"
         FROM payment_bills
        WHERE responsible = ? AND type = 'bill'
          AND sheet_type_id IS NOT NULL AND floor_label IS NOT NULL
-       ORDER BY paid_date ASC, id ASC`, person),
+       ORDER BY paid_date ASC, id ASC`,
+      person,
+    ),
   ]);
 
   // Gộp history vào từng tầng
@@ -50,10 +65,11 @@ export async function GET(req: NextRequest) {
   for (const h of histRows) {
     const k = `${h.sheetTypeId}__${h.floorLabel}`;
     const list = histMap.get(k) ?? [];
-    list.push(h); histMap.set(k, list);
+    list.push(h);
+    histMap.set(k, list);
   }
 
-  const floors = floorRows.map(f => {
+  const floors = floorRows.map((f) => {
     const history = histMap.get(`${f.sheetTypeId}__${f.floorLabel}`) ?? [];
     const pctPaid = history.reduce((s, h) => s + (h.pctThisPeriod ?? 0), 0);
     return { ...f, pctPaid, history };
