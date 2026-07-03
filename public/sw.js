@@ -1,27 +1,34 @@
 // Service worker XBoss — network-first cho trang, stale-while-revalidate cho API GET,
 // cache-first cho asset tĩnh.
 // Mất mạng (hầm, tầng kỹ thuật) vẫn xem được dữ liệu tracking đã tải lần cuối.
-const CACHE = "xboss-v6";
+const CACHE = "xboss-v7";
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => {
   e.waitUntil(
-    caches.keys()
+    caches
+      .keys()
       .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim())
+      .then(() => self.clients.claim()),
   );
 });
 
 // Web Push: hiện notification hệ thống khi server đẩy (kể cả khi app không mở).
 self.addEventListener("push", (e) => {
   let data = { title: "XBoss", body: "", url: "/" };
-  try { data = { ...data, ...e.data.json() }; } catch { /* payload không phải JSON — dùng mặc định */ }
-  e.waitUntil(self.registration.showNotification(data.title, {
-    body: data.body,
-    icon: "/icon.svg",
-    badge: "/icon.svg",
-    data: { url: data.url },
-  }));
+  try {
+    data = { ...data, ...e.data.json() };
+  } catch {
+    /* payload không phải JSON — dùng mặc định */
+  }
+  e.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: "/icon.svg",
+      badge: "/icon.svg",
+      data: { url: data.url },
+    }),
+  );
 });
 
 self.addEventListener("notificationclick", (e) => {
@@ -29,9 +36,13 @@ self.addEventListener("notificationclick", (e) => {
   const url = e.notification.data?.url ?? "/";
   e.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
-      for (const c of list) if ("focus" in c) { c.navigate(url); return c.focus(); }
+      for (const c of list)
+        if ("focus" in c) {
+          c.navigate(url);
+          return c.focus();
+        }
       return self.clients.openWindow(url);
-    })
+    }),
   );
 });
 
@@ -39,15 +50,19 @@ self.addEventListener("notificationclick", (e) => {
 self.addEventListener("message", (e) => {
   if (e.data?.type === "CLEAR_CACHE") {
     e.waitUntil(
-      caches.open(CACHE).then((cache) =>
-        cache.keys().then((keys) =>
-          Promise.all(
-            keys
-              .filter((r) => new URL(r.url).pathname.startsWith("/api/"))
-              .map((r) => cache.delete(r))
-          )
-        )
-      )
+      caches
+        .open(CACHE)
+        .then((cache) =>
+          cache
+            .keys()
+            .then((keys) =>
+              Promise.all(
+                keys
+                  .filter((r) => new URL(r.url).pathname.startsWith("/api/"))
+                  .map((r) => cache.delete(r)),
+              ),
+            ),
+        ),
     );
   }
 });
@@ -59,30 +74,44 @@ self.addEventListener("fetch", (e) => {
   // Mất mạng hoàn toàn → trả bản cache gần nhất.
   // Trừ: ảnh/tài liệu (cache riêng bởi browser) và SSE /api/events (stream).
   if (url.pathname.startsWith("/api/")) {
-    if (url.pathname.startsWith("/api/photos/") || url.pathname.startsWith("/api/documents/") || url.pathname.startsWith("/api/events")) return;
+    if (
+      url.pathname.startsWith("/api/photos/") ||
+      url.pathname.startsWith("/api/documents/") ||
+      url.pathname.startsWith("/api/events")
+    )
+      return;
     e.respondWith(
       caches.open(CACHE).then((cache) =>
         cache.match(e.request).then((cached) => {
-          const networkFetch = fetch(e.request).then((res) => {
-            if (res.ok) cache.put(e.request, res.clone());
-            return res;
-          }).catch(() => cached ?? Response.error());
+          const networkFetch = fetch(e.request)
+            .then((res) => {
+              if (res.ok) cache.put(e.request, res.clone());
+              return res;
+            })
+            .catch(() => cached ?? Response.error());
           // Có cache → trả ngay + cập nhật ngầm; không có cache → chờ mạng
           return cached ?? networkFetch;
-        })
-      )
+        }),
+      ),
     );
     return;
   }
 
   // Asset build của Next (immutable) → cache-first.
+  // Chỉ dùng/cache response tốt: lúc deploy chunk cũ có thể trả 404/500 (text/plain),
+  // nếu cache bản lỗi thì trang hỏng vĩnh viễn (ChunkLoadError) tới khi xoá site data.
   if (url.pathname.startsWith("/_next/static/")) {
     e.respondWith(
-      caches.match(e.request).then((hit) => hit ?? fetch(e.request).then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(e.request, copy));
-        return res;
-      }))
+      caches.match(e.request).then((hit) => {
+        if (hit && hit.ok) return hit;
+        return fetch(e.request).then((res) => {
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(e.request, copy));
+          }
+          return res;
+        });
+      }),
     );
     return;
   }
@@ -97,6 +126,6 @@ self.addEventListener("fetch", (e) => {
         }
         return res;
       })
-      .catch(() => caches.match(e.request))
+      .catch(() => caches.match(e.request)),
   );
 });
