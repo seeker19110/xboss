@@ -106,17 +106,17 @@ function TowerCurrentTable({
       className="overflow-x-auto -mx-3 sm:-mx-4 px-3 sm:px-4"
       style={{ WebkitOverflowScrolling: "touch" }}
     >
-      <p className="text-[10px] text-zinc-600 mb-1 sm:hidden">← Vuốt ngang để xem đủ cột →</p>
+      <p className="text-[10px] text-zinc-400 mb-1 sm:hidden">← Vuốt ngang để xem đủ cột →</p>
       <table
         className="border-separate border-spacing-1"
         style={{ minWidth: `${80 + 56 + filteredSheets.length * 76}px` }}
       >
         <thead>
           <tr>
-            <th className="sticky left-0 z-10 bg-zinc-900 text-left pl-0 pr-2 py-1.5 text-xs font-semibold text-zinc-500 w-16 sm:w-20">
+            <th className="sticky left-0 z-10 bg-zinc-900 text-left pl-0 pr-2 py-1.5 text-xs font-semibold text-zinc-400 w-16 sm:w-20">
               Tầng
             </th>
-            <th className="text-right px-2 py-1.5 text-xs font-semibold text-zinc-500 w-12 sm:w-14">
+            <th className="text-right px-2 py-1.5 text-xs font-semibold text-zinc-400 w-12 sm:w-14">
               TB
             </th>
             {filteredSheets.map((s) => (
@@ -406,6 +406,7 @@ export default function ProgressMap() {
         <select
           value={sheetFilter}
           onChange={(e) => setSheetFilter(e.target.value)}
+          aria-label="Lọc theo hệ"
           className="text-xs bg-zinc-950 border border-zinc-800 text-zinc-300 rounded-lg px-2 py-2 focus:outline-none min-w-0"
         >
           <option value="all">Tất cả hệ</option>
@@ -418,7 +419,7 @@ export default function ProgressMap() {
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-2 flex-wrap text-[10px] sm:text-[11px] text-zinc-500">
+      <div className="flex items-center gap-2 flex-wrap text-[10px] sm:text-[11px] text-zinc-400">
         {LEGEND.map((l) => (
           <span key={l.label} className="flex items-center gap-1 shrink-0">
             <span className={`inline-block w-3 h-3 sm:w-4 sm:h-4 rounded ${l.cls}`} />
@@ -431,7 +432,7 @@ export default function ProgressMap() {
       {mode === "current" && (
         <>
           {towers.every((t) => t.floors.length === 0) ? (
-            <div className="py-14 text-center text-zinc-500 bg-zinc-950 border border-zinc-800 rounded-xl">
+            <div className="py-14 text-center text-zinc-400 bg-zinc-950 border border-zinc-800 rounded-xl">
               <Layers className="w-10 h-10 mx-auto mb-3 opacity-20" />
               <p className="text-sm">Chưa có dữ liệu tầng.</p>
             </div>
@@ -510,7 +511,7 @@ export default function ProgressMap() {
       {mode === "history" && (
         <>
           {weeks.length === 0 ? (
-            <div className="py-14 text-center text-zinc-500 bg-zinc-950 border border-zinc-800 rounded-xl">
+            <div className="py-14 text-center text-zinc-400 bg-zinc-950 border border-zinc-800 rounded-xl">
               <TrendingUp className="w-10 h-10 mx-auto mb-3 opacity-20" />
               <p className="text-sm">Chưa có lịch sử tiến độ (cần ít nhất 1 tuần dữ liệu).</p>
             </div>
@@ -519,7 +520,7 @@ export default function ProgressMap() {
               className="overflow-x-auto -mx-3 sm:-mx-4 px-3 sm:px-4"
               style={{ WebkitOverflowScrolling: "touch" }}
             >
-              <p className="text-[10px] text-zinc-600 mb-1 sm:hidden">
+              <p className="text-[10px] text-zinc-400 mb-1 sm:hidden">
                 ← Vuốt ngang để xem đủ tuần →
               </p>
               <table
@@ -528,13 +529,13 @@ export default function ProgressMap() {
               >
                 <thead>
                   <tr>
-                    <th className="sticky left-0 z-10 bg-zinc-900 text-left pl-0 pr-2 py-1.5 text-xs font-semibold text-zinc-500 w-16 sm:w-20">
+                    <th className="sticky left-0 z-10 bg-zinc-900 text-left pl-0 pr-2 py-1.5 text-xs font-semibold text-zinc-400 w-16 sm:w-20">
                       Tầng
                     </th>
                     {weeks.map((w) => (
                       <th
                         key={w}
-                        className="text-center px-0.5 py-1.5 text-[10px] text-zinc-500 w-8 sm:w-10"
+                        className="text-center px-0.5 py-1.5 text-[10px] text-zinc-400 w-8 sm:w-10"
                       >
                         {fmtWeek(w)}
                       </th>
