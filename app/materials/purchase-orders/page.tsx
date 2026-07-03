@@ -733,8 +733,7 @@ export default function PurchaseOrdersPage() {
               {gridMode && (
                 <div className="space-y-1.5 mb-1">
                   <p className="text-xs text-zinc-500">
-                    Dán cột mã BOQ (hoặc tên vật tư), SL, đơn giá, ghi chú từ Excel. <b>Ctrl/⌘+V</b>{" "}
-                    dán cả vùng, <b>Enter</b> xuống dòng, <b>Ctrl/⌘+D</b> điền xuống. Vật tư không
+                    Dán cột mã BOQ (hoặc tên vật tư), SL, đơn giá, ghi chú từ Excel. Vật tư không
                     khớp sẽ để trống.
                   </p>
                   <SpreadsheetGrid<POGridRow>
