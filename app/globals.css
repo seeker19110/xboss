@@ -183,6 +183,24 @@ body {
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
+
+/* Thanh điều hướng (AppHeader) cố định dưới đáy màn hình — position:fixed không
+   chiếm chỗ trong flow nên chừa padding-bottom trên <body> để nội dung cuối trang
+   không bị thanh che. Class do AppHeader gắn/gỡ qua useEffect. */
+body.has-bottom-nav {
+  padding-bottom: calc(3rem + env(safe-area-inset-bottom, 0px));
+}
+/* Mobile có thêm hàng search (pt-2 + input h-10 + pb-1 ≈ 3.25rem) phía trên nav */
+@media (max-width: 639px) {
+  body.has-bottom-nav.has-bottom-search {
+    padding-bottom: calc(6.25rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+@media print {
+  body.has-bottom-nav {
+    padding-bottom: 0;
+  }
+}
 .safe-top {
   padding-top: env(safe-area-inset-top, 0px);
 }

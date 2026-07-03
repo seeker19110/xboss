@@ -106,21 +106,18 @@ export default function Dashboard() {
     copyFromId: number | "";
   } | null>(null);
   const [newSheetErr, setNewSheetErr] = useState("");
-  const [projectName, setProjectName] = useState<string | null>(null);
   const [kpiOrder, setKpiOrder] = useState<KPI[]>([]);
   const dragIdx = useRef<number | null>(null);
   const dragOverIdx = useRef<number | null>(null);
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/project").then((r) => (r.ok ? r.json() : null)),
       fetchMe(),
       fetch("/api/dashboard").then((r) => (r.ok ? r.json() : null)),
       fetch("/api/sheets").then((r) => (r.ok ? r.json() : null)),
     ])
-      .then(([proj, meData, dash, sh]) => {
+      .then(([meData, dash, sh]) => {
         if (!meData) return;
-        setProjectName(proj?.name ?? null);
         setMe(meData);
         setData(dash);
         setKpiOrder(dash?.kpi ?? []);
@@ -269,7 +266,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <AppHeader title="🏗️ XBoss" subtitle={projectName ?? "Quản lý tiến độ thi công MEP"}>
+      <AppHeader>
         {canImport && (
           <a
             href="/api/export/excel"
