@@ -16,8 +16,7 @@ const THEMES: { id: Theme; label: string; icon: typeof Sun; swatch: string }[] =
 
 const CLASSES: Theme[] = ["dark", "light", "kingblue", "darkblue", "navy"];
 
-// dropUp: mở menu lên trên (khi đặt trong thanh nav dưới đáy).
-export default function ThemeToggle({ dropUp = false }: { dropUp?: boolean }) {
+export default function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>("dark");
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -69,7 +68,7 @@ export default function ThemeToggle({ dropUp = false }: { dropUp?: boolean }) {
       {open && (
         <div
           role="menu"
-          className={`absolute right-0 ${dropUp ? "bottom-full mb-2" : "mt-2"} w-44 rounded-xl border border-zinc-800 bg-zinc-950 shadow-xl p-1 z-50`}
+          className="absolute right-0 mt-2 w-44 rounded-xl border border-zinc-800 bg-zinc-950 shadow-xl p-1 z-50"
         >
           <p className="px-3 pt-1.5 pb-1 text-[10px] uppercase tracking-wide text-zinc-500">
             Giao diện

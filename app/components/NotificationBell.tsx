@@ -22,8 +22,7 @@ function urlBase64ToUint8Array(base64: string): Uint8Array {
 
 type PushState = "unavailable" | "off" | "on" | "denied" | "busy";
 
-// dropUp: mở panel lên trên (khi đặt trong thanh nav dưới đáy).
-export default function NotificationBell({ dropUp = false }: { dropUp?: boolean }) {
+export default function NotificationBell() {
   const [items, setItems] = useState<Notif[]>([]);
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
@@ -141,9 +140,7 @@ export default function NotificationBell({ dropUp = false }: { dropUp?: boolean 
       </button>
 
       {open && (
-        <div
-          className={`absolute right-0 ${dropUp ? "bottom-full mb-2" : "mt-2"} w-96 max-w-[90vw] bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden`}
-        >
+        <div className="absolute right-0 mt-2 w-96 max-w-[90vw] bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-800">
             <span className="text-sm font-semibold">
               Thông báo {unread > 0 && <span className="text-red-400">({unread} mới)</span>}

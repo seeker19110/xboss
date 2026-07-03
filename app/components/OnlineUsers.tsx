@@ -9,14 +9,7 @@ const ROLE_LABEL: Record<string, string> = ROLE_LABELS;
 const HEARTBEAT_MS = 60_000; // gửi heartbeat mỗi 60s
 const POLL_MS = 30_000; // tải lại danh sách admin mỗi 30s
 
-// dropUp: mở popover lên trên (khi đặt trong thanh nav dưới đáy).
-export default function OnlineUsers({
-  isAdmin,
-  dropUp = false,
-}: {
-  isAdmin: boolean;
-  dropUp?: boolean;
-}) {
+export default function OnlineUsers({ isAdmin }: { isAdmin: boolean }) {
   const [users, setUsers] = useState<PresenceEntry[]>([]);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -78,9 +71,7 @@ export default function OnlineUsers({
       </button>
 
       {open && (
-        <div
-          className={`absolute right-0 ${dropUp ? "bottom-8" : "top-8"} z-50 w-64 rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl`}
-        >
+        <div className="absolute right-0 top-8 z-50 w-64 rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl">
           <div className="px-4 py-3 border-b border-zinc-800">
             <p className="text-sm font-semibold text-zinc-100">Đang online ({count})</p>
             <p className="text-xs text-zinc-500 mt-0.5">Cập nhật mỗi 30 giây</p>

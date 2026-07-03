@@ -31,8 +31,7 @@ function hitUrl(h: Hit): string {
   return `/tracking/${slug}${h.floorLabel ? `?floor=${encodeURIComponent(h.floorLabel)}` : ""}`;
 }
 
-// dropUp: mở danh sách kết quả lên trên (khi đặt trong thanh nav dưới đáy).
-export default function GlobalSearch({ dropUp = false }: { dropUp?: boolean }) {
+export default function GlobalSearch() {
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<Hit[]>([]);
   const [open, setOpen] = useState(false);
@@ -98,9 +97,7 @@ export default function GlobalSearch({ dropUp = false }: { dropUp?: boolean }) {
       />
 
       {open && q.trim().length >= 2 && (
-        <div
-          className={`absolute left-0 right-0 ${dropUp ? "bottom-full mb-2" : "mt-2"} bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden`}
-        >
+        <div className="absolute left-0 right-0 mt-2 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden">
           <div className="max-h-80 overflow-auto">
             {busy && <p className="px-4 py-3 text-sm text-zinc-500">Đang tìm...</p>}
             {!busy && hits.length === 0 && (

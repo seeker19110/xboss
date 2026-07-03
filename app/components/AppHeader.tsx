@@ -61,23 +61,8 @@ export default function AppHeader({
     fetchMe().then((u) => setMe(u));
   }, []);
 
-  // Thanh cố định dưới đáy không chiếm chỗ trong flow — gắn class lên <body>
-  // để globals.css chừa padding-bottom cho nội dung không bị che.
-  useEffect(() => {
-    document.body.classList.add("has-bottom-nav");
-    if (search) document.body.classList.add("has-bottom-search");
-    return () => document.body.classList.remove("has-bottom-nav", "has-bottom-search");
-  }, [search]);
-
   return (
-    <header className="fixed bottom-0 inset-x-0 z-40 bg-zinc-950 border-t border-zinc-800 safe-bottom print:hidden">
-      {/* Mobile: search hàng riêng phía trên nav */}
-      {search && (
-        <div className="sm:hidden px-3 pt-2 pb-1">
-          <GlobalSearch dropUp />
-        </div>
-      )}
-
+    <header className="sticky top-0 z-40 bg-zinc-950 border-b border-zinc-800 print:hidden">
       {/* Hàng duy nhất: nav · [title trang con] · controls */}
       <div className="flex items-center gap-1 px-3 h-12 min-w-0">
         {/* Nav chính — cuộn ngang khi chật, ẩn label trên mobile */}
@@ -127,13 +112,13 @@ export default function AppHeader({
         <div className="flex items-center gap-1 shrink-0 ml-1">
           {search && (
             <div className="hidden sm:block w-52 lg:w-72">
-              <GlobalSearch dropUp />
+              <GlobalSearch />
             </div>
           )}
           {children}
-          <ThemeToggle dropUp />
-          <OnlineUsers isAdmin={me?.role === "admin"} dropUp />
-          <NotificationBell dropUp />
+          <ThemeToggle />
+          <OnlineUsers isAdmin={me?.role === "admin"} />
+          <NotificationBell />
           {me && (
             <a
               href="/account"
@@ -149,6 +134,13 @@ export default function AppHeader({
           )}
         </div>
       </div>
+
+      {/* Mobile: search hàng 2 */}
+      {search && (
+        <div className="sm:hidden px-3 pb-2">
+          <GlobalSearch />
+        </div>
+      )}
     </header>
   );
 }

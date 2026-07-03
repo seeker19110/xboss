@@ -266,35 +266,41 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <AppHeader>
-        {canImport && (
+      <AppHeader />
+
+      {/* Thanh hành động cố định dưới đáy: Excel · PDF · Import Excel */}
+      <div className="fixed bottom-0 inset-x-0 z-40 bg-zinc-950 border-t border-zinc-800 safe-bottom print:hidden">
+        <div className="flex items-center justify-end gap-2 px-4 sm:px-6 py-2 max-w-screen-xl mx-auto">
+          {canImport && (
+            <a
+              href="/api/export/excel"
+              aria-label="Xuất Excel"
+              className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-3 py-2 rounded-lg text-sm font-medium transition"
+            >
+              <FileDown className="w-4 h-4" /> Excel
+            </a>
+          )}
           <a
-            href="/api/export/excel"
-            aria-label="Xuất Excel"
+            href="/report"
+            aria-label="Xem báo cáo PDF"
             className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-3 py-2 rounded-lg text-sm font-medium transition"
           >
-            <FileDown className="w-4 h-4" /> <span className="hidden sm:inline">Excel</span>
+            <Printer className="w-4 h-4" /> PDF
           </a>
-        )}
-        <a
-          href="/report"
-          aria-label="Xem báo cáo PDF"
-          className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-3 py-2 rounded-lg text-sm font-medium transition"
-        >
-          <Printer className="w-4 h-4" /> <span className="hidden sm:inline">PDF</span>
-        </a>
-        {canImport && (
-          <a
-            href="/import"
-            aria-label="Import Excel"
-            className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition"
-          >
-            <Upload className="w-4 h-4" /> <span className="hidden sm:inline">Import Excel</span>
-          </a>
-        )}
-      </AppHeader>
+          {canImport && (
+            <a
+              href="/import"
+              aria-label="Import Excel"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition"
+            >
+              <Upload className="w-4 h-4" /> Import Excel
+            </a>
+          )}
+        </div>
+      </div>
 
-      <main className="px-4 sm:px-6 py-6 space-y-6 max-w-screen-xl mx-auto">
+      {/* pb-24 chừa chỗ cho thanh hành động cố định dưới đáy */}
+      <main className="px-4 sm:px-6 py-6 pb-24 space-y-6 max-w-screen-xl mx-auto">
         {/* ── KPI ── */}
         <section>
           {/* Tổng trễ — banner nổi bật */}
