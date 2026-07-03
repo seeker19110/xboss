@@ -6,7 +6,6 @@ import {
   ClipboardList,
   Package,
   CheckSquare,
-  Layers,
   DollarSign,
 } from "lucide-react";
 import NotificationBell from "@/app/components/NotificationBell";
@@ -46,13 +45,6 @@ const NAV = [
     label: "Nghiệm thu",
     icon: CheckSquare,
     color: "text-teal-400",
-  },
-  {
-    href: "/timeline",
-    tkey: "nav.timeline",
-    label: "Timeline tầng",
-    icon: Layers,
-    color: "text-indigo-400",
   },
   {
     href: "/payments",

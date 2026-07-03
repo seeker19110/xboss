@@ -42,12 +42,12 @@ Schema **tự khởi tạo** khi app chạy query đầu tiên (`CREATE TABLE IF
 
 Khi DB chưa có user, môi trường **dev** tự tạo 4 tài khoản demo:
 
-| Email | Mật khẩu | Vai trò |
-|---|---|---|
-| `admin@xboss.vn` | `admin123` | Admin |
-| `pm@xboss.vn` | `pm123` | PM |
-| `engineer@xboss.vn` | `eng123` | Kỹ sư |
-| `subcon@xboss.vn` | `sub123` | Thầu phụ |
+| Email               | Mật khẩu   | Vai trò  |
+| ------------------- | ---------- | -------- |
+| `admin@xboss.vn`    | `admin123` | Admin    |
+| `pm@xboss.vn`       | `pm123`    | PM       |
+| `engineer@xboss.vn` | `eng123`   | Kỹ sư    |
+| `subcon@xboss.vn`   | `sub123`   | Thầu phụ |
 
 > ⚠️ **Production**: nếu DB trống, hệ thống chỉ tạo **1 admin** với mật khẩu lấy từ `XBOSS_ADMIN_PASSWORD` (không seed 4 tài khoản demo). Bắt buộc đặt `XBOSS_SECRET` để ký cookie phiên.
 
@@ -55,22 +55,23 @@ Khi DB chưa có user, môi trường **dev** tự tạo 4 tài khoản demo:
 
 ## Biến môi trường
 
-| Biến | Bắt buộc | Mô tả |
-|---|---|---|
-| `DATABASE_URL` | ✅ khi chạy app | Chuỗi kết nối Postgres |
-| `XBOSS_SECRET` | ✅ production | Ký cookie phiên (HMAC); thiếu → throw lúc ký/xác minh token |
-| `XBOSS_ADMIN_PASSWORD` | production | Mật khẩu admin khởi tạo khi DB trống |
-| `CRON_SECRET` | tuỳ chọn | Bảo vệ endpoint cron, nhận qua header `Authorization: Bearer` |
-| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | tuỳ chọn | Gửi báo cáo trễ hạn qua Telegram (song song email SMTP) |
-| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | tuỳ chọn | Web Push; sinh bằng `npx web-push generate-vapid-keys`. Thiếu → nút bật push tự ẩn |
-| SMTP (`SMTP_HOST`...) | tuỳ chọn | Gửi email báo cáo hằng ngày / tuần |
-| `TEST_DATABASE_URL` | tuỳ chọn | Postgres test riêng cho test tích hợp (không có thì test tự skip) |
+| Biến                                                       | Bắt buộc        | Mô tả                                                                              |
+| ---------------------------------------------------------- | --------------- | ---------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                             | ✅ khi chạy app | Chuỗi kết nối Postgres                                                             |
+| `XBOSS_SECRET`                                             | ✅ production   | Ký cookie phiên (HMAC); thiếu → throw lúc ký/xác minh token                        |
+| `XBOSS_ADMIN_PASSWORD`                                     | production      | Mật khẩu admin khởi tạo khi DB trống                                               |
+| `CRON_SECRET`                                              | tuỳ chọn        | Bảo vệ endpoint cron, nhận qua header `Authorization: Bearer`                      |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`                  | tuỳ chọn        | Gửi báo cáo trễ hạn qua Telegram (song song email SMTP)                            |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | tuỳ chọn        | Web Push; sinh bằng `npx web-push generate-vapid-keys`. Thiếu → nút bật push tự ẩn |
+| SMTP (`SMTP_HOST`...)                                      | tuỳ chọn        | Gửi email báo cáo hằng ngày / tuần                                                 |
+| `TEST_DATABASE_URL`                                        | tuỳ chọn        | Postgres test riêng cho test tích hợp (không có thì test tự skip)                  |
 
 ---
 
 ## Tính năng chính
 
 ### Tracking & tính toán tiến độ
+
 - **Sheet động**: trang tracking không hardcode — tạo/đổi tên/xoá sheet qua UI (Admin/PM), slug lưu ở `sheet_types.slug`. 5 sheet gốc: OGTĐ, OGHL, OGCH, ODNN Zone 1/2.
 - **Lưới checkbox**: drill-down nhóm → task → ô tiến độ theo kích thước ống / căn hộ; tick ô → tự tính lại % task → % nhóm → ghi `task_history`.
 - **Đồng bộ realtime đa người dùng**: SSE (`/api/events`) đẩy event khi sheet đổi; lỗi/serverless cắt → tự fallback poll `/api/tasks/version`. Mất mạng: tick được xếp hàng trong localStorage và tự gửi lại khi online.
@@ -78,6 +79,7 @@ Khi DB chưa có user, môi trường **dev** tự tạo 4 tài khoản demo:
 - **Sửa hàng loạt** (Admin/PM): sửa ngày BĐ/KT qua modal; chọn nhiều task → gán người / đặt ngày hàng loạt.
 
 ### Dashboard & báo cáo
+
 - **Dashboard**: KPI per sheet, **SPI** (chỉ số tiến độ), heatmap tầng × hệ (bấm ô mở thẳng sheet tại tầng), **dự báo ngày hoàn thành** từng hệ, cảnh báo task đình trệ, panel **Pareto nguyên nhân trễ**.
 - **S-curve** (`/api/dashboard/scurve`): đường kế hoạch nội suy + đường thực tế tái dựng từ `task_history`; nhận `?baseline=<id>` để so với kế hoạch đã chốt.
 - **Baseline kế hoạch**: chốt snapshot ngày + % toàn bộ task để đo độ lệch khi PM dời ngày.
@@ -87,16 +89,19 @@ Khi DB chưa có user, môi trường **dev** tự tạo 4 tài khoản demo:
 - **Báo cáo hằng ngày / hằng tuần**: email + Telegram, gọi qua cron (`CRON_SECRET`); Vercel Cron có sẵn trong `vercel.json`, VPS dùng crontab.
 
 ### Nghiệm thu & tài liệu
+
 - **Nghiệm thu 2 bước**: `nghiem_thu` chỉ đặt/huỷ qua `/api/tasks/:id/approve` (Admin/PM, task 100%, ghi audit). Duyệt theo lô tại `/approvals` + upload **biên bản nghiệm thu** (PDF/ảnh).
 - **Ảnh hiện trường** & **link bản vẽ/BBNT** gắn cho từng task/nhóm.
 
 ### Cộng tác & thông báo
+
 - **Bình luận** trên từng task (kèm notification cho người liên quan).
 - **Thông báo** 🔔: tự đồng bộ 4 loại — `delayed`, `due_soon`, `comment`, `material_over`.
 - **Web Push** (per thiết bị) + **tìm kiếm toàn cục** (mã/BOQCODE/tên, nhảy tới sheet + filter tầng).
 - **Nguyên nhân trễ**: danh mục 6 lý do, gán theo task; hiển thị Pareto trên dashboard.
 
 ### Quản lý & phân quyền
+
 - **Vật tư** (`/materials`): định mức / đã dùng theo hệ, vòng đời đặt hàng → về kho → đã dùng; mọi thay đổi `qty_used` ghi `material_transactions`; cảnh báo vượt định mức.
 - **RBAC**: 4 vai trò `admin | pm | engineer | subcon` (map `CAN`); subcon chỉ thao tác task được gán. Quản lý user tại `/users`; tự đổi mật khẩu tại `/password`.
 - **PWA**: cài lên màn hình chính, cache offline qua service worker; `/my-tasks` lọc theo người được giao.
@@ -115,7 +120,7 @@ xboss/
 │   ├── approvals/ materials/ # Nghiệm thu theo lô + vật tư
 │   ├── report/ my-tasks/     # Báo cáo in PDF + task của tôi
 │   ├── users/                # Quản lý người dùng (Admin)
-│   ├── components/           # AppHeader, NotificationBell, GlobalSearch, SCurveChart, FloorHeatmap...
+│   ├── components/           # AppHeader, NotificationBell, GlobalSearch, SCurveChart, ProgressMapCard...
 │   └── api/                  # REST API routes (đều force-dynamic + check auth)
 │       ├── auth/ dashboard/ tasks/ workpackages/ dimensions/
 │       ├── sheets/ baselines/ approvals/ notifications/ push/
@@ -140,15 +145,15 @@ xboss/
 
 ## Scripts
 
-| Command | Mô tả |
-|---|---|
-| `npm run dev` | Chạy dev server (cần `.env.local`) |
-| `npm run build` | Build production (pool kết nối lazy — không cần DB thật) |
-| `npm run lint` | `next lint` |
-| `npm run typecheck` | `tsc --noEmit` |
-| `npm test` | Unit tests (status / recompute / import) |
-| `npx tsx --test tests/status.test.ts` | Chạy 1 file test |
-| `npm run db:seed` | Seed từ Excel AVIO trong `attachments/` |
+| Command                               | Mô tả                                                    |
+| ------------------------------------- | -------------------------------------------------------- |
+| `npm run dev`                         | Chạy dev server (cần `.env.local`)                       |
+| `npm run build`                       | Build production (pool kết nối lazy — không cần DB thật) |
+| `npm run lint`                        | `next lint`                                              |
+| `npm run typecheck`                   | `tsc --noEmit`                                           |
+| `npm test`                            | Unit tests (status / recompute / import)                 |
+| `npx tsx --test tests/status.test.ts` | Chạy 1 file test                                         |
+| `npm run db:seed`                     | Seed từ Excel AVIO trong `attachments/`                  |
 
 Test tích hợp (`recompute.test.ts`) chỉ chạy khi đặt `TEST_DATABASE_URL`; không có thì tự skip. CI (`.github/workflows/ci.yml`) chạy `npm audit` → lint → typecheck → test (Postgres 16 service) → build trên mỗi push/PR.
 
