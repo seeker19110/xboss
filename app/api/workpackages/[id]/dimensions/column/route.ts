@@ -70,6 +70,11 @@ export async function POST(
     ...vals,
   );
 
+  // Thêm cột làm tăng mẫu số mỗi task — phải tính lại % task + nhóm, nếu không %
+  // hiển thị vẫn giữ giá trị cũ (cao hơn thực tế) cho tới khi ai đó tick 1 ô.
+  for (const t of tasks) await recomputeTask(t.id, user.name);
+  await recomputePackage(pkgId);
+
   return NextResponse.json({ created: tasks.length, label, sortOrder }, { status: 201 });
 }
 
@@ -200,6 +205,10 @@ export async function PATCH(
       ...vals,
     );
   });
+
+  // Cột mới (copy) cũng tăng mẫu số mỗi task — tính lại % task + nhóm như khi thêm cột.
+  for (const t of tasks) await recomputeTask(t.id, user.name);
+  await recomputePackage(pkgId);
 
   return NextResponse.json({ created: tasks.length, label: newLabel, sortOrder }, { status: 201 });
 }
