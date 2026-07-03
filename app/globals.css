@@ -1,6 +1,9 @@
 @import "tailwindcss";
 
-:root { --background: #0a0a0a; --foreground: #ededed; }
+:root {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+}
 
 @theme inline {
   --color-background: var(--background);
@@ -8,7 +11,9 @@
 }
 
 /* Chế độ tối (mặc định) — script trong layout gắn class theo localStorage('xboss_theme') */
-html.dark { color-scheme: dark; }
+html.dark {
+  color-scheme: dark;
+}
 
 /* ─── Theme xanh dương (King Blue / Dark Blue / Navy) ───────────────────────
    Cùng cơ chế như light mode: chỉ ghi đè thang `zinc` (nền/chữ/viền) sang
@@ -30,7 +35,7 @@ html.kingblue {
   --color-zinc-300: #b3c9f4;
   --color-zinc-200: #d4e2fa;
   --color-zinc-100: #e8f0fd;
-  --color-zinc-50:  #f4f8fe;
+  --color-zinc-50: #f4f8fe;
 }
 
 /* Dark Blue — xanh dương đậm, dịu hơn King Blue */
@@ -48,7 +53,7 @@ html.darkblue {
   --color-zinc-300: #b6d3e8;
   --color-zinc-200: #d7e8f5;
   --color-zinc-100: #eaf3fb;
-  --color-zinc-50:  #f5fafd;
+  --color-zinc-50: #f5fafd;
 }
 
 /* Navy — xanh hải quân thâm trầm nhất, tông slate xanh-xám */
@@ -66,7 +71,7 @@ html.navy {
   --color-zinc-300: #cbd5e1;
   --color-zinc-200: #e2e8f0;
   --color-zinc-100: #f1f5f9;
-  --color-zinc-50:  #f8fafc;
+  --color-zinc-50: #f8fafc;
 }
 
 /* Chế độ sáng: đảo thang zinc + white/black để toàn bộ UI (viết theo dark) tự đổi màu,
@@ -88,35 +93,96 @@ html.light {
   --color-zinc-800: #e4e4e7;
   --color-zinc-900: #f4f4f5;
   --color-zinc-950: #fafafa;
-  --color-emerald-300: #047857; --color-emerald-400: #059669;
-  --color-sky-300: #0369a1;     --color-sky-400: #0284c7;
-  --color-amber-300: #b45309;   --color-amber-400: #d97706;
-  --color-violet-300: #6d28d9;  --color-violet-400: #7c3aed;
-  --color-rose-300: #be123c;    --color-rose-400: #e11d48;
-  --color-teal-300: #0f766e;    --color-teal-400: #0d9488;
-  --color-red-300: #b91c1c;     --color-red-400: #dc2626;
-  --color-blue-300: #1d4ed8;    --color-blue-400: #2563eb;
-  --color-orange-300: #c2410c;  --color-orange-400: #ea580c;
-  --color-yellow-300: #a16207;  --color-yellow-400: #ca8a04;
-  --color-cyan-300: #0e7490;    --color-cyan-400: #0891b2;
-  --color-purple-300: #7e22ce;  --color-purple-400: #9333ea;
-  --color-green-300: #15803d;   --color-green-400: #16a34a;
-  --color-indigo-300: #4338ca;  --color-indigo-400: #4f46e5;
-  --color-pink-300: #be185d;    --color-pink-400: #db2777;
-  --color-lime-300: #4d7c0f;    --color-lime-400: #65a30d;
-  --color-fuchsia-300: #a21caf; --color-fuchsia-400: #c026d3;
+  --color-emerald-300: #047857;
+  --color-emerald-400: #059669;
+  --color-sky-300: #0369a1;
+  --color-sky-400: #0284c7;
+  --color-amber-300: #b45309;
+  --color-amber-400: #d97706;
+  --color-violet-300: #6d28d9;
+  --color-violet-400: #7c3aed;
+  --color-rose-300: #be123c;
+  --color-rose-400: #e11d48;
+  --color-teal-300: #0f766e;
+  --color-teal-400: #0d9488;
+  --color-red-300: #b91c1c;
+  --color-red-400: #dc2626;
+  --color-blue-300: #1d4ed8;
+  --color-blue-400: #2563eb;
+  --color-orange-300: #c2410c;
+  --color-orange-400: #ea580c;
+  --color-yellow-300: #a16207;
+  --color-yellow-400: #ca8a04;
+  --color-cyan-300: #0e7490;
+  --color-cyan-400: #0891b2;
+  --color-purple-300: #7e22ce;
+  --color-purple-400: #9333ea;
+  --color-green-300: #15803d;
+  --color-green-400: #16a34a;
+  --color-indigo-300: #4338ca;
+  --color-indigo-400: #4f46e5;
+  --color-pink-300: #be185d;
+  --color-pink-400: #db2777;
+  --color-lime-300: #4d7c0f;
+  --color-lime-400: #65a30d;
+  --color-fuchsia-300: #a21caf;
+  --color-fuchsia-400: #c026d3;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    Arial,
+    sans-serif;
+}
+
+/* Vùng bảng tính (SpreadsheetGrid) — giao diện "trang tính sáng" kiểu Excel phải
+   ổn định ở CẢ hai theme: ghim lại giá trị gốc các token bị html.light đảo,
+   nếu không lưới sẽ thành nền đen + chữ navy tối, không đọc được ở light mode. */
+.sheet-stable {
+  color-scheme: light;
+  --color-white: #ffffff;
+  --color-zinc-50: #fafafa;
+  --color-zinc-100: #f4f4f5;
+  --color-zinc-200: #e4e4e7;
+  --color-zinc-300: #d4d4d8;
+  --color-zinc-400: #a1a1aa;
+  --color-zinc-500: #71717a;
+  --color-zinc-600: #52525b;
+  --color-zinc-700: #3f3f46;
+  --color-zinc-800: #27272a;
+  --color-zinc-900: #18181b;
+  --color-zinc-950: #09090b;
+  --color-sky-300: #7dd3fc;
+  --color-sky-400: #38bdf8;
+  --color-amber-300: #fcd34d;
+  --color-amber-400: #fbbf24;
+  --color-rose-300: #fda4af;
+  --color-rose-400: #fb7185;
+  --color-emerald-300: #6ee7b7;
+  --color-emerald-400: #34d399;
+  --color-red-300: #fca5a5;
+  --color-red-400: #f87171;
 }
 
 /* Ẩn scrollbar trên nav cuộn ngang (iOS/Android) */
-.scrollbar-none { scrollbar-width: none; }
-.scrollbar-none::-webkit-scrollbar { display: none; }
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
 
 /* Safe area padding cho thiết bị có notch/home indicator (iPhone X+, Android notch) */
-.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
-.safe-top    { padding-top:    env(safe-area-inset-top,    0px); }
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}

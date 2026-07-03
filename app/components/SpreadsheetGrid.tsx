@@ -870,7 +870,7 @@ export default function SpreadsheetGrid<Row>({
           e.preventDefault();
           if (!ro) setContextMenu({ x: e.clientX, y: e.clientY });
         }}
-        className="overflow-auto outline-none rounded-lg border border-zinc-800 focus-visible:ring-1 focus-visible:ring-sky-400 select-none"
+        className="sheet-stable overflow-auto outline-none rounded-lg border border-zinc-800 focus-visible:ring-1 focus-visible:ring-sky-400 select-none"
         style={maxBodyHeight ? { maxHeight: maxBodyHeight } : undefined}
         role="grid"
         aria-rowcount={nRows + 1}
@@ -963,8 +963,8 @@ export default function SpreadsheetGrid<Row>({
                     // (toolbar) và `col.align` nếu trang cha chỉ định rõ.
                     const align = alignOverride[c] ?? col.align ?? "center";
                     const condClass = col.cellClass?.(row) ?? "";
-                    // Kẻ hàng xen kẽ 2 màu (zebra): dùng token zinc để light mode ra
-                    // dải xám sáng (~#EEEEEE/#CCCCCC), dark mode tự đảo — không hardcode hex.
+                    // Kẻ hàng xen kẽ 2 màu (zebra) trên nền "trang tính sáng" — màu
+                    // giữ nguyên ở cả hai theme nhờ scope .sheet-stable (globals.css).
                     const rowBg = isPinned
                       ? "bg-amber-950/30"
                       : displayR % 2 === 0
