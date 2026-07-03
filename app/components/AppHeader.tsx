@@ -1,13 +1,7 @@
 "use client";
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import {
-  LayoutDashboard,
-  ClipboardList,
-  Package,
-  CheckSquare,
-  DollarSign,
-} from "lucide-react";
+import { LayoutDashboard, ClipboardList, Package, CheckSquare, DollarSign } from "lucide-react";
 import NotificationBell from "@/app/components/NotificationBell";
 import GlobalSearch from "@/app/components/GlobalSearch";
 import ThemeToggle from "@/app/components/ThemeToggle";
@@ -76,7 +70,7 @@ export default function AppHeader({
   }, []);
 
   return (
-    <header className="border-b border-zinc-800 print:hidden">
+    <header className="sticky top-0 z-40 bg-zinc-950 border-b border-zinc-800 print:hidden">
       {/* Hàng duy nhất: brand · nav · [title trang con] · controls */}
       <div className="flex items-center gap-1 px-3 h-12 min-w-0">
         {/* Brand */}
