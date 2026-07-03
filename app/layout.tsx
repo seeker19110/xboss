@@ -43,6 +43,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             +849 778 19 110
           </a>
         </footer>
+        {/* Chừa chỗ cho thanh cố định dưới đáy (tìm kiếm/Nghiệm thu) của AppHeader */}
+        <div className="h-14 safe-bottom shrink-0 print:hidden" aria-hidden />
       </body>
     </html>
   );
