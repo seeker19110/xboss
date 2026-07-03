@@ -129,7 +129,7 @@ Làm việc với vai trò **chuyên gia thiết kế** — giao diện phải �
 
 **Thư viện & component:**
 
-- Icon: **`lucide-react`** (đồng bộ `size`/`strokeWidth`). Biểu đồ: **`recharts`** (`SCurveChart`, `ForecastCards`). Tái dùng component trong `app/components/*` trước khi tạo mới (`AppHeader`, `NotificationBell`, `GlobalSearch`, `FloorHeatmap`, `dialogs`).
+- Icon: **`lucide-react`** (đồng bộ `size`/`strokeWidth`). Biểu đồ: **`recharts`** (`SCurveChart`, `ForecastCards`). Tái dùng component trong `app/components/*` trước khi tạo mới (`AppHeader`, `NotificationBell`, `GlobalSearch`, `ProgressMapCard`, `dialogs`).
 - Loading: dùng **`Skeleton`** (`app/components/Skeleton.tsx`) thay vì màn hình trắng; trạng thái rỗng/ lỗi có thông điệp rõ ràng bằng tiếng Việt.
 
 **Responsive & công trường (mobile-first):**

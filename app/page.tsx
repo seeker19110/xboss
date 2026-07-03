@@ -24,9 +24,9 @@ import { fetchMe, type Me } from "@/app/lib/me";
 import { sortFloorsAsc } from "@/lib/floors";
 
 // Lazy-load các component nặng (recharts, nhiều fetch) — chỉ load khi đã render shell
-const FloorHeatmap = dynamic(() => import("@/app/components/FloorHeatmap"), {
+const ProgressMapCard = dynamic(() => import("@/app/components/ProgressMapCard"), {
   ssr: false,
-  loading: () => <Skeleton className="h-48 rounded-xl" />,
+  loading: () => <Skeleton className="h-16 rounded-xl mb-8" />,
 });
 const BlockedPanel = dynamic(() => import("@/app/components/BlockedPanel"), {
   ssr: false,
@@ -425,8 +425,8 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* ── Heatmap tầng × sheet ── */}
-        <FloorHeatmap />
+        {/* ── Tiến độ tháp A → link sang /timeline (bản đồ + timeline tầng đã gộp) ── */}
+        <ProgressMapCard />
 
         {/* ── Việc bị chặn (phụ thuộc chưa thông) ── */}
         <BlockedPanel />
