@@ -107,8 +107,9 @@ function TowerCurrentTable({
       style={{ WebkitOverflowScrolling: "touch" }}
     >
       <p className="text-[10px] text-zinc-400 mb-1 sm:hidden">← Vuốt ngang để xem đủ cột →</p>
+      {/* mx-auto: bảng hẹp hơn khung thì tự căn giữa; rộng hơn thì margin về 0, cuộn ngang như cũ */}
       <table
-        className="border-separate border-spacing-1"
+        className="border-separate border-spacing-1 mx-auto"
         style={{ minWidth: `${80 + 56 + filteredSheets.length * 76}px` }}
       >
         <thead>
@@ -524,7 +525,7 @@ export default function ProgressMap() {
                 ← Vuốt ngang để xem đủ tuần →
               </p>
               <table
-                className="border-separate border-spacing-1"
+                className="border-separate border-spacing-1 mx-auto"
                 style={{ minWidth: `${80 + weeks.length * 40 + 52}px` }}
               >
                 <thead>
