@@ -642,13 +642,7 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
           {/* Bảng đặt hàng — tích hợp SpreadsheetGrid */}
           <div className="relative no-print" onClick={(e) => e.stopPropagation()}>
             <div className="mb-2">
-              <p className="text-[10px] text-gray-600 flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span>
-                  Click ô để chỉnh sửa, <b>Enter</b> xuống dòng, <b>Ctrl/⌘+V</b> dán cả vùng,{" "}
-                  <b>Ctrl/⌘+D</b> điền xuống.
-                </span>
-                <span className="text-gray-500">Cột Mã BOQ tự tra vật tư và điền ĐM/ĐVT.</span>
-              </p>
+              <p className="text-[10px] text-gray-500">Cột Mã BOQ tự tra vật tư và điền ĐM/ĐVT.</p>
             </div>
             <SpreadsheetGrid<OrderRow>
               rows={rows}

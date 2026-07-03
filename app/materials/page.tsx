@@ -818,13 +818,9 @@ export default function MaterialsPage() {
             {/* Chế độ bảng tính: lưới sửa nhanh copy/paste/fill, dữ liệu vẫn lưu Postgres */}
             {sheetMode && !(loading && materials.length === 0) && (
               <>
-                <p className="text-xs text-zinc-400 flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <span>
-                    Mẹo: click ô để chọn, <b>Enter</b>/gõ để sửa, <b>Ctrl/⌘+C</b> sao chép,{" "}
-                    <b>Ctrl/⌘+V</b> dán, <b>Ctrl/⌘+D</b> điền xuống, kéo chọn vùng.
-                  </span>
-                  {filtered.length > 0 && <span>{filtered.length} dòng</span>}
-                </p>
+                {filtered.length > 0 && (
+                  <p className="text-xs text-zinc-400">{filtered.length} dòng</p>
+                )}
                 <SpreadsheetGrid<Material>
                   rows={filtered}
                   columns={gridColumns}
