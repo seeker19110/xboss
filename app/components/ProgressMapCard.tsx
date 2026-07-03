@@ -33,7 +33,7 @@ export default function ProgressMapCard() {
         <Building2 className="w-4 h-4 text-emerald-400 shrink-0" />
         <div className="min-w-0">
           <h2 className="font-semibold text-sm text-zinc-300 truncate">Tiến độ tháp A</h2>
-          <p className="text-xs text-zinc-500 truncate">
+          <p className="text-xs text-zinc-400 truncate">
             {overallPct}% hoàn thành · bấm để xem timeline theo tầng
           </p>
         </div>
