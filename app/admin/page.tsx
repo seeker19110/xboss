@@ -261,14 +261,17 @@ export default function AdminPage() {
   function UserSelect({
     value,
     onChange,
+    label,
   }: {
     value: number | null;
     onChange: (v: number | null) => void;
+    label: string;
   }) {
     return (
       <select
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
+        aria-label={label}
         className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm w-[200px] shrink-0"
       >
         <option value="">— Kế thừa / chưa gán —</option>
@@ -423,9 +426,9 @@ export default function AdminPage() {
                           <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                         )}
                       </p>
-                      <p className="text-xs text-zinc-500 flex items-center gap-2">
+                      <p className="text-xs text-zinc-400 flex items-center gap-2">
                         {pkgs.length} nhóm · Quản lý:{" "}
-                        {sheet.managerName ?? <span className="text-zinc-600">chưa gán</span>}
+                        {sheet.managerName ?? <span className="text-zinc-400">chưa gán</span>}
                         {sheet.managerId && <WorkloadBadge userId={sheet.managerId} />}
                       </p>
                     </div>
@@ -441,6 +444,7 @@ export default function AdminPage() {
                     <UserSelect
                       value={sheet.managerId}
                       onChange={(v) => assign("sheet", sheet.id, v, `hệ ${sheet.code}`)}
+                      label={`Người quản lý hệ ${sheet.code}`}
                     />
                   </div>
 
@@ -480,7 +484,7 @@ export default function AdminPage() {
                                   thủ công
                                 </span>
                               ) : (
-                                <span className="text-[11px] text-zinc-500 border border-zinc-800 rounded px-1.5 py-0.5 shrink-0">
+                                <span className="text-[11px] text-zinc-400 border border-zinc-800 rounded px-1.5 py-0.5 shrink-0">
                                   kế thừa
                                 </span>
                               )}
@@ -499,6 +503,7 @@ export default function AdminPage() {
                               <UserSelect
                                 value={pkg.assignedTo}
                                 onChange={(v) => assign("package", pkg.id, v, `nhóm ${pkg.code}`)}
+                                label={`Người phụ trách nhóm ${pkg.code}`}
                               />
                             </div>
 
@@ -516,7 +521,7 @@ export default function AdminPage() {
                                       thủ công
                                     </span>
                                   ) : (
-                                    <span className="text-[11px] text-zinc-500 border border-zinc-800 rounded px-1.5 py-0.5 shrink-0">
+                                    <span className="text-[11px] text-zinc-400 border border-zinc-800 rounded px-1.5 py-0.5 shrink-0">
                                       kế thừa
                                     </span>
                                   )}
@@ -533,6 +538,7 @@ export default function AdminPage() {
                                   <UserSelect
                                     value={t.assignedTo}
                                     onChange={(v) => assign("task", t.id, v, `task ${t.code}`)}
+                                    label={`Người phụ trách task ${t.code}`}
                                   />
                                 </div>
                               ))}
@@ -540,7 +546,7 @@ export default function AdminPage() {
                         );
                       })}
                       {pkgs.length === 0 && (
-                        <p className="pl-10 py-3 text-sm text-zinc-500">
+                        <p className="pl-10 py-3 text-sm text-zinc-400">
                           Sheet chưa có nhóm công việc.
                         </p>
                       )}
@@ -551,7 +557,7 @@ export default function AdminPage() {
             })}
 
             {sheets.length === 0 && (
-              <p className="text-center text-zinc-500 py-12">
+              <p className="text-center text-zinc-400 py-12">
                 {filterUnassigned
                   ? "Tất cả task đã được gán người phụ trách 🎉"
                   : "Chưa có sheet nào."}
@@ -595,11 +601,11 @@ export default function AdminPage() {
                       <td className="px-4 py-2 font-mono text-xs text-zinc-200">
                         {row.targetLabel}
                       </td>
-                      <td className="px-4 py-2 text-zinc-500">
-                        {row.prevUser ?? <span className="text-zinc-700">—</span>}
+                      <td className="px-4 py-2 text-zinc-400">
+                        {row.prevUser ?? <span className="text-zinc-400">—</span>}
                       </td>
                       <td className="px-4 py-2 text-emerald-400">
-                        {row.newUser ?? <span className="text-zinc-500">bỏ gán</span>}
+                        {row.newUser ?? <span className="text-zinc-400">bỏ gán</span>}
                       </td>
                       <td className="px-4 py-2 text-zinc-400">{row.changedBy}</td>
                       <td className="px-4 py-2">
@@ -608,7 +614,7 @@ export default function AdminPage() {
                             thủ công
                           </span>
                         ) : (
-                          <span className="text-[11px] text-zinc-500 border border-zinc-800 rounded px-1.5 py-0.5">
+                          <span className="text-[11px] text-zinc-400 border border-zinc-800 rounded px-1.5 py-0.5">
                             kế thừa
                           </span>
                         )}
@@ -617,7 +623,7 @@ export default function AdminPage() {
                   ))}
                   {audit.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="px-4 py-8 text-center text-zinc-600">
+                      <td colSpan={7} className="px-4 py-8 text-center text-zinc-400">
                         Chưa có lịch sử phân công.
                       </td>
                     </tr>
@@ -628,7 +634,7 @@ export default function AdminPage() {
             {/* Phân trang audit */}
             {auditTotal > AUDIT_LIMIT && (
               <div className="flex items-center justify-end gap-2">
-                <span className="text-xs text-zinc-500">
+                <span className="text-xs text-zinc-400">
                   Trang {auditPage + 1} / {Math.ceil(auditTotal / AUDIT_LIMIT)}
                 </span>
                 <button
@@ -663,7 +669,7 @@ export default function AdminPage() {
               </span>
               <button
                 onClick={() => setTraffic([])}
-                className="ml-auto text-xs text-zinc-500 hover:text-red-400 px-2 py-1 border border-zinc-800 rounded"
+                className="ml-auto text-xs text-zinc-400 hover:text-red-400 px-2 py-1 border border-zinc-800 rounded"
               >
                 Xóa
               </button>
@@ -682,7 +688,7 @@ export default function AdminPage() {
                 <tbody className="divide-y divide-zinc-800/60">
                   {traffic.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-zinc-600">
+                      <td colSpan={5} className="px-4 py-8 text-center text-zinc-400">
                         Chưa có traffic. Thực hiện bất kỳ thao tác nào để thấy request xuất hiện ở
                         đây.
                       </td>
@@ -693,7 +699,7 @@ export default function AdminPage() {
                       key={t.id}
                       className="odd:bg-zinc-900/40 hover:bg-zinc-800/50 transition-colors"
                     >
-                      <td className="px-3 py-1.5 text-zinc-500 text-xs whitespace-nowrap font-mono">
+                      <td className="px-3 py-1.5 text-zinc-400 text-xs whitespace-nowrap font-mono">
                         {new Date(t.ts).toLocaleTimeString("vi-VN", {
                           hour: "2-digit",
                           minute: "2-digit",
@@ -714,9 +720,9 @@ export default function AdminPage() {
                       >
                         {t.path}
                       </td>
-                      <td className="px-3 py-1.5 text-xs text-zinc-500 font-mono">{t.ip || "—"}</td>
+                      <td className="px-3 py-1.5 text-xs text-zinc-400 font-mono">{t.ip || "—"}</td>
                       <td
-                        className="px-3 py-1.5 text-xs text-zinc-600 truncate max-w-[12rem]"
+                        className="px-3 py-1.5 text-xs text-zinc-400 truncate max-w-[12rem]"
                         title={t.ua}
                       >
                         {t.ua

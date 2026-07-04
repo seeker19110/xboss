@@ -204,11 +204,11 @@ function TaskCard({
         </span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="font-mono text-xs text-zinc-500">{item.code}</span>
+            <span className="font-mono text-xs text-zinc-400">{item.code}</span>
             <span className="font-medium text-sm text-zinc-100 truncate flex-1">{item.name}</span>
             <ExternalLink className="w-3 h-3 text-zinc-600 group-hover:text-zinc-400 shrink-0" />
           </div>
-          <p className="text-xs text-zinc-500 truncate mt-0.5">{item.packageName}</p>
+          <p className="text-xs text-zinc-400 truncate mt-0.5">{item.packageName}</p>
           <div className="mt-2">
             <ProgressBar value={item.progress} warn={variant === "overdue"} />
           </div>
@@ -231,7 +231,7 @@ function TaskCard({
                   : `Bắt đầu sau ${days} ngày (${item.startDate})`}
             </span>
             {item.assignedTo && (
-              <span className="flex items-center gap-1 text-xs text-zinc-500">
+              <span className="flex items-center gap-1 text-xs text-zinc-400">
                 <Users className="w-3 h-3" /> {item.assignedTo}
               </span>
             )}
@@ -272,7 +272,7 @@ function SheetGroup({ group }: { group: SheetActivity }) {
               {EVENT_ICON[type]} {cnt}
             </span>
           ))}
-          <span className="text-xs text-zinc-500">{group.events.length}</span>
+          <span className="text-xs text-zinc-400">{group.events.length}</span>
           {expanded ? (
             <ChevronDown className="w-4 h-4 text-zinc-500" />
           ) : (
@@ -293,7 +293,7 @@ function SheetGroup({ group }: { group: SheetActivity }) {
               </span>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-xs text-zinc-500 font-mono">{ev.taskCode}</span>
+                  <span className="text-xs text-zinc-400 font-mono">{ev.taskCode}</span>
                   <span className="text-sm text-zinc-200 truncate flex-1">{ev.taskName}</span>
                   <ExternalLink className="w-3 h-3 text-zinc-700 group-hover/ev:text-zinc-400 shrink-0" />
                 </div>
@@ -304,8 +304,8 @@ function SheetGroup({ group }: { group: SheetActivity }) {
                   <span className="text-xs text-zinc-400 truncate">{ev.detail}</span>
                 </div>
                 <div className="flex items-center gap-2 mt-1">
-                  {ev.by && <span className="text-[11px] text-zinc-600">{ev.by}</span>}
-                  <span className="text-[11px] text-zinc-600">{timeAgo(ev.at)}</span>
+                  {ev.by && <span className="text-[11px] text-zinc-400">{ev.by}</span>}
+                  <span className="text-[11px] text-zinc-400">{timeAgo(ev.at)}</span>
                 </div>
               </div>
             </a>
@@ -338,11 +338,14 @@ function PrefRow({
     <div className="flex items-center gap-4 py-3 border-b border-zinc-800/60 last:border-0">
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-zinc-200">{label}</p>
-        <p className="text-xs text-zinc-500 mt-0.5">{desc}</p>
+        <p className="text-xs text-zinc-400 mt-0.5">{desc}</p>
       </div>
       <button
         onClick={() => onToggle(prefKey, !enabled)}
         disabled={saving}
+        role="switch"
+        aria-checked={enabled}
+        aria-label={label}
         className={`relative shrink-0 w-11 h-6 rounded-full transition-colors disabled:opacity-60 ${enabled ? "bg-emerald-600" : "bg-zinc-700"}`}
       >
         <span
@@ -357,7 +360,7 @@ function PrefRow({
 
 function Empty({ icon, label }: { icon?: React.ReactNode; label: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-zinc-600">
+    <div className="flex flex-col items-center justify-center py-16 text-zinc-400">
       <div className="mb-3 opacity-30">{icon ?? <Bell className="w-10 h-10" />}</div>
       <p className="text-sm text-center">{label}</p>
     </div>
@@ -459,7 +462,7 @@ export default function NotificationsPage() {
   if (loading) return <PageSkeleton />;
   if (!feed)
     return (
-      <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center gap-3 text-zinc-500">
+      <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center gap-3 text-zinc-400">
         <Bell className="w-10 h-10 opacity-20" />
         <p className="text-sm">Không tải được thông báo. Vui lòng thử lại.</p>
         <button
@@ -566,7 +569,7 @@ export default function NotificationsPage() {
           <span className="bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded-full font-medium">
             {ROLE_LABEL[role] ?? role}
           </span>
-          <span className="text-zinc-500">
+          <span className="text-zinc-400">
             {fullAccess
               ? "Nhận thông báo toàn bộ dự án"
               : "Chỉ nhận thông báo công việc được giao cho bạn"}
@@ -581,7 +584,7 @@ export default function NotificationsPage() {
           {/* ── HOẠT ĐỘNG ──────────────────────────────────────────── */}
           {activeTab === "activity" && (
             <>
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-zinc-400">
                 {activityCount > 0
                   ? `${activityCount} hoạt động${fullAccess ? " — toàn dự án" : ""}`
                   : "Chưa có hoạt động nào"}
@@ -600,7 +603,7 @@ export default function NotificationsPage() {
           {/* ── QUÁ HẠN ──────────────────────────────────────────── */}
           {activeTab === "overdue" && (
             <>
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-zinc-400">
                 {overdue.length} công việc quá hạn chưa hoàn thành
               </p>
               {overdue.length === 0 ? (
@@ -621,7 +624,7 @@ export default function NotificationsPage() {
           {/* ── SẮP ĐẾN HẠN ──────────────────────────────────────── */}
           {activeTab === "due_soon" && (
             <>
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-zinc-400">
                 {dueSoon.length} công việc đến hạn trong 5 ngày tới
               </p>
               {dueSoon.length === 0 ? (
@@ -642,7 +645,7 @@ export default function NotificationsPage() {
           {/* ── SẮP THI CÔNG ────────────────────────────────────── */}
           {activeTab === "upcoming" && (
             <>
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-zinc-400">
                 {upcomingStart.length} công việc bắt đầu trong 7 ngày tới
               </p>
               {upcomingStart.length === 0 ? (
@@ -663,7 +666,7 @@ export default function NotificationsPage() {
           {/* ── VẬT TƯ VƯỢT ĐM ─────────────────────────────────── */}
           {activeTab === "material" && fullAccess && (
             <>
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-zinc-400">
                 {materialOver.length} vật tư đang vượt định mức sử dụng
               </p>
               {materialOver.length === 0 ? (
@@ -682,7 +685,7 @@ export default function NotificationsPage() {
                       <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-zinc-100 truncate">{m.name}</p>
-                        <p className="text-xs text-zinc-500">
+                        <p className="text-xs text-zinc-400">
                           {m.sheetCode ? `[${m.sheetCode}] · ` : ""}Dùng {m.qtyUsed}/{m.qtyPlanned}
                           {m.unit ? ` ${m.unit}` : ""} — vượt {m.qtyUsed - m.qtyPlanned}
                           {m.unit ? ` ${m.unit}` : ""}
@@ -732,7 +735,7 @@ export default function NotificationsPage() {
                 <h2 className="font-semibold text-sm py-3 flex items-center gap-2">
                   <Bell className="w-4 h-4 text-amber-400" /> Loại thông báo muốn nhận
                 </h2>
-                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide pb-2">
+                <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide pb-2">
                   Nhắc nhở tiến độ
                 </p>
                 <PrefRow
@@ -759,7 +762,7 @@ export default function NotificationsPage() {
                   onToggle={togglePref}
                   saving={savingPref === "upcoming_start"}
                 />
-                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide pb-2 pt-4">
+                <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide pb-2 pt-4">
                   Hoạt động
                 </p>
                 <PrefRow
@@ -796,7 +799,7 @@ export default function NotificationsPage() {
                 />
                 {fullAccess && (
                   <>
-                    <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide pb-2 pt-4">
+                    <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide pb-2 pt-4">
                       Vật tư
                     </p>
                     <PrefRow
@@ -809,7 +812,7 @@ export default function NotificationsPage() {
                     />
                   </>
                 )}
-                <div className="py-3 text-xs text-zinc-600">
+                <div className="py-3 text-xs text-zinc-400">
                   {savingPref ? "Đang lưu..." : "Thay đổi được lưu tự động."}
                 </div>
               </div>
