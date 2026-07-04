@@ -24,6 +24,8 @@ import {
   DollarSign,
 } from "lucide-react";
 import { slugFromCode } from "@/lib/sheets";
+import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
+import { formatDateVN } from "@/lib/date";
 import { PAYMENT_VIEW_ROLES, type Role } from "@/lib/roles";
 import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import AppHeader from "@/app/components/AppHeader";
@@ -101,12 +103,6 @@ type Segment = "tasks" | "notifications";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function fmtDate(d: string | null) {
-  if (!d) return "—";
-  const dt = new Date(d);
-  return isNaN(dt.getTime()) ? "—" : dt.toLocaleDateString("vi-VN");
-}
-
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
@@ -147,13 +143,6 @@ const STATUS_COLOR: Record<string, string> = {
   nghiem_thu: "text-teal-400",
   dang_thi_cong: "text-sky-400",
   chuan_bi: "text-zinc-400",
-};
-const STATUS_LABEL: Record<string, string> = {
-  tre: "Đang trễ",
-  hoan_thanh: "Hoàn thành",
-  nghiem_thu: "Nghiệm thu",
-  dang_thi_cong: "Thi công",
-  chuan_bi: "Chuẩn bị",
 };
 
 const EVENT_ICON: Record<EventType, React.ReactNode> = {
@@ -778,7 +767,7 @@ export default function MyTasksPage() {
                                   </span>
                                   {t.endDate && (
                                     <span className="text-[11px] text-zinc-600">
-                                      · hạn {fmtDate(t.endDate)}
+                                      · hạn {formatDateVN(t.endDate)}
                                     </span>
                                   )}
                                 </div>
@@ -787,7 +776,7 @@ export default function MyTasksPage() {
                                 <span
                                   className={`text-xs font-medium ${STATUS_COLOR[t.status] ?? "text-zinc-500"}`}
                                 >
-                                  {STATUS_LABEL[t.status] ?? t.status}
+                                  {STATUS_LABEL[t.status as StatusSlug] ?? t.status}
                                 </span>
                                 <button
                                   onClick={() => copyTaskLink(t)}

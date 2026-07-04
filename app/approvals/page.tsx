@@ -15,6 +15,7 @@ import AppHeader from "@/app/components/AppHeader";
 import { Modal, appAlert, appConfirm } from "@/app/components/dialogs";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { redirectToLogin } from "@/app/lib/me";
+import { formatDateVN } from "@/lib/date";
 
 type FloorGroup = {
   sheetTypeId: number;
@@ -42,9 +43,6 @@ type Doc = {
 
 const fmtSize = (b: number) =>
   b > 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)}MB` : `${Math.round(b / 1024)}KB`;
-const fmtDate = (s: string) =>
-  new Date(s).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
-
 export default function ApprovalsPage() {
   const [pending, setPending] = useState<FloorGroup[]>([]);
   const [approved, setApproved] = useState<FloorGroup[]>([]);
@@ -293,7 +291,9 @@ export default function ApprovalsPage() {
         {!isPending && (
           <td className="p-3 text-xs text-zinc-400">
             {g.approvedByName ? `${g.approvedByName}` : "—"}
-            {g.approvedAt && <span className="block text-zinc-600">{fmtDate(g.approvedAt)}</span>}
+            {g.approvedAt && (
+              <span className="block text-zinc-600">{formatDateVN(g.approvedAt)}</span>
+            )}
           </td>
         )}
         {/* Cột Biên bản — hiện cho cả pending và approved */}

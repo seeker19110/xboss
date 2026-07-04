@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Printer } from "lucide-react";
 import { fetchMe, redirectToLogin } from "@/app/lib/me";
+import { formatDateDMY } from "@/lib/date";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -36,10 +37,6 @@ type ProjectInfo = {
 function fmtVND(n: number) {
   if (n === 0) return "—";
   return n.toLocaleString("vi-VN");
-}
-function fmtDate(d: string) {
-  const [y, m, day] = d.split("-");
-  return `${day}/${m}/${y}`;
 }
 
 // ── Print Page ─────────────────────────────────────────────────────────────────
@@ -236,7 +233,7 @@ export default function PrintPage() {
             <p className="text-sm">
               Tên NTP: <strong>TỔ ĐỘI THI CÔNG {person.toUpperCase()}</strong>
             </p>
-            <p className="text-sm">Ngày {fmtDate(billDate)}</p>
+            <p className="text-sm">Ngày {formatDateDMY(billDate)}</p>
             <p className="text-sm font-bold flex items-center justify-center gap-2">
               <span>KỲ BILL THỨ:</span>
               {/* Sửa được trên màn hình, in ra chỉ còn chữ */}

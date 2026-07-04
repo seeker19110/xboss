@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft, Printer, CalendarClock } from "lucide-react";
 import { LookaheadTable } from "@/app/components/LookaheadTable";
 import { redirectToLogin } from "@/app/lib/me";
+import { formatDateVN } from "@/lib/date";
 
 type LTask = {
   id: number;
@@ -19,12 +20,6 @@ type LTask = {
   delayReason: string | null;
 };
 type Data = { days: number; from: string; until: string; starting: LTask[]; due: LTask[] };
-
-const fmtDate = (d: string | null) => {
-  if (!d) return "—";
-  const dt = new Date(d);
-  return isNaN(dt.getTime()) ? "—" : dt.toLocaleDateString("vi-VN");
-};
 
 // Nhóm task theo hệ (sheet) — giữ thứ tự xuất hiện.
 function groupBySheet(tasks: LTask[]): { sheet: string; tasks: LTask[] }[] {
@@ -92,8 +87,8 @@ export default function LookaheadPage() {
             <CalendarClock className="w-6 h-6" /> KẾ HOẠCH {data?.days ?? days} NGÀY TỚI
           </h1>
           <p className="text-zinc-600">
-            {projectName ?? "XBoss"} · {fmtDate(data?.from ?? null)} →{" "}
-            {fmtDate(data?.until ?? null)}
+            {projectName ?? "XBoss"} · {formatDateVN(data?.from ?? null)} →{" "}
+            {formatDateVN(data?.until ?? null)}
           </p>
         </div>
 

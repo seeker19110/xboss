@@ -102,11 +102,6 @@ export async function withTransaction<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-// Hôm nay dạng ISO (YYYY-MM-DD) theo giờ Việt Nam (UTC+7, không có DST) —
-// dùng UTC sẽ lệch ranh giới ngày 7 tiếng (0h–7h sáng trạng thái "trễ" tính sai).
-export const todayISO = () => new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
-
-// Ngày ISO cách hôm nay `days` ngày (âm = quá khứ), cùng múi giờ VN với todayISO —
-// mọi phép cộng/trừ ngày phải đi qua đây, tự tính bằng UTC sẽ lệch 1 ngày lúc 0h–7h sáng.
-export const daysFromTodayISO = (days: number) =>
-  new Date(Date.now() + 7 * 3600_000 + days * 86400_000).toISOString().slice(0, 10);
+// todayISO/daysFromTodayISO chuyển sang lib/date.ts (thuần, không phụ thuộc pg)
+// để dùng lại được ở client — re-export ở đây cho code server hiện có.
+export { todayISO, daysFromTodayISO } from "@/lib/date";

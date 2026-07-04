@@ -1,0 +1,24 @@
+// Helper ngày tháng dùng chung — an toàn ở cả client lẫn server (không import lib/db).
+
+// Hôm nay dạng ISO (YYYY-MM-DD) theo giờ Việt Nam (UTC+7, không có DST) —
+// dùng UTC sẽ lệch ranh giới ngày 7 tiếng (0h–7h sáng trạng thái "trễ" tính sai).
+export const todayISO = () => new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
+
+// Ngày ISO cách hôm nay `days` ngày (âm = quá khứ), cùng múi giờ VN với todayISO —
+// mọi phép cộng/trừ ngày phải đi qua đây, tự tính bằng UTC sẽ lệch 1 ngày lúc 0h–7h sáng.
+export const daysFromTodayISO = (days: number) =>
+  new Date(Date.now() + 7 * 3600_000 + days * 86400_000).toISOString().slice(0, 10);
+
+// Định dạng ngày kiểu vi-VN (dd/mm/yyyy) cho hiển thị, "—" khi rỗng/không hợp lệ.
+export function formatDateVN(d: string | null | undefined): string {
+  if (!d) return "—";
+  const dt = new Date(d);
+  return isNaN(dt.getTime()) ? "—" : dt.toLocaleDateString("vi-VN");
+}
+
+// Định dạng nhanh chuỗi ISO "YYYY-MM-DD" → "DD/MM/YYYY" bằng tách chuỗi (không
+// qua Date/timezone) — dùng khi ngày chắc chắn có giá trị hợp lệ (vd chứng từ thanh toán).
+export function formatDateDMY(d: string): string {
+  const [y, m, day] = d.split("-");
+  return `${day}/${m}/${y}`;
+}

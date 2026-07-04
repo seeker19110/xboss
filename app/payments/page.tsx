@@ -22,6 +22,8 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import { useEditMode } from "@/app/components/useEditMode";
 import EditModeToggle from "@/app/components/EditModeToggle";
+import { appConfirm } from "@/app/components/dialogs";
+import { formatDateDMY, todayISO } from "@/lib/date";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -111,14 +113,6 @@ function fmtFull(n: number) {
 function editKey(r: FloorRow) {
   return `${r.sheetTypeId}__${r.floorLabel}`;
 }
-function fmtDate(d: string) {
-  const [y, m, day] = d.split("-");
-  return `${day}/${m}/${y}`;
-}
-function todayISO() {
-  return new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
-}
-
 function sortFloor(f: string) {
   if (f === "RF") return 9999;
   const n = parseInt(f);
@@ -270,7 +264,8 @@ export default function PaymentsPage() {
   }
 
   async function deleteBill(id: number) {
-    if (!confirm("Xoá bill thanh toán này?")) return;
+    if (!(await appConfirm("Xoá bill thanh toán này?", { danger: true, confirmLabel: "Xoá" })))
+      return;
     const res = await fetch(`/api/payments/bills/${id}`, { method: "DELETE" });
     if (res.ok) setBills((prev) => prev.filter((b) => b.id !== id));
   }
@@ -1077,7 +1072,7 @@ function BillsSection({
                                   <span className="text-sky-400 font-medium">
                                     {Math.round(h.pctThisPeriod * 100)}%
                                   </span>{" "}
-                                  ({fmtVND(h.amount)}) · {fmtDate(h.paidDate)}
+                                  ({fmtVND(h.amount)}) · {formatDateDMY(h.paidDate)}
                                 </span>
                               ))}
                               <span className="font-bold text-zinc-200 ml-auto">
@@ -1299,7 +1294,9 @@ function BillsSection({
                     <td className="px-2 py-1.5 text-right text-violet-300 font-semibold tabular-nums">
                       {fmtVND(b.amount)}
                     </td>
-                    <td className="px-2 py-1.5 text-zinc-500 text-[10px]">{fmtDate(b.paidDate)}</td>
+                    <td className="px-2 py-1.5 text-zinc-500 text-[10px]">
+                      {formatDateDMY(b.paidDate)}
+                    </td>
                     {canEdit && (
                       <td className="px-1 py-1.5 text-center">
                         <button onClick={() => onDelete(b.id)}>
@@ -1408,7 +1405,9 @@ function BillsSection({
                     <td className="px-2 py-1.5 text-right text-amber-300 font-semibold tabular-nums">
                       {fmtVND(b.amount)}
                     </td>
-                    <td className="px-2 py-1.5 text-zinc-500 text-[10px]">{fmtDate(b.paidDate)}</td>
+                    <td className="px-2 py-1.5 text-zinc-500 text-[10px]">
+                      {formatDateDMY(b.paidDate)}
+                    </td>
                     {canEdit && (
                       <td className="px-1 py-1.5 text-center">
                         <button onClick={() => onDelete(b.id)}>

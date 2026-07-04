@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
-import { getCurrentUser, type Role } from "@/lib/auth";
+import { getCurrentUser, isAdminOrPm } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
-
-const canApprove = (r?: Role) => r === "admin" || r === "pm";
 
 // PATCH /api/purchase-requests/:id  body: { action: 'approve'|'reject', reviewNote? }
 export async function PATCH(
@@ -29,7 +27,7 @@ export async function PATCH(
 
   // Duyệt/từ chối: chỉ Admin/PM, chỉ khi đang pending
   if (action === "approve" || action === "reject") {
-    if (!canApprove(user.role))
+    if (!isAdminOrPm(user.role))
       return NextResponse.json({ error: "Chỉ Admin/PM được duyệt yêu cầu" }, { status: 403 });
     if (pr.status !== "pending")
       return NextResponse.json(
@@ -51,7 +49,7 @@ export async function PATCH(
 
   // Sửa note (người tạo hoặc Admin/PM, khi còn pending)
   if (body.note !== undefined && pr.status === "pending") {
-    if (pr.requested_by !== user.id && user.role !== "admin" && user.role !== "pm")
+    if (pr.requested_by !== user.id && !isAdminOrPm(user.role))
       return NextResponse.json(
         { error: "Chỉ người tạo yêu cầu được sửa ghi chú" },
         { status: 403 },
@@ -84,7 +82,7 @@ export async function DELETE(
   );
   if (!pr) return NextResponse.json({ error: "Không tìm thấy yêu cầu" }, { status: 404 });
 
-  if (pr.requested_by !== user.id && user.role !== "admin" && user.role !== "pm")
+  if (pr.requested_by !== user.id && !isAdminOrPm(user.role))
     return NextResponse.json({ error: "Không có quyền xoá yêu cầu này" }, { status: 403 });
   if (pr.status === "ordered")
     return NextResponse.json({ error: "Yêu cầu đã được đặt hàng, không thể xoá" }, { status: 409 });
