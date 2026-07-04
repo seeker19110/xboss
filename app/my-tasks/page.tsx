@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { slugFromCode } from "@/lib/sheets";
 import { PAYMENT_VIEW_ROLES, type Role } from "@/lib/roles";
-import { fetchMe } from "@/app/lib/me";
+import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import AppHeader from "@/app/components/AppHeader";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { DELAY_REASON_LABEL } from "@/lib/delay";
@@ -424,7 +424,7 @@ export default function MyTasksPage() {
     fetch("/api/my-tasks")
       .then(async (r) => {
         if (r.status === 401) {
-          window.location.href = "/login";
+          redirectToLogin();
           return;
         }
         setTaskData(await r.json());
@@ -438,7 +438,7 @@ export default function MyTasksPage() {
     else setRefreshing(true);
     const r = await fetch("/api/notifications/feed").catch(() => null);
     if (r?.status === 401) {
-      window.location.href = "/login";
+      redirectToLogin();
       return;
     }
     if (r?.ok) setFeed(await r.json());

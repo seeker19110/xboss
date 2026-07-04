@@ -75,16 +75,18 @@ export async function recomputePackage(packageId: number): Promise<void> {
     `SELECT AVG(progress_percent) AS avg, COUNT(*) AS cnt FROM tasks WHERE package_id = ?`,
     packageId,
   );
-  if (!r || !Number(r.cnt)) return;
-  const progress = Math.round((r.avg ?? 0) * 100) / 100;
   const wp = await queryOne<{ end_date: string | null; status: string | null }>(
     `SELECT end_date, status FROM work_packages WHERE id = ? FOR UPDATE`,
     packageId,
   );
+  if (!wp) return;
+  // Nhóm hết task (xoá task cuối) → về 0%, không giữ % cũ (nếu không sẽ "chặn" nhầm các
+  // nhóm phụ thuộc trong /gantt vì tưởng nhóm rỗng vẫn đang dở dang).
+  const progress = r && Number(r.cnt) ? Math.round((r.avg ?? 0) * 100) / 100 : 0;
   await run(
     `UPDATE work_packages SET progress = ?, status = ? WHERE id = ?`,
     progress,
-    deriveStatus(progress, wp?.end_date ?? null, wp?.status),
+    deriveStatus(progress, wp.end_date, wp.status),
     packageId,
   );
 }

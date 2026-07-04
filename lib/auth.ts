@@ -182,3 +182,21 @@ export async function canTouchPackage(user: User, packageId: number): Promise<bo
   );
   return wp?.assigned_to === user.id;
 }
+
+// Sub-con chỉ được xem/nộp biên bản nghiệm thu tầng (floor_approvals) nếu có ít nhất 1
+// nhóm công việc thuộc sheet + tầng đó được giao cho mình — floor_approvals không có
+// assigned_to riêng nên phải suy ra qua work_packages cùng (sheet_type_id, floor_label).
+export async function canTouchFloor(
+  user: User,
+  sheetTypeId: number,
+  floorLabel: string,
+): Promise<boolean> {
+  if (user.role !== "subcon") return true;
+  const wp = await queryOne<{ id: number }>(
+    `SELECT id FROM work_packages WHERE sheet_type_id = ? AND floor_label = ? AND assigned_to = ? LIMIT 1`,
+    sheetTypeId,
+    floorLabel,
+    user.id,
+  );
+  return !!wp;
+}

@@ -27,47 +27,123 @@ test("deriveStatus: đã nghiệm thu thì giữ nguyên", () => {
 
 // ===== Test tích hợp (cần Postgres riêng: đặt TEST_DATABASE_URL) =====
 
-test("recomputeTask: % task = số ô checked / tổng ô, package = trung bình task", { skip: !HAS_TEST_DB }, async () => {
-  const { run, insertId, queryOne } = await import("@/lib/db");
-  const { recomputeTask } = await import("@/lib/recompute");
+test(
+  "recomputeTask: % task = số ô checked / tổng ô, package = trung bình task",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId, queryOne } = await import("@/lib/db");
+    const { recomputeTask } = await import("@/lib/recompute");
 
-  const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test recompute')`);
-  const towerId = await insertId(`INSERT INTO towers (project_id, name) VALUES (?, 'Tháp T')`, projectId);
-  const stId = await insertId(`INSERT INTO sheet_types (tower_id, code, name) VALUES (?, 'TEST', 'Sheet test')`, towerId);
-  const pkgId = await insertId(`INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'T1', 'Nhóm test')`, stId);
-  const taskId = await insertId(
-    `INSERT INTO tasks (package_id, code, name, end_date) VALUES (?, 'T1,01', 'Task test', ?)`, pkgId, TOMORROW);
+    const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test recompute')`);
+    const towerId = await insertId(
+      `INSERT INTO towers (project_id, name) VALUES (?, 'Tháp T')`,
+      projectId,
+    );
+    const stId = await insertId(
+      `INSERT INTO sheet_types (tower_id, code, name) VALUES (?, 'TEST', 'Sheet test')`,
+      towerId,
+    );
+    const pkgId = await insertId(
+      `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'T1', 'Nhóm test')`,
+      stId,
+    );
+    const taskId = await insertId(
+      `INSERT INTO tasks (package_id, code, name, end_date) VALUES (?, 'T1,01', 'Task test', ?)`,
+      pkgId,
+      TOMORROW,
+    );
 
-  // 4 dimension, 1 đã lắp → 25%
-  for (let i = 1; i <= 4; i++) {
-    await run(`INSERT INTO progress_dimensions (task_id, dimension_label, installed) VALUES (?, ?, ?)`,
-      taskId, `CH 0${i}`, i === 1 ? 1 : 0);
-  }
+    // 4 dimension, 1 đã lắp → 25%
+    for (let i = 1; i <= 4; i++) {
+      await run(
+        `INSERT INTO progress_dimensions (task_id, dimension_label, installed) VALUES (?, ?, ?)`,
+        taskId,
+        `CH 0${i}`,
+        i === 1 ? 1 : 0,
+      );
+    }
 
-  const result = await recomputeTask(taskId, "tester");
-  assert.ok(result);
-  assert.equal(result.progress, 0.25);
-  assert.equal(result.status, "dang_thi_cong");
+    const result = await recomputeTask(taskId, "tester");
+    assert.ok(result);
+    assert.equal(result.progress, 0.25);
+    assert.equal(result.status, "dang_thi_cong");
 
-  const task = await queryOne<{ progress_percent: number }>(
-    `SELECT progress_percent FROM tasks WHERE id = ?`, taskId);
-  assert.equal(task?.progress_percent, 0.25);
+    const task = await queryOne<{ progress_percent: number }>(
+      `SELECT progress_percent FROM tasks WHERE id = ?`,
+      taskId,
+    );
+    assert.equal(task?.progress_percent, 0.25);
 
-  const pkg = await queryOne<{ progress: number }>(
-    `SELECT progress FROM work_packages WHERE id = ?`, pkgId);
-  assert.equal(pkg?.progress, 0.25);
+    const pkg = await queryOne<{ progress: number }>(
+      `SELECT progress FROM work_packages WHERE id = ?`,
+      pkgId,
+    );
+    assert.equal(pkg?.progress, 0.25);
 
-  const hist = await queryOne<{ new_progress: number; changed_by: string }>(
-    `SELECT new_progress, changed_by FROM task_history WHERE task_id = ? ORDER BY id DESC`, taskId);
-  assert.equal(hist?.new_progress, 0.25);
-  assert.equal(hist?.changed_by, "tester");
+    const hist = await queryOne<{ new_progress: number; changed_by: string }>(
+      `SELECT new_progress, changed_by FROM task_history WHERE task_id = ? ORDER BY id DESC`,
+      taskId,
+    );
+    assert.equal(hist?.new_progress, 0.25);
+    assert.equal(hist?.changed_by, "tester");
 
-  // Dọn dữ liệu test.
-  await run(`DELETE FROM task_history WHERE task_id = ?`, taskId);
-  await run(`DELETE FROM progress_dimensions WHERE task_id = ?`, taskId);
-  await run(`DELETE FROM tasks WHERE id = ?`, taskId);
-  await run(`DELETE FROM work_packages WHERE id = ?`, pkgId);
-  await run(`DELETE FROM sheet_types WHERE id = ?`, stId);
-  await run(`DELETE FROM towers WHERE id = ?`, towerId);
-  await run(`DELETE FROM projects WHERE id = ?`, projectId);
-});
+    // Dọn dữ liệu test.
+    await run(`DELETE FROM task_history WHERE task_id = ?`, taskId);
+    await run(`DELETE FROM progress_dimensions WHERE task_id = ?`, taskId);
+    await run(`DELETE FROM tasks WHERE id = ?`, taskId);
+    await run(`DELETE FROM work_packages WHERE id = ?`, pkgId);
+    await run(`DELETE FROM sheet_types WHERE id = ?`, stId);
+    await run(`DELETE FROM towers WHERE id = ?`, towerId);
+    await run(`DELETE FROM projects WHERE id = ?`, projectId);
+  },
+);
+
+test(
+  "recomputePackage: xoá task cuối trong nhóm → progress về 0, không giữ % cũ",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId, queryOne } = await import("@/lib/db");
+    const { recomputePackage } = await import("@/lib/recompute");
+
+    const projectId = await insertId(
+      `INSERT INTO projects (name) VALUES ('Test recompute empty pkg')`,
+    );
+    const towerId = await insertId(
+      `INSERT INTO towers (project_id, name) VALUES (?, 'Tháp T')`,
+      projectId,
+    );
+    const stId = await insertId(
+      `INSERT INTO sheet_types (tower_id, code, name) VALUES (?, 'TEST2', 'Sheet test 2')`,
+      towerId,
+    );
+    const pkgId = await insertId(
+      `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'T2', 'Nhóm test 2')`,
+      stId,
+    );
+    const taskId = await insertId(
+      `INSERT INTO tasks (package_id, code, name, progress_percent) VALUES (?, 'T2,01', 'Task test', 0.8)`,
+      pkgId,
+    );
+
+    // Giả lập nhóm đang có % cũ (như trước khi xoá task cuối) rồi mới xoá task.
+    await run(
+      `UPDATE work_packages SET progress = 0.8, status = 'dang_thi_cong' WHERE id = ?`,
+      pkgId,
+    );
+    await run(`DELETE FROM tasks WHERE id = ?`, taskId);
+
+    await recomputePackage(pkgId);
+
+    const pkg = await queryOne<{ progress: number }>(
+      `SELECT progress FROM work_packages WHERE id = ?`,
+      pkgId,
+    );
+    assert.equal(pkg?.progress, 0); // không được giữ 0.8 cũ — nhóm rỗng không còn "đang dở dang"
+
+    // Dọn dữ liệu test.
+    await run(`DELETE FROM work_packages WHERE id = ?`, pkgId);
+    await run(`DELETE FROM sheet_types WHERE id = ?`, stId);
+    await run(`DELETE FROM towers WHERE id = ?`, towerId);
+    await run(`DELETE FROM projects WHERE id = ?`, projectId);
+  },
+);

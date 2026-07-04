@@ -4,7 +4,7 @@ import Link from "next/link";
 import { User, ShieldCheck, Users, KeyRound, LogOut, ChevronRight } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { PageSkeleton } from "@/app/components/Skeleton";
-import { fetchMe, invalidateMe } from "@/app/lib/me";
+import { fetchMe, invalidateMe, redirectToLogin } from "@/app/lib/me";
 import { ROLE_LABELS } from "@/lib/roles";
 
 type Me = { id: number; name: string; email: string; role: string };
@@ -24,10 +24,7 @@ export default function AccountPage() {
   async function logout() {
     invalidateMe();
     await fetch("/api/auth/logout", { method: "POST" });
-    if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
-      navigator.serviceWorker.controller.postMessage({ type: "CLEAR_CACHE" });
-    }
-    window.location.href = "/login";
+    redirectToLogin();
   }
 
   if (loading) {

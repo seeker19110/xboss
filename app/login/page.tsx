@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { LogIn } from "lucide-react";
 import ThemeToggle from "@/app/components/ThemeToggle";
+import { clearOfflineQueue } from "@/app/components/offlineQueue";
 
 const DEMO = [
   { role: "Admin", email: "admin@xboss.vn", pw: "admin123" },
@@ -33,6 +34,12 @@ export default function LoginPage() {
       body: JSON.stringify({ email, password }),
     });
     if (res.ok) {
+      // Đăng nhập mới trên thiết bị dùng chung: dọn cache API + hàng đợi tick offline còn sót
+      // lại từ phiên trước (có thể của người khác) để không lẫn dữ liệu giữa 2 người dùng.
+      clearOfflineQueue();
+      if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: "CLEAR_CACHE" });
+      }
       window.location.href = "/";
     } else {
       const j = await res.json().catch(() => ({}));

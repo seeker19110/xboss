@@ -9,16 +9,22 @@ export const dynamic = "force-dynamic";
 // Mỗi nhóm (sheet_type × floor_label) là 1 dòng với số task, số đã hoàn thành, trạng thái duyệt.
 export async function GET() {
   try {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
-  const groups = await query<{
-    sheetTypeId: number; sheetType: string; floorLabel: string; wpName: string | null;
-    totalTasks: number; doneTasks: number;
-    approvalId: number | null; isApproved: boolean;
-    approvedByName: string | null; approvedAt: string | null;
-    docCount: number;
-  }>(`
+    const groups = await query<{
+      sheetTypeId: number;
+      sheetType: string;
+      floorLabel: string;
+      wpName: string | null;
+      totalTasks: number;
+      doneTasks: number;
+      approvalId: number | null;
+      isApproved: boolean;
+      approvedByName: string | null;
+      approvedAt: string | null;
+      docCount: number;
+    }>(`
     SELECT
       st.id AS "sheetTypeId",
       st.code AS "sheetType",
@@ -40,13 +46,13 @@ export async function GET() {
     ORDER BY st.id, wp.floor_label
   `);
 
-  const pending = groups.filter(g => !g.isApproved);
-  const approved = groups.filter(g => g.isApproved);
+    const pending = groups.filter((g) => !g.isApproved);
+    const approved = groups.filter((g) => g.isApproved);
 
-  return NextResponse.json({ pending, approved, canApprove: CAN.approve(user.role) });
+    return NextResponse.json({ pending, approved, canApprove: CAN.approve(user.role) });
   } catch (err) {
     console.error("[GET /api/approvals]", err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json({ error: "Lỗi tải danh sách nghiệm thu" }, { status: 500 });
   }
 }
 
@@ -72,7 +78,9 @@ export async function POST(req: NextRequest) {
       // Khoá và kiểm tra lại trạng thái nghiệm thu bên trong transaction
       const existing = await queryOne<{ id: number; is_approved: boolean }>(
         `SELECT id, is_approved FROM floor_approvals WHERE sheet_type_id = ? AND floor_label = ? FOR UPDATE`,
-        sheetTypeId, floorLabel);
+        sheetTypeId,
+        floorLabel,
+      );
       if (existing?.is_approved)
         throw Object.assign(new Error("Tầng này đã được nghiệm thu rồi"), { status: 409 });
 
@@ -82,44 +90,64 @@ export async function POST(req: NextRequest) {
            FROM tasks t
            JOIN work_packages wp ON t.package_id = wp.id
           WHERE wp.sheet_type_id = ? AND wp.floor_label = ?
-          FOR UPDATE OF t`, sheetTypeId, floorLabel);
+          FOR UPDATE OF t`,
+        sheetTypeId,
+        floorLabel,
+      );
 
       if (tasks.length === 0)
         throw Object.assign(new Error("Không tìm thấy task nào trong tầng này"), { status: 404 });
 
-      const notDone = tasks.filter(t => (t.progress_percent ?? 0) < 1);
+      const notDone = tasks.filter((t) => (t.progress_percent ?? 0) < 1);
       if (notDone.length > 0)
         throw Object.assign(
           new Error(`Còn ${notDone.length} task chưa đạt 100% — không thể nghiệm thu tầng`),
-          { status: 422 });
+          { status: 422 },
+        );
 
       // Tạo hoặc cập nhật floor_approval thành chính thức
       let aid: number;
       if (existing) {
         await run(
           `UPDATE floor_approvals SET is_approved = TRUE, approved_by = ?, approved_by_name = ?, approved_at = NOW()
-           WHERE id = ?`, user.id, user.name, existing.id);
+           WHERE id = ?`,
+          user.id,
+          user.name,
+          existing.id,
+        );
         aid = existing.id;
       } else {
         aid = await insertId(
           `INSERT INTO floor_approvals (sheet_type_id, floor_label, is_approved, approved_by, approved_by_name, approved_at)
            VALUES (?, ?, TRUE, ?, ?, NOW())`,
-          sheetTypeId, floorLabel, user.id, user.name);
+          sheetTypeId,
+          floorLabel,
+          user.id,
+          user.name,
+        );
       }
 
       // Đặt toàn bộ task thành nghiem_thu — bulk UPDATE để tránh N+1 sequential queries.
       const taskIds = tasks.map((t) => t.id);
       await run(
         `UPDATE tasks SET status = 'nghiem_thu', updated_at = CURRENT_TIMESTAMP WHERE id = ANY(?)`,
-        taskIds);
+        taskIds,
+      );
 
       // Bulk INSERT audit history trong 1 câu lệnh.
       const note = `Nghiệm thu tầng ${floorLabel} bởi ${user.name}`;
       const ph = tasks.map(() => "(?, ?, ?, 'nghiem_thu', ?, ?)").join(", ");
-      const vals = tasks.flatMap((t) => [t.id, t.progress_percent, t.progress_percent, note, user.name]);
+      const vals = tasks.flatMap((t) => [
+        t.id,
+        t.progress_percent,
+        t.progress_percent,
+        note,
+        user.name,
+      ]);
       await run(
         `INSERT INTO task_history (task_id, old_progress, new_progress, status, note, changed_by) VALUES ${ph}`,
-        ...vals);
+        ...vals,
+      );
 
       return { aid, tasks };
     });
@@ -128,13 +156,20 @@ export async function POST(req: NextRequest) {
     taskCount = result.tasks.length;
 
     // recomputePackage chạy ngoài transaction, song song để giảm latency.
-    const packageIds = new Set(result.tasks.map(t => t.package_id));
+    const packageIds = new Set(result.tasks.map((t) => t.package_id));
     await Promise.all([...packageIds].map((pid) => recomputePackage(pid)));
-
   } catch (err: unknown) {
+    // Race hiếm: 2 request duyệt cùng 1 tầng lần đầu gần như đồng thời cùng vượt qua kiểm tra
+    // "existing" (chưa có bản ghi) rồi cùng INSERT — UNIQUE(sheet_type_id, floor_label) chặn
+    // đúng, chỉ cần trả 409 thân thiện thay vì để lộ lỗi Postgres thô.
+    if ((err as { code?: string }).code === "23505")
+      return NextResponse.json(
+        { error: "Tầng này vừa được nghiệm thu bởi người khác" },
+        { status: 409 },
+      );
     const e = err as { message?: string; status?: number };
     const status = e.status ?? 500;
-    return NextResponse.json({ error: e.message ?? String(err) }, { status });
+    return NextResponse.json({ error: e.message ?? "Lỗi duyệt nghiệm thu" }, { status });
   }
 
   return NextResponse.json({ approvalId, taskCount });

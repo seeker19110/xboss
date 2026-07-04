@@ -7,7 +7,10 @@ export const dynamic = "force-dynamic";
 const canManage = (r?: Role) => r === "admin" || r === "pm";
 
 // GET /api/purchase-orders/:id → chi tiết PO + danh sách items
-export async function GET(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+export async function GET(
+  _req: NextRequest,
+  { params: paramsP }: { params: Promise<{ id: string }> },
+) {
   const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -24,7 +27,9 @@ export async function GET(_req: NextRequest, { params: paramsP }: { params: Prom
        FROM purchase_orders po
        LEFT JOIN suppliers s ON po.supplier_id = s.id
        LEFT JOIN users u ON po.created_by = u.id
-      WHERE po.id = ?`, id);
+      WHERE po.id = ?`,
+    id,
+  );
   if (!po) return NextResponse.json({ error: "Không tìm thấy đơn hàng" }, { status: 404 });
 
   const items = await query(
@@ -36,13 +41,18 @@ export async function GET(_req: NextRequest, { params: paramsP }: { params: Prom
        FROM po_items pi
        LEFT JOIN materials m ON pi.material_id = m.id
       WHERE pi.po_id = ?
-      ORDER BY pi.id`, id);
+      ORDER BY pi.id`,
+    id,
+  );
 
   return NextResponse.json({ po, items });
 }
 
 // PATCH /api/purchase-orders/:id  body: { status?, supplierId?, expectedDate?, note? }
-export async function PATCH(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+export async function PATCH(
+  req: NextRequest,
+  { params: paramsP }: { params: Promise<{ id: string }> },
+) {
   const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -53,30 +63,44 @@ export async function PATCH(req: NextRequest, { params: paramsP }: { params: Pro
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const po = await queryOne<{ id: number; status: string }>(
-    `SELECT id, status FROM purchase_orders WHERE id = ?`, id);
+    `SELECT id, status FROM purchase_orders WHERE id = ?`,
+    id,
+  );
   if (!po) return NextResponse.json({ error: "Không tìm thấy đơn hàng" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
   const VALID_STATUSES = ["draft", "confirmed", "partial", "received", "cancelled"];
   if (body.status && !VALID_STATUSES.includes(body.status))
     return NextResponse.json({ error: "Trạng thái không hợp lệ" }, { status: 400 });
+  // Ngày phải đúng dạng YYYY-MM-DD — chuỗi sai để Postgres từ chối sẽ thành lỗi 500.
+  if (body.expectedDate && !/^\d{4}-\d{2}-\d{2}$/.test(String(body.expectedDate)))
+    return NextResponse.json({ error: "Ngày dự kiến phải có dạng YYYY-MM-DD" }, { status: 422 });
 
   const sets: string[] = [];
   const vals: unknown[] = [];
   const fields: Record<string, string> = {
-    status: "status", supplierId: "supplier_id",
-    expectedDate: "expected_date", note: "note",
+    status: "status",
+    supplierId: "supplier_id",
+    expectedDate: "expected_date",
+    note: "note",
   };
   for (const [k, col] of Object.entries(fields)) {
-    if (body[k] !== undefined) { sets.push(`${col} = ?`); vals.push(body[k] || null); }
+    if (body[k] !== undefined) {
+      sets.push(`${col} = ?`);
+      vals.push(body[k] || null);
+    }
   }
-  if (!sets.length) return NextResponse.json({ error: "Không có trường cập nhật" }, { status: 400 });
+  if (!sets.length)
+    return NextResponse.json({ error: "Không có trường cập nhật" }, { status: 400 });
   vals.push(id);
   await run(`UPDATE purchase_orders SET ${sets.join(", ")} WHERE id = ?`, ...vals);
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+export async function DELETE(
+  _req: NextRequest,
+  { params: paramsP }: { params: Promise<{ id: string }> },
+) {
   const params = await paramsP;
   const user = await getCurrentUser();
   if (!user || user.role !== "admin")
@@ -86,15 +110,22 @@ export async function DELETE(_req: NextRequest, { params: paramsP }: { params: P
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const po = await queryOne<{ status: string }>(
-    `SELECT status FROM purchase_orders WHERE id = ?`, id);
+    `SELECT status FROM purchase_orders WHERE id = ?`,
+    id,
+  );
   if (!po) return NextResponse.json({ error: "Không tìm thấy đơn hàng" }, { status: 404 });
 
   // Đã nhập kho (một phần/đủ) thì tồn kho đã cộng vào vật tư + có phiếu nhập gắn kèm —
   // xoá sẽ tạo tồn ảo và phiếu nhập mồ côi. Phải huỷ đơn thay vì xoá.
   const received = await queryOne<{ id: number }>(
-    `SELECT id FROM po_items WHERE po_id = ? AND qty_received > 0 LIMIT 1`, id);
+    `SELECT id FROM po_items WHERE po_id = ? AND qty_received > 0 LIMIT 1`,
+    id,
+  );
   if (received || po.status === "partial" || po.status === "received")
-    return NextResponse.json({ error: "Đơn hàng đã nhập kho, không thể xoá — hãy huỷ đơn" }, { status: 409 });
+    return NextResponse.json(
+      { error: "Đơn hàng đã nhập kho, không thể xoá — hãy huỷ đơn" },
+      { status: 409 },
+    );
 
   await run(`DELETE FROM po_items WHERE po_id = ?`, id);
   await run(`DELETE FROM purchase_orders WHERE id = ?`, id);

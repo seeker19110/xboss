@@ -9,13 +9,21 @@ export const SHEET_MAP: Record<string, { code: string; name: string; responsible
   "TRACKING OGTĐ": { code: "OGTĐ", name: "Ống gió trục đứng", responsible: "Mr. Thừa" },
   "TRACKING OGHL": { code: "OGHL", name: "Ống gió hành lang", responsible: "Mr. Thừa" },
   "TRACKING OGCH": { code: "OGCH", name: "Ống gió căn hộ", responsible: "Mr. Thừa" },
-  "TRACKING ODNN Zone 1": { code: "ODNN Zone 1", name: "Ống đồng nước ngưng Zone 1", responsible: "Mr. Hải" },
-  "TRACKING ODNN Zone 2": { code: "ODNN Zone 2", name: "Ống đồng nước ngưng Zone 2", responsible: "Mr. Thắng" },
+  "TRACKING ODNN Zone 1": {
+    code: "ODNN Zone 1",
+    name: "Ống đồng nước ngưng Zone 1",
+    responsible: "Mr. Hải",
+  },
+  "TRACKING ODNN Zone 2": {
+    code: "ODNN Zone 2",
+    name: "Ống đồng nước ngưng Zone 2",
+    responsible: "Mr. Thắng",
+  },
 };
 
-const HEADER_ROW = 2;   // dòng tiêu đề (index 2 = dòng 3)
-const DATA_START = 5;   // dữ liệu bắt đầu từ index 5
-const DIM_START = 9;    // cột dimension đầu tiên
+const HEADER_ROW = 2; // dòng tiêu đề (index 2 = dòng 3)
+const DATA_START = 5; // dữ liệu bắt đầu từ index 5
+const DIM_START = 9; // cột dimension đầu tiên
 
 export function toISO(v: unknown): string | null {
   if (v == null || v === "") return null;
@@ -32,12 +40,17 @@ const floorOf = (name: string) => name.match(/(\d+F)\b/)?.[1] ?? null;
 // ô checkbox đã hoàn thành?
 function isChecked(v: unknown): boolean {
   if (v === true || v === 1) return true;
-  if (typeof v === "string") return ["x", "1", "true", "✓", "đã lắp"].includes(v.trim().toLowerCase());
+  if (typeof v === "string")
+    return ["x", "1", "true", "✓", "đã lắp"].includes(v.trim().toLowerCase());
   return false;
 }
 function cleanLabel(v: unknown): string | null {
   if (v == null || String(v).trim() === "") return null;
-  return String(v).replace(/\n/g, " ").replace(/\s+/g, " ").trim().replace(/^\d+\s+/, "");
+  return String(v)
+    .replace(/\n/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^\d+\s+/, "");
 }
 
 type DimDef = { col: number; label: string; index: number };
@@ -53,39 +66,67 @@ function parseDimDefs(rows: unknown[][]): { defs: DimDef[]; linkCol: number } {
   const header = rows[HEADER_ROW] ?? [];
   let linkCol = -1;
   for (let c = DIM_START; c < header.length; c++) {
-    if (header[c] != null && String(header[c]).toLowerCase().includes("link")) { linkCol = c; break; }
+    if (header[c] != null && String(header[c]).toLowerCase().includes("link")) {
+      linkCol = c;
+      break;
+    }
   }
   const end = linkCol === -1 ? header.length : linkCol;
   const defs: DimDef[] = [];
-  let group = "", sub = 0, idx = 0;
+  let group = "",
+    sub = 0,
+    idx = 0;
   for (let c = DIM_START; c < end; c++) {
     const cleaned = cleanLabel(header[c]);
     let label: string;
-    if (cleaned) { group = cleaned; sub = 1; label = group; }
-    else { sub++; label = group ? `${group} (${sub})` : `Cột ${c}`; }
+    if (cleaned) {
+      group = cleaned;
+      sub = 1;
+      label = group;
+    } else {
+      sub++;
+      label = group ? `${group} (${sub})` : `Cột ${c}`;
+    }
     defs.push({ col: c, label, index: ++idx });
   }
   return { defs, linkCol };
 }
 
 export type ImportStats = {
-  totalRows: number; packages: number; tasks: number; dimensions: number; errors: string[]; sheets: string[];
+  totalRows: number;
+  packages: number;
+  tasks: number;
+  dimensions: number;
+  errors: string[];
+  sheets: string[];
 };
 
 // ===== Preview (dry-run): phân tích file, KHÔNG ghi DB =====
 export type SheetPreview = {
-  sheetName: string; code: string; label: string;
-  packages: number; tasks: number; dimColumns: number;
+  sheetName: string;
+  code: string;
+  label: string;
+  packages: number;
+  tasks: number;
+  dimColumns: number;
   warnings: string[];
 };
 export type PreviewResult = {
   sheets: SheetPreview[];
-  unknownSheets: string[];   // sheet trong file không nằm trong SHEET_MAP (bỏ qua khi import)
-  totalPackages: number; totalTasks: number; totalWarnings: number;
+  unknownSheets: string[]; // sheet trong file không nằm trong SHEET_MAP (bỏ qua khi import)
+  totalPackages: number;
+  totalTasks: number;
+  totalWarnings: number;
 };
 
 export function analyzeWorkbook(workbook: XLSX.WorkBook): PreviewResult {
-  const result: PreviewResult = { sheets: [], unknownSheets: [], totalPackages: 0, totalTasks: 0, totalWarnings: 0 };
+  const result: PreviewResult = {
+    sheets: [],
+    unknownSheets: [],
+    totalPackages: 0,
+    totalTasks: 0,
+    totalWarnings: 0,
+  };
 
   for (const sheetName of workbook.SheetNames) {
     const info = SHEET_MAP[sheetName];
@@ -97,7 +138,15 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): PreviewResult {
     const ws = workbook.Sheets[sheetName];
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null }) as unknown[][];
     const { defs: dimDefs } = parseDimDefs(rows);
-    const sp: SheetPreview = { sheetName, code: info.code, label: info.name, packages: 0, tasks: 0, dimColumns: dimDefs.length, warnings: [] };
+    const sp: SheetPreview = {
+      sheetName,
+      code: info.code,
+      label: info.name,
+      packages: 0,
+      tasks: 0,
+      dimColumns: dimDefs.length,
+      warnings: [],
+    };
 
     let hasPkg = false;
     for (let i = DATA_START; i < rows.length; i++) {
@@ -113,16 +162,27 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): PreviewResult {
       const startDate = toISO(row[4]);
       const endDate = toISO(row[6]);
       if (row[4] != null && row[4] !== "" && !startDate)
-        sp.warnings.push(`Dòng ${i + 1}: ngày bắt đầu không đọc được ("${String(row[4]).slice(0, 20)}")`);
+        sp.warnings.push(
+          `Dòng ${i + 1}: ngày bắt đầu không đọc được ("${String(row[4]).slice(0, 20)}")`,
+        );
       if (row[6] != null && row[6] !== "" && !endDate)
-        sp.warnings.push(`Dòng ${i + 1}: ngày kết thúc không đọc được ("${String(row[6]).slice(0, 20)}")`);
+        sp.warnings.push(
+          `Dòng ${i + 1}: ngày kết thúc không đọc được ("${String(row[6]).slice(0, 20)}")`,
+        );
       if (startDate && endDate && startDate > endDate)
-        sp.warnings.push(`Dòng ${i + 1}: ngày bắt đầu (${startDate}) sau ngày kết thúc (${endDate})`);
+        sp.warnings.push(
+          `Dòng ${i + 1}: ngày bắt đầu (${startDate}) sau ngày kết thúc (${endDate})`,
+        );
 
       const isPkg = !!code && !code.includes(",") && intStt(stt);
-      if (isPkg) { sp.packages++; hasPkg = true; }
-      else if (hasPkg) sp.tasks++;
-      else sp.warnings.push(`Dòng ${i + 1}: task "${name.slice(0, 30)}" đứng trước nhóm đầu tiên — sẽ bị bỏ qua`);
+      if (isPkg) {
+        sp.packages++;
+        hasPkg = true;
+      } else if (hasPkg) sp.tasks++;
+      else
+        sp.warnings.push(
+          `Dòng ${i + 1}: task "${name.slice(0, 30)}" đứng trước nhóm đầu tiên — sẽ bị bỏ qua`,
+        );
     }
 
     if (dimDefs.length === 0)
@@ -151,7 +211,14 @@ async function getOrCreateTower(projectId: number): Promise<number> {
 }
 
 export async function importWorkbook(workbook: XLSX.WorkBook): Promise<ImportStats> {
-  const stats: ImportStats = { totalRows: 0, packages: 0, tasks: 0, dimensions: 0, errors: [], sheets: [] };
+  const stats: ImportStats = {
+    totalRows: 0,
+    packages: 0,
+    tasks: 0,
+    dimensions: 0,
+    errors: [],
+    sheets: [],
+  };
 
   const projectId = await getOrCreateProject();
   const towerId = await getOrCreateTower(projectId);
@@ -166,10 +233,22 @@ export async function importWorkbook(workbook: XLSX.WorkBook): Promise<ImportSta
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null }) as unknown[][];
     const { defs: dimDefs, linkCol } = parseDimDefs(rows);
 
-    let st = await queryOne<Row>(`SELECT id FROM sheet_types WHERE tower_id = ? AND code = ?`, towerId, info.code);
+    let st = await queryOne<Row>(
+      `SELECT id FROM sheet_types WHERE tower_id = ? AND code = ?`,
+      towerId,
+      info.code,
+    );
     if (!st) {
-      st = { id: await insertId(`INSERT INTO sheet_types (tower_id, code, name, responsible, slug) VALUES (?, ?, ?, ?, ?)`,
-        towerId, info.code, info.name, info.responsible ?? null, slugFromCode(info.code) ?? toSlug(info.code)) };
+      st = {
+        id: await insertId(
+          `INSERT INTO sheet_types (tower_id, code, name, responsible, slug) VALUES (?, ?, ?, ?, ?)`,
+          towerId,
+          info.code,
+          info.name,
+          info.responsible ?? null,
+          slugFromCode(info.code) ?? toSlug(info.code),
+        ),
+      };
     }
 
     let currentPkgId: number | null = null;
@@ -200,17 +279,38 @@ export async function importWorkbook(workbook: XLSX.WorkBook): Promise<ImportSta
 
         if (isPkg) {
           const wpCode = code;
-          const existing = await queryOne<Row>(`SELECT id FROM work_packages WHERE sheet_type_id = ? AND code = ?`, st.id, wpCode);
+          const existing = await queryOne<Row>(
+            `SELECT id FROM work_packages WHERE sheet_type_id = ? AND code = ?`,
+            st.id,
+            wpCode,
+          );
           if (!existing) {
             currentPkgId = await insertId(
               `INSERT INTO work_packages (boq_code, sheet_type_id, code, seq_no, floor_label, name, start_date, end_date, duration_days, status, progress, drawing_url)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
-              makeBoq(info.code, wpCode), st.id, wpCode, stt, floorOf(name), name, startDate, endDate, durationDays, ghiChu, drawingUrl);
+              makeBoq(info.code, wpCode),
+              st.id,
+              wpCode,
+              stt,
+              floorOf(name),
+              name,
+              startDate,
+              endDate,
+              durationDays,
+              ghiChu,
+              drawingUrl,
+            );
             stats.packages++;
           } else {
             // Giữ nguyên boq_code (người dùng có thể đã sửa tay).
-            await run(`UPDATE work_packages SET start_date = ?, end_date = ?, duration_days = ?, drawing_url = COALESCE(?, drawing_url) WHERE id = ?`,
-              startDate, endDate, durationDays, drawingUrl, existing.id);
+            await run(
+              `UPDATE work_packages SET start_date = ?, end_date = ?, duration_days = ?, drawing_url = COALESCE(?, drawing_url) WHERE id = ?`,
+              startDate,
+              endDate,
+              durationDays,
+              drawingUrl,
+              existing.id,
+            );
             currentPkgId = existing.id;
           }
           currentPkgCode = wpCode;
@@ -226,30 +326,68 @@ export async function importWorkbook(workbook: XLSX.WorkBook): Promise<ImportSta
             const done = dimDefs.filter((d) => isChecked(row[d.col])).length;
             progress = Math.round((done / dimDefs.length) * 100) / 100;
           }
-          const status = deriveStatus(progress, endDate, ghiChu);
 
           let taskId: number;
-          const existing = await queryOne<Row>(`SELECT id FROM tasks WHERE package_id = ? AND code = ?`, currentPkgId, taskCode);
+          const existing = await queryOne<Row & { status: string }>(
+            `SELECT id, status FROM tasks WHERE package_id = ? AND code = ?`,
+            currentPkgId,
+            taskCode,
+          );
+          // Trạng thái "hiện tại" truyền cho deriveStatus: task đã tồn tại thì lấy status
+          // thật trong DB (không phải chữ ghi chú Excel) — nếu không, import lại 1 file cũ sẽ
+          // âm thầm huỷ nghiệm thu đã duyệt (không qua /api/tasks/:id/approve, mất audit).
+          // Task mới toanh (chưa từng có) chỉ nhận "nghiệm thu" từ Excel khi % đã đủ 100%,
+          // tránh nghiệm thu "chui" một task còn dở dang ngay từ lúc import.
+          const currentStatus = existing
+            ? existing.status
+            : ghiChu === "nghiem_thu" && progress >= 1
+              ? "nghiem_thu"
+              : null;
+          const status = deriveStatus(progress, endDate, currentStatus);
           if (!existing) {
             taskId = await insertId(
               `INSERT INTO tasks (boq_code, package_id, code, seq_no, name, note, status, start_date, end_date, duration_days, progress_percent, drawing_url)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-              makeBoq(info.code, taskCode), currentPkgId, taskCode, stt || null, name, row[3] != null ? String(row[3]) : null,
-              status, startDate, endDate, durationDays, progress, drawingUrl);
+              makeBoq(info.code, taskCode),
+              currentPkgId,
+              taskCode,
+              stt || null,
+              name,
+              row[3] != null ? String(row[3]) : null,
+              status,
+              startDate,
+              endDate,
+              durationDays,
+              progress,
+              drawingUrl,
+            );
             stats.tasks++;
           } else {
             taskId = existing.id;
             // Giữ nguyên boq_code (người dùng có thể đã sửa tay).
-            await run(`UPDATE tasks SET status = ?, progress_percent = ?, start_date = ?, end_date = ?, duration_days = ?, drawing_url = COALESCE(?, drawing_url) WHERE id = ?`,
-              status, progress, startDate, endDate, durationDays, drawingUrl, taskId);
+            await run(
+              `UPDATE tasks SET status = ?, progress_percent = ?, start_date = ?, end_date = ?, duration_days = ?, drawing_url = COALESCE(?, drawing_url) WHERE id = ?`,
+              status,
+              progress,
+              startDate,
+              endDate,
+              durationDays,
+              drawingUrl,
+              taskId,
+            );
             await run(`DELETE FROM progress_dimensions WHERE task_id = ?`, taskId);
           }
 
           if (hasGrid) {
             for (const d of dimDefs) {
               const checked = isChecked(row[d.col]) ? 1 : 0;
-              await run(`INSERT INTO progress_dimensions (task_id, dimension_label, installed, value) VALUES (?, ?, ?, ?)`,
-                taskId, d.label, checked, checked);
+              await run(
+                `INSERT INTO progress_dimensions (task_id, dimension_label, installed, value) VALUES (?, ?, ?, ?)`,
+                taskId,
+                d.label,
+                checked,
+                checked,
+              );
               stats.dimensions++;
             }
           }

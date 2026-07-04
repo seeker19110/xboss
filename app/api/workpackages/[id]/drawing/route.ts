@@ -41,6 +41,11 @@ export async function GET(
     id,
   );
   if (!wp) return NextResponse.json({ error: "Không tìm thấy nhóm" }, { status: 404 });
+  if (!(await canTouchPackage(user, id)))
+    return NextResponse.json(
+      { error: "Bạn chỉ được thao tác trên nhóm được giao cho mình" },
+      { status: 403 },
+    );
   if (!wp.drawingFileName)
     return NextResponse.json({ error: "Chưa có file bản vẽ" }, { status: 404 });
 

@@ -1,29 +1,40 @@
-'use client';
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { ArrowLeft, Printer, CalendarClock } from 'lucide-react';
-import { LookaheadTable } from '@/app/components/LookaheadTable';
+"use client";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { ArrowLeft, Printer, CalendarClock } from "lucide-react";
+import { LookaheadTable } from "@/app/components/LookaheadTable";
+import { redirectToLogin } from "@/app/lib/me";
 
 type LTask = {
-  id: number; code: string; name: string; status: string;
-  startDate: string | null; endDate: string | null; progressPercent: number;
-  floorLabel: string | null; packageCode: string; sheetType: string;
+  id: number;
+  code: string;
+  name: string;
+  status: string;
+  startDate: string | null;
+  endDate: string | null;
+  progressPercent: number;
+  floorLabel: string | null;
+  packageCode: string;
+  sheetType: string;
   delayReason: string | null;
 };
 type Data = { days: number; from: string; until: string; starting: LTask[]; due: LTask[] };
 
 const fmtDate = (d: string | null) => {
-  if (!d) return '—';
+  if (!d) return "—";
   const dt = new Date(d);
-  return isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString('vi-VN');
+  return isNaN(dt.getTime()) ? "—" : dt.toLocaleDateString("vi-VN");
 };
 
 // Nhóm task theo hệ (sheet) — giữ thứ tự xuất hiện.
 function groupBySheet(tasks: LTask[]): { sheet: string; tasks: LTask[] }[] {
   const groups: { sheet: string; tasks: LTask[] }[] = [];
   for (const t of tasks) {
-    let g = groups.find(x => x.sheet === t.sheetType);
-    if (!g) { g = { sheet: t.sheetType, tasks: [] }; groups.push(g); }
+    let g = groups.find((x) => x.sheet === t.sheetType);
+    if (!g) {
+      g = { sheet: t.sheetType, tasks: [] };
+      groups.push(g);
+    }
     g.tasks.push(t);
   }
   return groups;
@@ -35,27 +46,42 @@ export default function LookaheadPage() {
   const [projectName, setProjectName] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`/api/lookahead?days=${days}`).then(async r => {
-      if (r.status === 401) { window.location.href = '/login'; return; }
+    fetch(`/api/lookahead?days=${days}`).then(async (r) => {
+      if (r.status === 401) {
+        redirectToLogin();
+        return;
+      }
       setData(await r.json());
     });
   }, [days]);
   useEffect(() => {
-    fetch('/api/project').then(r => r.ok ? r.json() : null).then(j => setProjectName(j?.name ?? null));
+    fetch("/api/project")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setProjectName(j?.name ?? null));
   }, []);
 
   return (
     <div className="min-h-screen bg-white text-zinc-900">
       <div className="no-print sticky top-0 bg-zinc-100 border-b border-zinc-300 px-6 py-3 flex items-center gap-3">
-        <Link href="/" className="text-zinc-600 hover:text-zinc-900"><ArrowLeft className="w-5 h-5" /></Link>
-        <span className="text-sm text-zinc-600">Kế hoạch ngắn hạn cho họp giao ban — in hoặc lưu PDF</span>
-        <select value={days} onChange={e => setDays(Number(e.target.value))}
-          className="ml-auto border border-zinc-300 rounded-lg px-3 py-2 text-sm bg-white">
+        <Link href="/" className="text-zinc-600 hover:text-zinc-900">
+          <ArrowLeft className="w-5 h-5" />
+        </Link>
+        <span className="text-sm text-zinc-600">
+          Kế hoạch ngắn hạn cho họp giao ban — in hoặc lưu PDF
+        </span>
+        <select
+          value={days}
+          onChange={(e) => setDays(Number(e.target.value))}
+          className="ml-auto border border-zinc-300 rounded-lg px-3 py-2 text-sm bg-white"
+        >
           <option value={7}>7 ngày</option>
           <option value={14}>14 ngày</option>
           <option value={21}>21 ngày</option>
         </select>
-        <button onClick={() => window.print()} className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg text-sm">
+        <button
+          onClick={() => window.print()}
+          className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg text-sm"
+        >
           <Printer className="w-4 h-4" /> In / Lưu PDF
         </button>
       </div>
@@ -66,42 +92,77 @@ export default function LookaheadPage() {
             <CalendarClock className="w-6 h-6" /> KẾ HOẠCH {data?.days ?? days} NGÀY TỚI
           </h1>
           <p className="text-zinc-600">
-            {projectName ?? 'XBoss'} · {fmtDate(data?.from ?? null)} → {fmtDate(data?.until ?? null)}
+            {projectName ?? "XBoss"} · {fmtDate(data?.from ?? null)} →{" "}
+            {fmtDate(data?.until ?? null)}
           </p>
         </div>
 
-        <h2 className="font-bold text-lg mb-1">1. Công việc sắp bắt đầu ({data?.starting.length ?? 0})</h2>
-        <p className="text-xs text-zinc-500 mb-3">Chuẩn bị mặt bằng, vật tư, nhân lực trước ngày bắt đầu.</p>
-        {data?.starting.length === 0 && <p className="text-sm text-zinc-400 mb-6">Không có công việc nào bắt đầu trong giai đoạn này.</p>}
-        {groupBySheet(data?.starting ?? []).map(g => (
+        <h2 className="font-bold text-lg mb-1">
+          1. Công việc sắp bắt đầu ({data?.starting.length ?? 0})
+        </h2>
+        <p className="text-xs text-zinc-500 mb-3">
+          Chuẩn bị mặt bằng, vật tư, nhân lực trước ngày bắt đầu.
+        </p>
+        {data?.starting.length === 0 && (
+          <p className="text-sm text-zinc-400 mb-6">
+            Không có công việc nào bắt đầu trong giai đoạn này.
+          </p>
+        )}
+        {groupBySheet(data?.starting ?? []).map((g) => (
           <div key={g.sheet} className="mb-2 avoid-break">
-            <h3 className="font-semibold text-sm bg-zinc-50 border-l-4 border-zinc-900 pl-2 py-1 mb-1">{g.sheet} ({g.tasks.length})</h3>
+            <h3 className="font-semibold text-sm bg-zinc-50 border-l-4 border-zinc-900 pl-2 py-1 mb-1">
+              {g.sheet} ({g.tasks.length})
+            </h3>
             <LookaheadTable tasks={g.tasks} dateCol="startDate" />
           </div>
         ))}
 
-        <h2 className="font-bold text-lg mb-1 mt-8 page-break">2. Công việc đến hạn ({data?.due.length ?? 0})</h2>
-        <p className="text-xs text-zinc-500 mb-3">Phải hoàn thành trong giai đoạn này — ưu tiên dòng đang trễ (đỏ).</p>
-        {data?.due.length === 0 && <p className="text-sm text-zinc-400 mb-6">Không có deadline nào trong giai đoạn này.</p>}
-        {groupBySheet(data?.due ?? []).map(g => (
+        <h2 className="font-bold text-lg mb-1 mt-8 page-break">
+          2. Công việc đến hạn ({data?.due.length ?? 0})
+        </h2>
+        <p className="text-xs text-zinc-500 mb-3">
+          Phải hoàn thành trong giai đoạn này — ưu tiên dòng đang trễ (đỏ).
+        </p>
+        {data?.due.length === 0 && (
+          <p className="text-sm text-zinc-400 mb-6">Không có deadline nào trong giai đoạn này.</p>
+        )}
+        {groupBySheet(data?.due ?? []).map((g) => (
           <div key={g.sheet} className="mb-2 avoid-break">
-            <h3 className="font-semibold text-sm bg-zinc-50 border-l-4 border-zinc-900 pl-2 py-1 mb-1">{g.sheet} ({g.tasks.length})</h3>
+            <h3 className="font-semibold text-sm bg-zinc-50 border-l-4 border-zinc-900 pl-2 py-1 mb-1">
+              {g.sheet} ({g.tasks.length})
+            </h3>
             <LookaheadTable tasks={g.tasks} dateCol="endDate" />
           </div>
         ))}
 
-        <p className="text-xs text-zinc-400 mt-8" suppressHydrationWarning>Xuất từ XBoss · {new Date().toLocaleString('vi-VN')}</p>
+        <p className="text-xs text-zinc-400 mt-8" suppressHydrationWarning>
+          Xuất từ XBoss · {new Date().toLocaleString("vi-VN")}
+        </p>
       </div>
 
       <style jsx global>{`
         @media print {
-          .no-print { display: none !important; }
-          body { background: #fff; }
-          @page { margin: 14mm; }
-          .page-break { break-before: page; }
-          .avoid-break { break-inside: avoid; }
-          thead { display: table-header-group; }
-          tr { break-inside: avoid; }
+          .no-print {
+            display: none !important;
+          }
+          body {
+            background: #fff;
+          }
+          @page {
+            margin: 14mm;
+          }
+          .page-break {
+            break-before: page;
+          }
+          .avoid-break {
+            break-inside: avoid;
+          }
+          thead {
+            display: table-header-group;
+          }
+          tr {
+            break-inside: avoid;
+          }
         }
       `}</style>
     </div>
