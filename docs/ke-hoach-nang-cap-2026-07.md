@@ -6,15 +6,15 @@
 
 `npm outdated` hiện chỉ có bản vá/minor, không có breaking change:
 
-| Package | Hiện tại | Lên | Ghi chú |
-|---|---|---|---|
-| `next` | 16.2.9 | 16.2.10 | patch |
-| `lucide-react` | 1.18.0 | 1.23.0 | icon set only, ít rủi ro |
-| `pg` | 8.13.1 | 8.22.0 | minor, kiểm tra lại pool/type parser tuỳ chỉnh trong `lib/db` |
-| `recharts` | 3.8.1 | 3.9.2 | minor, smoke-test `SCurveChart`/`ForecastCards` |
-| `nodemailer` | 9.0.1 | 9.0.3 | patch |
-| `@tanstack/react-virtual` | 3.14.3 | 3.14.5 | patch |
-| `npm` (global, CI) | 10.x | 11.18.0 | không bắt buộc, cân nhắc riêng cho runner CI |
+| Package                   | Hiện tại | Lên     | Ghi chú                                                       |
+| ------------------------- | -------- | ------- | ------------------------------------------------------------- |
+| `next`                    | 16.2.9   | 16.2.10 | patch                                                         |
+| `lucide-react`            | 1.18.0   | 1.23.0  | icon set only, ít rủi ro                                      |
+| `pg`                      | 8.13.1   | 8.22.0  | minor, kiểm tra lại pool/type parser tuỳ chỉnh trong `lib/db` |
+| `recharts`                | 3.8.1    | 3.9.2   | minor, smoke-test `SCurveChart`/`ForecastCards`               |
+| `nodemailer`              | 9.0.1    | 9.0.3   | patch                                                         |
+| `@tanstack/react-virtual` | 3.14.3   | 3.14.5  | patch                                                         |
+| `npm` (global, CI)        | 10.x     | 11.18.0 | không bắt buộc, cân nhắc riêng cho runner CI                  |
 
 **Cách làm:** 1 PR riêng `chore: cập nhật dependency minor/patch`, chạy `npm install`, `npm run lint && npm run typecheck && npm test && npm run build`, kiểm tay S-curve + export Excel + gửi mail (3 điểm chạm rủi ro nhất theo bảng trên). Không gộp vào PR tính năng.
 
@@ -22,8 +22,8 @@
 
 Ưu tiên theo rủi ro/công sức, tách mỗi hạng mục thành 1 PR nhỏ:
 
-1. **CI: pin action bên thứ 3 theo SHA** (`gitleaks/gitleaks-action@v2`, `actions/*@v4`) — rủi ro supply-chain thấp nhưng dễ làm, không đụng logic app. Làm trước để dọn nền.
-2. **Test cho business logic rủi ro cao nhất chưa có test tích hợp:** `recomputeTask`/`recomputePackage` (chỉ `deriveStatus` thuần có test) và `boqTakenBy`/`makeBoq` — dùng `TEST_DATABASE_URL` sẵn có. Ưu tiên trước khi đụng tới các route gọi 2 hàm này.
+1. ~~**CI: pin action bên thứ 3 theo SHA**~~ → **đã xong**: `actions/checkout`, `actions/setup-node`, `actions/upload-artifact`, `gitleaks/gitleaks-action` (4 workflow) + `appleboy/ssh-action` (deploy.yml, đang `@master` nên rủi ro cao nhất — pin theo).
+2. ~~**Test cho business logic rủi ro cao nhất chưa có test tích hợp:**~~ → **đã xong**: `recomputeTask`/`recomputePackage` đã có test tích hợp từ trước (`tests/recompute.test.ts`, đợt audit lần 3); bổ sung `tests/boq.test.ts` cho `boqTakenBy`/`makeBoq` (mã trùng xuyên 3 bảng, có/không `exclude`).
 3. **Bọc nốt `recomputeTask`/`recomputePackage` trong `withTransaction`** ở 2 call site còn thiếu (`tasks/:id` PATCH đổi ngày, `workpackages/:id/dimensions/column` DELETE) — làm sau khi có test ở bước 2 để verify không hồi quy.
 4. **Nợ a11y contrast còn lại:** `/notifications`, `/admin`, `/timeline`, `/gantt`, `/materials/reports`, `/materials/import`, `/materials/purchase-orders`, `/lookahead`, `/report`, `/import` (`text-zinc-500/600` trên body-text). Theo đúng quy trình đã dùng: thêm `e2e/authed/<trang>.spec.ts`, chạy axe, sửa, xác nhận xanh. `/notifications` (24 chỗ) và `/admin` (23 chỗ) làm trước vì mật độ cao nhất.
 5. **Siết Lighthouse a11y `warn` → `error`** (`lighthouserc.json`) — làm **sau** bước 4 vì hiện chỉ đo `/login`; mở rộng gate sau khi các trang mật độ cao đã sạch, tránh CI đỏ hàng loạt ngay khi đổi ngưỡng.
