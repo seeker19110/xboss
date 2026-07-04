@@ -24,7 +24,7 @@
 
 1. ~~**CI: pin action bên thứ 3 theo SHA**~~ → **đã xong**: `actions/checkout`, `actions/setup-node`, `actions/upload-artifact`, `gitleaks/gitleaks-action` (4 workflow) + `appleboy/ssh-action` (deploy.yml, đang `@master` nên rủi ro cao nhất — pin theo).
 2. ~~**Test cho business logic rủi ro cao nhất chưa có test tích hợp:**~~ → **đã xong**: `recomputeTask`/`recomputePackage` đã có test tích hợp từ trước (`tests/recompute.test.ts`, đợt audit lần 3); bổ sung `tests/boq.test.ts` cho `boqTakenBy`/`makeBoq` (mã trùng xuyên 3 bảng, có/không `exclude`).
-3. **Bọc nốt `recomputeTask`/`recomputePackage` trong `withTransaction`** ở 2 call site còn thiếu (`tasks/:id` PATCH đổi ngày, `workpackages/:id/dimensions/column` DELETE) — làm sau khi có test ở bước 2 để verify không hồi quy.
+3. ~~**Bọc nốt `recomputeTask`/`recomputePackage` trong `withTransaction`**~~ → **đã xong từ trước** (commit `ccb8104`): kiểm tra lại 2 call site từng bị flag (`tasks/:id` PATCH đổi ngày, `workpackages/:id/dimensions/column` DELETE) đều đã bọc `withTransaction` — `git log -L` xác nhận đã fix ở đợt "audit lần 3", `PROGRESS.md` chưa cập nhật theo nên tưởng còn nợ.
 4. **Nợ a11y contrast còn lại:** `/notifications`, `/admin`, `/timeline`, `/gantt`, `/materials/reports`, `/materials/import`, `/materials/purchase-orders`, `/lookahead`, `/report`, `/import` (`text-zinc-500/600` trên body-text). Theo đúng quy trình đã dùng: thêm `e2e/authed/<trang>.spec.ts`, chạy axe, sửa, xác nhận xanh. `/notifications` (24 chỗ) và `/admin` (23 chỗ) làm trước vì mật độ cao nhất.
 5. **Siết Lighthouse a11y `warn` → `error`** (`lighthouserc.json`) — làm **sau** bước 4 vì hiện chỉ đo `/login`; mở rộng gate sau khi các trang mật độ cao đã sạch, tránh CI đỏ hàng loạt ngay khi đổi ngưỡng.
 
