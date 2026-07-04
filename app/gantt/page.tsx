@@ -7,7 +7,7 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appAlert } from "@/app/components/dialogs";
 import { useEditMode } from "@/app/components/useEditMode";
 import EditModeToggle from "@/app/components/EditModeToggle";
-import { fetchMe } from "@/app/lib/me";
+import { fetchMe, redirectToLogin } from "@/app/lib/me";
 
 type Bar = {
   id: number;
@@ -63,7 +63,7 @@ export default function GanttPage() {
   async function load() {
     const r = await fetch("/api/gantt");
     if (r.status === 401) {
-      window.location.href = "/login";
+      redirectToLogin();
       return;
     }
     const j = await r.json();

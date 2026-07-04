@@ -93,8 +93,12 @@ export async function POST(
 
   // Thêm cột làm tăng mẫu số mỗi task — phải tính lại % task + nhóm, nếu không %
   // hiển thị vẫn giữ giá trị cũ (cao hơn thực tế) cho tới khi ai đó tick 1 ô.
-  for (const t of targetTasks) await recomputeTask(t.id, user.name);
-  await recomputePackage(pkgId);
+  // recomputeTask khoá row bằng FOR UPDATE — phải nằm trong transaction để lock có tác dụng
+  // tới lúc ghi xong (chống lost update với tick checkbox đồng thời).
+  await withTransaction(async () => {
+    for (const t of targetTasks) await recomputeTask(t.id, user.name);
+    await recomputePackage(pkgId);
+  });
 
   return NextResponse.json(
     { created: targetTasks.length, skipped: tasks.length - targetTasks.length, label, sortOrder },
@@ -150,10 +154,12 @@ export async function DELETE(
     );
     totalDeleted += changes;
 
-    // Tính lại % cho mọi task + nhóm bị ảnh hưởng.
+    // Tính lại % cho mọi task + nhóm bị ảnh hưởng (trong transaction — xem chú thích ở POST).
     const tasks = await query<{ id: number }>(`SELECT id FROM tasks WHERE package_id = ?`, pid);
-    for (const t of tasks) await recomputeTask(t.id, user.name);
-    await recomputePackage(pid);
+    await withTransaction(async () => {
+      for (const t of tasks) await recomputeTask(t.id, user.name);
+      await recomputePackage(pid);
+    });
   }
 
   return NextResponse.json({ deleted: totalDeleted, groups: affectedPkgIds.length });
@@ -238,9 +244,12 @@ export async function PATCH(
     );
   });
 
-  // Cột mới (copy) cũng tăng mẫu số mỗi task — tính lại % task + nhóm như khi thêm cột.
-  for (const t of targetTasks) await recomputeTask(t.id, user.name);
-  await recomputePackage(pkgId);
+  // Cột mới (copy) cũng tăng mẫu số mỗi task — tính lại % task + nhóm như khi thêm cột
+  // (trong transaction — xem chú thích ở POST).
+  await withTransaction(async () => {
+    for (const t of targetTasks) await recomputeTask(t.id, user.name);
+    await recomputePackage(pkgId);
+  });
 
   return NextResponse.json(
     {

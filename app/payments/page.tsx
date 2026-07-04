@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { PageSkeleton } from "@/app/components/Skeleton";
-import { fetchMe } from "@/app/lib/me";
+import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import { useEditMode } from "@/app/components/useEditMode";
 import EditModeToggle from "@/app/components/EditModeToggle";
 
@@ -181,7 +181,7 @@ export default function PaymentsPage() {
       fetch("/api/payments/bills"),
     ]);
     if (dr.status === 401) {
-      window.location.href = "/login";
+      redirectToLogin();
       return;
     }
     if (dr.status === 403) {

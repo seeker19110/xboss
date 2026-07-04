@@ -1,16 +1,30 @@
-'use client';
+"use client";
 // Hàng đợi offline cho thao tác tick checkbox: mất mạng → lưu localStorage,
 // có mạng lại → tự gửi PATCH theo thứ tự. Mỗi dimension chỉ giữ thao tác mới nhất.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type QueuedTick = { dimId: number; installed: boolean; queuedAt: number };
-const KEY = 'xboss-offline-ticks';
+const KEY = "xboss-offline-ticks";
 
 function readQueue(): QueuedTick[] {
-  try { return JSON.parse(localStorage.getItem(KEY) ?? '[]'); } catch { return []; }
+  try {
+    return JSON.parse(localStorage.getItem(KEY) ?? "[]");
+  } catch {
+    return [];
+  }
 }
 function writeQueue(q: QueuedTick[]) {
   localStorage.setItem(KEY, JSON.stringify(q));
+}
+
+/** Xoá hàng đợi tick offline — gọi khi đăng xuất/hết phiên để tick dở dang của người dùng
+ * trước không bị gửi "chui" dưới tên người đăng nhập sau trên thiết bị dùng chung. */
+export function clearOfflineQueue() {
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    /* localStorage có thể bị chặn */
+  }
 }
 
 export function useOfflineTickQueue(onFlushed?: () => void) {
@@ -27,12 +41,15 @@ export function useOfflineTickQueue(onFlushed?: () => void) {
     for (const t of q) {
       try {
         const res = await fetch(`/api/dimensions/${t.dimId}`, {
-          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ installed: t.installed }),
         });
         // 5xx → giữ lại thử sau; 4xx (mất quyền/dimension bị xoá) → bỏ, không kẹt hàng đợi.
         if (!res.ok && res.status >= 500) remain.push(t);
-      } catch { remain.push(t); } // vẫn chưa có mạng
+      } catch {
+        remain.push(t);
+      } // vẫn chưa có mạng
     }
     writeQueue(remain);
     setPending(remain.length);
@@ -41,7 +58,7 @@ export function useOfflineTickQueue(onFlushed?: () => void) {
   }, [onFlushed]);
 
   const enqueue = useCallback((dimId: number, installed: boolean) => {
-    const q = readQueue().filter(t => t.dimId !== dimId);
+    const q = readQueue().filter((t) => t.dimId !== dimId);
     q.push({ dimId, installed, queuedAt: Date.now() });
     writeQueue(q);
     setPending(q.length);
@@ -50,27 +67,32 @@ export function useOfflineTickQueue(onFlushed?: () => void) {
   useEffect(() => {
     setPending(readQueue().length);
     setOnline(navigator.onLine);
-    const on = () => { setOnline(true); flush(); };
+    const on = () => {
+      setOnline(true);
+      flush();
+    };
     const off = () => setOnline(false);
-    window.addEventListener('online', on);
-    window.addEventListener('offline', off);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
     // Phòng trường hợp sự kiện 'online' không bắn (một số WebView) — thử gửi định kỳ.
-    const t = setInterval(() => { if (navigator.onLine) flush(); }, 30_000);
+    const t = setInterval(() => {
+      if (navigator.onLine) flush();
+    }, 30_000);
     flush();
 
     // Cảnh báo khi đóng tab/tải lại trang mà còn tick chưa gửi để tránh mất dữ liệu.
     const beforeUnload = (e: BeforeUnloadEvent) => {
       if (readQueue().length > 0) {
         e.preventDefault();
-        e.returnValue = '';
+        e.returnValue = "";
       }
     };
-    window.addEventListener('beforeunload', beforeUnload);
+    window.addEventListener("beforeunload", beforeUnload);
 
     return () => {
-      window.removeEventListener('online', on);
-      window.removeEventListener('offline', off);
-      window.removeEventListener('beforeunload', beforeUnload);
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
+      window.removeEventListener("beforeunload", beforeUnload);
       clearInterval(t);
     };
   }, [flush]);

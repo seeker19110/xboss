@@ -10,7 +10,10 @@ import { join } from "path";
 export const dynamic = "force-dynamic";
 
 // PATCH /api/tasks/:id  → sửa nội dung task (tên, code, BOQ, ngày, status, ghi chú). Admin/PM.
-export async function PATCH(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+export async function PATCH(
+  req: NextRequest,
+  { params: paramsP }: { params: Promise<{ id: string }> },
+) {
   const params = await paramsP;
   const me = await getCurrentUser();
   if (!me) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -24,9 +27,15 @@ export async function PATCH(req: NextRequest, { params: paramsP }: { params: Pro
 
   // nghiem_thu chỉ đặt/huỷ qua /api/tasks/:id/approve — đảm bảo có audit trong task_history.
   if (body.status === "nghiem_thu")
-    return NextResponse.json({ error: "Dùng POST /api/tasks/:id/approve để nghiệm thu" }, { status: 422 });
+    return NextResponse.json(
+      { error: "Dùng POST /api/tasks/:id/approve để nghiệm thu" },
+      { status: 422 },
+    );
   // status chỉ nhận slug hợp lệ — chặn chuỗi tự do lọt vào DB.
-  if (body.status !== undefined && !["chuan_bi", "dang_thi_cong", "hoan_thanh", "tre"].includes(body.status))
+  if (
+    body.status !== undefined &&
+    !["chuan_bi", "dang_thi_cong", "hoan_thanh", "tre"].includes(body.status)
+  )
     return NextResponse.json({ error: "Trạng thái không hợp lệ" }, { status: 422 });
 
   // Ngày phải đúng dạng YYYY-MM-DD (hoặc null = xoá) — chuỗi sai để Postgres từ chối sẽ thành lỗi 500.
@@ -42,7 +51,10 @@ export async function PATCH(req: NextRequest, { params: paramsP }: { params: Pro
   if (body.drawingUrl !== undefined && body.drawingUrl !== null) {
     const url = String(body.drawingUrl).trim();
     if (url && !/^https?:\/\//i.test(url))
-      return NextResponse.json({ error: "Link bản vẽ phải bắt đầu bằng http:// hoặc https://" }, { status: 422 });
+      return NextResponse.json(
+        { error: "Link bản vẽ phải bắt đầu bằng http:// hoặc https://" },
+        { status: 422 },
+      );
     body.drawingUrl = url || null;
   }
 
@@ -52,7 +64,11 @@ export async function PATCH(req: NextRequest, { params: paramsP }: { params: Pro
     body.boqCode = boq || null;
     if (boq) {
       const usedBy = await boqTakenBy(boq, { table: "tasks", id });
-      if (usedBy) return NextResponse.json({ error: `Mã BOQ "${boq}" đã được dùng bởi ${usedBy}` }, { status: 409 });
+      if (usedBy)
+        return NextResponse.json(
+          { error: `Mã BOQ "${boq}" đã được dùng bởi ${usedBy}` },
+          { status: 409 },
+        );
     }
   }
 
@@ -65,49 +81,83 @@ export async function PATCH(req: NextRequest, { params: paramsP }: { params: Pro
   }
 
   const fields: Record<string, string> = {
-    name: "name", code: "code", note: "note", status: "status",
-    startDate: "start_date", endDate: "end_date",
-    boqCode: "boq_code", drawingUrl: "drawing_url",
+    name: "name",
+    code: "code",
+    note: "note",
+    status: "status",
+    startDate: "start_date",
+    endDate: "end_date",
+    boqCode: "boq_code",
+    drawingUrl: "drawing_url",
   };
   const sets: string[] = [];
   const vals: unknown[] = [];
   for (const [key, col] of Object.entries(fields)) {
-    if (body[key] !== undefined) { sets.push(`${col} = ?`); vals.push(body[key]); }
+    if (body[key] !== undefined) {
+      sets.push(`${col} = ?`);
+      vals.push(body[key]);
+    }
   }
   if (!sets.length && !assignedHandled)
     return NextResponse.json({ error: "Không có trường để cập nhật" }, { status: 400 });
   if (!sets.length) {
-    const task = await queryOne(`SELECT id, code, name, status, boq_code AS "boqCode", drawing_url AS "drawingUrl" FROM tasks WHERE id = ?`, id);
+    const task = await queryOne(
+      `SELECT id, code, name, status, boq_code AS "boqCode", drawing_url AS "drawingUrl" FROM tasks WHERE id = ?`,
+      id,
+    );
     return NextResponse.json({ task });
   }
 
   vals.push(id);
-  await run(`UPDATE tasks SET ${sets.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, ...vals);
+  // UPDATE + recomputeTask (nếu cần) trong cùng transaction: recomputeTask khoá row bằng
+  // FOR UPDATE, phải nằm trong transaction để lock có tác dụng tới lúc ghi xong (chống lost update
+  // khi có tick checkbox đồng thời — xem chú thích lib/recompute.ts).
+  await withTransaction(async () => {
+    await run(
+      `UPDATE tasks SET ${sets.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      ...vals,
+    );
+    // Đổi deadline có thể đổi trạng thái trễ (tre ⇄ dang_thi_cong) → tính lại.
+    if (body.endDate !== undefined || body.startDate !== undefined) await recomputeTask(id);
+  });
 
-  // Đổi deadline có thể đổi trạng thái trễ (tre ⇄ dang_thi_cong) → tính lại.
-  if (body.endDate !== undefined || body.startDate !== undefined) await recomputeTask(id);
-
-  const task = await queryOne(`SELECT id, code, name, status, boq_code AS "boqCode", drawing_url AS "drawingUrl" FROM tasks WHERE id = ?`, id);
+  const task = await queryOne(
+    `SELECT id, code, name, status, boq_code AS "boqCode", drawing_url AS "drawingUrl" FROM tasks WHERE id = ?`,
+    id,
+  );
   return NextResponse.json({ task });
 }
 
 // DELETE /api/tasks/:id — xoá task và toàn bộ dữ liệu liên quan. Admin/PM.
-export async function DELETE(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+export async function DELETE(
+  _req: NextRequest,
+  { params: paramsP }: { params: Promise<{ id: string }> },
+) {
   const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.editStructure(user.role)) return NextResponse.json({ error: "Chỉ Admin/PM mới xoá được task" }, { status: 403 });
+  if (!CAN.editStructure(user.role))
+    return NextResponse.json({ error: "Chỉ Admin/PM mới xoá được task" }, { status: 403 });
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const task = await queryOne<{ id: number; package_id: number }>(`SELECT id, package_id FROM tasks WHERE id = ?`, id);
+  const task = await queryOne<{ id: number; package_id: number }>(
+    `SELECT id, package_id FROM tasks WHERE id = ?`,
+    id,
+  );
   if (!task) return NextResponse.json({ error: "Task không tồn tại" }, { status: 404 });
 
   // Đọc file trước khi xoá DB — tên file do server sinh nên không cần kiểm tra traversal.
   const uploadDir = join(process.cwd(), "data", "uploads");
-  const photos = await query<{ file_name: string }>(`SELECT file_name FROM task_photos WHERE task_id = ?`, id);
-  const docs = await query<{ file_name: string }>(`SELECT file_name FROM task_documents WHERE task_id = ?`, id);
+  const photos = await query<{ file_name: string }>(
+    `SELECT file_name FROM task_photos WHERE task_id = ?`,
+    id,
+  );
+  const docs = await query<{ file_name: string }>(
+    `SELECT file_name FROM task_documents WHERE task_id = ?`,
+    id,
+  );
 
   // Xoá toàn bộ dữ liệu liên quan trong 1 transaction — không để lại trạng thái nửa chừng.
   await withTransaction(async () => {
@@ -118,7 +168,10 @@ export async function DELETE(_req: NextRequest, { params: paramsP }: { params: P
     await run(`DELETE FROM task_comments WHERE task_id = ?`, id);
     await run(`DELETE FROM task_history WHERE task_id = ?`, id);
     // material_transactions trước materials (FK: material_transactions.material_id → materials.id).
-    await run(`DELETE FROM material_transactions WHERE material_id IN (SELECT id FROM materials WHERE task_id = ?)`, id);
+    await run(
+      `DELETE FROM material_transactions WHERE material_id IN (SELECT id FROM materials WHERE task_id = ?)`,
+      id,
+    );
     await run(`DELETE FROM materials WHERE task_id = ?`, id);
     await run(`DELETE FROM progress_dimensions WHERE task_id = ?`, id);
     await run(`DELETE FROM tasks WHERE id = ?`, id);
@@ -126,7 +179,9 @@ export async function DELETE(_req: NextRequest, { params: paramsP }: { params: P
 
   // Xoá file sau khi DB commit thành công — file mồ côi trên disk ít hại hơn row mồ côi trong DB.
   for (const f of [...photos, ...docs]) {
-    await unlink(join(uploadDir, f.file_name)).catch(() => {/* file đã xoá hoặc không tồn tại */});
+    await unlink(join(uploadDir, f.file_name)).catch(() => {
+      /* file đã xoá hoặc không tồn tại */
+    });
   }
 
   await recomputePackage(task.package_id);

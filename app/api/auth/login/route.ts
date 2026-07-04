@@ -15,7 +15,9 @@ function clientIp(req: NextRequest): string {
 export async function POST(req: NextRequest) {
   await ensureDefaultUsers();
   const { email, password } = await req.json().catch(() => ({}));
-  if (!email || !password)
+  // Bắt buộc là chuỗi — nếu không, verifyPassword (scryptSync) sẽ throw TypeError trước khi
+  // recordLoginFailure kịp chạy, vừa lộ 500 vừa không tính vào rate-limit chống brute-force.
+  if (typeof email !== "string" || !email || typeof password !== "string" || !password)
     return NextResponse.json({ error: "Thiếu email/mật khẩu" }, { status: 400 });
 
   const emailNorm = String(email).toLowerCase().trim();

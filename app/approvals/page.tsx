@@ -14,6 +14,7 @@ import {
 import AppHeader from "@/app/components/AppHeader";
 import { Modal, appAlert, appConfirm } from "@/app/components/dialogs";
 import { PageSkeleton } from "@/app/components/Skeleton";
+import { redirectToLogin } from "@/app/lib/me";
 
 type FloorGroup = {
   sheetTypeId: number;
@@ -61,7 +62,7 @@ export default function ApprovalsPage() {
   const load = useCallback(async () => {
     const r = await fetch("/api/approvals");
     if (r.status === 401) {
-      window.location.href = "/login";
+      redirectToLogin();
       return;
     }
     if (!r.ok) {

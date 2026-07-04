@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Printer } from "lucide-react";
-import { fetchMe } from "@/app/lib/me";
+import { fetchMe, redirectToLogin } from "@/app/lib/me";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -76,7 +76,7 @@ export default function PrintPage() {
         fetchMe(),
       ]);
       if (br.status === 401) {
-        window.location.href = "/login";
+        redirectToLogin();
         return;
       }
       const { bills: all }: { bills: Bill[] } = await br.json();

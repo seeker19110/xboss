@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentUser, CAN, canTouchFloor } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -18,15 +18,22 @@ export async function POST(req: NextRequest) {
   const floorLabel = String(body?.floorLabel ?? "").trim();
   if (isNaN(sheetTypeId) || !floorLabel)
     return NextResponse.json({ error: "Thiếu sheetTypeId hoặc floorLabel" }, { status: 400 });
+  // Sub-con chỉ được đụng tới tầng có nhóm công việc được giao cho mình.
+  if (!(await canTouchFloor(user, sheetTypeId, floorLabel)))
+    return NextResponse.json({ error: "Không có quyền với tầng này" }, { status: 403 });
 
   // INSERT ... ON CONFLICT để tránh race condition khi 2 request đồng thời tạo cùng 1 tầng
   await run(
     `INSERT INTO floor_approvals (sheet_type_id, floor_label, is_approved) VALUES (?, ?, FALSE)
      ON CONFLICT (sheet_type_id, floor_label) DO NOTHING`,
-    sheetTypeId, floorLabel);
+    sheetTypeId,
+    floorLabel,
+  );
   const record = await queryOne<{ id: number; isApproved: boolean }>(
     `SELECT id, is_approved AS "isApproved" FROM floor_approvals WHERE sheet_type_id = ? AND floor_label = ?`,
-    sheetTypeId, floorLabel);
+    sheetTypeId,
+    floorLabel,
+  );
   if (!record) return NextResponse.json({ error: "Lỗi tạo bản ghi" }, { status: 500 });
   return NextResponse.json({ id: record.id, isApproved: record.isApproved });
 }
