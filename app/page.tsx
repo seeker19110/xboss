@@ -16,12 +16,13 @@ import {
 } from "lucide-react";
 import { slugFromCode, toSlug } from "@/lib/sheets";
 import AppHeader from "@/app/components/AppHeader";
-import { Modal } from "@/app/components/dialogs";
+import { Modal, appAlert, appConfirm } from "@/app/components/dialogs";
 import { PageSkeleton, Skeleton } from "@/app/components/Skeleton";
 import EditableText from "@/app/components/EditableText";
 import { DELAY_REASON_LABEL } from "@/lib/delay";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { sortFloorsAsc } from "@/lib/floors";
+import { formatDateVN } from "@/lib/date";
 
 // Lazy-load các component nặng (recharts, nhiều fetch) — chỉ load khi đã render shell
 const ProgressMap = dynamic(() => import("@/app/components/ProgressMap"), {
@@ -79,12 +80,6 @@ type KPI = {
   delayed: number;
 };
 type SheetNav = { id: number; code: string; name: string; slug: string };
-
-function fmtDate(d: string | null) {
-  if (!d) return "—";
-  const dt = new Date(d);
-  return isNaN(dt.getTime()) ? "—" : dt.toLocaleDateString("vi-VN");
-}
 
 export default function Dashboard() {
   const [data, setData] = useState<{
@@ -210,14 +205,15 @@ export default function Dashboard() {
 
   async function deleteSheet(sheetId: number, sheetName: string) {
     if (
-      !confirm(
+      !(await appConfirm(
         `Xoá trang "${sheetName}"?\n\nToàn bộ nhóm, công việc, tiến độ và vật tư của trang này sẽ bị xoá vĩnh viễn. Thao tác không thể hoàn tác.`,
-      )
+        { danger: true, confirmLabel: "Xoá" },
+      ))
     )
       return;
     const res = await fetch(`/api/sheets/${sheetId}`, { method: "DELETE" });
     if (!res.ok) {
-      alert((await res.json().catch(() => null))?.error ?? "Xoá thất bại");
+      appAlert((await res.json().catch(() => null))?.error ?? "Xoá thất bại");
       return;
     }
     window.location.reload();
@@ -599,7 +595,7 @@ export default function Dashboard() {
                         {t.floorLabel || "—"}
                       </td>
                       <td className="px-4 py-3.5 text-red-400 text-xs whitespace-nowrap tabular-nums">
-                        {fmtDate(t.endDate)}
+                        {formatDateVN(t.endDate)}
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-2">

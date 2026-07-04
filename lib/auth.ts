@@ -150,6 +150,10 @@ export async function ensureDefaultUsers(): Promise<void> {
   defaultUsersEnsured = true;
 }
 
+// Admin/PM là ngưỡng vai trò dùng lặp lại ở nhiều route không thuộc 1 quyền cụ thể
+// trong CAN (vd sửa cấu hình dự án, tên cột vật tư, duyệt yêu cầu mua hàng).
+export const isAdminOrPm = (r?: Role): boolean => r === "admin" || r === "pm";
+
 // Quyền theo vai trò (rút gọn từ §8 spec).
 export const CAN = {
   import: (r?: Role) => r === "admin" || r === "pm",

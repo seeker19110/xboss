@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { slugFromCode } from "@/lib/sheets";
 import { fetchMe } from "@/app/lib/me";
+import { appAlert, appConfirm } from "@/app/components/dialogs";
 
 // Bản đồ tiến độ Tháp A — tầng × hệ (mode hiện tại) + tầng × tuần (mode lịch sử).
 // Component dùng chung cho dashboard (nhúng trực tiếp) và trang /timeline (toàn màn hình).
@@ -250,11 +251,17 @@ export default function ProgressMap() {
   }
 
   async function deleteTower(id: number, name: string) {
-    if (!confirm(`Xoá tháp "${name}"? Tháp phải không còn sheet nào.`)) return;
+    if (
+      !(await appConfirm(`Xoá tháp "${name}"? Tháp phải không còn sheet nào.`, {
+        danger: true,
+        confirmLabel: "Xoá",
+      }))
+    )
+      return;
     const res = await fetch(`/api/towers/${id}`, { method: "DELETE" });
     if (!res.ok) {
       const j = await res.json();
-      alert(j.error);
+      appAlert(j.error);
       return;
     }
     reload();

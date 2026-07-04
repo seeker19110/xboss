@@ -2,6 +2,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link2, X, Ban, Activity } from "lucide-react";
 import { slugFromCode } from "@/lib/sheets";
+import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
 import AppHeader from "@/app/components/AppHeader";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appAlert } from "@/app/components/dialogs";
@@ -33,14 +34,6 @@ const STATUS_BAR: Record<string, string> = {
   nghiem_thu: "bg-teal-500",
   tre: "bg-red-600",
 };
-const STATUS_LABEL: Record<string, string> = {
-  chuan_bi: "Chuẩn bị",
-  dang_thi_cong: "Đang thi công",
-  hoan_thanh: "Hoàn thành",
-  nghiem_thu: "Đã nghiệm thu",
-  tre: "Đang trễ",
-};
-
 const DAY = 86400_000;
 const d2n = (s: string) => new Date(s + "T00:00:00Z").getTime();
 const fmt = (s: string) => new Date(s).toLocaleDateString("vi-VN");
@@ -296,7 +289,7 @@ export default function GanttPage() {
                             }}
                             href={slug ? `/tracking/${slug}` : "#"}
                             title={
-                              `${b.code} — ${b.name}\n${fmt(b.startDate)} → ${fmt(b.endDate)} · ${Math.round(b.progress * 100)}% · ${STATUS_LABEL[b.status] ?? b.status}` +
+                              `${b.code} — ${b.name}\n${fmt(b.startDate)} → ${fmt(b.endDate)} · ${Math.round(b.progress * 100)}% · ${STATUS_LABEL[b.status as StatusSlug] ?? b.status}` +
                               (isCritical
                                 ? "\n★ Trên đường găng (không được trễ)"
                                 : fl !== undefined

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Search, Boxes, ListTodo } from "lucide-react";
 import { slugFromCode } from "@/lib/sheets";
+import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
 
 type Hit = {
   kind: "task" | "package";
@@ -15,14 +16,6 @@ type Hit = {
   progress: number;
   floorLabel: string | null;
   sheetType: string;
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  chuan_bi: "Chuẩn bị",
-  dang_thi_cong: "Đang thi công",
-  hoan_thanh: "Hoàn thành",
-  nghiem_thu: "Đã nghiệm thu",
-  tre: "Đang trễ",
 };
 
 function hitUrl(h: Hit): string {
@@ -127,7 +120,7 @@ export default function GlobalSearch() {
                 </span>
                 <span
                   className={`text-xs shrink-0 w-9 text-right ${h.status === "tre" ? "text-red-400" : "text-zinc-400"}`}
-                  title={h.status ? (STATUS_LABEL[h.status] ?? h.status) : ""}
+                  title={h.status ? (STATUS_LABEL[h.status as StatusSlug] ?? h.status) : ""}
                 >
                   {Math.round((h.progress ?? 0) * 100)}%
                 </span>

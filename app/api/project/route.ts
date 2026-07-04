@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isAdminOrPm } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -8,18 +8,29 @@ export const dynamic = "force-dynamic";
 // Public (chỉ trả tên hiển thị) — dùng cho header, trang login, báo cáo.
 export async function GET() {
   try {
-    const project = await queryOne<{ name: string; code: string | null; heatmap_title: string | null; investor: string | null; contractor: string | null; logo: string | null }>(
-      `SELECT name, code, heatmap_title, investor, contractor, logo FROM projects ORDER BY id LIMIT 1`);
+    const project = await queryOne<{
+      name: string;
+      code: string | null;
+      heatmap_title: string | null;
+      investor: string | null;
+      contractor: string | null;
+      logo: string | null;
+    }>(
+      `SELECT name, code, heatmap_title, investor, contractor, logo FROM projects ORDER BY id LIMIT 1`,
+    );
     const tower = await queryOne<{ name: string }>(`SELECT name FROM towers ORDER BY id LIMIT 1`);
-    return NextResponse.json({
-      name: project?.name ?? null,
-      code: project?.code ?? null,
-      tower: tower?.name ?? null,
-      investor: project?.investor ?? null,
-      contractor: project?.contractor ?? null,
-      logo: project?.logo ?? null,
-      project: { heatmapTitle: project?.heatmap_title ?? null },
-    }, { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } });
+    return NextResponse.json(
+      {
+        name: project?.name ?? null,
+        code: project?.code ?? null,
+        tower: tower?.name ?? null,
+        investor: project?.investor ?? null,
+        contractor: project?.contractor ?? null,
+        logo: project?.logo ?? null,
+        project: { heatmapTitle: project?.heatmap_title ?? null },
+      },
+      { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" } },
+    );
   } catch {
     return NextResponse.json({ name: null, code: null, tower: null, project: null });
   }
@@ -29,7 +40,7 @@ export async function GET() {
 export async function PATCH(req: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (user.role !== "admin" && user.role !== "pm")
+  if (!isAdminOrPm(user.role))
     return NextResponse.json({ error: "Không có quyền" }, { status: 403 });
 
   const body = await req.json();
@@ -37,11 +48,18 @@ export async function PATCH(req: Request) {
   // Cập nhật logo (data URL ảnh, tối đa ~2MB) — gửi chuỗi rỗng/null để xoá.
   if (body.logo !== undefined) {
     const logo: string | null = body.logo ? String(body.logo) : null;
-    if (logo && (!/^data:image\/(png|jpeg|jpg|webp|gif|svg\+xml);base64,/.test(logo) || logo.length > 2_800_000))
-      return NextResponse.json({ error: "Logo không hợp lệ (chỉ nhận ảnh ≤ 2MB)" }, { status: 400 });
+    if (
+      logo &&
+      (!/^data:image\/(png|jpeg|jpg|webp|gif|svg\+xml);base64,/.test(logo) ||
+        logo.length > 2_800_000)
+    )
+      return NextResponse.json(
+        { error: "Logo không hợp lệ (chỉ nhận ảnh ≤ 2MB)" },
+        { status: 400 },
+      );
     await run(
       `UPDATE projects SET logo = ? WHERE id = (SELECT id FROM projects ORDER BY id LIMIT 1)`,
-      logo
+      logo,
     );
     return NextResponse.json({ ok: true });
   }
@@ -49,7 +67,7 @@ export async function PATCH(req: Request) {
   const { heatmapTitle } = body;
   await run(
     `UPDATE projects SET heatmap_title = ? WHERE id = (SELECT id FROM projects ORDER BY id LIMIT 1)`,
-    heatmapTitle ?? null
+    heatmapTitle ?? null,
   );
   return NextResponse.json({ ok: true });
 }

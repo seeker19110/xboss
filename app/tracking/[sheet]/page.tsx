@@ -40,14 +40,8 @@ import EditModeToggle from "@/app/components/EditModeToggle";
 import { ROLE_LABELS } from "@/lib/roles";
 import { fetchMe } from "@/app/lib/me";
 import { sortFloorsAsc } from "@/lib/floors";
+import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
 
-const STATUS_LABEL: Record<string, string> = {
-  chuan_bi: "Chuẩn bị",
-  dang_thi_cong: "Đang thi công",
-  hoan_thanh: "Hoàn thành",
-  nghiem_thu: "Đã nghiệm thu",
-  tre: "Đang trễ",
-};
 const STATUS_CLS: Record<string, string> = {
   chuan_bi: "bg-zinc-800 text-zinc-300",
   dang_thi_cong: "bg-blue-950 text-blue-300",
@@ -1732,7 +1726,7 @@ function PkgGrid({
                 <span
                   className={`px-2.5 py-0.5 rounded text-[13px] w-32 text-center shrink-0 ${STATUS_CLS[pkg.status] ?? STATUS_CLS.chuan_bi}`}
                 >
-                  {STATUS_LABEL[pkg.status] ?? pkg.status}
+                  {STATUS_LABEL[pkg.status as StatusSlug] ?? pkg.status}
                 </span>
                 {/* Bản vẽ */}
                 <span
@@ -2966,7 +2960,7 @@ function HistoryModal({ task, onClose }: { task: GridTask; onClose: () => void }
                     </span>
                     {h.status && (
                       <span className="ml-2 px-1.5 py-0.5 bg-zinc-800 rounded text-[10px] text-zinc-400">
-                        {STATUS_LABEL[h.status] ?? h.status}
+                        {STATUS_LABEL[h.status as StatusSlug] ?? h.status}
                       </span>
                     )}
                   </p>
