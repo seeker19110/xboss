@@ -4,6 +4,8 @@
 >
 > **Số module = thứ tự triển khai** (M0 làm trước, M13 làm cuối; riêng M14 bổ sung sau, xếp đợt 2), chia 4 đợt — xem §5.
 >
+> **Đặc tả chi tiết từng module** (schema DDL, API, UI/UX, điểm chạm code, chia PR, điểm cần quyết — tự chứa để AI lập plan triển khai): thư mục **`docs/nang-cap/`** (README = quy ước chung, `M<xx>-*.md` = từng module). Khi ra lệnh "triển khai M<x>": đọc `CLAUDE.md` + `docs/nang-cap/README.md` + file module tương ứng.
+>
 > Kế hoạch nâng cấp **dependency + hạ tầng chất lượng** (việc riêng, độc lập) xem `docs/ke-hoach-nang-cap-2026-07.md`.
 
 ## 1. Nguyên tắc xuyên suốt
