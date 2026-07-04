@@ -159,7 +159,21 @@ Tổng quan 14 module, 4 đợt:
 - **Sổ rủi ro**: bảng `risks` (mô tả, nhóm: tiến độ/chi phí/chất lượng/an toàn/vật tư, xác suất × ảnh hưởng (ma trận 5×5), biện pháp giảm thiểu, người phụ trách, trạng thái mở/đang xử lý/đóng); heatmap rủi ro trên dashboard.
 - **Độ phức tạp: Trung bình** (2 nghiệp vụ gộp 1 module vì cùng mô hình "danh sách + action item + hạn").
 
-## 4b. NGOÀI phạm vi (giữ nguyên quyết định loại)
+## 4b. Hướng phát triển dài hạn (ngoài 14 module — chưa xếp đợt, chỉ định hướng)
+
+Sau khi hoàn thành (hoặc song song từ đợt 2–3 nếu có nhu cầu thật), 5 hướng nâng tầm nền tảng, xếp theo giá trị:
+
+| # | Hướng | Nội dung & lý do |
+|---|---|---|
+| N1 | **Đa dự án (portfolio)** | Schema đã có `projects`/`towers` nhưng UI đang khoá 1 dự án. Khi nhận công trình mới: bộ chọn dự án, dashboard tổng nhiều công trình, so sánh tiến độ/chi phí giữa dự án, phân quyền theo dự án. **Chiến lược lớn nhất** — điều kiện để XBoss thành công cụ của công ty thay vì của 1 công trình. |
+| N2 | **Kho dữ liệu giá & năng suất** | Tích luỹ đơn giá thực tế (từ PO/thanh toán — M2/M4) và năng suất tổ đội (từ nhật ký M5 × tiến độ) qua các dự án → cơ sở chào giá dự án sau chính xác hơn định mức chung. Feedback loop chỉ nhà thầu tự vận hành hệ thống mới có — **lợi thế cạnh tranh thật**. Cần N1 trước (nhiều dự án mới có dữ liệu so sánh). |
+| N3 | **Trợ lý AI** | Hỏi đáp ngôn ngữ tự nhiên trên dữ liệu dự án ("tầng 5 còn task nào trễ, vì sao?"), tự tóm tắt nhật ký/báo cáo tuần thành văn nói được, đọc file Excel BOQ/dự toán format lộn xộn khi import (M1), phân tích ảnh hiện trường gợi ý % hoàn thành. Cần API key LLM (secret từ người vận hành) — chi phí vận hành mới, cân nhắc kỹ điểm chạm nào đáng tiền nhất (import BOQ và tóm tắt báo cáo là 2 ứng viên đầu). |
+| N4 | **Trải nghiệm hiện trường sâu hơn** | QR code dán tại tầng/trục/thiết bị — quét là mở đúng lưới tracking/checklist/lý lịch thiết bị (nối M3/M12); ảnh chụp đóng **watermark thời gian + toạ độ + tên công trình** (giá trị pháp lý khi tranh chấp); mở rộng offline queue (hiện chỉ tick checkbox) cho ảnh/nhật ký/checklist — đúng bối cảnh sóng yếu trong hầm/tầng kỹ thuật. |
+| N5 | **Zalo + cổng CĐT/TVGS** | Kênh thông báo **Zalo** (OA/ZNS) — thực tế công trường VN dùng Zalo, Telegram/email chỉ là phụ; link báo cáo/dashboard **read-only có ký token, hết hạn** gửi CĐT/TVGS xem không cần tài khoản (mở rộng pattern HMAC của `lib/auth.ts`/`lib/traffic-token.ts`). |
+
+Nguyên tắc: các hướng này chỉ khởi động khi có **nhu cầu thật kích hoạt** (nhận dự án thứ 2 → N1; tranh chấp hồ sơ ảnh → N4; CĐT đòi xem trực tiếp → N5), không làm trước để "cho có" (YAGNI).
+
+## 4c. NGOÀI phạm vi (giữ nguyên quyết định loại)
 
 | Hạng mục | Lý do loại |
 |---|---|
