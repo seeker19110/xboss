@@ -2,7 +2,7 @@
 
 > **Trạng thái: CHỈ LẬP KẾ HOẠCH — chưa triển khai.** Chờ lệnh "triển khai" của người dùng mới bắt đầu code từng hạng mục. Tài liệu này là kết quả nghiên cứu các phần mềm quản lý dự án xây dựng (quốc tế: Procore, Oracle Primavera, Mastt; Việt Nam: FastCons, QLDA GXD, Nghiệm thu 360) đối chiếu với hiện trạng XBoss, theo yêu cầu mở rộng: **đấu thầu → BOQ → nhà cung cấp → đặt hàng/đơn hàng → kế hoạch & tiến độ thi công → QA&QC → hồ sơ chất lượng → bản vẽ BIM/Shop → nghiệm thu → thanh toán**.
 >
-> **Số module = thứ tự triển khai** (M0 làm trước, M13 làm cuối), chia 4 đợt — xem §5.
+> **Số module = thứ tự triển khai** (M0 làm trước, M13 làm cuối; riêng M14 bổ sung sau, xếp đợt 2), chia 4 đợt — xem §5.
 >
 > Kế hoạch nâng cấp **dependency + hạ tầng chất lượng** (việc riêng, độc lập) xem `docs/ke-hoach-nang-cap-2026-07.md`.
 
@@ -46,15 +46,15 @@ Từ các phần mềm tham chiếu, một hệ quản lý dự án thi công đ
 
 ## 4. Các hạng mục nâng cấp (đánh số theo thứ tự triển khai)
 
-Tổng quan 14 module, 4 đợt:
+Tổng quan 15 module, 4 đợt:
 
 | Module | Nội dung | Đợt | Phức tạp | Phụ thuộc |
 |---|---|---|---|---|
 | M0 | Khung UI sidebar + title AppHeader | 1 | Trung bình | — |
 | M1 | BOQ đầy đủ | 1 | Trung bình-Cao | — |
 | M2 | Kiểm soát chi phí + cảnh báo vượt | 1 | Trung bình | M1 |
-| M3 | QA&QC + hồ sơ chất lượng (gồm T&C) | 2 | Cao | — |
-| M4 | Nhà cung cấp & đơn hàng nâng cao | 2 | Trung bình | — |
+| M3 | QA&QC + hồ sơ chất lượng (T&C, phiếu YCNT, chuyển bước) | 2 | Cao | — |
+| M4 | NCC & đơn hàng nâng cao (cấp phát, xe ra vào) | 2 | Trung bình | — |
 | M5 | Nhật ký thi công + nhân lực hiện trường | 2 | Trung bình | — |
 | M6 | Phát sinh / thay đổi khối lượng (VO) | 3 | Trung bình | M1, M2 |
 | M7 | Đấu thầu | 3 | Trung bình | M1 |
@@ -64,6 +64,9 @@ Tổng quan 14 module, 4 đợt:
 | M11 | HSE / an toàn lao động | 4 | Trung bình | M3 (checklist engine) |
 | M12 | Thiết bị/máy móc thi công | 4 | Thấp-Trung bình | — |
 | M13 | Biên bản họp + sổ rủi ro | 4 | Trung bình | — |
+| M14 | Mặt bằng thi công (work front) | 2* | Trung bình | — |
+
+\* M14 bổ sung sau khi rà "công tác quản lý trên công trường" — giá trị cao nên xếp vào **đợt 2** dù số thứ tự đứng cuối (ngoại lệ duy nhất của quy tắc số = thứ tự làm).
 
 ### M0 — Khung UI: sidebar trái thu gọn được (yêu cầu trực tiếp)
 
@@ -87,18 +90,22 @@ Tổng quan 14 module, 4 đợt:
 - Trang `/costs`: bảng ngân sách–cam kết–thực chi theo hệ/tầng, drill-down tới PO/đợt thanh toán.
 - **Độ phức tạp: Trung bình** (sau M1; phần lớn là query tổng hợp + UI, ít bảng mới).
 
-### M3 — QA&QC + hồ sơ chất lượng (gồm T&C)
+### M3 — QA&QC + hồ sơ chất lượng (gồm T&C, phiếu yêu cầu nghiệm thu, chuyển bước)
 
 - **ITP/checklist**: bảng `qc_checklists` (mẫu checklist theo loại công tác — vd nghiệm thu ống gió: độ kín, treo giá đỡ, cách nhiệt...) + `qc_inspections` (lần kiểm tra gắn task/work package: người kiểm, kết quả từng mục đạt/không đạt, ảnh, chữ ký cấp phê duyệt). Gắn vào luồng nghiệm thu 2 bước sẵn có: task chỉ được `nghiem_thu` khi inspection đạt (cấu hình bật/tắt).
 - **NCR**: bảng `ncrs` (điểm không phù hợp: mô tả, ảnh, task liên quan, người chịu trách nhiệm, hạn khắc phục, vòng đời mở → đang khắc phục → chờ kiểm lại → đóng); notification khi quá hạn (cùng pattern `delayed`).
 - **Hồ sơ chất lượng**: phân loại `task_documents` theo danh mục (biên bản vật liệu đầu vào / nghiệm thu công việc / giai đoạn / hoàn công), trang tổng hợp `/quality` lọc theo tầng/hệ/loại — tiến tới **xuất trọn bộ hồ sơ** theo tầng (zip/PDF, tái dùng `@react-pdf/renderer` sẵn có).
 - **T&C (Testing & Commissioning) cho ACMV**: chạy thử **đơn động → liên động → hiệu chỉnh (TAB)** là một loại checklist/biên bản riêng (`qc_checklists.category = 'tc'`), gắn theo hệ/thiết bị thay vì theo tầng, có trường thông số đo (lưu lượng gió, áp suất, dòng điện...) so với thiết kế.
-- **Độ phức tạp: Cao** (nhiều bảng + luồng nghiệp vụ, nhưng độc lập tương đối, chia được ≥4 PR: checklist → NCR → hồ sơ → T&C). Checklist engine của module này được M11 (HSE) tái dùng.
+- **Phiếu yêu cầu nghiệm thu gửi TVGS** (thủ tục chuẩn VN — mời nghiệm thu trước ≥24h): tạo phiếu từ task/nhóm task đạt 100%, hẹn ngày giờ, trạng thái gửi → TVGS xác nhận lịch → nghiệm thu đạt/không đạt (không đạt → sinh NCR); xuất PDF phiếu theo mẫu để gửi.
+- **Hệ thống bàn giao chuyển bước (nghiệm thu chuyển bước thi công — hold point)**: công đoạn sau chỉ được thi công khi công đoạn trước có **biên bản nghiệm thu chuyển bước đã duyệt** — đúng trình tự MEP: lắp ống âm → test áp → bọc bảo ôn → (bàn giao cho thầu trần) đóng trần; điện âm tường → nghiệm thu che khuất → xây trát đè. Cơ chế: đánh dấu quan hệ phụ thuộc là **hold point** (mở rộng `package_dependencies` sẵn có, thêm cột `requires_handover`) — task/nhóm sau bị **khoá tick trên lưới tracking** (tooltip nêu rõ chờ biên bản nào) cho tới khi bước trước có inspection đạt + biên bản chuyển bước; bàn giao **giữa hai nhà thầu** (MEP ↔ xây tô/trần) ghi bên giao–bên nhận + ảnh hiện trạng, nối với bàn giao mặt bằng M14. Đây là chốt chặn "che khuất rồi mới phát hiện lỗi" — loại lỗi đắt nhất của MEP.
+- **Độ phức tạp: Cao** (nhiều bảng + luồng nghiệp vụ, nhưng độc lập tương đối, chia được ≥5 PR: checklist → NCR → hồ sơ → T&C → chuyển bước). Checklist engine của module này được M11 (HSE) tái dùng.
 
-### M4 — Nhà cung cấp & đơn hàng nâng cao
+### M4 — Nhà cung cấp & đơn hàng nâng cao (cấp phát vật tư, xe ra vào)
 
 - Mở rộng chuỗi PR → PO sẵn có: **trạng thái dòng đời đơn hàng** (đặt → xác nhận → đang giao → giao một phần → đủ → đối chiếu công nợ), ngày giao dự kiến vs thực tế, cảnh báo trễ giao (nối vào hệ notification sẵn có).
 - Đánh giá NCC (điểm chất lượng/tiến độ giao/giá sau mỗi PO), công nợ theo NCC (tổng PO − đã thanh toán, nối `payment_bills`).
+- **Cấp phát vật tư tại hiện trường**: phiếu xuất kho → tầng/khu vực + tổ đội lĩnh (mở rộng `material_transactions` thêm cột vị trí/tổ đội) — biết vật tư đã đi đâu, đối chiếu tiêu hao theo tầng với KL thi công.
+- **Quản lý xe nhà cung cấp ra vào công trường**: bảng `vehicle_logs` (PO liên quan, NCC, biển số, tài xế + SĐT, thời gian dự kiến đến, giờ vào/ra thực tế, cổng, hàng hoá, trạng thái: đăng ký → duyệt/báo tổng thầu → đã vào → đã ra) — công trường cao tầng yêu cầu **đăng ký xe trước với tổng thầu/bảo vệ**; lịch xe trong ngày xuất được danh sách gửi tổng thầu (kèm đăng ký cẩu/vận thăng nếu hàng cồng kềnh); xe vào → nối thẳng sang phiếu nhập kho (`warehouse_receipts`), giờ vào/ra là bằng chứng đối chiếu khi NCC claim đã giao; notification khi xe đăng ký quá giờ chưa đến (nối cảnh báo trễ giao ở trên).
 - **Độ phức tạp: Trung bình** (chủ yếu mở rộng bảng + UI hiện có, ít bảng mới).
 
 ### M5 — Nhật ký thi công + nhân lực hiện trường
@@ -127,6 +134,7 @@ Tổng quan 14 module, 4 đợt:
 - **Drawing register**: bảng `drawings` (mã bản vẽ, tên, hệ/tầng, loại: shop/as-built/BIM export) + `drawing_revisions` (rev A/B/C..., file PDF/ảnh, ngày trình, **trạng thái trình duyệt**: đang trình → TVGS góp ý → duyệt/duyệt có điều kiện/trả lại → thi công), thay cho 1 file `drawing` gắn work package hiện tại (migrate dữ liệu cũ thành rev đầu tiên).
 - Ma trận phân phối đơn giản (vai trò nào thấy/duyệt loại bản vẽ nào — theo mô hình document matrix); viewer PDF trên mobile cho kỹ sư/thầu phụ tra tại hiện trường (ưu tiên bản rev mới nhất đã duyệt, cảnh báo khi xem rev cũ).
 - Phạm vi BIM ở mức **quản lý file xuất từ BIM** (PDF/ảnh/IFC lưu trữ), **không** viewer 3D IFC trong đợt này (nặng, cần thư viện lớn — ghi nhận là hạng mục tương lai nếu thật sự cần).
+- **Biện pháp thi công (method statement)**: dùng chung luồng trình duyệt với bản vẽ (`drawings.kind = 'method'`) — trình → TVGS/CĐT duyệt → thi công; công tác đặc biệt (hàn trên cao, đấu nối hệ đang chạy) yêu cầu biện pháp đã duyệt trước khi thi công.
 - **Độ phức tạp: Trung bình-Cao.**
 
 ### M9 — Dashboard mở rộng
@@ -159,7 +167,14 @@ Tổng quan 14 module, 4 đợt:
 - **Sổ rủi ro**: bảng `risks` (mô tả, nhóm: tiến độ/chi phí/chất lượng/an toàn/vật tư, xác suất × ảnh hưởng (ma trận 5×5), biện pháp giảm thiểu, người phụ trách, trạng thái mở/đang xử lý/đóng); heatmap rủi ro trên dashboard.
 - **Độ phức tạp: Trung bình** (2 nghiệp vụ gộp 1 module vì cùng mô hình "danh sách + action item + hạn").
 
-## 4b. Hướng phát triển dài hạn (ngoài 14 module — chưa xếp đợt, chỉ định hướng)
+### M14 — Quản lý mặt bằng thi công (work front)
+
+- Đặc thù nhà thầu MEP: vào được tầng/khu vực nào là do **tổng thầu bàn giao mặt bằng** — "chờ mặt bằng" là lý do trễ phổ biến nhất nhưng hiện chỉ ghi nhận được như 1 mục trong `lib/delay.ts`, không theo dõi được tầng nào đã nhận/chưa, vướng gì, ảnh hưởng task nào.
+- Bảng `work_fronts` (tầng/khu vực × sheet, trạng thái: chưa bàn giao → đã bàn giao (ngày, biên bản đính kèm) → đang thi công → trả mặt bằng; điều kiện vướng: chưa xây tô/chưa trần/vướng nhà thầu khác + ghi chú, ảnh hiện trạng lúc nhận).
+- Nối vào tracking: tầng chưa có mặt bằng hiển thị khoá/mờ trên lưới + cảnh báo khi task tới ngày bắt đầu kế hoạch mà mặt bằng chưa bàn giao (notification pattern `due_soon`); lookahead đánh dấu task "chờ mặt bằng"; dashboard đếm số tầng chờ bàn giao — **bằng chứng đàm phán gia hạn tiến độ với tổng thầu/CĐT** (EOT claim).
+- **Độ phức tạp: Trung bình** (1 bảng chính + tích hợp lưới/lookahead/notification sẵn có). Độc lập, xếp **đợt 2** vì giá trị cao với bối cảnh thật.
+
+## 4b. Hướng phát triển dài hạn (ngoài 15 module — chưa xếp đợt, chỉ định hướng)
 
 Sau khi hoàn thành (hoặc song song từ đợt 2–3 nếu có nhu cầu thật), 5 hướng nâng tầm nền tảng, xếp theo giá trị:
 
@@ -183,7 +198,7 @@ Nguyên tắc: các hướng này chỉ khởi động khi có **nhu cầu thậ
 
 ```
 Đợt 1 (nền):            M0 sidebar + title AppHeader  →  M1 BOQ  →  M2 chi phí
-Đợt 2 (nghiệp vụ lõi):  M3 QA&QC + hồ sơ chất lượng (gồm T&C)  //  M4 đơn hàng nâng cao  //  M5 nhật ký thi công   (song song được)
+Đợt 2 (nghiệp vụ lõi):  M3 QA&QC + hồ sơ chất lượng (T&C, phiếu YCNT, chuyển bước)  //  M4 đơn hàng nâng cao  //  M5 nhật ký thi công  //  M14 mặt bằng thi công   (song song được)
 Đợt 3 (chuỗi tiền + bản vẽ): M6 phát sinh VO  →  M7 đấu thầu  →  M8 bản vẽ  →  M9 dashboard mở rộng
 Đợt 4 (quản trị mở rộng): M10 RFI/công văn  //  M11 HSE  //  M12 thiết bị  //  M13 họp + rủi ro   (song song được, thứ tự linh hoạt theo nhu cầu thực tế)
 ```
