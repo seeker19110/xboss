@@ -66,6 +66,9 @@ export default function AppHeader({
     fetchMe().then((u) => setMe(u));
   }, []);
 
+  // Ô tìm kiếm toàn cục + nút Nghiệm thu chỉ hiện ở trang chủ; trang khác chỉ giữ hành động riêng.
+  const isHome = path === "/";
+
   return (
     <>
       <header className="sticky top-0 z-40 bg-zinc-950 border-b border-zinc-800 safe-top print:hidden">
@@ -139,32 +142,37 @@ export default function AppHeader({
         </div>
       </header>
 
-      {/* Thanh cố định dưới đáy: tìm kiếm · Nghiệm thu · hành động riêng của trang (Excel/PDF/Import…) */}
-      <div className="fixed bottom-0 inset-x-0 z-40 bg-zinc-950 border-t border-zinc-800 safe-bottom print:hidden">
-        <div className="flex items-center gap-2 px-3 sm:px-6 py-2 max-w-screen-xl mx-auto overflow-x-auto scrollbar-none">
-          {search && (
-            <div className="flex-1 min-w-[140px]">
-              <GlobalSearch />
-            </div>
-          )}
-          <a
-            href="/approvals"
-            className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs whitespace-nowrap transition shrink-0 ${
-              path === APPROVALS_NAV.href || path.startsWith(APPROVALS_NAV.href)
-                ? "bg-zinc-800 text-white font-medium"
-                : "text-zinc-400 hover:text-white hover:bg-zinc-900"
-            }`}
-            aria-label={APPROVALS_NAV.label}
-            aria-current={path.startsWith(APPROVALS_NAV.href) ? "page" : undefined}
-          >
-            <APPROVALS_NAV.icon className={`w-4 h-4 shrink-0 ${APPROVALS_NAV.color}`} />
-            <span className="hidden sm:inline">
-              <EditableText tkey={APPROVALS_NAV.tkey}>{APPROVALS_NAV.label}</EditableText>
-            </span>
-          </a>
-          {bottomActions}
+      {/* Thanh cố định dưới đáy — chỉ hiện khi có nội dung: tìm kiếm + Nghiệm thu chỉ ở trang chủ,
+          hành động riêng của trang (Excel/PDF/Import…) ở trang có truyền bottomActions. */}
+      {(isHome || bottomActions) && (
+        <div className="fixed bottom-0 inset-x-0 z-40 bg-zinc-950 border-t border-zinc-800 safe-bottom print:hidden">
+          <div className="flex items-center gap-2 px-3 sm:px-6 py-2 max-w-screen-xl mx-auto overflow-x-auto scrollbar-none">
+            {search && isHome && (
+              <div className="flex-1 min-w-[140px]">
+                <GlobalSearch />
+              </div>
+            )}
+            {isHome && (
+              <a
+                href="/approvals"
+                className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs whitespace-nowrap transition shrink-0 ${
+                  path === APPROVALS_NAV.href || path.startsWith(APPROVALS_NAV.href)
+                    ? "bg-zinc-800 text-white font-medium"
+                    : "text-zinc-400 hover:text-white hover:bg-zinc-900"
+                }`}
+                aria-label={APPROVALS_NAV.label}
+                aria-current={path.startsWith(APPROVALS_NAV.href) ? "page" : undefined}
+              >
+                <APPROVALS_NAV.icon className={`w-4 h-4 shrink-0 ${APPROVALS_NAV.color}`} />
+                <span className="hidden sm:inline">
+                  <EditableText tkey={APPROVALS_NAV.tkey}>{APPROVALS_NAV.label}</EditableText>
+                </span>
+              </a>
+            )}
+            {bottomActions}
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 }

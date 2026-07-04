@@ -818,9 +818,6 @@ export default function MaterialsPage() {
             {/* Chế độ bảng tính: lưới sửa nhanh copy/paste/fill, dữ liệu vẫn lưu Postgres */}
             {sheetMode && !(loading && materials.length === 0) && (
               <>
-                {filtered.length > 0 && (
-                  <p className="text-xs text-zinc-400">{filtered.length} dòng</p>
-                )}
                 <SpreadsheetGrid<Material>
                   rows={filtered}
                   columns={gridColumns}

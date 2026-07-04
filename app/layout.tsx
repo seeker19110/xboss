@@ -3,6 +3,7 @@ import Script from "next/script";
 import "./globals.css";
 import PwaRegister from "@/app/components/PwaRegister";
 import AppDialogs from "@/app/components/dialogs";
+import BottomBarSpacer from "@/app/components/BottomBarSpacer";
 
 export const metadata: Metadata = {
   title: "XBoss — ACMV Tracking",
@@ -43,8 +44,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             +849 778 19 110
           </a>
         </footer>
-        {/* Chừa chỗ cho thanh cố định dưới đáy (tìm kiếm/Nghiệm thu) của AppHeader */}
-        <div className="h-14 safe-bottom shrink-0 print:hidden" aria-hidden />
+        {/* Chừa chỗ cho thanh cố định dưới đáy của AppHeader — chỉ ở trang chủ */}
+        <BottomBarSpacer />
       </body>
     </html>
   );
