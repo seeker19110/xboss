@@ -22,12 +22,14 @@ Mở rộng `/api/dashboard` (giữ 1 endpoint, thêm khối trong payload — c
 - `procurement`: PO trễ giao, xe no_show tuần này.
 - `workfront`: số tầng chờ bàn giao + ngày chờ luỹ kế.
 - `vo`: tổng giá trị VO theo trạng thái.
+- `byDiscipline`: bảng chéo hệ (mỗi hệ trong `disciplines`: % tiến độ, số task trễ, NCR mở, % ngân sách đã dùng) — màn hình chỉ huy trưởng đa hệ (§3b kế hoạch tổng).
 
 Mỗi khối chỉ tính khi bảng nguồn tồn tại (module đã triển khai) — check `to_regclass` hoặc try/catch, trả `null` để UI ẩn thẻ (dashboard chạy được dù module sau chưa làm).
 
 ## UI/UX (mở rộng `app/page.tsx`)
 
 - **Hàng thẻ KPI mới** dưới hàng hiện có: CPI (số to + mũi tên xu hướng; <1 rose, ≥1 emerald, kèm nhãn chữ), % ngân sách đã dùng, NCR mở (badge quá hạn), Tầng chờ MB, VO chờ duyệt (giá trị). Thẻ nào `null` thì ẩn — bố cục flex wrap.
+- **Bảng so sánh chéo hệ**: mỗi hệ 1 hàng (tên + màu từ danh mục `disciplines`), cột % tiến độ (bar mini)/trễ/NCR/% ngân sách; S-curve hỗ trợ chồng nhiều hệ (mỗi hệ 1 màu). Đặt ngay dưới hàng KPI.
 - **Cash flow chart**: bar đôi in/out theo tháng + line luỹ kế chênh (recharts ComposedChart) — đặt cạnh S-curve; theo `dataviz` conventions dự án (màu status, tooltip vi-VN).
 - Mỗi thẻ KPI click → trang module tương ứng (drill-down như Pareto hiện có).
 - Vai trò chỉ-xem `bch/cdt/viewer`: thấy tiến độ + chất lượng; khối tiền theo `PAYMENT_VIEW_ROLES` (bch có, cdt/viewer không — xác nhận lại khi làm).
