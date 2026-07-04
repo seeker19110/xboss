@@ -15,12 +15,20 @@ Nâng BOQCODE từ "mã định danh" (`lib/boq.ts`) thành **bảng khối lư�
 ## Schema (`migrations/000N_boq.sql`)
 
 ```sql
+CREATE TABLE IF NOT EXISTS disciplines (             -- danh mục hệ chuẩn (đa hệ — §3b kế hoạch tổng)
+  id SERIAL PRIMARY KEY,
+  code TEXT NOT NULL UNIQUE,   -- ket_cau | xay_to | acmv | dien | nuoc | pccc | ...
+  name TEXT NOT NULL,
+  color TEXT                    -- tên màu tailwind accent (vd 'sky') dùng nhất quán biểu đồ
+);
+-- seed 6 hệ mặc định trong cùng migration (INSERT ... ON CONFLICT DO NOTHING)
+ALTER TABLE sheet_types ADD COLUMN IF NOT EXISTS discipline_id INTEGER REFERENCES disciplines(id);
 CREATE TABLE IF NOT EXISTS boq_items (
   id SERIAL PRIMARY KEY,
   code TEXT NOT NULL UNIQUE,          -- BOQCODE, cùng không gian mã với tasks/wp/materials
   name TEXT NOT NULL,
   unit TEXT NOT NULL,
-  system_group TEXT,                  -- hệ (ống gió/nước/điện...) để nhóm hiển thị
+  discipline_id INTEGER REFERENCES disciplines(id), -- hệ (danh mục chuẩn — xem §3b kế hoạch tổng)
   qty_contract NUMERIC(15,3) NOT NULL DEFAULT 0,   -- KL nhận thầu (với CĐT)
   unit_price NUMERIC(15,2) NOT NULL DEFAULT 0,
   qty_sub NUMERIC(15,3) DEFAULT 0,    -- KL giao thầu phụ

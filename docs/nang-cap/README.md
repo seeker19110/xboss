@@ -13,6 +13,7 @@
 | `M04-ncc-don-hang.md` | NCC & đơn hàng (cấp phát, xe ra vào) | 2 |
 | `M05-nhat-ky.md` | Nhật ký thi công + nhân lực | 2 |
 | `M14-mat-bang.md` | Mặt bằng thi công (work front) | 2 |
+| `M15-trang-he.md` | Trang riêng từng hệ (hub quản lý nhà thầu) | 1 |
 | `M06-phat-sinh-vo.md` | Phát sinh / VO | 3 |
 | `M07-dau-thau.md` | Đấu thầu | 3 |
 | `M08-ban-ve.md` | Bản vẽ BIM/Shop + biện pháp thi công | 3 |

@@ -27,6 +27,7 @@ Chuyển điều hướng từ top-nav (`app/components/AppHeader.tsx`, 178 dòn
   5. Hồ sơ: (sau: Bản vẽ M8, Công văn M10...)
   6. Quản trị: Users, Admin, Import
 - RSC không dùng — AppShell là client component như toàn bộ app.
+- **Đa hệ (§3b kế hoạch tổng)**: nhóm "Thi công" liệt kê sheet theo hệ (`disciplines`); user có `user_disciplines` thì mặc định mở/ưu tiên hệ của mình (các hệ khác vẫn truy cập được nếu quyền cho phép).
 
 ### Nền tảng UX bổ sung (làm cùng PR 3)
 

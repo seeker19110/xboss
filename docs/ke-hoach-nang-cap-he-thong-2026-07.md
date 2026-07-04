@@ -46,6 +46,19 @@ Từ các phần mềm tham chiếu, một hệ quản lý dự án thi công đ
 | Dashboard | KPI + S-curve + forecast + Pareto lý do trễ + báo cáo ngày/tuần (email/Telegram/push) — chưa có cash flow, chưa cảnh báo chi phí | 🟢 khá đủ |
 | **Khung UI** | Top nav (`AppHeader`) — **yêu cầu mới: sidebar trái + nút thu gọn + title trang trên header** | 🔄 đổi |
 
+## 3b. Quản lý đa hệ (kết cấu / xây tô / ACMV / điện / nước / PCCC...)
+
+**Nền tảng đã hỗ trợ:** sheet tracking là **động** (`POST /api/sheets`) — mỗi hệ = 1 sheet riêng, tạo được ngay không cần code; các module M1/M3/M8/M14 đều thiết kế theo hệ (`system_group`, checklist theo hệ, bản vẽ theo hệ, mặt bằng theo sheet); chuyển bước M3 chính là bàn giao giữa các hệ.
+
+**3 bổ sung xuyên suốt để đa hệ trọn vẹn** (không thành module mới — gắn vào module sẵn có):
+
+1. **Danh mục hệ chuẩn hoá** (làm trong **M1**): bảng `disciplines(id, code, name, color)` seed sẵn: `ket_cau, xay_to, acmv, dien, nuoc, pccc` (+ thêm được); `sheet_types`/`boq_items`/`qc_checklists`/`drawings` tham chiếu FK thay vì text tự do — thống kê chéo hệ không lệch tên; màu hệ nhất quán mọi biểu đồ.
+2. **Phân quyền theo hệ** (làm trong **M0 PR 1 + áp dần**): bảng `user_disciplines(user_id, discipline_id)` — kỹ sư gắn hệ; sidebar/tracking mặc định lọc theo hệ của mình; quyền GHI của engineer giới hạn trong hệ được gán (mở rộng `canTouchTask` lên cấp hệ), Admin/PM thấy tất cả. Vai trò xem (`bch/cdt/viewer`) không đổi.
+3. **Dashboard chéo hệ** (làm trong **M9**): bảng so sánh 6+ hệ cạnh nhau — % tiến độ, trễ, NCR mở, ngân sách đã dùng theo từng hệ; S-curve chồng nhiều hệ (mỗi hệ 1 màu theo danh mục).
+4. **Trang riêng từng hệ = hub quản lý nhà thầu** (module **M15**, đặc tả `docs/nang-cap/M15-trang-he.md`): mỗi hệ 1 trang `/he/[code]` như app hiện phục vụ ACMV — tiến độ, sheet, nhân lực, sản lượng, chất lượng, thanh toán theo từng nhà thầu; **1 hệ có thể 2+ nhà thầu chia tầng/khu** (bảng `discipline_contractors`, đã quyết 2026-07-04) — bảng so sánh các nhà thầu cùng hệ cạnh nhau, badge nhà thầu theo tầng trên lưới; tài khoản `subcon` gắn hệ chỉ thấy hệ mình. Nguyên tắc: hub + deep-link `?he=` sang trang module dùng chung, KHÔNG nhân bản UI theo hệ.
+
+Lưu ý nghiệp vụ: lưới dimension hiện thiết kế cho MEP (kích thước ống/căn hộ) — với **kết cấu/xây tô**, cột dimension dùng theo **phân đoạn/phân khu hoặc căn/phòng** (cơ chế checkbox không đổi, chỉ khác nhãn cột — đã hỗ trợ vì cột dimension tự định nghĩa theo sheet).
+
 ## 4. Các hạng mục nâng cấp (đánh số theo thứ tự triển khai)
 
 Tổng quan 15 module, 4 đợt:
@@ -67,8 +80,9 @@ Tổng quan 15 module, 4 đợt:
 | M12 | Thiết bị/máy móc thi công | 4 | Thấp-Trung bình | — |
 | M13 | Biên bản họp + sổ rủi ro | 4 | Trung bình | — |
 | M14 | Mặt bằng thi công (work front) | 2* | Trung bình | — |
+| M15 | Trang riêng từng hệ (hub quản lý nhà thầu) | 1* | Trung bình | M0, M1 (disciplines) |
 
-\* M14 bổ sung sau khi rà "công tác quản lý trên công trường" — giá trị cao nên xếp vào **đợt 2** dù số thứ tự đứng cuối (ngoại lệ duy nhất của quy tắc số = thứ tự làm).
+\* M14, M15 bổ sung sau nên số đứng cuối nhưng xếp đợt sớm (M14 → đợt 2; M15 → đợt 1, ngay sau M0 + phần `disciplines` của M1) — 2 ngoại lệ của quy tắc số = thứ tự làm.
 
 ### M0 — Khung UI: sidebar trái thu gọn được (yêu cầu trực tiếp)
 
@@ -199,7 +213,7 @@ Nguyên tắc: các hướng này chỉ khởi động khi có **nhu cầu thậ
 ## 5. Lộ trình (4 đợt — số module đúng thứ tự làm)
 
 ```
-Đợt 1 (nền):            M0 sidebar + title AppHeader  →  M1 BOQ  →  M2 chi phí
+Đợt 1 (nền):            M0 sidebar + title AppHeader  →  M1 BOQ  →  M15 trang hệ (hub nhà thầu)  →  M2 chi phí
 Đợt 2 (nghiệp vụ lõi):  M3 QA&QC + hồ sơ chất lượng (T&C, phiếu YCNT, chuyển bước)  //  M4 đơn hàng nâng cao  //  M5 nhật ký thi công  //  M14 mặt bằng thi công   (song song được)
 Đợt 3 (chuỗi tiền + bản vẽ): M6 phát sinh VO  →  M7 đấu thầu  →  M8 bản vẽ  →  M9 dashboard mở rộng
 Đợt 4 (quản trị mở rộng): M10 RFI/công văn  //  M11 HSE  //  M12 thiết bị  //  M13 họp + rủi ro   (song song được, thứ tự linh hoạt theo nhu cầu thực tế)
