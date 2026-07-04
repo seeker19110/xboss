@@ -52,7 +52,7 @@ Chuyển điều hướng từ top-nav (`app/components/AppHeader.tsx`, 178 dòn
 2. Mobile drawer + tinh chỉnh responsive các trang bị ảnh hưởng + e2e/axe.
 3. Toast + EmptyState + focus ring; thay `alert()` hiện có ở 2–3 trang làm mẫu.
 
-## Điểm cần quyết trước khi code
+## Đã quyết (người dùng chốt 2026-07-04)
 
-- Thanh đáy mobile trang chủ hiện tại: giữ song song drawer hay bỏ hẳn? (đề xuất: giữ, chỉ bỏ khi menu drawer đã dùng quen).
-- Submenu sheet động trong sidebar: liệt kê phẳng hay collapse group? (đề xuất: collapse, mặc định mở).
+- **Thanh đáy mobile: GIỮ song song** với drawer; chỉ bỏ ở đợt sau khi người dùng đã quen drawer.
+- Submenu sheet động trong sidebar: collapse group, mặc định mở (đề xuất được giữ).

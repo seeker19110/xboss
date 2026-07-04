@@ -71,7 +71,7 @@ KL thực hiện: query JOIN `boq_task_map` × `tasks.progress` — viết trong
 2. Trang `/boq` (bảng + panel map + sửa nhanh) + menu sidebar + e2e/axe.
 3. Import Excel (parser + dry-run preview + UI).
 
-## Điểm cần quyết
+## Đã quyết (người dùng chốt 2026-07-04) & còn chờ
 
-- Format Excel dự toán thật (cần file mẫu từ người dùng trước PR 3).
-- 1 dòng BOQ ↔ n task chia weight: mặc định chia đều hay bắt nhập tay? (đề xuất: chia đều, sửa được).
+- **Map 1 dòng BOQ ↔ n task: LUÔN NHẬP TAY weight** (không tự chia đều) — UI map phải bắt nhập weight từng task, validate cảnh báo khi Σweight ≠ 1, có nút tiện ích "chia đều" để điền nhanh rồi sửa.
+- ⏳ Còn chờ: file Excel dự toán/BOQ thật của công ty (cần trước PR 3 — import).

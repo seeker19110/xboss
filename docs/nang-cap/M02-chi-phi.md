@@ -57,7 +57,8 @@ Cảnh báo `cost_over`: tính trong lượt đồng bộ on-fetch của `/api/n
 2. Trang `/costs` + menu sidebar + e2e/axe.
 3. Notification `cost_over` + settings ngưỡng.
 
-## Điểm cần quyết
+## Đã quyết (người dùng chốt 2026-07-04)
 
-- `payment_bills.responsible` TEXT: backfill FK `supplier_id`/`user_id` ngay trong module này (script `scripts/backfill-*.ts` mẫu) hay để M4? (đề xuất: làm ở đây — cần cho drill-down chính xác).
-- Tạm ứng (`advance`) tính vào thực chi hay theo dõi riêng? (nghiệp vụ: thường trừ dần vào các đợt sau — cần người dùng xác nhận cách công ty đang làm).
+- **Tạm ứng (`advance`) TÍNH VÀO thực chi** — dòng tiền đã ra khỏi công ty; các đợt thanh toán sau nhập số đã trừ tạm ứng. UI chú thích rõ cách tính ở tooltip cột Thực chi.
+- **Vai trò `cdt` KHÔNG thấy trang chi phí** (nhạy cảm thương mại — quyết định chung cho M2/M6/M9): quyền xem giữ `PAYMENT_VIEW_ROLES` (admin/pm/bch), không mở rộng cho cdt/viewer.
+- Backfill `payment_bills.responsible` → FK: làm ngay trong M2 (đề xuất được giữ — cần cho drill-down).

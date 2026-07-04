@@ -65,6 +65,7 @@ Notification `vo_pending`: VO `submitted` quá N ngày (mặc định 7) chưa d
 2. Trang `/variations` + form hiện trường + màn duyệt + menu + e2e/axe.
 3. Documents + notification `vo_pending` + toggle "Gồm VO" ở `/boq`, `/costs`.
 
-## Điểm cần quyết
+## Điểm cần quyết & đã quyết liên quan
 
-- Đơn giá VO: lấy theo đơn giá HĐ khi mã trùng công tác gốc, hay luôn nhập tay? (đề xuất: prefill từ HĐ, sửa được).
+- Đơn giá VO: lấy theo đơn giá HĐ khi mã trùng công tác gốc, hay luôn nhập tay? (đề xuất: prefill từ HĐ, sửa được — chưa chốt, hỏi khi triển khai M6).
+- **Đã quyết chung (2026-07-04): vai trò `cdt` không thấy giá trị VO** (xem M2/M9) — trang `/variations` giới hạn quyền xem như `/costs`.

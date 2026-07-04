@@ -43,6 +43,6 @@ Mỗi khối chỉ tính khi bảng nguồn tồn tại (module đã triển kha
 1. API khối cashflow + cpi + UI 2 thẻ + chart (cần M2 xong).
 2. Khối quality/procurement/workfront/vo + thẻ tương ứng (thêm dần theo module nào đã có — PR này có thể tách nhỏ theo nhịp).
 
-## Điểm cần quyết
+## Đã quyết (người dùng chốt 2026-07-04)
 
-- `cdt` (chủ đầu tư đăng nhập) có được thấy CPI/ngân sách nội bộ không? (nhạy cảm thương mại — đề xuất: KHÔNG, chỉ admin/pm/bch).
+- **`cdt` KHÔNG thấy CPI/ngân sách/cash flow/VO** — khối tài chính chỉ render cho `PAYMENT_VIEW_ROLES` (admin/pm/bch); cdt/viewer thấy tiến độ + chất lượng. API không trả khối tài chính cho vai trò ngoài danh sách (ẩn từ server, không chỉ ẩn UI).
