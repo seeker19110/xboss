@@ -98,15 +98,43 @@ Từ các phần mềm tham chiếu, một hệ quản lý dự án thi công đ
 - Giữ nguyên recharts + hệ màu status; các thẻ KPI bấm vào drill-down như Pareto hiện có.
 - **Độ phức tạp: Thấp-Trung bình** (làm cuối, khi các module đã có dữ liệu).
 
+### M8 — Phát sinh / thay đổi khối lượng (VO — Variation Order)
+
+- Nghiệp vụ quyết định lời/lỗ của nhà thầu MEP: khối lượng **ngoài hợp đồng gốc** phải được ghi nhận ngay tại hiện trường, trình CĐT/TVGS, duyệt xong mới vào được khối lượng thanh toán. Thiếu VO thì M1 (BOQ) và M6 (chi phí) chỉ phản ánh hợp đồng gốc.
+- Bảng `variation_orders` (mã VO, mô tả, nguyên nhân: thay đổi thiết kế/CĐT yêu cầu/điều kiện hiện trường, KL + đơn giá đề xuất, file đính kèm, **vòng đời**: ghi nhận → trình → CĐT duyệt/duyệt một phần/từ chối → bổ sung phụ lục HĐ) + dòng chi tiết theo cấu trúc `boq_items` (đánh dấu `is_vo`).
+- VO đã duyệt tự cộng vào ngân sách/KL nhận thầu ở M1/M6 (tách cột "HĐ gốc" vs "gốc + VO"); trang `/variations` liệt kê + tổng giá trị VO theo trạng thái; notification khi VO chờ duyệt quá N ngày.
+- **Độ phức tạp: Trung bình** (sau M1; mô hình dữ liệu mượn cấu trúc BOQ, vòng đời duyệt mượn pattern nghiệm thu 2 bước sẵn có).
+
+### M9 — Nhật ký thi công + nhân lực hiện trường
+
+- **Bắt buộc theo Nghị định 06/2021/NĐ-CP** (nhật ký thi công là hồ sơ pháp lý phải có khi nghiệm thu/hoàn công); các phần mềm VN (Nghiệm thu 360) lấy đây làm tính năng đinh.
+- Bảng `site_diaries` (ngày, thời tiết sáng/chiều, mô tả công việc, vướng mắc/chỉ đạo, người lập, khoá sổ theo ngày) + `diary_manpower` (số công nhân theo từng thầu phụ/tổ đội trong ngày — nguồn cho KPI năng suất, **không** phải chấm công nhân sự từng người).
+- **Sinh gần tự động**: phần "công việc thực hiện" prefill từ `task_history` trong ngày (task nào tăng %, ai tick) + ảnh hiện trường đã upload trong ngày — người lập chỉ bổ sung thời tiết/nhân lực/vướng mắc rồi khoá sổ. Xuất PDF theo mẫu (tái dùng `@react-pdf/renderer`) để in ký.
+- **Độ phức tạp: Trung bình** (độc lập, dữ liệu nguồn đã có sẵn; giá trị pháp lý cao so với công sức).
+
+### Mở rộng M4 — T&C (Testing & Commissioning) cho ACMV
+
+Không tách module riêng: chạy thử **đơn động → liên động → hiệu chỉnh (TAB)** của hệ ACMV là một **loại checklist/biên bản riêng trong M4** (`qc_checklists.category = 'tc'`), gắn theo hệ/thiết bị thay vì theo tầng, có trường thông số đo (lưu lượng gió, áp suất, dòng điện...) so với thiết kế. Đưa vào phạm vi M4 khi triển khai đợt 2.
+
+## 4b. Đã cân nhắc và KHÔNG đưa vào (YAGNI)
+
+| Hạng mục | Lý do loại |
+|---|---|
+| RFI / quản lý công văn CĐT-TVGS | Giá trị có nhưng khối lượng trao đổi ở quy mô 1 dự án chưa đáng 1 module; vướng mắc hằng ngày đã có chỗ ghi trong nhật ký (M9) + bình luận task. Xem lại nếu số lượng công văn thực tế lớn. |
+| HSE / an toàn lao động | Trách nhiệm chính thuộc tổng thầu trên công trường; nhà thầu MEP chủ yếu nộp hồ sơ theo yêu cầu tổng thầu — chưa cần hệ quản lý riêng. |
+| Quản lý thiết bị/máy móc thi công | MEP dùng ít máy lớn (chủ yếu dụng cụ cầm tay); theo dõi qua Excel/kho hiện tại là đủ. |
+| Biên bản họp, risk register | Mastt/Procore có nhưng ở tầm portfolio/CĐT; với 1 dự án là over-engineering. |
+| Chấm công nhân sự từng người, ERP kế toán, viewer BIM 3D | Đã loại từ đầu (§6) — ngoài phạm vi công cụ quản lý thi công. |
+
 ## 5. Lộ trình đề xuất (3 đợt)
 
 ```
 Đợt 1 (nền):    M0 sidebar  →  M1 BOQ  →  M6 chi phí (phần ngân sách vs thực chi cơ bản)
-Đợt 2 (nghiệp vụ): M4 QA&QC + hồ sơ chất lượng  //  M3 đơn hàng nâng cao   (song song được)
-Đợt 3 (hoàn thiện): M2 đấu thầu  →  M5 bản vẽ  →  M7 dashboard mở rộng + cảnh báo chi phí đầy đủ
+Đợt 2 (nghiệp vụ): M4 QA&QC + hồ sơ chất lượng (gồm T&C)  //  M3 đơn hàng nâng cao  //  M9 nhật ký thi công   (song song được)
+Đợt 3 (hoàn thiện): M8 phát sinh VO  →  M2 đấu thầu  →  M5 bản vẽ  →  M7 dashboard mở rộng + cảnh báo chi phí đầy đủ
 ```
 
-- Phụ thuộc cứng: M1 → M2, M1 → M6, M6 → M7 (phần cash flow/CPI). Còn lại độc lập.
+- Phụ thuộc cứng: M1 → M2, M1 → M6, M1 → M8, M6 → M7 (phần cash flow/CPI); M8 nên xong trước khi chốt báo cáo chi phí M7. Còn lại độc lập (M9 độc lập hoàn toàn — kéo lên sớm hơn được nếu cần hồ sơ pháp lý gấp).
 - Mỗi module chia 2–4 PR nhỏ (migration → API + test → UI → tích hợp notification/dashboard).
 - Sau mỗi module: cập nhật `PROGRESS.md`, `docs/ERD.md`, viết ADR nếu có quyết định kiến trúc mới (vd cấu trúc bảng drawings).
 
