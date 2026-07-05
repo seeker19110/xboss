@@ -10,11 +10,13 @@ import {
   GanttChartSquare,
   CalendarClock,
   ClipboardList,
+  ClipboardCheck,
   CheckSquare,
   Calculator,
   Package,
   Truck,
   Wallet,
+  Coins,
   Users,
   ShieldCheck,
   Upload,
@@ -53,6 +55,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/my-tasks", label: "Việc của tôi", icon: ClipboardList },
       { href: "/approvals", label: "Nghiệm thu", icon: CheckSquare },
       { href: "/boq", label: "BOQ", icon: Calculator },
+      { href: "/quality", label: "Chất lượng", icon: ClipboardCheck },
     ],
   },
   {
@@ -64,7 +67,10 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Tiền",
-    items: [{ href: "/payments", label: "Thanh toán", icon: Wallet }],
+    items: [
+      { href: "/payments", label: "Thanh toán", icon: Wallet },
+      { href: "/costs", label: "Chi phí", icon: Coins, roles: ["admin", "pm", "bch"] },
+    ],
   },
   {
     label: "Quản trị",

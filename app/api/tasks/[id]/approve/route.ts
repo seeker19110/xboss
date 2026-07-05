@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { deriveStatus, recomputePackage } from "@/lib/recompute";
+import { requiredInspectionMissing } from "@/lib/qaqc";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,15 @@ export async function POST(
         throw Object.assign(new Error("Task chưa hoàn thành 100% — không thể nghiệm thu"), {
           status: 422,
         });
+      // Gate M3: mẫu checklist nào bật `required` (áp cho hệ của task) mà chưa có inspection
+      // đạt cho task này → chặn nghiệm thu.
+      if (await requiredInspectionMissing(id))
+        throw Object.assign(
+          new Error(
+            "Cần có phiếu kiểm tra chất lượng Đạt (checklist bắt buộc) trước khi nghiệm thu",
+          ),
+          { status: 409 },
+        );
 
       await run(
         `UPDATE tasks SET status = 'nghiem_thu', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,

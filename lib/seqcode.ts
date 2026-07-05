@@ -11,12 +11,19 @@ export function isUniqueViolation(e: unknown): boolean {
 
 // Mã kế tiếp cho `prefix` (vd "PR-202606-") trên bảng/cột cho trước.
 // table/column là hằng nội bộ (không phải input người dùng) nên nội suy an toàn.
-export async function nextSeqCode(table: string, column: string, prefix: string): Promise<string> {
+// pad: độ rộng đệm số 0 (mặc định 3 — PR/PO/WR hiện có; NCR/YCNT dùng 4).
+export async function nextSeqCode(
+  table: string,
+  column: string,
+  prefix: string,
+  pad = 3,
+): Promise<string> {
   const last = await queryOne<{ code: string }>(
     `SELECT ${column} AS code FROM ${table} WHERE ${column} LIKE ? ORDER BY ${column} DESC LIMIT 1`,
-    `${prefix}%`);
+    `${prefix}%`,
+  );
   const seq = last?.code ? parseInt(last.code.slice(prefix.length)) + 1 : 1;
-  return `${prefix}${String(seq).padStart(3, "0")}`;
+  return `${prefix}${String(seq).padStart(pad, "0")}`;
 }
 
 // Chạy lại fn khi đụng UNIQUE (mã trùng do tạo đồng thời) — sinh mã mới ở mỗi lần.

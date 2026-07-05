@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query, run, todayISO, daysFromTodayISO } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, CAN } from "@/lib/auth";
+import { costSummary, getCostSettings } from "@/lib/cost";
 
 export const dynamic = "force-dynamic";
 
@@ -174,6 +175,79 @@ export async function GET() {
           AND material_id NOT IN (
             SELECT id FROM materials WHERE qty_planned > 0 AND qty_used > qty_planned)`,
       user.id,
+    );
+  }
+
+  // Vượt ngân sách theo hệ → cảnh báo Admin/PM/BCH (subcon/cdt/viewer/engineer không xem chi phí).
+  if (CAN.viewPayments(user.role)) {
+    const settings = await getCostSettings();
+    const rows = await costSummary("system");
+    const over = rows.filter(
+      (r) => r.budget > 0 && (r.committed / r.budget) * 100 >= settings.warnPct,
+    );
+
+    if (over.length > 0) {
+      const values = over.map(() => `(?, ?, 'cost_over', ?)`).join(", ");
+      const params = over.flatMap((r) => {
+        const pct = Math.round((r.committed / r.budget) * 100);
+        return [user.id, r.key, `💰 Hệ "${r.label}" cam kết đạt ${pct}% ngân sách`];
+      });
+      await run(
+        `INSERT INTO notifications (user_id, cost_group, type, message) VALUES ${values}
+         ON CONFLICT (user_id, type, cost_group) WHERE cost_group IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+
+    const overKeys = over.map((r) => r.key);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'cost_over' AND is_read = 0
+          AND cost_group <> ALL(?)`,
+      user.id,
+      overKeys,
+    );
+  }
+
+  // NCR quá hạn chưa đóng → cảnh báo người được gán; Admin/PM thấy mọi NCR quá hạn (quản lý chung).
+  {
+    const isPrivileged = user.role === "admin" || user.role === "pm";
+    const assignedFilter = isPrivileged ? "" : " AND n.assigned_to = ?";
+    const ncrParams = isPrivileged ? [today] : [today, user.id];
+    const overdueNcrs = await query<{
+      id: number;
+      code: string;
+      description: string;
+      dueDate: string;
+    }>(
+      `SELECT n.id, n.code, n.description, n.due_date AS "dueDate"
+         FROM ncrs n
+        WHERE n.status <> 'closed' AND n.due_date IS NOT NULL AND n.due_date < ?${assignedFilter}`,
+      ...ncrParams,
+    );
+
+    if (overdueNcrs.length > 0) {
+      const values = overdueNcrs.map(() => `(?, ?, 'ncr_overdue', ?)`).join(", ");
+      const params = overdueNcrs.flatMap((n) => [
+        user.id,
+        n.id,
+        `⚠ NCR ${n.code} quá hạn khắc phục (${n.dueDate}): ${n.description}`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, ncr_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, ncr_id, type) WHERE ncr_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'ncr_overdue' AND is_read = 0
+          AND ncr_id NOT IN (
+            SELECT n.id FROM ncrs n
+             WHERE n.status <> 'closed' AND n.due_date IS NOT NULL AND n.due_date < ?${assignedFilter})`,
+      user.id,
+      ...ncrParams,
     );
   }
 

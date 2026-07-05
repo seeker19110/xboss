@@ -80,8 +80,9 @@ test(
     assert.equal(summaryDien!.contractors.length, 1);
     assert.equal(summaryDien!.contractors[0].supplierName, "Nhà thầu điện Test");
     assert.deepEqual(summaryDien!.contractors[0].floorLabels, ["T1", "T2"]);
-    // Khối module chưa triển khai → null (UI ẩn khi null).
-    assert.equal(summaryDien!.ncrOpen, null);
+    // ncrOpen đã triển khai từ M3 (0 khi hệ chưa có NCR nào) — budget/drawings/floors vẫn
+    // null tới khi M2 (withCost) / M8 / M14 hoàn thành (UI ẩn khi null).
+    assert.equal(summaryDien!.ncrOpen, 0);
     assert.equal(summaryDien!.budget, null);
 
     const summaryNuoc = await getDisciplineSummary("nuoc");
