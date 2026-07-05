@@ -7,6 +7,8 @@
 > **Đặc tả chi tiết từng module** (schema DDL, API, UI/UX, điểm chạm code, chia PR, điểm cần quyết — tự chứa để AI lập plan triển khai): thư mục **`docs/nang-cap/`** (README = quy ước chung, `M<xx>-*.md` = từng module). Khi ra lệnh "triển khai M<x>": đọc `CLAUDE.md` + `docs/nang-cap/README.md` + file module tương ứng.
 >
 > Kế hoạch nâng cấp **dependency + hạ tầng chất lượng** (việc riêng, độc lập) xem `docs/ke-hoach-nang-cap-2026-07.md`.
+>
+> **Cập nhật 2026-07-05:** phần còn lại (M6–M14) đã được **sắp xếp lại + bổ sung module mới M16–M22** theo đối chiếu brochure FastCons — xem `docs/ke-hoach-fastcons-2026-07.md` (lộ trình §5 dưới đây hết hiệu lực cho các module chưa làm; đặc tả `docs/nang-cap/` vẫn nguyên giá trị).
 
 ## 1. Nguyên tắc xuyên suốt
 
