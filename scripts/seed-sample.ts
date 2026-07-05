@@ -1,6 +1,6 @@
 // Dữ liệu mẫu mô phỏng cấu trúc Excel AVIO Tháp A (chạy khi chưa có file Excel thật).
 import "./env";
-import { run, insertId, todayISO } from "../lib/db";
+import { run, insertId, queryOne, todayISO } from "../lib/db";
 import type { StatusSlug } from "../lib/status";
 import { slugFromCode, toSlug } from "../lib/sheets";
 
@@ -116,16 +116,21 @@ async function main() {
     return seed / 0x7fffffff;
   };
 
+  // Toàn bộ sheet mẫu là tracking ACMV — gán discipline_id (M15) như dữ liệu thật sau backfill
+  // migration 0005_boq.sql (không dựa vào backfill lúc migrate vì bảng sheet_types rỗng lúc đó).
+  const acmv = await queryOne<{ id: number }>(`SELECT id FROM disciplines WHERE code = 'acmv'`);
+
   for (const s of SHEETS) {
     // slug đặt tường minh (như lib/import.ts / POST /api/sheets) — không dựa vào backfill
     // lúc boot nữa vì hệ migrate chỉ chạy baseline một lần (xem ADR-0003).
     const stId = await insertId(
-      `INSERT INTO sheet_types (tower_id, code, name, responsible, slug) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO sheet_types (tower_id, code, name, responsible, slug, discipline_id) VALUES (?, ?, ?, ?, ?, ?)`,
       towerId,
       s.code,
       s.name,
       s.responsible,
       slugFromCode(s.code) ?? toSlug(s.code),
+      acmv?.id ?? null,
     );
 
     for (let f = 1; f <= s.floors; f++) {

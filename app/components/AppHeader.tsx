@@ -14,6 +14,9 @@ import ThemeToggle from "@/app/components/ThemeToggle";
 import OnlineUsers from "@/app/components/OnlineUsers";
 import { fetchMe } from "@/app/lib/me";
 import { NAV_GROUPS, isNavItemActive, canSeeNavItem, findActiveNav } from "@/app/lib/nav";
+import { disciplineColorClasses } from "@/lib/disciplineColors";
+
+type Discipline = { id: number; code: string; name: string; color: string | null };
 
 type Me = { id: number; name: string; email: string; role: string };
 
@@ -47,11 +50,16 @@ export default function AppHeader({
   const [path, setPath] = useState("");
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [disciplines, setDisciplines] = useState<Discipline[]>([]);
 
   useEffect(() => {
     setPath(window.location.pathname);
     fetchMe().then((u) => setMe(u));
     setCollapsed(document.documentElement.classList.contains("sidebar-collapsed"));
+    fetch("/api/disciplines")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => setDisciplines(data?.disciplines ?? []))
+      .catch(() => {});
   }, []);
 
   function toggleCollapsed() {
@@ -70,6 +78,38 @@ export default function AppHeader({
   const pageTitle = title ?? active?.item.label ?? "XBoss";
   const breadcrumbGroup =
     !title && active && active.group.label !== active.item.label ? active.group.label : undefined;
+
+  function renderNavGroup(group: (typeof NAV_GROUPS)[number]) {
+    const items = group.items.filter((it) => canSeeNavItem(it, me?.role));
+    if (items.length === 0) return null;
+    return (
+      <div key={group.label} className="mb-3">
+        <div className="sidebar-label px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+          {group.label}
+        </div>
+        {items.map((item) => {
+          const itemActive = isNavItemActive(item, path);
+          const Icon = item.icon;
+          return (
+            <a
+              key={item.href}
+              href={item.href}
+              title={item.label}
+              aria-current={itemActive ? "page" : undefined}
+              className={`flex items-center gap-2.5 mx-2 px-2.5 py-2 rounded-lg text-sm transition min-h-10 border-l-2 ${
+                itemActive
+                  ? "bg-zinc-800 text-white font-medium border-emerald-400"
+                  : "text-zinc-400 hover:text-white hover:bg-zinc-900/60 border-transparent"
+              }`}
+            >
+              <Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
+              <span className="sidebar-label">{item.label}</span>
+            </a>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <>
@@ -96,37 +136,43 @@ export default function AppHeader({
         </div>
 
         <nav className="flex-1 overflow-y-auto py-2" aria-label="Điều hướng chính">
-          {NAV_GROUPS.map((group) => {
-            const items = group.items.filter((it) => canSeeNavItem(it, me?.role));
-            if (items.length === 0) return null;
-            return (
-              <div key={group.label} className="mb-3">
-                <div className="sidebar-label px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-                  {group.label}
-                </div>
-                {items.map((item) => {
-                  const itemActive = isNavItemActive(item, path);
-                  const Icon = item.icon;
-                  return (
-                    <a
-                      key={item.href}
-                      href={item.href}
-                      title={item.label}
-                      aria-current={itemActive ? "page" : undefined}
-                      className={`flex items-center gap-2.5 mx-2 px-2.5 py-2 rounded-lg text-sm transition min-h-10 border-l-2 ${
-                        itemActive
-                          ? "bg-zinc-800 text-white font-medium border-emerald-400"
-                          : "text-zinc-400 hover:text-white hover:bg-zinc-900/60 border-transparent"
-                      }`}
-                    >
-                      <Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
-                      <span className="sidebar-label">{item.label}</span>
-                    </a>
-                  );
-                })}
+          {NAV_GROUPS.slice(0, 1).map(renderNavGroup)}
+
+          {/* Hệ thi công — danh mục động từ /api/disciplines (M15), mỗi hệ 1 mục
+              dẫn tới trang hub riêng (/he/[code]); chấm màu lấy từ disciplines.color. */}
+          {disciplines.length > 0 && (
+            <div className="mb-3">
+              <div className="sidebar-label px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+                Hệ thi công
               </div>
-            );
-          })}
+              {disciplines.map((d) => {
+                const href = `/he/${d.code}`;
+                const itemActive = path === href || path.startsWith(href + "/");
+                const c = disciplineColorClasses(d.color);
+                return (
+                  <a
+                    key={d.code}
+                    href={href}
+                    title={d.name}
+                    aria-current={itemActive ? "page" : undefined}
+                    className={`flex items-center gap-2.5 mx-2 px-2.5 py-2 rounded-lg text-sm transition min-h-10 border-l-2 ${
+                      itemActive
+                        ? `bg-zinc-800 text-white font-medium ${c.border}`
+                        : "text-zinc-400 hover:text-white hover:bg-zinc-900/60 border-transparent"
+                    }`}
+                  >
+                    <span
+                      className={`w-2.5 h-2.5 rounded-full shrink-0 ${c.dot}`}
+                      aria-hidden="true"
+                    />
+                    <span className="sidebar-label truncate">{d.name}</span>
+                  </a>
+                );
+              })}
+            </div>
+          )}
+
+          {NAV_GROUPS.slice(1).map(renderNavGroup)}
         </nav>
 
         <button

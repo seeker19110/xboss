@@ -18,6 +18,7 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
       "Lookahead",
       "Việc của tôi",
       "Nghiệm thu",
+      "BOQ",
       "Vật tư",
       "Đơn đặt hàng",
       "Thanh toán",

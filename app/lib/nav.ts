@@ -11,6 +11,7 @@ import {
   CalendarClock,
   ClipboardList,
   CheckSquare,
+  Calculator,
   Package,
   Truck,
   Wallet,
@@ -51,6 +52,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/my-tasks", label: "Việc của tôi", icon: ClipboardList },
       { href: "/approvals", label: "Nghiệm thu", icon: CheckSquare },
+      { href: "/boq", label: "BOQ", icon: Calculator },
     ],
   },
   {
