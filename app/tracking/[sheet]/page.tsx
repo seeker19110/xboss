@@ -32,6 +32,7 @@ import { useOfflineTickQueue } from "@/app/components/offlineQueue";
 import AppHeader from "@/app/components/AppHeader";
 import EditableText from "@/app/components/EditableText";
 import { Modal, appAlert, appConfirm, appPrompt } from "@/app/components/dialogs";
+import { showToast } from "@/app/components/Toast";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { DELAY_REASON_LABEL } from "@/lib/delay";
 import { toSlug } from "@/lib/sheets";
@@ -1080,6 +1081,21 @@ function PkgGrid({
         body: JSON.stringify({ installed: !cell.installed }),
       });
       const j = await res.json().catch(() => null);
+      if (!res.ok) {
+        // Bị chặn (vd hold point chuyển bước M3) — trả checkbox về trạng thái cũ + báo lý do,
+        // khác lỗi mạng (onOfflineTick) vì server đã trả lời rõ ràng là từ chối.
+        setGrid(
+          (g) =>
+            g && {
+              ...g,
+              tasks: g.tasks.map((t) =>
+                t.id === task.id ? { ...t, cells: { ...t.cells, [label]: cell } } : t,
+              ),
+            },
+        );
+        showToast(j?.error ?? "Không cập nhật được ô này", "error");
+        return;
+      }
       if (j?.task)
         setGrid(
           (g) =>
@@ -1100,15 +1116,24 @@ function PkgGrid({
 
   async function setAllInRow(task: GridTask, value: boolean) {
     const cells = Object.values(task.cells);
-    await Promise.all(
+    const results = await Promise.all(
       cells.map((c) =>
         fetch(`/api/dimensions/${c.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ installed: value }),
-        }).catch(() => onOfflineTick(c.id, value)),
+        })
+          .then(async (res) =>
+            res.ok ? null : ((await res.json().catch(() => null))?.error ?? "Lỗi"),
+          )
+          .catch(() => {
+            onOfflineTick(c.id, value);
+            return null;
+          }),
       ),
     );
+    const firstError = results.find((r) => r);
+    if (firstError) showToast(firstError, "error");
     load();
     onChanged();
   }

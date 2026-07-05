@@ -32,6 +32,7 @@ type Summary = {
   delayedCount: number;
   waitingApprovalCount: number;
   contractors: Contractor[];
+  ncrOpen: number;
 };
 
 // Rút gọn phạm vi tầng cho chip nhà thầu: 1 tầng → giữ nguyên, nhiều tầng → "đầu–cuối".
@@ -219,6 +220,11 @@ export default function DisciplineHubPage({ params }: { params: Promise<{ code: 
               label="Chờ nghiệm thu"
               value={String(summary.waitingApprovalCount)}
               accent="text-amber-300"
+            />
+            <KpiTile
+              label="NCR mở"
+              value={String(summary.ncrOpen)}
+              accent={summary.ncrOpen > 0 ? "text-rose-300" : "text-zinc-300"}
             />
           </div>
         </div>

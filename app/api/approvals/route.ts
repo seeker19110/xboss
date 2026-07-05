@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, insertId, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { recomputePackage } from "@/lib/recompute";
+import { requiredInspectionMissing } from "@/lib/qaqc";
 
 export const dynamic = "force-dynamic";
 
@@ -104,6 +105,17 @@ export async function POST(req: NextRequest) {
           new Error(`Còn ${notDone.length} task chưa đạt 100% — không thể nghiệm thu tầng`),
           { status: 422 },
         );
+
+      // Gate M3: mọi task trong tầng phải qua checklist bắt buộc (nếu có) trước khi nghiệm thu lô.
+      for (const t of tasks) {
+        if (await requiredInspectionMissing(t.id))
+          throw Object.assign(
+            new Error(
+              "Còn task chưa có phiếu kiểm tra chất lượng Đạt (checklist bắt buộc) — không thể nghiệm thu tầng",
+            ),
+            { status: 409 },
+          );
+      }
 
       // Tạo hoặc cập nhật floor_approval thành chính thức
       let aid: number;

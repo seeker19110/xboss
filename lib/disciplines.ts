@@ -28,8 +28,9 @@ export type DisciplineSummary = {
     isPrimary: boolean;
     note: string | null;
   }[];
-  // Khối module chưa triển khai — null tới khi M2/M3/M8/M14 hoàn thành (pattern M9: UI ẩn khi null).
-  ncrOpen: number | null;
+  ncrOpen: number; // NCR mở của hệ (M3) — 0 khi chưa có NCR nào, không phải null.
+  // Khối module chưa triển khai (M2 khi không có quyền xem chi phí, M8, M14) — null tới khi
+  // hoàn thành/đủ quyền (pattern M9: UI ẩn khi null).
   budget: number | null;
   drawingsPending: number | null;
   floorsPending: number | null;
@@ -110,6 +111,16 @@ export async function getDisciplineSummary(
     discipline.id,
   );
 
+  const ncrOpen = await queryOne<{ count: number }>(
+    `SELECT COUNT(*)::int AS count
+       FROM ncrs n
+       JOIN tasks t ON t.id = n.task_id
+       JOIN work_packages wp ON wp.id = t.package_id
+       JOIN sheet_types st ON st.id = wp.sheet_type_id
+      WHERE st.discipline_id = ? AND n.status <> 'closed'`,
+    discipline.id,
+  );
+
   const contractors = await query<{
     id: number;
     supplierId: number;
@@ -136,7 +147,7 @@ export async function getDisciplineSummary(
     delayedCount: overall?.delayed ?? 0,
     waitingApprovalCount: overall?.waitingApproval ?? 0,
     contractors,
-    ncrOpen: null,
+    ncrOpen: ncrOpen?.count ?? 0,
     budget: opts.withCost ? await disciplineBudget(discipline.id) : null,
     drawingsPending: null,
     floorsPending: null,

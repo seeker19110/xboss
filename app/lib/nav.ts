@@ -10,6 +10,7 @@ import {
   GanttChartSquare,
   CalendarClock,
   ClipboardList,
+  ClipboardCheck,
   CheckSquare,
   Calculator,
   Package,
@@ -54,6 +55,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/my-tasks", label: "Việc của tôi", icon: ClipboardList },
       { href: "/approvals", label: "Nghiệm thu", icon: CheckSquare },
       { href: "/boq", label: "BOQ", icon: Calculator },
+      { href: "/quality", label: "Chất lượng", icon: ClipboardCheck },
     ],
   },
   {

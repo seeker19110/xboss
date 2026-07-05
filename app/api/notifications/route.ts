@@ -209,6 +209,48 @@ export async function GET() {
     );
   }
 
+  // NCR quá hạn chưa đóng → cảnh báo người được gán; Admin/PM thấy mọi NCR quá hạn (quản lý chung).
+  {
+    const isPrivileged = user.role === "admin" || user.role === "pm";
+    const assignedFilter = isPrivileged ? "" : " AND n.assigned_to = ?";
+    const ncrParams = isPrivileged ? [today] : [today, user.id];
+    const overdueNcrs = await query<{
+      id: number;
+      code: string;
+      description: string;
+      dueDate: string;
+    }>(
+      `SELECT n.id, n.code, n.description, n.due_date AS "dueDate"
+         FROM ncrs n
+        WHERE n.status <> 'closed' AND n.due_date IS NOT NULL AND n.due_date < ?${assignedFilter}`,
+      ...ncrParams,
+    );
+
+    if (overdueNcrs.length > 0) {
+      const values = overdueNcrs.map(() => `(?, ?, 'ncr_overdue', ?)`).join(", ");
+      const params = overdueNcrs.flatMap((n) => [
+        user.id,
+        n.id,
+        `⚠ NCR ${n.code} quá hạn khắc phục (${n.dueDate}): ${n.description}`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, ncr_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, ncr_id, type) WHERE ncr_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'ncr_overdue' AND is_read = 0
+          AND ncr_id NOT IN (
+            SELECT n.id FROM ncrs n
+             WHERE n.status <> 'closed' AND n.due_date IS NOT NULL AND n.due_date < ?${assignedFilter})`,
+      user.id,
+      ...ncrParams,
+    );
+  }
+
   const items = await query<{
     id: number;
     taskId: number | null;
