@@ -4,7 +4,8 @@ import { costSummary, costTotals, getCostSettings } from "@/lib/cost";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/costs?groupBy=system|floor — bảng ngân sách/cam kết/thực chi (Admin/PM/BCH).
+// GET /api/costs?groupBy=system|floor&includeVo=0 — bảng ngân sách/cam kết/thực chi
+// (Admin/PM/BCH). includeVo mặc định true — gồm cả KL phát sinh (VO, M6) đã duyệt.
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -12,9 +13,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Chỉ Admin/PM/BCH được xem chi phí" }, { status: 403 });
 
   const groupBy = req.nextUrl.searchParams.get("groupBy") === "floor" ? "floor" : "system";
+  const includeVo = req.nextUrl.searchParams.get("includeVo") !== "0";
   const [rows, totals, settings] = await Promise.all([
-    costSummary(groupBy),
-    costTotals(),
+    costSummary(groupBy, includeVo),
+    costTotals(includeVo),
     getCostSettings(),
   ]);
 

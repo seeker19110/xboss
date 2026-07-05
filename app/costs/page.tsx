@@ -44,11 +44,12 @@ export default function CostsPage() {
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [groupBy, setGroupBy] = useState<"system" | "floor">("system");
+  const [includeVo, setIncludeVo] = useState(true);
   const [selected, setSelected] = useState<CostRow | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  async function load(gb: "system" | "floor") {
-    const res = await fetch(`/api/costs?groupBy=${gb}`);
+  async function load(gb: "system" | "floor", withVo = includeVo) {
+    const res = await fetch(`/api/costs?groupBy=${gb}&includeVo=${withVo ? 1 : 0}`);
     if (res.status === 401) {
       redirectToLogin();
       return;
@@ -78,6 +79,13 @@ export default function CostsPage() {
     setSelected(null);
     setLoading(true);
     load(gb);
+  }
+
+  function toggleIncludeVo(checked: boolean) {
+    setIncludeVo(checked);
+    setSelected(null);
+    setLoading(true);
+    load(groupBy, checked);
   }
 
   const canEditSettings = me?.role === "admin" || me?.role === "pm";
@@ -167,19 +175,30 @@ export default function CostsPage() {
         )}
 
         {/* Toggle nhóm */}
-        <div className="flex gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-xl w-fit">
-          <button
-            onClick={() => switchGroup("system")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${groupBy === "system" ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
-          >
-            Theo hệ
-          </button>
-          <button
-            onClick={() => switchGroup("floor")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${groupBy === "floor" ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
-          >
-            Theo tầng
-          </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-xl w-fit">
+            <button
+              onClick={() => switchGroup("system")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${groupBy === "system" ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
+            >
+              Theo hệ
+            </button>
+            <button
+              onClick={() => switchGroup("floor")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${groupBy === "floor" ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
+            >
+              Theo tầng
+            </button>
+          </div>
+          <label className="inline-flex items-center gap-2 text-sm text-zinc-300">
+            <input
+              type="checkbox"
+              checked={includeVo}
+              onChange={(e) => toggleIncludeVo(e.target.checked)}
+              className="rounded border-zinc-600 bg-zinc-800"
+            />
+            Gồm phát sinh (VO)
+          </label>
         </div>
         {groupBy === "floor" && (
           <p className="text-[11px] text-zinc-400">

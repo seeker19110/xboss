@@ -167,6 +167,10 @@ export const CAN = {
   viewPayments: (r?: Role) => !!r && PAYMENT_VIEW_ROLES.includes(r), // xem trang thanh toán
   createInspectionRequest: (r?: Role) => r === "admin" || r === "pm" || r === "engineer", // tạo phiếu YCNT
   manageContracts: (r?: Role) => r === "admin" || r === "pm", // tạo/sửa hợp đồng, phụ lục (M16)
+  // Xem phát sinh/VO (M6): loại cdt (không thấy giá trị VO — quyết 2026-07-04), subcon,
+  // viewer — như /costs nhưng vẫn cho kỹ sư xem/tạo vì họ ghi nhận VO tại hiện trường.
+  viewVariations: (r?: Role) => r === "admin" || r === "pm" || r === "engineer" || r === "bch",
+  createVariation: (r?: Role) => r === "admin" || r === "pm" || r === "engineer", // tạo VO (M6)
 };
 
 // Sub-con chỉ được thao tác trên task được giao cho mình.

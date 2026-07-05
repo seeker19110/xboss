@@ -29,8 +29,21 @@ type BoqItem = {
   subUnitPrice: number;
   note: string | null;
   sortOrder: number;
+  voId: number | null;
+  voCode: string | null;
+  voStatus: string | null;
+  qtyApproved: number | null;
   map: MapEntry[];
   executedQty: number;
+};
+
+const VO_STATUS_LABEL: Record<string, string> = {
+  draft: "Nháp",
+  submitted: "Đã trình",
+  approved: "Được duyệt",
+  partially_approved: "Duyệt một phần",
+  rejected: "Từ chối",
+  contract_added: "Đã vào phụ lục HĐ",
 };
 type Discipline = { id: number; code: string; name: string };
 type TaskHit = { id: number; code: string; name: string; sheetType: string };
@@ -52,17 +65,18 @@ export default function BoqPage() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<BoqItem | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [includeVo, setIncludeVo] = useState(true);
 
   const canManage = me?.role === "admin" || me?.role === "pm";
 
-  function load() {
-    return fetch("/api/boq").then((r) => (r.ok ? r.json() : null));
+  function load(withVo: boolean) {
+    return fetch(`/api/boq?includeVo=${withVo ? 1 : 0}`).then((r) => (r.ok ? r.json() : null));
   }
 
   useEffect(() => {
     Promise.all([
       fetchMe(),
-      load(),
+      load(includeVo),
       fetch("/api/disciplines").then((r) => (r.ok ? r.json() : null)),
     ])
       .then(([meData, boq, disc]) => {
@@ -73,10 +87,10 @@ export default function BoqPage() {
         setDisciplines(disc?.disciplines ?? []);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [includeVo]);
 
   async function refresh() {
-    const boq = await load();
+    const boq = await load(includeVo);
     setItems(boq?.items ?? []);
     setTotals(boq?.totals ?? { contractValue: 0, subValue: 0, executedValue: 0 });
     setSelected((sel) =>
@@ -142,6 +156,15 @@ export default function BoqPage() {
       />
 
       <main className="p-4 sm:p-6 pb-24 space-y-4">
+        <label className="inline-flex items-center gap-2 text-sm text-zinc-300">
+          <input
+            type="checkbox"
+            checked={includeVo}
+            onChange={(e) => setIncludeVo(e.target.checked)}
+            className="rounded border-zinc-600 bg-zinc-800"
+          />
+          Gồm phát sinh (VO)
+        </label>
         {items.length === 0 ? (
           <EmptyState
             title="Chưa có dòng BOQ nào"
@@ -198,7 +221,17 @@ export default function BoqPage() {
                                 onClick={() => setSelected(it)}
                                 className="border-b border-zinc-800/60 last:border-0 hover:bg-zinc-800/40 cursor-pointer"
                               >
-                                <td className="p-3 font-mono text-xs">{it.code}</td>
+                                <td className="p-3 font-mono text-xs">
+                                  {it.code}
+                                  {it.voId != null && (
+                                    <span
+                                      title={`Phát sinh ${it.voCode ?? ""} — ${VO_STATUS_LABEL[it.voStatus ?? ""] ?? it.voStatus}`}
+                                      className="ml-1.5 inline-block px-1.5 py-0.5 rounded bg-violet-900/40 text-violet-300 text-[10px] font-sans align-middle"
+                                    >
+                                      VO
+                                    </span>
+                                  )}
+                                </td>
                                 <td className="p-3">{it.name}</td>
                                 <td className="p-3 hidden sm:table-cell text-zinc-300">
                                   {it.unit}

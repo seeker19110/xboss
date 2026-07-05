@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { query, run, todayISO, daysFromTodayISO } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/auth";
 import { costSummary, getCostSettings } from "@/lib/cost";
 import { poLateList, vehicleLateList } from "@/lib/procurement";
 import { missingDiaryDates } from "@/lib/diary";
 import { expiringContracts } from "@/lib/contracts";
+import { pendingVariations } from "@/lib/vo";
 
 export const dynamic = "force-dynamic";
 
@@ -234,6 +235,31 @@ export async function GET() {
         WHERE user_id = ? AND type = 'contract_expiry' AND is_read = 0 AND contract_id <> ALL(?)`,
       user.id,
       expiringIds,
+    );
+  }
+
+  // Phát sinh/VO đã trình quá hạn chưa được quyết định → nhắc Admin/PM (M6).
+  if (isAdminOrPm(user.role)) {
+    const pending = await pendingVariations();
+    if (pending.length > 0) {
+      const values = pending.map(() => `(?, ?, 'vo_pending', ?)`).join(", ");
+      const params = pending.flatMap((v) => [
+        user.id,
+        v.id,
+        `📝 Phát sinh ${v.code} — ${v.title} đã trình từ ${v.submittedAt}, chưa được quyết định`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, vo_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, type, vo_id) WHERE vo_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    const pendingIds = pending.map((v) => v.id);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'vo_pending' AND is_read = 0 AND vo_id <> ALL(?)`,
+      user.id,
+      pendingIds,
     );
   }
 

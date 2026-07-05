@@ -13,13 +13,22 @@ export type CostRow = {
 
 export type CostSettings = { warnPct: number; overPct: number };
 
-// Ngân sách theo hệ = Σ qty_contract × unit_price của boq_items thuộc hệ đó (M1).
-async function budgetBySystem(): Promise<Map<number, number>> {
+// Ngân sách theo hệ = Σ qty_contract × unit_price của boq_items gốc thuộc hệ đó (M1),
+// cộng thêm dòng KL phát sinh (VO — M6) đã duyệt (qty_approved × unit_price) khi
+// includeVo=true (mặc định — UI có toggle "Gồm VO").
+async function budgetBySystem(includeVo = true): Promise<Map<number, number>> {
   const rows = await query<{ disciplineId: number | null; budget: number }>(
-    `SELECT discipline_id AS "disciplineId", COALESCE(SUM(qty_contract * unit_price), 0) AS budget
-       FROM boq_items
-      WHERE discipline_id IS NOT NULL
-      GROUP BY discipline_id`,
+    `SELECT bi.discipline_id AS "disciplineId",
+            COALESCE(SUM(
+              CASE WHEN bi.vo_id IS NULL THEN bi.qty_contract * bi.unit_price
+                   ELSE COALESCE(bi.qty_approved, 0) * bi.unit_price END
+            ), 0) AS budget
+       FROM boq_items bi
+       LEFT JOIN variation_orders vo ON vo.id = bi.vo_id
+      WHERE bi.discipline_id IS NOT NULL
+        AND (bi.vo_id IS NULL OR (? AND vo.status IN ('approved','partially_approved','contract_added')))
+      GROUP BY bi.discipline_id`,
+    includeVo,
   );
   return new Map(rows.map((r) => [r.disciplineId as number, r.budget]));
 }
@@ -93,14 +102,17 @@ async function costByFloor(): Promise<CostRow[]> {
   }));
 }
 
-export async function costSummary(groupBy: "system" | "floor"): Promise<CostRow[]> {
+export async function costSummary(
+  groupBy: "system" | "floor",
+  includeVo = true,
+): Promise<CostRow[]> {
   if (groupBy === "floor") return costByFloor();
 
   const disciplines = await query<{ id: number; code: string; name: string }>(
     `SELECT id, code, name FROM disciplines ORDER BY id`,
   );
   const [budget, committed, actual] = await Promise.all([
-    budgetBySystem(),
+    budgetBySystem(includeVo),
     committedBySystem(),
     actualBySystem(),
   ]);
@@ -113,8 +125,10 @@ export async function costSummary(groupBy: "system" | "floor"): Promise<CostRow[
   }));
 }
 
-export async function costTotals(): Promise<{ budget: number; committed: number; actual: number }> {
-  const rows = await costSummary("system");
+export async function costTotals(
+  includeVo = true,
+): Promise<{ budget: number; committed: number; actual: number }> {
+  const rows = await costSummary("system", includeVo);
   return rows.reduce(
     (acc, r) => ({
       budget: acc.budget + r.budget,
@@ -126,11 +140,18 @@ export async function costTotals(): Promise<{ budget: number; committed: number;
 }
 
 // Ngân sách của 1 hệ (dùng cho khối `budget` trong getDisciplineSummary — lib/disciplines.ts).
-export async function disciplineBudget(disciplineId: number): Promise<number> {
+export async function disciplineBudget(disciplineId: number, includeVo = true): Promise<number> {
   const row = await queryOne<{ budget: number }>(
-    `SELECT COALESCE(SUM(qty_contract * unit_price), 0) AS budget
-       FROM boq_items WHERE discipline_id = ?`,
+    `SELECT COALESCE(SUM(
+              CASE WHEN bi.vo_id IS NULL THEN bi.qty_contract * bi.unit_price
+                   ELSE COALESCE(bi.qty_approved, 0) * bi.unit_price END
+            ), 0) AS budget
+       FROM boq_items bi
+       LEFT JOIN variation_orders vo ON vo.id = bi.vo_id
+      WHERE bi.discipline_id = ?
+        AND (bi.vo_id IS NULL OR (? AND vo.status IN ('approved','partially_approved','contract_added')))`,
     disciplineId,
+    includeVo,
   );
   return row?.budget ?? 0;
 }
