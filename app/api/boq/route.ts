@@ -20,6 +20,10 @@ type BoqRow = {
   subUnitPrice: number;
   note: string | null;
   sortOrder: number;
+  voId: number | null;
+  voCode: string | null;
+  voStatus: string | null;
+  qtyApproved: number | null;
   map: {
     taskId: number;
     taskCode: string;
@@ -29,13 +33,24 @@ type BoqRow = {
   }[];
 };
 
-// GET /api/boq?discipline=<code> — danh sách dòng BOQ + tổng hợp KL 3 lớp
-// (nhận thầu / giao thầu / thực hiện). KL thực hiện tính động từ boq_task_map.
+// Trạng thái VO tính vào ngân sách/KL nhận thầu (đồng bộ lib/cost.ts + lib/vo.ts).
+const VO_APPROVED_STATUSES = new Set(["approved", "partially_approved", "contract_added"]);
+
+// GET /api/boq?discipline=<code>&includeVo=0 — danh sách dòng BOQ + tổng hợp KL 3
+// lớp (nhận thầu / giao thầu / thực hiện). KL thực hiện tính động từ boq_task_map.
+// includeVo mặc định true: hiện cả dòng phát sinh (VO, M6, badge "VO" ở UI) — dòng
+// VO chưa duyệt vẫn hiện để theo dõi nhưng không cộng vào contractValue.
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
   const discipline = req.nextUrl.searchParams.get("discipline")?.trim() || null;
+  const includeVo = req.nextUrl.searchParams.get("includeVo") !== "0";
+
+  const conds = [];
+  if (discipline) conds.push("d.code = ?");
+  if (!includeVo) conds.push("bi.vo_id IS NULL");
+  const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
 
   const rows = await query<BoqRow>(
     `SELECT bi.id, bi.code, bi.name, bi.unit,
@@ -44,6 +59,8 @@ export async function GET(req: NextRequest) {
             bi.qty_contract AS "qtyContract", bi.unit_price AS "unitPrice",
             bi.qty_sub AS "qtySub", bi.sub_unit_price AS "subUnitPrice",
             bi.note, bi.sort_order AS "sortOrder",
+            bi.vo_id AS "voId", vo.code AS "voCode", vo.status AS "voStatus",
+            bi.qty_approved AS "qtyApproved",
             COALESCE(
               json_agg(
                 json_build_object(
@@ -55,10 +72,11 @@ export async function GET(req: NextRequest) {
             ) AS map
        FROM boq_items bi
        LEFT JOIN disciplines d ON d.id = bi.discipline_id
+       LEFT JOIN variation_orders vo ON vo.id = bi.vo_id
        LEFT JOIN boq_task_map m ON m.boq_item_id = bi.id
        LEFT JOIN tasks t ON t.id = m.task_id
-      ${discipline ? "WHERE d.code = ?" : ""}
-      GROUP BY bi.id, d.code, d.name, d.color
+      ${where}
+      GROUP BY bi.id, d.code, d.name, d.color, vo.code, vo.status
       ORDER BY bi.sort_order, bi.id`,
     ...(discipline ? [discipline] : []),
   );
@@ -72,7 +90,11 @@ export async function GET(req: NextRequest) {
       0,
     );
     const executedQty = Number(r.qtyContract) * executedFraction;
-    contractValue += Number(r.qtyContract) * Number(r.unitPrice);
+    const isVo = r.voId != null;
+    const countsTowardBudget =
+      !isVo || (r.voStatus != null && VO_APPROVED_STATUSES.has(r.voStatus));
+    const budgetQty = isVo ? Number(r.qtyApproved ?? 0) : Number(r.qtyContract);
+    if (countsTowardBudget) contractValue += budgetQty * Number(r.unitPrice);
     subValue += Number(r.qtySub) * Number(r.subUnitPrice);
     executedValue += executedQty * Number(r.unitPrice);
     return { ...r, executedQty };

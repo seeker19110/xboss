@@ -1,0 +1,116 @@
+import { NextRequest, NextResponse } from "next/server";
+import { query, queryOne, run, withTransaction } from "@/lib/db";
+import { getCurrentUser, CAN } from "@/lib/auth";
+import { todayISO } from "@/lib/date";
+
+export const dynamic = "force-dynamic";
+
+type Decision = "approved" | "partially_approved" | "rejected";
+const DECISIONS: Decision[] = ["approved", "partially_approved", "rejected"];
+
+// POST /api/variations/:id/decide — CĐT/TVGS quyết định (Admin/PM, CAN.approve).
+// body: { decision: 'approved'|'partially_approved'|'rejected', lines?: [{ id, qtyApproved }] }
+// - approved: duyệt toàn bộ, qty_approved = qty_contract mọi dòng.
+// - partially_approved: bắt nhập qty_approved từng dòng qua `lines` (0 ≤ qty ≤ đề xuất).
+// - rejected: không duyệt dòng nào (qty_approved giữ NULL).
+export async function POST(
+  req: NextRequest,
+  { params: paramsP }: { params: Promise<{ id: string }> },
+) {
+  const params = await paramsP;
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (!CAN.approve(user.role))
+    return NextResponse.json({ error: "Chỉ Admin/PM được duyệt phát sinh" }, { status: 403 });
+
+  const id = parseInt(params.id);
+  if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  const body = await req.json().catch(() => null);
+  const decision = body?.decision as Decision;
+  if (!DECISIONS.includes(decision))
+    return NextResponse.json(
+      { error: "decision phải là approved/partially_approved/rejected" },
+      { status: 422 },
+    );
+
+  const lineInputs: { id: number; qtyApproved: number }[] = Array.isArray(body?.lines)
+    ? body.lines.map((l: Record<string, unknown>) => ({
+        id: Number(l?.id),
+        qtyApproved: Number(l?.qtyApproved),
+      }))
+    : [];
+
+  try {
+    await withTransaction(async () => {
+      const vo = await queryOne<{ status: string }>(
+        `SELECT status FROM variation_orders WHERE id = ? FOR UPDATE`,
+        id,
+      );
+      if (!vo) throw Object.assign(new Error("Không tìm thấy phát sinh"), { status: 404 });
+      if (vo.status !== "submitted")
+        throw Object.assign(
+          new Error("Chỉ quyết định được phát sinh đã trình (đã được trình CĐT)"),
+          {
+            status: 409,
+          },
+        );
+
+      const lines = await query<{ id: number; qtyContract: number }>(
+        `SELECT id, qty_contract AS "qtyContract" FROM boq_items WHERE vo_id = ? FOR UPDATE`,
+        id,
+      );
+      if (lines.length === 0)
+        throw Object.assign(new Error("Phát sinh không có dòng khối lượng nào"), { status: 409 });
+
+      if (decision === "rejected") {
+        await run(
+          `UPDATE variation_orders SET status = 'rejected', decided_at = ? WHERE id = ?`,
+          todayISO(),
+          id,
+        );
+        return;
+      }
+
+      if (decision === "approved") {
+        await run(`UPDATE boq_items SET qty_approved = qty_contract WHERE vo_id = ?`, id);
+      } else {
+        // partially_approved: bắt buộc gửi đủ qty_approved cho từng dòng, 0 ≤ qty ≤ đề xuất.
+        const byId = new Map(lineInputs.map((l) => [l.id, l.qtyApproved]));
+        for (const line of lines) {
+          const qty = byId.get(line.id);
+          if (qty == null || !Number.isFinite(qty))
+            throw Object.assign(new Error(`Thiếu khối lượng duyệt cho dòng #${line.id}`), {
+              status: 422,
+            });
+          if (qty < 0 || qty > Number(line.qtyContract))
+            throw Object.assign(
+              new Error(
+                `Khối lượng duyệt dòng #${line.id} phải trong khoảng 0–${line.qtyContract}`,
+              ),
+              { status: 422 },
+            );
+        }
+        for (const line of lines) {
+          await run(
+            `UPDATE boq_items SET qty_approved = ? WHERE id = ?`,
+            byId.get(line.id),
+            line.id,
+          );
+        }
+      }
+
+      await run(
+        `UPDATE variation_orders SET status = ?, decided_at = ? WHERE id = ?`,
+        decision,
+        todayISO(),
+        id,
+      );
+    });
+  } catch (err: unknown) {
+    const e = err as { message?: string; status?: number };
+    return NextResponse.json({ error: e.message ?? String(err) }, { status: e.status ?? 500 });
+  }
+
+  return NextResponse.json({ decided: id, decision });
+}

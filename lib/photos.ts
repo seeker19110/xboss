@@ -40,6 +40,10 @@ export function newFloorDocFileName(floorApprovalId: number, mime: string): stri
   return `fa${floorApprovalId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime]}`;
 }
 
+export function newVoDocFileName(voId: number, mime: string): string {
+  return `vo${voId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime]}`;
+}
+
 export function ensureUploadDir(): string {
   if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
   return UPLOAD_DIR;

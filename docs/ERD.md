@@ -316,6 +316,30 @@ Liên kết mềm (nullable, backfill dần): `floor_contracts.contract_id`, `pa
 
 ---
 
+## Phát sinh / VO (M6, `migrations/0013_vo.sql`)
+
+### `variation_orders`
+
+| Cột                      | Kiểu                                                                              |
+| ------------------------ | --------------------------------------------------------------------------------- |
+| code                     | TEXT UNIQUE (`VO-0001`, sinh tự động)                                             |
+| reason                   | TEXT (`design_change\|client_request\|site_condition\|other`)                     |
+| discipline_id            | FK → disciplines (áp cho mọi dòng KL con)                                         |
+| contract_id              | FK → contracts (HĐ nhận phụ lục khi chốt — nullable, gán lúc `contract-add`)      |
+| status                   | TEXT (`draft\|submitted\|approved\|partially_approved\|rejected\|contract_added`) |
+| submitted_at, decided_at | DATE                                                                              |
+| created_by               | FK → users                                                                        |
+
+`boq_items` thêm `vo_id` (FK → variation_orders, ON DELETE CASCADE) + `qty_approved` — dòng KL của VO dùng chung bảng BOQ (`qty_contract` = KL đề xuất). Ngân sách/KL nhận thầu (`lib/boq.ts`, `lib/cost.ts`) = dòng gốc (`vo_id IS NULL`) + dòng VO có status `approved|partially_approved|contract_added` (lấy `qty_approved`) — tham số `includeVo` (mặc định true).
+
+### `vo_documents`
+
+Pattern `contract_documents`/`task_documents` — file trong `data/uploads/`.
+
+Khi VO chốt vào phụ lục HĐ (`POST /api/variations/:id/contract-add`, trạng thái `approved`/`partially_approved`): sinh 1 dòng `contract_addenda` (value_delta = approvedValue của VO) + chuyển VO sang `contract_added` + gán `contract_id`.
+
+---
+
 ## Baseline & S-curve
 
 ### `baselines` + `baseline_tasks`

@@ -23,6 +23,7 @@ import {
   Upload,
   NotebookPen,
   FileSignature,
+  FilePlus2,
 } from "lucide-react";
 import type { Role } from "@/lib/roles";
 
@@ -80,6 +81,12 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Hợp đồng",
         icon: FileSignature,
         roles: ["admin", "pm", "bch"],
+      },
+      {
+        href: "/variations",
+        label: "Phát sinh",
+        icon: FilePlus2,
+        roles: ["admin", "pm", "engineer", "bch"],
       },
     ],
   },
