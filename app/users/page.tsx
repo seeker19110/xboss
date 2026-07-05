@@ -169,6 +169,7 @@ export default function UsersPage() {
               className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600"
             />
             <select
+              aria-label="Vai trò tài khoản mới"
               value={form.role}
               onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
               className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none"
@@ -182,7 +183,7 @@ export default function UsersPage() {
             <button
               onClick={createUser}
               disabled={busy || !form.name || !form.email || !form.password}
-              className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-zinc-800 disabled:text-zinc-500 rounded-lg px-3 py-2 text-sm font-medium transition"
+              className="bg-emerald-700 hover:bg-emerald-800 disabled:bg-zinc-800 disabled:text-zinc-500 rounded-lg px-3 py-2 text-sm font-medium transition"
             >
               {busy ? "Đang tạo..." : "Tạo"}
             </button>
@@ -215,6 +216,7 @@ export default function UsersPage() {
                   <td className="p-3 text-zinc-400">{u.email}</td>
                   <td className="p-3">
                     <select
+                      aria-label={`Vai trò của ${u.name}`}
                       value={u.role}
                       onChange={(e) => changeRole(u, e.target.value)}
                       className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs outline-none"
@@ -249,9 +251,9 @@ export default function UsersPage() {
           </table>
         </div>
 
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs text-zinc-400">
           Không thể xoá / hạ cấp Admin cuối cùng. Người dùng tự đổi mật khẩu tại{" "}
-          <a href="/password" className="text-emerald-400 hover:underline">
+          <a href="/password" className="text-emerald-400 underline">
             /password
           </a>
           .
