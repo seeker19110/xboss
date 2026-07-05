@@ -10,10 +10,11 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
   try {
-  const [stockSummary, overBudget, lowStock, warehouseAge, noTaskIssues, needsStock] = await Promise.all([
-    // 1. Tổng quan kho theo hệ
-    query(
-      `SELECT st.code AS "sheetCode", st.name AS "sheetName",
+    const [stockSummary, overBudget, lowStock, warehouseAge, noTaskIssues, needsStock, byFloor] =
+      await Promise.all([
+        // 1. Tổng quan kho theo hệ
+        query(
+          `SELECT st.code AS "sheetCode", st.name AS "sheetName",
               COUNT(m.id) AS "totalItems",
               SUM(m.qty_planned) AS "totalPlanned",
               SUM(m.qty_used) AS "totalUsed",
@@ -23,11 +24,12 @@ export async function GET() {
          FROM materials m
          LEFT JOIN sheet_types st ON m.sheet_type_id = st.id
         GROUP BY st.id, st.code, st.name
-        ORDER BY st.code`),
+        ORDER BY st.code`,
+        ),
 
-    // 2. Vật tư vượt định mức (hao hụt)
-    query(
-      `SELECT m.id, m.name, m.boq_code AS "boqCode", m.unit,
+        // 2. Vật tư vượt định mức (hao hụt)
+        query(
+          `SELECT m.id, m.name, m.boq_code AS "boqCode", m.unit,
               m.qty_planned AS "qtyPlanned", m.qty_used AS "qtyUsed",
               m.qty_used - m.qty_planned AS "overage",
               CASE WHEN m.qty_planned > 0 THEN ROUND(((m.qty_used - m.qty_planned) * 100.0 / m.qty_planned)::numeric, 1) ELSE 0 END AS "overPct",
@@ -36,11 +38,12 @@ export async function GET() {
          LEFT JOIN sheet_types st ON m.sheet_type_id = st.id
         WHERE m.qty_used > m.qty_planned AND m.qty_planned > 0
         ORDER BY (m.qty_used - m.qty_planned) DESC
-        LIMIT 50`),
+        LIMIT 50`,
+        ),
 
-    // 3. Vật tư tồn kho dưới mức tối thiểu
-    query(
-      `SELECT m.id, m.name, m.boq_code AS "boqCode", m.unit,
+        // 3. Vật tư tồn kho dưới mức tối thiểu
+        query(
+          `SELECT m.id, m.name, m.boq_code AS "boqCode", m.unit,
               COALESCE(m.qty_stock, 0) AS "qtyStock",
               m.min_stock_level AS "minStockLevel",
               m.qty_planned AS "qtyPlanned",
@@ -48,11 +51,12 @@ export async function GET() {
          FROM materials m
          LEFT JOIN sheet_types st ON m.sheet_type_id = st.id
         WHERE m.min_stock_level > 0 AND COALESCE(m.qty_stock, 0) < m.min_stock_level
-        ORDER BY (COALESCE(m.qty_stock, 0) - m.min_stock_level)`),
+        ORDER BY (COALESCE(m.qty_stock, 0) - m.min_stock_level)`,
+        ),
 
-    // 4. Vật tư tồn kho lâu (nhập > 30 ngày, tồn > 0)
-    query(
-      `SELECT m.id, m.name, m.boq_code AS "boqCode", m.unit,
+        // 4. Vật tư tồn kho lâu (nhập > 30 ngày, tồn > 0)
+        query(
+          `SELECT m.id, m.name, m.boq_code AS "boqCode", m.unit,
               COALESCE(m.qty_stock, 0) AS "qtyStock",
               MIN(t.created_at) AS "firstReceived",
               EXTRACT(DAY FROM NOW() - MIN(t.created_at)) AS "daysInStock",
@@ -65,11 +69,12 @@ export async function GET() {
        HAVING MIN(t.created_at) IS NOT NULL
           AND EXTRACT(DAY FROM NOW() - MIN(t.created_at)) > 30
         ORDER BY EXTRACT(DAY FROM NOW() - MIN(t.created_at)) DESC
-        LIMIT 30`),
+        LIMIT 30`,
+        ),
 
-    // 5. Xuất kho không gắn task (cần điều tra)
-    query(
-      `SELECT m.id AS "materialId", m.name AS "materialName",
+        // 5. Xuất kho không gắn task (cần điều tra)
+        query(
+          `SELECT m.id AS "materialId", m.name AS "materialName",
               t.id AS "txId", t.delta, t.created_at AS "createdAt",
               u.name AS "createdByName", t.note
          FROM material_transactions t
@@ -77,11 +82,12 @@ export async function GET() {
          LEFT JOIN users u ON t.created_by = u.id
         WHERE t.type = 'xuat_cong_truong' AND t.task_id IS NULL
         ORDER BY t.created_at DESC
-        LIMIT 30`),
+        LIMIT 30`,
+        ),
 
-    // 6. Vật tư cần nhập trước 1 tháng: có hạng mục sắp thi công mà kho chưa đủ
-    query(
-      `SELECT m.id, m.name, m.boq_code AS "boqCode", m.unit,
+        // 6. Vật tư cần nhập trước 1 tháng: có hạng mục sắp thi công mà kho chưa đủ
+        query(
+          `SELECT m.id, m.name, m.boq_code AS "boqCode", m.unit,
               m.qty_planned AS "qtyPlanned",
               COALESCE(m.qty_stock, 0) AS "qtyStock",
               m.qty_used AS "qtyUsed",
@@ -100,12 +106,41 @@ export async function GET() {
           AND tk.status NOT IN ('hoan_thanh', 'nghiem_thu')
         GROUP BY m.id, m.name, m.boq_code, m.unit, m.qty_planned, m.qty_stock, m.qty_used, st.code, st.name
         ORDER BY MIN(tk.start_date), GREATEST(0, m.qty_planned - m.qty_used - COALESCE(m.qty_stock, 0)) DESC
-        LIMIT 100`),
-  ]);
+        LIMIT 100`,
+        ),
 
-  return NextResponse.json({ stockSummary, overBudget, lowStock, warehouseAge, noTaskIssues, needsStock });
+        // 7. Tiêu hao theo tầng (M4): Σ xuất kho ra công trường theo vật tư × tầng.
+        // Số lượng xuất = trị tuyệt đối delta của loại 'xuat_cong_truong' (route /issue ghi delta ÂM
+        // vì đó là giảm tồn kho) HOẶC delta dương của điều chỉnh thủ công (route /transactions,
+        // nút "+" nghĩa là dùng thêm) — 2 route ghi cùng bảng nhưng ngược dấu, xem lib này.
+        // Chưa đối chiếu KL thi công theo tầng (cần nối boq_task_map ↔ work_packages.floor_label
+        // của M1 — để đợt sau, xem PROGRESS.md).
+        query(
+          `SELECT m.id AS "materialId", m.name AS "materialName", m.unit,
+              m.boq_code AS "boqCode", st.code AS "sheetCode",
+              t.floor_label AS "floorLabel",
+              SUM(CASE WHEN t.type = 'xuat_cong_truong' THEN -t.delta ELSE GREATEST(t.delta, 0) END) AS "qtyIssued"
+         FROM material_transactions t
+         JOIN materials m ON m.id = t.material_id
+         LEFT JOIN sheet_types st ON m.sheet_type_id = st.id
+        WHERE t.floor_label IS NOT NULL
+        GROUP BY m.id, m.name, m.unit, m.boq_code, st.code, t.floor_label
+       HAVING SUM(CASE WHEN t.type = 'xuat_cong_truong' THEN -t.delta ELSE GREATEST(t.delta, 0) END) > 0
+        ORDER BY m.name, t.floor_label`,
+        ),
+      ]);
+
+    return NextResponse.json({
+      stockSummary,
+      overBudget,
+      lowStock,
+      warehouseAge,
+      noTaskIssues,
+      needsStock,
+      byFloor,
+    });
   } catch (e) {
-    console.error('[reports]', e);
+    console.error("[reports]", e);
     return NextResponse.json({ error: "Lỗi máy chủ khi tổng hợp báo cáo vật tư" }, { status: 500 });
   }
 }

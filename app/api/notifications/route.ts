@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { query, run, todayISO, daysFromTodayISO } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { costSummary, getCostSettings } from "@/lib/cost";
+import { poLateList, vehicleLateList } from "@/lib/procurement";
 
 export const dynamic = "force-dynamic";
 
@@ -248,6 +249,54 @@ export async function GET() {
              WHERE n.status <> 'closed' AND n.due_date IS NOT NULL AND n.due_date < ?${assignedFilter})`,
       user.id,
       ...ncrParams,
+    );
+  }
+
+  // PO trễ giao (quá expected_date, chưa đủ hàng) → cảnh báo người quản lý mua sắm (Admin/PM).
+  if (user.role === "admin" || user.role === "pm") {
+    const latePos = await poLateList();
+    if (latePos.length > 0) {
+      const values = latePos.map(() => `(?, ?, 'po_late', ?)`).join(", ");
+      const params = latePos.flatMap((po) => [
+        user.id,
+        po.id,
+        `🚚 PO ${po.poCode}${po.supplierName ? ` (${po.supplierName})` : ""} trễ giao — dự kiến ${po.expectedDate}`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, po_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, po_id, type) WHERE po_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    const lateIds = latePos.map((po) => po.id);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'po_late' AND is_read = 0 AND po_id <> ALL(?)`,
+      user.id,
+      lateIds,
+    );
+
+    // Xe NCC quá giờ dự kiến ≥2h chưa vào cổng → cảnh báo Admin/PM.
+    const lateVehicles = await vehicleLateList();
+    if (lateVehicles.length > 0) {
+      const values = lateVehicles.map(() => `(?, ?, 'vehicle_late', ?)`).join(", ");
+      const params = lateVehicles.flatMap((v) => [
+        user.id,
+        v.id,
+        `🚛 Xe ${v.plate}${v.supplierName ? ` (${v.supplierName})` : ""} quá giờ dự kiến ${new Date(v.expectedAt).toLocaleString("vi-VN")} chưa vào cổng`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, vehicle_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, vehicle_id, type) WHERE vehicle_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    const lateVehicleIds = lateVehicles.map((v) => v.id);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'vehicle_late' AND is_read = 0 AND vehicle_id <> ALL(?)`,
+      user.id,
+      lateVehicleIds,
     );
   }
 

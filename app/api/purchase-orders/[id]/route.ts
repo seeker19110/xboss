@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne, run } from "@/lib/db";
+import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
+import { PO_ALL_STATUSES, isValidPoTransition, logPoStatusChange } from "@/lib/procurement";
 
 export const dynamic = "force-dynamic";
 
 const canManage = (r?: Role) => r === "admin" || r === "pm";
 
-// GET /api/purchase-orders/:id → chi tiết PO + danh sách items
+// GET /api/purchase-orders/:id → chi tiết PO + danh sách items + lịch sử đổi trạng thái
 export async function GET(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -45,7 +46,17 @@ export async function GET(
     id,
   );
 
-  return NextResponse.json({ po, items });
+  const history = await query(
+    `SELECT h.from_status AS "fromStatus", h.to_status AS "toStatus",
+            h.changed_at AS "changedAt", u.name AS "changedByName"
+       FROM po_status_history h
+       LEFT JOIN users u ON u.id = h.changed_by
+      WHERE h.po_id = ?
+      ORDER BY h.changed_at`,
+    id,
+  );
+
+  return NextResponse.json({ po, items, history });
 }
 
 // PATCH /api/purchase-orders/:id  body: { status?, supplierId?, expectedDate?, note? }
@@ -69,9 +80,15 @@ export async function PATCH(
   if (!po) return NextResponse.json({ error: "Không tìm thấy đơn hàng" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
-  const VALID_STATUSES = ["draft", "confirmed", "partial", "received", "cancelled"];
-  if (body.status && !VALID_STATUSES.includes(body.status))
+  if (body.status && !PO_ALL_STATUSES.includes(body.status))
     return NextResponse.json({ error: "Trạng thái không hợp lệ" }, { status: 400 });
+  // Đổi trạng thái thủ công phải theo đúng thứ tự (không nhảy cóc) — "partial"/"received"
+  // do route /receive tự set theo số lượng nhận, không đi qua đây.
+  if (body.status && body.status !== po.status && !isValidPoTransition(po.status, body.status))
+    return NextResponse.json(
+      { error: `Không thể chuyển từ "${po.status}" sang "${body.status}"` },
+      { status: 409 },
+    );
   // Ngày phải đúng dạng YYYY-MM-DD — chuỗi sai để Postgres từ chối sẽ thành lỗi 500.
   if (body.expectedDate && !/^\d{4}-\d{2}-\d{2}$/.test(String(body.expectedDate)))
     return NextResponse.json({ error: "Ngày dự kiến phải có dạng YYYY-MM-DD" }, { status: 422 });
@@ -93,7 +110,11 @@ export async function PATCH(
   if (!sets.length)
     return NextResponse.json({ error: "Không có trường cập nhật" }, { status: 400 });
   vals.push(id);
-  await run(`UPDATE purchase_orders SET ${sets.join(", ")} WHERE id = ?`, ...vals);
+  await withTransaction(async () => {
+    await run(`UPDATE purchase_orders SET ${sets.join(", ")} WHERE id = ?`, ...vals);
+    if (body.status && body.status !== po.status)
+      await logPoStatusChange(id, po.status, body.status, user.id);
+  });
   return NextResponse.json({ ok: true });
 }
 

@@ -15,6 +15,7 @@ import {
   Calculator,
   Package,
   Truck,
+  CarFront,
   Wallet,
   Coins,
   Users,
@@ -63,6 +64,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/materials", label: "Vật tư", icon: Package },
       { href: "/materials/purchase-orders", label: "Đơn đặt hàng", icon: Truck },
+      { href: "/vehicles", label: "Xe ra vào", icon: CarFront },
     ],
   },
   {
