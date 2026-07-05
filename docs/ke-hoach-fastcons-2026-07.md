@@ -158,7 +158,7 @@ Mỗi phiên nhận lệnh **"triển khai M<xx>"** (hoặc "triển khai M<xx> 
 | Q3       | Sửa `st.deadline` /api/export/pdf                   | Q    | Thấp (1 PR)       | nợ kỹ thuật `PROGRESS.md`     | ✅                                                                          |
 | M16      | Sổ hợp đồng + cảnh báo hiệu lực                     | A    | Trung bình        | `M16-hop-dong.md` ✅          | ✅ **đã xong** (3/3 PR)                                                     |
 | M6       | Phát sinh / VO                                      | A    | Trung bình        | `M06-phat-sinh-vo.md` ✅      | ✅ **đã xong** (schema/API/tích hợp ngân sách + UI + tài liệu/notification) |
-| M17      | Thanh toán KL theo đợt (IPC) + cảnh báo vượt GTHĐ   | A    | Cao               | `M17-thanh-toan-kl.md` ✅     | ✅                                                                          |
+| M17      | Thanh toán KL theo đợt (IPC) + cảnh báo vượt GTHĐ   | A    | Cao               | `M17-thanh-toan-kl.md` ✅     | ✅ **đã xong** (schema/API/PDF+Excel/UI/notification)                       |
 | M9       | Dashboard mở rộng (cash flow, CPI, health)          | A    | Thấp-TB           | `M09-dashboard.md` ✅         | ✅                                                                          |
 | M7       | Đấu thầu / so sánh báo giá                          | A*   | Trung bình        | `M07-dau-thau.md` ✅          | ✅ (cuối nhóm A, tuỳ chọn theo nhu cầu gói thầu còn mở)                     |
 | M8       | Bản vẽ BIM/Shop + biện pháp thi công                | B    | TB-Cao            | `M08-ban-ve.md` ✅            | ✅                                                                          |
