@@ -22,6 +22,13 @@
 | `M11-hse.md` | HSE / an toàn | 4 |
 | `M12-thiet-bi.md` | Thiết bị/máy móc | 4 |
 | `M13-hop-rui-ro.md` | Biên bản họp + sổ rủi ro | 4 |
+| `M16-hop-dong.md` | Sổ hợp đồng (nhận thầu/giao thầu/NCC) | A (FastCons) |
+| `M17-thanh-toan-kl.md` | Nghiệm thu khối lượng & thanh toán theo đợt (IPC) | A (FastCons) |
+| `M18-dinh-muc.md` | Định mức vật tư/nhân công/máy theo hạng mục | C (FastCons) |
+| `M19-de-xuat-phe-duyet.md` | Đề xuất & phê duyệt online tổng quát | D (FastCons) |
+| `M20-kho-ho-so.md` | Kho hồ sơ dự án (Drive) | B (FastCons) |
+
+> M16–M20 là module bổ sung từ đối chiếu brochure FastCons — xem `docs/ke-hoach-fastcons-2026-07.md` (nhóm A/B/C/D thay cho số đợt 1–4 cũ).
 
 ## Quy ước chung (áp cho MỌI module — không lặp lại trong từng file)
 

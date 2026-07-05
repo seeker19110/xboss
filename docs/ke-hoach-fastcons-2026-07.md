@@ -65,7 +65,7 @@ Ký hiệu: ✅ đã có tương đương · 🟡 một phần · 📋 đã có 
 
 ## 2. Module mới đề xuất (M16–M22)
 
-Phác thảo đủ để duyệt; **đặc tả chi tiết** (schema DDL, API, UI, chia PR) sẽ viết vào `docs/nang-cap/M<xx>-*.md` ngay đầu phiên triển khai module đó (bước 1 của quy trình §4).
+**Cập nhật 2026-07-05: đặc tả chi tiết đầy đủ cho M16–M20 đã viết** (`docs/nang-cap/M16-hop-dong.md` … `M20-kho-ho-so.md`, cùng khung schema DDL/API/UI/chia PR/điểm cần quyết như M00–M15) — phiên triển khai không cần viết lại, chỉ đọc và code theo. M21/M22 (nhóm E, hoãn/không làm) chưa viết đặc tả — chỉ viết khi có lệnh kích hoạt riêng.
 
 ### M16 — Sổ hợp đồng (nhận thầu / giao thầu / NCC)
 - Bảng `contracts` (số HĐ, loại: `nhan_thau|giao_thau|ncc`, đối tác — FK `suppliers` hoặc text CĐT, giá trị, ngày ký, hiệu lực từ/đến, % tạm ứng, % giữ lại bảo hành, trạng thái, file đính kèm theo pattern `task_documents`) + phụ lục (`contract_addenda`, VO duyệt xong nối vào đây).
@@ -140,29 +140,33 @@ Mỗi phiên nhận lệnh **"triển khai M<xx>"** (hoặc "triển khai M<xx> 
 5. **Verify thật** trước khi push (bài học M3/M4/M5): dựng Postgres cục bộ + seed + thao tác qua UI/API thật (Playwright), axe desktop+mobile cho trang mới; lint/typecheck/test/build xanh.
 6. **Kết phiên**: cập nhật `PROGRESS.md` (mục module) + `docs/ERD.md` nếu đổi schema + đánh dấu bảng §5 dưới đây; push nhánh + PR draft.
 
-## 5. Bảng duyệt (người dùng đánh dấu — chưa duyệt = chưa làm)
+## 5. Bảng duyệt
 
-| Hạng mục | Nội dung | Nhóm | Phức tạp | Đặc tả | Duyệt? |
+> **Đã duyệt toàn bộ 2026-07-05** (người dùng: "duyệt tất cả theo Claude kiến nghị"). Nghĩa là: nhóm A/B/C/D được duyệt triển khai theo thứ tự khuyến nghị; nhóm E (M21/M22 + CRM/HRM/Map) được duyệt **giữ nguyên khuyến nghị hoãn/không làm** — không tự triển khai trừ khi có lệnh riêng sau này khi nhu cầu thật xuất hiện. Đặc tả M16–M20 đã viết đủ (2026-07-05) theo khung `docs/nang-cap/README.md`.
+
+| Hạng mục | Nội dung | Nhóm | Phức tạp | Đặc tả | Duyệt |
 |---|---|---|---|---|---|
-| Q1 | Vật tư giao dịch "hoàn" | Q | Thấp (1 PR) | không cần | ☐ |
-| Q2 | Import Excel BOQ (PR 3 M1 — cần file dự toán) | Q | Trung bình (1 PR) | `M01-boq.md` ✅ | ☐ |
-| Q3 | Sửa `st.deadline` /api/export/pdf | Q | Thấp (1 PR) | nợ kỹ thuật `PROGRESS.md` | ☐ |
-| M16 | Sổ hợp đồng + cảnh báo hiệu lực | A | Trung bình | chưa — viết đầu phiên | ☐ |
-| M6 | Phát sinh / VO | A | Trung bình | `M06-phat-sinh-vo.md` ✅ | ☐ |
-| M17 | Thanh toán KL theo đợt (IPC) + cảnh báo vượt GTHĐ | A | Cao | chưa — viết đầu phiên | ☐ |
-| M9 | Dashboard mở rộng (cash flow, CPI, health) | A | Thấp-TB | `M09-dashboard.md` ✅ | ☐ |
-| M7 | Đấu thầu / so sánh báo giá | A* | Trung bình | `M07-dau-thau.md` ✅ | ☐ |
-| M8 | Bản vẽ BIM/Shop + biện pháp thi công | B | TB-Cao | `M08-ban-ve.md` ✅ | ☐ |
-| M10 | RFI / công văn | B | Thấp-TB | `M10-rfi-cong-van.md` ✅ | ☐ |
-| M20 | Kho hồ sơ dự án (Drive) | B | Thấp-TB | chưa — viết đầu phiên | ☐ |
-| M14 | Mặt bằng thi công (work front) | C | Trung bình | `M14-mat-bang.md` ✅ | ☐ |
-| M12 | Thiết bị / máy thi công | C | Thấp-TB | `M12-thiet-bi.md` ✅ | ☐ |
-| M18 | Định mức vật tư/nhân công/máy theo hạng mục | C | Trung bình | chưa — viết đầu phiên | ☐ |
-| M11 | HSE / an toàn | C | Trung bình | `M11-hse.md` ✅ | ☐ |
-| M13 | Biên bản họp + sổ rủi ro | D | Trung bình | `M13-hop-rui-ro.md` ✅ | ☐ |
-| M19 | Đề xuất & phê duyệt tổng quát | D | Trung bình | chưa — viết đầu phiên | ☐ |
-| M21 | Bảo hành công trình | E | Thấp-TB | chưa | ☐ (khuyến nghị: để sau) |
-| M22 | Điểm danh công trường GPS | E | Trung bình | chưa | ☐ (khuyến nghị: không) |
-| — | CRM bán hàng, HRM/lương, thu chi nội bộ, Map | E | — | — | ☐ (khuyến nghị: không — ngoài phạm vi) |
+| Q1 | Vật tư giao dịch "hoàn" | Q | Thấp (1 PR) | không cần | ✅ |
+| Q2 | Import Excel BOQ (PR 3 M1 — cần file dự toán) | Q | Trung bình (1 PR) | `M01-boq.md` ✅ | ✅ (chờ file dự toán thật) |
+| Q3 | Sửa `st.deadline` /api/export/pdf | Q | Thấp (1 PR) | nợ kỹ thuật `PROGRESS.md` | ✅ |
+| M16 | Sổ hợp đồng + cảnh báo hiệu lực | A | Trung bình | `M16-hop-dong.md` ✅ | ✅ (PR 1 đang code) |
+| M6 | Phát sinh / VO | A | Trung bình | `M06-phat-sinh-vo.md` ✅ | ✅ |
+| M17 | Thanh toán KL theo đợt (IPC) + cảnh báo vượt GTHĐ | A | Cao | `M17-thanh-toan-kl.md` ✅ | ✅ |
+| M9 | Dashboard mở rộng (cash flow, CPI, health) | A | Thấp-TB | `M09-dashboard.md` ✅ | ✅ |
+| M7 | Đấu thầu / so sánh báo giá | A* | Trung bình | `M07-dau-thau.md` ✅ | ✅ (cuối nhóm A, tuỳ chọn theo nhu cầu gói thầu còn mở) |
+| M8 | Bản vẽ BIM/Shop + biện pháp thi công | B | TB-Cao | `M08-ban-ve.md` ✅ | ✅ |
+| M10 | RFI / công văn | B | Thấp-TB | `M10-rfi-cong-van.md` ✅ | ✅ |
+| M20 | Kho hồ sơ dự án (Drive) | B | Thấp-TB | `M20-kho-ho-so.md` ✅ | ✅ |
+| M14 | Mặt bằng thi công (work front) | C | Trung bình | `M14-mat-bang.md` ✅ | ✅ |
+| M12 | Thiết bị / máy thi công | C | Thấp-TB | `M12-thiet-bi.md` ✅ | ✅ |
+| M18 | Định mức vật tư/nhân công/máy theo hạng mục | C | Trung bình | `M18-dinh-muc.md` ✅ | ✅ |
+| M11 | HSE / an toàn | C | Trung bình | `M11-hse.md` ✅ | ✅ |
+| M13 | Biên bản họp + sổ rủi ro | D | Trung bình | `M13-hop-rui-ro.md` ✅ | ✅ |
+| M19 | Đề xuất & phê duyệt tổng quát | D | Trung bình | `M19-de-xuat-phe-duyet.md` ✅ | ✅ |
+| M21 | Bảo hành công trình | E | Thấp-TB | chưa (chỉ viết khi kích hoạt) | ☐ hoãn — kích hoạt khi dự án sang giai đoạn bàn giao |
+| M22 | Điểm danh công trường GPS | E | Trung bình | chưa (chỉ viết khi kích hoạt) | ☐ không làm — trừ khi có lệnh riêng |
+| — | CRM bán hàng, HRM/lương, thu chi nội bộ, Map vị trí | E | — | — | ☐ không làm — ngoài phạm vi công cụ quản lý 1 công trình |
 
-Cách ra lệnh sau khi duyệt: `"triển khai nhóm A"` (chạy tuần tự M16 → M6 → M17 → M9, mỗi module vẫn theo quy trình §4) hoặc `"triển khai M16"` từng module lẻ.
+Thứ tự triển khai trong mỗi nhóm **tuần tự theo bảng trên** (A: M16→M6→M17→M9→(M7 tuỳ chọn); B: M8→M10→M20; C: M14→M12→M18→M11; D: M13→M19) — đúng phụ thuộc đã nêu ở §3. Giữa 4 nhóm độc lập, làm nhóm nào trước cũng được; khuyến nghị **A trước** vì đúng trọng tâm khoảng trống FastCons.
+
+Cách ra lệnh: `"triển khai nhóm A"` (chạy tuần tự cả nhóm, mỗi module vẫn theo quy trình §4, dừng ở ranh giới PR an toàn) hoặc `"triển khai M16"` / `"tiếp tục M16"` từng module lẻ.
