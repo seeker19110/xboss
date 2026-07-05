@@ -397,6 +397,33 @@ Trao thầu (`POST /api/tenders/:id/award`, `lib/tender.ts:awardTender`): sinh 1
 
 ---
 
+## Bản vẽ (M8, `migrations/0016_drawings.sql`)
+
+### `drawings`
+
+| Cột             | Kiểu                                          |
+| --------------- | --------------------------------------------- |
+| code            | TEXT UNIQUE (số bản vẽ, VD `ACMV-SD-T05-001`) |
+| kind            | TEXT (`shop\|asbuilt\|bim\|method`)           |
+| system_group    | TEXT                                          |
+| floor_label     | TEXT                                          |
+| work_package_id | FK → work_packages (ON DELETE SET NULL)       |
+
+### `drawing_revisions`
+
+FK → `drawings`, `UNIQUE(drawing_id, rev)`.
+
+| Cột                                             | Kiểu                                                                                  |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------- |
+| rev                                             | TEXT (A, B, C...)                                                                     |
+| status                                          | TEXT (`submitted\|commented\|approved\|approved_with_comments\|rejected\|superseded`) |
+| file_name, original_name, mime_type, size_bytes | pattern `task_documents` — file trong `data/uploads/`                                 |
+| submitted_at, decided_at, decision_note         | —                                                                                     |
+
+Rev mới chuyển `approved`/`approved_with_comments` tự thay thế (`superseded`) rev khác của cùng drawing đang ở 1 trong 2 trạng thái đó (`lib/drawings.ts` `setRevisionStatus`, trong transaction). Backfill: 1 file `work_packages.drawing_file_name` cũ (route `/api/workpackages/:id/drawing`, vẫn giữ hoạt động song song) → 1 `drawings` (code tạm `WP-<id>`) + 1 rev `A` trạng thái `approved`.
+
+---
+
 ## Baseline & S-curve
 
 ### `baselines` + `baseline_tasks`

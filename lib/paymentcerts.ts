@@ -120,9 +120,7 @@ export async function nextCertCode(): Promise<string> {
 // KL gợi ý cho đợt mới của 1 hợp đồng: với mỗi dòng BOQ thuộc contract_id, lấy KL
 // thực hiện luỹ kế theo tiến độ (boqExecutedQty, M1) trừ qty_cumulative của đợt
 // 'approved' gần nhất cùng dòng (đợt draft/rejected không tính) — không âm.
-export async function suggestQtyForContract(
-  contractId: number,
-): Promise<
+export async function suggestQtyForContract(contractId: number): Promise<
   {
     boqItemId: number;
     code: string;

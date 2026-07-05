@@ -61,6 +61,15 @@ export function newDrawingFileName(wpId: number, mime: string): string {
   return `wp${wpId}-drw-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime] ?? ".bin"}`;
 }
 
+// Revision bản vẽ (M8, register mới `drawings`/`drawing_revisions`): PDF/ảnh, tối đa 50MB
+// (bản vẽ nặng hơn biên bản/tài liệu thường).
+export const MAX_DRAWING_BYTES = 50 * 1024 * 1024;
+
+export function newDrawingRevisionFileName(drawingId: number, rev: string, mime: string): string {
+  const safeRev = rev.replace(/[^a-zA-Z0-9]/g, "").toLowerCase() || "x";
+  return `dr${drawingId}-${safeRev}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime] ?? ".bin"}`;
+}
+
 export function newPhotoFileName(taskId: number, mime: string): string {
   return `t${taskId}-${Date.now()}-${randomBytes(4).toString("hex")}${MIME_EXT[mime]}`;
 }
