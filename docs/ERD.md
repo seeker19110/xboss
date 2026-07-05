@@ -369,6 +369,34 @@ Giá trị đợt tính động (`lib/paymentcerts.ts`, không lưu cột trùng
 
 ---
 
+## Đấu thầu (M7, `migrations/0015_tender.sql`)
+
+### `tender_packages`
+
+| Cột                 | Kiểu                                                          |
+| ------------------- | ------------------------------------------------------------- |
+| code                | TEXT UNIQUE (`GT-0001`, sinh tự động)                         |
+| status              | TEXT (`draft\|open\|closed\|awarded\|cancelled`)              |
+| awarded_bid_id      | FK → tender_bids (nullable — gán lúc trao thầu)               |
+| awarded_contract_id | FK → contracts (HĐ giao thầu tự sinh cho NCC trúng thầu, M16) |
+| created_by          | FK → users                                                    |
+
+### `tender_items` (phạm vi mời thầu)
+
+FK → `tender_packages` + `boq_items`, PK ghép; `qty` = KL mời (có thể ≠ KL HĐ gốc).
+
+### `tender_bids`
+
+FK → `tender_packages` + `suppliers`, `UNIQUE(tender_id, supplier_id)`; `lump_sum` (chào trọn gói, nullable); file chào thầu gốc inline (`file_name`/`original_name`/`mime_type`/`size_bytes`, pattern `task_documents` — 1 file/bid).
+
+### `tender_bid_prices` (giá theo dòng)
+
+FK → `tender_bids` + `boq_items`, PK ghép. **Dòng NCC chưa chào không có bản ghi** — bảng so sánh (`lib/tender.ts:comparisonTable`) hiện "—" cho dòng thiếu, tổng chỉ cộng dòng đã chào (không cộng 0), kèm `quotedLines/totalLines` để UI ghi chú "chào N/M dòng".
+
+Trao thầu (`POST /api/tenders/:id/award`, `lib/tender.ts:awardTender`): sinh 1 dòng `contracts` (`kind='giao_thau'`, `party_supplier_id` = NCC trúng thầu, `value` = tổng giá của bid thắng) → gán `awarded_bid_id`/`awarded_contract_id`, khoá sửa giá.
+
+---
+
 ## Baseline & S-curve
 
 ### `baselines` + `baseline_tasks`

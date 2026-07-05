@@ -171,6 +171,10 @@ export const CAN = {
   // viewer — như /costs nhưng vẫn cho kỹ sư xem/tạo vì họ ghi nhận VO tại hiện trường.
   viewVariations: (r?: Role) => r === "admin" || r === "pm" || r === "engineer" || r === "bch",
   createVariation: (r?: Role) => r === "admin" || r === "pm" || r === "engineer", // tạo VO (M6)
+  // Đấu thầu (M7): giá chào là thông tin thương mại nhạy cảm — xem như VO (loại
+  // cdt/subcon/viewer); tạo gói/nhập giá chào/trao thầu chỉ Admin/PM.
+  viewTenders: (r?: Role) => r === "admin" || r === "pm" || r === "engineer" || r === "bch",
+  manageTenders: (r?: Role) => r === "admin" || r === "pm",
 };
 
 // Sub-con chỉ được thao tác trên task được giao cho mình.

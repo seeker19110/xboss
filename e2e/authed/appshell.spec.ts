@@ -29,6 +29,7 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
       "Hợp đồng",
       "Phát sinh",
       "Thanh toán KL",
+      "Đấu thầu",
       "Tài khoản",
       "Phân công",
       "Import Excel",

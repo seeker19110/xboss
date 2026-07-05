@@ -25,6 +25,7 @@ import {
   FileSignature,
   FilePlus2,
   Receipt,
+  Gavel,
 } from "lucide-react";
 import type { Role } from "@/lib/roles";
 
@@ -94,6 +95,12 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Thanh toán KL",
         icon: Receipt,
         roles: ["admin", "pm", "bch"],
+      },
+      {
+        href: "/tenders",
+        label: "Đấu thầu",
+        icon: Gavel,
+        roles: ["admin", "pm", "engineer", "bch"],
       },
     ],
   },
