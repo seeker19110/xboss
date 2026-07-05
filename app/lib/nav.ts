@@ -26,6 +26,7 @@ import {
   FilePlus2,
   Receipt,
   Gavel,
+  PencilRuler,
 } from "lucide-react";
 import type { Role } from "@/lib/roles";
 
@@ -63,6 +64,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/boq", label: "BOQ", icon: Calculator },
       { href: "/quality", label: "Chất lượng", icon: ClipboardCheck },
       { href: "/diary", label: "Nhật ký", icon: NotebookPen },
+      { href: "/drawings", label: "Bản vẽ", icon: PencilRuler },
     ],
   },
   {
