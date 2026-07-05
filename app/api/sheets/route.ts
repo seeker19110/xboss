@@ -78,6 +78,17 @@ export async function POST(req: NextRequest) {
   const responsible =
     typeof body?.responsible === "string" ? body.responsible.trim() || null : null;
 
+  // Hệ (discipline) gán cho sheet mới — dùng khi tạo sheet từ trang hệ /he/[code] (M15).
+  let disciplineId: number | null = null;
+  if (body?.disciplineId != null) {
+    disciplineId = Number(body.disciplineId);
+    if (
+      !Number.isInteger(disciplineId) ||
+      !(await queryOne(`SELECT id FROM disciplines WHERE id = ?`, disciplineId))
+    )
+      return NextResponse.json({ error: "Hệ không hợp lệ" }, { status: 422 });
+  }
+
   // INSERT sheet + copy cấu trúc trong cùng 1 transaction — không bao giờ có sheet rỗng / nửa chừng.
   // 23505 từ INSERT sheet_types (slug/code trùng do TOCTOU) bị bắt ở outer catch và trả 409.
   let sheetId: number;
@@ -85,12 +96,13 @@ export async function POST(req: NextRequest) {
   try {
     const result = await withTransaction(async () => {
       const newId = await insertId(
-        `INSERT INTO sheet_types (tower_id, code, name, responsible, slug) VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO sheet_types (tower_id, code, name, responsible, slug, discipline_id) VALUES (?, ?, ?, ?, ?, ?)`,
         tower.id,
         code,
         name,
         responsible,
         slug,
+        disciplineId,
       );
       let n = 0;
       if (copyFromId !== null) {

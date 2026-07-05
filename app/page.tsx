@@ -23,6 +23,7 @@ import { DELAY_REASON_LABEL } from "@/lib/delay";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { sortFloorsAsc } from "@/lib/floors";
 import { formatDateVN } from "@/lib/date";
+import { disciplineColorClasses } from "@/lib/disciplineColors";
 
 // Lazy-load các component nặng (recharts, nhiều fetch) — chỉ load khi đã render shell
 const ProgressMap = dynamic(() => import("@/app/components/ProgressMap"), {
@@ -80,6 +81,15 @@ type KPI = {
   delayed: number;
 };
 type SheetNav = { id: number; code: string; name: string; slug: string };
+type DisciplineCard = {
+  id: number;
+  code: string;
+  name: string;
+  color: string | null;
+  sheetCount: number;
+  avgProgress: number;
+  delayed: number;
+};
 
 export default function Dashboard() {
   const [data, setData] = useState<{
@@ -102,6 +112,7 @@ export default function Dashboard() {
   } | null>(null);
   const [newSheetErr, setNewSheetErr] = useState("");
   const [kpiOrder, setKpiOrder] = useState<KPI[]>([]);
+  const [disciplines, setDisciplines] = useState<DisciplineCard[]>([]);
   const dragIdx = useRef<number | null>(null);
   const dragOverIdx = useRef<number | null>(null);
 
@@ -110,13 +121,15 @@ export default function Dashboard() {
       fetchMe(),
       fetch("/api/dashboard").then((r) => (r.ok ? r.json() : null)),
       fetch("/api/sheets").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/disciplines").then((r) => (r.ok ? r.json() : null)),
     ])
-      .then(([meData, dash, sh]) => {
+      .then(([meData, dash, sh, disc]) => {
         if (!meData) return;
         setMe(meData);
         setData(dash);
         setKpiOrder(dash?.kpi ?? []);
         setSheets(sh?.sheets ?? []);
+        setDisciplines((disc?.disciplines ?? []).filter((d: DisciplineCard) => d.sheetCount > 0));
       })
       .finally(() => setLoading(false));
   }, []);
@@ -297,6 +310,40 @@ export default function Dashboard() {
 
       {/* pb-24 chừa chỗ cho thanh cố định dưới đáy (tìm kiếm/Nghiệm thu/Excel/PDF/Import) */}
       <main className="px-4 sm:px-6 py-6 pb-24 space-y-6 max-w-screen-xl mx-auto">
+        {/* ── Card hệ (M15) — nhìn nhanh từng hệ, bấm vào trang hub riêng ── */}
+        {disciplines.length > 0 && (
+          <section>
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-3">
+              Theo hệ thi công
+            </h2>
+            <div className="flex gap-3 overflow-x-auto scrollbar-none pb-1">
+              {disciplines.map((d) => {
+                const c = disciplineColorClasses(d.color);
+                const dpct = Math.round((d.avgProgress ?? 0) * 100);
+                return (
+                  <a
+                    key={d.code}
+                    href={`/he/${d.code}`}
+                    className={`shrink-0 w-40 bg-zinc-900 border border-zinc-800 border-l-4 ${c.border} rounded-xl p-3 hover:border-zinc-600 transition`}
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span
+                        className={`w-2 h-2 rounded-full shrink-0 ${c.dot}`}
+                        aria-hidden="true"
+                      />
+                      <p className="text-sm font-medium truncate">{d.name}</p>
+                    </div>
+                    <p className={`text-2xl font-bold mt-1 ${c.text}`}>{dpct}%</p>
+                    {d.delayed > 0 && (
+                      <p className="text-xs text-rose-300 mt-0.5">{d.delayed} trễ</p>
+                    )}
+                  </a>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
         {/* ── KPI ── */}
         <section>
           {/* Tổng trễ — banner nổi bật */}

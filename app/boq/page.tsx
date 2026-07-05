@@ -1,0 +1,739 @@
+"use client";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { Plus, ChevronDown, ChevronRight, X, Search, Trash2 } from "lucide-react";
+import AppHeader from "@/app/components/AppHeader";
+import EmptyState from "@/app/components/EmptyState";
+import { PageSkeleton } from "@/app/components/Skeleton";
+import { Modal, appAlert, appConfirm } from "@/app/components/dialogs";
+import { fetchMe, type Me } from "@/app/lib/me";
+
+type MapEntry = {
+  taskId: number;
+  taskCode: string;
+  taskName: string;
+  weight: number;
+  progressPercent: number;
+};
+type BoqItem = {
+  id: number;
+  code: string;
+  name: string;
+  unit: string;
+  disciplineId: number | null;
+  disciplineCode: string | null;
+  disciplineName: string | null;
+  disciplineColor: string | null;
+  qtyContract: number;
+  unitPrice: number;
+  qtySub: number;
+  subUnitPrice: number;
+  note: string | null;
+  sortOrder: number;
+  map: MapEntry[];
+  executedQty: number;
+};
+type Discipline = { id: number; code: string; name: string };
+type TaskHit = { id: number; code: string; name: string; sheetType: string };
+
+function fmtVND(n: number) {
+  if (!n) return "—";
+  return Math.round(n).toLocaleString("vi-VN") + " đ";
+}
+function fmtQty(n: number) {
+  return n.toLocaleString("vi-VN", { maximumFractionDigits: 3 });
+}
+
+export default function BoqPage() {
+  const [me, setMe] = useState<Me | null>(null);
+  const [items, setItems] = useState<BoqItem[]>([]);
+  const [totals, setTotals] = useState({ contractValue: 0, subValue: 0, executedValue: 0 });
+  const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<BoqItem | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+
+  const canManage = me?.role === "admin" || me?.role === "pm";
+
+  function load() {
+    return fetch("/api/boq").then((r) => (r.ok ? r.json() : null));
+  }
+
+  useEffect(() => {
+    Promise.all([
+      fetchMe(),
+      load(),
+      fetch("/api/disciplines").then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([meData, boq, disc]) => {
+        if (!meData) return;
+        setMe(meData);
+        setItems(boq?.items ?? []);
+        setTotals(boq?.totals ?? { contractValue: 0, subValue: 0, executedValue: 0 });
+        setDisciplines(disc?.disciplines ?? []);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function refresh() {
+    const boq = await load();
+    setItems(boq?.items ?? []);
+    setTotals(boq?.totals ?? { contractValue: 0, subValue: 0, executedValue: 0 });
+    setSelected((sel) =>
+      sel ? ((boq?.items ?? []).find((i: BoqItem) => i.id === sel.id) ?? null) : null,
+    );
+  }
+
+  const groups = useMemo(() => {
+    const map = new Map<string, { label: string; items: BoqItem[] }>();
+    for (const it of items) {
+      const key = it.disciplineCode ?? "__none";
+      const label = it.disciplineName ?? "Chưa gán hệ";
+      if (!map.has(key)) map.set(key, { label, items: [] });
+      map.get(key)!.items.push(it);
+    }
+    return [...map.entries()].map(([key, g]) => ({ key, ...g }));
+  }, [items]);
+
+  function toggleGroup(key: string) {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  async function deleteItem(item: BoqItem) {
+    if (
+      !(await appConfirm(`Xoá dòng BOQ "${item.code}"? Map task đi kèm sẽ bị xoá.`, {
+        danger: true,
+        confirmLabel: "Xoá",
+      }))
+    )
+      return;
+    const res = await fetch(`/api/boq/${item.id}`, { method: "DELETE" });
+    if (!res.ok) {
+      appAlert((await res.json().catch(() => null))?.error ?? "Xoá thất bại");
+      return;
+    }
+    if (selected?.id === item.id) setSelected(null);
+    refresh();
+  }
+
+  if (loading) return <PageSkeleton />;
+
+  return (
+    <div className="min-h-screen bg-zinc-950 text-white">
+      <AppHeader
+        title="BOQ"
+        subtitle="Khối lượng nhận thầu · giao thầu · thực hiện"
+        bottomActions={
+          canManage ? (
+            <button
+              onClick={() => setAddOpen(true)}
+              aria-label="Thêm dòng BOQ"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+            >
+              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm dòng BOQ</span>
+            </button>
+          ) : undefined
+        }
+      />
+
+      <main className="p-4 sm:p-6 pb-24 space-y-4">
+        {items.length === 0 ? (
+          <EmptyState
+            title="Chưa có dòng BOQ nào"
+            message={canManage ? 'Bấm "Thêm dòng BOQ" để bắt đầu.' : "Chưa có dữ liệu khối lượng."}
+          />
+        ) : (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+            <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Bảng BOQ">
+              <table className="w-full text-sm sm:min-w-[720px]">
+                <thead>
+                  <tr className="text-xs text-zinc-400 border-b border-zinc-800">
+                    <th className="text-left p-3">MÃ</th>
+                    <th className="text-left p-3">TÊN</th>
+                    <th className="text-left p-3 hidden sm:table-cell">ĐVT</th>
+                    <th className="text-right p-3 hidden sm:table-cell">KL HĐ</th>
+                    <th className="text-right p-3 hidden sm:table-cell">ĐƠN GIÁ</th>
+                    <th className="text-right p-3 hidden sm:table-cell">THÀNH TIỀN</th>
+                    <th className="text-right p-3 hidden sm:table-cell">KL GIAO THẦU</th>
+                    <th className="text-left p-3">KL THỰC HIỆN</th>
+                    <th className="text-right p-3 hidden sm:table-cell">CHÊNH LỆCH</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {groups.map((g) => {
+                    const isCollapsed = collapsed.has(g.key);
+                    return (
+                      <Fragment key={g.key}>
+                        <tr className="bg-zinc-950/60">
+                          <td colSpan={9} className="p-0">
+                            <button
+                              onClick={() => toggleGroup(g.key)}
+                              aria-expanded={!isCollapsed}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-300 hover:text-white transition"
+                            >
+                              {isCollapsed ? (
+                                <ChevronRight className="w-3.5 h-3.5 shrink-0" />
+                              ) : (
+                                <ChevronDown className="w-3.5 h-3.5 shrink-0" />
+                              )}
+                              {g.label} ({g.items.length})
+                            </button>
+                          </td>
+                        </tr>
+                        {!isCollapsed &&
+                          g.items.map((it) => {
+                            const executedPct =
+                              it.qtyContract > 0
+                                ? Math.round((it.executedQty / it.qtyContract) * 100)
+                                : 0;
+                            const remaining = it.qtyContract - it.executedQty;
+                            return (
+                              <tr
+                                key={it.id}
+                                onClick={() => setSelected(it)}
+                                className="border-b border-zinc-800/60 last:border-0 hover:bg-zinc-800/40 cursor-pointer"
+                              >
+                                <td className="p-3 font-mono text-xs">{it.code}</td>
+                                <td className="p-3">{it.name}</td>
+                                <td className="p-3 hidden sm:table-cell text-zinc-300">
+                                  {it.unit}
+                                </td>
+                                <td className="p-3 hidden sm:table-cell text-right">
+                                  {fmtQty(it.qtyContract)}
+                                </td>
+                                <td className="p-3 hidden sm:table-cell text-right">
+                                  {fmtVND(it.unitPrice)}
+                                </td>
+                                <td className="p-3 hidden sm:table-cell text-right font-medium">
+                                  {fmtVND(it.qtyContract * it.unitPrice)}
+                                </td>
+                                <td className="p-3 hidden sm:table-cell text-right">
+                                  {fmtQty(it.qtySub)}
+                                </td>
+                                <td className="p-3 min-w-[120px]">
+                                  <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+                                    <div
+                                      className="h-full bg-sky-400"
+                                      style={{ width: `${Math.min(100, executedPct)}%` }}
+                                    />
+                                  </div>
+                                  <p className="text-xs text-zinc-400 mt-1">
+                                    {fmtQty(it.executedQty)} {it.unit} ({executedPct}%)
+                                  </p>
+                                </td>
+                                <td
+                                  className={`p-3 hidden sm:table-cell text-right ${remaining > 0 ? "text-amber-300" : "text-emerald-300"}`}
+                                >
+                                  {fmtQty(remaining)}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+                <tfoot className="sticky bottom-0 bg-zinc-900 border-t border-zinc-700">
+                  <tr className="text-sm font-semibold">
+                    <td className="p-3" colSpan={5}>
+                      Tổng
+                    </td>
+                    <td className="p-3 hidden sm:table-cell text-right">
+                      {fmtVND(totals.contractValue)}
+                    </td>
+                    <td className="p-3 hidden sm:table-cell"></td>
+                    <td className="p-3">{fmtVND(totals.executedValue)}</td>
+                    <td className="p-3 hidden sm:table-cell"></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {selected && (
+        <BoqDetailModal
+          item={selected}
+          canManage={canManage}
+          onClose={() => setSelected(null)}
+          onSaved={refresh}
+          onDelete={() => deleteItem(selected)}
+        />
+      )}
+      {addOpen && (
+        <AddBoqModal
+          disciplines={disciplines}
+          onClose={() => setAddOpen(false)}
+          onCreated={() => {
+            setAddOpen(false);
+            refresh();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function AddBoqModal({
+  disciplines,
+  onClose,
+  onCreated,
+}: {
+  disciplines: Discipline[];
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [code, setCode] = useState("");
+  const [name, setName] = useState("");
+  const [unit, setUnit] = useState("");
+  const [disciplineId, setDisciplineId] = useState<number | "">("");
+  const [qtyContract, setQtyContract] = useState("0");
+  const [unitPrice, setUnitPrice] = useState("0");
+  const [qtySub, setQtySub] = useState("0");
+  const [subUnitPrice, setSubUnitPrice] = useState("0");
+  const [err, setErr] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function submit() {
+    setSaving(true);
+    setErr("");
+    try {
+      const res = await fetch("/api/boq", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: code.trim(),
+          name: name.trim(),
+          unit: unit.trim(),
+          disciplineId: disciplineId || undefined,
+          qtyContract: Number(qtyContract) || 0,
+          unitPrice: Number(unitPrice) || 0,
+          qtySub: Number(qtySub) || 0,
+          subUnitPrice: Number(subUnitPrice) || 0,
+        }),
+      });
+      const j = await res.json().catch(() => null);
+      if (!res.ok) {
+        setErr(j?.error ?? "Không tạo được dòng BOQ");
+        return;
+      }
+      onCreated();
+    } catch {
+      setErr("Mất kết nối — kiểm tra mạng rồi thử lại");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal onClose={onClose}>
+      <div className="p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold">Thêm dòng BOQ</h2>
+          <button onClick={onClose} aria-label="Đóng" className="text-zinc-400 hover:text-white">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="text-xs text-zinc-400 col-span-1">
+            Mã BOQ
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
+            />
+          </label>
+          <label className="text-xs text-zinc-400 col-span-1">
+            Đơn vị tính
+            <input
+              value={unit}
+              onChange={(e) => setUnit(e.target.value)}
+              className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
+            />
+          </label>
+          <label className="text-xs text-zinc-400 col-span-2">
+            Tên hạng mục
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
+            />
+          </label>
+          <label className="text-xs text-zinc-400 col-span-2">
+            Hệ
+            <select
+              value={disciplineId}
+              onChange={(e) => setDisciplineId(e.target.value ? Number(e.target.value) : "")}
+              className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
+            >
+              <option value="">— Chưa gán —</option>
+              {disciplines.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs text-zinc-400">
+            KL nhận thầu
+            <input
+              type="number"
+              value={qtyContract}
+              onChange={(e) => setQtyContract(e.target.value)}
+              className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
+            />
+          </label>
+          <label className="text-xs text-zinc-400">
+            Đơn giá
+            <input
+              type="number"
+              value={unitPrice}
+              onChange={(e) => setUnitPrice(e.target.value)}
+              className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
+            />
+          </label>
+          <label className="text-xs text-zinc-400">
+            KL giao thầu phụ
+            <input
+              type="number"
+              value={qtySub}
+              onChange={(e) => setQtySub(e.target.value)}
+              className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
+            />
+          </label>
+          <label className="text-xs text-zinc-400">
+            Đơn giá giao thầu phụ
+            <input
+              type="number"
+              value={subUnitPrice}
+              onChange={(e) => setSubUnitPrice(e.target.value)}
+              className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
+            />
+          </label>
+        </div>
+        {err && <p className="text-sm text-rose-300">{err}</p>}
+        <button
+          onClick={submit}
+          disabled={saving || !code.trim() || !name.trim() || !unit.trim()}
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+        >
+          {saving ? "Đang tạo…" : "Tạo dòng BOQ"}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function BoqDetailModal({
+  item,
+  canManage,
+  onClose,
+  onSaved,
+  onDelete,
+}: {
+  item: BoqItem;
+  canManage: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+  onDelete: () => void;
+}) {
+  const [qtyContract, setQtyContract] = useState(String(item.qtyContract));
+  const [unitPrice, setUnitPrice] = useState(String(item.unitPrice));
+  const [qtySub, setQtySub] = useState(String(item.qtySub));
+  const [subUnitPrice, setSubUnitPrice] = useState(String(item.subUnitPrice));
+  const [savingFields, setSavingFields] = useState(false);
+  const [fieldsErr, setFieldsErr] = useState("");
+
+  const [mapEntries, setMapEntries] = useState<
+    { taskId: number; taskCode: string; taskName: string; weight: number }[]
+  >(
+    item.map.map((m) => ({
+      taskId: m.taskId,
+      taskCode: m.taskCode,
+      taskName: m.taskName,
+      weight: m.weight,
+    })),
+  );
+  const [savingMap, setSavingMap] = useState(false);
+  const [mapMsg, setMapMsg] = useState<{ text: string; warn: boolean } | null>(null);
+  const [q, setQ] = useState("");
+  const [hits, setHits] = useState<TaskHit[]>([]);
+
+  useEffect(() => {
+    const term = q.trim();
+    if (term.length < 2) {
+      setHits([]);
+      return;
+    }
+    const t = setTimeout(() => {
+      fetch(`/api/search?q=${encodeURIComponent(term)}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => {
+          const taskHits = (j?.hits ?? []).filter((h: { kind: string }) => h.kind === "task");
+          setHits(taskHits);
+        })
+        .catch(() => setHits([]));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  const sumWeight = mapEntries.reduce((s, e) => s + (Number(e.weight) || 0), 0);
+
+  async function saveFields() {
+    setSavingFields(true);
+    setFieldsErr("");
+    try {
+      const res = await fetch(`/api/boq/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          qtyContract: Number(qtyContract) || 0,
+          unitPrice: Number(unitPrice) || 0,
+          qtySub: Number(qtySub) || 0,
+          subUnitPrice: Number(subUnitPrice) || 0,
+        }),
+      });
+      const j = await res.json().catch(() => null);
+      if (!res.ok) {
+        setFieldsErr(j?.error ?? "Lưu thất bại");
+        return;
+      }
+      onSaved();
+    } catch {
+      setFieldsErr("Mất kết nối — kiểm tra mạng rồi thử lại");
+    } finally {
+      setSavingFields(false);
+    }
+  }
+
+  function addTask(t: TaskHit) {
+    if (mapEntries.some((e) => e.taskId === t.id)) return;
+    setMapEntries((prev) => [
+      ...prev,
+      { taskId: t.id, taskCode: t.code, taskName: t.name, weight: 1 },
+    ]);
+    setQ("");
+    setHits([]);
+  }
+  function removeTask(taskId: number) {
+    setMapEntries((prev) => prev.filter((e) => e.taskId !== taskId));
+  }
+  function splitEvenly() {
+    if (mapEntries.length === 0) return;
+    const w = 1 / mapEntries.length;
+    setMapEntries((prev) => prev.map((e) => ({ ...e, weight: w })));
+  }
+
+  async function saveMap() {
+    setSavingMap(true);
+    setMapMsg(null);
+    try {
+      const res = await fetch(`/api/boq/${item.id}/map`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          map: mapEntries.map((e) => ({ taskId: e.taskId, weight: Number(e.weight) || 0 })),
+        }),
+      });
+      const j = await res.json().catch(() => null);
+      if (!res.ok) {
+        setMapMsg({ text: j?.error ?? "Lưu map thất bại", warn: true });
+        return;
+      }
+      setMapMsg(
+        j.warning ? { text: j.warning, warn: true } : { text: "Đã lưu map task.", warn: false },
+      );
+      onSaved();
+    } catch {
+      setMapMsg({ text: "Mất kết nối — kiểm tra mạng rồi thử lại", warn: true });
+    } finally {
+      setSavingMap(false);
+    }
+  }
+
+  return (
+    <Modal onClose={onClose} className="max-w-xl">
+      <div className="p-5 space-y-5 max-h-[85vh] overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold font-mono text-sm">{item.code}</h2>
+            <p className="text-sm text-zinc-300">{item.name}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {canManage && (
+              <button
+                onClick={onDelete}
+                aria-label={`Xoá dòng BOQ ${item.code}`}
+                className="text-zinc-400 hover:text-rose-300"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+            <button onClick={onClose} aria-label="Đóng" className="text-zinc-400 hover:text-white">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {canManage && (
+          <section className="space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              Sửa nhanh
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="text-xs text-zinc-400">
+                KL nhận thầu
+                <input
+                  type="number"
+                  value={qtyContract}
+                  onChange={(e) => setQtyContract(e.target.value)}
+                  className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
+                />
+              </label>
+              <label className="text-xs text-zinc-400">
+                Đơn giá
+                <input
+                  type="number"
+                  value={unitPrice}
+                  onChange={(e) => setUnitPrice(e.target.value)}
+                  className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
+                />
+              </label>
+              <label className="text-xs text-zinc-400">
+                KL giao thầu phụ
+                <input
+                  type="number"
+                  value={qtySub}
+                  onChange={(e) => setQtySub(e.target.value)}
+                  className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
+                />
+              </label>
+              <label className="text-xs text-zinc-400">
+                Đơn giá giao thầu phụ
+                <input
+                  type="number"
+                  value={subUnitPrice}
+                  onChange={(e) => setSubUnitPrice(e.target.value)}
+                  className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
+                />
+              </label>
+            </div>
+            {fieldsErr && <p className="text-sm text-rose-300">{fieldsErr}</p>}
+            <button
+              onClick={saveFields}
+              disabled={savingFields}
+              className="bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg"
+            >
+              {savingFields ? "Đang lưu…" : "Lưu"}
+            </button>
+          </section>
+        )}
+
+        <section className="space-y-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+            Map task ({mapEntries.length}) — tổng weight {sumWeight.toFixed(4)}
+          </h3>
+
+          {mapEntries.length > 0 && (
+            <ul className="space-y-1.5">
+              {mapEntries.map((e) => (
+                <li key={e.taskId} className="flex items-center gap-2">
+                  <span className="flex-1 min-w-0 truncate text-sm">
+                    <span className="font-mono text-xs text-zinc-400">{e.taskCode}</span>{" "}
+                    {e.taskName}
+                  </span>
+                  {canManage ? (
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={e.weight}
+                      onChange={(ev) =>
+                        setMapEntries((prev) =>
+                          prev.map((m) =>
+                            m.taskId === e.taskId ? { ...m, weight: Number(ev.target.value) } : m,
+                          ),
+                        )
+                      }
+                      className="w-20 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1 text-xs text-white text-right"
+                    />
+                  ) : (
+                    <span className="text-xs text-zinc-400">{e.weight}</span>
+                  )}
+                  {canManage && (
+                    <button
+                      onClick={() => removeTask(e.taskId)}
+                      aria-label={`Bỏ task ${e.taskCode} khỏi map`}
+                      className="text-zinc-500 hover:text-rose-300"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {canManage && (
+            <>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-2.5" />
+                  <input
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    placeholder="Tìm task theo mã/tên để thêm vào map…"
+                    aria-label="Tìm task để thêm vào map"
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg pl-8 pr-3 py-2 text-sm text-white"
+                  />
+                </div>
+                {mapEntries.length > 1 && (
+                  <button
+                    onClick={splitEvenly}
+                    className="text-xs text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 px-3 py-2 rounded-lg shrink-0"
+                  >
+                    Chia đều
+                  </button>
+                )}
+              </div>
+              {hits.length > 0 && (
+                <ul className="border border-zinc-700 rounded-lg divide-y divide-zinc-800 max-h-40 overflow-y-auto">
+                  {hits.map((h) => (
+                    <li key={h.id}>
+                      <button
+                        onClick={() => addTask(h)}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-zinc-800 flex items-center justify-between gap-2"
+                      >
+                        <span className="truncate">
+                          <span className="font-mono text-xs text-zinc-400">{h.code}</span> {h.name}
+                        </span>
+                        <span className="text-xs text-zinc-500 shrink-0">{h.sheetType}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {mapMsg && (
+                <p className={`text-sm ${mapMsg.warn ? "text-amber-300" : "text-emerald-300"}`}>
+                  {mapMsg.text}
+                </p>
+              )}
+              <button
+                onClick={saveMap}
+                disabled={savingMap}
+                className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg"
+              >
+                {savingMap ? "Đang lưu…" : "Lưu map"}
+              </button>
+            </>
+          )}
+        </section>
+      </div>
+    </Modal>
+  );
+}
