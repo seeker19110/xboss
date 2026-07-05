@@ -68,13 +68,14 @@ export async function POST(req: NextRequest) {
     withTransaction(async () => {
       const poCode = await nextSeqCode("purchase_orders", "po_code", `PO-${ym}-`);
       const id = await insertId(
-        `INSERT INTO purchase_orders (po_code, supplier_id, expected_date, note, created_by)
-       VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO purchase_orders (po_code, supplier_id, expected_date, note, created_by, contract_id)
+       VALUES (?, ?, ?, ?, ?, ?)`,
         poCode,
         body.supplierId ? Number(body.supplierId) : null,
         body.expectedDate ? String(body.expectedDate) : null,
         body.note ? String(body.note).trim() : null,
         user.id,
+        body.contractId ? Number(body.contractId) : null,
       );
 
       for (const item of items) {
