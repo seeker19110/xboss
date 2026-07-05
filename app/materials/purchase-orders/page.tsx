@@ -47,6 +47,7 @@ type POItem = {
   prId: number | null;
 };
 type Supplier = { id: number; name: string; avgRating?: number | null };
+type ContractOption = { id: number; code: string; title: string };
 type PRItem = {
   id: number;
   prCode: string;
@@ -133,6 +134,7 @@ const isPoLate = (po: { status: string; expectedDate: string | null }) =>
 export default function PurchaseOrdersPage() {
   const [orders, setOrders] = useState<PO[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [contracts, setContracts] = useState<ContractOption[]>([]);
   const [approvedPRs, setApprovedPRs] = useState<PRItem[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [canManage, setCanManage] = useState(false);
@@ -151,6 +153,7 @@ export default function PurchaseOrdersPage() {
   // Form tạo PO
   const [newPO, setNewPO] = useState({
     supplierId: "",
+    contractId: "",
     expectedDate: "",
     note: "",
     items: [{ materialId: "", prId: "", qtyOrdered: "", unitPrice: "", note: "" }] as {
@@ -188,6 +191,11 @@ export default function PurchaseOrdersPage() {
     fetch("/api/materials")
       .then((r) => r.json())
       .then((j) => setMaterials(j.materials ?? []));
+    // Hợp đồng NCC — chỉ Admin/PM/BCH xem được (CAN.viewPayments); vai trò khác 403, bỏ qua lặng lẽ.
+    fetch("/api/contracts?kind=ncc")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setContracts(j?.contracts ?? []))
+      .catch(() => setContracts([]));
   }, []);
 
   useEffect(() => {
@@ -223,6 +231,7 @@ export default function PurchaseOrdersPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           supplierId: newPO.supplierId ? Number(newPO.supplierId) : null,
+          contractId: newPO.contractId ? Number(newPO.contractId) : null,
           expectedDate: newPO.expectedDate || null,
           note: newPO.note || null,
           items: validItems.map((i) => ({
@@ -252,6 +261,7 @@ export default function PurchaseOrdersPage() {
   const resetNewPO = () =>
     setNewPO({
       supplierId: "",
+      contractId: "",
       expectedDate: "",
       note: "",
       items: [{ materialId: "", prId: "", qtyOrdered: "", unitPrice: "", note: "" }],
@@ -802,6 +812,23 @@ export default function PurchaseOrdersPage() {
                   className="w-full bg-zinc-700 border border-zinc-600 rounded px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-blue-500"
                 />
               </div>
+              {contracts.length > 0 && (
+                <div className="sm:col-span-2">
+                  <label className="text-xs text-zinc-400 mb-1 block">Hợp đồng (tuỳ chọn)</label>
+                  <select
+                    value={newPO.contractId}
+                    onChange={(e) => setNewPO((p) => ({ ...p, contractId: e.target.value }))}
+                    className="w-full bg-zinc-700 border border-zinc-600 rounded px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-blue-500"
+                  >
+                    <option value="">-- Không gắn hợp đồng --</option>
+                    {contracts.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.code} — {c.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="sm:col-span-2">
                 <label className="text-xs text-zinc-400 mb-1 block">Ghi chú</label>
                 <input

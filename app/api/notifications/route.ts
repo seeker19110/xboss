@@ -4,6 +4,7 @@ import { getCurrentUser, CAN } from "@/lib/auth";
 import { costSummary, getCostSettings } from "@/lib/cost";
 import { poLateList, vehicleLateList } from "@/lib/procurement";
 import { missingDiaryDates } from "@/lib/diary";
+import { expiringContracts } from "@/lib/contracts";
 
 export const dynamic = "force-dynamic";
 
@@ -208,6 +209,31 @@ export async function GET() {
           AND cost_group <> ALL(?)`,
       user.id,
       overKeys,
+    );
+
+    // Hợp đồng sắp hết hiệu lực hoặc đã quá hạn mà chưa đổi trạng thái → cảnh báo (M16).
+    const expiring = await expiringContracts();
+    if (expiring.length > 0) {
+      const values = expiring.map(() => `(?, ?, 'contract_expiry', ?)`).join(", ");
+      const params = expiring.flatMap((c) => [
+        user.id,
+        c.id,
+        c.expired
+          ? `📄 Hợp đồng ${c.code} — ${c.title} đã quá hạn hiệu lực (${c.validTo})`
+          : `📄 Hợp đồng ${c.code} — ${c.title} sắp hết hiệu lực (${c.validTo})`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, contract_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, type, contract_id) WHERE contract_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    const expiringIds = expiring.map((c) => c.id);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'contract_expiry' AND is_read = 0 AND contract_id <> ALL(?)`,
+      user.id,
+      expiringIds,
     );
   }
 

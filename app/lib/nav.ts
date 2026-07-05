@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   Upload,
   NotebookPen,
+  FileSignature,
 } from "lucide-react";
 import type { Role } from "@/lib/roles";
 
@@ -74,6 +75,12 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/payments", label: "Thanh toán", icon: Wallet },
       { href: "/costs", label: "Chi phí", icon: Coins, roles: ["admin", "pm", "bch"] },
+      {
+        href: "/contracts",
+        label: "Hợp đồng",
+        icon: FileSignature,
+        roles: ["admin", "pm", "bch"],
+      },
     ],
   },
   {
