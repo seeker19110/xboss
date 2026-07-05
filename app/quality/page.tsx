@@ -9,6 +9,10 @@ import {
   ShieldCheck,
   AlertTriangle,
   ClipboardCheck,
+  FileText,
+  Download,
+  Upload,
+  Ban,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
@@ -72,6 +76,32 @@ type Ncr = {
 };
 type UserOpt = { id: number; name: string };
 
+type YcntRequest = {
+  id: number;
+  code: string;
+  scheduledAt: string;
+  status: "sent" | "confirmed" | "passed" | "failed" | "cancelled";
+  note: string | null;
+  createdByName: string | null;
+  createdAt: string;
+  taskCount: number;
+};
+
+type QualityDoc = {
+  id: number;
+  taskId: number;
+  taskCode: string;
+  taskName: string;
+  floorLabel: string | null;
+  sheetType: string | null;
+  docCategory: string | null;
+  caption: string | null;
+  originalName: string | null;
+  mimeType: string | null;
+  createdAt: string;
+  uploaderName: string | null;
+};
+
 const CATEGORY_LABEL: Record<string, string> = { work: "Công việc", tc: "T&C", hse: "HSE" };
 const INSPECTION_STATUS_LABEL: Record<string, string> = {
   draft: "Nháp",
@@ -84,6 +114,20 @@ const NCR_STATUS_LABEL: Record<string, string> = {
   fixing: "Đang khắc phục",
   recheck: "Chờ kiểm lại",
   closed: "Đã đóng",
+};
+const YCNT_STATUS_LABEL: Record<string, string> = {
+  sent: "Đã gửi",
+  confirmed: "TVGS đã xác nhận",
+  passed: "Đạt",
+  failed: "Không đạt",
+  cancelled: "Đã huỷ",
+};
+const DOC_CATEGORY_LABEL: Record<string, string> = {
+  vat_lieu: "Vật liệu",
+  cong_viec: "Công việc",
+  giai_doan: "Giai đoạn",
+  chuyen_buoc: "Chuyển bước",
+  hoan_cong: "Hoàn công",
 };
 
 function badgeClass(kind: "ok" | "warn" | "bad" | "neutral") {
@@ -103,31 +147,53 @@ function ncrBadgeKind(status: string): "ok" | "warn" | "bad" | "neutral" {
   if (status === "open") return "bad";
   return "warn";
 }
+// T&C: % lệch giữa giá trị đo và thiết kế — hiện ngay khi nhập (chỉ khi cả 2 đều là số).
+function deviationPct(measured?: string, designValue?: string): number | null {
+  const m = Number(measured);
+  const d = Number(designValue);
+  if (!measured || !designValue || isNaN(m) || isNaN(d) || d === 0) return null;
+  return ((m - d) / d) * 100;
+}
+
+function ycntBadgeKind(status: string): "ok" | "warn" | "bad" | "neutral" {
+  if (status === "passed") return "ok";
+  if (status === "failed" || status === "cancelled") return "bad";
+  if (status === "confirmed") return "warn";
+  return "neutral";
+}
 
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function QualityPage() {
   const [me, setMe] = useState<Me | null>(null);
-  const [tab, setTab] = useState<"checklists" | "inspections" | "ncrs">("inspections");
+  const [tab, setTab] = useState<"checklists" | "inspections" | "ncrs" | "requests" | "documents">(
+    "inspections",
+  );
   const [loading, setLoading] = useState(true);
   const [checklists, setChecklists] = useState<Checklist[]>([]);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [ncrs, setNcrs] = useState<Ncr[]>([]);
+  const [requests, setRequests] = useState<YcntRequest[]>([]);
+  const [sheets, setSheets] = useState<{ id: number; code: string; name: string }[]>([]);
   const [users, setUsers] = useState<UserOpt[]>([]);
   const [checklistModal, setChecklistModal] = useState(false);
   const [inspectionModal, setInspectionModal] = useState(false);
   const [ncrModal, setNcrModal] = useState(false);
+  const [requestModal, setRequestModal] = useState(false);
 
   const canManage = me?.role === "admin" || me?.role === "pm";
+  const canCreateRequest = canManage || me?.role === "engineer";
 
   async function loadAll() {
-    const [meRes, clRes, discRes, inspRes, ncrRes] = await Promise.all([
+    const [meRes, clRes, discRes, inspRes, ncrRes, reqRes, sheetsRes] = await Promise.all([
       fetchMe(),
       fetch("/api/qc/checklists"),
       fetch("/api/disciplines"),
       fetch("/api/qc/inspections"),
       fetch("/api/ncrs"),
+      fetch("/api/inspection-requests"),
+      fetch("/api/sheets"),
     ]);
     if (!meRes) {
       redirectToLogin();
@@ -138,6 +204,8 @@ export default function QualityPage() {
     setDisciplines(discRes.ok ? ((await discRes.json())?.disciplines ?? []) : []);
     setInspections(inspRes.ok ? ((await inspRes.json())?.inspections ?? []) : []);
     setNcrs(ncrRes.ok ? ((await ncrRes.json())?.ncrs ?? []) : []);
+    setRequests(reqRes.ok ? ((await reqRes.json())?.requests ?? []) : []);
+    setSheets(sheetsRes.ok ? ((await sheetsRes.json())?.sheets ?? []) : []);
     if (meRes.role === "admin" || meRes.role === "pm") {
       const ur = await fetch("/api/users");
       setUsers(ur.ok ? ((await ur.json())?.users ?? []) : []);
@@ -164,7 +232,9 @@ export default function QualityPage() {
             [
               ["inspections", "Kiểm tra"],
               ["checklists", "Checklist mẫu"],
+              ["requests", "Phiếu YCNT"],
               ["ncrs", "NCR"],
+              ["documents", "Hồ sơ"],
             ] as const
           ).map(([key, label]) => (
             <button
@@ -210,6 +280,16 @@ export default function QualityPage() {
             onChanged={loadAll}
           />
         )}
+        {tab === "requests" && (
+          <RequestsTab
+            requests={requests}
+            canManage={canManage}
+            canCreate={canCreateRequest}
+            onAdd={() => setRequestModal(true)}
+            onChanged={loadAll}
+          />
+        )}
+        {tab === "documents" && <DocumentsTab sheets={sheets} canExport={canManage} />}
       </main>
 
       {checklistModal && (
@@ -238,6 +318,15 @@ export default function QualityPage() {
           onClose={() => setNcrModal(false)}
           onSaved={() => {
             setNcrModal(false);
+            loadAll();
+          }}
+        />
+      )}
+      {requestModal && (
+        <RequestFormModal
+          onClose={() => setRequestModal(false)}
+          onSaved={() => {
+            setRequestModal(false);
             loadAll();
           }}
         />
@@ -472,28 +561,51 @@ function ChecklistFormModal({
           <span className="text-xs text-zinc-400">Hạng mục kiểm tra</span>
           <div className="space-y-2 mt-1">
             {items.map((it, i) => (
-              <div key={i} className="flex gap-2 items-center">
-                <input
-                  value={it.label}
-                  onChange={(e) => updateItem(i, { label: e.target.value })}
-                  placeholder="Tên hạng mục"
-                  className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs focus:outline-none"
-                />
-                <select
-                  value={it.type}
-                  onChange={(e) => updateItem(i, { type: e.target.value as ChecklistItem["type"] })}
-                  className="bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs focus:outline-none"
-                >
-                  <option value="pass_fail">Đạt/Không</option>
-                  <option value="measure">Đo số</option>
-                </select>
-                <button
-                  onClick={() => setItems((prev) => prev.filter((_, idx) => idx !== i))}
-                  aria-label="Xoá hạng mục"
-                  className="text-zinc-600 hover:text-rose-400 shrink-0"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+              <div
+                key={i}
+                className="bg-zinc-800/40 border border-zinc-700 rounded-lg p-2 space-y-1.5"
+              >
+                <div className="flex gap-2 items-center">
+                  <input
+                    value={it.label}
+                    onChange={(e) => updateItem(i, { label: e.target.value })}
+                    placeholder="Tên hạng mục"
+                    className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs focus:outline-none"
+                  />
+                  <select
+                    value={it.type}
+                    onChange={(e) =>
+                      updateItem(i, { type: e.target.value as ChecklistItem["type"] })
+                    }
+                    className="bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs focus:outline-none"
+                  >
+                    <option value="pass_fail">Đạt/Không</option>
+                    <option value="measure">Đo số</option>
+                  </select>
+                  <button
+                    onClick={() => setItems((prev) => prev.filter((_, idx) => idx !== i))}
+                    aria-label="Xoá hạng mục"
+                    className="text-zinc-600 hover:text-rose-400 shrink-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                {it.type === "measure" && (
+                  <div className="flex gap-2 pl-1">
+                    <input
+                      value={it.unit ?? ""}
+                      onChange={(e) => updateItem(i, { unit: e.target.value })}
+                      placeholder="Đơn vị (vd: bar, mm)"
+                      className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-1 text-xs focus:outline-none"
+                    />
+                    <input
+                      value={it.designValue ?? ""}
+                      onChange={(e) => updateItem(i, { designValue: e.target.value })}
+                      placeholder="Giá trị thiết kế (tuỳ chọn)"
+                      className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-1 text-xs focus:outline-none"
+                    />
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -820,6 +932,24 @@ function InspectionFormModal({
                     />
                   )}
                 </div>
+                {it.type === "measure" && it.designValue && (
+                  <p className="text-[10px] text-zinc-500 mt-1">
+                    Thiết kế: {it.designValue}
+                    {it.unit ? ` ${it.unit}` : ""}
+                    {(() => {
+                      const dev = deviationPct(results[i]?.measured, it.designValue);
+                      if (dev === null) return null;
+                      const bad = Math.abs(dev) > 5;
+                      return (
+                        <span className={bad ? "text-rose-400" : "text-emerald-400"}>
+                          {" "}
+                          · Lệch {dev > 0 ? "+" : ""}
+                          {dev.toFixed(1)}%
+                        </span>
+                      );
+                    })()}
+                  </p>
+                )}
               </div>
             ))}
           </div>
@@ -1126,6 +1256,594 @@ function NcrFormModal({
           className="text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white px-3 py-2 rounded-lg transition"
         >
           {saving ? "Đang lưu..." : "Tạo NCR"}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+// ── Tab: Phiếu YCNT ──────────────────────────────────────────────────────────
+
+function RequestsTab({
+  requests,
+  canManage,
+  canCreate,
+  onAdd,
+  onChanged,
+}: {
+  requests: YcntRequest[];
+  canManage: boolean;
+  canCreate: boolean;
+  onAdd: () => void;
+  onChanged: () => void;
+}) {
+  async function setStatus(r: YcntRequest, status: YcntRequest["status"]) {
+    const res = await fetch(`/api/inspection-requests/${r.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => null);
+      showToast(j?.error ?? "Không đổi được trạng thái", "error");
+      return;
+    }
+    onChanged();
+  }
+
+  return (
+    <div className="space-y-3">
+      {canCreate && (
+        <button
+          onClick={onAdd}
+          className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 py-2 rounded-lg text-sm font-semibold transition"
+        >
+          <Plus className="w-4 h-4" /> Phiếu YCNT mới
+        </button>
+      )}
+      {requests.length === 0 ? (
+        <EmptyState
+          icon={FileText}
+          title="Chưa có phiếu YCNT nào"
+          message={
+            canCreate
+              ? 'Bấm "Phiếu YCNT mới" để gửi yêu cầu nghiệm thu cho TVGS.'
+              : "Chưa có dữ liệu."
+          }
+        />
+      ) : (
+        <div className="space-y-2">
+          {requests.map((r) => (
+            <div key={r.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="min-w-0">
+                  <p className="font-semibold text-sm">{r.code}</p>
+                  <p className="text-[11px] text-zinc-400">
+                    {r.taskCount} task · hẹn {new Date(r.scheduledAt).toLocaleString("vi-VN")}
+                    {r.createdByName ? ` · người gửi: ${r.createdByName}` : ""}
+                  </p>
+                  {r.note && <p className="text-xs text-zinc-300 mt-1">{r.note}</p>}
+                </div>
+                <span
+                  className={`text-[11px] font-semibold border rounded-full px-2 py-0.5 shrink-0 ${badgeClass(ycntBadgeKind(r.status))}`}
+                >
+                  {YCNT_STATUS_LABEL[r.status]}
+                </span>
+              </div>
+              <div className="mt-2 flex gap-2 flex-wrap items-center">
+                <a
+                  href={`/api/inspection-requests/${r.id}/pdf`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1 text-[11px] border border-zinc-700 hover:border-zinc-500 text-zinc-300 px-2 py-1 rounded-lg transition"
+                >
+                  <Download className="w-3 h-3" /> Xuất PDF
+                </a>
+                {canManage && r.status === "sent" && (
+                  <button
+                    onClick={() => setStatus(r, "confirmed")}
+                    className="text-[11px] border border-zinc-700 hover:border-zinc-500 text-zinc-300 px-2 py-1 rounded-lg transition"
+                  >
+                    TVGS đã xác nhận
+                  </button>
+                )}
+                {canManage && (r.status === "sent" || r.status === "confirmed") && (
+                  <>
+                    <button
+                      onClick={() => setStatus(r, "passed")}
+                      className="flex items-center gap-1 text-[11px] bg-emerald-800/60 hover:bg-emerald-700/60 text-emerald-200 px-2 py-1 rounded-lg transition"
+                    >
+                      <Check className="w-3 h-3" /> Đạt
+                    </button>
+                    <button
+                      onClick={() => setStatus(r, "failed")}
+                      className="flex items-center gap-1 text-[11px] bg-rose-800/60 hover:bg-rose-700/60 text-rose-200 px-2 py-1 rounded-lg transition"
+                    >
+                      <AlertTriangle className="w-3 h-3" /> Không đạt
+                    </button>
+                    <button
+                      onClick={() => setStatus(r, "cancelled")}
+                      className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300 px-2 py-1 rounded-lg transition"
+                    >
+                      <Ban className="w-3 h-3" /> Huỷ
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RequestFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const [scheduledAt, setScheduledAt] = useState("");
+  const [note, setNote] = useState("");
+  const [q, setQ] = useState("");
+  const [hits, setHits] = useState<TaskHit[]>([]);
+  const [tasks, setTasks] = useState<TaskHit[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const term = q.trim();
+    if (term.length < 2) {
+      setHits([]);
+      return;
+    }
+    const t = setTimeout(() => {
+      fetch(`/api/search?q=${encodeURIComponent(term)}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => setHits((j?.hits ?? []).filter((h: { kind: string }) => h.kind === "task")))
+        .catch(() => setHits([]));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  function addTask(h: TaskHit) {
+    if (!tasks.some((t) => t.id === h.id)) setTasks((prev) => [...prev, h]);
+    setQ("");
+    setHits([]);
+  }
+
+  async function save() {
+    if (!scheduledAt) {
+      showToast("Chọn thời gian hẹn nghiệm thu", "error");
+      return;
+    }
+    if (tasks.length === 0) {
+      showToast("Chọn ít nhất 1 task (phải đạt 100% tiến độ)", "error");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch("/api/inspection-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scheduledAt: new Date(scheduledAt).toISOString(),
+          note: note.trim() || null,
+          taskIds: tasks.map((t) => t.id),
+        }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => null);
+        showToast(j?.error ?? "Lưu thất bại", "error");
+        return;
+      }
+      onSaved();
+    } catch {
+      showToast("Mất kết nối — không lưu được", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal onClose={onClose} className="max-w-lg">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-bold">Phiếu YCNT mới</h2>
+        <button onClick={onClose} aria-label="Đóng" className="text-zinc-500 hover:text-zinc-200">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+      <div className="space-y-3 text-sm max-h-[70vh] overflow-y-auto">
+        <label className="block">
+          <span className="text-xs text-zinc-400">Thời gian hẹn nghiệm thu</span>
+          <input
+            type="datetime-local"
+            value={scheduledAt}
+            onChange={(e) => setScheduledAt(e.target.value)}
+            className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-600"
+          />
+        </label>
+
+        <div>
+          <span className="text-xs text-zinc-400">Task đề nghị nghiệm thu (phải đạt 100%)</span>
+          <div className="relative mt-1">
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-zinc-500" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Tìm task theo mã/tên..."
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg pl-8 pr-3 py-2 text-xs focus:outline-none"
+            />
+            {hits.length > 0 && (
+              <div className="absolute z-10 mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg overflow-hidden max-h-40 overflow-y-auto">
+                {hits.map((h) => (
+                  <button
+                    key={h.id}
+                    onClick={() => addTask(h)}
+                    className="w-full text-left px-3 py-1.5 text-xs hover:bg-zinc-700 transition"
+                  >
+                    {h.code} — {h.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {tasks.length > 0 && (
+            <div className="mt-2 space-y-1">
+              {tasks.map((t) => (
+                <div
+                  key={t.id}
+                  className="flex items-center justify-between bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5"
+                >
+                  <span className="text-xs">
+                    {t.code} — {t.name}
+                  </span>
+                  <button
+                    onClick={() => setTasks((prev) => prev.filter((x) => x.id !== t.id))}
+                    aria-label={`Bỏ chọn ${t.code}`}
+                  >
+                    <X className="w-3.5 h-3.5 text-zinc-500 hover:text-rose-400" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <label className="block">
+          <span className="text-xs text-zinc-400">Ghi chú (tuỳ chọn)</span>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={2}
+            className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-600"
+          />
+        </label>
+      </div>
+      <div className="flex justify-end gap-2 mt-4">
+        <button onClick={onClose} className="text-xs text-zinc-400 hover:text-zinc-200 px-3 py-2">
+          Huỷ
+        </button>
+        <button
+          onClick={save}
+          disabled={saving}
+          className="text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white px-3 py-2 rounded-lg transition"
+        >
+          {saving ? "Đang gửi..." : "Gửi YCNT"}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+// ── Tab: Hồ sơ chất lượng ─────────────────────────────────────────────────────
+
+function DocumentsTab({
+  sheets,
+  canExport,
+}: {
+  sheets: { id: number; code: string; name: string }[];
+  canExport: boolean;
+}) {
+  const [docs, setDocs] = useState<QualityDoc[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sheetTypeId, setSheetTypeId] = useState("");
+  const [floor, setFloor] = useState("");
+  const [category, setCategory] = useState("");
+  const [uploadOpen, setUploadOpen] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (sheetTypeId) params.set("sheetTypeId", sheetTypeId);
+    if (floor) params.set("floor", floor);
+    if (category) params.set("category", category);
+    const res = await fetch(`/api/qc/documents?${params.toString()}`);
+    setDocs(res.ok ? ((await res.json())?.documents ?? []) : []);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    load();
+  }, [sheetTypeId, floor, category]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function exportUrl() {
+    const params = new URLSearchParams();
+    if (sheetTypeId) params.set("sheetTypeId", sheetTypeId);
+    if (floor) params.set("floor", floor);
+    if (category) params.set("category", category);
+    return `/api/qc/documents/export?${params.toString()}`;
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2 items-end">
+        <label className="block">
+          <span className="text-xs text-zinc-400">Hệ</span>
+          <select
+            value={sheetTypeId}
+            onChange={(e) => setSheetTypeId(e.target.value)}
+            className="mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs focus:outline-none"
+            aria-label="Lọc theo hệ"
+          >
+            <option value="">— Mọi hệ —</option>
+            {sheets.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="text-xs text-zinc-400">Tầng</span>
+          <input
+            value={floor}
+            onChange={(e) => setFloor(e.target.value)}
+            placeholder="vd: T5"
+            className="mt-1 w-24 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs focus:outline-none"
+            aria-label="Lọc theo tầng"
+          />
+        </label>
+        <label className="block">
+          <span className="text-xs text-zinc-400">Loại hồ sơ</span>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs focus:outline-none"
+            aria-label="Lọc theo loại hồ sơ"
+          >
+            <option value="">— Mọi loại —</option>
+            {Object.entries(DOC_CATEGORY_LABEL).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          onClick={() => setUploadOpen(true)}
+          className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 py-2 rounded-lg text-sm font-semibold transition"
+        >
+          <Upload className="w-4 h-4" /> Nộp hồ sơ
+        </button>
+        {canExport && (
+          <a
+            href={exportUrl()}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-2 border border-zinc-700 hover:border-zinc-500 text-zinc-300 px-3 py-2 rounded-lg text-sm font-semibold transition"
+          >
+            <FileText className="w-4 h-4" /> Xuất hồ sơ tầng
+          </a>
+        )}
+      </div>
+
+      {loading ? (
+        <p className="text-xs text-zinc-500">Đang tải...</p>
+      ) : docs.length === 0 ? (
+        <EmptyState
+          icon={FileText}
+          title="Chưa có hồ sơ nào khớp bộ lọc"
+          message='Bấm "Nộp hồ sơ" để đính kèm biên bản/tài liệu cho 1 task.'
+        />
+      ) : (
+        <div className="space-y-2">
+          {docs.map((d) => (
+            <div
+              key={d.id}
+              className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 flex items-start justify-between gap-3"
+            >
+              <div className="min-w-0">
+                <p className="font-semibold text-sm flex items-center gap-2 flex-wrap">
+                  {d.taskCode} — {d.taskName}
+                  {d.docCategory && (
+                    <span
+                      className={`text-[10px] border rounded-full px-2 py-0.5 ${badgeClass("neutral")}`}
+                    >
+                      {DOC_CATEGORY_LABEL[d.docCategory] ?? d.docCategory}
+                    </span>
+                  )}
+                </p>
+                <p className="text-[11px] text-zinc-400 mt-1">
+                  {d.sheetType ?? "—"} · {d.floorLabel ?? "—"} ·{" "}
+                  {d.caption || d.originalName || "Tài liệu"} · {d.uploaderName ?? "—"} ·{" "}
+                  {new Date(d.createdAt).toLocaleDateString("vi-VN")}
+                </p>
+              </div>
+              <a
+                href={`/api/documents/${d.id}`}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Tải hồ sơ ${d.originalName ?? d.id}`}
+                className="text-zinc-500 hover:text-emerald-400 shrink-0"
+              >
+                <Download className="w-4 h-4" />
+              </a>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {uploadOpen && (
+        <DocUploadModal
+          onClose={() => setUploadOpen(false)}
+          onSaved={() => {
+            setUploadOpen(false);
+            load();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function DocUploadModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const [q, setQ] = useState("");
+  const [hits, setHits] = useState<TaskHit[]>([]);
+  const [task, setTask] = useState<TaskHit | null>(null);
+  const [category, setCategory] = useState("cong_viec");
+  const [caption, setCaption] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const term = q.trim();
+    if (term.length < 2) {
+      setHits([]);
+      return;
+    }
+    const t = setTimeout(() => {
+      fetch(`/api/search?q=${encodeURIComponent(term)}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => setHits((j?.hits ?? []).filter((h: { kind: string }) => h.kind === "task")))
+        .catch(() => setHits([]));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  async function save() {
+    if (!task) {
+      showToast("Chọn task cần đính kèm hồ sơ", "error");
+      return;
+    }
+    if (!file) {
+      showToast("Chọn file cần nộp", "error");
+      return;
+    }
+    setSaving(true);
+    try {
+      const fd = new FormData();
+      fd.set("file", file);
+      fd.set("docCategory", category);
+      if (caption.trim()) fd.set("caption", caption.trim());
+      const res = await fetch(`/api/tasks/${task.id}/documents`, { method: "POST", body: fd });
+      if (!res.ok) {
+        const j = await res.json().catch(() => null);
+        showToast(j?.error ?? "Nộp hồ sơ thất bại", "error");
+        return;
+      }
+      onSaved();
+    } catch {
+      showToast("Mất kết nối — không nộp được", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal onClose={onClose} className="max-w-md">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-bold">Nộp hồ sơ chất lượng</h2>
+        <button onClick={onClose} aria-label="Đóng" className="text-zinc-500 hover:text-zinc-200">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+      <div className="space-y-3 text-sm">
+        <div>
+          <span className="text-xs text-zinc-400">Task</span>
+          {task ? (
+            <div className="mt-1 flex items-center justify-between bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2">
+              <span className="text-xs">
+                {task.code} — {task.name}
+              </span>
+              <button onClick={() => setTask(null)} aria-label="Bỏ chọn task">
+                <X className="w-3.5 h-3.5 text-zinc-500 hover:text-rose-400" />
+              </button>
+            </div>
+          ) : (
+            <div className="relative mt-1">
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Tìm task theo mã/tên..."
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs focus:outline-none"
+              />
+              {hits.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg overflow-hidden max-h-40 overflow-y-auto">
+                  {hits.map((h) => (
+                    <button
+                      key={h.id}
+                      onClick={() => {
+                        setTask(h);
+                        setQ("");
+                        setHits([]);
+                      }}
+                      className="w-full text-left px-3 py-1.5 text-xs hover:bg-zinc-700 transition"
+                    >
+                      {h.code} — {h.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <label className="block">
+          <span className="text-xs text-zinc-400">Loại hồ sơ</span>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none"
+          >
+            {Object.entries(DOC_CATEGORY_LABEL).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </select>
+          {category === "chuyen_buoc" && (
+            <p className="text-[11px] text-amber-400 mt-1">
+              Biên bản chuyển bước — mở khoá hold-point cho nhóm công việc kế tiếp phụ thuộc task
+              này.
+            </p>
+          )}
+        </label>
+
+        <label className="block">
+          <span className="text-xs text-zinc-400">Ghi chú (tuỳ chọn)</span>
+          <input
+            value={caption}
+            onChange={(e) => setCaption(e.target.value)}
+            className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none"
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-xs text-zinc-400">File (PDF/ảnh, tối đa 20MB)</span>
+          <input
+            type="file"
+            accept="application/pdf,image/*"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            className="mt-1 w-full text-xs text-zinc-300"
+          />
+        </label>
+      </div>
+      <div className="flex justify-end gap-2 mt-4">
+        <button onClick={onClose} className="text-xs text-zinc-400 hover:text-zinc-200 px-3 py-2">
+          Huỷ
+        </button>
+        <button
+          onClick={save}
+          disabled={saving}
+          className="text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white px-3 py-2 rounded-lg transition"
+        >
+          {saving ? "Đang nộp..." : "Nộp hồ sơ"}
         </button>
       </div>
     </Modal>

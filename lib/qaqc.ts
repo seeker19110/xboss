@@ -100,6 +100,24 @@ export type InspectionResult = {
   note?: string;
 };
 
+// Phân loại hồ sơ chất lượng (task_documents.doc_category) — 'chuyen_buoc' là biên bản
+// bàn giao chuyển bước, dùng trực tiếp trong handoverBlocked() ở trên.
+export const DOC_CATEGORIES = [
+  "vat_lieu",
+  "cong_viec",
+  "giai_doan",
+  "chuyen_buoc",
+  "hoan_cong",
+] as const;
+export type DocCategory = (typeof DOC_CATEGORIES)[number];
+export const DOC_CATEGORY_LABEL: Record<DocCategory, string> = {
+  vat_lieu: "Vật liệu",
+  cong_viec: "Công việc",
+  giai_doan: "Giai đoạn",
+  chuyen_buoc: "Chuyển bước",
+  hoan_cong: "Hoàn công",
+};
+
 export function validateInspectionResults(results: unknown): results is InspectionResult[] {
   if (!Array.isArray(results)) return false;
   return results.every(

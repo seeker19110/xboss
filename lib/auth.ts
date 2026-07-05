@@ -165,6 +165,7 @@ export const CAN = {
   assign: (r?: Role) => r === "admin" || r === "pm", // gán task cho người làm
   approve: (r?: Role) => r === "admin" || r === "pm", // duyệt/huỷ nghiệm thu
   viewPayments: (r?: Role) => !!r && PAYMENT_VIEW_ROLES.includes(r), // xem trang thanh toán
+  createInspectionRequest: (r?: Role) => r === "admin" || r === "pm" || r === "engineer", // tạo phiếu YCNT
 };
 
 // Sub-con chỉ được thao tác trên task được giao cho mình.
