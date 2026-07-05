@@ -3,6 +3,7 @@ import Script from "next/script";
 import "./globals.css";
 import PwaRegister from "@/app/components/PwaRegister";
 import AppDialogs from "@/app/components/dialogs";
+import ToastHost from "@/app/components/Toast";
 import BottomBarSpacer from "@/app/components/BottomBarSpacer";
 
 export const metadata: Metadata = {
@@ -28,10 +29,15 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           id="theme-init"
           strategy="beforeInteractive"
         >{`try{var T=['dark','light','kingblue','darkblue','navy'];var t=localStorage.getItem('xboss_theme');if(t&&T.indexOf(t)>=0&&t!=='dark'){var e=document.documentElement;e.classList.remove('dark');e.classList.add(t);}}catch(_){}`}</Script>
+        <Script
+          id="sidebar-init"
+          strategy="beforeInteractive"
+        >{`try{if(localStorage.getItem('xboss_sidebar')==='1')document.documentElement.classList.add('sidebar-collapsed');}catch(_){}`}</Script>
       </head>
       <body className="min-h-full flex flex-col">
         <PwaRegister />
         <AppDialogs />
+        <ToastHost />
         {children}
         <footer className="mt-auto py-3 px-4 text-center text-[10px] text-zinc-400 border-t border-zinc-900 print:hidden">
           © {new Date().getFullYear()} XBoss — Phát triển bởi{" "}

@@ -1,48 +1,33 @@
 "use client";
 import { useEffect, useState, type ReactNode } from "react";
-import { LayoutDashboard, ClipboardList, Package, CheckSquare } from "lucide-react";
+import {
+  Menu,
+  X,
+  PanelLeftClose,
+  PanelLeftOpen,
+  LayoutDashboard,
+  ChevronRight,
+} from "lucide-react";
 import NotificationBell from "@/app/components/NotificationBell";
 import GlobalSearch from "@/app/components/GlobalSearch";
 import ThemeToggle from "@/app/components/ThemeToggle";
-import EditableText from "@/app/components/EditableText";
 import OnlineUsers from "@/app/components/OnlineUsers";
 import { fetchMe } from "@/app/lib/me";
+import { NAV_GROUPS, isNavItemActive, canSeeNavItem, findActiveNav } from "@/app/lib/nav";
 
 type Me = { id: number; name: string; email: string; role: string };
 
-const NAV = [
-  {
-    href: "/",
-    tkey: "nav.dashboard",
-    label: "ACMV",
-    icon: LayoutDashboard,
-    color: "text-emerald-400",
-  },
-  {
-    href: "/my-tasks",
-    tkey: "nav.my_tasks",
-    label: "Việc của tôi",
-    icon: ClipboardList,
-    color: "text-violet-400",
-  },
-  {
-    href: "/materials",
-    tkey: "nav.materials",
-    label: "Vật tư",
-    icon: Package,
-    color: "text-sky-400",
-  },
-];
+const SIDEBAR_KEY = "xboss_sidebar";
 
-// Nghiệm thu chuyển xuống thanh cố định dưới đáy cùng ô tìm kiếm — đỡ chật hàng nav chính.
-const APPROVALS_NAV = {
-  href: "/approvals",
-  tkey: "nav.approvals",
-  label: "Nghiệm thu",
-  icon: CheckSquare,
-  color: "text-teal-400",
-};
-
+// AppShell: sidebar trái (thu gọn được, drawer trên mobile) + topbar mỏng hiển thị
+// title/breadcrumb của mục đang chọn. Giữ nguyên props API cũ (title/subtitle/children/
+// search/bottomActions) để mọi trang gọi AppHeader không phải sửa gì (M0 — xem
+// docs/nang-cap/M00-khung-ui-sidebar.md).
+//
+// Trạng thái thu gọn desktop điều khiển bằng class `sidebar-collapsed` trên <html>
+// (đặt bởi script beforeInteractive trong layout.tsx, giống cơ chế theme) — tránh
+// giật layout lúc tải trang. State `collapsed` ở đây chỉ để đồng bộ icon nút bấm,
+// không quyết định bố cục (bố cục do CSS trong globals.css đảm nhiệm).
 export default function AppHeader({
   title,
   subtitle,
@@ -60,66 +45,141 @@ export default function AppHeader({
 }) {
   const [me, setMe] = useState<Me | null>(null);
   const [path, setPath] = useState("");
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     setPath(window.location.pathname);
     fetchMe().then((u) => setMe(u));
+    setCollapsed(document.documentElement.classList.contains("sidebar-collapsed"));
   }, []);
 
-  // Ô tìm kiếm toàn cục + nút Nghiệm thu chỉ hiện ở trang chủ; trang khác chỉ giữ hành động riêng.
+  function toggleCollapsed() {
+    const next = !collapsed;
+    setCollapsed(next);
+    document.documentElement.classList.toggle("sidebar-collapsed", next);
+    try {
+      localStorage.setItem(SIDEBAR_KEY, next ? "1" : "0");
+    } catch {
+      /* private mode */
+    }
+  }
+
   const isHome = path === "/";
+  const active = path ? findActiveNav(path) : undefined;
+  const pageTitle = title ?? active?.item.label ?? "XBoss";
+  const breadcrumbGroup =
+    !title && active && active.group.label !== active.item.label ? active.group.label : undefined;
 
   return (
     <>
-      <header className="sticky top-0 z-40 bg-zinc-950 border-b border-zinc-800 safe-top print:hidden">
-        {/* Hàng duy nhất: nav · [title trang con] · controls */}
-        <div className="flex items-center gap-1 px-3 sm:px-6 h-12 min-w-0 max-w-screen-xl mx-auto">
-          {/* Nav chính — cuộn ngang khi chật, ẩn label trên mobile */}
-          <nav
-            className="flex items-center gap-0.5 overflow-x-auto scrollbar-none min-w-0"
-            style={{ WebkitOverflowScrolling: "touch" } as React.CSSProperties}
-            aria-label="Điều hướng chính"
+      {/* ── Sidebar (desktop: cố định thu gọn được · mobile: drawer off-canvas) ──
+          Chiều rộng/ẩn nhãn khi thu gọn do CSS đảm nhiệm (xem #app-sidebar, .sidebar-label
+          trong globals.css) — ở đây chỉ toggle-transform cho drawer mobile. */}
+      <aside
+        id="app-sidebar"
+        className={`fixed inset-y-0 left-0 z-50 flex flex-col w-60 bg-zinc-950 border-r border-zinc-800 safe-top
+          transition-transform duration-200 lg:translate-x-0
+          ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
+          print:hidden`}
+      >
+        <div className="flex items-center gap-2 h-12 px-3 border-b border-zinc-800 shrink-0">
+          <LayoutDashboard className="w-5 h-5 text-emerald-400 shrink-0" />
+          <span className="sidebar-label text-sm font-bold truncate">XBoss</span>
+          <button
+            onClick={() => setMobileOpen(false)}
+            aria-label="Đóng menu"
+            className="ml-auto p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-900 lg:hidden"
           >
-            {NAV.map((n) => {
-              const active = path === n.href || (n.href !== "/" && path.startsWith(n.href));
-              const Icon = n.icon;
-              return (
-                <a
-                  key={n.href}
-                  href={n.href}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs whitespace-nowrap transition ${
-                    active
-                      ? "bg-zinc-800 text-white font-medium"
-                      : "text-zinc-400 hover:text-white hover:bg-zinc-900"
-                  }`}
-                  aria-label={n.label}
-                  aria-current={active ? "page" : undefined}
-                >
-                  <Icon className={`w-4 h-4 shrink-0 ${n.color}`} />
-                  <span className="hidden sm:inline">
-                    <EditableText tkey={n.tkey}>{n.label}</EditableText>
-                  </span>
-                </a>
-              );
-            })}
-          </nav>
+            <X className="w-4 h-4" />
+          </button>
+        </div>
 
-          {/* Tiêu đề trang con (tracking, admin…) */}
-          {title && (
-            <div className="min-w-0 flex-1 px-2 border-l border-zinc-800 ml-1">
-              <div className="text-sm font-semibold truncate flex items-center gap-1.5">
-                {title}
+        <nav className="flex-1 overflow-y-auto py-2" aria-label="Điều hướng chính">
+          {NAV_GROUPS.map((group) => {
+            const items = group.items.filter((it) => canSeeNavItem(it, me?.role));
+            if (items.length === 0) return null;
+            return (
+              <div key={group.label} className="mb-3">
+                <div className="sidebar-label px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+                  {group.label}
+                </div>
+                {items.map((item) => {
+                  const itemActive = isNavItemActive(item, path);
+                  const Icon = item.icon;
+                  return (
+                    <a
+                      key={item.href}
+                      href={item.href}
+                      title={item.label}
+                      aria-current={itemActive ? "page" : undefined}
+                      className={`flex items-center gap-2.5 mx-2 px-2.5 py-2 rounded-lg text-sm transition min-h-10 border-l-2 ${
+                        itemActive
+                          ? "bg-zinc-800 text-white font-medium border-emerald-400"
+                          : "text-zinc-400 hover:text-white hover:bg-zinc-900/60 border-transparent"
+                      }`}
+                    >
+                      <Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
+                      <span className="sidebar-label">{item.label}</span>
+                    </a>
+                  );
+                })}
               </div>
-              {subtitle && (
-                <p className="text-[11px] text-zinc-400 truncate leading-none">{subtitle}</p>
-              )}
-            </div>
+            );
+          })}
+        </nav>
+
+        <button
+          onClick={toggleCollapsed}
+          aria-label={collapsed ? "Mở rộng menu" : "Thu gọn menu"}
+          className="hidden lg:flex items-center gap-2.5 px-2.5 py-2.5 mx-2 mb-2 rounded-lg text-xs text-zinc-400 hover:text-white hover:bg-zinc-900/60 border-t border-zinc-800 shrink-0"
+        >
+          {collapsed ? (
+            <PanelLeftOpen className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
+          ) : (
+            <PanelLeftClose className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
           )}
+          <span className="sidebar-label">Thu gọn</span>
+        </button>
+      </aside>
 
-          {/* Spacer khi không có title */}
-          {!title && <div className="flex-1 min-w-0" />}
+      {/* Overlay tối khi drawer mobile đang mở */}
+      {mobileOpen && (
+        <div
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+          className="fixed inset-0 z-40 bg-black/60 lg:hidden"
+        />
+      )}
 
-          {/* Controls bên phải */}
+      {/* ── Topbar ── */}
+      <header className="sticky top-0 z-30 bg-zinc-950 border-b border-zinc-800 safe-top print:hidden">
+        <div className="flex items-center gap-2 px-3 sm:px-6 h-12 min-w-0">
+          <button
+            onClick={() => setMobileOpen(true)}
+            aria-label="Mở menu"
+            className="p-1.5 -ml-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-900 lg:hidden shrink-0"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold truncate flex items-center gap-1.5">
+              {breadcrumbGroup && (
+                <>
+                  <span className="text-zinc-400 font-normal hidden sm:inline">
+                    {breadcrumbGroup}
+                  </span>
+                  <ChevronRight className="w-3.5 h-3.5 text-zinc-600 hidden sm:inline shrink-0" />
+                </>
+              )}
+              <span className="inline-flex items-center gap-1.5 min-w-0 truncate">{pageTitle}</span>
+            </div>
+            {subtitle && (
+              <p className="text-[11px] text-zinc-400 truncate leading-none">{subtitle}</p>
+            )}
+          </div>
+
           <div className="flex items-center gap-1 shrink-0 ml-1">
             {children}
             <ThemeToggle />
@@ -142,32 +202,16 @@ export default function AppHeader({
         </div>
       </header>
 
-      {/* Thanh cố định dưới đáy — chỉ hiện khi có nội dung: tìm kiếm + Nghiệm thu chỉ ở trang chủ,
-          hành động riêng của trang (Excel/PDF/Import…) ở trang có truyền bottomActions. */}
+      {/* Thanh cố định dưới đáy — chỉ hiện khi có nội dung: tìm kiếm chỉ ở trang chủ,
+          hành động riêng của trang (Excel/PDF/Import…) ở trang có truyền bottomActions.
+          .app-bottombar tự bù chiều rộng sidebar trên desktop (xem globals.css). */}
       {(isHome || bottomActions) && (
-        <div className="fixed bottom-0 inset-x-0 z-40 bg-zinc-950 border-t border-zinc-800 safe-bottom print:hidden">
-          <div className="flex items-center gap-2 px-3 sm:px-6 py-2 max-w-screen-xl mx-auto overflow-x-auto scrollbar-none">
+        <div className="app-bottombar fixed bottom-0 inset-x-0 z-30 bg-zinc-950 border-t border-zinc-800 safe-bottom print:hidden">
+          <div className="flex items-center gap-2 px-3 sm:px-6 py-2 overflow-x-auto scrollbar-none">
             {search && isHome && (
               <div className="flex-1 min-w-[140px]">
                 <GlobalSearch />
               </div>
-            )}
-            {isHome && (
-              <a
-                href="/approvals"
-                className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs whitespace-nowrap transition shrink-0 ${
-                  path === APPROVALS_NAV.href || path.startsWith(APPROVALS_NAV.href)
-                    ? "bg-zinc-800 text-white font-medium"
-                    : "text-zinc-400 hover:text-white hover:bg-zinc-900"
-                }`}
-                aria-label={APPROVALS_NAV.label}
-                aria-current={path.startsWith(APPROVALS_NAV.href) ? "page" : undefined}
-              >
-                <APPROVALS_NAV.icon className={`w-4 h-4 shrink-0 ${APPROVALS_NAV.color}`} />
-                <span className="hidden sm:inline">
-                  <EditableText tkey={APPROVALS_NAV.tkey}>{APPROVALS_NAV.label}</EditableText>
-                </span>
-              </a>
             )}
             {bottomActions}
           </div>
