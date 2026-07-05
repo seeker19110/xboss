@@ -176,6 +176,10 @@ export const CAN = {
   manageDrawings: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
   // Đổi trạng thái duyệt rev (approved/rejected/...) — chỉ Admin/PM.
   decideDrawingRevision: (r?: Role) => r === "admin" || r === "pm",
+  // Đấu thầu (M7): giá chào là thông tin thương mại nhạy cảm — xem như VO (loại
+  // cdt/subcon/viewer); tạo gói/nhập giá chào/trao thầu chỉ Admin/PM.
+  viewTenders: (r?: Role) => r === "admin" || r === "pm" || r === "engineer" || r === "bch",
+  manageTenders: (r?: Role) => r === "admin" || r === "pm",
 };
 
 // Sub-con chỉ được thao tác trên task được giao cho mình.

@@ -28,11 +28,13 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
       "Chi phí",
       "Hợp đồng",
       "Phát sinh",
+      "Thanh toán KL",
+      "Đấu thầu",
       "Tài khoản",
       "Phân công",
       "Import Excel",
     ]) {
-      await expect(sidebar.getByRole("link", { name: label })).toBeVisible();
+      await expect(sidebar.getByRole("link", { name: label, exact: true })).toBeVisible();
     }
   });
 

@@ -6,6 +6,7 @@ import { poLateList, vehicleLateList } from "@/lib/procurement";
 import { missingDiaryDates } from "@/lib/diary";
 import { expiringContracts } from "@/lib/contracts";
 import { pendingVariations } from "@/lib/vo";
+import { overContractCerts, pendingCerts } from "@/lib/paymentcerts";
 
 export const dynamic = "force-dynamic";
 
@@ -235,6 +236,54 @@ export async function GET() {
         WHERE user_id = ? AND type = 'contract_expiry' AND is_read = 0 AND contract_id <> ALL(?)`,
       user.id,
       expiringIds,
+    );
+
+    // HĐ có đợt IPC đã duyệt mà luỹ kế nghiệm thu vượt giá trị HĐ (gồm phụ lục) → cảnh báo (M17).
+    const overCerts = await overContractCerts();
+    if (overCerts.length > 0) {
+      const values = overCerts.map(() => `(?, ?, 'cert_over_contract', ?)`).join(", ");
+      const params = overCerts.flatMap((c) => [
+        user.id,
+        c.contractId,
+        `📈 Hợp đồng ${c.contractCode} — ${c.contractTitle} luỹ kế nghiệm thu vượt giá trị HĐ (${Math.round((c.cumulativeValue / c.contractValue) * 100)}%)`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, contract_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, type, contract_id) WHERE contract_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    const overCertIds = overCerts.map((c) => c.contractId);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'cert_over_contract' AND is_read = 0 AND contract_id <> ALL(?)`,
+      user.id,
+      overCertIds,
+    );
+  }
+
+  // Đợt thanh toán (IPC) đã trình quá hạn chưa quyết định → nhắc Admin/PM (M17).
+  if (isAdminOrPm(user.role)) {
+    const pendingCertsList = await pendingCerts();
+    if (pendingCertsList.length > 0) {
+      const values = pendingCertsList.map(() => `(?, ?, 'cert_pending', ?)`).join(", ");
+      const params = pendingCertsList.flatMap((c) => [
+        user.id,
+        c.id,
+        `💳 Đợt thanh toán ${c.code} (HĐ ${c.contractCode}) đã trình từ ${c.submittedAt}, chưa được quyết định`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, payment_cert_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, type, payment_cert_id) WHERE payment_cert_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    const pendingCertIds = pendingCertsList.map((c) => c.id);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'cert_pending' AND is_read = 0 AND payment_cert_id <> ALL(?)`,
+      user.id,
+      pendingCertIds,
     );
   }
 

@@ -19,6 +19,12 @@ test.describe("Dashboard (sau đăng nhập)", () => {
     await gotoDashboard(page);
   });
 
+  test("khối mở rộng M9 (NCR + so sánh chéo hệ) hiển thị", async ({ page }) => {
+    await gotoDashboard(page);
+    await expect(page.getByText("NCR mở", { exact: false }).first()).toBeVisible();
+    await expect(page.getByText("So sánh chéo hệ", { exact: false })).toBeVisible();
+  });
+
   test("không có vi phạm a11y nghiêm trọng (axe)", async ({ page }) => {
     await gotoDashboard(page);
 

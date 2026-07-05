@@ -1,4 +1,4 @@
--- 0014_drawings.sql — M8: Drawing register (bản vẽ shop/asbuilt/BIM + biện pháp thi
+-- 0016_drawings.sql — M8: Drawing register (bản vẽ shop/asbuilt/BIM + biện pháp thi
 -- công) với lịch sử revision + trạng thái trình duyệt. Thay thế dần cơ chế 1 file
 -- gắn work_package (work_packages.drawing_*, giữ nguyên cho tới khi UI mới thay hẳn).
 -- Xem docs/nang-cap/M08-ban-ve.md.
