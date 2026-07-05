@@ -2,6 +2,7 @@
 // và các module sau (M2/M3/M8/M14). Logic tính KPI tách khỏi route để test tích hợp
 // trực tiếp qua DB (cùng pattern lib/report.ts, lib/recompute.ts).
 import { query, queryOne, todayISO } from "@/lib/db";
+import { disciplineBudget } from "@/lib/cost";
 
 export type DisciplineSummary = {
   discipline: { id: number; code: string; name: string; color: string | null };
@@ -52,7 +53,10 @@ export async function listDisciplines() {
   );
 }
 
-export async function getDisciplineSummary(code: string): Promise<DisciplineSummary | null> {
+export async function getDisciplineSummary(
+  code: string,
+  opts: { withCost?: boolean } = {},
+): Promise<DisciplineSummary | null> {
   const discipline = await queryOne<{
     id: number;
     code: string;
@@ -133,7 +137,7 @@ export async function getDisciplineSummary(code: string): Promise<DisciplineSumm
     waitingApprovalCount: overall?.waitingApproval ?? 0,
     contractors,
     ncrOpen: null,
-    budget: null,
+    budget: opts.withCost ? await disciplineBudget(discipline.id) : null,
     drawingsPending: null,
     floorsPending: null,
   };

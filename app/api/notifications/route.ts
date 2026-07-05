@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query, run, todayISO, daysFromTodayISO } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, CAN } from "@/lib/auth";
+import { costSummary, getCostSettings } from "@/lib/cost";
 
 export const dynamic = "force-dynamic";
 
@@ -174,6 +175,37 @@ export async function GET() {
           AND material_id NOT IN (
             SELECT id FROM materials WHERE qty_planned > 0 AND qty_used > qty_planned)`,
       user.id,
+    );
+  }
+
+  // Vượt ngân sách theo hệ → cảnh báo Admin/PM/BCH (subcon/cdt/viewer/engineer không xem chi phí).
+  if (CAN.viewPayments(user.role)) {
+    const settings = await getCostSettings();
+    const rows = await costSummary("system");
+    const over = rows.filter(
+      (r) => r.budget > 0 && (r.committed / r.budget) * 100 >= settings.warnPct,
+    );
+
+    if (over.length > 0) {
+      const values = over.map(() => `(?, ?, 'cost_over', ?)`).join(", ");
+      const params = over.flatMap((r) => {
+        const pct = Math.round((r.committed / r.budget) * 100);
+        return [user.id, r.key, `💰 Hệ "${r.label}" cam kết đạt ${pct}% ngân sách`];
+      });
+      await run(
+        `INSERT INTO notifications (user_id, cost_group, type, message) VALUES ${values}
+         ON CONFLICT (user_id, type, cost_group) WHERE cost_group IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+
+    const overKeys = over.map((r) => r.key);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'cost_over' AND is_read = 0
+          AND cost_group <> ALL(?)`,
+      user.id,
+      overKeys,
     );
   }
 

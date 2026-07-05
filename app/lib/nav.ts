@@ -15,6 +15,7 @@ import {
   Package,
   Truck,
   Wallet,
+  Coins,
   Users,
   ShieldCheck,
   Upload,
@@ -64,7 +65,10 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Tiền",
-    items: [{ href: "/payments", label: "Thanh toán", icon: Wallet }],
+    items: [
+      { href: "/payments", label: "Thanh toán", icon: Wallet },
+      { href: "/costs", label: "Chi phí", icon: Coins, roles: ["admin", "pm", "bch"] },
+    ],
   },
   {
     label: "Quản trị",
