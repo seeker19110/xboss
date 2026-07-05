@@ -15,6 +15,9 @@
 ## Đang làm
 
 - Áp khung brownfield Bước 0 → Lớp 1 (đợt này, nhánh `chore/ap-dung-khung-brownfield`).
+- **Triển khai kế hoạch nâng cấp** theo `docs/nang-cap/` — bắt đầu từ **M0 (khung UI sidebar)**:
+  - ~~PR 1: AppShell (sidebar trái thu gọn được + title/breadcrumb topbar)~~ → **đã xong**: `AppHeader.tsx` viết lại thành sidebar cố định (desktop, thu gọn bằng CSS class `sidebar-collapsed` trên `<html>` set bởi script beforeInteractive — không giật layout, giống cơ chế theme) + drawer off-canvas (mobile); cấu hình menu 1 nguồn `app/lib/nav.ts` (6 nhóm, ẩn mục theo vai trò — chỉ UX, API vẫn là ranh giới bảo mật thật); topbar suy title/breadcrumb từ pathname, trang tự truyền `title` vẫn ưu tiên (không phải sửa 19 trang gọi `AppHeader`). Bỏ nút "Nghiệm thu" trùng lặp khỏi thanh dưới đáy (đã có trong sidebar). Verify: `e2e/authed/appshell.spec.ts` (9 ca: đủ menu theo vai trò, title đổi theo trang, thu gọn giữ trạng thái sau reload, axe, drawer mobile) + toàn bộ 54 e2e authed khác vẫn xanh (không trang nào vỡ) + 58 test tích hợp + lint/typecheck/build xanh.
+  - Còn lại PR 2 (tinh chỉnh responsive các trang bị ảnh hưởng) và PR 3 (Toast/EmptyState/focus ring) theo `docs/nang-cap/M00-khung-ui-sidebar.md`.
 
 ## Đợt audit toàn dự án (2026-07)
 

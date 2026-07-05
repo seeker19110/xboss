@@ -186,3 +186,35 @@ body {
 .safe-top {
   padding-top: env(safe-area-inset-top, 0px);
 }
+
+/* Sidebar (AppShell — M0, xem docs/nang-cap/M00-khung-ui-sidebar.md).
+   Thu gọn desktop điều khiển bằng class `sidebar-collapsed` trên <html> (đặt bởi
+   script beforeInteractive trong layout.tsx, giống cơ chế theme) — bố cục quyết
+   định thuần bằng CSS, không phụ thuộc React state, nên không giật lúc tải trang.
+   `body:has(#app-sidebar)` chỉ áp dụng khi trang thực sự render sidebar (AppHeader) —
+   trang không dùng AppHeader (login, report in...) không bị ảnh hưởng. */
+@media (min-width: 1024px) {
+  body:has(#app-sidebar) {
+    padding-left: 15rem; /* khớp w-60 của #app-sidebar */
+    transition: padding-left 0.2s ease;
+  }
+  html.sidebar-collapsed body:has(#app-sidebar) {
+    padding-left: 3.5rem;
+  }
+  html.sidebar-collapsed #app-sidebar {
+    width: 3.5rem;
+  }
+  .app-bottombar {
+    padding-left: 15rem;
+    transition: padding-left 0.2s ease;
+  }
+  html.sidebar-collapsed .app-bottombar {
+    padding-left: 3.5rem;
+  }
+  .sidebar-label {
+    display: none;
+  }
+  html:not(.sidebar-collapsed) .sidebar-label {
+    display: inline;
+  }
+}

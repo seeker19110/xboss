@@ -28,6 +28,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           id="theme-init"
           strategy="beforeInteractive"
         >{`try{var T=['dark','light','kingblue','darkblue','navy'];var t=localStorage.getItem('xboss_theme');if(t&&T.indexOf(t)>=0&&t!=='dark'){var e=document.documentElement;e.classList.remove('dark');e.classList.add(t);}}catch(_){}`}</Script>
+        <Script
+          id="sidebar-init"
+          strategy="beforeInteractive"
+        >{`try{if(localStorage.getItem('xboss_sidebar')==='1')document.documentElement.classList.add('sidebar-collapsed');}catch(_){}`}</Script>
       </head>
       <body className="min-h-full flex flex-col">
         <PwaRegister />
