@@ -21,6 +21,7 @@ import {
   Users,
   ShieldCheck,
   Upload,
+  NotebookPen,
 } from "lucide-react";
 import type { Role } from "@/lib/roles";
 
@@ -57,6 +58,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/approvals", label: "Nghiệm thu", icon: CheckSquare },
       { href: "/boq", label: "BOQ", icon: Calculator },
       { href: "/quality", label: "Chất lượng", icon: ClipboardCheck },
+      { href: "/diary", label: "Nhật ký", icon: NotebookPen },
     ],
   },
   {
