@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, run, withTransaction } from "@/lib/db";
 import { recomputeTask } from "@/lib/recompute";
 import { getCurrentUser, canTouchTask, CAN } from "@/lib/auth";
-import { handoverBlocked } from "@/lib/qaqc";
+import { handoverBlocked, methodStatementBlocked } from "@/lib/qaqc";
 
 export const dynamic = "force-dynamic";
 
@@ -51,12 +51,16 @@ export async function PATCH(req: NextRequest) {
       );
   }
 
-  // Hold point chuyển bước (M3): chỉ chặn khi TICK — kiểm từng package liên quan (dedup).
+  // Hold point chuyển bước (M3) + gate biện pháp thi công (M8): chỉ chặn khi TICK —
+  // kiểm từng package liên quan (dedup).
   if (installed) {
     const packageIds = [...new Set(dims.map((d) => d.package_id))];
     for (const pid of packageIds) {
       const gate = await handoverBlocked(pid);
       if (gate.blocked) return NextResponse.json({ error: gate.reason }, { status: 409 });
+      const methodGate = await methodStatementBlocked(pid);
+      if (methodGate.blocked)
+        return NextResponse.json({ error: methodGate.reason }, { status: 409 });
     }
   }
 

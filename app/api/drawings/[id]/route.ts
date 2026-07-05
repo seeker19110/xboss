@@ -27,6 +27,7 @@ export async function GET(
     `SELECT d.id, d.code, d.name, d.kind, d.system_group AS "systemGroup",
             d.floor_label AS "floorLabel", d.work_package_id AS "workPackageId",
             wp.code AS "workPackageCode", wp.name AS "workPackageName",
+            wp.requires_method_statement AS "workPackageRequiresMethodStatement",
             d.created_at AS "createdAt"
        FROM drawings d LEFT JOIN work_packages wp ON wp.id = d.work_package_id
       WHERE d.id = ?`,

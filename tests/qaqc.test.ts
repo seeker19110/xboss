@@ -94,6 +94,63 @@ test(
 );
 
 test(
+  "methodStatementBlocked: chặn tick khi package đánh dấu cần biện pháp mà chưa có rev method approved",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { methodStatementBlocked } = await import("@/lib/qaqc");
+
+    const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test method gate')`);
+    const towerId = await insertId(
+      `INSERT INTO towers (project_id, name) VALUES (?, 'Tháp T')`,
+      projectId,
+    );
+    const stId = await insertId(
+      `INSERT INTO sheet_types (tower_id, code, name) VALUES (?, 'TESTMETHOD', 'Sheet method')`,
+      towerId,
+    );
+    const pkgId = await insertId(
+      `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'M1', 'Nhóm method')`,
+      stId,
+    );
+
+    // Chưa đánh dấu requires_method_statement → không bao giờ bị chặn.
+    assert.equal((await methodStatementBlocked(pkgId)).blocked, false);
+
+    await run(`UPDATE work_packages SET requires_method_statement = TRUE WHERE id = ?`, pkgId);
+    // Đã đánh dấu nhưng chưa có drawing method nào gắn package → bị chặn.
+    let gate = await methodStatementBlocked(pkgId);
+    assert.equal(gate.blocked, true);
+    assert.match(gate.reason ?? "", /M1/);
+
+    const drawingId = await insertId(
+      `INSERT INTO drawings (code, name, kind, work_package_id) VALUES ('BPTC-01', 'Biện pháp lắp ống', 'method', ?)`,
+      pkgId,
+    );
+    const revId = await insertId(
+      `INSERT INTO drawing_revisions (drawing_id, rev, file_name, mime_type, status)
+       VALUES (?, 'A', 'a.pdf', 'application/pdf', 'submitted')`,
+      drawingId,
+    );
+    // Có drawing method nhưng rev chưa approved → vẫn bị chặn.
+    gate = await methodStatementBlocked(pkgId);
+    assert.equal(gate.blocked, true);
+
+    await run(`UPDATE drawing_revisions SET status = 'approved' WHERE id = ?`, revId);
+    // Rev approved → mở khoá.
+    gate = await methodStatementBlocked(pkgId);
+    assert.equal(gate.blocked, false);
+
+    await run(`DELETE FROM drawing_revisions WHERE id = ?`, revId);
+    await run(`DELETE FROM drawings WHERE id = ?`, drawingId);
+    await run(`DELETE FROM work_packages WHERE id = ?`, pkgId);
+    await run(`DELETE FROM sheet_types WHERE id = ?`, stId);
+    await run(`DELETE FROM towers WHERE id = ?`, towerId);
+    await run(`DELETE FROM projects WHERE id = ?`, projectId);
+  },
+);
+
+test(
   "requiredInspectionMissing: chặn nghiệm thu khi checklist required chưa có inspection đạt",
   { skip: !HAS_TEST_DB },
   async () => {

@@ -86,6 +86,7 @@ export type DrawingRow = {
   workPackageId: number | null;
   workPackageCode: string | null;
   workPackageName: string | null;
+  workPackageRequiresMethodStatement: boolean | null;
   createdAt: string;
   latestRevisionId: number | null;
   latestRev: string | null;
@@ -132,6 +133,7 @@ export async function listDrawings(filters: DrawingFilters = {}): Promise<Drawin
     `SELECT d.id, d.code, d.name, d.kind, d.system_group AS "systemGroup",
             d.floor_label AS "floorLabel", d.work_package_id AS "workPackageId",
             wp.code AS "workPackageCode", wp.name AS "workPackageName",
+            wp.requires_method_statement AS "workPackageRequiresMethodStatement",
             d.created_at AS "createdAt",
             lr.id AS "latestRevisionId", lr.rev AS "latestRev", lr.status AS "latestStatus",
             lr.submitted_at AS "latestSubmittedAt", lr.decided_at AS "latestDecidedAt",

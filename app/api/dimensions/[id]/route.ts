@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { recomputeTask } from "@/lib/recompute";
 import { getCurrentUser, canTouchTask, CAN } from "@/lib/auth";
-import { handoverBlocked } from "@/lib/qaqc";
+import { handoverBlocked, methodStatementBlocked } from "@/lib/qaqc";
 
 export const dynamic = "force-dynamic";
 
@@ -40,10 +40,13 @@ export async function PATCH(
       { status: 403 },
     );
 
-  // Hold point chuyển bước (M3): chỉ chặn khi TICK (installed=true) — bỏ tick không cần mở khoá.
+  // Hold point chuyển bước (M3) + gate biện pháp thi công (M8): chỉ chặn khi TICK
+  // (installed=true) — bỏ tick không cần mở khoá.
   if (installed) {
     const gate = await handoverBlocked(dim.package_id);
     if (gate.blocked) return NextResponse.json({ error: gate.reason }, { status: 409 });
+    const methodGate = await methodStatementBlocked(dim.package_id);
+    if (methodGate.blocked) return NextResponse.json({ error: methodGate.reason }, { status: 409 });
   }
 
   const result = await withTransaction(async () => {
