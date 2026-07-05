@@ -3,6 +3,7 @@ import { query, run, todayISO, daysFromTodayISO } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { costSummary, getCostSettings } from "@/lib/cost";
 import { poLateList, vehicleLateList } from "@/lib/procurement";
+import { missingDiaryDates } from "@/lib/diary";
 
 export const dynamic = "force-dynamic";
 
@@ -297,6 +298,30 @@ export async function GET() {
         WHERE user_id = ? AND type = 'vehicle_late' AND is_read = 0 AND vehicle_id <> ALL(?)`,
       user.id,
       lateVehicleIds,
+    );
+  }
+
+  // Chưa lập nhật ký thi công cho ngày có cập nhật tiến độ → nhắc người lập (Admin/PM/Kỹ sư).
+  if (user.role === "admin" || user.role === "pm" || user.role === "engineer") {
+    const missingDates = await missingDiaryDates();
+    if (missingDates.length > 0) {
+      const values = missingDates.map(() => `(?, ?, 'diary_missing', ?)`).join(", ");
+      const params = missingDates.flatMap((d) => [
+        user.id,
+        d,
+        `📔 Chưa lập nhật ký thi công ngày ${d} (đã có cập nhật tiến độ)`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, diary_date, type, message) VALUES ${values}
+         ON CONFLICT (user_id, diary_date, type) WHERE diary_date IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'diary_missing' AND is_read = 0 AND diary_date <> ALL(?)`,
+      user.id,
+      missingDates,
     );
   }
 
