@@ -68,13 +68,14 @@ export async function PATCH(
     boqCode: "boq_code",
     drawingUrl: "drawing_url",
     bbntUrl: "bbnt_url",
+    requiresMethodStatement: "requires_method_statement",
   };
   const sets: string[] = [];
   const vals: unknown[] = [];
   for (const [key, col] of Object.entries(fields)) {
     if (body[key] !== undefined) {
       sets.push(`${col} = ?`);
-      vals.push(body[key]);
+      vals.push(key === "requiresMethodStatement" ? !!body[key] : body[key]);
     }
   }
   if (!sets.length)
@@ -89,7 +90,9 @@ export async function PATCH(
   // Bump updated_at của tất cả task trong nhóm → sheetVersion đổi → client refresh.
   await run(`UPDATE tasks SET updated_at = CURRENT_TIMESTAMP WHERE package_id = ?`, id);
   const wp = await queryOne(
-    `SELECT id, code, name, floor_label AS "floorLabel", boq_code AS "boqCode", drawing_url AS "drawingUrl" FROM work_packages WHERE id = ?`,
+    `SELECT id, code, name, floor_label AS "floorLabel", boq_code AS "boqCode",
+            drawing_url AS "drawingUrl", requires_method_statement AS "requiresMethodStatement"
+       FROM work_packages WHERE id = ?`,
     id,
   );
   return NextResponse.json({ workPackage: wp });

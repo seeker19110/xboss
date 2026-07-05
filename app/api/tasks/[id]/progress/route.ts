@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { deriveStatus, recomputePackage } from "@/lib/recompute";
 import { getCurrentUser, canTouchTask, CAN } from "@/lib/auth";
-import { handoverBlocked } from "@/lib/qaqc";
+import { handoverBlocked, methodStatementBlocked } from "@/lib/qaqc";
 import type { StatusSlug } from "@/lib/status";
 
 export const dynamic = "force-dynamic";
@@ -50,11 +50,13 @@ export async function PATCH(
     );
     if (!task) return { error: "Không tìm thấy task", httpStatus: 404 } as const;
 
-    // Hold point chuyển bước (M3): chỉ chặn khi tiến độ TĂNG (thi công thêm) — hạ tiến độ
-    // để sửa sai không cần mở khoá.
+    // Hold point chuyển bước (M3) + gate biện pháp thi công (M8): chỉ chặn khi tiến độ
+    // TĂNG (thi công thêm) — hạ tiến độ để sửa sai không cần mở khoá.
     if (progress > (task.progress_percent ?? 0)) {
       const gate = await handoverBlocked(task.package_id);
       if (gate.blocked) return { error: gate.reason, httpStatus: 409 } as const;
+      const methodGate = await methodStatementBlocked(task.package_id);
+      if (methodGate.blocked) return { error: methodGate.reason, httpStatus: 409 } as const;
     }
 
     // status từ client chỉ nhận các slug hợp lệ, KHÔNG nhận nghiem_thu —

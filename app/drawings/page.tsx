@@ -80,6 +80,7 @@ type DrawingRow = {
   workPackageId: number | null;
   workPackageCode: string | null;
   workPackageName: string | null;
+  workPackageRequiresMethodStatement: boolean | null;
   createdAt: string;
   latestRevisionId: number | null;
   latestRev: string | null;
@@ -291,6 +292,27 @@ export default function DrawingsPage() {
                       {d.latestDecidedAt ?? d.latestSubmittedAt ?? "—"}
                     </span>
                   </div>
+                  {d.kind === "method" && (
+                    <div className="mt-2 pt-2 border-t border-zinc-800/60 flex items-center justify-between gap-2 text-xs">
+                      <span className="text-zinc-400 truncate">
+                        Nhóm:{" "}
+                        {d.workPackageCode
+                          ? `${d.workPackageCode} — ${d.workPackageName}`
+                          : "Chưa gán"}
+                      </span>
+                      {d.workPackageRequiresMethodStatement && (
+                        <span
+                          className={`shrink-0 px-2 py-0.5 rounded-full font-semibold ${
+                            d.approvedRevisionId != null
+                              ? "bg-emerald-900/40 text-emerald-300"
+                              : "bg-amber-900/40 text-amber-300"
+                          }`}
+                        >
+                          {d.approvedRevisionId != null ? "Đủ điều kiện" : "Chờ duyệt — đang chặn"}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </button>
               );
             })}
@@ -647,6 +669,10 @@ function DrawingDetailModal({
           </p>
         )}
 
+        {drawing.kind === "method" && (
+          <MethodGateSection drawing={drawing} canManageGate={canDecide} onChanged={onChanged} />
+        )}
+
         {canManage && (
           <div className="bg-zinc-800/60 border border-zinc-700 rounded-lg p-3 space-y-2">
             <p className="text-xs font-semibold text-zinc-300">Tải lên rev mới</p>
@@ -778,5 +804,166 @@ function DrawingDetailModal({
         />
       )}
     </Modal>
+  );
+}
+
+// ── Gate biện pháp thi công (M8 PR 3/3): gán nhóm công việc + đánh dấu bắt buộc ──────
+
+type PackageHit = { kind: string; id: number; code: string; name: string };
+
+function MethodGateSection({
+  drawing,
+  canManageGate,
+  onChanged,
+}: {
+  drawing: DrawingRow;
+  canManageGate: boolean;
+  onChanged: () => void;
+}) {
+  const [picking, setPicking] = useState(false);
+  const [q, setQ] = useState("");
+  const [hits, setHits] = useState<PackageHit[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const term = q.trim();
+    if (term.length < 2) {
+      setHits([]);
+      return;
+    }
+    const t = setTimeout(async () => {
+      const r = await fetch(`/api/search?q=${encodeURIComponent(term)}`).catch(() => null);
+      const j = r?.ok ? await r.json() : null;
+      setHits(((j?.hits ?? []) as PackageHit[]).filter((h) => h.kind === "package"));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  async function assignPackage(pkgId: number) {
+    setBusy(true);
+    const res = await fetch(`/api/drawings/${drawing.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workPackageId: pkgId }),
+    });
+    setBusy(false);
+    const j = await res.json().catch(() => null);
+    if (!res.ok) {
+      showToast(j?.error ?? "Không gán được nhóm công việc", "error");
+      return;
+    }
+    setPicking(false);
+    setQ("");
+    setHits([]);
+    onChanged();
+  }
+
+  async function toggleRequired(next: boolean) {
+    if (!drawing.workPackageId) return;
+    setBusy(true);
+    const res = await fetch(`/api/workpackages/${drawing.workPackageId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ requiresMethodStatement: next }),
+    });
+    setBusy(false);
+    const j = await res.json().catch(() => null);
+    if (!res.ok) {
+      showToast(j?.error ?? "Không cập nhật được", "error");
+      return;
+    }
+    onChanged();
+  }
+
+  const gateReady = drawing.approvedRevisionId != null;
+
+  return (
+    <div className="bg-zinc-800/60 border border-zinc-700 rounded-lg p-3 space-y-2">
+      <p className="text-xs font-semibold text-zinc-300">Gate biện pháp thi công</p>
+
+      {drawing.workPackageId ? (
+        <div className="flex items-center justify-between gap-2 text-sm">
+          <span>
+            Nhóm áp dụng: <span className="font-mono text-xs">{drawing.workPackageCode}</span>{" "}
+            {drawing.workPackageName}
+          </span>
+          {canManageGate && (
+            <button
+              onClick={() => setPicking(true)}
+              className="text-xs text-sky-400 hover:underline shrink-0"
+            >
+              Đổi
+            </button>
+          )}
+        </div>
+      ) : (
+        <p className="text-sm text-zinc-400">Chưa gán nhóm công việc — gate chưa áp dụng.</p>
+      )}
+
+      {canManageGate && drawing.workPackageId && (
+        <label className="flex items-center gap-2 text-xs text-zinc-300">
+          <input
+            type="checkbox"
+            checked={!!drawing.workPackageRequiresMethodStatement}
+            disabled={busy}
+            onChange={(e) => toggleRequired(e.target.checked)}
+            className="accent-emerald-600"
+          />
+          Bắt buộc biện pháp thi công cho nhóm này (chặn tick tiến độ tới khi duyệt)
+        </label>
+      )}
+
+      {drawing.workPackageId && drawing.workPackageRequiresMethodStatement && (
+        <p
+          className={`text-xs px-2.5 py-1.5 rounded-lg border ${
+            gateReady
+              ? "bg-emerald-950/60 border-emerald-900 text-emerald-300"
+              : "bg-amber-950/60 border-amber-900 text-amber-300"
+          }`}
+        >
+          {gateReady
+            ? "Đủ điều kiện thi công — đã có rev duyệt."
+            : "Đang chặn tick tiến độ — chờ duyệt biện pháp thi công."}
+        </p>
+      )}
+
+      {canManageGate && (picking || !drawing.workPackageId) && (
+        <div className="relative">
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Tìm nhóm công việc theo mã/tên..."
+            className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-white"
+          />
+          {hits.length > 0 && (
+            <ul className="mt-1 bg-zinc-900 border border-zinc-700 rounded-lg overflow-hidden max-h-40 overflow-y-auto">
+              {hits.map((h) => (
+                <li key={h.id}>
+                  <button
+                    onClick={() => assignPackage(h.id)}
+                    disabled={busy}
+                    className="w-full text-left px-3 py-1.5 text-xs hover:bg-zinc-800"
+                  >
+                    <span className="font-mono text-zinc-400">{h.code}</span> {h.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {picking && (
+            <button
+              onClick={() => {
+                setPicking(false);
+                setQ("");
+                setHits([]);
+              }}
+              className="mt-1 text-xs text-zinc-400 hover:text-white"
+            >
+              Huỷ
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

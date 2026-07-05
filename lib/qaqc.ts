@@ -74,6 +74,33 @@ export async function requiredInspectionMissing(taskId: number): Promise<boolean
   return (missing?.count ?? 0) > 0;
 }
 
+// Gate biện pháp thi công (M8): package đánh dấu requires_method_statement chỉ tick
+// được khi có ít nhất 1 drawing kind='method' gắn work_package_id đó đạt rev
+// approved/approved_with_comments. Không đánh dấu → không chặn (mặc định FALSE).
+export async function methodStatementBlocked(packageId: number): Promise<HandoverCheck> {
+  const pkg = await queryOne<{ requiresMethodStatement: boolean; code: string; name: string }>(
+    `SELECT requires_method_statement AS "requiresMethodStatement", code, name
+       FROM work_packages WHERE id = ?`,
+    packageId,
+  );
+  if (!pkg?.requiresMethodStatement) return { blocked: false };
+
+  const approved = await queryOne<{ count: number }>(
+    `SELECT COUNT(*)::int AS count
+       FROM drawings d
+       JOIN drawing_revisions r ON r.drawing_id = d.id
+      WHERE d.kind = 'method' AND d.work_package_id = ?
+        AND r.status IN ('approved', 'approved_with_comments')`,
+    packageId,
+  );
+  if ((approved?.count ?? 0) > 0) return { blocked: false };
+
+  return {
+    blocked: true,
+    reason: `Chờ duyệt biện pháp thi công cho ${pkg.code} — ${pkg.name}`,
+  };
+}
+
 export type ChecklistItem = {
   label: string;
   type: "pass_fail" | "measure";
