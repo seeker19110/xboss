@@ -145,6 +145,12 @@ export default function MaterialsPage() {
   const [issueMat, setIssueMat] = useState<Material | null>(null);
   const [issueQty, setIssueQty] = useState("");
   const [issueNote, setIssueNote] = useState("");
+  const [issueFloor, setIssueFloor] = useState("");
+  const [issueCrew, setIssueCrew] = useState("");
+  const [allocationMeta, setAllocationMeta] = useState<{ floors: string[]; crews: string[] }>({
+    floors: [],
+    crews: [],
+  });
   const colMenuRef = useRef<HTMLDivElement>(null);
   const labelInputRef = useRef<HTMLInputElement>(null);
 
@@ -1175,6 +1181,16 @@ export default function MaterialsPage() {
                                     setIssueMat(m);
                                     setIssueQty("");
                                     setIssueNote("");
+                                    setIssueFloor("");
+                                    setIssueCrew("");
+                                    fetch("/api/materials/allocation-meta")
+                                      .then((r) => r.json())
+                                      .then((j) =>
+                                        setAllocationMeta({
+                                          floors: j.floors ?? [],
+                                          crews: j.crews ?? [],
+                                        }),
+                                      );
                                   }}
                                   title="Xuất kho ra công trường"
                                   className="text-zinc-500 hover:text-blue-400 p-2"
@@ -1412,12 +1428,44 @@ export default function MaterialsPage() {
                 className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-600"
               />
             </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <label className="text-xs text-zinc-400">Tầng</label>
+                <input
+                  list="issue-floor-options"
+                  value={issueFloor}
+                  onChange={(e) => setIssueFloor(e.target.value)}
+                  placeholder="vd: 24F"
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-600"
+                />
+                <datalist id="issue-floor-options">
+                  {allocationMeta.floors.map((f) => (
+                    <option key={f} value={f} />
+                  ))}
+                </datalist>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-zinc-400">Tổ đội</label>
+                <input
+                  list="issue-crew-options"
+                  value={issueCrew}
+                  onChange={(e) => setIssueCrew(e.target.value)}
+                  placeholder="vd: Tổ cơ điện 1"
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-600"
+                />
+                <datalist id="issue-crew-options">
+                  {allocationMeta.crews.map((c) => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
+              </div>
+            </div>
             <div className="space-y-1">
-              <label className="text-xs text-zinc-400">Ghi chú (vị trí, tầng...)</label>
+              <label className="text-xs text-zinc-400">Ghi chú</label>
               <input
                 value={issueNote}
                 onChange={(e) => setIssueNote(e.target.value)}
-                placeholder="vd: xuất tầng 24F, block A"
+                placeholder="vd: block A"
                 className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-600"
               />
             </div>
@@ -1432,7 +1480,12 @@ export default function MaterialsPage() {
                   const r = await fetch(`/api/materials/${issueMat.id}/issue`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ qty, note: issueNote.trim() || undefined }),
+                    body: JSON.stringify({
+                      qty,
+                      note: issueNote.trim() || undefined,
+                      floorLabel: issueFloor.trim() || undefined,
+                      crew: issueCrew.trim() || undefined,
+                    }),
                   });
                   if (r.ok) {
                     setIssueMat(null);

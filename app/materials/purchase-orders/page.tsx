@@ -11,11 +11,14 @@ import {
   Package,
   AlertCircle,
   Table2,
+  Star,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { appConfirm } from "@/app/components/dialogs";
 import SpreadsheetGrid, { type GridColumn, type GridEdit } from "@/app/components/SpreadsheetGrid";
 import { fetchMe } from "@/app/lib/me";
+import { todayISO } from "@/lib/date";
+import RatingModal from "./RatingModal";
 
 type PO = {
   id: number;
@@ -43,7 +46,7 @@ type POItem = {
   note: string | null;
   prId: number | null;
 };
-type Supplier = { id: number; name: string };
+type Supplier = { id: number; name: string; avgRating?: number | null };
 type PRItem = {
   id: number;
   prCode: string;
@@ -63,17 +66,69 @@ type Material = {
 const STATUS_LABEL: Record<string, string> = {
   draft: "Nháp",
   confirmed: "Đã xác nhận",
+  delivering: "Đang giao",
   partial: "Nhập một phần",
   received: "Đã nhập đủ",
+  reconciled: "Đã đối chiếu",
   cancelled: "Đã huỷ",
 };
 const STATUS_CLS: Record<string, string> = {
   draft: "bg-zinc-700 text-zinc-300",
   confirmed: "bg-blue-950 text-blue-300",
+  delivering: "bg-sky-950 text-sky-300",
   partial: "bg-amber-950 text-amber-300",
   received: "bg-green-950 text-green-300",
+  reconciled: "bg-emerald-950 text-emerald-300",
   cancelled: "bg-red-950 text-red-400",
 };
+// 6 bước dòng đời PO (đối xứng lib/procurement.ts PO_STATUS_ORDER — file này là client
+// component nên không import lib/procurement (kéo theo lib/db → node:crypto/pg vỡ build).
+const STEP_ORDER = ["draft", "confirmed", "delivering", "partial", "received", "reconciled"];
+const STEP_LABEL: Record<string, string> = {
+  draft: "Đặt",
+  confirmed: "Xác nhận",
+  delivering: "Đang giao",
+  partial: "Một phần",
+  received: "Đủ hàng",
+  reconciled: "Đối chiếu",
+};
+
+function PoStepper({ status }: { status: string }) {
+  if (status === "cancelled") return null;
+  const idx = STEP_ORDER.indexOf(status);
+  return (
+    <div className="flex items-center gap-1 py-1" role="list" aria-label="Tiến trình đơn hàng">
+      {STEP_ORDER.map((s, i) => {
+        const done = idx >= 0 && i <= idx;
+        const current = i === idx;
+        return (
+          <div key={s} className="flex items-center gap-1" role="listitem">
+            <span
+              className={`w-2 h-2 rounded-full shrink-0 ${current ? "bg-sky-400" : done ? "bg-sky-700" : "bg-zinc-700"}`}
+              aria-hidden="true"
+            />
+            <span
+              className={`text-[10px] whitespace-nowrap ${current ? "text-sky-300 font-medium" : done ? "text-zinc-400" : "text-zinc-600"}`}
+            >
+              {STEP_LABEL[s]}
+            </span>
+            {i < STEP_ORDER.length - 1 && (
+              <span
+                className={`w-3 h-px shrink-0 ${done && i < idx ? "bg-sky-700" : "bg-zinc-700"}`}
+                aria-hidden="true"
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const isPoLate = (po: { status: string; expectedDate: string | null }) =>
+  !!po.expectedDate &&
+  po.expectedDate < todayISO() &&
+  !["received", "reconciled", "cancelled"].includes(po.status);
 
 export default function PurchaseOrdersPage() {
   const [orders, setOrders] = useState<PO[]>([]);
@@ -91,6 +146,7 @@ export default function PurchaseOrdersPage() {
   const [receivePoItems, setReceivePoItems] = useState<POItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [ratingPo, setRatingPo] = useState<PO | null>(null);
 
   // Form tạo PO
   const [newPO, setNewPO] = useState({
@@ -120,7 +176,12 @@ export default function PurchaseOrdersPage() {
     });
     fetch("/api/suppliers")
       .then((r) => r.json())
-      .then((j) => setSuppliers(j.suppliers ?? []));
+      .then((j) => {
+        // Gợi ý NCC điểm cao hơn lên trước khi chọn cho PO mới (chưa có đánh giá → cuối danh sách).
+        const list: Supplier[] = j.suppliers ?? [];
+        list.sort((a, b) => (b.avgRating ?? -1) - (a.avgRating ?? -1));
+        setSuppliers(list);
+      });
     fetch("/api/purchase-requests?status=approved")
       .then((r) => r.json())
       .then((j) => setApprovedPRs(j.requests ?? []));
@@ -246,7 +307,16 @@ export default function PurchaseOrdersPage() {
   };
 
   const updateStatus = async (po: PO, status: string) => {
-    const label = status === "confirmed" ? "xác nhận" : status === "cancelled" ? "huỷ" : status;
+    const label =
+      status === "confirmed"
+        ? "xác nhận"
+        : status === "delivering"
+          ? "chuyển sang đang giao"
+          : status === "reconciled"
+            ? "đối chiếu"
+            : status === "cancelled"
+              ? "huỷ"
+              : status;
     if (!(await appConfirm(`${label} đơn hàng ${po.poCode}?`))) return;
     try {
       const r = await fetch(`/api/purchase-orders/${po.id}`, {
@@ -457,8 +527,10 @@ export default function PurchaseOrdersPage() {
             ["", "Tất cả"],
             ["draft", "Nháp"],
             ["confirmed", "Đã xác nhận"],
+            ["delivering", "Đang giao"],
             ["partial", "Một phần"],
             ["received", "Đã nhận đủ"],
+            ["reconciled", "Đã đối chiếu"],
             ["cancelled", "Đã huỷ"],
           ].map(([v, l]) => (
             <button
@@ -516,7 +588,13 @@ export default function PurchaseOrdersPage() {
                           >
                             {STATUS_LABEL[po.status]}
                           </span>
+                          {isPoLate(po) && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-rose-950 text-rose-300">
+                              <AlertCircle className="w-3 h-3" /> Trễ giao
+                            </span>
+                          )}
                         </div>
+                        <PoStepper status={po.status} />
                         <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-zinc-400">
                           {po.supplierName && (
                             <span>
@@ -526,7 +604,11 @@ export default function PurchaseOrdersPage() {
                           {po.expectedDate && (
                             <span>
                               Giao dự kiến:{" "}
-                              <span className="text-zinc-300">
+                              <span
+                                className={
+                                  isPoLate(po) ? "text-rose-400 font-medium" : "text-zinc-300"
+                                }
+                              >
                                 {new Date(po.expectedDate).toLocaleDateString("vi-VN")}
                               </span>
                             </span>
@@ -560,12 +642,36 @@ export default function PurchaseOrdersPage() {
                             Xác nhận
                           </button>
                         )}
-                        {(po.status === "confirmed" || po.status === "partial") && (
+                        {canManage && po.status === "confirmed" && (
+                          <button
+                            onClick={() => updateStatus(po, "delivering")}
+                            className="px-2.5 py-1.5 rounded bg-sky-800 hover:bg-sky-700 text-xs"
+                          >
+                            Bắt đầu giao
+                          </button>
+                        )}
+                        {["confirmed", "delivering", "partial"].includes(po.status) && (
                           <button
                             onClick={() => openReceive(po)}
                             className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-green-800 hover:bg-green-700 text-xs"
                           >
                             <Truck className="w-3.5 h-3.5" /> Nhập kho
+                          </button>
+                        )}
+                        {canManage && po.status === "received" && (
+                          <button
+                            onClick={() => updateStatus(po, "reconciled")}
+                            className="px-2.5 py-1.5 rounded bg-emerald-800 hover:bg-emerald-700 text-xs"
+                          >
+                            Đối chiếu
+                          </button>
+                        )}
+                        {["received", "reconciled"].includes(po.status) && po.supplierId && (
+                          <button
+                            onClick={() => setRatingPo(po)}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-amber-900/60 hover:bg-amber-800 text-xs text-amber-200"
+                          >
+                            <Star className="w-3.5 h-3.5" /> Đánh giá NCC
                           </button>
                         )}
                         {canManage && po.status === "draft" && (
@@ -577,15 +683,16 @@ export default function PurchaseOrdersPage() {
                             <X className="w-4 h-4" />
                           </button>
                         )}
-                        {canManage && (po.status === "confirmed" || po.status === "partial") && (
-                          <button
-                            onClick={() => updateStatus(po, "cancelled")}
-                            aria-label={`Huỷ đơn hàng ${po.poCode}`}
-                            className="p-1.5 rounded hover:bg-red-900/50 text-zinc-400 hover:text-red-400"
-                          >
-                            <AlertCircle className="w-4 h-4" />
-                          </button>
-                        )}
+                        {canManage &&
+                          ["confirmed", "delivering", "partial"].includes(po.status) && (
+                            <button
+                              onClick={() => updateStatus(po, "cancelled")}
+                              aria-label={`Huỷ đơn hàng ${po.poCode}`}
+                              className="p-1.5 rounded hover:bg-red-900/50 text-zinc-400 hover:text-red-400"
+                            >
+                              <AlertCircle className="w-4 h-4" />
+                            </button>
+                          )}
                       </div>
                     </div>
                   </div>
@@ -681,6 +788,7 @@ export default function PurchaseOrdersPage() {
                   {suppliers.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
+                      {s.avgRating ? ` (★${s.avgRating.toFixed(1)})` : ""}
                     </option>
                   ))}
                 </select>
@@ -930,6 +1038,8 @@ export default function PurchaseOrdersPage() {
           </div>
         </div>
       )}
+
+      {ratingPo && <RatingModal po={ratingPo} onClose={() => setRatingPo(null)} />}
     </div>
   );
 }

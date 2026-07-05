@@ -188,6 +188,19 @@ export async function canTouchPackage(user: User, packageId: number): Promise<bo
   return wp?.assigned_to === user.id;
 }
 
+// Sub-con chỉ được check-in/out xe (vehicle_logs) của đúng NCC mình (users.supplier_id,
+// gán ở M1 discipline_contractors) — không phải xe của NCC khác.
+export async function canTouchVehicle(user: User, vehicleId: number): Promise<boolean> {
+  if (user.role !== "subcon") return true;
+  const row = await queryOne<{ supplierId: number | null; userSupplierId: number | null }>(
+    `SELECT v.supplier_id AS "supplierId", u.supplier_id AS "userSupplierId"
+       FROM vehicle_logs v, users u WHERE v.id = ? AND u.id = ?`,
+    vehicleId,
+    user.id,
+  );
+  return !!row && row.supplierId != null && row.supplierId === row.userSupplierId;
+}
+
 // Sub-con chỉ được xem/nộp biên bản nghiệm thu tầng (floor_approvals) nếu có ít nhất 1
 // nhóm công việc thuộc sheet + tầng đó được giao cho mình — floor_approvals không có
 // assigned_to riêng nên phải suy ra qua work_packages cùng (sheet_type_id, floor_label).

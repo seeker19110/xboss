@@ -8,8 +8,10 @@ import {
   UserX,
   ShoppingCart,
   RefreshCw,
+  Layers,
 } from "lucide-react";
 import EmptyState from "@/app/components/EmptyState";
+import { sortFloorsAsc } from "@/lib/floors";
 
 type StockSummary = {
   sheetCode: string;
@@ -75,6 +77,15 @@ type NeedsStock = {
   earliestStart: string;
   upcomingTasks: number;
 };
+type ByFloor = {
+  materialId: number;
+  materialName: string;
+  unit: string | null;
+  boqCode: string | null;
+  sheetCode: string | null;
+  floorLabel: string;
+  qtyIssued: number;
+};
 type Report = {
   stockSummary: StockSummary[];
   overBudget: OverBudget[];
@@ -82,6 +93,7 @@ type Report = {
   warehouseAge: AgedStock[];
   noTaskIssues: NoTaskIssue[];
   needsStock: NeedsStock[];
+  byFloor: ByFloor[];
 };
 
 const TABS = [
@@ -91,6 +103,7 @@ const TABS = [
   { key: "lowStock", label: "Tồn thấp", icon: <AlertTriangle className="w-3.5 h-3.5" /> },
   { key: "aged", label: "Tồn lâu", icon: <Clock className="w-3.5 h-3.5" /> },
   { key: "noTask", label: "Xuất không task", icon: <UserX className="w-3.5 h-3.5" /> },
+  { key: "byFloor", label: "Tiêu hao theo tầng", icon: <Layers className="w-3.5 h-3.5" /> },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -106,10 +119,83 @@ function Badge({ n, cls }: { n: number; cls: string }) {
 function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
   return (
     <th
-      className={`py-2 px-3 text-xs text-zinc-500 font-semibold ${right ? "text-right" : "text-left"}`}
+      className={`py-2 px-3 text-xs text-zinc-400 font-semibold ${right ? "text-right" : "text-left"}`}
     >
       {children}
     </th>
+  );
+}
+
+// Bảng materials × tầng: Σ đã xuất kho gắn tầng cho mỗi vật tư. Chưa đối chiếu KL thi công
+// theo tầng (cần nối M1 boq_task_map ↔ work_packages.floor_label — để đợt sau).
+function ByFloorPivot({ rows }: { rows: ByFloor[] }) {
+  const floors = [...new Set(rows.map((r) => r.floorLabel))].sort(sortFloorsAsc);
+  const materials = new Map<
+    number,
+    { name: string; unit: string | null; boqCode: string | null; sheetCode: string | null }
+  >();
+  const cell = new Map<string, number>();
+  for (const r of rows) {
+    materials.set(r.materialId, {
+      name: r.materialName,
+      unit: r.unit,
+      boqCode: r.boqCode,
+      sheetCode: r.sheetCode,
+    });
+    cell.set(`${r.materialId}:${r.floorLabel}`, r.qtyIssued);
+  }
+  const matIds = [...materials.keys()].sort((a, b) =>
+    (materials.get(a)!.name ?? "").localeCompare(materials.get(b)!.name ?? ""),
+  );
+
+  return (
+    <div className="space-y-3">
+      <div className="p-3 bg-sky-950/40 border border-sky-800/50 rounded-lg text-xs text-sky-200">
+        Tổng số lượng đã xuất kho ra công trường theo vật tư × tầng (chưa đối chiếu khối lượng thi
+        công theo tầng).
+      </div>
+      <div className="overflow-x-auto rounded-xl border border-zinc-800">
+        <table className="w-full text-xs">
+          <thead className="bg-zinc-800/60">
+            <tr>
+              <Th>Vật tư</Th>
+              {floors.map((f) => (
+                <Th key={f} right>
+                  {f}
+                </Th>
+              ))}
+              <Th right>Tổng</Th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-800">
+            {matIds.map((id) => {
+              const m = materials.get(id)!;
+              const total = floors.reduce((s, f) => s + (cell.get(`${id}:${f}`) ?? 0), 0);
+              return (
+                <tr
+                  key={id}
+                  className="odd:bg-zinc-900/50 even:bg-zinc-800/20 hover:bg-zinc-700/40 transition-colors"
+                >
+                  <td className="py-2.5 px-3 font-medium text-zinc-100">
+                    {m.boqCode && (
+                      <span className="text-amber-400 font-mono mr-1">{m.boqCode}</span>
+                    )}
+                    {m.name}
+                    {m.unit && <span className="text-zinc-400"> ({m.unit})</span>}
+                  </td>
+                  {floors.map((f) => (
+                    <td key={f} className="py-2.5 px-3 text-right text-zinc-300">
+                      {cell.get(`${id}:${f}`) ?? "—"}
+                    </td>
+                  ))}
+                  <td className="py-2.5 px-3 text-right font-bold text-sky-300">{total}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 
@@ -205,7 +291,7 @@ export default function ReportsTab({ active }: { active: boolean }) {
         </div>
         <button
           onClick={() => setLoaded(false)}
-          className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300"
+          className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-300"
         >
           <RefreshCw className="w-3 h-3" /> Làm mới
         </button>
@@ -563,6 +649,14 @@ export default function ReportsTab({ active }: { active: boolean }) {
               </table>
             </div>
           </div>
+        ))}
+
+      {/* ── TIÊU HAO THEO TẦNG ── */}
+      {tab === "byFloor" &&
+        (r.byFloor.length === 0 ? (
+          <EmptyState message="Chưa có lần xuất kho nào gắn tầng — nhập Tầng khi xuất kho ở tab Vật tư để thấy bảng này." />
+        ) : (
+          <ByFloorPivot rows={r.byFloor} />
         ))}
     </div>
   );
