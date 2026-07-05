@@ -577,7 +577,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
 
       {syncToast && (
         <div
-          className="fixed left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-emerald-900/95 border border-emerald-700 text-emerald-200 px-4 py-2 rounded-full text-sm shadow-xl"
+          className="app-toast-center fixed left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-emerald-900/95 border border-emerald-700 text-emerald-200 px-4 py-2 rounded-full text-sm shadow-xl"
           style={{ bottom: "max(1.25rem, env(safe-area-inset-bottom, 0px) + 0.5rem)" }}
         >
           <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Dữ liệu vừa được người khác cập nhật —
@@ -587,7 +587,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
 
       {(!online || offlinePending > 0) && (
         <div
-          className={`fixed left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-full text-sm shadow-xl border ${
+          className={`app-toast-center fixed left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-full text-sm shadow-xl border ${
             online
               ? "bg-sky-900/95 border-sky-700 text-sky-200"
               : "bg-amber-900/95 border-amber-700 text-amber-200"

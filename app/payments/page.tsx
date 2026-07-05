@@ -23,6 +23,7 @@ import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import { useEditMode } from "@/app/components/useEditMode";
 import EditModeToggle from "@/app/components/EditModeToggle";
 import { appConfirm } from "@/app/components/dialogs";
+import { showToast } from "@/app/components/Toast";
 import { formatDateDMY, todayISO } from "@/lib/date";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -232,7 +233,7 @@ export default function PaymentsPage() {
     });
     if (!res.ok) {
       const e = await res.json().catch(() => null);
-      alert(e?.error ?? "Không lưu được mục thanh toán");
+      showToast(e?.error ?? "Không lưu được mục thanh toán", "error");
       return { ok: false };
     }
     const { id, amount: savedAmount } = await res.json();
@@ -759,7 +760,7 @@ function BillsSection({
       if (!d.sheetTypeId || !d.floorLabel) continue;
       const pct = parseFloat(d.pct) / 100 || 0;
       if (pct <= 0) {
-        alert(`Chọn % thanh toán cho tầng ${d.floorLabel}`);
+        showToast(`Chọn % thanh toán cho tầng ${d.floorLabel}`, "error");
         setBusy(false);
         return;
       }
@@ -767,7 +768,7 @@ function BillsSection({
         (f) => f.sheetTypeId === d.sheetTypeId && f.floorLabel === d.floorLabel,
       );
       if ((fl?.pctPaid ?? 0) + pct > 1.001) {
-        alert(`Tầng ${d.floorLabel} vượt 100%`);
+        showToast(`Tầng ${d.floorLabel} vượt 100%`, "error");
         setBusy(false);
         return;
       }
@@ -796,7 +797,7 @@ function BillsSection({
       if (!d.description.trim()) continue;
       const amt = parseFloat(d.amount.replace(/[^\d.]/g, "")) || 0;
       if (amt <= 0) {
-        alert(`"${d.description}" chưa có giá trị`);
+        showToast(`"${d.description}" chưa có giá trị`, "error");
         setBusy(false);
         return;
       }

@@ -179,6 +179,15 @@ body {
   display: none;
 }
 
+/* Focus ring bàn phím — chuẩn hoá toàn cục (M0 PR3). Màu accent cố định (không đổi theo
+   theme, giống mọi màu accent khác trong dự án — chỉ nền/chữ/viền zinc mới đảo theo theme)
+   để luôn tương phản rõ trên nền zinc-950 lẫn zinc-50. */
+:focus-visible {
+  outline: 2px solid #34d399; /* emerald-400 */
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
 /* Safe area padding cho thiết bị có notch/home indicator (iPhone X+, Android notch) */
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -210,6 +219,15 @@ body {
   }
   html.sidebar-collapsed .app-bottombar {
     padding-left: 3.5rem;
+  }
+  /* Toast/banner định vị `fixed left-1/2 -translate-x-1/2` (căn giữa viewport) cần bù
+     lại nửa chiều rộng sidebar để căn giữa đúng VÙNG NỘI DUNG thấy được, không phải
+     căn giữa cả màn hình (lệch phải khi sidebar mở). Dùng cùng cơ chế :has() với trên. */
+  body:has(#app-sidebar) .app-toast-center {
+    left: calc(50% + 7.5rem); /* + nửa 15rem */
+  }
+  html.sidebar-collapsed body:has(#app-sidebar) .app-toast-center {
+    left: calc(50% + 1.75rem); /* + nửa 3.5rem */
   }
   .sidebar-label {
     display: none;

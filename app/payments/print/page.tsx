@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Printer } from "lucide-react";
 import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import { formatDateDMY } from "@/lib/date";
+import { showToast } from "@/app/components/Toast";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -118,11 +119,11 @@ export default function PrintPage() {
 
   async function uploadLogo(file: File) {
     if (!file.type.startsWith("image/")) {
-      alert("Chỉ nhận file ảnh");
+      showToast("Chỉ nhận file ảnh", "error");
       return;
     }
     if (file.size > 2 * 1024 * 1024) {
-      alert("Ảnh tối đa 2MB");
+      showToast("Ảnh tối đa 2MB", "error");
       return;
     }
     const dataUrl: string = await new Promise((resolve, reject) => {
@@ -139,7 +140,7 @@ export default function PrintPage() {
     });
     setSavingLogo(false);
     if (res.ok) setLogo(dataUrl);
-    else alert((await res.json().catch(() => null))?.error ?? "Lưu logo thất bại");
+    else showToast((await res.json().catch(() => null))?.error ?? "Lưu logo thất bại", "error");
   }
 
   async function removeLogo() {

@@ -3,6 +3,7 @@ import Script from "next/script";
 import "./globals.css";
 import PwaRegister from "@/app/components/PwaRegister";
 import AppDialogs from "@/app/components/dialogs";
+import ToastHost from "@/app/components/Toast";
 import BottomBarSpacer from "@/app/components/BottomBarSpacer";
 
 export const metadata: Metadata = {
@@ -36,6 +37,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body className="min-h-full flex flex-col">
         <PwaRegister />
         <AppDialogs />
+        <ToastHost />
         {children}
         <footer className="mt-auto py-3 px-4 text-center text-[10px] text-zinc-400 border-t border-zinc-900 print:hidden">
           © {new Date().getFullYear()} XBoss — Phát triển bởi{" "}
