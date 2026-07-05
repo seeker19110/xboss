@@ -24,6 +24,13 @@ import { fetchMe, type Me } from "@/app/lib/me";
 import { sortFloorsAsc } from "@/lib/floors";
 import { formatDateVN } from "@/lib/date";
 import { disciplineColorClasses } from "@/lib/disciplineColors";
+import type {
+  CashflowMonth,
+  CpiBlock,
+  QualityBlock,
+  VoBlock,
+  DisciplineCrossRow,
+} from "@/app/components/DashboardExtCards";
 
 // Lazy-load các component nặng (recharts, nhiều fetch) — chỉ load khi đã render shell
 const ProgressMap = dynamic(() => import("@/app/components/ProgressMap"), {
@@ -49,6 +56,10 @@ const SCurveChart = dynamic(() => import("@/app/components/SCurveChart"), {
 const DashboardBarChart = dynamic(() => import("@/app/components/DashboardBarChart"), {
   ssr: false,
   loading: () => <Skeleton className="h-56 rounded-xl" />,
+});
+const DashboardExtCards = dynamic(() => import("@/app/components/DashboardExtCards"), {
+  ssr: false,
+  loading: () => <Skeleton className="h-28 rounded-xl" />,
 });
 
 const STATUS_LABEL: Record<string, string> = {
@@ -96,6 +107,11 @@ export default function Dashboard() {
     delayedTasks: DelayedTask[];
     kpi: KPI[];
     totalDelayed: number;
+    cashflow: CashflowMonth[] | null;
+    cpi: CpiBlock | null;
+    quality: QualityBlock;
+    vo: VoBlock | null;
+    byDiscipline: DisciplineCrossRow[];
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [sheetFilter, setSheetFilter] = useState("");
@@ -473,6 +489,18 @@ export default function Dashboard() {
 
         {/* ── Bản đồ tiến độ Tháp A (tầng × hệ + lịch sử) ── */}
         <ProgressMap />
+
+        {/* ── M9: KPI tiền/chất lượng + so sánh chéo hệ + dòng tiền ── */}
+        {data && (
+          <DashboardExtCards
+            cashflow={data.cashflow}
+            cpi={data.cpi}
+            quality={data.quality}
+            vo={data.vo}
+            byDiscipline={data.byDiscipline}
+            isEngineer={me?.role === "engineer"}
+          />
+        )}
 
         {/* ── Việc bị chặn (phụ thuộc chưa thông) ── */}
         <BlockedPanel />

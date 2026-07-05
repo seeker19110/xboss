@@ -567,7 +567,10 @@ function ContractDetailModal({
   onDeleted: () => void;
 }) {
   const [detail, setDetail] = useState<ContractDetail | null>(null);
-  const [tab, setTab] = useState<"info" | "addenda" | "documents" | "links">("info");
+  const [tab, setTab] = useState<"info" | "addenda" | "documents" | "links" | "ipc">("info");
+  const [certs, setCerts] = useState<
+    { id: number; code: string; periodNo: number; status: string }[]
+  >([]);
 
   const [title, setTitle] = useState(contract.title);
   const [value, setValue] = useState(String(contract.value));
@@ -592,6 +595,9 @@ function ContractDetailModal({
 
   useEffect(() => {
     loadDetail();
+    fetch(`/api/payment-certs?contractId=${contract.id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setCerts(j?.certs ?? []));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contract.id]);
 
@@ -742,6 +748,7 @@ function ContractDetailModal({
               ["addenda", "Phụ lục"],
               ["documents", "File"],
               ["links", "Liên kết"],
+              ["ipc", "Đợt IPC"],
             ] as const
           ).map(([key, label]) => (
             <button
@@ -1008,7 +1015,49 @@ function ContractDetailModal({
             </div>
           </section>
         )}
+
+        {tab === "ipc" && (
+          <section className="space-y-3 text-sm">
+            {certs.length ? (
+              <ul className="space-y-1.5">
+                {certs.map((c) => (
+                  <li key={c.id} className="flex items-center justify-between text-zinc-300">
+                    <span>
+                      <span className="font-mono text-xs">{c.code}</span> — Đợt {c.periodNo}
+                    </span>
+                    <span
+                      className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${IPC_STATUS_BADGE[c.status] ?? "bg-zinc-800 text-zinc-300"}`}
+                    >
+                      {IPC_STATUS_LABEL[c.status] ?? c.status}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState message="Chưa có đợt thanh toán khối lượng nào." compact />
+            )}
+            <a
+              href={`/payment-certs?contractId=${contract.id}`}
+              className="inline-block text-xs text-sky-300 hover:underline"
+            >
+              Quản lý đợt thanh toán khối lượng (IPC) →
+            </a>
+          </section>
+        )}
       </div>
     </Modal>
   );
 }
+
+const IPC_STATUS_LABEL: Record<string, string> = {
+  draft: "Nháp",
+  submitted: "Đã trình",
+  approved: "Được duyệt",
+  rejected: "Từ chối",
+};
+const IPC_STATUS_BADGE: Record<string, string> = {
+  draft: "bg-zinc-800 text-zinc-300",
+  submitted: "bg-amber-900/40 text-amber-300",
+  approved: "bg-emerald-900/40 text-emerald-300",
+  rejected: "bg-rose-900/40 text-rose-300",
+};

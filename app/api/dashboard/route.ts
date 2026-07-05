@@ -1,13 +1,23 @@
 import { NextResponse } from "next/server";
 import { query, todayISO } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import {
+  cashflowSeries,
+  cpiBlock,
+  qualityBlock,
+  procurementBlock,
+  workfrontBlock,
+  voBlock,
+  byDisciplineBlock,
+} from "@/lib/dashboardext";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.viewDashboard(user.role)) return NextResponse.json({ error: "Thầu phụ không có quyền xem dashboard" }, { status: 403 });
+  if (!CAN.viewDashboard(user.role))
+    return NextResponse.json({ error: "Thầu phụ không có quyền xem dashboard" }, { status: 403 });
 
   const today = todayISO();
 
@@ -46,5 +56,33 @@ export async function GET() {
     today,
   );
 
-  return NextResponse.json({ delayedTasks, kpi, totalDelayed: delayedTasks.length });
+  // M9 — khối mở rộng "tiền + chất lượng + công trường". Khối tài chính (cashflow/
+  // cpi/vo, và budgetUsedPct trong byDiscipline) chỉ trả cho PAYMENT_VIEW_ROLES
+  // (admin/pm/bch) — ẩn từ server cho cdt/viewer, không chỉ ẩn UI (quyết 2026-07-04).
+  const canViewFinance = CAN.viewPayments(user.role);
+  const [quality, procurement, workfront, byDiscipline] = await Promise.all([
+    qualityBlock(),
+    procurementBlock(),
+    workfrontBlock(),
+    byDisciplineBlock(),
+  ]);
+  const [cashflow, cpi, vo] = canViewFinance
+    ? await Promise.all([cashflowSeries(), cpiBlock(), voBlock()])
+    : [null, null, null];
+
+  return NextResponse.json({
+    delayedTasks,
+    kpi,
+    totalDelayed: delayedTasks.length,
+    cashflow,
+    cpi,
+    quality,
+    procurement,
+    workfront,
+    vo,
+    byDiscipline: byDiscipline.map((d) => ({
+      ...d,
+      budgetUsedPct: canViewFinance ? d.budgetUsedPct : null,
+    })),
+  });
 }

@@ -340,6 +340,63 @@ Khi VO chốt vào phụ lục HĐ (`POST /api/variations/:id/contract-add`, tr�
 
 ---
 
+## Nghiệm thu KL & thanh toán theo đợt / IPC (M17, `migrations/0014_payment_certs.sql`)
+
+### `payment_certs`
+
+| Cột                                  | Kiểu                                                              |
+| ------------------------------------ | ----------------------------------------------------------------- |
+| code                                 | TEXT UNIQUE (`IPC-0001`, sinh tự động)                            |
+| contract_id                          | FK → contracts (NOT NULL)                                         |
+| period_no                            | INTEGER — đợt số mấy của HĐ này, `UNIQUE(contract_id, period_no)` |
+| period_label                         | TEXT (hiển thị, vd "Tháng 7/2026" — không tính toán)              |
+| status                               | TEXT (`draft\|submitted\|approved\|rejected`)                     |
+| submitted_at, decided_at, decided_by | DATE / FK → users                                                 |
+| reject_reason                        | TEXT                                                              |
+| created_by                           | FK → users                                                        |
+
+### `payment_cert_items`
+
+| Cột            | Kiểu                                                              |
+| -------------- | ----------------------------------------------------------------- |
+| cert_id        | FK → payment_certs, `UNIQUE(cert_id, boq_item_id)`                |
+| boq_item_id    | FK → boq_items                                                    |
+| qty_period     | NUMERIC — KL nghiệm thu đợt này                                   |
+| qty_cumulative | NUMERIC — luỹ kế tới hết đợt này (snapshot lúc lập)               |
+| unit_price     | NUMERIC — snapshot đơn giá lúc lập (không đổi khi HĐ sửa giá sau) |
+
+Giá trị đợt tính động (`lib/paymentcerts.ts`, không lưu cột trùng lặp): `periodValue = Σ qty_period×unit_price`, trừ tạm ứng/giữ lại theo `%` của hợp đồng (M16) → `approvedValue`. Duyệt (`approved`) trong transaction tự sinh 1 dòng `payment_bills` (`type='bill'`, `amount=approvedValue`, `contract_id`, `payment_cert_id` — cột mới trên `payment_bills`).
+
+---
+
+## Đấu thầu (M7, `migrations/0015_tender.sql`)
+
+### `tender_packages`
+
+| Cột                 | Kiểu                                                          |
+| ------------------- | ------------------------------------------------------------- |
+| code                | TEXT UNIQUE (`GT-0001`, sinh tự động)                         |
+| status              | TEXT (`draft\|open\|closed\|awarded\|cancelled`)              |
+| awarded_bid_id      | FK → tender_bids (nullable — gán lúc trao thầu)               |
+| awarded_contract_id | FK → contracts (HĐ giao thầu tự sinh cho NCC trúng thầu, M16) |
+| created_by          | FK → users                                                    |
+
+### `tender_items` (phạm vi mời thầu)
+
+FK → `tender_packages` + `boq_items`, PK ghép; `qty` = KL mời (có thể ≠ KL HĐ gốc).
+
+### `tender_bids`
+
+FK → `tender_packages` + `suppliers`, `UNIQUE(tender_id, supplier_id)`; `lump_sum` (chào trọn gói, nullable); file chào thầu gốc inline (`file_name`/`original_name`/`mime_type`/`size_bytes`, pattern `task_documents` — 1 file/bid).
+
+### `tender_bid_prices` (giá theo dòng)
+
+FK → `tender_bids` + `boq_items`, PK ghép. **Dòng NCC chưa chào không có bản ghi** — bảng so sánh (`lib/tender.ts:comparisonTable`) hiện "—" cho dòng thiếu, tổng chỉ cộng dòng đã chào (không cộng 0), kèm `quotedLines/totalLines` để UI ghi chú "chào N/M dòng".
+
+Trao thầu (`POST /api/tenders/:id/award`, `lib/tender.ts:awardTender`): sinh 1 dòng `contracts` (`kind='giao_thau'`, `party_supplier_id` = NCC trúng thầu, `value` = tổng giá của bid thắng) → gán `awarded_bid_id`/`awarded_contract_id`, khoá sửa giá.
+
+---
+
 ## Baseline & S-curve
 
 ### `baselines` + `baseline_tasks`
