@@ -171,6 +171,11 @@ export const CAN = {
   // viewer — như /costs nhưng vẫn cho kỹ sư xem/tạo vì họ ghi nhận VO tại hiện trường.
   viewVariations: (r?: Role) => r === "admin" || r === "pm" || r === "engineer" || r === "bch",
   createVariation: (r?: Role) => r === "admin" || r === "pm" || r === "engineer", // tạo VO (M6)
+  // Bản vẽ (M8): tạo drawing/upload rev mới — Admin/PM/engineer (xem thì mọi vai trò,
+  // kể cả subcon, vì cần bản vẽ để thi công tại hiện trường).
+  manageDrawings: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  // Đổi trạng thái duyệt rev (approved/rejected/...) — chỉ Admin/PM.
+  decideDrawingRevision: (r?: Role) => r === "admin" || r === "pm",
 };
 
 // Sub-con chỉ được thao tác trên task được giao cho mình.

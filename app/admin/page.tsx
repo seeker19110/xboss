@@ -15,6 +15,7 @@ import {
   Activity,
   Circle,
   CalendarClock,
+  HardDrive,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { fetchMe } from "@/app/lib/me";
@@ -105,6 +106,9 @@ export default function AdminPage() {
   const [auditTotal, setAuditTotal] = useState(0);
   const [auditPage, setAuditPage] = useState(0);
   const AUDIT_LIMIT = 30;
+  const [storage, setStorage] = useState<{ bytes: number; files: number; warn: boolean } | null>(
+    null,
+  );
 
   const loadAssign = useCallback((unassignedOnly = false) => {
     const q = unassignedOnly ? "?unassignedOnly=1" : "";
@@ -167,6 +171,15 @@ export default function AdminPage() {
       es.close();
       setTrafficLive(false);
     };
+  }, [tab, me?.role]);
+
+  // Dung lượng data/uploads/ — chỉ gọi 1 lần khi mở tab traffic (Admin), không cần realtime.
+  useEffect(() => {
+    if (tab !== "traffic" || me?.role !== "admin") return;
+    fetch("/api/admin/storage")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setStorage(d))
+      .catch(() => {});
   }, [tab, me?.role]);
 
   function flash(msg: string) {
@@ -658,6 +671,24 @@ export default function AdminPage() {
         {/* ========== TAB TRAFFIC ========== */}
         {tab === "traffic" && me?.role === "admin" && (
           <div className="space-y-3">
+            {storage && (
+              <div
+                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+                  storage.warn
+                    ? "border-amber-400/40 bg-amber-400/10 text-amber-300"
+                    : "border-zinc-800 text-zinc-400"
+                }`}
+              >
+                <HardDrive className="w-4 h-4 shrink-0" aria-hidden="true" />
+                <span>
+                  Dung lượng <code className="text-zinc-300">data/uploads/</code>:{" "}
+                  <b className="text-white">{(storage.bytes / 1024 / 1024).toFixed(1)} MB</b>
+                  {" · "}
+                  {storage.files} file
+                  {storage.warn && " — sắp hết dung lượng, cân nhắc dọn bớt hoặc tăng ổ đĩa"}
+                </span>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <Circle
                 className={`w-2.5 h-2.5 ${trafficLive ? "text-emerald-400 animate-pulse" : "text-zinc-600"}`}
