@@ -28,4 +28,24 @@ test.describe("Vật tư (sau đăng nhập)", () => {
     );
     expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
   });
+
+  test("tab Yêu cầu mua (đề nghị vật tư) không có vi phạm a11y nghiêm trọng (axe)", async ({
+    page,
+  }) => {
+    await gotoMaterials(page);
+    await page.getByRole("button", { name: /Yêu cầu mua/ }).click();
+    // Tab đề nghị vật tư active (border emerald) → nội dung tab đã render.
+    await expect(page.getByRole("button", { name: /Yêu cầu mua/ })).toHaveClass(
+      /border-emerald-500/,
+    );
+
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+
+    const serious = results.violations.filter(
+      (v) => v.impact === "serious" || v.impact === "critical",
+    );
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+  });
 });

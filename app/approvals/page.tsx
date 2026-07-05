@@ -292,7 +292,7 @@ export default function ApprovalsPage() {
           <td className="p-3 text-xs text-zinc-400">
             {g.approvedByName ? `${g.approvedByName}` : "—"}
             {g.approvedAt && (
-              <span className="block text-zinc-600">{formatDateVN(g.approvedAt)}</span>
+              <span className="block text-zinc-400">{formatDateVN(g.approvedAt)}</span>
             )}
           </td>
         )}
@@ -305,7 +305,7 @@ export default function ApprovalsPage() {
               className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg border transition ${
                 g.docCount > 0
                   ? "bg-emerald-950/60 border-emerald-900 text-emerald-300 hover:bg-emerald-900/60"
-                  : "bg-zinc-800 border-zinc-700 text-zinc-500 hover:bg-zinc-700"
+                  : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:bg-zinc-700"
               }`}
             >
               <Paperclip className="w-3 h-3" /> {g.docCount} biên bản
@@ -341,7 +341,7 @@ export default function ApprovalsPage() {
                   <CheckSquare className="w-3 h-3" /> Duyệt nghiệm thu
                 </button>
               ) : (
-                <span className="flex items-center gap-1 text-xs text-zinc-600">
+                <span className="flex items-center gap-1 text-xs text-zinc-400">
                   <Clock className="w-3 h-3" /> Chờ {g.totalTasks - g.doneTasks} task
                 </span>
               )
@@ -379,11 +379,16 @@ export default function ApprovalsPage() {
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
           <div className="p-4 border-b border-zinc-800">
             <h2 className="font-semibold text-sm">Chờ nghiệm thu ({pending.length} tầng · hệ)</h2>
-            <p className="text-xs text-zinc-500 mt-0.5">
+            <p className="text-xs text-zinc-400 mt-0.5">
               Chỉ duyệt được khi tất cả task trong tầng đạt 100%
             </p>
           </div>
-          <div className="overflow-x-auto">
+          <div
+            className="overflow-x-auto"
+            tabIndex={0}
+            role="region"
+            aria-label="Bảng chờ nghiệm thu"
+          >
             <table className="w-full text-sm min-w-[560px]">
               <thead>
                 <tr className="text-xs text-zinc-400 border-b border-zinc-800">
@@ -399,7 +404,7 @@ export default function ApprovalsPage() {
                 {pending.map((g) => row(g, true))}
                 {pending.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-zinc-500">
+                    <td colSpan={6} className="p-8 text-center text-zinc-400">
                       Không có tầng nào chờ nghiệm thu — tất cả đã được duyệt hoặc chưa đủ tiến độ.
                     </td>
                   </tr>
@@ -416,7 +421,12 @@ export default function ApprovalsPage() {
               Đã nghiệm thu ({approved.length} tầng · hệ)
             </h2>
           </div>
-          <div className="overflow-x-auto">
+          <div
+            className="overflow-x-auto"
+            tabIndex={0}
+            role="region"
+            aria-label="Bảng đã nghiệm thu"
+          >
             <table className="w-full text-sm min-w-[560px]">
               <thead>
                 <tr className="text-xs text-zinc-400 border-b border-zinc-800">
@@ -433,7 +443,7 @@ export default function ApprovalsPage() {
                 {approved.map((g) => row(g, false))}
                 {approved.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-zinc-500">
+                    <td colSpan={7} className="p-8 text-center text-zinc-400">
                       Chưa có tầng nào được nghiệm thu.
                     </td>
                   </tr>
@@ -494,9 +504,9 @@ export default function ApprovalsPage() {
                       {d.caption || d.originalName || (isLink ? d.linkUrl : `Tài liệu #${d.id}`)}
                     </a>
                     {!isLink && d.sizeBytes != null && (
-                      <span className="text-xs text-zinc-500 shrink-0">{fmtSize(d.sizeBytes)}</span>
+                      <span className="text-xs text-zinc-400 shrink-0">{fmtSize(d.sizeBytes)}</span>
                     )}
-                    <span className="text-xs text-zinc-600 shrink-0">{d.uploaderName ?? "—"}</span>
+                    <span className="text-xs text-zinc-400 shrink-0">{d.uploaderName ?? "—"}</span>
                     {canApprove && (
                       <button
                         onClick={() => deleteDoc(d.id)}
@@ -511,7 +521,7 @@ export default function ApprovalsPage() {
               );
             })}
             {docs.length === 0 && (
-              <p className="text-sm text-zinc-500 text-center py-4">Chưa có biên bản nào.</p>
+              <p className="text-sm text-zinc-400 text-center py-4">Chưa có biên bản nào.</p>
             )}
 
             {/* Form thêm link */}
