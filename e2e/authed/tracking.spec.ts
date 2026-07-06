@@ -25,6 +25,13 @@ test.describe("Lưới tracking (sau đăng nhập)", () => {
     await gotoSheet(page);
   });
 
+  // M14 — tầng chưa bàn giao mặt bằng (mọi tầng seed mặc định 'pending', chưa có tầng nào
+  // bàn giao) hiện badge khoá cạnh nhãn tầng, không chặn tick (chỉ cảnh báo trực quan).
+  test("hiện badge 'Chưa có mặt bằng' cạnh tầng chưa bàn giao", async ({ page }) => {
+    await gotoSheet(page);
+    await expect(page.locator('svg[aria-label="Chưa có mặt bằng"]').first()).toBeVisible();
+  });
+
   test("không có vi phạm a11y nghiêm trọng (axe)", async ({ page }) => {
     await gotoSheet(page);
 

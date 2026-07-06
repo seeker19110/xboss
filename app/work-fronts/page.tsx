@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { X, Lock, Hammer, CheckCircle2, RotateCcw, Paperclip } from "lucide-react";
+import { X, Lock, Hammer, CheckCircle2, RotateCcw, Paperclip, Download } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal } from "@/app/components/dialogs";
@@ -50,6 +50,7 @@ export default function WorkFrontsPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const canManage = me?.role === "admin" || me?.role === "pm" || me?.role === "engineer";
+  const canExportReport = me?.role === "admin" || me?.role === "pm";
 
   function load() {
     return fetch("/api/work-fronts").then((r) => (r.ok ? r.json() : null));
@@ -81,7 +82,24 @@ export default function WorkFrontsPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <AppHeader title="Mặt bằng thi công" subtitle="Trạng thái bàn giao mặt bằng theo tầng/hệ" />
+      <AppHeader
+        title="Mặt bằng thi công"
+        subtitle="Trạng thái bàn giao mặt bằng theo tầng/hệ"
+        bottomActions={
+          canExportReport && (
+            <a
+              href="/api/work-fronts/report"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Báo cáo mặt bằng (EOT)"
+              className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-3 py-2 rounded-lg text-sm font-medium transition shrink-0"
+            >
+              <Download className="w-4 h-4" />{" "}
+              <span className="hidden sm:inline">Báo cáo mặt bằng (EOT)</span>
+            </a>
+          )
+        }
+      />
 
       <main className="p-4 sm:p-6 pb-24 space-y-4">
         {items.length === 0 ? (
