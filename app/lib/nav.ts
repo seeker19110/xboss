@@ -27,6 +27,7 @@ import {
   Receipt,
   Gavel,
   PencilRuler,
+  Mail,
 } from "lucide-react";
 import type { Role } from "@/lib/roles";
 
@@ -65,6 +66,12 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/quality", label: "Chất lượng", icon: ClipboardCheck },
       { href: "/diary", label: "Nhật ký", icon: NotebookPen },
       { href: "/drawings", label: "Bản vẽ", icon: PencilRuler },
+      {
+        href: "/correspondences",
+        label: "Công văn",
+        icon: Mail,
+        roles: ["admin", "pm", "engineer", "bch", "cdt", "viewer"],
+      },
     ],
   },
   {
