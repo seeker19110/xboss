@@ -52,6 +52,10 @@ export function newCorrespondenceFileName(correspondenceId: number, mime: string
   return `cv${correspondenceId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime]}`;
 }
 
+export function newProjectDocFileName(mime: string): string {
+  return `pd-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime]}`;
+}
+
 export function ensureUploadDir(): string {
   if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
   return UPLOAD_DIR;
