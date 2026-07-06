@@ -86,7 +86,7 @@ export function LookaheadTable({ tasks, dateCol }: TableProps) {
                 ? `Đang trễ${delayReason ? ` · ${DELAY_REASON_LABEL[delayReason as keyof typeof DELAY_REASON_LABEL] ?? delayReason}` : ""}`
                 : (STATUS_LABEL[status as StatusSlug] ?? "")}
               {waitingFront && (
-                <span className="text-amber-600 font-medium">
+                <span className="text-amber-700 font-medium">
                   {status === "tre" ? " · " : " "}⚠ chưa bàn giao MB
                 </span>
               )}
@@ -110,7 +110,7 @@ export function LookaheadTable({ tasks, dateCol }: TableProps) {
   });
 
   return (
-    <div className="overflow-x-auto mb-4">
+    <div className="overflow-x-auto mb-4" tabIndex={0} role="region" aria-label="Bảng kế hoạch">
       <table className="w-full text-sm border-collapse">
         <thead>
           {table.getHeaderGroups().map((headerGroup) => (

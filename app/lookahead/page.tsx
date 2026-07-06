@@ -59,7 +59,7 @@ export default function LookaheadPage() {
   return (
     <div className="min-h-screen bg-white text-zinc-900">
       <div className="no-print sticky top-0 bg-zinc-100 border-b border-zinc-300 px-6 py-3 flex items-center gap-3">
-        <Link href="/" className="text-zinc-600 hover:text-zinc-900">
+        <Link href="/" aria-label="Quay lại" className="text-zinc-600 hover:text-zinc-900">
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <span className="text-sm text-zinc-600">
@@ -68,6 +68,7 @@ export default function LookaheadPage() {
         <select
           value={days}
           onChange={(e) => setDays(Number(e.target.value))}
+          aria-label="Số ngày xem trước"
           className="ml-auto border border-zinc-300 rounded-lg px-3 py-2 text-sm bg-white"
         >
           <option value={7}>7 ngày</option>
@@ -131,7 +132,7 @@ export default function LookaheadPage() {
           </div>
         ))}
 
-        <p className="text-xs text-zinc-400 mt-8" suppressHydrationWarning>
+        <p className="text-xs text-zinc-600 mt-8" suppressHydrationWarning>
           Xuất từ XBoss · {new Date().toLocaleString("vi-VN")}
         </p>
       </div>

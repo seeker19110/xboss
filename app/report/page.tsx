@@ -49,7 +49,7 @@ export default function ReportPage() {
   return (
     <div className="min-h-screen bg-white text-zinc-900">
       <div className="no-print sticky top-0 bg-zinc-100 border-b border-zinc-300 px-6 py-3 flex items-center gap-3">
-        <Link href="/" className="text-zinc-600 hover:text-zinc-900">
+        <Link href="/" aria-label="Quay lại" className="text-zinc-600 hover:text-zinc-900">
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <span className="text-sm text-zinc-600">
@@ -83,7 +83,7 @@ export default function ReportPage() {
         <h2 className="font-bold text-lg mb-3">1. Tổng quan KPI</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
           <div className="border border-red-300 bg-red-50 rounded-lg p-3">
-            <p className="text-xs text-red-600 uppercase">Tổng công việc trễ</p>
+            <p className="text-xs text-red-700 uppercase">Tổng công việc trễ</p>
             <p className="text-3xl font-bold text-red-700">{data?.totalDelayed ?? 0}</p>
           </div>
           {data?.kpi.map((k) => (
@@ -196,7 +196,7 @@ export default function ReportPage() {
             ))}
             {!data?.delayedTasks.length && (
               <tr>
-                <td colSpan={6} className="p-4 text-center text-zinc-400">
+                <td colSpan={6} className="p-4 text-center text-zinc-600">
                   Không có công việc trễ.
                 </td>
               </tr>
@@ -218,7 +218,7 @@ export default function ReportPage() {
           </div>
         </div>
 
-        <p className="text-xs text-zinc-400 mt-8">Xuất từ XBoss · Hệ thống quản lý thi công MEP</p>
+        <p className="text-xs text-zinc-600 mt-8">Xuất từ XBoss · Hệ thống quản lý thi công MEP</p>
       </div>
 
       <style jsx global>{`
