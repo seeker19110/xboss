@@ -180,6 +180,10 @@ export const CAN = {
   // cdt/subcon/viewer); tạo gói/nhập giá chào/trao thầu chỉ Admin/PM.
   viewTenders: (r?: Role) => r === "admin" || r === "pm" || r === "engineer" || r === "bch",
   manageTenders: (r?: Role) => r === "admin" || r === "pm",
+  // Sổ công văn/RFI (M10): nhạy cảm hợp đồng — xem mọi vai trò trừ subcon; tạo/sửa
+  // Admin/PM/engineer (kỹ sư ghi nhận công văn tại hiện trường, giống VO).
+  viewCorrespondence: (r?: Role) => r !== "subcon",
+  manageCorrespondence: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
 };
 
 // Sub-con chỉ được thao tác trên task được giao cho mình.

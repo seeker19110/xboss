@@ -7,6 +7,7 @@ import { missingDiaryDates } from "@/lib/diary";
 import { expiringContracts } from "@/lib/contracts";
 import { pendingVariations } from "@/lib/vo";
 import { overContractCerts, pendingCerts } from "@/lib/paymentcerts";
+import { dueCorrespondences } from "@/lib/correspondence";
 
 export const dynamic = "force-dynamic";
 
@@ -284,6 +285,31 @@ export async function GET() {
         WHERE user_id = ? AND type = 'cert_pending' AND is_read = 0 AND payment_cert_id <> ALL(?)`,
       user.id,
       pendingCertIds,
+    );
+  }
+
+  // Công văn/RFI quá hạn phản hồi chưa 'replied'/'closed' → nhắc Admin/PM (M10).
+  if (isAdminOrPm(user.role)) {
+    const dueList = await dueCorrespondences();
+    if (dueList.length > 0) {
+      const values = dueList.map(() => `(?, ?, 'correspondence_due', ?)`).join(", ");
+      const params = dueList.flatMap((c) => [
+        user.id,
+        c.id,
+        `📨 Công văn ${c.code} (${c.counterparty}) — ${c.subject} đã quá hạn phản hồi (${c.dueDate})`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, correspondence_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, type, correspondence_id) WHERE correspondence_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    const dueIds = dueList.map((c) => c.id);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'correspondence_due' AND is_read = 0 AND correspondence_id <> ALL(?)`,
+      user.id,
+      dueIds,
     );
   }
 
