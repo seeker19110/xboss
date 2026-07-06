@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Cho phép deploy.sh build vào thư mục tạm rồi swap atomic vào ".next" thật —
+  // tránh app đang chạy (đọc ".next" hiện tại) bị vỡ chunk giữa lúc build ghi đè.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   serverExternalPackages: ["pg", "better-sqlite3"],
   images: {
     formats: ["image/avif", "image/webp"],
@@ -15,7 +18,9 @@ const nextConfig = {
       // Manifest + icons — cache 7 ngày (thay đổi khi deploy mới)
       {
         source: "/:file(manifest\\.webmanifest|icon.*\\.png|icon\\.svg)",
-        headers: [{ key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=86400" }],
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=86400" },
+        ],
       },
       // Service worker — không cache dài để SW mới được nhận ngay
       {
