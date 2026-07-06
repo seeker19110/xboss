@@ -7,13 +7,24 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { formatDateVN } from "@/lib/date";
-import {
-  RISK_CATEGORY_LABEL,
-  RISK_STATUS_LABEL,
-  type RiskCategory,
-  type RiskStatus,
-} from "@/lib/risks";
+// Nhân bản label từ lib/risks.ts — không import trực tiếp vì lib đó kéo theo
+// lib/db (chỉ chạy server), giống pattern trang HSE.
+type RiskCategory = "schedule" | "cost" | "quality" | "safety" | "material" | "other";
+const RISK_CATEGORY_LABEL: Record<RiskCategory, string> = {
+  schedule: "Tiến độ",
+  cost: "Chi phí",
+  quality: "Chất lượng",
+  safety: "An toàn",
+  material: "Vật tư",
+  other: "Khác",
+};
+
+type RiskStatus = "open" | "mitigating" | "closed";
+const RISK_STATUS_LABEL: Record<RiskStatus, string> = {
+  open: "Đang mở",
+  mitigating: "Đang giảm thiểu",
+  closed: "Đã đóng",
+};
 
 type Risk = {
   id: number;
@@ -155,13 +166,13 @@ export default function RisksPage() {
             <div className="grid grid-cols-[auto_repeat(5,1fr)] gap-1">
               <div />
               {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="text-center text-[10px] text-zinc-500 pb-1">
+                <div key={i} className="text-center text-[10px] text-zinc-400 pb-1">
                   {i}
                 </div>
               ))}
               {[5, 4, 3, 2, 1].map((p) => (
                 <Fragment key={p}>
-                  <div className="flex items-center justify-end pr-1.5 text-[10px] text-zinc-500">
+                  <div className="flex items-center justify-end pr-1.5 text-[10px] text-zinc-400">
                     {p}
                   </div>
                   {[1, 2, 3, 4, 5].map((i) => {
@@ -187,7 +198,7 @@ export default function RisksPage() {
                 </Fragment>
               ))}
             </div>
-            <div className="flex justify-between mt-2 text-[10px] text-zinc-500">
+            <div className="flex justify-between mt-2 text-[10px] text-zinc-400">
               <span>← Xác suất (dọc)</span>
               <span>Mức ảnh hưởng (ngang) →</span>
             </div>

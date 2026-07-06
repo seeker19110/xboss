@@ -13,6 +13,7 @@ import { calibrationDueList } from "@/lib/equipment";
 import { overNormItems } from "@/lib/norms";
 import { openHseActions } from "@/lib/hse";
 import { overdueMeetingActions } from "@/lib/meetings";
+import { pendingProposalsOver } from "@/lib/proposals";
 
 export const dynamic = "force-dynamic";
 
@@ -340,6 +341,31 @@ export async function GET() {
         WHERE user_id = ? AND type = 'vo_pending' AND is_read = 0 AND vo_id <> ALL(?)`,
       user.id,
       pendingIds,
+    );
+  }
+
+  // Đề xuất đã trình quá hạn chưa được quyết định → nhắc Admin/PM (M19).
+  if (isAdminOrPm(user.role)) {
+    const pendingProposals = await pendingProposalsOver();
+    if (pendingProposals.length > 0) {
+      const values = pendingProposals.map(() => `(?, ?, 'proposal_pending', ?)`).join(", ");
+      const params = pendingProposals.flatMap((p) => [
+        user.id,
+        p.id,
+        `🖋 Đề xuất ${p.code} — ${p.title} đã trình từ ${p.submittedAt}, chưa được quyết định`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, proposal_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, type, proposal_id) WHERE proposal_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    const pendingProposalIds = pendingProposals.map((p) => p.id);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'proposal_pending' AND is_read = 0 AND proposal_id <> ALL(?)`,
+      user.id,
+      pendingProposalIds,
     );
   }
 

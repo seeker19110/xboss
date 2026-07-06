@@ -31,6 +31,7 @@ import type {
   VoBlock,
   WorkfrontBlock,
   DisciplineCrossRow,
+  ApprovalsBlock,
 } from "@/app/components/DashboardExtCards";
 
 // Lazy-load các component nặng (recharts, nhiều fetch) — chỉ load khi đã render shell
@@ -118,6 +119,7 @@ export default function Dashboard() {
     vo: VoBlock | null;
     workfront: WorkfrontBlock | null;
     byDiscipline: DisciplineCrossRow[];
+    approvals: ApprovalsBlock | null;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [sheetFilter, setSheetFilter] = useState("");
@@ -505,6 +507,7 @@ export default function Dashboard() {
             vo={data.vo}
             workfront={data.workfront}
             byDiscipline={data.byDiscipline}
+            approvals={data.approvals}
             isEngineer={me?.role === "engineer"}
           />
         )}

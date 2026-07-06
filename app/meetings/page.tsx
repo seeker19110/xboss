@@ -20,12 +20,23 @@ import { Modal, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { formatDateVN, todayISO } from "@/lib/date";
-import {
-  MEETING_KIND_LABEL,
-  MEETING_ACTION_STATUS_LABEL,
-  type MeetingKind,
-  type MeetingActionStatus,
-} from "@/lib/meetings";
+
+// Nhân bản label từ lib/meetings.ts — không import trực tiếp vì lib đó kéo theo
+// lib/db (chỉ chạy server), giống pattern trang HSE.
+type MeetingKind = "weekly" | "client" | "subcon" | "other";
+const MEETING_KIND_LABEL: Record<MeetingKind, string> = {
+  weekly: "Họp tuần",
+  client: "Họp CĐT/TVGS",
+  subcon: "Họp thầu phụ",
+  other: "Khác",
+};
+
+type MeetingActionStatus = "open" | "done" | "cancelled";
+const MEETING_ACTION_STATUS_LABEL: Record<MeetingActionStatus, string> = {
+  open: "Đang mở",
+  done: "Đã xong",
+  cancelled: "Đã huỷ",
+};
 
 type MeetingAction = {
   id: number;

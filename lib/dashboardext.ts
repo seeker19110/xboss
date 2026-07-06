@@ -131,6 +131,21 @@ export async function workfrontBlock(): Promise<WorkfrontBlock | null> {
   };
 }
 
+export type ApprovalsBlock = { pendingProposals: number; pendingPurchaseRequests: number };
+
+// M19 — widget "Chờ duyệt" cho Admin/PM: đếm gộp đề xuất đã trình (proposals) +
+// yêu cầu mua vật tư đang chờ (purchase_requests) — 1 con số duy nhất, tránh 2 nơi rời rạc.
+export async function approvalsBlock(): Promise<ApprovalsBlock> {
+  const row = await queryOne<{ proposals: number; prs: number }>(
+    `SELECT (SELECT COUNT(*) FROM proposals WHERE status = 'submitted') AS proposals,
+            (SELECT COUNT(*) FROM purchase_requests WHERE status = 'pending') AS prs`,
+  );
+  return {
+    pendingProposals: Number(row?.proposals ?? 0),
+    pendingPurchaseRequests: Number(row?.prs ?? 0),
+  };
+}
+
 export type VoBlock = { draft: number; submitted: number; approved: number; rejected: number };
 
 // Tổng giá trị VO theo trạng thái (approved gộp cả partially_approved/contract_added).

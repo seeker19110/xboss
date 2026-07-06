@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronRight,
   MapPinned,
+  Inbox,
 } from "lucide-react";
 import { ComposedChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import EditableText from "@/app/components/EditableText";
@@ -27,6 +28,7 @@ export type QualityBlock = {
 };
 export type VoBlock = { draft: number; submitted: number; approved: number; rejected: number };
 export type WorkfrontBlock = { waitingFloors: number; cumulativeWaitDays: number };
+export type ApprovalsBlock = { pendingProposals: number; pendingPurchaseRequests: number };
 export type DisciplineCrossRow = {
   code: string;
   name: string;
@@ -53,6 +55,7 @@ export default function DashboardExtCards({
   vo,
   workfront,
   byDiscipline,
+  approvals,
   isEngineer,
 }: {
   cashflow: CashflowMonth[] | null;
@@ -61,6 +64,7 @@ export default function DashboardExtCards({
   vo: VoBlock | null;
   workfront: WorkfrontBlock | null;
   byDiscipline: DisciplineCrossRow[];
+  approvals?: ApprovalsBlock | null;
   isEngineer: boolean;
 }) {
   const [financeOpen, setFinanceOpen] = useState(!isEngineer);
@@ -69,6 +73,24 @@ export default function DashboardExtCards({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3">
+        {approvals != null &&
+          approvals.pendingProposals + approvals.pendingPurchaseRequests > 0 && (
+            <a
+              href="/proposals"
+              className="flex-1 min-w-[140px] bg-zinc-900 border border-zinc-800 rounded-xl p-4 hover:border-zinc-600 transition"
+            >
+              <p className="text-xs text-zinc-400 uppercase tracking-wide flex items-center gap-1.5">
+                <Inbox className="w-3.5 h-3.5" /> Chờ duyệt của tôi
+              </p>
+              <p className="text-lg font-semibold mt-1 text-amber-300">
+                {approvals.pendingProposals + approvals.pendingPurchaseRequests}
+                <span className="ml-1.5 text-xs font-medium text-zinc-400">
+                  ({approvals.pendingProposals} đề xuất · {approvals.pendingPurchaseRequests} mua
+                  vật tư)
+                </span>
+              </p>
+            </a>
+          )}
         {canViewFinance && (
           <a
             href="/costs"
