@@ -808,6 +808,9 @@ export default function MyTasksPage() {
                 })}
               </div>
             )}
+
+            {/* Việc sau họp được giao cho tôi (M13) */}
+            <MeetingActionsSection />
           </>
         )}
 
@@ -1101,6 +1104,89 @@ export default function MyTasksPage() {
           </>
         )}
       </main>
+    </div>
+  );
+}
+
+// ── Việc sau họp của tôi (M13) ────────────────────────────────────────────────
+// Mục riêng cuối trang — action đang mở được giao cho user hiện tại, đánh xong tại chỗ.
+
+type MyMeetingAction = {
+  id: number;
+  meetingId: number;
+  content: string;
+  dueDate: string | null;
+  meetingTitle: string;
+  meetingDate: string;
+};
+
+function MeetingActionsSection() {
+  const [actions, setActions] = useState<MyMeetingAction[]>([]);
+  const [marking, setMarking] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch("/api/meetings/actions?open=1")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setActions(d?.actions ?? []))
+      .catch(() => {});
+  }, []);
+
+  async function markDone(a: MyMeetingAction) {
+    setMarking(a.id);
+    const res = await fetch(`/api/meetings/${a.meetingId}/actions/${a.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "done" }),
+    }).catch(() => null);
+    setMarking(null);
+    if (res?.ok) setActions((prev) => prev.filter((x) => x.id !== a.id));
+  }
+
+  if (actions.length === 0) return null;
+
+  const today = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-zinc-800">
+        <Users className="w-4 h-4 text-violet-400" />
+        <h2 className="text-sm font-semibold">Việc sau họp</h2>
+        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-400">
+          {actions.length}
+        </span>
+        <a href="/meetings" className="ml-auto text-xs text-zinc-500 hover:text-zinc-300">
+          Xem tất cả →
+        </a>
+      </div>
+      <div className="divide-y divide-zinc-800/50">
+        {actions.map((a) => {
+          const overdue = a.dueDate != null && a.dueDate < today;
+          return (
+            <div key={a.id} className="flex items-center gap-3 px-4 py-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-zinc-200">{a.content}</p>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  {a.meetingTitle} · {formatDateVN(a.meetingDate)}
+                  {a.dueDate && (
+                    <span className={overdue ? "text-red-400 font-medium" : ""}>
+                      {" "}
+                      · hạn {formatDateVN(a.dueDate)}
+                      {overdue && " (quá hạn)"}
+                    </span>
+                  )}
+                </p>
+              </div>
+              <button
+                onClick={() => markDone(a)}
+                disabled={marking === a.id}
+                className="flex items-center gap-1.5 text-xs font-medium text-emerald-400 hover:text-emerald-300 disabled:opacity-50 bg-zinc-800 hover:bg-zinc-700 px-2.5 py-1.5 rounded-lg transition shrink-0"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" /> Xong
+              </button>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

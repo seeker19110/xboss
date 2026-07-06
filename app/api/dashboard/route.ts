@@ -9,6 +9,7 @@ import {
   workfrontBlock,
   voBlock,
   byDisciplineBlock,
+  approvalsBlock,
 } from "@/lib/dashboardext";
 
 export const dynamic = "force-dynamic";
@@ -70,7 +71,11 @@ export async function GET() {
     ? await Promise.all([cashflowSeries(), cpiBlock(), voBlock()])
     : [null, null, null];
 
+  // Widget "Chờ duyệt" (M19) — chỉ người có quyền duyệt (Admin/PM) cần thấy.
+  const approvals = CAN.approve(user.role) ? await approvalsBlock() : null;
+
   return NextResponse.json({
+    approvals,
     delayedTasks,
     kpi,
     totalDelayed: delayedTasks.length,

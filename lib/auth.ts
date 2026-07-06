@@ -192,6 +192,12 @@ export const CAN = {
   manageNorms: (r?: Role) => r === "admin" || r === "pm",
   // HSE (M11): mọi vai trò thao tác tạo được (kể cả subcon báo near-miss); sửa/đóng action Admin/PM/kỹ sư.
   manageHse: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  // Họp + action item (M13): tạo/sửa biên bản họp và action Admin/PM/kỹ sư
+  // (xem thì mọi vai trò đăng nhập — subcon cũng có action được giao từ họp thầu phụ).
+  manageMeetings: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  // Sổ rủi ro (M13): tạo/sửa Admin/PM/kỹ sư; xem mọi vai trò trừ subcon (nhạy cảm quản trị).
+  viewRisks: (r?: Role) => !!r && r !== "subcon",
+  manageRisks: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
 };
 
 // Sub-con chỉ được thao tác trên task được giao cho mình.

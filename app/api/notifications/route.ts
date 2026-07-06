@@ -12,6 +12,8 @@ import { frontMissingList } from "@/lib/workfronts";
 import { calibrationDueList } from "@/lib/equipment";
 import { overNormItems } from "@/lib/norms";
 import { openHseActions } from "@/lib/hse";
+import { overdueMeetingActions } from "@/lib/meetings";
+import { pendingProposalsOver } from "@/lib/proposals";
 
 export const dynamic = "force-dynamic";
 
@@ -342,6 +344,31 @@ export async function GET() {
     );
   }
 
+  // Đề xuất đã trình quá hạn chưa được quyết định → nhắc Admin/PM (M19).
+  if (isAdminOrPm(user.role)) {
+    const pendingProposals = await pendingProposalsOver();
+    if (pendingProposals.length > 0) {
+      const values = pendingProposals.map(() => `(?, ?, 'proposal_pending', ?)`).join(", ");
+      const params = pendingProposals.flatMap((p) => [
+        user.id,
+        p.id,
+        `🖋 Đề xuất ${p.code} — ${p.title} đã trình từ ${p.submittedAt}, chưa được quyết định`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, proposal_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, type, proposal_id) WHERE proposal_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    const pendingProposalIds = pendingProposals.map((p) => p.id);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'proposal_pending' AND is_read = 0 AND proposal_id <> ALL(?)`,
+      user.id,
+      pendingProposalIds,
+    );
+  }
+
   // NCR quá hạn chưa đóng → cảnh báo người được gán; Admin/PM thấy mọi NCR quá hạn (quản lý chung).
   {
     const isPrivileged = user.role === "admin" || user.role === "pm";
@@ -554,6 +581,32 @@ export async function GET() {
         WHERE user_id = ? AND type = 'hse_action_due' AND is_read = 0 AND hse_record_id <> ALL(?)`,
       user.id,
       overdueHseIds,
+    );
+  }
+
+  // Việc sau họp quá hạn chưa xong → nhắc assignee + Admin/PM (M13).
+  {
+    const isPrivileged = user.role === "admin" || user.role === "pm";
+    const overdueActions = await overdueMeetingActions(isPrivileged ? undefined : user.id);
+    if (overdueActions.length > 0) {
+      const values = overdueActions.map(() => `(?, ?, 'action_overdue', ?)`).join(", ");
+      const params = overdueActions.flatMap((a) => [
+        user.id,
+        a.id,
+        `📋 Việc sau họp "${a.content}" (${a.meetingTitle}) đã quá hạn ${a.dueDate}`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, meeting_action_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, meeting_action_id, type) WHERE meeting_action_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    const overdueActionIds = overdueActions.map((a) => a.id);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'action_overdue' AND is_read = 0 AND meeting_action_id <> ALL(?)`,
+      user.id,
+      overdueActionIds,
     );
   }
 
