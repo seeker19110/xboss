@@ -1,6 +1,15 @@
 "use client";
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { Plus, ChevronDown, ChevronRight, X, Search, Trash2, AlertTriangle } from "lucide-react";
+import {
+  Plus,
+  ChevronDown,
+  ChevronRight,
+  X,
+  Search,
+  Trash2,
+  AlertTriangle,
+  FileUp,
+} from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
@@ -64,6 +73,14 @@ function fmtQty(n: number) {
   return n.toLocaleString("vi-VN", { maximumFractionDigits: 3 });
 }
 
+// sw.js áp stale-while-revalidate cho mọi GET /api/* — gọi lại đúng URL ngay sau khi
+// tự mình vừa ghi (thêm/sửa/xoá/import) có thể nhận lại bản cache cũ. Thêm nonce để
+// bỏ qua cache đúng những lần load lại này (pattern đã dùng ở app/drawings/page.tsx).
+function fetchFresh(url: string): Promise<Response> {
+  const sep = url.includes("?") ? "&" : "?";
+  return fetch(`${url}${sep}_=${Date.now()}`, { cache: "no-store" });
+}
+
 export default function BoqPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [items, setItems] = useState<BoqItem[]>([]);
@@ -73,12 +90,14 @@ export default function BoqPage() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<BoqItem | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [includeVo, setIncludeVo] = useState(true);
 
   const canManage = me?.role === "admin" || me?.role === "pm";
 
-  function load(withVo: boolean) {
-    return fetch(`/api/boq?includeVo=${withVo ? 1 : 0}`).then((r) => (r.ok ? r.json() : null));
+  function load(withVo: boolean, fresh = false) {
+    const url = `/api/boq?includeVo=${withVo ? 1 : 0}`;
+    return (fresh ? fetchFresh(url) : fetch(url)).then((r) => (r.ok ? r.json() : null));
   }
 
   useEffect(() => {
@@ -98,7 +117,7 @@ export default function BoqPage() {
   }, [includeVo]);
 
   async function refresh() {
-    const boq = await load(includeVo);
+    const boq = await load(includeVo, true);
     setItems(boq?.items ?? []);
     setTotals(boq?.totals ?? { contractValue: 0, subValue: 0, executedValue: 0 });
     setSelected((sel) =>
@@ -152,13 +171,23 @@ export default function BoqPage() {
         subtitle="Khối lượng nhận thầu · giao thầu · thực hiện"
         bottomActions={
           canManage ? (
-            <button
-              onClick={() => setAddOpen(true)}
-              aria-label="Thêm dòng BOQ"
-              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
-            >
-              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm dòng BOQ</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setImportOpen(true)}
+                aria-label="Import Excel BOQ"
+                className="flex items-center gap-2 border border-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-white px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+              >
+                <FileUp className="w-4 h-4" />{" "}
+                <span className="hidden sm:inline">Import Excel</span>
+              </button>
+              <button
+                onClick={() => setAddOpen(true)}
+                aria-label="Thêm dòng BOQ"
+                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+              >
+                <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm dòng BOQ</span>
+              </button>
+            </div>
           ) : undefined
         }
       />
@@ -317,6 +346,16 @@ export default function BoqPage() {
           }}
         />
       )}
+      {importOpen && (
+        <ImportBoqModal
+          disciplines={disciplines}
+          onClose={() => setImportOpen(false)}
+          onImported={() => {
+            setImportOpen(false);
+            refresh();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -466,6 +505,258 @@ function AddBoqModal({
         >
           {saving ? "Đang tạo…" : "Tạo dòng BOQ"}
         </button>
+      </div>
+    </Modal>
+  );
+}
+
+type BoqImportPreviewRow = {
+  rowIndex: number;
+  code: string;
+  name: string;
+  unit: string;
+  qtyContract: number;
+  unitPrice: number;
+  note: string | null;
+  action: "add" | "error";
+  reason?: string;
+};
+
+function ImportBoqModal({
+  disciplines,
+  onClose,
+  onImported,
+}: {
+  disciplines: Discipline[];
+  onClose: () => void;
+  onImported: () => void;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [disciplineId, setDisciplineId] = useState<number | "">("");
+  const [preview, setPreview] = useState<BoqImportPreviewRow[] | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
+  const [skippedTowerBOnly, setSkippedTowerBOnly] = useState(0);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{
+    inserted: number;
+    skipped: number;
+    errors: string[];
+  } | null>(null);
+
+  async function runPreview() {
+    if (!file || !disciplineId) return;
+    setBusy(true);
+    setErr("");
+    setPreview(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("disciplineId", String(disciplineId));
+      const res = await fetch("/api/boq/import", { method: "POST", body: fd });
+      const j = await res.json().catch(() => null);
+      if (!res.ok) {
+        setErr(j?.error ?? "Không đọc được file");
+        return;
+      }
+      setPreview(j.preview ?? []);
+      setWarnings(j.warnings ?? []);
+      setSkippedTowerBOnly(j.skippedTowerBOnly ?? 0);
+    } catch {
+      setErr("Mất kết nối — kiểm tra mạng rồi thử lại");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function commit() {
+    if (!file || !disciplineId) return;
+    setBusy(true);
+    setErr("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("disciplineId", String(disciplineId));
+      const res = await fetch("/api/boq/import?commit=1", { method: "POST", body: fd });
+      const j = await res.json().catch(() => null);
+      if (!res.ok) {
+        setErr(j?.error ?? "Import thất bại");
+        return;
+      }
+      setResult(j);
+    } catch {
+      setErr("Mất kết nối — kiểm tra mạng rồi thử lại");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const addCount = preview?.filter((r) => r.action === "add").length ?? 0;
+  const errorCount = preview?.filter((r) => r.action === "error").length ?? 0;
+
+  return (
+    <Modal onClose={onClose} className="max-w-2xl max-h-[85vh] flex flex-col">
+      <div className="px-5 py-4 border-b border-zinc-800 flex items-center justify-between shrink-0">
+        <h2 className="font-semibold">Import Excel BOQ</h2>
+        <button onClick={onClose} aria-label="Đóng" className="text-zinc-400 hover:text-white">
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      <div className="p-5 space-y-3 overflow-auto">
+        {result ? (
+          <div className="space-y-2">
+            <p className="text-sm text-emerald-300">
+              ✅ Đã thêm {result.inserted} dòng BOQ
+              {result.skipped > 0 && `, bỏ qua ${result.skipped} dòng lỗi`}.
+            </p>
+            {result.errors.length > 0 && (
+              <ul className="text-xs text-rose-300 list-disc pl-4 space-y-0.5">
+                {result.errors.map((e, i) => (
+                  <li key={i}>{e}</li>
+                ))}
+              </ul>
+            )}
+            <button
+              onClick={onImported}
+              className="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-semibold py-2 rounded-lg text-sm"
+            >
+              Xong
+            </button>
+          </div>
+        ) : (
+          <>
+            <p className="text-xs text-zinc-400">
+              Nhận file &quot;Bảng khối lượng thanh toán&quot; — chỉ lấy phần khối lượng theo hợp
+              đồng gốc (bỏ qua phát sinh/khấu trừ/phạt) và chỉ khối lượng Tháp A. File không có cột
+              mã nên hệ thống tự sinh BOQCODE tuần tự theo hệ đã chọn.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="text-xs text-zinc-400 col-span-2">
+                File Excel
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={(e) => {
+                    setFile(e.target.files?.[0] ?? null);
+                    setPreview(null);
+                  }}
+                  className="mt-1 w-full text-sm text-zinc-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-zinc-700 file:text-white file:text-xs"
+                />
+              </label>
+              <label className="text-xs text-zinc-400 col-span-2">
+                Hệ (dùng để sinh mã, vd ACMV-0001)
+                <select
+                  value={disciplineId}
+                  onChange={(e) => {
+                    setDisciplineId(e.target.value ? Number(e.target.value) : "");
+                    setPreview(null);
+                  }}
+                  className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
+                >
+                  <option value="">— Chọn hệ —</option>
+                  {disciplines.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            {err && <p className="text-sm text-rose-300">{err}</p>}
+
+            {preview && (
+              <div className="space-y-2">
+                <p className="text-xs text-zinc-400">
+                  Tìm thấy <span className="text-emerald-300 font-medium">{addCount}</span> dòng sẽ
+                  thêm
+                  {errorCount > 0 && (
+                    <>
+                      {" "}
+                      · <span className="text-rose-300 font-medium">{errorCount}</span> dòng lỗi (mã
+                      trùng)
+                    </>
+                  )}
+                  {skippedTowerBOnly > 0 && (
+                    <> · đã bỏ qua {skippedTowerBOnly} dòng chỉ thuộc Tháp B</>
+                  )}
+                  .
+                </p>
+                {warnings.map((w, i) => (
+                  <p key={i} className="text-xs text-amber-300">
+                    ⚠ {w}
+                  </p>
+                ))}
+                <div className="border border-zinc-800 rounded-lg overflow-auto max-h-64">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-zinc-900">
+                      <tr className="text-zinc-500 text-left border-b border-zinc-800">
+                        <th className="py-1.5 px-2">Mã</th>
+                        <th className="py-1.5 px-2">Tên</th>
+                        <th className="py-1.5 px-2 text-right">KL</th>
+                        <th className="py-1.5 px-2 text-right">Đơn giá</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {preview.slice(0, 200).map((r) => (
+                        <tr
+                          key={r.rowIndex}
+                          className={`border-b border-zinc-800/50 ${r.action === "error" ? "bg-rose-950/40" : ""}`}
+                        >
+                          <td className="py-1 px-2 font-mono text-amber-400">{r.code}</td>
+                          <td className="py-1 px-2 text-zinc-300 truncate max-w-[240px]">
+                            {r.name}
+                            {r.action === "error" && (
+                              <span className="block text-rose-300">{r.reason}</span>
+                            )}
+                          </td>
+                          <td className="py-1 px-2 text-right text-zinc-300">
+                            {fmtQty(r.qtyContract)} {r.unit}
+                          </td>
+                          <td className="py-1 px-2 text-right text-zinc-300">
+                            {fmtVND(r.unitPrice)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {preview.length > 200 && (
+                  <p className="text-xs text-zinc-500">
+                    … và {preview.length - 200} dòng khác (đã rút gọn xem trước).
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-1">
+              {!preview ? (
+                <button
+                  onClick={runPreview}
+                  disabled={busy || !file || !disciplineId}
+                  className="flex-1 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-40 text-white font-semibold py-2 rounded-lg text-sm"
+                >
+                  {busy ? "Đang phân tích…" : "Xem trước"}
+                </button>
+              ) : (
+                <button
+                  onClick={commit}
+                  disabled={busy || addCount === 0}
+                  className="flex-1 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-white font-semibold py-2 rounded-lg text-sm"
+                >
+                  {busy ? "Đang ghi…" : `Xác nhận ghi ${addCount} dòng`}
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="px-4 border border-zinc-700 hover:border-zinc-500 rounded-lg text-sm text-zinc-400"
+              >
+                Huỷ
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </Modal>
   );

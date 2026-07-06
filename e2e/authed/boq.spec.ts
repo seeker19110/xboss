@@ -52,4 +52,29 @@ test.describe("BOQ (sau đăng nhập)", () => {
     );
     expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
   });
+
+  test("Admin mở được modal import Excel BOQ", async ({ page }) => {
+    await gotoBoq(page);
+    await page.getByRole("button", { name: "Import Excel BOQ" }).click();
+    await expect(page.getByRole("heading", { name: "Import Excel BOQ" })).toBeVisible();
+    // Chưa chọn file/hệ → nút "Xem trước" bị khoá.
+    await expect(page.getByRole("button", { name: "Xem trước" })).toBeDisabled();
+    await page.getByRole("button", { name: "Đóng", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Import Excel BOQ" })).not.toBeVisible();
+  });
+
+  test("modal import Excel BOQ không có vi phạm a11y nghiêm trọng (axe)", async ({ page }) => {
+    await gotoBoq(page);
+    await page.getByRole("button", { name: "Import Excel BOQ" }).click();
+    await expect(page.getByRole("heading", { name: "Import Excel BOQ" })).toBeVisible();
+
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+
+    const serious = results.violations.filter(
+      (v) => v.impact === "serious" || v.impact === "critical",
+    );
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+  });
 });
