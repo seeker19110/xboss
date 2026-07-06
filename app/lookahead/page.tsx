@@ -18,6 +18,7 @@ type LTask = {
   packageCode: string;
   sheetType: string;
   delayReason: string | null;
+  waitingFront?: boolean;
 };
 type Data = { days: number; from: string; until: string; starting: LTask[]; due: LTask[] };
 

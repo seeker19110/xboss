@@ -5,13 +5,50 @@ import assert from "node:assert/strict";
 // ===== Test tích hợp (cần Postgres riêng: đặt TEST_DATABASE_URL) =====
 
 test(
-  "tableExists: true với bảng có sẵn, false với bảng chưa tồn tại (work_fronts, M14 chưa làm)",
+  "tableExists: true với bảng có sẵn, false với bảng chưa tồn tại",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { tableExists, workfrontBlock } = await import("@/lib/dashboardext");
+    const { tableExists } = await import("@/lib/dashboardext");
     assert.equal(await tableExists("tasks"), true);
-    assert.equal(await tableExists("work_fronts"), false);
-    assert.equal(await workfrontBlock(), null);
+    assert.equal(await tableExists("bang_khong_ton_tai_xyz"), false);
+  },
+);
+
+test(
+  "workfrontBlock: đếm đúng tầng pending có task tới hạn + tổng ngày chờ luỹ kế (M14)",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { workfrontBlock } = await import("@/lib/dashboardext");
+    const { daysFromTodayISO } = await import("@/lib/date");
+
+    const sheetId = await insertId(
+      `INSERT INTO sheet_types (code, name, slug) VALUES ('D9-WF', 'Sheet test D9 WF', 'd9-wf')`,
+    );
+    const frontId = await insertId(
+      `INSERT INTO work_fronts (sheet_type_id, floor_label) VALUES (?, '9F')`,
+      sheetId,
+    );
+    const wpId = await insertId(
+      `INSERT INTO work_packages (code, name, sheet_type_id, floor_label) VALUES ('D9-WF-1', 'Nhóm test D9 WF', ?, '9F')`,
+      sheetId,
+    );
+    const taskId = await insertId(
+      `INSERT INTO tasks (code, name, package_id, start_date, status, progress_percent)
+       VALUES ('T-D9-WF', 'Task test D9 WF', ?, ?, 'chuan_bi', 0)`,
+      wpId,
+      daysFromTodayISO(-4), // đã quá hạn bắt đầu 4 ngày
+    );
+
+    const block = await workfrontBlock();
+    assert.ok(block !== null);
+    assert.ok(block!.waitingFloors >= 1);
+    assert.ok(block!.cumulativeWaitDays >= 4);
+
+    await run(`DELETE FROM tasks WHERE id = ?`, taskId);
+    await run(`DELETE FROM work_packages WHERE id = ?`, wpId);
+    await run(`DELETE FROM work_fronts WHERE id = ?`, frontId);
+    await run(`DELETE FROM sheet_types WHERE id = ?`, sheetId);
   },
 );
 

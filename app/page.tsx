@@ -29,6 +29,7 @@ import type {
   CpiBlock,
   QualityBlock,
   VoBlock,
+  WorkfrontBlock,
   DisciplineCrossRow,
 } from "@/app/components/DashboardExtCards";
 
@@ -38,6 +39,10 @@ const ProgressMap = dynamic(() => import("@/app/components/ProgressMap"), {
   loading: () => <Skeleton className="h-64 rounded-xl" />,
 });
 const BlockedPanel = dynamic(() => import("@/app/components/BlockedPanel"), {
+  ssr: false,
+  loading: () => <Skeleton className="h-24 rounded-xl" />,
+});
+const NormsOverPanel = dynamic(() => import("@/app/components/NormsOverPanel"), {
   ssr: false,
   loading: () => <Skeleton className="h-24 rounded-xl" />,
 });
@@ -111,6 +116,7 @@ export default function Dashboard() {
     cpi: CpiBlock | null;
     quality: QualityBlock;
     vo: VoBlock | null;
+    workfront: WorkfrontBlock | null;
     byDiscipline: DisciplineCrossRow[];
   } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -497,6 +503,7 @@ export default function Dashboard() {
             cpi={data.cpi}
             quality={data.quality}
             vo={data.vo}
+            workfront={data.workfront}
             byDiscipline={data.byDiscipline}
             isEngineer={me?.role === "engineer"}
           />
@@ -504,6 +511,9 @@ export default function Dashboard() {
 
         {/* ── Việc bị chặn (phụ thuộc chưa thông) ── */}
         <BlockedPanel />
+
+        {/* ── M18: vật tư vượt định mức theo hạng mục ── */}
+        {me?.role !== "subcon" && <NormsOverPanel />}
 
         {/* ── Chỉ số tiến độ (SPI) ── */}
         <SpiCards />

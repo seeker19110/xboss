@@ -56,6 +56,18 @@ export function newProjectDocFileName(mime: string): string {
   return `pd-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime]}`;
 }
 
+export function newWorkFrontFileName(workFrontId: number, mime: string): string {
+  return `wf${workFrontId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime]}`;
+}
+
+export function newEquipmentCertFileName(equipmentId: number, mime: string): string {
+  return `eq${equipmentId}-cert-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime]}`;
+}
+
+export function newHseFileName(recordId: number, mime: string): string {
+  return `hse${recordId}-${Date.now()}-${randomBytes(4).toString("hex")}${MIME_EXT[mime] ?? ".bin"}`;
+}
+
 export function ensureUploadDir(): string {
   if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
   return UPLOAD_DIR;

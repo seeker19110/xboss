@@ -184,6 +184,14 @@ export const CAN = {
   // Admin/PM/engineer (kỹ sư ghi nhận công văn tại hiện trường, giống VO).
   viewCorrespondence: (r?: Role) => r !== "subcon",
   manageCorrespondence: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  // Mặt bằng thi công (M14): xem mọi vai trò đăng nhập; đổi trạng thái/blocker Admin/PM/kỹ sư.
+  manageWorkFronts: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  // Thiết bị/máy móc (M12): xem mọi vai trò; tạo/sửa sổ thiết bị Admin/PM/kỹ sư.
+  manageEquipment: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  // Định mức thi công theo hạng mục (M18): tạo/sửa Admin/PM (đồng bộ editStructure).
+  manageNorms: (r?: Role) => r === "admin" || r === "pm",
+  // HSE (M11): mọi vai trò thao tác tạo được (kể cả subcon báo near-miss); sửa/đóng action Admin/PM/kỹ sư.
+  manageHse: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
 };
 
 // Sub-con chỉ được thao tác trên task được giao cho mình.

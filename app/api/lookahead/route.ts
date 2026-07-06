@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, todayISO, daysFromTodayISO } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { pendingFrontKeys } from "@/lib/workfronts";
 
 export const dynamic = "force-dynamic";
 
@@ -15,8 +16,10 @@ export type LookaheadTask = {
   floorLabel: string | null;
   packageCode: string;
   sheetType: string;
+  sheetTypeId: number;
   assigneeName: string | null;
   delayReason: string | null;
+  waitingFront?: boolean;
 };
 
 // GET /api/lookahead?days=14 → kế hoạch ngắn hạn cho họp giao ban:
@@ -37,7 +40,7 @@ export async function GET(req: NextRequest) {
             t.start_date AS "startDate", t.end_date AS "endDate",
             t.progress_percent AS "progressPercent", t.delay_reason AS "delayReason",
             wp.floor_label AS "floorLabel", wp.code AS "packageCode",
-            st.code AS "sheetType", u.name AS "assigneeName"
+            st.code AS "sheetType", st.id AS "sheetTypeId", u.name AS "assigneeName"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
@@ -63,5 +66,21 @@ export async function GET(req: NextRequest) {
     until,
   );
 
-  return NextResponse.json({ days, from: today, until, starting, due });
+  // Task thuộc tầng chưa bàn giao mặt bằng (M14) → cờ waitingFront cho báo cáo EOT.
+  const pendingFronts = await pendingFrontKeys();
+  const flag = (t: LookaheadTask) => ({
+    ...t,
+    waitingFront:
+      t.floorLabel != null && pendingFronts.has(`${t.sheetTypeId}:${t.floorLabel}`)
+        ? true
+        : undefined,
+  });
+
+  return NextResponse.json({
+    days,
+    from: today,
+    until,
+    starting: starting.map(flag),
+    due: due.map(flag),
+  });
 }
