@@ -118,11 +118,17 @@ export async function procurementBlock(): Promise<ProcurementBlock> {
 
 export type WorkfrontBlock = { waitingFloors: number; cumulativeWaitDays: number };
 
-// M14 (mặt bằng thi công) chưa triển khai — bảng work_fronts chưa tồn tại → null
-// (UI ẩn thẻ). Khi M14 xong, hàm này cần cập nhật đúng schema thật của work_fronts.
+// M14 (mặt bằng thi công): đếm tầng 'pending' có task sắp/đã tới hạn bắt đầu
+// (frontMissingList, cùng nguồn với notification front_missing + /lookahead) +
+// tổng số ngày chờ luỹ kế — bằng chứng xin gia hạn (EOT) trên dashboard.
 export async function workfrontBlock(): Promise<WorkfrontBlock | null> {
   if (!(await tableExists("work_fronts"))) return null;
-  return { waitingFloors: 0, cumulativeWaitDays: 0 };
+  const { frontMissingList } = await import("@/lib/workfronts");
+  const items = await frontMissingList();
+  return {
+    waitingFloors: items.length,
+    cumulativeWaitDays: items.reduce((sum, it) => sum + it.waitingDays, 0),
+  };
 }
 
 export type VoBlock = { draft: number; submitted: number; approved: number; rejected: number };
