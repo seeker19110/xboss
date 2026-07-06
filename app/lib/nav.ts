@@ -32,6 +32,8 @@ import {
   LandPlot,
   Wrench,
   ShieldAlert,
+  MessagesSquare,
+  AlertTriangle,
 } from "lucide-react";
 import type { Role } from "@/lib/roles";
 
@@ -83,6 +85,13 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "HSE",
         icon: ShieldAlert,
         roles: ["admin", "pm", "engineer", "subcon"],
+      },
+      { href: "/meetings", label: "Họp", icon: MessagesSquare },
+      {
+        href: "/risks",
+        label: "Rủi ro",
+        icon: AlertTriangle,
+        roles: ["admin", "pm", "engineer", "bch", "cdt", "viewer"],
       },
     ],
   },
