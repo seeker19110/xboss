@@ -26,6 +26,7 @@ type LTask = {
   packageCode: string;
   sheetType: string;
   delayReason: string | null;
+  waitingFront?: boolean;
 };
 
 type TableProps = {
@@ -78,11 +79,17 @@ export function LookaheadTable({ tasks, dateCol }: TableProps) {
         cell: (info) => {
           const status = info.getValue();
           const delayReason = info.row.original.delayReason;
+          const waitingFront = info.row.original.waitingFront;
           return (
             <span className="text-xs text-zinc-500">
               {status === "tre"
                 ? `Đang trễ${delayReason ? ` · ${DELAY_REASON_LABEL[delayReason as keyof typeof DELAY_REASON_LABEL] ?? delayReason}` : ""}`
                 : (STATUS_LABEL[status as StatusSlug] ?? "")}
+              {waitingFront && (
+                <span className="text-amber-600 font-medium">
+                  {status === "tre" ? " · " : " "}⚠ chưa bàn giao MB
+                </span>
+              )}
             </span>
           );
         },
