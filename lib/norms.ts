@@ -129,7 +129,7 @@ async function normUsageOne(norm: NormRow, executedQty: number): Promise<NormUsa
     const floors = await boqItemFloors(norm.boqItemId);
     const floorFilter = floors.length > 0 ? ` AND floor_label = ANY(?)` : "";
     const row = await queryOne<{ total: number }>(
-      `SELECT COALESCE(SUM(CASE WHEN type = 'xuat_cong_truong' THEN -delta ELSE GREATEST(delta, 0) END), 0) AS total
+      `SELECT COALESCE(SUM(CASE WHEN type IN ('xuat_cong_truong', 'hoan_kho') THEN -delta ELSE GREATEST(delta, 0) END), 0) AS total
          FROM material_transactions WHERE material_id = ?${floorFilter}`,
       ...(floors.length > 0 ? [norm.materialId, floors] : [norm.materialId]),
     );
@@ -207,7 +207,7 @@ export async function overNormItems(
     const floors = await boqItemFloors(n.boqItemId);
     const floorFilter = floors.length > 0 ? ` AND floor_label = ANY(?)` : "";
     const row = await queryOne<{ total: number }>(
-      `SELECT COALESCE(SUM(CASE WHEN type = 'xuat_cong_truong' THEN -delta ELSE GREATEST(delta, 0) END), 0) AS total
+      `SELECT COALESCE(SUM(CASE WHEN type IN ('xuat_cong_truong', 'hoan_kho') THEN -delta ELSE GREATEST(delta, 0) END), 0) AS total
          FROM material_transactions WHERE material_id = ?${floorFilter}`,
       ...(floors.length > 0 ? [n.materialId, floors] : [n.materialId]),
     );

@@ -23,6 +23,7 @@ import {
   ClipboardList,
   BarChart2,
   ArrowDownToLine,
+  ArrowUpFromLine,
   PenLine,
   LockOpen,
 } from "lucide-react";
@@ -143,6 +144,7 @@ export default function MaterialsPage() {
   const [boqDraft, setBoqDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [issueMat, setIssueMat] = useState<Material | null>(null);
+  const [issueMode, setIssueMode] = useState<"issue" | "return">("issue");
   const [issueQty, setIssueQty] = useState("");
   const [issueNote, setIssueNote] = useState("");
   const [issueFloor, setIssueFloor] = useState("");
@@ -1179,6 +1181,7 @@ export default function MaterialsPage() {
                                 <button
                                   onClick={() => {
                                     setIssueMat(m);
+                                    setIssueMode("issue");
                                     setIssueQty("");
                                     setIssueNote("");
                                     setIssueFloor("");
@@ -1196,6 +1199,20 @@ export default function MaterialsPage() {
                                   className="text-zinc-500 hover:text-blue-400 p-2"
                                 >
                                   <ArrowDownToLine className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {editMode && (m.qtyUsed ?? 0) > 0 && (
+                                <button
+                                  onClick={() => {
+                                    setIssueMat(m);
+                                    setIssueMode("return");
+                                    setIssueQty("");
+                                    setIssueNote("");
+                                  }}
+                                  title="Hoàn vật tư về kho"
+                                  className="text-zinc-500 hover:text-amber-400 p-2"
+                                >
+                                  <ArrowUpFromLine className="w-3.5 h-3.5" />
                                 </button>
                               )}
                               {editMode && (
@@ -1403,69 +1420,90 @@ export default function MaterialsPage() {
       {issueMat && (
         <Modal onClose={() => setIssueMat(null)} className="max-w-sm">
           <div className="px-5 py-4 border-b border-zinc-800 flex items-center gap-2">
-            <ArrowDownToLine className="w-4 h-4 text-blue-400" />
-            <h3 className="font-semibold text-sm flex-1">Xuất kho — {issueMat.name}</h3>
+            {issueMode === "issue" ? (
+              <ArrowDownToLine className="w-4 h-4 text-blue-400" />
+            ) : (
+              <ArrowUpFromLine className="w-4 h-4 text-amber-400" />
+            )}
+            <h3 className="font-semibold text-sm flex-1">
+              {issueMode === "issue" ? "Xuất kho" : "Hoàn kho"} — {issueMat.name}
+            </h3>
             <button onClick={() => setIssueMat(null)} className="text-zinc-400 hover:text-white">
               <X className="w-4 h-4" />
             </button>
           </div>
           <div className="p-5 space-y-3">
             <p className="text-sm text-zinc-400">
-              Tồn kho hiện tại:{" "}
-              <span className="text-blue-300 font-semibold">
-                {issueMat.qtyStock} {issueMat.unit ?? ""}
-              </span>
+              {issueMode === "issue" ? (
+                <>
+                  Tồn kho hiện tại:{" "}
+                  <span className="text-blue-300 font-semibold">
+                    {issueMat.qtyStock} {issueMat.unit ?? ""}
+                  </span>
+                </>
+              ) : (
+                <>
+                  Đã xuất công trường:{" "}
+                  <span className="text-amber-300 font-semibold">
+                    {issueMat.qtyUsed} {issueMat.unit ?? ""}
+                  </span>
+                </>
+              )}
             </p>
             <div className="space-y-1">
-              <label className="text-xs text-zinc-400">Số lượng xuất *</label>
+              <label className="text-xs text-zinc-400">
+                {issueMode === "issue" ? "Số lượng xuất *" : "Số lượng hoàn *"}
+              </label>
               <input
                 type="number"
                 min="0.001"
-                max={issueMat.qtyStock}
+                max={issueMode === "issue" ? issueMat.qtyStock : issueMat.qtyUsed}
                 step="any"
                 value={issueQty}
                 onChange={(e) => setIssueQty(e.target.value)}
                 className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-600"
               />
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <label className="text-xs text-zinc-400">Tầng</label>
-                <input
-                  list="issue-floor-options"
-                  value={issueFloor}
-                  onChange={(e) => setIssueFloor(e.target.value)}
-                  placeholder="vd: 24F"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-600"
-                />
-                <datalist id="issue-floor-options">
-                  {allocationMeta.floors.map((f) => (
-                    <option key={f} value={f} />
-                  ))}
-                </datalist>
+            {issueMode === "issue" && (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-xs text-zinc-400">Tầng</label>
+                  <input
+                    list="issue-floor-options"
+                    value={issueFloor}
+                    onChange={(e) => setIssueFloor(e.target.value)}
+                    placeholder="vd: 24F"
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-600"
+                  />
+                  <datalist id="issue-floor-options">
+                    {allocationMeta.floors.map((f) => (
+                      <option key={f} value={f} />
+                    ))}
+                  </datalist>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-zinc-400">Tổ đội</label>
+                  <input
+                    list="issue-crew-options"
+                    value={issueCrew}
+                    onChange={(e) => setIssueCrew(e.target.value)}
+                    placeholder="vd: Tổ cơ điện 1"
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-600"
+                  />
+                  <datalist id="issue-crew-options">
+                    {allocationMeta.crews.map((c) => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
+                </div>
               </div>
-              <div className="space-y-1">
-                <label className="text-xs text-zinc-400">Tổ đội</label>
-                <input
-                  list="issue-crew-options"
-                  value={issueCrew}
-                  onChange={(e) => setIssueCrew(e.target.value)}
-                  placeholder="vd: Tổ cơ điện 1"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-600"
-                />
-                <datalist id="issue-crew-options">
-                  {allocationMeta.crews.map((c) => (
-                    <option key={c} value={c} />
-                  ))}
-                </datalist>
-              </div>
-            </div>
+            )}
             <div className="space-y-1">
               <label className="text-xs text-zinc-400">Ghi chú</label>
               <input
                 value={issueNote}
                 onChange={(e) => setIssueNote(e.target.value)}
-                placeholder="vd: block A"
+                placeholder={issueMode === "issue" ? "vd: block A" : "vd: dư sau lắp đặt"}
                 className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-600"
               />
             </div>
@@ -1477,27 +1515,46 @@ export default function MaterialsPage() {
                     setError("Số lượng không hợp lệ");
                     return;
                   }
-                  const r = await fetch(`/api/materials/${issueMat.id}/issue`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      qty,
-                      note: issueNote.trim() || undefined,
-                      floorLabel: issueFloor.trim() || undefined,
-                      crew: issueCrew.trim() || undefined,
-                    }),
-                  });
+                  const r = await fetch(
+                    `/api/materials/${issueMat.id}/${issueMode === "issue" ? "issue" : "return"}`,
+                    {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(
+                        issueMode === "issue"
+                          ? {
+                              qty,
+                              note: issueNote.trim() || undefined,
+                              floorLabel: issueFloor.trim() || undefined,
+                              crew: issueCrew.trim() || undefined,
+                            }
+                          : { qty, note: issueNote.trim() || undefined },
+                      ),
+                    },
+                  );
                   if (r.ok) {
                     setIssueMat(null);
                     load();
                   } else {
                     const j = await r.json();
-                    setError(j.error ?? "Lỗi xuất kho");
+                    setError(j.error ?? (issueMode === "issue" ? "Lỗi xuất kho" : "Lỗi hoàn kho"));
                   }
                 }}
-                className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 rounded-lg py-2.5 text-sm font-medium"
+                className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium ${
+                  issueMode === "issue"
+                    ? "bg-blue-600 hover:bg-blue-700"
+                    : "bg-amber-600 hover:bg-amber-700"
+                }`}
               >
-                <ArrowDownToLine className="w-4 h-4" /> Xuất kho
+                {issueMode === "issue" ? (
+                  <>
+                    <ArrowDownToLine className="w-4 h-4" /> Xuất kho
+                  </>
+                ) : (
+                  <>
+                    <ArrowUpFromLine className="w-4 h-4" /> Hoàn kho
+                  </>
+                )}
               </button>
               <button
                 onClick={() => setIssueMat(null)}
@@ -1534,6 +1591,13 @@ type Transaction = {
   createdAt: string;
   userName: string | null;
   type?: string;
+};
+
+const TX_TYPE_LABEL: Record<string, string> = {
+  nhap_kho: "Nhập kho",
+  xuat_cong_truong: "Xuất công trường",
+  hoan_kho: "Hoàn kho",
+  dieu_chinh: "Điều chỉnh",
 };
 
 function MaterialHistoryModal({
@@ -1655,6 +1719,7 @@ function MaterialHistoryModal({
             <thead>
               <tr className="text-zinc-500 border-b border-zinc-800 text-left">
                 <th className="py-1.5 pr-2">Thời điểm</th>
+                <th className="py-1.5 pr-2">Loại</th>
                 <th className="py-1.5 pr-2">Người ghi</th>
                 <th className="py-1.5 pr-2 text-right">±</th>
                 <th className="py-1.5 pr-2 text-right">Còn lại</th>
@@ -1666,6 +1731,9 @@ function MaterialHistoryModal({
                 <tr key={t.id} className="border-b border-zinc-800/50">
                   <td className="py-1.5 pr-2 text-zinc-400 whitespace-nowrap">
                     {new Date(t.createdAt).toLocaleString("vi-VN")}
+                  </td>
+                  <td className="py-1.5 pr-2 text-zinc-400 whitespace-nowrap">
+                    {TX_TYPE_LABEL[t.type ?? "dieu_chinh"] ?? "Điều chỉnh"}
                   </td>
                   <td className="py-1.5 pr-2 text-zinc-300">{t.userName ?? "—"}</td>
                   <td

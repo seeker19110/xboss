@@ -110,22 +110,23 @@ export async function GET() {
         ),
 
         // 7. Tiêu hao theo tầng (M4): Σ xuất kho ra công trường theo vật tư × tầng.
-        // Số lượng xuất = trị tuyệt đối delta của loại 'xuat_cong_truong' (route /issue ghi delta ÂM
-        // vì đó là giảm tồn kho) HOẶC delta dương của điều chỉnh thủ công (route /transactions,
-        // nút "+" nghĩa là dùng thêm) — 2 route ghi cùng bảng nhưng ngược dấu, xem lib này.
+        // Số lượng xuất = trị tuyệt đối delta của loại 'xuat_cong_truong'/'hoan_kho' (route
+        // /issue và /return ghi delta theo chiều tồn kho, xuất ÂM/hoàn DƯƠNG nên đảo dấu)
+        // HOẶC delta dương của điều chỉnh thủ công (route /transactions, nút "+" nghĩa là
+        // dùng thêm) — các route ghi cùng bảng nhưng khác quy ước dấu, xem lib này.
         // Chưa đối chiếu KL thi công theo tầng (cần nối boq_task_map ↔ work_packages.floor_label
         // của M1 — để đợt sau, xem PROGRESS.md).
         query(
           `SELECT m.id AS "materialId", m.name AS "materialName", m.unit,
               m.boq_code AS "boqCode", st.code AS "sheetCode",
               t.floor_label AS "floorLabel",
-              SUM(CASE WHEN t.type = 'xuat_cong_truong' THEN -t.delta ELSE GREATEST(t.delta, 0) END) AS "qtyIssued"
+              SUM(CASE WHEN t.type IN ('xuat_cong_truong', 'hoan_kho') THEN -t.delta ELSE GREATEST(t.delta, 0) END) AS "qtyIssued"
          FROM material_transactions t
          JOIN materials m ON m.id = t.material_id
          LEFT JOIN sheet_types st ON m.sheet_type_id = st.id
         WHERE t.floor_label IS NOT NULL
         GROUP BY m.id, m.name, m.unit, m.boq_code, st.code, t.floor_label
-       HAVING SUM(CASE WHEN t.type = 'xuat_cong_truong' THEN -t.delta ELSE GREATEST(t.delta, 0) END) > 0
+       HAVING SUM(CASE WHEN t.type IN ('xuat_cong_truong', 'hoan_kho') THEN -t.delta ELSE GREATEST(t.delta, 0) END) > 0
         ORDER BY m.name, t.floor_label`,
         ),
       ]);
