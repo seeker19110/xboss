@@ -27,6 +27,7 @@ import {
   Printer,
   Eye,
   EyeOff,
+  Lock,
 } from "lucide-react";
 import { useOfflineTickQueue } from "@/app/components/offlineQueue";
 import AppHeader from "@/app/components/AppHeader";
@@ -160,6 +161,9 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
   const [printTitle, setPrintTitle] = useState("");
   const [hiddenPrintCols, setHiddenPrintCols] = useState<Set<string>>(new Set());
   const [allSheetCols, setAllSheetCols] = useState<string[]>([]);
+  // M14 — tầng chưa bàn giao mặt bằng (work_fronts.status='pending') của sheet này,
+  // chỉ để hiện badge cảnh báo trực quan (không chặn tick — xem docs/nang-cap/M14-mat-bang.md).
+  const [pendingFronts, setPendingFronts] = useState<Set<string>>(new Set());
   const handleColsLoaded = useCallback((cols: string[]) => {
     setAllSheetCols((prev) => {
       const merged = [...new Set([...prev, ...cols])];
@@ -185,6 +189,23 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    const sheetTypeId = data?.sheet.id;
+    if (!sheetTypeId) return;
+    fetch(`/api/work-fronts?sheetTypeId=${sheetTypeId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { workFronts?: { floorLabel: string; status: string }[] } | null) => {
+        setPendingFronts(
+          new Set(
+            (j?.workFronts ?? []).filter((w) => w.status === "pending").map((w) => w.floorLabel),
+          ),
+        );
+      })
+      .catch(() => {
+        /* mất mạng — bỏ qua badge, không ảnh hưởng thao tác chính */
+      });
+  }, [data?.sheet.id]);
 
   // Hàng đợi offline: tick khi mất mạng được gửi lại tự động lúc có mạng.
   const { pending: offlinePending, online, enqueue } = useOfflineTickQueue(load);
@@ -564,6 +585,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
                   hiddenPrintCols={hiddenPrintCols}
                   onColsLoaded={handleColsLoaded}
                   sheetCols={allSheetCols}
+                  pendingFront={!!p.floorLabel && pendingFronts.has(p.floorLabel)}
                 />
               </div>
             ))}
@@ -794,6 +816,7 @@ function PkgGrid({
   hiddenPrintCols,
   onColsLoaded,
   sheetCols,
+  pendingFront,
 }: {
   pkg: Pkg;
   pkgIdx: number;
@@ -809,6 +832,7 @@ function PkgGrid({
   hiddenPrintCols: Set<string>;
   onColsLoaded: (cols: string[]) => void;
   sheetCols: string[];
+  pendingFront: boolean;
 }) {
   const [grid, setGrid] = useState<Grid | null>(null);
   const [editName, setEditName] = useState<string | null>(null);
@@ -1525,6 +1549,14 @@ function PkgGrid({
               ) : (
                 <span className="group/floor inline-flex items-center gap-0.5">
                   <span className="text-xs text-zinc-400">{pkg.floorLabel ?? ""}</span>
+                  {pendingFront && (
+                    <Lock
+                      className="w-2.5 h-2.5 text-amber-400 shrink-0"
+                      aria-label="Chưa có mặt bằng"
+                    >
+                      <title>Chưa có mặt bằng — tầng {pkg.floorLabel} chưa được bàn giao</title>
+                    </Lock>
+                  )}
                   {ce && (
                     <button
                       onClick={(e) => {

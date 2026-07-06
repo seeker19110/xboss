@@ -20,6 +20,15 @@ test.describe("Mặt bằng thi công (sau đăng nhập)", () => {
     await expect(page.getByText("Đang thi công")).toBeVisible();
   });
 
+  // M14 PR3 — báo cáo PDF mặt bằng/EOT (Admin/PM).
+  test("Admin thấy nút xuất báo cáo mặt bằng (EOT)", async ({ page }) => {
+    await gotoWorkFronts(page);
+    await expect(page.getByRole("link", { name: "Báo cáo mặt bằng (EOT)" })).toHaveAttribute(
+      "href",
+      "/api/work-fronts/report",
+    );
+  });
+
   // Không đổi trạng thái thật (không ghi dữ liệu) — trang chia sẻ 1 DB test giữa các
   // project desktop/mobile chạy song song (cùng convention drawings.spec.ts).
   test("Admin mở được modal chi tiết 1 ô mặt bằng", async ({ page }) => {
