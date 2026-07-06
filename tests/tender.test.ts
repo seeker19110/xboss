@@ -129,6 +129,13 @@ test(
     const { awardTender } = await import("@/lib/tender");
     const { supplierAId, boqId1, boqId2, tenderId } = await setupTenderWithBoq();
 
+    // userId thật (không hardcode 1 — id đó không đảm bảo tồn tại, phụ thuộc thứ tự
+    // chạy các file test khác cùng bảng users dùng chung; hardcode gây lỗi FK
+    // contracts_created_by_fkey ngẫu nhiên khi chạy song song, đã thấy thật trong CI).
+    const userId = await insertId(
+      `INSERT INTO users (name, email, password_hash, role) VALUES ('Award Tester', 'award-tender@test.local', 'x', 'admin')`,
+    );
+
     const bidA = await insertId(
       `INSERT INTO tender_bids (tender_id, supplier_id) VALUES (?, ?)`,
       tenderId,
@@ -142,7 +149,7 @@ test(
       boqId2,
     );
 
-    const { contractId } = await awardTender(tenderId, bidA, 1);
+    const { contractId } = await awardTender(tenderId, bidA, userId);
     const contract = await queryOne<{
       value: number;
       kind: string;
@@ -169,11 +176,12 @@ test(
     assert.equal(tender!.awardedContractId, contractId);
 
     // Trao thầu lần 2 phải bị chặn (đã awarded).
-    await assert.rejects(awardTender(tenderId, bidA, 1), /đã được trao thầu rồi/i);
+    await assert.rejects(awardTender(tenderId, bidA, userId), /đã được trao thầu rồi/i);
 
     await run(`DELETE FROM contracts WHERE id = ?`, contractId);
     await run(`DELETE FROM tender_packages WHERE id = ?`, tenderId);
     await run(`DELETE FROM boq_items WHERE id IN (?, ?)`, boqId1, boqId2);
     await run(`DELETE FROM suppliers WHERE id = ?`, supplierAId);
+    await run(`DELETE FROM users WHERE id = ?`, userId);
   },
 );
