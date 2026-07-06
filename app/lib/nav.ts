@@ -29,6 +29,9 @@ import {
   PencilRuler,
   Mail,
   FolderOpen,
+  LandPlot,
+  Wrench,
+  ShieldAlert,
 } from "lucide-react";
 import type { Role } from "@/lib/roles";
 
@@ -74,6 +77,13 @@ export const NAV_GROUPS: NavGroup[] = [
         roles: ["admin", "pm", "engineer", "bch", "cdt", "viewer"],
       },
       { href: "/documents", label: "Hồ sơ dự án", icon: FolderOpen },
+      { href: "/work-fronts", label: "Mặt bằng", icon: LandPlot },
+      {
+        href: "/hse",
+        label: "HSE",
+        icon: ShieldAlert,
+        roles: ["admin", "pm", "engineer", "subcon"],
+      },
     ],
   },
   {
@@ -82,6 +92,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/materials", label: "Vật tư", icon: Package },
       { href: "/materials/purchase-orders", label: "Đơn đặt hàng", icon: Truck },
       { href: "/vehicles", label: "Xe ra vào", icon: CarFront },
+      { href: "/equipment", label: "Thiết bị", icon: Wrench },
     ],
   },
   {

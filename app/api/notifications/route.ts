@@ -8,6 +8,10 @@ import { expiringContracts } from "@/lib/contracts";
 import { pendingVariations } from "@/lib/vo";
 import { overContractCerts, pendingCerts } from "@/lib/paymentcerts";
 import { dueCorrespondences } from "@/lib/correspondence";
+import { frontMissingList } from "@/lib/workfronts";
+import { calibrationDueList } from "@/lib/equipment";
+import { overNormItems } from "@/lib/norms";
+import { openHseActions } from "@/lib/hse";
 
 export const dynamic = "force-dynamic";
 
@@ -449,6 +453,107 @@ export async function GET() {
         WHERE user_id = ? AND type = 'diary_missing' AND is_read = 0 AND diary_date <> ALL(?)`,
       user.id,
       missingDates,
+    );
+  }
+
+  // Tầng chưa bàn giao mặt bằng mà task sắp/đã tới ngày bắt đầu → cảnh báo Admin/PM (M14).
+  if (isAdminOrPm(user.role)) {
+    const missingFronts = await frontMissingList();
+    if (missingFronts.length > 0) {
+      const values = missingFronts.map(() => `(?, ?, 'front_missing', ?)`).join(", ");
+      const params = missingFronts.flatMap((f) => [
+        user.id,
+        f.workFrontId,
+        `🚧 [${f.sheetCode}] Tầng ${f.floorLabel} chưa bàn giao mặt bằng — chờ ${f.waitingDays} ngày`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, work_front_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, work_front_id, type) WHERE work_front_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    const missingFrontIds = missingFronts.map((f) => f.workFrontId);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'front_missing' AND is_read = 0 AND work_front_id <> ALL(?)`,
+      user.id,
+      missingFrontIds,
+    );
+  }
+
+  // Thiết bị sắp/đã hết hạn kiểm định/hiệu chuẩn → cảnh báo Admin/PM (M12).
+  if (isAdminOrPm(user.role)) {
+    const dueEquipment = await calibrationDueList();
+    if (dueEquipment.length > 0) {
+      const values = dueEquipment.map(() => `(?, ?, 'calibration_due', ?)`).join(", ");
+      const params = dueEquipment.flatMap((e) => [
+        user.id,
+        e.id,
+        `🔧 Thiết bị ${e.code} — ${e.name} ${e.expired ? "đã quá hạn" : "sắp hết hạn"} kiểm định (${e.calibrationDue})`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, equipment_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, equipment_id, type) WHERE equipment_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    const dueEquipmentIds = dueEquipment.map((e) => e.id);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'calibration_due' AND is_read = 0 AND equipment_id <> ALL(?)`,
+      user.id,
+      dueEquipmentIds,
+    );
+  }
+
+  // Vật tư/nhân công/máy vượt định mức theo hạng mục BOQ → cảnh báo Admin/PM/kỹ sư (M18).
+  if (user.role === "admin" || user.role === "pm" || user.role === "engineer") {
+    const overNorms = await overNormItems();
+    if (overNorms.length > 0) {
+      const values = overNorms.map(() => `(?, ?, 'norm_over', ?)`).join(", ");
+      const params = overNorms.flatMap((n) => [
+        user.id,
+        n.normId,
+        `📐 [${n.boqCode}] ${n.resourceLabel} vượt định mức ${Math.round(n.variancePct)}% (${n.actual}/${n.expected} ${n.unitLabel})`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, boq_norm_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, type, boq_norm_id) WHERE boq_norm_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    const overNormIds = overNorms.map((n) => n.normId);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'norm_over' AND is_read = 0 AND boq_norm_id <> ALL(?)`,
+      user.id,
+      overNormIds,
+    );
+  }
+
+  // HSE: action khắc phục quá hạn → nhắc assignee + Admin/PM (M11).
+  {
+    const isPrivileged = user.role === "admin" || user.role === "pm";
+    const overdueHse = await openHseActions(isPrivileged ? undefined : user.id);
+    if (overdueHse.length > 0) {
+      const values = overdueHse.map(() => `(?, ?, 'hse_action_due', ?)`).join(", ");
+      const params = overdueHse.flatMap((h) => [
+        user.id,
+        h.id,
+        `🦺 Hành động khắc phục HSE "${h.description}" quá hạn (${h.actionDue})`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, hse_record_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, hse_record_id, type) WHERE hse_record_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    const overdueHseIds = overdueHse.map((h) => h.id);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'hse_action_due' AND is_read = 0 AND hse_record_id <> ALL(?)`,
+      user.id,
+      overdueHseIds,
     );
   }
 
