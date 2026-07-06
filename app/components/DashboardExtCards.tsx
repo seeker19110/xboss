@@ -1,6 +1,14 @@
 "use client";
 import { useState } from "react";
-import { Wallet, Gauge, ShieldAlert, FilePlus2, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  Wallet,
+  Gauge,
+  ShieldAlert,
+  FilePlus2,
+  ChevronDown,
+  ChevronRight,
+  LandPlot,
+} from "lucide-react";
 import { ComposedChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import EditableText from "@/app/components/EditableText";
 
@@ -18,6 +26,7 @@ export type QualityBlock = {
   inspectionPassRate: number | null;
 };
 export type VoBlock = { draft: number; submitted: number; approved: number; rejected: number };
+export type WorkfrontBlock = { waitingFloors: number; cumulativeWaitDays: number };
 export type DisciplineCrossRow = {
   code: string;
   name: string;
@@ -42,6 +51,7 @@ export default function DashboardExtCards({
   cpi,
   quality,
   vo,
+  workfront,
   byDiscipline,
   isEngineer,
 }: {
@@ -49,6 +59,7 @@ export default function DashboardExtCards({
   cpi: CpiBlock | null;
   quality: QualityBlock;
   vo: VoBlock | null;
+  workfront: WorkfrontBlock | null;
   byDiscipline: DisciplineCrossRow[];
   isEngineer: boolean;
 }) {
@@ -109,6 +120,22 @@ export default function DashboardExtCards({
               <FilePlus2 className="w-3.5 h-3.5" /> VO chờ duyệt
             </p>
             <p className="text-lg font-semibold mt-1">{fmtVND(vo.submitted)}</p>
+          </a>
+        )}
+        {workfront != null && workfront.waitingFloors > 0 && (
+          <a
+            href="/work-fronts"
+            className="flex-1 min-w-[140px] bg-zinc-900 border border-amber-500/30 rounded-xl p-4 hover:border-amber-500/60 transition"
+          >
+            <p className="text-xs text-zinc-400 uppercase tracking-wide flex items-center gap-1.5">
+              <LandPlot className="w-3.5 h-3.5" /> Tầng chờ mặt bằng
+            </p>
+            <p className="text-lg font-semibold mt-1 text-amber-300">
+              {workfront.waitingFloors}
+              <span className="ml-1.5 text-xs font-medium text-zinc-400">
+                ({workfront.cumulativeWaitDays} ngày chờ luỹ kế)
+              </span>
+            </p>
           </a>
         )}
       </div>

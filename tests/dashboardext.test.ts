@@ -5,13 +5,54 @@ import assert from "node:assert/strict";
 // ===== Test tích hợp (cần Postgres riêng: đặt TEST_DATABASE_URL) =====
 
 test(
-  "tableExists: true với bảng có sẵn, false với bảng chưa tồn tại (work_fronts, M14 chưa làm)",
+  "tableExists: true với bảng có sẵn, false với bảng chưa tồn tại",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { tableExists, workfrontBlock } = await import("@/lib/dashboardext");
+    const { tableExists } = await import("@/lib/dashboardext");
     assert.equal(await tableExists("tasks"), true);
-    assert.equal(await tableExists("work_fronts"), false);
-    assert.equal(await workfrontBlock(), null);
+    assert.equal(await tableExists("no_such_table_xyz"), false);
+  },
+);
+
+test(
+  "workfrontBlock: đếm tầng pending + tổng ngày chờ luỹ kế đúng (M14 đã làm)",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { workfrontBlock } = await import("@/lib/dashboardext");
+    const { daysFromTodayISO } = await import("@/lib/date");
+
+    const stId = await insertId(
+      `INSERT INTO sheet_types (code, name, slug) VALUES ('D9WF', 'Sheet test D9 WF', 'd9wf')`,
+    );
+    const frontId = await insertId(
+      `INSERT INTO work_fronts (sheet_type_id, floor_label) VALUES (?, '20F')`,
+      stId,
+    );
+    const wpId = await insertId(
+      `INSERT INTO work_packages (code, name, sheet_type_id, floor_label) VALUES ('D9WF-1', 'Nhóm test D9 WF', ?, '20F')`,
+      stId,
+    );
+    const taskId = await insertId(
+      `INSERT INTO tasks (code, name, package_id, start_date, status, progress_percent)
+       VALUES ('D9WF-T1', 'Task test D9 WF', ?, ?, 'chuan_bi', 0)`,
+      wpId,
+      daysFromTodayISO(-7),
+    );
+
+    const block = await workfrontBlock();
+    assert.ok(block != null);
+    assert.ok(block!.waitingFloors >= 1);
+    assert.ok(block!.cumulativeWaitDays >= 7);
+
+    await run(`UPDATE work_fronts SET status = 'handed_over' WHERE id = ?`, frontId);
+    const afterHandover = await workfrontBlock();
+    assert.equal(afterHandover!.waitingFloors, block!.waitingFloors - 1);
+
+    await run(`DELETE FROM tasks WHERE id = ?`, taskId);
+    await run(`DELETE FROM work_packages WHERE id = ?`, wpId);
+    await run(`DELETE FROM work_fronts WHERE id = ?`, frontId);
+    await run(`DELETE FROM sheet_types WHERE id = ?`, stId);
   },
 );
 

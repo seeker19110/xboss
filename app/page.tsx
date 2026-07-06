@@ -115,6 +115,7 @@ export default function Dashboard() {
     cpi: CpiBlock | null;
     quality: QualityBlock;
     vo: VoBlock | null;
+    workfront: { waitingFloors: number; cumulativeWaitDays: number } | null;
     byDiscipline: DisciplineCrossRow[];
   } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -501,6 +502,7 @@ export default function Dashboard() {
             cpi={data.cpi}
             quality={data.quality}
             vo={data.vo}
+            workfront={data.workfront}
             byDiscipline={data.byDiscipline}
             isEngineer={me?.role === "engineer"}
           />

@@ -8,7 +8,14 @@ import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { formatDateVN } from "@/lib/date";
 import { sortFloorsAsc } from "@/lib/floors";
-import { WORK_FRONT_STATUS_LABEL, type WorkFrontStatus } from "@/lib/workfronts";
+
+type WorkFrontStatus = "pending" | "handed_over" | "in_progress" | "returned";
+const WORK_FRONT_STATUS_LABEL: Record<WorkFrontStatus, string> = {
+  pending: "Chưa bàn giao",
+  handed_over: "Đã bàn giao",
+  in_progress: "Đang thi công",
+  returned: "Đã trả",
+};
 
 const STATUS_ICON: Record<WorkFrontStatus, typeof Lock> = {
   pending: Lock,

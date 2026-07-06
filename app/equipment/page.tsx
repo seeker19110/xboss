@@ -8,12 +8,23 @@ import { Modal } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { formatDateVN } from "@/lib/date";
-import {
-  EQUIPMENT_CONDITION_LABEL,
-  EQUIPMENT_LOG_ACTION_LABEL,
-  type EquipmentCondition,
-  type EquipmentLogAction,
-} from "@/lib/equipment";
+
+type EquipmentCondition = "good" | "maintenance" | "broken" | "retired";
+const EQUIPMENT_CONDITION_LABEL: Record<EquipmentCondition, string> = {
+  good: "Tốt",
+  maintenance: "Đang bảo trì",
+  broken: "Hỏng",
+  retired: "Ngừng sử dụng",
+};
+
+type EquipmentLogAction = "issue" | "return" | "move" | "maintain" | "calibrate";
+const EQUIPMENT_LOG_ACTION_LABEL: Record<EquipmentLogAction, string> = {
+  issue: "Cấp phát",
+  return: "Thu hồi",
+  move: "Chuyển vị trí",
+  maintain: "Bảo trì",
+  calibrate: "Hiệu chuẩn",
+};
 
 const CONDITION_BADGE: Record<EquipmentCondition, string> = {
   good: "bg-emerald-900/40 text-emerald-300",

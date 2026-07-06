@@ -136,7 +136,7 @@ test("overNormItems: xuất hiện/biến mất đúng ngưỡng", { skip: !HAS_
   // executedQty = 10 * 1 * 1 = 10
 
   const materialId = await insertId(
-    `INSERT INTO materials (name, unit) VALUES ('Vật tư over test')`,
+    `INSERT INTO materials (name, unit) VALUES ('Vật tư over test', 'kg')`,
   );
   const normId = await insertId(
     `INSERT INTO boq_norms (boq_item_id, resource_type, material_id, qty_per_unit, unit_label)

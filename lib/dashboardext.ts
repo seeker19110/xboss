@@ -120,9 +120,35 @@ export type WorkfrontBlock = { waitingFloors: number; cumulativeWaitDays: number
 
 // M14 (mặt bằng thi công) chưa triển khai — bảng work_fronts chưa tồn tại → null
 // (UI ẩn thẻ). Khi M14 xong, hàm này cần cập nhật đúng schema thật của work_fronts.
+// Tầng chờ bàn giao mặt bằng (M14) + tổng số ngày chờ luỹ kế (Σ max(0, today −
+// start_date sớm nhất của tầng) qua mọi task chưa xong của tầng đó) — con số EOT
+// cho dashboard. `null` khi M14 chưa triển khai (bảng chưa tồn tại).
 export async function workfrontBlock(): Promise<WorkfrontBlock | null> {
   if (!(await tableExists("work_fronts"))) return null;
-  return { waitingFloors: 0, cumulativeWaitDays: 0 };
+
+  const rows = await query<{ earliestStart: string | null }>(
+    `SELECT MIN(t.start_date) AS "earliestStart"
+       FROM work_fronts wf
+       LEFT JOIN work_packages wp
+         ON wp.sheet_type_id = wf.sheet_type_id AND wp.floor_label = wf.floor_label
+       LEFT JOIN tasks t
+         ON t.package_id = wp.id AND t.start_date IS NOT NULL
+        AND t.status NOT IN ('hoan_thanh','nghiem_thu')
+      WHERE wf.status = 'pending'
+      GROUP BY wf.id`,
+  );
+
+  const today = todayISO();
+  let cumulativeWaitDays = 0;
+  for (const r of rows) {
+    if (!r.earliestStart) continue;
+    cumulativeWaitDays += Math.max(
+      0,
+      Math.round((Date.parse(today) - Date.parse(r.earliestStart)) / 86400_000),
+    );
+  }
+
+  return { waitingFloors: rows.length, cumulativeWaitDays };
 }
 
 export type VoBlock = { draft: number; submitted: number; approved: number; rejected: number };

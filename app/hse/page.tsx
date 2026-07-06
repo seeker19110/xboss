@@ -8,14 +8,30 @@ import { Modal } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { formatDateVN } from "@/lib/date";
-import {
-  HSE_KIND_LABEL,
-  HSE_SEVERITY_LABEL,
-  HSE_PERMIT_TYPE_LABEL,
-  type HseKind,
-  type HseSeverity,
-  type HsePermitType,
-} from "@/lib/hse";
+
+type HseKind = "inspection" | "toolbox" | "incident" | "near_miss" | "permit";
+const HSE_KIND_LABEL: Record<HseKind, string> = {
+  inspection: "Kiểm tra định kỳ",
+  toolbox: "Toolbox talk",
+  incident: "Sự cố",
+  near_miss: "Cận nguy",
+  permit: "Giấy phép làm việc",
+};
+
+type HseSeverity = "low" | "medium" | "high";
+const HSE_SEVERITY_LABEL: Record<HseSeverity, string> = {
+  low: "Thấp",
+  medium: "Trung bình",
+  high: "Cao",
+};
+
+type HsePermitType = "hot_work" | "height" | "confined" | "electrical";
+const HSE_PERMIT_TYPE_LABEL: Record<HsePermitType, string> = {
+  hot_work: "Hàn/cắt nóng",
+  height: "Làm việc trên cao",
+  confined: "Không gian hạn chế",
+  electrical: "Điện",
+};
 
 const SEVERITY_BADGE: Record<HseSeverity, string> = {
   low: "bg-zinc-800 text-zinc-300",

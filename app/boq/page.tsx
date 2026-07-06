@@ -7,7 +7,12 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appAlert, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { NORM_RESOURCE_TYPE_LABEL, type NormResourceType } from "@/lib/norms";
+type NormResourceType = "material" | "labor" | "equipment";
+const NORM_RESOURCE_TYPE_LABEL: Record<NormResourceType, string> = {
+  material: "Vật tư",
+  labor: "Nhân công",
+  equipment: "Máy",
+};
 
 type MapEntry = {
   taskId: number;
