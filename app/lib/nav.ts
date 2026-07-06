@@ -28,6 +28,7 @@ import {
   Gavel,
   PencilRuler,
   Mail,
+  FolderOpen,
 } from "lucide-react";
 import type { Role } from "@/lib/roles";
 
@@ -72,6 +73,7 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Mail,
         roles: ["admin", "pm", "engineer", "bch", "cdt", "viewer"],
       },
+      { href: "/documents", label: "Hồ sơ dự án", icon: FolderOpen },
     ],
   },
   {
