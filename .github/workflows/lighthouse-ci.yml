@@ -1,7 +1,7 @@
 name: Lighthouse CI
 
-# Đo BASELINE hiệu năng/a11y/SEO trên /login mỗi PR (xem lighthouserc.json).
-# Hiện không chặn merge (assertion 'warn' + continue-on-error) — đo để cải thiện dần.
+# Đo hiệu năng/a11y/best-practices/SEO trên /login mỗi PR (xem lighthouserc.json).
+# Chặn merge: cả 4 category đều assertion 'error' (đo thật 2026-07-06, dư nhiều ngưỡng).
 on:
   pull_request:
     branches: [main]
@@ -31,4 +31,3 @@ jobs:
 
       - name: Chạy Lighthouse CI
         run: npx --yes @lhci/cli@0.15.x autorun
-        continue-on-error: true
