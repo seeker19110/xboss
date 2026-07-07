@@ -65,13 +65,39 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    // Thi công hiện trường: việc được giao, nghiệm thu, khối lượng, nhật ký, mặt bằng.
     label: "Thi công",
     items: [
       { href: "/my-tasks", label: "Việc của tôi", icon: ClipboardList },
       { href: "/approvals", label: "Nghiệm thu", icon: CheckSquare },
       { href: "/boq", label: "BOQ", icon: Calculator },
-      { href: "/quality", label: "Chất lượng", icon: ClipboardCheck },
       { href: "/diary", label: "Nhật ký", icon: NotebookPen },
+      { href: "/work-fronts", label: "Mặt bằng", icon: LandPlot },
+    ],
+  },
+  {
+    // Cụm QHSE: kiểm soát chất lượng, an toàn (HSE) và quản lý rủi ro.
+    label: "Chất lượng & An toàn",
+    items: [
+      { href: "/quality", label: "Chất lượng", icon: ClipboardCheck },
+      {
+        href: "/hse",
+        label: "HSE",
+        icon: ShieldAlert,
+        roles: ["admin", "pm", "engineer", "subcon"],
+      },
+      {
+        href: "/risks",
+        label: "Rủi ro",
+        icon: AlertTriangle,
+        roles: ["admin", "pm", "engineer", "bch", "cdt", "viewer"],
+      },
+    ],
+  },
+  {
+    // Hồ sơ & trao đổi: bản vẽ, công văn, hồ sơ dự án và biên bản họp.
+    label: "Hồ sơ & Trao đổi",
+    items: [
       { href: "/drawings", label: "Bản vẽ", icon: PencilRuler },
       {
         href: "/correspondences",
@@ -80,20 +106,7 @@ export const NAV_GROUPS: NavGroup[] = [
         roles: ["admin", "pm", "engineer", "bch", "cdt", "viewer"],
       },
       { href: "/documents", label: "Hồ sơ dự án", icon: FolderOpen },
-      { href: "/work-fronts", label: "Mặt bằng", icon: LandPlot },
-      {
-        href: "/hse",
-        label: "HSE",
-        icon: ShieldAlert,
-        roles: ["admin", "pm", "engineer", "subcon"],
-      },
       { href: "/meetings", label: "Họp", icon: MessagesSquare },
-      {
-        href: "/risks",
-        label: "Rủi ro",
-        icon: AlertTriangle,
-        roles: ["admin", "pm", "engineer", "bch", "cdt", "viewer"],
-      },
     ],
   },
   {
