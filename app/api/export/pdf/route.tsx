@@ -51,15 +51,6 @@ type DelayedTask = {
   floorLabel: string;
   sheetType: string;
 };
-type Forecast = {
-  sheetType: string;
-  progress: number;
-  ratePerWeek: number;
-  deadline: string | null;
-  eta: string | null;
-  lateDays: number | null;
-};
-
 function fmt(d: string | null) {
   if (!d) return "—";
   const dt = new Date(d);
@@ -81,17 +72,14 @@ function ReportDoc({
   projectName,
   kpi,
   delayed,
-  forecast,
   today,
 }: {
   projectName: string;
   kpi: KPI[];
   delayed: DelayedTask[];
-  forecast: Forecast[];
   today: string;
 }) {
   const totalDelayed = kpi.reduce((s, k) => s + k.delayed, 0);
-  const hasForecast = forecast.some((f) => f.eta);
 
   return (
     <Document>
@@ -165,53 +153,9 @@ function ReportDoc({
           })}
         </View>
 
-        {/* Dự báo */}
-        {hasForecast && (
-          <View style={styles.section}>
-            <Text style={styles.sectionHead}>2. Dự báo hoàn thành</Text>
-            <View style={[styles.row, { backgroundColor: "#f8f8f8" }]}>
-              {["Hệ", "Tiến độ", "Tốc độ/tuần", "Deadline", "Dự kiến xong", "Chênh lệch"].map(
-                (h) => (
-                  <Text key={h} style={[styles.th, { flex: 1 }]}>
-                    {h}
-                  </Text>
-                ),
-              )}
-            </View>
-            {forecast.map((f) => (
-              <View key={f.sheetType} style={styles.row}>
-                <Text style={{ flex: 1, fontSize: 8 }}>{f.sheetType}</Text>
-                <Text style={{ flex: 1, fontSize: 8 }}>{pct(f.progress)}</Text>
-                <Text style={{ flex: 1, fontSize: 8 }}>
-                  {f.progress >= 0.999 ? "—" : `${(f.ratePerWeek * 100).toFixed(1)}%`}
-                </Text>
-                <Text style={{ flex: 1, fontSize: 8 }}>{fmt(f.deadline)}</Text>
-                <Text style={{ flex: 1, fontSize: 8, fontFamily: FONT_BOLD }}>
-                  {f.progress >= 0.999 ? "Đã xong" : fmt(f.eta)}
-                </Text>
-                <Text
-                  style={{
-                    flex: 1,
-                    fontSize: 8,
-                    color: (f.lateDays ?? 0) > 0 ? "#dc2626" : "#059669",
-                  }}
-                >
-                  {f.lateDays === null || f.progress >= 0.999
-                    ? "—"
-                    : f.lateDays > 0
-                      ? `Trễ ~${f.lateDays} ngày`
-                      : `Sớm ${-f.lateDays} ngày`}
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
-
         {/* Danh sách trễ */}
         <View style={styles.section}>
-          <Text style={styles.sectionHead}>
-            {hasForecast ? "3" : "2"}. Danh sách công việc đang trễ ({delayed.length})
-          </Text>
+          <Text style={styles.sectionHead}>2. Danh sách công việc đang trễ ({delayed.length})</Text>
           <View style={[styles.row, { backgroundColor: "#f8f8f8" }]}>
             {["Chi tiết", "Sheet", "Tầng", "Kết thúc", "%", "Trạng thái"].map((h) => (
               <Text key={h} style={[styles.th, { flex: h === "Chi tiết" ? 3 : 1 }]}>
@@ -269,7 +213,7 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json({ error: "Chỉ Admin/PM được xuất báo cáo" }, { status: 403 });
 
   // Lấy dữ liệu
-  const [kpiRows, delayedRows, forecastRows, project] = await Promise.all([
+  const [kpiRows, delayedRows, project] = await Promise.all([
     query<KPI>(`
       SELECT st.code AS "sheetType",
              COUNT(t.id)::int AS total,
@@ -282,19 +226,12 @@ export async function GET(_req: NextRequest) {
     query<DelayedTask>(`
       SELECT t.id, t.name, t.status, t.end_date AS "endDate",
              t.progress_percent AS "progressPercent",
-             COALESCE(t.floor_label, '') AS "floorLabel",
+             COALESCE(wp.floor_label, '') AS "floorLabel",
              st.code AS "sheetType"
         FROM tasks t
         JOIN work_packages wp ON t.package_id = wp.id
         JOIN sheet_types st ON wp.sheet_type_id = st.id
        WHERE t.status = 'tre' ORDER BY t.end_date NULLS LAST LIMIT 200`),
-    query<Forecast>(`
-      SELECT st.code AS "sheetType", AVG(t.progress_percent) AS progress,
-             st.deadline, NULL AS eta, NULL AS "lateDays", 0 AS "ratePerWeek"
-        FROM sheet_types st
-        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
-        LEFT JOIN tasks t ON t.package_id = wp.id
-       GROUP BY st.id, st.code, st.deadline ORDER BY st.id`),
     queryOne<{ name: string }>(`SELECT name FROM projects LIMIT 1`).catch(() => null),
   ]);
 
@@ -302,13 +239,7 @@ export async function GET(_req: NextRequest) {
   const projectName = project?.name ?? "XBoss";
 
   const stream = await ReactPDF.renderToStream(
-    <ReportDoc
-      projectName={projectName}
-      kpi={kpiRows}
-      delayed={delayedRows}
-      forecast={forecastRows}
-      today={today}
-    />,
+    <ReportDoc projectName={projectName} kpi={kpiRows} delayed={delayedRows} today={today} />,
   );
 
   const chunks: Buffer[] = [];

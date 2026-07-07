@@ -35,25 +35,6 @@ Truy cập: `http://<IP-server>:3000`
 
 Cập nhật phiên bản mới: `git pull` rồi `docker compose up -d --build` (dữ liệu giữ nguyên trong volume `xboss-pgdata`).
 
-### Script một lệnh: `deploy.sh`
-
-`deploy.sh` gói toàn bộ Cách A lại — VPS **luôn chạy nhánh `main`**: script tự
-`git fetch` + `reset --hard origin/main`, build lại image, khởi động qua Compose,
-và **tự seed dữ liệu ở lần deploy đầu** (phát hiện qua volume `xboss-pgdata`).
-Chạy lại nhiều lần an toàn (idempotent).
-
-```bash
-cd xboss
-./deploy.sh            # cập nhật: kéo main mới nhất + build + up
-./deploy.sh --seed     # ép chạy lại db:seed sau khi up
-./deploy.sh --no-pull  # build code đang có sẵn trên VPS, không git pull
-```
-
-> ⚠️ `reset --hard` sẽ **xoá mọi sửa đổi cục bộ** trên VPS để khớp đúng
-> `origin/main` — đừng sửa file trực tiếp trên server, hãy đổi cấu hình qua biến
-> môi trường hoặc file `.env`. Nhớ đổi `XBOSS_SECRET` trong `docker-compose.yml`
-> (script sẽ cảnh báo nếu vẫn để giá trị mặc định).
-
 ---
 
 ## Cách B — Không Docker (Node ≥ 20 + pm2 + Supabase)
@@ -75,6 +56,28 @@ pm2 save && pm2 startup          # tự khởi động lại khi reboot
 ```
 
 Mặc định lắng nghe cổng 3000. Đổi cổng: `PORT=8080 pm2 start ...`.
+
+### Script một lệnh cho các lần cập nhật sau: `deploy.sh`
+
+Sau lần setup đầu ở trên (đã có pm2 app tên `xboss`), các lần cập nhật sau chỉ cần:
+
+```bash
+cd xboss
+bash deploy.sh
+```
+
+Script tự làm: `git fetch` + `reset --hard origin/main` (VPS luôn chạy nhánh
+`main`) → `npm ci` → build vào thư mục tạm `.next-build` (không đụng `.next`
+đang được app chạy thật đọc) → swap atomic `.next-build` vào `.next` → `pm2
+reload xboss --update-env`. Build vào thư mục tạm rồi swap thay vì ghi đè
+thẳng lên `.next` đang chạy giúp tránh 2 rủi ro: client đã tải HTML cũ xin lại
+chunk JS/CSS đúng lúc file đó vừa bị ghi đè giữa chừng (ChunkLoadError thoáng
+qua), và build lỗi giữa chừng làm `.next` bị bỏ dở không rollback được (giờ
+`.next` đang chạy chỉ bị thay khi build mới đã hoàn tất chắc chắn).
+
+> ⚠️ `reset --hard` sẽ **xoá mọi sửa đổi cục bộ** trên VPS để khớp đúng
+> `origin/main` — đừng sửa file trực tiếp trên server, hãy đổi cấu hình qua
+> biến môi trường hoặc file `.env.local`.
 
 ---
 

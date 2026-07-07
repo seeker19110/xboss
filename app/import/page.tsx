@@ -107,13 +107,13 @@ export default function ImportPage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <header className="border-b border-zinc-800 px-6 py-4 flex items-center gap-3">
-        <Link href="/" className="text-zinc-400 hover:text-white">
+        <Link href="/" aria-label="Quay lại" className="text-zinc-400 hover:text-white">
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <h1 className="text-lg font-bold flex items-center gap-2">
           <Upload className="w-5 h-5" /> Import Excel
         </h1>
-        <span className="text-xs text-zinc-500 ml-auto">
+        <span className="text-xs text-zinc-400 ml-auto">
           Bước 1: chọn file → Bước 2: xem trước → Bước 3: xác nhận
         </span>
       </header>

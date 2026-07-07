@@ -556,7 +556,7 @@ export default function PurchaseOrdersPage() {
         {/* Danh sách PO */}
         <div className="space-y-2">
           {orders.length === 0 && (
-            <div className="text-center py-16 text-zinc-500">
+            <div className="text-center py-16 text-zinc-400">
               <ClipboardList className="w-12 h-12 mx-auto mb-3 opacity-30" />
               <p>Không có đơn hàng nào</p>
             </div>

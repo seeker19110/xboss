@@ -109,6 +109,12 @@ const DEFAULTS: { name: string; email: string; pw: string; role: Role }[] = [
 // Đã xác nhận DB có user trong process này → khỏi query lại (hàm được gọi trên mọi
 // request /api/auth/me, nhưng chỉ cần thật sự kiểm tra DB 1 lần lúc boot).
 let defaultUsersEnsured = false;
+// Chỉ dùng trong test: nhiều file test chạy chung 1 process (tsx --test nhiều file) nên
+// cache này rò rỉ giữa các file — file khác lỡ tạo user trước sẽ khiến cờ bật sớm, làm
+// test ensureDefaultUsers không bao giờ seed thật. Không dùng ở code sản phẩm.
+export function _resetDefaultUsersCacheForTests(): void {
+  defaultUsersEnsured = false;
+}
 export async function ensureDefaultUsers(): Promise<void> {
   if (defaultUsersEnsured) return;
   const c = await queryOne<{ n: number }>(`SELECT COUNT(*) AS n FROM users`);
