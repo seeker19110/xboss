@@ -33,6 +33,150 @@ export function isValidPoTransition(from: string, to: string): boolean {
   return MANUAL_FORWARD[from] === to;
 }
 
+export type PurchaseOrderRow = {
+  id: number;
+  poCode: string;
+  status: string;
+  expectedDate: string | null;
+  note: string | null;
+  createdAt: string;
+  supplierId: number | null;
+  supplierName: string | null;
+  createdByName: string | null;
+  itemCount: number;
+  totalOrdered: number;
+  totalReceived: number;
+};
+
+// Danh sách đơn hàng kèm tổng số lượng đặt/nhận. projectId (M22): undefined = không lọc
+// dự án (dùng nội bộ/cron chưa gắn ngữ cảnh dự án).
+export async function listPurchaseOrders(filter?: {
+  status?: string;
+  projectId?: number;
+}): Promise<PurchaseOrderRow[]> {
+  const conds: string[] = [];
+  const args: unknown[] = [];
+  if (filter?.status) {
+    conds.push("po.status = ?");
+    args.push(filter.status);
+  }
+  if (filter?.projectId != null) {
+    conds.push("po.project_id = ?");
+    args.push(filter.projectId);
+  }
+  const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+  return query<PurchaseOrderRow>(
+    `SELECT po.id, po.po_code AS "poCode", po.status,
+            po.expected_date AS "expectedDate", po.note,
+            po.created_at AS "createdAt",
+            s.id AS "supplierId", s.name AS "supplierName",
+            u.name AS "createdByName",
+            COALESCE(pi.item_count, 0) AS "itemCount",
+            COALESCE(pi.total_ordered, 0) AS "totalOrdered",
+            COALESCE(pi.total_received, 0) AS "totalReceived"
+       FROM purchase_orders po
+       LEFT JOIN suppliers s ON po.supplier_id = s.id
+       LEFT JOIN users u ON po.created_by = u.id
+       LEFT JOIN (
+         SELECT po_id,
+                COUNT(*) AS item_count,
+                SUM(qty_ordered) AS total_ordered,
+                SUM(qty_received) AS total_received
+           FROM po_items GROUP BY po_id
+       ) pi ON pi.po_id = po.id
+      ${where}
+      ORDER BY po.created_at DESC`,
+    ...args,
+  );
+}
+
+// projectId khi truyền → trả undefined nếu PO không thuộc dự án đang chọn (chặn truy
+// cập chéo dự án qua đoán ID) — dùng cho route GET/PATCH/DELETE :id.
+export async function getPurchaseOrder(
+  id: number,
+  projectId?: number,
+): Promise<{ id: number; status: string } | undefined> {
+  const conds = ["id = ?"];
+  const args: unknown[] = [id];
+  if (projectId != null) {
+    conds.push("project_id = ?");
+    args.push(projectId);
+  }
+  return queryOne<{ id: number; status: string }>(
+    `SELECT id, status FROM purchase_orders WHERE ${conds.join(" AND ")}`,
+    ...args,
+  );
+}
+
+export type VehicleRow = {
+  id: number;
+  plate: string;
+  driver: string | null;
+  driverPhone: string | null;
+  cargo: string | null;
+  gate: string | null;
+  expectedAt: string;
+  enteredAt: string | null;
+  exitedAt: string | null;
+  needsCrane: boolean;
+  status: string;
+  poId: number | null;
+  poCode: string | null;
+  supplierId: number | null;
+  supplierName: string | null;
+  createdAt: string;
+};
+
+// Danh sách xe ra vào — projectId (M22): undefined = không lọc dự án.
+export async function listVehicles(filter?: {
+  date?: string;
+  projectId?: number;
+}): Promise<VehicleRow[]> {
+  const conds: string[] = [];
+  const args: unknown[] = [];
+  if (filter?.date) {
+    conds.push("v.expected_at::date = ?");
+    args.push(filter.date);
+  }
+  if (filter?.projectId != null) {
+    conds.push("v.project_id = ?");
+    args.push(filter.projectId);
+  }
+  const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+  return query<VehicleRow>(
+    `SELECT v.id, v.plate, v.driver, v.driver_phone AS "driverPhone",
+            v.cargo, v.gate, v.expected_at AS "expectedAt",
+            v.entered_at AS "enteredAt", v.exited_at AS "exitedAt",
+            v.needs_crane AS "needsCrane", v.status,
+            v.po_id AS "poId", po.po_code AS "poCode",
+            v.supplier_id AS "supplierId", s.name AS "supplierName",
+            v.created_at AS "createdAt"
+       FROM vehicle_logs v
+       LEFT JOIN purchase_orders po ON po.id = v.po_id
+       LEFT JOIN suppliers s ON s.id = v.supplier_id
+      ${where}
+      ORDER BY v.expected_at`,
+    ...args,
+  );
+}
+
+// projectId khi truyền → trả undefined nếu xe không thuộc dự án đang chọn.
+export async function getVehicle(
+  id: number,
+  projectId?: number,
+): Promise<{ status: string; entered_at: string | null; exited_at: string | null } | undefined> {
+  const conds = ["id = ?"];
+  const args: unknown[] = [id];
+  if (projectId != null) {
+    conds.push("project_id = ?");
+    args.push(projectId);
+  }
+  return queryOne<{ status: string; entered_at: string | null; exited_at: string | null }>(
+    `SELECT status, entered_at, exited_at FROM vehicle_logs WHERE ${conds.join(" AND ")}`,
+    ...args,
+  );
+}
+
 // PO chưa nhận đủ hàng (chưa received/reconciled/cancelled) mà đã quá ngày giao dự kiến.
 export async function poLateList(): Promise<
   { id: number; poCode: string; expectedDate: string; supplierName: string | null }[]

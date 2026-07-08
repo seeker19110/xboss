@@ -3,6 +3,8 @@ import { writeFile, readFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
+import { getEquipment } from "@/lib/equipment";
 import {
   ensureUploadDir,
   extForDocMime,
@@ -15,7 +17,8 @@ export const dynamic = "force-dynamic";
 
 type CertRow = { certFileName: string | null; certMime: string | null };
 
-// GET /api/equipment/:id/cert — stream giấy kiểm định/hiệu chuẩn.
+// GET /api/equipment/:id/cert — stream giấy kiểm định/hiệu chuẩn. Scoped theo dự án
+// đang chọn (M22).
 export async function GET(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -26,6 +29,10 @@ export async function GET(
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  const projectId = await getCurrentProjectId(user);
+  const eqInProject = projectId != null ? await getEquipment(id, projectId) : null;
+  if (!eqInProject) return NextResponse.json({ error: "Không tìm thấy thiết bị" }, { status: 404 });
 
   const eq = await queryOne<CertRow>(
     `SELECT cert_file_name AS "certFileName", cert_mime AS "certMime" FROM equipment WHERE id = ?`,
@@ -54,6 +61,7 @@ export async function GET(
 }
 
 // POST /api/equipment/:id/cert — upload/thay giấy kiểm định (PDF/ảnh, max 20MB). Admin/PM/kỹ sư.
+// Scoped theo dự án đang chọn (M22).
 export async function POST(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -69,6 +77,11 @@ export async function POST(
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  const projectId = await getCurrentProjectId(user);
+  const eqInProject = projectId != null ? await getEquipment(id, projectId) : null;
+  if (!eqInProject) return NextResponse.json({ error: "Không tìm thấy thiết bị" }, { status: 404 });
+
   const eq = await queryOne<CertRow>(
     `SELECT cert_file_name AS "certFileName", cert_mime AS "certMime" FROM equipment WHERE id = ?`,
     id,

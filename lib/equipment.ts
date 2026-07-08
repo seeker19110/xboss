@@ -73,11 +73,13 @@ export type EquipmentRow = EquipmentInput & {
   createdAt: string;
 };
 
+// projectId (M22): undefined = không lọc dự án (dùng nội bộ/cron chưa gắn ngữ cảnh dự án).
 export async function listEquipment(filters: {
   kind?: string;
   condition?: EquipmentCondition;
   crew?: string;
   q?: string;
+  projectId?: number;
 }): Promise<EquipmentRow[]> {
   const clauses: string[] = [];
   const params: unknown[] = [];
@@ -98,6 +100,10 @@ export async function listEquipment(filters: {
     const like = `%${filters.q}%`;
     params.push(like, like, like);
   }
+  if (filters.projectId != null) {
+    clauses.push("project_id = ?");
+    params.push(filters.projectId);
+  }
   return query<EquipmentRow>(
     `SELECT id, code, name, kind, serial, condition,
             calibration_due AS "calibrationDue", cert_file_name AS "certFileName",
@@ -110,14 +116,22 @@ export async function listEquipment(filters: {
   );
 }
 
-export async function getEquipment(id: number): Promise<EquipmentRow | null> {
+// projectId khi truyền → trả null nếu thiết bị không thuộc dự án đang chọn (chặn truy
+// cập chéo dự án qua đoán ID).
+export async function getEquipment(id: number, projectId?: number): Promise<EquipmentRow | null> {
+  const conds = ["id = ?"];
+  const args: unknown[] = [id];
+  if (projectId != null) {
+    conds.push("project_id = ?");
+    args.push(projectId);
+  }
   const row = await queryOne<EquipmentRow>(
     `SELECT id, code, name, kind, serial, condition,
             calibration_due AS "calibrationDue", cert_file_name AS "certFileName",
             cert_mime AS "certMime", current_location AS "currentLocation",
             current_crew AS "currentCrew", note, created_at AS "createdAt"
-       FROM equipment WHERE id = ?`,
-    id,
+       FROM equipment WHERE ${conds.join(" AND ")}`,
+    ...args,
   );
   return row ?? null;
 }

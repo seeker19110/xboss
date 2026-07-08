@@ -159,3 +159,34 @@ test(
     await run(`DELETE FROM equipment WHERE id IN (?, ?, ?)`, soonId, farId, retiredId);
   },
 );
+
+test(
+  "listEquipment: scoped đúng theo project_id (M22), không lẫn dự án khác",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { listEquipment } = await import("@/lib/equipment");
+
+    const p1 = await insertId(
+      `INSERT INTO projects (name, code) VALUES ('DA Thiết bị 1', 'PJT-EQ1')`,
+    );
+    const p2 = await insertId(
+      `INSERT INTO projects (name, code) VALUES ('DA Thiết bị 2', 'PJT-EQ2')`,
+    );
+    const eq1 = await insertId(
+      `INSERT INTO equipment (code, name, kind, project_id) VALUES ('TB-SCOPE-1', 'Thiết bị DA1', 'May do', ?)`,
+      p1,
+    );
+    await insertId(
+      `INSERT INTO equipment (code, name, kind, project_id) VALUES ('TB-SCOPE-2', 'Thiết bị DA2', 'May do', ?)`,
+      p2,
+    );
+
+    const list1 = await listEquipment({ projectId: p1 });
+    assert.ok(list1.some((e) => e.id === eq1));
+    assert.equal(list1.length, 1);
+
+    await run(`DELETE FROM equipment WHERE code IN ('TB-SCOPE-1', 'TB-SCOPE-2')`);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+  },
+);

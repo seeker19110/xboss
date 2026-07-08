@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { getEquipment, parseEquipmentBody, validateEquipmentInput } from "@/lib/equipment";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/equipment/:id — chi tiết 1 thiết bị.
+// GET /api/equipment/:id — chi tiết 1 thiết bị, scoped theo dự án đang chọn (M22).
 export async function GET(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -17,12 +18,13 @@ export async function GET(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const equipment = await getEquipment(id);
+  const projectId = await getCurrentProjectId(user);
+  const equipment = projectId != null ? await getEquipment(id, projectId) : null;
   if (!equipment) return NextResponse.json({ error: "Không tìm thấy thiết bị" }, { status: 404 });
   return NextResponse.json({ equipment });
 }
 
-// PATCH /api/equipment/:id — sửa thông tin (Admin/PM/kỹ sư).
+// PATCH /api/equipment/:id — sửa thông tin (Admin/PM/kỹ sư). Scoped theo dự án đang chọn.
 export async function PATCH(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -39,12 +41,17 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const existing = await queryOne<Record<string, unknown>>(
-    `SELECT code, name, kind, serial, condition, calibration_due AS "calibrationDue",
+  const projectId = await getCurrentProjectId(user);
+  const existing =
+    projectId != null
+      ? await queryOne<Record<string, unknown>>(
+          `SELECT code, name, kind, serial, condition, calibration_due AS "calibrationDue",
             current_location AS "currentLocation", current_crew AS "currentCrew", note
-       FROM equipment WHERE id = ?`,
-    id,
-  );
+       FROM equipment WHERE id = ? AND project_id = ?`,
+          id,
+          projectId,
+        )
+      : undefined;
   if (!existing) return NextResponse.json({ error: "Không tìm thấy thiết bị" }, { status: 404 });
 
   const body = await req.json().catch(() => null);

@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, isAdminOrPm } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
 // PATCH /api/purchase-requests/:id  body: { action: 'approve'|'reject', reviewNote? }
+// scoped theo dự án đang chọn (M22) — yêu cầu không thuộc dự án hiện tại → 404.
 export async function PATCH(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -16,10 +18,15 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const pr = await queryOne<{ id: number; status: string; requested_by: number }>(
-    `SELECT id, status, requested_by FROM purchase_requests WHERE id = ?`,
-    id,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const pr =
+    projectId != null
+      ? await queryOne<{ id: number; status: string; requested_by: number }>(
+          `SELECT id, status, requested_by FROM purchase_requests WHERE id = ? AND project_id = ?`,
+          id,
+          projectId,
+        )
+      : undefined;
   if (!pr) return NextResponse.json({ error: "Không tìm thấy yêu cầu" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
@@ -65,6 +72,7 @@ export async function PATCH(
   return NextResponse.json({ error: "Hành động không hợp lệ" }, { status: 400 });
 }
 
+// DELETE /api/purchase-requests/:id — scoped theo dự án đang chọn (M22).
 export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -76,10 +84,15 @@ export async function DELETE(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const pr = await queryOne<{ requested_by: number; status: string }>(
-    `SELECT requested_by, status FROM purchase_requests WHERE id = ?`,
-    id,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const pr =
+    projectId != null
+      ? await queryOne<{ requested_by: number; status: string }>(
+          `SELECT requested_by, status FROM purchase_requests WHERE id = ? AND project_id = ?`,
+          id,
+          projectId,
+        )
+      : undefined;
   if (!pr) return NextResponse.json({ error: "Không tìm thấy yêu cầu" }, { status: 404 });
 
   if (pr.requested_by !== user.id && !isAdminOrPm(user.role))
