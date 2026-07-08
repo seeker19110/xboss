@@ -108,7 +108,7 @@ Tick checkbox dimension → `recomputeTask` (% = số ô checked / tổng ô) �
 
 ### Offline (PWA)
 
-`public/sw.js`: API GET network-first + fallback cache (trừ `/api/photos/`). Tick checkbox khi mất mạng được xếp hàng trong localStorage (`app/components/offlineQueue.ts` — `useOfflineTickQueue`) và tự PATCH lại khi online; 4xx bị bỏ để không kẹt hàng đợi. Đổi logic cache nhớ tăng version `CACHE` trong sw.js.
+`public/sw.js`: API GET network-first + fallback cache (trừ `/api/photos/`). Tick checkbox khi mất mạng được xếp hàng trong localStorage (`app/components/offlineQueue.ts` — `useOfflineTickQueue`) và tự PATCH lại khi online; 4xx bị bỏ để không kẹt hàng đợi. **App Shell**: `SHELL_URLS` precache `/offline` + manifest/icon lúc cài đặt SW; điều hướng HTML mất mạng mà chưa có trong cache (chưa từng ghé) rơi về trang `/offline` (`app/offline/page.tsx`) thay vì lỗi mạng mặc định của trình duyệt. Đổi logic cache nhớ tăng version `CACHE` trong sw.js.
 
 ### Frontend
 
