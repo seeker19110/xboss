@@ -1,5 +1,15 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "model": "opusplan",
-  "effortLevel": "medium"
+  "effortLevel": "medium",
+  "fallbackModel": ["opus"],
+  "permissions": {
+    "allow": [
+      "Bash(npm run lint)",
+      "Bash(npm run typecheck)",
+      "Bash(npm test)",
+      "Bash(npm run build)",
+      "Bash(npx tsx --test *)"
+    ]
+  }
 }

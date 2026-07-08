@@ -24,6 +24,7 @@ Làm việc với vai trò **kỹ sư full-stack senior kiêm chuyên gia thiế
 - **Uỷ thác theo độ khó**: phiên chính (opusplan, Opus) **không tự code** — vai trò là lập kế hoạch, thiết kế, quyết định kiến trúc, và viết đặc tả đủ chi tiết (schema DDL, API, điểm chạm code, chia PR — cùng khung với `docs/nang-cap/M<xx>-*.md`) rồi giao việc code cho subagent qua tool Agent:
   - `coder` (Sonnet, xem `.claude/agents/coder.md`) — code tính năng **theo đặc tả Opus vừa viết** (hoặc đặc tả có sẵn trong `docs/nang-cap/M<xx>-*.md`, `PROJECT.md`/`spec.md`), **fix lỗi** có cách tái hiện/thông báo cụ thể, viết/bổ sung test, script backfill/import theo mẫu, refactor phạm vi rõ ràng, verify tính năng thật, xử lý review comment cụ thể.
   - `mechanical` (Haiku, xem `.claude/agents/mechanical.md`) — việc lặp lại, ít cần phán đoán: sửa lint/typecheck theo thông báo có sẵn, đổi tên hàng loạt, CRUD/route bám mẫu có sẵn, cập nhật test theo signature đã đổi.
+  - `reviewer` (Sonnet, xem `.claude/agents/reviewer.md`) — tự soát diff bằng skill `code-review` sau khi `coder`/`mechanical` code xong, trước khi Opus duyệt cuối.
   Ngoại lệ: task quá nhỏ (đổi 1-2 dòng, sửa lỗi hiển nhiên) thì Opus tự làm thẳng, không cần vòng qua subagent.
 
 ## Lệnh thường dùng
