@@ -10,7 +10,7 @@ Tài liệu này mô tả cơ chế phân việc theo tầng model đang dùng t
 
 | Tầng | Model | Vai trò |
 | --- | --- | --- |
-| Phiên chính | Opus (`opusplan`, effort medium) | Lập kế hoạch, thiết kế, quyết định kiến trúc, viết đặc tả chi tiết — **không tự code** trừ task quá nhỏ (1-2 dòng) |
+| Phiên chính | Opus (`opusplan`, effort medium) | Lập kế hoạch, thiết kế, quyết định kiến trúc, viết đặc tả chi tiết — **uỷ thác code** khi việc đủ lớn/độc lập (≥1 PR); việc nhỏ/chạm ít file/cần liền mạch ngữ cảnh thì tự code thẳng |
 | `coder` (subagent) | Sonnet | Code theo đặc tả đã có, fix lỗi, viết test, script theo mẫu, refactor phạm vi rõ, verify tính năng thật, xử lý review comment cụ thể |
 | `reviewer` (subagent) | Sonnet | Tự soát diff bằng skill `code-review` sau khi `coder`/`mechanical` code xong, trước khi Opus duyệt cuối |
 | `mechanical` (subagent) | Haiku | Việc lặp lại, ít cần phán đoán: sửa lint/typecheck theo thông báo có sẵn, đổi tên hàng loạt, CRUD/route bám mẫu có sẵn |
@@ -75,13 +75,14 @@ Nội dung 3 file hiện có trong repo này (`coder.md`, `mechanical.md`, `revi
 4. **⚠️ Bước hay bị bỏ sót nhất** — thêm bullet uỷ thác vào `CLAUDE.md` (hoặc tài liệu tương đương) của repo đích, đặt cạnh các nguyên tắc làm việc khác. Copy-paste sẵn, chỉ cần đổi tên 3 subagent nếu repo đích đặt tên khác:
 
    ```markdown
-   - **Uỷ thác theo độ khó**: phiên chính (Opus) không tự code trừ task quá nhỏ (1-2 dòng) — vai trò là lập kế hoạch, thiết kế, quyết định kiến trúc, viết đặc tả đủ chi tiết rồi giao việc code cho subagent qua tool Agent:
+   - **Uỷ thác theo độ khó**: phiên chính (Opus) tập trung lập kế hoạch, thiết kế, quyết định kiến trúc, viết đặc tả đủ chi tiết. Uỷ thác code cho subagent qua tool Agent khi việc đủ lớn/độc lập và đã đặc tả rõ (đúng khung ≥1 PR, tách rời được khỏi mạch quyết định vừa chốt trong phiên):
      - `coder` (Sonnet) — code theo đặc tả, fix lỗi, viết test, script theo mẫu, refactor phạm vi rõ, verify tính năng thật.
      - `reviewer` (Sonnet) — tự soát diff bằng skill code-review trước khi Opus duyệt cuối.
      - `mechanical` (Haiku) — việc lặp lại: lint/typecheck fix, đổi tên hàng loạt, CRUD bám mẫu.
+     Việc nhỏ, chạm ít file, hoặc cần giữ liền mạch ngữ cảnh quyết định vừa chốt thì Opus tự code thẳng — không bắt buộc vòng qua subagent cho mọi việc.
    ```
 
-   Đây là dòng **duy nhất** khiến Opus chủ động dùng subagent thay vì tự làm hết. `.claude/agents/*.md` chỉ khai báo subagent tồn tại — không tự nhắc Opus gọi chúng; nếu quên bullet này, cấu hình `.claude/` coi như vô hiệu trên thực tế (subagent vẫn gọi thủ công được, nhưng Opus sẽ không tự làm điều đó).
+   Đây là dòng **duy nhất** khiến Opus chủ động dùng subagent thay vì tự làm hết. `.claude/agents/*.md` chỉ khai báo subagent tồn tại — không tự nhắc Opus gọi chúng; nếu quên bullet này, cấu hình `.claude/` coi như vô hiệu trên thực tế (subagent vẫn gọi thủ công được, nhưng Opus sẽ không tự làm điều đó). Ngưỡng "đủ lớn/độc lập" là hướng dẫn, không phải luật cứng — mục đích là tránh vòng uỷ thác làm chậm việc nhỏ mà chính Opus tự làm nhanh hơn, đồng thời tránh phá vỡ mạch quyết định vừa chốt trong hội thoại khi giao việc sang 1 phiên subagent mới (không có ngữ cảnh hội thoại).
 5. Mở phiên mới trong repo đích, thử gọi 1 task nhỏ qua từng subagent (`Agent({ subagent_type: "coder", ... })`) để xác nhận model/tool hoạt động đúng trước khi tin tưởng dùng thật.
 
 ## 6. Lưu ý / giới hạn

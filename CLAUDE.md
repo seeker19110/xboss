@@ -21,11 +21,11 @@ Làm việc với vai trò **kỹ sư full-stack senior kiêm chuyên gia thiế
 - **Đọc trước khi sửa, tái dùng trước khi viết mới**: ưu tiên utility sẵn có trong `lib/*`; thay đổi tối thiểu, đúng trọng tâm, diff nhỏ dễ review.
 - **Clean Code / KISS / DRY / YAGNI**: đơn giản, không lặp, không over-engineer; viết code bám đúng phong cách và cách đặt tên của code xung quanh.
 - **Security-first, fail-fast, idempotent**: API là ranh giới bảo mật duy nhất (xem Auth); thiếu cấu hình bắt buộc thì throw sớm; thao tác DB lặp lại không gây tác dụng phụ.
-- **Uỷ thác theo độ khó**: phiên chính (opusplan, Opus) **không tự code** — vai trò là lập kế hoạch, thiết kế, quyết định kiến trúc, và viết đặc tả đủ chi tiết (schema DDL, API, điểm chạm code, chia PR — cùng khung với `docs/nang-cap/M<xx>-*.md`) rồi giao việc code cho subagent qua tool Agent:
+- **Uỷ thác theo độ khó**: phiên chính (opusplan, Opus) tập trung lập kế hoạch, thiết kế, quyết định kiến trúc, viết đặc tả đủ chi tiết (schema DDL, API, điểm chạm code, chia PR — cùng khung với `docs/nang-cap/M<xx>-*.md`). **Uỷ thác code cho subagent** qua tool Agent khi việc đủ lớn/độc lập và đã đặc tả rõ (đúng khung ≥1 PR, tách rời được khỏi mạch quyết định vừa chốt trong phiên):
   - `coder` (Sonnet, xem `.claude/agents/coder.md`) — code tính năng **theo đặc tả Opus vừa viết** (hoặc đặc tả có sẵn trong `docs/nang-cap/M<xx>-*.md`, `PROJECT.md`/`spec.md`), **fix lỗi** có cách tái hiện/thông báo cụ thể, viết/bổ sung test, script backfill/import theo mẫu, refactor phạm vi rõ ràng, verify tính năng thật, xử lý review comment cụ thể.
   - `mechanical` (Haiku, xem `.claude/agents/mechanical.md`) — việc lặp lại, ít cần phán đoán: sửa lint/typecheck theo thông báo có sẵn, đổi tên hàng loạt, CRUD/route bám mẫu có sẵn, cập nhật test theo signature đã đổi.
   - `reviewer` (Sonnet, xem `.claude/agents/reviewer.md`) — tự soát diff bằng skill `code-review` sau khi `coder`/`mechanical` code xong, trước khi Opus duyệt cuối.
-  Ngoại lệ: task quá nhỏ (đổi 1-2 dòng, sửa lỗi hiển nhiên) thì Opus tự làm thẳng, không cần vòng qua subagent.
+  Việc nhỏ, chạm ít file, hoặc cần giữ liền mạch ngữ cảnh quyết định vừa chốt trong hội thoại thì Opus tự code thẳng như quy trình cũ — đúng nhịp "1 phiên ≈ 1-2 PR + verify thật" ở `docs/ke-hoach-fastcons-2026-07.md` §4, không bắt buộc vòng qua subagent cho mọi việc.
 
 ## Lệnh thường dùng
 
