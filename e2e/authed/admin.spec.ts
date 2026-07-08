@@ -7,7 +7,7 @@ import AxeBuilder from "@axe-core/playwright";
 async function gotoAdmin(page: Page) {
   await page.goto("/admin");
   // Tab "Phân công" (mặc định) chỉ có ý nghĩa render sau khi danh sách sheet/user đã tải xong.
-  await expect(page.getByRole("button", { name: "Lịch sử" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("tab", { name: "Lịch sử" })).toBeVisible({ timeout: 15_000 });
 }
 
 test.describe("Quản trị (sau đăng nhập)", () => {
@@ -30,8 +30,11 @@ test.describe("Quản trị (sau đăng nhập)", () => {
 
   test("tab Lịch sử không có vi phạm a11y nghiêm trọng (axe)", async ({ page }) => {
     await gotoAdmin(page);
-    await page.getByRole("button", { name: "Lịch sử" }).click();
-    await expect(page.getByRole("button", { name: "Lịch sử" })).toHaveClass(/bg-zinc-800/);
+    await page.getByRole("tab", { name: "Lịch sử" }).click();
+    await expect(page.getByRole("tab", { name: "Lịch sử" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
 
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
@@ -62,7 +65,7 @@ test.describe("Quản trị (sau đăng nhập)", () => {
       timeout: 15_000,
     });
 
-    await page.getByRole("button", { name: "Hiển thị AppShell" }).click();
+    await page.getByRole("tab", { name: "Hiển thị AppShell" }).click();
     const row = page.getByRole("switch", { name: /Khởi động & Pháp lý/ });
     await expect(row).toBeVisible({ timeout: 15_000 });
     await expect(row).toHaveAttribute("aria-checked", "true");
@@ -81,7 +84,7 @@ test.describe("Quản trị (sau đăng nhập)", () => {
     // tải lại trang để xác nhận đã ghi DB thật, không phải chỉ optimistic UI.
     await page.reload();
     await expect(sidebar.getByText("Khởi động & Pháp lý", { exact: true })).toHaveCount(0);
-    await page.getByRole("button", { name: "Hiển thị AppShell" }).click();
+    await page.getByRole("tab", { name: "Hiển thị AppShell" }).click();
     await expect(row).toHaveAttribute("aria-checked", "false");
 
     // Trả lại mặc định bật để không ảnh hưởng test khác dùng chung storageState.
@@ -100,7 +103,7 @@ test.describe("Quản trị (sau đăng nhập)", () => {
 
   test("tab Hiển thị AppShell không có vi phạm a11y nghiêm trọng (axe)", async ({ page }) => {
     await gotoAdmin(page);
-    await page.getByRole("button", { name: "Hiển thị AppShell" }).click();
+    await page.getByRole("tab", { name: "Hiển thị AppShell" }).click();
     await expect(page.getByRole("switch").first()).toBeVisible({ timeout: 15_000 });
 
     const results = await new AxeBuilder({ page })

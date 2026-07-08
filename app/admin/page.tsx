@@ -499,32 +499,6 @@ export default function AdminPage() {
         }
         search={false}
       >
-        <nav className="flex gap-1">
-          {(
-            [
-              ["assign", "Phân công", null],
-              ["nav", "Hiển thị AppShell", "nav"],
-              ["projects", "Dự án", "projects"],
-              ["audit", "Lịch sử", "audit"],
-              ["traffic", "Traffic", "traffic"],
-            ] as const
-          )
-            .filter(([key]) => key !== "traffic" || me?.role === "admin")
-            .filter(([key]) => key !== "projects" || me?.role === "admin")
-            .map(([key, label, icon]) => (
-              <button
-                key={key}
-                onClick={() => setTab(key as "assign" | "nav" | "projects" | "audit" | "traffic")}
-                className={`px-3 py-1 rounded text-sm flex items-center gap-1 ${tab === key ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-white"}`}
-              >
-                {icon === "nav" && <LayoutDashboard className="w-3.5 h-3.5" />}
-                {icon === "projects" && <Building2 className="w-3.5 h-3.5" />}
-                {icon === "audit" && <History className="w-3.5 h-3.5" />}
-                {icon === "traffic" && <Activity className="w-3.5 h-3.5" />}
-                {label}
-              </button>
-            ))}
-        </nav>
         <a
           href="/lookahead"
           className="flex items-center gap-1.5 text-sm text-zinc-400 hover:text-rose-400 shrink-0"
@@ -542,6 +516,38 @@ export default function AdminPage() {
       </AppHeader>
 
       <main className="max-w-5xl mx-auto px-6 py-6 space-y-4">
+        <div
+          className="flex gap-1 border-b border-zinc-800 overflow-x-auto scrollbar-none"
+          role="tablist"
+        >
+          {(
+            [
+              ["assign", "Phân công", null],
+              ["nav", "Hiển thị AppShell", "nav"],
+              ["projects", "Dự án", "projects"],
+              ["audit", "Lịch sử", "audit"],
+              ["traffic", "Traffic", "traffic"],
+            ] as const
+          )
+            .filter(([key]) => key !== "traffic" || me?.role === "admin")
+            .filter(([key]) => key !== "projects" || me?.role === "admin")
+            .map(([key, label, icon]) => (
+              <button
+                key={key}
+                role="tab"
+                aria-selected={tab === key}
+                onClick={() => setTab(key as "assign" | "nav" | "projects" | "audit" | "traffic")}
+                className={`px-3 py-2 text-sm flex items-center gap-1 border-b-2 shrink-0 transition ${tab === key ? "border-emerald-500 text-white" : "border-transparent text-zinc-400 hover:text-white"}`}
+              >
+                {icon === "nav" && <LayoutDashboard className="w-3.5 h-3.5" />}
+                {icon === "projects" && <Building2 className="w-3.5 h-3.5" />}
+                {icon === "audit" && <History className="w-3.5 h-3.5" />}
+                {icon === "traffic" && <Activity className="w-3.5 h-3.5" />}
+                {label}
+              </button>
+            ))}
+        </div>
+
         {error && (
           <p className="text-sm text-red-400 bg-red-950/40 border border-red-900 rounded px-3 py-2">
             {error}
