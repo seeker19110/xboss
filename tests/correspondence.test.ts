@@ -194,3 +194,85 @@ test(
     await run(`DELETE FROM correspondences WHERE id IN (?, ?)`, rfiId, letterId);
   },
 );
+
+test(
+  "listCorrespondences/getCorrespondence/createReply: scoped đúng theo project_id (M22), không lẫn dự án khác",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { listCorrespondences, getCorrespondence, createReply } =
+      await import("@/lib/correspondence");
+
+    const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA CV 1', 'PJT-CV1')`);
+    const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA CV 2', 'PJT-CV2')`);
+    const adminId = await insertId(
+      `INSERT INTO users (name, email, password_hash, role) VALUES ('CV Scope', 'cv-scope@xboss.vn', 'x', 'admin')`,
+    );
+    const cv1 = await insertId(
+      `INSERT INTO correspondences (code, direction, kind, counterparty, subject, sent_date, status, project_id)
+       VALUES ('RFI-SCOPE-1', 'in', 'rfi', 'TVGS', 'RFI DA1', '2026-07-01', 'awaiting', ?)`,
+      p1,
+    );
+    const cv2 = await insertId(
+      `INSERT INTO correspondences (code, direction, kind, counterparty, subject, sent_date, status, project_id)
+       VALUES ('RFI-SCOPE-2', 'in', 'rfi', 'TVGS', 'RFI DA2', '2026-07-01', 'awaiting', ?)`,
+      p2,
+    );
+
+    const list1 = await listCorrespondences({ projectId: p1 });
+    assert.ok(list1.some((c) => c.id === cv1));
+    assert.ok(!list1.some((c) => c.id === cv2));
+
+    assert.ok((await getCorrespondence(cv1, p1)) != null);
+    assert.equal(await getCorrespondence(cv2, p1), undefined); // sai dự án → không thấy
+
+    // Reply vào văn bản không thuộc dự án đang chọn → lỗi, không tạo được.
+    const wrongProjectReply = await createReply(
+      cv2,
+      {
+        code: "CV-SCOPE-REPLY",
+        direction: "in",
+        kind: "letter",
+        counterparty: "TVGS",
+        subject: "Trả lời sai dự án",
+        sentDate: "2026-07-03",
+        dueDate: null,
+        status: "awaiting",
+        taskId: null,
+        workPackageId: null,
+        drawingId: null,
+        note: null,
+      },
+      adminId,
+      p1,
+    );
+    assert.ok("error" in wrongProjectReply);
+
+    // Reply đúng dự án → thành công, kế thừa project_id từ văn bản gốc.
+    const okReply = await createReply(
+      cv1,
+      {
+        code: "CV-SCOPE-REPLY-OK",
+        direction: "in",
+        kind: "letter",
+        counterparty: "TVGS",
+        subject: "Trả lời đúng dự án",
+        sentDate: "2026-07-03",
+        dueDate: null,
+        status: "awaiting",
+        taskId: null,
+        workPackageId: null,
+        drawingId: null,
+        note: null,
+      },
+      adminId,
+      p1,
+    );
+    assert.ok("id" in okReply);
+    const replyId = (okReply as { id: number }).id;
+
+    await run(`DELETE FROM correspondences WHERE id IN (?, ?, ?)`, cv1, cv2, replyId);
+    await run(`DELETE FROM users WHERE id = ?`, adminId);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+  },
+);

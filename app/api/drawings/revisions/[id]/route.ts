@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { REVISION_STATUSES, setRevisionStatus, type RevisionStatus } from "@/lib/drawings";
 import { sendPushToUsers } from "@/lib/push";
 
@@ -86,10 +87,19 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const existing = await queryOne<{ id: number }>(
-    `SELECT id FROM drawing_revisions WHERE id = ?`,
-    id,
-  );
+  // Revision không có cột project_id riêng — kiểm qua JOIN drawing cha thuộc đúng
+  // dự án đang chọn (M22).
+  const projectId = await getCurrentProjectId(user);
+  const existing =
+    projectId != null
+      ? await queryOne<{ id: number }>(
+          `SELECT r.id FROM drawing_revisions r
+             JOIN drawings d ON d.id = r.drawing_id
+            WHERE r.id = ? AND d.project_id = ?`,
+          id,
+          projectId,
+        )
+      : undefined;
   if (!existing) return NextResponse.json({ error: "Không tìm thấy revision" }, { status: 404 });
 
   const body = await req.json().catch(() => null);

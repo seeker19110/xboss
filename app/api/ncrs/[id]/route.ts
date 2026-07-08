@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
 // PATCH /api/ncrs/:id — cập nhật NCR (mọi vai trò sửa mô tả/gán/hạn/chuyển trạng thái
-// open→fixing→recheck; đóng (status=closed) chỉ Admin/PM).
+// open→fixing→recheck; đóng (status=closed) chỉ Admin/PM), scoped theo dự án đang chọn
+// (M22) — sai dự án → 404 "không tìm thấy".
 export async function PATCH(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -17,7 +19,15 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const existing = await queryOne<{ status: string }>(`SELECT status FROM ncrs WHERE id = ?`, id);
+  const projectId = await getCurrentProjectId(user);
+  const existing =
+    projectId != null
+      ? await queryOne<{ status: string }>(
+          `SELECT status FROM ncrs WHERE id = ? AND project_id = ?`,
+          id,
+          projectId,
+        )
+      : undefined;
   if (!existing) return NextResponse.json({ error: "Không tìm thấy NCR" }, { status: 404 });
 
   const body = await req.json().catch(() => null);

@@ -112,3 +112,50 @@ test(
     await run(`DELETE FROM users WHERE id IN (?, ?)`, userId, otherId);
   },
 );
+
+test(
+  "listHse/getHse/daysSinceLastIncident/openHseActions: scoped đúng theo project_id (M22), không lẫn dự án khác",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { listHse, getHse, daysSinceLastIncident, openHseActions } = await import("@/lib/hse");
+    const { daysFromTodayISO, todayISO } = await import("@/lib/date");
+
+    const p1 = await insertId(`INSERT INTO projects (name) VALUES ('DA HSE 1')`);
+    const p2 = await insertId(`INSERT INTO projects (name) VALUES ('DA HSE 2')`);
+
+    const h1 = await insertId(
+      `INSERT INTO hse_records (kind, record_date, description, severity, action_required, action_assignee, action_due, action_status, project_id)
+       VALUES ('incident', ?, 'Sự cố DA1', 'high', 'Khắc phục ngay', NULL, ?, 'open', ?)`,
+      todayISO(),
+      daysFromTodayISO(-2),
+      p1,
+    );
+    const h2 = await insertId(
+      `INSERT INTO hse_records (kind, record_date, description, severity, project_id)
+       VALUES ('incident', ?, 'Sự cố DA2', 'high', ?)`,
+      todayISO(),
+      p2,
+    );
+
+    const list1 = await listHse({ projectId: p1 });
+    assert.ok(list1.some((r) => r.id === h1));
+    assert.ok(!list1.some((r) => r.id === h2));
+
+    // getHse: đúng dự án thì thấy, sai dự án (đoán ID) thì null — như pattern 404.
+    assert.ok((await getHse(h1, p1)) != null);
+    assert.equal(await getHse(h1, p2), null);
+
+    const overdue1 = await openHseActions(undefined, p1);
+    assert.ok(overdue1.some((a) => a.id === h1));
+    const overdue2 = await openHseActions(undefined, p2);
+    assert.ok(!overdue2.some((a) => a.id === h1));
+
+    // daysSinceLastIncident: chỉ tính incident trong dự án được lọc.
+    const days1 = await daysSinceLastIncident(p1);
+    assert.ok(days1 != null);
+
+    await run(`DELETE FROM hse_records WHERE id IN (?, ?)`, h1, h2);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+  },
+);

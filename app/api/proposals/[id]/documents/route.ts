@@ -3,6 +3,7 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { query, insertId } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import {
   ensureUploadDir,
   extForDocMime,
@@ -14,6 +15,7 @@ import { canEditProposal, canSeeAllProposals, getProposal } from "@/lib/proposal
 export const dynamic = "force-dynamic";
 
 // GET /api/proposals/:id/documents — danh sách file đính kèm (quyền như GET đề xuất).
+// Scoped theo dự án đang chọn (M22).
 export async function GET(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -25,7 +27,8 @@ export async function GET(
   const proposalId = parseInt(params.id);
   if (isNaN(proposalId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const proposal = await getProposal(proposalId);
+  const projectId = await getCurrentProjectId(user);
+  const proposal = projectId != null ? await getProposal(proposalId, projectId) : undefined;
   if (!proposal) return NextResponse.json({ error: "Không tìm thấy đề xuất" }, { status: 404 });
   if (proposal.requestedBy !== user.id && !canSeeAllProposals(user))
     return NextResponse.json({ error: "Không có quyền xem đề xuất này" }, { status: 403 });
@@ -43,7 +46,8 @@ export async function GET(
 }
 
 // POST /api/proposals/:id/documents — upload đính kèm (multipart: file, caption?).
-// PDF hoặc ảnh, max 20MB. Quyền như PATCH: khi còn nháp, người tạo hoặc Admin/PM.
+// PDF hoặc ảnh, max 20MB. Quyền như PATCH: khi còn nháp, người tạo hoặc Admin/PM. Scoped
+// theo dự án đang chọn (M22).
 export async function POST(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -55,7 +59,8 @@ export async function POST(
   const proposalId = parseInt(params.id);
   if (isNaN(proposalId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const proposal = await getProposal(proposalId);
+  const projectId = await getCurrentProjectId(user);
+  const proposal = projectId != null ? await getProposal(proposalId, projectId) : undefined;
   if (!proposal) return NextResponse.json({ error: "Không tìm thấy đề xuất" }, { status: 404 });
   const editErr = canEditProposal(proposal, user);
   if (editErr) return NextResponse.json({ error: editErr }, { status: 403 });

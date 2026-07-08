@@ -324,6 +324,50 @@ test(
   },
 );
 
+test(
+  "qc_checklists/ncrs: scoped đúng theo project_id (M22), không lẫn dự án khác",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId, query } = await import("@/lib/db");
+
+    const p1 = await insertId(`INSERT INTO projects (name) VALUES ('DA QAQC 1')`);
+    const p2 = await insertId(`INSERT INTO projects (name) VALUES ('DA QAQC 2')`);
+
+    const c1 = await insertId(
+      `INSERT INTO qc_checklists (name, items, project_id) VALUES ('Checklist DA1', '[]'::jsonb, ?)`,
+      p1,
+    );
+    const c2 = await insertId(
+      `INSERT INTO qc_checklists (name, items, project_id) VALUES ('Checklist DA2', '[]'::jsonb, ?)`,
+      p2,
+    );
+
+    const checklistsP1 = await query<{ id: number }>(
+      `SELECT id FROM qc_checklists WHERE project_id = ?`,
+      p1,
+    );
+    assert.ok(checklistsP1.some((c) => c.id === c1));
+    assert.ok(!checklistsP1.some((c) => c.id === c2));
+
+    const n1 = await insertId(
+      `INSERT INTO ncrs (code, description, project_id) VALUES ('NCR-9001', 'NCR DA1', ?)`,
+      p1,
+    );
+    const n2 = await insertId(
+      `INSERT INTO ncrs (code, description, project_id) VALUES ('NCR-9002', 'NCR DA2', ?)`,
+      p2,
+    );
+
+    const ncrsP1 = await query<{ id: number }>(`SELECT id FROM ncrs WHERE project_id = ?`, p1);
+    assert.ok(ncrsP1.some((n) => n.id === n1));
+    assert.ok(!ncrsP1.some((n) => n.id === n2));
+
+    await run(`DELETE FROM ncrs WHERE id IN (?, ?)`, n1, n2);
+    await run(`DELETE FROM qc_checklists WHERE id IN (?, ?)`, c1, c2);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+  },
+);
+
 // ===== Test thuần (validate JSONB) =====
 
 test("validateChecklistItems: chấp nhận mảng hợp lệ, từ chối dữ liệu rác", async () => {

@@ -3,11 +3,13 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { ensureUploadDir, extForMime, newHseFileName, MAX_PHOTO_BYTES } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/hse/:id/photos — ảnh đính kèm ghi nhận HSE.
+// GET /api/hse/:id/photos — ảnh đính kèm ghi nhận HSE. Kiểm ghi nhận cha thuộc đúng dự
+// án đang chọn qua JOIN (M22).
 export async function GET(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -18,6 +20,16 @@ export async function GET(
 
   const recordId = parseInt(params.id);
   if (isNaN(recordId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy ghi nhận" }, { status: 404 });
+  const record = await queryOne<{ id: number }>(
+    `SELECT id FROM hse_records WHERE id = ? AND project_id = ?`,
+    recordId,
+    projectId,
+  );
+  if (!record) return NextResponse.json({ error: "Không tìm thấy ghi nhận" }, { status: 404 });
 
   const photos = await query(
     `SELECT p.id, p.mime, p.created_at AS "createdAt", p.uploaded_by AS "uploadedBy", u.name AS "uploaderName"
@@ -30,6 +42,7 @@ export async function GET(
 
 // POST /api/hse/:id/photos — upload ảnh hiện trường (multipart: file). Mọi vai trò thao
 // tác HSE được (kể cả subcon — càng ít ma sát báo cáo càng tốt, giống ghi nhận HSE).
+// Kiểm ghi nhận cha thuộc đúng dự án đang chọn (M22).
 export async function POST(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -42,10 +55,15 @@ export async function POST(
 
   const recordId = parseInt(params.id);
   if (isNaN(recordId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
-  const record = await queryOne<{ id: number }>(
-    `SELECT id FROM hse_records WHERE id = ?`,
-    recordId,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const record =
+    projectId != null
+      ? await queryOne<{ id: number }>(
+          `SELECT id FROM hse_records WHERE id = ? AND project_id = ?`,
+          recordId,
+          projectId,
+        )
+      : undefined;
   if (!record) return NextResponse.json({ error: "Không tìm thấy ghi nhận" }, { status: 404 });
 
   const form = await req.formData().catch(() => null);

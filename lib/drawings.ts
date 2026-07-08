@@ -103,11 +103,12 @@ export type DrawingFilters = {
   floorLabel?: string;
   systemGroup?: string;
   status?: RevisionStatus;
+  projectId?: number;
 };
 
 // Danh sách drawing kèm rev mới nhất (mọi trạng thái) + rev đã duyệt mới nhất
 // (approved|approved_with_comments) — 2 nguồn UI cần: badge trạng thái hiện hành
-// và nút "Xem bản mới nhất đã duyệt".
+// và nút "Xem bản mới nhất đã duyệt". projectId (M22): undefined = không lọc dự án.
 export async function listDrawings(filters: DrawingFilters = {}): Promise<DrawingRow[]> {
   const conds: string[] = [];
   const params: unknown[] = [];
@@ -126,6 +127,10 @@ export async function listDrawings(filters: DrawingFilters = {}): Promise<Drawin
   if (filters.status) {
     conds.push("lr.status = ?");
     params.push(filters.status);
+  }
+  if (filters.projectId != null) {
+    conds.push("d.project_id = ?");
+    params.push(filters.projectId);
   }
   const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
 

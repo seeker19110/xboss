@@ -114,11 +114,13 @@ export type ProposalRow = ProposalInput & {
   documentCount: number;
 };
 
+// projectId (M22): undefined = không lọc dự án (dùng nội bộ/cron chưa gắn ngữ cảnh dự án).
 export async function listProposals(filter?: {
   kind?: ProposalKind;
   status?: ProposalStatus;
   requestedBy?: number;
   id?: number;
+  projectId?: number;
 }): Promise<ProposalRow[]> {
   const clauses: string[] = [];
   const params: unknown[] = [];
@@ -137,6 +139,10 @@ export async function listProposals(filter?: {
   if (filter?.requestedBy != null) {
     clauses.push("p.requested_by = ?");
     params.push(filter.requestedBy);
+  }
+  if (filter?.projectId != null) {
+    clauses.push("p.project_id = ?");
+    params.push(filter.projectId);
   }
   return query<ProposalRow>(
     `SELECT p.id, p.code, p.kind, p.title, p.amount,
@@ -159,22 +165,35 @@ export async function listProposals(filter?: {
   );
 }
 
-export async function getProposal(id: number): Promise<ProposalRow | undefined> {
-  const rows = await listProposals({ id });
+// projectId khi truyền → trả undefined nếu đề xuất không thuộc dự án đang chọn (chặn
+// truy cập chéo dự án qua đoán ID), giống pattern 404 "không tìm thấy" hiện có.
+export async function getProposal(
+  id: number,
+  projectId?: number,
+): Promise<ProposalRow | undefined> {
+  const rows = await listProposals({ id, projectId });
   return rows[0];
 }
 
 // Đề xuất 'submitted' quá N ngày chưa quyết → nhắc Admin/PM (pattern vo_pending/cert_pending).
+// projectId (M22): undefined = không lọc dự án (dùng nội bộ/cron chưa gắn ngữ cảnh dự án).
 export async function pendingProposalsOver(
   days = PROPOSAL_PENDING_DAYS,
+  projectId?: number,
 ): Promise<{ id: number; code: string; title: string; submittedAt: string }[]> {
   const limit = daysFromTodayISO(-days);
+  const conds = ["status = 'submitted'", "submitted_at IS NOT NULL", "submitted_at <= ?"];
+  const args: unknown[] = [limit];
+  if (projectId != null) {
+    conds.push("project_id = ?");
+    args.push(projectId);
+  }
   return query(
     `SELECT id, code, title, submitted_at AS "submittedAt"
        FROM proposals
-      WHERE status = 'submitted' AND submitted_at IS NOT NULL AND submitted_at <= ?
+      WHERE ${conds.join(" AND ")}
       ORDER BY submitted_at`,
-    limit,
+    ...args,
   );
 }
 

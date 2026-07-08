@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { canDecideProposal, decideProposal } from "@/lib/proposals";
+import { getCurrentProjectId } from "@/lib/projects";
+import { canDecideProposal, decideProposal, getProposal } from "@/lib/proposals";
 
 export const dynamic = "force-dynamic";
 
 // POST /api/proposals/:id/decide  body: { decision: 'approved'|'rejected', rejectReason?,
 // createBill? } — quyết đề xuất đã trình (CAN.approve = Admin/PM). Duyệt tạm ứng/thanh toán
 // có gắn HĐ + createBill=true → tạo phiếu payment_bills tương ứng (không tự động ép).
+// Scoped theo dự án đang chọn (M22).
 export async function POST(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -19,6 +21,10 @@ export async function POST(
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  const projectId = await getCurrentProjectId(user);
+  const proposal = projectId != null ? await getProposal(id, projectId) : undefined;
+  if (!proposal) return NextResponse.json({ error: "Không tìm thấy đề xuất" }, { status: 404 });
 
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });

@@ -1,7 +1,7 @@
 // Quản trị hiển thị mục AppShell (M21 PR3 — xem docs/nang-cap/M21-appshell-ia.md):
-// Admin/PM bật/tắt từng dashboard cấp 3 trong sidebar qua bảng nav_settings. Chưa
-// scoping theo dự án (M22) — mọi bản ghi hiện tại đều project_id IS NULL (áp toàn hệ
-// thống); tham số projectId chừa sẵn chỗ, chưa dùng thật.
+// Admin/PM bật/tắt từng dashboard cấp 3 trong sidebar qua bảng nav_settings. Override
+// theo dự án (M22) đã bật thật: `project_id IS NULL` = toàn hệ thống (mặc định), truyền
+// `projectId` để merge thêm override riêng dự án đang chọn (đè lên override toàn hệ thống).
 import { query, queryOne, run } from "@/lib/db";
 import { flattenDashboards } from "@/app/lib/dashboardTree";
 

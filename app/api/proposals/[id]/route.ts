@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { run } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import {
   canEditProposal,
   canSeeAllProposals,
@@ -13,7 +14,8 @@ import {
 export const dynamic = "force-dynamic";
 
 // GET /api/proposals/:id — chi tiết đề xuất (người tạo hoặc Admin/PM/BCH) kèm cảnh báo
-// vượt định mức khi là đề xuất cấp phát vật tư (M18 — cảnh báo mềm, không chặn).
+// vượt định mức khi là đề xuất cấp phát vật tư (M18 — cảnh báo mềm, không chặn). Scoped
+// theo dự án đang chọn (M22).
 export async function GET(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -25,7 +27,8 @@ export async function GET(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const proposal = await getProposal(id);
+  const projectId = await getCurrentProjectId(user);
+  const proposal = projectId != null ? await getProposal(id, projectId) : undefined;
   if (!proposal) return NextResponse.json({ error: "Không tìm thấy đề xuất" }, { status: 404 });
   if (proposal.requestedBy !== user.id && !canSeeAllProposals(user))
     return NextResponse.json({ error: "Không có quyền xem đề xuất này" }, { status: 403 });
@@ -40,7 +43,8 @@ export async function GET(
   return NextResponse.json({ proposal, overNorm });
 }
 
-// PATCH /api/proposals/:id — sửa đề xuất khi còn nháp (người tạo hoặc Admin/PM).
+// PATCH /api/proposals/:id — sửa đề xuất khi còn nháp (người tạo hoặc Admin/PM), scoped
+// theo dự án đang chọn (M22).
 export async function PATCH(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -52,7 +56,8 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const proposal = await getProposal(id);
+  const projectId = await getCurrentProjectId(user);
+  const proposal = projectId != null ? await getProposal(id, projectId) : undefined;
   if (!proposal) return NextResponse.json({ error: "Không tìm thấy đề xuất" }, { status: 404 });
   const editErr = canEditProposal(proposal, user);
   if (editErr) return NextResponse.json({ error: editErr }, { status: 403 });
@@ -79,7 +84,8 @@ export async function PATCH(
   return NextResponse.json({ ok: true });
 }
 
-// DELETE /api/proposals/:id — xoá đề xuất nháp (người tạo) hoặc bất kỳ (Admin).
+// DELETE /api/proposals/:id — xoá đề xuất nháp (người tạo) hoặc bất kỳ (Admin), scoped
+// theo dự án đang chọn (M22).
 export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -91,7 +97,8 @@ export async function DELETE(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const proposal = await getProposal(id);
+  const projectId = await getCurrentProjectId(user);
+  const proposal = projectId != null ? await getProposal(id, projectId) : undefined;
   if (!proposal) return NextResponse.json({ error: "Không tìm thấy đề xuất" }, { status: 404 });
 
   const isOwnDraft = proposal.requestedBy === user.id && proposal.status === "draft";

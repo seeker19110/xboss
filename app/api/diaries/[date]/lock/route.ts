@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { canLockDiary, canUnlockDiary } from "@/lib/diary";
 
 export const dynamic = "force-dynamic";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-// POST /api/diaries/:date/lock → khoá sổ (Admin/PM) — sau khoá không sửa được (giá trị pháp lý).
+// POST /api/diaries/:date/lock → khoá sổ (Admin/PM) — sau khoá không sửa được (giá trị
+// pháp lý). Scoped theo dự án đang chọn (M22).
 export async function POST(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ date: string }> },
@@ -20,11 +22,16 @@ export async function POST(
   if (!DATE_RE.test(date))
     return NextResponse.json({ error: "Ngày không hợp lệ (YYYY-MM-DD)" }, { status: 422 });
 
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Chưa có nhật ký ngày này để khoá" }, { status: 404 });
+
   try {
     await withTransaction(async () => {
       const diary = await queryOne<{ id: number; status: string }>(
-        `SELECT id, status FROM site_diaries WHERE diary_date = ? FOR UPDATE`,
+        `SELECT id, status FROM site_diaries WHERE diary_date = ? AND project_id = ? FOR UPDATE`,
         date,
+        projectId,
       );
       if (!diary)
         throw Object.assign(new Error("Chưa có nhật ký ngày này để khoá"), { status: 404 });
@@ -50,7 +57,8 @@ export async function POST(
   return NextResponse.json({ ok: true, status: "locked" });
 }
 
-// DELETE /api/diaries/:date/lock → mở khoá (chỉ Admin), ghi audit.
+// DELETE /api/diaries/:date/lock → mở khoá (chỉ Admin), ghi audit. Scoped theo dự án
+// đang chọn (M22).
 export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ date: string }> },
@@ -63,11 +71,16 @@ export async function DELETE(
   if (!DATE_RE.test(date))
     return NextResponse.json({ error: "Ngày không hợp lệ (YYYY-MM-DD)" }, { status: 422 });
 
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Chưa có nhật ký ngày này" }, { status: 404 });
+
   try {
     await withTransaction(async () => {
       const diary = await queryOne<{ id: number; status: string }>(
-        `SELECT id, status FROM site_diaries WHERE diary_date = ? FOR UPDATE`,
+        `SELECT id, status FROM site_diaries WHERE diary_date = ? AND project_id = ? FOR UPDATE`,
         date,
+        projectId,
       );
       if (!diary) throw Object.assign(new Error("Chưa có nhật ký ngày này"), { status: 404 });
       if (diary.status !== "locked")

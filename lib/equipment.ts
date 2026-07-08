@@ -235,16 +235,24 @@ export type CalibrationDueItem = {
   expired: boolean;
 };
 
+// projectId (M22): undefined = không lọc.
 export async function calibrationDueList(
   days = CALIBRATION_WARN_DAYS,
+  projectId?: number,
 ): Promise<CalibrationDueItem[]> {
   const limit = daysFromTodayISO(days);
+  const conds = ["calibration_due IS NOT NULL", "calibration_due <= ?", "condition <> 'retired'"];
+  const args: unknown[] = [limit];
+  if (projectId != null) {
+    conds.push("project_id = ?");
+    args.push(projectId);
+  }
   const rows = await query<{ id: number; code: string; name: string; calibrationDue: string }>(
     `SELECT id, code, name, calibration_due AS "calibrationDue"
        FROM equipment
-      WHERE calibration_due IS NOT NULL AND calibration_due <= ? AND condition <> 'retired'
+      WHERE ${conds.join(" AND ")}
       ORDER BY calibration_due`,
-    limit,
+    ...args,
   );
   const today = todayISO();
   return rows.map((r) => ({ ...r, expired: r.calibrationDue < today }));

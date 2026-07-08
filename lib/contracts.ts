@@ -202,15 +202,25 @@ export type ExpiringContract = {
 
 // HĐ đang active có valid_to trong vòng `days` ngày tới (gồm cả đã quá hạn mà chưa
 // đổi trạng thái) — so sánh chuỗi ngày theo quy ước lớp DB (DATE giữ nguyên string).
-export async function expiringContracts(days = EXPIRY_WARN_DAYS): Promise<ExpiringContract[]> {
+// projectId (M22): undefined = không lọc (nội bộ/cron chưa gắn ngữ cảnh dự án).
+export async function expiringContracts(
+  days = EXPIRY_WARN_DAYS,
+  projectId?: number,
+): Promise<ExpiringContract[]> {
   const limit = daysFromTodayISO(days);
   const today = todayISO();
+  const conds = ["status = 'active'", "valid_to IS NOT NULL", "valid_to <= ?"];
+  const args: unknown[] = [limit];
+  if (projectId != null) {
+    conds.push("project_id = ?");
+    args.push(projectId);
+  }
   const rows = await query<{ id: number; code: string; title: string; validTo: string }>(
     `SELECT id, code, title, valid_to AS "validTo"
        FROM contracts
-      WHERE status = 'active' AND valid_to IS NOT NULL AND valid_to <= ?
+      WHERE ${conds.join(" AND ")}
       ORDER BY valid_to`,
-    limit,
+    ...args,
   );
   return rows.map((r) => ({ ...r, expired: r.validTo < today }));
 }

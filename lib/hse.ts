@@ -102,7 +102,12 @@ export type HseRow = HseInput & {
   createdAt: string;
 };
 
-export async function listHse(filters: { kind?: HseKind; month?: string }): Promise<HseRow[]> {
+// projectId (M22): undefined = không lọc dự án (dùng nội bộ/cron/test cũ).
+export async function listHse(filters: {
+  kind?: HseKind;
+  month?: string;
+  projectId?: number;
+}): Promise<HseRow[]> {
   const clauses: string[] = [];
   const params: unknown[] = [];
   if (filters.kind) {
@@ -112,6 +117,10 @@ export async function listHse(filters: { kind?: HseKind; month?: string }): Prom
   if (filters.month) {
     clauses.push("to_char(h.record_date, 'YYYY-MM') = ?");
     params.push(filters.month);
+  }
+  if (filters.projectId != null) {
+    clauses.push("h.project_id = ?");
+    params.push(filters.projectId);
   }
   return query<HseRow>(
     `SELECT h.id, h.kind, h.record_date AS "recordDate", h.floor_label AS "floorLabel",
@@ -127,7 +136,15 @@ export async function listHse(filters: { kind?: HseKind; month?: string }): Prom
   );
 }
 
-export async function getHse(id: number): Promise<HseRow | null> {
+// projectId khi truyền → trả null nếu ghi nhận không thuộc dự án đang chọn (chặn truy
+// cập chéo dự án qua đoán ID), giống pattern 404 "không tìm thấy" hiện có.
+export async function getHse(id: number, projectId?: number): Promise<HseRow | null> {
+  const conds = ["h.id = ?"];
+  const args: unknown[] = [id];
+  if (projectId != null) {
+    conds.push("h.project_id = ?");
+    args.push(projectId);
+  }
   const row = await queryOne<HseRow>(
     `SELECT h.id, h.kind, h.record_date AS "recordDate", h.floor_label AS "floorLabel",
             h.area, h.description, h.severity, h.permit_type AS "permitType",
@@ -136,17 +153,26 @@ export async function getHse(id: number): Promise<HseRow | null> {
             u.name AS "actionAssigneeName", h.action_due AS "actionDue",
             h.action_status AS "actionStatus", h.created_by AS "createdBy", h.created_at AS "createdAt"
        FROM hse_records h LEFT JOIN users u ON u.id = h.action_assignee
-      WHERE h.id = ?`,
-    id,
+      WHERE ${conds.join(" AND ")}`,
+    ...args,
   );
   return row ?? null;
 }
 
 // Ngày không sự cố — số ngày từ lần incident gần nhất (con số treo công trường trên dashboard HSE).
-export async function daysSinceLastIncident(): Promise<number | null> {
+// projectId (M22): undefined = không lọc dự án (dùng nội bộ/cron/test cũ — sẽ scoped ở
+// batch cross-cutting notification/dashboard riêng).
+export async function daysSinceLastIncident(projectId?: number): Promise<number | null> {
+  const conds = ["kind = 'incident'"];
+  const args: unknown[] = [];
+  if (projectId != null) {
+    conds.push("project_id = ?");
+    args.push(projectId);
+  }
   const row = await queryOne<{ recordDate: string }>(
-    `SELECT record_date AS "recordDate" FROM hse_records WHERE kind = 'incident'
+    `SELECT record_date AS "recordDate" FROM hse_records WHERE ${conds.join(" AND ")}
       ORDER BY record_date DESC LIMIT 1`,
+    ...args,
   );
   if (!row) return null;
   return Math.max(0, Math.round((Date.parse(todayISO()) - Date.parse(row.recordDate)) / 86400_000));
@@ -161,15 +187,28 @@ export type OpenHseAction = {
 
 // Action khắc phục quá hạn chưa đóng — nguồn notification hse_action_due.
 // assigneeId = undefined → mọi action quá hạn (Admin/PM); có giá trị → chỉ của người đó.
-export async function openHseActions(assigneeId?: number): Promise<OpenHseAction[]> {
+// projectId (M22): undefined = không lọc dự án (dùng nội bộ/cron/test cũ).
+export async function openHseActions(
+  assigneeId?: number,
+  projectId?: number,
+): Promise<OpenHseAction[]> {
   const today = todayISO();
-  const filter = assigneeId != null ? " AND action_assignee = ?" : "";
+  const conds = ["action_status = 'open'", "action_due IS NOT NULL", "action_due < ?"];
+  const args: unknown[] = [today];
+  if (assigneeId != null) {
+    conds.push("action_assignee = ?");
+    args.push(assigneeId);
+  }
+  if (projectId != null) {
+    conds.push("project_id = ?");
+    args.push(projectId);
+  }
   return query<OpenHseAction>(
     `SELECT id, description, action_due AS "actionDue", action_assignee AS "actionAssignee"
        FROM hse_records
-      WHERE action_status = 'open' AND action_due IS NOT NULL AND action_due < ?${filter}
+      WHERE ${conds.join(" AND ")}
       ORDER BY action_due`,
-    ...(assigneeId != null ? [today, assigneeId] : [today]),
+    ...args,
   );
 }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { buildDiaryPrefill, assertDiaryUnlocked } from "@/lib/diary";
 
 export const dynamic = "force-dynamic";
@@ -30,9 +31,10 @@ const SELECT_DIARY = `
          sd.locked_by AS "lockedBy", u.name AS "lockedByName", sd.locked_at AS "lockedAt"
     FROM site_diaries sd
     LEFT JOIN users u ON u.id = sd.locked_by
-   WHERE sd.diary_date = ?`;
+   WHERE sd.diary_date = ? AND sd.project_id = ?`;
 
-// GET /api/diaries/:date → nhật ký ngày đó (null nếu chưa lập) + prefill tự tổng hợp.
+// GET /api/diaries/:date → nhật ký ngày đó (null nếu chưa lập) + prefill tự tổng hợp,
+// scoped theo dự án đang chọn (M22).
 export async function GET(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ date: string }> },
@@ -43,7 +45,11 @@ export async function GET(
   if (!DATE_RE.test(date))
     return NextResponse.json({ error: "Ngày không hợp lệ (YYYY-MM-DD)" }, { status: 422 });
 
-  const diary = await queryOne<DiaryRow>(SELECT_DIARY, date);
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ diary: null, manpower: [], photoIds: [], prefill: null });
+
+  const diary = await queryOne<DiaryRow>(SELECT_DIARY, date, projectId);
   const manpower = diary
     ? await query<{ id: number; crew: string; headcount: number; note: string | null }>(
         `SELECT id, crew, headcount, note FROM diary_manpower WHERE diary_id = ? ORDER BY id`,
@@ -66,7 +72,8 @@ export async function GET(
 
 type ManpowerInput = { crew: string; headcount: number; note?: string | null };
 
-// PUT /api/diaries/:date → upsert draft (Admin/PM/engineer). body:
+// PUT /api/diaries/:date → upsert draft (Admin/PM/engineer), scoped theo dự án đang chọn
+// (M22). body:
 // { weatherAm?, weatherPm?, workDone?, obstacles?, safetyNote?, manpower?: ManpowerInput[], photoIds?: number[] }
 export async function PUT(
   req: NextRequest,
@@ -79,6 +86,10 @@ export async function PUT(
     return NextResponse.json({ error: "Chỉ Admin/PM/Kỹ sư được lập nhật ký" }, { status: 403 });
   if (!DATE_RE.test(date))
     return NextResponse.json({ error: "Ngày không hợp lệ (YYYY-MM-DD)" }, { status: 422 });
+
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Chưa có dự án nào để lập nhật ký" }, { status: 422 });
 
   const body = await req.json().catch(() => ({}));
   const manpowerInput: ManpowerInput[] = Array.isArray(body.manpower) ? body.manpower : [];
@@ -103,9 +114,12 @@ export async function PUT(
 
   try {
     const diaryId = await withTransaction(async () => {
+      // Tìm bản ghi hiện có ĐÚNG dự án đang chọn — UNIQUE(diary_date, project_id) từ
+      // migrations/0028_diary_project_unique.sql cho phép mỗi dự án có nhật ký riêng/ngày.
       const existing = await queryOne<{ id: number; status: string }>(
-        `SELECT id, status FROM site_diaries WHERE diary_date = ? FOR UPDATE`,
+        `SELECT id, status FROM site_diaries WHERE diary_date = ? AND project_id = ? FOR UPDATE`,
         date,
+        projectId,
       );
       assertDiaryUnlocked(existing?.status);
 
@@ -126,8 +140,8 @@ export async function PUT(
       } else {
         const inserted = await queryOne<{ id: number }>(
           `INSERT INTO site_diaries (diary_date, weather_am, weather_pm, work_done, obstacles,
-                                      safety_note, created_by)
-           VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+                                      safety_note, created_by, project_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
           date,
           body.weatherAm ?? null,
           body.weatherPm ?? null,
@@ -135,6 +149,7 @@ export async function PUT(
           body.obstacles ?? null,
           body.safetyNote ?? null,
           user.id,
+          projectId,
         );
         id = inserted!.id;
       }
@@ -163,10 +178,15 @@ export async function PUT(
       return id;
     });
 
-    const diary = await queryOne<DiaryRow>(SELECT_DIARY, date);
+    const diary = await queryOne<DiaryRow>(SELECT_DIARY, date, projectId);
     return NextResponse.json({ id: diaryId, diary });
   } catch (err: unknown) {
-    const e = err as { message?: string; status?: number };
+    const e = err as { message?: string; status?: number; code?: string };
+    if (e.code === "23505")
+      return NextResponse.json(
+        { error: "Nhật ký ngày này vừa được tạo bởi thao tác khác, tải lại trang" },
+        { status: 409 },
+      );
     return NextResponse.json({ error: e.message ?? String(err) }, { status: e.status ?? 500 });
   }
 }

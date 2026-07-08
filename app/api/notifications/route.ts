@@ -17,6 +17,17 @@ import { pendingProposalsOver } from "@/lib/proposals";
 
 export const dynamic = "force-dynamic";
 
+// LƯU Ý (M22): cảnh báo dưới đây CHƯA scoped theo dự án đang chọn — vẫn quét toàn bộ dự án
+// user thấy được, giống hành vi trước M22. Các hàm nguồn (poLateList, vehicleLateList,
+// expiringContracts, overContractCerts, pendingCerts, pendingVariations, calibrationDueList,
+// frontMissingList, overNormItems...) đã nhận thêm tham số `projectId?` tuỳ chọn sẵn sàng để
+// wire vào đây, nhưng cố ý CHƯA làm trong đợt này: route dùng lại cùng 1 danh sách cho cả
+// việc TẠO thông báo mới lẫn dọn thông báo cũ (NOT IN / <> ALL) — nếu chỉ truyền projectId
+// vào phía tạo mà không tính lại phía dọn, thông báo hợp lệ của dự án KHÁC sẽ bị xoá nhầm
+// (vì không còn nằm trong danh sách đã lọc). Cần thiết kế lại 2 phía độc lập (dùng danh sách
+// scoped để tạo, danh sách KHÔNG scoped để dọn) — để riêng 1 đợt theo đúng ghi chú
+// `docs/nang-cap/M22-da-du-an.md` ("rà /api/notifications, cross-cutting, làm riêng 1 đợt").
+//
 // GET /api/notifications
 // Đồng bộ task trễ → notifications cho user hiện tại, rồi trả về danh sách + số chưa đọc.
 export async function GET() {

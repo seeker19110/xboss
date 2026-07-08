@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { validateChecklistItems } from "@/lib/qaqc";
 
 export const dynamic = "force-dynamic";
 
-// PATCH /api/qc/checklists/:id — sửa mẫu checklist (Admin/PM).
+// PATCH /api/qc/checklists/:id — sửa mẫu checklist (Admin/PM), scoped theo dự án đang
+// chọn (M22) — sai dự án → 404 "không tìm thấy" (tránh lộ tồn tại của bản ghi).
 export async function PATCH(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -19,7 +21,15 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const existing = await queryOne(`SELECT id FROM qc_checklists WHERE id = ?`, id);
+  const projectId = await getCurrentProjectId(user);
+  const existing =
+    projectId != null
+      ? await queryOne(
+          `SELECT id FROM qc_checklists WHERE id = ? AND project_id = ?`,
+          id,
+          projectId,
+        )
+      : undefined;
   if (!existing) return NextResponse.json({ error: "Không tìm thấy checklist" }, { status: 404 });
 
   const body = await req.json().catch(() => null);
@@ -71,7 +81,8 @@ export async function PATCH(
   return NextResponse.json({ ok: true });
 }
 
-// DELETE /api/qc/checklists/:id — xoá mẫu checklist (Admin/PM). Chặn nếu đã có lần kiểm dùng mẫu.
+// DELETE /api/qc/checklists/:id — xoá mẫu checklist (Admin/PM), scoped theo dự án đang
+// chọn. Chặn nếu đã có lần kiểm dùng mẫu (giữ nguyên logic 409 hiện có).
 export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -85,8 +96,16 @@ export async function DELETE(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy checklist" }, { status: 404 });
+
   try {
-    const result = await run(`DELETE FROM qc_checklists WHERE id = ?`, id);
+    const result = await run(
+      `DELETE FROM qc_checklists WHERE id = ? AND project_id = ?`,
+      id,
+      projectId,
+    );
     if (result.changes === 0)
       return NextResponse.json({ error: "Không tìm thấy checklist" }, { status: 404 });
   } catch (err) {

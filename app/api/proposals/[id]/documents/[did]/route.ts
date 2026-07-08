@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFile, unlink } from "node:fs/promises";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { photoPath } from "@/lib/photos";
 import { canEditProposal, canSeeAllProposals, getProposal } from "@/lib/proposals";
 
@@ -15,6 +16,7 @@ type ProposalDocRow = {
 };
 
 // GET /api/proposals/:id/documents/:did — stream file đính kèm (quyền như GET đề xuất).
+// Scoped theo dự án đang chọn (M22).
 export async function GET(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string; did: string }> },
@@ -28,7 +30,8 @@ export async function GET(
   if (isNaN(proposalId) || isNaN(did))
     return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const proposal = await getProposal(proposalId);
+  const projectId = await getCurrentProjectId(user);
+  const proposal = projectId != null ? await getProposal(proposalId, projectId) : undefined;
   if (!proposal) return NextResponse.json({ error: "Không tìm thấy đề xuất" }, { status: 404 });
   if (proposal.requestedBy !== user.id && !canSeeAllProposals(user))
     return NextResponse.json({ error: "Không có quyền xem tài liệu này" }, { status: 403 });
@@ -61,7 +64,7 @@ export async function GET(
 }
 
 // DELETE /api/proposals/:id/documents/:did — xoá file đính kèm (quyền như PATCH:
-// khi còn nháp, người tạo hoặc Admin/PM).
+// khi còn nháp, người tạo hoặc Admin/PM). Scoped theo dự án đang chọn (M22).
 export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string; did: string }> },
@@ -75,7 +78,8 @@ export async function DELETE(
   if (isNaN(proposalId) || isNaN(did))
     return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const proposal = await getProposal(proposalId);
+  const projectId = await getCurrentProjectId(user);
+  const proposal = projectId != null ? await getProposal(proposalId, projectId) : undefined;
   if (!proposal) return NextResponse.json({ error: "Không tìm thấy đề xuất" }, { status: 404 });
   const editErr = canEditProposal(proposal, user);
   if (editErr) return NextResponse.json({ error: editErr }, { status: 403 });

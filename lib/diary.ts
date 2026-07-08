@@ -85,18 +85,42 @@ export async function buildDiaryPrefill(date: string): Promise<DiaryPrefill> {
 // Ngày trong quá khứ (không tính hôm nay — có thể lập nhật ký cuối ngày) có task_history nhưng
 // chưa có site_diaries → cần nhắc lập nhật ký. Chỉ soát trong `lookbackDays` gần nhất (mặc định
 // 7, giống cửa sổ nhắc của due_soon/stalled) để tránh cảnh báo dồn ứ dữ liệu cũ.
-export async function missingDiaryDates(lookbackDays = 7): Promise<string[]> {
+// projectId (M22): undefined = không lọc dự án (dùng nội bộ/cron/test cũ — sẽ scoped ở
+// batch cross-cutting notification riêng). site_diaries.diary_date nay UNIQUE theo
+// (diary_date, project_id) (migrations/0028_diary_project_unique.sql) nên kiểm "đã lập
+// nhật ký chưa" cũng phải khớp đúng project_id, không thì dự án A tưởng đã lập nhật ký
+// chỉ vì dự án B đã lập cho cùng ngày đó.
+export async function missingDiaryDates(lookbackDays = 7, projectId?: number): Promise<string[]> {
+  const args: unknown[] = [daysFromTodayISO(-lookbackDays), todayISO()];
+  // task_history.task_id/tasks.package_id nullable trong schema (dù app luôn set) — chỉ
+  // JOIN thêm tasks/work_packages khi thật sự cần lọc theo dự án, để nhánh không lọc
+  // (projectId undefined) giữ nguyên hành vi/kết quả như trước M22 (không đổi thành INNER
+  // JOIN ẩn có thể làm rớt dòng hợp lệ nếu task_id/package_id có giá trị NULL bất thường).
+  const taskJoin =
+    projectId != null
+      ? `JOIN tasks t ON t.id = th.task_id
+       JOIN work_packages wp ON wp.id = t.package_id`
+      : "";
+  let taskCond = "";
+  let diaryCond = "";
+  if (projectId != null) {
+    taskCond = ` AND wp.sheet_type_id IN (
+        SELECT st.id FROM sheet_types st JOIN towers tw ON tw.id = st.tower_id WHERE tw.project_id = ?)`;
+    args.push(projectId);
+    diaryCond = " AND sd.project_id = ?";
+    args.push(projectId);
+  }
   const rows = await query<{ d: string }>(
     `SELECT DISTINCT (th.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date AS d
        FROM task_history th
+       ${taskJoin}
       WHERE (th.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date >= ?
-        AND (th.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date < ?
+        AND (th.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date < ?${taskCond}
         AND NOT EXISTS (
           SELECT 1 FROM site_diaries sd
-           WHERE sd.diary_date = (th.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)
+           WHERE sd.diary_date = (th.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date${diaryCond})
       ORDER BY d`,
-    daysFromTodayISO(-lookbackDays),
-    todayISO(),
+    ...args,
   );
   return rows.map((r) => r.d);
 }

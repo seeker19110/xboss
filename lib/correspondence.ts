@@ -131,6 +131,7 @@ export type CorrespondenceFilters = {
   taskId?: number;
   workPackageId?: number;
   drawingId?: number;
+  projectId?: number;
 };
 
 const CORRESPONDENCE_SELECT = `
@@ -178,6 +179,10 @@ export async function listCorrespondences(
     conds.push("c.drawing_id = ?");
     params.push(filters.drawingId);
   }
+  if (filters.projectId != null) {
+    conds.push("c.project_id = ?");
+    params.push(filters.projectId);
+  }
   const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
   return query<CorrespondenceRow>(
     `${CORRESPONDENCE_SELECT} ${where} ORDER BY c.sent_date DESC, c.id DESC`,
@@ -185,45 +190,74 @@ export async function listCorrespondences(
   );
 }
 
-export async function getCorrespondence(id: number): Promise<CorrespondenceRow | undefined> {
-  return queryOne<CorrespondenceRow>(`${CORRESPONDENCE_SELECT} WHERE c.id = ?`, id);
+// projectId khi truyền → trả undefined nếu văn bản không thuộc dự án đang chọn (chặn
+// truy cập chéo dự án qua đoán ID), giống pattern 404 "không tìm thấy" hiện có.
+export async function getCorrespondence(
+  id: number,
+  projectId?: number,
+): Promise<CorrespondenceRow | undefined> {
+  const conds = ["c.id = ?"];
+  const args: unknown[] = [id];
+  if (projectId != null) {
+    conds.push("c.project_id = ?");
+    args.push(projectId);
+  }
+  return queryOne<CorrespondenceRow>(
+    `${CORRESPONDENCE_SELECT} WHERE ${conds.join(" AND ")}`,
+    ...args,
+  );
 }
 
 // Chuỗi hỏi-đáp cùng gốc (văn bản gốc + mọi văn bản trả lời trỏ reply_id vào gốc đó)
 // — dùng hiển thị thread thu gọn trên UI (hàng hỏi-đáp nối nhau, indent nhẹ dòng reply).
-export async function getReplyChain(id: number): Promise<CorrespondenceRow[]> {
+// projectId: undefined = không lọc dự án (route gọi sau khi đã kiểm gốc scoped đúng).
+export async function getReplyChain(id: number, projectId?: number): Promise<CorrespondenceRow[]> {
   const cur = await queryOne<{ replyId: number | null }>(
     `SELECT reply_id AS "replyId" FROM correspondences WHERE id = ?`,
     id,
   );
   if (!cur) return [];
   const rootId = cur.replyId ?? id;
+  const conds = ["(c.id = ? OR c.reply_id = ?)"];
+  const args: unknown[] = [rootId, rootId];
+  if (projectId != null) {
+    conds.push("c.project_id = ?");
+    args.push(projectId);
+  }
   return query<CorrespondenceRow>(
-    `${CORRESPONDENCE_SELECT} WHERE c.id = ? OR c.reply_id = ? ORDER BY c.sent_date, c.id`,
-    rootId,
-    rootId,
+    `${CORRESPONDENCE_SELECT} WHERE ${conds.join(" AND ")} ORDER BY c.sent_date, c.id`,
+    ...args,
   );
 }
 
 // Tạo văn bản trả lời (luôn direction='out' — công ty phản hồi lại đối tác), nối
 // reply_id, tự chuyển văn bản gốc sang 'replied'. Trong transaction để nhất quán.
+// projectId (M22): kiểm văn bản gốc thuộc đúng dự án đang chọn trước khi tạo reply,
+// gán project_id kế thừa từ văn bản gốc cho dòng reply mới.
 export async function createReply(
   originalId: number,
   input: CorrespondenceInput,
   userId: number,
+  projectId?: number,
 ): Promise<{ error: string } | { id: number }> {
   return withTransaction(async () => {
-    const original = await queryOne<{ id: number }>(
-      `SELECT id FROM correspondences WHERE id = ? FOR UPDATE`,
-      originalId,
+    const conds = ["id = ?"];
+    const args: unknown[] = [originalId];
+    if (projectId != null) {
+      conds.push("project_id = ?");
+      args.push(projectId);
+    }
+    const original = await queryOne<{ id: number; projectId: number | null }>(
+      `SELECT id, project_id AS "projectId" FROM correspondences WHERE ${conds.join(" AND ")} FOR UPDATE`,
+      ...args,
     );
     if (!original) return { error: "Không tìm thấy văn bản gốc" };
 
     const id = await insertId(
       `INSERT INTO correspondences
          (code, direction, kind, counterparty, subject, sent_date, due_date, status,
-          reply_id, task_id, work_package_id, drawing_id, note, created_by)
-       VALUES (?, 'out', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          reply_id, task_id, work_package_id, drawing_id, note, created_by, project_id)
+       VALUES (?, 'out', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       input.code,
       input.kind,
       input.counterparty,
@@ -237,6 +271,7 @@ export async function createReply(
       input.drawingId,
       input.note,
       userId,
+      original.projectId,
     );
 
     await run(`UPDATE correspondences SET status = 'replied' WHERE id = ?`, originalId);
@@ -255,13 +290,20 @@ export type DueCorrespondence = {
 
 // Công văn quá hạn phản hồi (due_date < hôm nay) mà chưa 'replied'/'closed' — cảnh
 // báo Admin/PM (on-fetch, dedup theo id, cùng pattern các module trước).
-export async function dueCorrespondences(): Promise<DueCorrespondence[]> {
+// projectId (M22): undefined = không lọc dự án (dùng nội bộ/cron chưa gắn ngữ cảnh dự án).
+export async function dueCorrespondences(projectId?: number): Promise<DueCorrespondence[]> {
   const today = todayISO();
+  const conds = ["status = 'awaiting'", "due_date IS NOT NULL", "due_date < ?"];
+  const args: unknown[] = [today];
+  if (projectId != null) {
+    conds.push("project_id = ?");
+    args.push(projectId);
+  }
   return query<DueCorrespondence>(
     `SELECT id, code, subject, counterparty, due_date AS "dueDate"
        FROM correspondences
-      WHERE status = 'awaiting' AND due_date IS NOT NULL AND due_date < ?
+      WHERE ${conds.join(" AND ")}
       ORDER BY due_date`,
-    today,
+    ...args,
   );
 }
