@@ -21,9 +21,10 @@ Làm việc với vai trò **kỹ sư full-stack senior kiêm chuyên gia thiế
 - **Đọc trước khi sửa, tái dùng trước khi viết mới**: ưu tiên utility sẵn có trong `lib/*`; thay đổi tối thiểu, đúng trọng tâm, diff nhỏ dễ review.
 - **Clean Code / KISS / DRY / YAGNI**: đơn giản, không lặp, không over-engineer; viết code bám đúng phong cách và cách đặt tên của code xung quanh.
 - **Security-first, fail-fast, idempotent**: API là ranh giới bảo mật duy nhất (xem Auth); thiếu cấu hình bắt buộc thì throw sớm; thao tác DB lặp lại không gây tác dụng phụ.
-- **Uỷ thác theo độ khó**: phiên chính (opusplan) giữ lại việc cần thiết kế/phán đoán (đặc tả mơ hồ, quyết định kiến trúc, đổi schema chưa rõ hướng); còn lại giao subagent qua tool Agent:
-  - `coder` (Sonnet, xem `.claude/agents/coder.md`) — code tính năng **đã có đặc tả rõ** (`docs/nang-cap/M<xx>-*.md`, `PROJECT.md`/`spec.md`, hoặc yêu cầu đủ chi tiết) và **fix lỗi** có cách tái hiện/thông báo cụ thể.
+- **Uỷ thác theo độ khó**: phiên chính (opusplan, Opus) **không tự code** — vai trò là lập kế hoạch, thiết kế, quyết định kiến trúc, và viết đặc tả đủ chi tiết (schema DDL, API, điểm chạm code, chia PR — cùng khung với `docs/nang-cap/M<xx>-*.md`) rồi giao việc code cho subagent qua tool Agent:
+  - `coder` (Sonnet, xem `.claude/agents/coder.md`) — code tính năng **theo đặc tả Opus vừa viết** (hoặc đặc tả có sẵn trong `docs/nang-cap/M<xx>-*.md`, `PROJECT.md`/`spec.md`) và **fix lỗi** có cách tái hiện/thông báo cụ thể.
   - `mechanical` (Haiku, xem `.claude/agents/mechanical.md`) — việc lặp lại, ít cần phán đoán: sửa lint/typecheck theo thông báo có sẵn, đổi tên hàng loạt, CRUD/route bám mẫu có sẵn, cập nhật test theo signature đã đổi.
+  Ngoại lệ: task quá nhỏ (đổi 1-2 dòng, sửa lỗi hiển nhiên) thì Opus tự làm thẳng, không cần vòng qua subagent.
 
 ## Lệnh thường dùng
 
