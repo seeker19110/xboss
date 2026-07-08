@@ -99,6 +99,48 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     await expect(sidebar.getByRole("link", { name: "Timeline", exact: true })).toBeVisible();
   });
 
+  test("mục 'Tổng quan' trong nhóm dẫn tới trang hub khuôn chung (M21 PR2)", async ({
+    page,
+    isMobile,
+  }) => {
+    await page.goto("/");
+    if (isMobile) {
+      await page.getByRole("button", { name: "Mở menu" }).click();
+    }
+    const sidebar = page.locator("#app-sidebar");
+    const toggle = sidebar.getByRole("button", { name: "Tiến độ" });
+    await expect(toggle).toBeVisible({ timeout: 15_000 });
+    // "Tổng quan" xuất hiện ở mọi nhóm — thu hẹp về đúng nhóm "Tiến độ" (div bọc ngoài button).
+    const tienDoGroup = toggle.locator("xpath=..");
+
+    await tienDoGroup.getByRole("link", { name: "Tổng quan" }).click();
+    await expect(page).toHaveURL(/\/hub\/dash\.tien-do$/);
+    await expect(page.locator("header").getByText("Tiến độ", { exact: true })).toBeVisible();
+    const hub = page.getByRole("main");
+    await expect(hub.getByRole("link", { name: "Timeline", exact: true })).toBeVisible();
+    await expect(hub.getByRole("link", { name: "Gantt", exact: true })).toBeVisible();
+    await expect(hub.getByRole("link", { name: "Lookahead", exact: true })).toBeVisible();
+  });
+
+  test("trang hub hiện chip 'Sắp có' cho mục con chưa có trang thật", async ({ page }) => {
+    await page.goto("/hub/dash.claim");
+    await expect(page.locator("header").getByText("Claim & Thay đổi")).toBeVisible({
+      timeout: 15_000,
+    });
+    const hub = page.getByRole("main");
+    await expect(hub.getByRole("link", { name: "Phát sinh", exact: true })).toBeVisible();
+    const comingSoon = hub.getByText("Claim chi phí", { exact: true });
+    await expect(comingSoon).toBeVisible();
+    await expect(comingSoon.locator("xpath=..")).toHaveAttribute("aria-disabled", "true");
+  });
+
+  test("trang hub báo rõ khi id không tồn tại", async ({ page }) => {
+    await page.goto("/hub/khong-ton-tai");
+    await expect(page.getByText('Không tìm thấy dashboard "khong-ton-tai".')).toBeVisible({
+      timeout: 15_000,
+    });
+  });
+
   test("title topbar đổi theo trang đang xem", async ({ page, isMobile }) => {
     await page.goto("/");
     const topbar = page.locator("header");

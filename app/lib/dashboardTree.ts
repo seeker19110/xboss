@@ -331,3 +331,15 @@ export function canSeeNavItem(node: DashNode, role?: string): boolean {
   if (!node.children) return true;
   return node.children.some((c) => canSeeNavItem(c, role));
 }
+
+/** Tìm dashboard nhóm (có `children`) theo `id` — dùng cho trang hub khuôn chung (M21 PR2). */
+export function findDashboardById(
+  id: string,
+): { cluster: DashCluster; dashboard: DashNode } | undefined {
+  for (const cluster of DASHBOARD_TREE) {
+    for (const dashboard of cluster.dashboards) {
+      if (dashboard.id === id) return { cluster, dashboard };
+    }
+  }
+  return undefined;
+}
