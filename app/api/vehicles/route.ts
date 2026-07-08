@@ -1,45 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, insertId } from "@/lib/db";
+import { insertId } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
+import { listVehicles } from "@/lib/procurement";
 
 export const dynamic = "force-dynamic";
 
 const canCreate = (r?: Role) => r === "admin" || r === "pm" || r === "engineer";
 
-// GET /api/vehicles?date=YYYY-MM-DD → danh sách xe theo giờ dự kiến trong ngày (mặc định hôm nay).
+// GET /api/vehicles?date=YYYY-MM-DD → danh sách xe theo giờ dự kiến trong ngày (mặc định
+// hôm nay). Scoped theo dự án đang chọn (M22).
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
   const date = req.nextUrl.searchParams.get("date");
-  const dateFilter = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null;
+  const dateFilter = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : undefined;
 
-  const vehicles = await query(
-    `SELECT v.id, v.plate, v.driver, v.driver_phone AS "driverPhone",
-            v.cargo, v.gate, v.expected_at AS "expectedAt",
-            v.entered_at AS "enteredAt", v.exited_at AS "exitedAt",
-            v.needs_crane AS "needsCrane", v.status,
-            v.po_id AS "poId", po.po_code AS "poCode",
-            v.supplier_id AS "supplierId", s.name AS "supplierName",
-            v.created_at AS "createdAt"
-       FROM vehicle_logs v
-       LEFT JOIN purchase_orders po ON po.id = v.po_id
-       LEFT JOIN suppliers s ON s.id = v.supplier_id
-      ${dateFilter ? "WHERE v.expected_at::date = ?" : ""}
-      ORDER BY v.expected_at`,
-    ...(dateFilter ? [dateFilter] : []),
-  );
+  const projectId = await getCurrentProjectId(user);
+  const vehicles = projectId != null ? await listVehicles({ date: dateFilter, projectId }) : [];
 
   return NextResponse.json({ vehicles });
 }
 
 // POST /api/vehicles  body: { supplierId?, poId?, plate, driver?, driverPhone?, cargo?, gate?,
 //                              expectedAt, needsCrane? }
+// project_id gán = dự án đang chọn (server suy, không tin client).
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!canCreate(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM/Kỹ sư được đăng ký xe" }, { status: 403 });
+
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Chưa có dự án nào để đăng ký xe" }, { status: 422 });
 
   const body = await req.json().catch(() => ({}));
   const plate = String(body.plate ?? "").trim();
@@ -50,8 +45,8 @@ export async function POST(req: NextRequest) {
 
   const id = await insertId(
     `INSERT INTO vehicle_logs
-       (po_id, supplier_id, plate, driver, driver_phone, cargo, gate, expected_at, needs_crane, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (po_id, supplier_id, plate, driver, driver_phone, cargo, gate, expected_at, needs_crane, created_by, project_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     body.poId ? Number(body.poId) : null,
     body.supplierId ? Number(body.supplierId) : null,
     plate,
@@ -62,6 +57,7 @@ export async function POST(req: NextRequest) {
     expectedAt.toISOString(),
     !!body.needsCrane,
     user.id,
+    projectId,
   );
 
   return NextResponse.json({ id }, { status: 201 });

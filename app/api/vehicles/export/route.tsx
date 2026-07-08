@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, daysFromTodayISO } from "@/lib/db";
 import { getCurrentUser, isAdminOrPm } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import ReactPDF, { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/pdf-fonts";
 
@@ -75,11 +76,16 @@ function VehicleDoc({
 }
 
 // GET /api/vehicles/export?date=YYYY-MM-DD (mặc định ngày mai) → PDF gửi tổng thầu.
+// Scoped theo dự án đang chọn (M22).
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!isAdminOrPm(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM được xuất danh sách" }, { status: 403 });
+
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Chưa có dự án nào để xuất danh sách" }, { status: 422 });
 
   const param = req.nextUrl.searchParams.get("date");
   const date = param && /^\d{4}-\d{2}-\d{2}$/.test(param) ? param : daysFromTodayISO(1);
@@ -89,13 +95,15 @@ export async function GET(req: NextRequest) {
             v.cargo, v.gate, v.needs_crane AS "needsCrane"
        FROM vehicle_logs v
        LEFT JOIN suppliers s ON s.id = v.supplier_id
-      WHERE v.expected_at::date = ? AND v.status <> 'cancelled'
+      WHERE v.expected_at::date = ? AND v.status <> 'cancelled' AND v.project_id = ?
       ORDER BY v.expected_at`,
     date,
+    projectId,
   );
 
   const project = (await queryOne<Project>(
-    `SELECT name, contractor FROM projects ORDER BY id LIMIT 1`,
+    `SELECT name, contractor FROM projects WHERE id = ?`,
+    projectId,
   )) ?? { name: "XBoss", contractor: null };
 
   const stream = await ReactPDF.renderToStream(

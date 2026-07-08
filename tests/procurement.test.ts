@@ -211,3 +211,48 @@ test(
     await run(`DELETE FROM suppliers WHERE id = ?`, supplierId);
   },
 );
+
+test(
+  "listPurchaseOrders/listVehicles: scoped đúng theo project_id (M22), không lẫn dự án khác",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { listPurchaseOrders, listVehicles } = await import("@/lib/procurement");
+
+    const p1 = await insertId(
+      `INSERT INTO projects (name, code) VALUES ('DA Mua hàng 1', 'PJT-PO1')`,
+    );
+    const p2 = await insertId(
+      `INSERT INTO projects (name, code) VALUES ('DA Mua hàng 2', 'PJT-PO2')`,
+    );
+
+    const po1 = await insertId(
+      `INSERT INTO purchase_orders (po_code, status, project_id) VALUES ('PO-SCOPE-1', 'draft', ?)`,
+      p1,
+    );
+    await insertId(
+      `INSERT INTO purchase_orders (po_code, status, project_id) VALUES ('PO-SCOPE-2', 'draft', ?)`,
+      p2,
+    );
+    const v1 = await insertId(
+      `INSERT INTO vehicle_logs (plate, expected_at, project_id) VALUES ('SCOPE-1', NOW(), ?)`,
+      p1,
+    );
+    await insertId(
+      `INSERT INTO vehicle_logs (plate, expected_at, project_id) VALUES ('SCOPE-2', NOW(), ?)`,
+      p2,
+    );
+
+    const poList1 = await listPurchaseOrders({ projectId: p1 });
+    assert.ok(poList1.some((po) => po.id === po1));
+    assert.equal(poList1.length, 1);
+
+    const vList1 = await listVehicles({ projectId: p1 });
+    assert.ok(vList1.some((v) => v.id === v1));
+    assert.equal(vList1.length, 1);
+
+    await run(`DELETE FROM vehicle_logs WHERE plate IN ('SCOPE-1', 'SCOPE-2')`);
+    await run(`DELETE FROM purchase_orders WHERE po_code IN ('PO-SCOPE-1', 'PO-SCOPE-2')`);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+  },
+);
