@@ -3,6 +3,8 @@ import AxeBuilder from "@axe-core/playwright";
 
 // AppShell (M0) — sidebar trái thu gọn được + title/breadcrumb trên topbar.
 // Xem docs/nang-cap/M00-khung-ui-sidebar.md.
+// M21 (docs/ke-hoach-appshell-full-ia-2026-07.md): sidebar gom theo 11 cụm nghiệp vụ
+// + mục "Sắp có" cho dashboard mockup chưa có trang thật.
 
 test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
   test("sidebar render đủ nhóm menu theo vai trò Admin", async ({ page }) => {
@@ -44,6 +46,23 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     }
   });
 
+  test("dashboard mockup chưa có trang hiện mờ + badge 'Sắp có', không phải link", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const sidebar = page.locator("#app-sidebar");
+    await expect(sidebar.getByRole("link", { name: "Dashboard" })).toBeVisible({
+      timeout: 15_000,
+    });
+
+    const comingSoon = sidebar.getByText("Khởi động & Pháp lý", { exact: true });
+    await expect(comingSoon).toBeVisible();
+    await expect(comingSoon.locator("xpath=..")).toHaveAttribute("aria-disabled", "true");
+    // Không phải thẻ <a> — không có trang thật để điều hướng tới.
+    await expect(sidebar.getByRole("link", { name: "Khởi động & Pháp lý" })).toHaveCount(0);
+    await expect(sidebar.getByText("Sắp có").first()).toBeVisible();
+  });
+
   test("title topbar đổi theo trang đang xem", async ({ page, isMobile }) => {
     await page.goto("/");
     const topbar = page.locator("header");
@@ -53,7 +72,7 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     await expect(topbar.getByText("Vật tư", { exact: true })).toBeVisible({ timeout: 15_000 });
     // Breadcrumb nhóm chỉ hiện từ sm trở lên (ẩn trên mobile để nhường chỗ cho hamburger).
     if (!isMobile) {
-      await expect(topbar.getByText("Vật tư & mua sắm")).toBeVisible();
+      await expect(topbar.getByText("Vật tư & Thiết bị")).toBeVisible();
     }
   });
 

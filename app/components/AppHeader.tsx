@@ -131,8 +131,26 @@ export default function AppHeader({
           {group.label}
         </div>
         {items.map((item) => {
-          const itemActive = isNavItemActive(item, path);
           const Icon = item.icon;
+          // Dashboard mockup chưa có trang thật (M21 — xem docs/ke-hoach-appshell-full-ia-2026-07.md):
+          // hiện trong sidebar làm "bản đồ lộ trình sống" nhưng không phải link, không bấm được.
+          if (!item.href) {
+            return (
+              <span
+                key={item.label}
+                aria-disabled="true"
+                title={`${item.label} — sắp có`}
+                className="flex items-center gap-2.5 mx-2 px-2.5 py-2 rounded-lg text-sm min-h-10 border-l-2 border-transparent text-zinc-400 select-none"
+              >
+                <Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
+                <span className="sidebar-label flex-1 truncate">{item.label}</span>
+                <span className="sidebar-label shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded bg-zinc-800 text-amber-300">
+                  Sắp có
+                </span>
+              </span>
+            );
+          }
+          const itemActive = isNavItemActive(item, path);
           return (
             <a
               key={item.href}
