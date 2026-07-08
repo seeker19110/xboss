@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, insertId, run } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { boqTakenBy } from "@/lib/boq";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,15 @@ export async function GET(req: NextRequest) {
 
   const sheetTypeId = parseInt(req.nextUrl.searchParams.get("sheetTypeId") ?? "");
   const hasFilter = !isNaN(sheetTypeId);
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null) return NextResponse.json({ materials: [] });
+
+  const conds = ["m.project_id = ?"];
+  const args: unknown[] = [projectId];
+  if (hasFilter) {
+    conds.push("m.sheet_type_id = ?");
+    args.push(sheetTypeId);
+  }
 
   let materials;
   try {
@@ -28,9 +38,10 @@ export async function GET(req: NextRequest) {
               st.code AS "sheetCode"
          FROM materials m
          LEFT JOIN sheet_types st ON m.sheet_type_id = st.id
-         ${hasFilter ? "WHERE m.sheet_type_id = ?" : ""}
+        WHERE ${conds.join(" AND ")}
         ORDER BY m.sort_order, m.id`,
-      ...(hasFilter ? [sheetTypeId] : []));
+      ...args,
+    );
   } catch (e) {
     console.error("GET /api/materials error:", e);
     return NextResponse.json({ error: "Lỗi truy vấn DB", materials: [] }, { status: 500 });
@@ -46,6 +57,10 @@ export async function POST(req: NextRequest) {
   if (!canEditMaterials(user.role))
     return NextResponse.json({ error: "Không có quyền thêm vật tư" }, { status: 403 });
 
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Chưa có dự án nào để thêm vật tư" }, { status: 422 });
+
   const body = await req.json().catch(() => ({}));
   const name = String(body.name ?? "").trim();
   const sheetTypeId = Number(body.sheetTypeId);
@@ -56,7 +71,11 @@ export async function POST(req: NextRequest) {
   const boqCode = String(body.boqCode ?? "").trim() || null;
   if (boqCode) {
     const usedBy = await boqTakenBy(boqCode);
-    if (usedBy) return NextResponse.json({ error: `Mã BOQ "${boqCode}" đã được dùng bởi ${usedBy}` }, { status: 409 });
+    if (usedBy)
+      return NextResponse.json(
+        { error: `Mã BOQ "${boqCode}" đã được dùng bởi ${usedBy}` },
+        { status: 409 },
+      );
   }
 
   // afterId: chèn sau vật tư có id này (null = thêm vào cuối).
@@ -65,33 +84,57 @@ export async function POST(req: NextRequest) {
 
   if (afterId) {
     const after = await queryOne<{ sort_order: number }>(
-      `SELECT sort_order FROM materials WHERE id = ? AND sheet_type_id = ?`, afterId, sheetTypeId);
+      `SELECT sort_order FROM materials WHERE id = ? AND sheet_type_id = ?`,
+      afterId,
+      sheetTypeId,
+    );
     if (!after) return NextResponse.json({ error: "afterId không hợp lệ" }, { status: 400 });
     sortOrder = after.sort_order + 1;
-    await run(`UPDATE materials SET sort_order = sort_order + 1 WHERE sheet_type_id = ? AND sort_order >= ?`, sheetTypeId, sortOrder);
+    await run(
+      `UPDATE materials SET sort_order = sort_order + 1 WHERE sheet_type_id = ? AND sort_order >= ?`,
+      sheetTypeId,
+      sortOrder,
+    );
   } else {
-    const maxRow = await queryOne<{ m: number | null }>(`SELECT MAX(sort_order) AS m FROM materials WHERE sheet_type_id = ?`, sheetTypeId);
+    const maxRow = await queryOne<{ m: number | null }>(
+      `SELECT MAX(sort_order) AS m FROM materials WHERE sheet_type_id = ?`,
+      sheetTypeId,
+    );
     sortOrder = (maxRow?.m ?? 0) + 1;
   }
 
   let id: number;
   try {
     id = await insertId(
-      `INSERT INTO materials (sheet_type_id, boq_code, name, unit, qty_boq, qty_planned, qty_used, status, note, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, 0, 'dat_hang', ?, ?)`,
-      sheetTypeId, boqCode, name, body.unit ? String(body.unit).trim() : null,
-      Number(body.qtyBoq) || 0, Number(body.qtyPlanned) || 0,
-      body.note ? String(body.note) : null, sortOrder);
+      `INSERT INTO materials (sheet_type_id, boq_code, name, unit, qty_boq, qty_planned, qty_used, status, note, sort_order, project_id)
+       VALUES (?, ?, ?, ?, ?, ?, 0, 'dat_hang', ?, ?, ?)`,
+      sheetTypeId,
+      boqCode,
+      name,
+      body.unit ? String(body.unit).trim() : null,
+      Number(body.qtyBoq) || 0,
+      Number(body.qtyPlanned) || 0,
+      body.note ? String(body.note) : null,
+      sortOrder,
+      projectId,
+    );
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("POST /api/materials error:", msg);
     // Nếu cột qty_boq chưa tồn tại (schema chưa migrate), insert lại không có cột đó
     if (msg.includes("qty_boq")) {
       id = await insertId(
-        `INSERT INTO materials (sheet_type_id, boq_code, name, unit, qty_planned, qty_used, status, note, sort_order)
-         VALUES (?, ?, ?, ?, ?, 0, 'dat_hang', ?, ?)`,
-        sheetTypeId, boqCode, name, body.unit ? String(body.unit).trim() : null,
-        Number(body.qtyPlanned) || 0, body.note ? String(body.note) : null, sortOrder);
+        `INSERT INTO materials (sheet_type_id, boq_code, name, unit, qty_planned, qty_used, status, note, sort_order, project_id)
+         VALUES (?, ?, ?, ?, ?, 0, 'dat_hang', ?, ?, ?)`,
+        sheetTypeId,
+        boqCode,
+        name,
+        body.unit ? String(body.unit).trim() : null,
+        Number(body.qtyPlanned) || 0,
+        body.note ? String(body.note) : null,
+        sortOrder,
+        projectId,
+      );
     } else {
       return NextResponse.json({ error: "Lỗi máy chủ khi lưu vật tư" }, { status: 500 });
     }

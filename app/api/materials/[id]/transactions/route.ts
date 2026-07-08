@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,13 @@ export async function GET(
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  const projectId = await getCurrentProjectId(user);
+  const owner =
+    projectId != null
+      ? await queryOne(`SELECT id FROM materials WHERE id = ? AND project_id = ?`, id, projectId)
+      : undefined;
+  if (!owner) return NextResponse.json({ error: "Không tìm thấy vật tư" }, { status: 404 });
 
   const transactions = await query(
     `SELECT t.id, t.delta, t.qty_after AS "qtyAfter", t.note,
@@ -49,10 +57,15 @@ export async function POST(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const m = await queryOne<{ id: number; qty_used: number }>(
-    `SELECT id, qty_used FROM materials WHERE id = ?`,
-    id,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const m =
+    projectId != null
+      ? await queryOne<{ id: number; qty_used: number }>(
+          `SELECT id, qty_used FROM materials WHERE id = ? AND project_id = ?`,
+          id,
+          projectId,
+        )
+      : undefined;
   if (!m) return NextResponse.json({ error: "Không tìm thấy vật tư" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));

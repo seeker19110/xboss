@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { boqTakenBy } from "@/lib/boq";
 
 export const dynamic = "force-dynamic";
@@ -19,16 +20,28 @@ export async function PATCH(req: NextRequest) {
   if (!canEditMaterials(user.role))
     return NextResponse.json({ error: "Không có quyền sửa vật tư" }, { status: 403 });
 
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null) return NextResponse.json({ error: "Chưa có dự án nào" }, { status: 422 });
+
   const body = await req.json().catch(() => ({}));
-  const updates: { id: unknown; patch: unknown }[] = Array.isArray(body.updates) ? body.updates : [];
+  const updates: { id: unknown; patch: unknown }[] = Array.isArray(body.updates)
+    ? body.updates
+    : [];
   if (!updates.length) return NextResponse.json({ error: "Không có cập nhật" }, { status: 400 });
   if (updates.length > MAX_UPDATES)
     return NextResponse.json({ error: `Tối đa ${MAX_UPDATES} ô mỗi lần` }, { status: 422 });
 
   const fields: Record<string, string> = {
-    name: "name", unit: "unit", qtyBoq: "qty_boq", qtyPlanned: "qty_planned",
-    qtyUsed: "qty_used", qtyStock: "qty_stock", minStockLevel: "min_stock_level",
-    status: "status", note: "note", boqCode: "boq_code",
+    name: "name",
+    unit: "unit",
+    qtyBoq: "qty_boq",
+    qtyPlanned: "qty_planned",
+    qtyUsed: "qty_used",
+    qtyStock: "qty_stock",
+    minStockLevel: "min_stock_level",
+    status: "status",
+    note: "note",
+    boqCode: "boq_code",
   };
   const qtyKeys = new Set(["qtyBoq", "qtyPlanned", "qtyUsed", "qtyStock", "minStockLevel"]);
 
@@ -37,11 +50,17 @@ export async function PATCH(req: NextRequest) {
       let count = 0;
       for (const u of updates) {
         const id = parseInt(String(u.id));
-        const patch = (u.patch && typeof u.patch === "object" ? u.patch : {}) as Record<string, unknown>;
+        const patch = (u.patch && typeof u.patch === "object" ? u.patch : {}) as Record<
+          string,
+          unknown
+        >;
         if (isNaN(id)) throw new Error("ID không hợp lệ");
 
         const m = await queryOne<{ id: number; qty_used: number; qty_stock: number }>(
-          `SELECT id, qty_used, COALESCE(qty_stock, 0) AS qty_stock FROM materials WHERE id = ?`, id);
+          `SELECT id, qty_used, COALESCE(qty_stock, 0) AS qty_stock FROM materials WHERE id = ? AND project_id = ?`,
+          id,
+          projectId,
+        );
         if (!m) throw new Error(`Không tìm thấy vật tư #${id}`);
 
         if (patch.status !== undefined && !STATUSES.includes(String(patch.status)))
@@ -67,7 +86,10 @@ export async function PATCH(req: NextRequest) {
         if (!sets.length) continue;
 
         vals.push(id);
-        await run(`UPDATE materials SET ${sets.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, ...vals);
+        await run(
+          `UPDATE materials SET ${sets.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+          ...vals,
+        );
 
         if (patch.qtyUsed !== undefined) {
           const newQty = Number(patch.qtyUsed) || 0;
@@ -76,7 +98,11 @@ export async function PATCH(req: NextRequest) {
             await run(
               `INSERT INTO material_transactions (material_id, delta, qty_after, note, created_by)
                VALUES (?, ?, ?, 'Sửa hàng loạt (lưới)', ?)`,
-              id, delta, newQty, user.id);
+              id,
+              delta,
+              newQty,
+              user.id,
+            );
           }
         }
         if (patch.qtyStock !== undefined) {
@@ -86,7 +112,11 @@ export async function PATCH(req: NextRequest) {
             await run(
               `INSERT INTO material_transactions (material_id, delta, qty_after, type, note, created_by)
                VALUES (?, ?, ?, 'dieu_chinh_kho', 'Điều chỉnh tồn kho (lưới)', ?)`,
-              id, delta, newStock, user.id);
+              id,
+              delta,
+              newStock,
+              user.id,
+            );
           }
         }
         count++;

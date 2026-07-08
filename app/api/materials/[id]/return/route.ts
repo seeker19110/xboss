@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,10 @@ export async function POST(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy vật tư" }, { status: 404 });
+
   const body = await req.json().catch(() => ({}));
   const qty = Number(body.qty);
   if (!qty || qty <= 0)
@@ -34,8 +39,9 @@ export async function POST(
 
   const result = await withTransaction(async (): Promise<TxResult> => {
     const mat = await queryOne<{ qty_stock: number; qty_used: number }>(
-      `SELECT COALESCE(qty_stock, 0) AS qty_stock, qty_used FROM materials WHERE id = ? FOR UPDATE`,
+      `SELECT COALESCE(qty_stock, 0) AS qty_stock, qty_used FROM materials WHERE id = ? AND project_id = ? FOR UPDATE`,
       id,
+      projectId,
     );
     if (!mat) return { ok: false, status: 404, error: "Không tìm thấy vật tư" };
     if (qty > mat.qty_used)
