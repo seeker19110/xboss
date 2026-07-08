@@ -122,11 +122,8 @@ const SELECT_DIARY = `
     FROM site_diaries sd
     LEFT JOIN users u ON u.id = sd.locked_by`;
 
-// LƯU Ý (M22): site_diaries.diary_date đang UNIQUE toàn hệ thống (1 dòng/ngày, không phân
-// biệt dự án — xem migrations/0011_diary.sql). Scoping ở đây chỉ lọc ĐỌC/GHI theo project_id
-// đã có sẵn trên cột, KHÔNG sửa UNIQUE constraint trong đợt này (theo chỉ đạo PR3). Hệ quả:
-// 2 dự án cùng lập nhật ký cùng 1 ngày sẽ đụng độ (dự án tạo sau bị lỗi trùng khoá) — cần xử lý
-// ở đợt sau nếu công ty vận hành ≥2 dự án song song thật sự dùng nhật ký cùng ngày.
+// site_diaries.diary_date nay UNIQUE(diary_date, project_id) — mỗi dự án có nhật ký
+// riêng theo ngày (migrations/0028_diary_project_unique.sql, thay UNIQUE đơn cũ).
 export async function getDiaryByDate(
   date: string,
   projectId?: number,
@@ -179,18 +176,37 @@ export async function listDiaryCalendar(
 // Ngày trong quá khứ (không tính hôm nay — có thể lập nhật ký cuối ngày) có task_history nhưng
 // chưa có site_diaries → cần nhắc lập nhật ký. Chỉ soát trong `lookbackDays` gần nhất (mặc định
 // 7, giống cửa sổ nhắc của due_soon/stalled) để tránh cảnh báo dồn ứ dữ liệu cũ.
-export async function missingDiaryDates(lookbackDays = 7): Promise<string[]> {
+// projectId (M22): undefined = không lọc dự án (dùng nội bộ/cron/test cũ — chỉ JOIN thêm
+// tasks/work_packages khi thật cần lọc, để nhánh không lọc giữ nguyên hành vi cũ — hai cột
+// này nullable trong schema dù app luôn set). site_diaries nay UNIQUE(diary_date, project_id)
+// nên kiểm "đã lập nhật ký chưa" cũng phải khớp đúng project_id khi có lọc.
+export async function missingDiaryDates(lookbackDays = 7, projectId?: number): Promise<string[]> {
+  const args: unknown[] = [daysFromTodayISO(-lookbackDays), todayISO()];
+  const taskJoin =
+    projectId != null
+      ? `JOIN tasks t ON t.id = th.task_id
+       JOIN work_packages wp ON wp.id = t.package_id`
+      : "";
+  let taskCond = "";
+  let diaryCond = "";
+  if (projectId != null) {
+    taskCond = ` AND wp.sheet_type_id IN (
+        SELECT st.id FROM sheet_types st JOIN towers tw ON tw.id = st.tower_id WHERE tw.project_id = ?)`;
+    args.push(projectId);
+    diaryCond = " AND sd.project_id = ?";
+    args.push(projectId);
+  }
   const rows = await query<{ d: string }>(
     `SELECT DISTINCT (th.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date AS d
        FROM task_history th
+       ${taskJoin}
       WHERE (th.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date >= ?
-        AND (th.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date < ?
+        AND (th.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date < ?${taskCond}
         AND NOT EXISTS (
           SELECT 1 FROM site_diaries sd
-           WHERE sd.diary_date = (th.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)
+           WHERE sd.diary_date = (th.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date${diaryCond})
       ORDER BY d`,
-    daysFromTodayISO(-lookbackDays),
-    todayISO(),
+    ...args,
   );
   return rows.map((r) => r.d);
 }

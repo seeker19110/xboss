@@ -218,16 +218,24 @@ export async function getVariation(id: number, projectId?: number): Promise<VoRo
 }
 
 // VO 'submitted' quá VO_PENDING_DAYS ngày mà chưa được quyết → nhắc Admin/PM (M6).
+// projectId (M22): undefined = không lọc.
 export async function pendingVariations(
   days = VO_PENDING_DAYS,
+  projectId?: number,
 ): Promise<{ id: number; code: string; title: string; submittedAt: string }[]> {
   const limit = daysFromTodayISO(-days);
+  const conds = ["status = 'submitted'", "submitted_at IS NOT NULL", "submitted_at <= ?"];
+  const args: unknown[] = [limit];
+  if (projectId != null) {
+    conds.push("project_id = ?");
+    args.push(projectId);
+  }
   return query(
     `SELECT id, code, title, submitted_at AS "submittedAt"
        FROM variation_orders
-      WHERE status = 'submitted' AND submitted_at IS NOT NULL AND submitted_at <= ?
+      WHERE ${conds.join(" AND ")}
       ORDER BY submitted_at`,
-    limit,
+    ...args,
   );
 }
 

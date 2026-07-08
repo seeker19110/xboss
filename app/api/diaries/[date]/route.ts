@@ -86,20 +86,13 @@ export async function PUT(
 
   try {
     const diaryId = await withTransaction(async () => {
-      // M22: site_diaries.diary_date UNIQUE toàn hệ thống (không phân biệt dự án — xem
-      // lib/diary.ts). Nếu ngày này đã có nhật ký thuộc DỰ ÁN KHÁC, chặn rõ ràng thay vì
-      // âm thầm ghi đè chéo dự án; chưa sửa UNIQUE constraint trong đợt PR3 này.
-      const existing = await queryOne<{ id: number; status: string; projectId: number | null }>(
-        `SELECT id, status, project_id AS "projectId" FROM site_diaries WHERE diary_date = ? FOR UPDATE`,
+      // site_diaries nay UNIQUE(diary_date, project_id) — tìm đúng nhật ký của dự án
+      // đang chọn cho ngày này (dự án khác có nhật ký cùng ngày là hợp lệ, không đụng độ).
+      const existing = await queryOne<{ id: number; status: string }>(
+        `SELECT id, status FROM site_diaries WHERE diary_date = ? AND project_id = ? FOR UPDATE`,
         date,
+        projectId,
       );
-      if (existing && existing.projectId !== projectId)
-        throw Object.assign(
-          new Error(
-            "Ngày này đã có nhật ký thuộc dự án khác (mỗi ngày chỉ 1 nhật ký toàn hệ thống)",
-          ),
-          { status: 409 },
-        );
       assertDiaryUnlocked(existing?.status);
 
       let id: number;
