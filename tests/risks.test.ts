@@ -63,3 +63,34 @@ test(
     await run(`DELETE FROM risks WHERE id = ?`, id1);
   },
 );
+
+test(
+  "listRisks: scoped đúng theo project_id (M22), không lẫn dự án khác",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { listRisks } = await import("@/lib/risks");
+
+    const p1 = await insertId(
+      `INSERT INTO projects (name, code) VALUES ('DA Rủi ro 1', 'PJT-RK1')`,
+    );
+    const p2 = await insertId(
+      `INSERT INTO projects (name, code) VALUES ('DA Rủi ro 2', 'PJT-RK2')`,
+    );
+    const r1 = await insertId(
+      `INSERT INTO risks (code, title, category, probability, impact, project_id) VALUES ('R-8001', 'Rủi ro DA1', 'cost', 3, 3, ?)`,
+      p1,
+    );
+    await insertId(
+      `INSERT INTO risks (code, title, category, probability, impact, project_id) VALUES ('R-8002', 'Rủi ro DA2', 'cost', 3, 3, ?)`,
+      p2,
+    );
+
+    const list1 = await listRisks({ projectId: p1 });
+    assert.ok(list1.some((r) => r.id === r1));
+    assert.equal(list1.length, 1);
+
+    await run(`DELETE FROM risks WHERE code IN ('R-8001', 'R-8002')`);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+  },
+);

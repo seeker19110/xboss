@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import {
   addEquipmentLog,
+  getEquipment,
   listEquipmentLogs,
   parseEquipmentLogBody,
   validateEquipmentLogInput,
@@ -11,6 +13,7 @@ import {
 export const dynamic = "force-dynamic";
 
 // GET /api/equipment/:id/logs — lịch sử cấp phát/thu hồi/chuyển/bảo trì/hiệu chuẩn.
+// Scoped theo dự án đang chọn (M22) — thiết bị không thuộc dự án hiện tại → 404.
 export async function GET(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -22,12 +25,17 @@ export async function GET(
   const equipmentId = parseInt(params.id);
   if (isNaN(equipmentId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  const projectId = await getCurrentProjectId(user);
+  const eq = projectId != null ? await getEquipment(equipmentId, projectId) : null;
+  if (!eq) return NextResponse.json({ error: "Không tìm thấy thiết bị" }, { status: 404 });
+
   const logs = await listEquipmentLogs(equipmentId);
   return NextResponse.json({ logs });
 }
 
 // POST /api/equipment/:id/logs — ghi log thao tác. Admin/PM/kỹ sư mọi hành động;
 // subcon chỉ được 'return' thiết bị mình đang giữ (current_crew khớp tên hiển thị của mình).
+// Scoped theo dự án đang chọn (M22) — thiết bị không thuộc dự án hiện tại → 404.
 export async function POST(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -38,6 +46,10 @@ export async function POST(
 
   const equipmentId = parseInt(params.id);
   if (isNaN(equipmentId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  const projectId = await getCurrentProjectId(user);
+  const eqExists = projectId != null ? await getEquipment(equipmentId, projectId) : null;
+  if (!eqExists) return NextResponse.json({ error: "Không tìm thấy thiết bị" }, { status: 404 });
 
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });

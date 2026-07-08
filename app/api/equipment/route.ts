@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import {
   EQUIPMENT_CONDITIONS,
   listEquipment,
@@ -11,7 +12,8 @@ import {
 
 export const dynamic = "force-dynamic";
 
-// GET /api/equipment?kind=&condition=&crew=&q= — sổ thiết bị. Mọi vai trò đăng nhập xem được.
+// GET /api/equipment?kind=&condition=&crew=&q= — sổ thiết bị, scoped theo dự án đang
+// chọn (M22). Mọi vai trò đăng nhập xem được.
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -21,16 +23,22 @@ export async function GET(req: NextRequest) {
   if (conditionRaw && !EQUIPMENT_CONDITIONS.includes(conditionRaw as EquipmentCondition))
     return NextResponse.json({ error: "Tình trạng không hợp lệ" }, { status: 422 });
 
-  const equipment = await listEquipment({
-    kind: sp.get("kind")?.trim() || undefined,
-    condition: conditionRaw as EquipmentCondition | undefined,
-    crew: sp.get("crew")?.trim() || undefined,
-    q: sp.get("q")?.trim() || undefined,
-  });
+  const projectId = await getCurrentProjectId(user);
+  const equipment =
+    projectId != null
+      ? await listEquipment({
+          kind: sp.get("kind")?.trim() || undefined,
+          condition: conditionRaw as EquipmentCondition | undefined,
+          crew: sp.get("crew")?.trim() || undefined,
+          q: sp.get("q")?.trim() || undefined,
+          projectId,
+        })
+      : [];
   return NextResponse.json({ equipment });
 }
 
-// POST /api/equipment — tạo thiết bị mới (Admin/PM/kỹ sư).
+// POST /api/equipment — tạo thiết bị mới (Admin/PM/kỹ sư). project_id gán = dự án đang
+// chọn (server suy, không tin client).
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -39,6 +47,10 @@ export async function POST(req: NextRequest) {
       { error: "Bạn không có quyền tạo thiết bị (chỉ Admin/PM/kỹ sư)" },
       { status: 403 },
     );
+
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Chưa có dự án nào để tạo thiết bị" }, { status: 422 });
 
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });
@@ -52,8 +64,8 @@ export async function POST(req: NextRequest) {
 
   const id = await insertId(
     `INSERT INTO equipment (code, name, kind, serial, condition, calibration_due,
-       current_location, current_crew, note)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       current_location, current_crew, note, project_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     input.code,
     input.name,
     input.kind,
@@ -63,6 +75,7 @@ export async function POST(req: NextRequest) {
     input.currentLocation,
     input.currentCrew,
     input.note,
+    projectId,
   );
 
   return NextResponse.json({ id }, { status: 201 });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, isAdminOrPm } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { todayISO } from "@/lib/date";
 
 export const dynamic = "force-dynamic";
@@ -24,12 +25,18 @@ export async function POST(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  const projectId = await getCurrentProjectId(user);
+
   try {
     await withTransaction(async () => {
-      const vo = await queryOne<{ status: string }>(
-        `SELECT status FROM variation_orders WHERE id = ? FOR UPDATE`,
-        id,
-      );
+      const vo =
+        projectId != null
+          ? await queryOne<{ status: string }>(
+              `SELECT status FROM variation_orders WHERE id = ? AND project_id = ? FOR UPDATE`,
+              id,
+              projectId,
+            )
+          : undefined;
       if (!vo) throw Object.assign(new Error("Không tìm thấy phát sinh"), { status: 404 });
       if (vo.status !== "draft")
         throw Object.assign(new Error("Chỉ trình được phát sinh đang ở trạng thái nháp"), {

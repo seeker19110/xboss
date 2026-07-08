@@ -154,12 +154,27 @@ export type VoRow = {
 // Danh sách VO kèm dòng KL con + tổng giá trị đề xuất (Σ qty_contract×unit_price)
 // và giá trị được duyệt (Σ qty_approved×unit_price, chỉ tính khi status đã duyệt).
 // Lọc theo status hoặc id (getVariation dùng id để lấy đúng 1 VO không quét cả bảng).
+// projectId (M22): undefined = không lọc dự án (dùng nội bộ/test cũ).
 export async function listVariations(filter?: {
   status?: VoStatus;
   id?: number;
+  projectId?: number;
 }): Promise<VoRow[]> {
-  const where = filter?.id != null ? "WHERE v.id = ?" : filter?.status ? "WHERE v.status = ?" : "";
-  const param = filter?.id != null ? filter.id : filter?.status;
+  const conds: string[] = [];
+  const args: unknown[] = [];
+  if (filter?.id != null) {
+    conds.push("v.id = ?");
+    args.push(filter.id);
+  }
+  if (filter?.status) {
+    conds.push("v.status = ?");
+    args.push(filter.status);
+  }
+  if (filter?.projectId != null) {
+    conds.push("v.project_id = ?");
+    args.push(filter.projectId);
+  }
+  const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
   const rows = await query<VoRow>(
     `SELECT v.id, v.code, v.title, v.reason, v.description,
             v.discipline_id AS "disciplineId", d.code AS "disciplineCode",
@@ -190,13 +205,15 @@ export async function listVariations(filter?: {
       ${where}
       GROUP BY v.id, d.code, d.name, d.color, c.code, u.name
       ORDER BY v.created_at DESC, v.id DESC`,
-    ...(param != null ? [param] : []),
+    ...args,
   );
   return rows;
 }
 
-export async function getVariation(id: number): Promise<VoRow | undefined> {
-  const rows = await listVariations({ id });
+// projectId khi truyền → trả undefined nếu VO không thuộc dự án đang chọn (chặn
+// truy cập chéo dự án qua đoán ID).
+export async function getVariation(id: number, projectId?: number): Promise<VoRow | undefined> {
+  const rows = await listVariations({ id, projectId });
   return rows[0];
 }
 

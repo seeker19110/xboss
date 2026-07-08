@@ -145,7 +145,22 @@ export type ContractRow = {
 // Danh sách HĐ kèm tổng hợp: tổng giá trị (gốc + phụ lục), đã thanh toán
 // (Σ payment_bills mọi type kể cả advance — nhất quán quyết định M2), giá trị PO
 // gắn HĐ (loại đơn huỷ). Còn lại = value + addendaTotal − paid (tính phía gọi).
-export async function listContracts(kind?: ContractKind): Promise<ContractRow[]> {
+// projectId (M22): undefined = không lọc dự án (dùng nội bộ/test cũ).
+export async function listContracts(
+  kind?: ContractKind,
+  projectId?: number,
+): Promise<ContractRow[]> {
+  const conds: string[] = [];
+  const args: unknown[] = [];
+  if (kind) {
+    conds.push("c.kind = ?");
+    args.push(kind);
+  }
+  if (projectId != null) {
+    conds.push("c.project_id = ?");
+    args.push(projectId);
+  }
+  const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
   return query<ContractRow>(
     `SELECT c.id, c.code, c.kind, c.title,
             c.party_supplier_id AS "partySupplierId", s.name AS "partySupplierName",
@@ -171,9 +186,9 @@ export async function listContracts(kind?: ContractKind): Promise<ContractRow[]>
                     JOIN po_items poi ON poi.po_id = po.id
                    WHERE po.contract_id IS NOT NULL AND po.status <> 'cancelled'
                    GROUP BY po.contract_id) po ON po.contract_id = c.id
-      ${kind ? "WHERE c.kind = ?" : ""}
+      ${where}
       ORDER BY c.kind, c.code`,
-    ...(kind ? [kind] : []),
+    ...args,
   );
 }
 

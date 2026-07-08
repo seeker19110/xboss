@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +9,8 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // POST /api/contracts/:id/addenda — thêm phụ lục (Admin/PM). Giá trị âm được
 // (phụ lục giảm giá trị HĐ). UNIQUE(contract_id, code) chống trùng số phụ lục.
+// Kiểm hợp đồng cha thuộc đúng dự án đang chọn (M22) — addenda không có cột
+// project_id riêng.
 export async function POST(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -23,10 +26,15 @@ export async function POST(
 
   const contractId = parseInt(params.id);
   if (isNaN(contractId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
-  const contract = await queryOne<{ id: number }>(
-    `SELECT id FROM contracts WHERE id = ?`,
-    contractId,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const contract =
+    projectId != null
+      ? await queryOne<{ id: number }>(
+          `SELECT id FROM contracts WHERE id = ? AND project_id = ?`,
+          contractId,
+          projectId,
+        )
+      : undefined;
   if (!contract) return NextResponse.json({ error: "Không tìm thấy hợp đồng" }, { status: 404 });
 
   const body = await req.json().catch(() => null);

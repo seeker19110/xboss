@@ -1,52 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, insertId, run, withTransaction, todayISO } from "@/lib/db";
+import { insertId, run, withTransaction, todayISO } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { nextSeqCode, withUniqueRetry } from "@/lib/seqcode";
+import { listPurchaseOrders } from "@/lib/procurement";
 
 export const dynamic = "force-dynamic";
 
 const canManage = (r?: Role) => r === "admin" || r === "pm";
 
-// GET /api/purchase-orders?status=
+// GET /api/purchase-orders?status= — scoped theo dự án đang chọn (M22).
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
-  const status = req.nextUrl.searchParams.get("status");
+  const status = req.nextUrl.searchParams.get("status") ?? undefined;
 
-  const orders = await query(
-    `SELECT po.id, po.po_code AS "poCode", po.status,
-            po.expected_date AS "expectedDate", po.note,
-            po.created_at AS "createdAt",
-            s.id AS "supplierId", s.name AS "supplierName",
-            u.name AS "createdByName",
-            COALESCE(pi.item_count, 0) AS "itemCount",
-            COALESCE(pi.total_ordered, 0) AS "totalOrdered",
-            COALESCE(pi.total_received, 0) AS "totalReceived"
-       FROM purchase_orders po
-       LEFT JOIN suppliers s ON po.supplier_id = s.id
-       LEFT JOIN users u ON po.created_by = u.id
-       LEFT JOIN (
-         SELECT po_id,
-                COUNT(*) AS item_count,
-                SUM(qty_ordered) AS total_ordered,
-                SUM(qty_received) AS total_received
-           FROM po_items GROUP BY po_id
-       ) pi ON pi.po_id = po.id
-       ${status ? "WHERE po.status = ?" : ""}
-      ORDER BY po.created_at DESC`,
-    ...(status ? [status] : []),
-  );
+  const projectId = await getCurrentProjectId(user);
+  const orders = projectId != null ? await listPurchaseOrders({ status, projectId }) : [];
 
   return NextResponse.json({ orders });
 }
 
 // POST /api/purchase-orders  body: { supplierId?, expectedDate?, note?, items: [{materialId, prId?, qtyOrdered, unitPrice?, note?}] }
+// project_id gán = dự án đang chọn (server suy, không tin client).
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!canManage(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM được tạo đơn hàng" }, { status: 403 });
+
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Chưa có dự án nào để tạo đơn hàng" }, { status: 422 });
 
   const body = await req.json().catch(() => ({}));
   const items: {
@@ -68,14 +54,15 @@ export async function POST(req: NextRequest) {
     withTransaction(async () => {
       const poCode = await nextSeqCode("purchase_orders", "po_code", `PO-${ym}-`);
       const id = await insertId(
-        `INSERT INTO purchase_orders (po_code, supplier_id, expected_date, note, created_by, contract_id)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO purchase_orders (po_code, supplier_id, expected_date, note, created_by, contract_id, project_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
         poCode,
         body.supplierId ? Number(body.supplierId) : null,
         body.expectedDate ? String(body.expectedDate) : null,
         body.note ? String(body.note).trim() : null,
         user.id,
         body.contractId ? Number(body.contractId) : null,
+        projectId,
       );
 
       for (const item of items) {

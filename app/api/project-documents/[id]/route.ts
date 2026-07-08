@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFile, unlink } from "node:fs/promises";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { photoPath } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +15,8 @@ type ProjectDocRow = {
   uploaded_by: number | null;
 };
 
-// GET /api/project-documents/:id — stream file (mọi user đăng nhập).
+// GET /api/project-documents/:id — stream file (mọi user đăng nhập), scoped theo
+// dự án đang chọn (M22).
 export async function GET(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -26,10 +28,16 @@ export async function GET(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const doc = await queryOne<ProjectDocRow>(
-    `SELECT id, file_name, mime_type, original_name, uploaded_by FROM project_documents WHERE id = ?`,
-    id,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const doc =
+    projectId != null
+      ? await queryOne<ProjectDocRow>(
+          `SELECT id, file_name, mime_type, original_name, uploaded_by
+             FROM project_documents WHERE id = ? AND project_id = ?`,
+          id,
+          projectId,
+        )
+      : undefined;
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
   const path = photoPath(doc.file_name);
@@ -64,10 +72,16 @@ export async function DELETE(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const doc = await queryOne<ProjectDocRow>(
-    `SELECT id, file_name, mime_type, original_name, uploaded_by FROM project_documents WHERE id = ?`,
-    id,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const doc =
+    projectId != null
+      ? await queryOne<ProjectDocRow>(
+          `SELECT id, file_name, mime_type, original_name, uploaded_by
+             FROM project_documents WHERE id = ? AND project_id = ?`,
+          id,
+          projectId,
+        )
+      : undefined;
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
   if (doc.uploaded_by !== user.id && !CAN.editStructure(user.role))

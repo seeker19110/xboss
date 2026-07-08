@@ -161,3 +161,35 @@ test(
     await run(`DELETE FROM boq_items WHERE id = ?`, boqId);
   },
 );
+
+test(
+  "listVariations/getVariation: scoped đúng theo project_id (M22), không lẫn dự án khác",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { listVariations, getVariation } = await import("@/lib/vo");
+
+    const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA VO 1', 'PJT-VO1')`);
+    const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA VO 2', 'PJT-VO2')`);
+    const vo1 = await insertId(
+      `INSERT INTO variation_orders (code, title, reason, status, project_id)
+       VALUES ('VO-SCOPE-01', 'VO DA1', 'other', 'draft', ?)`,
+      p1,
+    );
+    const vo2 = await insertId(
+      `INSERT INTO variation_orders (code, title, reason, status, project_id)
+       VALUES ('VO-SCOPE-02', 'VO DA2', 'other', 'draft', ?)`,
+      p2,
+    );
+
+    const list1 = await listVariations({ projectId: p1 });
+    assert.ok(list1.some((v) => v.id === vo1));
+    assert.ok(!list1.some((v) => v.id === vo2));
+
+    assert.ok(await getVariation(vo1, p1));
+    assert.equal(await getVariation(vo2, p1), undefined);
+
+    await run(`DELETE FROM variation_orders WHERE id IN (?, ?)`, vo1, vo2);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+  },
+);

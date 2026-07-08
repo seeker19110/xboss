@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { boqTakenBy } from "@/lib/boq";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +10,10 @@ const STATUSES = ["dat_hang", "ve_kho", "da_dung"];
 const canEditMaterials = (r?: Role) => r === "admin" || r === "pm" || r === "engineer";
 
 // PATCH /api/materials/:id  body: { name?, unit?, qtyPlanned?, qtyUsed?, status?, note? }
-export async function PATCH(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+export async function PATCH(
+  req: NextRequest,
+  { params: paramsP }: { params: Promise<{ id: string }> },
+) {
   const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -19,8 +23,15 @@ export async function PATCH(req: NextRequest, { params: paramsP }: { params: Pro
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const m = await queryOne<{ id: number; qty_used: number; qty_stock: number }>(
-    `SELECT id, qty_used, COALESCE(qty_stock, 0) AS qty_stock FROM materials WHERE id = ?`, id);
+  const projectId = await getCurrentProjectId(user);
+  const m =
+    projectId != null
+      ? await queryOne<{ id: number; qty_used: number; qty_stock: number }>(
+          `SELECT id, qty_used, COALESCE(qty_stock, 0) AS qty_stock FROM materials WHERE id = ? AND project_id = ?`,
+          id,
+          projectId,
+        )
+      : undefined;
   if (!m) return NextResponse.json({ error: "Không tìm thấy vật tư" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
@@ -33,29 +44,49 @@ export async function PATCH(req: NextRequest, { params: paramsP }: { params: Pro
     body.boqCode = boq || null;
     if (boq) {
       const usedBy = await boqTakenBy(boq, { table: "materials", id });
-      if (usedBy) return NextResponse.json({ error: `Mã BOQ "${boq}" đã được dùng bởi ${usedBy}` }, { status: 409 });
+      if (usedBy)
+        return NextResponse.json(
+          { error: `Mã BOQ "${boq}" đã được dùng bởi ${usedBy}` },
+          { status: 409 },
+        );
     }
   }
 
   const fields: Record<string, string> = {
-    name: "name", unit: "unit", qtyBoq: "qty_boq", qtyPlanned: "qty_planned",
-    qtyUsed: "qty_used", qtyStock: "qty_stock", minStockLevel: "min_stock_level",
-    status: "status", note: "note", boqCode: "boq_code",
+    name: "name",
+    unit: "unit",
+    qtyBoq: "qty_boq",
+    qtyPlanned: "qty_planned",
+    qtyUsed: "qty_used",
+    qtyStock: "qty_stock",
+    minStockLevel: "min_stock_level",
+    status: "status",
+    note: "note",
+    boqCode: "boq_code",
   };
   const sets: string[] = [];
   const vals: unknown[] = [];
   for (const [key, col] of Object.entries(fields)) {
     if (body[key] !== undefined) {
       sets.push(`${col} = ?`);
-      const isQty = key === "qtyBoq" || key === "qtyPlanned" || key === "qtyUsed" || key === "qtyStock" || key === "minStockLevel";
+      const isQty =
+        key === "qtyBoq" ||
+        key === "qtyPlanned" ||
+        key === "qtyUsed" ||
+        key === "qtyStock" ||
+        key === "minStockLevel";
       vals.push(isQty ? Number(body[key]) || 0 : body[key]);
     }
   }
-  if (!sets.length) return NextResponse.json({ error: "Không có trường để cập nhật" }, { status: 400 });
+  if (!sets.length)
+    return NextResponse.json({ error: "Không có trường để cập nhật" }, { status: 400 });
 
   vals.push(id);
   try {
-    await run(`UPDATE materials SET ${sets.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, ...vals);
+    await run(
+      `UPDATE materials SET ${sets.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      ...vals,
+    );
   } catch (e: unknown) {
     console.error("PATCH /api/materials error:", e instanceof Error ? e.message : String(e));
     return NextResponse.json({ error: "Lỗi máy chủ khi cập nhật vật tư" }, { status: 500 });
@@ -69,7 +100,11 @@ export async function PATCH(req: NextRequest, { params: paramsP }: { params: Pro
       await run(
         `INSERT INTO material_transactions (material_id, delta, qty_after, note, created_by)
          VALUES (?, ?, ?, 'Sửa trực tiếp tổng đã dùng', ?)`,
-        id, delta, newQty, user.id);
+        id,
+        delta,
+        newQty,
+        user.id,
+      );
     }
   }
 
@@ -81,17 +116,26 @@ export async function PATCH(req: NextRequest, { params: paramsP }: { params: Pro
       await run(
         `INSERT INTO material_transactions (material_id, delta, qty_after, type, note, created_by)
          VALUES (?, ?, ?, 'dieu_chinh_kho', 'Điều chỉnh tồn kho trực tiếp', ?)`,
-        id, delta, newStock, user.id);
+        id,
+        delta,
+        newStock,
+        user.id,
+      );
     }
   }
 
   const material = await queryOne(
-    `SELECT id, name, unit, qty_planned AS "qtyPlanned", qty_used AS "qtyUsed", status, note FROM materials WHERE id = ?`, id);
+    `SELECT id, name, unit, qty_planned AS "qtyPlanned", qty_used AS "qtyUsed", status, note FROM materials WHERE id = ?`,
+    id,
+  );
   return NextResponse.json({ material });
 }
 
 // DELETE /api/materials/:id (Admin only)
-export async function DELETE(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+export async function DELETE(
+  _req: NextRequest,
+  { params: paramsP }: { params: Promise<{ id: string }> },
+) {
   const params = await paramsP;
   const user = await getCurrentUser();
   if (!user || user.role !== "admin")
@@ -100,6 +144,12 @@ export async function DELETE(_req: NextRequest, { params: paramsP }: { params: P
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  await run(`DELETE FROM materials WHERE id = ?`, id);
+  const projectId = await getCurrentProjectId(user);
+  const r =
+    projectId != null
+      ? await run(`DELETE FROM materials WHERE id = ? AND project_id = ?`, id, projectId)
+      : { changes: 0 };
+  if (r.changes === 0)
+    return NextResponse.json({ error: "Không tìm thấy vật tư" }, { status: 404 });
   return NextResponse.json({ ok: true });
 }

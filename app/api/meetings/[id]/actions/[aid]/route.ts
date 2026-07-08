@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import {
   MEETING_ACTION_STATUSES,
   getMeetingAction,
@@ -28,8 +29,9 @@ export async function PATCH(
   if (isNaN(meetingId) || isNaN(aid))
     return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  const projectId = await getCurrentProjectId(user);
   const action = await getMeetingAction(aid);
-  if (!action || action.meetingId !== meetingId)
+  if (!action || action.meetingId !== meetingId || action.projectId !== projectId)
     return NextResponse.json({ error: "Không tìm thấy việc sau họp" }, { status: 404 });
 
   const body = await req.json().catch(() => null);
@@ -85,6 +87,11 @@ export async function DELETE(
   const aid = parseInt(params.aid);
   if (isNaN(meetingId) || isNaN(aid))
     return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  const projectId = await getCurrentProjectId(user);
+  const action = await getMeetingAction(aid);
+  if (!action || action.meetingId !== meetingId || action.projectId !== projectId)
+    return NextResponse.json({ error: "Không tìm thấy việc sau họp" }, { status: 404 });
 
   const r = await run(
     `DELETE FROM meeting_actions WHERE id = ? AND meeting_id = ?`,

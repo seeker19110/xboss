@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
-import { PO_ALL_STATUSES, isValidPoTransition, logPoStatusChange } from "@/lib/procurement";
+import { getCurrentProjectId } from "@/lib/projects";
+import {
+  PO_ALL_STATUSES,
+  getPurchaseOrder,
+  isValidPoTransition,
+  logPoStatusChange,
+} from "@/lib/procurement";
 
 export const dynamic = "force-dynamic";
 
 const canManage = (r?: Role) => r === "admin" || r === "pm";
 
-// GET /api/purchase-orders/:id → chi tiết PO + danh sách items + lịch sử đổi trạng thái
+// GET /api/purchase-orders/:id → chi tiết PO + danh sách items + lịch sử đổi trạng thái,
+// scoped theo dự án đang chọn (M22).
 export async function GET(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -18,6 +25,10 @@ export async function GET(
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  const projectId = await getCurrentProjectId(user);
+  const exists = projectId != null ? await getPurchaseOrder(id, projectId) : undefined;
+  if (!exists) return NextResponse.json({ error: "Không tìm thấy đơn hàng" }, { status: 404 });
 
   const po = await queryOne(
     `SELECT po.id, po.po_code AS "poCode", po.status,
@@ -60,6 +71,7 @@ export async function GET(
 }
 
 // PATCH /api/purchase-orders/:id  body: { status?, supplierId?, expectedDate?, note? }
+// scoped theo dự án đang chọn (M22).
 export async function PATCH(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -73,10 +85,8 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const po = await queryOne<{ id: number; status: string }>(
-    `SELECT id, status FROM purchase_orders WHERE id = ?`,
-    id,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const po = projectId != null ? await getPurchaseOrder(id, projectId) : undefined;
   if (!po) return NextResponse.json({ error: "Không tìm thấy đơn hàng" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
@@ -118,6 +128,7 @@ export async function PATCH(
   return NextResponse.json({ ok: true });
 }
 
+// DELETE /api/purchase-orders/:id — scoped theo dự án đang chọn (M22).
 export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -130,10 +141,8 @@ export async function DELETE(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const po = await queryOne<{ status: string }>(
-    `SELECT status FROM purchase_orders WHERE id = ?`,
-    id,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const po = projectId != null ? await getPurchaseOrder(id, projectId) : undefined;
   if (!po) return NextResponse.json({ error: "Không tìm thấy đơn hàng" }, { status: 404 });
 
   // Đã nhập kho (một phần/đủ) thì tồn kho đã cộng vào vật tư + có phiếu nhập gắn kèm —

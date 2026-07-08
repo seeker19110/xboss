@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,15 @@ export async function PUT(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const item = await queryOne<{ id: number }>(`SELECT id FROM boq_items WHERE id = ?`, id);
+  const projectId = await getCurrentProjectId(user);
+  const item =
+    projectId != null
+      ? await queryOne<{ id: number }>(
+          `SELECT id FROM boq_items WHERE id = ? AND project_id = ?`,
+          id,
+          projectId,
+        )
+      : undefined;
   if (!item) return NextResponse.json({ error: "Không tìm thấy dòng BOQ" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));

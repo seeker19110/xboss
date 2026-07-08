@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { parseBoqWorkbook, previewBoqImport, commitBoqImport } from "@/lib/boq-import";
 
 export const dynamic = "force-dynamic";
@@ -73,6 +74,10 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const result = await commitBoqImport(parsed.rows, disciplineId, discipline.code);
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Chưa có dự án nào để import BOQ" }, { status: 422 });
+
+  const result = await commitBoqImport(parsed.rows, disciplineId, discipline.code, projectId);
   return NextResponse.json(result);
 }

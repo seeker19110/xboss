@@ -186,6 +186,7 @@ export async function commitBoqImport(
   rows: ParsedBoqRow[],
   disciplineId: number,
   disciplineCode: string,
+  projectId: number,
 ): Promise<BoqImportResult> {
   const prefix = `${disciplineCode.toUpperCase()}-`;
   return withTransaction(async () => {
@@ -201,8 +202,8 @@ export async function commitBoqImport(
         continue;
       }
       await insertId(
-        `INSERT INTO boq_items (code, name, unit, discipline_id, qty_contract, unit_price, note, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO boq_items (code, name, unit, discipline_id, qty_contract, unit_price, note, sort_order, project_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         code,
         row.name,
         row.unit,
@@ -211,6 +212,7 @@ export async function commitBoqImport(
         row.unitPrice,
         row.note,
         row.rowIndex,
+        projectId,
       );
       inserted++;
     }

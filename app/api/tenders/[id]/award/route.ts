@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { awardTender } from "@/lib/tender";
 
 export const dynamic = "force-dynamic";
 
 // POST /api/tenders/:id/award { bidId } — trao thầu (CAN.approve): chốt báo giá
 // thắng, sinh 1 hợp đồng giao thầu (contracts, M16) cho NCC trúng thầu, khoá sửa.
+// Gói thầu phải thuộc dự án đang chọn (M22); hợp đồng sinh ra gán cùng project_id.
 export async function POST(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -24,8 +26,12 @@ export async function POST(
   if (!Number.isInteger(bidId))
     return NextResponse.json({ error: "Thiếu báo giá được chọn" }, { status: 422 });
 
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy gói thầu" }, { status: 404 });
+
   try {
-    const { contractId } = await awardTender(id, bidId, user.id);
+    const { contractId } = await awardTender(id, bidId, user.id, projectId);
     return NextResponse.json({ awarded: id, contractId });
   } catch (err: unknown) {
     const e = err as { message?: string; status?: number };

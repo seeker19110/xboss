@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, run } from "@/lib/db";
+import { run } from "@/lib/db";
 import { getCurrentUser, canTouchVehicle, type Role } from "@/lib/auth";
-import { nextVehicleStatus, type VehicleAction } from "@/lib/procurement";
+import { getCurrentProjectId } from "@/lib/projects";
+import { getVehicle, nextVehicleStatus, type VehicleAction } from "@/lib/procurement";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,7 @@ const ACTIONS: VehicleAction[] = ["approve", "enter", "exit", "no_show", "cancel
 //    (Admin/PM/Kỹ sư làm mọi hành động; subcon đúng NCC của xe chỉ làm enter/exit).
 //  - body: { plate?, driver?, driverPhone?, cargo?, gate?, expectedAt?, supplierId?, poId?,
 //            needsCrane? } → sửa thông tin xe (Admin/PM/Kỹ sư).
+// Scoped theo dự án đang chọn (M22) — xe không thuộc dự án hiện tại → 404.
 export async function PATCH(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -24,11 +26,8 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const vehicle = await queryOne<{
-    status: string;
-    entered_at: string | null;
-    exited_at: string | null;
-  }>(`SELECT status, entered_at, exited_at FROM vehicle_logs WHERE id = ?`, id);
+  const projectId = await getCurrentProjectId(user);
+  const vehicle = projectId != null ? await getVehicle(id, projectId) : undefined;
   if (!vehicle) return NextResponse.json({ error: "Không tìm thấy xe" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));

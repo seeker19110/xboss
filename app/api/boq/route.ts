@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { boqTakenBy } from "@/lib/boq";
 
 export const dynamic = "force-dynamic";
@@ -46,10 +47,21 @@ export async function GET(req: NextRequest) {
 
   const discipline = req.nextUrl.searchParams.get("discipline")?.trim() || null;
   const includeVo = req.nextUrl.searchParams.get("includeVo") !== "0";
+  const projectId = await getCurrentProjectId(user);
 
   const conds = [];
-  if (discipline) conds.push("d.code = ?");
+  const args: unknown[] = [];
+  if (discipline) {
+    conds.push("d.code = ?");
+    args.push(discipline);
+  }
   if (!includeVo) conds.push("bi.vo_id IS NULL");
+  if (projectId != null) {
+    conds.push("bi.project_id = ?");
+    args.push(projectId);
+  } else {
+    conds.push("FALSE");
+  }
   const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
 
   const rows = await query<BoqRow>(
@@ -78,7 +90,7 @@ export async function GET(req: NextRequest) {
       ${where}
       GROUP BY bi.id, d.code, d.name, d.color, vo.code, vo.status
       ORDER BY bi.sort_order, bi.id`,
-    ...(discipline ? [discipline] : []),
+    ...args,
   );
 
   let contractValue = 0;
@@ -112,6 +124,10 @@ export async function POST(req: NextRequest) {
       { error: "Bạn không có quyền tạo dòng BOQ (chỉ Admin/PM)" },
       { status: 403 },
     );
+
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Chưa có dự án nào để tạo dòng BOQ" }, { status: 422 });
 
   const body = await req.json().catch(() => null);
   const code = typeof body?.code === "string" ? body.code.trim() : "";
@@ -147,8 +163,8 @@ export async function POST(req: NextRequest) {
   let id: number;
   try {
     id = await insertId(
-      `INSERT INTO boq_items (code, name, unit, discipline_id, qty_contract, unit_price, qty_sub, sub_unit_price, note, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO boq_items (code, name, unit, discipline_id, qty_contract, unit_price, qty_sub, sub_unit_price, note, sort_order, project_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       code,
       name,
       unit,
@@ -159,6 +175,7 @@ export async function POST(req: NextRequest) {
       subUnitPrice,
       note,
       sortOrder,
+      projectId,
     );
   } catch (err) {
     if ((err as { code?: string }).code === "23505")

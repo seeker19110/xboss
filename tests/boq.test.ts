@@ -96,6 +96,9 @@ test(
       `SELECT id FROM disciplines WHERE code = 'acmv'`,
     );
     const disciplineId = discipline!.id;
+    const testProjectId = await insertId(
+      `INSERT INTO projects (name) VALUES ('Test boq import commit')`,
+    );
 
     const parsed = parseBoqWorkbook(fakeBoqWorkbook());
     assert.equal(parsed.rows.length, 2);
@@ -111,7 +114,7 @@ test(
     assert.equal(preview[1].code, "ACMV-0003");
     assert.ok(preview.every((p) => p.action === "add"));
 
-    const result = await commitBoqImport(parsed.rows, disciplineId, "acmv");
+    const result = await commitBoqImport(parsed.rows, disciplineId, "acmv", testProjectId);
     assert.equal(result.inserted, 2);
     assert.equal(result.skipped, 0);
 
@@ -156,6 +159,7 @@ test(
     await run(`DELETE FROM projects WHERE id = ?`, projectId);
     await run(`DELETE FROM boq_items WHERE id = ?`, existingId);
     await run(`DELETE FROM boq_items WHERE code IN ('ACMV-0002', 'ACMV-0003')`);
+    await run(`DELETE FROM projects WHERE id = ?`, testProjectId);
   },
 );
 
@@ -295,5 +299,31 @@ test(
     await run(`DELETE FROM sheet_types WHERE id = ?`, stId);
     await run(`DELETE FROM towers WHERE id = ?`, towerId);
     await run(`DELETE FROM projects WHERE id = ?`, projectId);
+  },
+);
+
+test(
+  "boq_items: cột project_id (M22) scoped đúng — mỗi dự án chỉ thấy dòng BOQ của mình",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId, query } = await import("@/lib/db");
+
+    const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA BOQ 1', 'PJT-BQ1')`);
+    const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA BOQ 2', 'PJT-BQ2')`);
+    const b1 = await insertId(
+      `INSERT INTO boq_items (code, name, unit, project_id) VALUES ('BOQ-SCOPE-01', 'Dòng DA1', 'm', ?)`,
+      p1,
+    );
+    await insertId(
+      `INSERT INTO boq_items (code, name, unit, project_id) VALUES ('BOQ-SCOPE-02', 'Dòng DA2', 'm', ?)`,
+      p2,
+    );
+
+    const rowsP1 = await query<{ id: number }>(`SELECT id FROM boq_items WHERE project_id = ?`, p1);
+    assert.ok(rowsP1.some((r) => r.id === b1));
+    assert.equal(rowsP1.length, 1);
+
+    await run(`DELETE FROM boq_items WHERE code IN ('BOQ-SCOPE-01', 'BOQ-SCOPE-02')`);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
   },
 );

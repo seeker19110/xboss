@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, insertId, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { withUniqueRetry, isUniqueViolation } from "@/lib/seqcode";
 import {
   listTenders,
@@ -11,18 +12,21 @@ import {
 
 export const dynamic = "force-dynamic";
 
-// GET /api/tenders — danh sách gói thầu (Admin/PM/Kỹ sư/BCH).
+// GET /api/tenders — danh sách gói thầu (Admin/PM/Kỹ sư/BCH), scoped theo dự án
+// đang chọn (M22).
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.viewTenders(user.role))
     return NextResponse.json({ error: "Bạn không có quyền xem đấu thầu" }, { status: 403 });
 
-  const tenders = await listTenders();
+  const projectId = await getCurrentProjectId(user);
+  const tenders = projectId != null ? await listTenders(projectId) : [];
   return NextResponse.json({ tenders });
 }
 
 // POST /api/tenders — tạo gói thầu mới kèm dòng BOQ trong phạm vi mời thầu (Admin/PM).
+// Gán project_id = dự án đang chọn (server suy, không tin client).
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -31,6 +35,10 @@ export async function POST(req: NextRequest) {
       { error: "Bạn không có quyền tạo gói thầu (chỉ Admin/PM)" },
       { status: 403 },
     );
+
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Chưa có dự án nào để tạo gói thầu" }, { status: 422 });
 
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Dữ liệu không hợp lệ" }, { status: 422 });
@@ -63,12 +71,14 @@ export async function POST(req: NextRequest) {
       withTransaction(async () => {
         const code = await nextTenderCode();
         const id = await insertId(
-          `INSERT INTO tender_packages (code, name, scope, due_date, created_by) VALUES (?, ?, ?, ?, ?)`,
+          `INSERT INTO tender_packages (code, name, scope, due_date, created_by, project_id)
+           VALUES (?, ?, ?, ?, ?, ?)`,
           code,
           name,
           scope,
           dueDate,
           user.id,
+          projectId,
         );
         for (const it of items) {
           await run(

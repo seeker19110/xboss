@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, insertId, run, withTransaction, todayISO } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { nextSeqCode, withUniqueRetry } from "@/lib/seqcode";
-import { logPoStatusChange } from "@/lib/procurement";
+import { getPurchaseOrder, logPoStatusChange } from "@/lib/procurement";
 
 export const dynamic = "force-dynamic";
 
 const canReceive = (r?: Role) => r === "admin" || r === "pm" || r === "engineer";
 
 // POST /api/purchase-orders/:id/receive  body: { note?, items: [{poItemId, qtyReceived, note?}] }
-// Tạo phiếu nhập kho, cập nhật qty_stock + po_items.qty_received
+// Tạo phiếu nhập kho, cập nhật qty_stock + po_items.qty_received. Scoped theo dự án
+// đang chọn (M22) — PO không thuộc dự án hiện tại → 404.
 export async function POST(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -23,10 +25,8 @@ export async function POST(
   const poId = parseInt(params.id);
   if (isNaN(poId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const po = await queryOne<{ id: number; status: string }>(
-    `SELECT id, status FROM purchase_orders WHERE id = ?`,
-    poId,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const po = projectId != null ? await getPurchaseOrder(poId, projectId) : undefined;
   if (!po) return NextResponse.json({ error: "Không tìm thấy đơn hàng" }, { status: 404 });
   if (po.status === "cancelled")
     return NextResponse.json({ error: "Đơn hàng đã huỷ" }, { status: 409 });

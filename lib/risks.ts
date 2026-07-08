@@ -76,8 +76,22 @@ export type RiskRow = RiskInput & {
   closedAt: string | null;
 };
 
-export async function listRisks(filter?: { status?: RiskStatus }): Promise<RiskRow[]> {
-  const where = filter?.status ? "WHERE r.status = ?" : "";
+// projectId (M22): undefined = không lọc dự án (dùng nội bộ/test cũ).
+export async function listRisks(filter?: {
+  status?: RiskStatus;
+  projectId?: number;
+}): Promise<RiskRow[]> {
+  const conds: string[] = [];
+  const args: unknown[] = [];
+  if (filter?.status) {
+    conds.push("r.status = ?");
+    args.push(filter.status);
+  }
+  if (filter?.projectId != null) {
+    conds.push("r.project_id = ?");
+    args.push(filter.projectId);
+  }
+  const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
   return query<RiskRow>(
     `SELECT r.id, r.code, r.title, r.description, r.category,
             r.probability, r.impact, (r.probability * r.impact) AS score,
@@ -87,8 +101,28 @@ export async function listRisks(filter?: { status?: RiskStatus }): Promise<RiskR
        LEFT JOIN users u ON u.id = r.owner
       ${where}
       ORDER BY (r.status = 'closed'), (r.probability * r.impact) DESC, r.id`,
-    ...(filter?.status ? [filter.status] : []),
+    ...args,
   );
+}
+
+export async function getRisk(id: number, projectId?: number): Promise<RiskRow | undefined> {
+  const conds = ["r.id = ?"];
+  const args: unknown[] = [id];
+  if (projectId != null) {
+    conds.push("r.project_id = ?");
+    args.push(projectId);
+  }
+  const rows = await query<RiskRow>(
+    `SELECT r.id, r.code, r.title, r.description, r.category,
+            r.probability, r.impact, (r.probability * r.impact) AS score,
+            r.mitigation, r.owner, u.name AS "ownerName", r.status,
+            r.created_by AS "createdBy", r.created_at AS "createdAt", r.closed_at AS "closedAt"
+       FROM risks r
+       LEFT JOIN users u ON u.id = r.owner
+      WHERE ${conds.join(" AND ")}`,
+    ...args,
+  );
+  return rows[0];
 }
 
 export async function nextRiskCode(): Promise<string> {
