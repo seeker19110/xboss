@@ -19,6 +19,7 @@ import {
   isNavItemActive,
   canSeeNavItem,
   findActiveNav,
+  resolveVisibleTree,
   type DashNode,
   type DashCluster,
 } from "@/app/lib/dashboardTree";
@@ -63,6 +64,9 @@ export default function AppHeader({
   // Gập/mở dashboard có children (M21) — mặc định MỞ (không có bản ghi = true) nên
   // không ẩn link nào đang dùng; chỉ ẩn khi người dùng tự gập, nhớ localStorage.
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
+  // Bật/tắt dashboard qua khu "Hiển thị AppShell" ở /admin (M21 PR3). Rỗng lúc đầu =
+  // coi như mọi dashboard đều bật (tránh sidebar nhấp nháy ẩn/hiện lúc tải trang).
+  const [navSettings, setNavSettings] = useState<Map<string, boolean>>(new Map());
   const asideRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -72,6 +76,10 @@ export default function AppHeader({
     fetch("/api/disciplines")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => setDisciplines(data?.disciplines ?? []))
+      .catch(() => {});
+    fetch("/api/nav-settings", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => data?.settings && setNavSettings(new Map(Object.entries(data.settings))))
       .catch(() => {});
     try {
       const raw = localStorage.getItem(NAV_OPEN_KEY);
@@ -245,17 +253,19 @@ export default function AppHeader({
   }
 
   function renderCluster(cluster: DashCluster) {
-    const dashboards = cluster.dashboards.filter((d) => canSeeNavItem(d, me?.role));
-    if (dashboards.length === 0) return null;
+    // Vai trò + nav_settings đã lọc sẵn trong resolveVisibleTree (visibleTree bên dưới).
     return (
       <div key={cluster.label} className="mb-3">
         <div className="sidebar-label px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
           {cluster.label}
         </div>
-        {dashboards.map((dash) => renderDashboard(dash))}
+        {cluster.dashboards.map((dash) => renderDashboard(dash))}
       </div>
     );
   }
+
+  // Cây đã lọc theo vai trò + bật/tắt admin (M21 PR3) — nguồn duy nhất để render sidebar.
+  const visibleTree = resolveVisibleTree(DASHBOARD_TREE, me?.role, navSettings);
 
   return (
     <>
@@ -283,7 +293,7 @@ export default function AppHeader({
         </div>
 
         <nav className="flex-1 overflow-y-auto py-2" aria-label="Điều hướng chính">
-          {DASHBOARD_TREE.slice(0, 1).map(renderCluster)}
+          {visibleTree.slice(0, 1).map(renderCluster)}
 
           {/* Hệ thi công — danh mục động từ /api/disciplines (M15), mỗi hệ 1 mục
               dẫn tới trang hub riêng (/he/[code]); chấm màu lấy từ disciplines.color. */}
@@ -319,7 +329,7 @@ export default function AppHeader({
             </div>
           )}
 
-          {DASHBOARD_TREE.slice(1).map(renderCluster)}
+          {visibleTree.slice(1).map(renderCluster)}
         </nav>
 
         <button

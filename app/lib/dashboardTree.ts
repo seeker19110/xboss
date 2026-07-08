@@ -62,7 +62,11 @@ import type { Role } from "@/lib/roles";
 export type NavStatus = "available" | "coming-soon";
 
 export type DashNode = {
-  /** Bắt buộc cho node có `children` (khoá localStorage gập/mở) — tuỳ chọn cho lá. */
+  /**
+   * Bắt buộc ở cấp 3 (dashboard) — khoá ổn định dùng cho `localStorage` gập/mở (nhóm)
+   * VÀ cho `nav_settings.node_key` (M21 PR3, xem `lib/nav-settings.ts`). Đổi label
+   * không đổi `id`. Cấp 4 (children) không cần — chưa có bật/tắt riêng từng mục con.
+   */
   id?: string;
   label: string;
   icon: LucideIcon;
@@ -84,8 +88,8 @@ export const DASHBOARD_TREE: DashCluster[] = [
   {
     label: "Tổng quan & Báo cáo",
     dashboards: [
-      { href: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
-      { href: "/report", label: "Báo cáo", icon: FileText },
+      { id: "dash.dashboard", href: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
+      { id: "dash.bao-cao", href: "/report", label: "Báo cáo", icon: FileText },
     ],
   },
   {
@@ -101,15 +105,15 @@ export const DASHBOARD_TREE: DashCluster[] = [
           { href: "/admin", label: "Phân công", icon: ShieldCheck, roles: ["admin", "pm"] },
         ],
       },
-      { label: "Khởi động & Pháp lý", icon: Landmark }, // M23
+      { id: "dash.khoi-dong-phap-ly", label: "Khởi động & Pháp lý", icon: Landmark }, // M23
     ],
   },
   {
     // Thiết kế & Bản vẽ (mockup: Thiết Kế & BPTC; BIM-Shop-Drawing).
     label: "Thiết kế & Bản vẽ",
     dashboards: [
-      { href: "/drawings", label: "Bản vẽ", icon: PencilRuler },
-      { label: "Thiết kế & Biện pháp thi công", icon: Compass }, // M08 mở rộng
+      { id: "dash.ban-ve", href: "/drawings", label: "Bản vẽ", icon: PencilRuler },
+      { id: "dash.thiet-ke-bptc", label: "Thiết kế & Biện pháp thi công", icon: Compass }, // M08 mở rộng
     ],
   },
   {
@@ -134,12 +138,13 @@ export const DASHBOARD_TREE: DashCluster[] = [
     label: "Đấu thầu & Nhà thầu phụ",
     dashboards: [
       {
+        id: "dash.dau-thau",
         href: "/tenders",
         label: "Đấu thầu",
         icon: Gavel,
         roles: ["admin", "pm", "engineer", "bch"],
       },
-      { label: "Nhà thầu phụ", icon: HardHat }, // M15/M16 mở rộng (hồ sơ năng lực, đánh giá)
+      { id: "dash.nha-thau-phu", label: "Nhà thầu phụ", icon: HardHat }, // M15/M16 mở rộng (hồ sơ năng lực, đánh giá)
     ],
   },
   {
@@ -148,9 +153,14 @@ export const DASHBOARD_TREE: DashCluster[] = [
     // tiêu đề nhóm và trang /materials chính của nó, rối cho người dùng.
     label: "Vật tư & Thiết bị",
     dashboards: [
-      { href: "/boq", label: "BOQ", icon: Calculator },
-      { href: "/materials", label: "Vật tư", icon: Package },
-      { href: "/materials/purchase-orders", label: "Đơn đặt hàng", icon: Truck },
+      { id: "dash.boq", href: "/boq", label: "BOQ", icon: Calculator },
+      { id: "dash.vat-tu", href: "/materials", label: "Vật tư", icon: Package },
+      {
+        id: "dash.don-dat-hang",
+        href: "/materials/purchase-orders",
+        label: "Đơn đặt hàng",
+        icon: Truck,
+      },
       {
         id: "dash.thiet-bi",
         label: "Thiết bị & Máy móc",
@@ -184,7 +194,7 @@ export const DASHBOARD_TREE: DashCluster[] = [
     // Trường & Giấy Phép; Quan Hệ & Quan Trắc).
     label: "Chất lượng · An toàn · Môi trường",
     dashboards: [
-      { href: "/quality", label: "Chất lượng", icon: ClipboardCheck },
+      { id: "dash.chat-luong", href: "/quality", label: "Chất lượng", icon: ClipboardCheck },
       {
         id: "dash.an-toan",
         label: "An toàn – HSE & Rủi ro",
@@ -204,8 +214,8 @@ export const DASHBOARD_TREE: DashCluster[] = [
           },
         ],
       },
-      { label: "Môi trường & Giấy phép", icon: Leaf }, // M25
-      { label: "Quan hệ & Quan trắc", icon: Radar }, // M26
+      { id: "dash.moi-truong", label: "Môi trường & Giấy phép", icon: Leaf }, // M25
+      { id: "dash.quan-he-quan-trac", label: "Quan hệ & Quan trắc", icon: Radar }, // M26
     ],
   },
   {
@@ -253,8 +263,18 @@ export const DASHBOARD_TREE: DashCluster[] = [
           }, // M06/M19 mở rộng
         ],
       },
-      { label: "Tài chính – Kế toán", icon: Banknote, roles: ["admin", "pm", "bch"] }, // M27
-      { label: "Bảo hiểm & Bảo lãnh", icon: Umbrella, roles: ["admin", "pm", "bch"] }, // M28
+      {
+        id: "dash.tai-chinh-ke-toan",
+        label: "Tài chính – Kế toán",
+        icon: Banknote,
+        roles: ["admin", "pm", "bch"],
+      }, // M27
+      {
+        id: "dash.bao-hiem-bao-lanh",
+        label: "Bảo hiểm & Bảo lãnh",
+        icon: Umbrella,
+        roles: ["admin", "pm", "bch"],
+      }, // M28
     ],
   },
   {
@@ -275,15 +295,15 @@ export const DASHBOARD_TREE: DashCluster[] = [
           },
         ],
       },
-      { href: "/documents", label: "Hồ sơ dự án", icon: FolderOpen },
+      { id: "dash.ho-so-du-an", href: "/documents", label: "Hồ sơ dự án", icon: FolderOpen },
     ],
   },
   {
     // Bàn giao & Vận hành (mockup: Bàn Giao & Kết Thúc; Bảo Hành – Bảo Trì) — mới hoàn toàn.
     label: "Bàn giao & Vận hành",
     dashboards: [
-      { label: "Bàn giao & Kết thúc", icon: PackageCheck }, // M29
-      { label: "Bảo hành – Bảo trì", icon: Cog }, // M30
+      { id: "dash.ban-giao-ket-thuc", label: "Bàn giao & Kết thúc", icon: PackageCheck }, // M29
+      { id: "dash.bao-hanh-bao-tri", label: "Bảo hành – Bảo trì", icon: Cog }, // M30
     ],
   },
   {
@@ -291,8 +311,14 @@ export const DASHBOARD_TREE: DashCluster[] = [
     // để không phình số cụm — CDE/mobile/luồng duyệt đã có nền, xem M31).
     label: "Hệ thống",
     dashboards: [
-      { href: "/import", label: "Import Excel", icon: Upload, roles: ["admin", "pm"] },
-      { label: "Chuyển đổi số & Công nghệ", icon: Cpu }, // M31
+      {
+        id: "dash.import-excel",
+        href: "/import",
+        label: "Import Excel",
+        icon: Upload,
+        roles: ["admin", "pm"],
+      },
+      { id: "dash.chuyen-doi-so", label: "Chuyển đổi số & Công nghệ", icon: Cpu }, // M31
     ],
   },
 ];
@@ -332,6 +358,27 @@ export function canSeeNavItem(node: DashNode, role?: string): boolean {
   return node.children.some((c) => canSeeNavItem(c, role));
 }
 
+/** Lọc cây theo vai trò (canSeeNavItem) + nav_settings (M21 PR3, xem lib/nav-settings.ts)
+ *  — dùng cho AppHeader render sidebar và khu "Hiển thị AppShell" ở /admin. Cụm rỗng
+ *  sau lọc thì bị bỏ. `navSettings` rỗng (chưa tải xong) = coi như mọi dashboard đều bật,
+ *  tránh sidebar nhấp nháy ẩn/hiện lúc tải trang. */
+export function resolveVisibleTree(
+  tree: DashCluster[],
+  role: string | undefined,
+  navSettings: Map<string, boolean>,
+): DashCluster[] {
+  return tree
+    .map((cluster) => ({
+      ...cluster,
+      dashboards: cluster.dashboards.filter(
+        (dashboard) =>
+          canSeeNavItem(dashboard, role) &&
+          (!dashboard.id || navSettings.get(dashboard.id) !== false),
+      ),
+    }))
+    .filter((cluster) => cluster.dashboards.length > 0);
+}
+
 /** Tìm dashboard nhóm (có `children`) theo `id` — dùng cho trang hub khuôn chung (M21 PR2). */
 export function findDashboardById(
   id: string,
@@ -342,4 +389,17 @@ export function findDashboardById(
     }
   }
   return undefined;
+}
+
+/** Suy trạng thái hiển thị của 1 dashboard cấp 3 — có href/children = đã có trang thật. */
+export function dashboardStatus(dash: DashNode): NavStatus {
+  return dash.href || dash.children ? "available" : "coming-soon";
+}
+
+/** Phẳng hoá toàn bộ dashboard cấp 3 (mọi cụm) — dùng cho `lib/nav-settings.ts`
+ *  (mặc định bật/tắt, validate `node_key`, khu "Hiển thị AppShell" ở `/admin`). */
+export function flattenDashboards(): { cluster: DashCluster; dashboard: DashNode }[] {
+  return DASHBOARD_TREE.flatMap((cluster) =>
+    cluster.dashboards.map((dashboard) => ({ cluster, dashboard })),
+  );
 }

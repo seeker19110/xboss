@@ -204,6 +204,8 @@ export const CAN = {
   // Sổ rủi ro (M13): tạo/sửa Admin/PM/kỹ sư; xem mọi vai trò trừ subcon (nhạy cảm quản trị).
   viewRisks: (r?: Role) => !!r && r !== "subcon",
   manageRisks: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  // Bật/tắt mục hiển thị AppShell (M21 PR3, khu "Hiển thị AppShell" ở /admin) — Admin/PM.
+  manageNav: (r?: Role) => r === "admin" || r === "pm",
 };
 
 // Sub-con chỉ được thao tác trên task được giao cho mình.
