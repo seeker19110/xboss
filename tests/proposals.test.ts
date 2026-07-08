@@ -152,3 +152,39 @@ test(
     await run(`DELETE FROM users WHERE id = ?`, pmId);
   },
 );
+
+test(
+  "listProposals/getProposal: scoped đúng theo project_id (M22), không lẫn dự án khác",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { listProposals, getProposal } = await import("@/lib/proposals");
+
+    const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA DX 1', 'PJT-DX1')`);
+    const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA DX 2', 'PJT-DX2')`);
+    const userId = await insertId(
+      `INSERT INTO users (name, email, password_hash, role) VALUES ('Proposal Scope', 'proposal-scope@xboss.vn', 'x', 'engineer')`,
+    );
+    const dx1 = await insertId(
+      `INSERT INTO proposals (code, kind, title, requested_by, project_id) VALUES ('DX-SCOPE-1', 'other', 'Đề xuất DA1', ?, ?)`,
+      userId,
+      p1,
+    );
+    const dx2 = await insertId(
+      `INSERT INTO proposals (code, kind, title, requested_by, project_id) VALUES ('DX-SCOPE-2', 'other', 'Đề xuất DA2', ?, ?)`,
+      userId,
+      p2,
+    );
+
+    const list1 = await listProposals({ projectId: p1 });
+    assert.ok(list1.some((p) => p.id === dx1));
+    assert.ok(!list1.some((p) => p.id === dx2));
+
+    assert.ok(await getProposal(dx1, p1));
+    assert.equal(await getProposal(dx2, p1), undefined);
+
+    await run(`DELETE FROM proposals WHERE id IN (?, ?)`, dx1, dx2);
+    await run(`DELETE FROM users WHERE id = ?`, userId);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+  },
+);

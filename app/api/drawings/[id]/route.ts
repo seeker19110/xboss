@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import {
   checkDrawingRefs,
+  getDrawing,
   listRevisions,
   parseDrawingBody,
   validateDrawingInput,
@@ -23,16 +25,8 @@ export async function GET(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const drawing = await queryOne(
-    `SELECT d.id, d.code, d.name, d.kind, d.system_group AS "systemGroup",
-            d.floor_label AS "floorLabel", d.work_package_id AS "workPackageId",
-            wp.code AS "workPackageCode", wp.name AS "workPackageName",
-            wp.requires_method_statement AS "workPackageRequiresMethodStatement",
-            d.created_at AS "createdAt"
-       FROM drawings d LEFT JOIN work_packages wp ON wp.id = d.work_package_id
-      WHERE d.id = ?`,
-    id,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const drawing = projectId != null ? await getDrawing(id, projectId) : undefined;
   if (!drawing) return NextResponse.json({ error: "Không tìm thấy bản vẽ" }, { status: 404 });
 
   const revisions = await listRevisions(id);
@@ -57,12 +51,17 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const existing = await queryOne<Record<string, unknown>>(
-    `SELECT code, name, kind, system_group AS "systemGroup", floor_label AS "floorLabel",
-            work_package_id AS "workPackageId"
-       FROM drawings WHERE id = ?`,
-    id,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const existing =
+    projectId != null
+      ? await queryOne<Record<string, unknown>>(
+          `SELECT code, name, kind, system_group AS "systemGroup", floor_label AS "floorLabel",
+                  work_package_id AS "workPackageId"
+             FROM drawings WHERE id = ? AND project_id = ?`,
+          id,
+          projectId,
+        )
+      : undefined;
   if (!existing) return NextResponse.json({ error: "Không tìm thấy bản vẽ" }, { status: 404 });
 
   const body = await req.json().catch(() => null);

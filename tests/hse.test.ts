@@ -112,3 +112,33 @@ test(
     await run(`DELETE FROM users WHERE id IN (?, ?)`, userId, otherId);
   },
 );
+
+test(
+  "listHse/getHse: scoped đúng theo project_id (M22), không lẫn dự án khác",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { listHse, getHse } = await import("@/lib/hse");
+
+    const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA HSE 1', 'PJT-HSE1')`);
+    const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA HSE 2', 'PJT-HSE2')`);
+    const h1 = await insertId(
+      `INSERT INTO hse_records (kind, record_date, description, project_id) VALUES ('toolbox', '2026-07-01', 'HSE DA1', ?)`,
+      p1,
+    );
+    const h2 = await insertId(
+      `INSERT INTO hse_records (kind, record_date, description, project_id) VALUES ('toolbox', '2026-07-01', 'HSE DA2', ?)`,
+      p2,
+    );
+
+    const list1 = await listHse({ projectId: p1 });
+    assert.ok(list1.some((h) => h.id === h1));
+    assert.ok(!list1.some((h) => h.id === h2));
+
+    assert.ok(await getHse(h1, p1));
+    assert.equal(await getHse(h2, p1), null);
+
+    await run(`DELETE FROM hse_records WHERE id IN (?, ?)`, h1, h2);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+  },
+);

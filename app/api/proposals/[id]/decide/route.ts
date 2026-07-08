@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { canDecideProposal, decideProposal } from "@/lib/proposals";
 
 export const dynamic = "force-dynamic";
@@ -29,14 +30,23 @@ export async function POST(
       { status: 422 },
     );
 
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy đề xuất" }, { status: 404 });
+
   const result = await decideProposal({
     proposalId: id,
     decision,
     rejectReason: typeof body.rejectReason === "string" ? body.rejectReason : null,
     createBill: body.createBill === true,
     decidedBy: user.id,
+    projectId,
   });
-  if (typeof result === "string") return NextResponse.json({ error: result }, { status: 409 });
+  if (typeof result === "string")
+    return NextResponse.json(
+      { error: result },
+      { status: result === "Không tìm thấy đề xuất" ? 404 : 409 },
+    );
 
   return NextResponse.json({ ok: true, status: decision, billId: result.billId });
 }

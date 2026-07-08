@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN, canTouchTask, canTouchPackage } from "@/lib/auth";
-import { validateInspectionResults } from "@/lib/qaqc";
+import { getCurrentProjectId } from "@/lib/projects";
+import { taskInProject, validateInspectionResults, workPackageInProject } from "@/lib/qaqc";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,18 @@ export async function PATCH(
         id,
       );
       if (!inspection)
+        throw Object.assign(new Error("Không tìm thấy lần kiểm tra"), { status: 404 });
+
+      // qc_inspections không có project_id riêng (ADR-0004) — suy qua task/work_package (M22).
+      const projectId = await getCurrentProjectId(user);
+      const inProject =
+        projectId != null &&
+        (inspection.taskId
+          ? await taskInProject(inspection.taskId, projectId)
+          : inspection.workPackageId
+            ? await workPackageInProject(inspection.workPackageId, projectId)
+            : false);
+      if (!inProject)
         throw Object.assign(new Error("Không tìm thấy lần kiểm tra"), { status: 404 });
 
       const isApproval = nextStatus === "passed" || nextStatus === "failed";

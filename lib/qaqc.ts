@@ -155,3 +155,134 @@ export function validateInspectionResults(results: unknown): results is Inspecti
       typeof (r as InspectionResult).pass === "boolean",
   );
 }
+
+export type QcChecklistRow = {
+  id: number;
+  name: string;
+  category: string;
+  disciplineId: number | null;
+  disciplineCode: string | null;
+  disciplineName: string | null;
+  required: boolean;
+  items: unknown;
+  active: boolean;
+};
+
+// Danh sách mẫu checklist, lọc theo mã hệ (discipline) + dự án. projectId (M22):
+// undefined = không lọc dự án (dùng nội bộ/test cũ).
+export async function listQcChecklists(filter?: {
+  discipline?: string;
+  projectId?: number;
+}): Promise<QcChecklistRow[]> {
+  const conds: string[] = [];
+  const params: unknown[] = [];
+  if (filter?.discipline) {
+    conds.push("d.code = ?");
+    params.push(filter.discipline);
+  }
+  if (filter?.projectId != null) {
+    conds.push("c.project_id = ?");
+    params.push(filter.projectId);
+  }
+  const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+  return query<QcChecklistRow>(
+    `SELECT c.id, c.name, c.category, c.discipline_id AS "disciplineId",
+            d.code AS "disciplineCode", d.name AS "disciplineName",
+            c.required, c.items, c.active
+       FROM qc_checklists c
+       LEFT JOIN disciplines d ON d.id = c.discipline_id
+      ${where}
+      ORDER BY c.id`,
+    ...params,
+  );
+}
+
+export type NcrRow = {
+  id: number;
+  code: string;
+  taskId: number | null;
+  taskCode: string | null;
+  description: string;
+  assignedTo: number | null;
+  assignedToName: string | null;
+  dueDate: string | null;
+  status: string;
+  createdByName: string | null;
+  createdAt: string;
+  closedAt: string | null;
+};
+
+// Danh sách NCR (vòng đời mở → đóng). projectId (M22): undefined = không lọc dự án
+// (dùng nội bộ/test cũ).
+export async function listNcrs(filter?: {
+  status?: string;
+  assignedTo?: number;
+  taskId?: number;
+  projectId?: number;
+}): Promise<NcrRow[]> {
+  const conds: string[] = [];
+  const params: unknown[] = [];
+  if (filter?.status) {
+    conds.push("n.status = ?");
+    params.push(filter.status);
+  }
+  if (filter?.assignedTo != null) {
+    conds.push("n.assigned_to = ?");
+    params.push(filter.assignedTo);
+  }
+  if (filter?.taskId != null) {
+    conds.push("n.task_id = ?");
+    params.push(filter.taskId);
+  }
+  if (filter?.projectId != null) {
+    conds.push("n.project_id = ?");
+    params.push(filter.projectId);
+  }
+  const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+  return query<NcrRow>(
+    `SELECT n.id, n.code, n.task_id AS "taskId", t.code AS "taskCode",
+            n.description, n.assigned_to AS "assignedTo", au.name AS "assignedToName",
+            n.due_date AS "dueDate", n.status,
+            cu.name AS "createdByName", n.created_at AS "createdAt", n.closed_at AS "closedAt"
+       FROM ncrs n
+       LEFT JOIN tasks t ON t.id = n.task_id
+       LEFT JOIN users au ON au.id = n.assigned_to
+       LEFT JOIN users cu ON cu.id = n.created_by
+      ${where}
+      ORDER BY (n.status = 'closed') ASC, n.due_date ASC NULLS LAST, n.id DESC`,
+    ...params,
+  );
+}
+
+// qc_inspections không có cột project_id riêng (ADR-0004) — suy qua task/work_package
+// → work_packages → sheet_types → towers.project_id (M22). Dùng để chặn tạo/sửa
+// inspection gắn task/nhóm không thuộc dự án đang chọn.
+export async function taskInProject(taskId: number, projectId: number): Promise<boolean> {
+  const row = await queryOne<{ id: number }>(
+    `SELECT t.id
+       FROM tasks t
+       JOIN work_packages wp ON wp.id = t.package_id
+       JOIN sheet_types st ON st.id = wp.sheet_type_id
+       JOIN towers tw ON tw.id = st.tower_id
+      WHERE t.id = ? AND tw.project_id = ?`,
+    taskId,
+    projectId,
+  );
+  return !!row;
+}
+
+export async function workPackageInProject(
+  workPackageId: number,
+  projectId: number,
+): Promise<boolean> {
+  const row = await queryOne<{ id: number }>(
+    `SELECT wp.id
+       FROM work_packages wp
+       JOIN sheet_types st ON st.id = wp.sheet_type_id
+       JOIN towers tw ON tw.id = st.tower_id
+      WHERE wp.id = ? AND tw.project_id = ?`,
+    workPackageId,
+    projectId,
+  );
+  return !!row;
+}

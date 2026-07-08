@@ -103,6 +103,8 @@ export type DrawingFilters = {
   floorLabel?: string;
   systemGroup?: string;
   status?: RevisionStatus;
+  // M22: undefined = không lọc dự án (dùng nội bộ/test cũ).
+  projectId?: number;
 };
 
 // Danh sách drawing kèm rev mới nhất (mọi trạng thái) + rev đã duyệt mới nhất
@@ -126,6 +128,10 @@ export async function listDrawings(filters: DrawingFilters = {}): Promise<Drawin
   if (filters.status) {
     conds.push("lr.status = ?");
     params.push(filters.status);
+  }
+  if (filters.projectId != null) {
+    conds.push("d.project_id = ?");
+    params.push(filters.projectId);
   }
   const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
 
@@ -151,6 +157,44 @@ export async function listDrawings(filters: DrawingFilters = {}): Promise<Drawin
        ) ar ON TRUE
        ${where}
       ORDER BY d.code`,
+    ...params,
+  );
+}
+
+export type DrawingDetail = {
+  id: number;
+  code: string;
+  name: string;
+  kind: DrawingKind;
+  systemGroup: string | null;
+  floorLabel: string | null;
+  workPackageId: number | null;
+  workPackageCode: string | null;
+  workPackageName: string | null;
+  workPackageRequiresMethodStatement: boolean | null;
+  createdAt: string;
+};
+
+// projectId khi truyền → trả undefined nếu bản vẽ không thuộc dự án đang chọn (chặn
+// truy cập chéo dự án qua đoán ID), giống pattern 404 "không tìm thấy" hiện có.
+export async function getDrawing(
+  id: number,
+  projectId?: number,
+): Promise<DrawingDetail | undefined> {
+  const conds = ["d.id = ?"];
+  const params: unknown[] = [id];
+  if (projectId != null) {
+    conds.push("d.project_id = ?");
+    params.push(projectId);
+  }
+  return queryOne<DrawingDetail>(
+    `SELECT d.id, d.code, d.name, d.kind, d.system_group AS "systemGroup",
+            d.floor_label AS "floorLabel", d.work_package_id AS "workPackageId",
+            wp.code AS "workPackageCode", wp.name AS "workPackageName",
+            wp.requires_method_statement AS "workPackageRequiresMethodStatement",
+            d.created_at AS "createdAt"
+       FROM drawings d LEFT JOIN work_packages wp ON wp.id = d.work_package_id
+      WHERE ${conds.join(" AND ")}`,
     ...params,
   );
 }
@@ -182,6 +226,19 @@ export async function listRevisions(drawingId: number): Promise<DrawingRevisionR
       WHERE r.drawing_id = ?
       ORDER BY r.id DESC`,
     drawingId,
+  );
+}
+
+// Revision con không tự mang project_id — suy qua drawing cha (M22), dùng để kiểm
+// route theo id revision (PATCH duyệt, GET file) thuộc đúng dự án đang chọn.
+export async function getRevisionDrawingProject(
+  revisionId: number,
+): Promise<{ drawingId: number; projectId: number | null } | undefined> {
+  return queryOne<{ drawingId: number; projectId: number | null }>(
+    `SELECT r.drawing_id AS "drawingId", d.project_id AS "projectId"
+       FROM drawing_revisions r JOIN drawings d ON d.id = r.drawing_id
+      WHERE r.id = ?`,
+    revisionId,
   );
 }
 

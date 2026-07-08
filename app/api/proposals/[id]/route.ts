@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { run } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import {
   canEditProposal,
   canSeeAllProposals,
@@ -25,7 +26,8 @@ export async function GET(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const proposal = await getProposal(id);
+  const projectId = await getCurrentProjectId(user);
+  const proposal = projectId != null ? await getProposal(id, projectId) : undefined;
   if (!proposal) return NextResponse.json({ error: "Không tìm thấy đề xuất" }, { status: 404 });
   if (proposal.requestedBy !== user.id && !canSeeAllProposals(user))
     return NextResponse.json({ error: "Không có quyền xem đề xuất này" }, { status: 403 });
@@ -52,7 +54,8 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const proposal = await getProposal(id);
+  const projectId = await getCurrentProjectId(user);
+  const proposal = projectId != null ? await getProposal(id, projectId) : undefined;
   if (!proposal) return NextResponse.json({ error: "Không tìm thấy đề xuất" }, { status: 404 });
   const editErr = canEditProposal(proposal, user);
   if (editErr) return NextResponse.json({ error: editErr }, { status: 403 });
@@ -63,7 +66,7 @@ export async function PATCH(
   const input = parseProposalBody(body);
   const invalid = validateProposalInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
-  const refErr = await checkProposalRefs(input);
+  const refErr = await checkProposalRefs(input, projectId ?? undefined);
   if (refErr) return NextResponse.json({ error: refErr }, { status: 422 });
 
   await run(
@@ -91,7 +94,8 @@ export async function DELETE(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const proposal = await getProposal(id);
+  const projectId = await getCurrentProjectId(user);
+  const proposal = projectId != null ? await getProposal(id, projectId) : undefined;
   if (!proposal) return NextResponse.json({ error: "Không tìm thấy đề xuất" }, { status: 404 });
 
   const isOwnDraft = proposal.requestedBy === user.id && proposal.status === "draft";

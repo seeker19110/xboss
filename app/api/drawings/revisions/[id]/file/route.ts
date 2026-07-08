@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFile } from "node:fs/promises";
 import { queryOne } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
+import { getRevisionDrawingProject } from "@/lib/drawings";
 import { photoPath } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +20,11 @@ export async function GET(
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  const projectId = await getCurrentProjectId(user);
+  const revProject = await getRevisionDrawingProject(id);
+  if (!revProject || revProject.projectId !== projectId)
+    return NextResponse.json({ error: "Không tìm thấy revision" }, { status: 404 });
 
   const rev = await queryOne<{
     fileName: string;

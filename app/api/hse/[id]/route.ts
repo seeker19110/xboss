@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import {
   checkHseRefs,
   closeHseAction,
@@ -24,7 +25,8 @@ export async function GET(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const record = await getHse(id);
+  const projectId = await getCurrentProjectId(user);
+  const record = projectId != null ? await getHse(id, projectId) : null;
   if (!record) return NextResponse.json({ error: "Không tìm thấy ghi nhận" }, { status: 404 });
   return NextResponse.json({ record });
 }
@@ -47,12 +49,14 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  const projectId = await getCurrentProjectId(user);
+
   const body = await req.json().catch(() => null);
   if (!body || typeof body !== "object")
     return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });
 
   if (body.closeAction) {
-    const ok = await closeHseAction(id);
+    const ok = projectId != null ? await closeHseAction(id, projectId) : false;
     if (!ok)
       return NextResponse.json(
         { error: "Không tìm thấy ghi nhận hoặc action không ở trạng thái mở" },
@@ -61,7 +65,7 @@ export async function PATCH(
     return NextResponse.json({ updated: id });
   }
 
-  const existing = await getHse(id);
+  const existing = projectId != null ? await getHse(id, projectId) : null;
   if (!existing) return NextResponse.json({ error: "Không tìm thấy ghi nhận" }, { status: 404 });
 
   const merged: Record<string, unknown> = { ...existing };
@@ -118,7 +122,15 @@ export async function DELETE(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const existing = await queryOne<{ id: number }>(`SELECT id FROM hse_records WHERE id = ?`, id);
+  const projectId = await getCurrentProjectId(user);
+  const existing =
+    projectId != null
+      ? await queryOne<{ id: number }>(
+          `SELECT id FROM hse_records WHERE id = ? AND project_id = ?`,
+          id,
+          projectId,
+        )
+      : undefined;
   if (!existing) return NextResponse.json({ error: "Không tìm thấy ghi nhận" }, { status: 404 });
 
   await run(`DELETE FROM hse_records WHERE id = ?`, id);

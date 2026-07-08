@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, query } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import ReactPDF, { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/pdf-fonts";
 
@@ -132,27 +133,37 @@ export async function GET(
   if (!DATE_RE.test(date))
     return NextResponse.json({ error: "Ngày không hợp lệ (YYYY-MM-DD)" }, { status: 422 });
 
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Chưa có nhật ký ngày này" }, { status: 404 });
+
   const diary = await queryOne<DiaryRow>(
     `SELECT sd.diary_date AS "diaryDate", sd.weather_am AS "weatherAm", sd.weather_pm AS "weatherPm",
             sd.work_done AS "workDone", sd.obstacles, sd.safety_note AS "safetyNote", sd.status,
             u.name AS "lockedByName", sd.locked_at AS "lockedAt"
        FROM site_diaries sd
        LEFT JOIN users u ON u.id = sd.locked_by
-      WHERE sd.diary_date = ?`,
+      WHERE sd.diary_date = ? AND sd.project_id = ?`,
     date,
+    projectId,
   );
   if (!diary) return NextResponse.json({ error: "Chưa có nhật ký ngày này" }, { status: 404 });
 
   const manpower = await query<Manpower>(
     `SELECT dm.crew, dm.headcount, dm.note
        FROM diary_manpower dm JOIN site_diaries sd ON sd.id = dm.diary_id
-      WHERE sd.diary_date = ? ORDER BY dm.crew`,
+      WHERE sd.diary_date = ? AND sd.project_id = ? ORDER BY dm.crew`,
     date,
+    projectId,
   );
 
   const project = (await queryOne<Project>(
-    `SELECT name, contractor FROM projects ORDER BY id LIMIT 1`,
-  )) ?? { name: "XBoss", contractor: null };
+    `SELECT name, contractor FROM projects WHERE id = ?`,
+    projectId,
+  )) ?? {
+    name: "XBoss",
+    contractor: null,
+  };
 
   const stream = await ReactPDF.renderToStream(
     <DiaryDoc diary={diary} manpower={manpower} project={project} />,

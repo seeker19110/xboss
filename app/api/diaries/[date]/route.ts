@@ -1,38 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
-import { buildDiaryPrefill, assertDiaryUnlocked } from "@/lib/diary";
+import { getCurrentProjectId } from "@/lib/projects";
+import { buildDiaryPrefill, getDiaryByDate, assertDiaryUnlocked } from "@/lib/diary";
 
 export const dynamic = "force-dynamic";
 
 const canEdit = (r?: Role) => r === "admin" || r === "pm" || r === "engineer";
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-type DiaryRow = {
-  id: number;
-  diaryDate: string;
-  weatherAm: string | null;
-  weatherPm: string | null;
-  workDone: string | null;
-  obstacles: string | null;
-  safetyNote: string | null;
-  status: "draft" | "locked";
-  createdBy: number | null;
-  lockedBy: number | null;
-  lockedByName: string | null;
-  lockedAt: string | null;
-};
-
-const SELECT_DIARY = `
-  SELECT sd.id, sd.diary_date AS "diaryDate", sd.weather_am AS "weatherAm",
-         sd.weather_pm AS "weatherPm", sd.work_done AS "workDone", sd.obstacles,
-         sd.safety_note AS "safetyNote", sd.status, sd.created_by AS "createdBy",
-         sd.locked_by AS "lockedBy", u.name AS "lockedByName", sd.locked_at AS "lockedAt"
-    FROM site_diaries sd
-    LEFT JOIN users u ON u.id = sd.locked_by
-   WHERE sd.diary_date = ?`;
-
-// GET /api/diaries/:date → nhật ký ngày đó (null nếu chưa lập) + prefill tự tổng hợp.
+// GET /api/diaries/:date → nhật ký ngày đó (null nếu chưa lập, hoặc thuộc dự án khác —
+// M22) + prefill tự tổng hợp scoped theo dự án đang chọn.
 export async function GET(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ date: string }> },
@@ -43,7 +21,8 @@ export async function GET(
   if (!DATE_RE.test(date))
     return NextResponse.json({ error: "Ngày không hợp lệ (YYYY-MM-DD)" }, { status: 422 });
 
-  const diary = await queryOne<DiaryRow>(SELECT_DIARY, date);
+  const projectId = await getCurrentProjectId(user);
+  const diary = projectId != null ? await getDiaryByDate(date, projectId) : undefined;
   const manpower = diary
     ? await query<{ id: number; crew: string; headcount: number; note: string | null }>(
         `SELECT id, crew, headcount, note FROM diary_manpower WHERE diary_id = ? ORDER BY id`,
@@ -59,9 +38,9 @@ export async function GET(
       ).map((r) => r.photoId)
     : [];
 
-  const prefill = await buildDiaryPrefill(date);
+  const prefill = await buildDiaryPrefill(date, projectId ?? undefined);
 
-  return NextResponse.json({ diary, manpower, photoIds, prefill });
+  return NextResponse.json({ diary: diary ?? null, manpower, photoIds, prefill });
 }
 
 type ManpowerInput = { crew: string; headcount: number; note?: string | null };
@@ -79,6 +58,10 @@ export async function PUT(
     return NextResponse.json({ error: "Chỉ Admin/PM/Kỹ sư được lập nhật ký" }, { status: 403 });
   if (!DATE_RE.test(date))
     return NextResponse.json({ error: "Ngày không hợp lệ (YYYY-MM-DD)" }, { status: 422 });
+
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Chưa có dự án nào để lập nhật ký" }, { status: 422 });
 
   const body = await req.json().catch(() => ({}));
   const manpowerInput: ManpowerInput[] = Array.isArray(body.manpower) ? body.manpower : [];
@@ -103,10 +86,20 @@ export async function PUT(
 
   try {
     const diaryId = await withTransaction(async () => {
-      const existing = await queryOne<{ id: number; status: string }>(
-        `SELECT id, status FROM site_diaries WHERE diary_date = ? FOR UPDATE`,
+      // M22: site_diaries.diary_date UNIQUE toàn hệ thống (không phân biệt dự án — xem
+      // lib/diary.ts). Nếu ngày này đã có nhật ký thuộc DỰ ÁN KHÁC, chặn rõ ràng thay vì
+      // âm thầm ghi đè chéo dự án; chưa sửa UNIQUE constraint trong đợt PR3 này.
+      const existing = await queryOne<{ id: number; status: string; projectId: number | null }>(
+        `SELECT id, status, project_id AS "projectId" FROM site_diaries WHERE diary_date = ? FOR UPDATE`,
         date,
       );
+      if (existing && existing.projectId !== projectId)
+        throw Object.assign(
+          new Error(
+            "Ngày này đã có nhật ký thuộc dự án khác (mỗi ngày chỉ 1 nhật ký toàn hệ thống)",
+          ),
+          { status: 409 },
+        );
       assertDiaryUnlocked(existing?.status);
 
       let id: number;
@@ -126,8 +119,8 @@ export async function PUT(
       } else {
         const inserted = await queryOne<{ id: number }>(
           `INSERT INTO site_diaries (diary_date, weather_am, weather_pm, work_done, obstacles,
-                                      safety_note, created_by)
-           VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+                                      safety_note, created_by, project_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
           date,
           body.weatherAm ?? null,
           body.weatherPm ?? null,
@@ -135,6 +128,7 @@ export async function PUT(
           body.obstacles ?? null,
           body.safetyNote ?? null,
           user.id,
+          projectId,
         );
         id = inserted!.id;
       }
@@ -163,7 +157,7 @@ export async function PUT(
       return id;
     });
 
-    const diary = await queryOne<DiaryRow>(SELECT_DIARY, date);
+    const diary = await getDiaryByDate(date, projectId);
     return NextResponse.json({ id: diaryId, diary });
   } catch (err: unknown) {
     const e = err as { message?: string; status?: number };

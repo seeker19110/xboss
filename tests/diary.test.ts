@@ -173,3 +173,35 @@ test(
     await run(`DELETE FROM site_diaries WHERE id = ?`, diaryId);
   },
 );
+
+test(
+  "getDiaryByDate/listDiaryCalendar: scoped đúng theo project_id (M22), không lẫn dự án khác",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { getDiaryByDate, listDiaryCalendar } = await import("@/lib/diary");
+
+    const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA NK 1', 'PJT-NK1')`);
+    const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA NK 2', 'PJT-NK2')`);
+    // Ngày khác nhau — site_diaries.diary_date UNIQUE toàn hệ thống nên 2 dự án không
+    // thể cùng có nhật ký chung 1 ngày (xem ghi chú M22 trong lib/diary.ts).
+    const d1 = await insertId(
+      `INSERT INTO site_diaries (diary_date, project_id) VALUES ('2026-06-21', ?)`,
+      p1,
+    );
+    const d2 = await insertId(
+      `INSERT INTO site_diaries (diary_date, project_id) VALUES ('2026-06-22', ?)`,
+      p2,
+    );
+
+    assert.ok(await getDiaryByDate("2026-06-21", p1));
+    assert.equal(await getDiaryByDate("2026-06-22", p1), undefined);
+
+    const cal1 = await listDiaryCalendar("2026-06-01", "2026-07-01", p1);
+    assert.ok(cal1.days.some((d) => d.date === "2026-06-21"));
+    assert.ok(!cal1.days.some((d) => d.date === "2026-06-22"));
+
+    await run(`DELETE FROM site_diaries WHERE id IN (?, ?)`, d1, d2);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+  },
+);

@@ -1,48 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne, insertId } from "@/lib/db";
+import { queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
-import { validateChecklistItems } from "@/lib/qaqc";
+import { getCurrentProjectId } from "@/lib/projects";
+import { listQcChecklists, validateChecklistItems } from "@/lib/qaqc";
 
 export const dynamic = "force-dynamic";
 
-type ChecklistRow = {
-  id: number;
-  name: string;
-  category: string;
-  disciplineId: number | null;
-  disciplineCode: string | null;
-  disciplineName: string | null;
-  required: boolean;
-  items: unknown;
-  active: boolean;
-};
-
-// GET /api/qc/checklists?discipline=<code> — mọi user đăng nhập xem mẫu checklist.
+// GET /api/qc/checklists?discipline=<code> — mọi user đăng nhập xem mẫu checklist,
+// scoped theo dự án đang chọn (M22).
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
-  const discipline = req.nextUrl.searchParams.get("discipline")?.trim() || null;
+  const discipline = req.nextUrl.searchParams.get("discipline")?.trim() || undefined;
 
-  const rows = await query<ChecklistRow>(
-    `SELECT c.id, c.name, c.category, c.discipline_id AS "disciplineId",
-            d.code AS "disciplineCode", d.name AS "disciplineName",
-            c.required, c.items, c.active
-       FROM qc_checklists c
-       LEFT JOIN disciplines d ON d.id = c.discipline_id
-      ${discipline ? "WHERE d.code = ?" : ""}
-      ORDER BY c.id`,
-    ...(discipline ? [discipline] : []),
-  );
-  return NextResponse.json({ checklists: rows });
+  const projectId = await getCurrentProjectId(user);
+  const checklists = projectId != null ? await listQcChecklists({ discipline, projectId }) : [];
+  return NextResponse.json({ checklists });
 }
 
-// POST /api/qc/checklists — tạo mẫu checklist mới (Admin/PM).
+// POST /api/qc/checklists — tạo mẫu checklist mới (Admin/PM), gán project_id = dự án
+// đang chọn (server suy, không tin client).
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editStructure(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM được tạo mẫu checklist" }, { status: 403 });
+
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Chưa có dự án nào để tạo checklist" }, { status: 422 });
 
   const body = await req.json().catch(() => null);
   const name = typeof body?.name === "string" ? body.name.trim() : "";
@@ -66,13 +53,14 @@ export async function POST(req: NextRequest) {
   const required = body?.required === true;
 
   const id = await insertId(
-    `INSERT INTO qc_checklists (name, category, discipline_id, required, items)
-     VALUES (?, ?, ?, ?, ?::jsonb)`,
+    `INSERT INTO qc_checklists (name, category, discipline_id, required, items, project_id)
+     VALUES (?, ?, ?, ?, ?::jsonb, ?)`,
     name,
     category,
     disciplineId,
     required,
     JSON.stringify(items),
+    projectId,
   );
 
   return NextResponse.json({ id }, { status: 201 });

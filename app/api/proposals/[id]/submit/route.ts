@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { run, queryOne, todayISO } from "@/lib/db";
 import { getCurrentUser, isAdminOrPm } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -16,10 +17,15 @@ export async function POST(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const proposal = await queryOne<{ id: number; status: string; requested_by: number }>(
-    `SELECT id, status, requested_by FROM proposals WHERE id = ?`,
-    id,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const proposal =
+    projectId != null
+      ? await queryOne<{ id: number; status: string; requested_by: number }>(
+          `SELECT id, status, requested_by FROM proposals WHERE id = ? AND project_id = ?`,
+          id,
+          projectId,
+        )
+      : undefined;
   if (!proposal) return NextResponse.json({ error: "Không tìm thấy đề xuất" }, { status: 404 });
   if (proposal.requested_by !== user.id && !isAdminOrPm(user.role))
     return NextResponse.json(

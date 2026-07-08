@@ -350,3 +350,43 @@ test("validateInspectionResults: chấp nhận mảng hợp lệ, từ chối d�
   assert.equal(validateInspectionResults("not-an-array"), false);
   assert.equal(validateInspectionResults([{ label: "X", pass: "yes" }]), false);
 });
+
+test(
+  "listQcChecklists/listNcrs: scoped đúng theo project_id (M22), không lẫn dự án khác",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { listQcChecklists, listNcrs } = await import("@/lib/qaqc");
+
+    const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA QC 1', 'PJT-QC1')`);
+    const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA QC 2', 'PJT-QC2')`);
+    const c1 = await insertId(
+      `INSERT INTO qc_checklists (name, category, items, project_id) VALUES ('Checklist DA1', 'work', '[]'::jsonb, ?)`,
+      p1,
+    );
+    const c2 = await insertId(
+      `INSERT INTO qc_checklists (name, category, items, project_id) VALUES ('Checklist DA2', 'work', '[]'::jsonb, ?)`,
+      p2,
+    );
+    const n1 = await insertId(
+      `INSERT INTO ncrs (code, description, project_id) VALUES ('NCR-SCOPE-1', 'NCR DA1', ?)`,
+      p1,
+    );
+    const n2 = await insertId(
+      `INSERT INTO ncrs (code, description, project_id) VALUES ('NCR-SCOPE-2', 'NCR DA2', ?)`,
+      p2,
+    );
+
+    const checklists1 = await listQcChecklists({ projectId: p1 });
+    assert.ok(checklists1.some((c) => c.id === c1));
+    assert.ok(!checklists1.some((c) => c.id === c2));
+
+    const ncrs1 = await listNcrs({ projectId: p1 });
+    assert.ok(ncrs1.some((n) => n.id === n1));
+    assert.ok(!ncrs1.some((n) => n.id === n2));
+
+    await run(`DELETE FROM qc_checklists WHERE id IN (?, ?)`, c1, c2);
+    await run(`DELETE FROM ncrs WHERE id IN (?, ?)`, n1, n2);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+  },
+);

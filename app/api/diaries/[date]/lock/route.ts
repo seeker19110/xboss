@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { canLockDiary, canUnlockDiary } from "@/lib/diary";
 
 export const dynamic = "force-dynamic";
@@ -20,12 +21,18 @@ export async function POST(
   if (!DATE_RE.test(date))
     return NextResponse.json({ error: "Ngày không hợp lệ (YYYY-MM-DD)" }, { status: 422 });
 
+  const projectId = await getCurrentProjectId(user);
+
   try {
     await withTransaction(async () => {
-      const diary = await queryOne<{ id: number; status: string }>(
-        `SELECT id, status FROM site_diaries WHERE diary_date = ? FOR UPDATE`,
-        date,
-      );
+      const diary =
+        projectId != null
+          ? await queryOne<{ id: number; status: string }>(
+              `SELECT id, status FROM site_diaries WHERE diary_date = ? AND project_id = ? FOR UPDATE`,
+              date,
+              projectId,
+            )
+          : undefined;
       if (!diary)
         throw Object.assign(new Error("Chưa có nhật ký ngày này để khoá"), { status: 404 });
       if (diary.status === "locked")
@@ -63,12 +70,18 @@ export async function DELETE(
   if (!DATE_RE.test(date))
     return NextResponse.json({ error: "Ngày không hợp lệ (YYYY-MM-DD)" }, { status: 422 });
 
+  const projectId = await getCurrentProjectId(user);
+
   try {
     await withTransaction(async () => {
-      const diary = await queryOne<{ id: number; status: string }>(
-        `SELECT id, status FROM site_diaries WHERE diary_date = ? FOR UPDATE`,
-        date,
-      );
+      const diary =
+        projectId != null
+          ? await queryOne<{ id: number; status: string }>(
+              `SELECT id, status FROM site_diaries WHERE diary_date = ? AND project_id = ? FOR UPDATE`,
+              date,
+              projectId,
+            )
+          : undefined;
       if (!diary) throw Object.assign(new Error("Chưa có nhật ký ngày này"), { status: 404 });
       if (diary.status !== "locked")
         throw Object.assign(new Error("Nhật ký chưa khoá"), { status: 409 });
