@@ -16,7 +16,7 @@
 
 | Module | Phạm vi | Cụm | Công sức |
 |---|---|---|---|
-| **M21** | AppShell IA đầy đủ + cây `dashboardTree.ts` + trang hub | (nền) | M |
+| **M21** | AppShell IA đầy đủ + cây `dashboardTree.ts` + trang hub + **quản trị hiển thị** (admin/PM bật-tắt mục, notification `nav_enabled` khi admin bật) | (nền) | M |
 | **M22** | Multi-project: Portfolio, project switcher, scoping `project_id`, `user_projects` | Tầng 0–1 | L |
 | **M23** | Khởi động & Pháp lý | B | M |
 | **M24** | Nhân sự & Tổ chức | B | L |

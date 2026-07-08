@@ -232,6 +232,60 @@ Mỗi dashboard cấp 3 có một **trang hub** render cây con (D/E/F/G) dạng
 mỗi lá là link/badge trạng thái — tái dùng khuôn `/he/[code]`. Đây là nơi chứa
 chiều sâu, giữ sidebar gọn.
 
+### 4.4. Quản lý hiển thị mục AppShell (bật/tắt từ trang Admin)
+
+PM/Admin chủ động **bật/tắt từng mục** trong AppShell (cụm · dashboard · section) —
+để hé lộ dần dashboard mới, ẩn mục chưa dùng cho dự án cụ thể, hoặc gọn hoá sidebar
+theo giai đoạn thi công.
+
+**Vị trí & quyền:**
+
+- Bổ sung khu **"Hiển thị AppShell"** vào trang `/admin` (đã có, role admin/pm).
+- Quyền bật/tắt: **admin + pm** — thêm hàm `CAN.manageNav` vào map `CAN`
+  (`lib/auth.ts`), kiểm ở API (không rải rác role trong route).
+- Danh sách render đúng cây `dashboardTree.ts`: tick theo node, gập theo cụm; mỗi
+  dòng có tên + trạng thái (available/coming-soon) + công tắc.
+
+**Mô hình dữ liệu:** bảng `nav_settings` (append-only migration):
+
+| cột | ý nghĩa |
+|---|---|
+| `node_key` | id node trong `dashboardTree` (vd `dash.moi-truong`, `cluster.tai-chinh`) |
+| `enabled` | bật/tắt hiển thị |
+| `project_id` | NULL = áp toàn hệ thống; có = ghi đè riêng cho 1 dự án (đa dự án M22) |
+| `updated_by`, `updated_at` | audit ai đổi lúc nào |
+
+- **Mặc định (khi chưa có bản ghi):** node `available` → bật; node `coming-soon` →
+  tắt (chỉ hiện khi được bật thủ công để "xem trước"). Không cần seed — suy từ `status`.
+- **Bật một cụm** cha kéo theo hiển thị cụm; tắt cụm ẩn cả nhóm. Node `coming-soon`
+  dù bật vẫn `aria-disabled` (chưa có route) — bật ở đây = *cho hiện badge "Sắp có"*.
+
+**API:**
+
+- `GET /api/nav-settings` — mọi user đã đăng nhập; AppShell gọi để lọc sidebar
+  (kết hợp với `canSeeNavItem` theo vai trò). Cache nhẹ, revalidate khi đổi.
+- `PATCH /api/nav-settings` — `CAN.manageNav` (admin/pm), body `{ nodeKey, enabled,
+  projectId? }`; upsert `ON CONFLICT`, ghi audit. `export const dynamic = "force-dynamic"`.
+- `canSeeNavItem(node, role, navSettings)` mở rộng: ẩn nếu `enabled=false`
+  (quyền vai trò vẫn là lớp bảo mật chính ở API — đây chỉ là hiển thị).
+
+**Thông báo — admin bật thì PM được báo:**
+
+- Khi **actor là admin** và PATCH chuyển một mục `enabled: false → true`, tạo
+  notification loại mới **`nav_enabled`** cho **tất cả user role `pm`** (và admin
+  khác nếu muốn): _"Admin đã bật mục «Dashboard Môi trường» trong menu"_ + link tới
+  mục đó.
+- Khác 4 loại notification đồng bộ-điều-kiện hiện có (`delayed`/`due_soon`/`comment`/
+  `material_over` tự dọn khi hết điều kiện): `nav_enabled` là **sự kiện một lần** —
+  tạo lúc bật, đọc/ẩn bình thường, **không** auto-clean. Dedup theo `node_key` để
+  bật-tắt-bật nhiều lần không spam (chỉ 1 bản chưa đọc/ node).
+- Gửi kèm **Web Push** qua `lib/push.ts` (no-op khi thiếu VAPID) tới thiết bị PM.
+- PM tự bật/tắt thì **không** phát `nav_enabled` (chỉ chiều admin→PM như yêu cầu);
+  có thể ghi audit log để admin xem lịch sử.
+
+**Công sức:** S–M, gắn vào **M21** (cùng đợt AppShell) như một PR riêng
+(`M21 · PR quản trị hiển thị`). Phụ thuộc cây `dashboardTree.ts` đã có.
+
 ## 5. Ảnh hưởng kiến trúc — đa dự án
 
 Đây là thay đổi nền tảng, cần ADR riêng trước khi code:
@@ -291,6 +345,10 @@ tài liệu** — mỗi module M<x> khi hoàn thành chỉ đổi `status` node 
 - [ ] Sidebar render cây 2 tầng, gập/mở nhớ `localStorage`, cụm chứa trang hiện tại
       tự mở; node `coming-soon` `aria-disabled`, không phải link.
 - [ ] Trang hub khuôn chung render cây con + badge; áp cho ≥2 dashboard mẫu.
+- [ ] Trang `/admin` có khu "Hiển thị AppShell" (bật/tắt node, quyền `CAN.manageNav`);
+      `nav_settings` + `GET/PATCH /api/nav-settings`; AppShell lọc theo settings.
+- [ ] Admin bật một mục → notification `nav_enabled` tới mọi PM (+ Web Push), dedup
+      theo `node_key`, không phát khi PM tự bật.
 - [ ] Topbar title/breadcrumb suy đúng theo cây mới; tương phản đủ 2 theme; axe xanh
       desktop + mobile; `e2e/authed/appshell.spec.ts` cập nhật.
 - [ ] `lint` + `typecheck` + `build` xanh; cập nhật `PROGRESS.md` + tài liệu này.
