@@ -54,3 +54,77 @@ test(
     await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
   },
 );
+
+test(
+  "listProjects/portfolioKpi: % tiến độ + số việc trễ tính đúng theo dự án, không lẫn dự án khác",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { listProjects, portfolioKpi } = await import("@/lib/projects");
+
+    const YESTERDAY = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
+
+    const p1 = await insertId(
+      `INSERT INTO projects (name, code, status) VALUES ('DA Portfolio 1', 'PJT-PF1', 'active')`,
+    );
+    const p2 = await insertId(
+      `INSERT INTO projects (name, code, status) VALUES ('DA Portfolio 2', 'PJT-PF2', 'closed')`,
+    );
+    const tw1 = await insertId(`INSERT INTO towers (project_id, name) VALUES (?, 'Tháp PF1')`, p1);
+    const tw2 = await insertId(`INSERT INTO towers (project_id, name) VALUES (?, 'Tháp PF2')`, p2);
+    const st1 = await insertId(
+      `INSERT INTO sheet_types (tower_id, code, name) VALUES (?, 'PF1SHEET', 'Sheet PF1')`,
+      tw1,
+    );
+    const st2 = await insertId(
+      `INSERT INTO sheet_types (tower_id, code, name) VALUES (?, 'PF2SHEET', 'Sheet PF2')`,
+      tw2,
+    );
+    const pkg1 = await insertId(
+      `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'PF1', 'Nhóm PF1')`,
+      st1,
+    );
+    const pkg2 = await insertId(
+      `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'PF2', 'Nhóm PF2')`,
+      st2,
+    );
+
+    // Dự án 1: 1 task 100%, 1 task trễ (0%, quá hạn) → avg 50%, 1 việc trễ.
+    await insertId(
+      `INSERT INTO tasks (package_id, code, name, progress_percent, status) VALUES (?, 'PF1,01', 'Task xong', 1, 'hoan_thanh')`,
+      pkg1,
+    );
+    await insertId(
+      `INSERT INTO tasks (package_id, code, name, progress_percent, end_date, status) VALUES (?, 'PF1,02', 'Task trễ', 0, ?, 'tre')`,
+      pkg1,
+      YESTERDAY,
+    );
+    // Dự án 2: 1 task 100%, không trễ.
+    await insertId(
+      `INSERT INTO tasks (package_id, code, name, progress_percent, status) VALUES (?, 'PF2,01', 'Task xong', 1, 'hoan_thanh')`,
+      pkg2,
+    );
+
+    const admin = { id: -1, role: "admin" as const };
+    const list = await listProjects(admin);
+    const l1 = list.find((p) => p.id === p1);
+    const l2 = list.find((p) => p.id === p2);
+    assert.ok(l1 && l2);
+    assert.equal(l1!.progressPercent, 0.5);
+    assert.equal(l1!.delayedCount, 1);
+    assert.equal(l1!.status, "active");
+    assert.equal(l2!.progressPercent, 1);
+    assert.equal(l2!.delayedCount, 0);
+    assert.equal(l2!.status, "closed");
+
+    const kpi = await portfolioKpi(admin);
+    assert.ok(kpi.totalProjects >= 2);
+    assert.ok(kpi.totalDelayed >= 1);
+
+    await run(`DELETE FROM tasks WHERE package_id IN (?, ?)`, pkg1, pkg2);
+    await run(`DELETE FROM work_packages WHERE id IN (?, ?)`, pkg1, pkg2);
+    await run(`DELETE FROM sheet_types WHERE id IN (?, ?)`, st1, st2);
+    await run(`DELETE FROM towers WHERE id IN (?, ?)`, tw1, tw2);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+  },
+);

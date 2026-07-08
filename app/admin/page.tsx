@@ -17,11 +17,15 @@ import {
   CalendarClock,
   HardDrive,
   LayoutDashboard,
+  Building2,
+  Trash2,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
+import { appConfirm } from "@/app/components/dialogs";
 import { fetchMe } from "@/app/lib/me";
 import { ROLE_LABELS } from "@/lib/roles";
 import { DASHBOARD_TREE, dashboardStatus } from "@/app/lib/dashboardTree";
+import { disciplineColorClasses } from "@/lib/disciplineColors";
 
 type User = { id: number; name: string; role: string };
 type Sheet = {
@@ -52,6 +56,16 @@ type Task = {
   assigneeName: string | null;
 };
 type Workload = Record<number, { total: number; delayed: number }>;
+type ProjectRow = {
+  id: number;
+  name: string;
+  code: string | null;
+  status: "active" | "handover" | "closed";
+  color: string | null;
+  progressPercent: number;
+  delayedCount: number;
+};
+const PROJECT_COLORS = ["zinc", "amber", "sky", "violet", "emerald", "rose"] as const;
 type AuditRow = {
   id: number;
   level: string;
@@ -89,7 +103,7 @@ function fmtDt(s: string) {
 
 export default function AdminPage() {
   const [me, setMe] = useState<{ id: number; role: string } | null>(null);
-  const [tab, setTab] = useState<"assign" | "nav" | "audit" | "traffic">("assign");
+  const [tab, setTab] = useState<"assign" | "nav" | "projects" | "audit" | "traffic">("assign");
   const [traffic, setTraffic] = useState<TrafficEntry[]>([]);
   const [trafficLive, setTrafficLive] = useState(false);
   const trafficLatestRef = useRef(0);
@@ -114,6 +128,13 @@ export default function AdminPage() {
   // Hiển thị AppShell (M21 PR3): bật/tắt dashboard trong sidebar.
   const [navSettings, setNavSettings] = useState<Record<string, boolean>>({});
   const [navLoading, setNavLoading] = useState(false);
+  // Quản lý dự án + gán user (M22 PR2).
+  const [projects, setProjects] = useState<ProjectRow[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [newProject, setNewProject] = useState({ name: "", code: "", color: "" });
+  const [assignUserId, setAssignUserId] = useState<number | null>(null);
+  const [userProjectIds, setUserProjectIds] = useState<Set<number>>(new Set());
+  const [userProjectsMap, setUserProjectsMap] = useState<Record<number, number[]>>({});
 
   const loadAssign = useCallback((unassignedOnly = false) => {
     const q = unassignedOnly ? "?unassignedOnly=1" : "";
@@ -144,6 +165,27 @@ export default function AdminPage() {
       .finally(() => setNavLoading(false));
   }, []);
 
+  const loadProjects = useCallback(() => {
+    setProjectsLoading(true);
+    Promise.all([
+      fetch("/api/projects").then((r) => (r.ok ? r.json() : { projects: [] })),
+      fetch("/api/user-projects").then((r) => (r.ok ? r.json() : { assignments: [] })),
+    ])
+      .then(([projRes, assignRes]) => {
+        setProjects(projRes.projects ?? []);
+        const map: Record<number, number[]> = {};
+        for (const a of assignRes.assignments ?? []) {
+          (map[a.userId] ??= []).push(a.projectId);
+        }
+        setUserProjectsMap(map);
+      })
+      .finally(() => setProjectsLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (assignUserId != null) setUserProjectIds(new Set(userProjectsMap[assignUserId] ?? []));
+  }, [assignUserId, userProjectsMap]);
+
   useEffect(() => {
     fetchMe().then((user) => {
       if (!user) return;
@@ -164,6 +206,10 @@ export default function AdminPage() {
   useEffect(() => {
     if (tab === "nav") loadNav();
   }, [tab, loadNav]);
+
+  useEffect(() => {
+    if (tab === "projects") loadProjects();
+  }, [tab, loadProjects]);
 
   // SSE traffic: kết nối khi chuyển sang tab traffic (chỉ Admin), đóng khi rời.
   useEffect(() => {
@@ -254,6 +300,93 @@ export default function AdminPage() {
     } catch {
       setError("Mất kết nối mạng — vui lòng thử lại");
       setNavSettings((prev) => ({ ...prev, [nodeKey]: prevValue }));
+    }
+  }
+
+  async function createProject() {
+    const name = newProject.name.trim();
+    if (!name) {
+      setError("Thiếu tên dự án");
+      return;
+    }
+    try {
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          code: newProject.code.trim() || undefined,
+          color: newProject.color || undefined,
+        }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(j.error ?? "Lỗi không xác định");
+        return;
+      }
+      flash(`Đã tạo dự án "${name}"`);
+      setNewProject({ name: "", code: "", color: "" });
+      loadProjects();
+    } catch {
+      setError("Mất kết nối mạng — vui lòng thử lại");
+    }
+  }
+
+  async function updateProject(id: number, patch: Partial<Pick<ProjectRow, "status" | "color">>) {
+    const prev = projects;
+    setProjects((p) => p.map((x) => (x.id === id ? { ...x, ...patch } : x))); // optimistic
+    try {
+      const res = await fetch(`/api/projects/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setError(j.error ?? "Lỗi không xác định");
+        setProjects(prev);
+        return;
+      }
+      flash("Đã cập nhật dự án");
+    } catch {
+      setError("Mất kết nối mạng — vui lòng thử lại");
+      setProjects(prev);
+    }
+  }
+
+  async function deleteProject(id: number, name: string) {
+    if (!(await appConfirm(`Xoá dự án "${name}"? Chỉ xoá được khi dự án chưa có dữ liệu.`))) return;
+    try {
+      const res = await fetch(`/api/projects/${id}`, { method: "DELETE" });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(j.error ?? "Lỗi không xác định");
+        return;
+      }
+      flash(`Đã xoá dự án "${name}"`);
+      loadProjects();
+    } catch {
+      setError("Mất kết nối mạng — vui lòng thử lại");
+    }
+  }
+
+  async function saveUserProjects() {
+    if (assignUserId == null) return;
+    try {
+      const res = await fetch("/api/user-projects", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: assignUserId, projectIds: [...userProjectIds] }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(j.error ?? "Lỗi không xác định");
+        return;
+      }
+      flash("Đã lưu dự án được gán");
+      setUserProjectsMap((m) => ({ ...m, [assignUserId]: [...userProjectIds] }));
+    } catch {
+      setError("Mất kết nối mạng — vui lòng thử lại");
     }
   }
 
@@ -371,18 +504,21 @@ export default function AdminPage() {
             [
               ["assign", "Phân công", null],
               ["nav", "Hiển thị AppShell", "nav"],
+              ["projects", "Dự án", "projects"],
               ["audit", "Lịch sử", "audit"],
               ["traffic", "Traffic", "traffic"],
             ] as const
           )
             .filter(([key]) => key !== "traffic" || me?.role === "admin")
+            .filter(([key]) => key !== "projects" || me?.role === "admin")
             .map(([key, label, icon]) => (
               <button
                 key={key}
-                onClick={() => setTab(key as "assign" | "nav" | "audit" | "traffic")}
+                onClick={() => setTab(key as "assign" | "nav" | "projects" | "audit" | "traffic")}
                 className={`px-3 py-1 rounded text-sm flex items-center gap-1 ${tab === key ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-white"}`}
               >
                 {icon === "nav" && <LayoutDashboard className="w-3.5 h-3.5" />}
+                {icon === "projects" && <Building2 className="w-3.5 h-3.5" />}
                 {icon === "audit" && <History className="w-3.5 h-3.5" />}
                 {icon === "traffic" && <Activity className="w-3.5 h-3.5" />}
                 {label}
@@ -680,6 +816,174 @@ export default function AdminPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* ========== TAB QUẢN LÝ DỰ ÁN (M22 PR2) ========== */}
+        {tab === "projects" && me?.role === "admin" && (
+          <div className="space-y-6">
+            {projectsLoading && <p className="text-sm text-zinc-500">Đang tải…</p>}
+
+            <div className="rounded-lg border border-zinc-800 overflow-hidden">
+              <div className="px-4 py-2 border-b border-zinc-800 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                Danh sách dự án
+              </div>
+              <div className="divide-y divide-zinc-800/60">
+                {projects.map((p) => {
+                  const c = disciplineColorClasses(p.color);
+                  return (
+                    <div key={p.id} className="flex items-center gap-3 px-4 py-2.5 flex-wrap">
+                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${c.dot}`} />
+                      <div className="flex-1 min-w-[140px]">
+                        <p className="text-sm font-medium truncate">{p.name}</p>
+                        {p.code && <p className="text-xs text-zinc-500">{p.code}</p>}
+                      </div>
+                      <span className="text-xs tabular-nums text-zinc-400">
+                        {Math.round(p.progressPercent * 100)}% · {p.delayedCount} trễ
+                      </span>
+                      <select
+                        value={p.status}
+                        aria-label={`Trạng thái dự án ${p.name}`}
+                        onChange={(e) =>
+                          updateProject(p.id, { status: e.target.value as ProjectRow["status"] })
+                        }
+                        className="bg-zinc-900 border border-zinc-700 rounded text-sm px-2 py-1"
+                      >
+                        <option value="active">Đang thi công</option>
+                        <option value="handover">Đã bàn giao</option>
+                        <option value="closed">Đã đóng</option>
+                      </select>
+                      <select
+                        value={p.color ?? ""}
+                        aria-label={`Màu nhận diện dự án ${p.name}`}
+                        onChange={(e) => updateProject(p.id, { color: e.target.value || null })}
+                        className="bg-zinc-900 border border-zinc-700 rounded text-sm px-2 py-1"
+                      >
+                        <option value="">Mặc định</option>
+                        {PROJECT_COLORS.map((col) => (
+                          <option key={col} value={col}>
+                            {col}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => deleteProject(p.id, p.name)}
+                        aria-label={`Xoá dự án ${p.name}`}
+                        className="p-1.5 rounded text-zinc-500 hover:text-red-400 hover:bg-red-950/40"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+                {projects.length === 0 && !projectsLoading && (
+                  <p className="px-4 py-4 text-sm text-zinc-500">Chưa có dự án nào.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-zinc-800 p-4 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                Tạo dự án mới
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <input
+                  value={newProject.name}
+                  onChange={(e) => setNewProject((s) => ({ ...s, name: e.target.value }))}
+                  placeholder="Tên dự án"
+                  aria-label="Tên dự án mới"
+                  className="bg-zinc-900 border border-zinc-700 rounded text-sm px-2 py-1.5 flex-1 min-w-[160px]"
+                />
+                <input
+                  value={newProject.code}
+                  onChange={(e) => setNewProject((s) => ({ ...s, code: e.target.value }))}
+                  placeholder="Mã (tuỳ chọn)"
+                  aria-label="Mã dự án mới"
+                  className="bg-zinc-900 border border-zinc-700 rounded text-sm px-2 py-1.5 w-32"
+                />
+                <select
+                  value={newProject.color}
+                  onChange={(e) => setNewProject((s) => ({ ...s, color: e.target.value }))}
+                  aria-label="Màu nhận diện dự án mới"
+                  className="bg-zinc-900 border border-zinc-700 rounded text-sm px-2 py-1.5"
+                >
+                  <option value="">Màu mặc định</option>
+                  {PROJECT_COLORS.map((col) => (
+                    <option key={col} value={col}>
+                      {col}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={createProject}
+                  className="px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 text-sm text-white"
+                >
+                  Tạo dự án
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-zinc-800 p-4 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                Gán user ↔ dự án
+              </p>
+              <p className="text-sm text-zinc-400">
+                Chưa gán ai (bảng rỗng) = mọi user thấy mọi dự án. Gán ít nhất 1 user thì các user
+                chưa được gán sẽ không thấy dự án nào cho tới khi được gán.
+              </p>
+              <select
+                value={assignUserId ?? ""}
+                onChange={(e) => setAssignUserId(e.target.value ? Number(e.target.value) : null)}
+                aria-label="Chọn người dùng để gán dự án"
+                className="bg-zinc-900 border border-zinc-700 rounded text-sm px-2 py-1.5"
+              >
+                <option value="">— Chọn người dùng —</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} ({ROLE_LABEL[u.role] ?? u.role})
+                  </option>
+                ))}
+              </select>
+              {assignUserId != null && (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-2">
+                    {projects.map((p) => {
+                      const checked = userProjectIds.has(p.id);
+                      return (
+                        <label
+                          key={p.id}
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm cursor-pointer min-h-10 ${
+                            checked
+                              ? "border-emerald-700 bg-emerald-950/30 text-emerald-300"
+                              : "border-zinc-700 text-zinc-400"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) =>
+                              setUserProjectIds((prev) => {
+                                const next = new Set(prev);
+                                if (e.target.checked) next.add(p.id);
+                                else next.delete(p.id);
+                                return next;
+                              })
+                            }
+                          />
+                          {p.name}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <button
+                    onClick={saveUserProjects}
+                    className="px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 text-sm text-white"
+                  >
+                    Lưu dự án được gán
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
