@@ -25,14 +25,14 @@ Làm việc với vai trò **kỹ sư full-stack senior kiêm chuyên gia thiế
   - `coder` (Sonnet, xem `.claude/agents/coder.md`) — code tính năng **theo đặc tả Opus vừa viết** (hoặc đặc tả có sẵn trong `docs/nang-cap/M<xx>-*.md`, `PROJECT.md`/`spec.md`), **fix lỗi** có cách tái hiện/thông báo cụ thể, viết/bổ sung test, script backfill/import theo mẫu, refactor phạm vi rõ ràng, verify tính năng thật, xử lý review comment cụ thể.
   - `mechanical` (Haiku, xem `.claude/agents/mechanical.md`) — việc lặp lại, ít cần phán đoán: sửa lint/typecheck theo thông báo có sẵn, đổi tên hàng loạt, CRUD/route bám mẫu có sẵn, cập nhật test theo signature đã đổi.
   - `reviewer` (Sonnet, xem `.claude/agents/reviewer.md`) — tự soát diff bằng skill `code-review` sau khi `coder`/`mechanical` code xong, trước khi Opus duyệt cuối.
-  Việc nhỏ, chạm ít file, hoặc cần giữ liền mạch ngữ cảnh quyết định vừa chốt trong hội thoại thì Opus tự code thẳng như quy trình cũ — đúng nhịp "1 phiên ≈ 1-2 PR + verify thật" ở `docs/ke-hoach-fastcons-2026-07.md` §4, không bắt buộc vòng qua subagent cho mọi việc.
+    Việc nhỏ, chạm ít file, hoặc cần giữ liền mạch ngữ cảnh quyết định vừa chốt trong hội thoại thì Opus tự code thẳng như quy trình cũ — đúng nhịp "1 phiên ≈ 1-2 PR + verify thật" ở `docs/ke-hoach-fastcons-2026-07.md` §4, không bắt buộc vòng qua subagent cho mọi việc.
 
 ## Lệnh thường dùng
 
 ```bash
 npm run dev          # dev server (cần .env.local với DATABASE_URL)
 npm run build        # build production (không cần DB thật — pool kết nối lazy)
-npm run lint         # next lint (.eslintrc.json — next/core-web-vitals)
+npm run lint         # next lint (eslint.config.mjs — flat config, next/core-web-vitals)
 npm run typecheck    # tsc --noEmit
 npm test             # node:test qua tsx — 3 file trong tests/
 npx tsx --test tests/status.test.ts   # chạy 1 file test
