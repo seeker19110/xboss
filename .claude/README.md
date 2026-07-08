@@ -2,6 +2,8 @@
 
 Tài liệu này mô tả cơ chế phân việc theo tầng model đang dùng trong repo này, để có thể **copy sang repo khác** một cách nhanh gọn. Đây là tính năng của Claude Code CLI (không phải code của XBoss) — hoạt động qua 2 loại file: `.claude/settings.json` (cấu hình phiên chính) và `.claude/agents/*.md` (định nghĩa subagent tuỳ biến).
 
+> ⚠️ **Copy `.claude/` thôi là CHƯA ĐỦ.** Các file `.claude/agents/*.md` chỉ khai báo subagent **tồn tại** — không có gì khiến Opus **chủ động gọi** chúng. Điều khiến Opus biết "việc này nên giao cho `coder`/`reviewer`/`mechanical`" là 1 bullet nằm ở **`CLAUDE.md` gốc repo đích** (ngoài `.claude/`, dễ quên khi copy). Thiếu bullet đó, subagent vẫn gọi được thủ công nhưng Opus sẽ mặc định tự code hết như không có cấu hình này. Xem template copy-paste ở mục 5, bước 4.
+
 ## 1. Ý tưởng
 
 4 tầng, phân theo độ khó của việc — mục tiêu: chỉ dùng model đắt/chậm (Opus) cho việc thật sự cần phán đoán, còn lại đẩy xuống model rẻ/nhanh hơn:
@@ -22,6 +24,7 @@ Phiên chính gọi các subagent qua tool `Agent` (không phải helper riêng 
 .claude/agents/coder.md     # subagent Sonnet
 .claude/agents/reviewer.md  # subagent Sonnet
 .claude/agents/mechanical.md # subagent Haiku
+CLAUDE.md                   # KHÔNG nằm trong .claude/ — thêm 1 bullet uỷ thác (mục 5, bước 4). Dễ quên nhất vì nó không nằm trong thư mục copy.
 ```
 
 Không thể gom vào 1 file — Claude Code chỉ cho định nghĩa subagent tuỳ biến qua file `.md` riêng trong `.claude/agents/`, mỗi file có frontmatter (`name`, `description`, `tools`, `model`) + system prompt riêng ở phần thân. `settings.json` không có trường nào để khai báo subagent inline.
@@ -69,9 +72,16 @@ Nội dung 3 file hiện có trong repo này (`coder.md`, `mechanical.md`, `revi
 1. Copy 4 file ở mục 2 vào repo đích (`.claude/settings.json` + `.claude/agents/*.md`).
 2. Đọc `CLAUDE.md`/tài liệu quy ước của repo đích, sửa lại "Quy tắc bắt buộc" trong từng agent `.md` cho khớp (đừng để sót quy ước XBoss còn sót trong file copy).
 3. Sửa `permissions.allow` trong `settings.json` khớp lệnh lint/typecheck/test/build thật của repo đích.
-4. Thêm 1 bullet ngắn vào `CLAUDE.md` (hay tương đương) của repo đích ở mục nguyên tắc làm việc, kiểu:
-   > **Uỷ thác theo độ khó**: phiên chính không tự code — viết đặc tả rồi giao `coder`/`mechanical`/`reviewer` qua tool Agent.
-   Nếu không có bullet này, phiên chính (Opus) có thể vẫn tự code thay vì chủ động gọi subagent — model không tự biết cơ chế phân tầng nếu không được nhắc trong CLAUDE.md.
+4. **⚠️ Bước hay bị bỏ sót nhất** — thêm bullet uỷ thác vào `CLAUDE.md` (hoặc tài liệu tương đương) của repo đích, đặt cạnh các nguyên tắc làm việc khác. Copy-paste sẵn, chỉ cần đổi tên 3 subagent nếu repo đích đặt tên khác:
+
+   ```markdown
+   - **Uỷ thác theo độ khó**: phiên chính (Opus) không tự code trừ task quá nhỏ (1-2 dòng) — vai trò là lập kế hoạch, thiết kế, quyết định kiến trúc, viết đặc tả đủ chi tiết rồi giao việc code cho subagent qua tool Agent:
+     - `coder` (Sonnet) — code theo đặc tả, fix lỗi, viết test, script theo mẫu, refactor phạm vi rõ, verify tính năng thật.
+     - `reviewer` (Sonnet) — tự soát diff bằng skill code-review trước khi Opus duyệt cuối.
+     - `mechanical` (Haiku) — việc lặp lại: lint/typecheck fix, đổi tên hàng loạt, CRUD bám mẫu.
+   ```
+
+   Đây là dòng **duy nhất** khiến Opus chủ động dùng subagent thay vì tự làm hết. `.claude/agents/*.md` chỉ khai báo subagent tồn tại — không tự nhắc Opus gọi chúng; nếu quên bullet này, cấu hình `.claude/` coi như vô hiệu trên thực tế (subagent vẫn gọi thủ công được, nhưng Opus sẽ không tự làm điều đó).
 5. Mở phiên mới trong repo đích, thử gọi 1 task nhỏ qua từng subagent (`Agent({ subagent_type: "coder", ... })`) để xác nhận model/tool hoạt động đúng trước khi tin tưởng dùng thật.
 
 ## 6. Lưu ý / giới hạn
