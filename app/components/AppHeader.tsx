@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import NotificationBell from "@/app/components/NotificationBell";
 import GlobalSearch from "@/app/components/GlobalSearch";
+import ProjectSwitcher from "@/app/components/ProjectSwitcher";
 import ThemeToggle from "@/app/components/ThemeToggle";
 import OnlineUsers from "@/app/components/OnlineUsers";
 import { fetchMe } from "@/app/lib/me";
@@ -280,13 +281,12 @@ export default function AppHeader({
           ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
           print:hidden`}
       >
-        <div className="flex items-center gap-2 h-12 px-3 border-b border-zinc-800 shrink-0">
-          <LayoutDashboard className="w-5 h-5 text-emerald-400 shrink-0" />
-          <span className="sidebar-label text-sm font-bold truncate">XBoss</span>
+        <div className="flex items-center h-12 border-b border-zinc-800 shrink-0">
+          <ProjectSwitcher />
           <button
             onClick={() => setMobileOpen(false)}
             aria-label="Đóng menu"
-            className="ml-auto p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-900 lg:hidden"
+            className="p-1.5 mr-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-900 lg:hidden shrink-0"
           >
             <X className="w-4 h-4" />
           </button>

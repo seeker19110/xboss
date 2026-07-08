@@ -17,6 +17,8 @@ import {
   CalendarClock,
   HardDrive,
   LayoutDashboard,
+  Building2,
+  Plus,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { fetchMe } from "@/app/lib/me";
@@ -24,6 +26,16 @@ import { ROLE_LABELS } from "@/lib/roles";
 import { DASHBOARD_TREE, dashboardStatus } from "@/app/lib/dashboardTree";
 
 type User = { id: number; name: string; role: string };
+type ProjectRow = {
+  id: number;
+  name: string;
+  code: string | null;
+  status: string;
+  color: string | null;
+  totalTasks: number;
+  avgProgress: number;
+  delayedCount: number;
+};
 type Sheet = {
   id: number;
   code: string;
@@ -89,7 +101,7 @@ function fmtDt(s: string) {
 
 export default function AdminPage() {
   const [me, setMe] = useState<{ id: number; role: string } | null>(null);
-  const [tab, setTab] = useState<"assign" | "nav" | "audit" | "traffic">("assign");
+  const [tab, setTab] = useState<"assign" | "nav" | "projects" | "audit" | "traffic">("assign");
   const [traffic, setTraffic] = useState<TrafficEntry[]>([]);
   const [trafficLive, setTrafficLive] = useState(false);
   const trafficLatestRef = useRef(0);
@@ -114,6 +126,12 @@ export default function AdminPage() {
   // Hiển thị AppShell (M21 PR3): bật/tắt dashboard trong sidebar.
   const [navSettings, setNavSettings] = useState<Record<string, boolean>>({});
   const [navLoading, setNavLoading] = useState(false);
+  // Quản lý dự án + gán user↔dự án (M22 PR2).
+  const [projects, setProjects] = useState<ProjectRow[]>([]);
+  const [userProjects, setUserProjects] = useState<Record<number, Set<number>>>({});
+  const [projLoading, setProjLoading] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [creatingProject, setCreatingProject] = useState(false);
 
   const loadAssign = useCallback((unassignedOnly = false) => {
     const q = unassignedOnly ? "?unassignedOnly=1" : "";
@@ -144,6 +162,27 @@ export default function AdminPage() {
       .finally(() => setNavLoading(false));
   }, []);
 
+  const loadProjects = useCallback(() => {
+    setProjLoading(true);
+    Promise.all([
+      fetch("/api/projects", { cache: "no-store" }).then((r) =>
+        r.ok ? r.json() : { projects: [] },
+      ),
+      fetch("/api/user-projects", { cache: "no-store" }).then((r) =>
+        r.ok ? r.json() : { assignments: [] },
+      ),
+    ])
+      .then(([projRes, uaRes]) => {
+        setProjects(projRes.projects ?? []);
+        const map: Record<number, Set<number>> = {};
+        for (const a of uaRes.assignments ?? []) {
+          (map[a.userId] ??= new Set()).add(a.projectId);
+        }
+        setUserProjects(map);
+      })
+      .finally(() => setProjLoading(false));
+  }, []);
+
   useEffect(() => {
     fetchMe().then((user) => {
       if (!user) return;
@@ -164,6 +203,10 @@ export default function AdminPage() {
   useEffect(() => {
     if (tab === "nav") loadNav();
   }, [tab, loadNav]);
+
+  useEffect(() => {
+    if (tab === "projects") loadProjects();
+  }, [tab, loadProjects]);
 
   // SSE traffic: kết nối khi chuyển sang tab traffic (chỉ Admin), đóng khi rời.
   useEffect(() => {
@@ -255,6 +298,68 @@ export default function AdminPage() {
       setError("Mất kết nối mạng — vui lòng thử lại");
       setNavSettings((prev) => ({ ...prev, [nodeKey]: prevValue }));
     }
+  }
+
+  async function createProject() {
+    const name = newProjectName.trim();
+    if (!name) return;
+    setCreatingProject(true);
+    try {
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(j.error ?? "Lỗi không xác định");
+        return;
+      }
+      setNewProjectName("");
+      flash(`Đã tạo dự án "${name}"`);
+      loadProjects();
+    } catch {
+      setError("Mất kết nối mạng — vui lòng thử lại");
+    } finally {
+      setCreatingProject(false);
+    }
+  }
+
+  async function patchProject(id: number, field: "status" | "color", value: string) {
+    setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, [field]: value } : p)));
+    const res = await fetch(`/api/projects/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [field]: value }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setError(j.error ?? "Lỗi không xác định");
+      loadProjects(); // rollback về dữ liệu thật
+      return;
+    }
+    flash("Đã cập nhật dự án");
+  }
+
+  async function toggleUserProject(userId: number, projectId: number, checked: boolean) {
+    const prev = userProjects[userId] ?? new Set<number>();
+    const next = new Set(prev);
+    if (checked) next.add(projectId);
+    else next.delete(projectId);
+    setUserProjects((p) => ({ ...p, [userId]: next }));
+
+    const res = await fetch("/api/user-projects", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, projectIds: [...next] }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setError(j.error ?? "Lỗi không xác định");
+      setUserProjects((p) => ({ ...p, [userId]: prev })); // rollback
+      return;
+    }
+    flash("Đã cập nhật quyền xem dự án");
   }
 
   function toggleFilter() {
@@ -370,6 +475,7 @@ export default function AdminPage() {
           {(
             [
               ["assign", "Phân công", null],
+              ["projects", "Dự án", "projects"],
               ["nav", "Hiển thị AppShell", "nav"],
               ["audit", "Lịch sử", "audit"],
               ["traffic", "Traffic", "traffic"],
@@ -379,9 +485,10 @@ export default function AdminPage() {
             .map(([key, label, icon]) => (
               <button
                 key={key}
-                onClick={() => setTab(key as "assign" | "nav" | "audit" | "traffic")}
+                onClick={() => setTab(key as "assign" | "nav" | "projects" | "audit" | "traffic")}
                 className={`px-3 py-1 rounded text-sm flex items-center gap-1 ${tab === key ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-white"}`}
               >
+                {icon === "projects" && <Building2 className="w-3.5 h-3.5" />}
                 {icon === "nav" && <LayoutDashboard className="w-3.5 h-3.5" />}
                 {icon === "audit" && <History className="w-3.5 h-3.5" />}
                 {icon === "traffic" && <Activity className="w-3.5 h-3.5" />}
@@ -618,6 +725,155 @@ export default function AdminPage() {
               </p>
             )}
           </>
+        )}
+
+        {/* ========== TAB DỰ ÁN (M22 PR2) ========== */}
+        {tab === "projects" && (
+          <div className="space-y-6">
+            {projLoading && <p className="text-sm text-zinc-500">Đang tải…</p>}
+
+            <div className="rounded-lg border border-zinc-800 overflow-hidden">
+              <div className="px-4 py-2 border-b border-zinc-800 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                Dự án
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[560px]">
+                  <thead>
+                    <tr className="text-xs text-zinc-400 border-b border-zinc-800">
+                      <th className="text-left p-3">Tên</th>
+                      <th className="text-left p-3">Mã</th>
+                      <th className="text-left p-3">Trạng thái</th>
+                      <th className="text-left p-3">Màu</th>
+                      <th className="text-left p-3">Tiến độ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {projects.map((p) => (
+                      <tr key={p.id} className="border-b border-zinc-800/60 last:border-0">
+                        <td className="p-3 font-medium">{p.name}</td>
+                        <td className="p-3 text-zinc-400">{p.code ?? "—"}</td>
+                        <td className="p-3">
+                          <select
+                            value={p.status}
+                            disabled={me?.role !== "admin"}
+                            onChange={(e) => patchProject(p.id, "status", e.target.value)}
+                            aria-label={`Trạng thái dự án ${p.name}`}
+                            className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-sm disabled:opacity-50"
+                          >
+                            <option value="active">Đang thi công</option>
+                            <option value="handover">Bàn giao</option>
+                            <option value="closed">Đã đóng</option>
+                          </select>
+                        </td>
+                        <td className="p-3">
+                          <select
+                            value={p.color ?? ""}
+                            disabled={me?.role !== "admin"}
+                            onChange={(e) => patchProject(p.id, "color", e.target.value)}
+                            aria-label={`Màu nhận diện dự án ${p.name}`}
+                            className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-sm disabled:opacity-50"
+                          >
+                            <option value="">Mặc định</option>
+                            <option value="zinc">Zinc</option>
+                            <option value="amber">Amber</option>
+                            <option value="sky">Sky</option>
+                            <option value="violet">Violet</option>
+                            <option value="emerald">Emerald</option>
+                            <option value="rose">Rose</option>
+                          </select>
+                        </td>
+                        <td className="p-3 text-zinc-400">
+                          {Math.round((p.avgProgress ?? 0) * 100)}%
+                          {p.delayedCount > 0 && (
+                            <span className="text-rose-400"> · {p.delayedCount} trễ</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {projects.length === 0 && !projLoading && (
+                      <tr>
+                        <td colSpan={5} className="p-6 text-center text-zinc-400">
+                          Chưa có dự án nào.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {me?.role === "admin" && (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    createProject();
+                  }}
+                  className="flex items-center gap-2 p-3 border-t border-zinc-800"
+                >
+                  <input
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    placeholder="Tên dự án mới"
+                    aria-label="Tên dự án mới"
+                    className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm"
+                  />
+                  <button
+                    type="submit"
+                    disabled={creatingProject || !newProjectName.trim()}
+                    className="flex items-center gap-1.5 bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-50 shrink-0"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    {creatingProject ? "Đang tạo…" : "Dự án mới"}
+                  </button>
+                </form>
+              )}
+            </div>
+
+            <div className="rounded-lg border border-zinc-800 overflow-hidden">
+              <div className="px-4 py-2 border-b border-zinc-800 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                Gán user ↔ dự án
+              </div>
+              <p className="px-4 pt-3 text-xs text-zinc-500">
+                Chưa gán ai cho dự án nào = mọi user thấy mọi dự án (tương thích ngược). Tick để
+                giới hạn user đó chỉ thấy dự án đã chọn.
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[480px]">
+                  <thead>
+                    <tr className="text-xs text-zinc-400 border-b border-zinc-800">
+                      <th className="text-left p-3">Người dùng</th>
+                      {projects.map((p) => (
+                        <th key={p.id} className="text-center p-3 whitespace-nowrap">
+                          {p.name}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {users
+                      .filter((u) => u.role !== "admin")
+                      .map((u) => (
+                        <tr key={u.id} className="border-b border-zinc-800/60 last:border-0">
+                          <td className="p-3">
+                            {u.name}{" "}
+                            <span className="text-zinc-500">({ROLE_LABEL[u.role] ?? u.role})</span>
+                          </td>
+                          {projects.map((p) => (
+                            <td key={p.id} className="text-center p-3">
+                              <input
+                                type="checkbox"
+                                checked={userProjects[u.id]?.has(p.id) ?? false}
+                                onChange={(e) => toggleUserProject(u.id, p.id, e.target.checked)}
+                                aria-label={`${u.name} thấy dự án ${p.name}`}
+                                className="w-4 h-4 accent-emerald-600"
+                              />
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* ========== TAB HIỂN THỊ APPSHELL (M21 PR3) ========== */}
