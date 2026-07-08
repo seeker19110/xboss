@@ -151,6 +151,77 @@ test(
 );
 
 test(
+  "missingDiaryDates: projectId (M22) lọc đúng — task_history của dự án khác không tính vào ngày thiếu, kiểm đúng site_diaries của dự án đó",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { missingDiaryDates } = await import("@/lib/diary");
+
+    const p1 = await insertId(`INSERT INTO projects (name) VALUES ('DA missing 1')`);
+    const p2 = await insertId(`INSERT INTO projects (name) VALUES ('DA missing 2')`);
+    const t1 = await insertId(`INSERT INTO towers (project_id, name) VALUES (?, 'Tháp T1')`, p1);
+    const t2 = await insertId(`INSERT INTO towers (project_id, name) VALUES (?, 'Tháp T2')`, p2);
+    const st1 = await insertId(
+      `INSERT INTO sheet_types (tower_id, code, name) VALUES (?, 'TMISS1', 'Sheet 1')`,
+      t1,
+    );
+    const st2 = await insertId(
+      `INSERT INTO sheet_types (tower_id, code, name) VALUES (?, 'TMISS2', 'Sheet 2')`,
+      t2,
+    );
+    const pkg1 = await insertId(
+      `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'MP1', 'Nhóm 1')`,
+      st1,
+    );
+    const pkg2 = await insertId(
+      `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'MP2', 'Nhóm 2')`,
+      st2,
+    );
+    const task1 = await insertId(
+      `INSERT INTO tasks (package_id, code, name) VALUES (?, 'MP1,01', 'Task 1')`,
+      pkg1,
+    );
+    const task2 = await insertId(
+      `INSERT INTO tasks (package_id, code, name) VALUES (?, 'MP2,01', 'Task 2')`,
+      pkg2,
+    );
+
+    await run(
+      `INSERT INTO task_history (task_id, old_progress, new_progress, changed_by, changed_at)
+       VALUES (?, 0, 0.5, 'Test P1', NOW() - INTERVAL '3 days')`,
+      task1,
+    );
+    await run(
+      `INSERT INTO task_history (task_id, old_progress, new_progress, changed_by, changed_at)
+       VALUES (?, 0, 0.5, 'Test P2', NOW() - INTERVAL '3 days')`,
+      task2,
+    );
+
+    const missingP1 = await missingDiaryDates(7, p1);
+    const missingP2 = await missingDiaryDates(7, p2);
+    assert.ok(missingP1.length > 0);
+    assert.ok(missingP2.length > 0);
+
+    // Lập nhật ký cho dự án 1 — chỉ dự án 1 hết thiếu, dự án 2 vẫn còn (site_diaries nay
+    // scoped theo project_id, migrations/0028_diary_project_unique.sql).
+    const dateStr = missingP1[missingP1.length - 1];
+    await insertId(`INSERT INTO site_diaries (diary_date, project_id) VALUES (?, ?)`, dateStr, p1);
+    const missingP1After = await missingDiaryDates(7, p1);
+    assert.ok(!missingP1After.includes(dateStr));
+    const missingP2After = await missingDiaryDates(7, p2);
+    assert.ok(missingP2After.includes(dateStr), "dự án 2 chưa lập nhật ký ngày đó nên vẫn thiếu");
+
+    await run(`DELETE FROM site_diaries WHERE diary_date = ? AND project_id = ?`, dateStr, p1);
+    await run(`DELETE FROM task_history WHERE task_id IN (?, ?)`, task1, task2);
+    await run(`DELETE FROM tasks WHERE id IN (?, ?)`, task1, task2);
+    await run(`DELETE FROM work_packages WHERE id IN (?, ?)`, pkg1, pkg2);
+    await run(`DELETE FROM sheet_types WHERE id IN (?, ?)`, st1, st2);
+    await run(`DELETE FROM towers WHERE id IN (?, ?)`, t1, t2);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+  },
+);
+
+test(
   "diary_manpower: UNIQUE(diary_id, crew) chặn thêm trùng tổ đội trong cùng 1 nhật ký",
   { skip: !HAS_TEST_DB },
   async () => {
@@ -183,8 +254,6 @@ test(
 
     const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA NK 1', 'PJT-NK1')`);
     const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA NK 2', 'PJT-NK2')`);
-    // Ngày khác nhau — site_diaries.diary_date UNIQUE toàn hệ thống nên 2 dự án không
-    // thể cùng có nhật ký chung 1 ngày (xem ghi chú M22 trong lib/diary.ts).
     const d1 = await insertId(
       `INSERT INTO site_diaries (diary_date, project_id) VALUES ('2026-06-21', ?)`,
       p1,
@@ -200,6 +269,46 @@ test(
     const cal1 = await listDiaryCalendar("2026-06-01", "2026-07-01", p1);
     assert.ok(cal1.days.some((d) => d.date === "2026-06-21"));
     assert.ok(!cal1.days.some((d) => d.date === "2026-06-22"));
+
+    await run(`DELETE FROM site_diaries WHERE id IN (?, ?)`, d1, d2);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+  },
+);
+
+test(
+  "site_diaries: UNIQUE(diary_date, project_id) — migrations/0028_diary_project_unique.sql cho phép 2 dự án cùng ghi nhật ký 1 ngày",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId, query } = await import("@/lib/db");
+
+    const p1 = await insertId(`INSERT INTO projects (name) VALUES ('DA Nhật ký cùng ngày 1')`);
+    const p2 = await insertId(`INSERT INTO projects (name) VALUES ('DA Nhật ký cùng ngày 2')`);
+
+    const d1 = await insertId(
+      `INSERT INTO site_diaries (diary_date, project_id) VALUES ('2026-06-25', ?)`,
+      p1,
+    );
+    const d2 = await insertId(
+      `INSERT INTO site_diaries (diary_date, project_id) VALUES ('2026-06-25', ?)`,
+      p2,
+    );
+
+    const forP1 = await query<{ id: number }>(
+      `SELECT id FROM site_diaries WHERE diary_date = '2026-06-25' AND project_id = ?`,
+      p1,
+    );
+    assert.ok(forP1.some((r) => r.id === d1));
+    const forP2 = await query<{ id: number }>(
+      `SELECT id FROM site_diaries WHERE diary_date = '2026-06-25' AND project_id = ?`,
+      p2,
+    );
+    assert.ok(forP2.some((r) => r.id === d2));
+
+    // Cùng dự án, cùng ngày vẫn bị chặn trùng (composite unique giữ nguyên ý nghĩa "1 nhật ký/ngày/dự án").
+    await assert.rejects(
+      insertId(`INSERT INTO site_diaries (diary_date, project_id) VALUES ('2026-06-25', ?)`, p1),
+      (err: unknown) => (err as { code?: string }).code === "23505",
+    );
 
     await run(`DELETE FROM site_diaries WHERE id IN (?, ?)`, d1, d2);
     await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);

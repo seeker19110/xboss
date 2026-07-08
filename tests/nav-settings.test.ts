@@ -126,6 +126,40 @@ test(
 );
 
 test(
+  "getNavSettings/setNavEnabled: override theo dự án (M22) đè lên override toàn hệ thống, không ảnh hưởng dự án khác",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { getNavSettings, setNavEnabled } = await import("@/lib/nav-settings");
+
+    const adminId = await insertId(
+      `INSERT INTO users (name, email, password_hash, role) VALUES ('Admin NavProj', 'nav-proj-admin@xboss.vn', 'x', 'admin')`,
+    );
+    const p1 = await insertId(`INSERT INTO projects (name) VALUES ('DA Nav 1')`);
+    const p2 = await insertId(`INSERT INTO projects (name) VALUES ('DA Nav 2')`);
+    const nodeKey = "dash.chi-phi"; // available theo mặc định
+
+    // Tắt toàn hệ thống trước.
+    await setNavEnabled(nodeKey, false, null, adminId);
+    const globalOff = await getNavSettings();
+    assert.equal(globalOff.get(nodeKey), false);
+
+    // Bật riêng cho dự án 1 → đè lên override toàn hệ thống khi xem theo dự án 1.
+    await setNavEnabled(nodeKey, true, p1, adminId);
+    const forP1 = await getNavSettings(p1);
+    assert.equal(forP1.get(nodeKey), true);
+
+    // Dự án 2 không có override riêng → vẫn theo override toàn hệ thống (tắt).
+    const forP2 = await getNavSettings(p2);
+    assert.equal(forP2.get(nodeKey), false);
+
+    await run(`DELETE FROM nav_settings WHERE node_key = ?`, nodeKey);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+    await run(`DELETE FROM users WHERE id = ?`, adminId);
+  },
+);
+
+test(
   "notifications nav_enabled: unique index (user_id, type, nav_node_key) chặn trùng (dedup bật-tắt-bật)",
   { skip: !HAS_TEST_DB },
   async () => {

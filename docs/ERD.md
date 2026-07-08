@@ -36,16 +36,43 @@ Project
 
 ### `projects`
 
-| Cột                   | Kiểu        | Ghi chú                         |
-| --------------------- | ----------- | ------------------------------- |
-| id                    | SERIAL PK   |                                 |
-| name                  | TEXT        | Tên dự án                       |
-| code                  | TEXT UNIQUE | Mã dự án                        |
-| investor              | TEXT        | Chủ đầu tư                      |
-| contractor            | TEXT        | Nhà thầu                        |
-| start_date / end_date | DATE        |                                 |
-| heatmap_title         | TEXT        | Tiêu đề heatmap tuỳ chỉnh       |
-| material_col_labels   | TEXT        | JSON — nhãn cột tùy biến vật tư |
+| Cột                   | Kiểu        | Ghi chú                                     |
+| --------------------- | ----------- | ------------------------------------------- |
+| id                    | SERIAL PK   |                                             |
+| name                  | TEXT        | Tên dự án                                   |
+| code                  | TEXT UNIQUE | Mã dự án                                    |
+| investor              | TEXT        | Chủ đầu tư                                  |
+| contractor            | TEXT        | Nhà thầu                                    |
+| start_date / end_date | DATE        |                                             |
+| heatmap_title         | TEXT        | Tiêu đề heatmap tuỳ chỉnh                   |
+| material_col_labels   | TEXT        | JSON — nhãn cột tùy biến vật tư             |
+| status                | TEXT        | `active\|handover\|closed` (M22)            |
+| color                 | TEXT        | Chấm màu nhận diện switcher/Portfolio (M22) |
+
+## Đa dự án (M22, `migrations/0027_multi_project.sql`)
+
+Cookie `xboss_project` (không path prefix) chọn dự án đang xem — `lib/projects.ts:getCurrentProjectId(user)`. `visibleProjectIds(user)`: `admin` thấy mọi dự án; vai trò khác theo `user_projects`; bảng rỗng toàn hệ thống = mọi user thấy mọi dự án (tương thích ngược 1 dự án).
+
+### `user_projects`
+
+| Cột        | Kiểu          | Ghi chú                       |
+| ---------- | ------------- | ----------------------------- |
+| user_id    | FK → users    | PK ghép (user_id, project_id) |
+| project_id | FK → projects |                               |
+
+### Bảng "gốc cụm" có cột `project_id` (thêm ở migration 0027, backfill về dự án id nhỏ nhất)
+
+`contracts`, `variation_orders`, `materials`, `boq_items`, `purchase_orders`, `purchase_requests`, `meetings`, `risks`, `proposals`, `correspondences`, `drawings`, `qc_checklists`, `ncrs`, `hse_records`, `site_diaries`, `equipment`, `vehicle_logs`, `tender_packages`, `project_documents`.
+
+Mọi route GET/PATCH/DELETE theo ID của các bảng trên đều lọc thêm `project_id = <dự án đang chọn>` — sai dự án trả **404** (không lộ tồn tại của bản ghi). POST tạo mới gán `project_id` từ server (`getCurrentProjectId`), không tin client.
+
+`site_diaries` (`migrations/0028_diary_project_unique.sql`): UNIQUE gốc chỉ theo `diary_date` (một nhật ký/ngày cho cả hệ thống) đổi thành `UNIQUE(diary_date, project_id)` — mỗi dự án có nhật ký riêng theo ngày.
+
+### Bảng suy `project_id` qua bảng cha (KHÔNG thêm cột riêng)
+
+`towers.project_id` (có sẵn từ baseline, gốc của toàn bộ WBS) → `tasks`/`work_packages`/`sheet_types` suy qua chuỗi `sheet_types.tower_id → towers.project_id`. `payment_certs` suy qua `contract_id → contracts.project_id`. `qc_inspections` suy qua `task_id`/`work_package_id` (`lib/qaqc.ts:taskInProject`/`workPackageInProject`). `work_fronts` suy qua `sheet_type_id → towers.project_id`. `boq_norms` suy qua `boq_item_id → boq_items.project_id`.
+
+**Nợ kỹ thuật đã biết:** `/api/notifications` (cảnh báo trễ/PO trễ/NCR quá hạn...) **chưa** scoped theo dự án đang chọn — vẫn quét mọi dự án user thấy được, như trước M22. Nhiều hàm nguồn đã nhận sẵn tham số `projectId?` tuỳ chọn nhưng chưa wire vào route vì logic "tạo mới" và "dọn thông báo cũ" dùng chung 1 danh sách — cần thiết kế lại tách riêng 2 phía trước khi scope, tránh xoá nhầm thông báo hợp lệ của dự án khác. `costSummary`/`/api/costs` (M2) cũng chưa scoped — ngân sách/cam kết/thực chi hiện gộp mọi dự án theo hệ (`disciplines` là danh mục toàn hệ thống, không theo dự án).
 
 ### `towers`
 

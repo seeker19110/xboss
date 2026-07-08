@@ -178,31 +178,51 @@ export async function getVehicle(
 }
 
 // PO chưa nhận đủ hàng (chưa received/reconciled/cancelled) mà đã quá ngày giao dự kiến.
-export async function poLateList(): Promise<
-  { id: number; poCode: string; expectedDate: string; supplierName: string | null }[]
-> {
+// projectId (M22): undefined = không lọc.
+export async function poLateList(
+  projectId?: number,
+): Promise<{ id: number; poCode: string; expectedDate: string; supplierName: string | null }[]> {
+  const conds = [
+    "po.expected_date IS NOT NULL",
+    "po.expected_date < ?",
+    "po.status NOT IN ('received', 'reconciled', 'cancelled')",
+  ];
+  const args: unknown[] = [todayISO()];
+  if (projectId != null) {
+    conds.push("po.project_id = ?");
+    args.push(projectId);
+  }
   return query(
     `SELECT po.id, po.po_code AS "poCode", po.expected_date AS "expectedDate",
             s.name AS "supplierName"
        FROM purchase_orders po
        LEFT JOIN suppliers s ON s.id = po.supplier_id
-      WHERE po.expected_date IS NOT NULL AND po.expected_date < ?
-        AND po.status NOT IN ('received', 'reconciled', 'cancelled')`,
-    todayISO(),
+      WHERE ${conds.join(" AND ")}`,
+    ...args,
   );
 }
 
 // Xe đã đăng ký, quá giờ dự kiến ≥2h mà vẫn chưa vào cổng (entered_at NULL).
-export async function vehicleLateList(): Promise<
-  { id: number; plate: string; expectedAt: string; supplierName: string | null }[]
-> {
+// projectId (M22): undefined = không lọc.
+export async function vehicleLateList(
+  projectId?: number,
+): Promise<{ id: number; plate: string; expectedAt: string; supplierName: string | null }[]> {
+  const conds = [
+    "v.entered_at IS NULL",
+    "v.status NOT IN ('exited', 'no_show', 'cancelled')",
+    "v.expected_at < NOW() - INTERVAL '2 hours'",
+  ];
+  const args: unknown[] = [];
+  if (projectId != null) {
+    conds.push("v.project_id = ?");
+    args.push(projectId);
+  }
   return query(
     `SELECT v.id, v.plate, v.expected_at AS "expectedAt", s.name AS "supplierName"
        FROM vehicle_logs v
        LEFT JOIN suppliers s ON s.id = v.supplier_id
-      WHERE v.entered_at IS NULL
-        AND v.status NOT IN ('exited', 'no_show', 'cancelled')
-        AND v.expected_at < NOW() - INTERVAL '2 hours'`,
+      WHERE ${conds.join(" AND ")}`,
+    ...args,
   );
 }
 
