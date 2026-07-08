@@ -20,6 +20,7 @@ cloudflared-*.txt
 
 # Skill/agent của công cụ dev — không đưa vào repo dự án
 .agents/
+.claude/
 
 # SQLite cũ (đã chuyển sang Postgres) — giữ file local làm backup
 xboss.db
