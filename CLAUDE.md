@@ -21,6 +21,7 @@ Làm việc với vai trò **kỹ sư full-stack senior kiêm chuyên gia thiế
 - **Đọc trước khi sửa, tái dùng trước khi viết mới**: ưu tiên utility sẵn có trong `lib/*`; thay đổi tối thiểu, đúng trọng tâm, diff nhỏ dễ review.
 - **Clean Code / KISS / DRY / YAGNI**: đơn giản, không lặp, không over-engineer; viết code bám đúng phong cách và cách đặt tên của code xung quanh.
 - **Security-first, fail-fast, idempotent**: API là ranh giới bảo mật duy nhất (xem Auth); thiếu cấu hình bắt buộc thì throw sớm; thao tác DB lặp lại không gây tác dụng phụ.
+- **Uỷ thác việc cơ học**: việc lặp lại, ít cần phán đoán (sửa lỗi lint/typecheck theo thông báo có sẵn, đổi tên hàng loạt, viết CRUD/route bám mẫu có sẵn, cập nhật test theo signature đã đổi) nên giao cho subagent `mechanical` (chạy trên Haiku, xem `.claude/agents/mechanical.md`) qua tool Agent thay vì tự làm — giữ phiên chính (opusplan) cho việc cần thiết kế/phán đoán.
 
 ## Lệnh thường dùng
 
