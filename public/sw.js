@@ -1,9 +1,27 @@
 // Service worker XBoss — network-first cho trang, stale-while-revalidate cho API GET,
 // cache-first cho asset tĩnh.
 // Mất mạng (hầm, tầng kỹ thuật) vẫn xem được dữ liệu tracking đã tải lần cuối.
-const CACHE = "xboss-v7";
+// App Shell: precache /offline + asset tĩnh cốt lõi lúc cài đặt (M0) — trang HTML chưa
+// từng ghé mà mất mạng hoàn toàn sẽ thấy /offline thay vì lỗi mạng mặc định của trình duyệt.
+const CACHE = "xboss-v8";
+const SHELL_URLS = [
+  "/offline",
+  "/manifest.webmanifest",
+  "/icon.svg",
+  "/icon-192.png",
+  "/icon-512.png",
+];
 
-self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("install", (e) => {
+  self.skipWaiting();
+  // Từng URL tự bắt lỗi riêng — 1 asset lỗi (vd cài đặt lần đầu cũng đang mất mạng)
+  // không được làm hỏng toàn bộ cài đặt SW (khác `cache.addAll` vốn atomic).
+  e.waitUntil(
+    caches
+      .open(CACHE)
+      .then((cache) => Promise.all(SHELL_URLS.map((url) => cache.add(url).catch(() => {})))),
+  );
+});
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches
@@ -116,7 +134,8 @@ self.addEventListener("fetch", (e) => {
     return;
   }
 
-  // Trang HTML → network-first, offline thì dùng bản cache gần nhất.
+  // Trang HTML → network-first, offline thì dùng bản cache gần nhất; chưa từng ghé
+  // (không có trong cache) thì rơi về trang App Shell /offline đã precache lúc cài đặt.
   e.respondWith(
     fetch(e.request)
       .then((res) => {
@@ -126,6 +145,6 @@ self.addEventListener("fetch", (e) => {
         }
         return res;
       })
-      .catch(() => caches.match(e.request)),
+      .catch(() => caches.match(e.request).then((hit) => hit ?? caches.match("/offline"))),
   );
 });
