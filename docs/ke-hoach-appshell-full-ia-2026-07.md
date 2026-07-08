@@ -173,10 +173,15 @@ tức thì, không rời trang đang xem.
 ┌───────────────────────────────┐
 │ 🔎 Tìm dự án…                 │  ← ô lọc, chỉ hiện khi > ~7 dự án
 ├───────────────────────────────┤
-│ ✓ ● TT AVIO – Tháp A     72%  │  ← dự án hiện tại (tick + %tiến độ)
-│   ● TT AVIO – Tháp B     45%  │      · badge đỏ nếu có việc trễ
-│   ● Khu dân cư Phúc Lộc  8%  ⚠│
-│   … (cuộn nếu nhiều)          │
+│ ★ ĐÃ GHIM                     │  ← nhóm pin (nếu có), luôn trên cùng
+│ ✓ ● TT AVIO – Tháp A  ★  72%  │  ← dự án hiện tại (tick + %tiến độ)
+│   ● Khu dân cư PLK    ★   8% ⚠│
+├───────────────────────────────┤
+│ ● ĐANG THI CÔNG               │  ← nhóm theo trạng thái
+│   ● TT AVIO – Tháp B  ☆  45%  │      ☆ = bấm để ghim/bỏ ghim
+│   ● Nhà xưởng ABC     ☆  30%  │
+│ ✔ ĐÃ BÀN GIAO / ĐÓNG          │
+│   ● Cao ốc XYZ        ☆ 100%  │  ← làm mờ nhẹ
 ├───────────────────────────────┤
 │ ▦  Xem tất cả dự án (Portfolio)│  ← lối tới trang tổng
 └───────────────────────────────┘
@@ -184,6 +189,12 @@ tức thì, không rời trang đang xem.
 
 - Mỗi dòng: chấm màu dự án + tên + **% tiến độ** (tabular-nums) + badge cảnh báo nếu
   có việc trễ. Dự án đang chọn có dấu `✓` + nền `zinc-800`.
+- **Ghim yêu thích (★):** bấm sao để ghim; dự án đã ghim gom lên nhóm **"★ Đã ghim"**
+  trên cùng (nhiều PM chỉ xoay quanh vài dự án). Lưu `localStorage('xboss_pinned')` —
+  thuần client, không cần backend.
+- **Nhóm theo trạng thái:** khi có nhiều dự án, tách **"Đang thi công"** và **"Đã bàn
+  giao / Đóng"** (đọc trạng thái dự án); nhóm đã đóng làm mờ nhẹ, xếp dưới. Khi ít dự
+  án (≤ ~5) và chưa ghim gì → hiển thị phẳng, bỏ header cho gọn.
 - **Ô lọc** hiện khi danh sách dài (>~7); lọc client theo tên/mã.
 - Chân panel: **"Xem tất cả dự án (Portfolio)"** → `/portfolio`.
 - **Chọn 1 dự án** = đặt `xboss_project` (localStorage + cookie để server scope) →
