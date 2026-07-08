@@ -104,4 +104,42 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     await page.getByRole("button", { name: "Đóng menu" }).click();
     await expect(page.locator("#app-sidebar")).not.toBeInViewport();
   });
+
+  test("drawer mobile đóng bằng phím Esc", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Mở menu" }).click();
+    await expect(page.locator("#app-sidebar")).toBeInViewport();
+
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#app-sidebar")).not.toBeInViewport();
+  });
+
+  test("drawer mobile bẫy focus — Tab không thoát ra ngoài overlay", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Mở menu" }).click();
+    const sidebar = page.locator("#app-sidebar");
+    await expect(sidebar).toBeInViewport();
+
+    // Mở drawer tự đưa focus vào bên trong sidebar (nút đóng hoặc mục menu đầu tiên).
+    await expect(async () => {
+      const insideOnOpen = await page.evaluate(
+        () =>
+          !!document.activeElement &&
+          !!document.getElementById("app-sidebar")?.contains(document.activeElement),
+      );
+      expect(insideOnOpen).toBe(true);
+    }).toPass({ timeout: 2_000 });
+
+    // Tab nhiều lần hơn số mục trong sidebar — nếu không bẫy, focus sẽ thoát ra ngoài overlay.
+    for (let i = 0; i < 40; i++) await page.keyboard.press("Tab");
+    const stillInside = await page.evaluate(
+      () =>
+        !!document.activeElement &&
+        !!document.getElementById("app-sidebar")?.contains(document.activeElement),
+    );
+    expect(stillInside).toBe(true);
+    await expect(sidebar).toBeInViewport();
+  });
 });

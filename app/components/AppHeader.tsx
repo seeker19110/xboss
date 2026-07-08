@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Menu,
   X,
@@ -51,6 +51,7 @@ export default function AppHeader({
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+  const asideRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     setPath(window.location.pathname);
@@ -61,6 +62,48 @@ export default function AppHeader({
       .then((data) => setDisciplines(data?.disciplines ?? []))
       .catch(() => {});
   }, []);
+
+  // Drawer mobile: bẫy focus bên trong + đóng bằng Esc (M0 — chỉ áp dụng khi drawer
+  // đang mở, tức đang ở mobile vì nút mở/overlay chỉ hiện dưới lg:hidden). Trả focus
+  // lại phần tử đã kích hoạt (nút hamburger) khi đóng.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const aside = asideRef.current;
+    if (!aside) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+
+    function focusableEls() {
+      return Array.from(
+        aside!.querySelectorAll<HTMLElement>("a[href], button:not([disabled])"),
+      ).filter((el) => el.offsetParent !== null);
+    }
+    focusableEls()[0]?.focus();
+
+    function onKeydown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setMobileOpen(false);
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const items = focusableEls();
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+    document.addEventListener("keydown", onKeydown);
+    return () => {
+      document.removeEventListener("keydown", onKeydown);
+      previouslyFocused?.focus();
+    };
+  }, [mobileOpen]);
 
   function toggleCollapsed() {
     const next = !collapsed;
@@ -117,6 +160,7 @@ export default function AppHeader({
           Chiều rộng/ẩn nhãn khi thu gọn do CSS đảm nhiệm (xem #app-sidebar, .sidebar-label
           trong globals.css) — ở đây chỉ toggle-transform cho drawer mobile. */}
       <aside
+        ref={asideRef}
         id="app-sidebar"
         className={`fixed inset-y-0 left-0 z-50 flex flex-col w-60 bg-zinc-950 border-r border-zinc-800 safe-top
           transition-transform duration-200 lg:translate-x-0
