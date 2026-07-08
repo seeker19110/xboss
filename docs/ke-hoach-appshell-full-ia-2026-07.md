@@ -1,6 +1,9 @@
 # Kế hoạch nâng cấp: AppShell đa dự án + toàn bộ IA dashboard theo cấu trúc phân cấp
 
-> **Trạng thái: KẾ HOẠCH — chưa triển khai.** Tài liệu này phân tích file mockup
+> **Trạng thái: ĐÃ CHỐT hướng đi (2026-07).** PM duyệt cấu trúc phân cấp + cách gom
+> cụm + thiết kế project switcher. Triển khai theo lộ trình N1→N4 ở các PR sau (bắt
+> đầu M21); **điều chỉnh chi tiết khi vào từng module** — cây IA là append-only, chốt
+> khung không chốt cứng từng leaf. Tài liệu này phân tích file mockup
 > `xBossmockup.xlsx` (do PM cung cấp 2026-07), đối chiếu hiện trạng điều hướng
 > (`app/components/AppHeader.tsx` + `app/lib/nav.ts`, khung M0 trong
 > `docs/nang-cap/M00-khung-ui-sidebar.md`) và đề xuất tái cấu trúc **toàn bộ**

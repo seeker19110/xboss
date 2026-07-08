@@ -1,6 +1,8 @@
 # Kế hoạch chi tiết từng mục — IA đa dự án XBoss (2026-07)
 
-> **Trạng thái: KẾ HOẠCH — chưa triển khai.** Tài liệu này bóc tách **chi tiết
+> **Trạng thái: ĐÃ CHỐT hướng đi (2026-07)** — triển khai theo bảng module M21–M31 ở
+> các PR sau; công sức/route/dữ liệu đề xuất được **tinh chỉnh khi vào từng module**.
+> Tài liệu này bóc tách **chi tiết
 > từng dashboard** trong cây IA đề xuất (xem tổng quan + bản đồ trực quan ở
 > `docs/ke-hoach-appshell-full-ia-2026-07.md`). Mỗi mục gồm: cây con lấy từ mockup,
 > độ phủ code hiện tại, khoảng trống, đề xuất dữ liệu/route/quyền, module & công sức.
