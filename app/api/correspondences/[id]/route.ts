@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import {
   checkCorrespondenceRefs,
   getCorrespondence,
@@ -26,11 +27,12 @@ export async function GET(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const correspondence = await getCorrespondence(id);
+  const projectId = await getCurrentProjectId(user);
+  const correspondence = projectId != null ? await getCorrespondence(id, projectId) : undefined;
   if (!correspondence)
     return NextResponse.json({ error: "Không tìm thấy văn bản" }, { status: 404 });
 
-  const thread = await getReplyChain(id);
+  const thread = await getReplyChain(id, projectId ?? undefined);
   return NextResponse.json({ correspondence, thread });
 }
 
@@ -51,13 +53,18 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const existing = await queryOne<Record<string, unknown>>(
-    `SELECT code, direction, kind, counterparty, subject, sent_date AS "sentDate",
-            due_date AS "dueDate", status, task_id AS "taskId",
-            work_package_id AS "workPackageId", drawing_id AS "drawingId", note
-       FROM correspondences WHERE id = ?`,
-    id,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const existing =
+    projectId != null
+      ? await queryOne<Record<string, unknown>>(
+          `SELECT code, direction, kind, counterparty, subject, sent_date AS "sentDate",
+                  due_date AS "dueDate", status, task_id AS "taskId",
+                  work_package_id AS "workPackageId", drawing_id AS "drawingId", note
+             FROM correspondences WHERE id = ? AND project_id = ?`,
+          id,
+          projectId,
+        )
+      : undefined;
   if (!existing) return NextResponse.json({ error: "Không tìm thấy văn bản" }, { status: 404 });
 
   const body = await req.json().catch(() => null);

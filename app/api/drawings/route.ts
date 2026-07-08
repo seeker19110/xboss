@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import {
   DRAWING_KINDS,
   REVISION_STATUSES,
@@ -29,17 +30,22 @@ export async function GET(req: NextRequest) {
   if (status && !REVISION_STATUSES.includes(status as RevisionStatus))
     return NextResponse.json({ error: "Trạng thái không hợp lệ" }, { status: 422 });
 
-  const drawings = await listDrawings({
-    kind: kind as DrawingKind | undefined,
-    floorLabel: sp.get("floor")?.trim() || undefined,
-    systemGroup: sp.get("system")?.trim() || undefined,
-    status: status as RevisionStatus | undefined,
-  });
+  const projectId = await getCurrentProjectId(user);
+  const drawings =
+    projectId != null
+      ? await listDrawings({
+          kind: kind as DrawingKind | undefined,
+          floorLabel: sp.get("floor")?.trim() || undefined,
+          systemGroup: sp.get("system")?.trim() || undefined,
+          status: status as RevisionStatus | undefined,
+          projectId,
+        })
+      : [];
   return NextResponse.json({ drawings });
 }
 
 // POST /api/drawings — tạo bản vẽ mới (số bản vẽ, chưa có file — upload rev qua
-// /api/drawings/:id/revisions). Admin/PM/engineer.
+// /api/drawings/:id/revisions). Admin/PM/engineer, gán project_id = dự án đang chọn.
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -48,6 +54,10 @@ export async function POST(req: NextRequest) {
       { error: "Bạn không có quyền tạo bản vẽ (chỉ Admin/PM/kỹ sư)" },
       { status: 403 },
     );
+
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Chưa có dự án nào để tạo bản vẽ" }, { status: 422 });
 
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });
@@ -61,8 +71,8 @@ export async function POST(req: NextRequest) {
   let id: number;
   try {
     id = await insertId(
-      `INSERT INTO drawings (code, name, kind, system_group, floor_label, work_package_id, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO drawings (code, name, kind, system_group, floor_label, work_package_id, created_by, project_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       input.code,
       input.name,
       input.kind,
@@ -70,6 +80,7 @@ export async function POST(req: NextRequest) {
       input.floorLabel,
       input.workPackageId,
       user.id,
+      projectId,
     );
   } catch (err) {
     if ((err as { code?: string }).code === "23505")

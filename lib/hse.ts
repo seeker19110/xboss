@@ -102,7 +102,12 @@ export type HseRow = HseInput & {
   createdAt: string;
 };
 
-export async function listHse(filters: { kind?: HseKind; month?: string }): Promise<HseRow[]> {
+export async function listHse(filters: {
+  kind?: HseKind;
+  month?: string;
+  // M22: undefined = không lọc dự án (dùng nội bộ/test cũ).
+  projectId?: number;
+}): Promise<HseRow[]> {
   const clauses: string[] = [];
   const params: unknown[] = [];
   if (filters.kind) {
@@ -112,6 +117,10 @@ export async function listHse(filters: { kind?: HseKind; month?: string }): Prom
   if (filters.month) {
     clauses.push("to_char(h.record_date, 'YYYY-MM') = ?");
     params.push(filters.month);
+  }
+  if (filters.projectId != null) {
+    clauses.push("h.project_id = ?");
+    params.push(filters.projectId);
   }
   return query<HseRow>(
     `SELECT h.id, h.kind, h.record_date AS "recordDate", h.floor_label AS "floorLabel",
@@ -127,7 +136,15 @@ export async function listHse(filters: { kind?: HseKind; month?: string }): Prom
   );
 }
 
-export async function getHse(id: number): Promise<HseRow | null> {
+// projectId khi truyền → trả null nếu ghi nhận không thuộc dự án đang chọn (chặn truy
+// cập chéo dự án qua đoán ID), giống pattern 404 "không tìm thấy" hiện có.
+export async function getHse(id: number, projectId?: number): Promise<HseRow | null> {
+  const conds = ["h.id = ?"];
+  const params: unknown[] = [id];
+  if (projectId != null) {
+    conds.push("h.project_id = ?");
+    params.push(projectId);
+  }
   const row = await queryOne<HseRow>(
     `SELECT h.id, h.kind, h.record_date AS "recordDate", h.floor_label AS "floorLabel",
             h.area, h.description, h.severity, h.permit_type AS "permitType",
@@ -136,8 +153,8 @@ export async function getHse(id: number): Promise<HseRow | null> {
             u.name AS "actionAssigneeName", h.action_due AS "actionDue",
             h.action_status AS "actionStatus", h.created_by AS "createdBy", h.created_at AS "createdAt"
        FROM hse_records h LEFT JOIN users u ON u.id = h.action_assignee
-      WHERE h.id = ?`,
-    id,
+      WHERE ${conds.join(" AND ")}`,
+    ...params,
   );
   return row ?? null;
 }
@@ -173,11 +190,18 @@ export async function openHseActions(assigneeId?: number): Promise<OpenHseAction
   );
 }
 
-// Đóng action khắc phục (Admin/PM/kỹ sư).
-export async function closeHseAction(id: number): Promise<boolean> {
+// Đóng action khắc phục (Admin/PM/kỹ sư). projectId (M22): khi truyền, chỉ đóng nếu
+// ghi nhận thuộc đúng dự án đang chọn.
+export async function closeHseAction(id: number, projectId?: number): Promise<boolean> {
+  const conds = ["id = ?", "action_status = 'open'"];
+  const params: unknown[] = [id];
+  if (projectId != null) {
+    conds.push("project_id = ?");
+    params.push(projectId);
+  }
   const r = await run(
-    `UPDATE hse_records SET action_status = 'closed' WHERE id = ? AND action_status = 'open'`,
-    id,
+    `UPDATE hse_records SET action_status = 'closed' WHERE ${conds.join(" AND ")}`,
+    ...params,
   );
   return r.changes > 0;
 }

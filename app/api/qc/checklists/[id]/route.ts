@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { validateChecklistItems } from "@/lib/qaqc";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,15 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const existing = await queryOne(`SELECT id FROM qc_checklists WHERE id = ?`, id);
+  const projectId = await getCurrentProjectId(user);
+  const existing =
+    projectId != null
+      ? await queryOne(
+          `SELECT id FROM qc_checklists WHERE id = ? AND project_id = ?`,
+          id,
+          projectId,
+        )
+      : undefined;
   if (!existing) return NextResponse.json({ error: "Không tìm thấy checklist" }, { status: 404 });
 
   const body = await req.json().catch(() => null);
@@ -85,8 +94,12 @@ export async function DELETE(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  const projectId = await getCurrentProjectId(user);
   try {
-    const result = await run(`DELETE FROM qc_checklists WHERE id = ?`, id);
+    const result =
+      projectId != null
+        ? await run(`DELETE FROM qc_checklists WHERE id = ? AND project_id = ?`, id, projectId)
+        : { changes: 0 };
     if (result.changes === 0)
       return NextResponse.json({ error: "Không tìm thấy checklist" }, { status: 404 });
   } catch (err) {

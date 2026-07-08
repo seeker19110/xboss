@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import {
   checkCorrespondenceRefs,
   createReply,
@@ -27,6 +28,10 @@ export async function POST(
   const originalId = parseInt(params.id);
   if (isNaN(originalId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Không tìm thấy văn bản gốc" }, { status: 404 });
+
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });
 
@@ -36,7 +41,7 @@ export async function POST(
   const refErr = await checkCorrespondenceRefs(input);
   if (refErr) return NextResponse.json({ error: refErr }, { status: 422 });
 
-  const result = await createReply(originalId, input, user.id);
+  const result = await createReply(originalId, input, user.id, projectId);
   if ("error" in result) return NextResponse.json({ error: result.error }, { status: 404 });
 
   return NextResponse.json({ id: result.id }, { status: 201 });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import ReactPDF, { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/pdf-fonts";
 import { HSE_KIND_LABEL, HSE_SEVERITY_LABEL, type HseRow } from "@/lib/hse";
@@ -123,6 +124,10 @@ export async function GET(req: NextRequest) {
   if (!MONTH_RE.test(month))
     return NextResponse.json({ error: "Tháng không hợp lệ (YYYY-MM)" }, { status: 422 });
 
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Chưa có dự án nào để xuất báo cáo HSE" }, { status: 422 });
+
   const records = await query<HseRow>(
     `SELECT h.id, h.kind, h.record_date AS "recordDate", h.floor_label AS "floorLabel",
             h.area, h.description, h.severity, h.permit_type AS "permitType",
@@ -131,13 +136,15 @@ export async function GET(req: NextRequest) {
             u.name AS "actionAssigneeName", h.action_due AS "actionDue",
             h.action_status AS "actionStatus", h.created_by AS "createdBy", h.created_at AS "createdAt"
        FROM hse_records h LEFT JOIN users u ON u.id = h.action_assignee
-      WHERE to_char(h.record_date, 'YYYY-MM') = ?
+      WHERE to_char(h.record_date, 'YYYY-MM') = ? AND h.project_id = ?
       ORDER BY h.kind, h.record_date`,
     month,
+    projectId,
   );
 
   const project = (await queryOne<{ name: string }>(
-    `SELECT name FROM projects ORDER BY id LIMIT 1`,
+    `SELECT name FROM projects WHERE id = ?`,
+    projectId,
   )) ?? {
     name: "XBoss",
   };

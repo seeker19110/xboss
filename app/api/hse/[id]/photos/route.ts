@@ -3,6 +3,7 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { ensureUploadDir, extForMime, newHseFileName, MAX_PHOTO_BYTES } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,17 @@ export async function GET(
 
   const recordId = parseInt(params.id);
   if (isNaN(recordId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  const projectId = await getCurrentProjectId(user);
+  const record =
+    projectId != null
+      ? await queryOne(
+          `SELECT id FROM hse_records WHERE id = ? AND project_id = ?`,
+          recordId,
+          projectId,
+        )
+      : undefined;
+  if (!record) return NextResponse.json({ error: "Không tìm thấy ghi nhận" }, { status: 404 });
 
   const photos = await query(
     `SELECT p.id, p.mime, p.created_at AS "createdAt", p.uploaded_by AS "uploadedBy", u.name AS "uploaderName"
@@ -42,10 +54,15 @@ export async function POST(
 
   const recordId = parseInt(params.id);
   if (isNaN(recordId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
-  const record = await queryOne<{ id: number }>(
-    `SELECT id FROM hse_records WHERE id = ?`,
-    recordId,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const record =
+    projectId != null
+      ? await queryOne<{ id: number }>(
+          `SELECT id FROM hse_records WHERE id = ? AND project_id = ?`,
+          recordId,
+          projectId,
+        )
+      : undefined;
   if (!record) return NextResponse.json({ error: "Không tìm thấy ghi nhận" }, { status: 404 });
 
   const form = await req.formData().catch(() => null);

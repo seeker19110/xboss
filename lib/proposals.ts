@@ -61,13 +61,32 @@ export function validateProposalInput(input: ProposalInput): string | null {
   return null;
 }
 
-export async function checkProposalRefs(input: ProposalInput): Promise<string | null> {
+// projectId (M22): khi truyền, hợp đồng/vật tư gắn kèm phải thuộc đúng dự án đang chọn
+// (contracts/materials đều có cột project_id — migrations/0027_multi_project.sql).
+export async function checkProposalRefs(
+  input: ProposalInput,
+  projectId?: number,
+): Promise<string | null> {
   if (input.contractId != null) {
-    const c = await queryOne(`SELECT id FROM contracts WHERE id = ?`, input.contractId);
+    const c =
+      projectId != null
+        ? await queryOne(
+            `SELECT id FROM contracts WHERE id = ? AND project_id = ?`,
+            input.contractId,
+            projectId,
+          )
+        : await queryOne(`SELECT id FROM contracts WHERE id = ?`, input.contractId);
     if (!c) return "Hợp đồng gắn kèm không tồn tại";
   }
   if (input.materialId != null) {
-    const m = await queryOne(`SELECT id FROM materials WHERE id = ?`, input.materialId);
+    const m =
+      projectId != null
+        ? await queryOne(
+            `SELECT id FROM materials WHERE id = ? AND project_id = ?`,
+            input.materialId,
+            projectId,
+          )
+        : await queryOne(`SELECT id FROM materials WHERE id = ?`, input.materialId);
     if (!m) return "Vật tư gắn kèm không tồn tại";
   }
   return null;
@@ -119,6 +138,8 @@ export async function listProposals(filter?: {
   status?: ProposalStatus;
   requestedBy?: number;
   id?: number;
+  // M22: undefined = không lọc dự án (dùng nội bộ/test cũ).
+  projectId?: number;
 }): Promise<ProposalRow[]> {
   const clauses: string[] = [];
   const params: unknown[] = [];
@@ -137,6 +158,10 @@ export async function listProposals(filter?: {
   if (filter?.requestedBy != null) {
     clauses.push("p.requested_by = ?");
     params.push(filter.requestedBy);
+  }
+  if (filter?.projectId != null) {
+    clauses.push("p.project_id = ?");
+    params.push(filter.projectId);
   }
   return query<ProposalRow>(
     `SELECT p.id, p.code, p.kind, p.title, p.amount,
@@ -159,8 +184,13 @@ export async function listProposals(filter?: {
   );
 }
 
-export async function getProposal(id: number): Promise<ProposalRow | undefined> {
-  const rows = await listProposals({ id });
+// projectId khi truyền → trả undefined nếu đề xuất không thuộc dự án đang chọn (chặn
+// truy cập chéo dự án qua đoán ID), giống pattern 404 "không tìm thấy" hiện có.
+export async function getProposal(
+  id: number,
+  projectId?: number,
+): Promise<ProposalRow | undefined> {
+  const rows = await listProposals({ id, projectId });
   return rows[0];
 }
 
@@ -187,7 +217,15 @@ export async function decideProposal(opts: {
   rejectReason?: string | null;
   createBill?: boolean;
   decidedBy: number;
+  // M22: khi truyền, chỉ quyết được đề xuất thuộc đúng dự án đang chọn.
+  projectId?: number;
 }): Promise<{ billId: number | null } | string> {
+  const conds = ["id = ?"];
+  const args: unknown[] = [opts.proposalId];
+  if (opts.projectId != null) {
+    conds.push("project_id = ?");
+    args.push(opts.projectId);
+  }
   const p = await queryOne<{
     id: number;
     code: string;
@@ -198,8 +236,8 @@ export async function decideProposal(opts: {
     status: string;
   }>(
     `SELECT id, code, kind, title, amount, contract_id AS "contractId", status
-       FROM proposals WHERE id = ?`,
-    opts.proposalId,
+       FROM proposals WHERE ${conds.join(" AND ")}`,
+    ...args,
   );
   if (!p) return "Không tìm thấy đề xuất";
   if (p.status !== "submitted") return "Đề xuất không ở trạng thái đã trình";

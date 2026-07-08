@@ -3,6 +3,7 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import {
   ensureUploadDir,
   extForDocMime,
@@ -30,7 +31,15 @@ export async function POST(
 
   const drawingId = parseInt(params.id);
   if (isNaN(drawingId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
-  const drawing = await queryOne<{ id: number }>(`SELECT id FROM drawings WHERE id = ?`, drawingId);
+  const projectId = await getCurrentProjectId(user);
+  const drawing =
+    projectId != null
+      ? await queryOne<{ id: number }>(
+          `SELECT id FROM drawings WHERE id = ? AND project_id = ?`,
+          drawingId,
+          projectId,
+        )
+      : undefined;
   if (!drawing) return NextResponse.json({ error: "Không tìm thấy bản vẽ" }, { status: 404 });
 
   const form = await req.formData().catch(() => null);

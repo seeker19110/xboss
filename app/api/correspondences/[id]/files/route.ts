@@ -3,6 +3,7 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import {
   ensureUploadDir,
   extForDocMime,
@@ -26,6 +27,18 @@ export async function GET(
   const correspondenceId = parseInt(params.id);
   if (isNaN(correspondenceId))
     return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  const projectId = await getCurrentProjectId(user);
+  const correspondence =
+    projectId != null
+      ? await queryOne(
+          `SELECT id FROM correspondences WHERE id = ? AND project_id = ?`,
+          correspondenceId,
+          projectId,
+        )
+      : undefined;
+  if (!correspondence)
+    return NextResponse.json({ error: "Không tìm thấy văn bản" }, { status: 404 });
 
   const files = await query(
     `SELECT f.id, f.original_name AS "originalName", f.mime_type AS "mimeType",
@@ -56,10 +69,15 @@ export async function POST(
   const correspondenceId = parseInt(params.id);
   if (isNaN(correspondenceId))
     return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
-  const correspondence = await queryOne<{ id: number }>(
-    `SELECT id FROM correspondences WHERE id = ?`,
-    correspondenceId,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const correspondence =
+    projectId != null
+      ? await queryOne<{ id: number }>(
+          `SELECT id FROM correspondences WHERE id = ? AND project_id = ?`,
+          correspondenceId,
+          projectId,
+        )
+      : undefined;
   if (!correspondence)
     return NextResponse.json({ error: "Không tìm thấy văn bản" }, { status: 404 });
 

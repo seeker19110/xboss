@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
-import { REVISION_STATUSES, setRevisionStatus, type RevisionStatus } from "@/lib/drawings";
+import { getCurrentProjectId } from "@/lib/projects";
+import {
+  REVISION_STATUSES,
+  getRevisionDrawingProject,
+  setRevisionStatus,
+  type RevisionStatus,
+} from "@/lib/drawings";
 import { sendPushToUsers } from "@/lib/push";
 
 export const dynamic = "force-dynamic";
@@ -86,11 +92,10 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const existing = await queryOne<{ id: number }>(
-    `SELECT id FROM drawing_revisions WHERE id = ?`,
-    id,
-  );
-  if (!existing) return NextResponse.json({ error: "Không tìm thấy revision" }, { status: 404 });
+  const projectId = await getCurrentProjectId(user);
+  const revProject = await getRevisionDrawingProject(id);
+  if (!revProject || revProject.projectId !== projectId)
+    return NextResponse.json({ error: "Không tìm thấy revision" }, { status: 404 });
 
   const body = await req.json().catch(() => null);
   if (!body || typeof body !== "object")

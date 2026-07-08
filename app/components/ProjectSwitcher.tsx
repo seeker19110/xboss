@@ -202,7 +202,7 @@ export default function ProjectSwitcher({ collapsed }: { collapsed: boolean }) {
     return (
       <div className="flex items-center gap-2 h-12 px-3 border-b border-zinc-800 shrink-0">
         <div className="w-5 h-5 rounded-full bg-zinc-800 animate-pulse shrink-0" />
-        <span className="sidebar-label text-sm font-bold truncate text-zinc-500">Đang tải…</span>
+        <span className="sidebar-label text-sm font-bold truncate text-zinc-400">Đang tải…</span>
       </div>
     );
   }

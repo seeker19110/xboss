@@ -184,3 +184,33 @@ test("UNIQUE code bản vẽ chống trùng số bản vẽ toàn hệ thống",
 
   await run(`DELETE FROM drawings WHERE id = ?`, id);
 });
+
+test(
+  "listDrawings/getDrawing: scoped đúng theo project_id (M22), không lẫn dự án khác",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { listDrawings, getDrawing } = await import("@/lib/drawings");
+
+    const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA BV 1', 'PJT-DWG1')`);
+    const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA BV 2', 'PJT-DWG2')`);
+    const d1 = await insertId(
+      `INSERT INTO drawings (code, name, kind, project_id) VALUES ('DWG-SCOPE-1', 'BV DA1', 'shop', ?)`,
+      p1,
+    );
+    const d2 = await insertId(
+      `INSERT INTO drawings (code, name, kind, project_id) VALUES ('DWG-SCOPE-2', 'BV DA2', 'shop', ?)`,
+      p2,
+    );
+
+    const list1 = await listDrawings({ projectId: p1 });
+    assert.ok(list1.some((d) => d.id === d1));
+    assert.ok(!list1.some((d) => d.id === d2));
+
+    assert.ok(await getDrawing(d1, p1));
+    assert.equal(await getDrawing(d2, p1), undefined);
+
+    await run(`DELETE FROM drawings WHERE id IN (?, ?)`, d1, d2);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+  },
+);

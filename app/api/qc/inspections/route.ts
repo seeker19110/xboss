@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, canTouchTask, canTouchPackage } from "@/lib/auth";
-import { validateInspectionResults } from "@/lib/qaqc";
+import { getCurrentProjectId } from "@/lib/projects";
+import { taskInProject, validateInspectionResults, workPackageInProject } from "@/lib/qaqc";
 
 export const dynamic = "force-dynamic";
 
@@ -84,7 +85,23 @@ export async function POST(req: NextRequest) {
   if (workPackageId && !(await canTouchPackage(user, workPackageId)))
     return NextResponse.json({ error: "Bạn không được kiểm nhóm công việc này" }, { status: 403 });
 
-  const checklist = await queryOne(`SELECT id FROM qc_checklists WHERE id = ?`, checklistId);
+  // qc_inspections không có project_id riêng (ADR-0004) — suy qua task/work_package (M22).
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Chưa có dự án nào để tạo lần kiểm tra" }, { status: 422 });
+  if (taskId && !(await taskInProject(taskId, projectId)))
+    return NextResponse.json({ error: "Công việc không thuộc dự án đang chọn" }, { status: 422 });
+  if (workPackageId && !(await workPackageInProject(workPackageId, projectId)))
+    return NextResponse.json(
+      { error: "Nhóm công việc không thuộc dự án đang chọn" },
+      { status: 422 },
+    );
+
+  const checklist = await queryOne(
+    `SELECT id FROM qc_checklists WHERE id = ? AND project_id = ?`,
+    checklistId,
+    projectId,
+  );
   if (!checklist) return NextResponse.json({ error: "Không tìm thấy checklist" }, { status: 404 });
 
   const results = body?.results ?? [];

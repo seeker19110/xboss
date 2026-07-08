@@ -49,10 +49,14 @@ test(
     const adminId = await insertId(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('Test Admin CV', 'admincv-test@test.local', 'x', 'admin')`,
     );
+    const projectId = await insertId(
+      `INSERT INTO projects (name, code) VALUES ('DA Công văn Test', 'PJT-CV1')`,
+    );
     const originalId = await insertId(
-      `INSERT INTO correspondences (code, direction, kind, counterparty, subject, sent_date, due_date, status, created_by)
-       VALUES ('RFI-TEST-001', 'in', 'rfi', 'TVGS', 'Hỏi chi tiết lắp đặt', '2026-07-01', '2026-07-08', 'awaiting', ?)`,
+      `INSERT INTO correspondences (code, direction, kind, counterparty, subject, sent_date, due_date, status, created_by, project_id)
+       VALUES ('RFI-TEST-001', 'in', 'rfi', 'TVGS', 'Hỏi chi tiết lắp đặt', '2026-07-01', '2026-07-08', 'awaiting', ?, ?)`,
       adminId,
+      projectId,
     );
 
     const result = await createReply(
@@ -72,6 +76,7 @@ test(
         note: null,
       },
       adminId,
+      projectId,
     );
     assert.ok("id" in result);
     const replyId = (result as { id: number }).id;
@@ -113,12 +118,46 @@ test(
         note: null,
       },
       adminId,
+      projectId,
     );
     assert.ok("error" in errResult);
 
     await run(`DELETE FROM correspondences WHERE id = ?`, replyId);
     await run(`DELETE FROM correspondences WHERE id = ?`, originalId);
     await run(`DELETE FROM users WHERE id = ?`, adminId);
+    await run(`DELETE FROM projects WHERE id = ?`, projectId);
+  },
+);
+
+test(
+  "listCorrespondences/getCorrespondence: scoped đúng theo project_id (M22), không lẫn dự án khác",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { listCorrespondences, getCorrespondence } = await import("@/lib/correspondence");
+
+    const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA CV 1', 'PJT-CV2')`);
+    const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA CV 2', 'PJT-CV3')`);
+    const c1 = await insertId(
+      `INSERT INTO correspondences (code, direction, kind, counterparty, subject, sent_date, status, project_id)
+       VALUES ('RFI-SCOPE-1', 'in', 'rfi', 'TVGS', 'Văn bản DA1', '2026-07-01', 'awaiting', ?)`,
+      p1,
+    );
+    const c2 = await insertId(
+      `INSERT INTO correspondences (code, direction, kind, counterparty, subject, sent_date, status, project_id)
+       VALUES ('RFI-SCOPE-2', 'in', 'rfi', 'TVGS', 'Văn bản DA2', '2026-07-01', 'awaiting', ?)`,
+      p2,
+    );
+
+    const list1 = await listCorrespondences({ projectId: p1 });
+    assert.ok(list1.some((c) => c.id === c1));
+    assert.ok(!list1.some((c) => c.id === c2));
+
+    assert.ok(await getCorrespondence(c1, p1));
+    assert.equal(await getCorrespondence(c2, p1), undefined);
+
+    await run(`DELETE FROM correspondences WHERE id IN (?, ?)`, c1, c2);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
   },
 );
 

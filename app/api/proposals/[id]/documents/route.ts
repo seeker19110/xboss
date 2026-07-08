@@ -3,6 +3,7 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { query, insertId } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import {
   ensureUploadDir,
   extForDocMime,
@@ -25,7 +26,8 @@ export async function GET(
   const proposalId = parseInt(params.id);
   if (isNaN(proposalId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const proposal = await getProposal(proposalId);
+  const projectId = await getCurrentProjectId(user);
+  const proposal = projectId != null ? await getProposal(proposalId, projectId) : undefined;
   if (!proposal) return NextResponse.json({ error: "Không tìm thấy đề xuất" }, { status: 404 });
   if (proposal.requestedBy !== user.id && !canSeeAllProposals(user))
     return NextResponse.json({ error: "Không có quyền xem đề xuất này" }, { status: 403 });
@@ -55,7 +57,8 @@ export async function POST(
   const proposalId = parseInt(params.id);
   if (isNaN(proposalId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const proposal = await getProposal(proposalId);
+  const projectId = await getCurrentProjectId(user);
+  const proposal = projectId != null ? await getProposal(proposalId, projectId) : undefined;
   if (!proposal) return NextResponse.json({ error: "Không tìm thấy đề xuất" }, { status: 404 });
   const editErr = canEditProposal(proposal, user);
   if (editErr) return NextResponse.json({ error: editErr }, { status: 403 });
