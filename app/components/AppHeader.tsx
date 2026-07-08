@@ -7,13 +7,21 @@ import {
   PanelLeftOpen,
   LayoutDashboard,
   ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import NotificationBell from "@/app/components/NotificationBell";
 import GlobalSearch from "@/app/components/GlobalSearch";
 import ThemeToggle from "@/app/components/ThemeToggle";
 import OnlineUsers from "@/app/components/OnlineUsers";
 import { fetchMe } from "@/app/lib/me";
-import { NAV_GROUPS, isNavItemActive, canSeeNavItem, findActiveNav } from "@/app/lib/nav";
+import {
+  DASHBOARD_TREE,
+  isNavItemActive,
+  canSeeNavItem,
+  findActiveNav,
+  type DashNode,
+  type DashCluster,
+} from "@/app/lib/dashboardTree";
 import { disciplineColorClasses } from "@/lib/disciplineColors";
 
 type Discipline = { id: number; code: string; name: string; color: string | null };
@@ -21,6 +29,7 @@ type Discipline = { id: number; code: string; name: string; color: string | null
 type Me = { id: number; name: string; email: string; role: string };
 
 const SIDEBAR_KEY = "xboss_sidebar";
+const NAV_OPEN_KEY = "xboss_nav_open";
 
 // AppShell: sidebar trái (thu gọn được, drawer trên mobile) + topbar mỏng hiển thị
 // title/breadcrumb của mục đang chọn. Giữ nguyên props API cũ (title/subtitle/children/
@@ -51,6 +60,9 @@ export default function AppHeader({
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+  // Gập/mở dashboard có children (M21) — mặc định MỞ (không có bản ghi = true) nên
+  // không ẩn link nào đang dùng; chỉ ẩn khi người dùng tự gập, nhớ localStorage.
+  const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
   const asideRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -61,7 +73,25 @@ export default function AppHeader({
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => setDisciplines(data?.disciplines ?? []))
       .catch(() => {});
+    try {
+      const raw = localStorage.getItem(NAV_OPEN_KEY);
+      if (raw) setOpenMap(JSON.parse(raw));
+    } catch {
+      /* private mode / JSON hỏng — giữ mặc định mở hết */
+    }
   }, []);
+
+  function toggleDash(id: string, currentlyOpen: boolean) {
+    setOpenMap((prev) => {
+      const next = { ...prev, [id]: !currentlyOpen };
+      try {
+        localStorage.setItem(NAV_OPEN_KEY, JSON.stringify(next));
+      } catch {
+        /* private mode */
+      }
+      return next;
+    });
+  }
 
   // Drawer mobile: bẫy focus bên trong + đóng bằng Esc (M0 — chỉ áp dụng khi drawer
   // đang mở, tức đang ở mobile vì nút mở/overlay chỉ hiện dưới lg:hidden). Trả focus
@@ -120,54 +150,94 @@ export default function AppHeader({
   const active = path ? findActiveNav(path) : undefined;
   const pageTitle = title ?? active?.item.label ?? "XBoss";
   const breadcrumbGroup =
-    !title && active && active.group.label !== active.item.label ? active.group.label : undefined;
+    !title && active && active.cluster.label !== active.item.label
+      ? active.cluster.label
+      : undefined;
 
-  function renderNavGroup(group: (typeof NAV_GROUPS)[number]) {
-    const items = group.items.filter((it) => canSeeNavItem(it, me?.role));
-    if (items.length === 0) return null;
+  // Lá thật (có href) hoặc dashboard mockup chưa có trang ("coming-soon" — thiếu href
+  // VÀ không children): dùng chung cho cả dashboard cấp 3 đơn lẫn mục con cấp 4.
+  function renderLeaf(item: DashNode) {
+    const Icon = item.icon;
+    if (!item.href) {
+      return (
+        <span
+          key={item.label}
+          aria-disabled="true"
+          title={`${item.label} — sắp có`}
+          className="flex items-center gap-2.5 mx-2 px-2.5 py-2 rounded-lg text-sm min-h-10 border-l-2 border-transparent text-zinc-400 select-none"
+        >
+          <Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
+          <span className="sidebar-label flex-1 truncate">{item.label}</span>
+          <span className="sidebar-label shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded bg-zinc-800 text-amber-300">
+            Sắp có
+          </span>
+        </span>
+      );
+    }
+    const itemActive = isNavItemActive(item, path);
     return (
-      <div key={group.label} className="mb-3">
+      <a
+        key={item.href}
+        href={item.href}
+        title={item.label}
+        aria-current={itemActive ? "page" : undefined}
+        className={`flex items-center gap-2.5 mx-2 px-2.5 py-2 rounded-lg text-sm transition min-h-10 border-l-2 ${
+          itemActive
+            ? "bg-zinc-800 text-white font-medium border-emerald-400"
+            : "text-zinc-400 hover:text-white hover:bg-zinc-900/60 border-transparent"
+        }`}
+      >
+        <Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
+        <span className="sidebar-label">{item.label}</span>
+      </a>
+    );
+  }
+
+  // Dashboard cấp 3: lá đơn (có href, render thẳng) hoặc nhóm (không href, có children
+  // — hàng tiêu đề chỉ gập/mở, KHÔNG phải link; mặc định mở, tự mở khi chứa trang đang xem).
+  function renderDashboard(dash: DashNode) {
+    if (!dash.children) return renderLeaf(dash);
+    const visibleChildren = dash.children.filter((c) => canSeeNavItem(c, me?.role));
+    if (visibleChildren.length === 0) return null;
+    const id = dash.id ?? dash.label;
+    const containsActive = visibleChildren.some((c) => isNavItemActive(c, path));
+    // Thu gọn sidebar (icon-only): luôn mở — không có chỗ hiện chevron/nhãn để gập
+    // riêng từng dashboard, ẩn hẳn con sẽ làm mất link (trái ý "không ẩn link đang dùng").
+    const open = collapsed || containsActive || (openMap[id] ?? true);
+    const Icon = dash.icon;
+    return (
+      <div key={id}>
+        <button
+          type="button"
+          onClick={() => toggleDash(id, open)}
+          aria-expanded={open}
+          title={dash.label}
+          className="w-full flex items-center gap-2.5 mx-2 px-2.5 py-2 rounded-lg text-sm min-h-10 text-zinc-400 hover:text-white hover:bg-zinc-900/60 transition"
+        >
+          <Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
+          <span className="sidebar-label flex-1 truncate text-left">{dash.label}</span>
+          <ChevronDown
+            className={`sidebar-label w-3.5 h-3.5 shrink-0 transition-transform ${open ? "" : "-rotate-90"}`}
+          />
+        </button>
+        {open && (
+          <div className={collapsed ? "" : "ml-4 border-l border-zinc-800 pl-1"}>
+            {visibleChildren.map((child) => renderLeaf(child))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderCluster(cluster: DashCluster) {
+    const dashboards = cluster.dashboards.filter((d) => canSeeNavItem(d, me?.role));
+    if (dashboards.length === 0) return null;
+    return (
+      <div key={cluster.label} className="mb-3">
         <div className="sidebar-label px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-          {group.label}
+          {cluster.label}
         </div>
-        {items.map((item) => {
-          const Icon = item.icon;
-          // Dashboard mockup chưa có trang thật (M21 — xem docs/ke-hoach-appshell-full-ia-2026-07.md):
-          // hiện trong sidebar làm "bản đồ lộ trình sống" nhưng không phải link, không bấm được.
-          if (!item.href) {
-            return (
-              <span
-                key={item.label}
-                aria-disabled="true"
-                title={`${item.label} — sắp có`}
-                className="flex items-center gap-2.5 mx-2 px-2.5 py-2 rounded-lg text-sm min-h-10 border-l-2 border-transparent text-zinc-400 select-none"
-              >
-                <Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
-                <span className="sidebar-label flex-1 truncate">{item.label}</span>
-                <span className="sidebar-label shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded bg-zinc-800 text-amber-300">
-                  Sắp có
-                </span>
-              </span>
-            );
-          }
-          const itemActive = isNavItemActive(item, path);
-          return (
-            <a
-              key={item.href}
-              href={item.href}
-              title={item.label}
-              aria-current={itemActive ? "page" : undefined}
-              className={`flex items-center gap-2.5 mx-2 px-2.5 py-2 rounded-lg text-sm transition min-h-10 border-l-2 ${
-                itemActive
-                  ? "bg-zinc-800 text-white font-medium border-emerald-400"
-                  : "text-zinc-400 hover:text-white hover:bg-zinc-900/60 border-transparent"
-              }`}
-            >
-              <Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
-              <span className="sidebar-label">{item.label}</span>
-            </a>
-          );
-        })}
+        {dashboards.map((dash) => renderDashboard(dash))}
       </div>
     );
   }
@@ -198,7 +268,7 @@ export default function AppHeader({
         </div>
 
         <nav className="flex-1 overflow-y-auto py-2" aria-label="Điều hướng chính">
-          {NAV_GROUPS.slice(0, 1).map(renderNavGroup)}
+          {DASHBOARD_TREE.slice(0, 1).map(renderCluster)}
 
           {/* Hệ thi công — danh mục động từ /api/disciplines (M15), mỗi hệ 1 mục
               dẫn tới trang hub riêng (/he/[code]); chấm màu lấy từ disciplines.color. */}
@@ -234,7 +304,7 @@ export default function AppHeader({
             </div>
           )}
 
-          {NAV_GROUPS.slice(1).map(renderNavGroup)}
+          {DASHBOARD_TREE.slice(1).map(renderCluster)}
         </nav>
 
         <button

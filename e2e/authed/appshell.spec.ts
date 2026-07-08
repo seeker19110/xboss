@@ -3,8 +3,9 @@ import AxeBuilder from "@axe-core/playwright";
 
 // AppShell (M0) — sidebar trái thu gọn được + title/breadcrumb trên topbar.
 // Xem docs/nang-cap/M00-khung-ui-sidebar.md.
-// M21 (docs/ke-hoach-appshell-full-ia-2026-07.md): sidebar gom theo 11 cụm nghiệp vụ
-// + mục "Sắp có" cho dashboard mockup chưa có trang thật.
+// M21 (docs/ke-hoach-appshell-full-ia-2026-07.md, docs/nang-cap/M21-appshell-ia.md):
+// sidebar gom theo 11 cụm nghiệp vụ, dashboard nhóm nhiều trang gập/mở được (nhớ
+// localStorage, mặc định mở), + mục "Sắp có" cho dashboard mockup chưa có trang thật.
 
 test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
   test("sidebar render đủ nhóm menu theo vai trò Admin", async ({ page }) => {
@@ -61,6 +62,41 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     // Không phải thẻ <a> — không có trang thật để điều hướng tới.
     await expect(sidebar.getByRole("link", { name: "Khởi động & Pháp lý" })).toHaveCount(0);
     await expect(sidebar.getByText("Sắp có").first()).toBeVisible();
+  });
+
+  test("dashboard nhóm gập/mở được, nhớ trạng thái sau khi tải lại (mặc định mở)", async ({
+    page,
+    isMobile,
+  }) => {
+    await page.goto("/"); // Dashboard tổng — không nằm trong nhóm "Tiến độ" nên không bị ép mở.
+    if (isMobile) {
+      await page.getByRole("button", { name: "Mở menu" }).click();
+    }
+    const sidebar = page.locator("#app-sidebar");
+    const toggle = sidebar.getByRole("button", { name: "Tiến độ" });
+    await expect(toggle).toBeVisible({ timeout: 15_000 });
+
+    // Mặc định mở — link con thấy ngay, không cần bấm.
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(sidebar.getByRole("link", { name: "Timeline", exact: true })).toBeVisible();
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(sidebar.getByRole("link", { name: "Timeline", exact: true })).toHaveCount(0);
+
+    await page.reload();
+    if (isMobile) {
+      await page.getByRole("button", { name: "Mở menu" }).click();
+    }
+    await expect(sidebar.getByRole("button", { name: "Tiến độ" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    await expect(sidebar.getByRole("link", { name: "Timeline", exact: true })).toHaveCount(0);
+
+    // Trả lại mặc định mở để không ảnh hưởng test khác dùng chung storageState.
+    await sidebar.getByRole("button", { name: "Tiến độ" }).click();
+    await expect(sidebar.getByRole("link", { name: "Timeline", exact: true })).toBeVisible();
   });
 
   test("title topbar đổi theo trang đang xem", async ({ page, isMobile }) => {

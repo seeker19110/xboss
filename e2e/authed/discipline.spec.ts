@@ -23,8 +23,9 @@ test.describe("Trang hệ /he/[code] (sau đăng nhập)", () => {
 
   test("render KPI + danh sách sheet ở tab Tổng quan", async ({ page }) => {
     await gotoAcmv(page);
-    // exact:true — sidebar (M21) có cụm "Kế hoạch & Tiến độ" cũng chứa chuỗi con "Tiến độ".
-    await expect(page.getByText("Tiến độ", { exact: true })).toBeVisible();
+    // Scope vào KPI strip — sidebar (M21) cũng có dashboard "Tiến độ" trùng chuỗi.
+    const kpi = page.getByLabel("Chỉ số KPI của hệ");
+    await expect(kpi.getByText("Tiến độ", { exact: true })).toBeVisible();
     await expect(page.getByText("Task trễ")).toBeVisible();
     await expect(page.getByText("Chờ nghiệm thu")).toBeVisible();
     // 5 sheet ACMV gốc từ seed mẫu.

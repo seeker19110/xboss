@@ -4,31 +4,44 @@
 
 ## Danh mục
 
-| File | Module | Đợt |
-|---|---|---|
-| `M00-khung-ui-sidebar.md` | Khung UI sidebar + title AppHeader + nền tảng UX | 1 |
-| `M01-boq.md` | BOQ đầy đủ | 1 |
-| `M02-chi-phi.md` | Kiểm soát chi phí + cảnh báo vượt | 1 |
-| `M03-qaqc.md` | QA&QC + hồ sơ chất lượng (T&C, phiếu YCNT, chuyển bước) | 2 |
-| `M04-ncc-don-hang.md` | NCC & đơn hàng (cấp phát, xe ra vào) | 2 |
-| `M05-nhat-ky.md` | Nhật ký thi công + nhân lực | 2 |
-| `M14-mat-bang.md` | Mặt bằng thi công (work front) | 2 |
-| `M15-trang-he.md` | Trang riêng từng hệ (hub quản lý nhà thầu) | 1 |
-| `M06-phat-sinh-vo.md` | Phát sinh / VO | 3 |
-| `M07-dau-thau.md` | Đấu thầu | 3 |
-| `M08-ban-ve.md` | Bản vẽ BIM/Shop + biện pháp thi công | 3 |
-| `M09-dashboard.md` | Dashboard mở rộng | 3 |
-| `M10-rfi-cong-van.md` | RFI / công văn | 4 |
-| `M11-hse.md` | HSE / an toàn | 4 |
-| `M12-thiet-bi.md` | Thiết bị/máy móc | 4 |
-| `M13-hop-rui-ro.md` | Biên bản họp + sổ rủi ro | 4 |
-| `M16-hop-dong.md` | Sổ hợp đồng (nhận thầu/giao thầu/NCC) | A (FastCons) |
-| `M17-thanh-toan-kl.md` | Nghiệm thu khối lượng & thanh toán theo đợt (IPC) | A (FastCons) |
-| `M18-dinh-muc.md` | Định mức vật tư/nhân công/máy theo hạng mục | C (FastCons) |
-| `M19-de-xuat-phe-duyet.md` | Đề xuất & phê duyệt online tổng quát | D (FastCons) |
-| `M20-kho-ho-so.md` | Kho hồ sơ dự án (Drive) | B (FastCons) |
+| File                          | Module                                                              | Đợt          |
+| ----------------------------- | ------------------------------------------------------------------- | ------------ |
+| `M00-khung-ui-sidebar.md`     | Khung UI sidebar + title AppHeader + nền tảng UX                    | 1            |
+| `M01-boq.md`                  | BOQ đầy đủ                                                          | 1            |
+| `M02-chi-phi.md`              | Kiểm soát chi phí + cảnh báo vượt                                   | 1            |
+| `M03-qaqc.md`                 | QA&QC + hồ sơ chất lượng (T&C, phiếu YCNT, chuyển bước)             | 2            |
+| `M04-ncc-don-hang.md`         | NCC & đơn hàng (cấp phát, xe ra vào)                                | 2            |
+| `M05-nhat-ky.md`              | Nhật ký thi công + nhân lực                                         | 2            |
+| `M14-mat-bang.md`             | Mặt bằng thi công (work front)                                      | 2            |
+| `M15-trang-he.md`             | Trang riêng từng hệ (hub quản lý nhà thầu)                          | 1            |
+| `M06-phat-sinh-vo.md`         | Phát sinh / VO                                                      | 3            |
+| `M07-dau-thau.md`             | Đấu thầu                                                            | 3            |
+| `M08-ban-ve.md`               | Bản vẽ BIM/Shop + biện pháp thi công                                | 3            |
+| `M09-dashboard.md`            | Dashboard mở rộng                                                   | 3            |
+| `M10-rfi-cong-van.md`         | RFI / công văn                                                      | 4            |
+| `M11-hse.md`                  | HSE / an toàn                                                       | 4            |
+| `M12-thiet-bi.md`             | Thiết bị/máy móc                                                    | 4            |
+| `M13-hop-rui-ro.md`           | Biên bản họp + sổ rủi ro                                            | 4            |
+| `M16-hop-dong.md`             | Sổ hợp đồng (nhận thầu/giao thầu/NCC)                               | A (FastCons) |
+| `M17-thanh-toan-kl.md`        | Nghiệm thu khối lượng & thanh toán theo đợt (IPC)                   | A (FastCons) |
+| `M18-dinh-muc.md`             | Định mức vật tư/nhân công/máy theo hạng mục                         | C (FastCons) |
+| `M19-de-xuat-phe-duyet.md`    | Đề xuất & phê duyệt online tổng quát                                | D (FastCons) |
+| `M20-kho-ho-so.md`            | Kho hồ sơ dự án (Drive)                                             | B (FastCons) |
+| `M21-appshell-ia.md`          | AppShell IA đầy đủ (cây dashboard + hub + quản trị hiển thị)        | N1 (IA)      |
+| `M22-da-du-an.md`             | Đa dự án (Portfolio, switcher, scoping `project_id`) — cần ADR-0004 | N3 (IA)      |
+| `M23-khoi-dong-phap-ly.md`    | Khởi động & Pháp lý (giấy phép, huy động)                           | B (IA mới)   |
+| `M24-nhan-su-to-chuc.md`      | Nhân sự & Tổ chức (chấm công, tổ đội, chứng chỉ, RACI)              | B (IA mới)   |
+| `M25-moi-truong-giay-phep.md` | Môi trường & Giấy phép (quan trắc MT, chất thải)                    | H (IA mới)   |
+| `M26-quan-he-quan-trac.md`    | Quan hệ & Quan trắc (lún/chuyển vị, cộng đồng)                      | H (IA mới)   |
+| `M27-tai-chinh-ke-toan.md`    | Tài chính – Kế toán công trường (dòng tiền, VAT, lương)             | I (IA mới)   |
+| `M28-bao-hiem-bao-lanh.md`    | Bảo hiểm & Bảo lãnh (theo dõi hạn)                                  | I (IA mới)   |
+| `M29-ban-giao-ket-thuc.md`    | Bàn giao & Kết thúc (T&C, punch list, demob)                        | K (IA mới)   |
+| `M30-bao-hanh-bao-tri.md`     | Bảo hành – Bảo trì (O&M)                                            | K (IA mới)   |
+| `M31-chuyen-doi-so.md`        | Chuyển đổi số & Công nghệ (CDE, BIM viewer, drone)                  | L (IA mới)   |
 
 > M16–M20 là module bổ sung từ đối chiếu brochure FastCons — xem `docs/ke-hoach-fastcons-2026-07.md` (nhóm A/B/C/D thay cho số đợt 1–4 cũ).
+>
+> **M21–M31** là module của kế hoạch AppShell IA đa dự án — xem `docs/ke-hoach-appshell-full-ia-2026-07.md` (tổng quan + lộ trình N1–N4) + `docs/ke-hoach-ia-chi-tiet-2026-07.md` (bóc tách từng dashboard) + **ADR-0004** (nền đa dự án, đọc trước M22). Thứ tự đề xuất: M21 (mở khoá điều hướng, rủi ro thấp) → M22 (nền đa dự án) → đào sâu dashboard đã có → dashboard mới theo nhu cầu PM (M28 nhỏ/giá trị cao → M23 → M25 → M27 → M29 → còn lại).
 
 ## Quy ước chung (áp cho MỌI module — không lặp lại trong từng file)
 
