@@ -1,7 +1,11 @@
 # Kế hoạch chi tiết từng mục — IA đa dự án XBoss (2026-07)
 
-> **Trạng thái: ĐÃ CHỐT hướng đi (2026-07)** — triển khai theo bảng module M21–M31 ở
-> các PR sau; công sức/route/dữ liệu đề xuất được **tinh chỉnh khi vào từng module**.
+> **Trạng thái: ĐÃ CHỐT hướng đi (2026-07) + ĐÃ VIẾT ĐẶC TẢ CHI TIẾT (2026-07-08)** —
+> mỗi module M21–M31 nay có file đặc tả tự chứa riêng trong `docs/nang-cap/` (khuôn
+> giống M00–M20: schema/lib/API/UI-UX/test/chia-PR); M22 kèm **ADR-0004** (nền đa dự
+> án). Tài liệu này giữ vai trò **bóc tách IA từng dashboard** (bối cảnh); chi tiết
+> triển khai xem file `M<xx>-*.md` tương ứng. Công sức/route/dữ liệu **tinh chỉnh khi
+> vào từng module**.
 > Tài liệu này bóc tách **chi tiết
 > từng dashboard** trong cây IA đề xuất (xem tổng quan + bản đồ trực quan ở
 > `docs/ke-hoach-appshell-full-ia-2026-07.md`). Mỗi mục gồm: cây con lấy từ mockup,
@@ -14,19 +18,19 @@
 
 ## Bảng module đề xuất (nối tiếp M00–M20)
 
-| Module | Phạm vi | Cụm | Công sức |
-|---|---|---|---|
-| **M21** | AppShell IA đầy đủ + cây `dashboardTree.ts` + trang hub + **quản trị hiển thị** (admin/PM bật-tắt mục, notification `nav_enabled` khi admin bật) | (nền) | M |
-| **M22** | Multi-project: Portfolio, project switcher, scoping `project_id`, `user_projects` | Tầng 0–1 | L |
-| **M23** | Khởi động & Pháp lý | B | M |
-| **M24** | Nhân sự & Tổ chức | B | L |
-| **M25** | Môi trường & Giấy phép | H | M |
-| **M26** | Quan hệ & Quan trắc (lún/chuyển vị, cộng đồng) | H | M |
-| **M27** | Tài chính – Kế toán công trường | I | L |
-| **M28** | Bảo hiểm & Bảo lãnh | I | S |
-| **M29** | Bàn giao & Kết thúc (T&C, as-built, demob) | K | L |
-| **M30** | Bảo hành – Bảo trì (O&M) | K | M |
-| **M31** | Chuyển đổi số & Công nghệ (CDE, IoT, drone) | L | M |
+| Module  | Phạm vi                                                                                                                                          | Cụm      | Công sức | Đặc tả                        |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | -------- | -------- | ----------------------------- |
+| **M21** | AppShell IA đầy đủ + cây `dashboardTree.ts` + trang hub + **quản trị hiển thị** (admin/PM bật-tắt mục, notification `nav_enabled` khi admin bật) | (nền)    | M        | `M21-appshell-ia.md`          |
+| **M22** | Multi-project: Portfolio, project switcher, scoping `project_id`, `user_projects`                                                                | Tầng 0–1 | L        | `M22-da-du-an.md` + ADR-0004  |
+| **M23** | Khởi động & Pháp lý                                                                                                                              | B        | M        | `M23-khoi-dong-phap-ly.md`    |
+| **M24** | Nhân sự & Tổ chức                                                                                                                                | B        | L        | `M24-nhan-su-to-chuc.md`      |
+| **M25** | Môi trường & Giấy phép                                                                                                                           | H        | M        | `M25-moi-truong-giay-phep.md` |
+| **M26** | Quan hệ & Quan trắc (lún/chuyển vị, cộng đồng)                                                                                                   | H        | M        | `M26-quan-he-quan-trac.md`    |
+| **M27** | Tài chính – Kế toán công trường                                                                                                                  | I        | L        | `M27-tai-chinh-ke-toan.md`    |
+| **M28** | Bảo hiểm & Bảo lãnh                                                                                                                              | I        | S        | `M28-bao-hiem-bao-lanh.md`    |
+| **M29** | Bàn giao & Kết thúc (T&C, as-built, demob)                                                                                                       | K        | L        | `M29-ban-giao-ket-thuc.md`    |
+| **M30** | Bảo hành – Bảo trì (O&M)                                                                                                                         | K        | M        | `M30-bao-hanh-bao-tri.md`     |
+| **M31** | Chuyển đổi số & Công nghệ (CDE, IoT, drone)                                                                                                      | L        | M        | `M31-chuyen-doi-so.md`        |
 
 > Các dashboard còn lại tái dùng/đào sâu module đã đặc tả: Vật tư=M01/M04/M18,
 > Chi phí=M02/M16/M17/M19, QAQC=M03, Nhật ký/Hiện trường=M05/M14, VO/Claim=M06,
@@ -232,7 +236,8 @@ hoặc risk M13); an ninh (bảo vệ/tuần tra/camera) phần lớn mới; h�
 
 **Đề xuất:** bảng `hotspots` (vị trí × hệ liên quan × trạng thái) gắn `work_fronts`;
 an ninh gộp với xe ra vào thành module nhỏ. Camera → M31. **Công sức M** (điểm nóng
-+ an ninh cơ bản); phần lớn đã phủ.
+
+- an ninh cơ bản); phần lớn đã phủ.
 
 ---
 
