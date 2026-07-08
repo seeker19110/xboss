@@ -16,10 +16,12 @@ import {
   Circle,
   CalendarClock,
   HardDrive,
+  LayoutDashboard,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { fetchMe } from "@/app/lib/me";
 import { ROLE_LABELS } from "@/lib/roles";
+import { DASHBOARD_TREE, dashboardStatus } from "@/app/lib/dashboardTree";
 
 type User = { id: number; name: string; role: string };
 type Sheet = {
@@ -87,7 +89,7 @@ function fmtDt(s: string) {
 
 export default function AdminPage() {
   const [me, setMe] = useState<{ id: number; role: string } | null>(null);
-  const [tab, setTab] = useState<"assign" | "audit" | "traffic">("assign");
+  const [tab, setTab] = useState<"assign" | "nav" | "audit" | "traffic">("assign");
   const [traffic, setTraffic] = useState<TrafficEntry[]>([]);
   const [trafficLive, setTrafficLive] = useState(false);
   const trafficLatestRef = useRef(0);
@@ -109,6 +111,9 @@ export default function AdminPage() {
   const [storage, setStorage] = useState<{ bytes: number; files: number; warn: boolean } | null>(
     null,
   );
+  // Hiển thị AppShell (M21 PR3): bật/tắt dashboard trong sidebar.
+  const [navSettings, setNavSettings] = useState<Record<string, boolean>>({});
+  const [navLoading, setNavLoading] = useState(false);
 
   const loadAssign = useCallback((unassignedOnly = false) => {
     const q = unassignedOnly ? "?unassignedOnly=1" : "";
@@ -131,6 +136,14 @@ export default function AdminPage() {
       });
   }, []);
 
+  const loadNav = useCallback(() => {
+    setNavLoading(true);
+    fetch("/api/nav-settings", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => setNavSettings(j.settings ?? {}))
+      .finally(() => setNavLoading(false));
+  }, []);
+
   useEffect(() => {
     fetchMe().then((user) => {
       if (!user) return;
@@ -147,6 +160,10 @@ export default function AdminPage() {
   useEffect(() => {
     if (tab === "audit") loadAudit(auditPage);
   }, [tab, auditPage, loadAudit]);
+
+  useEffect(() => {
+    if (tab === "nav") loadNav();
+  }, [tab, loadNav]);
 
   // SSE traffic: kết nối khi chuyển sang tab traffic (chỉ Admin), đóng khi rời.
   useEffect(() => {
@@ -215,6 +232,28 @@ export default function AdminPage() {
       loadAssign(filterUnassigned);
     } catch {
       setError("Mất kết nối mạng — vui lòng thử lại");
+    }
+  }
+
+  async function toggleNav(nodeKey: string, next: boolean) {
+    const prevValue = navSettings[nodeKey];
+    setNavSettings((prev) => ({ ...prev, [nodeKey]: next })); // optimistic
+    try {
+      const res = await fetch("/api/nav-settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nodeKey, enabled: next }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setError(j.error ?? "Lỗi không xác định");
+        setNavSettings((prev) => ({ ...prev, [nodeKey]: prevValue }));
+        return;
+      }
+      flash(`Đã ${next ? "bật" : "tắt"} mục menu`);
+    } catch {
+      setError("Mất kết nối mạng — vui lòng thử lại");
+      setNavSettings((prev) => ({ ...prev, [nodeKey]: prevValue }));
     }
   }
 
@@ -331,6 +370,7 @@ export default function AdminPage() {
           {(
             [
               ["assign", "Phân công", null],
+              ["nav", "Hiển thị AppShell", "nav"],
               ["audit", "Lịch sử", "audit"],
               ["traffic", "Traffic", "traffic"],
             ] as const
@@ -339,9 +379,10 @@ export default function AdminPage() {
             .map(([key, label, icon]) => (
               <button
                 key={key}
-                onClick={() => setTab(key as "assign" | "audit" | "traffic")}
+                onClick={() => setTab(key as "assign" | "nav" | "audit" | "traffic")}
                 className={`px-3 py-1 rounded text-sm flex items-center gap-1 ${tab === key ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-white"}`}
               >
+                {icon === "nav" && <LayoutDashboard className="w-3.5 h-3.5" />}
                 {icon === "audit" && <History className="w-3.5 h-3.5" />}
                 {icon === "traffic" && <Activity className="w-3.5 h-3.5" />}
                 {label}
@@ -577,6 +618,69 @@ export default function AdminPage() {
               </p>
             )}
           </>
+        )}
+
+        {/* ========== TAB HIỂN THỊ APPSHELL (M21 PR3) ========== */}
+        {tab === "nav" && (
+          <div className="space-y-4">
+            <p className="text-sm text-zinc-400">
+              Bật/tắt dashboard hiển thị trong sidebar cho mọi người dùng. Mặc định mọi mục đều bật
+              (kể cả badge &quot;Sắp có&quot; cho dashboard chưa có trang thật) — tắt ở đây để ẩn
+              hẳn khỏi sidebar.
+            </p>
+            {navLoading && <p className="text-sm text-zinc-500">Đang tải…</p>}
+            {DASHBOARD_TREE.map((cluster) => (
+              <div
+                key={cluster.label}
+                className="rounded-lg border border-zinc-800 overflow-hidden"
+              >
+                <div className="px-4 py-2 border-b border-zinc-800 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                  {cluster.label}
+                </div>
+                <div className="divide-y divide-zinc-800/60">
+                  {cluster.dashboards.map((dash) => {
+                    if (!dash.id) return null;
+                    const status = dashboardStatus(dash);
+                    // Mặc định BẬT cho mọi trạng thái (kể cả "coming-soon") — xem lib/nav-settings.ts.
+                    const enabled = navSettings[dash.id] ?? true;
+                    return (
+                      <button
+                        key={dash.id}
+                        type="button"
+                        role="switch"
+                        aria-checked={enabled}
+                        aria-label={`${enabled ? "Tắt" : "Bật"} mục "${dash.label}"`}
+                        onClick={() => toggleNav(dash.id!, !enabled)}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-left min-h-10 hover:bg-zinc-900/60 transition"
+                      >
+                        <span className="flex-1 text-sm truncate">{dash.label}</span>
+                        <span
+                          className={`text-[10px] font-semibold border rounded-full px-2 py-0.5 shrink-0 ${
+                            status === "available"
+                              ? "bg-emerald-950/60 text-emerald-300 border-emerald-800"
+                              : "bg-zinc-800 text-amber-300 border-zinc-700"
+                          }`}
+                        >
+                          {status === "available" ? "Đã có" : "Sắp có"}
+                        </span>
+                        <span
+                          className={`shrink-0 w-11 h-6 rounded-full relative transition-colors ${
+                            enabled ? "bg-emerald-600" : "bg-zinc-700"
+                          }`}
+                        >
+                          <span
+                            className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
+                              enabled ? "translate-x-5" : ""
+                            }`}
+                          />
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
 
         {/* ========== TAB LỊCH SỬ PHÂN CÔNG ========== */}
