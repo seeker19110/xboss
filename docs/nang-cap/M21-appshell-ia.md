@@ -6,7 +6,11 @@
 
 Nâng điều hướng từ danh sách phẳng (`app/lib/nav.ts` — 11 cụm sau PR M21-N1 đầu) thành **cây IA sống 2 tầng** phản chiếu toàn bộ 24 dashboard của mockup `xBossmockup.xlsx`: cụm nghiệp vụ → dashboard (gập/mở), node chưa build hiện badge **"Sắp có"**. Thêm **trang hub khuôn chung** cho từng dashboard (render cây con cấp 4 dạng thẻ/section, tái dùng khuôn `/he/[code]`), và **khu quản trị hiển thị** ở `/admin` cho phép Admin/PM bật/tắt từng node (kèm notification `nav_enabled` khi admin bật để PM biết dashboard mới đã mở).
 
-> **Đã làm ở PR trước (M21-N1 phần 1, commit `b5bbc8a`):** gom `nav.ts` thành 11 cụm nghiệp vụ + 9 mục "Sắp có" (`href` optional → `AppHeader` render `<span aria-disabled>` + badge). Tài liệu này đặc tả **phần còn lại** của M21: cây `dashboardTree.ts` đầy đủ cấp con, gập/mở nhớ `localStorage`, trang hub, `nav_settings`.
+> **Đã làm:**
+>
+> - PR trước (M21-N1 phần 1, commit `b5bbc8a`): gom `nav.ts` thành 11 cụm nghiệp vụ + 9 mục "Sắp có" (`href` optional → `AppHeader` render `<span aria-disabled>` + badge).
+> - **Chia PR mục 1 (commit sau đó):** `app/lib/dashboardTree.ts` thay hẳn `nav.ts` — dashboard cấp 3 gộp đúng mockup thành nhóm gập/mở (`children`, mặc định mở, nhớ `localStorage('xboss_nav_open')`, tự mở khi chứa trang đang xem hoặc khi sidebar thu gọn icon-only). Ngoại lệ: cụm "Vật tư" (BOQ/Vật tư/Đơn đặt hàng) giữ phẳng không gộp nhóm (gộp sẽ trùng nhãn "Vật tư" giữa tiêu đề nhóm và trang chính).
+> - Tài liệu này giờ đặc tả **phần còn lại**: trang hub khuôn chung (chia PR mục 2), `nav_settings` + khu "Hiển thị AppShell" ở `/admin` + notification `nav_enabled` (chia PR mục 3).
 
 ## Hiện trạng & điểm chạm
 
