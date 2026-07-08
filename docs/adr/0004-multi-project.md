@@ -1,6 +1,6 @@
 # ADR-0004: Đa dự án — scoping theo `project_id` ở tầng API, chọn dự án qua cookie
 
-- **Trạng thái:** Đề xuất
+- **Trạng thái:** Đã chấp nhận (M22 PR1 đã triển khai theo quyết định này — xem PROGRESS.md)
 - **Ngày:** 2026-07-08
 - **Liên quan:** nền cho M22 (`docs/nang-cap/M22-da-du-an.md`); mở khoá tầng 0–1 của IA (`docs/ke-hoach-appshell-full-ia-2026-07.md` §5).
 

@@ -80,6 +80,15 @@ function deriveStatus(progress: number, endDate: string): StatusSlug {
 async function main() {
   console.log("🌱 Seeding dữ liệu mẫu AVIO Tháp A...");
 
+  // Xoá các bảng nghiệp vụ mang project_id (M22) trước — TRUNCATE CASCADE tự xoá theo
+  // đúng thứ tự FK (kể cả bảng con không mang project_id riêng như payment_certs,
+  // po_items, qc_inspections...) mà không cần liệt kê tay từng cấp con.
+  await run(`TRUNCATE TABLE
+    contracts, variation_orders, materials, boq_items, purchase_orders, purchase_requests,
+    meetings, risks, proposals, correspondences, drawings, qc_checklists, ncrs,
+    hse_records, site_diaries, equipment, vehicle_logs, tender_packages, project_documents
+    CASCADE`);
+
   // Reset (theo thứ tự FK).
   for (const t of [
     "notifications",

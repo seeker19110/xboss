@@ -206,6 +206,8 @@ export const CAN = {
   manageRisks: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
   // Bật/tắt mục hiển thị AppShell (M21 PR3, khu "Hiển thị AppShell" ở /admin) — Admin/PM.
   manageNav: (r?: Role) => r === "admin" || r === "pm",
+  // Tạo/sửa/đóng dự án + gán user↔dự án (M22): chỉ Admin (nhạy cảm hơn manageUsers).
+  manageProjects: (r?: Role) => r === "admin",
 };
 
 // Sub-con chỉ được thao tác trên task được giao cho mình.
