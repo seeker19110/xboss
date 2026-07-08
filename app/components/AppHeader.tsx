@@ -222,6 +222,21 @@ export default function AppHeader({
         </button>
         {open && (
           <div className={collapsed ? "" : "ml-4 border-l border-zinc-800 pl-1"}>
+            {dash.id && (
+              <a
+                href={`/hub/${dash.id}`}
+                title={`Tổng quan ${dash.label}`}
+                aria-current={path === `/hub/${dash.id}` ? "page" : undefined}
+                className={`flex items-center gap-2.5 mx-2 px-2.5 py-2 rounded-lg text-sm transition min-h-10 border-l-2 ${
+                  path === `/hub/${dash.id}`
+                    ? "bg-zinc-800 text-white font-medium border-emerald-400"
+                    : "text-zinc-400 hover:text-white hover:bg-zinc-900/60 border-transparent"
+                }`}
+              >
+                <LayoutDashboard className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
+                <span className="sidebar-label italic">Tổng quan</span>
+              </a>
+            )}
             {visibleChildren.map((child) => renderLeaf(child))}
           </div>
         )}
