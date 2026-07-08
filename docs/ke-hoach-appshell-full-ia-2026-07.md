@@ -150,6 +150,61 @@ _(Cây đầy đủ 4 cấp cho cả 24 dashboard nằm trong bản đồ Artifa
 - Giữ nguyên topbar (title/breadcrumb suy từ cây nav) + `GlobalSearch`,
   `NotificationBell`, `ThemeToggle`, `OnlineUsers`, avatar.
 
+### 4.1b. Project switcher — dropdown chọn nhanh dự án
+
+Title đỉnh AppShell không chỉ hiển thị tên dự án mà là **nút mở dropdown** đổi dự án
+tức thì, không rời trang đang xem.
+
+**Trigger (luôn thấy, đỉnh sidebar):**
+
+```
+┌───────────────────────────────┐
+│ [◈] TT AVIO – Tháp A       ▾  │  ← bấm mở dropdown; ◈ = avatar/màu dự án
+└───────────────────────────────┘
+```
+
+- Icon/màu nhận diện dự án + **tên dự án đang chọn** (truncate 1 dòng) + chevron `▾`.
+- Vùng chạm ≥40px; `aria-haspopup="listbox"`, `aria-expanded`. Khi thu gọn sidebar
+  (icon-only) chỉ hiện ◈, bấm vẫn mở dropdown (popover).
+
+**Panel dropdown (mở ra):**
+
+```
+┌───────────────────────────────┐
+│ 🔎 Tìm dự án…                 │  ← ô lọc, chỉ hiện khi > ~7 dự án
+├───────────────────────────────┤
+│ ✓ ● TT AVIO – Tháp A     72%  │  ← dự án hiện tại (tick + %tiến độ)
+│   ● TT AVIO – Tháp B     45%  │      · badge đỏ nếu có việc trễ
+│   ● Khu dân cư Phúc Lộc  8%  ⚠│
+│   … (cuộn nếu nhiều)          │
+├───────────────────────────────┤
+│ ▦  Xem tất cả dự án (Portfolio)│  ← lối tới trang tổng
+└───────────────────────────────┘
+```
+
+- Mỗi dòng: chấm màu dự án + tên + **% tiến độ** (tabular-nums) + badge cảnh báo nếu
+  có việc trễ. Dự án đang chọn có dấu `✓` + nền `zinc-800`.
+- **Ô lọc** hiện khi danh sách dài (>~7); lọc client theo tên/mã.
+- Chân panel: **"Xem tất cả dự án (Portfolio)"** → `/portfolio`.
+- **Chọn 1 dự án** = đặt `xboss_project` (localStorage + cookie để server scope) →
+  làm mới nội dung theo dự án mới, **giữ nguyên trang/route đang xem nếu tồn tại**
+  (vd đang ở `/materials` thì đổi dự án vẫn ở `/materials` của dự án mới); nếu route
+  không áp dụng cho dự án mới thì lùi về dashboard dự án.
+
+**Hành vi & a11y:**
+
+- Đóng khi bấm ngoài / `Esc`; điều hướng bằng phím ↑/↓/Enter (role `listbox`/`option`).
+- Mobile (<1024px): mở dạng **bottom sheet** full-width thay vì popover, dễ chạm.
+- Khi chỉ có **1 dự án**: trigger vẫn hiển thị tên (title), bấm mở panel chỉ có 1 mục
+  + lối Portfolio — sẵn sàng mở rộng, không phải trạng thái đặc biệt.
+- **Nguồn dữ liệu:** `GET /api/projects` (mới — danh sách dự án user được thấy + %
+  tiến độ + số việc trễ, dùng chung với trang Portfolio); tôn trọng `user_projects`
+  (M22). Trước khi có M22: trả 1 dự án hiện tại từ `/api/project`.
+
+> Đây thuần UI/UX ở đợt N1–N2 (dropdown + `xboss_project` client). Việc **server thực
+> sự lọc theo `project_id`** là M22 (đợt N3) — dropdown làm trước, scoping bật sau,
+> không phá vỡ hành vi 1 dự án hiện tại.
+
 ### 4.2. Trang Portfolio (`/portfolio` hoặc `/`)
 
 Khi có >1 dự án: trang tổng liệt kê dự án dạng thẻ (tên, % tiến độ, số việc trễ,
