@@ -94,9 +94,23 @@ export type MeetingRow = MeetingInput & {
 };
 
 // Danh sách họp kèm action con (json_agg — 1 query, pattern listVariations).
-// Lọc theo id để lấy đúng 1 cuộc họp không quét cả bảng.
-export async function listMeetings(filter?: { id?: number }): Promise<MeetingRow[]> {
-  const where = filter?.id != null ? "WHERE m.id = ?" : "";
+// Lọc theo id để lấy đúng 1 cuộc họp không quét cả bảng; projectId (M22) scoped theo
+// dự án đang chọn — undefined = không lọc (dùng nội bộ/cron chưa gắn ngữ cảnh dự án).
+export async function listMeetings(filter?: {
+  id?: number;
+  projectId?: number;
+}): Promise<MeetingRow[]> {
+  const conds: string[] = [];
+  const args: unknown[] = [];
+  if (filter?.id != null) {
+    conds.push("m.id = ?");
+    args.push(filter.id);
+  }
+  if (filter?.projectId != null) {
+    conds.push("m.project_id = ?");
+    args.push(filter.projectId);
+  }
+  const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
   return query<MeetingRow>(
     `SELECT m.id, m.meeting_date AS "meetingDate", m.kind, m.title, m.attendees, m.content,
             m.created_by AS "createdBy", u.name AS "createdByName", m.created_at AS "createdAt",
@@ -118,12 +132,14 @@ export async function listMeetings(filter?: { id?: number }): Promise<MeetingRow
       ${where}
       GROUP BY m.id, u.name
       ORDER BY m.meeting_date DESC, m.id DESC`,
-    ...(filter?.id != null ? [filter.id] : []),
+    ...args,
   );
 }
 
-export async function getMeeting(id: number): Promise<MeetingRow | undefined> {
-  const rows = await listMeetings({ id });
+// projectId khi truyền → trả undefined nếu cuộc họp không thuộc dự án đang chọn (chặn
+// truy cập chéo dự án qua đoán ID), giống pattern 404 "không tìm thấy" hiện có.
+export async function getMeeting(id: number, projectId?: number): Promise<MeetingRow | undefined> {
+  const rows = await listMeetings({ id, projectId });
   return rows[0];
 }
 
@@ -134,9 +150,22 @@ export type OpenMeetingAction = MeetingActionRow & {
 
 // Action đang mở — assigneeId có giá trị → chỉ của người đó (mục "việc sau họp"
 // ở /my-tasks); undefined → mọi action mở (tab "Việc sau họp" trang /meetings).
-// Sắp theo hạn: quá hạn/gần hạn nổi đầu, chưa đặt hạn xuống cuối.
-export async function openMeetingActions(assigneeId?: number): Promise<OpenMeetingAction[]> {
-  const filter = assigneeId != null ? " AND a.assignee = ?" : "";
+// Sắp theo hạn: quá hạn/gần hạn nổi đầu, chưa đặt hạn xuống cuối. projectId (M22):
+// undefined = không lọc dự án (dùng nội bộ/test cũ).
+export async function openMeetingActions(
+  assigneeId?: number,
+  projectId?: number,
+): Promise<OpenMeetingAction[]> {
+  const conds = ["a.status = 'open'"];
+  const args: unknown[] = [];
+  if (assigneeId != null) {
+    conds.push("a.assignee = ?");
+    args.push(assigneeId);
+  }
+  if (projectId != null) {
+    conds.push("m.project_id = ?");
+    args.push(projectId);
+  }
   return query<OpenMeetingAction>(
     `SELECT a.id, a.meeting_id AS "meetingId", a.content, a.assignee, ua.name AS "assigneeName",
             a.due_date AS "dueDate", a.status, a.task_id AS "taskId", a.done_at AS "doneAt",
@@ -144,17 +173,29 @@ export async function openMeetingActions(assigneeId?: number): Promise<OpenMeeti
        FROM meeting_actions a
        JOIN meetings m ON m.id = a.meeting_id
        LEFT JOIN users ua ON ua.id = a.assignee
-      WHERE a.status = 'open'${filter}
+      WHERE ${conds.join(" AND ")}
       ORDER BY (a.due_date IS NULL), a.due_date, a.id`,
-    ...(assigneeId != null ? [assigneeId] : []),
+    ...args,
   );
 }
 
 // Action quá hạn chưa xong — nguồn notification action_overdue.
 // assigneeId = undefined → mọi action quá hạn (Admin/PM); có giá trị → chỉ của người đó.
-export async function overdueMeetingActions(assigneeId?: number): Promise<OpenMeetingAction[]> {
+export async function overdueMeetingActions(
+  assigneeId?: number,
+  projectId?: number,
+): Promise<OpenMeetingAction[]> {
   const today = todayISO();
-  const filter = assigneeId != null ? " AND a.assignee = ?" : "";
+  const conds = ["a.status = 'open'", "a.due_date IS NOT NULL", "a.due_date < ?"];
+  const args: unknown[] = [today];
+  if (assigneeId != null) {
+    conds.push("a.assignee = ?");
+    args.push(assigneeId);
+  }
+  if (projectId != null) {
+    conds.push("m.project_id = ?");
+    args.push(projectId);
+  }
   return query<OpenMeetingAction>(
     `SELECT a.id, a.meeting_id AS "meetingId", a.content, a.assignee, ua.name AS "assigneeName",
             a.due_date AS "dueDate", a.status, a.task_id AS "taskId", a.done_at AS "doneAt",
@@ -162,9 +203,9 @@ export async function overdueMeetingActions(assigneeId?: number): Promise<OpenMe
        FROM meeting_actions a
        JOIN meetings m ON m.id = a.meeting_id
        LEFT JOIN users ua ON ua.id = a.assignee
-      WHERE a.status = 'open' AND a.due_date IS NOT NULL AND a.due_date < ?${filter}
+      WHERE ${conds.join(" AND ")}
       ORDER BY a.due_date, a.id`,
-    ...(assigneeId != null ? [today, assigneeId] : [today]),
+    ...args,
   );
 }
 
@@ -185,16 +226,24 @@ export async function setMeetingActionStatus(
   return r.changes > 0;
 }
 
-export async function getMeetingAction(
-  id: number,
-): Promise<{ id: number; meetingId: number; assignee: number | null; status: string } | null> {
+export async function getMeetingAction(id: number): Promise<{
+  id: number;
+  meetingId: number;
+  assignee: number | null;
+  status: string;
+  projectId: number | null;
+} | null> {
   const row = await queryOne<{
     id: number;
     meetingId: number;
     assignee: number | null;
     status: string;
+    projectId: number | null;
   }>(
-    `SELECT id, meeting_id AS "meetingId", assignee, status FROM meeting_actions WHERE id = ?`,
+    `SELECT a.id, a.meeting_id AS "meetingId", a.assignee, a.status, m.project_id AS "projectId"
+       FROM meeting_actions a
+       JOIN meetings m ON m.id = a.meeting_id
+      WHERE a.id = ?`,
     id,
   );
   return row ?? null;

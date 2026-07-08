@@ -109,3 +109,58 @@ test(
     await run(`DELETE FROM users WHERE id IN (?, ?)`, userId, otherId);
   },
 );
+
+test(
+  "listMeetings/openMeetingActions/overdueMeetingActions: scoped đúng theo project_id (M22), không lẫn dự án khác",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { listMeetings, openMeetingActions, overdueMeetingActions } =
+      await import("@/lib/meetings");
+    const { daysFromTodayISO, todayISO } = await import("@/lib/date");
+
+    const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA Họp 1', 'PJT-MT1')`);
+    const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA Họp 2', 'PJT-MT2')`);
+    const userId = await insertId(
+      `INSERT INTO users (name, email, password_hash, role) VALUES ('Meeting Scope', 'meeting-scope@xboss.vn', 'x', 'engineer')`,
+    );
+    const m1 = await insertId(
+      `INSERT INTO meetings (meeting_date, kind, title, project_id) VALUES (?, 'weekly', 'Họp DA1', ?)`,
+      todayISO(),
+      p1,
+    );
+    const m2 = await insertId(
+      `INSERT INTO meetings (meeting_date, kind, title, project_id) VALUES (?, 'weekly', 'Họp DA2', ?)`,
+      todayISO(),
+      p2,
+    );
+    const a1 = await insertId(
+      `INSERT INTO meeting_actions (meeting_id, content, assignee, due_date) VALUES (?, 'Việc DA1', ?, ?)`,
+      m1,
+      userId,
+      daysFromTodayISO(-1),
+    );
+    await insertId(
+      `INSERT INTO meeting_actions (meeting_id, content, assignee, due_date) VALUES (?, 'Việc DA2', ?, ?)`,
+      m2,
+      userId,
+      daysFromTodayISO(-1),
+    );
+
+    const list1 = await listMeetings({ projectId: p1 });
+    assert.ok(list1.some((m) => m.id === m1));
+    assert.ok(!list1.some((m) => m.id === m2));
+
+    const open1 = await openMeetingActions(userId, p1);
+    assert.ok(open1.some((a) => a.id === a1));
+    assert.equal(open1.length, 1);
+
+    const overdue1 = await overdueMeetingActions(userId, p1);
+    assert.ok(overdue1.some((a) => a.id === a1));
+    assert.equal(overdue1.length, 1);
+
+    await run(`DELETE FROM meetings WHERE id IN (?, ?)`, m1, m2); // cascade xoá actions
+    await run(`DELETE FROM users WHERE id = ?`, userId);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+  },
+);

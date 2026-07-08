@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { RISK_STATUSES, parseRiskBody, validateRiskInput, type RiskStatus } from "@/lib/risks";
 
 export const dynamic = "force-dynamic";
 
-// PATCH /api/risks/:id — sửa rủi ro / đổi trạng thái (Admin/PM/kỹ sư).
-// Đóng (closed) ghi closed_at; mở lại xoá closed_at.
+// PATCH /api/risks/:id — sửa rủi ro / đổi trạng thái (Admin/PM/kỹ sư), scoped theo dự
+// án đang chọn (M22). Đóng (closed) ghi closed_at; mở lại xoá closed_at.
 export async function PATCH(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -20,10 +21,15 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const risk = await queryOne<{ id: number; status: string }>(
-    `SELECT id, status FROM risks WHERE id = ?`,
-    id,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const risk =
+    projectId != null
+      ? await queryOne<{ id: number; status: string }>(
+          `SELECT id, status FROM risks WHERE id = ? AND project_id = ?`,
+          id,
+          projectId,
+        )
+      : undefined;
   if (!risk) return NextResponse.json({ error: "Không tìm thấy rủi ro" }, { status: 404 });
 
   const body = await req.json().catch(() => null);
@@ -65,7 +71,7 @@ export async function PATCH(
   return NextResponse.json({ ok: true });
 }
 
-// DELETE /api/risks/:id — xoá rủi ro (chỉ Admin/PM).
+// DELETE /api/risks/:id — xoá rủi ro (chỉ Admin/PM), scoped theo dự án đang chọn.
 export async function DELETE(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -79,7 +85,11 @@ export async function DELETE(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const r = await run(`DELETE FROM risks WHERE id = ?`, id);
+  const projectId = await getCurrentProjectId(user);
+  const r =
+    projectId != null
+      ? await run(`DELETE FROM risks WHERE id = ? AND project_id = ?`, id, projectId)
+      : { changes: 0 };
   if (r.changes === 0)
     return NextResponse.json({ error: "Không tìm thấy rủi ro" }, { status: 404 });
   return NextResponse.json({ deleted: id });

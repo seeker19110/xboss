@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { parseMeetingActionBody, validateMeetingActionInput } from "@/lib/meetings";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,15 @@ export async function POST(
   const meetingId = parseInt(params.id);
   if (isNaN(meetingId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const meeting = await queryOne(`SELECT id FROM meetings WHERE id = ?`, meetingId);
+  const projectId = await getCurrentProjectId(user);
+  const meeting =
+    projectId != null
+      ? await queryOne(
+          `SELECT id FROM meetings WHERE id = ? AND project_id = ?`,
+          meetingId,
+          projectId,
+        )
+      : undefined;
   if (!meeting) return NextResponse.json({ error: "Không tìm thấy cuộc họp" }, { status: 404 });
 
   const body = await req.json().catch(() => null);
