@@ -185,3 +185,33 @@ test(
     await run(`DELETE FROM users WHERE id = ?`, userId);
   },
 );
+
+test(
+  "listTenders/getTender: scoped đúng theo project_id (M22), không lẫn dự án khác",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { listTenders, getTender } = await import("@/lib/tender");
+
+    const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA Thầu 1', 'PJT-GT1')`);
+    const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA Thầu 2', 'PJT-GT2')`);
+    const t1 = await insertId(
+      `INSERT INTO tender_packages (code, name, project_id) VALUES ('GT-SCOPE-01', 'Gói DA1', ?)`,
+      p1,
+    );
+    const t2 = await insertId(
+      `INSERT INTO tender_packages (code, name, project_id) VALUES ('GT-SCOPE-02', 'Gói DA2', ?)`,
+      p2,
+    );
+
+    const list1 = await listTenders(p1);
+    assert.ok(list1.some((t) => t.id === t1));
+    assert.ok(!list1.some((t) => t.id === t2));
+
+    assert.ok(await getTender(t1, p1));
+    assert.equal(await getTender(t2, p1), undefined);
+
+    await run(`DELETE FROM tender_packages WHERE id IN (?, ?)`, t1, t2);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+  },
+);

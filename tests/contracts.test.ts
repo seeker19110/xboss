@@ -199,3 +199,32 @@ test(
     await run(`DELETE FROM contracts WHERE id = ?`, contractId);
   },
 );
+
+test(
+  "listContracts: scoped đúng theo project_id (M22), không lẫn dự án khác",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { listContracts } = await import("@/lib/contracts");
+
+    const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA HĐ 1', 'PJT-HD1')`);
+    const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA HĐ 2', 'PJT-HD2')`);
+    const c1 = await insertId(
+      `INSERT INTO contracts (code, kind, party_name, title, value, status, project_id)
+       VALUES ('HD-SCOPE-01', 'nhan_thau', 'CĐT Test', 'HĐ DA1', 0, 'active', ?)`,
+      p1,
+    );
+    const c2 = await insertId(
+      `INSERT INTO contracts (code, kind, party_name, title, value, status, project_id)
+       VALUES ('HD-SCOPE-02', 'nhan_thau', 'CĐT Test', 'HĐ DA2', 0, 'active', ?)`,
+      p2,
+    );
+
+    const list1 = await listContracts(undefined, p1);
+    assert.ok(list1.some((c) => c.id === c1));
+    assert.ok(!list1.some((c) => c.id === c2));
+
+    await run(`DELETE FROM contracts WHERE id IN (?, ?)`, c1, c2);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+  },
+);

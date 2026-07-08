@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { isUniqueViolation, withUniqueRetry } from "@/lib/seqcode";
 import {
   listVariations,
@@ -15,7 +16,8 @@ import {
 export const dynamic = "force-dynamic";
 
 // GET /api/variations?status= — danh sách phát sinh/VO kèm dòng KL con + tổng giá
-// trị đề xuất/được duyệt. Ẩn với cdt/subcon/viewer (không thấy giá trị VO).
+// trị đề xuất/được duyệt, scoped theo dự án đang chọn (M22). Ẩn với cdt/subcon/viewer
+// (không thấy giá trị VO).
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -28,13 +30,15 @@ export async function GET(req: NextRequest) {
       ? (statusParam as VoStatus)
       : undefined;
 
-  const items = await listVariations(status ? { status } : undefined);
+  const projectId = await getCurrentProjectId(user);
+  const items = projectId != null ? await listVariations({ status, projectId }) : [];
   return NextResponse.json({ items });
 }
 
 // POST /api/variations — tạo VO mới (Nháp) kèm dòng KL con (Admin/PM/Kỹ sư — ghi
 // nhận tại hiện trường). Mã VO-NNNN sinh tự động; mã dòng KL check trùng BOQCODE
-// toàn hệ thống trước khi ghi (lib/boq.ts:boqTakenBy).
+// toàn hệ thống trước khi ghi (lib/boq.ts:boqTakenBy). Gán project_id = dự án đang
+// chọn (server suy, không tin client).
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -43,6 +47,10 @@ export async function POST(req: NextRequest) {
       { error: "Bạn không có quyền tạo phát sinh/VO (Admin/PM/Kỹ sư)" },
       { status: 403 },
     );
+
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Chưa có dự án nào để tạo phát sinh/VO" }, { status: 422 });
 
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Dữ liệu không hợp lệ" }, { status: 422 });
@@ -67,14 +75,15 @@ export async function POST(req: NextRequest) {
       withTransaction(async () => {
         const code = await nextVoCode();
         const id = await insertId(
-          `INSERT INTO variation_orders (code, title, reason, description, discipline_id, created_by)
-           VALUES (?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO variation_orders (code, title, reason, description, discipline_id, created_by, project_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
           code,
           input.title,
           input.reason,
           input.description,
           input.disciplineId,
           user.id,
+          projectId,
         );
         for (const line of input.lines) {
           await insertId(

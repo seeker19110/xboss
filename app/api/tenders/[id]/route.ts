@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { getTender, comparisonTable, TENDER_STATUSES, type TenderStatus } from "@/lib/tender";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/tenders/:id — chi tiết gói thầu + bảng so sánh giá theo dòng BOQ × NCC.
+// GET /api/tenders/:id — chi tiết gói thầu + bảng so sánh giá theo dòng BOQ × NCC,
+// scoped theo dự án đang chọn (M22).
 export async function GET(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -19,7 +21,8 @@ export async function GET(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const tender = await getTender(id);
+  const projectId = await getCurrentProjectId(user);
+  const tender = projectId != null ? await getTender(id, projectId) : undefined;
   if (!tender) return NextResponse.json({ error: "Không tìm thấy gói thầu" }, { status: 404 });
 
   const { items, bids } = await comparisonTable(id);
@@ -44,12 +47,20 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const existing = await queryOne<{
-    status: TenderStatus;
-    name: string;
-    scope: string | null;
-    dueDate: string | null;
-  }>(`SELECT status, name, scope, due_date AS "dueDate" FROM tender_packages WHERE id = ?`, id);
+  const projectId = await getCurrentProjectId(user);
+  const existing =
+    projectId != null
+      ? await queryOne<{
+          status: TenderStatus;
+          name: string;
+          scope: string | null;
+          dueDate: string | null;
+        }>(
+          `SELECT status, name, scope, due_date AS "dueDate" FROM tender_packages WHERE id = ? AND project_id = ?`,
+          id,
+          projectId,
+        )
+      : undefined;
   if (!existing) return NextResponse.json({ error: "Không tìm thấy gói thầu" }, { status: 404 });
   if (existing.status === "awarded")
     return NextResponse.json({ error: "Gói thầu đã trao thầu — không thể sửa" }, { status: 409 });

@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { VO_REASONS, type VoReason, getVariation, canEditVo } from "@/lib/vo";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/variations/:id — chi tiết VO kèm dòng KL + file đính kèm.
+// GET /api/variations/:id — chi tiết VO kèm dòng KL + file đính kèm, scoped theo
+// dự án đang chọn (M22).
 export async function GET(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -19,7 +21,8 @@ export async function GET(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const variation = await getVariation(id);
+  const projectId = await getCurrentProjectId(user);
+  const variation = projectId != null ? await getVariation(id, projectId) : undefined;
   if (!variation) return NextResponse.json({ error: "Không tìm thấy phát sinh" }, { status: 404 });
 
   const documents = await query(
@@ -49,19 +52,24 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const existing = await queryOne<{
-    status: string;
-    createdBy: number | null;
-    title: string;
-    reason: VoReason;
-    description: string | null;
-    disciplineId: number | null;
-  }>(
-    `SELECT status, created_by AS "createdBy", title, reason, description,
-            discipline_id AS "disciplineId"
-       FROM variation_orders WHERE id = ?`,
-    id,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const existing =
+    projectId != null
+      ? await queryOne<{
+          status: string;
+          createdBy: number | null;
+          title: string;
+          reason: VoReason;
+          description: string | null;
+          disciplineId: number | null;
+        }>(
+          `SELECT status, created_by AS "createdBy", title, reason, description,
+                  discipline_id AS "disciplineId"
+             FROM variation_orders WHERE id = ? AND project_id = ?`,
+          id,
+          projectId,
+        )
+      : undefined;
   if (!existing) return NextResponse.json({ error: "Không tìm thấy phát sinh" }, { status: 404 });
 
   const editErr = canEditVo(existing, user);

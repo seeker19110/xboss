@@ -3,12 +3,15 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { ensureUploadDir, extForDocMime, newVoDocFileName, MAX_DOC_BYTES } from "@/lib/photos";
 import { canEditVo } from "@/lib/vo";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/variations/:id/documents — danh sách file đính kèm VO (văn bản trình/phản hồi CĐT).
+// GET /api/variations/:id/documents — danh sách file đính kèm VO (văn bản trình/
+// phản hồi CĐT). Kiểm VO thuộc đúng dự án đang chọn (M22) — vo_documents không có
+// cột project_id riêng.
 export async function GET(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -21,6 +24,17 @@ export async function GET(
 
   const voId = parseInt(params.id);
   if (isNaN(voId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  const projectId = await getCurrentProjectId(user);
+  const vo =
+    projectId != null
+      ? await queryOne<{ id: number }>(
+          `SELECT id FROM variation_orders WHERE id = ? AND project_id = ?`,
+          voId,
+          projectId,
+        )
+      : undefined;
+  if (!vo) return NextResponse.json({ error: "Không tìm thấy phát sinh" }, { status: 404 });
 
   const documents = await query(
     `SELECT d.id, d.original_name AS "originalName", d.mime_type AS "mimeType",
@@ -46,10 +60,15 @@ export async function POST(
   const voId = parseInt(params.id);
   if (isNaN(voId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const vo = await queryOne<{ status: string; createdBy: number | null }>(
-    `SELECT status, created_by AS "createdBy" FROM variation_orders WHERE id = ?`,
-    voId,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const vo =
+    projectId != null
+      ? await queryOne<{ status: string; createdBy: number | null }>(
+          `SELECT status, created_by AS "createdBy" FROM variation_orders WHERE id = ? AND project_id = ?`,
+          voId,
+          projectId,
+        )
+      : undefined;
   if (!vo) return NextResponse.json({ error: "Không tìm thấy phát sinh" }, { status: 404 });
   const editErr = canEditVo(vo, user);
   if (editErr) return NextResponse.json({ error: editErr }, { status: 403 });

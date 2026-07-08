@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import ReactPDF, { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/pdf-fonts";
 import { getTender, comparisonTable, type TenderItemRow, type BidRow } from "@/lib/tender";
@@ -92,7 +93,8 @@ export async function GET(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const tender = await getTender(id);
+  const projectId = await getCurrentProjectId(user);
+  const tender = projectId != null ? await getTender(id, projectId) : undefined;
   if (!tender) return NextResponse.json({ error: "Không tìm thấy gói thầu" }, { status: 404 });
   const { items, bids } = await comparisonTable(id);
   const today = new Date().toLocaleDateString("vi-VN");
