@@ -3,6 +3,7 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import {
   ensureUploadDir,
   extForDocMime,
@@ -12,7 +13,8 @@ import {
 
 export const dynamic = "force-dynamic";
 
-// GET /api/contracts/:id/documents — danh sách file đính kèm HĐ (vai trò xem thanh toán).
+// GET /api/contracts/:id/documents — danh sách file đính kèm HĐ (vai trò xem thanh
+// toán). Kiểm hợp đồng thuộc đúng dự án đang chọn (M22).
 export async function GET(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -25,6 +27,17 @@ export async function GET(
 
   const contractId = parseInt(params.id);
   if (isNaN(contractId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  const projectId = await getCurrentProjectId(user);
+  const contract =
+    projectId != null
+      ? await queryOne<{ id: number }>(
+          `SELECT id FROM contracts WHERE id = ? AND project_id = ?`,
+          contractId,
+          projectId,
+        )
+      : undefined;
+  if (!contract) return NextResponse.json({ error: "Không tìm thấy hợp đồng" }, { status: 404 });
 
   const documents = await query(
     `SELECT d.id, d.original_name AS "originalName", d.mime_type AS "mimeType",
@@ -54,10 +67,15 @@ export async function POST(
 
   const contractId = parseInt(params.id);
   if (isNaN(contractId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
-  const contract = await queryOne<{ id: number }>(
-    `SELECT id FROM contracts WHERE id = ?`,
-    contractId,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const contract =
+    projectId != null
+      ? await queryOne<{ id: number }>(
+          `SELECT id FROM contracts WHERE id = ? AND project_id = ?`,
+          contractId,
+          projectId,
+        )
+      : undefined;
   if (!contract) return NextResponse.json({ error: "Không tìm thấy hợp đồng" }, { status: 404 });
 
   const form = await req.formData().catch(() => null);

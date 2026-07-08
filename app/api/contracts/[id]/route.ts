@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { unlink } from "node:fs/promises";
 import { query, queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { photoPath } from "@/lib/photos";
 import {
   checkContractRefs,
@@ -14,7 +15,8 @@ import {
 
 export const dynamic = "force-dynamic";
 
-// GET /api/contracts/:id — chi tiết HĐ + phụ lục + file + các dòng tiền đã gắn.
+// GET /api/contracts/:id — chi tiết HĐ + phụ lục + file + các dòng tiền đã gắn,
+// scoped theo dự án đang chọn (M22).
 export async function GET(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -28,8 +30,12 @@ export async function GET(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  const projectId = await getCurrentProjectId(user);
   // Tái dùng query tổng hợp của danh sách (1 dự án — số HĐ ít, lọc trong JS đủ rẻ).
-  const contract = (await listContracts()).find((c) => c.id === id);
+  const contract =
+    projectId != null
+      ? (await listContracts(undefined, projectId)).find((c) => c.id === id)
+      : undefined;
   if (!contract) return NextResponse.json({ error: "Không tìm thấy hợp đồng" }, { status: 404 });
 
   const [addenda, documents, bills, purchaseOrders, floorContracts] = await Promise.all([
@@ -90,14 +96,19 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const existing = await queryOne<Record<string, unknown>>(
-    `SELECT code, kind, title, party_supplier_id AS "partySupplierId", party_name AS "partyName",
-            discipline_id AS "disciplineId", value, advance_pct AS "advancePct",
-            retention_pct AS "retentionPct", signed_date AS "signedDate",
-            valid_from AS "validFrom", valid_to AS "validTo", status, note
-       FROM contracts WHERE id = ?`,
-    id,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const existing =
+    projectId != null
+      ? await queryOne<Record<string, unknown>>(
+          `SELECT code, kind, title, party_supplier_id AS "partySupplierId", party_name AS "partyName",
+                  discipline_id AS "disciplineId", value, advance_pct AS "advancePct",
+                  retention_pct AS "retentionPct", signed_date AS "signedDate",
+                  valid_from AS "validFrom", valid_to AS "validTo", status, note
+             FROM contracts WHERE id = ? AND project_id = ?`,
+          id,
+          projectId,
+        )
+      : undefined;
   if (!existing) return NextResponse.json({ error: "Không tìm thấy hợp đồng" }, { status: 404 });
 
   const body = await req.json().catch(() => null);
@@ -163,7 +174,15 @@ export async function DELETE(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const existing = await queryOne<{ id: number }>(`SELECT id FROM contracts WHERE id = ?`, id);
+  const projectId = await getCurrentProjectId(user);
+  const existing =
+    projectId != null
+      ? await queryOne<{ id: number }>(
+          `SELECT id FROM contracts WHERE id = ? AND project_id = ?`,
+          id,
+          projectId,
+        )
+      : undefined;
   if (!existing) return NextResponse.json({ error: "Không tìm thấy hợp đồng" }, { status: 404 });
 
   const links = await contractLinkCounts(id);

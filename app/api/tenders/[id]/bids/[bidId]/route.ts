@@ -1,17 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { validateBidPrices, type BidPriceInput } from "@/lib/tender";
 
 export const dynamic = "force-dynamic";
 
-async function loadBidAndTender(tenderId: number, bidId: number) {
+// Kiểm gói thầu cha thuộc đúng dự án đang chọn (M22) — tender_bids không có
+// project_id riêng. projectId == null → luôn không tìm thấy (chặn truy cập khi
+// chưa chọn dự án).
+async function loadBidAndTender(tenderId: number, bidId: number, projectId: number | null) {
+  if (projectId == null) return undefined;
   return queryOne<{ tenderStatus: string; bidId: number }>(
     `SELECT tp.status AS "tenderStatus", tb.id AS "bidId"
        FROM tender_bids tb JOIN tender_packages tp ON tp.id = tb.tender_id
-      WHERE tb.id = ? AND tb.tender_id = ?`,
+      WHERE tb.id = ? AND tb.tender_id = ? AND tp.project_id = ?`,
     bidId,
     tenderId,
+    projectId,
   );
 }
 
@@ -34,7 +40,8 @@ export async function PATCH(
   if (isNaN(tenderId) || isNaN(bidId))
     return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const found = await loadBidAndTender(tenderId, bidId);
+  const projectId = await getCurrentProjectId(user);
+  const found = await loadBidAndTender(tenderId, bidId, projectId);
   if (!found) return NextResponse.json({ error: "Không tìm thấy báo giá" }, { status: 404 });
   if (found.tenderStatus === "awarded")
     return NextResponse.json({ error: "Gói thầu đã trao thầu — khoá sửa giá" }, { status: 409 });
@@ -98,7 +105,8 @@ export async function DELETE(
   if (isNaN(tenderId) || isNaN(bidId))
     return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const found = await loadBidAndTender(tenderId, bidId);
+  const projectId = await getCurrentProjectId(user);
+  const found = await loadBidAndTender(tenderId, bidId, projectId);
   if (!found) return NextResponse.json({ error: "Không tìm thấy báo giá" }, { status: 404 });
   if (found.tenderStatus === "awarded")
     return NextResponse.json({ error: "Gói thầu đã trao thầu — khoá sửa" }, { status: 409 });

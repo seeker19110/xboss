@@ -3,6 +3,7 @@ import { writeFile, unlink, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import {
   ensureUploadDir,
   extForDocMime,
@@ -15,7 +16,8 @@ export const dynamic = "force-dynamic";
 
 type BidFileRow = { fileName: string | null; mimeType: string | null; originalName: string | null };
 
-// GET /api/tenders/:id/bids/:bidId/file — tải file chào thầu gốc.
+// GET /api/tenders/:id/bids/:bidId/file — tải file chào thầu gốc. Kiểm gói thầu
+// cha thuộc đúng dự án đang chọn (M22) — tender_bids không có project_id riêng.
 export async function GET(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string; bidId: string }> },
@@ -29,11 +31,17 @@ export async function GET(
   const bidId = parseInt(params.bidId);
   if (isNaN(bidId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const bid = await queryOne<BidFileRow>(
-    `SELECT file_name AS "fileName", mime_type AS "mimeType", original_name AS "originalName"
-       FROM tender_bids WHERE id = ?`,
-    bidId,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const bid =
+    projectId != null
+      ? await queryOne<BidFileRow>(
+          `SELECT tb.file_name AS "fileName", tb.mime_type AS "mimeType", tb.original_name AS "originalName"
+             FROM tender_bids tb JOIN tender_packages tp ON tp.id = tb.tender_id
+            WHERE tb.id = ? AND tp.project_id = ?`,
+          bidId,
+          projectId,
+        )
+      : undefined;
   if (!bid?.fileName) return NextResponse.json({ error: "Chưa có file đính kèm" }, { status: 404 });
 
   const path = photoPath(bid.fileName);
@@ -56,7 +64,8 @@ export async function GET(
   });
 }
 
-// POST /api/tenders/:id/bids/:bidId/file — upload file chào thầu gốc (PDF/ảnh, max 20MB).
+// POST /api/tenders/:id/bids/:bidId/file — upload file chào thầu gốc (PDF/ảnh, max
+// 20MB). Kiểm gói thầu cha thuộc đúng dự án đang chọn (M22).
 export async function POST(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string; bidId: string }> },
@@ -73,10 +82,17 @@ export async function POST(
   const bidId = parseInt(params.bidId);
   if (isNaN(bidId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const bid = await queryOne<BidFileRow & { id: number }>(
-    `SELECT id, file_name AS "fileName" FROM tender_bids WHERE id = ?`,
-    bidId,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const bid =
+    projectId != null
+      ? await queryOne<BidFileRow & { id: number }>(
+          `SELECT tb.id, tb.file_name AS "fileName"
+             FROM tender_bids tb JOIN tender_packages tp ON tp.id = tb.tender_id
+            WHERE tb.id = ? AND tp.project_id = ?`,
+          bidId,
+          projectId,
+        )
+      : undefined;
   if (!bid) return NextResponse.json({ error: "Không tìm thấy báo giá" }, { status: 404 });
 
   const form = await req.formData().catch(() => null);

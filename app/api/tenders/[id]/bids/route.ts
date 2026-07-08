@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { validateBidPrices, type BidPriceInput } from "@/lib/tender";
 
 export const dynamic = "force-dynamic";
 
 // POST /api/tenders/:id/bids — nhập giá chào của 1 NCC (Admin/PM nhập hộ). body:
 // { supplierId, lumpSum?, note?, prices: [{boqItemId, unitPrice}] } — chấp nhận
-// chào thiếu dòng (không bắt buộc đủ 100% dòng mời — xem lib/tender.ts).
+// chào thiếu dòng (không bắt buộc đủ 100% dòng mời — xem lib/tender.ts). Kiểm gói
+// thầu cha thuộc đúng dự án đang chọn (M22) — tender_bids không có project_id riêng.
 export async function POST(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -24,10 +26,15 @@ export async function POST(
   const tenderId = parseInt(params.id);
   if (isNaN(tenderId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const tender = await queryOne<{ status: string }>(
-    `SELECT status FROM tender_packages WHERE id = ?`,
-    tenderId,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const tender =
+    projectId != null
+      ? await queryOne<{ status: string }>(
+          `SELECT status FROM tender_packages WHERE id = ? AND project_id = ?`,
+          tenderId,
+          projectId,
+        )
+      : undefined;
   if (!tender) return NextResponse.json({ error: "Không tìm thấy gói thầu" }, { status: 404 });
   if (tender.status === "awarded")
     return NextResponse.json(

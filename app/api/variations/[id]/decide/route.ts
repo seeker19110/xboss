@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { todayISO } from "@/lib/date";
 
 export const dynamic = "force-dynamic";
@@ -41,12 +42,18 @@ export async function POST(
       }))
     : [];
 
+  const projectId = await getCurrentProjectId(user);
+
   try {
     await withTransaction(async () => {
-      const vo = await queryOne<{ status: string }>(
-        `SELECT status FROM variation_orders WHERE id = ? FOR UPDATE`,
-        id,
-      );
+      const vo =
+        projectId != null
+          ? await queryOne<{ status: string }>(
+              `SELECT status FROM variation_orders WHERE id = ? AND project_id = ? FOR UPDATE`,
+              id,
+              projectId,
+            )
+          : undefined;
       if (!vo) throw Object.assign(new Error("Không tìm thấy phát sinh"), { status: 404 });
       if (vo.status !== "submitted")
         throw Object.assign(

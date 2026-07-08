@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { getVariation } from "@/lib/vo";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +10,7 @@ export const dynamic = "force-dynamic";
 // vào phụ lục hợp đồng (contract_addenda, M16): sinh 1 dòng phụ lục = giá trị đã
 // duyệt của VO, chuyển VO sang 'contract_added'. Admin/PM (CAN.manageContracts —
 // cùng quyền quản hợp đồng/phụ lục). body: { contractId, addendaCode, signedDate? }
+// Cả VO và hợp đồng đích đều phải thuộc đúng dự án đang chọn (M22).
 export async function POST(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -34,7 +36,8 @@ export async function POST(
     return NextResponse.json({ error: "Thiếu hợp đồng" }, { status: 422 });
   if (!addendaCode) return NextResponse.json({ error: "Thiếu mã phụ lục" }, { status: 422 });
 
-  const vo = await getVariation(id);
+  const projectId = await getCurrentProjectId(user);
+  const vo = projectId != null ? await getVariation(id, projectId) : undefined;
   if (!vo) return NextResponse.json({ error: "Không tìm thấy phát sinh" }, { status: 404 });
   if (vo.status !== "approved" && vo.status !== "partially_approved")
     return NextResponse.json(
@@ -42,10 +45,14 @@ export async function POST(
       { status: 409 },
     );
 
-  const contract = await queryOne<{ id: number }>(
-    `SELECT id FROM contracts WHERE id = ?`,
-    contractId,
-  );
+  const contract =
+    projectId != null
+      ? await queryOne<{ id: number }>(
+          `SELECT id FROM contracts WHERE id = ? AND project_id = ?`,
+          contractId,
+          projectId,
+        )
+      : undefined;
   if (!contract) return NextResponse.json({ error: "Hợp đồng không tồn tại" }, { status: 422 });
 
   try {

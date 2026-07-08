@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import {
   CONTRACT_KINDS,
   checkContractRefs,
@@ -12,8 +13,9 @@ import {
 
 export const dynamic = "force-dynamic";
 
-// GET /api/contracts?kind= — danh sách HĐ kèm tổng hợp (phụ lục/đã thanh toán/PO).
-// Giá trị tiền → chỉ vai trò xem thanh toán (admin/pm/bch), như /costs.
+// GET /api/contracts?kind= — danh sách HĐ kèm tổng hợp (phụ lục/đã thanh toán/PO),
+// scoped theo dự án đang chọn (M22). Giá trị tiền → chỉ vai trò xem thanh toán
+// (admin/pm/bch), như /costs.
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -24,11 +26,14 @@ export async function GET(req: NextRequest) {
   if (kindRaw && !CONTRACT_KINDS.includes(kindRaw as ContractKind))
     return NextResponse.json({ error: "Loại hợp đồng không hợp lệ" }, { status: 422 });
 
-  const contracts = await listContracts((kindRaw as ContractKind) ?? undefined);
+  const projectId = await getCurrentProjectId(user);
+  const contracts =
+    projectId != null ? await listContracts((kindRaw as ContractKind) ?? undefined, projectId) : [];
   return NextResponse.json({ contracts });
 }
 
 // POST /api/contracts — tạo HĐ (Admin/PM). Số HĐ nhập tay, UNIQUE chống trùng.
+// Gán project_id = dự án đang chọn (server suy, không tin client).
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -37,6 +42,10 @@ export async function POST(req: NextRequest) {
       { error: "Bạn không có quyền tạo hợp đồng (chỉ Admin/PM)" },
       { status: 403 },
     );
+
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Chưa có dự án nào để tạo hợp đồng" }, { status: 422 });
 
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });
@@ -52,8 +61,8 @@ export async function POST(req: NextRequest) {
     id = await insertId(
       `INSERT INTO contracts (code, kind, title, party_supplier_id, party_name, discipline_id,
                               value, advance_pct, retention_pct, signed_date, valid_from, valid_to,
-                              status, note, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                              status, note, created_by, project_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       input.code,
       input.kind,
       input.title,
@@ -69,6 +78,7 @@ export async function POST(req: NextRequest) {
       input.status,
       input.note,
       user.id,
+      projectId,
     );
   } catch (err) {
     if ((err as { code?: string }).code === "23505")

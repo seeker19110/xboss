@@ -72,7 +72,9 @@ export type TenderRow = {
   bidCount: number;
 };
 
-export async function listTenders(): Promise<TenderRow[]> {
+// projectId (M22): undefined = không lọc dự án (dùng nội bộ/test cũ).
+export async function listTenders(projectId?: number): Promise<TenderRow[]> {
+  const where = projectId != null ? "WHERE tp.project_id = ?" : "";
   return query<TenderRow>(
     `SELECT tp.id, tp.code, tp.name, tp.scope, tp.due_date AS "dueDate", tp.status,
             tp.awarded_bid_id AS "awardedBidId", tp.awarded_contract_id AS "awardedContractId",
@@ -81,12 +83,16 @@ export async function listTenders(): Promise<TenderRow[]> {
             (SELECT COUNT(*) FROM tender_bids tb WHERE tb.tender_id = tp.id) AS "bidCount"
        FROM tender_packages tp
        LEFT JOIN users u ON u.id = tp.created_by
+      ${where}
       ORDER BY tp.created_at DESC, tp.id DESC`,
+    ...(projectId != null ? [projectId] : []),
   );
 }
 
-export async function getTender(id: number): Promise<TenderRow | undefined> {
-  const rows = await listTenders();
+// projectId khi truyền → trả undefined nếu gói thầu không thuộc dự án đang chọn
+// (chặn truy cập chéo dự án qua đoán ID).
+export async function getTender(id: number, projectId?: number): Promise<TenderRow | undefined> {
+  const rows = await listTenders(projectId);
   return rows.find((r) => r.id === id);
 }
 
@@ -174,15 +180,25 @@ export async function comparisonTable(
 // Trao thầu: chốt awarded_bid_id + sinh 1 hợp đồng giao thầu (contracts, M16) cho
 // NCC trúng thầu (giá trị = total của bid đã chọn) → contracts.id gán vào
 // awarded_contract_id. Khoá sửa giá sau khi trao (status chuyển 'awarded').
+// projectId (M22): gói thầu phải thuộc đúng dự án đang chọn (bắt buộc — route gọi
+// hàm này luôn resolve trước, undefined chỉ dùng nội bộ/test cũ); hợp đồng sinh ra
+// gán project_id theo gói thầu.
 export async function awardTender(
   tenderId: number,
   bidId: number,
   userId: number,
+  projectId?: number,
 ): Promise<{ contractId: number }> {
   return withTransaction(async () => {
+    const conds = ["id = ?"];
+    const args: unknown[] = [tenderId];
+    if (projectId != null) {
+      conds.push("project_id = ?");
+      args.push(projectId);
+    }
     const tender = await queryOne<{ status: string; code: string; name: string }>(
-      `SELECT status, code, name FROM tender_packages WHERE id = ? FOR UPDATE`,
-      tenderId,
+      `SELECT status, code, name FROM tender_packages WHERE ${conds.join(" AND ")} FOR UPDATE`,
+      ...args,
     );
     if (!tender) throw Object.assign(new Error("Không tìm thấy gói thầu"), { status: 404 });
     if (tender.status === "awarded")
@@ -206,13 +222,14 @@ export async function awardTender(
       2,
     );
     const contractId = await insertId(
-      `INSERT INTO contracts (code, kind, title, party_supplier_id, value, status, created_by)
-       VALUES (?, 'giao_thau', ?, ?, ?, 'active', ?)`,
+      `INSERT INTO contracts (code, kind, title, party_supplier_id, value, status, created_by, project_id)
+       VALUES (?, 'giao_thau', ?, ?, ?, 'active', ?, ?)`,
       contractCode,
       `Trúng thầu — ${tender.name}`,
       chosen.supplierId,
       chosen.total,
       userId,
+      projectId ?? null,
     );
 
     await run(
