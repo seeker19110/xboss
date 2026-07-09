@@ -63,7 +63,8 @@ Xem `CLAUDE.md` mục **Quy trình & Definition of Done** và `.github/PULL_REQU
 
 ## 10. Rủi ro & Giả định
 
-- **Rate-limit in-memory** (`lib/ratelimit.ts`) đếm theo process → sai khi chạy multi-instance (cần chuyển DB/Redis).
-- **Không có hệ migrate** — đổi schema bảng đã tồn tại phải `ALTER` tay hoặc script backfill (`scripts/`).
-- **Schema auto-init** tiện nhưng dễ trôi khỏi tài liệu — `docs/ERD.md` phải cập nhật tay.
-- Giả định: 1 dự án (TT AVIO Tháp A); nếu mở rộng nhiều dự án cần rà lại mô hình + quyền.
+- ~~Rate-limit in-memory đếm theo process~~ → **đã chuyển Postgres** (bảng `login_rate_limits`, `migrations/0002_login_rate_limit.sql`) — đúng khi chạy nhiều instance, upsert atomic qua `ON CONFLICT`.
+- ~~Không có hệ migrate~~ → **đã có** (ADR-0003): `migrations/*.sql` đánh số + `schema_migrations` + runner `lib/db/migrate.ts`, tự áp khi boot hoặc `npm run db:migrate`.
+- **Schema qua hệ migrate append-only, `docs/ERD.md` vẫn phải cập nhật tay** — rủi ro thật còn lại (đã bổ sung phần thiếu 2026-07 sau nhiều module M23-M31 chưa được ghi vào ERD).
+- ~~Giả định: 1 dự án~~ → **đã hỗ trợ đa dự án** (M22 — Portfolio, project switcher, `user_projects` gate quyền, cột `project_id` trên các bảng gốc). Rủi ro còn lại: một số cụm cross-cutting chưa scope hết theo dự án (đã đóng phần `/api/notifications` + `/api/costs`, xem `PROGRESS.md` mục Nợ kỹ thuật).
+- Rủi ro thật đang chờ xử lý: chưa có Sentry (chờ `SENTRY_DSN` từ người vận hành); `EMBED_HOST_WHITELIST` (M31, BIM/camera viewer) là danh sách suy đoán, cần công ty xác nhận domain thật trước khi dùng production.
