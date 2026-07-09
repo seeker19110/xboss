@@ -92,6 +92,11 @@ export function newEnvPermitFileName(envPermitId: number, mime: string): string 
   return `ep${envPermitId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime] ?? ".bin"}`;
 }
 
+// Biên bản bàn giao (M29, `handover_items.minutes_file`) — 1 file gọn/hạng mục (PDF/ảnh).
+export function newHandoverMinutesFileName(handoverItemId: number, mime: string): string {
+  return `hi${handoverItemId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime] ?? ".bin"}`;
+}
+
 export function ensureUploadDir(): string {
   if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
   return UPLOAD_DIR;

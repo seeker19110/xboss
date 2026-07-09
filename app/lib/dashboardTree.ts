@@ -324,7 +324,12 @@ export const DASHBOARD_TREE: DashCluster[] = [
     // Bàn giao & Vận hành (mockup: Bàn Giao & Kết Thúc; Bảo Hành – Bảo Trì) — mới hoàn toàn.
     label: "Bàn giao & Vận hành",
     dashboards: [
-      { id: "dash.ban-giao-ket-thuc", label: "Bàn giao & Kết thúc", icon: PackageCheck }, // M29
+      {
+        id: "dash.ban-giao-ket-thuc",
+        href: "/handover",
+        label: "Bàn giao & Kết thúc",
+        icon: PackageCheck,
+      }, // M29
       { id: "dash.bao-hanh-bao-tri", label: "Bảo hành – Bảo trì", icon: Cog }, // M30
     ],
   },
