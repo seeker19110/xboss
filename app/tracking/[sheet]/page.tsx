@@ -28,6 +28,7 @@ import {
   Eye,
   EyeOff,
   Lock,
+  ShieldAlert,
 } from "lucide-react";
 import { useOfflineTickQueue } from "@/app/components/offlineQueue";
 import AppHeader from "@/app/components/AppHeader";
@@ -164,6 +165,9 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
   // M14 — tầng chưa bàn giao mặt bằng (work_fronts.status='pending') của sheet này,
   // chỉ để hiện badge cảnh báo trực quan (không chặn tick — xem docs/nang-cap/M14-mat-bang.md).
   const [pendingFronts, setPendingFronts] = useState<Set<string>>(new Set());
+  // M3 (QA&QC) — nhóm đang bị hold-point chuyển bước (packageId → lý do), chỉ để hiện icon
+  // cảnh báo trên hàng nhóm (chặn ghi thật đã nằm ở các route dùng handoverBlocked).
+  const [qcBlocked, setQcBlocked] = useState<Map<number, string>>(new Map());
   const handleColsLoaded = useCallback((cols: string[]) => {
     setAllSheetCols((prev) => {
       const merged = [...new Set([...prev, ...cols])];
@@ -201,6 +205,19 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
             (j?.workFronts ?? []).filter((w) => w.status === "pending").map((w) => w.floorLabel),
           ),
         );
+      })
+      .catch(() => {
+        /* mất mạng — bỏ qua badge, không ảnh hưởng thao tác chính */
+      });
+  }, [data?.sheet.id]);
+
+  useEffect(() => {
+    const sheetTypeId = data?.sheet.id;
+    if (!sheetTypeId) return;
+    fetch(`/api/workpackages/qc-status?sheetTypeId=${sheetTypeId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { blocked?: { packageId: number; reason: string }[] } | null) => {
+        setQcBlocked(new Map((j?.blocked ?? []).map((b) => [b.packageId, b.reason])));
       })
       .catch(() => {
         /* mất mạng — bỏ qua badge, không ảnh hưởng thao tác chính */
@@ -586,6 +603,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
                   onColsLoaded={handleColsLoaded}
                   sheetCols={allSheetCols}
                   pendingFront={!!p.floorLabel && pendingFronts.has(p.floorLabel)}
+                  qcReason={qcBlocked.get(p.id)}
                 />
               </div>
             ))}
@@ -817,6 +835,7 @@ function PkgGrid({
   onColsLoaded,
   sheetCols,
   pendingFront,
+  qcReason,
 }: {
   pkg: Pkg;
   pkgIdx: number;
@@ -833,6 +852,7 @@ function PkgGrid({
   onColsLoaded: (cols: string[]) => void;
   sheetCols: string[];
   pendingFront: boolean;
+  qcReason?: string;
 }) {
   const [grid, setGrid] = useState<Grid | null>(null);
   const [editName, setEditName] = useState<string | null>(null);
@@ -1556,6 +1576,14 @@ function PkgGrid({
                     >
                       <title>Chưa có mặt bằng — tầng {pkg.floorLabel} chưa được bàn giao</title>
                     </Lock>
+                  )}
+                  {qcReason && (
+                    <ShieldAlert
+                      className="w-2.5 h-2.5 text-rose-400 shrink-0"
+                      aria-label="Đang chờ nghiệm thu chuyển bước"
+                    >
+                      <title>{qcReason}</title>
+                    </ShieldAlert>
                   )}
                   {ce && (
                     <button
