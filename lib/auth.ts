@@ -220,6 +220,9 @@ export const CAN = {
   // Môi trường & Giấy phép (M25): hồ sơ MT/ĐTM/xả thải + quan trắc + chất thải — xem mọi
   // vai trò đăng nhập, ghi Admin/PM/kỹ sư (kỹ sư môi trường ghi kết quả quan trắc).
   manageEnv: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  // Quan hệ & Quan trắc (M26): mốc lún/chuyển vị + khiếu nại cộng đồng — xem mọi vai
+  // trò đăng nhập, ghi Admin/PM/kỹ sư (đội hiện trường trực tiếp đo/ghi kỳ đo).
+  manageMonitoring: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
 };
 
 // Sub-con chỉ được thao tác trên task được giao cho mình.

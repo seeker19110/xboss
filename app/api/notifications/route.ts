@@ -18,6 +18,7 @@ import { expiringLegalDocs } from "@/lib/kickoff";
 import { expiringCertifications } from "@/lib/hr";
 import { expiringInsuranceBonds } from "@/lib/insurance";
 import { expiringEnvPermits, exceededMonitoring } from "@/lib/environment";
+import { alarmingPoints } from "@/lib/monitoring";
 
 export const dynamic = "force-dynamic";
 
@@ -351,6 +352,32 @@ export async function GET() {
         WHERE user_id = ? AND type = 'cert_expiry' AND is_read = 0 AND certification_id <> ALL(?)`,
       user.id,
       expiringCertIds,
+    );
+  }
+
+  // Mốc quan trắc (lún/chuyển vị/nghiêng) có kỳ đo gần nhất vượt ngưỡng báo động →
+  // cảnh báo Admin/PM/kỹ sư (M26). Tự dọn khi kỳ đo mới về normal/warn.
+  if (user.role === "admin" || user.role === "pm" || user.role === "engineer") {
+    const alarming = await alarmingPoints();
+    if (alarming.length > 0) {
+      const values = alarming.map(() => `(?, ?, 'monitoring_alarm', ?)`).join(", ");
+      const params = alarming.flatMap((p) => [
+        user.id,
+        p.id,
+        `🚨 Mốc quan trắc ${p.code} vượt ngưỡng báo động ngày ${p.measuredAt} (${p.cumulative ?? p.value})`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, monitoring_point_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, type, monitoring_point_id) WHERE monitoring_point_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    const alarmingIds = alarming.map((p) => p.id);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'monitoring_alarm' AND is_read = 0 AND monitoring_point_id <> ALL(?)`,
+      user.id,
+      alarmingIds,
     );
   }
 
