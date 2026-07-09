@@ -62,7 +62,9 @@ Cookie `xboss_project` (không path prefix) chọn dự án đang xem — `lib/p
 
 ### Bảng "gốc cụm" có cột `project_id` (thêm ở migration 0027, backfill về dự án id nhỏ nhất)
 
-`contracts`, `variation_orders`, `materials`, `boq_items`, `purchase_orders`, `purchase_requests`, `meetings`, `risks`, `proposals`, `correspondences`, `drawings`, `qc_checklists`, `ncrs`, `hse_records`, `site_diaries`, `equipment`, `vehicle_logs`, `tender_packages`, `project_documents`.
+**M16-M22:** `contracts`, `variation_orders`, `materials`, `boq_items`, `purchase_orders`, `purchase_requests`, `meetings`, `risks`, `proposals`, `correspondences`, `drawings`, `qc_checklists`, `ncrs`, `hse_records`, `site_diaries`, `equipment`, `vehicle_logs`, `tender_packages`, `project_documents`.
+
+**M23-M31 (khởi động, nhân sự, môi trường, quan trắc, bảo hiểm, bàn giao, công nghệ):** `legal_documents`, `mobilization_items`, `personnel`, `crews`, `attendance`, `certifications`, `raci_matrix`, `env_permits`, `env_monitoring`, `waste_logs`, `monitoring_points`, `community_cases`, `insurance_bonds`, `commissioning`, `handover_items`, `punch_list`, `demob_items`, `lessons_learned`, `tech_links`, `progress_albums`.
 
 Mọi route GET/PATCH/DELETE theo ID của các bảng trên đều lọc thêm `project_id = <dự án đang chọn>` — sai dự án trả **404** (không lộ tồn tại của bản ghi). POST tạo mới gán `project_id` từ server (`getCurrentProjectId`), không tin client.
 
@@ -456,6 +458,330 @@ Rev mới chuyển `approved`/`approved_with_comments` tự thay thế (`superse
 ### `baselines` + `baseline_tasks`
 
 Snapshot ngày BĐ/KT + % tại thời điểm chốt. S-curve nhận `?baseline=<id>` để vẽ đường kế hoạch gốc.
+
+---
+
+## Khởi động & Pháp lý (M23, `migrations/0030_kickoff.sql`)
+
+### `legal_documents`
+
+Hồ sơ pháp lý dự án: giấy phép xây dựng, phê duyệt QH/TK, hợp đồng chính, và các loại khác. Mỗi loại có ngày cấp/hết hạn, trạng thái (draft/valid/expired/superseded) và 1 file đính kèm. Cảnh báo tự động khi sắp hết hạn qua notifications.
+
+| Cột                                             | Kiểu          | Ghi chú                                                    |
+| ----------------------------------------------- | ------------- | ---------------------------------------------------------- |
+| id                                              | SERIAL PK     |                                                            |
+| project_id                                      | FK → projects |                                                            |
+| kind                                            | TEXT CHECK    | `giay_phep_xd\|phe_duyet_qh\|phe_duyet_tk\|hd_chinh\|khac` |
+| code / title                                    | TEXT          | Mã/tên tài liệu                                            |
+| issued_by                                       | TEXT          | Cơ quan/đơn vị cấp                                         |
+| issued_date                                     | DATE          | Ngày cấp                                                   |
+| expiry_date                                     | DATE          | Ngày hết hạn (NULL = không hạn)                            |
+| status                                          | TEXT          | `draft\|valid\|expired\|superseded`                        |
+| file_name, original_name, mime_type, size_bytes |               | 1 file chính (pattern gọn)                                 |
+
+### `mobilization_items`
+
+Checklist huy động công trường: bàn giao mặt bằng, khảo sát, trắc đạc, huy động lán trại. Mỗi mục có category, trạng thái (pending/in_progress/done), ngày hạn/hoàn thành, người giao. Dùng để theo dõi các bước chuẩn bị trước khi khởi công.
+
+| Cột        | Kiểu          | Ghi chú                                        |
+| ---------- | ------------- | ---------------------------------------------- |
+| id         | SERIAL PK     |                                                |
+| project_id | FK → projects |                                                |
+| category   | TEXT CHECK    | `mat_bang\|khao_sat\|trac_dac\|huy_dong\|khac` |
+| title      | TEXT          | Tên mục việc                                   |
+| status     | TEXT CHECK    | `pending\|in_progress\|done`                   |
+| due_date   | DATE          | Hạn hoàn thành                                 |
+| done_date  | DATE          | Ngày hoàn thành thực                           |
+| assignee   | FK → users    | Người phụ trách                                |
+
+---
+
+## Nhân sự & Tổ chức (M24, `migrations/0031_hr.sql`)
+
+### `personnel`
+
+Nhân sự công trường (khác với user hệ thống): gồm các kỹ sư, công nhân, thầu phụ. Mỗi nhân sự gắn nhà thầu (supplier_id), có chức danh riêng, mã CCCD (nhạy cảm), trạng thái (active/inactive).
+
+| Cột              | Kiểu           | Ghi chú                        |
+| ---------------- | -------------- | ------------------------------ |
+| id               | SERIAL PK      |                                |
+| project_id       | FK → projects  |                                |
+| code / full_name | TEXT           | Mã/tên nhân sự                 |
+| role_title       | TEXT           | Chức danh công trường          |
+| supplier_id      | FK → suppliers | Nhà thầu phụ (nullable)        |
+| phone            | TEXT           | SĐT liên lạc                   |
+| id_number        | TEXT           | CCCD (nhạy cảm — chỉ admin/pm) |
+| status           | TEXT CHECK     | `active\|inactive`             |
+
+### `crews`
+
+Tổ đội công trường: nhóm người cùng chuyên ngành, gắn nhà thầu/cấp tầng (discipline), có người dẫn đầu. Dùng cho chấm công tổ, phân công hệ thống, quản lý nhân sự.
+
+| Cột           | Kiểu                | Ghi chú                     |
+| ------------- | ------------------- | --------------------------- |
+| id            | SERIAL PK           |                             |
+| project_id    | FK → projects       |                             |
+| name          | TEXT, UNIQUE (ghép) | Tên tổ                      |
+| discipline_id | FK → disciplines    | Chuyên ngành (MEP/ACMV/...) |
+| supplier_id   | FK → suppliers      | Nhà thầu phụ                |
+| leader_id     | FK → personnel      | Người dẫn đầu               |
+
+**Bảng nối `crew_members`** (PK ghép `crew_id, personnel_id`) — liệt kê nhân sự trong mỗi tổ.
+
+### `attendance`
+
+Chấm công ngày: ghi nhân sự có mặt/vắng mặt, số giờ làm việc, theo tổ hoặc cá nhân. Có thể ghi headcount gộp (personnel_id NULL, chỉ ghi số người).
+
+| Cột          | Kiểu           | Ghi chú                           |
+| ------------ | -------------- | --------------------------------- |
+| id           | SERIAL PK      |                                   |
+| project_id   | FK → projects  |                                   |
+| work_date    | DATE NOT NULL  | Ngày chấm công                    |
+| crew_id      | FK → crews     | Tổ (nullable — có thể chấm riêng) |
+| personnel_id | FK → personnel | Nhân sự (NULL = chấm gộp theo tổ) |
+| headcount    | INTEGER        | Số đầu khi chấm gộp               |
+| present      | BOOLEAN        | Có mặt/vắng                       |
+| hours        | NUMERIC(4,1)   | Số giờ làm việc                   |
+
+### `certifications`
+
+Chứng chỉ/giấy phép nhân sự: thẻ an toàn, chứng chỉ nghề, giấy phép vận hành máy. Mỗi chứng chỉ có loại, ngày cấp/hết hạn, 1 file scan.
+
+| Cột                                             | Kiểu           | Ghi chú                         |
+| ----------------------------------------------- | -------------- | ------------------------------- |
+| id                                              | SERIAL PK      |                                 |
+| project_id                                      | FK → projects  |                                 |
+| personnel_id                                    | FK → personnel |                                 |
+| kind                                            | TEXT           | Loại: thẻ an toàn, chứng chỉ... |
+| code                                            | TEXT           | Mã chứng chỉ                    |
+| issued_date / expiry_date                       | DATE           |                                 |
+| file_name, original_name, mime_type, size_bytes |                | 1 file scan                     |
+
+### `raci_matrix`
+
+Ma trận RACI (Responsible/Accountable/Consulted/Informed) — phân công vai trò cho từng hạng mục/quy trình. Mỗi dòng ghi: phạm vi (scope), chức danh (role_label), nhân sự (personnel_id), và ký tự RACI.
+
+| Cột          | Kiểu           | Ghi chú            |
+| ------------ | -------------- | ------------------ |
+| id           | SERIAL PK      |                    |
+| project_id   | FK → projects  |                    |
+| scope        | TEXT           | Hạng mục/quy trình |
+| role_label   | TEXT           | Chức danh          |
+| personnel_id | FK → personnel | Nhân sự            |
+| raci         | CHAR(1) CHECK  | R / A / C / I      |
+
+---
+
+## Môi trường & Giấy phép (M25, `migrations/0033_environment.sql`)
+
+### `env_permits`
+
+Hồ sơ môi trường: đánh giá tác động môi trường (ĐTM), giấy phép môi trường, giấy phép xả thải. Mỗi loại có ngày cấp, hết hạn, trạng thái (valid/expired/superseded) và 1 file đính kèm.
+
+| Cột                                             | Kiểu          | Ghi chú                                      |
+| ----------------------------------------------- | ------------- | -------------------------------------------- |
+| id                                              | SERIAL PK     |                                              |
+| project_id                                      | FK → projects |                                              |
+| kind                                            | TEXT CHECK    | `dtm\|giay_phep_mt\|giay_phep_xa_thai\|khac` |
+| code / title                                    | TEXT          | Mã/tên giấy phép                             |
+| issued_by                                       | TEXT          | Cơ quan cấp                                  |
+| issued_date / expiry_date                       | DATE          |                                              |
+| status                                          | TEXT CHECK    | `valid\|expired\|superseded`                 |
+| file_name, original_name, mime_type, size_bytes |               | 1 file                                       |
+
+### `env_monitoring`
+
+Quan trắc môi trường theo kỳ: nước thải, khí thải/bụi, độ ồn, rung động. Mỗi kỳ ghi chỉ tiêu, giá trị đo, ngưỡng cho phép, và đánh giá passed/failed. Cảnh báo khi vượt ngưỡng.
+
+| Cột         | Kiểu          | Ghi chú                             |
+| ----------- | ------------- | ----------------------------------- |
+| id          | SERIAL PK     |                                     |
+| project_id  | FK → projects |                                     |
+| measured_at | DATE NOT NULL | Ngày đo                             |
+| category    | TEXT CHECK    | `nuoc_thai\|khi_bui\|on_rung\|khac` |
+| indicator   | TEXT          | Chỉ tiêu (pH, TSS, độ ồn dBA...)    |
+| value       | NUMERIC(12,3) | Kết quả đo                          |
+| unit        | TEXT          | Đơn vị                              |
+| threshold   | NUMERIC(12,3) | Ngưỡng cho phép                     |
+| passed      | BOOLEAN       | value ≤ threshold                   |
+| location    | TEXT          | Địa điểm lấy mẫu                    |
+
+### `waste_logs`
+
+Quản lý chất thải: rác thải xây dựng, chất nguy hại, nước thải. Ghi loại, khối lượng, phương pháp xử lý, đơn vị xử lý.
+
+| Cột             | Kiểu          | Ghi chú                             |
+| --------------- | ------------- | ----------------------------------- |
+| id              | SERIAL PK     |                                     |
+| project_id      | FK → projects |                                     |
+| log_date        | DATE NOT NULL | Ngày ghi                            |
+| waste_type      | TEXT CHECK    | `ran_xd\|nguy_hai\|nuoc_thai\|khac` |
+| quantity        | NUMERIC(12,2) | Khối lượng                          |
+| unit            | TEXT          | Đơn vị (tấn, m³...)                 |
+| disposal_method | TEXT          | Phương pháp xử lý (đốt, chôn...)    |
+| handler         | TEXT          | Đơn vị xử lý                        |
+
+---
+
+## Quan hệ & Quan trắc (M26, `migrations/0034_monitoring.sql`)
+
+### `monitoring_points`
+
+Mốc quan trắc kết cấu/nền: lún, chuyển vị/nghiêng, công trình lân cận. Mỗi mốc có code, vị trí, ngưỡng cảnh báo warn/alarm, đơn vị đo, trạng thái (active/stopped).
+
+| Cột             | Kiểu          | Ghi chú                                  |
+| --------------- | ------------- | ---------------------------------------- |
+| id              | SERIAL PK     |                                          |
+| project_id      | FK → projects |                                          |
+| code            | TEXT NOT NULL | Mã mốc (UNIQUE ghép project_id)          |
+| kind            | TEXT CHECK    | `lun\|chuyen_vi\|nghieng\|lan_can\|khac` |
+| location        | TEXT          | Vị trí mốc                               |
+| warn_threshold  | NUMERIC(12,3) | Ngưỡng cảnh báo vàng                     |
+| alarm_threshold | NUMERIC(12,3) | Ngưỡng cảnh báo đỏ                       |
+| unit            | TEXT          | Đơn vị (mm, cm...)                       |
+| status          | TEXT CHECK    | `active\|stopped`                        |
+
+**Bảng liên quan `monitoring_readings`** (FK → `monitoring_points` ON DELETE CASCADE) — ghi mỗi lần đo (ngày, giá trị, luỹ kế, so ngưỡng warn/alarm/normal, người ghi).
+
+### `community_cases`
+
+Khiếu nại/quan hệ cộng đồng: tiếp nhận → xử lý → đóng. Mỗi vụ ghi nguồn (dân cư/chính quyền/khác), tiêu đề, ngày nhận, trạng thái, giải pháp, ngày đóng.
+
+| Cột           | Kiểu          | Ghi chú                          |
+| ------------- | ------------- | -------------------------------- |
+| id            | SERIAL PK     |                                  |
+| project_id    | FK → projects |                                  |
+| code / title  | TEXT          | Mã/tiêu đề khiếu nại             |
+| source        | TEXT          | Nguồn: dân cư, chính quyền, khác |
+| received_date | DATE          | Ngày tiếp nhận                   |
+| status        | TEXT CHECK    | `open\|handling\|closed`         |
+| resolution    | TEXT          | Giải pháp/kết quả xử lý          |
+| closed_date   | DATE          | Ngày đóng (khi status=closed)    |
+
+---
+
+## Bảo hiểm & Bảo lãnh (M28, `migrations/0032_insurance_bonds.sql`)
+
+### `insurance_bonds`
+
+Sổ theo dõi bảo hiểm & bảo lãnh: bảo hiểm công trình (CAR), trách nhiệm bên thứ ba, tai nạn lao động, bảo lãnh thực hiện/tạm ứng/bảo hành. Mỗi loại gắn hợp đồng (nullable — một số cấp toàn dự án không theo 1 HĐ), có giá trị, ngày cấp/hết hạn, 1 file chính. Cảnh báo sắp hết hiệu lực qua notifications.
+
+| Cột                                             | Kiểu           | Ghi chú                                   |
+| ----------------------------------------------- | -------------- | ----------------------------------------- |
+| id                                              | SERIAL PK      |                                           |
+| project_id                                      | FK → projects  |                                           |
+| contract_id                                     | FK → contracts | Nullable — có loại cấp toàn dự án         |
+| kind                                            | TEXT CHECK     | `car\|tnbt\|tai_nan_ld\|bao_lanh_*\|khac` |
+| title                                           | TEXT           | Tên giấy chứng nhận                       |
+| provider                                        | TEXT           | Đơn vị bảo hiểm/ngân hàng phát hành       |
+| code                                            | TEXT           | Số giấy chứng nhận                        |
+| value                                           | NUMERIC(15,2)  | Giá trị bảo hiểm/bảo lãnh                 |
+| issued_date / expiry_date                       | DATE           | Ngày cấp/hết hạn (NULL = không hạn)       |
+| status                                          | TEXT CHECK     | `valid\|expired\|released`                |
+| file_name, original_name, mime_type, size_bytes |                | 1 file chính                              |
+
+---
+
+## Bàn giao & Kết thúc (M29, `migrations/0035_handover.sql`)
+
+### `commissioning`
+
+Chạy thử & nghiệm thu hệ thống: gồm các hệ (ACMV, điện, PCCC...) với checklist bước T&C, trạng thái (draft/testing/passed/failed), ngày test, ghi chú.
+
+| Cột                | Kiểu             | Ghi chú                              |
+| ------------------ | ---------------- | ------------------------------------ |
+| id                 | SERIAL PK        |                                      |
+| project_id         | FK → projects    |                                      |
+| code / system_name | TEXT             | Mã/tên hệ                            |
+| discipline_id      | FK → disciplines | Chuyên ngành (ACMV, điện...)         |
+| checklist          | JSONB            | Các bước T&C (pattern qc_checklists) |
+| result             | TEXT CHECK       | `draft\|testing\|passed\|failed`     |
+| tested_at          | DATE             | Ngày chạy thử                        |
+
+### `handover_items`
+
+Hạng mục bàn giao CĐT: gồm tiêu đề, chuyên ngành, gắn nhóm công việc (nếu có), trạng thái (pending/handed_over/accepted), ngày bàn giao, biên bản (1 file).
+
+| Cột             | Kiểu               | Ghi chú                          |
+| --------------- | ------------------ | -------------------------------- |
+| id              | SERIAL PK          |                                  |
+| project_id      | FK → projects      |                                  |
+| title           | TEXT               | Tiêu đề hạng mục                 |
+| discipline_id   | FK → disciplines   | Chuyên ngành                     |
+| work_package_id | FK → work_packages | Gắn nhóm công việc (nullable)    |
+| status          | TEXT CHECK         | `pending\|handed_over\|accepted` |
+| handover_date   | DATE               | Ngày bàn giao                    |
+| minutes_file    | TEXT               | Tên file biên bản (1 file gọn)   |
+
+### `punch_list`
+
+Tồn tại khi bàn giao: danh sách công việc còn dang dở trước khi đóng (độ ưu tiên low/medium/high, người giao, hạn hoàn thành). Trạng thái open/fixing/closed.
+
+| Cột              | Kiểu                | Ghi chú                 |
+| ---------------- | ------------------- | ----------------------- |
+| id               | SERIAL PK           |                         |
+| project_id       | FK → projects       |                         |
+| handover_item_id | FK → handover_items | Gắn hạng mục bàn giao   |
+| description      | TEXT                | Mô tả công việc dang dở |
+| severity         | TEXT CHECK          | `low\|medium\|high`     |
+| status           | TEXT CHECK          | `open\|fixing\|closed`  |
+| due_date         | DATE                | Hạn hoàn thành          |
+| assignee         | FK → users          | Người giao việc         |
+
+### `demob_items`
+
+Giải thể công trường: các mục giải thể (lán trại, mặt bằng, vật tư dư...) với trạng thái (pending/done), ghi chú.
+
+| Cột        | Kiểu          | Ghi chú                           |
+| ---------- | ------------- | --------------------------------- |
+| id         | SERIAL PK     |                                   |
+| project_id | FK → projects |                                   |
+| title      | TEXT          | Mục giải thể                      |
+| category   | TEXT          | Phân loại (lán trại, mặt bằng...) |
+| status     | TEXT CHECK    | `pending\|done`                   |
+
+### `lessons_learned`
+
+Bài học kinh nghiệm từ dự án: ghi tiêu đề, danh mục (kỹ thuật, quản lý, an toàn...), nội dung chi tiết, tác giả & ngày.
+
+| Cột        | Kiểu          | Ghi chú                    |
+| ---------- | ------------- | -------------------------- |
+| id         | SERIAL PK     |                            |
+| project_id | FK → projects |                            |
+| title      | TEXT          | Tiêu đề bài học            |
+| category   | TEXT          | Danh mục (kỹ thuật, QL...) |
+| content    | TEXT          | Nội dung chi tiết          |
+
+---
+
+## Chuyển đổi số & Công nghệ (M31, `migrations/0036_tech.sql`)
+
+### `tech_links`
+
+Link công cụ ngoài: P6/MS Project (lịch trình), BIM viewer (mô hình), camera/drone (giám sát). Mỗi link ghi category, tiêu đề, URL, có thể nhúng iframe hay mở ngoài.
+
+| Cột        | Kiểu          | Ghi chú                               |
+| ---------- | ------------- | ------------------------------------- |
+| id         | SERIAL PK     |                                       |
+| project_id | FK → projects |                                       |
+| category   | TEXT CHECK    | `bim\|schedule\|camera\|drone\|other` |
+| title      | TEXT          | Tên công cụ                           |
+| url        | TEXT          | Địa chỉ truy cập                      |
+| embed      | BOOLEAN       | true = nhúng iframe; false = link ra  |
+
+### `progress_albums`
+
+Album ảnh mốc tiến độ (thường từ drone): ghi milestone/mốc quan trọng, ngày chụp, ghi chú, người quản lý. Ảnh trong `task_photos` với `album_id` = NULL khi không gắn album.
+
+| Cột             | Kiểu          | Ghi chú                |
+| --------------- | ------------- | ---------------------- |
+| id              | SERIAL PK     |                        |
+| project_id      | FK → projects |                        |
+| milestone_label | TEXT          | Tên mốc (vd "Tầng 10") |
+| captured_date   | DATE          | Ngày chụp              |
+| note            | TEXT          | Ghi chú về album       |
+
+**Lưu ý:** `task_photos` thêm cột `album_id` (FK → `progress_albums`) — cho phép ảnh gắn với album thay vì task cụ thể.
 
 ---
 

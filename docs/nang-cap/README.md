@@ -38,6 +38,9 @@
 | `M29-ban-giao-ket-thuc.md`    | Bàn giao & Kết thúc (T&C, punch list, demob)                        | K (IA mới)   |
 | `M30-bao-hanh-bao-tri.md`     | Bảo hành – Bảo trì (O&M)                                            | K (IA mới)   |
 | `M31-chuyen-doi-so.md`        | Chuyển đổi số & Công nghệ (CDE, BIM viewer, drone)                  | L (IA mới)   |
+| `M32-thiet-ke-thay-doi.md`    | Quản lý thay đổi thiết kế (Design Change — BPTC đã xong qua M08)    | C (IA mới)   |
+| `M33-nha-thau-phu.md`         | Hồ sơ năng lực & đánh giá định kỳ Nhà thầu phụ                      | E (IA mới)   |
+| `M34-claim.md`                | Claim chi phí & Gia hạn thời gian (EOT)                             | I (IA mới)   |
 
 > M16–M20 là module bổ sung từ đối chiếu brochure FastCons — xem `docs/ke-hoach-fastcons-2026-07.md` (nhóm A/B/C/D thay cho số đợt 1–4 cũ).
 >

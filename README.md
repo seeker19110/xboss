@@ -8,8 +8,8 @@ Web app quản lý tiến độ thi công MEP/ACMV cho dự án **TT AVIO Tháp 
 
 ## Yêu cầu hệ thống
 
-- Node.js **20+**
-- PostgreSQL — tài khoản [Supabase](https://supabase.com) (free tier) hoặc Postgres tự host
+- Node.js **22** (xem `.nvmrc`)
+- PostgreSQL tự host (khuyến nghị — `DEPLOY.md`). Dùng `DATABASE_URL` chỉ cần là chuỗi kết nối Postgres hợp lệ nên Supabase Postgres cũng chạy được cho `DATABASE_URL`, nhưng dự án **không dùng SDK/RLS/Auth của Supabase** (`docs/adr/0001-postgres-raw-sql.md`).
 
 ---
 
@@ -173,4 +173,4 @@ Quy tắc: cột `DATE` giữ nguyên **chuỗi** `'YYYY-MM-DD'` (so sánh ngày
 
 ## Tech Stack
 
-Next.js 14 (App Router) · TypeScript strict · Tailwind v4 (dark-first) · PostgreSQL · node-postgres (`pg`) · Recharts · SheetJS · Lucide · Web Push · PWA
+Next.js 16.2 (App Router, React 19.2) · TypeScript strict · Tailwind 4.3 (dark-first) · PostgreSQL · node-postgres (`pg`) · Recharts · SheetJS/ExcelJS · Lucide · Web Push · PWA
