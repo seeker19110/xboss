@@ -282,6 +282,7 @@ export const DASHBOARD_TREE: DashCluster[] = [
       }, // M27
       {
         id: "dash.bao-hiem-bao-lanh",
+        href: "/insurance",
         label: "Bảo hiểm & Bảo lãnh",
         icon: Umbrella,
         roles: ["admin", "pm", "bch"],
