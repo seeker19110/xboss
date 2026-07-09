@@ -228,6 +228,10 @@ export const CAN = {
   // result='passed'/'failed' (commissioning) và status='accepted' (handover-items) cần
   // CAN.approve (nhạy cảm hơn, giống nghiệm thu 2 bước).
   manageHandover: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  // Chuyển đổi số & Công nghệ (M31): link công cụ ngoài (BIM/P6/camera) + album ảnh
+  // mốc tiến độ — xem mọi vai trò đăng nhập, tạo/sửa/xoá Admin/PM (panel "Hệ thống"
+  // dung lượng/sao lưu chỉ Admin — kiểm riêng ở route /api/tech/system-status).
+  manageTech: (r?: Role) => r === "admin" || r === "pm",
 };
 
 // Sub-con chỉ được thao tác trên task được giao cho mình.

@@ -1,11 +1,44 @@
 // Lưu trữ ảnh hiện trường — file nằm trong data/uploads/ (ngoài git),
 // metadata trong bảng task_photos. Tên file do server sinh, không tin client.
 import { mkdirSync, existsSync } from "node:fs";
+import { readdir, stat } from "node:fs/promises";
 import { join, normalize, sep } from "node:path";
 import { randomBytes } from "node:crypto";
 
 export const UPLOAD_DIR = join(process.cwd(), "data", "uploads");
 export const MAX_PHOTO_BYTES = 10 * 1024 * 1024; // 10MB
+
+// Ngưỡng cảnh báo dung lượng data/uploads/ trên VPS (đề xuất trong M08-ban-ve.md —
+// bản vẽ nặng hơn ảnh/biên bản, dễ chiếm dung lượng nhanh hơn). Dùng chung bởi
+// GET /api/admin/storage và lib/tech.ts (systemStatus, M31) — tránh viết lại logic.
+export const STORAGE_WARN_BYTES = 5 * 1024 * 1024 * 1024; // 5GB
+
+// Tổng dung lượng + số file trong 1 thư mục (đệ quy) — dùng cho panel dung lượng
+// lưu trữ (M08) và trạng thái hệ thống (M31).
+export async function dirSize(dir: string): Promise<{ bytes: number; files: number }> {
+  let bytes = 0;
+  let files = 0;
+  let entries: string[];
+  try {
+    entries = await readdir(dir);
+  } catch {
+    return { bytes: 0, files: 0 };
+  }
+  for (const entry of entries) {
+    const p = join(dir, entry);
+    const s = await stat(p).catch(() => null);
+    if (!s) continue;
+    if (s.isDirectory()) {
+      const sub = await dirSize(p);
+      bytes += sub.bytes;
+      files += sub.files;
+    } else {
+      bytes += s.size;
+      files += 1;
+    }
+  }
+  return { bytes, files };
+}
 
 // Chỉ nhận ảnh — map mime → phần mở rộng (không lấy ext từ tên file client gửi).
 const MIME_EXT: Record<string, string> = {
@@ -121,6 +154,12 @@ export function newDrawingRevisionFileName(drawingId: number, rev: string, mime:
 
 export function newPhotoFileName(taskId: number, mime: string): string {
   return `t${taskId}-${Date.now()}-${randomBytes(4).toString("hex")}${MIME_EXT[mime]}`;
+}
+
+// Ảnh album mốc tiến độ (M31, register `progress_albums` — tái dùng task_photos qua
+// album_id, task_id NULL): cùng whitelist mime với ảnh hiện trường.
+export function newAlbumPhotoFileName(albumId: number, mime: string): string {
+  return `alb${albumId}-${Date.now()}-${randomBytes(4).toString("hex")}${MIME_EXT[mime]}`;
 }
 
 // Đường dẫn tuyệt đối tới file ảnh — chặn path traversal (file_name luôn do server sinh,

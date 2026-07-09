@@ -345,7 +345,7 @@ export const DASHBOARD_TREE: DashCluster[] = [
         icon: Upload,
         roles: ["admin", "pm"],
       },
-      { id: "dash.chuyen-doi-so", label: "Chuyển đổi số & Công nghệ", icon: Cpu }, // M31
+      { id: "dash.chuyen-doi-so", href: "/tech", label: "Chuyển đổi số & Công nghệ", icon: Cpu }, // M31 — đã có trang thật
     ],
   },
 ];
