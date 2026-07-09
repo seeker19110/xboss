@@ -17,6 +17,7 @@ import { pendingProposalsOver } from "@/lib/proposals";
 import { expiringLegalDocs } from "@/lib/kickoff";
 import { expiringCertifications } from "@/lib/hr";
 import { expiringInsuranceBonds } from "@/lib/insurance";
+import { expiringEnvPermits, exceededMonitoring } from "@/lib/environment";
 
 export const dynamic = "force-dynamic";
 
@@ -691,6 +692,58 @@ export async function GET() {
         WHERE user_id = ? AND type = 'action_overdue' AND is_read = 0 AND meeting_action_id <> ALL(?)`,
       user.id,
       overdueActionIds,
+    );
+  }
+
+  // Giấy phép môi trường (ĐTM, giấy phép MT, giấy phép xả thải) sắp/đã hết hạn mà chưa
+  // đổi trạng thái → cảnh báo Admin/PM/kỹ sư (M25).
+  if (CAN.manageEnv(user.role)) {
+    const expiringEnv = await expiringEnvPermits();
+    if (expiringEnv.length > 0) {
+      const values = expiringEnv.map(() => `(?, ?, 'env_permit_expiry', ?)`).join(", ");
+      const params = expiringEnv.flatMap((d) => [
+        user.id,
+        d.id,
+        d.expired
+          ? `🌱 Hồ sơ môi trường ${d.code ?? d.title} — ${d.title} đã quá hạn (${d.expiryDate})`
+          : `🌱 Hồ sơ môi trường ${d.code ?? d.title} — ${d.title} sắp hết hạn (${d.expiryDate})`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, env_permit_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, type, env_permit_id) WHERE env_permit_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    const expiringEnvIds = expiringEnv.map((d) => d.id);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'env_permit_expiry' AND is_read = 0 AND env_permit_id <> ALL(?)`,
+      user.id,
+      expiringEnvIds,
+    );
+
+    // Chỉ tiêu quan trắc vượt ngưỡng ở kỳ gần nhất (mỗi tổ hợp category/indicator/location)
+    // → cảnh báo Admin/PM/kỹ sư (M25).
+    const exceeded = await exceededMonitoring();
+    if (exceeded.length > 0) {
+      const values = exceeded.map(() => `(?, ?, 'env_monitoring_over', ?)`).join(", ");
+      const params = exceeded.flatMap((m) => [
+        user.id,
+        m.id,
+        `⚠ Quan trắc ${m.indicator}${m.location ? ` (${m.location})` : ""} vượt ngưỡng: ${m.value ?? "—"}/${m.threshold ?? "—"}${m.unit ? ` ${m.unit}` : ""} (${m.measuredAt})`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, env_monitoring_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, type, env_monitoring_id) WHERE env_monitoring_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    const exceededIds = exceeded.map((m) => m.id);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'env_monitoring_over' AND is_read = 0 AND env_monitoring_id <> ALL(?)`,
+      user.id,
+      exceededIds,
     );
   }
 
