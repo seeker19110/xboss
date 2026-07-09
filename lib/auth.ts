@@ -217,6 +217,9 @@ export const CAN = {
   // Chấm công (M24): ghi rộng hơn manageHr — cho phép kỹ sư (đội trưởng) ghi công tại
   // hiện trường, giống VO/công văn.
   recordAttendance: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  // Môi trường & Giấy phép (M25): hồ sơ MT/ĐTM/xả thải + quan trắc + chất thải — xem mọi
+  // vai trò đăng nhập, ghi Admin/PM/kỹ sư (kỹ sư môi trường ghi kết quả quan trắc).
+  manageEnv: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
 };
 
 // Sub-con chỉ được thao tác trên task được giao cho mình.

@@ -87,6 +87,11 @@ export function newInsuranceDocFileName(insuranceBondId: number, mime: string): 
   return `ib${insuranceBondId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime] ?? ".bin"}`;
 }
 
+// Giấy phép môi trường (M25, register mới `env_permits`) — 1 file chính/giấy phép (PDF/ảnh).
+export function newEnvPermitFileName(envPermitId: number, mime: string): string {
+  return `ep${envPermitId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime] ?? ".bin"}`;
+}
+
 export function ensureUploadDir(): string {
   if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
   return UPLOAD_DIR;

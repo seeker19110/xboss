@@ -225,7 +225,12 @@ export const DASHBOARD_TREE: DashCluster[] = [
           },
         ],
       },
-      { id: "dash.moi-truong", label: "Môi trường & Giấy phép", icon: Leaf }, // M25
+      {
+        id: "dash.moi-truong",
+        href: "/environment",
+        label: "Môi trường & Giấy phép",
+        icon: Leaf,
+      }, // M25
       { id: "dash.quan-he-quan-trac", label: "Quan hệ & Quan trắc", icon: Radar }, // M26
     ],
   },
