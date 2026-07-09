@@ -178,9 +178,12 @@ export type OverNormItem = {
 
 // Định mức vật tư (đối chiếu tin cậy) vượt ngưỡng — nguồn notification norm_over.
 // Nhân công chỉ tham khảo, không cảnh báo cứng (đối chiếu lỏng theo spec).
+// projectId: lọc theo dự án đang chọn (đa dự án, M22+) — không truyền = không lọc.
 export async function overNormItems(
   thresholdPct = NORM_OVER_THRESHOLD_PCT,
+  projectId?: number,
 ): Promise<OverNormItem[]> {
+  const projectFilter = projectId != null ? " AND bi.project_id = ?" : "";
   const materialNorms = await query<{
     id: number;
     boqItemId: number;
@@ -196,7 +199,8 @@ export async function overNormItems(
        FROM boq_norms n
        JOIN boq_items bi ON bi.id = n.boq_item_id
        JOIN materials m ON m.id = n.material_id
-      WHERE n.resource_type = 'material'`,
+      WHERE n.resource_type = 'material'${projectFilter}`,
+    ...(projectId != null ? [projectId] : []),
   );
 
   const result: OverNormItem[] = [];

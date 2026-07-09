@@ -221,16 +221,19 @@ export type CalibrationDueItem = {
   expired: boolean;
 };
 
+// projectId: lọc theo dự án đang chọn (đa dự án, M22+) — không truyền = không lọc.
 export async function calibrationDueList(
   days = CALIBRATION_WARN_DAYS,
+  projectId?: number,
 ): Promise<CalibrationDueItem[]> {
   const limit = daysFromTodayISO(days);
+  const projectFilter = projectId != null ? " AND project_id = ?" : "";
   const rows = await query<{ id: number; code: string; name: string; calibrationDue: string }>(
     `SELECT id, code, name, calibration_due AS "calibrationDue"
        FROM equipment
-      WHERE calibration_due IS NOT NULL AND calibration_due <= ? AND condition <> 'retired'
+      WHERE calibration_due IS NOT NULL AND calibration_due <= ? AND condition <> 'retired'${projectFilter}
       ORDER BY calibration_due`,
-    limit,
+    ...(projectId != null ? [limit, projectId] : [limit]),
   );
   const today = todayISO();
   return rows.map((r) => ({ ...r, expired: r.calibrationDue < today }));

@@ -201,16 +201,19 @@ export async function getVariation(id: number): Promise<VoRow | undefined> {
 }
 
 // VO 'submitted' quá VO_PENDING_DAYS ngày mà chưa được quyết → nhắc Admin/PM (M6).
+// projectId: lọc theo dự án đang chọn (đa dự án, M22+) — không truyền = không lọc.
 export async function pendingVariations(
   days = VO_PENDING_DAYS,
+  projectId?: number,
 ): Promise<{ id: number; code: string; title: string; submittedAt: string }[]> {
   const limit = daysFromTodayISO(-days);
+  const projectFilter = projectId != null ? " AND project_id = ?" : "";
   return query(
     `SELECT id, code, title, submitted_at AS "submittedAt"
        FROM variation_orders
-      WHERE status = 'submitted' AND submitted_at IS NOT NULL AND submitted_at <= ?
+      WHERE status = 'submitted' AND submitted_at IS NOT NULL AND submitted_at <= ?${projectFilter}
       ORDER BY submitted_at`,
-    limit,
+    ...(projectId != null ? [limit, projectId] : [limit]),
   );
 }
 

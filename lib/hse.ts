@@ -161,15 +161,26 @@ export type OpenHseAction = {
 
 // Action khắc phục quá hạn chưa đóng — nguồn notification hse_action_due.
 // assigneeId = undefined → mọi action quá hạn (Admin/PM); có giá trị → chỉ của người đó.
-export async function openHseActions(assigneeId?: number): Promise<OpenHseAction[]> {
+// projectId: lọc theo dự án đang chọn (đa dự án, M22+) — không truyền = không lọc.
+export async function openHseActions(
+  assigneeId?: number,
+  projectId?: number,
+): Promise<OpenHseAction[]> {
   const today = todayISO();
-  const filter = assigneeId != null ? " AND action_assignee = ?" : "";
+  const filter =
+    (assigneeId != null ? " AND action_assignee = ?" : "") +
+    (projectId != null ? " AND project_id = ?" : "");
+  const params = [
+    today,
+    ...(assigneeId != null ? [assigneeId] : []),
+    ...(projectId != null ? [projectId] : []),
+  ];
   return query<OpenHseAction>(
     `SELECT id, description, action_due AS "actionDue", action_assignee AS "actionAssignee"
        FROM hse_records
       WHERE action_status = 'open' AND action_due IS NOT NULL AND action_due < ?${filter}
       ORDER BY action_due`,
-    ...(assigneeId != null ? [today, assigneeId] : [today]),
+    ...params,
   );
 }
 

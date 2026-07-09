@@ -34,31 +34,36 @@ export function isValidPoTransition(from: string, to: string): boolean {
 }
 
 // PO chưa nhận đủ hàng (chưa received/reconciled/cancelled) mà đã quá ngày giao dự kiến.
-export async function poLateList(): Promise<
-  { id: number; poCode: string; expectedDate: string; supplierName: string | null }[]
-> {
+// projectId: lọc theo dự án đang chọn (đa dự án, M22+) — không truyền = không lọc (mọi dự án).
+export async function poLateList(
+  projectId?: number,
+): Promise<{ id: number; poCode: string; expectedDate: string; supplierName: string | null }[]> {
+  const projectFilter = projectId != null ? " AND po.project_id = ?" : "";
   return query(
     `SELECT po.id, po.po_code AS "poCode", po.expected_date AS "expectedDate",
             s.name AS "supplierName"
        FROM purchase_orders po
        LEFT JOIN suppliers s ON s.id = po.supplier_id
       WHERE po.expected_date IS NOT NULL AND po.expected_date < ?
-        AND po.status NOT IN ('received', 'reconciled', 'cancelled')`,
-    todayISO(),
+        AND po.status NOT IN ('received', 'reconciled', 'cancelled')${projectFilter}`,
+    ...(projectId != null ? [todayISO(), projectId] : [todayISO()]),
   );
 }
 
 // Xe đã đăng ký, quá giờ dự kiến ≥2h mà vẫn chưa vào cổng (entered_at NULL).
-export async function vehicleLateList(): Promise<
-  { id: number; plate: string; expectedAt: string; supplierName: string | null }[]
-> {
+// projectId: lọc theo dự án đang chọn — không truyền = không lọc.
+export async function vehicleLateList(
+  projectId?: number,
+): Promise<{ id: number; plate: string; expectedAt: string; supplierName: string | null }[]> {
+  const projectFilter = projectId != null ? " AND v.project_id = ?" : "";
   return query(
     `SELECT v.id, v.plate, v.expected_at AS "expectedAt", s.name AS "supplierName"
        FROM vehicle_logs v
        LEFT JOIN suppliers s ON s.id = v.supplier_id
       WHERE v.entered_at IS NULL
         AND v.status NOT IN ('exited', 'no_show', 'cancelled')
-        AND v.expected_at < NOW() - INTERVAL '2 hours'`,
+        AND v.expected_at < NOW() - INTERVAL '2 hours'${projectFilter}`,
+    ...(projectId != null ? [projectId] : []),
   );
 }
 

@@ -148,9 +148,13 @@ export type FrontMissingItem = {
 
 // Tầng 'pending' có ít nhất 1 task với start_date ≤3 ngày tới (hoặc đã quá) —
 // nguồn notification front_missing + số ngày chờ luỹ kế cho báo cáo EOT.
-export async function frontMissingList(): Promise<FrontMissingItem[]> {
+// projectId: lọc theo dự án đang chọn (đa dự án, M22+) — work_fronts không có cột
+// project_id trực tiếp, suy qua sheet_types.tower_id → towers.project_id.
+export async function frontMissingList(projectId?: number): Promise<FrontMissingItem[]> {
   const soon = daysFromTodayISO(3);
   const today = todayISO();
+  const projectJoin = projectId != null ? " JOIN towers tw ON tw.id = st.tower_id" : "";
+  const projectFilter = projectId != null ? " AND tw.project_id = ?" : "";
   const rows = await query<{
     workFrontId: number;
     sheetCode: string;
@@ -160,13 +164,13 @@ export async function frontMissingList(): Promise<FrontMissingItem[]> {
     `SELECT wf.id AS "workFrontId", st.code AS "sheetCode", wf.floor_label AS "floorLabel",
             MIN(t.start_date) AS "earliestStart"
        FROM work_fronts wf
-       JOIN sheet_types st ON st.id = wf.sheet_type_id
+       JOIN sheet_types st ON st.id = wf.sheet_type_id${projectJoin}
        JOIN work_packages wp ON wp.sheet_type_id = wf.sheet_type_id AND wp.floor_label = wf.floor_label
        JOIN tasks t ON t.package_id = wp.id
       WHERE wf.status = 'pending' AND t.start_date IS NOT NULL AND t.start_date <= ?
-        AND t.status NOT IN ('hoan_thanh','nghiem_thu')
+        AND t.status NOT IN ('hoan_thanh','nghiem_thu')${projectFilter}
       GROUP BY wf.id, st.code, wf.floor_label`,
-    soon,
+    ...(projectId != null ? [soon, projectId] : [soon]),
   );
   return rows.map((r) => {
     const waitingDays = Math.max(

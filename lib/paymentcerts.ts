@@ -294,7 +294,9 @@ export type OverContractCert = {
 
 // HĐ có đợt đã duyệt mà luỹ kế nghiệm thu vượt giá trị HĐ (gồm phụ lục) — nguồn
 // notification cert_over_contract (dedup theo contract_id, cùng cơ chế cost_over).
-export async function overContractCerts(): Promise<OverContractCert[]> {
+// projectId: lọc theo dự án đang chọn (đa dự án, M22+) — không truyền = không lọc.
+export async function overContractCerts(projectId?: number): Promise<OverContractCert[]> {
+  const projectFilter = projectId != null ? " AND c.project_id = ?" : "";
   const contracts = await query<{
     id: number;
     code: string;
@@ -305,7 +307,8 @@ export async function overContractCerts(): Promise<OverContractCert[]> {
     `SELECT c.id, c.code, c.title, c.value,
             COALESCE((SELECT SUM(value_delta) FROM contract_addenda WHERE contract_id = c.id), 0) AS "addendaTotal"
        FROM contracts c
-      WHERE EXISTS (SELECT 1 FROM payment_certs pc WHERE pc.contract_id = c.id AND pc.status = 'approved')`,
+      WHERE EXISTS (SELECT 1 FROM payment_certs pc WHERE pc.contract_id = c.id AND pc.status = 'approved')${projectFilter}`,
+    ...(projectId != null ? [projectId] : []),
   );
 
   const result: OverContractCert[] = [];
@@ -325,16 +328,19 @@ export async function overContractCerts(): Promise<OverContractCert[]> {
 }
 
 // Đợt 'submitted' quá CERT_PENDING_DAYS ngày chưa được quyết định → nhắc Admin/PM.
+// projectId: lọc theo dự án đang chọn (đa dự án, M22+) — không truyền = không lọc.
 export async function pendingCerts(
   days = CERT_PENDING_DAYS,
+  projectId?: number,
 ): Promise<{ id: number; code: string; contractCode: string; submittedAt: string }[]> {
   const limit = daysFromTodayISO(-days);
+  const projectFilter = projectId != null ? " AND ct.project_id = ?" : "";
   return query(
     `SELECT c.id, c.code, ct.code AS "contractCode", c.submitted_at AS "submittedAt"
        FROM payment_certs c
        JOIN contracts ct ON ct.id = c.contract_id
-      WHERE c.status = 'submitted' AND c.submitted_at IS NOT NULL AND c.submitted_at <= ?
+      WHERE c.status = 'submitted' AND c.submitted_at IS NOT NULL AND c.submitted_at <= ?${projectFilter}
       ORDER BY c.submitted_at`,
-    limit,
+    ...(projectId != null ? [limit, projectId] : [limit]),
   );
 }

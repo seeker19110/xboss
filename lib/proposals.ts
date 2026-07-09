@@ -165,16 +165,19 @@ export async function getProposal(id: number): Promise<ProposalRow | undefined> 
 }
 
 // Đề xuất 'submitted' quá N ngày chưa quyết → nhắc Admin/PM (pattern vo_pending/cert_pending).
+// projectId: lọc theo dự án đang chọn (đa dự án, M22+) — không truyền = không lọc.
 export async function pendingProposalsOver(
   days = PROPOSAL_PENDING_DAYS,
+  projectId?: number,
 ): Promise<{ id: number; code: string; title: string; submittedAt: string }[]> {
   const limit = daysFromTodayISO(-days);
+  const projectFilter = projectId != null ? " AND project_id = ?" : "";
   return query(
     `SELECT id, code, title, submitted_at AS "submittedAt"
        FROM proposals
-      WHERE status = 'submitted' AND submitted_at IS NOT NULL AND submitted_at <= ?
+      WHERE status = 'submitted' AND submitted_at IS NOT NULL AND submitted_at <= ?${projectFilter}
       ORDER BY submitted_at`,
-    limit,
+    ...(projectId != null ? [limit, projectId] : [limit]),
   );
 }
 

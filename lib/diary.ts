@@ -85,18 +85,31 @@ export async function buildDiaryPrefill(date: string): Promise<DiaryPrefill> {
 // Ngày trong quá khứ (không tính hôm nay — có thể lập nhật ký cuối ngày) có task_history nhưng
 // chưa có site_diaries → cần nhắc lập nhật ký. Chỉ soát trong `lookbackDays` gần nhất (mặc định
 // 7, giống cửa sổ nhắc của due_soon/stalled) để tránh cảnh báo dồn ứ dữ liệu cũ.
-export async function missingDiaryDates(lookbackDays = 7): Promise<string[]> {
+// projectId: lọc theo dự án đang chọn (đa dự án, M22+) — task_history không có project_id
+// trực tiếp, suy qua tasks → work_packages → sheet_types → towers. site_diaries là bảng
+// nhật ký chung theo ngày (diary_date UNIQUE toàn hệ thống, không theo dự án) nên vế
+// NOT EXISTS giữ nguyên không lọc — chỉ lọc vế "có hoạt động" theo dự án.
+export async function missingDiaryDates(lookbackDays = 7, projectId?: number): Promise<string[]> {
+  const projectFilter = projectId != null ? " AND tw.project_id = ?" : "";
+  const joinTower = projectId != null ? " JOIN towers tw ON tw.id = st.tower_id" : "";
+  const joinChain =
+    projectId != null
+      ? ` JOIN tasks t ON t.id = th.task_id
+       JOIN work_packages wp ON wp.id = t.package_id
+       JOIN sheet_types st ON st.id = wp.sheet_type_id${joinTower}`
+      : "";
   const rows = await query<{ d: string }>(
     `SELECT DISTINCT (th.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date AS d
-       FROM task_history th
+       FROM task_history th${joinChain}
       WHERE (th.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date >= ?
         AND (th.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date < ?
         AND NOT EXISTS (
           SELECT 1 FROM site_diaries sd
-           WHERE sd.diary_date = (th.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)
+           WHERE sd.diary_date = (th.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)${projectFilter}
       ORDER BY d`,
-    daysFromTodayISO(-lookbackDays),
-    todayISO(),
+    ...(projectId != null
+      ? [daysFromTodayISO(-lookbackDays), todayISO(), projectId]
+      : [daysFromTodayISO(-lookbackDays), todayISO()]),
   );
   return rows.map((r) => r.d);
 }

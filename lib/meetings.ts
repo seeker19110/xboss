@@ -152,9 +152,20 @@ export async function openMeetingActions(assigneeId?: number): Promise<OpenMeeti
 
 // Action quá hạn chưa xong — nguồn notification action_overdue.
 // assigneeId = undefined → mọi action quá hạn (Admin/PM); có giá trị → chỉ của người đó.
-export async function overdueMeetingActions(assigneeId?: number): Promise<OpenMeetingAction[]> {
+// projectId: lọc theo dự án đang chọn (đa dự án, M22+) — không truyền = không lọc.
+export async function overdueMeetingActions(
+  assigneeId?: number,
+  projectId?: number,
+): Promise<OpenMeetingAction[]> {
   const today = todayISO();
-  const filter = assigneeId != null ? " AND a.assignee = ?" : "";
+  const filter =
+    (assigneeId != null ? " AND a.assignee = ?" : "") +
+    (projectId != null ? " AND m.project_id = ?" : "");
+  const params = [
+    today,
+    ...(assigneeId != null ? [assigneeId] : []),
+    ...(projectId != null ? [projectId] : []),
+  ];
   return query<OpenMeetingAction>(
     `SELECT a.id, a.meeting_id AS "meetingId", a.content, a.assignee, ua.name AS "assigneeName",
             a.due_date AS "dueDate", a.status, a.task_id AS "taskId", a.done_at AS "doneAt",
@@ -164,7 +175,7 @@ export async function overdueMeetingActions(assigneeId?: number): Promise<OpenMe
        LEFT JOIN users ua ON ua.id = a.assignee
       WHERE a.status = 'open' AND a.due_date IS NOT NULL AND a.due_date < ?${filter}
       ORDER BY a.due_date, a.id`,
-    ...(assigneeId != null ? [today, assigneeId] : [today]),
+    ...params,
   );
 }
 
