@@ -94,6 +94,69 @@ test(
 );
 
 test(
+  "packagesWithQcBlock: chỉ trả về nhóm bị hold-point trong sheet, kèm lý do",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { packagesWithQcBlock } = await import("@/lib/qaqc");
+
+    const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test qc icon')`);
+    const towerId = await insertId(
+      `INSERT INTO towers (project_id, name) VALUES (?, 'Tháp T')`,
+      projectId,
+    );
+    const stId = await insertId(
+      `INSERT INTO sheet_types (tower_id, code, name) VALUES (?, 'TESTQCICON', 'Sheet qc icon')`,
+      towerId,
+    );
+    const predId = await insertId(
+      `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'PRED2', 'Nhóm trước 2')`,
+      stId,
+    );
+    const succId = await insertId(
+      `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'SUCC2', 'Nhóm sau 2')`,
+      stId,
+    );
+    const freeId = await insertId(
+      `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'FREE2', 'Nhóm tự do 2')`,
+      stId,
+    );
+    const depId = await insertId(
+      `INSERT INTO package_dependencies (predecessor_id, successor_id, requires_handover)
+       VALUES (?, ?, TRUE)`,
+      predId,
+      succId,
+    );
+
+    // Nhóm succId bị hold-point (chưa có inspection/biên bản); predId, freeId không bị chặn.
+    const blocked = await packagesWithQcBlock(stId);
+    assert.equal(blocked.length, 1);
+    assert.equal(blocked[0].packageId, succId);
+    assert.match(blocked[0].reason, /PRED2/);
+
+    // Có biên bản chuyển bước cho predecessor → hết bị chặn.
+    const predTaskId = await insertId(
+      `INSERT INTO tasks (package_id, code, name) VALUES (?, 'PRED2,01', 'Task trước 2')`,
+      predId,
+    );
+    const docId = await insertId(
+      `INSERT INTO task_documents (task_id, file_name, doc_category) VALUES (?, 'd2.pdf', 'chuyen_buoc')`,
+      predTaskId,
+    );
+    const blockedAfter = await packagesWithQcBlock(stId);
+    assert.equal(blockedAfter.length, 0);
+
+    await run(`DELETE FROM task_documents WHERE id = ?`, docId);
+    await run(`DELETE FROM package_dependencies WHERE id = ?`, depId);
+    await run(`DELETE FROM tasks WHERE id = ?`, predTaskId);
+    await run(`DELETE FROM work_packages WHERE id IN (?, ?, ?)`, predId, succId, freeId);
+    await run(`DELETE FROM sheet_types WHERE id = ?`, stId);
+    await run(`DELETE FROM towers WHERE id = ?`, towerId);
+    await run(`DELETE FROM projects WHERE id = ?`, projectId);
+  },
+);
+
+test(
   "methodStatementBlocked: chặn tick khi package đánh dấu cần biện pháp mà chưa có rev method approved",
   { skip: !HAS_TEST_DB },
   async () => {
