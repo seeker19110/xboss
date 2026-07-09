@@ -70,7 +70,7 @@ export default function ProjectSwitcher({ collapsed }: { collapsed: boolean }) {
     else setFilter("");
   }, [open]);
 
-  function togglePin(id: number, e: React.MouseEvent) {
+  function togglePin(id: number, e: React.SyntheticEvent) {
     e.stopPropagation();
     setPinned((prev) => {
       const next = prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id];
@@ -151,6 +151,13 @@ export default function ProjectSwitcher({ collapsed }: { collapsed: boolean }) {
       e.preventDefault();
       const p = flatOrder[activeIdx];
       if (p) select(p.id);
+    } else if (e.key.toLowerCase() === "p") {
+      // Phím tắt ghim/bỏ ghim dự án đang chọn bằng bàn phím — nút ghim trong mỗi hàng
+      // là <span> (không phải phần tử tương tác lồng trong role="option", tránh vi phạm
+      // a11y "nested-interactive") nên cần lối vào bàn phím riêng ở đây.
+      e.preventDefault();
+      const p = flatOrder[activeIdx];
+      if (p) togglePin(p.id, e);
     }
   }
 
@@ -186,14 +193,17 @@ export default function ProjectSwitcher({ collapsed }: { collapsed: boolean }) {
             ✓
           </span>
         )}
-        <button
-          type="button"
+        {/* Không dùng <button> — lồng phần tử tương tác trong role="option" vi phạm a11y
+            "nested-interactive" dù đã tabIndex={-1} (AT vẫn có thể focus tới). Chỉ còn
+            thao tác chuột/chạm ở đây; bàn phím ghim/bỏ ghim qua phím "P" ở onListKey. */}
+        <span
           onClick={(e) => togglePin(p.id, e)}
-          aria-label={isPinned ? `Bỏ ghim ${p.name}` : `Ghim ${p.name}`}
+          aria-hidden="true"
+          title={isPinned ? `Bỏ ghim ${p.name}` : `Ghim ${p.name}`}
           className="shrink-0 p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-amber-400"
         >
           <Star className={`w-3.5 h-3.5 ${isPinned ? "fill-amber-400 text-amber-400" : ""}`} />
-        </button>
+        </span>
       </div>
     );
   }
@@ -226,9 +236,6 @@ export default function ProjectSwitcher({ collapsed }: { collapsed: boolean }) {
 
       {open && (
         <div
-          role="listbox"
-          aria-label="Chọn dự án"
-          onKeyDown={onListKey}
           className={`z-50 bg-zinc-950 border border-zinc-800 rounded-xl shadow-xl overflow-hidden
             ${collapsed ? "absolute left-full top-0 ml-2 w-72" : "absolute left-2 right-2 top-full mt-1"}`}
         >
@@ -246,7 +253,15 @@ export default function ProjectSwitcher({ collapsed }: { collapsed: boolean }) {
             </div>
           )}
 
-          <div className="max-h-80 overflow-y-auto py-1">
+          {/* role=listbox chỉ bọc đúng các option/group — nút "Xem tất cả dự án" và ô
+              tìm kiếm nằm ngoài (axe aria-required-children: listbox chỉ nhận option/group). */}
+          <div
+            role="listbox"
+            aria-label="Chọn dự án"
+            tabIndex={0}
+            onKeyDown={onListKey}
+            className="max-h-80 overflow-y-auto py-1 outline-none"
+          >
             {flatOrder.length === 0 && (
               <div className="px-3 py-4 text-sm text-zinc-500 text-center">
                 Không tìm thấy dự án nào
@@ -255,24 +270,33 @@ export default function ProjectSwitcher({ collapsed }: { collapsed: boolean }) {
             {showGroups ? (
               <>
                 {pinnedList.length > 0 && (
-                  <div className="mb-1">
-                    <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                  <div role="group" aria-label="Đã ghim" className="mb-1">
+                    <div
+                      aria-hidden="true"
+                      className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500"
+                    >
                       ★ Đã ghim
                     </div>
                     {pinnedList.map((p) => row(p, flatOrder.indexOf(p)))}
                   </div>
                 )}
                 {activeList.length > 0 && (
-                  <div className="mb-1">
-                    <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                  <div role="group" aria-label={STATUS_LABEL.active} className="mb-1">
+                    <div
+                      aria-hidden="true"
+                      className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500"
+                    >
                       {STATUS_LABEL.active}
                     </div>
                     {activeList.map((p) => row(p, flatOrder.indexOf(p)))}
                   </div>
                 )}
                 {closedList.length > 0 && (
-                  <div>
-                    <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                  <div role="group" aria-label="Đã bàn giao / Đóng">
+                    <div
+                      aria-hidden="true"
+                      className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500"
+                    >
                       Đã bàn giao / Đóng
                     </div>
                     {closedList.map((p) => row(p, flatOrder.indexOf(p)))}

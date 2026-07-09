@@ -58,7 +58,7 @@ function ProjectCard({ project }: { project: ProjectListItem }) {
           {STATUS_LABEL[project.status]}
         </span>
       </div>
-      {project.code && <p className="mt-1 text-xs text-zinc-500">{project.code}</p>}
+      {project.code && <p className="mt-1 text-xs text-zinc-400">{project.code}</p>}
       <div className="mt-3 h-1.5 rounded-full bg-zinc-800 overflow-hidden">
         <div className={`h-full ${c.dot}`} style={{ width: `${pct}%` }} />
       </div>

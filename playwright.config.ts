@@ -1,6 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 import { ADMIN_PW, AUTH_FILE, E2E_DB, E2E_SECRET, HAS_DB } from "./e2e/constants";
 
+// Cổng webServer — cho phép override qua PW_PORT để tránh nhiều subagent chạy
+// e2e song song trên cùng máy cướp nhầm server :3000 của nhau.
+const port = process.env.PW_PORT ?? "3000";
+
 /**
  * Cấu hình E2E (Playwright) cho XBoss — desktop (Chromium) + mobile (Pixel 5).
  *
@@ -23,7 +27,7 @@ export default defineConfig({
   globalSetup: HAS_DB ? "./e2e/global-setup.ts" : undefined,
 
   use: {
-    baseURL: process.env.BASE_URL ?? "http://127.0.0.1:3000",
+    baseURL: process.env.BASE_URL ?? `http://127.0.0.1:${port}`,
     trace: "on-first-retry",
     // Escape-hatch chỉ dùng khi máy đã có sẵn Chromium build khác bản pin (vd môi trường
     // CI dựng sẵn). Bỏ trống ở CI thường → Playwright dùng trình duyệt cài qua `playwright install`.
@@ -67,13 +71,14 @@ export default defineConfig({
 
   webServer: {
     command: "npm run start",
-    url: "http://127.0.0.1:3000",
+    url: `http://127.0.0.1:${port}`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
     env: {
       DATABASE_URL: E2E_DB ?? process.env.DATABASE_URL ?? "postgres://x:x@127.0.0.1:5432/x",
       XBOSS_SECRET: E2E_SECRET,
       XBOSS_ADMIN_PASSWORD: ADMIN_PW,
+      PORT: port,
     },
   },
 });

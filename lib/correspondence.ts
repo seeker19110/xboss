@@ -285,13 +285,15 @@ export type DueCorrespondence = {
 
 // Công văn quá hạn phản hồi (due_date < hôm nay) mà chưa 'replied'/'closed' — cảnh
 // báo Admin/PM (on-fetch, dedup theo id, cùng pattern các module trước).
-export async function dueCorrespondences(): Promise<DueCorrespondence[]> {
+// projectId: lọc theo dự án đang chọn (đa dự án, M22+) — không truyền = không lọc.
+export async function dueCorrespondences(projectId?: number): Promise<DueCorrespondence[]> {
   const today = todayISO();
+  const projectFilter = projectId != null ? " AND project_id = ?" : "";
   return query<DueCorrespondence>(
     `SELECT id, code, subject, counterparty, due_date AS "dueDate"
        FROM correspondences
-      WHERE status = 'awaiting' AND due_date IS NOT NULL AND due_date < ?
+      WHERE status = 'awaiting' AND due_date IS NOT NULL AND due_date < ?${projectFilter}
       ORDER BY due_date`,
-    today,
+    ...(projectId != null ? [today, projectId] : [today]),
   );
 }
