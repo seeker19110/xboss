@@ -234,7 +234,7 @@ export async function GET() {
   // Vượt ngân sách theo hệ → cảnh báo Admin/PM/BCH (subcon/cdt/viewer/engineer không xem chi phí).
   if (CAN.viewPayments(user.role)) {
     const settings = await getCostSettings();
-    const rows = await costSummary("system");
+    const rows = await costSummary("system", true, projectId ?? undefined);
     const over = rows.filter(
       (r) => r.budget > 0 && (r.committed / r.budget) * 100 >= settings.warnPct,
     );

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getDisciplineSummary } from "@/lib/disciplines";
+import { getCurrentProjectId } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,12 @@ export async function GET(
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
   const { code } = await paramsP;
-  const summary = await getDisciplineSummary(code, { withCost: CAN.viewPayments(user.role) });
+  // Dự án đang chọn — lọc ngân sách theo dự án (đa dự án, M22+). null = không lọc.
+  const projectId = await getCurrentProjectId(user);
+  const summary = await getDisciplineSummary(code, {
+    withCost: CAN.viewPayments(user.role),
+    projectId: projectId ?? undefined,
+  });
   if (!summary) return NextResponse.json({ error: "Không tìm thấy hệ" }, { status: 404 });
 
   return NextResponse.json(summary);

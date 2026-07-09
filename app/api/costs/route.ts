@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { costSummary, costTotals, getCostSettings } from "@/lib/cost";
+import { getCurrentProjectId } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -12,11 +13,14 @@ export async function GET(req: NextRequest) {
   if (!CAN.viewPayments(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM/BCH được xem chi phí" }, { status: 403 });
 
+  // Dự án đang chọn — lọc chi phí theo dự án (đa dự án, M22+). null = chưa có project → không lọc.
+  const projectId = await getCurrentProjectId(user);
+
   const groupBy = req.nextUrl.searchParams.get("groupBy") === "floor" ? "floor" : "system";
   const includeVo = req.nextUrl.searchParams.get("includeVo") !== "0";
   const [rows, totals, settings] = await Promise.all([
-    costSummary(groupBy, includeVo),
-    costTotals(includeVo),
+    costSummary(groupBy, includeVo, projectId ?? undefined),
+    costTotals(includeVo, projectId ?? undefined),
     getCostSettings(),
   ]);
 

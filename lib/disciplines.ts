@@ -56,7 +56,7 @@ export async function listDisciplines() {
 
 export async function getDisciplineSummary(
   code: string,
-  opts: { withCost?: boolean } = {},
+  opts: { withCost?: boolean; projectId?: number } = {},
 ): Promise<DisciplineSummary | null> {
   const discipline = await queryOne<{
     id: number;
@@ -148,7 +148,7 @@ export async function getDisciplineSummary(
     waitingApprovalCount: overall?.waitingApproval ?? 0,
     contractors,
     ncrOpen: ncrOpen?.count ?? 0,
-    budget: opts.withCost ? await disciplineBudget(discipline.id) : null,
+    budget: opts.withCost ? await disciplineBudget(discipline.id, true, opts.projectId) : null,
     drawingsPending: null,
     floorsPending: null,
   };
