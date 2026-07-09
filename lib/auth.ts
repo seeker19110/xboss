@@ -235,6 +235,9 @@ export const CAN = {
   // Tài chính & Kế toán (M27): quỹ tiền mặt/dòng tiền, tạm ứng, hoá đơn VAT, lương —
   // nhạy cảm tiền, ghi chỉ Admin/PM (xem: CAN.viewPayments, đã gồm bch).
   manageFinance: (r?: Role) => r === "admin" || r === "pm",
+  // Bảo hành & Bảo trì (M30): hạng mục bảo hành + claim lỗi sau bàn giao + tài liệu O&M —
+  // xem mọi vai trò đăng nhập, ghi Admin/PM/kỹ sư.
+  manageWarranty: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
 };
 
 // Sub-con chỉ được thao tác trên task được giao cho mình.

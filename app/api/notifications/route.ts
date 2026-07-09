@@ -20,6 +20,7 @@ import { expiringInsuranceBonds } from "@/lib/insurance";
 import { expiringEnvPermits, exceededMonitoring } from "@/lib/environment";
 import { alarmingPoints } from "@/lib/monitoring";
 import { overduePunch } from "@/lib/handover";
+import { expiringWarranties, overdueClaims } from "@/lib/warranty";
 import { getCurrentProjectId } from "@/lib/projects";
 import { EXPIRY_WARN_DAYS } from "@/lib/contracts";
 import { CERT_PENDING_DAYS } from "@/lib/paymentcerts";
@@ -851,6 +852,66 @@ export async function GET() {
         WHERE user_id = ? AND type = 'env_monitoring_over' AND is_read = 0 AND env_monitoring_id <> ALL(?)`,
       user.id,
       exceededIds,
+    );
+  }
+
+  // Bảo hành sắp/đã hết hạn (warranty_from + warranty_months) mà chưa đổi trạng thái →
+  // cảnh báo Admin/PM/kỹ sư (M30). Scope theo project_id đang chọn (M22 PR3 đã lọc mọi
+  // notification khác theo dự án — module mới phải nhất quán ngay từ đầu).
+  if (CAN.manageWarranty(user.role)) {
+    const expiringWarranty = await expiringWarranties(30, projectId ?? undefined);
+    if (expiringWarranty.length > 0) {
+      const values = expiringWarranty.map(() => `(?, ?, 'warranty_expiry', ?)`).join(", ");
+      const params = expiringWarranty.flatMap((w) => [
+        user.id,
+        w.id,
+        w.expired
+          ? `🛠 Bảo hành "${w.title}" đã quá hạn (${w.expiry})`
+          : `🛠 Bảo hành "${w.title}" sắp hết hạn (${w.expiry})`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, warranty_item_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, type, warranty_item_id) WHERE warranty_item_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    const expiringWarrantyIds = expiringWarranty.map((w) => w.id);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'warranty_expiry' AND is_read = 0 AND warranty_item_id <> ALL(?)`,
+      user.id,
+      expiringWarrantyIds,
+    );
+
+    // Claim lỗi sau bàn giao quá hạn xử lý chưa đóng → cảnh báo người được gán; Admin/PM
+    // thấy mọi claim quá hạn (mirror overduePunch/overdueMeetingActions — "quá hạn xử lý"
+    // chứ không phải "sắp hết hạn giấy tờ" như warranty_expiry).
+    const isPrivilegedWarranty = user.role === "admin" || user.role === "pm";
+    const overdueWarrantyClaims = await overdueClaims(
+      isPrivilegedWarranty ? undefined : user.id,
+      projectId ?? undefined,
+    );
+    if (overdueWarrantyClaims.length > 0) {
+      const values = overdueWarrantyClaims
+        .map(() => `(?, ?, 'warranty_claim_overdue', ?)`)
+        .join(", ");
+      const params = overdueWarrantyClaims.flatMap((c) => [
+        user.id,
+        c.id,
+        `🛠 Claim bảo hành "${c.description}" quá hạn xử lý (${c.dueDate})`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, warranty_claim_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, type, warranty_claim_id) WHERE warranty_claim_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    const overdueWarrantyClaimIds = overdueWarrantyClaims.map((c) => c.id);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'warranty_claim_overdue' AND is_read = 0 AND warranty_claim_id <> ALL(?)`,
+      user.id,
+      overdueWarrantyClaimIds,
     );
   }
 

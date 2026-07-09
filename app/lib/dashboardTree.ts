@@ -330,7 +330,12 @@ export const DASHBOARD_TREE: DashCluster[] = [
         label: "Bàn giao & Kết thúc",
         icon: PackageCheck,
       }, // M29
-      { id: "dash.bao-hanh-bao-tri", label: "Bảo hành – Bảo trì", icon: Cog }, // M30
+      {
+        id: "dash.bao-hanh-bao-tri",
+        href: "/warranty",
+        label: "Bảo hành – Bảo trì",
+        icon: Cog,
+      }, // M30
     ],
   },
   {
