@@ -223,6 +223,11 @@ export const CAN = {
   // Quan hệ & Quan trắc (M26): mốc lún/chuyển vị + khiếu nại cộng đồng — xem mọi vai
   // trò đăng nhập, ghi Admin/PM/kỹ sư (đội hiện trường trực tiếp đo/ghi kỳ đo).
   manageMonitoring: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  // Bàn giao & Kết thúc (M29): T&C/commissioning, hạng mục bàn giao, punch list, demob,
+  // bài học kinh nghiệm — xem mọi vai trò đăng nhập, ghi Admin/PM/kỹ sư. Đổi
+  // result='passed'/'failed' (commissioning) và status='accepted' (handover-items) cần
+  // CAN.approve (nhạy cảm hơn, giống nghiệm thu 2 bước).
+  manageHandover: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
 };
 
 // Sub-con chỉ được thao tác trên task được giao cho mình.

@@ -19,6 +19,7 @@ import { expiringCertifications } from "@/lib/hr";
 import { expiringInsuranceBonds } from "@/lib/insurance";
 import { expiringEnvPermits, exceededMonitoring } from "@/lib/environment";
 import { alarmingPoints } from "@/lib/monitoring";
+import { overduePunch } from "@/lib/handover";
 
 export const dynamic = "force-dynamic";
 
@@ -520,6 +521,34 @@ export async function GET() {
              WHERE n.status <> 'closed' AND n.due_date IS NOT NULL AND n.due_date < ?${assignedFilter})`,
       user.id,
       ...ncrParams,
+    );
+  }
+
+  // Punch list quá hạn xử lý chưa đóng → cảnh báo người được gán; Admin/PM thấy mọi punch
+  // quá hạn (quản lý chung bàn giao, M29). Mirror ncr_overdue — "quá hạn xử lý" chứ
+  // không phải "sắp hết hạn giấy tờ" như legal_expiry/contract_expiry.
+  {
+    const isPrivileged = user.role === "admin" || user.role === "pm";
+    const overduePunches = await overduePunch(isPrivileged ? undefined : user.id);
+    if (overduePunches.length > 0) {
+      const values = overduePunches.map(() => `(?, ?, 'punch_overdue', ?)`).join(", ");
+      const params = overduePunches.flatMap((p) => [
+        user.id,
+        p.id,
+        `🔧 Tồn tại "${p.description}" quá hạn xử lý (${p.dueDate})`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, punch_item_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, type, punch_item_id) WHERE punch_item_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    const overduePunchIds = overduePunches.map((p) => p.id);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'punch_overdue' AND is_read = 0 AND punch_item_id <> ALL(?)`,
+      user.id,
+      overduePunchIds,
     );
   }
 
