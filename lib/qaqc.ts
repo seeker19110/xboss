@@ -45,6 +45,27 @@ export async function handoverBlocked(packageId: number): Promise<HandoverCheck>
   return { blocked: false };
 }
 
+// Danh sách nhóm (work_packages) thuộc 1 sheet đang bị hold-point chuyển bước — dùng để
+// hiện icon cảnh báo QC trên hàng nhóm lưới tracking (chỉ hiển thị, không chặn ghi — chặn
+// ghi thật đã nằm ở các route dùng handoverBlocked trực tiếp). N+1 query chấp nhận được vì
+// số nhóm/sheet nhỏ, cùng mức tối ưu hoá hiện có của codebase.
+export async function packagesWithQcBlock(
+  sheetTypeId: number,
+): Promise<{ packageId: number; reason: string }[]> {
+  const packages = await query<{ id: number }>(
+    `SELECT id FROM work_packages WHERE sheet_type_id = ?`,
+    sheetTypeId,
+  );
+  const result: { packageId: number; reason: string }[] = [];
+  for (const pkg of packages) {
+    const gate = await handoverBlocked(pkg.id);
+    if (gate.blocked) {
+      result.push({ packageId: pkg.id, reason: gate.reason ?? "Đang chờ nghiệm thu chuyển bước" });
+    }
+  }
+  return result;
+}
+
 // Gate nghiệm thu: task chỉ bị chặn approve nếu có ÍT NHẤT 1 checklist mẫu đang bật `required`
 // áp dụng cho hệ của task mà CHƯA có inspection `passed` gắn đúng checklist đó + đúng task.
 // (đã quyết 2026-07-05: gate theo cờ required của mẫu, không phải công tắc toàn dự án.)
