@@ -105,7 +105,12 @@ export const DASHBOARD_TREE: DashCluster[] = [
           { href: "/admin", label: "Phân công", icon: ShieldCheck, roles: ["admin", "pm"] },
         ],
       },
-      { id: "dash.khoi-dong-phap-ly", label: "Khởi động & Pháp lý", icon: Landmark }, // M23
+      {
+        id: "dash.khoi-dong-phap-ly",
+        href: "/kickoff",
+        label: "Khởi động & Pháp lý",
+        icon: Landmark,
+      }, // M23
     ],
   },
   {

@@ -39,6 +39,7 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
       "Phát sinh",
       "Thanh toán KL",
       "Đấu thầu",
+      "Khởi động & Pháp lý",
       "Tài khoản",
       "Phân công",
       "Import Excel",
@@ -56,11 +57,13 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
       timeout: 15_000,
     });
 
-    const comingSoon = sidebar.getByText("Khởi động & Pháp lý", { exact: true });
+    // "Nhà thầu phụ" (M15/M16 mở rộng) vẫn chưa có trang thật — dùng làm mẫu coming-soon
+    // (M23 đã đổi "Khởi động & Pháp lý" thành link thật, không còn phù hợp cho test này).
+    const comingSoon = sidebar.getByText("Nhà thầu phụ", { exact: true });
     await expect(comingSoon).toBeVisible();
     await expect(comingSoon.locator("xpath=..")).toHaveAttribute("aria-disabled", "true");
     // Không phải thẻ <a> — không có trang thật để điều hướng tới.
-    await expect(sidebar.getByRole("link", { name: "Khởi động & Pháp lý" })).toHaveCount(0);
+    await expect(sidebar.getByRole("link", { name: "Nhà thầu phụ" })).toHaveCount(0);
     await expect(sidebar.getByText("Sắp có").first()).toBeVisible();
   });
 

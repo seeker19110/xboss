@@ -208,6 +208,9 @@ export const CAN = {
   manageNav: (r?: Role) => r === "admin" || r === "pm",
   // Tạo/sửa/đóng dự án + gán user↔dự án (M22): chỉ Admin (nhạy cảm hơn manageUsers).
   manageProjects: (r?: Role) => r === "admin",
+  // Khởi động & Pháp lý (M23): hồ sơ pháp lý + checklist huy động — xem mọi vai trò
+  // đăng nhập, tạo/sửa/xoá Admin/PM.
+  manageKickoff: (r?: Role) => r === "admin" || r === "pm",
 };
 
 // Sub-con chỉ được thao tác trên task được giao cho mình.

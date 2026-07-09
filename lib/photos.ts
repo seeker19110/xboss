@@ -72,6 +72,11 @@ export function newHseFileName(recordId: number, mime: string): string {
   return `hse${recordId}-${Date.now()}-${randomBytes(4).toString("hex")}${MIME_EXT[mime] ?? ".bin"}`;
 }
 
+// Hồ sơ pháp lý (M23, register mới `legal_documents`) — 1 file chính/giấy phép (PDF/ảnh).
+export function newLegalDocFileName(legalDocId: number, mime: string): string {
+  return `ld${legalDocId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime] ?? ".bin"}`;
+}
+
 export function ensureUploadDir(): string {
   if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
   return UPLOAD_DIR;

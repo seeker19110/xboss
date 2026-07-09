@@ -59,14 +59,19 @@ test.describe("Quản trị (sau đăng nhập)", () => {
       isMobile,
       "Mutate state DB toàn cục — chỉ cần kiểm 1 project để tránh đua với mobile.",
     );
+    // Chọn "Bảo hành – Bảo trì" (dashboard mockup chưa có trang thật, M30) làm mục toggle —
+    // KHÔNG dùng node nào được assert ở spec khác (vd appshell.spec.ts) vì nav_settings là
+    // state DB toàn cục: chạy song song sẽ đua với test đọc sidebar ở file khác (đã gặp thật
+    // với "Khởi động & Pháp lý" sau khi M23 biến nó thành link — appshell.spec.ts đọc đúng
+    // lúc mục này đang bị tắt tạm thời).
     await gotoAdmin(page);
     const sidebar = page.locator("#app-sidebar");
-    await expect(sidebar.getByText("Khởi động & Pháp lý", { exact: true })).toBeVisible({
+    await expect(sidebar.getByText("Bảo hành – Bảo trì", { exact: true })).toBeVisible({
       timeout: 15_000,
     });
 
     await page.getByRole("tab", { name: "Hiển thị AppShell" }).click();
-    const row = page.getByRole("switch", { name: /Khởi động & Pháp lý/ });
+    const row = page.getByRole("switch", { name: /Bảo hành – Bảo trì/ });
     await expect(row).toBeVisible({ timeout: 15_000 });
     await expect(row).toHaveAttribute("aria-checked", "true");
 
@@ -83,7 +88,7 @@ test.describe("Quản trị (sau đăng nhập)", () => {
     // AppHeader chỉ tải nav-settings 1 lần lúc mount (không live-sync trong cùng trang) —
     // tải lại trang để xác nhận đã ghi DB thật, không phải chỉ optimistic UI.
     await page.reload();
-    await expect(sidebar.getByText("Khởi động & Pháp lý", { exact: true })).toHaveCount(0);
+    await expect(sidebar.getByText("Bảo hành – Bảo trì", { exact: true })).toHaveCount(0);
     await page.getByRole("tab", { name: "Hiển thị AppShell" }).click();
     await expect(row).toHaveAttribute("aria-checked", "false");
 
@@ -96,7 +101,7 @@ test.describe("Quản trị (sau đăng nhập)", () => {
     ]);
     await expect(row).toHaveAttribute("aria-checked", "true");
     await page.reload();
-    await expect(sidebar.getByText("Khởi động & Pháp lý", { exact: true })).toBeVisible({
+    await expect(sidebar.getByText("Bảo hành – Bảo trì", { exact: true })).toBeVisible({
       timeout: 15_000,
     });
   });
