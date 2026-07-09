@@ -13,6 +13,7 @@ import {
   Download,
   Upload,
   Ban,
+  Archive,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
@@ -1570,6 +1571,14 @@ function DocumentsTab({
     return `/api/qc/documents/export?${params.toString()}`;
   }
 
+  function exportZipUrl() {
+    const params = new URLSearchParams();
+    if (sheetTypeId) params.set("sheetTypeId", sheetTypeId);
+    if (floor) params.set("floor", floor);
+    if (category) params.set("category", category);
+    return `/api/qc/documents/export/zip?${params.toString()}`;
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2 items-end">
@@ -1629,6 +1638,16 @@ function DocumentsTab({
             className="flex items-center gap-2 border border-zinc-700 hover:border-zinc-500 text-zinc-300 px-3 py-2 rounded-lg text-sm font-semibold transition"
           >
             <FileText className="w-4 h-4" /> Xuất hồ sơ tầng
+          </a>
+        )}
+        {canExport && (
+          <a
+            href={exportZipUrl()}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-2 border border-zinc-700 hover:border-zinc-500 text-zinc-300 px-3 py-2 rounded-lg text-sm font-semibold transition"
+          >
+            <Archive className="w-4 h-4" /> Tải file gốc (ZIP)
           </a>
         )}
       </div>
