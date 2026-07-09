@@ -56,6 +56,9 @@ import {
   PackageCheck,
   Cog,
   Cpu,
+  CalendarCheck,
+  UserCog,
+  Network,
 } from "lucide-react";
 import type { Role } from "@/lib/roles";
 
@@ -103,6 +106,9 @@ export const DASHBOARD_TREE: DashCluster[] = [
         children: [
           { href: "/users", label: "Tài khoản", icon: Users, roles: ["admin"] },
           { href: "/admin", label: "Phân công", icon: ShieldCheck, roles: ["admin", "pm"] },
+          { href: "/attendance", label: "Chấm công", icon: CalendarCheck }, // M24
+          { href: "/personnel", label: "Nhân sự", icon: UserCog }, // M24
+          { href: "/org", label: "Sơ đồ tổ chức", icon: Network }, // M24
         ],
       },
       {

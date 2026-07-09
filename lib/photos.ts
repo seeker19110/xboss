@@ -77,6 +77,11 @@ export function newLegalDocFileName(legalDocId: number, mime: string): string {
   return `ld${legalDocId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime] ?? ".bin"}`;
 }
 
+// Chứng chỉ nhân sự (M24, register mới `certifications`) — 1 file chính/chứng chỉ (PDF/ảnh).
+export function newCertificationFileName(certificationId: number, mime: string): string {
+  return `cert${certificationId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime] ?? ".bin"}`;
+}
+
 export function ensureUploadDir(): string {
   if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
   return UPLOAD_DIR;

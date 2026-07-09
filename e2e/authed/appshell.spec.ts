@@ -42,6 +42,9 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
       "Khởi động & Pháp lý",
       "Tài khoản",
       "Phân công",
+      "Chấm công",
+      "Nhân sự",
+      "Sơ đồ tổ chức",
       "Import Excel",
     ]) {
       await expect(sidebar.getByRole("link", { name: label, exact: true })).toBeVisible();
