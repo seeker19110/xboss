@@ -14,6 +14,7 @@ import { overNormItems } from "@/lib/norms";
 import { openHseActions } from "@/lib/hse";
 import { overdueMeetingActions } from "@/lib/meetings";
 import { pendingProposalsOver } from "@/lib/proposals";
+import { expiringLegalDocs } from "@/lib/kickoff";
 
 export const dynamic = "force-dynamic";
 
@@ -266,6 +267,34 @@ export async function GET() {
         WHERE user_id = ? AND type = 'cert_over_contract' AND is_read = 0 AND contract_id <> ALL(?)`,
       user.id,
       overCertIds,
+    );
+  }
+
+  // Hồ sơ pháp lý (giấy phép XD, phê duyệt QH/TK, HĐ chính...) sắp/đã hết hạn mà chưa
+  // đổi trạng thái → cảnh báo Admin/PM (M23).
+  if (isAdminOrPm(user.role)) {
+    const expiringLegal = await expiringLegalDocs();
+    if (expiringLegal.length > 0) {
+      const values = expiringLegal.map(() => `(?, ?, 'legal_expiry', ?)`).join(", ");
+      const params = expiringLegal.flatMap((d) => [
+        user.id,
+        d.id,
+        d.expired
+          ? `📜 Hồ sơ pháp lý ${d.code ?? d.title} — ${d.title} đã quá hạn (${d.expiryDate})`
+          : `📜 Hồ sơ pháp lý ${d.code ?? d.title} — ${d.title} sắp hết hạn (${d.expiryDate})`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, legal_document_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, type, legal_document_id) WHERE legal_document_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    const expiringLegalIds = expiringLegal.map((d) => d.id);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'legal_expiry' AND is_read = 0 AND legal_document_id <> ALL(?)`,
+      user.id,
+      expiringLegalIds,
     );
   }
 
