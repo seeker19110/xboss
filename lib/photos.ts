@@ -130,6 +130,12 @@ export function newHandoverMinutesFileName(handoverItemId: number, mime: string)
   return `hi${handoverItemId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime] ?? ".bin"}`;
 }
 
+// Tài liệu hướng dẫn O&M (M30, register mới `om_documents`) — thư viện theo dự án,
+// không gắn 1 hạng mục cụ thể như legal/certification/insurance nên đặt theo project (pattern newProjectDocFileName).
+export function newOmDocFileName(projectId: number, mime: string): string {
+  return `om${projectId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime] ?? ".bin"}`;
+}
+
 export function ensureUploadDir(): string {
   if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
   return UPLOAD_DIR;
