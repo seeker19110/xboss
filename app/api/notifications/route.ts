@@ -15,6 +15,7 @@ import { openHseActions } from "@/lib/hse";
 import { overdueMeetingActions } from "@/lib/meetings";
 import { pendingProposalsOver } from "@/lib/proposals";
 import { expiringLegalDocs } from "@/lib/kickoff";
+import { expiringCertifications } from "@/lib/hr";
 
 export const dynamic = "force-dynamic";
 
@@ -295,6 +296,34 @@ export async function GET() {
         WHERE user_id = ? AND type = 'legal_expiry' AND is_read = 0 AND legal_document_id <> ALL(?)`,
       user.id,
       expiringLegalIds,
+    );
+  }
+
+  // Chứng chỉ nhân sự (thẻ an toàn, chứng chỉ nghề, vận hành...) sắp/đã hết hạn →
+  // cảnh báo Admin/PM (M24, tái dùng cho HSE huấn luyện/thẻ an toàn).
+  if (isAdminOrPm(user.role)) {
+    const expiringCerts = await expiringCertifications();
+    if (expiringCerts.length > 0) {
+      const values = expiringCerts.map(() => `(?, ?, 'cert_expiry', ?)`).join(", ");
+      const params = expiringCerts.flatMap((c) => [
+        user.id,
+        c.id,
+        c.expired
+          ? `🪪 Chứng chỉ ${c.kind}${c.personnelName ? ` — ${c.personnelName}` : ""} đã quá hạn (${c.expiryDate})`
+          : `🪪 Chứng chỉ ${c.kind}${c.personnelName ? ` — ${c.personnelName}` : ""} sắp hết hạn (${c.expiryDate})`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, certification_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, type, certification_id) WHERE certification_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    const expiringCertIds = expiringCerts.map((c) => c.id);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'cert_expiry' AND is_read = 0 AND certification_id <> ALL(?)`,
+      user.id,
+      expiringCertIds,
     );
   }
 

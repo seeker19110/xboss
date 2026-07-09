@@ -211,6 +211,12 @@ export const CAN = {
   // Khởi động & Pháp lý (M23): hồ sơ pháp lý + checklist huy động — xem mọi vai trò
   // đăng nhập, tạo/sửa/xoá Admin/PM.
   manageKickoff: (r?: Role) => r === "admin" || r === "pm",
+  // Nhân sự & Tổ chức (M24): nhân sự/tổ đội/chứng chỉ/RACI — xem mọi vai trò đăng
+  // nhập, tạo/sửa/xoá Admin/PM.
+  manageHr: (r?: Role) => r === "admin" || r === "pm",
+  // Chấm công (M24): ghi rộng hơn manageHr — cho phép kỹ sư (đội trưởng) ghi công tại
+  // hiện trường, giống VO/công văn.
+  recordAttendance: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
 };
 
 // Sub-con chỉ được thao tác trên task được giao cho mình.
