@@ -82,6 +82,11 @@ export function newCertificationFileName(certificationId: number, mime: string):
   return `cert${certificationId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime] ?? ".bin"}`;
 }
 
+// Bảo hiểm & bảo lãnh (M28, register mới `insurance_bonds`) — 1 chứng thư chính (PDF/ảnh).
+export function newInsuranceDocFileName(insuranceBondId: number, mime: string): string {
+  return `ib${insuranceBondId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime] ?? ".bin"}`;
+}
+
 export function ensureUploadDir(): string {
   if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
   return UPLOAD_DIR;

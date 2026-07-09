@@ -16,6 +16,7 @@ import { overdueMeetingActions } from "@/lib/meetings";
 import { pendingProposalsOver } from "@/lib/proposals";
 import { expiringLegalDocs } from "@/lib/kickoff";
 import { expiringCertifications } from "@/lib/hr";
+import { expiringInsuranceBonds } from "@/lib/insurance";
 
 export const dynamic = "force-dynamic";
 
@@ -268,6 +269,31 @@ export async function GET() {
         WHERE user_id = ? AND type = 'cert_over_contract' AND is_read = 0 AND contract_id <> ALL(?)`,
       user.id,
       overCertIds,
+    );
+
+    // Bảo hiểm/bảo lãnh sắp/đã hết hiệu lực mà chưa đổi trạng thái → cảnh báo (M28).
+    const expiringInsurance = await expiringInsuranceBonds();
+    if (expiringInsurance.length > 0) {
+      const values = expiringInsurance.map(() => `(?, ?, 'insurance_expiry', ?)`).join(", ");
+      const params = expiringInsurance.flatMap((b) => [
+        user.id,
+        b.id,
+        b.expired
+          ? `🛡 Bảo hiểm/bảo lãnh ${b.code ?? b.title} — ${b.title} đã quá hạn hiệu lực (${b.expiryDate})`
+          : `🛡 Bảo hiểm/bảo lãnh ${b.code ?? b.title} — ${b.title} sắp hết hiệu lực (${b.expiryDate})`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, insurance_bond_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, type, insurance_bond_id) WHERE insurance_bond_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    const expiringInsuranceIds = expiringInsurance.map((b) => b.id);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'insurance_expiry' AND is_read = 0 AND insurance_bond_id <> ALL(?)`,
+      user.id,
+      expiringInsuranceIds,
     );
   }
 

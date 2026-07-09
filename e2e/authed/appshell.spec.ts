@@ -40,6 +40,7 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
       "Thanh toán KL",
       "Đấu thầu",
       "Khởi động & Pháp lý",
+      "Bảo hiểm & Bảo lãnh",
       "Tài khoản",
       "Phân công",
       "Chấm công",
