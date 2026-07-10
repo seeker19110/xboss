@@ -74,11 +74,13 @@ html.navy {
   --color-zinc-50: #f8fafc;
 }
 
-/* Chế độ sáng: đảo thang zinc + white/black để toàn bộ UI (viết theo dark) tự đổi màu,
-   không phải sửa từng class trong các page. Các màu nhấn -300/-400 đậm lại cho đủ tương phản. */
+/* Chế độ sáng (mặc định): đảo thang zinc + white/black để toàn bộ UI (viết theo dark)
+   tự đổi màu, không phải sửa từng class trong các page. Nền/mặt thẻ/viền ngả màu giấy
+   ấm (không dùng trắng tinh #fff) — dễ chịu hơn khi nhìn lâu; các màu nhấn -300/-400
+   đậm lại cho đủ tương phản. */
 html.light {
   color-scheme: light;
-  --background: #ffffff;
+  --background: #faf8f4;
   --foreground: #171717;
   --color-white: #18181b;
   --color-black: #ffffff;
@@ -89,10 +91,10 @@ html.light {
   --color-zinc-400: #52525b;
   --color-zinc-500: #71717a;
   --color-zinc-600: #a1a1aa;
-  --color-zinc-700: #d4d4d8;
-  --color-zinc-800: #e4e4e7;
-  --color-zinc-900: #f4f4f5;
-  --color-zinc-950: #fafafa;
+  --color-zinc-700: #d8d2c5;
+  --color-zinc-800: #e6e0d3;
+  --color-zinc-900: #f3efe7;
+  --color-zinc-950: #faf8f4;
   --color-emerald-300: #047857;
   --color-emerald-400: #059669;
   --color-sky-300: #0369a1;
