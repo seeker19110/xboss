@@ -86,7 +86,11 @@ export async function insertId(sql: string, ...params: unknown[]): Promise<numbe
 
 // Bọc nhiều thao tác ghi vào 1 transaction — COMMIT khi fn thành công, ROLLBACK khi throw.
 // Mọi query/run/insertId bên trong fn tự dùng cùng client (qua AsyncLocalStorage).
+// Reentrant: gọi lồng bên trong 1 withTransaction khác (vd recomputePackage tự bọc
+// nhưng được recomputeTask gọi từ trong transaction của route) tái dùng luôn client hiện
+// có thay vì mở connection/transaction thứ 2 — tránh treo (2 client cùng chờ khoá nhau).
 export async function withTransaction<T>(fn: () => Promise<T>): Promise<T> {
+  if (txStorage.getStore()) return fn();
   await ensureSchema();
   const client = await getPool().connect();
   try {

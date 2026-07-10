@@ -8,7 +8,8 @@ import { DOC_CATEGORIES, type DocCategory } from "@/lib/qaqc";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/tasks/:id/documents → danh sách biên bản/tài liệu đính kèm task.
+// GET /api/tasks/:id/documents → danh sách biên bản/tài liệu đính kèm task
+// (subcon chỉ xem được task được giao cho mình — cùng quy tắc với POST/comments).
 export async function GET(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -19,6 +20,11 @@ export async function GET(
 
   const taskId = parseInt(params.id);
   if (isNaN(taskId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+  if (!(await canTouchTask(user, taskId)))
+    return NextResponse.json(
+      { error: "Bạn chỉ được xem tài liệu của task được giao cho mình" },
+      { status: 403 },
+    );
 
   const documents = await query(
     `SELECT d.id, d.original_name AS "originalName", d.mime_type AS "mimeType",
