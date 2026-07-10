@@ -46,6 +46,7 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
       "Bàn giao & Kết thúc",
       "Bảo hành – Bảo trì",
       "Tài chính – Kế toán",
+      "Nhà thầu phụ",
       "Tài khoản",
       "Phân công",
       "Chấm công",
@@ -66,13 +67,15 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
       timeout: 15_000,
     });
 
-    // "Nhà thầu phụ" (M15/M16 mở rộng) vẫn chưa có trang thật — dùng làm mẫu coming-soon
-    // (M23 đã đổi "Khởi động & Pháp lý" thành link thật, không còn phù hợp cho test này).
-    const comingSoon = sidebar.getByText("Nhà thầu phụ", { exact: true });
+    // "Thiết kế & Biện pháp thi công" vẫn chưa có trang thật — dùng làm mẫu coming-soon
+    // (M33 đã đổi "Nhà thầu phụ" thành link thật, không còn phù hợp cho test này).
+    const comingSoon = sidebar.getByText("Thiết kế & Biện pháp thi công", { exact: true });
     await expect(comingSoon).toBeVisible();
     await expect(comingSoon.locator("xpath=..")).toHaveAttribute("aria-disabled", "true");
     // Không phải thẻ <a> — không có trang thật để điều hướng tới.
-    await expect(sidebar.getByRole("link", { name: "Nhà thầu phụ" })).toHaveCount(0);
+    await expect(
+      sidebar.getByRole("link", { name: "Thiết kế & Biện pháp thi công" }),
+    ).toHaveCount(0);
     await expect(sidebar.getByText("Sắp có").first()).toBeVisible();
   });
 
@@ -134,16 +137,19 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     await expect(hub.getByRole("link", { name: "Lookahead", exact: true })).toBeVisible();
   });
 
-  test("trang hub hiện chip 'Sắp có' cho mục con chưa có trang thật", async ({ page }) => {
+  // M34 đã gán href thật cho "Claim chi phí" — hết node coming-soon con mẫu trong toàn
+  // bộ cây điều hướng. Chuyển hướng test sang xác nhận hub "Claim & Thay đổi" render đủ
+  // 2 mục con đều là link thật; để dành lại logic "chip Sắp có" cho module coming-soon
+  // con tiếp theo nếu phát sinh (xem test "dashboard mockup chưa có trang..." ở trên,
+  // vẫn phủ trường hợp node NHÓM coming-soon).
+  test("trang hub 'Claim & Thay đổi' render đủ 2 mục con đều là link thật", async ({ page }) => {
     await page.goto("/hub/dash.claim");
     await expect(page.locator("header").getByText("Claim & Thay đổi")).toBeVisible({
       timeout: 15_000,
     });
     const hub = page.getByRole("main");
     await expect(hub.getByRole("link", { name: "Phát sinh", exact: true })).toBeVisible();
-    const comingSoon = hub.getByText("Claim chi phí", { exact: true });
-    await expect(comingSoon).toBeVisible();
-    await expect(comingSoon.locator("xpath=..")).toHaveAttribute("aria-disabled", "true");
+    await expect(hub.getByRole("link", { name: "Claim chi phí", exact: true })).toBeVisible();
   });
 
   test("trang hub báo rõ khi id không tồn tại", async ({ page }) => {

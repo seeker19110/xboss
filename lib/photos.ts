@@ -101,6 +101,10 @@ export function newProposalDocFileName(proposalId: number, mime: string): string
   return `dx${proposalId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime]}`;
 }
 
+export function newClaimDocFileName(claimId: number, mime: string): string {
+  return `clm${claimId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime]}`;
+}
+
 export function newHseFileName(recordId: number, mime: string): string {
   return `hse${recordId}-${Date.now()}-${randomBytes(4).toString("hex")}${MIME_EXT[mime] ?? ".bin"}`;
 }
@@ -134,6 +138,12 @@ export function newHandoverMinutesFileName(handoverItemId: number, mime: string)
 // không gắn 1 hạng mục cụ thể như legal/certification/insurance nên đặt theo project (pattern newProjectDocFileName).
 export function newOmDocFileName(projectId: number, mime: string): string {
   return `om${projectId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime] ?? ".bin"}`;
+}
+
+// Hồ sơ năng lực NTP (M33, register mới `subcon_documents`) — giấy phép KD/chứng chỉ/
+// hồ sơ nhân sự, gắn theo supplier_id (pattern task_documents).
+export function newSubconDocFileName(supplierId: number, mime: string): string {
+  return `sc${supplierId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime] ?? ".bin"}`;
 }
 
 export function ensureUploadDir(): string {

@@ -238,6 +238,19 @@ export const CAN = {
   // Bảo hành & Bảo trì (M30): hạng mục bảo hành + claim lỗi sau bàn giao + tài liệu O&M —
   // xem mọi vai trò đăng nhập, ghi Admin/PM/kỹ sư.
   manageWarranty: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  // Thay đổi thiết kế (M32): tiếp nhận/sửa Admin/PM/kỹ sư (kỹ sư hiện trường ghi nhận
+  // yêu cầu); quyết định (duyệt/từ chối) vẫn qua CAN.approve như VO/đề xuất.
+  manageDesignChanges: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  // Hồ sơ năng lực NTP (M33): sửa subcontractor_profiles + upload/xoá subcon_documents —
+  // Admin/PM (đánh giá subcon_evaluations dùng check riêng admin/pm/engineer, rộng hơn
+  // — xem app/api/subcontractors/[supplierId]/evaluations/route.ts). Thêm vào map trung
+  // tâm nhân dịp M33 dù app/api/suppliers/[id]/ratings/route.ts (M04) vẫn dùng canRate
+  // cục bộ — không sửa lại chỗ đó (ngoài phạm vi M33).
+  manageSuppliers: (r?: Role) => r === "admin" || r === "pm",
+  // Claim chi phí & gia hạn EOT (M34): thông tin tranh chấp/thương mại nhạy cảm —
+  // xem như VO/thanh toán KL (loại cdt/subcon/viewer); ghi nhận (tạo/sửa) Admin/PM/kỹ sư.
+  viewClaims: (r?: Role) => r === "admin" || r === "pm" || r === "engineer" || r === "bch",
+  manageClaims: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
 };
 
 // Sub-con chỉ được thao tác trên task được giao cho mình.
@@ -289,4 +302,15 @@ export async function canTouchFloor(
     user.id,
   );
   return !!wp;
+}
+
+// Sub-con chỉ được xem hồ sơ NTP (M33) của đúng mình (users.supplier_id, gán ở M15
+// discipline_contractors) — vai trò khác xem được mọi NTP.
+export async function canViewSubcontractor(user: User, supplierId: number): Promise<boolean> {
+  if (user.role !== "subcon") return true;
+  const row = await queryOne<{ supplierId: number | null }>(
+    `SELECT supplier_id AS "supplierId" FROM users WHERE id = ?`,
+    user.id,
+  );
+  return !!row && row.supplierId === supplierId;
 }

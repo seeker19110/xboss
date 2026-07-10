@@ -26,6 +26,7 @@ Làm việc với vai trò **kỹ sư full-stack senior kiêm chuyên gia thiế
   - `mechanical` (Haiku, xem `.claude/agents/mechanical.md`) — việc lặp lại, ít cần phán đoán: sửa lint/typecheck theo thông báo có sẵn, đổi tên hàng loạt, CRUD/route bám mẫu có sẵn, cập nhật test theo signature đã đổi.
   - `reviewer` (Sonnet, xem `.claude/agents/reviewer.md`) — tự soát diff bằng skill `code-review` sau khi `coder`/`mechanical` code xong, trước khi Opus duyệt cuối.
     Việc nhỏ, chạm ít file, hoặc cần giữ liền mạch ngữ cảnh quyết định vừa chốt trong hội thoại thì Opus tự code thẳng như quy trình cũ — đúng nhịp "1 phiên ≈ 1-2 PR + verify thật" ở `docs/ke-hoach-fastcons-2026-07.md` §4, không bắt buộc vòng qua subagent cho mọi việc.
+- **Trước khi code (đặc biệt khi dispatch subagent/worktree song song): luôn đồng bộ nhánh trước.** `git fetch origin` + đảm bảo base (`main` cục bộ hoặc nhánh làm việc) khớp `origin/main` mới nhất trước khi tạo worktree/nhánh mới — nhánh cục bộ lỗi thời khiến agent code chồng số migration/bỏ lỡ thay đổi mới, gây conflict phải dọn tay lúc tích hợp (đã xảy ra thật ở đợt M32/M33/M34, xem `PROGRESS.md`). Mỗi việc song song code trên nhánh/worktree riêng của nó, không chia sẻ working tree, để tránh xung đột file giữa các agent.
 
 ## Lệnh thường dùng
 
@@ -34,7 +35,7 @@ npm run dev          # dev server (cần .env.local với DATABASE_URL)
 npm run build        # build production (không cần DB thật — pool kết nối lazy)
 npm run lint         # next lint (eslint.config.mjs — flat config, next/core-web-vitals)
 npm run typecheck    # tsc --noEmit
-npm test             # node:test qua tsx — 3 file trong tests/
+npm test             # node:test qua tsx — 46 file trong tests/
 npx tsx --test tests/status.test.ts   # chạy 1 file test
 npm run db:seed      # import Excel gốc trong attachments/ vào DB
 ```
@@ -65,7 +66,7 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy lint + typecheck + test +
 
 - Phiên stateless: cookie `xboss_session` = `userId.exp.HMAC` — không có bảng session.
 - Login có rate limit lưu Postgres (`lib/ratelimit.ts`, bảng `login_rate_limits`): 5 lần sai/15 phút theo IP+email, 20/IP → 429 + `Retry-After`. Upsert atomic qua `ON CONFLICT` nên đúng khi chạy nhiều instance.
-- 4 vai trò: `admin | pm | engineer | subcon`. Quyền tập trung trong map `CAN`; subcon chỉ thao tác task được gán (`canTouchTask`).
+- 7 vai trò (`lib/roles.ts`): `admin | pm | engineer | subcon` (thao tác) + `bch | cdt | viewer` (chỉ-xem + bình luận, `VIEW_ONLY_ROLES`). Quyền tập trung trong map `CAN`; subcon chỉ thao tác task được gán (`canTouchTask`); `bch` thêm được xem các trang tài chính (`PAYMENT_VIEW_ROLES` = `admin/pm/bch`).
 - **Các trang chỉ redirect client-side khi 401 — API route là ranh giới bảo mật duy nhất.** Mọi route handler mới phải gọi `getCurrentUser()` và trả 401 khi chưa đăng nhập (pattern xem `app/api/dashboard/route.ts`).
 
 ### Mô hình dữ liệu (WBS)
