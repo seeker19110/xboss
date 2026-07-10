@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Plus,
   X,
@@ -128,10 +129,26 @@ function canDecideRevision(role?: string) {
 }
 
 export default function DrawingsPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <DrawingsPageInner />
+    </Suspense>
+  );
+}
+
+const DRAWING_KIND_VALUES = ["shop", "asbuilt", "bim", "method"] as const;
+
+function DrawingsPageInner() {
+  const searchParams = useSearchParams();
+  const initialKind = searchParams.get("kind");
+  const validInitialKind = (DRAWING_KIND_VALUES as readonly string[]).includes(initialKind ?? "")
+    ? (initialKind as DrawingKind)
+    : "all";
+
   const [me, setMe] = useState<Me | null>(null);
   const [items, setItems] = useState<DrawingRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [kindFilter, setKindFilter] = useState<DrawingKind | "all">("all");
+  const [kindFilter, setKindFilter] = useState<DrawingKind | "all">(validInitialKind);
   const [statusFilter, setStatusFilter] = useState<RevisionStatus | "all">("all");
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);

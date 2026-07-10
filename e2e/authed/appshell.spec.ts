@@ -58,7 +58,12 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     }
   });
 
-  test("dashboard mockup chưa có trang hiện mờ + badge 'Sắp có', không phải link", async ({
+  // M35 đã gán href thật cho "Thiết kế & Biện pháp thi công" (deep-link vào tab lọc
+  // kind=method trên /drawings, tính năng đã có từ M08) — hết hoàn toàn node coming-soon
+  // lá trong cây điều hướng từ đây. Để dành logic "chip Sắp có" cho module tương lai nếu
+  // có (đoạn code hiển thị coming-soon trong AppHeader.tsx vẫn giữ nguyên, chỉ không còn
+  // dữ liệu mẫu để test qua sidebar thật).
+  test("'Thiết kế & Biện pháp thi công' là link thật, trỏ đúng trang bản vẽ đã lọc method", async ({
     page,
   }) => {
     await page.goto("/");
@@ -67,16 +72,16 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
       timeout: 15_000,
     });
 
-    // "Thiết kế & Biện pháp thi công" vẫn chưa có trang thật — dùng làm mẫu coming-soon
-    // (M33 đã đổi "Nhà thầu phụ" thành link thật, không còn phù hợp cho test này).
-    const comingSoon = sidebar.getByText("Thiết kế & Biện pháp thi công", { exact: true });
-    await expect(comingSoon).toBeVisible();
-    await expect(comingSoon.locator("xpath=..")).toHaveAttribute("aria-disabled", "true");
-    // Không phải thẻ <a> — không có trang thật để điều hướng tới.
-    await expect(
-      sidebar.getByRole("link", { name: "Thiết kế & Biện pháp thi công" }),
-    ).toHaveCount(0);
-    await expect(sidebar.getByText("Sắp có").first()).toBeVisible();
+    const link = sidebar.getByRole("link", { name: "Thiết kế & Biện pháp thi công" });
+    await expect(link).toBeVisible();
+    await link.click();
+    await expect(page).toHaveURL(/\/drawings\?kind=method$/);
+
+    // Chip lọc "Biện pháp thi công" đã active sẵn — không cần bấm tay.
+    const main = page.getByRole("main");
+    await expect(main.getByRole("button", { name: "Biện pháp thi công" })).toHaveClass(
+      /bg-emerald-800\/60/,
+    );
   });
 
   test("dashboard nhóm gập/mở được, nhớ trạng thái sau khi tải lại (mặc định mở)", async ({
@@ -140,8 +145,8 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
   // M34 đã gán href thật cho "Claim chi phí" — hết node coming-soon con mẫu trong toàn
   // bộ cây điều hướng. Chuyển hướng test sang xác nhận hub "Claim & Thay đổi" render đủ
   // 2 mục con đều là link thật; để dành lại logic "chip Sắp có" cho module coming-soon
-  // con tiếp theo nếu phát sinh (xem test "dashboard mockup chưa có trang..." ở trên,
-  // vẫn phủ trường hợp node NHÓM coming-soon).
+  // con tiếp theo nếu phát sinh (M35 đã gán nốt href thật cho node lá cuối cùng còn lại
+  // — "Thiết kế & Biện pháp thi công" — xem test ở trên).
   test("trang hub 'Claim & Thay đổi' render đủ 2 mục con đều là link thật", async ({ page }) => {
     await page.goto("/hub/dash.claim");
     await expect(page.locator("header").getByText("Claim & Thay đổi")).toBeVisible({

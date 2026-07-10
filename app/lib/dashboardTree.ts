@@ -124,7 +124,12 @@ export const DASHBOARD_TREE: DashCluster[] = [
     label: "Thiết kế & Bản vẽ",
     dashboards: [
       { id: "dash.ban-ve", href: "/drawings", label: "Bản vẽ", icon: PencilRuler },
-      { id: "dash.thiet-ke-bptc", label: "Thiết kế & Biện pháp thi công", icon: Compass }, // M08 mở rộng
+      {
+        id: "dash.thiet-ke-bptc",
+        href: "/drawings?kind=method",
+        label: "Thiết kế & Biện pháp thi công",
+        icon: Compass,
+      }, // M08 mở rộng
     ],
   },
   {
