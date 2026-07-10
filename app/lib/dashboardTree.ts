@@ -155,7 +155,7 @@ export const DASHBOARD_TREE: DashCluster[] = [
         icon: Gavel,
         roles: ["admin", "pm", "engineer", "bch"],
       },
-      { id: "dash.nha-thau-phu", label: "Nhà thầu phụ", icon: HardHat }, // M15/M16 mở rộng (hồ sơ năng lực, đánh giá)
+      { id: "dash.nha-thau-phu", href: "/subcontractors", label: "Nhà thầu phụ", icon: HardHat }, // M33: hồ sơ năng lực + đánh giá NTP
     ],
   },
   {

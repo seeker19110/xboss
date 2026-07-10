@@ -136,6 +136,12 @@ export function newOmDocFileName(projectId: number, mime: string): string {
   return `om${projectId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime] ?? ".bin"}`;
 }
 
+// Hồ sơ năng lực NTP (M33, register mới `subcon_documents`) — giấy phép KD/chứng chỉ/
+// hồ sơ nhân sự, gắn theo supplier_id (pattern task_documents).
+export function newSubconDocFileName(supplierId: number, mime: string): string {
+  return `sc${supplierId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime] ?? ".bin"}`;
+}
+
 export function ensureUploadDir(): string {
   if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
   return UPLOAD_DIR;
