@@ -1,4 +1,4 @@
--- 0028_subcontractors.sql — M33: Hồ sơ năng lực & Đánh giá Nhà thầu phụ (NTP).
+-- 0041_subcontractors.sql — M33: Hồ sơ năng lực & Đánh giá Nhà thầu phụ (NTP).
 -- Mở rộng suppliers hiện có bằng bảng con 1-1 (không sửa bảng suppliers — tránh đụng
 -- FK/chỗ dùng suppliers cho NCC vật tư thông thường không cần các trường này).
 -- Xem docs/nang-cap/M33-nha-thau-phu.md (đặc tả gốc ghi số 0040 — worktree này đang ở
