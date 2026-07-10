@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Printer, ArrowLeft, Download } from "lucide-react";
 import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
 import { formatDateVN } from "@/lib/date";
+import HeFilter from "@/app/components/HeFilter";
 
 type DelayedTask = {
   id: number;
@@ -14,7 +15,15 @@ type DelayedTask = {
   floorLabel: string;
   sheetType: string;
 };
-type KPI = { sheetType: string; total: number; avgProgress: number; delayed: number };
+type KPI = {
+  sheetType: string;
+  total: number;
+  avgProgress: number;
+  delayed: number;
+  avgProgressPrev?: number;
+  deltaProgress?: number;
+};
+type Range = "day" | "week" | "month";
 type Forecast = {
   sheetType: string;
   progress: number;
@@ -33,18 +42,66 @@ export default function ReportPage() {
   } | null>(null);
   const [forecast, setForecast] = useState<Forecast[]>([]);
   const [projectName, setProjectName] = useState<string | null>(null);
+  const [he, setHe] = useState("");
+  const [heName, setHeName] = useState<string | null>(null);
+  const [range, setRange] = useState<Range>("day");
+  // Chặn effect fetch bên dưới chạy lần đầu với he=""/range="day" mặc định trước khi
+  // effect đọc URL kịp cập nhật state (race condition — xem M36).
+  const [heReady, setHeReady] = useState(false);
+
+  // Đọc `?he=` và `?range=` lúc mount để link chia sẻ/từ hub trỏ thẳng vào đúng bộ lọc (M36).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setHe(params.get("he") ?? "");
+    const r = params.get("range");
+    if (r === "week" || r === "month") setRange(r);
+    setHeReady(true);
+  }, []);
+
+  function updateRange(next: Range) {
+    setRange(next);
+    try {
+      const url = new URL(window.location.href);
+      if (next === "day") url.searchParams.delete("range");
+      else url.searchParams.set("range", next);
+      window.history.replaceState(null, "", url.toString());
+    } catch {
+      /* URL không hợp lệ (hiếm) — bỏ qua */
+    }
+  }
 
   useEffect(() => {
-    fetch("/api/dashboard")
+    if (!heReady) return;
+    const params = new URLSearchParams();
+    if (he) params.set("he", he);
+    if (range !== "day") params.set("range", range);
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    fetch(`/api/dashboard${qs}`)
       .then((r) => r.json())
       .then(setData);
+    // /api/dashboard/forecast chưa hỗ trợ `he` (ngoài phạm vi PR1) — giữ nguyên không lọc.
     fetch("/api/dashboard/forecast")
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => setForecast(j?.forecast ?? []));
+  }, [he, range, heReady]);
+  useEffect(() => {
     fetch("/api/project")
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => setProjectName(j?.name ?? null));
   }, []);
+  // Tên hệ để hiện "— Hệ <tên>" trong tiêu đề khi đang lọc.
+  useEffect(() => {
+    if (!he) {
+      setHeName(null);
+      return;
+    }
+    fetch("/api/disciplines")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        const d = (j?.disciplines ?? []).find((x: { code: string }) => x.code === he);
+        setHeName(d?.name ?? null);
+      });
+  }, [he]);
 
   return (
     <div className="min-h-screen bg-white text-zinc-900">
@@ -56,6 +113,25 @@ export default function ReportPage() {
           Báo cáo in — dùng nút bên phải rồi chọn &ldquo;Save as PDF&rdquo;
         </span>
         <div className="ml-auto flex items-center gap-2">
+          <HeFilter
+            value={he}
+            onChange={setHe}
+            labelClassName="flex items-center gap-1.5 text-xs text-zinc-600"
+            selectClassName="min-h-10 border border-zinc-300 rounded-lg px-3 py-2 text-sm bg-white"
+          />
+          <label className="flex items-center gap-1.5 text-xs text-zinc-600">
+            <span className="shrink-0">Kỳ:</span>
+            <select
+              value={range}
+              onChange={(e) => updateRange(e.target.value as Range)}
+              aria-label="Chọn kỳ báo cáo"
+              className="min-h-10 border border-zinc-300 rounded-lg px-3 py-2 text-sm bg-white"
+            >
+              <option value="day">Hiện tại</option>
+              <option value="week">Theo tuần</option>
+              <option value="month">Theo tháng</option>
+            </select>
+          </label>
           <a
             href="/api/export/pdf"
             download
@@ -74,7 +150,9 @@ export default function ReportPage() {
 
       <div className="max-w-4xl mx-auto p-8">
         <div className="border-b-2 border-zinc-900 pb-4 mb-6">
-          <h1 className="text-2xl font-bold">BÁO CÁO TIẾN ĐỘ THI CÔNG ACMV</h1>
+          <h1 className="text-2xl font-bold">
+            BÁO CÁO TIẾN ĐỘ THI CÔNG ACMV{heName ? ` — Hệ ${heName}` : ""}
+          </h1>
           <p className="text-zinc-600">
             {projectName ?? "XBoss"} · Ngày: {new Date().toLocaleDateString("vi-VN")}
           </p>
@@ -86,15 +164,26 @@ export default function ReportPage() {
             <p className="text-xs text-red-700 uppercase">Tổng công việc trễ</p>
             <p className="text-3xl font-bold text-red-700">{data?.totalDelayed ?? 0}</p>
           </div>
-          {data?.kpi.map((k) => (
-            <div key={k.sheetType} className="border border-zinc-300 rounded-lg p-3">
-              <p className="text-xs text-zinc-500 uppercase">{k.sheetType}</p>
-              <p className="text-2xl font-bold">{Math.round((k.avgProgress ?? 0) * 100)}%</p>
-              <p className="text-xs text-zinc-500">
-                {k.delayed} trễ / {k.total} task
-              </p>
-            </div>
-          ))}
+          {data?.kpi.map((k) => {
+            const delta = k.deltaProgress;
+            return (
+              <div key={k.sheetType} className="border border-zinc-300 rounded-lg p-3">
+                <p className="text-xs text-zinc-500 uppercase">{k.sheetType}</p>
+                <p className="text-2xl font-bold">{Math.round((k.avgProgress ?? 0) * 100)}%</p>
+                <p className="text-xs text-zinc-500">
+                  {k.delayed} trễ / {k.total} task
+                </p>
+                {range !== "day" && delta !== undefined && (
+                  <p
+                    className={`text-xs font-medium mt-1 ${delta > 0 ? "text-emerald-700" : delta < 0 ? "text-red-600" : "text-zinc-500"}`}
+                  >
+                    Δ kỳ: {delta > 0 ? "+" : ""}
+                    {Math.round(delta * 100)}%
+                  </p>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <h2 className="font-bold text-lg mb-3">2. Tiến độ theo hệ</h2>

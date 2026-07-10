@@ -1,6 +1,8 @@
-import { NextResponse } from "next/server";
-import { query, todayISO } from "@/lib/db";
+import { NextRequest, NextResponse } from "next/server";
+import { query, todayISO, daysFromTodayISO } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { resolveDisciplineId } from "@/lib/disciplines";
+import { progressAtDate } from "@/lib/report";
 import {
   cashflowSeries,
   cpiBlock,
@@ -14,13 +16,21 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+// `?he=<disciplines.code>` (M36 PR1) lọc KPI + bảng trễ theo hệ — không truyền = nguyên hành vi cũ.
+// `?range=week|month` (M36 PR3) thêm cột "Δ kỳ" cho từng dòng KPI — % đầu kỳ (tái dựng từ
+// task_history qua `progressAtDate`) so với % hiện tại. Không truyền/`day` = không có Δ kỳ (cũ).
+export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.viewDashboard(user.role))
     return NextResponse.json({ error: "Thầu phụ không có quyền xem dashboard" }, { status: 403 });
 
   const today = todayISO();
+  const disciplineId = await resolveDisciplineId(req.nextUrl.searchParams.get("he"));
+  const heFilterAnd = disciplineId !== null ? "AND st.discipline_id = ?" : "";
+  const heFilterWhere = disciplineId !== null ? "WHERE st.discipline_id = ?" : "";
+  const heParams = disciplineId !== null ? [disciplineId] : [];
+  const range = req.nextUrl.searchParams.get("range"); // "week" | "month" | null
 
   // Task trễ: end_date < hôm nay AND progress < 1 AND chưa hoàn thành/nghiệm thu.
   const delayedTasks = await query(
@@ -38,12 +48,21 @@ export async function GET() {
       WHERE t.end_date IS NOT NULL AND t.end_date < ?
         AND t.progress_percent < 1
         AND t.status NOT IN ('hoan_thanh','nghiem_thu')
+        ${heFilterAnd}
       ORDER BY t.end_date`,
     today,
+    ...heParams,
   );
 
   // KPI theo từng sheet
-  const kpi = await query(
+  const kpi = await query<{
+    sheetId: number;
+    sheetType: string;
+    sheetSlug: string | null;
+    total: number;
+    avgProgress: number;
+    delayed: number;
+  }>(
     `SELECT st.id AS "sheetId", st.code AS "sheetType", st.slug AS "sheetSlug",
             COUNT(t.id) AS total,
             COALESCE(AVG(t.progress_percent), 0) AS "avgProgress",
@@ -52,10 +71,41 @@ export async function GET() {
        FROM sheet_types st
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
+       ${heFilterWhere}
       GROUP BY st.id, st.code, st.slug
       ORDER BY st.sort_order, st.id`,
     today,
+    ...heParams,
   );
+
+  // `?range=week|month` (M36 PR3): thêm % đầu kỳ + Δ kỳ cho từng dòng KPI — tái dựng từ
+  // task_history qua `progressAtDate` (mốc 7/30 ngày trước), gộp theo sheetId.
+  const kpiWithDelta =
+    range === "week" || range === "month"
+      ? await (async () => {
+          const pastDate = range === "week" ? daysFromTodayISO(-7) : daysFromTodayISO(-30);
+          const prevRows = await progressAtDate(
+            pastDate,
+            disciplineId !== null ? { disciplineId } : {},
+          );
+          const prevBySheet = new Map<number, number[]>();
+          for (const r of prevRows) {
+            if (!prevBySheet.has(r.sheetId)) prevBySheet.set(r.sheetId, []);
+            prevBySheet.get(r.sheetId)!.push(r.progress);
+          }
+          return kpi.map((k) => {
+            const list = prevBySheet.get(k.sheetId) ?? [];
+            const avgProgressPrev = list.length
+              ? list.reduce((s, v) => s + v, 0) / list.length
+              : (k.avgProgress ?? 0);
+            return {
+              ...k,
+              avgProgressPrev,
+              deltaProgress: (k.avgProgress ?? 0) - avgProgressPrev,
+            };
+          });
+        })()
+      : kpi;
 
   // M9 — khối mở rộng "tiền + chất lượng + công trường". Khối tài chính (cashflow/
   // cpi/vo, và budgetUsedPct trong byDiscipline) chỉ trả cho PAYMENT_VIEW_ROLES
@@ -77,7 +127,7 @@ export async function GET() {
   return NextResponse.json({
     approvals,
     delayedTasks,
-    kpi,
+    kpi: kpiWithDelta,
     totalDelayed: delayedTasks.length,
     cashflow,
     cpi,

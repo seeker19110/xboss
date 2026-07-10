@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, todayISO, daysFromTodayISO } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { pendingFrontKeys } from "@/lib/workfronts";
+import { resolveDisciplineId } from "@/lib/disciplines";
 
 export const dynamic = "force-dynamic";
 
@@ -22,9 +23,10 @@ export type LookaheadTask = {
   waitingFront?: boolean;
 };
 
-// GET /api/lookahead?days=14 → kế hoạch ngắn hạn cho họp giao ban:
+// GET /api/lookahead?days=14&he=<disciplines.code> → kế hoạch ngắn hạn cho họp giao ban:
 // task sắp bắt đầu + task đến hạn trong N ngày tới. Mọi vai trò thấy toàn bộ (giống
-// lưới tracking — subcon cần ngữ cảnh tầng/nhóm, xem app/api/tasks/route.ts).
+// lưới tracking — subcon cần ngữ cảnh tầng/nhóm, xem app/api/tasks/route.ts). `he` lọc
+// theo hệ thi công (M36) — bổ sung, không breaking.
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -35,6 +37,9 @@ export async function GET(req: NextRequest) {
   );
   const today = todayISO();
   const until = daysFromTodayISO(days);
+  const disciplineId = await resolveDisciplineId(req.nextUrl.searchParams.get("he"));
+  const heFilter = disciplineId !== null ? "AND st.discipline_id = ?" : "";
+  const heParams = disciplineId !== null ? [disciplineId] : [];
 
   const select = `SELECT t.id, t.code, t.name, t.status,
             t.start_date AS "startDate", t.end_date AS "endDate",
@@ -51,9 +56,11 @@ export async function GET(req: NextRequest) {
     `${select}
       WHERE t.start_date IS NOT NULL AND t.start_date >= ? AND t.start_date <= ?
         AND t.progress_percent = 0 AND t.status NOT IN ('hoan_thanh','nghiem_thu')
+        ${heFilter}
       ORDER BY t.start_date, st.id, t.id`,
     today,
     until,
+    ...heParams,
   );
 
   // Đến hạn: end_date trong cửa sổ, chưa xong.
@@ -61,9 +68,11 @@ export async function GET(req: NextRequest) {
     `${select}
       WHERE t.end_date IS NOT NULL AND t.end_date >= ? AND t.end_date <= ?
         AND t.progress_percent < 1 AND t.status NOT IN ('hoan_thanh','nghiem_thu')
+        ${heFilter}
       ORDER BY t.end_date, st.id, t.id`,
     today,
     until,
+    ...heParams,
   );
 
   // Task thuộc tầng chưa bàn giao mặt bằng (M14) → cờ waitingFront cho báo cáo EOT.

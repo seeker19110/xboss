@@ -1,12 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
 import AppHeader from "@/app/components/AppHeader";
-import ProgressMap from "@/app/components/ProgressMap";
 import HeFilter from "@/app/components/HeFilter";
+import SCurveChart from "@/app/components/SCurveChart";
 
-export default function TimelinePage() {
+// Trang S-Curve riêng (M36 PR2) — bọc SCurveChart (đã có baseline selector + nút chốt
+// baseline) + HeFilter lọc theo hệ, đồng bộ `?he=` lên URL như các trang tiến độ khác.
+export default function ScurvePage() {
   const [he, setHe] = useState("");
-  // Chỉ mount ProgressMap SAU khi đã đọc xong `?he=` từ URL — tránh nó fetch lần đầu
+  // Chỉ mount SCurveChart SAU khi đã đọc xong `?he=` từ URL — tránh nó fetch lần đầu
   // với he="" rồi lại fetch lại khi state cập nhật (race condition, xem M36).
   const [ready, setReady] = useState(false);
 
@@ -18,10 +20,10 @@ export default function TimelinePage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <AppHeader title="Timeline tầng" back>
+      <AppHeader title="S-Curve" back>
         <HeFilter value={he} onChange={setHe} />
       </AppHeader>
-      <main className="px-3 sm:px-6 py-4 w-full">{ready && <ProgressMap he={he} />}</main>
+      <main className="px-3 sm:px-6 py-4 w-full">{ready && <SCurveChart he={he} />}</main>
     </div>
   );
 }

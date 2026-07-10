@@ -8,6 +8,7 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appAlert } from "@/app/components/dialogs";
 import { useEditMode } from "@/app/components/useEditMode";
 import EditModeToggle from "@/app/components/EditModeToggle";
+import HeFilter from "@/app/components/HeFilter";
 import { fetchMe, redirectToLogin } from "@/app/lib/me";
 
 type Bar = {
@@ -47,14 +48,15 @@ export default function GanttPage() {
   const [floatDays, setFloatDays] = useState<Record<string, number>>({});
   const [me, setMe] = useState<Me | null>(null);
   const [sheetFilter, setSheetFilter] = useState("");
+  const [he, setHe] = useState("");
   const [depFor, setDepFor] = useState<Bar | null>(null); // nhóm đang sửa phụ thuộc
   const [arrows, setArrows] = useState<Arrow[]>([]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const barRefs = useRef<Map<number, HTMLElement>>(new Map());
 
-  async function load() {
-    const r = await fetch("/api/gantt");
+  async function load(heCode: string) {
+    const r = await fetch(`/api/gantt${heCode ? `?he=${encodeURIComponent(heCode)}` : ""}`);
     if (r.status === 401) {
       redirectToLogin();
       return;
@@ -68,10 +70,31 @@ export default function GanttPage() {
     setFloatDays(j.float ?? {});
   }
 
+  // Đọc `?he=` và `?sheet=` lúc mount để link chia sẻ/từ hub trỏ thẳng vào đúng bộ lọc (M36).
+  // Gọi `load(initial)` trực tiếp với giá trị vừa đọc (không qua state) để tránh 2 request
+  // chạy song song (fetch không lọc trước, fetch đã lọc sau — race condition).
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const initial = params.get("he") ?? "";
+    setHe(initial);
+    setSheetFilter(params.get("sheet") ?? "");
     fetchMe().then((user) => setMe(user ?? null));
-    load();
+    load(initial);
   }, []);
+
+  // Select sheet in-page đồng bộ lên URL `?sheet=` (đọc lúc mount ở trên) để link ngoài
+  // trỏ thẳng vào được (M36).
+  function updateSheetFilter(next: string) {
+    setSheetFilter(next);
+    try {
+      const url = new URL(window.location.href);
+      if (next) url.searchParams.set("sheet", next);
+      else url.searchParams.delete("sheet");
+      window.history.replaceState(null, "", url.toString());
+    } catch {
+      /* URL không hợp lệ — bỏ qua */
+    }
+  }
 
   const canEdit = me?.role === "admin" || me?.role === "pm";
   const { editMode, toggle: toggleEditMode } = useEditMode(canEdit);
@@ -148,9 +171,9 @@ export default function GanttPage() {
       <AppHeader>
         <select
           value={sheetFilter}
-          onChange={(e) => setSheetFilter(e.target.value)}
-          aria-label="Lọc theo hệ"
-          className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm outline-none"
+          onChange={(e) => updateSheetFilter(e.target.value)}
+          aria-label="Lọc theo sheet"
+          className="min-h-10 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm outline-none"
         >
           <option value="">Tất cả hệ</option>
           {sheets.map((s) => (
@@ -159,6 +182,13 @@ export default function GanttPage() {
             </option>
           ))}
         </select>
+        <HeFilter
+          value={he}
+          onChange={(next) => {
+            setHe(next);
+            load(next);
+          }}
+        />
         <EditModeToggle canEdit={canEdit} editMode={editMode} onToggle={toggleEditMode} />
       </AppHeader>
 
@@ -333,7 +363,7 @@ export default function GanttPage() {
           deps={deps}
           onClose={() => setDepFor(null)}
           onChanged={async () => {
-            await load();
+            await load(he);
           }}
         />
       )}
