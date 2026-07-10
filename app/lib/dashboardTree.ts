@@ -118,6 +118,11 @@ export const DASHBOARD_TREE: DashCluster[] = [
           { href: "/timeline", label: "Timeline", icon: CalendarRange },
           { href: "/gantt", label: "Gantt", icon: GanttChartSquare },
           { href: "/lookahead", label: "Lookahead", icon: CalendarClock },
+          {
+            href: "/schedule-control",
+            label: "Đường găng & Chậm tiến độ",
+            icon: AlertTriangle,
+          },
         ],
       },
     ],

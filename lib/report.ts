@@ -58,6 +58,73 @@ export async function buildDailyReport(): Promise<DailyReport> {
   return { date: today, projectName: project?.name ?? null, totalDelayed: all.length, newDelayed, topDelayed, dueSoon, kpi };
 }
 
+// ===== Tái dựng "% tiến độ tại 1 mốc ngày" (dùng chung) =====
+// Logic gốc trước đây viết trực tiếp trong buildWeeklyReport — trích thành hàm chung
+// để `/api/dashboard?range=` (M36 PR3) và cron tuần dùng lại, không lặp.
+
+export type TaskProgressAtDate = { taskId: number; sheetId: number; sheetType: string; progress: number };
+
+type HistRow = { taskId: number; oldProgress: number | null; newProgress: number | null; day: string };
+
+// Phần thuần (không chạm DB) — lấy new_progress của sự kiện cuối cùng trước/tại mốc `date`;
+// chưa có sự kiện nào trước mốc thì dùng old_progress của sự kiện đầu tiên; không có lịch sử
+// nào cho task đó → dùng `progress` hiện tại truyền vào. Tách riêng để test đơn vị không cần DB.
+export function reconstructProgressAtDate<T extends { id: number; progress: number }>(
+  tasks: T[],
+  history: HistRow[],
+  date: string,
+): Map<number, number> {
+  const prevProgress = new Map<number, number>();
+  const firstOld = new Map<number, number>();
+  for (const h of history) {
+    if (!firstOld.has(h.taskId)) firstOld.set(h.taskId, h.oldProgress ?? 0);
+    if (h.day <= date) prevProgress.set(h.taskId, h.newProgress ?? 0);
+  }
+  const result = new Map<number, number>();
+  for (const t of tasks) {
+    result.set(t.id, prevProgress.get(t.id) ?? (firstOld.has(t.id) ? firstOld.get(t.id)! : (t.progress ?? 0)));
+  }
+  return result;
+}
+
+// Bản đọc DB: tái dựng % tiến độ từng task tại mốc `date`, lọc theo hệ nếu có `disciplineId`.
+export async function progressAtDate(
+  date: string,
+  filter: { disciplineId?: number } = {},
+): Promise<TaskProgressAtDate[]> {
+  const heFilter = filter.disciplineId != null ? "AND st.discipline_id = ?" : "";
+  const heParams = filter.disciplineId != null ? [filter.disciplineId] : [];
+
+  const tasks = await query<{ id: number; progress: number; sheetId: number; sheetType: string }>(
+    `SELECT t.id, t.progress_percent AS progress, st.id AS "sheetId", st.code AS "sheetType"
+       FROM tasks t
+       JOIN work_packages wp ON t.package_id = wp.id
+       JOIN sheet_types st ON wp.sheet_type_id = st.id
+      WHERE 1=1 ${heFilter}`,
+    ...heParams,
+  );
+
+  const hist = await query<HistRow>(
+    `SELECT h.task_id AS "taskId", h.old_progress AS "oldProgress", h.new_progress AS "newProgress",
+            (h.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date::text AS day
+       FROM task_history h
+       JOIN tasks t ON h.task_id = t.id
+       JOIN work_packages wp ON t.package_id = wp.id
+       JOIN sheet_types st ON wp.sheet_type_id = st.id
+      WHERE 1=1 ${heFilter}
+      ORDER BY h.task_id, h.changed_at`,
+    ...heParams,
+  );
+
+  const progress = reconstructProgressAtDate(tasks, hist, date);
+  return tasks.map((t) => ({
+    taskId: t.id,
+    sheetId: t.sheetId,
+    sheetType: t.sheetType,
+    progress: progress.get(t.id) ?? (t.progress ?? 0),
+  }));
+}
+
 // ===== Báo cáo tuần =====
 // So sánh tiến độ hiện tại với 7 ngày trước (tái dựng từ task_history như S-curve),
 // kèm danh sách hoàn thành trong tuần + trễ mới phát sinh.
@@ -91,24 +158,11 @@ export async function buildWeeklyReport(): Promise<WeeklyReport> {
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id`);
 
-  // Tái dựng % của từng task tại thời điểm 7 ngày trước từ task_history:
-  // lấy new_progress của sự kiện cuối cùng trước mốc; chưa có sự kiện nào trước mốc
-  // thì dùng old_progress của sự kiện đầu tiên; không có lịch sử → % hiện tại.
-  type HistRow = { taskId: number; oldProgress: number | null; newProgress: number | null; day: string };
-  const hist = await query<HistRow>(
-    `SELECT task_id AS "taskId", old_progress AS "oldProgress",
-            new_progress AS "newProgress",
-            (changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date::text AS day
-       FROM task_history ORDER BY task_id, changed_at`);
-
-  const prevProgress = new Map<number, number>();
-  const firstOld = new Map<number, number>();
-  for (const h of hist) {
-    if (!firstOld.has(h.taskId)) firstOld.set(h.taskId, h.oldProgress ?? 0);
-    if (h.day <= weekFrom) prevProgress.set(h.taskId, h.newProgress ?? 0);
-  }
-  const progressAt = (t: TaskRow) =>
-    prevProgress.get(t.id) ?? (firstOld.has(t.id) ? firstOld.get(t.id)! : t.progress ?? 0);
+  // % của từng task tại thời điểm 7 ngày trước — tái dựng từ task_history qua hàm chung
+  // `progressAtDate` (M36 PR3, dùng lại bởi `/api/dashboard?range=`).
+  const prevRows = await progressAtDate(weekFrom);
+  const prevProgressByTask = new Map(prevRows.map((r) => [r.taskId, r.progress]));
+  const progressAt = (t: TaskRow) => prevProgressByTask.get(t.id) ?? t.progress ?? 0;
 
   const select = `SELECT t.code, t.name, t.status, t.end_date AS "endDate",
             t.progress_percent AS "progressPercent",

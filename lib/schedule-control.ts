@@ -1,0 +1,106 @@
+// Dữ liệu cho trang "Đường găng & Chậm tiến độ" (M36 PR3) — tách khỏi route để test
+// tích hợp gọi thẳng (không cần dựng NextRequest/auth), cùng pattern lib/report.ts.
+import { query, todayISO } from "@/lib/db";
+import { computeCpm } from "@/lib/cpm";
+import { getCpmData } from "@/lib/gantt-data";
+import { DELAY_REASON_LABEL, type DelayReason } from "@/lib/delay";
+
+export type CriticalRow = {
+  id: number;
+  code: string;
+  name: string;
+  floorLabel: string | null;
+  startDate: string;
+  endDate: string;
+  progress: number;
+  sheetType: string;
+  sheetSlug: string | null;
+  float: number;
+};
+
+export type DelayedRow = {
+  id: number;
+  code: string;
+  name: string;
+  status: string;
+  endDate: string;
+  progressPercent: number;
+  floorLabel: string | null;
+  sheetType: string;
+  sheetSlug: string | null;
+  delayReason: string | null;
+  delayNote: string | null;
+};
+
+export type DelayParetoRow = { slug: string | null; label: string; count: number };
+
+export type ScheduleControlData = {
+  critical: CriticalRow[];
+  delayed: DelayedRow[];
+  delayPareto: DelayParetoRow[];
+};
+
+export async function getScheduleControlData(
+  disciplineId: number | null,
+): Promise<ScheduleControlData> {
+  const today = todayISO();
+  const heFilterAnd = disciplineId !== null ? "AND st.discipline_id = ?" : "";
+  const heParams = disciplineId !== null ? [disciplineId] : [];
+
+  // Đường găng: CPM trên tập nhóm việc đã lọc theo hệ (nhất quán với /api/gantt).
+  const { nodes, edges, meta } = await getCpmData(disciplineId);
+  const cpm = computeCpm(nodes, edges);
+  const critical: CriticalRow[] = [...cpm.criticalNodes]
+    .map((id) => {
+      const m = meta.get(id)!;
+      return {
+        id: m.id,
+        code: m.code,
+        name: m.name,
+        floorLabel: m.floorLabel,
+        startDate: m.startDate,
+        endDate: m.endDate,
+        progress: m.progress,
+        sheetType: m.sheetType,
+        sheetSlug: m.sheetSlug,
+        float: cpm.float.get(id) ?? 0,
+      };
+    })
+    .sort((a, b) => a.startDate.localeCompare(b.startDate) || a.code.localeCompare(b.code));
+
+  // Task trễ — cùng điều kiện lọc trễ đang dùng ở /api/dashboard.
+  const delayed = await query<DelayedRow>(
+    `SELECT t.id, t.code, t.name, t.status,
+            t.end_date AS "endDate", t.progress_percent AS "progressPercent",
+            wp.floor_label AS "floorLabel", st.code AS "sheetType", st.slug AS "sheetSlug",
+            t.delay_reason AS "delayReason", t.delay_note AS "delayNote"
+       FROM tasks t
+       JOIN work_packages wp ON t.package_id = wp.id
+       JOIN sheet_types st ON wp.sheet_type_id = st.id
+      WHERE t.end_date IS NOT NULL AND t.end_date < ?
+        AND t.progress_percent < 1
+        AND t.status NOT IN ('hoan_thanh','nghiem_thu')
+        ${heFilterAnd}
+      ORDER BY t.end_date`,
+    today,
+    ...heParams,
+  );
+
+  // Pareto lý do trễ — cùng cách đếm với panel Pareto trên Dashboard (app/page.tsx):
+  // nhóm theo delay_reason, giảm dần theo count, kèm mục "chưa gán lý do" ở cuối.
+  const reasonCounts = (Object.keys(DELAY_REASON_LABEL) as DelayReason[])
+    .map((slug) => ({
+      slug: slug as string,
+      label: DELAY_REASON_LABEL[slug],
+      count: delayed.filter((t) => t.delayReason === slug).length,
+    }))
+    .filter((r) => r.count > 0)
+    .sort((a, b) => b.count - a.count);
+  const noReasonCount = delayed.filter((t) => !t.delayReason).length;
+  const delayPareto: DelayParetoRow[] =
+    noReasonCount > 0
+      ? [...reasonCounts, { slug: null, label: "Chưa gán lý do", count: noReasonCount }]
+      : reasonCounts;
+
+  return { critical, delayed, delayPareto };
+}
