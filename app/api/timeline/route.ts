@@ -2,15 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { query, todayISO } from "@/lib/db";
 import { sortFloorsDesc } from "@/lib/floors";
+import { resolveDisciplineId } from "@/lib/disciplines";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/timeline — tiến độ hiện tại (tầng × hệ, nhóm theo tháp) + lịch sử (tầng × tuần).
-export async function GET(_req: NextRequest) {
+// GET /api/timeline?he=<disciplines.code> — tiến độ hiện tại (tầng × hệ, nhóm theo tháp)
+// + lịch sử (tầng × tuần). `he` lọc theo hệ thi công (M36) — không truyền = toàn dự án,
+// code không tồn tại = kết quả rỗng (không lỗi).
+export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
   const today = todayISO();
+  const disciplineId = await resolveDisciplineId(req.nextUrl.searchParams.get("he"));
+  const heFilter = disciplineId !== null ? "AND st.discipline_id = ?" : "";
+  const heParams = disciplineId !== null ? [disciplineId] : [];
 
   // Tiến độ hiện tại theo tháp × tầng × hệ — trễ tính theo ngày quá hạn
   // (giống /api/dashboard/floors, nhất quán với cách lib/status.ts suy ra "tre").
@@ -34,27 +40,33 @@ export async function GET(_req: NextRequest) {
        LEFT JOIN towers tw ON st.tower_id = tw.id
        LEFT JOIN tasks t ON t.package_id = wp.id
       WHERE wp.floor_label IS NOT NULL AND wp.floor_label != ''
+        ${heFilter}
       GROUP BY tw.id, tw.name, wp.floor_label, st.id, st.code, st.slug
       ORDER BY tw.id, st.sort_order, st.id, wp.floor_label`,
     today,
+    ...heParams,
   );
 
-  // Tiến độ theo tuần × tầng (gộp tất cả hệ/tháp) — 13 tuần gần nhất
+  // Tiến độ theo tuần × tầng (gộp tất cả hệ/tháp, lọc theo `he` nếu có) — 13 tuần gần nhất
   const history = await query<{
     floorLabel: string;
     weekStart: string;
     avgProgress: number;
-  }>(`
-    SELECT wp.floor_label AS "floorLabel",
+  }>(
+    `SELECT wp.floor_label AS "floorLabel",
            DATE_TRUNC('week', th.changed_at)::DATE::TEXT AS "weekStart",
            AVG(th.new_progress) AS "avgProgress"
       FROM task_history th
       JOIN tasks t ON th.task_id = t.id
       JOIN work_packages wp ON t.package_id = wp.id
+      JOIN sheet_types st ON wp.sheet_type_id = st.id
      WHERE wp.floor_label IS NOT NULL AND wp.floor_label != ''
        AND th.changed_at >= NOW() - INTERVAL '13 weeks'
+       ${heFilter}
      GROUP BY wp.floor_label, DATE_TRUNC('week', th.changed_at)
-     ORDER BY "floorLabel", "weekStart"`);
+     ORDER BY "floorLabel", "weekStart"`,
+    ...heParams,
+  );
 
   // Danh sách tuần (ISO date, thứ Hai đầu tuần)
   const weeksSet = new Set(history.map((h) => h.weekStart));

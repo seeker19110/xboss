@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Printer, CalendarClock } from "lucide-react";
 import { LookaheadTable } from "@/app/components/LookaheadTable";
+import HeFilter from "@/app/components/HeFilter";
 import { redirectToLogin } from "@/app/lib/me";
 import { formatDateVN } from "@/lib/date";
 
@@ -39,17 +40,24 @@ function groupBySheet(tasks: LTask[]): { sheet: string; tasks: LTask[] }[] {
 export default function LookaheadPage() {
   const [data, setData] = useState<Data | null>(null);
   const [days, setDays] = useState(14);
+  const [he, setHe] = useState("");
   const [projectName, setProjectName] = useState<string | null>(null);
 
+  // Đọc `?he=` lúc mount để link chia sẻ/từ hub trỏ thẳng vào đúng bộ lọc (M36).
   useEffect(() => {
-    fetch(`/api/lookahead?days=${days}`).then(async (r) => {
+    setHe(new URLSearchParams(window.location.search).get("he") ?? "");
+  }, []);
+
+  useEffect(() => {
+    const qs = `?days=${days}${he ? `&he=${encodeURIComponent(he)}` : ""}`;
+    fetch(`/api/lookahead${qs}`).then(async (r) => {
       if (r.status === 401) {
         redirectToLogin();
         return;
       }
       setData(await r.json());
     });
-  }, [days]);
+  }, [days, he]);
   useEffect(() => {
     fetch("/api/project")
       .then((r) => (r.ok ? r.json() : null))
@@ -65,11 +73,17 @@ export default function LookaheadPage() {
         <span className="text-sm text-zinc-600">
           Kế hoạch ngắn hạn cho họp giao ban — in hoặc lưu PDF
         </span>
+        <HeFilter
+          value={he}
+          onChange={setHe}
+          labelClassName="ml-auto flex items-center gap-1.5 text-xs text-zinc-600"
+          selectClassName="min-h-10 border border-zinc-300 rounded-lg px-3 py-2 text-sm bg-white"
+        />
         <select
           value={days}
           onChange={(e) => setDays(Number(e.target.value))}
           aria-label="Số ngày xem trước"
-          className="ml-auto border border-zinc-300 rounded-lg px-3 py-2 text-sm bg-white"
+          className="border border-zinc-300 rounded-lg px-3 py-2 text-sm bg-white"
         >
           <option value={7}>7 ngày</option>
           <option value={14}>14 ngày</option>

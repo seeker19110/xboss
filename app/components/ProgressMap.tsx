@@ -189,7 +189,7 @@ function TowerCurrentTable({
 
 // ── Component chính ──────────────────────────────────────────────────────────
 
-export default function ProgressMap() {
+export default function ProgressMap({ he = "" }: { he?: string }) {
   const [data, setData] = useState<ApiData | null>(null);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<"current" | "history">("current");
@@ -206,7 +206,8 @@ export default function ProgressMap() {
   const [titleDraft, setTitleDraft] = useState("");
 
   function reload() {
-    fetch("/api/timeline")
+    setLoading(true);
+    fetch(`/api/timeline${he ? `?he=${encodeURIComponent(he)}` : ""}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => setData(j))
       .finally(() => setLoading(false));
@@ -217,6 +218,10 @@ export default function ProgressMap() {
 
   useEffect(() => {
     reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [he]);
+
+  useEffect(() => {
     fetchMe().then((u) => setCanEdit(u?.role === "admin" || u?.role === "pm"));
     fetch("/api/project")
       .then((r) => (r.ok ? r.json() : null))

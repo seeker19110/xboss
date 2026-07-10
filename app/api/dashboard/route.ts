@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { query, todayISO } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { resolveDisciplineId } from "@/lib/disciplines";
 import {
   cashflowSeries,
   cpiBlock,
@@ -14,13 +15,18 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+// `?he=<disciplines.code>` (M36) lọc KPI + bảng trễ theo hệ — không truyền = nguyên hành vi cũ.
+export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.viewDashboard(user.role))
     return NextResponse.json({ error: "Thầu phụ không có quyền xem dashboard" }, { status: 403 });
 
   const today = todayISO();
+  const disciplineId = await resolveDisciplineId(req.nextUrl.searchParams.get("he"));
+  const heFilterAnd = disciplineId !== null ? "AND st.discipline_id = ?" : "";
+  const heFilterWhere = disciplineId !== null ? "WHERE st.discipline_id = ?" : "";
+  const heParams = disciplineId !== null ? [disciplineId] : [];
 
   // Task trễ: end_date < hôm nay AND progress < 1 AND chưa hoàn thành/nghiệm thu.
   const delayedTasks = await query(
@@ -38,8 +44,10 @@ export async function GET() {
       WHERE t.end_date IS NOT NULL AND t.end_date < ?
         AND t.progress_percent < 1
         AND t.status NOT IN ('hoan_thanh','nghiem_thu')
+        ${heFilterAnd}
       ORDER BY t.end_date`,
     today,
+    ...heParams,
   );
 
   // KPI theo từng sheet
@@ -52,9 +60,11 @@ export async function GET() {
        FROM sheet_types st
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
+       ${heFilterWhere}
       GROUP BY st.id, st.code, st.slug
       ORDER BY st.sort_order, st.id`,
     today,
+    ...heParams,
   );
 
   // M9 — khối mở rộng "tiền + chất lượng + công trường". Khối tài chính (cashflow/

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Printer, ArrowLeft, Download } from "lucide-react";
 import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
 import { formatDateVN } from "@/lib/date";
+import HeFilter from "@/app/components/HeFilter";
 
 type DelayedTask = {
   id: number;
@@ -33,18 +34,42 @@ export default function ReportPage() {
   } | null>(null);
   const [forecast, setForecast] = useState<Forecast[]>([]);
   const [projectName, setProjectName] = useState<string | null>(null);
+  const [he, setHe] = useState("");
+  const [heName, setHeName] = useState<string | null>(null);
+
+  // Đọc `?he=` lúc mount để link chia sẻ/từ hub trỏ thẳng vào đúng bộ lọc (M36).
+  useEffect(() => {
+    setHe(new URLSearchParams(window.location.search).get("he") ?? "");
+  }, []);
 
   useEffect(() => {
-    fetch("/api/dashboard")
+    const qs = he ? `?he=${encodeURIComponent(he)}` : "";
+    fetch(`/api/dashboard${qs}`)
       .then((r) => r.json())
       .then(setData);
+    // /api/dashboard/forecast chưa hỗ trợ `he` (ngoài phạm vi PR1) — giữ nguyên không lọc.
     fetch("/api/dashboard/forecast")
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => setForecast(j?.forecast ?? []));
+  }, [he]);
+  useEffect(() => {
     fetch("/api/project")
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => setProjectName(j?.name ?? null));
   }, []);
+  // Tên hệ để hiện "— Hệ <tên>" trong tiêu đề khi đang lọc.
+  useEffect(() => {
+    if (!he) {
+      setHeName(null);
+      return;
+    }
+    fetch("/api/disciplines")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        const d = (j?.disciplines ?? []).find((x: { code: string }) => x.code === he);
+        setHeName(d?.name ?? null);
+      });
+  }, [he]);
 
   return (
     <div className="min-h-screen bg-white text-zinc-900">
@@ -56,6 +81,12 @@ export default function ReportPage() {
           Báo cáo in — dùng nút bên phải rồi chọn &ldquo;Save as PDF&rdquo;
         </span>
         <div className="ml-auto flex items-center gap-2">
+          <HeFilter
+            value={he}
+            onChange={setHe}
+            labelClassName="flex items-center gap-1.5 text-xs text-zinc-600"
+            selectClassName="min-h-10 border border-zinc-300 rounded-lg px-3 py-2 text-sm bg-white"
+          />
           <a
             href="/api/export/pdf"
             download
@@ -74,7 +105,9 @@ export default function ReportPage() {
 
       <div className="max-w-4xl mx-auto p-8">
         <div className="border-b-2 border-zinc-900 pb-4 mb-6">
-          <h1 className="text-2xl font-bold">BÁO CÁO TIẾN ĐỘ THI CÔNG ACMV</h1>
+          <h1 className="text-2xl font-bold">
+            BÁO CÁO TIẾN ĐỘ THI CÔNG ACMV{heName ? ` — Hệ ${heName}` : ""}
+          </h1>
           <p className="text-zinc-600">
             {projectName ?? "XBoss"} · Ngày: {new Date().toLocaleDateString("vi-VN")}
           </p>

@@ -36,6 +36,16 @@ export type DisciplineSummary = {
   floorsPending: number | null;
 };
 
+// Resolve `?he=<code>` (query param dùng chung cho các API tiến độ — M36) → id hệ.
+// - Không truyền code (null/rỗng) → null: không lọc, giữ nguyên hành vi cũ.
+// - Code không khớp hệ nào → -1 (sentinel không khớp id thật nào) để query lọc ra kết quả
+//   rỗng một cách tự nhiên thay vì phải rẽ nhánh 404/500 ở từng route.
+export async function resolveDisciplineId(code: string | null): Promise<number | null> {
+  if (!code) return null;
+  const d = await queryOne<{ id: number }>(`SELECT id FROM disciplines WHERE code = ?`, code);
+  return d?.id ?? -1;
+}
+
 export async function listDisciplines() {
   const today = todayISO();
   return query(

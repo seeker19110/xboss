@@ -1,30 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, todayISO } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { resolveDisciplineId } from "@/lib/disciplines";
 
 export const dynamic = "force-dynamic";
 
-type TaskRow = { id: number; startDate: string | null; endDate: string | null; progress: number; sheet: string };
-type HistRow = { taskId: number; oldProgress: number | null; newProgress: number | null; day: string };
+type TaskRow = {
+  id: number;
+  startDate: string | null;
+  endDate: string | null;
+  progress: number;
+  sheet: string;
+};
+type HistRow = {
+  taskId: number;
+  oldProgress: number | null;
+  newProgress: number | null;
+  day: string;
+};
 
 const DAY_MS = 86400_000;
 const toDate = (iso: string) => new Date(iso + "T00:00:00Z").getTime();
 const toISO = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
-// GET /api/dashboard/scurve?sheet=OGTĐ&baseline=<id> (đều tuỳ chọn)
+// GET /api/dashboard/scurve?sheet=OGTĐ&baseline=<id>&he=<disciplines.code> (đều tuỳ chọn)
 // S-curve: đường kế hoạch (nội suy tuyến tính start→end mỗi task)
 // vs đường thực tế (tái dựng % từng ngày từ task_history).
 // Có ?baseline= → đường kế hoạch dùng ngày đã chốt trong baseline thay vì ngày hiện tại,
 // để đo độ lệch so với kế hoạch gốc kể cả khi PM đã dời ngày.
+// `he` (M36) gộp mọi sheet thuộc hệ — truyền cả `sheet` lẫn `he` thì `sheet` thắng (hẹp hơn).
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.viewDashboard(user.role)) return NextResponse.json({ error: "Thầu phụ không có quyền xem dashboard" }, { status: 403 });
+  if (!CAN.viewDashboard(user.role))
+    return NextResponse.json({ error: "Thầu phụ không có quyền xem dashboard" }, { status: 403 });
 
   const sheet = req.nextUrl.searchParams.get("sheet");
   const baselineId = parseInt(req.nextUrl.searchParams.get("baseline") ?? "");
-  const sheetFilter = sheet ? `AND st.code = ?` : "";
-  const params = sheet ? [sheet] : [];
+  const disciplineId = sheet ? null : await resolveDisciplineId(req.nextUrl.searchParams.get("he"));
+  const sheetFilter = sheet
+    ? `AND st.code = ?`
+    : disciplineId !== null
+      ? `AND st.discipline_id = ?`
+      : "";
+  const params = sheet ? [sheet] : disciplineId !== null ? [disciplineId] : [];
 
   const tasks = await query<TaskRow>(
     `SELECT t.id, t.start_date AS "startDate", t.end_date AS "endDate",
@@ -32,18 +51,29 @@ export async function GET(req: NextRequest) {
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
-      WHERE 1=1 ${sheetFilter}`, ...params);
+      WHERE 1=1 ${sheetFilter}`,
+    ...params,
+  );
   if (tasks.length === 0) return NextResponse.json({ points: [], sheets: [] });
 
   // Ngày kế hoạch lấy từ baseline đã chốt (nếu chọn) — task tạo sau baseline giữ ngày hiện tại.
   if (!isNaN(baselineId)) {
-    const blDates = await query<{ taskId: number; startDate: string | null; endDate: string | null }>(
+    const blDates = await query<{
+      taskId: number;
+      startDate: string | null;
+      endDate: string | null;
+    }>(
       `SELECT task_id AS "taskId", start_date AS "startDate", end_date AS "endDate"
-         FROM baseline_tasks WHERE baseline_id = ?`, baselineId);
+         FROM baseline_tasks WHERE baseline_id = ?`,
+      baselineId,
+    );
     const byTask = new Map(blDates.map((b) => [b.taskId, b]));
     for (const t of tasks) {
       const b = byTask.get(t.id);
-      if (b) { t.startDate = b.startDate; t.endDate = b.endDate; }
+      if (b) {
+        t.startDate = b.startDate;
+        t.endDate = b.endDate;
+      }
     }
   }
 
@@ -56,7 +86,9 @@ export async function GET(req: NextRequest) {
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
       WHERE 1=1 ${sheetFilter}
-      ORDER BY h.task_id, h.changed_at`, ...params);
+      ORDER BY h.task_id, h.changed_at`,
+    ...params,
+  );
 
   // Sự kiện theo task: [{day, progress}] đã sắp theo thời gian.
   const eventsByTask = new Map<number, { day: string; progress: number }[]>();
@@ -70,7 +102,10 @@ export async function GET(req: NextRequest) {
 
   const today = todayISO();
   const dates: string[] = [];
-  for (const t of tasks) { if (t.startDate) dates.push(t.startDate); if (t.endDate) dates.push(t.endDate); }
+  for (const t of tasks) {
+    if (t.startDate) dates.push(t.startDate);
+    if (t.endDate) dates.push(t.endDate);
+  }
   for (const h of hist) dates.push(h.day);
   if (dates.length === 0) return NextResponse.json({ points: [], sheets: [] });
 
@@ -95,7 +130,8 @@ export async function GET(req: NextRequest) {
     if (planned.length > 0) {
       let sum = 0;
       for (const t of planned) {
-        const s = toDate(t.startDate!), e = toDate(t.endDate!);
+        const s = toDate(t.startDate!),
+          e = toDate(t.endDate!);
         sum += e <= s ? (ms >= e ? 1 : 0) : Math.min(1, Math.max(0, (ms - s) / (e - s)));
       }
       plannedPct = sum / planned.length;
@@ -107,9 +143,15 @@ export async function GET(req: NextRequest) {
       let sum = 0;
       for (const t of tasks) {
         const events = eventsByTask.get(t.id);
-        if (!events) { sum += t.progress ?? 0; continue; } // không có lịch sử → coi như % hiện tại từ đầu
+        if (!events) {
+          sum += t.progress ?? 0;
+          continue;
+        } // không có lịch sử → coi như % hiện tại từ đầu
         let p = baseline.get(t.id) ?? 0;
-        for (const ev of events) { if (ev.day <= d) p = ev.progress; else break; }
+        for (const ev of events) {
+          if (ev.day <= d) p = ev.progress;
+          else break;
+        }
         sum += p;
       }
       actualPct = sum / tasks.length;
