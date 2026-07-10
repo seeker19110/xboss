@@ -21,6 +21,7 @@ import { expiringEnvPermits, exceededMonitoring } from "@/lib/environment";
 import { alarmingPoints } from "@/lib/monitoring";
 import { overduePunch } from "@/lib/handover";
 import { expiringWarranties, overdueClaims } from "@/lib/warranty";
+import { advanceOverdueList, ADVANCE_OVERDUE_DAYS } from "@/lib/finance";
 import { getCurrentProjectId } from "@/lib/projects";
 import { EXPIRY_WARN_DAYS } from "@/lib/contracts";
 import { CERT_PENDING_DAYS } from "@/lib/paymentcerts";
@@ -912,6 +913,32 @@ export async function GET() {
         WHERE user_id = ? AND type = 'warranty_claim_overdue' AND is_read = 0 AND warranty_claim_id <> ALL(?)`,
       user.id,
       overdueWarrantyClaimIds,
+    );
+  }
+
+  // Tạm ứng quá hạn hoàn ứng (advance_date quá ADVANCE_OVERDUE_DAYS ngày mà vẫn chưa
+  // 'settled') → cảnh báo Admin/PM (M27, nhạy cảm tiền = manageFinance).
+  if (CAN.manageFinance(user.role)) {
+    const overdueAdvances = await advanceOverdueList(ADVANCE_OVERDUE_DAYS, projectId ?? undefined);
+    if (overdueAdvances.length > 0) {
+      const values = overdueAdvances.map(() => `(?, ?, 'advance_overdue', ?)`).join(", ");
+      const params = overdueAdvances.flatMap((a) => [
+        user.id,
+        a.id,
+        `💸 Tạm ứng ${a.code ?? `#${a.id}`}${a.recipient ? ` — ${a.recipient}` : ""} quá hạn hoàn ứng (tạm ứng ${a.advanceDate})`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, advance_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, type, advance_id) WHERE advance_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    const overdueAdvanceIds = overdueAdvances.map((a) => a.id);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'advance_overdue' AND is_read = 0 AND advance_id <> ALL(?)`,
+      user.id,
+      overdueAdvanceIds,
     );
   }
 

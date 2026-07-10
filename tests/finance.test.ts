@@ -435,3 +435,212 @@ test(
     await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
   },
 );
+
+test("parseInvoiceBody: đọc body JSON thành InvoiceInput", async () => {
+  const { parseInvoiceBody } = await import("@/lib/finance");
+
+  const input = parseInvoiceBody({
+    invoiceNo: " HD001 ",
+    invoiceDate: "2026-07-01",
+    direction: "out",
+    netAmount: "1000000",
+    vatAmount: "100000",
+    vatRate: "10",
+    counterparty: " Công ty A ",
+  });
+  assert.equal(input.invoiceNo, "HD001");
+  assert.equal(input.direction, "out");
+  assert.equal(input.netAmount, 1000000);
+  assert.equal(input.vatAmount, 100000);
+  assert.equal(input.vatRate, 10);
+  assert.equal(input.counterparty, "Công ty A");
+  assert.equal(input.contractId, null);
+
+  const empty = parseInvoiceBody({});
+  assert.equal(empty.invoiceNo, null);
+  assert.equal(empty.netAmount, 0);
+  assert.equal(empty.vatRate, null);
+});
+
+test("parsePayrollBody: đọc body JSON thành PayrollInput", async () => {
+  const { parsePayrollBody } = await import("@/lib/finance");
+
+  const input = parsePayrollBody({
+    period: "2026-07",
+    personnelId: "5",
+    workdays: "26",
+    rate: "300000",
+    gross: "7800000",
+    deductions: "200000",
+    net: "7600000",
+    status: "approved",
+  });
+  assert.equal(input.period, "2026-07");
+  assert.equal(input.personnelId, 5);
+  assert.equal(input.crewId, null);
+  assert.equal(input.workdays, 26);
+  assert.equal(input.status, "approved");
+
+  const empty = parsePayrollBody({});
+  assert.equal(empty.status, "draft");
+  assert.equal(empty.workdays, 0);
+});
+
+test(
+  "vatSummary: gộp đúng VAT vào/ra theo kỳ, không lẫn dự án khác",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { vatSummary } = await import("@/lib/finance");
+
+    const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA VAT 1', 'PJT-VAT1')`);
+    const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA VAT 2', 'PJT-VAT2')`);
+
+    const ids: number[] = [];
+    ids.push(
+      await insertId(
+        `INSERT INTO invoices (project_id, invoice_date, direction, net_amount, vat_amount)
+         VALUES (?, '2026-07-05', 'out', 10000000, 1000000)`,
+        p1,
+      ),
+    );
+    ids.push(
+      await insertId(
+        `INSERT INTO invoices (project_id, invoice_date, direction, net_amount, vat_amount)
+         VALUES (?, '2026-07-06', 'in', 4000000, 400000)`,
+        p1,
+      ),
+    );
+    ids.push(
+      await insertId(
+        `INSERT INTO invoices (project_id, invoice_date, direction, net_amount, vat_amount)
+         VALUES (?, '2026-07-07', 'out', 999999999, 99999999)`,
+        p2,
+      ),
+    );
+
+    const vat1 = await vatSummary("2026-07", p1);
+    assert.equal(vat1.vatOut, 1000000);
+    assert.equal(vat1.vatIn, 400000);
+    assert.equal(vat1.netVat, 600000);
+
+    const vat2 = await vatSummary("2026-07", p2);
+    assert.equal(vat2.vatOut, 99999999);
+    assert.equal(vat2.vatIn, 0);
+
+    await run(`DELETE FROM invoices WHERE id = ANY(?)`, ids);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+  },
+);
+
+test(
+  "payrollFromAttendance: tính đúng công theo người từ attendance thật, bỏ chấm công theo tổ (gộp)",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { payrollFromAttendance } = await import("@/lib/finance");
+
+    const p1 = await insertId(
+      `INSERT INTO projects (name, code) VALUES ('DA LUONG 1', 'PJT-LUONG1')`,
+    );
+    const personnelId = await insertId(
+      `INSERT INTO personnel (project_id, full_name) VALUES (?, 'Nguyễn Văn Công')`,
+      p1,
+    );
+    const crewId = await insertId(
+      `INSERT INTO crews (project_id, name) VALUES (?, 'Tổ điện nước')`,
+      p1,
+    );
+
+    const attIds: number[] = [];
+    // Chấm công theo người: 3 ngày có mặt trong kỳ 2026-07.
+    for (const d of ["2026-07-01", "2026-07-02", "2026-07-03"]) {
+      attIds.push(
+        await insertId(
+          `INSERT INTO attendance (project_id, work_date, personnel_id, present)
+           VALUES (?, ?, ?, true)`,
+          p1,
+          d,
+          personnelId,
+        ),
+      );
+    }
+    // Chấm công theo tổ (gộp, headcount) — không tách được người cụ thể, không vào gợi ý.
+    attIds.push(
+      await insertId(
+        `INSERT INTO attendance (project_id, work_date, crew_id, headcount)
+         VALUES (?, '2026-07-01', ?, 5)`,
+        p1,
+        crewId,
+      ),
+    );
+
+    const suggestions = await payrollFromAttendance("2026-07", p1);
+    assert.equal(suggestions.length, 1);
+    assert.equal(suggestions[0].personnelId, personnelId);
+    assert.equal(suggestions[0].workdays, 3);
+
+    await run(`DELETE FROM attendance WHERE id = ANY(?)`, attIds);
+    await run(`DELETE FROM crews WHERE id = ?`, crewId);
+    await run(`DELETE FROM personnel WHERE id = ?`, personnelId);
+    await run(`DELETE FROM projects WHERE id = ?`, p1);
+  },
+);
+
+test(
+  "advanceOverdueList: chỉ trả tạm ứng quá ngưỡng ngày chưa settled, scoping đúng dự án",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { advanceOverdueList } = await import("@/lib/finance");
+
+    const p1 = await insertId(
+      `INSERT INTO projects (name, code) VALUES ('DA TUQH 1', 'PJT-TUQH1')`,
+    );
+    const p2 = await insertId(
+      `INSERT INTO projects (name, code) VALUES ('DA TUQH 2', 'PJT-TUQH2')`,
+    );
+
+    // Quá hạn: tạm ứng cách đây 40 ngày, chưa settled.
+    const overdueId = await insertId(
+      `INSERT INTO advances (project_id, code, advance_date, amount, recipient, status)
+       VALUES (?, 'TU-OVERDUE', CURRENT_DATE - INTERVAL '40 days', 2000000, 'A', 'open')`,
+      p1,
+    );
+    // Chưa quá hạn: mới tạm ứng 5 ngày trước.
+    const freshId = await insertId(
+      `INSERT INTO advances (project_id, code, advance_date, amount, recipient, status)
+       VALUES (?, 'TU-FRESH', CURRENT_DATE - INTERVAL '5 days', 1000000, 'B', 'open')`,
+      p1,
+    );
+    // Đã settled dù quá hạn ngày — không được tính là quá hạn hoàn ứng.
+    const settledId = await insertId(
+      `INSERT INTO advances (project_id, code, advance_date, amount, settled_amount, recipient, status)
+       VALUES (?, 'TU-SETTLED', CURRENT_DATE - INTERVAL '50 days', 3000000, 3000000, 'C', 'settled')`,
+      p1,
+    );
+    // Dự án khác — không được lẫn vào kết quả DA1.
+    const otherProjectId = await insertId(
+      `INSERT INTO advances (project_id, code, advance_date, amount, recipient, status)
+       VALUES (?, 'TU-OTHERPRJ', CURRENT_DATE - INTERVAL '40 days', 5000000, 'D', 'open')`,
+      p2,
+    );
+
+    const overdue1 = await advanceOverdueList(30, p1);
+    assert.equal(overdue1.length, 1);
+    assert.equal(overdue1[0].id, overdueId);
+
+    const overdue2 = await advanceOverdueList(30, p2);
+    assert.equal(overdue2.length, 1);
+    assert.equal(overdue2[0].id, otherProjectId);
+
+    await run(
+      `DELETE FROM advances WHERE id IN (?, ?, ?, ?)`,
+      overdueId,
+      freshId,
+      settledId,
+      otherProjectId,
+    );
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+  },
+);

@@ -286,6 +286,7 @@ export const DASHBOARD_TREE: DashCluster[] = [
       },
       {
         id: "dash.tai-chinh-ke-toan",
+        href: "/finance",
         label: "Tài chính – Kế toán",
         icon: Banknote,
         roles: ["admin", "pm", "bch"],
