@@ -75,12 +75,14 @@ html.navy {
 }
 
 /* Chế độ sáng (mặc định): đảo thang zinc + white/black để toàn bộ UI (viết theo dark)
-   tự đổi màu, không phải sửa từng class trong các page. Nền/mặt thẻ/viền ngả màu giấy
-   ấm (không dùng trắng tinh #fff) — dễ chịu hơn khi nhìn lâu; các màu nhấn -300/-400
-   đậm lại cho đủ tương phản. */
+   tự đổi màu, không phải sửa từng class trong các page. Nền trang xám nhạt lạnh + card
+   trắng nổi khối (kiểu dashboard SaaS hiện đại) thay vì trắng tinh #fff đồng nhất — dễ
+   phân lớp nội dung, đỡ chói khi nhìn lâu. Chỉ chỉnh nền/thẻ/viền (zinc-700..950); các
+   màu nhấn -300/-400 GIỮ NGUYÊN (không đổi theo bất kỳ ảnh tham khảo nào) để không lệch
+   ý nghĩa màu trạng thái (lib/status.ts) và các nút hành động chính (emerald) toàn app. */
 html.light {
   color-scheme: light;
-  --background: #faf8f4;
+  --background: #eef1f5;
   --foreground: #171717;
   --color-white: #18181b;
   --color-black: #ffffff;
@@ -91,10 +93,10 @@ html.light {
   --color-zinc-400: #52525b;
   --color-zinc-500: #71717a;
   --color-zinc-600: #a1a1aa;
-  --color-zinc-700: #d8d2c5;
-  --color-zinc-800: #e6e0d3;
-  --color-zinc-900: #f3efe7;
-  --color-zinc-950: #faf8f4;
+  --color-zinc-700: #d3d8e0;
+  --color-zinc-800: #e2e6ec;
+  --color-zinc-900: #ffffff;
+  --color-zinc-950: #eef1f5;
   --color-emerald-300: #047857;
   --color-emerald-400: #059669;
   --color-sky-300: #0369a1;
