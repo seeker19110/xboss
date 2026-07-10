@@ -26,6 +26,7 @@ export const EMBED_HOST_WHITELIST = [
   "acc.autodesk.com", // Autodesk Construction Cloud
   "my.matterport.com", // Matterport 3D walkthrough (flycam/hiện trạng)
   "app.smartsheet.com", // một số dự án dùng thay P6/MS Project online
+  "donghanhcungban.com", // Công ty — camera/BIM riêng
 ];
 
 export type TechLinkRow = {
