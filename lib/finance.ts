@@ -5,6 +5,8 @@
 // lib/contracts.ts, KHÔNG lặp công thức). Xem docs/nang-cap/M27-tai-chinh-ke-toan.md.
 import { query, queryOne } from "@/lib/db";
 import { listContracts } from "@/lib/contracts";
+import { attendanceSummary } from "@/lib/hr";
+import { daysFromTodayISO } from "@/lib/date";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const PERIOD_RE = /^\d{4}-\d{2}$/;
@@ -180,6 +182,21 @@ export function validateInvoiceInput(input: InvoiceInput): string | null {
   return null;
 }
 
+export function parseInvoiceBody(body: Record<string, unknown>): InvoiceInput {
+  const strOrNull = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+  return {
+    invoiceNo: strOrNull(body.invoiceNo),
+    invoiceDate: strOrNull(body.invoiceDate),
+    direction: (typeof body.direction === "string" ? body.direction : "") as "in" | "out",
+    netAmount: body.netAmount != null ? Number(body.netAmount) : 0,
+    vatAmount: body.vatAmount != null ? Number(body.vatAmount) : 0,
+    vatRate: body.vatRate != null && body.vatRate !== "" ? Number(body.vatRate) : null,
+    counterparty: strOrNull(body.counterparty),
+    contractId: body.contractId != null ? Number(body.contractId) : null,
+    paymentBillId: body.paymentBillId != null ? Number(body.paymentBillId) : null,
+  };
+}
+
 export type VatSummary = { vatIn: number; vatOut: number; netVat: number };
 
 // VAT vào (đầu vào, được khấu trừ) / ra (đầu ra, phải nộp) / ròng = vatOut − vatIn,
@@ -236,6 +253,22 @@ export function validatePayrollInput(input: PayrollInput): string | null {
   return null;
 }
 
+export function parsePayrollBody(body: Record<string, unknown>): PayrollInput {
+  const numOrZero = (v: unknown) => (v != null && v !== "" ? Number(v) : 0);
+  const numOrNull = (v: unknown) => (v != null && v !== "" ? Number(v) : null);
+  return {
+    period: typeof body.period === "string" ? body.period.trim() : "",
+    crewId: numOrNull(body.crewId),
+    personnelId: numOrNull(body.personnelId),
+    workdays: numOrZero(body.workdays),
+    rate: numOrZero(body.rate),
+    gross: numOrZero(body.gross),
+    deductions: numOrZero(body.deductions),
+    net: numOrZero(body.net),
+    status: (typeof body.status === "string" ? body.status : "draft") as PayrollInput["status"],
+  };
+}
+
 export type PayrollTotals = { workdays: number; gross: number; deductions: number; net: number };
 
 // Tổng hợp các kỳ lương đã ghi (bảng payroll) theo kỳ — dùng cho báo cáo tổng lương;
@@ -254,4 +287,66 @@ export async function payrollTotals(period: string, projectId?: number): Promise
     ...args,
   );
   return row ?? { workdays: 0, gross: 0, deductions: 0, net: 0 };
+}
+
+export type PayrollSuggestion = { personnelId: number; personnelName: string; workdays: number };
+
+// Gợi ý công/lương từ chấm công (M24 attendance) theo kỳ 'YYYY-MM' — chỉ gộp chấm công
+// theo NGƯỜI (personnel_id NOT NULL, tái dùng attendanceSummary lib/hr.ts); chấm công
+// theo tổ (headcount gộp) không tách được người cụ thể nên không đưa vào gợi ý — người
+// dùng nhập tay các trường hợp này (đúng tinh thần "nhập tay nếu cần" của đặc tả).
+// KHÔNG ghi vào bảng payroll — chỉ trả gợi ý để người dùng xác nhận/chỉnh trước khi lưu.
+export async function payrollFromAttendance(
+  period: string,
+  projectId?: number,
+): Promise<PayrollSuggestion[]> {
+  if (!PERIOD_RE.test(period)) throw new Error("Kỳ lương phải đúng định dạng YYYY-MM");
+  const [y, m] = period.split("-").map(Number);
+  const from = `${period}-01`;
+  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const to = `${period}-${String(lastDay).padStart(2, "0")}`;
+  const rows = await attendanceSummary(projectId, from, to);
+  return rows.map((r) => ({
+    personnelId: r.personnelId,
+    personnelName: r.personnelName,
+    workdays: r.daysPresent,
+  }));
+}
+
+// --- Thông báo tạm ứng quá hạn hoàn ứng ---------------------------------------------
+
+// Ngưỡng "quá hạn hoàn ứng" (ngày) — đặc tả gốc không có cột due_date riêng cho advances
+// (schema PR1 chỉ có advance_date), nên quyết định tự chọn: coi tạm ứng quá hạn khi
+// advance_date đã qua ADVANCE_OVERDUE_DAYS ngày mà vẫn chưa 'settled'. Không thêm cột
+// mới vào schema đã chốt PR1 — xem quyết định ghi trong PROGRESS.md.
+export const ADVANCE_OVERDUE_DAYS = 30;
+
+export type OverdueAdvance = {
+  id: number;
+  code: string | null;
+  recipient: string | null;
+  advanceDate: string | null;
+  amount: number;
+  settledAmount: number;
+  projectId: number | null;
+};
+
+export async function advanceOverdueList(
+  days = ADVANCE_OVERDUE_DAYS,
+  projectId?: number,
+): Promise<OverdueAdvance[]> {
+  const limit = daysFromTodayISO(-days);
+  const conds = ["status <> 'settled'", "advance_date IS NOT NULL", "advance_date <= ?"];
+  const args: unknown[] = [limit];
+  if (projectId != null) {
+    conds.push("project_id = ?");
+    args.push(projectId);
+  }
+  return query<OverdueAdvance>(
+    `SELECT id, code, recipient, advance_date AS "advanceDate", amount,
+            settled_amount AS "settledAmount", project_id AS "projectId"
+       FROM advances WHERE ${conds.join(" AND ")}
+      ORDER BY advance_date`,
+    ...args,
+  );
 }
