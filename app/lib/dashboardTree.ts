@@ -88,6 +88,13 @@ export type DashCluster = {
 };
 
 export const DASHBOARD_TREE: DashCluster[] = [
+  // Thứ tự 24 dashboard bám mockup xBoss-mockup.xlsx: Tổng Quan & Báo Cáo (#1-2),
+  // Khởi Động & Pháp Lý (#3), Nhân Sự & Tổ Chức (#4), Thiết Kế & BPTC (#5), Bản Vẽ (#6),
+  // Kế Hoạch & Tiến Độ (#7-9), Đấu Thầu & NTP (#10-11), Vật Tư & Thiết Bị (#12-15),
+  // Thi Công Hiện Trường (#16-19), Chất Lượng & An Toàn & Môi Trường (#20-23),
+  // Họp – Công Văn (#24-25), Chi Phí & Hợp Đồng (#26-30), Tài Chính – Kế Toán (#31),
+  // Bảo Hiểm & Bảo Lãnh (#32), Claim & Thay Đổi (#33-34), Bàn Giao & Vận Hành (#35-36),
+  // Hệ Thống (#37-38). Lưu ý: Hồ Sơ Dự Án (#24 mockup) giữ nguyên gộp cụm "Điều Hành".
   {
     label: "Tổng quan & Báo cáo",
     dashboards: [
@@ -100,6 +107,12 @@ export const DASHBOARD_TREE: DashCluster[] = [
     label: "Khởi động & Tổ chức",
     dashboards: [
       {
+        id: "dash.khoi-dong-phap-ly",
+        href: "/kickoff",
+        label: "Khởi động & Pháp lý",
+        icon: Landmark,
+      }, // M23
+      {
         id: "dash.nhan-su",
         label: "Nhân sự & Tổ chức",
         icon: Users,
@@ -111,20 +124,19 @@ export const DASHBOARD_TREE: DashCluster[] = [
           { href: "/org", label: "Sơ đồ tổ chức", icon: Network }, // M24
         ],
       },
-      {
-        id: "dash.khoi-dong-phap-ly",
-        href: "/kickoff",
-        label: "Khởi động & Pháp lý",
-        icon: Landmark,
-      }, // M23
     ],
   },
   {
     // Thiết kế & Bản vẽ (mockup: Thiết Kế & BPTC; BIM-Shop-Drawing).
     label: "Thiết kế & Bản vẽ",
     dashboards: [
+      {
+        id: "dash.thiet-ke-bptc",
+        href: "/drawings?kind=method",
+        label: "Thiết kế & Biện pháp thi công",
+        icon: Compass,
+      }, // M08 mở rộng
       { id: "dash.ban-ve", href: "/drawings", label: "Bản vẽ", icon: PencilRuler },
-      { id: "dash.thiet-ke-bptc", label: "Thiết kế & Biện pháp thi công", icon: Compass }, // M08 mở rộng
     ],
   },
   {
@@ -240,6 +252,27 @@ export const DASHBOARD_TREE: DashCluster[] = [
     ],
   },
   {
+    // Điều hành & Hồ sơ (mockup: Họp – Công Văn; Hồ Sơ).
+    label: "Điều hành & Hồ sơ",
+    dashboards: [
+      {
+        id: "dash.hop-cong-van",
+        label: "Họp – Công văn",
+        icon: MessagesSquare,
+        children: [
+          { href: "/meetings", label: "Họp", icon: MessagesSquare },
+          {
+            href: "/correspondences",
+            label: "Công văn",
+            icon: Mail,
+            roles: ["admin", "pm", "engineer", "bch", "cdt", "viewer"],
+          },
+        ],
+      },
+      { id: "dash.ho-so-du-an", href: "/documents", label: "Hồ sơ dự án", icon: FolderOpen },
+    ],
+  },
+  {
     // Chi phí, hợp đồng, tài chính (mockup: Chi Phí & Hợp Đồng; Tài Chính – Kế Toán;
     // Bảo Hiểm & Bảo Lãnh; Claim & Thay Đổi).
     label: "Chi phí · Hợp đồng · Tài chính",
@@ -267,6 +300,20 @@ export const DASHBOARD_TREE: DashCluster[] = [
         ],
       },
       {
+        id: "dash.tai-chinh-ke-toan",
+        href: "/finance",
+        label: "Tài chính – Kế toán",
+        icon: Banknote,
+        roles: ["admin", "pm", "bch"],
+      }, // M27
+      {
+        id: "dash.bao-hiem-bao-lanh",
+        href: "/insurance",
+        label: "Bảo hiểm & Bảo lãnh",
+        icon: Umbrella,
+        roles: ["admin", "pm", "bch"],
+      }, // M28
+      {
         id: "dash.claim",
         label: "Claim & Thay đổi",
         icon: Scale,
@@ -285,41 +332,6 @@ export const DASHBOARD_TREE: DashCluster[] = [
           }, // M34
         ],
       },
-      {
-        id: "dash.tai-chinh-ke-toan",
-        href: "/finance",
-        label: "Tài chính – Kế toán",
-        icon: Banknote,
-        roles: ["admin", "pm", "bch"],
-      }, // M27
-      {
-        id: "dash.bao-hiem-bao-lanh",
-        href: "/insurance",
-        label: "Bảo hiểm & Bảo lãnh",
-        icon: Umbrella,
-        roles: ["admin", "pm", "bch"],
-      }, // M28
-    ],
-  },
-  {
-    // Điều hành & Hồ sơ (mockup: Họp – Công Văn; Hồ Sơ).
-    label: "Điều hành & Hồ sơ",
-    dashboards: [
-      {
-        id: "dash.hop-cong-van",
-        label: "Họp – Công văn",
-        icon: MessagesSquare,
-        children: [
-          { href: "/meetings", label: "Họp", icon: MessagesSquare },
-          {
-            href: "/correspondences",
-            label: "Công văn",
-            icon: Mail,
-            roles: ["admin", "pm", "engineer", "bch", "cdt", "viewer"],
-          },
-        ],
-      },
-      { id: "dash.ho-so-du-an", href: "/documents", label: "Hồ sơ dự án", icon: FolderOpen },
     ],
   },
   {
