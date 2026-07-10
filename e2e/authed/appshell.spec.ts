@@ -177,7 +177,7 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     await expect(topbar.getByText("Vật tư", { exact: true })).toBeVisible({ timeout: 15_000 });
     // Breadcrumb nhóm chỉ hiện từ sm trở lên (ẩn trên mobile để nhường chỗ cho hamburger).
     if (!isMobile) {
-      await expect(topbar.getByText("Vật tư & Thiết bị")).toBeVisible();
+      await expect(topbar.getByText("Quản lý vật tư")).toBeVisible();
     }
   });
 
