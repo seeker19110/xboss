@@ -71,16 +71,16 @@ export default function GanttPage() {
   }
 
   // Đọc `?he=` và `?sheet=` lúc mount để link chia sẻ/từ hub trỏ thẳng vào đúng bộ lọc (M36).
+  // Gọi `load(initial)` trực tiếp với giá trị vừa đọc (không qua state) để tránh 2 request
+  // chạy song song (fetch không lọc trước, fetch đã lọc sau — race condition).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    setHe(params.get("he") ?? "");
+    const initial = params.get("he") ?? "";
+    setHe(initial);
     setSheetFilter(params.get("sheet") ?? "");
     fetchMe().then((user) => setMe(user ?? null));
+    load(initial);
   }, []);
-
-  useEffect(() => {
-    load(he);
-  }, [he]);
 
   // Select sheet in-page đồng bộ lên URL `?sheet=` (đọc lúc mount ở trên) để link ngoài
   // trỏ thẳng vào được (M36).
@@ -182,7 +182,13 @@ export default function GanttPage() {
             </option>
           ))}
         </select>
-        <HeFilter value={he} onChange={setHe} />
+        <HeFilter
+          value={he}
+          onChange={(next) => {
+            setHe(next);
+            load(next);
+          }}
+        />
         <EditModeToggle canEdit={canEdit} editMode={editMode} onToggle={toggleEditMode} />
       </AppHeader>
 

@@ -39,14 +39,19 @@ type Data = { critical: Critical[]; delayed: Delayed[]; delayPareto: ParetoRow[]
 export default function ScheduleControlPage() {
   const [data, setData] = useState<Data | null>(null);
   const [he, setHe] = useState("");
+  // Chặn effect fetch bên dưới chạy lần đầu với `he=""` trước khi effect đọc URL kịp
+  // cập nhật state (race condition — xem M36).
+  const [heReady, setHeReady] = useState(false);
   const [reasonFilter, setReasonFilter] = useState<string | null>("");
 
   // Đọc `?he=` lúc mount để link chia sẻ/từ hub trỏ thẳng vào đúng bộ lọc (M36).
   useEffect(() => {
     setHe(new URLSearchParams(window.location.search).get("he") ?? "");
+    setHeReady(true);
   }, []);
 
   useEffect(() => {
+    if (!heReady) return;
     const qs = he ? `?he=${encodeURIComponent(he)}` : "";
     fetch(`/api/schedule-control${qs}`).then(async (r) => {
       if (r.status === 401) {
@@ -55,7 +60,7 @@ export default function ScheduleControlPage() {
       }
       setData(await r.json());
     });
-  }, [he]);
+  }, [he, heReady]);
 
   const maxParetoCount = useMemo(
     () => Math.max(1, ...(data?.delayPareto ?? []).map((r) => r.count)),

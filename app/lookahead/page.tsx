@@ -41,14 +41,20 @@ export default function LookaheadPage() {
   const [data, setData] = useState<Data | null>(null);
   const [days, setDays] = useState(14);
   const [he, setHe] = useState("");
+  // Chặn effect fetch bên dưới chạy lần đầu với `he=""` trước khi effect đọc URL kịp
+  // cập nhật state (race condition — 2 request chạy song song, kết quả không lọc có
+  // thể ghi đè kết quả đã lọc nếu về sau). Xem M36.
+  const [heReady, setHeReady] = useState(false);
   const [projectName, setProjectName] = useState<string | null>(null);
 
   // Đọc `?he=` lúc mount để link chia sẻ/từ hub trỏ thẳng vào đúng bộ lọc (M36).
   useEffect(() => {
     setHe(new URLSearchParams(window.location.search).get("he") ?? "");
+    setHeReady(true);
   }, []);
 
   useEffect(() => {
+    if (!heReady) return;
     const qs = `?days=${days}${he ? `&he=${encodeURIComponent(he)}` : ""}`;
     fetch(`/api/lookahead${qs}`).then(async (r) => {
       if (r.status === 401) {
@@ -57,7 +63,7 @@ export default function LookaheadPage() {
       }
       setData(await r.json());
     });
-  }, [days, he]);
+  }, [days, he, heReady]);
   useEffect(() => {
     fetch("/api/project")
       .then((r) => (r.ok ? r.json() : null))

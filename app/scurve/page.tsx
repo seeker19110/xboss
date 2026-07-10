@@ -8,10 +8,14 @@ import SCurveChart from "@/app/components/SCurveChart";
 // baseline) + HeFilter lọc theo hệ, đồng bộ `?he=` lên URL như các trang tiến độ khác.
 export default function ScurvePage() {
   const [he, setHe] = useState("");
+  // Chỉ mount SCurveChart SAU khi đã đọc xong `?he=` từ URL — tránh nó fetch lần đầu
+  // với he="" rồi lại fetch lại khi state cập nhật (race condition, xem M36).
+  const [ready, setReady] = useState(false);
 
   // Đọc `?he=` lúc mount để link chia sẻ/từ hub trỏ thẳng vào đúng bộ lọc (M36).
   useEffect(() => {
     setHe(new URLSearchParams(window.location.search).get("he") ?? "");
+    setReady(true);
   }, []);
 
   return (
@@ -19,9 +23,7 @@ export default function ScurvePage() {
       <AppHeader title="S-Curve" back>
         <HeFilter value={he} onChange={setHe} />
       </AppHeader>
-      <main className="px-3 sm:px-6 py-4 w-full">
-        <SCurveChart he={he} />
-      </main>
+      <main className="px-3 sm:px-6 py-4 w-full">{ready && <SCurveChart he={he} />}</main>
     </div>
   );
 }

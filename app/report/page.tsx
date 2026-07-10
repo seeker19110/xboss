@@ -45,6 +45,9 @@ export default function ReportPage() {
   const [he, setHe] = useState("");
   const [heName, setHeName] = useState<string | null>(null);
   const [range, setRange] = useState<Range>("day");
+  // Chặn effect fetch bên dưới chạy lần đầu với he=""/range="day" mặc định trước khi
+  // effect đọc URL kịp cập nhật state (race condition — xem M36).
+  const [heReady, setHeReady] = useState(false);
 
   // Đọc `?he=` và `?range=` lúc mount để link chia sẻ/từ hub trỏ thẳng vào đúng bộ lọc (M36).
   useEffect(() => {
@@ -52,6 +55,7 @@ export default function ReportPage() {
     setHe(params.get("he") ?? "");
     const r = params.get("range");
     if (r === "week" || r === "month") setRange(r);
+    setHeReady(true);
   }, []);
 
   function updateRange(next: Range) {
@@ -67,6 +71,7 @@ export default function ReportPage() {
   }
 
   useEffect(() => {
+    if (!heReady) return;
     const params = new URLSearchParams();
     if (he) params.set("he", he);
     if (range !== "day") params.set("range", range);
@@ -78,7 +83,7 @@ export default function ReportPage() {
     fetch("/api/dashboard/forecast")
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => setForecast(j?.forecast ?? []));
-  }, [he, range]);
+  }, [he, range, heReady]);
   useEffect(() => {
     fetch("/api/project")
       .then((r) => (r.ok ? r.json() : null))
