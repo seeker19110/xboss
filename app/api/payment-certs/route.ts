@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { isUniqueViolation, withUniqueRetry } from "@/lib/seqcode";
 import {
   listCertsByContract,
@@ -12,7 +13,8 @@ import {
 
 export const dynamic = "force-dynamic";
 
-// GET /api/payment-certs?contractId= — danh sách đợt IPC theo hợp đồng.
+// GET /api/payment-certs?contractId= — danh sách đợt IPC theo hợp đồng, scoped
+// theo dự án đang chọn (M22) — chặn xem đợt của hợp đồng thuộc dự án khác.
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -22,6 +24,17 @@ export async function GET(req: NextRequest) {
   const contractId = Number(req.nextUrl.searchParams.get("contractId"));
   if (!Number.isInteger(contractId))
     return NextResponse.json({ error: "Thiếu contractId" }, { status: 422 });
+
+  const projectId = await getCurrentProjectId(user);
+  const contract =
+    projectId != null
+      ? await queryOne<{ id: number }>(
+          `SELECT id FROM contracts WHERE id = ? AND project_id = ?`,
+          contractId,
+          projectId,
+        )
+      : undefined;
+  if (!contract) return NextResponse.json({ error: "Hợp đồng không tồn tại" }, { status: 422 });
 
   const certs = await listCertsByContract(contractId);
   return NextResponse.json({ certs });
@@ -43,10 +56,15 @@ export async function POST(req: NextRequest) {
   if (!Number.isInteger(contractId))
     return NextResponse.json({ error: "Thiếu hợp đồng" }, { status: 422 });
 
-  const contract = await queryOne<{ id: number }>(
-    `SELECT id FROM contracts WHERE id = ?`,
-    contractId,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const contract =
+    projectId != null
+      ? await queryOne<{ id: number }>(
+          `SELECT id FROM contracts WHERE id = ? AND project_id = ?`,
+          contractId,
+          projectId,
+        )
+      : undefined;
   if (!contract) return NextResponse.json({ error: "Hợp đồng không tồn tại" }, { status: 422 });
 
   const suggested = await suggestQtyForContract(contractId);

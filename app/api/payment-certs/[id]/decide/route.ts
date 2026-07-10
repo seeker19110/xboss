@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { todayISO } from "@/lib/date";
 import { certTotals } from "@/lib/paymentcerts";
 
@@ -11,7 +12,7 @@ type Decision = "approved" | "rejected";
 // POST /api/payment-certs/:id/decide — CĐT/TVGS quyết định (Admin/PM, CAN.approve).
 // body: { decision: 'approved'|'rejected', rejectReason? } — approved sinh 1 dòng
 // payment_bills (amount = giá trị đề nghị sau trừ tạm ứng/giữ lại); rejected bắt
-// buộc rejectReason.
+// buộc rejectReason. Scoped theo dự án đang chọn (M22).
 export async function POST(
   req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -33,13 +34,20 @@ export async function POST(
   if (decision === "rejected" && !rejectReason)
     return NextResponse.json({ error: "Cần nhập lý do từ chối" }, { status: 422 });
 
+  const projectId = await getCurrentProjectId(user);
+
   try {
     await withTransaction(async () => {
-      const cert = await queryOne<{ status: string; contractId: number; periodNo: number }>(
-        `SELECT status, contract_id AS "contractId", period_no AS "periodNo"
-           FROM payment_certs WHERE id = ? FOR UPDATE`,
-        id,
-      );
+      const cert =
+        projectId != null
+          ? await queryOne<{ status: string; contractId: number; periodNo: number }>(
+              `SELECT c.status, c.contract_id AS "contractId", c.period_no AS "periodNo"
+                 FROM payment_certs c JOIN contracts ct ON ct.id = c.contract_id
+                WHERE c.id = ? AND ct.project_id = ? FOR UPDATE OF c`,
+              id,
+              projectId,
+            )
+          : undefined;
       if (!cert) throw Object.assign(new Error("Không tìm thấy đợt thanh toán"), { status: 404 });
       if (cert.status !== "submitted")
         throw Object.assign(

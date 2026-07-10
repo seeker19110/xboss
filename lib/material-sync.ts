@@ -329,8 +329,12 @@ export async function runMaterialSync(sheetClient?: SheetClient): Promise<SyncSu
       }
     }
 
-    // 3) Dòng Sheet không ID → tạo vật tư mới trong DB.
+    // 3) Dòng Sheet không ID → khớp theo Mã BOQ với vật tư đã có trong DB trước
+    // (đúng theo mô tả đầu file); chỉ tạo mới khi không khớp được vật tư nào.
     // Tra mã hệ → sheet_type_id (giống import). Mã BOQ trùng task/nhóm/vật tư khác → tạo không mã.
+    const dbByBoqCode = new Map(
+      dbMaterials.filter((m) => m.boqCode).map((m) => [m.boqCode as string, m]),
+    );
     const sheetTypes = await query<{ id: number; code: string }>(
       `SELECT id, code FROM sheet_types`,
     );
@@ -349,6 +353,31 @@ export async function runMaterialSync(sheetClient?: SheetClient): Promise<SyncSu
       const f = sheetRowToFields(row);
       if (!f.name) {
         summary.skipped.push({ row: rowNum, reason: "Thiếu tên vật tư" });
+        continue;
+      }
+
+      const matched = f.boqCode ? dbByBoqCode.get(f.boqCode) : undefined;
+      if (matched) {
+        // Dòng mất ID nhưng Mã BOQ khớp vật tư đã có → cập nhật vật tư đó thay vì
+        // tạo trùng (bug cũ: chỉ kiểm mã có bị chiếm không rồi luôn tạo mới, không
+        // bao giờ thực sự khớp-cập-nhật như header comment mô tả).
+        const dbF = dbToFields(matched);
+        const snap = snapshots.get(matched.id) ?? null;
+        const { decision, winner } = decideMerge(dbF, f, snap);
+        if (decision === "pull") {
+          await applyToDb(matched.id, winner);
+          summary.pulled++;
+        } else if (decision === "conflict") {
+          if (CONFLICT_POLICY === "sheet") {
+            await applyToDb(matched.id, winner);
+            summary.pulled++;
+          } else summary.pushed++;
+          summary.conflicts.push({ id: matched.id, name: matched.name, winner: CONFLICT_POLICY });
+        } else if (decision === "push") {
+          summary.pushed++;
+        }
+        if (decision !== "noop" || !snap || !fieldsEqual(snap, winner))
+          pendingSnapshots.push({ id: matched.id, fields: winner });
         continue;
       }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import {
   getCert,
   certTotals,
@@ -12,7 +13,24 @@ import {
 
 export const dynamic = "force-dynamic";
 
-// GET /api/payment-certs/:id — chi tiết đợt kèm dòng KL + tổng hợp giá trị.
+// Xác nhận đợt thuộc hợp đồng của dự án đang chọn (M22) — chặn xem/sửa đợt của
+// hợp đồng thuộc dự án khác qua đoán/liệt kê id.
+async function certInProject(
+  id: number,
+  projectId: number | null,
+): Promise<{ status: string; contractId: number } | undefined> {
+  if (projectId == null) return undefined;
+  return queryOne<{ status: string; contractId: number }>(
+    `SELECT c.status, c.contract_id AS "contractId"
+       FROM payment_certs c JOIN contracts ct ON ct.id = c.contract_id
+      WHERE c.id = ? AND ct.project_id = ?`,
+    id,
+    projectId,
+  );
+}
+
+// GET /api/payment-certs/:id — chi tiết đợt kèm dòng KL + tổng hợp giá trị,
+// scoped theo dự án đang chọn (M22).
 export async function GET(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
@@ -25,6 +43,11 @@ export async function GET(
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  const projectId = await getCurrentProjectId(user);
+  const scoped = await certInProject(id, projectId);
+  if (!scoped)
+    return NextResponse.json({ error: "Không tìm thấy đợt thanh toán" }, { status: 404 });
 
   const cert = await getCert(id);
   if (!cert) return NextResponse.json({ error: "Không tìm thấy đợt thanh toán" }, { status: 404 });
@@ -51,10 +74,8 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const existing = await queryOne<{ status: string; contractId: number }>(
-    `SELECT status, contract_id AS "contractId" FROM payment_certs WHERE id = ?`,
-    id,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const existing = await certInProject(id, projectId);
   if (!existing)
     return NextResponse.json({ error: "Không tìm thấy đợt thanh toán" }, { status: 404 });
   if (existing.status !== "draft")
