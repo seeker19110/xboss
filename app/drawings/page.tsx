@@ -1109,10 +1109,14 @@ function DesignChangesTab({
   const canCreate = canManageDrawings(me?.role);
   const canDecide = canDecideDesignChange(me?.role);
 
-  function load() {
+  function buildQuery() {
     const sp = new URLSearchParams();
     if (statusFilter !== "all") sp.set("status", statusFilter);
-    const qs = sp.toString();
+    return sp.toString();
+  }
+
+  function load() {
+    const qs = buildQuery();
     return fetch(`/api/design-changes${qs ? `?${qs}` : ""}`).then((r) => (r.ok ? r.json() : null));
   }
 
@@ -1124,8 +1128,12 @@ function DesignChangesTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
+  // Gọi sau khi tự ghi (tạo/quyết định/đánh dấu) — dùng fetchFresh để bỏ qua cache SW
+  // (stale-while-revalidate), khác với load() ở trên chỉ dùng cho tải lần đầu/đổi filter.
   async function refresh() {
-    const d = await load();
+    const qs = buildQuery();
+    const res = await fetchFresh(`/api/design-changes${qs ? `?${qs}` : ""}`);
+    const d = res.ok ? await res.json() : null;
     setItems(d?.items ?? []);
   }
 
@@ -1187,7 +1195,7 @@ function DesignChangesTab({
                   {dc.drawingCode && <span>Bản vẽ {dc.drawingCode}</span>}
                 </div>
                 <p className="mt-2 text-xs text-zinc-400 line-clamp-2">{dc.reason}</p>
-                <div className="mt-2 text-xs text-zinc-500">{dc.createdAt?.slice(0, 10)}</div>
+                <div className="mt-2 text-xs text-zinc-400">{dc.createdAt?.slice(0, 10)}</div>
               </button>
             );
           })}
