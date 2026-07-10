@@ -238,6 +238,9 @@ export const CAN = {
   // Bảo hành & Bảo trì (M30): hạng mục bảo hành + claim lỗi sau bàn giao + tài liệu O&M —
   // xem mọi vai trò đăng nhập, ghi Admin/PM/kỹ sư.
   manageWarranty: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  // Thay đổi thiết kế (M32): tiếp nhận/sửa Admin/PM/kỹ sư (kỹ sư hiện trường ghi nhận
+  // yêu cầu); quyết định (duyệt/từ chối) vẫn qua CAN.approve như VO/đề xuất.
+  manageDesignChanges: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
 };
 
 // Sub-con chỉ được thao tác trên task được giao cho mình.
