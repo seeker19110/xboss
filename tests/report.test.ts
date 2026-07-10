@@ -6,9 +6,51 @@ import {
   reportToHtml,
   weeklyToTelegramText,
   weeklyToHtml,
+  reconstructProgressAtDate,
   type DailyReport,
   type WeeklyReport,
 } from "@/lib/report";
+
+// ===== Test thuần: reconstructProgressAtDate (tái dựng % tại 1 mốc ngày, M36 PR3) =====
+
+test("reconstructProgressAtDate: task chưa có sự kiện history nào → dùng % hiện tại", () => {
+  const tasks = [{ id: 1, progress: 0.7 }];
+  const result = reconstructProgressAtDate(tasks, [], "2026-07-01");
+  assert.equal(result.get(1), 0.7);
+});
+
+test("reconstructProgressAtDate: mọi sự kiện đều SAU mốc → dùng old_progress của sự kiện đầu tiên", () => {
+  const tasks = [{ id: 1, progress: 0.9 }];
+  const history = [
+    { taskId: 1, oldProgress: 0.1, newProgress: 0.5, day: "2026-07-05" },
+    { taskId: 1, oldProgress: 0.5, newProgress: 0.9, day: "2026-07-08" },
+  ];
+  // Mốc trước cả sự kiện đầu tiên → % tại mốc = old_progress của sự kiện đầu (0.1).
+  const result = reconstructProgressAtDate(tasks, history, "2026-07-01");
+  assert.equal(result.get(1), 0.1);
+});
+
+test("reconstructProgressAtDate: có sự kiện TRƯỚC mốc → dùng new_progress của sự kiện gần mốc nhất", () => {
+  const tasks = [{ id: 1, progress: 0.9 }];
+  const history = [
+    { taskId: 1, oldProgress: 0, newProgress: 0.3, day: "2026-06-25" },
+    { taskId: 1, oldProgress: 0.3, newProgress: 0.6, day: "2026-06-30" },
+    { taskId: 1, oldProgress: 0.6, newProgress: 0.9, day: "2026-07-05" }, // sau mốc — bỏ qua
+  ];
+  const result = reconstructProgressAtDate(tasks, history, "2026-07-01");
+  assert.equal(result.get(1), 0.6); // sự kiện 06-30 là gần mốc nhất trước/tại mốc
+});
+
+test("reconstructProgressAtDate: nhiều task độc lập, mỗi task tự tái dựng theo history riêng", () => {
+  const tasks = [
+    { id: 1, progress: 1 },
+    { id: 2, progress: 0.2 },
+  ];
+  const history = [{ taskId: 1, oldProgress: 0.5, newProgress: 1, day: "2026-06-20" }];
+  const result = reconstructProgressAtDate(tasks, history, "2026-07-01");
+  assert.equal(result.get(1), 1); // task 1: sự kiện trước mốc → new_progress
+  assert.equal(result.get(2), 0.2); // task 2: không có history → % hiện tại
+});
 
 // ===== Test thuần: định dạng báo cáo (Telegram/HTML) — không chạm DB =====
 

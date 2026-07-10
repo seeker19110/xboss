@@ -3,17 +3,22 @@ import { query, queryOne, todayISO, daysFromTodayISO } from "@/lib/db";
 import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
 
 export type DelayedRow = {
-  code: string; name: string; status: string; endDate: string;
-  progressPercent: number; floorLabel: string | null; sheetType: string;
+  code: string;
+  name: string;
+  status: string;
+  endDate: string;
+  progressPercent: number;
+  floorLabel: string | null;
+  sheetType: string;
 };
 export type KpiRow = { sheetType: string; total: number; avgProgress: number; delayed: number };
 export type DailyReport = {
   date: string;
   projectName: string | null;
   totalDelayed: number;
-  newDelayed: DelayedRow[];   // mới quá hạn trong 24h (end_date = hôm qua)
-  topDelayed: DelayedRow[];   // trễ lâu nhất
-  dueSoon: DelayedRow[];      // còn ≤3 ngày tới hạn mà tiến độ < 70%
+  newDelayed: DelayedRow[]; // mới quá hạn trong 24h (end_date = hôm qua)
+  topDelayed: DelayedRow[]; // trễ lâu nhất
+  dueSoon: DelayedRow[]; // còn ≤3 ngày tới hạn mà tiến độ < 70%
   kpi: KpiRow[];
 };
 
@@ -31,8 +36,7 @@ export async function buildDailyReport(): Promise<DailyReport> {
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id`;
 
-  const all = await query<DelayedRow>(
-    `${select} WHERE ${DELAY_COND} ORDER BY t.end_date`, today);
+  const all = await query<DelayedRow>(`${select} WHERE ${DELAY_COND} ORDER BY t.end_date`, today);
 
   const newDelayed = all.filter((r) => r.endDate === yesterday);
   const topDelayed = all.slice(0, 15);
@@ -42,7 +46,10 @@ export async function buildDailyReport(): Promise<DailyReport> {
   const dueSoon = await query<DelayedRow>(
     `${select} WHERE t.end_date IS NOT NULL AND t.end_date >= ? AND t.end_date <= ?
         AND t.progress_percent < 0.7 AND t.status NOT IN ('hoan_thanh','nghiem_thu')
-      ORDER BY t.end_date LIMIT 20`, today, soon);
+      ORDER BY t.end_date LIMIT 20`,
+    today,
+    soon,
+  );
 
   const kpi = await query<KpiRow>(
     `SELECT st.code AS "sheetType", COUNT(t.id) AS total,
@@ -51,11 +58,101 @@ export async function buildDailyReport(): Promise<DailyReport> {
        FROM sheet_types st
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
-      GROUP BY st.id, st.code ORDER BY st.id`, today);
+      GROUP BY st.id, st.code ORDER BY st.id`,
+    today,
+  );
 
   const project = await queryOne<{ name: string }>(`SELECT name FROM projects ORDER BY id LIMIT 1`);
 
-  return { date: today, projectName: project?.name ?? null, totalDelayed: all.length, newDelayed, topDelayed, dueSoon, kpi };
+  return {
+    date: today,
+    projectName: project?.name ?? null,
+    totalDelayed: all.length,
+    newDelayed,
+    topDelayed,
+    dueSoon,
+    kpi,
+  };
+}
+
+// ===== Tái dựng "% tiến độ tại 1 mốc ngày" (dùng chung) =====
+// Logic gốc trước đây viết trực tiếp trong buildWeeklyReport — trích thành hàm chung
+// để `/api/dashboard?range=` (M36 PR3) và cron tuần dùng lại, không lặp.
+
+export type TaskProgressAtDate = {
+  taskId: number;
+  sheetId: number;
+  sheetType: string;
+  progress: number;
+};
+
+type HistRow = {
+  taskId: number;
+  oldProgress: number | null;
+  newProgress: number | null;
+  day: string;
+};
+
+// Phần thuần (không chạm DB) — lấy new_progress của sự kiện cuối cùng trước/tại mốc `date`;
+// chưa có sự kiện nào trước mốc thì dùng old_progress của sự kiện đầu tiên; không có lịch sử
+// nào cho task đó → dùng `progress` hiện tại truyền vào. Tách riêng để test đơn vị không cần DB.
+export function reconstructProgressAtDate<T extends { id: number; progress: number }>(
+  tasks: T[],
+  history: HistRow[],
+  date: string,
+): Map<number, number> {
+  const prevProgress = new Map<number, number>();
+  const firstOld = new Map<number, number>();
+  for (const h of history) {
+    if (!firstOld.has(h.taskId)) firstOld.set(h.taskId, h.oldProgress ?? 0);
+    if (h.day <= date) prevProgress.set(h.taskId, h.newProgress ?? 0);
+  }
+  const result = new Map<number, number>();
+  for (const t of tasks) {
+    result.set(
+      t.id,
+      prevProgress.get(t.id) ?? (firstOld.has(t.id) ? firstOld.get(t.id)! : (t.progress ?? 0)),
+    );
+  }
+  return result;
+}
+
+// Bản đọc DB: tái dựng % tiến độ từng task tại mốc `date`, lọc theo hệ nếu có `disciplineId`.
+export async function progressAtDate(
+  date: string,
+  filter: { disciplineId?: number } = {},
+): Promise<TaskProgressAtDate[]> {
+  const heFilter = filter.disciplineId != null ? "AND st.discipline_id = ?" : "";
+  const heParams = filter.disciplineId != null ? [filter.disciplineId] : [];
+
+  const tasks = await query<{ id: number; progress: number; sheetId: number; sheetType: string }>(
+    `SELECT t.id, t.progress_percent AS progress, st.id AS "sheetId", st.code AS "sheetType"
+       FROM tasks t
+       JOIN work_packages wp ON t.package_id = wp.id
+       JOIN sheet_types st ON wp.sheet_type_id = st.id
+      WHERE 1=1 ${heFilter}`,
+    ...heParams,
+  );
+
+  const hist = await query<HistRow>(
+    `SELECT h.task_id AS "taskId", h.old_progress AS "oldProgress", h.new_progress AS "newProgress",
+            (h.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date::text AS day
+       FROM task_history h
+       JOIN tasks t ON h.task_id = t.id
+       JOIN work_packages wp ON t.package_id = wp.id
+       JOIN sheet_types st ON wp.sheet_type_id = st.id
+      WHERE 1=1 ${heFilter}
+      ORDER BY h.task_id, h.changed_at`,
+    ...heParams,
+  );
+
+  const progress = reconstructProgressAtDate(tasks, hist, date);
+  return tasks.map((t) => ({
+    taskId: t.id,
+    sheetId: t.sheetId,
+    sheetType: t.sheetType,
+    progress: progress.get(t.id) ?? t.progress ?? 0,
+  }));
 }
 
 // ===== Báo cáo tuần =====
@@ -63,19 +160,26 @@ export async function buildDailyReport(): Promise<DailyReport> {
 // kèm danh sách hoàn thành trong tuần + trễ mới phát sinh.
 
 export type WeeklyKpiRow = {
-  sheetType: string; total: number;
-  avgProgress: number;      // hiện tại
-  avgProgressPrev: number;  // 7 ngày trước
+  sheetType: string;
+  total: number;
+  avgProgress: number; // hiện tại
+  avgProgressPrev: number; // 7 ngày trước
   delayed: number;
 };
-export type CompletedRow = { code: string; name: string; sheetType: string; floorLabel: string | null; day: string };
+export type CompletedRow = {
+  code: string;
+  name: string;
+  sheetType: string;
+  floorLabel: string | null;
+  day: string;
+};
 export type WeeklyReport = {
   date: string;
   weekFrom: string; // 7 ngày trước
   projectName: string | null;
   kpi: WeeklyKpiRow[];
-  completed: CompletedRow[];   // đạt 100% trong tuần
-  newDelayed: DelayedRow[];    // quá hạn trong 7 ngày qua, chưa xong
+  completed: CompletedRow[]; // đạt 100% trong tuần
+  newDelayed: DelayedRow[]; // quá hạn trong 7 ngày qua, chưa xong
   topDelayed: DelayedRow[];
   totalDelayed: number;
 };
@@ -89,26 +193,14 @@ export async function buildWeeklyReport(): Promise<WeeklyReport> {
     `SELECT t.id, t.progress_percent AS progress, st.code AS "sheetType"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
-       JOIN sheet_types st ON wp.sheet_type_id = st.id`);
+       JOIN sheet_types st ON wp.sheet_type_id = st.id`,
+  );
 
-  // Tái dựng % của từng task tại thời điểm 7 ngày trước từ task_history:
-  // lấy new_progress của sự kiện cuối cùng trước mốc; chưa có sự kiện nào trước mốc
-  // thì dùng old_progress của sự kiện đầu tiên; không có lịch sử → % hiện tại.
-  type HistRow = { taskId: number; oldProgress: number | null; newProgress: number | null; day: string };
-  const hist = await query<HistRow>(
-    `SELECT task_id AS "taskId", old_progress AS "oldProgress",
-            new_progress AS "newProgress",
-            (changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date::text AS day
-       FROM task_history ORDER BY task_id, changed_at`);
-
-  const prevProgress = new Map<number, number>();
-  const firstOld = new Map<number, number>();
-  for (const h of hist) {
-    if (!firstOld.has(h.taskId)) firstOld.set(h.taskId, h.oldProgress ?? 0);
-    if (h.day <= weekFrom) prevProgress.set(h.taskId, h.newProgress ?? 0);
-  }
-  const progressAt = (t: TaskRow) =>
-    prevProgress.get(t.id) ?? (firstOld.has(t.id) ? firstOld.get(t.id)! : t.progress ?? 0);
+  // % của từng task tại thời điểm 7 ngày trước — tái dựng từ task_history qua hàm chung
+  // `progressAtDate` (M36 PR3, dùng lại bởi `/api/dashboard?range=`).
+  const prevRows = await progressAtDate(weekFrom);
+  const prevProgressByTask = new Map(prevRows.map((r) => [r.taskId, r.progress]));
+  const progressAt = (t: TaskRow) => prevProgressByTask.get(t.id) ?? t.progress ?? 0;
 
   const select = `SELECT t.code, t.name, t.status, t.end_date AS "endDate",
             t.progress_percent AS "progressPercent",
@@ -118,7 +210,9 @@ export async function buildWeeklyReport(): Promise<WeeklyReport> {
        JOIN sheet_types st ON wp.sheet_type_id = st.id`;
 
   const allDelayed = await query<DelayedRow>(
-    `${select} WHERE ${DELAY_COND} ORDER BY t.end_date`, today);
+    `${select} WHERE ${DELAY_COND} ORDER BY t.end_date`,
+    today,
+  );
   const newDelayed = allDelayed.filter((r) => r.endDate >= weekFrom);
 
   // Đạt 100% trong tuần: sự kiện history đầu tiên chạm new_progress >= 1 nằm trong 7 ngày qua.
@@ -132,7 +226,9 @@ export async function buildWeeklyReport(): Promise<WeeklyReport> {
       WHERE h.new_progress >= 1 AND t.progress_percent >= 1
       GROUP BY t.id, t.code, t.name, st.code, wp.floor_label
      HAVING MIN((h.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)::text > ?
-      ORDER BY day DESC LIMIT 30`, weekFrom);
+      ORDER BY day DESC LIMIT 30`,
+    weekFrom,
+  );
 
   // KPI theo sheet: % trung bình hiện tại vs 7 ngày trước + số trễ.
   const bySheet = new Map<string, TaskRow[]>();
@@ -141,7 +237,8 @@ export async function buildWeeklyReport(): Promise<WeeklyReport> {
     bySheet.get(t.sheetType)!.push(t);
   }
   const delayedCount = new Map<string, number>();
-  for (const d of allDelayed) delayedCount.set(d.sheetType, (delayedCount.get(d.sheetType) ?? 0) + 1);
+  for (const d of allDelayed)
+    delayedCount.set(d.sheetType, (delayedCount.get(d.sheetType) ?? 0) + 1);
 
   const kpi: WeeklyKpiRow[] = [...bySheet.entries()].map(([sheetType, list]) => ({
     sheetType,
@@ -154,8 +251,14 @@ export async function buildWeeklyReport(): Promise<WeeklyReport> {
   const project = await queryOne<{ name: string }>(`SELECT name FROM projects ORDER BY id LIMIT 1`);
 
   return {
-    date: today, weekFrom, projectName: project?.name ?? null, kpi,
-    completed, newDelayed, topDelayed: allDelayed.slice(0, 15), totalDelayed: allDelayed.length,
+    date: today,
+    weekFrom,
+    projectName: project?.name ?? null,
+    kpi,
+    completed,
+    newDelayed,
+    topDelayed: allDelayed.slice(0, 15),
+    totalDelayed: allDelayed.length,
   };
 }
 
@@ -164,14 +267,18 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 
 function rowsHtml(rows: DelayedRow[]): string {
   if (!rows.length) return `<tr><td colspan="5" style="padding:8px;color:#888">Không có</td></tr>`;
-  return rows.map((r) => `
+  return rows
+    .map(
+      (r) => `
     <tr>
       <td style="padding:6px 8px;border-bottom:1px solid #eee;font-family:monospace">${esc(r.code)}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #eee">${esc(r.name)}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #eee">${esc(r.sheetType)}${r.floorLabel ? ` · ${esc(r.floorLabel)}` : ""}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #eee;color:#c00">${r.endDate}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${pct(r.progressPercent)}</td>
-    </tr>`).join("");
+    </tr>`,
+    )
+    .join("");
 }
 
 // Bản rút gọn cho Telegram (parse_mode HTML — chỉ hỗ trợ b/i/a/code, giới hạn 4096 ký tự).
@@ -181,22 +288,31 @@ export function reportToTelegramText(r: DailyReport, appUrl?: string): string {
     `Tổng cộng <b>${r.totalDelayed}</b> việc đang trễ · <b>${r.newDelayed.length}</b> mới quá hạn trong 24h`,
     "",
     "📊 <b>KPI theo hệ</b>",
-    ...r.kpi.map((k) => `· ${esc(k.sheetType)}: ${pct(k.avgProgress)} — ${k.delayed > 0 ? `⚠ ${k.delayed} trễ` : "✓ không trễ"}`),
+    ...r.kpi.map(
+      (k) =>
+        `· ${esc(k.sheetType)}: ${pct(k.avgProgress)} — ${k.delayed > 0 ? `⚠ ${k.delayed} trễ` : "✓ không trễ"}`,
+    ),
   ];
   if (r.newDelayed.length) {
     lines.push("", `🆕 <b>Mới quá hạn (${r.newDelayed.length})</b>`);
     for (const t of r.newDelayed.slice(0, 10))
-      lines.push(`· <code>${esc(t.code)}</code> ${esc(t.name)} — hạn ${t.endDate} (${pct(t.progressPercent)})`);
+      lines.push(
+        `· <code>${esc(t.code)}</code> ${esc(t.name)} — hạn ${t.endDate} (${pct(t.progressPercent)})`,
+      );
   }
   if (r.topDelayed.length) {
     lines.push("", `⏰ <b>Trễ lâu nhất</b>`);
     for (const t of r.topDelayed.slice(0, 5))
-      lines.push(`· <code>${esc(t.code)}</code> ${esc(t.name)} — hạn ${t.endDate} (${pct(t.progressPercent)})`);
+      lines.push(
+        `· <code>${esc(t.code)}</code> ${esc(t.name)} — hạn ${t.endDate} (${pct(t.progressPercent)})`,
+      );
   }
   if (r.dueSoon.length) {
     lines.push("", `⏳ <b>Sắp đến hạn ≤3 ngày, tiến độ &lt;70% (${r.dueSoon.length})</b>`);
     for (const t of r.dueSoon.slice(0, 8))
-      lines.push(`· <code>${esc(t.code)}</code> ${esc(t.name)} — hạn ${t.endDate} (${pct(t.progressPercent)})`);
+      lines.push(
+        `· <code>${esc(t.code)}</code> ${esc(t.name)} — hạn ${t.endDate} (${pct(t.progressPercent)})`,
+      );
   }
   if (appUrl) lines.push("", `<a href="${appUrl}">→ Mở XBoss Dashboard</a>`);
   // Telegram giới hạn 4096 ký tự/tin — cắt an toàn.
@@ -206,14 +322,22 @@ export function reportToTelegramText(r: DailyReport, appUrl?: string): string {
 // Gửi tin nhắn qua Telegram Bot API. Trả về lỗi dạng chuỗi (null = thành công).
 export async function sendTelegram(text: string): Promise<string | null> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatIds = (process.env.TELEGRAM_CHAT_ID ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const chatIds = (process.env.TELEGRAM_CHAT_ID ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
   if (!token || chatIds.length === 0) return "Chưa cấu hình TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID";
 
   for (const chatId of chatIds) {
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true }),
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        parse_mode: "HTML",
+        disable_web_page_preview: true,
+      }),
     });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
@@ -235,7 +359,10 @@ export function weeklyToTelegramText(r: WeeklyReport, appUrl?: string): string {
     `${esc(r.projectName ?? "")}`,
     "",
     "📊 <b>Tiến độ theo hệ (so với tuần trước)</b>",
-    ...r.kpi.map((k) => `· ${esc(k.sheetType)}: ${pct(k.avgProgress)} (${trend(k.avgProgressPrev, k.avgProgress)})${k.delayed > 0 ? ` — ⚠ ${k.delayed} trễ` : ""}`),
+    ...r.kpi.map(
+      (k) =>
+        `· ${esc(k.sheetType)}: ${pct(k.avgProgress)} (${trend(k.avgProgressPrev, k.avgProgress)})${k.delayed > 0 ? ` — ⚠ ${k.delayed} trễ` : ""}`,
+    ),
     "",
     `✅ <b>Hoàn thành trong tuần: ${r.completed.length}</b>`,
   ];
@@ -244,7 +371,9 @@ export function weeklyToTelegramText(r: WeeklyReport, appUrl?: string): string {
   if (r.newDelayed.length) {
     lines.push("", `🆕 <b>Trễ mới phát sinh trong tuần (${r.newDelayed.length})</b>`);
     for (const t of r.newDelayed.slice(0, 10))
-      lines.push(`· <code>${esc(t.code)}</code> ${esc(t.name)} — hạn ${t.endDate} (${pct(t.progressPercent)})`);
+      lines.push(
+        `· <code>${esc(t.code)}</code> ${esc(t.name)} — hạn ${t.endDate} (${pct(t.progressPercent)})`,
+      );
   }
   lines.push("", `Tổng cộng <b>${r.totalDelayed}</b> việc đang trễ`);
   if (appUrl) lines.push(`<a href="${appUrl}">→ Mở XBoss Dashboard</a>`);
@@ -255,8 +384,12 @@ export function weeklyToHtml(r: WeeklyReport, appUrl?: string): string {
   const th = `style="padding:6px 8px;text-align:left;background:#f4f4f5;font-size:12px;color:#555"`;
   const td = `style="padding:6px 8px;border-bottom:1px solid #eee"`;
   const completedRows = r.completed.length
-    ? r.completed.map((t) => `<tr><td ${td}><code>${esc(t.code)}</code></td><td ${td}>${esc(t.name)}</td>
-        <td ${td}>${esc(t.sheetType)}${t.floorLabel ? ` · ${esc(t.floorLabel)}` : ""}</td><td ${td}>${t.day}</td></tr>`).join("")
+    ? r.completed
+        .map(
+          (t) => `<tr><td ${td}><code>${esc(t.code)}</code></td><td ${td}>${esc(t.name)}</td>
+        <td ${td}>${esc(t.sheetType)}${t.floorLabel ? ` · ${esc(t.floorLabel)}` : ""}</td><td ${td}>${t.day}</td></tr>`,
+        )
+        .join("")
     : `<tr><td colspan="4" style="padding:8px;color:#888">Không có</td></tr>`;
   return `<!doctype html><html><body style="font-family:Segoe UI,Arial,sans-serif;color:#222;max-width:720px;margin:0 auto">
   <h2 style="margin:16px 0 4px">📅 XBoss — Báo cáo tuần ${r.weekFrom} → ${r.date}</h2>
@@ -266,12 +399,16 @@ export function weeklyToHtml(r: WeeklyReport, appUrl?: string): string {
   <h3 style="margin:16px 0 8px">📊 Tiến độ theo hệ (so với tuần trước)</h3>
   <table style="border-collapse:collapse;width:100%">
     <tr><th ${th}>Sheet</th><th ${th}>Tổng task</th><th ${th}>Tuần trước</th><th ${th}>Hiện tại</th><th ${th}>Xu hướng</th><th ${th}>Đang trễ</th></tr>
-    ${r.kpi.map((k) => `<tr>
+    ${r.kpi
+      .map(
+        (k) => `<tr>
       <td ${td}>${esc(k.sheetType)}</td><td ${td}>${k.total}</td>
       <td ${td}>${pct(k.avgProgressPrev)}</td><td ${td}><b>${pct(k.avgProgress)}</b></td>
       <td ${td};color:#059669>${trend(k.avgProgressPrev, k.avgProgress)}</td>
       <td ${td};color:${k.delayed > 0 ? "#c00" : "#16a34a"}>${k.delayed}</td>
-    </tr>`).join("")}
+    </tr>`,
+      )
+      .join("")}
   </table>
 
   <h3 style="margin:20px 0 8px">✅ Hoàn thành trong tuần (${r.completed.length})</h3>
@@ -307,12 +444,16 @@ export function reportToHtml(r: DailyReport, appUrl?: string): string {
   <h3 style="margin:16px 0 8px">📊 KPI theo hệ</h3>
   <table style="border-collapse:collapse;width:100%">
     <tr><th ${th}>Sheet</th><th ${th}>Tổng task</th><th ${th}>Tiến độ TB</th><th ${th}>Đang trễ</th></tr>
-    ${r.kpi.map((k) => `<tr>
+    ${r.kpi
+      .map(
+        (k) => `<tr>
       <td style="padding:6px 8px;border-bottom:1px solid #eee">${esc(k.sheetType)}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #eee">${k.total}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #eee">${pct(k.avgProgress)}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #eee;color:${k.delayed > 0 ? "#c00" : "#16a34a"}">${k.delayed}</td>
-    </tr>`).join("")}
+    </tr>`,
+      )
+      .join("")}
   </table>
 
   <h3 style="margin:20px 0 8px">🆕 Mới quá hạn trong 24h (${r.newDelayed.length})</h3>

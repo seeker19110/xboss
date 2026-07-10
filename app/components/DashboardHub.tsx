@@ -86,10 +86,7 @@ function DisciplineRow({ d }: { d: Discipline }) {
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
       <div className="flex flex-wrap items-center gap-3">
         <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${c.dot}`} aria-hidden="true" />
-        <a
-          href={`/he/${d.code}`}
-          className={`text-sm font-semibold hover:underline ${c.text}`}
-        >
+        <a href={`/he/${d.code}`} className={`text-sm font-semibold hover:underline ${c.text}`}>
           {d.name}
         </a>
         <span className="ml-auto text-xs text-zinc-400 shrink-0">
@@ -117,15 +114,22 @@ function TienDoHubSections({ items }: { items: DashNode[] }) {
 
   // /report không phải children thật của node dash.tien-do (thuộc dash.bao-cao) — tạo
   // literal DashNode để đưa vào ChildCard, không sửa dashboardTree.ts thêm lần nữa.
-  const reportCard: DashNode = { href: "/report", label: "Báo cáo ngày/tuần/tháng", icon: FileText };
-  const controlCard: DashNode = { label: "Đường găng & Chậm tiến độ", icon: AlertTriangle };
+  const reportCard: DashNode = {
+    href: "/report",
+    label: "Báo cáo ngày/tuần/tháng",
+    icon: FileText,
+  };
+  // "Đường găng & Chậm tiến độ" thuộc khối "Kiểm soát" riêng (không lặp trong khối tổng
+  // thể) — tách khỏi `items` để đưa vào section Kiểm soát ở dưới cùng.
+  const planningItems = items.filter((c) => c.href !== "/schedule-control");
+  const controlItems = items.filter((c) => c.href === "/schedule-control");
 
   return (
     <>
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-zinc-300">Kế hoạch & Báo cáo tổng thể</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {items.map((child) => (
+          {planningItems.map((child) => (
             <ChildCard key={child.href ?? child.label} child={child} />
           ))}
           <ChildCard child={reportCard} />
@@ -146,7 +150,11 @@ function TienDoHubSections({ items }: { items: DashNode[] }) {
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-zinc-300">Kiểm soát</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <ChildCard child={controlCard} />
+          {controlItems.length > 0 ? (
+            controlItems.map((child) => <ChildCard key={child.href} child={child} />)
+          ) : (
+            <ChildCard child={{ label: "Đường găng & Chậm tiến độ", icon: AlertTriangle }} />
+          )}
         </div>
       </section>
     </>

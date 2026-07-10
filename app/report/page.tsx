@@ -15,7 +15,15 @@ type DelayedTask = {
   floorLabel: string;
   sheetType: string;
 };
-type KPI = { sheetType: string; total: number; avgProgress: number; delayed: number };
+type KPI = {
+  sheetType: string;
+  total: number;
+  avgProgress: number;
+  delayed: number;
+  avgProgressPrev?: number;
+  deltaProgress?: number;
+};
+type Range = "day" | "week" | "month";
 type Forecast = {
   sheetType: string;
   progress: number;
@@ -36,14 +44,33 @@ export default function ReportPage() {
   const [projectName, setProjectName] = useState<string | null>(null);
   const [he, setHe] = useState("");
   const [heName, setHeName] = useState<string | null>(null);
+  const [range, setRange] = useState<Range>("day");
 
-  // Đọc `?he=` lúc mount để link chia sẻ/từ hub trỏ thẳng vào đúng bộ lọc (M36).
+  // Đọc `?he=` và `?range=` lúc mount để link chia sẻ/từ hub trỏ thẳng vào đúng bộ lọc (M36).
   useEffect(() => {
-    setHe(new URLSearchParams(window.location.search).get("he") ?? "");
+    const params = new URLSearchParams(window.location.search);
+    setHe(params.get("he") ?? "");
+    const r = params.get("range");
+    if (r === "week" || r === "month") setRange(r);
   }, []);
 
+  function updateRange(next: Range) {
+    setRange(next);
+    try {
+      const url = new URL(window.location.href);
+      if (next === "day") url.searchParams.delete("range");
+      else url.searchParams.set("range", next);
+      window.history.replaceState(null, "", url.toString());
+    } catch {
+      /* URL không hợp lệ (hiếm) — bỏ qua */
+    }
+  }
+
   useEffect(() => {
-    const qs = he ? `?he=${encodeURIComponent(he)}` : "";
+    const params = new URLSearchParams();
+    if (he) params.set("he", he);
+    if (range !== "day") params.set("range", range);
+    const qs = params.toString() ? `?${params.toString()}` : "";
     fetch(`/api/dashboard${qs}`)
       .then((r) => r.json())
       .then(setData);
@@ -51,7 +78,7 @@ export default function ReportPage() {
     fetch("/api/dashboard/forecast")
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => setForecast(j?.forecast ?? []));
-  }, [he]);
+  }, [he, range]);
   useEffect(() => {
     fetch("/api/project")
       .then((r) => (r.ok ? r.json() : null))
@@ -87,6 +114,19 @@ export default function ReportPage() {
             labelClassName="flex items-center gap-1.5 text-xs text-zinc-600"
             selectClassName="min-h-10 border border-zinc-300 rounded-lg px-3 py-2 text-sm bg-white"
           />
+          <label className="flex items-center gap-1.5 text-xs text-zinc-600">
+            <span className="shrink-0">Kỳ:</span>
+            <select
+              value={range}
+              onChange={(e) => updateRange(e.target.value as Range)}
+              aria-label="Chọn kỳ báo cáo"
+              className="min-h-10 border border-zinc-300 rounded-lg px-3 py-2 text-sm bg-white"
+            >
+              <option value="day">Hiện tại</option>
+              <option value="week">Theo tuần</option>
+              <option value="month">Theo tháng</option>
+            </select>
+          </label>
           <a
             href="/api/export/pdf"
             download
@@ -119,15 +159,26 @@ export default function ReportPage() {
             <p className="text-xs text-red-700 uppercase">Tổng công việc trễ</p>
             <p className="text-3xl font-bold text-red-700">{data?.totalDelayed ?? 0}</p>
           </div>
-          {data?.kpi.map((k) => (
-            <div key={k.sheetType} className="border border-zinc-300 rounded-lg p-3">
-              <p className="text-xs text-zinc-500 uppercase">{k.sheetType}</p>
-              <p className="text-2xl font-bold">{Math.round((k.avgProgress ?? 0) * 100)}%</p>
-              <p className="text-xs text-zinc-500">
-                {k.delayed} trễ / {k.total} task
-              </p>
-            </div>
-          ))}
+          {data?.kpi.map((k) => {
+            const delta = k.deltaProgress;
+            return (
+              <div key={k.sheetType} className="border border-zinc-300 rounded-lg p-3">
+                <p className="text-xs text-zinc-500 uppercase">{k.sheetType}</p>
+                <p className="text-2xl font-bold">{Math.round((k.avgProgress ?? 0) * 100)}%</p>
+                <p className="text-xs text-zinc-500">
+                  {k.delayed} trễ / {k.total} task
+                </p>
+                {range !== "day" && delta !== undefined && (
+                  <p
+                    className={`text-xs font-medium mt-1 ${delta > 0 ? "text-emerald-700" : delta < 0 ? "text-red-600" : "text-zinc-500"}`}
+                  >
+                    Δ kỳ: {delta > 0 ? "+" : ""}
+                    {Math.round(delta * 100)}%
+                  </p>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <h2 className="font-bold text-lg mb-3">2. Tiến độ theo hệ</h2>
