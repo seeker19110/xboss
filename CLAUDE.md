@@ -34,7 +34,7 @@ npm run dev          # dev server (cần .env.local với DATABASE_URL)
 npm run build        # build production (không cần DB thật — pool kết nối lazy)
 npm run lint         # next lint (eslint.config.mjs — flat config, next/core-web-vitals)
 npm run typecheck    # tsc --noEmit
-npm test             # node:test qua tsx — 3 file trong tests/
+npm test             # node:test qua tsx — 46 file trong tests/
 npx tsx --test tests/status.test.ts   # chạy 1 file test
 npm run db:seed      # import Excel gốc trong attachments/ vào DB
 ```
@@ -65,7 +65,7 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy lint + typecheck + test +
 
 - Phiên stateless: cookie `xboss_session` = `userId.exp.HMAC` — không có bảng session.
 - Login có rate limit lưu Postgres (`lib/ratelimit.ts`, bảng `login_rate_limits`): 5 lần sai/15 phút theo IP+email, 20/IP → 429 + `Retry-After`. Upsert atomic qua `ON CONFLICT` nên đúng khi chạy nhiều instance.
-- 4 vai trò: `admin | pm | engineer | subcon`. Quyền tập trung trong map `CAN`; subcon chỉ thao tác task được gán (`canTouchTask`).
+- 7 vai trò (`lib/roles.ts`): `admin | pm | engineer | subcon` (thao tác) + `bch | cdt | viewer` (chỉ-xem + bình luận, `VIEW_ONLY_ROLES`). Quyền tập trung trong map `CAN`; subcon chỉ thao tác task được gán (`canTouchTask`); `bch` thêm được xem các trang tài chính (`PAYMENT_VIEW_ROLES` = `admin/pm/bch`).
 - **Các trang chỉ redirect client-side khi 401 — API route là ranh giới bảo mật duy nhất.** Mọi route handler mới phải gọi `getCurrentUser()` và trả 401 khi chưa đăng nhập (pattern xem `app/api/dashboard/route.ts`).
 
 ### Mô hình dữ liệu (WBS)
