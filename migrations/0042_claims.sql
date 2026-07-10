@@ -1,4 +1,4 @@
--- 0028_claims.sql — M34: Claim chi phí & Gia hạn thời gian (EOT) — tách khỏi VO (M6):
+-- 0042_claims.sql — M34: Claim chi phí & Gia hạn thời gian (EOT) — tách khỏi VO (M6):
 -- claim là PHẢN ỨNG với sự kiện gây chậm/phát sinh chi phí ngoài kiểm soát (chờ mặt
 -- bằng, thay đổi thiết kế của CĐT, điều kiện công trường...), vòng đời riêng
 -- notice→quantified→negotiating→settled/rejected. Xem docs/nang-cap/M34-claim.md.
