@@ -65,8 +65,12 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
   // dữ liệu mẫu để test qua sidebar thật).
   test("'Thiết kế & Biện pháp thi công' là link thật, trỏ đúng trang bản vẽ đã lọc method", async ({
     page,
+    isMobile,
   }) => {
     await page.goto("/");
+    if (isMobile) {
+      await page.getByRole("button", { name: "Mở menu" }).click();
+    }
     const sidebar = page.locator("#app-sidebar");
     await expect(sidebar.getByRole("link", { name: "Dashboard" })).toBeVisible({
       timeout: 15_000,
