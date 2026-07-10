@@ -247,6 +247,10 @@ export const CAN = {
   // tâm nhân dịp M33 dù app/api/suppliers/[id]/ratings/route.ts (M04) vẫn dùng canRate
   // cục bộ — không sửa lại chỗ đó (ngoài phạm vi M33).
   manageSuppliers: (r?: Role) => r === "admin" || r === "pm",
+  // Claim chi phí & gia hạn EOT (M34): thông tin tranh chấp/thương mại nhạy cảm —
+  // xem như VO/thanh toán KL (loại cdt/subcon/viewer); ghi nhận (tạo/sửa) Admin/PM/kỹ sư.
+  viewClaims: (r?: Role) => r === "admin" || r === "pm" || r === "engineer" || r === "bch",
+  manageClaims: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
 };
 
 // Sub-con chỉ được thao tác trên task được giao cho mình.

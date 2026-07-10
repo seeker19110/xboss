@@ -29,6 +29,7 @@ import { VO_PENDING_DAYS } from "@/lib/vo";
 import { CALIBRATION_WARN_DAYS } from "@/lib/equipment";
 import { PROPOSAL_PENDING_DAYS } from "@/lib/proposals";
 import { pendingDesignChanges } from "@/lib/designchanges";
+import { pendingClaims } from "@/lib/claims";
 
 export const dynamic = "force-dynamic";
 
@@ -547,6 +548,32 @@ export async function GET() {
           AND design_change_id <> ALL(?)`,
       user.id,
       pendingDcIds,
+    );
+  }
+
+  // Claim chi phí/EOT đang mở quá hạn xử lý → nhắc Admin/PM (M34, mirror vo_pending).
+  if (isAdminOrPm(user.role)) {
+    const projectId = await getCurrentProjectId(user);
+    const pendingClaimsList = await pendingClaims(undefined, projectId);
+    if (pendingClaimsList.length > 0) {
+      const values = pendingClaimsList.map(() => `(?, ?, 'claim_pending', ?)`).join(", ");
+      const params = pendingClaimsList.flatMap((c) => [
+        user.id,
+        c.id,
+        `⚖️ Claim ${c.code} — ${c.title} đã thông báo từ ${c.noticeDate}, chưa xử lý xong`,
+      ]);
+      await run(
+        `INSERT INTO notifications (user_id, claim_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, type, claim_id) WHERE claim_id IS NOT NULL DO NOTHING`,
+        ...params,
+      );
+    }
+    const pendingClaimIds = pendingClaimsList.map((c) => c.id);
+    await run(
+      `DELETE FROM notifications
+        WHERE user_id = ? AND type = 'claim_pending' AND is_read = 0 AND claim_id <> ALL(?)`,
+      user.id,
+      pendingClaimIds,
     );
   }
 

@@ -278,10 +278,11 @@ export const DASHBOARD_TREE: DashCluster[] = [
             roles: ["admin", "pm", "engineer", "bch"],
           },
           {
+            href: "/claims",
             label: "Claim chi phí",
             icon: Scale,
             roles: ["admin", "pm", "engineer", "bch"],
-          }, // M06/M19 mở rộng
+          }, // M34
         ],
       },
       {

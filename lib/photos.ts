@@ -101,6 +101,10 @@ export function newProposalDocFileName(proposalId: number, mime: string): string
   return `dx${proposalId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime]}`;
 }
 
+export function newClaimDocFileName(claimId: number, mime: string): string {
+  return `clm${claimId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime]}`;
+}
+
 export function newHseFileName(recordId: number, mime: string): string {
   return `hse${recordId}-${Date.now()}-${randomBytes(4).toString("hex")}${MIME_EXT[mime] ?? ".bin"}`;
 }
