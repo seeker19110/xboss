@@ -1,4 +1,4 @@
--- 0028_design_changes.sql — M32: Quản lý thay đổi thiết kế (Design Change). Quy trình
+-- 0040_design_changes.sql — M32: Quản lý thay đổi thiết kế (Design Change). Quy trình
 -- tiếp nhận yêu cầu → đánh giá tác động (kỹ thuật/chi phí/tiến độ) → trình duyệt → cập
 -- nhật bản vẽ liên quan. Xem docs/nang-cap/M32-thiet-ke-thay-doi.md. Biện pháp thi công
 -- (drawings.kind='method') đã có từ M8 — KHÔNG làm lại ở đây.
