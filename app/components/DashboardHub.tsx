@@ -4,11 +4,27 @@ import EmptyState from "@/app/components/EmptyState";
 import { findDashboardById, canSeeNavItem, type DashNode } from "@/app/lib/dashboardTree";
 import { useEffect, useState } from "react";
 import { fetchMe, type Me } from "@/app/lib/me";
+import { FileText, AlertTriangle } from "lucide-react";
+import { disciplineColorClasses } from "@/lib/disciplineColors";
 
 // Trang hub khuôn chung cho dashboard nhóm (M21 PR2 — xem docs/nang-cap/M21-appshell-ia.md).
 // Route /hub/[id] (app/hub/[id]/page.tsx) render component này cho MỌI dashboard nhóm
 // trong DASHBOARD_TREE (không tạo trang riêng từng nhóm) — 1 khuôn dùng chung, cây mở
 // rộng thêm nhóm thì hub tự có theo, không cần sửa gì ở đây.
+//
+// Ngoại lệ duy nhất: `dash.tien-do` (M36) có mặt tiền riêng theo mockup — 3 khối
+// "Kế hoạch & Báo cáo tổng thể" / "Tiến độ theo hệ" / "Kiểm soát" — xem
+// `TienDoHubSections` bên dưới. Mọi dashboard khác giữ nguyên grid children mặc định.
+
+type Discipline = {
+  id: number;
+  code: string;
+  name: string;
+  color: string | null;
+  sheetCount: number;
+  avgProgress: number;
+  delayed: number;
+};
 
 function ChildCard({ child }: { child: DashNode }) {
   const Icon = child.icon;
@@ -38,6 +54,105 @@ function ChildCard({ child }: { child: DashNode }) {
   );
 }
 
+// Hàng "5 nút nhỏ" theo hệ — Timeline · Gantt · Lookahead · Báo cáo · S-Curve, đều kèm `?he=`.
+function DisciplineViews({ code }: { code: string }) {
+  const q = `?he=${encodeURIComponent(code)}`;
+  const views = [
+    { href: `/timeline${q}`, label: "Timeline" },
+    { href: `/gantt${q}`, label: "Gantt" },
+    { href: `/lookahead${q}`, label: "Lookahead" },
+    { href: `/report${q}`, label: "Báo cáo" },
+    { href: `/scurve${q}`, label: "S-Curve" },
+  ];
+  return (
+    <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+      {views.map((v) => (
+        <a
+          key={v.href}
+          href={v.href}
+          className="shrink-0 min-h-10 flex items-center bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-full px-3 text-xs text-zinc-300 transition"
+        >
+          {v.label}
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function DisciplineRow({ d }: { d: Discipline }) {
+  const c = disciplineColorClasses(d.color);
+  const pct = Math.round((d.avgProgress ?? 0) * 100);
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${c.dot}`} aria-hidden="true" />
+        <a
+          href={`/he/${d.code}`}
+          className={`text-sm font-semibold hover:underline ${c.text}`}
+        >
+          {d.name}
+        </a>
+        <span className="ml-auto text-xs text-zinc-400 shrink-0">
+          {pct}% {d.delayed > 0 ? `· ${d.delayed} trễ` : ""}
+        </span>
+      </div>
+      <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+        <div className={`h-full ${c.dot}`} style={{ width: `${pct}%` }} />
+      </div>
+      <DisciplineViews code={d.code} />
+    </div>
+  );
+}
+
+// Mặt tiền riêng của dashboard "Tiến độ" (M36) — 3 khối theo mockup.
+function TienDoHubSections({ items }: { items: DashNode[] }) {
+  const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+
+  useEffect(() => {
+    fetch("/api/disciplines")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setDisciplines(j?.disciplines ?? []))
+      .catch(() => {});
+  }, []);
+
+  // /report không phải children thật của node dash.tien-do (thuộc dash.bao-cao) — tạo
+  // literal DashNode để đưa vào ChildCard, không sửa dashboardTree.ts thêm lần nữa.
+  const reportCard: DashNode = { href: "/report", label: "Báo cáo ngày/tuần/tháng", icon: FileText };
+  const controlCard: DashNode = { label: "Đường găng & Chậm tiến độ", icon: AlertTriangle };
+
+  return (
+    <>
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-zinc-300">Kế hoạch & Báo cáo tổng thể</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {items.map((child) => (
+            <ChildCard key={child.href ?? child.label} child={child} />
+          ))}
+          <ChildCard child={reportCard} />
+        </div>
+      </section>
+
+      {disciplines.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold text-zinc-300">Tiến độ theo hệ</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {disciplines.map((d) => (
+              <DisciplineRow key={d.code} d={d} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-zinc-300">Kiểm soát</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <ChildCard child={controlCard} />
+        </div>
+      </section>
+    </>
+  );
+}
+
 export default function DashboardHub({ dashId }: { dashId: string }) {
   const [me, setMe] = useState<Me | null>(null);
 
@@ -61,6 +176,7 @@ export default function DashboardHub({ dashId }: { dashId: string }) {
   const { cluster, dashboard } = found;
   const Icon = dashboard.icon;
   const children = (dashboard.children ?? []).filter((c) => canSeeNavItem(c, me?.role));
+  const isTienDo = dashboard.id === "dash.tien-do";
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -71,7 +187,9 @@ export default function DashboardHub({ dashId }: { dashId: string }) {
           <h1 className="text-lg font-bold">{dashboard.label}</h1>
         </div>
 
-        {children.length === 0 ? (
+        {isTienDo ? (
+          <TienDoHubSections items={children} />
+        ) : children.length === 0 ? (
           <EmptyState message="Chưa có mục nào trong dashboard này." />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

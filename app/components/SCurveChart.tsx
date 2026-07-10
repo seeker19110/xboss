@@ -17,7 +17,7 @@ const fmtTick = (d: string) => {
 // S-curve: tiến độ kế hoạch (nội suy từ ngày bắt đầu/kết thúc task)
 // vs thực tế (tái dựng từ lịch sử cập nhật) — chuẩn báo cáo xây dựng.
 // Chọn baseline đã chốt → đường kế hoạch dùng ngày gốc, đo được độ lệch thật khi PM dời ngày.
-export default function SCurveChart() {
+export default function SCurveChart({ he }: { he?: string }) {
   const [data, setData] = useState<Data | null>(null);
   const [sheet, setSheet] = useState('');
   const [baselines, setBaselines] = useState<Baseline[]>([]);
@@ -32,9 +32,10 @@ export default function SCurveChart() {
     const qs = new URLSearchParams();
     if (sheet) qs.set('sheet', sheet);
     if (baseline) qs.set('baseline', baseline);
+    if (he) qs.set('he', he);
     const s = qs.toString();
     fetch(`/api/dashboard/scurve${s ? `?${s}` : ''}`).then(r => r.ok ? r.json() : null).then(setData);
-  }, [sheet, baseline]);
+  }, [sheet, baseline, he]);
 
   async function snapshotBaseline() {
     const name = await appPrompt('Tên baseline', '', { placeholder: 'VD: Kế hoạch hợp đồng, Điều chỉnh đợt 1' });
