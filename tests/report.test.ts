@@ -105,7 +105,7 @@ test("reportToTelegramText: escape HTML/script trong tên task, hiện đúng s�
   assert.ok(!text.includes("<script>alert(1)</script>"));
   assert.ok(text.includes("&lt;script&gt;"));
   assert.ok(text.includes("60%")); // avgProgress 0.6 → 60%
-  assert.ok(text.includes("⚠ 1 trễ"));
+  assert.ok(text.includes("⚠ 1 tầng trễ"));
 });
 
 test("reportToTelegramText: hệ không trễ hiện '✓ không trễ' thay vì cảnh báo", () => {
@@ -265,7 +265,10 @@ test(
     const kpiRow = report.kpi.find((k) => k.sheetType === sheetCode);
     assert.ok(kpiRow);
     assert.equal(kpiRow!.total, 4);
-    assert.equal(kpiRow!.delayed, 2); // R1,01 + R1,02 (R1,04 đã nghiệm thu không tính)
+    // delayed đếm theo TẦNG (quyết 2026-07-11), không theo task: R1,01 + R1,02 cùng thuộc
+    // work_package 'R1' (floor_label rỗng) nên chỉ tính 1 tầng trễ dù có 2 task trễ
+    // (R1,04 đã nghiệm thu không tính).
+    assert.equal(kpiRow!.delayed, 1);
 
     await run(`DELETE FROM tasks WHERE id IN (?, ?, ?, ?)`, tOld, tNew, tSoon, tDone);
     await cleanupProject(ids);

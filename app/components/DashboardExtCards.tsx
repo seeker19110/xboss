@@ -122,7 +122,7 @@ export default function DashboardExtCards({
                 <tr className="text-xs text-zinc-400 border-b border-zinc-800">
                   <th className="text-left p-3">HỆ</th>
                   <th className="text-left p-3">% TIẾN ĐỘ</th>
-                  <th className="text-right p-3">TRỄ</th>
+                  <th className="text-right p-3">TẦNG TRỄ</th>
                   <th className="text-right p-3">NCR MỞ</th>
                 </tr>
               </thead>

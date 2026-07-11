@@ -15,15 +15,23 @@ export async function GET(req: NextRequest) {
   const bySecret = checkCronSecret(req.headers.get("authorization"));
   const bySession = CAN.export((await getCurrentUser())?.role ?? undefined);
   if (!bySecret && !bySession)
-    return NextResponse.json({ error: "Không có quyền (cần CRON_SECRET hoặc đăng nhập Admin/PM)" }, { status: 401 });
+    return NextResponse.json(
+      { error: "Không có quyền (cần CRON_SECRET hoặc đăng nhập Admin/PM)" },
+      { status: 401 },
+    );
 
   const report = await buildDailyReport();
   const html = reportToHtml(report, process.env.APP_URL);
 
   // Người nhận: REPORT_EMAIL_TO (phân tách bằng dấu phẩy) — mặc định mọi Admin + PM.
-  let to = (process.env.REPORT_EMAIL_TO ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  let to = (process.env.REPORT_EMAIL_TO ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
   if (to.length === 0) {
-    const rows = await query<{ email: string }>(`SELECT email FROM users WHERE role IN ('admin','pm')`);
+    const rows = await query<{ email: string }>(
+      `SELECT email FROM users WHERE role IN ('admin','pm')`,
+    );
     to = rows.map((r) => r.email);
   }
 
@@ -35,7 +43,7 @@ export async function GET(req: NextRequest) {
   let pushSent = 0;
   if (report.totalDelayed > 0) {
     pushSent = await sendPushToAll({
-      title: `🏗️ ${report.totalDelayed} việc đang trễ`,
+      title: `🏗️ ${report.totalDelayed} tầng đang trễ`,
       body: `${report.newDelayed.length} mới quá hạn trong 24h · ${report.dueSoon.length} sắp đến hạn`,
       url: "/",
     }).catch(() => 0);
@@ -66,13 +74,18 @@ export async function GET(req: NextRequest) {
   await transporter.sendMail({
     from: process.env.SMTP_FROM ?? `"XBoss" <${SMTP_USER}>`,
     to: to.join(", "),
-    subject: `🏗️ XBoss ${report.date} — ${report.totalDelayed} việc trễ (${report.newDelayed.length} mới)`,
+    subject: `🏗️ XBoss ${report.date} — ${report.totalDelayed} tầng trễ (${report.newDelayed.length} việc mới)`,
     html,
   });
 
   return NextResponse.json({
-    sent: true, emailSent: true, to, telegramSent,
-    telegramError: telegramSent ? undefined : telegramError, pushSent,
-    totalDelayed: report.totalDelayed, newDelayed: report.newDelayed.length,
+    sent: true,
+    emailSent: true,
+    to,
+    telegramSent,
+    telegramError: telegramSent ? undefined : telegramError,
+    pushSent,
+    totalDelayed: report.totalDelayed,
+    newDelayed: report.newDelayed.length,
   });
 }

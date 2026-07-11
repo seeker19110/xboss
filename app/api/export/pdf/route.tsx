@@ -86,14 +86,14 @@ function ReportDoc({
         <View style={styles.kpiGrid}>
           <View style={[styles.kpiCard, { borderColor: "#fca5a5" }]}>
             <Text style={[styles.kpiVal, { color: "#dc2626" }]}>{totalDelayed}</Text>
-            <Text style={styles.kpiLbl}>Công việc trễ</Text>
+            <Text style={styles.kpiLbl}>Tầng trễ</Text>
           </View>
           {kpi.map((k) => (
             <View key={k.sheetType} style={styles.kpiCard}>
               <Text style={styles.kpiVal}>{pct(k.avgProgress ?? 0)}</Text>
               <Text style={styles.kpiLbl}>{k.sheetType}</Text>
               <Text style={[styles.kpiLbl, { color: k.delayed > 0 ? "#dc2626" : "#999" }]}>
-                {k.delayed} trễ / {k.total} task
+                {k.delayed} tầng trễ / {k.total} task
               </Text>
             </View>
           ))}
@@ -138,7 +138,7 @@ function ReportDoc({
                     color: k.delayed > 0 ? "#dc2626" : "#aaa",
                   }}
                 >
-                  {k.delayed > 0 ? `${k.delayed} trễ` : "—"}
+                  {k.delayed > 0 ? `${k.delayed} tầng trễ` : "—"}
                 </Text>
               </View>
             );
@@ -212,7 +212,7 @@ export async function GET(_req: NextRequest) {
       SELECT st.code AS "sheetType",
              COUNT(t.id)::int AS total,
              AVG(t.progress_percent) AS "avgProgress",
-             SUM(CASE WHEN t.status = 'tre' THEN 1 ELSE 0 END)::int AS delayed
+             COUNT(DISTINCT wp.floor_label) FILTER (WHERE t.status = 'tre')::int AS delayed
         FROM sheet_types st
         LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
         LEFT JOIN tasks t ON t.package_id = wp.id

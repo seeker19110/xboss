@@ -59,7 +59,7 @@ export default function ReportPrintable({
       <h2 className="font-bold text-lg mb-3">1. Tổng quan KPI</h2>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
         <div className="border border-red-300 bg-red-50 rounded-lg p-3">
-          <p className="text-xs text-red-700 uppercase">Tổng công việc trễ</p>
+          <p className="text-xs text-red-700 uppercase">Tổng số tầng trễ</p>
           <p className="text-3xl font-bold text-red-700">{data?.totalDelayed ?? 0}</p>
         </div>
         {data?.kpi.map((k) => {
@@ -69,7 +69,7 @@ export default function ReportPrintable({
               <p className="text-xs text-zinc-500 uppercase">{k.sheetType}</p>
               <p className="text-2xl font-bold">{Math.round((k.avgProgress ?? 0) * 100)}%</p>
               <p className="text-xs text-zinc-500">
-                {k.delayed} trễ / {k.total} task
+                {k.delayed} tầng trễ / {k.total} task
               </p>
               {range !== "day" && delta !== undefined && (
                 <p
@@ -105,7 +105,7 @@ export default function ReportPrintable({
               <span
                 className={`w-16 text-right text-xs shrink-0 ${k.delayed > 0 ? "text-red-600" : "text-zinc-400"}`}
               >
-                {k.delayed > 0 ? `${k.delayed} trễ` : "—"}
+                {k.delayed > 0 ? `${k.delayed} tầng trễ` : "—"}
               </span>
             </div>
           );
