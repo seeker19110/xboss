@@ -67,7 +67,8 @@ bash deploy.sh
 ```
 
 Script tự làm: `git fetch` + `reset --hard origin/main` (VPS luôn chạy nhánh
-`main`) → `npm ci` → build vào thư mục tạm `.next-build` (không đụng `.next`
+`main`) → `npm ci` → `npm run db:migrate` (áp migration DB còn thiếu, dừng
+deploy nếu lỗi) → build vào thư mục tạm `.next-build` (không đụng `.next`
 đang được app chạy thật đọc) → swap atomic `.next-build` vào `.next` → `pm2
 reload xboss --update-env`. Build vào thư mục tạm rồi swap thay vì ghi đè
 thẳng lên `.next` đang chạy giúp tránh 2 rủi ro: client đã tải HTML cũ xin lại
