@@ -7,7 +7,9 @@ import AxeBuilder from "@axe-core/playwright";
 
 async function gotoPaymentCerts(page: Page) {
   await page.goto("/payment-certs");
-  await expect(page.getByText("Thanh toán khối lượng", { exact: false }).first()).toBeVisible({
+  await expect(
+    page.locator("header").getByText("Thanh toán khối lượng", { exact: false }).first(),
+  ).toBeVisible({
     timeout: 15_000,
   });
 }

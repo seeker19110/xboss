@@ -7,7 +7,9 @@ import AxeBuilder from "@axe-core/playwright";
 
 async function gotoMonitoring(page: Page) {
   await page.goto("/monitoring");
-  await expect(page.getByText("Quan hệ & Quan trắc", { exact: false }).first()).toBeVisible({
+  await expect(
+    page.locator("header").getByText("Quan hệ & Quan trắc", { exact: false }).first(),
+  ).toBeVisible({
     timeout: 15_000,
   });
 }

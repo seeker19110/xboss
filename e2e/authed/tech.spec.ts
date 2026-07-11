@@ -10,7 +10,9 @@ import AxeBuilder from "@axe-core/playwright";
 
 async function gotoTech(page: Page) {
   await page.goto("/tech");
-  await expect(page.getByText("Chuyển đổi số & Công nghệ", { exact: false }).first()).toBeVisible({
+  await expect(
+    page.locator("header").getByText("Chuyển đổi số & Công nghệ", { exact: false }).first(),
+  ).toBeVisible({
     timeout: 15_000,
   });
 }

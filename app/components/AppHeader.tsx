@@ -262,7 +262,12 @@ export default function AppHeader({
       {/* ── Drawer mobile: dùng Modal chung (backdrop/Escape/focus-trap/khoá scroll có sẵn)
           thay vì tự dựng overlay + bẫy focus thủ công. */}
       {mobileOpen && (
-        <Modal onClose={() => setMobileOpen(false)} drawer className="w-60 lg:hidden flex flex-col">
+        <Modal
+          id="app-sidebar-mobile"
+          onClose={() => setMobileOpen(false)}
+          drawer
+          className="w-60 lg:hidden flex flex-col"
+        >
           <div className="flex items-center h-12 px-1 shrink-0">
             <div className="flex-1 min-w-0">
               <ProjectSwitcher collapsed={false} />

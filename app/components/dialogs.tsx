@@ -10,6 +10,7 @@ export function Modal({
   className = "max-w-md",
   zIndex = "z-50",
   drawer = false,
+  id,
 }: {
   onClose: () => void;
   children: ReactNode;
@@ -17,6 +18,8 @@ export function Modal({
   zIndex?: string;
   /** true = dạng drawer bám mép trái, cao toàn màn hình (vd sidebar mobile) thay vì hộp thoại giữa màn hình (mặc định). */
   drawer?: boolean;
+  /** id gắn vào panel — dùng khi cần locator/CSS trỏ thẳng tới nội dung modal (vd drawer sidebar mobile). */
+  id?: string;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -88,6 +91,7 @@ export function Modal({
     >
       <div
         ref={panelRef}
+        id={id}
         className={
           drawer
             ? `bg-zinc-950 border-r border-zinc-800 h-full overflow-y-auto safe-top ${className}`

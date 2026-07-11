@@ -6,7 +6,7 @@ import AxeBuilder from "@axe-core/playwright";
 
 async function gotoContracts(page: Page) {
   await page.goto("/contracts");
-  await expect(page.getByText("Hợp đồng", { exact: false }).first()).toBeVisible({
+  await expect(page.locator("header").getByText("Hợp đồng", { exact: false }).first()).toBeVisible({
     timeout: 15_000,
   });
 }

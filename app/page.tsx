@@ -396,14 +396,15 @@ export default function Dashboard() {
                 <TrendingDown className="w-5 h-5 text-red-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-red-400 uppercase tracking-wider font-medium mb-0.5">
+                {/* Nền tint mờ (bg-red-950/20) đổi độ sáng nhiều theo theme — text-red-400 không
+                    đủ tương phản AA trên nền đã sáng ở theme sáng (đo axe: 2.93 < 4.5). Dùng
+                    token zinc thích ứng cho chữ (đảm bảo AA mọi theme), giữ sắc đỏ ở icon/nền/viền. */}
+                <p className="text-xs text-zinc-400 uppercase tracking-wider font-medium mb-0.5">
                   Tổng công việc đang trễ
                 </p>
-                <p className="text-4xl font-bold text-red-400 leading-none">
-                  {data?.totalDelayed ?? 0}
-                </p>
+                <p className="text-4xl font-bold leading-none">{data?.totalDelayed ?? 0}</p>
               </div>
-              <span className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 transition shrink-0">
+              <span className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 transition shrink-0">
                 Xem chi tiết <ChevronRight className="w-3.5 h-3.5" />
               </span>
             </a>

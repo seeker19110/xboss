@@ -36,6 +36,10 @@ export default function ProjectSwitcher({ collapsed }: { collapsed: boolean }) {
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const filterRef = useRef<HTMLInputElement>(null);
+  // onKey bên dưới đăng ký 1 lần (mount) nên đọc `open` trực tiếp sẽ bị đóng băng giá trị
+  // cũ (stale closure) — dùng ref cập nhật mỗi render để luôn đọc đúng trạng thái hiện tại.
+  const openRef = useRef(open);
+  openRef.current = open;
 
   useEffect(() => {
     setPinned(loadPinned());
@@ -55,7 +59,13 @@ export default function ProjectSwitcher({ collapsed }: { collapsed: boolean }) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
+      // stopImmediatePropagation: trên mobile, panel này còn nằm trong drawer sidebar
+      // (Modal — M37 PR2.4), Modal cũng lắng nghe Escape trên document để tự đóng. Không
+      // chặn thì 1 lần Esc đóng luôn cả drawer thay vì chỉ đóng panel chọn dự án trước.
+      if (e.key === "Escape" && openRef.current) {
+        e.stopImmediatePropagation();
+        setOpen(false);
+      }
     }
     document.addEventListener("mousedown", onClick);
     document.addEventListener("keydown", onKey);

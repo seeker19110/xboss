@@ -6,9 +6,11 @@ import AxeBuilder from "@axe-core/playwright";
 
 async function gotoVariations(page: Page) {
   await page.goto("/variations");
-  await expect(page.getByText("Phát sinh", { exact: false }).first()).toBeVisible({
-    timeout: 15_000,
-  });
+  await expect(page.locator("header").getByText("Phát sinh", { exact: false }).first()).toBeVisible(
+    {
+      timeout: 15_000,
+    },
+  );
 }
 
 test.describe("Phát sinh/VO (sau đăng nhập)", () => {
