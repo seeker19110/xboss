@@ -388,7 +388,7 @@ function CategoryNav({
   onChange: (key: TabKey) => void;
 }) {
   return (
-    <div className="flex items-center gap-1 overflow-x-auto scrollbar-none px-1 py-1.5 bg-zinc-900 border border-zinc-800 rounded-2xl">
+    <div className="flex items-center gap-1 overflow-x-auto scrollbar-none px-1 py-1.5 bg-zinc-900 border border-zinc-800 rounded-xl">
       {items.map((item) => {
         const isActive = item.key === active;
         return (

@@ -3,6 +3,7 @@ import { getCurrentUser, CAN } from "@/lib/auth";
 import { query, queryOne } from "@/lib/db";
 import ReactPDF, { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/pdf-fonts";
+import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
 
 export const dynamic = "force-dynamic";
 registerVietnameseFonts();
@@ -59,14 +60,6 @@ function fmt(d: string | null) {
 function pct(v: number) {
   return `${Math.round(v * 100)}%`;
 }
-
-const STATUS_LABEL: Record<string, string> = {
-  chuan_bi: "Chuẩn bị",
-  dang_thi_cong: "Đang thi công",
-  hoan_thanh: "Hoàn thành",
-  nghiem_thu: "Đã nghiệm thu",
-  tre: "Đang trễ",
-};
 
 function ReportDoc({
   projectName,
@@ -175,7 +168,9 @@ function ReportDoc({
               <Text style={{ flex: 1, fontSize: 8 }}>{t.floorLabel || "—"}</Text>
               <Text style={{ flex: 1, fontSize: 8, color: "#dc2626" }}>{fmt(t.endDate)}</Text>
               <Text style={{ flex: 1, fontSize: 8 }}>{pct(t.progressPercent ?? 0)}</Text>
-              <Text style={{ flex: 1, fontSize: 8 }}>{STATUS_LABEL[t.status] ?? "Đang trễ"}</Text>
+              <Text style={{ flex: 1, fontSize: 8 }}>
+                {STATUS_LABEL[t.status as StatusSlug] ?? "Đang trễ"}
+              </Text>
             </View>
           ))}
         </View>

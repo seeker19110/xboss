@@ -24,6 +24,7 @@ import { fetchMe, type Me } from "@/app/lib/me";
 import { sortFloorsAsc } from "@/lib/floors";
 import { formatDateVN } from "@/lib/date";
 import { systemColorClasses } from "@/lib/systemColors";
+import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
 import type {
   CashflowMonth,
   CpiBlock,
@@ -67,14 +68,6 @@ const DashboardExtCards = dynamic(() => import("@/app/components/DashboardExtCar
   ssr: false,
   loading: () => <Skeleton className="h-28 rounded-xl" />,
 });
-
-const STATUS_LABEL: Record<string, string> = {
-  chuan_bi: "Chuẩn bị",
-  dang_thi_cong: "Đang thi công",
-  hoan_thanh: "Hoàn thành",
-  nghiem_thu: "Đã nghiệm thu",
-  tre: "Đang trễ",
-};
 
 type DelayedTask = {
   id: number;
@@ -625,7 +618,7 @@ export default function Dashboard() {
                   value: statusFilter,
                   onChange: setStatusFilter,
                   placeholder: "Tất cả trạng thái",
-                  options: statuses.map((s) => ({ v: s, l: STATUS_LABEL[s] ?? s })),
+                  options: statuses.map((s) => ({ v: s, l: STATUS_LABEL[s as StatusSlug] ?? s })),
                 },
               ].map((sel, i) => (
                 <select

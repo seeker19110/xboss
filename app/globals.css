@@ -88,21 +88,21 @@ html.navy {
    ý nghĩa màu trạng thái (lib/status.ts) và các nút hành động chính (emerald) toàn app. */
 html.light {
   color-scheme: light;
-  --background: #eef1f5;
-  --foreground: #171717;
-  --color-white: #18181b;
+  --background: #f6f7f9;
+  --foreground: #14171d;
+  --color-white: #14171d;
   --color-black: #ffffff;
-  --color-zinc-50: #18181b;
-  --color-zinc-100: #27272a;
-  --color-zinc-200: #3f3f46;
-  --color-zinc-300: #52525b;
-  --color-zinc-400: #52525b;
-  --color-zinc-500: #71717a;
-  --color-zinc-600: #a1a1aa;
-  --color-zinc-700: #d3d8e0;
-  --color-zinc-800: #e2e6ec;
+  --color-zinc-50: #14171d;
+  --color-zinc-100: #232833;
+  --color-zinc-200: #363c47;
+  --color-zinc-300: #4a5261;
+  --color-zinc-400: #4a5261;
+  --color-zinc-500: #67707c;
+  --color-zinc-600: #99a1ad;
+  --color-zinc-700: #c8cfda;
+  --color-zinc-800: #dde2ea;
   --color-zinc-900: #ffffff;
-  --color-zinc-950: #eef1f5;
+  --color-zinc-950: #f6f7f9;
   /* -400 = cùng giá trị -300 ở 9 màu bên dưới (emerald/sky/amber/teal/orange/yellow/cyan/
      green/lime): giá trị -400 gốc (nhạt hơn -300) chỉ đạt ~3.2-4.1:1 trên nền card trắng
      tinh (--color-zinc-900), dưới ngưỡng 4.5:1 WCAG AA — bắt bởi axe. Các màu còn lại

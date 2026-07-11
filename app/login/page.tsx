@@ -60,7 +60,7 @@ export default function LoginPage() {
         </div>
         <form
           onSubmit={submit}
-          className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4"
+          className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4"
         >
           <div>
             <label htmlFor="login-email" className="text-xs text-zinc-400">

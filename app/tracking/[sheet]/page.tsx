@@ -45,14 +45,7 @@ import { ROLE_LABELS } from "@/lib/roles";
 import { fetchMe } from "@/app/lib/me";
 import { sortFloorsAsc } from "@/lib/floors";
 import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
-
-const STATUS_CLS: Record<string, string> = {
-  chuan_bi: "bg-zinc-800 text-zinc-300",
-  dang_thi_cong: "bg-blue-950 text-blue-200",
-  hoan_thanh: "bg-emerald-950 text-emerald-200",
-  nghiem_thu: "bg-teal-950 text-teal-200",
-  tre: "bg-red-950 text-red-200",
-};
+import { StatusBadge } from "@/app/components/StatusBadge";
 
 type Task = {
   id: number;
@@ -1944,11 +1937,10 @@ function PkgGrid({
                     />
                   </div>
                 </div>
-                <span
-                  className={`px-2.5 py-0.5 rounded text-[13px] w-32 text-center shrink-0 ${STATUS_CLS[pkg.status] ?? STATUS_CLS.chuan_bi}`}
-                >
-                  {STATUS_LABEL[pkg.status as StatusSlug] ?? pkg.status}
-                </span>
+                <StatusBadge
+                  status={pkg.status}
+                  className="text-[13px] w-32 text-center shrink-0"
+                />
                 {/* Bản vẽ */}
                 <span
                   className="flex flex-col items-center shrink-0 border-l border-zinc-800 pl-3 ml-1"
