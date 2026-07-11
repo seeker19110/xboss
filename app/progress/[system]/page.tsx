@@ -155,6 +155,32 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
     );
   }
 
+  // Hệ chưa có sheet tracking nào (vd Điện/Nước/PCCC/Kết cấu/Xây tô trước khi tạo sheet đầu
+  // tiên) — báo rõ thay vì render 7 khối gần như trống (S-curve/SPI/dự báo/timeline tự ẩn
+  // khi rỗng, KPI toàn 0%) khiến trang trông như bị lỗi.
+  if (summary.totalTasks === 0) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-white">
+        <AppHeader title={`Tiến độ — ${label}`} back />
+        <main className="px-3 sm:px-6 py-4 w-full max-w-6xl mx-auto">
+          <EmptyState
+            icon={ClipboardList}
+            title={`Hệ ${label} chưa có sheet tracking nào`}
+            message="Tạo sheet đầu tiên để bắt đầu theo dõi tiến độ hệ này."
+            action={
+              <a
+                href={`/system/${system}`}
+                className="mt-1 inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-on-accent text-sm font-medium px-4 py-2 rounded-lg transition"
+              >
+                Tạo sheet cho hệ {label}
+              </a>
+            }
+          />
+        </main>
+      </div>
+    );
+  }
+
   const pct = Math.round(summary.progressPercent * 100);
 
   return (
