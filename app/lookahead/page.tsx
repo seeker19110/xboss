@@ -5,7 +5,7 @@ import { ArrowLeft, Printer, CalendarClock } from "lucide-react";
 import { LookaheadTable } from "@/app/components/LookaheadTable";
 import SystemFilter from "@/app/components/SystemFilter";
 import { redirectToLogin } from "@/app/lib/me";
-import { formatDateVN } from "@/lib/date";
+import { formatDateVN, formatDateTimeVN } from "@/lib/date";
 
 type LTask = {
   id: number;
@@ -153,7 +153,7 @@ export default function LookaheadPage() {
         ))}
 
         <p className="text-xs text-zinc-600 mt-8" suppressHydrationWarning>
-          Xuất từ XBoss · {new Date().toLocaleString("vi-VN")}
+          Xuất từ XBoss · {formatDateTimeVN(new Date())}
         </p>
       </div>
 

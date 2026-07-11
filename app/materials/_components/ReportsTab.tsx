@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import EmptyState from "@/app/components/EmptyState";
 import { sortFloorsAsc } from "@/lib/floors";
+import { formatDateVN, formatDateTimeVN } from "@/lib/date";
 
 type StockSummary = {
   sheetCode: string;
@@ -357,7 +358,7 @@ export default function ReportsTab({ active }: { active: boolean }) {
                           </span>
                         </td>
                         <td className={`py-2.5 px-3 text-right font-medium ${urgencyColor(days)}`}>
-                          {new Date(m.earliestStart).toLocaleDateString("vi-VN")}
+                          {formatDateVN(m.earliestStart)}
                           <div className="text-[10px] font-normal opacity-75">còn {days} ngày</div>
                         </td>
                         <td className="py-2.5 px-3 text-right text-zinc-400">{m.upcomingTasks}</td>
@@ -594,7 +595,7 @@ export default function ReportsTab({ active }: { active: boolean }) {
                       {Number(x.qtyStock).toLocaleString("vi")}
                     </td>
                     <td className="py-2.5 px-3 text-right text-zinc-400">
-                      {new Date(x.firstReceived).toLocaleDateString("vi-VN")}
+                      {formatDateVN(x.firstReceived)}
                     </td>
                     <td
                       className={`py-2.5 px-3 text-right font-bold ${Number(x.daysInStock) > 60 ? "text-red-400" : "text-amber-400"}`}
@@ -641,7 +642,7 @@ export default function ReportsTab({ active }: { active: boolean }) {
                       <td className="py-2.5 px-3 text-zinc-400">{x.createdByName}</td>
                       <td className="py-2.5 px-3 text-zinc-500 italic">{x.note ?? "—"}</td>
                       <td className="py-2.5 px-3 text-right text-zinc-400">
-                        {new Date(x.createdAt).toLocaleString("vi-VN")}
+                        {formatDateTimeVN(x.createdAt)}
                       </td>
                     </tr>
                   ))}

@@ -12,6 +12,7 @@ import {
   ClipboardList,
 } from "lucide-react";
 import { appConfirm } from "@/app/components/dialogs";
+import { formatDateVN } from "@/lib/date";
 
 type PR = {
   id: number;
@@ -565,7 +566,7 @@ export default function PurchaseRequestsTab({
                     </span>
                   </span>
                   <span>{pr.requestedByName}</span>
-                  <span>{new Date(pr.createdAt).toLocaleDateString("vi-VN")}</span>
+                  <span>{formatDateVN(pr.createdAt)}</span>
                 </div>
                 {pr.note && <div className="text-xs text-zinc-400 italic mt-0.5">{pr.note}</div>}
                 {pr.reviewNote && (

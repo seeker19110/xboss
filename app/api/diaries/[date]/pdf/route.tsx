@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import ReactPDF, { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/pdf-fonts";
+import { formatDateTimeVN } from "@/lib/date";
 
 export const dynamic = "force-dynamic";
 registerVietnameseFonts();
@@ -108,7 +109,7 @@ function DiaryDoc({
         {diary.status === "locked" && (
           <Text style={{ fontSize: 8, color: "#777", marginTop: 4 }}>
             Đã khoá bởi {diary.lockedByName ?? "—"} lúc{" "}
-            {diary.lockedAt ? new Date(diary.lockedAt).toLocaleString("vi-VN") : "—"}
+            {diary.lockedAt ? formatDateTimeVN(diary.lockedAt) : "—"}
           </Text>
         )}
 

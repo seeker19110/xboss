@@ -4,6 +4,7 @@ import { query, queryOne } from "@/lib/db";
 import ReactPDF, { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/pdf-fonts";
 import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
+import { formatDateVN } from "@/lib/date";
 
 export const dynamic = "force-dynamic";
 registerVietnameseFonts();
@@ -53,9 +54,7 @@ type DelayedTask = {
   sheetType: string;
 };
 function fmt(d: string | null) {
-  if (!d) return "—";
-  const dt = new Date(d);
-  return isNaN(dt.getTime()) ? "—" : dt.toLocaleDateString("vi-VN");
+  return formatDateVN(d);
 }
 function pct(v: number) {
   return `${Math.round(v * 100)}%`;
@@ -230,7 +229,7 @@ export async function GET(_req: NextRequest) {
     queryOne<{ name: string }>(`SELECT name FROM projects LIMIT 1`).catch(() => null),
   ]);
 
-  const today = new Date().toLocaleDateString("vi-VN");
+  const today = formatDateVN(new Date());
   const projectName = project?.name ?? "XBoss";
 
   const stream = await ReactPDF.renderToStream(

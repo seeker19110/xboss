@@ -3,6 +3,7 @@ import { getCurrentUser, CAN } from "@/lib/auth";
 import ReactPDF, { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/pdf-fonts";
 import { getCert, certTotals, type PaymentCertRow, type CertTotals } from "@/lib/paymentcerts";
+import { formatDateVN } from "@/lib/date";
 
 export const dynamic = "force-dynamic";
 registerVietnameseFonts();
@@ -170,7 +171,7 @@ export async function GET(
   const cert = await getCert(id);
   if (!cert) return NextResponse.json({ error: "Không tìm thấy đợt thanh toán" }, { status: 404 });
   const totals = await certTotals(id);
-  const today = new Date().toLocaleDateString("vi-VN");
+  const today = formatDateVN(new Date());
 
   const stream = await ReactPDF.renderToStream(
     <IpcDoc cert={cert} totals={totals} today={today} />,

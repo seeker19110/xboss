@@ -52,7 +52,7 @@ export default function ReportPrintable({
           BÁO CÁO TIẾN ĐỘ THI CÔNG ACMV{systemName ? ` — Hệ ${systemName}` : ""}
         </h1>
         <p className="text-zinc-600">
-          {projectName ?? "XBoss"} · Ngày: {new Date().toLocaleDateString("vi-VN")}
+          {projectName ?? "XBoss"} · Ngày: {formatDateVN(new Date())}
         </p>
       </div>
 

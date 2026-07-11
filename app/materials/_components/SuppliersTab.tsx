@@ -14,6 +14,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { appConfirm } from "@/app/components/dialogs";
+import { formatDateVN } from "@/lib/date";
 
 export type Supplier = {
   id: number;
@@ -361,7 +362,7 @@ function SupplierSummaryPanel({ supplierId }: { supplierId: number }) {
               </span>
               {r.note && <span className="text-zinc-400 italic">&ldquo;{r.note}&rdquo;</span>}
               <span className="text-zinc-400 ml-auto">
-                {r.ratedByName ?? ""} · {new Date(r.createdAt).toLocaleDateString("vi-VN")}
+                {r.ratedByName ?? ""} · {formatDateVN(r.createdAt)}
               </span>
             </div>
           ))}

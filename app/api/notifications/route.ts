@@ -13,6 +13,7 @@ import { calibrationDueList } from "@/lib/equipment";
 import { overNormItems, NORM_OVER_THRESHOLD_PCT } from "@/lib/norms";
 import { openHseActions } from "@/lib/hse";
 import { overdueMeetingActions } from "@/lib/meetings";
+import { formatDateTimeVN } from "@/lib/date";
 import { pendingProposalsOver } from "@/lib/proposals";
 import { expiringLegalDocs } from "@/lib/kickoff";
 import { expiringCertifications } from "@/lib/hr";
@@ -685,7 +686,7 @@ export async function GET() {
       const params = lateVehicles.flatMap((v) => [
         user.id,
         v.id,
-        `🚛 Xe ${v.plate}${v.supplierName ? ` (${v.supplierName})` : ""} quá giờ dự kiến ${new Date(v.expectedAt).toLocaleString("vi-VN")} chưa vào cổng`,
+        `🚛 Xe ${v.plate}${v.supplierName ? ` (${v.supplierName})` : ""} quá giờ dự kiến ${formatDateTimeVN(v.expectedAt)} chưa vào cổng`,
       ]);
       await run(
         `INSERT INTO notifications (user_id, vehicle_id, type, message) VALUES ${values}

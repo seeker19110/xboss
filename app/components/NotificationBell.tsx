@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Bell, CheckCheck, BellRing, BellOff } from "lucide-react";
+import { formatDateTimeVN } from "@/lib/date";
 
 type Notif = {
   id: number;
@@ -165,9 +166,7 @@ export default function NotificationBell() {
                 className={`w-full text-left px-4 py-2.5 border-b border-zinc-800/60 text-sm transition ${n.isRead ? "text-zinc-500" : "text-zinc-200 bg-red-950/20 hover:bg-zinc-800/60"}`}
               >
                 <span className="block">{n.message}</span>
-                <span className="text-xs text-zinc-600">
-                  {new Date(n.createdAt).toLocaleString("vi-VN")}
-                </span>
+                <span className="text-xs text-zinc-600">{formatDateTimeVN(n.createdAt)}</span>
               </button>
             ))}
           </div>

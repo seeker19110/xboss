@@ -4,6 +4,7 @@ import { getCurrentProjectId } from "@/lib/projects";
 import ReactPDF, { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/pdf-fonts";
 import { getTender, comparisonTable, type TenderItemRow, type BidRow } from "@/lib/tender";
+import { formatDateVN } from "@/lib/date";
 
 export const dynamic = "force-dynamic";
 registerVietnameseFonts();
@@ -97,7 +98,7 @@ export async function GET(
   const tender = projectId != null ? await getTender(id, projectId) : undefined;
   if (!tender) return NextResponse.json({ error: "Không tìm thấy gói thầu" }, { status: 404 });
   const { items, bids } = await comparisonTable(id);
-  const today = new Date().toLocaleDateString("vi-VN");
+  const today = formatDateVN(new Date());
 
   const stream = await ReactPDF.renderToStream(
     <TenderCompareDoc

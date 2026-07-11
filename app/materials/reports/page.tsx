@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { BarChart2, TrendingUp, AlertTriangle, Package, Clock, UserX } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { fetchMe } from "@/app/lib/me";
+import { formatDateVN, formatDateTimeVN } from "@/lib/date";
 
 type StockSummary = {
   sheetCode: string;
@@ -393,7 +394,7 @@ export default function MaterialReportsPage() {
                             <td className="py-3 pr-4 text-right text-zinc-400">{r.unit ?? "-"}</td>
                             <td className="py-3 pr-4 text-right font-medium">{r.qtyStock}</td>
                             <td className="py-3 pr-4 text-right text-zinc-400">
-                              {new Date(r.firstReceived).toLocaleDateString("vi-VN")}
+                              {formatDateVN(r.firstReceived)}
                             </td>
                             <td
                               className={`py-3 text-right font-semibold ${r.daysInStock > 60 ? "text-red-400" : "text-amber-400"}`}
@@ -449,7 +450,7 @@ export default function MaterialReportsPage() {
                               <td className="py-3 pr-4 text-zinc-400">{r.createdByName}</td>
                               <td className="py-3 pr-4 text-zinc-400 italic">{r.note ?? "-"}</td>
                               <td className="py-3 text-right text-zinc-400">
-                                {new Date(r.createdAt).toLocaleString("vi-VN")}
+                                {formatDateTimeVN(r.createdAt)}
                               </td>
                             </tr>
                           ))}

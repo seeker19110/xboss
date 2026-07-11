@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import { appAlert, appPrompt } from "@/app/components/dialogs";
 import EditableText from "@/app/components/EditableText";
+import { formatDateVN } from "@/lib/date";
 
 type Point = { date: string; planned: number | null; actual: number | null };
 type Data = { points: Point[]; sheets: string[]; today?: string };
@@ -151,7 +152,7 @@ export default function SCurveChart({ system }: { system?: string }) {
                 borderRadius: 8,
                 fontSize: 12,
               }}
-              labelFormatter={(d) => new Date(String(d)).toLocaleDateString("vi-VN")}
+              labelFormatter={(d) => formatDateVN(String(d))}
               formatter={(v, name) => [`${v ?? "—"}%`, name === "planned" ? "Kế hoạch" : "Thực tế"]}
             />
             <Legend

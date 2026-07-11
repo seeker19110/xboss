@@ -17,7 +17,7 @@ import AppHeader from "@/app/components/AppHeader";
 import { appConfirm } from "@/app/components/dialogs";
 import SpreadsheetGrid, { type GridColumn, type GridEdit } from "@/app/components/SpreadsheetGrid";
 import { fetchMe } from "@/app/lib/me";
-import { todayISO } from "@/lib/date";
+import { todayISO, formatDateVN } from "@/lib/date";
 import RatingModal from "./RatingModal";
 
 type PO = {
@@ -619,7 +619,7 @@ export default function PurchaseOrdersPage() {
                                   isPoLate(po) ? "text-rose-400 font-medium" : "text-zinc-300"
                                 }
                               >
-                                {new Date(po.expectedDate).toLocaleDateString("vi-VN")}
+                                {formatDateVN(po.expectedDate)}
                               </span>
                             </span>
                           )}
