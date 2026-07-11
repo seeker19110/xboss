@@ -330,7 +330,7 @@ export default function Dashboard() {
         {/* ── Card hệ (M15) — nhìn nhanh từng hệ, bấm vào trang hub riêng ── */}
         {systems.length > 0 && (
           <section>
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-3">
               Theo hệ thi công
             </h2>
             <div className="flex gap-3 overflow-x-auto scrollbar-none pb-1">
@@ -365,7 +365,7 @@ export default function Dashboard() {
         <section>
           {/* Tổng trễ — banner nổi bật */}
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-400">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
               Tổng quan tiến độ
             </h2>
             {canImport && (
@@ -528,7 +528,7 @@ export default function Dashboard() {
           <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
             <div className="flex items-center gap-2 mb-1">
               <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-              <h2 className="text-sm font-semibold text-zinc-200">
+              <h2 className="text-base font-semibold text-zinc-100">
                 <EditableText tkey="dashboard.pareto.title">Nguyên nhân trễ (Pareto)</EditableText>
               </h2>
             </div>
@@ -593,7 +593,7 @@ export default function Dashboard() {
         >
           {/* Header + filter */}
           <div className="px-5 py-4 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center gap-3">
-            <h2 className="flex items-center gap-2 font-semibold text-sm shrink-0">
+            <h2 className="flex items-center gap-2 font-semibold text-base text-zinc-100 shrink-0">
               <Clock className="w-4 h-4 text-red-400" />
               <EditableText tkey="dashboard.delayed.title">
                 Danh sách công việc đang trễ
