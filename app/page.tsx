@@ -26,8 +26,6 @@ import { formatDateVN } from "@/lib/date";
 import { systemColorClasses } from "@/lib/systemColors";
 import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
 import type {
-  CashflowMonth,
-  CpiBlock,
   QualityBlock,
   VoBlock,
   WorkfrontBlock,
@@ -106,8 +104,6 @@ export default function Dashboard() {
     delayedTasks: DelayedTask[];
     kpi: KPI[];
     totalDelayed: number;
-    cashflow: CashflowMonth[] | null;
-    cpi: CpiBlock | null;
     quality: QualityBlock;
     vo: VoBlock | null;
     workfront: WorkfrontBlock | null;
@@ -492,17 +488,14 @@ export default function Dashboard() {
         {/* ── Bản đồ tiến độ Tháp A (tầng × hệ + lịch sử) ── */}
         <ProgressMap />
 
-        {/* ── M9: KPI tiền/chất lượng + so sánh chéo hệ + dòng tiền ── */}
+        {/* ── M9: KPI chất lượng + so sánh chéo hệ ── */}
         {data && (
           <DashboardExtCards
-            cashflow={data.cashflow}
-            cpi={data.cpi}
             quality={data.quality}
             vo={data.vo}
             workfront={data.workfront}
             bySystem={data.bySystem}
             approvals={data.approvals}
-            isEngineer={me?.role === "engineer"}
           />
         )}
 

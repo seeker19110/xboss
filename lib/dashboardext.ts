@@ -4,7 +4,6 @@
 // (dashboard chạy được dù module sau chưa làm, vd work_fronts của M14).
 // Xem docs/nang-cap/M09-dashboard.md.
 import { query, queryOne, todayISO } from "@/lib/db";
-import { boqExecutedQty } from "@/lib/boq";
 import { costSummary } from "@/lib/cost";
 
 export async function tableExists(name: string): Promise<boolean> {
@@ -13,57 +12,6 @@ export async function tableExists(name: string): Promise<boolean> {
     name,
   );
   return !!row?.exists;
-}
-
-export type CashflowMonth = { month: string; in: number; out: number };
-
-// 12 tháng gần nhất: in = payment_bills gắn hợp đồng nhận thầu (thu từ CĐT),
-// out = payment_bills gắn hợp đồng giao thầu/NCC hoặc chưa gắn hợp đồng (mặc định
-// trước M16 mọi bill đều là chi cho NCC/thầu phụ).
-export async function cashflowSeries(): Promise<CashflowMonth[]> {
-  const rows = await query<{ month: string; direction: "in" | "out"; total: number }>(
-    `SELECT to_char(pb.paid_date, 'YYYY-MM') AS month,
-            CASE WHEN c.kind = 'nhan_thau' THEN 'in' ELSE 'out' END AS direction,
-            SUM(pb.amount) AS total
-       FROM payment_bills pb
-       LEFT JOIN contracts c ON c.id = pb.contract_id
-      WHERE pb.paid_date >= (CURRENT_DATE - INTERVAL '12 months')
-      GROUP BY month, direction
-      ORDER BY month`,
-  );
-  const map = new Map<string, CashflowMonth>();
-  for (const r of rows) {
-    const entry = map.get(r.month) ?? { month: r.month, in: 0, out: 0 };
-    entry[r.direction] = Number(r.total);
-    map.set(r.month, entry);
-  }
-  return [...map.values()].sort((a, b) => a.month.localeCompare(b.month));
-}
-
-export type CpiBlock = {
-  executedValue: number;
-  actualCost: number;
-  cpi: number;
-  budgetUsedPct: number;
-};
-
-// CPI = giá trị thực hiện (KL thực hiện × đơn giá, lib/boq.ts) / thực chi (lib/cost.ts).
-// CPI ≥ 1: thực hiện nhiều hơn tiền đã chi (tốt) — < 1: chi vượt so với thực hiện (rủi ro).
-export async function cpiBlock(): Promise<CpiBlock> {
-  const boqItems = await query<{ id: number; unitPrice: number }>(
-    `SELECT id, unit_price AS "unitPrice" FROM boq_items WHERE vo_id IS NULL`,
-  );
-  let executedValue = 0;
-  for (const it of boqItems) executedValue += (await boqExecutedQty(it.id)) * Number(it.unitPrice);
-
-  const rows = await costSummary("system");
-  const totals = rows.reduce(
-    (acc, r) => ({ budget: acc.budget + r.budget, actual: acc.actual + r.actual }),
-    { budget: 0, actual: 0 },
-  );
-  const cpi = totals.actual > 0 ? executedValue / totals.actual : 0;
-  const budgetUsedPct = totals.budget > 0 ? (totals.actual / totals.budget) * 100 : 0;
-  return { executedValue, actualCost: totals.actual, cpi, budgetUsedPct };
 }
 
 export type QualityBlock = {

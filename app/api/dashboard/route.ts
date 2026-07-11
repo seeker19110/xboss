@@ -4,8 +4,6 @@ import { getCurrentUser, CAN } from "@/lib/auth";
 import { resolveSystemId } from "@/lib/systems";
 import { progressAtDate } from "@/lib/report";
 import {
-  cashflowSeries,
-  cpiBlock,
   qualityBlock,
   procurementBlock,
   workfrontBlock,
@@ -104,9 +102,11 @@ export async function GET(req: NextRequest) {
         })()
       : kpi;
 
-  // M9 — khối mở rộng "tiền + chất lượng + công trường". Khối tài chính (cashflow/
-  // cpi/vo, và budgetUsedPct trong bySystem) chỉ trả cho PAYMENT_VIEW_ROLES
-  // (admin/pm/bch) — ẩn từ server cho cdt/viewer, không chỉ ẩn UI (quyết 2026-07-04).
+  // M9 — khối mở rộng "tiền + chất lượng + công trường". Khối tài chính (vo, và
+  // budgetUsedPct trong bySystem) chỉ trả cho PAYMENT_VIEW_ROLES (admin/pm/bch) —
+  // ẩn từ server cho cdt/viewer, không chỉ ẩn UI (quyết 2026-07-04). Dashboard
+  // tổng quan không còn hiển thị cashflow/CPI/% ngân sách (quyết 2026-07-11) nên
+  // bỏ hẳn budgetUsedPct khỏi response thay vì null theo quyền.
   const canViewFinance = CAN.viewPayments(user.role);
   const [quality, procurement, workfront, bySystem] = await Promise.all([
     qualityBlock(),
@@ -114,9 +114,7 @@ export async function GET(req: NextRequest) {
     workfrontBlock(),
     bySystemBlock(),
   ]);
-  const [cashflow, cpi, vo] = canViewFinance
-    ? await Promise.all([cashflowSeries(), cpiBlock(), voBlock()])
-    : [null, null, null];
+  const vo = canViewFinance ? await voBlock() : null;
 
   // Widget "Chờ duyệt" (M19) — chỉ người có quyền duyệt (Admin/PM) cần thấy.
   const approvals = CAN.approve(user.role) ? await approvalsBlock() : null;
@@ -126,15 +124,10 @@ export async function GET(req: NextRequest) {
     delayedTasks,
     kpi: kpiWithDelta,
     totalDelayed: delayedTasks.length,
-    cashflow,
-    cpi,
     quality,
     procurement,
     workfront,
     vo,
-    bySystem: bySystem.map((d) => ({
-      ...d,
-      budgetUsedPct: canViewFinance ? d.budgetUsedPct : null,
-    })),
+    bySystem: bySystem.map(({ budgetUsedPct, ...rest }) => rest),
   });
 }
