@@ -688,7 +688,7 @@ export default function PurchaseOrdersPage() {
                           <button
                             onClick={() => deletePO(po)}
                             aria-label={`Xoá đơn hàng ${po.poCode}`}
-                            className="p-1.5 rounded hover:bg-red-900 text-zinc-400 hover:text-red-200"
+                            className="p-1.5 rounded text-zinc-500 hover:text-red-300 hover:bg-red-950/40"
                           >
                             <X className="w-4 h-4" />
                           </button>
@@ -698,7 +698,7 @@ export default function PurchaseOrdersPage() {
                             <button
                               onClick={() => updateStatus(po, "cancelled")}
                               aria-label={`Huỷ đơn hàng ${po.poCode}`}
-                              className="p-1.5 rounded hover:bg-red-900 text-zinc-400 hover:text-red-200"
+                              className="p-1.5 rounded text-zinc-500 hover:text-red-300 hover:bg-red-950/40"
                             >
                               <AlertCircle className="w-4 h-4" />
                             </button>

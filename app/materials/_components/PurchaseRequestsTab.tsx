@@ -601,7 +601,7 @@ export default function PurchaseRequestsTab({
                   <button
                     onClick={() => deletePR(pr.id, pr.prCode)}
                     aria-label="Xoá yêu cầu mua"
-                    className="p-1.5 rounded hover:bg-red-900 text-zinc-500 hover:text-red-200"
+                    className="p-1.5 rounded text-zinc-500 hover:text-red-300 hover:bg-red-950/40"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -645,7 +645,7 @@ export default function PurchaseRequestsTab({
               <button
                 onClick={() => review("reject")}
                 disabled={saving}
-                className="flex-1 flex items-center justify-center gap-1.5 bg-red-800 hover:bg-red-700 disabled:opacity-50 py-2 rounded text-sm font-medium text-on-accent"
+                className="flex-1 flex items-center justify-center gap-1.5 bg-red-700 hover:bg-red-600 disabled:opacity-50 py-2 rounded text-sm font-medium text-on-accent"
               >
                 <X className="w-4 h-4" /> Từ chối
               </button>
