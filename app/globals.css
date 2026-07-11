@@ -263,3 +263,15 @@ body {
     display: inline;
   }
 }
+
+/* Khi in (window.print()/PDF trình duyệt): sidebar/topbar/bottombar của AppShell đã tự
+   ẩn bằng class `print:hidden` trên từng phần tử, nhưng `#app-sidebar` vẫn còn trong DOM
+   nên selector `:has(#app-sidebar)` ở trên vẫn khớp và body vẫn giữ padding-left chừa
+   chỗ cho sidebar đã ẩn — nội dung bị đẩy lệch phải, không nằm gọn trong khổ giấy. Reset
+   về 0 để nội dung các trang có AppHeader (schedule-control, tracking...) chiếm trọn
+   chiều rộng khi in, giống các trang in-friendly độc lập (report/lookahead...). */
+@media print {
+  body:has(#app-sidebar) {
+    padding-left: 0 !important;
+  }
+}
