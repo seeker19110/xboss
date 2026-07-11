@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Menu,
   X,
@@ -14,6 +14,7 @@ import ProjectSwitcher from "@/app/components/ProjectSwitcher";
 import GlobalSearch from "@/app/components/GlobalSearch";
 import ThemeToggle from "@/app/components/ThemeToggle";
 import OnlineUsers from "@/app/components/OnlineUsers";
+import { Modal } from "@/app/components/dialogs";
 import { fetchMe } from "@/app/lib/me";
 import {
   DASHBOARD_TREE,
@@ -64,7 +65,6 @@ export default function AppHeader({
   // Bật/tắt dashboard qua khu "Hiển thị AppShell" ở /admin (M21 PR3). Rỗng lúc đầu =
   // coi như mọi dashboard đều bật (tránh sidebar nhấp nháy ẩn/hiện lúc tải trang).
   const [navSettings, setNavSettings] = useState<Map<string, boolean>>(new Map());
-  const asideRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     setPath(window.location.pathname);
@@ -93,48 +93,6 @@ export default function AppHeader({
       return next;
     });
   }
-
-  // Drawer mobile: bẫy focus bên trong + đóng bằng Esc (M0 — chỉ áp dụng khi drawer
-  // đang mở, tức đang ở mobile vì nút mở/overlay chỉ hiện dưới lg:hidden). Trả focus
-  // lại phần tử đã kích hoạt (nút hamburger) khi đóng.
-  useEffect(() => {
-    if (!mobileOpen) return;
-    const aside = asideRef.current;
-    if (!aside) return;
-    const previouslyFocused = document.activeElement as HTMLElement | null;
-
-    function focusableEls() {
-      return Array.from(
-        aside!.querySelectorAll<HTMLElement>("a[href], button:not([disabled])"),
-      ).filter((el) => el.offsetParent !== null);
-    }
-    focusableEls()[0]?.focus();
-
-    function onKeydown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        setMobileOpen(false);
-        return;
-      }
-      if (e.key !== "Tab") return;
-      const items = focusableEls();
-      if (items.length === 0) return;
-      const first = items[0];
-      const last = items[items.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    }
-    document.addEventListener("keydown", onKeydown);
-    return () => {
-      document.removeEventListener("keydown", onKeydown);
-      previouslyFocused?.focus();
-    };
-  }, [mobileOpen]);
 
   function toggleCollapsed() {
     const next = !collapsed;
@@ -260,40 +218,37 @@ export default function AppHeader({
   // Cây đã lọc theo vai trò + bật/tắt admin (M21 PR3) — nguồn duy nhất để render sidebar.
   const visibleTree = resolveVisibleTree(DASHBOARD_TREE, me?.role, navSettings);
 
+  // Nội dung điều hướng dùng chung cho cả sidebar desktop lẫn drawer mobile.
+  function renderNav() {
+    return (
+      <nav className="flex-1 overflow-y-auto py-2" aria-label="Điều hướng chính">
+        {visibleTree.map(renderCluster)}
+      </nav>
+    );
+  }
+
   return (
     <>
-      {/* ── Sidebar (desktop: cố định thu gọn được · mobile: drawer off-canvas) ──
+      {/* ── Sidebar desktop: cố định, thu gọn được ──
           Chiều rộng/ẩn nhãn khi thu gọn do CSS đảm nhiệm (xem #app-sidebar, .sidebar-label
-          trong globals.css) — ở đây chỉ toggle-transform cho drawer mobile. */}
+          trong globals.css). Luôn mount (ẩn dưới lg bằng `hidden lg:flex`) — không phải
+          overlay/dismissible nên không cần Modal (không có backdrop/Escape). */}
       <aside
-        ref={asideRef}
         id="app-sidebar"
-        className={`fixed inset-y-0 left-0 z-50 flex flex-col w-60 bg-zinc-950 border-r border-zinc-800 safe-top
-          transition-transform duration-200 lg:translate-x-0
-          ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
-          print:hidden`}
+        className="hidden lg:flex fixed inset-y-0 left-0 z-50 flex-col w-60 bg-zinc-950 border-r border-zinc-800 safe-top print:hidden"
       >
         <div className="flex items-center h-12 px-1 shrink-0">
           <div className="flex-1 min-w-0">
             <ProjectSwitcher collapsed={collapsed} />
           </div>
-          <button
-            onClick={() => setMobileOpen(false)}
-            aria-label="Đóng menu"
-            className="ml-1 p-1.5 mr-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-900 lg:hidden shrink-0"
-          >
-            <X className="w-4 h-4" />
-          </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-2" aria-label="Điều hướng chính">
-          {visibleTree.map(renderCluster)}
-        </nav>
+        {renderNav()}
 
         <button
           onClick={toggleCollapsed}
           aria-label={collapsed ? "Mở rộng menu" : "Thu gọn menu"}
-          className="hidden lg:flex items-center gap-2.5 px-2.5 py-2.5 mx-2 mb-2 rounded-lg text-xs text-zinc-400 hover:text-white hover:bg-zinc-900/60 border-t border-zinc-800 shrink-0"
+          className="flex items-center gap-2.5 px-2.5 py-2.5 mx-2 mb-2 rounded-lg text-xs text-zinc-400 hover:text-white hover:bg-zinc-900/60 border-t border-zinc-800 shrink-0"
         >
           {collapsed ? (
             <PanelLeftOpen className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
@@ -304,13 +259,25 @@ export default function AppHeader({
         </button>
       </aside>
 
-      {/* Overlay tối khi drawer mobile đang mở */}
+      {/* ── Drawer mobile: dùng Modal chung (backdrop/Escape/focus-trap/khoá scroll có sẵn)
+          thay vì tự dựng overlay + bẫy focus thủ công. */}
       {mobileOpen && (
-        <div
-          onClick={() => setMobileOpen(false)}
-          aria-hidden="true"
-          className="fixed inset-0 z-40 bg-black/60 lg:hidden"
-        />
+        <Modal onClose={() => setMobileOpen(false)} drawer className="w-60 lg:hidden flex flex-col">
+          <div className="flex items-center h-12 px-1 shrink-0">
+            <div className="flex-1 min-w-0">
+              <ProjectSwitcher collapsed={false} />
+            </div>
+            <button
+              onClick={() => setMobileOpen(false)}
+              aria-label="Đóng menu"
+              className="ml-1 p-1.5 mr-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-900 shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {renderNav()}
+        </Modal>
       )}
 
       {/* ── Topbar ── */}
