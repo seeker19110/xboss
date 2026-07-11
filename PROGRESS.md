@@ -12,6 +12,8 @@
 - **Hạ tầng chất lượng có sẵn:** TypeScript `strict`; ESLint 9 flat config (`eslint.config.mjs`); CI (`.github/workflows/ci.yml`) chạy `npm audit` → lint → typecheck → test (Postgres 16 service) → build trên push `main` + PR; PR template XBoss-specific; test `node:test` (8 file trong `tests/`).
 - **Áp khung — Lớp 1 (đợt này):** `PROJECT.md` (viết ngược) + `PROGRESS.md` + ADR-0001/0002; `CONTRIBUTING.md` + `SECURITY.md` (khớp thực tế XBoss); issue templates + Dependabot + CODEOWNERS; mục trỏ tài liệu khung trong `CLAUDE.md`.
 
+- **Sidebar "Tiến độ" đổi từ 5 view chung (Timeline/Gantt/Lookahead/S-Curve/Đường găng) sang 6 hệ đang thi công** (ACMV/Điện/Cấp thoát nước/PCCC/Kết cấu/Xây tô, `app/lib/dashboardTree.ts` node `dash.tien-do`): mỗi hệ 1 trang mới `app/tien-do/[he]/page.tsx` gộp đủ 7 khối theo đúng thứ tự (tổng quan tiến độ, S-curve, timeline, SPI, dự báo, nguyên nhân trễ, danh sách trễ) trên cùng 1 trang cuộn xuống — tái dùng thẳng `SCurveChart`/`ProgressMap` (đã có sẵn prop `he`), bổ sung prop `he` cho `SpiCards`/`ForecastCards` + lọc theo hệ ở 2 route `/api/dashboard/spi`, `/api/dashboard/forecast` (cùng pattern `resolveDisciplineId` đã dùng ở `/api/dashboard`). Các trang view chung cũ (`/timeline`, `/gantt`, `/lookahead`, `/scurve`, `/schedule-control`) vẫn còn nguyên, chỉ hết link tắt trực tiếp trong sidebar — vẫn vào được qua hub `/hub/dash.tien-do`.
+
 ## Đang làm
 
 - Áp khung brownfield Bước 0 → Lớp 1 (đợt này, nhánh `chore/ap-dung-khung-brownfield`).
