@@ -10,15 +10,12 @@ async function gotoAcmv(page: import("@playwright/test").Page) {
 }
 
 test.describe("Trang hệ /system/[code] (sau đăng nhập)", () => {
-  test("điều hướng từ sidebar vào trang hệ", async ({ page, isMobile }) => {
+  test("điều hướng từ Dashboard vào trang hệ", async ({ page }) => {
+    // Sidebar không còn mục "Hệ thi công" riêng (đã gộp vào nhóm "Tiến độ" trỏ
+    // /progress/[system]) — đường vào /system/[code] còn lại là card "Theo hệ thi công"
+    // trên Dashboard (app/page.tsx), DashboardHub và bảng Chi phí.
     await page.goto("/");
-    // Mobile: sidebar là drawer off-canvas, phải mở qua nút hamburger trước khi bấm được link.
-    if (isMobile) {
-      await page.getByRole("button", { name: "Mở menu" }).click();
-    }
-    // Nhóm sidebar "Tiến độ" (M-tiến-độ-6-hệ) cũng có mục "ACMV" trỏ /progress/acmv — dùng
-    // href để nhắm đúng link "Hệ thi công" /system/acmv, tránh nhập nhằng cùng tên.
-    await page.locator('#app-sidebar a[href="/system/acmv"]').click();
+    await page.locator('a[href="/system/acmv"]').first().click();
     await expect(page).toHaveURL(/\/system\/acmv$/);
     await expect(page.getByRole("heading", { name: "ACMV" })).toBeVisible({ timeout: 15_000 });
   });
