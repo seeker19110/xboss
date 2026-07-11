@@ -44,14 +44,14 @@ type TowerRow = { id: number; name: string };
 
 function bucketClass(p: number): string {
   if (p >= 0.999) return "bg-emerald-600 text-on-accent";
-  if (p >= 0.8) return "bg-emerald-800 text-emerald-100";
-  if (p >= 0.5) return "bg-amber-800 text-amber-100";
-  if (p >= 0.2) return "bg-red-900 text-red-200";
-  if (p > 0) return "bg-red-950 text-red-200";
+  if (p >= 0.8) return "bg-emerald-100 text-emerald-900";
+  if (p >= 0.5) return "bg-amber-100 text-amber-900";
+  if (p >= 0.2) return "bg-red-100 text-red-900";
+  if (p > 0) return "bg-red-200 text-red-900";
   return "bg-zinc-800 text-zinc-300";
 }
 function cellClass(p: number, delayed: number): string {
-  return bucketClass(p) + (delayed > 0 ? " ring-1 ring-red-500/70" : "");
+  return bucketClass(p) + (delayed > 0 ? " ring-2 ring-red-500/70" : "");
 }
 function tbColor(avg: number): string {
   return avg >= 1 ? "text-emerald-400" : avg >= 0.5 ? "text-amber-400" : "text-zinc-400";
@@ -59,12 +59,12 @@ function tbColor(avg: number): string {
 
 const LEGEND = [
   { cls: "bg-zinc-800", label: "0%" },
-  { cls: "bg-red-950", label: "<20%" },
-  { cls: "bg-red-900", label: "20–50%" },
-  { cls: "bg-amber-800", label: "50–80%" },
-  { cls: "bg-emerald-800", label: "80–99%" },
+  { cls: "bg-red-200", label: "<20%" },
+  { cls: "bg-red-100", label: "20–50%" },
+  { cls: "bg-amber-100", label: "50–80%" },
+  { cls: "bg-emerald-100", label: "80–99%" },
   { cls: "bg-emerald-600", label: "100%" },
-  { cls: "bg-zinc-800 ring-1 ring-red-500/70", label: "Trễ (viền đỏ)" },
+  { cls: "bg-zinc-800 ring-2 ring-red-500/70", label: "Trễ (viền đỏ)" },
   { cls: "bg-zinc-900 border border-dashed border-zinc-700/60", label: "Không có" },
 ];
 
@@ -604,7 +604,7 @@ export default function ProgressMap({ system = "" }: { system?: string }) {
                         })}
                         <td className="text-center py-0.5">
                           <span
-                            className={`inline-flex items-center justify-center w-9 sm:w-10 h-7 sm:h-8 rounded text-[10px] font-bold tabular-nums ${bucketClass(curAvg)} ${hasDelayed ? "ring-1 ring-red-500/70" : "border border-zinc-600"}`}
+                            className={`inline-flex items-center justify-center w-9 sm:w-10 h-7 sm:h-8 rounded text-[10px] font-bold tabular-nums ${bucketClass(curAvg)} ${hasDelayed ? "ring-2 ring-red-500/70" : "border border-zinc-600"}`}
                           >
                             {Math.round(curAvg * 100)}%
                           </span>
