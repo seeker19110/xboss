@@ -393,7 +393,7 @@ function ChecklistsTab({
           {checklists.map((c) => (
             <div
               key={c.id}
-              className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 flex items-start justify-between gap-3"
+              className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-start justify-between gap-3"
             >
               <div className="min-w-0">
                 <p className="font-semibold text-sm flex items-center gap-2 flex-wrap">
@@ -698,7 +698,7 @@ function InspectionsTab({
       ) : (
         <div className="space-y-2">
           {inspections.map((i) => (
-            <div key={i.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+            <div key={i.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="min-w-0">
                   <p className="font-semibold text-sm">{i.checklistName}</p>
@@ -1038,7 +1038,7 @@ function NcrsTab({
             return (
               <div
                 key={n.id}
-                className={`bg-zinc-900 border rounded-xl p-3 ${overdue ? "border-rose-800" : "border-zinc-800"}`}
+                className={`bg-zinc-900 border rounded-xl p-4 ${overdue ? "border-rose-800" : "border-zinc-800"}`}
               >
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="min-w-0">
@@ -1315,7 +1315,7 @@ function RequestsTab({
       ) : (
         <div className="space-y-2">
           {requests.map((r) => (
-            <div key={r.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+            <div key={r.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="min-w-0">
                   <p className="font-semibold text-sm">{r.code}</p>
@@ -1665,7 +1665,7 @@ function DocumentsTab({
           {docs.map((d) => (
             <div
               key={d.id}
-              className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 flex items-start justify-between gap-3"
+              className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-start justify-between gap-3"
             >
               <div className="min-w-0">
                 <p className="font-semibold text-sm flex items-center gap-2 flex-wrap">

@@ -696,7 +696,7 @@ function TcTab({
 function AsbuiltPanel({ drawings }: { drawings: AsbuiltDrawing[] }) {
   if (drawings.length === 0) return null;
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
       <p className="text-xs text-zinc-400 mb-2">
         Bản vẽ hoàn công (as-built) — tham khảo từ Bản vẽ, không lưu trùng ở đây
       </p>

@@ -338,7 +338,7 @@ export default function RisksPage() {
             {/* Card view (mobile) */}
             <div className="sm:hidden space-y-2">
               {filtered.map((r) => (
-                <div key={r.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+                <div key={r.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-xs text-zinc-500">{r.code}</span>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_BADGE[r.status]}`}>

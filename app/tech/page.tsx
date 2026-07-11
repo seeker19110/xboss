@@ -293,7 +293,7 @@ export default function TechPage() {
                   {albums.map((a) => (
                     <div
                       key={a.id}
-                      className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 space-y-2"
+                      className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-2"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div>

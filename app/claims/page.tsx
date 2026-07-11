@@ -135,13 +135,13 @@ export default function ClaimsPage() {
 
       <main className="p-4 sm:p-6 pb-24 space-y-4">
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
             <p className="text-xs text-zinc-400 uppercase tracking-wide">Claim chi phí đang mở</p>
             <p className="text-lg font-semibold mt-1">
               {kpi.costCount} — {fmtVND(kpi.costAmount)}
             </p>
           </div>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
             <p className="text-xs text-zinc-400 uppercase tracking-wide">Claim EOT đang mở</p>
             <p className="text-lg font-semibold mt-1">
               {kpi.eotCount} — {kpi.eotDays} ngày

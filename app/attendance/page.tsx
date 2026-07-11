@@ -342,7 +342,7 @@ function IndividualForm({
   }
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 space-y-2">
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-2">
       <p className="text-xs text-zinc-400">Chấm công theo người (tuỳ chọn)</p>
       <div className="grid grid-cols-2 gap-2">
         <select

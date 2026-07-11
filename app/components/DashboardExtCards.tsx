@@ -77,7 +77,7 @@ export default function DashboardExtCards({
           approvals.pendingProposals + approvals.pendingPurchaseRequests > 0 && (
             <a
               href="/proposals"
-              className="flex-1 min-w-[140px] bg-zinc-900 border border-zinc-800 rounded-xl p-4 hover:border-zinc-600 transition"
+              className="flex-1 min-w-[140px] bg-zinc-900 border border-zinc-800 rounded-xl p-3 hover:border-zinc-600 transition"
             >
               <p className="text-xs text-zinc-400 uppercase tracking-wide flex items-center gap-1.5">
                 <Inbox className="w-3.5 h-3.5" /> Chờ duyệt của tôi
@@ -94,7 +94,7 @@ export default function DashboardExtCards({
         {canViewFinance && (
           <a
             href="/costs"
-            className="flex-1 min-w-[140px] bg-zinc-900 border border-zinc-800 rounded-xl p-4 hover:border-zinc-600 transition"
+            className="flex-1 min-w-[140px] bg-zinc-900 border border-zinc-800 rounded-xl p-3 hover:border-zinc-600 transition"
           >
             <p className="text-xs text-zinc-400 uppercase tracking-wide flex items-center gap-1.5">
               <Gauge className="w-3.5 h-3.5" /> CPI
@@ -109,7 +109,7 @@ export default function DashboardExtCards({
         {canViewFinance && (
           <a
             href="/costs"
-            className="flex-1 min-w-[140px] bg-zinc-900 border border-zinc-800 rounded-xl p-4 hover:border-zinc-600 transition"
+            className="flex-1 min-w-[140px] bg-zinc-900 border border-zinc-800 rounded-xl p-3 hover:border-zinc-600 transition"
           >
             <p className="text-xs text-zinc-400 uppercase tracking-wide flex items-center gap-1.5">
               <Wallet className="w-3.5 h-3.5" /> % Ngân sách đã dùng
@@ -119,7 +119,7 @@ export default function DashboardExtCards({
         )}
         <a
           href="/quality"
-          className="flex-1 min-w-[140px] bg-zinc-900 border border-zinc-800 rounded-xl p-4 hover:border-zinc-600 transition"
+          className="flex-1 min-w-[140px] bg-zinc-900 border border-zinc-800 rounded-xl p-3 hover:border-zinc-600 transition"
         >
           <p className="text-xs text-zinc-400 uppercase tracking-wide flex items-center gap-1.5">
             <ShieldAlert className="w-3.5 h-3.5" /> NCR mở
@@ -136,7 +136,7 @@ export default function DashboardExtCards({
         {vo != null && (
           <a
             href="/variations"
-            className="flex-1 min-w-[140px] bg-zinc-900 border border-zinc-800 rounded-xl p-4 hover:border-zinc-600 transition"
+            className="flex-1 min-w-[140px] bg-zinc-900 border border-zinc-800 rounded-xl p-3 hover:border-zinc-600 transition"
           >
             <p className="text-xs text-zinc-400 uppercase tracking-wide flex items-center gap-1.5">
               <FilePlus2 className="w-3.5 h-3.5" /> VO chờ duyệt
@@ -147,7 +147,7 @@ export default function DashboardExtCards({
         {workfront != null && workfront.waitingFloors > 0 && (
           <a
             href="/work-fronts"
-            className="flex-1 min-w-[140px] bg-zinc-900 border border-zinc-800 rounded-xl p-4 hover:border-zinc-600 transition"
+            className="flex-1 min-w-[140px] bg-zinc-900 border border-zinc-800 rounded-xl p-3 hover:border-zinc-600 transition"
           >
             <p className="text-xs text-zinc-400 uppercase tracking-wide flex items-center gap-1.5">
               <MapPinned className="w-3.5 h-3.5" /> Tầng chờ mặt bằng
