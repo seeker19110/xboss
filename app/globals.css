@@ -169,9 +169,10 @@ body {
 
 /* Ghim lại giá trị gốc các token bị html.<theme> đảo màu — dùng cho mọi khu vực PHẢI
    luôn trông giống "giấy trắng" bất kể theme đang chọn: SpreadsheetGrid (giao diện kiểu
-   Excel) VÀ các trang in-friendly (report/lookahead/payments-print/order — hard-code
-   bg-white/text-zinc-900/text-black giả định luôn là màu thật). Không ghim thì ở theme
-   sáng --color-white/--color-zinc-* bị đảo ngược, nền hoá gần đen hoặc tương phản vỡ. */
+   Excel) VÀ các khối/trang in-friendly (ReportPrintable nhúng trong /report, lookahead/
+   payments-print/order — hard-code bg-white/text-zinc-900/text-black giả định luôn là
+   màu thật). Không ghim thì ở theme sáng --color-white/--color-zinc-* bị đảo ngược, nền
+   hoá gần đen hoặc tương phản vỡ. */
 .sheet-stable {
   color-scheme: light;
   --color-white: #ffffff;
