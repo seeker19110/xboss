@@ -44,6 +44,14 @@ type Summary = {
   ncrOpen: number;
 };
 
+type SheetKpi = {
+  sheetId: number;
+  sheetType: string;
+  sheetSlug: string | null;
+  total: number;
+  avgProgress: number;
+  delayed: number;
+};
 type Critical = { id: number; float: number };
 type Delayed = {
   id: number;
@@ -73,6 +81,7 @@ function KpiTile({ label, value, accent }: { label: string; value: string; accen
 export default function ProgressSystemPage({ params }: { params: Promise<{ system: string }> }) {
   const { system } = use(params);
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [sheetKpi, setSheetKpi] = useState<SheetKpi[]>([]);
   const [schedule, setSchedule] = useState<ScheduleData | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -96,8 +105,13 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
       fetch(`/api/schedule-control?system=${encodeURIComponent(system)}`).then((r) =>
         r.status === 401 ? null : r.ok ? r.json() : Promise.reject(new Error("fetch failed")),
       ),
+      // Cards theo từng sheet trong hệ (giống lưới "Tổng quan tiến độ" ở Dashboard tổng,
+      // nhưng /api/dashboard?system= đã tự lọc chỉ còn sheet của hệ này).
+      fetch(`/api/dashboard?system=${encodeURIComponent(system)}`).then((r) =>
+        r.status === 401 ? null : r.ok ? r.json() : Promise.reject(new Error("fetch failed")),
+      ),
     ])
-      .then(([meData, summaryData, scheduleData]) => {
+      .then(([meData, summaryData, scheduleData, dashData]) => {
         if (!meData) {
           redirectToLogin();
           return;
@@ -108,6 +122,7 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
         }
         setSummary(summaryData);
         setSchedule(scheduleData);
+        setSheetKpi(dashData?.kpi ?? []);
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
@@ -171,6 +186,59 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
               accent={summary.ncrOpen > 0 ? "text-rose-300" : "text-zinc-300"}
             />
           </div>
+
+          {/* Card theo từng sheet trong hệ — cùng bố cục với lưới sheet ở Dashboard tổng,
+              chỉ khác nguồn dữ liệu đã lọc sẵn theo hệ (?system=). */}
+          {sheetKpi.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mt-3">
+              {sheetKpi.map((k) => {
+                const spct = Math.round((k.avgProgress ?? 0) * 100);
+                const hasDelay = k.delayed > 0;
+                const card = (
+                  <div className="flex flex-col h-full gap-3">
+                    <div className="flex items-start justify-between gap-1">
+                      <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wide leading-snug">
+                        {k.sheetType}
+                      </span>
+                      {hasDelay && (
+                        <span className="flex items-center gap-0.5 text-[10px] text-red-200 bg-red-950 px-1.5 py-0.5 rounded-full shrink-0 font-medium">
+                          <AlertTriangle className="w-2.5 h-2.5" /> {k.delayed}
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-3xl font-bold leading-none">{spct}%</p>
+                      <p className="text-[11px] text-zinc-400 mt-1">{k.total} công việc</p>
+                    </div>
+                    <div className="mt-auto">
+                      <div className="bg-zinc-800 rounded-full h-2 overflow-hidden">
+                        <div
+                          className={`h-2 rounded-full transition-all ${spct >= 80 ? "bg-emerald-500" : spct >= 50 ? "bg-sky-500" : "bg-amber-500"}`}
+                          style={{ width: `${spct}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+                return k.sheetSlug ? (
+                  <a
+                    key={k.sheetId}
+                    href={`/tracking/${k.sheetSlug}`}
+                    className="bg-zinc-900 border border-zinc-800 hover:border-emerald-700/60 rounded-xl p-4 flex flex-col transition min-h-[120px]"
+                  >
+                    {card}
+                  </a>
+                ) : (
+                  <div
+                    key={k.sheetId}
+                    className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex flex-col min-h-[120px]"
+                  >
+                    {card}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </section>
 
         {/* ── 2. Biểu đồ kế hoạch so với thực tế ── */}
