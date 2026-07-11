@@ -17,10 +17,12 @@ export type SearchHit = {
   sheetSlug: string | null;
 };
 
-// GET /api/search?q= → tìm task + nhóm theo mã / BOQCODE / tên.
+// GET /api/search?q= → tìm task + nhóm theo mã / BOQCODE / tên / tên hệ (system).
 // Chiến lược tìm kiếm (không cần pg_trgm extension):
 //   - code / boq_code: prefix match lower(code) LIKE 'term%' — dùng B-tree index
 //   - name: plainto_tsquery('simple', ...) trên tsvector GIN index — built-in Postgres
+//   - system.code / system.name: prefix match — cho phép gõ tên hệ (vd "ACMV") để tìm
+//     mọi task/nhóm thuộc các sheet của hệ đó (task không có chữ "ACMV" trong code/tên riêng).
 // Mọi vai trò tìm thấy toàn bộ task/nhóm (giống lưới tracking — subcon cần ngữ cảnh
 // tầng/nhóm xung quanh việc của mình, xem app/api/tasks/route.ts). Không lọc theo assigned_to.
 export async function GET(req: NextRequest) {
@@ -43,13 +45,18 @@ export async function GET(req: NextRequest) {
          FROM tasks t
          JOIN work_packages wp ON t.package_id = wp.id
          JOIN sheet_types st ON wp.sheet_type_id = st.id
+         LEFT JOIN systems sys ON sys.id = st.system_id
         WHERE lower(t.code) LIKE ?
            OR lower(t.boq_code) LIKE ?
            OR to_tsvector('simple', coalesce(t.name, '')) @@ plainto_tsquery('simple', ?)
+           OR lower(sys.code) LIKE ?
+           OR lower(sys.name) LIKE ?
         ORDER BY st.id, t.code LIMIT 15`,
       prefix,
       prefix,
       ftsQuery,
+      prefix,
+      prefix,
     ),
 
     query<SearchHit>(
@@ -58,13 +65,18 @@ export async function GET(req: NextRequest) {
               st.code AS "sheetType", st.slug AS "sheetSlug"
          FROM work_packages wp
          JOIN sheet_types st ON wp.sheet_type_id = st.id
+         LEFT JOIN systems sys ON sys.id = st.system_id
         WHERE lower(wp.code) LIKE ?
            OR lower(wp.boq_code) LIKE ?
            OR to_tsvector('simple', coalesce(wp.name, '')) @@ plainto_tsquery('simple', ?)
+           OR lower(sys.code) LIKE ?
+           OR lower(sys.name) LIKE ?
         ORDER BY st.id, wp.code LIMIT 10`,
       prefix,
       prefix,
       ftsQuery,
+      prefix,
+      prefix,
     ),
   ]);
 
