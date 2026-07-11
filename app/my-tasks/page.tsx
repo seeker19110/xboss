@@ -819,7 +819,7 @@ export default function MyTasksPage() {
           <>
             {/* Feed nav */}
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1 overflow-x-auto scrollbar-none flex-1 p-1 bg-zinc-900 border border-zinc-800 rounded-2xl">
+              <div className="flex items-center gap-1 overflow-x-auto scrollbar-none flex-1 p-1 bg-zinc-900 border border-zinc-800 rounded-xl">
                 {feedTabs.map((tab) => {
                   const isActive = tab.key === feedTab;
                   return (
