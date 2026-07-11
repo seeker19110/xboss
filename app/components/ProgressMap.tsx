@@ -44,10 +44,10 @@ type TowerRow = { id: number; name: string };
 
 function bucketClass(p: number): string {
   if (p >= 0.999) return "bg-emerald-600 text-on-accent";
-  if (p >= 0.8) return "bg-blue-600 text-on-accent";
-  if (p >= 0.5) return "bg-orange-700 text-on-accent";
-  if (p >= 0.2) return "bg-red-600 text-on-accent";
-  if (p > 0) return "bg-red-800 text-on-accent";
+  if (p >= 0.8) return "bg-emerald-100 text-blue-900";
+  if (p >= 0.5) return "bg-amber-100 text-blue-900";
+  if (p >= 0.2) return "bg-red-100 text-blue-900";
+  if (p > 0) return "bg-red-200 text-blue-900";
   return "bg-zinc-800 text-zinc-300";
 }
 function cellClass(p: number, delayed: number): string {
@@ -59,10 +59,10 @@ function tbColor(avg: number): string {
 
 const LEGEND = [
   { cls: "bg-zinc-800", label: "0%" },
-  { cls: "bg-red-800", label: "<20%" },
-  { cls: "bg-red-600", label: "20–50%" },
-  { cls: "bg-orange-700", label: "50–80%" },
-  { cls: "bg-blue-600", label: "80–99%" },
+  { cls: "bg-red-200", label: "<20%" },
+  { cls: "bg-red-100", label: "20–50%" },
+  { cls: "bg-amber-100", label: "50–80%" },
+  { cls: "bg-emerald-100", label: "80–99%" },
   { cls: "bg-emerald-600", label: "100%" },
   { cls: "bg-zinc-800 ring-2 ring-red-500/70", label: "Trễ (viền đỏ)" },
   { cls: "bg-zinc-900 border border-dashed border-zinc-700/60", label: "Không có" },
