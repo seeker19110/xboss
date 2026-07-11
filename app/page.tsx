@@ -390,20 +390,20 @@ export default function Dashboard() {
           {(data?.totalDelayed ?? 0) > 0 && (
             <a
               href="#delayed-table"
-              className="flex items-center gap-4 bg-red-950 border border-red-900/60 rounded-xl px-5 py-4 mb-4 hover:bg-red-900 transition"
+              className="flex items-center gap-4 bg-red-950/20 border border-red-900/50 rounded-xl px-5 py-4 mb-4 hover:bg-red-950/30 transition"
             >
-              <div className="p-2.5 bg-red-900/50 rounded-lg shrink-0">
+              <div className="p-2.5 bg-red-950/30 rounded-lg shrink-0">
                 <TrendingDown className="w-5 h-5 text-red-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-red-200 uppercase tracking-wide font-medium mb-0.5">
+                <p className="text-xs text-red-400 uppercase tracking-wider font-medium mb-0.5">
                   Tổng công việc đang trễ
                 </p>
-                <p className="text-4xl font-bold text-red-200 leading-none">
+                <p className="text-4xl font-bold text-red-400 leading-none">
                   {data?.totalDelayed ?? 0}
                 </p>
               </div>
-              <span className="flex items-center gap-1 text-xs text-red-200 hover:text-red-300 transition shrink-0">
+              <span className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 transition shrink-0">
                 Xem chi tiết <ChevronRight className="w-3.5 h-3.5" />
               </span>
             </a>
