@@ -54,9 +54,9 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
       await expect(sidebar.getByRole("link", { name: label, exact: true })).toBeVisible();
     }
 
-    // 6 mục hệ trong nhóm "Tiến độ" (dash.tien-do) trùng tên với mục "Hệ thi công"
-    // (link /system/[code], render riêng ngoài cây điều hướng — xem AppHeader.tsx) nên phải
-    // thu hẹp về đúng nhóm "Tiến độ" để tránh nhập nhằng nhiều link cùng tên.
+    // 6 mục hệ trong nhóm "Tiến độ" (dash.tien-do) — mục "Hệ thi công" riêng (link
+    // /system/[code]) đã bỏ khỏi sidebar vì trùng chức năng với nhóm này (chỉ còn vào
+    // /system/[code] qua Dashboard/DashboardHub/Chi phí — xem AppHeader.tsx).
     const tienDoGroup = sidebar.getByRole("button", { name: "Tiến độ" }).locator("xpath=..");
     for (const label of ["ACMV", "Điện", "Cấp thoát nước", "PCCC", "Kết cấu", "Xây tô"]) {
       await expect(tienDoGroup.getByRole("link", { name: label, exact: true })).toBeVisible();
@@ -104,8 +104,6 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     const sidebar = page.locator("#app-sidebar");
     const toggle = sidebar.getByRole("button", { name: "Tiến độ" });
     await expect(toggle).toBeVisible({ timeout: 15_000 });
-    // "ACMV" cũng là tên 1 mục ở nhóm "Hệ thi công" riêng (link /system/[code], luôn hiển thị
-    // ngoài nhóm gập/mở) — thu hẹp về đúng nhóm "Tiến độ" để không lẫn.
     const tienDoGroup = toggle.locator("xpath=..");
 
     // Mặc định mở — link con thấy ngay, không cần bấm.
