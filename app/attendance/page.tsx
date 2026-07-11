@@ -208,7 +208,7 @@ export default function AttendancePage() {
                         onClick={() => bumpCrew(c.id, 1)}
                         disabled={busyCrewId === c.id}
                         aria-label={`Tăng số người tổ ${c.name}`}
-                        className="w-10 h-10 flex items-center justify-center rounded-lg bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-white"
+                        className="w-10 h-10 flex items-center justify-center rounded-lg bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-on-accent"
                       >
                         <Plus className="w-4 h-4" />
                       </button>
@@ -392,7 +392,7 @@ function IndividualForm({
       <button
         onClick={submit}
         disabled={saving}
-        className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+        className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
       >
         {saving ? "Đang lưu…" : "Chấm công"}
       </button>

@@ -537,7 +537,7 @@ export default function SuppliersTab({ role }: { role: string }) {
               setShowAdd(true);
               setAddDraft({ ...EMPTY_DRAFT });
             }}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded text-sm font-medium"
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded text-sm font-medium text-on-accent"
           >
             <Plus className="w-4 h-4" /> Thêm
           </button>
@@ -561,7 +561,7 @@ export default function SuppliersTab({ role }: { role: string }) {
             <button
               onClick={saveAdd}
               disabled={saving}
-              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-3 py-1.5 rounded text-sm"
+              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-3 py-1.5 rounded text-sm text-on-accent"
             >
               <Check className="w-3.5 h-3.5" /> Lưu
             </button>
@@ -645,7 +645,7 @@ export default function SuppliersTab({ role }: { role: string }) {
                     <button
                       onClick={saveEdit}
                       disabled={saving}
-                      className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-3 py-1.5 rounded text-sm"
+                      className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-3 py-1.5 rounded text-sm text-on-accent"
                     >
                       <Check className="w-3.5 h-3.5" /> Lưu
                     </button>
@@ -721,7 +721,7 @@ export default function SuppliersTab({ role }: { role: string }) {
                       {canDelete && (
                         <button
                           onClick={() => del(s.id, s.name)}
-                          className="p-1.5 rounded hover:bg-red-900/50 text-zinc-400 hover:text-red-400"
+                          className="p-1.5 rounded hover:bg-red-900 text-zinc-400 hover:text-red-200"
                           title="Xoá"
                         >
                           <Trash2 className="w-3.5 h-3.5" />

@@ -275,7 +275,7 @@ export default function TechPage() {
                 {canManage && (
                   <button
                     onClick={() => setAddAlbumOpen(true)}
-                    className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                    className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-xs font-semibold text-on-accent"
                   >
                     <Plus className="w-3.5 h-3.5" /> Thêm album
                   </button>
@@ -440,7 +440,7 @@ function TechLinkSection({
         {canManage && (
           <button
             onClick={onAdd}
-            className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-xs font-semibold"
+            className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-xs font-semibold text-on-accent"
           >
             <Plus className="w-3.5 h-3.5" /> Thêm link
           </button>
@@ -605,7 +605,7 @@ function TechLinkModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>
@@ -692,7 +692,7 @@ function AlbumModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>

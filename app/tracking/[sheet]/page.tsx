@@ -47,10 +47,10 @@ import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
 
 const STATUS_CLS: Record<string, string> = {
   chuan_bi: "bg-zinc-800 text-zinc-300",
-  dang_thi_cong: "bg-blue-950 text-blue-300",
-  hoan_thanh: "bg-emerald-950 text-emerald-300",
-  nghiem_thu: "bg-teal-950 text-teal-300",
-  tre: "bg-red-950 text-red-300",
+  dang_thi_cong: "bg-blue-950 text-blue-200",
+  hoan_thanh: "bg-emerald-950 text-emerald-200",
+  nghiem_thu: "bg-teal-950 text-teal-200",
+  tre: "bg-red-950 text-red-200",
 };
 
 type Task = {
@@ -461,7 +461,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
             />
             <button
               onClick={() => window.print()}
-              className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-medium shrink-0"
+              className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-medium shrink-0 text-on-accent"
             >
               <Printer className="w-4 h-4" /> In / Lưu PDF
             </button>
@@ -618,7 +618,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
 
       {syncToast && (
         <div
-          className="app-toast-center fixed left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-emerald-900/95 border border-emerald-700 text-emerald-200 px-4 py-2 rounded-full text-sm shadow-xl"
+          className="app-toast-center fixed left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-emerald-900 border border-emerald-700 text-emerald-200 px-4 py-2 rounded-full text-sm shadow-xl"
           style={{ bottom: "max(1.25rem, env(safe-area-inset-bottom, 0px) + 0.5rem)" }}
         >
           <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Dữ liệu vừa được người khác cập nhật —
@@ -630,8 +630,8 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
         <div
           className={`app-toast-center fixed left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-full text-sm shadow-xl border ${
             online
-              ? "bg-sky-900/95 border-sky-700 text-sky-200"
-              : "bg-amber-900/95 border-amber-700 text-amber-200"
+              ? "bg-sky-900 border-sky-700 text-sky-200"
+              : "bg-amber-900 border-amber-700 text-amber-200"
           }`}
           style={{ bottom: "max(4rem, env(safe-area-inset-bottom, 0px) + 3.5rem)" }}
         >
@@ -752,7 +752,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
               {isAdmin && (
                 <button
                   onClick={deleteSheet}
-                  className="flex items-center gap-1 px-3 py-1.5 text-sm text-red-400 hover:bg-red-950/60 rounded-lg"
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm text-red-200 hover:bg-red-950 rounded-lg"
                 >
                   <Trash2 className="w-3.5 h-3.5" /> Xoá trang
                 </button>
@@ -767,7 +767,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
                 <button
                   onClick={saveSheet}
                   disabled={!sheetModal.name.trim() || !sheetModal.code.trim()}
-                  className="px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg font-medium"
+                  className="px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg font-medium text-on-accent"
                 >
                   Lưu
                 </button>
@@ -2048,7 +2048,7 @@ function PkgGrid({
                     <button
                       onClick={deleteVariantColumns}
                       title={`Xoá ${variantColumns.length} cột biến thể (2)(3)(4) khỏi DB`}
-                      className="w-6 h-6 flex items-center justify-center text-zinc-600 hover:text-red-400 hover:bg-red-950/40 rounded"
+                      className="w-6 h-6 flex items-center justify-center text-zinc-600 hover:text-red-200 hover:bg-red-950 rounded"
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
@@ -2057,7 +2057,7 @@ function PkgGrid({
                     <button
                       onClick={() => addColumnAfter(grid.columns[grid.columns.length - 1] ?? null)}
                       title="Thêm cột mới vào cuối"
-                      className="w-6 h-6 flex items-center justify-center text-zinc-600 hover:text-emerald-400 hover:bg-emerald-950/40 rounded"
+                      className="w-6 h-6 flex items-center justify-center text-zinc-600 hover:text-emerald-200 hover:bg-emerald-950 rounded"
                     >
                       <Columns className="w-3 h-3" />
                     </button>
@@ -2266,7 +2266,7 @@ function PkgGrid({
                         )}
                       </button>
                       {t.status === "nghiem_thu" ? (
-                        <span className="flex items-center gap-1 text-[10px] text-teal-300 bg-teal-950 px-1.5 py-0.5 rounded">
+                        <span className="flex items-center gap-1 text-[10px] text-teal-200 bg-teal-950 px-1.5 py-0.5 rounded">
                           ✓ Đã NT
                           {ce && (
                             <button
@@ -2284,7 +2284,7 @@ function PkgGrid({
                           <button
                             onClick={() => approveTask(t, true)}
                             title="Duyệt nghiệm thu (task đã 100%)"
-                            className="text-[10px] text-teal-400 border border-teal-800 bg-teal-950/50 hover:bg-teal-900/60 px-1.5 py-0.5 rounded"
+                            className="text-[10px] text-teal-200 border border-teal-800 bg-teal-950 hover:bg-teal-900 px-1.5 py-0.5 rounded"
                           >
                             Nghiệm thu
                           </button>
@@ -2297,7 +2297,7 @@ function PkgGrid({
                           title="Nguyên nhân trễ — giúp PM thống kê và xử lý"
                           className={`text-[10px] rounded px-1 py-0.5 outline-none border max-w-[110px] ${
                             t.delayReason
-                              ? "bg-red-950/60 border-red-900 text-red-300"
+                              ? "bg-red-950 border-red-900 text-red-200"
                               : "bg-zinc-800 border-zinc-700 text-zinc-300"
                           }`}
                         >
@@ -2607,7 +2607,7 @@ function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => void })
             {task.code} · {photos?.length ?? 0} ảnh
           </p>
         </div>
-        <label className="ml-auto shrink-0 flex items-center gap-1.5 bg-sky-900/60 hover:bg-sky-800/60 border border-sky-800 text-sky-200 px-3 py-1.5 rounded-lg text-xs cursor-pointer">
+        <label className="ml-auto shrink-0 flex items-center gap-1.5 bg-sky-900 hover:bg-sky-800 border border-sky-800 text-sky-200 px-3 py-1.5 rounded-lg text-xs cursor-pointer">
           <Upload className="w-3.5 h-3.5" /> {uploading ? "Đang tải lên..." : "Thêm ảnh"}
           <input
             type="file"
@@ -2986,7 +2986,7 @@ function CommentsModal({ task, onClose }: { task: GridTask; onClose: () => void 
             onClick={send}
             disabled={!draft.trim() || sending}
             title="Gửi"
-            className="bg-violet-700 hover:bg-violet-600 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg px-3 self-end py-2.5"
+            className="bg-violet-700 hover:bg-violet-600 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg px-3 self-end py-2.5 text-on-accent"
           >
             <Send className="w-4 h-4" />
           </button>

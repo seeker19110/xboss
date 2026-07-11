@@ -24,9 +24,9 @@ const STATUS_LABEL: Record<ContractStatus, string> = {
 };
 const STATUS_BADGE: Record<ContractStatus, string> = {
   draft: "bg-zinc-800 text-zinc-300",
-  active: "bg-emerald-900/40 text-emerald-300",
-  completed: "bg-sky-900/40 text-sky-300",
-  terminated: "bg-rose-900/40 text-rose-300",
+  active: "bg-emerald-900 text-emerald-200",
+  completed: "bg-sky-900 text-sky-200",
+  terminated: "bg-rose-900 text-rose-200",
 };
 
 type Contract = {
@@ -146,7 +146,7 @@ export default function ContractsPage() {
             <button
               onClick={() => setAddOpen(true)}
               aria-label="Thêm hợp đồng"
-              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
             >
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm hợp đồng</span>
             </button>
@@ -507,7 +507,7 @@ function AddContractModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang tạo…" : "Tạo hợp đồng"}
         </button>
@@ -899,7 +899,7 @@ function ContractDetailModal({
                 <button
                   onClick={addAddendum}
                   disabled={savingAddendum || !addCode.trim()}
-                  className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white text-sm font-medium px-3 py-2 rounded-lg shrink-0"
+                  className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent text-sm font-medium px-3 py-2 rounded-lg shrink-0"
                 >
                   Thêm
                 </button>
@@ -1057,7 +1057,7 @@ const IPC_STATUS_LABEL: Record<string, string> = {
 };
 const IPC_STATUS_BADGE: Record<string, string> = {
   draft: "bg-zinc-800 text-zinc-300",
-  submitted: "bg-amber-900/40 text-amber-300",
-  approved: "bg-emerald-900/40 text-emerald-300",
-  rejected: "bg-rose-900/40 text-rose-300",
+  submitted: "bg-amber-900 text-amber-200",
+  approved: "bg-emerald-900 text-emerald-200",
+  rejected: "bg-rose-900 text-rose-200",
 };

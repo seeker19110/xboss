@@ -8,8 +8,8 @@ import { Sun, Moon, Crown, Droplet, Anchor } from "lucide-react";
 type Theme = "dark" | "light" | "kingblue" | "darkblue" | "navy";
 
 const THEMES: { id: Theme; label: string; icon: typeof Sun }[] = [
-  { id: "dark", label: "Tối", icon: Moon },
   { id: "light", label: "Sáng", icon: Sun },
+  { id: "dark", label: "Tối", icon: Moon },
   { id: "kingblue", label: "King Blue", icon: Crown },
   { id: "darkblue", label: "Dark Blue", icon: Droplet },
   { id: "navy", label: "Navy", icon: Anchor },
@@ -18,7 +18,7 @@ const THEMES: { id: Theme; label: string; icon: typeof Sun }[] = [
 const CLASSES: Theme[] = THEMES.map((t) => t.id);
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>("light");
 
   useEffect(() => {
     const el = document.documentElement;

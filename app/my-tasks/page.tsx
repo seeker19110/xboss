@@ -152,10 +152,10 @@ const EVENT_ICON: Record<EventType, React.ReactNode> = {
   comment: <MessageSquare className="w-3.5 h-3.5" />,
 };
 const EVENT_COLOR: Record<EventType, string> = {
-  progress: "text-emerald-400 bg-emerald-950",
-  photo: "text-sky-400 bg-sky-950",
-  document: "text-violet-400 bg-violet-950",
-  comment: "text-amber-400 bg-amber-950",
+  progress: "text-emerald-200 bg-emerald-950",
+  photo: "text-sky-200 bg-sky-950",
+  document: "text-violet-200 bg-violet-950",
+  comment: "text-amber-200 bg-amber-950",
 };
 const EVENT_LABEL: Record<EventType, string> = {
   progress: "Cập nhật tiến độ",
@@ -226,10 +226,10 @@ function FeedTaskCard({
         <span
           className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full mt-0.5 ${
             variant === "overdue"
-              ? "bg-red-950 text-red-300"
+              ? "bg-red-950 text-red-200"
               : variant === "due_soon"
-                ? "bg-amber-950 text-amber-300"
-                : "bg-sky-950 text-sky-300"
+                ? "bg-amber-950 text-amber-200"
+                : "bg-sky-950 text-sky-200"
           }`}
         >
           {item.sheetCode}
@@ -516,28 +516,28 @@ export default function MyTasksPage() {
       label: "Hoạt động",
       icon: <Activity className="w-4 h-4" />,
       count: activityCount,
-      activeCls: "bg-emerald-700",
+      activeCls: "bg-emerald-700 text-on-accent",
     },
     {
       key: "overdue",
       label: "Quá hạn",
       icon: <AlertTriangle className="w-4 h-4" />,
       count: feed?.overdue.length ?? 0,
-      activeCls: "bg-red-700",
+      activeCls: "bg-red-700 text-on-accent",
     },
     {
       key: "due_soon",
       label: "Sắp hạn",
       icon: <Clock className="w-4 h-4" />,
       count: feed?.dueSoon.length ?? 0,
-      activeCls: "bg-amber-700",
+      activeCls: "bg-amber-700 text-on-accent",
     },
     {
       key: "upcoming",
       label: "Sắp thi công",
       icon: <CalendarClock className="w-4 h-4" />,
       count: feed?.upcomingStart.length ?? 0,
-      activeCls: "bg-sky-700",
+      activeCls: "bg-sky-700 text-on-accent",
     },
     ...(feed?.fullAccess
       ? [
@@ -546,7 +546,7 @@ export default function MyTasksPage() {
             label: "Vật tư vượt ĐM",
             icon: <Package className="w-4 h-4" />,
             count: feed.materialOver.length,
-            activeCls: "bg-rose-700",
+            activeCls: "bg-rose-700 text-on-accent",
           },
         ]
       : []),
@@ -555,7 +555,7 @@ export default function MyTasksPage() {
       label: "Cài đặt",
       icon: <Settings className="w-4 h-4" />,
       count: 0,
-      activeCls: "bg-zinc-600",
+      activeCls: "bg-zinc-600 text-white",
     },
   ];
 
@@ -625,7 +625,7 @@ export default function MyTasksPage() {
           >
             <Bell className="w-4 h-4" /> Thông báo
             {totalAlerts > 0 && (
-              <span className="text-[10px] font-bold bg-red-600 text-white px-1.5 py-0.5 rounded-full leading-none">
+              <span className="text-[10px] font-bold bg-red-600 text-on-accent px-1.5 py-0.5 rounded-full leading-none">
                 {totalAlerts}
               </span>
             )}
@@ -663,9 +663,9 @@ export default function MyTasksPage() {
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition border ${
                     taskFilter === f.key
                       ? f.key === "delayed"
-                        ? "bg-red-900/60 border-red-700 text-red-200"
+                        ? "bg-red-900 border-red-700 text-red-200"
                         : f.key === "done"
-                          ? "bg-emerald-900/60 border-emerald-700 text-emerald-200"
+                          ? "bg-emerald-900 border-emerald-700 text-emerald-200"
                           : "bg-zinc-700 border-zinc-600 text-white"
                       : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200"
                   }`}
@@ -706,7 +706,7 @@ export default function MyTasksPage() {
                               {sheetType}
                             </span>
                             {g.delayed > 0 && (
-                              <span className="flex items-center gap-1 text-[10px] text-red-400 bg-red-950/60 px-1.5 py-0.5 rounded-full font-semibold">
+                              <span className="flex items-center gap-1 text-[10px] text-red-200 bg-red-950 px-1.5 py-0.5 rounded-full font-semibold">
                                 <AlertTriangle className="w-2.5 h-2.5" /> {g.delayed} trễ
                               </span>
                             )}
@@ -829,7 +829,7 @@ export default function MyTasksPage() {
                       aria-label={tab.label}
                       className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition shrink-0 ${
                         isActive
-                          ? `${tab.activeCls} text-white`
+                          ? tab.activeCls
                           : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60"
                       }`}
                     >
@@ -838,7 +838,9 @@ export default function MyTasksPage() {
                       {tab.count > 0 && (
                         <span
                           className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none ${
-                            isActive ? "bg-white/20 text-white" : "bg-zinc-800 text-zinc-400"
+                            isActive
+                              ? "bg-on-accent/20 text-on-accent"
+                              : "bg-zinc-800 text-zinc-400"
                           }`}
                         >
                           {tab.count}
@@ -1005,7 +1007,7 @@ export default function MyTasksPage() {
                         Được xác định theo vai trò, không thể thay đổi.
                       </p>
                       <div
-                        className={`rounded-lg px-3 py-2.5 text-sm ${feed.fullAccess ? "bg-emerald-950 text-emerald-300" : "bg-zinc-800 text-zinc-300"}`}
+                        className={`rounded-lg px-3 py-2.5 text-sm ${feed.fullAccess ? "bg-emerald-950 text-emerald-200" : "bg-zinc-800 text-zinc-300"}`}
                       >
                         {feed.fullAccess
                           ? "✓ Toàn bộ dự án — Admin, PM, Kỹ sư"

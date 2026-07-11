@@ -322,7 +322,7 @@ export default function Dashboard() {
               <a
                 href="/import"
                 aria-label="Import Excel"
-                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition"
+                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition text-on-accent"
               >
                 <Upload className="w-4 h-4" />{" "}
                 <span className="hidden sm:inline">Import Excel</span>
@@ -397,20 +397,20 @@ export default function Dashboard() {
           {(data?.totalDelayed ?? 0) > 0 && (
             <a
               href="#delayed-table"
-              className="flex items-center gap-4 bg-red-950/60 border border-red-900/60 rounded-xl px-5 py-4 mb-4 hover:bg-red-950/80 transition"
+              className="flex items-center gap-4 bg-red-950 border border-red-900/60 rounded-xl px-5 py-4 mb-4 hover:bg-red-900 transition"
             >
               <div className="p-2.5 bg-red-900/50 rounded-lg shrink-0">
                 <TrendingDown className="w-5 h-5 text-red-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-red-400 uppercase tracking-wide font-medium mb-0.5">
+                <p className="text-xs text-red-200 uppercase tracking-wide font-medium mb-0.5">
                   Tổng công việc đang trễ
                 </p>
-                <p className="text-4xl font-bold text-red-300 leading-none">
+                <p className="text-4xl font-bold text-red-200 leading-none">
                   {data?.totalDelayed ?? 0}
                 </p>
               </div>
-              <span className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 transition shrink-0">
+              <span className="flex items-center gap-1 text-xs text-red-200 hover:text-red-300 transition shrink-0">
                 Xem chi tiết <ChevronRight className="w-3.5 h-3.5" />
               </span>
             </a>
@@ -429,7 +429,7 @@ export default function Dashboard() {
                       {k.sheetType}
                     </span>
                     {hasDelay && (
-                      <span className="flex items-center gap-0.5 text-[10px] text-red-400 bg-red-950/70 px-1.5 py-0.5 rounded-full shrink-0 font-medium">
+                      <span className="flex items-center gap-0.5 text-[10px] text-red-200 bg-red-950 px-1.5 py-0.5 rounded-full shrink-0 font-medium">
                         <AlertTriangle className="w-2.5 h-2.5" /> {k.delayed}
                       </span>
                     )}
@@ -483,7 +483,7 @@ export default function Dashboard() {
                           deleteSheet(k.sheetId, k.sheetType);
                         }}
                         title="Xoá trang tracking"
-                        className="absolute top-2 right-2 p-1 rounded-md bg-zinc-800/80 text-zinc-600 hover:bg-red-900/80 hover:text-red-400 opacity-100 sm:opacity-0 sm:group-hover/wrap:opacity-100 transition z-10"
+                        className="absolute top-2 right-2 p-1 rounded-md bg-zinc-800/80 text-zinc-600 hover:bg-red-900 hover:text-red-200 opacity-100 sm:opacity-0 sm:group-hover/wrap:opacity-100 transition z-10"
                       >
                         <Trash2 className="w-3 h-3" />
                       </button>
@@ -709,7 +709,7 @@ export default function Dashboard() {
                             aria-label="Nguyên nhân trễ"
                             className={`text-xs rounded-md px-2 py-1.5 outline-none border w-full max-w-[160px] transition ${
                               t.delayReason
-                                ? "bg-amber-950/50 border-amber-900/60 text-amber-300"
+                                ? "bg-amber-950 border-amber-900/60 text-amber-200"
                                 : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-600"
                             }`}
                           >
@@ -837,7 +837,7 @@ export default function Dashboard() {
               <button
                 onClick={createSheet}
                 disabled={!newSheet.name.trim()}
-                className="px-4 py-2 text-sm bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 rounded-lg font-semibold transition"
+                className="px-4 py-2 text-sm bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 rounded-lg font-semibold transition text-on-accent"
               >
                 Tạo trang
               </button>

@@ -150,7 +150,7 @@ function ByFloorPivot({ rows }: { rows: ByFloor[] }) {
 
   return (
     <div className="space-y-3">
-      <div className="p-3 bg-sky-950/40 border border-sky-800/50 rounded-lg text-xs text-sky-200">
+      <div className="p-3 bg-sky-950 border border-sky-800/50 rounded-lg text-xs text-sky-200">
         Tổng số lượng đã xuất kho ra công trường theo vật tư × tầng (chưa đối chiếu khối lượng thi
         công theo tầng).
       </div>
@@ -241,7 +241,7 @@ export default function ReportsTab({ active }: { active: boolean }) {
   if (err)
     return (
       <div className="space-y-3">
-        <div className="p-4 bg-red-950/40 border border-red-800/60 rounded-xl text-sm text-red-300">
+        <div className="p-4 bg-red-950 border border-red-800/60 rounded-xl text-sm text-red-200">
           {err}
         </div>
         <button
@@ -268,23 +268,23 @@ export default function ReportsTab({ active }: { active: boolean }) {
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 tab === t.key
                   ? t.key === "needs"
-                    ? "bg-orange-600 text-white"
-                    : "bg-emerald-700 text-white"
+                    ? "bg-orange-600 text-on-accent"
+                    : "bg-emerald-700 text-on-accent"
                   : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"
               }`}
             >
               {t.icon} {t.label}
               {t.key === "needs" && (
-                <Badge n={r.needsStock.length} cls="bg-orange-500 text-white" />
+                <Badge n={r.needsStock.length} cls="bg-orange-500 text-on-accent" />
               )}
               {t.key === "overBudget" && (
-                <Badge n={r.overBudget.length} cls="bg-red-600 text-white" />
+                <Badge n={r.overBudget.length} cls="bg-red-600 text-on-accent" />
               )}
               {t.key === "lowStock" && (
-                <Badge n={r.lowStock.length} cls="bg-amber-600 text-white" />
+                <Badge n={r.lowStock.length} cls="bg-amber-600 text-on-accent" />
               )}
               {t.key === "noTask" && (
-                <Badge n={r.noTaskIssues.length} cls="bg-orange-700 text-white" />
+                <Badge n={r.noTaskIssues.length} cls="bg-orange-700 text-on-accent" />
               )}
             </button>
           ))}
@@ -303,7 +303,7 @@ export default function ReportsTab({ active }: { active: boolean }) {
           <EmptyState message="Không có vật tư nào cần nhập gấp trong 30 ngày tới" />
         ) : (
           <div className="space-y-3">
-            <div className="flex items-start gap-3 p-3 bg-orange-950/40 border border-orange-800/50 rounded-lg text-xs text-orange-200">
+            <div className="flex items-start gap-3 p-3 bg-orange-950 border border-orange-800/50 rounded-lg text-xs text-orange-200">
               <ShoppingCart className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
               <div>
                 <span className="font-semibold">{r.needsStock.length} vật tư</span> chưa đủ kho cho
@@ -614,7 +614,7 @@ export default function ReportsTab({ active }: { active: boolean }) {
           <EmptyState message="Mọi lần xuất kho đều gắn task — tốt!" />
         ) : (
           <div className="space-y-3">
-            <div className="p-3 bg-orange-950/40 border border-orange-800/50 rounded-lg text-xs text-orange-200">
+            <div className="p-3 bg-orange-950 border border-orange-800/50 rounded-lg text-xs text-orange-200">
               Các lần xuất không gắn task cần điều tra — mọi xuất kho nên có công việc cụ thể.
             </div>
             <div className="overflow-x-auto rounded-xl border border-zinc-800">

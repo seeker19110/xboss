@@ -27,9 +27,9 @@ const EQUIPMENT_LOG_ACTION_LABEL: Record<EquipmentLogAction, string> = {
 };
 
 const CONDITION_BADGE: Record<EquipmentCondition, string> = {
-  good: "bg-emerald-900/40 text-emerald-300",
-  maintenance: "bg-amber-900/40 text-amber-300",
-  broken: "bg-rose-900/40 text-rose-300",
+  good: "bg-emerald-900 text-emerald-200",
+  maintenance: "bg-amber-900 text-amber-200",
+  broken: "bg-rose-900 text-rose-200",
   retired: "bg-zinc-800 text-zinc-400",
 };
 
@@ -112,7 +112,7 @@ export default function EquipmentPage() {
             <button
               onClick={() => setAddOpen(true)}
               aria-label="Thêm thiết bị"
-              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
             >
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm thiết bị</span>
             </button>
@@ -139,7 +139,7 @@ export default function EquipmentPage() {
                 onClick={() => setConditionFilter(conditionFilter === c ? "" : c)}
                 className={`px-2.5 py-1 rounded-full text-xs font-medium border ${
                   conditionFilter === c
-                    ? "bg-sky-900/50 border-sky-700 text-sky-200"
+                    ? "bg-sky-900 border-sky-700 text-sky-200"
                     : "border-zinc-700 text-zinc-400 hover:text-white"
                 }`}
               >
@@ -344,7 +344,7 @@ function AddEquipmentModal({ onClose, onCreated }: { onClose: () => void; onCrea
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang tạo…" : "Tạo thiết bị"}
         </button>
@@ -566,7 +566,7 @@ function EquipmentDetailModal({
               <button
                 onClick={submitLog}
                 disabled={busy}
-                className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white text-xs font-medium px-3 py-2 rounded-lg"
+                className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
               >
                 Ghi nhận
               </button>

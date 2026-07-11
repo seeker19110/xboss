@@ -31,8 +31,8 @@ const STATUS_LABEL: Record<Status, string> = {
   closed: "Đã đóng",
 };
 const STATUS_BADGE: Record<Status, string> = {
-  awaiting: "bg-amber-900/40 text-amber-300",
-  replied: "bg-sky-900/40 text-sky-300",
+  awaiting: "bg-amber-900 text-amber-200",
+  replied: "bg-sky-900 text-sky-200",
   closed: "bg-zinc-800 text-zinc-300",
 };
 
@@ -124,7 +124,7 @@ export default function CorrespondencesPage() {
             <button
               onClick={() => setAddOpen(true)}
               aria-label="Thêm công văn"
-              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
             >
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm công văn</span>
             </button>
@@ -166,7 +166,7 @@ export default function CorrespondencesPage() {
                 onClick={() => setKindFilter(kindFilter === k ? "" : k)}
                 className={`px-2.5 py-1 rounded-full text-xs font-medium border ${
                   kindFilter === k
-                    ? "bg-sky-900/50 border-sky-700 text-sky-200"
+                    ? "bg-sky-900 border-sky-700 text-sky-200"
                     : "border-zinc-700 text-zinc-400 hover:text-white"
                 }`}
               >
@@ -459,7 +459,7 @@ function AddCorrespondenceModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang tạo…" : "Tạo công văn"}
         </button>
@@ -667,7 +667,7 @@ function CorrespondenceDetailModal({
                 <button
                   onClick={sendReply}
                   disabled={busy || !replyCode.trim() || !replySubject.trim()}
-                  className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white text-xs font-medium px-3 py-2 rounded-lg"
+                  className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
                 >
                   Gửi trả lời
                 </button>

@@ -41,10 +41,10 @@ function certBadge(c: Certification): { label: string; className: string } | nul
   if (!c.expiryDate) return null;
   const limit = new Date(Date.now() + EXPIRY_WARN_DAYS * 86400_000).toISOString().slice(0, 10);
   if (c.expiryDate < todayISO())
-    return { label: "Quá hạn", className: "bg-rose-900/40 text-rose-300" };
+    return { label: "Quá hạn", className: "bg-rose-900 text-rose-200" };
   if (c.expiryDate <= limit)
-    return { label: "Sắp hết hạn", className: "bg-amber-900/40 text-amber-300" };
-  return { label: "Còn hạn", className: "bg-emerald-900/40 text-emerald-300" };
+    return { label: "Sắp hết hạn", className: "bg-amber-900 text-amber-200" };
+  return { label: "Còn hạn", className: "bg-emerald-900 text-emerald-200" };
 }
 
 export default function PersonnelPage() {
@@ -112,7 +112,7 @@ export default function PersonnelPage() {
             <button
               onClick={() => setAddOpen(true)}
               aria-label="Thêm nhân sự"
-              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
             >
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm nhân sự</span>
             </button>
@@ -193,7 +193,7 @@ export default function PersonnelPage() {
                         <span
                           className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
                             p.status === "active"
-                              ? "bg-emerald-900/40 text-emerald-300"
+                              ? "bg-emerald-900 text-emerald-200"
                               : "bg-zinc-800 text-zinc-500"
                           }`}
                         >
@@ -400,7 +400,7 @@ function PersonnelModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>
@@ -685,7 +685,7 @@ function CertificationModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>

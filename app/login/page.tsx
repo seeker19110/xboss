@@ -92,7 +92,7 @@ export default function LoginPage() {
           <button
             disabled={busy}
             type="submit"
-            className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 disabled:bg-zinc-700 py-2.5 rounded-lg font-medium transition"
+            className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 disabled:bg-zinc-700 py-2.5 rounded-lg font-medium transition text-on-accent"
           >
             <LogIn className="w-4 h-4" /> {busy ? "Đang đăng nhập..." : "Đăng nhập"}
           </button>

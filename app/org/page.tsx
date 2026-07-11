@@ -339,7 +339,7 @@ function RaciEditor({
           <button
             onClick={save}
             disabled={saving}
-            className="ml-auto flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
+            className="ml-auto flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 px-3 py-1.5 rounded-lg text-xs font-semibold text-on-accent"
           >
             <Save className="w-3.5 h-3.5" /> {saving ? "Đang lưu…" : "Lưu RACI"}
           </button>

@@ -40,9 +40,9 @@ const PROPOSAL_STATUS_LABEL: Record<ProposalStatus, string> = {
 
 const STATUS_BADGE: Record<ProposalStatus, string> = {
   draft: "bg-zinc-800 text-zinc-300",
-  submitted: "bg-sky-900/40 text-sky-300",
-  approved: "bg-emerald-900/40 text-emerald-300",
-  rejected: "bg-rose-900/40 text-rose-300",
+  submitted: "bg-sky-900 text-sky-200",
+  approved: "bg-emerald-900 text-emerald-200",
+  rejected: "bg-rose-900 text-rose-200",
 };
 
 type Proposal = {
@@ -168,7 +168,7 @@ export default function ProposalsPage() {
             <button
               onClick={() => setAddOpen(true)}
               aria-label="Tạo đề xuất"
-              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
             >
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Đề xuất mới</span>
             </button>
@@ -212,7 +212,7 @@ export default function ProposalsPage() {
               className={`px-3 py-1.5 rounded-full text-xs font-medium border ${
                 tab === t.key
                   ? t.key === "inbox"
-                    ? "bg-sky-900/60 border-sky-700 text-sky-200"
+                    ? "bg-sky-900 border-sky-700 text-sky-200"
                     : "bg-zinc-700 border-zinc-600 text-white"
                   : "border-zinc-700 text-zinc-400 hover:text-white"
               }`}
@@ -492,7 +492,7 @@ function ProposalFormModal({
         <button
           onClick={submit}
           disabled={saving || !title.trim()}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Tạo đề xuất (nháp)"}
         </button>
@@ -691,7 +691,7 @@ function ProposalDetailModal({
 
         {/* Cảnh báo cấp phát vượt định mức (M18) — cảnh báo mềm, không chặn duyệt */}
         {overNorm && (
-          <div className="flex items-start gap-2 bg-amber-950/40 border border-amber-800/60 rounded-lg p-3 text-sm text-amber-200">
+          <div className="flex items-start gap-2 bg-amber-950 border border-amber-800/60 rounded-lg p-3 text-sm text-amber-200">
             <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
             <p>
               Vật tư <strong>{overNorm.resourceLabel}</strong> đang vượt định mức [
@@ -764,7 +764,7 @@ function ProposalDetailModal({
             <button
               onClick={submit}
               disabled={busy}
-              className="flex items-center gap-2 bg-sky-700 hover:bg-sky-600 disabled:opacity-50 px-4 py-2 rounded-lg text-sm font-semibold transition"
+              className="flex items-center gap-2 bg-sky-700 hover:bg-sky-600 disabled:opacity-50 px-4 py-2 rounded-lg text-sm font-semibold transition text-on-accent"
             >
               <Send className="w-4 h-4" /> Trình duyệt
             </button>
@@ -774,14 +774,14 @@ function ProposalDetailModal({
               <button
                 onClick={approve}
                 disabled={busy}
-                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 px-4 py-2 rounded-lg text-sm font-semibold transition"
+                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 px-4 py-2 rounded-lg text-sm font-semibold transition text-on-accent"
               >
                 <CheckCircle2 className="w-4 h-4" /> Duyệt
               </button>
               <button
                 onClick={reject}
                 disabled={busy}
-                className="flex items-center gap-2 bg-rose-800 hover:bg-rose-700 disabled:opacity-50 px-4 py-2 rounded-lg text-sm font-semibold transition"
+                className="flex items-center gap-2 bg-rose-800 hover:bg-rose-700 disabled:opacity-50 px-4 py-2 rounded-lg text-sm font-semibold transition text-on-accent"
               >
                 <XCircle className="w-4 h-4" /> Từ chối
               </button>

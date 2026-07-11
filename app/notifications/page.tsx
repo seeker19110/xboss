@@ -127,10 +127,10 @@ const EVENT_ICON: Record<EventType, React.ReactNode> = {
 };
 
 const EVENT_COLOR: Record<EventType, string> = {
-  progress: "text-emerald-400 bg-emerald-950",
-  photo: "text-sky-400 bg-sky-950",
-  document: "text-violet-400 bg-violet-950",
-  comment: "text-amber-400 bg-amber-950",
+  progress: "text-emerald-200 bg-emerald-950",
+  photo: "text-sky-200 bg-sky-950",
+  document: "text-violet-200 bg-violet-950",
+  comment: "text-amber-200 bg-amber-950",
 };
 
 const EVENT_LABEL: Record<EventType, string> = {
@@ -194,10 +194,10 @@ function TaskCard({
         <span
           className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full mt-0.5 ${
             variant === "overdue"
-              ? "bg-red-950 text-red-300"
+              ? "bg-red-950 text-red-200"
               : variant === "due_soon"
-                ? "bg-amber-950 text-amber-300"
-                : "bg-sky-950 text-sky-300"
+                ? "bg-amber-950 text-amber-200"
+                : "bg-sky-950 text-sky-200"
           }`}
         >
           {item.sheetCode}
@@ -397,7 +397,7 @@ function CategoryNav({
             onClick={() => onChange(item.key)}
             className={`relative flex items-center gap-2 px-3 py-2 rounded-xl transition-all shrink-0 ${
               isActive
-                ? `${item.bgActiveClass} text-white`
+                ? item.bgActiveClass
                 : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60"
             }`}
           >
@@ -406,7 +406,7 @@ function CategoryNav({
             {item.count > 0 && (
               <span
                 className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none ${
-                  isActive ? "bg-white/20 text-white" : "bg-zinc-800 text-zinc-400"
+                  isActive ? "bg-on-accent/20 text-on-accent" : "bg-zinc-800 text-zinc-400"
                 }`}
               >
                 {item.count}
@@ -495,7 +495,7 @@ export default function NotificationsPage() {
       icon: <Activity className="w-4 h-4" />,
       count: activityCount,
       iconActiveClass: "text-emerald-300",
-      bgActiveClass: "bg-emerald-700",
+      bgActiveClass: "bg-emerald-700 text-on-accent",
     },
     {
       key: "overdue",
@@ -503,7 +503,7 @@ export default function NotificationsPage() {
       icon: <AlertTriangle className="w-4 h-4" />,
       count: overdue.length,
       iconActiveClass: "text-red-200",
-      bgActiveClass: "bg-red-700",
+      bgActiveClass: "bg-red-700 text-on-accent",
     },
     {
       key: "due_soon",
@@ -511,7 +511,7 @@ export default function NotificationsPage() {
       icon: <Clock className="w-4 h-4" />,
       count: dueSoon.length,
       iconActiveClass: "text-amber-200",
-      bgActiveClass: "bg-amber-700",
+      bgActiveClass: "bg-amber-700 text-on-accent",
     },
     {
       key: "upcoming",
@@ -519,7 +519,7 @@ export default function NotificationsPage() {
       icon: <CalendarClock className="w-4 h-4" />,
       count: upcomingStart.length,
       iconActiveClass: "text-sky-200",
-      bgActiveClass: "bg-sky-700",
+      bgActiveClass: "bg-sky-700 text-on-accent",
     },
     ...(fullAccess
       ? [
@@ -529,7 +529,7 @@ export default function NotificationsPage() {
             icon: <Package className="w-4 h-4" />,
             count: materialOver.length,
             iconActiveClass: "text-rose-200",
-            bgActiveClass: "bg-rose-700",
+            bgActiveClass: "bg-rose-700 text-on-accent",
           },
         ]
       : []),
@@ -539,7 +539,7 @@ export default function NotificationsPage() {
       icon: <Settings className="w-4 h-4" />,
       count: 0,
       iconActiveClass: "text-zinc-200",
-      bgActiveClass: "bg-zinc-600",
+      bgActiveClass: "bg-zinc-600 text-white",
     },
   ];
 
@@ -723,7 +723,7 @@ export default function NotificationsPage() {
                   Được xác định theo vai trò, không thể thay đổi.
                 </p>
                 <div
-                  className={`rounded-lg px-3 py-2.5 text-sm ${fullAccess ? "bg-emerald-950 text-emerald-300" : "bg-zinc-800 text-zinc-300"}`}
+                  className={`rounded-lg px-3 py-2.5 text-sm ${fullAccess ? "bg-emerald-950 text-emerald-200" : "bg-zinc-800 text-zinc-300"}`}
                 >
                   {fullAccess
                     ? "✓ Toàn bộ dự án — Admin, PM, Kỹ sư, BCH, CĐT"

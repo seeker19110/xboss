@@ -113,7 +113,7 @@ export default function RatingModal({ po, onClose }: { po: PO; onClose: () => vo
           <button
             onClick={submit}
             disabled={saving}
-            className="flex items-center gap-2 bg-amber-700 hover:bg-amber-600 disabled:opacity-50 px-5 py-2.5 rounded text-sm font-medium"
+            className="flex items-center gap-2 bg-amber-700 hover:bg-amber-600 disabled:opacity-50 px-5 py-2.5 rounded text-sm font-medium text-on-accent"
           >
             <Star className="w-4 h-4" /> Lưu đánh giá
           </button>

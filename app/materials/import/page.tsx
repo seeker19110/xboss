@@ -147,7 +147,7 @@ export default function ImportMaterialsPage() {
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 rounded-lg border border-red-800 bg-red-950/40 text-red-300 px-4 py-2.5 text-sm">
+            <div className="flex items-center gap-2 rounded-lg border border-red-800 bg-red-950 text-red-200 px-4 py-2.5 text-sm">
               <AlertTriangle className="w-4 h-4 shrink-0" />
               {error}
             </div>
@@ -201,8 +201,8 @@ export default function ImportMaterialsPage() {
                     ${
                       mode === opt.value
                         ? opt.value === "replace"
-                          ? "border-red-700 bg-red-950/30 text-red-300"
-                          : "border-emerald-700 bg-emerald-950/20 text-emerald-300"
+                          ? "border-red-700 bg-red-950 text-red-200"
+                          : "border-emerald-700 bg-emerald-950 text-emerald-200"
                         : "border-zinc-700 hover:border-zinc-600 text-zinc-400"
                     }`}
                 >

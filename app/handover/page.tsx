@@ -37,9 +37,9 @@ const RESULT_LABEL: Record<CommissioningResult, string> = {
 };
 const RESULT_BADGE: Record<CommissioningResult, string> = {
   draft: "bg-zinc-800 text-zinc-400",
-  testing: "bg-sky-900/40 text-sky-300",
-  passed: "bg-emerald-900/40 text-emerald-300",
-  failed: "bg-rose-900/40 text-rose-300",
+  testing: "bg-sky-900 text-sky-200",
+  passed: "bg-emerald-900 text-emerald-200",
+  failed: "bg-rose-900 text-rose-200",
 };
 
 type ChecklistItem = {
@@ -69,8 +69,8 @@ const HANDOVER_STATUS_LABEL: Record<HandoverStatus, string> = {
 };
 const HANDOVER_STATUS_BADGE: Record<HandoverStatus, string> = {
   pending: "bg-zinc-800 text-zinc-400",
-  handed_over: "bg-sky-900/40 text-sky-300",
-  accepted: "bg-emerald-900/40 text-emerald-300",
+  handed_over: "bg-sky-900 text-sky-200",
+  accepted: "bg-emerald-900 text-emerald-200",
 };
 
 type HandoverItem = {
@@ -92,8 +92,8 @@ const SEVERITY_LABEL: Record<PunchSeverity, string> = {
 };
 const SEVERITY_BADGE: Record<PunchSeverity, string> = {
   low: "bg-zinc-800 text-zinc-400",
-  medium: "bg-amber-900/40 text-amber-300",
-  high: "bg-rose-900/40 text-rose-300",
+  medium: "bg-amber-900 text-amber-200",
+  high: "bg-rose-900 text-rose-200",
 };
 
 type PunchStatus = "open" | "fixing" | "closed";
@@ -103,9 +103,9 @@ const PUNCH_STATUS_LABEL: Record<PunchStatus, string> = {
   closed: "Đã đóng",
 };
 const PUNCH_STATUS_BADGE: Record<PunchStatus, string> = {
-  open: "bg-rose-900/40 text-rose-300",
-  fixing: "bg-amber-900/40 text-amber-300",
-  closed: "bg-emerald-900/40 text-emerald-300",
+  open: "bg-rose-900 text-rose-200",
+  fixing: "bg-amber-900 text-amber-200",
+  closed: "bg-emerald-900 text-emerald-200",
 };
 
 type Punch = {
@@ -333,7 +333,7 @@ export default function HandoverPage() {
                 <button
                   onClick={() => setAddTcOpen(true)}
                   aria-label="Thêm hệ thống T&C"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                 >
                   <Plus className="w-4 h-4" />{" "}
                   <span className="hidden sm:inline">Thêm hệ thống</span>
@@ -343,7 +343,7 @@ export default function HandoverPage() {
                 <button
                   onClick={() => setAddHiOpen(true)}
                   aria-label="Thêm hạng mục bàn giao"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                 >
                   <Plus className="w-4 h-4" />{" "}
                   <span className="hidden sm:inline">Thêm hạng mục</span>
@@ -353,7 +353,7 @@ export default function HandoverPage() {
                 <button
                   onClick={() => setAddPunchOpen(true)}
                   aria-label="Thêm tồn tại"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                 >
                   <Plus className="w-4 h-4" />{" "}
                   <span className="hidden sm:inline">Thêm tồn tại</span>
@@ -363,7 +363,7 @@ export default function HandoverPage() {
                 <button
                   onClick={() => setAddDemobOpen(true)}
                   aria-label="Thêm hạng mục giải thể"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                 >
                   <Plus className="w-4 h-4" />{" "}
                   <span className="hidden sm:inline">Thêm hạng mục</span>
@@ -373,7 +373,7 @@ export default function HandoverPage() {
                 <button
                   onClick={() => setAddLessonOpen(true)}
                   aria-label="Thêm bài học"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                 >
                   <Plus className="w-4 h-4" />{" "}
                   <span className="hidden sm:inline">Thêm bài học</span>
@@ -1026,7 +1026,7 @@ function DemobTab({
                   <span
                     className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
                       d.status === "done"
-                        ? "bg-emerald-900/40 text-emerald-300"
+                        ? "bg-emerald-900 text-emerald-200"
                         : "bg-zinc-800 text-zinc-400"
                     }`}
                   >
@@ -1332,7 +1332,7 @@ function TcModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>
@@ -1505,7 +1505,7 @@ function HandoverModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>
@@ -1669,7 +1669,7 @@ function PunchModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>
@@ -1783,7 +1783,7 @@ function DemobModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>
@@ -1880,7 +1880,7 @@ function LessonModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>

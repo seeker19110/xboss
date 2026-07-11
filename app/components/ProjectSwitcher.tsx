@@ -181,7 +181,7 @@ export default function ProjectSwitcher({ collapsed }: { collapsed: boolean }) {
         <span className={`w-2 h-2 rounded-full shrink-0 ${cc.dot}`} aria-hidden="true" />
         <span className="truncate flex-1">{p.name}</span>
         {p.delayedCount > 0 && (
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-950/60 text-rose-300 border border-rose-800 shrink-0">
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-950 text-rose-200 border border-rose-800 shrink-0">
             {p.delayedCount} trễ
           </span>
         )}

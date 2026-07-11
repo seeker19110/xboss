@@ -89,7 +89,7 @@ export default function PasswordPage() {
           <button
             type="submit"
             disabled={busy}
-            className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-zinc-800 py-2.5 rounded-lg font-medium text-sm transition"
+            className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-zinc-800 py-2.5 rounded-lg font-medium text-sm transition text-on-accent"
           >
             {busy ? "Đang lưu..." : "Đổi mật khẩu"}
           </button>

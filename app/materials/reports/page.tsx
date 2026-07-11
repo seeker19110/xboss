@@ -122,21 +122,21 @@ export default function MaterialReportsPage() {
                 <button
                   key={t.key}
                   onClick={() => setTab(t.key)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition-colors ${tab === t.key ? "bg-purple-700 text-white" : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"}`}
+                  className={`flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition-colors ${tab === t.key ? "bg-purple-700 text-on-accent" : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"}`}
                 >
                   {t.icon} {t.label}
                   {t.key === "overBudget" && report.overBudget.length > 0 && (
-                    <span className="bg-red-600 text-white px-1.5 py-0.5 rounded-full text-xs">
+                    <span className="bg-red-600 text-on-accent px-1.5 py-0.5 rounded-full text-xs">
                       {report.overBudget.length}
                     </span>
                   )}
                   {t.key === "lowStock" && report.lowStock.length > 0 && (
-                    <span className="bg-amber-600 text-white px-1.5 py-0.5 rounded-full text-xs">
+                    <span className="bg-amber-600 text-on-accent px-1.5 py-0.5 rounded-full text-xs">
                       {report.lowStock.length}
                     </span>
                   )}
                   {t.key === "noTask" && report.noTaskIssues.length > 0 && (
-                    <span className="bg-orange-600 text-white px-1.5 py-0.5 rounded-full text-xs">
+                    <span className="bg-orange-600 text-on-accent px-1.5 py-0.5 rounded-full text-xs">
                       {report.noTaskIssues.length}
                     </span>
                   )}
@@ -419,7 +419,7 @@ export default function MaterialReportsPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="mb-3 p-3 bg-orange-950/50 border border-orange-800/50 rounded text-sm text-orange-300">
+                    <div className="mb-3 p-3 bg-orange-950 border border-orange-800/50 rounded text-sm text-orange-200">
                       Các lần xuất vật tư không gắn task cần điều tra. Mọi xuất kho nên gắn với công
                       việc cụ thể để truy vết.
                     </div>

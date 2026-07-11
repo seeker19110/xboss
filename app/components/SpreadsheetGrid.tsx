@@ -839,7 +839,7 @@ export default function SpreadsheetGrid<Row>({
               <button
                 onClick={doReplace}
                 disabled={!search.trim()}
-                className="bg-amber-700 hover:bg-amber-600 disabled:opacity-40 rounded px-3 py-1 text-sm font-medium"
+                className="bg-amber-700 hover:bg-amber-600 disabled:opacity-40 rounded px-3 py-1 text-sm font-medium text-on-accent"
               >
                 Thay thế
               </button>
@@ -1385,7 +1385,7 @@ const ColumnFilter = forwardRef<
         </button>
         <button
           onClick={() => onApply(picked.size === values.length ? new Set() : new Set(picked))}
-          className="text-xs bg-sky-700 hover:bg-sky-600 rounded px-2 py-1 font-medium"
+          className="text-xs bg-sky-700 hover:bg-sky-600 rounded px-2 py-1 font-medium text-on-accent"
         >
           Áp dụng
         </button>

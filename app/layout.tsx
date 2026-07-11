@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#09090b",
+  themeColor: "#eef1f5",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -23,12 +23,12 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="vi" className="h-full antialiased dark" suppressHydrationWarning>
+    <html lang="vi" className="h-full antialiased light" suppressHydrationWarning>
       <head>
         <Script
           id="theme-init"
           strategy="beforeInteractive"
-        >{`try{var T=['dark','light','kingblue','darkblue','navy'];var t=localStorage.getItem('xboss_theme');if(t&&T.indexOf(t)>=0&&t!=='dark'){var e=document.documentElement;e.classList.remove('dark');e.classList.add(t);}}catch(_){}`}</Script>
+        >{`try{var T=['dark','light','kingblue','darkblue','navy'];var t=localStorage.getItem('xboss_theme');if(t&&T.indexOf(t)>=0&&t!=='light'){var e=document.documentElement;e.classList.remove('light');e.classList.add(t);}}catch(_){}`}</Script>
         <Script
           id="sidebar-init"
           strategy="beforeInteractive"

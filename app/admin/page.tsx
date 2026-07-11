@@ -549,12 +549,12 @@ export default function AdminPage() {
         </div>
 
         {error && (
-          <p className="text-sm text-red-400 bg-red-950/40 border border-red-900 rounded px-3 py-2">
+          <p className="text-sm text-red-200 bg-red-950 border border-red-900 rounded px-3 py-2">
             {error}
           </p>
         )}
         {okMsg && (
-          <p className="text-sm text-emerald-400 bg-emerald-950/40 border border-emerald-900 rounded px-3 py-2">
+          <p className="text-sm text-emerald-200 bg-emerald-950 border border-emerald-900 rounded px-3 py-2">
             {okMsg}
           </p>
         )}
@@ -586,7 +586,7 @@ export default function AdminPage() {
                 </button>
                 <button
                   onClick={toggleFilter}
-                  className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded border transition ${filterUnassigned ? "bg-amber-950/50 border-amber-700 text-amber-400" : "border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-600"}`}
+                  className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded border transition ${filterUnassigned ? "bg-amber-950 border-amber-700 text-amber-200" : "border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-600"}`}
                 >
                   <Filter className="w-3.5 h-3.5" />
                   Chưa gán{unassignedCount > 0 && !filterUnassigned ? ` (${unassignedCount})` : ""}
@@ -799,7 +799,7 @@ export default function AdminPage() {
                         <span
                           className={`text-[10px] font-semibold border rounded-full px-2 py-0.5 shrink-0 ${
                             status === "available"
-                              ? "bg-emerald-950/60 text-emerald-300 border-emerald-800"
+                              ? "bg-emerald-950 text-emerald-200 border-emerald-800"
                               : "bg-zinc-800 text-amber-300 border-zinc-700"
                           }`}
                         >
@@ -875,7 +875,7 @@ export default function AdminPage() {
                       <button
                         onClick={() => deleteProject(p.id, p.name)}
                         aria-label={`Xoá dự án ${p.name}`}
-                        className="p-1.5 rounded text-zinc-500 hover:text-red-400 hover:bg-red-950/40"
+                        className="p-1.5 rounded text-zinc-500 hover:text-red-200 hover:bg-red-950"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -922,7 +922,7 @@ export default function AdminPage() {
                 </select>
                 <button
                   onClick={createProject}
-                  className="px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 text-sm text-white"
+                  className="px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 text-sm text-on-accent"
                 >
                   Tạo dự án
                 </button>
@@ -960,7 +960,7 @@ export default function AdminPage() {
                           key={p.id}
                           className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm cursor-pointer min-h-10 ${
                             checked
-                              ? "border-emerald-700 bg-emerald-950/30 text-emerald-300"
+                              ? "border-emerald-700 bg-emerald-950 text-emerald-200"
                               : "border-zinc-700 text-zinc-400"
                           }`}
                         >
@@ -983,7 +983,7 @@ export default function AdminPage() {
                   </div>
                   <button
                     onClick={saveUserProjects}
-                    className="px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 text-sm text-white"
+                    className="px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 text-sm text-on-accent"
                   >
                     Lưu dự án được gán
                   </button>

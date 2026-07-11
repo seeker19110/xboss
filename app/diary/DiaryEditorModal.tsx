@@ -190,7 +190,7 @@ export default function DiaryEditorModal({
       ) : (
         <div className="space-y-4">
           {isLocked && (
-            <div className="bg-emerald-950/40 border border-emerald-800 rounded-lg px-3 py-2 text-sm text-emerald-200 flex items-center gap-2">
+            <div className="bg-emerald-950 border border-emerald-800 rounded-lg px-3 py-2 text-sm text-emerald-200 flex items-center gap-2">
               <Lock className="w-4 h-4 shrink-0" />
               Đã khoá bởi {diary?.lockedByName ?? "—"} lúc{" "}
               {diary?.lockedAt ? new Date(diary.lockedAt).toLocaleString("vi-VN") : "—"}
@@ -351,7 +351,7 @@ export default function DiaryEditorModal({
                         className="w-full h-full object-cover"
                       />
                       {checked && (
-                        <span className="absolute top-1 right-1 bg-sky-600 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]">
+                        <span className="absolute top-1 right-1 bg-sky-600 text-on-accent rounded-full w-4 h-4 flex items-center justify-center text-[10px]">
                           ✓
                         </span>
                       )}
@@ -389,7 +389,7 @@ export default function DiaryEditorModal({
               <button
                 onClick={save}
                 disabled={saving}
-                className="flex-1 min-w-[120px] bg-sky-600 hover:bg-sky-700 disabled:opacity-50 py-2.5 rounded-lg text-sm font-medium"
+                className="flex-1 min-w-[120px] bg-sky-600 hover:bg-sky-700 disabled:opacity-50 py-2.5 rounded-lg text-sm font-medium text-on-accent"
               >
                 {saving ? "Đang lưu…" : "Lưu nháp"}
               </button>
@@ -397,7 +397,7 @@ export default function DiaryEditorModal({
             {!isLocked && canLock && diary?.id && (
               <button
                 onClick={lock}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-emerald-700 hover:bg-emerald-600"
+                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-emerald-700 hover:bg-emerald-600 text-on-accent"
               >
                 <Lock className="w-4 h-4" /> Khoá sổ
               </button>
@@ -405,7 +405,7 @@ export default function DiaryEditorModal({
             {isLocked && canUnlock && (
               <button
                 onClick={unlock}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-amber-800 hover:bg-amber-700"
+                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-amber-800 hover:bg-amber-700 text-on-accent"
               >
                 <Unlock className="w-4 h-4" /> Mở khoá
               </button>

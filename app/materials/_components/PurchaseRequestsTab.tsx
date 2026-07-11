@@ -39,10 +39,10 @@ const STATUS_LABEL: Record<string, string> = {
   ordered: "Đã đặt hàng",
 };
 const STATUS_CLS: Record<string, string> = {
-  pending: "bg-amber-950 text-amber-300",
-  approved: "bg-green-950 text-green-300",
-  rejected: "bg-red-950 text-red-400",
-  ordered: "bg-blue-950 text-blue-300",
+  pending: "bg-amber-950 text-amber-200",
+  approved: "bg-green-950 text-green-200",
+  rejected: "bg-red-950 text-red-200",
+  ordered: "bg-blue-950 text-blue-200",
 };
 const STATUS_ICON: Record<string, React.ReactNode> = {
   pending: <Clock className="w-3 h-3" />,
@@ -266,7 +266,7 @@ export default function PurchaseRequestsTab({
           {canApprove && approvedPRs.length > 0 && !showCreatePO && (
             <button
               onClick={() => openCreatePO(approvedPRs)}
-              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded text-sm font-medium"
+              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded text-sm font-medium text-on-accent"
             >
               <ClipboardList className="w-4 h-4" /> Tạo đơn hàng ({approvedPRs.length} PR)
             </button>
@@ -276,7 +276,7 @@ export default function PurchaseRequestsTab({
               setShowAdd((v) => !v);
               setShowCreatePO(false);
             }}
-            className="flex items-center gap-1.5 bg-amber-700 hover:bg-amber-800 px-3 py-1.5 rounded text-sm font-medium"
+            className="flex items-center gap-1.5 bg-amber-700 hover:bg-amber-800 px-3 py-1.5 rounded text-sm font-medium text-on-accent"
           >
             <Plus className="w-4 h-4" /> Tạo yêu cầu
           </button>
@@ -285,7 +285,7 @@ export default function PurchaseRequestsTab({
 
       {error && (
         <div
-          className={`p-3 border rounded text-sm flex justify-between ${error.startsWith("✓") ? "bg-green-900/50 border-green-700 text-green-300" : "bg-red-900/50 border-red-700 text-red-300"}`}
+          className={`p-3 border rounded text-sm flex justify-between ${error.startsWith("✓") ? "bg-green-900 border-green-700 text-green-200" : "bg-red-900 border-red-700 text-red-200"}`}
         >
           {error}{" "}
           <button onClick={() => setError("")}>
@@ -340,7 +340,7 @@ export default function PurchaseRequestsTab({
             <button
               onClick={submitPR}
               disabled={saving}
-              className="flex items-center gap-1.5 bg-amber-700 hover:bg-amber-800 disabled:opacity-50 px-3 py-1.5 rounded text-sm"
+              className="flex items-center gap-1.5 bg-amber-700 hover:bg-amber-800 disabled:opacity-50 px-3 py-1.5 rounded text-sm text-on-accent"
             >
               <Check className="w-3.5 h-3.5" /> Gửi yêu cầu
             </button>
@@ -522,7 +522,7 @@ export default function PurchaseRequestsTab({
             <button
               onClick={submitPO}
               disabled={saving}
-              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-4 py-2 rounded text-sm font-medium"
+              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-4 py-2 rounded text-sm font-medium text-on-accent"
             >
               <Check className="w-4 h-4" /> {saving ? "Đang tạo..." : "Tạo đơn hàng"}
             </button>
@@ -601,7 +601,7 @@ export default function PurchaseRequestsTab({
                   <button
                     onClick={() => deletePR(pr.id, pr.prCode)}
                     aria-label="Xoá yêu cầu mua"
-                    className="p-1.5 rounded hover:bg-red-900/50 text-zinc-500 hover:text-red-400"
+                    className="p-1.5 rounded hover:bg-red-900 text-zinc-500 hover:text-red-200"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -638,14 +638,14 @@ export default function PurchaseRequestsTab({
               <button
                 onClick={() => review("approve")}
                 disabled={saving}
-                className="flex-1 flex items-center justify-center gap-1.5 bg-green-700 hover:bg-green-600 disabled:opacity-50 py-2 rounded text-sm font-medium"
+                className="flex-1 flex items-center justify-center gap-1.5 bg-green-700 hover:bg-green-600 disabled:opacity-50 py-2 rounded text-sm font-medium text-on-accent"
               >
                 <Check className="w-4 h-4" /> Duyệt
               </button>
               <button
                 onClick={() => review("reject")}
                 disabled={saving}
-                className="flex-1 flex items-center justify-center gap-1.5 bg-red-800 hover:bg-red-700 disabled:opacity-50 py-2 rounded text-sm font-medium"
+                className="flex-1 flex items-center justify-center gap-1.5 bg-red-800 hover:bg-red-700 disabled:opacity-50 py-2 rounded text-sm font-medium text-on-accent"
               >
                 <X className="w-4 h-4" /> Từ chối
               </button>
