@@ -8,6 +8,7 @@ import {
   MAX_DOC_BYTES,
   extForDocMime,
   extForMime,
+  verifyFileMime,
 } from "@/lib/photos";
 import { createReadStream, statSync, existsSync } from "node:fs";
 import { unlink, writeFile } from "node:fs/promises";
@@ -120,10 +121,17 @@ export async function POST(
   if (!extForDocMime(mime) && !extForMime(mime))
     return NextResponse.json({ error: "Chỉ nhận PDF hoặc ảnh" }, { status: 415 });
 
+  const bytes = await file.arrayBuffer();
+  const fileBuf = Buffer.from(bytes);
+  if (!verifyFileMime(fileBuf, mime))
+    return NextResponse.json(
+      { error: "Nội dung file không khớp định dạng khai báo (Content-Type giả mạo?)" },
+      { status: 415 },
+    );
+
   const dir = ensureUploadDir();
   const fileName = newBbntFileName(id, mime);
-  const bytes = await file.arrayBuffer();
-  await writeFile(join(dir, fileName), Buffer.from(bytes));
+  await writeFile(join(dir, fileName), fileBuf);
 
   // Xoá file cũ sau khi ghi file mới thành công
   if (wp.bbntFileName) {

@@ -7,6 +7,7 @@ import { getCurrentProjectId } from "@/lib/projects";
 import {
   ensureUploadDir,
   extForDocMime,
+  verifyFileMime,
   newDrawingRevisionFileName,
   MAX_DRAWING_BYTES,
 } from "@/lib/photos";
@@ -62,6 +63,13 @@ export async function POST(
       { status: 413 },
     );
 
+  const fileBuf = Buffer.from(await file.arrayBuffer());
+  if (!verifyFileMime(fileBuf, file.type))
+    return NextResponse.json(
+      { error: "Nội dung file không khớp định dạng khai báo (Content-Type giả mạo?)" },
+      { status: 415 },
+    );
+
   const existing = await queryOne(
     `SELECT id FROM drawing_revisions WHERE drawing_id = ? AND rev = ?`,
     drawingId,
@@ -74,7 +82,7 @@ export async function POST(
 
   const fileName = newDrawingRevisionFileName(drawingId, rev, file.type);
   const dir = ensureUploadDir();
-  await writeFile(join(dir, fileName), Buffer.from(await file.arrayBuffer()));
+  await writeFile(join(dir, fileName), fileBuf);
 
   let id: number;
   try {

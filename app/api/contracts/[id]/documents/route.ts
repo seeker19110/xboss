@@ -7,6 +7,7 @@ import { getCurrentProjectId } from "@/lib/projects";
 import {
   ensureUploadDir,
   extForDocMime,
+  verifyFileMime,
   newContractDocFileName,
   MAX_DOC_BYTES,
 } from "@/lib/photos";
@@ -97,10 +98,17 @@ export async function POST(
       { status: 413 },
     );
 
+  const fileBuf = Buffer.from(await file.arrayBuffer());
+  if (!verifyFileMime(fileBuf, file.type))
+    return NextResponse.json(
+      { error: "Nội dung file không khớp định dạng khai báo (Content-Type giả mạo?)" },
+      { status: 415 },
+    );
+
   const caption = String(form.get("caption") ?? "").trim() || null;
   const fileName = newContractDocFileName(contractId, file.type);
   const dir = ensureUploadDir();
-  await writeFile(join(dir, fileName), Buffer.from(await file.arrayBuffer()));
+  await writeFile(join(dir, fileName), fileBuf);
 
   const id = await insertId(
     `INSERT INTO contract_documents (contract_id, file_name, original_name, mime_type, size_bytes, caption, uploaded_by)

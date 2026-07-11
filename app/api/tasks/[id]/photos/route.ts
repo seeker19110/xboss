@@ -3,7 +3,13 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, canTouchTask, CAN } from "@/lib/auth";
-import { ensureUploadDir, extForMime, newPhotoFileName, MAX_PHOTO_BYTES } from "@/lib/photos";
+import {
+  ensureUploadDir,
+  extForMime,
+  verifyFileMime,
+  newPhotoFileName,
+  MAX_PHOTO_BYTES,
+} from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
 
@@ -77,10 +83,17 @@ export async function POST(
       { status: 413 },
     );
 
+  const fileBuf = Buffer.from(await file.arrayBuffer());
+  if (!verifyFileMime(fileBuf, file.type))
+    return NextResponse.json(
+      { error: "Nội dung file không khớp định dạng khai báo (Content-Type giả mạo?)" },
+      { status: 415 },
+    );
+
   const caption = String(form.get("caption") ?? "").trim() || null;
   const fileName = newPhotoFileName(taskId, file.type);
   const dir = ensureUploadDir();
-  await writeFile(join(dir, fileName), Buffer.from(await file.arrayBuffer()));
+  await writeFile(join(dir, fileName), fileBuf);
 
   const id = await insertId(
     `INSERT INTO task_photos (task_id, file_name, original_name, mime_type, size_bytes, caption, uploaded_by)

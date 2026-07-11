@@ -53,6 +53,65 @@ export function extForMime(mime: string): string | null {
   return MIME_EXT[mime] ?? null;
 }
 
+// Dò mime THẬT từ magic byte đầu file — không tin `Content-Type` client tự khai
+// (dễ giả mạo: đổi phần mở rộng/header request để lách whitelist mime). Chỉ nhận
+// diện đúng các định dạng dự án cho upload; không nhận diện được → null (caller từ chối).
+export function sniffMime(buf: Buffer): string | null {
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "image/jpeg";
+  if (
+    buf.length >= 8 &&
+    buf[0] === 0x89 &&
+    buf[1] === 0x50 &&
+    buf[2] === 0x4e &&
+    buf[3] === 0x47 &&
+    buf[4] === 0x0d &&
+    buf[5] === 0x0a &&
+    buf[6] === 0x1a &&
+    buf[7] === 0x0a
+  )
+    return "image/png";
+  if (
+    buf.length >= 12 &&
+    buf.toString("ascii", 0, 4) === "RIFF" &&
+    buf.toString("ascii", 8, 12) === "WEBP"
+  )
+    return "image/webp";
+  if (
+    buf.length >= 6 &&
+    (buf.toString("ascii", 0, 6) === "GIF87a" || buf.toString("ascii", 0, 6) === "GIF89a")
+  )
+    return "image/gif";
+  if (
+    buf.length >= 12 &&
+    buf.toString("ascii", 4, 8) === "ftyp" &&
+    ["heic", "heix", "heim", "heis", "hevc", "hevx", "mif1", "msf1"].includes(
+      buf.toString("ascii", 8, 12).replace(/\0/g, "").trim(),
+    )
+  )
+    return "image/heic";
+  if (buf.length >= 5 && buf.toString("ascii", 0, 5) === "%PDF-") return "application/pdf";
+  return null;
+}
+
+// Vài client khai mime không chuẩn cho cùng 1 định dạng thật (vd Safari/iOS khai
+// "image/heif" cho ảnh .heic) — coi cùng họ khi đối chiếu với kết quả sniff.
+const MIME_DECLARE_ALIASES: Record<string, string> = {
+  "image/heif": "image/heic",
+  "image/jpg": "image/jpeg",
+};
+
+// Đối chiếu nội dung file thật (magic byte) với mime client khai báo — trả về mime
+// ĐÃ XÁC THỰC (dùng để chọn phần mở rộng/lưu DB) hoặc `null` nếu không khớp/không
+// nhận diện được (client giả mạo Content-Type, hoặc file hỏng/không phải định dạng
+// cho phép). Luôn gọi hàm này trên buffer thật SAU KHI đọc file, không chỉ dựa
+// `file.type` để quyết định chấp nhận upload.
+export function verifyFileMime(buf: Buffer, declaredMime: string): string | null {
+  const sniffed = sniffMime(buf);
+  if (!sniffed) return null;
+  const declared = MIME_DECLARE_ALIASES[declaredMime] ?? declaredMime;
+  return sniffed === declared ? sniffed : null;
+}
+
 // Tài liệu đính kèm (biên bản nghiệm thu): PDF hoặc ảnh, tối đa 20MB.
 export const MAX_DOC_BYTES = 20 * 1024 * 1024;
 const DOC_MIME_EXT: Record<string, string> = { ...MIME_EXT, "application/pdf": ".pdf" };

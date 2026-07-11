@@ -7,6 +7,7 @@ import { getCurrentProjectId } from "@/lib/projects";
 import {
   ensureUploadDir,
   extForDocMime,
+  verifyFileMime,
   newEnvPermitFileName,
   photoPath,
   MAX_DOC_BYTES,
@@ -136,6 +137,13 @@ export async function PATCH(
         { status: 413 },
       );
 
+    const fileBuf = Buffer.from(await file.arrayBuffer());
+    if (!verifyFileMime(fileBuf, file.type))
+      return NextResponse.json(
+        { error: "Nội dung file không khớp định dạng khai báo (Content-Type giả mạo?)" },
+        { status: 415 },
+      );
+
     if (existing.fileName) {
       const oldPath = photoPath(existing.fileName);
       if (oldPath)
@@ -146,7 +154,7 @@ export async function PATCH(
 
     const fileName = newEnvPermitFileName(id, file.type);
     const dir = ensureUploadDir();
-    await writeFile(join(dir, fileName), Buffer.from(await file.arrayBuffer()));
+    await writeFile(join(dir, fileName), fileBuf);
     fileCols = {
       fileName,
       originalName: file.name || null,
