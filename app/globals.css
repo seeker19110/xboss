@@ -199,6 +199,34 @@ body {
   --color-red-400: #f87171;
 }
 
+@layer base {
+  /* Sọc xen kẽ (zebra) cho MỌI bảng <table> trong toàn app — áp dụng tự động cho cả
+     bảng cũ (chưa có class riêng) lẫn bảng mới sau này, không cần thêm class thủ công
+     ở từng trang. Đặt trong @layer base (thấp hơn @layer utilities Tailwind sinh ra)
+     nên bất kỳ class nền tường minh trên <tr>/<td> (odd:/even: đã dùng thủ công ở
+     users/approvals/materials, hàng tổng bg-amber-400/10, ô lưới tô điều kiện...) LUÔN
+     thắng bất kể độ đặc trưng — quy tắc này chỉ lộ ra ở các hàng "trơn" chưa có màu
+     riêng. Loại trừ bảng của SpreadsheetGrid (lớp .spreadsheet-grid-table) vì component
+     đó đã tự quản zebra theo từng ô (kể cả dòng ghim) bằng đúng dải màu bên dưới.
+     Bảng thường: token zinc-900/zinc-800 tự đảo theo theme — dải trắng/xám nhạt ở theme
+     sáng, tối/tối hơn ở theme tối (đúng cặp màu quy ước odd:bg-zinc-900/50
+     even:bg-zinc-800/20 đã dùng rải rác). Bảng trong khu vực "giấy trắng" cố định
+     (.sheet-stable — báo cáo in, lookahead, đơn hàng): dùng zinc-100 (ghim sáng, không
+     đảo theo theme) cho đúng dải trắng → xám nhạt trên nền giấy trắng. */
+  table:not(.spreadsheet-grid-table) tbody tr:nth-child(odd) {
+    background-color: color-mix(in srgb, var(--color-zinc-900) 50%, transparent);
+  }
+  table:not(.spreadsheet-grid-table) tbody tr:nth-child(even) {
+    background-color: color-mix(in srgb, var(--color-zinc-800) 20%, transparent);
+  }
+  .sheet-stable table:not(.spreadsheet-grid-table) tbody tr:nth-child(odd) {
+    background-color: transparent;
+  }
+  .sheet-stable table:not(.spreadsheet-grid-table) tbody tr:nth-child(even) {
+    background-color: var(--color-zinc-100);
+  }
+}
+
 /* Ẩn scrollbar trên nav cuộn ngang (iOS/Android) */
 .scrollbar-none {
   scrollbar-width: none;

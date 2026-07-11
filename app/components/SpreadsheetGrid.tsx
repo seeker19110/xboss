@@ -880,7 +880,7 @@ export default function SpreadsheetGrid<Row>({
             div role="grid" mới "sở hữu" trực tiếp row/cell (chuẩn ARIA grid trên bảng),
             tránh aria-required-children khi bảng rỗng. */}
         <table
-          className="border-collapse text-sm"
+          className="spreadsheet-grid-table border-collapse text-sm"
           style={{ tableLayout: "fixed" }}
           role="presentation"
         >
