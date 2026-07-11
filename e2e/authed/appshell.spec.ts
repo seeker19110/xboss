@@ -16,9 +16,12 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     });
     for (const label of [
       "Báo cáo",
-      "Timeline",
-      "Gantt",
-      "Lookahead",
+      "ACMV",
+      "Điện",
+      "Cấp thoát nước",
+      "PCCC",
+      "Kết cấu",
+      "Xây tô",
       "Việc của tôi",
       "Nghiệm thu",
       "BOQ",
@@ -102,11 +105,11 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
 
     // Mặc định mở — link con thấy ngay, không cần bấm.
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
-    await expect(sidebar.getByRole("link", { name: "Timeline", exact: true })).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: "ACMV", exact: true })).toBeVisible();
 
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
-    await expect(sidebar.getByRole("link", { name: "Timeline", exact: true })).toHaveCount(0);
+    await expect(sidebar.getByRole("link", { name: "ACMV", exact: true })).toHaveCount(0);
 
     await page.reload();
     if (isMobile) {
@@ -116,11 +119,11 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
       "aria-expanded",
       "false",
     );
-    await expect(sidebar.getByRole("link", { name: "Timeline", exact: true })).toHaveCount(0);
+    await expect(sidebar.getByRole("link", { name: "ACMV", exact: true })).toHaveCount(0);
 
     // Trả lại mặc định mở để không ảnh hưởng test khác dùng chung storageState.
     await sidebar.getByRole("button", { name: "Tiến độ" }).click();
-    await expect(sidebar.getByRole("link", { name: "Timeline", exact: true })).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: "ACMV", exact: true })).toBeVisible();
   });
 
   test("mục 'Tổng quan' trong nhóm dẫn tới trang hub khuôn chung (M21 PR2)", async ({
