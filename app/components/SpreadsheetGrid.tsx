@@ -12,6 +12,7 @@
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, ChevronUp, ChevronDown, ListFilter } from "lucide-react";
 import { serializeTSV, parseTSV, normalizeRect, spreadPaste, type Rect } from "@/lib/grid";
+import { Modal } from "@/app/components/dialogs";
 
 export type GridColumn<Row> = {
   key: string;
@@ -1090,107 +1091,108 @@ export default function SpreadsheetGrid<Row>({
         </div>
       )}
 
-      {/* Keyboard Shortcuts Modal */}
+      {/* Keyboard Shortcuts Modal — dùng Modal chung (không gắn vị trí ô lưới, an toàn để gộp) */}
       {showShortcuts && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-zinc-800 border border-zinc-700 rounded-lg max-w-lg w-full max-h-[80vh] overflow-y-auto">
-            <div className="sticky top-0 bg-zinc-900 border-b border-zinc-700 px-4 py-3 flex items-center justify-between">
-              <h3 className="font-bold text-lg">⌨️ Phím tắt</h3>
-              <button
-                onClick={() => setShowShortcuts(false)}
-                className="text-zinc-400 hover:text-white"
-              >
-                ✕
-              </button>
+        <Modal
+          onClose={() => setShowShortcuts(false)}
+          className="max-w-lg max-h-[80vh] flex flex-col"
+        >
+          <div className="sticky top-0 bg-zinc-900 border-b border-zinc-700 px-4 py-3 flex items-center justify-between">
+            <h3 className="font-bold text-lg">⌨️ Phím tắt</h3>
+            <button
+              onClick={() => setShowShortcuts(false)}
+              className="text-zinc-400 hover:text-white"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="p-4 space-y-3 text-sm overflow-y-auto">
+            <div>
+              <div className="font-semibold text-sky-300 mb-2">Điều hướng</div>
+              <div className="space-y-1 text-zinc-300">
+                <div>
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">↑↓←→</kbd> Mũi tên |{" "}
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">Tab</kbd> Tab
+                </div>
+                <div>
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">Enter</kbd> /{" "}
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">F2</kbd> Sửa ô
+                </div>
+                <div>
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">Shift</kbd> + Mũi tên Chọn vùng
+                </div>
+              </div>
             </div>
-            <div className="p-4 space-y-3 text-sm">
-              <div>
-                <div className="font-semibold text-sky-300 mb-2">Điều hướng</div>
-                <div className="space-y-1 text-zinc-300">
-                  <div>
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">↑↓←→</kbd> Mũi tên |{" "}
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">Tab</kbd> Tab
-                  </div>
-                  <div>
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">Enter</kbd> /{" "}
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">F2</kbd> Sửa ô
-                  </div>
-                  <div>
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">Shift</kbd> + Mũi tên Chọn vùng
-                  </div>
+            <div>
+              <div className="font-semibold text-sky-300 mb-2">Clipboard</div>
+              <div className="space-y-1 text-zinc-300">
+                <div>
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">Ctrl/⌘</kbd> +{" "}
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">C</kbd> Sao chép
+                </div>
+                <div>
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">Ctrl/⌘</kbd> +{" "}
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">X</kbd> Cắt
+                </div>
+                <div>
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">Ctrl/⌘</kbd> +{" "}
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">V</kbd> Dán
+                </div>
+                <div>
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">Ctrl/⌘</kbd> +{" "}
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">D</kbd> Điền xuống
                 </div>
               </div>
-              <div>
-                <div className="font-semibold text-sky-300 mb-2">Clipboard</div>
-                <div className="space-y-1 text-zinc-300">
-                  <div>
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">Ctrl/⌘</kbd> +{" "}
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">C</kbd> Sao chép
-                  </div>
-                  <div>
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">Ctrl/⌘</kbd> +{" "}
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">X</kbd> Cắt
-                  </div>
-                  <div>
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">Ctrl/⌘</kbd> +{" "}
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">V</kbd> Dán
-                  </div>
-                  <div>
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">Ctrl/⌘</kbd> +{" "}
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">D</kbd> Điền xuống
-                  </div>
+            </div>
+            <div>
+              <div className="font-semibold text-sky-300 mb-2">Chỉnh sửa</div>
+              <div className="space-y-1 text-zinc-300">
+                <div>
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">Delete</kbd> /{" "}
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">Backspace</kbd> Xoá
+                </div>
+                <div>
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">Ctrl/⌘</kbd> +{" "}
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">A</kbd> Chọn tất cả
+                </div>
+                <div>
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">Ctrl/⌘</kbd> +{" "}
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">F</kbd> Tìm kiếm
+                </div>
+                <div>
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">Ctrl/⌘</kbd> +{" "}
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">H</kbd> Thay thế
+                </div>
+                <div>
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">Ctrl/⌘</kbd> +{" "}
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">Z</kbd> Hoàn tác ·{" "}
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">Ctrl/⌘</kbd> +{" "}
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">Y</kbd> Làm lại
                 </div>
               </div>
-              <div>
-                <div className="font-semibold text-sky-300 mb-2">Chỉnh sửa</div>
-                <div className="space-y-1 text-zinc-300">
-                  <div>
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">Delete</kbd> /{" "}
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">Backspace</kbd> Xoá
-                  </div>
-                  <div>
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">Ctrl/⌘</kbd> +{" "}
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">A</kbd> Chọn tất cả
-                  </div>
-                  <div>
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">Ctrl/⌘</kbd> +{" "}
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">F</kbd> Tìm kiếm
-                  </div>
-                  <div>
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">Ctrl/⌘</kbd> +{" "}
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">H</kbd> Thay thế
-                  </div>
-                  <div>
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">Ctrl/⌘</kbd> +{" "}
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">Z</kbd> Hoàn tác ·{" "}
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">Ctrl/⌘</kbd> +{" "}
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">Y</kbd> Làm lại
-                  </div>
-                </div>
+            </div>
+            <div>
+              <div className="font-semibold text-sky-300 mb-2">Cột</div>
+              <div className="space-y-1 text-zinc-300">
+                <div>Bấm nhãn cột trên header để sắp xếp (A→Z hoặc Z→A)</div>
+                <div>Mỗi header có nút lọc theo cột</div>
               </div>
-              <div>
-                <div className="font-semibold text-sky-300 mb-2">Cột</div>
-                <div className="space-y-1 text-zinc-300">
-                  <div>Bấm nhãn cột trên header để sắp xếp (A→Z hoặc Z→A)</div>
-                  <div>Mỗi header có nút lọc theo cột</div>
+            </div>
+            <div>
+              <div className="font-semibold text-sky-300 mb-2">Xuất</div>
+              <div className="space-y-1 text-zinc-300">
+                <div>
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">Ctrl/⌘</kbd> +{" "}
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">S</kbd> Xuất CSV
                 </div>
-              </div>
-              <div>
-                <div className="font-semibold text-sky-300 mb-2">Xuất</div>
-                <div className="space-y-1 text-zinc-300">
-                  <div>
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">Ctrl/⌘</kbd> +{" "}
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">S</kbd> Xuất CSV
-                  </div>
-                  <div>
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">Ctrl/⌘</kbd> +{" "}
-                    <kbd className="bg-zinc-700 px-2 py-1 rounded">?</kbd> Hướng dẫn
-                  </div>
+                <div>
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">Ctrl/⌘</kbd> +{" "}
+                  <kbd className="bg-zinc-700 px-2 py-1 rounded">?</kbd> Hướng dẫn
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Context Menu */}
