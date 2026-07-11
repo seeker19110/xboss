@@ -16,7 +16,9 @@ test.describe("Trang hệ /he/[code] (sau đăng nhập)", () => {
     if (isMobile) {
       await page.getByRole("button", { name: "Mở menu" }).click();
     }
-    await page.locator("#app-sidebar").getByRole("link", { name: "ACMV" }).click();
+    // Nhóm sidebar "Tiến độ" (M-tiến-độ-6-hệ) cũng có mục "ACMV" trỏ /tien-do/acmv — dùng
+    // href để nhắm đúng link "Hệ thi công" /he/acmv, tránh nhập nhằng cùng tên.
+    await page.locator('#app-sidebar a[href="/he/acmv"]').click();
     await expect(page).toHaveURL(/\/he\/acmv$/);
     await expect(page.getByRole("heading", { name: "ACMV" })).toBeVisible({ timeout: 15_000 });
   });

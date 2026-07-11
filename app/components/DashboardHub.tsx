@@ -4,7 +4,14 @@ import EmptyState from "@/app/components/EmptyState";
 import { findDashboardById, canSeeNavItem, type DashNode } from "@/app/lib/dashboardTree";
 import { useEffect, useState } from "react";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { FileText, AlertTriangle } from "lucide-react";
+import {
+  FileText,
+  AlertTriangle,
+  CalendarRange,
+  GanttChartSquare,
+  CalendarClock,
+  TrendingUp,
+} from "lucide-react";
 import { disciplineColorClasses } from "@/lib/disciplineColors";
 
 // Trang hub khuôn chung cho dashboard nhóm (M21 PR2 — xem docs/nang-cap/M21-appshell-ia.md).
@@ -101,8 +108,24 @@ function DisciplineRow({ d }: { d: Discipline }) {
   );
 }
 
+// Khối 1 "Kế hoạch & Báo cáo tổng thể" — view chung KHÔNG lọc theo hệ. Trước đây lấy từ
+// `dashboard.children` (node dash.tien-do), nhưng từ khi sidebar đổi children của node đó
+// sang 6 hệ đang thi công (mỗi hệ 1 trang /tien-do/[he]), 2 việc này tách nhau — hub giữ
+// literal riêng để không mất view chung khi sidebar đổi.
+const GENERAL_VIEWS: DashNode[] = [
+  { href: "/timeline", label: "Timeline", icon: CalendarRange },
+  { href: "/gantt", label: "Gantt", icon: GanttChartSquare },
+  { href: "/lookahead", label: "Lookahead", icon: CalendarClock },
+  { href: "/scurve", label: "S-Curve", icon: TrendingUp },
+];
+const CONTROL_CARD: DashNode = {
+  href: "/schedule-control",
+  label: "Đường găng & Chậm tiến độ",
+  icon: AlertTriangle,
+};
+
 // Mặt tiền riêng của dashboard "Tiến độ" (M36) — 3 khối theo mockup.
-function TienDoHubSections({ items }: { items: DashNode[] }) {
+function TienDoHubSections() {
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
 
   useEffect(() => {
@@ -119,18 +142,14 @@ function TienDoHubSections({ items }: { items: DashNode[] }) {
     label: "Báo cáo ngày/tuần/tháng",
     icon: FileText,
   };
-  // "Đường găng & Chậm tiến độ" thuộc khối "Kiểm soát" riêng (không lặp trong khối tổng
-  // thể) — tách khỏi `items` để đưa vào section Kiểm soát ở dưới cùng.
-  const planningItems = items.filter((c) => c.href !== "/schedule-control");
-  const controlItems = items.filter((c) => c.href === "/schedule-control");
 
   return (
     <>
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-zinc-300">Kế hoạch & Báo cáo tổng thể</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {planningItems.map((child) => (
-            <ChildCard key={child.href ?? child.label} child={child} />
+          {GENERAL_VIEWS.map((child) => (
+            <ChildCard key={child.href} child={child} />
           ))}
           <ChildCard child={reportCard} />
         </div>
@@ -150,11 +169,7 @@ function TienDoHubSections({ items }: { items: DashNode[] }) {
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-zinc-300">Kiểm soát</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {controlItems.length > 0 ? (
-            controlItems.map((child) => <ChildCard key={child.href} child={child} />)
-          ) : (
-            <ChildCard child={{ label: "Đường găng & Chậm tiến độ", icon: AlertTriangle }} />
-          )}
+          <ChildCard child={CONTROL_CARD} />
         </div>
       </section>
     </>
@@ -196,7 +211,7 @@ export default function DashboardHub({ dashId }: { dashId: string }) {
         </div>
 
         {isTienDo ? (
-          <TienDoHubSections items={children} />
+          <TienDoHubSections />
         ) : children.length === 0 ? (
           <EmptyState message="Chưa có mục nào trong dashboard này." />
         ) : (

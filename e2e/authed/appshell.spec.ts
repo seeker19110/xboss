@@ -16,12 +16,6 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     });
     for (const label of [
       "Báo cáo",
-      "ACMV",
-      "Điện",
-      "Cấp thoát nước",
-      "PCCC",
-      "Kết cấu",
-      "Xây tô",
       "Việc của tôi",
       "Nghiệm thu",
       "BOQ",
@@ -58,6 +52,14 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
       "Import Excel",
     ]) {
       await expect(sidebar.getByRole("link", { name: label, exact: true })).toBeVisible();
+    }
+
+    // 6 mục hệ trong nhóm "Tiến độ" (dash.tien-do) trùng tên với mục "Hệ thi công"
+    // (link /he/[code], render riêng ngoài cây điều hướng — xem AppHeader.tsx) nên phải
+    // thu hẹp về đúng nhóm "Tiến độ" để tránh nhập nhằng nhiều link cùng tên.
+    const tienDoGroup = sidebar.getByRole("button", { name: "Tiến độ" }).locator("xpath=..");
+    for (const label of ["ACMV", "Điện", "Cấp thoát nước", "PCCC", "Kết cấu", "Xây tô"]) {
+      await expect(tienDoGroup.getByRole("link", { name: label, exact: true })).toBeVisible();
     }
   });
 
@@ -102,14 +104,17 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     const sidebar = page.locator("#app-sidebar");
     const toggle = sidebar.getByRole("button", { name: "Tiến độ" });
     await expect(toggle).toBeVisible({ timeout: 15_000 });
+    // "ACMV" cũng là tên 1 mục ở nhóm "Hệ thi công" riêng (link /he/[code], luôn hiển thị
+    // ngoài nhóm gập/mở) — thu hẹp về đúng nhóm "Tiến độ" để không lẫn.
+    const tienDoGroup = toggle.locator("xpath=..");
 
     // Mặc định mở — link con thấy ngay, không cần bấm.
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
-    await expect(sidebar.getByRole("link", { name: "ACMV", exact: true })).toBeVisible();
+    await expect(tienDoGroup.getByRole("link", { name: "ACMV", exact: true })).toBeVisible();
 
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
-    await expect(sidebar.getByRole("link", { name: "ACMV", exact: true })).toHaveCount(0);
+    await expect(tienDoGroup.getByRole("link", { name: "ACMV", exact: true })).toHaveCount(0);
 
     await page.reload();
     if (isMobile) {
@@ -119,11 +124,11 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
       "aria-expanded",
       "false",
     );
-    await expect(sidebar.getByRole("link", { name: "ACMV", exact: true })).toHaveCount(0);
+    await expect(tienDoGroup.getByRole("link", { name: "ACMV", exact: true })).toHaveCount(0);
 
     // Trả lại mặc định mở để không ảnh hưởng test khác dùng chung storageState.
     await sidebar.getByRole("button", { name: "Tiến độ" }).click();
-    await expect(sidebar.getByRole("link", { name: "ACMV", exact: true })).toBeVisible();
+    await expect(tienDoGroup.getByRole("link", { name: "ACMV", exact: true })).toBeVisible();
   });
 
   test("mục 'Tổng quan' trong nhóm dẫn tới trang hub khuôn chung (M21 PR2)", async ({
@@ -144,9 +149,16 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     await expect(page).toHaveURL(/\/hub\/dash\.tien-do$/);
     await expect(page.locator("header").getByText("Tiến độ", { exact: true })).toBeVisible();
     const hub = page.getByRole("main");
-    await expect(hub.getByRole("link", { name: "Timeline", exact: true })).toBeVisible();
-    await expect(hub.getByRole("link", { name: "Gantt", exact: true })).toBeVisible();
-    await expect(hub.getByRole("link", { name: "Lookahead", exact: true })).toBeVisible();
+    // Khối "Tiến độ theo hệ" bên dưới cũng có nút nhỏ tên "Timeline"/"Gantt"/"Lookahead"
+    // cho mỗi hệ (M36) — thu hẹp về đúng khối "Kế hoạch & Báo cáo tổng thể" phía trên.
+    const generalSection = hub
+      .locator("section")
+      .filter({ hasText: "Kế hoạch & Báo cáo tổng thể" });
+    await expect(generalSection.getByRole("link", { name: "Timeline", exact: true })).toBeVisible();
+    await expect(generalSection.getByRole("link", { name: "Gantt", exact: true })).toBeVisible();
+    await expect(
+      generalSection.getByRole("link", { name: "Lookahead", exact: true }),
+    ).toBeVisible();
   });
 
   // M34 đã gán href thật cho "Claim chi phí" — hết node coming-soon con mẫu trong toàn
