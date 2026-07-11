@@ -3,7 +3,13 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, canViewSubcontractor, CAN } from "@/lib/auth";
-import { ensureUploadDir, extForDocMime, newSubconDocFileName, MAX_DOC_BYTES } from "@/lib/photos";
+import {
+  ensureUploadDir,
+  extForDocMime,
+  verifyFileMime,
+  newSubconDocFileName,
+  MAX_DOC_BYTES,
+} from "@/lib/photos";
 import { listSubconDocuments } from "@/lib/subcontractors";
 
 export const dynamic = "force-dynamic";
@@ -74,10 +80,17 @@ export async function POST(
       { status: 413 },
     );
 
+  const fileBuf = Buffer.from(await file.arrayBuffer());
+  if (!verifyFileMime(fileBuf, file.type))
+    return NextResponse.json(
+      { error: "Nội dung file không khớp định dạng khai báo (Content-Type giả mạo?)" },
+      { status: 415 },
+    );
+
   const docKind = String(form.get("docKind") ?? "").trim() || null;
   const fileName = newSubconDocFileName(supplierId, file.type);
   const dir = ensureUploadDir();
-  await writeFile(join(dir, fileName), Buffer.from(await file.arrayBuffer()));
+  await writeFile(join(dir, fileName), fileBuf);
 
   const id = await insertId(
     `INSERT INTO subcon_documents (supplier_id, title, doc_kind, file_name, original_name, mime_type, size_bytes, uploaded_by)

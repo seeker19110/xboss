@@ -5,7 +5,13 @@ import { insertId, queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { listOmDocs } from "@/lib/warranty";
-import { ensureUploadDir, extForDocMime, newOmDocFileName, MAX_DOC_BYTES } from "@/lib/photos";
+import {
+  ensureUploadDir,
+  extForDocMime,
+  verifyFileMime,
+  newOmDocFileName,
+  MAX_DOC_BYTES,
+} from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
 
@@ -65,9 +71,16 @@ export async function POST(req: NextRequest) {
       { status: 413 },
     );
 
+  const fileBuf = Buffer.from(await file.arrayBuffer());
+  if (!verifyFileMime(fileBuf, file.type))
+    return NextResponse.json(
+      { error: "Nội dung file không khớp định dạng khai báo (Content-Type giả mạo?)" },
+      { status: 415 },
+    );
+
   const fileName = newOmDocFileName(projectId, file.type);
   const dir = ensureUploadDir();
-  await writeFile(join(dir, fileName), Buffer.from(await file.arrayBuffer()));
+  await writeFile(join(dir, fileName), fileBuf);
 
   const id = await insertId(
     `INSERT INTO om_documents (project_id, title, system_id, file_name, original_name,

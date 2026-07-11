@@ -4,7 +4,13 @@ import { join } from "node:path";
 import { query, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
-import { ensureUploadDir, extForDocMime, newProjectDocFileName, MAX_DOC_BYTES } from "@/lib/photos";
+import {
+  ensureUploadDir,
+  extForDocMime,
+  verifyFileMime,
+  newProjectDocFileName,
+  MAX_DOC_BYTES,
+} from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
 
@@ -67,10 +73,17 @@ export async function POST(req: NextRequest) {
       { status: 413 },
     );
 
+  const fileBuf = Buffer.from(await file.arrayBuffer());
+  if (!verifyFileMime(fileBuf, file.type))
+    return NextResponse.json(
+      { error: "Nội dung file không khớp định dạng khai báo (Content-Type giả mạo?)" },
+      { status: 415 },
+    );
+
   const category = String(form.get("category") ?? "").trim() || null;
   const fileName = newProjectDocFileName(file.type);
   const dir = ensureUploadDir();
-  await writeFile(join(dir, fileName), Buffer.from(await file.arrayBuffer()));
+  await writeFile(join(dir, fileName), fileBuf);
 
   const id = await insertId(
     `INSERT INTO project_documents (title, category, file_name, original_name, mime_type, size_bytes, uploaded_by, project_id)

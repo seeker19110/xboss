@@ -4,7 +4,13 @@ import { join } from "node:path";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
-import { ensureUploadDir, extForMime, newHseFileName, MAX_PHOTO_BYTES } from "@/lib/photos";
+import {
+  ensureUploadDir,
+  extForMime,
+  verifyFileMime,
+  newHseFileName,
+  MAX_PHOTO_BYTES,
+} from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
 
@@ -82,9 +88,16 @@ export async function POST(
       { status: 413 },
     );
 
+  const fileBuf = Buffer.from(await file.arrayBuffer());
+  if (!verifyFileMime(fileBuf, file.type))
+    return NextResponse.json(
+      { error: "Nội dung file không khớp định dạng khai báo (Content-Type giả mạo?)" },
+      { status: 415 },
+    );
+
   const fileName = newHseFileName(recordId, file.type);
   const dir = ensureUploadDir();
-  await writeFile(join(dir, fileName), Buffer.from(await file.arrayBuffer()));
+  await writeFile(join(dir, fileName), fileBuf);
 
   const id = await insertId(
     `INSERT INTO hse_photos (record_id, file_path, mime, uploaded_by) VALUES (?, ?, ?, ?)`,

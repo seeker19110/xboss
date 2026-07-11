@@ -8,6 +8,7 @@ import { getEquipment } from "@/lib/equipment";
 import {
   ensureUploadDir,
   extForDocMime,
+  verifyFileMime,
   newEquipmentCertFileName,
   photoPath,
   MAX_DOC_BYTES,
@@ -105,9 +106,16 @@ export async function POST(
       { status: 413 },
     );
 
+  const fileBuf = Buffer.from(await file.arrayBuffer());
+  if (!verifyFileMime(fileBuf, file.type))
+    return NextResponse.json(
+      { error: "Nội dung file không khớp định dạng khai báo (Content-Type giả mạo?)" },
+      { status: 415 },
+    );
+
   const fileName = newEquipmentCertFileName(id, file.type);
   const dir = ensureUploadDir();
-  await writeFile(join(dir, fileName), Buffer.from(await file.arrayBuffer()));
+  await writeFile(join(dir, fileName), fileBuf);
 
   const oldPath = eq.certFileName ? photoPath(eq.certFileName) : null;
   await run(

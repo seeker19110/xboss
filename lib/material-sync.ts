@@ -159,6 +159,58 @@ const sheetRowToFields = (row: string[]): MaterialFields =>
     note: row[10] ?? "",
   });
 
+// Parse "nghiêm ngặt" 1 trường Sheet: trả `null` nếu giá trị nhập không hợp lệ
+// (số không parse được / status lạ), khác `normField` (luôn coerce về giá trị an
+// toàn — dùng cho dữ liệu đã biết đúng như DB/snapshot). Rỗng vẫn coi là hợp lệ
+// (= giá trị mặc định 0 / dat_hang), chỉ rác thật sự mới trả null.
+function parseFieldStrict(field: SyncField, value: string): string | null {
+  const v = (value ?? "").toString().trim();
+  if (field === "qtyBoq" || field === "qtyPlanned") {
+    if (v === "") return "0";
+    const n = parseFloat(v.replace(/,/g, ""));
+    return isFinite(n) ? String(n) : null;
+  }
+  if (field === "status") {
+    if (v === "") return "dat_hang";
+    return VALID_STATUSES.includes(v) ? v : null;
+  }
+  return v;
+}
+
+// Đọc 1 dòng Sheet → trường đã chuẩn hoá + danh sách trường lỗi (không parse được).
+// Trường lỗi được GIỮ NGUYÊN giá trị `fallback` tương ứng (thường là giá trị DB
+// hiện tại) thay vì coerce về "0"/"dat_hang" — coi lỗi gõ trên Sheet (vd qtyBoq
+// gõ nhầm chữ) là "không đổi" thay vì "đổi thành 0", để 3-way merge không âm thầm
+// ghi đè DB bằng giá trị rác chỉ vì Sheet gõ sai.
+export function sheetRowToFieldsChecked(
+  row: string[],
+  fallback: MaterialFields,
+): { fields: MaterialFields; invalid: SyncField[] } {
+  const raw: Record<SyncField, string> = {
+    boqCode: row[1] ?? "",
+    name: row[2] ?? "",
+    unit: row[3] ?? "",
+    qtyBoq: row[4] ?? "",
+    qtyPlanned: row[5] ?? "",
+    status: row[9] ?? "",
+    note: row[10] ?? "",
+  };
+  const fields = {} as MaterialFields;
+  const invalid: SyncField[] = [];
+  for (const k of SYNCED_FIELDS) {
+    const parsed = parseFieldStrict(k, raw[k]);
+    if (parsed === null) {
+      invalid.push(k);
+      fields[k] = fallback[k];
+    } else {
+      fields[k] = parsed;
+    }
+  }
+  return { fields, invalid };
+}
+
+const DEFAULT_NEW_FIELDS: MaterialFields = normalizeFields({});
+
 const dbToSheetRow = (m: DbMaterial): (string | number)[] => [
   m.id,
   m.boqCode ?? "",
@@ -265,14 +317,14 @@ export async function runMaterialSync(sheetClient?: SheetClient): Promise<SyncSu
     const dbMaterials = await loadDbMaterials();
     const snapshots = await loadSnapshots();
 
-    // Map dòng Sheet theo ID (bỏ header dòng 0).
-    const sheetById = new Map<number, string[]>();
+    // Map dòng Sheet theo ID (bỏ header dòng 0) — giữ cả số dòng để log lỗi rõ ràng.
+    const sheetById = new Map<number, { rowNum: number; row: string[] }>();
     const newSheetRows: { rowNum: number; row: string[] }[] = [];
     for (let i = 1; i < sheetRows.length; i++) {
       const row = sheetRows[i];
       if (!row || row.every((c) => !String(c ?? "").trim())) continue; // bỏ dòng trống
       const id = parseInt(String(row[0] ?? ""));
-      if (!isNaN(id)) sheetById.set(id, row);
+      if (!isNaN(id)) sheetById.set(id, { rowNum: i + 1, row });
       else newSheetRows.push({ rowNum: i + 1, row });
     }
 
@@ -297,7 +349,13 @@ export async function runMaterialSync(sheetClient?: SheetClient): Promise<SyncSu
         continue;
       }
 
-      const sheetF = sheetRowToFields(sheetRow);
+      const { fields: sheetF, invalid } = sheetRowToFieldsChecked(sheetRow.row, dbF);
+      if (invalid.length) {
+        summary.skipped.push({
+          row: sheetRow.rowNum,
+          reason: `Cột ${invalid.join(", ")} nhập không hợp lệ trên Sheet (vật tư #${m.id}) — giữ nguyên giá trị DB cho các cột này, kiểm tra lại Sheet`,
+        });
+      }
       const { decision, winner } = decideMerge(dbF, sheetF, snap);
 
       if (decision === "pull") {
@@ -319,9 +377,8 @@ export async function runMaterialSync(sheetClient?: SheetClient): Promise<SyncSu
     }
 
     // 2) Dòng Sheet có ID nhưng không còn trong DB → bỏ qua (không tự xoá DB).
-    for (const [id, row] of sheetById) {
+    for (const [id, { rowNum, row }] of sheetById) {
       if (!dbIds.has(id)) {
-        const rowNum = sheetRows.findIndex((r) => parseInt(String(r?.[0] ?? "")) === id) + 1;
         summary.skipped.push({
           row: rowNum,
           reason: `ID ${id} không còn trong DB — bỏ qua (không xoá), tên "${row[2] ?? ""}"`,
@@ -350,13 +407,28 @@ export async function runMaterialSync(sheetClient?: SheetClient): Promise<SyncSu
     }
 
     for (const { rowNum, row } of newSheetRows) {
-      const f = sheetRowToFields(row);
-      if (!f.name) {
+      // boqCode/name là trường chuỗi thuần (không parse số/enum), lấy trực tiếp để
+      // xác định "khớp với vật tư nào" trước khi biết fallback cho các trường số/status.
+      const rawName = (row[2] ?? "").toString().trim();
+      if (!rawName) {
         summary.skipped.push({ row: rowNum, reason: "Thiếu tên vật tư" });
         continue;
       }
+      const rawBoqCode = (row[1] ?? "").toString().trim();
+      const matched = rawBoqCode ? dbByBoqCode.get(rawBoqCode) : undefined;
+      const fallback = matched ? dbToFields(matched) : DEFAULT_NEW_FIELDS;
+      const { fields: f, invalid } = sheetRowToFieldsChecked(row, fallback);
+      if (invalid.length) {
+        summary.skipped.push({
+          row: rowNum,
+          reason: `Cột ${invalid.join(", ")} nhập không hợp lệ trên Sheet — ${
+            matched
+              ? `giữ nguyên giá trị DB cho các cột này (vật tư #${matched.id})`
+              : "dùng giá trị mặc định khi tạo vật tư mới"
+          }, kiểm tra lại Sheet`,
+        });
+      }
 
-      const matched = f.boqCode ? dbByBoqCode.get(f.boqCode) : undefined;
       if (matched) {
         // Dòng mất ID nhưng Mã BOQ khớp vật tư đã có → cập nhật vật tư đó thay vì
         // tạo trùng (bug cũ: chỉ kiểm mã có bị chiếm không rồi luôn tạo mới, không

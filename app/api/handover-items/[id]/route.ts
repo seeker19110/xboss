@@ -7,6 +7,7 @@ import { getCurrentProjectId } from "@/lib/projects";
 import {
   ensureUploadDir,
   extForDocMime,
+  verifyFileMime,
   newHandoverMinutesFileName,
   photoPath,
   MAX_DOC_BYTES,
@@ -152,6 +153,14 @@ export async function PATCH(
         { error: `File quá lớn (tối đa ${MAX_DOC_BYTES / 1024 / 1024}MB)` },
         { status: 413 },
       );
+
+    const fileBuf = Buffer.from(await file.arrayBuffer());
+    if (!verifyFileMime(fileBuf, file.type))
+      return NextResponse.json(
+        { error: "Nội dung file không khớp định dạng khai báo (Content-Type giả mạo?)" },
+        { status: 415 },
+      );
+
     if (existing.minutesFile) {
       const oldPath = photoPath(existing.minutesFile);
       if (oldPath)
@@ -161,7 +170,7 @@ export async function PATCH(
     }
     minutesFile = newHandoverMinutesFileName(id, file.type);
     const dir = ensureUploadDir();
-    await writeFile(join(dir, minutesFile), Buffer.from(await file.arrayBuffer()));
+    await writeFile(join(dir, minutesFile), fileBuf);
   }
 
   try {

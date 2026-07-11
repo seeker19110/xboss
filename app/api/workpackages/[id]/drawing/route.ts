@@ -7,6 +7,7 @@ import {
   photoPath,
   MAX_DOC_BYTES,
   extForDocMime,
+  verifyFileMime,
 } from "@/lib/photos";
 import { createReadStream, statSync, existsSync } from "node:fs";
 import { unlink, writeFile } from "node:fs/promises";
@@ -120,7 +121,13 @@ export async function POST(
   const dir = ensureUploadDir();
   const fileName = newDrawingFileName(id, mime);
   const bytes = await file.arrayBuffer();
-  await writeFile(join(dir, fileName), Buffer.from(bytes));
+  const fileBuf = Buffer.from(bytes);
+  if (!verifyFileMime(fileBuf, mime))
+    return NextResponse.json(
+      { error: "Nội dung file không khớp định dạng khai báo (Content-Type giả mạo?)" },
+      { status: 415 },
+    );
+  await writeFile(join(dir, fileName), fileBuf);
 
   // Xoá file cũ sau khi ghi file mới thành công
   if (wp.drawingFileName) {

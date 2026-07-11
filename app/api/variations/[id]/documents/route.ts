@@ -4,7 +4,13 @@ import { join } from "node:path";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
-import { ensureUploadDir, extForDocMime, newVoDocFileName, MAX_DOC_BYTES } from "@/lib/photos";
+import {
+  ensureUploadDir,
+  extForDocMime,
+  verifyFileMime,
+  newVoDocFileName,
+  MAX_DOC_BYTES,
+} from "@/lib/photos";
 import { canEditVo } from "@/lib/vo";
 
 export const dynamic = "force-dynamic";
@@ -92,10 +98,17 @@ export async function POST(
       { status: 413 },
     );
 
+  const fileBuf = Buffer.from(await file.arrayBuffer());
+  if (!verifyFileMime(fileBuf, file.type))
+    return NextResponse.json(
+      { error: "Nội dung file không khớp định dạng khai báo (Content-Type giả mạo?)" },
+      { status: 415 },
+    );
+
   const caption = String(form.get("caption") ?? "").trim() || null;
   const fileName = newVoDocFileName(voId, file.type);
   const dir = ensureUploadDir();
-  await writeFile(join(dir, fileName), Buffer.from(await file.arrayBuffer()));
+  await writeFile(join(dir, fileName), fileBuf);
 
   const id = await insertId(
     `INSERT INTO vo_documents (vo_id, file_name, original_name, mime_type, size_bytes, caption, uploaded_by)

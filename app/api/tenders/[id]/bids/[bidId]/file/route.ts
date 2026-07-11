@@ -7,6 +7,7 @@ import { getCurrentProjectId } from "@/lib/projects";
 import {
   ensureUploadDir,
   extForDocMime,
+  verifyFileMime,
   newTenderBidFileName,
   photoPath,
   MAX_DOC_BYTES,
@@ -112,6 +113,13 @@ export async function POST(
       { status: 413 },
     );
 
+  const fileBuf = Buffer.from(await file.arrayBuffer());
+  if (!verifyFileMime(fileBuf, file.type))
+    return NextResponse.json(
+      { error: "Nội dung file không khớp định dạng khai báo (Content-Type giả mạo?)" },
+      { status: 415 },
+    );
+
   // Xoá file cũ nếu có (mỗi báo giá chỉ giữ 1 file chào thầu gốc).
   if (bid.fileName) {
     const oldPath = photoPath(bid.fileName);
@@ -123,7 +131,7 @@ export async function POST(
 
   const fileName = newTenderBidFileName(bidId, file.type);
   const dir = ensureUploadDir();
-  await writeFile(join(dir, fileName), Buffer.from(await file.arrayBuffer()));
+  await writeFile(join(dir, fileName), fileBuf);
 
   await run(
     `UPDATE tender_bids SET file_name = ?, original_name = ?, mime_type = ?, size_bytes = ? WHERE id = ?`,
