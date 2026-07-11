@@ -7,7 +7,9 @@ import AxeBuilder from "@axe-core/playwright";
 
 async function gotoFinance(page: Page) {
   await page.goto("/finance");
-  await expect(page.getByText("Tài chính – Kế toán", { exact: false }).first()).toBeVisible({
+  await expect(
+    page.locator("header").getByText("Tài chính – Kế toán", { exact: false }).first(),
+  ).toBeVisible({
     timeout: 15_000,
   });
 }

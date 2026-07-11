@@ -8,12 +8,14 @@ import AxeBuilder from "@axe-core/playwright";
 // Test này KHÔNG bấm chọn dự án khác (chỉ có 1 dự án nên cũng không có lựa chọn khác)
 // để tránh side-effect đổi cookie project rò sang test khác dùng chung storageState.
 
+// M37 PR 2.4: sidebar desktop (#app-sidebar, luôn mount) và drawer mobile
+// (#app-sidebar-mobile, mount có điều kiện khi mở) là 2 phần tử DOM khác nhau.
 async function openSwitcher(page: Page, isMobile: boolean) {
   await page.goto("/");
   if (isMobile) {
     await page.getByRole("button", { name: "Mở menu" }).click();
   }
-  const sidebar = page.locator("#app-sidebar");
+  const sidebar = page.locator(isMobile ? "#app-sidebar-mobile" : "#app-sidebar");
   await expect(sidebar).toBeVisible({ timeout: 15_000 });
 
   // exact: true — tránh khớp nhầm nút ghim "Ghim TT AVIO Tháp A" trong panel khi đang mở.

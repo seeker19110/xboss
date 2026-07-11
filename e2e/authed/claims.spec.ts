@@ -6,7 +6,9 @@ import AxeBuilder from "@axe-core/playwright";
 
 async function gotoClaims(page: Page) {
   await page.goto("/claims");
-  await expect(page.getByText("Claim chi phí & EOT", { exact: false }).first()).toBeVisible({
+  await expect(
+    page.locator("header").getByText("Claim chi phí & EOT", { exact: false }).first(),
+  ).toBeVisible({
     timeout: 15_000,
   });
 }

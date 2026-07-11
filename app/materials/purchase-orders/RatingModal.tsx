@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Star, X } from "lucide-react";
+import { Modal } from "@/app/components/dialogs";
 
 type PO = { id: number; poCode: string; supplierId: number | null; supplierName: string | null };
 
@@ -73,58 +74,56 @@ export default function RatingModal({ po, onClose }: { po: PO; onClose: () => vo
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-zinc-800 border border-zinc-700 rounded-xl w-full max-w-md p-6">
-        <div className="flex justify-between items-center mb-4">
-          <div>
-            <h3 className="font-bold text-lg">Đánh giá nhà cung cấp</h3>
-            <p className="text-sm text-zinc-400">
-              {po.poCode}
-              {po.supplierName ? ` – ${po.supplierName}` : ""}
-            </p>
-          </div>
-          <button onClick={onClose} aria-label="Đóng" className="text-zinc-400 hover:text-zinc-100">
-            <X className="w-5 h-5" />
-          </button>
+    <Modal onClose={onClose} className="max-w-md p-6">
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <h3 className="font-bold text-lg">Đánh giá nhà cung cấp</h3>
+          <p className="text-sm text-zinc-400">
+            {po.poCode}
+            {po.supplierName ? ` – ${po.supplierName}` : ""}
+          </p>
         </div>
+        <button onClick={onClose} aria-label="Đóng" className="text-zinc-400 hover:text-zinc-100">
+          <X className="w-5 h-5" />
+        </button>
+      </div>
 
-        {error && (
-          <div className="mb-3 p-2.5 bg-red-900/50 border border-red-700 rounded text-sm">
-            {error}
-          </div>
-        )}
-
-        <div className="space-y-4 mb-5">
-          <StarInput label="Chất lượng hàng" value={quality} onChange={setQuality} />
-          <StarInput label="Giao hàng đúng hẹn" value={delivery} onChange={setDelivery} />
-          <StarInput label="Giá cả" value={price} onChange={setPrice} />
-          <div>
-            <label className="text-xs text-zinc-400 mb-1 block">Ghi chú</label>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={2}
-              className="w-full bg-zinc-700 border border-zinc-600 rounded px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-blue-500 resize-none"
-            />
-          </div>
+      {error && (
+        <div className="mb-3 p-2.5 bg-red-900/50 border border-red-700 rounded text-sm">
+          {error}
         </div>
+      )}
 
-        <div className="flex gap-2">
-          <button
-            onClick={submit}
-            disabled={saving}
-            className="flex items-center gap-2 bg-amber-700 hover:bg-amber-600 disabled:opacity-50 px-5 py-2.5 rounded text-sm font-medium text-on-accent"
-          >
-            <Star className="w-4 h-4" /> Lưu đánh giá
-          </button>
-          <button
-            onClick={onClose}
-            className="px-5 py-2.5 rounded bg-zinc-700 hover:bg-zinc-600 text-sm"
-          >
-            Huỷ
-          </button>
+      <div className="space-y-4 mb-5">
+        <StarInput label="Chất lượng hàng" value={quality} onChange={setQuality} />
+        <StarInput label="Giao hàng đúng hẹn" value={delivery} onChange={setDelivery} />
+        <StarInput label="Giá cả" value={price} onChange={setPrice} />
+        <div>
+          <label className="text-xs text-zinc-400 mb-1 block">Ghi chú</label>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={2}
+            className="w-full bg-zinc-700 border border-zinc-600 rounded px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-blue-500 resize-none"
+          />
         </div>
       </div>
-    </div>
+
+      <div className="flex gap-2">
+        <button
+          onClick={submit}
+          disabled={saving}
+          className="flex items-center gap-2 bg-amber-700 hover:bg-amber-600 disabled:opacity-50 px-5 py-2.5 rounded text-sm font-medium text-on-accent"
+        >
+          <Star className="w-4 h-4" /> Lưu đánh giá
+        </button>
+        <button
+          onClick={onClose}
+          className="px-5 py-2.5 rounded bg-zinc-700 hover:bg-zinc-600 text-sm"
+        >
+          Huỷ
+        </button>
+      </div>
+    </Modal>
   );
 }

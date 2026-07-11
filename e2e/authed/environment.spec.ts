@@ -7,7 +7,9 @@ import AxeBuilder from "@axe-core/playwright";
 
 async function gotoEnvironment(page: Page) {
   await page.goto("/environment");
-  await expect(page.getByText("Môi trường & Giấy phép", { exact: false }).first()).toBeVisible({
+  await expect(
+    page.locator("header").getByText("Môi trường & Giấy phép", { exact: false }).first(),
+  ).toBeVisible({
     timeout: 15_000,
   });
 }

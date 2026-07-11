@@ -171,7 +171,7 @@ export default function VariationsPage() {
               ["rejected", "Từ chối"],
             ] as const
           ).map(([key, label]) => (
-            <div key={key} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+            <div key={key} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
               <p className="text-xs text-zinc-400 uppercase tracking-wide">{label}</p>
               <p className="text-lg font-semibold mt-1">{fmtVND(totals[key])}</p>
             </div>

@@ -875,7 +875,7 @@ export default function AdminPage() {
                       <button
                         onClick={() => deleteProject(p.id, p.name)}
                         aria-label={`Xoá dự án ${p.name}`}
-                        className="p-1.5 rounded text-zinc-500 hover:text-red-200 hover:bg-red-950"
+                        className="p-1.5 rounded text-zinc-500 hover:text-red-300 hover:bg-red-950/40"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>

@@ -7,7 +7,9 @@ import AxeBuilder from "@axe-core/playwright";
 
 async function gotoWarranty(page: Page) {
   await page.goto("/warranty");
-  await expect(page.getByText("Bảo hành – Bảo trì", { exact: false }).first()).toBeVisible({
+  await expect(
+    page.locator("header").getByText("Bảo hành – Bảo trì", { exact: false }).first(),
+  ).toBeVisible({
     timeout: 15_000,
   });
 }

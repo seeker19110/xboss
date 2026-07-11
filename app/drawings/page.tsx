@@ -319,7 +319,7 @@ function DrawingsPageInner() {
                     <button
                       key={d.id}
                       onClick={() => setSelectedId(d.id)}
-                      className="text-left bg-zinc-900 border border-zinc-800 hover:border-zinc-600 rounded-xl p-3 transition"
+                      className="text-left bg-zinc-900 border border-zinc-800 hover:border-zinc-600 rounded-xl p-4 transition"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -792,7 +792,7 @@ function DrawingDetailModal({
                 const StatusIcon = STATUS_ICON[r.status];
                 const isBusy = busyRevId === r.id;
                 return (
-                  <div key={r.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+                  <div key={r.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
                     <div className="flex items-start justify-between gap-3 flex-wrap">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-lg">{r.rev}</span>
@@ -1177,7 +1177,7 @@ function DesignChangesTab({
               <button
                 key={dc.id}
                 onClick={() => setSelectedId(dc.id)}
-                className="text-left bg-zinc-900 border border-zinc-800 hover:border-zinc-600 rounded-xl p-3 transition"
+                className="text-left bg-zinc-900 border border-zinc-800 hover:border-zinc-600 rounded-xl p-4 transition"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">

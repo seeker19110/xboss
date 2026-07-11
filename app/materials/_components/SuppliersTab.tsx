@@ -721,7 +721,7 @@ export default function SuppliersTab({ role }: { role: string }) {
                       {canDelete && (
                         <button
                           onClick={() => del(s.id, s.name)}
-                          className="p-1.5 rounded hover:bg-red-900 text-zinc-400 hover:text-red-200"
+                          className="p-1.5 rounded text-zinc-500 hover:text-red-300 hover:bg-red-950/40"
                           title="Xoá"
                         >
                           <Trash2 className="w-3.5 h-3.5" />

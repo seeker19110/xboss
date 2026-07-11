@@ -7,7 +7,9 @@ import AxeBuilder from "@axe-core/playwright";
 
 async function gotoKickoff(page: Page) {
   await page.goto("/kickoff");
-  await expect(page.getByText("Khởi động & Pháp lý", { exact: false }).first()).toBeVisible({
+  await expect(
+    page.locator("header").getByText("Khởi động & Pháp lý", { exact: false }).first(),
+  ).toBeVisible({
     timeout: 15_000,
   });
 }

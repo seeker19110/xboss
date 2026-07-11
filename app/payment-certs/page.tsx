@@ -196,11 +196,11 @@ function PaymentCertsInner() {
 
             {contract && (
               <div className="grid grid-cols-3 gap-3">
-                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
                   <p className="text-xs text-zinc-400 uppercase tracking-wide">Giá trị HĐ</p>
                   <p className="text-lg font-semibold mt-1">{fmtVND(contractValue)}</p>
                 </div>
-                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
                   <p className="text-xs text-zinc-400 uppercase tracking-wide">Luỹ kế đã duyệt</p>
                   <p
                     className={`text-lg font-semibold mt-1 ${approvedCumulative > contractValue ? "text-rose-300" : ""}`}
@@ -208,7 +208,7 @@ function PaymentCertsInner() {
                     {fmtVND(approvedCumulative)}
                   </p>
                 </div>
-                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
                   <p className="text-xs text-zinc-400 uppercase tracking-wide">% dùng</p>
                   <p className="text-lg font-semibold mt-1">
                     {contractValue > 0 ? Math.round((approvedCumulative / contractValue) * 100) : 0}

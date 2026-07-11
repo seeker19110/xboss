@@ -157,7 +157,7 @@ export default function ContractsPage() {
       <main className="p-4 sm:p-6 pb-24 space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {(["nhan_thau", "giao_thau", "ncc"] as ContractKind[]).map((kind) => (
-            <div key={kind} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+            <div key={kind} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
               <p className="text-xs text-zinc-400 uppercase tracking-wide">{KIND_LABEL[kind]}</p>
               <p className="text-lg font-semibold mt-1">{fmtVND(kindTotals[kind].total)}</p>
               <p className="text-xs text-zinc-400 mt-1">

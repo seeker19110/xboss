@@ -5,7 +5,9 @@ import AxeBuilder from "@axe-core/playwright";
 
 async function gotoMaterialsImport(page: Page) {
   await page.goto("/materials/import");
-  await expect(page.getByText("Import vật tư", { exact: false }).first()).toBeVisible({
+  await expect(
+    page.locator("header").getByText("Import vật tư", { exact: false }).first(),
+  ).toBeVisible({
     timeout: 15_000,
   });
 }

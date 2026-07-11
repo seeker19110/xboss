@@ -324,7 +324,7 @@ export default function VehiclesPage() {
                       <button
                         onClick={() => doAction(v, "cancel", `Huỷ đăng ký xe ${v.plate}?`)}
                         aria-label={`Huỷ đăng ký xe ${v.plate}`}
-                        className="p-3 rounded-lg hover:bg-red-900 text-zinc-400 hover:text-red-200"
+                        className="p-3 rounded-lg text-zinc-500 hover:text-red-300 hover:bg-red-950/40"
                       >
                         <Ban className="w-4 h-4" />
                       </button>

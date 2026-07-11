@@ -7,7 +7,9 @@ import AxeBuilder from "@axe-core/playwright";
 
 async function gotoHandover(page: Page) {
   await page.goto("/handover");
-  await expect(page.getByText("Bàn giao & Kết thúc", { exact: false }).first()).toBeVisible({
+  await expect(
+    page.locator("header").getByText("Bàn giao & Kết thúc", { exact: false }).first(),
+  ).toBeVisible({
     timeout: 15_000,
   });
 }

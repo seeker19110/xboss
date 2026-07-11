@@ -7,9 +7,14 @@ import AxeBuilder from "@axe-core/playwright";
 
 async function gotoAttendance(page: Page) {
   await page.goto("/attendance");
-  await expect(page.getByText("Chấm công", { exact: false }).first()).toBeVisible({
-    timeout: 15_000,
-  });
+  // M37 PR2.4: aside desktop (sidebar) luôn mount, chỉ ẩn qua CSS trên mobile — nhãn nav
+  // trùng tên trang vẫn khớp getByText() dù đang display:none. Text thật ra chỉ render qua
+  // prop title của AppHeader (bên trong <header>), không có trong <main> — scope vào header.
+  await expect(page.locator("header").getByText("Chấm công", { exact: false }).first()).toBeVisible(
+    {
+      timeout: 15_000,
+    },
+  );
 }
 
 test.describe("Chấm công (sau đăng nhập)", () => {

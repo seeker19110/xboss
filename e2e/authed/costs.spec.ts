@@ -6,9 +6,11 @@ import AxeBuilder from "@axe-core/playwright";
 
 async function gotoCosts(page: Page) {
   await page.goto("/costs");
-  await expect(page.getByText("Ngân sách", { exact: false }).first()).toBeVisible({
-    timeout: 15_000,
-  });
+  await expect(page.locator("header").getByText("Ngân sách", { exact: false }).first()).toBeVisible(
+    {
+      timeout: 15_000,
+    },
+  );
 }
 
 test.describe("Chi phí (sau đăng nhập)", () => {

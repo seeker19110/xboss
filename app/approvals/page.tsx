@@ -351,7 +351,7 @@ export default function ApprovalsPage() {
                 <button
                   onClick={() => unapproveFloor(g)}
                   disabled={isBusy}
-                  className="text-xs bg-red-950 hover:bg-red-900 disabled:opacity-50 border border-red-900 text-red-200 rounded-lg px-2 py-1 transition"
+                  className="text-xs bg-red-700 hover:bg-red-600 disabled:opacity-50 text-on-accent rounded-lg px-2 py-1 transition"
                 >
                   Huỷ NT
                 </button>

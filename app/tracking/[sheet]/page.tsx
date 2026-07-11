@@ -881,7 +881,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
               {isAdmin && (
                 <button
                   onClick={deleteSheet}
-                  className="flex items-center gap-1 px-3 py-1.5 text-sm text-red-200 hover:bg-red-950 rounded-lg"
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm text-zinc-500 hover:text-red-300 hover:bg-red-950/40 rounded-lg"
                 >
                   <Trash2 className="w-3.5 h-3.5" /> Xoá trang
                 </button>
@@ -2176,7 +2176,7 @@ function PkgGrid({
                     <button
                       onClick={deleteVariantColumns}
                       title={`Xoá ${variantColumns.length} cột biến thể (2)(3)(4) khỏi DB`}
-                      className="w-6 h-6 flex items-center justify-center text-zinc-600 hover:text-red-200 hover:bg-red-950 rounded"
+                      className="w-6 h-6 flex items-center justify-center text-zinc-500 hover:text-red-300 hover:bg-red-950/40 rounded"
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>

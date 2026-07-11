@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 // AppShell (M0) — sidebar trái thu gọn được + title/breadcrumb trên topbar.
@@ -7,10 +7,22 @@ import AxeBuilder from "@axe-core/playwright";
 // sidebar gom theo 11 cụm nghiệp vụ, dashboard nhóm nhiều trang gập/mở được (nhớ
 // localStorage, mặc định mở), + mục "Sắp có" cho dashboard mockup chưa có trang thật.
 
+// M37 PR 2.4: sidebar desktop (<aside id="app-sidebar">, luôn mount, ẩn dưới lg qua CSS)
+// và drawer mobile (<Modal id="app-sidebar-mobile">, mount có điều kiện khi mở) là 2
+// phần tử DOM khác nhau — không còn 1 phần tử off-canvas dùng chung cho cả 2 như trước.
+// Helper này trả về đúng locator theo viewport đang chạy test (mở menu trước nếu mobile).
+async function openSidebar(page: Page, isMobile: boolean) {
+  if (isMobile) {
+    await page.getByRole("button", { name: "Mở menu" }).click();
+    return page.locator("#app-sidebar-mobile");
+  }
+  return page.locator("#app-sidebar");
+}
+
 test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
-  test("sidebar render đủ nhóm menu theo vai trò Admin", async ({ page }) => {
+  test("sidebar render đủ nhóm menu theo vai trò Admin", async ({ page, isMobile }) => {
     await page.goto("/");
-    const sidebar = page.locator("#app-sidebar");
+    const sidebar = await openSidebar(page, isMobile);
     await expect(sidebar.getByRole("link", { name: "Dashboard" })).toBeVisible({
       timeout: 15_000,
     });
@@ -73,10 +85,7 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     isMobile,
   }) => {
     await page.goto("/");
-    if (isMobile) {
-      await page.getByRole("button", { name: "Mở menu" }).click();
-    }
-    const sidebar = page.locator("#app-sidebar");
+    const sidebar = await openSidebar(page, isMobile);
     await expect(sidebar.getByRole("link", { name: "Dashboard" })).toBeVisible({
       timeout: 15_000,
     });
@@ -98,10 +107,7 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     isMobile,
   }) => {
     await page.goto("/"); // Dashboard tổng — không nằm trong nhóm "Tiến độ" nên không bị ép mở.
-    if (isMobile) {
-      await page.getByRole("button", { name: "Mở menu" }).click();
-    }
-    const sidebar = page.locator("#app-sidebar");
+    const sidebar = await openSidebar(page, isMobile);
     const toggle = sidebar.getByRole("button", { name: "Tiến độ" });
     await expect(toggle).toBeVisible({ timeout: 15_000 });
     const tienDoGroup = toggle.locator("xpath=..");
@@ -134,10 +140,7 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     isMobile,
   }) => {
     await page.goto("/");
-    if (isMobile) {
-      await page.getByRole("button", { name: "Mở menu" }).click();
-    }
-    const sidebar = page.locator("#app-sidebar");
+    const sidebar = await openSidebar(page, isMobile);
     const toggle = sidebar.getByRole("button", { name: "Tiến độ" });
     await expect(toggle).toBeVisible({ timeout: 15_000 });
     // "Tổng quan" xuất hiện ở mọi nhóm — thu hẹp về đúng nhóm "Tiến độ" (div bọc ngoài button).
@@ -212,9 +215,14 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     await expect(sidebar).toHaveCSS("width", "240px");
   });
 
-  test("không có vi phạm a11y nghiêm trọng (axe) — desktop", async ({ page }) => {
+  test("không có vi phạm a11y nghiêm trọng (axe) — desktop", async ({ page, isMobile }) => {
     await page.goto("/");
-    await expect(page.getByRole("link", { name: "Dashboard" })).toBeVisible({ timeout: 15_000 });
+    // Trên mobile, "Dashboard" chỉ vào được accessibility tree sau khi mở drawer (Modal
+    // mount có điều kiện, xem M37 PR2.4) — mở trước để axe soát đúng trạng thái thật.
+    const sidebar = await openSidebar(page, isMobile);
+    await expect(sidebar.getByRole("link", { name: "Dashboard" })).toBeVisible({
+      timeout: 15_000,
+    });
 
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
@@ -231,32 +239,32 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     await page.goto("/");
     await expect(page.getByRole("button", { name: "Mở menu" })).toBeVisible({ timeout: 15_000 });
 
-    // Sidebar tồn tại trong DOM (off-canvas) nhưng chưa hiện tới khi chưa mở drawer.
-    await expect(page.locator("#app-sidebar")).not.toBeInViewport();
+    // Drawer dùng Modal (mount có điều kiện, M37 PR2.4) — chưa mở thì không tồn tại trong DOM.
+    await expect(page.locator("#app-sidebar-mobile")).toHaveCount(0);
 
     await page.getByRole("button", { name: "Mở menu" }).click();
-    await expect(page.locator("#app-sidebar")).toBeInViewport();
+    await expect(page.locator("#app-sidebar-mobile")).toBeInViewport();
     await expect(page.getByRole("link", { name: "Vật tư" })).toBeVisible();
 
     await page.getByRole("button", { name: "Đóng menu" }).click();
-    await expect(page.locator("#app-sidebar")).not.toBeInViewport();
+    await expect(page.locator("#app-sidebar-mobile")).toHaveCount(0);
   });
 
   test("drawer mobile đóng bằng phím Esc", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
     await page.getByRole("button", { name: "Mở menu" }).click();
-    await expect(page.locator("#app-sidebar")).toBeInViewport();
+    await expect(page.locator("#app-sidebar-mobile")).toBeInViewport();
 
     await page.keyboard.press("Escape");
-    await expect(page.locator("#app-sidebar")).not.toBeInViewport();
+    await expect(page.locator("#app-sidebar-mobile")).toHaveCount(0);
   });
 
   test("drawer mobile bẫy focus — Tab không thoát ra ngoài overlay", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
     await page.getByRole("button", { name: "Mở menu" }).click();
-    const sidebar = page.locator("#app-sidebar");
+    const sidebar = page.locator("#app-sidebar-mobile");
     await expect(sidebar).toBeInViewport();
 
     // Mở drawer tự đưa focus vào bên trong sidebar (nút đóng hoặc mục menu đầu tiên).
@@ -264,7 +272,7 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
       const insideOnOpen = await page.evaluate(
         () =>
           !!document.activeElement &&
-          !!document.getElementById("app-sidebar")?.contains(document.activeElement),
+          !!document.getElementById("app-sidebar-mobile")?.contains(document.activeElement),
       );
       expect(insideOnOpen).toBe(true);
     }).toPass({ timeout: 2_000 });
@@ -274,7 +282,7 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     const stillInside = await page.evaluate(
       () =>
         !!document.activeElement &&
-        !!document.getElementById("app-sidebar")?.contains(document.activeElement),
+        !!document.getElementById("app-sidebar-mobile")?.contains(document.activeElement),
     );
     expect(stillInside).toBe(true);
     await expect(sidebar).toBeInViewport();

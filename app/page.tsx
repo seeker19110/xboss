@@ -330,7 +330,7 @@ export default function Dashboard() {
         {/* ── Card hệ (M15) — nhìn nhanh từng hệ, bấm vào trang hub riêng ── */}
         {systems.length > 0 && (
           <section>
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-3">
               Theo hệ thi công
             </h2>
             <div className="flex gap-3 overflow-x-auto scrollbar-none pb-1">
@@ -365,7 +365,7 @@ export default function Dashboard() {
         <section>
           {/* Tổng trễ — banner nổi bật */}
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-400">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
               Tổng quan tiến độ
             </h2>
             {canImport && (
@@ -390,20 +390,21 @@ export default function Dashboard() {
           {(data?.totalDelayed ?? 0) > 0 && (
             <a
               href="#delayed-table"
-              className="flex items-center gap-4 bg-red-950 border border-red-900/60 rounded-xl px-5 py-4 mb-4 hover:bg-red-900 transition"
+              className="flex items-center gap-4 bg-red-950/20 border border-red-900/50 rounded-xl px-5 py-4 mb-4 hover:bg-red-950/30 transition"
             >
-              <div className="p-2.5 bg-red-900/50 rounded-lg shrink-0">
+              <div className="p-2.5 bg-red-950/30 rounded-lg shrink-0">
                 <TrendingDown className="w-5 h-5 text-red-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-red-200 uppercase tracking-wide font-medium mb-0.5">
+                {/* Nền tint mờ (bg-red-950/20) đổi độ sáng nhiều theo theme — text-red-400 không
+                    đủ tương phản AA trên nền đã sáng ở theme sáng (đo axe: 2.93 < 4.5). Dùng
+                    token zinc thích ứng cho chữ (đảm bảo AA mọi theme), giữ sắc đỏ ở icon/nền/viền. */}
+                <p className="text-xs text-zinc-400 uppercase tracking-wider font-medium mb-0.5">
                   Tổng công việc đang trễ
                 </p>
-                <p className="text-4xl font-bold text-red-200 leading-none">
-                  {data?.totalDelayed ?? 0}
-                </p>
+                <p className="text-4xl font-bold leading-none">{data?.totalDelayed ?? 0}</p>
               </div>
-              <span className="flex items-center gap-1 text-xs text-red-200 hover:text-red-300 transition shrink-0">
+              <span className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 transition shrink-0">
                 Xem chi tiết <ChevronRight className="w-3.5 h-3.5" />
               </span>
             </a>
@@ -476,7 +477,7 @@ export default function Dashboard() {
                           deleteSheet(k.sheetId, k.sheetType);
                         }}
                         title="Xoá trang tracking"
-                        className="absolute top-2 right-2 p-1 rounded-md bg-zinc-800/80 text-zinc-600 hover:bg-red-900 hover:text-red-200 opacity-100 sm:opacity-0 sm:group-hover/wrap:opacity-100 transition z-10"
+                        className="absolute top-2 right-2 p-1 rounded-md bg-zinc-800/80 text-zinc-500 hover:text-red-300 hover:bg-red-950/40 opacity-100 sm:opacity-0 sm:group-hover/wrap:opacity-100 transition z-10"
                       >
                         <Trash2 className="w-3 h-3" />
                       </button>
@@ -528,7 +529,7 @@ export default function Dashboard() {
           <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
             <div className="flex items-center gap-2 mb-1">
               <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-              <h2 className="text-sm font-semibold text-zinc-200">
+              <h2 className="text-base font-semibold text-zinc-100">
                 <EditableText tkey="dashboard.pareto.title">Nguyên nhân trễ (Pareto)</EditableText>
               </h2>
             </div>
@@ -593,7 +594,7 @@ export default function Dashboard() {
         >
           {/* Header + filter */}
           <div className="px-5 py-4 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center gap-3">
-            <h2 className="flex items-center gap-2 font-semibold text-sm shrink-0">
+            <h2 className="flex items-center gap-2 font-semibold text-base text-zinc-100 shrink-0">
               <Clock className="w-4 h-4 text-red-400" />
               <EditableText tkey="dashboard.delayed.title">
                 Danh sách công việc đang trễ

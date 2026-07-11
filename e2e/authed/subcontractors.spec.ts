@@ -21,7 +21,9 @@ test.describe("Nhà thầu phụ (sau đăng nhập)", () => {
     if (isMobile) {
       await page.getByRole("button", { name: "Mở menu" }).click();
     }
-    const sidebar = page.locator("#app-sidebar");
+    // M37 PR 2.4: sidebar desktop (#app-sidebar) và drawer mobile (#app-sidebar-mobile,
+    // mount có điều kiện khi mở) là 2 phần tử DOM khác nhau.
+    const sidebar = page.locator(isMobile ? "#app-sidebar-mobile" : "#app-sidebar");
     const link = sidebar.getByRole("link", { name: "Nhà thầu phụ", exact: true });
     await expect(link).toBeVisible({ timeout: 15_000 });
     await link.click();
