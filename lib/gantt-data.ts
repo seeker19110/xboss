@@ -25,15 +25,15 @@ const DAY_MS = 86400_000;
 const d2n = (s: string) => new Date(s + "T00:00:00Z").getTime();
 
 // Dựng CpmNode[]/CpmEdge[] cho `computeCpm` + map thông tin đầy đủ từng nhóm (meta) —
-// lọc theo hệ nếu có `disciplineId` (null = toàn dự án). `meta` giữ đúng thứ tự sort gốc
+// lọc theo hệ nếu có `systemId` (null = toàn dự án). `meta` giữ đúng thứ tự sort gốc
 // (st.id, wp.start_date, wp.id) nên `[...meta.values()]` dùng lại được như mảng `bars` cũ.
-export async function getCpmData(disciplineId: number | null): Promise<{
+export async function getCpmData(systemId: number | null): Promise<{
   nodes: CpmNode[];
   edges: DepRow[];
   meta: Map<number, PackageMeta>;
 }> {
-  const heFilter = disciplineId !== null ? "AND st.discipline_id = ?" : "";
-  const heParams = disciplineId !== null ? [disciplineId] : [];
+  const systemFilter = systemId !== null ? "AND st.system_id = ?" : "";
+  const systemParams = systemId !== null ? [systemId] : [];
 
   const bars = await query<PackageMeta>(
     `SELECT wp.id, wp.code, wp.name, wp.floor_label AS "floorLabel",
@@ -42,9 +42,9 @@ export async function getCpmData(disciplineId: number | null): Promise<{
        FROM work_packages wp
        JOIN sheet_types st ON wp.sheet_type_id = st.id
       WHERE wp.start_date IS NOT NULL AND wp.end_date IS NOT NULL
-        ${heFilter}
+        ${systemFilter}
       ORDER BY st.id, wp.start_date, wp.id`,
-    ...heParams,
+    ...systemParams,
   );
 
   // Phụ thuộc không lọc theo hệ (giữ nguyên hành vi gốc — việc trước có thể thuộc hệ

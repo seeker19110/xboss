@@ -9,12 +9,12 @@ import { listContracts } from "@/lib/contracts";
 
 const PERIOD_RE = /^\d{4}-(Q[1-4]|\d{2})$/;
 
-// ===== Danh sách NTP (suppliers có ít nhất 1 dòng discipline_contractors, M15) =====
+// ===== Danh sách NTP (suppliers có ít nhất 1 dòng system_contractors, M15) =====
 
-export type SubcontractorDiscipline = {
-  disciplineId: number;
-  disciplineCode: string;
-  disciplineName: string;
+export type SubcontractorSystem = {
+  systemId: number;
+  systemCode: string;
+  systemName: string;
   zone: string | null;
   floorLabels: string[] | null;
   isPrimary: boolean;
@@ -25,7 +25,7 @@ export type SubcontractorListRow = {
   name: string;
   phone: string | null;
   email: string | null;
-  disciplines: SubcontractorDiscipline[];
+  systems: SubcontractorSystem[];
   orgChartNote: string | null;
   siteRepName: string | null;
   siteRepPhone: string | null;
@@ -34,7 +34,7 @@ export type SubcontractorListRow = {
 
 // projectId (M22 pattern): undefined = không lọc; có giá trị → chỉ ẩn NTP đã gắn hồ sơ
 // (subcontractor_profiles.project_id) cho MỘT dự án khác — hồ sơ chưa gán dự án nào
-// vẫn hiện ở mọi dự án (discipline_contractors/suppliers chưa có cột project_id).
+// vẫn hiện ở mọi dự án (system_contractors/suppliers chưa có cột project_id).
 export async function listSubcontractors(projectId?: number): Promise<SubcontractorListRow[]> {
   const conds = ["dc.supplier_id IS NOT NULL"];
   const args: unknown[] = [];
@@ -44,20 +44,20 @@ export async function listSubcontractors(projectId?: number): Promise<Subcontrac
   }
   return query<SubcontractorListRow>(
     `SELECT s.id, s.name, s.phone, s.email,
-            COALESCE(disc.disciplines, '[]') AS disciplines,
+            COALESCE(disc.systems, '[]') AS systems,
             p.org_chart_note AS "orgChartNote", p.site_rep_name AS "siteRepName",
             p.site_rep_phone AS "siteRepPhone", p.capability_summary AS "capabilitySummary"
        FROM suppliers s
-       JOIN (SELECT DISTINCT supplier_id FROM discipline_contractors) dc ON dc.supplier_id = s.id
+       JOIN (SELECT DISTINCT supplier_id FROM system_contractors) dc ON dc.supplier_id = s.id
        LEFT JOIN subcontractor_profiles p ON p.supplier_id = s.id
        LEFT JOIN (
          SELECT x.supplier_id,
                 json_agg(json_build_object(
-                  'disciplineId', x.discipline_id, 'disciplineCode', d.code, 'disciplineName', d.name,
+                  'systemId', x.system_id, 'systemCode', d.code, 'systemName', d.name,
                   'zone', x.zone, 'floorLabels', x.floor_labels, 'isPrimary', x.is_primary
-                ) ORDER BY d.code) AS disciplines
-           FROM discipline_contractors x
-           JOIN disciplines d ON d.id = x.discipline_id
+                ) ORDER BY d.code) AS systems
+           FROM system_contractors x
+           JOIN systems d ON d.id = x.system_id
           GROUP BY x.supplier_id
        ) disc ON disc.supplier_id = s.id
       WHERE ${conds.join(" AND ")}
@@ -266,7 +266,7 @@ export type SubcontractorDetail = {
   email: string | null;
   address: string | null;
   note: string | null;
-  disciplines: SubcontractorDiscipline[];
+  systems: SubcontractorSystem[];
   profile: SubcontractorProfileInput | null;
   documents: SubconDocumentRow[];
   evaluations: EvaluationRow[];
@@ -285,11 +285,11 @@ export async function getSubcontractor(supplierId: number): Promise<Subcontracto
   }>(`SELECT id, name, phone, email, address, note FROM suppliers WHERE id = ?`, supplierId);
   if (!supplier) return null;
 
-  const disciplineRows = await query<SubcontractorDiscipline>(
-    `SELECT dc.discipline_id AS "disciplineId", d.code AS "disciplineCode", d.name AS "disciplineName",
+  const systemRows = await query<SubcontractorSystem>(
+    `SELECT dc.system_id AS "systemId", d.code AS "systemCode", d.name AS "systemName",
             dc.zone, dc.floor_labels AS "floorLabels", dc.is_primary AS "isPrimary"
-       FROM discipline_contractors dc
-       JOIN disciplines d ON d.id = dc.discipline_id
+       FROM system_contractors dc
+       JOIN systems d ON d.id = dc.system_id
       WHERE dc.supplier_id = ?
       ORDER BY d.code`,
     supplierId,
@@ -318,7 +318,7 @@ export async function getSubcontractor(supplierId: number): Promise<Subcontracto
 
   return {
     ...supplier,
-    disciplines: disciplineRows,
+    systems: systemRows,
     profile: profileRow
       ? {
           projectId: profileRow.projectId,

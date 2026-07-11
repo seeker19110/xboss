@@ -3,8 +3,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 // ===== Test tích hợp (cần Postgres riêng: đặt TEST_DATABASE_URL) =====
-// Seed 2 hệ (dùng danh mục disciplines đã seed sẵn: ket_cau/xay_to) × 1 sheet mỗi hệ ×
-// vài nhóm việc/task + 1 dependency tạo đường găng — kiểm `?he=` lọc đúng, critical/float
+// Seed 2 hệ (dùng danh mục systems đã seed sẵn: ket_cau/xay_to) × 1 sheet mỗi hệ ×
+// vài nhóm việc/task + 1 dependency tạo đường găng — kiểm `?system=` lọc đúng, critical/float
 // khớp computeCpm chạy tay, delayed/delayPareto đếm đúng theo delay_reason.
 
 test(
@@ -15,17 +15,13 @@ test(
     const { computeCpm } = await import("@/lib/cpm");
     const { getScheduleControlData } = await import("@/lib/schedule-control");
 
-    const ketCau = await queryOne<{ id: number }>(
-      `SELECT id FROM disciplines WHERE code = 'ket_cau'`,
-    );
-    const xayTo = await queryOne<{ id: number }>(
-      `SELECT id FROM disciplines WHERE code = 'xay_to'`,
-    );
-    assert.ok(ketCau && xayTo, "cần disciplines seed sẵn ket_cau/xay_to");
+    const ketCau = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'ket_cau'`);
+    const xayTo = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'xay_to'`);
+    assert.ok(ketCau && xayTo, "cần systems seed sẵn ket_cau/xay_to");
 
     // Hệ A (ket_cau): sheet + 3 nhóm việc nối chuỗi A→B→C tạo đường găng.
     const sheetAId = await insertId(
-      `INSERT INTO sheet_types (code, name, slug, discipline_id) VALUES ('SC-A', 'Sheet SC hệ A', 'sc-a', ?)`,
+      `INSERT INTO sheet_types (code, name, slug, system_id) VALUES ('SC-A', 'Sheet SC hệ A', 'sc-a', ?)`,
       ketCau!.id,
     );
     const wpAId = await insertId(
@@ -73,7 +69,7 @@ test(
 
     // Hệ B (xay_to): sheet + 1 nhóm riêng, không liên quan gì đến hệ A.
     const sheetBId = await insertId(
-      `INSERT INTO sheet_types (code, name, slug, discipline_id) VALUES ('SC-B', 'Sheet SC hệ B', 'sc-b', ?)`,
+      `INSERT INTO sheet_types (code, name, slug, system_id) VALUES ('SC-B', 'Sheet SC hệ B', 'sc-b', ?)`,
       xayTo!.id,
     );
     const wpEId = await insertId(
@@ -158,7 +154,7 @@ test(
       assert.equal(noneRow?.count, 1);
       assert.equal(noneRow, filtered.delayPareto[filtered.delayPareto.length - 1]);
 
-      // ── he không tồn tại → resolveDisciplineId trả -1 → rỗng, không lỗi ──
+      // ── system không tồn tại → resolveSystemId trả -1 → rỗng, không lỗi ──
       const empty = await getScheduleControlData(-1);
       assert.equal(empty.critical.length, 0);
       assert.equal(empty.delayed.length, 0);

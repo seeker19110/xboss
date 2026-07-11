@@ -72,7 +72,7 @@ export async function PATCH(
 
   const merged: Record<string, unknown> = {
     title: existing.title,
-    disciplineId: existing.disciplineId,
+    systemId: existing.systemId,
     drawingId: existing.drawingId,
     requestedByNote: existing.requestedByNote,
     reason: existing.reason,
@@ -92,11 +92,11 @@ export async function PATCH(
   const nextStatus = body.status === "assessing" ? "assessing" : existing.status;
 
   await run(
-    `UPDATE design_changes SET title = ?, discipline_id = ?, drawing_id = ?, requested_by_note = ?,
+    `UPDATE design_changes SET title = ?, system_id = ?, drawing_id = ?, requested_by_note = ?,
             reason = ?, impact_technical = ?, impact_cost = ?, impact_schedule = ?, status = ?
       WHERE id = ?`,
     input.title,
-    input.disciplineId,
+    input.systemId,
     input.drawingId,
     input.requestedByNote,
     input.reason,

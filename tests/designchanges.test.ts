@@ -9,7 +9,7 @@ test("validateDesignChangeInput: title/reason bắt buộc", async () => {
 
   const base = {
     title: "Đổi cao độ trần kỹ thuật tầng 5",
-    disciplineId: null,
+    systemId: null,
     drawingId: null,
     requestedByNote: null,
     reason: "TVGS yêu cầu tăng khoảng hở kỹ thuật",

@@ -37,10 +37,10 @@ type Contract = {
   partySupplierId: number | null;
   partySupplierName: string | null;
   partyName: string | null;
-  disciplineId: number | null;
-  disciplineCode: string | null;
-  disciplineName: string | null;
-  disciplineColor: string | null;
+  systemId: number | null;
+  systemCode: string | null;
+  systemName: string | null;
+  systemColor: string | null;
   value: number;
   advancePct: number;
   retentionPct: number;
@@ -54,7 +54,7 @@ type Contract = {
   poCommitted: number;
 };
 type Supplier = { id: number; name: string };
-type Discipline = { id: number; code: string; name: string };
+type SystemOption = { id: number; code: string; name: string };
 
 function fmtVND(n: number) {
   if (!n) return "—";
@@ -69,7 +69,7 @@ export default function ContractsPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+  const [systems, setSystems] = useState<SystemOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState<Set<ContractKind>>(new Set());
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -86,14 +86,14 @@ export default function ContractsPage() {
       fetchMe(),
       load(),
       fetch("/api/suppliers").then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/disciplines").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/systems").then((r) => (r.ok ? r.json() : null)),
     ])
       .then(([meData, c, s, d]) => {
         if (!meData) return;
         setMe(meData);
         setContracts(c?.contracts ?? []);
         setSuppliers(s?.suppliers ?? []);
-        setDisciplines(d?.disciplines ?? []);
+        setSystems(d?.systems ?? []);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -231,12 +231,12 @@ export default function ContractsPage() {
                                   </p>
                                 </td>
                                 <td className="p-3 hidden sm:table-cell">
-                                  {c.disciplineName ? (
+                                  {c.systemName ? (
                                     <span className="inline-flex items-center gap-1.5 text-xs text-zinc-300">
                                       <span
-                                        className={`w-2 h-2 rounded-full bg-${c.disciplineColor}-400`}
+                                        className={`w-2 h-2 rounded-full bg-${c.systemColor}-400`}
                                       />
-                                      {c.disciplineName}
+                                      {c.systemName}
                                     </span>
                                   ) : (
                                     <span className="text-zinc-500 text-xs">—</span>
@@ -301,7 +301,7 @@ export default function ContractsPage() {
       {addOpen && (
         <AddContractModal
           suppliers={suppliers}
-          disciplines={disciplines}
+          systems={systems}
           onClose={() => setAddOpen(false)}
           onCreated={() => {
             setAddOpen(false);
@@ -315,12 +315,12 @@ export default function ContractsPage() {
 
 function AddContractModal({
   suppliers,
-  disciplines,
+  systems,
   onClose,
   onCreated,
 }: {
   suppliers: Supplier[];
-  disciplines: Discipline[];
+  systems: SystemOption[];
   onClose: () => void;
   onCreated: () => void;
 }) {
@@ -329,7 +329,7 @@ function AddContractModal({
   const [title, setTitle] = useState("");
   const [partySupplierId, setPartySupplierId] = useState<number | "">("");
   const [partyName, setPartyName] = useState("");
-  const [disciplineId, setDisciplineId] = useState<number | "">("");
+  const [systemId, setSystemId] = useState<number | "">("");
   const [value, setValue] = useState("0");
   const [advancePct, setAdvancePct] = useState("0");
   const [retentionPct, setRetentionPct] = useState("0");
@@ -353,7 +353,7 @@ function AddContractModal({
           title: title.trim(),
           partySupplierId: needsSupplier && partySupplierId ? Number(partySupplierId) : null,
           partyName: !needsSupplier ? partyName.trim() || null : null,
-          disciplineId: disciplineId || null,
+          systemId: systemId || null,
           value: Number(value) || 0,
           advancePct: Number(advancePct) || 0,
           retentionPct: Number(retentionPct) || 0,
@@ -445,12 +445,12 @@ function AddContractModal({
           <label className="text-xs text-zinc-400 col-span-2">
             Hệ
             <select
-              value={disciplineId}
-              onChange={(e) => setDisciplineId(e.target.value ? Number(e.target.value) : "")}
+              value={systemId}
+              onChange={(e) => setSystemId(e.target.value ? Number(e.target.value) : "")}
               className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
             >
               <option value="">— Chưa gán —</option>
-              {disciplines.map((d) => (
+              {systems.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
                 </option>

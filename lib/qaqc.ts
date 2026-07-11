@@ -70,8 +70,8 @@ export async function packagesWithQcBlock(
 // áp dụng cho hệ của task mà CHƯA có inspection `passed` gắn đúng checklist đó + đúng task.
 // (đã quyết 2026-07-05: gate theo cờ required của mẫu, không phải công tắc toàn dự án.)
 export async function requiredInspectionMissing(taskId: number): Promise<boolean> {
-  const task = await queryOne<{ disciplineId: number | null }>(
-    `SELECT st.discipline_id AS "disciplineId"
+  const task = await queryOne<{ systemId: number | null }>(
+    `SELECT st.system_id AS "systemId"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
@@ -84,12 +84,12 @@ export async function requiredInspectionMissing(taskId: number): Promise<boolean
     `SELECT COUNT(*)::int AS count
        FROM qc_checklists c
       WHERE c.active = TRUE AND c.required = TRUE
-        AND (c.discipline_id IS NULL OR c.discipline_id = ?)
+        AND (c.system_id IS NULL OR c.system_id = ?)
         AND NOT EXISTS (
           SELECT 1 FROM qc_inspections i
            WHERE i.checklist_id = c.id AND i.task_id = ? AND i.status = 'passed'
         )`,
-    task.disciplineId,
+    task.systemId,
     taskId,
   );
   return (missing?.count ?? 0) > 0;
@@ -181,25 +181,25 @@ export type QcChecklistRow = {
   id: number;
   name: string;
   category: string;
-  disciplineId: number | null;
-  disciplineCode: string | null;
-  disciplineName: string | null;
+  systemId: number | null;
+  systemCode: string | null;
+  systemName: string | null;
   required: boolean;
   items: unknown;
   active: boolean;
 };
 
-// Danh sách mẫu checklist, lọc theo mã hệ (discipline) + dự án. projectId (M22):
+// Danh sách mẫu checklist, lọc theo mã hệ (system) + dự án. projectId (M22):
 // undefined = không lọc dự án (dùng nội bộ/test cũ).
 export async function listQcChecklists(filter?: {
-  discipline?: string;
+  system?: string;
   projectId?: number;
 }): Promise<QcChecklistRow[]> {
   const conds: string[] = [];
   const params: unknown[] = [];
-  if (filter?.discipline) {
+  if (filter?.system) {
     conds.push("d.code = ?");
-    params.push(filter.discipline);
+    params.push(filter.system);
   }
   if (filter?.projectId != null) {
     conds.push("c.project_id = ?");
@@ -207,11 +207,11 @@ export async function listQcChecklists(filter?: {
   }
   const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
   return query<QcChecklistRow>(
-    `SELECT c.id, c.name, c.category, c.discipline_id AS "disciplineId",
-            d.code AS "disciplineCode", d.name AS "disciplineName",
+    `SELECT c.id, c.name, c.category, c.system_id AS "systemId",
+            d.code AS "systemCode", d.name AS "systemName",
             c.required, c.items, c.active
        FROM qc_checklists c
-       LEFT JOIN disciplines d ON d.id = c.discipline_id
+       LEFT JOIN systems d ON d.id = c.system_id
       ${where}
       ORDER BY c.id`,
     ...params,

@@ -53,8 +53,8 @@ type Commissioning = {
   id: number;
   code: string | null;
   systemName: string;
-  disciplineId: number | null;
-  disciplineName: string | null;
+  tradeId: number | null;
+  tradeName: string | null;
   checklist: ChecklistItem[] | null;
   result: CommissioningResult;
   testedAt: string | null;
@@ -76,8 +76,8 @@ const HANDOVER_STATUS_BADGE: Record<HandoverStatus, string> = {
 type HandoverItem = {
   id: number;
   title: string;
-  disciplineId: number | null;
-  disciplineName: string | null;
+  tradeId: number | null;
+  tradeName: string | null;
   workPackageId: number | null;
   status: HandoverStatus;
   handoverDate: string | null;
@@ -138,7 +138,7 @@ type Lesson = {
   createdAt: string;
 };
 
-type Discipline = { id: number; code: string; name: string };
+type SystemOption = { id: number; code: string; name: string };
 
 // Bản vẽ hoàn công (as-built, kind='asbuilt' — M08) — chỉ liên kết tham khảo, M29 không
 // lưu file mới (xem docs/nang-cap/M29-ban-giao-ket-thuc.md mục "As-built không lưu file mới").
@@ -167,7 +167,7 @@ export default function HandoverPage() {
   const [demob, setDemob] = useState<Demob[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [users, setUsers] = useState<{ id: number; name: string }[]>([]);
-  const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+  const [systems, setSystems] = useState<SystemOption[]>([]);
   const [asbuiltDrawings, setAsbuiltDrawings] = useState<AsbuiltDrawing[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("tc");
@@ -206,9 +206,9 @@ export default function HandoverPage() {
         setPunch(punchRes?.items ?? []);
         setDemob(demobRes?.items ?? []);
         setLessons(lessonRes?.items ?? []);
-        fetch("/api/disciplines")
+        fetch("/api/systems")
           .then((r) => (r.ok ? r.json() : null))
-          .then((j) => setDisciplines(j?.disciplines ?? []));
+          .then((j) => setSystems(j?.systems ?? []));
         fetch("/api/drawings?kind=asbuilt")
           .then((r) => (r.ok ? r.json() : null))
           .then((j) => setAsbuiltDrawings(j?.drawings ?? []));
@@ -492,7 +492,7 @@ export default function HandoverPage() {
       {(addTcOpen || editTc) && (
         <TcModal
           item={editTc}
-          disciplines={disciplines}
+          systems={systems}
           canApprove={canApprove}
           onClose={() => {
             setAddTcOpen(false);
@@ -509,7 +509,7 @@ export default function HandoverPage() {
       {(addHiOpen || editHi) && (
         <HandoverModal
           item={editHi}
-          disciplines={disciplines}
+          systems={systems}
           canApprove={canApprove}
           onClose={() => {
             setAddHiOpen(false);
@@ -624,7 +624,7 @@ function TcTab({
                   <p className="truncate max-w-[220px]">{c.systemName}</p>
                   {c.code && <p className="text-xs text-zinc-500">{c.code}</p>}
                 </td>
-                <td className="p-3 text-xs text-zinc-400">{c.disciplineName ?? "—"}</td>
+                <td className="p-3 text-xs text-zinc-400">{c.tradeName ?? "—"}</td>
                 <td className="p-3 text-xs text-zinc-400">
                   {c.checklist && c.checklist.length > 0 ? `${c.checklist.length} bước` : "—"}
                 </td>
@@ -772,7 +772,7 @@ function HandoverTab({
                 <td className="p-3">
                   <p className="truncate max-w-[220px]">{h.title}</p>
                 </td>
-                <td className="p-3 text-xs text-zinc-400">{h.disciplineName ?? "—"}</td>
+                <td className="p-3 text-xs text-zinc-400">{h.tradeName ?? "—"}</td>
                 <td className="p-3 text-xs text-zinc-400">
                   {h.handoverDate ? formatDateVN(h.handoverDate) : "—"}
                 </td>
@@ -1131,20 +1131,20 @@ function LessonsTab({
 
 function TcModal({
   item,
-  disciplines,
+  systems,
   canApprove,
   onClose,
   onSaved,
 }: {
   item: Commissioning | null;
-  disciplines: Discipline[];
+  systems: SystemOption[];
   canApprove: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [systemName, setSystemName] = useState(item?.systemName ?? "");
   const [code, setCode] = useState(item?.code ?? "");
-  const [disciplineId, setDisciplineId] = useState<number | "">(item?.disciplineId ?? "");
+  const [tradeId, setTradeId] = useState<number | "">(item?.tradeId ?? "");
   const [result, setResult] = useState<CommissioningResult>(item?.result ?? "draft");
   const [testedAt, setTestedAt] = useState(item?.testedAt ?? "");
   const [note, setNote] = useState(item?.note ?? "");
@@ -1174,7 +1174,7 @@ function TcModal({
       const payload = {
         systemName: systemName.trim(),
         code: code.trim() || null,
-        disciplineId: disciplineId === "" ? null : disciplineId,
+        tradeId: tradeId === "" ? null : tradeId,
         result,
         testedAt: testedAt || null,
         note: note.trim() || null,
@@ -1229,12 +1229,12 @@ function TcModal({
           <label className="text-xs text-zinc-400">
             Hệ
             <select
-              value={disciplineId}
-              onChange={(e) => setDisciplineId(e.target.value ? Number(e.target.value) : "")}
+              value={tradeId}
+              onChange={(e) => setTradeId(e.target.value ? Number(e.target.value) : "")}
               className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
             >
               <option value="">— Chưa gán —</option>
-              {disciplines.map((d) => (
+              {systems.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
                 </option>
@@ -1345,19 +1345,19 @@ function TcModal({
 
 function HandoverModal({
   item,
-  disciplines,
+  systems,
   canApprove,
   onClose,
   onSaved,
 }: {
   item: HandoverItem | null;
-  disciplines: Discipline[];
+  systems: SystemOption[];
   canApprove: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [title, setTitle] = useState(item?.title ?? "");
-  const [disciplineId, setDisciplineId] = useState<number | "">(item?.disciplineId ?? "");
+  const [tradeId, setTradeId] = useState<number | "">(item?.tradeId ?? "");
   const [status, setStatus] = useState<HandoverStatus>(item?.status ?? "pending");
   const [handoverDate, setHandoverDate] = useState(item?.handoverDate ?? "");
   const [file, setFile] = useState<File | null>(null);
@@ -1375,7 +1375,7 @@ function HandoverModal({
     try {
       const payload = {
         title: title.trim(),
-        disciplineId: disciplineId === "" ? null : disciplineId,
+        tradeId: tradeId === "" ? null : tradeId,
         status,
         handoverDate: handoverDate || null,
       };
@@ -1449,12 +1449,12 @@ function HandoverModal({
           <label className="text-xs text-zinc-400">
             Hệ
             <select
-              value={disciplineId}
-              onChange={(e) => setDisciplineId(e.target.value ? Number(e.target.value) : "")}
+              value={tradeId}
+              onChange={(e) => setTradeId(e.target.value ? Number(e.target.value) : "")}
               className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
             >
               <option value="">— Chưa gán —</option>
-              {disciplines.map((d) => (
+              {systems.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
                 </option>

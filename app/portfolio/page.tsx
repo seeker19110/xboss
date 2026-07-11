@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
-import { disciplineColorClasses } from "@/lib/disciplineColors";
+import { systemColorClasses } from "@/lib/systemColors";
 import type { ProjectListItem, PortfolioKpi } from "@/lib/projects";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -41,7 +41,7 @@ async function selectProject(id: number) {
 }
 
 function ProjectCard({ project }: { project: ProjectListItem }) {
-  const c = disciplineColorClasses(project.color);
+  const c = systemColorClasses(project.color);
   const pct = Math.round(project.progressPercent * 100);
   return (
     <button

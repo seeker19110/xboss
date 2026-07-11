@@ -39,8 +39,8 @@ export async function POST(req: NextRequest) {
   const invalid = validateCrewInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  if (input.disciplineId != null) {
-    if (!(await queryOne(`SELECT id FROM disciplines WHERE id = ?`, input.disciplineId)))
+  if (input.systemId != null) {
+    if (!(await queryOne(`SELECT id FROM systems WHERE id = ?`, input.systemId)))
       return NextResponse.json({ error: "Hệ thi công không tồn tại" }, { status: 422 });
   }
   if (input.supplierId != null) {
@@ -67,11 +67,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Tên tổ đội đã tồn tại trong dự án" }, { status: 409 });
 
   const id = await insertId(
-    `INSERT INTO crews (project_id, name, discipline_id, supplier_id, leader_id)
+    `INSERT INTO crews (project_id, name, system_id, supplier_id, leader_id)
      VALUES (?, ?, ?, ?, ?)`,
     projectId,
     input.name,
-    input.disciplineId,
+    input.systemId,
     input.supplierId,
     input.leaderId,
   );

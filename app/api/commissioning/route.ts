@@ -62,19 +62,19 @@ export async function POST(req: NextRequest) {
   const invalid = validateCommissioningInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  if (input.disciplineId != null) {
-    const disc = await queryOne(`SELECT id FROM disciplines WHERE id = ?`, input.disciplineId);
+  if (input.tradeId != null) {
+    const disc = await queryOne(`SELECT id FROM systems WHERE id = ?`, input.tradeId);
     if (!disc) return NextResponse.json({ error: "Hệ không tồn tại" }, { status: 422 });
   }
 
   const id = await insertId(
-    `INSERT INTO commissioning (project_id, code, system_name, discipline_id, checklist,
+    `INSERT INTO commissioning (project_id, code, system_name, system_id, checklist,
                                  result, tested_at, note, created_by)
      VALUES (?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?)`,
     projectId,
     input.code,
     input.systemName,
-    input.disciplineId,
+    input.tradeId,
     JSON.stringify(input.checklist),
     input.result,
     input.testedAt,

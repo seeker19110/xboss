@@ -145,15 +145,15 @@ test(
 );
 
 test(
-  "byDisciplineBlock: mỗi hệ trong danh mục disciplines đều có 1 dòng",
+  "bySystemBlock: mỗi hệ trong danh mục systems đều có 1 dòng",
   { skip: !HAS_TEST_DB },
   async () => {
     const { query } = await import("@/lib/db");
-    const { byDisciplineBlock } = await import("@/lib/dashboardext");
+    const { bySystemBlock } = await import("@/lib/dashboardext");
 
-    const disciplines = await query<{ code: string }>(`SELECT code FROM disciplines`);
-    const rows = await byDisciplineBlock();
-    assert.equal(rows.length, disciplines.length);
-    for (const d of disciplines) assert.ok(rows.some((r) => r.code === d.code));
+    const systems = await query<{ code: string }>(`SELECT code FROM systems`);
+    const rows = await bySystemBlock();
+    assert.equal(rows.length, systems.length);
+    for (const d of systems) assert.ok(rows.some((r) => r.code === d.code));
   },
 );

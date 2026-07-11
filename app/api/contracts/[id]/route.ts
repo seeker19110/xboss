@@ -101,7 +101,7 @@ export async function PATCH(
     projectId != null
       ? await queryOne<Record<string, unknown>>(
           `SELECT code, kind, title, party_supplier_id AS "partySupplierId", party_name AS "partyName",
-                  discipline_id AS "disciplineId", value, advance_pct AS "advancePct",
+                  system_id AS "systemId", value, advance_pct AS "advancePct",
                   retention_pct AS "retentionPct", signed_date AS "signedDate",
                   valid_from AS "validFrom", valid_to AS "validTo", status, note
              FROM contracts WHERE id = ? AND project_id = ?`,
@@ -128,7 +128,7 @@ export async function PATCH(
   try {
     await run(
       `UPDATE contracts SET code = ?, kind = ?, title = ?, party_supplier_id = ?, party_name = ?,
-              discipline_id = ?, value = ?, advance_pct = ?, retention_pct = ?, signed_date = ?,
+              system_id = ?, value = ?, advance_pct = ?, retention_pct = ?, signed_date = ?,
               valid_from = ?, valid_to = ?, status = ?, note = ?
         WHERE id = ?`,
       input.code,
@@ -136,7 +136,7 @@ export async function PATCH(
       input.title,
       input.partySupplierId,
       input.partyName,
-      input.disciplineId,
+      input.systemId,
       input.value,
       input.advancePct,
       input.retentionPct,

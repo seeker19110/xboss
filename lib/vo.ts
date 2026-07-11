@@ -58,7 +58,7 @@ export type VoInput = {
   title: string;
   reason: VoReason;
   description: string | null;
-  disciplineId: number | null;
+  systemId: number | null;
   lines: VoLineInput[];
 };
 
@@ -94,7 +94,7 @@ export function parseVoBody(body: Record<string, unknown>): VoInput {
     title: str(body.title),
     reason: str(body.reason) as VoReason,
     description: strOrNull(body.description),
-    disciplineId: body.disciplineId != null ? Number(body.disciplineId) : null,
+    systemId: body.systemId != null ? Number(body.systemId) : null,
     lines: lines.map((l) => {
       const line = (l ?? {}) as Record<string, unknown>;
       return {
@@ -134,10 +134,10 @@ export type VoRow = {
   title: string;
   reason: VoReason;
   description: string | null;
-  disciplineId: number | null;
-  disciplineCode: string | null;
-  disciplineName: string | null;
-  disciplineColor: string | null;
+  systemId: number | null;
+  systemCode: string | null;
+  systemName: string | null;
+  systemColor: string | null;
   contractId: number | null;
   contractCode: string | null;
   status: VoStatus;
@@ -177,8 +177,8 @@ export async function listVariations(filter?: {
   const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
   const rows = await query<VoRow>(
     `SELECT v.id, v.code, v.title, v.reason, v.description,
-            v.discipline_id AS "disciplineId", d.code AS "disciplineCode",
-            d.name AS "disciplineName", d.color AS "disciplineColor",
+            v.system_id AS "systemId", d.code AS "systemCode",
+            d.name AS "systemName", d.color AS "systemColor",
             v.contract_id AS "contractId", c.code AS "contractCode",
             v.status, v.submitted_at AS "submittedAt", v.decided_at AS "decidedAt",
             v.created_by AS "createdBy", u.name AS "createdByName", v.created_at AS "createdAt",
@@ -198,7 +198,7 @@ export async function listVariations(filter?: {
               '[]'
             ) AS lines
        FROM variation_orders v
-       LEFT JOIN disciplines d ON d.id = v.discipline_id
+       LEFT JOIN systems d ON d.id = v.system_id
        LEFT JOIN contracts c ON c.id = v.contract_id
        LEFT JOIN users u ON u.id = v.created_by
        LEFT JOIN boq_items bi ON bi.vo_id = v.id

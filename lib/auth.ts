@@ -274,7 +274,7 @@ export async function canTouchPackage(user: User, packageId: number): Promise<bo
 }
 
 // Sub-con chỉ được check-in/out xe (vehicle_logs) của đúng NCC mình (users.supplier_id,
-// gán ở M1 discipline_contractors) — không phải xe của NCC khác.
+// gán ở M1 system_contractors) — không phải xe của NCC khác.
 export async function canTouchVehicle(user: User, vehicleId: number): Promise<boolean> {
   if (user.role !== "subcon") return true;
   const row = await queryOne<{ supplierId: number | null; userSupplierId: number | null }>(
@@ -305,7 +305,7 @@ export async function canTouchFloor(
 }
 
 // Sub-con chỉ được xem hồ sơ NTP (M33) của đúng mình (users.supplier_id, gán ở M15
-// discipline_contractors) — vai trò khác xem được mọi NTP.
+// system_contractors) — vai trò khác xem được mọi NTP.
 export async function canViewSubcontractor(user: User, supplierId: number): Promise<boolean> {
   if (user.role !== "subcon") return true;
   const row = await queryOne<{ supplierId: number | null }>(

@@ -14,15 +14,15 @@ type Forecast = {
 
 const fmt = (s: string | null) => (s ? new Date(s).toLocaleDateString("vi-VN") : "—");
 
-export default function ForecastCards({ he }: { he?: string }) {
+export default function ForecastCards({ system }: { system?: string }) {
   const [data, setData] = useState<{ forecast: Forecast[]; windowDays: number } | null>(null);
 
   useEffect(() => {
-    const qs = he ? `?he=${encodeURIComponent(he)}` : "";
+    const qs = system ? `?system=${encodeURIComponent(system)}` : "";
     fetch(`/api/dashboard/forecast${qs}`)
       .then((r) => (r.ok ? r.json() : null))
       .then(setData);
-  }, [he]);
+  }, [system]);
 
   if (!data || data.forecast.length === 0) return null;
 

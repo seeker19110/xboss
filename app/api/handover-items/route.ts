@@ -65,8 +65,8 @@ export async function POST(req: NextRequest) {
   const invalid = validateHandoverItemInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  if (input.disciplineId != null) {
-    if (!(await queryOne(`SELECT id FROM disciplines WHERE id = ?`, input.disciplineId)))
+  if (input.tradeId != null) {
+    if (!(await queryOne(`SELECT id FROM systems WHERE id = ?`, input.tradeId)))
       return NextResponse.json({ error: "Hệ không tồn tại" }, { status: 422 });
   }
   if (input.workPackageId != null) {
@@ -75,12 +75,12 @@ export async function POST(req: NextRequest) {
   }
 
   const id = await insertId(
-    `INSERT INTO handover_items (project_id, title, discipline_id, work_package_id, status,
+    `INSERT INTO handover_items (project_id, title, system_id, work_package_id, status,
                                   handover_date, created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     projectId,
     input.title,
-    input.disciplineId,
+    input.tradeId,
     input.workPackageId,
     input.status,
     input.handoverDate,

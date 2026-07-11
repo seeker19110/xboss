@@ -51,10 +51,10 @@ type Vo = {
   title: string;
   reason: VoReason;
   description: string | null;
-  disciplineId: number | null;
-  disciplineCode: string | null;
-  disciplineName: string | null;
-  disciplineColor: string | null;
+  systemId: number | null;
+  systemCode: string | null;
+  systemName: string | null;
+  systemColor: string | null;
   contractId: number | null;
   contractCode: string | null;
   status: VoStatus;
@@ -68,7 +68,7 @@ type Vo = {
   lines: VoLine[];
 };
 
-type Discipline = { id: number; code: string; name: string };
+type SystemOption = { id: number; code: string; name: string };
 type Contract = { id: number; code: string; title: string; kind: string };
 type BoqItem = { code: string; unitPrice: number; voId: number | null };
 
@@ -80,7 +80,7 @@ function fmtVND(n: number) {
 export default function VariationsPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [items, setItems] = useState<Vo[]>([]);
-  const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+  const [systems, setSystems] = useState<SystemOption[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [boqIndex, setBoqIndex] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -95,16 +95,12 @@ export default function VariationsPage() {
   }
 
   useEffect(() => {
-    Promise.all([
-      fetchMe(),
-      load(),
-      fetch("/api/disciplines").then((r) => (r.ok ? r.json() : null)),
-    ])
+    Promise.all([fetchMe(), load(), fetch("/api/systems").then((r) => (r.ok ? r.json() : null))])
       .then(([meData, v, d]) => {
         if (!meData) return;
         setMe(meData);
         setItems(v?.items ?? []);
-        setDisciplines(d?.disciplines ?? []);
+        setSystems(d?.systems ?? []);
         if (meData.role === "admin" || meData.role === "pm") {
           fetch("/api/contracts")
             .then((r) => (r.ok ? r.json() : null))
@@ -216,10 +212,10 @@ export default function VariationsPage() {
                         <p className="text-xs text-zinc-400">{REASON_LABEL[v.reason]}</p>
                       </td>
                       <td className="p-3 hidden sm:table-cell">
-                        {v.disciplineName ? (
+                        {v.systemName ? (
                           <span className="inline-flex items-center gap-1.5 text-xs text-zinc-300">
-                            <span className={`w-2 h-2 rounded-full bg-${v.disciplineColor}-400`} />
-                            {v.disciplineName}
+                            <span className={`w-2 h-2 rounded-full bg-${v.systemColor}-400`} />
+                            {v.systemName}
                           </span>
                         ) : (
                           <span className="text-zinc-500 text-xs">—</span>
@@ -260,7 +256,7 @@ export default function VariationsPage() {
       )}
       {addOpen && (
         <AddVoModal
-          disciplines={disciplines}
+          systems={systems}
           boqIndex={boqIndex}
           onClose={() => setAddOpen(false)}
           onCreated={() => {
@@ -280,19 +276,19 @@ function emptyLine(): LineDraft {
 }
 
 function AddVoModal({
-  disciplines,
+  systems,
   boqIndex,
   onClose,
   onCreated,
 }: {
-  disciplines: Discipline[];
+  systems: SystemOption[];
   boqIndex: Map<string, number>;
   onClose: () => void;
   onCreated: () => void;
 }) {
   const [title, setTitle] = useState("");
   const [reason, setReason] = useState<VoReason>("design_change");
-  const [disciplineId, setDisciplineId] = useState<number | "">("");
+  const [systemId, setSystemId] = useState<number | "">("");
   const [description, setDescription] = useState("");
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
   const [err, setErr] = useState("");
@@ -324,7 +320,7 @@ function AddVoModal({
           title: title.trim(),
           reason,
           description: description.trim() || null,
-          disciplineId: disciplineId || null,
+          systemId: systemId || null,
           lines: lines.map((l) => ({
             code: l.code.trim(),
             name: l.name.trim(),
@@ -383,12 +379,12 @@ function AddVoModal({
           <label className="text-xs text-zinc-400">
             Hệ
             <select
-              value={disciplineId}
-              onChange={(e) => setDisciplineId(e.target.value ? Number(e.target.value) : "")}
+              value={systemId}
+              onChange={(e) => setSystemId(e.target.value ? Number(e.target.value) : "")}
               className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
             >
               <option value="">— Chưa gán —</option>
-              {disciplines.map((d) => (
+              {systems.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
                 </option>
@@ -672,7 +668,7 @@ function VoDetailModal({
           <section className="space-y-2 text-sm">
             <dl className="space-y-1 text-zinc-300">
               <div>Lý do: {REASON_LABEL[vo.reason]}</div>
-              <div>Hệ: {vo.disciplineName ?? "—"}</div>
+              <div>Hệ: {vo.systemName ?? "—"}</div>
               <div>Người tạo: {vo.createdByName ?? "—"}</div>
               <div>Ngày trình: {vo.submittedAt ?? "—"}</div>
               <div>Ngày quyết định: {vo.decidedAt ?? "—"}</div>

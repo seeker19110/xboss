@@ -25,7 +25,7 @@ test("validateWarrantyInput/validateClaimInput: đủ ca biên", async () => {
   assert.equal(
     validateWarrantyInput({
       title: "Hệ thống điều hoà tầng 1",
-      disciplineId: null,
+      tradeId: null,
       handoverItemId: null,
       warrantyFrom: "2026-01-01",
       warrantyMonths: 24,
@@ -38,7 +38,7 @@ test("validateWarrantyInput/validateClaimInput: đủ ca biên", async () => {
   assert.match(
     validateWarrantyInput({
       title: "",
-      disciplineId: null,
+      tradeId: null,
       handoverItemId: null,
       warrantyFrom: null,
       warrantyMonths: null,
@@ -51,7 +51,7 @@ test("validateWarrantyInput/validateClaimInput: đủ ca biên", async () => {
   assert.match(
     validateWarrantyInput({
       title: "X",
-      disciplineId: null,
+      tradeId: null,
       handoverItemId: null,
       warrantyFrom: "01/01/2026",
       warrantyMonths: 12,
@@ -64,7 +64,7 @@ test("validateWarrantyInput/validateClaimInput: đủ ca biên", async () => {
   assert.match(
     validateWarrantyInput({
       title: "X",
-      disciplineId: null,
+      tradeId: null,
       handoverItemId: null,
       warrantyFrom: null,
       warrantyMonths: null,

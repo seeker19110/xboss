@@ -344,7 +344,7 @@ function DrillDown({
           → Xem đơn đặt hàng / thanh toán chi tiết
         </a>
         {groupBy === "system" && (
-          <a href={`/he/${row.key}`} className="block text-xs text-emerald-400 hover:underline">
+          <a href={`/system/${row.key}`} className="block text-xs text-emerald-400 hover:underline">
             → Xem trang hệ {row.label}
           </a>
         )}

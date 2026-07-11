@@ -38,13 +38,13 @@ export async function buildDiaryPrefill(date: string, projectId?: number): Promi
   const projectArgs = projectId != null ? [projectId] : [];
 
   const groups = await query<{
-    disciplineName: string | null;
+    systemName: string | null;
     floorLabel: string | null;
     taskCount: number;
     minCode: string;
     maxCode: string;
   }>(
-    `SELECT d.name AS "disciplineName", wp.floor_label AS "floorLabel",
+    `SELECT d.name AS "systemName", wp.floor_label AS "floorLabel",
             COUNT(DISTINCT t.id) AS "taskCount",
             MIN(t.code) AS "minCode", MAX(t.code) AS "maxCode"
        FROM task_history th
@@ -52,7 +52,7 @@ export async function buildDiaryPrefill(date: string, projectId?: number): Promi
        JOIN work_packages wp ON wp.id = t.package_id
        JOIN sheet_types st ON st.id = wp.sheet_type_id
        JOIN towers tw ON tw.id = st.tower_id
-       LEFT JOIN disciplines d ON d.id = st.discipline_id
+       LEFT JOIN systems d ON d.id = st.system_id
       WHERE (th.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date = ?
         AND th.new_progress > th.old_progress${projectCond}
       GROUP BY d.name, wp.floor_label
@@ -63,7 +63,7 @@ export async function buildDiaryPrefill(date: string, projectId?: number): Promi
 
   const workDone = groups
     .map((g) => {
-      const label = [g.disciplineName ?? "Chưa rõ hệ", g.floorLabel].filter(Boolean).join(" ");
+      const label = [g.systemName ?? "Chưa rõ hệ", g.floorLabel].filter(Boolean).join(" ");
       const range = g.minCode === g.maxCode ? g.minCode : `${g.minCode} → ${g.maxCode}`;
       return `${label}: cập nhật ${g.taskCount} hạng mục (${range})`;
     })

@@ -1067,9 +1067,9 @@ type DesignChangeRow = {
   id: number;
   code: string;
   title: string;
-  disciplineId: number | null;
-  disciplineCode: string | null;
-  disciplineName: string | null;
+  systemId: number | null;
+  systemCode: string | null;
+  systemName: string | null;
   drawingId: number | null;
   drawingCode: string | null;
   drawingName: string | null;
@@ -1191,7 +1191,7 @@ function DesignChangesTab({
                   </span>
                 </div>
                 <div className="mt-2 flex items-center gap-3 text-xs text-zinc-400 flex-wrap">
-                  {dc.disciplineName && <span>Hệ {dc.disciplineName}</span>}
+                  {dc.systemName && <span>Hệ {dc.systemName}</span>}
                   {dc.drawingCode && <span>Bản vẽ {dc.drawingCode}</span>}
                 </div>
                 <p className="mt-2 text-xs text-zinc-400 line-clamp-2">{dc.reason}</p>
@@ -1486,7 +1486,7 @@ function DesignChangeDetailModal({
         </span>
 
         <div className="text-xs text-zinc-400 space-y-1">
-          {dc.disciplineName && <p>Hệ: {dc.disciplineName}</p>}
+          {dc.systemName && <p>Hệ: {dc.systemName}</p>}
           {dc.requestedByNote && <p>Yêu cầu bởi: {dc.requestedByNote}</p>}
           <p>Người tạo: {dc.createdByName ?? "—"}</p>
         </div>

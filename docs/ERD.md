@@ -74,7 +74,7 @@ Mọi route GET/PATCH/DELETE theo ID của các bảng trên đều lọc thêm 
 
 `towers.project_id` (có sẵn từ baseline, gốc của toàn bộ WBS) → `tasks`/`work_packages`/`sheet_types` suy qua chuỗi `sheet_types.tower_id → towers.project_id`. `payment_certs` suy qua `contract_id → contracts.project_id`. `qc_inspections` suy qua `task_id`/`work_package_id` (`lib/qaqc.ts:taskInProject`/`workPackageInProject`). `work_fronts` suy qua `sheet_type_id → towers.project_id`. `boq_norms` suy qua `boq_item_id → boq_items.project_id`.
 
-**Nợ kỹ thuật đã biết:** `/api/notifications` (cảnh báo trễ/PO trễ/NCR quá hạn...) **chưa** scoped theo dự án đang chọn — vẫn quét mọi dự án user thấy được, như trước M22. Nhiều hàm nguồn đã nhận sẵn tham số `projectId?` tuỳ chọn nhưng chưa wire vào route vì logic "tạo mới" và "dọn thông báo cũ" dùng chung 1 danh sách — cần thiết kế lại tách riêng 2 phía trước khi scope, tránh xoá nhầm thông báo hợp lệ của dự án khác. `costSummary`/`/api/costs` (M2) cũng chưa scoped — ngân sách/cam kết/thực chi hiện gộp mọi dự án theo hệ (`disciplines` là danh mục toàn hệ thống, không theo dự án).
+**Nợ kỹ thuật đã biết:** `/api/notifications` (cảnh báo trễ/PO trễ/NCR quá hạn...) **chưa** scoped theo dự án đang chọn — vẫn quét mọi dự án user thấy được, như trước M22. Nhiều hàm nguồn đã nhận sẵn tham số `projectId?` tuỳ chọn nhưng chưa wire vào route vì logic "tạo mới" và "dọn thông báo cũ" dùng chung 1 danh sách — cần thiết kế lại tách riêng 2 phía trước khi scope, tránh xoá nhầm thông báo hợp lệ của dự án khác. `costSummary`/`/api/costs` (M2) cũng chưa scoped — ngân sách/cam kết/thực chi hiện gộp mọi dự án theo hệ (`systems` là danh mục toàn hệ thống, không theo dự án).
 
 ### `towers`
 
@@ -329,7 +329,7 @@ Ghi delta ±qty mỗi lần thay đổi `qty_used`.
 | kind                              | TEXT (`nhan_thau`\|`giao_thau`\|`ncc`) |
 | party_supplier_id                 | FK → suppliers (giao_thau/ncc)         |
 | party_name                        | TEXT (nhan_thau — tên CĐT/tổng thầu)   |
-| discipline_id                     | FK → disciplines                       |
+| system_id                         | FK → systems                           |
 | value, advance_pct, retention_pct | NUMERIC                                |
 | valid_from, valid_to, status      | —                                      |
 
@@ -353,7 +353,7 @@ Liên kết mềm (nullable, backfill dần): `floor_contracts.contract_id`, `pa
 | ------------------------ | --------------------------------------------------------------------------------- |
 | code                     | TEXT UNIQUE (`VO-0001`, sinh tự động)                                             |
 | reason                   | TEXT (`design_change\|client_request\|site_condition\|other`)                     |
-| discipline_id            | FK → disciplines (áp cho mọi dòng KL con)                                         |
+| system_id                | FK → systems (áp cho mọi dòng KL con)                                             |
 | contract_id              | FK → contracts (HĐ nhận phụ lục khi chốt — nullable, gán lúc `contract-add`)      |
 | status                   | TEXT (`draft\|submitted\|approved\|partially_approved\|rejected\|contract_added`) |
 | submitted_at, decided_at | DATE                                                                              |
@@ -515,16 +515,16 @@ Nhân sự công trường (khác với user hệ thống): gồm các kỹ sư,
 
 ### `crews`
 
-Tổ đội công trường: nhóm người cùng chuyên ngành, gắn nhà thầu/cấp tầng (discipline), có người dẫn đầu. Dùng cho chấm công tổ, phân công hệ thống, quản lý nhân sự.
+Tổ đội công trường: nhóm người cùng chuyên ngành, gắn nhà thầu/cấp tầng (system), có người dẫn đầu. Dùng cho chấm công tổ, phân công hệ thống, quản lý nhân sự.
 
-| Cột           | Kiểu                | Ghi chú                     |
-| ------------- | ------------------- | --------------------------- |
-| id            | SERIAL PK           |                             |
-| project_id    | FK → projects       |                             |
-| name          | TEXT, UNIQUE (ghép) | Tên tổ                      |
-| discipline_id | FK → disciplines    | Chuyên ngành (MEP/ACMV/...) |
-| supplier_id   | FK → suppliers      | Nhà thầu phụ                |
-| leader_id     | FK → personnel      | Người dẫn đầu               |
+| Cột         | Kiểu                | Ghi chú                     |
+| ----------- | ------------------- | --------------------------- |
+| id          | SERIAL PK           |                             |
+| project_id  | FK → projects       |                             |
+| name        | TEXT, UNIQUE (ghép) | Tên tổ                      |
+| system_id   | FK → systems        | Chuyên ngành (MEP/ACMV/...) |
+| supplier_id | FK → suppliers      | Nhà thầu phụ                |
+| leader_id   | FK → personnel      | Người dẫn đầu               |
 
 **Bảng nối `crew_members`** (PK ghép `crew_id, personnel_id`) — liệt kê nhân sự trong mỗi tổ.
 
@@ -688,15 +688,15 @@ Sổ theo dõi bảo hiểm & bảo lãnh: bảo hiểm công trình (CAR), trá
 
 Chạy thử & nghiệm thu hệ thống: gồm các hệ (ACMV, điện, PCCC...) với checklist bước T&C, trạng thái (draft/testing/passed/failed), ngày test, ghi chú.
 
-| Cột                | Kiểu             | Ghi chú                              |
-| ------------------ | ---------------- | ------------------------------------ |
-| id                 | SERIAL PK        |                                      |
-| project_id         | FK → projects    |                                      |
-| code / system_name | TEXT             | Mã/tên hệ                            |
-| discipline_id      | FK → disciplines | Chuyên ngành (ACMV, điện...)         |
-| checklist          | JSONB            | Các bước T&C (pattern qc_checklists) |
-| result             | TEXT CHECK       | `draft\|testing\|passed\|failed`     |
-| tested_at          | DATE             | Ngày chạy thử                        |
+| Cột                | Kiểu          | Ghi chú                              |
+| ------------------ | ------------- | ------------------------------------ |
+| id                 | SERIAL PK     |                                      |
+| project_id         | FK → projects |                                      |
+| code / system_name | TEXT          | Mã/tên hệ                            |
+| system_id          | FK → systems  | Chuyên ngành (ACMV, điện...)         |
+| checklist          | JSONB         | Các bước T&C (pattern qc_checklists) |
+| result             | TEXT CHECK    | `draft\|testing\|passed\|failed`     |
+| tested_at          | DATE          | Ngày chạy thử                        |
 
 ### `handover_items`
 
@@ -707,7 +707,7 @@ Hạng mục bàn giao CĐT: gồm tiêu đề, chuyên ngành, gắn nhóm côn
 | id              | SERIAL PK          |                                  |
 | project_id      | FK → projects      |                                  |
 | title           | TEXT               | Tiêu đề hạng mục                 |
-| discipline_id   | FK → disciplines   | Chuyên ngành                     |
+| system_id       | FK → systems       | Chuyên ngành                     |
 | work_package_id | FK → work_packages | Gắn nhóm công việc (nullable)    |
 | status          | TEXT CHECK         | `pending\|handed_over\|accepted` |
 | handover_date   | DATE               | Ngày bàn giao                    |

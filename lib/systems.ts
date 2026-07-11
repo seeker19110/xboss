@@ -1,11 +1,11 @@
-// Hệ (discipline) — danh mục chuẩn dùng chung cho BOQ (M1), trang riêng từng hệ (M15)
+// Hệ (system) — danh mục chuẩn dùng chung cho BOQ (M1), trang riêng từng hệ (M15)
 // và các module sau (M2/M3/M8/M14). Logic tính KPI tách khỏi route để test tích hợp
 // trực tiếp qua DB (cùng pattern lib/report.ts, lib/recompute.ts).
 import { query, queryOne, todayISO } from "@/lib/db";
-import { disciplineBudget } from "@/lib/cost";
+import { systemBudget } from "@/lib/cost";
 
-export type DisciplineSummary = {
-  discipline: { id: number; code: string; name: string; color: string | null };
+export type SystemSummary = {
+  system: { id: number; code: string; name: string; color: string | null };
   sheets: {
     id: number;
     code: string;
@@ -36,17 +36,17 @@ export type DisciplineSummary = {
   floorsPending: number | null;
 };
 
-// Resolve `?he=<code>` (query param dùng chung cho các API tiến độ — M36) → id hệ.
+// Resolve `?system=<code>` (query param dùng chung cho các API tiến độ — M36) → id hệ.
 // - Không truyền code (null/rỗng) → null: không lọc, giữ nguyên hành vi cũ.
 // - Code không khớp hệ nào → -1 (sentinel không khớp id thật nào) để query lọc ra kết quả
 //   rỗng một cách tự nhiên thay vì phải rẽ nhánh 404/500 ở từng route.
-export async function resolveDisciplineId(code: string | null): Promise<number | null> {
+export async function resolveSystemId(code: string | null): Promise<number | null> {
   if (!code) return null;
-  const d = await queryOne<{ id: number }>(`SELECT id FROM disciplines WHERE code = ?`, code);
+  const d = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = ?`, code);
   return d?.id ?? -1;
 }
 
-export async function listDisciplines() {
+export async function listSystems() {
   const today = todayISO();
   return query(
     `SELECT d.id, d.code, d.name, d.color,
@@ -54,8 +54,8 @@ export async function listDisciplines() {
             COALESCE(AVG(t.progress_percent), 0) AS "avgProgress",
             COALESCE(SUM(CASE WHEN t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_percent < 1
                               AND t.status NOT IN ('hoan_thanh','nghiem_thu') THEN 1 ELSE 0 END), 0) AS delayed
-       FROM disciplines d
-       LEFT JOIN sheet_types st ON st.discipline_id = d.id
+       FROM systems d
+       LEFT JOIN sheet_types st ON st.system_id = d.id
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
       GROUP BY d.id, d.code, d.name, d.color
@@ -64,17 +64,17 @@ export async function listDisciplines() {
   );
 }
 
-export async function getDisciplineSummary(
+export async function getSystemSummary(
   code: string,
   opts: { withCost?: boolean; projectId?: number } = {},
-): Promise<DisciplineSummary | null> {
-  const discipline = await queryOne<{
+): Promise<SystemSummary | null> {
+  const system = await queryOne<{
     id: number;
     code: string;
     name: string;
     color: string | null;
-  }>(`SELECT id, code, name, color FROM disciplines WHERE code = ?`, code);
-  if (!discipline) return null;
+  }>(`SELECT id, code, name, color FROM systems WHERE code = ?`, code);
+  if (!system) return null;
 
   const today = todayISO();
 
@@ -95,11 +95,11 @@ export async function getDisciplineSummary(
        FROM sheet_types st
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
-      WHERE st.discipline_id = ?
+      WHERE st.system_id = ?
       GROUP BY st.id, st.code, st.name, st.slug
       ORDER BY st.sort_order, st.id`,
     today,
-    discipline.id,
+    system.id,
   );
 
   const overall = await queryOne<{
@@ -116,9 +116,9 @@ export async function getDisciplineSummary(
        FROM sheet_types st
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
-      WHERE st.discipline_id = ?`,
+      WHERE st.system_id = ?`,
     today,
-    discipline.id,
+    system.id,
   );
 
   const ncrOpen = await queryOne<{ count: number }>(
@@ -127,8 +127,8 @@ export async function getDisciplineSummary(
        JOIN tasks t ON t.id = n.task_id
        JOIN work_packages wp ON wp.id = t.package_id
        JOIN sheet_types st ON st.id = wp.sheet_type_id
-      WHERE st.discipline_id = ? AND n.status <> 'closed'`,
-    discipline.id,
+      WHERE st.system_id = ? AND n.status <> 'closed'`,
+    system.id,
   );
 
   const contractors = await query<{
@@ -142,15 +142,15 @@ export async function getDisciplineSummary(
   }>(
     `SELECT dc.id, dc.supplier_id AS "supplierId", s.name AS "supplierName",
             dc.floor_labels AS "floorLabels", dc.zone, dc.is_primary AS "isPrimary", dc.note
-       FROM discipline_contractors dc
+       FROM system_contractors dc
        JOIN suppliers s ON s.id = dc.supplier_id
-      WHERE dc.discipline_id = ?
+      WHERE dc.system_id = ?
       ORDER BY dc.is_primary DESC, s.name`,
-    discipline.id,
+    system.id,
   );
 
   return {
-    discipline,
+    system,
     sheets,
     progressPercent: overall?.avgProgress ?? 0,
     totalTasks: overall?.total ?? 0,
@@ -158,7 +158,7 @@ export async function getDisciplineSummary(
     waitingApprovalCount: overall?.waitingApproval ?? 0,
     contractors,
     ncrOpen: ncrOpen?.count ?? 0,
-    budget: opts.withCost ? await disciplineBudget(discipline.id, true, opts.projectId) : null,
+    budget: opts.withCost ? await systemBudget(system.id, true, opts.projectId) : null,
     drawingsPending: null,
     floorsPending: null,
   };

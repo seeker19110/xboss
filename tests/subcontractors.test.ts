@@ -89,14 +89,14 @@ test("validateEvaluationInput: đủ ca hợp lệ/không hợp lệ", async () 
 // ===== Test tích hợp (cần Postgres riêng: đặt TEST_DATABASE_URL) =====
 
 test(
-  "listSubcontractors: gộp đúng discipline_contractors + subcontractor_profiles (kể cả supplier chưa có profile)",
+  "listSubcontractors: gộp đúng system_contractors + subcontractor_profiles (kể cả supplier chưa có profile)",
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
     const { listSubcontractors, upsertSubcontractorProfile } = await import("@/lib/subcontractors");
 
-    const dien = await queryOne<{ id: number }>(`SELECT id FROM disciplines WHERE code = 'dien'`);
-    assert.ok(dien, "disciplines seed phải có sẵn từ migration 0005_boq.sql");
+    const dien = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'dien'`);
+    assert.ok(dien, "systems seed phải có sẵn từ migration 0005_boq.sql");
 
     const withProfileId = await insertId(
       `INSERT INTO suppliers (name) VALUES ('NTP có hồ sơ Test')`,
@@ -109,13 +109,13 @@ test(
     );
 
     await insertId(
-      `INSERT INTO discipline_contractors (discipline_id, supplier_id, zone, floor_labels, is_primary)
+      `INSERT INTO system_contractors (system_id, supplier_id, zone, floor_labels, is_primary)
        VALUES (?, ?, 'Zone 1', ARRAY['T1'], true)`,
       dien!.id,
       withProfileId,
     );
     await insertId(
-      `INSERT INTO discipline_contractors (discipline_id, supplier_id, zone, is_primary)
+      `INSERT INTO system_contractors (system_id, supplier_id, zone, is_primary)
        VALUES (?, ?, 'Zone 2', false)`,
       dien!.id,
       noProfileId,
@@ -133,21 +133,21 @@ test(
     const ids = list.map((s) => s.id);
     assert.ok(ids.includes(withProfileId));
     assert.ok(ids.includes(noProfileId));
-    // NCC vật tư thường (không có discipline_contractors) không xuất hiện.
+    // NCC vật tư thường (không có system_contractors) không xuất hiện.
     assert.ok(!ids.includes(materialVendorId));
 
     const withProfile = list.find((s) => s.id === withProfileId)!;
     assert.equal(withProfile.siteRepName, "Nguyễn Văn A");
-    assert.equal(withProfile.disciplines.length, 1);
-    assert.equal(withProfile.disciplines[0].zone, "Zone 1");
+    assert.equal(withProfile.systems.length, 1);
+    assert.equal(withProfile.systems[0].zone, "Zone 1");
 
     const noProfile = list.find((s) => s.id === noProfileId)!;
     assert.equal(noProfile.orgChartNote, null);
     assert.equal(noProfile.siteRepName, null);
-    assert.equal(noProfile.disciplines[0].zone, "Zone 2");
+    assert.equal(noProfile.systems[0].zone, "Zone 2");
 
     await run(
-      `DELETE FROM discipline_contractors WHERE supplier_id IN (?, ?)`,
+      `DELETE FROM system_contractors WHERE supplier_id IN (?, ?)`,
       withProfileId,
       noProfileId,
     );

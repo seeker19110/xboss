@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, todayISO, daysFromTodayISO } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
-import { resolveDisciplineId } from "@/lib/disciplines";
+import { resolveSystemId } from "@/lib/systems";
 import { progressAtDate } from "@/lib/report";
 import {
   cashflowSeries,
@@ -10,13 +10,13 @@ import {
   procurementBlock,
   workfrontBlock,
   voBlock,
-  byDisciplineBlock,
+  bySystemBlock,
   approvalsBlock,
 } from "@/lib/dashboardext";
 
 export const dynamic = "force-dynamic";
 
-// `?he=<disciplines.code>` (M36 PR1) lọc KPI + bảng trễ theo hệ — không truyền = nguyên hành vi cũ.
+// `?system=<systems.code>` (M36 PR1) lọc KPI + bảng trễ theo hệ — không truyền = nguyên hành vi cũ.
 // `?range=week|month` (M36 PR3) thêm cột "Δ kỳ" cho từng dòng KPI — % đầu kỳ (tái dựng từ
 // task_history qua `progressAtDate`) so với % hiện tại. Không truyền/`day` = không có Δ kỳ (cũ).
 export async function GET(req: NextRequest) {
@@ -26,10 +26,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Thầu phụ không có quyền xem dashboard" }, { status: 403 });
 
   const today = todayISO();
-  const disciplineId = await resolveDisciplineId(req.nextUrl.searchParams.get("he"));
-  const heFilterAnd = disciplineId !== null ? "AND st.discipline_id = ?" : "";
-  const heFilterWhere = disciplineId !== null ? "WHERE st.discipline_id = ?" : "";
-  const heParams = disciplineId !== null ? [disciplineId] : [];
+  const systemId = await resolveSystemId(req.nextUrl.searchParams.get("system"));
+  const systemFilterAnd = systemId !== null ? "AND st.system_id = ?" : "";
+  const systemFilterWhere = systemId !== null ? "WHERE st.system_id = ?" : "";
+  const systemParams = systemId !== null ? [systemId] : [];
   const range = req.nextUrl.searchParams.get("range"); // "week" | "month" | null
 
   // Task trễ: end_date < hôm nay AND progress < 1 AND chưa hoàn thành/nghiệm thu.
@@ -48,10 +48,10 @@ export async function GET(req: NextRequest) {
       WHERE t.end_date IS NOT NULL AND t.end_date < ?
         AND t.progress_percent < 1
         AND t.status NOT IN ('hoan_thanh','nghiem_thu')
-        ${heFilterAnd}
+        ${systemFilterAnd}
       ORDER BY t.end_date`,
     today,
-    ...heParams,
+    ...systemParams,
   );
 
   // KPI theo từng sheet
@@ -71,11 +71,11 @@ export async function GET(req: NextRequest) {
        FROM sheet_types st
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
-       ${heFilterWhere}
+       ${systemFilterWhere}
       GROUP BY st.id, st.code, st.slug
       ORDER BY st.sort_order, st.id`,
     today,
-    ...heParams,
+    ...systemParams,
   );
 
   // `?range=week|month` (M36 PR3): thêm % đầu kỳ + Δ kỳ cho từng dòng KPI — tái dựng từ
@@ -84,10 +84,7 @@ export async function GET(req: NextRequest) {
     range === "week" || range === "month"
       ? await (async () => {
           const pastDate = range === "week" ? daysFromTodayISO(-7) : daysFromTodayISO(-30);
-          const prevRows = await progressAtDate(
-            pastDate,
-            disciplineId !== null ? { disciplineId } : {},
-          );
+          const prevRows = await progressAtDate(pastDate, systemId !== null ? { systemId } : {});
           const prevBySheet = new Map<number, number[]>();
           for (const r of prevRows) {
             if (!prevBySheet.has(r.sheetId)) prevBySheet.set(r.sheetId, []);
@@ -108,14 +105,14 @@ export async function GET(req: NextRequest) {
       : kpi;
 
   // M9 — khối mở rộng "tiền + chất lượng + công trường". Khối tài chính (cashflow/
-  // cpi/vo, và budgetUsedPct trong byDiscipline) chỉ trả cho PAYMENT_VIEW_ROLES
+  // cpi/vo, và budgetUsedPct trong bySystem) chỉ trả cho PAYMENT_VIEW_ROLES
   // (admin/pm/bch) — ẩn từ server cho cdt/viewer, không chỉ ẩn UI (quyết 2026-07-04).
   const canViewFinance = CAN.viewPayments(user.role);
-  const [quality, procurement, workfront, byDiscipline] = await Promise.all([
+  const [quality, procurement, workfront, bySystem] = await Promise.all([
     qualityBlock(),
     procurementBlock(),
     workfrontBlock(),
-    byDisciplineBlock(),
+    bySystemBlock(),
   ]);
   const [cashflow, cpi, vo] = canViewFinance
     ? await Promise.all([cashflowSeries(), cpiBlock(), voBlock()])
@@ -135,7 +132,7 @@ export async function GET(req: NextRequest) {
     procurement,
     workfront,
     vo,
-    byDiscipline: byDiscipline.map((d) => ({
+    bySystem: bySystem.map((d) => ({
       ...d,
       budgetUsedPct: canViewFinance ? d.budgetUsedPct : null,
     })),

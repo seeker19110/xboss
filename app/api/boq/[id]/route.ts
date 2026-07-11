@@ -60,19 +60,19 @@ export async function PATCH(
     fields.push("unit = ?");
     values.push(unit);
   }
-  if (body.disciplineId !== undefined) {
-    if (body.disciplineId === null) {
-      fields.push("discipline_id = ?");
+  if (body.systemId !== undefined) {
+    if (body.systemId === null) {
+      fields.push("system_id = ?");
       values.push(null);
     } else {
-      const disciplineId = Number(body.disciplineId);
+      const systemId = Number(body.systemId);
       if (
-        !Number.isInteger(disciplineId) ||
-        !(await queryOne(`SELECT id FROM disciplines WHERE id = ?`, disciplineId))
+        !Number.isInteger(systemId) ||
+        !(await queryOne(`SELECT id FROM systems WHERE id = ?`, systemId))
       )
         return NextResponse.json({ error: "Hệ không hợp lệ" }, { status: 422 });
-      fields.push("discipline_id = ?");
-      values.push(disciplineId);
+      fields.push("system_id = ?");
+      values.push(systemId);
     }
   }
   for (const [key, col] of [

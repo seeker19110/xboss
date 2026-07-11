@@ -23,15 +23,15 @@ function tone(spi: number | null) {
 
 const pct = (n: number) => `${(n * 100).toFixed(0)}%`;
 
-export default function SpiCards({ he }: { he?: string }) {
+export default function SpiCards({ system }: { system?: string }) {
   const [data, setData] = useState<Data | null>(null);
 
   useEffect(() => {
-    const qs = he ? `?he=${encodeURIComponent(he)}` : "";
+    const qs = system ? `?system=${encodeURIComponent(system)}` : "";
     fetch(`/api/dashboard/spi${qs}`)
       .then((r) => (r.ok ? r.json() : null))
       .then(setData);
-  }, [he]);
+  }, [system]);
 
   if (!data || data.overall.taskCount === 0) return null;
 

@@ -39,8 +39,8 @@ test(
     const { run, insertId, queryOne } = await import("@/lib/db");
     const { buildDiaryPrefill } = await import("@/lib/diary");
 
-    const dien = await queryOne<{ id: number }>(`SELECT id FROM disciplines WHERE code = 'dien'`);
-    assert.ok(dien, "disciplines seed phải có sẵn từ migration 0005_boq.sql");
+    const dien = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'dien'`);
+    assert.ok(dien, "systems seed phải có sẵn từ migration 0005_boq.sql");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test diary')`);
     const towerId = await insertId(
@@ -48,7 +48,7 @@ test(
       projectId,
     );
     const st = await insertId(
-      `INSERT INTO sheet_types (tower_id, code, name, discipline_id) VALUES (?, 'TESTDIARY', 'Sheet điện', ?)`,
+      `INSERT INTO sheet_types (tower_id, code, name, system_id) VALUES (?, 'TESTDIARY', 'Sheet điện', ?)`,
       towerId,
       dien!.id,
     );

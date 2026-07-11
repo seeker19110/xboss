@@ -24,9 +24,9 @@ export type HubDocument = {
   source: DocumentSource;
   title: string;
   category: string | null;
-  disciplineCode: string | null;
-  disciplineName: string | null;
-  disciplineColor: string | null;
+  systemCode: string | null;
+  systemName: string | null;
+  systemColor: string | null;
   floorLabel: string | null;
   mimeType: string | null;
   sizeBytes: number | null;
@@ -44,9 +44,9 @@ async function listTaskDocuments(user: User): Promise<HubDocument[]> {
     id: number;
     title: string;
     docCategory: DocCategory | null;
-    disciplineCode: string | null;
-    disciplineName: string | null;
-    disciplineColor: string | null;
+    systemCode: string | null;
+    systemName: string | null;
+    systemColor: string | null;
     floorLabel: string | null;
     mimeType: string | null;
     sizeBytes: number | null;
@@ -54,15 +54,15 @@ async function listTaskDocuments(user: User): Promise<HubDocument[]> {
     uploaderName: string | null;
   }>(
     `SELECT td.id, t.name AS title, td.doc_category AS "docCategory",
-            disc.code AS "disciplineCode", disc.name AS "disciplineName",
-            disc.color AS "disciplineColor", wp.floor_label AS "floorLabel",
+            disc.code AS "systemCode", disc.name AS "systemName",
+            disc.color AS "systemColor", wp.floor_label AS "floorLabel",
             td.mime_type AS "mimeType", td.size_bytes AS "sizeBytes",
             td.created_at AS "createdAt", u.name AS "uploaderName"
        FROM task_documents td
        JOIN tasks t ON t.id = td.task_id
        LEFT JOIN work_packages wp ON wp.id = t.package_id
        LEFT JOIN sheet_types st ON st.id = wp.sheet_type_id
-       LEFT JOIN disciplines disc ON disc.id = st.discipline_id
+       LEFT JOIN systems disc ON disc.id = st.system_id
        LEFT JOIN users u ON u.id = td.uploaded_by
       WHERE td.task_id IS NOT NULL ${subconFilter}
       ORDER BY td.id DESC`,
@@ -73,9 +73,9 @@ async function listTaskDocuments(user: User): Promise<HubDocument[]> {
     source: "task",
     title: r.title,
     category: r.docCategory ? DOC_CATEGORY_LABEL[r.docCategory] : null,
-    disciplineCode: r.disciplineCode,
-    disciplineName: r.disciplineName,
-    disciplineColor: r.disciplineColor,
+    systemCode: r.systemCode,
+    systemName: r.systemName,
+    systemColor: r.systemColor,
     floorLabel: r.floorLabel,
     mimeType: r.mimeType,
     sizeBytes: r.sizeBytes,
@@ -92,22 +92,22 @@ async function listContractDocuments(user: User): Promise<HubDocument[]> {
     id: number;
     title: string;
     kind: ContractKind;
-    disciplineCode: string | null;
-    disciplineName: string | null;
-    disciplineColor: string | null;
+    systemCode: string | null;
+    systemName: string | null;
+    systemColor: string | null;
     mimeType: string | null;
     sizeBytes: number | null;
     createdAt: string;
     uploaderName: string | null;
   }>(
     `SELECT cd.id, c.title, c.kind,
-            disc.code AS "disciplineCode", disc.name AS "disciplineName",
-            disc.color AS "disciplineColor",
+            disc.code AS "systemCode", disc.name AS "systemName",
+            disc.color AS "systemColor",
             cd.mime_type AS "mimeType", cd.size_bytes AS "sizeBytes",
             cd.created_at AS "createdAt", u.name AS "uploaderName"
        FROM contract_documents cd
        JOIN contracts c ON c.id = cd.contract_id
-       LEFT JOIN disciplines disc ON disc.id = c.discipline_id
+       LEFT JOIN systems disc ON disc.id = c.system_id
        LEFT JOIN users u ON u.id = cd.uploaded_by
       ORDER BY cd.id DESC`,
   );
@@ -116,9 +116,9 @@ async function listContractDocuments(user: User): Promise<HubDocument[]> {
     source: "contract",
     title: r.title,
     category: CONTRACT_KIND_LABEL[r.kind],
-    disciplineCode: r.disciplineCode,
-    disciplineName: r.disciplineName,
-    disciplineColor: r.disciplineColor,
+    systemCode: r.systemCode,
+    systemName: r.systemName,
+    systemColor: r.systemColor,
     floorLabel: null,
     mimeType: r.mimeType,
     sizeBytes: r.sizeBytes,
@@ -135,22 +135,22 @@ async function listVoDocuments(user: User): Promise<HubDocument[]> {
     id: number;
     title: string;
     reason: VoReason;
-    disciplineCode: string | null;
-    disciplineName: string | null;
-    disciplineColor: string | null;
+    systemCode: string | null;
+    systemName: string | null;
+    systemColor: string | null;
     mimeType: string | null;
     sizeBytes: number | null;
     createdAt: string;
     uploaderName: string | null;
   }>(
     `SELECT vd.id, vo.title, vo.reason,
-            disc.code AS "disciplineCode", disc.name AS "disciplineName",
-            disc.color AS "disciplineColor",
+            disc.code AS "systemCode", disc.name AS "systemName",
+            disc.color AS "systemColor",
             vd.mime_type AS "mimeType", vd.size_bytes AS "sizeBytes",
             vd.created_at AS "createdAt", u.name AS "uploaderName"
        FROM vo_documents vd
        JOIN variation_orders vo ON vo.id = vd.vo_id
-       LEFT JOIN disciplines disc ON disc.id = vo.discipline_id
+       LEFT JOIN systems disc ON disc.id = vo.system_id
        LEFT JOIN users u ON u.id = vd.uploaded_by
       ORDER BY vd.id DESC`,
   );
@@ -159,9 +159,9 @@ async function listVoDocuments(user: User): Promise<HubDocument[]> {
     source: "vo",
     title: r.title,
     category: VO_REASON_LABEL[r.reason],
-    disciplineCode: r.disciplineCode,
-    disciplineName: r.disciplineName,
-    disciplineColor: r.disciplineColor,
+    systemCode: r.systemCode,
+    systemName: r.systemName,
+    systemColor: r.systemColor,
     floorLabel: null,
     mimeType: r.mimeType,
     sizeBytes: r.sizeBytes,
@@ -173,7 +173,7 @@ async function listVoDocuments(user: User): Promise<HubDocument[]> {
 
 // Bản vẽ (drawing_revisions) — mọi vai trò đăng nhập kể cả subcon (cần bản vẽ tại
 // hiện trường, đúng quyền xem của M8). system_group là nhãn tự do (không FK cứng vào
-// disciplines) nên không lọc chéo bảng — chỉ hiển thị đúng label người dùng đã nhập.
+// systems) nên không lọc chéo bảng — chỉ hiển thị đúng label người dùng đã nhập.
 async function listDrawingDocuments(): Promise<HubDocument[]> {
   const rows = await query<{
     id: number;
@@ -199,9 +199,9 @@ async function listDrawingDocuments(): Promise<HubDocument[]> {
     source: "drawing",
     title: r.name,
     category: DRAWING_KIND_LABEL[r.kind],
-    disciplineCode: null,
-    disciplineName: r.systemGroup,
-    disciplineColor: null,
+    systemCode: null,
+    systemName: r.systemGroup,
+    systemColor: null,
     floorLabel: r.floorLabel,
     mimeType: r.mimeType,
     sizeBytes: r.sizeBytes,
@@ -232,9 +232,9 @@ async function listProjectDocuments(): Promise<HubDocument[]> {
     source: "project",
     title: r.title,
     category: r.category,
-    disciplineCode: null,
-    disciplineName: null,
-    disciplineColor: null,
+    systemCode: null,
+    systemName: null,
+    systemColor: null,
     floorLabel: null,
     mimeType: r.mimeType,
     sizeBytes: r.sizeBytes,
@@ -245,7 +245,7 @@ async function listProjectDocuments(): Promise<HubDocument[]> {
 }
 
 export type DocumentHubFilters = {
-  discipline?: string;
+  system?: string;
   floor?: string;
   source?: DocumentSource;
   q?: string;
@@ -267,7 +267,7 @@ export async function listAllDocuments(
   ]);
   let all = results.flat();
 
-  if (filters.discipline) all = all.filter((d) => d.disciplineCode === filters.discipline);
+  if (filters.system) all = all.filter((d) => d.systemCode === filters.system);
   // Nguồn không có tầng (contract/vo/project) ẩn khi có lọc tầng cụ thể — rõ ràng hơn
   // là giả định chúng "luôn khớp mọi tầng".
   if (filters.floor) all = all.filter((d) => d.floorLabel === filters.floor);

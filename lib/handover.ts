@@ -44,9 +44,9 @@ export type CommissioningRow = {
   projectId: number | null;
   code: string | null;
   systemName: string;
-  disciplineId: number | null;
-  disciplineCode: string | null;
-  disciplineName: string | null;
+  tradeId: number | null;
+  tradeCode: string | null;
+  tradeName: string | null;
   checklist: unknown;
   result: CommissioningResult;
   testedAt: string | null;
@@ -74,11 +74,11 @@ export async function listCommissioning(
   const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
   return query<CommissioningRow>(
     `SELECT c.id, c.project_id AS "projectId", c.code, c.system_name AS "systemName",
-            c.discipline_id AS "disciplineId", d.code AS "disciplineCode", d.name AS "disciplineName",
+            c.system_id AS "tradeId", d.code AS "tradeCode", d.name AS "tradeName",
             c.checklist, c.result, c.tested_at AS "testedAt", c.note,
             c.created_by AS "createdBy", u.name AS "createdByName", c.created_at AS "createdAt"
        FROM commissioning c
-       LEFT JOIN disciplines d ON d.id = c.discipline_id
+       LEFT JOIN systems d ON d.id = c.system_id
        LEFT JOIN users u ON u.id = c.created_by
       ${where}
       ORDER BY c.id DESC`,
@@ -100,9 +100,9 @@ export type HandoverItemRow = {
   id: number;
   projectId: number | null;
   title: string;
-  disciplineId: number | null;
-  disciplineCode: string | null;
-  disciplineName: string | null;
+  tradeId: number | null;
+  tradeCode: string | null;
+  tradeName: string | null;
   workPackageId: number | null;
   workPackageCode: string | null;
   workPackageName: string | null;
@@ -131,12 +131,12 @@ export async function listHandoverItems(
   const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
   return query<HandoverItemRow>(
     `SELECT h.id, h.project_id AS "projectId", h.title,
-            h.discipline_id AS "disciplineId", d.code AS "disciplineCode", d.name AS "disciplineName",
+            h.system_id AS "tradeId", d.code AS "tradeCode", d.name AS "tradeName",
             h.work_package_id AS "workPackageId", wp.code AS "workPackageCode", wp.name AS "workPackageName",
             h.status, h.handover_date AS "handoverDate", h.minutes_file AS "minutesFile",
             h.created_by AS "createdBy", u.name AS "createdByName", h.created_at AS "createdAt"
        FROM handover_items h
-       LEFT JOIN disciplines d ON d.id = h.discipline_id
+       LEFT JOIN systems d ON d.id = h.system_id
        LEFT JOIN work_packages wp ON wp.id = h.work_package_id
        LEFT JOIN users u ON u.id = h.created_by
       ${where}
@@ -382,7 +382,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 export type CommissioningInput = {
   code: string | null;
   systemName: string;
-  disciplineId: number | null;
+  tradeId: number | null;
   checklist: unknown;
   result: CommissioningResult;
   testedAt: string | null;
@@ -395,7 +395,7 @@ export function parseCommissioningBody(body: Record<string, unknown>): Commissio
   return {
     code: strOrNull(body.code),
     systemName: str(body.systemName),
-    disciplineId: body.disciplineId != null ? Number(body.disciplineId) : null,
+    tradeId: body.tradeId != null ? Number(body.tradeId) : null,
     checklist: body.checklist ?? [],
     result: (str(body.result) || "draft") as CommissioningResult,
     testedAt: strOrNull(body.testedAt),
@@ -414,7 +414,7 @@ export function validateCommissioningInput(input: CommissioningInput): string | 
 
 export type HandoverItemInput = {
   title: string;
-  disciplineId: number | null;
+  tradeId: number | null;
   workPackageId: number | null;
   status: HandoverItemStatus;
   handoverDate: string | null;
@@ -425,7 +425,7 @@ export function parseHandoverItemBody(body: Record<string, unknown>): HandoverIt
   const strOrNull = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
   return {
     title: str(body.title),
-    disciplineId: body.disciplineId != null ? Number(body.disciplineId) : null,
+    tradeId: body.tradeId != null ? Number(body.tradeId) : null,
     workPackageId: body.workPackageId != null ? Number(body.workPackageId) : null,
     status: (str(body.status) || "pending") as HandoverItemStatus,
     handoverDate: strOrNull(body.handoverDate),

@@ -12,7 +12,7 @@ import {
   CalendarClock,
   TrendingUp,
 } from "lucide-react";
-import { disciplineColorClasses } from "@/lib/disciplineColors";
+import { systemColorClasses } from "@/lib/systemColors";
 
 // Trang hub khuôn chung cho dashboard nhóm (M21 PR2 — xem docs/nang-cap/M21-appshell-ia.md).
 // Route /hub/[id] (app/hub/[id]/page.tsx) render component này cho MỌI dashboard nhóm
@@ -23,7 +23,7 @@ import { disciplineColorClasses } from "@/lib/disciplineColors";
 // "Kế hoạch & Báo cáo tổng thể" / "Tiến độ theo hệ" / "Kiểm soát" — xem
 // `TienDoHubSections` bên dưới. Mọi dashboard khác giữ nguyên grid children mặc định.
 
-type Discipline = {
+type SystemOption = {
   id: number;
   code: string;
   name: string;
@@ -61,9 +61,9 @@ function ChildCard({ child }: { child: DashNode }) {
   );
 }
 
-// Hàng "5 nút nhỏ" theo hệ — Timeline · Gantt · Lookahead · Báo cáo · S-Curve, đều kèm `?he=`.
-function DisciplineViews({ code }: { code: string }) {
-  const q = `?he=${encodeURIComponent(code)}`;
+// Hàng "5 nút nhỏ" theo hệ — Timeline · Gantt · Lookahead · Báo cáo · S-Curve, đều kèm `?system=`.
+function SystemViews({ code }: { code: string }) {
+  const q = `?system=${encodeURIComponent(code)}`;
   const views = [
     { href: `/timeline${q}`, label: "Timeline" },
     { href: `/gantt${q}`, label: "Gantt" },
@@ -86,14 +86,14 @@ function DisciplineViews({ code }: { code: string }) {
   );
 }
 
-function DisciplineRow({ d }: { d: Discipline }) {
-  const c = disciplineColorClasses(d.color);
+function SystemRow({ d }: { d: SystemOption }) {
+  const c = systemColorClasses(d.color);
   const pct = Math.round((d.avgProgress ?? 0) * 100);
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
       <div className="flex flex-wrap items-center gap-3">
         <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${c.dot}`} aria-hidden="true" />
-        <a href={`/he/${d.code}`} className={`text-sm font-semibold hover:underline ${c.text}`}>
+        <a href={`/system/${d.code}`} className={`text-sm font-semibold hover:underline ${c.text}`}>
           {d.name}
         </a>
         <span className="ml-auto text-xs text-zinc-400 shrink-0">
@@ -103,14 +103,14 @@ function DisciplineRow({ d }: { d: Discipline }) {
       <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
         <div className={`h-full ${c.dot}`} style={{ width: `${pct}%` }} />
       </div>
-      <DisciplineViews code={d.code} />
+      <SystemViews code={d.code} />
     </div>
   );
 }
 
 // Khối 1 "Kế hoạch & Báo cáo tổng thể" — view chung KHÔNG lọc theo hệ. Trước đây lấy từ
 // `dashboard.children` (node dash.tien-do), nhưng từ khi sidebar đổi children của node đó
-// sang 6 hệ đang thi công (mỗi hệ 1 trang /tien-do/[he]), 2 việc này tách nhau — hub giữ
+// sang 6 hệ đang thi công (mỗi hệ 1 trang /progress/[system]), 2 việc này tách nhau — hub giữ
 // literal riêng để không mất view chung khi sidebar đổi.
 const GENERAL_VIEWS: DashNode[] = [
   { href: "/timeline", label: "Timeline", icon: CalendarRange },
@@ -126,12 +126,12 @@ const CONTROL_CARD: DashNode = {
 
 // Mặt tiền riêng của dashboard "Tiến độ" (M36) — 3 khối theo mockup.
 function TienDoHubSections() {
-  const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+  const [systems, setSystems] = useState<SystemOption[]>([]);
 
   useEffect(() => {
-    fetch("/api/disciplines")
+    fetch("/api/systems")
       .then((r) => (r.ok ? r.json() : null))
-      .then((j) => setDisciplines(j?.disciplines ?? []))
+      .then((j) => setSystems(j?.systems ?? []))
       .catch(() => {});
   }, []);
 
@@ -155,12 +155,12 @@ function TienDoHubSections() {
         </div>
       </section>
 
-      {disciplines.length > 0 && (
+      {systems.length > 0 && (
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-zinc-300">Tiến độ theo hệ</h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {disciplines.map((d) => (
-              <DisciplineRow key={d.code} d={d} />
+            {systems.map((d) => (
+              <SystemRow key={d.code} d={d} />
             ))}
           </div>
         </section>

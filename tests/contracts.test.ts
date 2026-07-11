@@ -13,7 +13,7 @@ test("validateContractInput: đủ ca hợp lệ/không hợp lệ", async () =>
     title: "Hợp đồng test",
     partySupplierId: 1,
     partyName: null,
-    disciplineId: null,
+    systemId: null,
     value: 1000,
     advancePct: 10,
     retentionPct: 5,

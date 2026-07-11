@@ -21,9 +21,9 @@ export type WarrantyItemRow = {
   id: number;
   projectId: number | null;
   title: string;
-  disciplineId: number | null;
-  disciplineCode: string | null;
-  disciplineName: string | null;
+  tradeId: number | null;
+  tradeCode: string | null;
+  tradeName: string | null;
   handoverItemId: number | null;
   handoverItemTitle: string | null;
   warrantyFrom: string | null;
@@ -68,14 +68,14 @@ export async function listWarrantyItems(
   const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
   return query<WarrantyItemRow>(
     `SELECT w.id, w.project_id AS "projectId", w.title,
-            w.discipline_id AS "disciplineId", d.code AS "disciplineCode", d.name AS "disciplineName",
+            w.system_id AS "tradeId", d.code AS "tradeCode", d.name AS "tradeName",
             w.handover_item_id AS "handoverItemId", hi.title AS "handoverItemTitle",
             w.warranty_from AS "warrantyFrom", w.warranty_months AS "warrantyMonths",
             w.guarantee_id AS "guaranteeId", ib.title AS "guaranteeTitle",
             w.status, w.note,
             w.created_by AS "createdBy", u.name AS "createdByName", w.created_at AS "createdAt"
        FROM warranty_items w
-       LEFT JOIN disciplines d ON d.id = w.discipline_id
+       LEFT JOIN systems d ON d.id = w.system_id
        LEFT JOIN handover_items hi ON hi.id = w.handover_item_id
        LEFT JOIN insurance_bonds ib ON ib.id = w.guarantee_id
        LEFT JOIN users u ON u.id = w.created_by
@@ -97,14 +97,14 @@ export async function getWarrantyItem(
   }
   const row = await queryOne<WarrantyItemRow>(
     `SELECT w.id, w.project_id AS "projectId", w.title,
-            w.discipline_id AS "disciplineId", d.code AS "disciplineCode", d.name AS "disciplineName",
+            w.system_id AS "tradeId", d.code AS "tradeCode", d.name AS "tradeName",
             w.handover_item_id AS "handoverItemId", hi.title AS "handoverItemTitle",
             w.warranty_from AS "warrantyFrom", w.warranty_months AS "warrantyMonths",
             w.guarantee_id AS "guaranteeId", ib.title AS "guaranteeTitle",
             w.status, w.note,
             w.created_by AS "createdBy", u.name AS "createdByName", w.created_at AS "createdAt"
        FROM warranty_items w
-       LEFT JOIN disciplines d ON d.id = w.discipline_id
+       LEFT JOIN systems d ON d.id = w.system_id
        LEFT JOIN handover_items hi ON hi.id = w.handover_item_id
        LEFT JOIN insurance_bonds ib ON ib.id = w.guarantee_id
        LEFT JOIN users u ON u.id = w.created_by
@@ -116,7 +116,7 @@ export async function getWarrantyItem(
 
 export type WarrantyItemInput = {
   title: string;
-  disciplineId: number | null;
+  tradeId: number | null;
   handoverItemId: number | null;
   warrantyFrom: string | null;
   warrantyMonths: number | null;
@@ -135,7 +135,7 @@ export function parseWarrantyItemBody(body: Record<string, unknown>): WarrantyIt
   };
   return {
     title: str(body.title),
-    disciplineId: numOrNull(body.disciplineId),
+    tradeId: numOrNull(body.tradeId),
     handoverItemId: numOrNull(body.handoverItemId),
     warrantyFrom: strOrNull(body.warrantyFrom),
     warrantyMonths: numOrNull(body.warrantyMonths),
@@ -400,8 +400,8 @@ export type OmDocumentRow = {
   id: number;
   projectId: number | null;
   title: string;
-  disciplineId: number | null;
-  disciplineName: string | null;
+  tradeId: number | null;
+  tradeName: string | null;
   fileName: string | null;
   originalName: string | null;
   mimeType: string | null;
@@ -416,12 +416,12 @@ export async function listOmDocs(projectId?: number): Promise<OmDocumentRow[]> {
   const args = projectId != null ? [projectId] : [];
   return query<OmDocumentRow>(
     `SELECT o.id, o.project_id AS "projectId", o.title,
-            o.discipline_id AS "disciplineId", d.name AS "disciplineName",
+            o.system_id AS "tradeId", d.name AS "tradeName",
             o.file_name AS "fileName", o.original_name AS "originalName",
             o.mime_type AS "mimeType", o.size_bytes AS "sizeBytes",
             o.uploaded_by AS "uploadedBy", u.name AS "uploaderName", o.created_at AS "createdAt"
        FROM om_documents o
-       LEFT JOIN disciplines d ON d.id = o.discipline_id
+       LEFT JOIN systems d ON d.id = o.system_id
        LEFT JOIN users u ON u.id = o.uploaded_by
       ${where}
       ORDER BY o.id DESC`,
@@ -438,12 +438,12 @@ export async function getOmDoc(id: number, projectId?: number): Promise<OmDocume
   }
   const row = await queryOne<OmDocumentRow>(
     `SELECT o.id, o.project_id AS "projectId", o.title,
-            o.discipline_id AS "disciplineId", d.name AS "disciplineName",
+            o.system_id AS "tradeId", d.name AS "tradeName",
             o.file_name AS "fileName", o.original_name AS "originalName",
             o.mime_type AS "mimeType", o.size_bytes AS "sizeBytes",
             o.uploaded_by AS "uploadedBy", u.name AS "uploaderName", o.created_at AS "createdAt"
        FROM om_documents o
-       LEFT JOIN disciplines d ON d.id = o.discipline_id
+       LEFT JOIN systems d ON d.id = o.system_id
        LEFT JOIN users u ON u.id = o.uploaded_by
       WHERE ${conds.join(" AND ")}`,
     ...args,

@@ -8,7 +8,7 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appAlert } from "@/app/components/dialogs";
 import { useEditMode } from "@/app/components/useEditMode";
 import EditModeToggle from "@/app/components/EditModeToggle";
-import HeFilter from "@/app/components/HeFilter";
+import SystemFilter from "@/app/components/SystemFilter";
 import { fetchMe, redirectToLogin } from "@/app/lib/me";
 
 type Bar = {
@@ -48,15 +48,17 @@ export default function GanttPage() {
   const [floatDays, setFloatDays] = useState<Record<string, number>>({});
   const [me, setMe] = useState<Me | null>(null);
   const [sheetFilter, setSheetFilter] = useState("");
-  const [he, setHe] = useState("");
+  const [system, setSystem] = useState("");
   const [depFor, setDepFor] = useState<Bar | null>(null); // nhóm đang sửa phụ thuộc
   const [arrows, setArrows] = useState<Arrow[]>([]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const barRefs = useRef<Map<number, HTMLElement>>(new Map());
 
-  async function load(heCode: string) {
-    const r = await fetch(`/api/gantt${heCode ? `?he=${encodeURIComponent(heCode)}` : ""}`);
+  async function load(systemCode: string) {
+    const r = await fetch(
+      `/api/gantt${systemCode ? `?system=${encodeURIComponent(systemCode)}` : ""}`,
+    );
     if (r.status === 401) {
       redirectToLogin();
       return;
@@ -70,13 +72,13 @@ export default function GanttPage() {
     setFloatDays(j.float ?? {});
   }
 
-  // Đọc `?he=` và `?sheet=` lúc mount để link chia sẻ/từ hub trỏ thẳng vào đúng bộ lọc (M36).
+  // Đọc `?system=` và `?sheet=` lúc mount để link chia sẻ/từ hub trỏ thẳng vào đúng bộ lọc (M36).
   // Gọi `load(initial)` trực tiếp với giá trị vừa đọc (không qua state) để tránh 2 request
   // chạy song song (fetch không lọc trước, fetch đã lọc sau — race condition).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const initial = params.get("he") ?? "";
-    setHe(initial);
+    const initial = params.get("system") ?? "";
+    setSystem(initial);
     setSheetFilter(params.get("sheet") ?? "");
     fetchMe().then((user) => setMe(user ?? null));
     load(initial);
@@ -182,10 +184,10 @@ export default function GanttPage() {
             </option>
           ))}
         </select>
-        <HeFilter
-          value={he}
+        <SystemFilter
+          value={system}
           onChange={(next) => {
-            setHe(next);
+            setSystem(next);
             load(next);
           }}
         />
@@ -363,7 +365,7 @@ export default function GanttPage() {
           deps={deps}
           onClose={() => setDepFor(null)}
           onChanged={async () => {
-            await load(he);
+            await load(system);
           }}
         />
       )}

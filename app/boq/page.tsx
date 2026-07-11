@@ -36,10 +36,10 @@ type BoqItem = {
   code: string;
   name: string;
   unit: string;
-  disciplineId: number | null;
-  disciplineCode: string | null;
-  disciplineName: string | null;
-  disciplineColor: string | null;
+  systemId: number | null;
+  systemCode: string | null;
+  systemName: string | null;
+  systemColor: string | null;
   qtyContract: number;
   unitPrice: number;
   qtySub: number;
@@ -62,7 +62,7 @@ const VO_STATUS_LABEL: Record<string, string> = {
   rejected: "Từ chối",
   contract_added: "Đã vào phụ lục HĐ",
 };
-type Discipline = { id: number; code: string; name: string };
+type SystemOption = { id: number; code: string; name: string };
 type TaskHit = { id: number; code: string; name: string; sheetType: string };
 
 function fmtVND(n: number) {
@@ -85,7 +85,7 @@ export default function BoqPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [items, setItems] = useState<BoqItem[]>([]);
   const [totals, setTotals] = useState({ contractValue: 0, subValue: 0, executedValue: 0 });
-  const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+  const [systems, setSystems] = useState<SystemOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<BoqItem | null>(null);
@@ -104,14 +104,14 @@ export default function BoqPage() {
     Promise.all([
       fetchMe(),
       load(includeVo),
-      fetch("/api/disciplines").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/systems").then((r) => (r.ok ? r.json() : null)),
     ])
-      .then(([meData, boq, disc]) => {
+      .then(([meData, boq, sys]) => {
         if (!meData) return;
         setMe(meData);
         setItems(boq?.items ?? []);
         setTotals(boq?.totals ?? { contractValue: 0, subValue: 0, executedValue: 0 });
-        setDisciplines(disc?.disciplines ?? []);
+        setSystems(sys?.systems ?? []);
       })
       .finally(() => setLoading(false));
   }, [includeVo]);
@@ -128,8 +128,8 @@ export default function BoqPage() {
   const groups = useMemo(() => {
     const map = new Map<string, { label: string; items: BoqItem[] }>();
     for (const it of items) {
-      const key = it.disciplineCode ?? "__none";
-      const label = it.disciplineName ?? "Chưa gán hệ";
+      const key = it.systemCode ?? "__none";
+      const label = it.systemName ?? "Chưa gán hệ";
       if (!map.has(key)) map.set(key, { label, items: [] });
       map.get(key)!.items.push(it);
     }
@@ -338,7 +338,7 @@ export default function BoqPage() {
       )}
       {addOpen && (
         <AddBoqModal
-          disciplines={disciplines}
+          systems={systems}
           onClose={() => setAddOpen(false)}
           onCreated={() => {
             setAddOpen(false);
@@ -348,7 +348,7 @@ export default function BoqPage() {
       )}
       {importOpen && (
         <ImportBoqModal
-          disciplines={disciplines}
+          systems={systems}
           onClose={() => setImportOpen(false)}
           onImported={() => {
             setImportOpen(false);
@@ -361,18 +361,18 @@ export default function BoqPage() {
 }
 
 function AddBoqModal({
-  disciplines,
+  systems,
   onClose,
   onCreated,
 }: {
-  disciplines: Discipline[];
+  systems: SystemOption[];
   onClose: () => void;
   onCreated: () => void;
 }) {
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [unit, setUnit] = useState("");
-  const [disciplineId, setDisciplineId] = useState<number | "">("");
+  const [systemId, setSystemId] = useState<number | "">("");
   const [qtyContract, setQtyContract] = useState("0");
   const [unitPrice, setUnitPrice] = useState("0");
   const [qtySub, setQtySub] = useState("0");
@@ -391,7 +391,7 @@ function AddBoqModal({
           code: code.trim(),
           name: name.trim(),
           unit: unit.trim(),
-          disciplineId: disciplineId || undefined,
+          systemId: systemId || undefined,
           qtyContract: Number(qtyContract) || 0,
           unitPrice: Number(unitPrice) || 0,
           qtySub: Number(qtySub) || 0,
@@ -448,12 +448,12 @@ function AddBoqModal({
           <label className="text-xs text-zinc-400 col-span-2">
             Hệ
             <select
-              value={disciplineId}
-              onChange={(e) => setDisciplineId(e.target.value ? Number(e.target.value) : "")}
+              value={systemId}
+              onChange={(e) => setSystemId(e.target.value ? Number(e.target.value) : "")}
               className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
             >
               <option value="">— Chưa gán —</option>
-              {disciplines.map((d) => (
+              {systems.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
                 </option>
@@ -523,16 +523,16 @@ type BoqImportPreviewRow = {
 };
 
 function ImportBoqModal({
-  disciplines,
+  systems,
   onClose,
   onImported,
 }: {
-  disciplines: Discipline[];
+  systems: SystemOption[];
   onClose: () => void;
   onImported: () => void;
 }) {
   const [file, setFile] = useState<File | null>(null);
-  const [disciplineId, setDisciplineId] = useState<number | "">("");
+  const [systemId, setSystemId] = useState<number | "">("");
   const [preview, setPreview] = useState<BoqImportPreviewRow[] | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [skippedTowerBOnly, setSkippedTowerBOnly] = useState(0);
@@ -545,14 +545,14 @@ function ImportBoqModal({
   } | null>(null);
 
   async function runPreview() {
-    if (!file || !disciplineId) return;
+    if (!file || !systemId) return;
     setBusy(true);
     setErr("");
     setPreview(null);
     try {
       const fd = new FormData();
       fd.append("file", file);
-      fd.append("disciplineId", String(disciplineId));
+      fd.append("systemId", String(systemId));
       const res = await fetch("/api/boq/import", { method: "POST", body: fd });
       const j = await res.json().catch(() => null);
       if (!res.ok) {
@@ -570,13 +570,13 @@ function ImportBoqModal({
   }
 
   async function commit() {
-    if (!file || !disciplineId) return;
+    if (!file || !systemId) return;
     setBusy(true);
     setErr("");
     try {
       const fd = new FormData();
       fd.append("file", file);
-      fd.append("disciplineId", String(disciplineId));
+      fd.append("systemId", String(systemId));
       const res = await fetch("/api/boq/import?commit=1", { method: "POST", body: fd });
       const j = await res.json().catch(() => null);
       if (!res.ok) {
@@ -611,7 +611,7 @@ function ImportBoqModal({
               {result.skipped > 0 && `, bỏ qua ${result.skipped} dòng lỗi`}.
             </p>
             {result.errors.length > 0 && (
-              <ul className="text-xs text-rose-300 list-disc pl-4 space-y-0.5">
+              <ul className="text-xs text-rose-300 list-sys pl-4 space-y-0.5">
                 {result.errors.map((e, i) => (
                   <li key={i}>{e}</li>
                 ))}
@@ -647,15 +647,15 @@ function ImportBoqModal({
               <label className="text-xs text-zinc-400 col-span-2">
                 Hệ (dùng để sinh mã, vd ACMV-0001)
                 <select
-                  value={disciplineId}
+                  value={systemId}
                   onChange={(e) => {
-                    setDisciplineId(e.target.value ? Number(e.target.value) : "");
+                    setSystemId(e.target.value ? Number(e.target.value) : "");
                     setPreview(null);
                   }}
                   className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
                 >
                   <option value="">— Chọn hệ —</option>
-                  {disciplines.map((d) => (
+                  {systems.map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.name}
                     </option>
@@ -734,7 +734,7 @@ function ImportBoqModal({
               {!preview ? (
                 <button
                   onClick={runPreview}
-                  disabled={busy || !file || !disciplineId}
+                  disabled={busy || !file || !systemId}
                   className="flex-1 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-40 text-white font-semibold py-2 rounded-lg text-sm"
                 >
                   {busy ? "Đang phân tích…" : "Xem trước"}

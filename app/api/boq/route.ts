@@ -11,10 +11,10 @@ type BoqRow = {
   code: string;
   name: string;
   unit: string;
-  disciplineId: number | null;
-  disciplineCode: string | null;
-  disciplineName: string | null;
-  disciplineColor: string | null;
+  systemId: number | null;
+  systemCode: string | null;
+  systemName: string | null;
+  systemColor: string | null;
   qtyContract: number;
   unitPrice: number;
   qtySub: number;
@@ -37,7 +37,7 @@ type BoqRow = {
 // Trạng thái VO tính vào ngân sách/KL nhận thầu (đồng bộ lib/cost.ts + lib/vo.ts).
 const VO_APPROVED_STATUSES = new Set(["approved", "partially_approved", "contract_added"]);
 
-// GET /api/boq?discipline=<code>&includeVo=0 — danh sách dòng BOQ + tổng hợp KL 3
+// GET /api/boq?system=<code>&includeVo=0 — danh sách dòng BOQ + tổng hợp KL 3
 // lớp (nhận thầu / giao thầu / thực hiện). KL thực hiện tính động từ boq_task_map.
 // includeVo mặc định true: hiện cả dòng phát sinh (VO, M6, badge "VO" ở UI) — dòng
 // VO chưa duyệt vẫn hiện để theo dõi nhưng không cộng vào contractValue.
@@ -45,15 +45,15 @@ export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
-  const discipline = req.nextUrl.searchParams.get("discipline")?.trim() || null;
+  const system = req.nextUrl.searchParams.get("system")?.trim() || null;
   const includeVo = req.nextUrl.searchParams.get("includeVo") !== "0";
   const projectId = await getCurrentProjectId(user);
 
   const conds = [];
   const args: unknown[] = [];
-  if (discipline) {
+  if (system) {
     conds.push("d.code = ?");
-    args.push(discipline);
+    args.push(system);
   }
   if (!includeVo) conds.push("bi.vo_id IS NULL");
   if (projectId != null) {
@@ -66,8 +66,8 @@ export async function GET(req: NextRequest) {
 
   const rows = await query<BoqRow>(
     `SELECT bi.id, bi.code, bi.name, bi.unit,
-            bi.discipline_id AS "disciplineId", d.code AS "disciplineCode",
-            d.name AS "disciplineName", d.color AS "disciplineColor",
+            bi.system_id AS "systemId", d.code AS "systemCode",
+            d.name AS "systemName", d.color AS "systemColor",
             bi.qty_contract AS "qtyContract", bi.unit_price AS "unitPrice",
             bi.qty_sub AS "qtySub", bi.sub_unit_price AS "subUnitPrice",
             bi.note, bi.sort_order AS "sortOrder",
@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
               '[]'
             ) AS map
        FROM boq_items bi
-       LEFT JOIN disciplines d ON d.id = bi.discipline_id
+       LEFT JOIN systems d ON d.id = bi.system_id
        LEFT JOIN variation_orders vo ON vo.id = bi.vo_id
        LEFT JOIN boq_task_map m ON m.boq_item_id = bi.id
        LEFT JOIN tasks t ON t.id = m.task_id
@@ -143,12 +143,12 @@ export async function POST(req: NextRequest) {
       { status: 409 },
     );
 
-  let disciplineId: number | null = null;
-  if (body?.disciplineId != null) {
-    disciplineId = Number(body.disciplineId);
+  let systemId: number | null = null;
+  if (body?.systemId != null) {
+    systemId = Number(body.systemId);
     if (
-      !Number.isInteger(disciplineId) ||
-      !(await queryOne(`SELECT id FROM disciplines WHERE id = ?`, disciplineId))
+      !Number.isInteger(systemId) ||
+      !(await queryOne(`SELECT id FROM systems WHERE id = ?`, systemId))
     )
       return NextResponse.json({ error: "Hệ không hợp lệ" }, { status: 422 });
   }
@@ -163,12 +163,12 @@ export async function POST(req: NextRequest) {
   let id: number;
   try {
     id = await insertId(
-      `INSERT INTO boq_items (code, name, unit, discipline_id, qty_contract, unit_price, qty_sub, sub_unit_price, note, sort_order, project_id)
+      `INSERT INTO boq_items (code, name, unit, system_id, qty_contract, unit_price, qty_sub, sub_unit_price, note, sort_order, project_id)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       code,
       name,
       unit,
-      disciplineId,
+      systemId,
       qtyContract,
       unitPrice,
       qtySub,

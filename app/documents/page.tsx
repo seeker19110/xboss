@@ -6,7 +6,7 @@ import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal } from "@/app/components/dialogs";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { disciplineColorClasses } from "@/lib/disciplineColors";
+import { systemColorClasses } from "@/lib/systemColors";
 
 type DocumentSource = "task" | "contract" | "vo" | "drawing" | "project";
 
@@ -30,9 +30,9 @@ type HubDocument = {
   source: DocumentSource;
   title: string;
   category: string | null;
-  disciplineCode: string | null;
-  disciplineName: string | null;
-  disciplineColor: string | null;
+  systemCode: string | null;
+  systemName: string | null;
+  systemColor: string | null;
   floorLabel: string | null;
   mimeType: string | null;
   sizeBytes: number | null;
@@ -41,14 +41,14 @@ type HubDocument = {
   viewUrl: string;
 };
 
-type Discipline = { id: number; code: string; name: string; color: string | null };
+type SystemOption = { id: number; code: string; name: string; color: string | null };
 
 export default function DocumentsPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [items, setItems] = useState<HubDocument[]>([]);
-  const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+  const [systems, setSystems] = useState<SystemOption[]>([]);
   const [loading, setLoading] = useState(true);
-  const [disciplineFilter, setDisciplineFilter] = useState("");
+  const [systemFilter, setSystemFilter] = useState("");
   const [floorFilter, setFloorFilter] = useState("");
   const [sourceFilter, setSourceFilter] = useState<DocumentSource | "">("");
   const [q, setQ] = useState("");
@@ -61,16 +61,12 @@ export default function DocumentsPage() {
   }
 
   useEffect(() => {
-    Promise.all([
-      fetchMe(),
-      load(),
-      fetch("/api/disciplines").then((r) => (r.ok ? r.json() : null)),
-    ])
-      .then(([meData, docs, disc]) => {
+    Promise.all([fetchMe(), load(), fetch("/api/systems").then((r) => (r.ok ? r.json() : null))])
+      .then(([meData, docs, sys]) => {
         if (!meData) return;
         setMe(meData);
         setItems(docs?.documents ?? []);
-        setDisciplines(disc?.disciplines ?? []);
+        setSystems(sys?.systems ?? []);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -88,13 +84,13 @@ export default function DocumentsPage() {
 
   const filtered = useMemo(() => {
     return items.filter((d) => {
-      if (disciplineFilter && d.disciplineCode !== disciplineFilter) return false;
+      if (systemFilter && d.systemCode !== systemFilter) return false;
       if (floorFilter && d.floorLabel !== floorFilter) return false;
       if (sourceFilter && d.source !== sourceFilter) return false;
       if (q.trim() && !d.title.toLowerCase().includes(q.trim().toLowerCase())) return false;
       return true;
     });
-  }, [items, disciplineFilter, floorFilter, sourceFilter, q]);
+  }, [items, systemFilter, floorFilter, sourceFilter, q]);
 
   if (loading) return <PageSkeleton />;
 
@@ -121,23 +117,23 @@ export default function DocumentsPage() {
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex flex-wrap gap-1.5" role="group" aria-label="Lọc theo hệ">
             <button
-              onClick={() => setDisciplineFilter("")}
+              onClick={() => setSystemFilter("")}
               className={`px-2.5 py-1 rounded-full text-xs font-medium border ${
-                disciplineFilter === ""
+                systemFilter === ""
                   ? "bg-zinc-700 border-zinc-600 text-white"
                   : "border-zinc-700 text-zinc-400 hover:text-white"
               }`}
             >
               Mọi hệ
             </button>
-            {disciplines.map((d) => {
-              const c = disciplineColorClasses(d.color);
+            {systems.map((d) => {
+              const c = systemColorClasses(d.color);
               return (
                 <button
                   key={d.code}
-                  onClick={() => setDisciplineFilter(disciplineFilter === d.code ? "" : d.code)}
+                  onClick={() => setSystemFilter(systemFilter === d.code ? "" : d.code)}
                   className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
-                    disciplineFilter === d.code
+                    systemFilter === d.code
                       ? `${c.border} ${c.text} bg-zinc-800`
                       : "border-zinc-700 text-zinc-400 hover:text-white"
                   }`}
@@ -219,7 +215,7 @@ export default function DocumentsPage() {
                 <tbody>
                   {filtered.map((d) => {
                     const isImage = d.mimeType?.startsWith("image/");
-                    const c = disciplineColorClasses(d.disciplineColor);
+                    const c = systemColorClasses(d.systemColor);
                     return (
                       <tr
                         key={`${d.source}-${d.id}`}
@@ -251,10 +247,10 @@ export default function DocumentsPage() {
                           </span>
                         </td>
                         <td className="p-3 hidden sm:table-cell text-xs">
-                          {d.disciplineName ? (
+                          {d.systemName ? (
                             <span className={`inline-flex items-center gap-1.5 ${c.text}`}>
                               <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
-                              {d.disciplineName}
+                              {d.systemName}
                             </span>
                           ) : (
                             <span className="text-zinc-500">—</span>

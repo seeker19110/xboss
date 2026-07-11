@@ -24,9 +24,9 @@ import { DELAY_REASON_LABEL } from "@/lib/delay";
 // Lookahead/S-Curve/Đường găng bằng 6 trang theo hệ đang thi công, mỗi trang đủ 7 khối
 // tiến độ của riêng hệ đó — cuộn xuống xem hết, không phải tab ẩn/hiện.
 
-// Nhãn hiển thị cứng — KHÔNG dùng summary.discipline.name vì DB ghi "Nước" chứ không
+// Nhãn hiển thị cứng — KHÔNG dùng summary.system.name vì DB ghi "Nước" chứ không
 // phải "Cấp thoát nước" theo yêu cầu hiển thị.
-const HE_LABEL: Record<string, string> = {
+const SYSTEM_LABEL: Record<string, string> = {
   acmv: "ACMV",
   dien: "Điện",
   nuoc: "Cấp thoát nước",
@@ -36,7 +36,7 @@ const HE_LABEL: Record<string, string> = {
 };
 
 type Summary = {
-  discipline: { id: number; code: string; name: string; color: string | null };
+  system: { id: number; code: string; name: string; color: string | null };
   progressPercent: number;
   totalTasks: number;
   delayedCount: number;
@@ -70,18 +70,18 @@ function KpiTile({ label, value, accent }: { label: string; value: string; accen
   );
 }
 
-export default function TienDoHePage({ params }: { params: Promise<{ he: string }> }) {
-  const { he } = use(params);
+export default function ProgressSystemPage({ params }: { params: Promise<{ system: string }> }) {
+  const { system } = use(params);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [schedule, setSchedule] = useState<ScheduleData | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
   const [reasonFilter, setReasonFilter] = useState<string | null>("");
 
-  const validHe = Object.prototype.hasOwnProperty.call(HE_LABEL, he);
+  const validSystem = Object.prototype.hasOwnProperty.call(SYSTEM_LABEL, system);
 
   useEffect(() => {
-    if (!validHe) {
+    if (!validSystem) {
       setLoading(false);
       setNotFound(true);
       return;
@@ -90,10 +90,10 @@ export default function TienDoHePage({ params }: { params: Promise<{ he: string 
     setNotFound(false);
     Promise.all([
       fetchMe(),
-      fetch(`/api/disciplines/${he}/summary`).then((r) =>
+      fetch(`/api/systems/${system}/summary`).then((r) =>
         r.status === 404 ? null : r.ok ? r.json() : Promise.reject(new Error("fetch failed")),
       ),
-      fetch(`/api/schedule-control?he=${encodeURIComponent(he)}`).then((r) =>
+      fetch(`/api/schedule-control?system=${encodeURIComponent(system)}`).then((r) =>
         r.status === 401 ? null : r.ok ? r.json() : Promise.reject(new Error("fetch failed")),
       ),
     ])
@@ -111,7 +111,7 @@ export default function TienDoHePage({ params }: { params: Promise<{ he: string 
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
-  }, [he, validHe]);
+  }, [system, validSystem]);
 
   const maxParetoCount = useMemo(
     () => Math.max(1, ...(schedule?.delayPareto ?? []).map((r) => r.count)),
@@ -127,14 +127,14 @@ export default function TienDoHePage({ params }: { params: Promise<{ he: string 
 
   if (loading) return <PageSkeleton />;
 
-  const label = HE_LABEL[he];
+  const label = SYSTEM_LABEL[system];
 
   if (notFound || !summary || !label) {
     return (
       <div className="min-h-screen bg-zinc-950 text-white">
         <AppHeader title="Không tìm thấy hệ" />
         <main className="p-4 sm:p-6">
-          <EmptyState message={`Không tìm thấy hệ "${he}".`} />
+          <EmptyState message={`Không tìm thấy hệ "${system}".`} />
         </main>
       </div>
     );
@@ -179,7 +179,7 @@ export default function TienDoHePage({ params }: { params: Promise<{ he: string 
             <TrendingUp className="w-4 h-4 text-emerald-400 shrink-0" />
             <h2 className="font-semibold text-sm text-zinc-200">Biểu đồ kế hoạch so với thực tế</h2>
           </div>
-          <SCurveChart he={he} />
+          <SCurveChart system={system} />
         </section>
 
         {/* ── 3. Timeline ── */}
@@ -188,7 +188,7 @@ export default function TienDoHePage({ params }: { params: Promise<{ he: string 
             <MapIcon className="w-4 h-4 text-sky-400 shrink-0" />
             <h2 className="font-semibold text-sm text-zinc-200">Timeline</h2>
           </div>
-          <ProgressMap he={he} />
+          <ProgressMap system={system} />
         </section>
 
         {/* ── 4. Chỉ số tiến độ SPI ── */}
@@ -197,7 +197,7 @@ export default function TienDoHePage({ params }: { params: Promise<{ he: string 
             <Gauge className="w-4 h-4 text-sky-400 shrink-0" />
             <h2 className="font-semibold text-sm text-zinc-200">Chỉ số tiến độ SPI</h2>
           </div>
-          <SpiCards he={he} />
+          <SpiCards system={system} />
         </section>
 
         {/* ── 5. Dự báo hoàn thành ── */}
@@ -206,7 +206,7 @@ export default function TienDoHePage({ params }: { params: Promise<{ he: string 
             <TrendingUp className="w-4 h-4 text-emerald-400 shrink-0" />
             <h2 className="font-semibold text-sm text-zinc-200">Dự báo hoàn thành</h2>
           </div>
-          <ForecastCards he={he} />
+          <ForecastCards system={system} />
         </section>
 
         {/* ── 6. Nguyên nhân trễ ── */}

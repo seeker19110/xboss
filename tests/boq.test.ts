@@ -60,7 +60,7 @@ test("makeBoq: sheet không có mapping tĩnh → giữ nguyên mã sheet viết
 test("parseBoqWorkbook: chỉ lấy dòng hạng mục phần I, KL Tháp A, dừng ở ranh giới phần II", () => {
   const result = parseBoqWorkbook(fakeBoqWorkbook());
 
-  assert.equal(result.detectedDisciplineCode, "acmv");
+  assert.equal(result.detectedSystemCode, "acmv");
   assert.equal(result.skippedTowerBOnly, 1); // "EAF-02 (chỉ Tháp B)"
   assert.equal(result.rows.length, 2); // EAF-01 + FAF-01, không lấy dòng phát sinh ở phần II
 
@@ -92,10 +92,8 @@ test(
     const { run, query, queryOne, insertId } = await import("@/lib/db");
     const { previewBoqImport, commitBoqImport } = await import("@/lib/boq-import");
 
-    const discipline = await queryOne<{ id: number }>(
-      `SELECT id FROM disciplines WHERE code = 'acmv'`,
-    );
-    const disciplineId = discipline!.id;
+    const system = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'acmv'`);
+    const systemId = system!.id;
     const testProjectId = await insertId(
       `INSERT INTO projects (name) VALUES ('Test boq import commit')`,
     );
@@ -114,7 +112,7 @@ test(
     assert.equal(preview[1].code, "ACMV-0003");
     assert.ok(preview.every((p) => p.action === "add"));
 
-    const result = await commitBoqImport(parsed.rows, disciplineId, "acmv", testProjectId);
+    const result = await commitBoqImport(parsed.rows, systemId, "acmv", testProjectId);
     assert.equal(result.inserted, 2);
     assert.equal(result.skipped, 0);
 

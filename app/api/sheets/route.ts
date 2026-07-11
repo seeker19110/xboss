@@ -78,13 +78,13 @@ export async function POST(req: NextRequest) {
   const responsible =
     typeof body?.responsible === "string" ? body.responsible.trim() || null : null;
 
-  // Hệ (discipline) gán cho sheet mới — dùng khi tạo sheet từ trang hệ /he/[code] (M15).
-  let disciplineId: number | null = null;
-  if (body?.disciplineId != null) {
-    disciplineId = Number(body.disciplineId);
+  // Hệ (system) gán cho sheet mới — dùng khi tạo sheet từ trang hệ /system/[code] (M15).
+  let systemId: number | null = null;
+  if (body?.systemId != null) {
+    systemId = Number(body.systemId);
     if (
-      !Number.isInteger(disciplineId) ||
-      !(await queryOne(`SELECT id FROM disciplines WHERE id = ?`, disciplineId))
+      !Number.isInteger(systemId) ||
+      !(await queryOne(`SELECT id FROM systems WHERE id = ?`, systemId))
     )
       return NextResponse.json({ error: "Hệ không hợp lệ" }, { status: 422 });
   }
@@ -96,13 +96,13 @@ export async function POST(req: NextRequest) {
   try {
     const result = await withTransaction(async () => {
       const newId = await insertId(
-        `INSERT INTO sheet_types (tower_id, code, name, responsible, slug, discipline_id) VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO sheet_types (tower_id, code, name, responsible, slug, system_id) VALUES (?, ?, ?, ?, ?, ?)`,
         tower.id,
         code,
         name,
         responsible,
         slug,
-        disciplineId,
+        systemId,
       );
       let n = 0;
       if (copyFromId !== null) {

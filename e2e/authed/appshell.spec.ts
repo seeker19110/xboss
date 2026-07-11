@@ -55,7 +55,7 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     }
 
     // 6 mục hệ trong nhóm "Tiến độ" (dash.tien-do) trùng tên với mục "Hệ thi công"
-    // (link /he/[code], render riêng ngoài cây điều hướng — xem AppHeader.tsx) nên phải
+    // (link /system/[code], render riêng ngoài cây điều hướng — xem AppHeader.tsx) nên phải
     // thu hẹp về đúng nhóm "Tiến độ" để tránh nhập nhằng nhiều link cùng tên.
     const tienDoGroup = sidebar.getByRole("button", { name: "Tiến độ" }).locator("xpath=..");
     for (const label of ["ACMV", "Điện", "Cấp thoát nước", "PCCC", "Kết cấu", "Xây tô"]) {
@@ -104,7 +104,7 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     const sidebar = page.locator("#app-sidebar");
     const toggle = sidebar.getByRole("button", { name: "Tiến độ" });
     await expect(toggle).toBeVisible({ timeout: 15_000 });
-    // "ACMV" cũng là tên 1 mục ở nhóm "Hệ thi công" riêng (link /he/[code], luôn hiển thị
+    // "ACMV" cũng là tên 1 mục ở nhóm "Hệ thi công" riêng (link /system/[code], luôn hiển thị
     // ngoài nhóm gập/mở) — thu hẹp về đúng nhóm "Tiến độ" để không lẫn.
     const tienDoGroup = toggle.locator("xpath=..");
 

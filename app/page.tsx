@@ -23,14 +23,14 @@ import { DELAY_REASON_LABEL } from "@/lib/delay";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { sortFloorsAsc } from "@/lib/floors";
 import { formatDateVN } from "@/lib/date";
-import { disciplineColorClasses } from "@/lib/disciplineColors";
+import { systemColorClasses } from "@/lib/systemColors";
 import type {
   CashflowMonth,
   CpiBlock,
   QualityBlock,
   VoBlock,
   WorkfrontBlock,
-  DisciplineCrossRow,
+  SystemCrossRow,
   ApprovalsBlock,
 } from "@/app/components/DashboardExtCards";
 
@@ -98,7 +98,7 @@ type KPI = {
   delayed: number;
 };
 type SheetNav = { id: number; code: string; name: string; slug: string };
-type DisciplineCard = {
+type SystemCard = {
   id: number;
   code: string;
   name: string;
@@ -118,7 +118,7 @@ export default function Dashboard() {
     quality: QualityBlock;
     vo: VoBlock | null;
     workfront: WorkfrontBlock | null;
-    byDiscipline: DisciplineCrossRow[];
+    bySystem: SystemCrossRow[];
     approvals: ApprovalsBlock | null;
   } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -136,7 +136,7 @@ export default function Dashboard() {
   } | null>(null);
   const [newSheetErr, setNewSheetErr] = useState("");
   const [kpiOrder, setKpiOrder] = useState<KPI[]>([]);
-  const [disciplines, setDisciplines] = useState<DisciplineCard[]>([]);
+  const [systems, setSystems] = useState<SystemCard[]>([]);
   const dragIdx = useRef<number | null>(null);
   const dragOverIdx = useRef<number | null>(null);
 
@@ -145,15 +145,15 @@ export default function Dashboard() {
       fetchMe(),
       fetch("/api/dashboard").then((r) => (r.ok ? r.json() : null)),
       fetch("/api/sheets").then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/disciplines").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/systems").then((r) => (r.ok ? r.json() : null)),
     ])
-      .then(([meData, dash, sh, disc]) => {
+      .then(([meData, dash, sh, sys]) => {
         if (!meData) return;
         setMe(meData);
         setData(dash);
         setKpiOrder(dash?.kpi ?? []);
         setSheets(sh?.sheets ?? []);
-        setDisciplines((disc?.disciplines ?? []).filter((d: DisciplineCard) => d.sheetCount > 0));
+        setSystems((sys?.systems ?? []).filter((d: SystemCard) => d.sheetCount > 0));
       })
       .finally(() => setLoading(false));
   }, []);
@@ -335,19 +335,19 @@ export default function Dashboard() {
       {/* pb-24 chừa chỗ cho thanh cố định dưới đáy (tìm kiếm/Nghiệm thu/Excel/PDF/Import) */}
       <main className="px-4 sm:px-6 py-6 pb-24 space-y-6 max-w-screen-xl mx-auto">
         {/* ── Card hệ (M15) — nhìn nhanh từng hệ, bấm vào trang hub riêng ── */}
-        {disciplines.length > 0 && (
+        {systems.length > 0 && (
           <section>
             <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-3">
               Theo hệ thi công
             </h2>
             <div className="flex gap-3 overflow-x-auto scrollbar-none pb-1">
-              {disciplines.map((d) => {
-                const c = disciplineColorClasses(d.color);
+              {systems.map((d) => {
+                const c = systemColorClasses(d.color);
                 const dpct = Math.round((d.avgProgress ?? 0) * 100);
                 return (
                   <a
                     key={d.code}
-                    href={`/he/${d.code}`}
+                    href={`/system/${d.code}`}
                     className={`shrink-0 w-40 bg-zinc-900 border border-zinc-800 border-l-4 ${c.border} rounded-xl p-3 hover:border-zinc-600 transition`}
                   >
                     <div className="flex items-center gap-1.5 min-w-0">
@@ -506,7 +506,7 @@ export default function Dashboard() {
             quality={data.quality}
             vo={data.vo}
             workfront={data.workfront}
-            byDiscipline={data.byDiscipline}
+            bySystem={data.bySystem}
             approvals={data.approvals}
             isEngineer={me?.role === "engineer"}
           />

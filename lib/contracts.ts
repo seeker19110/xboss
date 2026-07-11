@@ -30,7 +30,7 @@ export type ContractInput = {
   title: string;
   partySupplierId: number | null;
   partyName: string | null;
-  disciplineId: number | null;
+  systemId: number | null;
   value: number;
   advancePct: number;
   retentionPct: number;
@@ -44,7 +44,7 @@ export type ContractInput = {
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Validate thuần — trả thông điệp lỗi tiếng Việt hoặc null khi hợp lệ.
-// Không chạm DB (tồn tại supplier/discipline do route kiểm riêng).
+// Không chạm DB (tồn tại supplier/system do route kiểm riêng).
 export function validateContractInput(input: ContractInput): string | null {
   if (!input.code.trim()) return "Thiếu số hợp đồng";
   if (!input.title.trim()) return "Thiếu tên hợp đồng";
@@ -84,7 +84,7 @@ export function parseContractBody(body: Record<string, unknown>): ContractInput 
     title: str(body.title),
     partySupplierId: body.partySupplierId != null ? Number(body.partySupplierId) : null,
     partyName: strOrNull(body.partyName),
-    disciplineId: body.disciplineId != null ? Number(body.disciplineId) : null,
+    systemId: body.systemId != null ? Number(body.systemId) : null,
     value: body.value != null ? Number(body.value) : 0,
     advancePct: body.advancePct != null ? Number(body.advancePct) : 0,
     retentionPct: body.retentionPct != null ? Number(body.retentionPct) : 0,
@@ -96,7 +96,7 @@ export function parseContractBody(body: Record<string, unknown>): ContractInput 
   };
 }
 
-// Kiểm FK tồn tại (supplier/discipline) — trả thông điệp lỗi hoặc null.
+// Kiểm FK tồn tại (supplier/system) — trả thông điệp lỗi hoặc null.
 export async function checkContractRefs(input: ContractInput): Promise<string | null> {
   if (input.partySupplierId != null) {
     if (
@@ -105,10 +105,10 @@ export async function checkContractRefs(input: ContractInput): Promise<string | 
     )
       return "Đối tác (NCC/thầu phụ) không tồn tại";
   }
-  if (input.disciplineId != null) {
+  if (input.systemId != null) {
     if (
-      !Number.isInteger(input.disciplineId) ||
-      !(await queryOne(`SELECT id FROM disciplines WHERE id = ?`, input.disciplineId))
+      !Number.isInteger(input.systemId) ||
+      !(await queryOne(`SELECT id FROM systems WHERE id = ?`, input.systemId))
     )
       return "Hệ không hợp lệ";
   }
@@ -123,10 +123,10 @@ export type ContractRow = {
   partySupplierId: number | null;
   partySupplierName: string | null;
   partyName: string | null;
-  disciplineId: number | null;
-  disciplineCode: string | null;
-  disciplineName: string | null;
-  disciplineColor: string | null;
+  systemId: number | null;
+  systemCode: string | null;
+  systemName: string | null;
+  systemColor: string | null;
   value: number;
   advancePct: number;
   retentionPct: number;
@@ -165,8 +165,8 @@ export async function listContracts(
     `SELECT c.id, c.code, c.kind, c.title,
             c.party_supplier_id AS "partySupplierId", s.name AS "partySupplierName",
             c.party_name AS "partyName",
-            c.discipline_id AS "disciplineId", d.code AS "disciplineCode",
-            d.name AS "disciplineName", d.color AS "disciplineColor",
+            c.system_id AS "systemId", d.code AS "systemCode",
+            d.name AS "systemName", d.color AS "systemColor",
             c.value, c.advance_pct AS "advancePct", c.retention_pct AS "retentionPct",
             c.signed_date AS "signedDate", c.valid_from AS "validFrom", c.valid_to AS "validTo",
             c.status, c.note, c.created_by AS "createdBy", c.created_at AS "createdAt",
@@ -175,7 +175,7 @@ export async function listContracts(
             COALESCE(po.total, 0) AS "poCommitted"
        FROM contracts c
        LEFT JOIN suppliers s ON s.id = c.party_supplier_id
-       LEFT JOIN disciplines d ON d.id = c.discipline_id
+       LEFT JOIN systems d ON d.id = c.system_id
        LEFT JOIN (SELECT contract_id, SUM(value_delta) AS total
                     FROM contract_addenda GROUP BY contract_id) a ON a.contract_id = c.id
        LEFT JOIN (SELECT contract_id, SUM(amount) AS total

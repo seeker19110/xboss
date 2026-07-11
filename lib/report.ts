@@ -117,21 +117,21 @@ export function reconstructProgressAtDate<T extends { id: number; progress: numb
   return result;
 }
 
-// Bản đọc DB: tái dựng % tiến độ từng task tại mốc `date`, lọc theo hệ nếu có `disciplineId`.
+// Bản đọc DB: tái dựng % tiến độ từng task tại mốc `date`, lọc theo hệ nếu có `systemId`.
 export async function progressAtDate(
   date: string,
-  filter: { disciplineId?: number } = {},
+  filter: { systemId?: number } = {},
 ): Promise<TaskProgressAtDate[]> {
-  const heFilter = filter.disciplineId != null ? "AND st.discipline_id = ?" : "";
-  const heParams = filter.disciplineId != null ? [filter.disciplineId] : [];
+  const systemFilter = filter.systemId != null ? "AND st.system_id = ?" : "";
+  const systemParams = filter.systemId != null ? [filter.systemId] : [];
 
   const tasks = await query<{ id: number; progress: number; sheetId: number; sheetType: string }>(
     `SELECT t.id, t.progress_percent AS progress, st.id AS "sheetId", st.code AS "sheetType"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
-      WHERE 1=1 ${heFilter}`,
-    ...heParams,
+      WHERE 1=1 ${systemFilter}`,
+    ...systemParams,
   );
 
   const hist = await query<HistRow>(
@@ -141,9 +141,9 @@ export async function progressAtDate(
        JOIN tasks t ON h.task_id = t.id
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
-      WHERE 1=1 ${heFilter}
+      WHERE 1=1 ${systemFilter}
       ORDER BY h.task_id, h.changed_at`,
-    ...heParams,
+    ...systemParams,
   );
 
   const progress = reconstructProgressAtDate(tasks, hist, date);

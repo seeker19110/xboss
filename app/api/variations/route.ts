@@ -59,10 +59,10 @@ export async function POST(req: NextRequest) {
   const validationErr = validateVoInput(input);
   if (validationErr) return NextResponse.json({ error: validationErr }, { status: 422 });
 
-  if (input.disciplineId != null) {
+  if (input.systemId != null) {
     if (
-      !Number.isInteger(input.disciplineId) ||
-      !(await queryOne(`SELECT id FROM disciplines WHERE id = ?`, input.disciplineId))
+      !Number.isInteger(input.systemId) ||
+      !(await queryOne(`SELECT id FROM systems WHERE id = ?`, input.systemId))
     )
       return NextResponse.json({ error: "Hệ không hợp lệ" }, { status: 422 });
   }
@@ -75,24 +75,24 @@ export async function POST(req: NextRequest) {
       withTransaction(async () => {
         const code = await nextVoCode();
         const id = await insertId(
-          `INSERT INTO variation_orders (code, title, reason, description, discipline_id, created_by, project_id)
+          `INSERT INTO variation_orders (code, title, reason, description, system_id, created_by, project_id)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
           code,
           input.title,
           input.reason,
           input.description,
-          input.disciplineId,
+          input.systemId,
           user.id,
           projectId,
         );
         for (const line of input.lines) {
           await insertId(
-            `INSERT INTO boq_items (code, name, unit, discipline_id, qty_contract, unit_price, vo_id)
+            `INSERT INTO boq_items (code, name, unit, system_id, qty_contract, unit_price, vo_id)
              VALUES (?, ?, ?, ?, ?, ?, ?)`,
             line.code.trim(),
             line.name.trim(),
             line.unit.trim(),
-            input.disciplineId,
+            input.systemId,
             line.qty,
             line.unitPrice,
             id,
