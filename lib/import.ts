@@ -210,6 +210,13 @@ async function getOrCreateTower(projectId: number): Promise<number> {
   return insertId(`INSERT INTO towers (project_id, name) VALUES (?, ?)`, projectId, "Tháp A");
 }
 
+// Toàn bộ sheet trong SHEET_MAP là tracking ACMV (xem migrations/0005_boq.sql) — sheet tạo
+// mới qua import phải gán system_id ngay, nếu không /progress/acmv sẽ không thấy dữ liệu.
+async function getAcmvSystemId(): Promise<number | null> {
+  const d = await queryOne<Row>(`SELECT id FROM systems WHERE code = 'acmv'`);
+  return d?.id ?? null;
+}
+
 export async function importWorkbook(workbook: XLSX.WorkBook): Promise<ImportStats> {
   const stats: ImportStats = {
     totalRows: 0,
@@ -222,6 +229,7 @@ export async function importWorkbook(workbook: XLSX.WorkBook): Promise<ImportSta
 
   const projectId = await getOrCreateProject();
   const towerId = await getOrCreateTower(projectId);
+  const acmvSystemId = await getAcmvSystemId();
   const touchedPkgs = new Set<number>();
 
   for (const sheetName of workbook.SheetNames) {
@@ -241,12 +249,13 @@ export async function importWorkbook(workbook: XLSX.WorkBook): Promise<ImportSta
     if (!st) {
       st = {
         id: await insertId(
-          `INSERT INTO sheet_types (tower_id, code, name, responsible, slug) VALUES (?, ?, ?, ?, ?)`,
+          `INSERT INTO sheet_types (tower_id, code, name, responsible, slug, system_id) VALUES (?, ?, ?, ?, ?, ?)`,
           towerId,
           info.code,
           info.name,
           info.responsible ?? null,
           slugFromCode(info.code) ?? toSlug(info.code),
+          acmvSystemId,
         ),
       };
     }
