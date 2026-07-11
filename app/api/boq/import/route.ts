@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 const MAX_BYTES = 20 * 1024 * 1024; // 20 MB, khớp /api/import/excel
 
-// POST /api/boq/import  (formData: file, disciplineId)  ?commit=1 mới ghi DB.
+// POST /api/boq/import  (formData: file, systemId)  ?commit=1 mới ghi DB.
 // Không commit → chỉ phân tích + preview (mã sẽ sinh, dòng lỗi trùng mã nếu có).
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
@@ -31,17 +31,14 @@ export async function POST(req: NextRequest) {
       { status: 413 },
     );
 
-  const disciplineId = Number(formData?.get("disciplineId"));
-  if (!Number.isInteger(disciplineId))
-    return NextResponse.json(
-      { error: "Thiếu hệ (discipline) để gán cho dòng BOQ" },
-      { status: 422 },
-    );
-  const discipline = await queryOne<{ code: string }>(
-    `SELECT code FROM disciplines WHERE id = ?`,
-    disciplineId,
+  const systemId = Number(formData?.get("systemId"));
+  if (!Number.isInteger(systemId))
+    return NextResponse.json({ error: "Thiếu hệ (system) để gán cho dòng BOQ" }, { status: 422 });
+  const system = await queryOne<{ code: string }>(
+    `SELECT code FROM systems WHERE id = ?`,
+    systemId,
   );
-  if (!discipline) return NextResponse.json({ error: "Hệ không hợp lệ" }, { status: 422 });
+  if (!system) return NextResponse.json({ error: "Hệ không hợp lệ" }, { status: 422 });
 
   let workbook: XLSX.WorkBook;
   try {
@@ -65,10 +62,10 @@ export async function POST(req: NextRequest) {
   const commit = req.nextUrl.searchParams.get("commit") === "1";
 
   if (!commit) {
-    const preview = await previewBoqImport(parsed.rows, discipline.code);
+    const preview = await previewBoqImport(parsed.rows, system.code);
     return NextResponse.json({
       preview,
-      detectedDisciplineCode: parsed.detectedDisciplineCode,
+      detectedSystemCode: parsed.detectedSystemCode,
       warnings: parsed.warnings,
       skippedTowerBOnly: parsed.skippedTowerBOnly,
     });
@@ -78,6 +75,6 @@ export async function POST(req: NextRequest) {
   if (projectId == null)
     return NextResponse.json({ error: "Chưa có dự án nào để import BOQ" }, { status: 422 });
 
-  const result = await commitBoqImport(parsed.rows, disciplineId, discipline.code, projectId);
+  const result = await commitBoqImport(parsed.rows, systemId, system.code, projectId);
   return NextResponse.json(result);
 }

@@ -41,14 +41,14 @@ export type ScheduleControlData = {
 };
 
 export async function getScheduleControlData(
-  disciplineId: number | null,
+  systemId: number | null,
 ): Promise<ScheduleControlData> {
   const today = todayISO();
-  const heFilterAnd = disciplineId !== null ? "AND st.discipline_id = ?" : "";
-  const heParams = disciplineId !== null ? [disciplineId] : [];
+  const systemFilterAnd = systemId !== null ? "AND st.system_id = ?" : "";
+  const systemParams = systemId !== null ? [systemId] : [];
 
   // Đường găng: CPM trên tập nhóm việc đã lọc theo hệ (nhất quán với /api/gantt).
-  const { nodes, edges, meta } = await getCpmData(disciplineId);
+  const { nodes, edges, meta } = await getCpmData(systemId);
   const cpm = computeCpm(nodes, edges);
   const critical: CriticalRow[] = [...cpm.criticalNodes]
     .map((id) => {
@@ -80,10 +80,10 @@ export async function getScheduleControlData(
       WHERE t.end_date IS NOT NULL AND t.end_date < ?
         AND t.progress_percent < 1
         AND t.status NOT IN ('hoan_thanh','nghiem_thu')
-        ${heFilterAnd}
+        ${systemFilterAnd}
       ORDER BY t.end_date`,
     today,
-    ...heParams,
+    ...systemParams,
   );
 
   // Pareto lý do trễ — cùng cách đếm với panel Pareto trên Dashboard (app/page.tsx):

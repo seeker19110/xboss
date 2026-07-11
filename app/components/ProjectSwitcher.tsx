@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Star, LayoutGrid, Search } from "lucide-react";
-import { disciplineColorClasses } from "@/lib/disciplineColors";
+import { systemColorClasses } from "@/lib/systemColors";
 import type { ProjectListItem } from "@/lib/projects";
 
 const PINNED_KEY = "xboss_pinned";
@@ -131,7 +131,7 @@ export default function ProjectSwitcher({ collapsed }: { collapsed: boolean }) {
   const list = projects ?? [];
   const currentProject = list.find((p) => p.id === current) ?? list[0];
   const effectiveCurrentId = currentProject?.id;
-  const c = disciplineColorClasses(currentProject?.color);
+  const c = systemColorClasses(currentProject?.color);
 
   function onTriggerKey(e: React.KeyboardEvent) {
     if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
@@ -162,7 +162,7 @@ export default function ProjectSwitcher({ collapsed }: { collapsed: boolean }) {
   }
 
   function row(p: ProjectListItem, idx: number) {
-    const cc = disciplineColorClasses(p.color);
+    const cc = systemColorClasses(p.color);
     const isCurrent = p.id === effectiveCurrentId;
     const isPinned = pinned.includes(p.id);
     return (

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, todayISO } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
-import { resolveDisciplineId } from "@/lib/disciplines";
+import { resolveSystemId } from "@/lib/systems";
 
 export const dynamic = "force-dynamic";
 
@@ -23,12 +23,12 @@ const DAY_MS = 86400_000;
 const toDate = (iso: string) => new Date(iso + "T00:00:00Z").getTime();
 const toISO = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
-// GET /api/dashboard/scurve?sheet=OGTĐ&baseline=<id>&he=<disciplines.code> (đều tuỳ chọn)
+// GET /api/dashboard/scurve?sheet=OGTĐ&baseline=<id>&system=<systems.code> (đều tuỳ chọn)
 // S-curve: đường kế hoạch (nội suy tuyến tính start→end mỗi task)
 // vs đường thực tế (tái dựng % từng ngày từ task_history).
 // Có ?baseline= → đường kế hoạch dùng ngày đã chốt trong baseline thay vì ngày hiện tại,
 // để đo độ lệch so với kế hoạch gốc kể cả khi PM đã dời ngày.
-// `he` (M36) gộp mọi sheet thuộc hệ — truyền cả `sheet` lẫn `he` thì `sheet` thắng (hẹp hơn).
+// `system` (M36) gộp mọi sheet thuộc hệ — truyền cả `sheet` lẫn `system` thì `sheet` thắng (hẹp hơn).
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -37,13 +37,9 @@ export async function GET(req: NextRequest) {
 
   const sheet = req.nextUrl.searchParams.get("sheet");
   const baselineId = parseInt(req.nextUrl.searchParams.get("baseline") ?? "");
-  const disciplineId = sheet ? null : await resolveDisciplineId(req.nextUrl.searchParams.get("he"));
-  const sheetFilter = sheet
-    ? `AND st.code = ?`
-    : disciplineId !== null
-      ? `AND st.discipline_id = ?`
-      : "";
-  const params = sheet ? [sheet] : disciplineId !== null ? [disciplineId] : [];
+  const systemId = sheet ? null : await resolveSystemId(req.nextUrl.searchParams.get("system"));
+  const sheetFilter = sheet ? `AND st.code = ?` : systemId !== null ? `AND st.system_id = ?` : "";
+  const params = sheet ? [sheet] : systemId !== null ? [systemId] : [];
 
   const tasks = await query<TaskRow>(
     `SELECT t.id, t.start_date AS "startDate", t.end_date AS "endDate",

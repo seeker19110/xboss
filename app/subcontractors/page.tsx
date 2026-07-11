@@ -16,10 +16,10 @@ function fmtVND(n: number) {
 
 // ===== Kiểu dữ liệu (client) — mirror lib/subcontractors.ts =====
 
-type Discipline = {
-  disciplineId: number;
-  disciplineCode: string;
-  disciplineName: string;
+type SystemOption = {
+  systemId: number;
+  systemCode: string;
+  systemName: string;
   zone: string | null;
   floorLabels: string[] | null;
   isPrimary: boolean;
@@ -30,7 +30,7 @@ type SubcontractorListItem = {
   name: string;
   phone: string | null;
   email: string | null;
-  disciplines: Discipline[];
+  systems: SystemOption[];
   orgChartNote: string | null;
   siteRepName: string | null;
   siteRepPhone: string | null;
@@ -82,7 +82,7 @@ type SubcontractorDetail = {
   email: string | null;
   address: string | null;
   note: string | null;
-  disciplines: Discipline[];
+  systems: SystemOption[];
   profile: {
     projectId: number | null;
     orgChartNote: string | null;
@@ -200,10 +200,10 @@ export default function SubcontractorsPage() {
                         )}
                       </td>
                       <td className="p-3 text-xs text-zinc-400">
-                        {it.disciplines.length === 0
+                        {it.systems.length === 0
                           ? "—"
-                          : it.disciplines
-                              .map((d) => `${d.disciplineName}${d.zone ? ` (${d.zone})` : ""}`)
+                          : it.systems
+                              .map((d) => `${d.systemName}${d.zone ? ` (${d.zone})` : ""}`)
                               .join(", ")}
                       </td>
                       <td className="p-3">
@@ -459,12 +459,12 @@ function ProfileTab({
             </p>
             <p className="text-xs text-zinc-500 pt-1">
               Hệ phụ trách:{" "}
-              {detail.disciplines.length === 0
+              {detail.systems.length === 0
                 ? "—"
-                : detail.disciplines
+                : detail.systems
                     .map(
                       (d) =>
-                        `${d.disciplineName}${d.zone ? ` · ${d.zone}` : ""}${
+                        `${d.systemName}${d.zone ? ` · ${d.zone}` : ""}${
                           d.floorLabels?.length ? ` (${d.floorLabels.join(", ")})` : ""
                         }`,
                     )

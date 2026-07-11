@@ -9,9 +9,9 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { costSummary, disciplineBudget } = await import("@/lib/cost");
+    const { costSummary, systemBudget } = await import("@/lib/cost");
 
-    const dien = await queryOne<{ id: number }>(`SELECT id FROM disciplines WHERE code = 'dien'`);
+    const dien = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'dien'`);
     assert.ok(dien);
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test cost')`);
@@ -20,14 +20,14 @@ test(
       projectId,
     );
     const stId = await insertId(
-      `INSERT INTO sheet_types (tower_id, code, name, discipline_id) VALUES (?, 'TESTCOST', 'Sheet chi phí', ?)`,
+      `INSERT INTO sheet_types (tower_id, code, name, system_id) VALUES (?, 'TESTCOST', 'Sheet chi phí', ?)`,
       towerId,
       dien!.id,
     );
 
     // Ngân sách: 1 dòng BOQ 100 x 1000 = 100,000.
     const boqId = await insertId(
-      `INSERT INTO boq_items (code, name, unit, discipline_id, qty_contract, unit_price)
+      `INSERT INTO boq_items (code, name, unit, system_id, qty_contract, unit_price)
        VALUES ('TESTBOQ-COST', 'Ống gió test', 'm', ?, 100, 1000)`,
       dien!.id,
     );
@@ -82,7 +82,7 @@ test(
     assert.equal(row!.committed, 5_000 + 20_000); // PO huỷ không tính
     assert.equal(row!.actual, 3_000 + 1_000); // advance tính vào thực chi
 
-    assert.equal(await disciplineBudget(dien!.id), 100_000);
+    assert.equal(await systemBudget(dien!.id), 100_000);
 
     // Dọn dữ liệu test.
     await run(`DELETE FROM payment_bills WHERE sheet_type_id = ?`, stId);
@@ -105,7 +105,7 @@ test(
     const { run, insertId, queryOne } = await import("@/lib/db");
     const { costSummary } = await import("@/lib/cost");
 
-    const dien = await queryOne<{ id: number }>(`SELECT id FROM disciplines WHERE code = 'dien'`);
+    const dien = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'dien'`);
     assert.ok(dien);
 
     // 2 dự án độc lập, mỗi dự án có tháp/sheet/BOQ/PO/giao thầu/bill riêng.
@@ -120,25 +120,25 @@ test(
       projB,
     );
     const stA = await insertId(
-      `INSERT INTO sheet_types (tower_id, code, name, discipline_id) VALUES (?, 'TESTCOSTA', 'Sheet chi phí A', ?)`,
+      `INSERT INTO sheet_types (tower_id, code, name, system_id) VALUES (?, 'TESTCOSTA', 'Sheet chi phí A', ?)`,
       towerA,
       dien!.id,
     );
     const stB = await insertId(
-      `INSERT INTO sheet_types (tower_id, code, name, discipline_id) VALUES (?, 'TESTCOSTB', 'Sheet chi phí B', ?)`,
+      `INSERT INTO sheet_types (tower_id, code, name, system_id) VALUES (?, 'TESTCOSTB', 'Sheet chi phí B', ?)`,
       towerB,
       dien!.id,
     );
 
     // Ngân sách: BOQ gắn project_id trực tiếp (migration 0027).
     const boqA = await insertId(
-      `INSERT INTO boq_items (code, name, unit, discipline_id, qty_contract, unit_price, project_id)
+      `INSERT INTO boq_items (code, name, unit, system_id, qty_contract, unit_price, project_id)
        VALUES ('TESTBOQ-A', 'Ống gió A', 'm', ?, 100, 1000, ?)`,
       dien!.id,
       projA,
     );
     const boqB = await insertId(
-      `INSERT INTO boq_items (code, name, unit, discipline_id, qty_contract, unit_price, project_id)
+      `INSERT INTO boq_items (code, name, unit, system_id, qty_contract, unit_price, project_id)
        VALUES ('TESTBOQ-B', 'Ống gió B', 'm', ?, 200, 1000, ?)`,
       dien!.id,
       projB,

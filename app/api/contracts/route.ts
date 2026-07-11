@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
   let id: number;
   try {
     id = await insertId(
-      `INSERT INTO contracts (code, kind, title, party_supplier_id, party_name, discipline_id,
+      `INSERT INTO contracts (code, kind, title, party_supplier_id, party_name, system_id,
                               value, advance_pct, retention_pct, signed_date, valid_from, valid_to,
                               status, note, created_by, project_id)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       input.title,
       input.partySupplierId,
       input.partyName,
-      input.disciplineId,
+      input.systemId,
       input.value,
       input.advancePct,
       input.retentionPct,

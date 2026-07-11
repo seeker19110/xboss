@@ -11,7 +11,7 @@ test("validateVoInput: đủ ca hợp lệ/không hợp lệ", async () => {
     title: "Bổ sung ống gió tầng 5",
     reason: "design_change" as const,
     description: null,
-    disciplineId: null,
+    systemId: null,
     lines: [{ code: "VO-L1", name: "Ống gió D200", unit: "m", qty: 10, unitPrice: 500 }],
   };
 
@@ -119,27 +119,27 @@ test(
 );
 
 test(
-  "lib/cost.ts budgetBySystem/disciplineBudget: gồm/loại VO đã duyệt theo includeVo",
+  "lib/cost.ts budgetBySystem/systemBudget: gồm/loại VO đã duyệt theo includeVo",
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { costSummary, disciplineBudget } = await import("@/lib/cost");
+    const { costSummary, systemBudget } = await import("@/lib/cost");
 
-    const dien = await queryOne<{ id: number }>(`SELECT id FROM disciplines WHERE code = 'dien'`);
+    const dien = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'dien'`);
     assert.ok(dien);
 
     const boqId = await insertId(
-      `INSERT INTO boq_items (code, name, unit, discipline_id, qty_contract, unit_price)
+      `INSERT INTO boq_items (code, name, unit, system_id, qty_contract, unit_price)
        VALUES ('VO-TEST-BOQ-BASE', 'Gốc', 'm', ?, 100, 1000)`,
       dien!.id,
     );
     const voId = await insertId(
-      `INSERT INTO variation_orders (code, title, reason, discipline_id, status)
+      `INSERT INTO variation_orders (code, title, reason, system_id, status)
        VALUES ('VO-TEST-COST', 'VO test cost', 'other', ?, 'approved')`,
       dien!.id,
     );
     await insertId(
-      `INSERT INTO boq_items (code, name, unit, discipline_id, qty_contract, qty_approved, unit_price, vo_id)
+      `INSERT INTO boq_items (code, name, unit, system_id, qty_contract, qty_approved, unit_price, vo_id)
        VALUES ('VO-TEST-BOQ-VO', 'Dòng VO', 'm', ?, 10, 10, 500, ?)`,
       dien!.id,
       voId,
@@ -149,13 +149,13 @@ test(
     const rowsWithVo = await costSummary("system", true);
     const rowWithVo = rowsWithVo.find((r) => r.key === "dien");
     assert.equal(Number(rowWithVo!.budget), 100_000 + 5_000);
-    assert.equal(await disciplineBudget(dien!.id, true), 100_000 + 5_000);
+    assert.equal(await systemBudget(dien!.id, true), 100_000 + 5_000);
 
     // includeVo=false: chỉ dòng gốc.
     const rowsNoVo = await costSummary("system", false);
     const rowNoVo = rowsNoVo.find((r) => r.key === "dien");
     assert.equal(Number(rowNoVo!.budget), 100_000);
-    assert.equal(await disciplineBudget(dien!.id, false), 100_000);
+    assert.equal(await systemBudget(dien!.id, false), 100_000);
 
     await run(`DELETE FROM variation_orders WHERE id = ?`, voId); // cascade xoá dòng KL của VO
     await run(`DELETE FROM boq_items WHERE id = ?`, boqId);

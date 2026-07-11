@@ -11,8 +11,8 @@ test(
     const { run, insertId, queryOne } = await import("@/lib/db");
     const { listAllDocuments } = await import("@/lib/documents-hub");
 
-    const dien = await queryOne<{ id: number }>(`SELECT id FROM disciplines WHERE code = 'dien'`);
-    assert.ok(dien, "discipline 'dien' phải có sẵn từ migration 0005_boq.sql");
+    const dien = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'dien'`);
+    assert.ok(dien, "system 'dien' phải có sẵn từ migration 0005_boq.sql");
 
     const pmId = await insertId(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('PM Test Hub', 'pm-hub-test@test.local', 'x', 'pm')`,
@@ -30,7 +30,7 @@ test(
       projectId,
     );
     const sheetId = await insertId(
-      `INSERT INTO sheet_types (tower_id, code, name, discipline_id) VALUES (?, 'HUBDIEN', 'Sheet điện hub', ?)`,
+      `INSERT INTO sheet_types (tower_id, code, name, system_id) VALUES (?, 'HUBDIEN', 'Sheet điện hub', ?)`,
       towerId,
       dien!.id,
     );
@@ -64,7 +64,7 @@ test(
     );
 
     const contractId = await insertId(
-      `INSERT INTO contracts (code, kind, party_name, title, value, status, discipline_id)
+      `INSERT INTO contracts (code, kind, party_name, title, value, status, system_id)
        VALUES ('HD-HUB-TEST', 'nhan_thau', 'CĐT Hub', 'Hợp đồng test hub', 0, 'active', ?)`,
       dien!.id,
     );
@@ -99,14 +99,14 @@ test(
     assert.ok(!viewerIds.includes(`contract:${contractDocId}`));
 
     // Lọc theo hệ 'dien': cả 2 nguồn đều thuộc hệ điện.
-    const byDiscipline = await listAllDocuments(pmUser, { discipline: "dien" });
-    const byDisciplineIds = byDiscipline.map((d) => `${d.source}:${d.id}`);
-    assert.ok(byDisciplineIds.includes(`task:${assignedDocId}`));
-    assert.ok(byDisciplineIds.includes(`contract:${contractDocId}`));
+    const bySystem = await listAllDocuments(pmUser, { system: "dien" });
+    const bySystemIds = bySystem.map((d) => `${d.source}:${d.id}`);
+    assert.ok(bySystemIds.includes(`task:${assignedDocId}`));
+    assert.ok(bySystemIds.includes(`contract:${contractDocId}`));
 
     // Lọc theo hệ khác: không còn dòng nào của test này.
-    const byOtherDiscipline = await listAllDocuments(pmUser, { discipline: "nuoc" });
-    const byOtherIds = byOtherDiscipline.map((d) => `${d.source}:${d.id}`);
+    const byOtherSystem = await listAllDocuments(pmUser, { system: "nuoc" });
+    const byOtherIds = byOtherSystem.map((d) => `${d.source}:${d.id}`);
     assert.ok(!byOtherIds.includes(`task:${assignedDocId}`));
 
     // Lọc theo tầng T05: chỉ 2 dòng task (có tầng); hợp đồng không có tầng nên bị ẩn.

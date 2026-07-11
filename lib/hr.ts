@@ -76,8 +76,8 @@ export type CrewRow = {
   id: number;
   projectId: number | null;
   name: string;
-  disciplineId: number | null;
-  disciplineName: string | null;
+  systemId: number | null;
+  systemName: string | null;
   supplierId: number | null;
   supplierName: string | null;
   leaderId: number | null;
@@ -91,12 +91,12 @@ export async function listCrews(projectId?: number): Promise<CrewRow[]> {
   const args = projectId != null ? [projectId] : [];
   return query<CrewRow>(
     `SELECT c.id, c.project_id AS "projectId", c.name,
-            c.discipline_id AS "disciplineId", d.name AS "disciplineName",
+            c.system_id AS "systemId", d.name AS "systemName",
             c.supplier_id AS "supplierId", s.name AS "supplierName",
             c.leader_id AS "leaderId", l.full_name AS "leaderName",
             (SELECT COUNT(*) FROM crew_members cm WHERE cm.crew_id = c.id) AS "memberCount"
        FROM crews c
-       LEFT JOIN disciplines d ON d.id = c.discipline_id
+       LEFT JOIN systems d ON d.id = c.system_id
        LEFT JOIN suppliers s ON s.id = c.supplier_id
        LEFT JOIN personnel l ON l.id = c.leader_id
       ${where}
@@ -141,14 +141,14 @@ export function parsePersonnelBody(body: Record<string, unknown>): PersonnelInpu
 
 export type CrewInput = {
   name: string;
-  disciplineId: number | null;
+  systemId: number | null;
   supplierId: number | null;
   leaderId: number | null;
 };
 
 export function validateCrewInput(input: CrewInput): string | null {
   if (!input.name.trim()) return "Thiếu tên tổ đội";
-  if (input.disciplineId != null && !Number.isInteger(input.disciplineId))
+  if (input.systemId != null && !Number.isInteger(input.systemId))
     return "Hệ thi công không hợp lệ";
   if (input.supplierId != null && !Number.isInteger(input.supplierId))
     return "Nhà thầu phụ không hợp lệ";
@@ -161,7 +161,7 @@ export function parseCrewBody(body: Record<string, unknown>): CrewInput {
   const numOrNull = (v: unknown) => (v != null && v !== "" ? Number(v) : null);
   return {
     name: str(body.name),
-    disciplineId: numOrNull(body.disciplineId),
+    systemId: numOrNull(body.systemId),
     supplierId: numOrNull(body.supplierId),
     leaderId: numOrNull(body.leaderId),
   };

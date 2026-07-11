@@ -26,7 +26,7 @@ test("validatePersonnelInput: đủ ca hợp lệ/không hợp lệ", async () =
 test("validateCrewInput: đủ ca hợp lệ/không hợp lệ", async () => {
   const { validateCrewInput } = await import("@/lib/hr");
 
-  const base = { name: "Tổ điện 1", disciplineId: null, supplierId: null, leaderId: null };
+  const base = { name: "Tổ điện 1", systemId: null, supplierId: null, leaderId: null };
   assert.equal(validateCrewInput(base), null);
   assert.match(validateCrewInput({ ...base, name: "" })!, /tên tổ đội/i);
 });

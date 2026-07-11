@@ -111,7 +111,7 @@ export const DASHBOARD_TREE: DashCluster[] = [
   },
   {
     // Kế hoạch & Tiến độ (đổi từ 5 view chung Timeline/Gantt/Lookahead/S-Curve/Đường
-    // găng sang 6 hệ đang thi công — mỗi hệ 1 trang `/tien-do/[he]` gộp đủ 7 khối tiến
+    // găng sang 6 hệ đang thi công — mỗi hệ 1 trang `/progress/[system]` gộp đủ 7 khối tiến
     // độ của riêng hệ đó: tổng quan, S-curve, timeline, SPI, dự báo, nguyên nhân trễ,
     // danh sách trễ. Các trang view chung cũ vẫn còn, reachable qua hub `/hub/dash.tien-do`).
     label: "Kế hoạch & Tiến độ",
@@ -121,12 +121,12 @@ export const DASHBOARD_TREE: DashCluster[] = [
         label: "Tiến độ",
         icon: CalendarRange,
         children: [
-          { href: "/tien-do/acmv", label: "ACMV", icon: Wind },
-          { href: "/tien-do/dien", label: "Điện", icon: Zap },
-          { href: "/tien-do/nuoc", label: "Cấp thoát nước", icon: Droplets },
-          { href: "/tien-do/pccc", label: "PCCC", icon: Flame },
-          { href: "/tien-do/ket_cau", label: "Kết cấu", icon: Building2 },
-          { href: "/tien-do/xay_to", label: "Xây tô", icon: PaintRoller },
+          { href: "/progress/acmv", label: "ACMV", icon: Wind },
+          { href: "/progress/dien", label: "Điện", icon: Zap },
+          { href: "/progress/nuoc", label: "Cấp thoát nước", icon: Droplets },
+          { href: "/progress/pccc", label: "PCCC", icon: Flame },
+          { href: "/progress/ket_cau", label: "Kết cấu", icon: Building2 },
+          { href: "/progress/xay_to", label: "Xây tô", icon: PaintRoller },
         ],
       },
     ],

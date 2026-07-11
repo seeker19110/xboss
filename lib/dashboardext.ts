@@ -171,7 +171,7 @@ export async function voBlock(): Promise<VoBlock> {
   return result;
 }
 
-export type DisciplineCrossRow = {
+export type SystemCrossRow = {
   code: string;
   name: string;
   color: string | null;
@@ -182,41 +182,41 @@ export type DisciplineCrossRow = {
 };
 
 // Bảng so sánh chéo hệ: % tiến độ, số task trễ, NCR mở, % ngân sách đã dùng — mỗi
-// hệ trong danh mục disciplines (màn hình chỉ huy trưởng đa hệ, §3b kế hoạch tổng).
-export async function byDisciplineBlock(): Promise<DisciplineCrossRow[]> {
+// hệ trong danh mục systems (màn hình chỉ huy trưởng đa hệ, §3b kế hoạch tổng).
+export async function bySystemBlock(): Promise<SystemCrossRow[]> {
   const today = todayISO();
-  const progress = await query<{ disciplineId: number; progressPct: number; delayedCount: number }>(
-    `SELECT st.discipline_id AS "disciplineId",
+  const progress = await query<{ systemId: number; progressPct: number; delayedCount: number }>(
+    `SELECT st.system_id AS "systemId",
             COALESCE(AVG(t.progress_percent), 0) * 100 AS "progressPct",
             COUNT(*) FILTER (WHERE t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_percent < 1
                               AND t.status NOT IN ('hoan_thanh','nghiem_thu')) AS "delayedCount"
        FROM sheet_types st
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
-      WHERE st.discipline_id IS NOT NULL
-      GROUP BY st.discipline_id`,
+      WHERE st.system_id IS NOT NULL
+      GROUP BY st.system_id`,
     today,
   );
-  const ncrOpen = await query<{ disciplineId: number; n: number }>(
-    `SELECT st.discipline_id AS "disciplineId", COUNT(*) AS n
+  const ncrOpen = await query<{ systemId: number; n: number }>(
+    `SELECT st.system_id AS "systemId", COUNT(*) AS n
        FROM ncrs n
        JOIN tasks t ON t.id = n.task_id
        JOIN work_packages wp ON wp.id = t.package_id
        JOIN sheet_types st ON st.id = wp.sheet_type_id
-      WHERE n.status <> 'closed' AND st.discipline_id IS NOT NULL
-      GROUP BY st.discipline_id`,
+      WHERE n.status <> 'closed' AND st.system_id IS NOT NULL
+      GROUP BY st.system_id`,
   );
   const cost = await costSummary("system");
 
-  const progressMap = new Map(progress.map((r) => [r.disciplineId, r]));
-  const ncrMap = new Map(ncrOpen.map((r) => [r.disciplineId, Number(r.n)]));
+  const progressMap = new Map(progress.map((r) => [r.systemId, r]));
+  const ncrMap = new Map(ncrOpen.map((r) => [r.systemId, Number(r.n)]));
   const costMap = new Map(cost.map((r) => [r.key, r]));
 
-  const disciplines = await query<{ id: number; code: string; name: string; color: string | null }>(
-    `SELECT id, code, name, color FROM disciplines ORDER BY id`,
+  const systems = await query<{ id: number; code: string; name: string; color: string | null }>(
+    `SELECT id, code, name, color FROM systems ORDER BY id`,
   );
 
-  return disciplines.map((d) => {
+  return systems.map((d) => {
     const p = progressMap.get(d.id);
     const c = costMap.get(d.code);
     return {

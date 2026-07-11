@@ -18,7 +18,7 @@ async function loadExisting(
 ): Promise<ExistingRow | undefined> {
   if (projectId == null) return undefined;
   return queryOne<ExistingRow>(
-    `SELECT code, system_name AS "systemName", discipline_id AS "disciplineId", checklist,
+    `SELECT code, system_name AS "systemName", system_id AS "tradeId", checklist,
             result, tested_at AS "testedAt", note
        FROM commissioning WHERE id = ? AND project_id = ?`,
     id,
@@ -43,11 +43,11 @@ export async function GET(
     projectId != null
       ? await queryOne<Record<string, unknown>>(
           `SELECT c.id, c.project_id AS "projectId", c.code, c.system_name AS "systemName",
-                  c.discipline_id AS "disciplineId", d.code AS "disciplineCode", d.name AS "disciplineName",
+                  c.system_id AS "tradeId", d.code AS "tradeCode", d.name AS "tradeName",
                   c.checklist, c.result, c.tested_at AS "testedAt", c.note,
                   c.created_by AS "createdBy", u.name AS "createdByName", c.created_at AS "createdAt"
              FROM commissioning c
-             LEFT JOIN disciplines d ON d.id = c.discipline_id
+             LEFT JOIN systems d ON d.id = c.system_id
              LEFT JOIN users u ON u.id = c.created_by
             WHERE c.id = ? AND c.project_id = ?`,
           id,
@@ -88,23 +88,15 @@ export async function PATCH(
     return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });
 
   const merged: Record<string, unknown> = { ...existing };
-  for (const key of [
-    "code",
-    "systemName",
-    "disciplineId",
-    "checklist",
-    "result",
-    "testedAt",
-    "note",
-  ])
+  for (const key of ["code", "systemName", "tradeId", "checklist", "result", "testedAt", "note"])
     if (key in body) merged[key] = body[key];
   const input = parseCommissioningBody(merged);
 
   const invalid = validateCommissioningInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  if (input.disciplineId != null) {
-    const disc = await queryOne(`SELECT id FROM disciplines WHERE id = ?`, input.disciplineId);
+  if (input.tradeId != null) {
+    const disc = await queryOne(`SELECT id FROM systems WHERE id = ?`, input.tradeId);
     if (!disc) return NextResponse.json({ error: "Hệ không tồn tại" }, { status: 422 });
   }
 
@@ -126,12 +118,12 @@ export async function PATCH(
       if (!locked) throw Object.assign(new Error("Không tìm thấy hệ thống T&C"), { status: 404 });
 
       await run(
-        `UPDATE commissioning SET code = ?, system_name = ?, discipline_id = ?, checklist = ?::jsonb,
+        `UPDATE commissioning SET code = ?, system_name = ?, system_id = ?, checklist = ?::jsonb,
                 result = ?, tested_at = ?, note = ?
           WHERE id = ?`,
         input.code,
         input.systemName,
-        input.disciplineId,
+        input.tradeId,
         JSON.stringify(input.checklist),
         input.result,
         input.testedAt,

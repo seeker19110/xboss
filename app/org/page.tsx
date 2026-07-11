@@ -10,8 +10,8 @@ import { fetchMe, type Me } from "@/app/lib/me";
 type Crew = {
   id: number;
   name: string;
-  disciplineId: number | null;
-  disciplineName: string | null;
+  systemId: number | null;
+  systemName: string | null;
   leaderId: number | null;
   leaderName: string | null;
   memberCount: number;
@@ -75,10 +75,10 @@ export default function OrgPage() {
     [raciItems],
   );
 
-  const byDiscipline = useMemo(() => {
+  const bySystem = useMemo(() => {
     const map = new Map<string, Crew[]>();
     for (const c of crews) {
-      const key = c.disciplineName ?? "Chưa phân hệ";
+      const key = c.systemName ?? "Chưa phân hệ";
       map.set(key, [...(map.get(key) ?? []), c]);
     }
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
@@ -104,9 +104,9 @@ export default function OrgPage() {
             <EmptyState icon={Users} message="Chưa có tổ đội nào — tạo tổ đội ở trang Nhân sự." />
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
-              {byDiscipline.map(([discipline, list]) => (
-                <div key={discipline} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
-                  <p className="text-xs font-semibold text-zinc-400 uppercase mb-2">{discipline}</p>
+              {bySystem.map(([system, list]) => (
+                <div key={system} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+                  <p className="text-xs font-semibold text-zinc-400 uppercase mb-2">{system}</p>
                   <ul className="space-y-2">
                     {list.map((c) => (
                       <li key={c.id} className="bg-zinc-800/60 rounded-lg px-3 py-2 text-sm">

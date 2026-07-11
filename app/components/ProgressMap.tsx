@@ -187,7 +187,7 @@ function TowerCurrentTable({
 
 // ── Component chính ──────────────────────────────────────────────────────────
 
-export default function ProgressMap({ he = "" }: { he?: string }) {
+export default function ProgressMap({ system = "" }: { system?: string }) {
   const [data, setData] = useState<ApiData | null>(null);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<"current" | "history">("current");
@@ -205,7 +205,7 @@ export default function ProgressMap({ he = "" }: { he?: string }) {
 
   function reload() {
     setLoading(true);
-    fetch(`/api/timeline${he ? `?he=${encodeURIComponent(he)}` : ""}`)
+    fetch(`/api/timeline${system ? `?system=${encodeURIComponent(system)}` : ""}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => setData(j))
       .finally(() => setLoading(false));
@@ -217,7 +217,7 @@ export default function ProgressMap({ he = "" }: { he?: string }) {
   useEffect(() => {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [he]);
+  }, [system]);
 
   useEffect(() => {
     fetchMe().then((u) => setCanEdit(u?.role === "admin" || u?.role === "pm"));

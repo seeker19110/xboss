@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 // Trang Nhà thầu phụ (/subcontractors, M33) — hồ sơ năng lực + đánh giá định kỳ + công
-// nợ. DB seed mẫu (scripts/seed-sample.ts) không gán discipline_contractors nên danh
+// nợ. DB seed mẫu (scripts/seed-sample.ts) không gán system_contractors nên danh
 // sách rỗng — trang phải render EmptyState rõ ràng thay vì lỗi.
 
 async function gotoSubcontractors(page: Page) {

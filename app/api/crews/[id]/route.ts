@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 async function loadExisting(id: number, projectId: number | null) {
   if (projectId == null) return undefined;
   return queryOne<CrewInput & { id: number }>(
-    `SELECT id, name, discipline_id AS "disciplineId", supplier_id AS "supplierId",
+    `SELECT id, name, system_id AS "systemId", supplier_id AS "supplierId",
             leader_id AS "leaderId"
        FROM crews WHERE id = ? AND project_id = ?`,
     id,
@@ -43,15 +43,15 @@ export async function PATCH(
     return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });
 
   const merged: Record<string, unknown> = { ...existing };
-  for (const key of ["name", "disciplineId", "supplierId", "leaderId"])
+  for (const key of ["name", "systemId", "supplierId", "leaderId"])
     if (key in body) merged[key] = body[key];
   const input = parseCrewBody(merged);
 
   const invalid = validateCrewInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  if (input.disciplineId != null) {
-    if (!(await queryOne(`SELECT id FROM disciplines WHERE id = ?`, input.disciplineId)))
+  if (input.systemId != null) {
+    if (!(await queryOne(`SELECT id FROM systems WHERE id = ?`, input.systemId)))
       return NextResponse.json({ error: "Hệ thi công không tồn tại" }, { status: 422 });
   }
   if (input.supplierId != null) {
@@ -81,9 +81,9 @@ export async function PATCH(
   }
 
   await run(
-    `UPDATE crews SET name = ?, discipline_id = ?, supplier_id = ?, leader_id = ? WHERE id = ?`,
+    `UPDATE crews SET name = ?, system_id = ?, supplier_id = ?, leader_id = ? WHERE id = ?`,
     input.name,
-    input.disciplineId,
+    input.systemId,
     input.supplierId,
     input.leaderId,
     id,

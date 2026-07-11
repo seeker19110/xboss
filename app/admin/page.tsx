@@ -25,7 +25,7 @@ import { appConfirm } from "@/app/components/dialogs";
 import { fetchMe } from "@/app/lib/me";
 import { ROLE_LABELS } from "@/lib/roles";
 import { DASHBOARD_TREE, dashboardStatus } from "@/app/lib/dashboardTree";
-import { disciplineColorClasses } from "@/lib/disciplineColors";
+import { systemColorClasses } from "@/lib/systemColors";
 
 type User = { id: number; name: string; role: string };
 type Sheet = {
@@ -836,7 +836,7 @@ export default function AdminPage() {
               </div>
               <div className="divide-y divide-zinc-800/60">
                 {projects.map((p) => {
-                  const c = disciplineColorClasses(p.color);
+                  const c = systemColorClasses(p.color);
                   return (
                     <div key={p.id} className="flex items-center gap-3 px-4 py-2.5 flex-wrap">
                       <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${c.dot}`} />

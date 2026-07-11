@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Printer, CalendarClock } from "lucide-react";
 import { LookaheadTable } from "@/app/components/LookaheadTable";
-import HeFilter from "@/app/components/HeFilter";
+import SystemFilter from "@/app/components/SystemFilter";
 import { redirectToLogin } from "@/app/lib/me";
 import { formatDateVN } from "@/lib/date";
 
@@ -40,22 +40,22 @@ function groupBySheet(tasks: LTask[]): { sheet: string; tasks: LTask[] }[] {
 export default function LookaheadPage() {
   const [data, setData] = useState<Data | null>(null);
   const [days, setDays] = useState(14);
-  const [he, setHe] = useState("");
-  // Chặn effect fetch bên dưới chạy lần đầu với `he=""` trước khi effect đọc URL kịp
+  const [system, setSystem] = useState("");
+  // Chặn effect fetch bên dưới chạy lần đầu với `system=""` trước khi effect đọc URL kịp
   // cập nhật state (race condition — 2 request chạy song song, kết quả không lọc có
   // thể ghi đè kết quả đã lọc nếu về sau). Xem M36.
-  const [heReady, setHeReady] = useState(false);
+  const [systemReady, setSystemReady] = useState(false);
   const [projectName, setProjectName] = useState<string | null>(null);
 
-  // Đọc `?he=` lúc mount để link chia sẻ/từ hub trỏ thẳng vào đúng bộ lọc (M36).
+  // Đọc `?system=` lúc mount để link chia sẻ/từ hub trỏ thẳng vào đúng bộ lọc (M36).
   useEffect(() => {
-    setHe(new URLSearchParams(window.location.search).get("he") ?? "");
-    setHeReady(true);
+    setSystem(new URLSearchParams(window.location.search).get("system") ?? "");
+    setSystemReady(true);
   }, []);
 
   useEffect(() => {
-    if (!heReady) return;
-    const qs = `?days=${days}${he ? `&he=${encodeURIComponent(he)}` : ""}`;
+    if (!systemReady) return;
+    const qs = `?days=${days}${system ? `&system=${encodeURIComponent(system)}` : ""}`;
     fetch(`/api/lookahead${qs}`).then(async (r) => {
       if (r.status === 401) {
         redirectToLogin();
@@ -63,7 +63,7 @@ export default function LookaheadPage() {
       }
       setData(await r.json());
     });
-  }, [days, he, heReady]);
+  }, [days, system, systemReady]);
   useEffect(() => {
     fetch("/api/project")
       .then((r) => (r.ok ? r.json() : null))
@@ -79,9 +79,9 @@ export default function LookaheadPage() {
         <span className="text-sm text-zinc-600">
           Kế hoạch ngắn hạn cho họp giao ban — in hoặc lưu PDF
         </span>
-        <HeFilter
-          value={he}
-          onChange={setHe}
+        <SystemFilter
+          value={system}
+          onChange={setSystem}
           labelClassName="ml-auto flex items-center gap-1.5 text-xs text-zinc-600"
           selectClassName="min-h-10 border border-zinc-300 rounded-lg px-3 py-2 text-sm bg-white"
         />

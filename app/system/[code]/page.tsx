@@ -4,7 +4,7 @@ import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { disciplineColorClasses, type DisciplineColorClasses } from "@/lib/disciplineColors";
+import { systemColorClasses, type SystemColorClasses } from "@/lib/systemColors";
 
 type Sheet = {
   id: number;
@@ -25,7 +25,7 @@ type Contractor = {
   note: string | null;
 };
 type Summary = {
-  discipline: { id: number; code: string; name: string; color: string | null };
+  system: { id: number; code: string; name: string; color: string | null };
   sheets: Sheet[];
   progressPercent: number;
   totalTasks: number;
@@ -50,7 +50,7 @@ function KpiTile({ label, value, accent }: { label: string; value: string; accen
   );
 }
 
-function SheetCard({ sheet, accent }: { sheet: Sheet; accent: DisciplineColorClasses }) {
+function SheetCard({ sheet, accent }: { sheet: Sheet; accent: SystemColorClasses }) {
   const pct = Math.round((sheet.avgProgress ?? 0) * 100);
   return (
     <a
@@ -114,7 +114,7 @@ function ContractorTable({ contractors }: { contractors: Contractor[] }) {
   );
 }
 
-export default function DisciplineHubPage({ params }: { params: Promise<{ code: string }> }) {
+export default function SystemHubPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = use(params);
   const [me, setMe] = useState<Me | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -130,7 +130,7 @@ export default function DisciplineHubPage({ params }: { params: Promise<{ code: 
     setNotFound(false);
     Promise.all([
       fetchMe(),
-      fetch(`/api/disciplines/${code}/summary`).then((r) =>
+      fetch(`/api/systems/${code}/summary`).then((r) =>
         r.status === 404 ? null : r.ok ? r.json() : Promise.reject(new Error("fetch failed")),
       ),
     ])
@@ -152,7 +152,7 @@ export default function DisciplineHubPage({ params }: { params: Promise<{ code: 
       const res = await fetch("/api/sheets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newSheetName.trim(), disciplineId: summary.discipline.id }),
+        body: JSON.stringify({ name: newSheetName.trim(), systemId: summary.system.id }),
       });
       const j = await res.json().catch(() => null);
       if (!res.ok) {
@@ -180,20 +180,20 @@ export default function DisciplineHubPage({ params }: { params: Promise<{ code: 
     );
   }
 
-  const c = disciplineColorClasses(summary.discipline.color);
+  const c = systemColorClasses(summary.system.color);
   const canManage = me?.role === "admin" || me?.role === "pm";
   const pct = Math.round(summary.progressPercent * 100);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <AppHeader title={`Hệ ${summary.discipline.name}`} subtitle="Trang quản lý theo hệ" />
+      <AppHeader title={`Hệ ${summary.system.name}`} subtitle="Trang quản lý theo hệ" />
       <main className="p-4 sm:p-6 space-y-6">
         <div
           className={`bg-zinc-900 border border-zinc-800 border-l-4 ${c.border} rounded-xl p-4 sm:p-5`}
         >
           <div className="flex flex-wrap items-center gap-2">
             <span className={`w-3 h-3 rounded-full shrink-0 ${c.dot}`} aria-hidden="true" />
-            <h1 className="text-lg font-bold">{summary.discipline.name}</h1>
+            <h1 className="text-lg font-bold">{summary.system.name}</h1>
             {summary.contractors.map((ct) => (
               <span
                 key={ct.id}

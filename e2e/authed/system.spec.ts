@@ -1,25 +1,25 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
-// Trang hệ /he/[code] (M15) — hub tổng quan theo hệ thi công. Seed mẫu gán cả 5 sheet
+// Trang hệ /system/[code] (M15) — hub tổng quan theo hệ thi công. Seed mẫu gán cả 5 sheet
 // ACMV vào hệ `acmv` (scripts/seed-sample.ts) nên trang này có dữ liệu thật để kiểm.
 
 async function gotoAcmv(page: import("@playwright/test").Page) {
-  await page.goto("/he/acmv");
+  await page.goto("/system/acmv");
   await expect(page.getByRole("heading", { name: "ACMV" })).toBeVisible({ timeout: 15_000 });
 }
 
-test.describe("Trang hệ /he/[code] (sau đăng nhập)", () => {
+test.describe("Trang hệ /system/[code] (sau đăng nhập)", () => {
   test("điều hướng từ sidebar vào trang hệ", async ({ page, isMobile }) => {
     await page.goto("/");
     // Mobile: sidebar là drawer off-canvas, phải mở qua nút hamburger trước khi bấm được link.
     if (isMobile) {
       await page.getByRole("button", { name: "Mở menu" }).click();
     }
-    // Nhóm sidebar "Tiến độ" (M-tiến-độ-6-hệ) cũng có mục "ACMV" trỏ /tien-do/acmv — dùng
-    // href để nhắm đúng link "Hệ thi công" /he/acmv, tránh nhập nhằng cùng tên.
-    await page.locator('#app-sidebar a[href="/he/acmv"]').click();
-    await expect(page).toHaveURL(/\/he\/acmv$/);
+    // Nhóm sidebar "Tiến độ" (M-tiến-độ-6-hệ) cũng có mục "ACMV" trỏ /progress/acmv — dùng
+    // href để nhắm đúng link "Hệ thi công" /system/acmv, tránh nhập nhằng cùng tên.
+    await page.locator('#app-sidebar a[href="/system/acmv"]').click();
+    await expect(page).toHaveURL(/\/system\/acmv$/);
     await expect(page.getByRole("heading", { name: "ACMV" })).toBeVisible({ timeout: 15_000 });
   });
 
@@ -42,7 +42,7 @@ test.describe("Trang hệ /he/[code] (sau đăng nhập)", () => {
   });
 
   test("hệ không tồn tại → thông báo không tìm thấy", async ({ page }) => {
-    await page.goto("/he/khong-ton-tai");
+    await page.goto("/system/khong-ton-tai");
     await expect(page.getByText('Không tìm thấy hệ "khong-ton-tai".')).toBeVisible({
       timeout: 15_000,
     });

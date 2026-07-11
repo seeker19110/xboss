@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Printer, ArrowLeft, Download } from "lucide-react";
 import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
 import { formatDateVN } from "@/lib/date";
-import HeFilter from "@/app/components/HeFilter";
+import SystemFilter from "@/app/components/SystemFilter";
 
 type DelayedTask = {
   id: number;
@@ -42,20 +42,20 @@ export default function ReportPage() {
   } | null>(null);
   const [forecast, setForecast] = useState<Forecast[]>([]);
   const [projectName, setProjectName] = useState<string | null>(null);
-  const [he, setHe] = useState("");
-  const [heName, setHeName] = useState<string | null>(null);
+  const [system, setSystem] = useState("");
+  const [systemName, setSystemName] = useState<string | null>(null);
   const [range, setRange] = useState<Range>("day");
-  // Chặn effect fetch bên dưới chạy lần đầu với he=""/range="day" mặc định trước khi
+  // Chặn effect fetch bên dưới chạy lần đầu với system=""/range="day" mặc định trước khi
   // effect đọc URL kịp cập nhật state (race condition — xem M36).
-  const [heReady, setHeReady] = useState(false);
+  const [systemReady, setSystemReady] = useState(false);
 
-  // Đọc `?he=` và `?range=` lúc mount để link chia sẻ/từ hub trỏ thẳng vào đúng bộ lọc (M36).
+  // Đọc `?system=` và `?range=` lúc mount để link chia sẻ/từ hub trỏ thẳng vào đúng bộ lọc (M36).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    setHe(params.get("he") ?? "");
+    setSystem(params.get("system") ?? "");
     const r = params.get("range");
     if (r === "week" || r === "month") setRange(r);
-    setHeReady(true);
+    setSystemReady(true);
   }, []);
 
   function updateRange(next: Range) {
@@ -71,19 +71,19 @@ export default function ReportPage() {
   }
 
   useEffect(() => {
-    if (!heReady) return;
+    if (!systemReady) return;
     const params = new URLSearchParams();
-    if (he) params.set("he", he);
+    if (system) params.set("system", system);
     if (range !== "day") params.set("range", range);
     const qs = params.toString() ? `?${params.toString()}` : "";
     fetch(`/api/dashboard${qs}`)
       .then((r) => r.json())
       .then(setData);
-    // /api/dashboard/forecast chưa hỗ trợ `he` (ngoài phạm vi PR1) — giữ nguyên không lọc.
+    // /api/dashboard/forecast chưa hỗ trợ `system` (ngoài phạm vi PR1) — giữ nguyên không lọc.
     fetch("/api/dashboard/forecast")
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => setForecast(j?.forecast ?? []));
-  }, [he, range, heReady]);
+  }, [system, range, systemReady]);
   useEffect(() => {
     fetch("/api/project")
       .then((r) => (r.ok ? r.json() : null))
@@ -91,17 +91,17 @@ export default function ReportPage() {
   }, []);
   // Tên hệ để hiện "— Hệ <tên>" trong tiêu đề khi đang lọc.
   useEffect(() => {
-    if (!he) {
-      setHeName(null);
+    if (!system) {
+      setSystemName(null);
       return;
     }
-    fetch("/api/disciplines")
+    fetch("/api/systems")
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
-        const d = (j?.disciplines ?? []).find((x: { code: string }) => x.code === he);
-        setHeName(d?.name ?? null);
+        const d = (j?.systems ?? []).find((x: { code: string }) => x.code === system);
+        setSystemName(d?.name ?? null);
       });
-  }, [he]);
+  }, [system]);
 
   return (
     <div className="sheet-stable min-h-screen bg-white text-zinc-900">
@@ -113,9 +113,9 @@ export default function ReportPage() {
           Báo cáo in — dùng nút bên phải rồi chọn &ldquo;Save as PDF&rdquo;
         </span>
         <div className="ml-auto flex items-center gap-2">
-          <HeFilter
-            value={he}
-            onChange={setHe}
+          <SystemFilter
+            value={system}
+            onChange={setSystem}
             labelClassName="flex items-center gap-1.5 text-xs text-zinc-600"
             selectClassName="min-h-10 border border-zinc-300 rounded-lg px-3 py-2 text-sm bg-white"
           />
@@ -151,7 +151,7 @@ export default function ReportPage() {
       <div className="max-w-4xl mx-auto p-8">
         <div className="border-b-2 border-zinc-900 pb-4 mb-6">
           <h1 className="text-2xl font-bold">
-            BÁO CÁO TIẾN ĐỘ THI CÔNG ACMV{heName ? ` — Hệ ${heName}` : ""}
+            BÁO CÁO TIẾN ĐỘ THI CÔNG ACMV{systemName ? ` — Hệ ${systemName}` : ""}
           </h1>
           <p className="text-zinc-600">
             {projectName ?? "XBoss"} · Ngày: {new Date().toLocaleDateString("vi-VN")}

@@ -8,28 +8,28 @@ const TOMORROW = new Date(Date.now() + 86400_000).toISOString().slice(0, 10);
 // ===== Test tích hợp (cần Postgres riêng: đặt TEST_DATABASE_URL) =====
 
 test(
-  "getDisciplineSummary: % tiến độ/trễ/chờ nghiệm thu tính đúng theo hệ, không lẫn hệ khác",
+  "getSystemSummary: % tiến độ/trễ/chờ nghiệm thu tính đúng theo hệ, không lẫn hệ khác",
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { getDisciplineSummary } = await import("@/lib/disciplines");
+    const { getSystemSummary } = await import("@/lib/systems");
 
-    const dien = await queryOne<{ id: number }>(`SELECT id FROM disciplines WHERE code = 'dien'`);
-    const nuoc = await queryOne<{ id: number }>(`SELECT id FROM disciplines WHERE code = 'nuoc'`);
-    assert.ok(dien && nuoc, "disciplines seed phải có sẵn từ migration 0005_boq.sql");
+    const dien = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'dien'`);
+    const nuoc = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'nuoc'`);
+    assert.ok(dien && nuoc, "systems seed phải có sẵn từ migration 0005_boq.sql");
 
-    const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test discipline')`);
+    const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test system')`);
     const towerId = await insertId(
       `INSERT INTO towers (project_id, name) VALUES (?, 'Tháp T')`,
       projectId,
     );
     const stDien = await insertId(
-      `INSERT INTO sheet_types (tower_id, code, name, discipline_id) VALUES (?, 'TESTDIEN', 'Sheet điện', ?)`,
+      `INSERT INTO sheet_types (tower_id, code, name, system_id) VALUES (?, 'TESTDIEN', 'Sheet điện', ?)`,
       towerId,
       dien!.id,
     );
     const stNuoc = await insertId(
-      `INSERT INTO sheet_types (tower_id, code, name, discipline_id) VALUES (?, 'TESTNUOC', 'Sheet nước', ?)`,
+      `INSERT INTO sheet_types (tower_id, code, name, system_id) VALUES (?, 'TESTNUOC', 'Sheet nước', ?)`,
       towerId,
       nuoc!.id,
     );
@@ -62,13 +62,13 @@ test(
 
     const supplierId = await insertId(`INSERT INTO suppliers (name) VALUES ('Nhà thầu điện Test')`);
     const contractorId = await insertId(
-      `INSERT INTO discipline_contractors (discipline_id, supplier_id, floor_labels, is_primary)
+      `INSERT INTO system_contractors (system_id, supplier_id, floor_labels, is_primary)
        VALUES (?, ?, ARRAY['T1','T2'], true)`,
       dien!.id,
       supplierId,
     );
 
-    const summaryDien = await getDisciplineSummary("dien");
+    const summaryDien = await getSystemSummary("dien");
     assert.ok(summaryDien);
     assert.equal(summaryDien!.totalTasks, 2);
     assert.equal(summaryDien!.progressPercent, 0.5);
@@ -85,7 +85,7 @@ test(
     assert.equal(summaryDien!.ncrOpen, 0);
     assert.equal(summaryDien!.budget, null);
 
-    const summaryNuoc = await getDisciplineSummary("nuoc");
+    const summaryNuoc = await getSystemSummary("nuoc");
     assert.ok(summaryNuoc);
     assert.equal(summaryNuoc!.totalTasks, 1);
     assert.equal(summaryNuoc!.progressPercent, 0.3);
@@ -93,10 +93,10 @@ test(
     assert.equal(summaryNuoc!.sheets.length, 1);
     assert.equal(summaryNuoc!.contractors.length, 0);
 
-    assert.equal(await getDisciplineSummary("khong-ton-tai"), null);
+    assert.equal(await getSystemSummary("khong-ton-tai"), null);
 
     // Dọn dữ liệu test.
-    await run(`DELETE FROM discipline_contractors WHERE id = ?`, contractorId);
+    await run(`DELETE FROM system_contractors WHERE id = ?`, contractorId);
     await run(`DELETE FROM suppliers WHERE id = ?`, supplierId);
     await run(`DELETE FROM tasks WHERE package_id IN (?, ?)`, pkgDien, pkgNuoc);
     await run(`DELETE FROM work_packages WHERE id IN (?, ?)`, pkgDien, pkgNuoc);
@@ -107,22 +107,22 @@ test(
 );
 
 test(
-  "getDisciplineSummary: task chờ nghiệm thu (progress 100% nhưng chưa duyệt) được đếm riêng",
+  "getSystemSummary: task chờ nghiệm thu (progress 100% nhưng chưa duyệt) được đếm riêng",
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { getDisciplineSummary } = await import("@/lib/disciplines");
+    const { getSystemSummary } = await import("@/lib/systems");
 
-    const pccc = await queryOne<{ id: number }>(`SELECT id FROM disciplines WHERE code = 'pccc'`);
+    const pccc = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'pccc'`);
     assert.ok(pccc);
 
-    const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test discipline 2')`);
+    const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test system 2')`);
     const towerId = await insertId(
       `INSERT INTO towers (project_id, name) VALUES (?, 'Tháp T')`,
       projectId,
     );
     const stId = await insertId(
-      `INSERT INTO sheet_types (tower_id, code, name, discipline_id) VALUES (?, 'TESTPCCC', 'Sheet PCCC', ?)`,
+      `INSERT INTO sheet_types (tower_id, code, name, system_id) VALUES (?, 'TESTPCCC', 'Sheet PCCC', ?)`,
       towerId,
       pccc!.id,
     );
@@ -135,7 +135,7 @@ test(
       pkgId,
     );
 
-    const summary = await getDisciplineSummary("pccc");
+    const summary = await getSystemSummary("pccc");
     assert.equal(summary!.waitingApprovalCount, 1);
 
     await run(`DELETE FROM tasks WHERE package_id = ?`, pkgId);

@@ -37,7 +37,7 @@ test("validateCommissioningInput/validateHandoverItemInput/validatePunchInput: Ä
     validateCommissioningInput({
       code: null,
       systemName: "Há»‡ thá»‘ng PCCC",
-      disciplineId: null,
+      tradeId: null,
       checklist: [],
       result: "draft",
       testedAt: null,
@@ -49,7 +49,7 @@ test("validateCommissioningInput/validateHandoverItemInput/validatePunchInput: Ä
     validateCommissioningInput({
       code: null,
       systemName: "",
-      disciplineId: null,
+      tradeId: null,
       checklist: [],
       result: "draft",
       testedAt: null,
@@ -61,7 +61,7 @@ test("validateCommissioningInput/validateHandoverItemInput/validatePunchInput: Ä
     validateCommissioningInput({
       code: null,
       systemName: "X",
-      disciplineId: null,
+      tradeId: null,
       checklist: [],
       result: "xxx" as never,
       testedAt: null,
@@ -73,7 +73,7 @@ test("validateCommissioningInput/validateHandoverItemInput/validatePunchInput: Ä
     validateCommissioningInput({
       code: null,
       systemName: "X",
-      disciplineId: null,
+      tradeId: null,
       checklist: [],
       result: "draft",
       testedAt: "01/01/2026",
@@ -85,7 +85,7 @@ test("validateCommissioningInput/validateHandoverItemInput/validatePunchInput: Ä
   assert.equal(
     validateHandoverItemInput({
       title: "Táº§ng 1",
-      disciplineId: null,
+      tradeId: null,
       workPackageId: null,
       status: "pending",
       handoverDate: null,
@@ -95,7 +95,7 @@ test("validateCommissioningInput/validateHandoverItemInput/validatePunchInput: Ä
   assert.match(
     validateHandoverItemInput({
       title: "",
-      disciplineId: null,
+      tradeId: null,
       workPackageId: null,
       status: "pending",
       handoverDate: null,

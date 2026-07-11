@@ -47,17 +47,17 @@ export async function PATCH(
     sets.push("category = ?");
     values.push(body.category);
   }
-  if (body?.disciplineId !== undefined) {
-    const disciplineId = body.disciplineId === null ? null : Number(body.disciplineId);
-    if (disciplineId !== null) {
+  if (body?.systemId !== undefined) {
+    const systemId = body.systemId === null ? null : Number(body.systemId);
+    if (systemId !== null) {
       if (
-        !Number.isInteger(disciplineId) ||
-        !(await queryOne(`SELECT id FROM disciplines WHERE id = ?`, disciplineId))
+        !Number.isInteger(systemId) ||
+        !(await queryOne(`SELECT id FROM systems WHERE id = ?`, systemId))
       )
         return NextResponse.json({ error: "Hệ không hợp lệ" }, { status: 422 });
     }
-    sets.push("discipline_id = ?");
-    values.push(disciplineId);
+    sets.push("system_id = ?");
+    values.push(systemId);
   }
   if (typeof body?.required === "boolean") {
     sets.push("required = ?");

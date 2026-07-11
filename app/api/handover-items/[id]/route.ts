@@ -27,7 +27,7 @@ async function loadExisting(
 ): Promise<ExistingRow | undefined> {
   if (projectId == null) return undefined;
   return queryOne<ExistingRow>(
-    `SELECT title, discipline_id AS "disciplineId", work_package_id AS "workPackageId",
+    `SELECT title, system_id AS "tradeId", work_package_id AS "workPackageId",
             status, handover_date AS "handoverDate", minutes_file AS "minutesFile"
        FROM handover_items WHERE id = ? AND project_id = ?`,
     id,
@@ -52,12 +52,12 @@ export async function GET(
     projectId != null
       ? await queryOne<Record<string, unknown>>(
           `SELECT h.id, h.project_id AS "projectId", h.title,
-                  h.discipline_id AS "disciplineId", d.code AS "disciplineCode", d.name AS "disciplineName",
+                  h.system_id AS "tradeId", d.code AS "tradeCode", d.name AS "tradeName",
                   h.work_package_id AS "workPackageId", wp.code AS "workPackageCode", wp.name AS "workPackageName",
                   h.status, h.handover_date AS "handoverDate", h.minutes_file AS "minutesFile",
                   h.created_by AS "createdBy", u.name AS "createdByName", h.created_at AS "createdAt"
              FROM handover_items h
-             LEFT JOIN disciplines d ON d.id = h.discipline_id
+             LEFT JOIN systems d ON d.id = h.system_id
              LEFT JOIN work_packages wp ON wp.id = h.work_package_id
              LEFT JOIN users u ON u.id = h.created_by
             WHERE h.id = ? AND h.project_id = ?`,
@@ -103,7 +103,7 @@ export async function PATCH(
     if (!form)
       return NextResponse.json({ error: "Dữ liệu multipart không hợp lệ" }, { status: 400 });
     bodyFields = {};
-    for (const key of ["title", "disciplineId", "workPackageId", "status", "handoverDate"]) {
+    for (const key of ["title", "tradeId", "workPackageId", "status", "handoverDate"]) {
       if (form.has(key)) bodyFields[key] = form.get(key);
     }
     const f = form.get("file");
@@ -116,15 +116,15 @@ export async function PATCH(
   }
 
   const merged: Record<string, unknown> = { ...existing };
-  for (const key of ["title", "disciplineId", "workPackageId", "status", "handoverDate"])
+  for (const key of ["title", "tradeId", "workPackageId", "status", "handoverDate"])
     if (key in bodyFields) merged[key] = bodyFields[key];
   const input = parseHandoverItemBody(merged);
 
   const invalid = validateHandoverItemInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  if (input.disciplineId != null) {
-    if (!(await queryOne(`SELECT id FROM disciplines WHERE id = ?`, input.disciplineId)))
+  if (input.tradeId != null) {
+    if (!(await queryOne(`SELECT id FROM systems WHERE id = ?`, input.tradeId)))
       return NextResponse.json({ error: "Hệ không tồn tại" }, { status: 422 });
   }
   if (input.workPackageId != null) {
@@ -174,11 +174,11 @@ export async function PATCH(
       if (!locked) throw Object.assign(new Error("Không tìm thấy hạng mục"), { status: 404 });
 
       await run(
-        `UPDATE handover_items SET title = ?, discipline_id = ?, work_package_id = ?, status = ?,
+        `UPDATE handover_items SET title = ?, system_id = ?, work_package_id = ?, status = ?,
                 handover_date = ?, minutes_file = ?
           WHERE id = ?`,
         input.title,
-        input.disciplineId,
+        input.tradeId,
         input.workPackageId,
         input.status,
         input.handoverDate,

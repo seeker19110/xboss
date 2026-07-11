@@ -29,7 +29,7 @@ export type QualityBlock = {
 export type VoBlock = { draft: number; submitted: number; approved: number; rejected: number };
 export type WorkfrontBlock = { waitingFloors: number; cumulativeWaitDays: number };
 export type ApprovalsBlock = { pendingProposals: number; pendingPurchaseRequests: number };
-export type DisciplineCrossRow = {
+export type SystemCrossRow = {
   code: string;
   name: string;
   color: string | null;
@@ -54,7 +54,7 @@ export default function DashboardExtCards({
   quality,
   vo,
   workfront,
-  byDiscipline,
+  bySystem,
   approvals,
   isEngineer,
 }: {
@@ -63,7 +63,7 @@ export default function DashboardExtCards({
   quality: QualityBlock;
   vo: VoBlock | null;
   workfront: WorkfrontBlock | null;
-  byDiscipline: DisciplineCrossRow[];
+  bySystem: SystemCrossRow[];
   approvals?: ApprovalsBlock | null;
   isEngineer: boolean;
 }) {
@@ -162,7 +162,7 @@ export default function DashboardExtCards({
         )}
       </div>
 
-      {byDiscipline.length > 0 && (
+      {bySystem.length > 0 && (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
           <div className="px-4 pt-4 pb-1">
             <h2 className="text-sm font-semibold text-zinc-200">
@@ -186,7 +186,7 @@ export default function DashboardExtCards({
                 </tr>
               </thead>
               <tbody>
-                {byDiscipline.map((d) => (
+                {bySystem.map((d) => (
                   <tr key={d.code} className="border-b border-zinc-800/60 last:border-0">
                     <td className="p-3">
                       <span className="inline-flex items-center gap-1.5">

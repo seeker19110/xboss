@@ -2,31 +2,31 @@
 import { useEffect, useState } from "react";
 
 // Lọc theo hệ (M36) — dùng chung cho các trang tiến độ (timeline/gantt/lookahead/report).
-// Chuẩn duy nhất: query param `?he=<disciplines.code>`. Đổi lựa chọn gọi onChange (trang
+// Chuẩn duy nhất: query param `?system=<systems.code>`. Đổi lựa chọn gọi onChange (trang
 // cha tự refetch) VÀ đồng bộ URL bằng history.replaceState (giữ nguyên các param khác) —
 // để link chia sẻ/hub trỏ thẳng vào đúng bộ lọc.
 
-type Discipline = { id: number; code: string; name: string; color: string | null };
+type SystemOption = { id: number; code: string; name: string; color: string | null };
 
-export default function HeFilter({
+export default function SystemFilter({
   value,
   onChange,
   selectClassName,
   labelClassName,
 }: {
   value: string;
-  onChange: (he: string) => void;
+  onChange: (system: string) => void;
   /** Class tuỳ biến cho <select> — mặc định bám thang zinc dark-first. Trang in
    *  (report/lookahead — nền trắng cố định, không theo theme) truyền class riêng. */
   selectClassName?: string;
   labelClassName?: string;
 }) {
-  const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+  const [systems, setSystems] = useState<SystemOption[]>([]);
 
   useEffect(() => {
-    fetch("/api/disciplines")
+    fetch("/api/systems")
       .then((r) => (r.ok ? r.json() : null))
-      .then((j) => setDisciplines(j?.disciplines ?? []))
+      .then((j) => setSystems(j?.systems ?? []))
       .catch(() => {});
   }, []);
 
@@ -34,8 +34,8 @@ export default function HeFilter({
     onChange(next);
     try {
       const url = new URL(window.location.href);
-      if (next) url.searchParams.set("he", next);
-      else url.searchParams.delete("he");
+      if (next) url.searchParams.set("system", next);
+      else url.searchParams.delete("system");
       window.history.replaceState(null, "", url.toString());
     } catch {
       /* URL không hợp lệ (hiếm) — bỏ qua, state vẫn cập nhật qua onChange */
@@ -55,7 +55,7 @@ export default function HeFilter({
         }
       >
         <option value="">Tổng thể</option>
-        {disciplines.map((d) => (
+        {systems.map((d) => (
           <option key={d.code} value={d.code}>
             {d.name}
           </option>

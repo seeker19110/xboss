@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, todayISO } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
-import { resolveDisciplineId } from "@/lib/disciplines";
+import { resolveSystemId } from "@/lib/systems";
 
 export const dynamic = "force-dynamic";
 
@@ -23,20 +23,20 @@ function plannedRatio(start: string, end: string, today: number): number {
   return Math.min(1, Math.max(0, (today - s) / (e - s)));
 }
 
-// GET /api/dashboard/spi?he=<code>
+// GET /api/dashboard/spi?system=<code>
 // SPI (Schedule Performance Index) = % thực tế / % kế hoạch tại hôm nay, theo từng hệ + tổng dự án.
 // % kế hoạch nội suy tuyến tính start→end mỗi task (giống đường kế hoạch S-curve).
 // SPI ≥ 1 đúng/vượt tiến độ · 0.9–1 hơi chậm · < 0.9 chậm đáng kể.
-// `?he=<disciplines.code>` lọc theo hệ — không truyền = nguyên hành vi cũ (toàn dự án).
+// `?system=<systems.code>` lọc theo hệ — không truyền = nguyên hành vi cũ (toàn dự án).
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.viewDashboard(user.role))
     return NextResponse.json({ error: "Thầu phụ không có quyền xem dashboard" }, { status: 403 });
 
-  const disciplineId = await resolveDisciplineId(req.nextUrl.searchParams.get("he"));
-  const heFilter = disciplineId !== null ? "WHERE st.discipline_id = ?" : "";
-  const heParams = disciplineId !== null ? [disciplineId] : [];
+  const systemId = await resolveSystemId(req.nextUrl.searchParams.get("system"));
+  const systemFilter = systemId !== null ? "WHERE st.system_id = ?" : "";
+  const systemParams = systemId !== null ? [systemId] : [];
 
   const rows = await query<Row>(
     `SELECT st.code AS "sheetType", t.start_date AS "startDate",
@@ -44,8 +44,8 @@ export async function GET(req: NextRequest) {
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
-       ${heFilter}`,
-    ...heParams,
+       ${systemFilter}`,
+    ...systemParams,
   );
 
   const todayMs = toDate(todayISO());

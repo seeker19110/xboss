@@ -1,24 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, todayISO, daysFromTodayISO } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
-import { resolveDisciplineId } from "@/lib/disciplines";
+import { resolveSystemId } from "@/lib/systems";
 
 export const dynamic = "force-dynamic";
 
 const WINDOW_DAYS = 14; // cửa sổ tính tốc độ
 
-// GET /api/dashboard/forecast?he=<code> → dự báo ngày hoàn thành từng hệ,
+// GET /api/dashboard/forecast?system=<code> → dự báo ngày hoàn thành từng hệ,
 // ngoại suy từ tốc độ cập nhật tiến độ thực tế (task_history) trong 14 ngày gần nhất.
-// `?he=<disciplines.code>` lọc theo hệ — không truyền = nguyên hành vi cũ (mọi hệ).
+// `?system=<systems.code>` lọc theo hệ — không truyền = nguyên hành vi cũ (mọi hệ).
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.viewDashboard(user.role))
     return NextResponse.json({ error: "Thầu phụ không có quyền xem dashboard" }, { status: 403 });
 
-  const disciplineId = await resolveDisciplineId(req.nextUrl.searchParams.get("he"));
-  const heFilter = disciplineId !== null ? "WHERE st.discipline_id = ?" : "";
-  const heParams = disciplineId !== null ? [disciplineId] : [];
+  const systemId = await resolveSystemId(req.nextUrl.searchParams.get("system"));
+  const systemFilter = systemId !== null ? "WHERE st.system_id = ?" : "";
+  const systemParams = systemId !== null ? [systemId] : [];
 
   const rows = await query<{
     sheetType: string;
@@ -40,9 +40,9 @@ export async function GET(req: NextRequest) {
        FROM sheet_types st
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
-       ${heFilter}
+       ${systemFilter}
       GROUP BY st.id, st.code ORDER BY st.sort_order, st.id`,
-    ...heParams,
+    ...systemParams,
   );
 
   const today = todayISO();

@@ -35,14 +35,14 @@ type Checklist = {
   id: number;
   name: string;
   category: "work" | "tc" | "hse";
-  disciplineId: number | null;
-  disciplineCode: string | null;
-  disciplineName: string | null;
+  systemId: number | null;
+  systemCode: string | null;
+  systemName: string | null;
   required: boolean;
   items: ChecklistItem[];
   active: boolean;
 };
-type Discipline = { id: number; code: string; name: string };
+type SystemOption = { id: number; code: string; name: string };
 type TaskHit = { id: number; code: string; name: string; sheetType: string };
 
 type InspectionResult = { label: string; pass: boolean; measured?: string; note?: string };
@@ -172,7 +172,7 @@ export default function QualityPage() {
   );
   const [loading, setLoading] = useState(true);
   const [checklists, setChecklists] = useState<Checklist[]>([]);
-  const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+  const [systems, setSystems] = useState<SystemOption[]>([]);
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [ncrs, setNcrs] = useState<Ncr[]>([]);
   const [requests, setRequests] = useState<YcntRequest[]>([]);
@@ -187,10 +187,10 @@ export default function QualityPage() {
   const canCreateRequest = canManage || me?.role === "engineer";
 
   async function loadAll() {
-    const [meRes, clRes, discRes, inspRes, ncrRes, reqRes, sheetsRes] = await Promise.all([
+    const [meRes, clRes, sysRes, inspRes, ncrRes, reqRes, sheetsRes] = await Promise.all([
       fetchMe(),
       fetch("/api/qc/checklists"),
-      fetch("/api/disciplines"),
+      fetch("/api/systems"),
       fetch("/api/qc/inspections"),
       fetch("/api/ncrs"),
       fetch("/api/inspection-requests"),
@@ -202,7 +202,7 @@ export default function QualityPage() {
     }
     setMe(meRes);
     setChecklists(clRes.ok ? ((await clRes.json())?.checklists ?? []) : []);
-    setDisciplines(discRes.ok ? ((await discRes.json())?.disciplines ?? []) : []);
+    setSystems(sysRes.ok ? ((await sysRes.json())?.systems ?? []) : []);
     setInspections(inspRes.ok ? ((await inspRes.json())?.inspections ?? []) : []);
     setNcrs(ncrRes.ok ? ((await ncrRes.json())?.ncrs ?? []) : []);
     setRequests(reqRes.ok ? ((await reqRes.json())?.requests ?? []) : []);
@@ -257,7 +257,7 @@ export default function QualityPage() {
         {tab === "checklists" && (
           <ChecklistsTab
             checklists={checklists}
-            disciplines={disciplines}
+            systems={systems}
             canManage={canManage}
             onAdd={() => setChecklistModal(true)}
             onChanged={loadAll}
@@ -295,7 +295,7 @@ export default function QualityPage() {
 
       {checklistModal && (
         <ChecklistFormModal
-          disciplines={disciplines}
+          systems={systems}
           onClose={() => setChecklistModal(false)}
           onSaved={() => {
             setChecklistModal(false);
@@ -340,13 +340,13 @@ export default function QualityPage() {
 
 function ChecklistsTab({
   checklists,
-  disciplines,
+  systems,
   canManage,
   onAdd,
   onChanged,
 }: {
   checklists: Checklist[];
-  disciplines: Discipline[];
+  systems: SystemOption[];
   canManage: boolean;
   onAdd: () => void;
   onChanged: () => void;
@@ -403,8 +403,8 @@ function ChecklistsTab({
                   >
                     {CATEGORY_LABEL[c.category]}
                   </span>
-                  {c.disciplineName && (
-                    <span className="text-[10px] text-zinc-400">{c.disciplineName}</span>
+                  {c.systemName && (
+                    <span className="text-[10px] text-zinc-400">{c.systemName}</span>
                   )}
                   {c.required && (
                     <span
@@ -438,24 +438,24 @@ function ChecklistsTab({
         </div>
       )}
       <p className="text-[11px] text-zinc-500">
-        Danh mục hệ: {disciplines.map((d) => d.name).join(", ") || "—"}
+        Danh mục hệ: {systems.map((d) => d.name).join(", ") || "—"}
       </p>
     </div>
   );
 }
 
 function ChecklistFormModal({
-  disciplines,
+  systems,
   onClose,
   onSaved,
 }: {
-  disciplines: Discipline[];
+  systems: SystemOption[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [name, setName] = useState("");
   const [category, setCategory] = useState<"work" | "tc" | "hse">("work");
-  const [disciplineId, setDisciplineId] = useState<string>("");
+  const [systemId, setSystemId] = useState<string>("");
   const [required, setRequired] = useState(false);
   const [items, setItems] = useState<ChecklistItem[]>([{ label: "", type: "pass_fail" }]);
   const [saving, setSaving] = useState(false);
@@ -482,7 +482,7 @@ function ChecklistFormModal({
         body: JSON.stringify({
           name: name.trim(),
           category,
-          disciplineId: disciplineId ? Number(disciplineId) : null,
+          systemId: systemId ? Number(systemId) : null,
           required,
           items: cleanItems,
         }),
@@ -533,12 +533,12 @@ function ChecklistFormModal({
           <label className="block flex-1">
             <span className="text-xs text-zinc-400">Hệ (tuỳ chọn)</span>
             <select
-              value={disciplineId}
-              onChange={(e) => setDisciplineId(e.target.value)}
+              value={systemId}
+              onChange={(e) => setSystemId(e.target.value)}
               className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none"
             >
               <option value="">— Mọi hệ —</option>
-              {disciplines.map((d) => (
+              {systems.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
                 </option>

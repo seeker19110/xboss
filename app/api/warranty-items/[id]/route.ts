@@ -54,7 +54,7 @@ export async function PATCH(
 
   const merged: Record<string, unknown> = {
     title: existing.title,
-    disciplineId: existing.disciplineId,
+    tradeId: existing.tradeId,
     handoverItemId: existing.handoverItemId,
     warrantyFrom: existing.warrantyFrom,
     warrantyMonths: existing.warrantyMonths,
@@ -68,8 +68,8 @@ export async function PATCH(
   const invalid = validateWarrantyInput(input);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 422 });
 
-  if (input.disciplineId != null) {
-    if (!(await queryOne(`SELECT id FROM disciplines WHERE id = ?`, input.disciplineId)))
+  if (input.tradeId != null) {
+    if (!(await queryOne(`SELECT id FROM systems WHERE id = ?`, input.tradeId)))
       return NextResponse.json({ error: "Hệ không tồn tại" }, { status: 422 });
   }
   if (input.handoverItemId != null) {
@@ -95,11 +95,11 @@ export async function PATCH(
   }
 
   await run(
-    `UPDATE warranty_items SET title = ?, discipline_id = ?, handover_item_id = ?,
+    `UPDATE warranty_items SET title = ?, system_id = ?, handover_item_id = ?,
             warranty_from = ?, warranty_months = ?, guarantee_id = ?, status = ?, note = ?
       WHERE id = ?`,
     input.title,
-    input.disciplineId,
+    input.tradeId,
     input.handoverItemId,
     input.warrantyFrom,
     input.warrantyMonths,

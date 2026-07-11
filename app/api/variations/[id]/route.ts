@@ -61,10 +61,10 @@ export async function PATCH(
           title: string;
           reason: VoReason;
           description: string | null;
-          disciplineId: number | null;
+          systemId: number | null;
         }>(
           `SELECT status, created_by AS "createdBy", title, reason, description,
-                  discipline_id AS "disciplineId"
+                  system_id AS "systemId"
              FROM variation_orders WHERE id = ? AND project_id = ?`,
           id,
           projectId,
@@ -87,35 +87,31 @@ export async function PATCH(
         ? body.description.trim()
         : null
       : existing.description;
-  const disciplineId =
-    "disciplineId" in body
-      ? body.disciplineId != null
-        ? Number(body.disciplineId)
-        : null
-      : existing.disciplineId;
+  const systemId =
+    "systemId" in body ? (body.systemId != null ? Number(body.systemId) : null) : existing.systemId;
 
   if (!title) return NextResponse.json({ error: "Thiếu tên phát sinh" }, { status: 422 });
   if (!VO_REASONS.includes(reason))
     return NextResponse.json({ error: "Lý do phát sinh không hợp lệ" }, { status: 422 });
-  if (disciplineId != null) {
+  if (systemId != null) {
     if (
-      !Number.isInteger(disciplineId) ||
-      !(await queryOne(`SELECT id FROM disciplines WHERE id = ?`, disciplineId))
+      !Number.isInteger(systemId) ||
+      !(await queryOne(`SELECT id FROM systems WHERE id = ?`, systemId))
     )
       return NextResponse.json({ error: "Hệ không hợp lệ" }, { status: 422 });
   }
 
   await run(
-    `UPDATE variation_orders SET title = ?, reason = ?, description = ?, discipline_id = ? WHERE id = ?`,
+    `UPDATE variation_orders SET title = ?, reason = ?, description = ?, system_id = ? WHERE id = ?`,
     title,
     reason,
     description,
-    disciplineId,
+    systemId,
     id,
   );
   // Đồng bộ hệ xuống mọi dòng KL con (VO đại diện 1 hệ duy nhất).
-  if (disciplineId !== existing.disciplineId)
-    await run(`UPDATE boq_items SET discipline_id = ? WHERE vo_id = ?`, disciplineId, id);
+  if (systemId !== existing.systemId)
+    await run(`UPDATE boq_items SET system_id = ? WHERE vo_id = ?`, systemId, id);
 
   return NextResponse.json({ updated: id });
 }

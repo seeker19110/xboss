@@ -21,7 +21,7 @@ export async function GET() {
 }
 
 // POST /api/om-documents — upload tài liệu hướng dẫn O&M (multipart: file, title,
-// disciplineId?). PDF hoặc ảnh, max 20MB (pattern task_documents). manageWarranty:
+// tradeId?). PDF hoặc ảnh, max 20MB (pattern task_documents). manageWarranty:
 // Admin/PM/kỹ sư. Gán project_id = dự án đang chọn (server suy).
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
@@ -44,10 +44,10 @@ export async function POST(req: NextRequest) {
   const title = String(form.get("title") ?? "").trim();
   if (!title) return NextResponse.json({ error: "Thiếu tên tài liệu" }, { status: 422 });
 
-  const disciplineIdRaw = String(form.get("disciplineId") ?? "").trim();
-  const disciplineId = disciplineIdRaw ? Number(disciplineIdRaw) : null;
-  if (disciplineId != null) {
-    if (!(await queryOne(`SELECT id FROM disciplines WHERE id = ?`, disciplineId)))
+  const tradeIdRaw = String(form.get("tradeId") ?? "").trim();
+  const tradeId = tradeIdRaw ? Number(tradeIdRaw) : null;
+  if (tradeId != null) {
+    if (!(await queryOne(`SELECT id FROM systems WHERE id = ?`, tradeId)))
       return NextResponse.json({ error: "Hệ không tồn tại" }, { status: 422 });
   }
 
@@ -70,12 +70,12 @@ export async function POST(req: NextRequest) {
   await writeFile(join(dir, fileName), Buffer.from(await file.arrayBuffer()));
 
   const id = await insertId(
-    `INSERT INTO om_documents (project_id, title, discipline_id, file_name, original_name,
+    `INSERT INTO om_documents (project_id, title, system_id, file_name, original_name,
        mime_type, size_bytes, uploaded_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     projectId,
     title,
-    disciplineId,
+    tradeId,
     fileName,
     file.name || null,
     file.type,

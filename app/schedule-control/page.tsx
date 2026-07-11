@@ -6,7 +6,7 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { redirectToLogin } from "@/app/lib/me";
 import { formatDateVN } from "@/lib/date";
 import { DELAY_REASON_LABEL } from "@/lib/delay";
-import HeFilter from "@/app/components/HeFilter";
+import SystemFilter from "@/app/components/SystemFilter";
 
 type Critical = {
   id: number;
@@ -38,21 +38,21 @@ type Data = { critical: Critical[]; delayed: Delayed[]; delayPareto: ParetoRow[]
 
 export default function ScheduleControlPage() {
   const [data, setData] = useState<Data | null>(null);
-  const [he, setHe] = useState("");
-  // Chặn effect fetch bên dưới chạy lần đầu với `he=""` trước khi effect đọc URL kịp
+  const [system, setSystem] = useState("");
+  // Chặn effect fetch bên dưới chạy lần đầu với `system=""` trước khi effect đọc URL kịp
   // cập nhật state (race condition — xem M36).
-  const [heReady, setHeReady] = useState(false);
+  const [systemReady, setSystemReady] = useState(false);
   const [reasonFilter, setReasonFilter] = useState<string | null>("");
 
-  // Đọc `?he=` lúc mount để link chia sẻ/từ hub trỏ thẳng vào đúng bộ lọc (M36).
+  // Đọc `?system=` lúc mount để link chia sẻ/từ hub trỏ thẳng vào đúng bộ lọc (M36).
   useEffect(() => {
-    setHe(new URLSearchParams(window.location.search).get("he") ?? "");
-    setHeReady(true);
+    setSystem(new URLSearchParams(window.location.search).get("system") ?? "");
+    setSystemReady(true);
   }, []);
 
   useEffect(() => {
-    if (!heReady) return;
-    const qs = he ? `?he=${encodeURIComponent(he)}` : "";
+    if (!systemReady) return;
+    const qs = system ? `?system=${encodeURIComponent(system)}` : "";
     fetch(`/api/schedule-control${qs}`).then(async (r) => {
       if (r.status === 401) {
         redirectToLogin();
@@ -60,7 +60,7 @@ export default function ScheduleControlPage() {
       }
       setData(await r.json());
     });
-  }, [he, heReady]);
+  }, [system, systemReady]);
 
   const maxParetoCount = useMemo(
     () => Math.max(1, ...(data?.delayPareto ?? []).map((r) => r.count)),
@@ -80,7 +80,7 @@ export default function ScheduleControlPage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white schedule-control-print">
       <AppHeader title="Đường găng & Chậm tiến độ">
-        <HeFilter value={he} onChange={setHe} />
+        <SystemFilter value={system} onChange={setSystem} />
         <button
           onClick={() => window.print()}
           className="no-print flex items-center gap-2 min-h-10 bg-zinc-900 border border-zinc-800 hover:border-zinc-600 rounded-lg px-3 py-1.5 text-sm transition"

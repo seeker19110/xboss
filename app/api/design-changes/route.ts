@@ -59,13 +59,13 @@ export async function POST(req: NextRequest) {
     const code = await nextDesignChangeCode();
     const id = await insertId(
       `INSERT INTO design_changes
-         (project_id, code, title, discipline_id, drawing_id, requested_by_note, reason,
+         (project_id, code, title, system_id, drawing_id, requested_by_note, reason,
           impact_technical, impact_cost, impact_schedule, created_by)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       projectId,
       code,
       input.title,
-      input.disciplineId,
+      input.systemId,
       input.drawingId,
       input.requestedByNote,
       input.reason,

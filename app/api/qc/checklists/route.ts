@@ -6,16 +6,16 @@ import { listQcChecklists, validateChecklistItems } from "@/lib/qaqc";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/qc/checklists?discipline=<code> — mọi user đăng nhập xem mẫu checklist,
+// GET /api/qc/checklists?system=<code> — mọi user đăng nhập xem mẫu checklist,
 // scoped theo dự án đang chọn (M22).
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
-  const discipline = req.nextUrl.searchParams.get("discipline")?.trim() || undefined;
+  const system = req.nextUrl.searchParams.get("system")?.trim() || undefined;
 
   const projectId = await getCurrentProjectId(user);
-  const checklists = projectId != null ? await listQcChecklists({ discipline, projectId }) : [];
+  const checklists = projectId != null ? await listQcChecklists({ system, projectId }) : [];
   return NextResponse.json({ checklists });
 }
 
@@ -40,12 +40,12 @@ export async function POST(req: NextRequest) {
   if (!validateChecklistItems(items))
     return NextResponse.json({ error: "Danh sách hạng mục không hợp lệ" }, { status: 422 });
 
-  let disciplineId: number | null = null;
-  if (body?.disciplineId != null) {
-    disciplineId = Number(body.disciplineId);
+  let systemId: number | null = null;
+  if (body?.systemId != null) {
+    systemId = Number(body.systemId);
     if (
-      !Number.isInteger(disciplineId) ||
-      !(await queryOne(`SELECT id FROM disciplines WHERE id = ?`, disciplineId))
+      !Number.isInteger(systemId) ||
+      !(await queryOne(`SELECT id FROM systems WHERE id = ?`, systemId))
     )
       return NextResponse.json({ error: "Hệ không hợp lệ" }, { status: 422 });
   }
@@ -53,11 +53,11 @@ export async function POST(req: NextRequest) {
   const required = body?.required === true;
 
   const id = await insertId(
-    `INSERT INTO qc_checklists (name, category, discipline_id, required, items, project_id)
+    `INSERT INTO qc_checklists (name, category, system_id, required, items, project_id)
      VALUES (?, ?, ?, ?, ?::jsonb, ?)`,
     name,
     category,
-    disciplineId,
+    systemId,
     required,
     JSON.stringify(items),
     projectId,

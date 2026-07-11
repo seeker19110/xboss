@@ -28,7 +28,7 @@ export const DESIGN_CHANGE_PENDING_DAYS = 5;
 
 export type DesignChangeInput = {
   title: string;
-  disciplineId: number | null;
+  systemId: number | null;
   drawingId: number | null;
   requestedByNote: string | null;
   reason: string;
@@ -42,7 +42,7 @@ export function parseDesignChangeBody(body: Record<string, unknown>): DesignChan
   const strOrNull = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
   return {
     title: str(body.title),
-    disciplineId: body.disciplineId != null ? Number(body.disciplineId) : null,
+    systemId: body.systemId != null ? Number(body.systemId) : null,
     drawingId: body.drawingId != null ? Number(body.drawingId) : null,
     requestedByNote: strOrNull(body.requestedByNote),
     reason: str(body.reason),
@@ -59,12 +59,12 @@ export function validateDesignChangeInput(input: DesignChangeInput): string | nu
   return null;
 }
 
-// Kiểm FK discipline/drawing tồn tại — trả thông điệp lỗi hoặc null.
+// Kiểm FK system/drawing tồn tại — trả thông điệp lỗi hoặc null.
 export async function checkDesignChangeRefs(input: DesignChangeInput): Promise<string | null> {
-  if (input.disciplineId != null) {
+  if (input.systemId != null) {
     if (
-      !Number.isInteger(input.disciplineId) ||
-      !(await queryOne(`SELECT id FROM disciplines WHERE id = ?`, input.disciplineId))
+      !Number.isInteger(input.systemId) ||
+      !(await queryOne(`SELECT id FROM systems WHERE id = ?`, input.systemId))
     )
       return "Hệ không hợp lệ";
   }
@@ -86,9 +86,9 @@ export type DesignChangeRow = DesignChangeInput & {
   id: number;
   code: string;
   projectId: number | null;
-  disciplineCode: string | null;
-  disciplineName: string | null;
-  disciplineColor: string | null;
+  systemCode: string | null;
+  systemName: string | null;
+  systemColor: string | null;
   drawingCode: string | null;
   drawingName: string | null;
   status: DesignChangeStatus;
@@ -130,8 +130,8 @@ export async function listDesignChanges(
 
   return query<DesignChangeRow>(
     `SELECT dc.id, dc.code, dc.project_id AS "projectId", dc.title,
-            dc.discipline_id AS "disciplineId", d.code AS "disciplineCode",
-            d.name AS "disciplineName", d.color AS "disciplineColor",
+            dc.system_id AS "systemId", d.code AS "systemCode",
+            d.name AS "systemName", d.color AS "systemColor",
             dc.drawing_id AS "drawingId", dw.code AS "drawingCode", dw.name AS "drawingName",
             dc.requested_by_note AS "requestedByNote", dc.reason,
             dc.impact_technical AS "impactTechnical", dc.impact_cost AS "impactCost",
@@ -140,7 +140,7 @@ export async function listDesignChanges(
             ud.name AS "decidedByName", dc.decided_at AS "decidedAt",
             dc.created_by AS "createdBy", uc.name AS "createdByName", dc.created_at AS "createdAt"
        FROM design_changes dc
-       LEFT JOIN disciplines d ON d.id = dc.discipline_id
+       LEFT JOIN systems d ON d.id = dc.system_id
        LEFT JOIN drawings dw ON dw.id = dc.drawing_id
        LEFT JOIN users uc ON uc.id = dc.created_by
        LEFT JOIN users ud ON ud.id = dc.decided_by

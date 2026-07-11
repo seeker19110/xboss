@@ -1,6 +1,6 @@
 // Kiểm soát chi phí (M2): ngân sách (BOQ) vs cam kết (PO + giao thầu) vs thực chi
 // (payment_bills) theo hệ hoặc theo tầng. Logic tách khỏi route để test tích hợp trực
-// tiếp qua DB (cùng pattern lib/report.ts, lib/disciplines.ts). Xem docs/nang-cap/M02-chi-phi.md.
+// tiếp qua DB (cùng pattern lib/report.ts, lib/systems.ts). Xem docs/nang-cap/M02-chi-phi.md.
 import { query, queryOne, run } from "@/lib/db";
 
 export type CostRow = {
@@ -18,12 +18,9 @@ export type CostSettings = { warnPct: number; overPct: number };
 // includeVo=true (mặc định — UI có toggle "Gồm VO").
 // projectId (M22+): undefined = không lọc dự án; boq_items có cột project_id trực tiếp
 // (migration 0027).
-async function budgetBySystem(
-  includeVo = true,
-  projectId?: number,
-): Promise<Map<number, number>> {
+async function budgetBySystem(includeVo = true, projectId?: number): Promise<Map<number, number>> {
   const conds = [
-    "bi.discipline_id IS NOT NULL",
+    "bi.system_id IS NOT NULL",
     "(bi.vo_id IS NULL OR (? AND vo.status IN ('approved','partially_approved','contract_added')))",
   ];
   const args: unknown[] = [includeVo];
@@ -31,8 +28,8 @@ async function budgetBySystem(
     conds.push("bi.project_id = ?");
     args.push(projectId);
   }
-  const rows = await query<{ disciplineId: number | null; budget: number }>(
-    `SELECT bi.discipline_id AS "disciplineId",
+  const rows = await query<{ systemId: number | null; budget: number }>(
+    `SELECT bi.system_id AS "systemId",
             COALESCE(SUM(
               CASE WHEN bi.vo_id IS NULL THEN bi.qty_contract * bi.unit_price
                    ELSE COALESCE(bi.qty_approved, 0) * bi.unit_price END
@@ -40,80 +37,79 @@ async function budgetBySystem(
        FROM boq_items bi
        LEFT JOIN variation_orders vo ON vo.id = bi.vo_id
       WHERE ${conds.join(" AND ")}
-      GROUP BY bi.discipline_id`,
+      GROUP BY bi.system_id`,
     ...args,
   );
-  return new Map(rows.map((r) => [r.disciplineId as number, r.budget]));
+  return new Map(rows.map((r) => [r.systemId as number, r.budget]));
 }
 
 // Cam kết theo hệ = giá trị PO (loại đơn đã huỷ) quy về hệ qua materials.sheet_type_id
-// → sheet_types.discipline_id, cộng giá trị hợp đồng giao thầu theo tầng (floor_contracts)
-// quy về hệ qua sheet_types.discipline_id.
+// → sheet_types.system_id, cộng giá trị hợp đồng giao thầu theo tầng (floor_contracts)
+// quy về hệ qua sheet_types.system_id.
 // projectId (M22+): undefined = không lọc. purchase_orders có cột project_id trực tiếp;
 // floor_contracts không có nên lọc qua sheet_types → towers.project_id.
 async function committedBySystem(projectId?: number): Promise<Map<number, number>> {
-  const poConds = ["po.status <> 'cancelled'", "st.discipline_id IS NOT NULL"];
+  const poConds = ["po.status <> 'cancelled'", "st.system_id IS NOT NULL"];
   const poArgs: unknown[] = [];
   if (projectId != null) {
     poConds.push("po.project_id = ?");
     poArgs.push(projectId);
   }
-  const poRows = await query<{ disciplineId: number | null; committed: number }>(
-    `SELECT st.discipline_id AS "disciplineId",
+  const poRows = await query<{ systemId: number | null; committed: number }>(
+    `SELECT st.system_id AS "systemId",
             COALESCE(SUM(poi.qty_ordered * COALESCE(poi.unit_price, 0)), 0) AS committed
        FROM po_items poi
        JOIN purchase_orders po ON po.id = poi.po_id
        LEFT JOIN materials m ON m.id = poi.material_id
        LEFT JOIN sheet_types st ON st.id = m.sheet_type_id
       WHERE ${poConds.join(" AND ")}
-      GROUP BY st.discipline_id`,
+      GROUP BY st.system_id`,
     ...poArgs,
   );
-  const fcConds = ["st.discipline_id IS NOT NULL"];
+  const fcConds = ["st.system_id IS NOT NULL"];
   const fcArgs: unknown[] = [];
-  const fcJoin =
-    projectId != null ? " JOIN towers tw ON tw.id = st.tower_id" : "";
+  const fcJoin = projectId != null ? " JOIN towers tw ON tw.id = st.tower_id" : "";
   if (projectId != null) {
     fcConds.push("tw.project_id = ?");
     fcArgs.push(projectId);
   }
-  const fcRows = await query<{ disciplineId: number | null; committed: number }>(
-    `SELECT st.discipline_id AS "disciplineId", COALESCE(SUM(fc.contract_value), 0) AS committed
+  const fcRows = await query<{ systemId: number | null; committed: number }>(
+    `SELECT st.system_id AS "systemId", COALESCE(SUM(fc.contract_value), 0) AS committed
        FROM floor_contracts fc
        JOIN sheet_types st ON st.id = fc.sheet_type_id${fcJoin}
       WHERE ${fcConds.join(" AND ")}
-      GROUP BY st.discipline_id`,
+      GROUP BY st.system_id`,
     ...fcArgs,
   );
   const map = new Map<number, number>();
   for (const r of poRows)
-    map.set(r.disciplineId as number, (map.get(r.disciplineId as number) ?? 0) + r.committed);
+    map.set(r.systemId as number, (map.get(r.systemId as number) ?? 0) + r.committed);
   for (const r of fcRows)
-    map.set(r.disciplineId as number, (map.get(r.disciplineId as number) ?? 0) + r.committed);
+    map.set(r.systemId as number, (map.get(r.systemId as number) ?? 0) + r.committed);
   return map;
 }
 
 // Thực chi theo hệ = Σ amount của payment_bills (MỌI type, kể cả advance — tạm ứng đã
-// ra khỏi công ty, đã quyết 2026-07-04) quy về hệ qua sheet_types.discipline_id.
+// ra khỏi công ty, đã quyết 2026-07-04) quy về hệ qua sheet_types.system_id.
 // projectId (M22+): undefined = không lọc. payment_bills không có cột riêng nên lọc qua
 // sheet_types → towers.project_id.
 async function actualBySystem(projectId?: number): Promise<Map<number, number>> {
-  const conds = ["st.discipline_id IS NOT NULL"];
+  const conds = ["st.system_id IS NOT NULL"];
   const args: unknown[] = [];
   const join = projectId != null ? " JOIN towers tw ON tw.id = st.tower_id" : "";
   if (projectId != null) {
     conds.push("tw.project_id = ?");
     args.push(projectId);
   }
-  const rows = await query<{ disciplineId: number | null; actual: number }>(
-    `SELECT st.discipline_id AS "disciplineId", COALESCE(SUM(pb.amount), 0) AS actual
+  const rows = await query<{ systemId: number | null; actual: number }>(
+    `SELECT st.system_id AS "systemId", COALESCE(SUM(pb.amount), 0) AS actual
        FROM payment_bills pb
        JOIN sheet_types st ON st.id = pb.sheet_type_id${join}
       WHERE ${conds.join(" AND ")}
-      GROUP BY st.discipline_id`,
+      GROUP BY st.system_id`,
     ...args,
   );
-  return new Map(rows.map((r) => [r.disciplineId as number, r.actual]));
+  return new Map(rows.map((r) => [r.systemId as number, r.actual]));
 }
 
 // Ngân sách/cam kết/thực chi theo tầng — BOQ không có chiều tầng nên budget = committed
@@ -160,15 +156,15 @@ export async function costSummary(
 ): Promise<CostRow[]> {
   if (groupBy === "floor") return costByFloor(projectId);
 
-  const disciplines = await query<{ id: number; code: string; name: string }>(
-    `SELECT id, code, name FROM disciplines ORDER BY id`,
+  const systems = await query<{ id: number; code: string; name: string }>(
+    `SELECT id, code, name FROM systems ORDER BY id`,
   );
   const [budget, committed, actual] = await Promise.all([
     budgetBySystem(includeVo, projectId),
     committedBySystem(projectId),
     actualBySystem(projectId),
   ]);
-  return disciplines.map((d) => ({
+  return systems.map((d) => ({
     key: d.code,
     label: d.name,
     budget: budget.get(d.id) ?? 0,
@@ -192,18 +188,18 @@ export async function costTotals(
   );
 }
 
-// Ngân sách của 1 hệ (dùng cho khối `budget` trong getDisciplineSummary — lib/disciplines.ts).
+// Ngân sách của 1 hệ (dùng cho khối `budget` trong getSystemSummary — lib/systems.ts).
 // projectId (M22+): undefined = không lọc.
-export async function disciplineBudget(
-  disciplineId: number,
+export async function systemBudget(
+  systemId: number,
   includeVo = true,
   projectId?: number,
 ): Promise<number> {
   const conds = [
-    "bi.discipline_id = ?",
+    "bi.system_id = ?",
     "(bi.vo_id IS NULL OR (? AND vo.status IN ('approved','partially_approved','contract_added')))",
   ];
-  const args: unknown[] = [disciplineId, includeVo];
+  const args: unknown[] = [systemId, includeVo];
   if (projectId != null) {
     conds.push("bi.project_id = ?");
     args.push(projectId);

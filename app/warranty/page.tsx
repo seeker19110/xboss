@@ -35,8 +35,8 @@ const WARRANTY_STATUS_BADGE: Record<WarrantyItemStatus, string> = {
 type WarrantyItem = {
   id: number;
   title: string;
-  disciplineId: number | null;
-  disciplineName: string | null;
+  tradeId: number | null;
+  tradeName: string | null;
   handoverItemId: number | null;
   handoverItemTitle: string | null;
   warrantyFrom: string | null;
@@ -103,8 +103,8 @@ type Claim = {
 type OmDoc = {
   id: number;
   title: string;
-  disciplineId: number | null;
-  disciplineName: string | null;
+  tradeId: number | null;
+  tradeName: string | null;
   fileName: string | null;
   originalName: string | null;
   mimeType: string | null;
@@ -113,7 +113,7 @@ type OmDoc = {
   createdAt: string;
 };
 
-type Discipline = { id: number; code: string; name: string };
+type SystemOption = { id: number; code: string; name: string };
 type GuaranteeOption = { id: number; title: string };
 
 type Tab = "warranty" | "claims" | "om";
@@ -128,7 +128,7 @@ export default function WarrantyPage() {
   const [items, setItems] = useState<WarrantyItem[]>([]);
   const [claims, setClaims] = useState<Claim[]>([]);
   const [omDocs, setOmDocs] = useState<OmDoc[]>([]);
-  const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+  const [systems, setSystems] = useState<SystemOption[]>([]);
   const [guarantees, setGuarantees] = useState<GuaranteeOption[]>([]);
   const [handoverItems, setHandoverItems] = useState<{ id: number; title: string }[]>([]);
   const [users, setUsers] = useState<{ id: number; name: string }[]>([]);
@@ -159,9 +159,9 @@ export default function WarrantyPage() {
         setItems(itemsRes?.items ?? []);
         setClaims(claimsRes?.items ?? []);
         setOmDocs(omRes?.items ?? []);
-        fetch("/api/disciplines")
+        fetch("/api/systems")
           .then((r) => (r.ok ? r.json() : null))
-          .then((j) => setDisciplines(j?.disciplines ?? []));
+          .then((j) => setSystems(j?.systems ?? []));
         fetch("/api/handover-items")
           .then((r) => (r.ok ? r.json() : null))
           .then((j) => setHandoverItems(j?.items ?? []));
@@ -351,7 +351,7 @@ export default function WarrantyPage() {
       {(addItemOpen || editItem) && (
         <WarrantyItemModal
           item={editItem}
-          disciplines={disciplines}
+          systems={systems}
           handoverItems={handoverItems}
           guarantees={guarantees}
           onClose={() => {
@@ -385,7 +385,7 @@ export default function WarrantyPage() {
 
       {addOmOpen && (
         <OmModal
-          disciplines={disciplines}
+          systems={systems}
           onClose={() => setAddOmOpen(false)}
           onSaved={() => {
             setAddOmOpen(false);
@@ -453,7 +453,7 @@ function WarrantyTab({
                       </p>
                     )}
                   </td>
-                  <td className="p-3 text-xs text-zinc-400">{it.disciplineName ?? "—"}</td>
+                  <td className="p-3 text-xs text-zinc-400">{it.tradeName ?? "—"}</td>
                   <td className="p-3 text-xs text-zinc-400">
                     {it.warrantyFrom ? formatDateVN(it.warrantyFrom) : "—"}
                   </td>
@@ -656,7 +656,7 @@ function OmTab({
             <div className="min-w-0">
               <p className="font-medium truncate">{d.title}</p>
               <p className="text-xs text-zinc-500">
-                {d.disciplineName ? `${d.disciplineName} · ` : ""}
+                {d.tradeName ? `${d.tradeName} · ` : ""}
                 {d.uploaderName ?? "—"} · {formatDateVN(d.createdAt.slice(0, 10))}
               </p>
             </div>
@@ -689,21 +689,21 @@ function OmTab({
 
 function WarrantyItemModal({
   item,
-  disciplines,
+  systems,
   handoverItems,
   guarantees,
   onClose,
   onSaved,
 }: {
   item: WarrantyItem | null;
-  disciplines: Discipline[];
+  systems: SystemOption[];
   handoverItems: { id: number; title: string }[];
   guarantees: GuaranteeOption[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [title, setTitle] = useState(item?.title ?? "");
-  const [disciplineId, setDisciplineId] = useState<number | "">(item?.disciplineId ?? "");
+  const [tradeId, setTradeId] = useState<number | "">(item?.tradeId ?? "");
   const [handoverItemId, setHandoverItemId] = useState<number | "">(item?.handoverItemId ?? "");
   const [warrantyFrom, setWarrantyFrom] = useState(item?.warrantyFrom ?? "");
   const [warrantyMonths, setWarrantyMonths] = useState(
@@ -723,7 +723,7 @@ function WarrantyItemModal({
     try {
       const payload = {
         title: title.trim(),
-        disciplineId: disciplineId === "" ? null : disciplineId,
+        tradeId: tradeId === "" ? null : tradeId,
         handoverItemId: handoverItemId === "" ? null : handoverItemId,
         warrantyFrom: warrantyFrom || null,
         warrantyMonths: warrantyMonths === "" ? null : Number(warrantyMonths),
@@ -774,12 +774,12 @@ function WarrantyItemModal({
           <label className="text-xs text-zinc-400">
             Hệ
             <select
-              value={disciplineId}
-              onChange={(e) => setDisciplineId(e.target.value ? Number(e.target.value) : "")}
+              value={tradeId}
+              onChange={(e) => setTradeId(e.target.value ? Number(e.target.value) : "")}
               className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
             >
               <option value="">— Chưa gán —</option>
-              {disciplines.map((d) => (
+              {systems.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
                 </option>
@@ -1082,16 +1082,16 @@ function ClaimModal({
 // ===== Modal O&M (upload) =====
 
 function OmModal({
-  disciplines,
+  systems,
   onClose,
   onSaved,
 }: {
-  disciplines: Discipline[];
+  systems: SystemOption[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [title, setTitle] = useState("");
-  const [disciplineId, setDisciplineId] = useState<number | "">("");
+  const [tradeId, setTradeId] = useState<number | "">("");
   const [file, setFile] = useState<File | null>(null);
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
@@ -1105,7 +1105,7 @@ function OmModal({
     try {
       const form = new FormData();
       form.append("title", title.trim());
-      if (disciplineId !== "") form.append("disciplineId", String(disciplineId));
+      if (tradeId !== "") form.append("tradeId", String(tradeId));
       form.append("file", file);
       const res = await fetch("/api/om-documents", { method: "POST", body: form });
       if (!res.ok) {
@@ -1142,12 +1142,12 @@ function OmModal({
         <label className="text-xs text-zinc-400 block">
           Hệ (tuỳ chọn)
           <select
-            value={disciplineId}
-            onChange={(e) => setDisciplineId(e.target.value ? Number(e.target.value) : "")}
+            value={tradeId}
+            onChange={(e) => setTradeId(e.target.value ? Number(e.target.value) : "")}
             className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
           >
             <option value="">— Chưa gán —</option>
-            {disciplines.map((d) => (
+            {systems.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.name}
               </option>

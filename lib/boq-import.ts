@@ -19,7 +19,7 @@ export type ParsedBoqRow = {
 
 export type BoqParseResult = {
   rows: ParsedBoqRow[];
-  detectedDisciplineCode: string | null;
+  detectedSystemCode: string | null;
   warnings: string[];
   skippedTowerBOnly: number; // dòng chỉ thuộc Tháp B (KL Tháp A = 0) — XBoss chỉ quản lý Tháp A
 };
@@ -30,7 +30,7 @@ export type BoqParseResult = {
 // vì I/II/III bị dùng lặp lại ở nhiều cấp đề mục lồng nhau trong cùng phần I).
 const SECTION_BOUNDARY = [/NGOÀI HỢP ĐỒNG/i, /KHẤU TRỪ/i, /PHẠT THEO QUY/i];
 
-const DISCIPLINE_KEYWORDS: { code: string; patterns: RegExp[] }[] = [
+const SYSTEM_KEYWORDS: { code: string; patterns: RegExp[] }[] = [
   { code: "acmv", patterns: [/điều hòa/i, /thông gió/i, /\bacmv\b/i, /\bhvac\b/i] },
   { code: "dien", patterns: [/hệ thống điện/i, /\belectric/i] },
   { code: "nuoc", patterns: [/cấp thoát nước/i, /\bnước\b/i] },
@@ -39,8 +39,8 @@ const DISCIPLINE_KEYWORDS: { code: string; patterns: RegExp[] }[] = [
   { code: "xay_to", patterns: [/xây tô/i, /xây dựng/i] },
 ];
 
-function detectDiscipline(text: string): string | null {
-  for (const d of DISCIPLINE_KEYWORDS) {
+function detectSystem(text: string): string | null {
+  for (const d of SYSTEM_KEYWORDS) {
     if (d.patterns.some((p) => p.test(text))) return d.code;
   }
   return null;
@@ -61,7 +61,7 @@ function num(v: unknown): number {
 export function parseBoqWorkbook(workbook: XLSX.WorkBook): BoqParseResult {
   const empty: BoqParseResult = {
     rows: [],
-    detectedDisciplineCode: null,
+    detectedSystemCode: null,
     warnings: [],
     skippedTowerBOnly: 0,
   };
@@ -93,13 +93,13 @@ export function parseBoqWorkbook(workbook: XLSX.WorkBook): BoqParseResult {
 
   // Dò tên gói thầu ở các dòng trước tiêu đề để tự nhận diện hệ (best-effort — người
   // dùng vẫn xác nhận/chỉnh lại hệ trước khi ghi DB, xem UI import).
-  let detectedDisciplineCode: string | null = null;
+  let detectedSystemCode: string | null = null;
   for (let i = 0; i < headerRow; i++) {
     const text = cleanLabel(raw[i]?.[0]);
     if (!text) continue;
-    const d = detectDiscipline(text);
+    const d = detectSystem(text);
     if (d) {
-      detectedDisciplineCode = d;
+      detectedSystemCode = d;
       break;
     }
   }
@@ -134,7 +134,7 @@ export function parseBoqWorkbook(workbook: XLSX.WorkBook): BoqParseResult {
   const warnings: string[] = [];
   if (rows.length === 0) warnings.push("Không tìm thấy dòng hạng mục hợp lệ nào trong phần I");
 
-  return { rows, detectedDisciplineCode, warnings, skippedTowerBOnly };
+  return { rows, detectedSystemCode, warnings, skippedTowerBOnly };
 }
 
 // File không có cột mã (BOQCODE) — tự sinh mã tuần tự "<PREFIX>-NNNN" theo mã lớn
@@ -159,9 +159,9 @@ export type BoqImportPreviewRow = ParsedBoqRow & {
 // tránh lệch nếu có import khác chen giữa lúc preview và lúc xác nhận ghi.
 export async function previewBoqImport(
   rows: ParsedBoqRow[],
-  disciplineCode: string,
+  systemCode: string,
 ): Promise<BoqImportPreviewRow[]> {
-  const prefix = `${disciplineCode.toUpperCase()}-`;
+  const prefix = `${systemCode.toUpperCase()}-`;
   let seq = await nextBoqSeq(prefix);
   const out: BoqImportPreviewRow[] = [];
   for (const row of rows) {
@@ -184,11 +184,11 @@ export type BoqImportResult = { inserted: number; skipped: number; errors: strin
 // và ghi vào errors thay vì làm hỏng cả transaction.
 export async function commitBoqImport(
   rows: ParsedBoqRow[],
-  disciplineId: number,
-  disciplineCode: string,
+  systemId: number,
+  systemCode: string,
   projectId: number,
 ): Promise<BoqImportResult> {
-  const prefix = `${disciplineCode.toUpperCase()}-`;
+  const prefix = `${systemCode.toUpperCase()}-`;
   return withTransaction(async () => {
     let seq = await nextBoqSeq(prefix);
     let inserted = 0;
@@ -202,12 +202,12 @@ export async function commitBoqImport(
         continue;
       }
       await insertId(
-        `INSERT INTO boq_items (code, name, unit, discipline_id, qty_contract, unit_price, note, sort_order, project_id)
+        `INSERT INTO boq_items (code, name, unit, system_id, qty_contract, unit_price, note, sort_order, project_id)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         code,
         row.name,
         row.unit,
-        disciplineId,
+        systemId,
         row.qtyContract,
         row.unitPrice,
         row.note,

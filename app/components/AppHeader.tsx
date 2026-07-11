@@ -24,9 +24,9 @@ import {
   type DashNode,
   type DashCluster,
 } from "@/app/lib/dashboardTree";
-import { disciplineColorClasses } from "@/lib/disciplineColors";
+import { systemColorClasses } from "@/lib/systemColors";
 
-type Discipline = { id: number; code: string; name: string; color: string | null };
+type SystemOption = { id: number; code: string; name: string; color: string | null };
 
 type Me = { id: number; name: string; email: string; role: string };
 
@@ -61,7 +61,7 @@ export default function AppHeader({
   const [path, setPath] = useState("");
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+  const [systems, setSystems] = useState<SystemOption[]>([]);
   // Gập/mở dashboard có children (M21) — mặc định MỞ (không có bản ghi = true) nên
   // không ẩn link nào đang dùng; chỉ ẩn khi người dùng tự gập, nhớ localStorage.
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
@@ -74,9 +74,9 @@ export default function AppHeader({
     setPath(window.location.pathname);
     fetchMe().then((u) => setMe(u));
     setCollapsed(document.documentElement.classList.contains("sidebar-collapsed"));
-    fetch("/api/disciplines")
+    fetch("/api/systems")
       .then((r) => (r.ok ? r.json() : null))
-      .then((data) => setDisciplines(data?.disciplines ?? []))
+      .then((data) => setSystems(data?.systems ?? []))
       .catch(() => {});
     fetch("/api/nav-settings", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
@@ -297,17 +297,17 @@ export default function AppHeader({
         <nav className="flex-1 overflow-y-auto py-2" aria-label="Điều hướng chính">
           {visibleTree.slice(0, 1).map(renderCluster)}
 
-          {/* Hệ thi công — danh mục động từ /api/disciplines (M15), mỗi hệ 1 mục
-              dẫn tới trang hub riêng (/he/[code]); chấm màu lấy từ disciplines.color. */}
-          {disciplines.length > 0 && (
+          {/* Hệ thi công — danh mục động từ /api/systems (M15), mỗi hệ 1 mục
+              dẫn tới trang hub riêng (/system/[code]); chấm màu lấy từ systems.color. */}
+          {systems.length > 0 && (
             <div className="mb-3">
               <div className="sidebar-label px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
                 Hệ thi công
               </div>
-              {disciplines.map((d) => {
-                const href = `/he/${d.code}`;
+              {systems.map((d) => {
+                const href = `/system/${d.code}`;
                 const itemActive = path === href || path.startsWith(href + "/");
-                const c = disciplineColorClasses(d.color);
+                const c = systemColorClasses(d.color);
                 return (
                   <a
                     key={d.code}
