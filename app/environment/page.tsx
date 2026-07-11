@@ -40,8 +40,8 @@ const PERMIT_STATUS_LABEL: Record<PermitStatus, string> = {
   superseded: "Đã thay thế",
 };
 const PERMIT_STATUS_BADGE: Record<PermitStatus, string> = {
-  valid: "bg-emerald-900/40 text-emerald-300",
-  expired: "bg-rose-900/40 text-rose-300",
+  valid: "bg-emerald-900 text-emerald-200",
+  expired: "bg-rose-900 text-rose-200",
   superseded: "bg-zinc-800 text-zinc-500",
 };
 
@@ -260,7 +260,7 @@ export default function EnvironmentPage() {
                 <button
                   onClick={() => setAddPermitOpen(true)}
                   aria-label="Thêm hồ sơ"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                 >
                   <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm hồ sơ</span>
                 </button>
@@ -269,7 +269,7 @@ export default function EnvironmentPage() {
                 <button
                   onClick={() => setAddMonOpen(true)}
                   aria-label="Thêm kỳ quan trắc"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                 >
                   <Plus className="w-4 h-4" />{" "}
                   <span className="hidden sm:inline">Thêm kỳ quan trắc</span>
@@ -279,7 +279,7 @@ export default function EnvironmentPage() {
                 <button
                   onClick={() => setAddWasteOpen(true)}
                   aria-label="Ghi nhận chất thải"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                 >
                   <Plus className="w-4 h-4" />{" "}
                   <span className="hidden sm:inline">Ghi nhận chất thải</span>
@@ -599,11 +599,11 @@ export default function EnvironmentPage() {
                             {m.passed === null ? (
                               <span className="text-zinc-500 text-xs">Chưa đánh giá</span>
                             ) : m.passed ? (
-                              <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-emerald-900/40 text-emerald-300">
+                              <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-emerald-900 text-emerald-200">
                                 Đạt
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-rose-900/40 text-rose-300">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-rose-900 text-rose-200">
                                 <AlertTriangle className="w-3 h-3" /> Vượt ngưỡng
                               </span>
                             )}
@@ -996,7 +996,7 @@ function PermitModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>
@@ -1159,7 +1159,7 @@ function MonitoringModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>
@@ -1309,7 +1309,7 @@ function WasteModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>

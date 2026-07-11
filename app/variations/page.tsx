@@ -28,11 +28,11 @@ const STATUS_LABEL: Record<VoStatus, string> = {
 };
 const STATUS_BADGE: Record<VoStatus, string> = {
   draft: "bg-zinc-800 text-zinc-300",
-  submitted: "bg-amber-900/40 text-amber-300",
-  approved: "bg-emerald-900/40 text-emerald-300",
-  partially_approved: "bg-sky-900/40 text-sky-300",
-  rejected: "bg-rose-900/40 text-rose-300",
-  contract_added: "bg-violet-900/40 text-violet-300",
+  submitted: "bg-amber-900 text-amber-200",
+  approved: "bg-emerald-900 text-emerald-200",
+  partially_approved: "bg-sky-900 text-sky-200",
+  rejected: "bg-rose-900 text-rose-200",
+  contract_added: "bg-violet-900 text-violet-200",
 };
 
 type VoLine = {
@@ -157,7 +157,7 @@ export default function VariationsPage() {
             <button
               onClick={() => setAddOpen(true)}
               aria-label="Thêm phát sinh"
-              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
             >
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm phát sinh</span>
             </button>
@@ -476,7 +476,7 @@ function AddVoModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang tạo…" : "Tạo phát sinh"}
         </button>
@@ -683,7 +683,7 @@ function VoDetailModal({
               <button
                 onClick={submitVo}
                 disabled={busy}
-                className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg"
+                className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent text-sm font-medium px-4 py-2 rounded-lg"
               >
                 Trình lên CĐT/TVGS
               </button>
@@ -746,21 +746,21 @@ function VoDetailModal({
                 <button
                   onClick={() => decide("approved")}
                   disabled={busy}
-                  className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white text-xs font-medium px-3 py-2 rounded-lg"
+                  className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
                 >
                   Duyệt toàn bộ
                 </button>
                 <button
                   onClick={() => decide("partially_approved")}
                   disabled={busy}
-                  className="bg-sky-700 hover:bg-sky-600 disabled:opacity-50 text-white text-xs font-medium px-3 py-2 rounded-lg"
+                  className="bg-sky-700 hover:bg-sky-600 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
                 >
                   Duyệt một phần
                 </button>
                 <button
                   onClick={() => decide("rejected")}
                   disabled={busy}
-                  className="bg-rose-800 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-medium px-3 py-2 rounded-lg"
+                  className="bg-rose-800 hover:bg-rose-700 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
                 >
                   Từ chối
                 </button>
@@ -798,7 +798,7 @@ function VoDetailModal({
                   <button
                     onClick={contractAdd}
                     disabled={busy || !addendaContractId || !addendaCode.trim()}
-                    className="bg-violet-700 hover:bg-violet-600 disabled:opacity-50 text-white text-xs font-medium px-3 py-2 rounded-lg shrink-0"
+                    className="bg-violet-700 hover:bg-violet-600 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg shrink-0"
                   >
                     Chốt
                   </button>

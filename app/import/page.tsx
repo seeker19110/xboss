@@ -120,7 +120,7 @@ export default function ImportPage() {
 
       <main className="p-6 max-w-3xl mx-auto">
         {allowed === false && (
-          <div className="rounded-xl border border-amber-800 bg-amber-950/40 text-amber-300 p-4 mb-4 text-sm">
+          <div className="rounded-xl border border-amber-800 bg-amber-950 text-amber-200 p-4 mb-4 text-sm">
             Bạn không có quyền import (chỉ Admin/PM). Đăng nhập bằng tài khoản Admin hoặc PM để dùng
             chức năng này.
           </div>
@@ -228,7 +228,7 @@ export default function ImportPage() {
               </details>
             )}
 
-            <div className="p-4 border-t border-zinc-800 bg-amber-950/20 text-xs text-amber-300">
+            <div className="p-4 border-t border-zinc-800 bg-amber-950 text-xs text-amber-200">
               ⚠️ Import sẽ <b>cập nhật đè</b> trạng thái/% các task trùng mã đang có trong hệ thống
               theo nội dung file này.
             </div>
@@ -237,7 +237,7 @@ export default function ImportPage() {
               <button
                 onClick={handleImport}
                 disabled={busy}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-zinc-800 py-3 rounded-lg font-medium transition"
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-zinc-800 py-3 rounded-lg font-medium transition text-on-accent"
               >
                 {busy ? "Đang import..." : `✓ Xác nhận import ${preview.totalTasks} task`}
               </button>

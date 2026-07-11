@@ -132,12 +132,12 @@ export default function UsersPage() {
 
       <main className="p-6 max-w-3xl mx-auto space-y-6">
         {error && (
-          <div className="rounded-lg border border-red-800 bg-red-950/40 text-red-300 px-4 py-2.5 text-sm">
+          <div className="rounded-lg border border-red-800 bg-red-950 text-red-200 px-4 py-2.5 text-sm">
             {error}
           </div>
         )}
         {okMsg && (
-          <div className="rounded-lg border border-emerald-800 bg-emerald-950/40 text-emerald-300 px-4 py-2.5 text-sm">
+          <div className="rounded-lg border border-emerald-800 bg-emerald-950 text-emerald-200 px-4 py-2.5 text-sm">
             {okMsg}
           </div>
         )}

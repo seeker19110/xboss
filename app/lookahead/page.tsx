@@ -71,7 +71,7 @@ export default function LookaheadPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white text-zinc-900">
+    <div className="sheet-stable min-h-screen bg-white text-zinc-900">
       <div className="no-print sticky top-0 bg-zinc-100 border-b border-zinc-300 px-6 py-3 flex items-center gap-3">
         <Link href="/" aria-label="Quay lại" className="text-zinc-600 hover:text-zinc-900">
           <ArrowLeft className="w-5 h-5" />

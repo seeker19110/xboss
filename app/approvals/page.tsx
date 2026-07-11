@@ -304,7 +304,7 @@ export default function ApprovalsPage() {
               disabled={isBusy}
               className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg border transition ${
                 g.docCount > 0
-                  ? "bg-emerald-950/60 border-emerald-900 text-emerald-300 hover:bg-emerald-900/60"
+                  ? "bg-emerald-950 border-emerald-900 text-emerald-200 hover:bg-emerald-900"
                   : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:bg-zinc-700"
               }`}
             >
@@ -336,7 +336,7 @@ export default function ApprovalsPage() {
                 <button
                   onClick={() => approveFloor(g)}
                   disabled={isBusy}
-                  className="flex items-center gap-1 text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-lg px-2.5 py-1.5 transition font-medium"
+                  className="flex items-center gap-1 text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent rounded-lg px-2.5 py-1.5 transition font-medium"
                 >
                   <CheckSquare className="w-3 h-3" /> Duyệt nghiệm thu
                 </button>
@@ -351,7 +351,7 @@ export default function ApprovalsPage() {
                 <button
                   onClick={() => unapproveFloor(g)}
                   disabled={isBusy}
-                  className="text-xs bg-red-950/60 hover:bg-red-900/60 disabled:opacity-50 border border-red-900 text-red-300 rounded-lg px-2 py-1 transition"
+                  className="text-xs bg-red-950 hover:bg-red-900 disabled:opacity-50 border border-red-900 text-red-200 rounded-lg px-2 py-1 transition"
                 >
                   Huỷ NT
                 </button>
@@ -543,7 +543,7 @@ export default function ApprovalsPage() {
                   <button
                     onClick={submitLink}
                     disabled={!linkInput.trim() || !!busy}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg py-2 text-sm font-medium transition"
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg py-2 text-sm font-medium transition text-on-accent"
                   >
                     Thêm link
                   </button>

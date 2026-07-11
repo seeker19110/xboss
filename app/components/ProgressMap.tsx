@@ -43,11 +43,11 @@ type TowerRow = { id: number; name: string };
 // (zinc/red/amber/emerald), viền đỏ = có task trễ (không đổi màu nền). ─────────
 
 function bucketClass(p: number): string {
-  if (p >= 0.999) return "bg-emerald-600 text-white";
+  if (p >= 0.999) return "bg-emerald-600 text-on-accent";
   if (p >= 0.8) return "bg-emerald-800 text-emerald-100";
   if (p >= 0.5) return "bg-amber-800 text-amber-100";
   if (p >= 0.2) return "bg-red-900 text-red-200";
-  if (p > 0) return "bg-red-950 text-red-300";
+  if (p > 0) return "bg-red-950 text-red-200";
   return "bg-zinc-800 text-zinc-300";
 }
 function cellClass(p: number, delayed: number): string {
@@ -170,9 +170,7 @@ function TowerCurrentTable({
                       >
                         {Math.round(p * 100)}%
                         {(cell?.delayed ?? 0) > 0 && (
-                          <span className="text-[9px] leading-none opacity-80">
-                            {cell!.delayed} trễ
-                          </span>
+                          <span className="text-[9px] leading-none">{cell!.delayed} trễ</span>
                         )}
                       </a>
                     )}

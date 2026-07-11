@@ -133,7 +133,7 @@ export default function DiaryPage() {
                         : "border-zinc-800 bg-zinc-900 hover:bg-zinc-800"
                     }`}
                   >
-                    <span className="text-zinc-200">{dayNum}</span>
+                    <span className="text-white">{dayNum}</span>
                     {status === "locked" && <Lock className="w-3 h-3 text-emerald-400" />}
                     {status === "draft" && <FileEdit className="w-3 h-3 text-amber-400" />}
                     {!status && <span className="w-1.5 h-1.5 rounded-full bg-zinc-700" />}

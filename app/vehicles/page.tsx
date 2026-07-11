@@ -49,11 +49,11 @@ const STATUS_LABEL: Record<Vehicle["status"], string> = {
 };
 const STATUS_CLS: Record<Vehicle["status"], string> = {
   registered: "bg-zinc-700 text-zinc-300",
-  approved: "bg-blue-950 text-blue-300",
-  entered: "bg-emerald-950 text-emerald-300",
+  approved: "bg-blue-950 text-blue-200",
+  entered: "bg-emerald-950 text-emerald-200",
   exited: "bg-zinc-800 text-zinc-400",
-  no_show: "bg-amber-950 text-amber-300",
-  cancelled: "bg-red-950 text-red-400",
+  no_show: "bg-amber-950 text-amber-200",
+  cancelled: "bg-red-950 text-red-200",
 };
 
 const isLate = (v: Vehicle) =>
@@ -210,7 +210,7 @@ export default function VehiclesPage() {
             {canManage && (
               <button
                 onClick={() => setShowAdd(true)}
-                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 px-3 py-2.5 rounded-lg text-sm font-medium"
+                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 px-3 py-2.5 rounded-lg text-sm font-medium text-on-accent"
               >
                 <Plus className="w-4 h-4" /> Đăng ký xe
               </button>
@@ -292,7 +292,7 @@ export default function VehiclesPage() {
                   {canManage && v.status === "registered" && (
                     <button
                       onClick={() => doAction(v, "approve")}
-                      className="flex-1 min-w-[100px] flex items-center justify-center gap-2 bg-blue-700 hover:bg-blue-600 rounded-lg py-3 text-sm font-semibold"
+                      className="flex-1 min-w-[100px] flex items-center justify-center gap-2 bg-blue-700 hover:bg-blue-600 rounded-lg py-3 text-sm font-semibold text-on-accent"
                     >
                       <CheckCircle2 className="w-4 h-4" /> Duyệt
                     </button>
@@ -300,7 +300,7 @@ export default function VehiclesPage() {
                   {["registered", "approved"].includes(v.status) && (
                     <button
                       onClick={() => doAction(v, "enter")}
-                      className="flex-1 min-w-[100px] flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-600 rounded-lg py-3 text-sm font-semibold"
+                      className="flex-1 min-w-[100px] flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-600 rounded-lg py-3 text-sm font-semibold text-on-accent"
                     >
                       <LogIn className="w-4 h-4" /> Đã vào
                     </button>
@@ -317,14 +317,14 @@ export default function VehiclesPage() {
                     <>
                       <button
                         onClick={() => doAction(v, "no_show", `Đánh dấu xe ${v.plate} không đến?`)}
-                        className="px-4 py-3 rounded-lg text-sm bg-amber-900/60 hover:bg-amber-800 text-amber-200"
+                        className="px-4 py-3 rounded-lg text-sm bg-amber-900 hover:bg-amber-800 text-amber-200"
                       >
                         Không đến
                       </button>
                       <button
                         onClick={() => doAction(v, "cancel", `Huỷ đăng ký xe ${v.plate}?`)}
                         aria-label={`Huỷ đăng ký xe ${v.plate}`}
-                        className="p-3 rounded-lg hover:bg-red-900/50 text-zinc-400 hover:text-red-400"
+                        className="p-3 rounded-lg hover:bg-red-900 text-zinc-400 hover:text-red-200"
                       >
                         <Ban className="w-4 h-4" />
                       </button>
@@ -433,7 +433,7 @@ export default function VehiclesPage() {
               <button
                 onClick={addVehicle}
                 disabled={saving}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 py-2.5 rounded-lg text-sm font-medium"
+                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 py-2.5 rounded-lg text-sm font-medium text-on-accent"
               >
                 Đăng ký
               </button>

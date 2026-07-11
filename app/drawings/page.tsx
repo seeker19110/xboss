@@ -55,11 +55,11 @@ const STATUS_LABEL: Record<RevisionStatus, string> = {
   superseded: "Đã thay thế",
 };
 const STATUS_BADGE: Record<RevisionStatus, string> = {
-  submitted: "bg-sky-900/40 text-sky-300",
-  commented: "bg-amber-900/40 text-amber-300",
-  approved: "bg-emerald-900/40 text-emerald-300",
-  approved_with_comments: "bg-emerald-900/40 text-emerald-300",
-  rejected: "bg-rose-900/40 text-rose-300",
+  submitted: "bg-sky-900 text-sky-200",
+  commented: "bg-amber-900 text-amber-200",
+  approved: "bg-emerald-900 text-emerald-200",
+  approved_with_comments: "bg-emerald-900 text-emerald-200",
+  rejected: "bg-rose-900 text-rose-200",
   superseded: "bg-zinc-800 text-zinc-400 line-through decoration-zinc-600",
 };
 const STATUS_ICON: Record<RevisionStatus, LucideIcon> = {
@@ -216,7 +216,7 @@ function DrawingsPageInner() {
               <button
                 onClick={() => setAddOpen(true)}
                 aria-label="Thêm bản vẽ"
-                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
               >
                 <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm bản vẽ</span>
               </button>
@@ -225,7 +225,7 @@ function DrawingsPageInner() {
             <button
               onClick={() => setDcAddOpen(true)}
               aria-label="Thêm thay đổi thiết kế"
-              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
             >
               <Plus className="w-4 h-4" />{" "}
               <span className="hidden sm:inline">Thêm thay đổi thiết kế</span>
@@ -362,8 +362,8 @@ function DrawingsPageInner() {
                             <span
                               className={`shrink-0 px-2 py-0.5 rounded-full font-semibold ${
                                 d.approvedRevisionId != null
-                                  ? "bg-emerald-900/40 text-emerald-300"
-                                  : "bg-amber-900/40 text-amber-300"
+                                  ? "bg-emerald-900 text-emerald-200"
+                                  : "bg-amber-900 text-amber-200"
                               }`}
                             >
                               {d.approvedRevisionId != null
@@ -425,7 +425,7 @@ function FilterChip({
       onClick={onClick}
       className={`px-2.5 py-1 rounded-full text-xs font-medium border transition ${
         active
-          ? "bg-emerald-800/60 border-emerald-700 text-emerald-200"
+          ? "bg-emerald-800/60 border-emerald-700 text-white"
           : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600"
       }`}
     >
@@ -559,7 +559,7 @@ function DrawingFormModal({
           <button
             onClick={submit}
             disabled={!canSubmit || saving}
-            className="px-4 py-1.5 text-sm bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 rounded-lg font-medium"
+            className="px-4 py-1.5 text-sm bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 rounded-lg font-medium text-on-accent"
           >
             {saving ? "Đang lưu..." : "Lưu"}
           </button>
@@ -723,7 +723,7 @@ function DrawingDetailModal({
         <button
           onClick={() => drawing.approvedRevisionId && viewFile(drawing.approvedRevisionId)}
           disabled={!drawing.approvedRevisionId}
-          className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg px-4 py-2.5 text-sm font-semibold transition"
+          className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg px-4 py-2.5 text-sm font-semibold transition text-on-accent"
         >
           <ExternalLink className="w-4 h-4" />
           {drawing.approvedRevisionId
@@ -732,7 +732,7 @@ function DrawingDetailModal({
         </button>
 
         {hasPendingNewerThanApproved && (
-          <p className="text-xs bg-amber-950/60 border border-amber-900 text-amber-300 rounded-lg px-3 py-2">
+          <p className="text-xs bg-amber-950 border border-amber-900 text-amber-200 rounded-lg px-3 py-2">
             Rev {drawing.latestRev} đang chờ duyệt — hiện trường vẫn dùng rev{" "}
             {drawing.approvedRev ?? "—"} (bản đã duyệt).
           </p>
@@ -826,28 +826,28 @@ function DrawingDetailModal({
                         <button
                           disabled={isBusy}
                           onClick={() => decide(r, "approved")}
-                          className="flex items-center gap-1 text-[11px] bg-emerald-800/60 hover:bg-emerald-700/60 disabled:opacity-50 text-emerald-200 px-2 py-1 rounded-lg transition"
+                          className="flex items-center gap-1 text-[11px] bg-emerald-800 hover:bg-emerald-700/60 disabled:opacity-50 text-emerald-200 px-2 py-1 rounded-lg transition"
                         >
                           <CheckCircle2 className="w-3 h-3" /> Duyệt
                         </button>
                         <button
                           disabled={isBusy}
                           onClick={() => decide(r, "approved_with_comments")}
-                          className="text-[11px] bg-emerald-900/40 hover:bg-emerald-800/60 disabled:opacity-50 text-emerald-300 px-2 py-1 rounded-lg transition"
+                          className="text-[11px] bg-emerald-900 hover:bg-emerald-800 disabled:opacity-50 text-emerald-200 px-2 py-1 rounded-lg transition"
                         >
                           Duyệt kèm ý kiến
                         </button>
                         <button
                           disabled={isBusy}
                           onClick={() => decide(r, "commented")}
-                          className="flex items-center gap-1 text-[11px] bg-amber-900/40 hover:bg-amber-800/60 disabled:opacity-50 text-amber-300 px-2 py-1 rounded-lg transition"
+                          className="flex items-center gap-1 text-[11px] bg-amber-900 hover:bg-amber-800 disabled:opacity-50 text-amber-200 px-2 py-1 rounded-lg transition"
                         >
                           <MessageSquare className="w-3 h-3" /> Có ý kiến
                         </button>
                         <button
                           disabled={isBusy}
                           onClick={() => decide(r, "rejected")}
-                          className="flex items-center gap-1 text-[11px] bg-rose-900/40 hover:bg-rose-800/60 disabled:opacity-50 text-rose-300 px-2 py-1 rounded-lg transition"
+                          className="flex items-center gap-1 text-[11px] bg-rose-900 hover:bg-rose-800 disabled:opacity-50 text-rose-200 px-2 py-1 rounded-lg transition"
                         >
                           <XCircle className="w-3 h-3" /> Từ chối
                         </button>
@@ -986,8 +986,8 @@ function MethodGateSection({
         <p
           className={`text-xs px-2.5 py-1.5 rounded-lg border ${
             gateReady
-              ? "bg-emerald-950/60 border-emerald-900 text-emerald-300"
-              : "bg-amber-950/60 border-amber-900 text-amber-300"
+              ? "bg-emerald-950 border-emerald-900 text-emerald-200"
+              : "bg-amber-950 border-amber-900 text-amber-200"
           }`}
         >
           {gateReady
@@ -1049,11 +1049,11 @@ const DC_STATUS_LABEL: Record<DesignChangeStatus, string> = {
   drawing_updated: "Đã cập nhật bản vẽ",
 };
 const DC_STATUS_BADGE: Record<DesignChangeStatus, string> = {
-  submitted: "bg-sky-900/40 text-sky-300",
-  assessing: "bg-amber-900/40 text-amber-300",
-  approved: "bg-emerald-900/40 text-emerald-300",
-  rejected: "bg-rose-900/40 text-rose-300",
-  drawing_updated: "bg-violet-900/40 text-violet-300",
+  submitted: "bg-sky-900 text-sky-200",
+  assessing: "bg-amber-900 text-amber-200",
+  approved: "bg-emerald-900 text-emerald-200",
+  rejected: "bg-rose-900 text-rose-200",
+  drawing_updated: "bg-violet-900 text-violet-200",
 };
 const DC_STATUS_ICON: Record<DesignChangeStatus, LucideIcon> = {
   submitted: Clock,
@@ -1370,7 +1370,7 @@ function DesignChangeFormModal({
           <button
             onClick={submit}
             disabled={!canSubmit || saving}
-            className="px-3 py-2 text-sm rounded-lg bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 font-semibold"
+            className="px-3 py-2 text-sm rounded-lg bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 font-semibold text-on-accent"
           >
             {saving ? "Đang lưu..." : "Lưu"}
           </button>
@@ -1547,14 +1547,14 @@ function DesignChangeDetailModal({
               <button
                 onClick={() => decide("rejected")}
                 disabled={busy}
-                className="px-3 py-2 text-sm rounded-lg border border-rose-700 text-rose-300 hover:bg-rose-900/30 disabled:opacity-50"
+                className="px-3 py-2 text-sm rounded-lg border border-rose-700 text-rose-200 hover:bg-rose-900 disabled:opacity-50"
               >
                 Từ chối
               </button>
               <button
                 onClick={() => decide("approved")}
                 disabled={busy}
-                className="px-3 py-2 text-sm rounded-lg bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 font-semibold"
+                className="px-3 py-2 text-sm rounded-lg bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 font-semibold text-on-accent"
               >
                 Duyệt
               </button>
@@ -1564,7 +1564,7 @@ function DesignChangeDetailModal({
             <button
               onClick={markDrawingUpdated}
               disabled={busy}
-              className="px-3 py-2 text-sm rounded-lg bg-violet-700 hover:bg-violet-600 disabled:opacity-50 font-semibold"
+              className="px-3 py-2 text-sm rounded-lg bg-violet-700 hover:bg-violet-600 disabled:opacity-50 font-semibold text-on-accent"
             >
               Đánh dấu đã cập nhật bản vẽ
             </button>

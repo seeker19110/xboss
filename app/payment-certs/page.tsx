@@ -18,9 +18,9 @@ const STATUS_LABEL: Record<CertStatus, string> = {
 };
 const STATUS_BADGE: Record<CertStatus, string> = {
   draft: "bg-zinc-800 text-zinc-300",
-  submitted: "bg-amber-900/40 text-amber-300",
-  approved: "bg-emerald-900/40 text-emerald-300",
-  rejected: "bg-rose-900/40 text-rose-300",
+  submitted: "bg-amber-900 text-amber-200",
+  approved: "bg-emerald-900 text-emerald-200",
+  rejected: "bg-rose-900 text-rose-200",
 };
 
 type CertItem = {
@@ -187,7 +187,7 @@ function PaymentCertsInner() {
                 <button
                   onClick={createCert}
                   disabled={creating || !contractId}
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                 >
                   <Plus className="w-4 h-4" /> {creating ? "Đang lập…" : "Lập đợt mới"}
                 </button>
@@ -219,7 +219,7 @@ function PaymentCertsInner() {
             )}
 
             {approvedCumulative > contractValue && contractValue > 0 && (
-              <div className="bg-rose-950/40 border border-rose-900/60 rounded-xl px-4 py-3 text-xs text-rose-200">
+              <div className="bg-rose-950 border border-rose-900/60 rounded-xl px-4 py-3 text-xs text-rose-200">
                 Luỹ kế đã duyệt vượt giá trị hợp đồng (gồm phụ lục) — kiểm tra lại phụ lục/VO trước
                 khi lập đợt tiếp theo.
               </div>
@@ -503,7 +503,7 @@ function CertDetailModal({
             <button
               onClick={submitCert}
               disabled={busy}
-              className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white text-xs font-medium px-3 py-2 rounded-lg"
+              className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
             >
               Trình lên CĐT/TVGS
             </button>
@@ -513,14 +513,14 @@ function CertDetailModal({
               <button
                 onClick={() => decide("approved")}
                 disabled={busy}
-                className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white text-xs font-medium px-3 py-2 rounded-lg"
+                className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
               >
                 Duyệt
               </button>
               <button
                 onClick={() => decide("rejected")}
                 disabled={busy}
-                className="bg-rose-800 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-medium px-3 py-2 rounded-lg"
+                className="bg-rose-800 hover:bg-rose-700 disabled:opacity-50 text-on-accent text-xs font-medium px-3 py-2 rounded-lg"
               >
                 Từ chối
               </button>

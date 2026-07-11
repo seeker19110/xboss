@@ -25,8 +25,8 @@ const STATUS_ICON: Record<WorkFrontStatus, typeof Lock> = {
 };
 const STATUS_CELL: Record<WorkFrontStatus, string> = {
   pending: "bg-zinc-800 text-zinc-400",
-  handed_over: "bg-sky-900/40 text-sky-300",
-  in_progress: "bg-emerald-900/40 text-emerald-300",
+  handed_over: "bg-sky-900 text-sky-200",
+  in_progress: "bg-emerald-900 text-emerald-200",
   returned: "bg-zinc-800/60 text-zinc-500",
 };
 
@@ -338,7 +338,7 @@ function WorkFrontDetailModal({
             <button
               onClick={save}
               disabled={busy}
-              className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+              className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
             >
               {busy ? "Đang lưu…" : "Lưu"}
             </button>

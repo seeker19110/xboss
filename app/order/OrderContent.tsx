@@ -429,7 +429,7 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
           <EditModeToggle canEdit editMode={editMode} onToggle={() => setEditMode((v) => !v)} />
           <button
             onClick={() => window.print()}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg px-4 py-1.5 text-sm font-medium text-white transition"
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg px-4 py-1.5 text-sm font-medium text-on-accent transition"
           >
             <Printer className="w-4 h-4" /> In / Xuất PDF
           </button>
@@ -441,7 +441,7 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
         className="no-print-bg min-h-screen bg-zinc-900 py-8 px-4 flex justify-center"
         onClick={() => setBoqSearch(null)}
       >
-        <div className="a4-page bg-white text-black w-[210mm] min-h-[297mm] shadow-2xl p-[14mm]">
+        <div className="sheet-stable a4-page bg-white text-black w-[210mm] min-h-[297mm] shadow-2xl p-[14mm]">
           {/* Tiêu đề */}
           <div className="mb-4">
             <div className="border-b-2 border-teal-600 pb-1 mb-1 flex items-end gap-4">

@@ -279,7 +279,7 @@ export default function DisciplineHubPage({ params }: { params: Promise<{ code: 
                     <button
                       type="submit"
                       disabled={creating || !newSheetName.trim()}
-                      className="bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+                      className="bg-emerald-700 text-on-accent px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
                     >
                       {creating ? "Đang tạo…" : "Tạo sheet"}
                     </button>

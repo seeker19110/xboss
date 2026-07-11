@@ -18,10 +18,10 @@ const SOURCE_LABEL: Record<DocumentSource, string> = {
   project: "Dự án",
 };
 const SOURCE_BADGE: Record<DocumentSource, string> = {
-  task: "bg-emerald-900/40 text-emerald-300",
-  contract: "bg-sky-900/40 text-sky-300",
-  vo: "bg-violet-900/40 text-violet-300",
-  drawing: "bg-amber-900/40 text-amber-300",
+  task: "bg-emerald-900 text-emerald-200",
+  contract: "bg-sky-900 text-sky-200",
+  vo: "bg-violet-900 text-violet-200",
+  drawing: "bg-amber-900 text-amber-200",
   project: "bg-zinc-800 text-zinc-300",
 };
 
@@ -108,7 +108,7 @@ export default function DocumentsPage() {
             <button
               onClick={() => setUploadOpen(true)}
               aria-label="Tải lên hồ sơ dự án"
-              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
             >
               <Plus className="w-4 h-4" />{" "}
               <span className="hidden sm:inline">Tải lên hồ sơ dự án</span>
@@ -170,7 +170,7 @@ export default function DocumentsPage() {
                 onClick={() => setSourceFilter(sourceFilter === s ? "" : s)}
                 className={`px-2.5 py-1 rounded-full text-xs font-medium border ${
                   sourceFilter === s
-                    ? "bg-sky-900/50 border-sky-700 text-sky-200"
+                    ? "bg-sky-900 border-sky-700 text-sky-200"
                     : "border-zinc-700 text-zinc-400 hover:text-white"
                 }`}
               >
@@ -370,7 +370,7 @@ function UploadProjectDocModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang tải lên…" : "Tải lên"}
         </button>

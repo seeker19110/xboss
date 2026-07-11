@@ -47,8 +47,8 @@ const STATUS_LABEL: Record<InsuranceStatus, string> = {
   released: "Đã tất toán/thu hồi",
 };
 const STATUS_BADGE: Record<InsuranceStatus, string> = {
-  valid: "bg-emerald-900/40 text-emerald-300",
-  expired: "bg-rose-900/40 text-rose-300",
+  valid: "bg-emerald-900 text-emerald-200",
+  expired: "bg-rose-900 text-rose-200",
   released: "bg-zinc-800 text-zinc-400",
 };
 
@@ -164,7 +164,7 @@ export default function InsurancePage() {
             <button
               onClick={() => setAddOpen(true)}
               aria-label="Thêm bảo hiểm/bảo lãnh"
-              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
             >
               <Plus className="w-4 h-4" />{" "}
               <span className="hidden sm:inline">Thêm bảo hiểm/bảo lãnh</span>
@@ -627,7 +627,7 @@ function InsuranceModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>

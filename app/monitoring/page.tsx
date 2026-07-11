@@ -51,9 +51,9 @@ const LEVEL_LABEL: Record<ReadingLevel, string> = {
   alarm: "Báo động",
 };
 const LEVEL_BADGE: Record<ReadingLevel, string> = {
-  normal: "bg-emerald-900/40 text-emerald-300",
-  warn: "bg-amber-900/40 text-amber-300",
-  alarm: "bg-rose-900/40 text-rose-300",
+  normal: "bg-emerald-900 text-emerald-200",
+  warn: "bg-amber-900 text-amber-200",
+  alarm: "bg-rose-900 text-rose-200",
 };
 
 type CaseStatus = "open" | "handling" | "closed";
@@ -63,8 +63,8 @@ const CASE_STATUS_LABEL: Record<CaseStatus, string> = {
   closed: "Đã đóng",
 };
 const CASE_STATUS_BADGE: Record<CaseStatus, string> = {
-  open: "bg-sky-900/40 text-sky-300",
-  handling: "bg-amber-900/40 text-amber-300",
+  open: "bg-sky-900 text-sky-200",
+  handling: "bg-amber-900 text-amber-200",
   closed: "bg-zinc-800 text-zinc-500",
 };
 
@@ -274,7 +274,7 @@ export default function MonitoringPage() {
                   <button
                     onClick={() => setAddPointOpen(true)}
                     aria-label="Thêm mốc quan trắc"
-                    className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+                    className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                   >
                     <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm mốc</span>
                   </button>
@@ -293,7 +293,7 @@ export default function MonitoringPage() {
                 <button
                   onClick={() => setAddCaseOpen(true)}
                   aria-label="Thêm khiếu nại"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                 >
                   <Plus className="w-4 h-4" />{" "}
                   <span className="hidden sm:inline">Thêm khiếu nại</span>
@@ -830,7 +830,7 @@ function PointModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>
@@ -939,7 +939,7 @@ function ReadingModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>
@@ -1076,7 +1076,7 @@ function CaseModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>

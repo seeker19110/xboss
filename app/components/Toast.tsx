@@ -27,9 +27,9 @@ const ICONS: Record<ToastKind, typeof CheckCircle2> = {
   warning: AlertTriangle,
 };
 const STYLES: Record<ToastKind, string> = {
-  success: "bg-emerald-900/95 border-emerald-700 text-emerald-200",
-  error: "bg-red-900/95 border-red-700 text-red-200",
-  warning: "bg-amber-900/95 border-amber-700 text-amber-200",
+  success: "bg-emerald-900 border-emerald-700 text-emerald-200",
+  error: "bg-red-900 border-red-700 text-red-200",
+  warning: "bg-amber-900 border-amber-700 text-amber-200",
 };
 
 const DURATION_MS = 4000;

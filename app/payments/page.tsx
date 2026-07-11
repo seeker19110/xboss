@@ -406,7 +406,7 @@ export default function PaymentsPage() {
         {editMode && Object.keys(edits).length > 0 && !saving && (
           <button
             onClick={() => data && saveEdits(edits, data.rows)}
-            className="flex items-center gap-1.5 text-xs bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg transition shrink-0"
+            className="flex items-center gap-1.5 text-xs bg-emerald-700 hover:bg-emerald-600 text-on-accent px-3 py-1.5 rounded-lg transition shrink-0"
           >
             <Save className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Lưu ngay</span>
@@ -580,7 +580,7 @@ export default function PaymentsPage() {
                   {/* Header người phụ trách */}
                   <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800 bg-zinc-900/60">
                     <div
-                      className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-sm font-bold ${isNone ? "bg-zinc-800 text-zinc-500" : "bg-emerald-900/60 text-emerald-300"}`}
+                      className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-sm font-bold ${isNone ? "bg-zinc-800 text-zinc-500" : "bg-emerald-900 text-emerald-200"}`}
                     >
                       {isNone ? "?" : person.trim().charAt(0).toUpperCase()}
                     </div>
@@ -904,7 +904,7 @@ function BillsSection({
                 <button
                   onClick={submitAll}
                   disabled={busy}
-                  className="ml-auto flex items-center gap-1.5 text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg transition shrink-0"
+                  className="ml-auto flex items-center gap-1.5 text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent px-3 py-1.5 rounded-lg transition shrink-0"
                 >
                   {busy ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />

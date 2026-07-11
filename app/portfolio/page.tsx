@@ -12,8 +12,8 @@ const STATUS_LABEL: Record<string, string> = {
   closed: "Đã đóng",
 };
 const STATUS_BADGE: Record<string, string> = {
-  active: "bg-emerald-950/60 text-emerald-300 border-emerald-800",
-  handover: "bg-sky-950/60 text-sky-300 border-sky-800",
+  active: "bg-emerald-950 text-emerald-200 border-emerald-800",
+  handover: "bg-sky-950 text-sky-200 border-sky-800",
   closed: "bg-zinc-800 text-zinc-400 border-zinc-700",
 };
 
@@ -65,7 +65,7 @@ function ProjectCard({ project }: { project: ProjectListItem }) {
       <div className="mt-2 flex items-center justify-between text-xs">
         <span className="tabular-nums text-zinc-300 font-medium">{pct}% tiến độ</span>
         {project.delayedCount > 0 && (
-          <span className="px-1.5 py-0.5 rounded bg-rose-950/60 text-rose-300 border border-rose-800">
+          <span className="px-1.5 py-0.5 rounded bg-rose-950 text-rose-200 border border-rose-800">
             {project.delayedCount} việc trễ
           </span>
         )}

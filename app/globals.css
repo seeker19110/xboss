@@ -3,11 +3,17 @@
 :root {
   --background: #0a0a0a;
   --foreground: #ededed;
+  /* Trắng CỐ ĐỊNH, không đảo theo theme — dùng cho chữ trên nền màu đặc luôn tự chọn
+     (nút bg-emerald-600, badge bg-red-600...) KHÁC với text-white (đảo theo --color-white,
+     chỉ đúng khi text nằm trên nền zinc cũng tự đảo cùng lúc, vd bg-zinc-950 text-white).
+     Không khai báo lại trong bất kỳ html.<theme> nào — phải luôn là #ffffff. */
+  --on-accent: #ffffff;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-on-accent: var(--on-accent);
 }
 
 /* Chế độ tối (mặc định) — script trong layout gắn class theo localStorage('xboss_theme') */
@@ -97,40 +103,55 @@ html.light {
   --color-zinc-800: #e2e6ec;
   --color-zinc-900: #ffffff;
   --color-zinc-950: #eef1f5;
-  --color-emerald-300: #047857;
-  --color-emerald-400: #059669;
-  --color-sky-300: #0369a1;
-  --color-sky-400: #0284c7;
-  --color-amber-300: #b45309;
-  --color-amber-400: #d97706;
+  /* -400 = cùng giá trị -300 ở 9 màu bên dưới (emerald/sky/amber/teal/orange/yellow/cyan/
+     green/lime): giá trị -400 gốc (nhạt hơn -300) chỉ đạt ~3.2-4.1:1 trên nền card trắng
+     tinh (--color-zinc-900), dưới ngưỡng 4.5:1 WCAG AA — bắt bởi axe. Các màu còn lại
+     (violet/rose/red/blue/purple/indigo/pink/fuchsia) giữ -400 nhạt hơn -300 vì đã đủ
+     tương phản (kiểm bằng contrast ratio calculator trước khi đổi). */
+  --color-emerald-300: #065f46;
+  --color-emerald-400: #065f46;
+  --color-sky-300: #075985;
+  --color-sky-400: #075985;
+  --color-amber-300: #92400e;
+  --color-amber-400: #92400e;
   --color-violet-300: #6d28d9;
   --color-violet-400: #7c3aed;
   --color-rose-300: #be123c;
-  --color-rose-400: #e11d48;
+  --color-rose-400: #be123c;
   --color-teal-300: #0f766e;
-  --color-teal-400: #0d9488;
+  --color-teal-400: #0f766e;
   --color-red-300: #b91c1c;
   --color-red-400: #dc2626;
   --color-blue-300: #1d4ed8;
   --color-blue-400: #2563eb;
   --color-orange-300: #c2410c;
-  --color-orange-400: #ea580c;
+  --color-orange-400: #c2410c;
   --color-yellow-300: #a16207;
-  --color-yellow-400: #ca8a04;
+  --color-yellow-400: #a16207;
   --color-cyan-300: #0e7490;
-  --color-cyan-400: #0891b2;
+  --color-cyan-400: #0e7490;
   --color-purple-300: #7e22ce;
   --color-purple-400: #9333ea;
   --color-green-300: #15803d;
-  --color-green-400: #16a34a;
+  --color-green-400: #15803d;
   --color-indigo-300: #4338ca;
   --color-indigo-400: #4f46e5;
   --color-pink-300: #be185d;
   --color-pink-400: #db2777;
   --color-lime-300: #4d7c0f;
-  --color-lime-400: #65a30d;
+  --color-lime-400: #4d7c0f;
   --color-fuchsia-300: #a21caf;
   --color-fuchsia-400: #c026d3;
+
+  /* -700..-950 của màu nhấn CỐ Ý không đảo theo theme (khác zinc) — 2 lý do:
+     (1) -700 là màu NÚT ĐẶC chính (bg-emerald-700 hover:bg-emerald-600 text-on-accent...)
+     dùng ở hàng chục nút "Lưu/Xác nhận" toàn app; (2) -950/-900/-800 là nền "chip tối"
+     (badge/trạng thái) VÀ nền heatmap (ProgressMap bucketClass: bg-amber-800 text-amber-100)
+     — cả hai đều ghép với chữ SÁNG cố định (-100/-200, không đảo), tự đủ tương phản mà
+     KHÔNG cần đảo nền vì cả nền lẫn chữ cùng giữ nguyên giá trị ở mọi theme. Badge/chip
+     dùng chữ -300/-400 (ĐÃ đảo đậm cho mục đích "chữ thường trên nền trang") phải đổi
+     sang -200 (không đảo, luôn sáng) khi ghép với nền chip cùng màu — xem các chỗ dùng
+     bg-{màu}-950/900/800 + text-{màu}-300/400 đã đổi thành text-{màu}-200 trong JSX. */
 }
 
 body {
@@ -146,9 +167,11 @@ body {
     sans-serif;
 }
 
-/* Vùng bảng tính (SpreadsheetGrid) — giao diện "trang tính sáng" kiểu Excel phải
-   ổn định ở CẢ hai theme: ghim lại giá trị gốc các token bị html.light đảo,
-   nếu không lưới sẽ thành nền đen + chữ navy tối, không đọc được ở light mode. */
+/* Ghim lại giá trị gốc các token bị html.<theme> đảo màu — dùng cho mọi khu vực PHẢI
+   luôn trông giống "giấy trắng" bất kể theme đang chọn: SpreadsheetGrid (giao diện kiểu
+   Excel) VÀ các trang in-friendly (report/lookahead/payments-print/order — hard-code
+   bg-white/text-zinc-900/text-black giả định luôn là màu thật). Không ghim thì ở theme
+   sáng --color-white/--color-zinc-* bị đảo ngược, nền hoá gần đen hoặc tương phản vỡ. */
 .sheet-stable {
   color-scheme: light;
   --color-white: #ffffff;

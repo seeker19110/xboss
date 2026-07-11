@@ -691,7 +691,7 @@ export default function MaterialsPage() {
         {activeTab === "materials" && (
           <>
             {error && (
-              <div className="rounded-lg border border-red-800 bg-red-950/40 text-red-300 px-4 py-2.5 text-sm flex items-center gap-2">
+              <div className="rounded-lg border border-red-800 bg-red-950 text-red-200 px-4 py-2.5 text-sm flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
                 {error}
               </div>
@@ -701,7 +701,7 @@ export default function MaterialsPage() {
               const over = materials.filter((m) => m.qtyPlanned > 0 && m.qtyUsed > m.qtyPlanned);
               return (
                 over.length > 0 && (
-                  <div className="rounded-lg border border-red-800 bg-red-950/40 text-red-300 px-4 py-2.5 text-sm flex items-center gap-2">
+                  <div className="rounded-lg border border-red-800 bg-red-950 text-red-200 px-4 py-2.5 text-sm flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 shrink-0" />
                     <span>
                       <b>{over.length}</b> vật tư vượt định mức:{" "}
@@ -722,7 +722,7 @@ export default function MaterialsPage() {
               );
               return (
                 low.length > 0 && (
-                  <div className="rounded-lg border border-amber-800 bg-amber-950/40 text-amber-300 px-4 py-2.5 text-sm flex items-center gap-2">
+                  <div className="rounded-lg border border-amber-800 bg-amber-950 text-amber-200 px-4 py-2.5 text-sm flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 shrink-0" />
                     <span>
                       <b>{low.length}</b> vật tư tồn kho dưới mức tối thiểu:{" "}
@@ -781,7 +781,7 @@ export default function MaterialsPage() {
               )}
               <a
                 href="/materials/order-form"
-                className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 rounded-xl px-4 py-2.5 text-sm font-medium transition shrink-0"
+                className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 rounded-xl px-4 py-2.5 text-sm font-medium transition shrink-0 text-on-accent"
               >
                 <Plus className="w-4 h-4" /> Đặt hàng
               </a>
@@ -1139,11 +1139,11 @@ export default function MaterialsPage() {
                                 if (bs === "none")
                                   return <span className="text-zinc-600 text-xs">—</span>;
                                 return bs === "over" ? (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-rose-950 text-rose-300">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-rose-950 text-rose-200">
                                     <AlertTriangle className="w-3 h-3" /> Vượt ĐM
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-emerald-950 text-emerald-300">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-emerald-950 text-emerald-200">
                                     <Check className="w-3 h-3" /> Trong ĐM
                                   </span>
                                 );
@@ -1381,7 +1381,7 @@ export default function MaterialsPage() {
                           e.preventDefault();
                           setBoqDraft(m.boqCode!);
                         }}
-                        className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-zinc-800 ${isDupe ? "bg-red-900/30 text-red-300" : "text-zinc-400"}`}
+                        className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-zinc-800 ${isDupe ? "bg-red-900 text-red-200" : "text-zinc-400"}`}
                       >
                         <span
                           className={`font-mono w-16 shrink-0 ${isDupe ? "text-red-400" : "text-amber-400"}`}
@@ -1407,7 +1407,7 @@ export default function MaterialsPage() {
               </button>
               <button
                 onClick={submitBoq}
-                className="px-4 py-1.5 rounded-lg text-sm bg-emerald-600 hover:bg-emerald-500 text-white font-medium"
+                className="px-4 py-1.5 rounded-lg text-sm bg-emerald-600 hover:bg-emerald-500 text-on-accent font-medium"
               >
                 OK
               </button>
@@ -1696,7 +1696,7 @@ function MaterialHistoryModal({
             <button
               onClick={() => add(1)}
               disabled={busy || !Number(delta)}
-              className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 rounded-lg px-3 py-1.5 text-sm font-medium"
+              className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 rounded-lg px-3 py-1.5 text-sm font-medium text-on-accent"
             >
               +
             </button>

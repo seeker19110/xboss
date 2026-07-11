@@ -28,7 +28,7 @@ const WARRANTY_STATUS_LABEL: Record<WarrantyItemStatus, string> = {
   expired: "Đã hết bảo hành",
 };
 const WARRANTY_STATUS_BADGE: Record<WarrantyItemStatus, string> = {
-  active: "bg-emerald-900/40 text-emerald-300",
+  active: "bg-emerald-900 text-emerald-200",
   expired: "bg-zinc-800 text-zinc-400",
 };
 
@@ -68,8 +68,8 @@ const CLAIM_SEVERITY_LABEL: Record<ClaimSeverity, string> = {
 };
 const CLAIM_SEVERITY_BADGE: Record<ClaimSeverity, string> = {
   low: "bg-zinc-800 text-zinc-400",
-  medium: "bg-amber-900/40 text-amber-300",
-  high: "bg-rose-900/40 text-rose-300",
+  medium: "bg-amber-900 text-amber-200",
+  high: "bg-rose-900 text-rose-200",
 };
 
 type ClaimStatus = "open" | "handling" | "closed";
@@ -79,9 +79,9 @@ const CLAIM_STATUS_LABEL: Record<ClaimStatus, string> = {
   closed: "Đã đóng",
 };
 const CLAIM_STATUS_BADGE: Record<ClaimStatus, string> = {
-  open: "bg-rose-900/40 text-rose-300",
-  handling: "bg-amber-900/40 text-amber-300",
-  closed: "bg-emerald-900/40 text-emerald-300",
+  open: "bg-rose-900 text-rose-200",
+  handling: "bg-amber-900 text-amber-200",
+  closed: "bg-emerald-900 text-emerald-200",
 };
 
 type Claim = {
@@ -245,7 +245,7 @@ export default function WarrantyPage() {
                 <button
                   onClick={() => setAddItemOpen(true)}
                   aria-label="Thêm hạng mục bảo hành"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                 >
                   <Plus className="w-4 h-4" />{" "}
                   <span className="hidden sm:inline">Thêm hạng mục</span>
@@ -255,7 +255,7 @@ export default function WarrantyPage() {
                 <button
                   onClick={() => setAddClaimOpen(true)}
                   aria-label="Thêm claim bảo hành"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                 >
                   <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm claim</span>
                 </button>
@@ -264,7 +264,7 @@ export default function WarrantyPage() {
                 <button
                   onClick={() => setAddOmOpen(true)}
                   aria-label="Thêm tài liệu O&M"
-                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+                  className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
                 >
                   <Plus className="w-4 h-4" />{" "}
                   <span className="hidden sm:inline">Thêm tài liệu</span>
@@ -870,7 +870,7 @@ function WarrantyItemModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>
@@ -1070,7 +1070,7 @@ function ClaimModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>
@@ -1170,7 +1170,7 @@ function OmModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu"}
         </button>

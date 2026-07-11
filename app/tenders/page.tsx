@@ -18,10 +18,10 @@ const STATUS_LABEL: Record<TenderStatus, string> = {
 };
 const STATUS_BADGE: Record<TenderStatus, string> = {
   draft: "bg-zinc-800 text-zinc-300",
-  open: "bg-amber-900/40 text-amber-300",
-  closed: "bg-sky-900/40 text-sky-300",
-  awarded: "bg-emerald-900/40 text-emerald-300",
-  cancelled: "bg-rose-900/40 text-rose-300",
+  open: "bg-amber-900 text-amber-200",
+  closed: "bg-sky-900 text-sky-200",
+  awarded: "bg-emerald-900 text-emerald-200",
+  cancelled: "bg-rose-900 text-rose-200",
 };
 
 type Tender = {
@@ -97,7 +97,7 @@ export default function TendersPage() {
             <button
               onClick={() => setAddOpen(true)}
               aria-label="Thêm gói thầu"
-              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
             >
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm gói thầu</span>
             </button>
@@ -335,7 +335,7 @@ function AddTenderModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang tạo…" : "Tạo gói thầu"}
         </button>
@@ -524,7 +524,7 @@ function TenderDetailModal({
                       return (
                         <td
                           key={b.bidId}
-                          className={`p-1.5 text-right ${isLowest ? "bg-emerald-950/40 text-emerald-300 font-semibold" : ""}`}
+                          className={`p-1.5 text-right ${isLowest ? "bg-emerald-950 text-emerald-200 font-semibold" : ""}`}
                         >
                           {p != null ? fmtVND(p) : "—"}
                         </td>
@@ -585,7 +585,7 @@ function TenderDetailModal({
                             <button
                               onClick={() => award(b.bidId, b.supplierName, b.total)}
                               disabled={busy}
-                              className="text-[10px] bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white px-2 py-1 rounded"
+                              className="text-[10px] bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent px-2 py-1 rounded"
                             >
                               Trao thầu
                             </button>
@@ -725,7 +725,7 @@ function AddBidModal({
         <button
           onClick={submit}
           disabled={saving || !supplierId}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang lưu…" : "Lưu báo giá"}
         </button>

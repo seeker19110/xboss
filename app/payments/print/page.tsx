@@ -158,12 +158,12 @@ export default function PrintPage() {
   let stt = 0;
 
   return (
-    <div className="min-h-screen bg-white text-black">
+    <div className="sheet-stable min-h-screen bg-white text-black">
       {/* Nút in — ẩn khi print */}
       <div className="print:hidden fixed top-4 right-4 z-50">
         <button
           onClick={() => window.print()}
-          className="flex items-center gap-2 bg-blue-700 hover:bg-blue-600 text-white text-sm px-4 py-2 rounded-lg shadow-lg transition"
+          className="flex items-center gap-2 bg-blue-700 hover:bg-blue-600 text-on-accent text-sm px-4 py-2 rounded-lg shadow-lg transition"
         >
           <Printer className="w-4 h-4" />
           In / Xuất PDF

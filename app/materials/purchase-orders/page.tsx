@@ -75,12 +75,12 @@ const STATUS_LABEL: Record<string, string> = {
 };
 const STATUS_CLS: Record<string, string> = {
   draft: "bg-zinc-700 text-zinc-300",
-  confirmed: "bg-blue-950 text-blue-300",
-  delivering: "bg-sky-950 text-sky-300",
-  partial: "bg-amber-950 text-amber-300",
-  received: "bg-green-950 text-green-300",
-  reconciled: "bg-emerald-950 text-emerald-300",
-  cancelled: "bg-red-950 text-red-400",
+  confirmed: "bg-blue-950 text-blue-200",
+  delivering: "bg-sky-950 text-sky-200",
+  partial: "bg-amber-950 text-amber-200",
+  received: "bg-green-950 text-green-200",
+  reconciled: "bg-emerald-950 text-emerald-200",
+  cancelled: "bg-red-950 text-red-200",
 };
 // 6 bước dòng đời PO (đối xứng lib/procurement.ts PO_STATUS_ORDER — file này là client
 // component nên không import lib/procurement (kéo theo lib/db → node:crypto/pg vỡ build).
@@ -515,7 +515,7 @@ export default function PurchaseOrdersPage() {
                 setShowCreate(true);
                 resetNewPO();
               }}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-sm font-medium"
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-sm font-medium text-on-accent"
             >
               <Plus className="w-4 h-4" /> Tạo đơn hàng
             </button>
@@ -599,7 +599,7 @@ export default function PurchaseOrdersPage() {
                             {STATUS_LABEL[po.status]}
                           </span>
                           {isPoLate(po) && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-rose-950 text-rose-300">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-rose-950 text-rose-200">
                               <AlertCircle className="w-3 h-3" /> Trễ giao
                             </span>
                           )}
@@ -647,7 +647,7 @@ export default function PurchaseOrdersPage() {
                         {canManage && po.status === "draft" && (
                           <button
                             onClick={() => updateStatus(po, "confirmed")}
-                            className="px-2.5 py-1.5 rounded bg-blue-800 hover:bg-blue-700 text-xs"
+                            className="px-2.5 py-1.5 rounded bg-blue-800 hover:bg-blue-700 text-xs text-on-accent"
                           >
                             Xác nhận
                           </button>
@@ -655,7 +655,7 @@ export default function PurchaseOrdersPage() {
                         {canManage && po.status === "confirmed" && (
                           <button
                             onClick={() => updateStatus(po, "delivering")}
-                            className="px-2.5 py-1.5 rounded bg-sky-800 hover:bg-sky-700 text-xs"
+                            className="px-2.5 py-1.5 rounded bg-sky-800 hover:bg-sky-700 text-xs text-on-accent"
                           >
                             Bắt đầu giao
                           </button>
@@ -663,7 +663,7 @@ export default function PurchaseOrdersPage() {
                         {["confirmed", "delivering", "partial"].includes(po.status) && (
                           <button
                             onClick={() => openReceive(po)}
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-green-800 hover:bg-green-700 text-xs"
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-green-800 hover:bg-green-700 text-xs text-on-accent"
                           >
                             <Truck className="w-3.5 h-3.5" /> Nhập kho
                           </button>
@@ -671,7 +671,7 @@ export default function PurchaseOrdersPage() {
                         {canManage && po.status === "received" && (
                           <button
                             onClick={() => updateStatus(po, "reconciled")}
-                            className="px-2.5 py-1.5 rounded bg-emerald-800 hover:bg-emerald-700 text-xs"
+                            className="px-2.5 py-1.5 rounded bg-emerald-800 hover:bg-emerald-700 text-xs text-on-accent"
                           >
                             Đối chiếu
                           </button>
@@ -679,7 +679,7 @@ export default function PurchaseOrdersPage() {
                         {["received", "reconciled"].includes(po.status) && po.supplierId && (
                           <button
                             onClick={() => setRatingPo(po)}
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-amber-900/60 hover:bg-amber-800 text-xs text-amber-200"
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-amber-900 hover:bg-amber-800 text-xs text-amber-200"
                           >
                             <Star className="w-3.5 h-3.5" /> Đánh giá NCC
                           </button>
@@ -688,7 +688,7 @@ export default function PurchaseOrdersPage() {
                           <button
                             onClick={() => deletePO(po)}
                             aria-label={`Xoá đơn hàng ${po.poCode}`}
-                            className="p-1.5 rounded hover:bg-red-900/50 text-zinc-400 hover:text-red-400"
+                            className="p-1.5 rounded hover:bg-red-900 text-zinc-400 hover:text-red-200"
                           >
                             <X className="w-4 h-4" />
                           </button>
@@ -698,7 +698,7 @@ export default function PurchaseOrdersPage() {
                             <button
                               onClick={() => updateStatus(po, "cancelled")}
                               aria-label={`Huỷ đơn hàng ${po.poCode}`}
-                              className="p-1.5 rounded hover:bg-red-900/50 text-zinc-400 hover:text-red-400"
+                              className="p-1.5 rounded hover:bg-red-900 text-zinc-400 hover:text-red-200"
                             >
                               <AlertCircle className="w-4 h-4" />
                             </button>
@@ -963,7 +963,7 @@ export default function PurchaseOrdersPage() {
               <button
                 onClick={createPO}
                 disabled={saving}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-5 py-2.5 rounded text-sm font-medium"
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-5 py-2.5 rounded text-sm font-medium text-on-accent"
               >
                 <Check className="w-4 h-4" /> Tạo đơn hàng
               </button>
@@ -1051,7 +1051,7 @@ export default function PurchaseOrdersPage() {
               <button
                 onClick={submitReceive}
                 disabled={saving}
-                className="flex items-center gap-2 bg-green-700 hover:bg-green-600 disabled:opacity-50 px-5 py-2.5 rounded text-sm font-medium"
+                className="flex items-center gap-2 bg-green-700 hover:bg-green-600 disabled:opacity-50 px-5 py-2.5 rounded text-sm font-medium text-on-accent"
               >
                 <Package className="w-4 h-4" /> Xác nhận nhập kho
               </button>

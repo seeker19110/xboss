@@ -62,7 +62,7 @@ export default function OnlineUsers({ isAdmin }: { isAdmin: boolean }) {
         <Wifi className="w-5 h-5" />
         {count > 0 && (
           <span
-            className="absolute -top-1 -right-2 min-w-[1.1rem] h-[1.1rem] px-0.5 flex items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold text-white leading-none tabular-nums"
+            className="absolute -top-1 -right-2 min-w-[1.1rem] h-[1.1rem] px-0.5 flex items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold text-on-accent leading-none tabular-nums"
             aria-hidden
           >
             {count}

@@ -33,8 +33,8 @@ function usagePct(committed: number, budget: number) {
   return budget > 0 ? (committed / budget) * 100 : 0;
 }
 function usageBadgeClass(pct: number, warnPct: number, overPct: number) {
-  if (pct >= overPct) return "bg-rose-950/60 text-rose-300 border-rose-800";
-  if (pct >= warnPct) return "bg-amber-950/60 text-amber-300 border-amber-800";
+  if (pct >= overPct) return "bg-rose-950 text-rose-200 border-rose-800";
+  if (pct >= warnPct) return "bg-amber-950 text-amber-200 border-amber-800";
   return "bg-zinc-800 text-zinc-300 border-zinc-700";
 }
 
@@ -261,7 +261,7 @@ export default function CostsPage() {
                         <td className="p-3">
                           <div className="h-2 bg-zinc-800 rounded-full overflow-hidden relative">
                             <div
-                              className="h-full bg-sky-800/70 absolute inset-y-0 left-0"
+                              className="h-full bg-sky-800/70 absolute inset-y-0 left-0 text-on-accent"
                               style={{ width: `${committedPct}%` }}
                             />
                             <div
@@ -419,7 +419,7 @@ function SettingsModal({
         <button
           onClick={save}
           disabled={saving}
-          className="text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white px-3 py-2 rounded-lg transition"
+          className="text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent px-3 py-2 rounded-lg transition"
         >
           {saving ? "Đang lưu..." : "Lưu"}
         </button>

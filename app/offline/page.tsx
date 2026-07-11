@@ -15,7 +15,7 @@ export default function OfflinePage() {
       </p>
       <button
         onClick={() => window.location.reload()}
-        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-700 text-white text-sm font-medium hover:bg-emerald-600 transition min-h-10"
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-700 text-on-accent text-sm font-medium hover:bg-emerald-600 transition min-h-10"
       >
         <RefreshCw className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" />
         Thử lại

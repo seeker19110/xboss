@@ -21,10 +21,10 @@ const STATUS_LABEL: Record<ClaimStatus, string> = {
 };
 const STATUS_BADGE: Record<ClaimStatus, string> = {
   notice: "bg-zinc-800 text-zinc-300",
-  quantified: "bg-sky-900/40 text-sky-300",
-  negotiating: "bg-amber-900/40 text-amber-300",
-  settled: "bg-emerald-900/40 text-emerald-300",
-  rejected: "bg-rose-900/40 text-rose-300",
+  quantified: "bg-sky-900 text-sky-200",
+  negotiating: "bg-amber-900 text-amber-200",
+  settled: "bg-emerald-900 text-emerald-200",
+  rejected: "bg-rose-900 text-rose-200",
 };
 const OPEN_STATUSES: ClaimStatus[] = ["notice", "quantified", "negotiating"];
 
@@ -125,7 +125,7 @@ export default function ClaimsPage() {
             <button
               onClick={() => setAddOpen(true)}
               aria-label="Thêm claim"
-              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
             >
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm claim</span>
             </button>
@@ -163,7 +163,7 @@ export default function ClaimsPage() {
               aria-pressed={kindFilter === key}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
                 kindFilter === key
-                  ? "bg-emerald-700 text-white"
+                  ? "bg-emerald-700 text-on-accent"
                   : "bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white"
               }`}
             >
@@ -340,7 +340,7 @@ function AddClaimModal({
               aria-pressed={kind === k}
               className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition ${
                 kind === k
-                  ? "bg-emerald-700 text-white"
+                  ? "bg-emerald-700 text-on-accent"
                   : "bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white"
               }`}
             >
@@ -435,7 +435,7 @@ function AddClaimModal({
         <button
           onClick={submit}
           disabled={saving || !canSubmit}
-          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold py-2 rounded-lg text-sm"
+          className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent font-semibold py-2 rounded-lg text-sm"
         >
           {saving ? "Đang tạo…" : "Tạo claim"}
         </button>
@@ -637,14 +637,14 @@ function ClaimDetailModal({
                 <button
                   onClick={settle}
                   disabled={busy}
-                  className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg"
+                  className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent text-sm font-medium px-4 py-2 rounded-lg"
                 >
                   Chốt
                 </button>
                 <button
                   onClick={reject}
                   disabled={busy}
-                  className="bg-rose-800 hover:bg-rose-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg"
+                  className="bg-rose-800 hover:bg-rose-700 disabled:opacity-50 text-on-accent text-sm font-medium px-4 py-2 rounded-lg"
                 >
                   Từ chối
                 </button>
