@@ -17,6 +17,28 @@ const THEMES: { id: Theme; label: string; icon: typeof Sun }[] = [
 
 const CLASSES: Theme[] = THEMES.map((t) => t.id);
 
+// Màu `--background` của từng theme (globals.css) — dùng để cập nhật
+// <meta name="theme-color"> động. Trùng với map trong script init ở
+// app/layout.tsx (không thể chia sẻ vì script đó chạy inline trước hydrate,
+// không import được module ngoài) — sửa 1 bên nhớ sửa bên kia.
+const THEME_COLORS: Record<Theme, string> = {
+  light: "#f6f7f9",
+  dark: "#0a0a0a",
+  kingblue: "#0a1f4d",
+  darkblue: "#0c1a2e",
+  navy: "#060b18",
+};
+
+function setThemeColorMeta(theme: Theme) {
+  let meta = document.querySelector('meta[name="theme-color"]');
+  if (!meta) {
+    meta = document.createElement("meta");
+    meta.setAttribute("name", "theme-color");
+    document.head.appendChild(meta);
+  }
+  meta.setAttribute("content", THEME_COLORS[theme]);
+}
+
 export default function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>("light");
 
@@ -37,6 +59,7 @@ export default function ThemeToggle() {
     } catch {
       /* private mode */
     }
+    setThemeColorMeta(next);
     setTheme(next);
   }
 

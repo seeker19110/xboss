@@ -15,7 +15,9 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f6f7f9",
+  // themeColor không khai báo tĩnh ở đây — thẻ <meta name="theme-color"> được
+  // script init + ThemeToggle tự quản động theo theme đang chọn (xem PR 2.5,
+  // docs/nang-cap/M37-redesign-theme-sang-phase2.md).
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -28,7 +30,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <Script
           id="theme-init"
           strategy="beforeInteractive"
-        >{`try{var T=['dark','light','kingblue','darkblue','navy'];var t=localStorage.getItem('xboss_theme');if(t&&T.indexOf(t)>=0&&t!=='light'){var e=document.documentElement;e.classList.remove('light');e.classList.add(t);}}catch(_){}`}</Script>
+        >{`try{var T=['dark','light','kingblue','darkblue','navy'];var C={light:'#f6f7f9',dark:'#0a0a0a',kingblue:'#0a1f4d',darkblue:'#0c1a2e',navy:'#060b18'};var t=localStorage.getItem('xboss_theme');var active='light';if(t&&T.indexOf(t)>=0&&t!=='light'){var e=document.documentElement;e.classList.remove('light');e.classList.add(t);active=t;}var m=document.querySelector('meta[name="theme-color"]');if(!m){m=document.createElement('meta');m.setAttribute('name','theme-color');document.head.appendChild(m);}m.setAttribute('content',C[active]);}catch(_){}`}</Script>
         <Script
           id="sidebar-init"
           strategy="beforeInteractive"
