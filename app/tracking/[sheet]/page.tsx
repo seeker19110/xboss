@@ -29,6 +29,7 @@ import {
   EyeOff,
   Lock,
   ShieldAlert,
+  Plus,
 } from "lucide-react";
 import { useOfflineTickQueue } from "@/app/components/offlineQueue";
 import AppHeader from "@/app/components/AppHeader";
@@ -155,6 +156,14 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
   } | null>(null);
   const [sheetUsers, setSheetUsers] = useState<UserItem[]>([]);
   const [sheetErr, setSheetErr] = useState("");
+  const [addPkgModal, setAddPkgModal] = useState<{
+    code: string;
+    name: string;
+    floorLabel: string;
+    copyFromId: number | "";
+  } | null>(null);
+  const [addPkgErr, setAddPkgErr] = useState("");
+  const [addPkgSaving, setAddPkgSaving] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [syncToast, setSyncToast] = useState(false);
   const versionRef = useRef<string | null>(null);
@@ -360,6 +369,52 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
     load();
   }
 
+  // Thêm hạng mục (nhóm) mới — tạo trống hoặc sao chép cấu trúc (task + cột checkbox)
+  // từ 1 nhóm có sẵn trong cùng trang tracking.
+  async function saveAddPkg() {
+    if (!addPkgModal || !data?.sheet.id) return;
+    const code = addPkgModal.code.trim();
+    const name = addPkgModal.name.trim();
+    if (!code || !name) {
+      setAddPkgErr("Thiếu mã hoặc tên nhóm");
+      return;
+    }
+    setAddPkgSaving(true);
+    setAddPkgErr("");
+    const floorLabel = addPkgModal.floorLabel.trim();
+    const res = addPkgModal.copyFromId
+      ? await fetch(`/api/workpackages/${addPkgModal.copyFromId}/copy`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          // floorLabel chỉ gửi khi có nhập — bỏ trống thì giữ nguyên tầng của nhóm gốc
+          // (route /copy coi floorLabel=null như chuỗi "null" nếu ép kiểu String()).
+          body: JSON.stringify({
+            code,
+            name,
+            afterId: addPkgModal.copyFromId,
+            ...(floorLabel ? { floorLabel } : {}),
+          }),
+        })
+      : await fetch(`/api/workpackages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sheetTypeId: data.sheet.id,
+            code,
+            name,
+            floorLabel: floorLabel || null,
+          }),
+        });
+    setAddPkgSaving(false);
+    const j = await res.json().catch(() => null);
+    if (!res.ok) {
+      setAddPkgErr(j?.error ?? "Không tạo được nhóm");
+      return;
+    }
+    setAddPkgModal(null);
+    load();
+  }
+
   async function deleteSheet() {
     if (!data?.sheet.id) return;
     if (
@@ -448,6 +503,76 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
           onToggle={toggleEditMode}
         />
       </AppHeader>
+
+      {/* Modal thêm hạng mục (nhóm) mới — tạo trống hoặc sao chép cấu trúc từ nhóm có sẵn */}
+      {addPkgModal && (
+        <Modal onClose={() => setAddPkgModal(null)}>
+          <div className="p-5">
+            <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <Plus className="w-4 h-4 text-emerald-400" /> Thêm hạng mục mới
+            </h3>
+            <label className="block text-xs text-zinc-400 mb-1">Mã nhóm</label>
+            <input
+              autoFocus
+              value={addPkgModal.code}
+              onChange={(e) => setAddPkgModal((m) => m && { ...m, code: e.target.value })}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm mb-3 outline-none focus:border-emerald-600 font-mono"
+            />
+            <label className="block text-xs text-zinc-400 mb-1">Tên hạng mục</label>
+            <input
+              value={addPkgModal.name}
+              onChange={(e) => setAddPkgModal((m) => m && { ...m, name: e.target.value })}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm mb-3 outline-none focus:border-emerald-600"
+            />
+            <label className="block text-xs text-zinc-400 mb-1">Tầng (tuỳ chọn)</label>
+            <input
+              value={addPkgModal.floorLabel}
+              onChange={(e) => setAddPkgModal((m) => m && { ...m, floorLabel: e.target.value })}
+              placeholder="vd: 4F"
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm mb-3 outline-none focus:border-emerald-600"
+            />
+            <label className="block text-xs text-zinc-400 mb-1">
+              Sao chép cấu trúc từ hạng mục có sẵn (tuỳ chọn)
+            </label>
+            <select
+              value={addPkgModal.copyFromId}
+              onChange={(e) =>
+                setAddPkgModal(
+                  (m) => m && { ...m, copyFromId: e.target.value ? Number(e.target.value) : "" },
+                )
+              }
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm mb-1 outline-none focus:border-emerald-600"
+            >
+              <option value="">— Tạo trống, không sao chép —</option>
+              {(data?.packages ?? []).map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.code} — {p.name} ({p.tasks.length} task)
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-zinc-500 mb-3">
+              Chọn 1 hạng mục để sao chép toàn bộ task và cột checkbox của nó (trạng thái/tiến độ
+              reset về chưa làm). Mã BOQ không được sao chép — mỗi hạng mục phải tự gán mã riêng.
+            </p>
+            {addPkgErr && <p className="text-xs text-red-400 mb-2">{addPkgErr}</p>}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setAddPkgModal(null)}
+                className="px-3 py-1.5 text-sm bg-zinc-800 hover:bg-zinc-700 rounded-lg"
+              >
+                Huỷ
+              </button>
+              <button
+                onClick={saveAddPkg}
+                disabled={!addPkgModal.code.trim() || !addPkgModal.name.trim() || addPkgSaving}
+                className="px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg font-medium text-on-accent"
+              >
+                {addPkgSaving ? "Đang lưu..." : "Tạo hạng mục"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* ── Panel in PDF (ẩn khi in thật) ── */}
       {printPanel && (
@@ -572,6 +697,17 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
             </option>
           ))}
         </select>
+        {canEdit && editMode && data?.sheet.id && (
+          <button
+            onClick={() => {
+              setAddPkgErr("");
+              setAddPkgModal({ code: "", name: "", floorLabel: "", copyFromId: "" });
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-800"
+          >
+            <Plus className="w-4 h-4" /> Thêm hạng mục
+          </button>
+        )}
         <span className="text-xs text-zinc-400 ml-auto">
           {packages.length} nhóm · bấm vào nhóm để mở lưới checkbox
         </span>
