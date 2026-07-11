@@ -105,7 +105,7 @@ export default function OrgPage() {
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
               {bySystem.map(([system, list]) => (
-                <div key={system} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+                <div key={system} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
                   <p className="text-xs font-semibold text-zinc-400 uppercase mb-2">{system}</p>
                   <ul className="space-y-2">
                     {list.map((c) => (
