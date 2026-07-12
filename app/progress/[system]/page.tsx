@@ -1,14 +1,6 @@
 "use client";
 import { use, useEffect, useMemo, useState } from "react";
-import {
-  Gauge,
-  TrendingUp,
-  Map as MapIcon,
-  AlertTriangle,
-  Clock,
-  ClipboardList,
-  ExternalLink,
-} from "lucide-react";
+import { AlertTriangle, Clock, ClipboardList, ExternalLink } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
@@ -267,39 +259,23 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
           )}
         </section>
 
-        {/* ── 2. Biểu đồ kế hoạch so với thực tế ── */}
+        {/* ── 2. Biểu đồ kế hoạch so với thực tế ── (SCurveChart tự có tiêu đề riêng) */}
         <section>
-          <div className="flex items-center gap-2 mb-3">
-            <TrendingUp className="w-4 h-4 text-emerald-400 shrink-0" />
-            <h2 className="font-semibold text-sm text-zinc-200">Biểu đồ kế hoạch so với thực tế</h2>
-          </div>
           <SCurveChart system={system} />
         </section>
 
-        {/* ── 3. Timeline ── */}
+        {/* ── 3. Timeline ── (ProgressMap tự có tiêu đề riêng) */}
         <section>
-          <div className="flex items-center gap-2 mb-3">
-            <MapIcon className="w-4 h-4 text-sky-400 shrink-0" />
-            <h2 className="font-semibold text-sm text-zinc-200">Timeline</h2>
-          </div>
           <ProgressMap system={system} />
         </section>
 
-        {/* ── 4. Chỉ số tiến độ SPI ── */}
+        {/* ── 4. Chỉ số tiến độ SPI ── (SpiCards tự có tiêu đề riêng) */}
         <section>
-          <div className="flex items-center gap-2 mb-3">
-            <Gauge className="w-4 h-4 text-sky-400 shrink-0" />
-            <h2 className="font-semibold text-sm text-zinc-200">Chỉ số tiến độ SPI</h2>
-          </div>
           <SpiCards system={system} />
         </section>
 
-        {/* ── 5. Dự báo hoàn thành ── */}
+        {/* ── 5. Dự báo hoàn thành ── (ForecastCards tự có tiêu đề riêng) */}
         <section>
-          <div className="flex items-center gap-2 mb-3">
-            <TrendingUp className="w-4 h-4 text-emerald-400 shrink-0" />
-            <h2 className="font-semibold text-sm text-zinc-200">Dự báo hoàn thành</h2>
-          </div>
           <ForecastCards system={system} />
         </section>
 
