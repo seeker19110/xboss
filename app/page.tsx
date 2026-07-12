@@ -422,7 +422,7 @@ export default function Dashboard() {
                     {hasDelay && (
                       <span
                         title={`${k.delayed} tầng đang trễ`}
-                        className="flex items-center gap-0.5 text-[10px] text-orange-200 bg-orange-950 px-1.5 py-0.5 rounded-full shrink-0 font-medium"
+                        className="flex items-center gap-0.5 text-[10px] text-red-950 bg-orange-500 px-1.5 py-0.5 rounded-full shrink-0 font-medium"
                       >
                         <AlertTriangle className="w-2.5 h-2.5" /> {k.delayed}
                       </span>

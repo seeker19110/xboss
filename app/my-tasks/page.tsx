@@ -706,7 +706,7 @@ export default function MyTasksPage() {
                               {sheetType}
                             </span>
                             {g.delayed > 0 && (
-                              <span className="flex items-center gap-1 text-[10px] text-orange-200 bg-orange-950 px-1.5 py-0.5 rounded-full font-semibold">
+                              <span className="flex items-center gap-1 text-[10px] text-red-950 bg-orange-500 px-1.5 py-0.5 rounded-full font-semibold">
                                 <AlertTriangle className="w-2.5 h-2.5" /> {g.delayed} trễ
                               </span>
                             )}
