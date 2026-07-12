@@ -126,6 +126,12 @@
   - Test hồi quy mới: `tests/workpackages.test.ts` (tích hợp, xác nhận unique index chặn trùng mã cùng sheet kể cả khác hoa/thường, không chặn trùng mã khác sheet).
 - Verify: `npm run lint`/`typecheck` xanh; `npm test` 51/51 file pass (Postgres 16 cục bộ dựng riêng, gồm test mới); `npm run build` xanh.
 
+## Đợt audit thiết kế UI/UX (2026-07-12, riêng biệt sau lần 4)
+
+Xác nhận M37 Phase 2 (typography/padding tier/nút danger/modal/theme-color, xem `docs/nang-cap/M37-redesign-theme-sang-phase2.md`) đã hoàn tất đúng đặc tả (rà `docs/nang-cap/README.md` mục UI/UX). Rà mã nguồn đối chiếu 4 quy tắc: `dark:`/hex hardcode, padding tier thẻ (`p-6` trên vỏ thẻ), nút danger lệch chuẩn — cả 3 đều **không có vi phạm thật** (các chỗ nghi ngờ ban đầu qua grep đều là ngoại lệ hợp lệ: `dark:` chỉ là key tên theme trong object JS không phải Tailwind variant; hex hardcode chỉ nằm trong trang in `/payments/print` + khối `print:` cô lập; `p-6` chỉ ở `<main>` page container, không phải vỏ thẻ; các `bg-red-900/50` là banner cảnh báo/hàng nhấn mạnh, không phải nút, không thuộc phạm vi chuẩn hoá nút danger).
+
+**Phát hiện thật (Thấp):** `docs/nang-cap/README.md` — dòng `> > > > > > > pr2.1-typo` là dấu vết merge conflict marker (`>>>>>>>`, bị markdown format tách khoảng trắng) sót lại từ lúc tích hợp PR 2.1, chưa từng được dọn — nằm ngay giữa bảng recipe typography, có thể gây hiểu nhầm khi đọc tài liệu chuẩn thiết kế. Đã xoá dòng thừa.
+
 ## Đồng bộ AppShell theo mockup xBoss mới (2026-07)
 
 - `attachments/xBoss-mockup.xlsx` bản mới (commit `chore(attachments): update xBoss mockup`) đổi thứ tự 24 dashboard cấp cao so với bản cũ mà `app/lib/dashboardTree.ts` bám theo — sắp lại `DASHBOARD_TREE` từ 12 cụm cũ thành 18 cụm nhỏ hơn để khớp đúng thứ tự mockup (tách các cụm không còn liền kề như "Thiết kế & Bản vẽ", "Chất lượng · An toàn · Môi trường", "Khởi động & Tổ chức", "Điều hành & Hồ sơ" thành các cụm 1 dashboard riêng). Đổi tên cụm `"Vật tư & Thiết bị"` → `"Quản lý vật tư"` (theo mockup đổi tên "Dashboard Vật Tư" → "Quản Lý Vật Tư"). Đổi chỗ nội bộ 2 cặp dashboard theo mockup: `Claim & Thay đổi` đứng trước `Bảo hiểm & Bảo lãnh` trong cụm tài chính; `Chuyển đổi số & Công nghệ` đứng trước `Import Excel` trong cụm Hệ thống. Dời `"Nhân sự & Tổ chức"` và `"Khởi động & Pháp lý"` xuống cuối sidebar (mockup xếp 2 dashboard này ở vị trí #23-24). Giữ nguyên toàn bộ `id`/`href`/`icon`/`roles`/`children` của mọi node (hợp đồng ổn định cho `localStorage` gập/mở và `nav_settings.node_key`) — thuần reorder + tách cụm, không đổi route/API/schema/quyền nào.
