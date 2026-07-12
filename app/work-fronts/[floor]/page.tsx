@@ -7,6 +7,7 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { showToast } from "@/app/components/Toast";
 import { appConfirm } from "@/app/components/dialogs";
 import { fetchMe, type Me } from "@/app/lib/me";
+import { compressImageToWebp } from "@/app/lib/compressImage";
 import { formatDateVN } from "@/lib/date";
 
 type Stage = { id: number; name: string; sortOrder: number; active: boolean; durationDays: number };
@@ -234,8 +235,9 @@ function StageCard({
     if (!front) return;
     setUploadingKind(kind);
     try {
+      const compressed = await compressImageToWebp(f);
       const form = new FormData();
-      form.append("file", f);
+      form.append("file", compressed);
       form.append("kind", kind);
       const res = await fetch(`/api/floor-stage-fronts/${front.id}/documents`, {
         method: "POST",
