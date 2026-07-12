@@ -15,19 +15,25 @@ test(
 );
 
 test(
-  "workfrontBlock: đếm đúng tầng pending có task tới hạn + tổng ngày chờ luỹ kế (M14)",
+  "workfrontBlock: đếm đúng tầng chưa sẵn sàng mặt bằng (công tác cuối chưa bàn giao) có task tới hạn + tổng ngày chờ luỹ kế (M46 — model tầng×công tác, thay M14 cũ)",
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
     const { workfrontBlock } = await import("@/lib/dashboardext");
     const { daysFromTodayISO } = await import("@/lib/date");
 
+    // sort_order rất lớn để chắc chắn là "công tác cuối" toàn cục trong lúc test chạy,
+    // không phụ thuộc/đụng tới 7 công tác seed sẵn (Trắc đạc..Đóng trần) hay dữ liệu
+    // test khác đang có trong DB tích hợp dùng chung.
+    const stageId = await insertId(
+      `INSERT INTO construction_stages (name, sort_order, duration_days) VALUES ('Test D9 stage cuối', 9999, 1)`,
+    );
     const sheetId = await insertId(
       `INSERT INTO sheet_types (code, name, slug) VALUES ('D9-WF', 'Sheet test D9 WF', 'd9-wf')`,
     );
     const frontId = await insertId(
-      `INSERT INTO work_fronts (sheet_type_id, floor_label) VALUES (?, '9F')`,
-      sheetId,
+      `INSERT INTO floor_stage_fronts (floor_label, stage_id) VALUES ('9F', ?)`,
+      stageId,
     );
     const wpId = await insertId(
       `INSERT INTO work_packages (code, name, sheet_type_id, floor_label) VALUES ('D9-WF-1', 'Nhóm test D9 WF', ?, '9F')`,
@@ -47,8 +53,9 @@ test(
 
     await run(`DELETE FROM tasks WHERE id = ?`, taskId);
     await run(`DELETE FROM work_packages WHERE id = ?`, wpId);
-    await run(`DELETE FROM work_fronts WHERE id = ?`, frontId);
     await run(`DELETE FROM sheet_types WHERE id = ?`, sheetId);
+    await run(`DELETE FROM floor_stage_fronts WHERE id = ?`, frontId);
+    await run(`DELETE FROM construction_stages WHERE id = ?`, stageId);
   },
 );
 

@@ -26,7 +26,7 @@ export async function PATCH(
   if (!body || typeof body !== "object")
     return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });
 
-  const patch: { name?: string; active?: boolean } = {};
+  const patch: { name?: string; active?: boolean; durationDays?: number } = {};
   if (typeof body.name === "string") {
     const name = body.name.trim();
     if (!name)
@@ -34,6 +34,15 @@ export async function PATCH(
     patch.name = name;
   }
   if (typeof body.active === "boolean") patch.active = body.active;
+  if (body.durationDays !== undefined) {
+    const durationDays = Number(body.durationDays);
+    if (!Number.isInteger(durationDays) || durationDays <= 0)
+      return NextResponse.json(
+        { error: "Số ngày thi công phải là số nguyên dương" },
+        { status: 422 },
+      );
+    patch.durationDays = durationDays;
+  }
 
   await updateStage(id, patch);
   return NextResponse.json({ updated: id });

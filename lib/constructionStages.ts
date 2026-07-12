@@ -3,27 +3,35 @@
 // Bảng cũ (work_fronts, xem lib/workfronts.ts) vẫn giữ nguyên, không đụng tới.
 import { query, queryOne, run, insertId, todayISO, daysFromTodayISO } from "@/lib/db";
 import { sortFloorsDesc } from "@/lib/floors";
+import { addDaysISO } from "@/lib/date";
 
-export type StageRow = { id: number; name: string; sortOrder: number; active: boolean };
+export type StageRow = {
+  id: number;
+  name: string;
+  sortOrder: number;
+  active: boolean;
+  durationDays: number;
+};
 
 export async function listStages(): Promise<StageRow[]> {
   return query<StageRow>(
-    `SELECT id, name, sort_order AS "sortOrder", active
+    `SELECT id, name, sort_order AS "sortOrder", active, duration_days AS "durationDays"
        FROM construction_stages WHERE active = TRUE ORDER BY sort_order, id`,
   );
 }
 
-export async function createStage(name: string): Promise<number> {
+export async function createStage(name: string, durationDays: number): Promise<number> {
   return insertId(
-    `INSERT INTO construction_stages (name, sort_order)
-     VALUES (?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM construction_stages))`,
+    `INSERT INTO construction_stages (name, sort_order, duration_days)
+     VALUES (?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM construction_stages), ?)`,
     name,
+    durationDays,
   );
 }
 
 export async function updateStage(
   id: number,
-  patch: { name?: string; active?: boolean; sortOrder?: number },
+  patch: { name?: string; active?: boolean; sortOrder?: number; durationDays?: number },
 ): Promise<void> {
   const sets: string[] = [];
   const args: unknown[] = [];
@@ -39,6 +47,10 @@ export async function updateStage(
     sets.push("sort_order = ?");
     args.push(patch.sortOrder);
   }
+  if (patch.durationDays !== undefined) {
+    sets.push("duration_days = ?");
+    args.push(patch.durationDays);
+  }
   if (sets.length === 0) return;
   args.push(id);
   await run(`UPDATE construction_stages SET ${sets.join(", ")} WHERE id = ?`, ...args);
@@ -49,6 +61,8 @@ export type FloorStageFrontRow = {
   floorLabel: string;
   stageId: number;
   handedOverAt: string | null;
+  receivedAt: string | null;
+  plannedReceivedAt: string | null;
   note: string | null;
   updatedAt: string;
 };
@@ -70,7 +84,8 @@ export async function ensureFloorStageFronts(floorLabels: string[]): Promise<voi
 export async function listFloorStageFronts(floorLabel?: string): Promise<FloorStageFrontRow[]> {
   return query<FloorStageFrontRow>(
     `SELECT id, floor_label AS "floorLabel", stage_id AS "stageId",
-            handed_over_at AS "handedOverAt", note, updated_at AS "updatedAt"
+            handed_over_at AS "handedOverAt", received_at AS "receivedAt",
+            planned_received_at AS "plannedReceivedAt", note, updated_at AS "updatedAt"
        FROM floor_stage_fronts
       ${floorLabel ? "WHERE floor_label = ?" : ""}
       ORDER BY floor_label, stage_id`,
@@ -81,24 +96,60 @@ export async function listFloorStageFronts(floorLabel?: string): Promise<FloorSt
 export async function upsertFloorStageFront(
   floorLabel: string,
   stageId: number,
-  input: { handedOverAt: string | null; note: string | null },
+  input: {
+    receivedAt: string | null;
+    handedOverAt: string | null;
+    plannedReceivedAt: string | null;
+    note: string | null;
+  },
   userId: number,
 ): Promise<number> {
   const row = await queryOne<{ id: number }>(
-    `INSERT INTO floor_stage_fronts (floor_label, stage_id, handed_over_at, note, updated_by)
-     VALUES (?, ?, ?, ?, ?)
+    `INSERT INTO floor_stage_fronts
+       (floor_label, stage_id, received_at, handed_over_at, planned_received_at, note, updated_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (floor_label, stage_id) DO UPDATE
-       SET handed_over_at = EXCLUDED.handed_over_at, note = EXCLUDED.note,
+       SET received_at = EXCLUDED.received_at, handed_over_at = EXCLUDED.handed_over_at,
+           planned_received_at = EXCLUDED.planned_received_at, note = EXCLUDED.note,
            updated_by = ?, updated_at = NOW()
      RETURNING id`,
     floorLabel,
     stageId,
+    input.receivedAt,
     input.handedOverAt,
+    input.plannedReceivedAt,
     input.note,
     userId,
     userId,
   );
   return row!.id;
+}
+
+export type PlannedDates = { plannedReceivedAt: string | null; plannedHandedOverAt: string | null };
+
+// Tính ngày kế hoạch nối tiếp cho từng công tác của 1 tầng theo thứ tự sort_order: công
+// tác đầu tiên lấy planned_received_at đã lưu (do PM đặt tay), các công tác sau = ngày
+// bàn giao kế hoạch của công tác liền trước (không lưu DB, tính lại mỗi lần đọc để không
+// bao giờ lệch khi đổi duration_days/thêm bớt công tác).
+export function computePlannedDates(
+  stages: StageRow[],
+  fronts: FloorStageFrontRow[],
+  floorLabel: string,
+): Map<number, PlannedDates> {
+  const result = new Map<number, PlannedDates>();
+  const sorted = [...stages].sort((a, b) => a.sortOrder - b.sortOrder);
+  let cursor: string | null = null;
+  for (let i = 0; i < sorted.length; i++) {
+    const stage = sorted[i];
+    const front = fronts.find((f) => f.floorLabel === floorLabel && f.stageId === stage.id);
+    const receivedAt: string | null = i === 0 ? (front?.plannedReceivedAt ?? null) : cursor;
+    const handedOverAt: string | null = receivedAt
+      ? addDaysISO(receivedAt, stage.durationDays)
+      : null;
+    result.set(stage.id, { plannedReceivedAt: receivedAt, plannedHandedOverAt: handedOverAt });
+    cursor = handedOverAt;
+  }
+  return result;
 }
 
 // Toàn bộ tầng đang có trong dự án (kể cả tầng chưa từng có work_package/task) — dùng

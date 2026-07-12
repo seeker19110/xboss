@@ -8,12 +8,15 @@ import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { formatDateVN } from "@/lib/date";
 
-type Stage = { id: number; name: string; sortOrder: number; active: boolean };
+type Stage = { id: number; name: string; sortOrder: number; active: boolean; durationDays: number };
 type Front = {
   id: number;
   floorLabel: string;
   stageId: number;
+  receivedAt: string | null;
   handedOverAt: string | null;
+  plannedReceivedAt: string | null;
+  plannedHandedOverAt: string | null;
   note: string | null;
   updatedAt: string;
 };
@@ -86,6 +89,7 @@ export default function FloorStageFrontsPage({ params }: { params: Promise<{ flo
                 <StageCard
                   key={stage.id}
                   index={i}
+                  isFirstStage={i === 0}
                   floor={floor}
                   stage={stage}
                   front={front}
@@ -112,6 +116,7 @@ type Doc = {
 
 function StageCard({
   index,
+  isFirstStage,
   floor,
   stage,
   front,
@@ -119,13 +124,16 @@ function StageCard({
   onSaved,
 }: {
   index: number;
+  isFirstStage: boolean;
   floor: string;
   stage: Stage;
   front: Front | null;
   canManage: boolean;
   onSaved: () => void;
 }) {
+  const [receivedAt, setReceivedAt] = useState(front?.receivedAt ?? "");
   const [handedOverAt, setHandedOverAt] = useState(front?.handedOverAt ?? "");
+  const [plannedReceivedAt, setPlannedReceivedAt] = useState(front?.plannedReceivedAt ?? "");
   const [note, setNote] = useState(front?.note ?? "");
   const [busy, setBusy] = useState(false);
   const [docs, setDocs] = useState<Doc[]>([]);
@@ -134,9 +142,11 @@ function StageCard({
 
   // Giữ đồng bộ khi refresh() nạp lại dữ liệu mới từ server sau khi lưu.
   useEffect(() => {
+    setReceivedAt(front?.receivedAt ?? "");
     setHandedOverAt(front?.handedOverAt ?? "");
+    setPlannedReceivedAt(front?.plannedReceivedAt ?? "");
     setNote(front?.note ?? "");
-  }, [front?.handedOverAt, front?.note]);
+  }, [front?.receivedAt, front?.handedOverAt, front?.plannedReceivedAt, front?.note]);
 
   function loadDocs() {
     if (!front) return;
@@ -158,7 +168,9 @@ function StageCard({
       body: JSON.stringify({
         floorLabel: floor,
         stageId: stage.id,
+        receivedAt: receivedAt || null,
         handedOverAt: handedOverAt || null,
+        plannedReceivedAt: isFirstStage ? plannedReceivedAt || null : null,
         note: note.trim() || null,
       }),
     });
@@ -198,16 +210,49 @@ function StageCard({
     .map((k) => ({ kind: k, items: docs.filter((d) => d.docKind === k) }))
     .filter((g) => g.items.length > 0);
 
+  // Dòng đọc "Kế hoạch: nhận... → bàn giao..." — chỉ hiện khi KHÔNG phải công tác đầu tiên
+  // (ngày nhận kế hoạch của công tác đầu do người dùng tự đặt tay ở ô nhập bên dưới) hoặc
+  // khi người xem không có quyền sửa (không có ô nhập nào để đọc thay).
+  const showPlannedLine =
+    (!isFirstStage || !canManage) && (front?.plannedReceivedAt || front?.plannedHandedOverAt);
+
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
       <h2 className="font-semibold">
         {index + 1}. {stage.name}
       </h2>
 
+      {showPlannedLine && (
+        <p className="text-xs text-zinc-500">
+          Kế hoạch: nhận {formatDateVN(front?.plannedReceivedAt)} → bàn giao{" "}
+          {formatDateVN(front?.plannedHandedOverAt)}
+        </p>
+      )}
+
       {canManage ? (
         <div className="grid sm:grid-cols-2 gap-3">
+          {isFirstStage && (
+            <label className="text-xs text-zinc-400 block sm:col-span-2">
+              Ngày bắt đầu kế hoạch
+              <input
+                type="date"
+                value={plannedReceivedAt}
+                onChange={(e) => setPlannedReceivedAt(e.target.value)}
+                className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
+              />
+            </label>
+          )}
           <label className="text-xs text-zinc-400 block">
-            Ngày bàn giao
+            Ngày nhận thực tế
+            <input
+              type="date"
+              value={receivedAt}
+              onChange={(e) => setReceivedAt(e.target.value)}
+              className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
+            />
+          </label>
+          <label className="text-xs text-zinc-400 block">
+            Ngày bàn giao thực tế
             <input
               type="date"
               value={handedOverAt}
@@ -215,7 +260,7 @@ function StageCard({
               className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
             />
           </label>
-          <label className="text-xs text-zinc-400 block">
+          <label className="text-xs text-zinc-400 block sm:col-span-2">
             Ghi chú
             <textarea
               value={note}
@@ -236,6 +281,14 @@ function StageCard({
         </div>
       ) : (
         <dl className="text-sm text-zinc-300 space-y-1">
+          <div>
+            Ngày nhận:{" "}
+            {front?.receivedAt ? (
+              formatDateVN(front.receivedAt)
+            ) : (
+              <span className="text-zinc-700">— chưa xong</span>
+            )}
+          </div>
           <div>
             Ngày bàn giao:{" "}
             {front?.handedOverAt ? (

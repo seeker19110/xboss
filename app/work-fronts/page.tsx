@@ -9,15 +9,43 @@ import { fetchMe, type Me } from "@/app/lib/me";
 import { formatDateVN } from "@/lib/date";
 import { sortFloorsDesc } from "@/lib/floors";
 
-type Stage = { id: number; name: string; sortOrder: number; active: boolean };
+type Stage = { id: number; name: string; sortOrder: number; active: boolean; durationDays: number };
 type Front = {
   id: number;
   floorLabel: string;
   stageId: number;
+  receivedAt: string | null;
   handedOverAt: string | null;
+  plannedReceivedAt: string | null;
+  plannedHandedOverAt: string | null;
   note: string | null;
   updatedAt: string;
 };
+
+// Ô lưới hiện 2 dòng: ngày nhận mặt bằng / ngày bàn giao mặt bằng. Chưa có thực tế → hiện
+// ngày kế hoạch (tính nối tiếp từ duration_days) màu nhạt, không tích; đã ghi nhận thực tế
+// → hiện ngày thực tế màu nổi bật kèm dấu ✓.
+function FrontCell({ front }: { front: Front | undefined }) {
+  const received = front?.receivedAt ?? front?.plannedReceivedAt ?? null;
+  const receivedActual = !!front?.receivedAt;
+  const handedOver = front?.handedOverAt ?? front?.plannedHandedOverAt ?? null;
+  const handedOverActual = !!front?.handedOverAt;
+
+  if (!received && !handedOver) return <span className="text-zinc-700">—</span>;
+
+  return (
+    <div className="flex flex-col items-center gap-0.5 text-[11px] leading-tight">
+      <span className={receivedActual ? "text-emerald-300 font-medium" : "text-zinc-500"}>
+        {received ? formatDateVN(received) : "—"}
+        {receivedActual && " ✓"}
+      </span>
+      <span className={handedOverActual ? "text-emerald-300 font-medium" : "text-zinc-500"}>
+        {handedOver ? formatDateVN(handedOver) : "—"}
+        {handedOverActual && " ✓"}
+      </span>
+    </div>
+  );
+}
 
 export default function WorkFrontsPage() {
   const [me, setMe] = useState<Me | null>(null);
@@ -55,10 +83,16 @@ export default function WorkFrontsPage() {
   async function addStage() {
     const name = await appPrompt("Tên công tác mới:");
     if (!name?.trim()) return;
+    const durationStr = await appPrompt("Số ngày thi công (số nguyên dương):", "1");
+    const durationDays = Number(durationStr);
+    if (!Number.isInteger(durationDays) || durationDays <= 0) {
+      showToast("Số ngày thi công phải là số nguyên dương", "error");
+      return;
+    }
     const res = await fetch("/api/construction-stages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim() }),
+      body: JSON.stringify({ name: name.trim(), durationDays }),
     });
     if (!res.ok) {
       showToast((await res.json().catch(() => null))?.error ?? "Thêm công tác thất bại", "error");
@@ -148,13 +182,7 @@ export default function WorkFrontsPage() {
                         );
                         return (
                           <td key={stage.id} className="p-2 text-center">
-                            {front?.handedOverAt ? (
-                              <span className="inline-flex items-center justify-center px-2 py-1 rounded-lg bg-emerald-950 text-emerald-200 text-xs font-medium whitespace-nowrap">
-                                {formatDateVN(front.handedOverAt)}
-                              </span>
-                            ) : (
-                              <span className="text-zinc-700">—</span>
-                            )}
+                            <FrontCell front={front} />
                           </td>
                         );
                       })}

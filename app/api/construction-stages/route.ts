@@ -29,6 +29,13 @@ export async function POST(req: NextRequest) {
   if (!name)
     return NextResponse.json({ error: "Tên công tác không được để trống" }, { status: 422 });
 
-  const id = await createStage(name);
+  const durationDays = Number(body?.durationDays);
+  if (!Number.isInteger(durationDays) || durationDays <= 0)
+    return NextResponse.json(
+      { error: "Số ngày thi công phải là số nguyên dương" },
+      { status: 422 },
+    );
+
+  const id = await createStage(name, durationDays);
   return NextResponse.json({ id }, { status: 201 });
 }

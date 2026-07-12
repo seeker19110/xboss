@@ -55,3 +55,24 @@ ALTER TABLE notifications
   ADD COLUMN IF NOT EXISTS floor_stage_front_id INTEGER REFERENCES floor_stage_fronts(id) ON DELETE CASCADE;
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_notif_floor_stage_front
   ON notifications(user_id, floor_stage_front_id, type) WHERE floor_stage_front_id IS NOT NULL;
+
+-- Ngày nhận thực tế (dòng 1 trên ô lưới /work-fronts) + số ngày thi công mặc định của mỗi
+-- công tác (dùng tính ngày kế hoạch nối tiếp: nhận công tác sau = bàn giao công tác trước
+-- + duration_days) + ngày bắt đầu kế hoạch (chỉ có giá trị thật ở row công tác ĐẦU TIÊN
+-- của mỗi tầng — các công tác sau tính lại ở tầng API, không lưu trùng).
+ALTER TABLE construction_stages
+  ADD COLUMN IF NOT EXISTS duration_days INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE floor_stage_fronts
+  ADD COLUMN IF NOT EXISTS received_at DATE,
+  ADD COLUMN IF NOT EXISTS planned_received_at DATE;
+
+-- Số ngày thi công mặc định (ước lượng, Admin/PM chỉnh lại đúng thực tế dự án sau) cho 7
+-- công tác đã seed ở migration này — chỉ update nếu đang là giá trị mặc định 1 (tránh ghi
+-- đè nếu ai đã chỉnh tay giữa 2 lần migrate, dù thực tế chỉ chạy 1 lần).
+UPDATE construction_stages SET duration_days = 2 WHERE name = 'Trắc đạc' AND duration_days = 1;
+UPDATE construction_stages SET duration_days = 3 WHERE name = 'MEP (Thi công Layout)' AND duration_days = 1;
+UPDATE construction_stages SET duration_days = 15 WHERE name = 'Xây dựng (Xây Thô)' AND duration_days = 1;
+UPDATE construction_stages SET duration_days = 5 WHERE name = 'MEP (Thi công âm tường)' AND duration_days = 1;
+UPDATE construction_stages SET duration_days = 10 WHERE name = 'Xây dựng (Tô Trám)' AND duration_days = 1;
+UPDATE construction_stages SET duration_days = 5 WHERE name = 'Sơn bả' AND duration_days = 1;
+UPDATE construction_stages SET duration_days = 5 WHERE name = 'Đóng trần' AND duration_days = 1;
