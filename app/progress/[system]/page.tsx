@@ -6,12 +6,15 @@ import {
   Clock,
   ClipboardList,
   ExternalLink,
+  Plus,
   TrendingDown,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
-import { fetchMe, redirectToLogin } from "@/app/lib/me";
+import { Modal } from "@/app/components/dialogs";
+import { fetchMe, redirectToLogin, type Me } from "@/app/lib/me";
+import { toSlug } from "@/lib/sheets";
 import SCurveChart from "@/app/components/SCurveChart";
 import ProgressMap from "@/app/components/ProgressMap";
 import SpiCards from "@/app/components/SpiCards";
@@ -79,6 +82,7 @@ function KpiTile({ label, value, accent }: { label: string; value: string; accen
 
 export default function ProgressSystemPage({ params }: { params: Promise<{ system: string }> }) {
   const { system } = use(params);
+  const [me, setMe] = useState<Me | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [sheetKpi, setSheetKpi] = useState<SheetKpi[]>([]);
   const [totalDelayedFloors, setTotalDelayedFloors] = useState(0);
@@ -86,6 +90,10 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
   const [reasonFilter, setReasonFilter] = useState<string | null>("");
+  const [newSheetName, setNewSheetName] = useState("");
+  const [addingSheet, setAddingSheet] = useState(false);
+  const [creatingSheet, setCreatingSheet] = useState(false);
+  const [createSheetErr, setCreateSheetErr] = useState("");
 
   const validSystem = Object.prototype.hasOwnProperty.call(SYSTEM_LABEL, system);
 
@@ -116,6 +124,7 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
           redirectToLogin();
           return;
         }
+        setMe(meData);
         if (!summaryData) {
           setNotFound(true);
           return;
@@ -140,6 +149,31 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
     if (reasonFilter === "__none") return schedule.delayed.filter((t) => !t.delayReason);
     return schedule.delayed.filter((t) => t.delayReason === reasonFilter);
   }, [schedule, reasonFilter]);
+
+  const canManage = me?.role === "admin" || me?.role === "pm";
+
+  async function createSheet() {
+    if (!newSheetName.trim() || !summary) return;
+    setCreatingSheet(true);
+    setCreateSheetErr("");
+    try {
+      const res = await fetch("/api/sheets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newSheetName.trim(), systemId: summary.system.id }),
+      });
+      const j = await res.json().catch(() => null);
+      if (!res.ok) {
+        setCreateSheetErr(j?.error ?? "Không tạo được hạng mục");
+        return;
+      }
+      window.location.href = `/tracking/${j.sheet.slug}`;
+    } catch {
+      setCreateSheetErr("Mất kết nối — kiểm tra mạng rồi thử lại");
+    } finally {
+      setCreatingSheet(false);
+    }
+  }
 
   if (loading) return <PageSkeleton />;
 
@@ -190,9 +224,23 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
       <main className="px-3 sm:px-6 py-4 w-full max-w-6xl mx-auto space-y-8">
         {/* ── 1. Tổng quan tiến độ ── */}
         <section>
-          <div className="flex items-center gap-2 mb-3">
-            <ClipboardList className="w-4 h-4 text-emerald-400 shrink-0" />
-            <h2 className="font-semibold text-sm text-zinc-200">Tổng quan tiến độ</h2>
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <div className="flex items-center gap-2">
+              <ClipboardList className="w-4 h-4 text-emerald-400 shrink-0" />
+              <h2 className="font-semibold text-sm text-zinc-200">Tổng quan tiến độ</h2>
+            </div>
+            {canManage && (
+              <button
+                onClick={() => {
+                  setCreateSheetErr("");
+                  setNewSheetName("");
+                  setAddingSheet(true);
+                }}
+                className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-emerald-400 transition"
+              >
+                <Plus className="w-3.5 h-3.5" /> Thêm hạng mục
+              </button>
+            )}
           </div>
           <div
             className="flex gap-3 overflow-x-auto scrollbar-none"
@@ -437,6 +485,50 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
           </div>
         </section>
       </main>
+
+      {/* Modal tạo hạng mục (sheet tracking) mới trong hệ này — cùng field tối thiểu với
+          form ở /system/[code] khi hệ chưa có sheet nào, chỉ khác đã gán sẵn systemId hiện tại. */}
+      {addingSheet && (
+        <Modal onClose={() => setAddingSheet(false)}>
+          <div className="p-5">
+            <h3 className="font-semibold mb-4 flex items-center gap-2">
+              <Plus className="w-4 h-4 text-emerald-400" /> Thêm hạng mục cho hệ {label}
+            </h3>
+            <div>
+              <label className="block text-xs text-zinc-400 mb-1">Tên hạng mục</label>
+              <input
+                autoFocus
+                value={newSheetName}
+                onChange={(e) => setNewSheetName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") createSheet();
+                }}
+                placeholder="VD: ACMV Zone 3"
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600 transition"
+              />
+              <p className="text-[11px] text-zinc-400 mt-1">
+                Đường dẫn tracking tự sinh từ tên: /tracking/{toSlug(newSheetName) || "…"}
+              </p>
+            </div>
+            {createSheetErr && <p className="text-xs text-red-400 mt-3">{createSheetErr}</p>}
+            <div className="flex justify-end gap-2 mt-5">
+              <button
+                onClick={() => setAddingSheet(false)}
+                className="px-4 py-2 text-sm bg-zinc-800 hover:bg-zinc-700 rounded-lg transition"
+              >
+                Huỷ
+              </button>
+              <button
+                onClick={createSheet}
+                disabled={creatingSheet || !newSheetName.trim()}
+                className="px-4 py-2 text-sm bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 rounded-lg font-semibold transition text-on-accent"
+              >
+                {creatingSheet ? "Đang tạo…" : "Tạo hạng mục"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
