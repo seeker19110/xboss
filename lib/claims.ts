@@ -217,16 +217,14 @@ export async function pendingClaims(
 export type EotEvidenceSuggestion = { suggestedDays: number; waitingFloors: number };
 
 // Gợi ý số ngày EOT khi tạo claim kind='eot' — tái dùng số ngày chờ mặt bằng luỹ kế
-// (lib/workfronts.ts:frontMissingList, cùng công thức dùng cho dashboard/notification
-// front_missing). Chỉ là GỢI Ý — người dùng tự nhập số cuối, không ép buộc.
-// Lưu ý: work_fronts hiện CHƯA có cột project_id (M22 PR1 không đưa vào) nên tham số
-// projectId ở đây chưa lọc được — giữ chữ ký để dùng ngay khi work_fronts được gán
-// project_id ở migration sau.
+// (lib/constructionStages.ts:stageMissingList, cùng công thức dùng cho dashboard/
+// notification stage_missing — model tầng×công tác của M46, thay cho work_fronts cũ).
+// Chỉ là GỢI Ý — người dùng tự nhập số cuối, không ép buộc.
 export async function eotEvidenceSuggestion(
-  _projectId?: number | null,
+  projectId?: number | null,
 ): Promise<EotEvidenceSuggestion> {
-  const { frontMissingList } = await import("@/lib/workfronts");
-  const items = await frontMissingList();
+  const { stageMissingList } = await import("@/lib/constructionStages");
+  const items = await stageMissingList(projectId ?? undefined);
   return {
     suggestedDays: items.reduce((sum, it) => sum + it.waitingDays, 0),
     waitingFloors: items.length,

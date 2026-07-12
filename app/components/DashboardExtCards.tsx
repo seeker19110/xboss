@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { ShieldAlert, FilePlus2, MapPinned, Inbox } from "lucide-react";
 import EditableText from "@/app/components/EditableText";
 
@@ -87,7 +88,7 @@ export default function DashboardExtCards({
           </a>
         )}
         {workfront != null && workfront.waitingFloors > 0 && (
-          <a
+          <Link
             href="/work-fronts"
             className="flex-1 min-w-[140px] bg-zinc-900 border border-zinc-800 rounded-xl p-3 hover:border-zinc-600 transition"
           >
@@ -100,7 +101,7 @@ export default function DashboardExtCards({
                 ({workfront.cumulativeWaitDays} ngày chờ luỹ kế)
               </span>
             </p>
-          </a>
+          </Link>
         )}
       </div>
 

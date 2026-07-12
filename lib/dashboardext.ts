@@ -66,13 +66,14 @@ export async function procurementBlock(): Promise<ProcurementBlock> {
 
 export type WorkfrontBlock = { waitingFloors: number; cumulativeWaitDays: number };
 
-// M14 (mặt bằng thi công): đếm tầng 'pending' có task sắp/đã tới hạn bắt đầu
-// (frontMissingList, cùng nguồn với notification front_missing + /lookahead) +
-// tổng số ngày chờ luỹ kế — bằng chứng xin gia hạn (EOT) trên dashboard.
+// M14 (mặt bằng thi công, đã chuyển sang model tầng×công tác của M46): đếm tầng chưa
+// sẵn sàng (công tác cuối chưa bàn giao) có task sắp/đã tới hạn bắt đầu (stageMissingList,
+// cùng nguồn với notification stage_missing + /lookahead) + tổng số ngày chờ luỹ kế —
+// bằng chứng xin gia hạn (EOT) trên dashboard.
 export async function workfrontBlock(): Promise<WorkfrontBlock | null> {
-  if (!(await tableExists("work_fronts"))) return null;
-  const { frontMissingList } = await import("@/lib/workfronts");
-  const items = await frontMissingList();
+  if (!(await tableExists("floor_stage_fronts"))) return null;
+  const { stageMissingList } = await import("@/lib/constructionStages");
+  const items = await stageMissingList();
   return {
     waitingFloors: items.length,
     cumulativeWaitDays: items.reduce((sum, it) => sum + it.waitingDays, 0),
