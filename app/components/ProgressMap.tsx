@@ -44,11 +44,15 @@ type TowerRow = { id: number; name: string };
 // Viền đỏ = có task trễ (không đổi màu nền). Hằng số dưới đây là nguồn duy nhất
 // cho cả ô bảng (current/history) lẫn chú thích LEGEND — đổi ở đây là đổi toàn bộ. ──
 
+// Mức -100 (không phải -300/-400) CỐ Ý: theme sáng ghi đè các mã -300/-400 sang tông
+// đậm hơn (dành cho CHỮ trên nền sáng, xem html.light trong globals.css) — dùng làm NỀN
+// ô kèm chữ tối text-blue-900 sẽ ra tối-trên-tối, vỡ tương phản (bắt bởi axe trong e2e).
+// -100 không nằm trong danh sách bị ghi đè nên luôn giữ tông nhạt ổn định ở mọi theme.
 const BG_DONE = "bg-emerald-600"; // 100%
-const BG_HIGH = "bg-green-400"; // 80–99%
-const BG_MID = "bg-yellow-400"; // 50–80%
-const BG_LOW = "bg-orange-400"; // 20–50%
-const BG_VLOW = "bg-red-400"; // <20%
+const BG_HIGH = "bg-green-100"; // 80–99%
+const BG_MID = "bg-yellow-100"; // 50–80%
+const BG_LOW = "bg-orange-100"; // 20–50%
+const BG_VLOW = "bg-red-100"; // <20%
 const BG_ZERO = "bg-zinc-800"; // 0%
 
 function bucketClass(p: number): string {
@@ -67,12 +71,12 @@ function tbColor(avg: number): string {
 }
 
 const LEGEND = [
-  { cls: "bg-zinc-800", label: "0%" },
-  { cls: "bg-red-200", label: "<20%" },
-  { cls: "bg-red-100", label: "20–50%" },
-  { cls: "bg-amber-100", label: "50–80%" },
-  { cls: "bg-emerald-100", label: "80–99%" },
-  { cls: "bg-emerald-600", label: "100%" },
+  { cls: BG_ZERO, label: "0%" },
+  { cls: BG_VLOW, label: "<20%" },
+  { cls: BG_LOW, label: "20–50%" },
+  { cls: BG_MID, label: "50–80%" },
+  { cls: BG_HIGH, label: "80–99%" },
+  { cls: BG_DONE, label: "100%" },
   { cls: "bg-zinc-800 ring-2 ring-red-500/70", label: "Trễ (viền đỏ)" },
   { cls: "bg-zinc-900 border border-dashed border-zinc-700/60", label: "Không có" },
 ];
