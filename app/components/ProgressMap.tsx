@@ -204,7 +204,13 @@ function TowerCurrentTable({
 
 // ── Component chính ──────────────────────────────────────────────────────────
 
-export default function ProgressMap({ system = "" }: { system?: string }) {
+export default function ProgressMap({
+  system = "",
+  hideControls = false,
+}: {
+  system?: string;
+  hideControls?: boolean;
+}) {
   const [data, setData] = useState<ApiData | null>(null);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<"current" | "history">("current");
@@ -410,41 +416,44 @@ export default function ProgressMap({ system = "" }: { system?: string }) {
         )}
       </div>
 
-      {/* Controls */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="flex gap-1 p-1 bg-zinc-950 border border-zinc-800 rounded-xl shrink-0">
-          <button
-            onClick={() => setMode("current")}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${mode === "current" ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
-          >
-            <Layers className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden sm:inline">Hiện tại</span>
-            <span className="sm:hidden">Tầng×Hệ</span>
-          </button>
-          <button
-            onClick={() => setMode("history")}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${mode === "history" ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
-          >
-            <TrendingUp className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden sm:inline">Lịch sử</span>
-            <span className="sm:hidden">Tầng×Tuần</span>
-          </button>
-        </div>
+      {/* Controls — ẩn trên trang theo hệ (progress/[system]): mode "Lịch sử" gộp toàn dự án
+          và lọc "Tất cả hệ" chỉ liệt kê sheet của chính hệ đang xem nên thừa/gây nhầm. */}
+      {!hideControls && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex gap-1 p-1 bg-zinc-950 border border-zinc-800 rounded-xl shrink-0">
+            <button
+              onClick={() => setMode("current")}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${mode === "current" ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
+            >
+              <Layers className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">Hiện tại</span>
+              <span className="sm:hidden">Tầng×Hệ</span>
+            </button>
+            <button
+              onClick={() => setMode("history")}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${mode === "history" ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
+            >
+              <TrendingUp className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">Lịch sử</span>
+              <span className="sm:hidden">Tầng×Tuần</span>
+            </button>
+          </div>
 
-        <select
-          value={sheetFilter}
-          onChange={(e) => setSheetFilter(e.target.value)}
-          aria-label="Lọc theo hệ"
-          className="text-xs bg-zinc-950 border border-zinc-800 text-zinc-300 rounded-lg px-2 py-2 focus:outline-none min-w-0"
-        >
-          <option value="all">Tất cả hệ</option>
-          {sheets.map((s) => (
-            <option key={s.code} value={s.code}>
-              {s.code}
-            </option>
-          ))}
-        </select>
-      </div>
+          <select
+            value={sheetFilter}
+            onChange={(e) => setSheetFilter(e.target.value)}
+            aria-label="Lọc theo hệ"
+            className="text-xs bg-zinc-950 border border-zinc-800 text-zinc-300 rounded-lg px-2 py-2 focus:outline-none min-w-0"
+          >
+            <option value="all">Tất cả hệ</option>
+            {sheets.map((s) => (
+              <option key={s.code} value={s.code}>
+                {s.code}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Legend */}
       <div className="flex items-center gap-2 flex-wrap text-[10px] sm:text-[11px] text-zinc-400">
