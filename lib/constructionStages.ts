@@ -64,6 +64,11 @@ export type FloorStageFrontRow = {
   receivedAt: string | null;
   plannedReceivedAt: string | null;
   note: string | null;
+  outgoingSupplierId: number | null;
+  incomingSupplierId: number | null;
+  transitionStageId: number | null;
+  outgoingRepName: string | null;
+  incomingRepName: string | null;
   updatedAt: string;
 };
 
@@ -85,7 +90,12 @@ export async function listFloorStageFronts(floorLabel?: string): Promise<FloorSt
   return query<FloorStageFrontRow>(
     `SELECT id, floor_label AS "floorLabel", stage_id AS "stageId",
             handed_over_at AS "handedOverAt", received_at AS "receivedAt",
-            planned_received_at AS "plannedReceivedAt", note, updated_at AS "updatedAt"
+            planned_received_at AS "plannedReceivedAt", note,
+            outgoing_supplier_id AS "outgoingSupplierId",
+            incoming_supplier_id AS "incomingSupplierId",
+            transition_stage_id AS "transitionStageId",
+            outgoing_rep_name AS "outgoingRepName", incoming_rep_name AS "incomingRepName",
+            updated_at AS "updatedAt"
        FROM floor_stage_fronts
       ${floorLabel ? "WHERE floor_label = ?" : ""}
       ORDER BY floor_label, stage_id`,
@@ -101,16 +111,28 @@ export async function upsertFloorStageFront(
     handedOverAt: string | null;
     plannedReceivedAt: string | null;
     note: string | null;
+    outgoingSupplierId: number | null;
+    incomingSupplierId: number | null;
+    transitionStageId: number | null;
+    outgoingRepName: string | null;
+    incomingRepName: string | null;
   },
   userId: number,
 ): Promise<number> {
   const row = await queryOne<{ id: number }>(
     `INSERT INTO floor_stage_fronts
-       (floor_label, stage_id, received_at, handed_over_at, planned_received_at, note, updated_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
+       (floor_label, stage_id, received_at, handed_over_at, planned_received_at, note,
+        outgoing_supplier_id, incoming_supplier_id, transition_stage_id,
+        outgoing_rep_name, incoming_rep_name, updated_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (floor_label, stage_id) DO UPDATE
        SET received_at = EXCLUDED.received_at, handed_over_at = EXCLUDED.handed_over_at,
            planned_received_at = EXCLUDED.planned_received_at, note = EXCLUDED.note,
+           outgoing_supplier_id = EXCLUDED.outgoing_supplier_id,
+           incoming_supplier_id = EXCLUDED.incoming_supplier_id,
+           transition_stage_id = EXCLUDED.transition_stage_id,
+           outgoing_rep_name = EXCLUDED.outgoing_rep_name,
+           incoming_rep_name = EXCLUDED.incoming_rep_name,
            updated_by = ?, updated_at = NOW()
      RETURNING id`,
     floorLabel,
@@ -119,6 +141,11 @@ export async function upsertFloorStageFront(
     input.handedOverAt,
     input.plannedReceivedAt,
     input.note,
+    input.outgoingSupplierId,
+    input.incomingSupplierId,
+    input.transitionStageId,
+    input.outgoingRepName,
+    input.incomingRepName,
     userId,
     userId,
   );
