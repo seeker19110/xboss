@@ -48,6 +48,12 @@ const serverSchema = z.object({
 
   // Seed dữ liệu (scripts/seed)
   XLSX_FILE: z.string().optional(),
+
+  // Theo dõi lỗi (Sentry) — thiếu thì sentry.server.config.ts/sentry.edge.config.ts tự
+  // enabled=false (đọc trực tiếp process.env.SENTRY_DSN, không qua getServerEnv(), vì
+  // instrumentation.ts chạy lúc server bootstrap, trước khi chắc chắn có DATABASE_URL để
+  // validate cả schema). Khai báo ở đây chỉ để liệt kê đủ biến môi trường tuỳ chọn của dự án.
+  SENTRY_DSN: z.string().optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverSchema>;
