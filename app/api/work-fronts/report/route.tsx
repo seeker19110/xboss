@@ -3,7 +3,7 @@ import { queryOne } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import ReactPDF, { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/pdf-fonts";
-import { frontMissingList, type FrontMissingItem } from "@/lib/workfronts";
+import { stageMissingList, type StageMissingItem } from "@/lib/constructionStages";
 import { formatDateVN, todayISO } from "@/lib/date";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +20,7 @@ const styles = StyleSheet.create({
   note: { fontSize: 8, color: "#777", marginBottom: 14 },
   th: { fontFamily: FONT_BOLD, fontSize: 8 },
   tr: { flexDirection: "row", paddingVertical: 3, borderBottom: "0.3 solid #eee" },
-  colSheet: { width: 70 },
+  colStage: { width: 70 },
   colFloor: { width: 60 },
   colStart: { width: 90 },
   colWait: { width: 90, textAlign: "right" },
@@ -33,7 +33,7 @@ function ReportDoc({
 }: {
   today: string;
   projectName: string;
-  items: FrontMissingItem[];
+  items: StageMissingItem[];
 }) {
   const cumulativeWaitDays = items.reduce((sum, it) => sum + it.waitingDays, 0);
 
@@ -45,9 +45,9 @@ function ReportDoc({
           {projectName} · Tính đến ngày {formatDateVN(today)}
         </Text>
         <Text style={styles.note}>
-          Danh sách tầng/hệ chưa được tổng thầu bàn giao mặt bằng (trạng thái &quot;Chưa bàn
-          giao&quot;) trong khi công việc đã đến hoặc sắp đến ngày bắt đầu theo kế hoạch — dùng làm
-          bằng chứng xin gia hạn (EOT) với tổng thầu/CĐT.
+          Danh sách tầng chưa hoàn tất mặt bằng (công tác cuối trong chuỗi thi công chưa bàn giao)
+          trong khi công việc đã đến hoặc sắp đến ngày bắt đầu theo kế hoạch — dùng làm bằng chứng
+          xin gia hạn (EOT) với tổng thầu/CĐT.
         </Text>
 
         <View style={styles.summaryRow}>
@@ -66,7 +66,7 @@ function ReportDoc({
         ) : (
           <>
             <View style={[styles.tr, { backgroundColor: "#f8f8f8" }]}>
-              <Text style={[styles.th, styles.colSheet]}>Hệ</Text>
+              <Text style={[styles.th, styles.colStage]}>Công tác</Text>
               <Text style={[styles.th, styles.colFloor]}>Tầng</Text>
               <Text style={[styles.th, styles.colStart]}>Ngày lẽ ra bắt đầu</Text>
               <Text style={[styles.th, styles.colWait]}>Số ngày chờ</Text>
@@ -74,8 +74,8 @@ function ReportDoc({
             {items
               .sort((a, b) => b.waitingDays - a.waitingDays)
               .map((it) => (
-                <View key={it.workFrontId} style={styles.tr}>
-                  <Text style={styles.colSheet}>{it.sheetCode}</Text>
+                <View key={it.floorStageFrontId} style={styles.tr}>
+                  <Text style={styles.colStage}>{it.stageName}</Text>
                   <Text style={styles.colFloor}>{it.floorLabel}</Text>
                   <Text style={styles.colStart}>{formatDateVN(it.earliestStart)}</Text>
                   <Text style={styles.colWait}>{it.waitingDays} ngày</Text>
@@ -95,7 +95,7 @@ export async function GET() {
   if (user.role !== "admin" && user.role !== "pm")
     return NextResponse.json({ error: "Chỉ Admin/PM được xuất báo cáo mặt bằng" }, { status: 403 });
 
-  const items = await frontMissingList();
+  const items = await stageMissingList();
   const project = (await queryOne<{ name: string }>(
     `SELECT name FROM projects ORDER BY id LIMIT 1`,
   )) ?? { name: "XBoss" };

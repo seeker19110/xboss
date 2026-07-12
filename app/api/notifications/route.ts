@@ -8,7 +8,7 @@ import { expiringContracts } from "@/lib/contracts";
 import { pendingVariations } from "@/lib/vo";
 import { overContractCerts, pendingCerts } from "@/lib/paymentcerts";
 import { dueCorrespondences } from "@/lib/correspondence";
-import { frontMissingList } from "@/lib/workfronts";
+import { stageMissingList } from "@/lib/constructionStages";
 import { calibrationDueList } from "@/lib/equipment";
 import { overNormItems, NORM_OVER_THRESHOLD_PCT } from "@/lib/norms";
 import { openHseActions } from "@/lib/hse";
@@ -727,28 +727,30 @@ export async function GET() {
     );
   }
 
-  // Tầng chưa bàn giao mặt bằng mà task sắp/đã tới ngày bắt đầu → cảnh báo Admin/PM (M14).
+  // Tầng chưa sẵn sàng mặt bằng (công tác cuối chưa bàn giao) mà task sắp/đã tới ngày bắt
+  // đầu → cảnh báo Admin/PM (M14 bản mới, tầng×công tác — thay cho front_missing cũ theo
+  // sheet, đã ngừng nuôi vì trang /work-fronts không còn ghi vào model cũ).
   if (isAdminOrPm(user.role)) {
-    const missingFronts = await frontMissingList(projectId ?? undefined);
-    if (missingFronts.length > 0) {
-      const values = missingFronts.map(() => `(?, ?, 'front_missing', ?)`).join(", ");
-      const params = missingFronts.flatMap((f) => [
+    const missingStages = await stageMissingList(projectId ?? undefined);
+    if (missingStages.length > 0) {
+      const values = missingStages.map(() => `(?, ?, 'stage_missing', ?)`).join(", ");
+      const params = missingStages.flatMap((f) => [
         user.id,
-        f.workFrontId,
-        `🚧 [${f.sheetCode}] Tầng ${f.floorLabel} chưa bàn giao mặt bằng — chờ ${f.waitingDays} ngày`,
+        f.floorStageFrontId,
+        `🚧 Tầng ${f.floorLabel} chưa hoàn tất mặt bằng (${f.stageName}) — chờ ${f.waitingDays} ngày`,
       ]);
       await run(
-        `INSERT INTO notifications (user_id, work_front_id, type, message) VALUES ${values}
-         ON CONFLICT (user_id, work_front_id, type) WHERE work_front_id IS NOT NULL DO NOTHING`,
+        `INSERT INTO notifications (user_id, floor_stage_front_id, type, message) VALUES ${values}
+         ON CONFLICT (user_id, floor_stage_front_id, type) WHERE floor_stage_front_id IS NOT NULL DO NOTHING`,
         ...params,
       );
     }
-    const missingFrontIds = missingFronts.map((f) => f.workFrontId);
+    const missingStageIds = missingStages.map((f) => f.floorStageFrontId);
     await run(
       `DELETE FROM notifications
-        WHERE user_id = ? AND type = 'front_missing' AND is_read = 0 AND work_front_id <> ALL(?)`,
+        WHERE user_id = ? AND type = 'stage_missing' AND is_read = 0 AND floor_stage_front_id <> ALL(?)`,
       user.id,
-      missingFrontIds,
+      missingStageIds,
     );
   }
 

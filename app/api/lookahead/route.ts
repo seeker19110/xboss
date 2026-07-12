@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, todayISO, daysFromTodayISO } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { pendingFrontKeys } from "@/lib/workfronts";
+import { pendingStageFloors } from "@/lib/constructionStages";
 import { resolveSystemId } from "@/lib/systems";
 
 export const dynamic = "force-dynamic";
@@ -75,14 +75,13 @@ export async function GET(req: NextRequest) {
     ...systemParams,
   );
 
-  // Task thuộc tầng chưa bàn giao mặt bằng (M14) → cờ waitingFront cho báo cáo EOT.
-  const pendingFronts = await pendingFrontKeys();
+  // Task thuộc tầng chưa sẵn sàng mặt bằng (công tác cuối trong chuỗi thi công chưa bàn
+  // giao — model tầng×công tác của M46, thay cho model tầng×sheet cũ của M14) → cờ
+  // waitingFront cho báo cáo EOT.
+  const pendingFronts = await pendingStageFloors();
   const flag = (t: LookaheadTask) => ({
     ...t,
-    waitingFront:
-      t.floorLabel != null && pendingFronts.has(`${t.sheetTypeId}:${t.floorLabel}`)
-        ? true
-        : undefined,
+    waitingFront: t.floorLabel != null && pendingFronts.has(t.floorLabel) ? true : undefined,
   });
 
   return NextResponse.json({

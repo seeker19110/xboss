@@ -152,6 +152,11 @@ export function newWorkFrontFileName(workFrontId: number, mime: string): string 
   return `wf${workFrontId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime]}`;
 }
 
+// Biên bản/ảnh của trang "Mặt bằng thi công" bản mới (tầng × công tác thi công, M46).
+export function newFloorStageFrontFileName(floorStageFrontId: number, mime: string): string {
+  return `fsf${floorStageFrontId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime]}`;
+}
+
 export function newEquipmentCertFileName(equipmentId: number, mime: string): string {
   return `eq${equipmentId}-cert-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime]}`;
 }

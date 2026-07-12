@@ -9,6 +9,12 @@ export const todayISO = () => new Date(Date.now() + 7 * 3600_000).toISOString().
 export const daysFromTodayISO = (days: number) =>
   new Date(Date.now() + 7 * 3600_000 + days * 86400_000).toISOString().slice(0, 10);
 
+// Ngày ISO = `iso` + `days` ngày (âm = trừ lùi) — thuần cộng lịch, KHÔNG phụ thuộc "hôm
+// nay" (khác daysFromTodayISO). Parse ép giờ UTC 00:00 để tránh lệch múi giờ khi cộng.
+export function addDaysISO(iso: string, days: number): string {
+  return new Date(Date.parse(iso + "T00:00:00Z") + days * 86400_000).toISOString().slice(0, 10);
+}
+
 // Định dạng ngày kiểu vi-VN (dd/mm/yyyy) cho hiển thị, "—" khi rỗng/không hợp lệ.
 // Luôn ép ngày/tháng đủ 2 chữ số (Intl "vi-VN" mặc định KHÔNG đệm 0, vd "1/7/2026") —
 // nguồn định dạng ngày dùng chung toàn app, sửa ở đây là sửa toàn cục.
