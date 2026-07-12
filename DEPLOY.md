@@ -37,7 +37,7 @@ Cập nhật phiên bản mới: `git pull` rồi `docker compose up -d --build`
 
 ---
 
-## Cách B — Không Docker (Node ≥ 20 + pm2 + Supabase)
+## Cách B — Không Docker (Node ≥ 24 + pm2 + Supabase)
 
 ```bash
 cd xboss
