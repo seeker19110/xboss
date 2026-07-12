@@ -49,14 +49,13 @@ type TowerRow = { id: number; name: string };
 // globals.css) — dùng làm NỀN sẽ đổi màu bất ngờ giữa 2 theme + có thể vỡ tương phản với
 // chữ ghép cùng. Các mã còn lại không bị ghi đè nên giữ đúng tông gốc ở mọi theme:
 // BG_HIGH dùng nền đậm -800 + chữ sáng -100 (chip đặc, cùng pattern vehicles/payments/
-// materials). BG_LOW/BG_VLOW dùng nền tươi -500 (giống ảnh mẫu) + chữ tối. BG_LOW dùng
-// text-orange-950 (đủ tương phản); BG_VLOW đo bằng axe không đạt 4.5:1 với text-red-950
-// (đỏ-950 đã là tông đỏ tối nhất) nên đổi sang text-neutral-950 (gần đen, không nằm
-// trong danh sách bị ghi đè theo theme, tương phản dư ngưỡng). BG_MID dùng nền nhạt -200
-// + chữ tối text-blue-900.
+// materials). BG_MID/BG_LOW/BG_VLOW dùng nền tươi -500 (giống ảnh mẫu) + chữ tối cùng
+// tông -950 (đủ tương phản, cố định không theo theme) — riêng BG_VLOW đo bằng axe không
+// đạt 4.5:1 với text-red-950 (đỏ-950 đã là tông đỏ tối nhất) nên đổi sang text-neutral-950
+// (gần đen, không nằm trong danh sách bị ghi đè theo theme, tương phản dư ngưỡng).
 const BG_DONE = "bg-emerald-600"; // 100%
 const BG_HIGH = "bg-green-800"; // 80–99%
-const BG_MID = "bg-amber-200"; // 50–80%
+const BG_MID = "bg-amber-500"; // 50–80%
 const BG_LOW = "bg-orange-500"; // 20–50%
 const BG_VLOW = "bg-red-500"; // <20%
 const BG_ZERO = "bg-zinc-800"; // 0%
@@ -64,7 +63,7 @@ const BG_ZERO = "bg-zinc-800"; // 0%
 function bucketClass(p: number): string {
   if (p >= 0.999) return `${BG_DONE} text-on-accent`;
   if (p >= 0.8) return `${BG_HIGH} text-green-100`;
-  if (p >= 0.5) return `${BG_MID} text-blue-900`;
+  if (p >= 0.5) return `${BG_MID} text-amber-950`;
   if (p >= 0.2) return `${BG_LOW} text-orange-950`;
   if (p > 0) return `${BG_VLOW} text-neutral-950`;
   return `${BG_ZERO} text-zinc-300`;
