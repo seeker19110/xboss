@@ -89,6 +89,8 @@
   - Verify thật: dựng Postgres cục bộ (`xboss_dev`), seed mẫu, thao tác qua Playwright + API thật trên `npm run start` — luồng đầy đủ (đăng nhập → mở nhật ký hôm nay → chọn thời tiết → thêm dòng nhân lực → lưu nháp → khoá sổ → xuất PDF trả `200 application/pdf` → banner "Đã khoá bởi" hiện đúng); xác nhận gate: PUT khi đã khoá → 409, Kỹ sư gọi DELETE/POST lock → 403 (chỉ Admin/PM khoá, chỉ Admin mở khoá), Admin mở khoá → PUT lại thành công. Phát hiện & sửa qua axe: `text-zinc-500` nhãn thứ trong tuần (T2..T7) trên nền `zinc-950` → `zinc-400`. 96 e2e authed (desktop+mobile, 1 skip có sẵn không liên quan) + 81 test tích hợp (`npm test`) + lint/typecheck/build xanh.
   - **M5 hoàn tất mọi PR trong đặc tả** (`docs/nang-cap/M05-nhat-ky.md`). Còn lại (điểm cần quyết, ghi trong đặc tả): mẫu PDF nhật ký theo yêu cầu CĐT thật (đang dùng bố cục phổ biến); nhật ký hiện theo dự án (1 tháp) — thêm cột tower nếu sau này đa tháp.
 
+> Từ đây, mọi đợt audit bám theo checklist chuẩn hoá ở `docs/audit.md` (bảo mật/phân quyền · logic & toàn vẹn dữ liệu · UI/UX & a11y).
+
 ## Đợt audit toàn dự án (2026-07)
 
 - **Phân quyền:** bịt 3 route sửa tiến độ thiếu `CAN.editProgress` (`tasks/:id/progress`, `dimensions/:id`, `dimensions/batch` — vai trò chỉ-xem BCH/CĐT/Viewer trước đây sửa được tiến độ); `materials/:id/move` về đúng nhóm quyền Admin/PM/Kỹ sư; `purchase-requests` POST chặn vai trò chỉ-xem.

@@ -11,6 +11,7 @@ XBoss — web app quản lý tiến độ thi công MEP/ACMV (dự án TT AVIO T
 - `PROJECT.md` — _cái gì_ cần xây (vấn đề, MVP, schema, kiến trúc, DoD), viết ngược từ code. **Đọc trước việc liên quan tính năng/thiết kế.**
 - `PROGRESS.md` — đang ở giai đoạn nào, đã xong/đang làm/tiếp theo, **nợ kỹ thuật**. Cập nhật sau mỗi mốc.
 - `docs/adr/` — các quyết định kỹ thuật. **Đọc trước khi đề xuất thay đổi kiến trúc lớn** (vd đừng đề xuất thêm Supabase/ORM/vitest — đã có ADR giải thích lý do giữ hiện trạng).
+- `docs/audit.md` — **tiêu chuẩn audit toàn diện của XBoss** (bảo mật/phân quyền, logic nghiệp vụ & toàn vẹn dữ liệu, UI/UX & a11y) — checklist đúc kết từ các lớp lỗi thật đã lặp lại nhiều lần trong dự án. **Đọc trước khi tự audit/review diện rộng**, và bắt buộc rà theo mục "Vùng rủi ro cao" khi PR chạm `lib/recompute.ts`, `lib/auth.ts`, `lib/material-sync.ts`, `lib/boq.ts` hoặc route tài chính/nghiệm thu.
 - `docs/framework/` — bộ khung quy trình/chất lượng (tham khảo dài, đọc đúng phần cần). Áp dụng brownfield theo `AP-DUNG-vao-du-an-co-san.md`.
 - `docs/ops/` — vận hành sự cố production (`incident-response.md`).
 
