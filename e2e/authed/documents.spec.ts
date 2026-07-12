@@ -15,7 +15,7 @@ test.describe("Hồ sơ dự án (sau đăng nhập)", () => {
     await gotoDocuments(page);
     await expect(page.getByText("Chưa có hồ sơ nào")).toBeVisible();
     await expect(page.getByRole("button", { name: "Mọi hệ" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Bản vẽ" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Bản vẽ", exact: true })).toBeVisible();
   });
 
   // Không bấm "Tải lên" (không ghi dữ liệu thật) — trang chia sẻ 1 DB test giữa các
