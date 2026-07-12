@@ -7,7 +7,7 @@ import { Modal } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { formatDateVN } from "@/lib/date";
-import { sortFloorsAsc } from "@/lib/floors";
+import { sortFloorsDesc } from "@/lib/floors";
 
 type WorkFrontStatus = "pending" | "handed_over" | "in_progress" | "returned";
 const WORK_FRONT_STATUS_LABEL: Record<WorkFrontStatus, string> = {
@@ -76,9 +76,7 @@ export default function WorkFrontsPage() {
   if (loading) return <PageSkeleton />;
 
   const sheets = Array.from(new Set(items.map((w) => w.sheetCode))).sort();
-  const floors = Array.from(new Set(items.map((w) => w.floorLabel)))
-    .sort(sortFloorsAsc)
-    .reverse();
+  const floors = Array.from(new Set(items.map((w) => w.floorLabel))).sort(sortFloorsDesc);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">

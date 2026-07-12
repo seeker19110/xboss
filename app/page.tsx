@@ -21,7 +21,7 @@ import { PageSkeleton, Skeleton } from "@/app/components/Skeleton";
 import EditableText from "@/app/components/EditableText";
 import { DELAY_REASON_LABEL } from "@/lib/delay";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { sortFloorsAsc } from "@/lib/floors";
+import { sortFloorsDesc } from "@/lib/floors";
 import { formatDateVN } from "@/lib/date";
 import { systemColorClasses } from "@/lib/systemColors";
 import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
@@ -159,7 +159,7 @@ export default function Dashboard() {
   const floors = useMemo(
     () =>
       [...new Set((data?.delayedTasks ?? []).map((t) => t.floorLabel).filter(Boolean))].sort(
-        sortFloorsAsc,
+        sortFloorsDesc,
       ),
     [data],
   );
