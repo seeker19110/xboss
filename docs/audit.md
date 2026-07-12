@@ -62,11 +62,30 @@ Kế thừa quy trình ground-truth đã chứng minh hiệu quả ở `docs/a11
 - [ ] Không truyền tải thông tin chỉ bằng màu (kèm icon/nhãn) — đặc biệt badge trạng thái/cảnh báo ngưỡng chi phí/vật tư.
 - [ ] Optimistic UI (tick checkbox lưới tracking...) rollback đúng khi server trả lỗi + báo rõ lý do cụ thể (không chỉ "thất bại") — lỗi thật đã gặp khi bị chặn bởi hold-point QAQC nhưng checkbox vẫn hiện đã tick.
 
-## 6. Vùng rủi ro cao (audit hẹp bắt buộc khi PR chạm vào)
+## 6. Checklist Hiệu năng, Dependency & CI/CD
 
-`lib/recompute.ts` · mọi route PATCH tiến độ/nghiệm thu (`tasks/:id/progress`, `dimensions/*`, `tasks/:id/approve`, `approvals`) · `lib/material-sync.ts` · `lib/boq.ts` · `lib/auth.ts` (`CAN`/`canTouchTask`/`canTouchPackage`) · mọi route tài chính (`/api/costs`, `/api/payment-certs`, `/api/contracts`, `/api/purchase-orders`) · mọi route/khối notification tính theo dự án (M22).
+- [ ] Ngân sách Lighthouse (`lighthouserc.json`, đo `/login`, 3 lần chạy) không tụt dưới ngưỡng `error` hiện tại (performance/accessibility/best-practices ≥ 0.9, seo ≥ 0.8) — đây là cổng cứng, không phải `warn`; kiểm job `lighthouse-ci.yml` không bị `continue-on-error` che mất kết quả thật.
+- [ ] `npm audit` sạch mức cao trở lên; lỗ hổng qua dependency gián tiếp (vd `uuid` dưới `exceljs`) xử lý bằng `overrides` trong `package.json`, không bỏ qua âm thầm.
+- [ ] Mọi `uses:` trong `.github/workflows/*.yml` pin theo **SHA đầy đủ** (kèm comment version), không dùng tag nổi (`@v4`).
+- [ ] Mọi workflow khai báo `permissions:` tường minh (least-privilege), không dựa vào mặc định rộng của GitHub Actions.
+- [ ] `deploy.yml` chỉ deploy khi job CI trước đó thật sự `success` (kể cả E2E) — không để CI đỏ vẫn lọt qua vì thiếu `needs`/điều kiện đúng.
+- [ ] Query mới trên bảng lớn (`tasks`, `progress_dimensions`, `task_history`, `notifications`) có index cho cột lọc/sắp xếp/join hay chưa — đặc biệt route dashboard/notification chạy mỗi lần fetch (on-fetch sync), không phải cron.
 
-## 7. Quy trình chạy 1 đợt audit toàn dự án
+## 7. Checklist Vận hành, Đồng bộ real-time, Offline (PWA) & Xuất bản
+
+- [ ] **SSE/đồng bộ đa người dùng** (`/api/events?sheet=`): watermark `sheetVersion` tăng đúng mọi thao tác đổi dữ liệu sheet đó; client có fallback poll khi EventSource lỗi/bị cắt (serverless/reverse-proxy timeout) — không được im lặng mất đồng bộ.
+- [ ] **Offline queue** (`useOfflineTickQueue`, localStorage): thao tác lặp lại khi online trở lại phải idempotent (đối chiếu §4 Idempotency); lỗi 4xx phải bị bỏ khỏi hàng đợi (dữ liệu/quyền không hợp lệ), không được kẹt hàng đợi retry vô hạn; lỗi 5xx/mất mạng thì giữ lại để thử tiếp.
+- [ ] **App Shell / service worker** (`public/sw.js`): đổi logic cache phải tăng version `CACHE`, nếu không thiết bị cũ kẹt cache cũ vĩnh viễn; route `/api/events`, `/api/photos/*` loại trừ khỏi cache network-first như đã quy ước.
+- [ ] **Xuất PDF/Excel** (`@react-pdf/renderer`, `exceljs`): font hỗ trợ đủ dấu tiếng Việt (đã từng vỡ dấu do dùng Helvetica mặc định — dùng `lib/pdf-fonts.ts` cho mọi route PDF mới); cột SQL tham chiếu đúng tên thật (đã từng có route 500 vì tham chiếu cột không tồn tại như `work_package_id`/`deadline` — chạy thử route thật, không chỉ đọc query bằng mắt).
+- [ ] **Dedup thông báo** (loại mới trong `/api/notifications`): dùng đúng cơ chế partial unique index + on-fetch sync + tự dọn khi hết điều kiện — kiểm cả trường hợp tắt dashboard qua `nav_settings` vẫn còn sinh notification cho mục người dùng không thấy trên sidebar nữa (nợ đã ghi nhận với M25-M31).
+- [ ] **Backup & rollback**: trước migration đụng dữ liệu thật trên production, xác nhận đã có backup gần nhất + biết cách phục hồi; `deploy.sh` build vào thư mục tạm rồi swap atomic, không đè trực tiếp `.next` đang chạy.
+- [ ] **Quan sát lỗi production**: nơi nào nuốt lỗi im lặng (catch rỗng, chỉ trả `null`) — tối thiểu `console.error` khi chưa có Sentry (`SENTRY_DSN` chờ người vận hành cấp) để còn dấu vết trong log.
+
+## 8. Vùng rủi ro cao (audit hẹp bắt buộc khi PR chạm vào)
+
+`lib/recompute.ts` · mọi route PATCH tiến độ/nghiệm thu (`tasks/:id/progress`, `dimensions/*`, `tasks/:id/approve`, `approvals`) · `lib/material-sync.ts` · `lib/boq.ts` · `lib/auth.ts` (`CAN`/`canTouchTask`/`canTouchPackage`) · mọi route tài chính (`/api/costs`, `/api/payment-certs`, `/api/contracts`, `/api/purchase-orders`) · mọi route/khối notification tính theo dự án (M22) · `lib/push.ts` + service worker (`public/sw.js`) · mọi route xuất PDF/Excel mới · `.github/workflows/*.yml`.
+
+## 9. Quy trình chạy 1 đợt audit toàn dự án
 
 1. Chia theo miền, chạy song song bằng nhiều subagent độc lập (mẫu đã dùng nhiều lần: bảo mật/phân quyền, correctness/race-condition, frontend a11y/XSS/hardcode, dependency/CI/migration/test) — mỗi agent đọc code thật, không đoán.
 2. Mỗi phát hiện: xác nhận bằng cách đọc code kỹ + khi khả thi, chạy thử thật (Postgres cục bộ + Playwright) trước khi coi là lỗi.
@@ -74,9 +93,16 @@ Kế thừa quy trình ground-truth đã chứng minh hiệu quả ở `docs/a11
 4. Ghi kết quả vào `PROGRESS.md` mục **"Đợt audit toàn dự án ..."** (thêm mục mới, không sửa mục cũ) theo đúng format đã có: mức độ nghiêm trọng, mô tả lỗi thật kèm file/hàm, cách sửa, cách verify.
 5. Việc chưa sửa hoặc cần cân nhắc kỹ thuật thêm (không phải bug logic, đánh đổi có chủ đích) → ghi rõ vào `PROGRESS.md` mục **Nợ kỹ thuật**, không được bỏ sót.
 
-## 8. Cổng "đạt chuẩn" cho một đợt audit
+## 10. Khoảng trống hạ tầng chất lượng đã biết — đề xuất cụ thể
 
-- [ ] Cả 3 checklist (Bảo mật §3, Logic §4, UI/UX §5) đã được rà ít nhất một lượt cho phạm vi audit.
+Rà lại `package.json` + `.github/workflows/*` (2026-07-12): axe-core/Playwright, Lighthouse CI, gitleaks, Dependabot, husky/commitlint, CODEOWNERS **đã đủ**. Còn 2 khoảng trống thật, ghi rõ đề xuất để không lặp lại việc chỉ nhắc chung chung qua nhiều đợt audit:
+
+- [ ] **Sentry (observability)** — chưa cài. Đề xuất: cài `@sentry/nextjs` qua `npx @sentry/wizard@latest -i nextjs`, thêm `SENTRY_DSN` vào `lib/env.ts` **tuỳ chọn** (theo đúng pattern no-op sẵn có của `VAPID_*`/`GOOGLE_SERVICE_ACCOUNT_JSON`: thiếu DSN → bỏ qua báo lỗi, không throw, không chặn build/dev). Việc cài package + scaffold làm được ngay không cần secret; chỉ việc **bật gửi lỗi thật** mới cần `SENTRY_DSN` từ người vận hành (secret nhạy cảm — không tự tạo/đoán). **Cần xác nhận trước khi cài** vì đây là thêm dependency mới vào `package.json`.
+- [ ] **CodeQL** — bị chặn (repo private, cần GHAS trả phí — xem `SECURITY.md`), không phải thiếu sót có thể tự cài; giữ nguyên hiện trạng, chỉ đổi khi công ty nâng cấp gói GitHub.
+
+## 11. Cổng "đạt chuẩn" cho một đợt audit
+
+- [ ] Cả 5 checklist (Bảo mật §3, Logic §4, UI/UX §5, Hiệu năng/CI §6, Vận hành/Offline/Xuất bản §7) đã được rà ít nhất một lượt cho phạm vi audit.
 - [ ] Không còn phát hiện mức Cao/Trung bình chưa xử lý hoặc chưa ghi nợ kỹ thuật rõ ràng kèm lý do.
 - [ ] `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` xanh.
 - [ ] `PROGRESS.md` đã cập nhật đúng mục audit + nợ kỹ thuật (nếu có việc chưa đóng).
