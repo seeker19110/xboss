@@ -8,7 +8,7 @@ export const STATUS_CLS: Record<StatusSlug, string> = {
   dang_thi_cong: "bg-blue-950 text-blue-200",
   hoan_thanh: "bg-emerald-950 text-emerald-200",
   nghiem_thu: "bg-teal-950 text-teal-200",
-  tre: "bg-red-950 text-red-200",
+  tre: "bg-orange-950 text-orange-200",
 };
 
 // `className` để caller tuỳ biến kích thước/độ rộng theo bố cục (vd lưới tracking cần w-32).

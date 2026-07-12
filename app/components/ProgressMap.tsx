@@ -39,16 +39,29 @@ type ApiData = {
 };
 type TowerRow = { id: number; name: string };
 
-// ── Màu theo % hoàn thành — bám bảng màu "Bản đồ tiến độ Tháp A"
-// (zinc/red/amber/emerald), viền đỏ = có task trễ (không đổi màu nền). ─────────
+// ── Màu theo % hoàn thành — thang nhiệt đỏ → cam → vàng → lục, mỗi mốc một tông
+// riêng (trước đây <20% và 20–50% cùng tông đỏ nên khó phân biệt trên bản đồ).
+// Viền đỏ = có task trễ (không đổi màu nền). Hằng số dưới đây là nguồn duy nhất
+// cho cả ô bảng (current/history) lẫn chú thích LEGEND — đổi ở đây là đổi toàn bộ. ──
+
+// Mức -100 (không phải -300/-400) CỐ Ý: theme sáng ghi đè các mã -300/-400 sang tông
+// đậm hơn (dành cho CHỮ trên nền sáng, xem html.light trong globals.css) — dùng làm NỀN
+// ô kèm chữ tối text-blue-900 sẽ ra tối-trên-tối, vỡ tương phản (bắt bởi axe trong e2e).
+// -100 không nằm trong danh sách bị ghi đè nên luôn giữ tông nhạt ổn định ở mọi theme.
+const BG_DONE = "bg-emerald-600"; // 100%
+const BG_HIGH = "bg-green-100"; // 80–99%
+const BG_MID = "bg-yellow-100"; // 50–80%
+const BG_LOW = "bg-orange-100"; // 20–50%
+const BG_VLOW = "bg-red-100"; // <20%
+const BG_ZERO = "bg-zinc-800"; // 0%
 
 function bucketClass(p: number): string {
-  if (p >= 0.999) return "bg-emerald-600 text-on-accent";
-  if (p >= 0.8) return "bg-emerald-100 text-blue-900";
-  if (p >= 0.5) return "bg-amber-100 text-blue-900";
-  if (p >= 0.2) return "bg-red-100 text-blue-900";
-  if (p > 0) return "bg-red-200 text-blue-900";
-  return "bg-zinc-800 text-zinc-300";
+  if (p >= 0.999) return `${BG_DONE} text-on-accent`;
+  if (p >= 0.8) return `${BG_HIGH} text-blue-900`;
+  if (p >= 0.5) return `${BG_MID} text-blue-900`;
+  if (p >= 0.2) return `${BG_LOW} text-blue-900`;
+  if (p > 0) return `${BG_VLOW} text-blue-900`;
+  return `${BG_ZERO} text-zinc-300`;
 }
 function cellClass(p: number, delayed: number): string {
   return bucketClass(p) + (delayed > 0 ? " ring-2 ring-red-500/70" : "");
@@ -58,12 +71,12 @@ function tbColor(avg: number): string {
 }
 
 const LEGEND = [
-  { cls: "bg-zinc-800", label: "0%" },
-  { cls: "bg-red-200", label: "<20%" },
-  { cls: "bg-red-100", label: "20–50%" },
-  { cls: "bg-amber-100", label: "50–80%" },
-  { cls: "bg-emerald-100", label: "80–99%" },
-  { cls: "bg-emerald-600", label: "100%" },
+  { cls: BG_ZERO, label: "0%" },
+  { cls: BG_VLOW, label: "<20%" },
+  { cls: BG_LOW, label: "20–50%" },
+  { cls: BG_MID, label: "50–80%" },
+  { cls: BG_HIGH, label: "80–99%" },
+  { cls: BG_DONE, label: "100%" },
   { cls: "bg-zinc-800 ring-2 ring-red-500/70", label: "Trễ (viền đỏ)" },
   { cls: "bg-zinc-900 border border-dashed border-zinc-700/60", label: "Không có" },
 ];

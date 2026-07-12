@@ -11,7 +11,7 @@ import {
   Layers,
 } from "lucide-react";
 import EmptyState from "@/app/components/EmptyState";
-import { sortFloorsAsc } from "@/lib/floors";
+import { sortFloorsDesc } from "@/lib/floors";
 import { formatDateVN, formatDateTimeVN } from "@/lib/date";
 
 type StockSummary = {
@@ -130,7 +130,7 @@ function Th({ children, right }: { children: React.ReactNode; right?: boolean })
 // Bảng materials × tầng: Σ đã xuất kho gắn tầng cho mỗi vật tư. Chưa đối chiếu KL thi công
 // theo tầng (cần nối M1 boq_task_map ↔ work_packages.floor_label — để đợt sau).
 function ByFloorPivot({ rows }: { rows: ByFloor[] }) {
-  const floors = [...new Set(rows.map((r) => r.floorLabel))].sort(sortFloorsAsc);
+  const floors = [...new Set(rows.map((r) => r.floorLabel))].sort(sortFloorsDesc);
   const materials = new Map<
     number,
     { name: string; unit: string | null; boqCode: string | null; sheetCode: string | null }

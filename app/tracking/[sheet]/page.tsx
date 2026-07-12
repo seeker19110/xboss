@@ -43,7 +43,7 @@ import { useEditMode } from "@/app/components/useEditMode";
 import EditModeToggle from "@/app/components/EditModeToggle";
 import { ROLE_LABELS } from "@/lib/roles";
 import { fetchMe } from "@/app/lib/me";
-import { sortFloorsAsc } from "@/lib/floors";
+import { sortFloorsDesc } from "@/lib/floors";
 import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
 import { StatusBadge } from "@/app/components/StatusBadge";
 import { formatDateTimeVN } from "@/lib/date";
@@ -196,6 +196,23 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
   useEffect(() => {
     load();
   }, [load]);
+
+  // Chọn 1 tầng (dropdown hoặc ?floor= từ link timeline) → tự mở các nhóm thuộc
+  // tầng đó thay vì để đóng như mặc định, để không phải bấm mở lại thủ công.
+  useEffect(() => {
+    if (!floorFilter || !data?.packages) return;
+    setExpanded((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const p of data.packages) {
+        if (p.floorLabel === floorFilter && !next[p.id]) {
+          next[p.id] = true;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [floorFilter, data]);
 
   useEffect(() => {
     const sheetTypeId = data?.sheet.id;
@@ -431,7 +448,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
 
   const floors = [
     ...new Set((data?.packages ?? []).map((p) => p.floorLabel).filter((f): f is string => !!f)),
-  ].sort(sortFloorsAsc);
+  ].sort(sortFloorsDesc);
   const q = deferredQuery.toLowerCase();
   const packages = (data?.packages ?? []).filter(
     (p) =>
@@ -2426,7 +2443,7 @@ function PkgGrid({
                           title="Nguyên nhân trễ — giúp PM thống kê và xử lý"
                           className={`text-[10px] rounded px-1 py-0.5 outline-none border max-w-[110px] ${
                             t.delayReason
-                              ? "bg-red-950 border-red-900 text-red-200"
+                              ? "bg-orange-950 border-orange-900 text-orange-200"
                               : "bg-zinc-800 border-zinc-700 text-zinc-300"
                           }`}
                         >

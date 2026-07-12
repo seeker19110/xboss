@@ -21,7 +21,7 @@ import { PageSkeleton, Skeleton } from "@/app/components/Skeleton";
 import EditableText from "@/app/components/EditableText";
 import { DELAY_REASON_LABEL } from "@/lib/delay";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { sortFloorsAsc } from "@/lib/floors";
+import { sortFloorsDesc } from "@/lib/floors";
 import { formatDateVN } from "@/lib/date";
 import { systemColorClasses } from "@/lib/systemColors";
 import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
@@ -159,7 +159,7 @@ export default function Dashboard() {
   const floors = useMemo(
     () =>
       [...new Set((data?.delayedTasks ?? []).map((t) => t.floorLabel).filter(Boolean))].sort(
-        sortFloorsAsc,
+        sortFloorsDesc,
       ),
     [data],
   );
@@ -386,15 +386,16 @@ export default function Dashboard() {
           {(data?.totalDelayed ?? 0) > 0 && (
             <a
               href="#delayed-table"
-              className="flex items-center gap-4 bg-red-950/20 border border-red-900/50 rounded-xl px-5 py-4 mb-4 hover:bg-red-950/30 transition"
+              className="flex items-center gap-4 bg-orange-950/20 border border-orange-900/50 rounded-xl px-5 py-4 mb-4 hover:bg-orange-950/30 transition"
             >
-              <div className="p-2.5 bg-red-950/30 rounded-lg shrink-0">
-                <TrendingDown className="w-5 h-5 text-red-400" />
+              <div className="p-2.5 bg-orange-950/30 rounded-lg shrink-0">
+                <TrendingDown className="w-5 h-5 text-orange-400" />
               </div>
               <div className="flex-1 min-w-0">
-                {/* Nền tint mờ (bg-red-950/20) đổi độ sáng nhiều theo theme — text-red-400 không
-                    đủ tương phản AA trên nền đã sáng ở theme sáng (đo axe: 2.93 < 4.5). Dùng
-                    token zinc thích ứng cho chữ (đảm bảo AA mọi theme), giữ sắc đỏ ở icon/nền/viền. */}
+                {/* Nền tint mờ (bg-orange-950/20) đổi độ sáng nhiều theo theme — chữ màu (vd
+                    text-orange-400) không đủ tương phản AA trên nền đã sáng ở theme sáng (đo axe:
+                    2.93 < 4.5 khi từng thử với đỏ). Dùng token zinc thích ứng cho chữ (đảm bảo AA
+                    mọi theme), giữ sắc cam ở icon/nền/viền. */}
                 <p className="text-xs text-zinc-400 uppercase tracking-wider font-medium mb-0.5">
                   Tổng số tầng đang trễ
                 </p>
@@ -421,7 +422,7 @@ export default function Dashboard() {
                     {hasDelay && (
                       <span
                         title={`${k.delayed} tầng đang trễ`}
-                        className="flex items-center gap-0.5 text-[10px] text-red-200 bg-red-950 px-1.5 py-0.5 rounded-full shrink-0 font-medium"
+                        className="flex items-center gap-0.5 text-[10px] text-orange-200 bg-orange-950 px-1.5 py-0.5 rounded-full shrink-0 font-medium"
                       >
                         <AlertTriangle className="w-2.5 h-2.5" /> {k.delayed}
                       </span>
