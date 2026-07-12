@@ -1,6 +1,13 @@
 "use client";
 import { use, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Clock, ClipboardList, ExternalLink } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronRight,
+  Clock,
+  ClipboardList,
+  ExternalLink,
+  TrendingDown,
+} from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
@@ -74,6 +81,7 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
   const { system } = use(params);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [sheetKpi, setSheetKpi] = useState<SheetKpi[]>([]);
+  const [totalDelayedFloors, setTotalDelayedFloors] = useState(0);
   const [schedule, setSchedule] = useState<ScheduleData | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -115,6 +123,7 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
         setSummary(summaryData);
         setSchedule(scheduleData);
         setSheetKpi(dashData?.kpi ?? []);
+        setTotalDelayedFloors(dashData?.totalDelayed ?? 0);
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
@@ -205,6 +214,28 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
             />
           </div>
 
+          {/* Banner trễ — cùng bố cục với Dashboard tổng (app/page.tsx), tính theo TẦNG
+              (đã lọc theo hệ này qua ?system=), không phải theo task. */}
+          {totalDelayedFloors > 0 && (
+            <a
+              href="#delayed-table"
+              className="flex items-center gap-4 bg-orange-950/20 border border-orange-900/50 rounded-xl px-5 py-4 mt-3 hover:bg-orange-950/30 transition"
+            >
+              <div className="p-2.5 bg-orange-950/30 rounded-lg shrink-0">
+                <TrendingDown className="w-5 h-5 text-orange-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-zinc-400 uppercase tracking-wider font-medium mb-0.5">
+                  Tổng số tầng đang trễ
+                </p>
+                <p className="text-4xl font-bold leading-none">{totalDelayedFloors}</p>
+              </div>
+              <span className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 transition shrink-0">
+                Xem chi tiết <ChevronRight className="w-3.5 h-3.5" />
+              </span>
+            </a>
+          )}
+
           {/* Card theo từng sheet trong hệ — cùng bố cục với lưới sheet ở Dashboard tổng,
               chỉ khác nguồn dữ liệu đã lọc sẵn theo hệ (?system=). */}
           {sheetKpi.length > 0 && (
@@ -266,7 +297,7 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
 
         {/* ── 3. Timeline ── (ProgressMap tự có tiêu đề riêng) */}
         <section>
-          <ProgressMap system={system} />
+          <ProgressMap system={system} hideControls />
         </section>
 
         {/* ── 4. Chỉ số tiến độ SPI ── (SpiCards tự có tiêu đề riêng) */}
@@ -323,7 +354,10 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
         )}
 
         {/* ── 7. Danh sách công việc đang trễ ── */}
-        <section className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+        <section
+          id="delayed-table"
+          className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden"
+        >
           <div className="px-5 py-4 border-b border-zinc-800 flex items-center gap-2">
             <Clock className="w-4 h-4 text-red-400 shrink-0" />
             <h2 className="font-semibold text-sm">Danh sách công việc đang trễ</h2>
