@@ -226,7 +226,7 @@ function FeedTaskCard({
         <span
           className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full mt-0.5 ${
             variant === "overdue"
-              ? "bg-red-950 text-red-200"
+              ? "bg-orange-950 text-orange-200"
               : variant === "due_soon"
                 ? "bg-amber-950 text-amber-200"
                 : "bg-sky-950 text-sky-200"
@@ -706,7 +706,7 @@ export default function MyTasksPage() {
                               {sheetType}
                             </span>
                             {g.delayed > 0 && (
-                              <span className="flex items-center gap-1 text-[10px] text-red-200 bg-red-950 px-1.5 py-0.5 rounded-full font-semibold">
+                              <span className="flex items-center gap-1 text-[10px] text-orange-200 bg-orange-950 px-1.5 py-0.5 rounded-full font-semibold">
                                 <AlertTriangle className="w-2.5 h-2.5" /> {g.delayed} trễ
                               </span>
                             )}

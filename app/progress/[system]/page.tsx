@@ -227,7 +227,7 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
                         {k.sheetType}
                       </span>
                       {hasDelay && (
-                        <span className="flex items-center gap-0.5 text-[10px] text-red-200 bg-red-950 px-1.5 py-0.5 rounded-full shrink-0 font-medium">
+                        <span className="flex items-center gap-0.5 text-[10px] text-orange-200 bg-orange-950 px-1.5 py-0.5 rounded-full shrink-0 font-medium">
                           <AlertTriangle className="w-2.5 h-2.5" /> {k.delayed}
                         </span>
                       )}

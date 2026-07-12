@@ -34,7 +34,7 @@ const STATUS_BAR: Record<string, string> = {
   dang_thi_cong: "bg-blue-600",
   hoan_thanh: "bg-emerald-600",
   nghiem_thu: "bg-teal-500",
-  tre: "bg-red-600",
+  tre: "bg-orange-600",
 };
 const DAY = 86400_000;
 const d2n = (s: string) => new Date(s + "T00:00:00Z").getTime();

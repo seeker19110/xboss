@@ -2426,7 +2426,7 @@ function PkgGrid({
                           title="Nguyên nhân trễ — giúp PM thống kê và xử lý"
                           className={`text-[10px] rounded px-1 py-0.5 outline-none border max-w-[110px] ${
                             t.delayReason
-                              ? "bg-red-950 border-red-900 text-red-200"
+                              ? "bg-orange-950 border-orange-900 text-orange-200"
                               : "bg-zinc-800 border-zinc-700 text-zinc-300"
                           }`}
                         >

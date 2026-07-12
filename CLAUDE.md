@@ -130,7 +130,7 @@ Làm việc với vai trò **chuyên gia thiết kế** — giao diện phải �
 
 - **Dark-first**: viết class Tailwind theo chế độ tối; chế độ sáng **tự đảo màu** qua override biến CSS trong `app/globals.css` (`html.light`). **Không dùng biến thể `dark:` và không hardcode mã hex** trong component — nếu không sẽ vỡ cơ chế đảo màu.
 - Dùng thang **`zinc`** cho nền/chữ/viền và màu nhấn ở mức **`-300`/`-400`** (emerald/sky/amber/violet/rose/red...); light mode đã làm đậm các mức này cho đủ tương phản.
-- Màu trạng thái nhất quán theo enum `lib/status.ts` (vd `tre` = đỏ/rose, `hoan_thanh`/`nghiem_thu` = xanh) — dùng cùng bảng màu ở mọi nơi (badge, biểu đồ, heatmap).
+- Màu trạng thái nhất quán theo enum `lib/status.ts` (vd `tre` = cam, `hoan_thanh`/`nghiem_thu` = xanh) — dùng cùng bảng màu ở mọi nơi (badge, biểu đồ, heatmap).
 - Theme lưu ở `localStorage('xboss_theme')`, chuyển bằng `ThemeToggle`.
 
 **Thư viện & component:**

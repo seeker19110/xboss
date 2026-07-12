@@ -194,7 +194,7 @@ function TaskCard({
         <span
           className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full mt-0.5 ${
             variant === "overdue"
-              ? "bg-red-950 text-red-200"
+              ? "bg-orange-950 text-orange-200"
               : variant === "due_soon"
                 ? "bg-amber-950 text-amber-200"
                 : "bg-sky-950 text-sky-200"
@@ -502,8 +502,8 @@ export default function NotificationsPage() {
       label: "Quá hạn",
       icon: <AlertTriangle className="w-4 h-4" />,
       count: overdue.length,
-      iconActiveClass: "text-red-200",
-      bgActiveClass: "bg-red-700 text-on-accent",
+      iconActiveClass: "text-orange-200",
+      bgActiveClass: "bg-orange-700 text-on-accent",
     },
     {
       key: "due_soon",
