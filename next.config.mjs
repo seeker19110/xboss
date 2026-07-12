@@ -1,3 +1,5 @@
+import { withSentryConfig } from "@sentry/nextjs";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Cho phép deploy.sh build vào thư mục tạm rồi swap atomic vào ".next" thật —
@@ -58,4 +60,9 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+// Sourcemap upload cần SENTRY_AUTH_TOKEN (secret riêng org/project trên Sentry, người vận
+// hành tự cấu hình khi cần) — tắt mặc định để `next build` không phụ thuộc secret đó.
+export default withSentryConfig(nextConfig, {
+  silent: true,
+  sourcemaps: { disable: true },
+});

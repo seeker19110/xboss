@@ -11,6 +11,7 @@ XBoss — web app quản lý tiến độ thi công MEP/ACMV (dự án TT AVIO T
 - `PROJECT.md` — _cái gì_ cần xây (vấn đề, MVP, schema, kiến trúc, DoD), viết ngược từ code. **Đọc trước việc liên quan tính năng/thiết kế.**
 - `PROGRESS.md` — đang ở giai đoạn nào, đã xong/đang làm/tiếp theo, **nợ kỹ thuật**. Cập nhật sau mỗi mốc.
 - `docs/adr/` — các quyết định kỹ thuật. **Đọc trước khi đề xuất thay đổi kiến trúc lớn** (vd đừng đề xuất thêm Supabase/ORM/vitest — đã có ADR giải thích lý do giữ hiện trạng).
+- `docs/audit.md` — **tiêu chuẩn audit toàn diện của XBoss** (bảo mật/phân quyền, logic nghiệp vụ & toàn vẹn dữ liệu, UI/UX & a11y) — checklist đúc kết từ các lớp lỗi thật đã lặp lại nhiều lần trong dự án. **Đọc trước khi tự audit/review diện rộng**, và bắt buộc rà theo mục "Vùng rủi ro cao" khi PR chạm `lib/recompute.ts`, `lib/auth.ts`, `lib/material-sync.ts`, `lib/boq.ts` hoặc route tài chính/nghiệm thu.
 - `docs/framework/` — bộ khung quy trình/chất lượng (tham khảo dài, đọc đúng phần cần). Áp dụng brownfield theo `AP-DUNG-vao-du-an-co-san.md`.
 - `docs/ops/` — vận hành sự cố production (`incident-response.md`).
 
@@ -53,6 +54,7 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy lint + typecheck + test +
 - `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` — (tuỳ chọn) gửi báo cáo trễ hạn hằng ngày qua Telegram, song song với email SMTP.
 - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` — (tuỳ chọn) Web Push; sinh key bằng `npx web-push generate-vapid-keys`. Thiếu key → nút bật push tự ẩn, mọi hàm gửi trong `lib/push.ts` là no-op.
 - `GOOGLE_SERVICE_ACCOUNT_JSON` (hoặc cặp `GOOGLE_SA_EMAIL` + `GOOGLE_SA_PRIVATE_KEY`) + `GOOGLE_SHEET_ID` + `GOOGLE_SHEET_TAB` — (tuỳ chọn) đồng bộ hai chiều bảng vật tư ↔ Google Sheet. Thiếu cấu hình → `lib/google-sheets.ts` throw fail-fast khi gọi sync (build vẫn chạy).
+- `SENTRY_DSN` — (tuỳ chọn) theo dõi lỗi production qua Sentry (`instrumentation.ts` + `sentry.server.config.ts`/`sentry.edge.config.ts`, xem `docs/audit.md` §10). Thiếu → SDK tự `enabled: false`, không gửi gì, không ảnh hưởng build/dev.
 
 ## Kiến trúc
 
