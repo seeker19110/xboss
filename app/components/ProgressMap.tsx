@@ -44,23 +44,29 @@ type TowerRow = { id: number; name: string };
 // Viền đỏ = có task trễ (không đổi màu nền). Hằng số dưới đây là nguồn duy nhất
 // cho cả ô bảng (current/history) lẫn chú thích LEGEND — đổi ở đây là đổi toàn bộ. ──
 
-// Mức -100 (không phải -300/-400) CỐ Ý: theme sáng ghi đè các mã -300/-400 sang tông
-// đậm hơn (dành cho CHỮ trên nền sáng, xem html.light trong globals.css) — dùng làm NỀN
-// ô kèm chữ tối text-blue-900 sẽ ra tối-trên-tối, vỡ tương phản (bắt bởi axe trong e2e).
-// -100 không nằm trong danh sách bị ghi đè nên luôn giữ tông nhạt ổn định ở mọi theme.
+// Mọi mức bên dưới CỐ Ý chỉ dùng -50..-200 hoặc -500..-950 (không dùng -300/-400): hai
+// mã đó BỊ theme sáng ghi đè sang tông đậm để dùng làm CHỮ (xem html.light trong
+// globals.css) — dùng làm NỀN sẽ đổi màu bất ngờ giữa 2 theme + có thể vỡ tương phản với
+// chữ ghép cùng. Các mã còn lại không bị ghi đè nên giữ đúng tông gốc ở mọi theme:
+// BG_HIGH dùng nền đậm -800 + chữ sáng -100 (chip đặc, cùng pattern vehicles/payments/
+// materials). BG_LOW/BG_VLOW dùng nền tươi -500 (giống ảnh mẫu) + chữ tối. BG_LOW dùng
+// text-orange-950 (đủ tương phản); BG_VLOW đo bằng axe không đạt 4.5:1 với text-red-950
+// (đỏ-950 đã là tông đỏ tối nhất) nên đổi sang text-neutral-950 (gần đen, không nằm
+// trong danh sách bị ghi đè theo theme, tương phản dư ngưỡng). BG_MID dùng nền nhạt -200
+// + chữ tối text-blue-900.
 const BG_DONE = "bg-emerald-600"; // 100%
-const BG_HIGH = "bg-green-100"; // 80–99%
-const BG_MID = "bg-yellow-100"; // 50–80%
-const BG_LOW = "bg-orange-100"; // 20–50%
-const BG_VLOW = "bg-red-100"; // <20%
+const BG_HIGH = "bg-green-800"; // 80–99%
+const BG_MID = "bg-amber-200"; // 50–80%
+const BG_LOW = "bg-orange-500"; // 20–50%
+const BG_VLOW = "bg-red-500"; // <20%
 const BG_ZERO = "bg-zinc-800"; // 0%
 
 function bucketClass(p: number): string {
   if (p >= 0.999) return `${BG_DONE} text-on-accent`;
-  if (p >= 0.8) return `${BG_HIGH} text-blue-900`;
+  if (p >= 0.8) return `${BG_HIGH} text-green-100`;
   if (p >= 0.5) return `${BG_MID} text-blue-900`;
-  if (p >= 0.2) return `${BG_LOW} text-blue-900`;
-  if (p > 0) return `${BG_VLOW} text-blue-900`;
+  if (p >= 0.2) return `${BG_LOW} text-orange-950`;
+  if (p > 0) return `${BG_VLOW} text-neutral-950`;
   return `${BG_ZERO} text-zinc-300`;
 }
 function cellClass(p: number, delayed: number): string {
