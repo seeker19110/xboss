@@ -4,6 +4,7 @@ node_modules/
 .next-old/
 .env.local
 .env*.local
+.env.sentry-build-plugin
 *.log
 .DS_Store
 /build
