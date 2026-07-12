@@ -112,6 +112,47 @@ export async function PUT(req: NextRequest) {
 
   const note = typeof body.note === "string" ? body.note.trim() || null : null;
 
+  // Thông tin bàn giao (tuỳ chọn) — nhà thầu bàn giao/nhận (suppliers), công tác bàn giao
+  // chuyển bước (construction_stages) và đại diện 2 bên. Validate FK tồn tại như stageId ở trên.
+  async function optionalRef(
+    value: unknown,
+    table: "suppliers" | "construction_stages",
+    label: string,
+  ): Promise<number | null | NextResponse> {
+    if (value === null || value === undefined || value === "") return null;
+    const n = Number(value);
+    if (!Number.isInteger(n))
+      return NextResponse.json({ error: `${label} không hợp lệ` }, { status: 422 });
+    const row = await queryOne<{ id: number }>(`SELECT id FROM ${table} WHERE id = ?`, n);
+    if (!row)
+      return NextResponse.json({ error: `Không tìm thấy ${label.toLowerCase()}` }, { status: 404 });
+    return n;
+  }
+
+  const outgoingSupplierId = await optionalRef(
+    body.outgoingSupplierId,
+    "suppliers",
+    "Nhà thầu bàn giao",
+  );
+  if (outgoingSupplierId instanceof NextResponse) return outgoingSupplierId;
+  const incomingSupplierId = await optionalRef(
+    body.incomingSupplierId,
+    "suppliers",
+    "Nhà thầu nhận bàn giao",
+  );
+  if (incomingSupplierId instanceof NextResponse) return incomingSupplierId;
+  const transitionStageId = await optionalRef(
+    body.transitionStageId,
+    "construction_stages",
+    "Công tác bàn giao chuyển bước",
+  );
+  if (transitionStageId instanceof NextResponse) return transitionStageId;
+
+  const outgoingRepName =
+    typeof body.outgoingRepName === "string" ? body.outgoingRepName.trim() || null : null;
+  const incomingRepName =
+    typeof body.incomingRepName === "string" ? body.incomingRepName.trim() || null : null;
+
   const id = await upsertFloorStageFront(
     floorLabel,
     stageId,
@@ -120,6 +161,11 @@ export async function PUT(req: NextRequest) {
       handedOverAt: handedOverAt ?? null,
       plannedReceivedAt: plannedReceivedAt ?? null,
       note,
+      outgoingSupplierId,
+      incomingSupplierId,
+      transitionStageId,
+      outgoingRepName,
+      incomingRepName,
     },
     user.id,
   );

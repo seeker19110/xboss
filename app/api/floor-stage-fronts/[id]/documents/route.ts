@@ -13,7 +13,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const DOC_KINDS = ["handover", "completion", "other"] as const;
+const DOC_KINDS = ["handover", "completion", "debris", "other"] as const;
 type DocKind = (typeof DOC_KINDS)[number];
 
 // GET /api/floor-stage-fronts/:id/documents — biên bản bàn giao/ảnh hoàn thiện của 1 ô

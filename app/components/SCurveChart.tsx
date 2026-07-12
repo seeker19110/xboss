@@ -14,7 +14,6 @@ import {
 import { appAlert, appPrompt } from "@/app/components/dialogs";
 import EditableText from "@/app/components/EditableText";
 import { formatDateVN } from "@/lib/date";
-import { diffColor } from "@/lib/chartColor";
 
 type Point = { date: string; planned: number | null; actual: number | null };
 type Data = { points: Point[]; sheets: string[]; today?: string };
@@ -85,14 +84,6 @@ export default function SCurveChart({ system }: { system?: string }) {
 
   if (!data || data.points.length < 2) return null;
 
-  // Stop màu cho đường "Thực tế" theo độ lệch so với "Kế hoạch" tại từng điểm: thực tế
-  // vượt/đúng kế hoạch → xanh, chậm nhẹ → vàng, chậm càng nhiều → càng ngả đỏ (lib/chartColor).
-  const n = data.points.length;
-  const gradientStops = data.points.map((p, i) => {
-    const diff = p.actual != null && p.planned != null ? p.actual - p.planned : null;
-    return { offset: `${(i / (n - 1)) * 100}%`, color: diffColor(diff) };
-  });
-
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl mb-8">
       <div className="flex items-center gap-2 flex-wrap p-4 border-b border-zinc-800">
@@ -139,19 +130,12 @@ export default function SCurveChart({ system }: { system?: string }) {
         <p className="text-xs text-zinc-400 w-full">
           {baseline
             ? "Đường kế hoạch theo ngày đã chốt trong baseline — thấy được độ lệch so với kế hoạch gốc kể cả khi đã dời ngày"
-            : "Đường kế hoạch nội suy từ ngày bắt đầu/kết thúc của từng task · đường thực tế tái dựng từ lịch sử cập nhật, màu theo độ lệch so với kế hoạch"}
+            : "Đường kế hoạch (đỏ) nội suy từ ngày bắt đầu/kết thúc của từng task · đường thực tế (xanh) tái dựng từ lịch sử cập nhật"}
         </p>
       </div>
       <div className="p-4" style={{ width: "100%", height: 260 }}>
         <ResponsiveContainer>
           <LineChart data={data.points} margin={{ top: 8, right: 8, bottom: 8, left: -16 }}>
-            <defs>
-              <linearGradient id="scurveActualStroke" x1="0" y1="0" x2="1" y2="0">
-                {gradientStops.map((s, i) => (
-                  <stop key={i} offset={s.offset} stopColor={s.color} />
-                ))}
-              </linearGradient>
-            </defs>
             <XAxis
               dataKey="date"
               stroke="var(--color-zinc-500)"
@@ -181,7 +165,7 @@ export default function SCurveChart({ system }: { system?: string }) {
             <Line
               type="monotone"
               dataKey="planned"
-              stroke="var(--color-zinc-500)"
+              stroke="var(--color-red-400)"
               strokeDasharray="6 4"
               dot={false}
               strokeWidth={2}
@@ -190,7 +174,7 @@ export default function SCurveChart({ system }: { system?: string }) {
             <Line
               type="monotone"
               dataKey="actual"
-              stroke="url(#scurveActualStroke)"
+              stroke="var(--color-sky-400)"
               dot={false}
               strokeWidth={2.5}
             />

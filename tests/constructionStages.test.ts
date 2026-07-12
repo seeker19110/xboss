@@ -34,6 +34,11 @@ function mkFront(
     receivedAt: null,
     plannedReceivedAt,
     note: null,
+    outgoingSupplierId: null,
+    incomingSupplierId: null,
+    transitionStageId: null,
+    outgoingRepName: null,
+    incomingRepName: null,
     updatedAt: "",
   };
 }
