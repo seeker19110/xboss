@@ -10,6 +10,7 @@ import { useEditMode } from "@/app/components/useEditMode";
 import EditModeToggle from "@/app/components/EditModeToggle";
 import SystemFilter from "@/app/components/SystemFilter";
 import { fetchMe, redirectToLogin } from "@/app/lib/me";
+import { formatDateVN } from "@/lib/date";
 
 type Bar = {
   id: number;
@@ -37,7 +38,7 @@ const STATUS_BAR: Record<string, string> = {
 };
 const DAY = 86400_000;
 const d2n = (s: string) => new Date(s + "T00:00:00Z").getTime();
-const fmt = (s: string) => new Date(s).toLocaleDateString("vi-VN");
+const fmt = (s: string) => formatDateVN(s);
 
 export default function GanttPage() {
   const [bars, setBars] = useState<Bar[] | null>(null);

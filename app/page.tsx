@@ -26,8 +26,6 @@ import { formatDateVN } from "@/lib/date";
 import { systemColorClasses } from "@/lib/systemColors";
 import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
 import type {
-  CashflowMonth,
-  CpiBlock,
   QualityBlock,
   VoBlock,
   WorkfrontBlock,
@@ -106,8 +104,6 @@ export default function Dashboard() {
     delayedTasks: DelayedTask[];
     kpi: KPI[];
     totalDelayed: number;
-    cashflow: CashflowMonth[] | null;
-    cpi: CpiBlock | null;
     quality: QualityBlock;
     vo: VoBlock | null;
     workfront: WorkfrontBlock | null;
@@ -400,7 +396,7 @@ export default function Dashboard() {
                     đủ tương phản AA trên nền đã sáng ở theme sáng (đo axe: 2.93 < 4.5). Dùng
                     token zinc thích ứng cho chữ (đảm bảo AA mọi theme), giữ sắc đỏ ở icon/nền/viền. */}
                 <p className="text-xs text-zinc-400 uppercase tracking-wider font-medium mb-0.5">
-                  Tổng công việc đang trễ
+                  Tổng số tầng đang trễ
                 </p>
                 <p className="text-4xl font-bold leading-none">{data?.totalDelayed ?? 0}</p>
               </div>
@@ -423,7 +419,10 @@ export default function Dashboard() {
                       {k.sheetType}
                     </span>
                     {hasDelay && (
-                      <span className="flex items-center gap-0.5 text-[10px] text-red-200 bg-red-950 px-1.5 py-0.5 rounded-full shrink-0 font-medium">
+                      <span
+                        title={`${k.delayed} tầng đang trễ`}
+                        className="flex items-center gap-0.5 text-[10px] text-red-200 bg-red-950 px-1.5 py-0.5 rounded-full shrink-0 font-medium"
+                      >
                         <AlertTriangle className="w-2.5 h-2.5" /> {k.delayed}
                       </span>
                     )}
@@ -492,17 +491,14 @@ export default function Dashboard() {
         {/* ── Bản đồ tiến độ Tháp A (tầng × hệ + lịch sử) ── */}
         <ProgressMap />
 
-        {/* ── M9: KPI tiền/chất lượng + so sánh chéo hệ + dòng tiền ── */}
+        {/* ── M9: KPI chất lượng + so sánh chéo hệ ── */}
         {data && (
           <DashboardExtCards
-            cashflow={data.cashflow}
-            cpi={data.cpi}
             quality={data.quality}
             vo={data.vo}
             workfront={data.workfront}
             bySystem={data.bySystem}
             approvals={data.approvals}
-            isEngineer={me?.role === "engineer"}
           />
         )}
 

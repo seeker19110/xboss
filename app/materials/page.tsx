@@ -37,6 +37,7 @@ import PurchaseRequestsTab from "./_components/PurchaseRequestsTab";
 import ReportsTab from "./_components/ReportsTab";
 import { Skeleton } from "@/app/components/Skeleton";
 import SpreadsheetGrid, { type GridColumn, type GridEdit } from "@/app/components/SpreadsheetGrid";
+import { formatDateTimeVN } from "@/lib/date";
 import { Table2, RefreshCw } from "lucide-react";
 
 // Cache in-memory ngoài component — sống qua tab-switch, mất khi reload trang.
@@ -1730,7 +1731,7 @@ function MaterialHistoryModal({
               {items.map((t) => (
                 <tr key={t.id} className="border-b border-zinc-800/50">
                   <td className="py-1.5 pr-2 text-zinc-400 whitespace-nowrap">
-                    {new Date(t.createdAt).toLocaleString("vi-VN")}
+                    {formatDateTimeVN(t.createdAt)}
                   </td>
                   <td className="py-1.5 pr-2 text-zinc-400 whitespace-nowrap">
                     {TX_TYPE_LABEL[t.type ?? "dieu_chinh"] ?? "Điều chỉnh"}

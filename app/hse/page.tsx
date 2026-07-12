@@ -7,7 +7,7 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { formatDateVN } from "@/lib/date";
+import { formatDateVN, formatDateTimeVN } from "@/lib/date";
 
 type HseKind = "inspection" | "toolbox" | "incident" | "near_miss" | "permit";
 const HSE_KIND_LABEL: Record<HseKind, string> = {
@@ -240,9 +240,8 @@ export default function HsePage() {
                   </div>
                   <p className="text-sm text-zinc-300">{r.description}</p>
                   <p className="text-xs text-zinc-500 mt-1">
-                    {r.floorLabel ?? "—"} ·{" "}
-                    {r.permitFrom ? new Date(r.permitFrom).toLocaleString("vi-VN") : "—"} →{" "}
-                    {r.permitTo ? new Date(r.permitTo).toLocaleString("vi-VN") : "—"}
+                    {r.floorLabel ?? "—"} · {r.permitFrom ? formatDateTimeVN(r.permitFrom) : "—"} →{" "}
+                    {r.permitTo ? formatDateTimeVN(r.permitTo) : "—"}
                   </p>
                 </div>
               );

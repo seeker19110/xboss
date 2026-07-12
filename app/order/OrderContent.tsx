@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useDeferredValue, useMemo } from "rea
 import { Printer, ArrowLeft, Plus, X } from "lucide-react";
 import SpreadsheetGrid, { type GridColumn, type GridEdit } from "@/app/components/SpreadsheetGrid";
 import EditModeToggle from "@/app/components/EditModeToggle";
+import { formatDateVN } from "@/lib/date";
 
 type Supplier = {
   id: number;
@@ -102,7 +103,7 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
     phone: "",
     subcon: "",
   });
-  const [orderDate, setOrderDate] = useState(() => new Date().toLocaleDateString("vi-VN"));
+  const [orderDate, setOrderDate] = useState(() => formatDateVN(new Date()));
   const [docTitle, setDocTitle] = useState("ĐƠN ĐẶT HÀNG");
   const [delivery, setDelivery] = useState({
     time: "",

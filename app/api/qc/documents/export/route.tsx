@@ -4,6 +4,7 @@ import { getCurrentUser, CAN } from "@/lib/auth";
 import { DOC_CATEGORY_LABEL, DOC_CATEGORIES, type DocCategory } from "@/lib/qaqc";
 import ReactPDF, { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/pdf-fonts";
+import { formatDateVN } from "@/lib/date";
 
 export const dynamic = "force-dynamic";
 registerVietnameseFonts();
@@ -32,8 +33,7 @@ type DocRow = {
 };
 
 function fmt(v: string) {
-  const d = new Date(v);
-  return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("vi-VN");
+  return formatDateVN(v);
 }
 
 function IndexDoc({
@@ -136,7 +136,7 @@ export async function GET(req: NextRequest) {
   );
 
   const project = await queryOne<{ name: string }>(`SELECT name FROM projects ORDER BY id LIMIT 1`);
-  const today = new Date().toLocaleDateString("vi-VN");
+  const today = formatDateVN(new Date());
 
   const stream = await ReactPDF.renderToStream(
     <IndexDoc

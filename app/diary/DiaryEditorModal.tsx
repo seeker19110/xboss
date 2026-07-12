@@ -4,7 +4,7 @@ import { Plus, Trash2, Lock, Unlock, Download, RotateCcw, X } from "lucide-react
 import { Modal, appConfirm } from "@/app/components/dialogs";
 import EmptyState from "@/app/components/EmptyState";
 import { showToast } from "@/app/components/Toast";
-import { formatDateDMY } from "@/lib/date";
+import { formatDateDMY, formatDateTimeVN } from "@/lib/date";
 
 type ManpowerRow = { crew: string; headcount: string; note: string };
 type Diary = {
@@ -193,7 +193,7 @@ export default function DiaryEditorModal({
             <div className="bg-emerald-950 border border-emerald-800 rounded-lg px-3 py-2 text-sm text-emerald-200 flex items-center gap-2">
               <Lock className="w-4 h-4 shrink-0" />
               Đã khoá bởi {diary?.lockedByName ?? "—"} lúc{" "}
-              {diary?.lockedAt ? new Date(diary.lockedAt).toLocaleString("vi-VN") : "—"}
+              {diary?.lockedAt ? formatDateTimeVN(diary.lockedAt) : "—"}
             </div>
           )}
 

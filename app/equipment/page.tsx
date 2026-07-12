@@ -7,7 +7,7 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { formatDateVN } from "@/lib/date";
+import { formatDateVN, formatDateTimeVN } from "@/lib/date";
 
 type EquipmentCondition = "good" | "maintenance" | "broken" | "retired";
 const EQUIPMENT_CONDITION_LABEL: Record<EquipmentCondition, string> = {
@@ -512,7 +512,7 @@ function EquipmentDetailModal({
                   {l.toCrew && <span className="text-zinc-400"> → {l.toCrew}</span>}
                   {l.toLocation && <span className="text-zinc-400"> · {l.toLocation}</span>}
                   <p className="text-xs text-zinc-500">
-                    {l.loggerName ?? "—"} · {new Date(l.createdAt).toLocaleString("vi-VN")}
+                    {l.loggerName ?? "—"} · {formatDateTimeVN(l.createdAt)}
                   </p>
                   {l.note && <p className="text-xs text-zinc-400">{l.note}</p>}
                 </li>

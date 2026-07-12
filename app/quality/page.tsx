@@ -21,7 +21,7 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appAlert, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, redirectToLogin, type Me } from "@/app/lib/me";
-import { todayISO } from "@/lib/date";
+import { todayISO, formatDateVN, formatDateTimeVN } from "@/lib/date";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -1320,7 +1320,7 @@ function RequestsTab({
                 <div className="min-w-0">
                   <p className="font-semibold text-sm">{r.code}</p>
                   <p className="text-[11px] text-zinc-400">
-                    {r.taskCount} task · hẹn {new Date(r.scheduledAt).toLocaleString("vi-VN")}
+                    {r.taskCount} task · hẹn {formatDateTimeVN(r.scheduledAt)}
                     {r.createdByName ? ` · người gửi: ${r.createdByName}` : ""}
                   </p>
                   {r.note && <p className="text-xs text-zinc-300 mt-1">{r.note}</p>}
@@ -1681,7 +1681,7 @@ function DocumentsTab({
                 <p className="text-[11px] text-zinc-400 mt-1">
                   {d.sheetType ?? "—"} · {d.floorLabel ?? "—"} ·{" "}
                   {d.caption || d.originalName || "Tài liệu"} · {d.uploaderName ?? "—"} ·{" "}
-                  {new Date(d.createdAt).toLocaleDateString("vi-VN")}
+                  {formatDateVN(d.createdAt)}
                 </p>
               </div>
               <a

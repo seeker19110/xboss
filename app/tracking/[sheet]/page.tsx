@@ -46,6 +46,7 @@ import { fetchMe } from "@/app/lib/me";
 import { sortFloorsAsc } from "@/lib/floors";
 import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
 import { StatusBadge } from "@/app/components/StatusBadge";
+import { formatDateTimeVN } from "@/lib/date";
 
 type Task = {
   id: number;
@@ -2785,7 +2786,7 @@ function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => void })
                       </p>
                     )}
                     <p className="text-[10px] text-zinc-500 truncate">
-                      {p.uploaderName ?? "—"} · {new Date(p.createdAt).toLocaleString("vi-VN")}
+                      {p.uploaderName ?? "—"} · {formatDateTimeVN(p.createdAt)}
                     </p>
                   </div>
                   {canDelete(p) && (
@@ -3081,7 +3082,7 @@ function CommentsModal({ task, onClose }: { task: GridTask; onClose: () => void 
                   {ROLE_BADGE[c.userRole] ?? c.userRole}
                 </span>
               )}
-              <span className="text-zinc-600">{new Date(c.createdAt).toLocaleString("vi-VN")}</span>
+              <span className="text-zinc-600">{formatDateTimeVN(c.createdAt)}</span>
               {canDelete(c) && (
                 <button
                   onClick={() => remove(c)}
@@ -3178,7 +3179,7 @@ function HistoryModal({ task, onClose }: { task: GridTask; onClose: () => void }
                     )}
                   </p>
                   <p className="text-xs text-zinc-500">
-                    {h.changedBy ?? "—"} · {new Date(h.changedAt).toLocaleString("vi-VN")}
+                    {h.changedBy ?? "—"} · {formatDateTimeVN(h.changedAt)}
                     {h.note && <span className="text-zinc-600"> · {h.note}</span>}
                   </p>
                 </li>

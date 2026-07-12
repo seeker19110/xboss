@@ -3,6 +3,7 @@ import { queryOne, query } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import ReactPDF, { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/pdf-fonts";
+import { formatDateVN, formatDateTimeVN } from "@/lib/date";
 
 export const dynamic = "force-dynamic";
 registerVietnameseFonts();
@@ -43,9 +44,7 @@ type TaskRow = { code: string; name: string; sheetType: string | null };
 type Project = { name: string; investor: string | null; contractor: string | null };
 
 function fmtDateTime(v: string) {
-  const d = new Date(v);
-  if (isNaN(d.getTime())) return "—";
-  return `${d.toLocaleDateString("vi-VN")} ${d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}`;
+  return formatDateTimeVN(v);
 }
 
 function YcntDoc({
@@ -178,7 +177,7 @@ export async function GET(
     `SELECT name, investor, contractor FROM projects ORDER BY id LIMIT 1`,
   )) ?? { name: "XBoss", investor: null, contractor: null };
 
-  const today = new Date().toLocaleDateString("vi-VN");
+  const today = formatDateVN(new Date());
 
   const stream = await ReactPDF.renderToStream(
     <YcntDoc reqRow={reqRow} tasks={tasks} project={project} today={today} />,

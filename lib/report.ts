@@ -25,6 +25,25 @@ export type DailyReport = {
 const DELAY_COND = `t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_percent < 1
         AND t.status NOT IN ('hoan_thanh','nghiem_thu')`;
 
+// Quyết 2026-07-11: đơn vị đếm "trễ" trong các số liệu tổng hợp (KPI/tổng số) đổi từ
+// TASK sang TẦNG — 1 tầng (floor_label) trong 1 sheet tính trễ nếu có ≥1 task trễ,
+// bất kể tầng đó có bao nhiêu task trễ. Danh sách chi tiết (newDelayed/topDelayed/
+// dueSoon) vẫn liệt kê theo từng task (cần biết đúng task nào để xử lý).
+function delayedFloorKey(r: DelayedRow): string {
+  return `${r.sheetType}::${r.floorLabel ?? ""}`;
+}
+function countDelayedFloors(rows: DelayedRow[]): number {
+  return new Set(rows.map(delayedFloorKey)).size;
+}
+function delayedFloorCountBySheet(rows: DelayedRow[]): Map<string, number> {
+  const bySheet = new Map<string, Set<string>>();
+  for (const r of rows) {
+    if (!bySheet.has(r.sheetType)) bySheet.set(r.sheetType, new Set());
+    bySheet.get(r.sheetType)!.add(r.floorLabel ?? "");
+  }
+  return new Map([...bySheet.entries()].map(([sheetType, set]) => [sheetType, set.size]));
+}
+
 export async function buildDailyReport(): Promise<DailyReport> {
   const today = todayISO();
   const yesterday = daysFromTodayISO(-1);
@@ -51,23 +70,26 @@ export async function buildDailyReport(): Promise<DailyReport> {
     soon,
   );
 
-  const kpi = await query<KpiRow>(
+  const kpiRaw = await query<{ sheetType: string; total: number; avgProgress: number }>(
     `SELECT st.code AS "sheetType", COUNT(t.id) AS total,
-            COALESCE(AVG(t.progress_percent), 0) AS "avgProgress",
-            COALESCE(SUM(CASE WHEN ${DELAY_COND} THEN 1 ELSE 0 END), 0) AS delayed
+            COALESCE(AVG(t.progress_percent), 0) AS "avgProgress"
        FROM sheet_types st
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
       GROUP BY st.id, st.code ORDER BY st.id`,
-    today,
   );
+  const delayedBySheet = delayedFloorCountBySheet(all);
+  const kpi: KpiRow[] = kpiRaw.map((k) => ({
+    ...k,
+    delayed: delayedBySheet.get(k.sheetType) ?? 0,
+  }));
 
   const project = await queryOne<{ name: string }>(`SELECT name FROM projects ORDER BY id LIMIT 1`);
 
   return {
     date: today,
     projectName: project?.name ?? null,
-    totalDelayed: all.length,
+    totalDelayed: countDelayedFloors(all),
     newDelayed,
     topDelayed,
     dueSoon,
@@ -236,9 +258,7 @@ export async function buildWeeklyReport(): Promise<WeeklyReport> {
     if (!bySheet.has(t.sheetType)) bySheet.set(t.sheetType, []);
     bySheet.get(t.sheetType)!.push(t);
   }
-  const delayedCount = new Map<string, number>();
-  for (const d of allDelayed)
-    delayedCount.set(d.sheetType, (delayedCount.get(d.sheetType) ?? 0) + 1);
+  const delayedCount = delayedFloorCountBySheet(allDelayed);
 
   const kpi: WeeklyKpiRow[] = [...bySheet.entries()].map(([sheetType, list]) => ({
     sheetType,
@@ -258,7 +278,7 @@ export async function buildWeeklyReport(): Promise<WeeklyReport> {
     completed,
     newDelayed,
     topDelayed: allDelayed.slice(0, 15),
-    totalDelayed: allDelayed.length,
+    totalDelayed: countDelayedFloors(allDelayed),
   };
 }
 
@@ -285,12 +305,12 @@ function rowsHtml(rows: DelayedRow[]): string {
 export function reportToTelegramText(r: DailyReport, appUrl?: string): string {
   const lines: string[] = [
     `🏗️ <b>XBoss — Báo cáo trễ hạn ${r.date}</b>`,
-    `Tổng cộng <b>${r.totalDelayed}</b> việc đang trễ · <b>${r.newDelayed.length}</b> mới quá hạn trong 24h`,
+    `Tổng cộng <b>${r.totalDelayed}</b> tầng đang trễ · <b>${r.newDelayed.length}</b> việc mới quá hạn trong 24h`,
     "",
     "📊 <b>KPI theo hệ</b>",
     ...r.kpi.map(
       (k) =>
-        `· ${esc(k.sheetType)}: ${pct(k.avgProgress)} — ${k.delayed > 0 ? `⚠ ${k.delayed} trễ` : "✓ không trễ"}`,
+        `· ${esc(k.sheetType)}: ${pct(k.avgProgress)} — ${k.delayed > 0 ? `⚠ ${k.delayed} tầng trễ` : "✓ không trễ"}`,
     ),
   ];
   if (r.newDelayed.length) {
@@ -361,7 +381,7 @@ export function weeklyToTelegramText(r: WeeklyReport, appUrl?: string): string {
     "📊 <b>Tiến độ theo hệ (so với tuần trước)</b>",
     ...r.kpi.map(
       (k) =>
-        `· ${esc(k.sheetType)}: ${pct(k.avgProgress)} (${trend(k.avgProgressPrev, k.avgProgress)})${k.delayed > 0 ? ` — ⚠ ${k.delayed} trễ` : ""}`,
+        `· ${esc(k.sheetType)}: ${pct(k.avgProgress)} (${trend(k.avgProgressPrev, k.avgProgress)})${k.delayed > 0 ? ` — ⚠ ${k.delayed} tầng trễ` : ""}`,
     ),
     "",
     `✅ <b>Hoàn thành trong tuần: ${r.completed.length}</b>`,
@@ -375,7 +395,7 @@ export function weeklyToTelegramText(r: WeeklyReport, appUrl?: string): string {
         `· <code>${esc(t.code)}</code> ${esc(t.name)} — hạn ${t.endDate} (${pct(t.progressPercent)})`,
       );
   }
-  lines.push("", `Tổng cộng <b>${r.totalDelayed}</b> việc đang trễ`);
+  lines.push("", `Tổng cộng <b>${r.totalDelayed}</b> tầng đang trễ`);
   if (appUrl) lines.push(`<a href="${appUrl}">→ Mở XBoss Dashboard</a>`);
   return lines.join("\n").slice(0, 4000);
 }
@@ -394,11 +414,11 @@ export function weeklyToHtml(r: WeeklyReport, appUrl?: string): string {
   return `<!doctype html><html><body style="font-family:Segoe UI,Arial,sans-serif;color:#222;max-width:720px;margin:0 auto">
   <h2 style="margin:16px 0 4px">📅 XBoss — Báo cáo tuần ${r.weekFrom} → ${r.date}</h2>
   <p style="margin:0 0 16px;color:#666">${esc(r.projectName ?? "XBoss")} · <b style="color:#16a34a">${r.completed.length}</b> hoàn thành trong tuần
-  · <b style="color:#c00">${r.newDelayed.length}</b> trễ mới · tổng ${r.totalDelayed} đang trễ</p>
+  · <b style="color:#c00">${r.newDelayed.length}</b> việc trễ mới · tổng ${r.totalDelayed} tầng đang trễ</p>
 
   <h3 style="margin:16px 0 8px">📊 Tiến độ theo hệ (so với tuần trước)</h3>
   <table style="border-collapse:collapse;width:100%">
-    <tr><th ${th}>Sheet</th><th ${th}>Tổng task</th><th ${th}>Tuần trước</th><th ${th}>Hiện tại</th><th ${th}>Xu hướng</th><th ${th}>Đang trễ</th></tr>
+    <tr><th ${th}>Sheet</th><th ${th}>Tổng task</th><th ${th}>Tuần trước</th><th ${th}>Hiện tại</th><th ${th}>Xu hướng</th><th ${th}>Tầng trễ</th></tr>
     ${r.kpi
       .map(
         (k) => `<tr>
@@ -438,12 +458,12 @@ export function reportToHtml(r: DailyReport, appUrl?: string): string {
   const th = `style="padding:6px 8px;text-align:left;background:#f4f4f5;font-size:12px;color:#555"`;
   return `<!doctype html><html><body style="font-family:Segoe UI,Arial,sans-serif;color:#222;max-width:720px;margin:0 auto">
   <h2 style="margin:16px 0 4px">🏗️ XBoss — Báo cáo trễ hạn ${r.date}</h2>
-  <p style="margin:0 0 16px;color:#666">${esc(r.projectName ?? "XBoss")} · Tổng cộng <b style="color:#c00">${r.totalDelayed}</b> công việc đang trễ
-  · <b>${r.newDelayed.length}</b> mới quá hạn trong 24h</p>
+  <p style="margin:0 0 16px;color:#666">${esc(r.projectName ?? "XBoss")} · Tổng cộng <b style="color:#c00">${r.totalDelayed}</b> tầng đang trễ
+  · <b>${r.newDelayed.length}</b> việc mới quá hạn trong 24h</p>
 
   <h3 style="margin:16px 0 8px">📊 KPI theo hệ</h3>
   <table style="border-collapse:collapse;width:100%">
-    <tr><th ${th}>Sheet</th><th ${th}>Tổng task</th><th ${th}>Tiến độ TB</th><th ${th}>Đang trễ</th></tr>
+    <tr><th ${th}>Sheet</th><th ${th}>Tổng task</th><th ${th}>Tiến độ TB</th><th ${th}>Tầng trễ</th></tr>
     ${r.kpi
       .map(
         (k) => `<tr>

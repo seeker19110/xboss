@@ -10,10 +10,30 @@ export const daysFromTodayISO = (days: number) =>
   new Date(Date.now() + 7 * 3600_000 + days * 86400_000).toISOString().slice(0, 10);
 
 // Định dạng ngày kiểu vi-VN (dd/mm/yyyy) cho hiển thị, "—" khi rỗng/không hợp lệ.
-export function formatDateVN(d: string | null | undefined): string {
+// Luôn ép ngày/tháng đủ 2 chữ số (Intl "vi-VN" mặc định KHÔNG đệm 0, vd "1/7/2026") —
+// nguồn định dạng ngày dùng chung toàn app, sửa ở đây là sửa toàn cục.
+export function formatDateVN(d: string | Date | null | undefined): string {
   if (!d) return "—";
-  const dt = new Date(d);
-  return isNaN(dt.getTime()) ? "—" : dt.toLocaleDateString("vi-VN");
+  const dt = d instanceof Date ? d : new Date(d);
+  return isNaN(dt.getTime())
+    ? "—"
+    : dt.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+// Định dạng ngày giờ kiểu vi-VN (dd/mm/yyyy hh:mm) cho hiển thị, "—" khi rỗng/không hợp lệ.
+// Cùng cơ chế đệm 0 với formatDateVN — dùng cho mọi nơi hiển thị "tạo lúc/khoá lúc...".
+export function formatDateTimeVN(d: string | Date | null | undefined): string {
+  if (!d) return "—";
+  const dt = d instanceof Date ? d : new Date(d);
+  return isNaN(dt.getTime())
+    ? "—"
+    : dt.toLocaleString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
 }
 
 // Định dạng nhanh chuỗi ISO "YYYY-MM-DD" → "DD/MM/YYYY" bằng tách chuỗi (không

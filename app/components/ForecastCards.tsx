@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { TrendingUp } from "lucide-react";
+import { formatDateVN } from "@/lib/date";
 
 type Forecast = {
   sheetType: string;
@@ -12,7 +13,7 @@ type Forecast = {
   lateDays: number | null;
 };
 
-const fmt = (s: string | null) => (s ? new Date(s).toLocaleDateString("vi-VN") : "—");
+const fmt = (s: string | null) => formatDateVN(s);
 
 export default function ForecastCards({ system }: { system?: string }) {
   const [data, setData] = useState<{ forecast: Forecast[]; windowDays: number } | null>(null);
