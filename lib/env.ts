@@ -6,7 +6,9 @@
 //   thật. getServerEnv() chỉ validate ở lần gọi đầu (runtime), nên build vẫn không cần env.
 //
 //   Quy ước Next.js: biến BÍ MẬT (chỉ server) KHÔNG có tiền tố NEXT_PUBLIC_.
-//   XBoss hiện không có biến client nào (toàn bộ cấu hình ở server) → chỉ có serverEnv.
+//   XBoss chỉ có 1 biến client duy nhất — NEXT_PUBLIC_SENTRY_DSN (đọc trực tiếp trong
+//   instrumentation-client.ts, không qua schema này vì file đó chạy trong bundle trình
+//   duyệt, không import được lib/env.ts phía server) — mọi cấu hình khác vẫn ở server.
 import { z } from "zod";
 
 // Bắt buộc = DATABASE_URL (app không chạy nếu thiếu). Các biến tích hợp (SMTP/Telegram/

@@ -62,7 +62,11 @@ const nextConfig = {
 
 // Sourcemap upload cần SENTRY_AUTH_TOKEN (secret riêng org/project trên Sentry, người vận
 // hành tự cấu hình khi cần) — tắt mặc định để `next build` không phụ thuộc secret đó.
+// tunnelRoute: proxy request Sentry qua route Next.js cùng origin để trình chặn quảng cáo
+// (uBlock/Adblock chặn domain *.sentry.io/*.ingest.*) không nuốt mất báo lỗi phía trình duyệt
+// — không cần đổi CSP vì vẫn cùng origin ("connect-src 'self'" đã cho phép sẵn).
 export default withSentryConfig(nextConfig, {
   silent: true,
   sourcemaps: { disable: true },
+  tunnelRoute: "/monitoring",
 });
