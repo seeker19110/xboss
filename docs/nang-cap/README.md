@@ -45,6 +45,7 @@
 | `M39-bang-filter-sort-sticky.md` | Filter/search/sort bảng Nghiệm thu + sticky header/cột ma trận   | UX 2026-07   |
 | `M40-trung-tam-thong-bao.md`  | Trung tâm thông báo: nhóm · lọc · click-through                     | UX 2026-07   |
 | `M41-responsive-mobile.md`    | Tối ưu responsive mobile (card view approvals, kích thước chạm)     | UX 2026-07   |
+| `M42-flatten-submenu-sidebar.md` | Bỏ submenu lồng trong sidebar, giữ accordion cấp nhóm             | UX 2026-07   |
 
 > M16–M20 là module bổ sung từ đối chiếu brochure FastCons — xem `docs/ke-hoach-fastcons-2026-07.md` (nhóm A/B/C/D thay cho số đợt 1–4 cũ).
 >
