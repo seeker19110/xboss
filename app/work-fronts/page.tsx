@@ -138,7 +138,7 @@ export default function WorkFrontsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-xs text-zinc-400 border-b border-zinc-800">
-                    <th className="text-left p-2 sticky left-0 z-10 bg-zinc-900">TẦNG</th>
+                    <th className="text-right p-2 sticky left-0 z-10 bg-zinc-900">TẦNG</th>
                     {stages.map((s) => (
                       <th key={s.id} className="text-center p-2 whitespace-nowrap">
                         {s.name}
@@ -167,7 +167,7 @@ export default function WorkFrontsPage() {
                         window.location.href = `/work-fronts/${encodeURIComponent(floor)}`;
                       }}
                     >
-                      <td className="p-2 font-mono text-xs sticky left-0 z-10 bg-zinc-900">
+                      <td className="p-2 font-mono text-xs text-right sticky left-0 z-10 bg-zinc-900 tabular-nums">
                         <a
                           href={`/work-fronts/${encodeURIComponent(floor)}`}
                           className="hover:text-emerald-400"
