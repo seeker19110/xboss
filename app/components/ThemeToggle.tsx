@@ -71,7 +71,7 @@ export default function ThemeToggle() {
       onClick={cycle}
       title={`Giao diện: ${Active.label} — bấm để chuyển sang ${nextLabel}`}
       aria-label={`Đổi giao diện, hiện tại: ${Active.label}`}
-      className="flex items-center justify-center w-7 h-7 rounded-lg text-zinc-400 hover:text-amber-400 hover:bg-zinc-900 transition shrink-0"
+      className="flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg text-zinc-400 hover:text-amber-400 hover:bg-zinc-900 transition shrink-0"
     >
       <Active.icon className="w-4 h-4" />
     </button>

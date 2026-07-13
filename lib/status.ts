@@ -1,5 +1,4 @@
-export type StatusSlug =
-  | "chuan_bi" | "dang_thi_cong" | "hoan_thanh" | "nghiem_thu" | "tre";
+export type StatusSlug = "chuan_bi" | "dang_thi_cong" | "hoan_thanh" | "nghiem_thu" | "tre";
 
 // Map mọi biến thể chuỗi tiếng Việt trong Excel → slug enum.
 const MAP: Record<string, StatusSlug> = {
@@ -10,15 +9,18 @@ const MAP: Record<string, StatusSlug> = {
   "nghiem thu": "nghiem_thu",
   "da nghiem thu": "nghiem_thu",
   "dang tre": "tre",
-  "tre": "tre",
+  tre: "tre",
 };
 
 function deburr(s: string): string {
   return s
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d").replace(/Đ/g, "d")
-    .toLowerCase().trim().replace(/\s+/g, " ");
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "d")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, " ");
 }
 
 export function toStatusSlug(raw: unknown): StatusSlug {
@@ -33,6 +35,20 @@ export const STATUS_LABEL: Record<StatusSlug, string> = {
   hoan_thanh: "Hoàn thành",
   nghiem_thu: "Đã nghiệm thu",
   tre: "Đang trễ",
+};
+
+// Icon dùng chung cho từng trạng thái — tín hiệu thứ 2 ngoài màu (a11y mù màu). Dùng
+// string key (tên component lucide-react) thay vì import JSX trực tiếp để giữ file
+// này thuần logic (không JSX), nơi dùng tự map sang component tương ứng.
+export const STATUS_ICON: Record<
+  StatusSlug,
+  "AlertTriangle" | "CheckCircle2" | "Circle" | "Clock" | "CircleDot"
+> = {
+  chuan_bi: "Circle",
+  dang_thi_cong: "CircleDot",
+  hoan_thanh: "CheckCircle2",
+  nghiem_thu: "CheckCircle2",
+  tre: "AlertTriangle",
 };
 
 // % tiến độ: Excel chứa số (0..1) HOẶC chuỗi status. Trả về [0,1].

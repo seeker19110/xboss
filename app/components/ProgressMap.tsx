@@ -4,6 +4,7 @@ import {
   Layers,
   TrendingUp,
   AlertTriangle,
+  CheckCircle2,
   Building2,
   Plus,
   Pencil,
@@ -74,14 +75,14 @@ function tbColor(avg: number): string {
   return avg >= 1 ? "text-emerald-400" : avg >= 0.5 ? "text-amber-400" : "text-zinc-400";
 }
 
-const LEGEND = [
+const LEGEND: { cls: string; label: string; icon?: typeof CheckCircle2 }[] = [
   { cls: BG_ZERO, label: "0%" },
   { cls: BG_VLOW, label: "<20%" },
   { cls: BG_LOW, label: "20–50%" },
   { cls: BG_MID, label: "50–80%" },
   { cls: BG_HIGH, label: "80–99%" },
-  { cls: BG_DONE, label: "100%" },
-  { cls: "bg-zinc-800 ring-2 ring-red-500/70", label: "Trễ (viền đỏ)" },
+  { cls: BG_DONE, label: "100%", icon: CheckCircle2 },
+  { cls: "bg-zinc-800 ring-2 ring-red-500/70", label: "Trễ (viền đỏ)", icon: AlertTriangle },
   { cls: "bg-zinc-900 border border-dashed border-zinc-700/60", label: "Không có" },
 ];
 
@@ -131,17 +132,17 @@ function TowerCurrentTable({
         style={{ minWidth: `${80 + 56 + filteredSheets.length * 76}px` }}
       >
         <thead>
-          <tr>
-            <th className="sticky -left-3 sm:-left-4 z-10 bg-zinc-900 text-right pl-3 sm:pl-4 pr-2 py-1.5 text-xs font-semibold text-zinc-400 w-16 sm:w-20">
+          <tr className="sticky top-0 z-20 bg-zinc-900">
+            <th className="sticky -left-3 sm:-left-4 top-0 z-30 bg-zinc-900 text-right pl-3 sm:pl-4 pr-2 py-1.5 text-xs font-semibold text-zinc-400 w-16 sm:w-20">
               Tầng
             </th>
-            <th className="text-right px-2 py-1.5 text-xs font-semibold text-zinc-400 w-12 sm:w-14">
+            <th className="bg-zinc-900 text-right px-2 py-1.5 text-xs font-semibold text-zinc-400 w-12 sm:w-14">
               TB
             </th>
             {filteredSheets.map((s) => (
               <th
                 key={s}
-                className="text-center px-1 py-1.5 text-[10px] sm:text-[11px] font-semibold text-zinc-400 w-16 sm:w-20"
+                className="bg-zinc-900 text-center px-1 py-1.5 text-[10px] sm:text-[11px] font-semibold text-zinc-400 w-16 sm:w-20"
               >
                 {s}
               </th>
@@ -176,7 +177,7 @@ function TowerCurrentTable({
                   <td key={s} className="text-center py-0.5">
                     {p < 0 ? (
                       <span
-                        className="inline-flex items-center justify-center w-14 sm:w-16 h-8 rounded bg-zinc-900 border border-dashed border-zinc-800/60 text-zinc-700 text-xs select-none"
+                        className="inline-flex items-center justify-center w-14 sm:w-16 h-8 rounded bg-zinc-900 border border-dashed border-zinc-800/60 text-zinc-500 text-xs select-none"
                         title={`${floor} · ${s} · không có công việc`}
                       >
                         –
@@ -187,9 +188,15 @@ function TowerCurrentTable({
                         className={`inline-flex flex-col items-center justify-center w-14 sm:w-16 h-8 rounded text-[10px] font-bold tabular-nums transition active:opacity-60 hover:opacity-80 ${cellClass(p, cell?.delayed ?? 0)}`}
                         title={`${s} · ${floor} · ${Math.round(p * 100)}%${cell?.delayed ? ` · ${cell.delayed} trễ` : ""}`}
                       >
-                        {Math.round(p * 100)}%
+                        <span className="flex items-center gap-0.5">
+                          {p >= 0.999 && <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />}
+                          {Math.round(p * 100)}%
+                        </span>
                         {(cell?.delayed ?? 0) > 0 && (
-                          <span className="text-[9px] leading-none">{cell!.delayed} trễ</span>
+                          <span className="text-[9px] leading-none flex items-center gap-0.5">
+                            <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
+                            {cell!.delayed} trễ
+                          </span>
                         )}
                       </a>
                     )}
@@ -462,6 +469,7 @@ export default function ProgressMap({
         {LEGEND.map((l) => (
           <span key={l.label} className="flex items-center gap-1 shrink-0">
             <span className={`inline-block w-3 h-3 sm:w-4 sm:h-4 rounded ${l.cls}`} />
+            {l.icon && <l.icon className="w-3 h-3 shrink-0" />}
             {l.label}
           </span>
         ))}
@@ -567,19 +575,19 @@ export default function ProgressMap({
                 style={{ minWidth: `${80 + weeks.length * 40 + 52}px` }}
               >
                 <thead>
-                  <tr>
-                    <th className="sticky -left-3 sm:-left-4 z-10 bg-zinc-900 text-right pl-3 sm:pl-4 pr-2 py-1.5 text-xs font-semibold text-zinc-400 w-16 sm:w-20">
+                  <tr className="sticky top-0 z-20 bg-zinc-900">
+                    <th className="sticky -left-3 sm:-left-4 top-0 z-30 bg-zinc-900 text-right pl-3 sm:pl-4 pr-2 py-1.5 text-xs font-semibold text-zinc-400 w-16 sm:w-20">
                       Tầng
                     </th>
                     {weeks.map((w) => (
                       <th
                         key={w}
-                        className="text-center px-0.5 py-1.5 text-[10px] text-zinc-400 w-8 sm:w-10"
+                        className="bg-zinc-900 text-center px-0.5 py-1.5 text-[10px] text-zinc-400 w-8 sm:w-10"
                       >
                         {fmtWeek(w)}
                       </th>
                     ))}
-                    <th className="text-center px-1 py-1.5 text-[10px] font-semibold text-zinc-300 w-10 sm:w-12 whitespace-nowrap">
+                    <th className="bg-zinc-900 text-center px-1 py-1.5 text-[10px] font-semibold text-zinc-300 w-10 sm:w-12 whitespace-nowrap">
                       Nay
                     </th>
                   </tr>
@@ -614,16 +622,17 @@ export default function ProgressMap({
                             <td key={w} className="text-center py-0.5">
                               {p < 0 ? (
                                 <span
-                                  className="inline-flex items-center justify-center w-7 sm:w-8 h-7 sm:h-8 rounded bg-zinc-950 border border-dashed border-zinc-800/50 text-zinc-700 text-[9px] select-none"
+                                  className="inline-flex items-center justify-center w-7 sm:w-8 h-7 sm:h-8 rounded bg-zinc-950 border border-dashed border-zinc-800/50 text-zinc-500 text-[9px] select-none"
                                   title={`${floor} · ${fmtWeek(w)} · không có dữ liệu`}
                                 >
                                   –
                                 </span>
                               ) : (
                                 <span
-                                  className={`inline-flex items-center justify-center w-7 sm:w-8 h-7 sm:h-8 rounded text-[9px] sm:text-[10px] font-bold tabular-nums ${bucketClass(p)}`}
+                                  className={`inline-flex items-center justify-center gap-0.5 w-7 sm:w-8 h-7 sm:h-8 rounded text-[9px] sm:text-[10px] font-bold tabular-nums ${bucketClass(p)}`}
                                   title={`${floor} · ${fmtWeek(w)} · ${Math.round(p * 100)}%`}
                                 >
+                                  {p >= 0.999 && <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />}
                                   {Math.round(p * 100)}
                                 </span>
                               )}
@@ -632,8 +641,12 @@ export default function ProgressMap({
                         })}
                         <td className="text-center py-0.5">
                           <span
-                            className={`inline-flex items-center justify-center w-9 sm:w-10 h-7 sm:h-8 rounded text-[10px] font-bold tabular-nums ${bucketClass(curAvg)} ${hasDelayed ? "ring-2 ring-red-500/70" : "border border-zinc-600"}`}
+                            className={`inline-flex items-center justify-center gap-0.5 w-9 sm:w-10 h-7 sm:h-8 rounded text-[10px] font-bold tabular-nums ${bucketClass(curAvg)} ${hasDelayed ? "ring-2 ring-red-500/70" : "border border-zinc-600"}`}
                           >
+                            {hasDelayed && <AlertTriangle className="w-2.5 h-2.5 shrink-0" />}
+                            {curAvg >= 0.999 && !hasDelayed && (
+                              <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />
+                            )}
                             {Math.round(curAvg * 100)}%
                           </span>
                         </td>

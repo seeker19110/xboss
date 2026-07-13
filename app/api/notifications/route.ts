@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { query, run, todayISO, daysFromTodayISO } from "@/lib/db";
+import { query, queryOne, run, todayISO, daysFromTodayISO } from "@/lib/db";
 import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/auth";
 import { costSummary, getCostSettings } from "@/lib/cost";
 import { poLateList, vehicleLateList } from "@/lib/procurement";
@@ -1000,6 +1000,10 @@ export async function GET() {
     );
   }
 
+  // JOIN thêm sheet slug + tầng của task liên quan (khi có task_id) để chuông thông báo/
+  // trang thông báo dựng được link click-through đúng `/tracking/<slug>?floor=<floorLabel>`
+  // (cùng pattern GlobalSearch). LEFT JOIN vì phần lớn loại thông báo không gắn với task
+  // (contract_id, ncr_id, ...) — sheetSlug/floorLabel sẽ là null, client tự bỏ qua link.
   const items = await query<{
     id: number;
     taskId: number | null;
@@ -1007,15 +1011,28 @@ export async function GET() {
     message: string;
     isRead: number;
     createdAt: string;
+    sheetSlug: string | null;
+    floorLabel: string | null;
   }>(
-    `SELECT id, task_id AS "taskId", type, message, is_read AS "isRead", created_at AS "createdAt"
-       FROM notifications WHERE user_id = ?
-      ORDER BY is_read ASC, created_at DESC, id DESC LIMIT 50`,
+    `SELECT n.id, n.task_id AS "taskId", n.type, n.message, n.is_read AS "isRead",
+            n.created_at AS "createdAt", st.slug AS "sheetSlug", wp.floor_label AS "floorLabel"
+       FROM notifications n
+       LEFT JOIN tasks t ON t.id = n.task_id
+       LEFT JOIN work_packages wp ON wp.id = t.package_id
+       LEFT JOIN sheet_types st ON st.id = wp.sheet_type_id
+      WHERE n.user_id = ?
+      ORDER BY n.is_read ASC, n.created_at DESC, n.id DESC LIMIT 50`,
     user.id,
   );
 
-  const unread = items.filter((n) => !n.isRead).length;
-  return NextResponse.json({ notifications: items, unread });
+  // Đếm riêng tổng số chưa đọc (không giới hạn LIMIT 50 của `items`) — nếu đếm trên chính
+  // `items` thì badge sẽ bị "kẹt cứng" ở tối đa 50 khi user có >50 thông báo chưa đọc (đã
+  // gặp thật khi verify tay M40: 388 chưa đọc nhưng badge chỉ hiện 50).
+  const unread = await queryOne<{ count: number }>(
+    `SELECT COUNT(*)::int AS count FROM notifications WHERE user_id = ? AND is_read = 0`,
+    user.id,
+  );
+  return NextResponse.json({ notifications: items, unread: unread?.count ?? 0 });
 }
 
 // POST /api/notifications  body: { markAllRead: true } → đánh dấu tất cả đã đọc.

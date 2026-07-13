@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckSquare,
   FileText,
@@ -10,12 +10,19 @@ import {
   Clock,
   Link2,
   Image as ImageIcon,
+  SearchX,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { Modal, appAlert, appConfirm } from "@/app/components/dialogs";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { redirectToLogin } from "@/app/lib/me";
 import { formatDateVN } from "@/lib/date";
+import { sortFloorsAsc } from "@/lib/floors";
+import TableToolbar, {
+  SortableHeader,
+  highlightMatch,
+  type ToolbarFilter,
+} from "@/app/components/TableToolbar";
 
 type FloorGroup = {
   sheetTypeId: number;
@@ -43,7 +50,34 @@ type Doc = {
 
 const fmtSize = (b: number) =>
   b > 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)}MB` : `${Math.round(b / 1024)}KB`;
+
+// Bucket % tiến độ cho preset filter (0% / 1-49% / 50-99% / 100%)
+function pctBucketOf(g: FloorGroup): string {
+  const pct = g.totalTasks > 0 ? Math.round((g.doneTasks / g.totalTasks) * 100) : 0;
+  if (pct <= 0) return "0";
+  if (pct >= 100) return "100";
+  if (pct < 50) return "1-49";
+  return "50-99";
+}
+const PCT_OPTIONS = [
+  { value: "0", label: "0%" },
+  { value: "1-49", label: "1-49%" },
+  { value: "50-99", label: "50-99%" },
+  { value: "100", label: "100%" },
+];
+// Sort mặc định: theo tầng vật lý (sortFloorsAsc), tie-break theo hệ.
+const compareFloorGroup = (a: FloorGroup, b: FloorGroup) =>
+  sortFloorsAsc(a.floorLabel, b.floorLabel) || a.sheetType.localeCompare(b.sheetType);
+
 export default function ApprovalsPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <ApprovalsPageInner />
+    </Suspense>
+  );
+}
+
+function ApprovalsPageInner() {
   const [pending, setPending] = useState<FloorGroup[]>([]);
   const [approved, setApproved] = useState<FloorGroup[]>([]);
   const [canApprove, setCanApprove] = useState(false);
@@ -253,9 +287,53 @@ export default function ApprovalsPage() {
     load();
   }
 
+  const pendingSheetOptions = useMemo(
+    () => Array.from(new Set(pending.map((g) => g.sheetType))).map((s) => ({ value: s, label: s })),
+    [pending],
+  );
+  const approvedSheetOptions = useMemo(
+    () =>
+      Array.from(new Set(approved.map((g) => g.sheetType))).map((s) => ({ value: s, label: s })),
+    [approved],
+  );
+  const docFilterOptions = [
+    { value: "has", label: "Đã có biên bản" },
+    { value: "none", label: "Chưa có biên bản" },
+  ];
+  const pendingFilters: ToolbarFilter<FloorGroup>[] = [
+    { key: "he", label: "Hệ", options: pendingSheetOptions, getValue: (g) => g.sheetType },
+    {
+      key: "status",
+      label: "Trạng thái",
+      options: [
+        { value: "eligible", label: "Đủ điều kiện duyệt" },
+        { value: "waiting", label: "Đang chờ" },
+      ],
+      getValue: (g) => (g.doneTasks === g.totalTasks ? "eligible" : "waiting"),
+    },
+    {
+      key: "doc",
+      label: "Biên bản",
+      options: docFilterOptions,
+      getValue: (g) => (g.docCount > 0 ? "has" : "none"),
+    },
+    { key: "pct", label: "% tiến độ", options: PCT_OPTIONS, getValue: pctBucketOf },
+  ];
+  const approvedFilters: ToolbarFilter<FloorGroup>[] = [
+    { key: "he", label: "Hệ", options: approvedSheetOptions, getValue: (g) => g.sheetType },
+    {
+      key: "doc",
+      label: "Biên bản",
+      options: docFilterOptions,
+      getValue: (g) => (g.docCount > 0 ? "has" : "none"),
+    },
+    { key: "pct", label: "% tiến độ", options: PCT_OPTIONS, getValue: pctBucketOf },
+  ];
+  const floorSort = [{ key: "floor", label: "Tầng", compare: compareFloorGroup }];
+
   if (loading) return <PageSkeleton />;
 
-  function row(g: FloorGroup, isPending: boolean) {
+  function row(g: FloorGroup, isPending: boolean, query = "") {
     const key = `${g.sheetTypeId}-${g.floorLabel}`;
     const isBusy =
       busy === `approve-${key}` ||
@@ -269,9 +347,11 @@ export default function ApprovalsPage() {
         key={key}
         className="border-b border-zinc-800/50 odd:bg-zinc-900/50 even:bg-zinc-800/20 hover:bg-zinc-700/40 transition-colors"
       >
-        <td className="p-3 font-medium text-sm">{g.sheetType}</td>
-        <td className="p-3 text-sm">{g.floorLabel}</td>
-        <td className="p-3 text-sm text-zinc-300">{g.wpName ?? "—"}</td>
+        <td className="p-3 font-medium text-sm">{highlightMatch(g.sheetType, query)}</td>
+        <td className="p-3 text-sm">{highlightMatch(g.floorLabel, query)}</td>
+        <td className="p-3 text-sm text-zinc-300">
+          {g.wpName ? highlightMatch(g.wpName, query) : "—"}
+        </td>
         <td className="p-3">
           <div className="flex items-center gap-2">
             <div className="w-20 h-1.5 bg-zinc-700 rounded-full overflow-hidden">
@@ -314,6 +394,7 @@ export default function ApprovalsPage() {
               onClick={() => pickFileForGroup(g)}
               disabled={isBusy}
               title="Upload PDF/ảnh"
+              aria-label="Upload PDF/ảnh"
               className="flex items-center gap-1 text-xs bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 border border-zinc-700 rounded-lg px-2 py-1 transition"
             >
               <Upload className="w-3 h-3" />
@@ -322,6 +403,7 @@ export default function ApprovalsPage() {
               onClick={() => openLinkFormForGroup(g)}
               disabled={isBusy}
               title="Thêm link"
+              aria-label="Thêm link"
               className="flex items-center gap-1 text-xs bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 border border-zinc-700 rounded-lg px-2 py-1 transition"
             >
               <Link2 className="w-3 h-3" />
@@ -363,6 +445,109 @@ export default function ApprovalsPage() {
     );
   }
 
+  // Biến thể card cho màn hình <640px — cùng logic với row(), chỉ đổi phần hiển thị
+  function card(g: FloorGroup, isPending: boolean) {
+    const key = `${g.sheetTypeId}-${g.floorLabel}`;
+    const isBusy =
+      busy === `approve-${key}` ||
+      busy === `unapprove-${g.approvalId}` ||
+      busy === `upload-${g.approvalId}`;
+    const allDone = g.doneTasks === g.totalTasks;
+    const pct = g.totalTasks > 0 ? Math.round((g.doneTasks / g.totalTasks) * 100) : 0;
+
+    return (
+      <div key={key} className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-3 space-y-2.5">
+        <div>
+          <div className="font-semibold text-sm">
+            {g.sheetType} · Tầng {g.floorLabel}
+          </div>
+          {g.wpName && <div className="text-xs text-zinc-400 mt-0.5">{g.wpName}</div>}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="flex-1 h-1.5 bg-zinc-700 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${allDone ? "bg-emerald-500" : "bg-blue-500"}`}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <span
+            className={`text-xs font-medium shrink-0 ${allDone ? "text-emerald-400" : "text-zinc-400"}`}
+          >
+            {g.doneTasks}/{g.totalTasks}
+            {allDone && <CheckCircle2 className="w-3 h-3 inline ml-1" />}
+          </span>
+        </div>
+
+        {!isPending && (
+          <div className="text-xs text-zinc-400">
+            {g.approvedByName ? `Duyệt bởi ${g.approvedByName}` : "—"}
+            {g.approvedAt && <span> · {formatDateVN(g.approvedAt)}</span>}
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => openDocsForGroup(g)}
+            disabled={isBusy}
+            className={`flex items-center gap-1 text-xs px-2.5 rounded-lg border transition min-h-[40px] ${
+              g.docCount > 0
+                ? "bg-emerald-950 border-emerald-900 text-emerald-200"
+                : "bg-zinc-800 border-zinc-700 text-zinc-400"
+            }`}
+          >
+            <Paperclip className="w-3.5 h-3.5" /> {g.docCount} biên bản
+          </button>
+          <button
+            onClick={() => pickFileForGroup(g)}
+            disabled={isBusy}
+            title="Upload PDF/ảnh"
+            aria-label="Upload PDF/ảnh"
+            className="flex items-center justify-center min-w-[40px] min-h-[40px] bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 border border-zinc-700 rounded-lg transition"
+          >
+            <Upload className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => openLinkFormForGroup(g)}
+            disabled={isBusy}
+            title="Thêm link"
+            aria-label="Thêm link"
+            className="flex items-center justify-center min-w-[40px] min-h-[40px] bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 border border-zinc-700 rounded-lg transition"
+          >
+            <Link2 className="w-4 h-4" />
+          </button>
+        </div>
+
+        {isPending ? (
+          canApprove && allDone ? (
+            <button
+              onClick={() => approveFloor(g)}
+              disabled={isBusy}
+              className="w-full flex items-center justify-center gap-1.5 text-sm bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent rounded-lg py-3 font-medium transition min-h-[44px]"
+            >
+              <CheckSquare className="w-4 h-4" /> Duyệt nghiệm thu
+            </button>
+          ) : (
+            <div className="flex items-center justify-center gap-1 text-xs text-zinc-400 py-2">
+              <Clock className="w-3.5 h-3.5" /> Chờ {g.totalTasks - g.doneTasks} task
+            </div>
+          )
+        ) : (
+          canApprove &&
+          g.approvalId && (
+            <button
+              onClick={() => unapproveFloor(g)}
+              disabled={isBusy}
+              className="w-full text-sm bg-red-700 hover:bg-red-600 disabled:opacity-50 text-on-accent rounded-lg py-3 transition min-h-[44px]"
+            >
+              Huỷ NT
+            </button>
+          )
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <input
@@ -383,35 +568,74 @@ export default function ApprovalsPage() {
               Chỉ duyệt được khi tất cả task trong tầng đạt 100%
             </p>
           </div>
-          <div
-            className="overflow-x-auto"
-            tabIndex={0}
-            role="region"
-            aria-label="Bảng chờ nghiệm thu"
+          <TableToolbar
+            data={pending}
+            searchFields={(g) => [g.sheetType, g.floorLabel, g.wpName ?? ""]}
+            filters={pendingFilters}
+            sorts={floorSort}
+            defaultSort={{ key: "floor", dir: "asc" }}
+            urlPrefix="pending"
           >
-            <table className="w-full text-sm min-w-[560px]">
-              <thead>
-                <tr className="text-xs text-zinc-400 border-b border-zinc-800">
-                  <th className="text-left p-3">HỆ</th>
-                  <th className="text-left p-3">TẦNG</th>
-                  <th className="text-left p-3">TÊN CÔNG VIỆC</th>
-                  <th className="text-left p-3">TIẾN ĐỘ</th>
-                  <th className="text-left p-3">BIÊN BẢN</th>
-                  <th className="text-left p-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {pending.map((g) => row(g, true))}
-                {pending.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="p-8 text-center text-zinc-400">
+            {(filtered, toolbar, sort, query) => (
+              <>
+                {toolbar}
+                <div
+                  className="overflow-x-auto hidden sm:block"
+                  tabIndex={0}
+                  role="region"
+                  aria-label="Bảng chờ nghiệm thu"
+                >
+                  <table className="w-full text-sm min-w-[560px]">
+                    <thead>
+                      <tr className="text-xs text-zinc-400 border-b border-zinc-800">
+                        <th className="text-left p-3">HỆ</th>
+                        <th className="text-left p-3">
+                          <SortableHeader label="TẦNG" sortKey="floor" sort={sort} />
+                        </th>
+                        <th className="text-left p-3">TÊN CÔNG VIỆC</th>
+                        <th className="text-left p-3">TIẾN ĐỘ</th>
+                        <th className="text-left p-3">BIÊN BẢN</th>
+                        <th className="text-left p-3"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map((g) => row(g, true, query))}
+                      {filtered.length === 0 && pending.length > 0 && (
+                        <tr>
+                          <td colSpan={6} className="p-10 text-center text-zinc-400">
+                            <SearchX className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                            Không có tầng/hệ nào khớp bộ lọc.
+                          </td>
+                        </tr>
+                      )}
+                      {pending.length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="p-8 text-center text-zinc-400">
+                            Không có tầng nào chờ nghiệm thu — tất cả đã được duyệt hoặc chưa đủ
+                            tiến độ.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Card view mobile (<640px) — dùng cùng dữ liệu đã lọc/sort ở trên */}
+                <div className="sm:hidden p-3 space-y-2">
+                  {filtered.map((g) => card(g, true))}
+                  {filtered.length === 0 && pending.length > 0 && (
+                    <p className="p-4 text-center text-sm text-zinc-400">
+                      Không có tầng/hệ nào khớp bộ lọc.
+                    </p>
+                  )}
+                  {pending.length === 0 && (
+                    <p className="p-4 text-center text-sm text-zinc-400">
                       Không có tầng nào chờ nghiệm thu — tất cả đã được duyệt hoặc chưa đủ tiến độ.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
+          </TableToolbar>
         </div>
 
         {/* Đã nghiệm thu */}
@@ -421,36 +645,74 @@ export default function ApprovalsPage() {
               Đã nghiệm thu ({approved.length} tầng · hệ)
             </h2>
           </div>
-          <div
-            className="overflow-x-auto"
-            tabIndex={0}
-            role="region"
-            aria-label="Bảng đã nghiệm thu"
+          <TableToolbar
+            data={approved}
+            searchFields={(g) => [g.sheetType, g.floorLabel, g.wpName ?? ""]}
+            filters={approvedFilters}
+            sorts={floorSort}
+            defaultSort={{ key: "floor", dir: "asc" }}
+            urlPrefix="approved"
           >
-            <table className="w-full text-sm min-w-[560px]">
-              <thead>
-                <tr className="text-xs text-zinc-400 border-b border-zinc-800">
-                  <th className="text-left p-3">HỆ</th>
-                  <th className="text-left p-3">TẦNG</th>
-                  <th className="text-left p-3">TÊN CÔNG VIỆC</th>
-                  <th className="text-left p-3">TIẾN ĐỘ</th>
-                  <th className="text-left p-3">NGƯỜI DUYỆT</th>
-                  <th className="text-left p-3">BIÊN BẢN</th>
-                  <th className="text-left p-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {approved.map((g) => row(g, false))}
-                {approved.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="p-8 text-center text-zinc-400">
+            {(filtered, toolbar, sort, query) => (
+              <>
+                {toolbar}
+                <div
+                  className="overflow-x-auto hidden sm:block"
+                  tabIndex={0}
+                  role="region"
+                  aria-label="Bảng đã nghiệm thu"
+                >
+                  <table className="w-full text-sm min-w-[560px]">
+                    <thead>
+                      <tr className="text-xs text-zinc-400 border-b border-zinc-800">
+                        <th className="text-left p-3">HỆ</th>
+                        <th className="text-left p-3">
+                          <SortableHeader label="TẦNG" sortKey="floor" sort={sort} />
+                        </th>
+                        <th className="text-left p-3">TÊN CÔNG VIỆC</th>
+                        <th className="text-left p-3">TIẾN ĐỘ</th>
+                        <th className="text-left p-3">NGƯỜI DUYỆT</th>
+                        <th className="text-left p-3">BIÊN BẢN</th>
+                        <th className="text-left p-3"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map((g) => row(g, false, query))}
+                      {filtered.length === 0 && approved.length > 0 && (
+                        <tr>
+                          <td colSpan={7} className="p-10 text-center text-zinc-400">
+                            <SearchX className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                            Không có tầng/hệ nào khớp bộ lọc.
+                          </td>
+                        </tr>
+                      )}
+                      {approved.length === 0 && (
+                        <tr>
+                          <td colSpan={7} className="p-8 text-center text-zinc-400">
+                            Chưa có tầng nào được nghiệm thu.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Card view mobile (<640px) — dùng cùng dữ liệu đã lọc/sort ở trên */}
+                <div className="sm:hidden p-3 space-y-2">
+                  {filtered.map((g) => card(g, false))}
+                  {filtered.length === 0 && approved.length > 0 && (
+                    <p className="p-4 text-center text-sm text-zinc-400">
+                      Không có tầng/hệ nào khớp bộ lọc.
+                    </p>
+                  )}
+                  {approved.length === 0 && (
+                    <p className="p-4 text-center text-sm text-zinc-400">
                       Chưa có tầng nào được nghiệm thu.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
+          </TableToolbar>
         </div>
       </main>
 
