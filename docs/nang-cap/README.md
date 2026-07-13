@@ -41,6 +41,10 @@
 | `M32-thiet-ke-thay-doi.md`    | Quản lý thay đổi thiết kế (Design Change — BPTC đã xong qua M08)    | C (IA mới)   |
 | `M33-nha-thau-phu.md`         | Hồ sơ năng lực & đánh giá định kỳ Nhà thầu phụ                      | E (IA mới)   |
 | `M34-claim.md`                | Claim chi phí & Gia hạn thời gian (EOT)                             | I (IA mới)   |
+| `M38-mau-token-tuong-phan.md` | Màu cho người mù màu + tương phản chữ (icon/nhãn thứ 2)             | UX 2026-07   |
+| `M39-bang-filter-sort-sticky.md` | Filter/search/sort bảng Nghiệm thu + sticky header/cột ma trận   | UX 2026-07   |
+| `M40-trung-tam-thong-bao.md`  | Trung tâm thông báo: nhóm · lọc · click-through                     | UX 2026-07   |
+| `M41-responsive-mobile.md`    | Tối ưu responsive mobile (card view approvals, kích thước chạm)     | UX 2026-07   |
 
 > M16–M20 là module bổ sung từ đối chiếu brochure FastCons — xem `docs/ke-hoach-fastcons-2026-07.md` (nhóm A/B/C/D thay cho số đợt 1–4 cũ).
 >
