@@ -135,10 +135,6 @@ export default function TableToolbar<T>({
     });
   }
 
-  function clearFilter(key: string) {
-    setActive((a) => ({ ...a, [key]: [] }));
-  }
-
   function clearAll() {
     setQuery("");
     setActive((a) => {
