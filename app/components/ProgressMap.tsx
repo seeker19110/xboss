@@ -4,6 +4,7 @@ import {
   Layers,
   TrendingUp,
   AlertTriangle,
+  CheckCircle2,
   Building2,
   Plus,
   Pencil,
@@ -74,14 +75,14 @@ function tbColor(avg: number): string {
   return avg >= 1 ? "text-emerald-400" : avg >= 0.5 ? "text-amber-400" : "text-zinc-400";
 }
 
-const LEGEND = [
+const LEGEND: { cls: string; label: string; icon?: typeof CheckCircle2 }[] = [
   { cls: BG_ZERO, label: "0%" },
   { cls: BG_VLOW, label: "<20%" },
   { cls: BG_LOW, label: "20–50%" },
   { cls: BG_MID, label: "50–80%" },
   { cls: BG_HIGH, label: "80–99%" },
-  { cls: BG_DONE, label: "100%" },
-  { cls: "bg-zinc-800 ring-2 ring-red-500/70", label: "Trễ (viền đỏ)" },
+  { cls: BG_DONE, label: "100%", icon: CheckCircle2 },
+  { cls: "bg-zinc-800 ring-2 ring-red-500/70", label: "Trễ (viền đỏ)", icon: AlertTriangle },
   { cls: "bg-zinc-900 border border-dashed border-zinc-700/60", label: "Không có" },
 ];
 
@@ -187,9 +188,15 @@ function TowerCurrentTable({
                         className={`inline-flex flex-col items-center justify-center w-14 sm:w-16 h-8 rounded text-[10px] font-bold tabular-nums transition active:opacity-60 hover:opacity-80 ${cellClass(p, cell?.delayed ?? 0)}`}
                         title={`${s} · ${floor} · ${Math.round(p * 100)}%${cell?.delayed ? ` · ${cell.delayed} trễ` : ""}`}
                       >
-                        {Math.round(p * 100)}%
+                        <span className="flex items-center gap-0.5">
+                          {p >= 0.999 && <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />}
+                          {Math.round(p * 100)}%
+                        </span>
                         {(cell?.delayed ?? 0) > 0 && (
-                          <span className="text-[9px] leading-none">{cell!.delayed} trễ</span>
+                          <span className="text-[9px] leading-none flex items-center gap-0.5">
+                            <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
+                            {cell!.delayed} trễ
+                          </span>
                         )}
                       </a>
                     )}
@@ -462,6 +469,7 @@ export default function ProgressMap({
         {LEGEND.map((l) => (
           <span key={l.label} className="flex items-center gap-1 shrink-0">
             <span className={`inline-block w-3 h-3 sm:w-4 sm:h-4 rounded ${l.cls}`} />
+            {l.icon && <l.icon className="w-3 h-3 shrink-0" />}
             {l.label}
           </span>
         ))}
@@ -621,9 +629,10 @@ export default function ProgressMap({
                                 </span>
                               ) : (
                                 <span
-                                  className={`inline-flex items-center justify-center w-7 sm:w-8 h-7 sm:h-8 rounded text-[9px] sm:text-[10px] font-bold tabular-nums ${bucketClass(p)}`}
+                                  className={`inline-flex items-center justify-center gap-0.5 w-7 sm:w-8 h-7 sm:h-8 rounded text-[9px] sm:text-[10px] font-bold tabular-nums ${bucketClass(p)}`}
                                   title={`${floor} · ${fmtWeek(w)} · ${Math.round(p * 100)}%`}
                                 >
+                                  {p >= 0.999 && <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />}
                                   {Math.round(p * 100)}
                                 </span>
                               )}
@@ -632,8 +641,12 @@ export default function ProgressMap({
                         })}
                         <td className="text-center py-0.5">
                           <span
-                            className={`inline-flex items-center justify-center w-9 sm:w-10 h-7 sm:h-8 rounded text-[10px] font-bold tabular-nums ${bucketClass(curAvg)} ${hasDelayed ? "ring-2 ring-red-500/70" : "border border-zinc-600"}`}
+                            className={`inline-flex items-center justify-center gap-0.5 w-9 sm:w-10 h-7 sm:h-8 rounded text-[10px] font-bold tabular-nums ${bucketClass(curAvg)} ${hasDelayed ? "ring-2 ring-red-500/70" : "border border-zinc-600"}`}
                           >
+                            {hasDelayed && <AlertTriangle className="w-2.5 h-2.5 shrink-0" />}
+                            {curAvg >= 0.999 && !hasDelayed && (
+                              <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />
+                            )}
                             {Math.round(curAvg * 100)}%
                           </span>
                         </td>
