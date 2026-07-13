@@ -210,12 +210,36 @@ export default function AppHeader({
 
   function renderCluster(cluster: DashCluster) {
     // Vai trò + nav_settings đã lọc sẵn trong resolveVisibleTree (visibleTree bên dưới).
+    // Tiêu đề cụm gập/mở được cả nhóm, cùng cơ chế với hàng tiêu đề dashboard
+    // (renderDashboard) — dùng chung toggleDash/openMap, khoá riêng theo "cluster:<label>".
+    const id = `cluster:${cluster.label}`;
+    const containsActive = cluster.dashboards.some((dash) => isNavItemActive(dash, path));
+    const open = collapsed || containsActive || (openMap[id] ?? true);
     return (
       <div key={cluster.label} className="mb-3">
-        <div className="sidebar-label px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-          {cluster.label}
-        </div>
-        {cluster.dashboards.map((dash) => renderDashboard(dash))}
+        {collapsed ? (
+          // Thu gọn sidebar (icon-only): luôn mở — không có chỗ hiện chevron/nhãn để
+          // gập riêng, ẩn hẳn con sẽ làm mất link (giống lý do ở renderDashboard).
+          <div className="sidebar-label px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+            {cluster.label}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => toggleDash(id, open)}
+            aria-expanded={open}
+            title={cluster.label}
+            className="w-full flex items-center gap-1.5 mx-2 mb-1 px-2.5 py-1.5 rounded-lg text-left hover:bg-zinc-900/60 transition"
+          >
+            <span className="flex-1 truncate text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+              {cluster.label}
+            </span>
+            <ChevronDown
+              className={`w-3 h-3 shrink-0 text-zinc-500 transition-transform ${open ? "" : "-rotate-90"}`}
+            />
+          </button>
+        )}
+        {open && cluster.dashboards.map((dash) => renderDashboard(dash))}
       </div>
     );
   }

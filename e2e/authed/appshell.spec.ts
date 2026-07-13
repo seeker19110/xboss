@@ -69,7 +69,9 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     // 6 mục hệ trong nhóm "Tiến độ" (dash.tien-do) — mục "Hệ thi công" riêng (link
     // /system/[code]) đã bỏ khỏi sidebar vì trùng chức năng với nhóm này (chỉ còn vào
     // /system/[code] qua Dashboard/DashboardHub/Chi phí — xem AppHeader.tsx).
-    const tienDoGroup = sidebar.getByRole("button", { name: "Tiến độ" }).locator("xpath=..");
+    const tienDoGroup = sidebar
+      .getByRole("button", { name: "Tiến độ", exact: true })
+      .locator("xpath=..");
     for (const label of ["ACMV", "Điện", "Cấp thoát nước", "PCCC", "Kết cấu", "Xây tô"]) {
       await expect(tienDoGroup.getByRole("link", { name: label, exact: true })).toBeVisible();
     }
@@ -108,7 +110,7 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
   }) => {
     await page.goto("/"); // Dashboard tổng — không nằm trong nhóm "Tiến độ" nên không bị ép mở.
     const sidebar = await openSidebar(page, isMobile);
-    const toggle = sidebar.getByRole("button", { name: "Tiến độ" });
+    const toggle = sidebar.getByRole("button", { name: "Tiến độ", exact: true });
     await expect(toggle).toBeVisible({ timeout: 15_000 });
     const tienDoGroup = toggle.locator("xpath=..");
 
@@ -124,14 +126,14 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     if (isMobile) {
       await page.getByRole("button", { name: "Mở menu" }).click();
     }
-    await expect(sidebar.getByRole("button", { name: "Tiến độ" })).toHaveAttribute(
+    await expect(sidebar.getByRole("button", { name: "Tiến độ", exact: true })).toHaveAttribute(
       "aria-expanded",
       "false",
     );
     await expect(tienDoGroup.getByRole("link", { name: "ACMV", exact: true })).toHaveCount(0);
 
     // Trả lại mặc định mở để không ảnh hưởng test khác dùng chung storageState.
-    await sidebar.getByRole("button", { name: "Tiến độ" }).click();
+    await sidebar.getByRole("button", { name: "Tiến độ", exact: true }).click();
     await expect(tienDoGroup.getByRole("link", { name: "ACMV", exact: true })).toBeVisible();
   });
 
@@ -141,7 +143,7 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
   }) => {
     await page.goto("/");
     const sidebar = await openSidebar(page, isMobile);
-    const toggle = sidebar.getByRole("button", { name: "Tiến độ" });
+    const toggle = sidebar.getByRole("button", { name: "Tiến độ", exact: true });
     await expect(toggle).toBeVisible({ timeout: 15_000 });
     // "Tổng quan" xuất hiện ở mọi nhóm — thu hẹp về đúng nhóm "Tiến độ" (div bọc ngoài button).
     const tienDoGroup = toggle.locator("xpath=..");
