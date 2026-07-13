@@ -78,6 +78,9 @@ export default function GlobalSearch() {
     <div className="relative w-full max-w-md" ref={boxRef}>
       <Search className="w-4 h-4 absolute left-3 top-3 text-zinc-500 pointer-events-none" />
       <input
+        id="global-search"
+        name="q"
+        autoComplete="off"
         value={q}
         onChange={(e) => {
           setQ(e.target.value);
