@@ -145,3 +145,61 @@ test(
     await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
   },
 );
+
+test(
+  "câu SELECT cuối cùng của GET /api/notifications trả kèm sheetSlug/floorLabel " +
+    "(M40 — cần cho click-through chuông thông báo dựng đúng URL /tracking/<slug>?floor=)",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId, query } = await import("@/lib/db");
+
+    const userId = await insertId(
+      `INSERT INTO users (name, email, password_hash, role) VALUES ('U notif M40', 'u-notif-m40@test.local', 'x', 'admin')`,
+    );
+    const tw = await insertId(`INSERT INTO towers (name) VALUES ('Tháp M40')`);
+    const st = await insertId(
+      `INSERT INTO sheet_types (tower_id, code, name, slug) VALUES (?, 'NOTIFM40', 'Sheet M40', 'notif-m40')`,
+      tw,
+    );
+    const pkg = await insertId(
+      `INSERT INTO work_packages (sheet_type_id, code, name, floor_label) VALUES (?, 'M40', 'Nhóm M40', 'Tầng 5')`,
+      st,
+    );
+    const taskId = await insertId(
+      `INSERT INTO tasks (package_id, code, name, progress_percent, status)
+       VALUES (?, 'M40,01', 'Task M40', 0, 'dang_thi_cong')`,
+      pkg,
+    );
+    const notifId = await insertId(
+      `INSERT INTO notifications (user_id, task_id, type, message) VALUES (?, ?, 'delayed', 'test M40')`,
+      userId,
+      taskId,
+    );
+
+    // Câu SELECT tương đương phần cuối route.ts sau khi thêm LEFT JOIN sheet_types/work_packages.
+    const rows = await query<{
+      id: number;
+      taskId: number | null;
+      sheetSlug: string | null;
+      floorLabel: string | null;
+    }>(
+      `SELECT n.id, n.task_id AS "taskId", st.slug AS "sheetSlug", wp.floor_label AS "floorLabel"
+         FROM notifications n
+         LEFT JOIN tasks t ON t.id = n.task_id
+         LEFT JOIN work_packages wp ON wp.id = t.package_id
+         LEFT JOIN sheet_types st ON st.id = wp.sheet_type_id
+        WHERE n.id = ?`,
+      notifId,
+    );
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].sheetSlug, "notif-m40");
+    assert.equal(rows[0].floorLabel, "Tầng 5");
+
+    await run(`DELETE FROM notifications WHERE id = ?`, notifId);
+    await run(`DELETE FROM tasks WHERE id = ?`, taskId);
+    await run(`DELETE FROM work_packages WHERE id = ?`, pkg);
+    await run(`DELETE FROM sheet_types WHERE id = ?`, st);
+    await run(`DELETE FROM towers WHERE id = ?`, tw);
+    await run(`DELETE FROM users WHERE id = ?`, userId);
+  },
+);
