@@ -18,7 +18,7 @@ export default function SuppliersPage() {
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex items-center gap-3 mb-6">
           <Building2 className="w-6 h-6 text-blue-400" />
-          <h1 className="text-2xl font-bold">Nhà cung cấp</h1>
+          <h2 className="text-2xl font-bold">Nhà cung cấp</h2>
         </div>
         {role && <SuppliersTab role={role} />}
       </div>

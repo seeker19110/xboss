@@ -506,7 +506,7 @@ export default function PurchaseOrdersPage() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <ClipboardList className="w-6 h-6 text-blue-400" />
-            <h1 className="text-2xl font-bold">Đơn đặt hàng (PO)</h1>
+            <h2 className="text-2xl font-bold">Đơn đặt hàng (PO)</h2>
             <span className="text-sm text-zinc-400">({orders.length})</span>
           </div>
           {canManage && (

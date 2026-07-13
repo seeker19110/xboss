@@ -177,7 +177,7 @@ function TowerCurrentTable({
                   <td key={s} className="text-center py-0.5">
                     {p < 0 ? (
                       <span
-                        className="inline-flex items-center justify-center w-14 sm:w-16 h-8 rounded bg-zinc-900 border border-dashed border-zinc-800/60 text-zinc-700 text-xs select-none"
+                        className="inline-flex items-center justify-center w-14 sm:w-16 h-8 rounded bg-zinc-900 border border-dashed border-zinc-800/60 text-zinc-500 text-xs select-none"
                         title={`${floor} · ${s} · không có công việc`}
                       >
                         –
@@ -622,7 +622,7 @@ export default function ProgressMap({
                             <td key={w} className="text-center py-0.5">
                               {p < 0 ? (
                                 <span
-                                  className="inline-flex items-center justify-center w-7 sm:w-8 h-7 sm:h-8 rounded bg-zinc-950 border border-dashed border-zinc-800/50 text-zinc-700 text-[9px] select-none"
+                                  className="inline-flex items-center justify-center w-7 sm:w-8 h-7 sm:h-8 rounded bg-zinc-950 border border-dashed border-zinc-800/50 text-zinc-500 text-[9px] select-none"
                                   title={`${floor} · ${fmtWeek(w)} · không có dữ liệu`}
                                 >
                                   –

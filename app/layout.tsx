@@ -12,6 +12,8 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   icons: { icon: "/icon.svg", apple: "/icon-192.png" },
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "XBoss" },
+  // App quản trị nội bộ sau đăng nhập — không cần công cụ tìm kiếm lập chỉ mục.
+  robots: { index: false, follow: false },
 };
 
 export const viewport: Viewport = {

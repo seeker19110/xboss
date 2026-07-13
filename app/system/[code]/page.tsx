@@ -193,7 +193,7 @@ export default function SystemHubPage({ params }: { params: Promise<{ code: stri
         >
           <div className="flex flex-wrap items-center gap-2">
             <span className={`w-3 h-3 rounded-full shrink-0 ${c.dot}`} aria-hidden="true" />
-            <h1 className="text-lg font-bold">{summary.system.name}</h1>
+            <h2 className="text-lg font-bold">{summary.system.name}</h2>
             {summary.contractors.map((ct) => (
               <span
                 key={ct.id}

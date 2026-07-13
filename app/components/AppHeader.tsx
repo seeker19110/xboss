@@ -304,7 +304,7 @@ export default function AppHeader({
           </button>
 
           <div className="min-w-0 flex-1">
-            <div className="text-base font-semibold truncate flex items-center gap-1.5">
+            <h1 className="text-base font-semibold truncate flex items-center gap-1.5">
               {breadcrumbGroup && (
                 <>
                   <span className="text-zinc-400 font-normal hidden sm:inline">
@@ -314,7 +314,7 @@ export default function AppHeader({
                 </>
               )}
               <span className="inline-flex items-center gap-1.5 min-w-0 truncate">{pageTitle}</span>
-            </div>
+            </h1>
             {subtitle && (
               <p className="text-[11px] text-zinc-400 truncate leading-none">{subtitle}</p>
             )}

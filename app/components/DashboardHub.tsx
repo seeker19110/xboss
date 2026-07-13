@@ -207,7 +207,7 @@ export default function DashboardHub({ dashId }: { dashId: string }) {
       <main className="p-4 sm:p-6 space-y-6">
         <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-xl p-4 sm:p-5">
           <Icon className="w-6 h-6 text-emerald-400 shrink-0" strokeWidth={1.75} />
-          <h1 className="text-lg font-bold">{dashboard.label}</h1>
+          <h2 className="text-lg font-bold">{dashboard.label}</h2>
         </div>
 
         {isTienDo ? (
