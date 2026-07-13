@@ -189,7 +189,7 @@ export default function VehiclesPage() {
         <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
           <div className="flex items-center gap-3">
             <Truck className="w-6 h-6 text-blue-400" />
-            <h2 className="text-xl font-bold">Xe ra vào công trường</h2>
+            <h1 className="text-xl font-bold">Xe ra vào công trường</h1>
           </div>
           <div className="flex items-center gap-2">
             <input

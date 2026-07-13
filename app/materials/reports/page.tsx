@@ -105,7 +105,7 @@ export default function MaterialReportsPage() {
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex items-center gap-3 mb-6">
           <BarChart2 className="w-6 h-6 text-purple-400" />
-          <h2 className="text-2xl font-bold">Báo cáo vật tư</h2>
+          <h1 className="text-2xl font-bold">Báo cáo vật tư</h1>
         </div>
 
         {error && (

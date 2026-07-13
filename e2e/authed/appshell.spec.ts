@@ -106,9 +106,11 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     page,
     isMobile,
   }) => {
-    await page.goto("/"); // Dashboard tổng — không nằm trong nhóm "Hiện trường" nên không bị ép mở.
+    await page.goto("/"); // Dashboard tổng — không nằm trong cụm "Thi công hiện trường" nên không bị ép mở.
     const sidebar = await openSidebar(page, isMobile);
-    const toggle = sidebar.getByRole("button", { name: "Hiện trường", exact: true });
+    // M42: bỏ hàng tiêu đề dashboard lồng bên trong cụm ("Hiện trường") — giờ accordion
+    // duy nhất là chevron cấp cụm ("Thi công hiện trường"), mở ra thấy ngay Tổng quan + link con.
+    const toggle = sidebar.getByRole("button", { name: "Thi công hiện trường", exact: true });
     await expect(toggle).toBeVisible({ timeout: 15_000 });
     const hienTruongGroup = toggle.locator("xpath=..");
 
@@ -128,16 +130,15 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     if (isMobile) {
       await page.getByRole("button", { name: "Mở menu" }).click();
     }
-    await expect(sidebar.getByRole("button", { name: "Hiện trường", exact: true })).toHaveAttribute(
-      "aria-expanded",
-      "false",
-    );
+    await expect(
+      sidebar.getByRole("button", { name: "Thi công hiện trường", exact: true }),
+    ).toHaveAttribute("aria-expanded", "false");
     await expect(
       hienTruongGroup.getByRole("link", { name: "Việc của tôi", exact: true }),
     ).toHaveCount(0);
 
     // Trả lại mặc định mở để không ảnh hưởng test khác dùng chung storageState.
-    await sidebar.getByRole("button", { name: "Hiện trường", exact: true }).click();
+    await sidebar.getByRole("button", { name: "Thi công hiện trường", exact: true }).click();
     await expect(
       hienTruongGroup.getByRole("link", { name: "Việc của tôi", exact: true }),
     ).toBeVisible();
@@ -149,9 +150,9 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
   }) => {
     await page.goto("/");
     const sidebar = await openSidebar(page, isMobile);
-    const toggle = sidebar.getByRole("button", { name: "Hiện trường", exact: true });
+    const toggle = sidebar.getByRole("button", { name: "Thi công hiện trường", exact: true });
     await expect(toggle).toBeVisible({ timeout: 15_000 });
-    // "Tổng quan" xuất hiện ở mọi nhóm — thu hẹp về đúng nhóm "Hiện trường" (div bọc ngoài button).
+    // "Tổng quan" xuất hiện ở mọi nhóm — thu hẹp về đúng cụm "Thi công hiện trường" (div bọc ngoài button).
     const hienTruongGroup = toggle.locator("xpath=..");
 
     await hienTruongGroup.getByRole("link", { name: "Tổng quan" }).click();
