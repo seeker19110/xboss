@@ -132,7 +132,7 @@ function TowerCurrentTable({
       >
         <thead>
           <tr>
-            <th className="sticky left-0 z-10 bg-zinc-900 text-left pl-0 pr-2 py-1.5 text-xs font-semibold text-zinc-400 w-16 sm:w-20">
+            <th className="sticky -left-3 sm:-left-4 z-10 bg-zinc-900 text-right pl-3 sm:pl-4 pr-2 py-1.5 text-xs font-semibold text-zinc-400 w-16 sm:w-20">
               Tầng
             </th>
             <th className="text-right px-2 py-1.5 text-xs font-semibold text-zinc-400 w-12 sm:w-14">
@@ -151,10 +151,12 @@ function TowerCurrentTable({
         <tbody>
           {floorSummary.map(({ floor, avg, delayed }) => (
             <tr key={floor}>
-              <td className="sticky left-0 z-10 bg-zinc-900 pr-2 py-0.5">
-                <div className="flex items-center gap-1">
-                  <span className="text-sm font-bold text-zinc-200 whitespace-nowrap">{floor}</span>
+              <td className="sticky -left-3 sm:-left-4 z-10 bg-zinc-900 pl-3 sm:pl-4 pr-2 py-0.5 w-16 sm:w-20">
+                <div className="flex items-center justify-end gap-1">
                   {delayed > 0 && <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" />}
+                  <span className="text-sm font-bold text-zinc-200 whitespace-nowrap text-right tabular-nums">
+                    {floor}
+                  </span>
                 </div>
               </td>
               <td className="text-right pr-2 py-0.5">
@@ -566,7 +568,7 @@ export default function ProgressMap({
               >
                 <thead>
                   <tr>
-                    <th className="sticky left-0 z-10 bg-zinc-900 text-left pl-0 pr-2 py-1.5 text-xs font-semibold text-zinc-400 w-16 sm:w-20">
+                    <th className="sticky -left-3 sm:-left-4 z-10 bg-zinc-900 text-right pl-3 sm:pl-4 pr-2 py-1.5 text-xs font-semibold text-zinc-400 w-16 sm:w-20">
                       Tầng
                     </th>
                     {weeks.map((w) => (
@@ -596,14 +598,14 @@ export default function ProgressMap({
 
                     return (
                       <tr key={floor}>
-                        <td className="sticky left-0 z-10 bg-zinc-900 pr-2 py-0.5">
-                          <div className="flex items-center gap-1">
-                            <span className="text-sm font-bold text-zinc-200 whitespace-nowrap">
-                              {floor}
-                            </span>
+                        <td className="sticky -left-3 sm:-left-4 z-10 bg-zinc-900 pl-3 sm:pl-4 pr-2 py-0.5 w-16 sm:w-20">
+                          <div className="flex items-center justify-end gap-1">
                             {hasDelayed && (
                               <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" />
                             )}
+                            <span className="text-sm font-bold text-zinc-200 whitespace-nowrap text-right tabular-nums">
+                              {floor}
+                            </span>
                           </div>
                         </td>
                         {weeks.map((w) => {
