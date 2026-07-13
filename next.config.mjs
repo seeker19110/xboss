@@ -41,11 +41,13 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline'",
+              "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
               "font-src 'self'",
-              "connect-src 'self'",
+              // Cloudflare Web Analytics: beacon.min.js (script-src) tự gửi số liệu đo
+              // hiệu năng về cloudflareinsights.com (connect-src) — cùng domain script.
+              "connect-src 'self' https://cloudflareinsights.com",
               "media-src 'self' blob:",
               // Service worker + push notification
               "worker-src 'self' blob:",
