@@ -132,17 +132,17 @@ function TowerCurrentTable({
         style={{ minWidth: `${80 + 56 + filteredSheets.length * 76}px` }}
       >
         <thead>
-          <tr>
-            <th className="sticky -left-3 sm:-left-4 z-10 bg-zinc-900 text-right pl-3 sm:pl-4 pr-2 py-1.5 text-xs font-semibold text-zinc-400 w-16 sm:w-20">
+          <tr className="sticky top-0 z-20 bg-zinc-900">
+            <th className="sticky -left-3 sm:-left-4 top-0 z-30 bg-zinc-900 text-right pl-3 sm:pl-4 pr-2 py-1.5 text-xs font-semibold text-zinc-400 w-16 sm:w-20">
               Tầng
             </th>
-            <th className="text-right px-2 py-1.5 text-xs font-semibold text-zinc-400 w-12 sm:w-14">
+            <th className="bg-zinc-900 text-right px-2 py-1.5 text-xs font-semibold text-zinc-400 w-12 sm:w-14">
               TB
             </th>
             {filteredSheets.map((s) => (
               <th
                 key={s}
-                className="text-center px-1 py-1.5 text-[10px] sm:text-[11px] font-semibold text-zinc-400 w-16 sm:w-20"
+                className="bg-zinc-900 text-center px-1 py-1.5 text-[10px] sm:text-[11px] font-semibold text-zinc-400 w-16 sm:w-20"
               >
                 {s}
               </th>
@@ -575,19 +575,19 @@ export default function ProgressMap({
                 style={{ minWidth: `${80 + weeks.length * 40 + 52}px` }}
               >
                 <thead>
-                  <tr>
-                    <th className="sticky -left-3 sm:-left-4 z-10 bg-zinc-900 text-right pl-3 sm:pl-4 pr-2 py-1.5 text-xs font-semibold text-zinc-400 w-16 sm:w-20">
+                  <tr className="sticky top-0 z-20 bg-zinc-900">
+                    <th className="sticky -left-3 sm:-left-4 top-0 z-30 bg-zinc-900 text-right pl-3 sm:pl-4 pr-2 py-1.5 text-xs font-semibold text-zinc-400 w-16 sm:w-20">
                       Tầng
                     </th>
                     {weeks.map((w) => (
                       <th
                         key={w}
-                        className="text-center px-0.5 py-1.5 text-[10px] text-zinc-400 w-8 sm:w-10"
+                        className="bg-zinc-900 text-center px-0.5 py-1.5 text-[10px] text-zinc-400 w-8 sm:w-10"
                       >
                         {fmtWeek(w)}
                       </th>
                     ))}
-                    <th className="text-center px-1 py-1.5 text-[10px] font-semibold text-zinc-300 w-10 sm:w-12 whitespace-nowrap">
+                    <th className="bg-zinc-900 text-center px-1 py-1.5 text-[10px] font-semibold text-zinc-300 w-10 sm:w-12 whitespace-nowrap">
                       Nay
                     </th>
                   </tr>
