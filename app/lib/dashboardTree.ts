@@ -16,7 +16,6 @@ import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
   FileText,
-  CalendarRange,
   Wind,
   Zap,
   Droplets,
@@ -110,24 +109,32 @@ export const DASHBOARD_TREE: DashCluster[] = [
     ],
   },
   {
-    // Kế hoạch & Tiến độ (đổi từ 5 view chung Timeline/Gantt/Lookahead/S-Curve/Đường
-    // găng sang 6 hệ đang thi công — mỗi hệ 1 trang `/progress/[system]` gộp đủ 7 khối tiến
-    // độ của riêng hệ đó: tổng quan, S-curve, timeline, SPI, dự báo, nguyên nhân trễ,
-    // danh sách trễ. Các trang view chung cũ vẫn còn, reachable qua hub `/hub/dash.tien-do`).
+    // Kế hoạch & Tiến độ — 6 hệ đang thi công, mỗi hệ 1 trang `/progress/[system]` gộp
+    // đủ 7 khối tiến độ của riêng hệ đó: tổng quan, S-curve, timeline, SPI, dự báo,
+    // nguyên nhân trễ, danh sách trễ. Bỏ nhóm cha "Tiến độ" (chỉ gập/mở, không phải
+    // trang riêng) — hiển thị thẳng 6 hệ dưới cụm, không qua bước gập/mở thừa.
     label: "Kế hoạch & Tiến độ",
     dashboards: [
+      { id: "dash.tien-do-acmv", href: "/progress/acmv", label: "ACMV", icon: Wind },
+      { id: "dash.tien-do-dien", href: "/progress/dien", label: "Điện", icon: Zap },
       {
-        id: "dash.tien-do",
-        label: "Tiến độ",
-        icon: CalendarRange,
-        children: [
-          { href: "/progress/acmv", label: "ACMV", icon: Wind },
-          { href: "/progress/dien", label: "Điện", icon: Zap },
-          { href: "/progress/nuoc", label: "Cấp thoát nước", icon: Droplets },
-          { href: "/progress/pccc", label: "PCCC", icon: Flame },
-          { href: "/progress/ket_cau", label: "Kết cấu", icon: Building2 },
-          { href: "/progress/xay_to", label: "Xây tô", icon: PaintRoller },
-        ],
+        id: "dash.tien-do-nuoc",
+        href: "/progress/nuoc",
+        label: "Cấp thoát nước",
+        icon: Droplets,
+      },
+      { id: "dash.tien-do-pccc", href: "/progress/pccc", label: "PCCC", icon: Flame },
+      {
+        id: "dash.tien-do-ket-cau",
+        href: "/progress/ket_cau",
+        label: "Kết cấu",
+        icon: Building2,
+      },
+      {
+        id: "dash.tien-do-xay-to",
+        href: "/progress/xay_to",
+        label: "Xây tô",
+        icon: PaintRoller,
       },
     ],
   },

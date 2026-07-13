@@ -229,7 +229,7 @@ export default function AppHeader({
             onClick={() => toggleDash(id, open)}
             aria-expanded={open}
             title={cluster.label}
-            className="w-full flex items-center gap-1.5 mx-2 mb-1 px-2.5 py-1.5 rounded-lg text-left hover:bg-zinc-900/60 transition"
+            className="w-full flex items-center gap-1.5 mx-2 mb-1 px-2.5 py-1.5 rounded-lg text-left min-h-10 hover:bg-zinc-900/60 transition"
           >
             <span className="flex-1 truncate text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
               {cluster.label}
@@ -277,7 +277,7 @@ export default function AppHeader({
         <button
           onClick={toggleCollapsed}
           aria-label={collapsed ? "Mở rộng menu" : "Thu gọn menu"}
-          className="flex items-center gap-2.5 px-2.5 py-2.5 mx-2 mb-2 rounded-lg text-xs text-zinc-400 hover:text-white hover:bg-zinc-900/60 border-t border-zinc-800 shrink-0"
+          className="flex items-center gap-2.5 px-2.5 py-2.5 mx-2 mb-2 rounded-lg text-xs min-h-10 text-zinc-400 hover:text-white hover:bg-zinc-900/60 border-t border-zinc-800 shrink-0"
         >
           {collapsed ? (
             <PanelLeftOpen className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />

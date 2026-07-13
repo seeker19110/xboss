@@ -66,14 +66,12 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
       await expect(sidebar.getByRole("link", { name: label, exact: true })).toBeVisible();
     }
 
-    // 6 mục hệ trong nhóm "Tiến độ" (dash.tien-do) — mục "Hệ thi công" riêng (link
-    // /system/[code]) đã bỏ khỏi sidebar vì trùng chức năng với nhóm này (chỉ còn vào
-    // /system/[code] qua Dashboard/DashboardHub/Chi phí — xem AppHeader.tsx).
-    const tienDoGroup = sidebar
-      .getByRole("button", { name: "Tiến độ", exact: true })
-      .locator("xpath=..");
+    // 6 mục hệ nằm thẳng trong cụm "Kế hoạch & Tiến độ" (không còn qua nhóm gập/mở
+    // "Tiến độ" trung gian) — mục "Hệ thi công" riêng (link /system/[code]) đã bỏ khỏi
+    // sidebar vì trùng chức năng với nhóm này (chỉ còn vào /system/[code] qua
+    // Dashboard/DashboardHub/Chi phí — xem AppHeader.tsx).
     for (const label of ["ACMV", "Điện", "Cấp thoát nước", "PCCC", "Kết cấu", "Xây tô"]) {
-      await expect(tienDoGroup.getByRole("link", { name: label, exact: true })).toBeVisible();
+      await expect(sidebar.getByRole("link", { name: label, exact: true })).toBeVisible();
     }
   });
 
@@ -108,33 +106,41 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     page,
     isMobile,
   }) => {
-    await page.goto("/"); // Dashboard tổng — không nằm trong nhóm "Tiến độ" nên không bị ép mở.
+    await page.goto("/"); // Dashboard tổng — không nằm trong nhóm "Hiện trường" nên không bị ép mở.
     const sidebar = await openSidebar(page, isMobile);
-    const toggle = sidebar.getByRole("button", { name: "Tiến độ", exact: true });
+    const toggle = sidebar.getByRole("button", { name: "Hiện trường", exact: true });
     await expect(toggle).toBeVisible({ timeout: 15_000 });
-    const tienDoGroup = toggle.locator("xpath=..");
+    const hienTruongGroup = toggle.locator("xpath=..");
 
     // Mặc định mở — link con thấy ngay, không cần bấm.
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
-    await expect(tienDoGroup.getByRole("link", { name: "ACMV", exact: true })).toBeVisible();
+    await expect(
+      hienTruongGroup.getByRole("link", { name: "Việc của tôi", exact: true }),
+    ).toBeVisible();
 
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
-    await expect(tienDoGroup.getByRole("link", { name: "ACMV", exact: true })).toHaveCount(0);
+    await expect(
+      hienTruongGroup.getByRole("link", { name: "Việc của tôi", exact: true }),
+    ).toHaveCount(0);
 
     await page.reload();
     if (isMobile) {
       await page.getByRole("button", { name: "Mở menu" }).click();
     }
-    await expect(sidebar.getByRole("button", { name: "Tiến độ", exact: true })).toHaveAttribute(
+    await expect(sidebar.getByRole("button", { name: "Hiện trường", exact: true })).toHaveAttribute(
       "aria-expanded",
       "false",
     );
-    await expect(tienDoGroup.getByRole("link", { name: "ACMV", exact: true })).toHaveCount(0);
+    await expect(
+      hienTruongGroup.getByRole("link", { name: "Việc của tôi", exact: true }),
+    ).toHaveCount(0);
 
     // Trả lại mặc định mở để không ảnh hưởng test khác dùng chung storageState.
-    await sidebar.getByRole("button", { name: "Tiến độ", exact: true }).click();
-    await expect(tienDoGroup.getByRole("link", { name: "ACMV", exact: true })).toBeVisible();
+    await sidebar.getByRole("button", { name: "Hiện trường", exact: true }).click();
+    await expect(
+      hienTruongGroup.getByRole("link", { name: "Việc của tôi", exact: true }),
+    ).toBeVisible();
   });
 
   test("mục 'Tổng quan' trong nhóm dẫn tới trang hub khuôn chung (M21 PR2)", async ({
@@ -143,25 +149,18 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
   }) => {
     await page.goto("/");
     const sidebar = await openSidebar(page, isMobile);
-    const toggle = sidebar.getByRole("button", { name: "Tiến độ", exact: true });
+    const toggle = sidebar.getByRole("button", { name: "Hiện trường", exact: true });
     await expect(toggle).toBeVisible({ timeout: 15_000 });
-    // "Tổng quan" xuất hiện ở mọi nhóm — thu hẹp về đúng nhóm "Tiến độ" (div bọc ngoài button).
-    const tienDoGroup = toggle.locator("xpath=..");
+    // "Tổng quan" xuất hiện ở mọi nhóm — thu hẹp về đúng nhóm "Hiện trường" (div bọc ngoài button).
+    const hienTruongGroup = toggle.locator("xpath=..");
 
-    await tienDoGroup.getByRole("link", { name: "Tổng quan" }).click();
-    await expect(page).toHaveURL(/\/hub\/dash\.tien-do$/);
-    await expect(page.locator("header").getByText("Tiến độ", { exact: true })).toBeVisible();
+    await hienTruongGroup.getByRole("link", { name: "Tổng quan" }).click();
+    await expect(page).toHaveURL(/\/hub\/dash\.hien-truong$/);
+    await expect(page.locator("header").getByText("Hiện trường", { exact: true })).toBeVisible();
     const hub = page.getByRole("main");
-    // Khối "Tiến độ theo hệ" bên dưới cũng có nút nhỏ tên "Timeline"/"Gantt"/"Lookahead"
-    // cho mỗi hệ (M36) — thu hẹp về đúng khối "Kế hoạch & Báo cáo tổng thể" phía trên.
-    const generalSection = hub
-      .locator("section")
-      .filter({ hasText: "Kế hoạch & Báo cáo tổng thể" });
-    await expect(generalSection.getByRole("link", { name: "Timeline", exact: true })).toBeVisible();
-    await expect(generalSection.getByRole("link", { name: "Gantt", exact: true })).toBeVisible();
-    await expect(
-      generalSection.getByRole("link", { name: "Lookahead", exact: true }),
-    ).toBeVisible();
+    await expect(hub.getByRole("link", { name: "Việc của tôi", exact: true })).toBeVisible();
+    await expect(hub.getByRole("link", { name: "Nghiệm thu", exact: true })).toBeVisible();
+    await expect(hub.getByRole("link", { name: "Mặt bằng", exact: true })).toBeVisible();
   });
 
   // M34 đã gán href thật cho "Claim chi phí" — hết node coming-soon con mẫu trong toàn
