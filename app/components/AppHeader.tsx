@@ -304,7 +304,7 @@ export default function AppHeader({
             <button
               onClick={() => setMobileOpen(false)}
               aria-label="Đóng menu"
-              className="ml-1 p-1.5 mr-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-900 shrink-0"
+              className="ml-1 mr-1 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-900 shrink-0"
             >
               <X className="w-4 h-4" />
             </button>
@@ -320,7 +320,7 @@ export default function AppHeader({
           <button
             onClick={() => setMobileOpen(true)}
             aria-label="Mở menu"
-            className="p-1.5 -ml-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-900 lg:hidden shrink-0"
+            className="min-w-[44px] min-h-[44px] -ml-2 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-900 lg:hidden shrink-0"
           >
             <Menu className="w-5 h-5" />
           </button>
@@ -352,7 +352,7 @@ export default function AppHeader({
                 href="/account"
                 title="Tài khoản"
                 aria-label={`Tài khoản — ${me.name}`}
-                className="flex items-center gap-1.5 ml-1 pl-2 border-l border-zinc-800 rounded-lg text-zinc-400 hover:text-white transition"
+                className="flex items-center gap-1.5 ml-1 pl-2 min-h-[44px] border-l border-zinc-800 rounded-lg text-zinc-400 hover:text-white transition"
               >
                 <span className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center text-[11px] font-bold text-emerald-400 shrink-0">
                   {me.name.trim().charAt(0).toUpperCase()}
