@@ -1,6 +1,14 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Bell, CheckCheck, BellRing, BellOff } from "lucide-react";
+import {
+  Bell,
+  CheckCheck,
+  BellRing,
+  BellOff,
+  AlertTriangle,
+  Clock,
+  MessageSquare,
+} from "lucide-react";
 import { formatDateTimeVN } from "@/lib/date";
 
 type Notif = {
@@ -13,6 +21,33 @@ type Notif = {
 };
 
 const POLL_MS = 30_000;
+
+// Phân cấp mức độ nghiêm trọng theo `type` — hệ thống có ~40 loại thông báo rải rác
+// nhiều module (xem app/api/notifications/route.ts), dùng heuristic từ khoá thay vì
+// liệt kê từng loại để dễ bảo trì khi có module mới. Tín hiệu thứ 2 ngoài màu = icon.
+type NotifSeverity = "danger" | "warning" | "info";
+
+function notifSeverity(type: string): NotifSeverity {
+  if (type === "comment") return "info";
+  if (/overdue|delayed|_over$|late|alarm/.test(type)) return "danger";
+  return "warning"; // due_soon, expiry, pending, missing, due, ...
+}
+
+const SEVERITY_BG: Record<NotifSeverity, string> = {
+  danger: "bg-red-950/20",
+  warning: "bg-amber-950/20",
+  info: "bg-sky-950/20",
+};
+const SEVERITY_ICON: Record<NotifSeverity, typeof AlertTriangle> = {
+  danger: AlertTriangle,
+  warning: Clock,
+  info: MessageSquare,
+};
+const SEVERITY_ICON_CLS: Record<NotifSeverity, string> = {
+  danger: "text-red-400",
+  warning: "text-amber-400",
+  info: "text-sky-400",
+};
 
 // VAPID public key (base64url) → Uint8Array cho pushManager.subscribe.
 function urlBase64ToUint8Array(base64: string): Uint8Array {
@@ -159,16 +194,27 @@ export default function NotificationBell() {
             {items.length === 0 && (
               <p className="p-6 text-center text-sm text-zinc-500">Không có thông báo</p>
             )}
-            {items.map((n) => (
-              <button
-                key={n.id}
-                onClick={() => !n.isRead && markRead(n.id)}
-                className={`w-full text-left px-4 py-2.5 border-b border-zinc-800/60 text-sm transition ${n.isRead ? "text-zinc-500" : "text-zinc-200 bg-red-950/20 hover:bg-zinc-800/60"}`}
-              >
-                <span className="block">{n.message}</span>
-                <span className="text-xs text-zinc-600">{formatDateTimeVN(n.createdAt)}</span>
-              </button>
-            ))}
+            {items.map((n) => {
+              const sev = notifSeverity(n.type);
+              const SevIcon = SEVERITY_ICON[sev];
+              return (
+                <button
+                  key={n.id}
+                  onClick={() => !n.isRead && markRead(n.id)}
+                  className={`w-full text-left px-4 py-2.5 border-b border-zinc-800/60 text-sm transition ${n.isRead ? "text-zinc-500" : `text-zinc-200 ${SEVERITY_BG[sev]} hover:bg-zinc-800/60`}`}
+                >
+                  <span className="flex items-start gap-1.5">
+                    <SevIcon
+                      className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${n.isRead ? "text-zinc-600" : SEVERITY_ICON_CLS[sev]}`}
+                    />
+                    <span className="block">{n.message}</span>
+                  </span>
+                  <span className="text-xs text-zinc-600 pl-5">
+                    {formatDateTimeVN(n.createdAt)}
+                  </span>
+                </button>
+              );
+            })}
           </div>
           {push !== "unavailable" && (
             <div className="px-4 py-2.5 border-t border-zinc-800 bg-zinc-950/50">
