@@ -394,6 +394,7 @@ function ApprovalsPageInner() {
               onClick={() => pickFileForGroup(g)}
               disabled={isBusy}
               title="Upload PDF/ảnh"
+              aria-label="Upload PDF/ảnh"
               className="flex items-center gap-1 text-xs bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 border border-zinc-700 rounded-lg px-2 py-1 transition"
             >
               <Upload className="w-3 h-3" />
@@ -402,6 +403,7 @@ function ApprovalsPageInner() {
               onClick={() => openLinkFormForGroup(g)}
               disabled={isBusy}
               title="Thêm link"
+              aria-label="Thêm link"
               className="flex items-center gap-1 text-xs bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 border border-zinc-700 rounded-lg px-2 py-1 transition"
             >
               <Link2 className="w-3 h-3" />
@@ -443,6 +445,109 @@ function ApprovalsPageInner() {
     );
   }
 
+  // Biến thể card cho màn hình <640px — cùng logic với row(), chỉ đổi phần hiển thị
+  function card(g: FloorGroup, isPending: boolean) {
+    const key = `${g.sheetTypeId}-${g.floorLabel}`;
+    const isBusy =
+      busy === `approve-${key}` ||
+      busy === `unapprove-${g.approvalId}` ||
+      busy === `upload-${g.approvalId}`;
+    const allDone = g.doneTasks === g.totalTasks;
+    const pct = g.totalTasks > 0 ? Math.round((g.doneTasks / g.totalTasks) * 100) : 0;
+
+    return (
+      <div key={key} className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-3 space-y-2.5">
+        <div>
+          <div className="font-semibold text-sm">
+            {g.sheetType} · Tầng {g.floorLabel}
+          </div>
+          {g.wpName && <div className="text-xs text-zinc-400 mt-0.5">{g.wpName}</div>}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="flex-1 h-1.5 bg-zinc-700 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${allDone ? "bg-emerald-500" : "bg-blue-500"}`}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <span
+            className={`text-xs font-medium shrink-0 ${allDone ? "text-emerald-400" : "text-zinc-400"}`}
+          >
+            {g.doneTasks}/{g.totalTasks}
+            {allDone && <CheckCircle2 className="w-3 h-3 inline ml-1" />}
+          </span>
+        </div>
+
+        {!isPending && (
+          <div className="text-xs text-zinc-400">
+            {g.approvedByName ? `Duyệt bởi ${g.approvedByName}` : "—"}
+            {g.approvedAt && <span> · {formatDateVN(g.approvedAt)}</span>}
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => openDocsForGroup(g)}
+            disabled={isBusy}
+            className={`flex items-center gap-1 text-xs px-2.5 rounded-lg border transition min-h-[40px] ${
+              g.docCount > 0
+                ? "bg-emerald-950 border-emerald-900 text-emerald-200"
+                : "bg-zinc-800 border-zinc-700 text-zinc-400"
+            }`}
+          >
+            <Paperclip className="w-3.5 h-3.5" /> {g.docCount} biên bản
+          </button>
+          <button
+            onClick={() => pickFileForGroup(g)}
+            disabled={isBusy}
+            title="Upload PDF/ảnh"
+            aria-label="Upload PDF/ảnh"
+            className="flex items-center justify-center min-w-[40px] min-h-[40px] bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 border border-zinc-700 rounded-lg transition"
+          >
+            <Upload className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => openLinkFormForGroup(g)}
+            disabled={isBusy}
+            title="Thêm link"
+            aria-label="Thêm link"
+            className="flex items-center justify-center min-w-[40px] min-h-[40px] bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 border border-zinc-700 rounded-lg transition"
+          >
+            <Link2 className="w-4 h-4" />
+          </button>
+        </div>
+
+        {isPending ? (
+          canApprove && allDone ? (
+            <button
+              onClick={() => approveFloor(g)}
+              disabled={isBusy}
+              className="w-full flex items-center justify-center gap-1.5 text-sm bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent rounded-lg py-3 font-medium transition min-h-[44px]"
+            >
+              <CheckSquare className="w-4 h-4" /> Duyệt nghiệm thu
+            </button>
+          ) : (
+            <div className="flex items-center justify-center gap-1 text-xs text-zinc-400 py-2">
+              <Clock className="w-3.5 h-3.5" /> Chờ {g.totalTasks - g.doneTasks} task
+            </div>
+          )
+        ) : (
+          canApprove &&
+          g.approvalId && (
+            <button
+              onClick={() => unapproveFloor(g)}
+              disabled={isBusy}
+              className="w-full text-sm bg-red-700 hover:bg-red-600 disabled:opacity-50 text-on-accent rounded-lg py-3 transition min-h-[44px]"
+            >
+              Huỷ NT
+            </button>
+          )
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <input
@@ -475,7 +580,7 @@ function ApprovalsPageInner() {
               <>
                 {toolbar}
                 <div
-                  className="overflow-x-auto"
+                  className="overflow-x-auto hidden sm:block"
                   tabIndex={0}
                   role="region"
                   aria-label="Bảng chờ nghiệm thu"
@@ -514,6 +619,20 @@ function ApprovalsPageInner() {
                     </tbody>
                   </table>
                 </div>
+                {/* Card view mobile (<640px) — dùng cùng dữ liệu đã lọc/sort ở trên */}
+                <div className="sm:hidden p-3 space-y-2">
+                  {filtered.map((g) => card(g, true))}
+                  {filtered.length === 0 && pending.length > 0 && (
+                    <p className="p-4 text-center text-sm text-zinc-400">
+                      Không có tầng/hệ nào khớp bộ lọc.
+                    </p>
+                  )}
+                  {pending.length === 0 && (
+                    <p className="p-4 text-center text-sm text-zinc-400">
+                      Không có tầng nào chờ nghiệm thu — tất cả đã được duyệt hoặc chưa đủ tiến độ.
+                    </p>
+                  )}
+                </div>
               </>
             )}
           </TableToolbar>
@@ -538,7 +657,7 @@ function ApprovalsPageInner() {
               <>
                 {toolbar}
                 <div
-                  className="overflow-x-auto"
+                  className="overflow-x-auto hidden sm:block"
                   tabIndex={0}
                   role="region"
                   aria-label="Bảng đã nghiệm thu"
@@ -576,6 +695,20 @@ function ApprovalsPageInner() {
                       )}
                     </tbody>
                   </table>
+                </div>
+                {/* Card view mobile (<640px) — dùng cùng dữ liệu đã lọc/sort ở trên */}
+                <div className="sm:hidden p-3 space-y-2">
+                  {filtered.map((g) => card(g, false))}
+                  {filtered.length === 0 && approved.length > 0 && (
+                    <p className="p-4 text-center text-sm text-zinc-400">
+                      Không có tầng/hệ nào khớp bộ lọc.
+                    </p>
+                  )}
+                  {approved.length === 0 && (
+                    <p className="p-4 text-center text-sm text-zinc-400">
+                      Chưa có tầng nào được nghiệm thu.
+                    </p>
+                  )}
                 </div>
               </>
             )}
