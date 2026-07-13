@@ -158,52 +158,30 @@ export default function AppHeader({
   }
 
   // Dashboard cấp 3: lá đơn (có href, render thẳng) hoặc nhóm (không href, có children
-  // — hàng tiêu đề chỉ gập/mở, KHÔNG phải link; mặc định mở, tự mở khi chứa trang đang xem).
+  // — flatten ngang hàng dưới cụm cha, không còn hàng tiêu đề/chevron riêng: cụm cha
+  // (renderCluster) đã là accordion duy nhất ở cấp này).
   function renderDashboard(dash: DashNode) {
     if (!dash.children) return renderLeaf(dash);
     const visibleChildren = dash.children.filter((c) => canSeeNavItem(c, me?.role));
     if (visibleChildren.length === 0) return null;
-    const id = dash.id ?? dash.label;
-    const containsActive = visibleChildren.some((c) => isNavItemActive(c, path));
-    // Thu gọn sidebar (icon-only): luôn mở — không có chỗ hiện chevron/nhãn để gập
-    // riêng từng dashboard, ẩn hẳn con sẽ làm mất link (trái ý "không ẩn link đang dùng").
-    const open = collapsed || containsActive || (openMap[id] ?? true);
-    const Icon = dash.icon;
     return (
-      <div key={id}>
-        <button
-          type="button"
-          onClick={() => toggleDash(id, open)}
-          aria-expanded={open}
-          title={dash.label}
-          className="w-full flex items-center gap-2.5 mx-2 px-2.5 py-2 rounded-lg text-sm min-h-10 text-zinc-400 hover:text-white hover:bg-zinc-900/60 transition"
-        >
-          <Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
-          <span className="sidebar-label flex-1 truncate text-left">{dash.label}</span>
-          <ChevronDown
-            className={`sidebar-label w-3.5 h-3.5 shrink-0 transition-transform ${open ? "" : "-rotate-90"}`}
-          />
-        </button>
-        {open && (
-          <div className={collapsed ? "" : "ml-4 border-l border-zinc-800 pl-1"}>
-            {dash.id && (
-              <a
-                href={`/hub/${dash.id}`}
-                title={`Tổng quan ${dash.label}`}
-                aria-current={path === `/hub/${dash.id}` ? "page" : undefined}
-                className={`flex items-center gap-2.5 mx-2 px-2.5 py-2 rounded-lg text-sm transition min-h-10 border-l-2 ${
-                  path === `/hub/${dash.id}`
-                    ? "bg-zinc-800 text-white font-medium border-emerald-400"
-                    : "text-zinc-400 hover:text-white hover:bg-zinc-900/60 border-transparent"
-                }`}
-              >
-                <LayoutDashboard className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
-                <span className="sidebar-label italic">Tổng quan</span>
-              </a>
-            )}
-            {visibleChildren.map((child) => renderLeaf(child))}
-          </div>
+      <div key={dash.id ?? dash.label} role="group" aria-label={dash.label}>
+        {dash.id && (
+          <a
+            href={`/hub/${dash.id}`}
+            title={`Tổng quan ${dash.label}`}
+            aria-current={path === `/hub/${dash.id}` ? "page" : undefined}
+            className={`flex items-center gap-2.5 mx-2 px-2.5 py-2 rounded-lg text-sm transition min-h-10 border-l-2 ${
+              path === `/hub/${dash.id}`
+                ? "bg-zinc-800 text-white font-medium border-emerald-400"
+                : "text-zinc-400 hover:text-white hover:bg-zinc-900/60 border-transparent"
+            }`}
+          >
+            <LayoutDashboard className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
+            <span className="sidebar-label italic">Tổng quan</span>
+          </a>
         )}
+        {visibleChildren.map((child) => renderLeaf(child))}
       </div>
     );
   }
