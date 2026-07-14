@@ -143,6 +143,7 @@ export default function AllNotificationsPage() {
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
+            aria-label="Lọc theo loại thông báo"
             className="bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-2 text-sm h-10"
           >
             <option value="">Mọi loại</option>
@@ -155,6 +156,7 @@ export default function AllNotificationsPage() {
           <select
             value={readFilter}
             onChange={(e) => setReadFilter(e.target.value as "all" | "unread" | "read")}
+            aria-label="Lọc theo trạng thái đã đọc"
             className="bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-2 text-sm h-10"
           >
             <option value="all">Tất cả trạng thái</option>
@@ -199,22 +201,23 @@ export default function AllNotificationsPage() {
 
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
           {paged.length === 0 && (
-            <p className="p-6 text-center text-sm text-zinc-500">Không có thông báo phù hợp</p>
+            <p className="p-6 text-center text-sm text-zinc-400">Không có thông báo phù hợp</p>
           )}
           {paged.map((n) => (
             <div
               key={n.id}
-              className={`flex items-start gap-3 px-4 py-3 border-b border-zinc-800/60 last:border-0 ${n.isRead ? "text-zinc-500" : "text-zinc-200 bg-red-950/10"}`}
+              className={`flex items-start gap-3 px-4 py-3 border-b border-zinc-800/60 last:border-0 ${n.isRead ? "text-zinc-400" : "text-zinc-200 bg-red-950/10"}`}
             >
               <input
                 type="checkbox"
                 checked={selected.has(n.id)}
                 onChange={() => toggleSelect(n.id)}
+                aria-label={`Chọn thông báo: ${n.message}`}
                 className="w-4 h-4 mt-1 shrink-0"
               />
               <button onClick={() => onItemClick(n)} className="flex-1 text-left text-sm">
                 <span className="block">{n.message}</span>
-                <span className="text-xs text-zinc-600">
+                <span className="text-xs text-zinc-400">
                   {formatDateTimeVN(n.createdAt)} · {n.type}
                 </span>
               </button>

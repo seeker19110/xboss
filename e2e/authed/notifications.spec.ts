@@ -48,7 +48,10 @@ test.describe("Thông báo (sau đăng nhập)", () => {
 test.describe("Chuông thông báo — dropdown (sau đăng nhập)", () => {
   test("mở dropdown, không có vi phạm a11y nghiêm trọng (axe)", async ({ page }) => {
     await page.goto("/");
-    const bell = page.getByRole("button", { name: "Thông báo" });
+    // exact: true — sau khi mở dropdown, nội dung thông báo (vd "thông báo công việc đình
+    // trệ") cũng khớp match không-exact với tên "Thông báo" của nút chuông, gây strict mode
+    // violation (nhiều phần tử cùng khớp locator).
+    const bell = page.getByRole("button", { name: "Thông báo", exact: true });
     await expect(bell).toBeVisible({ timeout: 15_000 });
     await expect(bell).toHaveAttribute("aria-expanded", "false");
     await bell.click();
