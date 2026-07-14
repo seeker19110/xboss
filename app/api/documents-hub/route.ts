@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { DOCUMENT_SOURCES, listAllDocuments, type DocumentSource } from "@/lib/documents-hub";
+import { getCurrentProjectId } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,8 @@ export async function GET(req: NextRequest) {
   if (sourceRaw && !DOCUMENT_SOURCES.includes(sourceRaw as DocumentSource))
     return NextResponse.json({ error: "Loại nguồn không hợp lệ" }, { status: 422 });
 
-  const documents = await listAllDocuments(user, {
+  const projectId = await getCurrentProjectId(user);
+  const documents = await listAllDocuments(user, projectId, {
     system: sp.get("system")?.trim() || undefined,
     floor: sp.get("floor")?.trim() || undefined,
     source: sourceRaw as DocumentSource | undefined,
