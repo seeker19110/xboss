@@ -117,21 +117,28 @@ export function reconstructProgressAtDate<T extends { id: number; progress: numb
   return result;
 }
 
-// Bản đọc DB: tái dựng % tiến độ từng task tại mốc `date`, lọc theo hệ nếu có `systemId`.
+// Bản đọc DB: tái dựng % tiến độ từng task tại mốc `date`, lọc theo hệ nếu có `systemId`
+// và theo dự án đang chọn nếu có `projectId` (đa dự án, M22+ — optional, không truyền =
+// không lọc, tương thích ngược các chỗ gọi cũ như buildWeeklyReport).
 export async function progressAtDate(
   date: string,
-  filter: { systemId?: number } = {},
+  filter: { systemId?: number; projectId?: number } = {},
 ): Promise<TaskProgressAtDate[]> {
   const systemFilter = filter.systemId != null ? "AND st.system_id = ?" : "";
   const systemParams = filter.systemId != null ? [filter.systemId] : [];
+  const projectJoin = filter.projectId != null ? "JOIN towers tw ON tw.id = st.tower_id" : "";
+  const projectFilter = filter.projectId != null ? "AND tw.project_id = ?" : "";
+  const projectParams = filter.projectId != null ? [filter.projectId] : [];
 
   const tasks = await query<{ id: number; progress: number; sheetId: number; sheetType: string }>(
     `SELECT t.id, t.progress_percent AS progress, st.id AS "sheetId", st.code AS "sheetType"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
-      WHERE 1=1 ${systemFilter}`,
+       ${projectJoin}
+      WHERE 1=1 ${systemFilter} ${projectFilter}`,
     ...systemParams,
+    ...projectParams,
   );
 
   const hist = await query<HistRow>(
@@ -141,9 +148,11 @@ export async function progressAtDate(
        JOIN tasks t ON h.task_id = t.id
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
-      WHERE 1=1 ${systemFilter}
+       ${projectJoin}
+      WHERE 1=1 ${systemFilter} ${projectFilter}
       ORDER BY h.task_id, h.changed_at`,
     ...systemParams,
+    ...projectParams,
   );
 
   const progress = reconstructProgressAtDate(tasks, hist, date);

@@ -73,20 +73,37 @@ export type QualityBlock = {
   inspectionPassRate: number | null;
 };
 
-export async function qualityBlock(): Promise<QualityBlock> {
+// projectId: lọc theo dự án đang chọn (M22+, đa dự án) — null/undefined = không lọc
+// (tương thích ngược DB chưa gán project nào, xem lib/projects.ts).
+export async function qualityBlock(projectId?: number | null): Promise<QualityBlock> {
   const today = todayISO();
+  const ncrProjectFilter = projectId != null ? " AND project_id = ?" : "";
+  const ncrParams = projectId != null ? [projectId] : [];
   const ncrRow = await queryOne<{ open: number; overdue: number; closed30d: number }>(
     `SELECT
        COUNT(*) FILTER (WHERE status <> 'closed') AS open,
        COUNT(*) FILTER (WHERE status <> 'closed' AND due_date IS NOT NULL AND due_date < ?) AS overdue,
        COUNT(*) FILTER (WHERE status = 'closed' AND closed_at >= NOW() - INTERVAL '30 days') AS "closed30d"
-     FROM ncrs`,
+     FROM ncrs WHERE TRUE${ncrProjectFilter}`,
     today,
+    ...ncrParams,
   );
+  // qc_inspections không có project_id trực tiếp — suy qua task hoặc work_package → sheet_types → towers.
+  const inspProjectJoin =
+    projectId != null
+      ? ` LEFT JOIN tasks qt ON qt.id = qi.task_id
+       LEFT JOIN work_packages qwp ON qwp.id = COALESCE(qt.package_id, qi.work_package_id)
+       LEFT JOIN sheet_types qst ON qst.id = qwp.sheet_type_id
+       LEFT JOIN towers qtw ON qtw.id = qst.tower_id`
+      : "";
+  const inspProjectFilter = projectId != null ? " AND qtw.project_id = ?" : "";
+  const inspParams = projectId != null ? [projectId] : [];
   const inspRow = await queryOne<{ passed: number; failed: number }>(
-    `SELECT COUNT(*) FILTER (WHERE status = 'passed') AS passed,
-            COUNT(*) FILTER (WHERE status = 'failed') AS failed
-       FROM qc_inspections WHERE status IN ('passed','failed')`,
+    `SELECT COUNT(*) FILTER (WHERE qi.status = 'passed') AS passed,
+            COUNT(*) FILTER (WHERE qi.status = 'failed') AS failed
+       FROM qc_inspections qi${inspProjectJoin}
+      WHERE qi.status IN ('passed','failed')${inspProjectFilter}`,
+    ...inspParams,
   );
   const passed = inspRow?.passed ?? 0;
   const failed = inspRow?.failed ?? 0;
@@ -102,16 +119,23 @@ export async function qualityBlock(): Promise<QualityBlock> {
 
 export type ProcurementBlock = { poLate: number; vehicleNoShowWeek: number };
 
-export async function procurementBlock(): Promise<ProcurementBlock> {
+export async function procurementBlock(projectId?: number | null): Promise<ProcurementBlock> {
+  // purchase_orders/vehicle_logs có project_id trực tiếp (M22+) — lọc thẳng, không cần join.
+  const poProjectFilter = projectId != null ? " AND project_id = ?" : "";
+  const poParams = projectId != null ? [projectId] : [];
   const poLate = await queryOne<{ n: number }>(
     `SELECT COUNT(*) AS n FROM purchase_orders
       WHERE expected_date IS NOT NULL AND expected_date < ?
-        AND status NOT IN ('received','reconciled','cancelled')`,
+        AND status NOT IN ('received','reconciled','cancelled')${poProjectFilter}`,
     todayISO(),
+    ...poParams,
   );
+  const vehicleProjectFilter = projectId != null ? " AND project_id = ?" : "";
+  const vehicleParams = projectId != null ? [projectId] : [];
   const vehicleNoShow = await queryOne<{ n: number }>(
     `SELECT COUNT(*) AS n FROM vehicle_logs
-      WHERE status = 'no_show' AND expected_at >= NOW() - INTERVAL '7 days'`,
+      WHERE status = 'no_show' AND expected_at >= NOW() - INTERVAL '7 days'${vehicleProjectFilter}`,
+    ...vehicleParams,
   );
   return { poLate: poLate?.n ?? 0, vehicleNoShowWeek: vehicleNoShow?.n ?? 0 };
 }
@@ -121,10 +145,10 @@ export type WorkfrontBlock = { waitingFloors: number; cumulativeWaitDays: number
 // M14 (mặt bằng thi công): đếm tầng 'pending' có task sắp/đã tới hạn bắt đầu
 // (frontMissingList, cùng nguồn với notification front_missing + /lookahead) +
 // tổng số ngày chờ luỹ kế — bằng chứng xin gia hạn (EOT) trên dashboard.
-export async function workfrontBlock(): Promise<WorkfrontBlock | null> {
+export async function workfrontBlock(projectId?: number | null): Promise<WorkfrontBlock | null> {
   if (!(await tableExists("work_fronts"))) return null;
   const { frontMissingList } = await import("@/lib/workfronts");
-  const items = await frontMissingList();
+  const items = await frontMissingList(projectId ?? undefined);
   return {
     waitingFloors: items.length,
     cumulativeWaitDays: items.reduce((sum, it) => sum + it.waitingDays, 0),
@@ -135,10 +159,14 @@ export type ApprovalsBlock = { pendingProposals: number; pendingPurchaseRequests
 
 // M19 — widget "Chờ duyệt" cho Admin/PM: đếm gộp đề xuất đã trình (proposals) +
 // yêu cầu mua vật tư đang chờ (purchase_requests) — 1 con số duy nhất, tránh 2 nơi rời rạc.
-export async function approvalsBlock(): Promise<ApprovalsBlock> {
+export async function approvalsBlock(projectId?: number | null): Promise<ApprovalsBlock> {
+  // proposals/purchase_requests có project_id trực tiếp (M22+) — lọc thẳng, không cần join.
+  const proposalFilter = projectId != null ? " AND project_id = ?" : "";
+  const prFilter = projectId != null ? " AND project_id = ?" : "";
   const row = await queryOne<{ proposals: number; prs: number }>(
-    `SELECT (SELECT COUNT(*) FROM proposals WHERE status = 'submitted') AS proposals,
-            (SELECT COUNT(*) FROM purchase_requests WHERE status = 'pending') AS prs`,
+    `SELECT (SELECT COUNT(*) FROM proposals WHERE status = 'submitted'${proposalFilter}) AS proposals,
+            (SELECT COUNT(*) FROM purchase_requests WHERE status = 'pending'${prFilter}) AS prs`,
+    ...(projectId != null ? [projectId, projectId] : []),
   );
   return {
     pendingProposals: Number(row?.proposals ?? 0),
@@ -149,7 +177,10 @@ export async function approvalsBlock(): Promise<ApprovalsBlock> {
 export type VoBlock = { draft: number; submitted: number; approved: number; rejected: number };
 
 // Tổng giá trị VO theo trạng thái (approved gộp cả partially_approved/contract_added).
-export async function voBlock(): Promise<VoBlock> {
+export async function voBlock(projectId?: number | null): Promise<VoBlock> {
+  // variation_orders có project_id trực tiếp (M22+) — lọc thẳng, không cần join.
+  const projectFilter = projectId != null ? " AND vo.project_id = ?" : "";
+  const projectParams = projectId != null ? [projectId] : [];
   const rows = await query<{ status: string; total: number }>(
     `SELECT vo.status,
             COALESCE(SUM(
@@ -159,7 +190,9 @@ export async function voBlock(): Promise<VoBlock> {
             ), 0) AS total
        FROM variation_orders vo
        LEFT JOIN boq_items bi ON bi.vo_id = vo.id
+      WHERE TRUE${projectFilter}
       GROUP BY vo.status`,
+    ...projectParams,
   );
   const result: VoBlock = { draft: 0, submitted: 0, approved: 0, rejected: 0 };
   for (const r of rows) {
@@ -183,8 +216,12 @@ export type SystemCrossRow = {
 
 // Bảng so sánh chéo hệ: % tiến độ, số task trễ, NCR mở, % ngân sách đã dùng — mỗi
 // hệ trong danh mục systems (màn hình chỉ huy trưởng đa hệ, §3b kế hoạch tổng).
-export async function bySystemBlock(): Promise<SystemCrossRow[]> {
+export async function bySystemBlock(projectId?: number | null): Promise<SystemCrossRow[]> {
   const today = todayISO();
+  // sheet_types/work_packages/tasks chưa có project_id trực tiếp — suy qua towers.
+  const towerJoin = projectId != null ? " JOIN towers tw ON tw.id = st.tower_id" : "";
+  const towerFilter = projectId != null ? " AND tw.project_id = ?" : "";
+  const towerParams = projectId != null ? [projectId] : [];
   const progress = await query<{ systemId: number; progressPct: number; delayedCount: number }>(
     `SELECT st.system_id AS "systemId",
             COALESCE(AVG(t.progress_percent), 0) * 100 AS "progressPct",
@@ -192,21 +229,25 @@ export async function bySystemBlock(): Promise<SystemCrossRow[]> {
                               AND t.status NOT IN ('hoan_thanh','nghiem_thu')) AS "delayedCount"
        FROM sheet_types st
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
-       LEFT JOIN tasks t ON t.package_id = wp.id
-      WHERE st.system_id IS NOT NULL
+       LEFT JOIN tasks t ON t.package_id = wp.id${towerJoin}
+      WHERE st.system_id IS NOT NULL${towerFilter}
       GROUP BY st.system_id`,
     today,
+    ...towerParams,
   );
+  // ncrs có project_id trực tiếp (M22+) — lọc thẳng trên n.project_id, không cần join thêm.
+  const ncrProjectFilter = projectId != null ? " AND n.project_id = ?" : "";
   const ncrOpen = await query<{ systemId: number; n: number }>(
     `SELECT st.system_id AS "systemId", COUNT(*) AS n
        FROM ncrs n
        JOIN tasks t ON t.id = n.task_id
        JOIN work_packages wp ON wp.id = t.package_id
        JOIN sheet_types st ON st.id = wp.sheet_type_id
-      WHERE n.status <> 'closed' AND st.system_id IS NOT NULL
+      WHERE n.status <> 'closed' AND st.system_id IS NOT NULL${ncrProjectFilter}
       GROUP BY st.system_id`,
+    ...(projectId != null ? [projectId] : []),
   );
-  const cost = await costSummary("system");
+  const cost = await costSummary("system", true, projectId ?? undefined);
 
   const progressMap = new Map(progress.map((r) => [r.systemId, r]));
   const ncrMap = new Map(ncrOpen.map((r) => [r.systemId, Number(r.n)]));

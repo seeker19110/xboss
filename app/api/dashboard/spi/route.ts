@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, todayISO } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { resolveSystemId } from "@/lib/systems";
+import { getCurrentProjectId } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -35,8 +36,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Thầu phụ không có quyền xem dashboard" }, { status: 403 });
 
   const systemId = await resolveSystemId(req.nextUrl.searchParams.get("system"));
-  const systemFilter = systemId !== null ? "WHERE st.system_id = ?" : "";
+  const systemFilter = systemId !== null ? "AND st.system_id = ?" : "";
   const systemParams = systemId !== null ? [systemId] : [];
+  // Dự án đang chọn — lọc theo dự án để tránh rò rỉ chéo dự án (đa dự án, M22+).
+  // null = DB chưa có project nào → giữ hành vi không lọc (tương thích ngược).
+  const projectId = await getCurrentProjectId(user);
+  const projectJoin = projectId != null ? "JOIN towers tw ON tw.id = st.tower_id" : "";
+  const projectFilter = projectId != null ? "AND tw.project_id = ?" : "";
+  const projectParams = projectId != null ? [projectId] : [];
 
   const rows = await query<Row>(
     `SELECT st.code AS "sheetType", t.start_date AS "startDate",
@@ -44,8 +51,10 @@ export async function GET(req: NextRequest) {
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
-       ${systemFilter}`,
+       ${projectJoin}
+      WHERE 1=1 ${systemFilter} ${projectFilter}`,
     ...systemParams,
+    ...projectParams,
   );
 
   const todayMs = toDate(todayISO());

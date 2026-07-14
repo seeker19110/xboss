@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,13 @@ export async function GET(req: NextRequest) {
   // Nếu chuỗi không sinh được token hợp lệ (vd: ký tự đặc biệt) thì trả rỗng — an toàn.
   const ftsQuery = q.replace(/[^\p{L}\p{N}\s]/gu, " ").trim() || q;
 
+  // Dự án đang chọn — lọc kết quả tìm kiếm theo dự án để tránh rò rỉ chéo dự án (đa dự
+  // án, M22+). null = DB chưa có project nào → giữ hành vi không lọc (tương thích ngược).
+  const projectId = await getCurrentProjectId(user);
+  const projectJoin = projectId != null ? " JOIN towers tw ON tw.id = st.tower_id" : "";
+  const projectFilter = projectId != null ? " AND tw.project_id = ?" : "";
+  const projectParam = projectId != null ? [projectId] : [];
+
   const [tasks, packages] = await Promise.all([
     query<SearchHit>(
       `SELECT 'task' AS kind, t.id, t.code, t.name, t.boq_code AS "boqCode",
@@ -45,18 +53,19 @@ export async function GET(req: NextRequest) {
          FROM tasks t
          JOIN work_packages wp ON t.package_id = wp.id
          JOIN sheet_types st ON wp.sheet_type_id = st.id
-         LEFT JOIN systems sys ON sys.id = st.system_id
-        WHERE lower(t.code) LIKE ?
+         LEFT JOIN systems sys ON sys.id = st.system_id${projectJoin}
+        WHERE (lower(t.code) LIKE ?
            OR lower(t.boq_code) LIKE ?
            OR to_tsvector('simple', coalesce(t.name, '')) @@ plainto_tsquery('simple', ?)
            OR lower(sys.code) LIKE ?
-           OR lower(sys.name) LIKE ?
+           OR lower(sys.name) LIKE ?)${projectFilter}
         ORDER BY st.id, t.code LIMIT 15`,
       prefix,
       prefix,
       ftsQuery,
       prefix,
       prefix,
+      ...projectParam,
     ),
 
     query<SearchHit>(
@@ -65,18 +74,19 @@ export async function GET(req: NextRequest) {
               st.code AS "sheetType", st.slug AS "sheetSlug"
          FROM work_packages wp
          JOIN sheet_types st ON wp.sheet_type_id = st.id
-         LEFT JOIN systems sys ON sys.id = st.system_id
-        WHERE lower(wp.code) LIKE ?
+         LEFT JOIN systems sys ON sys.id = st.system_id${projectJoin}
+        WHERE (lower(wp.code) LIKE ?
            OR lower(wp.boq_code) LIKE ?
            OR to_tsvector('simple', coalesce(wp.name, '')) @@ plainto_tsquery('simple', ?)
            OR lower(sys.code) LIKE ?
-           OR lower(sys.name) LIKE ?
+           OR lower(sys.name) LIKE ?)${projectFilter}
         ORDER BY st.id, wp.code LIMIT 10`,
       prefix,
       prefix,
       ftsQuery,
       prefix,
       prefix,
+      ...projectParam,
     ),
   ]);
 

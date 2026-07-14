@@ -313,3 +313,41 @@ test(
     await cleanupProject(ids);
   },
 );
+
+test(
+  "progressAtDate({ projectId }): chỉ tái dựng task của dự án được chọn, không lẫn dự án khác (chống rò rỉ chéo dự án)",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { insertId, run } = await import("@/lib/db");
+    const { progressAtDate } = await import("@/lib/report");
+
+    const sheetA = uniqueCode("TESTRPTPA");
+    const sheetB = uniqueCode("TESTRPTPB");
+    const idsA = await seedProject(sheetA);
+    const idsB = await seedProject(sheetB);
+
+    const taskA = await insertId(
+      `INSERT INTO tasks (package_id, code, name, progress_percent, status)
+       VALUES (?, 'RA,01', 'Task dự án A', 1, 'hoan_thanh')`,
+      idsA.pkgId,
+    );
+    const taskB = await insertId(
+      `INSERT INTO tasks (package_id, code, name, progress_percent, status)
+       VALUES (?, 'RB,01', 'Task dự án B', 1, 'hoan_thanh')`,
+      idsB.pkgId,
+    );
+
+    const today = new Date().toISOString().slice(0, 10);
+    const rowsA = await progressAtDate(today, { projectId: idsA.projectId });
+    const rowsB = await progressAtDate(today, { projectId: idsB.projectId });
+
+    assert.ok(rowsA.some((r) => r.taskId === taskA));
+    assert.ok(!rowsA.some((r) => r.taskId === taskB), "lọc dự án A không được lẫn task dự án B");
+    assert.ok(rowsB.some((r) => r.taskId === taskB));
+    assert.ok(!rowsB.some((r) => r.taskId === taskA), "lọc dự án B không được lẫn task dự án A");
+
+    await run(`DELETE FROM tasks WHERE id IN (?, ?)`, taskA, taskB);
+    await cleanupProject(idsA);
+    await cleanupProject(idsB);
+  },
+);

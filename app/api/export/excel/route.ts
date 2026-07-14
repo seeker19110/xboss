@@ -3,6 +3,7 @@ import ExcelJS from "exceljs";
 import { query, queryOne, todayISO } from "@/lib/db";
 import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -172,6 +173,13 @@ export async function GET(req: NextRequest) {
 
   const today = todayISO();
 
+  // Dự án đang chọn — lọc mọi tab theo dự án để tránh rò rỉ chéo dự án (đa dự án, M22+).
+  // null = DB chưa có project nào → giữ hành vi không lọc (tương thích ngược).
+  const projectId = await getCurrentProjectId(user);
+  const projectJoin = projectId != null ? " JOIN towers tw ON tw.id = st.tower_id" : "";
+  const projectFilter = projectId != null ? " AND tw.project_id = ?" : "";
+  const projectParam = projectId != null ? [projectId] : [];
+
   const delayed = await query<{
     boqCode: string | null;
     code: string;
@@ -187,11 +195,12 @@ export async function GET(req: NextRequest) {
             t.progress_percent AS "progressPercent", wp.floor_label AS "floorLabel", st.code AS "sheetType"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
-       JOIN sheet_types st ON wp.sheet_type_id = st.id
+       JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
       WHERE t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_percent < 1
-        AND t.status NOT IN ('hoan_thanh','nghiem_thu')
+        AND t.status NOT IN ('hoan_thanh','nghiem_thu')${projectFilter}
       ORDER BY st.code, t.end_date`,
     today,
+    ...projectParam,
   );
 
   const kpi = await query<{
@@ -204,14 +213,16 @@ export async function GET(req: NextRequest) {
             COALESCE(AVG(t.progress_percent),0) AS "avgProgress",
             COALESCE(SUM(CASE WHEN t.end_date < ? AND t.progress_percent < 1 AND t.status NOT IN ('hoan_thanh','nghiem_thu') THEN 1 ELSE 0 END),0) AS delayed
        FROM sheet_types st
+       ${projectId != null ? "JOIN towers tw ON tw.id = st.tower_id AND tw.project_id = ?" : ""}
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
       GROUP BY st.id, st.code ORDER BY st.id`,
     today,
+    ...projectParam,
   );
 
   // Toàn bộ task theo sheet (cho các tab tracking) — thứ tự như lưới trên web.
-  const sheetFilter = onlySheet ? "WHERE st.code = ?" : "";
+  const sheetFilter = onlySheet ? "AND st.code = ?" : "";
   const sheetParams = onlySheet ? [onlySheet] : [];
   const allTasks = await query<TrackTask>(
     `SELECT t.id AS "taskId", t.boq_code AS "boqCode", t.code, t.name, t.status,
@@ -221,10 +232,11 @@ export async function GET(req: NextRequest) {
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
-       LEFT JOIN users u ON t.assigned_to = u.id
-      ${sheetFilter}
+       LEFT JOIN users u ON t.assigned_to = u.id${projectJoin}
+      WHERE 1=1 ${sheetFilter}${projectFilter}
       ORDER BY st.id, wp.sort_order, wp.id, t.sort_order, t.id`,
     ...sheetParams,
+    ...projectParam,
   );
 
   const allDims = await query<DimRow>(
@@ -232,10 +244,11 @@ export async function GET(req: NextRequest) {
        FROM progress_dimensions d
        JOIN tasks t ON d.task_id = t.id
        JOIN work_packages wp ON t.package_id = wp.id
-       JOIN sheet_types st ON wp.sheet_type_id = st.id
-      ${sheetFilter}
+       JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
+      WHERE 1=1 ${sheetFilter}${projectFilter}
       ORDER BY d.task_id, d.sort_order, d.id`,
     ...sheetParams,
+    ...projectParam,
   );
 
   const wb = new ExcelJS.Workbook();

@@ -3,6 +3,7 @@ import { query, todayISO, daysFromTodayISO } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { resolveSystemId } from "@/lib/systems";
 import { progressAtDate } from "@/lib/report";
+import { getCurrentProjectId } from "@/lib/projects";
 import {
   cashflowSeries,
   cpiBlock,
@@ -27,8 +28,12 @@ export async function GET(req: NextRequest) {
 
   const today = todayISO();
   const systemId = await resolveSystemId(req.nextUrl.searchParams.get("system"));
+  // Dự án đang chọn — lọc mọi khối theo dự án để tránh rò rỉ chéo dự án (đa dự án, M22+).
+  // null = DB chưa có project nào → giữ hành vi không lọc (tương thích ngược).
+  const projectId = await getCurrentProjectId(user);
+  const projectFilterAnd = projectId != null ? "AND tw.project_id = ?" : "";
+  const projectParams = projectId != null ? [projectId] : [];
   const systemFilterAnd = systemId !== null ? "AND st.system_id = ?" : "";
-  const systemFilterWhere = systemId !== null ? "WHERE st.system_id = ?" : "";
   const systemParams = systemId !== null ? [systemId] : [];
   const range = req.nextUrl.searchParams.get("range"); // "week" | "month" | null
 
@@ -45,16 +50,21 @@ export async function GET(req: NextRequest) {
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
        LEFT JOIN users u ON t.assigned_to = u.id
+       ${projectId != null ? "JOIN towers tw ON tw.id = st.tower_id" : ""}
       WHERE t.end_date IS NOT NULL AND t.end_date < ?
         AND t.progress_percent < 1
         AND t.status NOT IN ('hoan_thanh','nghiem_thu')
         ${systemFilterAnd}
+        ${projectFilterAnd}
       ORDER BY t.end_date`,
     today,
     ...systemParams,
+    ...projectParams,
   );
 
-  // KPI theo từng sheet
+  // KPI theo từng sheet. LEFT JOIN work_packages/tasks (sheet chưa có task nào vẫn phải
+  // hiện) — lọc dự án đặt trong ON của LEFT JOIN towers (không phải WHERE) để không làm
+  // biến mất sheet chưa có task khi đang lọc theo dự án khác task đó.
   const kpi = await query<{
     sheetId: number;
     sheetType: string;
@@ -69,12 +79,14 @@ export async function GET(req: NextRequest) {
             COALESCE(SUM(CASE WHEN t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_percent < 1
                               AND t.status NOT IN ('hoan_thanh','nghiem_thu') THEN 1 ELSE 0 END), 0) AS delayed
        FROM sheet_types st
+       ${projectId != null ? "JOIN towers tw ON tw.id = st.tower_id AND tw.project_id = ?" : ""}
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
-       ${systemFilterWhere}
+       ${systemId !== null ? "WHERE st.system_id = ?" : ""}
       GROUP BY st.id, st.code, st.slug
       ORDER BY st.sort_order, st.id`,
     today,
+    ...projectParams,
     ...systemParams,
   );
 
@@ -84,7 +96,10 @@ export async function GET(req: NextRequest) {
     range === "week" || range === "month"
       ? await (async () => {
           const pastDate = range === "week" ? daysFromTodayISO(-7) : daysFromTodayISO(-30);
-          const prevRows = await progressAtDate(pastDate, systemId !== null ? { systemId } : {});
+          const prevRows = await progressAtDate(pastDate, {
+            ...(systemId !== null ? { systemId } : {}),
+            projectId: projectId ?? undefined,
+          });
           const prevBySheet = new Map<number, number[]>();
           for (const r of prevRows) {
             if (!prevBySheet.has(r.sheetId)) prevBySheet.set(r.sheetId, []);
@@ -109,17 +124,17 @@ export async function GET(req: NextRequest) {
   // (admin/pm/bch) — ẩn từ server cho cdt/viewer, không chỉ ẩn UI (quyết 2026-07-04).
   const canViewFinance = CAN.viewPayments(user.role);
   const [quality, procurement, workfront, bySystem] = await Promise.all([
-    qualityBlock(),
-    procurementBlock(),
-    workfrontBlock(),
-    bySystemBlock(),
+    qualityBlock(projectId),
+    procurementBlock(projectId),
+    workfrontBlock(projectId),
+    bySystemBlock(projectId),
   ]);
   const [cashflow, cpi, vo] = canViewFinance
-    ? await Promise.all([cashflowSeries(), cpiBlock(), voBlock()])
+    ? await Promise.all([cashflowSeries(), cpiBlock(), voBlock(projectId)])
     : [null, null, null];
 
   // Widget "Chờ duyệt" (M19) — chỉ người có quyền duyệt (Admin/PM) cần thấy.
-  const approvals = CAN.approve(user.role) ? await approvalsBlock() : null;
+  const approvals = CAN.approve(user.role) ? await approvalsBlock(projectId) : null;
 
   return NextResponse.json({
     approvals,

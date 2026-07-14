@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query, queryOne, todayISO, daysFromTodayISO } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import type { Prefs } from "@/app/api/notifications/prefs/route";
 
 export const dynamic = "force-dynamic";
@@ -22,68 +23,111 @@ export async function GET() {
 
   // Lọc assigned cho subcon/viewer
   const assignedFilter = fullAccess ? "" : " AND t.assigned_to = ?";
-  const args = (base: unknown[]) => fullAccess ? base : [...base, user.id];
+  // Dự án đang chọn — cộng thêm lọc theo dự án để tránh rò rỉ chéo dự án (đa dự án,
+  // M22+). null = DB chưa có project nào → giữ hành vi không lọc (tương thích ngược).
+  const projectId = await getCurrentProjectId(user);
+  const projectJoin = projectId != null ? " JOIN towers tw ON tw.id = st.tower_id" : "";
+  const projectFilter = projectId != null ? " AND tw.project_id = ?" : "";
+  const args = (base: unknown[]) => {
+    const withAssigned = fullAccess ? base : [...base, user.id];
+    return projectId != null ? [...withAssigned, projectId] : withAssigned;
+  };
 
-  const due5   = daysFromTodayISO(5);
+  const due5 = daysFromTodayISO(5);
   const start7 = daysFromTodayISO(7);
   const ago48h = new Date(0).toISOString(); // không giới hạn thời gian
 
   // Prefs của user
   const prefRow = await queryOne<{ prefs: string }>(
-    `SELECT prefs FROM notification_prefs WHERE user_id = ?`, user.id);
+    `SELECT prefs FROM notification_prefs WHERE user_id = ?`,
+    user.id,
+  );
   let prefs: Prefs = {};
-  try { prefs = JSON.parse(prefRow?.prefs ?? "{}") ?? {}; } catch { /* default all on */ }
+  try {
+    prefs = JSON.parse(prefRow?.prefs ?? "{}") ?? {};
+  } catch {
+    /* default all on */
+  }
   // Nếu key chưa có trong prefs → mặc định bật (true khi undefined)
   const pref = (key: keyof Prefs) => prefs[key] !== false;
 
   // ── OVERDUE ────────────────────────────────────────────────────────────────
-  const overdue = pref("delayed") ? await query<{
-    id: number; code: string; name: string; endDate: string;
-    progress: number; assignedTo: string | null;
-    sheetCode: string; sheetName: string; sheetSlug: string | null; packageName: string;
-  }>(
-    `SELECT t.id, t.code, t.name, t.end_date AS "endDate",
+  const overdue = pref("delayed")
+    ? await query<{
+        id: number;
+        code: string;
+        name: string;
+        endDate: string;
+        progress: number;
+        assignedTo: string | null;
+        sheetCode: string;
+        sheetName: string;
+        sheetSlug: string | null;
+        packageName: string;
+      }>(
+        `SELECT t.id, t.code, t.name, t.end_date AS "endDate",
             ROUND((t.progress_percent * 100)::numeric,0)::int AS progress,
             u.name AS "assignedTo",
             st.code AS "sheetCode", st.name AS "sheetName", st.slug AS "sheetSlug",
             wp.name AS "packageName"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
-       JOIN sheet_types st ON wp.sheet_type_id = st.id
+       JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
        LEFT JOIN users u ON t.assigned_to = u.id
       WHERE t.end_date < ? AND t.progress_percent < 1
-        AND t.status NOT IN ('hoan_thanh','nghiem_thu')${assignedFilter}
+        AND t.status NOT IN ('hoan_thanh','nghiem_thu')${assignedFilter}${projectFilter}
       ORDER BY t.end_date ASC, st.code ASC`,
-    ...args([today])) : [];
+        ...args([today]),
+      )
+    : [];
 
   // ── DUE SOON (5 ngày) ─────────────────────────────────────────────────────
-  const dueSoon = pref("due_soon") ? await query<{
-    id: number; code: string; name: string; endDate: string;
-    progress: number; assignedTo: string | null;
-    sheetCode: string; sheetName: string; sheetSlug: string | null; packageName: string;
-  }>(
-    `SELECT t.id, t.code, t.name, t.end_date AS "endDate",
+  const dueSoon = pref("due_soon")
+    ? await query<{
+        id: number;
+        code: string;
+        name: string;
+        endDate: string;
+        progress: number;
+        assignedTo: string | null;
+        sheetCode: string;
+        sheetName: string;
+        sheetSlug: string | null;
+        packageName: string;
+      }>(
+        `SELECT t.id, t.code, t.name, t.end_date AS "endDate",
             ROUND((t.progress_percent * 100)::numeric,0)::int AS progress,
             u.name AS "assignedTo",
             st.code AS "sheetCode", st.name AS "sheetName", st.slug AS "sheetSlug",
             wp.name AS "packageName"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
-       JOIN sheet_types st ON wp.sheet_type_id = st.id
+       JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
        LEFT JOIN users u ON t.assigned_to = u.id
       WHERE t.end_date >= ? AND t.end_date <= ?
         AND t.progress_percent < 1
-        AND t.status NOT IN ('hoan_thanh','nghiem_thu')${assignedFilter}
+        AND t.status NOT IN ('hoan_thanh','nghiem_thu')${assignedFilter}${projectFilter}
       ORDER BY t.end_date ASC, st.code ASC`,
-    ...args([today, due5])) : [];
+        ...args([today, due5]),
+      )
+    : [];
 
   // ── UPCOMING START (7 ngày) ────────────────────────────────────────────────
-  const upcomingStart = pref("upcoming_start") ? await query<{
-    id: number; code: string; name: string; startDate: string; endDate: string | null;
-    progress: number; assignedTo: string | null;
-    sheetCode: string; sheetName: string; sheetSlug: string | null; packageName: string;
-  }>(
-    `SELECT t.id, t.code, t.name,
+  const upcomingStart = pref("upcoming_start")
+    ? await query<{
+        id: number;
+        code: string;
+        name: string;
+        startDate: string;
+        endDate: string | null;
+        progress: number;
+        assignedTo: string | null;
+        sheetCode: string;
+        sheetName: string;
+        sheetSlug: string | null;
+        packageName: string;
+      }>(
+        `SELECT t.id, t.code, t.name,
             t.start_date AS "startDate", t.end_date AS "endDate",
             ROUND((t.progress_percent * 100)::numeric,0)::int AS progress,
             u.name AS "assignedTo",
@@ -91,32 +135,50 @@ export async function GET() {
             wp.name AS "packageName"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
-       JOIN sheet_types st ON wp.sheet_type_id = st.id
+       JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
        LEFT JOIN users u ON t.assigned_to = u.id
       WHERE t.start_date > ? AND t.start_date <= ?
         AND t.progress_percent = 0
-        AND t.status NOT IN ('hoan_thanh','nghiem_thu')${assignedFilter}
+        AND t.status NOT IN ('hoan_thanh','nghiem_thu')${assignedFilter}${projectFilter}
       ORDER BY t.start_date ASC, st.code ASC`,
-    ...args([today, start7])) : [];
+        ...args([today, start7]),
+      )
+    : [];
 
   // ── RECENT ACTIVITY 48H ────────────────────────────────────────────────────
   type Event = {
-    type: "progress"|"photo"|"document"|"comment";
-    taskId: number; taskCode: string; taskName: string;
-    detail: string; by: string|null; at: string;
-    sheetSlug: string|null; meta?: Record<string,unknown>;
+    type: "progress" | "photo" | "document" | "comment";
+    taskId: number;
+    taskCode: string;
+    taskName: string;
+    detail: string;
+    by: string | null;
+    at: string;
+    sheetSlug: string | null;
+    meta?: Record<string, unknown>;
   };
-  const bySheet = new Map<string, { sheetCode:string; sheetName:string; sheetSlug:string|null; events:Event[] }>();
-  const ensureSheet = (code: string, name: string, slug: string|null) => {
-    if (!bySheet.has(code)) bySheet.set(code, { sheetCode:code, sheetName:name, sheetSlug:slug, events:[] });
+  const bySheet = new Map<
+    string,
+    { sheetCode: string; sheetName: string; sheetSlug: string | null; events: Event[] }
+  >();
+  const ensureSheet = (code: string, name: string, slug: string | null) => {
+    if (!bySheet.has(code))
+      bySheet.set(code, { sheetCode: code, sheetName: name, sheetSlug: slug, events: [] });
     return bySheet.get(code)!;
   };
 
   if (pref("activity_progress")) {
     const rows = await query<{
-      taskId:number; taskCode:string; taskName:string;
-      sheetCode:string; sheetName:string; sheetSlug:string|null;
-      oldProgress:number; newProgress:number; by:string|null; at:string;
+      taskId: number;
+      taskCode: string;
+      taskName: string;
+      sheetCode: string;
+      sheetName: string;
+      sheetSlug: string | null;
+      oldProgress: number;
+      newProgress: number;
+      by: string | null;
+      at: string;
     }>(
       `SELECT t.id AS "taskId", t.code AS "taskCode", t.name AS "taskName",
               st.code AS "sheetCode", st.name AS "sheetName", st.slug AS "sheetSlug",
@@ -126,26 +188,42 @@ export async function GET() {
          FROM task_history h
          JOIN tasks t ON h.task_id = t.id
          JOIN work_packages wp ON t.package_id = wp.id
-         JOIN sheet_types st ON wp.sheet_type_id = st.id
-        WHERE h.changed_at >= ?${assignedFilter}
+         JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
+        WHERE h.changed_at >= ?${assignedFilter}${projectFilter}
         ORDER BY h.changed_at DESC LIMIT 200`,
-      ...args([ago48h]));
+      ...args([ago48h]),
+    );
     for (const r of rows) {
       const diff = r.newProgress - r.oldProgress;
       ensureSheet(r.sheetCode, r.sheetName, r.sheetSlug).events.push({
-        type:"progress", taskId:r.taskId, taskCode:r.taskCode, taskName:r.taskName,
-        sheetSlug:r.sheetSlug,
-        detail: diff >= 0 ? `${r.oldProgress}% → ${r.newProgress}%` : `Bỏ CN: ${r.oldProgress}% → ${r.newProgress}%`,
-        by:r.by, at:r.at, meta:{ oldProgress:r.oldProgress, newProgress:r.newProgress },
+        type: "progress",
+        taskId: r.taskId,
+        taskCode: r.taskCode,
+        taskName: r.taskName,
+        sheetSlug: r.sheetSlug,
+        detail:
+          diff >= 0
+            ? `${r.oldProgress}% → ${r.newProgress}%`
+            : `Bỏ CN: ${r.oldProgress}% → ${r.newProgress}%`,
+        by: r.by,
+        at: r.at,
+        meta: { oldProgress: r.oldProgress, newProgress: r.newProgress },
       });
     }
   }
 
   if (pref("activity_photo")) {
     const rows = await query<{
-      taskId:number; taskCode:string; taskName:string;
-      sheetCode:string; sheetName:string; sheetSlug:string|null;
-      caption:string|null; by:string|null; at:string; fileId:number;
+      taskId: number;
+      taskCode: string;
+      taskName: string;
+      sheetCode: string;
+      sheetName: string;
+      sheetSlug: string | null;
+      caption: string | null;
+      by: string | null;
+      at: string;
+      fileId: number;
     }>(
       `SELECT t.id AS "taskId", t.code AS "taskCode", t.name AS "taskName",
               st.code AS "sheetCode", st.name AS "sheetName", st.slug AS "sheetSlug",
@@ -153,25 +231,40 @@ export async function GET() {
          FROM task_photos p
          JOIN tasks t ON p.task_id = t.id
          JOIN work_packages wp ON t.package_id = wp.id
-         JOIN sheet_types st ON wp.sheet_type_id = st.id
+         JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
          LEFT JOIN users u ON p.uploaded_by = u.id
-        WHERE p.created_at >= ?${assignedFilter}
+        WHERE p.created_at >= ?${assignedFilter}${projectFilter}
         ORDER BY p.created_at DESC LIMIT 200`,
-      ...args([ago48h]));
+      ...args([ago48h]),
+    );
     for (const r of rows) {
       ensureSheet(r.sheetCode, r.sheetName, r.sheetSlug).events.push({
-        type:"photo", taskId:r.taskId, taskCode:r.taskCode, taskName:r.taskName,
-        sheetSlug:r.sheetSlug, detail:r.caption||"Ảnh hiện trường",
-        by:r.by, at:r.at, meta:{ fileId:r.fileId },
+        type: "photo",
+        taskId: r.taskId,
+        taskCode: r.taskCode,
+        taskName: r.taskName,
+        sheetSlug: r.sheetSlug,
+        detail: r.caption || "Ảnh hiện trường",
+        by: r.by,
+        at: r.at,
+        meta: { fileId: r.fileId },
       });
     }
   }
 
   if (pref("activity_document")) {
     const rows = await query<{
-      taskId:number; taskCode:string; taskName:string;
-      sheetCode:string; sheetName:string; sheetSlug:string|null;
-      caption:string|null; origName:string|null; by:string|null; at:string; fileId:number;
+      taskId: number;
+      taskCode: string;
+      taskName: string;
+      sheetCode: string;
+      sheetName: string;
+      sheetSlug: string | null;
+      caption: string | null;
+      origName: string | null;
+      by: string | null;
+      at: string;
+      fileId: number;
     }>(
       `SELECT t.id AS "taskId", t.code AS "taskCode", t.name AS "taskName",
               st.code AS "sheetCode", st.name AS "sheetName", st.slug AS "sheetSlug",
@@ -179,25 +272,38 @@ export async function GET() {
          FROM task_documents d
          JOIN tasks t ON d.task_id = t.id
          JOIN work_packages wp ON t.package_id = wp.id
-         JOIN sheet_types st ON wp.sheet_type_id = st.id
+         JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
          LEFT JOIN users u ON d.uploaded_by = u.id
-        WHERE d.created_at >= ?${assignedFilter}
+        WHERE d.created_at >= ?${assignedFilter}${projectFilter}
         ORDER BY d.created_at DESC LIMIT 200`,
-      ...args([ago48h]));
+      ...args([ago48h]),
+    );
     for (const r of rows) {
       ensureSheet(r.sheetCode, r.sheetName, r.sheetSlug).events.push({
-        type:"document", taskId:r.taskId, taskCode:r.taskCode, taskName:r.taskName,
-        sheetSlug:r.sheetSlug, detail:r.caption||r.origName||"Bản vẽ / tài liệu",
-        by:r.by, at:r.at, meta:{ fileId:r.fileId, origName:r.origName },
+        type: "document",
+        taskId: r.taskId,
+        taskCode: r.taskCode,
+        taskName: r.taskName,
+        sheetSlug: r.sheetSlug,
+        detail: r.caption || r.origName || "Bản vẽ / tài liệu",
+        by: r.by,
+        at: r.at,
+        meta: { fileId: r.fileId, origName: r.origName },
       });
     }
   }
 
   if (pref("activity_comment")) {
     const rows = await query<{
-      taskId:number; taskCode:string; taskName:string;
-      sheetCode:string; sheetName:string; sheetSlug:string|null;
-      body:string; by:string|null; at:string;
+      taskId: number;
+      taskCode: string;
+      taskName: string;
+      sheetCode: string;
+      sheetName: string;
+      sheetSlug: string | null;
+      body: string;
+      by: string | null;
+      at: string;
     }>(
       `SELECT t.id AS "taskId", t.code AS "taskCode", t.name AS "taskName",
               st.code AS "sheetCode", st.name AS "sheetName", st.slug AS "sheetSlug",
@@ -205,38 +311,67 @@ export async function GET() {
          FROM task_comments c
          JOIN tasks t ON c.task_id = t.id
          JOIN work_packages wp ON t.package_id = wp.id
-         JOIN sheet_types st ON wp.sheet_type_id = st.id
+         JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
          LEFT JOIN users u ON c.user_id = u.id
-        WHERE c.created_at >= ?${assignedFilter}
+        WHERE c.created_at >= ?${assignedFilter}${projectFilter}
         ORDER BY c.created_at DESC LIMIT 200`,
-      ...args([ago48h]));
+      ...args([ago48h]),
+    );
     for (const r of rows) {
       ensureSheet(r.sheetCode, r.sheetName, r.sheetSlug).events.push({
-        type:"comment", taskId:r.taskId, taskCode:r.taskCode, taskName:r.taskName,
-        sheetSlug:r.sheetSlug, detail:r.body.length > 80 ? r.body.slice(0,80)+"…" : r.body,
-        by:r.by, at:r.at,
+        type: "comment",
+        taskId: r.taskId,
+        taskCode: r.taskCode,
+        taskName: r.taskName,
+        sheetSlug: r.sheetSlug,
+        detail: r.body.length > 80 ? r.body.slice(0, 80) + "…" : r.body,
+        by: r.by,
+        at: r.at,
       });
     }
   }
 
-  const recentActivity = [...bySheet.values()].map(g => ({
-    ...g,
-    events: g.events
-      .map(e => ({ ...e, at: typeof e.at === 'object' && e.at !== null ? (e.at as Date).toISOString() : e.at }))
-      .sort((a,b) => (b.at ?? "").localeCompare(a.at ?? "")),
-  })).sort((a,b) => (b.events[0]?.at ?? "").localeCompare(a.events[0]?.at ?? ""));
+  const recentActivity = [...bySheet.values()]
+    .map((g) => ({
+      ...g,
+      events: g.events
+        .map((e) => ({
+          ...e,
+          at: typeof e.at === "object" && e.at !== null ? (e.at as Date).toISOString() : e.at,
+        }))
+        .sort((a, b) => (b.at ?? "").localeCompare(a.at ?? "")),
+    }))
+    .sort((a, b) => (b.events[0]?.at ?? "").localeCompare(a.events[0]?.at ?? ""));
 
-  // Vật tư vượt định mức — chỉ fullAccess
-  const materialOver = (fullAccess && pref("material_over")) ? await query<{
-    id:number; name:string; unit:string|null; qtyPlanned:number; qtyUsed:number; sheetCode:string|null;
-  }>(
-    `SELECT m.id, m.name, m.unit, m.qty_planned AS "qtyPlanned", m.qty_used AS "qtyUsed", st.code AS "sheetCode"
+  // Vật tư vượt định mức — chỉ fullAccess. materials có project_id trực tiếp (M22+) —
+  // lọc thẳng theo dự án đang chọn, không cần join tower.
+  const matProjectFilter = projectId != null ? " AND m.project_id = ?" : "";
+  const materialOver =
+    fullAccess && pref("material_over")
+      ? await query<{
+          id: number;
+          name: string;
+          unit: string | null;
+          qtyPlanned: number;
+          qtyUsed: number;
+          sheetCode: string | null;
+        }>(
+          `SELECT m.id, m.name, m.unit, m.qty_planned AS "qtyPlanned", m.qty_used AS "qtyUsed", st.code AS "sheetCode"
        FROM materials m LEFT JOIN sheet_types st ON m.sheet_type_id = st.id
-      WHERE m.qty_planned > 0 AND m.qty_used > m.qty_planned
-      ORDER BY (m.qty_used - m.qty_planned) DESC`) : [];
+      WHERE m.qty_planned > 0 AND m.qty_used > m.qty_planned${matProjectFilter}
+      ORDER BY (m.qty_used - m.qty_planned) DESC`,
+          ...(projectId != null ? [projectId] : []),
+        )
+      : [];
 
   return NextResponse.json({
-    overdue, dueSoon, upcomingStart, recentActivity, materialOver,
-    fullAccess, role: user.role, prefs,
+    overdue,
+    dueSoon,
+    upcomingStart,
+    recentActivity,
+    materialOver,
+    fullAccess,
+    role: user.role,
+    prefs,
   });
 }
