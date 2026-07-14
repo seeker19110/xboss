@@ -51,7 +51,7 @@
     "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4.3.2",
     "@types/archiver": "^8.0.0",
-    "@types/node": "^24.10.1",
+    "@types/node": "^26.1.1",
     "@types/nodemailer": "^8.0.1",
     "@types/pg": "^8.11.10",
     "@types/react": "^19.2.17",
