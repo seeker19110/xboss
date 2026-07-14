@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { DOC_CATEGORIES, type DocCategory } from "@/lib/qaqc";
 
 export const dynamic = "force-dynamic";
@@ -47,6 +48,13 @@ export async function GET(req: NextRequest) {
     values.push(category);
   }
 
+  // task_documents không có project_id riêng — suy qua task/work_package (M22).
+  const projectId = await getCurrentProjectId(user);
+  if (projectId != null) {
+    conds.push("tw.project_id = ?");
+    values.push(projectId);
+  }
+
   const rows = await query<DocRow>(
     `SELECT d.id, d.task_id AS "taskId", t.code AS "taskCode", t.name AS "taskName",
             wp.floor_label AS "floorLabel", st.code AS "sheetType",
@@ -56,6 +64,7 @@ export async function GET(req: NextRequest) {
        JOIN tasks t ON t.id = d.task_id
        LEFT JOIN work_packages wp ON wp.id = t.package_id
        LEFT JOIN sheet_types st ON st.id = wp.sheet_type_id
+       LEFT JOIN towers tw ON tw.id = st.tower_id
        LEFT JOIN users u ON u.id = d.uploaded_by
       WHERE ${conds.join(" AND ")}
       ORDER BY d.id DESC`,

@@ -1,8 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
+
+// inspection_requests không có project_id riêng — suy qua các task gắn phiếu (mỗi
+// phiếu luôn có ≥1 task) để chặn xem/sửa phiếu YCNT xuyên dự án (M22).
+async function requestInProject(id: number, projectId: number): Promise<boolean> {
+  const row = await queryOne<{ id: number }>(
+    `SELECT rt.request_id AS id
+       FROM inspection_request_tasks rt
+       JOIN tasks t ON t.id = rt.task_id
+       JOIN work_packages wp ON wp.id = t.package_id
+       JOIN sheet_types st ON st.id = wp.sheet_type_id
+       JOIN towers tw ON tw.id = st.tower_id
+      WHERE rt.request_id = ? AND tw.project_id = ?
+      LIMIT 1`,
+    id,
+    projectId,
+  );
+  return !!row;
+}
 
 type RequestDetail = {
   id: number;
@@ -36,6 +55,10 @@ export async function GET(
     id,
   );
   if (!requestRow)
+    return NextResponse.json({ error: "Không tìm thấy phiếu YCNT" }, { status: 404 });
+
+  const projectId = await getCurrentProjectId(user);
+  if (projectId != null && !(await requestInProject(id, projectId)))
     return NextResponse.json({ error: "Không tìm thấy phiếu YCNT" }, { status: 404 });
 
   const tasks = await query<TaskRow>(
@@ -72,6 +95,10 @@ export async function PATCH(
   const status = typeof body?.status === "string" ? body.status : "";
   if (!["sent", "confirmed", "passed", "failed", "cancelled"].includes(status))
     return NextResponse.json({ error: "Trạng thái không hợp lệ" }, { status: 422 });
+
+  const projectId = await getCurrentProjectId(user);
+  if (projectId != null && !(await requestInProject(id, projectId)))
+    return NextResponse.json({ error: "Không tìm thấy phiếu YCNT" }, { status: 404 });
 
   try {
     await withTransaction(async () => {
