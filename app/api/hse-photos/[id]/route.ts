@@ -2,11 +2,32 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFile, unlink } from "node:fs/promises";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { photoPath } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
 
 type PhotoRow = { id: number; file_path: string; mime: string; uploaded_by: number | null };
+
+// Lấy ảnh HSE, lọc theo dự án đang chọn (M22) — chặn xem/xoá ảnh của biên bản
+// thuộc dự án khác qua đoán/liệt kê id.
+async function getPhotoInProject(
+  id: number,
+  projectId: number | null,
+): Promise<PhotoRow | undefined> {
+  const conds = ["p.id = ?"];
+  const args: unknown[] = [id];
+  if (projectId != null) {
+    conds.push("r.project_id = ?");
+    args.push(projectId);
+  }
+  return queryOne<PhotoRow>(
+    `SELECT p.id, p.file_path, p.mime, p.uploaded_by
+       FROM hse_photos p JOIN hse_records r ON r.id = p.record_id
+      WHERE ${conds.join(" AND ")}`,
+    ...args,
+  );
+}
 
 // GET /api/hse-photos/:id — stream ảnh HSE.
 export async function GET(
@@ -20,10 +41,8 @@ export async function GET(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const photo = await queryOne<PhotoRow>(
-    `SELECT id, file_path, mime, uploaded_by FROM hse_photos WHERE id = ?`,
-    id,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const photo = await getPhotoInProject(id, projectId);
   if (!photo) return NextResponse.json({ error: "Không tìm thấy ảnh" }, { status: 404 });
 
   const path = photoPath(photo.file_path);
@@ -57,10 +76,8 @@ export async function DELETE(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const photo = await queryOne<PhotoRow>(
-    `SELECT id, file_path, mime, uploaded_by FROM hse_photos WHERE id = ?`,
-    id,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const photo = await getPhotoInProject(id, projectId);
   if (!photo) return NextResponse.json({ error: "Không tìm thấy ảnh" }, { status: 404 });
 
   if (photo.uploaded_by !== user.id && !CAN.manageHse(user.role))
