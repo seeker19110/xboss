@@ -67,6 +67,8 @@ export async function GET(req: NextRequest) {
        LEFT JOIN work_packages wp2 ON wp2.id = t.package_id
        LEFT JOIN sheet_types st ON st.id = COALESCE(wp.sheet_type_id, wp2.sheet_type_id)
        LEFT JOIN towers tw ON tw.id = st.tower_id
+       LEFT JOIN users iu ON iu.id = i.inspected_by
+       LEFT JOIN users au ON au.id = i.approved_by
       ${conds.length ? `WHERE ${conds.join(" AND ")}` : ""}
       ORDER BY i.inspected_at DESC, i.id DESC`,
     ...values,
