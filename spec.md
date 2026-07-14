@@ -6,7 +6,7 @@
 **Cập nhật:** 2026-07-13
 **Tech Stack:** Next.js 16.2 App Router (React 19.2) · TypeScript 6.0 strict · Tailwind 4.3 · PostgreSQL (tự host, raw SQL qua `pg` — **không Supabase/ORM**, xem `docs/adr/0001-postgres-raw-sql.md`)
 
-> Đặc tả kỹ thuật tổng hợp: auth, mô hình dữ liệu cốt lõi, logic nghiệp vụ trung tâm, danh mục module + màn hình. Schema đầy đủ → `docs/ERD.md`; chi tiết từng module (schema/API/UI/test) → `docs/nang-cap/M<xx>-*.md`; tiến độ/nợ kỹ thuật → `PROGRESS.md`; mục tiêu/MVP → `PROJECT.md`.
+> Đặc tả kỹ thuật tổng hợp: auth, mô hình dữ liệu cốt lõi, logic nghiệp vụ trung tâm, danh mục module + màn hình. Schema đầy đủ → `docs/ERD.md`; chi tiết từng module (schema/API/UI/test) → `docs/nang-cap/G<nn>-*.md`; tiến độ/nợ kỹ thuật → `PROGRESS.md`; mục tiêu/MVP → `PROJECT.md`.
 
 ---
 
@@ -50,24 +50,24 @@ Quản lý qua **hệ migrate SQL nhẹ** (`migrations/000N_*.sql`, đánh số 
 
 ## 5. Module & màn hình (M0–M42 — tất cả đã triển khai)
 
-Mỗi module có đặc tả tự chứa trong `docs/nang-cap/M<xx>-*.md` (schema/lib/API/UI/test). `PROGRESS.md` giữ lịch sử/nợ kỹ thuật.
+Mỗi module có đặc tả tự chứa trong `docs/nang-cap/G<nn>-*.md` (schema/lib/API/UI/test). `PROGRESS.md` giữ lịch sử/nợ kỹ thuật.
 
-| Nhóm                 | Module (Mxx)                                                        | Route                                                                              |
-| -------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Nền tảng             | M0 AppShell sidebar · M21 IA đầy đủ (hub) · M22 đa dự án            | `/`, `/hub/[id]`, `/portfolio`                                                     |
-| Tiến độ & BOQ        | M1 BOQ · M15 trang hệ · M9 dashboard mở rộng · M35 BPTC · M36 trang tiến độ theo hệ | `/tracking/[slug]`, `/boq`, `/he/[code]`, `/tien-do/[he]`                          |
-| Chi phí & Hợp đồng   | M2 chi phí · M16 hợp đồng · M6 VO · M17 thanh toán KL (IPC) · M7 đấu thầu · M27 tài chính & kế toán | `/costs`, `/contracts`, `/variations`, `/payment-certs`, `/tenders`, `/finance`    |
-| Mua sắm & Vật tư     | M4 NCC & đơn hàng, xe ra vào · M18 định mức · M33 hồ sơ năng lực NTP | `/materials/*`, `/vehicles`                                                        |
-| Chất lượng & An toàn | M3 QA&QC + hồ sơ chất lượng · M11 HSE                                | `/quality`, `/hse`                                                                 |
-| Hiện trường          | M5 nhật ký thi công · M14 mặt bằng · M12 thiết bị                    | `/diary`, `/work-fronts`, `/equipment`                                             |
-| Bản vẽ & Hồ sơ       | M8 bản vẽ BIM/Shop · M32 thay đổi thiết kế · M10 RFI/công văn · M13 họp & rủi ro · M34 claim & EOT · M19 đề xuất & phê duyệt · M20 kho hồ sơ | `/drawings`, `/correspondences`, `/meetings`, `/risks`, `/proposals`, `/documents` |
-| Khởi động & Tổ chức  | M23 khởi động & pháp lý · M24 nhân sự & tổ chức                      | `/kickoff`, `/org`, `/personnel`, `/attendance`                                    |
-| Môi trường & Rủi ro  | M25 môi trường & giấy phép · M26 quan hệ & quan trắc                 | `/environment`, `/monitoring`                                                      |
-| Bàn giao & Vận hành  | M28 bảo hiểm & bảo lãnh · M29 bàn giao & kết thúc · M30 bảo hành & bảo trì | `/insurance`, `/handover`, `/warranty`                                             |
-| Công nghệ            | M31 chuyển đổi số (CDE/BIM link/album drone)                         | `/tech`                                                                            |
+| Nhóm (file `docs/nang-cap/G<nn>-*.md`) | Module (Mxx) gộp bên trong                                          | Route                                                                              |
+| ---------------------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| G00 nền tảng                            | M0 AppShell sidebar · M21 IA đầy đủ (hub) · M22 đa dự án            | `/`, `/hub/[id]`, `/portfolio`                                                     |
+| G01 tiến độ & BOQ                       | M1 BOQ · M15 trang hệ · M9 dashboard mở rộng · M35 BPTC · M36 trang tiến độ theo hệ | `/tracking/[slug]`, `/boq`, `/he/[code]`, `/tien-do/[he]`                          |
+| G02 chi phí & hợp đồng                  | M2 chi phí · M16 hợp đồng · M6 VO · M17 thanh toán KL (IPC) · M7 đấu thầu · M27 tài chính & kế toán | `/costs`, `/contracts`, `/variations`, `/payment-certs`, `/tenders`, `/finance`    |
+| G03 mua sắm & vật tư                    | M4 NCC & đơn hàng, xe ra vào · M18 định mức · M33 hồ sơ năng lực NTP | `/materials/*`, `/vehicles`                                                        |
+| G04 chất lượng & an toàn                | M3 QA&QC + hồ sơ chất lượng · M11 HSE                                | `/quality`, `/hse`                                                                 |
+| G05 hiện trường                         | M5 nhật ký thi công · M14 mặt bằng · M12 thiết bị                    | `/diary`, `/work-fronts`, `/equipment`                                             |
+| G06 bản vẽ & hồ sơ                      | M8 bản vẽ BIM/Shop · M32 thay đổi thiết kế · M10 RFI/công văn · M13 họp & rủi ro · M34 claim & EOT · M19 đề xuất & phê duyệt · M20 kho hồ sơ | `/drawings`, `/correspondences`, `/meetings`, `/risks`, `/proposals`, `/documents` |
+| G07 khởi động & tổ chức                 | M23 khởi động & pháp lý · M24 nhân sự & tổ chức                      | `/kickoff`, `/org`, `/personnel`, `/attendance`                                    |
+| G08 môi trường & rủi ro                 | M25 môi trường & giấy phép · M26 quan hệ & quan trắc                 | `/environment`, `/monitoring`                                                      |
+| G09 bàn giao & vận hành                 | M28 bảo hiểm & bảo lãnh · M29 bàn giao & kết thúc · M30 bảo hành & bảo trì | `/insurance`, `/handover`, `/warranty`                                             |
+| G10 công nghệ                           | M31 chuyển đổi số (CDE/BIM link/album drone)                         | `/tech`                                                                            |
 | Lập kế hoạch & báo cáo (không module riêng) | —                                                       | `/lookahead`, `/gantt`, `/timeline`, `/report`, `/my-tasks`, `/notifications` (M40) |
 | Quản trị hệ thống (không module riêng) | —                                                             | `/login`, `/password`, `/users`, `/admin`, `/import`, `/offline`                   |
-| UI/UX xuyên suốt (không route riêng) | M37 theme sáng · M38 màu/token tương phản · M39 bảng filter/sort/sticky · M40 trung tâm thông báo · M41 responsive mobile · M42 flatten sidebar | —                                                                                  |
+| G11 UI/UX xuyên suốt (không route riêng) | M37 theme sáng · M38 màu/token tương phản · M39 bảng filter/sort/sticky · M40 trung tâm thông báo · M41 responsive mobile · M42 flatten sidebar | —                                                                                  |
 
 **Chủ động không làm** (2026-07-05, `docs/ke-hoach-fastcons-2026-07.md` §5): bảo hành kiểu FastCons cũ, điểm danh GPS, CRM bán hàng, HRM/lương độc lập, thu chi nội bộ ngoài công trình, Map vị trí.
 
@@ -131,4 +131,4 @@ Next.js **16.2** App Router (React **19.2**) · TypeScript **6.0** strict · Tai
 - **Ngày**: chuỗi `'YYYY-MM-DD'`, so sánh bằng string — không dùng `Date` object cho logic nghiệp vụ.
 - **UI/comment/commit**: toàn bộ tiếng Việt; dark-first, thang `zinc`, không hardcode hex/`dark:`.
 - **Test**: `npm test` (`tests/*.test.ts`, tích hợp cần `TEST_DATABASE_URL` — tự skip nếu thiếu; `tests/setup.ts` import đầu tiên ở file chạm DB); e2e authed (`e2e/authed/*.spec.ts`) phủ axe a11y cho trang mới, desktop + mobile.
-- **Module mới**: viết đặc tả `docs/nang-cap/M<xx>-*.md` theo khung `docs/nang-cap/README.md` trước khi code (trừ việc nhỏ/sửa lỗi rõ ràng).
+- **Module mới**: viết đặc tả `docs/nang-cap/G<nn>-*.md` theo khung `docs/nang-cap/README.md` trước khi code (trừ việc nhỏ/sửa lỗi rõ ràng).
