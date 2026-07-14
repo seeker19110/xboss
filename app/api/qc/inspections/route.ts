@@ -45,6 +45,14 @@ export async function GET(req: NextRequest) {
     values.push(parseInt(workPackageId));
   }
 
+  // qc_inspections không có project_id riêng (ADR-0004) — suy qua task/work_package
+  // để chặn rò rỉ dữ liệu xuyên dự án (M22).
+  const projectId = await getCurrentProjectId(user);
+  if (projectId != null) {
+    conds.push("tw.project_id = ?");
+    values.push(projectId);
+  }
+
   const rows = await query<InspectionRow>(
     `SELECT i.id, i.checklist_id AS "checklistId", c.name AS "checklistName",
             i.task_id AS "taskId", t.code AS "taskCode",
@@ -56,8 +64,9 @@ export async function GET(req: NextRequest) {
        JOIN qc_checklists c ON c.id = i.checklist_id
        LEFT JOIN tasks t ON t.id = i.task_id
        LEFT JOIN work_packages wp ON wp.id = i.work_package_id
-       LEFT JOIN users iu ON iu.id = i.inspected_by
-       LEFT JOIN users au ON au.id = i.approved_by
+       LEFT JOIN work_packages wp2 ON wp2.id = t.package_id
+       LEFT JOIN sheet_types st ON st.id = COALESCE(wp.sheet_type_id, wp2.sheet_type_id)
+       LEFT JOIN towers tw ON tw.id = st.tower_id
       ${conds.length ? `WHERE ${conds.join(" AND ")}` : ""}
       ORDER BY i.inspected_at DESC, i.id DESC`,
     ...values,

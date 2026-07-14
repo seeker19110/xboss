@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, insertId, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { nextSeqCode, withUniqueRetry } from "@/lib/seqcode";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,21 @@ export async function GET(req: NextRequest) {
   if (status) {
     conds.push("r.status = ?");
     values.push(status);
+  }
+
+  // inspection_requests không có project_id riêng — suy qua các task gắn phiếu
+  // (mỗi phiếu luôn có ≥1 task) để chặn rò rỉ dữ liệu xuyên dự án (M22).
+  const projectId = await getCurrentProjectId(user);
+  if (projectId != null) {
+    conds.push(
+      `EXISTS (SELECT 1 FROM inspection_request_tasks rt2
+                 JOIN tasks t2 ON t2.id = rt2.task_id
+                 JOIN work_packages wp2 ON wp2.id = t2.package_id
+                 JOIN sheet_types st2 ON st2.id = wp2.sheet_type_id
+                 JOIN towers tw2 ON tw2.id = st2.tower_id
+                WHERE rt2.request_id = r.id AND tw2.project_id = ?)`,
+    );
+    values.push(projectId);
   }
 
   const rows = await query<RequestRow>(

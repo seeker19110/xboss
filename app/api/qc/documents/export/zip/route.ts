@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { ZipArchive } from "archiver";
 import { query } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { DOC_CATEGORIES, type DocCategory } from "@/lib/qaqc";
 import { photoPath } from "@/lib/photos";
 
@@ -43,11 +44,20 @@ export async function GET(req: NextRequest) {
     values.push(category);
   }
 
+  // task_documents không có project_id riêng — suy qua task/work_package (M22).
+  const projectId = await getCurrentProjectId(user);
+  if (projectId != null) {
+    conds.push("tw.project_id = ?");
+    values.push(projectId);
+  }
+
   const rows = await query<DocRow>(
     `SELECT t.code AS "taskCode", d.file_name AS "fileName", d.original_name AS "originalName"
        FROM task_documents d
        JOIN tasks t ON t.id = d.task_id
        LEFT JOIN work_packages wp ON wp.id = t.package_id
+       LEFT JOIN sheet_types st ON st.id = wp.sheet_type_id
+       LEFT JOIN towers tw ON tw.id = st.tower_id
       WHERE ${conds.join(" AND ")}
       ORDER BY t.code`,
     ...values,
