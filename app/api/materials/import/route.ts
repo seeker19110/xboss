@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { query, queryOne, insertId, run } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,10 @@ export async function POST(req: NextRequest) {
   if (!canEditMaterials(user.role))
     return NextResponse.json({ error: "Không có quyền import vật tư" }, { status: 403 });
 
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null)
+    return NextResponse.json({ error: "Chưa có dự án nào để import vật tư" }, { status: 422 });
+
   const form = await req.formData().catch(() => null);
   if (!form) return NextResponse.json({ error: "Không đọc được form" }, { status: 400 });
 
@@ -37,7 +42,10 @@ export async function POST(req: NextRequest) {
   try {
     wb = XLSX.read(buf, { type: "buffer" });
   } catch {
-    return NextResponse.json({ error: "File không đúng định dạng Excel (.xlsx/.xls)" }, { status: 400 });
+    return NextResponse.json(
+      { error: "File không đúng định dạng Excel (.xlsx/.xls)" },
+      { status: 400 },
+    );
   }
 
   // Ưu tiên sheet "Data-BOQ" nếu có, ngược lại lấy sheet đầu tiên
@@ -48,25 +56,36 @@ export async function POST(req: NextRequest) {
   if (!rows.length) return NextResponse.json({ error: "File không có dữ liệu" }, { status: 400 });
 
   // Chuẩn hoá key: trim khoảng trắng + bỏ dấu ngoặc kép thừa + NFC
-  const normalizedRows = rows.map(r =>
+  const normalizedRows = rows.map((r) =>
     Object.fromEntries(
-      Object.entries(r).map(([k, v]) => [k.trim().replace(/^"+|"+$/g, "").trim().normalize("NFC"), v])
-    )
+      Object.entries(r).map(([k, v]) => [
+        k
+          .trim()
+          .replace(/^"+|"+$/g, "")
+          .trim()
+          .normalize("NFC"),
+        v,
+      ]),
+    ),
   );
 
   // Cột tên vật tư trong file BOQ có thể là "Vật tư", "MÔ TẢ", "MO TA"
   const BOQ_NAME_COLS = ["Vật tư", "MÔ TẢ", "MO TA"];
   const firstRow = normalizedRows[0];
-  const boqNameCol = BOQ_NAME_COLS.find(c => c in firstRow) ?? null;
+  const boqNameCol = BOQ_NAME_COLS.find((c) => c in firstRow) ?? null;
   const isBOQFormat = !("Tên vật tư *" in firstRow) && boqNameCol !== null;
 
   // Cột mã BOQ trong file BOQ có thể là "Mã BOQ" hoặc "MãBOQ"
-  const boqCodeCol = ("Mã BOQ" in firstRow ? "Mã BOQ" : "MãBOQ");
+  const boqCodeCol = "Mã BOQ" in firstRow ? "Mã BOQ" : "MãBOQ";
 
   if (!isBOQFormat && !("Tên vật tư *" in firstRow)) {
-    return NextResponse.json({
-      error: "File không đúng cấu trúc. Cần có cột 'Tên vật tư *' (template mẫu) hoặc 'Vật tư' / 'MÔ TẢ' (file BOQ gốc).",
-    }, { status: 400 });
+    return NextResponse.json(
+      {
+        error:
+          "File không đúng cấu trúc. Cần có cột 'Tên vật tư *' (template mẫu) hoặc 'Vật tư' / 'MÔ TẢ' (file BOQ gốc).",
+      },
+      { status: 400 },
+    );
   }
 
   // Template format mà không chọn hệ → báo lỗi sớm
@@ -76,7 +95,7 @@ export async function POST(req: NextRequest) {
 
   // Tìm cột trong firstRow theo danh sách ưu tiên (case-insensitive, NFC)
   function findCol(candidates: string[]): string | null {
-    const keys = Object.keys(firstRow).map(k => k.toLowerCase());
+    const keys = Object.keys(firstRow).map((k) => k.toLowerCase());
     for (const c of candidates) {
       const idx = keys.indexOf(c.toLowerCase());
       if (idx >= 0) return Object.keys(firstRow)[idx];
@@ -84,10 +103,10 @@ export async function POST(req: NextRequest) {
     return null;
   }
 
-  const boqQtyCol    = findCol(["ĐỊnh Mức BOQ", "KHỐI LƯỢNG BOQ", "Định mức BOQ", "KL BOQ"]);
-  const plannedCol   = findCol(["Định mức Tháp A", "KL Định Mức", "KL Định mức", "Định mức tháp A"]);
-  const unitColBOQ   = findCol(["ĐVT", "Đơn vị", "DVT"]);
-  const noteColBOQ   = findCol(["GHI CHÚ", "Ghi chú", "Ghi chu"]);
+  const boqQtyCol = findCol(["ĐỊnh Mức BOQ", "KHỐI LƯỢNG BOQ", "Định mức BOQ", "KL BOQ"]);
+  const plannedCol = findCol(["Định mức Tháp A", "KL Định Mức", "KL Định mức", "Định mức tháp A"]);
+  const unitColBOQ = findCol(["ĐVT", "Đơn vị", "DVT"]);
+  const noteColBOQ = findCol(["GHI CHÚ", "Ghi chú", "Ghi chu"]);
   const statusColBOQ = findCol(["Trạng Thái", "Trạng thái", "TRANG THAI"]);
 
   // Helper đọc trường theo format
@@ -98,17 +117,22 @@ export async function POST(req: NextRequest) {
 
   // Danh sách hệ (sheet_types) để tra mã → id
   const sheetTypes = await query<{ id: number; code: string }>(
-    `SELECT id, code FROM sheet_types ORDER BY id`);
-  const sheetMap = new Map(sheetTypes.map(s => [s.code.trim().toLowerCase(), s.id]));
+    `SELECT id, code FROM sheet_types ORDER BY id`,
+  );
+  const sheetMap = new Map(sheetTypes.map((s) => [s.code.trim().toLowerCase(), s.id]));
 
   const results: RowResult[] = [];
   let inserted = 0;
   let skipped = 0;
   let errors = 0;
 
-  // mode=replace với template format: xoá vật tư của hệ được chọn
+  // mode=replace với template format: xoá vật tư của hệ được chọn (trong dự án hiện tại)
   if (mode === "replace" && !isBOQFormat && defaultSheetId) {
-    await run(`DELETE FROM materials WHERE sheet_type_id = ?`, defaultSheetId);
+    await run(
+      `DELETE FROM materials WHERE sheet_type_id = ? AND project_id = ?`,
+      defaultSheetId,
+      projectId,
+    );
   }
 
   // sort_order counter: null key = vật tư không có hệ
@@ -120,7 +144,8 @@ export async function POST(req: NextRequest) {
       } else {
         const maxRow = await queryOne<{ m: number | null }>(
           `SELECT MAX(sort_order) AS m FROM materials WHERE sheet_type_id ${sid === null ? "IS NULL" : "= ?"}`,
-          ...(sid !== null ? [sid] : []));
+          ...(sid !== null ? [sid] : []),
+        );
         sortCounters.set(sid, (maxRow?.m ?? 0) + 1);
       }
     }
@@ -134,12 +159,18 @@ export async function POST(req: NextRequest) {
     const rowNum = i + 2;
     const name = getField(raw, "Tên vật tư *", boqNameCol ?? "Vật tư");
 
-    if (!name) { skipped++; results.push({ row: rowNum, name: "—", status: "skip", message: "Bỏ qua (không có tên)" }); continue; }
+    if (!name) {
+      skipped++;
+      results.push({ row: rowNum, name: "—", status: "skip", message: "Bỏ qua (không có tên)" });
+      continue;
+    }
 
     // Xác định sheetId: template dùng defaultSheetId, BOQ thử prefix rồi fallback null
     let sheetId: number | null;
     if (isBOQFormat) {
-      const boqPrefix = String(raw[boqCodeCol] ?? "").split("-")[0].toLowerCase();
+      const boqPrefix = String(raw[boqCodeCol] ?? "")
+        .split("-")[0]
+        .toLowerCase();
       sheetId = sheetMap.get(boqPrefix) ?? defaultSheetId ?? null;
     } else {
       sheetId = defaultSheetId!;
@@ -147,45 +178,76 @@ export async function POST(req: NextRequest) {
 
     const boqCode = getField(raw, "Mã BOQ", boqCodeCol) || null;
 
-    const unit = isBOQFormat ? String(raw[unitColBOQ ?? "ĐVT"] ?? "").trim() || null
+    const unit = isBOQFormat
+      ? String(raw[unitColBOQ ?? "ĐVT"] ?? "").trim() || null
       : String(raw["ĐVT"] ?? "").trim() || null;
-    const qtyBoq = parseFloat(String(raw[isBOQFormat ? (boqQtyCol ?? "") : "Định mức BOQ"] ?? "")) || 0;
-    const qtyPlanned = parseFloat(String(raw[isBOQFormat ? (plannedCol ?? "") : "Định mức Tháp A"] ?? "")) || 0;
-    const noteRaw = isBOQFormat ? String(raw[noteColBOQ ?? "GHI CHÚ"] ?? "").trim()
+    const qtyBoq =
+      parseFloat(String(raw[isBOQFormat ? (boqQtyCol ?? "") : "Định mức BOQ"] ?? "")) || 0;
+    const qtyPlanned =
+      parseFloat(String(raw[isBOQFormat ? (plannedCol ?? "") : "Định mức Tháp A"] ?? "")) || 0;
+    const noteRaw = isBOQFormat
+      ? String(raw[noteColBOQ ?? "GHI CHÚ"] ?? "").trim()
       : String(raw["Ghi chú"] ?? "").trim();
     const note = noteRaw || null;
 
     // sort_order theo thứ tự dòng trong file
     const sortOrder = await getCounter(sheetId);
 
-    // Nếu mã BOQ đã tồn tại ở vật tư → cập nhật số liệu + sort_order
+    // Nếu mã BOQ đã tồn tại ở vật tư (trong dự án hiện tại) → cập nhật số liệu + sort_order
     if (boqCode) {
       const existing = await queryOne<{ id: number }>(
-        `SELECT id FROM materials WHERE boq_code = ?`, boqCode);
+        `SELECT id FROM materials WHERE boq_code = ? AND project_id = ?`,
+        boqCode,
+        projectId,
+      );
       if (existing) {
         await run(
-          `UPDATE materials SET name=?, unit=?, qty_boq=?, qty_planned=?, note=?, sort_order=? WHERE id=?`,
-          name, unit, qtyBoq, qtyPlanned, note, sortOrder, existing.id);
+          `UPDATE materials SET name=?, unit=?, qty_boq=?, qty_planned=?, note=?, sort_order=? WHERE id=? AND project_id=?`,
+          name,
+          unit,
+          qtyBoq,
+          qtyPlanned,
+          note,
+          sortOrder,
+          existing.id,
+          projectId,
+        );
         inserted++;
         results.push({ row: rowNum, name, status: "ok", message: "Cập nhật" });
         continue;
       }
     }
 
-    let status = isBOQFormat ? String(raw[statusColBOQ ?? "Trạng Thái"] ?? "").trim()
+    let status = isBOQFormat
+      ? String(raw[statusColBOQ ?? "Trạng Thái"] ?? "").trim()
       : String(raw["Trạng thái"] ?? "").trim();
     if (!VALID_STATUSES.includes(status)) status = "dat_hang";
 
     try {
       await insertId(
-        `INSERT INTO materials (sheet_type_id, boq_code, name, unit, qty_boq, qty_planned, qty_used, status, note, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
-        sheetId, boqCode, name, unit, qtyBoq, qtyPlanned, status, note, sortOrder);
+        `INSERT INTO materials (sheet_type_id, boq_code, name, unit, qty_boq, qty_planned, qty_used, status, note, sort_order, project_id)
+         VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
+        sheetId,
+        boqCode,
+        name,
+        unit,
+        qtyBoq,
+        qtyPlanned,
+        status,
+        note,
+        sortOrder,
+        projectId,
+      );
       inserted++;
       results.push({ row: rowNum, name, status: "ok" });
     } catch (e: unknown) {
       errors++;
-      results.push({ row: rowNum, name, status: "error", message: e instanceof Error ? e.message : String(e) });
+      results.push({
+        row: rowNum,
+        name,
+        status: "error",
+        message: e instanceof Error ? e.message : String(e),
+      });
     }
   }
 

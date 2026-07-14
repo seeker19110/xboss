@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +9,19 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null) {
+    return NextResponse.json({
+      stockSummary: [],
+      overBudget: [],
+      lowStock: [],
+      warehouseAge: [],
+      noTaskIssues: [],
+      needsStock: [],
+      byFloor: [],
+    });
+  }
 
   try {
     const [stockSummary, overBudget, lowStock, warehouseAge, noTaskIssues, needsStock, byFloor] =
@@ -23,8 +37,10 @@ export async function GET() {
               SUM(CASE WHEN COALESCE(m.qty_stock, 0) < COALESCE(m.min_stock_level, 0) AND m.min_stock_level > 0 THEN 1 ELSE 0 END) AS "lowStockCount"
          FROM materials m
          LEFT JOIN sheet_types st ON m.sheet_type_id = st.id
+        WHERE m.project_id = ?
         GROUP BY st.id, st.code, st.name
         ORDER BY st.code`,
+          projectId,
         ),
 
         // 2. Vật tư vượt định mức (hao hụt)
@@ -36,9 +52,10 @@ export async function GET() {
               st.code AS "sheetCode"
          FROM materials m
          LEFT JOIN sheet_types st ON m.sheet_type_id = st.id
-        WHERE m.qty_used > m.qty_planned AND m.qty_planned > 0
+        WHERE m.qty_used > m.qty_planned AND m.qty_planned > 0 AND m.project_id = ?
         ORDER BY (m.qty_used - m.qty_planned) DESC
         LIMIT 50`,
+          projectId,
         ),
 
         // 3. Vật tư tồn kho dưới mức tối thiểu
@@ -50,8 +67,9 @@ export async function GET() {
               st.code AS "sheetCode"
          FROM materials m
          LEFT JOIN sheet_types st ON m.sheet_type_id = st.id
-        WHERE m.min_stock_level > 0 AND COALESCE(m.qty_stock, 0) < m.min_stock_level
+        WHERE m.min_stock_level > 0 AND COALESCE(m.qty_stock, 0) < m.min_stock_level AND m.project_id = ?
         ORDER BY (COALESCE(m.qty_stock, 0) - m.min_stock_level)`,
+          projectId,
         ),
 
         // 4. Vật tư tồn kho lâu (nhập > 30 ngày, tồn > 0)
@@ -64,12 +82,13 @@ export async function GET() {
          FROM materials m
          LEFT JOIN sheet_types st ON m.sheet_type_id = st.id
          LEFT JOIN material_transactions t ON t.material_id = m.id AND t.type = 'nhap_kho'
-        WHERE COALESCE(m.qty_stock, 0) > 0
+        WHERE COALESCE(m.qty_stock, 0) > 0 AND m.project_id = ?
         GROUP BY m.id, m.name, m.boq_code, m.unit, m.qty_stock, m.min_stock_level, st.code
        HAVING MIN(t.created_at) IS NOT NULL
           AND EXTRACT(DAY FROM NOW() - MIN(t.created_at)) > 30
         ORDER BY EXTRACT(DAY FROM NOW() - MIN(t.created_at)) DESC
         LIMIT 30`,
+          projectId,
         ),
 
         // 5. Xuất kho không gắn task (cần điều tra)
@@ -80,9 +99,10 @@ export async function GET() {
          FROM material_transactions t
          LEFT JOIN materials m ON t.material_id = m.id
          LEFT JOIN users u ON t.created_by = u.id
-        WHERE t.type = 'xuat_cong_truong' AND t.task_id IS NULL
+        WHERE t.type = 'xuat_cong_truong' AND t.task_id IS NULL AND m.project_id = ?
         ORDER BY t.created_at DESC
         LIMIT 30`,
+          projectId,
         ),
 
         // 6. Vật tư cần nhập trước 1 tháng: có hạng mục sắp thi công mà kho chưa đủ
@@ -104,9 +124,11 @@ export async function GET() {
           AND tk.start_date >= CURRENT_DATE
           AND tk.start_date <= CURRENT_DATE + INTERVAL '30 days'
           AND tk.status NOT IN ('hoan_thanh', 'nghiem_thu')
+          AND m.project_id = ?
         GROUP BY m.id, m.name, m.boq_code, m.unit, m.qty_planned, m.qty_stock, m.qty_used, st.code, st.name
         ORDER BY MIN(tk.start_date), GREATEST(0, m.qty_planned - m.qty_used - COALESCE(m.qty_stock, 0)) DESC
         LIMIT 100`,
+          projectId,
         ),
 
         // 7. Tiêu hao theo tầng (M4): Σ xuất kho ra công trường theo vật tư × tầng.
@@ -124,10 +146,11 @@ export async function GET() {
          FROM material_transactions t
          JOIN materials m ON m.id = t.material_id
          LEFT JOIN sheet_types st ON m.sheet_type_id = st.id
-        WHERE t.floor_label IS NOT NULL
+        WHERE t.floor_label IS NOT NULL AND m.project_id = ?
         GROUP BY m.id, m.name, m.unit, m.boq_code, st.code, t.floor_label
        HAVING SUM(CASE WHEN t.type IN ('xuat_cong_truong', 'hoan_kho') THEN -t.delta ELSE GREATEST(t.delta, 0) END) > 0
         ORDER BY m.name, t.floor_label`,
+          projectId,
         ),
       ]);
 
