@@ -1,9 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
+import { queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { getCert, certTotals } from "@/lib/paymentcerts";
 
 export const dynamic = "force-dynamic";
+
+// Xác nhận đợt thuộc hợp đồng của dự án đang chọn (M22) — chặn xem đợt của
+// hợp đồng thuộc dự án khác qua đoán/liệt kê id.
+async function certInProject(
+  id: number,
+  projectId: number | null,
+): Promise<{ status: string; contractId: number } | undefined> {
+  if (projectId == null) return undefined;
+  return queryOne<{ status: string; contractId: number }>(
+    `SELECT c.status, c.contract_id AS "contractId"
+       FROM payment_certs c JOIN contracts ct ON ct.id = c.contract_id
+      WHERE c.id = ? AND ct.project_id = ?`,
+    id,
+    projectId,
+  );
+}
 
 // GET /api/payment-certs/:id/excel — xuất bảng KL nghiệm thu 1 đợt IPC.
 export async function GET(
@@ -18,6 +36,11 @@ export async function GET(
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+
+  const projectId = await getCurrentProjectId(user);
+  const scoped = await certInProject(id, projectId);
+  if (!scoped)
+    return NextResponse.json({ error: "Không tìm thấy đợt thanh toán" }, { status: 404 });
 
   const cert = await getCert(id);
   if (!cert) return NextResponse.json({ error: "Không tìm thấy đợt thanh toán" }, { status: 404 });

@@ -134,6 +134,39 @@ Xác nhận M37 Phase 2 (typography/padding tier/nút danger/modal/theme-color, 
 
 **Phát hiện thật (Thấp):** `docs/nang-cap/README.md` — dòng `> > > > > > > pr2.1-typo` là dấu vết merge conflict marker (`>>>>>>>`, bị markdown format tách khoảng trắng) sót lại từ lúc tích hợp PR 2.1, chưa từng được dọn — nằm ngay giữa bảng recipe typography, có thể gây hiểu nhầm khi đọc tài liệu chuẩn thiết kế. Đã xoá dòng thừa.
 
+## Đợt audit bảo mật toàn dự án lần 5 (2026-07-14, riêng miền Bảo mật §3 docs/audit.md)
+
+5 agent song song rà **toàn bộ ~90 domain route API** theo checklist Bảo mật & Phân quyền §3 (401/`CAN`/`canTouchTask`/`canTouchPackage`/scoping đa dự án M22/SQL/upload/rate-limit/cron) — chia theo miền: tài chính, tiến độ/nghiệm thu, đa dự án & auth, tài liệu/upload, nghiệp vụ còn lại (HR/HSE/QC/env/...). Phát hiện **19 lỗ hổng thật**, gần như toàn bộ cùng 1 nguyên nhân gốc: route thêm **sau** đợt M22 (đa dự án) quên áp `getCurrentProjectId(user)`/lọc `project_id`, trong khi route "anh em" cùng resource đã làm đúng — rò rỉ hoặc ghi/xoá/duyệt dữ liệu xuyên dự án. Đã sửa toàn bộ 19 lỗi qua 8 subagent `coder` chạy song song (mỗi subagent 1 nhóm domain độc lập, worktree riêng), merge lại và verify chung.
+
+**Mức Cao (12 — rò rỉ hoặc ghi/xoá/duyệt xuyên dự án):**
+
+- `GET /api/payment-certs/:id/excel` — tải Excel đơn giá/giá trị IPC dự án khác → thêm `certInProject` scope (giống route anh em `[id]/route.ts`).
+- `GET/DELETE /api/claim-documents/:id` — xem/xoá hồ sơ claim (tranh chấp) dự án khác → scope qua `getClaim(doc.claim_id, projectId)`.
+- `app/api/dashboard/{route,floors,forecast,scurve,spi}.ts`, `lib/dashboardext.ts` (6 hàm block), `lib/report.ts::progressAtDate`, `/api/search`, `/api/export/excel`, `/api/notifications/feed` — **lộ toàn bộ KPI/tiến độ/task trễ/S-curve/SPI/forecast/kết quả tìm kiếm/Excel export/feed hoạt động của mọi dự án** cho user chỉ được gán 1 dự án (`user_projects`) — phạm vi ảnh hưởng lớn nhất đợt này. Áp pattern chuẩn đã có ở `app/api/notifications/route.ts` (`projectId != null ? "AND tw.project_id = ?" : ""`) xuyên suốt; KPI theo sheet dùng `JOIN towers ... AND tw.project_id = ?` ngay trong `ON` (không phải `WHERE`) để không làm biến mất sheet chưa có task khi lọc dự án.
+- `GET /api/materials/reports` — lộ tồn kho/vượt định mức dự án khác (7 truy vấn) → thêm `m.project_id = ?`.
+- `GET /api/qc/inspections` — lộ biên bản QC dự án khác (POST cùng file đã đúng, GET thiếu) → join `work_packages/sheet_types/towers` suy `project_id` (bảng không có cột riêng, đúng ADR-0004).
+- `GET /api/qc/documents` + `/export/zip` — lộ + tải file hồ sơ QC dự án khác → cùng cách join.
+- `inspection_requests` (GET list/detail + PATCH đổi trạng thái) — không có cột `project_id`, dùng join qua `inspection_request_tasks→tasks→...→towers` (không thêm migration, theo đúng nguyên tắc ADR-0004: bảng suy được qua FK cha thì không cần cột riêng).
+- `lib/documents-hub.ts` (5 nguồn: task/contract/vo/drawing/project) — `/documents-hub` lộ toàn bộ hợp đồng/VO/bản vẽ/tài liệu mọi dự án → 4 nguồn có `project_id` trực tiếp lọc thẳng, nguồn `task` suy qua towers.
+- `GET/DELETE /api/contract-documents/:id`, `/api/correspondence-files/:id`, `/api/hse-photos/:id` — xem/xoá tài liệu hợp đồng/công văn/ảnh HSE dự án khác → join tới bảng cha có `project_id` (mẫu `certInProject`).
+- `app/api/design-changes/[id]/*` (GET/PATCH/DELETE) + `.../decide` — **sửa/xoá/duyệt** thay đổi thiết kế dự án khác (nghiêm trọng nhất vì là ghi/duyệt, không chỉ đọc) → `getDesignChange`/`markDrawingUpdated`/`decideDesignChange` (lib/designchanges.ts) nhận `projectId`, bảng đã có cột riêng.
+
+**Mức Trung bình (4):**
+
+- `boq_norms` (GET/POST `/api/boq/:id/norms`, GET `norm-usage`, PATCH/DELETE `/api/boq-norms/:id`) — tạo/sửa/xoá định mức không kiểm `project_id` của `boq_item` → thêm check qua `boq_items.project_id`.
+- `/api/towers` — GET lộ tên tháp mọi dự án (sửa dùng `visibleProjectIds`); POST luôn gắn tháp mới vào dự án `id` nhỏ nhất thay vì dự án đang chọn (sửa dùng `getCurrentProjectId`).
+- `/api/materials/import` — vật tư import không gắn `project_id` (mồ côi, khuếch đại mức lộ của lỗi #reports) → thêm cột + scope nhánh update theo `boqCode`.
+- `/api/materials/columns` — nhãn cột đọc `LIMIT 1` không theo dự án đang chọn (nợ nhỏ, sửa nhân tiện).
+
+**Đã rà và không phát hiện vấn đề mới:** auth/login/rate-limit/`CRON_SECRET`/cookie-session/đổi mật khẩu, chuỗi nghiệm thu 2 bước (`approve`/`approvals` với `FOR UPDATE`), `canTouchTask`/`canTouchPackage`/`canTouchVehicle`/`canTouchFloor` ở hầu hết route (đối xứng GET/POST/PATCH/DELETE), upload mime thật + giới hạn dung lượng, sở hữu comment/tài liệu, SQL 100% qua placeholder `?`, không path traversal ở tên file upload.
+
+**Verify:** merge 8 nhánh subagent vào `claude/security-audit-jmq9a0` (1 conflict thật ở `app/api/dashboard/route.ts`/`lib/dashboardext.ts` — 1 nhánh vô tình phục hồi `cashflowSeries()`/`cpiBlock()` đã cố ý bỏ theo quyết 2026-07-11 và dùng nhầm `frontMissingList`/`work_fronts` model cũ thay vì `stageMissingList`/`floor_stage_fronts` M46 hiện tại — đã resolve giữ đúng bản hiện hành, chỉ thêm `projectId`). `npm run lint`/`typecheck` xanh; `npm test` — **57 file, 0 fail** (Postgres 16 cục bộ dựng riêng, gồm ~15 test hồi quy mới xác nhận scoping đa dự án qua từng lỗi); `npm run build` xanh.
+
+**Nợ kỹ thuật ghi nhận, chưa xử lý trong đợt này:**
+
+- `lib/dashboardext.ts::cashflowSeries()`/`cpiBlock()` (dùng `payment_bills`/`contracts`/`boq_items`) — hiện không gọi từ dashboard chính (đã bỏ theo quyết 2026-07-11) nhưng nếu còn được gọi ở nơi khác thì chưa scope theo dự án; cần rà lại nếu tái sử dụng.
+- **Nợ lớn đã biết theo ADR-0004** (không phải lỗi mới, đã ghi nhận trước đây): cụm `tasks`/`gantt`/`timeline`/`lookahead`/`my-tasks`/`schedule-control`/`norms/over` vẫn chưa lọc theo `project_id` — chưa gây hậu quả vì DB thật hiện chỉ có 1 dự án hoạt động, nhưng sẽ lộ ngay khi bật dự án thứ 2. Cần PR riêng rà từng route theo đúng lộ trình ADR-0004 ("PR 3+ = rà scoping từng cụm").
+
 ## Đồng bộ AppShell theo mockup xBoss mới (2026-07)
 
 - `attachments/xBoss-mockup.xlsx` bản mới (commit `chore(attachments): update xBoss mockup`) đổi thứ tự 24 dashboard cấp cao so với bản cũ mà `app/lib/dashboardTree.ts` bám theo — sắp lại `DASHBOARD_TREE` từ 12 cụm cũ thành 18 cụm nhỏ hơn để khớp đúng thứ tự mockup (tách các cụm không còn liền kề như "Thiết kế & Bản vẽ", "Chất lượng · An toàn · Môi trường", "Khởi động & Tổ chức", "Điều hành & Hồ sơ" thành các cụm 1 dashboard riêng). Đổi tên cụm `"Vật tư & Thiết bị"` → `"Quản lý vật tư"` (theo mockup đổi tên "Dashboard Vật Tư" → "Quản Lý Vật Tư"). Đổi chỗ nội bộ 2 cặp dashboard theo mockup: `Claim & Thay đổi` đứng trước `Bảo hiểm & Bảo lãnh` trong cụm tài chính; `Chuyển đổi số & Công nghệ` đứng trước `Import Excel` trong cụm Hệ thống. Dời `"Nhân sự & Tổ chức"` và `"Khởi động & Pháp lý"` xuống cuối sidebar (mockup xếp 2 dashboard này ở vị trí #23-24). Giữ nguyên toàn bộ `id`/`href`/`icon`/`roles`/`children` của mọi node (hợp đồng ổn định cho `localStorage` gập/mở và `nav_settings.node_key`) — thuần reorder + tách cụm, không đổi route/API/schema/quyền nào.

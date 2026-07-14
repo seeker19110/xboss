@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFile, unlink } from "node:fs/promises";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
+import { getClaim } from "@/lib/claims";
 import { photoPath } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +14,7 @@ type ClaimDocRow = {
   mime_type: string;
   original_name: string | null;
   uploaded_by: number | null;
+  claim_id: number;
 };
 
 // GET /api/claim-documents/:id — stream file hồ sơ đính kèm claim.
@@ -29,10 +32,14 @@ export async function GET(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const doc = await queryOne<ClaimDocRow>(
-    `SELECT id, file_name, mime_type, original_name, uploaded_by FROM claim_documents WHERE id = ?`,
+    `SELECT id, file_name, mime_type, original_name, uploaded_by, claim_id FROM claim_documents WHERE id = ?`,
     id,
   );
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
+
+  const projectId = await getCurrentProjectId(user);
+  const claim = await getClaim(doc.claim_id, projectId);
+  if (!claim) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
   const path = photoPath(doc.file_name);
   if (!path) return NextResponse.json({ error: "Tên file không hợp lệ" }, { status: 400 });
@@ -67,10 +74,14 @@ export async function DELETE(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const doc = await queryOne<ClaimDocRow>(
-    `SELECT id, file_name, mime_type, original_name, uploaded_by FROM claim_documents WHERE id = ?`,
+    `SELECT id, file_name, mime_type, original_name, uploaded_by, claim_id FROM claim_documents WHERE id = ?`,
     id,
   );
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
+
+  const projectId = await getCurrentProjectId(user);
+  const claim = await getClaim(doc.claim_id, projectId);
+  if (!claim) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
   if (doc.uploaded_by !== user.id && !isAdminOrPm(user.role))
     return NextResponse.json(

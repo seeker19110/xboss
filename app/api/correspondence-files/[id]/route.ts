@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFile, unlink } from "node:fs/promises";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { photoPath } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +14,26 @@ type CorrespondenceFileRow = {
   original_name: string | null;
   uploaded_by: number | null;
 };
+
+// Lấy file công văn, lọc theo dự án đang chọn (M22) — chặn xem/xoá file của
+// công văn thuộc dự án khác qua đoán/liệt kê id.
+async function getFileInProject(
+  id: number,
+  projectId: number | null,
+): Promise<CorrespondenceFileRow | undefined> {
+  const conds = ["cf.id = ?"];
+  const args: unknown[] = [id];
+  if (projectId != null) {
+    conds.push("c.project_id = ?");
+    args.push(projectId);
+  }
+  return queryOne<CorrespondenceFileRow>(
+    `SELECT cf.id, cf.file_name, cf.mime_type, cf.original_name, cf.uploaded_by
+       FROM correspondence_files cf JOIN correspondences c ON c.id = cf.correspondence_id
+      WHERE ${conds.join(" AND ")}`,
+    ...args,
+  );
+}
 
 // GET /api/correspondence-files/:id — stream file scan công văn.
 export async function GET(
@@ -28,10 +49,8 @@ export async function GET(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const doc = await queryOne<CorrespondenceFileRow>(
-    `SELECT id, file_name, mime_type, original_name, uploaded_by FROM correspondence_files WHERE id = ?`,
-    id,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const doc = await getFileInProject(id, projectId);
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
   const path = photoPath(doc.file_name);
@@ -66,10 +85,8 @@ export async function DELETE(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const doc = await queryOne<CorrespondenceFileRow>(
-    `SELECT id, file_name, mime_type, original_name, uploaded_by FROM correspondence_files WHERE id = ?`,
-    id,
-  );
+  const projectId = await getCurrentProjectId(user);
+  const doc = await getFileInProject(id, projectId);
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
   if (doc.uploaded_by !== user.id && !CAN.manageCorrespondence(user.role))

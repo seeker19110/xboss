@@ -164,3 +164,71 @@ test(
     for (const d of systems) assert.ok(rows.some((r) => r.code === d.code));
   },
 );
+
+// ===== Test tích hợp: lọc theo projectId (chống rò rỉ chéo dự án, M22 PR — audit) =====
+// 2 dự án riêng biệt, mỗi dự án 1 NCR + 1 PO + 1 VO gắn project_id khác nhau. Truyền
+// projectId của dự án B phải KHÔNG thấy dữ liệu của dự án A (và ngược lại).
+
+test(
+  "qualityBlock(projectId): NCR của dự án khác không lẫn vào khi lọc theo 1 dự án",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { qualityBlock } = await import("@/lib/dashboardext");
+
+    const pA = await insertId(`INSERT INTO projects (name) VALUES ('Test QB Leak A')`);
+    const pB = await insertId(`INSERT INTO projects (name) VALUES ('Test QB Leak B')`);
+
+    const ncrA = await insertId(
+      `INSERT INTO ncrs (code, description, status, project_id) VALUES ('NCR-LEAK-A', 'Lỗi A', 'open', ?)`,
+      pA,
+    );
+    const ncrB = await insertId(
+      `INSERT INTO ncrs (code, description, status, project_id) VALUES ('NCR-LEAK-B', 'Lỗi B', 'open', ?)`,
+      pB,
+    );
+
+    const blockA = await qualityBlock(pA);
+    const blockB = await qualityBlock(pB);
+    // Mỗi dự án chỉ thấy đúng 1 NCR mở của chính nó — không lẫn NCR dự án kia.
+    assert.equal(blockA.ncrOpen, 1);
+    assert.equal(blockB.ncrOpen, 1);
+
+    await run(`DELETE FROM ncrs WHERE id IN (?, ?)`, ncrA, ncrB);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, pA, pB);
+  },
+);
+
+test(
+  "procurementBlock(projectId): PO trễ giao của dự án khác không lẫn vào",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { procurementBlock } = await import("@/lib/dashboardext");
+    const { daysFromTodayISO } = await import("@/lib/date");
+
+    const pA = await insertId(`INSERT INTO projects (name) VALUES ('Test Proc Leak A')`);
+    const pB = await insertId(`INSERT INTO projects (name) VALUES ('Test Proc Leak B')`);
+
+    const poA = await insertId(
+      `INSERT INTO purchase_orders (po_code, status, expected_date, project_id)
+       VALUES ('PO-LEAK-A', 'draft', ?, ?)`,
+      daysFromTodayISO(-3),
+      pA,
+    );
+    const poB = await insertId(
+      `INSERT INTO purchase_orders (po_code, status, expected_date, project_id)
+       VALUES ('PO-LEAK-B', 'draft', ?, ?)`,
+      daysFromTodayISO(-3),
+      pB,
+    );
+
+    const blockA = await procurementBlock(pA);
+    const blockB = await procurementBlock(pB);
+    assert.equal(blockA.poLate, 1);
+    assert.equal(blockB.poLate, 1);
+
+    await run(`DELETE FROM purchase_orders WHERE id IN (?, ?)`, poA, poB);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, pA, pB);
+  },
+);
