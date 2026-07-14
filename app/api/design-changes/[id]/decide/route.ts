@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { canDecideDesignChange, decideDesignChange } from "@/lib/designchanges";
 
 export const dynamic = "force-dynamic";
@@ -32,11 +33,13 @@ export async function POST(
       { status: 422 },
     );
 
+  const projectId = await getCurrentProjectId(user);
   const result = await decideDesignChange({
     designChangeId: id,
     decision,
     decisionNote: typeof body.decisionNote === "string" ? body.decisionNote : null,
     decidedBy: user.id,
+    projectId,
   });
   if (typeof result === "string") return NextResponse.json({ error: result }, { status: 409 });
 

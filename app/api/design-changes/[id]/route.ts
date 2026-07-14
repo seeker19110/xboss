@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import {
   checkDesignChangeRefs,
   getDesignChange,
@@ -23,7 +24,8 @@ export async function GET(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const designChange = await getDesignChange(id);
+  const projectId = await getCurrentProjectId(user);
+  const designChange = await getDesignChange(id, projectId);
   if (!designChange)
     return NextResponse.json({ error: "Không tìm thấy thay đổi thiết kế" }, { status: 404 });
 
@@ -50,7 +52,8 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const existing = await getDesignChange(id);
+  const projectId = await getCurrentProjectId(user);
+  const existing = await getDesignChange(id, projectId);
   if (!existing)
     return NextResponse.json({ error: "Không tìm thấy thay đổi thiết kế" }, { status: 404 });
 
@@ -59,7 +62,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });
 
   if (body.markDrawingUpdated === true) {
-    const err = await markDrawingUpdated(id);
+    const err = await markDrawingUpdated(id, projectId);
     if (err) return NextResponse.json({ error: err }, { status: 409 });
     return NextResponse.json({ ok: true, status: "drawing_updated" });
   }
@@ -127,7 +130,8 @@ export async function DELETE(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const existing = await getDesignChange(id);
+  const projectId = await getCurrentProjectId(user);
+  const existing = await getDesignChange(id, projectId);
   if (!existing)
     return NextResponse.json({ error: "Không tìm thấy thay đổi thiết kế" }, { status: 404 });
 
