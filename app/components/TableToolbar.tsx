@@ -197,7 +197,7 @@ export default function TableToolbar<T>({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Tìm kiếm…"
             aria-label="Tìm kiếm"
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg pl-8 pr-8 py-1.5 text-sm outline-none focus:border-emerald-600"
+            className="w-full min-h-10 bg-zinc-800 border border-zinc-700 rounded-lg pl-8 pr-8 py-1.5 text-sm outline-none focus:border-emerald-600"
           />
           {query && (
             <button
@@ -215,7 +215,7 @@ export default function TableToolbar<T>({
           return (
             <details key={f.key} className="relative group">
               <summary
-                className={`list-none flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer select-none transition ${
+                className={`list-none flex items-center gap-1 text-xs px-2.5 py-1.5 min-h-10 rounded-lg border cursor-pointer select-none transition ${
                   sel.length
                     ? "bg-emerald-950 border-emerald-900 text-emerald-200"
                     : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700"

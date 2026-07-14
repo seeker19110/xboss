@@ -3,8 +3,7 @@
 // LƯU Ý ĐẶT TÊN: route `/notifications` đã có sẵn từ trước (trang feed hoạt động
 // trễ/đến hạn/vật tư + cài đặt loại thông báo, xem `app/notifications/page.tsx`), nên trang
 // liệt kê đầy đủ bảng `notifications` (dữ liệu chuông thông báo) đặt tại `/notifications/all`
-// để tránh đè lên trang đã có — cần phiên chính xác nhận lại cách đặt tên/khả năng gộp 2
-// trang này trong đợt tích hợp (xem báo cáo cuối phiên coder).
+// để tránh đè lên trang đã có.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckSquare, Search } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
@@ -43,7 +42,9 @@ export default function AllNotificationsPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
   const load = useCallback(async () => {
-    const r = await fetch("/api/notifications").catch(() => null);
+    // limit=1000: trang này liệt kê "tất cả" — không dùng limit mặc định 50 của dropdown
+    // chuông, tránh lọc/tìm kiếm/phân trang phía client bị cắt mất dữ liệu cũ hơn.
+    const r = await fetch("/api/notifications?limit=1000").catch(() => null);
     if (r?.status === 401) {
       redirectToLogin();
       return;
