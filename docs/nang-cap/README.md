@@ -1,55 +1,27 @@
-# Bộ đặc tả nâng cấp XBoss — chi tiết từng module
+# Bộ đặc tả nâng cấp XBoss — theo nhóm module (đã triển khai xong M0–M42)
 
-> **Trạng thái: KẾ HOẠCH — chưa triển khai.** Tổng quan, thứ tự đợt và lý do xem `docs/ke-hoach-nang-cap-he-thong-2026-07.md`. Thư mục này là đặc tả **chi tiết, tự chứa** cho từng module — khi được lệnh "triển khai M<x>", đọc `CLAUDE.md` + file `M<xx>-*.md` tương ứng + mục Quy ước chung dưới đây là đủ ngữ cảnh lập plan.
-
-## Danh mục
-
-| File                          | Module                                                              | Đợt          |
-| ----------------------------- | ------------------------------------------------------------------- | ------------ |
-| `M00-khung-ui-sidebar.md`     | Khung UI sidebar + title AppHeader + nền tảng UX                    | 1            |
-| `M01-boq.md`                  | BOQ đầy đủ                                                          | 1            |
-| `M02-chi-phi.md`              | Kiểm soát chi phí + cảnh báo vượt                                   | 1            |
-| `M03-qaqc.md`                 | QA&QC + hồ sơ chất lượng (T&C, phiếu YCNT, chuyển bước)             | 2            |
-| `M04-ncc-don-hang.md`         | NCC & đơn hàng (cấp phát, xe ra vào)                                | 2            |
-| `M05-nhat-ky.md`              | Nhật ký thi công + nhân lực                                         | 2            |
-| `M14-mat-bang.md`             | Mặt bằng thi công (work front)                                      | 2            |
-| `M15-trang-he.md`             | Trang riêng từng hệ (hub quản lý nhà thầu)                          | 1            |
-| `M06-phat-sinh-vo.md`         | Phát sinh / VO                                                      | 3            |
-| `M07-dau-thau.md`             | Đấu thầu                                                            | 3            |
-| `M08-ban-ve.md`               | Bản vẽ BIM/Shop + biện pháp thi công                                | 3            |
-| `M09-dashboard.md`            | Dashboard mở rộng                                                   | 3            |
-| `M10-rfi-cong-van.md`         | RFI / công văn                                                      | 4            |
-| `M11-hse.md`                  | HSE / an toàn                                                       | 4            |
-| `M12-thiet-bi.md`             | Thiết bị/máy móc                                                    | 4            |
-| `M13-hop-rui-ro.md`           | Biên bản họp + sổ rủi ro                                            | 4            |
-| `M16-hop-dong.md`             | Sổ hợp đồng (nhận thầu/giao thầu/NCC)                               | A (FastCons) |
-| `M17-thanh-toan-kl.md`        | Nghiệm thu khối lượng & thanh toán theo đợt (IPC)                   | A (FastCons) |
-| `M18-dinh-muc.md`             | Định mức vật tư/nhân công/máy theo hạng mục                         | C (FastCons) |
-| `M19-de-xuat-phe-duyet.md`    | Đề xuất & phê duyệt online tổng quát                                | D (FastCons) |
-| `M20-kho-ho-so.md`            | Kho hồ sơ dự án (Drive)                                             | B (FastCons) |
-| `M21-appshell-ia.md`          | AppShell IA đầy đủ (cây dashboard + hub + quản trị hiển thị)        | N1 (IA)      |
-| `M22-da-du-an.md`             | Đa dự án (Portfolio, switcher, scoping `project_id`) — cần ADR-0004 | N3 (IA)      |
-| `M23-khoi-dong-phap-ly.md`    | Khởi động & Pháp lý (giấy phép, huy động)                           | B (IA mới)   |
-| `M24-nhan-su-to-chuc.md`      | Nhân sự & Tổ chức (chấm công, tổ đội, chứng chỉ, RACI)              | B (IA mới)   |
-| `M25-moi-truong-giay-phep.md` | Môi trường & Giấy phép (quan trắc MT, chất thải)                    | H (IA mới)   |
-| `M26-quan-he-quan-trac.md`    | Quan hệ & Quan trắc (lún/chuyển vị, cộng đồng)                      | H (IA mới)   |
-| `M27-tai-chinh-ke-toan.md`    | Tài chính – Kế toán công trường (dòng tiền, VAT, lương)             | I (IA mới)   |
-| `M28-bao-hiem-bao-lanh.md`    | Bảo hiểm & Bảo lãnh (theo dõi hạn)                                  | I (IA mới)   |
-| `M29-ban-giao-ket-thuc.md`    | Bàn giao & Kết thúc (T&C, punch list, demob)                        | K (IA mới)   |
-| `M30-bao-hanh-bao-tri.md`     | Bảo hành – Bảo trì (O&M)                                            | K (IA mới)   |
-| `M31-chuyen-doi-so.md`        | Chuyển đổi số & Công nghệ (CDE, BIM viewer, drone)                  | L (IA mới)   |
-| `M32-thiet-ke-thay-doi.md`    | Quản lý thay đổi thiết kế (Design Change — BPTC đã xong qua M08)    | C (IA mới)   |
-| `M33-nha-thau-phu.md`         | Hồ sơ năng lực & đánh giá định kỳ Nhà thầu phụ                      | E (IA mới)   |
-| `M34-claim.md`                | Claim chi phí & Gia hạn thời gian (EOT)                             | I (IA mới)   |
-| `M38-mau-token-tuong-phan.md` | Màu cho người mù màu + tương phản chữ (icon/nhãn thứ 2)             | UX 2026-07   |
-| `M39-bang-filter-sort-sticky.md` | Filter/search/sort bảng Nghiệm thu + sticky header/cột ma trận   | UX 2026-07   |
-| `M40-trung-tam-thong-bao.md`  | Trung tâm thông báo: nhóm · lọc · click-through                     | UX 2026-07   |
-| `M41-responsive-mobile.md`    | Tối ưu responsive mobile (card view approvals, kích thước chạm)     | UX 2026-07   |
-| `M42-flatten-submenu-sidebar.md` | Bỏ submenu lồng trong sidebar, giữ accordion cấp nhóm             | UX 2026-07   |
-
-> M16–M20 là module bổ sung từ đối chiếu brochure FastCons — xem `docs/ke-hoach-fastcons-2026-07.md` (nhóm A/B/C/D thay cho số đợt 1–4 cũ).
+> **Trạng thái: ĐÃ TRIỂN KHAI XONG toàn bộ M0–M42.** File `M<xx>-*.md` gốc (viết TRƯỚC khi code, dùng để giao việc subagent) đã được **gộp theo nhóm nghiệp vụ** thành các file `G<nn>-*.md` dưới đây — cô đọng còn lại phần tra cứu (schema/API/quyết định), bỏ phần "Chia PR"/kế hoạch giao việc không còn cần thiết sau khi đã code xong. Lịch sử PR/quyết định chi tiết từng đợt vẫn nằm ở `PROGRESS.md`.
 >
-> **M21–M31** là module của kế hoạch AppShell IA đa dự án — xem `docs/ke-hoach-appshell-full-ia-2026-07.md` (tổng quan + lộ trình N1–N4) + `docs/ke-hoach-ia-chi-tiet-2026-07.md` (bóc tách từng dashboard) + **ADR-0004** (nền đa dự án, đọc trước M22). Thứ tự đề xuất: M21 (mở khoá điều hướng, rủi ro thấp) → M22 (nền đa dự án) → đào sâu dashboard đã có → dashboard mới theo nhu cầu PM (M28 nhỏ/giá trị cao → M23 → M25 → M27 → M29 → còn lại).
+> Khi cần đặc tả cho **module mới** (M43 trở đi), viết file `M<xx>-*.md` riêng theo khung ở mục Quy ước chung bên dưới TRƯỚC khi code — chỉ gộp vào `G<nn>` cùng nhóm sau khi đã triển khai xong.
+
+## Danh mục (nhóm → module gộp bên trong)
+
+| File                             | Nhóm nghiệp vụ                    | Module gộp bên trong                          |
+| --------------------------------- | ---------------------------------- | ------------------------------------------------ |
+| `G00-nen-tang.md`                | Nền tảng                          | M00 (AppShell), M21 (IA đầy đủ), M22 (đa dự án) |
+| `G01-tien-do-boq.md`             | Tiến độ & BOQ                     | M01, M09, M15, M35, M36                        |
+| `G02-chi-phi-hop-dong.md`        | Chi phí & Hợp đồng                | M02, M06, M07, M16, M17, M27                   |
+| `G03-mua-sam-vat-tu.md`          | Mua sắm & Vật tư                  | M04, M18, M33                                  |
+| `G04-chat-luong-an-toan.md`      | Chất lượng & An toàn              | M03, M11                                       |
+| `G05-hien-truong.md`             | Hiện trường                       | M05, M12, M14                                  |
+| `G06-ban-ve-ho-so.md`            | Bản vẽ & Hồ sơ                    | M08, M10, M13, M19, M20, M32, M34              |
+| `G07-khoi-dong-to-chuc.md`       | Khởi động & Tổ chức               | M23, M24                                       |
+| `G08-moi-truong-rui-ro.md`       | Môi trường & Rủi ro               | M25, M26                                       |
+| `G09-ban-giao-van-hanh.md`       | Bàn giao & Vận hành               | M28, M29, M30                                  |
+| `G10-cong-nghe.md`               | Công nghệ                         | M31                                            |
+| `G11-uiux.md`                    | UI/UX xuyên suốt (không route riêng) | M37, M38, M39, M40, M41, M42                |
+
+> Bối cảnh lịch sử các đợt (FastCons nhóm A-E, AppShell IA N1-N4, UX 2026-07...) không còn cần thiết để tra cứu module đã xong — xem `docs/ke-hoach-*.md` nếu cần đối chiếu quyết định gốc.
 
 ## Quy ước chung (áp cho MỌI module — không lặp lại trong từng file)
 

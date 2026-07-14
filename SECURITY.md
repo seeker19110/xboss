@@ -19,7 +19,7 @@ Mục tiêu phản hồi: xác nhận trong vòng **72 giờ**; thống nhất m
 |-----|--------------------------|
 | Ranh giới | **API là ranh giới bảo mật duy nhất** — mọi route gọi `getCurrentUser()`, kiểm quyền `CAN` / `canTouchTask` (`lib/auth.ts`, `lib/roles.ts`). Trang chỉ redirect client-side khi 401. |
 | Phiên | Cookie stateless `xboss_session = userId.exp.HMAC` ký bằng `XBOSS_SECRET` (bắt buộc ở production, fail-fast nếu thiếu). |
-| Chống dò mật khẩu | Rate-limit login in-memory (`lib/ratelimit.ts`): 5 lần sai/15 phút theo IP+email, 20/IP → 429 + `Retry-After`. |
+| Chống dò mật khẩu | Rate-limit login lưu **Postgres** (bảng `login_rate_limits`, `lib/ratelimit.ts` — đúng khi chạy nhiều instance, upsert atomic qua `ON CONFLICT`): 5 lần sai/15 phút theo IP+email, 20/IP → 429 + `Retry-After`. |
 | SQL injection | Truy vấn **tham số hoá** bắt buộc qua helper `lib/db` (placeholder `?` → `$n`) — không nối chuỗi giá trị. |
 | Phụ thuộc | `npm audit --audit-level=high` trong CI (`.github/workflows/ci.yml`) + Dependabot (cập nhật hằng tuần). |
 | Bí mật | Dùng biến môi trường; `.env*` bị `.gitignore` chặn. **gitleaks** (`.github/workflows/secret-scan.yml`) quét diff/commit mỗi push & PR. Cron bảo vệ bằng `CRON_SECRET` qua header `Authorization: Bearer` (không qua query param). |

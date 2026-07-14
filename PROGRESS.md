@@ -1,6 +1,8 @@
 # PROGRESS.md — Trạng thái dự án
 
 > Cập nhật sau mỗi mốc đáng kể. AI đọc file này để biết đang ở đâu.
+>
+> **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
 ## Giai đoạn hiện tại
 
