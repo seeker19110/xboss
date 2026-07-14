@@ -43,3 +43,46 @@ test.describe("Thông báo (sau đăng nhập)", () => {
     expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
   });
 });
+
+// Dropdown chuông thông báo (M40 — trung tâm thông báo) — render trong AppHeader ở mọi trang.
+test.describe("Chuông thông báo — dropdown (sau đăng nhập)", () => {
+  test("mở dropdown, không có vi phạm a11y nghiêm trọng (axe)", async ({ page }) => {
+    await page.goto("/");
+    // exact: true — sau khi mở dropdown, nội dung thông báo (vd "thông báo công việc đình
+    // trệ") cũng khớp match không-exact với tên "Thông báo" của nút chuông, gây strict mode
+    // violation (nhiều phần tử cùng khớp locator).
+    const bell = page.getByRole("button", { name: "Thông báo", exact: true });
+    await expect(bell).toBeVisible({ timeout: 15_000 });
+    await expect(bell).toHaveAttribute("aria-expanded", "false");
+    await bell.click();
+    await expect(bell).toHaveAttribute("aria-expanded", "true");
+
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+
+    const serious = results.violations.filter(
+      (v) => v.impact === "serious" || v.impact === "critical",
+    );
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+  });
+});
+
+// Trang /notifications/all (M40 — danh sách đầy đủ thông báo, khác /notifications feed cũ).
+test.describe("Tất cả thông báo (sau đăng nhập)", () => {
+  test("render nội dung chính, không có vi phạm a11y nghiêm trọng (axe)", async ({ page }) => {
+    await page.goto("/notifications/all");
+    await expect(page.getByPlaceholder("Tìm trong nội dung thông báo...")).toBeVisible({
+      timeout: 15_000,
+    });
+
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+
+    const serious = results.violations.filter(
+      (v) => v.impact === "serious" || v.impact === "critical",
+    );
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+  });
+});

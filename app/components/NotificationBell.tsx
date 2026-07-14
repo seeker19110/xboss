@@ -339,6 +339,8 @@ export default function NotificationBell() {
         onClick={() => setOpen((o) => !o)}
         title="Thông báo"
         aria-label="Thông báo"
+        aria-haspopup="true"
+        aria-expanded={open}
         className="relative min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition"
       >
         <Bell className="w-5 h-5" />

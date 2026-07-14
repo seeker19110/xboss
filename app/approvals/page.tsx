@@ -51,11 +51,14 @@ type Doc = {
 const fmtSize = (b: number) =>
   b > 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)}MB` : `${Math.round(b / 1024)}KB`;
 
-// Bucket % tiến độ cho preset filter (0% / 1-49% / 50-99% / 100%)
+// Bucket % tiến độ cho preset filter (0% / 1-49% / 50-99% / 100%). Bucket "100" chỉ khi
+// TẤT CẢ task đã xong (không dùng Math.round — tránh làm tròn gần-xong, vd 199/200 = 99.5%,
+// thành "100%" như lớp lỗi đã từng sửa ở recomputeTask/recomputePackage).
 function pctBucketOf(g: FloorGroup): string {
-  const pct = g.totalTasks > 0 ? Math.round((g.doneTasks / g.totalTasks) * 100) : 0;
+  if (g.totalTasks <= 0) return "0";
+  if (g.doneTasks === g.totalTasks) return "100";
+  const pct = Math.round((g.doneTasks / g.totalTasks) * 100);
   if (pct <= 0) return "0";
-  if (pct >= 100) return "100";
   if (pct < 50) return "1-49";
   return "50-99";
 }

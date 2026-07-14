@@ -34,11 +34,16 @@ import { pendingClaims } from "@/lib/claims";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/notifications
+// GET /api/notifications?limit=<n>
 // Đồng bộ task trễ → notifications cho user hiện tại, rồi trả về danh sách + số chưa đọc.
-export async function GET() {
+// `limit` mặc định 50 (đủ cho dropdown chuông); trang `/notifications/all` truyền limit lớn
+// hơn để không bị cắt bớt trong lúc lọc/tìm kiếm/phân trang phía client.
+export async function GET(req: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+
+  const limitParam = Number(new URL(req.url).searchParams.get("limit"));
+  const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 1000) : 50;
 
   // Dự án đang chọn — lọc mọi cảnh báo theo dự án để tránh rò rỉ chéo dự án (đa dự án, M22+).
   // null = DB chưa có project nào → giữ hành vi không lọc (tương thích ngược).
@@ -1021,8 +1026,9 @@ export async function GET() {
        LEFT JOIN work_packages wp ON wp.id = t.package_id
        LEFT JOIN sheet_types st ON st.id = wp.sheet_type_id
       WHERE n.user_id = ?
-      ORDER BY n.is_read ASC, n.created_at DESC, n.id DESC LIMIT 50`,
+      ORDER BY n.is_read ASC, n.created_at DESC, n.id DESC LIMIT ?`,
     user.id,
+    limit,
   );
 
   // Đếm riêng tổng số chưa đọc (không giới hạn LIMIT 50 của `items`) — nếu đếm trên chính

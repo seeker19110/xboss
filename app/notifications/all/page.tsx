@@ -3,8 +3,7 @@
 // LƯU Ý ĐẶT TÊN: route `/notifications` đã có sẵn từ trước (trang feed hoạt động
 // trễ/đến hạn/vật tư + cài đặt loại thông báo, xem `app/notifications/page.tsx`), nên trang
 // liệt kê đầy đủ bảng `notifications` (dữ liệu chuông thông báo) đặt tại `/notifications/all`
-// để tránh đè lên trang đã có — cần phiên chính xác nhận lại cách đặt tên/khả năng gộp 2
-// trang này trong đợt tích hợp (xem báo cáo cuối phiên coder).
+// để tránh đè lên trang đã có.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckSquare, Search } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
@@ -43,7 +42,9 @@ export default function AllNotificationsPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
   const load = useCallback(async () => {
-    const r = await fetch("/api/notifications").catch(() => null);
+    // limit=1000: trang này liệt kê "tất cả" — không dùng limit mặc định 50 của dropdown
+    // chuông, tránh lọc/tìm kiếm/phân trang phía client bị cắt mất dữ liệu cũ hơn.
+    const r = await fetch("/api/notifications?limit=1000").catch(() => null);
     if (r?.status === 401) {
       redirectToLogin();
       return;
@@ -142,6 +143,7 @@ export default function AllNotificationsPage() {
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
+            aria-label="Lọc theo loại thông báo"
             className="bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-2 text-sm h-10"
           >
             <option value="">Mọi loại</option>
@@ -154,6 +156,7 @@ export default function AllNotificationsPage() {
           <select
             value={readFilter}
             onChange={(e) => setReadFilter(e.target.value as "all" | "unread" | "read")}
+            aria-label="Lọc theo trạng thái đã đọc"
             className="bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-2 text-sm h-10"
           >
             <option value="all">Tất cả trạng thái</option>
@@ -198,22 +201,23 @@ export default function AllNotificationsPage() {
 
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
           {paged.length === 0 && (
-            <p className="p-6 text-center text-sm text-zinc-500">Không có thông báo phù hợp</p>
+            <p className="p-6 text-center text-sm text-zinc-400">Không có thông báo phù hợp</p>
           )}
           {paged.map((n) => (
             <div
               key={n.id}
-              className={`flex items-start gap-3 px-4 py-3 border-b border-zinc-800/60 last:border-0 ${n.isRead ? "text-zinc-500" : "text-zinc-200 bg-red-950/10"}`}
+              className={`flex items-start gap-3 px-4 py-3 border-b border-zinc-800/60 last:border-0 ${n.isRead ? "text-zinc-400" : "text-zinc-200 bg-red-950/10"}`}
             >
               <input
                 type="checkbox"
                 checked={selected.has(n.id)}
                 onChange={() => toggleSelect(n.id)}
+                aria-label={`Chọn thông báo: ${n.message}`}
                 className="w-4 h-4 mt-1 shrink-0"
               />
               <button onClick={() => onItemClick(n)} className="flex-1 text-left text-sm">
                 <span className="block">{n.message}</span>
-                <span className="text-xs text-zinc-600">
+                <span className="text-xs text-zinc-400">
                   {formatDateTimeVN(n.createdAt)} · {n.type}
                 </span>
               </button>

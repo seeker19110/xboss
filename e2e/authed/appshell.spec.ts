@@ -73,6 +73,19 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     for (const label of ["ACMV", "Điện", "Cấp thoát nước", "PCCC", "Kết cấu", "Xây tô"]) {
       await expect(sidebar.getByRole("link", { name: label, exact: true })).toBeVisible();
     }
+
+    // Nhóm "Chung (mọi hệ)" trong cùng cụm — view chung KHÔNG lọc theo hệ, phát hiện thiếu
+    // (mất link tắt) khi audit toàn diện: thêm lại dưới dạng nhóm gập/mở (M42-style, luôn
+    // hiện, không toggle riêng — xem dashboardTree.ts).
+    for (const label of [
+      "Timeline",
+      "Gantt",
+      "Lookahead",
+      "S-Curve",
+      "Đường găng & Chậm tiến độ",
+    ]) {
+      await expect(sidebar.getByRole("link", { name: label, exact: true })).toBeVisible();
+    }
   });
 
   // M35 đã gán href thật cho "Thiết kế & Biện pháp thi công" (deep-link vào tab lọc
