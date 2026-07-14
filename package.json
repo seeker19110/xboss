@@ -66,5 +66,12 @@
     "tailwindcss": "^4.3.2",
     "tsx": "^4.23.0",
     "typescript": "^6.0.3"
-  }
+  },
+  "browserslist": [
+    "last 2 chrome versions",
+    "last 2 safari versions",
+    "last 2 firefox versions",
+    "last 2 edge versions",
+    "not dead"
+  ]
 }
