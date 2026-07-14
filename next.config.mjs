@@ -67,8 +67,11 @@ const nextConfig = {
 // tunnelRoute: proxy request Sentry qua route Next.js cùng origin để trình chặn quảng cáo
 // (uBlock/Adblock chặn domain *.sentry.io/*.ingest.*) không nuốt mất báo lỗi phía trình duyệt
 // — không cần đổi CSP vì vẫn cùng origin ("connect-src 'self'" đã cho phép sẵn).
+// Lưu ý: path này không được trùng bất kỳ route/page có sẵn nào (Sentry rewrite chặn request
+// theo path bất kể method) — trước đây từng để "/monitoring", trùng trang thật
+// app/monitoring/page.tsx (module Quan trắc), có thể chặn nhầm truy cập trang.
 export default withSentryConfig(nextConfig, {
   silent: true,
   sourcemaps: { disable: true },
-  tunnelRoute: "/monitoring",
+  tunnelRoute: "/monitoring-tunnel",
 });
