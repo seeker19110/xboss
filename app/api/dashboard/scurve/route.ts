@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, todayISO } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { resolveSystemId } from "@/lib/systems";
+import { getCurrentProjectId } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,12 @@ export async function GET(req: NextRequest) {
   const systemId = sheet ? null : await resolveSystemId(req.nextUrl.searchParams.get("system"));
   const sheetFilter = sheet ? `AND st.code = ?` : systemId !== null ? `AND st.system_id = ?` : "";
   const params = sheet ? [sheet] : systemId !== null ? [systemId] : [];
+  // Dự án đang chọn — lọc theo dự án để tránh rò rỉ chéo dự án (đa dự án, M22+).
+  // null = DB chưa có project nào → giữ hành vi không lọc (tương thích ngược).
+  const projectId = await getCurrentProjectId(user);
+  const projectJoin = projectId != null ? "JOIN towers tw ON tw.id = st.tower_id" : "";
+  const projectFilter = projectId != null ? "AND tw.project_id = ?" : "";
+  const projectParams = projectId != null ? [projectId] : [];
 
   const tasks = await query<TaskRow>(
     `SELECT t.id, t.start_date AS "startDate", t.end_date AS "endDate",
@@ -47,8 +54,10 @@ export async function GET(req: NextRequest) {
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
-      WHERE 1=1 ${sheetFilter}`,
+       ${projectJoin}
+      WHERE 1=1 ${sheetFilter} ${projectFilter}`,
     ...params,
+    ...projectParams,
   );
   if (tasks.length === 0) return NextResponse.json({ points: [], sheets: [] });
 
@@ -81,9 +90,11 @@ export async function GET(req: NextRequest) {
        JOIN tasks t ON h.task_id = t.id
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
-      WHERE 1=1 ${sheetFilter}
+       ${projectJoin}
+      WHERE 1=1 ${sheetFilter} ${projectFilter}
       ORDER BY h.task_id, h.changed_at`,
     ...params,
+    ...projectParams,
   );
 
   // Sự kiện theo task: [{day, progress}] đã sắp theo thời gian.

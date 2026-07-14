@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { query, todayISO } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { sortFloorsDesc } from "@/lib/floors";
+import { getCurrentProjectId } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,11 @@ export async function GET() {
     return NextResponse.json({ error: "Thầu phụ không có quyền xem dashboard" }, { status: 403 });
 
   const today = todayISO();
+  // Dự án đang chọn — lọc theo dự án để tránh rò rỉ chéo dự án (đa dự án, M22+).
+  // null = DB chưa có project nào → giữ hành vi không lọc (tương thích ngược).
+  const projectId = await getCurrentProjectId(user);
+  const projectFilter = projectId != null ? " AND tw.project_id = ?" : "";
+  const projectParams = projectId != null ? [projectId] : [];
 
   const cells = await query<{
     tower: string | null;
@@ -33,10 +39,11 @@ export async function GET() {
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
        LEFT JOIN towers tw ON st.tower_id = tw.id
-      WHERE wp.floor_label IS NOT NULL
+      WHERE wp.floor_label IS NOT NULL${projectFilter}
       GROUP BY tw.id, tw.name, st.code, st.slug, st.id, wp.floor_label
       ORDER BY tw.id, st.sort_order, st.id`,
     today,
+    ...projectParams,
   );
 
   // Mỗi tháp có danh sách sheet + tầng riêng (tầng cao trên cùng — giống toà nhà).
