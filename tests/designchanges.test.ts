@@ -193,3 +193,82 @@ test(
     await run(`DELETE FROM users WHERE id = ?`, pmId);
   },
 );
+
+test(
+  "scoping đa dự án (M22): getDesignChange/decideDesignChange/markDrawingUpdated không cho thao tác xuyên dự án theo id đoán được",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId, queryOne } = await import("@/lib/db");
+    const { getDesignChange, decideDesignChange, markDrawingUpdated } =
+      await import("@/lib/designchanges");
+
+    const p1 = await insertId(
+      `INSERT INTO projects (name, code) VALUES ('DA test DC scoping 1', 'PJT-DCS1')`,
+    );
+    const p2 = await insertId(
+      `INSERT INTO projects (name, code) VALUES ('DA test DC scoping 2', 'PJT-DCS2')`,
+    );
+    const pmId = await insertId(
+      `INSERT INTO users (name, email, password_hash, role) VALUES ('PM DC Scoping', 'dc-scoping-pm@xboss.vn', 'x', 'pm')`,
+    );
+
+    const dcP1 = await insertId(
+      `INSERT INTO design_changes (project_id, code, title, reason, status)
+       VALUES (?, 'DC-SCOPE-1', 'DC dự án 1', 'Lý do', 'submitted')`,
+      p1,
+    );
+
+    // getDesignChange: đúng dự án → thấy; dự án khác → undefined (không lộ dữ liệu).
+    const foundOwn = await getDesignChange(dcP1, p1);
+    assert.ok(foundOwn);
+    const foundOther = await getDesignChange(dcP1, p2);
+    assert.equal(foundOther, undefined);
+
+    // decideDesignChange với projectId sai → lỗi "không tìm thấy", KHÔNG đổi trạng thái.
+    const decideWrongProject = await decideDesignChange({
+      designChangeId: dcP1,
+      decision: "approved",
+      decisionNote: null,
+      decidedBy: pmId,
+      projectId: p2,
+    });
+    assert.equal(typeof decideWrongProject, "string");
+    const afterWrongDecide = await queryOne<{ status: string }>(
+      `SELECT status FROM design_changes WHERE id = ?`,
+      dcP1,
+    );
+    assert.equal(afterWrongDecide?.status, "submitted");
+
+    // decideDesignChange đúng dự án → duyệt thành công.
+    const decideOwnProject = await decideDesignChange({
+      designChangeId: dcP1,
+      decision: "approved",
+      decisionNote: null,
+      decidedBy: pmId,
+      projectId: p1,
+    });
+    assert.ok(typeof decideOwnProject !== "string");
+
+    // markDrawingUpdated với projectId sai → lỗi, KHÔNG đổi trạng thái.
+    const markWrongProject = await markDrawingUpdated(dcP1, p2);
+    assert.ok(markWrongProject);
+    const afterWrongMark = await queryOne<{ status: string }>(
+      `SELECT status FROM design_changes WHERE id = ?`,
+      dcP1,
+    );
+    assert.equal(afterWrongMark?.status, "approved");
+
+    // markDrawingUpdated đúng dự án → thành công.
+    const markOwnProject = await markDrawingUpdated(dcP1, p1);
+    assert.equal(markOwnProject, null);
+    const afterOwnMark = await queryOne<{ status: string }>(
+      `SELECT status FROM design_changes WHERE id = ?`,
+      dcP1,
+    );
+    assert.equal(afterOwnMark?.status, "drawing_updated");
+
+    await run(`DELETE FROM design_changes WHERE id = ?`, dcP1);
+    await run(`DELETE FROM users WHERE id = ?`, pmId);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+  },
+);
