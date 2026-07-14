@@ -167,3 +167,55 @@ test("overNormItems: xuất hiện/biến mất đúng ngưỡng", { skip: !HAS_
   await run(`DELETE FROM work_packages WHERE id = ?`, wpId);
   await run(`DELETE FROM boq_items WHERE id = ?`, boqId);
 });
+
+// M22 — scoping định mức BOQ theo dự án đang chọn. boq_norms không có cột project_id
+// riêng, suy qua boq_items.project_id (mirror điều kiện WHERE trong các route
+// app/api/boq/:id/norms, app/api/boq/:id/norm-usage, app/api/boq-norms/:id).
+test(
+  "getNorm + check boq_items thuộc project: dự án khác không thấy được (404)",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId, queryOne } = await import("@/lib/db");
+    const { getNorm } = await import("@/lib/norms");
+
+    const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA Norm 1', 'PJT-NM1')`);
+    const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA Norm 2', 'PJT-NM2')`);
+
+    const boqId = await insertId(
+      `INSERT INTO boq_items (code, name, unit, qty_contract, project_id) VALUES ('BOQ-SCOPE', 'Dòng BOQ scope', 'm', 10, ?)`,
+      p1,
+    );
+    const normId = await insertId(
+      `INSERT INTO boq_norms (boq_item_id, resource_type, resource_name, qty_per_unit, unit_label)
+       VALUES (?, 'labor', 'Thợ scope', 0.5, 'công')`,
+      boqId,
+    );
+
+    // Dự án đúng (p1) → tìm thấy.
+    const found = await getNorm(normId, p1);
+    assert.ok(found);
+    assert.equal(found!.id, normId);
+
+    // Dự án khác (p2) → không thấy (404 ở route).
+    const notFound = await getNorm(normId, p2);
+    assert.equal(notFound, null);
+
+    // Mirror check boq_items thuộc project dùng ở app/api/boq/:id/norms & norm-usage.
+    const boqItemP1 = await queryOne<{ id: number }>(
+      `SELECT id FROM boq_items WHERE id = ? AND project_id = ?`,
+      boqId,
+      p1,
+    );
+    assert.ok(boqItemP1);
+    const boqItemP2 = await queryOne<{ id: number }>(
+      `SELECT id FROM boq_items WHERE id = ? AND project_id = ?`,
+      boqId,
+      p2,
+    );
+    assert.equal(boqItemP2, undefined);
+
+    await run(`DELETE FROM boq_norms WHERE id = ?`, normId);
+    await run(`DELETE FROM boq_items WHERE id = ?`, boqId);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+  },
+);

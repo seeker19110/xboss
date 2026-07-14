@@ -81,15 +81,21 @@ export async function listNormsForBoqItem(boqItemId: number): Promise<NormRow[]>
   );
 }
 
-export async function getNorm(id: number): Promise<NormRow | null> {
+// projectId (M22): boq_norms không có cột project_id riêng — suy qua boq_items.project_id
+// (join thêm khi truyền projectId); undefined = không lọc.
+export async function getNorm(id: number, projectId?: number): Promise<NormRow | null> {
+  const projectFilter = projectId != null ? " AND bi.project_id = ?" : "";
   const row = await queryOne<NormRow>(
     `SELECT n.id, n.boq_item_id AS "boqItemId", n.resource_type AS "resourceType",
             n.material_id AS "materialId", m.name AS "materialName",
             n.resource_name AS "resourceName", n.qty_per_unit AS "qtyPerUnit",
             n.unit_label AS "unitLabel", n.note, n.created_at AS "createdAt"
-       FROM boq_norms n LEFT JOIN materials m ON m.id = n.material_id
-      WHERE n.id = ?`,
+       FROM boq_norms n
+       JOIN boq_items bi ON bi.id = n.boq_item_id
+       LEFT JOIN materials m ON m.id = n.material_id
+      WHERE n.id = ?${projectFilter}`,
     id,
+    ...(projectId != null ? [projectId] : []),
   );
   return row ?? null;
 }

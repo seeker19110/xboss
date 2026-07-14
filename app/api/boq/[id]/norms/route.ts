@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import {
   checkNormMaterial,
   listNormsForBoqItem,
@@ -22,6 +23,14 @@ export async function GET(
   const boqItemId = parseInt(params.id);
   if (isNaN(boqItemId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  const projectId = await getCurrentProjectId(user);
+  const boqItem = await queryOne<{ id: number }>(
+    `SELECT id FROM boq_items WHERE id = ?${projectId != null ? " AND project_id = ?" : ""}`,
+    boqItemId,
+    ...(projectId != null ? [projectId] : []),
+  );
+  if (!boqItem) return NextResponse.json({ error: "Không tìm thấy dòng BOQ" }, { status: 404 });
+
   const norms = await listNormsForBoqItem(boqItemId);
   return NextResponse.json({ norms });
 }
@@ -42,9 +51,11 @@ export async function POST(
 
   const boqItemId = parseInt(params.id);
   if (isNaN(boqItemId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+  const projectId = await getCurrentProjectId(user);
   const boqItem = await queryOne<{ id: number }>(
-    `SELECT id FROM boq_items WHERE id = ?`,
+    `SELECT id FROM boq_items WHERE id = ?${projectId != null ? " AND project_id = ?" : ""}`,
     boqItemId,
+    ...(projectId != null ? [projectId] : []),
   );
   if (!boqItem) return NextResponse.json({ error: "Không tìm thấy dòng BOQ" }, { status: 404 });
 

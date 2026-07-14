@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { checkNormMaterial, getNorm, parseNormBody, validateNormInput } from "@/lib/norms";
 
 export const dynamic = "force-dynamic";
@@ -22,12 +23,16 @@ export async function PATCH(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  const projectId = await getCurrentProjectId(user);
+  const projectFilter = projectId != null ? " AND bi.project_id = ?" : "";
   const existing = await queryOne<Record<string, unknown>>(
-    `SELECT resource_type AS "resourceType", material_id AS "materialId",
-            resource_name AS "resourceName", qty_per_unit AS "qtyPerUnit",
-            unit_label AS "unitLabel", note
-       FROM boq_norms WHERE id = ?`,
+    `SELECT bn.resource_type AS "resourceType", bn.material_id AS "materialId",
+            bn.resource_name AS "resourceName", bn.qty_per_unit AS "qtyPerUnit",
+            bn.unit_label AS "unitLabel", bn.note
+       FROM boq_norms bn JOIN boq_items bi ON bi.id = bn.boq_item_id
+      WHERE bn.id = ?${projectFilter}`,
     id,
+    ...(projectId != null ? [projectId] : []),
   );
   if (!existing) return NextResponse.json({ error: "Không tìm thấy định mức" }, { status: 404 });
 
@@ -77,7 +82,8 @@ export async function DELETE(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
-  const norm = await getNorm(id);
+  const projectId = await getCurrentProjectId(user);
+  const norm = await getNorm(id, projectId ?? undefined);
   if (!norm) return NextResponse.json({ error: "Không tìm thấy định mức" }, { status: 404 });
 
   await run(`DELETE FROM boq_norms WHERE id = ?`, id);
