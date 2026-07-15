@@ -17,6 +17,7 @@ import {
   History,
   ExternalLink,
   Pencil,
+  Compass,
   type LucideIcon,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
@@ -26,20 +27,25 @@ import { Modal, appPrompt, appAlert, appConfirm } from "@/app/components/dialogs
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
 
-// M8 — Drawing register (bản vẽ shop/asbuilt/BIM + biện pháp thi công). Trang danh
-// sách + chi tiết + upload rev + duyệt. Xem docs/nang-cap/M08-ban-ve.md.
+// M8 — Drawing register (bản vẽ thiết kế/shop/asbuilt/BIM + biện pháp thi công).
+// Trang danh sách + chi tiết + upload rev + duyệt. Xem docs/nang-cap/G06-ban-ve-ho-so.md.
+// Lọc theo LOẠI chỉ qua URL ?kind= (5 mục trong cụm sidebar "Thiết kế & BPTC" —
+// dashboardTree.ts), trang không còn hàng chip loại riêng.
 
-type DrawingKind = "shop" | "asbuilt" | "bim" | "method";
+type DrawingKind = "design" | "shop" | "asbuilt" | "bim" | "method";
 type RevisionStatus =
   "submitted" | "commented" | "approved" | "approved_with_comments" | "rejected" | "superseded";
 
+// Thứ tự khớp thứ tự mục sidebar (lib/drawings.ts DRAWING_KINDS).
 const KIND_LABEL: Record<DrawingKind, string> = {
+  design: "Thiết kế",
+  method: "Biện pháp thi công",
+  bim: "BIM",
   shop: "Shop drawing",
   asbuilt: "As-built",
-  bim: "BIM",
-  method: "Biện pháp thi công",
 };
 const KIND_ICON: Record<DrawingKind, LucideIcon> = {
+  design: Compass,
   shop: FileText,
   asbuilt: BadgeCheck,
   bim: Box,
@@ -136,19 +142,22 @@ export default function DrawingsPage() {
   );
 }
 
-const DRAWING_KIND_VALUES = ["shop", "asbuilt", "bim", "method"] as const;
+const DRAWING_KIND_VALUES = ["design", "method", "bim", "shop", "asbuilt"] as const;
 
 function DrawingsPageInner() {
   const searchParams = useSearchParams();
-  const initialKind = searchParams.get("kind");
-  const validInitialKind = (DRAWING_KIND_VALUES as readonly string[]).includes(initialKind ?? "")
-    ? (initialKind as DrawingKind)
+  // Loại bản vẽ lấy THẲNG từ URL — chọn loại bằng 5 link cụm "Thiết kế & BPTC" ở
+  // sidebar (không còn chip loại trên trang), đổi loại = điều hướng sang ?kind= khác.
+  const kindParam = searchParams.get("kind");
+  const kindFilter: DrawingKind | "all" = (DRAWING_KIND_VALUES as readonly string[]).includes(
+    kindParam ?? "",
+  )
+    ? (kindParam as DrawingKind)
     : "all";
 
   const [me, setMe] = useState<Me | null>(null);
   const [items, setItems] = useState<DrawingRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [kindFilter, setKindFilter] = useState<DrawingKind | "all">(validInitialKind);
   const [statusFilter, setStatusFilter] = useState<RevisionStatus | "all">("all");
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -208,8 +217,7 @@ function DrawingsPageInner() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <AppHeader
-        title="Bản vẽ"
-        subtitle="Shop drawing · As-built · BIM · Biện pháp thi công · Thay đổi thiết kế"
+        title={kindFilter === "all" ? "Bản vẽ" : KIND_LABEL[kindFilter]}
         bottomActions={
           tab === "drawings" ? (
             canCreate ? (
@@ -275,21 +283,6 @@ function DrawingsPageInner() {
 
             <div className="flex flex-wrap gap-1.5">
               <FilterChip
-                label="Tất cả loại"
-                active={kindFilter === "all"}
-                onClick={() => setKindFilter("all")}
-              />
-              {(Object.keys(KIND_LABEL) as DrawingKind[]).map((k) => (
-                <FilterChip
-                  key={k}
-                  label={KIND_LABEL[k]}
-                  active={kindFilter === k}
-                  onClick={() => setKindFilter(k)}
-                />
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              <FilterChip
                 label="Tất cả trạng thái"
                 active={statusFilter === "all"}
                 onClick={() => setStatusFilter("all")}
@@ -307,7 +300,11 @@ function DrawingsPageInner() {
             {filtered.length === 0 ? (
               <EmptyState
                 icon={FileText}
-                title="Chưa có bản vẽ nào"
+                title={
+                  kindFilter === "all"
+                    ? "Chưa có bản vẽ nào"
+                    : `Chưa có bản vẽ ${KIND_LABEL[kindFilter]}`
+                }
                 message={canCreate ? 'Bấm "Thêm bản vẽ" để bắt đầu.' : "Chưa có dữ liệu bản vẽ."}
               />
             ) : (
@@ -400,6 +397,7 @@ function DrawingsPageInner() {
       )}
       {addOpen && (
         <DrawingFormModal
+          defaultKind={kindFilter === "all" ? undefined : kindFilter}
           onClose={() => setAddOpen(false)}
           onSaved={() => {
             setAddOpen(false);
@@ -438,17 +436,20 @@ function FilterChip({
 
 function DrawingFormModal({
   drawing,
+  defaultKind,
   onClose,
   onSaved,
 }: {
   drawing?: DrawingRow;
+  /** Loại chọn sẵn khi tạo mới từ trang đang lọc theo loại (sidebar ?kind=). */
+  defaultKind?: DrawingKind;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const editing = !!drawing;
   const [code, setCode] = useState(drawing?.code ?? "");
   const [name, setName] = useState(drawing?.name ?? "");
-  const [kind, setKind] = useState<DrawingKind>(drawing?.kind ?? "shop");
+  const [kind, setKind] = useState<DrawingKind>(drawing?.kind ?? defaultKind ?? "shop");
   const [systemGroup, setSystemGroup] = useState(drawing?.systemGroup ?? "");
   const [floorLabel, setFloorLabel] = useState(drawing?.floorLabel ?? "");
   const [err, setErr] = useState("");

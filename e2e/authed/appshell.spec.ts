@@ -33,7 +33,12 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
       "BOQ",
       "Chất lượng",
       "Nhật ký",
-      "Bản vẽ",
+      "Tất cả bản vẽ",
+      "Thiết kế",
+      "Biện pháp thi công",
+      "BIM",
+      "Shop drawing",
+      "As-built",
       "Công văn",
       "Hồ sơ dự án",
       "Mặt bằng",
@@ -89,12 +94,11 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     }
   });
 
-  // M35 đã gán href thật cho "Thiết kế & Biện pháp thi công" (deep-link vào tab lọc
-  // kind=method trên /drawings, tính năng đã có từ M08) — hết hoàn toàn node coming-soon
-  // lá trong cây điều hướng từ đây. Để dành logic "chip Sắp có" cho module tương lai nếu
-  // có (đoạn code hiển thị coming-soon trong AppHeader.tsx vẫn giữ nguyên, chỉ không còn
-  // dữ liệu mẫu để test qua sidebar thật).
-  test("'Thiết kế & Biện pháp thi công' là link thật, trỏ đúng trang bản vẽ đã lọc method", async ({
+  // Cụm "Thiết Kế-BIM-Shopdrawings" (gộp cụm "Bản vẽ (BIM-Shop)" cũ, nhãn hiển thị
+  // đổi từ "Thiết kế & BPTC"): "Tất cả bản vẽ" + 5 loại bản vẽ deep-link /drawings?kind=
+  // — sidebar là nơi duy nhất chọn loại, trang /drawings đã bỏ hàng chip lọc loại
+  // (chỉ còn chip trạng thái).
+  test("cụm 'Thiết Kế-BIM-Shopdrawings': link loại bản vẽ deep-link ?kind=, trang hết chip loại, mục đang xem sáng active", async ({
     page,
     isMobile,
   }) => {
@@ -104,16 +108,26 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
       timeout: 15_000,
     });
 
-    const link = sidebar.getByRole("link", { name: "Thiết kế & Biện pháp thi công" });
+    const link = sidebar.getByRole("link", { name: "Biện pháp thi công", exact: true });
     await expect(link).toBeVisible();
     await link.click();
     await expect(page).toHaveURL(/\/drawings\?kind=method$/);
 
-    // Chip lọc "Biện pháp thi công" đã active sẵn — không cần bấm tay.
+    // Topbar hiển thị đúng loại đang xem; hàng chip lọc loại đã bỏ khỏi trang.
+    await expect(
+      page.locator("header").getByText("Biện pháp thi công", { exact: true }),
+    ).toBeVisible();
     const main = page.getByRole("main");
-    await expect(main.getByRole("button", { name: "Biện pháp thi công" })).toHaveClass(
-      /bg-emerald-800\/60/,
-    );
+    await expect(main.getByRole("button", { name: "Tất cả loại" })).toHaveCount(0);
+
+    // Link đúng loại sáng active (so khớp cả query), "Tất cả bản vẽ" không sáng chung.
+    const sidebarAfter = await openSidebar(page, isMobile);
+    await expect(
+      sidebarAfter.getByRole("link", { name: "Biện pháp thi công", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
+    await expect(
+      sidebarAfter.getByRole("link", { name: "Tất cả bản vẽ", exact: true }),
+    ).not.toHaveAttribute("aria-current", "page");
   });
 
   test("dashboard nhóm gập/mở được, nhớ trạng thái sau khi tải lại (mặc định mở)", async ({

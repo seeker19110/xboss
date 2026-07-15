@@ -24,6 +24,8 @@ import {
   PaintRoller,
   ClipboardList,
   ClipboardCheck,
+  Box,
+  BadgeCheck,
   CheckSquare,
   Calculator,
   Package,
@@ -91,16 +93,19 @@ export type DashCluster = {
 };
 
 export const DASHBOARD_TREE: DashCluster[] = [
-  // Thứ tự 18 cụm bám mockup xBoss-mockup.xlsx bản mới (commit "chore(attachments):
+  // Thứ tự 17 cụm bám mockup xBoss-mockup.xlsx bản mới (commit "chore(attachments):
   // update xBoss mockup"), sắp theo đúng thứ tự 24 dashboard cấp cao của mockup —
-  // tách nhỏ các cụm cũ không còn liền kề thay vì gộp cưỡng ép:
+  // tách nhỏ các cụm cũ không còn liền kề thay vì gộp cưỡng ép. Riêng 2 cụm
+  // "Bản vẽ (BIM-Shop)" + "Thiết kế & BPTC" của mockup đã GỘP làm 1, nhãn hiển thị
+  // đổi thành "Thiết Kế-BIM-Shopdrawings" (cùng trỏ /drawings, để riêng gây trùng
+  // lặp — quyết định 2026-07-15):
   // 1. Tổng quan & Báo cáo · 2. Kế hoạch & Tiến độ · 3. Thi công hiện trường ·
-  // 4. Bản vẽ (BIM-Shop) · 5. Quản lý vật tư · 6. Chất lượng (QA/QC) ·
-  // 7. Thiết kế & BPTC · 8. An toàn – HSE & Rủi ro · 9. Thiết bị & Máy móc ·
-  // 10. Đấu thầu & Nhà thầu phụ · 11. Môi trường & Quan trắc · 12. Họp – Công văn ·
-  // 13. Chi phí · Hợp đồng · Tài chính (Claim đứng trước Bảo hiểm & Bảo lãnh) ·
-  // 14. Bàn giao & Vận hành · 15. Hệ thống (Chuyển đổi số đứng trước Import Excel) ·
-  // 16. Hồ sơ dự án · 17. Nhân sự & Tổ chức · 18. Khởi động & Pháp lý (dời xuống cuối).
+  // 4. Thiết Kế-BIM-Shopdrawings (gộp Bản vẽ BIM-Shop + Thiết kế & BPTC) · 5. Quản lý vật tư ·
+  // 6. Chất lượng (QA/QC) · 7. An toàn – HSE & Rủi ro · 8. Thiết bị & Máy móc ·
+  // 9. Đấu thầu & Nhà thầu phụ · 10. Môi trường & Quan trắc · 11. Họp – Công văn ·
+  // 12. Chi phí · Hợp đồng · Tài chính (Claim đứng trước Bảo hiểm & Bảo lãnh) ·
+  // 13. Bàn giao & Vận hành · 14. Hệ thống (Chuyển đổi số đứng trước Import Excel) ·
+  // 15. Hồ sơ dự án · 16. Nhân sự & Tổ chức · 17. Khởi động & Pháp lý (dời xuống cuối).
   {
     label: "Tổng quan & Báo cáo",
     dashboards: [
@@ -161,10 +166,42 @@ export const DASHBOARD_TREE: DashCluster[] = [
     ],
   },
   {
-    // Bản vẽ (BIM-Shop-Drawing) — tách khỏi cụm "Thiết kế & Bản vẽ" cũ, mockup mới
-    // không còn xếp liền kề dashboard Thiết kế & BPTC.
-    label: "Bản vẽ (BIM-Shop)",
-    dashboards: [{ id: "dash.ban-ve", href: "/drawings", label: "Bản vẽ", icon: PencilRuler }],
+    // Thiết kế & BPTC (nhãn hiển thị "Thiết Kế-BIM-Shopdrawings") — gộp cụm "Bản vẽ
+    // (BIM-Shop)" cũ vào đây (2 cụm cùng trỏ /drawings gây trùng lặp): mục "Tất cả bản
+    // vẽ" (thay node "Thiết kế & Biện pháp thi công" cũ trùng tên cụm) + 5 loại bản vẽ
+    // deep-link ?kind= — trang /drawings đã BỎ hàng chip lọc loại, sidebar là nơi duy
+    // nhất chọn loại (nhãn/thứ tự khớp DRAWING_KINDS ở lib/drawings.ts). "Tất cả bản
+    // vẽ" cần `exact` để không sáng chung khi đang xem 1 loại (xem isLeafActive).
+    label: "Thiết Kế-BIM-Shopdrawings",
+    dashboards: [
+      {
+        id: "dash.ban-ve",
+        href: "/drawings",
+        label: "Tất cả bản vẽ",
+        icon: PencilRuler,
+        exact: true,
+      },
+      {
+        id: "dash.thiet-ke",
+        href: "/drawings?kind=design",
+        label: "Thiết kế",
+        icon: Compass,
+      },
+      {
+        id: "dash.bien-phap-thi-cong",
+        href: "/drawings?kind=method",
+        label: "Biện pháp thi công",
+        icon: HardHat,
+      },
+      { id: "dash.bim", href: "/drawings?kind=bim", label: "BIM", icon: Box },
+      {
+        id: "dash.shop-drawing",
+        href: "/drawings?kind=shop",
+        label: "Shop drawing",
+        icon: FileText,
+      },
+      { id: "dash.as-built", href: "/drawings?kind=asbuilt", label: "As-built", icon: BadgeCheck },
+    ],
   },
   {
     // Quản lý vật tư (mockup đổi tên dashboard "Dashboard Vật Tư" → "Quản Lý Vật Tư").
@@ -187,20 +224,6 @@ export const DASHBOARD_TREE: DashCluster[] = [
     label: "Chất lượng (QA/QC)",
     dashboards: [
       { id: "dash.chat-luong", href: "/quality", label: "Chất lượng", icon: ClipboardCheck },
-    ],
-  },
-  {
-    // Thiết kế & BPTC — tách khỏi cụm "Thiết kế & Bản vẽ" cũ. Đặt tên cụm khác nhãn
-    // dashboard "Thiết kế & Biện pháp thi công" cho ngắn gọn (trùng nhãn cũng không
-    // sao — AppHeader tự ẩn breadcrumb khi trùng — nhưng đặt khác cho tự nhiên hơn).
-    label: "Thiết kế & BPTC",
-    dashboards: [
-      {
-        id: "dash.thiet-ke-bptc",
-        href: "/drawings?kind=method",
-        label: "Thiết kế & Biện pháp thi công",
-        icon: Compass,
-      }, // M08 mở rộng
     ],
   },
   {
@@ -436,27 +459,45 @@ export const DASHBOARD_TREE: DashCluster[] = [
   },
 ];
 
-function isLeafActive(node: DashNode, pathname: string): boolean {
+function splitPathQuery(value: string): [string, string] {
+  const i = value.indexOf("?");
+  return i < 0 ? [value, ""] : [value.slice(0, i), value.slice(i + 1)];
+}
+
+// `path` truyền vào có thể kèm query ("/drawings?kind=bim") để các link chỉ khác nhau
+// ở query (5 loại bản vẽ trong cụm Thiết kế & BPTC) sáng đúng mục đang xem:
+//   - href CÓ query: mọi param của href phải khớp URL hiện tại.
+//   - href KHÔNG query + `exact`: URL không được mang query — để "Tất cả bản vẽ"
+//     không sáng chung khi đang xem 1 loại.
+function isLeafActive(node: DashNode, path: string): boolean {
   if (!node.href) return false;
-  if (node.exact) return pathname === node.href;
-  return pathname === node.href || pathname.startsWith(node.href + "/");
+  const [pathname, search] = splitPathQuery(path);
+  const [hrefPath, hrefSearch] = splitPathQuery(node.href);
+  if (hrefSearch) {
+    if (pathname !== hrefPath) return false;
+    const current = new URLSearchParams(search);
+    return Array.from(new URLSearchParams(hrefSearch)).every(([k, v]) => current.get(k) === v);
+  }
+  if (node.exact) return pathname === hrefPath && search === "";
+  return pathname === hrefPath || pathname.startsWith(hrefPath + "/");
 }
 
-export function isNavItemActive(node: DashNode, pathname: string): boolean {
-  if (isLeafActive(node, pathname)) return true;
-  return !!node.children?.some((c) => isNavItemActive(c, pathname));
+export function isNavItemActive(node: DashNode, path: string): boolean {
+  if (isLeafActive(node, path)) return true;
+  return !!node.children?.some((c) => isNavItemActive(c, path));
 }
 
-/** Tìm lá khớp nhất với pathname hiện tại — dùng để suy ra title/breadcrumb topbar. */
+/** Tìm lá khớp nhất với path hiện tại (pathname, kèm query nếu có) — dùng để suy ra
+ *  title/breadcrumb topbar. */
 export function findActiveNav(
-  pathname: string,
+  path: string,
 ): { cluster: DashCluster; dashboard: DashNode; item: DashNode } | undefined {
   let best: { cluster: DashCluster; dashboard: DashNode; item: DashNode } | undefined;
   for (const cluster of DASHBOARD_TREE) {
     for (const dashboard of cluster.dashboards) {
       const candidates = dashboard.children?.length ? dashboard.children : [dashboard];
       for (const item of candidates) {
-        if (!isLeafActive(item, pathname)) continue;
+        if (!isLeafActive(item, path)) continue;
         if (!best || item.href!.length > best.item.href!.length)
           best = { cluster, dashboard, item };
       }

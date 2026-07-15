@@ -57,6 +57,9 @@ export default function AppHeader({
 }) {
   const [me, setMe] = useState<Me | null>(null);
   const [path, setPath] = useState("");
+  // Query string hiện tại — link sidebar phân biệt nhau bằng query (vd 5 loại bản vẽ
+  // /drawings?kind=) cần path kèm query mới sáng đúng mục (xem isLeafActive).
+  const [pathQuery, setPathQuery] = useState("");
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   // Gập/mở dashboard có children (M21) — mặc định MỞ (không có bản ghi = true) nên
@@ -68,6 +71,7 @@ export default function AppHeader({
 
   useEffect(() => {
     setPath(window.location.pathname);
+    setPathQuery(window.location.search);
     fetchMe().then((u) => setMe(u));
     setCollapsed(document.documentElement.classList.contains("sidebar-collapsed"));
     // `cache: "no-store"` chỉ chặn cache HTTP của trình duyệt — service worker
@@ -111,7 +115,8 @@ export default function AppHeader({
   }
 
   const isHome = path === "/";
-  const active = path ? findActiveNav(path) : undefined;
+  const navPath = path + pathQuery;
+  const active = path ? findActiveNav(navPath) : undefined;
   const pageTitle = title ?? active?.item.label ?? "XBoss";
   const breadcrumbGroup =
     !title && active && active.cluster.label !== active.item.label
@@ -138,7 +143,7 @@ export default function AppHeader({
         </span>
       );
     }
-    const itemActive = isNavItemActive(item, path);
+    const itemActive = isNavItemActive(item, navPath);
     return (
       <a
         key={item.href}
@@ -191,7 +196,7 @@ export default function AppHeader({
     // Tiêu đề cụm gập/mở được cả nhóm, cùng cơ chế với hàng tiêu đề dashboard
     // (renderDashboard) — dùng chung toggleDash/openMap, khoá riêng theo "cluster:<label>".
     const id = `cluster:${cluster.label}`;
-    const containsActive = cluster.dashboards.some((dash) => isNavItemActive(dash, path));
+    const containsActive = cluster.dashboards.some((dash) => isNavItemActive(dash, navPath));
     const open = collapsed || containsActive || (openMap[id] ?? true);
     return (
       <div key={cluster.label} className="mb-3">
