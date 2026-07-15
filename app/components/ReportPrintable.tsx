@@ -1,5 +1,5 @@
-import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
 import { formatDateVN } from "@/lib/date";
+import { groupDelayedTasks } from "@/lib/delayed-groups";
 
 export type ReportDelayedTask = {
   id: number;
@@ -157,33 +157,35 @@ export default function ReportPrintable({
       )}
 
       <h2 className="font-bold text-lg mb-3 page-break">
-        {forecast.some((f) => f.eta) ? "4" : "3"}. Danh sách công việc đang trễ
+        {forecast.some((f) => f.eta) ? "4" : "3"}. Danh sách hạng mục trễ
       </h2>
       <table className="w-full text-sm border-collapse">
         <thead>
           <tr className="bg-zinc-100 border-y border-zinc-300 text-left">
-            <th className="p-2">Chi tiết</th>
+            <th className="p-2">Hạng mục</th>
             <th className="p-2">Sheet</th>
             <th className="p-2">Tầng</th>
-            <th className="p-2">Kết thúc</th>
-            <th className="p-2">%</th>
-            <th className="p-2">Trạng thái</th>
+            <th className="p-2">Số công tác</th>
+            <th className="p-2">Hạn sớm nhất</th>
+            <th className="p-2">Trễ (ngày)</th>
+            <th className="p-2">Tiến độ TB</th>
           </tr>
         </thead>
         <tbody>
-          {data?.delayedTasks.map((t) => (
-            <tr key={t.id} className="border-b border-zinc-200">
-              <td className="p-2">{t.name}</td>
-              <td className="p-2">{t.sheetType}</td>
-              <td className="p-2">{t.floorLabel || "—"}</td>
-              <td className="p-2 text-red-600">{formatDateVN(t.endDate)}</td>
-              <td className="p-2">{Math.round((t.progressPercent ?? 0) * 100)}%</td>
-              <td className="p-2">{STATUS_LABEL[t.status as StatusSlug] ?? "Đang trễ"}</td>
+          {groupDelayedTasks(data?.delayedTasks ?? []).map((g) => (
+            <tr key={g.key} className="border-b border-zinc-200">
+              <td className="p-2">{g.name}</td>
+              <td className="p-2">{g.sheetType}</td>
+              <td className="p-2">{g.floorLabel || "—"}</td>
+              <td className="p-2">{g.count}</td>
+              <td className="p-2 text-red-600">{formatDateVN(g.earliestEndDate)}</td>
+              <td className="p-2 text-red-600">{g.maxDaysOverdue}</td>
+              <td className="p-2">{Math.round(g.avgProgress * 100)}%</td>
             </tr>
           ))}
           {!data?.delayedTasks.length && (
             <tr>
-              <td colSpan={6} className="p-4 text-center text-zinc-600">
+              <td colSpan={7} className="p-4 text-center text-zinc-600">
                 Không có công việc trễ.
               </td>
             </tr>

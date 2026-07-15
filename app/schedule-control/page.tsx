@@ -5,8 +5,7 @@ import AppHeader from "@/app/components/AppHeader";
 import ScheduleControlPanel from "@/app/components/ScheduleControlPanel";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { redirectToLogin } from "@/app/lib/me";
-import { formatDateVN, daysOverdue } from "@/lib/date";
-import { DELAY_REASON_LABEL } from "@/lib/delay";
+import DelayedGroupsTable from "@/app/components/DelayedGroupsTable";
 import SystemFilter from "@/app/components/SystemFilter";
 import type { CriticalRow } from "@/lib/schedule-control";
 
@@ -64,6 +63,10 @@ export default function ScheduleControlPage() {
     if (reasonFilter === "__none") return data.delayed.filter((t) => !t.delayReason);
     return data.delayed.filter((t) => t.delayReason === reasonFilter);
   }, [data, reasonFilter]);
+  const delayedGroupCount = useMemo(
+    () => new Set(filteredDelayed.map((t) => `${t.sheetType}::${t.floorLabel ?? ""}`)).size,
+    [filteredDelayed],
+  );
 
   if (!data) return <PageSkeleton />;
 
@@ -130,77 +133,20 @@ export default function ScheduleControlPage() {
         <section className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-zinc-800 flex items-center gap-2">
             <Clock className="w-4 h-4 text-red-400 shrink-0" />
-            <h2 className="font-semibold text-sm">Danh sách công việc đang trễ</h2>
+            <h2 className="font-semibold text-sm">Danh sách hạng mục trễ</h2>
             <span className="text-xs font-normal text-zinc-400">
-              ({filteredDelayed.length}/{totalDelayed})
+              ({delayedGroupCount} hạng mục · {filteredDelayed.length}/{totalDelayed} công tác)
             </span>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[680px]">
-              <thead>
-                <tr className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400 border-b border-zinc-800/80">
-                  <th className="text-left px-5 py-3">Công việc</th>
-                  <th className="text-left px-4 py-3">Hệ</th>
-                  <th className="text-left px-4 py-3">Hạn</th>
-                  <th className="text-left px-4 py-3">Trễ (ngày)</th>
-                  <th className="text-left px-4 py-3 w-32">Tiến độ</th>
-                  <th className="text-left px-4 py-3">Lý do trễ</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800/50">
-                {filteredDelayed.map((t) => {
-                  const pct = Math.round((t.progressPercent ?? 0) * 100);
-                  return (
-                    <tr key={t.id} className="hover:bg-zinc-800/40 transition-colors">
-                      <td className="px-5 py-3.5 font-medium max-w-[240px]">
-                        <span className="font-mono text-xs text-zinc-400 mr-1.5">{t.code}</span>
-                        <span className="truncate">{t.name}</span>
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <span className="px-2 py-0.5 bg-zinc-800 rounded-md text-[11px] font-medium text-zinc-300">
-                          {t.sheetType}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5 text-red-400 text-xs whitespace-nowrap tabular-nums">
-                        {formatDateVN(t.endDate)}
-                      </td>
-                      <td className="px-4 py-3.5 text-red-400 text-xs whitespace-nowrap tabular-nums font-medium">
-                        {daysOverdue(t.endDate)}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-2">
-                          <div className="bg-zinc-800 rounded-full h-1.5 w-16 shrink-0 overflow-hidden">
-                            <div
-                              className="bg-emerald-500 h-1.5 rounded-full"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                          <span className="text-xs tabular-nums text-zinc-300">{pct}%</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3.5 text-xs" title={t.delayNote ?? undefined}>
-                        {t.delayReason ? (
-                          <span className="text-amber-300">
-                            {DELAY_REASON_LABEL[t.delayReason as keyof typeof DELAY_REASON_LABEL] ??
-                              t.delayReason}
-                          </span>
-                        ) : (
-                          <span className="text-zinc-500">— Chưa gán —</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-                {filteredDelayed.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-5 py-12 text-center text-zinc-400 text-sm">
-                      Không có công việc trễ.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <DelayedGroupsTable
+            tasks={filteredDelayed}
+            showTaskCode
+            taskHref={(t) =>
+              t.sheetSlug
+                ? `/tracking/${t.sheetSlug}${t.floorLabel ? `?floor=${encodeURIComponent(t.floorLabel)}` : ""}`
+                : null
+            }
+          />
         </section>
       </main>
 

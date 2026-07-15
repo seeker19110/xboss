@@ -3,8 +3,8 @@ import { getCurrentUser, CAN } from "@/lib/auth";
 import { query, queryOne } from "@/lib/db";
 import ReactPDF, { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/pdf-fonts";
-import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
 import { formatDateVN } from "@/lib/date";
+import { groupDelayedTasks } from "@/lib/delayed-groups";
 
 export const dynamic = "force-dynamic";
 registerVietnameseFonts();
@@ -72,6 +72,7 @@ function ReportDoc({
   today: string;
 }) {
   const totalDelayed = kpi.reduce((s, k) => s + k.delayed, 0);
+  const delayedGroups = groupDelayedTasks(delayed);
 
   return (
     <Document>
@@ -145,31 +146,32 @@ function ReportDoc({
           })}
         </View>
 
-        {/* Danh sách trễ */}
+        {/* Danh sách hạng mục trễ (gom theo sheet + tầng) */}
         <View style={styles.section}>
-          <Text style={styles.sectionHead}>2. Danh sách công việc đang trễ ({delayed.length})</Text>
+          <Text style={styles.sectionHead}>2. Danh sách hạng mục trễ ({delayedGroups.length})</Text>
           <View style={[styles.row, { backgroundColor: "#f8f8f8" }]}>
-            {["Chi tiết", "Sheet", "Tầng", "Kết thúc", "%", "Trạng thái"].map((h) => (
-              <Text key={h} style={[styles.th, { flex: h === "Chi tiết" ? 3 : 1 }]}>
+            {["Hạng mục", "Sheet", "Tầng", "Số CT", "Hạn sớm nhất", "Trễ", "%"].map((h) => (
+              <Text key={h} style={[styles.th, { flex: h === "Hạng mục" ? 3 : 1 }]}>
                 {h}
               </Text>
             ))}
           </View>
-          {delayed.length === 0 && (
+          {delayedGroups.length === 0 && (
             <Text style={{ fontSize: 8, color: "#999", marginTop: 6 }}>
               Không có công việc trễ.
             </Text>
           )}
-          {delayed.map((t) => (
-            <View key={t.id} style={styles.row}>
-              <Text style={{ flex: 3, fontSize: 8 }}>{t.name}</Text>
-              <Text style={{ flex: 1, fontSize: 8 }}>{t.sheetType}</Text>
-              <Text style={{ flex: 1, fontSize: 8 }}>{t.floorLabel || "—"}</Text>
-              <Text style={{ flex: 1, fontSize: 8, color: "#dc2626" }}>{fmt(t.endDate)}</Text>
-              <Text style={{ flex: 1, fontSize: 8 }}>{pct(t.progressPercent ?? 0)}</Text>
-              <Text style={{ flex: 1, fontSize: 8 }}>
-                {STATUS_LABEL[t.status as StatusSlug] ?? "Đang trễ"}
+          {delayedGroups.map((g) => (
+            <View key={g.key} style={styles.row}>
+              <Text style={{ flex: 3, fontSize: 8 }}>{g.name}</Text>
+              <Text style={{ flex: 1, fontSize: 8 }}>{g.sheetType}</Text>
+              <Text style={{ flex: 1, fontSize: 8 }}>{g.floorLabel || "—"}</Text>
+              <Text style={{ flex: 1, fontSize: 8 }}>{g.count}</Text>
+              <Text style={{ flex: 1, fontSize: 8, color: "#dc2626" }}>
+                {fmt(g.earliestEndDate)}
               </Text>
+              <Text style={{ flex: 1, fontSize: 8, color: "#dc2626" }}>{g.maxDaysOverdue}</Text>
+              <Text style={{ flex: 1, fontSize: 8 }}>{pct(g.avgProgress)}</Text>
             </View>
           ))}
         </View>
