@@ -163,6 +163,7 @@ Parse file tracking gốc (sheet OGTĐ/OGHL/OGCH/ODNN) thành WBS — chứa log
 - Khi thêm API route mới: luôn có check auth + `export const dynamic = "force-dynamic"`.
 - TypeScript strict, import nội bộ qua alias `@/*`, tránh `any` tuỳ tiện.
 - SQL luôn dùng helper `lib/db` với placeholder `?` — **không nối chuỗi để chèn giá trị**.
+- **Tiền tệ (M45 PR1):** parser oid 1700 (`lib/db/index.ts`) chuyển NUMERIC → `parseFloat` nên **cấm cộng/nhân tiền trên float JS**. Mọi tổng/tích tiền (`SUM`, `* rate`) làm **trong SQL**; JS chỉ hiển thị. Khi buộc phải tính tiếp ở JS (vd tỷ lệ VAT/tạm ứng/giữ lại), cast cột tiền `::text` trong SELECT rồi đưa qua `lib/money.ts` (`parseMoney`/`addMoney`/`mulRate`/`formatVnd` — làm việc trên bigint đơn vị nhỏ = đồng×100).
 
 ## Quy trình & Definition of Done
 

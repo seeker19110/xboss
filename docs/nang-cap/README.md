@@ -6,20 +6,20 @@
 
 ## Danh mục (nhóm → module gộp bên trong)
 
-| File                             | Nhóm nghiệp vụ                    | Module gộp bên trong                          |
-| --------------------------------- | ---------------------------------- | ------------------------------------------------ |
-| `G00-nen-tang.md`                | Nền tảng                          | M00 (AppShell), M21 (IA đầy đủ), M22 (đa dự án) |
-| `G01-tien-do-boq.md`             | Tiến độ & BOQ                     | M01, M09, M15, M35, M36                        |
-| `G02-chi-phi-hop-dong.md`        | Chi phí & Hợp đồng                | M02, M06, M07, M16, M17, M27                   |
-| `G03-mua-sam-vat-tu.md`          | Mua sắm & Vật tư                  | M04, M18, M33                                  |
-| `G04-chat-luong-an-toan.md`      | Chất lượng & An toàn              | M03, M11                                       |
-| `G05-hien-truong.md`             | Hiện trường                       | M05, M12, M14                                  |
-| `G06-ban-ve-ho-so.md`            | Bản vẽ & Hồ sơ                    | M08, M10, M13, M19, M20, M32, M34              |
-| `G07-khoi-dong-to-chuc.md`       | Khởi động & Tổ chức               | M23, M24                                       |
-| `G08-moi-truong-rui-ro.md`       | Môi trường & Rủi ro               | M25, M26                                       |
-| `G09-ban-giao-van-hanh.md`       | Bàn giao & Vận hành               | M28, M29, M30                                  |
-| `G10-cong-nghe.md`               | Công nghệ                         | M31                                            |
-| `G11-uiux.md`                    | UI/UX xuyên suốt (không route riêng) | M37, M38, M39, M40, M41, M42                |
+| File                        | Nhóm nghiệp vụ                       | Module gộp bên trong                            |
+| --------------------------- | ------------------------------------ | ----------------------------------------------- |
+| `G00-nen-tang.md`           | Nền tảng                             | M00 (AppShell), M21 (IA đầy đủ), M22 (đa dự án) |
+| `G01-tien-do-boq.md`        | Tiến độ & BOQ                        | M01, M09, M15, M35, M36                         |
+| `G02-chi-phi-hop-dong.md`   | Chi phí & Hợp đồng                   | M02, M06, M07, M16, M17, M27                    |
+| `G03-mua-sam-vat-tu.md`     | Mua sắm & Vật tư                     | M04, M18, M33                                   |
+| `G04-chat-luong-an-toan.md` | Chất lượng & An toàn                 | M03, M11                                        |
+| `G05-hien-truong.md`        | Hiện trường                          | M05, M12, M14                                   |
+| `G06-ban-ve-ho-so.md`       | Bản vẽ & Hồ sơ                       | M08, M10, M13, M19, M20, M32, M34               |
+| `G07-khoi-dong-to-chuc.md`  | Khởi động & Tổ chức                  | M23, M24                                        |
+| `G08-moi-truong-rui-ro.md`  | Môi trường & Rủi ro                  | M25, M26                                        |
+| `G09-ban-giao-van-hanh.md`  | Bàn giao & Vận hành                  | M28, M29, M30                                   |
+| `G10-cong-nghe.md`          | Công nghệ                            | M31                                             |
+| `G11-uiux.md`               | UI/UX xuyên suốt (không route riêng) | M37, M38, M39, M40, M41, M42                    |
 
 > Bối cảnh lịch sử các đợt (FastCons nhóm A-E, AppShell IA N1-N4, UX 2026-07...) không còn cần thiết để tra cứu module đã xong — xem `docs/ke-hoach-*.md` nếu cần đối chiếu quyết định gốc.
 
@@ -27,24 +27,24 @@
 
 Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 trục + bảng điểm). Thứ tự ưu tiên P0 → P3; số migration trong đặc tả (0049+) là **tạm** — kiểm tra lại số thứ tự thực tế lúc code (bài học M32/M33).
 
-| File | Hạng mục | Ưu tiên | Trục điểm | Phụ thuộc |
-| --- | --- | --- | --- | --- |
-| `M43-audit-trail.md` | Ngữ cảnh request + audit trail toàn hệ (trigger + SET LOCAL) | P0 | Audit 2.0→3.5 | — |
-| `M44-van-hanh.md` | Backup/DR, health, structured logging, Sentry, staging | P0 | Vận hành 2.5→4.0 | PR3 cần M43 PR1 |
-| `M45-chat-luong-du-lieu.md` | Money helper, CHECK, ERD tự sinh, soft-delete, test bất biến scope | P0 | Dữ liệu 3.5→4.0 | — |
-| `M46-approval-engine.md` | Phê duyệt nhiều cấp cấu hình được (ngưỡng, SLA, SoD) | P1 | Workflow 2.0→3.5 | nên sau M43 PR1 |
-| `M47-evm-bi.md` | EVM (SPI/CPI/EAC), materialized views, saved reports, alert rules | P1 | BI 3.0→4.0 | — |
-| `M48-tich-hop-tai-chinh.md` | Khung integrations, adapter kế toán, hoá đơn điện tử NĐ 70/2025 | P1 | Tích hợp 2.0→3.5 | PR2 cần M46 |
-| `M49-api-mo-sso.md` | API keys `/api/v1`, webhook ra ngoài, SSO OIDC | P3 | Tích hợp →4.0 | webhook lợi từ M46 |
-| `M50-phan-quyen-nang-cao.md` | Override quyền trong DB, quyền theo trường, báo cáo SoD | P2 | Phân quyền 3.0→4.0 | audit từ M43 |
-| `M51-da-du-an-rls.md` | RLS phòng tuyến 2 (kèm ADR-0005), template dự án, organizations | P2 | Đa dự án 3.5→4.5 | M43 PR1, M45 PR5 |
-| `M52-mo-rong-cau-hinh.md` | code_lists, custom fields, module registry, feature flags, tách tracking | P2–P3 | Kiến trúc 3.0→4.0 | registry trước flags |
+| File                         | Hạng mục                                                                 | Ưu tiên | Trục điểm          | Phụ thuộc            |
+| ---------------------------- | ------------------------------------------------------------------------ | ------- | ------------------ | -------------------- |
+| `M43-audit-trail.md`         | Ngữ cảnh request + audit trail toàn hệ (trigger + SET LOCAL)             | P0      | Audit 2.0→3.5      | —                    |
+| `M44-van-hanh.md`            | Backup/DR, health, structured logging, Sentry, staging                   | P0      | Vận hành 2.5→4.0   | PR3 cần M43 PR1      |
+| `M45-chat-luong-du-lieu.md`  | Money helper, CHECK, ERD tự sinh, soft-delete, test bất biến scope       | P0      | Dữ liệu 3.5→4.0    | —                    |
+| `M46-approval-engine.md`     | Phê duyệt nhiều cấp cấu hình được (ngưỡng, SLA, SoD)                     | P1      | Workflow 2.0→3.5   | nên sau M43 PR1      |
+| `M47-evm-bi.md`              | EVM (SPI/CPI/EAC), materialized views, saved reports, alert rules        | P1      | BI 3.0→4.0         | —                    |
+| `M48-tich-hop-tai-chinh.md`  | Khung integrations, adapter kế toán, hoá đơn điện tử NĐ 70/2025          | P1      | Tích hợp 2.0→3.5   | PR2 cần M46          |
+| `M49-api-mo-sso.md`          | API keys `/api/v1`, webhook ra ngoài, SSO OIDC                           | P3      | Tích hợp →4.0      | webhook lợi từ M46   |
+| `M50-phan-quyen-nang-cao.md` | Override quyền trong DB, quyền theo trường, báo cáo SoD                  | P2      | Phân quyền 3.0→4.0 | audit từ M43         |
+| `M51-da-du-an-rls.md`        | RLS phòng tuyến 2 (kèm ADR-0005), template dự án, organizations          | P2      | Đa dự án 3.5→4.5   | M43 PR1, M45 PR5     |
+| `M52-mo-rong-cau-hinh.md`    | code_lists, custom fields, module registry, feature flags, tách tracking | P2–P3   | Kiến trúc 3.0→4.0  | registry trước flags |
 
 ## Quy ước chung (áp cho MỌI module — không lặp lại trong từng file)
 
 ### Backend
 
-- **Migration**: mỗi module 1+ file `migrations/000N_<ten>.sql` append-only, idempotent (`IF NOT EXISTS`); cập nhật `docs/ERD.md` cùng PR. Không sửa file migration đã áp production (ADR-0003).
+- **Migration**: mỗi module 1+ file `migrations/000N_<ten>.sql` append-only, idempotent (`IF NOT EXISTS`); chạy `npm run gen:erd` cùng PR (ERD sinh tự động, CI kiểm khớp schema). Không sửa file migration đã áp production (ADR-0003).
 - **API route** (pattern chuẩn `app/api/dashboard/route.ts`): `export const dynamic = "force-dynamic"`; `getCurrentUser()` → 401 khi chưa đăng nhập → check quyền qua `CAN`/`canTouchTask`/`canTouchPackage` → 403; validate input bằng zod (xem `lib/env.ts` style) hoặc check thủ công → 422; SQL qua helper `lib/db` placeholder `?`, không nối chuỗi.
 - **Quyền**: 7 vai trò (`lib/roles.ts`): `admin | pm | engineer | subcon` (thao tác) + `bch | cdt | viewer` (chỉ xem — `VIEW_ONLY_ROLES`). Thêm quyền mới = thêm hàm vào map `CAN` (`lib/auth.ts:158`), không check role rải rác.
 - **Thao tác ghi nhiều bước**: bọc `withTransaction` + `SELECT ... FOR UPDATE` (pattern `POST /api/tasks/:id/approve`).

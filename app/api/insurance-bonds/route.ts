@@ -28,10 +28,18 @@ export async function GET(req: NextRequest) {
   if (kindRaw && !INSURANCE_KINDS.includes(kindRaw as InsuranceKind))
     return NextResponse.json({ error: "Loại bảo hiểm/bảo lãnh không hợp lệ" }, { status: 422 });
 
+  // Soft-delete (M45 PR4): admin ?includeDeleted=1 xem bản đã xoá.
+  const deletedView =
+    user.role === "admin" && req.nextUrl.searchParams.get("includeDeleted") === "1"
+      ? "deleted"
+      : "alive";
   const projectId = await getCurrentProjectId(user);
   const bonds =
     projectId != null
-      ? await listInsuranceBonds(projectId, { kind: (kindRaw as InsuranceKind) ?? undefined })
+      ? await listInsuranceBonds(projectId, {
+          kind: (kindRaw as InsuranceKind) ?? undefined,
+          deletedView,
+        })
       : [];
   return NextResponse.json({ bonds });
 }

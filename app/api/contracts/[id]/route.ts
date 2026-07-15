@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { unlink } from "node:fs/promises";
 import { query, queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
-import { photoPath } from "@/lib/photos";
 import {
   checkContractRefs,
   contractLinkCounts,
@@ -195,19 +193,9 @@ export async function DELETE(
       { status: 409 },
     );
 
-  // Lấy tên file trước khi xoá (ON DELETE CASCADE xoá row nhưng không xoá file trên đĩa).
-  const docs = await query<{ file_name: string }>(
-    `SELECT file_name FROM contract_documents WHERE contract_id = ?`,
-    id,
-  );
-  await run(`DELETE FROM contracts WHERE id = ?`, id);
-  for (const d of docs) {
-    const p = photoPath(d.file_name);
-    if (p)
-      await unlink(p).catch(() => {
-        /* file đã mất trên đĩa — bỏ qua */
-      });
-  }
+  // Soft-delete (M45 PR4): giữ row + tài liệu để khôi phục được; SELECT liệt kê
+  // đã lọc deleted_at IS NULL. Admin khôi phục qua POST /api/contracts/:id/restore.
+  await run(`UPDATE contracts SET deleted_at = now() WHERE id = ?`, id);
 
   return NextResponse.json({ deleted: id });
 }

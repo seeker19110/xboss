@@ -32,7 +32,7 @@ async function loadExisting(
     `SELECT contract_id AS "contractId", kind, title, provider, code, value,
             issued_date AS "issuedDate", expiry_date AS "expiryDate", status, note,
             file_name AS "fileName"
-       FROM insurance_bonds WHERE id = ? AND project_id = ?`,
+       FROM insurance_bonds WHERE id = ? AND project_id = ? AND deleted_at IS NULL`,
     id,
     projectId,
   );
@@ -259,14 +259,11 @@ export async function DELETE(
   if (!existing)
     return NextResponse.json({ error: "Không tìm thấy bảo hiểm/bảo lãnh" }, { status: 404 });
 
-  await run(`DELETE FROM insurance_bonds WHERE id = ?`, id);
-  if (existing.fileName) {
-    const p = photoPath(existing.fileName);
-    if (p)
-      await unlink(p).catch(() => {
-        /* file đã mất trên đĩa — bỏ qua */
-      });
-  }
+  // Soft-delete (M45 PR4): giữ row + file để khôi phục qua POST .../restore.
+  await run(
+    `UPDATE insurance_bonds SET deleted_at = now() WHERE id = ? AND deleted_at IS NULL`,
+    id,
+  );
 
   return NextResponse.json({ deleted: id });
 }

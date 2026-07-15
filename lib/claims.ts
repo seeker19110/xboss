@@ -126,12 +126,19 @@ export type ClaimRow = {
   createdBy: number | null;
   createdByName: string | null;
   createdAt: string;
+  deletedAt: string | null;
   documentCount: number;
 };
 
 export async function listClaims(
   projectId?: number | null,
-  filters?: { kind?: ClaimKind; status?: ClaimStatus; contractId?: number; id?: number },
+  filters?: {
+    kind?: ClaimKind;
+    status?: ClaimStatus;
+    contractId?: number;
+    id?: number;
+    deletedView?: "alive" | "deleted" | "all";
+  },
 ): Promise<ClaimRow[]> {
   const clauses: string[] = [];
   const params: unknown[] = [];
@@ -139,6 +146,10 @@ export async function listClaims(
     clauses.push("c.project_id = ?");
     params.push(projectId);
   }
+  // Soft-delete (M45 PR4): mặc định chỉ dòng còn sống.
+  const dv = filters?.deletedView ?? "alive";
+  if (dv === "alive") clauses.push("c.deleted_at IS NULL");
+  else if (dv === "deleted") clauses.push("c.deleted_at IS NOT NULL");
   if (filters?.id != null) {
     clauses.push("c.id = ?");
     params.push(filters.id);
@@ -165,6 +176,7 @@ export async function listClaims(
             c.status, c.settlement_note AS "settlementNote",
             c.settled_by AS "settledBy", us.name AS "settledByName", c.settled_at AS "settledAt",
             c.created_by AS "createdBy", uc.name AS "createdByName", c.created_at AS "createdAt",
+            c.deleted_at AS "deletedAt",
             (SELECT COUNT(*) FROM claim_documents d WHERE d.claim_id = c.id) AS "documentCount"
        FROM claims c
        LEFT JOIN contracts ct ON ct.id = c.contract_id
@@ -197,6 +209,7 @@ export async function pendingClaims(
 ): Promise<{ id: number; code: string; title: string; noticeDate: string }[]> {
   const limit = daysFromTodayISO(-days);
   const clauses = [
+    `deleted_at IS NULL`,
     `status IN ('notice','quantified','negotiating')`,
     `notice_date IS NOT NULL AND notice_date <= ?`,
   ];
