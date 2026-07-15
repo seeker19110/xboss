@@ -22,7 +22,7 @@ import EditableText from "@/app/components/EditableText";
 import { DELAY_REASON_LABEL } from "@/lib/delay";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { sortFloorsDesc } from "@/lib/floors";
-import { formatDateVN } from "@/lib/date";
+import { formatDateVN, daysOverdue } from "@/lib/date";
 import { systemColorClasses } from "@/lib/systemColors";
 import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
 import type {
@@ -167,6 +167,33 @@ export default function Dashboard() {
     () => [...new Set((data?.delayedTasks ?? []).map((t) => t.status).filter(Boolean))],
     [data],
   );
+  const sheetNameByCode = useMemo(() => new Map(sheets.map((s) => [s.code, s.name])), [sheets]);
+  // Hạng mục trễ = cặp (sheet, tầng), khớp cách đếm totalDelayed/kpi[].delayed ở API —
+  // OGTĐ tầng 27 có nhiều công việc trễ vẫn gộp thành 1 hạng mục trong danh sách này.
+  const delayedGroups = useMemo(() => {
+    const map = new Map<
+      string,
+      { sheetType: string; floorLabel: string; name: string; count: number }
+    >();
+    for (const t of data?.delayedTasks ?? []) {
+      const key = `${t.sheetType}::${t.floorLabel ?? ""}`;
+      const existing = map.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        map.set(key, {
+          sheetType: t.sheetType,
+          floorLabel: t.floorLabel ?? "",
+          name: `Thi công ${sheetNameByCode.get(t.sheetType) ?? t.sheetType}${t.floorLabel ? ` tầng ${t.floorLabel}` : ""}`,
+          count: 1,
+        });
+      }
+    }
+    return [...map.values()].sort(
+      (a, b) =>
+        a.sheetType.localeCompare(b.sheetType) || sortFloorsDesc(a.floorLabel, b.floorLabel),
+    );
+  }, [data, sheetNameByCode]);
   const delayed = useMemo(
     () =>
       (data?.delayedTasks ?? []).filter(
@@ -637,6 +664,43 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* Danh sách hạng mục trễ (cặp sheet + tầng) — bấm để lọc bảng bên dưới về đúng
+              nhóm đó, hiện toàn bộ công việc trễ thuộc hạng mục. */}
+          {delayedGroups.length > 0 && (
+            <div className="px-5 py-3 border-b border-zinc-800 flex flex-wrap gap-2">
+              {delayedGroups.map((g) => {
+                const active = sheetFilter === g.sheetType && floorFilter === g.floorLabel;
+                return (
+                  <button
+                    key={`${g.sheetType}::${g.floorLabel}`}
+                    onClick={() => {
+                      if (active) {
+                        setSheetFilter("");
+                        setFloorFilter("");
+                      } else {
+                        setSheetFilter(g.sheetType);
+                        setFloorFilter(g.floorLabel);
+                      }
+                    }}
+                    title={`Xem toàn bộ công việc trễ của ${g.name}`}
+                    className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full border transition ${
+                      active
+                        ? "bg-orange-500 border-orange-500 text-red-950 font-medium"
+                        : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-orange-700/60 hover:text-orange-300"
+                    }`}
+                  >
+                    {g.name}
+                    <span
+                      className={`px-1.5 rounded-full text-[10px] font-semibold ${active ? "bg-red-950/30 text-red-950" : "bg-zinc-700 text-zinc-300"}`}
+                    >
+                      {g.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {/* Bảng — cuộn ngang trên mobile */}
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[680px]">
@@ -645,6 +709,7 @@ export default function Dashboard() {
                   <th className="text-left px-5 py-3">Công việc</th>
                   <th className="text-left px-4 py-3">Tầng</th>
                   <th className="text-left px-4 py-3">Hạn</th>
+                  <th className="text-left px-4 py-3">Trễ (ngày)</th>
                   <th className="text-left px-4 py-3 w-32">Tiến độ</th>
                   <th className="text-left px-4 py-3">Sheet</th>
                   <th className="text-left px-4 py-3">Nguyên nhân</th>
@@ -675,6 +740,9 @@ export default function Dashboard() {
                       </td>
                       <td className="px-4 py-3.5 text-red-400 text-xs whitespace-nowrap tabular-nums">
                         {formatDateVN(t.endDate)}
+                      </td>
+                      <td className="px-4 py-3.5 text-red-400 text-xs whitespace-nowrap tabular-nums font-medium">
+                        {daysOverdue(t.endDate)}
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-2">
@@ -724,7 +792,7 @@ export default function Dashboard() {
                 })}
                 {delayed.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-5 py-12 text-center text-zinc-400 text-sm">
+                    <td colSpan={7} className="px-5 py-12 text-center text-zinc-400 text-sm">
                       Không có công việc trễ.{" "}
                       {canImport && (
                         <a href="/import" className="text-emerald-400 hover:underline">

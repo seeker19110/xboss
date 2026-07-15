@@ -15,6 +15,13 @@ export function addDaysISO(iso: string, days: number): string {
   return new Date(Date.parse(iso + "T00:00:00Z") + days * 86400_000).toISOString().slice(0, 10);
 }
 
+// Số ngày trễ = hôm nay - hạn (endDate), cả hai dạng ISO 'YYYY-MM-DD' — ép giờ UTC 00:00
+// tránh lệch múi giờ khi trừ. Dùng cho cột "Trễ (ngày)" ở các bảng danh sách trễ.
+export function daysOverdue(endDate: string, today: string = todayISO()): number {
+  const diff = Date.parse(today + "T00:00:00Z") - Date.parse(endDate + "T00:00:00Z");
+  return Math.max(0, Math.round(diff / 86400_000));
+}
+
 // Định dạng ngày kiểu vi-VN (dd/mm/yyyy) cho hiển thị, "—" khi rỗng/không hợp lệ.
 // Luôn ép ngày/tháng đủ 2 chữ số (Intl "vi-VN" mặc định KHÔNG đệm 0, vd "1/7/2026") —
 // nguồn định dạng ngày dùng chung toàn app, sửa ở đây là sửa toàn cục.

@@ -4,7 +4,7 @@ import { AlertTriangle, Activity, Clock, ExternalLink, Printer } from "lucide-re
 import AppHeader from "@/app/components/AppHeader";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { redirectToLogin } from "@/app/lib/me";
-import { formatDateVN } from "@/lib/date";
+import { formatDateVN, daysOverdue } from "@/lib/date";
 import { DELAY_REASON_LABEL } from "@/lib/delay";
 import SystemFilter from "@/app/components/SystemFilter";
 
@@ -228,6 +228,7 @@ export default function ScheduleControlPage() {
                   <th className="text-left px-5 py-3">Công việc</th>
                   <th className="text-left px-4 py-3">Hệ</th>
                   <th className="text-left px-4 py-3">Hạn</th>
+                  <th className="text-left px-4 py-3">Trễ (ngày)</th>
                   <th className="text-left px-4 py-3 w-32">Tiến độ</th>
                   <th className="text-left px-4 py-3">Lý do trễ</th>
                 </tr>
@@ -248,6 +249,9 @@ export default function ScheduleControlPage() {
                       </td>
                       <td className="px-4 py-3.5 text-red-400 text-xs whitespace-nowrap tabular-nums">
                         {formatDateVN(t.endDate)}
+                      </td>
+                      <td className="px-4 py-3.5 text-red-400 text-xs whitespace-nowrap tabular-nums font-medium">
+                        {daysOverdue(t.endDate)}
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-2">
@@ -275,7 +279,7 @@ export default function ScheduleControlPage() {
                 })}
                 {filteredDelayed.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-5 py-12 text-center text-zinc-400 text-sm">
+                    <td colSpan={6} className="px-5 py-12 text-center text-zinc-400 text-sm">
                       Không có công việc trễ.
                     </td>
                   </tr>
