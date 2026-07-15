@@ -3,7 +3,7 @@
 import { mkdirSync, existsSync } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import { join, normalize, sep } from "node:path";
-import { randomBytes } from "node:crypto";
+import { randomBytes, createHash } from "node:crypto";
 
 export const UPLOAD_DIR = join(process.cwd(), "data", "uploads");
 export const MAX_PHOTO_BYTES = 10 * 1024 * 1024; // 10MB
@@ -208,6 +208,13 @@ export function newOmDocFileName(projectId: number, mime: string): string {
 // hồ sơ nhân sự, gắn theo supplier_id (pattern task_documents).
 export function newSubconDocFileName(supplierId: number, mime: string): string {
   return `sc${supplierId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime] ?? ".bin"}`;
+}
+
+// Hash nội dung file (hex) — tính lúc upload (task_documents/claim_documents/
+// contract_documents/vo_documents, cột sha256, M43 PR3) và đối chiếu lại lúc tải xuống
+// để phát hiện file trên đĩa bị tráo/hỏng ngoài ý muốn.
+export function sha256Hex(buf: Buffer): string {
+  return createHash("sha256").update(buf).digest("hex");
 }
 
 export function ensureUploadDir(): string {

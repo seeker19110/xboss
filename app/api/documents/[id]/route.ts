@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFile, unlink } from "node:fs/promises";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, canTouchTask, canTouchFloor, CAN } from "@/lib/auth";
-import { photoPath } from "@/lib/photos";
+import { photoPath, sha256Hex } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +15,7 @@ type DocRow = {
   floor_approval_id: number | null;
   link_url: string | null;
   task_id: number | null;
+  sha256: string | null;
 };
 
 // GET /api/documents/:id → trả về nội dung file biên bản/tài liệu (cần đăng nhập + có quyền xem
@@ -31,7 +32,7 @@ export async function GET(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const doc = await queryOne<DocRow>(
-    `SELECT id, file_name, mime_type, original_name, uploaded_by, floor_approval_id, link_url, task_id FROM task_documents WHERE id = ?`,
+    `SELECT id, file_name, mime_type, original_name, uploaded_by, floor_approval_id, link_url, task_id, sha256 FROM task_documents WHERE id = ?`,
     id,
   );
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
@@ -68,6 +69,15 @@ export async function GET(
     buf = await readFile(path);
   } catch {
     return NextResponse.json({ error: "File không còn trên đĩa" }, { status: 404 });
+  }
+
+  // Đối chiếu hash lưu lúc upload (M43 PR3) — file bị tráo/hỏng trên đĩa sẽ lệch hash.
+  // sha256 NULL (upload trước PR3) thì bỏ qua, không có gì để so.
+  if (doc.sha256 && sha256Hex(buf) !== doc.sha256) {
+    return NextResponse.json(
+      { error: "File trên đĩa không khớp hash lưu trong DB — có thể đã bị tráo/hỏng." },
+      { status: 409 },
+    );
   }
 
   return new NextResponse(new Uint8Array(buf), {

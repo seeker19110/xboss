@@ -1,6 +1,15 @@
 "use client";
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { Plus, ChevronDown, ChevronRight, X, Trash2, Paperclip, FileSignature } from "lucide-react";
+import {
+  Plus,
+  ChevronDown,
+  ChevronRight,
+  X,
+  Trash2,
+  Paperclip,
+  FileSignature,
+  Lock,
+} from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
@@ -535,6 +544,7 @@ type ContractDetail = {
     caption: string | null;
     createdAt: string;
     uploaderName: string | null;
+    sha256: string | null;
   }[];
   bills: { id: number; responsible: string; type: string; amount: number; paidDate: string }[];
   purchaseOrders: {
@@ -923,6 +933,15 @@ function ContractDetailModal({
                     >
                       {d.originalName ?? "File"}
                     </a>
+                    {d.sha256 && (
+                      <span
+                        className="flex items-center gap-1 text-[10px] text-zinc-500 shrink-0"
+                        title={`SHA-256: ${d.sha256}`}
+                      >
+                        <Lock className="w-3 h-3" aria-hidden="true" />
+                        {d.sha256.slice(0, 8)}...
+                      </span>
+                    )}
                     {canManage && (
                       <button
                         onClick={() => deleteFile(d.id)}

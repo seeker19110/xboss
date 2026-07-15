@@ -19,6 +19,7 @@ type DocRow = {
   mimeType: string | null;
   createdAt: string;
   uploaderName: string | null;
+  sha256: string | null;
 };
 
 // GET /api/qc/documents?sheetTypeId=&floor=&category= — hồ sơ chất lượng gắn task
@@ -59,7 +60,8 @@ export async function GET(req: NextRequest) {
     `SELECT d.id, d.task_id AS "taskId", t.code AS "taskCode", t.name AS "taskName",
             wp.floor_label AS "floorLabel", st.code AS "sheetType",
             d.doc_category AS "docCategory", d.caption, d.original_name AS "originalName",
-            d.mime_type AS "mimeType", d.created_at AS "createdAt", u.name AS "uploaderName"
+            d.mime_type AS "mimeType", d.created_at AS "createdAt", u.name AS "uploaderName",
+            d.sha256
        FROM task_documents d
        JOIN tasks t ON t.id = d.task_id
        LEFT JOIN work_packages wp ON wp.id = t.package_id

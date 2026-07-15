@@ -381,7 +381,22 @@ const trend = (prev: number, cur: number) => {
   return d > 0 ? `▲ +${d}%` : d < 0 ? `▼ ${d}%` : "—";
 };
 
-export function weeklyToTelegramText(r: WeeklyReport, appUrl?: string): string {
+// Tóm tắt xác minh chuỗi hash audit_log (M43 PR3, lib/audit-chain.ts::verifyAuditChain) —
+// tham số optional để không đổi chữ ký với các chỗ gọi cũ (tests/report.test.ts).
+export type AuditChainSummary = { checked: number; errorCount: number };
+
+function auditChainLineText(a?: AuditChainSummary): string | null {
+  if (!a) return null;
+  return a.errorCount === 0
+    ? `🔒 Audit chain: hợp lệ (${a.checked} dòng đã đối chiếu)`
+    : `🔒 ⚠ Audit chain: PHÁT HIỆN ${a.errorCount} dòng bị thay đổi/không khớp (trong ${a.checked} dòng đối chiếu)`;
+}
+
+export function weeklyToTelegramText(
+  r: WeeklyReport,
+  appUrl?: string,
+  auditChain?: AuditChainSummary,
+): string {
   const lines: string[] = [
     `📅 <b>XBoss — Báo cáo tuần ${r.weekFrom} → ${r.date}</b>`,
     `${esc(r.projectName ?? "")}`,
@@ -404,11 +419,24 @@ export function weeklyToTelegramText(r: WeeklyReport, appUrl?: string): string {
       );
   }
   lines.push("", `Tổng cộng <b>${r.totalDelayed}</b> hạng mục đang trễ`);
+  const chainLine = auditChainLineText(auditChain);
+  if (chainLine) lines.push("", chainLine);
   if (appUrl) lines.push(`<a href="${appUrl}">→ Mở XBoss Dashboard</a>`);
   return lines.join("\n").slice(0, 4000);
 }
 
-export function weeklyToHtml(r: WeeklyReport, appUrl?: string): string {
+function auditChainLineHtml(a?: AuditChainSummary): string {
+  if (!a) return "";
+  return a.errorCount === 0
+    ? `<p style="margin:16px 0;color:#16a34a">🔒 Audit chain: hợp lệ (${a.checked} dòng đã đối chiếu)</p>`
+    : `<p style="margin:16px 0;color:#c00">🔒 ⚠ Audit chain: PHÁT HIỆN <b>${a.errorCount}</b> dòng bị thay đổi/không khớp (trong ${a.checked} dòng đối chiếu)</p>`;
+}
+
+export function weeklyToHtml(
+  r: WeeklyReport,
+  appUrl?: string,
+  auditChain?: AuditChainSummary,
+): string {
   const th = `style="padding:6px 8px;text-align:left;background:#f4f4f5;font-size:12px;color:#555"`;
   const td = `style="padding:6px 8px;border-bottom:1px solid #eee"`;
   const completedRows = r.completed.length
@@ -457,6 +485,7 @@ export function weeklyToHtml(r: WeeklyReport, appUrl?: string): string {
     ${rowsHtml(r.topDelayed)}
   </table>
 
+  ${auditChainLineHtml(auditChain)}
   ${appUrl ? `<p style="margin:20px 0"><a href="${appUrl}" style="color:#059669">→ Mở XBoss Dashboard</a></p>` : ""}
   <p style="color:#999;font-size:11px;margin-top:24px">Email tự động từ XBoss — báo cáo tuần</p>
   </body></html>`;

@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { query } from "@/lib/db";
 import { getCurrentUser, CAN, checkCronSecret } from "@/lib/auth";
-import { buildWeeklyReport, weeklyToHtml, weeklyToTelegramText, sendTelegram } from "@/lib/report";
+import {
+  buildWeeklyReport,
+  weeklyToHtml,
+  weeklyToTelegramText,
+  sendTelegram,
+  type AuditChainSummary,
+} from "@/lib/report";
+import { verifyAuditChain } from "@/lib/audit-chain";
 
 export const dynamic = "force-dynamic";
 
@@ -13,19 +20,41 @@ export async function GET(req: NextRequest) {
   const bySecret = checkCronSecret(req.headers.get("authorization"));
   const bySession = CAN.export((await getCurrentUser())?.role ?? undefined);
   if (!bySecret && !bySession)
-    return NextResponse.json({ error: "Không có quyền (cần CRON_SECRET hoặc đăng nhập Admin/PM)" }, { status: 401 });
+    return NextResponse.json(
+      { error: "Không có quyền (cần CRON_SECRET hoặc đăng nhập Admin/PM)" },
+      { status: 401 },
+    );
 
   const report = await buildWeeklyReport();
-  const html = weeklyToHtml(report, process.env.APP_URL);
+
+  // Xác minh chuỗi hash audit_log (M43 PR3) — chạy trong process, không spawn subprocess
+  // (route Next.js). Lỗi khi xác minh không chặn gửi báo cáo (báo cáo vẫn hữu ích dù thiếu
+  // dòng audit chain) — chỉ log, coi như "chưa xác minh được" trong nội dung gửi.
+  let auditChain: AuditChainSummary | undefined;
+  try {
+    const chainResult = await verifyAuditChain();
+    auditChain = { checked: chainResult.checked, errorCount: chainResult.errors.length };
+  } catch (err) {
+    console.error("weekly-report: verifyAuditChain lỗi:", err);
+  }
+
+  const html = weeklyToHtml(report, process.env.APP_URL, auditChain);
 
   // Người nhận: REPORT_EMAIL_TO (phân tách bằng dấu phẩy) — mặc định mọi Admin + PM.
-  let to = (process.env.REPORT_EMAIL_TO ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  let to = (process.env.REPORT_EMAIL_TO ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
   if (to.length === 0) {
-    const rows = await query<{ email: string }>(`SELECT email FROM users WHERE role IN ('admin','pm')`);
+    const rows = await query<{ email: string }>(
+      `SELECT email FROM users WHERE role IN ('admin','pm')`,
+    );
     to = rows.map((r) => r.email);
   }
 
-  const telegramError = await sendTelegram(weeklyToTelegramText(report, process.env.APP_URL));
+  const telegramError = await sendTelegram(
+    weeklyToTelegramText(report, process.env.APP_URL, auditChain),
+  );
   const telegramSent = telegramError === null;
 
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
@@ -38,6 +67,7 @@ export async function GET(req: NextRequest) {
       reason: "Chưa cấu hình SMTP_HOST / SMTP_USER / SMTP_PASS — trả về preview",
       wouldSendTo: to,
       report,
+      auditChain,
     });
   }
 
@@ -56,8 +86,14 @@ export async function GET(req: NextRequest) {
   });
 
   return NextResponse.json({
-    sent: true, emailSent: true, to, telegramSent,
+    sent: true,
+    emailSent: true,
+    to,
+    telegramSent,
     telegramError: telegramSent ? undefined : telegramError,
-    completed: report.completed.length, newDelayed: report.newDelayed.length, totalDelayed: report.totalDelayed,
+    completed: report.completed.length,
+    newDelayed: report.newDelayed.length,
+    totalDelayed: report.totalDelayed,
+    auditChain,
   });
 }

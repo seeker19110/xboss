@@ -10,6 +10,7 @@ import {
   verifyFileMime,
   newVoDocFileName,
   MAX_DOC_BYTES,
+  sha256Hex,
 } from "@/lib/photos";
 import { canEditVo } from "@/lib/vo";
 
@@ -44,7 +45,7 @@ export async function GET(
 
   const documents = await query(
     `SELECT d.id, d.original_name AS "originalName", d.mime_type AS "mimeType",
-            d.size_bytes AS "sizeBytes", d.caption, d.created_at AS "createdAt",
+            d.size_bytes AS "sizeBytes", d.caption, d.created_at AS "createdAt", d.sha256,
             d.uploaded_by AS "uploadedBy", u.name AS "uploaderName"
        FROM vo_documents d LEFT JOIN users u ON u.id = d.uploaded_by
       WHERE d.vo_id = ? ORDER BY d.id DESC`,
@@ -109,10 +110,11 @@ export async function POST(
   const fileName = newVoDocFileName(voId, file.type);
   const dir = ensureUploadDir();
   await writeFile(join(dir, fileName), fileBuf);
+  const sha256 = sha256Hex(fileBuf);
 
   const id = await insertId(
-    `INSERT INTO vo_documents (vo_id, file_name, original_name, mime_type, size_bytes, caption, uploaded_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO vo_documents (vo_id, file_name, original_name, mime_type, size_bytes, caption, uploaded_by, sha256)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     voId,
     fileName,
     file.name || null,
@@ -120,6 +122,7 @@ export async function POST(
     file.size,
     caption,
     user.id,
+    sha256,
   );
 
   return NextResponse.json({ id, voId, caption, sizeBytes: file.size }, { status: 201 });

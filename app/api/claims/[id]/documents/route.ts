@@ -10,6 +10,7 @@ import {
   verifyFileMime,
   newClaimDocFileName,
   MAX_DOC_BYTES,
+  sha256Hex,
 } from "@/lib/photos";
 import { getClaim } from "@/lib/claims";
 
@@ -35,7 +36,7 @@ export async function GET(
 
   const documents = await query(
     `SELECT d.id, d.title, d.original_name AS "originalName", d.mime_type AS "mimeType",
-            d.size_bytes AS "sizeBytes", d.created_at AS "createdAt",
+            d.size_bytes AS "sizeBytes", d.created_at AS "createdAt", d.sha256,
             d.uploaded_by AS "uploadedBy", u.name AS "uploaderName"
        FROM claim_documents d LEFT JOIN users u ON u.id = d.uploaded_by
       WHERE d.claim_id = ? ORDER BY d.id DESC`,
@@ -93,10 +94,11 @@ export async function POST(
   const fileName = newClaimDocFileName(claimId, file.type);
   const dir = ensureUploadDir();
   await writeFile(join(dir, fileName), fileBuf);
+  const sha256 = sha256Hex(fileBuf);
 
   const id = await insertId(
-    `INSERT INTO claim_documents (claim_id, title, file_name, original_name, mime_type, size_bytes, uploaded_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO claim_documents (claim_id, title, file_name, original_name, mime_type, size_bytes, uploaded_by, sha256)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     claimId,
     title,
     fileName,
@@ -104,6 +106,7 @@ export async function POST(
     file.type,
     file.size,
     user.id,
+    sha256,
   );
 
   return NextResponse.json({ id, claimId, title, sizeBytes: file.size }, { status: 201 });

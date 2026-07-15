@@ -9,6 +9,7 @@ import {
   verifyFileMime,
   newFloorDocFileName,
   MAX_DOC_BYTES,
+  sha256Hex,
 } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +39,7 @@ export async function GET(
   const documents = await query(
     `SELECT d.id, d.original_name AS "originalName", d.mime_type AS "mimeType",
             d.size_bytes AS "sizeBytes", d.caption, d.link_url AS "linkUrl",
-            d.created_at AS "createdAt", u.name AS "uploaderName"
+            d.created_at AS "createdAt", d.sha256, u.name AS "uploaderName"
        FROM task_documents d
        LEFT JOIN users u ON d.uploaded_by = u.id
       WHERE d.floor_approval_id = ? ORDER BY d.id DESC`,
@@ -129,10 +130,11 @@ export async function POST(
   const fileName = newFloorDocFileName(approvalId, file.type);
   const dir = ensureUploadDir();
   await writeFile(join(dir, fileName), fileBuf);
+  const sha256 = sha256Hex(fileBuf);
 
   const id = await insertId(
-    `INSERT INTO task_documents (floor_approval_id, file_name, original_name, mime_type, size_bytes, caption, uploaded_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO task_documents (floor_approval_id, file_name, original_name, mime_type, size_bytes, caption, uploaded_by, sha256)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     approvalId,
     fileName,
     file.name || null,
@@ -140,6 +142,7 @@ export async function POST(
     file.size,
     caption,
     user.id,
+    sha256,
   );
 
   return NextResponse.json({ id, approvalId, caption, sizeBytes: file.size }, { status: 201 });
