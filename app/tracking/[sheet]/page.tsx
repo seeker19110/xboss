@@ -1580,8 +1580,10 @@ function PkgGrid({
   const W_PCT = 40;
   const W_DATE = 52; // Ngày BĐ / Ngày KT
   const W_DAYS = 36; // Số ngày thi công
-  // 60px đủ cho tên kích thước ống 2 dòng (vd "1300X700" / "X1-X6")
-  const W_DIM = 60;
+  // Cột dimension co theo độ dài nhãn (áp dụng toàn cục mọi sheet): nhãn ngắn kiểu căn hộ
+  // "CH 01"/"X1-X6" dùng cột hẹp 44px (vẫn ≥40px vùng chạm) để tầng nhiều căn không phải
+  // cuộn ngang quá xa; có nhãn dài kiểu kích thước ống "1300X700" thì giữ 60px đủ 2 dòng.
+  const W_DIM = visibleColumns.every((c) => c.length <= 6) ? 44 : 60;
   const W_ACT = 88;
   // Sticky left offset tính tự động từ các hằng số trên
   const LEFT_CODE = W_BOQ;
