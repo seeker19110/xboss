@@ -233,7 +233,7 @@ export default function AppHeader({
   // Nội dung điều hướng dùng chung cho cả sidebar desktop lẫn drawer mobile.
   function renderNav() {
     return (
-      <nav className="flex-1 overflow-y-auto py-2" aria-label="Điều hướng chính">
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2" aria-label="Điều hướng chính">
         {visibleTree.map(renderCluster)}
       </nav>
     );
