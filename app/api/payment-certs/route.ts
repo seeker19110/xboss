@@ -9,7 +9,9 @@ import {
   nextPeriodNo,
   suggestQtyForContract,
   saveCertItems,
+  certTotals,
 } from "@/lib/paymentcerts";
+import { openApproval } from "@/lib/approvals";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +68,9 @@ export async function POST(req: NextRequest) {
         )
       : undefined;
   if (!contract) return NextResponse.json({ error: "Hợp đồng không tồn tại" }, { status: 422 });
+  // contract chỉ tìm được khi projectId != null (điều kiện ternary phía trên) — ép kiểu
+  // để dùng làm tham số bắt buộc `number` của openApproval bên dưới.
+  const pid = projectId as number;
 
   const suggested = await suggestQtyForContract(contractId);
   if (suggested.length === 0)
@@ -96,6 +101,16 @@ export async function POST(req: NextRequest) {
           contractId,
           suggested.map((s) => ({ boqItemId: s.boqItemId, qtyPeriod: s.qtySuggested })),
         );
+        // M46 PR2: mở approval request nếu có flow cấu hình cho 'payment_cert' (PR4) —
+        // không có flow thì openApproval trả null, không đổi hành vi hiện tại.
+        const { periodValue } = await certTotals(id);
+        await openApproval({
+          entityType: "payment_cert",
+          entityId: id,
+          projectId: pid,
+          amount: periodValue,
+          user,
+        });
         return { id, code };
       }),
     );

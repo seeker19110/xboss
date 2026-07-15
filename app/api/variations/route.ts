@@ -12,6 +12,7 @@ import {
   VO_STATUSES,
   type VoStatus,
 } from "@/lib/vo";
+import { openApproval } from "@/lib/approvals";
 
 export const dynamic = "force-dynamic";
 
@@ -98,6 +99,13 @@ export async function POST(req: NextRequest) {
             id,
           );
         }
+        // M46 PR2: mở approval request nếu có flow cấu hình cho 'variation' (PR4) —
+        // không có flow thì openApproval trả null, không đổi hành vi hiện tại.
+        const { amount } = (await queryOne<{ amount: number }>(
+          `SELECT COALESCE(SUM(qty_contract * unit_price), 0) AS amount FROM boq_items WHERE vo_id = ?`,
+          id,
+        ))!;
+        await openApproval({ entityType: "variation", entityId: id, projectId, amount, user });
         return { id, code };
       }),
     );
