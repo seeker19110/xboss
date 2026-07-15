@@ -4,6 +4,7 @@
 // Xem docs/nang-cap/M17-thanh-toan-kl.md.
 import { query, queryOne, run } from "@/lib/db";
 import { boqExecutedQty } from "@/lib/boq";
+import { parseMoney, mulRate, moneyToNumber } from "@/lib/money";
 import { nextSeqCode } from "@/lib/seqcode";
 import { daysFromTodayISO } from "@/lib/date";
 
@@ -252,36 +253,44 @@ export async function certTotals(certId: number): Promise<CertTotals> {
     `SELECT advance_pct AS "advancePct", retention_pct AS "retentionPct" FROM contracts WHERE id = ?`,
     cert.contractId,
   );
-  const items = await query<{ qtyPeriod: number; qtyCumulative: number; unitPrice: number }>(
-    `SELECT qty_period AS "qtyPeriod", qty_cumulative AS "qtyCumulative", unit_price AS "unitPrice"
+  // Cộng/nhân tiền trong SQL (không cộng dồn float ở JS — M45 PR1); lấy về dạng
+  // text rồi qua lib/money để tính tỷ lệ tạm ứng/giữ lại chính xác.
+  const agg = await queryOne<{ period: string; cumulative: string }>(
+    `SELECT COALESCE(SUM(qty_period * unit_price), 0)::text AS period,
+            COALESCE(SUM(qty_cumulative * unit_price), 0)::text AS cumulative
        FROM payment_cert_items WHERE cert_id = ?`,
     certId,
   );
+  const periodMinor = parseMoney(agg?.period ?? "0");
+  const cumulativeMinor = parseMoney(agg?.cumulative ?? "0");
+  const advanceMinor = mulRate(periodMinor, (contract?.advancePct ?? 0) / 100);
+  const retentionMinor = mulRate(periodMinor, (contract?.retentionPct ?? 0) / 100);
+  const approvedMinor = periodMinor - advanceMinor - retentionMinor;
 
-  const periodValue = items.reduce((s, i) => s + Number(i.qtyPeriod) * Number(i.unitPrice), 0);
-  const cumulativeValue = items.reduce(
-    (s, i) => s + Number(i.qtyCumulative) * Number(i.unitPrice),
-    0,
-  );
-  const advanceDeduct = (periodValue * (contract?.advancePct ?? 0)) / 100;
-  const retentionDeduct = (periodValue * (contract?.retentionPct ?? 0)) / 100;
-  const approvedValue = periodValue - advanceDeduct - retentionDeduct;
-
-  return { periodValue, cumulativeValue, advanceDeduct, retentionDeduct, approvedValue };
+  return {
+    periodValue: moneyToNumber(periodMinor),
+    cumulativeValue: moneyToNumber(cumulativeMinor),
+    advanceDeduct: moneyToNumber(advanceMinor),
+    retentionDeduct: moneyToNumber(retentionMinor),
+    approvedValue: moneyToNumber(approvedMinor),
+  };
 }
 
 // Giá trị luỹ kế đã nghiệm thu của 1 hợp đồng = Σ cumulativeValue của đợt
 // 'approved' mới nhất mỗi dòng BOQ — so với giá trị HĐ (gồm phụ lục) để tính %.
 export async function contractCumulativeValue(contractId: number): Promise<number> {
-  const rows = await query<{ value: number }>(
-    `SELECT DISTINCT ON (i.boq_item_id) i.qty_cumulative * i.unit_price AS value
-       FROM payment_cert_items i
-       JOIN payment_certs c ON c.id = i.cert_id
-      WHERE c.contract_id = ? AND c.status = 'approved'
-      ORDER BY i.boq_item_id, c.period_no DESC`,
+  // Cộng trong SQL (M45 PR1): bọc DISTINCT ON trong subquery rồi SUM.
+  const row = await queryOne<{ total: string }>(
+    `SELECT COALESCE(SUM(v), 0)::text AS total FROM (
+       SELECT DISTINCT ON (i.boq_item_id) i.qty_cumulative * i.unit_price AS v
+         FROM payment_cert_items i
+         JOIN payment_certs c ON c.id = i.cert_id
+        WHERE c.contract_id = ? AND c.status = 'approved'
+        ORDER BY i.boq_item_id, c.period_no DESC
+     ) t`,
     contractId,
   );
-  return rows.reduce((s, r) => s + Number(r.value), 0);
+  return moneyToNumber(parseMoney(row?.total ?? "0"));
 }
 
 export type OverContractCert = {
