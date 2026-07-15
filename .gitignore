@@ -2,7 +2,10 @@ node_modules/
 .next/
 .next-build/
 .next-old/
+.next-build-staging/
+.next-old-staging/
 .env.local
+.env.staging
 .env*.local
 .env.sentry-build-plugin
 *.log
@@ -14,6 +17,9 @@ next-env.d.ts
 
 # Ảnh hiện trường upload từ app — không đưa vào git
 data/uploads/
+
+# Backup DB/uploads (scripts/ops/backup.sh) — không đưa vào git, xem docs/ops/backup.md
+backups/
 
 # Binary + log của cloudflared tunnel — chạy local, không đưa vào git
 cloudflared.exe
