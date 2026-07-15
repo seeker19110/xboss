@@ -218,7 +218,7 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     await page.goto("/");
     const sidebar = page.locator("#app-sidebar");
     await expect(sidebar).toBeVisible({ timeout: 15_000 });
-    await expect(sidebar).toHaveCSS("width", "240px");
+    await expect(sidebar).toHaveCSS("width", "256px");
 
     await page.getByRole("button", { name: "Thu gọn menu" }).click();
     await expect(sidebar).toHaveCSS("width", "56px");
@@ -228,7 +228,7 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
 
     // Trả lại trạng thái mặc định để không ảnh hưởng test khác dùng chung storageState.
     await page.getByRole("button", { name: "Mở rộng menu" }).click();
-    await expect(sidebar).toHaveCSS("width", "240px");
+    await expect(sidebar).toHaveCSS("width", "256px");
   });
 
   test("không có vi phạm a11y nghiêm trọng (axe) — desktop", async ({ page, isMobile }) => {

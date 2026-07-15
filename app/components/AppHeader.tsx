@@ -152,7 +152,7 @@ export default function AppHeader({
         }`}
       >
         <Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
-        <span className="sidebar-label">{item.label}</span>
+        <span className="sidebar-label flex-1 truncate">{item.label}</span>
       </a>
     );
   }
@@ -242,7 +242,7 @@ export default function AppHeader({
           overlay/dismissible nên không cần Modal (không có backdrop/Escape). */}
       <aside
         id="app-sidebar"
-        className="hidden lg:flex fixed inset-y-0 left-0 z-50 flex-col w-60 bg-zinc-950 border-r border-zinc-800 safe-top print:hidden"
+        className="hidden lg:flex fixed inset-y-0 left-0 z-50 flex-col w-64 bg-zinc-950 border-r border-zinc-800 safe-top print:hidden"
       >
         <div className="flex items-center h-12 px-1 shrink-0">
           <div className="flex-1 min-w-0">
@@ -273,7 +273,7 @@ export default function AppHeader({
           id="app-sidebar-mobile"
           onClose={() => setMobileOpen(false)}
           drawer
-          className="w-60 lg:hidden flex flex-col"
+          className="w-64 lg:hidden flex flex-col"
         >
           <div className="flex items-center h-12 px-1 shrink-0">
             <div className="flex-1 min-w-0">
