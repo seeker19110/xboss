@@ -22,9 +22,6 @@ import {
   Flame,
   Building2,
   PaintRoller,
-  CalendarRange,
-  GanttChartSquare,
-  CalendarClock,
   TrendingUp,
   ClipboardList,
   ClipboardCheck,
@@ -140,22 +137,13 @@ export const DASHBOARD_TREE: DashCluster[] = [
         label: "Xây tô",
         icon: PaintRoller,
       },
-      // View chung KHÔNG lọc theo hệ (Timeline/Gantt/Lookahead/S-Curve/Đường găng) — trước
-      // đây vào qua hub `dash.tien-do` cũ, mất link tắt khi cụm này flatten thành 6 hệ ở
-      // trên (không có node cha nào trỏ tới nữa) → phát hiện khi audit toàn diện, thêm lại
-      // dưới dạng nhóm gập/mở để không mất trang đã tồn tại.
-      {
-        id: "dash.tien-do-chung",
-        label: "Chung (mọi hệ)",
-        icon: CalendarRange,
-        children: [
-          { href: "/timeline", label: "Timeline", icon: CalendarRange },
-          { href: "/gantt", label: "Gantt", icon: GanttChartSquare },
-          { href: "/lookahead", label: "Lookahead", icon: CalendarClock },
-          { href: "/scurve", label: "S-Curve", icon: TrendingUp },
-          { href: "/schedule-control", label: "Đường găng & Chậm tiến độ", icon: AlertTriangle },
-        ],
-      },
+      // View chung KHÔNG lọc theo hệ: sidebar chỉ còn S-Curve — Timeline/Gantt/Lookahead/
+      // Đường găng đã bỏ khỏi sidebar cho gọn cụm (trang vẫn tồn tại, vào từ link trong
+      // trang hệ `/progress/[system]` hoặc URL trực tiếp; riêng khối Đường găng đã nhúng
+      // thẳng vào Dashboard tổng qua `ScheduleControlPanel`). Node lá thay nhóm gập/mở cũ
+      // nên không còn link hub "Tổng quan"; giữ nguyên `id` để không mất override
+      // nav_settings đã lưu.
+      { id: "dash.tien-do-chung", href: "/scurve", label: "S-Curve", icon: TrendingUp },
     ],
   },
   {
