@@ -1,30 +1,37 @@
-import { type NextRequest, NextResponse } from 'next/server';
-import { TRAFFIC_TOKEN_HEADER, trafficToken } from '@/lib/traffic-token';
+import { type NextRequest, NextResponse } from "next/server";
+import { TRAFFIC_TOKEN_HEADER, trafficToken } from "@/lib/traffic-token";
 
 // Middleware chạy Edge Runtime — chỉ intercept /api/ (trừ chính endpoint traffic/ingest).
 // Fire-and-forget POST đến ingest để ghi ring buffer trong Node.js runtime.
 // Không await → không làm trễ request gốc.
+// Kèm gắn `x-request-id` (M43): sinh UUID nếu chưa có, forward vào request headers để
+// route handler đọc qua `headers()` (dùng cho audit trail + tương quan log), trả lại ở response.
 export function proxy(req: NextRequest) {
   const path = req.nextUrl.pathname;
+  const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
   // Bỏ qua endpoint ingest để tránh vòng lặp vô hạn và các route traffic
-  if (!path.startsWith('/api/admin/traffic/')) {
-    const ingestUrl = new URL('/api/admin/traffic/ingest', req.url);
+  if (!path.startsWith("/api/admin/traffic/")) {
+    const ingestUrl = new URL("/api/admin/traffic/ingest", req.url);
     fetch(ingestUrl.toString(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', [TRAFFIC_TOKEN_HEADER]: trafficToken() },
+      method: "POST",
+      headers: { "Content-Type": "application/json", [TRAFFIC_TOKEN_HEADER]: trafficToken() },
       body: JSON.stringify({
         method: req.method,
         path,
-        ip: req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? '',
-        ua: req.headers.get('user-agent') ?? '',
+        ip: req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "",
+        ua: req.headers.get("user-agent") ?? "",
         ts: Date.now(),
       }),
     }).catch(() => {});
   }
-  return NextResponse.next();
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set("x-request-id", requestId);
+  const res = NextResponse.next({ request: { headers: requestHeaders } });
+  res.headers.set("x-request-id", requestId);
+  return res;
 }
 
 export const config = {
   // Chỉ intercept các API route — bỏ qua static file, _next/image, favicon...
-  matcher: ['/api/:path*'],
+  matcher: ["/api/:path*"],
 };

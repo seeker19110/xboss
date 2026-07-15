@@ -64,6 +64,7 @@ import {
   CalendarCheck,
   UserCog,
   Network,
+  History,
 } from "lucide-react";
 import type { Role } from "@/lib/roles";
 
@@ -414,6 +415,13 @@ export const DASHBOARD_TREE: DashCluster[] = [
         icon: Upload,
         roles: ["admin", "pm"],
       },
+      {
+        id: "dash.audit-log",
+        href: "/admin/audit-log",
+        label: "Audit trail (tài chính)",
+        icon: History,
+        roles: ["admin"],
+      }, // M43 PR2 — sổ audit toàn hệ (bảng audit_log ghi bằng trigger), chỉ Admin
     ],
   },
   {

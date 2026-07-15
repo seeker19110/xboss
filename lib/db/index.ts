@@ -4,6 +4,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { Pool, PoolClient, types } from "pg";
 import { getServerEnv } from "@/lib/env";
+import { getRequestContext } from "@/lib/request-context";
 import { runMigrations } from "./migrate";
 
 // DATE (oid 1082) → giữ nguyên chuỗi 'YYYY-MM-DD' (code so sánh ngày dạng chuỗi).
@@ -95,6 +96,22 @@ export async function withTransaction<T>(fn: () => Promise<T>): Promise<T> {
   const client = await getPool().connect();
   try {
     await client.query("BEGIN");
+    // Truyền ngữ cảnh actor xuống Postgres qua SET LOCAL (set_config ..., true) để trigger
+    // audit (migration 0049) ghi được ai/vai trò/dự án/request-id. Tự hết hạn khi COMMIT/
+    // ROLLBACK; giá trị thiếu truyền '' (trigger dùng NULLIF để chuyển về NULL).
+    const ctx = getRequestContext();
+    if (ctx) {
+      await client.query(
+        `SELECT set_config('app.user_id', $1, true), set_config('app.role', $2, true),
+                set_config('app.project_id', $3, true), set_config('app.request_id', $4, true)`,
+        [
+          ctx.userId != null ? String(ctx.userId) : "",
+          ctx.role ?? "",
+          ctx.projectId != null ? String(ctx.projectId) : "",
+          ctx.requestId ?? "",
+        ],
+      );
+    }
     const result = await txStorage.run(client, fn);
     await client.query("COMMIT");
     return result;

@@ -791,6 +791,14 @@ Album ảnh mốc tiến độ (thường từ drone): ghi milestone/mốc quan 
 
 Ghi mỗi lần gán người vào sheet/nhóm/task: ai gán, từ ai sang ai, thủ công hay kế thừa.
 
+### `audit_log` (M43)
+
+Audit trail toàn hệ, ghi **tự động bằng trigger Postgres** (`audit_row_change`) trên nhóm bảng tài chính/hợp đồng/nghiệm thu đợt 1: `contracts`, `variation_orders`, `payment_certs`, `invoices`, `cash_transactions`, `advances`, `payroll`, `purchase_orders`, `task_documents`, `baselines`, `insurance_bonds`, `claims`. Cột: `at`, `actor_id`/`actor_role`, `entity_type` (tên bảng), `entity_id`, `action` (INSERT/UPDATE/DELETE), `changes` JSONB (UPDATE: `{cột: [cũ,mới]}` chỉ cột đổi; INSERT/DELETE: snapshot đầy đủ), `project_id`, `request_id`, **`row_hash` TEXT (M43 PR3)**. Actor lấy từ `SET LOCAL app.*` do `withTransaction` (lib/db) truyền qua ngữ cảnh request (`lib/request-context.ts`) — ghi ngoài transaction vẫn log nhưng actor NULL. Lớp phủ chung, KHÔNG thay các bảng lịch sử theo domain (`task_history`, `material_transactions`...). Chỉ Admin đọc (M43 PR2); bất biến (không route UPDATE/DELETE).
+
+**Hash-chain (M43 PR3, `migrations/0050_document_hash.sql`):** `row_hash = sha256(prevRowHash || entity_id || at || changes)`, `prevRowHash` = `row_hash` của dòng `audit_log` có `id` lớn nhất hiện có (NULL trước migration → `COALESCE` về `''`) — mỗi dòng "khoá" nội dung dòng trước, phát hiện sửa/xoá tay trực tiếp trên DB ngoài luồng app. Xác minh qua `lib/audit-chain.ts::verifyAuditChain()` (dùng chung bởi `scripts/verify-audit-chain.ts` và `GET /api/cron/weekly-report`, kết quả in vào báo cáo tuần). Giới hạn đã biết: dưới ghi đồng thời thật sự trên nhiều connection, thứ tự COMMIT có thể khác thứ tự `id` (bigserial không đảm bảo thứ tự commit) → chấp nhận không khoá thêm (xem comment trong migration).
+
+4 bảng tài liệu đính kèm — `task_documents`, `claim_documents`, `contract_documents`, `vo_documents` — đều có thêm cột **`sha256` TEXT (M43 PR3)**: hash nội dung file tính lúc upload (`lib/photos.ts::sha256Hex`), đối chiếu lại khi tải xuống (route GET stream) để phát hiện file trên đĩa bị tráo/hỏng; NULL với file upload trước PR3 (bỏ qua kiểm tra).
+
 ---
 
 ## Indexes quan trọng

@@ -2,6 +2,7 @@
 // kể cả khi không mở app. Không cấu hình VAPID key → mọi hàm gửi là no-op.
 import webpush from "web-push";
 import { query, run } from "@/lib/db";
+import { log } from "@/lib/log";
 
 export type PushPayload = { title: string; body: string; url?: string };
 
@@ -41,10 +42,12 @@ async function sendToSubs(subs: SubRow[], payload: PushPayload): Promise<number>
       // Lỗi khác (VAPID sai, quota, timeout...) không nên bị nuốt im lặng — dự án chưa
       // có observability (Sentry), nên đây là dấu vết duy nhất để phát hiện push gửi hỏng.
       else
-        console.error(
-          `[push] gửi thất bại tới subscription #${s.id} (mã lỗi ${code ?? "?"}):`,
-          err,
-        );
+        log.error("Gửi web push thất bại", {
+          route: "lib/push.ts",
+          subscriptionId: s.id,
+          errorCode: code ?? null,
+          err: err instanceof Error ? err.message : String(err),
+        });
     }
   }
   return sent;

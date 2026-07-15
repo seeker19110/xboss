@@ -4,7 +4,7 @@ import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { getClaim } from "@/lib/claims";
-import { photoPath } from "@/lib/photos";
+import { photoPath, sha256Hex } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +15,7 @@ type ClaimDocRow = {
   original_name: string | null;
   uploaded_by: number | null;
   claim_id: number;
+  sha256: string | null;
 };
 
 // GET /api/claim-documents/:id — stream file hồ sơ đính kèm claim.
@@ -32,7 +33,7 @@ export async function GET(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const doc = await queryOne<ClaimDocRow>(
-    `SELECT id, file_name, mime_type, original_name, uploaded_by, claim_id FROM claim_documents WHERE id = ?`,
+    `SELECT id, file_name, mime_type, original_name, uploaded_by, claim_id, sha256 FROM claim_documents WHERE id = ?`,
     id,
   );
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
@@ -49,6 +50,13 @@ export async function GET(
     buf = await readFile(path);
   } catch {
     return NextResponse.json({ error: "File không còn trên đĩa" }, { status: 404 });
+  }
+
+  if (doc.sha256 && sha256Hex(buf) !== doc.sha256) {
+    return NextResponse.json(
+      { error: "File trên đĩa không khớp hash lưu trong DB — có thể đã bị tráo/hỏng." },
+      { status: 409 },
+    );
   }
 
   return new NextResponse(new Uint8Array(buf), {

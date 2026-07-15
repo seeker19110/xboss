@@ -9,6 +9,7 @@ import {
   verifyFileMime,
   newDocFileName,
   MAX_DOC_BYTES,
+  sha256Hex,
 } from "@/lib/photos";
 import { DOC_CATEGORIES, type DocCategory } from "@/lib/qaqc";
 
@@ -35,7 +36,7 @@ export async function GET(
   const documents = await query(
     `SELECT d.id, d.original_name AS "originalName", d.mime_type AS "mimeType",
             d.size_bytes AS "sizeBytes", d.caption, d.doc_category AS "docCategory",
-            d.created_at AS "createdAt",
+            d.created_at AS "createdAt", d.sha256,
             d.uploaded_by AS "uploadedBy", u.name AS "uploaderName"
        FROM task_documents d
        LEFT JOIN users u ON d.uploaded_by = u.id
@@ -102,10 +103,11 @@ export async function POST(
   const fileName = newDocFileName(taskId, file.type);
   const dir = ensureUploadDir();
   await writeFile(join(dir, fileName), fileBuf);
+  const sha256 = sha256Hex(fileBuf);
 
   const id = await insertId(
-    `INSERT INTO task_documents (task_id, file_name, original_name, mime_type, size_bytes, caption, doc_category, uploaded_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO task_documents (task_id, file_name, original_name, mime_type, size_bytes, caption, doc_category, uploaded_by, sha256)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     taskId,
     fileName,
     file.name || null,
@@ -114,6 +116,7 @@ export async function POST(
     caption,
     docCategory,
     user.id,
+    sha256,
   );
 
   return NextResponse.json(

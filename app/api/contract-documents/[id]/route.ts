@@ -3,7 +3,7 @@ import { readFile, unlink } from "node:fs/promises";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
-import { photoPath } from "@/lib/photos";
+import { photoPath, sha256Hex } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +13,7 @@ type ContractDocRow = {
   mime_type: string;
   original_name: string | null;
   uploaded_by: number | null;
+  sha256: string | null;
 };
 
 // Lấy tài liệu hợp đồng, lọc theo dự án đang chọn (M22) — chặn xem/xoá tài liệu
@@ -28,7 +29,7 @@ async function getDocInProject(
     args.push(projectId);
   }
   return queryOne<ContractDocRow>(
-    `SELECT cd.id, cd.file_name, cd.mime_type, cd.original_name, cd.uploaded_by
+    `SELECT cd.id, cd.file_name, cd.mime_type, cd.original_name, cd.uploaded_by, cd.sha256
        FROM contract_documents cd JOIN contracts c ON c.id = cd.contract_id
       WHERE ${conds.join(" AND ")}`,
     ...args,
@@ -61,6 +62,13 @@ export async function GET(
     buf = await readFile(path);
   } catch {
     return NextResponse.json({ error: "File không còn trên đĩa" }, { status: 404 });
+  }
+
+  if (doc.sha256 && sha256Hex(buf) !== doc.sha256) {
+    return NextResponse.json(
+      { error: "File trên đĩa không khớp hash lưu trong DB — có thể đã bị tráo/hỏng." },
+      { status: 409 },
+    );
   }
 
   return new NextResponse(new Uint8Array(buf), {

@@ -48,7 +48,7 @@ export async function GET(
     ),
     query(
       `SELECT d.id, d.original_name AS "originalName", d.mime_type AS "mimeType",
-              d.size_bytes AS "sizeBytes", d.caption, d.created_at AS "createdAt",
+              d.size_bytes AS "sizeBytes", d.caption, d.created_at AS "createdAt", d.sha256,
               d.uploaded_by AS "uploadedBy", u.name AS "uploaderName"
          FROM contract_documents d LEFT JOIN users u ON u.id = d.uploaded_by
         WHERE d.contract_id = ? ORDER BY d.id DESC`,

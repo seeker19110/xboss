@@ -3,6 +3,7 @@ import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { boqTakenBy } from "@/lib/boq";
+import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 
@@ -88,7 +89,10 @@ export async function PATCH(
       ...vals,
     );
   } catch (e: unknown) {
-    console.error("PATCH /api/materials error:", e instanceof Error ? e.message : String(e));
+    log.error("PATCH /api/materials/:id lỗi", {
+      route: "PATCH /api/materials/:id",
+      err: e instanceof Error ? e.message : String(e),
+    });
     return NextResponse.json({ error: "Lỗi máy chủ khi cập nhật vật tư" }, { status: 500 });
   }
 

@@ -3,6 +3,7 @@
 // tin `project_id` client gửi qua body/query — luôn suy qua getCurrentProjectId(user).
 import { cookies } from "next/headers";
 import { query, todayISO } from "@/lib/db";
+import { patchRequestContext } from "@/lib/request-context";
 import type { Role } from "@/lib/roles";
 
 export const PROJECT_COOKIE = "xboss_project";
@@ -49,7 +50,9 @@ export async function getCurrentProjectId(user: {
 }): Promise<number | null> {
   const visible = await visibleProjectIds(user);
   const store = await cookies();
-  return resolveProjectId(visible, store.get(PROJECT_COOKIE)?.value);
+  const projectId = resolveProjectId(visible, store.get(PROJECT_COOKIE)?.value);
+  if (projectId != null) patchRequestContext({ projectId });
+  return projectId;
 }
 
 export type ProjectListItem = {

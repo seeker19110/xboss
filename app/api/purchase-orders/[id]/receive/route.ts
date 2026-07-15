@@ -4,6 +4,7 @@ import { getCurrentUser, type Role } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { nextSeqCode, withUniqueRetry } from "@/lib/seqcode";
 import { getPurchaseOrder, logPoStatusChange } from "@/lib/procurement";
+import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 
@@ -179,7 +180,10 @@ export async function POST(
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.startsWith("OVERRECEIVE:"))
       return NextResponse.json({ error: msg.slice("OVERRECEIVE:".length) }, { status: 409 });
-    console.error("POST /api/purchase-orders/:id/receive error:", msg);
+    log.error("POST /api/purchase-orders/:id/receive lỗi", {
+      route: "POST /api/purchase-orders/:id/receive",
+      err: msg,
+    });
     return NextResponse.json({ error: "Lỗi máy chủ khi nhập kho" }, { status: 500 });
   }
 

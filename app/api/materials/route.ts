@@ -3,6 +3,7 @@ import { query, queryOne, insertId, run } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { boqTakenBy } from "@/lib/boq";
+import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +44,10 @@ export async function GET(req: NextRequest) {
       ...args,
     );
   } catch (e) {
-    console.error("GET /api/materials error:", e);
+    log.error("GET /api/materials lỗi", {
+      route: "GET /api/materials",
+      err: e instanceof Error ? e.message : String(e),
+    });
     return NextResponse.json({ error: "Lỗi truy vấn DB", materials: [] }, { status: 500 });
   }
 
@@ -120,7 +124,7 @@ export async function POST(req: NextRequest) {
     );
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error("POST /api/materials error:", msg);
+    log.error("POST /api/materials lỗi", { route: "POST /api/materials", err: msg });
     // Nếu cột qty_boq chưa tồn tại (schema chưa migrate), insert lại không có cột đó
     if (msg.includes("qty_boq")) {
       id = await insertId(

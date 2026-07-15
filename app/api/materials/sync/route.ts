@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, type Role } from "@/lib/auth";
 import { runMaterialSync } from "@/lib/material-sync";
+import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ export async function POST() {
     return NextResponse.json({ ok: true, summary });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Lỗi đồng bộ Google Sheet";
-    console.error("POST /api/materials/sync error:", msg);
+    log.error("POST /api/materials/sync lỗi", { route: "POST /api/materials/sync", err: msg });
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

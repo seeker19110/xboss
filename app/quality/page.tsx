@@ -14,6 +14,7 @@ import {
   Upload,
   Ban,
   Archive,
+  Lock,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
@@ -101,6 +102,7 @@ type QualityDoc = {
   mimeType: string | null;
   createdAt: string;
   uploaderName: string | null;
+  sha256: string | null;
 };
 
 const CATEGORY_LABEL: Record<string, string> = { work: "Công việc", tc: "T&C", hse: "HSE" };
@@ -1683,6 +1685,15 @@ function DocumentsTab({
                   {d.caption || d.originalName || "Tài liệu"} · {d.uploaderName ?? "—"} ·{" "}
                   {formatDateVN(d.createdAt)}
                 </p>
+                {d.sha256 && (
+                  <p
+                    className="text-[10px] text-zinc-500 mt-0.5 flex items-center gap-1"
+                    title={`SHA-256: ${d.sha256}`}
+                  >
+                    <Lock className="w-3 h-3" aria-hidden="true" />
+                    {d.sha256.slice(0, 8)}...
+                  </p>
+                )}
               </div>
               <a
                 href={`/api/documents/${d.id}`}

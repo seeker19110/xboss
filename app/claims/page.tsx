@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, X, Paperclip, Scale } from "lucide-react";
+import { Plus, X, Paperclip, Scale, Lock } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
@@ -449,6 +449,7 @@ type ClaimDocument = {
   title: string | null;
   originalName: string | null;
   uploadedBy: number | null;
+  sha256: string | null;
 };
 
 function ClaimDetailModal({
@@ -671,6 +672,15 @@ function ClaimDetailModal({
                     >
                       {d.title || d.originalName || "File"}
                     </a>
+                    {d.sha256 && (
+                      <span
+                        className="flex items-center gap-1 text-[10px] text-zinc-500 shrink-0"
+                        title={`SHA-256: ${d.sha256}`}
+                      >
+                        <Lock className="w-3 h-3" aria-hidden="true" />
+                        {d.sha256.slice(0, 8)}...
+                      </span>
+                    )}
                     {(d.uploadedBy === me?.id || isAdminOrPm) && (
                       <button
                         onClick={() => deleteFile(d.id)}
