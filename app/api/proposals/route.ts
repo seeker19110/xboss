@@ -3,6 +3,7 @@ import { insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { withUniqueRetry } from "@/lib/seqcode";
+import { openApproval } from "@/lib/approvals";
 import {
   PROPOSAL_KINDS,
   PROPOSAL_STATUSES,
@@ -82,6 +83,15 @@ export async function POST(req: NextRequest) {
       projectId,
     );
     return { id, code };
+  });
+  // M46 PR3: mở approval request nếu có flow cấu hình cho 'proposal' (PR4) — không có
+  // flow thì openApproval trả null, không đổi hành vi hiện tại (giữ y hệt submit/decide cũ).
+  await openApproval({
+    entityType: "proposal",
+    entityId: id,
+    projectId,
+    amount: input.amount,
+    user,
   });
   return NextResponse.json({ id, code }, { status: 201 });
 }

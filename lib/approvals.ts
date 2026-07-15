@@ -6,11 +6,11 @@
 
 import { query, queryOne, run, insertId, withTransaction } from "@/lib/db";
 import { isUniqueViolation } from "@/lib/seqcode";
-import { VIEW_ONLY_ROLES, type Role } from "@/lib/roles";
+import { ROLES, VIEW_ONLY_ROLES, type Role } from "@/lib/roles";
 
 // Vai trò chỉ-xem KHÔNG bao giờ được làm bước duyệt — trừ `cdt` (CĐT được phép là bước
 // duyệt cuối, theo M46 PR4). bch/viewer luôn 403 dù có bị cấu hình nhầm làm step role.
-const NON_APPROVER_ROLES: Role[] = VIEW_ONLY_ROLES.filter((r) => r !== "cdt");
+export const NON_APPROVER_ROLES: Role[] = VIEW_ONLY_ROLES.filter((r) => r !== "cdt");
 
 // Các loại thực thể engine phục vụ. Giữ danh sách đóng để validate cấu hình flow (PR4).
 export const APPROVAL_ENTITY_TYPES = [
@@ -276,4 +276,307 @@ export async function pendingForUser(user: ActorUser, projectId: number): Promis
     user.role,
     user.id,
   );
+}
+
+export type PendingItemDisplay = PendingItem & { label: string; linkUrl: string };
+
+// Gắn nhãn hiển thị (mã + tên) + link trang chi tiết cho hộp thư "Chờ tôi duyệt" (M46 PR3
+// /approvals). Tra cứu theo lô (WHERE id = ANY(?)) từng loại thực thể để tránh N+1 — 4 loại
+// đóng (APPROVAL_ENTITY_TYPES), thêm loại mới phải bổ sung nhánh tương ứng ở đây.
+export async function pendingForUserDisplay(
+  user: ActorUser,
+  projectId: number,
+): Promise<PendingItemDisplay[]> {
+  const items = await pendingForUser(user, projectId);
+  if (items.length === 0) return [];
+
+  const idsByType = new Map<string, number[]>();
+  for (const it of items)
+    idsByType.set(it.entityType, [...(idsByType.get(it.entityType) ?? []), it.entityId]);
+
+  const label = new Map<string, string>();
+  const linkUrl = new Map<string, string>();
+  const key = (t: string, id: number) => `${t}:${id}`;
+
+  const voIds = idsByType.get("variation");
+  if (voIds) {
+    const rows = await query<{ id: number; code: string; title: string }>(
+      `SELECT id, code, title FROM variation_orders WHERE id = ANY(?)`,
+      voIds,
+    );
+    for (const r of rows) {
+      label.set(key("variation", r.id), `${r.code} — ${r.title}`);
+      linkUrl.set(key("variation", r.id), "/variations");
+    }
+  }
+  const certIds = idsByType.get("payment_cert");
+  if (certIds) {
+    const rows = await query<{ id: number; code: string; contractTitle: string }>(
+      `SELECT c.id, c.code, ct.title AS "contractTitle"
+         FROM payment_certs c JOIN contracts ct ON ct.id = c.contract_id
+        WHERE c.id = ANY(?)`,
+      certIds,
+    );
+    for (const r of rows) {
+      label.set(key("payment_cert", r.id), `${r.code} — ${r.contractTitle}`);
+      linkUrl.set(key("payment_cert", r.id), "/payments");
+    }
+  }
+  const proposalIds = idsByType.get("proposal");
+  if (proposalIds) {
+    const rows = await query<{ id: number; code: string; title: string }>(
+      `SELECT id, code, title FROM proposals WHERE id = ANY(?)`,
+      proposalIds,
+    );
+    for (const r of rows) {
+      label.set(key("proposal", r.id), `${r.code} — ${r.title}`);
+      linkUrl.set(key("proposal", r.id), "/proposals");
+    }
+  }
+  const taskIds = idsByType.get("task_acceptance");
+  if (taskIds) {
+    const rows = await query<{ id: number; code: string; name: string }>(
+      `SELECT id, code, name FROM tasks WHERE id = ANY(?)`,
+      taskIds,
+    );
+    for (const r of rows) {
+      label.set(key("task_acceptance", r.id), `${r.code} — ${r.name}`);
+      linkUrl.set(key("task_acceptance", r.id), "/approvals");
+    }
+  }
+
+  return items.map((it) => ({
+    ...it,
+    label: label.get(key(it.entityType, it.entityId)) ?? `#${it.entityId}`,
+    linkUrl: linkUrl.get(key(it.entityType, it.entityId)) ?? "#",
+  }));
+}
+
+// ── M46 PR4 — CRUD cấu hình flow (Admin). CAN.manageApprovalFlows/viewApprovalFlows
+// (lib/auth.ts) gác quyền ở route; hàm ở đây là logic thuần + DB, không tự chạy
+// getCurrentUser(). Không seed flow nào — trang tạo được thì mới có, giữ đúng
+// nguyên tắc "không có flow = hành xử như cũ" của cả module.
+
+export type FlowStepInput = {
+  seq: number;
+  role: string;
+  minAmount: number | null;
+  slaDays: number | null;
+};
+
+export type FlowInput = {
+  projectId: number | null; // NULL = áp mọi dự án
+  entityType: string;
+  name: string;
+  steps: FlowStepInput[];
+};
+
+export type ApprovalFlowAdmin = {
+  id: number;
+  projectId: number | null;
+  projectName: string | null;
+  entityType: string;
+  name: string;
+  active: boolean;
+  steps: ApprovalStep[];
+  pendingCount: number;
+  totalRequestCount: number;
+};
+
+// Validate mảng bước thuần (không chạm DB) — dùng chung cho tạo mới lẫn sửa steps riêng.
+// seq phải liên tục từ 1 (không trùng/lệch); role phải hợp lệ và KHÔNG thuộc
+// NON_APPROVER_ROLES (bch/viewer — cdt được phép); min_amount ≥ 0; sla_days nguyên ≥ 1.
+export function validateFlowSteps(steps: FlowStepInput[]): string | null {
+  if (!Array.isArray(steps) || steps.length === 0) return "Cần ít nhất 1 bước duyệt";
+  const seqs = steps.map((s) => s.seq).sort((a, b) => a - b);
+  for (let i = 0; i < seqs.length; i++)
+    if (seqs[i] !== i + 1) return "Số thứ tự bước (seq) phải liên tục từ 1, không trùng/lệch";
+  for (const s of steps) {
+    if (!ROLES.includes(s.role as Role) || NON_APPROVER_ROLES.includes(s.role as Role))
+      return `Vai trò bước không hợp lệ: ${s.role}`;
+    if (s.minAmount != null && (!Number.isFinite(s.minAmount) || s.minAmount < 0))
+      return "Ngưỡng giá trị (min_amount) phải ≥ 0";
+    if (s.slaDays != null && (!Number.isInteger(s.slaDays) || s.slaDays < 1))
+      return "SLA (ngày) phải là số nguyên ≥ 1";
+  }
+  return null;
+}
+
+export function validateFlowInput(input: {
+  entityType: string;
+  name: string;
+  steps: FlowStepInput[];
+}): string | null {
+  if (!APPROVAL_ENTITY_TYPES.includes(input.entityType as ApprovalEntityType))
+    return "Loại thực thể không hợp lệ";
+  if (!input.name.trim()) return "Thiếu tên flow";
+  return validateFlowSteps(input.steps);
+}
+
+// Danh sách mọi flow (xuyên dự án — trang admin cần thấy toàn cảnh, xem whitelist
+// "admin/approval-flows" trong tests/project-scope-invariant.test.ts) kèm bước + số
+// request (tổng/đang chờ) để UI cảnh báo trước khi sửa/xoá.
+export async function listApprovalFlows(): Promise<ApprovalFlowAdmin[]> {
+  const flows = await query<{
+    id: number;
+    projectId: number | null;
+    projectName: string | null;
+    entityType: string;
+    name: string;
+    active: boolean;
+  }>(
+    `SELECT f.id, f.project_id AS "projectId", p.name AS "projectName",
+            f.entity_type AS "entityType", f.name, f.active
+       FROM approval_flows f
+       LEFT JOIN projects p ON p.id = f.project_id
+      ORDER BY f.entity_type, f.project_id NULLS FIRST, f.id`,
+  );
+  if (flows.length === 0) return [];
+
+  const flowIds = flows.map((f) => f.id);
+  const steps = await query<{ flowId: number } & ApprovalStep>(
+    `SELECT flow_id AS "flowId", seq, role, min_amount AS "minAmount", sla_days AS "slaDays"
+       FROM approval_steps WHERE flow_id = ANY(?) ORDER BY flow_id, seq`,
+    flowIds,
+  );
+  const counts = await query<{ flowId: number; status: string; count: number }>(
+    `SELECT flow_id AS "flowId", status, COUNT(*)::int AS count
+       FROM approval_requests WHERE flow_id = ANY(?) GROUP BY flow_id, status`,
+    flowIds,
+  );
+
+  const stepsByFlow = new Map<number, ApprovalStep[]>();
+  for (const s of steps) stepsByFlow.set(s.flowId, [...(stepsByFlow.get(s.flowId) ?? []), s]);
+  const pendingByFlow = new Map<number, number>();
+  const totalByFlow = new Map<number, number>();
+  for (const c of counts) {
+    totalByFlow.set(c.flowId, (totalByFlow.get(c.flowId) ?? 0) + c.count);
+    if (c.status === "pending")
+      pendingByFlow.set(c.flowId, (pendingByFlow.get(c.flowId) ?? 0) + c.count);
+  }
+
+  return flows.map((f) => ({
+    ...f,
+    steps: stepsByFlow.get(f.id) ?? [],
+    pendingCount: pendingByFlow.get(f.id) ?? 0,
+    totalRequestCount: totalByFlow.get(f.id) ?? 0,
+  }));
+}
+
+// Tạo flow mới + bước. Unique index ux_flow_active (entity_type, COALESCE(project_id,0))
+// chặn 2 flow active cùng lúc cho cùng (loại, phạm vi dự án) → dịch 23505 thành lỗi
+// thân thiện thay vì để lộ lỗi Postgres thô.
+export async function createApprovalFlow(input: FlowInput): Promise<{ id: number } | string> {
+  const err = validateFlowInput(input);
+  if (err) return err;
+  try {
+    return await withTransaction(async () => {
+      const flowId = await insertId(
+        `INSERT INTO approval_flows (project_id, entity_type, name) VALUES (?, ?, ?)`,
+        input.projectId,
+        input.entityType,
+        input.name.trim(),
+      );
+      for (const s of input.steps) {
+        await insertId(
+          `INSERT INTO approval_steps (flow_id, seq, role, min_amount, sla_days) VALUES (?, ?, ?, ?, ?)`,
+          flowId,
+          s.seq,
+          s.role,
+          s.minAmount,
+          s.slaDays,
+        );
+      }
+      return { id: flowId };
+    });
+  } catch (e) {
+    if (isUniqueViolation(e))
+      return "Đã có flow đang bật (active) cho loại thực thể này (cùng phạm vi dự án) — tắt flow cũ trước khi tạo mới";
+    throw e;
+  }
+}
+
+// Sửa flow: tên/trạng thái active/toàn bộ mảng bước (thay hết, không diff từng dòng —
+// đơn giản hơn và đủ dùng vì UI luôn gửi lại nguyên mảng). Chặn sửa khi còn request
+// 'pending' qua flow này (đổi bước giữa chừng sẽ làm currentSeq của request đang chờ
+// trỏ vào bước không còn tồn tại) — khoá FOR UPDATE + đếm trong cùng transaction.
+export async function updateApprovalFlow(
+  id: number,
+  patch: { name?: string; active?: boolean; steps?: FlowStepInput[] },
+): Promise<{ ok: true } | string> {
+  if (patch.steps) {
+    const err = validateFlowSteps(patch.steps);
+    if (err) return err;
+  }
+  try {
+    return await withTransaction(async () => {
+      const flow = await queryOne<{ id: number }>(
+        `SELECT id FROM approval_flows WHERE id = ? FOR UPDATE`,
+        id,
+      );
+      if (!flow) return "Không tìm thấy flow";
+
+      const pending = await queryOne<{ count: number }>(
+        `SELECT COUNT(*)::int AS count FROM approval_requests WHERE flow_id = ? AND status = 'pending'`,
+        id,
+      );
+      const pendingCount = pending?.count ?? 0;
+      if (pendingCount > 0)
+        return `Còn ${pendingCount} yêu cầu đang chờ duyệt qua flow này — không thể sửa`;
+
+      if (patch.name != null || patch.active != null) {
+        const sets: string[] = [];
+        const vals: unknown[] = [];
+        if (patch.name != null) {
+          sets.push("name = ?");
+          vals.push(patch.name.trim());
+        }
+        if (patch.active != null) {
+          sets.push("active = ?");
+          vals.push(patch.active);
+        }
+        vals.push(id);
+        await run(`UPDATE approval_flows SET ${sets.join(", ")} WHERE id = ?`, ...vals);
+      }
+
+      if (patch.steps) {
+        await run(`DELETE FROM approval_steps WHERE flow_id = ?`, id);
+        for (const s of patch.steps) {
+          await insertId(
+            `INSERT INTO approval_steps (flow_id, seq, role, min_amount, sla_days) VALUES (?, ?, ?, ?, ?)`,
+            id,
+            s.seq,
+            s.role,
+            s.minAmount,
+            s.slaDays,
+          );
+        }
+      }
+      return { ok: true };
+    });
+  } catch (e) {
+    if (isUniqueViolation(e))
+      return "Bật (active) flow này sẽ trùng với flow khác đang bật cùng loại + phạm vi dự án";
+    throw e;
+  }
+}
+
+// Xoá flow. approval_requests.flow_id có FK không ON DELETE (giữ lịch sử duyệt) —
+// đã có bất kỳ request nào (kể cả đã xong) tham chiếu tới thì KHÔNG xoá được, dù
+// pending hay không — hướng dẫn tắt (active=false) thay vì xoá để giữ nguyên lịch sử.
+export async function deleteApprovalFlow(id: number): Promise<{ ok: true } | string> {
+  const flow = await queryOne<{ id: number }>(`SELECT id FROM approval_flows WHERE id = ?`, id);
+  if (!flow) return "Không tìm thấy flow";
+
+  const counts = await queryOne<{ total: number; pending: number }>(
+    `SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE status = 'pending')::int AS pending
+       FROM approval_requests WHERE flow_id = ?`,
+    id,
+  );
+  const total = counts?.total ?? 0;
+  if (total > 0)
+    return `Flow này đã có ${total} yêu cầu duyệt (${counts?.pending ?? 0} đang chờ) — không thể xoá, hãy tắt (active=false) thay vì xoá`;
+
+  await run(`DELETE FROM approval_flows WHERE id = ?`, id);
+  return { ok: true };
 }

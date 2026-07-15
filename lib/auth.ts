@@ -261,6 +261,10 @@ export const CAN = {
   // xem như VO/thanh toán KL (loại cdt/subcon/viewer); ghi nhận (tạo/sửa) Admin/PM/kỹ sư.
   viewClaims: (r?: Role) => r === "admin" || r === "pm" || r === "engineer" || r === "bch",
   manageClaims: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  // Cấu hình Approval Engine (M46 PR4): xem flow/bước duyệt — Admin/PM; tạo/sửa/xoá
+  // (đổi luồng duyệt tài chính/nghiệm thu toàn hệ) — chỉ Admin.
+  viewApprovalFlows: (r?: Role) => r === "admin" || r === "pm",
+  manageApprovalFlows: (r?: Role) => r === "admin",
 };
 
 // Sub-con chỉ được thao tác trên task được giao cho mình.

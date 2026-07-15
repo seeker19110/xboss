@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, insertId, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { recomputePackage } from "@/lib/recompute";
 import { requiredInspectionMissing } from "@/lib/qaqc";
+import { decideNext, getActiveFlow, openApproval, advanceApproval } from "@/lib/approvals";
 import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
@@ -75,6 +77,11 @@ export async function POST(req: NextRequest) {
   if (isNaN(sheetTypeId) || !floorLabel)
     return NextResponse.json({ error: "Thiếu sheetTypeId hoặc floorLabel" }, { status: 400 });
 
+  // M46 PR3: flow chỉ dùng để CHỌN flow áp dụng (bảng floor_approvals/tasks vốn không
+  // scope theo dự án — whitelist "nhóm nghiệm thu theo sheet × tầng" trong
+  // tests/project-scope-invariant.test.ts), không dùng để lọc dữ liệu tầng.
+  const projectId = await getCurrentProjectId(user);
+
   let approvalId: number;
   let taskCount: number;
 
@@ -119,6 +126,46 @@ export async function POST(req: NextRequest) {
             ),
             { status: 409 },
           );
+      }
+
+      // M46 PR3: có flow 'task_acceptance' active → mở + duyệt 1 request/task qua engine.
+      // Duyệt CẢ TẦNG trong 1 lượt chỉ hợp lý khi flow có ĐÚNG 1 bước hiệu lực (mọi task
+      // amount NULL) và caller đúng vai trò bước đó — nếu không dừng lại, hướng dẫn duyệt
+      // từng task qua hộp thư "Chờ tôi duyệt" (engine hỗ trợ multi-step ở mức từng task,
+      // không phải ở mức thao tác hàng loạt này). Không có flow → hành vi y hệt trước đây.
+      const flow =
+        projectId != null ? await getActiveFlow("task_acceptance", projectId) : undefined;
+      if (flow) {
+        const firstStep = decideNext(flow.steps, null, 0);
+        if (firstStep) {
+          if (decideNext(flow.steps, null, firstStep.seq))
+            throw Object.assign(
+              new Error(
+                'Hệ đang cấu hình duyệt nghiệm thu nhiều bước — hãy duyệt từng task qua hộp thư "Chờ tôi duyệt" (/approvals) thay vì duyệt cả tầng.',
+              ),
+              { status: 409 },
+            );
+          if (firstStep.role !== user.role && user.role !== "admin")
+            throw Object.assign(new Error(`Chỉ vai trò ${firstStep.role} được duyệt bước này`), {
+              status: 403,
+            });
+        }
+        for (const t of tasks) {
+          const opened = await openApproval({
+            entityType: "task_acceptance",
+            entityId: t.id,
+            projectId: projectId!,
+            amount: null,
+            user,
+          });
+          if (opened && opened.status === "pending")
+            await advanceApproval({
+              entityType: "task_acceptance",
+              entityId: t.id,
+              user,
+              decision: "approve",
+            });
+        }
       }
 
       // Tạo hoặc cập nhật floor_approval thành chính thức
