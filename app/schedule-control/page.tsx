@@ -23,7 +23,12 @@ type Delayed = {
   delayNote: string | null;
 };
 type ParetoRow = { slug: string | null; label: string; count: number };
-type Data = { critical: CriticalRow[]; delayed: Delayed[]; delayPareto: ParetoRow[] };
+type Data = {
+  critical: CriticalRow[];
+  delayed: Delayed[];
+  delayPareto: ParetoRow[];
+  groupProgress: Record<string, number>;
+};
 
 export default function ScheduleControlPage() {
   const [data, setData] = useState<Data | null>(null);
@@ -66,6 +71,10 @@ export default function ScheduleControlPage() {
   const delayedGroupCount = useMemo(
     () => new Set(filteredDelayed.map((t) => `${t.sheetType}::${t.floorLabel ?? ""}`)).size,
     [filteredDelayed],
+  );
+  const groupProgressMap = useMemo(
+    () => new Map(Object.entries(data?.groupProgress ?? {})),
+    [data],
   );
 
   if (!data) return <PageSkeleton />;
@@ -146,6 +155,7 @@ export default function ScheduleControlPage() {
                 ? `/tracking/${t.sheetSlug}${t.floorLabel ? `?floor=${encodeURIComponent(t.floorLabel)}` : ""}`
                 : null
             }
+            groupProgress={groupProgressMap}
           />
         </section>
       </main>

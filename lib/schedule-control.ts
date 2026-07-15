@@ -4,6 +4,7 @@ import { query, todayISO } from "@/lib/db";
 import { computeCpm } from "@/lib/cpm";
 import { getCpmData } from "@/lib/gantt-data";
 import { DELAY_REASON_LABEL, type DelayReason } from "@/lib/delay";
+import { getGroupProgressMap } from "@/lib/group-progress";
 
 export type CriticalRow = {
   id: number;
@@ -38,6 +39,7 @@ export type ScheduleControlData = {
   critical: CriticalRow[];
   delayed: DelayedRow[];
   delayPareto: DelayParetoRow[];
+  groupProgress: Record<string, number>;
 };
 
 export async function getScheduleControlData(
@@ -102,5 +104,9 @@ export async function getScheduleControlData(
       ? [...reasonCounts, { slug: null, label: "Chưa gán lý do", count: noReasonCount }]
       : reasonCounts;
 
-  return { critical, delayed, delayPareto };
+  // Tiến độ trung bình của TOÀN BỘ công tác trong từng hạng mục (sheet+tầng) — dùng cho
+  // cột "Tiến độ TB" ở bảng hạng mục trễ, tránh nhầm với avg chỉ tính trên công tác trễ.
+  const groupProgress = Object.fromEntries(await getGroupProgressMap({ systemId }));
+
+  return { critical, delayed, delayPareto, groupProgress };
 }

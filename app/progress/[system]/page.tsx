@@ -67,7 +67,12 @@ type Delayed = {
   delayNote: string | null;
 };
 type ParetoRow = { slug: string | null; label: string; count: number };
-type ScheduleData = { critical: Critical[]; delayed: Delayed[]; delayPareto: ParetoRow[] };
+type ScheduleData = {
+  critical: Critical[];
+  delayed: Delayed[];
+  delayPareto: ParetoRow[];
+  groupProgress: Record<string, number>;
+};
 
 function KpiTile({ label, value, accent }: { label: string; value: string; accent: string }) {
   return (
@@ -160,6 +165,10 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
   const delayedGroupCount = useMemo(
     () => new Set(filteredDelayed.map((t) => `${t.sheetType}::${t.floorLabel ?? ""}`)).size,
     [filteredDelayed],
+  );
+  const groupProgressMap = useMemo(
+    () => new Map(Object.entries(schedule?.groupProgress ?? {})),
+    [schedule],
   );
 
   const canManage = me?.role === "admin" || me?.role === "pm";
@@ -436,6 +445,7 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
                 ? `/tracking/${t.sheetSlug}${t.floorLabel ? `?floor=${encodeURIComponent(t.floorLabel)}` : ""}`
                 : null
             }
+            groupProgress={groupProgressMap}
           />
         </section>
       </main>

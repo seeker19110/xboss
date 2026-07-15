@@ -4,6 +4,7 @@ import { getCurrentUser, CAN } from "@/lib/auth";
 import { resolveSystemId } from "@/lib/systems";
 import { progressAtDate } from "@/lib/report";
 import { getCurrentProjectId } from "@/lib/projects";
+import { getGroupProgressMap } from "@/lib/group-progress";
 import {
   qualityBlock,
   procurementBlock,
@@ -92,6 +93,10 @@ export async function GET(req: NextRequest) {
     0,
   );
 
+  // Tiến độ trung bình của TOÀN BỘ công tác trong từng hạng mục (sheet+tầng) — dùng cho
+  // cột "Tiến độ TB" ở bảng hạng mục trễ, tránh nhầm với avg chỉ tính trên công tác trễ.
+  const groupProgress = await getGroupProgressMap({ systemId, projectId });
+
   // KPI theo từng sheet. LEFT JOIN work_packages/tasks (sheet chưa có task nào vẫn phải
   // hiện) — JOIN towers (INNER) lọc đúng dự án qua ON, không ảnh hưởng LEFT JOIN work_packages/tasks
   // phía sau nên sheet chưa có task vẫn hiện đúng khi đang lọc theo dự án.
@@ -169,6 +174,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     approvals,
     delayedTasks,
+    groupProgress: Object.fromEntries(groupProgress),
     kpi: kpiWithDelta,
     totalDelayed: totalDelayedItems,
     quality,

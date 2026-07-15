@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { groupDelayedTasks } from "@/lib/delayed-groups";
+import { groupDelayedTasks, delayedGroupKey } from "@/lib/delayed-groups";
 
 const T = (over: Partial<Parameters<typeof groupDelayedTasks>[0][number]> = {}) => ({
   sheetType: "A-ODNN-Z1",
@@ -47,12 +47,32 @@ test("hạn sớm nhất + số ngày trễ lớn nhất theo hạn sớm nhất
   assert.equal(g.maxDaysOverdue, 68); // 2026-05-08 → 2026-07-15
 });
 
-test("tiến độ trung bình = trung bình các công tác (null coi như 0)", () => {
+test("không có groupProgress: tiến độ TB tạm suy từ trung bình các công tác trễ (null coi như 0)", () => {
   const [g] = groupDelayedTasks(
     [T({ progressPercent: 0.2 }), T({ progressPercent: 0.6 }), T({ progressPercent: null })],
     { today: "2026-07-15" },
   );
   assert.ok(Math.abs(g.avgProgress - 0.8 / 3) < 1e-9);
+});
+
+test("có groupProgress: tiến độ TB lấy từ tiến độ TOÀN BỘ hạng mục, không phải trung bình công tác trễ", () => {
+  // Hạng mục thực tế đã xong 70% (kể cả công tác không trễ) dù 2 công tác trễ đưa vào đây
+  // đều 0% — nếu lấy avg-of-delayed sẽ cho 0%, sai lệch hoàn toàn thực trạng.
+  const groupProgress = new Map([[delayedGroupKey("A-ODNN-Z1", "16"), 0.7]]);
+  const [g] = groupDelayedTasks([T({ progressPercent: 0 }), T({ progressPercent: 0 })], {
+    today: "2026-07-15",
+    groupProgress,
+  });
+  assert.equal(g.avgProgress, 0.7);
+});
+
+test("groupProgress không có khoá khớp → vẫn rơi về trung bình công tác trễ (không crash)", () => {
+  const groupProgress = new Map([[delayedGroupKey("KHÁC", "99"), 0.5]]);
+  const [g] = groupDelayedTasks([T({ progressPercent: 0.4 })], {
+    today: "2026-07-15",
+    groupProgress,
+  });
+  assert.equal(g.avgProgress, 0.4);
 });
 
 test("lý do trễ tổng hợp: đếm và sắp giảm dần, null → reason=null", () => {

@@ -15,6 +15,7 @@ export default function ReportPage() {
     delayedTasks: ReportDelayedTask[];
     kpi: ReportKpi[];
     totalDelayed: number;
+    groupProgress: Record<string, number>;
   } | null>(null);
   const [forecast, setForecast] = useState<ReportForecast[]>([]);
   const [projectName, setProjectName] = useState<string | null>(null);
