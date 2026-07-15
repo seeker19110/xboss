@@ -22,7 +22,6 @@ import {
   Flame,
   Building2,
   PaintRoller,
-  TrendingUp,
   ClipboardList,
   ClipboardCheck,
   CheckSquare,
@@ -137,13 +136,11 @@ export const DASHBOARD_TREE: DashCluster[] = [
         label: "Xây tô",
         icon: PaintRoller,
       },
-      // View chung KHÔNG lọc theo hệ: sidebar chỉ còn S-Curve — Timeline/Gantt/Lookahead/
-      // Đường găng đã bỏ khỏi sidebar cho gọn cụm (trang vẫn tồn tại, vào từ link trong
-      // trang hệ `/progress/[system]` hoặc URL trực tiếp; riêng khối Đường găng đã nhúng
-      // thẳng vào Dashboard tổng qua `ScheduleControlPanel`). Node lá thay nhóm gập/mở cũ
-      // nên không còn link hub "Tổng quan"; giữ nguyên `id` để không mất override
-      // nav_settings đã lưu.
-      { id: "dash.tien-do-chung", href: "/scurve", label: "S-Curve", icon: TrendingUp },
+      // Cụm chỉ còn 6 hệ đang thi công — bỏ hẳn view chung KHÔNG lọc theo hệ (từng có
+      // S-Curve, trước đó là nhóm gập/mở Timeline/Gantt/Lookahead/Đường găng). Các trang
+      // đó vẫn tồn tại (S-Curve nhúng trong từng `/progress/[system]` + Dashboard tổng
+      // qua `ScheduleControlPanel`; Timeline/Gantt/Lookahead vào qua link trong trang hệ
+      // hoặc URL trực tiếp) — chỉ không còn link riêng trong sidebar.
     ],
   },
   {

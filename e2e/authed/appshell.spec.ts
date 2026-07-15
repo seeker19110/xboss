@@ -74,12 +74,17 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
       await expect(sidebar.getByRole("link", { name: label, exact: true })).toBeVisible();
     }
 
-    // Cụm "Kế hoạch & Tiến độ" giờ chỉ còn lá "S-Curve" cho view chung — Timeline/Gantt/
-    // Lookahead/Đường găng đã bỏ khỏi sidebar cho gọn (trang vẫn tồn tại, vào từ trang hệ
+    // Cụm "Kế hoạch & Tiến độ" giờ CHỈ còn 6 hệ — bỏ hẳn view chung không lọc theo hệ
+    // (Timeline/Gantt/Lookahead/S-Curve/Đường găng); trang vẫn tồn tại, vào từ trang hệ
     // /progress/[system] hoặc URL trực tiếp; khối Đường găng đã nhúng thẳng vào Dashboard
-    // tổng qua ScheduleControlPanel — xem dashboardTree.ts).
-    await expect(sidebar.getByRole("link", { name: "S-Curve", exact: true })).toBeVisible();
-    for (const label of ["Timeline", "Gantt", "Lookahead", "Đường găng & Chậm tiến độ"]) {
+    // tổng qua ScheduleControlPanel — xem dashboardTree.ts.
+    for (const label of [
+      "Timeline",
+      "Gantt",
+      "Lookahead",
+      "S-Curve",
+      "Đường găng & Chậm tiến độ",
+    ]) {
       await expect(sidebar.getByRole("link", { name: label, exact: true })).toHaveCount(0);
     }
   });
