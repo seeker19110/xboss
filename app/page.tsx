@@ -105,6 +105,7 @@ type SystemCard = {
 export default function Dashboard() {
   const [data, setData] = useState<{
     delayedTasks: DelayedTask[];
+    groupProgress: Record<string, number>;
     kpi: KPI[];
     totalDelayed: number;
     quality: QualityBlock;
@@ -187,6 +188,10 @@ export default function Dashboard() {
   const delayedGroupCount = useMemo(
     () => new Set(delayed.map((t) => `${t.sheetType}::${t.floorLabel ?? ""}`)).size,
     [delayed],
+  );
+  const groupProgressMap = useMemo(
+    () => new Map(Object.entries(data?.groupProgress ?? {})),
+    [data],
   );
 
   const allDelayed = useMemo(() => data?.delayedTasks ?? [], [data]);
@@ -656,6 +661,7 @@ export default function Dashboard() {
             sheetLabel={(s) => sheetNameByCode.get(s) ?? s}
             taskHref={trackingUrl}
             editReason={{ canEdit: !!me && me.role !== "subcon", onChange: setReason }}
+            groupProgress={groupProgressMap}
             emptyMessage={
               <>
                 Không có công việc trễ.{" "}

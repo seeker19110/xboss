@@ -42,10 +42,17 @@ function slipColor(planned: number | null | undefined, actual: number | null | u
     : `color-mix(in oklab, var(--color-red-400) ${Math.round((t - 0.5) * 200)}%, var(--color-amber-400))`;
 }
 
-// Chấm tuỳ biến trên đường thực tế — mỗi chấm 1 ngày, tô theo mức lệch của chính ngày đó.
+// Mỗi chấm đại diện 3 ngày (DOT_STEP) — dày đặc từng-ngày trước đây nhìn như vệt liền,
+// giãn thưa ra để phân biệt được các mốc màu theo mức lệch.
+const DOT_STEP = 3;
 type DotProps = { cx?: number; cy?: number; index?: number; payload?: Point };
+
+// Chấm tuỳ biến trên đường thực tế — cứ mỗi DOT_STEP ngày mới vẽ 1 chấm, tô theo mức lệch
+// của chính ngày đó.
 function actualDot({ cx, cy, index, payload }: DotProps) {
-  if (cx == null || cy == null || payload?.actual == null) return <g key={`d${index}`} />;
+  const i = index ?? 0;
+  if (cx == null || cy == null || payload?.actual == null || i % DOT_STEP !== 0)
+    return <g key={`d${index}`} />;
   return (
     <circle
       key={`d${index}`}
@@ -55,6 +62,15 @@ function actualDot({ cx, cy, index, payload }: DotProps) {
       fill={slipColor(payload.planned, payload.actual)}
       stroke="none"
     />
+  );
+}
+
+// Chấm trên đường kế hoạch — cùng nhịp DOT_STEP với đường thực tế cho đồng bộ thị giác.
+function plannedDot({ cx, cy, index }: DotProps) {
+  const i = index ?? 0;
+  if (cx == null || cy == null || i % DOT_STEP !== 0) return <g key={`p${index}`} />;
+  return (
+    <circle key={`p${index}`} cx={cx} cy={cy} r={1.2} fill="var(--color-zinc-500)" stroke="none" />
   );
 }
 
@@ -122,7 +138,7 @@ export default function SCurveChart({ system }: { system?: string }) {
   const actualSpan = Math.max(1, (actualPts[actualPts.length - 1]?.i ?? 0) - firstIdx);
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl mb-8">
+    <div className="chart-vivid bg-zinc-900 border border-zinc-800 rounded-xl mb-8">
       <div className="flex items-center gap-2 flex-wrap p-4 border-b border-zinc-800">
         <h2 className="font-semibold text-sm text-zinc-300 flex items-center gap-2">
           <TrendingUp className="w-4 h-4 text-emerald-400" />{" "}
@@ -167,7 +183,7 @@ export default function SCurveChart({ system }: { system?: string }) {
         <p className="text-xs text-zinc-400 w-full">
           {baseline
             ? "Đường kế hoạch theo ngày đã chốt trong baseline — thấy được độ lệch so với kế hoạch gốc kể cả khi đã dời ngày"
-            : "Đường kế hoạch (xám, nét đứt) nội suy từ ngày bắt đầu/kết thúc của từng task · đường thực tế tái dựng từ lịch sử cập nhật — xanh khi đạt/vượt kế hoạch, ngả vàng rồi đỏ theo mức chậm · mỗi chấm = 1 ngày"}
+            : "Đường kế hoạch (xám, nét đứt) nội suy từ ngày bắt đầu/kết thúc của từng task · đường thực tế tái dựng từ lịch sử cập nhật — xanh khi đạt/vượt kế hoạch, ngả vàng rồi đỏ theo mức chậm · mỗi chấm = 3 ngày"}
         </p>
       </div>
       <div className="p-4" style={{ width: "100%", height: 260 }}>
@@ -215,7 +231,7 @@ export default function SCurveChart({ system }: { system?: string }) {
               dataKey="planned"
               stroke="var(--color-zinc-500)"
               strokeDasharray="6 4"
-              dot={{ r: 1.2, fill: "var(--color-zinc-500)", stroke: "none", strokeDasharray: "" }}
+              dot={plannedDot}
               strokeWidth={2}
               connectNulls
             />

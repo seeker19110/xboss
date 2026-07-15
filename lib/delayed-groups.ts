@@ -24,18 +24,30 @@ export type DelayedGroup<T extends DelayedTaskLike> = {
   count: number;
   earliestEndDate: string; // hạn sớm nhất trong nhóm (trễ nhiều nhất)
   maxDaysOverdue: number; // số ngày trễ lớn nhất
-  avgProgress: number; // 0..1, trung bình tiến độ các công tác
+  avgProgress: number; // 0..1 — tiến độ TOÀN BỘ hạng mục (mọi công tác, không chỉ công tác
+  // đang trễ) khi có `groupProgress`; nếu không, tạm suy từ trung bình các công tác trễ.
   reasons: ReasonCount[]; // lý do trễ tổng hợp, sắp giảm dần theo số lượng (null = chưa gán)
   tasks: T[];
 };
 
+// Khoá gom nhóm (sheet, tầng) — dùng chung để tra `groupProgress` truyền từ ngoài vào.
+export const delayedGroupKey = (sheetType: string, floorLabel: string | null): string =>
+  `${sheetType}::${floorLabel ?? ""}`;
+
 /**
  * Gom công tác trễ theo (sheet, tầng). `sheetLabel` map mã sheet → tên hiển thị cho `name`
  * (mặc định dùng luôn mã). `today` để tính số ngày trễ (mặc định hôm nay theo giờ VN).
+ * `groupProgress` (tuỳ chọn): map khoá `delayedGroupKey(sheetType, floorLabel)` → tiến độ
+ * trung bình của TOÀN BỘ công tác thuộc hạng mục đó (kể cả không trễ) — truyền vào để cột
+ * "Tiến độ TB" phản ánh đúng cả hạng mục thay vì chỉ trung bình các công tác đang trễ.
  */
 export function groupDelayedTasks<T extends DelayedTaskLike>(
   tasks: T[],
-  opts: { sheetLabel?: (sheetType: string) => string; today?: string } = {},
+  opts: {
+    sheetLabel?: (sheetType: string) => string;
+    today?: string;
+    groupProgress?: Map<string, number>;
+  } = {},
 ): DelayedGroup<T>[] {
   const today = opts.today ?? todayISO();
   const sheetLabel = opts.sheetLabel ?? ((s: string) => s);
@@ -43,7 +55,7 @@ export function groupDelayedTasks<T extends DelayedTaskLike>(
 
   for (const t of tasks) {
     const floorLabel = t.floorLabel ?? "";
-    const key = `${t.sheetType}::${floorLabel}`;
+    const key = delayedGroupKey(t.sheetType, floorLabel);
     let g = map.get(key);
     if (!g) {
       g = {
@@ -68,7 +80,9 @@ export function groupDelayedTasks<T extends DelayedTaskLike>(
   const reasonOrder = new Map<string, number>(); // giữ thứ tự gặp để ổn định khi cùng count
   for (const g of map.values()) {
     g.maxDaysOverdue = daysOverdue(g.earliestEndDate, today);
+    const fullGroupProgress = opts.groupProgress?.get(g.key);
     g.avgProgress =
+      fullGroupProgress ??
       g.tasks.reduce((s, t) => s + (t.progressPercent ?? 0), 0) / (g.tasks.length || 1);
 
     const counts = new Map<string, number>();

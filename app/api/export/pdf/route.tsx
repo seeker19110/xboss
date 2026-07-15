@@ -5,6 +5,7 @@ import ReactPDF, { Document, Page, Text, View, StyleSheet } from "@react-pdf/ren
 import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/pdf-fonts";
 import { formatDateVN } from "@/lib/date";
 import { groupDelayedTasks } from "@/lib/delayed-groups";
+import { getGroupProgressMap } from "@/lib/group-progress";
 
 export const dynamic = "force-dynamic";
 registerVietnameseFonts();
@@ -65,14 +66,16 @@ function ReportDoc({
   kpi,
   delayed,
   today,
+  groupProgress,
 }: {
   projectName: string;
   kpi: KPI[];
   delayed: DelayedTask[];
   today: string;
+  groupProgress: Map<string, number>;
 }) {
   const totalDelayed = kpi.reduce((s, k) => s + k.delayed, 0);
-  const delayedGroups = groupDelayedTasks(delayed);
+  const delayedGroups = groupDelayedTasks(delayed, { groupProgress });
 
   return (
     <Document>
@@ -209,7 +212,7 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json({ error: "Chỉ Admin/PM được xuất báo cáo" }, { status: 403 });
 
   // Lấy dữ liệu
-  const [kpiRows, delayedRows, project] = await Promise.all([
+  const [kpiRows, delayedRows, project, groupProgress] = await Promise.all([
     query<KPI>(`
       SELECT st.code AS "sheetType",
              COUNT(t.id)::int AS total,
@@ -229,13 +232,20 @@ export async function GET(_req: NextRequest) {
         JOIN sheet_types st ON wp.sheet_type_id = st.id
        WHERE t.status = 'tre' ORDER BY t.end_date NULLS LAST LIMIT 200`),
     queryOne<{ name: string }>(`SELECT name FROM projects LIMIT 1`).catch(() => null),
+    getGroupProgressMap(),
   ]);
 
   const today = formatDateVN(new Date());
   const projectName = project?.name ?? "XBoss";
 
   const stream = await ReactPDF.renderToStream(
-    <ReportDoc projectName={projectName} kpi={kpiRows} delayed={delayedRows} today={today} />,
+    <ReportDoc
+      projectName={projectName}
+      kpi={kpiRows}
+      delayed={delayedRows}
+      today={today}
+      groupProgress={groupProgress}
+    />,
   );
 
   const chunks: Buffer[] = [];

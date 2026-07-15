@@ -39,7 +39,12 @@ export default function ReportPrintable({
   systemName,
   range,
 }: {
-  data: { delayedTasks: ReportDelayedTask[]; kpi: ReportKpi[]; totalDelayed: number } | null;
+  data: {
+    delayedTasks: ReportDelayedTask[];
+    kpi: ReportKpi[];
+    totalDelayed: number;
+    groupProgress?: Record<string, number>;
+  } | null;
   forecast: ReportForecast[];
   projectName: string | null;
   systemName: string | null;
@@ -172,7 +177,9 @@ export default function ReportPrintable({
           </tr>
         </thead>
         <tbody>
-          {groupDelayedTasks(data?.delayedTasks ?? []).map((g) => (
+          {groupDelayedTasks(data?.delayedTasks ?? [], {
+            groupProgress: new Map(Object.entries(data?.groupProgress ?? {})),
+          }).map((g) => (
             <tr key={g.key} className="border-b border-zinc-200">
               <td className="p-2">{g.name}</td>
               <td className="p-2">{g.sheetType}</td>

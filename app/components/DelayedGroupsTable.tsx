@@ -24,6 +24,9 @@ type Props<T extends TaskRow> = {
   showTaskCode?: boolean;
   /** Cho sửa lý do trễ (dashboard) — có thì render ô select thay vì text. */
   editReason?: { canEdit: boolean; onChange: (taskId: number, reason: string) => void };
+  /** Tiến độ trung bình TOÀN BỘ công tác mỗi hạng mục (khoá `delayedGroupKey`) — không
+   * truyền thì cột "Tiến độ TB" tạm suy từ trung bình các công tác trễ trong nhóm. */
+  groupProgress?: Map<string, number>;
   today?: string;
   emptyMessage?: React.ReactNode;
 };
@@ -64,12 +67,13 @@ export default function DelayedGroupsTable<T extends TaskRow>({
   taskHref,
   showTaskCode,
   editReason,
+  groupProgress,
   today,
   emptyMessage,
 }: Props<T>) {
   const groups = useMemo(
-    () => groupDelayedTasks(tasks, { sheetLabel, today }),
-    [tasks, sheetLabel, today],
+    () => groupDelayedTasks(tasks, { sheetLabel, today, groupProgress }),
+    [tasks, sheetLabel, today, groupProgress],
   );
   const [open, setOpen] = useState<Set<string>>(new Set());
   const toggle = (key: string) =>

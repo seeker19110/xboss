@@ -199,6 +199,19 @@ body {
   --color-red-400: #f87171;
 }
 
+/* Ghim màu nhấn (emerald/amber/red) luôn TƯƠI SÁNG bất kể theme — dùng cho nét vẽ biểu đồ
+   (đường/chấm), khác với chữ trên thẻ nên không cần công thức tối màu để đủ tương phản văn
+   bản (html.light đã tối hoá -300/-400 riêng cho mục đích đó). Cùng giá trị với .sheet-stable
+   để nhất quán "tươi sáng" toàn app. Không đảo theo html.light — luôn giữ nguyên. */
+.chart-vivid {
+  --color-emerald-300: #6ee7b7;
+  --color-emerald-400: #34d399;
+  --color-amber-300: #fcd34d;
+  --color-amber-400: #fbbf24;
+  --color-red-300: #fca5a5;
+  --color-red-400: #f87171;
+}
+
 @layer base {
   /* Sọc xen kẽ (zebra) cho MỌI bảng <table> trong toàn app — áp dụng tự động cho cả
      bảng cũ (chưa có class riêng) lẫn bảng mới sau này, không cần thêm class thủ công
