@@ -9,7 +9,6 @@ import {
   FileDown,
   Printer,
   Plus,
-  ExternalLink,
   Trash2,
   TrendingDown,
   GripVertical,
@@ -22,7 +21,7 @@ import EditableText from "@/app/components/EditableText";
 import { DELAY_REASON_LABEL } from "@/lib/delay";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { sortFloorsDesc } from "@/lib/floors";
-import { formatDateVN, daysOverdue } from "@/lib/date";
+import DelayedGroupsTable from "@/app/components/DelayedGroupsTable";
 import { systemColorClasses } from "@/lib/systemColors";
 import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
 import type {
@@ -172,32 +171,6 @@ export default function Dashboard() {
     [data],
   );
   const sheetNameByCode = useMemo(() => new Map(sheets.map((s) => [s.code, s.name])), [sheets]);
-  // Hạng mục trễ = cặp (sheet, tầng), khớp cách đếm totalDelayed/kpi[].delayed ở API —
-  // OGTĐ tầng 27 có nhiều công việc trễ vẫn gộp thành 1 hạng mục trong danh sách này.
-  const delayedGroups = useMemo(() => {
-    const map = new Map<
-      string,
-      { sheetType: string; floorLabel: string; name: string; count: number }
-    >();
-    for (const t of data?.delayedTasks ?? []) {
-      const key = `${t.sheetType}::${t.floorLabel ?? ""}`;
-      const existing = map.get(key);
-      if (existing) {
-        existing.count += 1;
-      } else {
-        map.set(key, {
-          sheetType: t.sheetType,
-          floorLabel: t.floorLabel ?? "",
-          name: `Thi công ${sheetNameByCode.get(t.sheetType) ?? t.sheetType}${t.floorLabel ? ` tầng ${t.floorLabel}` : ""}`,
-          count: 1,
-        });
-      }
-    }
-    return [...map.values()].sort(
-      (a, b) =>
-        a.sheetType.localeCompare(b.sheetType) || sortFloorsDesc(a.floorLabel, b.floorLabel),
-    );
-  }, [data, sheetNameByCode]);
   const delayed = useMemo(
     () =>
       (data?.delayedTasks ?? []).filter(
@@ -209,6 +182,11 @@ export default function Dashboard() {
             (reasonFilter === "__none" ? !t.delayReason : t.delayReason === reasonFilter)),
       ),
     [data, sheetFilter, floorFilter, statusFilter, reasonFilter],
+  );
+  // Số hạng mục trễ = số cặp (sheet, tầng) trong danh sách đã lọc — khớp cách đếm ở KPI.
+  const delayedGroupCount = useMemo(
+    () => new Set(delayed.map((t) => `${t.sheetType}::${t.floorLabel ?? ""}`)).size,
+    [delayed],
   );
 
   const allDelayed = useMemo(() => data?.delayedTasks ?? [], [data]);
@@ -627,10 +605,10 @@ export default function Dashboard() {
           <div className="px-5 py-4 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center gap-3">
             <h2 className="flex items-center gap-2 font-semibold text-base text-zinc-100 shrink-0">
               <Clock className="w-4 h-4 text-red-400" />
-              <EditableText tkey="dashboard.delayed.title">
-                Danh sách công việc đang trễ
-              </EditableText>
-              <span className="ml-1 text-xs font-normal text-zinc-400">({delayed.length})</span>
+              <EditableText tkey="dashboard.delayed.title">Danh sách hạng mục trễ</EditableText>
+              <span className="ml-1 text-xs font-normal text-zinc-400">
+                ({delayedGroupCount} hạng mục · {delayed.length} công tác)
+              </span>
             </h2>
             <div className="flex flex-wrap gap-2 sm:ml-auto">
               {[
@@ -671,144 +649,25 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Bảng — cuộn ngang trên mobile */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[680px]">
-              <thead>
-                <tr className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400 border-b border-zinc-800/80">
-                  <th className="text-left px-5 py-3">Công việc</th>
-                  <th className="text-left px-4 py-3">Tầng</th>
-                  <th className="text-left px-4 py-3">Hạn</th>
-                  <th className="text-left px-4 py-3">Trễ (ngày)</th>
-                  <th className="text-left px-4 py-3 w-32">Tiến độ</th>
-                  <th className="text-left px-4 py-3">Sheet</th>
-                  <th className="text-left px-4 py-3">Nguyên nhân</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800/50">
-                {delayed.map((t) => {
-                  const url = trackingUrl(t);
-                  const pct = Math.round((t.progressPercent ?? 0) * 100);
-                  return (
-                    <tr key={t.id} className="hover:bg-zinc-800/40 transition-colors">
-                      <td className="px-5 py-3.5 font-medium max-w-[220px]">
-                        {url ? (
-                          <a
-                            href={url}
-                            title="Mở trên lưới tracking"
-                            className="flex items-center gap-1.5 hover:text-emerald-400 transition group"
-                          >
-                            <span className="truncate">{t.name}</span>
-                            <ExternalLink className="w-3 h-3 shrink-0 text-zinc-600 group-hover:text-emerald-400 transition" />
-                          </a>
-                        ) : (
-                          <span className="truncate block">{t.name}</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5 text-zinc-400 text-xs whitespace-nowrap">
-                        {t.floorLabel || "—"}
-                      </td>
-                      <td className="px-4 py-3.5 text-red-400 text-xs whitespace-nowrap tabular-nums">
-                        {formatDateVN(t.endDate)}
-                      </td>
-                      <td className="px-4 py-3.5 text-red-400 text-xs whitespace-nowrap tabular-nums font-medium">
-                        {daysOverdue(t.endDate)}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-2">
-                          <div className="bg-zinc-800 rounded-full h-1.5 w-16 shrink-0 overflow-hidden">
-                            <div
-                              className="bg-emerald-500 h-1.5 rounded-full"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                          <span className="text-xs tabular-nums text-zinc-300">{pct}%</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <span className="px-2 py-0.5 bg-zinc-800 rounded-md text-[11px] font-medium text-zinc-300">
-                          {t.sheetType}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5" title={t.delayNote ?? undefined}>
-                        {me && me.role !== "subcon" ? (
-                          <select
-                            value={t.delayReason ?? ""}
-                            onChange={(e) => setReason(t.id, e.target.value)}
-                            aria-label="Nguyên nhân trễ"
-                            className={`text-xs rounded-md px-2 py-1.5 outline-none border w-full max-w-[160px] transition ${
-                              t.delayReason
-                                ? "bg-amber-950 border-amber-900/60 text-amber-200"
-                                : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-600"
-                            }`}
-                          >
-                            <option value="">— Chưa gán —</option>
-                            {Object.entries(DELAY_REASON_LABEL).map(([k, v]) => (
-                              <option key={k} value={k}>
-                                {v}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span className="text-xs text-zinc-400">
-                            {t.delayReason
-                              ? DELAY_REASON_LABEL[t.delayReason as keyof typeof DELAY_REASON_LABEL]
-                              : "—"}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-                {delayed.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-5 py-12 text-center text-zinc-400 text-sm">
-                      Không có công việc trễ.{" "}
-                      {canImport && (
-                        <a href="/import" className="text-emerald-400 hover:underline">
-                          Import file Excel
-                        </a>
-                      )}
-                      {!canImport && "Hãy liên hệ Admin/PM để cập nhật dữ liệu."}
-                    </td>
-                  </tr>
+          {/* Danh sách hạng mục trễ (cặp sheet + tầng) — bấm 1 hạng mục để mở ra các công
+              tác trễ bên trong. Cuộn ngang trên mobile. */}
+          <DelayedGroupsTable
+            tasks={delayed}
+            sheetLabel={(s) => sheetNameByCode.get(s) ?? s}
+            taskHref={trackingUrl}
+            editReason={{ canEdit: !!me && me.role !== "subcon", onChange: setReason }}
+            emptyMessage={
+              <>
+                Không có công việc trễ.{" "}
+                {canImport && (
+                  <a href="/import" className="text-emerald-400 hover:underline">
+                    Import file Excel
+                  </a>
                 )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Danh sách hạng mục trễ (cặp sheet + tầng) — bấm để lọc bảng phía trên về đúng
-              nhóm đó, hiện toàn bộ công việc trễ thuộc hạng mục. Đặt dưới bảng để không
-              chắn ngang trước khi thấy được nội dung chính. */}
-          {delayedGroups.length > 0 && (
-            <div className="px-5 py-3 border-t border-zinc-800 flex flex-wrap gap-2">
-              {delayedGroups.map((g) => {
-                const active = sheetFilter === g.sheetType && floorFilter === g.floorLabel;
-                return (
-                  <button
-                    key={`${g.sheetType}::${g.floorLabel}`}
-                    onClick={() => {
-                      if (active) {
-                        setSheetFilter("");
-                        setFloorFilter("");
-                      } else {
-                        setSheetFilter(g.sheetType);
-                        setFloorFilter(g.floorLabel);
-                      }
-                    }}
-                    title={`Xem toàn bộ công việc trễ của ${g.name}`}
-                    className={`text-xs px-2.5 py-1.5 rounded-full border transition ${
-                      active
-                        ? "bg-orange-500 border-orange-500 text-red-950 font-medium"
-                        : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-orange-700/60 hover:text-orange-300"
-                    }`}
-                  >
-                    {g.name}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+                {!canImport && "Hãy liên hệ Admin/PM để cập nhật dữ liệu."}
+              </>
+            }
+          />
         </section>
       </main>
 

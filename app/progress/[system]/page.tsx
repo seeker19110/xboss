@@ -5,7 +5,6 @@ import {
   ChevronRight,
   Clock,
   ClipboardList,
-  ExternalLink,
   Plus,
   TrendingDown,
 } from "lucide-react";
@@ -19,8 +18,7 @@ import SCurveChart from "@/app/components/SCurveChart";
 import ProgressMap from "@/app/components/ProgressMap";
 import SpiCards from "@/app/components/SpiCards";
 import ForecastCards from "@/app/components/ForecastCards";
-import { formatDateVN, daysOverdue } from "@/lib/date";
-import { DELAY_REASON_LABEL } from "@/lib/delay";
+import DelayedGroupsTable from "@/app/components/DelayedGroupsTable";
 
 // Trang gộp toàn bộ tiến độ 1 hệ (M-tiến-độ-6-hệ): thay 5 view chung Timeline/Gantt/
 // Lookahead/S-Curve/Đường găng bằng 6 trang theo hệ đang thi công, mỗi trang đủ 7 khối
@@ -90,8 +88,6 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
   const [reasonFilter, setReasonFilter] = useState<string | null>("");
-  const [sheetFilter, setSheetFilter] = useState("");
-  const [floorFilter, setFloorFilter] = useState("");
   const [sheetNameByCode, setSheetNameByCode] = useState<Map<string, string>>(new Map());
   const [newSheetName, setNewSheetName] = useState("");
   const [addingSheet, setAddingSheet] = useState(false);
@@ -156,35 +152,15 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
     if (!schedule) return [];
     return schedule.delayed.filter(
       (t) =>
-        (!sheetFilter || t.sheetType === sheetFilter) &&
-        (!floorFilter || t.floorLabel === floorFilter) &&
-        (!reasonFilter ||
-          (reasonFilter === "__none" ? !t.delayReason : t.delayReason === reasonFilter)),
+        !reasonFilter ||
+        (reasonFilter === "__none" ? !t.delayReason : t.delayReason === reasonFilter),
     );
-  }, [schedule, sheetFilter, floorFilter, reasonFilter]);
-  // Hạng mục trễ = cặp (sheet, tầng), khớp cách đếm totalDelayedItems ở API — 1 hạng mục
-  // dù có nhiều công việc trễ vẫn gộp thành 1 dòng trong danh sách này.
-  const delayedGroups = useMemo(() => {
-    const map = new Map<
-      string,
-      { sheetType: string; floorLabel: string; name: string; count: number }
-    >();
-    for (const t of schedule?.delayed ?? []) {
-      const key = `${t.sheetType}::${t.floorLabel ?? ""}`;
-      const existing = map.get(key);
-      if (existing) {
-        existing.count += 1;
-      } else {
-        map.set(key, {
-          sheetType: t.sheetType,
-          floorLabel: t.floorLabel ?? "",
-          name: `Thi công ${sheetNameByCode.get(t.sheetType) ?? t.sheetType}${t.floorLabel ? ` tầng ${t.floorLabel}` : ""}`,
-          count: 1,
-        });
-      }
-    }
-    return [...map.values()].sort((a, b) => a.sheetType.localeCompare(b.sheetType));
-  }, [schedule, sheetNameByCode]);
+  }, [schedule, reasonFilter]);
+  // Số hạng mục trễ = số cặp (sheet, tầng) trong danh sách đã lọc — khớp cách đếm ở KPI.
+  const delayedGroupCount = useMemo(
+    () => new Set(filteredDelayed.map((t) => `${t.sheetType}::${t.floorLabel ?? ""}`)).size,
+    [filteredDelayed],
+  );
 
   const canManage = me?.role === "admin" || me?.role === "pm";
 
@@ -444,119 +420,23 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
         >
           <div className="px-5 py-4 border-b border-zinc-800 flex items-center gap-2">
             <Clock className="w-4 h-4 text-red-400 shrink-0" />
-            <h2 className="font-semibold text-sm">Danh sách công việc đang trễ</h2>
+            <h2 className="font-semibold text-sm">Danh sách hạng mục trễ</h2>
             <span className="text-xs font-normal text-zinc-400">
-              ({filteredDelayed.length}/{totalDelayed})
+              ({delayedGroupCount} hạng mục · {filteredDelayed.length}/{totalDelayed} công tác)
             </span>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[680px]">
-              <thead>
-                <tr className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400 border-b border-zinc-800/80">
-                  <th className="text-left px-5 py-3">Công việc</th>
-                  <th className="text-left px-4 py-3">Hệ</th>
-                  <th className="text-left px-4 py-3">Hạn</th>
-                  <th className="text-left px-4 py-3">Trễ (ngày)</th>
-                  <th className="text-left px-4 py-3 w-32">Tiến độ</th>
-                  <th className="text-left px-4 py-3">Lý do trễ</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800/50">
-                {filteredDelayed.map((t) => {
-                  const tpct = Math.round((t.progressPercent ?? 0) * 100);
-                  const url = t.sheetSlug ? `/tracking/${t.sheetSlug}` : "#";
-                  return (
-                    <tr key={t.id} className="hover:bg-zinc-800/40 transition-colors">
-                      <td className="px-5 py-3.5 font-medium max-w-[240px]">
-                        <a
-                          href={url}
-                          title="Mở trên lưới tracking"
-                          className="flex items-center gap-1.5 hover:text-emerald-400 transition group"
-                        >
-                          <span className="font-mono text-xs text-zinc-400 shrink-0">{t.code}</span>
-                          <span className="truncate">{t.name}</span>
-                          <ExternalLink className="w-3 h-3 shrink-0 text-zinc-600 group-hover:text-emerald-400 transition" />
-                        </a>
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <span className="px-2 py-0.5 bg-zinc-800 rounded-md text-[11px] font-medium text-zinc-300">
-                          {t.sheetType}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5 text-red-400 text-xs whitespace-nowrap tabular-nums">
-                        {formatDateVN(t.endDate)}
-                      </td>
-                      <td className="px-4 py-3.5 text-red-400 text-xs whitespace-nowrap tabular-nums font-medium">
-                        {daysOverdue(t.endDate)}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-2">
-                          <div className="bg-zinc-800 rounded-full h-1.5 w-16 shrink-0 overflow-hidden">
-                            <div
-                              className="bg-emerald-500 h-1.5 rounded-full"
-                              style={{ width: `${tpct}%` }}
-                            />
-                          </div>
-                          <span className="text-xs tabular-nums text-zinc-300">{tpct}%</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3.5 text-xs" title={t.delayNote ?? undefined}>
-                        {t.delayReason ? (
-                          <span className="text-amber-300">
-                            {DELAY_REASON_LABEL[t.delayReason as keyof typeof DELAY_REASON_LABEL] ??
-                              t.delayReason}
-                          </span>
-                        ) : (
-                          <span className="text-zinc-500">— Chưa gán —</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-                {filteredDelayed.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-5 py-12 text-center text-zinc-400 text-sm">
-                      Không có công việc trễ.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Danh sách hạng mục trễ (cặp sheet + tầng) — bấm để lọc bảng phía trên về đúng
-              nhóm đó, hiện toàn bộ công việc trễ thuộc hạng mục. Đặt dưới bảng để không
-              chắn ngang trước khi thấy được nội dung chính. */}
-          {delayedGroups.length > 0 && (
-            <div className="px-5 py-3 border-t border-zinc-800 flex flex-wrap gap-2">
-              {delayedGroups.map((g) => {
-                const active = sheetFilter === g.sheetType && floorFilter === g.floorLabel;
-                return (
-                  <button
-                    key={`${g.sheetType}::${g.floorLabel}`}
-                    onClick={() => {
-                      if (active) {
-                        setSheetFilter("");
-                        setFloorFilter("");
-                      } else {
-                        setSheetFilter(g.sheetType);
-                        setFloorFilter(g.floorLabel);
-                      }
-                    }}
-                    title={`Xem toàn bộ công việc trễ của ${g.name}`}
-                    className={`text-xs px-2.5 py-1.5 rounded-full border transition ${
-                      active
-                        ? "bg-orange-500 border-orange-500 text-red-950 font-medium"
-                        : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-orange-700/60 hover:text-orange-300"
-                    }`}
-                  >
-                    {g.name}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          {/* Bấm 1 hạng mục để mở ra các công tác trễ bên trong. */}
+          <DelayedGroupsTable
+            tasks={filteredDelayed}
+            sheetLabel={(s) => sheetNameByCode.get(s) ?? s}
+            showTaskCode
+            taskHref={(t) =>
+              t.sheetSlug
+                ? `/tracking/${t.sheetSlug}${t.floorLabel ? `?floor=${encodeURIComponent(t.floorLabel)}` : ""}`
+                : null
+            }
+          />
         </section>
       </main>
 
