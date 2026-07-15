@@ -2,6 +2,7 @@ import { scryptSync, randomBytes, createHmac, timingSafeEqual } from "node:crypt
 import { cookies, headers } from "next/headers";
 import { queryOne, run } from "@/lib/db";
 import { patchRequestContext } from "@/lib/request-context";
+import { log } from "@/lib/log";
 import { ROLES, ROLE_LABELS, VIEW_ONLY_ROLES, PAYMENT_VIEW_ROLES, type Role } from "@/lib/roles";
 export { ROLES, ROLE_LABELS, VIEW_ONLY_ROLES, PAYMENT_VIEW_ROLES, type Role };
 
@@ -134,9 +135,9 @@ export async function ensureDefaultUsers(): Promise<void> {
   if (process.env.NODE_ENV === "production") {
     const pw = process.env.XBOSS_ADMIN_PASSWORD;
     if (!pw) {
-      console.warn(
-        "[xboss] DB chưa có user và XBOSS_ADMIN_PASSWORD chưa đặt — bỏ qua seed (không tạo tài khoản mặc định trong production).",
-      );
+      log.warn("DB chưa có user và XBOSS_ADMIN_PASSWORD chưa đặt — bỏ qua seed", {
+        route: "ensureDefaultUsers",
+      });
       return;
     }
     await run(

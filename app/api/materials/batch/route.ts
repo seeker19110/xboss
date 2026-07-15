@@ -3,6 +3,7 @@ import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { boqTakenBy } from "@/lib/boq";
+import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 
@@ -128,7 +129,11 @@ export async function PATCH(req: NextRequest) {
     const msg = e instanceof Error ? e.message : "Lỗi máy chủ khi cập nhật vật tư";
     // Lỗi BOQ trùng / dữ liệu xấu là lỗi người dùng → 422; còn lại 500.
     const status = /BOQ|hợp lệ|tìm thấy/i.test(msg) ? 422 : 500;
-    if (status === 500) console.error("PATCH /api/materials/batch error:", msg);
+    if (status === 500)
+      log.error("PATCH /api/materials/batch lỗi", {
+        route: "PATCH /api/materials/batch",
+        err: msg,
+      });
     return NextResponse.json({ error: msg }, { status });
   }
 }

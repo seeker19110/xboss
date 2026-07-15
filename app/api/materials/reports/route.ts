@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
+import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 
@@ -164,7 +165,10 @@ export async function GET() {
       byFloor,
     });
   } catch (e) {
-    console.error("[reports]", e);
+    log.error("GET /api/materials/reports lỗi", {
+      route: "GET /api/materials/reports",
+      err: e instanceof Error ? e.message : String(e),
+    });
     return NextResponse.json({ error: "Lỗi máy chủ khi tổng hợp báo cáo vật tư" }, { status: 500 });
   }
 }

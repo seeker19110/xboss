@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { importWorkbook, analyzeWorkbook } from "@/lib/import";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +52,10 @@ export async function POST(request: NextRequest) {
       message: `✅ Import hoàn tất! ${stats.packages} nhóm, ${stats.tasks} tasks đã lưu.`,
     });
   } catch (error) {
-    console.error("Import Error:", error);
+    log.error("POST /api/import/excel lỗi", {
+      route: "POST /api/import/excel",
+      err: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
       { error: "Lỗi xử lý file — vui lòng kiểm tra định dạng Excel" },
       { status: 500 },

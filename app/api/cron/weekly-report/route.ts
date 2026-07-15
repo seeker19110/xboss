@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { query } from "@/lib/db";
 import { getCurrentUser, CAN, checkCronSecret } from "@/lib/auth";
+import { log } from "@/lib/log";
 import {
   buildWeeklyReport,
   weeklyToHtml,
@@ -35,7 +36,10 @@ export async function GET(req: NextRequest) {
     const chainResult = await verifyAuditChain();
     auditChain = { checked: chainResult.checked, errorCount: chainResult.errors.length };
   } catch (err) {
-    console.error("weekly-report: verifyAuditChain lỗi:", err);
+    log.error("weekly-report: verifyAuditChain lỗi", {
+      route: "GET /api/cron/weekly-report",
+      err: err instanceof Error ? err.message : String(err),
+    });
   }
 
   const html = weeklyToHtml(report, process.env.APP_URL, auditChain);

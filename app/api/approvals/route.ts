@@ -3,6 +3,7 @@ import { query, queryOne, run, insertId, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { recomputePackage } from "@/lib/recompute";
 import { requiredInspectionMissing } from "@/lib/qaqc";
+import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +53,10 @@ export async function GET() {
 
     return NextResponse.json({ pending, approved, canApprove: CAN.approve(user.role) });
   } catch (err) {
-    console.error("[GET /api/approvals]", err);
+    log.error("GET /api/approvals lỗi", {
+      route: "GET /api/approvals",
+      err: err instanceof Error ? err.message : String(err),
+    });
     return NextResponse.json({ error: "Lỗi tải danh sách nghiệm thu" }, { status: 500 });
   }
 }

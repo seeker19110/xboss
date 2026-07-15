@@ -4,6 +4,7 @@ import { getCurrentUser, CAN } from "@/lib/auth";
 import { boqTakenBy } from "@/lib/boq";
 import { recomputeTask } from "@/lib/recompute";
 import { assignTask } from "@/lib/assignments";
+import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 
@@ -20,14 +21,21 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Không có quyền chỉnh sửa (chỉ Admin/PM)" }, { status: 403 });
 
   const body = await req.json().catch(() => ({}));
-  const updates: { id: unknown; patch: unknown }[] = Array.isArray(body.updates) ? body.updates : [];
+  const updates: { id: unknown; patch: unknown }[] = Array.isArray(body.updates)
+    ? body.updates
+    : [];
   if (!updates.length) return NextResponse.json({ error: "Không có cập nhật" }, { status: 400 });
   if (updates.length > MAX_UPDATES)
     return NextResponse.json({ error: `Tối đa ${MAX_UPDATES} ô mỗi lần` }, { status: 422 });
 
   const fields: Record<string, string> = {
-    name: "name", code: "code", note: "note", status: "status",
-    startDate: "start_date", endDate: "end_date", boqCode: "boq_code",
+    name: "name",
+    code: "code",
+    note: "note",
+    status: "status",
+    startDate: "start_date",
+    endDate: "end_date",
+    boqCode: "boq_code",
   };
   const toRecompute = new Set<number>();
 
@@ -36,7 +44,10 @@ export async function PATCH(req: NextRequest) {
       let count = 0;
       for (const u of updates) {
         const id = parseInt(String(u.id));
-        const patch = (u.patch && typeof u.patch === "object" ? u.patch : {}) as Record<string, unknown>;
+        const patch = (u.patch && typeof u.patch === "object" ? u.patch : {}) as Record<
+          string,
+          unknown
+        >;
         if (isNaN(id)) throw new Error("ID không hợp lệ");
 
         const exists = await queryOne<{ id: number }>(`SELECT id FROM tasks WHERE id = ?`, id);
@@ -45,10 +56,17 @@ export async function PATCH(req: NextRequest) {
         if (patch.status === "nghiem_thu")
           throw new Error("Dùng duyệt nghiệm thu để đặt trạng thái này");
         // Cùng quy tắc validate với PATCH đơn: status là slug hợp lệ, ngày đúng dạng.
-        if (patch.status !== undefined && !["chuan_bi", "dang_thi_cong", "hoan_thanh", "tre"].includes(patch.status as string))
+        if (
+          patch.status !== undefined &&
+          !["chuan_bi", "dang_thi_cong", "hoan_thanh", "tre"].includes(patch.status as string)
+        )
           throw new Error(`Trạng thái không hợp lệ ở task #${id}`);
         for (const k of ["startDate", "endDate"] as const) {
-          if (patch[k] !== undefined && patch[k] !== null && !/^\d{4}-\d{2}-\d{2}$/.test(String(patch[k])))
+          if (
+            patch[k] !== undefined &&
+            patch[k] !== null &&
+            !/^\d{4}-\d{2}-\d{2}$/.test(String(patch[k]))
+          )
             throw new Error(`Ngày không hợp lệ ở task #${id} (cần dạng YYYY-MM-DD)`);
         }
         if (patch.name !== undefined && !String(patch.name ?? "").trim())
@@ -70,11 +88,17 @@ export async function PATCH(req: NextRequest) {
         const sets: string[] = [];
         const vals: unknown[] = [];
         for (const [key, col] of Object.entries(fields)) {
-          if (patch[key] !== undefined) { sets.push(`${col} = ?`); vals.push(patch[key]); }
+          if (patch[key] !== undefined) {
+            sets.push(`${col} = ?`);
+            vals.push(patch[key]);
+          }
         }
         if (sets.length) {
           vals.push(id);
-          await run(`UPDATE tasks SET ${sets.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, ...vals);
+          await run(
+            `UPDATE tasks SET ${sets.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+            ...vals,
+          );
           if (patch.startDate !== undefined || patch.endDate !== undefined) toRecompute.add(id);
         }
         count++;
@@ -86,7 +110,8 @@ export async function PATCH(req: NextRequest) {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Lỗi máy chủ khi cập nhật task";
     const status = /BOQ|hợp lệ|tìm thấy|nghiệm thu/i.test(msg) ? 422 : 500;
-    if (status === 500) console.error("PATCH /api/tasks/batch error:", msg);
+    if (status === 500)
+      log.error("PATCH /api/tasks/batch lỗi", { route: "PATCH /api/tasks/batch", err: msg });
     return NextResponse.json({ error: msg }, { status });
   }
 }
