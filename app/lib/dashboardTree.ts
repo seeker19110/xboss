@@ -65,6 +65,7 @@ import {
   UserCog,
   Network,
   History,
+  Workflow,
 } from "lucide-react";
 import type { Role } from "@/lib/roles";
 
@@ -422,6 +423,13 @@ export const DASHBOARD_TREE: DashCluster[] = [
         icon: History,
         roles: ["admin"],
       }, // M43 PR2 — sổ audit toàn hệ (bảng audit_log ghi bằng trigger), chỉ Admin
+      {
+        id: "dash.approval-flows",
+        href: "/admin/approval-flows",
+        label: "Cấu hình duyệt",
+        icon: Workflow,
+        roles: ["admin", "pm"],
+      }, // M46 PR4 — Approval Engine: cấu hình luồng duyệt nhiều cấp; PM chỉ xem, Admin sửa
     ],
   },
   {
