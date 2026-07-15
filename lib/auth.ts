@@ -214,6 +214,9 @@ export const CAN = {
   manageNav: (r?: Role) => r === "admin" || r === "pm",
   // Tạo/sửa/đóng dự án + gán user↔dự án (M22): chỉ Admin (nhạy cảm hơn manageUsers).
   manageProjects: (r?: Role) => r === "admin",
+  // Xem sổ audit trail toàn hệ (M43 PR2, bảng audit_log ghi bằng trigger) — chỉ Admin,
+  // nhạy cảm hơn cả manageProjects vì lộ mọi thay đổi dữ liệu tài chính/hợp đồng.
+  viewAudit: (r?: Role) => r === "admin",
   // Khởi động & Pháp lý (M23): hồ sơ pháp lý + checklist huy động — xem mọi vai trò
   // đăng nhập, tạo/sửa/xoá Admin/PM.
   manageKickoff: (r?: Role) => r === "admin" || r === "pm",
