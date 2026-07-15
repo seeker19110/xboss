@@ -175,3 +175,4 @@ Trước khi push, đảm bảo:
 - [ ] Validate input; không lộ secret; thao tác nhạy cảm có rate-limit; endpoint cron bảo vệ bằng `CRON_SECRET` qua header Bearer.
 - [ ] File test chạm DB import `tests/setup.ts` **đầu tiên**; đã tự review diff đúng phạm vi.
 - [ ] CI (`.github/workflows/ci.yml`) xanh: `npm audit` → lint → typecheck → test (Postgres 16) → build.
+- [ ] **Migration đụng dữ liệu** (`UPDATE`/backfill/đổi kiểu cột `ALTER COLUMN ... TYPE`/`DROP COLUMN`) phải chạy qua staging trước (`bash deploy.sh --staging`, xem `docs/ops/staging.md`) rồi mới lên production; kiểm trước bằng `npm run db:migrate -- --dry-run`. Migration chỉ `CREATE TABLE`/`ADD COLUMN`/`CREATE INDEX` (thêm thuần tuý, không đụng dòng dữ liệu hiện có) được đi thẳng production.

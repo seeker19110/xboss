@@ -21,6 +21,25 @@ export function listMigrationFiles(): string[] {
     .sort();
 }
 
+// Liệt kê migration CHƯA áp mà KHÔNG chạy gì — dùng cho `npm run db:migrate -- --dry-run`
+// (M44 PR4) để kiểm tra trước deploy/staging xem sắp áp file nào. Chỉ đọc bảng
+// schema_migrations (tạo nếu chưa có) — không cần advisory lock vì không ghi dữ liệu ngoài
+// CREATE TABLE IF NOT EXISTS.
+export async function pendingMigrations(pool: Pool): Promise<string[]> {
+  const client = await pool.connect();
+  try {
+    await client.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
+      name TEXT PRIMARY KEY,
+      applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    const appliedRows = await client.query<{ name: string }>("SELECT name FROM schema_migrations");
+    const applied = new Set(appliedRows.rows.map((r) => r.name));
+    return listMigrationFiles().filter((f) => !applied.has(f));
+  } finally {
+    client.release();
+  }
+}
+
 // Áp mọi migration chưa chạy. Trả về danh sách file vừa áp (rỗng nếu đã cập nhật).
 // - 1 client giữ suốt phiên: acquire advisory lock → tạo bảng theo dõi → chạy từng file
 //   trong 1 transaction riêng (một file lỗi không kéo theo file trước) → ghi schema_migrations.

@@ -80,6 +80,14 @@ qua), và build lỗi giữa chừng làm `.next` bị bỏ dở không rollback
 > `origin/main` — đừng sửa file trực tiếp trên server, hãy đổi cấu hình qua
 > biến môi trường hoặc file `.env.local`.
 
+### Vận hành: backup, health check, staging
+
+- **Backup + kiểm chứng phục hồi**: `scripts/ops/backup.sh`/`scripts/ops/restore-check.sh` +
+  quy trình phục hồi từng bước — xem [`docs/ops/backup.md`](./docs/ops/backup.md).
+- **Health check** cho uptime monitor: `GET /api/health`.
+- **Staging** (tập dượt migration/deploy đụng dữ liệu trước khi lên production, `deploy.sh
+--staging`): xem [`docs/ops/staging.md`](./docs/ops/staging.md).
+
 ---
 
 ## Cách C — Vercel + Supabase (không cần server)
