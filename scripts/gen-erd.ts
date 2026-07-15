@@ -169,6 +169,10 @@ const MODULES: { title: string; tables: string[] }[] = [
     tables: ["tender_packages", "tender_items", "tender_bids", "tender_bid_prices"],
   },
   {
+    title: "Phê duyệt (Approval Engine)",
+    tables: ["approval_flows", "approval_steps", "approval_requests", "approval_actions"],
+  },
+  {
     title: "Hệ thống & audit",
     tables: ["audit_log", "assignment_log", "schema_migrations"],
   },
