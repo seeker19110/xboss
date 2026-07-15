@@ -13,16 +13,18 @@ import {
   SearchX,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
-import { Modal, appAlert, appConfirm } from "@/app/components/dialogs";
+import { Modal, appAlert, appConfirm, appPrompt } from "@/app/components/dialogs";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { redirectToLogin } from "@/app/lib/me";
 import { formatDateVN } from "@/lib/date";
+import { formatVnd } from "@/lib/money";
 import { sortFloorsAsc } from "@/lib/floors";
 import TableToolbar, {
   SortableHeader,
   highlightMatch,
   type ToolbarFilter,
 } from "@/app/components/TableToolbar";
+import { Inbox, ThumbsUp, ThumbsDown } from "lucide-react";
 
 type FloorGroup = {
   sheetTypeId: number;
@@ -37,6 +39,50 @@ type FloorGroup = {
   approvedAt: string | null;
   docCount: number;
 };
+// M46 PR3 — hộp thư "chờ tôi duyệt" hợp nhất (VO/IPC/đề xuất/nghiệm thu task qua Approval
+// Engine, xem docs/nang-cap/M46-approval-engine.md). Chỉ xuất hiện khi Admin đã cấu hình
+// flow (PR4) — trống khi chưa có flow nào, không đổi trải nghiệm hiện có.
+type PendingApproval = {
+  id: number;
+  entityType: "variation" | "payment_cert" | "proposal" | "task_acceptance";
+  entityId: number;
+  amount: number | null;
+  currentSeq: number;
+  stepRole: string;
+  slaDays: number | null;
+  createdAt: string;
+  flowName: string;
+  label: string;
+  linkUrl: string;
+};
+
+const ENTITY_TYPE_LABEL: Record<PendingApproval["entityType"], string> = {
+  variation: "Phát sinh (VO)",
+  payment_cert: "Đợt thanh toán (IPC)",
+  proposal: "Đề xuất",
+  task_acceptance: "Nghiệm thu task",
+};
+
+// Endpoint quyết định theo loại — mỗi entity_type giữ nguyên body/route decide riêng đã có
+// (VO/IPC/proposal) để không đụng logic nghiệp vụ cuối chuỗi (boq_items/payment_bills/...),
+// engine chỉ chen vào bước TRUNG GIAN của các route đó (xem app/api/*/decide).
+function decideBody(entityType: PendingApproval["entityType"], approve: boolean, note: string) {
+  if (entityType === "task_acceptance") return { decision: approve ? "approve" : "reject", note };
+  return { decision: approve ? "approved" : "rejected", rejectReason: note };
+}
+function decideUrl(item: PendingApproval): string {
+  switch (item.entityType) {
+    case "variation":
+      return `/api/variations/${item.entityId}/decide`;
+    case "payment_cert":
+      return `/api/payment-certs/${item.entityId}/decide`;
+    case "proposal":
+      return `/api/proposals/${item.entityId}/decide`;
+    case "task_acceptance":
+      return `/api/tasks/${item.entityId}/approve`;
+  }
+}
+
 type Doc = {
   id: number;
   originalName: string | null;
@@ -86,6 +132,8 @@ function ApprovalsPageInner() {
   const [canApprove, setCanApprove] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [inbox, setInbox] = useState<PendingApproval[]>([]);
+  const [inboxBusy, setInboxBusy] = useState<number | null>(null);
   const [openDocs, setOpenDocs] = useState<{ approvalId: number; label: string } | null>(null);
   const [docs, setDocs] = useState<Doc[]>([]);
   const [linkInput, setLinkInput] = useState("");
@@ -113,9 +161,43 @@ function ApprovalsPageInner() {
     setLoading(false);
   }, []);
 
+  const loadInbox = useCallback(async () => {
+    const r = await fetch("/api/approvals/inbox");
+    if (r.ok) setInbox((await r.json()).items ?? []);
+  }, []);
+
   useEffect(() => {
     load();
-  }, [load]);
+    loadInbox();
+  }, [load, loadInbox]);
+
+  async function decideInboxItem(item: PendingApproval, approve: boolean) {
+    let note = "";
+    if (!approve) {
+      const n = await appPrompt("Lý do từ chối (bắt buộc)");
+      if (!n?.trim()) return;
+      note = n.trim();
+    } else if (
+      !(await appConfirm(`Duyệt "${item.label}" — bước ${item.currentSeq} (${item.stepRole})?`, {
+        confirmLabel: "Duyệt",
+      }))
+    )
+      return;
+    setInboxBusy(item.id);
+    const r = await fetch(decideUrl(item), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(decideBody(item.entityType, approve, note)),
+    });
+    const j = await r.json().catch(() => ({}));
+    setInboxBusy(null);
+    if (!r.ok) {
+      appAlert(j.error ?? "Quyết định thất bại");
+      return;
+    }
+    loadInbox();
+    load();
+  }
 
   async function getOrCreateApprovalId(g: FloorGroup): Promise<number | null> {
     if (g.approvalId) return g.approvalId;
@@ -563,6 +645,78 @@ function ApprovalsPageInner() {
       <AppHeader />
 
       <main className="p-4 sm:p-6 space-y-8">
+        {/* Chờ tôi duyệt — hộp thư hợp nhất M46 PR3 (VO/IPC/đề xuất/nghiệm thu task).
+            Chỉ hiện khi có ít nhất 1 mục — trống nghĩa là chưa cấu hình flow nào (PR4). */}
+        {inbox.length > 0 && (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
+            <div className="p-4 border-b border-zinc-800">
+              <h2 className="font-semibold text-sm flex items-center gap-2">
+                <Inbox className="w-4 h-4 text-sky-400" /> Chờ tôi duyệt ({inbox.length})
+              </h2>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Phát sinh/thanh toán/đề xuất/nghiệm thu đang chờ đúng bước duyệt của bạn.
+              </p>
+            </div>
+            <div className="divide-y divide-zinc-800/70">
+              {inbox.map((it) => {
+                const deadline =
+                  it.slaDays != null
+                    ? new Date(new Date(it.createdAt).getTime() + it.slaDays * 86400000)
+                    : null;
+                const overdue = deadline != null && deadline.getTime() < Date.now();
+                const isBusy = inboxBusy === it.id;
+                return (
+                  <div
+                    key={it.id}
+                    className="p-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 shrink-0">
+                          {ENTITY_TYPE_LABEL[it.entityType]}
+                        </span>
+                        <a
+                          href={it.linkUrl}
+                          className="text-sm font-medium hover:underline truncate"
+                        >
+                          {it.label}
+                        </a>
+                      </div>
+                      <div className="text-xs text-zinc-400 mt-0.5">
+                        Bước {it.currentSeq} · vai trò {it.stepRole}
+                        {it.amount != null && <> · {formatVnd(it.amount)}</>}
+                        {deadline && (
+                          <span className={overdue ? "text-red-400 font-medium" : ""}>
+                            {" "}
+                            · hạn {formatDateVN(deadline)}
+                            {overdue && " (quá hạn)"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <button
+                        onClick={() => decideInboxItem(it, true)}
+                        disabled={isBusy}
+                        className="flex items-center gap-1 text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent rounded-lg px-2.5 py-1.5 transition font-medium"
+                      >
+                        <ThumbsUp className="w-3 h-3" /> Duyệt
+                      </button>
+                      <button
+                        onClick={() => decideInboxItem(it, false)}
+                        disabled={isBusy}
+                        className="flex items-center gap-1 text-xs bg-red-700 hover:bg-red-600 disabled:opacity-50 text-on-accent rounded-lg px-2.5 py-1.5 transition"
+                      >
+                        <ThumbsDown className="w-3 h-3" /> Từ chối
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Chờ nghiệm thu */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
           <div className="p-4 border-b border-zinc-800">

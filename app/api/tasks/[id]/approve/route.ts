@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { deriveStatus, recomputePackage } from "@/lib/recompute";
 import { requiredInspectionMissing } from "@/lib/qaqc";
+import { getActiveFlow, openApproval, advanceApproval } from "@/lib/approvals";
 
 export const dynamic = "force-dynamic";
 
@@ -15,12 +17,21 @@ type TaskRow = {
   name: string;
 };
 
+type StepResult =
+  | { kind: "pending"; currentSeq: number; nextRole: string }
+  | { kind: "rejected" }
+  | { kind: "final"; packageId: number };
+
 // Workflow nghiệm thu 2 bước: thi công xong (100%) → Admin/PM duyệt nghiệm thu.
 // Trạng thái nghiem_thu chỉ đặt được qua endpoint này — có audit trong task_history.
-
-// POST /api/tasks/:id/approve → duyệt nghiệm thu (Admin/PM, task phải đạt 100%).
+// M46 PR3: nếu có flow 'task_acceptance' active (Admin cấu hình — PR4) → click đầu tiên
+// mở approval_request (mỗi task 1 request, amount NULL) rồi lập tức ghi nhận quyết định
+// của người gọi làm bước hiện tại; bước sau (người khác vai trò) gọi lại CHÍNH endpoint
+// này để quyết bước tiếp (route tự thấy request đã pending, không mở request mới — idempotent
+// giống pattern VO/IPC). Chưa tới bước cuối → CHƯA đổi status/task_history, chỉ trả
+// {pending:true}. Không có flow → hành vi y hệt trước đây (CAN.approve, 1 bước).
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
   const params = await paramsP;
@@ -32,10 +43,18 @@ export async function POST(
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
+  const body = await req.json().catch(() => ({}));
+  const decision: "approve" | "reject" = body?.decision === "reject" ? "reject" : "approve";
+  const note = typeof body?.note === "string" ? body.note.trim() : null;
+  if (decision === "reject" && !note)
+    return NextResponse.json({ error: "Cần nhập lý do từ chối" }, { status: 422 });
+
+  const projectId = await getCurrentProjectId(user);
+
   // FOR UPDATE để tránh 2 PM approve đồng thời tạo duplicate audit record.
-  let packageId: number;
+  let result: StepResult;
   try {
-    packageId = await withTransaction(async () => {
+    result = await withTransaction(async () => {
       const task = await queryOne<TaskRow>(
         `SELECT id, package_id, status, progress_percent, end_date, name FROM tasks WHERE id = ? FOR UPDATE`,
         id,
@@ -57,6 +76,61 @@ export async function POST(
           { status: 409 },
         );
 
+      if (projectId != null) {
+        const liveRequest = await queryOne<{ id: number }>(
+          `SELECT id FROM approval_requests WHERE entity_type = 'task_acceptance' AND entity_id = ? AND status = 'pending'`,
+          id,
+        );
+        let advance: Awaited<ReturnType<typeof advanceApproval>> | undefined;
+        if (liveRequest) {
+          advance = await advanceApproval({
+            entityType: "task_acceptance",
+            entityId: id,
+            user,
+            decision,
+            note,
+          });
+        } else {
+          const flow = await getActiveFlow("task_acceptance", projectId);
+          if (flow) {
+            if (decision === "reject")
+              throw Object.assign(new Error("Chưa có yêu cầu duyệt đang chờ để từ chối"), {
+                status: 409,
+              });
+            const opened = await openApproval({
+              entityType: "task_acceptance",
+              entityId: id,
+              projectId,
+              amount: null,
+              user,
+            });
+            if (opened && opened.status === "pending")
+              advance = await advanceApproval({
+                entityType: "task_acceptance",
+                entityId: id,
+                user,
+                decision: "approve",
+              });
+            // opened.status === 'approved' (flow không có bước hiệu lực nào) → rơi thẳng
+            // xuống domain logic bên dưới, coi như đã qua engine.
+          } else if (decision === "reject") {
+            throw Object.assign(new Error("Không có yêu cầu duyệt đang chờ để từ chối"), {
+              status: 409,
+            });
+          }
+        }
+        if (advance) {
+          if (advance.status === "pending")
+            return { kind: "pending", currentSeq: advance.currentSeq, nextRole: advance.nextRole };
+          if (advance.status === "rejected") return { kind: "rejected" };
+          // advance.status === "approved" → rơi xuống domain logic bên dưới.
+        }
+      } else if (decision === "reject") {
+        throw Object.assign(new Error("Không có yêu cầu duyệt đang chờ để từ chối"), {
+          status: 409,
+        });
+      }
+
       await run(
         `UPDATE tasks SET status = 'nghiem_thu', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         id,
@@ -70,14 +144,23 @@ export async function POST(
         `Nghiệm thu bởi ${user.name}`,
         user.name,
       );
-      return task.package_id;
+      return { kind: "final", packageId: task.package_id };
     });
   } catch (err: unknown) {
     const e = err as { message?: string; status?: number };
     return NextResponse.json({ error: e.message ?? String(err) }, { status: e.status ?? 500 });
   }
 
-  await recomputePackage(packageId);
+  if (result.kind === "pending")
+    return NextResponse.json({
+      id,
+      pending: true,
+      currentSeq: result.currentSeq,
+      nextRole: result.nextRole,
+    });
+  if (result.kind === "rejected") return NextResponse.json({ id, rejected: true });
+
+  await recomputePackage(result.packageId);
   return NextResponse.json({ id, status: "nghiem_thu" });
 }
 

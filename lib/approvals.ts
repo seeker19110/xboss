@@ -277,3 +277,77 @@ export async function pendingForUser(user: ActorUser, projectId: number): Promis
     user.id,
   );
 }
+
+export type PendingItemDisplay = PendingItem & { label: string; linkUrl: string };
+
+// Gắn nhãn hiển thị (mã + tên) + link trang chi tiết cho hộp thư "Chờ tôi duyệt" (M46 PR3
+// /approvals). Tra cứu theo lô (WHERE id = ANY(?)) từng loại thực thể để tránh N+1 — 4 loại
+// đóng (APPROVAL_ENTITY_TYPES), thêm loại mới phải bổ sung nhánh tương ứng ở đây.
+export async function pendingForUserDisplay(
+  user: ActorUser,
+  projectId: number,
+): Promise<PendingItemDisplay[]> {
+  const items = await pendingForUser(user, projectId);
+  if (items.length === 0) return [];
+
+  const idsByType = new Map<string, number[]>();
+  for (const it of items)
+    idsByType.set(it.entityType, [...(idsByType.get(it.entityType) ?? []), it.entityId]);
+
+  const label = new Map<string, string>();
+  const linkUrl = new Map<string, string>();
+  const key = (t: string, id: number) => `${t}:${id}`;
+
+  const voIds = idsByType.get("variation");
+  if (voIds) {
+    const rows = await query<{ id: number; code: string; title: string }>(
+      `SELECT id, code, title FROM variation_orders WHERE id = ANY(?)`,
+      voIds,
+    );
+    for (const r of rows) {
+      label.set(key("variation", r.id), `${r.code} — ${r.title}`);
+      linkUrl.set(key("variation", r.id), "/variations");
+    }
+  }
+  const certIds = idsByType.get("payment_cert");
+  if (certIds) {
+    const rows = await query<{ id: number; code: string; contractTitle: string }>(
+      `SELECT c.id, c.code, ct.title AS "contractTitle"
+         FROM payment_certs c JOIN contracts ct ON ct.id = c.contract_id
+        WHERE c.id = ANY(?)`,
+      certIds,
+    );
+    for (const r of rows) {
+      label.set(key("payment_cert", r.id), `${r.code} — ${r.contractTitle}`);
+      linkUrl.set(key("payment_cert", r.id), "/payments");
+    }
+  }
+  const proposalIds = idsByType.get("proposal");
+  if (proposalIds) {
+    const rows = await query<{ id: number; code: string; title: string }>(
+      `SELECT id, code, title FROM proposals WHERE id = ANY(?)`,
+      proposalIds,
+    );
+    for (const r of rows) {
+      label.set(key("proposal", r.id), `${r.code} — ${r.title}`);
+      linkUrl.set(key("proposal", r.id), "/proposals");
+    }
+  }
+  const taskIds = idsByType.get("task_acceptance");
+  if (taskIds) {
+    const rows = await query<{ id: number; code: string; name: string }>(
+      `SELECT id, code, name FROM tasks WHERE id = ANY(?)`,
+      taskIds,
+    );
+    for (const r of rows) {
+      label.set(key("task_acceptance", r.id), `${r.code} — ${r.name}`);
+      linkUrl.set(key("task_acceptance", r.id), "/approvals");
+    }
+  }
+
+  return items.map((it) => ({
+    ...it,
+    label: label.get(key(it.entityType, it.entityId)) ?? `#${it.entityId}`,
+    linkUrl: linkUrl.get(key(it.entityType, it.entityId)) ?? "#",
+  }));
+}

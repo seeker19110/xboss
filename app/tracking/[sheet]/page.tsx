@@ -1420,11 +1420,14 @@ function PkgGrid({
     )
       return;
     const res = await fetch(`/api/tasks/${t.id}/approve`, { method: approve ? "POST" : "DELETE" });
+    const j = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
       appAlert(j.error ?? "Lỗi không xác định");
       return;
     }
+    // M46 PR3: flow nghiệm thu nhiều bước cấu hình được — bước vừa ghi nhận chưa phải bước
+    // cuối, task chưa chuyển nghiem_thu (chờ vai trò tiếp theo duyệt qua hộp thư /approvals).
+    if (j.pending) appAlert(`Đã ghi nhận bước duyệt — chờ vai trò ${j.nextRole} duyệt tiếp.`);
     load();
     onChanged();
   }
