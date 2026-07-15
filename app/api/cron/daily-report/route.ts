@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
   let pushSent = 0;
   if (report.totalDelayed > 0) {
     pushSent = await sendPushToAll({
-      title: `🏗️ ${report.totalDelayed} tầng đang trễ`,
+      title: `🏗️ ${report.totalDelayed} hạng mục đang trễ`,
       body: `${report.newDelayed.length} mới quá hạn trong 24h · ${report.dueSoon.length} sắp đến hạn`,
       url: "/",
     }).catch(() => 0);
@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
   await transporter.sendMail({
     from: process.env.SMTP_FROM ?? `"XBoss" <${SMTP_USER}>`,
     to: to.join(", "),
-    subject: `🏗️ XBoss ${report.date} — ${report.totalDelayed} tầng trễ (${report.newDelayed.length} việc mới)`,
+    subject: `🏗️ XBoss ${report.date} — ${report.totalDelayed} hạng mục trễ (${report.newDelayed.length} việc mới)`,
     html,
   });
 

@@ -93,7 +93,7 @@ function ReportDoc({
               <Text style={styles.kpiVal}>{pct(k.avgProgress ?? 0)}</Text>
               <Text style={styles.kpiLbl}>{k.sheetType}</Text>
               <Text style={[styles.kpiLbl, { color: k.delayed > 0 ? "#dc2626" : "#999" }]}>
-                {k.delayed} tầng trễ / {k.total} task
+                {k.delayed} hạng mục trễ / {k.total} task
               </Text>
             </View>
           ))}
@@ -138,7 +138,7 @@ function ReportDoc({
                     color: k.delayed > 0 ? "#dc2626" : "#aaa",
                   }}
                 >
-                  {k.delayed > 0 ? `${k.delayed} tầng trễ` : "—"}
+                  {k.delayed > 0 ? `${k.delayed} hạng mục trễ` : "—"}
                 </Text>
               </View>
             );

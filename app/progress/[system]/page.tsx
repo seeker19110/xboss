@@ -85,7 +85,7 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
   const [me, setMe] = useState<Me | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [sheetKpi, setSheetKpi] = useState<SheetKpi[]>([]);
-  const [totalDelayedFloors, setTotalDelayedFloors] = useState(0);
+  const [totalDelayedItems, setTotalDelayedItems] = useState(0);
   const [schedule, setSchedule] = useState<ScheduleData | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -132,7 +132,7 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
         setSummary(summaryData);
         setSchedule(scheduleData);
         setSheetKpi(dashData?.kpi ?? []);
-        setTotalDelayedFloors(dashData?.totalDelayed ?? 0);
+        setTotalDelayedItems(dashData?.totalDelayed ?? 0);
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
@@ -262,9 +262,9 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
             />
           </div>
 
-          {/* Banner trễ — cùng bố cục với Dashboard tổng (app/page.tsx), tính theo TẦNG
-              (đã lọc theo hệ này qua ?system=), không phải theo task. */}
-          {totalDelayedFloors > 0 && (
+          {/* Banner trễ — cùng bố cục với Dashboard tổng (app/page.tsx), đếm theo HẠNG MỤC
+              (mỗi task trễ tính riêng, đã lọc theo hệ này qua ?system=). */}
+          {totalDelayedItems > 0 && (
             <a
               href="#delayed-table"
               className="flex items-center gap-4 bg-orange-950/20 border border-orange-900/50 rounded-xl px-5 py-4 mt-3 hover:bg-orange-950/30 transition"
@@ -274,9 +274,9 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-zinc-400 uppercase tracking-wider font-medium mb-0.5">
-                  Tổng số tầng đang trễ
+                  Tổng số hạng mục đang trễ
                 </p>
-                <p className="text-4xl font-bold leading-none">{totalDelayedFloors}</p>
+                <p className="text-4xl font-bold leading-none">{totalDelayedItems}</p>
               </div>
               <span className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 transition shrink-0">
                 Xem chi tiết <ChevronRight className="w-3.5 h-3.5" />

@@ -397,7 +397,7 @@ export default function Dashboard() {
                     2.93 < 4.5 khi từng thử với đỏ). Dùng token zinc thích ứng cho chữ (đảm bảo AA
                     mọi theme), giữ sắc cam ở icon/nền/viền. */}
                 <p className="text-xs text-zinc-400 uppercase tracking-wider font-medium mb-0.5">
-                  Tổng số tầng đang trễ
+                  Tổng số hạng mục đang trễ
                 </p>
                 <p className="text-4xl font-bold leading-none">{data?.totalDelayed ?? 0}</p>
               </div>
@@ -421,7 +421,7 @@ export default function Dashboard() {
                     </span>
                     {hasDelay && (
                       <span
-                        title={`${k.delayed} tầng đang trễ`}
+                        title={`${k.delayed} hạng mục đang trễ`}
                         className="flex items-center gap-0.5 text-[10px] text-red-950 bg-orange-500 px-1.5 py-0.5 rounded-full shrink-0 font-medium"
                       >
                         <AlertTriangle className="w-2.5 h-2.5" /> {k.delayed}
