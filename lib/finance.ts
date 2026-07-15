@@ -202,7 +202,7 @@ export type VatSummary = { vatIn: number; vatOut: number; netVat: number };
 // VAT vào (đầu vào, được khấu trừ) / ra (đầu ra, phải nộp) / ròng = vatOut − vatIn,
 // gộp theo kỳ 'YYYY-MM'. projectId tuỳ chọn (undefined = toàn hệ thống, dùng nội bộ).
 export async function vatSummary(period: string, projectId?: number): Promise<VatSummary> {
-  const conds = ["to_char(invoice_date, 'YYYY-MM') = ?"];
+  const conds = ["deleted_at IS NULL", "to_char(invoice_date, 'YYYY-MM') = ?"];
   const args: unknown[] = [period];
   if (projectId != null) {
     conds.push("project_id = ?");

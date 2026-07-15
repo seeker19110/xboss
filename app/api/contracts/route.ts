@@ -26,9 +26,16 @@ export async function GET(req: NextRequest) {
   if (kindRaw && !CONTRACT_KINDS.includes(kindRaw as ContractKind))
     return NextResponse.json({ error: "Loại hợp đồng không hợp lệ" }, { status: 422 });
 
+  // Soft-delete (M45 PR4): admin ?includeDeleted=1 xem hợp đồng đã xoá.
+  const deletedView =
+    user.role === "admin" && req.nextUrl.searchParams.get("includeDeleted") === "1"
+      ? "deleted"
+      : "alive";
   const projectId = await getCurrentProjectId(user);
   const contracts =
-    projectId != null ? await listContracts((kindRaw as ContractKind) ?? undefined, projectId) : [];
+    projectId != null
+      ? await listContracts((kindRaw as ContractKind) ?? undefined, projectId, deletedView)
+      : [];
   return NextResponse.json({ contracts });
 }
 

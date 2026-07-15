@@ -35,11 +35,15 @@ export async function GET(req: NextRequest) {
   const contractIdRaw = sp.get("contractId");
   const contractId = contractIdRaw ? Number(contractIdRaw) : undefined;
 
+  // Soft-delete (M45 PR4): admin ?includeDeleted=1 xem claim đã xoá.
+  const deletedView =
+    user.role === "admin" && sp.get("includeDeleted") === "1" ? "deleted" : "alive";
   const projectId = await getCurrentProjectId(user);
   const items = await listClaims(projectId, {
     kind: kindRaw as ClaimKind | undefined,
     status: statusRaw as ClaimStatus | undefined,
     contractId,
+    deletedView,
   });
   return NextResponse.json({ items });
 }

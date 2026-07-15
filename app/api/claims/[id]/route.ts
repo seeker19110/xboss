@@ -126,6 +126,7 @@ export async function DELETE(
   const editErr = canEditClaim(claim, user);
   if (editErr) return NextResponse.json({ error: editErr }, { status: 403 });
 
-  await run(`DELETE FROM claims WHERE id = ?`, id);
+  // Soft-delete (M45 PR4) — khôi phục qua POST /api/claims/:id/restore.
+  await run(`UPDATE claims SET deleted_at = now() WHERE id = ? AND deleted_at IS NULL`, id);
   return NextResponse.json({ deleted: id });
 }

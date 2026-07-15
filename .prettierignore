@@ -7,3 +7,6 @@ _framework-dropins
 package-lock.json
 data/uploads
 *.tar.gz
+
+# ERD sinh tự động (npm run gen:erd) — CI so khớp bằng git diff, không để prettier canh lại bảng
+docs/ERD.md

@@ -65,12 +65,13 @@ export type InsuranceBondRow = {
   createdBy: number | null;
   createdByName: string | null;
   createdAt: string;
+  deletedAt: string | null;
 };
 
 // Danh sách bảo hiểm/bảo lãnh — projectId (M22): undefined = không lọc dự án (test cũ/nội bộ).
 export async function listInsuranceBonds(
   projectId?: number,
-  filters?: { kind?: InsuranceKind },
+  filters?: { kind?: InsuranceKind; deletedView?: "alive" | "deleted" | "all" },
 ): Promise<InsuranceBondRow[]> {
   const conds: string[] = [];
   const args: unknown[] = [];
@@ -82,6 +83,10 @@ export async function listInsuranceBonds(
     conds.push("b.kind = ?");
     args.push(filters.kind);
   }
+  // Soft-delete (M45 PR4): mặc định chỉ dòng còn sống.
+  const dv = filters?.deletedView ?? "alive";
+  if (dv === "alive") conds.push("b.deleted_at IS NULL");
+  else if (dv === "deleted") conds.push("b.deleted_at IS NOT NULL");
   const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
   return query<InsuranceBondRow>(
     `SELECT b.id, b.project_id AS "projectId", b.contract_id AS "contractId",
@@ -91,7 +96,8 @@ export async function listInsuranceBonds(
             b.status, b.note,
             b.file_name AS "fileName", b.original_name AS "originalName",
             b.mime_type AS "mimeType", b.size_bytes AS "sizeBytes",
-            b.created_by AS "createdBy", u.name AS "createdByName", b.created_at AS "createdAt"
+            b.created_by AS "createdBy", u.name AS "createdByName", b.created_at AS "createdAt",
+            b.deleted_at AS "deletedAt"
        FROM insurance_bonds b
        LEFT JOIN contracts c ON c.id = b.contract_id
        LEFT JOIN users u ON u.id = b.created_by
@@ -118,7 +124,12 @@ export async function expiringInsuranceBonds(
 ): Promise<ExpiringInsuranceBond[]> {
   const limit = daysFromTodayISO(days);
   const today = todayISO();
-  const conds = ["status = 'valid'", "expiry_date IS NOT NULL", "expiry_date <= ?"];
+  const conds = [
+    "deleted_at IS NULL",
+    "status = 'valid'",
+    "expiry_date IS NOT NULL",
+    "expiry_date <= ?",
+  ];
   const args: unknown[] = [limit];
   if (projectId != null) {
     conds.push("project_id = ?");

@@ -11,6 +11,7 @@ export type InvoiceRow = InvoiceInput & {
   createdBy: number | null;
   createdByName: string | null;
   createdAt: string;
+  deletedAt: string | null;
 };
 
 // GET /api/invoices?direction= — hoá đơn VAT vào/ra, scoped theo dự án đang chọn (M22).
@@ -34,11 +35,16 @@ export async function GET(req: NextRequest) {
     conds.push("i.direction = ?");
     args.push(direction);
   }
+  // Soft-delete (M45 PR4): mặc định chỉ hoá đơn còn sống; admin ?includeDeleted=1 xem bản đã xoá.
+  const showDeleted =
+    user.role === "admin" && req.nextUrl.searchParams.get("includeDeleted") === "1";
+  conds.push(showDeleted ? "i.deleted_at IS NOT NULL" : "i.deleted_at IS NULL");
   const invoices = await query<InvoiceRow>(
     `SELECT i.id, i.invoice_no AS "invoiceNo", i.invoice_date AS "invoiceDate", i.direction,
             i.net_amount AS "netAmount", i.vat_amount AS "vatAmount", i.vat_rate AS "vatRate",
             i.counterparty, i.contract_id AS "contractId", i.payment_bill_id AS "paymentBillId",
-            i.created_by AS "createdBy", u.name AS "createdByName", i.created_at AS "createdAt"
+            i.created_by AS "createdBy", u.name AS "createdByName", i.created_at AS "createdAt",
+            i.deleted_at AS "deletedAt"
        FROM invoices i
        LEFT JOIN users u ON u.id = i.created_by
       WHERE ${conds.join(" AND ")}

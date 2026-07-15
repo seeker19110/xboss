@@ -140,7 +140,11 @@ export type ContractRow = {
   addendaTotal: number;
   paid: number;
   poCommitted: number;
+  deletedAt: string | null;
 };
+
+// Bộ lọc soft-delete (M45 PR4): mặc định chỉ dòng còn sống.
+export type DeletedView = "alive" | "deleted" | "all";
 
 // Danh sách HĐ kèm tổng hợp: tổng giá trị (gốc + phụ lục), đã thanh toán
 // (Σ payment_bills mọi type kể cả advance — nhất quán quyết định M2), giá trị PO
@@ -149,6 +153,7 @@ export type ContractRow = {
 export async function listContracts(
   kind?: ContractKind,
   projectId?: number,
+  deletedView: DeletedView = "alive",
 ): Promise<ContractRow[]> {
   const conds: string[] = [];
   const args: unknown[] = [];
@@ -160,6 +165,8 @@ export async function listContracts(
     conds.push("c.project_id = ?");
     args.push(projectId);
   }
+  if (deletedView === "alive") conds.push("c.deleted_at IS NULL");
+  else if (deletedView === "deleted") conds.push("c.deleted_at IS NOT NULL");
   const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
   return query<ContractRow>(
     `SELECT c.id, c.code, c.kind, c.title,
@@ -172,7 +179,8 @@ export async function listContracts(
             c.status, c.note, c.created_by AS "createdBy", c.created_at AS "createdAt",
             COALESCE(a.total, 0) AS "addendaTotal",
             COALESCE(p.total, 0) AS "paid",
-            COALESCE(po.total, 0) AS "poCommitted"
+            COALESCE(po.total, 0) AS "poCommitted",
+            c.deleted_at AS "deletedAt"
        FROM contracts c
        LEFT JOIN suppliers s ON s.id = c.party_supplier_id
        LEFT JOIN systems d ON d.id = c.system_id
@@ -209,7 +217,12 @@ export async function expiringContracts(
 ): Promise<ExpiringContract[]> {
   const limit = daysFromTodayISO(days);
   const today = todayISO();
-  const conds = ["status = 'active'", "valid_to IS NOT NULL", "valid_to <= ?"];
+  const conds = [
+    "deleted_at IS NULL",
+    "status = 'active'",
+    "valid_to IS NOT NULL",
+    "valid_to <= ?",
+  ];
   const args: unknown[] = [limit];
   if (projectId != null) {
     conds.push("project_id = ?");

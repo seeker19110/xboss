@@ -15,7 +15,7 @@ async function loadExisting(
     `SELECT invoice_no AS "invoiceNo", invoice_date AS "invoiceDate", direction,
             net_amount AS "netAmount", vat_amount AS "vatAmount", vat_rate AS "vatRate",
             counterparty, contract_id AS "contractId", payment_bill_id AS "paymentBillId"
-       FROM invoices WHERE id = ? AND project_id = ?`,
+       FROM invoices WHERE id = ? AND project_id = ? AND deleted_at IS NULL`,
     id,
     projectId,
   );
@@ -111,6 +111,7 @@ export async function DELETE(
   const existing = await loadExisting(id, projectId);
   if (!existing) return NextResponse.json({ error: "Không tìm thấy hoá đơn" }, { status: 404 });
 
-  await run(`DELETE FROM invoices WHERE id = ?`, id);
+  // Soft-delete (M45 PR4) — khôi phục qua POST /api/invoices/:id/restore.
+  await run(`UPDATE invoices SET deleted_at = now() WHERE id = ? AND deleted_at IS NULL`, id);
   return NextResponse.json({ deleted: id });
 }
