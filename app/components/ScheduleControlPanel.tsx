@@ -49,7 +49,10 @@ export default function ScheduleControlPanel({
           </a>
         )}
       </div>
-      <div className="overflow-x-auto">
+      {/* tabIndex={0} để vùng cuộn ngang truy cập được bằng bàn phím kể cả khi bảng rỗng
+          (không có link/ô focus bên trong) — axe scrollable-region-focusable, thấy rõ ở
+          mobile khi nhúng panel vào Dashboard tổng. */}
+      <div className="overflow-x-auto" tabIndex={0} aria-label="Bảng nhóm việc trên đường găng">
         <table className="w-full text-sm min-w-[640px]">
           <thead>
             <tr className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400 border-b border-zinc-800/80">
