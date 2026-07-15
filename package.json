@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
     "db:migrate": "tsx scripts/migrate.ts",
+    "gen:erd": "tsx scripts/gen-erd.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:seed": "tsx scripts/seed.ts",
