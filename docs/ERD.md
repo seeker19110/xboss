@@ -2899,6 +2899,87 @@
 **Index:**
 - `tender_bid_prices_pkey`: UNIQUE INDEX tender_bid_prices_pkey ON public.tender_bid_prices USING btree (bid_id, boq_item_id)
 
+## Phê duyệt (Approval Engine)
+
+### approval_flows
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | integer |  | `nextval('approval_flows_id_seq'::regclass)` |
+| project_id | integer | ✓ |  |
+| entity_type | text |  |  |
+| name | text |  |  |
+| active | boolean |  | `true` |
+
+**Khóa ngoại:**
+- `project_id` → `projects(id)`
+
+**Index:**
+- `approval_flows_pkey`: UNIQUE INDEX approval_flows_pkey ON public.approval_flows USING btree (id)
+- `ux_flow_active`: UNIQUE INDEX ux_flow_active ON public.approval_flows USING btree (entity_type, COALESCE(project_id, 0)) WHERE active
+
+### approval_steps
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | integer |  | `nextval('approval_steps_id_seq'::regclass)` |
+| flow_id | integer |  |  |
+| seq | integer |  |  |
+| role | text |  |  |
+| min_amount | numeric(15,2) | ✓ |  |
+| sla_days | integer | ✓ |  |
+
+**Khóa ngoại:**
+- `flow_id` → `approval_flows(id)`
+
+**Index:**
+- `approval_steps_flow_id_seq_key`: UNIQUE INDEX approval_steps_flow_id_seq_key ON public.approval_steps USING btree (flow_id, seq)
+- `approval_steps_pkey`: UNIQUE INDEX approval_steps_pkey ON public.approval_steps USING btree (id)
+
+### approval_requests
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | integer |  | `nextval('approval_requests_id_seq'::regclass)` |
+| flow_id | integer |  |  |
+| entity_type | text |  |  |
+| entity_id | integer |  |  |
+| project_id | integer |  |  |
+| amount | numeric(15,2) | ✓ |  |
+| current_seq | integer |  | `1` |
+| status | text |  | `'pending'::text` |
+| created_by | integer |  |  |
+| created_at | timestamptz |  | `now()` |
+| decided_at | timestamptz | ✓ |  |
+
+**Khóa ngoại:**
+- `created_by` → `users(id)`
+- `flow_id` → `approval_flows(id)`
+
+**Index:**
+- `approval_requests_pkey`: UNIQUE INDEX approval_requests_pkey ON public.approval_requests USING btree (id)
+- `ux_request_live`: UNIQUE INDEX ux_request_live ON public.approval_requests USING btree (entity_type, entity_id) WHERE (status = 'pending'::text)
+
+### approval_actions
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | integer |  | `nextval('approval_actions_id_seq'::regclass)` |
+| request_id | integer |  |  |
+| step_seq | integer |  |  |
+| actor_id | integer |  |  |
+| decision | text |  |  |
+| note | text | ✓ |  |
+| at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `actor_id` → `users(id)`
+- `request_id` → `approval_requests(id)`
+
+**Index:**
+- `approval_actions_pkey`: UNIQUE INDEX approval_actions_pkey ON public.approval_actions USING btree (id)
+- `approval_actions_request_id_step_seq_key`: UNIQUE INDEX approval_actions_request_id_step_seq_key ON public.approval_actions USING btree (request_id, step_seq)
+
 ## Hệ thống & audit
 
 ### audit_log
