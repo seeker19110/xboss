@@ -105,7 +105,7 @@ test("reportToTelegramText: escape HTML/script trong tên task, hiện đúng s�
   assert.ok(!text.includes("<script>alert(1)</script>"));
   assert.ok(text.includes("&lt;script&gt;"));
   assert.ok(text.includes("60%")); // avgProgress 0.6 → 60%
-  assert.ok(text.includes("⚠ 1 tầng trễ"));
+  assert.ok(text.includes("⚠ 1 hạng mục trễ"));
 });
 
 test("reportToTelegramText: hệ không trễ hiện '✓ không trễ' thay vì cảnh báo", () => {
@@ -265,8 +265,8 @@ test(
     const kpiRow = report.kpi.find((k) => k.sheetType === sheetCode);
     assert.ok(kpiRow);
     assert.equal(kpiRow!.total, 4);
-    // delayed đếm theo TẦNG (quyết 2026-07-11), không theo task: R1,01 + R1,02 cùng thuộc
-    // work_package 'R1' (floor_label rỗng) nên chỉ tính 1 tầng trễ dù có 2 task trễ
+    // delayed đếm theo HẠNG MỤC = cặp (sheet, tầng): R1,01 + R1,02 cùng thuộc work_package
+    // 'R1' (floor_label rỗng) nên chỉ tính 1 hạng mục trễ dù có 2 công tác trễ
     // (R1,04 đã nghiệm thu không tính).
     assert.equal(kpiRow!.delayed, 1);
 

@@ -19,7 +19,7 @@ import SCurveChart from "@/app/components/SCurveChart";
 import ProgressMap from "@/app/components/ProgressMap";
 import SpiCards from "@/app/components/SpiCards";
 import ForecastCards from "@/app/components/ForecastCards";
-import { formatDateVN } from "@/lib/date";
+import { formatDateVN, daysOverdue } from "@/lib/date";
 import { DELAY_REASON_LABEL } from "@/lib/delay";
 
 // Trang gộp toàn bộ tiến độ 1 hệ (M-tiến-độ-6-hệ): thay 5 view chung Timeline/Gantt/
@@ -85,11 +85,14 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
   const [me, setMe] = useState<Me | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [sheetKpi, setSheetKpi] = useState<SheetKpi[]>([]);
-  const [totalDelayedFloors, setTotalDelayedFloors] = useState(0);
+  const [totalDelayedItems, setTotalDelayedItems] = useState(0);
   const [schedule, setSchedule] = useState<ScheduleData | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
   const [reasonFilter, setReasonFilter] = useState<string | null>("");
+  const [sheetFilter, setSheetFilter] = useState("");
+  const [floorFilter, setFloorFilter] = useState("");
+  const [sheetNameByCode, setSheetNameByCode] = useState<Map<string, string>>(new Map());
   const [newSheetName, setNewSheetName] = useState("");
   const [addingSheet, setAddingSheet] = useState(false);
   const [creatingSheet, setCreatingSheet] = useState(false);
@@ -118,8 +121,9 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
       fetch(`/api/dashboard?system=${encodeURIComponent(system)}`).then((r) =>
         r.status === 401 ? null : r.ok ? r.json() : Promise.reject(new Error("fetch failed")),
       ),
+      fetch("/api/sheets").then((r) => (r.ok ? r.json() : null)),
     ])
-      .then(([meData, summaryData, scheduleData, dashData]) => {
+      .then(([meData, summaryData, scheduleData, dashData, sheetsData]) => {
         if (!meData) {
           redirectToLogin();
           return;
@@ -132,7 +136,12 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
         setSummary(summaryData);
         setSchedule(scheduleData);
         setSheetKpi(dashData?.kpi ?? []);
-        setTotalDelayedFloors(dashData?.totalDelayed ?? 0);
+        setTotalDelayedItems(dashData?.totalDelayed ?? 0);
+        setSheetNameByCode(
+          new Map(
+            (sheetsData?.sheets ?? []).map((s: { code: string; name: string }) => [s.code, s.name]),
+          ),
+        );
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
@@ -145,10 +154,37 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
   const totalDelayed = schedule?.delayed.length ?? 0;
   const filteredDelayed = useMemo(() => {
     if (!schedule) return [];
-    if (!reasonFilter) return schedule.delayed;
-    if (reasonFilter === "__none") return schedule.delayed.filter((t) => !t.delayReason);
-    return schedule.delayed.filter((t) => t.delayReason === reasonFilter);
-  }, [schedule, reasonFilter]);
+    return schedule.delayed.filter(
+      (t) =>
+        (!sheetFilter || t.sheetType === sheetFilter) &&
+        (!floorFilter || t.floorLabel === floorFilter) &&
+        (!reasonFilter ||
+          (reasonFilter === "__none" ? !t.delayReason : t.delayReason === reasonFilter)),
+    );
+  }, [schedule, sheetFilter, floorFilter, reasonFilter]);
+  // Hạng mục trễ = cặp (sheet, tầng), khớp cách đếm totalDelayedItems ở API — 1 hạng mục
+  // dù có nhiều công việc trễ vẫn gộp thành 1 dòng trong danh sách này.
+  const delayedGroups = useMemo(() => {
+    const map = new Map<
+      string,
+      { sheetType: string; floorLabel: string; name: string; count: number }
+    >();
+    for (const t of schedule?.delayed ?? []) {
+      const key = `${t.sheetType}::${t.floorLabel ?? ""}`;
+      const existing = map.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        map.set(key, {
+          sheetType: t.sheetType,
+          floorLabel: t.floorLabel ?? "",
+          name: `Thi công ${sheetNameByCode.get(t.sheetType) ?? t.sheetType}${t.floorLabel ? ` tầng ${t.floorLabel}` : ""}`,
+          count: 1,
+        });
+      }
+    }
+    return [...map.values()].sort((a, b) => a.sheetType.localeCompare(b.sheetType));
+  }, [schedule, sheetNameByCode]);
 
   const canManage = me?.role === "admin" || me?.role === "pm";
 
@@ -262,9 +298,9 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
             />
           </div>
 
-          {/* Banner trễ — cùng bố cục với Dashboard tổng (app/page.tsx), tính theo TẦNG
-              (đã lọc theo hệ này qua ?system=), không phải theo task. */}
-          {totalDelayedFloors > 0 && (
+          {/* Banner trễ — cùng bố cục với Dashboard tổng (app/page.tsx), đếm theo HẠNG MỤC
+              (mỗi task trễ tính riêng, đã lọc theo hệ này qua ?system=). */}
+          {totalDelayedItems > 0 && (
             <a
               href="#delayed-table"
               className="flex items-center gap-4 bg-orange-950/20 border border-orange-900/50 rounded-xl px-5 py-4 mt-3 hover:bg-orange-950/30 transition"
@@ -274,9 +310,9 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-zinc-400 uppercase tracking-wider font-medium mb-0.5">
-                  Tổng số tầng đang trễ
+                  Tổng số hạng mục đang trễ
                 </p>
-                <p className="text-4xl font-bold leading-none">{totalDelayedFloors}</p>
+                <p className="text-4xl font-bold leading-none">{totalDelayedItems}</p>
               </div>
               <span className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 transition shrink-0">
                 Xem chi tiết <ChevronRight className="w-3.5 h-3.5" />
@@ -413,6 +449,44 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
               ({filteredDelayed.length}/{totalDelayed})
             </span>
           </div>
+
+          {/* Danh sách hạng mục trễ (cặp sheet + tầng) — bấm để lọc bảng bên dưới về đúng
+              nhóm đó, hiện toàn bộ công việc trễ thuộc hạng mục. */}
+          {delayedGroups.length > 0 && (
+            <div className="px-5 py-3 border-b border-zinc-800 flex flex-wrap gap-2">
+              {delayedGroups.map((g) => {
+                const active = sheetFilter === g.sheetType && floorFilter === g.floorLabel;
+                return (
+                  <button
+                    key={`${g.sheetType}::${g.floorLabel}`}
+                    onClick={() => {
+                      if (active) {
+                        setSheetFilter("");
+                        setFloorFilter("");
+                      } else {
+                        setSheetFilter(g.sheetType);
+                        setFloorFilter(g.floorLabel);
+                      }
+                    }}
+                    title={`Xem toàn bộ công việc trễ của ${g.name}`}
+                    className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full border transition ${
+                      active
+                        ? "bg-orange-500 border-orange-500 text-red-950 font-medium"
+                        : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-orange-700/60 hover:text-orange-300"
+                    }`}
+                  >
+                    {g.name}
+                    <span
+                      className={`px-1.5 rounded-full text-[10px] font-semibold ${active ? "bg-red-950/30 text-red-950" : "bg-zinc-700 text-zinc-300"}`}
+                    >
+                      {g.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[680px]">
               <thead>
@@ -420,6 +494,7 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
                   <th className="text-left px-5 py-3">Công việc</th>
                   <th className="text-left px-4 py-3">Hệ</th>
                   <th className="text-left px-4 py-3">Hạn</th>
+                  <th className="text-left px-4 py-3">Trễ (ngày)</th>
                   <th className="text-left px-4 py-3 w-32">Tiến độ</th>
                   <th className="text-left px-4 py-3">Lý do trễ</th>
                 </tr>
@@ -449,6 +524,9 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
                       <td className="px-4 py-3.5 text-red-400 text-xs whitespace-nowrap tabular-nums">
                         {formatDateVN(t.endDate)}
                       </td>
+                      <td className="px-4 py-3.5 text-red-400 text-xs whitespace-nowrap tabular-nums font-medium">
+                        {daysOverdue(t.endDate)}
+                      </td>
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-2">
                           <div className="bg-zinc-800 rounded-full h-1.5 w-16 shrink-0 overflow-hidden">
@@ -475,7 +553,7 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
                 })}
                 {filteredDelayed.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-5 py-12 text-center text-zinc-400 text-sm">
+                    <td colSpan={6} className="px-5 py-12 text-center text-zinc-400 text-sm">
                       Không có công việc trễ.
                     </td>
                   </tr>

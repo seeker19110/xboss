@@ -36,9 +36,10 @@ export async function GET(req: NextRequest) {
   const range = req.nextUrl.searchParams.get("range"); // "week" | "month" | null
 
   // Task trễ: end_date < hôm nay AND progress < 1 AND chưa hoàn thành/nghiệm thu.
-  // Danh sách này vẫn liệt kê theo TỪNG TASK (cần biết đúng task nào để gán lý do trễ/
-  // xử lý — bảng Pareto trên dashboard dựa vào đây), khác với các số liệu tổng hợp
-  // bên dưới (totalDelayed/kpi[].delayed) đã đổi đơn vị đếm sang TẦNG (quyết 2026-07-11).
+  // Danh sách này liệt kê theo TỪNG TASK/CÔNG TÁC (cần biết đúng task nào để gán lý do
+  // trễ/xử lý — bảng Pareto trên dashboard dựa vào đây). Các số liệu tổng hợp bên dưới
+  // (totalDelayed/kpi[].delayed) đếm theo HẠNG MỤC = cặp (sheet, tầng): OGTĐ tầng 27 có
+  // nhiều công tác trễ vẫn tính 1 hạng mục trễ; OGTĐ-27 và OGCH-27 tính riêng 2 hạng mục.
   const delayedTasks = await query<{
     id: number;
     code: string;
@@ -78,15 +79,15 @@ export async function GET(req: NextRequest) {
     ...projectParams,
   );
 
-  // Tầng trễ = tồn tại ≥1 task trễ trong (floor_label, sheet) đó — 1 tầng nhiều task
-  // trễ vẫn tính 1 lần. Suy trực tiếp từ delayedTasks (đã lọc theo systemFilter) thay
-  // vì query SQL riêng, đảm bảo tổng số + số theo từng sheet luôn khớp nhau.
-  const delayedFloorsBySheet = new Map<string, Set<string>>();
+  // Hạng mục trễ = cặp (sheet, tầng) có ≥1 công tác trễ — nhiều công tác trễ cùng một
+  // (sheet, tầng) vẫn tính 1 hạng mục. Suy trực tiếp từ delayedTasks (đã lọc theo
+  // systemFilter) thay vì query SQL riêng, đảm bảo tổng số + số theo từng sheet luôn khớp.
+  const delayedItemsBySheet = new Map<string, Set<string>>();
   for (const t of delayedTasks) {
-    if (!delayedFloorsBySheet.has(t.sheetType)) delayedFloorsBySheet.set(t.sheetType, new Set());
-    delayedFloorsBySheet.get(t.sheetType)!.add(t.floorLabel ?? "");
+    if (!delayedItemsBySheet.has(t.sheetType)) delayedItemsBySheet.set(t.sheetType, new Set());
+    delayedItemsBySheet.get(t.sheetType)!.add(t.floorLabel ?? "");
   }
-  const totalDelayedFloors = [...delayedFloorsBySheet.values()].reduce(
+  const totalDelayedItems = [...delayedItemsBySheet.values()].reduce(
     (sum, set) => sum + set.size,
     0,
   );
@@ -116,7 +117,7 @@ export async function GET(req: NextRequest) {
   );
   const kpi = kpiRaw.map((k) => ({
     ...k,
-    delayed: delayedFloorsBySheet.get(k.sheetType)?.size ?? 0,
+    delayed: delayedItemsBySheet.get(k.sheetType)?.size ?? 0,
   }));
 
   // `?range=week|month` (M36 PR3): thêm % đầu kỳ + Δ kỳ cho từng dòng KPI — tái dựng từ
@@ -169,7 +170,7 @@ export async function GET(req: NextRequest) {
     approvals,
     delayedTasks,
     kpi: kpiWithDelta,
-    totalDelayed: totalDelayedFloors,
+    totalDelayed: totalDelayedItems,
     quality,
     procurement,
     workfront,
