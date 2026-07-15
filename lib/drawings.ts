@@ -1,15 +1,17 @@
-// M8 — Drawing register (bản vẽ shop/asbuilt/BIM + biện pháp thi công): validate thuần
-// (unit test được) + query danh sách/chi tiết + logic supersede revision khi duyệt.
-// Xem docs/nang-cap/M08-ban-ve.md.
+// M8 — Drawing register (bản vẽ thiết kế/shop/asbuilt/BIM + biện pháp thi công):
+// validate thuần (unit test được) + query danh sách/chi tiết + logic supersede
+// revision khi duyệt. Xem docs/nang-cap/G06-ban-ve-ho-so.md.
 import { query, queryOne, run, withTransaction } from "@/lib/db";
 
-export const DRAWING_KINDS = ["shop", "asbuilt", "bim", "method"] as const;
+// Thứ tự khớp thứ tự mục trong cụm sidebar "Thiết kế & BPTC" (dashboardTree.ts).
+export const DRAWING_KINDS = ["design", "method", "bim", "shop", "asbuilt"] as const;
 export type DrawingKind = (typeof DRAWING_KINDS)[number];
 export const DRAWING_KIND_LABEL: Record<DrawingKind, string> = {
+  design: "Thiết kế",
+  method: "Biện pháp thi công",
+  bim: "BIM",
   shop: "Shop drawing",
   asbuilt: "As-built",
-  bim: "BIM",
-  method: "Biện pháp thi công",
 };
 
 export const REVISION_STATUSES = [

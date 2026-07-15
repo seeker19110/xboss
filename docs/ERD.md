@@ -430,13 +430,13 @@ Trao thầu (`POST /api/tenders/:id/award`, `lib/tender.ts:awardTender`): sinh 1
 
 ### `drawings`
 
-| Cột             | Kiểu                                          |
-| --------------- | --------------------------------------------- |
-| code            | TEXT UNIQUE (số bản vẽ, VD `ACMV-SD-T05-001`) |
-| kind            | TEXT (`shop\|asbuilt\|bim\|method`)           |
-| system_group    | TEXT                                          |
-| floor_label     | TEXT                                          |
-| work_package_id | FK → work_packages (ON DELETE SET NULL)       |
+| Cột             | Kiểu                                                                 |
+| --------------- | -------------------------------------------------------------------- |
+| code            | TEXT UNIQUE (số bản vẽ, VD `ACMV-SD-T05-001`)                        |
+| kind            | TEXT (`design\|shop\|asbuilt\|bim\|method` — `design` thêm ở `0048`) |
+| system_group    | TEXT                                                                 |
+| floor_label     | TEXT                                                                 |
+| work_package_id | FK → work_packages (ON DELETE SET NULL)                              |
 
 ### `drawing_revisions`
 

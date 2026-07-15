@@ -11,11 +11,17 @@ async function gotoDrawings(page: Page) {
 }
 
 test.describe("Bản vẽ (sau đăng nhập)", () => {
-  test("render trạng thái rỗng + filter chip", async ({ page }) => {
+  test("render trạng thái rỗng + chip trạng thái (chip loại đã dời sang sidebar)", async ({
+    page,
+  }) => {
     await gotoDrawings(page);
     await expect(page.getByText("Chưa có bản vẽ nào")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Shop drawing" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Biện pháp thi công" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Tất cả trạng thái" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Đã duyệt", exact: true })).toBeVisible();
+    // Chọn loại giờ nằm ở cụm sidebar "Thiết kế & BPTC" — trang không còn chip loại.
+    await expect(page.getByRole("main").getByRole("button", { name: "Tất cả loại" })).toHaveCount(
+      0,
+    );
   });
 
   // Không bấm "Lưu" (không ghi dữ liệu thật) — trang chia sẻ 1 DB test giữa các project
