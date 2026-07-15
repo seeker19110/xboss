@@ -121,9 +121,10 @@ export async function GET(req: NextRequest) {
   if (to < today) to = today;
   if (from > today) from = today;
 
-  // Tối đa ~140 điểm để chart nhẹ — bước nhảy theo ngày.
+  // Mỗi điểm = 1 ngày để mỗi chấm trên chart tương ứng đúng 1 ngày. Trần 1000 điểm
+  // giữ chart nhẹ với dự án kéo dài nhiều năm — vượt trần mới nhảy bước >1 ngày.
   const rangeDays = Math.max(1, Math.round((toDate(to) - toDate(from)) / DAY_MS));
-  const step = Math.max(1, Math.ceil(rangeDays / 140));
+  const step = Math.max(1, Math.ceil(rangeDays / 1000));
 
   const planned = tasks.filter((t) => t.startDate && t.endDate);
   const points: { date: string; planned: number | null; actual: number | null }[] = [];

@@ -66,6 +66,10 @@ const DashboardExtCards = dynamic(() => import("@/app/components/DashboardExtCar
   ssr: false,
   loading: () => <Skeleton className="h-28 rounded-xl" />,
 });
+const ScheduleControlPanel = dynamic(() => import("@/app/components/ScheduleControlPanel"), {
+  ssr: false,
+  loading: () => <Skeleton className="h-40 rounded-xl" />,
+});
 
 type DelayedTask = {
   id: number;
@@ -547,6 +551,9 @@ export default function Dashboard() {
 
         {/* ── Bar chart tiến độ ── */}
         <DashboardBarChart data={chartData} />
+
+        {/* ── Đường găng (nhúng từ /schedule-control — panel tự fetch /api/schedule-control) ── */}
+        <ScheduleControlPanel />
 
         {/* ── Pareto nguyên nhân trễ ── */}
         {allDelayed.length > 0 && (reasonCounts.length > 0 || noReason > 0) && (

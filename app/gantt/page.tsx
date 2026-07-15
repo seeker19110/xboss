@@ -171,7 +171,8 @@ export default function GanttPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <AppHeader>
+      {/* Trang đã rời cây sidebar (dashboardTree) nên topbar không tự suy ra được title — khai tĩnh. */}
+      <AppHeader title="Gantt">
         <select
           value={sheetFilter}
           onChange={(e) => updateSheetFilter(e.target.value)}

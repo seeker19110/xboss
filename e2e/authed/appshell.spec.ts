@@ -74,9 +74,10 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
       await expect(sidebar.getByRole("link", { name: label, exact: true })).toBeVisible();
     }
 
-    // Nhóm "Chung (mọi hệ)" trong cùng cụm — view chung KHÔNG lọc theo hệ, phát hiện thiếu
-    // (mất link tắt) khi audit toàn diện: thêm lại dưới dạng nhóm gập/mở (M42-style, luôn
-    // hiện, không toggle riêng — xem dashboardTree.ts).
+    // Cụm "Kế hoạch & Tiến độ" giờ CHỈ còn 6 hệ — bỏ hẳn view chung không lọc theo hệ
+    // (Timeline/Gantt/Lookahead/S-Curve/Đường găng); trang vẫn tồn tại, vào từ trang hệ
+    // /progress/[system] hoặc URL trực tiếp; khối Đường găng đã nhúng thẳng vào Dashboard
+    // tổng qua ScheduleControlPanel — xem dashboardTree.ts.
     for (const label of [
       "Timeline",
       "Gantt",
@@ -84,7 +85,7 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
       "S-Curve",
       "Đường găng & Chậm tiến độ",
     ]) {
-      await expect(sidebar.getByRole("link", { name: label, exact: true })).toBeVisible();
+      await expect(sidebar.getByRole("link", { name: label, exact: true })).toHaveCount(0);
     }
   });
 
