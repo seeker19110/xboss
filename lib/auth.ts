@@ -1,6 +1,7 @@
 import { scryptSync, randomBytes, createHmac, timingSafeEqual } from "node:crypto";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { queryOne, run } from "@/lib/db";
+import { patchRequestContext } from "@/lib/request-context";
 import { ROLES, ROLE_LABELS, VIEW_ONLY_ROLES, PAYMENT_VIEW_ROLES, type Role } from "@/lib/roles";
 export { ROLES, ROLE_LABELS, VIEW_ONLY_ROLES, PAYMENT_VIEW_ROLES, type Role };
 
@@ -82,6 +83,10 @@ function parseToken(token: string): { uid: number; pwFrag: string } | null {
 
 // ===== Người dùng hiện tại =====
 export async function getCurrentUser(): Promise<User | null> {
+  // Ghi request-id (do middleware.ts gắn) vào ngữ cảnh sớm — cả request chưa đăng nhập
+  // cũng tương quan được trong log; actor bổ sung sau khi xác thực thành công.
+  const requestId = (await headers()).get("x-request-id") ?? undefined;
+  if (requestId) patchRequestContext({ requestId });
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
   const parsed = parseToken(token);
@@ -94,6 +99,7 @@ export async function getCurrentUser(): Promise<User | null> {
   // Fragment không khớp → mật khẩu đã đổi, phiên cũ không còn hợp lệ.
   if (!u.password_hash.startsWith(parsed.pwFrag)) return null;
   const { password_hash: _, ...user } = u;
+  patchRequestContext({ userId: user.id, role: user.role });
   return user as User;
 }
 

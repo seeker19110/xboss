@@ -791,6 +791,10 @@ Album ảnh mốc tiến độ (thường từ drone): ghi milestone/mốc quan 
 
 Ghi mỗi lần gán người vào sheet/nhóm/task: ai gán, từ ai sang ai, thủ công hay kế thừa.
 
+### `audit_log` (M43)
+
+Audit trail toàn hệ, ghi **tự động bằng trigger Postgres** (`audit_row_change`) trên nhóm bảng tài chính/hợp đồng/nghiệm thu đợt 1: `contracts`, `variation_orders`, `payment_certs`, `invoices`, `cash_transactions`, `advances`, `payroll`, `purchase_orders`, `task_documents`, `baselines`, `insurance_bonds`, `claims`. Cột: `at`, `actor_id`/`actor_role`, `entity_type` (tên bảng), `entity_id`, `action` (INSERT/UPDATE/DELETE), `changes` JSONB (UPDATE: `{cột: [cũ,mới]}` chỉ cột đổi; INSERT/DELETE: snapshot đầy đủ), `project_id`, `request_id`. Actor lấy từ `SET LOCAL app.*` do `withTransaction` (lib/db) truyền qua ngữ cảnh request (`lib/request-context.ts`) — ghi ngoài transaction vẫn log nhưng actor NULL. Lớp phủ chung, KHÔNG thay các bảng lịch sử theo domain (`task_history`, `material_transactions`...). Chỉ Admin đọc (M43 PR2); bất biến (không route UPDATE/DELETE), nâng hash-chain ở PR3.
+
 ---
 
 ## Indexes quan trọng
