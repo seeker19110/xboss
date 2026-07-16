@@ -3040,6 +3040,28 @@
 
 ## Khác (chưa gán module)
 
+### alert_rules
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | integer |  | `nextval('alert_rules_id_seq'::regclass)` |
+| project_id | integer | ✓ |  |
+| metric | text |  |  |
+| operator | text |  |  |
+| threshold | numeric |  |  |
+| channel | text |  | `'notification'::text` |
+| active | boolean |  | `true` |
+| created_by | integer | ✓ |  |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `created_by` → `users(id)`
+- `project_id` → `projects(id)`
+
+**Index:**
+- `alert_rules_pkey`: UNIQUE INDEX alert_rules_pkey ON public.alert_rules USING btree (id)
+- `ux_alert_rule_active`: UNIQUE INDEX ux_alert_rule_active ON public.alert_rules USING btree (metric, COALESCE(project_id, 0)) WHERE active
+
 ### saved_reports
 
 | Cột | Kiểu | Null | Default |

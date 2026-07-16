@@ -4,6 +4,8 @@ import { query } from "@/lib/db";
 import { getCurrentUser, CAN, checkCronSecret } from "@/lib/auth";
 import { buildDailyReport, reportToHtml, reportToTelegramText, sendTelegram } from "@/lib/report";
 import { sendPushToAll } from "@/lib/push";
+import { getEvmSeries } from "@/lib/evm";
+import { getAlertThreshold } from "@/lib/alerts";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +23,31 @@ export async function GET(req: NextRequest) {
     );
 
   const report = await buildDailyReport();
-  const html = reportToHtml(report, process.env.APP_URL);
+
+  // Cảnh báo SPI/CPI (M47 PR4): đánh giá trên toàn hệ (projectId=null — DB hiện chưa
+  // multi-project trong ngữ cảnh cron, xem docs/nang-cap/M47-evm-bi.md mục PR4).
+  // getEvmSeries trả null khi không có task nào (DB trống) → bỏ qua an toàn.
+  const evmAlerts: string[] = [];
+  const evm = await getEvmSeries({
+    projectId: null,
+    baselineId: null,
+    systemId: null,
+    source: "bills",
+  });
+  if (evm) {
+    const spiBelow = await getAlertThreshold("spi_below", null);
+    const cpiBelow = await getAlertThreshold("cpi_below", null);
+    if (evm.summary.spi != null && evm.summary.spi < spiBelow)
+      evmAlerts.push(
+        `SPI = ${evm.summary.spi.toFixed(2)} (< ${spiBelow}) — tiến độ đang chậm so với kế hoạch`,
+      );
+    if (evm.summary.cpi != null && evm.summary.cpi < cpiBelow)
+      evmAlerts.push(
+        `CPI = ${evm.summary.cpi.toFixed(2)} (< ${cpiBelow}) — chi phí đang vượt so với giá trị đạt được`,
+      );
+  }
+
+  const html = reportToHtml(report, process.env.APP_URL, evmAlerts);
 
   // Người nhận: REPORT_EMAIL_TO (phân tách bằng dấu phẩy) — mặc định mọi Admin + PM.
   let to = (process.env.REPORT_EMAIL_TO ?? "")
@@ -36,7 +62,9 @@ export async function GET(req: NextRequest) {
   }
 
   // Kênh Telegram (tuỳ chọn) — gửi song song với email, kênh nào cấu hình thì gửi kênh đó.
-  const telegramError = await sendTelegram(reportToTelegramText(report, process.env.APP_URL));
+  const telegramError = await sendTelegram(
+    reportToTelegramText(report, process.env.APP_URL, evmAlerts),
+  );
   const telegramSent = telegramError === null;
 
   // Web Push tóm tắt tới mọi thiết bị đã đăng ký (no-op nếu chưa cấu hình VAPID).
@@ -58,6 +86,7 @@ export async function GET(req: NextRequest) {
       telegramSent,
       telegramError: telegramSent ? undefined : telegramError,
       pushSent,
+      evmAlerts,
       reason: "Chưa cấu hình SMTP_HOST / SMTP_USER / SMTP_PASS — trả về preview",
       wouldSendTo: to,
       report,
@@ -85,6 +114,7 @@ export async function GET(req: NextRequest) {
     telegramSent,
     telegramError: telegramSent ? undefined : telegramError,
     pushSent,
+    evmAlerts,
     totalDelayed: report.totalDelayed,
     newDelayed: report.newDelayed.length,
   });

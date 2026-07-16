@@ -67,6 +67,7 @@ import {
   Network,
   History,
   Workflow,
+  BellRing,
 } from "lucide-react";
 import type { Role } from "@/lib/roles";
 
@@ -432,6 +433,13 @@ export const DASHBOARD_TREE: DashCluster[] = [
         icon: Workflow,
         roles: ["admin", "pm"],
       }, // M46 PR4 — Approval Engine: cấu hình luồng duyệt nhiều cấp; PM chỉ xem, Admin sửa
+      {
+        id: "dash.alert-rules",
+        href: "/admin/alert-rules",
+        label: "Ngưỡng cảnh báo",
+        icon: BellRing,
+        roles: ["admin", "pm"],
+      }, // M47 PR4 — alert_rules: cấu hình ngưỡng cảnh báo (hạn/vật tư/SPI/CPI); PM chỉ xem, Admin sửa
     ],
   },
   {
