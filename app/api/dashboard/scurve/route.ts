@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, todayISO } from "@/lib/db";
+import { query, queryOne, todayISO } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { resolveSystemId } from "@/lib/systems";
 import { getCurrentProjectId } from "@/lib/projects";
@@ -23,6 +23,45 @@ type HistRow = {
 const DAY_MS = 86400_000;
 const toDate = (iso: string) => new Date(iso + "T00:00:00Z").getTime();
 const toISO = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+
+// M47 PR2: đọc đường thực tế từ mv_progress_daily (xem migrations/0055_matviews.sql) thay
+// vì tái dựng từ task_history mỗi request — chỉ khi MV phủ đủ [from, toCap]. Trả null (DB
+// mới/cron chưa refresh lần nào → MV rỗng, hoặc phủ chưa đủ) để route tự fallback tái dựng
+// như trước, KHÔNG đổi kết quả trong mọi trường hợp (đã verify khớp tuyệt đối bằng dữ liệu
+// thật, xem PROGRESS.md mục M47 PR2). MV dùng sentinel 0 cho project/system NULL.
+async function readMvActual(
+  projectId: number | null,
+  systemId: number | null,
+  from: string,
+  toCap: string,
+): Promise<Map<string, number> | null> {
+  const scopeProjectId = projectId ?? 0;
+  const systemFilter = systemId !== null ? "AND system_id = ?" : "";
+  const systemParams = systemId !== null ? [systemId] : [];
+
+  const coverage = await queryOne<{ minD: string | null; maxD: string | null }>(
+    `SELECT MIN(date) AS "minD", MAX(date) AS "maxD" FROM mv_progress_daily
+      WHERE project_id = ? ${systemFilter}`,
+    scopeProjectId,
+    ...systemParams,
+  );
+  if (!coverage?.minD || !coverage.maxD || coverage.minD > from || coverage.maxD < toCap)
+    return null;
+
+  const rows = await query<{ date: string; sumProgress: number; sumCount: number }>(
+    `SELECT date, SUM(avg_progress * total_count) AS "sumProgress", SUM(total_count) AS "sumCount"
+       FROM mv_progress_daily
+      WHERE project_id = ? ${systemFilter} AND date BETWEEN ? AND ?
+      GROUP BY date`,
+    scopeProjectId,
+    ...systemParams,
+    from,
+    toCap,
+  );
+  const map = new Map<string, number>();
+  for (const r of rows) if (r.sumCount > 0) map.set(r.date, r.sumProgress / r.sumCount);
+  return map;
+}
 
 // GET /api/dashboard/scurve?sheet=OGTĐ&baseline=<id>&system=<systems.code> (đều tuỳ chọn)
 // S-curve: đường kế hoạch (nội suy tuyến tính start→end mỗi task)
@@ -82,38 +121,58 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const hist = await query<HistRow>(
-    `SELECT h.task_id AS "taskId", h.old_progress AS "oldProgress",
-            h.new_progress AS "newProgress",
-            (h.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date::text AS day
-       FROM task_history h
-       JOIN tasks t ON h.task_id = t.id
-       JOIN work_packages wp ON t.package_id = wp.id
-       JOIN sheet_types st ON wp.sheet_type_id = st.id
-       ${projectJoin}
-      WHERE 1=1 ${sheetFilter} ${projectFilter}
-      ORDER BY h.task_id, h.changed_at`,
-    ...params,
-    ...projectParams,
-  );
-
-  // Sự kiện theo task: [{day, progress}] đã sắp theo thời gian.
-  const eventsByTask = new Map<number, { day: string; progress: number }[]>();
-  for (const h of hist) {
-    if (!eventsByTask.has(h.taskId)) eventsByTask.set(h.taskId, []);
-    eventsByTask.get(h.taskId)!.push({ day: h.day, progress: h.newProgress ?? 0 });
-  }
-  // % nền trước sự kiện đầu tiên = old_progress của sự kiện đầu (≈ % lúc import).
-  const baseline = new Map<number, number>();
-  for (const h of hist) if (!baseline.has(h.taskId)) baseline.set(h.taskId, h.oldProgress ?? 0);
-
   const today = todayISO();
-  const dates: string[] = [];
+  const taskDates: string[] = [];
   for (const t of tasks) {
-    if (t.startDate) dates.push(t.startDate);
-    if (t.endDate) dates.push(t.endDate);
+    if (t.startDate) taskDates.push(t.startDate);
+    if (t.endDate) taskDates.push(t.endDate);
   }
-  for (const h of hist) dates.push(h.day);
+
+  // Thử MV trước (chỉ khi không lọc sheet — MV chỉ gộp tới cấp hệ). Dải ngày kiểm phủ tính
+  // từ ngày BĐ/KT task (không cộng ngày lịch sử vì nhánh này không fetch lịch sử) — chấp
+  // nhận vì lịch sử luôn phát sinh sau khi task tồn tại; ca hiếm start_date đổi muộn hơn
+  // lịch sử cũ sẽ tự fallback (coverage check trong readMvActual không qua được → null).
+  let mvActual: Map<string, number> | null = null;
+  if (!sheet && taskDates.length > 0) {
+    const mvFrom = taskDates.reduce((a, b) => (a < b ? a : b));
+    const mvToCap = today < mvFrom ? mvFrom : today;
+    mvActual = await readMvActual(projectId, systemId, mvFrom, mvToCap);
+  }
+
+  // Chỉ tái dựng từ task_history khi không dùng được MV (lọc sheet, hoặc MV rỗng/chưa phủ đủ).
+  let eventsByTask: Map<number, { day: string; progress: number }[]> | null = null;
+  let baselineProgress: Map<number, number> | null = null;
+  const dates: string[] = [...taskDates];
+
+  if (!mvActual) {
+    const hist = await query<HistRow>(
+      `SELECT h.task_id AS "taskId", h.old_progress AS "oldProgress",
+              h.new_progress AS "newProgress",
+              (h.changed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date::text AS day
+         FROM task_history h
+         JOIN tasks t ON h.task_id = t.id
+         JOIN work_packages wp ON t.package_id = wp.id
+         JOIN sheet_types st ON wp.sheet_type_id = st.id
+         ${projectJoin}
+        WHERE 1=1 ${sheetFilter} ${projectFilter}
+        ORDER BY h.task_id, h.changed_at`,
+      ...params,
+      ...projectParams,
+    );
+
+    // Sự kiện theo task: [{day, progress}] đã sắp theo thời gian.
+    eventsByTask = new Map();
+    for (const h of hist) {
+      if (!eventsByTask.has(h.taskId)) eventsByTask.set(h.taskId, []);
+      eventsByTask.get(h.taskId)!.push({ day: h.day, progress: h.newProgress ?? 0 });
+    }
+    // % nền trước sự kiện đầu tiên = old_progress của sự kiện đầu (≈ % lúc import).
+    baselineProgress = new Map();
+    for (const h of hist)
+      if (!baselineProgress.has(h.taskId)) baselineProgress.set(h.taskId, h.oldProgress ?? 0);
+    dates.push(...hist.map((h) => h.day));
+  }
+
   if (dates.length === 0) return NextResponse.json({ points: [], sheets: [] });
 
   let from = dates.reduce((a, b) => (a < b ? a : b));
@@ -145,24 +204,29 @@ export async function GET(req: NextRequest) {
       plannedPct = sum / planned.length;
     }
 
-    // Thực tế: % của từng task tại ngày d (chỉ tới hôm nay).
+    // Thực tế: % của từng task tại ngày d (chỉ tới hôm nay) — đọc MV nếu có, không thì
+    // tái dựng từ task_history như trước.
     let actualPct: number | null = null;
     if (d <= today) {
-      let sum = 0;
-      for (const t of tasks) {
-        const events = eventsByTask.get(t.id);
-        if (!events) {
-          sum += t.progress ?? 0;
-          continue;
-        } // không có lịch sử → coi như % hiện tại từ đầu
-        let p = baseline.get(t.id) ?? 0;
-        for (const ev of events) {
-          if (ev.day <= d) p = ev.progress;
-          else break;
+      if (mvActual) {
+        actualPct = mvActual.get(d) ?? 0;
+      } else {
+        let sum = 0;
+        for (const t of tasks) {
+          const events = eventsByTask!.get(t.id);
+          if (!events) {
+            sum += t.progress ?? 0;
+            continue;
+          } // không có lịch sử → coi như % hiện tại từ đầu
+          let p = baselineProgress!.get(t.id) ?? 0;
+          for (const ev of events) {
+            if (ev.day <= d) p = ev.progress;
+            else break;
+          }
+          sum += p;
         }
-        sum += p;
+        actualPct = sum / tasks.length;
       }
-      actualPct = sum / tasks.length;
     }
 
     points.push({

@@ -189,6 +189,7 @@
 **Index:**
 - `idx_history_changed_at`: INDEX idx_history_changed_at ON public.task_history USING btree (changed_at DESC)
 - `idx_history_task`: INDEX idx_history_task ON public.task_history USING btree (task_id)
+- `idx_task_history_task_changed`: INDEX idx_task_history_task_changed ON public.task_history USING btree (task_id, changed_at DESC)
 - `task_history_pkey`: UNIQUE INDEX task_history_pkey ON public.task_history USING btree (id)
 
 ### baselines
