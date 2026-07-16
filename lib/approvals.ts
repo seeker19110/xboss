@@ -439,25 +439,35 @@ export type PendingApprovalOverdue = {
   entityId: number;
   currentRole: Role;
   slaDays: number;
-  createdAt: string; // dùng làm mốc tính quá hạn bước hiện tại (đơn giản hoá: schema hiện
-  // không lưu thời điểm chuyển bước riêng — chấp nhận theo đặc tả gốc M46, ghi rõ ở đây)
+  createdAt: string; // mốc bắt đầu tính SLA bước hiện tại — không phải luôn là created_at
+  // của request (xem enteredStepAt bên dưới)
 };
 
-// Request đang 'pending', bước hiện tại có sla_days khác NULL, và đã quá created_at +
+// Mốc "vào bước hiện tại": bước 1 (chưa có action nào trước đó) = created_at của request;
+// bước ≥2 = thời điểm quyết định (approval_actions.at) của bước liền trước — đã có sẵn
+// trong schema từ 0053 (không cần migration mới), chỉ trước đây chưa tận dụng nên mọi
+// bước sau bước 1 bị tính SLA sai (luôn dùng created_at gốc, làm bước sau "quá hạn" sớm
+// hơn thực tế hoặc — khi flow đứng lâu ở bước 1 rồi mới chuyển — "chưa quá hạn" trễ hơn
+// thực tế cho bước hiện tại).
+// Request đang 'pending', bước hiện tại có sla_days khác NULL, và đã quá mốc vào bước +
 // sla_days ngày → coi là quá hạn. Gộp chung "đang chờ"/"quá hạn" thành 1 loại thông báo
-// (approval_pending) — không tách 2 loại như đặc tả cũ nêu, vì schema hiện không lưu mốc
-// thời gian chuyển bước riêng lẻ (chỉ có created_at của request, không phải của bước).
+// (approval_pending) — không tách 2 loại như đặc tả cũ nêu.
 export async function overdueApprovals(projectId?: number): Promise<PendingApprovalOverdue[]> {
   const projectFilter = projectId != null ? " AND r.project_id = ?" : "";
   const params = projectId != null ? [projectId] : [];
   return query<PendingApprovalOverdue>(
     `SELECT r.id AS "requestId", r.entity_type AS "entityType", r.entity_id AS "entityId",
-            s.role AS "currentRole", s.sla_days AS "slaDays", r.created_at AS "createdAt"
+            s.role AS "currentRole", s.sla_days AS "slaDays", entered."enteredAt" AS "createdAt"
        FROM approval_requests r
        JOIN approval_steps s ON s.flow_id = r.flow_id AND s.seq = r.current_seq
+       JOIN LATERAL (
+         SELECT COALESCE(MAX(a.at), r.created_at) AS "enteredAt"
+           FROM approval_actions a
+          WHERE a.request_id = r.id AND a.step_seq < r.current_seq
+       ) entered ON TRUE
       WHERE r.status = 'pending' AND s.sla_days IS NOT NULL
-        AND r.created_at < now() - (s.sla_days || ' days')::interval${projectFilter}
-      ORDER BY r.created_at`,
+        AND entered."enteredAt" < now() - (s.sla_days || ' days')::interval${projectFilter}
+      ORDER BY entered."enteredAt"`,
     ...params,
   );
 }
