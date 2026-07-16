@@ -10,6 +10,7 @@ import {
   verifyFileMime,
   newAlbumPhotoFileName,
   MAX_PHOTO_BYTES,
+  isContentTooLarge,
 } from "@/lib/photos";
 import { listAlbumPhotos } from "@/lib/tech";
 
@@ -73,6 +74,12 @@ export async function POST(
         )
       : undefined;
   if (!album) return NextResponse.json({ error: "Không tìm thấy album" }, { status: 404 });
+
+  if (isContentTooLarge(req.headers.get("content-length"), MAX_PHOTO_BYTES))
+    return NextResponse.json(
+      { error: `Ảnh quá lớn (tối đa ${MAX_PHOTO_BYTES / 1024 / 1024}MB)` },
+      { status: 413 },
+    );
 
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");

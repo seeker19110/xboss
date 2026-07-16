@@ -9,6 +9,7 @@ import {
   extForDocMime,
   extForMime,
   verifyFileMime,
+  isContentTooLarge,
 } from "@/lib/photos";
 import { createReadStream, statSync, existsSync } from "node:fs";
 import { unlink, writeFile } from "node:fs/promises";
@@ -106,6 +107,12 @@ export async function POST(
     return NextResponse.json(
       { error: "Bạn chỉ được thao tác trên nhóm được giao cho mình" },
       { status: 403 },
+    );
+
+  if (isContentTooLarge(req.headers.get("content-length"), MAX_DOC_BYTES))
+    return NextResponse.json(
+      { error: `File vượt quá ${MAX_DOC_BYTES / 1024 / 1024}MB` },
+      { status: 413 },
     );
 
   const formData = await req.formData().catch(() => null);

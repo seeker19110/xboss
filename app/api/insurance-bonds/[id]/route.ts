@@ -11,6 +11,7 @@ import {
   newInsuranceDocFileName,
   photoPath,
   MAX_DOC_BYTES,
+  isContentTooLarge,
 } from "@/lib/photos";
 import {
   checkInsuranceContractRef,
@@ -110,6 +111,12 @@ export async function PATCH(
   let file: File | null = null;
 
   if (contentType.startsWith("multipart/form-data")) {
+    if (isContentTooLarge(req.headers.get("content-length"), MAX_DOC_BYTES))
+      return NextResponse.json(
+        { error: `File quá lớn (tối đa ${MAX_DOC_BYTES / 1024 / 1024}MB)` },
+        { status: 413 },
+      );
+
     const form = await req.formData().catch(() => null);
     if (!form)
       return NextResponse.json({ error: "Dữ liệu multipart không hợp lệ" }, { status: 400 });

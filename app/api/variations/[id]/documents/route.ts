@@ -11,6 +11,7 @@ import {
   newVoDocFileName,
   MAX_DOC_BYTES,
   sha256Hex,
+  isContentTooLarge,
 } from "@/lib/photos";
 import { canEditVo } from "@/lib/vo";
 
@@ -79,6 +80,12 @@ export async function POST(
   if (!vo) return NextResponse.json({ error: "Không tìm thấy phát sinh" }, { status: 404 });
   const editErr = canEditVo(vo, user);
   if (editErr) return NextResponse.json({ error: editErr }, { status: 403 });
+
+  if (isContentTooLarge(req.headers.get("content-length"), MAX_DOC_BYTES))
+    return NextResponse.json(
+      { error: `File quá lớn (tối đa ${MAX_DOC_BYTES / 1024 / 1024}MB)` },
+      { status: 413 },
+    );
 
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");
