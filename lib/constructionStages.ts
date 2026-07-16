@@ -202,13 +202,28 @@ export type StageMissingItem = {
 
 // Tầng "chưa sẵn sàng" = công tác cuối cùng theo sort_order (trong các stage active) của
 // tầng đó còn handed_over_at NULL — áp dụng chung mọi hệ (khác model cũ tách theo sheet).
-export async function pendingStageFloors(): Promise<Set<string>> {
+// projectId lọc qua chain work_packages → sheet_types → towers (floor_label không phải
+// FK nên JOIN theo giá trị, giống stageMissingList/allProjectFloors) — tránh 2 dự án
+// trùng nhãn tầng (vd cả 2 đều có "T5") lẫn dữ liệu "chưa sẵn sàng" của nhau.
+export async function pendingStageFloors(projectId?: number): Promise<Set<string>> {
+  const conds = [
+    "cs.active = TRUE",
+    "fsf.handed_over_at IS NULL",
+    "cs.sort_order = (SELECT MAX(sort_order) FROM construction_stages WHERE active = TRUE)",
+  ];
+  const args: unknown[] = [];
+  if (projectId != null) {
+    conds.push(
+      "EXISTS (SELECT 1 FROM work_packages wp JOIN sheet_types st ON st.id = wp.sheet_type_id JOIN towers tw ON tw.id = st.tower_id WHERE wp.floor_label = fsf.floor_label AND tw.project_id = ?)",
+    );
+    args.push(projectId);
+  }
   const rows = await query<{ floorLabel: string }>(
     `SELECT fsf.floor_label AS "floorLabel"
        FROM floor_stage_fronts fsf
        JOIN construction_stages cs ON cs.id = fsf.stage_id
-      WHERE cs.active = TRUE AND fsf.handed_over_at IS NULL
-        AND cs.sort_order = (SELECT MAX(sort_order) FROM construction_stages WHERE active = TRUE)`,
+      WHERE ${conds.join(" AND ")}`,
+    ...args,
   );
   return new Set(rows.map((r) => r.floorLabel));
 }

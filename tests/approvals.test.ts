@@ -240,3 +240,66 @@ test(
     }
   },
 );
+
+test(
+  "overdueApprovals: SLA bước 2 tính từ thời điểm duyệt xong bước 1 (approval_actions.at), không phải created_at gốc của request",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { insertId, run } = await import("@/lib/db");
+    const { openApproval, advanceApproval, overdueApprovals } = await import("@/lib/approvals");
+    const { projectId, creator, pm, cdt, flowId } = await seed2("proposal", 3); // bước 1 SLA 3 ngày
+    // seed2 tạo sẵn bước 2 (cdt) với sla_days NULL — sửa thành 3 ngày để có SLA thật ở bước 2.
+    await run(`UPDATE approval_steps SET sla_days = 3 WHERE flow_id = ? AND seq = 2`, flowId);
+    const entityId = EID2 * 10 + 3;
+    try {
+      const req = await openApproval({
+        entityType: "proposal",
+        entityId,
+        projectId,
+        amount: 100,
+        user: { id: creator, role: "engineer" },
+      });
+      // Request mở từ 10 ngày trước (quá SLA bước 1) nhưng bước 1 duyệt gần đây (1 ngày
+      // trước) → nếu vẫn đo SLA bước 2 từ created_at gốc thì đã "quá hạn" ngay khi vào
+      // bước 2; đo đúng phải lấy mốc duyệt bước 1 → chưa quá hạn (mới 1 ngày < SLA 3 ngày).
+      await run(
+        `UPDATE approval_requests SET created_at = now() - interval '10 days' WHERE id = ?`,
+        req!.id,
+      );
+      await advanceApproval({
+        entityType: "proposal",
+        entityId,
+        user: { id: pm, role: "pm" },
+        decision: "approve",
+      });
+      await run(
+        `UPDATE approval_actions SET at = now() - interval '1 day' WHERE request_id = ? AND step_seq = 1`,
+        req!.id,
+      );
+      const notYetOverdue = await overdueApprovals(projectId);
+      assert.ok(
+        !notYetOverdue.some((o) => o.requestId === req!.id),
+        "chưa quá hạn: bước 1 chỉ vừa duyệt 1 ngày trước, SLA bước 2 là 3 ngày",
+      );
+
+      // Lùi mốc duyệt bước 1 ra 5 ngày trước (> SLA 3 ngày) → giờ mới thực sự quá hạn.
+      await run(
+        `UPDATE approval_actions SET at = now() - interval '5 days' WHERE request_id = ? AND step_seq = 1`,
+        req!.id,
+      );
+      const overdue = await overdueApprovals(projectId);
+      const found = overdue.find((o) => o.requestId === req!.id);
+      assert.ok(found, "phải quá hạn khi đã 5 ngày kể từ lúc duyệt xong bước 1");
+      assert.equal(found!.currentRole, "cdt");
+      assert.equal(found!.slaDays, 3);
+    } finally {
+      await cleanup2({
+        projectId,
+        userIds: [creator, pm, cdt],
+        flowId,
+        entityType: "proposal",
+        entityIds: [entityId],
+      });
+    }
+  },
+);

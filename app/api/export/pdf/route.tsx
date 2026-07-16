@@ -6,6 +6,7 @@ import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/pdf-font
 import { formatDateVN } from "@/lib/date";
 import { groupDelayedTasks } from "@/lib/delayed-groups";
 import { getGroupProgressMap } from "@/lib/group-progress";
+import { getCurrentProjectId } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 registerVietnameseFonts();
@@ -211,9 +212,16 @@ export async function GET(_req: NextRequest) {
   if (!CAN.export(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM được xuất báo cáo" }, { status: 403 });
 
+  // Lọc theo dự án đang chọn để tránh rò rỉ chéo dự án (M22+); null = không lọc.
+  const projectId = await getCurrentProjectId(user);
+  const projectJoin = projectId != null ? "JOIN towers tw ON tw.id = st.tower_id" : "";
+  const projectFilterAnd = projectId != null ? "AND tw.project_id = ?" : "";
+  const projectParams = projectId != null ? [projectId] : [];
+
   // Lấy dữ liệu
   const [kpiRows, delayedRows, project, groupProgress] = await Promise.all([
-    query<KPI>(`
+    query<KPI>(
+      `
       SELECT st.code AS "sheetType",
              COUNT(t.id)::int AS total,
              AVG(t.progress_percent) AS "avgProgress",
@@ -221,8 +229,13 @@ export async function GET(_req: NextRequest) {
         FROM sheet_types st
         LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
         LEFT JOIN tasks t ON t.package_id = wp.id
-       GROUP BY st.id, st.code ORDER BY st.id`),
-    query<DelayedTask>(`
+        ${projectJoin}
+       WHERE 1=1 ${projectFilterAnd}
+       GROUP BY st.id, st.code ORDER BY st.id`,
+      ...projectParams,
+    ),
+    query<DelayedTask>(
+      `
       SELECT t.id, t.name, t.status, t.end_date AS "endDate",
              t.progress_percent AS "progressPercent",
              COALESCE(wp.floor_label, '') AS "floorLabel",
@@ -230,9 +243,16 @@ export async function GET(_req: NextRequest) {
         FROM tasks t
         JOIN work_packages wp ON t.package_id = wp.id
         JOIN sheet_types st ON wp.sheet_type_id = st.id
-       WHERE t.status = 'tre' ORDER BY t.end_date NULLS LAST LIMIT 200`),
-    queryOne<{ name: string }>(`SELECT name FROM projects LIMIT 1`).catch(() => null),
-    getGroupProgressMap(),
+        ${projectJoin}
+       WHERE t.status = 'tre' ${projectFilterAnd} ORDER BY t.end_date NULLS LAST LIMIT 200`,
+      ...projectParams,
+    ),
+    projectId != null
+      ? queryOne<{ name: string }>(`SELECT name FROM projects WHERE id = ?`, projectId).catch(
+          () => null,
+        )
+      : queryOne<{ name: string }>(`SELECT name FROM projects LIMIT 1`).catch(() => null),
+    getGroupProgressMap({ projectId }),
   ]);
 
   const today = formatDateVN(new Date());
