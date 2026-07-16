@@ -257,3 +257,149 @@ viết trước, code đã đổi) + quyết định đã chốt. Khi kế hoạ
       `xboss_app`, `MIGRATE_DATABASE_URL`, ADR-0005). (Câu hỏi thư viện OIDC của M49
       PR3 ĐÃ chốt 2026-07-16: dùng `openid-client` — đặc tả M49 đã viết lại toàn diện
       theo quyết định này, xem `docs/nang-cap/M49-api-mo-sso.md`.)
+
+---
+
+## Kế hoạch: Đợt vá vận hành 2026-07-16 (độc lập, chạy song song được với M50)
+
+### Bối cảnh & mục tiêu
+
+Kết quả đợt quét dự án 2026-07-16 theo `docs/audit.md` (phiên chính tự quét, đã xác
+minh ground-truth từng điểm bằng grep/đọc migration/chạy `npm audit`): nền bảo mật/vận
+hành sau M43–M48 đã vững (`npm audit` 0 lỗ hổng, workflow pin SHA đủ, security headers
+đủ trừ HSTS, M44 đóng đủ 4 PR) — còn lại 4 điểm nhỏ vá được ngay bằng đợt này.
+
+**Phạm vi**: 2 việc, 2 nhánh, 2 PR nhỏ. KHÔNG đụng file nào của kế hoạch M50 ở trên
+(deploy.yml/DEPLOY.md/PROGRESS.md/2 file test — không giao với `lib/auth.ts`/route/UI
+của M50) → coordinator được dispatch song song cả hai kế hoạch.
+
+**Ngoài phạm vi (chờ người dùng, KHÔNG tự làm)**: xác nhận branch protection `main`
+có enforce cho admin không (quyết định giữ/bỏ deploy-on-push, nợ audit lần 5); cấp
+`SENTRY_DSN`; tắt nguồn notification 8 module ẩn (giải tận gốc ở M52 PR3).
+
+### Việc
+
+#### A. Vá cấu hình + dọn tài liệu vận hành (deploy.yml, DEPLOY.md, PROGRESS.md)
+
+- `route:` `mechanical` (mọi thay đổi là văn bản/cấu hình có nội dung cho sẵn dưới đây)
+- agent: `mechanical-worker`
+- nhánh/worktree: `claude/chore-ops-hardening` (base `origin/main` mới nhất)
+- đặc tả (3 file, nội dung đóng — chép đúng, không sáng tác thêm):
+
+  **A1. `.github/workflows/deploy.yml`** — file DUY NHẤT trong `.github/workflows/`
+  thiếu khối `permissions:` (vi phạm checklist `docs/audit.md` §6 "least-privilege
+  tường minh"). Job chỉ SSH vào VPS qua secrets, không dùng `GITHUB_TOKEN` → thêm
+  ngay dưới khối `on:` (trước `jobs:`), thụt lề cấp 0:
+
+  ```yaml
+  # Job chỉ SSH vào VPS bằng secrets riêng — không cần bất kỳ quyền GITHUB_TOKEN nào
+  # (least-privilege theo docs/audit.md §6).
+  permissions: {}
+  ```
+
+  **A2. `DEPLOY.md`** — mục reverse proxy (~dòng 117, câu "Đặt Nginx/Caddy làm reverse
+  proxy trước cổng 3000, rồi dùng `certbot --nginx` cấp SSL miễn phí."): bổ sung ngay
+  sau câu đó đoạn sau (certbot KHÔNG tự thêm HSTS — app hiện không có
+  `Strict-Transport-Security` ở đâu):
+
+  ```markdown
+  Sau khi HTTPS chạy ổn định, thêm HSTS vào block `server` cổng 443 của Nginx để chặn
+  downgrade về HTTP (certbot không tự thêm header này):
+
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+  > Lưu ý: chỉ thêm khi chắc chắn toàn bộ domain (kể cả subdomain nếu dùng
+  > `includeSubDomains`) phục vụ HTTPS lâu dài; không dùng `preload` — ghi danh vào
+  > danh sách preload của trình duyệt gần như không rút lại được.
+  ```
+
+  **A3. `PROGRESS.md`** — 3 chỉnh sửa vào mục nợ kỹ thuật (đã xác minh hiện trạng
+  2026-07-16, ghi đúng như sau):
+
+  1. Khối "**Nợ lớn đã biết theo ADR-0004**" (cụm `tasks`/`gantt`/`timeline`/
+     `lookahead`/`my-tasks`/`schedule-control`/`norms/over` chưa lọc `project_id`):
+     bọc `~~...~~` toàn dòng + nối vào cuối: "→ **đã đóng** (2026-07-16, PR #202 vá
+     đủ 7 route + PR #209 vá nốt `pendingStageFloors`/`export/pdf`; bất biến tĩnh
+     `tests/project-scope-invariant.test.ts` canh lớp lỗi này từ nay)".
+  2. Dòng nợ "`lib/dashboardext.ts::cashflowSeries()`/`cpiBlock()` ... chưa scope
+     theo dự án": bọc `~~...~~` + nối: "→ **hết hiện trạng** (xác minh 2026-07-16:
+     2 hàm đã bị xoá khỏi codebase trong các đợt refactor trước, không còn định nghĩa
+     trong `lib/dashboardext.ts` lẫn `lib/finance.ts` — chỉ còn comment nhắc tên ở
+     `lib/finance.ts:18`; không còn gì để scope)".
+  3. Thêm 1 dòng nợ MỚI (cùng danh sách nợ kỹ thuật, mục gần nhất): "**CSP còn
+     `script-src 'unsafe-inline'`** (`next.config.mjs`) — chấp nhận có chủ đích
+     2026-07-16: gỡ cần chuyển sang nonce-based CSP (đụng mọi inline script của
+     Next/analytics), chi phí lớn, làm thành đợt riêng khi có yêu cầu cứng về CSP;
+     các lớp chống XSS khác đã có (React escape mặc định, không `dangerouslySetInnerHTML`
+     với dữ liệu người dùng)."
+
+- tiêu chí chấp nhận:
+  - [ ] `git diff` chỉ chạm đúng 3 file trên, nội dung khớp đặc tả
+  - [ ] YAML hợp lệ (workflow parse được — chạy `npx --yes yaml-lint` hoặc để CI kiểm);
+        `npm run lint`/`typecheck` xanh (không đụng code nên phải xanh nguyên trạng)
+  - [ ] Không sửa/xoá mục nào khác trong `PROGRESS.md` ngoài 3 điểm nêu trên
+
+#### B. Fixture test idempotent: `tests/evm.test.ts` + `tests/matviews.test.ts`
+
+- `route:` `standard` (fix có cơ chế lỗi đã chẩn đoán sẵn + cách tái hiện cụ thể)
+- agent: `standard-worker`
+- nhánh/worktree: `claude/fix-test-fixture-rerun` (base `origin/main` mới nhất)
+- đặc tả — cơ chế lỗi ĐÃ XÁC MINH (nợ ghi trong `PROGRESS.md`: "2 file thiếu cleanup
+  fixture nên chỉ chạy đúng 1 lần/DB"):
+  - Cả 2 file seed fixture bằng **mã cứng** va vào ràng buộc UNIQUE toàn cục:
+    `tests/matviews.test.ts:19` chèn `systems (code='MVACMV')` — `systems.code` là
+    `NOT NULL UNIQUE` (kế thừa `disciplines`, `migrations/0005_boq.sql`);
+    `tests/evm.test.ts` chèn `boq_items` với BOQCODE cứng — BOQCODE unique **toàn
+    hệ thống** qua bảng `boq_codes` + trigger (`migrations/0029_boq_codes.sql`).
+  - Cleanup (`DELETE FROM ...`) nằm **cuối thân test, sau các assert, không bọc
+    `finally`** (vd `evm.test.ts:131-141`, `matviews.test.ts:86-90`) → bất kỳ assert
+    fail nào bỏ dở cleanup, dữ liệu mồ côi ở lại, lần chạy sau vỡ UNIQUE ngay từ seed
+    → "fail giả" nối tiếp dù code đúng.
+  - Sửa theo 2 lớp, áp cho CẢ 2 file (không đổi bất kỳ assert/logic kiểm nào):
+    1. **Mã duy nhất theo lần chạy**: đầu mỗi file thêm
+       `const RUN = Date.now().toString(36);` — mọi mã cứng trong fixture (code của
+       systems/sheet_types/work_packages/tasks/boq_items, slug, tên project) nối thêm
+       `-${RUN}` (vd `` `MVACMV-${RUN}` ``). Hai lần chạy không bao giờ đụng UNIQUE
+       kể cả khi lần trước bỏ dở cleanup.
+    2. **Cleanup chạy cả khi fail**: chuyển toàn bộ khối DELETE cuối test vào
+       `try { ...thân test... } finally { ...cleanup... }` (node:test không có
+       fixture teardown theo test — `try/finally` là pattern đơn giản nhất, giữ
+       nguyên thứ tự DELETE con-trước-cha hiện có). Biến id khai báo trước `try`
+       (kiểu `let`, gán trong `try`, cleanup check `if (id)` trước khi DELETE).
+  - **Bắt buộc tái hiện lỗi TRƯỚC khi sửa** (ground-truth theo `docs/audit.md` §1):
+    dựng Postgres cục bộ + `TEST_DATABASE_URL`, chạy
+    `npx tsx --test tests/evm.test.ts tests/matviews.test.ts` **2 lần liên tiếp cùng
+    DB** — ghi nhận lần 2 fail (nếu KHÔNG tái hiện được: dừng, báo lại, không sửa mù).
+- tiêu chí chấp nhận:
+  - [ ] Tái hiện được lỗi trước khi sửa (ghi output lần 2 fail vào báo cáo)
+  - [ ] Sau sửa: chạy 2 file test **2 lần liên tiếp cùng DB** đều xanh; thêm lần 3
+        sau khi giả lập fail giữa chừng (chèn tạm 1 assert sai, chạy, gỡ ra, chạy
+        lại) vẫn xanh — chứng minh cả 2 lớp sửa đều hoạt động
+  - [ ] Toàn bộ `npm test` xanh; `npm run lint`/`typecheck` xanh
+  - [ ] Không assert/logic kiểm nào bị đổi — diff chỉ gồm mã fixture + `try/finally`
+
+### Thứ tự & phụ thuộc
+
+- Việc A và B độc lập hoàn toàn (không chung file) — dispatch song song, mỗi việc 1
+  worktree. Cả hai độc lập với kế hoạch M50 ở trên.
+- Không migration nào trong đợt này.
+
+### Sau khi worker xong (coordinator thực hiện)
+
+- [ ] Việc A: đối chiếu diff từng dòng với nội dung cho sẵn (mechanical — sai lệch
+      văn bản là lỗi); việc B: kiểm tra báo cáo có bằng chứng tái hiện + 3 lượt chạy
+      xanh như tiêu chí
+- [ ] `reviewer` soát diff việc B (skill `code-review`) — chú ý: thứ tự DELETE
+      con-trước-cha trong `finally` không đổi; không có đường code nào khiến cleanup
+      chạy khi seed chưa xong (id undefined)
+- [ ] Báo cáo tổng hợp về phiên chính: nhánh + commit từng việc, bằng chứng verify B
+
+### Duyệt cuối (phiên chính thực hiện)
+
+- [ ] Đối chiếu diff với đặc tả; push 2 nhánh + mở 2 PR draft
+- [ ] Ghi kết quả đợt quét + đợt vá vào `PROGRESS.md` (mục "Đợt quét vận hành
+      2026-07-16") sau khi 2 PR xong
+- [ ] Nhắc người dùng 2 việc chỉ họ làm được: (a) kiểm tra branch protection `main`
+      có "Include administrators" + chặn push thẳng không — nếu không, cân nhắc trả
+      `deploy.yml` về `workflow_run` chờ CI; (b) cấp `SENTRY_DSN` để bật theo dõi lỗi
+      production (scaffold M44 đã sẵn, chỉ thiếu secret)
