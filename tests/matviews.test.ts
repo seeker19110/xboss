@@ -80,6 +80,16 @@ test(
     assert.ok(Math.abs((byDate.get("2026-06-04") ?? 0) - (0.6 + 0 + 0.3) / 3) < 1e-9);
     assert.ok(Math.abs((byDate.get("2026-06-05") ?? 0) - (0.6 + 0.5 + 0.3) / 3) < 1e-9);
     assert.ok(Math.abs((byDate.get("2026-06-06") ?? 0) - (0.9 + 0.5 + 0.3) / 3) < 1e-9);
+
+    // Dọn dữ liệu — chạy lại nhiều lần trên cùng DB (dev/local) không đụng slug/mã cố định
+    // ('m47-mv', 'MVACMV'...) của lần chạy trước (khác CI luôn dùng Postgres ephemeral).
+    await run(`DELETE FROM task_history WHERE task_id IN (?, ?)`, tA, tB);
+    await run(`DELETE FROM tasks WHERE package_id = ?`, wpId);
+    await run(`DELETE FROM work_packages WHERE id = ?`, wpId);
+    await run(`DELETE FROM sheet_types WHERE id = ?`, sheetId);
+    await run(`DELETE FROM systems WHERE id = ?`, sysId);
+    await run(`DELETE FROM towers WHERE id = ?`, towerId);
+    await run(`DELETE FROM projects WHERE id = ?`, projectId);
   },
 );
 
@@ -129,6 +139,15 @@ test(
     assert.equal(row.length, 1);
     assert.equal(Number(row[0].committed), 100 * 50000);
     assert.equal(Number(row[0].actual), 2000000);
+
+    await run(`DELETE FROM payment_bills WHERE sheet_type_id = ?`, sheetId);
+    await run(`DELETE FROM po_items WHERE po_id = ?`, poId);
+    await run(`DELETE FROM purchase_orders WHERE id = ?`, poId);
+    await run(`DELETE FROM materials WHERE id = ?`, matId);
+    await run(`DELETE FROM suppliers WHERE id = ?`, supId);
+    await run(`DELETE FROM sheet_types WHERE id = ?`, sheetId);
+    await run(`DELETE FROM towers WHERE id = ?`, towerId);
+    await run(`DELETE FROM projects WHERE id = ?`, projectId);
   },
 );
 
@@ -177,5 +196,14 @@ test(
     await run(`REFRESH MATERIALIZED VIEW CONCURRENTLY mv_cost_by_month`);
     const cached = await runReport("cost_by_month", {}, projectId);
     assert.deepEqual(cached.rows, fallback.rows);
+
+    await run(`DELETE FROM payment_bills WHERE sheet_type_id = ?`, sheetId);
+    await run(`DELETE FROM po_items WHERE po_id = ?`, poId);
+    await run(`DELETE FROM purchase_orders WHERE id = ?`, poId);
+    await run(`DELETE FROM materials WHERE id = ?`, matId);
+    await run(`DELETE FROM suppliers WHERE id = ?`, supId);
+    await run(`DELETE FROM sheet_types WHERE id = ?`, sheetId);
+    await run(`DELETE FROM towers WHERE id = ?`, towerId);
+    await run(`DELETE FROM projects WHERE id = ?`, projectId);
   },
 );

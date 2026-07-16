@@ -125,6 +125,20 @@ test(
     assert.equal(dataCash!.summary.ac, 3_000_000);
     // cash + lọc hệ → phải từ chối (tiền mặt không gắn hệ)
     await assert.rejects(() => getEvmSeries({ projectId, source: "cash", systemId: 1 }));
+
+    // Dọn dữ liệu — chạy lại nhiều lần trên cùng DB (dev/local) không đụng slug/mã cố định
+    // ('m47-evm', 'M47-T1'...) của lần chạy trước (khác CI luôn dùng Postgres ephemeral).
+    await run(`DELETE FROM cash_transactions WHERE project_id = ?`, projectId);
+    await run(`DELETE FROM baseline_tasks WHERE baseline_id = ?`, blId);
+    await run(`DELETE FROM baselines WHERE id = ?`, blId);
+    await run(`DELETE FROM payment_bills WHERE sheet_type_id = ?`, sheetId);
+    await run(`DELETE FROM boq_task_map WHERE boq_item_id = ?`, boqId);
+    await run(`DELETE FROM boq_items WHERE id = ?`, boqId);
+    await run(`DELETE FROM tasks WHERE id IN (?, ?)`, t1, t2Id);
+    await run(`DELETE FROM work_packages WHERE id = ?`, wpId);
+    await run(`DELETE FROM sheet_types WHERE id = ?`, sheetId);
+    await run(`DELETE FROM towers WHERE id = ?`, towerId);
+    await run(`DELETE FROM projects WHERE id = ?`, projectId);
   },
 );
 
@@ -173,5 +187,11 @@ test(
     // Dự án không có task → null (API trả series rỗng + summary null)
     const emptyProject = await insertId(`INSERT INTO projects (name) VALUES ('M47 EVM P3')`);
     assert.equal(await getEvmSeries({ projectId: emptyProject }), null);
+
+    await run(`DELETE FROM tasks WHERE package_id = ?`, wpId);
+    await run(`DELETE FROM work_packages WHERE id = ?`, wpId);
+    await run(`DELETE FROM sheet_types WHERE id = ?`, sheetId);
+    await run(`DELETE FROM towers WHERE id = ?`, towerId);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, projectId, emptyProject);
   },
 );
