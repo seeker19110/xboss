@@ -31,6 +31,7 @@ import { CALIBRATION_WARN_DAYS } from "@/lib/equipment";
 import { PROPOSAL_PENDING_DAYS } from "@/lib/proposals";
 import { pendingDesignChanges } from "@/lib/designchanges";
 import { pendingClaims } from "@/lib/claims";
+import { getAlertThreshold } from "@/lib/alerts";
 
 export const dynamic = "force-dynamic";
 
@@ -93,10 +94,14 @@ export async function GET(req: Request) {
     );
   }
 
-  // Sắp đến hạn: deadline còn ≤3 ngày mà tiến độ < 70% → cảnh báo sớm trước khi thành trễ.
-  const soon = daysFromTodayISO(3);
+  // Sắp đến hạn: deadline còn ≤N ngày mà tiến độ < ngưỡng → cảnh báo sớm trước khi
+  // thành trễ. Ngưỡng đọc từ alert_rules (M47 PR4, lib/alerts.ts); không có rule →
+  // default cũ y hệt (3 ngày / 70%).
+  const dueSoonDays = await getAlertThreshold("due_soon_days", projectId);
+  const dueSoonProgress = await getAlertThreshold("due_soon_progress", projectId);
+  const soon = daysFromTodayISO(dueSoonDays);
   const DUE_SOON_COND = `t.end_date IS NOT NULL AND t.end_date >= ? AND t.end_date <= ?
-        AND t.progress_percent < 0.7 AND t.status NOT IN ('hoan_thanh','nghiem_thu')`;
+        AND t.progress_percent < ? AND t.status NOT IN ('hoan_thanh','nghiem_thu')`;
   const dueSoon = await query<{
     id: number;
     code: string;
@@ -109,7 +114,7 @@ export async function GET(req: Request) {
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
       WHERE ${DUE_SOON_COND}${subconFilter}${projectFilter}`,
-    ...(isSubcon ? [today, soon, user.id] : [today, soon]),
+    ...(isSubcon ? [today, soon, dueSoonProgress, user.id] : [today, soon, dueSoonProgress]),
     ...projectParam,
   );
 
@@ -118,7 +123,7 @@ export async function GET(req: Request) {
     const params = dueSoon.flatMap((t) => [
       user.id,
       t.id,
-      `⏳ [${t.sheetType}] ${t.code} — ${t.name} sắp đến hạn ${t.endDate} (tiến độ < 70%)`,
+      `⏳ [${t.sheetType}] ${t.code} — ${t.name} sắp đến hạn ${t.endDate} (tiến độ < ${Math.round(dueSoonProgress * 100)}%)`,
     ]);
     await run(
       `INSERT INTO notifications (user_id, task_id, type, message) VALUES ${values}
@@ -150,7 +155,9 @@ export async function GET(req: Request) {
            JOIN work_packages wp ON t.package_id = wp.id
            JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
            WHERE ${DUE_SOON_COND}${subconFilter}${projectFilter})`,
-    ...(isSubcon ? [user.id, today, soon, user.id] : [user.id, today, soon]),
+    ...(isSubcon
+      ? [user.id, today, soon, dueSoonProgress, user.id]
+      : [user.id, today, soon, dueSoonProgress]),
     ...projectParam,
   );
 
@@ -201,6 +208,14 @@ export async function GET(req: Request) {
   // materials có project_id trực tiếp (M22+) — lọc theo dự án đang chọn.
   if (user.role !== "subcon") {
     const matProjectFilter = projectId != null ? " AND m.project_id = ?" : "";
+    // Ngưỡng vượt định mức đọc từ alert_rules (M47 PR4); default 0% → hệt điều kiện cũ
+    // `qty_used > qty_planned` (không đổi hành vi mặc định).
+    const materialOverPct = await getAlertThreshold("material_over_pct", projectId);
+    // ?::numeric bắt buộc — nếu không Postgres suy luận kiểu tham số là integer (vì vế
+    // phải "100" là literal integer) và làm TRÒN NGUYÊN phép chia (vd 20/100 = 0), khiến
+    // ngưỡng % vô hiệu (đã phát hiện qua tests/alerts.test.ts khi verify bất biến PR4).
+    const materialOverCond =
+      "m.qty_planned > 0 AND m.qty_used > m.qty_planned * (1 + ?::numeric / 100)";
     const overMats = await query<{
       id: number;
       name: string;
@@ -212,7 +227,8 @@ export async function GET(req: Request) {
       `SELECT m.id, m.name, m.unit, m.qty_planned AS "qtyPlanned", m.qty_used AS "qtyUsed", st.code AS "sheetCode"
          FROM materials m
          LEFT JOIN sheet_types st ON m.sheet_type_id = st.id
-        WHERE m.qty_planned > 0 AND m.qty_used > m.qty_planned${matProjectFilter}`,
+        WHERE ${materialOverCond}${matProjectFilter}`,
+      materialOverPct,
       ...projectParam,
     );
 
@@ -235,8 +251,9 @@ export async function GET(req: Request) {
       `DELETE FROM notifications
         WHERE user_id = ? AND type = 'material_over' AND is_read = 0
           AND material_id NOT IN (
-            SELECT id FROM materials m WHERE qty_planned > 0 AND qty_used > qty_planned${matProjectFilter})`,
+            SELECT id FROM materials m WHERE ${materialOverCond}${matProjectFilter})`,
       user.id,
+      materialOverPct,
       ...projectParam,
     );
   }

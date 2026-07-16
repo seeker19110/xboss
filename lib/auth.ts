@@ -265,6 +265,10 @@ export const CAN = {
   // (đổi luồng duyệt tài chính/nghiệm thu toàn hệ) — chỉ Admin.
   viewApprovalFlows: (r?: Role) => r === "admin" || r === "pm",
   manageApprovalFlows: (r?: Role) => r === "admin",
+  // Ngưỡng cảnh báo cấu hình được (M47 PR4, lib/alerts.ts) — xem Admin/PM, sửa chỉ
+  // Admin (cùng phân quyền Approval Engine, M46 PR4).
+  viewAlertRules: (r?: Role) => r === "admin" || r === "pm",
+  manageAlertRules: (r?: Role) => r === "admin",
 };
 
 // Sub-con chỉ được thao tác trên task được giao cho mình.

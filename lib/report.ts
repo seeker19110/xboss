@@ -310,7 +310,11 @@ function rowsHtml(rows: DelayedRow[]): string {
 }
 
 // Bản rút gọn cho Telegram (parse_mode HTML — chỉ hỗ trợ b/i/a/code, giới hạn 4096 ký tự).
-export function reportToTelegramText(r: DailyReport, appUrl?: string): string {
+export function reportToTelegramText(
+  r: DailyReport,
+  appUrl?: string,
+  evmAlerts?: string[],
+): string {
   const lines: string[] = [
     `🏗️ <b>XBoss — Báo cáo trễ hạn ${r.date}</b>`,
     `Tổng cộng <b>${r.totalDelayed}</b> hạng mục đang trễ · <b>${r.newDelayed.length}</b> việc mới quá hạn trong 24h`,
@@ -341,6 +345,11 @@ export function reportToTelegramText(r: DailyReport, appUrl?: string): string {
       lines.push(
         `· <code>${esc(t.code)}</code> ${esc(t.name)} — hạn ${t.endDate} (${pct(t.progressPercent)})`,
       );
+  }
+  // Cảnh báo SPI/CPI (M47 PR4, ngưỡng đọc từ alert_rules qua lib/alerts.ts).
+  if (evmAlerts && evmAlerts.length) {
+    lines.push("", `📈 <b>Cảnh báo EVM</b>`);
+    for (const a of evmAlerts) lines.push(`· ${esc(a)}`);
   }
   if (appUrl) lines.push("", `<a href="${appUrl}">→ Mở XBoss Dashboard</a>`);
   // Telegram giới hạn 4096 ký tự/tin — cắt an toàn.
@@ -491,8 +500,15 @@ export function weeklyToHtml(
   </body></html>`;
 }
 
-export function reportToHtml(r: DailyReport, appUrl?: string): string {
+export function reportToHtml(r: DailyReport, appUrl?: string, evmAlerts?: string[]): string {
   const th = `style="padding:6px 8px;text-align:left;background:#f4f4f5;font-size:12px;color:#555"`;
+  const evmAlertsHtml =
+    evmAlerts && evmAlerts.length
+      ? `<h3 style="margin:20px 0 8px">📈 Cảnh báo EVM</h3>
+  <ul style="margin:0 0 16px;padding-left:20px;color:#c00">
+    ${evmAlerts.map((a) => `<li>${esc(a)}</li>`).join("")}
+  </ul>`
+      : "";
   return `<!doctype html><html><body style="font-family:Segoe UI,Arial,sans-serif;color:#222;max-width:720px;margin:0 auto">
   <h2 style="margin:16px 0 4px">🏗️ XBoss — Báo cáo trễ hạn ${r.date}</h2>
   <p style="margin:0 0 16px;color:#666">${esc(r.projectName ?? "XBoss")} · Tổng cộng <b style="color:#c00">${r.totalDelayed}</b> hạng mục đang trễ
@@ -531,6 +547,7 @@ export function reportToHtml(r: DailyReport, appUrl?: string): string {
     ${rowsHtml(r.dueSoon)}
   </table>
 
+  ${evmAlertsHtml}
   ${appUrl ? `<p style="margin:20px 0"><a href="${appUrl}" style="color:#059669">→ Mở XBoss Dashboard</a></p>` : ""}
   <p style="color:#999;font-size:11px;margin-top:24px">Email tự động từ XBoss · trạng thái: ${Object.values(STATUS_LABEL as Record<StatusSlug, string>).join(" / ")}</p>
   </body></html>`;
