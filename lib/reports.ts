@@ -128,25 +128,77 @@ const SOURCES: Record<string, ReportSource> = {
 
   cost_by_month: {
     key: "cost_by_month",
-    label: "Chi phí thực chi theo tháng",
+    label: "Chi phí cam kết & thực chi theo tháng",
     canView: (role) => PAYMENT_VIEW_ROLES.includes(role),
     columns: [
       { key: "month", label: "Tháng", kind: "text" },
+      { key: "committed", label: "Cam kết (PO + HĐ giao thầu)", kind: "money" },
       { key: "actual", label: "Thực chi", kind: "money" },
     ],
     filters: [],
+    // M47 PR2: đọc từ mv_cost_by_month (migrations/0055_matviews.sql) trước — MV dùng
+    // sentinel 0 cho project_id NULL. MV rỗng cho dự án này (DB mới/cron chưa refresh
+    // lần nào) → tính trực tiếp bằng lại đúng logic trong migration (chậm hơn nhưng
+    // luôn đúng, không lặng lẽ trả thiếu dữ liệu).
     async run(projectId) {
-      // Thực chi = payment_bills theo paid_date; quy dự án qua sheet_types như lib/cost.ts.
-      const rows = await query<{ month: string; total: string }>(
-        `SELECT to_char(pb.paid_date, 'YYYY-MM') AS month, SUM(pb.amount)::text AS total
-           FROM payment_bills pb
-           ${projectId != null ? "JOIN sheet_types st ON st.id = pb.sheet_type_id JOIN towers tw ON tw.id = st.tower_id" : ""}
-          WHERE pb.paid_date IS NOT NULL
-            ${projectId != null ? "AND tw.project_id = ?" : ""}
-          GROUP BY month ORDER BY month`,
-        ...(projectId != null ? [projectId] : []),
+      const scopeProjectId = projectId ?? 0;
+      const mvRows = await query<{ month: string; committed: string; actual: string }>(
+        `SELECT month, committed::text AS committed, actual::text AS actual
+           FROM mv_cost_by_month WHERE project_id = ? ORDER BY month`,
+        scopeProjectId,
       );
-      return rows.map((r) => ({ month: r.month, actual: moneyToNumber(parseMoney(r.total)) }));
+      if (mvRows.length > 0) {
+        return mvRows.map((r) => ({
+          month: r.month,
+          committed: moneyToNumber(parseMoney(r.committed)),
+          actual: moneyToNumber(parseMoney(r.actual)),
+        }));
+      }
+
+      const projectFilterPo = projectId != null ? "AND po.project_id = ?" : "";
+      const projectFilterFc = projectId != null ? "AND c.project_id = ?" : "";
+      const projectFilterActual = projectId != null ? "AND tw.project_id = ?" : "";
+      const rows = await query<{ month: string; committed: string; actual: string }>(
+        `WITH committed_po AS (
+           SELECT to_char(po.created_at, 'YYYY-MM') AS month,
+                  SUM(poi.qty_ordered * COALESCE(poi.unit_price, 0)) AS amount
+             FROM po_items poi
+             JOIN purchase_orders po ON po.id = poi.po_id
+            WHERE po.status <> 'cancelled' ${projectFilterPo}
+            GROUP BY month
+         ),
+         committed_fc AS (
+           SELECT to_char(COALESCE(c.signed_date, c.created_at::date), 'YYYY-MM') AS month,
+                  SUM(fc.contract_value) AS amount
+             FROM floor_contracts fc
+             JOIN contracts c ON c.id = fc.contract_id
+            WHERE 1=1 ${projectFilterFc}
+            GROUP BY month
+         ),
+         committed AS (
+           SELECT month, SUM(amount) AS committed
+             FROM (SELECT * FROM committed_po UNION ALL SELECT * FROM committed_fc) u
+            GROUP BY month
+         ),
+         actual AS (
+           SELECT to_char(pb.paid_date, 'YYYY-MM') AS month, SUM(pb.amount) AS actual
+             FROM payment_bills pb
+             ${projectId != null ? "JOIN sheet_types st ON st.id = pb.sheet_type_id JOIN towers tw ON tw.id = st.tower_id" : ""}
+            WHERE pb.paid_date IS NOT NULL ${projectFilterActual}
+            GROUP BY month
+         )
+         SELECT COALESCE(c.month, a.month) AS month,
+                COALESCE(c.committed, 0)::text AS committed,
+                COALESCE(a.actual, 0)::text AS actual
+           FROM committed c FULL OUTER JOIN actual a ON a.month = c.month
+          ORDER BY month`,
+        ...(projectId != null ? [projectId, projectId, projectId] : []),
+      );
+      return rows.map((r) => ({
+        month: r.month,
+        committed: moneyToNumber(parseMoney(r.committed)),
+        actual: moneyToNumber(parseMoney(r.actual)),
+      }));
     },
   },
 
