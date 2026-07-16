@@ -339,7 +339,7 @@ export async function GET(req: Request) {
     );
 
     // Bảo hiểm/bảo lãnh sắp/đã hết hiệu lực mà chưa đổi trạng thái → cảnh báo (M28).
-    const expiringInsurance = await expiringInsuranceBonds();
+    const expiringInsurance = await expiringInsuranceBonds(30, projectId ?? undefined);
     if (expiringInsurance.length > 0) {
       const values = expiringInsurance.map(() => `(?, ?, 'insurance_expiry', ?)`).join(", ");
       const params = expiringInsurance.flatMap((b) => [
@@ -367,7 +367,7 @@ export async function GET(req: Request) {
   // Hồ sơ pháp lý (giấy phép XD, phê duyệt QH/TK, HĐ chính...) sắp/đã hết hạn mà chưa
   // đổi trạng thái → cảnh báo Admin/PM (M23).
   if (isAdminOrPm(user.role)) {
-    const expiringLegal = await expiringLegalDocs();
+    const expiringLegal = await expiringLegalDocs(30, projectId ?? undefined);
     if (expiringLegal.length > 0) {
       const values = expiringLegal.map(() => `(?, ?, 'legal_expiry', ?)`).join(", ");
       const params = expiringLegal.flatMap((d) => [
@@ -395,7 +395,7 @@ export async function GET(req: Request) {
   // Chứng chỉ nhân sự (thẻ an toàn, chứng chỉ nghề, vận hành...) sắp/đã hết hạn →
   // cảnh báo Admin/PM (M24, tái dùng cho HSE huấn luyện/thẻ an toàn).
   if (isAdminOrPm(user.role)) {
-    const expiringCerts = await expiringCertifications();
+    const expiringCerts = await expiringCertifications(projectId ?? undefined, 30);
     if (expiringCerts.length > 0) {
       const values = expiringCerts.map(() => `(?, ?, 'cert_expiry', ?)`).join(", ");
       const params = expiringCerts.flatMap((c) => [
@@ -889,7 +889,7 @@ export async function GET(req: Request) {
   // Giấy phép môi trường (ĐTM, giấy phép MT, giấy phép xả thải) sắp/đã hết hạn mà chưa
   // đổi trạng thái → cảnh báo Admin/PM/kỹ sư (M25).
   if (CAN.manageEnv(user.role)) {
-    const expiringEnv = await expiringEnvPermits();
+    const expiringEnv = await expiringEnvPermits(projectId ?? undefined, 30);
     if (expiringEnv.length > 0) {
       const values = expiringEnv.map(() => `(?, ?, 'env_permit_expiry', ?)`).join(", ");
       const params = expiringEnv.flatMap((d) => [
