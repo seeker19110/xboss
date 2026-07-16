@@ -352,6 +352,116 @@ export async function pendingForUserDisplay(
   }));
 }
 
+// ── M46 PR2 (nợ kỹ thuật) — tra trạng thái duyệt của 1 thực thể + badge/lịch sử UI +
+// notification quá SLA. Xem docs/nang-cap/M46-approval-engine.md, PROGRESS.md dòng ~101.
+
+export type ApprovalActionRow = {
+  seq: number;
+  actorId: number;
+  actorName: string | null;
+  decision: "approve" | "reject";
+  note: string | null;
+  at: string; // ISO timestamp
+};
+
+export type EntityApprovalStatus = {
+  requestId: number;
+  status: "pending" | "approved" | "rejected" | "cancelled";
+  currentSeq: number;
+  totalSteps: number;
+  currentRole: Role | null; // null khi status != 'pending'
+  actions: ApprovalActionRow[];
+};
+
+// Trả trạng thái duyệt GẦN NHẤT của 1 thực thể (theo created_at DESC, LIMIT 1) — null nếu
+// chưa từng mở approval request (không có flow cấu hình, hoặc entity mới). Dùng cho UI
+// hiển thị badge "chờ duyệt bước N/M" + lịch sử hành động ở trang chi tiết VO/IPC/...
+export async function getEntityApprovalStatus(
+  entityType: string,
+  entityId: number,
+): Promise<EntityApprovalStatus | null> {
+  const req = await queryOne<{
+    id: number;
+    flowId: number;
+    currentSeq: number;
+    status: EntityApprovalStatus["status"];
+  }>(
+    `SELECT id, flow_id AS "flowId", current_seq AS "currentSeq", status
+       FROM approval_requests
+      WHERE entity_type = ? AND entity_id = ?
+      ORDER BY created_at DESC LIMIT 1`,
+    entityType,
+    entityId,
+  );
+  if (!req) return null;
+
+  const totalRow = await queryOne<{ count: number }>(
+    `SELECT COUNT(*)::int AS count FROM approval_steps WHERE flow_id = ?`,
+    req.flowId,
+  );
+  const totalSteps = totalRow?.count ?? 0;
+
+  // currentRole chỉ có ý nghĩa khi còn đang chờ — tra bước có seq = currentSeq (cùng cách
+  // advanceApproval tra bước hiện tại).
+  let currentRole: Role | null = null;
+  if (req.status === "pending") {
+    const step = await queryOne<{ role: Role }>(
+      `SELECT role FROM approval_steps WHERE flow_id = ? AND seq = ?`,
+      req.flowId,
+      req.currentSeq,
+    );
+    currentRole = step?.role ?? null;
+  }
+
+  const actions = await query<ApprovalActionRow>(
+    `SELECT a.step_seq AS "seq", a.actor_id AS "actorId", u.name AS "actorName",
+            a.decision AS "decision", a.note, a.at
+       FROM approval_actions a
+       LEFT JOIN users u ON u.id = a.actor_id
+      WHERE a.request_id = ?
+      ORDER BY a.step_seq`,
+    req.id,
+  );
+
+  return {
+    requestId: req.id,
+    status: req.status,
+    currentSeq: req.currentSeq,
+    totalSteps,
+    currentRole,
+    actions,
+  };
+}
+
+export type PendingApprovalOverdue = {
+  requestId: number;
+  entityType: string;
+  entityId: number;
+  currentRole: Role;
+  slaDays: number;
+  createdAt: string; // dùng làm mốc tính quá hạn bước hiện tại (đơn giản hoá: schema hiện
+  // không lưu thời điểm chuyển bước riêng — chấp nhận theo đặc tả gốc M46, ghi rõ ở đây)
+};
+
+// Request đang 'pending', bước hiện tại có sla_days khác NULL, và đã quá created_at +
+// sla_days ngày → coi là quá hạn. Gộp chung "đang chờ"/"quá hạn" thành 1 loại thông báo
+// (approval_pending) — không tách 2 loại như đặc tả cũ nêu, vì schema hiện không lưu mốc
+// thời gian chuyển bước riêng lẻ (chỉ có created_at của request, không phải của bước).
+export async function overdueApprovals(projectId?: number): Promise<PendingApprovalOverdue[]> {
+  const projectFilter = projectId != null ? " AND r.project_id = ?" : "";
+  const params = projectId != null ? [projectId] : [];
+  return query<PendingApprovalOverdue>(
+    `SELECT r.id AS "requestId", r.entity_type AS "entityType", r.entity_id AS "entityId",
+            s.role AS "currentRole", s.sla_days AS "slaDays", r.created_at AS "createdAt"
+       FROM approval_requests r
+       JOIN approval_steps s ON s.flow_id = r.flow_id AND s.seq = r.current_seq
+      WHERE r.status = 'pending' AND s.sla_days IS NOT NULL
+        AND r.created_at < now() - (s.sla_days || ' days')::interval${projectFilter}
+      ORDER BY r.created_at`,
+    ...params,
+  );
+}
+
 // ── M46 PR4 — CRUD cấu hình flow (Admin). CAN.manageApprovalFlows/viewApprovalFlows
 // (lib/auth.ts) gác quyền ở route; hàm ở đây là logic thuần + DB, không tự chạy
 // getCurrentUser(). Không seed flow nào — trang tạo được thì mới có, giữ đúng

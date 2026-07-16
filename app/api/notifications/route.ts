@@ -32,8 +32,19 @@ import { PROPOSAL_PENDING_DAYS } from "@/lib/proposals";
 import { pendingDesignChanges } from "@/lib/designchanges";
 import { pendingClaims } from "@/lib/claims";
 import { getAlertThreshold } from "@/lib/alerts";
+import { overdueApprovals, NON_APPROVER_ROLES } from "@/lib/approvals";
 
 export const dynamic = "force-dynamic";
+
+// Cột dedup notifications cho từng loại thực thể của engine phê duyệt (M46) — tái dùng
+// cột entity đã có sẵn từ trước (vo_id/payment_cert_id/proposal_id/task_id), không thêm
+// cột mới. 4 loại đóng, khớp APPROVAL_ENTITY_TYPES trong lib/approvals.ts.
+const APPROVAL_ENTITY_COLUMN: Record<string, string> = {
+  variation: "vo_id",
+  payment_cert: "payment_cert_id",
+  proposal: "proposal_id",
+  task_acceptance: "task_id",
+};
 
 // GET /api/notifications?limit=<n>
 // Đồng bộ task trễ → notifications cho user hiện tại, rồi trả về danh sách + số chưa đọc.
@@ -519,6 +530,54 @@ export async function GET(req: Request) {
       user.id,
       pendingIds,
     );
+  }
+
+  // Bước duyệt engine (M46, lib/approvals.ts) đang chờ quá SLA của bước hiện tại → nhắc
+  // đúng người có vai trò = bước hiện tại (không gửi người tạo request — hộp thư "chờ tôi
+  // duyệt" /approvals đã tách riêng qua pendingForUser; đây chỉ là cảnh báo quá SLA).
+  // Cột dedup TÁI DÙNG cột entity đã có sẵn (vo_id/payment_cert_id/proposal_id/task_id)
+  // theo entityType — KHÔNG cần migration mới (4 loại đóng, xem APPROVAL_ENTITY_TYPES).
+  if (!NON_APPROVER_ROLES.includes(user.role)) {
+    const overdueList = await overdueApprovals(projectId ?? undefined);
+    const mine = overdueList.filter((o) => o.currentRole === user.role);
+    const mineByColumn = new Map<string, typeof mine>();
+    for (const o of mine) {
+      const col = APPROVAL_ENTITY_COLUMN[o.entityType];
+      if (!col) continue; // loại thực thể lạ (không nên xảy ra — APPROVAL_ENTITY_TYPES đóng)
+      mineByColumn.set(col, [...(mineByColumn.get(col) ?? []), o]);
+    }
+    for (const col of Object.values(APPROVAL_ENTITY_COLUMN)) {
+      const list = mineByColumn.get(col) ?? [];
+      // task_id dùng UNIQUE (user_id, task_id, type) GỐC không partial (bảng notifications
+      // 0001_baseline.sql) — khác vo_id/payment_cert_id/proposal_id (partial WHERE ... IS
+      // NOT NULL, thêm sau ở M6/M16/M19). ON CONFLICT phải khớp ĐÚNG index đích, không
+      // thêm WHERE cho task_id kẻo Postgres báo "no unique constraint matching".
+      const onConflict =
+        col === "task_id"
+          ? `ON CONFLICT (user_id, task_id, type) DO NOTHING`
+          : `ON CONFLICT (user_id, type, ${col}) WHERE ${col} IS NOT NULL DO NOTHING`;
+      if (list.length > 0) {
+        const values = list.map(() => `(?, ?, 'approval_pending', ?)`).join(", ");
+        const params = list.flatMap((o) => [
+          user.id,
+          o.entityId,
+          `✅ Yêu cầu duyệt #${o.requestId} (${o.entityType}) đã quá hạn SLA ${o.slaDays} ngày — đang chờ bạn duyệt`,
+        ]);
+        await run(
+          `INSERT INTO notifications (user_id, ${col}, type, message) VALUES ${values}
+           ${onConflict}`,
+          ...params,
+        );
+      }
+      const ids = list.map((o) => o.entityId);
+      await run(
+        `DELETE FROM notifications
+          WHERE user_id = ? AND type = 'approval_pending' AND is_read = 0
+            AND ${col} IS NOT NULL AND ${col} <> ALL(?)`,
+        user.id,
+        ids,
+      );
+    }
   }
 
   // Đề xuất đã trình quá hạn chưa được quyết định → nhắc Admin/PM (M19).

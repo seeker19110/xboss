@@ -10,6 +10,7 @@ import {
   saveCertItems,
   type CertLineInput,
 } from "@/lib/paymentcerts";
+import { getEntityApprovalStatus } from "@/lib/approvals";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,10 @@ export async function GET(
   if (!cert) return NextResponse.json({ error: "Không tìm thấy đợt thanh toán" }, { status: 404 });
 
   const totals = await certTotals(id);
-  return NextResponse.json({ cert, totals });
+  // Trạng thái duyệt engine (M46 PR2) — null khi chưa có flow cấu hình cho loại
+  // "payment_cert" (hành xử dormant, không đổi UI cũ).
+  const approvalStatus = await getEntityApprovalStatus("payment_cert", id);
+  return NextResponse.json({ cert, totals, approvalStatus });
 }
 
 // PATCH /api/payment-certs/:id { items: [{boqItemId, qtyPeriod}], periodLabel? }
