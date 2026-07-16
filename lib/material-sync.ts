@@ -147,18 +147,6 @@ const dbToFields = (m: DbMaterial): MaterialFields =>
     note: m.note ?? "",
   });
 
-// Đọc 1 dòng Sheet (mảng ô) → trường vật tư đã chuẩn hoá (theo cột B..L).
-const sheetRowToFields = (row: string[]): MaterialFields =>
-  normalizeFields({
-    boqCode: row[1] ?? "",
-    name: row[2] ?? "",
-    unit: row[3] ?? "",
-    qtyBoq: row[4] ?? "",
-    qtyPlanned: row[5] ?? "",
-    status: row[9] ?? "",
-    note: row[10] ?? "",
-  });
-
 // Parse "nghiêm ngặt" 1 trường Sheet: trả `null` nếu giá trị nhập không hợp lệ
 // (số không parse được / status lạ), khác `normField` (luôn coerce về giá trị an
 // toàn — dùng cho dữ liệu đã biết đúng như DB/snapshot). Rỗng vẫn coi là hợp lệ
