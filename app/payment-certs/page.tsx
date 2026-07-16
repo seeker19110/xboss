@@ -3,6 +3,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Plus, X, FileDown, FileSpreadsheet, Receipt } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
+import MaskedValue from "@/app/components/MaskedValue";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appConfirm, appPrompt } from "@/app/components/dialogs";
@@ -501,7 +502,9 @@ function CertDetailModal({
                   <td className="p-1.5">
                     {it.boqName} <span className="text-zinc-500">({it.boqUnit})</span>
                   </td>
-                  <td className="p-1.5 text-right">{fmtVND(it.unitPrice)}</td>
+                  <td className="p-1.5 text-right">
+                    <MaskedValue value={it.unitPrice} format={fmtVND} />
+                  </td>
                   <td className="p-1.5 text-right">
                     {canEdit ? (
                       <input
@@ -524,7 +527,7 @@ function CertDetailModal({
         </div>
 
         <div className="flex justify-end text-sm font-semibold">
-          Giá trị đợt này (tạm tính): {fmtVND(totals)}
+          Giá trị đợt này (tạm tính): <MaskedValue value={totals} format={fmtVND} />
         </div>
 
         <div className="flex flex-wrap gap-2 border-t border-zinc-800 pt-3">

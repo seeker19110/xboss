@@ -24,6 +24,9 @@ async function certInProject(
 }
 
 // GET /api/payment-certs/:id/excel — xuất bảng KL nghiệm thu 1 đợt IPC.
+// M50 PR2 (quyền theo trường): perm che tiền IPC = viewPayments, trùng gate route dưới
+// đây → user thiếu quyền bị 403 NGAY (không xuất file). Che từng ô trong Excel là vô
+// nghĩa (người nhận có thể mở file) nên chặn cả file — quyết định phiên chính.
 export async function GET(
   _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },

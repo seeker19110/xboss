@@ -13,6 +13,7 @@ import {
   type VoStatus,
 } from "@/lib/vo";
 import { openApproval } from "@/lib/approvals";
+import { stripSensitive } from "@/lib/sensitive-fields";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,9 @@ export async function GET(req: NextRequest) {
 
   const projectId = await getCurrentProjectId(user);
   const items = projectId != null ? await listVariations({ status, projectId }) : [];
-  return NextResponse.json({ items });
+  // M50 PR2: che giá trị/đơn giá VO cho user thiếu viewPayments (vd engineer xem được
+  // VO nhưng không thấy tiền) — che tại API trước khi trả.
+  return NextResponse.json({ items: stripSensitive("variation", items, user) });
 }
 
 // POST /api/variations — tạo VO mới (Nháp) kèm dòng KL con (Admin/PM/Kỹ sư — ghi

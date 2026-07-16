@@ -12,6 +12,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
+import MaskedValue from "@/app/components/MaskedValue";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appAlert, appConfirm } from "@/app/components/dialogs";
@@ -916,7 +917,9 @@ function ContractDetailModal({
               </>
             ) : (
               <dl className="text-sm space-y-1 text-zinc-300">
-                <div>Giá trị: {fmtVND(contract.value)}</div>
+                <div>
+                  Giá trị: <MaskedValue value={contract.value} format={fmtVND} />
+                </div>
                 <div>Trạng thái: {STATUS_LABEL[contract.status]}</div>
                 <div>Hiệu lực đến: {contract.validTo ?? "Không thời hạn"}</div>
               </dl>
@@ -1069,7 +1072,9 @@ function ContractDetailModal({
                   {detail.bills.map((b) => (
                     <li key={b.id} className="flex justify-between text-zinc-300">
                       <span>{b.paidDate}</span>
-                      <span>{fmtVND(b.amount)}</span>
+                      <span>
+                        <MaskedValue value={b.amount} format={fmtVND} />
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -1088,7 +1093,9 @@ function ContractDetailModal({
                       <span>
                         {fc.sheetName} — {fc.floorLabel}
                       </span>
-                      <span>{fmtVND(fc.contractValue)}</span>
+                      <span>
+                        <MaskedValue value={fc.contractValue} format={fmtVND} />
+                      </span>
                     </li>
                   ))}
                 </ul>

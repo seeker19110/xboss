@@ -181,6 +181,11 @@ const CAN_DEFAULT = {
   assign: (r?: Role) => r === "admin" || r === "pm", // gán task cho người làm
   approve: (r?: Role) => r === "admin" || r === "pm", // duyệt/huỷ nghiệm thu
   viewPayments: (r?: Role) => !!r && PAYMENT_VIEW_ROLES.includes(r), // xem trang thanh toán
+  // Xem SỐ TIỀN lương (M50 PR2, che trường): lương nhạy cảm hơn thanh toán — `bch` vẫn
+  // vào được TRANG lương (gate route là viewPayments) nhưng số tiền lương (đơn giá/gộp/
+  // khấu trừ/thực nhận) bị che. Mặc định chỉ Admin/PM. Bắt đầu bằng "view" nên KHÔNG nằm
+  // trong LOCKED_PERMS → được mở qua ma trận /admin/permissions (đúng nhóm perm xem).
+  viewPayroll: (r?: Role) => r === "admin" || r === "pm",
   createInspectionRequest: (r?: Role) => r === "admin" || r === "pm" || r === "engineer", // tạo phiếu YCNT
   manageContracts: (r?: Role) => r === "admin" || r === "pm", // tạo/sửa hợp đồng, phụ lục (M16)
   // Xem phát sinh/VO (M6): loại cdt (không thấy giá trị VO — quyết 2026-07-04), subcon,

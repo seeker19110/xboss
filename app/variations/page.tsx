@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus, X, Trash2, Paperclip, FilePlus2, Lock } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
+import MaskedValue from "@/app/components/MaskedValue";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appAlert, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
@@ -174,7 +175,9 @@ export default function VariationsPage() {
           ).map(([key, label]) => (
             <div key={key} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
               <p className="text-xs text-zinc-400 uppercase tracking-wide">{label}</p>
-              <p className="text-lg font-semibold mt-1">{fmtVND(totals[key])}</p>
+              <p className="text-lg font-semibold mt-1">
+                <MaskedValue value={totals[key]} format={fmtVND} />
+              </p>
             </div>
           ))}
         </div>
@@ -223,9 +226,11 @@ export default function VariationsPage() {
                         )}
                       </td>
                       <td className="p-3 hidden sm:table-cell text-right">
-                        {fmtVND(v.proposedValue)}
+                        <MaskedValue value={v.proposedValue} format={fmtVND} />
                       </td>
-                      <td className="p-3 text-right font-medium">{fmtVND(v.approvedValue)}</td>
+                      <td className="p-3 text-right font-medium">
+                        <MaskedValue value={v.approvedValue} format={fmtVND} />
+                      </td>
                       <td className="p-3 hidden sm:table-cell text-xs text-zinc-400">
                         {v.decidedAt ?? v.submittedAt ?? "—"}
                       </td>
@@ -768,7 +773,9 @@ function VoDetailModal({
                           (l.qtyApproved ?? "—")
                         )}
                       </td>
-                      <td className="p-1.5 text-right">{fmtVND(l.unitPrice)}</td>
+                      <td className="p-1.5 text-right">
+                        <MaskedValue value={l.unitPrice} format={fmtVND} />
+                      </td>
                     </tr>
                   ))}
                 </tbody>

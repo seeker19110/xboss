@@ -16,6 +16,7 @@ import {
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
+import MaskedValue from "@/app/components/MaskedValue";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
@@ -711,10 +712,18 @@ function PayrollTab({
                   <tr key={p.id} className="border-b border-zinc-800/60 last:border-0">
                     <td className="p-3">{p.personnelName ?? p.crewName ?? "—"}</td>
                     <td className="p-3">{p.workdays}</td>
-                    <td className="p-3">{fmtVND(p.rate)}</td>
-                    <td className="p-3">{fmtVND(p.gross)}</td>
-                    <td className="p-3">{fmtVND(p.deductions)}</td>
-                    <td className="p-3 font-medium">{fmtVND(p.net)}</td>
+                    <td className="p-3">
+                      <MaskedValue value={p.rate} format={fmtVND} />
+                    </td>
+                    <td className="p-3">
+                      <MaskedValue value={p.gross} format={fmtVND} />
+                    </td>
+                    <td className="p-3">
+                      <MaskedValue value={p.deductions} format={fmtVND} />
+                    </td>
+                    <td className="p-3 font-medium">
+                      <MaskedValue value={p.net} format={fmtVND} />
+                    </td>
                     <td className="p-3">
                       <button
                         onClick={() => canManage && p.status !== "paid" && onCycle(p)}

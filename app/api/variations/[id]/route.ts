@@ -4,6 +4,7 @@ import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { VO_REASONS, type VoReason, getVariation, canEditVo } from "@/lib/vo";
 import { getEntityApprovalStatus } from "@/lib/approvals";
+import { stripSensitive } from "@/lib/sensitive-fields";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +40,9 @@ export async function GET(
   // (hành xử dormant, không đổi UI cũ).
   const approvalStatus = await getEntityApprovalStatus("variation", id);
 
-  return NextResponse.json({ variation, documents, approvalStatus });
+  // M50 PR2: che giá trị/đơn giá VO cho user thiếu viewPayments trước khi trả.
+  const [maskedVariation] = stripSensitive("variation", [variation], user);
+  return NextResponse.json({ variation: maskedVariation, documents, approvalStatus });
 }
 
 // PATCH /api/variations/:id — sửa thông tin chung (tên/lý do/mô tả/hệ). Không sửa
