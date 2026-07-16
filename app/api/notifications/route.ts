@@ -561,7 +561,7 @@ export async function GET(req: Request) {
         const params = list.flatMap((o) => [
           user.id,
           o.entityId,
-          `✅ Yêu cầu duyệt #${o.requestId} (${o.entityType}) đã quá hạn SLA ${o.slaDays} ngày — đang chờ bạn duyệt`,
+          `⏰ Yêu cầu duyệt #${o.requestId} (${o.entityType}) đã quá hạn SLA ${o.slaDays} ngày — đang chờ bạn duyệt`,
         ]);
         await run(
           `INSERT INTO notifications (user_id, ${col}, type, message) VALUES ${values}
