@@ -297,8 +297,9 @@ Xác nhận M37 Phase 2 (typography/padding tier/nút danger/modal/theme-color, 
 
 **Nợ kỹ thuật ghi nhận, chưa xử lý trong đợt này:**
 
-- `lib/dashboardext.ts::cashflowSeries()`/`cpiBlock()` (dùng `payment_bills`/`contracts`/`boq_items`) — hiện không gọi từ dashboard chính (đã bỏ theo quyết 2026-07-11) nhưng nếu còn được gọi ở nơi khác thì chưa scope theo dự án; cần rà lại nếu tái sử dụng.
-- **Nợ lớn đã biết theo ADR-0004** (không phải lỗi mới, đã ghi nhận trước đây): cụm `tasks`/`gantt`/`timeline`/`lookahead`/`my-tasks`/`schedule-control`/`norms/over` vẫn chưa lọc theo `project_id` — chưa gây hậu quả vì DB thật hiện chỉ có 1 dự án hoạt động, nhưng sẽ lộ ngay khi bật dự án thứ 2. Cần PR riêng rà từng route theo đúng lộ trình ADR-0004 ("PR 3+ = rà scoping từng cụm").
+- **CSP còn `script-src 'unsafe-inline'`** (`next.config.mjs`) — chấp nhận có chủ đích 2026-07-16: gỡ cần chuyển sang nonce-based CSP (đụng mọi inline script của Next/analytics), chi phí lớn, làm thành đợt riêng khi có yêu cầu cứng về CSP; các lớp chống XSS khác đã có (React escape mặc định, không `dangerouslySetInnerHTML` với dữ liệu người dùng).
+- ~~`lib/dashboardext.ts::cashflowSeries()`/`cpiBlock()` (dùng `payment_bills`/`contracts`/`boq_items`) — hiện không gọi từ dashboard chính (đã bỏ theo quyết 2026-07-11) nhưng nếu còn được gọi ở nơi khác thì chưa scope theo dự án; cần rà lại nếu tái sử dụng.~~ → **hết hiện trạng** (xác minh 2026-07-16: 2 hàm đã bị xoá khỏi codebase trong các đợt refactor trước, không còn định nghĩa trong `lib/dashboardext.ts` lẫn `lib/finance.ts` — chỉ còn comment nhắc tên ở `lib/finance.ts:18`; không còn gì để scope).
+- ~~**Nợ lớn đã biết theo ADR-0004** (không phải lỗi mới, đã ghi nhận trước đây): cụm `tasks`/`gantt`/`timeline`/`lookahead`/`my-tasks`/`schedule-control`/`norms/over` vẫn chưa lọc theo `project_id` — chưa gây hậu quả vì DB thật hiện chỉ có 1 dự án hoạt động, nhưng sẽ lộ ngay khi bật dự án thứ 2. Cần PR riêng rà từng route theo đúng lộ trình ADR-0004 ("PR 3+ = rà scoping từng cụm").~~ → **đã đóng** (2026-07-16, PR #202 vá đủ 7 route + PR #209 vá nốt `pendingStageFloors`/`export/pdf`; bất biến tĩnh `tests/project-scope-invariant.test.ts` canh lớp lỗi này từ nay).
 
 ## Đồng bộ AppShell theo mockup xBoss mới (2026-07)
 
