@@ -9,6 +9,7 @@ import {
   verifyFileMime,
   newFloorStageFrontFileName,
   MAX_DOC_BYTES,
+  isContentTooLarge,
 } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
@@ -61,6 +62,12 @@ export async function POST(
     frontId,
   );
   if (!front) return NextResponse.json({ error: "Không tìm thấy mặt bằng" }, { status: 404 });
+
+  if (isContentTooLarge(req.headers.get("content-length"), MAX_DOC_BYTES))
+    return NextResponse.json(
+      { error: `File quá lớn (tối đa ${MAX_DOC_BYTES / 1024 / 1024}MB)` },
+      { status: 413 },
+    );
 
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");

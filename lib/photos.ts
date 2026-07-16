@@ -217,6 +217,16 @@ export function sha256Hex(buf: Buffer): string {
   return createHash("sha256").update(buf).digest("hex");
 }
 
+// Chặn sớm request multipart quá lớn dựa vào header Content-Length — TRƯỚC KHI
+// buffer toàn bộ body qua req.formData(), né DoS bộ nhớ với file khổng lồ. Thiếu
+// header (vd chunked transfer) → bỏ qua, vẫn có check `file.size` sau formData()
+// làm lưới an toàn cuối như cũ. +64KB dung sai cho boundary/header multipart.
+export function isContentTooLarge(contentLengthHeader: string | null, maxBytes: number): boolean {
+  if (!contentLengthHeader) return false;
+  const n = Number(contentLengthHeader);
+  return Number.isFinite(n) && n > maxBytes + 64 * 1024;
+}
+
 export function ensureUploadDir(): string {
   if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
   return UPLOAD_DIR;

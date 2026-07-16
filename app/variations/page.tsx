@@ -7,6 +7,7 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appAlert, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
+import type { EntityApprovalStatus } from "@/lib/approvals";
 
 type VoReason = "design_change" | "client_request" | "site_condition" | "other";
 type VoStatus =
@@ -511,6 +512,9 @@ function VoDetailModal({
   const [approvals, setApprovals] = useState<Record<number, string>>({});
   const [addendaCode, setAddendaCode] = useState("");
   const [addendaContractId, setAddendaContractId] = useState<number | "">("");
+  // Trạng thái duyệt engine (M46 PR2) — null khi chưa có flow cấu hình cho "variation",
+  // giữ UI y hệt trước (không hiện badge/lịch sử) đúng nguyên tắc "dormant" của M46.
+  const [approvalStatus, setApprovalStatus] = useState<EntityApprovalStatus | null>(null);
 
   const canEditMeta =
     (vo.status === "draft" && (vo.createdBy === me?.id || isAdminOrPm)) ||
@@ -528,6 +532,9 @@ function VoDetailModal({
   useEffect(() => {
     loadDocs();
     setApprovals(Object.fromEntries(vo.lines.map((l) => [l.id, String(l.qtyProposed)])));
+    fetch(`/api/variations/${vo.id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setApprovalStatus(j?.approvalStatus ?? null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vo.id]);
 
@@ -635,6 +642,11 @@ function VoDetailModal({
             >
               {STATUS_LABEL[vo.status]}
             </span>
+            {approvalStatus && approvalStatus.status === "pending" && (
+              <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-amber-900 text-amber-200">
+                Chờ duyệt (bước {approvalStatus.currentSeq}/{approvalStatus.totalSteps})
+              </span>
+            )}
             <button onClick={onClose} aria-label="Đóng" className="text-zinc-400 hover:text-white">
               <X className="w-5 h-5" />
             </button>
@@ -689,6 +701,31 @@ function VoDetailModal({
               <p className="text-xs text-zinc-500">
                 Chỉ Admin/PM sửa được thông tin ở giai đoạn này.
               </p>
+            )}
+
+            {/* Lịch sử duyệt engine (M46 PR2) — ẩn hoàn toàn khi chưa có flow cấu hình
+                cho "variation" (approvalStatus null), giữ UI y hệt trước đây. */}
+            {approvalStatus && approvalStatus.actions.length > 0 && (
+              <div className="border-t border-zinc-800 pt-3 space-y-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                  Lịch sử duyệt
+                </h3>
+                <ul className="space-y-1.5">
+                  {approvalStatus.actions.map((a) => (
+                    <li key={a.seq} className="text-xs text-zinc-300 flex flex-wrap gap-x-1.5">
+                      <span className="font-medium">{a.actorName ?? `#${a.actorId}`}</span>
+                      <span
+                        className={a.decision === "approve" ? "text-emerald-300" : "text-rose-300"}
+                      >
+                        {a.decision === "approve" ? "đã duyệt" : "đã từ chối"}
+                      </span>
+                      <span className="text-zinc-500">bước {a.seq}</span>
+                      {a.note && <span className="text-zinc-400">— {a.note}</span>}
+                      <span className="text-zinc-500">({a.at})</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </section>
         )}

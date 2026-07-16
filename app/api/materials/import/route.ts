@@ -3,10 +3,14 @@ import * as XLSX from "xlsx";
 import { query, queryOne, insertId, run } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
+import { isContentTooLarge } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
 
 const canEditMaterials = (r?: Role) => r === "admin" || r === "pm" || r === "engineer";
+
+// 20MB — khớp ngưỡng file Excel import khác (/api/import/excel, /api/boq/import).
+const MAX_BYTES = 20 * 1024 * 1024;
 
 const VALID_STATUSES = ["dat_hang", "ve_kho", "da_dung"];
 
@@ -27,6 +31,12 @@ export async function POST(req: NextRequest) {
   const projectId = await getCurrentProjectId(user);
   if (projectId == null)
     return NextResponse.json({ error: "Chưa có dự án nào để import vật tư" }, { status: 422 });
+
+  if (isContentTooLarge(req.headers.get("content-length"), MAX_BYTES))
+    return NextResponse.json(
+      { error: `File quá lớn (tối đa ${MAX_BYTES / 1024 / 1024}MB)` },
+      { status: 413 },
+    );
 
   const form = await req.formData().catch(() => null);
   if (!form) return NextResponse.json({ error: "Không đọc được form" }, { status: 400 });

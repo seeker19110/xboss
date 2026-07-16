@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query, todayISO } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,11 @@ export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
+  // Lọc theo dự án đang chọn để tránh rò rỉ chéo dự án (M22+); null = không lọc.
+  const projectId = await getCurrentProjectId(user);
+  const projectFilter = projectId != null ? " AND tw.project_id = ?" : "";
+  const projectParams = projectId != null ? [projectId] : [];
+
   // COALESCE(t.start_date/end_date, wp....): task NULL = kế thừa ngày nhóm (lib/recompute.ts).
   const tasks = await query<MyTask>(
     `SELECT t.id, t.code, t.name, t.status,
@@ -36,9 +42,11 @@ export async function GET() {
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
-      WHERE t.assigned_to = ?
+       LEFT JOIN towers tw ON st.tower_id = tw.id
+      WHERE t.assigned_to = ?${projectFilter}
       ORDER BY (COALESCE(t.end_date, wp.end_date) IS NULL), COALESCE(t.end_date, wp.end_date), t.id`,
     user.id,
+    ...projectParams,
   );
 
   const today = todayISO();

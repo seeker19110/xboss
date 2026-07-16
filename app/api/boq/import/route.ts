@@ -4,6 +4,7 @@ import { queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { parseBoqWorkbook, previewBoqImport, commitBoqImport } from "@/lib/boq-import";
+import { isContentTooLarge } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { error: "Bạn không có quyền import (chỉ Admin/PM)" },
       { status: 403 },
+    );
+
+  if (isContentTooLarge(req.headers.get("content-length"), MAX_BYTES))
+    return NextResponse.json(
+      { error: `File quá lớn (tối đa ${MAX_BYTES / 1024 / 1024} MB)` },
+      { status: 413 },
     );
 
   const formData = await req.formData().catch(() => null);

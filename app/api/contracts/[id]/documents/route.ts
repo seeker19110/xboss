@@ -11,6 +11,7 @@ import {
   newContractDocFileName,
   MAX_DOC_BYTES,
   sha256Hex,
+  isContentTooLarge,
 } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
@@ -79,6 +80,12 @@ export async function POST(
         )
       : undefined;
   if (!contract) return NextResponse.json({ error: "Không tìm thấy hợp đồng" }, { status: 404 });
+
+  if (isContentTooLarge(req.headers.get("content-length"), MAX_DOC_BYTES))
+    return NextResponse.json(
+      { error: `File quá lớn (tối đa ${MAX_DOC_BYTES / 1024 / 1024}MB)` },
+      { status: 413 },
+    );
 
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");
