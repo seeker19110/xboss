@@ -7,10 +7,10 @@
 // thái: Mặc định (theo CAN_DEFAULT) / Mở (bật) / Siết (tắt). KHÔNG import lib/auth (kéo
 // node:crypto) — mọi dữ liệu quyền lấy từ API; nhãn/nhóm từ permissionMeta client-safe.
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ShieldCheck, Info, Lock } from "lucide-react";
+import { ShieldCheck, Info, Lock, FileSpreadsheet, ShieldAlert } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
-import { PageSkeleton } from "@/app/components/Skeleton";
+import { Skeleton, PageSkeleton } from "@/app/components/Skeleton";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { ROLE_LABELS, type Role } from "@/lib/roles";
@@ -34,6 +34,8 @@ export default function PermissionsPage() {
   // Map key `${role}|${permKey}` → allowed (override hiện có).
   const [overrides, setOverrides] = useState<Map<string, boolean>>(new Map());
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  // M50 PR3: tab "Báo cáo SoD" thêm cạnh ma trận quyền — không đổi state/logic ma trận.
+  const [tab, setTab] = useState<"matrix" | "sod">("matrix");
 
   const isAdmin = me?.role === "admin";
 
@@ -136,102 +138,260 @@ export default function PermissionsPage() {
       />
 
       <main className="p-4 sm:p-6 pb-24 space-y-5">
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 space-y-2 text-sm text-zinc-300">
-          <p className="flex items-start gap-2">
-            <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-300" />
-            <span>
-              Mỗi ô 3 trạng thái: <b className="text-zinc-100">Mặc định</b> (theo cấu hình gốc),{" "}
-              <b className="text-emerald-300">Mở</b> (bật thêm),{" "}
-              <b className="text-amber-300">Siết</b> (tắt bớt). Chỉ <b>quyền xem</b> mới được Mở;{" "}
-              <b>quyền ghi dữ liệu</b> chỉ Siết được hoặc để Mặc định (không mở qua ma trận).
-            </span>
-          </p>
-          <p className="flex items-start gap-2 text-zinc-400">
-            <Lock className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" />
-            <span>
-              Thay đổi có hiệu lực trong <b>tối đa 60 giây</b> trên các phiên bản khác (cache). Một
-              số ngưỡng quyền dạng &ldquo;Admin/PM&rdquo; nằm ngoài ma trận này (kiểm trực tiếp
-              trong route, không dữ liệu-hoá) nên <b>không đổi được</b> tại đây.
-            </span>
-          </p>
+        {/* M50 PR3: tab ma trận / báo cáo SoD + nút xuất ma trận quyền hiệu lực */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex gap-1 rounded-lg border border-zinc-800 bg-zinc-900 p-1 text-sm">
+            <button
+              type="button"
+              onClick={() => setTab("matrix")}
+              className={`rounded-md px-3 py-1.5 font-medium transition-colors ${
+                tab === "matrix" ? "bg-zinc-800 text-zinc-100" : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              Ma trận quyền
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab("sod")}
+              className={`rounded-md px-3 py-1.5 font-medium transition-colors ${
+                tab === "sod" ? "bg-zinc-800 text-zinc-100" : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              Báo cáo SoD
+            </button>
+          </div>
+          <a
+            href="/api/admin/permissions-snapshot"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm font-medium text-zinc-200 hover:bg-zinc-800"
+          >
+            <FileSpreadsheet className="h-4 w-4 text-emerald-300" aria-hidden />
+            Xuất ma trận quyền (.xlsx)
+          </a>
         </div>
 
-        {loading || !data ? (
-          <div className="space-y-3">
-            {Array.from({ length: 4 }, (_, i) => (
-              <div
-                key={i}
-                className="h-40 animate-pulse rounded-xl border border-zinc-800 bg-zinc-900"
-              />
-            ))}
-          </div>
-        ) : (
-          grouped.map(({ group, perms }) => (
-            <section
-              key={group}
-              className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900"
-            >
-              <h2 className="border-b border-zinc-800 px-4 py-2.5 text-sm font-semibold text-zinc-200">
-                {group}
-              </h2>
+        {tab === "sod" && <SodReportTab />}
+
+        {tab === "matrix" && (
+          <>
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 space-y-2 text-sm text-zinc-300">
+              <p className="flex items-start gap-2">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-300" />
+                <span>
+                  Mỗi ô 3 trạng thái: <b className="text-zinc-100">Mặc định</b> (theo cấu hình gốc),{" "}
+                  <b className="text-emerald-300">Mở</b> (bật thêm),{" "}
+                  <b className="text-amber-300">Siết</b> (tắt bớt). Chỉ <b>quyền xem</b> mới được
+                  Mở; <b>quyền ghi dữ liệu</b> chỉ Siết được hoặc để Mặc định (không mở qua ma
+                  trận).
+                </span>
+              </p>
+              <p className="flex items-start gap-2 text-zinc-400">
+                <Lock className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" />
+                <span>
+                  Thay đổi có hiệu lực trong <b>tối đa 60 giây</b> trên các phiên bản khác (cache).
+                  Một số ngưỡng quyền dạng &ldquo;Admin/PM&rdquo; nằm ngoài ma trận này (kiểm trực
+                  tiếp trong route, không dữ liệu-hoá) nên <b>không đổi được</b> tại đây.
+                </span>
+              </p>
+            </div>
+
+            {loading || !data ? (
+              <div className="space-y-3">
+                {Array.from({ length: 4 }, (_, i) => (
+                  <div
+                    key={i}
+                    className="h-40 animate-pulse rounded-xl border border-zinc-800 bg-zinc-900"
+                  />
+                ))}
+              </div>
+            ) : (
+              grouped.map(({ group, perms }) => (
+                <section
+                  key={group}
+                  className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900"
+                >
+                  <h2 className="border-b border-zinc-800 px-4 py-2.5 text-sm font-semibold text-zinc-200">
+                    {group}
+                  </h2>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-zinc-800 text-zinc-400">
+                          <th className="sticky left-0 z-10 bg-zinc-900 px-3 py-2 text-left font-medium">
+                            Quyền
+                          </th>
+                          {data.roles.map((r) => (
+                            <th
+                              key={r}
+                              className="px-2 py-2 text-center font-medium whitespace-nowrap"
+                            >
+                              {ROLE_LABELS[r]}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {perms.map((permKey) => {
+                          const isWrite = lockedSet.has(permKey);
+                          return (
+                            <tr key={permKey} className="border-b border-zinc-900 last:border-0">
+                              <td className="sticky left-0 z-10 bg-zinc-900 px-3 py-2 text-zinc-200">
+                                <span className="flex items-center gap-1.5">
+                                  {permMeta(permKey).label}
+                                  {isWrite && (
+                                    <Lock
+                                      className="h-3 w-3 text-zinc-600"
+                                      aria-label="Quyền ghi — chỉ siết được"
+                                    />
+                                  )}
+                                </span>
+                              </td>
+                              {data.roles.map((role) => {
+                                const key = `${role}|${permKey}`;
+                                const ov = overrides.get(key);
+                                const state: CellState =
+                                  ov === undefined ? "default" : ov ? "on" : "off";
+                                const def = data.defaults[permKey]?.[role] ?? false;
+                                return (
+                                  <td key={role} className="px-2 py-1.5 text-center">
+                                    <CellSelect
+                                      state={state}
+                                      defaultVal={def}
+                                      isWrite={isWrite}
+                                      disabled={savingKey === key}
+                                      onChange={(next) => changeCell(role, permKey, next)}
+                                    />
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              ))
+            )}
+          </>
+        )}
+      </main>
+    </div>
+  );
+}
+
+// ── M50 PR3: Báo cáo SoD ───────────────────────────────────────────────────────────
+// Tách riêng khỏi state ma trận (PR1) — chỉ gọi API mới, không đụng logic ma trận.
+type SodRuleResult = {
+  rule: string;
+  description: string;
+  violations: Record<string, unknown>[];
+};
+
+const DAY_OPTIONS = [30, 90, 180] as const;
+
+function SodReportTab() {
+  const [days, setDays] = useState<(typeof DAY_OPTIONS)[number]>(90);
+  const [report, setReport] = useState<SodRuleResult[] | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/admin/sod-report?days=${days}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: SodRuleResult[] | null) => setReport(j))
+      .catch(() => showToast("Không tải được báo cáo SoD", "error"))
+      .finally(() => setLoading(false));
+  }, [days]);
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 space-y-2 text-sm text-zinc-300">
+        <p className="flex items-start gap-2">
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+          <span>
+            Vi phạm <b className="text-zinc-100">mềm</b>: cùng 1 người vừa tạo vừa xử lý bước sau
+            (không bị chặn ghi dữ liệu — Approval Engine M46 đã chặn cứng trường hợp mới). Danh sách
+            chỉ phục vụ rà soát kiểm toán.
+          </span>
+        </p>
+      </div>
+
+      <div className="flex items-center gap-2 text-sm">
+        <span className="text-zinc-400">Khoảng thời gian:</span>
+        {DAY_OPTIONS.map((d) => (
+          <button
+            key={d}
+            type="button"
+            onClick={() => setDays(d)}
+            className={`rounded-md border px-3 py-1 font-medium ${
+              days === d
+                ? "border-sky-500/60 bg-sky-500/10 text-sky-200"
+                : "border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+            }`}
+          >
+            {d} ngày
+          </button>
+        ))}
+      </div>
+
+      {loading || !report ? (
+        <div className="space-y-3">
+          {Array.from({ length: 2 }, (_, i) => (
+            <Skeleton key={i} className="h-32 rounded-xl" />
+          ))}
+        </div>
+      ) : (
+        report.map((r) => (
+          <section
+            key={r.rule}
+            className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900"
+          >
+            <div className="border-b border-zinc-800 px-4 py-3">
+              <h3 className="text-sm font-semibold text-zinc-100">
+                {r.rule}{" "}
+                <span
+                  className={`ml-2 rounded-full px-2 py-0.5 text-xs font-medium ${
+                    r.violations.length > 0
+                      ? "bg-amber-500/10 text-amber-300"
+                      : "bg-emerald-500/10 text-emerald-300"
+                  }`}
+                >
+                  {r.violations.length} vi phạm
+                </span>
+              </h3>
+              <p className="mt-1 text-xs text-zinc-400">{r.description}</p>
+            </div>
+            {r.violations.length === 0 ? (
+              <p className="px-4 py-3 text-sm text-zinc-500">Không phát hiện vi phạm.</p>
+            ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-zinc-800 text-zinc-400">
-                      <th className="sticky left-0 z-10 bg-zinc-900 px-3 py-2 text-left font-medium">
-                        Quyền
-                      </th>
-                      {data.roles.map((r) => (
-                        <th key={r} className="px-2 py-2 text-center font-medium whitespace-nowrap">
-                          {ROLE_LABELS[r]}
+                      {Object.keys(r.violations[0]).map((col) => (
+                        <th key={col} className="px-3 py-2 text-left font-medium whitespace-nowrap">
+                          {col}
                         </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {perms.map((permKey) => {
-                      const isWrite = lockedSet.has(permKey);
-                      return (
-                        <tr key={permKey} className="border-b border-zinc-900 last:border-0">
-                          <td className="sticky left-0 z-10 bg-zinc-900 px-3 py-2 text-zinc-200">
-                            <span className="flex items-center gap-1.5">
-                              {permMeta(permKey).label}
-                              {isWrite && (
-                                <Lock
-                                  className="h-3 w-3 text-zinc-600"
-                                  aria-label="Quyền ghi — chỉ siết được"
-                                />
-                              )}
-                            </span>
+                    {r.violations.map((v, i) => (
+                      <tr key={i} className="border-b border-zinc-900 last:border-0">
+                        {Object.keys(r.violations[0]).map((col) => (
+                          <td key={col} className="px-3 py-2 whitespace-nowrap text-zinc-200">
+                            {String(v[col] ?? "—")}
                           </td>
-                          {data.roles.map((role) => {
-                            const key = `${role}|${permKey}`;
-                            const ov = overrides.get(key);
-                            const state: CellState =
-                              ov === undefined ? "default" : ov ? "on" : "off";
-                            const def = data.defaults[permKey]?.[role] ?? false;
-                            return (
-                              <td key={role} className="px-2 py-1.5 text-center">
-                                <CellSelect
-                                  state={state}
-                                  defaultVal={def}
-                                  isWrite={isWrite}
-                                  disabled={savingKey === key}
-                                  onChange={(next) => changeCell(role, permKey, next)}
-                                />
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      );
-                    })}
+                        ))}
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
-            </section>
-          ))
-        )}
-      </main>
+            )}
+          </section>
+        ))
+      )}
     </div>
   );
 }
