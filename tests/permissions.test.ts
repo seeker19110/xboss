@@ -33,6 +33,12 @@ test("validatePermOverride: chặn role/permKey sai + luật mở quyền ghi", 
     const write = !k.startsWith("view") && k !== "export";
     assert.equal(LOCKED_PERMS.includes(k), write, `LOCKED_PERMS phân loại sai: ${k}`);
   }
+
+  // Chống tự khoá hệ thống: admin không được SIẾT (false) manageUsers của chính admin.
+  assert.equal(typeof validatePermOverride("admin", "manageUsers", false), "string");
+  // Nhưng vẫn xoá override (null) được, và siết manageUsers của vai trò KHÁC vẫn ok.
+  assert.equal(validatePermOverride("admin", "manageUsers", null), null);
+  assert.equal(validatePermOverride("pm", "manageUsers", false), null);
 });
 
 // ── Lớp tích hợp: cache + CAN + audit (cần Postgres) ─────────────────────────────

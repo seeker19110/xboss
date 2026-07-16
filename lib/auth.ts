@@ -325,6 +325,11 @@ export function validatePermOverride(
 ): string | null {
   if (!(ROLES as string[]).includes(role)) return "Vai trò không hợp lệ";
   if (!isPermKey(permKey)) return "Mã quyền không tồn tại";
+  // Chống tự khoá hệ thống: admin không được siết quyền quản lý người dùng của chính
+  // vai trò admin — nếu không, PATCH này khoá mọi admin ra khỏi hệ (kể cả trang ma trận
+  // này) ngay khi cache invalidate, chỉ sửa được bằng cách vào thẳng DB.
+  if (role === "admin" && permKey === "manageUsers" && allowed === false)
+    return "Không thể tự khoá quyền quản lý người dùng của vai trò admin — tránh tự khoá hệ thống.";
   if (allowed === true && isWritePerm(permKey))
     return "Quyền ghi dữ liệu chỉ được siết (tắt) hoặc để mặc định — không thể mở qua ma trận. Chỉ quyền xem mới được mở.";
   return null;
