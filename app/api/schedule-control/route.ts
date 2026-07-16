@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { resolveSystemId } from "@/lib/systems";
 import { getScheduleControlData } from "@/lib/schedule-control";
+import { getCurrentProjectId } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,8 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
   const systemId = await resolveSystemId(req.nextUrl.searchParams.get("system"));
-  const data = await getScheduleControlData(systemId);
+  // Lọc theo dự án đang chọn để tránh rò rỉ chéo dự án (M22+); null = không lọc.
+  const projectId = await getCurrentProjectId(user);
+  const data = await getScheduleControlData(systemId, projectId ?? undefined);
   return NextResponse.json(data);
 }

@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { query, todayISO } from "@/lib/db";
 import { sortFloorsDesc } from "@/lib/floors";
 import { resolveSystemId } from "@/lib/systems";
+import { getCurrentProjectId } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,10 @@ export async function GET(req: NextRequest) {
   const systemId = await resolveSystemId(req.nextUrl.searchParams.get("system"));
   const systemFilter = systemId !== null ? "AND st.system_id = ?" : "";
   const systemParams = systemId !== null ? [systemId] : [];
+  // Lọc theo dự án đang chọn để tránh rò rỉ chéo dự án (M22+); null = không lọc.
+  const projectId = await getCurrentProjectId(user);
+  const projectFilter = projectId != null ? " AND tw.project_id = ?" : "";
+  const projectParams = projectId != null ? [projectId] : [];
 
   // Tiến độ hiện tại theo tháp × tầng × hệ — trễ tính theo ngày quá hạn
   // (giống /api/dashboard/floors, nhất quán với cách lib/status.ts suy ra "tre").
@@ -41,11 +46,12 @@ export async function GET(req: NextRequest) {
        LEFT JOIN towers tw ON st.tower_id = tw.id
        LEFT JOIN tasks t ON t.package_id = wp.id
       WHERE wp.floor_label IS NOT NULL AND wp.floor_label != ''
-        ${systemFilter}
+        ${systemFilter}${projectFilter}
       GROUP BY tw.id, tw.name, wp.floor_label, st.id, st.code, st.slug
       ORDER BY tw.id, st.sort_order, st.id, wp.floor_label`,
     today,
     ...systemParams,
+    ...projectParams,
   );
 
   // Tiến độ theo tuần × tầng (gộp tất cả hệ/tháp, lọc theo `system` nếu có) — 13 tuần gần nhất
@@ -61,12 +67,14 @@ export async function GET(req: NextRequest) {
       JOIN tasks t ON th.task_id = t.id
       JOIN work_packages wp ON t.package_id = wp.id
       JOIN sheet_types st ON wp.sheet_type_id = st.id
+      LEFT JOIN towers tw ON st.tower_id = tw.id
      WHERE wp.floor_label IS NOT NULL AND wp.floor_label != ''
        AND th.changed_at >= NOW() - INTERVAL '13 weeks'
-       ${systemFilter}
+       ${systemFilter}${projectFilter}
      GROUP BY wp.floor_label, DATE_TRUNC('week', th.changed_at)
      ORDER BY "floorLabel", "weekStart"`,
     ...systemParams,
+    ...projectParams,
   );
 
   // Danh sách tuần (ISO date, thứ Hai đầu tuần)

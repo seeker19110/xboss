@@ -173,3 +173,100 @@ test(
     }
   },
 );
+
+// M22 — getScheduleControlData/getCpmData lọc theo dự án đang chọn (suy qua sheet_types →
+// towers.project_id): 2 dự án riêng, mỗi dự án có tháp/sheet/nhóm/task trễ → truyền projectId
+// chỉ trả đúng dự án đó (đường găng + task trễ), không lẫn; không truyền = toàn bộ (tương thích ngược).
+test(
+  "getScheduleControlData(systemId, projectId): tách đúng đường găng + task trễ theo dự án (M22+)",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId, queryOne, daysFromTodayISO } = await import("@/lib/db");
+    const { getScheduleControlData } = await import("@/lib/schedule-control");
+    const { getCpmData } = await import("@/lib/gantt-data");
+
+    const ketCau = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'ket_cau'`);
+    assert.ok(ketCau, "cần system ket_cau seed sẵn");
+
+    // 2 dự án độc lập, mỗi dự án 1 tháp → 1 sheet (cùng hệ ket_cau) → nhóm + task trễ.
+    const p1 = await insertId(`INSERT INTO projects (name) VALUES ('SC Proj 1')`);
+    const p2 = await insertId(`INSERT INTO projects (name) VALUES ('SC Proj 2')`);
+    const tw1 = await insertId(`INSERT INTO towers (project_id, name) VALUES (?, 'Tháp SC1')`, p1);
+    const tw2 = await insertId(`INSERT INTO towers (project_id, name) VALUES (?, 'Tháp SC2')`, p2);
+    const st1 = await insertId(
+      `INSERT INTO sheet_types (tower_id, code, name, slug, system_id) VALUES (?, 'SCP-1', 'Sheet SCP1', 'scp-1', ?)`,
+      tw1,
+      ketCau!.id,
+    );
+    const st2 = await insertId(
+      `INSERT INTO sheet_types (tower_id, code, name, slug, system_id) VALUES (?, 'SCP-2', 'Sheet SCP2', 'scp-2', ?)`,
+      tw2,
+      ketCau!.id,
+    );
+    const wp1 = await insertId(
+      `INSERT INTO work_packages (code, name, sheet_type_id, floor_label, start_date, end_date, progress)
+       VALUES ('SCP-1-1', 'Nhóm P1', ?, '1F', ?, ?, 0.3)`,
+      st1,
+      daysFromTodayISO(-10),
+      daysFromTodayISO(-2),
+    );
+    const wp2 = await insertId(
+      `INSERT INTO work_packages (code, name, sheet_type_id, floor_label, start_date, end_date, progress)
+       VALUES ('SCP-2-1', 'Nhóm P2', ?, '2F', ?, ?, 0.3)`,
+      st2,
+      daysFromTodayISO(-10),
+      daysFromTodayISO(-2),
+    );
+    const t1 = await insertId(
+      `INSERT INTO tasks (code, name, package_id, status, start_date, end_date, progress_percent, delay_reason)
+       VALUES ('SCP-T1', 'Task trễ P1', ?, 'dang_thi_cong', ?, ?, 0.3, 'thieu_vat_tu')`,
+      wp1,
+      daysFromTodayISO(-10),
+      daysFromTodayISO(-2),
+    );
+    const t2 = await insertId(
+      `INSERT INTO tasks (code, name, package_id, status, start_date, end_date, progress_percent, delay_reason)
+       VALUES ('SCP-T2', 'Task trễ P2', ?, 'dang_thi_cong', ?, ?, 0.3, 'thieu_vat_tu')`,
+      wp2,
+      daysFromTodayISO(-10),
+      daysFromTodayISO(-2),
+    );
+
+    try {
+      // ── Không lọc dự án → cả 2 xuất hiện (tương thích ngược) ──
+      const all = await getScheduleControlData(ketCau!.id);
+      const allCodes = all.delayed.map((t) => t.code);
+      assert.ok(allCodes.includes("SCP-T1"));
+      assert.ok(allCodes.includes("SCP-T2"));
+
+      // ── Lọc dự án 1 → chỉ task/nhóm dự án 1 ──
+      const only1 = await getScheduleControlData(ketCau!.id, p1);
+      const codes1 = only1.delayed.map((t) => t.code);
+      assert.ok(codes1.includes("SCP-T1"));
+      assert.ok(!codes1.includes("SCP-T2"));
+
+      // ── Lọc dự án 2 → ngược lại ──
+      const only2 = await getScheduleControlData(ketCau!.id, p2);
+      const codes2 = only2.delayed.map((t) => t.code);
+      assert.ok(codes2.includes("SCP-T2"));
+      assert.ok(!codes2.includes("SCP-T1"));
+
+      // ── getCpmData lọc dự án: meta chỉ chứa nhóm của dự án được truyền ──
+      const cpm1 = await getCpmData(ketCau!.id, p1);
+      assert.ok(cpm1.meta.has(wp1));
+      assert.ok(!cpm1.meta.has(wp2));
+      const cpm2 = await getCpmData(ketCau!.id, p2);
+      assert.ok(cpm2.meta.has(wp2));
+      assert.ok(!cpm2.meta.has(wp1));
+      // Không truyền projectId → cả 2 nhóm (tương thích ngược).
+      const cpmAll = await getCpmData(ketCau!.id);
+      assert.ok(cpmAll.meta.has(wp1) && cpmAll.meta.has(wp2));
+    } finally {
+      await run(`DELETE FROM tasks WHERE id IN (?, ?)`, t1, t2);
+      await run(`DELETE FROM work_packages WHERE id IN (?, ?)`, wp1, wp2);
+      await run(`DELETE FROM sheet_types WHERE id IN (?, ?)`, st1, st2);
+      await run(`DELETE FROM towers WHERE id IN (?, ?)`, tw1, tw2);
+      await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+    }
+  },
+);
