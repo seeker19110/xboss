@@ -2981,6 +2981,76 @@
 - `approval_actions_pkey`: UNIQUE INDEX approval_actions_pkey ON public.approval_actions USING btree (id)
 - `approval_actions_request_id_step_seq_key`: UNIQUE INDEX approval_actions_request_id_step_seq_key ON public.approval_actions USING btree (request_id, step_seq)
 
+## Tích hợp hệ ngoài (Integrations)
+
+### integrations
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | integer |  | `nextval('integrations_id_seq'::regclass)` |
+| provider | text |  |  |
+| project_id | integer | ✓ |  |
+| config | jsonb |  | `'{}'::jsonb` |
+| active | boolean |  | `false` |
+
+**Khóa ngoại:**
+- `project_id` → `projects(id)`
+
+**Index:**
+- `integrations_pkey`: UNIQUE INDEX integrations_pkey ON public.integrations USING btree (id)
+- `integrations_provider_project_id_key`: UNIQUE INDEX integrations_provider_project_id_key ON public.integrations USING btree (provider, project_id)
+
+### integration_runs
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | integer |  | `nextval('integration_runs_id_seq'::regclass)` |
+| integration_id | integer |  |  |
+| started_at | timestamptz | ✓ | `now()` |
+| finished_at | timestamptz | ✓ |  |
+| status | text |  | `'running'::text` |
+| stats | jsonb | ✓ |  |
+| error | text | ✓ |  |
+
+**Khóa ngoại:**
+- `integration_id` → `integrations(id)`
+
+**Index:**
+- `integration_runs_pkey`: UNIQUE INDEX integration_runs_pkey ON public.integration_runs USING btree (id)
+
+### sync_cursors
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| integration_id | integer |  |  |
+| entity | text |  |  |
+| last_local_id | bigint | ✓ |  |
+| last_remote_key | text | ✓ |  |
+| last_at | timestamptz | ✓ |  |
+
+**Khóa ngoại:**
+- `integration_id` → `integrations(id)`
+
+**Index:**
+- `sync_cursors_pkey`: UNIQUE INDEX sync_cursors_pkey ON public.sync_cursors USING btree (integration_id, entity)
+
+### remote_links
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| entity_type | text |  |  |
+| entity_id | bigint |  |  |
+| integration_id | integer |  |  |
+| remote_key | text |  |  |
+| remote_status | text | ✓ |  |
+| synced_at | timestamptz | ✓ |  |
+
+**Khóa ngoại:**
+- `integration_id` → `integrations(id)`
+
+**Index:**
+- `remote_links_pkey`: UNIQUE INDEX remote_links_pkey ON public.remote_links USING btree (entity_type, entity_id, integration_id)
+
 ## Hệ thống & audit
 
 ### audit_log

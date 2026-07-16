@@ -173,6 +173,10 @@ const MODULES: { title: string; tables: string[] }[] = [
     tables: ["approval_flows", "approval_steps", "approval_requests", "approval_actions"],
   },
   {
+    title: "Tích hợp hệ ngoài (Integrations)",
+    tables: ["integrations", "integration_runs", "sync_cursors", "remote_links"],
+  },
+  {
     title: "Hệ thống & audit",
     tables: ["audit_log", "assignment_log", "schema_migrations"],
   },

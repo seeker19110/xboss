@@ -123,4 +123,33 @@ test.describe("Quản trị (sau đăng nhập)", () => {
     );
     expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
   });
+
+  // M48 PR1 — trang khung tích hợp. PR1 chưa đăng ký adapter thật nào → danh sách rỗng
+  // (EmptyState). Không kiểm bật/tắt/đồng bộ vì không có adapter thật để tạo dữ liệu qua UI.
+  test("trang /admin/integrations render EmptyState + không vi phạm a11y (axe)", async ({
+    page,
+  }) => {
+    await page.goto("/admin/integrations");
+    // AppHeader render title trong <span>, không phải heading — và nhãn trùng với
+    // mục sidebar cùng tên, nên scope vào header để tránh strict-mode match nhầm
+    // (bài học PR2.4, xem PROGRESS.md).
+    await expect(
+      page.locator("header").getByText("Tích hợp hệ ngoài", { exact: true }),
+    ).toBeVisible({
+      timeout: 15_000,
+    });
+    // Registry rỗng ở PR1 → hiện thông điệp EmptyState (trạng thái bình thường).
+    await expect(page.getByText("Chưa có tích hợp nào", { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+
+    const serious = results.violations.filter(
+      (v) => v.impact === "serious" || v.impact === "critical",
+    );
+    expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
+  });
 });

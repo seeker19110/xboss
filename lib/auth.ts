@@ -269,6 +269,11 @@ export const CAN = {
   // Admin (cùng phân quyền Approval Engine, M46 PR4).
   viewAlertRules: (r?: Role) => r === "admin" || r === "pm",
   manageAlertRules: (r?: Role) => r === "admin",
+  // Khung tích hợp hệ ngoài (M48 PR1, lib/integrations/) — xem trang admin + bấm
+  // "Đồng bộ ngay" Admin/PM; bật/tắt + sửa config JSON chỉ Admin (nhạy cảm — đổi
+  // luồng đẩy dữ liệu ra hệ ngoài, cùng phân quyền Approval Engine/Alert Rules).
+  viewIntegrations: (r?: Role) => r === "admin" || r === "pm",
+  manageIntegrations: (r?: Role) => r === "admin",
 };
 
 // Sub-con chỉ được thao tác trên task được giao cho mình.
