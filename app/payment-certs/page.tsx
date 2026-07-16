@@ -8,6 +8,7 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appConfirm, appPrompt } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
+import type { EntityApprovalStatus } from "@/lib/approvals";
 
 type CertStatus = "draft" | "submitted" | "approved" | "rejected";
 const STATUS_LABEL: Record<CertStatus, string> = {
@@ -342,6 +343,15 @@ function CertDetailModal({
     Object.fromEntries(cert.items.map((it) => [it.id, String(it.qtyPeriod)])),
   );
   const [busy, setBusy] = useState(false);
+  // Trạng thái duyệt engine (M46 PR2) — null khi chưa có flow cấu hình cho "payment_cert",
+  // giữ UI y hệt trước (không hiện badge/lịch sử) đúng nguyên tắc "dormant" của M46.
+  const [approvalStatus, setApprovalStatus] = useState<EntityApprovalStatus | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/payment-certs/${cert.id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setApprovalStatus(j?.approvalStatus ?? null));
+  }, [cert.id]);
 
   const canEdit = canManage && cert.status === "draft";
 
@@ -435,6 +445,11 @@ function CertDetailModal({
             >
               {STATUS_LABEL[cert.status]}
             </span>
+            {approvalStatus && approvalStatus.status === "pending" && (
+              <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-amber-900 text-amber-200">
+                Chờ duyệt (bước {approvalStatus.currentSeq}/{approvalStatus.totalSteps})
+              </span>
+            )}
             <button onClick={onClose} aria-label="Đóng" className="text-zinc-400 hover:text-white">
               <X className="w-5 h-5" />
             </button>
@@ -443,6 +458,29 @@ function CertDetailModal({
 
         {cert.rejectReason && (
           <p className="text-xs text-rose-300">Lý do từ chối: {cert.rejectReason}</p>
+        )}
+
+        {/* Lịch sử duyệt engine (M46 PR2) — ẩn hoàn toàn khi chưa có flow cấu hình cho
+            "payment_cert" (approvalStatus null), giữ UI y hệt trước đây. */}
+        {approvalStatus && approvalStatus.actions.length > 0 && (
+          <div className="border-t border-zinc-800 pt-3 space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              Lịch sử duyệt
+            </h3>
+            <ul className="space-y-1.5">
+              {approvalStatus.actions.map((a) => (
+                <li key={a.seq} className="text-xs text-zinc-300 flex flex-wrap gap-x-1.5">
+                  <span className="font-medium">{a.actorName ?? `#${a.actorId}`}</span>
+                  <span className={a.decision === "approve" ? "text-emerald-300" : "text-rose-300"}>
+                    {a.decision === "approve" ? "đã duyệt" : "đã từ chối"}
+                  </span>
+                  <span className="text-zinc-500">bước {a.seq}</span>
+                  {a.note && <span className="text-zinc-400">— {a.note}</span>}
+                  <span className="text-zinc-500">({a.at})</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         <div className="overflow-x-auto">

@@ -3,6 +3,7 @@ import { query, queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { VO_REASONS, type VoReason, getVariation, canEditVo } from "@/lib/vo";
+import { getEntityApprovalStatus } from "@/lib/approvals";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,11 @@ export async function GET(
     id,
   );
 
-  return NextResponse.json({ variation, documents });
+  // Trạng thái duyệt engine (M46 PR2) — null khi chưa có flow cấu hình cho loại "variation"
+  // (hành xử dormant, không đổi UI cũ).
+  const approvalStatus = await getEntityApprovalStatus("variation", id);
+
+  return NextResponse.json({ variation, documents, approvalStatus });
 }
 
 // PATCH /api/variations/:id — sửa thông tin chung (tên/lý do/mô tả/hệ). Không sửa
