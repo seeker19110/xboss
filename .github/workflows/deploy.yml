@@ -7,6 +7,10 @@ on:
   push:
     branches: [main]
 
+# Job chỉ SSH vào VPS bằng secrets riêng — không cần bất kỳ quyền GITHUB_TOKEN nào
+# (least-privilege theo docs/audit.md §6).
+permissions: {}
+
 jobs:
   deploy:
     runs-on: ubuntu-latest

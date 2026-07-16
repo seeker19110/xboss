@@ -116,6 +116,15 @@ Script giữ nguyên ID, tự chỉnh sequence và đối chiếu số dòng t�
 
 Đặt Nginx/Caddy làm reverse proxy trước cổng 3000, rồi dùng `certbot --nginx` cấp SSL miễn phí.
 
+Sau khi HTTPS chạy ổn định, thêm HSTS vào block `server` cổng 443 của Nginx để chặn
+downgrade về HTTP (certbot không tự thêm header này):
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+> Lưu ý: chỉ thêm khi chắc chắn toàn bộ domain (kể cả subdomain nếu dùng
+> `includeSubDomains`) phục vụ HTTPS lâu dài; không dùng `preload` — ghi danh vào
+> danh sách preload của trình duyệt gần như không rút lại được.
+
 ---
 
 ## ✅ Checklist trước khi chạy thật
