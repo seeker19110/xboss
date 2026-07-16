@@ -10,286 +10,249 @@
 
 ---
 
-## Kế hoạch: M48 PR1 — Khung tích hợp `lib/integrations/` + trạng thái đồng bộ
+## Kế hoạch: M50 — Phân quyền nâng cao (3 PR: override quyền, quyền theo trường, SoD)
 
 ### Bối cảnh & mục tiêu
 
-Kế hoạch trước (4 nợ kỹ thuật từ audit PROGRESS.md — rò rỉ project_id, notifications
-project scope, M46 approval badge, upload size precheck) **đã hoàn tất và merge**
-(PR #202-#206). Bước tiếp theo theo thứ tự ưu tiên trong `docs/nang-cap/README.md`:
-M43-M47 đã xong; M48 (P1, "Tích hợp tài chính") là module tiếp theo, đặc tả tại
-`docs/nang-cap/M48-tich-hop-tai-chinh.md`.
+Kế hoạch trước (M48 PR1 — khung `lib/integrations/`) **đã hoàn tất và merge** (PR #208).
+M48 PR2/PR3 vẫn chờ công ty chốt nhà cung cấp thật (không đưa vào kế hoạch — luật cứng).
 
-M48 chia 3 PR: **PR2 (adapter kế toán) và PR3 (hoá đơn điện tử) đều ghi rõ "điều kiện
-tiên quyết: chốt nhà cung cấp thật trước khi code"** (MISA/BRAVO cho kế toán,
-meInvoice/Viettel SInvoice/VNPT cho HĐĐT) — công ty chưa xác nhận NCC nào, nên **KHÔNG
-đưa PR2/PR3 vào kế hoạch này** (đúng luật cứng CLAUDE.md — không đoán tên NCC/API thật).
-**PR1 (khung `lib/integrations/` core) đặc tả ghi rõ "code được ngay"** — không phụ
-thuộc NCC, chỉ là hạ tầng chung (bảng, engine đồng bộ, trang admin, cron) chuẩn hoá từ
-pattern `lib/material-sync.ts` đã chạy ổn. Kế hoạch này **chỉ làm PR1**.
+Theo thứ tự ưu tiên `docs/nang-cap/README.md`: M43–M48 (phần code được) đã xong; còn lại
+M50/M51/M52 (P2) và M49 (P3). Chọn **M50** cho đợt này vì:
 
-Không có việc nào khác đổi cùng file — chạy 1 nhánh duy nhất.
+- **M51 (RLS)** bị chặn bởi quyết định vận hành chưa chốt với người dùng: tạo role
+  Postgres `xboss_app` trên production, tách `MIGRATE_DATABASE_URL`, kèm ADR-0005 —
+  KHÔNG code trước khi người dùng xác nhận sẵn sàng đụng cấu hình prod.
+- **M49 (P3)** xếp sau P2, và PR3 (SSO OIDC) cần người dùng chốt việc thêm thư viện
+  `jose` (hoặc ADR zero-dep).
+- **M52 PR3** (module registry) tham chiếu ma trận perm của M50 — M50 đi trước hợp lẽ.
+- M50 không có điểm nào phải hỏi thêm: đặc tả `docs/nang-cap/M50-phan-quyen-nang-cao.md`
+  đã kín, phụ thuộc (audit trail M43) đã xong.
+
+**Worker PHẢI đọc `docs/nang-cap/M50-phan-quyen-nang-cao.md` trước khi code** — kế hoạch
+này không chép lại toàn bộ đặc tả, chỉ ghi các điểm ĐÍNH CHÍNH so với đặc tả (đặc tả
+viết trước, code đã đổi) + quyết định đã chốt. Khi kế hoạch và file đặc tả lệch nhau,
+**kế hoạch này thắng**.
+
+### Đính chính chung so với đặc tả M50 (áp cho mọi việc bên dưới)
+
+1. **Số migration**: đặc tả ghi `0055_role_permissions.sql` nhưng 0054–0057 đã bị
+   M47/M48 chiếm (mới nhất hiện là `migrations/0057_integrations.sql`) → dùng
+   **`migrations/0058_role_permissions.sql`**. Xác nhận lại bằng `ls migrations/ | sort`
+   lúc code (bài học M32/M33).
+2. **Tên perm thật**: đặc tả ghi `viewPayment` — tên thật trong map `CAN`
+   (`lib/auth.ts:171`) là **`viewPayments`**. Toàn bộ chỗ đặc tả nhắc `viewPayment`
+   hiểu là `viewPayments`.
+3. **Tên bảng thật**: đặc tả ghi `variations`/`payrolls` — bảng thật là
+   **`variation_orders`** (migration `0013_vo.sql`) và **`payroll`** (`0037_finance.sql`).
+4. **Cột tiền thật**: `variation_orders` và `payment_certs` KHÔNG có cột tiền trực
+   tiếp — giá trị nằm ở `boq_items` (qty × đơn giá) và `payment_cert_items`/tổng do
+   SQL tính trả trong response. Phần quyền theo trường (việc 2) làm việc trên **trường
+   của JSON response route GET**, không phải tên cột DB trong đặc tả.
+5. **Ngoài map `CAN` còn `isAdminOrPm`** (`lib/auth.ts:168`, ~14 route dùng) — các
+   route đó KHÔNG override được qua ma trận. Chấp nhận (đặc tả chỉ nói CAN); UI ma
+   trận ghi chú rõ giới hạn này bằng tiếng Việt.
 
 ### Việc
 
-#### 1. M48 PR1 — khung `lib/integrations/core.ts` + migration + API + trang admin + cron
+#### 1. M50 PR1 — Override quyền trong DB: migration + `can()` + cache + trang ma trận
 
-- `route:` `complex`
+- `route:` `complex` (chạm `lib/auth.ts` — vùng rủi ro cao theo `docs/audit.md`)
 - agent: `complex-implementer`
-- nhánh/worktree: `claude/feat-m48-integrations-pr1` (base `origin/main` mới nhất)
-- đặc tả nền (từ `docs/nang-cap/M48-tich-hop-tai-chinh.md` mục PR1, đã xác minh số
-  migration/pattern thật trong code — phần dưới đây đã đóng, không cần tự quyết):
+- nhánh/worktree: `claude/feat-m50-permissions-pr1` (base `origin/main` mới nhất)
+- đặc tả nền: mục **PR1** của `docs/nang-cap/M50-phan-quyen-nang-cao.md` + đính chính
+  chung ở trên. Các quyết định đã CHỐT (không tự đổi):
 
-  **Số migration thật**: đặc tả gốc ghi `0053_integrations.sql` nhưng `0053` đã bị
-  chiếm bởi `migrations/0053_approvals.sql` (M46). Migration mới nhất hiện có là
-  `migrations/0056_alert_rules.sql` → dùng **`migrations/0057_integrations.sql`**
-  (xác nhận lại bằng `ls migrations/ | sort` lúc code, phòng trường hợp có PR khác
-  merge trước — bài học M32/M33 ghi trong CLAUDE.md).
+  **Migration `migrations/0058_role_permissions.sql`** — đúng schema trong đặc tả
+  (bảng `role_permissions(role, perm_key, allowed, updated_by, updated_at)`, PK
+  `(role, perm_key)`, idempotent). Thêm khối `DO $$` gắn trigger
+  `audit_row_change()` cho bảng `role_permissions` (copy đúng pattern cuối
+  `migrations/0053_approvals.sql:71` — M43 audit mọi thay đổi cấu hình quyền).
+  Migration thêm thuần (CREATE TABLE/TRIGGER) → đi thẳng production được.
+  Chạy `npm run gen:erd` cùng PR.
 
-  **Migration `migrations/0057_integrations.sql`** — đúng y schema trong đặc tả (4
-  bảng, idempotent `IF NOT EXISTS`):
+  **`lib/auth.ts` — GIỮ NGUYÊN chữ ký `CAN.x(role)` , KHÔNG đổi call-site hàng loạt**
+  (quyết định của phiên chính, đơn giản hoá so với đặc tả — đặc tả cho phép "2 API
+  cùng tồn tại, CAN.x đọc override qua cùng cache"; vì override chỉ theo `role`,
+  chữ ký `(r?: Role) => boolean` là đủ, đổi ~119 call-site không thêm giá trị):
+  - Đổi tên map hàm tĩnh hiện tại thành `CAN_DEFAULT` (nội bộ, không export đổi tên
+    ra ngoài file).
+  - `CAN` export mới = proxy cùng shape: mỗi `CAN.x(role)` tra cache override
+    `(role, 'x')` → có dòng thì theo `allowed`, không có → `CAN_DEFAULT.x(role)`.
+    Mọi route hiện có giữ nguyên không sửa.
+  - **Cache**: nạp toàn bộ `role_permissions` vào memory (bảng <100 dòng). Vì
+    `CAN.x` là hàm sync, dùng mô hình **stale-while-revalidate**: đọc luôn từ
+    snapshot memory hiện có; một tác vụ nền refresh snapshot khi quá TTL 60s
+    (kích hoạt lười ở lần gọi kế tiếp, không setInterval — thân thiện serverless).
+    Snapshot rỗng lúc cold start → mọi perm theo default cho tới lần nạp đầu
+    (an toàn: default là hành vi hiện tại). PATCH ma trận gọi invalidate trực tiếp
+    trong cùng process; instance khác tự bắt kịp trong ≤60s — chấp nhận độ trễ này
+    (ghi chú trên UI). Ranh giới được phép tự quyết: chi tiết cấu trúc module cache
+    (file mới `lib/permissions.ts` hay trong `lib/auth.ts`) — miễn `lib/auth.ts`
+    không import vòng.
+  - **`LOCKED_PERMS`**: danh sách perm KHÔNG cho override mở (allowed=true) cho
+    `VIEW_ONLY_ROLES` (`bch/cdt/viewer`) = mọi perm ghi dữ liệu. Duyệt map
+    `CAN_DEFAULT` thật để liệt kê (mọi perm `manage*`, `edit*`, `create*`,
+    `record*`, `decide*`, `assign`, `approve`, `import`); perm chỉ-xem
+    (`view*`, `export`) được mở. Quy tắc API: chỉ cho **siết** (allowed=false)
+    với vai trò thao tác, hoặc **mở/siết** perm xem — vi phạm → 422 kèm lý do
+    tiếng Việt.
 
-  ```sql
-  CREATE TABLE IF NOT EXISTS integrations (
-    id SERIAL PRIMARY KEY,
-    provider TEXT NOT NULL,
-    project_id INT REFERENCES projects(id),
-    config JSONB NOT NULL DEFAULT '{}',
-    active BOOLEAN NOT NULL DEFAULT FALSE,
-    UNIQUE(provider, project_id)
-  );
-  CREATE TABLE IF NOT EXISTS integration_runs (
-    id SERIAL PRIMARY KEY,
-    integration_id INT NOT NULL REFERENCES integrations(id) ON DELETE CASCADE,
-    started_at TIMESTAMPTZ DEFAULT now(), finished_at TIMESTAMPTZ,
-    status TEXT NOT NULL DEFAULT 'running',
-    stats JSONB, error TEXT
-  );
-  CREATE TABLE IF NOT EXISTS sync_cursors (
-    integration_id INT NOT NULL REFERENCES integrations(id) ON DELETE CASCADE,
-    entity TEXT NOT NULL,
-    last_local_id BIGINT, last_remote_key TEXT, last_at TIMESTAMPTZ,
-    PRIMARY KEY(integration_id, entity)
-  );
-  CREATE TABLE IF NOT EXISTS remote_links (
-    entity_type TEXT NOT NULL, entity_id BIGINT NOT NULL,
-    integration_id INT NOT NULL REFERENCES integrations(id) ON DELETE CASCADE,
-    remote_key TEXT NOT NULL, remote_status TEXT, synced_at TIMESTAMPTZ,
-    PRIMARY KEY(entity_type, entity_id, integration_id)
-  );
-  ```
+  **API** (pattern `app/api/admin/alert-rules/route.ts`):
+  - `GET /api/admin/role-permissions` — `CAN.manageUsers` (admin): trả toàn bộ
+    override + danh sách perm_key hợp lệ (tên hàm trong `CAN_DEFAULT`) + giá trị
+    default từng (role, perm) để UI vẽ ma trận 3 trạng thái.
+  - `PATCH /api/admin/role-permissions` — admin, body
+    `{role, permKey, allowed: boolean | null}` (`null` = xoá override, về default).
+    Validate: role hợp lệ (`lib/roles.ts`), permKey tồn tại trong `CAN_DEFAULT`,
+    luật `LOCKED_PERMS` → 422. Upsert/DELETE + invalidate cache.
 
-  Chạy `npm run gen:erd` cùng PR để cập nhật `docs/ERD.md` (CI gate kiểm khớp schema).
+  **Trang `app/admin/permissions/page.tsx`** (mới, client component, bố cục tham
+  khảo `app/admin/alert-rules/page.tsx`): ma trận role × perm_key nhóm theo module
+  (nhóm theo prefix/comment trong `CAN_DEFAULT`, đặt nhãn tiếng Việt), ô 3 trạng
+  thái: mặc định (nhạt, ghi rõ giá trị default) / mở / siết; chỉ admin sửa (PM
+  không có mục sidebar — gate `CAN.manageUsers`); ô thuộc `LOCKED_PERMS` với vai
+  trò chỉ-xem: disable + tooltip lý do. Ghi chú giới hạn `isAdminOrPm` (đính chính
+  §5) + độ trễ cache ≤60s. Sidebar: thêm node vào `app/lib/dashboardTree.ts` nhóm
+  "Hệ thống" cạnh "Cấu hình duyệt", gate theo `manageUsers`.
 
-  **Chống chạy chồng — tái dùng `sync_locks` (bảng có sẵn từ M18, dùng bởi
-  `lib/material-sync.ts`, KHÔNG tạo bảng khoá riêng):** đọc `lib/material-sync.ts`
-  dòng ~90-102 (`acquireLock`/`releaseLock`) làm mẫu — cùng cơ chế
-  `INSERT ... ON CONFLICT (name) DO UPDATE ... WHERE locked_at IS NULL OR locked_at <
-  NOW() - INTERVAL '10 minutes'`. Khoá theo tên duy nhất mỗi (provider, project):
-  `` `integration:${provider}:${projectId}` ``.
-
-  **`lib/integrations/core.ts` (file mới):**
-
-  ```ts
-  export type Row = Record<string, unknown>;
-  export type Config = Record<string, unknown>;
-  export type PushResult = { remoteKey: string; remoteStatus?: string } | { error: string };
-  export type Link = { entityId: number; remoteKey: string; remoteStatus: string | null };
-  export type StatusUpdate = { entityId: number; remoteStatus: string };
-  export type RunSummary = {
-    ok: boolean;
-    stats: Record<string, { pushed: number; pulled: number; errors: number }>;
-    error?: string;
-  };
-
-  export type Adapter = {
-    provider: string;
-    pushEntities: string[];
-    // Lấy các dòng LOCAL mới hơn cursor để đẩy đi — mỗi entity do adapter tự biết
-    // truy vấn bảng nào (khung core không hard-code bảng nghiệp vụ cụ thể, giữ
-    // core tách biệt khỏi domain — đúng tinh thần "khung chung" của đặc tả).
-    // Trả về rỗng khi hết dữ liệu mới. `row.id` (number) BẮT BUỘC có để làm
-    // last_local_id con trỏ tiến.
-    fetchRows(entity: string, projectId: number, sinceId: number | null): Promise<Row[]>;
-    push(entity: string, rows: Row[], cfg: Config): Promise<PushResult[]>; // 1-1 với rows
-    pullStatus?(entity: string, links: Link[], cfg: Config): Promise<StatusUpdate[]>;
-  };
-
-  const registry = new Map<string, Adapter>();
-  export function registerAdapter(adapter: Adapter): void; // ghi đè nếu trùng provider (test tiện re-register)
-  export function getAdapter(provider: string): Adapter | undefined;
-
-  export async function runSync(provider: string, projectId: number): Promise<RunSummary>;
-  ```
-
-  **Hành vi `runSync` (viết mới, không có hàm cũ để tái dùng — đây là phần thân
-  chính của việc):**
-  1. `getAdapter(provider)` không có → trả `{ ok: false, stats: {}, error: "Chưa đăng
-     ký adapter cho provider này" }` (không throw ra ngoài route — route trả JSON lỗi
-     422, không phải 500).
-  2. Đọc `integrations` theo `(provider, project_id)` — không có hàng hoặc
-     `active=false` → trả lỗi tương tự ("Tích hợp chưa được bật").
-  3. `acquireLock` theo tên `integration:${provider}:${projectId}` — thất bại (đang
-     chạy) → trả `{ ok: false, stats: {}, error: "Đang đồng bộ, thử lại sau" }`.
-  4. `try/finally` bọc toàn bộ thân — `finally` luôn gọi `releaseLock`.
-  5. Ghi 1 hàng `integration_runs` (`status='running'`) lúc bắt đầu — giữ `id` để
-     `UPDATE` `status`/`finished_at`/`stats`/`error` lúc kết thúc (thành công lẫn lỗi
-     — bọc `try/catch` quanh toàn bộ vòng lặp entity, lỗi tổng vẫn phải ghi
-     `integration_runs.status='error'` trước khi trả về, không để hàng `running` treo
-     mãi).
-  6. Với mỗi `entity` trong `adapter.pushEntities`:
-     - Đọc `sync_cursors` (integration_id, entity) lấy `last_local_id` (null nếu chưa
-       từng chạy).
-     - `adapter.fetchRows(entity, projectId, lastLocalId)` lấy các dòng mới hơn.
-     - Rỗng → bỏ qua entity này, sang entity kế.
-     - `adapter.push(entity, rows, config)` — **lỗi TỪNG DÒNG không chặn cả batch**:
-       mỗi phần tử kết quả tương ứng 1-1 với `rows` theo thứ tự; phần tử có `error` →
-       cộng `stats[entity].errors++`, KHÔNG lưu `remote_links`, KHÔNG tiến cursor qua
-       dòng đó (dòng lỗi sẽ được `fetchRows` trả lại ở lần chạy sau vì cursor chưa
-       vượt qua nó — nghĩa là `last_local_id` chỉ tiến đến **dòng thành công liền kề
-       cuối cùng theo thứ tự**, không tiến nhảy qua dòng lỗi ở giữa; đơn giản hoá hợp
-       lý: nếu dòng lỗi nằm giữa batch, các dòng sau nó tạm thời bị đẩy lại ở lần
-       chạy kế tiếp cùng với dòng lỗi — chấp nhận trùng lặp vô hại vì `remote_links`
-       upsert theo `(entity_type, entity_id, integration_id)` là idempotent).
-       Phần tử thành công → `UPSERT remote_links` (`entity_type=entity, entity_id=
-       row.id, integration_id, remote_key, remote_status, synced_at=now()`) +
-       `stats[entity].pushed++`.
-     - Sau vòng lặp, `UPSERT sync_cursors` với `last_local_id` = id dòng thành công
-       cuối cùng theo thứ tự liên tục từ đầu (theo mô tả trên), `last_at=now()`.
-     - Nếu `adapter.pullStatus` tồn tại: đọc toàn bộ `remote_links` của
-       `(integration_id, entity)`, gọi `pullStatus(entity, links, config)`, với mỗi
-       `StatusUpdate` trả về → `UPDATE remote_links SET remote_status=?, synced_at=
-       now() WHERE entity_type=? AND entity_id=? AND integration_id=?`,
-       `stats[entity].pulled++`.
-  7. Trả `{ ok: true, stats }` (hoặc `ok:false` kèm `error` nếu có exception tổng ở
-     bước 6, đã bắt ở bước 5).
-
-  **`lib/auth.ts`** thêm 2 quyền vào map `CAN` (đồng bộ pattern `manageAlertRules`/
-  `viewAlertRules` dòng ~271/gần đó):
-  - `viewIntegrations: (r?: Role) => r === "admin" || r === "pm"` — xem trang admin +
-    bấm "Đồng bộ ngay".
-  - `manageIntegrations: (r?: Role) => r === "admin"` — bật/tắt, sửa `config` JSON.
-
-  **API (bám đúng pattern `app/api/admin/alert-rules/route.ts` + `app/api/cron/
-  sync-sheets/route.ts`):**
-  - `GET /api/admin/integrations` — `viewIntegrations`, trả danh sách `integrations`
-    JOIN `integration_runs` lấy lần chạy gần nhất mỗi hàng (`DISTINCT ON
-    (integration_id) ... ORDER BY integration_id, started_at DESC`) — trả cả
-    `provider`/`projectId`/`active`/`config`/`lastRun: {status, startedAt, finishedAt,
-    stats, error} | null`.
-  - `POST /api/admin/integrations` — `manageIntegrations`, body
-    `{provider, projectId, config?, active?}` — validate `provider` **phải đã đăng
-    ký** trong registry (`getAdapter(provider)` tồn tại) mới cho tạo/bật, else 422
-    "Provider chưa được hỗ trợ" (PR1 chưa có adapter thật nào đăng ký — endpoint này
-    chưa dùng được cho tới PR2, đúng thiết kế "khung trước, adapter sau"; **vẫn phải
-    viết đủ validate này ngay từ PR1** để PR2 chỉ cần đăng ký adapter là hoạt động
-    được, không sửa lại route). Upsert theo `(provider, project_id)` (`ON CONFLICT`).
-  - `POST /api/integrations/:provider/sync` — `viewIntegrations` (Admin/PM theo đúng
-    đặc tả), lấy `projectId` từ `getCurrentProjectId(user)` (bắt buộc phải có dự án
-    đang chọn, `null` → 422 "Chưa chọn dự án"), gọi `runSync(provider, projectId)`,
-    trả JSON `RunSummary` (200 nếu `ok`, 422 kèm `error` nếu không — không phải 500,
-    đây là lỗi nghiệp vụ dự kiến được như "chưa bật"/"đang chạy").
-  - `GET /api/cron/sync-integrations` — xác thực `checkCronSecret` HOẶC session
-    `CAN.export` (copy đúng khối auth 2 dòng đầu của `app/api/cron/sync-sheets/
-    route.ts`). Quét toàn bộ `SELECT id, provider, project_id FROM integrations WHERE
-    active = true AND project_id IS NOT NULL`, gọi `runSync(provider, projectId)`
-    tuần tự cho từng hàng (không Promise.all — tránh nhiều tiến trình cùng tranh
-    `sync_locks`/quá tải DB), gộp kết quả thành mảng trả về, log lỗi từng cái qua
-    `lib/log.ts` (`log.error`) nhưng không chặn các hàng còn lại.
-
-  **Trang `app/admin/integrations/page.tsx`** (mới, bố cục tham khảo
-  `app/admin/alert-rules/page.tsx` — client component, fetch qua
-  `/api/admin/integrations`, KHÔNG import `lib/integrations/core.ts` trực tiếp vì kéo
-  theo `lib/db`):
-  - Bảng danh sách: provider, dự án, trạng thái bật/tắt (toggle switch —
-    `manageIntegrations` mới bấm được, ẩn nút nếu không đủ quyền), lần chạy gần nhất
-    (thời gian + badge màu theo status running/ok/error, kèm icon không chỉ dựa màu)
-    + số liệu `stats` rút gọn (tổng pushed/pulled/errors), nút "Đồng bộ ngay" (gọi
-    `POST /api/integrations/:provider/sync`, disable lúc đang gửi, toast kết quả).
-  - Không có hàng nào (registry rỗng ở PR1, chưa có adapter thật) → `EmptyState`
-    thông điệp tiếng Việt "Chưa có tích hợp nào — sẽ bổ sung ở các đợt sau (kế toán,
-    hoá đơn điện tử)" — **đây là trạng thái BÌNH THƯỜNG của PR1**, không phải lỗi.
-  - Thêm 1 dòng read-only riêng biệt (không phải hàng trong bảng `integrations`,
-    chỉ là text tĩnh) hiển thị trạng thái đồng bộ Google Sheet vật tư hiện có — gọi
-    `GET /api/materials/sync` **KHÔNG** (route đó là POST trigger, không phải GET
-    status) — thay vào đó chỉ hiển thị dòng tĩnh "Đồng bộ Google Sheet (vật tư): xem
-    chi tiết tại trang Vật tư" kèm link `/materials` (KHÔNG dựng thêm API status
-    riêng cho việc này — YAGNI, đặc tả chỉ yêu cầu "hiển thị read-only trạng thái...
-    cho đủ bức tranh", một dòng link là đủ).
-  - Sidebar: thêm mục vào `app/lib/dashboardTree.ts` dưới nhóm "Hệ thống" (cùng nhóm
-    node `dash.chuyen-doi-so` → `/tech` đã có) với `href: "/admin/integrations"`,
-    gate hiển thị theo `viewIntegrations` (đọc cách các node admin khác trong file
-    này tự ẩn/hiện theo quyền — bám đúng mẫu, không tạo cơ chế gate mới).
-
-  **Test bắt buộc:**
-  - `tests/integrations-core.test.ts` (mới, import `tests/setup.ts` đầu tiên) — dùng
-    1 adapter giả in-memory tự viết trong file test (mảng `Row[]` cứng, `push` trả
-    thành công cho tất cả hoặc giả lập 1 dòng lỗi tuỳ ca), `registerAdapter` trước
-    mỗi test, tích hợp thật với `TEST_DATABASE_URL` (insert 1 hàng `integrations`
-    active trước khi gọi `runSync`). Ca bắt buộc: (1) chạy lần đầu — cursor tiến từ
-    null đến id dòng cuối, `remote_links` đủ số dòng, `integration_runs` ghi
-    `status='ok'`; (2) chạy lại (re-run) không có dòng mới — không tạo `remote_links`
-    trùng, `stats.pushed=0`; (3) 1 dòng giữa batch lỗi — dòng lỗi + các dòng sau nó
-    không vào `remote_links`, cursor không vượt qua dòng lỗi, `stats.errors` đúng số;
-    (4) 2 lệnh gọi `runSync` đồng thời cùng (provider, projectId) — 1 cái phải trả
-    `ok:false, error` do khoá (verify bằng `Promise.all` gọi song song, hoặc gọi
-    tuần tự có giữ khoá giả lập — chọn cách nào verify được thật sự tranh khoá, ghi
-    rõ cách làm trong code comment); (5) `runSync` với provider chưa đăng ký → lỗi
-    rõ ràng, không throw.
-  - Thêm file test vào lệnh `npm test` trong `package.json` (mảng file test — bám
-    đúng cách các file `.test.ts` khác đã được liệt kê).
-  - `e2e/authed/admin.spec.ts` (mở rộng, không tạo file mới — đọc file hiện có để
-    bám đúng cấu trúc checklist sidebar admin đã có sẵn) thêm 1 ca: trang
-    `/admin/integrations` render đúng (tiêu đề + `EmptyState` vì registry rỗng) +
-    axe sạch (desktop + mobile) — **không cần ca "bật/tắt/đồng bộ"** vì không có
-    adapter thật để tạo dữ liệu qua UI ở PR1 (nếu muốn verify sâu hơn hành vi bảng có
-    dữ liệu, dùng test tích hợp `integrations-core.test.ts` ở trên là đủ, tránh
-    overengineer e2e cho tính năng chưa có dữ liệu thật).
+  **Test `tests/permissions.test.ts`** (mới, import `tests/setup.ts` đầu tiên,
+  integration `TEST_DATABASE_URL`): (1) không override → `CAN.x` = default;
+  (2) siết `approve` của `pm` → false thật sau invalidate; (3) mở perm ghi cho
+  `viewer` qua API → 422; (4) mở perm xem (`viewPayments`) cho `viewer` → true;
+  (5) xoá override (`allowed: null`) → về default; (6) PATCH xong cache invalidate
+  ngay trong cùng process. Thêm file vào lệnh `npm test` trong `package.json`.
 
 - tiêu chí chấp nhận:
-  - [ ] `npm run lint` + `npm run typecheck` + `npm test` (+ `npm run build`) xanh
-  - [ ] `npm run gen:erd` chạy sạch, `docs/ERD.md` phản ánh đúng 4 bảng mới, CI gate
-        `git diff --exit-code` không phát hiện lệch
-  - [ ] `runSync` với provider chưa đăng ký, hoặc integration chưa bật, hoặc đang khoá
-        → trả lỗi nghiệp vụ rõ ràng (không throw 500, không crash route)
-  - [ ] Chạy lại `runSync` nhiều lần liên tiếp không tạo `remote_links` trùng
-        (idempotent) — verify bằng test tích hợp
-  - [ ] 1 dòng lỗi giữa batch không chặn các dòng còn lại trong CÙNG lần chạy đó (lỗi
-        chỉ ảnh hưởng đúng dòng đó + các dòng sau nó bị đẩy lại lần sau, không panic
-        toàn bộ `runSync`)
-  - [ ] Trang `/admin/integrations` render đúng cho user Admin/PM (thấy trang, PM
-        không thấy toggle bật/tắt), user khác vai trò không thấy mục sidebar và bị
-        chặn ở route (kiểm tra qua `CAN`, không chỉ ẩn UI)
-  - [ ] `GET /api/cron/sync-integrations` xác thực đúng `CRON_SECRET` Bearer hoặc
-        session Admin/PM, không nhận secret qua query param
+  - [ ] `npm run lint` + `npm run typecheck` + `npm test` + `npm run build` xanh;
+        `npm run gen:erd` không lệch
+  - [ ] Không sửa call-site `CAN.x(...)` nào ngoài `lib/auth.ts` (diff các route = 0)
+  - [ ] DB trống bảng override → hành vi mọi perm y hệt trước PR (test 1 + chạy lại
+        toàn bộ test suite cũ pass là bằng chứng)
+  - [ ] Luật `LOCKED_PERMS` chặn ở API (422), không chỉ disable ở UI
+  - [ ] Thay đổi override có dòng `audit_log` tương ứng (trigger M43)
+  - [ ] Đọc perm mỗi request không chạm DB (trừ lần refresh TTL) — kiểm bằng đọc code
+        + reviewer xác nhận
+
+#### 2. M50 PR2 — Quyền theo trường: `lib/sensitive-fields.ts` + strip tại route + `MaskedValue`
+
+- `route:` `complex` (chạm route tài chính — vùng rủi ro cao; danh sách trường thật
+  phải tự xác định từ response, đặc tả chỉ nêu tinh thần)
+- agent: `complex-implementer`
+- nhánh/worktree: `claude/feat-m50-permissions-pr2`, base **nhánh việc 1** (cần perm
+  `viewPayroll` đăng ký vào `CAN_DEFAULT` + cache của PR1)
+- đặc tả nền: mục **PR2** của `docs/nang-cap/M50-phan-quyen-nang-cao.md` + đính chính
+  chung. Quyết định đã chốt:
+
+  - Perm mới `viewPayroll` thêm vào `CAN_DEFAULT`: `(r) => r === "admin" || r === "pm"`
+    (kèm comment tiếng Việt: lương nhạy cảm hơn thanh toán — `bch` xem được trang
+    payroll nhưng số tiền bị che). Route payroll GET vẫn gate vào trang bằng
+    `viewPayments` như hiện tại (`app/api/payroll/route.ts:31`) — KHÔNG đổi; chỉ
+    thêm lớp che trường.
+  - `lib/sensitive-fields.ts` (mới): map entity → `{ fields, perm }[]` như đặc tả
+    nhưng **fields là tên trường trong JSON response** (camelCase) của từng route
+    GET. **Ranh giới được phép tự quyết**: worker đọc từng route GET trả 4 entity
+    (`variation_orders`: `app/api/variations/*`; `contracts`: `app/api/contracts/*`;
+    `payment_certs`: `app/api/payment-certs/*` kể cả `[id]/excel`; `payroll`:
+    `app/api/payroll/*`) và tự liệt kê đúng các trường mang giá trị tiền/đơn giá/
+    tỷ lệ nhạy cảm (vd `contracts`: `value`, `advancePct`, `retentionPct`; `payroll`:
+    `rate`, `gross`, `deductions`, `net`; VO/IPC: các trường tổng tiền do SQL tính
+    và đơn giá trong items) — danh sách cuối phải ghi thành comment đầu file kèm
+    route áp dụng, reviewer đối chiếu.
+  - `stripSensitive(entity, rows, user)`: thay giá trị bằng `null` khi user thiếu
+    perm; thuần, không chạm DB (perm check qua `CAN` PR1). Áp tại route GET (ranh
+    giới bảo mật duy nhất) TRƯỚC `res.json`. Route tổng hợp tài chính đã chặn cả
+    trang bằng `PAYMENT_VIEW_ROLES` → không đụng (đúng đặc tả).
+  - Export Excel của payment-certs (`[id]/excel`): user thiếu perm → 403 luôn
+    (che từng ô trong file Excel là vô nghĩa — quyết định của phiên chính).
+  - UI: component `MaskedValue` (`app/components/MaskedValue.tsx`) hiển thị "•••"
+    khi giá trị `null` ở cột tiền, kèm `aria-label` "Không có quyền xem"; gắn vào
+    các trang/bảng hiển thị 4 entity. Không đổi layout khác.
+  - Test `tests/sensitive-fields.test.ts` (unit, thuần): strip đúng trường theo
+    perm, không đụng trường khác, mảng rỗng, user đủ perm → nguyên vẹn.
+
+- tiêu chí chấp nhận:
+  - [ ] lint/typecheck/test/build xanh
+  - [ ] User `bch` GET payroll: vẫn 200, các trường tiền = `null`; `admin`/`pm`
+        thấy đủ (test integration hoặc unit trên handler logic — chọn cách rẻ nhất
+        verify được thật)
+  - [ ] Strip nằm ở API route, không phải chỉ ẩn ở UI
+  - [ ] Không route nào ngoài danh sách 4 entity bị đổi hành vi
+
+#### 3. M50 PR3 — Báo cáo SoD + xuất ma trận quyền hiệu lực
+
+- `route:` `standard` (đọc-only, SQL + export, đặc tả cụ thể, không đổi hành vi ghi)
+- agent: `standard-worker`
+- nhánh/worktree: `claude/feat-m50-permissions-pr3`, base **nhánh việc 1** (tab gắn
+  vào trang `/admin/permissions` của PR1; chạy SONG SONG được với việc 2 — không
+  chung file với việc 2)
+- đặc tả nền: mục **PR3** của `docs/nang-cap/M50-phan-quyen-nang-cao.md` + đính chính
+  chung. Cụ thể hoá:
+
+  - `lib/sod.ts` (mới): mỗi rule = 1 câu SQL placeholder `?` + mô tả tiếng Việt.
+    3 rule v1 (đối chiếu bảng thật trước khi viết): (a) cùng user vừa tạo vừa duyệt
+    — quét `approval_requests`/`approval_actions` (M46) VÀ dữ liệu trước M46 qua
+    `variation_orders`/`payment_certs` (`created_by` = `decided_by`); (b) vừa lập
+    PO vừa nhận hàng (`purchase_orders.created_by` = người ghi nhận giao nhận —
+    đọc schema `0016`+ để lấy đúng bảng nhận hàng; nếu bảng nhận hàng không có cột
+    người ghi thì BỎ rule này kèm ghi chú trong code, không chế thêm cột); (c) vừa
+    ghi chi vừa duyệt chi trên `cash_transactions`/`advances` (tương tự — chỉ viết
+    rule khi cột người-duyệt thật sự tồn tại). Tham số `days` giới hạn theo
+    `created_at`.
+  - `GET /api/admin/sod-report?days=90` — `CAN.viewAudit` (admin, cùng độ nhạy
+    audit log): trả mảng `{rule, description, violations: [...]}`.
+  - `GET /api/admin/permissions-snapshot` — admin: xuất Excel (exceljs, pattern
+    `app/api/export/excel/route.ts`) ma trận role × perm hiệu lực (default +
+    override đè), 1 sheet, kèm cột "nguồn" (mặc định/override) + thời điểm xuất.
+  - UI: trang `/admin/permissions` (PR1) thêm tab "Báo cáo SoD" (bảng vi phạm,
+    chọn khoảng ngày 30/90/180) + nút "Xuất ma trận quyền (.xlsx)".
+  - Test `tests/sod.test.ts` (integration): seed 1 cặp vi phạm rule (a) → report
+    bắt được; user không vi phạm → không xuất hiện.
+
+- tiêu chí chấp nhận:
+  - [ ] lint/typecheck/test/build xanh
+  - [ ] Chỉ admin gọi được 2 route mới (401/403 đúng), `dynamic = "force-dynamic"`
+  - [ ] Rule chỉ dựa cột có thật — không migration mới nào trong PR này
+  - [ ] File Excel mở được, đủ ma trận + nguồn
 
 ### Thứ tự & phụ thuộc
 
-- Việc này độc lập, không đụng migration/route/file của việc khác đang mở song song
-  nào (không có việc nào khác trong kế hoạch này).
-- Không phụ thuộc M46/M43 về mặt code (dùng chung pattern `sync_locks`/`CAN`/
-  `getCurrentProjectId` đã có sẵn từ trước, không cần chờ PR nào).
+- Việc 1 đi trước, một mình một đợt dispatch. Việc 2 và việc 3 base nhánh việc 1,
+  chạy **song song** với nhau sau khi việc 1 qua reviewer (2 việc không chung file:
+  việc 2 đụng `lib/sensitive-fields.ts` + route 4 entity + components; việc 3 đụng
+  `lib/sod.ts` + 2 route admin mới + tab trong trang permissions — nếu cùng sửa
+  `app/admin/permissions/page.tsx` gây conflict nhỏ, coordinator tự tích hợp).
+  - Ngoại lệ chung file duy nhất: cả việc 2 lẫn việc 1 đụng `lib/auth.ts` (thêm
+    `viewPayroll`) — việc 2 base nhánh việc 1 nên không conflict.
+- Migration duy nhất của đợt: `0058_role_permissions.sql` (việc 1). Việc 2/3 không
+  migration.
+- Trước khi tạo worktree: `git fetch origin` + xác nhận `0058` còn trống.
 
 ### Sau khi worker xong (coordinator thực hiện)
 
-- [ ] Đối chiếu với tiêu chí chấp nhận (chạy lại lint/typecheck/test/build nếu cần)
-- [ ] `reviewer` soát diff (skill `code-review`) — chú ý: (1) đúng logic idempotent
-      cursor/remote_links khi có dòng lỗi giữa batch (dễ sai lệch off-by-one); (2)
-      route `/api/integrations/:provider/sync` và `/api/cron/sync-integrations` không
-      lộ secret trong `stats`/`error` trả về; (3) trang admin đúng gate quyền
-      `viewIntegrations`/`manageIntegrations`, không chỉ ẩn UI mà route cũng chặn
-- [ ] Va chạm lớn hoặc worker phát hiện đặc tả thiếu/sai (đặc biệt phần `fetchRows`/
-      cách sourcing rows tự quyết định trong brief) → dừng, báo phiên chính, không tự
-      đổi phạm vi
-- [ ] Báo cáo tổng hợp về phiên chính: trạng thái việc, nhánh + commit, kết quả
-      reviewer, quyết định worker tự đưa ra trong ranh giới cho phép (đặc biệt: cách
-      cụ thể `fetchRows` được implement, cách verify tranh khoá đồng thời), điểm vướng
+- [ ] Đối chiếu từng việc với tiêu chí chấp nhận (chạy lại lint/typecheck/test/build)
+- [ ] `reviewer` soát diff từng việc — chú ý: (1) việc 1: cache stale-while-revalidate
+      không chạm DB mỗi request, `LOCKED_PERMS` đủ mọi perm ghi (đối chiếu
+      `CAN_DEFAULT` thật, dễ sót perm mới như `manageIntegrations`), hành vi khi bảng
+      override trống phải y hệt trước PR; (2) việc 2: danh sách trường nhạy cảm khớp
+      response thật từng route (đối chiếu comment đầu `lib/sensitive-fields.ts`),
+      strip đặt trước MỌI đường return của route; (3) việc 3: SQL rule không nối
+      chuỗi, quyền admin đúng.
+- [ ] Worker phát hiện đặc tả sai/thiếu (vd cột người-nhận-hàng không tồn tại làm
+      rỗng rule (b)) → ghi nhận theo hướng dẫn trong brief; vướng NGOÀI ranh giới đã
+      cho → dừng việc đó, báo phiên chính, không tự đổi phạm vi
+- [ ] Báo cáo tổng hợp: trạng thái từng việc, nhánh + commit, kết quả reviewer, các
+      quyết định worker tự đưa trong ranh giới (đặc biệt: danh sách trường nhạy cảm
+      cuối cùng của việc 2, rule SoD nào bị bỏ vì thiếu cột)
 
 ### Duyệt cuối (phiên chính thực hiện)
 
-- [ ] Đối chiếu diff với đặc tả + báo cáo coordinator
-- [ ] Cập nhật `PROGRESS.md` (mục M48 PR1) + `docs/nang-cap/README.md` nếu cần ghi
-      chú tiến độ M48
-- [ ] Push nhánh + mở PR draft theo template
-- [ ] Nhắc người dùng: PR2 (adapter kế toán)/PR3 (HĐĐT) của M48 cần chốt nhà cung cấp
-      thật trước khi lập kế hoạch tiếp — hỏi khi tới lượt, không tự chọn
+- [ ] Đối chiếu diff 3 việc với đặc tả + báo cáo coordinator; chú ý điểm phiên chính
+      đã quyết lệch đặc tả (không đổi call-site; Excel 403 thay vì che ô)
+- [ ] Cập nhật `PROGRESS.md` (mục M50, ghi rõ các quyết định lệch đặc tả) +
+      `docs/nang-cap/README.md` nếu cần
+- [ ] Push nhánh + mở PR draft theo template (3 PR, thứ tự merge: 1 → 2/3)
+- [ ] Nhắc người dùng 2 quyết định đang chờ cho các đợt sau (hỏi khi tới lượt, không
+      tự quyết): (a) **M51 PR1** cần xác nhận sẵn sàng đổi cấu hình production (role
+      `xboss_app`, `MIGRATE_DATABASE_URL`, ADR-0005); (b) **M49 PR3** cần chốt dùng
+      thư viện `jose` cho OIDC hay yêu cầu zero-dep (kèm ADR)
