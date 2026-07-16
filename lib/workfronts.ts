@@ -154,10 +154,12 @@ export type FrontMissingItem = {
 export async function frontMissingList(projectId?: number): Promise<FrontMissingItem[]> {
   const soon = daysFromTodayISO(3);
   const today = todayISO();
+  // COALESCE(t.start_date, wp.start_date): task.start_date NULL = kế thừa ngày BĐ nhóm
+  // (lib/recompute.ts) — bỏ qua sẽ khiến task kế thừa không bao giờ tính vào mặt bằng chờ.
   const conds = [
     "wf.status = 'pending'",
-    "t.start_date IS NOT NULL",
-    "t.start_date <= ?",
+    "COALESCE(t.start_date, wp.start_date) IS NOT NULL",
+    "COALESCE(t.start_date, wp.start_date) <= ?",
     "t.status NOT IN ('hoan_thanh','nghiem_thu')",
   ];
   const args: unknown[] = [soon];
@@ -172,7 +174,7 @@ export async function frontMissingList(projectId?: number): Promise<FrontMissing
     earliestStart: string;
   }>(
     `SELECT wf.id AS "workFrontId", st.code AS "sheetCode", wf.floor_label AS "floorLabel",
-            MIN(t.start_date) AS "earliestStart"
+            MIN(COALESCE(t.start_date, wp.start_date)) AS "earliestStart"
        FROM work_fronts wf
        JOIN sheet_types st ON st.id = wf.sheet_type_id
        LEFT JOIN towers tw ON tw.id = st.tower_id

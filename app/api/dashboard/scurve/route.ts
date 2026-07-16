@@ -87,8 +87,10 @@ export async function GET(req: NextRequest) {
   const projectFilter = projectId != null ? "AND tw.project_id = ?" : "";
   const projectParams = projectId != null ? [projectId] : [];
 
+  // COALESCE(t.start_date/end_date, wp....): task NULL = kế thừa ngày nhóm (lib/recompute.ts).
   const tasks = await query<TaskRow>(
-    `SELECT t.id, t.start_date AS "startDate", t.end_date AS "endDate",
+    `SELECT t.id, COALESCE(t.start_date, wp.start_date) AS "startDate",
+            COALESCE(t.end_date, wp.end_date) AS "endDate",
             t.progress_percent AS progress, st.code AS sheet
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id

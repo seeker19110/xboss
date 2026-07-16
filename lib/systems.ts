@@ -48,11 +48,13 @@ export async function resolveSystemId(code: string | null): Promise<number | nul
 
 export async function listSystems() {
   const today = todayISO();
+  // COALESCE(t.end_date, wp.end_date): task.end_date NULL = kế thừa ngày KT của nhóm
+  // (xem lib/recompute.ts) — phải dùng ngày HIỆU LỰC để đếm trễ đúng, không phải cột thô.
   return query(
     `SELECT d.id, d.code, d.name, d.color,
             COUNT(DISTINCT st.id) AS "sheetCount",
             COALESCE(AVG(t.progress_percent), 0) AS "avgProgress",
-            COALESCE(SUM(CASE WHEN t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_percent < 1
+            COALESCE(SUM(CASE WHEN COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) < ? AND t.progress_percent < 1
                               AND t.status NOT IN ('hoan_thanh','nghiem_thu') THEN 1 ELSE 0 END), 0) AS delayed
        FROM systems d
        LEFT JOIN sheet_types st ON st.system_id = d.id
@@ -90,7 +92,7 @@ export async function getSystemSummary(
     `SELECT st.id, st.code, st.name, st.slug,
             COUNT(t.id) AS total,
             COALESCE(AVG(t.progress_percent), 0) AS "avgProgress",
-            COALESCE(SUM(CASE WHEN t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_percent < 1
+            COALESCE(SUM(CASE WHEN COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) < ? AND t.progress_percent < 1
                               AND t.status NOT IN ('hoan_thanh','nghiem_thu') THEN 1 ELSE 0 END), 0) AS delayed
        FROM sheet_types st
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
@@ -110,7 +112,7 @@ export async function getSystemSummary(
   }>(
     `SELECT COALESCE(AVG(t.progress_percent), 0) AS "avgProgress",
             COUNT(t.id) AS total,
-            COALESCE(SUM(CASE WHEN t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_percent < 1
+            COALESCE(SUM(CASE WHEN COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) < ? AND t.progress_percent < 1
                               AND t.status NOT IN ('hoan_thanh','nghiem_thu') THEN 1 ELSE 0 END), 0) AS delayed,
             COALESCE(SUM(CASE WHEN t.progress_percent >= 1 AND t.status <> 'nghiem_thu' THEN 1 ELSE 0 END), 0) AS "waitingApproval"
        FROM sheet_types st

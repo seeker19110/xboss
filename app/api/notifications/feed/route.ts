@@ -65,7 +65,7 @@ export async function GET() {
         sheetSlug: string | null;
         packageName: string;
       }>(
-        `SELECT t.id, t.code, t.name, t.end_date AS "endDate",
+        `SELECT t.id, t.code, t.name, COALESCE(t.end_date, wp.end_date) AS "endDate",
             ROUND((t.progress_percent * 100)::numeric,0)::int AS progress,
             u.name AS "assignedTo",
             st.code AS "sheetCode", st.name AS "sheetName", st.slug AS "sheetSlug",
@@ -74,9 +74,9 @@ export async function GET() {
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
        LEFT JOIN users u ON t.assigned_to = u.id
-      WHERE t.end_date < ? AND t.progress_percent < 1
+      WHERE COALESCE(t.end_date, wp.end_date) < ? AND t.progress_percent < 1
         AND t.status NOT IN ('hoan_thanh','nghiem_thu')${assignedFilter}${projectFilter}
-      ORDER BY t.end_date ASC, st.code ASC`,
+      ORDER BY COALESCE(t.end_date, wp.end_date) ASC, st.code ASC`,
         ...args([today]),
       )
     : [];
@@ -95,7 +95,7 @@ export async function GET() {
         sheetSlug: string | null;
         packageName: string;
       }>(
-        `SELECT t.id, t.code, t.name, t.end_date AS "endDate",
+        `SELECT t.id, t.code, t.name, COALESCE(t.end_date, wp.end_date) AS "endDate",
             ROUND((t.progress_percent * 100)::numeric,0)::int AS progress,
             u.name AS "assignedTo",
             st.code AS "sheetCode", st.name AS "sheetName", st.slug AS "sheetSlug",
@@ -104,10 +104,10 @@ export async function GET() {
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
        LEFT JOIN users u ON t.assigned_to = u.id
-      WHERE t.end_date >= ? AND t.end_date <= ?
+      WHERE COALESCE(t.end_date, wp.end_date) >= ? AND COALESCE(t.end_date, wp.end_date) <= ?
         AND t.progress_percent < 1
         AND t.status NOT IN ('hoan_thanh','nghiem_thu')${assignedFilter}${projectFilter}
-      ORDER BY t.end_date ASC, st.code ASC`,
+      ORDER BY COALESCE(t.end_date, wp.end_date) ASC, st.code ASC`,
         ...args([today, due5]),
       )
     : [];
@@ -128,7 +128,7 @@ export async function GET() {
         packageName: string;
       }>(
         `SELECT t.id, t.code, t.name,
-            t.start_date AS "startDate", t.end_date AS "endDate",
+            COALESCE(t.start_date, wp.start_date) AS "startDate", COALESCE(t.end_date, wp.end_date) AS "endDate",
             ROUND((t.progress_percent * 100)::numeric,0)::int AS progress,
             u.name AS "assignedTo",
             st.code AS "sheetCode", st.name AS "sheetName", st.slug AS "sheetSlug",
@@ -137,10 +137,10 @@ export async function GET() {
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
        LEFT JOIN users u ON t.assigned_to = u.id
-      WHERE t.start_date > ? AND t.start_date <= ?
+      WHERE COALESCE(t.start_date, wp.start_date) > ? AND COALESCE(t.start_date, wp.start_date) <= ?
         AND t.progress_percent = 0
         AND t.status NOT IN ('hoan_thanh','nghiem_thu')${assignedFilter}${projectFilter}
-      ORDER BY t.start_date ASC, st.code ASC`,
+      ORDER BY COALESCE(t.start_date, wp.start_date) ASC, st.code ASC`,
         ...args([today, start7]),
       )
     : [];

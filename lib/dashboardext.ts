@@ -172,10 +172,11 @@ export async function bySystemBlock(projectId?: number | null): Promise<SystemCr
   const towerJoin = projectId != null ? " JOIN towers tw ON tw.id = st.tower_id" : "";
   const towerFilter = projectId != null ? " AND tw.project_id = ?" : "";
   const towerParams = projectId != null ? [projectId] : [];
+  // COALESCE(t.end_date, wp.end_date): task.end_date NULL = kế thừa ngày KT nhóm (lib/recompute.ts).
   const progress = await query<{ systemId: number; progressPct: number; delayedCount: number }>(
     `SELECT st.system_id AS "systemId",
             COALESCE(AVG(t.progress_percent), 0) * 100 AS "progressPct",
-            COUNT(DISTINCT wp.floor_label) FILTER (WHERE t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_percent < 1
+            COUNT(DISTINCT wp.floor_label) FILTER (WHERE COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) < ? AND t.progress_percent < 1
                               AND t.status NOT IN ('hoan_thanh','nghiem_thu')) AS "delayedCount"
        FROM sheet_types st
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id

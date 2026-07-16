@@ -107,8 +107,10 @@ const SOURCES: Record<string, ReportSource> = {
     async run(projectId, filters) {
       const systemId = filters.system ? await resolveSystemId(String(filters.system)) : null;
       const sc = projectScope(projectId, "st");
+      // COALESCE(t.end_date, wp.end_date): task.end_date NULL = kế thừa ngày KT nhóm
+      // (lib/recompute.ts) — hiển thị đúng ngày hiệu lực (t.status='tre' đã đúng nhờ đó).
       const rows = await query<ReportRow & { progress: number }>(
-        `SELECT t.code, t.name, st.code AS sheet, t.end_date AS "endDate",
+        `SELECT t.code, t.name, st.code AS sheet, COALESCE(t.end_date, wp.end_date) AS "endDate",
                 t.progress_percent AS progress, u.name AS assignee
            FROM tasks t
            JOIN work_packages wp ON t.package_id = wp.id
@@ -118,7 +120,7 @@ const SOURCES: Record<string, ReportSource> = {
           WHERE t.status = 'tre'
             ${systemId != null ? "AND st.system_id = ?" : ""}
             ${sc.cond}
-          ORDER BY t.end_date`,
+          ORDER BY COALESCE(t.end_date, wp.end_date)`,
         ...(systemId != null ? [systemId] : []),
         ...sc.args,
       );

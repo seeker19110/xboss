@@ -22,17 +22,25 @@ export async function recomputeTask(
   // FOR UPDATE: khi hàm này chạy trong withTransaction (mọi route gọi recomputeTask đều
   // nên bọc như vậy), khoá row task tới hết transaction — 2 recompute đồng thời trên
   // cùng task sẽ serialize thay vì cùng đọc 1 snapshot rồi ghi đè lẫn nhau (lost update).
+  // JOIN work_packages để lấy ngày KT nhóm — task.end_date NULL nghĩa là "kế thừa ngày
+  // nhóm" (xem savePkgDates ở app/tracking/[sheet]/page.tsx), phải dùng ngày HIỆU LỰC
+  // (task.end_date ?? wp.end_date) để suy trạng thái trễ, không phải end_date thô của
+  // riêng task (bug đã sửa: task kế thừa ngày nhóm trước đây không bao giờ lên "tre").
   const task = await queryOne<{
     id: number;
     package_id: number;
     end_date: string | null;
+    pkg_end_date: string | null;
     status: string | null;
     progress_percent: number | null;
   }>(
-    `SELECT id, package_id, end_date, status, progress_percent FROM tasks WHERE id = ? FOR UPDATE`,
+    `SELECT t.id, t.package_id, t.end_date, wp.end_date AS pkg_end_date, t.status, t.progress_percent
+       FROM tasks t JOIN work_packages wp ON wp.id = t.package_id
+      WHERE t.id = ? FOR UPDATE`,
     taskId,
   );
   if (!task) return null;
+  const effectiveEndDate = task.end_date ?? task.pkg_end_date;
 
   const dimCount = await queryOne<{ checked: number; total: number }>(
     `SELECT COUNT(*) FILTER (WHERE installed = 1) AS checked, COUNT(*) AS total
@@ -50,7 +58,7 @@ export async function recomputeTask(
         ? 1
         : Math.min(0.99, Math.round((dimCount.checked / dimCount.total) * 100) / 100);
   }
-  const status = deriveStatus(progress, task.end_date, task.status);
+  const status = deriveStatus(progress, effectiveEndDate, task.status);
   await run(
     `UPDATE tasks SET progress_percent = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
     progress,
@@ -113,4 +121,16 @@ export async function recomputePackage(packageId: number): Promise<void> {
       packageId,
     );
   });
+}
+
+// Nhóm đổi ngày BĐ/KT → mọi task con đang KẾ THỪA ngày nhóm (end_date NULL) phải tính lại
+// trạng thái trễ theo ngày MỚI. Gọi từ PATCH /api/workpackages/:id khi đổi startDate/endDate
+// (KHÔNG gọi từ trong recomputePackage — sẽ đệ quy recomputeTask ⇄ recomputePackage vô hạn
+// vì recomputeTask luôn gọi recomputePackage ở cuối).
+export async function recomputeTasksInheritingDates(packageId: number): Promise<void> {
+  const rows = await query<{ id: number }>(
+    `SELECT id FROM tasks WHERE package_id = ? AND end_date IS NULL`,
+    packageId,
+  );
+  for (const r of rows) await recomputeTask(r.id);
 }

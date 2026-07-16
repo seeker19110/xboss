@@ -99,6 +99,69 @@ test(
 );
 
 test(
+  "recomputeTask: task.end_date NULL kế thừa ngày KT nhóm — trễ theo ngày nhóm, không phải hằng số 'không bao giờ trễ'",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId, queryOne } = await import("@/lib/db");
+    const { recomputeTask, recomputeTasksInheritingDates } = await import("@/lib/recompute");
+
+    const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test date inherit')`);
+    const towerId = await insertId(
+      `INSERT INTO towers (project_id, name) VALUES (?, 'Tháp DI')`,
+      projectId,
+    );
+    const stId = await insertId(
+      `INSERT INTO sheet_types (tower_id, code, name) VALUES (?, 'DI', 'Sheet date inherit')`,
+      towerId,
+    );
+    const pkgId = await insertId(
+      `INSERT INTO work_packages (sheet_type_id, code, name, end_date) VALUES (?, 'DI1', 'Nhóm DI', ?)`,
+      stId,
+      TOMORROW,
+    );
+    // Task KHÔNG có end_date riêng — phải kế thừa ngày KT nhóm.
+    const taskId = await insertId(
+      `INSERT INTO tasks (package_id, code, name, status, progress_percent) VALUES (?, 'DI1,01', 'Task kế thừa', 'dang_thi_cong', 0.5)`,
+      pkgId,
+    );
+
+    await recomputeTask(taskId);
+    let task = await queryOne<{ status: string }>(`SELECT status FROM tasks WHERE id = ?`, taskId);
+    assert.equal(task?.status, "dang_thi_cong", "nhóm còn hạn → task kế thừa chưa trễ");
+
+    // Nhóm quá hạn (như PATCH /api/workpackages/:id đổi endDate) → task kế thừa phải
+    // tính lại thành trễ dù CHÍNH task chưa từng được update trực tiếp.
+    await run(`UPDATE work_packages SET end_date = ? WHERE id = ?`, YESTERDAY, pkgId);
+    await recomputeTasksInheritingDates(pkgId);
+
+    task = await queryOne<{ status: string }>(`SELECT status FROM tasks WHERE id = ?`, taskId);
+    assert.equal(task?.status, "tre", "nhóm quá hạn → task kế thừa (end_date NULL) phải lên trễ");
+
+    // Task có ngày riêng (override) không bị ảnh hưởng bởi nhóm quá hạn.
+    const taskId2 = await insertId(
+      `INSERT INTO tasks (package_id, code, name, status, progress_percent, end_date)
+       VALUES (?, 'DI1,02', 'Task tự đặt ngày', 'dang_thi_cong', 0.5, ?)`,
+      pkgId,
+      TOMORROW,
+    );
+    await recomputeTask(taskId2);
+    const task2 = await queryOne<{ status: string }>(
+      `SELECT status FROM tasks WHERE id = ?`,
+      taskId2,
+    );
+    assert.equal(task2?.status, "dang_thi_cong", "task có end_date riêng không kế thừa ngày nhóm");
+
+    // Dọn dữ liệu test.
+    await run(`DELETE FROM task_history WHERE task_id IN (?, ?)`, taskId, taskId2);
+    await run(`DELETE FROM tasks WHERE id IN (?, ?)`, taskId, taskId2);
+    await run(`DELETE FROM work_packages WHERE id = ?`, pkgId);
+    await run(`DELETE FROM sheet_types WHERE id = ?`, stId);
+    await run(`DELETE FROM towers WHERE id = ?`, towerId);
+    await run(`DELETE FROM projects WHERE id = ?`, projectId);
+  },
+);
+
+test(
   "recomputePackage: xoá task cuối trong nhóm → progress về 0, không giữ % cũ",
   { skip: !HAS_TEST_DB },
   async () => {
