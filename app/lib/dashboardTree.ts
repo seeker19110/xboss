@@ -16,6 +16,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
   FileText,
+  BookMarked,
   Wind,
   Zap,
   Droplets,
@@ -113,6 +114,7 @@ export const DASHBOARD_TREE: DashCluster[] = [
     dashboards: [
       { id: "dash.dashboard", href: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
       { id: "dash.bao-cao", href: "/report", label: "Báo cáo", icon: FileText },
+      { id: "dash.bao-cao-luu", href: "/reports", label: "Báo cáo lưu", icon: BookMarked },
     ],
   },
   {
