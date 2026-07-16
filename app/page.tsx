@@ -61,6 +61,10 @@ const DashboardBarChart = dynamic(() => import("@/app/components/DashboardBarCha
   ssr: false,
   loading: () => <Skeleton className="h-56 rounded-xl" />,
 });
+const EvmChart = dynamic(() => import("@/app/components/EvmChart"), {
+  ssr: false,
+  loading: () => <Skeleton className="h-64 rounded-xl" />,
+});
 const DashboardExtCards = dynamic(() => import("@/app/components/DashboardExtCards"), {
   ssr: false,
   loading: () => <Skeleton className="h-28 rounded-xl" />,
@@ -531,6 +535,9 @@ export default function Dashboard() {
 
         {/* ── S-curve ── */}
         <SCurveChart />
+
+        {/* ── M47: EVM (PV/EV/AC → SPI/CPI/EAC) — API tự chặn role không xem tiền ── */}
+        <EvmChart />
 
         {/* ── Bar chart tiến độ ── */}
         <DashboardBarChart data={chartData} />
