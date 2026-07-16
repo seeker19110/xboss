@@ -3037,3 +3037,27 @@
 **Index:**
 - `schema_migrations_pkey`: UNIQUE INDEX schema_migrations_pkey ON public.schema_migrations USING btree (name)
 
+## Khác (chưa gán module)
+
+### saved_reports
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | integer |  | `nextval('saved_reports_id_seq'::regclass)` |
+| project_id | integer | ✓ |  |
+| owner_id | integer |  |  |
+| name | text |  |  |
+| source | text |  |  |
+| config | jsonb |  | `'{}'::jsonb` |
+| shared | boolean |  | `false` |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `owner_id` → `users(id)`
+- `project_id` → `projects(id)`
+
+**Index:**
+- `ix_saved_reports_owner`: INDEX ix_saved_reports_owner ON public.saved_reports USING btree (owner_id)
+- `ix_saved_reports_project`: INDEX ix_saved_reports_project ON public.saved_reports USING btree (project_id)
+- `saved_reports_pkey`: UNIQUE INDEX saved_reports_pkey ON public.saved_reports USING btree (id)
+
