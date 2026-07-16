@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Dùng để tự soát diff hiện tại (sau khi `coder`/`mechanical` code xong) trước khi phiên chính duyệt cuối — chạy skill `code-review` để tìm lỗi correctness và điểm cần đơn giản hoá/tái dùng. KHÔNG tự sửa code trừ khi được giao rõ ràng dùng cờ --fix; mặc định chỉ review và báo cáo.
+description: Dùng để tự soát diff hiện tại (sau khi worker — `complex-implementer`/`spec-executor`/`standard-worker`/`mechanical-worker` — code xong) trước khi phiên chính duyệt cuối — chạy skill `code-review` để tìm lỗi correctness và điểm cần đơn giản hoá/tái dùng. KHÔNG tự sửa code trừ khi được giao rõ ràng dùng cờ --fix; mặc định chỉ review và báo cáo.
 tools: Read, Grep, Glob, Bash, Skill
 model: sonnet
 ---
