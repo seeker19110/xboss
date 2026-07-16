@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { sheetVersion } from "@/lib/version";
+import { getCurrentProjectId } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -44,9 +45,16 @@ export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get("sheet");
   if (!slug) return NextResponse.json({ error: "Thiếu tham số sheet" }, { status: 400 });
 
+  // Lọc theo dự án đang chọn để tránh rò rỉ chéo dự án (M22+); null = không lọc. Sheet
+  // thuộc dự án khác → trả 404 "Sheet không hợp lệ" (không lộ sự tồn tại ở dự án khác).
+  const projectId = await getCurrentProjectId(user);
   const st = await queryOne<Sheet>(
-    `SELECT id, code, name, responsible, slug FROM sheet_types WHERE slug = ?`,
+    `SELECT st.id, st.code, st.name, st.responsible, st.slug
+       FROM sheet_types st
+       LEFT JOIN towers tw ON st.tower_id = tw.id
+      WHERE st.slug = ?${projectId != null ? " AND tw.project_id = ?" : ""}`,
     slug,
+    ...(projectId != null ? [projectId] : []),
   );
   if (!st) return NextResponse.json({ error: "Sheet không hợp lệ" }, { status: 404 });
 

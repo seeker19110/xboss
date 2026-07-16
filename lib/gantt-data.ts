@@ -27,13 +27,19 @@ const d2n = (s: string) => new Date(s + "T00:00:00Z").getTime();
 // Dựng CpmNode[]/CpmEdge[] cho `computeCpm` + map thông tin đầy đủ từng nhóm (meta) —
 // lọc theo hệ nếu có `systemId` (null = toàn dự án). `meta` giữ đúng thứ tự sort gốc
 // (st.id, wp.start_date, wp.id) nên `[...meta.values()]` dùng lại được như mảng `bars` cũ.
-export async function getCpmData(systemId: number | null): Promise<{
+export async function getCpmData(
+  systemId: number | null,
+  projectId?: number,
+): Promise<{
   nodes: CpmNode[];
   edges: DepRow[];
   meta: Map<number, PackageMeta>;
 }> {
   const systemFilter = systemId !== null ? "AND st.system_id = ?" : "";
   const systemParams = systemId !== null ? [systemId] : [];
+  // Lọc theo dự án để tránh rò rỉ chéo dự án (M22+); undefined = không lọc.
+  const projectFilter = projectId != null ? "AND tw.project_id = ?" : "";
+  const projectParams = projectId != null ? [projectId] : [];
 
   const bars = await query<PackageMeta>(
     `SELECT wp.id, wp.code, wp.name, wp.floor_label AS "floorLabel",
@@ -41,10 +47,13 @@ export async function getCpmData(systemId: number | null): Promise<{
             wp.progress, wp.status, st.code AS "sheetType", st.slug AS "sheetSlug"
        FROM work_packages wp
        JOIN sheet_types st ON wp.sheet_type_id = st.id
+       LEFT JOIN towers tw ON st.tower_id = tw.id
       WHERE wp.start_date IS NOT NULL AND wp.end_date IS NOT NULL
         ${systemFilter}
+        ${projectFilter}
       ORDER BY st.id, wp.start_date, wp.id`,
     ...systemParams,
+    ...projectParams,
   );
 
   // Phụ thuộc không lọc theo hệ (giữ nguyên hành vi gốc — việc trước có thể thuộc hệ

@@ -168,6 +168,90 @@ test("overNormItems: xuất hiện/biến mất đúng ngưỡng", { skip: !HAS_
   await run(`DELETE FROM boq_items WHERE id = ?`, boqId);
 });
 
+// M22 — overNormItems lọc theo dự án đang chọn (suy qua boq_items.project_id): 2 dự án,
+// mỗi dự án có 1 định mức vượt ngưỡng → truyền projectId chỉ trả đúng dự án đó, không lẫn.
+test(
+  "overNormItems(projectId): chỉ trả định mức vượt của dự án đó, không rò rỉ chéo (M22+)",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { overNormItems } = await import("@/lib/norms");
+
+    const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA Over 1', 'PJT-OV1')`);
+    const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA Over 2', 'PJT-OV2')`);
+
+    // Dựng 1 hạng mục vượt ngưỡng cho mỗi dự án (executedQty=10, expected=10, actual=13 → 30%).
+    async function seedOver(projectId: number, suffix: string) {
+      const boqId = await insertId(
+        `INSERT INTO boq_items (code, name, unit, qty_contract, project_id) VALUES (?, 'Dòng BOQ over', 'm', 10, ?)`,
+        `BOQ-OV-${suffix}`,
+        projectId,
+      );
+      const wpId = await insertId(
+        `INSERT INTO work_packages (code, name) VALUES (?, 'Nhóm over')`,
+        `WP-OV-${suffix}`,
+      );
+      const taskId = await insertId(
+        `INSERT INTO tasks (code, name, package_id, progress_percent) VALUES (?, 'Task over', ?, 1)`,
+        `T-OV-${suffix}`,
+        wpId,
+      );
+      await run(
+        `INSERT INTO boq_task_map (boq_item_id, task_id, weight) VALUES (?, ?, 1)`,
+        boqId,
+        taskId,
+      );
+      const materialId = await insertId(
+        `INSERT INTO materials (name, unit) VALUES (?, 'kg')`,
+        `Vật tư over ${suffix}`,
+      );
+      const normId = await insertId(
+        `INSERT INTO boq_norms (boq_item_id, resource_type, material_id, qty_per_unit, unit_label)
+         VALUES (?, 'material', ?, 1, 'kg')`,
+        boqId,
+        materialId,
+      );
+      await insertId(
+        `INSERT INTO material_transactions (material_id, delta, qty_after, type)
+         VALUES (?, -13, 13, 'xuat_cong_truong')`,
+        materialId,
+      );
+      return { boqId, wpId, taskId, materialId, normId };
+    }
+
+    const a = await seedOver(p1, "A");
+    const b = await seedOver(p2, "B");
+
+    try {
+      // Không lọc → cả 2 xuất hiện (tương thích ngược).
+      const all = await overNormItems();
+      assert.ok(all.some((o) => o.normId === a.normId));
+      assert.ok(all.some((o) => o.normId === b.normId));
+
+      // Lọc dự án 1 → chỉ định mức của dự án 1, không lẫn dự án 2.
+      const only1 = await overNormItems(undefined, p1);
+      assert.ok(only1.some((o) => o.normId === a.normId));
+      assert.ok(!only1.some((o) => o.normId === b.normId));
+
+      // Lọc dự án 2 → ngược lại.
+      const only2 = await overNormItems(undefined, p2);
+      assert.ok(only2.some((o) => o.normId === b.normId));
+      assert.ok(!only2.some((o) => o.normId === a.normId));
+    } finally {
+      for (const x of [a, b]) {
+        await run(`DELETE FROM boq_norms WHERE id = ?`, x.normId);
+        await run(`DELETE FROM material_transactions WHERE material_id = ?`, x.materialId);
+        await run(`DELETE FROM materials WHERE id = ?`, x.materialId);
+        await run(`DELETE FROM boq_task_map WHERE boq_item_id = ?`, x.boqId);
+        await run(`DELETE FROM tasks WHERE id = ?`, x.taskId);
+        await run(`DELETE FROM work_packages WHERE id = ?`, x.wpId);
+        await run(`DELETE FROM boq_items WHERE id = ?`, x.boqId);
+      }
+      await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+    }
+  },
+);
+
 // M22 — scoping định mức BOQ theo dự án đang chọn. boq_norms không có cột project_id
 // riêng, suy qua boq_items.project_id (mirror điều kiện WHERE trong các route
 // app/api/boq/:id/norms, app/api/boq/:id/norm-usage, app/api/boq-norms/:id).
