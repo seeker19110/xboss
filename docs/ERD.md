@@ -331,6 +331,21 @@
 - `uq_nav_settings_global`: UNIQUE INDEX uq_nav_settings_global ON public.nav_settings USING btree (node_key) WHERE (project_id IS NULL)
 - `uq_nav_settings_project`: UNIQUE INDEX uq_nav_settings_project ON public.nav_settings USING btree (node_key, project_id) WHERE (project_id IS NOT NULL)
 
+### role_permissions
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | bigint |  | `nextval('role_permissions_id_seq'::regclass)` |
+| role | text |  |  |
+| perm_key | text |  |  |
+| allowed | boolean |  |  |
+| updated_by | integer | ✓ |  |
+| updated_at | timestamptz |  | `now()` |
+
+**Index:**
+- `role_permissions_pkey`: UNIQUE INDEX role_permissions_pkey ON public.role_permissions USING btree (id)
+- `role_permissions_role_perm_key_key`: UNIQUE INDEX role_permissions_role_perm_key_key ON public.role_permissions USING btree (role, perm_key)
+
 ## Kèm task (ảnh/bình luận/tài liệu/nghiệm thu)
 
 ### task_photos
