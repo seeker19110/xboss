@@ -1,4 +1,4 @@
--- 0055_alert_rules.sql — M47 PR4: cảnh báo cấu hình được (alert_rules).
+-- 0056_alert_rules.sql — M47 PR4: cảnh báo cấu hình được (alert_rules).
 -- Thay 2 ngưỡng hard-code trong /api/notifications (hạn sắp đến, vật tư vượt định mức)
 -- + SPI/CPI (cron daily-report) bằng bảng cấu hình. Rule mức dự án không có → dùng
 -- default cũ y hệt (lib/alerts.ts::ALERT_METRICS) — không đổi hành vi mặc định.
