@@ -57,8 +57,10 @@ export async function GET(req: NextRequest) {
     sheetSlug: string | null;
     assigneeName: string | null;
   }>(
+    // COALESCE(t.start_date/end_date, wp....): task NULL = kế thừa ngày nhóm (lib/recompute.ts).
     `SELECT t.id, t.code, t.name, t.status,
-            t.start_date AS "startDate", t.end_date AS "endDate",
+            COALESCE(t.start_date, wp.start_date) AS "startDate",
+            COALESCE(t.end_date, wp.end_date) AS "endDate",
             t.progress_percent AS "progressPercent",
             t.delay_reason AS "delayReason", t.delay_note AS "delayNote",
             wp.floor_label AS "floorLabel", wp.code AS "packageCode",
@@ -69,12 +71,12 @@ export async function GET(req: NextRequest) {
        JOIN sheet_types st ON wp.sheet_type_id = st.id
        LEFT JOIN users u ON t.assigned_to = u.id
        ${projectId != null ? "JOIN towers tw ON tw.id = st.tower_id" : ""}
-      WHERE t.end_date IS NOT NULL AND t.end_date < ?
+      WHERE COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) < ?
         AND t.progress_percent < 1
         AND t.status NOT IN ('hoan_thanh','nghiem_thu')
         ${systemFilterAnd}
         ${projectFilterAnd}
-      ORDER BY t.end_date`,
+      ORDER BY COALESCE(t.end_date, wp.end_date)`,
     today,
     ...systemParams,
     ...projectParams,

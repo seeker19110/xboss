@@ -71,10 +71,11 @@ export async function listProjects(user: { id: number; role: Role }): Promise<Pr
   const visible = await visibleProjectIds(user);
   if (visible.length === 0) return [];
   const placeholders = visible.map(() => "?").join(",");
+  // COALESCE(t.end_date, wp.end_date): task.end_date NULL = kế thừa ngày KT nhóm (lib/recompute.ts).
   const rows = await query<ProjectListItem>(
     `SELECT p.id, p.name, p.code, p.status, p.color,
             COALESCE(AVG(t.progress_percent), 0) AS "progressPercent",
-            COALESCE(SUM(CASE WHEN t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_percent < 1
+            COALESCE(SUM(CASE WHEN COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) < ? AND t.progress_percent < 1
                               AND t.status NOT IN ('hoan_thanh','nghiem_thu') THEN 1 ELSE 0 END), 0) AS "delayedCount"
        FROM projects p
        LEFT JOIN towers tw ON tw.project_id = p.id

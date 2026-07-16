@@ -103,8 +103,11 @@ export async function getEvmSeries(opts: {
   const where = conds.length > 0 ? `WHERE ${conds.join(" AND ")}` : "";
 
   // Giá trị task tổng trong SQL (M45): dòng VO chỉ tính khi đã duyệt, lấy qty_approved.
+  // COALESCE(t.start_date/end_date, wp....): task NULL = kế thừa ngày nhóm (lib/recompute.ts)
+  // — PV (kế hoạch) phải nội suy theo ngày HIỆU LỰC, không phải cột thô (có thể NULL).
   const tasks = await query<TaskRow>(
-    `SELECT t.id, t.start_date AS "startDate", t.end_date AS "endDate",
+    `SELECT t.id, COALESCE(t.start_date, wp.start_date) AS "startDate",
+            COALESCE(t.end_date, wp.end_date) AS "endDate",
             t.progress_percent AS progress, v.value_text AS "valueText"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id

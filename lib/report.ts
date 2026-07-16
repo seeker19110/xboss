@@ -22,7 +22,8 @@ export type DailyReport = {
   kpi: KpiRow[];
 };
 
-const DELAY_COND = `t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_percent < 1
+// COALESCE(t.end_date, wp.end_date): task.end_date NULL = kế thừa ngày KT nhóm (lib/recompute.ts).
+const DELAY_COND = `COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) < ? AND t.progress_percent < 1
         AND t.status NOT IN ('hoan_thanh','nghiem_thu')`;
 
 // Đơn vị đếm "trễ" trong các số liệu tổng hợp (KPI/tổng số) là HẠNG MỤC = cặp (sheet,
@@ -47,14 +48,17 @@ export async function buildDailyReport(): Promise<DailyReport> {
   const today = todayISO();
   const yesterday = daysFromTodayISO(-1);
 
-  const select = `SELECT t.code, t.name, t.status, t.end_date AS "endDate",
+  const select = `SELECT t.code, t.name, t.status, COALESCE(t.end_date, wp.end_date) AS "endDate",
             t.progress_percent AS "progressPercent",
             wp.floor_label AS "floorLabel", st.code AS "sheetType"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id`;
 
-  const all = await query<DelayedRow>(`${select} WHERE ${DELAY_COND} ORDER BY t.end_date`, today);
+  const all = await query<DelayedRow>(
+    `${select} WHERE ${DELAY_COND} ORDER BY COALESCE(t.end_date, wp.end_date)`,
+    today,
+  );
 
   const newDelayed = all.filter((r) => r.endDate === yesterday);
   const topDelayed = all.slice(0, 15);
@@ -62,9 +66,9 @@ export async function buildDailyReport(): Promise<DailyReport> {
   // Sắp đến hạn (≤3 ngày, tiến độ < 70%) — cảnh báo sớm để còn kịp xử lý.
   const soon = daysFromTodayISO(3);
   const dueSoon = await query<DelayedRow>(
-    `${select} WHERE t.end_date IS NOT NULL AND t.end_date >= ? AND t.end_date <= ?
+    `${select} WHERE COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) >= ? AND COALESCE(t.end_date, wp.end_date) <= ?
         AND t.progress_percent < 0.7 AND t.status NOT IN ('hoan_thanh','nghiem_thu')
-      ORDER BY t.end_date LIMIT 20`,
+      ORDER BY COALESCE(t.end_date, wp.end_date) LIMIT 20`,
     today,
     soon,
   );
@@ -232,7 +236,7 @@ export async function buildWeeklyReport(): Promise<WeeklyReport> {
   const prevProgressByTask = new Map(prevRows.map((r) => [r.taskId, r.progress]));
   const progressAt = (t: TaskRow) => prevProgressByTask.get(t.id) ?? t.progress ?? 0;
 
-  const select = `SELECT t.code, t.name, t.status, t.end_date AS "endDate",
+  const select = `SELECT t.code, t.name, t.status, COALESCE(t.end_date, wp.end_date) AS "endDate",
             t.progress_percent AS "progressPercent",
             wp.floor_label AS "floorLabel", st.code AS "sheetType"
        FROM tasks t
@@ -240,7 +244,7 @@ export async function buildWeeklyReport(): Promise<WeeklyReport> {
        JOIN sheet_types st ON wp.sheet_type_id = st.id`;
 
   const allDelayed = await query<DelayedRow>(
-    `${select} WHERE ${DELAY_COND} ORDER BY t.end_date`,
+    `${select} WHERE ${DELAY_COND} ORDER BY COALESCE(t.end_date, wp.end_date)`,
     today,
   );
   const newDelayed = allDelayed.filter((r) => r.endDate >= weekFrom);

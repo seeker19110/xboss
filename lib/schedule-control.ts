@@ -70,20 +70,22 @@ export async function getScheduleControlData(
     })
     .sort((a, b) => a.startDate.localeCompare(b.startDate) || a.code.localeCompare(b.code));
 
-  // Task trễ — cùng điều kiện lọc trễ đang dùng ở /api/dashboard.
+  // Task trễ — cùng điều kiện lọc trễ đang dùng ở /api/dashboard. COALESCE(t.end_date,
+  // wp.end_date): task.end_date NULL = kế thừa ngày KT nhóm (xem lib/recompute.ts) —
+  // dùng ngày hiệu lực để lọc VÀ hiển thị đúng.
   const delayed = await query<DelayedRow>(
     `SELECT t.id, t.code, t.name, t.status,
-            t.end_date AS "endDate", t.progress_percent AS "progressPercent",
+            COALESCE(t.end_date, wp.end_date) AS "endDate", t.progress_percent AS "progressPercent",
             wp.floor_label AS "floorLabel", st.code AS "sheetType", st.slug AS "sheetSlug",
             t.delay_reason AS "delayReason", t.delay_note AS "delayNote"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id
-      WHERE t.end_date IS NOT NULL AND t.end_date < ?
+      WHERE COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) < ?
         AND t.progress_percent < 1
         AND t.status NOT IN ('hoan_thanh','nghiem_thu')
         ${systemFilterAnd}
-      ORDER BY t.end_date`,
+      ORDER BY COALESCE(t.end_date, wp.end_date)`,
     today,
     ...systemParams,
   );

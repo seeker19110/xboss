@@ -32,14 +32,15 @@ export async function DELETE(
   if (!approval.is_approved)
     return NextResponse.json({ error: "Tầng này chưa được duyệt nghiệm thu" }, { status: 409 });
 
-  // Lấy toàn bộ tasks trong tầng để đặt lại status
+  // Lấy toàn bộ tasks trong tầng để đặt lại status. COALESCE(t.end_date, wp.end_date):
+  // task.end_date NULL = kế thừa ngày KT nhóm (lib/recompute.ts).
   const tasks = await query<{
     id: number;
     package_id: number;
     progress_percent: number;
     end_date: string | null;
   }>(
-    `SELECT t.id, t.package_id, t.progress_percent, t.end_date
+    `SELECT t.id, t.package_id, t.progress_percent, COALESCE(t.end_date, wp.end_date) AS end_date
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
       WHERE wp.sheet_type_id = ? AND wp.floor_label = ?`,

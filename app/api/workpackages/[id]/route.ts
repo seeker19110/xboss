@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { boqTakenBy } from "@/lib/boq";
-import { recomputePackage } from "@/lib/recompute";
+import { recomputePackage, recomputeTasksInheritingDates } from "@/lib/recompute";
 import { unlink } from "fs/promises";
 import { join } from "path";
 
@@ -85,7 +85,12 @@ export async function PATCH(
   await withTransaction(async () => {
     await run(`UPDATE work_packages SET ${sets.join(", ")} WHERE id = ?`, ...vals);
     // Đổi deadline có thể đổi trạng thái trễ (tre ⇄ dang_thi_cong) của nhóm → tính lại.
-    if (body.endDate !== undefined || body.startDate !== undefined) await recomputePackage(id);
+    if (body.endDate !== undefined || body.startDate !== undefined) {
+      await recomputePackage(id);
+      // Task con có end_date NULL (đang kế thừa ngày nhóm) phải tính lại trạng thái trễ
+      // theo ngày MỚI của nhóm — không tự động qua recomputePackage (xem lib/recompute.ts).
+      await recomputeTasksInheritingDates(id);
+    }
   });
   // Bump updated_at của tất cả task trong nhóm → sheetVersion đổi → client refresh.
   await run(`UPDATE tasks SET updated_at = CURRENT_TIMESTAMP WHERE package_id = ?`, id);

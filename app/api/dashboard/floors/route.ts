@@ -30,10 +30,11 @@ export async function GET() {
     tasks: number;
     delayed: number;
   }>(
+    // COALESCE(t.end_date, wp.end_date): task.end_date NULL = kế thừa ngày KT nhóm (lib/recompute.ts).
     `SELECT tw.name AS tower, st.code AS "sheetType", st.slug AS "sheetSlug", wp.floor_label AS floor,
             COALESCE(AVG(t.progress_percent), 0) AS progress,
             COUNT(t.id) AS tasks,
-            COALESCE(SUM(CASE WHEN t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_percent < 1
+            COALESCE(SUM(CASE WHEN COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) < ? AND t.progress_percent < 1
                               AND t.status NOT IN ('hoan_thanh','nghiem_thu') THEN 1 ELSE 0 END), 0) AS delayed
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id

@@ -41,8 +41,10 @@ export async function GET(req: NextRequest) {
   const systemFilter = systemId !== null ? "AND st.system_id = ?" : "";
   const systemParams = systemId !== null ? [systemId] : [];
 
+  // COALESCE(t.start_date/end_date, wp....): task NULL = kế thừa ngày nhóm (lib/recompute.ts).
   const select = `SELECT t.id, t.code, t.name, t.status,
-            t.start_date AS "startDate", t.end_date AS "endDate",
+            COALESCE(t.start_date, wp.start_date) AS "startDate",
+            COALESCE(t.end_date, wp.end_date) AS "endDate",
             t.progress_percent AS "progressPercent", t.delay_reason AS "delayReason",
             wp.floor_label AS "floorLabel", wp.code AS "packageCode",
             st.code AS "sheetType", st.id AS "sheetTypeId", u.name AS "assigneeName"
@@ -54,10 +56,10 @@ export async function GET(req: NextRequest) {
   // Sắp bắt đầu: start_date trong cửa sổ, chưa làm gì (progress = 0, chưa hoàn thành).
   const starting = await query<LookaheadTask>(
     `${select}
-      WHERE t.start_date IS NOT NULL AND t.start_date >= ? AND t.start_date <= ?
+      WHERE COALESCE(t.start_date, wp.start_date) IS NOT NULL AND COALESCE(t.start_date, wp.start_date) >= ? AND COALESCE(t.start_date, wp.start_date) <= ?
         AND t.progress_percent = 0 AND t.status NOT IN ('hoan_thanh','nghiem_thu')
         ${systemFilter}
-      ORDER BY t.start_date, st.id, t.id`,
+      ORDER BY COALESCE(t.start_date, wp.start_date), st.id, t.id`,
     today,
     until,
     ...systemParams,
@@ -66,10 +68,10 @@ export async function GET(req: NextRequest) {
   // Đến hạn: end_date trong cửa sổ, chưa xong.
   const due = await query<LookaheadTask>(
     `${select}
-      WHERE t.end_date IS NOT NULL AND t.end_date >= ? AND t.end_date <= ?
+      WHERE COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) >= ? AND COALESCE(t.end_date, wp.end_date) <= ?
         AND t.progress_percent < 1 AND t.status NOT IN ('hoan_thanh','nghiem_thu')
         ${systemFilter}
-      ORDER BY t.end_date, st.id, t.id`,
+      ORDER BY COALESCE(t.end_date, wp.end_date), st.id, t.id`,
     today,
     until,
     ...systemParams,

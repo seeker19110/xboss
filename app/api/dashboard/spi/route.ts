@@ -45,9 +45,10 @@ export async function GET(req: NextRequest) {
   const projectFilter = projectId != null ? "AND tw.project_id = ?" : "";
   const projectParams = projectId != null ? [projectId] : [];
 
+  // COALESCE(t.start_date/end_date, wp....): task NULL = kế thừa ngày nhóm (lib/recompute.ts).
   const rows = await query<Row>(
-    `SELECT st.code AS "sheetType", t.start_date AS "startDate",
-            t.end_date AS "endDate", t.progress_percent AS progress
+    `SELECT st.code AS "sheetType", COALESCE(t.start_date, wp.start_date) AS "startDate",
+            COALESCE(t.end_date, wp.end_date) AS "endDate", t.progress_percent AS progress
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id

@@ -191,14 +191,15 @@ export async function GET(req: NextRequest) {
     floorLabel: string | null;
     sheetType: string;
   }>(
-    `SELECT t.boq_code AS "boqCode", t.code, t.name, t.status, t.start_date AS "startDate", t.end_date AS "endDate",
+    `SELECT t.boq_code AS "boqCode", t.code, t.name, t.status,
+            COALESCE(t.start_date, wp.start_date) AS "startDate", COALESCE(t.end_date, wp.end_date) AS "endDate",
             t.progress_percent AS "progressPercent", wp.floor_label AS "floorLabel", st.code AS "sheetType"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
-      WHERE t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_percent < 1
+      WHERE COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) < ? AND t.progress_percent < 1
         AND t.status NOT IN ('hoan_thanh','nghiem_thu')${projectFilter}
-      ORDER BY st.code, t.end_date`,
+      ORDER BY st.code, COALESCE(t.end_date, wp.end_date)`,
     today,
     ...projectParam,
   );
@@ -211,7 +212,7 @@ export async function GET(req: NextRequest) {
   }>(
     `SELECT st.code AS "sheetType", COUNT(t.id) AS total,
             COALESCE(AVG(t.progress_percent),0) AS "avgProgress",
-            COALESCE(SUM(CASE WHEN t.end_date < ? AND t.progress_percent < 1 AND t.status NOT IN ('hoan_thanh','nghiem_thu') THEN 1 ELSE 0 END),0) AS delayed
+            COALESCE(SUM(CASE WHEN COALESCE(t.end_date, wp.end_date) < ? AND t.progress_percent < 1 AND t.status NOT IN ('hoan_thanh','nghiem_thu') THEN 1 ELSE 0 END),0) AS delayed
        FROM sheet_types st
        ${projectId != null ? "JOIN towers tw ON tw.id = st.tower_id AND tw.project_id = ?" : ""}
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
@@ -226,7 +227,7 @@ export async function GET(req: NextRequest) {
   const sheetParams = onlySheet ? [onlySheet] : [];
   const allTasks = await query<TrackTask>(
     `SELECT t.id AS "taskId", t.boq_code AS "boqCode", t.code, t.name, t.status,
-            t.start_date AS "startDate", t.end_date AS "endDate", t.progress_percent AS "progressPercent",
+            COALESCE(t.start_date, wp.start_date) AS "startDate", COALESCE(t.end_date, wp.end_date) AS "endDate", t.progress_percent AS "progressPercent",
             u.name AS assignee, wp.id AS "wpId", wp.code AS "wpCode", wp.name AS "wpName",
             wp.floor_label AS "floorLabel", st.code AS "sheetCode"
        FROM tasks t

@@ -221,12 +221,13 @@ export async function pendingStageFloors(): Promise<Set<string>> {
 export async function stageMissingList(projectId?: number): Promise<StageMissingItem[]> {
   const soon = daysFromTodayISO(3);
   const today = todayISO();
+  // COALESCE(t.start_date, wp.start_date): task.start_date NULL = kế thừa ngày BĐ nhóm (lib/recompute.ts).
   const conds = [
     "cs.active = TRUE",
     "fsf.handed_over_at IS NULL",
     "cs.sort_order = (SELECT MAX(sort_order) FROM construction_stages WHERE active = TRUE)",
-    "t.start_date IS NOT NULL",
-    "t.start_date <= ?",
+    "COALESCE(t.start_date, wp.start_date) IS NOT NULL",
+    "COALESCE(t.start_date, wp.start_date) <= ?",
     "t.status NOT IN ('hoan_thanh','nghiem_thu')",
   ];
   const args: unknown[] = [soon];
@@ -241,7 +242,7 @@ export async function stageMissingList(projectId?: number): Promise<StageMissing
     earliestStart: string;
   }>(
     `SELECT fsf.id AS "floorStageFrontId", fsf.floor_label AS "floorLabel", cs.name AS "stageName",
-            MIN(t.start_date) AS "earliestStart"
+            MIN(COALESCE(t.start_date, wp.start_date)) AS "earliestStart"
        FROM floor_stage_fronts fsf
        JOIN construction_stages cs ON cs.id = fsf.stage_id
        JOIN work_packages wp ON wp.floor_label = fsf.floor_label

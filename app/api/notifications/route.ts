@@ -70,11 +70,11 @@ export async function GET(req: Request) {
     endDate: string;
     sheetType: string;
   }>(
-    `SELECT t.id, t.code, t.name, t.end_date AS "endDate", st.code AS "sheetType"
+    `SELECT t.id, t.code, t.name, COALESCE(t.end_date, wp.end_date) AS "endDate", st.code AS "sheetType"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
-      WHERE t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_percent < 1
+      WHERE COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) < ? AND t.progress_percent < 1
         AND t.status NOT IN ('hoan_thanh','nghiem_thu')${subconFilter}${projectFilter}`,
     ...(isSubcon ? [today, user.id] : [today]),
     ...projectParam,
@@ -97,10 +97,11 @@ export async function GET(req: Request) {
   // Sắp đến hạn: deadline còn ≤N ngày mà tiến độ < ngưỡng → cảnh báo sớm trước khi
   // thành trễ. Ngưỡng đọc từ alert_rules (M47 PR4, lib/alerts.ts); không có rule →
   // default cũ y hệt (3 ngày / 70%).
+  // COALESCE(t.end_date, wp.end_date): task.end_date NULL = kế thừa ngày KT nhóm (lib/recompute.ts).
   const dueSoonDays = await getAlertThreshold("due_soon_days", projectId);
   const dueSoonProgress = await getAlertThreshold("due_soon_progress", projectId);
   const soon = daysFromTodayISO(dueSoonDays);
-  const DUE_SOON_COND = `t.end_date IS NOT NULL AND t.end_date >= ? AND t.end_date <= ?
+  const DUE_SOON_COND = `COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) >= ? AND COALESCE(t.end_date, wp.end_date) <= ?
         AND t.progress_percent < ? AND t.status NOT IN ('hoan_thanh','nghiem_thu')`;
   const dueSoon = await query<{
     id: number;
@@ -109,7 +110,7 @@ export async function GET(req: Request) {
     endDate: string;
     sheetType: string;
   }>(
-    `SELECT t.id, t.code, t.name, t.end_date AS "endDate", st.code AS "sheetType"
+    `SELECT t.id, t.code, t.name, COALESCE(t.end_date, wp.end_date) AS "endDate", st.code AS "sheetType"
        FROM tasks t
        JOIN work_packages wp ON t.package_id = wp.id
        JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
@@ -140,7 +141,7 @@ export async function GET(req: Request) {
           SELECT t.id FROM tasks t
            JOIN work_packages wp ON t.package_id = wp.id
            JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
-           WHERE t.end_date IS NOT NULL AND t.end_date < ? AND t.progress_percent < 1
+           WHERE COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) < ? AND t.progress_percent < 1
              AND t.status NOT IN ('hoan_thanh','nghiem_thu')${subconFilter}${projectFilter})`,
     ...(isSubcon ? [user.id, today, user.id] : [user.id, today]),
     ...projectParam,
@@ -163,8 +164,9 @@ export async function GET(req: Request) {
 
   // Task đình trệ: đang thi công, chưa xong, còn hạn (end_date ≥ hôm nay) nhưng KHÔNG có
   // cập nhật tiến độ nào trong 7 ngày → nhắc người liên quan cập nhật. Khác "trễ" (đã quá hạn).
+  // COALESCE(t.end_date, wp.end_date): task.end_date NULL = kế thừa ngày KT nhóm (lib/recompute.ts).
   const STALLED_COND = `t.status = 'dang_thi_cong' AND t.progress_percent < 1
-        AND (t.end_date IS NULL OR t.end_date >= ?)
+        AND (COALESCE(t.end_date, wp.end_date) IS NULL OR COALESCE(t.end_date, wp.end_date) >= ?)
         AND NOT EXISTS (SELECT 1 FROM task_history h
                           WHERE h.task_id = t.id AND h.changed_at > NOW() - INTERVAL '7 days')`;
   const stalled = await query<{ id: number; code: string; name: string; sheetType: string }>(
