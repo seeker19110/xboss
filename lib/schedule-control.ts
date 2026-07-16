@@ -115,7 +115,7 @@ export async function getScheduleControlData(
 
   // Tiến độ trung bình của TOÀN BỘ công tác trong từng hạng mục (sheet+tầng) — dùng cho
   // cột "Tiến độ TB" ở bảng hạng mục trễ, tránh nhầm với avg chỉ tính trên công tác trễ.
-  const groupProgress = Object.fromEntries(await getGroupProgressMap({ systemId }));
+  const groupProgress = Object.fromEntries(await getGroupProgressMap({ systemId, projectId }));
 
   return { critical, delayed, delayPareto, groupProgress };
 }

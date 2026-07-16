@@ -244,12 +244,17 @@ test(
       const codes1 = only1.delayed.map((t) => t.code);
       assert.ok(codes1.includes("SCP-T1"));
       assert.ok(!codes1.includes("SCP-T2"));
+      // groupProgress ("Tiến độ TB") cũng lọc theo dự án: key sheetType::floorLabel.
+      assert.ok("SCP-1::1F" in only1.groupProgress);
+      assert.ok(!("SCP-2::2F" in only1.groupProgress));
 
       // ── Lọc dự án 2 → ngược lại ──
       const only2 = await getScheduleControlData(ketCau!.id, p2);
       const codes2 = only2.delayed.map((t) => t.code);
       assert.ok(codes2.includes("SCP-T2"));
       assert.ok(!codes2.includes("SCP-T1"));
+      assert.ok("SCP-2::2F" in only2.groupProgress);
+      assert.ok(!("SCP-1::1F" in only2.groupProgress));
 
       // ── getCpmData lọc dự án: meta chỉ chứa nhóm của dự án được truyền ──
       const cpm1 = await getCpmData(ketCau!.id, p1);
