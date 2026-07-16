@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   Upload,
   FileSignature,
+  RotateCcw,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
@@ -70,6 +71,7 @@ type InsuranceBond = {
   note: string | null;
   fileName: string | null;
   originalName: string | null;
+  deletedAt: string | null;
 };
 
 type Contract = { id: number; code: string; title: string };
@@ -96,15 +98,20 @@ export default function InsurancePage() {
   const [kindFilter, setKindFilter] = useState<InsuranceKind | "all">("all");
   const [addOpen, setAddOpen] = useState(false);
   const [editBond, setEditBond] = useState<InsuranceBond | null>(null);
+  const [showDeleted, setShowDeleted] = useState(false);
+  const [restoringId, setRestoringId] = useState<number | null>(null);
 
   const canManage = me?.role === "admin" || me?.role === "pm";
+  const isAdmin = me?.role === "admin";
 
-  function load() {
-    return fetch("/api/insurance-bonds").then((r) => (r.ok ? r.json() : null));
+  function load(deleted = showDeleted) {
+    return fetch(`/api/insurance-bonds${deleted ? "?includeDeleted=1" : ""}`).then((r) =>
+      r.ok ? r.json() : null,
+    );
   }
 
   useEffect(() => {
-    Promise.all([fetchMe(), load()])
+    Promise.all([fetchMe(), load(false)])
       .then(([meData, bondsRes]) => {
         if (!meData) return;
         setMe(meData);
@@ -116,11 +123,34 @@ export default function InsurancePage() {
         }
       })
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function refresh() {
-    const bondsRes = await load();
+  async function refresh(deleted = showDeleted) {
+    const bondsRes = await load(deleted);
     setBonds(bondsRes?.bonds ?? []);
+  }
+
+  async function toggleShowDeleted() {
+    const next = !showDeleted;
+    setShowDeleted(next);
+    setEditBond(null);
+    setLoading(true);
+    await refresh(next);
+    setLoading(false);
+  }
+
+  async function restoreBond(id: number) {
+    setRestoringId(id);
+    const res = await fetch(`/api/insurance-bonds/${id}/restore`, { method: "POST" });
+    if (res.ok) {
+      showToast("Đã khôi phục bảo hiểm/bảo lãnh", "success");
+      await refresh(true);
+    } else {
+      const j = await res.json().catch(() => null);
+      showToast(j?.error ?? "Khôi phục thất bại", "error");
+    }
+    setRestoringId(null);
   }
 
   const filtered = useMemo(
@@ -203,11 +233,27 @@ export default function InsurancePage() {
           </select>
         </label>
 
+        {isAdmin && (
+          <label className="inline-flex items-center gap-2 text-sm text-zinc-300">
+            <input
+              type="checkbox"
+              checked={showDeleted}
+              onChange={toggleShowDeleted}
+              className="rounded"
+            />
+            Xem bảo hiểm/bảo lãnh đã xoá
+          </label>
+        )}
+
         {bonds.length === 0 ? (
           <EmptyState
             icon={Umbrella}
-            title="Chưa có bảo hiểm/bảo lãnh"
-            message="Bấm “Thêm bảo hiểm/bảo lãnh” để thêm hồ sơ đầu tiên."
+            title={showDeleted ? "Không có bản ghi nào đã xoá" : "Chưa có bảo hiểm/bảo lãnh"}
+            message={
+              showDeleted
+                ? "Chưa bảo hiểm/bảo lãnh nào bị xoá."
+                : "Bấm “Thêm bảo hiểm/bảo lãnh” để thêm hồ sơ đầu tiên."
+            }
           />
         ) : (
           <>
@@ -217,6 +263,9 @@ export default function InsurancePage() {
               canManage={canManage}
               onEdit={setEditBond}
               onDelete={deleteBond}
+              showDeleted={showDeleted}
+              restoringId={restoringId}
+              onRestore={restoreBond}
             />
             <InsuranceTable
               title="Bảo lãnh"
@@ -224,6 +273,9 @@ export default function InsurancePage() {
               canManage={canManage}
               onEdit={setEditBond}
               onDelete={deleteBond}
+              showDeleted={showDeleted}
+              restoringId={restoringId}
+              onRestore={restoreBond}
             />
             {otherRows.length > 0 && (
               <InsuranceTable
@@ -232,6 +284,9 @@ export default function InsurancePage() {
                 canManage={canManage}
                 onEdit={setEditBond}
                 onDelete={deleteBond}
+                showDeleted={showDeleted}
+                restoringId={restoringId}
+                onRestore={restoreBond}
               />
             )}
           </>
@@ -263,12 +318,18 @@ function InsuranceTable({
   canManage,
   onEdit,
   onDelete,
+  showDeleted = false,
+  restoringId = null,
+  onRestore,
 }: {
   title: string;
   rows: InsuranceBond[];
   canManage: boolean;
   onEdit: (b: InsuranceBond) => void;
   onDelete: (id: number) => void;
+  showDeleted?: boolean;
+  restoringId?: number | null;
+  onRestore?: (id: number) => void;
 }) {
   if (rows.length === 0) return null;
   return (
@@ -361,25 +422,36 @@ function InsuranceTable({
                     )}
                   </td>
                   <td className="p-3">
-                    {canManage && (
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => onEdit(b)}
-                          aria-label="Sửa"
-                          className="text-zinc-400 hover:text-white"
-                          title="Sửa"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => onDelete(b.id)}
-                          aria-label="Xoá"
-                          className="text-zinc-400 hover:text-rose-400"
-                          title="Xoá"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                    {showDeleted ? (
+                      <button
+                        onClick={() => onRestore?.(b.id)}
+                        disabled={restoringId === b.id}
+                        aria-label={`Khôi phục ${b.title}`}
+                        className="flex items-center gap-1 text-emerald-300 hover:text-emerald-200 disabled:opacity-50 text-xs font-medium"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" /> Khôi phục
+                      </button>
+                    ) : (
+                      canManage && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => onEdit(b)}
+                            aria-label="Sửa"
+                            className="text-zinc-400 hover:text-white"
+                            title="Sửa"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => onDelete(b.id)}
+                            aria-label="Xoá"
+                            className="text-zinc-400 hover:text-rose-400"
+                            title="Xoá"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )
                     )}
                   </td>
                 </tr>
