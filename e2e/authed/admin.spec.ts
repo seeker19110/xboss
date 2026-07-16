@@ -130,7 +130,12 @@ test.describe("Quản trị (sau đăng nhập)", () => {
     page,
   }) => {
     await page.goto("/admin/integrations");
-    await expect(page.getByRole("heading", { name: "Tích hợp hệ ngoài" })).toBeVisible({
+    // AppHeader render title trong <span>, không phải heading — và nhãn trùng với
+    // mục sidebar cùng tên, nên scope vào header để tránh strict-mode match nhầm
+    // (bài học PR2.4, xem PROGRESS.md).
+    await expect(
+      page.locator("header").getByText("Tích hợp hệ ngoài", { exact: true }),
+    ).toBeVisible({
       timeout: 15_000,
     });
     // Registry rỗng ở PR1 → hiện thông điệp EmptyState (trạng thái bình thường).
