@@ -8,6 +8,13 @@
 
 - **GĐ 4–5 — Phát triển & nâng chất lượng.** Sản phẩm đã chạy thật (v0.2.1, tự host VPS), đang phát triển/tinh chỉnh tính năng liên tục **và** đang áp bộ khung quy trình/chất lượng (brownfield) theo `docs/framework/AP-DUNG-vao-du-an-co-san.md`.
 
+## Việc tạm hoãn — chờ bên ngoài (không phải "tiếp theo", đừng tự nhặt lại)
+
+Ghi nhận 2026-07-16: 2 mục dưới đây đã có kết luận rõ, **không cần AI chủ động làm** cho tới khi có tín hiệu bên ngoài nêu rõ — không phải việc "quên làm":
+
+- **Ký số thật (PAdES, USB token/HSM)** cho biên bản/hợp đồng — chờ nhu cầu pháp lý thật phát sinh (xem mục Nợ kỹ thuật bên dưới).
+- **Sentry production** — scaffold code đã xong, chờ người vận hành tự đặt `SENTRY_DSN`/`NEXT_PUBLIC_SENTRY_DSN` trên VPS thật + deploy (việc ops ngoài code, không phải việc AI làm trong repo).
+
 ## Đã xong
 
 - **Sản phẩm lõi:** WBS tracking (sheet động, lưới checkbox, tự tính %/trạng thái, SSE đồng bộ đa người dùng), auth 4 vai trò, dashboard + S-curve + forecast, nghiệm thu 2 bước + biên bản, baseline, thông báo + Web Push, tìm kiếm toàn cục, lý do trễ + Pareto, lookahead, báo cáo ngày/tuần (email + Telegram), vật tư + đồng bộ Google Sheet 2 chiều, export Excel, PWA offline queue.
@@ -70,7 +77,7 @@
   - SPI/CPI trong cron `daily-report`: gọi `getEvmSeries({projectId:null, source:"bills"})` (đơn giản hoá — DB hiện chưa multi-project trong ngữ cảnh cron), so `spi_below`/`cpi_below` → thêm dòng cảnh báo vào cả `reportToHtml`/`reportToTelegramText` (tham số `evmAlerts?: string[]` tuỳ chọn, không đổi chữ ký chỗ gọi cũ).
   - UI `app/admin/alert-rules/page.tsx` (mọi metric là 1 khối: ngưỡng hiệu lực hiện tại + bảng rule riêng dự án/toàn hệ + modal thêm/sửa) + API `GET/POST /api/admin/alert-rules` + `DELETE /api/admin/alert-rules/:id` (`CAN.viewAlertRules` = admin/pm, `CAN.manageAlertRules` = admin, cùng phân quyền Approval Engine M46 PR4). Mục sidebar "Ngưỡng cảnh báo" cạnh "Cấu hình duyệt" (`dashboardTree.ts`, icon `BellRing`).
   - Test `tests/alerts.test.ts` (đủ ca: whitelist metric, `getAlertThreshold` 3 tình huống ưu tiên, `upsertAlertRule` không tạo trùng + validate, **đối chiếu bất biến quan trọng nhất bằng dữ liệu thật**: điều kiện mới với threshold=0 cho đúng tập kết quả hệt điều kiện cũ). Verify: lint/typecheck/build xanh; dựng Postgres 16 ephemeral (`initdb`/`pg_ctl`, DB sạch mỗi lần chạy) — toàn bộ `tests/alerts.test.ts` + `report.test.ts`/`notifications.test.ts`/`auth.test.ts`/`evm.test.ts` xanh (34 test).
-  - **Chưa verify UI qua trình duyệt thật** (không có `.env.local`/DB dev sẵn trong phiên này) — chỉ verify qua build + test tích hợp DB thật; phiên sau nên click qua `/admin/alert-rules` xác nhận modal/bảng hiển thị đúng trước khi coi UI hoàn tất.
+  - ~~Chưa verify UI qua trình duyệt thật~~ → **đã verify** (2026-07-16, phiên sau): dựng Postgres + dev server cục bộ, Playwright đăng nhập admin thật thao tác `/admin/alert-rules` — 5 thẻ metric render đúng ngưỡng mặc định; round-trip đầy đủ modal "Thêm/sửa ngưỡng" → `POST` 201 → card cập nhật giá trị mới → `DELETE` (qua `appConfirm`) 200 → quay lại mặc định. Dọn sạch dữ liệu test sau khi xong.
 - **M43 PR1 — Ngữ cảnh request + Audit trail toàn hệ (nền)** (2026-07-15, `docs/nang-cap/M43-audit-trail.md`): audit trail tự động bằng **trigger Postgres generic**, không phụ thuộc gọi helper trong code nên không thể bỏ sót.
   - `lib/request-context.ts` (mới): `AsyncLocalStorage` giữ `{userId, role, projectId, requestId}`; `patchRequestContext` dùng `enterWith` để thiết lập store khi App Router chưa bọc handler (không có middleware Node bọc mọi route) — mỗi request là async context riêng nên không rò rỉ.
   - `proxy.ts` (Next 16 đã đổi tên middleware→proxy — gộp vào file có sẵn thay vì tạo `middleware.ts` mới): sinh `x-request-id` (UUID) nếu chưa có, forward vào request headers + trả ở response.
