@@ -10,6 +10,7 @@ import {
   verifyFileMime,
   newProjectDocFileName,
   MAX_DOC_BYTES,
+  isContentTooLarge,
 } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
@@ -51,6 +52,12 @@ export async function POST(req: NextRequest) {
   const projectId = await getCurrentProjectId(user);
   if (projectId == null)
     return NextResponse.json({ error: "Chưa có dự án nào để tải lên hồ sơ" }, { status: 422 });
+
+  if (isContentTooLarge(req.headers.get("content-length"), MAX_DOC_BYTES))
+    return NextResponse.json(
+      { error: `File quá lớn (tối đa ${MAX_DOC_BYTES / 1024 / 1024}MB)` },
+      { status: 413 },
+    );
 
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");

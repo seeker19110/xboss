@@ -10,6 +10,7 @@ import {
   verifyFileMime,
   newDrawingRevisionFileName,
   MAX_DRAWING_BYTES,
+  isContentTooLarge,
 } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +43,12 @@ export async function POST(
         )
       : undefined;
   if (!drawing) return NextResponse.json({ error: "Không tìm thấy bản vẽ" }, { status: 404 });
+
+  if (isContentTooLarge(req.headers.get("content-length"), MAX_DRAWING_BYTES))
+    return NextResponse.json(
+      { error: `File quá lớn (tối đa ${MAX_DRAWING_BYTES / 1024 / 1024}MB)` },
+      { status: 413 },
+    );
 
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");

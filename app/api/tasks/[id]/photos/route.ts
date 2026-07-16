@@ -9,6 +9,7 @@ import {
   verifyFileMime,
   newPhotoFileName,
   MAX_PHOTO_BYTES,
+  isContentTooLarge,
 } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
@@ -64,6 +65,12 @@ export async function POST(
     return NextResponse.json(
       { error: "Bạn chỉ được upload ảnh cho task được giao cho mình" },
       { status: 403 },
+    );
+
+  if (isContentTooLarge(req.headers.get("content-length"), MAX_PHOTO_BYTES))
+    return NextResponse.json(
+      { error: `Ảnh quá lớn (tối đa ${MAX_PHOTO_BYTES / 1024 / 1024}MB)` },
+      { status: 413 },
     );
 
   const form = await req.formData().catch(() => null);

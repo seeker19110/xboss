@@ -11,6 +11,7 @@ import {
   newClaimDocFileName,
   MAX_DOC_BYTES,
   sha256Hex,
+  isContentTooLarge,
 } from "@/lib/photos";
 import { getClaim } from "@/lib/claims";
 
@@ -63,6 +64,12 @@ export async function POST(
   const projectId = await getCurrentProjectId(user);
   const claim = await getClaim(claimId, projectId);
   if (!claim) return NextResponse.json({ error: "Không tìm thấy claim" }, { status: 404 });
+
+  if (isContentTooLarge(req.headers.get("content-length"), MAX_DOC_BYTES))
+    return NextResponse.json(
+      { error: `File quá lớn (tối đa ${MAX_DOC_BYTES / 1024 / 1024}MB)` },
+      { status: 413 },
+    );
 
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");

@@ -3,8 +3,11 @@ import * as XLSX from "xlsx";
 import { importWorkbook, analyzeWorkbook } from "@/lib/import";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { log } from "@/lib/log";
+import { isContentTooLarge } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
+
+const MAX_BYTES = 20 * 1024 * 1024; // 20 MB
 
 // POST /api/import/excel  (formData: file, mode?)
 // mode = "preview" → chỉ phân tích, KHÔNG ghi DB. Mặc định → import thật.
@@ -18,11 +21,16 @@ export async function POST(request: NextRequest) {
         { status: 403 },
       );
 
+    if (isContentTooLarge(request.headers.get("content-length"), MAX_BYTES))
+      return NextResponse.json(
+        { error: `File quá lớn (tối đa ${MAX_BYTES / 1024 / 1024} MB)` },
+        { status: 413 },
+      );
+
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
     if (!file) return NextResponse.json({ error: "Không tìm thấy file" }, { status: 400 });
 
-    const MAX_BYTES = 20 * 1024 * 1024; // 20 MB
     if (file.size > MAX_BYTES)
       return NextResponse.json(
         {

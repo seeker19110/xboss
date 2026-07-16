@@ -10,6 +10,7 @@ import {
   newDocFileName,
   MAX_DOC_BYTES,
   sha256Hex,
+  isContentTooLarge,
 } from "@/lib/photos";
 import { DOC_CATEGORIES, type DocCategory } from "@/lib/qaqc";
 
@@ -67,6 +68,12 @@ export async function POST(
     return NextResponse.json(
       { error: "Bạn chỉ được upload tài liệu cho task được giao cho mình" },
       { status: 403 },
+    );
+
+  if (isContentTooLarge(req.headers.get("content-length"), MAX_DOC_BYTES))
+    return NextResponse.json(
+      { error: `File quá lớn (tối đa ${MAX_DOC_BYTES / 1024 / 1024}MB)` },
+      { status: 413 },
     );
 
   const form = await req.formData().catch(() => null);

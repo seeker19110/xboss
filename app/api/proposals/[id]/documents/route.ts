@@ -10,6 +10,7 @@ import {
   verifyFileMime,
   newProposalDocFileName,
   MAX_DOC_BYTES,
+  isContentTooLarge,
 } from "@/lib/photos";
 import { canEditProposal, canSeeAllProposals, getProposal } from "@/lib/proposals";
 
@@ -63,6 +64,12 @@ export async function POST(
   if (!proposal) return NextResponse.json({ error: "Không tìm thấy đề xuất" }, { status: 404 });
   const editErr = canEditProposal(proposal, user);
   if (editErr) return NextResponse.json({ error: editErr }, { status: 403 });
+
+  if (isContentTooLarge(req.headers.get("content-length"), MAX_DOC_BYTES))
+    return NextResponse.json(
+      { error: `File quá lớn (tối đa ${MAX_DOC_BYTES / 1024 / 1024}MB)` },
+      { status: 413 },
+    );
 
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");
