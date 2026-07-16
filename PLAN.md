@@ -252,7 +252,8 @@ viết trước, code đã đổi) + quyết định đã chốt. Khi kế hoạ
 - [ ] Cập nhật `PROGRESS.md` (mục M50, ghi rõ các quyết định lệch đặc tả) +
       `docs/nang-cap/README.md` nếu cần
 - [ ] Push nhánh + mở PR draft theo template (3 PR, thứ tự merge: 1 → 2/3)
-- [ ] Nhắc người dùng 2 quyết định đang chờ cho các đợt sau (hỏi khi tới lượt, không
-      tự quyết): (a) **M51 PR1** cần xác nhận sẵn sàng đổi cấu hình production (role
-      `xboss_app`, `MIGRATE_DATABASE_URL`, ADR-0005); (b) **M49 PR3** cần chốt dùng
-      thư viện `jose` cho OIDC hay yêu cầu zero-dep (kèm ADR)
+- [ ] Nhắc người dùng quyết định đang chờ cho các đợt sau (hỏi khi tới lượt, không
+      tự quyết): **M51 PR1** cần xác nhận sẵn sàng đổi cấu hình production (role
+      `xboss_app`, `MIGRATE_DATABASE_URL`, ADR-0005). (Câu hỏi thư viện OIDC của M49
+      PR3 ĐÃ chốt 2026-07-16: dùng `openid-client` — đặc tả M49 đã viết lại toàn diện
+      theo quyết định này, xem `docs/nang-cap/M49-api-mo-sso.md`.)
