@@ -9,6 +9,7 @@ import {
   Paperclip,
   FileSignature,
   Lock,
+  RotateCcw,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
@@ -61,6 +62,7 @@ type Contract = {
   addendaTotal: number;
   paid: number;
   poCommitted: number;
+  deletedAt: string | null;
 };
 type Supplier = { id: number; name: string };
 type SystemOption = { id: number; code: string; name: string };
@@ -83,17 +85,22 @@ export default function ContractsPage() {
   const [collapsed, setCollapsed] = useState<Set<ContractKind>>(new Set());
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [showDeleted, setShowDeleted] = useState(false);
+  const [restoringId, setRestoringId] = useState<number | null>(null);
 
   const canManage = me?.role === "admin" || me?.role === "pm";
+  const isAdmin = me?.role === "admin";
 
-  function load() {
-    return fetch("/api/contracts").then((r) => (r.ok ? r.json() : null));
+  function load(deleted = showDeleted) {
+    return fetch(`/api/contracts${deleted ? "?includeDeleted=1" : ""}`).then((r) =>
+      r.ok ? r.json() : null,
+    );
   }
 
   useEffect(() => {
     Promise.all([
       fetchMe(),
-      load(),
+      load(false),
       fetch("/api/suppliers").then((r) => (r.ok ? r.json() : null)),
       fetch("/api/systems").then((r) => (r.ok ? r.json() : null)),
     ])
@@ -105,11 +112,34 @@ export default function ContractsPage() {
         setSystems(d?.systems ?? []);
       })
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function refresh() {
-    const c = await load();
+  async function refresh(deleted = showDeleted) {
+    const c = await load(deleted);
     setContracts(c?.contracts ?? []);
+  }
+
+  async function toggleShowDeleted() {
+    const next = !showDeleted;
+    setShowDeleted(next);
+    setSelectedId(null);
+    setLoading(true);
+    await refresh(next);
+    setLoading(false);
+  }
+
+  async function restoreContract(id: number) {
+    setRestoringId(id);
+    const res = await fetch(`/api/contracts/${id}/restore`, { method: "POST" });
+    if (res.ok) {
+      showToast("Đã khôi phục hợp đồng", "success");
+      await refresh(true);
+    } else {
+      const j = await res.json().catch(() => null);
+      showToast(j?.error ?? "Khôi phục thất bại", "error");
+    }
+    setRestoringId(null);
   }
 
   const groups = useMemo(() => {
@@ -176,11 +206,29 @@ export default function ContractsPage() {
           ))}
         </div>
 
+        {isAdmin && (
+          <label className="inline-flex items-center gap-2 text-sm text-zinc-300">
+            <input
+              type="checkbox"
+              checked={showDeleted}
+              onChange={toggleShowDeleted}
+              className="rounded"
+            />
+            Xem hợp đồng đã xoá
+          </label>
+        )}
+
         {contracts.length === 0 ? (
           <EmptyState
             icon={FileSignature}
-            title="Chưa có hợp đồng nào"
-            message={canManage ? 'Bấm "Thêm hợp đồng" để bắt đầu.' : "Chưa có dữ liệu hợp đồng."}
+            title={showDeleted ? "Không có hợp đồng nào đã xoá" : "Chưa có hợp đồng nào"}
+            message={
+              showDeleted
+                ? "Chưa hợp đồng nào bị xoá."
+                : canManage
+                  ? 'Bấm "Thêm hợp đồng" để bắt đầu.'
+                  : "Chưa có dữ liệu hợp đồng."
+            }
           />
         ) : (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
@@ -229,8 +277,10 @@ export default function ContractsPage() {
                             return (
                               <tr
                                 key={c.id}
-                                onClick={() => setSelectedId(c.id)}
-                                className="border-b border-zinc-800/60 last:border-0 hover:bg-zinc-800/40 cursor-pointer"
+                                onClick={showDeleted ? undefined : () => setSelectedId(c.id)}
+                                className={`border-b border-zinc-800/60 last:border-0 ${
+                                  showDeleted ? "opacity-60" : "hover:bg-zinc-800/40 cursor-pointer"
+                                }`}
                               >
                                 <td className="p-3 font-mono text-xs">{c.code}</td>
                                 <td className="p-3">
@@ -276,11 +326,25 @@ export default function ContractsPage() {
                                   )}
                                 </td>
                                 <td className="p-3">
-                                  <span
-                                    className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${STATUS_BADGE[c.status]}`}
-                                  >
-                                    {STATUS_LABEL[c.status]}
-                                  </span>
+                                  {showDeleted ? (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        restoreContract(c.id);
+                                      }}
+                                      disabled={restoringId === c.id}
+                                      aria-label={`Khôi phục hợp đồng ${c.code}`}
+                                      className="flex items-center gap-1 text-emerald-300 hover:text-emerald-200 disabled:opacity-50 text-xs font-medium"
+                                    >
+                                      <RotateCcw className="w-3.5 h-3.5" /> Khôi phục
+                                    </button>
+                                  ) : (
+                                    <span
+                                      className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${STATUS_BADGE[c.status]}`}
+                                    >
+                                      {STATUS_LABEL[c.status]}
+                                    </span>
+                                  )}
                                 </td>
                               </tr>
                             );

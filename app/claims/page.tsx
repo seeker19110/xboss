@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, X, Paperclip, Scale, Lock } from "lucide-react";
+import { Plus, X, Paperclip, Scale, Lock, RotateCcw } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
@@ -50,6 +50,7 @@ type Claim = {
   createdByName: string | null;
   createdAt: string;
   documentCount: number;
+  deletedAt: string | null;
 };
 
 type Contract = { id: number; code: string; title: string; kind: string };
@@ -67,16 +68,21 @@ export default function ClaimsPage() {
   const [kindFilter, setKindFilter] = useState<ClaimKind | "all">("all");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [showDeleted, setShowDeleted] = useState(false);
+  const [restoringId, setRestoringId] = useState<number | null>(null);
 
   const canManage = me?.role === "admin" || me?.role === "pm" || me?.role === "engineer";
   const isAdminOrPm = me?.role === "admin" || me?.role === "pm";
+  const isAdmin = me?.role === "admin";
 
-  function load() {
-    return fetch("/api/claims").then((r) => (r.ok ? r.json() : null));
+  function load(deleted = showDeleted) {
+    return fetch(`/api/claims${deleted ? "?includeDeleted=1" : ""}`).then((r) =>
+      r.ok ? r.json() : null,
+    );
   }
 
   useEffect(() => {
-    Promise.all([fetchMe(), load()])
+    Promise.all([fetchMe(), load(false)])
       .then(([meData, c]) => {
         if (!meData) return;
         setMe(meData);
@@ -88,11 +94,34 @@ export default function ClaimsPage() {
         }
       })
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function refresh() {
-    const c = await load();
+  async function refresh(deleted = showDeleted) {
+    const c = await load(deleted);
     setItems(c?.items ?? []);
+  }
+
+  async function toggleShowDeleted() {
+    const next = !showDeleted;
+    setShowDeleted(next);
+    setSelectedId(null);
+    setLoading(true);
+    await refresh(next);
+    setLoading(false);
+  }
+
+  async function restoreClaim(id: number) {
+    setRestoringId(id);
+    const res = await fetch(`/api/claims/${id}/restore`, { method: "POST" });
+    if (res.ok) {
+      showToast("Đã khôi phục claim", "success");
+      await refresh(true);
+    } else {
+      const j = await res.json().catch(() => null);
+      showToast(j?.error ?? "Khôi phục thất bại", "error");
+    }
+    setRestoringId(null);
   }
 
   const filtered = useMemo(
@@ -172,11 +201,29 @@ export default function ClaimsPage() {
           ))}
         </div>
 
+        {isAdmin && (
+          <label className="inline-flex items-center gap-2 text-sm text-zinc-300">
+            <input
+              type="checkbox"
+              checked={showDeleted}
+              onChange={toggleShowDeleted}
+              className="rounded"
+            />
+            Xem claim đã xoá
+          </label>
+        )}
+
         {filtered.length === 0 ? (
           <EmptyState
             icon={Scale}
-            title="Chưa có claim nào"
-            message={canManage ? 'Bấm "Thêm claim" để bắt đầu.' : "Chưa có dữ liệu claim."}
+            title={showDeleted ? "Không có claim nào đã xoá" : "Chưa có claim nào"}
+            message={
+              showDeleted
+                ? "Chưa claim nào bị xoá."
+                : canManage
+                  ? 'Bấm "Thêm claim" để bắt đầu.'
+                  : "Chưa có dữ liệu claim."
+            }
           />
         ) : (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
@@ -197,8 +244,10 @@ export default function ClaimsPage() {
                   {filtered.map((c) => (
                     <tr
                       key={c.id}
-                      onClick={() => setSelectedId(c.id)}
-                      className="border-b border-zinc-800/60 last:border-0 hover:bg-zinc-800/40 cursor-pointer"
+                      onClick={showDeleted ? undefined : () => setSelectedId(c.id)}
+                      className={`border-b border-zinc-800/60 last:border-0 ${
+                        showDeleted ? "opacity-60" : "hover:bg-zinc-800/40 cursor-pointer"
+                      }`}
                     >
                       <td className="p-3 font-mono text-xs">{c.code}</td>
                       <td className="p-3 text-xs text-zinc-300">{KIND_LABEL[c.kind]}</td>
@@ -217,11 +266,25 @@ export default function ClaimsPage() {
                           : `${c.daysSettled ?? c.daysRequested ?? 0} ngày`}
                       </td>
                       <td className="p-3">
-                        <span
-                          className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${STATUS_BADGE[c.status]}`}
-                        >
-                          {STATUS_LABEL[c.status]}
-                        </span>
+                        {showDeleted ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              restoreClaim(c.id);
+                            }}
+                            disabled={restoringId === c.id}
+                            aria-label={`Khôi phục claim ${c.code}`}
+                            className="flex items-center gap-1 text-emerald-300 hover:text-emerald-200 disabled:opacity-50 text-xs font-medium"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" /> Khôi phục
+                          </button>
+                        ) : (
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${STATUS_BADGE[c.status]}`}
+                          >
+                            {STATUS_LABEL[c.status]}
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))}

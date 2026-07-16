@@ -11,6 +11,7 @@ import {
   Users,
   ExternalLink,
   CheckCircle2,
+  RotateCcw,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import AppHeader from "@/app/components/AppHeader";
@@ -55,6 +56,7 @@ type Invoice = {
   contractId: number | null;
   paymentBillId: number | null;
   createdByName: string | null;
+  deletedAt: string | null;
 };
 
 type PayrollStatus = "draft" | "approved" | "paid";
@@ -111,19 +113,24 @@ export default function FinancePage() {
   const [addPayrollOpen, setAddPayrollOpen] = useState(false);
   const [editPayroll, setEditPayroll] = useState<PayrollRow | null>(null);
   const [payrollPrefill, setPayrollPrefill] = useState<PayrollSuggestion | null>(null);
+  const [showDeletedInvoices, setShowDeletedInvoices] = useState(false);
+  const [restoringInvoiceId, setRestoringInvoiceId] = useState<number | null>(null);
 
   const canManage = me?.role === "admin" || me?.role === "pm";
+  const isAdmin = me?.role === "admin";
 
-  function load(p: string) {
+  function load(p: string, deletedInvoices = showDeletedInvoices) {
     return Promise.all([
       fetch(`/api/finance/summary?period=${p}`).then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/invoices").then((r) => (r.ok ? r.json() : null)),
+      fetch(`/api/invoices${deletedInvoices ? "?includeDeleted=1" : ""}`).then((r) =>
+        r.ok ? r.json() : null,
+      ),
       fetch(`/api/payroll?period=${p}&suggest=1`).then((r) => (r.ok ? r.json() : null)),
     ]);
   }
 
   useEffect(() => {
-    Promise.all([fetchMe(), load(period)])
+    Promise.all([fetchMe(), load(period, false)])
       .then(([meData, [summaryRes, invoicesRes, payrollRes]]) => {
         if (!meData) return;
         setMe(meData);
@@ -144,12 +151,31 @@ export default function FinancePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function refresh(p = period) {
-    const [summaryRes, invoicesRes, payrollRes] = await load(p);
+  async function refresh(p = period, deletedInvoices = showDeletedInvoices) {
+    const [summaryRes, invoicesRes, payrollRes] = await load(p, deletedInvoices);
     setSummary(summaryRes);
     setInvoices(invoicesRes?.invoices ?? []);
     setPayroll(payrollRes?.payroll ?? []);
     setSuggestions(payrollRes?.suggestions ?? []);
+  }
+
+  async function toggleShowDeletedInvoices() {
+    const next = !showDeletedInvoices;
+    setShowDeletedInvoices(next);
+    await refresh(period, next);
+  }
+
+  async function restoreInvoice(id: number) {
+    setRestoringInvoiceId(id);
+    const res = await fetch(`/api/invoices/${id}/restore`, { method: "POST" });
+    if (res.ok) {
+      showToast("Đã khôi phục hoá đơn", "success");
+      await refresh(period, true);
+    } else {
+      const j = await res.json().catch(() => null);
+      showToast(j?.error ?? "Khôi phục thất bại", "error");
+    }
+    setRestoringInvoiceId(null);
   }
 
   function changePeriod(p: string) {
@@ -302,8 +328,13 @@ export default function FinancePage() {
             items={invoices}
             vat={summary?.vat ?? { vatIn: 0, vatOut: 0, netVat: 0 }}
             canManage={canManage}
+            isAdmin={isAdmin}
             onEdit={setEditInvoice}
             onDelete={(id) => deleteEntity(`/api/invoices/${id}`, "hoá đơn")}
+            showDeleted={showDeletedInvoices}
+            onToggleShowDeleted={toggleShowDeletedInvoices}
+            restoringId={restoringInvoiceId}
+            onRestore={restoreInvoice}
           />
         )}
 
@@ -453,14 +484,24 @@ function InvoicesTab({
   items,
   vat,
   canManage,
+  isAdmin,
   onEdit,
   onDelete,
+  showDeleted,
+  onToggleShowDeleted,
+  restoringId,
+  onRestore,
 }: {
   items: Invoice[];
   vat: VatSummary;
   canManage: boolean;
+  isAdmin: boolean;
   onEdit: (item: Invoice) => void;
   onDelete: (id: number) => void;
+  showDeleted: boolean;
+  onToggleShowDeleted: () => void;
+  restoringId: number | null;
+  onRestore: (id: number) => void;
 }) {
   return (
     <div className="space-y-3">
@@ -485,11 +526,27 @@ function InvoicesTab({
         </div>
       </div>
 
+      {isAdmin && (
+        <label className="inline-flex items-center gap-2 text-sm text-zinc-300">
+          <input
+            type="checkbox"
+            checked={showDeleted}
+            onChange={onToggleShowDeleted}
+            className="rounded"
+          />
+          Xem hoá đơn đã xoá
+        </label>
+      )}
+
       {items.length === 0 ? (
         <EmptyState
           icon={Receipt}
-          title="Chưa có hoá đơn"
-          message="Bấm “Thêm hoá đơn” để ghi hoá đơn VAT vào/ra."
+          title={showDeleted ? "Không có hoá đơn nào đã xoá" : "Chưa có hoá đơn"}
+          message={
+            showDeleted
+              ? "Chưa hoá đơn nào bị xoá."
+              : "Bấm “Thêm hoá đơn” để ghi hoá đơn VAT vào/ra."
+          }
         />
       ) : (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
@@ -508,7 +565,10 @@ function InvoicesTab({
               </thead>
               <tbody>
                 {items.map((inv) => (
-                  <tr key={inv.id} className="border-b border-zinc-800/60 last:border-0">
+                  <tr
+                    key={inv.id}
+                    className={`border-b border-zinc-800/60 last:border-0 ${showDeleted ? "opacity-60" : ""}`}
+                  >
                     <td className="p-3">{inv.invoiceNo ?? "—"}</td>
                     <td className="p-3 text-xs text-zinc-400">
                       {inv.invoiceDate ? formatDateVN(inv.invoiceDate) : "—"}
@@ -533,25 +593,36 @@ function InvoicesTab({
                       )}
                     </td>
                     <td className="p-3">
-                      {canManage && (
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => onEdit(inv)}
-                            aria-label="Sửa hoá đơn"
-                            className="text-zinc-400 hover:text-white"
-                            title="Sửa"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => onDelete(inv.id)}
-                            aria-label="Xoá hoá đơn"
-                            className="text-zinc-400 hover:text-rose-400"
-                            title="Xoá"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                      {showDeleted ? (
+                        <button
+                          onClick={() => onRestore(inv.id)}
+                          disabled={restoringId === inv.id}
+                          aria-label={`Khôi phục hoá đơn ${inv.invoiceNo ?? inv.id}`}
+                          className="flex items-center gap-1 text-emerald-300 hover:text-emerald-200 disabled:opacity-50 text-xs font-medium"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" /> Khôi phục
+                        </button>
+                      ) : (
+                        canManage && (
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => onEdit(inv)}
+                              aria-label="Sửa hoá đơn"
+                              className="text-zinc-400 hover:text-white"
+                              title="Sửa"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => onDelete(inv.id)}
+                              aria-label="Xoá hoá đơn"
+                              className="text-zinc-400 hover:text-rose-400"
+                              title="Xoá"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )
                       )}
                     </td>
                   </tr>
