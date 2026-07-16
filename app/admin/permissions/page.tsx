@@ -1,0 +1,276 @@
+"use client";
+// Trang ma trận phân quyền (M50 PR1 — override quyền trong DB, bảng role_permissions,
+// xem docs/nang-cap/M50-phan-quyen-nang-cao.md mục PR1). Đọc/ghi qua
+// GET/PATCH /api/admin/role-permissions. Chỉ Admin (CAN.manageUsers).
+//
+// Ma trận vai trò × quyền, nhóm theo module (app/lib/permissionMeta.ts). Mỗi ô 3 trạng
+// thái: Mặc định (theo CAN_DEFAULT) / Mở (bật) / Siết (tắt). KHÔNG import lib/auth (kéo
+// node:crypto) — mọi dữ liệu quyền lấy từ API; nhãn/nhóm từ permissionMeta client-safe.
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ShieldCheck, Info, Lock } from "lucide-react";
+import AppHeader from "@/app/components/AppHeader";
+import EmptyState from "@/app/components/EmptyState";
+import { PageSkeleton } from "@/app/components/Skeleton";
+import { showToast } from "@/app/components/Toast";
+import { fetchMe, type Me } from "@/app/lib/me";
+import { ROLE_LABELS, type Role } from "@/lib/roles";
+import { PERM_GROUP_ORDER, permMeta } from "@/app/lib/permissionMeta";
+
+type MatrixData = {
+  roles: Role[];
+  perms: string[];
+  lockedPerms: string[];
+  defaults: Record<string, Record<Role, boolean>>;
+  overrides: { role: Role; permKey: string; allowed: boolean }[];
+};
+
+type CellState = "default" | "on" | "off";
+
+export default function PermissionsPage() {
+  const [me, setMe] = useState<Me | null>(null);
+  const [meLoading, setMeLoading] = useState(true);
+  const [data, setData] = useState<MatrixData | null>(null);
+  const [loading, setLoading] = useState(true);
+  // Map key `${role}|${permKey}` → allowed (override hiện có).
+  const [overrides, setOverrides] = useState<Map<string, boolean>>(new Map());
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+
+  const isAdmin = me?.role === "admin";
+
+  const load = useCallback(() => {
+    setLoading(true);
+    return fetch("/api/admin/role-permissions")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: MatrixData | null) => {
+        if (!j) return;
+        setData(j);
+        const m = new Map<string, boolean>();
+        for (const o of j.overrides) m.set(`${o.role}|${o.permKey}`, o.allowed);
+        setOverrides(m);
+      })
+      .catch(() => showToast("Không tải được ma trận phân quyền", "error"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    fetchMe()
+      .then((u) => setMe(u))
+      .finally(() => setMeLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (!me || me.role !== "admin") return;
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me]);
+
+  // Nhóm quyền theo module, giữ thứ tự PERM_GROUP_ORDER.
+  const grouped = useMemo(() => {
+    if (!data) return [];
+    const byGroup = new Map<string, string[]>();
+    for (const p of data.perms) {
+      const g = permMeta(p).group;
+      const arr = byGroup.get(g) ?? [];
+      arr.push(p);
+      byGroup.set(g, arr);
+    }
+    return PERM_GROUP_ORDER.filter((g) => byGroup.has(g)).map((g) => ({
+      group: g,
+      perms: byGroup.get(g)!,
+    }));
+  }, [data]);
+
+  const lockedSet = useMemo(() => new Set(data?.lockedPerms ?? []), [data]);
+
+  async function changeCell(role: Role, permKey: string, next: CellState) {
+    const key = `${role}|${permKey}`;
+    const allowed: boolean | null = next === "default" ? null : next === "on";
+    setSavingKey(key);
+    try {
+      const res = await fetch("/api/admin/role-permissions", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role, permKey, allowed }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => null);
+        showToast(j?.error ?? "Lưu thất bại", "error");
+        return;
+      }
+      setOverrides((prev) => {
+        const m = new Map(prev);
+        if (allowed === null) m.delete(key);
+        else m.set(key, allowed);
+        return m;
+      });
+      showToast("Đã lưu — có hiệu lực trong tối đa 60 giây trên mọi phiên bản", "success");
+    } catch {
+      showToast("Mất kết nối — không lưu được", "error");
+    } finally {
+      setSavingKey(null);
+    }
+  }
+
+  if (meLoading) return <PageSkeleton />;
+
+  if (me && !isAdmin) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-white">
+        <AppHeader title="Phân quyền" subtitle="Ma trận quyền theo vai trò" />
+        <main className="p-4 sm:p-6">
+          <EmptyState
+            icon={ShieldCheck}
+            title="Không có quyền truy cập"
+            message="Chỉ Admin mới cấu hình được ma trận phân quyền."
+          />
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-zinc-950 text-white">
+      <AppHeader
+        title="Phân quyền"
+        subtitle="Ghi đè quyền theo vai trò — không cấu hình = giữ hành vi mặc định"
+      />
+
+      <main className="p-4 sm:p-6 pb-24 space-y-5">
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 space-y-2 text-sm text-zinc-300">
+          <p className="flex items-start gap-2">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-300" />
+            <span>
+              Mỗi ô 3 trạng thái: <b className="text-zinc-100">Mặc định</b> (theo cấu hình gốc),{" "}
+              <b className="text-emerald-300">Mở</b> (bật thêm),{" "}
+              <b className="text-amber-300">Siết</b> (tắt bớt). Chỉ <b>quyền xem</b> mới được Mở;{" "}
+              <b>quyền ghi dữ liệu</b> chỉ Siết được hoặc để Mặc định (không mở qua ma trận).
+            </span>
+          </p>
+          <p className="flex items-start gap-2 text-zinc-400">
+            <Lock className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" />
+            <span>
+              Thay đổi có hiệu lực trong <b>tối đa 60 giây</b> trên các phiên bản khác (cache). Một
+              số ngưỡng quyền dạng &ldquo;Admin/PM&rdquo; nằm ngoài ma trận này (kiểm trực tiếp
+              trong route, không dữ liệu-hoá) nên <b>không đổi được</b> tại đây.
+            </span>
+          </p>
+        </div>
+
+        {loading || !data ? (
+          <div className="space-y-3">
+            {Array.from({ length: 4 }, (_, i) => (
+              <div
+                key={i}
+                className="h-40 animate-pulse rounded-xl border border-zinc-800 bg-zinc-900"
+              />
+            ))}
+          </div>
+        ) : (
+          grouped.map(({ group, perms }) => (
+            <section
+              key={group}
+              className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900"
+            >
+              <h2 className="border-b border-zinc-800 px-4 py-2.5 text-sm font-semibold text-zinc-200">
+                {group}
+              </h2>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-zinc-800 text-zinc-400">
+                      <th className="sticky left-0 z-10 bg-zinc-900 px-3 py-2 text-left font-medium">
+                        Quyền
+                      </th>
+                      {data.roles.map((r) => (
+                        <th key={r} className="px-2 py-2 text-center font-medium whitespace-nowrap">
+                          {ROLE_LABELS[r]}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {perms.map((permKey) => {
+                      const isWrite = lockedSet.has(permKey);
+                      return (
+                        <tr key={permKey} className="border-b border-zinc-900 last:border-0">
+                          <td className="sticky left-0 z-10 bg-zinc-900 px-3 py-2 text-zinc-200">
+                            <span className="flex items-center gap-1.5">
+                              {permMeta(permKey).label}
+                              {isWrite && (
+                                <Lock
+                                  className="h-3 w-3 text-zinc-600"
+                                  aria-label="Quyền ghi — chỉ siết được"
+                                />
+                              )}
+                            </span>
+                          </td>
+                          {data.roles.map((role) => {
+                            const key = `${role}|${permKey}`;
+                            const ov = overrides.get(key);
+                            const state: CellState =
+                              ov === undefined ? "default" : ov ? "on" : "off";
+                            const def = data.defaults[permKey]?.[role] ?? false;
+                            return (
+                              <td key={role} className="px-2 py-1.5 text-center">
+                                <CellSelect
+                                  state={state}
+                                  defaultVal={def}
+                                  isWrite={isWrite}
+                                  disabled={savingKey === key}
+                                  onChange={(next) => changeCell(role, permKey, next)}
+                                />
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ))
+        )}
+      </main>
+    </div>
+  );
+}
+
+// Ô 3 trạng thái. Quyền ghi (isWrite) không cho chọn "Mở" (option disabled) — khớp luật
+// API (422 nếu cố mở). Hiển thị giá trị mặc định để người dùng biết trạng thái gốc.
+function CellSelect({
+  state,
+  defaultVal,
+  isWrite,
+  disabled,
+  onChange,
+}: {
+  state: CellState;
+  defaultVal: boolean;
+  isWrite: boolean;
+  disabled: boolean;
+  onChange: (next: CellState) => void;
+}) {
+  // Màu viền theo trạng thái (không chỉ dựa màu — kèm nhãn chữ trong option).
+  const tone =
+    state === "on"
+      ? "border-emerald-500/60 text-emerald-200"
+      : state === "off"
+        ? "border-amber-500/60 text-amber-200"
+        : "border-zinc-700 text-zinc-300";
+  return (
+    <select
+      value={state}
+      disabled={disabled}
+      aria-label="Trạng thái quyền"
+      onChange={(e) => onChange(e.target.value as CellState)}
+      className={`w-full min-w-[6.5rem] rounded-md border bg-zinc-800 px-1.5 py-1 text-xs disabled:opacity-50 ${tone}`}
+    >
+      <option value="default">Mặc định ({defaultVal ? "có" : "không"})</option>
+      <option value="on" disabled={isWrite}>
+        Mở (bật){isWrite ? " — khoá" : ""}
+      </option>
+      <option value="off">Siết (tắt)</option>
+    </select>
+  );
+}

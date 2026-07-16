@@ -4,6 +4,7 @@ import { queryOne, run } from "@/lib/db";
 import { patchRequestContext } from "@/lib/request-context";
 import { log } from "@/lib/log";
 import { ROLES, ROLE_LABELS, VIEW_ONLY_ROLES, PAYMENT_VIEW_ROLES, type Role } from "@/lib/roles";
+import { getPermissionOverride } from "@/lib/permissions";
 export { ROLES, ROLE_LABELS, VIEW_ONLY_ROLES, PAYMENT_VIEW_ROLES, type Role };
 
 export const COOKIE = "xboss_session";
@@ -167,8 +168,10 @@ export async function ensureDefaultUsers(): Promise<void> {
 // trong CAN (vd sửa cấu hình dự án, tên cột vật tư, duyệt yêu cầu mua hàng).
 export const isAdminOrPm = (r?: Role): boolean => r === "admin" || r === "pm";
 
-// Quyền theo vai trò (rút gọn từ §8 spec).
-export const CAN = {
+// Quyền MẶC ĐỊNH theo vai trò (rút gọn từ §8 spec). Đây là nguồn mặc định — override
+// trong DB (bảng role_permissions, M50 PR1) ghi đè từng cặp (vai trò, quyền) qua proxy
+// `CAN` bên dưới. KHÔNG gọi trực tiếp CAN_DEFAULT ở route (dùng `CAN` để tôn trọng override).
+const CAN_DEFAULT = {
   import: (r?: Role) => r === "admin" || r === "pm",
   export: (r?: Role) => r === "admin" || r === "pm",
   editProgress: (r?: Role) => r === "admin" || r === "pm" || r === "engineer" || r === "subcon",
@@ -275,6 +278,73 @@ export const CAN = {
   viewIntegrations: (r?: Role) => r === "admin" || r === "pm",
   manageIntegrations: (r?: Role) => r === "admin",
 };
+
+// ===== M50 PR1 — Override quyền trong DB =====
+// Tên (khoá) mọi quyền = tên hàm trong CAN_DEFAULT. Dùng làm perm_key trong bảng
+// role_permissions và để trang ma trận /admin/permissions liệt kê.
+export type PermKey = keyof typeof CAN_DEFAULT;
+export const PERM_KEYS = Object.keys(CAN_DEFAULT) as PermKey[];
+
+export function isPermKey(v: string): v is PermKey {
+  return (PERM_KEYS as string[]).includes(v);
+}
+
+// Quyền GHI dữ liệu = mọi quyền KHÔNG bắt đầu bằng "view" và khác "export" (duyệt map
+// CAN_DEFAULT thật: import/edit*/create*/manage*/record*/decide*/assign/approve...).
+// Suy ra từ danh sách khoá thật nên tự bắt được quyền ghi mới thêm về sau (không sót).
+// Luật: chỉ được MỞ (allowed=true) quyền XEM (view*/export); quyền ghi chỉ được siết
+// (allowed=false) hoặc để mặc định — đặc biệt KHÔNG được mở cho VIEW_ONLY_ROLES.
+export const LOCKED_PERMS: PermKey[] = PERM_KEYS.filter(
+  (k) => !k.startsWith("view") && k !== "export",
+);
+export const isWritePerm = (permKey: PermKey): boolean =>
+  (LOCKED_PERMS as string[]).includes(permKey);
+
+// Giá trị mặc định của 1 quyền cho 1 vai trò (bỏ qua override) — cho trang ma trận.
+export function permDefault(role: Role, permKey: PermKey): boolean {
+  return CAN_DEFAULT[permKey](role);
+}
+
+// Ma trận mặc định đầy đủ (role × permKey) — trang /admin/permissions vẽ 3 trạng thái.
+export function permDefaultsMatrix(): Record<PermKey, Record<Role, boolean>> {
+  const out = {} as Record<PermKey, Record<Role, boolean>>;
+  for (const k of PERM_KEYS) {
+    const row = {} as Record<Role, boolean>;
+    for (const r of ROLES) row[r] = CAN_DEFAULT[k](r);
+    out[k] = row;
+  }
+  return out;
+}
+
+// Kiểm luật ghi override trước khi lưu. Trả null nếu hợp lệ, hoặc thông điệp lỗi
+// tiếng Việt (route trả 422). allowed: true = mở · false = siết · null = xoá override.
+export function validatePermOverride(
+  role: string,
+  permKey: string,
+  allowed: boolean | null,
+): string | null {
+  if (!(ROLES as string[]).includes(role)) return "Vai trò không hợp lệ";
+  if (!isPermKey(permKey)) return "Mã quyền không tồn tại";
+  if (allowed === true && isWritePerm(permKey))
+    return "Quyền ghi dữ liệu chỉ được siết (tắt) hoặc để mặc định — không thể mở qua ma trận. Chỉ quyền xem mới được mở.";
+  return null;
+}
+
+// Giải quyền hiệu lực cho 1 (role, permKey): có override trong cache → theo allowed;
+// không có → mặc định CAN_DEFAULT. Đọc override đồng bộ từ cache memory (không chạm DB).
+function resolvePerm(role: Role | undefined, permKey: PermKey): boolean {
+  if (role) {
+    const ov = getPermissionOverride(role, permKey);
+    if (ov !== undefined) return ov;
+  }
+  return CAN_DEFAULT[permKey](role);
+}
+
+// Proxy quyền: GIỮ NGUYÊN chữ ký `CAN.x(role)` như map tĩnh cũ (mọi route hiện có không
+// đổi), nhưng mỗi lần gọi tra override trong DB (qua cache) trước khi rơi về mặc định.
+export const CAN = Object.fromEntries(
+  PERM_KEYS.map((k) => [k, (r?: Role) => resolvePerm(r, k)]),
+) as Record<PermKey, (r?: Role) => boolean>;
 
 // Sub-con chỉ được thao tác trên task được giao cho mình.
 export async function canTouchTask(user: User, taskId: number): Promise<boolean> {

@@ -69,6 +69,7 @@ import {
   Workflow,
   BellRing,
   Cable,
+  KeyRound,
 } from "lucide-react";
 import type { Role } from "@/lib/roles";
 
@@ -434,6 +435,13 @@ export const DASHBOARD_TREE: DashCluster[] = [
         icon: Workflow,
         roles: ["admin", "pm"],
       }, // M46 PR4 — Approval Engine: cấu hình luồng duyệt nhiều cấp; PM chỉ xem, Admin sửa
+      {
+        id: "dash.permissions",
+        href: "/admin/permissions",
+        label: "Phân quyền",
+        icon: KeyRound,
+        roles: ["admin"],
+      }, // M50 PR1 — ma trận override quyền (role_permissions); chỉ Admin
       {
         id: "dash.alert-rules",
         href: "/admin/alert-rules",

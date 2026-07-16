@@ -28,7 +28,7 @@ const MODULES: { title: string; tables: string[] }[] = [
   },
   {
     title: "Người dùng & phân quyền",
-    tables: ["users", "user_projects", "login_rate_limits", "nav_settings"],
+    tables: ["users", "user_projects", "login_rate_limits", "nav_settings", "role_permissions"],
   },
   {
     title: "Kèm task (ảnh/bình luận/tài liệu/nghiệm thu)",
