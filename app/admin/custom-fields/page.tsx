@@ -226,7 +226,7 @@ export default function CustomFieldsPage() {
                           onClick={() => toggleActive(row)}
                           className={`text-xs px-2 py-0.5 rounded-md font-medium ${
                             row.active
-                              ? "bg-emerald-950 text-emerald-300"
+                              ? "bg-emerald-950 text-emerald-200"
                               : "bg-zinc-800 text-zinc-400"
                           }`}
                         >
@@ -236,7 +236,7 @@ export default function CustomFieldsPage() {
                         <span
                           className={`text-xs px-2 py-0.5 rounded-md font-medium ${
                             row.active
-                              ? "bg-emerald-950 text-emerald-300"
+                              ? "bg-emerald-950 text-emerald-200"
                               : "bg-zinc-800 text-zinc-400"
                           }`}
                         >

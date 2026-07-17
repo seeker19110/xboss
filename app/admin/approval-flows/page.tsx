@@ -150,6 +150,7 @@ export default function ApprovalFlowsPage() {
           isAdmin ? (
             <button
               onClick={() => setAddOpen(true)}
+              aria-label="Thêm flow"
               className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
             >
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm flow</span>

@@ -60,6 +60,11 @@
 //     được trang lương nhưng KHÔNG thấy số tiền lương. (Ca có hiệu lực.)
 //   → suggestions (payrollFromAttendance) chỉ có personnelId/name + workdays, KHÔNG tiền
 //     → không cần che.
+//
+// [poItem] — perm: viewPayments — route: GET /api/purchase-orders/[id] (mảng items)
+//   unitPrice          đơn giá đặt hàng (po_items.unit_price)
+//   → Gate route là canView (admin/pm/engineer — engineer cần thấy PO để nhập kho); perm
+//     che là viewPayments (loại engineer) → engineer XEM được PO nhưng KHÔNG thấy đơn giá.
 import { CAN, type PermKey, type Role } from "@/lib/auth";
 
 export type SensitiveRule = { fields: string[]; perm: PermKey };
@@ -91,6 +96,7 @@ export const SENSITIVE: Record<string, SensitiveRule[]> = {
     },
   ],
   payroll: [{ fields: ["rate", "gross", "deductions", "net"], perm: "viewPayroll" }],
+  poItem: [{ fields: ["unitPrice"], perm: "viewPayments" }],
 };
 
 // Che 1 bản ghi: trả BẢN SAO với các trường liệt kê được đặt null (không đụng bản gốc,

@@ -325,7 +325,7 @@ function SodReportTab() {
             onClick={() => setDays(d)}
             className={`rounded-md border px-3 py-1 font-medium ${
               days === d
-                ? "border-sky-500/60 bg-sky-500/10 text-sky-200"
+                ? "border-sky-500/60 bg-sky-900 text-sky-200"
                 : "border-zinc-700 text-zinc-300 hover:bg-zinc-800"
             }`}
           >
