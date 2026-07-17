@@ -5,6 +5,7 @@ import { getCurrentProjectId } from "@/lib/projects";
 import { deriveStatus, recomputePackage } from "@/lib/recompute";
 import { requiredInspectionMissing } from "@/lib/qaqc";
 import { getActiveFlow, openApproval, advanceApproval } from "@/lib/approvals";
+import { emitWebhook } from "@/lib/webhooks";
 
 export const dynamic = "force-dynamic";
 
@@ -15,12 +16,14 @@ type TaskRow = {
   progress_percent: number;
   end_date: string | null;
   name: string;
+  code: string;
+  boq_code: string | null;
 };
 
 type StepResult =
   | { kind: "pending"; currentSeq: number; nextRole: string }
   | { kind: "rejected" }
-  | { kind: "final"; packageId: number };
+  | { kind: "final"; packageId: number; code: string; boqCode: string | null; name: string };
 
 // Workflow nghiệm thu 2 bước: thi công xong (100%) → Admin/PM duyệt nghiệm thu.
 // Trạng thái nghiem_thu chỉ đặt được qua endpoint này — có audit trong task_history.
@@ -56,7 +59,7 @@ export async function POST(
   try {
     result = await withTransaction(async () => {
       const task = await queryOne<TaskRow>(
-        `SELECT id, package_id, status, progress_percent, end_date, name FROM tasks WHERE id = ? FOR UPDATE`,
+        `SELECT id, package_id, status, progress_percent, end_date, name, code, boq_code FROM tasks WHERE id = ? FOR UPDATE`,
         id,
       );
       if (!task) throw Object.assign(new Error("Không tìm thấy task"), { status: 404 });
@@ -144,7 +147,13 @@ export async function POST(
         `Nghiệm thu bởi ${user.name}`,
         user.name,
       );
-      return { kind: "final", packageId: task.package_id };
+      return {
+        kind: "final",
+        packageId: task.package_id,
+        code: task.code,
+        boqCode: task.boq_code,
+        name: task.name,
+      };
     });
   } catch (err: unknown) {
     const e = err as { message?: string; status?: number };
@@ -161,6 +170,16 @@ export async function POST(
   if (result.kind === "rejected") return NextResponse.json({ id, rejected: true });
 
   await recomputePackage(result.packageId);
+  // Task vừa CHUYỂN sang nghiem_thu THẬT trong request này (kind 'final' gồm cả nhánh legacy
+  // 1 bước lẫn bước cuối của engine M46). Không phát ở nhánh 'pending' (bước giữa) hay
+  // 'rejected'; task đã nghiệm thu từ trước bị chặn 409 ở trên nên không tới đây → 1 emit/1
+  // lần chuyển approved.
+  await emitWebhook("task.approved", projectId, {
+    taskId: id,
+    code: result.code,
+    boqCode: result.boqCode,
+    name: result.name,
+  });
   return NextResponse.json({ id, status: "nghiem_thu" });
 }
 

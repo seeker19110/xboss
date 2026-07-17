@@ -5,6 +5,7 @@ import { getCurrentProjectId } from "@/lib/projects";
 import { recomputePackage } from "@/lib/recompute";
 import { requiredInspectionMissing } from "@/lib/qaqc";
 import { decideNext, getActiveFlow, openApproval, advanceApproval } from "@/lib/approvals";
+import { emitWebhook } from "@/lib/webhooks";
 import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
@@ -97,8 +98,15 @@ export async function POST(req: NextRequest) {
         throw Object.assign(new Error("Tầng này đã được nghiệm thu rồi"), { status: 409 });
 
       // Khoá và đọc lại tiến độ task trong transaction để tránh TOCTOU
-      const tasks = await query<{ id: number; package_id: number; progress_percent: number }>(
-        `SELECT t.id, t.package_id, t.progress_percent
+      const tasks = await query<{
+        id: number;
+        package_id: number;
+        progress_percent: number;
+        code: string;
+        boq_code: string | null;
+        name: string;
+      }>(
+        `SELECT t.id, t.package_id, t.progress_percent, t.code, t.boq_code, t.name
            FROM tasks t
            JOIN work_packages wp ON t.package_id = wp.id
           WHERE wp.sheet_type_id = ? AND wp.floor_label = ?
@@ -221,6 +229,17 @@ export async function POST(req: NextRequest) {
     // recomputePackage chạy ngoài transaction, song song để giảm latency.
     const packageIds = new Set(result.tasks.map((t) => t.package_id));
     await Promise.all([...packageIds].map((pid) => recomputePackage(pid)));
+
+    // Mỗi task trong tầng vừa CHUYỂN sang nghiem_thu THẬT (bulk UPDATE trong transaction đã
+    // commit) → 1 emit/task. Tầng đã nghiệm thu bị chặn 409 ở trên nên không phát trùng.
+    for (const t of result.tasks) {
+      await emitWebhook("task.approved", projectId, {
+        taskId: t.id,
+        code: t.code,
+        boqCode: t.boq_code,
+        name: t.name,
+      });
+    }
   } catch (err: unknown) {
     // Race hiếm: 2 request duyệt cùng 1 tầng lần đầu gần như đồng thời cùng vượt qua kiểm tra
     // "existing" (chưa có bản ghi) rồi cùng INSERT — UNIQUE(sheet_type_id, floor_label) chặn

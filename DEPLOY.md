@@ -185,3 +185,14 @@ liệt kê trong kết quả). Cột `Đã dùng`/`Tồn kho`/`Ngưỡng tối t
 
   Ví dụ crontab mỗi giờ: `0 * * * * curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://<APP_URL>/api/cron/sync-sheets`
   (hoặc khai báo trong `vercel.json` nếu deploy Vercel).
+
+- **Gửi webhook ra ngoài (mỗi 5 phút):** đẩy các sự kiện đang chờ (nghiệm thu task, duyệt
+  VO/IPC, vật tư vượt định mức, yêu cầu nghiệm thu) tới hệ ngoài đã cấu hình — dùng chung
+  `CRON_SECRET`:
+
+  ```bash
+  curl -H "Authorization: Bearer $CRON_SECRET" https://<APP_URL>/api/cron/deliver-webhooks
+  ```
+
+  Ví dụ crontab mỗi 5 phút: `*/5 * * * * curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://<APP_URL>/api/cron/deliver-webhooks`
+  (hoặc khai báo trong `vercel.json` nếu deploy Vercel).

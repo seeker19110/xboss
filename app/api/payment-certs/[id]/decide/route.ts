@@ -5,6 +5,7 @@ import { getCurrentProjectId } from "@/lib/projects";
 import { todayISO } from "@/lib/date";
 import { certTotals } from "@/lib/paymentcerts";
 import { advanceApproval } from "@/lib/approvals";
+import { emitWebhook } from "@/lib/webhooks";
 
 export const dynamic = "force-dynamic";
 
@@ -138,5 +139,21 @@ export async function POST(
       currentSeq: pendingStep.currentSeq,
       nextRole: pendingStep.nextRole,
     });
+
+  // IPC vừa CHUYỂN sang approved THẬT (pendingStep undefined + decision approved = domain
+  // logic đã chạy, đã sinh payment_bills + set status='approved'; gồm cả nhánh legacy lẫn
+  // bước cuối engine). Không phát khi reject hay bước giữa. Re-fetch sau commit để tránh CFA.
+  if (decision === "approved") {
+    const c = await queryOne<{ code: string; contractId: number; periodNo: number }>(
+      `SELECT code, contract_id AS "contractId", period_no AS "periodNo" FROM payment_certs WHERE id = ?`,
+      id,
+    );
+    await emitWebhook("payment_cert.approved", projectId, {
+      certId: id,
+      code: c?.code ?? null,
+      contractId: c?.contractId ?? null,
+      periodNo: c?.periodNo ?? null,
+    });
+  }
   return NextResponse.json({ decided: id, decision });
 }
