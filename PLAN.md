@@ -403,3 +403,198 @@ có enforce cho admin không (quyết định giữ/bỏ deploy-on-push, nợ au
       có "Include administrators" + chặn push thẳng không — nếu không, cân nhắc trả
       `deploy.yml` về `workflow_run` chờ CI; (b) cấp `SENTRY_DSN` để bật theo dõi lỗi
       production (scaffold M44 đã sẵn, chỉ thiếu secret)
+
+---
+
+## Kế hoạch: M49 PR3 — SSO OIDC bằng `openid-client` (độc lập, không cần PR1/PR2)
+
+### Bối cảnh & mục tiêu
+
+`docs/nang-cap/M49-api-mo-sso.md` (viết lại 2026-07-16, commit #211) đã chốt dùng thư
+viện `openid-client` v6 cho SSO thay vì tự viết OIDC thủ công (quyết định đã chốt với
+người dùng, không tự đổi). M49 PR1 (API keys)/PR2 (webhooks) **chưa làm** — PR3 độc
+lập về code với PR1/PR2 (chỉ đụng luồng đăng nhập, không đụng `lib/ratelimit.ts` theo
+cách PR1 định làm) nên tách ra một đợt riêng, không chờ PR1/PR2.
+
+Người dùng đã xác nhận (2026-07-17): **chưa có IdP thật để verify** — cứ dispatch code
++ test tự động trước; PR giữ **draft** cho tới khi có IdP thật để xác minh thủ công
+theo tiêu chí chấp nhận, không merge trước bước đó.
+
+**Worker PHẢI đọc mục PR3 của `docs/nang-cap/M49-api-mo-sso.md` trước khi code** —
+kế hoạch này chỉ ghi các điểm ĐÍNH CHÍNH so với đặc tả (đặc tả viết trước, giả định số
+migration/PR1 đã xong — thực tế chưa) + quyết định đã chốt. Khi kế hoạch và file đặc
+tả lệch nhau, **kế hoạch này thắng**.
+
+### Đính chính so với đặc tả M49 PR3
+
+1. **Số migration**: đặc tả ghi `0061` (giả định 0059=PR1, 0060=PR2 đã chiếm) —
+   thực tế mới nhất là `migrations/0058_role_permissions.sql` (M50 PR1 vừa merge) và
+   PR1/PR2 của M49 chưa tồn tại → dùng **`migrations/0059_sso_audit.sql`**. Xác nhận
+   lại bằng `ls migrations/ | sort` lúc code (bài học M32/M33).
+2. **Rate-limit callback lỗi**: đặc tả gọi `hitRateLimit()` — helper này thuộc M49
+   PR1, chưa tồn tại. KHÔNG kéo theo cả PR1 chỉ để có 1 hàm, KHÔNG sửa
+   `lib/ratelimit.ts` (giữ nguyên hành vi login rate-limit hiện có). Viết trực tiếp
+   trong `lib/oidc.ts` 2 hàm riêng, tái dùng bảng `login_rate_limits` sẵn có
+   (`migrations/0002_login_rate_limit.sql`) với khoá riêng `oidc|<ip>`:
+   - `oidcCallbackBlocked(ip): Promise<number>` — số giây phải chờ hoặc 0 (đọc
+     `count/reset_at` theo khoá `oidc|<ip>`, ngưỡng 10 lần/15 phút).
+   - `recordOidcCallbackFailure(ip): Promise<void>` — upsert atomic same pattern
+     `bump()` trong `lib/ratelimit.ts` (`INSERT ... ON CONFLICT` reset theo cửa sổ),
+     nhưng viết local trong `lib/oidc.ts`, không export từ `lib/ratelimit.ts`.
+   - Chỉ ĐẾM khi callback KẾT THÚC lỗi (gọi ở mọi nhánh lỗi của callback), không đếm
+     lần thành công.
+
+### Việc — 1 PR duy nhất
+
+- `route:` `complex` (auth flow tạo user mới + phát session — vùng rủi ro cao theo
+  `docs/audit.md`; đặc tả dù đã kín vẫn chọn route đắt hơn theo luật tie-break trong
+  `CLAUDE.md`)
+- agent: `complex-implementer`
+- nhánh/worktree: `claude/feat-m49-pr3-sso-oidc` (base `origin/main` mới nhất — xác
+  nhận lại `0059` còn trống lúc code)
+- đặc tả nền: mục **PR3** của `docs/nang-cap/M49-api-mo-sso.md` (phần "Nguyên tắc &
+  phạm vi" tới hết "Test") + đính chính ở trên. Các quyết định đã CHỐT:
+
+  **1. Dependency**: `npm i openid-client` (v6, API function-based: `discovery`,
+  `buildAuthorizationUrl`, `authorizationCodeGrant`, `randomState`/`randomNonce`/
+  `randomPKCECodeVerifier`/`calculatePKCECodeChallenge`).
+
+  **2. `lib/env.ts`** — thêm vào `serverSchema` (tất cả optional, đúng pattern
+  lazy-validate hiện có, validate lúc DÙNG không lúc build):
+  ```
+  OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET,
+  OIDC_ROLE_CLAIM (optional — tên claim chứa role),
+  OIDC_DEFAULT_ROLE (optional — validate thuộc ROLES của lib/roles.ts, mặc định 'viewer')
+  ```
+  `APP_URL` đã có sẵn (optional) — dùng làm `redirect_uri` =
+  `${APP_URL}/api/auth/oidc/callback`. `ssoEnabled()` = đủ cả 4 biến bắt buộc
+  (`OIDC_ISSUER/CLIENT_ID/CLIENT_SECRET` + `APP_URL`) → true; KHÔNG suy `redirect_uri`
+  từ request origin (sau proxy dễ sai).
+
+  **3. `migrations/0059_sso_audit.sql`**: gắn audit trigger M43 cho bảng `users`
+  (copy đúng khối `DO $$` cuối `migrations/0053_approvals.sql`, mảng bảng =
+  `ARRAY['users']`). Thêm thuần (CREATE TRIGGER, DROP+CREATE idempotent) → đi thẳng
+  production. Chạy `npm run gen:erd` cùng PR.
+  - Lưu ý audit: lúc SSO callback tạo/sửa `users`, request context (`lib/request-context.ts`)
+    chưa có `userId` (chưa đăng nhập) → `audit_log.actor_id` sẽ là `NULL` cho các
+    dòng này — đúng bản chất (hệ thống tự tạo qua IdP), không phải lỗi cần sửa.
+
+  **4. `lib/oidc.ts`** (mới):
+  ```ts
+  export function ssoEnabled(): boolean;
+  // Cache Configuration ở module scope (discovery gọi 1 lần, gọi lại nếu lần trước lỗi
+  // — KHÔNG cache vĩnh viễn lỗi).
+  export async function getOidcConfig(): Promise<Configuration>;
+  // Thuần, test được — KHÔNG chạm DB trong hàm này.
+  export function resolveSsoUser(claims: {
+    email?: string; name?: string; [k: string]: unknown;
+  }): { email: string; name: string; roleFromClaim: Role | null } | { error: string };
+  //  - email thiếu/rỗng → { error: "IdP không trả email" }.
+  //  - email lowercase + trim.
+  //  - OIDC_ROLE_CLAIM đặt: đọc claims[claim] (string hoặc string[] — lấy phần tử đầu
+  //    khớp ROLES); giá trị lạ → roleFromClaim = null (caller log.warn, giữ role cũ/default).
+  // Chạm DB: tìm user theo email; có → UPDATE role nếu roleFromClaim khác null và khác
+  // role hiện tại (KHÔNG hạ cấp admin cuối cùng: nếu user là admin duy nhất còn lại và
+  // claim đòi hạ → giữ nguyên + log.warn — chống tự khoá hệ thống, cùng mẫu guard M50
+  // PR1 vừa thêm cho manageUsers); chưa có → INSERT (name, email,
+  // role = roleFromClaim ?? OIDC_DEFAULT_ROLE ?? 'viewer',
+  // password_hash = hashPassword(randomBytes(32).toString('hex'))).
+  // password_hash NOT NULL + makeToken() nhúng pwFrag từ hash (lib/auth.ts:60-64) — hash
+  // ngẫu nhiên vừa thoả ràng buộc vừa để makeToken hoạt động; không ai biết mật khẩu này
+  // nên KHÔNG đăng nhập được bằng form (đúng chủ đích — SSO là đường vào duy nhất cho
+  // user loại này, admin đặt lại mật khẩu sau nếu cần fallback).
+  export async function upsertSsoUser(resolved: {...}): Promise<User>;
+  // Rate-limit callback lỗi riêng (đính chính §2) — không export từ lib/ratelimit.ts.
+  export async function oidcCallbackBlocked(ip: string): Promise<number>;
+  export async function recordOidcCallbackFailure(ip: string): Promise<void>;
+  ```
+  User mới chưa gán dự án (`user_projects` trống) — đăng nhập được, thấy trạng thái
+  "chưa được gán dự án" như user thường admin tạo mà chưa gán (hành vi sẵn có, không
+  code thêm).
+
+  **5. Route mới** (`dynamic = "force-dynamic"` cả 3):
+  - `GET /api/auth/oidc/status` (public, như `/api/project`) — `{ enabled: boolean }`.
+  - `GET /api/auth/oidc/login`: `!ssoEnabled()` → 404; sinh
+    `state/nonce/verifier/challenge`; set cookie tạm `xboss_oidc` = JSON
+    `{state, nonce, verifier}` (httpOnly, `sameSite:"lax"`, `secure` theo production,
+    `path:"/api/auth/oidc"`, `maxAge:600`); redirect 302 tới
+    `buildAuthorizationUrl(config, { redirect_uri, scope:"openid email profile", state,
+    nonce, code_challenge: challenge, code_challenge_method:"S256" })`.
+  - `GET /api/auth/oidc/callback`: `!ssoEnabled()` → 404. Đọc+XOÁ cookie `xboss_oidc`
+    ngay (dùng 1 lần); thiếu → redirect `/login?error=oidc_expired`.
+    `oidcCallbackBlocked(clientIp)` (copy hàm `clientIp` từ
+    `app/api/auth/login/route.ts:9-13`) → vượt → redirect `/login?error=oidc_rate`.
+    `authorizationCodeGrant(config, new URL(req.url), { pkceCodeVerifier: verifier,
+    expectedState: state, expectedNonce: nonce })` → throw (state/nonce/chữ ký/aud
+    sai, IdP trả lỗi) → `recordOidcCallbackFailure` + `log.warn` + redirect
+    `/login?error=oidc_failed` (KHÔNG lộ chi tiết lỗi ra query — chỉ vào log).
+    `claims = tokens.claims()` → `resolveSsoUser` → lỗi → `recordOidcCallbackFailure`
+    + redirect `/login?error=oidc_noemail`. → `upsertSsoUser` → phát cookie phiên
+    `makeToken(user.id, user.password_hash)` đúng flags như
+    `app/api/auth/login/route.ts:49-55` (`httpOnly, path:"/", maxAge:COOKIE_MAX_AGE,
+    sameSite:"lax", secure` theo production) → redirect 302 về `/` **cố định** —
+    KHÔNG nhận `returnTo`/`redirect` từ query (chống open-redirect).
+
+  **6. `app/login/page.tsx`**: fetch `/api/auth/oidc/status` khi mount (giống fetch
+  `/api/project` sẵn có ở đầu file); `enabled` → hiện nút "Đăng nhập bằng SSO công ty"
+  (thẻ `<a href="/api/auth/oidc/login">`, KHÔNG fetch — cần redirect trình duyệt)
+  dưới form, phân cách "hoặc". Đọc `?error=oidc_*` từ URL (`useSearchParams` hoặc đọc
+  `window.location.search` trong `useEffect`) → thông điệp tiếng Việt cho 4 mã
+  (`expired`/`rate`/`failed`/`noemail`). Form mật khẩu giữ nguyên (fallback khi IdP
+  hỏng).
+
+  **7. `docs/api-v1.md` KHÔNG cần** (thuộc PR1) — thay vào đó thêm mục biến môi
+  trường `OIDC_*` vào `DEPLOY.md` (tuỳ chọn, pattern giống mục VAPID/Google Sheets
+  hiện có trong file).
+
+  **8. Test `tests/oidc.test.ts`** (import `tests/setup.ts` đầu tiên):
+  - Unit thuần: `resolveSsoUser` (email thiếu, hoa-thường, role claim đúng/lạ/mảng,
+    default role khi không set `OIDC_ROLE_CLAIM`).
+  - Integration (`TEST_DATABASE_URL`): `upsertSsoUser` tạo mới thoả NOT NULL +
+    đăng nhập lại (gọi lần 2 cùng email) không tạo trùng + update role theo claim +
+    **không hạ cấp admin cuối cùng** (seed đúng 1 admin, gọi với claim role khác →
+    role giữ nguyên).
+  - Route: `ssoEnabled()=false` (không set env) → `status.enabled=false`,
+    `login`/`callback` trả 404; `callback` thiếu cookie `xboss_oidc` → redirect
+    `error=oidc_expired`.
+  - **Không tự động hoá được**: flow HTTP thật với 1 IdP — bù bằng xác minh thủ công
+    sau khi có IdP (xem "Duyệt cuối" bên dưới), ghi kết quả vào PR description trước
+    khi gỡ draft.
+  - Thêm file vào lệnh `npm test` trong `package.json`.
+
+- tiêu chí chấp nhận:
+  - [ ] `npm run lint` + `npm run typecheck` + `npm test` + `npm run build` xanh;
+        `npm run gen:erd` không lệch
+  - [ ] Thiếu bất kỳ biến `OIDC_*`/`APP_URL` bắt buộc → nút SSO ẩn, đăng nhập mật
+        khẩu không đổi hành vi (test tự động xác nhận)
+  - [ ] `lib/auth.ts` **không sửa** — chỉ gọi `makeToken`/`hashPassword`/`COOKIE_MAX_AGE`
+        sẵn có; `lib/ratelimit.ts` **không sửa**
+  - [ ] Callback không lộ chi tiết lỗi IdP ra query string (chỉ mã `oidc_*` cố định);
+        redirect sau login thành công **không** nhận tham số đích từ client
+  - [ ] Admin duy nhất còn lại không thể bị hạ role qua claim (test integration xác nhận)
+  - [ ] `tests/oidc.test.ts` nằm trong `npm test`
+
+### Sau khi worker xong (coordinator thực hiện)
+
+- [ ] Đối chiếu diff với tiêu chí chấp nhận (chạy lại lint/typecheck/test/build)
+- [ ] `reviewer` soát diff (skill `code-review`) — chú ý: (1) cookie `xboss_oidc`
+      httpOnly + xoá ngay khi đọc (dùng 1 lần); (2) `state`/`nonce`/PKCE truyền đúng
+      chiều vào `authorizationCodeGrant`; (3) không có nhánh nào redirect theo tham
+      số client (open-redirect); (4) `oidcCallbackBlocked`/`recordOidcCallbackFailure`
+      không đổi hành vi rate-limit login hiện có (file khác, bảng chung nhưng khoá
+      khác `login|`/`ip|`); (5) `password_hash` ngẫu nhiên đủ entropy
+      (`randomBytes(32)`, không phải chuỗi cố định)
+- [ ] Báo cáo về phiên chính: nhánh + commit, kết quả reviewer, quyết định worker tự
+      đưa trong ranh giới (nếu có)
+
+### Duyệt cuối (phiên chính thực hiện)
+
+- [ ] Đối chiếu diff với đặc tả + báo cáo coordinator
+- [ ] Push nhánh + mở **PR draft** (giữ draft — KHÔNG merge cho tới khi xác minh
+      thủ công với 1 IdP thật theo tiêu chí chấp nhận, đúng quyết định người dùng
+      2026-07-17)
+- [ ] Cập nhật `PROGRESS.md` (mục M49 PR3) ghi rõ trạng thái "chờ xác minh IdP thật
+      trước khi merge"
+- [ ] Nhắc người dùng: khi có IdP thật (Google Workspace/Microsoft Entra), cấu hình
+      `OIDC_*`/`APP_URL` ở môi trường test, chạy thử đăng nhập SSO thật, rồi báo lại
+      để gỡ draft và merge
