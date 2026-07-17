@@ -7,6 +7,16 @@ on:
   push:
     branches: [main]
 
+# 2 push liên tiếp trong lúc build trước chưa xong từng làm deploy sau đá deploy trước
+# ("Another next build process is already running", build tạm dùng chung thư mục
+# .next-build trên VPS) — không mất code (lượt sau luôn git reset --hard origin/main
+# nên tự lấy đúng bản mới nhất) nhưng để lại dấu đỏ giả trong Actions. Xếp hàng tuần tự
+# thay vì đá nhau; không cancel-in-progress vì huỷ giữa chừng lúc SSH đang chạy deploy.sh
+# trên VPS thật có thể để lại trạng thái dở dang (migration/build/pm2 restart).
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
 # Job chỉ SSH vào VPS bằng secrets riêng — không cần bất kỳ quyền GITHUB_TOKEN nào
 # (least-privilege theo docs/audit.md §6).
 permissions: {}
