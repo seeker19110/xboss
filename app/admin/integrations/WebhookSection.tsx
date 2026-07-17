@@ -253,7 +253,7 @@ export default function WebhookSection({ canManage }: { canManage: boolean }) {
           <button
             type="button"
             onClick={openCreate}
-            className="inline-flex items-center gap-1.5 bg-violet-600 hover:bg-violet-500 px-3 py-1.5 rounded-lg text-xs font-medium transition shrink-0"
+            className="inline-flex items-center gap-1.5 bg-violet-600 hover:bg-violet-500 text-on-accent px-3 py-1.5 rounded-lg text-xs font-medium transition shrink-0"
           >
             <Plus className="w-3.5 h-3.5" /> Thêm webhook
           </button>
@@ -487,7 +487,7 @@ export default function WebhookSection({ canManage }: { canManage: boolean }) {
                 <button
                   onClick={save}
                   disabled={saving}
-                  className="px-4 py-1.5 text-sm rounded-lg font-medium bg-violet-600 hover:bg-violet-500 disabled:opacity-50"
+                  className="px-4 py-1.5 text-sm rounded-lg font-medium bg-violet-600 hover:bg-violet-500 text-on-accent disabled:opacity-50"
                 >
                   {editing ? "Lưu" : "Tạo"}
                 </button>
