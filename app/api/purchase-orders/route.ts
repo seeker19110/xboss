@@ -8,11 +8,15 @@ import { listPurchaseOrders } from "@/lib/procurement";
 export const dynamic = "force-dynamic";
 
 const canManage = (r?: Role) => r === "admin" || r === "pm";
+// Ai cần thấy PO: admin/pm (quản lý) + engineer (nhận hàng qua /receive) — khớp canReceive.
+const canView = (r?: Role) => r === "admin" || r === "pm" || r === "engineer";
 
 // GET /api/purchase-orders?status= — scoped theo dự án đang chọn (M22).
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (!canView(user.role))
+    return NextResponse.json({ error: "Không có quyền xem đơn hàng" }, { status: 403 });
 
   const status = req.nextUrl.searchParams.get("status") ?? undefined;
 

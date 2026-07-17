@@ -8,10 +8,13 @@ import {
   isValidPoTransition,
   logPoStatusChange,
 } from "@/lib/procurement";
+import { stripSensitive } from "@/lib/sensitive-fields";
 
 export const dynamic = "force-dynamic";
 
 const canManage = (r?: Role) => r === "admin" || r === "pm";
+// Ai cần thấy PO: admin/pm (quản lý) + engineer (nhận hàng qua /receive) — khớp canReceive.
+const canView = (r?: Role) => r === "admin" || r === "pm" || r === "engineer";
 
 // GET /api/purchase-orders/:id → chi tiết PO + danh sách items + lịch sử đổi trạng thái,
 // scoped theo dự án đang chọn (M22).
@@ -22,6 +25,8 @@ export async function GET(
   const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (!canView(user.role))
+    return NextResponse.json({ error: "Không có quyền xem đơn hàng" }, { status: 403 });
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
@@ -67,7 +72,7 @@ export async function GET(
     id,
   );
 
-  return NextResponse.json({ po, items, history });
+  return NextResponse.json({ po, items: stripSensitive("poItem", items, user), history });
 }
 
 // PATCH /api/purchase-orders/:id  body: { status?, supplierId?, expectedDate?, note? }

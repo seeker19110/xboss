@@ -1494,33 +1494,33 @@ function DesignChangeDetailModal({
 
         <div className="space-y-2 text-sm">
           <div>
-            <p className="text-xs text-zinc-500">Lý do thay đổi</p>
+            <p className="text-xs text-zinc-400">Lý do thay đổi</p>
             <p className="whitespace-pre-wrap">{dc.reason}</p>
           </div>
           {dc.impactTechnical && (
             <div>
-              <p className="text-xs text-zinc-500">Tác động kỹ thuật</p>
+              <p className="text-xs text-zinc-400">Tác động kỹ thuật</p>
               <p className="whitespace-pre-wrap">{dc.impactTechnical}</p>
             </div>
           )}
           {dc.impactCost && (
             <div>
-              <p className="text-xs text-zinc-500">Tác động chi phí</p>
+              <p className="text-xs text-zinc-400">Tác động chi phí</p>
               <p className="whitespace-pre-wrap">{dc.impactCost}</p>
             </div>
           )}
           {dc.impactSchedule && (
             <div>
-              <p className="text-xs text-zinc-500">Tác động tiến độ</p>
+              <p className="text-xs text-zinc-400">Tác động tiến độ</p>
               <p className="whitespace-pre-wrap">{dc.impactSchedule}</p>
             </div>
           )}
           {dc.decisionNote && (
             <div>
-              <p className="text-xs text-zinc-500">Ghi chú quyết định</p>
+              <p className="text-xs text-zinc-400">Ghi chú quyết định</p>
               <p className="whitespace-pre-wrap">{dc.decisionNote}</p>
               {dc.decidedByName && (
-                <p className="text-xs text-zinc-500 mt-1">
+                <p className="text-xs text-zinc-400 mt-1">
                   Quyết bởi {dc.decidedByName}
                   {dc.decidedAt ? ` — ${dc.decidedAt.slice(0, 10)}` : ""}
                 </p>

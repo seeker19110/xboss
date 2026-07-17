@@ -691,7 +691,7 @@ function ImportBoqModal({
                 <div className="border border-zinc-800 rounded-lg overflow-auto max-h-64">
                   <table className="w-full text-xs">
                     <thead className="sticky top-0 bg-zinc-900">
-                      <tr className="text-zinc-500 text-left border-b border-zinc-800">
+                      <tr className="text-zinc-400 text-left border-b border-zinc-800">
                         <th className="py-1.5 px-2">Mã</th>
                         <th className="py-1.5 px-2">Tên</th>
                         <th className="py-1.5 px-2 text-right">KL</th>
@@ -723,7 +723,7 @@ function ImportBoqModal({
                   </table>
                 </div>
                 {preview.length > 200 && (
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-zinc-400">
                     … và {preview.length - 200} dòng khác (đã rút gọn xem trước).
                   </p>
                 )}
@@ -1183,7 +1183,7 @@ function NormsSection({ boqItemId, canManage }: { boqItemId: number; canManage: 
             return (
               <li key={n.id} className="border-b border-zinc-800/60 last:border-0 pb-1.5">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-zinc-500 w-16 shrink-0">
+                  <span className="text-xs text-zinc-400 w-16 shrink-0">
                     {NORM_RESOURCE_TYPE_LABEL[n.resourceType]}
                   </span>
                   <span className="flex-1 min-w-0 truncate text-sm">{label}</span>
@@ -1223,7 +1223,7 @@ function NormsSection({ boqItemId, canManage }: { boqItemId: number; canManage: 
           })}
         </ul>
       ) : (
-        <p className="text-xs text-zinc-500">Chưa có định mức.</p>
+        <p className="text-xs text-zinc-400">Chưa có định mức.</p>
       )}
 
       {canManage && (
