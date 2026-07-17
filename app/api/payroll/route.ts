@@ -8,6 +8,7 @@ import {
   payrollFromAttendance,
   type PayrollInput,
 } from "@/lib/finance";
+import { stripSensitive } from "@/lib/sensitive-fields";
 
 export const dynamic = "force-dynamic";
 
@@ -61,7 +62,10 @@ export async function GET(req: NextRequest) {
   const suggest = req.nextUrl.searchParams.get("suggest");
   const suggestions = suggest && period ? await payrollFromAttendance(period, projectId) : [];
 
-  return NextResponse.json({ payroll, suggestions });
+  // M50 PR2: che số tiền lương (đơn giá/gộp/khấu trừ/thực nhận) cho user thiếu
+  // viewPayroll — vd bch vào được trang lương (gate route = viewPayments) nhưng không
+  // thấy số tiền. suggestions chỉ có công/nhân sự, không tiền → không che.
+  return NextResponse.json({ payroll: stripSensitive("payroll", payroll, user), suggestions });
 }
 
 // POST /api/payroll — tạo kỳ lương (manageFinance: Admin/PM). project_id gán = dự án

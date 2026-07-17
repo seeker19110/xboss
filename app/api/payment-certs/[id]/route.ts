@@ -11,6 +11,7 @@ import {
   type CertLineInput,
 } from "@/lib/paymentcerts";
 import { getEntityApprovalStatus } from "@/lib/approvals";
+import { stripSensitive } from "@/lib/sensitive-fields";
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +58,11 @@ export async function GET(
   // Trạng thái duyệt engine (M46 PR2) — null khi chưa có flow cấu hình cho loại
   // "payment_cert" (hành xử dormant, không đổi UI cũ).
   const approvalStatus = await getEntityApprovalStatus("payment_cert", id);
-  return NextResponse.json({ cert, totals, approvalStatus });
+  // M50 PR2: che đơn giá dòng KL + tổng tiền đợt cho user thiếu viewPayments (phòng thủ
+  // — gate route hiện cũng là viewPayments).
+  const [maskedCert] = stripSensitive("paymentCert", [cert], user);
+  const [maskedTotals] = stripSensitive("certTotals", [totals], user);
+  return NextResponse.json({ cert: maskedCert, totals: maskedTotals, approvalStatus });
 }
 
 // PATCH /api/payment-certs/:id { items: [{boqItemId, qtyPeriod}], periodLabel? }

@@ -12,6 +12,7 @@ import {
   certTotals,
 } from "@/lib/paymentcerts";
 import { openApproval } from "@/lib/approvals";
+import { stripSensitive } from "@/lib/sensitive-fields";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +40,9 @@ export async function GET(req: NextRequest) {
   if (!contract) return NextResponse.json({ error: "Hợp đồng không tồn tại" }, { status: 422 });
 
   const certs = await listCertsByContract(contractId);
-  return NextResponse.json({ certs });
+  // M50 PR2: che đơn giá dòng KL cho user thiếu viewPayments (phòng thủ — gate route
+  // hiện cũng là viewPayments).
+  return NextResponse.json({ certs: stripSensitive("paymentCert", certs, user) });
 }
 
 // POST /api/payment-certs { contractId } — lập đợt mới (Admin/PM), KL gợi ý tự

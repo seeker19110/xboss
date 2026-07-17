@@ -10,6 +10,7 @@ import {
   validateContractInput,
   type ContractKind,
 } from "@/lib/contracts";
+import { stripSensitive } from "@/lib/sensitive-fields";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,9 @@ export async function GET(req: NextRequest) {
     projectId != null
       ? await listContracts((kindRaw as ContractKind) ?? undefined, projectId, deletedView)
       : [];
-  return NextResponse.json({ contracts });
+  // M50 PR2: che giá trị/tỷ lệ HĐ cho user thiếu viewPayments (phòng thủ — gate route
+  // hiện cũng là viewPayments nên không đổi ai hiện tại).
+  return NextResponse.json({ contracts: stripSensitive("contract", contracts, user) });
 }
 
 // POST /api/contracts — tạo HĐ (Admin/PM). Số HĐ nhập tay, UNIQUE chống trùng.

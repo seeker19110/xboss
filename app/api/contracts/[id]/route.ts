@@ -10,6 +10,7 @@ import {
   validateContractInput,
   type ContractInput,
 } from "@/lib/contracts";
+import { stripSensitive } from "@/lib/sensitive-fields";
 
 export const dynamic = "force-dynamic";
 
@@ -73,7 +74,17 @@ export async function GET(
     ),
   ]);
 
-  return NextResponse.json({ contract, addenda, documents, bills, purchaseOrders, floorContracts });
+  // M50 PR2: che tiền/tỷ lệ cho user thiếu viewPayments — HĐ + phụ lục + dòng thanh
+  // toán + giao thầu tầng (phòng thủ — gate route hiện cũng là viewPayments).
+  const [maskedContract] = stripSensitive("contract", [contract], user);
+  return NextResponse.json({
+    contract: maskedContract,
+    addenda: stripSensitive("contractAddendum", addenda, user),
+    documents,
+    bills: stripSensitive("paymentBill", bills, user),
+    purchaseOrders,
+    floorContracts: stripSensitive("floorContract", floorContracts, user),
+  });
 }
 
 // PATCH /api/contracts/:id — sửa HĐ (Admin/PM). Body gửi field nào sửa field đó

@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus, X, Trash2, Paperclip, FilePlus2, Lock } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
+import MaskedValue from "@/app/components/MaskedValue";
+import { mSum } from "@/app/lib/masked";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appAlert, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
@@ -124,18 +126,21 @@ export default function VariationsPage() {
     setItems(v?.items ?? []);
   }
 
+  // M50 PR2: giá trị VO có thể bị che (null) với user thiếu viewPayments (vd engineer) —
+  // dùng mSum để tổng cũng "bị che" (null) thay vì ngầm thành 0, để MaskedValue hiện "•••".
   const totals = useMemo(() => {
-    const map: Record<"draft" | "submitted" | "approved" | "rejected", number> = {
+    const map: Record<"draft" | "submitted" | "approved" | "rejected", number | null> = {
       draft: 0,
       submitted: 0,
       approved: 0,
       rejected: 0,
     };
     for (const v of items) {
-      if (v.status === "draft") map.draft += v.proposedValue;
-      else if (v.status === "submitted") map.submitted += v.proposedValue;
-      else if (v.status === "rejected") map.rejected += v.proposedValue;
-      else map.approved += v.approvedValue; // approved/partially_approved/contract_added
+      if (v.status === "draft") map.draft = mSum(map.draft, v.proposedValue);
+      else if (v.status === "submitted") map.submitted = mSum(map.submitted, v.proposedValue);
+      else if (v.status === "rejected") map.rejected = mSum(map.rejected, v.proposedValue);
+      // approved/partially_approved/contract_added
+      else map.approved = mSum(map.approved, v.approvedValue);
     }
     return map;
   }, [items]);
@@ -174,7 +179,9 @@ export default function VariationsPage() {
           ).map(([key, label]) => (
             <div key={key} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
               <p className="text-xs text-zinc-400 uppercase tracking-wide">{label}</p>
-              <p className="text-lg font-semibold mt-1">{fmtVND(totals[key])}</p>
+              <p className="text-lg font-semibold mt-1">
+                <MaskedValue value={totals[key]} format={fmtVND} />
+              </p>
             </div>
           ))}
         </div>
@@ -223,9 +230,11 @@ export default function VariationsPage() {
                         )}
                       </td>
                       <td className="p-3 hidden sm:table-cell text-right">
-                        {fmtVND(v.proposedValue)}
+                        <MaskedValue value={v.proposedValue} format={fmtVND} />
                       </td>
-                      <td className="p-3 text-right font-medium">{fmtVND(v.approvedValue)}</td>
+                      <td className="p-3 text-right font-medium">
+                        <MaskedValue value={v.approvedValue} format={fmtVND} />
+                      </td>
                       <td className="p-3 hidden sm:table-cell text-xs text-zinc-400">
                         {v.decidedAt ?? v.submittedAt ?? "—"}
                       </td>
@@ -768,7 +777,9 @@ function VoDetailModal({
                           (l.qtyApproved ?? "—")
                         )}
                       </td>
-                      <td className="p-1.5 text-right">{fmtVND(l.unitPrice)}</td>
+                      <td className="p-1.5 text-right">
+                        <MaskedValue value={l.unitPrice} format={fmtVND} />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
