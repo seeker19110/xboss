@@ -37,6 +37,7 @@ import PurchaseRequestsTab from "./_components/PurchaseRequestsTab";
 import ReportsTab from "./_components/ReportsTab";
 import { Skeleton } from "@/app/components/Skeleton";
 import SpreadsheetGrid, { type GridColumn, type GridEdit } from "@/app/components/SpreadsheetGrid";
+import CustomFieldsSection from "@/app/components/CustomFieldsSection";
 import { formatDateTimeVN } from "@/lib/date";
 import { Table2, RefreshCw } from "lucide-react";
 
@@ -58,6 +59,7 @@ type Material = {
   minStockLevel: number;
   status: string;
   note: string | null;
+  custom: Record<string, unknown>;
   sheetCode: string | null;
 };
 type Sheet = { id: number; code: string; name: string };
@@ -1713,6 +1715,12 @@ function MaterialHistoryModal({
       )}
 
       <div className="overflow-auto p-4">
+        <CustomFieldsSection
+          entityType="material"
+          apiPath={`/api/materials/${material.id}`}
+          value={material.custom}
+          canEdit={canEdit}
+        />
         {items === null && <p className="text-sm text-zinc-500">Đang tải...</p>}
         {items?.length === 0 && <p className="text-sm text-zinc-500">Chưa có giao dịch nào.</p>}
         {!!items?.length && (

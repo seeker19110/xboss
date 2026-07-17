@@ -3,6 +3,7 @@ import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { boqTakenBy } from "@/lib/boq";
+import { validateCustom } from "@/lib/custom-fields";
 import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
@@ -78,6 +79,13 @@ export async function PATCH(
         key === "minStockLevel";
       vals.push(isQty ? Number(body[key]) || 0 : body[key]);
     }
+  }
+  // Trường tuỳ biến (M52 PR2): merge shallow vào cột custom — không đè field khác.
+  if (body.custom !== undefined) {
+    const v = await validateCustom("material", projectId, body.custom);
+    if (!v.ok) return NextResponse.json({ error: v.error }, { status: v.status });
+    sets.push(`custom = custom || ?::jsonb`);
+    vals.push(JSON.stringify(v.value));
   }
   if (!sets.length)
     return NextResponse.json({ error: "Không có trường để cập nhật" }, { status: 400 });

@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
               m.qty_boq AS "qtyBoq", m.qty_planned AS "qtyPlanned", m.qty_used AS "qtyUsed",
               COALESCE(m.qty_stock, 0) AS "qtyStock",
               COALESCE(m.min_stock_level, 0) AS "minStockLevel",
-              m.status, m.note, m.updated_at AS "updatedAt",
+              m.status, m.note, m.custom, m.updated_at AS "updatedAt",
               st.code AS "sheetCode"
          FROM materials m
          LEFT JOIN sheet_types st ON m.sheet_type_id = st.id

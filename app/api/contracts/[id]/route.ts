@@ -11,6 +11,7 @@ import {
   type ContractInput,
 } from "@/lib/contracts";
 import { stripSensitive } from "@/lib/sensitive-fields";
+import { validateCustom } from "@/lib/custom-fields";
 
 export const dynamic = "force-dynamic";
 
@@ -124,6 +125,14 @@ export async function PATCH(
   if (!body || typeof body !== "object")
     return NextResponse.json({ error: "Body không hợp lệ" }, { status: 400 });
 
+  // Trường tuỳ biến (M52 PR2): validate trước, merge shallow sau khi UPDATE chính xong.
+  let customPatch: Record<string, unknown> | null = null;
+  if (body.custom !== undefined) {
+    const v = await validateCustom("contract", projectId, body.custom);
+    if (!v.ok) return NextResponse.json({ error: v.error }, { status: v.status });
+    customPatch = v.value;
+  }
+
   // Field không gửi giữ giá trị cũ; field gửi null để xoá (partyName/ngày/note...).
   const merged: Record<string, unknown> = { ...existing };
   for (const key of Object.keys(existing)) if (key in body) merged[key] = body[key];
@@ -164,6 +173,13 @@ export async function PATCH(
       );
     throw err;
   }
+
+  if (customPatch !== null)
+    await run(
+      `UPDATE contracts SET custom = custom || ?::jsonb WHERE id = ?`,
+      JSON.stringify(customPatch),
+      id,
+    );
 
   return NextResponse.json({ updated: id });
 }

@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { useOfflineTickQueue } from "@/app/components/offlineQueue";
 import AppHeader from "@/app/components/AppHeader";
+import CustomFieldsSection from "@/app/components/CustomFieldsSection";
 import EditableText from "@/app/components/EditableText";
 import { Modal, appAlert, appConfirm, appPrompt } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
@@ -69,6 +70,7 @@ type Pkg = {
   bbntUrl: string | null;
   startDate: string | null;
   endDate: string | null;
+  custom: Record<string, unknown>;
 };
 type Data = {
   sheet: {
@@ -962,6 +964,7 @@ type GridTask = {
   delayReason: string | null;
   startDate: string | null;
   endDate: string | null;
+  custom: Record<string, unknown>;
   cells: Record<string, Cell>;
 };
 type Grid = { columns: string[]; tasks: GridTask[] };
@@ -2613,6 +2616,7 @@ function PkgGrid({
       {commentsTask && (
         <CommentsModal
           task={commentsTask}
+          canEdit={canEdit}
           onClose={() => {
             setCommentsTask(null);
             load();
@@ -2623,7 +2627,12 @@ function PkgGrid({
         <DatesModal target={datesTarget} onSave={saveDates} onClose={() => setDatesTarget(null)} />
       )}
       {showDatesModal && (
-        <PkgDatesModal pkg={pkg} onSave={savePkgDates} onClose={() => setShowDatesModal(false)} />
+        <PkgDatesModal
+          pkg={pkg}
+          canEdit={canEdit}
+          onSave={savePkgDates}
+          onClose={() => setShowDatesModal(false)}
+        />
       )}
     </>
   );
@@ -2849,10 +2858,12 @@ function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => void })
 // Modal sửa ngày bắt đầu / kết thúc cho toàn nhóm công việc.
 function PkgDatesModal({
   pkg,
+  canEdit,
   onSave,
   onClose,
 }: {
   pkg: Pkg;
+  canEdit: boolean;
   onSave: (start: string, end: string, syncTasks: boolean) => void;
   onClose: () => void;
 }) {
@@ -2919,6 +2930,12 @@ function PkgDatesModal({
             </span>
           </span>
         </label>
+        <CustomFieldsSection
+          entityType="work_package"
+          apiPath={`/api/workpackages/${pkg.id}`}
+          value={pkg.custom}
+          canEdit={canEdit}
+        />
         <div className="flex gap-2 pt-1">
           <button
             onClick={() => {
@@ -3027,7 +3044,15 @@ type Comment = {
 const ROLE_BADGE: Record<string, string> = ROLE_LABELS;
 
 // Trao đổi trên task: PM hỏi — người thi công trả lời ngay trong app.
-function CommentsModal({ task, onClose }: { task: GridTask; onClose: () => void }) {
+function CommentsModal({
+  task,
+  canEdit,
+  onClose,
+}: {
+  task: GridTask;
+  canEdit: boolean;
+  onClose: () => void;
+}) {
   const [comments, setComments] = useState<Comment[] | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -3086,6 +3111,12 @@ function CommentsModal({ task, onClose }: { task: GridTask; onClose: () => void 
         </button>
       </div>
       <div className="overflow-auto p-4 flex-1 space-y-3">
+        <CustomFieldsSection
+          entityType="task"
+          apiPath={`/api/tasks/${task.id}`}
+          value={task.custom}
+          canEdit={canEdit}
+        />
         {comments === null && <p className="text-sm text-zinc-500">Đang tải...</p>}
         {comments?.length === 0 && (
           <p className="text-sm text-zinc-500">

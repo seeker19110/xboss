@@ -20,6 +20,7 @@ type Pkg = {
   bbntUrl: string | null;
   startDate: string | null;
   endDate: string | null;
+  custom: Record<string, unknown>;
 };
 type Task = {
   id: number;
@@ -63,7 +64,7 @@ export async function GET(req: NextRequest) {
     query<Pkg>(
       `SELECT id, code, seq_no AS "seqNo", floor_label AS "floorLabel", name, status, progress,
               boq_code AS "boqCode", drawing_url AS "drawingUrl", bbnt_url AS "bbntUrl",
-              start_date AS "startDate", end_date AS "endDate"
+              start_date AS "startDate", end_date AS "endDate", custom
          FROM work_packages WHERE sheet_type_id = ? ORDER BY sort_order, id`,
       st.id,
     ),
