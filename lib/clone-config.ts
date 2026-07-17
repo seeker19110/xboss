@@ -2,7 +2,8 @@
 // KHÔNG sao chép dữ liệu giao dịch (tasks/contracts/work_packages/transactions...). Toàn bộ
 // chạy trong 1 withTransaction; map id cũ→mới giữ trong biến JS cục bộ (không bảng mapping).
 // Xem docs/nang-cap/M51-da-du-an-rls.md mục "PR3 — Template dự án".
-import { query, run, insertId, withTransaction } from "@/lib/db";
+import { query, queryOne, run, insertId, withTransaction } from "@/lib/db";
+import { toSlug, SLUG_RE } from "@/lib/sheets";
 
 export type NewProjectInput = {
   name: string;
@@ -38,6 +39,31 @@ export type CloneResult = {
 // work_packages/materials/boq_items — migrations/0029). sheet_types.code chỉ unique theo
 // tower (UNIQUE(tower_id, code)) nên tower mới → không đụng mã; clone-config không thể gây
 // trùng BOQCODE toàn hệ.
+// Sinh slug UNIQUE toàn hệ cho 1 sheet clone. Base ưu tiên slug nguồn (đã hợp lệ), rồi
+// toSlug(code)/toSlug(name); trùng (trong DB hoặc trong lượt clone này) thì thêm suffix
+// "-N". Cắt còn ≤50 ký tự chừa chỗ suffix để luôn khớp SLUG_RE.
+async function pickUniqueSlug(
+  sourceSlug: string | null,
+  code: string,
+  name: string,
+  used: Set<string>,
+): Promise<string> {
+  const raw = sourceSlug && SLUG_RE.test(sourceSlug) ? sourceSlug : toSlug(code) || toSlug(name);
+  const base = SLUG_RE.test(raw) ? raw : "sheet";
+  let candidate = base;
+  let n = 1;
+  while (
+    used.has(candidate) ||
+    (await queryOne(`SELECT id FROM sheet_types WHERE slug = ?`, candidate))
+  ) {
+    n++;
+    const suffix = `-${n}`;
+    candidate = base.slice(0, 50 - suffix.length) + suffix;
+  }
+  used.add(candidate);
+  return candidate;
+}
+
 export async function cloneProjectConfig(
   sourceProjectId: number,
   input: NewProjectInput,
@@ -71,6 +97,11 @@ export async function cloneProjectConfig(
     }
 
     // 3) sheet_types của các tower nguồn — giữ hệ (system_id), code, name, responsible.
+    //    slug là khoá routing UNIQUE toàn hệ (uniq_sheet_slug), KHÔNG chép nguyên: sinh
+    //    slug MỚI cho từng sheet clone (base = slug nguồn / toSlug(name)), thêm suffix -N
+    //    khi trùng — cùng cơ chế đảm bảo unique như POST /api/sheets, nhưng không 409 mà
+    //    tự đổi để clone luôn ra dự án dùng được. Set cục bộ chặn trùng giữa các sheet
+    //    trong chính lượt clone này (song song với check DB, phòng read-your-writes lỡ sót).
     let sheetTypes = 0;
     if (towerMap.size > 0) {
       const oldTowerIds = [...towerMap.keys()];
@@ -81,19 +112,23 @@ export async function cloneProjectConfig(
         name: string;
         responsible: string | null;
         system_id: number | null;
+        slug: string | null;
       }>(
-        `SELECT tower_id, code, name, responsible, system_id
+        `SELECT tower_id, code, name, responsible, system_id, slug
            FROM sheet_types WHERE tower_id IN (${placeholders}) ORDER BY id`,
         ...oldTowerIds,
       );
+      const usedSlugs = new Set<string>();
       for (const s of sheets) {
+        const slug = await pickUniqueSlug(s.slug, s.code, s.name, usedSlugs);
         await run(
-          `INSERT INTO sheet_types (tower_id, code, name, responsible, system_id) VALUES (?, ?, ?, ?, ?)`,
+          `INSERT INTO sheet_types (tower_id, code, name, responsible, system_id, slug) VALUES (?, ?, ?, ?, ?, ?)`,
           towerMap.get(s.tower_id),
           s.code,
           s.name,
           s.responsible,
           s.system_id,
+          slug,
         );
         sheetTypes++;
       }
@@ -127,26 +162,15 @@ export async function cloneProjectConfig(
         f.name,
         f.active,
       );
-      const steps = await query<{
-        seq: number;
-        role: string;
-        min_amount: number | null;
-        sla_days: number | null;
-      }>(
-        `SELECT seq, role, min_amount, sla_days FROM approval_steps WHERE flow_id = ? ORDER BY seq`,
+      // Chép step bằng INSERT...SELECT — min_amount (tiền, NUMERIC) giữ nguyên trong SQL,
+      // KHÔNG roundtrip qua float JS (quy ước tiền M45).
+      const steps = await run(
+        `INSERT INTO approval_steps (flow_id, seq, role, min_amount, sla_days)
+         SELECT ?, seq, role, min_amount, sla_days FROM approval_steps WHERE flow_id = ?`,
+        newFlowId,
         f.id,
       );
-      for (const st of steps) {
-        await run(
-          `INSERT INTO approval_steps (flow_id, seq, role, min_amount, sla_days) VALUES (?, ?, ?, ?, ?)`,
-          newFlowId,
-          st.seq,
-          st.role,
-          st.min_amount,
-          st.sla_days,
-        );
-        approvalSteps++;
-      }
+      approvalSteps += steps.changes;
     }
 
     // 6) alert_rules gắn dự án nguồn → gắn dự án mới (created_by = người sao chép).

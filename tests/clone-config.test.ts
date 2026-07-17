@@ -35,21 +35,28 @@ test(
       `acmv-clone-${Date.now()}`,
     );
 
-    // 3 sheet_types trên 2 tháp.
+    // 3 sheet_types trên 2 tháp. Đặt slug nguồn duy nhất toàn run (token) — vì slug là
+    // UNIQUE toàn hệ, nếu clone chép nguyên slug thì sẽ trùng với sheet nguồn → buộc
+    // clone-config phải SINH slug mới (kích hoạt nhánh thêm suffix).
+    const tok = Date.now();
+    const srcSlugs = [`ogtd-${tok}`, `oghl-${tok}`, `odnn1-${tok}`];
     const sheet1 = await insertId(
-      `INSERT INTO sheet_types (tower_id, code, name, responsible, system_id) VALUES (?, 'OGTD', 'Ống gió TĐ', 'KS An', ?) RETURNING id`,
+      `INSERT INTO sheet_types (tower_id, code, name, responsible, system_id, slug) VALUES (?, 'OGTD', 'Ống gió TĐ', 'KS An', ?, ?) RETURNING id`,
       towerA,
       sysId,
+      srcSlugs[0],
     );
     await run(
-      `INSERT INTO sheet_types (tower_id, code, name, system_id) VALUES (?, 'OGHL', 'Ống gió HL', ?)`,
+      `INSERT INTO sheet_types (tower_id, code, name, system_id, slug) VALUES (?, 'OGHL', 'Ống gió HL', ?, ?)`,
       towerA,
       sysId,
+      srcSlugs[1],
     );
     await run(
-      `INSERT INTO sheet_types (tower_id, code, name, system_id) VALUES (?, 'ODNN1', 'ĐHKK Zone 1', ?)`,
+      `INSERT INTO sheet_types (tower_id, code, name, system_id, slug) VALUES (?, 'ODNN1', 'ĐHKK Zone 1', ?, ?)`,
       towerB,
       sysId,
+      srcSlugs[2],
     );
 
     // nav_settings gắn dự án nguồn.
@@ -126,8 +133,8 @@ test(
     );
     assert.equal(dstTowers?.n, 2);
 
-    const dstSheets = await query<{ code: string; system_id: number | null }>(
-      `SELECT st.code, st.system_id FROM sheet_types st
+    const dstSheets = await query<{ code: string; system_id: number | null; slug: string | null }>(
+      `SELECT st.code, st.system_id, st.slug FROM sheet_types st
         JOIN towers tw ON tw.id = st.tower_id WHERE tw.project_id = ? ORDER BY st.code`,
       dstId,
     );
@@ -137,6 +144,31 @@ test(
     );
     // Giữ hệ (system_id) khi chép.
     assert.ok(dstSheets.every((s) => s.system_id === sysId));
+
+    // slug là khoá routing UNIQUE toàn hệ: mọi sheet đích phải có slug (KHÔNG NULL),
+    // hợp lệ, không trùng nhau và không trùng slug sheet nguồn (đã bị chiếm).
+    const dstSlugs = dstSheets.map((s) => s.slug);
+    assert.ok(
+      dstSlugs.every((s) => s != null && /^[a-z0-9][a-z0-9-]{0,49}$/.test(s)),
+      "mọi sheet đích phải có slug hợp lệ, không NULL",
+    );
+    assert.equal(
+      new Set(dstSlugs).size,
+      dstSlugs.length,
+      "slug các sheet đích không được trùng nhau",
+    );
+    assert.ok(
+      dstSlugs.every((s) => !srcSlugs.includes(s as string)),
+      "slug sheet đích không được trùng slug sheet nguồn (đã chiếm)",
+    );
+    // UNIQUE toàn hệ thật: không dòng nào khác cùng slug.
+    for (const s of dstSlugs) {
+      const dup = await queryOne<{ n: number }>(
+        `SELECT COUNT(*)::int AS n FROM sheet_types WHERE slug = ?`,
+        s,
+      );
+      assert.equal(dup?.n, 1, `slug "${s}" phải là duy nhất toàn hệ`);
+    }
 
     const dstNav = await queryOne<{ n: number }>(
       `SELECT COUNT(*)::int AS n FROM nav_settings WHERE project_id = ?`,
