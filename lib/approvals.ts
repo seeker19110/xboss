@@ -536,7 +536,12 @@ export function validateFlowInput(input: {
 // Danh sách mọi flow (xuyên dự án — trang admin cần thấy toàn cảnh, xem whitelist
 // "admin/approval-flows" trong tests/project-scope-invariant.test.ts) kèm bước + số
 // request (tổng/đang chờ) để UI cảnh báo trước khi sửa/xoá.
-export async function listApprovalFlows(): Promise<ApprovalFlowAdmin[]> {
+// projectId != null → chỉ trả flow của dự án đó + flow toàn cục (project_id IS NULL),
+// nhất quán với cách scope theo dự án của M22. projectId = null (DB chưa có dự án/chưa
+// chọn) → không lọc, trả hết (tương thích ngược).
+export async function listApprovalFlows(projectId?: number | null): Promise<ApprovalFlowAdmin[]> {
+  const where = projectId != null ? `WHERE (f.project_id = ? OR f.project_id IS NULL)` : "";
+  const scopeParams = projectId != null ? [projectId] : [];
   const flows = await query<{
     id: number;
     projectId: number | null;
@@ -549,7 +554,9 @@ export async function listApprovalFlows(): Promise<ApprovalFlowAdmin[]> {
             f.entity_type AS "entityType", f.name, f.active
        FROM approval_flows f
        LEFT JOIN projects p ON p.id = f.project_id
+       ${where}
       ORDER BY f.entity_type, f.project_id NULLS FIRST, f.id`,
+    ...scopeParams,
   );
   if (flows.length === 0) return [];
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { query } from "@/lib/db";
 import { getAdapter } from "@/lib/integrations/core";
 
@@ -35,7 +36,12 @@ export async function GET() {
   if (!CAN.viewIntegrations(user.role))
     return NextResponse.json({ error: "Không có quyền xem tích hợp" }, { status: 403 });
 
-  // DISTINCT ON lấy lần chạy mới nhất mỗi integration_id (order theo started_at DESC).
+  // projectId != null → chỉ tích hợp của dự án đó + tích hợp toàn cục (project_id IS NULL),
+  // nhất quán với cách scope theo dự án của M22; projectId = null → không lọc (tương thích ngược).
+  const projectId = await getCurrentProjectId(user);
+  const scopeWhere = projectId != null ? `WHERE (i.project_id = ? OR i.project_id IS NULL)` : "";
+  const scopeParams = projectId != null ? [projectId] : [];
+  // LATERAL lấy lần chạy mới nhất mỗi integration_id (order theo started_at DESC).
   const rows = await query<IntegrationRow>(
     `SELECT i.id, i.provider, i.project_id AS "projectId", p.name AS "projectName",
             i.active, i.config,
@@ -51,7 +57,9 @@ export async function GET() {
           ORDER BY started_at DESC
           LIMIT 1
        ) r ON TRUE
+       ${scopeWhere}
       ORDER BY i.provider, i.project_id`,
+    ...scopeParams,
   );
 
   const integrations = rows.map((r) => {

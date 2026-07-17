@@ -73,6 +73,46 @@ test(
 );
 
 test(
+  "listAlertRules(projectId): chỉ trả rule của dự án đó + rule toàn cục (project_id NULL); null → trả hết",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { insertId, run } = await import("@/lib/db");
+    const { listAlertRules, upsertAlertRule, deleteAlertRule } = await import("@/lib/alerts");
+
+    const p1 = await insertId(`INSERT INTO projects (name) VALUES ('M52 Alerts scope P1')`);
+    const p2 = await insertId(`INSERT INTO projects (name) VALUES ('M52 Alerts scope P2')`);
+
+    const rGlobal = await upsertAlertRule({ projectId: null, metric: "spi_below", threshold: 0.9 });
+    const r1 = await upsertAlertRule({ projectId: p1, metric: "cpi_below", threshold: 0.8 });
+    const r2 = await upsertAlertRule({ projectId: p2, metric: "cpi_below", threshold: 0.7 });
+    assert.ok(typeof rGlobal === "object" && typeof r1 === "object" && typeof r2 === "object");
+    const idG = (rGlobal as { id: number }).id;
+    const id1 = (r1 as { id: number }).id;
+    const id2 = (r2 as { id: number }).id;
+
+    // Scope theo p1: thấy rule p1 + rule toàn cục, KHÔNG thấy rule p2.
+    const forP1 = await listAlertRules(p1);
+    const idsP1 = forP1.map((r) => r.id);
+    assert.ok(idsP1.includes(id1), "phải thấy rule dự án p1");
+    assert.ok(idsP1.includes(idG), "phải thấy rule toàn cục");
+    assert.ok(!idsP1.includes(id2), "KHÔNG được thấy rule dự án p2");
+
+    // null → không lọc, thấy cả 3.
+    const all = await listAlertRules(null);
+    const idsAll = all.map((r) => r.id);
+    assert.ok(
+      [idG, id1, id2].every((id) => idsAll.includes(id)),
+      "null phải trả hết",
+    );
+
+    await deleteAlertRule(idG);
+    await deleteAlertRule(id1);
+    await deleteAlertRule(id2);
+    await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+  },
+);
+
+test(
   "upsertAlertRule: update cùng (metric,project) không tạo trùng; xoá xong về lại default",
   { skip: !HAS_TEST_DB },
   async () => {

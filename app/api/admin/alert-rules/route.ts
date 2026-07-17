@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { listAlertRules, upsertAlertRule } from "@/lib/alerts";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +13,8 @@ export async function GET() {
   if (!CAN.viewAlertRules(user.role))
     return NextResponse.json({ error: "Không có quyền xem ngưỡng cảnh báo" }, { status: 403 });
 
-  const rules = await listAlertRules();
+  const projectId = await getCurrentProjectId(user);
+  const rules = await listAlertRules(projectId);
   return NextResponse.json({ rules });
 }
 

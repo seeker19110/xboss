@@ -84,14 +84,21 @@ export async function getAlertThreshold(
 }
 
 // Danh sách mọi rule (xuyên dự án) cho trang admin — kèm tên dự án để hiển thị.
-export async function listAlertRules(): Promise<AlertRuleRow[]> {
+// projectId != null → chỉ trả rule của dự án đó + rule toàn cục (project_id IS NULL),
+// nhất quán với cách scope theo dự án của M22. projectId = null (DB chưa có dự án/chưa
+// chọn) → không lọc, trả hết (tương thích ngược).
+export async function listAlertRules(projectId?: number | null): Promise<AlertRuleRow[]> {
+  const where = projectId != null ? `WHERE (ar.project_id = ? OR ar.project_id IS NULL)` : "";
+  const params = projectId != null ? [projectId] : [];
   return query<AlertRuleRow>(
     `SELECT ar.id, ar.project_id AS "projectId", p.name AS "projectName", ar.metric,
             ar.operator, ar.threshold, ar.channel, ar.active,
             ar.created_at AS "createdAt"
        FROM alert_rules ar
        LEFT JOIN projects p ON p.id = ar.project_id
+       ${where}
       ORDER BY ar.metric, ar.project_id NULLS FIRST, ar.id`,
+    ...params,
   );
 }
 

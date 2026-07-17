@@ -32,6 +32,20 @@ test("buildAuditFilter: bỏ qua entityId/actorId không phải số", async () 
   assert.deepEqual(params, []);
 });
 
+test("buildAuditFilter: projectId != null → giới hạn dự án + bản ghi toàn cục (đứng đầu)", async () => {
+  const { buildAuditFilter } = await import("@/lib/audit");
+  const { where, params } = buildAuditFilter(new URLSearchParams({ entity: "contracts" }), 7);
+  assert.equal(where, "WHERE (al.project_id = ? OR al.project_id IS NULL) AND al.entity_type = ?");
+  assert.deepEqual(params, [7, "contracts"]);
+});
+
+test("buildAuditFilter: projectId null → không thêm điều kiện dự án (tương thích ngược)", async () => {
+  const { buildAuditFilter } = await import("@/lib/audit");
+  const { where, params } = buildAuditFilter(new URLSearchParams(), null);
+  assert.equal(where, "");
+  assert.deepEqual(params, []);
+});
+
 const S = Date.now().toString(36); // hậu tố duy nhất tránh đụng UNIQUE khi chạy lại trên cùng DB
 const PAGE_SIZE = 50;
 

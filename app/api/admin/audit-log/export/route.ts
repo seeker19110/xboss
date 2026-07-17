@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { query, todayISO } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { buildAuditFilter } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +52,8 @@ export async function GET(req: NextRequest) {
   if (!CAN.viewAudit(me.role))
     return NextResponse.json({ error: "Không có quyền xuất audit trail" }, { status: 403 });
 
-  const { where, params } = buildAuditFilter(req.nextUrl.searchParams);
+  const projectId = await getCurrentProjectId(me);
+  const { where, params } = buildAuditFilter(req.nextUrl.searchParams, projectId);
 
   const rows = await query<AuditExportRow>(
     `SELECT al.at, u.name AS "actorName", al.actor_role AS "actorRole",

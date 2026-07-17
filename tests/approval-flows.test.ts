@@ -381,3 +381,59 @@ test(
     }
   },
 );
+
+test(
+  "listApprovalFlows(projectId): chỉ trả flow của dự án đó + flow toàn cục (project_id NULL); null → trả hết",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { insertId, run } = await import("@/lib/db");
+    const { createApprovalFlow, listApprovalFlows } = await import("@/lib/approvals");
+
+    const p1 = await insertId(`INSERT INTO projects (name) VALUES (?)`, `SCOPE-FLOW P1 ${S}`);
+    const p2 = await insertId(`INSERT INTO projects (name) VALUES (?)`, `SCOPE-FLOW P2 ${S}`);
+    const steps = [{ seq: 1, role: "pm", minAmount: null, slaDays: null }];
+    const flowIds: number[] = [];
+    try {
+      const g = await createApprovalFlow({
+        projectId: null,
+        entityType: "variation",
+        name: `G ${S}`,
+        steps,
+      });
+      const f1 = await createApprovalFlow({
+        projectId: p1,
+        entityType: "payment_cert",
+        name: `F1 ${S}`,
+        steps,
+      });
+      const f2 = await createApprovalFlow({
+        projectId: p2,
+        entityType: "payment_cert",
+        name: `F2 ${S}`,
+        steps,
+      });
+      assert.ok(typeof g === "object" && typeof f1 === "object" && typeof f2 === "object");
+      const idG = (g as { id: number }).id;
+      const id1 = (f1 as { id: number }).id;
+      const id2 = (f2 as { id: number }).id;
+      flowIds.push(idG, id1, id2);
+
+      const forP1 = (await listApprovalFlows(p1)).map((f) => f.id);
+      assert.ok(forP1.includes(id1), "phải thấy flow dự án p1");
+      assert.ok(forP1.includes(idG), "phải thấy flow toàn cục");
+      assert.ok(!forP1.includes(id2), "KHÔNG được thấy flow dự án p2");
+
+      const all = (await listApprovalFlows(null)).map((f) => f.id);
+      assert.ok(
+        [idG, id1, id2].every((id) => all.includes(id)),
+        "null phải trả hết",
+      );
+    } finally {
+      for (const id of flowIds) {
+        await run(`DELETE FROM approval_requests WHERE flow_id = ?`, id);
+        await run(`DELETE FROM approval_flows WHERE id = ?`, id);
+      }
+      await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
+    }
+  },
+);
