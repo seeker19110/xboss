@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 // Trang /notifications — trung tâm thông báo (feed trễ hạn/đến hạn/bình luận/vật tư vượt định
-// mức + cài đặt). Mật độ ứng viên contrast cao nhất theo docs/a11y/contrast-audit.md §4 (23 chỗ).
+// mức + cài đặt). Mật độ ứng viên contrast cao (23 chỗ) — quy tắc tương phản: docs/audit.md §13.
 
 async function gotoNotifications(page: Page) {
   await page.goto("/notifications");

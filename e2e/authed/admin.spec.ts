@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 // Trang /admin — phân công người phụ trách (theo hệ/nhóm/task) + lịch sử audit + traffic
-// (chỉ Admin/PM). Mật độ ứng viên contrast cao thứ 2 theo docs/a11y/contrast-audit.md §4 (23 chỗ).
+// (chỉ Admin/PM). Mật độ ứng viên contrast cao (23 chỗ) — quy tắc tương phản: docs/audit.md §13.
 
 async function gotoAdmin(page: Page) {
   await page.goto("/admin");

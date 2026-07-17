@@ -21,7 +21,7 @@
 
 - **Hiệu năng:** ngân sách Lighthouse CI chính thức (`lighthouserc.json`, đo trên `/login`, 3 lần chạy) — cả 4 category `performance`/`accessibility`/`best-practices`/`seo` đã siết ngưỡng `error` (0.9/0.9/0.9/0.8), chặn merge khi tụt điểm. Mục tiêu định hướng thêm: LCP ≤ 2.5s, INP ≤ 200ms, CLS ≤ 0.1.
 - **Bảo mật:** **API là ranh giới bảo mật duy nhất** — mọi route gọi `getCurrentUser()` + kiểm quyền `CAN`/`canTouchTask`. Phiên stateless HMAC; rate-limit login; SQL tham số hoá qua `lib/db`. (Không dùng RLS Postgres — quyền ở tầng app.)
-- **Accessibility:** mục tiêu WCAG AA cả hai theme; **đã có** axe-core tự động qua Playwright (`e2e/authed/*.spec.ts`, desktop + mobile, mọi trang mới bắt buộc thêm case axe) — xem `docs/a11y/contrast-audit.md` cho backlog remediation đã đóng hết.
+- **Accessibility:** mục tiêu WCAG AA cả hai theme; **đã có** axe-core tự động qua Playwright (`e2e/authed/*.spec.ts`, desktop + mobile, mọi trang mới bắt buộc thêm case axe) — quy tắc tương phản + quy trình ground-truth ở `docs/audit.md` §13.
 - **Mobile-first:** vùng chạm ~40px, nav cuộn ngang `.scrollbar-none`, bảng dày sticky header + cuộn ngang.
 - **Theme:** **dark-first** với cơ chế đảo màu qua biến CSS (`app/globals.css`): các class `html.dark` / `html.light` / `html.kingblue` / `html.darkblue` / `html.navy`. **Không** dùng `styles/theme.css`/`data-theme` của khung (xem ADR nếu cần) — không hard-code hex, không dùng biến thể `dark:`.
 

@@ -58,7 +58,7 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 
 ### UI/UX (nền tảng trải nghiệm — mọi trang mới PHẢI theo)
 
-- **Theme**: dark-first, thang `zinc`, accent `-300/-400`, KHÔNG `dark:`/hex (cơ chế đảo màu `html.light` trong `app/globals.css`); màu trạng thái đồng bộ `lib/status.ts`. Body-text tĩnh không dùng `text-zinc-500/600` (WCAG — xem `docs/a11y/contrast-audit.md`).
+- **Theme**: dark-first, thang `zinc`, accent `-300/-400`, KHÔNG `dark:`/hex (cơ chế đảo màu `html.light` trong `app/globals.css`); màu trạng thái đồng bộ `lib/status.ts`. Body-text tĩnh không dùng `text-zinc-500/600` (WCAG — xem `docs/audit.md` §13).
 - **Vỏ thẻ & bo góc (chuẩn hoá)**: base thẻ `bg-zinc-900 border border-zinc-800 rounded-xl`; padding theo tier — stat tile dày `p-3`, thẻ nội dung `p-4`, panel cấp trang/section lớn/hero `p-5` (không dùng `p-6`). Bo góc: `rounded-lg` cho control/nút/input/select, `rounded-xl` cho thẻ + cụm segment/tab-bar, `rounded-full` cho pill/badge/avatar.
 - **Nút danger (chuẩn hoá, 2 mẫu — không tạo biến thể thứ 3)**: đặc (nút text, hành động phá huỷ rõ ràng như "Xoá"/"Từ chối", mẫu tham chiếu `app/components/dialogs.tsx:151`) dùng `bg-red-700 hover:bg-red-600 text-on-accent`; ghost (icon-only trong hàng bảng/toolbar/modal phụ) dùng `text-zinc-500 hover:text-red-300 hover:bg-red-950/40`. Chọn mẫu theo ngữ cảnh: CTA độc lập/rõ ràng → đặc; icon nhỏ lẫn trong hàng/toolbar → ghost.
 - **Thang typography (chuẩn hoá, M37 PR2.1)**: dùng đúng recipe Tailwind theo vai trò, không tạo class CSS mới.
