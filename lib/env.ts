@@ -10,6 +10,7 @@
 //   instrumentation-client.ts, không qua schema này vì file đó chạy trong bundle trình
 //   duyệt, không import được lib/env.ts phía server) — mọi cấu hình khác vẫn ở server.
 import { z } from "zod";
+import { ROLES } from "@/lib/roles";
 
 // Bắt buộc = DATABASE_URL (app không chạy nếu thiếu). Các biến tích hợp (SMTP/Telegram/
 // VAPID/Google) là TUỲ CHỌN — module liên quan tự no-op/throw on-demand khi thiếu.
@@ -47,6 +48,16 @@ const serverSchema = z.object({
   GOOGLE_SA_PRIVATE_KEY: z.string().optional(),
   GOOGLE_SHEET_ID: z.string().optional(),
   GOOGLE_SHEET_TAB: z.string().optional(),
+
+  // SSO OIDC (M49 PR3) — thiếu bất kỳ biến bắt buộc (OIDC_ISSUER/CLIENT_ID/CLIENT_SECRET +
+  // APP_URL) → nút SSO tự ẩn, đăng nhập mật khẩu như cũ. lib/oidc.ts đọc trực tiếp
+  // process.env (như VAPID/Google Sheets) để resolveSsoUser thuần, không phụ thuộc DATABASE_URL;
+  // khai báo ở đây để liệt kê đủ biến môi trường tuỳ chọn của dự án.
+  OIDC_ISSUER: z.string().optional(),
+  OIDC_CLIENT_ID: z.string().optional(),
+  OIDC_CLIENT_SECRET: z.string().optional(),
+  OIDC_ROLE_CLAIM: z.string().optional(), // tên claim chứa vai trò (tuỳ chọn)
+  OIDC_DEFAULT_ROLE: z.enum(ROLES as [string, ...string[]]).optional(), // mặc định 'viewer' trong lib/oidc.ts
 
   // Seed dữ liệu (scripts/seed)
   XLSX_FILE: z.string().optional(),

@@ -196,3 +196,24 @@ liệt kê trong kết quả). Cột `Đã dùng`/`Tồn kho`/`Ngưỡng tối t
 
   Ví dụ crontab mỗi 5 phút: `*/5 * * * * curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://<APP_URL>/api/cron/deliver-webhooks`
   (hoặc khai báo trong `vercel.json` nếu deploy Vercel).
+
+## Đăng nhập bằng tài khoản công ty — SSO OIDC (tuỳ chọn)
+
+Cho phép đăng nhập bằng Google Workspace / Microsoft Entra (OIDC chuẩn). Thiếu bất kỳ biến
+bắt buộc → nút SSO tự ẩn, đăng nhập mật khẩu như cũ (mật khẩu vẫn là đường thoát hiểm khi
+IdP hỏng).
+
+1. Tạo OIDC client (Google Cloud Console / Entra App registration), đặt **redirect URI** =
+   `https://<APP_URL>/api/auth/oidc/callback` (phải khớp chính xác `APP_URL`).
+2. Đặt biến môi trường:
+
+   - `OIDC_ISSUER` — URL issuer (vd `https://accounts.google.com`).
+   - `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` — lấy từ IdP.
+   - `APP_URL` — URL gốc app (dùng dựng `redirect_uri`, không suy từ request origin).
+   - `OIDC_ROLE_CLAIM` _(tuỳ chọn)_ — tên claim chứa vai trò XBoss (`admin/pm/engineer/...`);
+     giá trị lạ bị bỏ qua (giữ role cũ / dùng mặc định).
+   - `OIDC_DEFAULT_ROLE` _(tuỳ chọn)_ — vai trò cho user SSO mới khi không có claim role hợp
+     lệ (mặc định `viewer`).
+
+   User tạo qua SSO không có mật khẩu dùng được (hash ngẫu nhiên) — chỉ vào được qua SSO;
+   Admin gán dự án (`/users`) và có thể đặt lại mật khẩu nếu cần fallback.
