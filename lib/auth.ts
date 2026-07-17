@@ -286,6 +286,10 @@ const CAN_DEFAULT = {
   // định nghĩa chỉ Admin (đổi cấu trúc dữ liệu chung, cùng phân quyền Alert Rules).
   viewCustomFields: (r?: Role) => r === "admin" || r === "pm",
   manageCustomFields: (r?: Role) => r === "admin",
+  // Cờ tính năng theo dự án (M52 PR4, lib/feature-flags.ts) — xem ma trận Admin/PM,
+  // bật/tắt chỉ Admin (đổi hành vi API/sidebar toàn hệ, cùng mức nhạy cảm Alert Rules).
+  viewFeatureFlags: (r?: Role) => r === "admin" || r === "pm",
+  manageFeatureFlags: (r?: Role) => r === "admin",
 };
 
 // ===== M50 PR1 — Override quyền trong DB =====

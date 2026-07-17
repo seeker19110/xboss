@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { query, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 import {
   ensureUploadDir,
   extForDocMime,
@@ -22,6 +23,9 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("documents", projectId);
+  if (blocked) return blocked;
+
   const documents =
     projectId != null
       ? await query(
@@ -52,6 +56,8 @@ export async function POST(req: NextRequest) {
   const projectId = await getCurrentProjectId(user);
   if (projectId == null)
     return NextResponse.json({ error: "Chưa có dự án nào để tải lên hồ sơ" }, { status: 422 });
+  const blocked = await assertModuleEnabled("documents", projectId);
+  if (blocked) return blocked;
 
   if (isContentTooLarge(req.headers.get("content-length"), MAX_DOC_BYTES))
     return NextResponse.json(

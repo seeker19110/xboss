@@ -3211,6 +3211,23 @@
 - `custom_field_defs_pkey`: UNIQUE INDEX custom_field_defs_pkey ON public.custom_field_defs USING btree (id)
 - `custom_field_defs_scope_key_uidx`: UNIQUE INDEX custom_field_defs_scope_key_uidx ON public.custom_field_defs USING btree (entity_type, COALESCE(project_id, 0), key)
 
+### feature_flags
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| module_key | text |  |  |
+| project_id | integer |  |  |
+| enabled | boolean |  | `true` |
+| updated_by | integer | ✓ |  |
+| updated_at | timestamptz | ✓ | `now()` |
+
+**Khóa ngoại:**
+- `project_id` → `projects(id)`
+- `updated_by` → `users(id)`
+
+**Index:**
+- `feature_flags_pkey`: UNIQUE INDEX feature_flags_pkey ON public.feature_flags USING btree (module_key, project_id)
+
 ### saved_reports
 
 | Cột | Kiểu | Null | Default |

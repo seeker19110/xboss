@@ -22,9 +22,11 @@ import {
   canSeeNavItem,
   findActiveNav,
   resolveVisibleTree,
+  flattenDashboards,
   type DashNode,
   type DashCluster,
 } from "@/app/lib/dashboardTree";
+import { MODULES } from "@/lib/modules";
 
 type Me = { id: number; name: string; email: string; role: string };
 
@@ -68,6 +70,9 @@ export default function AppHeader({
   // Bật/tắt dashboard qua khu "Hiển thị AppShell" ở /admin (M21 PR3). Rỗng lúc đầu =
   // coi như mọi dashboard đều bật (tránh sidebar nhấp nháy ẩn/hiện lúc tải trang).
   const [navSettings, setNavSettings] = useState<Map<string, boolean>>(new Map());
+  // Cờ tính năng theo dự án (M52 PR4) — module tắt thì ẩn nav của nó (đọc registry
+  // lib/modules.ts + /api/feature-flags). Rỗng lúc đầu = coi như mọi module đều bật.
+  const [featureFlags, setFeatureFlags] = useState<Map<string, boolean>>(new Map());
 
   useEffect(() => {
     setPath(window.location.pathname);
@@ -82,6 +87,10 @@ export default function AppHeader({
     fetch(`/api/nav-settings?_=${Date.now()}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => data?.settings && setNavSettings(new Map(Object.entries(data.settings))))
+      .catch(() => {});
+    fetch(`/api/feature-flags?_=${Date.now()}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => data?.flags && setFeatureFlags(new Map(Object.entries(data.flags))))
       .catch(() => {});
     try {
       const raw = localStorage.getItem(NAV_OPEN_KEY);
@@ -227,8 +236,26 @@ export default function AppHeader({
     );
   }
 
-  // Cây đã lọc theo vai trò + bật/tắt admin (M21 PR3) — nguồn duy nhất để render sidebar.
-  const visibleTree = resolveVisibleTree(DASHBOARD_TREE, me?.role, navSettings);
+  // M52 PR4: module tắt (feature_flags) → ẩn thêm nav của module đó, cộng dồn lên trên
+  // nav_settings (M21 PR3). Khớp theo `href` — MODULES.nav được giữ đồng bộ với các
+  // dashboard cấp 3 thật trong DASHBOARD_TREE (xem ghi chú lib/modules.ts).
+  const disabledModuleHrefs = new Set(
+    MODULES.filter((m) => featureFlags.get(m.key) === false).flatMap((m) =>
+      m.nav.map((n) => n.href),
+    ),
+  );
+  const effectiveNavSettings = new Map(navSettings);
+  if (disabledModuleHrefs.size > 0) {
+    for (const { dashboard } of flattenDashboards()) {
+      if (dashboard.id && dashboard.href && disabledModuleHrefs.has(dashboard.href)) {
+        effectiveNavSettings.set(dashboard.id, false);
+      }
+    }
+  }
+
+  // Cây đã lọc theo vai trò + bật/tắt admin (M21 PR3) + cờ tính năng (M52 PR4) — nguồn
+  // duy nhất để render sidebar.
+  const visibleTree = resolveVisibleTree(DASHBOARD_TREE, me?.role, effectiveNavSettings);
 
   // Nội dung điều hướng dùng chung cho cả sidebar desktop lẫn drawer mobile.
   function renderNav() {
