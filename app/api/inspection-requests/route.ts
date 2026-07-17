@@ -3,6 +3,7 @@ import { query, insertId, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { nextSeqCode, withUniqueRetry } from "@/lib/seqcode";
+import { emitWebhook } from "@/lib/webhooks";
 
 export const dynamic = "force-dynamic";
 
@@ -93,6 +94,10 @@ export async function POST(req: NextRequest) {
       { status: 422 },
     );
 
+  // Dự án của phiếu suy từ dự án đang chọn của người tạo (cùng helper getCurrentProjectId các
+  // route khác dùng, không suy lại từ nội bộ thực thể) — để lọc webhook theo dự án.
+  const projectId = await getCurrentProjectId(user);
+
   const id = await withUniqueRetry(() =>
     withTransaction(async () => {
       const code = await nextSeqCode("inspection_requests", "code", "YCNT-", 4);
@@ -114,6 +119,13 @@ export async function POST(req: NextRequest) {
       return reqId;
     }),
   );
+
+  // Phiếu YCNT vừa tạo thành công. taskId chỉ đưa vào khi phiếu đúng 1 task (nếu nhiều task
+  // thì bỏ trường taskId — data theo đặc tả {requestId, taskId?}).
+  await emitWebhook("inspection.requested", projectId, {
+    requestId: id,
+    ...(taskIds.length === 1 ? { taskId: taskIds[0] } : {}),
+  });
 
   return NextResponse.json({ id }, { status: 201 });
 }

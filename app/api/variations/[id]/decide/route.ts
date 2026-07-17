@@ -4,6 +4,7 @@ import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { todayISO } from "@/lib/date";
 import { advanceApproval } from "@/lib/approvals";
+import { emitWebhook } from "@/lib/webhooks";
 
 export const dynamic = "force-dynamic";
 
@@ -156,5 +157,21 @@ export async function POST(
       currentSeq: pendingStep.currentSeq,
       nextRole: pendingStep.nextRole,
     });
+
+  // VO vừa CHUYỂN sang approved/partially_approved THẬT (pendingStep undefined = domain logic
+  // đã chạy — nhánh legacy CAN.approve lẫn bước cuối engine đều rơi vào đây). Không phát khi
+  // reject hay khi mới qua bước giữa (pendingStep set). Re-fetch code sau commit để tránh
+  // vướng CFA của closure withTransaction.
+  if (decision === "approved" || decision === "partially_approved") {
+    const vo = await queryOne<{ code: string }>(
+      `SELECT code FROM variation_orders WHERE id = ?`,
+      id,
+    );
+    await emitWebhook("variation.approved", projectId, {
+      voId: id,
+      code: vo?.code ?? null,
+      status: decision,
+    });
+  }
   return NextResponse.json({ decided: id, decision });
 }

@@ -3169,3 +3169,44 @@
 - `ix_saved_reports_project`: INDEX ix_saved_reports_project ON public.saved_reports USING btree (project_id)
 - `saved_reports_pkey`: UNIQUE INDEX saved_reports_pkey ON public.saved_reports USING btree (id)
 
+### webhook_deliveries
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | bigint |  | `nextval('webhook_deliveries_id_seq'::regclass)` |
+| webhook_id | integer |  |  |
+| event | text |  |  |
+| payload | jsonb |  |  |
+| status | text |  | `'pending'::text` |
+| attempts | integer |  | `0` |
+| last_error | text | ✓ |  |
+| next_retry_at | timestamptz | ✓ | `now()` |
+| created_at | timestamptz | ✓ | `now()` |
+
+**Khóa ngoại:**
+- `webhook_id` → `webhooks(id)`
+
+**Index:**
+- `idx_webhook_deliveries_due`: INDEX idx_webhook_deliveries_due ON public.webhook_deliveries USING btree (next_retry_at) WHERE (status = 'pending'::text)
+- `webhook_deliveries_pkey`: UNIQUE INDEX webhook_deliveries_pkey ON public.webhook_deliveries USING btree (id)
+
+### webhooks
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | integer |  | `nextval('webhooks_id_seq'::regclass)` |
+| project_id | integer | ✓ |  |
+| url | text |  |  |
+| secret | text |  |  |
+| events | text[] |  |  |
+| active | boolean |  | `true` |
+| created_by | integer |  |  |
+| created_at | timestamptz | ✓ | `now()` |
+
+**Khóa ngoại:**
+- `created_by` → `users(id)`
+- `project_id` → `projects(id)`
+
+**Index:**
+- `webhooks_pkey`: UNIQUE INDEX webhooks_pkey ON public.webhooks USING btree (id)
+

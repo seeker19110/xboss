@@ -21,6 +21,7 @@ import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
+import WebhookSection from "./WebhookSection";
 
 type RunStats = Record<string, { pushed: number; pulled: number; errors: number }>;
 
@@ -222,6 +223,9 @@ export default function IntegrationsPage() {
             </Link>
           </div>
         </section>
+
+        {/* Webhook ra ngoài (M49 PR2) — quản lý CRUD chỉ Admin (canManage). */}
+        <WebhookSection canManage={canManage} />
 
         {loading ? (
           <div className="space-y-3">

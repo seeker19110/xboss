@@ -33,6 +33,7 @@ import { pendingDesignChanges } from "@/lib/designchanges";
 import { pendingClaims } from "@/lib/claims";
 import { getAlertThreshold } from "@/lib/alerts";
 import { overdueApprovals, NON_APPROVER_ROLES } from "@/lib/approvals";
+import { emitWebhook } from "@/lib/webhooks";
 
 export const dynamic = "force-dynamic";
 
@@ -236,8 +237,10 @@ export async function GET(req: Request) {
       qtyPlanned: number;
       qtyUsed: number;
       sheetCode: string | null;
+      boqCode: string | null;
     }>(
-      `SELECT m.id, m.name, m.unit, m.qty_planned AS "qtyPlanned", m.qty_used AS "qtyUsed", st.code AS "sheetCode"
+      `SELECT m.id, m.name, m.unit, m.qty_planned AS "qtyPlanned", m.qty_used AS "qtyUsed",
+              st.code AS "sheetCode", m.boq_code AS "boqCode"
          FROM materials m
          LEFT JOIN sheet_types st ON m.sheet_type_id = st.id
         WHERE ${materialOverCond}${matProjectFilter}`,
@@ -252,11 +255,27 @@ export async function GET(req: Request) {
         m.id,
         `📦 Vật tư "${m.name}"${m.sheetCode ? ` [${m.sheetCode}]` : ""} vượt định mức: ${m.qtyUsed}/${m.qtyPlanned}${m.unit ? ` ${m.unit}` : ""}`,
       ]);
-      await run(
+      // RETURNING material_id: ON CONFLICT DO NOTHING chỉ trả về hàng THẬT SỰ chèn mới → dùng
+      // đúng dedup sẵn có của notifications (user_id, material_id, type) làm dedup của webhook,
+      // không thêm cơ chế mới. Chỉ emit material.over_norm cho vật tư mới vượt định mức.
+      const insertedMat = await query<{ materialId: number }>(
         `INSERT INTO notifications (user_id, material_id, type, message) VALUES ${values}
-         ON CONFLICT (user_id, material_id, type) WHERE material_id IS NOT NULL DO NOTHING`,
+         ON CONFLICT (user_id, material_id, type) WHERE material_id IS NOT NULL DO NOTHING
+         RETURNING material_id AS "materialId"`,
         ...params,
       );
+      if (insertedMat.length > 0) {
+        const byId = new Map(overMats.map((m) => [m.id, m]));
+        for (const row of insertedMat) {
+          const m = byId.get(row.materialId);
+          if (!m) continue;
+          await emitWebhook("material.over_norm", projectId, {
+            materialId: m.id,
+            boqCode: m.boqCode,
+            name: m.name,
+          });
+        }
+      }
     }
 
     // Đã điều chỉnh định mức/số dùng về ngưỡng an toàn (hoặc vật tư bị xoá) → dọn cảnh báo chưa đọc.
