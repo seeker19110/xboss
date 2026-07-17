@@ -20,6 +20,22 @@ test("resolveSsoUser: email chuẩn hoá lowercase + trim, name mặc định t�
   assert.equal(r.roleFromClaim, null);
 });
 
+test("resolveSsoUser: email_verified=false → error, không tin email chưa xác minh", () => {
+  assert.deepEqual(resolveSsoUser({ email: "a@b.vn", email_verified: false }), {
+    error: "IdP chưa xác minh email này",
+  });
+});
+
+test("resolveSsoUser: thiếu email_verified (IdP không gửi field) → vẫn coi là hợp lệ", () => {
+  const r = resolveSsoUser({ email: "a@b.vn" });
+  assert.ok(!("error" in r));
+});
+
+test("resolveSsoUser: email_verified=true → hợp lệ", () => {
+  const r = resolveSsoUser({ email: "a@b.vn", email_verified: true });
+  assert.ok(!("error" in r));
+});
+
 test("resolveSsoUser: giữ name từ claim khi có", () => {
   const r = resolveSsoUser({ email: "a@b.vn", name: "  Trần B  " });
   assert.ok(!("error" in r));

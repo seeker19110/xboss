@@ -78,6 +78,10 @@ function roleFromClaims(claims: SsoClaims): Role | null {
 export function resolveSsoUser(claims: SsoClaims): ResolvedSsoUser | { error: string } {
   const rawEmail = typeof claims.email === "string" ? claims.email.trim() : "";
   if (!rawEmail) return { error: "IdP không trả email" };
+  // Chuẩn OIDC: chỉ chặn khi IdP trả rõ email_verified=false (email tự khai, chưa xác
+  // minh — rủi ro chiếm tài khoản qua trùng email). IdP không trả field này (nhiều IdP
+  // không gửi) → coi như verified, không chặn nhầm.
+  if (claims.email_verified === false) return { error: "IdP chưa xác minh email này" };
   const email = rawEmail.toLowerCase();
   const name =
     (typeof claims.name === "string" && claims.name.trim()) || email.split("@")[0];
