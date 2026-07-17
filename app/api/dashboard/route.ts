@@ -5,6 +5,7 @@ import { resolveSystemId } from "@/lib/systems";
 import { progressAtDate } from "@/lib/report";
 import { getCurrentProjectId } from "@/lib/projects";
 import { getGroupProgressMap } from "@/lib/group-progress";
+import { sheetProgressKpi } from "@/lib/kpi";
 import {
   qualityBlock,
   procurementBlock,
@@ -99,29 +100,8 @@ export async function GET(req: NextRequest) {
   // cột "Tiến độ TB" ở bảng hạng mục trễ, tránh nhầm với avg chỉ tính trên công tác trễ.
   const groupProgress = await getGroupProgressMap({ systemId, projectId });
 
-  // KPI theo từng sheet. LEFT JOIN work_packages/tasks (sheet chưa có task nào vẫn phải
-  // hiện) — JOIN towers (INNER) lọc đúng dự án qua ON, không ảnh hưởng LEFT JOIN work_packages/tasks
-  // phía sau nên sheet chưa có task vẫn hiện đúng khi đang lọc theo dự án.
-  const kpiRaw = await query<{
-    sheetId: number;
-    sheetType: string;
-    sheetSlug: string | null;
-    total: number;
-    avgProgress: number;
-  }>(
-    `SELECT st.id AS "sheetId", st.code AS "sheetType", st.slug AS "sheetSlug",
-            COUNT(t.id) AS total,
-            COALESCE(AVG(t.progress_percent), 0) AS "avgProgress"
-       FROM sheet_types st
-       ${projectId != null ? "JOIN towers tw ON tw.id = st.tower_id AND tw.project_id = ?" : ""}
-       LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
-       LEFT JOIN tasks t ON t.package_id = wp.id
-       ${systemId !== null ? "WHERE st.system_id = ?" : ""}
-      GROUP BY st.id, st.code, st.slug
-      ORDER BY st.sort_order, st.id`,
-    ...projectParams,
-    ...systemParams,
-  );
+  // KPI theo từng sheet — tách hàm dùng chung lib/kpi.ts (dùng lại cho /api/v1/dashboard/kpi).
+  const kpiRaw = await sheetProgressKpi({ projectId, systemId });
   const kpi = kpiRaw.map((k) => ({
     ...k,
     delayed: delayedItemsBySheet.get(k.sheetType)?.size ?? 0,

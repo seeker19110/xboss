@@ -31,19 +31,35 @@ export async function loginBlockedSeconds(ip: string, email: string): Promise<nu
   return blockedUntil > now ? Math.ceil((blockedUntil - now) / 1000) : 0;
 }
 
+// Rate limit generic tái dùng bảng login_rate_limits + pattern upsert atomic sẵn có.
+// Trả về true nếu ĐÃ VƯỢT giới hạn (caller trả 429), false nếu còn quota (đã đếm +1).
+// Dùng cho `api:${keyId}` (M49 PR1), `oidc:${ip}` (M49 PR3)... — đếm-trước-chặn-sau
+// đủ cho API (khác login: login cần hàm check riêng để không đếm lần đăng nhập đúng).
 // Upsert atomic (INSERT ... ON CONFLICT): an toàn khi nhiều instance ghi đồng thời —
 // Postgres khoá theo row key, không có race đọc-rồi-ghi như Map trong process.
-async function bump(key: string): Promise<void> {
-  await run(
+export async function hitRateLimit(
+  key: string,
+  max: number,
+  windowMinutes: number,
+): Promise<boolean> {
+  const rows = await query<{ count: number }>(
     `INSERT INTO login_rate_limits (key, count, reset_at)
      VALUES (?, 1, NOW() + make_interval(mins => ?))
      ON CONFLICT (key) DO UPDATE SET
        count = CASE WHEN login_rate_limits.reset_at <= NOW() THEN 1 ELSE login_rate_limits.count + 1 END,
-       reset_at = CASE WHEN login_rate_limits.reset_at <= NOW() THEN NOW() + make_interval(mins => ?) ELSE login_rate_limits.reset_at END`,
+       reset_at = CASE WHEN login_rate_limits.reset_at <= NOW() THEN NOW() + make_interval(mins => ?) ELSE login_rate_limits.reset_at END
+     RETURNING count`,
     key,
-    WINDOW_MINUTES,
-    WINDOW_MINUTES,
+    windowMinutes,
+    windowMinutes,
   );
+  return (rows[0]?.count ?? 1) > max;
+}
+
+// Ghi nhận 1 lần chạm cửa sổ login — dùng chung helper generic, giữ nguyên cửa sổ login.
+// (login đếm-trước, chặn qua loginBlockedSeconds bằng ngưỡng riêng MAX_PER_KEY/MAX_PER_IP.)
+async function bump(key: string): Promise<void> {
+  await hitRateLimit(key, Number.POSITIVE_INFINITY, WINDOW_MINUTES);
 }
 
 // Ghi nhận 1 lần đăng nhập sai.

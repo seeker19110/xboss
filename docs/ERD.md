@@ -3147,6 +3147,28 @@
 - `alert_rules_pkey`: UNIQUE INDEX alert_rules_pkey ON public.alert_rules USING btree (id)
 - `ux_alert_rule_active`: UNIQUE INDEX ux_alert_rule_active ON public.alert_rules USING btree (metric, COALESCE(project_id, 0)) WHERE active
 
+### api_keys
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | integer |  | `nextval('api_keys_id_seq'::regclass)` |
+| name | text |  |  |
+| key_hash | text |  |  |
+| project_id | integer | ✓ |  |
+| scopes | text[] |  | `'{read}'::text[]` |
+| created_by | integer |  |  |
+| created_at | timestamptz | ✓ | `now()` |
+| last_used_at | timestamptz | ✓ |  |
+| revoked_at | timestamptz | ✓ |  |
+
+**Khóa ngoại:**
+- `created_by` → `users(id)`
+- `project_id` → `projects(id)`
+
+**Index:**
+- `api_keys_key_hash_key`: UNIQUE INDEX api_keys_key_hash_key ON public.api_keys USING btree (key_hash)
+- `api_keys_pkey`: UNIQUE INDEX api_keys_pkey ON public.api_keys USING btree (id)
+
 ### saved_reports
 
 | Cột | Kiểu | Null | Default |
