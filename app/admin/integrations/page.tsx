@@ -130,7 +130,7 @@ export default function IntegrationsPage() {
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [keyName, setKeyName] = useState("");
   const [keyProject, setKeyProject] = useState<string>(""); // "" = toàn cục
-  const [keyScope, setKeyScope] = useState<"read" | "read_finance">("read");
+  const [keyScopes, setKeyScopes] = useState<string[]>(["read"]);
   const [creatingKey, setCreatingKey] = useState(false);
   const [createdKey, setCreatedKey] = useState<string | null>(null);
 
@@ -191,7 +191,7 @@ export default function IntegrationsPage() {
         body: JSON.stringify({
           name,
           projectId: keyProject === "" ? null : Number(keyProject),
-          scopes: [keyScope],
+          scopes: keyScopes,
         }),
       });
       const j = await res.json().catch(() => null);
@@ -202,7 +202,7 @@ export default function IntegrationsPage() {
       setCreatedKey(j.key);
       setKeyName("");
       setKeyProject("");
-      setKeyScope("read");
+      setKeyScopes(["read"]);
       loadKeys();
     } catch {
       showToast("Mất kết nối — không tạo được key", "error");
@@ -239,7 +239,7 @@ export default function IntegrationsPage() {
     setCreatedKey(null);
     setKeyName("");
     setKeyProject("");
-    setKeyScope("read");
+    setKeyScopes(["read"]);
   }
 
   async function copyKey() {
@@ -646,15 +646,41 @@ export default function IntegrationsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-zinc-400 mb-1">Scope</label>
-                <select
-                  value={keyScope}
-                  onChange={(e) => setKeyScope(e.target.value as "read" | "read_finance")}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-violet-500"
-                >
-                  <option value="read">read — đọc tiến độ/vật tư</option>
-                  <option value="read_finance">read_finance — thêm dữ liệu tài chính</option>
-                </select>
+                <label className="block text-xs text-zinc-400 mb-2">Quyền truy cập</label>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={keyScopes.includes("read")}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setKeyScopes([...keyScopes, "read"]);
+                        } else {
+                          setKeyScopes(keyScopes.filter((s) => s !== "read"));
+                        }
+                      }}
+                      className="w-4 h-4 bg-zinc-800 border border-zinc-700 rounded cursor-pointer accent-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 focus:ring-offset-zinc-900"
+                    />
+                    <span className="text-sm text-zinc-300">read — đọc tiến độ/vật tư</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={keyScopes.includes("read_finance")}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setKeyScopes([...keyScopes, "read_finance"]);
+                        } else {
+                          setKeyScopes(keyScopes.filter((s) => s !== "read_finance"));
+                        }
+                      }}
+                      className="w-4 h-4 bg-zinc-800 border border-zinc-700 rounded cursor-pointer accent-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 focus:ring-offset-zinc-900"
+                    />
+                    <span className="text-sm text-zinc-300">
+                      read_finance — thêm dữ liệu tài chính
+                    </span>
+                  </label>
+                </div>
               </div>
               <div className="flex justify-end gap-2 pt-1">
                 <button
@@ -667,8 +693,9 @@ export default function IntegrationsPage() {
                 <button
                   type="button"
                   onClick={createKey}
-                  disabled={creatingKey}
+                  disabled={creatingKey || keyScopes.length === 0}
                   className="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm rounded-lg font-medium bg-violet-600 hover:bg-violet-500 disabled:opacity-50"
+                  title={keyScopes.length === 0 ? "Chọn ít nhất 1 quyền" : undefined}
                 >
                   {creatingKey && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   Tạo key

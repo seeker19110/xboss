@@ -29,10 +29,10 @@ Thân lỗi luôn dạng `{ "error": "..." }` (tiếng Việt).
 
 ## Scope
 
-| Scope          | Cho phép                                                                       |
-| -------------- | ------------------------------------------------------------------------------ |
-| `read`         | Đọc tiến độ, nhóm công tác, vật tư, KPI dashboard                              |
-| `read_finance` | Bao gồm `read` cho tài chính — đọc thêm chứng chỉ thanh toán (`payment-certs`) |
+| Scope          | Cho phép                                                                         |
+| -------------- | -------------------------------------------------------------------------------- |
+| `read`         | Đọc tiến độ, nhóm công tác, vật tư, KPI dashboard                                |
+| `read_finance` | Đọc chứng chỉ thanh toán (`payment-certs`) — scope độc lập, không bao gồm `read` |
 
 Mỗi endpoint yêu cầu 1 scope tối thiểu (xem bảng bên dưới).
 

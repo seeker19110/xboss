@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/auth";
-import { query, insertId } from "@/lib/db";
+import { query, queryOne, insertId } from "@/lib/db";
 import { generateApiKey, hashApiKey } from "@/lib/api-keys";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +42,14 @@ export async function POST(req: NextRequest) {
   const projectId = body.projectId != null && body.projectId !== "" ? Number(body.projectId) : null;
   if (projectId != null && !Number.isInteger(projectId))
     return NextResponse.json({ error: "projectId không hợp lệ" }, { status: 400 });
+
+  // Kiểm FK projectId tồn tại
+  if (projectId != null) {
+    const projectExists = await queryOne(`SELECT 1 FROM projects WHERE id = ?`, projectId);
+    if (!projectExists) {
+      return NextResponse.json({ error: "Dự án không tồn tại" }, { status: 404 });
+    }
+  }
 
   const rawScopes: string[] = Array.isArray(body.scopes)
     ? (body.scopes as unknown[]).map((s) => String(s))
