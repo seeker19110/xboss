@@ -49,6 +49,11 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Cổng M52 PR3: swExclude khai trong module registry (lib/modules.ts) phải khớp
+      # danh sách loại trừ cache thật trong public/sw.js — lệch là đỏ. Static, không cần DB.
+      - name: Kiểm swExclude registry khớp sw.js
+        run: npm run check:sw-exclude
+
       # "npm test" chạy từng file test trong 1 process Node riêng, tuần tự (xem
       # scripts/run-tests.mjs) — cô lập để nhiều file cùng chạm 1 Postgres CI không đụng
       # nhau gây fail ngẫu nhiên. Cùng lệnh với chạy test cục bộ (local === CI).

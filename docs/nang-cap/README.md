@@ -81,6 +81,7 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 - **Mobile công trường**: vùng chạm ≥40px, thao tác chính với được bằng ngón cái, form quan trọng hoạt động khi offline nếu thuộc luồng đã có offline queue.
 - **A11y**: nút icon-only có `aria-label` tiếng Việt; select có tên; focus ring rõ; không truyền tin chỉ bằng màu. Trang mới thêm `e2e/authed/<trang>.spec.ts` chạy axe (desktop + mobile) theo pattern sẵn có.
 - **Điều hướng**: trang mới thêm mục vào sidebar (M0) đúng nhóm nghiệp vụ + title/breadcrumb topbar; route động nhớ đăng ký loại trừ cache trong `public/sw.js` nếu cần (tăng version `CACHE`).
+- **Module registry (M52 PR3)**: module mới **bắt buộc** thêm 1 entry vào `MODULES` (`lib/modules.ts`) khai báo mọi điểm chạm xuyên suốt (nav sidebar, `permKeys`, `notificationTypes`, `swExclude`, `routePrefix`) — nguồn tra cứu tập trung thay cho việc sửa rời rạc ≥4 nơi. Khai `swExclude` phải khớp `public/sw.js` (cổng CI `scripts/check-sw-exclude.ts` kiểm).
 
 ### Quy trình mỗi PR
 
