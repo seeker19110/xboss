@@ -1,6 +1,6 @@
 // Kiểm tra tương phản WCAG cho hệ màu zinc của XBoss qua cả 6 theme (dark/light/kingblue/darkblue/navy)
 // + nút accent chữ trắng. Dùng để biến "ứng viên grep" (text-zinc-500/600) thành "khả năng lỗi cao"
-// TRƯỚC khi chạy axe (ground-truth cuối). Xem docs/a11y/contrast-audit.md.
+// TRƯỚC khi chạy axe (ground-truth cuối). Xem docs/audit.md §13 (Phụ lục A — tương phản màu WCAG).
 //
 // Chạy: npx tsx scripts/contrast-check.ts
 //
