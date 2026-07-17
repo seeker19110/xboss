@@ -282,6 +282,10 @@ const CAN_DEFAULT = {
   // luồng đẩy dữ liệu ra hệ ngoài, cùng phân quyền Approval Engine/Alert Rules).
   viewIntegrations: (r?: Role) => r === "admin" || r === "pm",
   manageIntegrations: (r?: Role) => r === "admin",
+  // Trường tuỳ biến (M52 PR2, custom_field_defs) — xem định nghĩa Admin/PM; tạo/sửa/xoá
+  // định nghĩa chỉ Admin (đổi cấu trúc dữ liệu chung, cùng phân quyền Alert Rules).
+  viewCustomFields: (r?: Role) => r === "admin" || r === "pm",
+  manageCustomFields: (r?: Role) => r === "admin",
 };
 
 // ===== M50 PR1 — Override quyền trong DB =====

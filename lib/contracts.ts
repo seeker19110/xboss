@@ -140,6 +140,7 @@ export type ContractRow = {
   addendaTotal: number;
   paid: number;
   poCommitted: number;
+  custom: Record<string, unknown>;
   deletedAt: string | null;
 };
 
@@ -180,6 +181,7 @@ export async function listContracts(
             COALESCE(a.total, 0) AS "addendaTotal",
             COALESCE(p.total, 0) AS "paid",
             COALESCE(po.total, 0) AS "poCommitted",
+            c.custom,
             c.deleted_at AS "deletedAt"
        FROM contracts c
        LEFT JOIN suppliers s ON s.id = c.party_supplier_id

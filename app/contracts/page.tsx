@@ -19,6 +19,7 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appAlert, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
+import CustomFieldsSection from "@/app/components/CustomFieldsSection";
 
 type ContractKind = "nhan_thau" | "giao_thau" | "ncc";
 type ContractStatus = "draft" | "active" | "completed" | "terminated";
@@ -64,6 +65,7 @@ type Contract = {
   addendaTotal: number;
   paid: number;
   poCommitted: number;
+  custom: Record<string, unknown>;
   deletedAt: string | null;
 };
 type Supplier = { id: number; name: string };
@@ -937,6 +939,16 @@ function ContractDetailModal({
                 <div>Hiệu lực đến: {contract.validTo ?? "Không thời hạn"}</div>
               </dl>
             )}
+            <CustomFieldsSection
+              entityType="contract"
+              apiPath={`/api/contracts/${contract.id}`}
+              value={detail?.contract.custom}
+              canEdit={canManage}
+              onSaved={() => {
+                onSaved();
+                loadDetail();
+              }}
+            />
           </section>
         )}
 

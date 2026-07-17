@@ -94,6 +94,7 @@
 | assigned_to | integer | ✓ |  |
 | assigned_manual | boolean |  | `false` |
 | requires_method_statement | boolean |  | `false` |
+| custom | jsonb |  | `'{}'::jsonb` |
 
 **Khóa ngoại:**
 - `assigned_to` → `users(id)`
@@ -132,6 +133,7 @@
 | delay_reason | text | ✓ |  |
 | delay_note | text | ✓ |  |
 | assigned_manual | boolean |  | `false` |
+| custom | jsonb |  | `'{}'::jsonb` |
 
 **Khóa ngoại:**
 - `assigned_to` → `users(id)`
@@ -696,6 +698,7 @@
 | created_at | timestamptz | ✓ | `now()` |
 | project_id | integer | ✓ |  |
 | deleted_at | timestamptz | ✓ |  |
+| custom | jsonb |  | `'{}'::jsonb` |
 
 **Khóa ngoại:**
 - `created_by` → `users(id)`
@@ -1358,6 +1361,7 @@
 | qty_stock | float8 | ✓ | `0` |
 | min_stock_level | float8 | ✓ | `0` |
 | project_id | integer | ✓ |  |
+| custom | jsonb |  | `'{}'::jsonb` |
 
 **Khóa ngoại:**
 - `project_id` → `projects(id)`
@@ -3184,6 +3188,28 @@
 **Index:**
 - `api_keys_key_hash_key`: UNIQUE INDEX api_keys_key_hash_key ON public.api_keys USING btree (key_hash)
 - `api_keys_pkey`: UNIQUE INDEX api_keys_pkey ON public.api_keys USING btree (id)
+
+### custom_field_defs
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | integer |  | `nextval('custom_field_defs_id_seq'::regclass)` |
+| project_id | integer | ✓ |  |
+| entity_type | text |  |  |
+| key | text |  |  |
+| label | text |  |  |
+| type | text |  |  |
+| options | jsonb | ✓ |  |
+| required | boolean |  | `false` |
+| sort | integer |  | `0` |
+| active | boolean |  | `true` |
+
+**Khóa ngoại:**
+- `project_id` → `projects(id)`
+
+**Index:**
+- `custom_field_defs_pkey`: UNIQUE INDEX custom_field_defs_pkey ON public.custom_field_defs USING btree (id)
+- `custom_field_defs_scope_key_uidx`: UNIQUE INDEX custom_field_defs_scope_key_uidx ON public.custom_field_defs USING btree (entity_type, COALESCE(project_id, 0), key)
 
 ### saved_reports
 

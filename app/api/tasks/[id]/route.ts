@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { boqTakenBy } from "@/lib/boq";
 import { recomputeTask, recomputePackage } from "@/lib/recompute";
 import { assignTask } from "@/lib/assignments";
+import { validateCustom } from "@/lib/custom-fields";
 import { unlink } from "fs/promises";
 import { join } from "path";
 
@@ -97,6 +99,14 @@ export async function PATCH(
       sets.push(`${col} = ?`);
       vals.push(body[key]);
     }
+  }
+  // Trường tuỳ biến (M52 PR2): merge shallow vào cột custom — không đè field khác.
+  if (body.custom !== undefined) {
+    const projectId = await getCurrentProjectId(me);
+    const v = await validateCustom("task", projectId, body.custom);
+    if (!v.ok) return NextResponse.json({ error: v.error }, { status: v.status });
+    sets.push(`custom = custom || ?::jsonb`);
+    vals.push(JSON.stringify(v.value));
   }
   if (!sets.length && !assignedHandled)
     return NextResponse.json({ error: "Không có trường để cập nhật" }, { status: 400 });

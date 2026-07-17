@@ -70,6 +70,7 @@ import {
   BellRing,
   Cable,
   ListTree,
+  SlidersHorizontal,
   KeyRound,
 } from "lucide-react";
 import type { Role } from "@/lib/roles";
@@ -464,6 +465,13 @@ export const DASHBOARD_TREE: DashCluster[] = [
         icon: ListTree,
         roles: ["admin"],
       }, // M52 PR1 — code_lists: danh mục enum-mềm (nguyên nhân trễ…); chỉ Admin
+      {
+        id: "dash.custom-fields",
+        href: "/admin/custom-fields",
+        label: "Trường tuỳ biến",
+        icon: SlidersHorizontal,
+        roles: ["admin", "pm"],
+      }, // M52 PR2 — custom_field_defs: trường tuỳ biến cho 4 entity; Admin sửa, PM xem
     ],
   },
   {
