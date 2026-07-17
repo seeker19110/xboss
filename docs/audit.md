@@ -13,11 +13,15 @@ Mọi đợt audit phủ đủ 3 trụ: **Bảo mật & phân quyền**, **Logic
 - **Ưu tiên theo mức ảnh hưởng tới dữ liệu thật**: sai % tiến độ / sai tiền / rò rỉ chéo dự án / mất quyền riêng tư nghiêm trọng hơn vấn đề thẩm mỹ.
 - **Audit không thay thế test.** Mọi lỗi logic tìm thấy phải có ít nhất 1 test hồi quy trước khi coi là đóng.
 - **Không big-bang.** Audit hẹp theo vùng rủi ro (mục 6) khi PR chạm vào; audit toàn dự án định kỳ dùng nhiều agent song song theo miền.
+- **Audit = ĐỌC + BÁO CÁO trước, SỬA sau.** Một lượt audit trước hết là chụp trạng thái toàn repo ở một thời điểm (kể cả khi working tree sạch, không có diff nào) rồi xuất báo cáo (mục 12). Việc sửa tách thành thay đổi riêng có PR — trừ khi người dùng yêu cầu sửa luôn. Lịch sử XBoss thường sửa-trong-lượt vì đa số phát hiện là bug logic tự sửa được; vẫn phải **báo cáo phát hiện trước khi sửa** để có dấu vết so sánh giữa các đợt, không trộn lẫn "phát hiện" và "sửa" thành một khối mờ.
+- **Phân loại việc rõ ai xử lý.** Mỗi phát hiện gắn `[AI]` (Claude tự sửa được: lỗi code/logic/format/test) hoặc `[Người dùng]` (cần thao tác tay ngoài tầm AI: cấp/xoay secret trên VPS như `SENTRY_DSN`/`XBOSS_SECRET`, chạy migration đụng dữ liệu trên production, bật branch protection, nâng gói GitHub cho CodeQL). Không gộp chung — kẻo việc `[Người dùng]` bị bỏ quên vì tưởng AI đã lo.
+- **Đối chiếu, không tin trí nhớ.** Trạng thái thật đọc từ repo/lệnh/DB, **không** lấy từ hook đầu phiên hay ghi chú cũ (dễ lỗi thời — đã từng lệch với trạng thái migration). Migration đã áp production tra thẳng bảng `schema_migrations`, không đoán.
 
 ## 2. Khi nào chạy
 
 - **Audit toàn dự án**: sau khi gộp xong một nhóm module lớn, trước mốc release, hoặc khi nghi ngờ có lỗ hổng hệ thống (đã làm nhiều lần — xem lịch sử trong `PROGRESS.md`). Chia theo miền, chạy song song nhiều subagent độc lập (mẫu đã dùng: bảo mật/phân quyền, correctness/race-condition, frontend a11y/UX, dependency/CI/migration/test).
 - **Audit hẹp**: bắt buộc tự soát theo checklist tương ứng (mục 3/4/5) trước khi merge PR chạm vùng rủi ro cao (mục 6), kể cả khi không có ai yêu cầu.
+- **Audit định kỳ (khuyến nghị)**: trước mỗi đợt deploy production, hoặc mốc cuối tuần làm việc. Có thể tự hẹn bằng `send_later`/Routine (đã dùng thật trong dự án để theo dõi PR) để không quên — mỗi lần fire chạy lại đúng quy trình mục 9 và xuất báo cáo mục 12.
 
 ## 3. Checklist Bảo mật & Phân quyền (API là ranh giới duy nhất)
 
@@ -70,6 +74,8 @@ Kế thừa quy trình ground-truth đã chứng minh hiệu quả ở `docs/a11
 - [ ] Mọi workflow khai báo `permissions:` tường minh (least-privilege), không dựa vào mặc định rộng của GitHub Actions.
 - [ ] `deploy.yml` chỉ deploy khi job CI trước đó thật sự `success` (kể cả E2E) — không để CI đỏ vẫn lọt qua vì thiếu `needs`/điều kiện đúng.
 - [ ] Query mới trên bảng lớn (`tasks`, `progress_dimensions`, `task_history`, `notifications`) có index cho cột lọc/sắp xếp/join hay chưa — đặc biệt route dashboard/notification chạy mỗi lần fetch (on-fetch sync), không phải cron.
+- [ ] **Độ phủ test (định lượng)**: đo bằng coverage built-in của `node:test` (Node 22): `node --experimental-test-coverage scripts/run-tests.mjs` (hoặc `tsx --test --experimental-test-coverage tests/<file>` cho 1 file). Chỉ soi **logic thuần** (`lib/**`, `app/api/**`), không đo component UI. Cơ chế **ratchet — không tệ hơn lần đo trước**: ghi mốc `stmts/branches/funcs/lines` mới nhất vào `PROGRESS.md`; thêm test mới thì nâng dần, không để trôi xuống. *(Chưa có script `test:coverage`/ngưỡng CI cứng — nếu muốn chốt thành cổng CI thì mở thay đổi riêng, không tự thêm trong lượt audit.)*
+- [ ] **Rà vùng thiếu test (định tính)**: với mỗi hàm logic phức tạp trong vùng rủi ro cao (mục 8) còn nhánh chưa phủ, đối chiếu checklist ca biên §4 (rỗng/`null` vs 0/off-by-one/race-idempotency/ngày UTC↔`Asia/Ho_Chi_Minh`/nhánh lỗi mạng-DB). Vùng thiếu → ghi danh sách **đề xuất bổ sung test** vào báo cáo, không tự viết test trong lượt audit (trừ khi người dùng yêu cầu).
 
 ## 7. Checklist Vận hành, Đồng bộ real-time, Offline (PWA) & Xuất bản
 
@@ -106,3 +112,51 @@ Rà lại `package.json` + `.github/workflows/*` (2026-07-12): axe-core/Playwrig
 - [ ] Không còn phát hiện mức Cao/Trung bình chưa xử lý hoặc chưa ghi nợ kỹ thuật rõ ràng kèm lý do.
 - [ ] `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` xanh.
 - [ ] `PROGRESS.md` đã cập nhật đúng mục audit + nợ kỹ thuật (nếu có việc chưa đóng).
+- [ ] Đã xuất **báo cáo audit** theo mẫu §12 (kể cả khi mọi mục xanh) — để so sánh được giữa các đợt.
+
+## 12. Mẫu báo cáo audit
+
+Xuất báo cáo theo khung dưới sau mỗi lượt (dán vào `PROGRESS.md` mục "Đợt audit toàn dự án ..." hoặc reply cho người dùng). Mọi mục ❌ ở nhóm **chặn** (Cổng tự động §3-Bảo mật §... ) → kết luận phải là "Cần xử lý", không được "Sẵn sàng".
+
+```
+=== BÁO CÁO AUDIT TOÀN DIỆN — <ngày giờ, giờ VN> · nhánh <tên> · <commit ngắn> ===
+
+CỔNG TỰ ĐỘNG (chặn)
+  lint ✅/❌ | typecheck ✅/❌ (lỗi: ..) | test ✅/❌ (X/Y file, A/B ca) | build ✅/❌
+
+§3 BẢO MẬT & PHÂN QUYỀN
+  Route mới có getCurrentUser()+401 ✅/❌ | CAN/canTouchTask/canTouchPackage đối xứng ✅/❌
+  | scope projectId (M22) ✅/❌ | secret hardcode: 0/.. | .env track: chỉ .env.example ✅/❌
+  | npm audit (high/critical: ..) | cron Bearer-only ✅/❌ | rate-limit atomic ✅/❌
+
+§4 LOGIC & TOÀN VẸN DỮ LIỆU
+  Làm tròn % ✅/❌ | FOR UPDATE trong transaction ✅/❌ | race/idempotency ✅/❌
+  | tiền tính trong SQL (không float JS) ✅/❌ | ngày Asia/Ho_Chi_Minh ✅/❌
+  | nghiem_thu không tự hạ cấp ✅/❌ | migration append-only idempotent ✅/❌
+
+§5 UI/UX & A11Y
+  4 trạng thái màn hình ✅/❌ | axe serious/critical: 0/.. (5 theme) | aria-label icon ✅/❌
+  | vùng chạm ≥40px / không cuộn ngang toàn trang ✅/❌ | không chỉ-bằng-màu ✅/❌
+
+§6 HIỆU NĂNG / DEPENDENCY / CI
+  Lighthouse ≥ ngưỡng error ✅/❌ | uses: pin SHA ✅/❌ | permissions tường minh ✅/❌
+  | deploy needs CI success ✅/❌ | index bảng lớn ✅/❌
+  | Coverage (lib/**, app/api/**): stmts../branches../funcs../lines.. (so mốc trước: ↑/↓/=)
+  | Vùng thiếu test đề xuất: [..]
+
+§7 VẬN HÀNH / OFFLINE / XUẤT BẢN
+  SSE watermark+fallback ✅/❌ | offline queue idempotent, bỏ 4xx ✅/❌
+  | sw.js tăng CACHE version ✅/❌ | PDF/Excel font VN + cột SQL đúng ✅/❌ | dedup notif ✅/❌
+
+ĐỐI CHIẾU TÀI LIỆU & HẠ TẦNG (git/PROGRESS/migration — đọc trạng thái thật, không tin trí nhớ)
+  Git: ahead X / behind Y | working tree ✅/❌ | PROGRESS khớp thực tế ✅/❌
+  | Migration chưa áp production (tra schema_migrations): [..] | Nợ kỹ thuật còn đúng: [..]
+
+--- PHÂN LOẠI VIỆC ---
+  [AI] tự làm được: [..]
+  [Người dùng] cần thao tác tay: [.. vd cấp SENTRY_DSN trên VPS, chạy migration đụng dữ liệu qua staging→production, nâng gói GitHub cho CodeQL ..]
+  Rủi ro/ảnh hưởng: ..
+  Góp ý cải tiến: ..
+
+KẾT LUẬN: Sẵn sàng / Cần xử lý: [..]
+```
