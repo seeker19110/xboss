@@ -72,6 +72,7 @@ import {
   ListTree,
   SlidersHorizontal,
   KeyRound,
+  ToggleRight,
 } from "lucide-react";
 import type { Role } from "@/lib/roles";
 
@@ -472,6 +473,13 @@ export const DASHBOARD_TREE: DashCluster[] = [
         icon: SlidersHorizontal,
         roles: ["admin", "pm"],
       }, // M52 PR2 — custom_field_defs: trường tuỳ biến cho 4 entity; Admin sửa, PM xem
+      {
+        id: "dash.feature-flags",
+        href: "/admin/features",
+        label: "Cờ tính năng",
+        icon: ToggleRight,
+        roles: ["admin", "pm"],
+      }, // M52 PR4 — feature_flags: bật/tắt module theo dự án; PM chỉ xem, Admin sửa
     ],
   },
   {

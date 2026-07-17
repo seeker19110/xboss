@@ -1,3 +1,8 @@
+// @deprecated (M52 PR4): granularity mịn hơn feature_flags (per dashboard node, không
+// phải per module) — giữ nguyên API/hành vi cho tương thích ngược, KHÔNG xoá/di trú dữ
+// liệu. Module mới nên dùng lib/feature-flags.ts (per module × dự án, có enforcement API
+// thật qua assertModuleEnabled). Xem docs/nang-cap/M52-mo-rong-cau-hinh.md mục PR4.
+//
 // Quản trị hiển thị mục AppShell (M21 PR3 — xem docs/nang-cap/M21-appshell-ia.md):
 // Admin/PM bật/tắt từng dashboard cấp 3 trong sidebar qua bảng nav_settings. Override
 // theo dự án (M22) đã bật thật: `project_id IS NULL` = toàn hệ thống (mặc định), truyền

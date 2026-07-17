@@ -3,6 +3,7 @@ import { readFile, unlink } from "node:fs/promises";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 import { photoPath } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,9 @@ export async function GET(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("documents", projectId);
+  if (blocked) return blocked;
+
   const doc =
     projectId != null
       ? await queryOne<ProjectDocRow>(
@@ -73,6 +77,9 @@ export async function DELETE(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("documents", projectId);
+  if (blocked) return blocked;
+
   const doc =
     projectId != null
       ? await queryOne<ProjectDocRow>(
