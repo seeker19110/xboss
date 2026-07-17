@@ -178,7 +178,7 @@ const MODULES: { title: string; tables: string[] }[] = [
   },
   {
     title: "Hệ thống & audit",
-    tables: ["audit_log", "assignment_log", "schema_migrations"],
+    tables: ["audit_log", "assignment_log", "schema_migrations", "code_lists"],
   },
 ];
 
