@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, insertId, run } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 import { boqTakenBy } from "@/lib/boq";
 import { log } from "@/lib/log";
 
@@ -18,6 +19,8 @@ export async function GET(req: NextRequest) {
   const hasFilter = !isNaN(sheetTypeId);
   const projectId = await getCurrentProjectId(user);
   if (projectId == null) return NextResponse.json({ materials: [] });
+  const blocked = await assertModuleEnabled("materials", projectId);
+  if (blocked) return blocked;
 
   const conds = ["m.project_id = ?"];
   const args: unknown[] = [projectId];
@@ -64,6 +67,8 @@ export async function POST(req: NextRequest) {
   const projectId = await getCurrentProjectId(user);
   if (projectId == null)
     return NextResponse.json({ error: "Chưa có dự án nào để thêm vật tư" }, { status: 422 });
+  const blocked = await assertModuleEnabled("materials", projectId);
+  if (blocked) return blocked;
 
   const body = await req.json().catch(() => ({}));
   const name = String(body.name ?? "").trim();

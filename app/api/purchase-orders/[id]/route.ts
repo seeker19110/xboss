@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 import {
   PO_ALL_STATUSES,
   getPurchaseOrder,
@@ -32,6 +33,8 @@ export async function GET(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("materials", projectId);
+  if (blocked) return blocked;
   const exists = projectId != null ? await getPurchaseOrder(id, projectId) : undefined;
   if (!exists) return NextResponse.json({ error: "Không tìm thấy đơn hàng" }, { status: 404 });
 
@@ -91,6 +94,8 @@ export async function PATCH(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("materials", projectId);
+  if (blocked) return blocked;
   const po = projectId != null ? await getPurchaseOrder(id, projectId) : undefined;
   if (!po) return NextResponse.json({ error: "Không tìm thấy đơn hàng" }, { status: 404 });
 
@@ -147,6 +152,8 @@ export async function DELETE(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("materials", projectId);
+  if (blocked) return blocked;
   const po = projectId != null ? await getPurchaseOrder(id, projectId) : undefined;
   if (!po) return NextResponse.json({ error: "Không tìm thấy đơn hàng" }, { status: 404 });
 

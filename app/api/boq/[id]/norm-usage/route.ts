@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 import { normUsage } from "@/lib/norms";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,8 @@ export async function GET(
   if (isNaN(boqItemId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("materials", projectId);
+  if (blocked) return blocked;
   const boqItem = await queryOne<{ id: number }>(
     `SELECT id FROM boq_items WHERE id = ?${projectId != null ? " AND project_id = ?" : ""}`,
     boqItemId,

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { deriveStatus, recomputePackage } from "@/lib/recompute";
 import { getCurrentUser, canTouchTask, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 import { handoverBlocked, methodStatementBlocked } from "@/lib/qaqc";
 import type { StatusSlug } from "@/lib/status";
 
@@ -35,6 +37,10 @@ export async function PATCH(
       { error: "Bạn chỉ được cập nhật task được giao cho mình" },
       { status: 403 },
     );
+
+  const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("tracking", projectId);
+  if (blocked) return blocked;
 
   const body = await req.json().catch(() => ({}));
   let progress = Number(body.progress);

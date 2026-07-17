@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 
 export const dynamic = "force-dynamic";
 
@@ -12,12 +14,18 @@ export async function POST(req: NextRequest) {
   if (!CAN.editStructure(user.role))
     return NextResponse.json({ error: "Không có quyền chỉnh sửa (chỉ Admin/PM)" }, { status: 403 });
 
+  const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("tracking", projectId);
+  if (blocked) return blocked;
+
   const { packageId, oldLabel, newLabel } = await req.json().catch(() => ({}));
   if (!packageId || !oldLabel || !newLabel)
     return NextResponse.json({ error: "Thiếu tham số" }, { status: 400 });
 
   const sheet = await queryOne<{ sheet_type_id: number }>(
-    `SELECT sheet_type_id FROM work_packages WHERE id = ?`, packageId);
+    `SELECT sheet_type_id FROM work_packages WHERE id = ?`,
+    packageId,
+  );
   if (!sheet) return NextResponse.json({ error: "Không tìm thấy nhóm" }, { status: 404 });
 
   const r = await run(
@@ -27,7 +35,10 @@ export async function POST(req: NextRequest) {
            SELECT t.id FROM tasks t
            JOIN work_packages wp ON t.package_id = wp.id
           WHERE wp.sheet_type_id = ?)`,
-    String(newLabel).trim(), oldLabel, sheet.sheet_type_id);
+    String(newLabel).trim(),
+    oldLabel,
+    sheet.sheet_type_id,
+  );
 
   return NextResponse.json({ updated: Number(r.changes), oldLabel, newLabel });
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, insertId, todayISO } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 import { nextSeqCode, withUniqueRetry } from "@/lib/seqcode";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,8 @@ export async function GET(req: NextRequest) {
 
   const projectId = await getCurrentProjectId(user);
   if (projectId == null) return NextResponse.json({ requests: [] });
+  const blocked = await assertModuleEnabled("materials", projectId);
+  if (blocked) return blocked;
 
   const wheres: string[] = [`pr.project_id = ?`];
   const vals: unknown[] = [projectId];
@@ -64,6 +67,8 @@ export async function POST(req: NextRequest) {
       { error: "Chưa có dự án nào để tạo yêu cầu mua vật tư" },
       { status: 422 },
     );
+  const blocked = await assertModuleEnabled("materials", projectId);
+  if (blocked) return blocked;
 
   const body = await req.json().catch(() => ({}));
   const materialId = Number(body.materialId);

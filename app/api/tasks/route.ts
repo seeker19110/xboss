@@ -3,6 +3,7 @@ import { query, queryOne } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { sheetVersion } from "@/lib/version";
 import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,8 @@ export async function GET(req: NextRequest) {
   // Lọc theo dự án đang chọn để tránh rò rỉ chéo dự án (M22+); null = không lọc. Sheet
   // thuộc dự án khác → trả 404 "Sheet không hợp lệ" (không lộ sự tồn tại ở dự án khác).
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("tracking", projectId);
+  if (blocked) return blocked;
   const st = await queryOne<Sheet>(
     `SELECT st.id, st.code, st.name, st.responsible, st.slug
        FROM sheet_types st

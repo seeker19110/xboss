@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +24,8 @@ export async function GET() {
       byFloor: [],
     });
   }
+  const blocked = await assertModuleEnabled("materials", projectId);
+  if (blocked) return blocked;
 
   try {
     const [stockSummary, overBudget, lowStock, warehouseAge, noTaskIssues, needsStock, byFloor] =

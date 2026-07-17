@@ -3,6 +3,8 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 import {
   ensureUploadDir,
   extForDocMime,
@@ -22,6 +24,10 @@ export async function GET(
   const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+
+  const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("field", projectId);
+  if (blocked) return blocked;
 
   const workFrontId = parseInt(params.id);
   if (isNaN(workFrontId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
@@ -49,6 +55,10 @@ export async function POST(
       { error: "Bạn không có quyền upload biên bản mặt bằng (chỉ Admin/PM/kỹ sư)" },
       { status: 403 },
     );
+
+  const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("field", projectId);
+  if (blocked) return blocked;
 
   const workFrontId = parseInt(params.id);
   if (isNaN(workFrontId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });

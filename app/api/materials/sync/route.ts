@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, type Role } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 import { runMaterialSync } from "@/lib/material-sync";
 import { log } from "@/lib/log";
 
@@ -13,6 +15,10 @@ export async function POST() {
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!canSync(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM được đồng bộ Google Sheet" }, { status: 403 });
+
+  const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("materials", projectId);
+  if (blocked) return blocked;
 
   try {
     const summary = await runMaterialSync();

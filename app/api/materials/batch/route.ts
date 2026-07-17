@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 import { boqTakenBy } from "@/lib/boq";
 import { log } from "@/lib/log";
 
@@ -23,6 +24,8 @@ export async function PATCH(req: NextRequest) {
 
   const projectId = await getCurrentProjectId(user);
   if (projectId == null) return NextResponse.json({ error: "Chưa có dự án nào" }, { status: 422 });
+  const blocked = await assertModuleEnabled("materials", projectId);
+  if (blocked) return blocked;
 
   const body = await req.json().catch(() => ({}));
   const updates: { id: unknown; patch: unknown }[] = Array.isArray(body.updates)

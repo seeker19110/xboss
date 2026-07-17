@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { getCurrentUser } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 import { query } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -10,18 +12,31 @@ export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
+  const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("materials", projectId);
+  if (blocked) return blocked;
+
   const sheets = await query<{ code: string; name: string }>(
-    `SELECT code, name FROM sheet_types ORDER BY id`);
-  const sheetList = sheets.map(s => `${s.code} - ${s.name}`).join(", ");
+    `SELECT code, name FROM sheet_types ORDER BY id`,
+  );
+  const sheetList = sheets.map((s) => `${s.code} - ${s.name}`).join(", ");
 
   const wb = XLSX.utils.book_new();
 
   // ── Tab "Vật tư" — dữ liệu nhập ─────────────────────────────────────────
-  const headers = ["Mã BOQ", "Tên vật tư *", "ĐVT", "Định mức BOQ", "Định mức Tháp A", "Trạng thái", "Ghi chú"];
+  const headers = [
+    "Mã BOQ",
+    "Tên vật tư *",
+    "ĐVT",
+    "Định mức BOQ",
+    "Định mức Tháp A",
+    "Trạng thái",
+    "Ghi chú",
+  ];
   const example = [
     ["AF1", "Ống đồng Ø15", "Mét", 120, 115, "dat_hang", "Tầng 1-5"],
-    ["AF2", "Co đồng 90°",  "Cái",  40,  38, "ve_kho",   ""],
-    ["",    "Van bi Ø15",   "Cái",  20,  20, "da_dung",  ""],
+    ["AF2", "Co đồng 90°", "Cái", 40, 38, "ve_kho", ""],
+    ["", "Van bi Ø15", "Cái", 20, 20, "da_dung", ""],
   ];
 
   const wsData = [headers, ...example];
@@ -29,8 +44,13 @@ export async function GET() {
 
   // Độ rộng cột
   ws["!cols"] = [
-    { wch: 12 }, { wch: 30 }, { wch: 10 },
-    { wch: 16 }, { wch: 18 }, { wch: 14 }, { wch: 25 },
+    { wch: 12 },
+    { wch: 30 },
+    { wch: 10 },
+    { wch: 16 },
+    { wch: 18 },
+    { wch: 14 },
+    { wch: 25 },
   ];
 
   // Định dạng tiêu đề (bold)
@@ -46,18 +66,20 @@ export async function GET() {
     ["HƯỚNG DẪN NHẬP VẬT TƯ"],
     [""],
     ["Cột", "Bắt buộc", "Mô tả"],
-    ["Mã BOQ",           "Không", "Mã duy nhất toàn hệ thống. Để trống nếu chưa có."],
-    ["Tên vật tư *",     "Có",    "Tên vật tư (không được để trống)."],
-    ["ĐVT",              "Không", "Đơn vị tính: Cái, Mét, m2, Ống hoặc tự nhập."],
-    ["Định mức BOQ",     "Không", "Định mức theo hợp đồng BOQ gốc. Số nguyên hoặc thập phân."],
-    ["Định mức Tháp A",  "Không", "Định mức bóc lại thực tế Tháp A."],
-    ["Trạng thái",       "Không", "dat_hang | ve_kho | da_dung (mặc định: dat_hang)"],
-    ["Ghi chú",          "Không", "Ghi chú tự do."],
+    ["Mã BOQ", "Không", "Mã duy nhất toàn hệ thống. Để trống nếu chưa có."],
+    ["Tên vật tư *", "Có", "Tên vật tư (không được để trống)."],
+    ["ĐVT", "Không", "Đơn vị tính: Cái, Mét, m2, Ống hoặc tự nhập."],
+    ["Định mức BOQ", "Không", "Định mức theo hợp đồng BOQ gốc. Số nguyên hoặc thập phân."],
+    ["Định mức Tháp A", "Không", "Định mức bóc lại thực tế Tháp A."],
+    ["Trạng thái", "Không", "dat_hang | ve_kho | da_dung (mặc định: dat_hang)"],
+    ["Ghi chú", "Không", "Ghi chú tự do."],
     [""],
     ["Lưu ý:"],
     ["- Hệ được chọn trên giao diện import — không cần cột riêng trong file."],
     ["- Hàng tiêu đề (hàng 1) không được xóa hoặc đổi thứ tự cột."],
-    ["- Mã BOQ nếu nhập phải là duy nhất trong toàn hệ thống (không trùng với task hoặc nhóm công việc)."],
+    [
+      "- Mã BOQ nếu nhập phải là duy nhất trong toàn hệ thống (không trùng với task hoặc nhóm công việc).",
+    ],
     ["- Các hàng trống (không có tên vật tư) sẽ bị bỏ qua."],
     [`- Hệ hiện có: ${sheetList}`],
   ]);

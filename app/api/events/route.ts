@@ -1,11 +1,13 @@
 import { NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 import { sheetVersion } from "@/lib/version";
 
 export const dynamic = "force-dynamic";
 
-const CHECK_MS = 3_000;       // chu kỳ kiểm tra watermark
-const REFRESH_EVERY = 10;     // ~30s gửi lại version 1 lần (bắt kịp client bỏ lỡ lúc đang edit)
+const CHECK_MS = 3_000; // chu kỳ kiểm tra watermark
+const REFRESH_EVERY = 10; // ~30s gửi lại version 1 lần (bắt kịp client bỏ lỡ lúc đang edit)
 
 // GET /api/events?sheet= → SSE stream: đẩy event `version` khi sheet đổi watermark.
 // Client (trang tracking) nghe để reload ngay ~3s thay vì poll 10s.
@@ -14,6 +16,10 @@ const REFRESH_EVERY = 10;     // ~30s gửi lại version 1 lần (bắt kịp c
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return new Response("Chưa đăng nhập", { status: 401 });
+
+  const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("tracking", projectId);
+  if (blocked) return blocked;
 
   const sheet = req.nextUrl.searchParams.get("sheet");
   if (!sheet) return new Response("Thiếu tham số sheet", { status: 400 });
@@ -30,10 +36,18 @@ export async function GET(req: NextRequest) {
         if (closed) return;
         closed = true;
         if (timer) clearInterval(timer);
-        try { controller.close(); } catch { /* đã đóng */ }
+        try {
+          controller.close();
+        } catch {
+          /* đã đóng */
+        }
       };
       const send = (chunk: string) => {
-        try { controller.enqueue(encoder.encode(chunk)); } catch { close(); }
+        try {
+          controller.enqueue(encoder.encode(chunk));
+        } catch {
+          close();
+        }
       };
       const check = async () => {
         if (closed) return;
@@ -46,14 +60,18 @@ export async function GET(req: NextRequest) {
           } else {
             send(`: ping\n\n`); // comment SSE giữ kết nối qua proxy
           }
-        } catch { /* DB chập chờn — thử lại chu kỳ sau */ }
+        } catch {
+          /* DB chập chờn — thử lại chu kỳ sau */
+        }
       };
 
       await check();
       timer = setInterval(check, CHECK_MS);
       req.signal.addEventListener("abort", close);
     },
-    cancel() { if (timer) clearInterval(timer); },
+    cancel() {
+      if (timer) clearInterval(timer);
+    },
   });
 
   return new Response(stream, {

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 import {
   parseWorkFrontUpdateBody,
   updateWorkFrontStatus,
@@ -23,6 +25,10 @@ export async function PATCH(
       { error: "Bạn không có quyền đổi trạng thái mặt bằng (chỉ Admin/PM/kỹ sư)" },
       { status: 403 },
     );
+
+  const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("field", projectId);
+  if (blocked) return blocked;
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
