@@ -190,6 +190,7 @@ export default function AuditLogPage() {
         bottomActions={
           <button
             onClick={exportExcel}
+            aria-label="Xuất Excel"
             className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
           >
             <Download className="w-4 h-4" /> <span className="hidden sm:inline">Xuất Excel</span>
