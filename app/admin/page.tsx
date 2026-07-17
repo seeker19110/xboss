@@ -131,7 +131,8 @@ export default function AdminPage() {
   // Quản lý dự án + gán user (M22 PR2).
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(false);
-  const [newProject, setNewProject] = useState({ name: "", code: "", color: "" });
+  // cloneFrom: id dự án nguồn để sao chép cấu hình ("" = tạo trống, không sao chép).
+  const [newProject, setNewProject] = useState({ name: "", code: "", color: "", cloneFrom: "" });
   const [assignUserId, setAssignUserId] = useState<number | null>(null);
   const [userProjectIds, setUserProjectIds] = useState<Set<number>>(new Set());
   const [userProjectsMap, setUserProjectsMap] = useState<Record<number, number[]>>({});
@@ -310,7 +311,11 @@ export default function AdminPage() {
       return;
     }
     try {
-      const res = await fetch("/api/projects", {
+      // Có chọn dự án nguồn → sao chép cấu hình; không thì tạo dự án trống như cũ.
+      const url = newProject.cloneFrom
+        ? `/api/projects/${newProject.cloneFrom}/clone-config`
+        : "/api/projects";
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -324,8 +329,10 @@ export default function AdminPage() {
         setError(j.error ?? "Lỗi không xác định");
         return;
       }
-      flash(`Đã tạo dự án "${name}"`);
-      setNewProject({ name: "", code: "", color: "" });
+      flash(
+        newProject.cloneFrom ? `Đã sao chép cấu hình sang "${name}"` : `Đã tạo dự án "${name}"`,
+      );
+      setNewProject({ name: "", code: "", color: "", cloneFrom: "" });
       loadProjects();
     } catch {
       setError("Mất kết nối mạng — vui lòng thử lại");
@@ -924,8 +931,30 @@ export default function AdminPage() {
                   onClick={createProject}
                   className="px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 text-sm text-on-accent"
                 >
-                  Tạo dự án
+                  {newProject.cloneFrom ? "Sao chép & tạo" : "Tạo dự án"}
                 </button>
+              </div>
+              {/* Bước sao chép cấu hình từ dự án có sẵn (M51 PR3) — tháp/sheet/hệ,
+                  nav, luồng duyệt, ngưỡng cảnh báo; KHÔNG chép dữ liệu thi công. */}
+              <div className="flex flex-wrap items-center gap-2">
+                <label htmlFor="clone-from" className="text-xs text-zinc-400">
+                  Sao chép cấu hình từ dự án có sẵn
+                </label>
+                <select
+                  id="clone-from"
+                  value={newProject.cloneFrom}
+                  onChange={(e) => setNewProject((s) => ({ ...s, cloneFrom: e.target.value }))}
+                  aria-label="Dự án nguồn để sao chép cấu hình"
+                  className="bg-zinc-900 border border-zinc-700 rounded text-sm px-2 py-1.5 min-w-[180px]"
+                >
+                  <option value="">Không sao chép (dự án trống)</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                      {p.code ? ` (${p.code})` : ""}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
