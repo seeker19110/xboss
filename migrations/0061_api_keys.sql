@@ -1,4 +1,4 @@
--- 0059_api_keys.sql — M49 PR1: API keys đọc-only cho namespace /api/v1.
+-- 0061_api_keys.sql — M49 PR1: API keys đọc-only cho namespace /api/v1.
 -- Bên thứ ba đọc dữ liệu qua API key (Bearer xbk_...). Key thô chỉ hiện 1 lần lúc tạo;
 -- DB chỉ giữ sha256 hex. project_id NULL = key toàn cục (mọi dự án). Xem
 -- docs/nang-cap/M49-api-mo-sso.md mục PR1. Thêm thuần (CREATE TABLE/TRIGGER).
