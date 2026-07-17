@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { insertId, queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 import {
   checkNormMaterial,
   listNormsForBoqItem,
@@ -24,6 +25,8 @@ export async function GET(
   if (isNaN(boqItemId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("materials", projectId);
+  if (blocked) return blocked;
   const boqItem = await queryOne<{ id: number }>(
     `SELECT id FROM boq_items WHERE id = ?${projectId != null ? " AND project_id = ?" : ""}`,
     boqItemId,
@@ -52,6 +55,8 @@ export async function POST(
   const boqItemId = parseInt(params.id);
   if (isNaN(boqItemId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("materials", projectId);
+  if (blocked) return blocked;
   const boqItem = await queryOne<{ id: number }>(
     `SELECT id FROM boq_items WHERE id = ?${projectId != null ? " AND project_id = ?" : ""}`,
     boqItemId,

@@ -3,6 +3,7 @@ import * as XLSX from "xlsx";
 import { queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 import { parseBoqWorkbook, previewBoqImport, commitBoqImport } from "@/lib/boq-import";
 import { isContentTooLarge } from "@/lib/photos";
 
@@ -20,6 +21,9 @@ export async function POST(req: NextRequest) {
       { error: "Bạn không có quyền import (chỉ Admin/PM)" },
       { status: 403 },
     );
+
+  const blocked = await assertModuleEnabled("materials", await getCurrentProjectId(user));
+  if (blocked) return blocked;
 
   if (isContentTooLarge(req.headers.get("content-length"), MAX_BYTES))
     return NextResponse.json(

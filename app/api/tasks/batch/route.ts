@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 import { boqTakenBy } from "@/lib/boq";
 import { recomputeTask } from "@/lib/recompute";
 import { assignTask } from "@/lib/assignments";
@@ -19,6 +21,10 @@ export async function PATCH(req: NextRequest) {
   if (!me) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editStructure(me.role))
     return NextResponse.json({ error: "Không có quyền chỉnh sửa (chỉ Admin/PM)" }, { status: 403 });
+
+  const projectId = await getCurrentProjectId(me);
+  const blocked = await assertModuleEnabled("tracking", projectId);
+  if (blocked) return blocked;
 
   const body = await req.json().catch(() => ({}));
   const updates: { id: unknown; patch: unknown }[] = Array.isArray(body.updates)

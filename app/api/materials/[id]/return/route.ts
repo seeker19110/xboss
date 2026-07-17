@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,8 @@ export async function POST(
   const projectId = await getCurrentProjectId(user);
   if (projectId == null)
     return NextResponse.json({ error: "Không tìm thấy vật tư" }, { status: 404 });
+  const blocked = await assertModuleEnabled("materials", projectId);
+  if (blocked) return blocked;
 
   const body = await req.json().catch(() => ({}));
   const qty = Number(body.qty);

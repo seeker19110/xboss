@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +11,10 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+
+  const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("materials", projectId);
+  if (blocked) return blocked;
 
   const floors = await query<{ floorLabel: string }>(
     `SELECT DISTINCT floor_label AS "floorLabel" FROM material_transactions

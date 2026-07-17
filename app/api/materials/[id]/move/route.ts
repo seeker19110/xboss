@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,8 @@ export async function PATCH(
     return NextResponse.json({ error: "direction phải là 'up' hoặc 'down'" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("materials", projectId);
+  if (blocked) return blocked;
   const cur =
     projectId != null
       ? await queryOne<{ sort_order: number; sheet_type_id: number | null }>(

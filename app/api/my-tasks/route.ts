@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { query, todayISO } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,9 @@ export async function GET() {
 
   // Lọc theo dự án đang chọn để tránh rò rỉ chéo dự án (M22+); null = không lọc.
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("field", projectId);
+  if (blocked) return blocked;
+
   const projectFilter = projectId != null ? " AND tw.project_id = ?" : "";
   const projectParams = projectId != null ? [projectId] : [];
 

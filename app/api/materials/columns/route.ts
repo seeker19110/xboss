@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, isAdminOrPm } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,8 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("materials", projectId);
+  if (blocked) return blocked;
   // Không có dự án nào (DB trống) → fallback dự án đầu tiên như cũ, giữ hành vi cũ.
   const row =
     projectId != null
@@ -41,6 +44,8 @@ export async function PATCH(req: NextRequest) {
   const labels = body.labels && typeof body.labels === "object" ? body.labels : {};
 
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("materials", projectId);
+  if (blocked) return blocked;
   if (projectId != null) {
     await run(
       `UPDATE projects SET material_col_labels = ? WHERE id = ?`,

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, run, withTransaction } from "@/lib/db";
 import { recomputeTask } from "@/lib/recompute";
 import { getCurrentUser, canTouchTask, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 import { handoverBlocked, methodStatementBlocked } from "@/lib/qaqc";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +19,10 @@ export async function PATCH(req: NextRequest) {
   // Vai trò chỉ-xem (BCH/CĐT/Viewer) không được tick ô tiến độ.
   if (!CAN.editProgress(user.role))
     return NextResponse.json({ error: "Không có quyền cập nhật tiến độ" }, { status: 403 });
+
+  const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("tracking", projectId);
+  if (blocked) return blocked;
 
   const body = await req.json().catch(() => ({}));
   const ids = Array.isArray(body.ids)

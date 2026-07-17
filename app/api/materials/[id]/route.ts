@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 import { boqTakenBy } from "@/lib/boq";
 import { validateCustom } from "@/lib/custom-fields";
 import { log } from "@/lib/log";
@@ -26,6 +27,8 @@ export async function PATCH(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("materials", projectId);
+  if (blocked) return blocked;
   const m =
     projectId != null
       ? await queryOne<{ id: number; qty_used: number; qty_stock: number }>(
@@ -157,6 +160,8 @@ export async function DELETE(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("materials", projectId);
+  if (blocked) return blocked;
   const r =
     projectId != null
       ? await run(`DELETE FROM materials WHERE id = ? AND project_id = ?`, id, projectId)

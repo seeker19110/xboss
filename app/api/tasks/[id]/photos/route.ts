@@ -3,6 +3,8 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, canTouchTask, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 import {
   ensureUploadDir,
   extForMime,
@@ -26,6 +28,9 @@ export async function GET(
 
   const taskId = parseInt(params.id);
   if (isNaN(taskId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+  const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("tracking", projectId);
+  if (blocked) return blocked;
   if (!(await canTouchTask(user, taskId)))
     return NextResponse.json(
       { error: "Bạn chỉ được xem ảnh của task được giao cho mình" },
@@ -55,6 +60,10 @@ export async function POST(
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editProgress(user.role))
     return NextResponse.json({ error: "Không có quyền upload ảnh" }, { status: 403 });
+
+  const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("tracking", projectId);
+  if (blocked) return blocked;
 
   const taskId = parseInt(params.id);
   if (isNaN(taskId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });

@@ -1,32 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 
 export const dynamic = "force-dynamic";
 
 // PATCH /api/tasks/:id/move  body: { direction: 'up' | 'down' }
 // Hoán đổi sort_order với task liền kề trong cùng package.
-export async function PATCH(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+export async function PATCH(
+  req: NextRequest,
+  { params: paramsP }: { params: Promise<{ id: string }> },
+) {
   const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.editStructure(user.role)) return NextResponse.json({ error: "Chỉ Admin/PM mới di chuyển được" }, { status: 403 });
+  if (!CAN.editStructure(user.role))
+    return NextResponse.json({ error: "Chỉ Admin/PM mới di chuyển được" }, { status: 403 });
+
+  const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("tracking", projectId);
+  if (blocked) return blocked;
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const body = await req.json().catch(() => ({}));
   const dir = String(body.direction ?? "");
-  if (dir !== "up" && dir !== "down") return NextResponse.json({ error: "direction phải là 'up' hoặc 'down'" }, { status: 400 });
+  if (dir !== "up" && dir !== "down")
+    return NextResponse.json({ error: "direction phải là 'up' hoặc 'down'" }, { status: 400 });
 
   const cur = await queryOne<{ sort_order: number; package_id: number }>(
-    `SELECT sort_order, package_id FROM tasks WHERE id = ?`, id);
+    `SELECT sort_order, package_id FROM tasks WHERE id = ?`,
+    id,
+  );
   if (!cur) return NextResponse.json({ error: "Task không tồn tại" }, { status: 404 });
 
-  const op = dir === "up" ? `< ${cur.sort_order} ORDER BY sort_order DESC` : `> ${cur.sort_order} ORDER BY sort_order ASC`;
+  const op =
+    dir === "up"
+      ? `< ${cur.sort_order} ORDER BY sort_order DESC`
+      : `> ${cur.sort_order} ORDER BY sort_order ASC`;
   const neighbor = await queryOne<{ id: number; sort_order: number }>(
     `SELECT id, sort_order FROM tasks WHERE package_id = ? AND sort_order ${op} LIMIT 1`,
-    cur.package_id);
+    cur.package_id,
+  );
 
   if (!neighbor) return NextResponse.json({ ok: false, message: "Đã ở đầu/cuối danh sách" });
 

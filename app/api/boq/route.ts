@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 import { boqTakenBy } from "@/lib/boq";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +49,8 @@ export async function GET(req: NextRequest) {
   const system = req.nextUrl.searchParams.get("system")?.trim() || null;
   const includeVo = req.nextUrl.searchParams.get("includeVo") !== "0";
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("materials", projectId);
+  if (blocked) return blocked;
 
   const conds = [];
   const args: unknown[] = [];
@@ -128,6 +131,8 @@ export async function POST(req: NextRequest) {
   const projectId = await getCurrentProjectId(user);
   if (projectId == null)
     return NextResponse.json({ error: "Chưa có dự án nào để tạo dòng BOQ" }, { status: 422 });
+  const blocked = await assertModuleEnabled("materials", projectId);
+  if (blocked) return blocked;
 
   const body = await req.json().catch(() => null);
   const code = typeof body?.code === "string" ? body.code.trim() : "";

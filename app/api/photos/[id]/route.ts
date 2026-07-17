@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFile, unlink } from "node:fs/promises";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, canTouchTask, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 import { photoPath } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +26,10 @@ export async function GET(
   const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+
+  const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("field", projectId);
+  if (blocked) return blocked;
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
@@ -64,6 +70,10 @@ export async function DELETE(
   const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+
+  const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("field", projectId);
+  if (blocked) return blocked;
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });

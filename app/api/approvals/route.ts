@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, insertId, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 import { recomputePackage } from "@/lib/recompute";
 import { requiredInspectionMissing } from "@/lib/qaqc";
 import { decideNext, getActiveFlow, openApproval, advanceApproval } from "@/lib/approvals";
@@ -16,6 +17,10 @@ export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+
+    const projectId = await getCurrentProjectId(user);
+    const blocked = await assertModuleEnabled("field", projectId);
+    if (blocked) return blocked;
 
     const groups = await query<{
       sheetTypeId: number;
@@ -82,6 +87,8 @@ export async function POST(req: NextRequest) {
   // scope theo dự án — whitelist "nhóm nghiệm thu theo sheet × tầng" trong
   // tests/project-scope-invariant.test.ts), không dùng để lọc dữ liệu tầng.
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("field", projectId);
+  if (blocked) return blocked;
 
   let approvalId: number;
   let taskCount: number;

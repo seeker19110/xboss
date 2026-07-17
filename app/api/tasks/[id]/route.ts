@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 import { boqTakenBy } from "@/lib/boq";
 import { recomputeTask, recomputePackage } from "@/lib/recompute";
 import { assignTask } from "@/lib/assignments";
@@ -21,6 +22,10 @@ export async function PATCH(
   if (!me) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editStructure(me.role))
     return NextResponse.json({ error: "Không có quyền chỉnh sửa (chỉ Admin/PM)" }, { status: 403 });
+
+  const projectId = await getCurrentProjectId(me);
+  const blocked = await assertModuleEnabled("tracking", projectId);
+  if (blocked) return blocked;
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
@@ -102,7 +107,6 @@ export async function PATCH(
   }
   // Trường tuỳ biến (M52 PR2): merge shallow vào cột custom — không đè field khác.
   if (body.custom !== undefined) {
-    const projectId = await getCurrentProjectId(me);
     const v = await validateCustom("task", projectId, body.custom);
     if (!v.ok) return NextResponse.json({ error: v.error }, { status: v.status });
     sets.push(`custom = custom || ?::jsonb`);
@@ -148,6 +152,10 @@ export async function DELETE(
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editStructure(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM mới xoá được task" }, { status: 403 });
+
+  const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("tracking", projectId);
+  if (blocked) return blocked;
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });

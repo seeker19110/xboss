@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, insertId, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 import { recomputePackage } from "@/lib/recompute";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +19,10 @@ export async function POST(
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.editStructure(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM mới copy được task" }, { status: 403 });
+
+  const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("tracking", projectId);
+  if (blocked) return blocked;
 
   const srcId = parseInt(params.id);
   if (isNaN(srcId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });

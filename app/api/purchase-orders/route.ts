@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { insertId, run, withTransaction, todayISO } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
+import { assertModuleEnabled } from "@/lib/feature-flags";
 import { nextSeqCode, withUniqueRetry } from "@/lib/seqcode";
 import { listPurchaseOrders } from "@/lib/procurement";
 
@@ -21,6 +22,8 @@ export async function GET(req: NextRequest) {
   const status = req.nextUrl.searchParams.get("status") ?? undefined;
 
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("materials", projectId);
+  if (blocked) return blocked;
   const orders = projectId != null ? await listPurchaseOrders({ status, projectId }) : [];
 
   return NextResponse.json({ orders });
@@ -37,6 +40,8 @@ export async function POST(req: NextRequest) {
   const projectId = await getCurrentProjectId(user);
   if (projectId == null)
     return NextResponse.json({ error: "Chưa có dự án nào để tạo đơn hàng" }, { status: 422 });
+  const blocked = await assertModuleEnabled("materials", projectId);
+  if (blocked) return blocked;
 
   const body = await req.json().catch(() => ({}));
   const items: {
