@@ -955,8 +955,12 @@ function PayrollModal({
   );
   const [crewId, setCrewId] = useState<number | "">(item?.crewId ?? "");
   const [workdays, setWorkdays] = useState(String(item?.workdays ?? prefill?.workdays ?? 0));
-  const [rate, setRate] = useState(item ? String(item.rate) : "0");
-  const [deductions, setDeductions] = useState(item ? String(item.deductions) : "0");
+  // M50 PR2: fallback về "" khi giá trị bị che (null) để ô input không hiện chuỗi "null"
+  // — hiện admin/pm không bị che nhưng giữ đúng nếu quyền đổi về sau.
+  const [rate, setRate] = useState(item?.rate != null ? String(item.rate) : "");
+  const [deductions, setDeductions] = useState(
+    item?.deductions != null ? String(item.deductions) : "",
+  );
   const [status, setStatus] = useState<PayrollStatus>(item?.status ?? "draft");
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);

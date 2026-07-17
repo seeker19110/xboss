@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import MaskedValue from "@/app/components/MaskedValue";
+import { mSum, mSub } from "@/app/lib/masked";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appAlert, appConfirm } from "@/app/components/dialogs";
@@ -150,15 +151,17 @@ export default function ContractsPage() {
       .filter((g) => g.items.length > 0);
   }, [contracts]);
 
+  // M50 PR2: value/addendaTotal/paid có thể bị che (null) với user thiếu viewPayments —
+  // dùng mSum để tổng nhóm cũng "bị che" (null) thay vì ngầm thành 0 (Number(null)===0).
   const kindTotals = useMemo(() => {
-    const map: Record<ContractKind, { total: number; paid: number }> = {
+    const map: Record<ContractKind, { total: number | null; paid: number | null }> = {
       nhan_thau: { total: 0, paid: 0 },
       giao_thau: { total: 0, paid: 0 },
       ncc: { total: 0, paid: 0 },
     };
     for (const c of contracts) {
-      map[c.kind].total += Number(c.value) + Number(c.addendaTotal);
-      map[c.kind].paid += Number(c.paid);
+      map[c.kind].total = mSum(map[c.kind].total, c.value, c.addendaTotal);
+      map[c.kind].paid = mSum(map[c.kind].paid, c.paid);
     }
     return map;
   }, [contracts]);
@@ -199,9 +202,11 @@ export default function ContractsPage() {
           {(["nhan_thau", "giao_thau", "ncc"] as ContractKind[]).map((kind) => (
             <div key={kind} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
               <p className="text-xs text-zinc-400 uppercase tracking-wide">{KIND_LABEL[kind]}</p>
-              <p className="text-lg font-semibold mt-1">{fmtVND(kindTotals[kind].total)}</p>
+              <p className="text-lg font-semibold mt-1">
+                <MaskedValue value={kindTotals[kind].total} format={fmtVND} />
+              </p>
               <p className="text-xs text-zinc-400 mt-1">
-                Đã thanh toán: {fmtVND(kindTotals[kind].paid)}
+                Đã thanh toán: <MaskedValue value={kindTotals[kind].paid} format={fmtVND} />
               </p>
             </div>
           ))}
@@ -270,8 +275,10 @@ export default function ContractsPage() {
                         </tr>
                         {!isCollapsed &&
                           g.items.map((c) => {
-                            const total = Number(c.value) + Number(c.addendaTotal);
-                            const remaining = total - Number(c.paid);
+                            // M50 PR2: che (null) lan truyền — tổng/còn lại "bị che" khi
+                            // value/addendaTotal/paid bị che, không ngầm thành 0.
+                            const total = mSum(c.value, c.addendaTotal);
+                            const remaining = mSub(total, c.paid);
                             const today = todayISO();
                             const expiringSoon =
                               c.status === "active" && c.validTo != null && c.validTo <= today;
@@ -303,15 +310,21 @@ export default function ContractsPage() {
                                   )}
                                 </td>
                                 <td className="p-3 hidden sm:table-cell text-right font-medium">
-                                  {fmtVND(total)}
+                                  <MaskedValue value={total} format={fmtVND} />
                                 </td>
                                 <td className="p-3 hidden sm:table-cell text-right">
-                                  {fmtVND(Number(c.paid))}
+                                  <MaskedValue value={c.paid} format={fmtVND} />
                                 </td>
                                 <td
-                                  className={`p-3 text-right ${remaining > 0 ? "text-amber-300" : "text-emerald-300"}`}
+                                  className={`p-3 text-right ${
+                                    remaining == null
+                                      ? ""
+                                      : remaining > 0
+                                        ? "text-amber-300"
+                                        : "text-emerald-300"
+                                  }`}
                                 >
-                                  {fmtVND(remaining)}
+                                  <MaskedValue value={remaining} format={fmtVND} />
                                 </td>
                                 <td className="p-3 hidden sm:table-cell">
                                   {c.validTo ? (
@@ -937,9 +950,17 @@ function ContractDetailModal({
                       <span className="font-mono text-xs text-zinc-400">{a.code}</span>{" "}
                       {a.title ?? ""}
                     </span>
-                    <span className={a.valueDelta >= 0 ? "text-emerald-300" : "text-rose-300"}>
-                      {a.valueDelta >= 0 ? "+" : ""}
-                      {fmtVND(a.valueDelta)}
+                    <span
+                      className={
+                        a.valueDelta == null
+                          ? ""
+                          : a.valueDelta >= 0
+                            ? "text-emerald-300"
+                            : "text-rose-300"
+                      }
+                    >
+                      {a.valueDelta != null && a.valueDelta >= 0 ? "+" : ""}
+                      <MaskedValue value={a.valueDelta} format={fmtVND} />
                     </span>
                     {canManage && (
                       <button

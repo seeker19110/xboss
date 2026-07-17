@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { Plus, X, FileDown, FileSpreadsheet, Receipt } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import MaskedValue from "@/app/components/MaskedValue";
+import { mSum, mMul, mSumBy } from "@/app/lib/masked";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appConfirm, appPrompt } from "@/app/components/dialogs";
@@ -118,14 +119,30 @@ function PaymentCertsInner() {
   }
 
   const contract = contracts.find((c) => c.id === contractId) ?? null;
-  const contractValue = contract ? Number(contract.value) + Number(contract.addendaTotal) : 0;
+  // M50 PR2: value/addendaTotal/unitPrice có thể bị che (null) với user thiếu viewPayments
+  // — dùng mSum/mMul để giá trị dẫn xuất cũng "bị che" (null), không ngầm thành 0.
+  const contractValue = contract ? mSum(contract.value, contract.addendaTotal) : null;
 
-  const approvedCumulative = useMemo(() => {
+  const approvedCumulative = useMemo((): number | null => {
     const approved = certs.filter((c) => c.status === "approved");
     if (approved.length === 0) return 0;
     const latest = approved.reduce((a, b) => (a.periodNo > b.periodNo ? a : b));
-    return latest.items.reduce((s, it) => s + Number(it.qtyCumulative) * Number(it.unitPrice), 0);
+    return mSumBy(latest.items, (it) => mMul(Number(it.qtyCumulative), it.unitPrice));
   }, [certs]);
+
+  // Cảnh báo vượt giá trị HĐ: chỉ xác định được khi CẢ HAI vế không bị che — tránh vừa
+  // cảnh báo sai (0 > 0) vừa nuốt cảnh báo thật khi giá trị bị ép về 0.
+  const overContract =
+    contractValue != null &&
+    approvedCumulative != null &&
+    contractValue > 0 &&
+    approvedCumulative > contractValue;
+  const pctUsed =
+    contractValue == null || approvedCumulative == null
+      ? null
+      : contractValue > 0
+        ? Math.round((approvedCumulative / contractValue) * 100)
+        : 0;
 
   async function createCert() {
     if (!contractId) return;
@@ -200,27 +217,28 @@ function PaymentCertsInner() {
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
                   <p className="text-xs text-zinc-400 uppercase tracking-wide">Giá trị HĐ</p>
-                  <p className="text-lg font-semibold mt-1">{fmtVND(contractValue)}</p>
+                  <p className="text-lg font-semibold mt-1">
+                    <MaskedValue value={contractValue} format={fmtVND} />
+                  </p>
                 </div>
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
                   <p className="text-xs text-zinc-400 uppercase tracking-wide">Luỹ kế đã duyệt</p>
                   <p
-                    className={`text-lg font-semibold mt-1 ${approvedCumulative > contractValue ? "text-rose-300" : ""}`}
+                    className={`text-lg font-semibold mt-1 ${overContract ? "text-rose-300" : ""}`}
                   >
-                    {fmtVND(approvedCumulative)}
+                    <MaskedValue value={approvedCumulative} format={fmtVND} />
                   </p>
                 </div>
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
                   <p className="text-xs text-zinc-400 uppercase tracking-wide">% dùng</p>
                   <p className="text-lg font-semibold mt-1">
-                    {contractValue > 0 ? Math.round((approvedCumulative / contractValue) * 100) : 0}
-                    %
+                    <MaskedValue value={pctUsed} format={(n) => `${n}%`} />
                   </p>
                 </div>
               </div>
             )}
 
-            {approvedCumulative > contractValue && contractValue > 0 && (
+            {overContract && (
               <div className="bg-rose-950 border border-rose-900/60 rounded-xl px-4 py-3 text-xs text-rose-200">
                 Luỹ kế đã duyệt vượt giá trị hợp đồng (gồm phụ lục) — kiểm tra lại phụ lục/VO trước
                 khi lập đợt tiếp theo.
@@ -336,7 +354,7 @@ function CertDetailModal({
   cert: Cert;
   canManage: boolean;
   canDecide: boolean;
-  contractValue: number;
+  contractValue: number | null; // null = bị che (thiếu viewPayments)
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -356,13 +374,12 @@ function CertDetailModal({
 
   const canEdit = canManage && cert.status === "draft";
 
-  const totals = useMemo(() => {
-    const periodValue = cert.items.reduce(
-      (s, it) => s + (Number(qtys[it.id]) || 0) * Number(it.unitPrice),
-      0,
-    );
-    return periodValue;
-  }, [cert.items, qtys]);
+  // M50 PR2: unitPrice có thể bị che (null) — dùng mMul/mSumBy để tổng tạm tính cũng
+  // "bị che" (null) thay vì ngầm thành 0.
+  const totals = useMemo(
+    () => mSumBy(cert.items, (it) => mMul(Number(qtys[it.id]) || 0, it.unitPrice)),
+    [cert.items, qtys],
+  );
 
   async function saveItems() {
     setBusy(true);
@@ -405,11 +422,16 @@ function CertDetailModal({
     } else {
       // qty_cumulative của mỗi dòng trong đợt này đã là luỹ kế tính tới hết đợt này —
       // nếu duyệt, đây sẽ là luỹ kế mới của hợp đồng (thay cho luỹ kế đợt duyệt trước đó).
-      const projectedCumulative = cert.items.reduce(
-        (s, it) => s + Number(it.qtyCumulative) * Number(it.unitPrice),
-        0,
+      const projectedCumulative = mSumBy(cert.items, (it) =>
+        mMul(Number(it.qtyCumulative), it.unitPrice),
       );
-      const wouldBeOver = contractValue > 0 && projectedCumulative > contractValue;
+      // Chỉ cảnh báo vượt khi cả hai vế xác định (không bị che) — duyệt là quyền admin/pm
+      // (có viewPayments) nên thực tế luôn xác định; guard để đúng kiểu + phòng thủ.
+      const wouldBeOver =
+        contractValue != null &&
+        projectedCumulative != null &&
+        contractValue > 0 &&
+        projectedCumulative > contractValue;
       const label = wouldBeOver
         ? `Duyệt đợt ${cert.code}? CẢNH BÁO: luỹ kế sẽ vượt giá trị hợp đồng.`
         : `Duyệt đợt ${cert.code}?`;

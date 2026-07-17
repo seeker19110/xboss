@@ -4,6 +4,7 @@ import { Plus, X, Trash2, Paperclip, FilePlus2, Lock } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import MaskedValue from "@/app/components/MaskedValue";
+import { mSum } from "@/app/lib/masked";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appAlert, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
@@ -125,18 +126,21 @@ export default function VariationsPage() {
     setItems(v?.items ?? []);
   }
 
+  // M50 PR2: giá trị VO có thể bị che (null) với user thiếu viewPayments (vd engineer) —
+  // dùng mSum để tổng cũng "bị che" (null) thay vì ngầm thành 0, để MaskedValue hiện "•••".
   const totals = useMemo(() => {
-    const map: Record<"draft" | "submitted" | "approved" | "rejected", number> = {
+    const map: Record<"draft" | "submitted" | "approved" | "rejected", number | null> = {
       draft: 0,
       submitted: 0,
       approved: 0,
       rejected: 0,
     };
     for (const v of items) {
-      if (v.status === "draft") map.draft += v.proposedValue;
-      else if (v.status === "submitted") map.submitted += v.proposedValue;
-      else if (v.status === "rejected") map.rejected += v.proposedValue;
-      else map.approved += v.approvedValue; // approved/partially_approved/contract_added
+      if (v.status === "draft") map.draft = mSum(map.draft, v.proposedValue);
+      else if (v.status === "submitted") map.submitted = mSum(map.submitted, v.proposedValue);
+      else if (v.status === "rejected") map.rejected = mSum(map.rejected, v.proposedValue);
+      // approved/partially_approved/contract_added
+      else map.approved = mSum(map.approved, v.approvedValue);
     }
     return map;
   }, [items]);
