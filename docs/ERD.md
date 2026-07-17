@@ -3123,6 +3123,22 @@
 **Index:**
 - `schema_migrations_pkey`: UNIQUE INDEX schema_migrations_pkey ON public.schema_migrations USING btree (name)
 
+### code_lists
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | integer |  | `nextval('code_lists_id_seq'::regclass)` |
+| domain | text |  |  |
+| code | text |  |  |
+| label | text |  |  |
+| sort | integer |  | `0` |
+| active | boolean |  | `true` |
+| meta | jsonb |  | `'{}'::jsonb` |
+
+**Index:**
+- `code_lists_domain_code_key`: UNIQUE INDEX code_lists_domain_code_key ON public.code_lists USING btree (domain, code)
+- `code_lists_pkey`: UNIQUE INDEX code_lists_pkey ON public.code_lists USING btree (id)
+
 ## Khác (chưa gán module)
 
 ### alert_rules

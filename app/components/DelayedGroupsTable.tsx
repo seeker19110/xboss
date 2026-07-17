@@ -24,6 +24,9 @@ type Props<T extends TaskRow> = {
   showTaskCode?: boolean;
   /** Cho sửa lý do trễ (dashboard) — có thì render ô select thay vì text. */
   editReason?: { canEdit: boolean; onChange: (taskId: number, reason: string) => void };
+  /** Danh mục nguyên nhân trễ (đọc từ code_lists qua getList('delay_reason')); không
+   * truyền thì fallback về hằng DELAY_REASON_LABEL tĩnh. */
+  delayReasons?: { code: string; label: string }[];
   /** Tiến độ trung bình TOÀN BỘ công tác mỗi hạng mục (khoá `delayedGroupKey`) — không
    * truyền thì cột "Tiến độ TB" tạm suy từ trung bình các công tác trễ trong nhóm. */
   groupProgress?: Map<string, number>;
@@ -31,11 +34,29 @@ type Props<T extends TaskRow> = {
   emptyMessage?: React.ReactNode;
 };
 
-const reasonLabel = (slug: string | null) =>
-  slug ? (DELAY_REASON_LABEL[slug as keyof typeof DELAY_REASON_LABEL] ?? slug) : null;
+type ReasonOption = { code: string; label: string };
+type ReasonLabelFn = (slug: string | null) => string | null;
+
+// Danh mục nguyên nhân trễ: ưu tiên prop (từ code_lists) → fallback hằng tĩnh.
+function toReasonOptions(delayReasons?: ReasonOption[]): ReasonOption[] {
+  return (
+    delayReasons ?? Object.entries(DELAY_REASON_LABEL).map(([code, label]) => ({ code, label }))
+  );
+}
+
+function buildReasonLabel(options: ReasonOption[]): ReasonLabelFn {
+  const map = new Map(options.map((o) => [o.code, o.label]));
+  return (slug) => (slug ? (map.get(slug) ?? slug) : null);
+}
 
 // Tóm tắt lý do trễ của cả nhóm: "Chờ vật tư (3), Nhân lực (1)…" — ưu tiên đã gán trước.
-function ReasonsSummary({ reasons }: { reasons: ReasonCount[] }) {
+function ReasonsSummary({
+  reasons,
+  reasonLabel,
+}: {
+  reasons: ReasonCount[];
+  reasonLabel: ReasonLabelFn;
+}) {
   const assigned = reasons.filter((r) => r.reason);
   const none = reasons.find((r) => !r.reason);
   if (assigned.length === 0) return <span className="text-zinc-500">— Chưa gán —</span>;
@@ -67,10 +88,13 @@ export default function DelayedGroupsTable<T extends TaskRow>({
   taskHref,
   showTaskCode,
   editReason,
+  delayReasons,
   groupProgress,
   today,
   emptyMessage,
 }: Props<T>) {
+  const reasonOptions = useMemo(() => toReasonOptions(delayReasons), [delayReasons]);
+  const reasonLabel = useMemo(() => buildReasonLabel(reasonOptions), [reasonOptions]);
   const groups = useMemo(
     () => groupDelayedTasks(tasks, { sheetLabel, today, groupProgress }),
     [tasks, sheetLabel, today, groupProgress],
@@ -137,7 +161,7 @@ export default function DelayedGroupsTable<T extends TaskRow>({
                     <ProgressBar pct={avgPct} />
                   </td>
                   <td className="px-4 py-3.5 text-xs">
-                    <ReasonsSummary reasons={g.reasons} />
+                    <ReasonsSummary reasons={g.reasons} reasonLabel={reasonLabel} />
                   </td>
                 </tr>
 
@@ -197,9 +221,9 @@ export default function DelayedGroupsTable<T extends TaskRow>({
                               }`}
                             >
                               <option value="">— Chưa gán —</option>
-                              {Object.entries(DELAY_REASON_LABEL).map(([k, v]) => (
-                                <option key={k} value={k}>
-                                  {v}
+                              {reasonOptions.map((r) => (
+                                <option key={r.code} value={r.code}>
+                                  {r.label}
                                 </option>
                               ))}
                             </select>

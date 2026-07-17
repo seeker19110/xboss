@@ -69,6 +69,7 @@ import {
   Workflow,
   BellRing,
   Cable,
+  ListTree,
   KeyRound,
 } from "lucide-react";
 import type { Role } from "@/lib/roles";
@@ -456,6 +457,13 @@ export const DASHBOARD_TREE: DashCluster[] = [
         icon: Cable,
         roles: ["admin", "pm"],
       }, // M48 PR1 — khung tích hợp (integrations): đồng bộ hệ ngoài; PM chỉ xem+đồng bộ, Admin bật/tắt
+      {
+        id: "dash.code-lists",
+        href: "/admin/code-lists",
+        label: "Danh mục mềm",
+        icon: ListTree,
+        roles: ["admin"],
+      }, // M52 PR1 — code_lists: danh mục enum-mềm (nguyên nhân trễ…); chỉ Admin
     ],
   },
   {

@@ -18,7 +18,6 @@ import AppHeader from "@/app/components/AppHeader";
 import { Modal, appAlert, appConfirm } from "@/app/components/dialogs";
 import { PageSkeleton, Skeleton } from "@/app/components/Skeleton";
 import EditableText from "@/app/components/EditableText";
-import { DELAY_REASON_LABEL } from "@/lib/delay";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { sortFloorsDesc } from "@/lib/floors";
 import DelayedGroupsTable from "@/app/components/DelayedGroupsTable";
@@ -134,6 +133,8 @@ export default function Dashboard() {
   const [newSheetErr, setNewSheetErr] = useState("");
   const [kpiOrder, setKpiOrder] = useState<KPI[]>([]);
   const [systems, setSystems] = useState<SystemCard[]>([]);
+  // Danh mục nguyên nhân trễ đọc từ code_lists (thay hằng DELAY_REASON_LABEL tĩnh).
+  const [delayReasons, setDelayReasons] = useState<{ code: string; label: string }[]>([]);
   const dragIdx = useRef<number | null>(null);
   const dragOverIdx = useRef<number | null>(null);
 
@@ -143,14 +144,21 @@ export default function Dashboard() {
       fetch("/api/dashboard").then((r) => (r.ok ? r.json() : null)),
       fetch("/api/sheets").then((r) => (r.ok ? r.json() : null)),
       fetch("/api/systems").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/code-lists?domain=delay_reason").then((r) => (r.ok ? r.json() : null)),
     ])
-      .then(([meData, dash, sh, sys]) => {
+      .then(([meData, dash, sh, sys, cl]) => {
         if (!meData) return;
         setMe(meData);
         setData(dash);
         setKpiOrder(dash?.kpi ?? []);
         setSheets(sh?.sheets ?? []);
         setSystems((sys?.systems ?? []).filter((d: SystemCard) => d.sheetCount > 0));
+        setDelayReasons(
+          (cl?.items ?? []).map((i: { code: string; label: string }) => ({
+            code: i.code,
+            label: i.label,
+          })),
+        );
       })
       .finally(() => setLoading(false));
   }, []);
@@ -200,11 +208,11 @@ export default function Dashboard() {
 
   const allDelayed = useMemo(() => data?.delayedTasks ?? [], [data]);
   const { reasonCounts, noReason, maxReason } = useMemo(() => {
-    const counts = Object.keys(DELAY_REASON_LABEL)
-      .map((slug) => ({
-        slug,
-        label: DELAY_REASON_LABEL[slug as keyof typeof DELAY_REASON_LABEL],
-        count: allDelayed.filter((t) => t.delayReason === slug).length,
+    const counts = delayReasons
+      .map(({ code, label }) => ({
+        slug: code,
+        label,
+        count: allDelayed.filter((t) => t.delayReason === code).length,
       }))
       .filter((r) => r.count > 0)
       .sort((a, b) => b.count - a.count);
@@ -214,7 +222,7 @@ export default function Dashboard() {
       noReason: none,
       maxReason: Math.max(1, ...counts.map((r) => r.count), none),
     };
-  }, [allDelayed]);
+  }, [allDelayed, delayReasons]);
 
   if (loading) return <PageSkeleton />;
 
@@ -668,6 +676,7 @@ export default function Dashboard() {
             sheetLabel={(s) => sheetNameByCode.get(s) ?? s}
             taskHref={trackingUrl}
             editReason={{ canEdit: !!me && me.role !== "subcon", onChange: setReason }}
+            delayReasons={delayReasons}
             groupProgress={groupProgressMap}
             emptyMessage={
               <>
