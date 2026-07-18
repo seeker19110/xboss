@@ -12,8 +12,11 @@ import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
 
 // Các domain danh mục đã biết (hiện chỉ delay_reason được seed — xem lib/delay.ts).
+// require_2fa_roles (M56 PR2): mỗi dòng active có mã = 1 vai trò (admin/pm/…) bị BẮT BUỘC
+// bật 2FA; rỗng = không ai bị bắt buộc. API POST validate mã chỉ được là vai trò hợp lệ.
 const DOMAINS: { key: string; label: string }[] = [
   { key: "delay_reason", label: "Nguyên nhân trễ" },
+  { key: "require_2fa_roles", label: "Bắt buộc 2FA theo vai trò" },
 ];
 
 type CodeListRow = {

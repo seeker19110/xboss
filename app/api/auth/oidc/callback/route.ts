@@ -33,8 +33,7 @@ function toLogin(req: NextRequest, error: string): NextResponse {
 
 // GET /api/auth/oidc/callback → nhận code từ IdP, đổi token, phát cookie phiên xboss_session.
 export async function GET(req: NextRequest) {
-  if (!ssoEnabled())
-    return NextResponse.json({ error: "SSO chưa được bật" }, { status: 404 });
+  if (!ssoEnabled()) return NextResponse.json({ error: "SSO chưa được bật" }, { status: 404 });
 
   const ip = clientIp(req);
 
@@ -89,8 +88,10 @@ export async function GET(req: NextRequest) {
 
   // Phát cookie phiên (flags y hệt app/api/auth/login/route.ts). Redirect CỐ ĐỊNH về "/"
   // — KHÔNG nhận returnTo/redirect từ query (chống open-redirect).
+  // M56 PR2: 2FA theo vai trò chỉ áp cho tài khoản mật khẩu — SSO đã đẩy MFA về IdP
+  // (đúng phạm vi "Không làm" của docs/nang-cap/M56-2fa-totp.md), nên LUÔN mustSetup2fa=false.
   const res = NextResponse.redirect(new URL("/", req.url));
-  res.cookies.set(COOKIE, makeToken(user.id, user.password_hash), {
+  res.cookies.set(COOKIE, makeToken(user.id, user.password_hash, false), {
     httpOnly: true,
     path: "/",
     maxAge: COOKIE_MAX_AGE,

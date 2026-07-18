@@ -1,4 +1,4 @@
-import { scryptSync, randomBytes, createHmac, timingSafeEqual } from "node:crypto";
+import { scryptSync, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { queryOne, run } from "@/lib/db";
 import { patchRequestContext, getRequestContext } from "@/lib/request-context";
@@ -6,21 +6,13 @@ import { log } from "@/lib/log";
 import { ROLES, ROLE_LABELS, VIEW_ONLY_ROLES, PAYMENT_VIEW_ROLES, type Role } from "@/lib/roles";
 import { getPermissionOverride, hasProjectOverrides } from "@/lib/permissions";
 import { getCurrentProjectId } from "@/lib/projects";
+import { getList } from "@/lib/code-lists";
+// Ký/verify cookie phiên tách sang lib/session-token (thuần node:crypto) để proxy.ts import
+// được mà không kéo theo next/headers/lib/db. Re-export để mọi call-site cũ import từ @/lib/auth
+// không đổi.
+import { COOKIE, COOKIE_MAX_AGE, sign, makeToken, parseToken } from "@/lib/session-token";
 export { ROLES, ROLE_LABELS, VIEW_ONLY_ROLES, PAYMENT_VIEW_ROLES, type Role };
-
-export const COOKIE = "xboss_session";
-const SESSION_DAYS = 7;
-
-// Fallback chỉ dành cho dev — production bắt buộc đặt XBOSS_SECRET,
-// nếu không ai cũng có thể tự ký cookie phiên (kể cả phiên admin).
-// Kiểm tra lúc dùng (không phải lúc import) để next build không cần secret.
-function getSecret(): string {
-  const s = process.env.XBOSS_SECRET;
-  if (s) return s;
-  if (process.env.NODE_ENV === "production")
-    throw new Error("XBOSS_SECRET chưa được cấu hình — bắt buộc khi chạy production.");
-  return "xboss-dev-secret-change-me";
-}
+export { COOKIE, COOKIE_MAX_AGE, makeToken, parseToken };
 
 export type User = { id: number; name: string; email: string; role: Role };
 
@@ -56,32 +48,29 @@ export function verifyPassword(pw: string, stored: string): boolean {
   return test.length === ref.length && timingSafeEqual(test, ref);
 }
 
-// ===== Cookie phiên (stateless, ký HMAC) =====
-// Token format: `userId.exp.pwFrag.HMAC(userId.exp.pwFrag)`
-// pwFrag = 12 ký tự đầu của password_hash — đổi mật khẩu là token cũ tự hết hiệu lực.
-function sign(payload: string): string {
-  return createHmac("sha256", getSecret()).update(payload).digest("hex");
-}
-export function makeToken(userId: number, passwordHash: string): string {
-  const exp = Date.now() + SESSION_DAYS * 86400_000;
-  const pwFrag = passwordHash.slice(0, 12);
-  const payload = `${userId}.${exp}.${pwFrag}`;
-  return `${payload}.${sign(payload)}`;
-}
-function parseToken(token: string): { uid: number; pwFrag: string } | null {
-  const parts = token.split(".");
-  if (parts.length !== 4) return null;
-  const [uid, exp, pwFrag, mac] = parts;
-  const expected = Buffer.from(sign(`${uid}.${exp}.${pwFrag}`), "hex");
-  let given: Buffer;
-  try {
-    given = Buffer.from(mac, "hex");
-  } catch {
-    return null;
+// ===== Bắt buộc 2FA theo vai trò (M56 PR2) =====
+// requiredRoles: đọc danh mục mềm code_lists domain `require_2fa_roles` (cache theo
+// watermark trong lib/code-lists) — mỗi dòng active có code = 1 vai trò bị bắt buộc bật
+// 2FA. Domain rỗng (mặc định, chưa admin nào thêm dòng) → Set rỗng → không ai bị bắt buộc,
+// hành vi y hệt trước PR2.
+export async function requiredRoles(): Promise<Set<Role>> {
+  const items = await getList("require_2fa_roles");
+  const roles = new Set<Role>();
+  for (const it of items) {
+    if ((ROLES as string[]).includes(it.code)) roles.add(it.code as Role);
   }
-  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
-  if (Number(exp) < Date.now()) return null;
-  return { uid: Number(uid), pwFrag };
+  return roles;
+}
+
+// Thuần (test riêng): tài khoản có bị buộc bật 2FA trước khi tiếp tục dùng hệ thống không —
+// vai trò nằm trong danh sách bắt buộc VÀ chưa từng bật 2FA (totp_enabled_at null). Nhận
+// `required` làm tham số để hàm thuần, không chạm DB (caller lấy từ requiredRoles()).
+export function computeMustSetup2fa(
+  role: Role,
+  totpEnabledAt: string | null | undefined,
+  required: Set<Role>,
+): boolean {
+  return required.has(role) && !totpEnabledAt;
 }
 
 // ===== Người dùng hiện tại =====
@@ -120,8 +109,6 @@ export async function getCurrentUser(): Promise<User | null> {
   }
   return user as User;
 }
-
-export const COOKIE_MAX_AGE = SESSION_DAYS * 86400;
 
 // ===== Token tạm "chờ 2FA" (M56 PR1) =====
 // Sau khi verifyPassword đúng nhưng user đã bật TOTP: KHÔNG set cookie phiên ngay, trả

@@ -144,7 +144,8 @@ test(
       assert.equal(u1.role, "viewer"); // default khi không có claim + không đặt OIDC_DEFAULT_ROLE
       assert.ok(u1.password_hash && u1.password_hash.length > 0); // NOT NULL thoả
       // Token phiên nhúng pwFrag từ hash — chứng minh makeToken hoạt động với hash ngẫu nhiên.
-      assert.ok(makeToken(u1.id, u1.password_hash).split(".").length === 4);
+      // M56 PR2: token có 5 phần (thêm cờ mustSetup2fa); SSO luôn false (MFA ở IdP).
+      assert.ok(makeToken(u1.id, u1.password_hash, false).split(".").length === 5);
 
       // Gọi lần 2 cùng email → cùng id, không tạo trùng.
       const u2 = await upsertSsoUser({ email, name: "SSO Mới", roleFromClaim: null });
@@ -199,33 +200,29 @@ test(
   },
 );
 
-test(
-  "upsertSsoUser: KHÔNG hạ cấp admin cuối cùng theo claim",
-  { skip: !HAS_TEST_DB },
-  async () => {
-    const { run, query } = await import("@/lib/db");
-    const { upsertSsoUser } = await import("@/lib/oidc");
-    const email = `sso-admin-${Date.now()}@example.com`;
-    // Snapshot các admin hiện có để khôi phục sau (test chạy tuần tự theo file).
-    const others = await query<{ id: number }>(`SELECT id FROM users WHERE role = 'admin'`);
-    try {
-      await run(
-        `INSERT INTO users (name, email, role, password_hash) VALUES (?, ?, 'admin', 'x')`,
-        "SSO Admin",
-        email,
-      );
-      // Biến user SSO thành admin DUY NHẤT còn lại.
-      await run(`UPDATE users SET role = 'pm' WHERE role = 'admin' AND email != ?`, email);
+test("upsertSsoUser: KHÔNG hạ cấp admin cuối cùng theo claim", { skip: !HAS_TEST_DB }, async () => {
+  const { run, query } = await import("@/lib/db");
+  const { upsertSsoUser } = await import("@/lib/oidc");
+  const email = `sso-admin-${Date.now()}@example.com`;
+  // Snapshot các admin hiện có để khôi phục sau (test chạy tuần tự theo file).
+  const others = await query<{ id: number }>(`SELECT id FROM users WHERE role = 'admin'`);
+  try {
+    await run(
+      `INSERT INTO users (name, email, role, password_hash) VALUES (?, ?, 'admin', 'x')`,
+      "SSO Admin",
+      email,
+    );
+    // Biến user SSO thành admin DUY NHẤT còn lại.
+    await run(`UPDATE users SET role = 'pm' WHERE role = 'admin' AND email != ?`, email);
 
-      const u = await upsertSsoUser({ email, name: "SSO Admin", roleFromClaim: "engineer" });
-      assert.equal(u.role, "admin"); // giữ nguyên — không tự khoá hệ thống
-    } finally {
-      // Khôi phục: xoá user test + trả các admin cũ về admin.
-      await run(`DELETE FROM users WHERE email = ?`, email);
-      for (const o of others) await run(`UPDATE users SET role = 'admin' WHERE id = ?`, o.id);
-    }
-  },
-);
+    const u = await upsertSsoUser({ email, name: "SSO Admin", roleFromClaim: "engineer" });
+    assert.equal(u.role, "admin"); // giữ nguyên — không tự khoá hệ thống
+  } finally {
+    // Khôi phục: xoá user test + trả các admin cũ về admin.
+    await run(`DELETE FROM users WHERE email = ?`, email);
+    for (const o of others) await run(`UPDATE users SET role = 'admin' WHERE id = ?`, o.id);
+  }
+});
 
 // GHI CHÚ: flow HTTP thật với 1 IdP (discovery → redirect → callback đổi token) không tự
 // động hoá được trong CI — verify thủ công với 1 IdP thật (Google Workspace / Entra) trước
