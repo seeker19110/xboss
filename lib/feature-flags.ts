@@ -6,9 +6,13 @@ import { NextResponse } from "next/server";
 import { query, run } from "@/lib/db";
 import { MODULES } from "@/lib/modules";
 
+// M53 PR4: bump `version` chỉ vô hiệu cache trong CÙNG process — chạy nhiều instance thì
+// admin bật/tắt module ở instance A không tự lan sang B/C. Thêm TTL làm trần độ trễ tối đa
+// (giống lib/code-lists.ts) — instance khác thấy đổi chậm nhất sau TTL_MS.
+const TTL_MS = 60_000;
 let version = 0;
 // Cache theo projectId — value là Map<module_key, enabled> chỉ chứa override đã lưu.
-const cache = new Map<number, { v: number; overrides: Map<string, boolean> }>();
+const cache = new Map<number, { v: number; overrides: Map<string, boolean>; loadedAt: number }>();
 
 export function bumpFeatureFlagsVersion(): void {
   version++;
@@ -20,13 +24,14 @@ export function featureFlagsVersion(): number {
 
 async function getOverrides(projectId: number): Promise<Map<string, boolean>> {
   const cached = cache.get(projectId);
-  if (cached && cached.v === version) return cached.overrides;
+  if (cached && cached.v === version && Date.now() - cached.loadedAt < TTL_MS)
+    return cached.overrides;
   const rows = await query<{ moduleKey: string; enabled: boolean }>(
     `SELECT module_key AS "moduleKey", enabled FROM feature_flags WHERE project_id = ?`,
     projectId,
   );
   const overrides = new Map(rows.map((r) => [r.moduleKey, r.enabled]));
-  cache.set(projectId, { v: version, overrides });
+  cache.set(projectId, { v: version, overrides, loadedAt: Date.now() });
   return overrides;
 }
 

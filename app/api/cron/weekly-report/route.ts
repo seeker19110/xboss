@@ -11,8 +11,11 @@ import {
   type AuditChainSummary,
 } from "@/lib/report";
 import { verifyAuditChain } from "@/lib/audit-chain";
+import { acquireSyncLock, releaseSyncLock } from "@/lib/sync-locks";
 
 export const dynamic = "force-dynamic";
+
+const LOCK_NAME = "cron:weekly-report";
 
 // GET /api/cron/weekly-report
 // Gọi bởi cron sáng thứ Hai (hoặc Admin/PM gọi tay để xem trước).
@@ -26,6 +29,22 @@ export async function GET(req: NextRequest) {
       { status: 401 },
     );
 
+  // M53 PR4: chống gửi trùng email/Telegram khi 2 request chạm route gần như đồng thời
+  // (cùng lý do như daily-report).
+  if (!(await acquireSyncLock(LOCK_NAME)))
+    return NextResponse.json(
+      { error: "Báo cáo tuần đang được gửi bởi tiến trình khác — thử lại sau ít phút" },
+      { status: 429 },
+    );
+
+  try {
+    return await handleWeeklyReport();
+  } finally {
+    await releaseSyncLock(LOCK_NAME);
+  }
+}
+
+async function handleWeeklyReport(): Promise<NextResponse> {
   const report = await buildWeeklyReport();
 
   // Xác minh chuỗi hash audit_log (M43 PR3) — chạy trong process, không spawn subprocess
