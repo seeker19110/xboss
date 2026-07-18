@@ -36,6 +36,9 @@ export async function POST(
     return NextResponse.json({ error: "Số lượng không hợp lệ" }, { status: 400 });
 
   const noteText = body.note ? String(body.note).trim() : "Hoàn kho từ công trường";
+  // Chống double-submit (bấm nhanh 2 lần / mất mạng công trường retry): client gửi
+  // header Idempotency-Key, unique index (material_id, type, key) chặn ghi trùng.
+  const idempotencyKey = req.headers.get("Idempotency-Key")?.trim().slice(0, 200) || null;
 
   type TxResult =
     { ok: true; newStock: number; newUsed: number } | { ok: false; status: number; error: string };
@@ -47,6 +50,17 @@ export async function POST(
       projectId,
     );
     if (!mat) return { ok: false, status: 404, error: "Không tìm thấy vật tư" };
+
+    if (idempotencyKey) {
+      const dup = await queryOne<{ qty_after: number }>(
+        `SELECT qty_after FROM material_transactions
+          WHERE material_id = ? AND type = 'hoan_kho' AND idempotency_key = ?`,
+        id,
+        idempotencyKey,
+      );
+      if (dup) return { ok: true, newStock: dup.qty_after, newUsed: mat.qty_used };
+    }
+
     if (qty > mat.qty_used)
       return {
         ok: false,
@@ -69,13 +83,14 @@ export async function POST(
 
     await insertId(
       `INSERT INTO material_transactions
-         (material_id, delta, qty_after, type, note, created_by)
-       VALUES (?, ?, ?, 'hoan_kho', ?, ?)`,
+         (material_id, delta, qty_after, type, note, created_by, idempotency_key)
+       VALUES (?, ?, ?, 'hoan_kho', ?, ?, ?)`,
       id,
       qty,
       newStock,
       noteText,
       user.id,
+      idempotencyKey,
     );
 
     return { ok: true, newStock, newUsed };

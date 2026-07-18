@@ -43,6 +43,9 @@ export async function POST(
   // Cấp phát: đi tầng nào, tổ đội nào lĩnh (M4) — tự do nhập, không bắt buộc.
   const floorLabel = body.floorLabel ? String(body.floorLabel).trim().slice(0, 50) : null;
   const crew = body.crew ? String(body.crew).trim().slice(0, 100) : null;
+  // Chống double-submit (bấm nhanh 2 lần / mất mạng công trường retry): client gửi
+  // header Idempotency-Key, unique index (material_id, type, key) chặn ghi trùng.
+  const idempotencyKey = req.headers.get("Idempotency-Key")?.trim().slice(0, 200) || null;
 
   // FOR UPDATE: khoá hàng trong transaction để tránh race condition khi
   // nhiều request xuất vật tư đồng thời vượt quá số dư tồn kho.
@@ -56,6 +59,17 @@ export async function POST(
       projectId,
     );
     if (!mat) return { ok: false, status: 404, error: "Không tìm thấy vật tư" };
+
+    if (idempotencyKey) {
+      const dup = await queryOne<{ qty_after: number }>(
+        `SELECT qty_after FROM material_transactions
+          WHERE material_id = ? AND type = 'xuat_cong_truong' AND idempotency_key = ?`,
+        id,
+        idempotencyKey,
+      );
+      if (dup) return { ok: true, newStock: dup.qty_after, newUsed: mat.qty_used };
+    }
+
     if (qty > mat.qty_stock)
       return { ok: false, status: 409, error: `Tồn kho không đủ (còn ${mat.qty_stock})` };
 
@@ -74,8 +88,8 @@ export async function POST(
 
     await insertId(
       `INSERT INTO material_transactions
-         (material_id, delta, qty_after, type, task_id, note, floor_label, crew, created_by)
-       VALUES (?, ?, ?, 'xuat_cong_truong', ?, ?, ?, ?, ?)`,
+         (material_id, delta, qty_after, type, task_id, note, floor_label, crew, created_by, idempotency_key)
+       VALUES (?, ?, ?, 'xuat_cong_truong', ?, ?, ?, ?, ?, ?)`,
       id,
       -qty,
       newStock,
@@ -84,6 +98,7 @@ export async function POST(
       floorLabel,
       crew,
       user.id,
+      idempotencyKey,
     );
 
     return { ok: true, newStock, newUsed };
