@@ -22,10 +22,37 @@ const txStorage = new AsyncLocalStorage<PoolClient>();
 // Schema DB được quản qua các file .sql đánh số trong migrations/ (chạy bởi runMigrations,
 // xem lib/db/migrate.ts + docs/adr/0003-migrations.md). Không còn chuỗi SCHEMA inline ở đây.
 
+// Đọc số nguyên từ env, clamp về [min, max]; giá trị thiếu/không hợp lệ → dùng mặc định.
+// Không throw — cấu hình sai chỉ bị ghim về biên thay vì sập app (M53 PR3).
+function envIntClamped(
+  raw: string | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  const n = raw !== undefined ? Number(raw) : NaN;
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.trunc(n)));
+}
+
 export function getPool(): Pool {
   if (!g.__xbossPool) {
-    const url = getServerEnv().DATABASE_URL;
-    g.__xbossPool = new Pool({ connectionString: url, max: 10 });
+    const env = getServerEnv();
+    const url = env.DATABASE_URL;
+    // Số connection tối đa trong pool — mặc định 10 (giữ nguyên hành vi cũ), chỉnh qua
+    // XBOSS_PG_POOL_MAX khi cần scale (clamp 1–100 để tránh cấu hình sai làm cạn connection
+    // Postgres phía server).
+    const max = envIntClamped(env.XBOSS_PG_POOL_MAX, 10, 1, 100);
+    // Chặn query treo vô hạn (khoá chết, quên WHERE...) — mặc định 30s, chỉnh qua
+    // XBOSS_PG_STMT_TIMEOUT_MS (clamp 1s–5 phút). idle_in_transaction cố định 15s: transaction
+    // mở rồi bỏ đó (quên COMMIT/ROLLBACK) sẽ tự bị Postgres đóng để không giữ khoá.
+    const stmtTimeoutMs = envIntClamped(env.XBOSS_PG_STMT_TIMEOUT_MS, 30_000, 1_000, 300_000);
+    g.__xbossPool = new Pool({
+      connectionString: url,
+      max,
+      connectionTimeoutMillis: 10_000,
+      options: `-c statement_timeout=${stmtTimeoutMs} -c idle_in_transaction_session_timeout=15000`,
+    });
   }
   return g.__xbossPool;
 }

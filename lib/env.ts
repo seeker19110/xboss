@@ -62,6 +62,11 @@ const serverSchema = z.object({
   // Seed dữ liệu (scripts/seed)
   XLSX_FILE: z.string().optional(),
 
+  // Pool Postgres & ngưỡng cảnh báo (M53 — Scale headroom). Đọc chuỗi rồi tự parse/clamp
+  // ngay tại nơi dùng (vd lib/db/index.ts) — không coerce ở schema để giữ nguyên pattern
+  // optional string sẵn có của file này.
+  XBOSS_PG_POOL_MAX: z.string().optional(),
+  XBOSS_PG_STMT_TIMEOUT_MS: z.string().optional(),
   // Ngưỡng cảnh báo query chậm (ms) — mặc định 500, 0 = tắt hẳn (M53 PR1, lib/db/index.ts).
   XBOSS_SLOW_QUERY_MS: z.string().optional(),
 
