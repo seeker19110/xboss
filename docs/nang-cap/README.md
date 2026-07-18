@@ -48,7 +48,7 @@ Từ phân tích so XBoss với ERP chuyên nghiệp (`PROGRESS.md`). **Thứ t�
 
 1. **M53 (4 PR) song song M57 PR1** — kế hoạch đã lập sẵn (PLAN.md commit `d6d6dd9`, PR #236), 2 module không đụng chung file; chạy TRƯỚC để chiếm số migration sớm nhất.
 2. **M56 PR2** — bắt buộc 2FA theo vai trò (nhỏ, nền PR1 đã chạy).
-3. **M61** — override quyền theo dự án (kế hoạch trong PLAN.md hiện tại + PR #246); làm trước M51 để `getCurrentUser` giải projectId sẵn — M51 RLS cũng đọc projectId từ request-context, hưởng chung nền.
+3. ~~**M61** — override quyền theo dự án~~ → **đã xong** (2026-07-18, PR1 #248 + PR2 #249, đã merge vào `main`).
 4. **M51 (GĐ0 của M54)** — RLS theo dự án + `organizations`.
 5. **M55** — BI/Metabase (cần dữ liệu ổn định sau RLS để view whitelist đúng).
 6. **M58** — QR + offline hiện trường (độc lập, không migration lớn).
