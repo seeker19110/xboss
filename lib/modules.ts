@@ -194,4 +194,14 @@ export const MODULES: ModuleDef[] = [
       "/api/admin/sod-report",
     ],
   },
+  {
+    // Mã QR mở URL + tem in (M58 PR1) — không có nav sidebar riêng (nút "In tem QR" nằm
+    // trong /equipment, /materials); resolve route dùng chung mọi vai trò đăng nhập, tem
+    // in gác quyền CAN.export (Admin/PM).
+    key: "qr",
+    nav: [],
+    permKeys: ["export"],
+    routePrefix: ["/api/r", "/api/qr"],
+    swExclude: ["/api/r/", "/api/qr/"],
+  },
 ];

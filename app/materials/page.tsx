@@ -39,7 +39,7 @@ import { Skeleton } from "@/app/components/Skeleton";
 import SpreadsheetGrid, { type GridColumn, type GridEdit } from "@/app/components/SpreadsheetGrid";
 import CustomFieldsSection from "@/app/components/CustomFieldsSection";
 import { formatDateTimeVN } from "@/lib/date";
-import { Table2, RefreshCw } from "lucide-react";
+import { Table2, RefreshCw, QrCode } from "lucide-react";
 
 // Cache in-memory ngoài component — sống qua tab-switch, mất khi reload trang.
 // Khác localStorage: không serialize/deserialize JSON → gán reference O(1).
@@ -135,6 +135,8 @@ export default function MaterialsPage() {
   // Đồng bộ Google Sheet (hai chiều)
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<SyncSummary | null>(null);
+  // In tem QR (M58 PR1) — modal chọn nhiều dòng riêng, không đụng SpreadsheetGrid/bảng chính.
+  const [labelModalOpen, setLabelModalOpen] = useState(false);
 
   const [search, setSearch] = useState("");
   const [hiddenCols, setHiddenCols] = useState<Set<ColKey>>(new Set());
@@ -805,6 +807,16 @@ export default function MaterialsPage() {
                 >
                   <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />{" "}
                   {syncing ? "Đang đồng bộ…" : "Đồng bộ Google Sheet"}
+                </button>
+              )}
+              {canAdmin && (
+                <button
+                  onClick={() => setLabelModalOpen(true)}
+                  aria-label="In tem QR vật tư"
+                  title="Chọn vật tư để in tem QR"
+                  className="flex items-center gap-1.5 border border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-white rounded-xl px-4 py-2.5 text-sm font-medium transition shrink-0"
+                >
+                  <QrCode className="w-4 h-4" /> In tem QR
                 </button>
               )}
             </div>
@@ -1580,7 +1592,97 @@ export default function MaterialsPage() {
           }}
         />
       )}
+
+      {labelModalOpen && (
+        <PrintLabelsModal materials={materials} onClose={() => setLabelModalOpen(false)} />
+      )}
     </div>
+  );
+}
+
+// ─── Modal chọn vật tư để in tem QR (M58 PR1) ──────────────────────────────
+// Tách riêng khỏi bảng chính/SpreadsheetGrid — trang chưa có cơ chế chọn nhiều dòng nên
+// chỉ thêm tối giản 1 modal danh sách + checkbox, không đụng lưới bảng tính phức tạp sẵn có.
+function PrintLabelsModal({ materials, onClose }: { materials: Material[]; onClose: () => void }) {
+  const [q, setQ] = useState("");
+  const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
+
+  const filtered = q.trim()
+    ? materials.filter((m) => {
+        const needle = q.trim().toLowerCase();
+        return (
+          m.name.toLowerCase().includes(needle) || (m.boqCode ?? "").toLowerCase().includes(needle)
+        );
+      })
+    : materials;
+
+  function toggle(id: number) {
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function printLabels() {
+    if (checkedIds.size === 0) return;
+    window.open(`/api/qr/labels?kind=mt&ids=${[...checkedIds].join(",")}`, "_blank");
+    onClose();
+  }
+
+  return (
+    <Modal onClose={onClose} className="max-w-lg">
+      <div className="p-5 space-y-3 max-h-[85vh] flex flex-col">
+        <div className="flex items-center justify-between shrink-0">
+          <h2 className="font-semibold flex items-center gap-2">
+            <QrCode className="w-4 h-4" /> Chọn vật tư để in tem QR
+          </h2>
+          <button onClick={onClose} aria-label="Đóng" className="text-zinc-400 hover:text-white">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Tìm theo mã BOQ/tên..."
+          aria-label="Tìm vật tư"
+          className="shrink-0 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-500"
+        />
+        <div className="flex-1 overflow-y-auto border border-zinc-800 rounded-lg divide-y divide-zinc-800/60">
+          {filtered.length === 0 ? (
+            <p className="p-4 text-sm text-zinc-500 text-center">Không tìm thấy vật tư nào.</p>
+          ) : (
+            filtered.map((m) => (
+              <label
+                key={m.id}
+                className="flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-zinc-800/40 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={checkedIds.has(m.id)}
+                  onChange={() => toggle(m.id)}
+                  className="w-4 h-4 accent-emerald-600 shrink-0"
+                  aria-label={`Chọn ${m.name} để in tem QR`}
+                />
+                <span className="font-mono text-xs text-zinc-400 shrink-0">{m.boqCode ?? "—"}</span>
+                <span className="truncate">{m.name}</span>
+              </label>
+            ))
+          )}
+        </div>
+        <div className="flex items-center justify-between shrink-0">
+          <p className="text-xs text-zinc-500">Đã chọn {checkedIds.size} vật tư</p>
+          <button
+            onClick={printLabels}
+            disabled={checkedIds.size === 0}
+            className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed text-on-accent font-semibold px-4 py-2 rounded-lg text-sm"
+          >
+            <QrCode className="w-4 h-4" /> In tem QR
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

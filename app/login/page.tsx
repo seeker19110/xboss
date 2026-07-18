@@ -72,7 +72,12 @@ export default function LoginPage() {
     if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage({ type: "CLEAR_CACHE" });
     }
-    window.location.href = "/";
+    // M58 PR1: quay lại đúng đích sau khi quét QR gặp 401 (?next=/r/<kind>/<id>) — chỉ chấp
+    // nhận đường dẫn nội bộ tuyệt đối (bắt đầu "/" và không phải "//..." — chặn open redirect
+    // dạng protocol-relative URL), không tin giá trị lạ.
+    const next = new URLSearchParams(window.location.search).get("next");
+    const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+    window.location.href = safeNext;
   }
 
   async function submit2fa(e: React.FormEvent) {
@@ -142,45 +147,45 @@ export default function LoginPage() {
             </button>
           </form>
         ) : (
-        <form
-          onSubmit={submit}
-          className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4"
-        >
-          <div>
-            <label htmlFor="login-email" className="text-xs text-zinc-400">
-              Email
-            </label>
-            <input
-              id="login-email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              type="email"
-              required
-              className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600"
-            />
-          </div>
-          <div>
-            <label htmlFor="login-password" className="text-xs text-zinc-400">
-              Mật khẩu
-            </label>
-            <input
-              id="login-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              type="password"
-              required
-              className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600"
-            />
-          </div>
-          {error && <p className="text-sm text-red-400">{error}</p>}
-          <button
-            disabled={busy}
-            type="submit"
-            className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 disabled:bg-zinc-700 py-2.5 rounded-lg font-medium transition text-on-accent"
+          <form
+            onSubmit={submit}
+            className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4"
           >
-            <LogIn className="w-4 h-4" /> {busy ? "Đang đăng nhập..." : "Đăng nhập"}
-          </button>
-        </form>
+            <div>
+              <label htmlFor="login-email" className="text-xs text-zinc-400">
+                Email
+              </label>
+              <input
+                id="login-email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                type="email"
+                required
+                className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600"
+              />
+            </div>
+            <div>
+              <label htmlFor="login-password" className="text-xs text-zinc-400">
+                Mật khẩu
+              </label>
+              <input
+                id="login-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                type="password"
+                required
+                className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600"
+              />
+            </div>
+            {error && <p className="text-sm text-red-400">{error}</p>}
+            <button
+              disabled={busy}
+              type="submit"
+              className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 disabled:bg-zinc-700 py-2.5 rounded-lg font-medium transition text-on-accent"
+            >
+              <LogIn className="w-4 h-4" /> {busy ? "Đang đăng nhập..." : "Đăng nhập"}
+            </button>
+          </form>
         )}
         {!pending && ssoEnabled && (
           <div className="mt-4">
