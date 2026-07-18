@@ -67,19 +67,25 @@ export type ProjectListItem = {
   code: string | null;
   status: "active" | "handover" | "closed";
   color: string | null;
+  orgId: number | null;
   progressPercent: number;
   delayedCount: number;
 };
 
 /** Danh sách dự án user thấy + % tiến độ (TB task qua tower) + số việc trễ — dùng chung
- *  cho project switcher lẫn trang Portfolio. */
-export async function listProjects(user: { id: number; role: Role }): Promise<ProjectListItem[]> {
+ *  cho project switcher lẫn trang Portfolio. `orgId` (M51 PR4): lọc theo tổ chức khi có
+ *  giá trị; NULL/undefined = không lọc (mọi dự án user thấy). */
+export async function listProjects(
+  user: { id: number; role: Role },
+  orgId?: number | null,
+): Promise<ProjectListItem[]> {
   const visible = await visibleProjectIds(user);
   if (visible.length === 0) return [];
   const placeholders = visible.map(() => "?").join(",");
+  const orgFilter = orgId != null ? ` AND p.org_id = ?` : "";
   // COALESCE(t.end_date, wp.end_date): task.end_date NULL = kế thừa ngày KT nhóm (lib/recompute.ts).
   const rows = await query<ProjectListItem>(
-    `SELECT p.id, p.name, p.code, p.status, p.color,
+    `SELECT p.id, p.name, p.code, p.status, p.color, p.org_id AS "orgId",
             COALESCE(AVG(t.progress_percent), 0) AS "progressPercent",
             COALESCE(SUM(CASE WHEN COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) < ? AND t.progress_percent < 1
                               AND t.status NOT IN ('hoan_thanh','nghiem_thu') THEN 1 ELSE 0 END), 0) AS "delayedCount"
@@ -88,13 +94,35 @@ export async function listProjects(user: { id: number; role: Role }): Promise<Pr
        LEFT JOIN sheet_types st ON st.tower_id = tw.id
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
-      WHERE p.id IN (${placeholders})
-      GROUP BY p.id, p.name, p.code, p.status, p.color
+      WHERE p.id IN (${placeholders})${orgFilter}
+      GROUP BY p.id, p.name, p.code, p.status, p.color, p.org_id
       ORDER BY p.id`,
     todayISO(),
     ...visible,
+    ...(orgId != null ? [orgId] : []),
   );
   return rows;
+}
+
+export type OrganizationItem = { id: number; name: string };
+
+/** Tổ chức có ít nhất 1 dự án user thấy — dùng để trang Portfolio quyết định có hiện
+ *  select tổ chức hay không (chỉ hiện khi >1 org). Dự án org_id NULL không tạo mục. */
+export async function listOrganizations(user: {
+  id: number;
+  role: Role;
+}): Promise<OrganizationItem[]> {
+  const visible = await visibleProjectIds(user);
+  if (visible.length === 0) return [];
+  const placeholders = visible.map(() => "?").join(",");
+  return query<OrganizationItem>(
+    `SELECT DISTINCT o.id, o.name
+       FROM organizations o
+       JOIN projects p ON p.org_id = o.id
+      WHERE p.id IN (${placeholders})
+      ORDER BY o.name`,
+    ...visible,
+  );
 }
 
 export type PortfolioKpi = {

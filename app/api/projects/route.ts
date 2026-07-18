@@ -1,18 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
-import { listProjects } from "@/lib/projects";
+import { listProjects, listOrganizations } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/projects — dự án user thấy + % tiến độ + số việc trễ (project switcher +
 // trang Portfolio). Tôn trọng user_projects qua listProjects().
-export async function GET() {
+// M51 PR4: `?org=<id>` lọc theo tổ chức; trả kèm `orgs` (tổ chức có dự án user thấy)
+// để trang Portfolio quyết định hiện select tổ chức (chỉ khi có >1 org).
+export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
-  const projects = await listProjects(user);
-  return NextResponse.json({ projects });
+  const orgParam = req.nextUrl.searchParams.get("org");
+  const orgId = orgParam && Number.isFinite(Number(orgParam)) ? Number(orgParam) : null;
+
+  const [projects, orgs] = await Promise.all([listProjects(user, orgId), listOrganizations(user)]);
+  return NextResponse.json({ projects, orgs });
 }
 
 // POST /api/projects — tạo dự án mới (chỉ Admin). Body: { name, code?, investor?, contractor? }.

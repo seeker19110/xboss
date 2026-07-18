@@ -23,6 +23,10 @@
 | logo | text | ✓ |  |
 | status | text |  | `'active'::text` |
 | color | text | ✓ |  |
+| org_id | integer | ✓ |  |
+
+**Khóa ngoại:**
+- `org_id` → `organizations(id)`
 
 **Index:**
 - `projects_code_key`: UNIQUE INDEX projects_code_key ON public.projects USING btree (code)
@@ -3234,6 +3238,17 @@
 
 **Index:**
 - `feature_flags_pkey`: UNIQUE INDEX feature_flags_pkey ON public.feature_flags USING btree (module_key, project_id)
+
+### organizations
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | integer |  | `nextval('organizations_id_seq'::regclass)` |
+| name | text |  |  |
+| tax_code | text | ✓ |  |
+
+**Index:**
+- `organizations_pkey`: UNIQUE INDEX organizations_pkey ON public.organizations USING btree (id)
 
 ### saved_reports
 
