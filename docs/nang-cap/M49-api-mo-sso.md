@@ -12,12 +12,12 @@
 
 ## Quyết định đã chốt & hiện trạng phụ thuộc
 
-| Quyết định | Nội dung |
-| --- | --- |
-| Thư viện SSO | **`openid-client` v6** (người dùng chốt 2026-07-16). Lý do: client OIDC được OpenID Foundation certify, lo trọn discovery/PKCE/token/verify `id_token` (các "góc chết" `aud`/`azp`/`max_age`/chuẩn hoá lỗi OAuth); cùng tác giả và xây trên `jose`; chỉ là thư viện client — **không đụng hệ session `xboss_session` hiện có**. Không dùng `next-auth` (đòi sở hữu session, xung đột `lib/auth.ts`). Không cần ADR riêng — mục này là bản ghi quyết định. |
-| Số migration | Bản gốc ghi 0054 — đã bị chiếm. Hiện mới nhất là `0057_integrations.sql`; **0058 đã dành cho M50 PR1** (`PLAN.md`). Số trong file này (**0059/0060/0061**) là **tạm** — kiểm lại `ls migrations/ | sort` lúc code (bài học M32/M33). |
-| Phụ thuộc đã xong | M43 (bảng `audit_log` + trigger `audit_row_change()` + request context), M46 (`lib/approvals.ts::advanceApproval` — **flow đang dormant**, đường duyệt legacy vẫn là đường sống), M48 PR1 (trang `app/admin/integrations/page.tsx` — UI của PR1/PR2 gắn vào đây). |
-| Thứ tự PR | PR1 → PR2 → PR3 (PR2 tái dùng helper rate-limit generic viết ở PR1; PR3 độc lập về code nhưng đi sau cùng vì đụng luồng đăng nhập). |
+| Quyết định        | Nội dung                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Thư viện SSO      | **`openid-client` v6** (người dùng chốt 2026-07-16). Lý do: client OIDC được OpenID Foundation certify, lo trọn discovery/PKCE/token/verify `id_token` (các "góc chết" `aud`/`azp`/`max_age`/chuẩn hoá lỗi OAuth); cùng tác giả và xây trên `jose`; chỉ là thư viện client — **không đụng hệ session `xboss_session` hiện có**. Không dùng `next-auth` (đòi sở hữu session, xung đột `lib/auth.ts`). Không cần ADR riêng — mục này là bản ghi quyết định. |
+| Số migration      | Bản gốc ghi 0054 — đã bị chiếm. Hiện mới nhất là `0057_integrations.sql`; **0058 đã dành cho M50 PR1** (`PLAN.md`). Số trong file này (**0059/0060/0061**) là **tạm** — kiểm lại `ls migrations/                                                                                                                                                                                                                                                          | sort` lúc code (bài học M32/M33). |
+| Phụ thuộc đã xong | M43 (bảng `audit_log` + trigger `audit_row_change()` + request context), M46 (`lib/approvals.ts::advanceApproval` — **flow đang dormant**, đường duyệt legacy vẫn là đường sống), M48 PR1 (trang `app/admin/integrations/page.tsx` — UI của PR1/PR2 gắn vào đây).                                                                                                                                                                                         |
+| Thứ tự PR         | PR1 → PR2 → PR3 (PR2 tái dùng helper rate-limit generic viết ở PR1; PR3 độc lập về code nhưng đi sau cùng vì đụng luồng đăng nhập).                                                                                                                                                                                                                                                                                                                       |
 
 ---
 
@@ -52,8 +52,8 @@ Hiện tại file chuyên cho login (hằng `WINDOW_MINUTES=15`, `MAX_PER_KEY=5`
 // Rate limit generic tái dùng bảng login_rate_limits + pattern upsert atomic sẵn có.
 // Trả về true nếu ĐÃ VƯỢT giới hạn (caller trả 429), false nếu còn quota (đã đếm +1).
 export async function hitRateLimit(
-  key: string,          // vd `api:${keyId}` (PR1), `oidc:${ip}` (PR3)
-  max: number,          // số lần tối đa trong cửa sổ
+  key: string, // vd `api:${keyId}` (PR1), `oidc:${ip}` (PR3)
+  max: number, // số lần tối đa trong cửa sổ
   windowMinutes: number,
 ): Promise<boolean>;
 ```
@@ -67,8 +67,8 @@ test login rate-limit hiện có phải pass nguyên trạng.
 ### `lib/api-keys.ts` (file mới)
 
 ```ts
-export function generateApiKey(): string;          // `xbk_` + randomBytes(32).toString('hex')
-export function hashApiKey(raw: string): string;   // sha256 hex (node:crypto createHash)
+export function generateApiKey(): string; // `xbk_` + randomBytes(32).toString('hex')
+export function hashApiKey(raw: string): string; // sha256 hex (node:crypto createHash)
 export type ApiKeyAuth = { keyId: number; projectId: number | null; scopes: string[] };
 // Đọc header `Authorization: Bearer xbk_...` → tra key_hash, check revoked_at IS NULL.
 // Trả null khi sai/thiếu/revoked (route trả 401). So khớp bằng lookup UNIQUE key_hash
@@ -92,13 +92,13 @@ export async function requireApiKey(
 route: `export const dynamic = "force-dynamic"`, auth bằng `requireApiKey` (KHÔNG
 `getCurrentUser` — API key không có session), scope mặc định `read`:
 
-| Route | Nội dung trả (camelCase, phân trang `?page=` 100 dòng/trang, kèm `total`) |
-| --- | --- |
+| Route                                           | Nội dung trả (camelCase, phân trang `?page=` 100 dòng/trang, kèm `total`)                                                                                                                                    |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `GET /api/v1/tasks?sheet=&floor=&status=&page=` | id, code, boqCode, name, floor, status, progress, startDate, endDate, packageId — JOIN `work_packages → sheet_types` lọc đúng `projectId` (qua `towers.project_id`, xem cách `app/api/tasks/route.ts` scope) |
-| `GET /api/v1/packages?sheet=&page=` | id, code, boqCode, name, floor, progress, status, sheetSlug |
-| `GET /api/v1/materials?page=` | id, boqCode, name, unit, qtyBoq, qtyPlanned, qtyUsed, qtyStock, status |
-| `GET /api/v1/dashboard/kpi` | tổng hợp % theo hệ + đếm trạng thái — tái dùng query của `app/api/dashboard/route.ts` phần KPI (tách hàm dùng chung vào `lib/` nếu tiện, không copy-paste SQL dài) |
-| `GET /api/v1/payment-certs?page=` | **scope `read_finance`** — id, code, contractId, periodNo, status, submittedAt, decidedAt (KHÔNG kèm số tiền chi tiết items ở v1) |
+| `GET /api/v1/packages?sheet=&page=`             | id, code, boqCode, name, floor, progress, status, sheetSlug                                                                                                                                                  |
+| `GET /api/v1/materials?page=`                   | id, boqCode, name, unit, qtyBoq, qtyPlanned, qtyUsed, qtyStock, status                                                                                                                                       |
+| `GET /api/v1/dashboard/kpi`                     | tổng hợp % theo hệ + đếm trạng thái — tái dùng query của `app/api/dashboard/route.ts` phần KPI (tách hàm dùng chung vào `lib/` nếu tiện, không copy-paste SQL dài)                                           |
+| `GET /api/v1/payment-certs?page=`               | **scope `read_finance`** — id, code, contractId, periodNo, status, submittedAt, decidedAt (KHÔNG kèm số tiền chi tiết items ở v1)                                                                            |
 
 Cột `DATE` trả nguyên chuỗi `YYYY-MM-DD` (đúng type parser của `lib/db`). Lỗi trả
 `{ error: string }` tiếng Việt + status đúng nghĩa (401/403/422/429).
@@ -131,7 +131,7 @@ có throttle. Thêm file vào lệnh `npm test` trong `package.json`.
 
 ## PR2 — Webhook ra ngoài
 
-### Migration `0060_webhooks.sql` (số tạm)
+### Migration `0064_webhooks.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS webhooks (
@@ -166,8 +166,12 @@ CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_due
 
 ```ts
 export const WEBHOOK_EVENTS = [
-  "task.approved", "variation.approved", "payment_cert.approved",
-  "material.over_norm", "inspection.requested", "ping",
+  "task.approved",
+  "variation.approved",
+  "payment_cert.approved",
+  "material.over_norm",
+  "inspection.requested",
+  "ping",
 ] as const;
 // Fire-and-forget từ route nghiệp vụ: chỉ INSERT webhook_deliveries cho mọi webhook
 // active có event khớp + (project_id IS NULL OR = projectId). KHÔNG gọi HTTP tại đây
@@ -204,14 +208,14 @@ chung: **phát đúng tại chỗ trạng thái thực thể chuyển sang appro
 (engine nhiều bước: duyệt bước giữa KHÔNG phát; `advanceApproval` trả kết quả — chỉ
 phát khi kết quả cuối là approved):
 
-| Sự kiện | File sửa | Vị trí |
-| --- | --- | --- |
-| `task.approved` | `app/api/tasks/[id]/approve/route.ts` | sau khi set `nghiem_thu` thành công (cả nhánh legacy lẫn nhánh engine trong cùng route); `data` = {taskId, code, boqCode, name} |
-| `task.approved` | `app/api/approvals/route.ts` (duyệt lô) | 1 emit/task duyệt thành công |
-| `variation.approved` | `app/api/variations/[id]/decide/route.ts` | khi status chuyển `approved`/`partially_approved`; `data` = {voId, code, status} |
-| `payment_cert.approved` | `app/api/payment-certs/[id]/decide/route.ts` | khi status chuyển `approved`; `data` = {certId, code, contractId, periodNo} |
-| `material.over_norm` | `app/api/notifications/route.ts` | trong khối INSERT notification `material_over` (~dòng 249) — chỉ emit cho notification MỚI chèn (dedup sẵn có của notifications chính là dedup của webhook, không thêm cơ chế mới); `data` = {materialId, boqCode, name} |
-| `inspection.requested` | `app/api/inspection-requests/route.ts` POST | sau tạo phiếu thành công; `data` = {requestId, taskId?} |
+| Sự kiện                 | File sửa                                     | Vị trí                                                                                                                                                                                                                   |
+| ----------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `task.approved`         | `app/api/tasks/[id]/approve/route.ts`        | sau khi set `nghiem_thu` thành công (cả nhánh legacy lẫn nhánh engine trong cùng route); `data` = {taskId, code, boqCode, name}                                                                                          |
+| `task.approved`         | `app/api/approvals/route.ts` (duyệt lô)      | 1 emit/task duyệt thành công                                                                                                                                                                                             |
+| `variation.approved`    | `app/api/variations/[id]/decide/route.ts`    | khi status chuyển `approved`/`partially_approved`; `data` = {voId, code, status}                                                                                                                                         |
+| `payment_cert.approved` | `app/api/payment-certs/[id]/decide/route.ts` | khi status chuyển `approved`; `data` = {certId, code, contractId, periodNo}                                                                                                                                              |
+| `material.over_norm`    | `app/api/notifications/route.ts`             | trong khối INSERT notification `material_over` (~dòng 249) — chỉ emit cho notification MỚI chèn (dedup sẵn có của notifications chính là dedup của webhook, không thêm cơ chế mới); `data` = {materialId, boqCode, name} |
+| `inspection.requested`  | `app/api/inspection-requests/route.ts` POST  | sau tạo phiếu thành công; `data` = {requestId, taskId?}                                                                                                                                                                  |
 
 `projectId` truyền vào `emitWebhook`: dùng đúng project của thực thể (đã có sẵn trong
 từng route sau đợt vá scope PR #202–#209 — đọc biến sẵn có, không suy lại).
@@ -222,7 +226,7 @@ từng route sau đợt vá scope PR #202–#209 — đọc biến sẵn có, kh
   (Bearer `CRON_SECRET` qua `checkCronSecret` HOẶC session Admin/PM) → gọi
   `deliverDueWebhooks()` trả `{sent, failed}`.
 - **THAY ĐỔI FILE CÓ SẴN — `vercel.json`**: thêm `{ "path": "/api/cron/deliver-webhooks",
-  "schedule": "*/5 * * * *" }` vào mảng `crons`. **`DEPLOY.md`** mục cron: thêm dòng
+"schedule": "*/5 * * * *" }` vào mảng `crons`. **`DEPLOY.md`** mục cron: thêm dòng
   crontab mẫu tương ứng (self-host).
 - `GET/POST /api/admin/webhooks`, `PATCH/DELETE /api/admin/webhooks/:id`,
   `POST /api/admin/webhooks/:id/test` (insert delivery event `ping` rồi gọi gửi ngay,
@@ -326,7 +330,7 @@ gì thêm cho trạng thái này (hành vi sẵn có).
    (Không cần ký: cookie httpOnly chỉ chủ trình duyệt sửa được và sửa chỉ tự hại phiên
    của chính họ — openid-client so khớp server-side.)
 4. Redirect 302 tới `buildAuthorizationUrl(config, { redirect_uri, scope: "openid email profile",
-   state, nonce, code_challenge: challenge, code_challenge_method: "S256" })`.
+state, nonce, code_challenge: challenge, code_challenge_method: "S256" })`.
 
 **`GET /api/auth/oidc/callback`** (`dynamic = "force-dynamic"`):
 
@@ -338,7 +342,7 @@ gì thêm cho trạng thái này (hành vi sẵn có).
    `/login?error=oidc_rate`. Chỉ ĐẾM khi callback KẾT THÚC lỗi (gọi ở các nhánh lỗi),
    không đếm lần thành công.
 3. `tokens = await authorizationCodeGrant(config, new URL(req.url), { pkceCodeVerifier:
-   verifier, expectedState: state, expectedNonce: nonce })` — throw (state/nonce/chữ
+verifier, expectedState: state, expectedNonce: nonce })` — throw (state/nonce/chữ
    ký/aud sai, IdP trả error) → log.warn + redirect `/login?error=oidc_failed` (KHÔNG
    lộ chi tiết lỗi ra query — chi tiết chỉ vào log).
 4. `claims = tokens.claims()` → `resolveSsoUser` → error → redirect
@@ -383,11 +387,11 @@ gì thêm cho trạng thái này (hành vi sẵn có).
 
 ## Chia PR & gợi ý route (cho PLAN.md khi lập kế hoạch)
 
-| PR | Nội dung | Gợi ý `route:` |
-| --- | --- | --- |
-| PR1 | api_keys + helper rate-limit generic + `/api/v1/*` + UI + `docs/api-v1.md` | `spec` (đặc tả kín; lượng file nhiều nhưng máy móc) |
-| PR2 | webhooks + hàng đợi + cron deliver + 6 điểm emit + UI | `complex` (điểm emit rải trên route nghiệp vụ đang sống — cần phán đoán tại chỗ trong ranh giới "phát đúng lúc chuyển approved") |
-| PR3 | openid-client + `lib/oidc.ts` + 2 route + login page + audit users | `complex` (luồng auth — vùng rủi ro cao `docs/audit.md`) |
+| PR  | Nội dung                                                                   | Gợi ý `route:`                                                                                                                   |
+| --- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| PR1 | api_keys + helper rate-limit generic + `/api/v1/*` + UI + `docs/api-v1.md` | `spec` (đặc tả kín; lượng file nhiều nhưng máy móc)                                                                              |
+| PR2 | webhooks + hàng đợi + cron deliver + 6 điểm emit + UI                      | `complex` (điểm emit rải trên route nghiệp vụ đang sống — cần phán đoán tại chỗ trong ranh giới "phát đúng lúc chuyển approved") |
+| PR3 | openid-client + `lib/oidc.ts` + 2 route + login page + audit users         | `complex` (luồng auth — vùng rủi ro cao `docs/audit.md`)                                                                         |
 
 Mỗi PR theo DoD `CLAUDE.md` (lint/typecheck/test/build, PR draft, cập nhật
 `PROGRESS.md`). PR2/PR3 đụng `vercel.json`/`DEPLOY.md`/`.env.example` (nếu có) — nhớ
