@@ -13,7 +13,11 @@ export const dynamic = "force-dynamic";
 // đang mở trên process này) — không public để tránh lộ thông tin hạ tầng cho người ngoài.
 export async function GET() {
   const result = await checkHealth();
-  const user = await getCurrentUser();
+  // getCurrentUser() đọc cookies() qua next/headers — đòi hỏi request scope thật của
+  // Next.js. Gọi route này trực tiếp ngoài request scope (test, script) khiến nó throw;
+  // nuốt lỗi và coi như chưa đăng nhập — vẫn giữ đúng phần public (status/db/migration/
+  // uptime_s), chỉ bỏ qua phần metrics Admin/PM.
+  const user = await getCurrentUser().catch(() => null);
   const body =
     user && (user.role === "admin" || user.role === "pm")
       ? { ...result, pool: poolStats(), sseStreams: getOpenStreamCount() }
