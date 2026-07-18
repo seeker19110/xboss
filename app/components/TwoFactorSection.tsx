@@ -13,7 +13,9 @@ function secretFromUri(uri: string): string {
   }
 }
 
-export default function TwoFactorSection() {
+// onConfirmed: gọi sau khi bật 2FA thành công (M56 PR2 — trang /account dùng để bỏ banner
+// "bắt buộc bật 2FA" + hiện lại toàn trang mà không cần reload).
+export default function TwoFactorSection({ onConfirmed }: { onConfirmed?: () => void } = {}) {
   const [loading, setLoading] = useState(true);
   const [enabled, setEnabled] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -65,6 +67,7 @@ export default function TwoFactorSection() {
     setRecoveryCodes(null);
     setConfirmCode("");
     refreshStatus();
+    onConfirmed?.();
   }
 
   function downloadRecoveryCodes() {
@@ -203,7 +206,9 @@ export default function TwoFactorSection() {
           )}
 
           <div>
-            <p className="text-xs text-zinc-400 mb-1">Nhập mã 6 số hiện trên app để xác nhận bật:</p>
+            <p className="text-xs text-zinc-400 mb-1">
+              Nhập mã 6 số hiện trên app để xác nhận bật:
+            </p>
             <div className="flex gap-2">
               <input
                 type="text"

@@ -85,7 +85,9 @@ test("makeTotpPendingToken/parseTotpPendingToken: round-trip đúng userId + pwF
 test("parseTotpPendingToken: token phiên đăng nhập thường (không có purpose 2fa) bị từ chối", async () => {
   const { makeToken, parseTotpPendingToken, hashPassword } = await import("@/lib/auth");
   const hash = hashPassword("pw123");
-  const sessionToken = makeToken(7, hash); // 4 phần, không phải token pending 2FA (5 phần)
+  // M56 PR2: token phiên nay có 5 phần (userId.exp.pwFrag.flag.mac) — cùng số phần với
+  // token pending 2FA, nhưng phần thứ 4 là cờ "0"/"1", KHÁC "2fa" → vẫn bị từ chối.
+  const sessionToken = makeToken(7, hash, false);
   assert.equal(parseTotpPendingToken(sessionToken), null);
 });
 
@@ -95,6 +97,70 @@ test("parseTotpPendingToken: token bị sửa (tamper) → null", async () => {
   const token = makeTotpPendingToken(7, hash);
   const tampered = token.replace(/^\d+/, "999");
   assert.equal(parseTotpPendingToken(tampered), null);
+});
+
+// ===== Unit: M56 PR2 — Bắt buộc 2FA theo vai trò =====
+
+test("computeMustSetup2fa: role bắt buộc + chưa bật 2FA → true; các biên còn lại → false", async () => {
+  const { computeMustSetup2fa } = await import("@/lib/auth");
+  const required = new Set(["engineer"]) as Set<import("@/lib/roles").Role>;
+  // role trong danh sách + chưa bật → true
+  assert.equal(computeMustSetup2fa("engineer", null, required), true);
+  assert.equal(computeMustSetup2fa("engineer", undefined, required), true);
+  // role trong danh sách + ĐÃ bật (totp_enabled_at có giá trị) → false
+  assert.equal(computeMustSetup2fa("engineer", "2026-01-01T00:00:00Z", required), false);
+  // role KHÔNG trong danh sách → luôn false (kể cả chưa bật)
+  assert.equal(computeMustSetup2fa("admin", null, required), false);
+  // danh sách rỗng (domain require_2fa_roles chưa có dòng nào) → luôn false = hành vi trước PR2
+  assert.equal(computeMustSetup2fa("engineer", null, new Set()), false);
+});
+
+test("parseToken: round-trip cờ mustSetup2fa (0/1); từ chối token pending 2FA (flag lạ)", async () => {
+  const { makeToken, parseToken, hashPassword, makeTotpPendingToken } = await import("@/lib/auth");
+  const hash = hashPassword("pw");
+  assert.equal(parseToken(makeToken(9, hash, true))?.mustSetup2fa, true);
+  const t0 = parseToken(makeToken(9, hash, false));
+  assert.equal(t0?.mustSetup2fa, false);
+  assert.equal(t0?.uid, 9);
+  // Token tạm "chờ 2FA" (phần thứ 4 = "2fa", cũng 5 phần) KHÔNG được nhận là cookie phiên.
+  assert.equal(parseToken(makeTotpPendingToken(9, hash)), null);
+});
+
+test("proxy: cờ mustSetup2fa=1 chặn API ngoài whitelist (403 2fa_required); /api/auth/* đi qua", async () => {
+  const { makeToken, hashPassword } = await import("@/lib/auth");
+  const { proxy } = await import("@/proxy");
+  const hash = hashPassword("pw");
+  const locked = makeToken(1, hash, true);
+  const free = makeToken(1, hash, false);
+  const reqWith = (path: string, token?: string): NextRequest =>
+    new NextRequest(
+      `http://localhost${path}`,
+      token ? { headers: { cookie: `xboss_session=${token}` } } : {},
+    );
+
+  // Bị khoá → API ngoài whitelist trả 403 + code 2fa_required
+  const blocked = proxy(reqWith("/api/tasks", locked));
+  assert.equal(blocked.status, 403);
+  assert.equal((await blocked.json()).code, "2fa_required");
+
+  // Whitelist /api/auth/* KHÔNG bị chặn (login/2fa/logout/me/totp cần để bật 2FA hoặc đăng xuất)
+  for (const p of [
+    "/api/auth/me",
+    "/api/auth/logout",
+    "/api/auth/login",
+    "/api/auth/login/2fa",
+    "/api/auth/totp",
+    "/api/auth/totp/setup",
+    "/api/auth/totp/confirm",
+  ]) {
+    assert.notEqual(proxy(reqWith(p, locked)).status, 403, `${p} không được bị chặn`);
+  }
+
+  // flag=0 (đã bật 2FA / không bắt buộc) → không chặn. Đây cũng là trạng thái cookie sau khi
+  // /api/auth/totp/confirm phát lại token → gọi lại API ngoài whitelist thành công ngay.
+  assert.notEqual(proxy(reqWith("/api/tasks", free)).status, 403);
+  // Không có cookie (chưa đăng nhập) → không chặn ở proxy; route tự trả 401.
+  assert.notEqual(proxy(reqWith("/api/tasks")).status, 403);
 });
 
 // ===== Integration: luồng login 2 bước thật qua route =====
@@ -137,12 +203,16 @@ test(
 
     const { POST: totpPost } = await import("@/app/api/auth/login/2fa/route");
     const token = await generate({ secret });
-    const res2 = await totpPost(postJson("/api/auth/login/2fa", { pending: j1.pending, code: token }));
+    const res2 = await totpPost(
+      postJson("/api/auth/login/2fa", { pending: j1.pending, code: token }),
+    );
     assert.equal(res2.status, 200);
     assert.ok(res2.headers.get("set-cookie")?.includes("xboss_session="));
 
     // Chống replay: dùng lại đúng mã đó lần 2 trong cùng step phải bị chặn.
-    const res3 = await totpPost(postJson("/api/auth/login/2fa", { pending: j1.pending, code: token }));
+    const res3 = await totpPost(
+      postJson("/api/auth/login/2fa", { pending: j1.pending, code: token }),
+    );
     assert.equal(res3.status, 401);
 
     await run(`DELETE FROM users WHERE email = ?`, email);
@@ -155,9 +225,8 @@ test(
   async () => {
     const { insertId, run } = await import("@/lib/db");
     const { hashPassword } = await import("@/lib/auth");
-    const { encryptTotpSecret, generateNewTotpSecret, generateRecoveryCodes } = await import(
-      "@/lib/totp"
-    );
+    const { encryptTotpSecret, generateNewTotpSecret, generateRecoveryCodes } =
+      await import("@/lib/totp");
 
     const secret = generateNewTotpSecret();
     const suffix = Date.now().toString(36);
@@ -217,3 +286,83 @@ test("login: user chưa bật 2FA → hành vi cũ (không đổi), set cookie n
 
   await run(`DELETE FROM users WHERE email = ?`, email);
 });
+
+// M56 PR2 integration: bật bắt buộc 2FA cho vai trò engineer qua code_lists → user engineer
+// chưa bật 2FA đăng nhập → cookie có cờ mustSetup2fa=1 → proxy chặn /api/tasks (403) nhưng
+// cho /api/auth/* đi qua. User admin (không trong danh sách) → cờ=0, không bị chặn.
+test(
+  "M56 PR2: role bắt buộc + chưa bật 2FA → cookie mustSetup2fa=1 + proxy chặn; role không bắt buộc → không ảnh hưởng",
+  S,
+  async () => {
+    const { insertId, run } = await import("@/lib/db");
+    const { hashPassword, parseToken } = await import("@/lib/auth");
+    const { createItem, deleteItem } = await import("@/lib/code-lists");
+    const { proxy } = await import("@/proxy");
+    const { POST: loginPost } = await import("@/app/api/auth/login/route");
+
+    const created = await createItem({
+      domain: "require_2fa_roles",
+      code: "engineer",
+      label: "Kỹ sư",
+    });
+    const codeItemId = typeof created === "string" ? null : created.id;
+    assert.ok(codeItemId, "tạo được dòng require_2fa_roles=engineer");
+
+    const suffix = Date.now().toString(36);
+    const engEmail = `req2fa-eng-${suffix}@x.vn`;
+    const admEmail = `req2fa-adm-${suffix}@x.vn`;
+    const engId = await insertId(
+      `INSERT INTO users (name, email, role, password_hash) VALUES ('Eng Req2FA', ?, 'engineer', ?)`,
+      engEmail,
+      hashPassword("matkhau123"),
+    );
+    const admId = await insertId(
+      `INSERT INTO users (name, email, role, password_hash) VALUES ('Adm Req2FA', ?, 'admin', ?)`,
+      admEmail,
+      hashPassword("matkhau123"),
+    );
+
+    try {
+      const cookieOf = async (email: string): Promise<string> => {
+        const res = await loginPost(postJson("/api/auth/login", { email, password: "matkhau123" }));
+        assert.equal(res.status, 200);
+        const setCookie = res.headers.get("set-cookie") ?? "";
+        const m = setCookie.match(/xboss_session=([^;]+)/);
+        assert.ok(m, "có set-cookie phiên");
+        return m![1];
+      };
+
+      // Engineer (bắt buộc, chưa bật) → cờ = 1
+      const engTok = await cookieOf(engEmail);
+      assert.equal(parseToken(engTok)?.mustSetup2fa, true, "engineer bị buộc bật 2FA");
+
+      const cookieHdr = `xboss_session=${engTok}`;
+      const blocked = proxy(
+        new NextRequest("http://localhost/api/tasks", { headers: { cookie: cookieHdr } }),
+      );
+      assert.equal(blocked.status, 403);
+      assert.equal((await blocked.json()).code, "2fa_required");
+      assert.notEqual(
+        proxy(new NextRequest("http://localhost/api/auth/me", { headers: { cookie: cookieHdr } }))
+          .status,
+        403,
+        "/api/auth/me phải đi qua",
+      );
+
+      // Admin (không trong danh sách bắt buộc) → cờ = 0, không bị chặn
+      const admTok = await cookieOf(admEmail);
+      assert.equal(parseToken(admTok)?.mustSetup2fa, false, "admin không bị buộc");
+      assert.notEqual(
+        proxy(
+          new NextRequest("http://localhost/api/tasks", {
+            headers: { cookie: `xboss_session=${admTok}` },
+          }),
+        ).status,
+        403,
+      );
+    } finally {
+      await run(`DELETE FROM users WHERE id IN (?, ?)`, engId, admId);
+      if (codeItemId) await deleteItem(codeItemId);
+    }
+  },
+);

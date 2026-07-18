@@ -34,7 +34,10 @@ export async function POST(req: NextRequest) {
 
   const parsed = parseTotpPendingToken(pending);
   if (!parsed)
-    return NextResponse.json({ error: "Phiên xác thực đã hết hạn — đăng nhập lại" }, { status: 401 });
+    return NextResponse.json(
+      { error: "Phiên xác thực đã hết hạn — đăng nhập lại" },
+      { status: 401 },
+    );
 
   const u = await queryOne<{
     id: number;
@@ -76,8 +79,10 @@ export async function POST(req: NextRequest) {
 
   if (!ok) return NextResponse.json({ error: "Mã không đúng hoặc đã dùng" }, { status: 401 });
 
+  // M56 PR2: đã verify TOTP/recovery xong nghĩa là user CHẮC CHẮN đã bật 2FA (totp_secret
+  // + totp_enabled_at có giá trị) → không bao giờ còn phải "setup" nữa → mustSetup2fa=false.
   const res = NextResponse.json({ user: { id: u.id, name: u.name, email: u.email, role: u.role } });
-  res.cookies.set(COOKIE, makeToken(u.id, u.password_hash), {
+  res.cookies.set(COOKIE, makeToken(u.id, u.password_hash, false), {
     httpOnly: true,
     path: "/",
     maxAge: COOKIE_MAX_AGE,

@@ -5,8 +5,11 @@ import {
   makeToken,
   makeTotpPendingToken,
   ensureDefaultUsers,
+  requiredRoles,
+  computeMustSetup2fa,
   COOKIE,
   COOKIE_MAX_AGE,
+  type Role,
 } from "@/lib/auth";
 import { loginBlockedSeconds, recordLoginFailure, recordLoginSuccess } from "@/lib/ratelimit";
 
@@ -65,8 +68,13 @@ export async function POST(req: NextRequest) {
       pending: makeTotpPendingToken(u.id, u.password_hash),
     });
   }
+  // M56 PR2: nhúng cờ mustSetup2fa vào token — vai trò bị bắt buộc 2FA nhưng chưa bật thì
+  // proxy.ts chặn mọi API ngoài /api/auth/* cho tới khi user bật 2FA. Tính TẠI ĐÂY (lúc phát
+  // token) — admin bật yêu cầu sau khi user đã có phiên chỉ ảnh hưởng từ lần đăng nhập kế tiếp.
+  const required = await requiredRoles();
+  const mustSetup2fa = computeMustSetup2fa(u.role as Role, u.totp_enabled_at, required);
   const res = NextResponse.json({ user: { id: u.id, name: u.name, email: u.email, role: u.role } });
-  res.cookies.set(COOKIE, makeToken(u.id, u.password_hash), {
+  res.cookies.set(COOKIE, makeToken(u.id, u.password_hash, mustSetup2fa), {
     httpOnly: true,
     path: "/",
     maxAge: COOKIE_MAX_AGE,
