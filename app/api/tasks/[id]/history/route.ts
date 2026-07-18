@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, canTouchTask } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { assertModuleEnabled } from "@/lib/feature-flags";
 
@@ -21,6 +21,8 @@ export async function GET(
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+  if (!(await canTouchTask(user, id)))
+    return NextResponse.json({ error: "Không có quyền xem lịch sử task này" }, { status: 403 });
 
   const task = await queryOne<{ id: number; code: string; name: string }>(
     `SELECT id, code, name FROM tasks WHERE id = ?`,
