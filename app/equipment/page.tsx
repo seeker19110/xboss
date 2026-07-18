@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, X, Wrench, FileUp, ArrowLeftRight, ShieldCheck } from "lucide-react";
+import { Plus, X, Wrench, FileUp, ArrowLeftRight, ShieldCheck, QrCode } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
@@ -59,8 +59,25 @@ export default function EquipmentPage() {
   const [q, setQ] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  // M58 PR1 — chọn nhiều dòng để in tem QR (chỉ dùng client-side, không đụng DB).
+  const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
 
   const canManage = me?.role === "admin" || me?.role === "pm" || me?.role === "engineer";
+  const canPrintLabels = me?.role === "admin" || me?.role === "pm";
+
+  function toggleChecked(id: number) {
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function printLabels() {
+    if (checkedIds.size === 0) return;
+    window.open(`/api/qr/labels?kind=eq&ids=${[...checkedIds].join(",")}`, "_blank");
+  }
 
   function load() {
     return fetch("/api/equipment").then((r) => (r.ok ? r.json() : null));
@@ -108,15 +125,30 @@ export default function EquipmentPage() {
         title="Thiết bị"
         subtitle="Sổ thiết bị/máy thi công — tình trạng, vị trí, hạn kiểm định"
         bottomActions={
-          canManage ? (
-            <button
-              onClick={() => setAddOpen(true)}
-              aria-label="Thêm thiết bị"
-              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
-            >
-              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm thiết bị</span>
-            </button>
-          ) : undefined
+          <div className="flex items-center gap-2 shrink-0">
+            {canPrintLabels && (
+              <button
+                onClick={printLabels}
+                disabled={checkedIds.size === 0}
+                aria-label={`In tem QR ${checkedIds.size} thiết bị đã chọn`}
+                className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed border border-zinc-700 px-3 py-2 rounded-lg text-sm font-medium transition"
+              >
+                <QrCode className="w-4 h-4" />
+                <span className="hidden sm:inline">
+                  In tem QR{checkedIds.size ? ` (${checkedIds.size})` : ""}
+                </span>
+              </button>
+            )}
+            {canManage && (
+              <button
+                onClick={() => setAddOpen(true)}
+                aria-label="Thêm thiết bị"
+                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition text-on-accent"
+              >
+                <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm thiết bị</span>
+              </button>
+            )}
+          </div>
         }
       />
 
@@ -168,6 +200,7 @@ export default function EquipmentPage() {
               <table className="w-full text-sm sm:min-w-[760px]">
                 <thead>
                   <tr className="text-xs text-zinc-400 border-b border-zinc-800">
+                    {canPrintLabels && <th className="p-3 w-8"></th>}
                     <th className="text-left p-3">MÃ</th>
                     <th className="text-left p-3">TÊN / LOẠI</th>
                     <th className="text-left p-3">TÌNH TRẠNG</th>
@@ -189,6 +222,17 @@ export default function EquipmentPage() {
                         onClick={() => setSelectedId(e.id)}
                         className="border-b border-zinc-800/60 last:border-0 hover:bg-zinc-800/40 cursor-pointer"
                       >
+                        {canPrintLabels && (
+                          <td className="p-3" onClick={(ev) => ev.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={checkedIds.has(e.id)}
+                              onChange={() => toggleChecked(e.id)}
+                              aria-label={`Chọn thiết bị ${e.code} để in tem QR`}
+                              className="w-4 h-4 accent-emerald-600"
+                            />
+                          </td>
+                        )}
                         <td className="p-3 font-mono text-xs">{e.code}</td>
                         <td className="p-3">
                           <p className="truncate max-w-[220px]">{e.name}</p>

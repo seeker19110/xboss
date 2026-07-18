@@ -3,7 +3,7 @@
 // Mất mạng (hầm, tầng kỹ thuật) vẫn xem được dữ liệu tracking đã tải lần cuối.
 // App Shell: precache /offline + asset tĩnh cốt lõi lúc cài đặt (M0) — trang HTML chưa
 // từng ghé mà mất mạng hoàn toàn sẽ thấy /offline thay vì lỗi mạng mặc định của trình duyệt.
-const CACHE = "xboss-v11";
+const CACHE = "xboss-v12";
 const SHELL_URLS = [
   "/offline",
   "/manifest.webmanifest",
@@ -90,14 +90,18 @@ self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET" || url.origin !== location.origin) return;
   // API GET → stale-while-revalidate: trả cache ngay nếu có, cập nhật ngầm từ mạng.
   // Mất mạng hoàn toàn → trả bản cache gần nhất.
-  // Trừ: ảnh/tài liệu (cache riêng bởi browser), SSE /api/events (stream), và /api/health
-  // (uptime monitor cần kết quả ping DB thật mỗi lần, không phải bản cache cũ).
+  // Trừ: ảnh/tài liệu (cache riêng bởi browser), SSE /api/events (stream), /api/health
+  // (uptime monitor cần kết quả ping DB thật mỗi lần, không phải bản cache cũ), và
+  // /api/r/ + /api/qr/ (M58 PR1 — route điều hướng QR/tem in, luôn cần dữ liệu mới nhất,
+  // không được phục vụ bản cache cũ).
   if (url.pathname.startsWith("/api/")) {
     if (
       url.pathname.startsWith("/api/photos/") ||
       url.pathname.startsWith("/api/documents/") ||
       url.pathname.startsWith("/api/events") ||
-      url.pathname.startsWith("/api/health")
+      url.pathname.startsWith("/api/health") ||
+      url.pathname.startsWith("/api/r/") ||
+      url.pathname.startsWith("/api/qr/")
     )
       return;
     e.respondWith(
