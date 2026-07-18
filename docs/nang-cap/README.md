@@ -42,14 +42,28 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 | `M51-da-du-an-rls.md`        | RLS phòng tuyến 2 (kèm ADR-0005), template dự án, organizations          | ❌ **chưa**                                            | — (GĐ0 của M54, chưa có RLS/`organizations`)                |
 | `M52-mo-rong-cau-hinh.md`    | code_lists, custom fields, module registry, feature flags, tách tracking | ✅ xong                                                | `0060_code_lists`/`0062_custom_fields`/`0063_feature_flags` |
 
-## Đặc tả chờ triển khai — đợt Scale/SaaS/BI + bổ sung (M53–M59, viết 07/2026)
+## Đặc tả chờ triển khai — đợt Scale/SaaS/BI + bổ sung (M53–M59 viết 07/2026, M61 viết 2026-07-18)
 
-Từ phân tích so XBoss với ERP chuyên nghiệp (`PROGRESS.md`). **Thứ tự thi hành đã chốt:** M53 → M56 PR2 → M51 (GĐ0 của M54) → M55 → M57 → M58 → M54 GĐ1 → M59.
+Từ phân tích so XBoss với ERP chuyên nghiệp (`PROGRESS.md`). **Thứ tự thi hành đã chốt (cập nhật 2026-07-18, chèn M61):**
+
+1. **M53 (4 PR) song song M57 PR1** — kế hoạch đã lập sẵn (PLAN.md commit `d6d6dd9`, PR #236), 2 module không đụng chung file; chạy TRƯỚC để chiếm số migration sớm nhất.
+2. **M56 PR2** — bắt buộc 2FA theo vai trò (nhỏ, nền PR1 đã chạy).
+3. **M61** — override quyền theo dự án (kế hoạch trong PLAN.md hiện tại + PR #246); làm trước M51 để `getCurrentUser` giải projectId sẵn — M51 RLS cũng đọc projectId từ request-context, hưởng chung nền.
+4. **M51 (GĐ0 của M54)** — RLS theo dự án + `organizations`.
+5. **M55** — BI/Metabase (cần dữ liệu ổn định sau RLS để view whitelist đúng).
+6. **M58** — QR + offline hiện trường (độc lập, không migration lớn).
+7. **M54 GĐ1** — multi-tenant SaaS (phụ thuộc cứng M51).
+8. **M59** — histogram tài nguyên (không migration, chỉ tổng hợp — làm cuối, mọi bảng nguồn đã chốt).
+
+M57 PR2 (extract text PDF) tuỳ chọn — quyết định sau khi PR1 dùng thật, KHÔNG nằm trong hàng đợi.
+
+**LUẬT trước khi thi hành bất kỳ hạng mục nào:** kiểm tra trên code thật xem hạng mục đã được làm chưa (grep điểm chạm chính trong đặc tả: migration/bảng, hàm `lib/*`, route API, trang UI) — trạng thái trong bảng trên có thể lỗi thời so với code (đã xảy ra 2026-07-17: 3 mục "dở dang" thực ra đã merge). Đã có rồi → cập nhật bảng này + `PROGRESS.md`, không code lại.
 
 | File                            | Hạng mục                                                                | Trạng thái                                                      | Ghi chú                              |
 | ------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------ |
 | `M53-scale-headroom.md`         | Đo tải → watermark SSE O(1) thay aggregate JOIN 3s/client, pool env     | ❌ chưa                                                         | Việc kế tiếp trong hàng đợi          |
 | `M56-2fa-totp.md`               | TOTP RFC 6238 + recovery codes; PR2 bắt buộc theo vai trò               | ⚠️ PR1 xong (`0065_totp.sql`); **PR2 (enforce theo role) chưa** | —                                    |
+| `M61-phan-quyen-theo-du-an.md`  | Override quyền theo dự án (`role_permissions.project_id`, đóng nợ M52 PR4 module `permissions`) | ❌ chưa                          | Vị trí 3 trong hàng đợi; chạm `lib/auth.ts` (vùng rủi ro cao); migration DROP CONSTRAINT → qua staging |
 | `M51-da-du-an-rls.md`           | RLS theo dự án + `organizations` (GĐ0 của M54)                          | ❌ chưa                                                         | Phải làm trước M54                   |
 | `M55-bi-metabase.md`            | Schema `bi` (view whitelist cột) + role `xboss_bi` chỉ-đọc cho Metabase | ❌ chưa                                                         | Metabase không bao giờ chạm `public` |
 | `M57-tim-kiem-toan-van.md`      | FTS GIN index + `unaccent` (thay ILIKE inline hiện tại)                 | ❌ chưa                                                         | PR2 tuỳ chọn extract text PDF        |
