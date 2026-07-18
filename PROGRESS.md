@@ -10,6 +10,8 @@
 
 ## Việc tạm hoãn — chờ bên ngoài (không phải "tiếp theo", đừng tự nhặt lại)
 
+Ghi nhận 2026-07-18: **M49 PR3 — SSO OIDC** (PR #218, `docs/nang-cap/M49-api-mo-sso.md`) — merge code vào `main` ở trạng thái **feature-flag tắt mặc định** (quyết định người dùng 2026-07-18: "merge trước, xác minh sau"). PR đã rebase lên `main` mới nhất (sau M50/M52/M56 PR1), lint/typecheck/build/test xanh (92 file). **KHÔNG set biến môi trường production** (`OIDC_ISSUER`/`OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET`/`APP_URL`) cho đến khi có người xác minh tay end-to-end với 1 IdP thật (Google Workspace/Microsoft Entra) — thiếu biến bắt buộc thì `ssoEnabled()=false`, nút SSO tự ẩn, route `/api/auth/oidc/*` trả 404, không ảnh hưởng đăng nhập mật khẩu hiện có nên an toàn để merge/deploy ở trạng thái tắt. Việc còn treo trước khi BẬT thật: chạy tay đủ luồng SSO (đăng nhập → callback → nhận cookie phiên; cả nhánh lỗi state/cookie hết hạn), ghi kết quả vào `DEPLOY.md`/mục này trước khi set biến env trên VPS.
+
 Các mục dưới đây đã có kết luận rõ, **không cần AI chủ động làm** cho tới khi có tín hiệu bên ngoài nêu rõ — không phải việc "quên làm":
 
 - **Ký số thật (PAdES, USB token/HSM)** cho biên bản/hợp đồng — chờ nhu cầu pháp lý thật phát sinh (xem mục Nợ kỹ thuật bên dưới). (Ghi nhận 2026-07-16)
