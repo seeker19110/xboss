@@ -1,10 +1,11 @@
 import { scryptSync, randomBytes, createHmac, timingSafeEqual } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { queryOne, run } from "@/lib/db";
-import { patchRequestContext } from "@/lib/request-context";
+import { patchRequestContext, getRequestContext } from "@/lib/request-context";
 import { log } from "@/lib/log";
 import { ROLES, ROLE_LABELS, VIEW_ONLY_ROLES, PAYMENT_VIEW_ROLES, type Role } from "@/lib/roles";
-import { getPermissionOverride } from "@/lib/permissions";
+import { getPermissionOverride, hasProjectOverrides } from "@/lib/permissions";
+import { getCurrentProjectId } from "@/lib/projects";
 export { ROLES, ROLE_LABELS, VIEW_ONLY_ROLES, PAYMENT_VIEW_ROLES, type Role };
 
 export const COOKIE = "xboss_session";
@@ -102,6 +103,21 @@ export async function getCurrentUser(): Promise<User | null> {
   if (!u.password_hash.startsWith(parsed.pwFrag)) return null;
   const { password_hash: _, ...user } = u;
   patchRequestContext({ userId: user.id, role: user.role });
+  // M61: chỉ giải + patch projectId khi cache có ≥1 override THEO DỰ ÁN — để giải quyền
+  // theo phạm vi dự án trong CAN.x (resolvePerm đọc projectId từ request-context). Bảng
+  // chưa có override dự án → bỏ qua hoàn toàn, chi phí = 0, hành vi = trước M61.
+  // Lỗi giải dự án (DB lỗi lúc query visibleProjectIds) KHÔNG được làm fail xác thực:
+  // nuốt lỗi + log warn, rơi về override toàn hệ/mặc định (an toàn).
+  if (hasProjectOverrides()) {
+    try {
+      await getCurrentProjectId(user as User);
+    } catch (e) {
+      log.warn("Không giải được projectId cho override quyền — rơi về toàn hệ", {
+        route: "getCurrentUser",
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
   return user as User;
 }
 
@@ -362,16 +378,28 @@ export function permDefaultsMatrix(): Record<PermKey, Record<Role, boolean>> {
 
 // Kiểm luật ghi override trước khi lưu. Trả null nếu hợp lệ, hoặc thông điệp lỗi
 // tiếng Việt (route trả 422). allowed: true = mở · false = siết · null = xoá override.
+// M61: luật cũ giữ nguyên và áp cho MỌI phạm vi (toàn hệ lẫn theo dự án) — LOCKED_PERMS
+// (không mở quyền ghi kể cả theo dự án), chống tự khoá admin/manageUsers (admin phải luôn
+// vào được ma trận ở mọi ngữ cảnh). projectId chỉ được là null (toàn hệ) hoặc số nguyên
+// dương (id dự án) — route tự kiểm id có thật trong bảng projects (hàm thuần chỉ kiểm kiểu).
 export function validatePermOverride(
   role: string,
   permKey: string,
   allowed: boolean | null,
+  projectId?: number | null,
 ): string | null {
   if (!(ROLES as string[]).includes(role)) return "Vai trò không hợp lệ";
   if (!isPermKey(permKey)) return "Mã quyền không tồn tại";
+  if (
+    projectId !== undefined &&
+    projectId !== null &&
+    (!Number.isInteger(projectId) || projectId <= 0)
+  )
+    return "Mã dự án không hợp lệ";
   // Chống tự khoá hệ thống: admin không được siết quyền quản lý người dùng của chính
   // vai trò admin — nếu không, PATCH này khoá mọi admin ra khỏi hệ (kể cả trang ma trận
-  // này) ngay khi cache invalidate, chỉ sửa được bằng cách vào thẳng DB.
+  // này) ngay khi cache invalidate, chỉ sửa được bằng cách vào thẳng DB. Áp cho MỌI phạm
+  // vi (kể cả siết chỉ trong 1 dự án — admin phải luôn vào được ma trận ở mọi ngữ cảnh).
   if (role === "admin" && permKey === "manageUsers" && allowed === false)
     return "Không thể tự khoá quyền quản lý người dùng của vai trò admin — tránh tự khoá hệ thống.";
   if (allowed === true && isWritePerm(permKey))
@@ -381,9 +409,14 @@ export function validatePermOverride(
 
 // Giải quyền hiệu lực cho 1 (role, permKey): có override trong cache → theo allowed;
 // không có → mặc định CAN_DEFAULT. Đọc override đồng bộ từ cache memory (không chạm DB).
+// M61: đọc projectId đã validate từ request-context (getCurrentUser patch sau xác thực)
+// → override theo dự án ưu tiên trước override toàn hệ (project_id NULL), rồi mới mặc định.
+// Request không có ngữ cảnh dự án (cron CRON_SECRET, API key /api/v1, test gọi CAN trực
+// tiếp) → projectId undefined → rơi về override toàn hệ ("*") rồi CAN_DEFAULT.
 function resolvePerm(role: Role | undefined, permKey: PermKey): boolean {
   if (role) {
-    const ov = getPermissionOverride(role, permKey);
+    const projectId = getRequestContext()?.projectId;
+    const ov = getPermissionOverride(role, permKey, projectId);
     if (ov !== undefined) return ov;
   }
   return CAN_DEFAULT[permKey](role);
