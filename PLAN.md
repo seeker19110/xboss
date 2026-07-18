@@ -10,312 +10,161 @@
 
 ---
 
-## Kế hoạch: M53 (Scale headroom, 4 PR) song song M57 PR1 (Tìm kiếm toàn văn)
+## Kế hoạch: M61 — Override quyền theo dự án (`role_permissions.project_id`, 2 PR tuần tự)
 
 ### Bối cảnh & mục tiêu
 
-Người dùng chọn 2 việc chạy song song trong số các module đã có đặc tả kín nhưng chưa
-thi hành (`PROGRESS.md` dòng 22, thứ tự đã chốt: M53 → M52 PR4 [đã xong, PR #234] → M56
-→ M51 GĐ0 → M55 → M57 → M58 → M54 GĐ1 → M59):
+Thi hành `docs/nang-cap/M61-phan-quyen-theo-du-an.md` (đặc tả viết 2026-07-18, đối chiếu
+code thật cùng ngày — đặc tả và code chưa kịp lệch nhau): thêm chiều dự án cho override
+quyền (bảng `role_permissions`, M50 PR1), đóng nợ kỹ thuật cuối của M52 PR4 (module
+`permissions` là module quản trị duy nhất chưa scope theo dự án được). Giải quyền 3 tầng:
+**override dự án > override toàn hệ (`project_id NULL`) > `CAN_DEFAULT`**, đọc `projectId`
+từ request-context (AsyncLocalStorage sẵn có của M43) nên **không đổi chữ ký `CAN.x(role)`,
+0 call site phải sửa**.
 
-- **M53 — Scale headroom** (`docs/nang-cap/M53-scale-headroom.md`, P1): đo tải hệ thống
-  hiện tại, thay watermark SSE O(1) cho aggregate JOIN mỗi 3s/client, siết pool/timeout
-  qua env, audit cluster-ready. Đúng thứ tự kế tiếp theo kế hoạch đã chốt.
-- **M57 PR1 — Tìm kiếm toàn văn** (`docs/nang-cap/M57-tim-kiem-toan-van.md`, P2): hạ
-  tầng FTS có index (GIN + `unaccent`) phủ toàn kho hồ sơ, nâng `/api/search` hiện có.
-  **Chỉ làm PR1** — PR2 (extract text PDF) là tuỳ chọn, quyết định sau khi PR1 dùng
-  thật, KHÔNG đưa vào đợt này.
+**Mọi worker PHẢI đọc `docs/nang-cap/M61-phan-quyen-theo-du-an.md` trọn vẹn trước khi
+code** — kế hoạch này chỉ ghi đính chính + phân việc, không lặp lại đặc tả. Kế hoạch và
+đặc tả lệch nhau → kế hoạch này thắng.
 
-2 module **không đụng chung file** (M53 chạm `lib/db/index.ts`/`lib/version.ts`/
-`app/api/health/*`/`app/api/events/*`; M57 chạm `lib/search.ts`/`app/api/search/*`/
-`app/components/GlobalSearch.tsx`) — chạy song song an toàn qua worktree riêng.
+**Ghi chú cho coordinator — kế hoạch đợt trước chưa thi hành:** kế hoạch M53/M57 (commit
+`d6d6dd9`, PR #236) vẫn **chưa chạy** (xác minh 2026-07-18: `lib/version.ts` còn aggregate
+JOIN cũ, chưa có `lib/search.ts`/`poolStats`) — đợt đó KHÔNG bị huỷ, chỉ nhường chỗ trong
+file này (tra lại nguyên văn ở commit `d6d6dd9`); không tự nhặt lại trong đợt M61.
 
-**Mọi worker PHẢI đọc đúng file đặc tả nguồn trước khi code**: `docs/nang-cap/M53-scale-headroom.md`
-(cả 4 PR), `docs/nang-cap/M57-tim-kiem-toan-van.md` (chỉ mục PR1) — kế hoạch này chỉ ghi
-**đính chính** so với đặc tả (đặc tả viết trước, code đã đổi từ đó tới nay) + quyết định
-đã chốt. Khi kế hoạch và file đặc tả lệch nhau, **kế hoạch này thắng**.
+### Đính chính so với đặc tả (xác minh trên code 2026-07-18)
 
-### Đính chính chung so với đặc tả (áp cho mọi việc bên dưới)
-
-- **Số migration hiện tại cao nhất trên `main`: `0063_feature_flags.sql`.** Đặc tả M53
-  ghi `0064`, M57 ghi `0067` — đều là số tạm. **Mỗi worker PHẢI tự chạy
-  `ls migrations/ | sort -V | tail -5` ngay trước khi tạo migration mới** để lấy đúng số
-  tại thời điểm code — 2 việc chạy song song trên cùng base `origin/main` nên **sẽ đụng
-  số nhau** (M53 PR2 và M57 PR1 cùng cần 1 migration mới); coordinator renumber lúc tích
-  hợp theo thứ tự merge thực tế (xem mục Thứ tự & phụ thuộc).
-- **`lib/log.ts`**: hàm log là `log.warn(msg, fields?)` (object `log` gộp `info/warn/error`),
-  **không phải `logWarn`** như đặc tả M53 PR1 ghi — worker PR1 dùng đúng `log.warn`.
-  `fields` là `Record<string, unknown>` tuỳ ý (vd `{ sql, durationMs }`).
-- **`app/api/health/route.ts` hiện public thật** (không `getCurrentUser()`), gọi thẳng
-  `checkHealth()` từ `lib/health.ts` (đã tách hàm thuần khỏi route, có test riêng) — trả
-  4 trường `status/db/migration/uptime_s`. Đặc tả M53 PR1 đúng như dự đoán: phần ping DB
-  (`status/db/migration/uptime_s`) giữ nguyên public; phần metrics mới (`pool`,
-  `sseStreams`) chỉ trả khi có session Admin/PM (`getCurrentUser()` + check role trong
-  route, KHÔNG đổi `checkHealth()` — hàm đó giữ thuần/test được, ghép field ở route).
-- **`lib/version.ts::sheetVersion(slug)` hiện tại** đúng như mô tả trong đặc tả M53 PR2
-  (aggregate `MAX(updated_at)+COUNT` JOIN 3 bảng) — worker PR2 viết lại đúng thân hàm
-  theo đặc tả, giữ nguyên chữ ký `(sheetSlug: string): Promise<string>`.
-  callers: `app/api/events/route.ts`, `app/api/tasks/version/route.ts` (đọc trước khi
-  sửa để chắc không đổi chữ ký).
-- **`lib/db/index.ts::getPool()` hiện tại**: `new Pool({ connectionString: url, max: 10 })`
-  — không có `statement_timeout`/`idle_in_transaction_session_timeout`/
-  `connectionTimeoutMillis` nào. `lib/db/migrate.ts` dùng client riêng cho migration —
-  worker PR3 đọc file này trước khi thêm timeout, đảm bảo client migration đặt
-  `statement_timeout=0` (không bị timeout khi backfill dài).
-- **`lib/env.ts`**: `serverSchema` dùng `zod`, hiện KHÔNG có field số nào qua
-  `z.coerce.number()` — mọi biến hiện có đều `z.string().optional()`. Worker PR3 thêm 3
-  biến mới (`XBOSS_PG_POOL_MAX`, `XBOSS_PG_STMT_TIMEOUT_MS`, `XBOSS_SLOW_QUERY_MS`, dùng
-  cho cả PR1 lẫn PR3) theo đúng pattern `z.string().optional()` hiện có — parse
-  `Number(...)` + validate khoảng giá trị + áp mặc định ngay tại nơi dùng
-  (`lib/db/index.ts`), không cần đổi cách khai báo schema hiện tại.
-- **`app/api/search/route.ts` hiện tại** đã dùng `plainto_tsquery('simple', ...)` trên
-  `to_tsvector('simple', ...)` **tính inline không index** cho `tasks.name`/
-  `work_packages.name` (đúng mô tả "điểm nghẽn" trong đặc tả M57) + prefix match
-  ILIKE cho mã/BOQCODE/hệ + lọc theo `getCurrentProjectId(user)` (JOIN `towers`).
-  Route **KHÔNG có `unaccent`** hiện tại. Worker M57 PR1 giữ nguyên shape kết quả cũ cho
-  `kind: "task"|"package"` (client `GlobalSearch.tsx` không đổi đột ngột theo đúng đặc
-  tả), thêm nhóm nguồn mới qua `lib/search.ts`.
-- **Đọc `docs/ERD.md` (đã sinh tự động, `npm run gen:erd`) để lấy đúng tên cột thật**
-  của `site_diaries`, `correspondences`, `meetings`, `ncrs`, `drawings`,
-  `project_documents`, `task_comments`, `contracts` trước khi viết migration FTS M57
-  PR1 — đặc tả chỉ liệt kê cột theo trí nhớ, có thể lệch tên cột thật.
-
----
+- **Số migration cao nhất trên `main`: `0065_totp.sql`** (0064 bị bỏ trống, có 2 file cùng
+  số 0060 — đánh số lỏng). Đặc tả ghi `0066` — worker PHẢI tự chạy
+  `ls migrations/ | sort -V | tail -5` ngay trước khi tạo file để lấy số thật tại thời
+  điểm code (đợt M53/M57 nếu chạy trước sẽ chiếm số).
+- **Tên constraint UNIQUE cũ không hardcode được chắc chắn** (mặc định Postgres là
+  `role_permissions_role_perm_key_key` nhưng chưa xác minh trên production). Thay vì
+  `DROP CONSTRAINT IF EXISTS <tên đoán>` như DDL mẫu trong đặc tả, worker viết **DO block
+  tra `pg_constraint`** tìm constraint UNIQUE trên đúng cặp cột `(role, perm_key)` của
+  bảng `role_permissions` rồi `EXECUTE` drop theo `conname` thật — idempotent, đúng với
+  mọi tên. Vẫn bắt buộc qua staging (xem mục Lưu ý migration).
+- **`tests/permissions.test.ts` đã tồn tại** (113 dòng, test M50) — PR1 mở rộng file này
+  cho phần unit/cache. Runner `scripts/run-tests.mjs` **tự phát hiện mọi file trong
+  `tests/`** — KHÔNG cần (và không có chỗ) đăng ký file test mới vào `package.json`;
+  file mới `tests/auth-perms-project.test.ts` cứ tạo là được chạy. File test chạm DB
+  import `tests/setup.ts` ĐẦU TIÊN (quy ước dự án).
+- **E2E cho `/admin/permissions` nằm trong `e2e/authed/admin-config.spec.ts`** (không có
+  file riêng như đặc tả đoán) — PR2 mở rộng file này, không tạo file mới.
+- **Trang `app/admin/permissions/page.tsx` là client component KHÔNG import `lib/auth`**
+  (tránh kéo `node:crypto`) — mọi dữ liệu quyền qua API, nhãn/nhóm từ
+  `app/lib/permissionMeta.ts` (client-safe). Selector phạm vi ở PR2 lấy danh sách dự án
+  từ response GET `/api/admin/role-permissions` (PR1 thêm field `projects`), KHÔNG import
+  gì từ `lib/projects.ts` vào client.
+- **Điểm chèn trong `getCurrentUser()`** (`lib/auth.ts`, hàm ~dòng 87): sau dòng
+  `patchRequestContext({ userId: user.id, role: user.role })` hiện có. `lib/projects.ts`
+  không import `lib/auth.ts` (đã kiểm — thêm import chiều `auth → projects` không tạo
+  vòng).
+- **3 route hiện có của module**: `GET/PATCH /api/admin/role-permissions` (gate
+  `CAN.manageUsers`), `GET /api/admin/permissions-snapshot` (Excel, gate `CAN.viewAudit`).
+  PR1 chỉ đụng route đầu; snapshot để PR2.
 
 ### Việc
 
-#### 1. M53 PR1 — Quan trắc tải (nền, không phụ thuộc)
+#### 1. M61 PR1 — Nền: migration + cache + giải quyền + API
+
+- route: `complex`
+- nhánh: `claude/feat-m61-pr1-perm-project`
+- đọc trước: `docs/nang-cap/M61-phan-quyen-theo-du-an.md` (mục "Ngữ nghĩa giải quyền" +
+  "PR1" trọn vẹn) + toàn bộ Đính chính ở trên + các file sẽ sửa:
+  `migrations/0058_role_permissions.sql` (hiểu schema hiện tại), `lib/permissions.ts`,
+  `lib/auth.ts` (vùng `resolvePerm`/`CAN`/`validatePermOverride`/`getCurrentUser`),
+  `lib/projects.ts` (`getCurrentProjectId`/`resolveProjectId`), `lib/request-context.ts`,
+  `app/api/admin/role-permissions/route.ts`.
+- việc: đúng theo đặc tả mục PR1 —
+  - Migration (số thật lúc code): `ALTER TABLE role_permissions ADD COLUMN IF NOT EXISTS
+    project_id INT REFERENCES projects(id) ON DELETE CASCADE` + DO block drop UNIQUE cũ
+    theo `pg_constraint` (xem Đính chính) + `CREATE UNIQUE INDEX IF NOT EXISTS
+    uq_role_perm_scope ON role_permissions (role, perm_key, COALESCE(project_id, 0))`.
+    Chạy `npm run gen:erd` cùng PR.
+  - `lib/permissions.ts`: snapshot key `` `${role}|${permKey}|${projectId ?? "*"}` ``;
+    `getPermissionOverride(role, permKey, projectId?)` tra dự án trước, miss → tra `*`;
+    `hasProjectOverrides()` (boolean tính sẵn lúc `reload()`, đọc đồng bộ);
+    `listPermissionOverrides(projectId?)` (undefined = hết / null = toàn hệ / số = dự án);
+    `setPermissionOverride(..., projectId)` — upsert
+    `ON CONFLICT (role, perm_key, COALESCE(project_id, 0))`, DELETE dùng
+    `project_id IS NOT DISTINCT FROM ?`. Giữ nguyên stale-while-revalidate/TTL/cold-start.
+  - `lib/auth.ts`: `resolvePerm` đọc `getRequestContext()?.projectId` truyền vào
+    `getPermissionOverride`; `getCurrentUser` — CHỈ KHI `hasProjectOverrides()` →
+    `await getCurrentProjectId(user)` bọc try/catch nuốt lỗi + `log.warn` (lỗi giải dự
+    án không được fail xác thực); `validatePermOverride(role, permKey, allowed,
+    projectId?)` — luật LOCKED_PERMS + chống tự khoá `admin/manageUsers` áp MỌI phạm vi.
+  - `lib/projects.ts::getCurrentProjectId`: memoize đầu hàm qua
+    `getRequestContext()?.projectId` (comment rõ: chỉ patch sau khi đã validate nên tin
+    được trong cùng request).
+  - Route `GET /api/admin/role-permissions?projectId=` (trả overrides dự án + toàn hệ +
+    field `projects: [{id, name}]`) / `PATCH` body thêm `projectId?: number|null`
+    (validate id tồn tại trong `projects` → 422).
+- **ranh giới được phép quyết** (vì `route: complex`): cấu trúc nội bộ cache/tên hàm
+  phụ/cách tổ chức test. **KHÔNG được quyết khác**: ngữ nghĩa 3 tầng, chữ ký
+  `CAN.x(role)`, luật LOCKED_PERMS + chống tự khoá (áp mọi phạm vi), nguyên tắc không
+  đọc cookie `xboss_project` thô để giải quyền, bất biến "bảng không có dòng theo dự án
+  → hành vi + chi phí y hệt trước M61". Vướng đặc tả sai/thiếu → DỪNG, báo coordinator,
+  không tự chế.
+- tiêu chí chấp nhận:
+  - Test unit + integration đúng danh sách mục "Test" PR1 của đặc tả: thứ tự 3 tầng;
+    `hasProjectOverrides` false khi chỉ có override toàn hệ; validate chặn mở quyền ghi
+    theo dự án + chặn siết `admin/manageUsers` theo dự án; siết `engineer/editProgress`
+    ở dự án A → `runWithRequestContext({projectId: A})` bị chặn, context B/không-context
+    không bị; upsert 2 lần cùng `(role, perm, NULL)` không sinh 2 dòng; xoá dự án →
+    override theo dự án tự mất (CASCADE); `invalidatePermissionCache` nạp ngay.
+  - Toàn bộ test cũ xanh KHÔNG SỬA (bất biến tương thích — phải sửa test cũ mới pass =
+    fail tiêu chí; trừ khi test cũ sai thật thì dừng và báo).
+  - `npm run lint`/`typecheck`/`build` xanh; `npm test` xanh trên Postgres cục bộ
+    (`TEST_DATABASE_URL`); `docs/ERD.md` đã sinh lại khớp schema (CI gate).
+  - Diff không chạm file ngoài danh sách: migration mới, `docs/ERD.md`,
+    `lib/permissions.ts`, `lib/auth.ts`, `lib/projects.ts`,
+    `app/api/admin/role-permissions/route.ts`, `tests/permissions.test.ts`,
+    `tests/auth-perms-project.test.ts` (mới).
+
+#### 2. M61 PR2 — UI ma trận + export snapshot + tài liệu
 
 - route: `standard`
-- nhánh: `claude/feat-m53-pr1-quan-trac-tai`
-- đọc trước: `docs/nang-cap/M53-scale-headroom.md` mục PR1 + đính chính ở trên (đặc biệt
-  `log.warn` không phải `logWarn`, health route public thật)
-- việc:
-  - `lib/db/index.ts`: export `poolStats()` trả `{ total, idle, waiting }` từ
-    `pool.totalCount/idleCount/waitingCount` (API sẵn có của `pg`).
-  - `lib/db/index.ts`: trong `query`/`run`/`insertId` (3 hàm export chính, đọc file để
-    xác nhận đủ 3 chỗ gọi `pool.query`/`tx.query`), đo `Date.now()` quanh câu query;
-    vượt ngưỡng `XBOSS_SLOW_QUERY_MS` (env, mặc định 500ms, giá trị `0` = tắt hẳn) thì
-    gọi `log.warn("slow_query", { sql: sql.slice(0,120), durationMs })` — **KHÔNG log
-    params** (tránh lộ dữ liệu nhạy cảm).
-  - `app/api/events/route.ts`: đếm SSE stream đang mở qua counter module-level
-    (`let openStreams = 0`, tăng lúc `start` của `ReadableStream`, giảm lúc đóng/huỷ
-    connection — đọc kỹ code hiện tại để gắn đúng chỗ cleanup, không rò rỉ counter khi
-    client ngắt kết nối đột ngột); export getter `getOpenStreamCount()`.
-  - `app/api/health/route.ts`: thêm nhánh — nếu có session Admin/PM
-    (`getCurrentUser()` + role check trực tiếp trong route, không tạo `CAN.*` mới cho
-    việc này) thì gộp thêm `{ pool: poolStats(), sseStreams: getOpenStreamCount() }` vào
-    JSON trả về của `checkHealth()`; không có session/không phải Admin-PM thì trả y hệt
-    4 trường cũ (giữ public, không đổi status code/behavior hiện có).
-- tiêu chí chấp nhận:
-  - `GET /api/health` không đăng nhập → y hệt hành vi cũ (4 trường, public, 200/503).
-  - `GET /api/health` với session Admin → có thêm `pool`/`sseStreams` đúng số liệu thật
-    (verify thật: mở 3 tab tracking → `sseStreams: 3`, đóng cả 3 → về 0 sau ≤35s).
-  - Giả lập `SELECT pg_sleep(1)` qua 1 câu query nội bộ (test/script) sinh đúng 1 dòng
-    `log.warn` không chứa params.
-  - Không đổi hành vi nào khác; `npm run lint`/`npm run typecheck`/`npm run build`/
-    test liên quan xanh.
-
-#### 2. M53 PR2 — Watermark SSE O(1) (`sheet_versions` + trigger)
-
-- route: `complex` — chạm đường nóng tracking (SSE mọi client tracking), vùng rủi ro
-  cao theo `docs/audit.md` (đường ghi `tasks`/`work_packages`); ranh giới quyết định
-  được phép: cách viết thân trigger PL/pgSQL (miễn giữ đúng bất biến "mọi INSERT/UPDATE/
-  DELETE trên `tasks` hoặc đổi `sheet_type_id`/`package_id` trên `work_packages` đều
-  bump đúng (các) sheet liên quan"), tên các biến trung gian trong trigger.
-- nhánh: `claude/feat-m53-pr2-sheet-versions`
-- đọc trước: `docs/nang-cap/M53-scale-headroom.md` mục PR2 (đầy đủ, kể cả khối SQL mẫu)
-  + đính chính ở trên (`lib/version.ts` hiện tại, số migration thật)
-- việc:
-  - Migration mới (số lấy đúng theo `ls migrations/ | sort -V | tail -5` lúc code):
-    bảng `sheet_versions(sheet_type_id PK, version BIGINT DEFAULT 1, updated_at)` +
-    trigger `bump_sheet_version()` trên `tasks` (AFTER INSERT/UPDATE/DELETE — UPDATE đổi
-    `package_id` bump CẢ sheet cũ lẫn mới, dùng `NEW`/`OLD` đúng theo `TG_OP`) + trigger
-    tương tự trên `work_packages` (UPDATE đổi `sheet_type_id` — bump cả sheet cũ và
-    mới). Backfill 1 dòng `version=1` cho mọi `sheet_types` hiện có
-    (`ON CONFLICT DO NOTHING`). Tham khảo pattern trigger có tiền lệ:
-    `boq_codes_sync` (migration `0029`), `audit_row_change` (migration `0049`).
-  - `lib/version.ts::sheetVersion(slug)`: đổi thân hàm thành
-    `SELECT version::text FROM sheet_versions sv JOIN sheet_types st ON sv.sheet_type_id = st.id WHERE st.slug = ?`;
-    sheet chưa có dòng (phòng thủ, không nên xảy ra sau backfill) → trả `'0'`. Giữ
-    nguyên chữ ký hàm, không đổi bất kỳ caller nào.
-- test:
-  - `tests/sheet-versions.test.ts` (integration, import `tests/setup.ts` đầu tiên đúng
-    quy ước dự án): (1) tick dimension qua `recomputeTask` → version bump; (2) tạo/xoá
-    task → bump; (3) move task sang package thuộc sheet khác → CẢ 2 sheet bump; (4) move
-    work_package sang sheet khác → cả 2 sheet bump; (5) sửa task không đổi tiến độ (vd
-    note) vẫn bump là CHẤP NHẬN ĐƯỢC (false-positive rẻ, chỉ khiến client refresh thừa —
-    ghi comment giải thích rõ trong test).
-  - Đo `EXPLAIN ANALYZE` trước/sau trên DB seed thật, ghi kết quả vào phần báo cáo của
-    worker (không cần file riêng — nêu trong tóm tắt gửi coordinator).
-  - Verify thật: 2 trình duyệt/2 tab mở cùng sheet, tick ở A → B nhận event `version`
-    trong ≤3s (hành vi y hệt trước khi đổi).
-- tiêu chí chấp nhận: test trên xanh; verify SSE 2 tab thật; lint/typecheck/build xanh;
-  `npm test` toàn bộ không có test cũ nào đỏ do đổi hành vi `sheetVersion`.
-
-#### 3. M53 PR3 — Pool cứng cáp qua env
-
-- route: `standard` — độc lập PR2, không đụng file chung với việc 2.
-- nhánh: `claude/feat-m53-pr3-pool-env`
-- đọc trước: `docs/nang-cap/M53-scale-headroom.md` mục PR3 + đính chính `lib/env.ts`/
-  `lib/db/index.ts` ở trên
-- việc:
-  - `lib/db/index.ts::getPool()`: `max` đọc từ env `XBOSS_PG_POOL_MAX` (parse số, mặc
-    định 10, clamp về khoảng 1–100 nếu ngoài khoảng — không throw, chỉ ghim về biên).
-    Thêm vào config `Pool`: `options: "-c statement_timeout=<N> -c idle_in_transaction_session_timeout=15000"`
-    với N từ env `XBOSS_PG_STMT_TIMEOUT_MS` (mặc định 30000). Thêm
-    `connectionTimeoutMillis: 10_000`.
-  - `lib/db/migrate.ts`: client chạy migration (đọc file để xác nhận có tạo `Pool`/
-    `Client` riêng hay dùng chung `getPool()`) phải đặt `statement_timeout=0` — nếu
-    dùng chung `getPool()` thì cần `SET LOCAL statement_timeout=0` trong phiên chạy
-    migration hoặc tạo client riêng cho migration, chọn cách nào ít thay đổi nhất sau
-    khi đọc code thật.
-  - `lib/env.ts`: thêm 3 field `z.string().optional()` vào `serverSchema`:
-    `XBOSS_PG_POOL_MAX`, `XBOSS_PG_STMT_TIMEOUT_MS`, `XBOSS_SLOW_QUERY_MS` (field thứ 3
-    dùng chung với việc 1 — nếu việc 1 đã merge trước, chỉ cần xác nhận không khai báo
-    trùng; nếu 2 nhánh song song cùng thêm, coordinator gộp tay lúc tích hợp — xung đột
-    nhỏ, không phải logic).
-  - `DEPLOY.md`: thêm mục liệt kê 3 biến env mới (mô tả ngắn + mặc định).
-- test: integration — query `pg_sleep` vượt `statement_timeout` → lỗi Postgres `57014`,
-  connection được trả về pool đúng (`poolStats().waiting` về 0 sau khi lỗi, không rò rỉ
-  connection).
-- tiêu chí chấp nhận: không đặt env nào → hành vi mặc định y hệt trước (10 connection) +
-  có timeout mới; test trên xanh; `DEPLOY.md` cập nhật; lint/typecheck/build xanh.
-
-#### 4. M53 PR4 — Cluster-ready: audit state in-process + tài liệu vận hành
-
-- route: `standard` — làm SAU việc 1–3 (đọc kết quả 3 việc trước để audit, đặc biệt
-  counter SSE của việc 1).
-- nhánh: `claude/feat-m53-pr4-cluster-audit` (tạo sau khi việc 1–3 đã tích hợp vào
-  nhánh tổng hợp của đợt này — xem Thứ tự & phụ thuộc)
-- đọc trước: `docs/nang-cap/M53-scale-headroom.md` mục PR4
-- việc:
-  - Quét `lib/` + `app/api/` tìm state module-level ghi-được (`Map`/`let`/biến global)
-    ngoài các chỗ đã biết an toàn (`lib/permissions.ts` SWR cache — thiết kế sẵn cho đa
-    instance; biến "pool ready"/"schema ready" per-process — đúng thiết kế). Mỗi phát
-    hiện: phân loại an-toàn/không-an-toàn cho chạy nhiều instance; sửa nếu nhỏ (vd đổi
-    sang đọc DB), ghi vào `PROGRESS.md` mục Nợ kỹ thuật nếu lớn/cần thiết kế lại. Counter
-    SSE của việc 1 ghi rõ là per-process (health mỗi instance chỉ trả số của chính nó —
-    chấp nhận, ghi chú trong code).
-  - Rà 6 endpoint `app/api/cron/*` (đọc danh sách file thật): xác nhận idempotent +
-    chống chạy chồng khi có ≥2 instance (sync vật tư đã có `sync_locks`; xác nhận
-    daily-report/weekly-report gửi trùng có hại thật không — nếu có, thêm khoá
-    `sync_locks` cùng pattern có sẵn, không tạo cơ chế khoá mới).
-  - `DEPLOY.md`: thêm mục "Chạy nhiều instance" — lệnh `pm2 start npm -i 2 --name xboss -- start`,
-    điều kiện tiên quyết (hạ `XBOSS_PG_POOL_MAX` mỗi process hoặc dùng PgBouncer
-    transaction-pooling, lưu ý `withTransaction` dùng `SET LOCAL` nên tương thích
-    PgBouncer transaction mode), xác nhận cron chỉ gọi từ ngoài 1 lần (không tự nhân đôi
-    khi có nhiều instance).
-  - `PROGRESS.md`: thêm khối mục "Điều kiện kích hoạt các việc đang hoãn" y nguyên nội
-    dung cuối file đặc tả M53 (object storage, SSE bậc 2/3, PgBouncer, read-replica) vào
-    mục Nợ kỹ thuật — đây là ghi chú, không phải code.
-- tiêu chí chấp nhận: báo cáo quét kèm theo (liệt kê state phát hiện + phân loại); chạy
-  `pm2 -i 2` cục bộ + smoke test thủ công (login, tick 1 dimension, xác nhận SSE 2 tab
-  vẫn nhận event đúng) xanh; lint/typecheck/build xanh.
-
-#### 5. M57 PR1 — Hạ tầng FTS + nâng `/api/search`
-
-- route: `complex` — quyết định biểu thức index thống nhất (ranh giới được phép quyết:
-  cách viết `ftsExpr()`/tên hàm `xboss_unaccent`/thứ tự cột trong từng nguồn, miễn mọi
-  index và mọi câu query dùng **đúng cùng 1 biểu thức** — đây là bất biến cứng, lệch 1
-  ký tự là planner bỏ index; KHÔNG được tự quyết đổi phạm vi quyền xem theo nguồn —
-  phần đó đã chốt trong đặc tả, xem dưới).
-- nhánh: `claude/feat-m57-pr1-fts`
-- đọc trước: `docs/nang-cap/M57-tim-kiem-toan-van.md` mục PR1 (đầy đủ) + đính chính ở
-  trên (đọc `docs/ERD.md` lấy đúng tên cột thật trước khi viết migration; trạng thái
-  thật của `app/api/search/route.ts` hiện tại)
-- việc:
-  - Migration mới (số lấy đúng theo `ls migrations/ | sort -V | tail -5` lúc code, thuần
-    thêm → CREATE EXTENSION/FUNCTION/INDEX, không đụng dữ liệu):
-    `CREATE EXTENSION IF NOT EXISTS unaccent;` + hàm `xboss_unaccent(text)` IMMUTABLE
-    bọc `unaccent('unaccent', $1)` (bắt buộc bọc vì `unaccent` gốc là STABLE, Postgres
-    từ chối index trực tiếp trên hàm STABLE). Index GIN biểu thức
-    `to_tsvector('simple', xboss_unaccent(coalesce(col1,'') || ' ' || coalesce(col2,'') ...))`
-    cho đợt 1: `tasks(code_excel, boq_code, name)`, `work_packages(code_excel, boq_code, name)`,
-    `contracts(code, name, contractor)`, `correspondences(code, subject, content)`,
-    `meetings(title, minutes)`, `site_diaries(...)` (đọc ERD lấy đúng cột nội dung thật),
-    `ncrs(code, title, description)`, `materials(boq_code, name)`, `drawings(code, name)`,
-    `project_documents(name)`, `task_comments(content)`. Nếu bảng nào lớn và runner
-    migration (`lib/db/migrate.ts`) chạy trong 1 transaction (đọc code xác nhận trước) —
-    `CREATE INDEX CONCURRENTLY` không chạy được trong transaction → tách bước
-    CONCURRENTLY thành script riêng trong `scripts/` (chạy tay lúc thấp điểm), migration
-    chỉ tạo extension/hàm + index thường cho bảng nhỏ; ghi rõ quyết định này trong báo
-    cáo worker gửi coordinator.
-  - `lib/search.ts` (mới): registry nguồn tìm kiếm — mỗi nguồn khai báo bảng, cột index
-    (dùng chung `ftsExpr(cols)` sinh đúng biểu thức khớp index, neo comment 2 chiều với
-    migration), cột hiển thị, URL đích, quyền xem (tái dùng triết lý whitelist của
-    `lib/reports.ts` — đọc file đó trước để bám đúng pattern). **Quyền đã chốt (không tự
-    quyết)**: nguồn `contracts` chỉ hiện cho `PAYMENT_VIEW_ROLES`; mọi nguồn lọc theo
-    `project_id` (trực tiếp hoặc qua chuỗi JOIN đúng bài học "project-scope-invariant"
-    đã áp cho `/api/notifications` ở M22) + loại bản ghi đã soft-delete (nếu bảng có cột
-    soft-delete — kiểm ERD). Xếp hạng theo `ts_rank` + ưu tiên khớp mã chính xác (mã
-    hiệu vẫn qua nhánh ILIKE prefix hiện có cho `code`/`boq_code` — GIỮ NGUYÊN nhánh này,
-    không thay bằng FTS, vì FTS tách token kém với mã dạng `A1,03`).
-  - `app/api/search/route.ts`: giữ nguyên `SearchHit` shape cũ cho `kind: "task"|"package"`
-    (không đổi contract với `GlobalSearch.tsx` hiện có), thêm nhóm kết quả mới theo từng
-    nguồn trong registry — mỗi nguồn tự lọc quyền/project scope theo đúng khai báo.
-  - `app/components/GlobalSearch.tsx`: nhóm kết quả hiển thị theo loại (icon `lucide-react`
-    theo module — bám bảng icon đã dùng ở sidebar `app/lib/nav.ts` cho nhất quán), điều
-    hướng đúng trang đích từng loại, giữ nguyên keyboard navigation + `aria-*` hiện có
-    (đọc file trước khi sửa, không viết lại từ đầu).
-- test:
-  - `tests/search.test.ts` (integration): (1) gõ "nghiem thu" khớp bản ghi chứa
-    "nghiệm thu" và ngược lại (gõ có dấu ra bản ghi không dấu); (2) kết quả tôn trọng
-    project scope — 2 dự án dựng riêng trong test không lẫn kết quả — + không trả bản
-    ghi đã soft-delete; (3) role `engineer` không thấy nhóm `contracts`, `admin` thấy;
-    (4) `EXPLAIN` xác nhận dùng index GIN (assert plan output chứa `Bitmap Index Scan`
-    trên ít nhất 1 bảng seed đủ lớn để planner chọn index thay vì seq scan).
-  - Verify UI thật: gõ có dấu/không dấu ra cùng tập kết quả trong `GlobalSearch`; đo thời
-    gian phản hồi trên DB seed < 200ms (ghi số đo vào báo cáo worker).
-- tiêu chí chấp nhận: test trên xanh; `SearchHit` cũ không đổi field (không phá client
-  cũ nếu có nơi khác dùng shape này — grep trước khi sửa); axe không phát sinh vi phạm
-  mới trên `GlobalSearch.tsx`; lint/typecheck/build xanh.
-
----
+- nhánh: `claude/feat-m61-pr2-perm-ui` (tạo TỪ kết quả PR1 đã tích hợp — phụ thuộc cứng)
+- đọc trước: `docs/nang-cap/M61-phan-quyen-theo-du-an.md` mục PR2 + Đính chính +
+  `app/admin/permissions/page.tsx`, `app/lib/permissionMeta.ts`,
+  `app/api/admin/permissions-snapshot/route.ts`, `e2e/authed/admin-config.spec.ts`.
+- việc: đúng đặc tả mục PR2 —
+  - Selector phạm vi ("Toàn hệ thống" mặc định + danh sách dự án từ API) trên
+    `/admin/permissions`; ở phạm vi dự án, ô "mặc định" = giá trị hiệu lực kế thừa
+    (CAN_DEFAULT + override toàn hệ) kèm chú thích nguồn "kế thừa toàn hệ" khi nguồn là
+    override toàn hệ; bấm đổi → PATCH kèm `projectId`; quyền trong `lockedPerms` vẫn
+    không cho bật.
+  - Export snapshot: thêm cột "Phạm vi" — ma trận toàn hệ đầy đủ như cũ + mỗi dự án CÓ
+    override riêng chỉ xuất các dòng chênh lệch (không nhân bản toàn ma trận × N dự án);
+    nguồn "Mặc định" / "Override toàn hệ" / "Override dự án <tên>".
+  - Tài liệu: `PROGRESS.md` đóng dòng nợ M52 PR4 (ghi kết cục: 4/5 module quản trị scope
+    shape ✅, `permissions` = M61, `ops` không áp dụng, không gate module `permissions`
+    bằng feature flag) + `docs/nang-cap/README.md` chuyển M61 → ✅.
+  - Mở rộng `e2e/authed/admin-config.spec.ts`: render selector, đổi phạm vi, axe
+    desktop + mobile.
+- tiêu chí chấp nhận: quy ước UI/UX chung (`docs/nang-cap/README.md` — dark-first không
+  `dark:`/hex, thang `zinc`, select có `aria-label`); e2e + axe xanh trên Postgres cục
+  bộ; lint/typecheck/build xanh; phạm vi "Toàn hệ thống" hành xử y hệt UI cũ.
 
 ### Thứ tự & phụ thuộc
 
-- **Việc 1 (M53 PR1)** không phụ thuộc gì — dispatch ngay.
-- **Việc 2 (M53 PR2)** và **việc 3 (M53 PR3)** không phụ thuộc việc 1 về mặt code (chỉ
-  đụng file khác nhau trong `lib/db/`), nhưng **cùng có khả năng thêm field vào
-  `lib/env.ts`** với việc 1/việc 3 (biến `XBOSS_SLOW_QUERY_MS` dùng chung việc 1+3) — có
-  thể dispatch cả 3 việc 1/2/3 song song ngay từ đầu (base cùng `origin/main`), xung đột
-  nhỏ ở `lib/env.ts` xử lý lúc tích hợp (gộp tay, không phải logic).
-- **Việc 4 (M53 PR4)** dispatch SAU KHI việc 1, 2, 3 đã tích hợp xong vào 1 nhánh tổng
-  hợp của đợt M53 — vì cần đọc code thật của cả 3 việc trước (đặc biệt counter SSE của
-  việc 1) để audit đúng.
-- **Việc 5 (M57 PR1)** hoàn toàn độc lập với cả 4 việc M53 — dispatch song song ngay từ
-  đầu cùng lúc với việc 1/2/3.
-- Việc 2 (`sheet_versions`) và việc 5 (FTS) đều cần thêm 1 migration mới, base cùng
-  `origin/main` → **sẽ đụng số migration** — coordinator renumber theo thứ tự merge
-  thực tế lúc tích hợp (ghi rõ số cuối cùng trong báo cáo tổng hợp).
+Tuần tự, KHÔNG song song: PR1 → `reviewer` soát diff (bắt buộc rà mục "Vùng rủi ro cao"
+trong `docs/audit.md` vì chạm `lib/auth.ts`) → tích hợp → PR2 (base = kết quả PR1) →
+`reviewer` → tích hợp → báo cáo phiên chính duyệt cuối. Trước khi tạo nhánh:
+`git fetch origin` + base khớp `origin/main` mới nhất (luật đồng bộ nhánh CLAUDE.md).
 
-### Sau khi worker xong (coordinator thực hiện)
+### Lưu ý migration (coordinator ghi vào mô tả PR, KHÔNG tự deploy)
 
-- Đối chiếu kết quả từng việc với tiêu chí chấp nhận ghi trong việc đó; chạy lại
-  `npm run lint`/`npm run typecheck`/test liên quan để xác nhận độc lập với báo cáo
-  worker.
-- Gọi `reviewer` soát diff từng nhánh — **đặc biệt chú ý việc 2 (M53 PR2, `route: complex`,
-  đường nóng tracking — bám checklist "vùng rủi ro cao" `docs/audit.md`)** và **việc 5
-  (M57 PR1, `route: complex`, quyền xem theo nguồn tìm kiếm — xác nhận không rò rỉ chéo
-  dự án/vai trò qua kết quả search)**.
-- Tích hợp: renumber migration theo đúng thứ tự merge thực tế; gộp tay xung đột nhỏ
-  `lib/env.ts` nếu việc 1/3 cùng thêm field; dispatch việc 4 chỉ sau khi việc 1-3 đã
-  tích hợp xong.
-- Báo cáo tổng hợp về phiên chính theo từng việc — trạng thái (xong/vướng/bỏ), nhánh +
-  commit, kết quả reviewer, quyết định worker tự đưa ra (việc 2 và việc 5, route
-  `complex`), số migration cuối cùng sau renumber, và danh sách điểm vướng cần phiên
-  chính xử lý.
+Migration PR1 có **DROP CONSTRAINT** → không thuộc whitelist "thêm thuần tuý" của DoD:
+PHẢI chạy staging (`bash deploy.sh --staging`, kiểm trước `npm run db:migrate -- --dry-run`)
+trước production. Đây là việc của người vận hành sau khi merge — coordinator chỉ cần ghi
+rõ cảnh báo này vào mô tả PR1.
 
-### Duyệt cuối (phiên chính thực hiện)
+### Tiêu chí duyệt cuối (phiên chính kiểm khi coordinator báo xong)
 
-- [ ] Đối chiếu diff 5 việc với đặc tả nguồn (`M53-scale-headroom.md` cả 4 PR,
-      `M57-tim-kiem-toan-van.md` mục PR1) + báo cáo coordinator
-- [ ] Xác nhận việc 2 (watermark SSE) verify thật bằng 2 tab trình duyệt (không chỉ tin
-      test) — đây là đường nóng ảnh hưởng mọi người dùng tracking đồng thời
-- [ ] Xác nhận việc 5 (FTS) không rò rỉ chéo dự án/vai trò qua `GlobalSearch` (tự thao
-      tác thử với 1 tài khoản `engineer` + 1 tài khoản `admin`)
-- [ ] Cập nhật `PROGRESS.md` (thêm mục đợt này) + đối chiếu thứ tự đã chốt (dòng 22) —
-      việc kế tiếp sau đợt này là **M56 (2FA/TOTP)**
-- [ ] Push nhánh + mở PR draft theo template cho từng việc (5 PR, hoặc gộp M53 thành 1
-      PR nếu coordinator thấy hợp lý hơn khi tích hợp — quyết định lúc đó, ghi rõ lý do)
+5 tiêu chí "Tiêu chí chấp nhận (toàn M61)" trong đặc tả: (1) bảng không có dòng theo dự
+án → hành vi + hiệu năng y hệt trước M61, test cũ xanh không sửa; (2) siết theo dự án A
+chặn đúng A, đổi dự án B quyền trở lại, đổi cookie tay không né được; (3) không mở quyền
+ghi / không siết `admin+manageUsers` ở mọi phạm vi; (4) mọi thay đổi override có trong
+`audit_log` với actor đúng; (5) lint/typecheck/build/test xanh + ERD khớp + cảnh báo
+staging có trong mô tả PR1.
