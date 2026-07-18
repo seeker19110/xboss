@@ -1,8 +1,10 @@
-# Bộ đặc tả nâng cấp XBoss — theo nhóm module (đã triển khai xong M0–M42)
+# Bộ đặc tả nâng cấp XBoss — theo nhóm module (đã triển khai xong M0–M52)
 
-> **Trạng thái: ĐÃ TRIỂN KHAI XONG toàn bộ M0–M42.** File `M<xx>-*.md` gốc (viết TRƯỚC khi code, dùng để giao việc subagent) đã được **gộp theo nhóm nghiệp vụ** thành các file `G<nn>-*.md` dưới đây — cô đọng còn lại phần tra cứu (schema/API/quyết định), bỏ phần "Chia PR"/kế hoạch giao việc không còn cần thiết sau khi đã code xong. Lịch sử PR/quyết định chi tiết từng đợt vẫn nằm ở `PROGRESS.md`.
+> **Trạng thái (cập nhật 2026-07-18): ĐÃ TRIỂN KHAI XONG M0–M52 (đợt "lên tầm ERP" P0–P2) + M56 PR1 (TOTP self-service).** File `M<xx>-*.md` gốc của M0–M42 (viết TRƯỚC khi code, dùng để giao việc subagent) đã được **gộp theo nhóm nghiệp vụ** thành các file `G<nn>-*.md` dưới đây — cô đọng còn lại phần tra cứu (schema/API/quyết định), bỏ phần "Chia PR"/kế hoạch giao việc không còn cần thiết sau khi đã code xong. Đặc tả M43–M52 giữ nguyên file `M<xx>-*.md` (chưa gộp). Lịch sử PR/quyết định chi tiết từng đợt vẫn nằm ở `PROGRESS.md`.
 >
-> Khi cần đặc tả cho **module mới** (M43 trở đi), viết file `M<xx>-*.md` riêng theo khung ở mục Quy ước chung bên dưới TRƯỚC khi code — chỉ gộp vào `G<nn>` cùng nhóm sau khi đã triển khai xong.
+> **Chưa triển khai (theo thứ tự thi hành đã chốt):** M53 → M56 PR2 → M51 (GĐ0 của M54) → M55 → M57 → M58 → M54 GĐ1 → M59 — xem bảng "Đặc tả chờ triển khai" bên dưới. Một số việc **hoãn có chủ đích** (M49 PR3 SSO OIDC merge nhưng flag tắt, M60 major deps) — xem `PROGRESS.md` mục "Việc tạm hoãn".
+>
+> Khi cần đặc tả cho **module mới**, viết file `M<xx>-*.md` riêng theo khung ở mục Quy ước chung bên dưới TRƯỚC khi code — chỉ gộp vào `G<nn>` cùng nhóm sau khi đã triển khai xong.
 
 ## Danh mục (nhóm → module gộp bên trong)
 
@@ -23,22 +25,42 @@
 
 > Bối cảnh lịch sử các đợt (FastCons nhóm A-E, AppShell IA N1-N4, UX 2026-07...) không còn cần thiết để tra cứu module đã xong — xem `docs/ke-hoach-*.md` nếu cần đối chiếu quyết định gốc.
 
-## Đặc tả chờ triển khai — đợt "lên tầm ERP" (M43–M52, viết 07/2026)
+## Đợt "lên tầm ERP" (M43–M52, viết 07/2026) — ĐÃ TRIỂN KHAI XONG
 
-Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 trục + bảng điểm). Thứ tự ưu tiên P0 → P3; số migration trong đặc tả (0049+) là **tạm** — kiểm tra lại số thứ tự thực tế lúc code (bài học M32/M33).
+Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 trục + bảng điểm). Thứ tự ưu tiên P0 → P3; số migration thực tế đã dùng khác số tạm trong đặc tả (bài học M32/M33). **Toàn bộ M43–M52 đã merge vào `main`** — cột dưới ghi migration/điểm chạm thực tế để tra cứu.
 
-| File                         | Hạng mục                                                                 | Ưu tiên | Trục điểm          | Phụ thuộc            |
-| ---------------------------- | ------------------------------------------------------------------------ | ------- | ------------------ | -------------------- |
-| `M43-audit-trail.md`         | Ngữ cảnh request + audit trail toàn hệ (trigger + SET LOCAL)             | P0      | Audit 2.0→3.5      | —                    |
-| `M44-van-hanh.md`            | Backup/DR, health, structured logging, Sentry, staging                   | P0      | Vận hành 2.5→4.0   | PR3 cần M43 PR1      |
-| `M45-chat-luong-du-lieu.md`  | Money helper, CHECK, ERD tự sinh, soft-delete, test bất biến scope       | P0      | Dữ liệu 3.5→4.0    | —                    |
-| `M46-approval-engine.md`     | Phê duyệt nhiều cấp cấu hình được (ngưỡng, SLA, SoD)                     | P1      | Workflow 2.0→3.5   | nên sau M43 PR1      |
-| `M47-evm-bi.md`              | EVM (SPI/CPI/EAC), materialized views, saved reports, alert rules        | P1      | BI 3.0→4.0         | —                    |
-| `M48-tich-hop-tai-chinh.md`  | Khung integrations, adapter kế toán, hoá đơn điện tử NĐ 70/2025          | P1      | Tích hợp 2.0→3.5   | PR2 cần M46          |
-| `M49-api-mo-sso.md`          | API keys `/api/v1`, webhook ra ngoài, SSO OIDC                           | P3      | Tích hợp →4.0      | webhook lợi từ M46   |
-| `M50-phan-quyen-nang-cao.md` | Override quyền trong DB, quyền theo trường, báo cáo SoD                  | P2      | Phân quyền 3.0→4.0 | audit từ M43         |
-| `M51-da-du-an-rls.md`        | RLS phòng tuyến 2 (kèm ADR-0005), template dự án, organizations          | P2      | Đa dự án 3.5→4.5   | M43 PR1, M45 PR5     |
-| `M52-mo-rong-cau-hinh.md`    | code_lists, custom fields, module registry, feature flags, tách tracking | P2–P3   | Kiến trúc 3.0→4.0  | registry trước flags |
+| File                         | Hạng mục                                                                 | Trạng thái | Migration/điểm chạm thực tế                              |
+| ---------------------------- | ------------------------------------------------------------------------ | ---------- | -------------------------------------------------------- |
+| `M43-audit-trail.md`         | Ngữ cảnh request + audit trail toàn hệ (trigger + SET LOCAL)             | ✅ xong     | `0049_audit_log.sql`, `0059_sso_audit.sql`               |
+| `M44-van-hanh.md`            | Backup/DR, health, structured logging, Sentry, staging                   | ✅ xong     | `app/api/health`, Sentry scaffold (chờ ops đặt DSN)      |
+| `M45-chat-luong-du-lieu.md`  | Money helper, CHECK, ERD tự sinh, soft-delete, test bất biến scope       | ✅ xong     | `lib/money.ts`, `0050`/`0051_checks`/`0052_soft_delete`  |
+| `M46-approval-engine.md`     | Phê duyệt nhiều cấp cấu hình được (ngưỡng, SLA, SoD)                     | ✅ xong     | `0053_approvals.sql`                                      |
+| `M47-evm-bi.md`              | EVM (SPI/CPI/EAC), materialized views, saved reports, alert rules        | ✅ xong     | `0054_saved_reports`/`0055_matviews`/`0056_alert_rules`  |
+| `M48-tich-hop-tai-chinh.md`  | Khung integrations, adapter kế toán, hoá đơn điện tử NĐ 70/2025          | ✅ xong     | `0057_integrations.sql`                                   |
+| `M49-api-mo-sso.md`          | API keys `/api/v1`, webhook ra ngoài, SSO OIDC                           | ⚠️ PR1/PR2 xong; PR3 SSO OIDC merge nhưng **flag tắt** | `app/api/v1`, `0060_webhooks`/`0061_api_keys` |
+| `M50-phan-quyen-nang-cao.md` | Override quyền trong DB, quyền theo trường, báo cáo SoD                  | ✅ xong     | `0058_role_permissions.sql`, `lib/permissions.ts`        |
+| `M51-da-du-an-rls.md`        | RLS phòng tuyến 2 (kèm ADR-0005), template dự án, organizations          | ❌ **chưa** | — (GĐ0 của M54, chưa có RLS/`organizations`)             |
+| `M52-mo-rong-cau-hinh.md`    | code_lists, custom fields, module registry, feature flags, tách tracking | ✅ xong     | `0060_code_lists`/`0062_custom_fields`/`0063_feature_flags` |
+
+## Đặc tả chờ triển khai — đợt Scale/SaaS/BI + bổ sung (M53–M59, viết 07/2026)
+
+Từ phân tích so XBoss với ERP chuyên nghiệp (`PROGRESS.md`). **Thứ tự thi hành đã chốt:** M53 → M56 PR2 → M51 (GĐ0 của M54) → M55 → M57 → M58 → M54 GĐ1 → M59.
+
+| File                         | Hạng mục                                                                 | Trạng thái | Ghi chú                                       |
+| ---------------------------- | ------------------------------------------------------------------------ | ---------- | --------------------------------------------- |
+| `M53-scale-headroom.md`      | Đo tải → watermark SSE O(1) thay aggregate JOIN 3s/client, pool env      | ❌ chưa     | Việc kế tiếp trong hàng đợi                    |
+| `M56-2fa-totp.md`            | TOTP RFC 6238 + recovery codes; PR2 bắt buộc theo vai trò                | ⚠️ PR1 xong (`0065_totp.sql`); **PR2 (enforce theo role) chưa** | —          |
+| `M51-da-du-an-rls.md`        | RLS theo dự án + `organizations` (GĐ0 của M54)                            | ❌ chưa     | Phải làm trước M54                             |
+| `M55-bi-metabase.md`         | Schema `bi` (view whitelist cột) + role `xboss_bi` chỉ-đọc cho Metabase  | ❌ chưa     | Metabase không bao giờ chạm `public`          |
+| `M57-tim-kiem-toan-van.md`   | FTS GIN index + `unaccent` (thay ILIKE inline hiện tại)                   | ❌ chưa     | PR2 tuỳ chọn extract text PDF                  |
+| `M58-qr-offline-hien-truong.md` | QR tem in `/r/<kind>/<id>` + offline queue IndexedDB ảnh/nhật ký       | ❌ chưa     | —                                             |
+| `M54-multi-tenant-saas.md`   | Trục `org_id` + RLS org + object storage uploads (GĐ1)                    | ❌ chưa     | Phụ thuộc cứng M51                             |
+| `M59-tai-nguyen.md`          | Histogram nhân lực/thiết bị kế hoạch-vs-thực-tế, cảnh báo gán chồng      | ❌ chưa     | Không migration, chỉ tổng hợp                  |
+
+## Hoãn có chủ đích (không tự nhặt lại — xem `PROGRESS.md`)
+
+- `M60-nang-major-deps.md` — nâng TS 7 / ESLint 10 / Node 26, chờ điều kiện kích hoạt từng PR.
+- M49 PR3 SSO OIDC — merge ở trạng thái flag tắt, chờ xác minh tay end-to-end với IdP thật.
 
 ## Quy ước chung (áp cho MỌI module — không lặp lại trong từng file)
 
