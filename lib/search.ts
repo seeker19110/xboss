@@ -174,7 +174,10 @@ const SOURCES: SearchSource[] = [
     label: "Tài liệu",
     from: "project_documents pd",
     alias: "pd",
-    cols: ["pd.title"],
+    // M57 PR2: gồm cả extracted_text (nội dung text-layer PDF trích lúc upload,
+    // lib/pdf-extract.ts) — khớp CHÍNH XÁC index idx_project_documents_fts_text
+    // trong migrations/0071_extracted_text.sql (bất biến neo 2 chiều ftsExpr).
+    cols: ["pd.title", "pd.extracted_text"],
     codeCol: null,
     titleSql: "pd.title",
     subtitleSql: "pd.category",

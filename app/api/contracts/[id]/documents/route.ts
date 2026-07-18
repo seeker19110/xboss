@@ -13,6 +13,7 @@ import {
   sha256Hex,
   isContentTooLarge,
 } from "@/lib/photos";
+import { extractPdfText } from "@/lib/pdf-extract";
 
 export const dynamic = "force-dynamic";
 
@@ -120,10 +121,13 @@ export async function POST(
   const dir = ensureUploadDir();
   await writeFile(join(dir, fileName), fileBuf);
   const sha256 = sha256Hex(fileBuf);
+  // Trích text-layer PDF để lập chỉ mục tìm kiếm (M57 PR2) — êm nếu không extract
+  // được (scan ảnh, hỏng, quá giới hạn trang/thời gian), không chặn upload.
+  const extractedText = ext === ".pdf" ? await extractPdfText(fileBuf) : null;
 
   const id = await insertId(
-    `INSERT INTO contract_documents (contract_id, file_name, original_name, mime_type, size_bytes, caption, uploaded_by, sha256)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO contract_documents (contract_id, file_name, original_name, mime_type, size_bytes, caption, uploaded_by, sha256, extracted_text)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     contractId,
     fileName,
     file.name || null,
@@ -132,6 +136,7 @@ export async function POST(
     caption,
     user.id,
     sha256,
+    extractedText,
   );
 
   return NextResponse.json({ id, contractId, caption, sizeBytes: file.size }, { status: 201 });
