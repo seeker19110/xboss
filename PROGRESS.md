@@ -386,7 +386,7 @@ Trước khi audit, bổ sung `docs/audit.md` (rà thật trong code, không suy
 
 ## Tiếp theo
 
-- **Hàng đợi thi hành đã chốt lại (2026-07-18, rà lại code thật sau merge #252 + #256 — nguồn chuẩn duy nhất: `docs/nang-cap/README.md` mục "Đặc tả chờ triển khai"):** ~~(1) M53 song song M57 PR1~~ **cả 4 PR của M53 + PR1 của M57 đã xong (PR1-3: 2026-07-18, PR #252, commit `cefda6a`; PR4: 2026-07-18, nhánh `claude/plan-md-30cmcp` — xem mục "M53 PR4" phía dưới)** → ~~(2) M61~~ **đã xong (2026-07-18, PR1 #248 + PR2 #249, xem mục M61 phía dưới)** → ~~(3) M51 GĐ0~~ **PR1/PR2/PR4 đã xong (2026-07-18, PR #256, xem mục "M51 GĐ0" phía dưới); còn nợ bước "khoá cửa" RLS sau ~1 tuần theo dõi production**. Hàng đợi còn lại (chưa triển khai): **M56 PR2** (bắt buộc 2FA theo vai trò) → **M55** (BI/Metabase) → **M58 PR3** (wire ảnh/nhật ký vào offline queue — PR1+PR2 đã xong) → **M54 GĐ1** (multi-tenant SaaS, phụ thuộc M51) → **M59** (histogram tài nguyên). Các dòng "thứ tự thi hành" cũ hơn trong log dưới đây là lịch sử, không sửa lại. **LUẬT trước khi thi hành BẤT KỲ hạng mục nào (yêu cầu người dùng 2026-07-18): kiểm tra trên code thật xem hạng mục đã được làm chưa** — grep điểm chạm chính ghi trong đặc tả (bảng/migration, hàm lib, route, trang UI) trước khi lập nhánh/giao worker; đã có rồi thì cập nhật tài liệu thay vì code lại (bài học 2026-07-17: 3/5 mục "dở dang" thực ra đã xong; lặp lại 2026-07-18: tài liệu vẫn ghi M53/M57 PR1 "chưa" dù đã merge từ trước — luôn grep lại, đừng tin bảng trạng thái).
+- **Hàng đợi thi hành đã chốt lại (2026-07-18, rà lại code thật sau merge #252 + #256 + #259 — nguồn chuẩn duy nhất: `docs/nang-cap/README.md` mục "Đặc tả chờ triển khai"):** ~~(1) M53 song song M57 PR1~~ **cả 4 PR của M53 + PR1 của M57 đã xong (PR1-3: 2026-07-18, PR #252, commit `cefda6a`; PR4: 2026-07-18, nhánh `claude/plan-md-30cmcp` — xem mục "M53 PR4" phía dưới)** → ~~(2) M61~~ **đã xong (2026-07-18, PR1 #248 + PR2 #249, xem mục M61 phía dưới)** → ~~(3) M51 GĐ0~~ **PR1/PR2/PR4 đã xong (2026-07-18, PR #256, xem mục "M51 GĐ0" phía dưới); còn nợ bước "khoá cửa" RLS sau ~1 tuần theo dõi production** → ~~(4) M56 PR2~~ **đã xong (2026-07-18, PR #259, xem mục "M56 PR2" phía trên)**. Hàng đợi còn lại (chưa triển khai): **M55** (BI/Metabase) → **M58 PR3** (wire ảnh/nhật ký vào offline queue — PR1+PR2 đã xong) → **M54 GĐ1** (multi-tenant SaaS, phụ thuộc M51) → **M59** (histogram tài nguyên). Các dòng "thứ tự thi hành" cũ hơn trong log dưới đây là lịch sử, không sửa lại. **LUẬT trước khi thi hành BẤT KỲ hạng mục nào (yêu cầu người dùng 2026-07-18): kiểm tra trên code thật xem hạng mục đã được làm chưa** — grep điểm chạm chính ghi trong đặc tả (bảng/migration, hàm lib, route, trang UI) trước khi lập nhánh/giao worker; đã có rồi thì cập nhật tài liệu thay vì code lại (bài học 2026-07-17: 3/5 mục "dở dang" thực ra đã xong; lặp lại 2026-07-18: tài liệu vẫn ghi M53/M57 PR1 "chưa" dù đã merge từ trước — luôn grep lại, đừng tin bảng trạng thái).
 
 - **M53 (PR1-3) + M57 PR1 — Scale headroom & tìm kiếm toàn văn** (2026-07-18, PR #252, commit `cefda6a`, `docs/nang-cap/M53-scale-headroom.md` + `M57-tim-kiem-toan-van.md`): **M53 PR1** — quan trắc tải: `poolStats()` (`lib/db/index.ts`), log `slow_query` khi vượt `XBOSS_SLOW_QUERY_MS` (mặc định 500ms, không log params), đếm SSE stream đang mở (`app/api/events/route.ts`), `GET /api/health` trả thêm `{pool, sseStreams}` cho Admin/PM. **M53 PR2** — watermark SSE O(1): `migrations/0067_sheet_versions.sql` (bảng `sheet_versions` 1 dòng/sheet + trigger `bump_sheet_version()` dùng chung cho `tasks`/`work_packages`, move task/nhóm bump cả sheet cũ lẫn mới), `lib/version.ts` đổi từ aggregate JOIN 3 bảng sang SELECT 1 dòng theo khoá chính (giữ nguyên chữ ký). **M53 PR3** — pool cứng cáp qua env: `XBOSS_PG_POOL_MAX` (mặc định 10, clamp 1-100), `statement_timeout` từ `XBOSS_PG_STMT_TIMEOUT_MS` (mặc định 30s), `idle_in_transaction_session_timeout=15s`, `connectionTimeoutMillis=10s`. **M57 PR1** — FTS toàn văn: `lib/search.ts` (`to_tsvector('simple', xboss_unaccent(...))`), `migrations/0068_fts.sql` (GIN index + hàm `xboss_unaccent`), `GET /api/search` + `GlobalSearch.tsx` chuyển từ ILIKE sang FTS. Sự cố phát hiện + sửa lúc tích hợp: renumber migration 0064→0067 (0064 đã bị `webhooks` chiếm trên `main`); CI báo lỗi lặp "function unaccent(unknown, text) does not exist" mỗi chu kỳ autovacuum — do hàm IMMUTABLE bị planner inline, autovacuum chạy `search_path` thu hẹp chỉ `pg_catalog` → phải schema-qualify `public.unaccent(...)`/`'public.unaccent'` cả trong hàm lẫn tên dictionary; quên `npm run gen:erd` sau khi thêm 2 migration mới — đã sinh lại đúng 140 bảng. Test: `tests/db-pool.test.ts`, `tests/sheet-versions.test.ts` (5 ca), `tests/search.test.ts`.
 
@@ -780,16 +780,40 @@ Verify hạ tầng: Postgres 16 local (`pg_ctlcluster`, đã có sẵn trong má
 
 - **[Cao] `payments`/`payments/bills`/`payments/floors` chưa scope theo `projectId` (M22)** — xem chi tiết "Đợt audit toàn dự án lần 6" ở trên. `GET` đã whitelist có chủ đích trong `tests/project-scope-invariant.test.ts` ("nợ đa dự án đã biết") nhưng `PATCH`/`DELETE /api/payments/bills/:id` ngoài phạm vi whitelist đó (chỉ kiểm GET+SELECT) — user dự án B sửa/xoá được bill dự án A nếu đoán được `id`. Cần đặc tả riêng kiểu M22 (`payment-certs`) trước khi làm — không tự chế cách scope.
 - **[Trung] `materials/:id/issue` và `.../return` không có cơ chế idempotency** — đã bọc `withTransaction`+`FOR UPDATE` chống race condition nhưng gửi lại cùng request (double-submit, mạng công trường chập chờn) vẫn tạo 2 dòng `material_transactions`/trừ-cộng tồn kho 2 lần. Cần đặc tả (schema lưu idempotency-key, TTL, nơi sinh key ở client) trước khi làm.
-- **M56 PR2 — auto-redirect client `/account?require2fa=1` chưa thực sự kích hoạt** (2026-07-18,
-  quyết định người dùng: merge nguyên trạng, ghi nợ): `app/lib/me.ts::fetchMe()` chỉ gọi
-  `/api/auth/me` — endpoint này nằm TRONG whitelist `/api/auth/*` nên `proxy.ts` luôn cho qua
-  (200), nhánh `if (j?.code === "2fa_required") redirectTo2faSetup()` vì vậy không bao giờ
-  chạy trong thực tế qua đường này. **Chặn bảo mật server-side (403 ở `proxy.ts`) vẫn đúng và
-  an toàn tuyệt đối** — chỉ ảnh hưởng trải nghiệm: user bị khoá thấy các trang dữ liệu
-  rỗng/lỗi 403 thay vì được tự động đưa tới trang bật 2FA (phải tự gõ URL mới thấy banner).
-  Cách vá dự kiến: `/api/auth/me` trả thêm cờ `mustSetup2fa` trong body JSON, `fetchMe()` kiểm
-  cờ này (không chỉ dựa vào status/code lỗi của chính request đó) để tự redirect ngay sau khi
-  đăng nhập.
+- ~~**M56 PR2 — auto-redirect client `/account?require2fa=1` chưa thực sự kích hoạt**~~ →
+  **đã đóng** (2026-07-18, nhánh `claude/plan-md-30cmcp`, đúng cách vá đã dự kiến): thêm
+  `app/api/auth/me/route.ts` tự đọc cờ `mustSetup2fa` từ token đang hiệu lực (`parseToken`,
+  không recompute từ DB) và đính kèm `code: "2fa_required"` trong body khi cần — `fetchMe()`
+  không cần đổi (đã sẵn kiểm `j?.code` từ trước, chỉ là route chưa từng trả field đó).
+  **Lúc verify bằng Playwright thật (không chỉ đọc code) phát hiện thêm 2 lỗi NGHIÊM TRỌNG
+  đã lọt qua merge #259, cả 2 đều đã vá cùng đợt này:**
+  1. **Reload vô hạn trên `/account?require2fa=1`**: `redirectTo2faSetup()` gán
+     `window.location.href` y hệt URL hiện tại mỗi khi `fetchMe()` chạy lại — nhưng trình
+     duyệt KHÔNG tự bỏ qua điều hướng trùng URL, vẫn reload thật. Trang `/account` tự nó
+     cũng gọi `fetchMe()`, nên user vừa được đưa tới đúng trang bật 2FA thì trang đó lập
+     tức tự reload chính nó, lặp vô hạn — đo được **30 lần điều hướng trong 6 giây**, nút
+     "Bật xác thực 2 lớp" không bao giờ kịp hiện. **Hệ quả: user bị khoá không có cách nào
+     tự mở khoá qua UI** (chặn bảo mật vẫn đúng, nhưng lối thoát duy nhất bị hỏng). Vá:
+     thêm guard trong `redirectTo2faSetup()` — bỏ qua điều hướng nếu đã ở đúng
+     `/account?require2fa=1`.
+  2. **Trang trắng ngay cả sau khi hết lặp**: `fetchMe()` trả `null` (không phải `user`)
+     khi `code === "2fa_required"` — `AccountPageInner` có `if (!me) return null`, nên dù
+     hết lặp, trang vẫn không render gì (chỉ thấy footer layout gốc). Vá: `fetchMe()` vẫn
+     trả `user` thật trong nhánh này (redirect vẫn fire như cũ, chỉ không còn trả `null`).
+  - **Verify thật bằng Playwright** (Chromium tại `/opt/pw-browsers`, không dùng authenticator
+    app thật nên sinh mã 6 số hợp lệ bằng `otplib.generate()` từ secret trả về, giống pattern
+    `tests/totp.test.ts`): trước khi vá — xác nhận tái hiện đúng 2 lỗi trên (đếm điều hướng
+    qua sự kiện `framenavigated`, `locator('main')` timeout vì không bao giờ ổn định). Sau khi
+    vá — đăng nhập tài khoản `engineer` bị bắt buộc 2FA, vào thẳng `/account?require2fa=1`:
+    banner + nút "Bật xác thực 2 lớp" hiện đúng trong &lt;1.5s, chỉ 1 document request (không
+    còn reload); bấm bật → nhập mã TOTP thật → banner tự biến mất NGAY (không reload) → gọi
+    lại `/api/auth/me` qua `page.evaluate` xác nhận hết `code`, `/api/tasks` không còn 403.
+    Route `/api/auth/me` tự nó KHÔNG test được bằng `node:test` (gọi `getCurrentUser()` qua
+    `next/headers`, throw "called outside a request scope" ngoài request thật của Next —
+    đúng giới hạn đã ghi nhận ở `tests/qr-resolve.test.ts`) nên verify hoàn toàn qua dev
+    server thật thay vì test tự động, đúng tiền lệ của các route cùng loại.
+  - `npm run lint`/`typecheck`/`build` xanh; `npm test` toàn bộ file xanh (không sửa test có
+    sẵn — hành vi `fetchMe()`/route khác không đổi ngoài phần liên quan `code`).
 - ~~`tests/evm.test.ts`/`tests/matviews.test.ts` (M47 PR1/PR2) không dọn dữ liệu fixture sau khi chạy — hardcode `sheet_types.slug` (unique toàn hệ, vd `'m47-evm'`) và `systems.code` nên chỉ pass đúng 1 lần trên mỗi DB; chạy `npm test` lần 2 trở đi trên cùng Postgres cục bộ (không phải CI — CI luôn dùng Postgres ephemeral nên chưa từng lộ) báo lỗi `duplicate key value violates unique constraint "uniq_sheet_slug"`~~ → **đã sửa** (2026-07-16, phát hiện khi verify UI soft-delete ở trên bằng cách chạy `npm test` nhiều lần trên cùng DB cục bộ): thêm `DELETE` dọn theo đúng thứ tự phụ thuộc (task_history/tasks/work_packages/sheet_types/systems/towers/projects, cùng boq_items/payment_bills/baselines/cash_transactions ở evm.test.ts) ở cuối mỗi test — cùng pattern `tests/cost.test.ts`. Verify: chạy 2 file này 2 lần liên tiếp trên cùng DB → cả 2 lần 6/6 pass (trước đó lần 2 luôn fail); `npm test` đầy đủ 80/80 file trên DB mới. ~~**Còn sót:** cleanup nằm sau assert, không bọc `finally` nên assert fail giữa chừng vẫn bỏ dở dọn dẹp, để lại dữ liệu mồ côi vỡ UNIQUE ở lần chạy sau.~~ → **đã đóng hẳn** (PR #213, 2026-07-16): thêm hậu tố `RUN=Date.now().toString(36)` cho mọi mã cứng + bọc toàn bộ `DELETE` vào `try/finally` — tái hiện đúng lỗi còn sót bằng cách giả lập fail giữa chừng trước khi vá, verify lại 3 lượt (2 lần liên tiếp + 1 lần giả lập fail) đều xanh.
 
 - **Ký số thật (PAdES, USB token/HSM) cho biên bản/hợp đồng** — ngoài phạm vi M43 (chỉ mới có `sha256` toàn vẹn nội dung file + hash-chain `audit_log` chống sửa tay, PR3, `docs/nang-cap/M43-audit-trail.md`). Chưa có giá trị pháp lý ký số thật; chờ nhu cầu pháp lý thật phát sinh mới làm (cần tích hợp HSM/USB token phần cứng, ngoài khả năng của web app thuần).
