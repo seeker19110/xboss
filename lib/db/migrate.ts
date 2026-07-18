@@ -4,7 +4,7 @@
 // và thủ công qua `npm run db:migrate` (scripts/migrate.ts).
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
-import type { Pool } from "pg";
+import { Pool } from "pg";
 
 // Thư mục migrations ở gốc repo (self-host chạy `next start` từ đây; tsx/test cũng cwd = root).
 export const MIGRATIONS_DIR = path.join(process.cwd(), "migrations");
@@ -12,6 +12,17 @@ export const MIGRATIONS_DIR = path.join(process.cwd(), "migrations");
 // Khoá tư vấn (advisory lock) toàn cục: serialize migrate giữa nhiều process/instance
 // (multi-instance production hoặc test chạy song song). Số bất kỳ, cố định.
 const MIGRATION_LOCK_KEY = 918_273_645;
+
+// Pool riêng cho lệnh `npm run db:migrate` (script scripts/migrate.ts). M51 PR1: khi bật
+// RLS, production đổi DATABASE_URL sang role ứng dụng `xboss_app` (NOBYPASSRLS, không đủ
+// quyền chạy migration/tạo role) — migration phải chạy bằng role owner qua biến riêng
+// MIGRATE_DATABASE_URL. Ưu tiên MIGRATE_DATABASE_URL, fallback DATABASE_URL (dev không đổi
+// gì). Chỉ ảnh hưởng script db:migrate — ensureSchema lúc boot app vẫn dùng getPool() (lib/db).
+export function getMigrationPool(): Pool {
+  const url = process.env.MIGRATE_DATABASE_URL || process.env.DATABASE_URL;
+  if (!url) throw new Error("Thiếu MIGRATE_DATABASE_URL/DATABASE_URL để chạy migration");
+  return new Pool({ connectionString: url, max: 4 });
+}
 
 // Danh sách file migration đã sắp thứ tự. Tên đánh số 4 chữ số (0001_, 0002_…) nên
 // sắp theo chuỗi = sắp theo số. Chỉ nhận đuôi .sql.

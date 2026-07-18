@@ -265,15 +265,21 @@ export async function decideProposal(opts: {
       p.amount != null &&
       p.amount > 0;
     if (billable) {
-      const contract = await queryOne<{ code: string; partyName: string | null }>(
-        `SELECT c.code, COALESCE(s.name, c.party_name) AS "partyName"
+      const contract = await queryOne<{
+        code: string;
+        partyName: string | null;
+        projectId: number | null;
+      }>(
+        `SELECT c.code, COALESCE(s.name, c.party_name) AS "partyName", c.project_id AS "projectId"
            FROM contracts c LEFT JOIN suppliers s ON s.id = c.party_supplier_id
           WHERE c.id = ?`,
         p.contractId,
       );
+      // M51 PR1: project_id của bill lấy từ hợp đồng (p.contractId → contracts.project_id)
+      // để RLS lọc đúng dự án.
       billId = await insertId(
-        `INSERT INTO payment_bills (responsible, type, amount, description, paid_date, contract_id, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO payment_bills (responsible, type, amount, description, paid_date, contract_id, created_by, project_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         contract?.partyName ?? contract?.code ?? "—",
         p.kind === "advance" ? "advance" : "bill",
         p.amount,
@@ -281,6 +287,7 @@ export async function decideProposal(opts: {
         todayISO(),
         p.contractId,
         opts.decidedBy,
+        contract?.projectId ?? null,
       );
     }
     return { billId };
