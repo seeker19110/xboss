@@ -48,6 +48,10 @@ export async function runMigrations(pool: Pool): Promise<string[]> {
   const client = await pool.connect();
   const ran: string[] = [];
   try {
+    // Pool (lib/db/index.ts) đặt statement_timeout mặc định 30s cho mọi connection (M53 PR3) —
+    // không phù hợp cho migration backfill dữ liệu lớn nên tắt hẳn (0 = không giới hạn) cho
+    // riêng session client này trước khi chạy bất kỳ file .sql nào.
+    await client.query("SET statement_timeout = 0");
     // Chờ tới khi giành được khoá — process khác đang migrate thì xếp hàng, xong sẽ thấy đã áp.
     await client.query("SELECT pg_advisory_lock($1)", [MIGRATION_LOCK_KEY]);
 
