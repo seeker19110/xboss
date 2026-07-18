@@ -280,6 +280,9 @@
 | role | text |  | `'engineer'::text` |
 | created_at | timestamptz | ✓ | `now()` |
 | supplier_id | integer | ✓ |  |
+| totp_secret | text | ✓ |  |
+| totp_enabled_at | timestamptz | ✓ |  |
+| totp_last_step | bigint | ✓ |  |
 
 **Khóa ngoại:**
 - `supplier_id` → `suppliers(id)`
@@ -3249,6 +3252,23 @@
 - `ix_saved_reports_owner`: INDEX ix_saved_reports_owner ON public.saved_reports USING btree (owner_id)
 - `ix_saved_reports_project`: INDEX ix_saved_reports_project ON public.saved_reports USING btree (project_id)
 - `saved_reports_pkey`: UNIQUE INDEX saved_reports_pkey ON public.saved_reports USING btree (id)
+
+### totp_recovery_codes
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | bigint |  | `nextval('totp_recovery_codes_id_seq'::regclass)` |
+| user_id | integer |  |  |
+| code_hash | text |  |  |
+| used_at | timestamptz | ✓ |  |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `user_id` → `users(id)`
+
+**Index:**
+- `idx_totp_recovery_codes_user`: INDEX idx_totp_recovery_codes_user ON public.totp_recovery_codes USING btree (user_id)
+- `totp_recovery_codes_pkey`: UNIQUE INDEX totp_recovery_codes_pkey ON public.totp_recovery_codes USING btree (id)
 
 ### webhook_deliveries
 
