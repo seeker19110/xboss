@@ -898,16 +898,19 @@
 | responsible_supplier_id | integer | ✓ |  |
 | contract_id | integer | ✓ |  |
 | payment_cert_id | integer | ✓ |  |
+| project_id | integer | ✓ |  |
 
 **Khóa ngoại:**
 - `contract_id` → `contracts(id)`
 - `created_by` → `users(id)`
 - `payment_cert_id` → `payment_certs(id)`
+- `project_id` → `projects(id)`
 - `responsible_supplier_id` → `suppliers(id)`
 - `sheet_type_id` → `sheet_types(id)`
 
 **Index:**
 - `idx_payment_bills_contract`: INDEX idx_payment_bills_contract ON public.payment_bills USING btree (contract_id)
+- `idx_payment_bills_project`: INDEX idx_payment_bills_project ON public.payment_bills USING btree (project_id)
 - `idx_payment_bills_resp`: INDEX idx_payment_bills_resp ON public.payment_bills USING btree (responsible)
 - `idx_payment_bills_resp_supplier`: INDEX idx_payment_bills_resp_supplier ON public.payment_bills USING btree (responsible_supplier_id)
 - `payment_bills_pkey`: UNIQUE INDEX payment_bills_pkey ON public.payment_bills USING btree (id)
