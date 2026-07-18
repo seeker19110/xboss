@@ -36,6 +36,9 @@ Dựa trên các lớp lỗ hổng **đã từng phát hiện thật** trong d�
 - [ ] Upload file: kiểm mime thật khi khả thi (không chỉ tin `Content-Type` client); có giới hạn dung lượng hợp lý.
 - [ ] Endpoint cron chỉ nhận `CRON_SECRET` qua header `Authorization: Bearer`, không qua query param.
 - [ ] Rate-limit endpoint nhạy cảm (login...) atomic qua `ON CONFLICT` — không phải Map trong process (race đọc-rồi-ghi khi nhiều instance).
+- [ ] Mọi route `res.cookies.set(COOKIE, ...)` mới (đăng nhập/đổi mật khẩu/OIDC/2FA...) giữ đủ 3 cờ như các route hiện có (`httpOnly: true`, `sameSite: "lax"`, `secure: process.env.NODE_ENV === "production"`) — đã xác nhận đúng ở `login`, `login/2fa`, `password`, `oidc/callback`, `oidc/login` (2026-07-18); route mới thiếu 1 trong 3 cờ là lỗi thật, không phải style.
+- [ ] Không dùng `dangerouslySetInnerHTML` để render nội dung người dùng nhập (comment/note/mô tả...) — hiện repo không có chỗ nào dùng (grep xác nhận 2026-07-18); nếu tính năng mới cần render rich text, phải qua sanitizer (DOMPurify hoặc tương đương), không render thẳng.
+- [ ] Thu hồi phiên khi nghi tài khoản bị lộ: chưa có bảng session nên không "logout mọi thiết bị" trực tiếp — quy trình đúng là Admin `PATCH /api/users/:id` với `password` mới ngẫu nhiên (đổi `password_hash` → `pwFrag` cũ không còn khớp → mọi cookie phiên hiện tại của user đó tự vô hiệu ở lần request kế tiếp, xem `getCurrentUser`/`lib/auth.ts:103`). Ghi nhận đây là **quy trình vận hành**, không phải nút bấm riêng — audit chỉ cần xác nhận PATCH password vẫn đổi `password_hash` đúng (không giữ nguyên do bug) mỗi khi sửa route này.
 
 ## 4. Checklist Logic nghiệp vụ & Toàn vẹn dữ liệu
 
@@ -59,7 +62,7 @@ Kế thừa quy trình ground-truth đã chứng minh hiệu quả (xem **Phụ 
 
 - [ ] Mỗi màn hình dữ liệu xử lý đủ 4 trạng thái: đang tải (skeleton, không màn trắng/nhảy layout), rỗng (thông điệp + hành động gợi ý), lỗi (thân thiện, không phơi stack trace, có thử lại), có dữ liệu.
 - [ ] Mọi `fetch` ghi dữ liệu quan trọng có `try/catch` — mất mạng công trường (bối cảnh thật của app) không được để nút kẹt "Đang lưu..." vĩnh viễn mà không báo lỗi (lớp lỗi thật đã lặp lại ở nhiều form: đổi mật khẩu, PO/PR, quản lý user...).
-- [ ] Form: nút submit **disable + hiện loading** khi đang gửi (chặn double-submit); thất bại thì **giữ nguyên dữ liệu người dùng đã nhập**; validate inline ngay cạnh ô lỗi, thông báo nói *cách sửa* chứ không chỉ "sai".
+- [ ] Form: nút submit **disable + hiện loading** khi đang gửi (chặn double-submit); thất bại thì **giữ nguyên dữ liệu người dùng đã nhập**; validate inline ngay cạnh ô lỗi, thông báo nói _cách sửa_ chứ không chỉ "sai".
 - [ ] Nút icon-only có `aria-label` tiếng Việt mô tả đúng hành động — đặc biệt nút xoá/đóng dữ liệu quan trọng.
 - [ ] Tương phản màu đạt AA ở **cả 5 theme** (`dark/light/kingblue/darkblue/navy`) — tra bảng quy tắc đã tính sẵn ở **Phụ lục A §13.2–13.3** trước khi thêm màu mới, không đoán bằng mắt.
 - [ ] Trang/luồng mới bắt buộc có 1 spec axe (`e2e/authed/*.spec.ts`) chạy desktop + mobile, assert không vi phạm `serious`/`critical` — coi đây là **cổng merge**, không phải việc "nên làm thêm".
@@ -77,7 +80,7 @@ Kế thừa quy trình ground-truth đã chứng minh hiệu quả (xem **Phụ 
 - [ ] Mọi workflow khai báo `permissions:` tường minh (least-privilege), không dựa vào mặc định rộng của GitHub Actions.
 - [ ] `deploy.yml` chỉ deploy khi job CI trước đó thật sự `success` (kể cả E2E) — không để CI đỏ vẫn lọt qua vì thiếu `needs`/điều kiện đúng.
 - [ ] Query mới trên bảng lớn (`tasks`, `progress_dimensions`, `task_history`, `notifications`) có index cho cột lọc/sắp xếp/join hay chưa — đặc biệt route dashboard/notification chạy mỗi lần fetch (on-fetch sync), không phải cron.
-- [ ] **Độ phủ test (định lượng)**: đo bằng coverage built-in của `node:test` (Node 22): `node --experimental-test-coverage scripts/run-tests.mjs` (hoặc `tsx --test --experimental-test-coverage tests/<file>` cho 1 file). Chỉ soi **logic thuần** (`lib/**`, `app/api/**`), không đo component UI. Cơ chế **ratchet — không tệ hơn lần đo trước**: ghi mốc `stmts/branches/funcs/lines` mới nhất vào `PROGRESS.md`; thêm test mới thì nâng dần, không để trôi xuống. *(Chưa có script `test:coverage`/ngưỡng CI cứng — nếu muốn chốt thành cổng CI thì mở thay đổi riêng, không tự thêm trong lượt audit.)*
+- [ ] **Độ phủ test (định lượng)**: đo bằng coverage built-in của `node:test` (Node 22): `node --experimental-test-coverage scripts/run-tests.mjs` (hoặc `tsx --test --experimental-test-coverage tests/<file>` cho 1 file). Chỉ soi **logic thuần** (`lib/**`, `app/api/**`), không đo component UI. Cơ chế **ratchet — không tệ hơn lần đo trước**: ghi mốc `stmts/branches/funcs/lines` mới nhất vào `PROGRESS.md`; thêm test mới thì nâng dần, không để trôi xuống. _(Chưa có script `test:coverage`/ngưỡng CI cứng — nếu muốn chốt thành cổng CI thì mở thay đổi riêng, không tự thêm trong lượt audit.)_
 - [ ] **Rà vùng thiếu test (định tính)**: với mỗi hàm logic phức tạp trong vùng rủi ro cao (mục 8) còn nhánh chưa phủ, đối chiếu checklist ca biên §4 (rỗng/`null` vs 0/off-by-one/race-idempotency/ngày UTC↔`Asia/Ho_Chi_Minh`/nhánh lỗi mạng-DB). Vùng thiếu → ghi danh sách **đề xuất bổ sung test** vào báo cáo, không tự viết test trong lượt audit (trừ khi người dùng yêu cầu).
 
 ## 7. Checklist Vận hành, Đồng bộ real-time, Offline (PWA) & Xuất bản
@@ -87,7 +90,7 @@ Kế thừa quy trình ground-truth đã chứng minh hiệu quả (xem **Phụ 
 - [ ] **App Shell / service worker** (`public/sw.js`): đổi logic cache phải tăng version `CACHE`, nếu không thiết bị cũ kẹt cache cũ vĩnh viễn; route `/api/events`, `/api/photos/*` loại trừ khỏi cache network-first như đã quy ước.
 - [ ] **Xuất PDF/Excel** (`@react-pdf/renderer`, `exceljs`): font hỗ trợ đủ dấu tiếng Việt (đã từng vỡ dấu do dùng Helvetica mặc định — dùng `lib/pdf-fonts.ts` cho mọi route PDF mới); cột SQL tham chiếu đúng tên thật (đã từng có route 500 vì tham chiếu cột không tồn tại như `work_package_id`/`deadline` — chạy thử route thật, không chỉ đọc query bằng mắt).
 - [ ] **Dedup thông báo** (loại mới trong `/api/notifications`): dùng đúng cơ chế partial unique index + on-fetch sync + tự dọn khi hết điều kiện — kiểm cả trường hợp tắt dashboard qua `nav_settings` vẫn còn sinh notification cho mục người dùng không thấy trên sidebar nữa (nợ đã ghi nhận với M25-M31).
-- [ ] **Backup & rollback**: trước migration đụng dữ liệu thật trên production, xác nhận đã có backup gần nhất + biết cách phục hồi; `deploy.sh` build vào thư mục tạm rồi swap atomic, không đè trực tiếp `.next` đang chạy.
+- [ ] **Backup & rollback**: trước migration đụng dữ liệu thật trên production, xác nhận đã có backup gần nhất + `logs/restore-check.log` (cron Chủ nhật, `scripts/ops/restore-check.sh`) lần gần nhất **thật sự xanh** — không chỉ tin "có chạy `pg_dump`" (nguyên tắc `docs/ops/backup.md`: "backup chưa restore được = chưa có backup"); `deploy.sh` build vào thư mục tạm rồi swap atomic, không đè trực tiếp `.next` đang chạy.
 - [ ] **Quan sát lỗi production**: nơi nào nuốt lỗi im lặng (catch rỗng, chỉ trả `null`) — tối thiểu `console.error` khi chưa có Sentry (`SENTRY_DSN` chờ người vận hành cấp) để còn dấu vết trong log.
 
 ## 8. Vùng rủi ro cao (audit hẹp bắt buộc khi PR chạm vào)

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, canTouchTask } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { assertModuleEnabled } from "@/lib/feature-flags";
 
@@ -21,6 +21,8 @@ export async function GET(
   const projectId = await getCurrentProjectId(user);
   const blocked = await assertModuleEnabled("tracking", projectId);
   if (blocked) return blocked;
+  if (!(await canTouchTask(user, id)))
+    return NextResponse.json({ error: "Không có quyền xem dimension task này" }, { status: 403 });
 
   const dimensions = await query(
     `SELECT id, dimension_label AS label, installed, value

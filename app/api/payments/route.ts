@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/auth";
-import { query, run } from "@/lib/db";
+import { query, queryOne, run } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -40,10 +40,30 @@ export async function GET(_req: NextRequest) {
      GROUP BY st.id, st.code, st.slug, st.responsible, wp.floor_label, fc.contract_value
      ORDER BY st.id, wp.floor_label`);
 
-  const totalContract = rows.reduce((s, r) => s + r.contractValue, 0);
-  const totalEarned = rows.reduce((s, r) => s + r.contractValue * r.progress, 0);
+  // Tổng hợp làm trong SQL (không cộng/nhân tiền trên số JS parse từ NUMERIC —
+  // xem CLAUDE.md mục Quy ước / lib/money.ts) — cùng điều kiện lọc/nhóm với câu trên.
+  const totals = await queryOne<{ totalContract: number; totalEarned: number }>(`
+    WITH floor_data AS (
+      SELECT st.id, wp.floor_label,
+             COALESCE(AVG(t.progress_percent), 0) AS progress,
+             COALESCE(fc.contract_value, 0) AS contract_value
+        FROM work_packages wp
+        JOIN sheet_types st ON wp.sheet_type_id = st.id
+        LEFT JOIN tasks t ON t.package_id = wp.id
+        LEFT JOIN floor_contracts fc
+               ON fc.sheet_type_id = st.id AND fc.floor_label = wp.floor_label
+       WHERE wp.floor_label IS NOT NULL AND wp.floor_label != ''
+       GROUP BY st.id, wp.floor_label, fc.contract_value
+    )
+    SELECT COALESCE(SUM(contract_value), 0) AS "totalContract",
+           COALESCE(SUM(contract_value * progress), 0) AS "totalEarned"
+      FROM floor_data`);
 
-  return NextResponse.json({ rows, totalContract, totalEarned });
+  return NextResponse.json({
+    rows,
+    totalContract: totals?.totalContract ?? 0,
+    totalEarned: totals?.totalEarned ?? 0,
+  });
 }
 
 // PATCH /api/payments — cập nhật giá trị HĐ theo tầng × hệ (upsert).

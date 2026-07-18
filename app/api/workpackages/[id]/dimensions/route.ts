@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, canTouchPackage } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +34,8 @@ export async function GET(
 
   const pkgId = parseInt(params.id);
   if (isNaN(pkgId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
+  if (!(await canTouchPackage(user, pkgId)))
+    return NextResponse.json({ error: "Không có quyền xem nhóm công việc này" }, { status: 403 });
 
   const tasks = await query<TaskRow>(
     `SELECT t.id, t.code, t.name, t.status, t.progress_percent AS "progressPercent",
