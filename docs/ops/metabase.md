@@ -2,7 +2,7 @@
 
 > Cụ thể hóa **PR2** của [`docs/nang-cap/M55-bi-metabase.md`](../nang-cap/M55-bi-metabase.md).
 > Vận hành thuần túy, KHÔNG code app — mọi luật che dữ liệu (masking tiền M50 PR2, scope dự án
-> M22) đã nằm sẵn trong 18 view schema `bi` (migration `migrations/0071_bi_schema.sql`, PR1).
+> M22) đã nằm sẵn trong 18 view schema `bi` (migration `migrations/0073_bi_schema.sql`, PR1).
 > Metabase **không bao giờ** kết nối vào schema `public` của Postgres XBoss — chỉ vào `bi`, qua
 > role Postgres chỉ-đọc `xboss_bi`.
 >
@@ -44,14 +44,14 @@ Nếu VPS hiện tại không đủ (ví dụ VPS 2-4GB đang chạy sát app + 
   (chấp nhận đánh đổi hiệu năng câu hỏi phức tạp/nhiều người dùng đồng thời) — chỉ dùng tạm, không
   khuyến nghị cho production dài hạn.
 
-## 1. Tạo role Postgres `xboss_bi` (chạy TAY, **BƯỚC BẮT BUỘC LÀM TRƯỚC** migration `0071`)
+## 1. Tạo role Postgres `xboss_bi` (chạy TAY, **BƯỚC BẮT BUỘC LÀM TRƯỚC** migration `0073`)
 
-> ⚠️ **Điểm lưu ý quan trọng — thứ tự bắt buộc.** Migration `0071_bi_schema.sql` (đã áp ở PR1)
+> ⚠️ **Điểm lưu ý quan trọng — thứ tự bắt buộc.** Migration `0073_bi_schema.sql` (đã áp ở PR1)
 > tạo schema `bi` + 18 view rồi mới `GRANT` quyền `SELECT` cho role `xboss_bi`. Câu `GRANT` được
 > bọc trong khối `DO ... EXCEPTION WHEN undefined_object` để migration không vỡ khi role chưa tồn
 > tại (đúng cho CI/dev sạch) — nghĩa là **nếu role `xboss_bi` chưa được tạo trước khi migration
-> `0071` chạy lần đầu, các câu GRANT bị bỏ qua âm thầm** (chỉ in `RAISE NOTICE`, không lỗi).
-> Vì `schema_migrations` đã ghi nhận `0071` đã áp, chạy lại `npm run db:migrate` **không** tự áp
+> `0073` chạy lần đầu, các câu GRANT bị bỏ qua âm thầm** (chỉ in `RAISE NOTICE`, không lỗi).
+> Vì `schema_migrations` đã ghi nhận `0073` đã áp, chạy lại `npm run db:migrate` **không** tự áp
 > lại GRANT. Nếu rơi vào tình huống này (đã lỡ migrate trước khi tạo role), phải `GRANT` thủ
 > công — xem lệnh ở cuối mục này.
 
@@ -64,9 +64,9 @@ qua `psql "$DATABASE_URL"` hoặc `docker compose exec db psql -U xboss xboss`:
 CREATE ROLE xboss_bi LOGIN PASSWORD '<mật-khẩu-ngẫu-nhiên-dài>' NOBYPASSRLS;
 ```
 
-**Chạy lệnh này TRƯỚC bước 2 (chạy migration `0071` lần đầu)** nếu đang setup mới hoàn toàn.
+**Chạy lệnh này TRƯỚC bước 2 (chạy migration `0073` lần đầu)** nếu đang setup mới hoàn toàn.
 
-### Nếu migration `0071` đã lỡ chạy trước khi tạo role (GRANT bị bỏ qua)
+### Nếu migration `0073` đã lỡ chạy trước khi tạo role (GRANT bị bỏ qua)
 
 Sau khi `CREATE ROLE` như trên, chạy tay 3 câu `GRANT` sau (giống hệt nội dung trong migration):
 
@@ -89,11 +89,12 @@ SELECT * FROM public.tasks LIMIT 1;
 RESET ROLE;
 ```
 
-## 2. Chạy migration `0071` (nếu chưa áp)
+## 2. Chạy migration `0073` (nếu chưa áp)
 
 Đã áp production/staging ở PR1 (`npm run db:migrate` tự chạy khi app khởi động, hoặc chủ động
 `npm run db:migrate`). Nếu đang dựng staging mới từ đầu, đảm bảo đã tạo role `xboss_bi` (bước 1)
-**trước** khi chạy lệnh này lần đầu.
+**trước** khi chạy lệnh này lần đầu. Migration sẽ được ghi nhận trong bảng `schema_migrations` để
+đảm bảo không chạy lại trong lần sau.
 
 ## 3. Dựng Metabase qua Docker Compose (DB nội bộ RIÊNG, không dùng chung DB `xboss`)
 
@@ -283,7 +284,7 @@ nâng tag khi quyết định update.
 ## Tiêu chí xác nhận đã dựng đúng (checklist)
 
 - [ ] `free -h` xác nhận đủ RAM trước khi cài (mục 0).
-- [ ] Role `xboss_bi` được tạo **trước** khi migration `0071` chạy lần đầu trên môi trường đang
+- [ ] Role `xboss_bi` được tạo **trước** khi migration `0073` chạy lần đầu trên môi trường đang
       dựng (mục 1) — hoặc đã GRANT tay nếu lỡ thứ tự.
 - [ ] `metabase-db` là Postgres riêng, không trùng database `xboss`/`xboss_staging` (mục 3).
 - [ ] Metabase kết nối XBoss bằng `xboss_bi`, thấy đúng 18 view `bi.*`, không thấy bảng nào của

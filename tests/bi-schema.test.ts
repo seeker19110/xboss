@@ -49,7 +49,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { query } = await import("@/lib/db");
-    // Query bất kỳ để ensureSchema() áp migration 0071 lên DB test trước khi kiểm.
+    // Query bất kỳ để ensureSchema() áp migration 0073 lên DB test trước khi kiểm.
     await query("SELECT 1");
 
     const roleRows = await query<{ exists: boolean }>(
@@ -99,12 +99,12 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { query } = await import("@/lib/db");
-    await query("SELECT 1"); // ensureSchema() áp migration 0071.
+    await query("SELECT 1"); // ensureSchema() áp migration 0073.
 
     const cols = await query<{ table_name: string; column_name: string }>(
       `SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'bi'`,
     );
-    assert.ok(cols.length > 0, "schema bi phải có cột (migration 0071 đã áp?)");
+    assert.ok(cols.length > 0, "schema bi phải có cột (migration 0073 đã áp?)");
 
     const piiLeaks: string[] = [];
     const moneyLeaks: string[] = [];
@@ -134,7 +134,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { query, queryOne } = await import("@/lib/db");
-    await query("SELECT 1"); // ensureSchema() áp migration 0071.
+    await query("SELECT 1"); // ensureSchema() áp migration 0073.
 
     for (const view of SOFT_DELETE_VIEWS) {
       const row = await queryOne<{ def: string }>(

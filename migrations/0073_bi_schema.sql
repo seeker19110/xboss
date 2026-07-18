@@ -1,4 +1,4 @@
--- 0071_bi_schema.sql — M55 PR1: schema `bi` (view whitelist chỉ-đọc) + role `xboss_bi`.
+-- 0073_bi_schema.sql — M55 PR1: schema `bi` (view whitelist chỉ-đọc) + role `xboss_bi`.
 -- Xem docs/nang-cap/M55-bi-metabase.md § PR1.
 --
 -- MỤC ĐÍCH: Metabase self-host đọc dữ liệu BI mà KHÔNG xuyên thủng lớp quyền tầng app
@@ -24,7 +24,7 @@
 --
 -- THỨ TỰ DEPLOY QUAN TRỌNG: tạo role xboss_bi TRƯỚC khi chạy migration lần đầu để GRANT áp
 -- ngay. Nếu migration đã chạy trước khi có role (GRANT bị bỏ qua), chạy lại migration KHÔNG
--- áp lại GRANT (schema_migrations đã ghi nhận 0071 → không tái chạy) — phải GRANT thủ công:
+-- áp lại GRANT (schema_migrations đã ghi nhận 0073 → không tái chạy) — phải GRANT thủ công:
 --   GRANT USAGE ON SCHEMA bi TO xboss_bi;
 --   GRANT SELECT ON ALL TABLES IN SCHEMA bi TO xboss_bi;
 --   ALTER DEFAULT PRIVILEGES IN SCHEMA bi GRANT SELECT ON TABLES TO xboss_bi;
@@ -377,5 +377,5 @@ BEGIN
   ALTER DEFAULT PRIVILEGES IN SCHEMA bi GRANT SELECT ON TABLES TO xboss_bi;
 EXCEPTION
   WHEN undefined_object THEN
-    RAISE NOTICE 'Role xboss_bi chưa tồn tại — bỏ qua GRANT. Tạo role rồi GRANT thủ công (xem header): migration đã ghi 0071 nên chạy lại KHÔNG áp lại GRANT.';
+    RAISE NOTICE 'Role xboss_bi chưa tồn tại — bỏ qua GRANT. Tạo role rồi GRANT thủ công (xem header): migration đã ghi 0073 nên chạy lại KHÔNG áp lại GRANT.';
 END $$;
