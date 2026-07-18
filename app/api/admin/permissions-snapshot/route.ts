@@ -75,10 +75,16 @@ export async function GET() {
   }
 
   // 2) Với mỗi dự án CÓ override riêng, chỉ thêm các dòng CHÊNH LỆCH (không lặp lại toàn
-  // ma trận cho từng dự án).
-  for (const [projectId, scoped] of scopedByProject) {
+  // ma trận cho từng dự án). Sắp theo project_id rồi theo permKey/vai trò — thứ tự Map
+  // không xác định (phụ thuộc thứ tự trả về của listPermissionOverrides), snapshot phục
+  // vụ kiểm toán nên cần thứ tự ổn định giữa các lần xuất.
+  const sortedProjectIds = [...scopedByProject.keys()].sort((a, b) => a - b);
+  for (const projectId of sortedProjectIds) {
+    const scoped = scopedByProject.get(projectId)!;
     const name = projectNames.get(projectId) ?? `#${projectId}`;
-    for (const [key, allowed] of scoped) {
+    const sortedKeys = [...scoped.keys()].sort();
+    for (const key of sortedKeys) {
+      const allowed = scoped.get(key)!;
       const [role, permKey] = key.split("|");
       ws.addRow([
         permKey,

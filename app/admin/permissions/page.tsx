@@ -11,7 +11,7 @@
 // định" hiển thị giá trị HIỆU LỰC KẾ THỪA (CAN_DEFAULT + override toàn hệ nếu có) kèm chú
 // thích nguồn — không phải CAN_DEFAULT thô như phạm vi toàn hệ thống. Phạm vi toàn hệ
 // thống giữ nguyên hành vi cũ (không đổi state/logic).
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ShieldCheck, Info, Lock, FileSpreadsheet, ShieldAlert, Globe2 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
@@ -53,13 +53,18 @@ export default function PermissionsPage() {
 
   const isAdmin = me?.role === "admin";
 
+  // M61: chống race khi đổi phạm vi nhanh liên tiếp — chỉ áp response của lần gọi MỚI
+  // NHẤT (so khớp qua requestId), bỏ qua response cũ đến trễ.
+  const latestRequestId = useRef(0);
+
   const load = useCallback((projectId: number | null) => {
+    const requestId = ++latestRequestId.current;
     setLoading(true);
     const qs = projectId != null ? `?projectId=${projectId}` : "";
     return fetch(`/api/admin/role-permissions${qs}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((j: MatrixData | null) => {
-        if (!j) return;
+        if (!j || requestId !== latestRequestId.current) return;
         setData(j);
         const g = new Map<string, boolean>();
         const s = new Map<string, boolean>();
@@ -71,8 +76,14 @@ export default function PermissionsPage() {
         setGlobalOverrides(g);
         setScopedOverrides(s);
       })
-      .catch(() => showToast("Không tải được ma trận phân quyền", "error"))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (requestId === latestRequestId.current) {
+          showToast("Không tải được ma trận phân quyền", "error");
+        }
+      })
+      .finally(() => {
+        if (requestId === latestRequestId.current) setLoading(false);
+      });
   }, []);
 
   useEffect(() => {
