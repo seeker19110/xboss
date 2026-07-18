@@ -4,7 +4,7 @@
 //     cho mọi webhook active khớp sự kiện + dự án. KHÔNG gọi HTTP (không chặn request nghiệp
 //     vụ), nuốt mọi lỗi để phát webhook hỏng không làm hỏng nghiệp vụ.
 //   - deliverDueWebhooks(): gọi TỪ cron — gửi thật các delivery đến hạn, retry theo backoff.
-// Xem migrations/0060_webhooks.sql + docs/nang-cap/M49-api-mo-sso.md (PR2).
+// Xem migrations/0064_webhooks.sql + docs/nang-cap/M49-api-mo-sso.md (PR2).
 import { createHmac } from "node:crypto";
 import { query, run, withTransaction } from "@/lib/db";
 import { log } from "@/lib/log";

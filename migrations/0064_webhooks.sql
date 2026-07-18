@@ -1,4 +1,8 @@
--- 0060_webhooks.sql — M49 PR2: Webhook ra ngoài.
+-- 0064_webhooks.sql — M49 PR2: Webhook ra ngoài.
+-- (Đổi tên từ 0060_webhooks.sql → 0064 để gỡ trùng số 0060 với 0060_code_lists.sql.
+--  Toàn bộ DDL dưới đây idempotent (IF NOT EXISTS / DROP TRIGGER IF EXISTS) nên DB đã áp
+--  bản 0060 cũ chạy lại file này an toàn — không tạo gì mới, chỉ thêm 1 dòng schema_migrations
+--  cho tên mới; dòng '0060_webhooks.sql' cũ còn lại vô hại. Xem PROGRESS.md mục Nợ kỹ thuật.)
 -- Cho phép hệ ngoài (Zapier/n8n/hệ nội bộ CĐT...) nhận sự kiện nghiệp vụ quan trọng của
 -- XBoss (nghiệm thu task, duyệt VO/IPC, vật tư vượt định mức, yêu cầu nghiệm thu) qua HTTP
 -- POST có ký HMAC-SHA256. Fire-and-forget: route nghiệp vụ chỉ INSERT webhook_deliveries,
