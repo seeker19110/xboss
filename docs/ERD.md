@@ -426,6 +426,7 @@
 | link_url | text | ✓ |  |
 | doc_category | text | ✓ |  |
 | sha256 | text | ✓ |  |
+| extracted_text | text | ✓ |  |
 
 **Khóa ngoại:**
 - `floor_approval_id` → `floor_approvals(id)`
@@ -764,6 +765,7 @@
 | uploaded_by | integer | ✓ |  |
 | created_at | timestamptz | ✓ | `now()` |
 | sha256 | text | ✓ |  |
+| extracted_text | text | ✓ |  |
 
 **Khóa ngoại:**
 - `contract_id` → `contracts(id)`
@@ -2682,6 +2684,7 @@
 | uploaded_by | integer | ✓ |  |
 | created_at | timestamptz | ✓ | `now()` |
 | project_id | integer | ✓ |  |
+| extracted_text | text | ✓ |  |
 
 **Khóa ngoại:**
 - `project_id` → `projects(id)`
@@ -2689,6 +2692,7 @@
 
 **Index:**
 - `idx_project_documents_fts`: INDEX idx_project_documents_fts ON public.project_documents USING gin (to_tsvector('simple'::regconfig, xboss_unaccent(COALESCE(title, ''::text))))
+- `idx_project_documents_fts_text`: INDEX idx_project_documents_fts_text ON public.project_documents USING gin (to_tsvector('simple'::regconfig, xboss_unaccent(((COALESCE(title, ''::text) || ' '::text) || COALESCE(extracted_text, ''::text)))))
 - `idx_project_documents_project`: INDEX idx_project_documents_project ON public.project_documents USING btree (project_id)
 - `project_documents_pkey`: UNIQUE INDEX project_documents_pkey ON public.project_documents USING btree (id)
 

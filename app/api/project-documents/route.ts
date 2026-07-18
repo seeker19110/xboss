@@ -13,6 +13,7 @@ import {
   MAX_DOC_BYTES,
   isContentTooLarge,
 } from "@/lib/photos";
+import { extractPdfText } from "@/lib/pdf-extract";
 
 export const dynamic = "force-dynamic";
 
@@ -97,10 +98,13 @@ export async function POST(req: NextRequest) {
   const fileName = newProjectDocFileName(file.type);
   const dir = ensureUploadDir();
   await writeFile(join(dir, fileName), fileBuf);
+  // Trích text-layer PDF để lập chỉ mục tìm kiếm (M57 PR2) — êm nếu không extract
+  // được (scan ảnh, hỏng, quá giới hạn trang/thời gian), không chặn upload.
+  const extractedText = ext === ".pdf" ? await extractPdfText(fileBuf) : null;
 
   const id = await insertId(
-    `INSERT INTO project_documents (title, category, file_name, original_name, mime_type, size_bytes, uploaded_by, project_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO project_documents (title, category, file_name, original_name, mime_type, size_bytes, uploaded_by, project_id, extracted_text)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     title,
     category,
     fileName,
@@ -109,6 +113,7 @@ export async function POST(req: NextRequest) {
     file.size,
     user.id,
     projectId,
+    extractedText,
   );
 
   return NextResponse.json({ id, title, category, sizeBytes: file.size }, { status: 201 });
