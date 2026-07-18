@@ -148,6 +148,15 @@ file này (tra lại nguyên văn ở commit `d6d6dd9`); không tự nhặt lạ
 
 ### Thứ tự & phụ thuộc
 
+**Bước 0 — kiểm tra hạng mục đã có trên code chưa (LUẬT, yêu cầu người dùng 2026-07-18,
+làm TRƯỚC khi tạo nhánh/dispatch bất kỳ việc nào):** coordinator chạy
+`grep -n "project_id" migrations/0058_role_permissions.sql lib/permissions.ts` và
+`ls migrations/ | grep -i "role_permissions_project\|perm.*project"` — nếu đã có dấu vết
+(cột `project_id` trong bảng `role_permissions`, snapshot key 3 phần, migration tương
+ứng) nghĩa là M61 đã được làm ở phiên khác: DỪNG toàn bộ đợt, báo phiên chính để đối
+chiếu/cập nhật tài liệu thay vì code lại. (Trạng thái xác minh lúc lập kế hoạch
+2026-07-18: CHƯA có — bảng vẫn `UNIQUE(role, perm_key)` không cột dự án.)
+
 Tuần tự, KHÔNG song song: PR1 → `reviewer` soát diff (bắt buộc rà mục "Vùng rủi ro cao"
 trong `docs/audit.md` vì chạm `lib/auth.ts`) → tích hợp → PR2 (base = kết quả PR1) →
 `reviewer` → tích hợp → báo cáo phiên chính duyệt cuối. Trước khi tạo nhánh:

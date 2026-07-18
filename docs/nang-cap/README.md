@@ -44,7 +44,20 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 
 ## Đặc tả chờ triển khai — đợt Scale/SaaS/BI + bổ sung (M53–M59 viết 07/2026, M61 viết 2026-07-18)
 
-Từ phân tích so XBoss với ERP chuyên nghiệp (`PROGRESS.md`). **Thứ tự thi hành đã chốt:** M53 → M56 PR2 → M51 (GĐ0 của M54) → M55 → M57 → M58 → M54 GĐ1 → M59. M61 độc lập (không phụ thuộc chuỗi trên), chèn khi tiện — lưu ý migration có DROP CONSTRAINT phải qua staging.
+Từ phân tích so XBoss với ERP chuyên nghiệp (`PROGRESS.md`). **Thứ tự thi hành đã chốt (cập nhật 2026-07-18, chèn M61):**
+
+1. **M53 (4 PR) song song M57 PR1** — kế hoạch đã lập sẵn (PLAN.md commit `d6d6dd9`, PR #236), 2 module không đụng chung file; chạy TRƯỚC để chiếm số migration sớm nhất.
+2. **M56 PR2** — bắt buộc 2FA theo vai trò (nhỏ, nền PR1 đã chạy).
+3. **M61** — override quyền theo dự án (kế hoạch trong PLAN.md hiện tại + PR #246); làm trước M51 để `getCurrentUser` giải projectId sẵn — M51 RLS cũng đọc projectId từ request-context, hưởng chung nền.
+4. **M51 (GĐ0 của M54)** — RLS theo dự án + `organizations`.
+5. **M55** — BI/Metabase (cần dữ liệu ổn định sau RLS để view whitelist đúng).
+6. **M58** — QR + offline hiện trường (độc lập, không migration lớn).
+7. **M54 GĐ1** — multi-tenant SaaS (phụ thuộc cứng M51).
+8. **M59** — histogram tài nguyên (không migration, chỉ tổng hợp — làm cuối, mọi bảng nguồn đã chốt).
+
+M57 PR2 (extract text PDF) tuỳ chọn — quyết định sau khi PR1 dùng thật, KHÔNG nằm trong hàng đợi.
+
+**LUẬT trước khi thi hành bất kỳ hạng mục nào:** kiểm tra trên code thật xem hạng mục đã được làm chưa (grep điểm chạm chính trong đặc tả: migration/bảng, hàm `lib/*`, route API, trang UI) — trạng thái trong bảng trên có thể lỗi thời so với code (đã xảy ra 2026-07-17: 3 mục "dở dang" thực ra đã merge). Đã có rồi → cập nhật bảng này + `PROGRESS.md`, không code lại.
 
 | File                         | Hạng mục                                                                 | Trạng thái | Ghi chú                                       |
 | ---------------------------- | ------------------------------------------------------------------------ | ---------- | --------------------------------------------- |
@@ -56,7 +69,7 @@ Từ phân tích so XBoss với ERP chuyên nghiệp (`PROGRESS.md`). **Thứ t�
 | `M58-qr-offline-hien-truong.md` | QR tem in `/r/<kind>/<id>` + offline queue IndexedDB ảnh/nhật ký       | ❌ chưa     | —                                             |
 | `M54-multi-tenant-saas.md`   | Trục `org_id` + RLS org + object storage uploads (GĐ1)                    | ❌ chưa     | Phụ thuộc cứng M51                             |
 | `M59-tai-nguyen.md`          | Histogram nhân lực/thiết bị kế hoạch-vs-thực-tế, cảnh báo gán chồng      | ❌ chưa     | Không migration, chỉ tổng hợp                  |
-| `M61-phan-quyen-theo-du-an.md` | Override quyền theo dự án (`role_permissions.project_id`, đóng nợ M52 PR4 module `permissions`) | ❌ chưa | Chạm `lib/auth.ts` (vùng rủi ro cao); migration DROP CONSTRAINT → qua staging |
+| `M61-phan-quyen-theo-du-an.md` | Override quyền theo dự án (`role_permissions.project_id`, đóng nợ M52 PR4 module `permissions`) | ❌ chưa | Vị trí 3 trong hàng đợi; chạm `lib/auth.ts` (vùng rủi ro cao); migration DROP CONSTRAINT → qua staging |
 
 ## Hoãn có chủ đích (không tự nhặt lại — xem `PROGRESS.md`)
 
