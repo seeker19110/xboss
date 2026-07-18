@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { LogIn } from "lucide-react";
+import { LogIn, KeyRound } from "lucide-react";
 import ThemeToggle from "@/app/components/ThemeToggle";
 import { clearOfflineQueue } from "@/app/components/offlineQueue";
 
@@ -11,6 +11,14 @@ const DEMO = [
   { role: "Sub-con", email: "subcon@xboss.vn", pw: "sub123" },
 ];
 
+// Thông điệp tiếng Việt cho các mã lỗi ?error=oidc_* mà callback trả về.
+const OIDC_ERRORS: Record<string, string> = {
+  oidc_expired: "Phiên đăng nhập SSO đã hết hạn — vui lòng thử lại.",
+  oidc_rate: "Thử SSO quá nhiều lần — vui lòng chờ ít phút rồi thử lại.",
+  oidc_failed: "Đăng nhập SSO thất bại — vui lòng thử lại hoặc dùng mật khẩu.",
+  oidc_noemail: "Tài khoản SSO không trả về email — không thể đăng nhập.",
+};
+
 export default function LoginPage() {
   const [email, setEmail] = useState("admin@xboss.vn");
   const [password, setPassword] = useState("admin123");
@@ -20,11 +28,18 @@ export default function LoginPage() {
   // Bước 2 (M56 PR1): server trả { need2fa: true, pending } thay vì set cookie ngay.
   const [pending, setPending] = useState<string | null>(null);
   const [totpCode, setTotpCode] = useState("");
+  const [ssoEnabled, setSsoEnabled] = useState(false);
 
   useEffect(() => {
     fetch("/api/project")
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => setProjectName(j?.name ?? null));
+    fetch("/api/auth/oidc/status")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setSsoEnabled(!!j?.enabled));
+    // Hiển thị lỗi SSO trả về qua ?error=oidc_* (callback không lộ chi tiết, chỉ mã cố định).
+    const code = new URLSearchParams(window.location.search).get("error");
+    if (code && OIDC_ERRORS[code]) setError(OIDC_ERRORS[code]);
   }, []);
 
   async function submit(e: React.FormEvent) {
@@ -166,6 +181,21 @@ export default function LoginPage() {
             <LogIn className="w-4 h-4" /> {busy ? "Đang đăng nhập..." : "Đăng nhập"}
           </button>
         </form>
+        )}
+        {!pending && ssoEnabled && (
+          <div className="mt-4">
+            <div className="flex items-center gap-3 text-xs text-zinc-500">
+              <span className="h-px flex-1 bg-zinc-800" />
+              hoặc
+              <span className="h-px flex-1 bg-zinc-800" />
+            </div>
+            <a
+              href="/api/auth/oidc/login"
+              className="mt-4 w-full flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 py-2.5 rounded-lg font-medium transition text-sky-300"
+            >
+              <KeyRound className="w-4 h-4" /> Đăng nhập bằng SSO công ty
+            </a>
+          </div>
         )}
         {!pending && process.env.NODE_ENV === "development" && (
           <div className="mt-4 text-xs text-zinc-500">
