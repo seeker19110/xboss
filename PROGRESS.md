@@ -10,10 +10,11 @@
 
 ## Việc tạm hoãn — chờ bên ngoài (không phải "tiếp theo", đừng tự nhặt lại)
 
-Ghi nhận 2026-07-16: 2 mục dưới đây đã có kết luận rõ, **không cần AI chủ động làm** cho tới khi có tín hiệu bên ngoài nêu rõ — không phải việc "quên làm":
+Các mục dưới đây đã có kết luận rõ, **không cần AI chủ động làm** cho tới khi có tín hiệu bên ngoài nêu rõ — không phải việc "quên làm":
 
-- **Ký số thật (PAdES, USB token/HSM)** cho biên bản/hợp đồng — chờ nhu cầu pháp lý thật phát sinh (xem mục Nợ kỹ thuật bên dưới).
-- **Sentry production** — scaffold code đã xong, chờ người vận hành tự đặt `SENTRY_DSN`/`NEXT_PUBLIC_SENTRY_DSN` trên VPS thật + deploy (việc ops ngoài code, không phải việc AI làm trong repo).
+- **Ký số thật (PAdES, USB token/HSM)** cho biên bản/hợp đồng — chờ nhu cầu pháp lý thật phát sinh (xem mục Nợ kỹ thuật bên dưới). (Ghi nhận 2026-07-16)
+- **Sentry production** — scaffold code đã xong, chờ người vận hành tự đặt `SENTRY_DSN`/`NEXT_PUBLIC_SENTRY_DSN` trên VPS thật + deploy (việc ops ngoài code, không phải việc AI làm trong repo). (Ghi nhận 2026-07-16)
+- **M60 — 3 major deps bị giữ lại có chủ đích** (`typescript` 6→7, `eslint` 9→10, Node 24→26 + `@types/node`): caret range trong `package.json` đã tự chặn, KHÔNG nâng khi chưa đạt điều kiện kích hoạt từng PR trong `docs/nang-cap/M60-nang-major-deps.md` (tóm tắt: ESLint 10 chờ `eslint-config-next` peer `^10` — vercel/next.js PR #91710 còn mở; TS 7 chờ TS 7.1 có JS API + Next hỗ trợ ổn định; Node 26 chờ vào LTS 2026-10 + ops VPS). Kiểm định kỳ theo mục "Kiểm tra định kỳ" trong đặc tả. (Ghi nhận 2026-07-18, sau đợt cập nhật bản vá PR #239)
 
 ## Đã xong
 
