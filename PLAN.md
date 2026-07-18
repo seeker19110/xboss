@@ -10,356 +10,312 @@
 
 ---
 
-## Kế hoạch: Đợt "lên tầm ERP" phần còn lại — M51 PR3, M52 (5 PR), M49 PR1+PR2 (8 PR)
+## Kế hoạch: M53 (Scale headroom, 4 PR) song song M57 PR1 (Tìm kiếm toàn văn)
 
 ### Bối cảnh & mục tiêu
 
-Rà toàn bộ `docs/*.md` (xem `docs/danh-gia-nang-cap-con-lai-2026-07-17.md` — đánh giá
-tổng hợp vừa viết cùng đợt này) xác nhận: **không còn ý tưởng nâng cấp nào thiếu đặc
-tả** — mọi đề xuất trong `docs/nghien-cuu-nang-cap-erp-2026-07.md` đã có file `M<xx>-*.md`
-riêng. Phần **chưa triển khai** còn lại:
+Người dùng chọn 2 việc chạy song song trong số các module đã có đặc tả kín nhưng chưa
+thi hành (`PROGRESS.md` dòng 22, thứ tự đã chốt: M53 → M52 PR4 [đã xong, PR #234] → M56
+→ M51 GĐ0 → M55 → M57 → M58 → M54 GĐ1 → M59):
 
-- **M51 (Đa dự án cấp 2 — RLS)**: PR1/PR2 đụng cấu hình Postgres production (role mới
-  `xboss_app`, tách `MIGRATE_DATABASE_URL`, cần ADR-0005) — đợt kế hoạch M50 trước đã
-  ghi rõ luật "không code khi chưa xác nhận sẵn sàng đổi cấu hình prod". Hỏi lại người
-  dùng đợt này, câu trả lời ("nào tốt thì triển khai") **không phải xác nhận rõ ràng**
-  sẵn sàng đổi role Postgres production → **KHÔNG đưa PR1/PR2 vào đợt này**, chỉ đưa
-  **PR3 (template dự án)** — không đụng RLS/production, đặc tả kín. PR4 (organizations)
-  đặc tả ghi rõ "ngoài phạm vi — YAGNI", không đưa vào.
-- **M52 (Mở rộng cấu hình)**: cả 5 PR thuần code, không đụng production, đặc tả kín —
-  đưa đủ cả 5 PR vào đợt này.
-- **M49 PR1 (API keys + `/api/v1`) + PR2 (Webhook ra ngoài)**: phát hiện thêm khi rà —
-  đặc tả đã kín từ trước nhưng chưa từng được đưa vào kế hoạch triển khai nào (chỉ PR3
-  SSO đã làm, PR #218 draft). Thuần code, không đụng auth/production — đưa vào đợt này.
-  (M49 PR3 đã xong, PR #218 đang chờ người dùng tự verify với IdP thật — không đụng gì
-  thêm ở đây.)
+- **M53 — Scale headroom** (`docs/nang-cap/M53-scale-headroom.md`, P1): đo tải hệ thống
+  hiện tại, thay watermark SSE O(1) cho aggregate JOIN mỗi 3s/client, siết pool/timeout
+  qua env, audit cluster-ready. Đúng thứ tự kế tiếp theo kế hoạch đã chốt.
+- **M57 PR1 — Tìm kiếm toàn văn** (`docs/nang-cap/M57-tim-kiem-toan-van.md`, P2): hạ
+  tầng FTS có index (GIN + `unaccent`) phủ toàn kho hồ sơ, nâng `/api/search` hiện có.
+  **Chỉ làm PR1** — PR2 (extract text PDF) là tuỳ chọn, quyết định sau khi PR1 dùng
+  thật, KHÔNG đưa vào đợt này.
 
-**8 việc, chạy song song tối đa qua worktree riêng**, trừ **M52 PR4 phải chạy sau PR3**
-(đọc registry PR3 tạo ra) — xem mục Thứ tự & phụ thuộc.
+2 module **không đụng chung file** (M53 chạm `lib/db/index.ts`/`lib/version.ts`/
+`app/api/health/*`/`app/api/events/*`; M57 chạm `lib/search.ts`/`app/api/search/*`/
+`app/components/GlobalSearch.tsx`) — chạy song song an toàn qua worktree riêng.
 
-**Mọi worker PHẢI đọc đúng file đặc tả nguồn trước khi code**:
-`docs/nang-cap/M51-da-du-an-rls.md` (chỉ mục PR3), `docs/nang-cap/M52-mo-rong-cau-hinh.md`,
-`docs/nang-cap/M49-api-mo-sso.md` (chỉ mục PR1/PR2) — kế hoạch này chỉ ghi **đính chính**
-so với đặc tả (đặc tả viết trước, code đã đổi từ đó tới nay) + quyết định đã chốt. Khi
-kế hoạch và file đặc tả lệch nhau, **kế hoạch này thắng**.
+**Mọi worker PHẢI đọc đúng file đặc tả nguồn trước khi code**: `docs/nang-cap/M53-scale-headroom.md`
+(cả 4 PR), `docs/nang-cap/M57-tim-kiem-toan-van.md` (chỉ mục PR1) — kế hoạch này chỉ ghi
+**đính chính** so với đặc tả (đặc tả viết trước, code đã đổi từ đó tới nay) + quyết định
+đã chốt. Khi kế hoạch và file đặc tả lệch nhau, **kế hoạch này thắng**.
 
 ### Đính chính chung so với đặc tả (áp cho mọi việc bên dưới)
 
-- **Số migration hiện tại cao nhất trên `main`: `0058_role_permissions.sql`.** Số tạm
-  trong các đặc tả (M51 ghi `0056`, M52 ghi `0057/0058`, M49 ghi `0059/0060/0061`) đều
-  đã lệch — **mỗi worker PHẢI tự chạy `ls migrations/ | sort -V | tail -5` ngay trước
-  khi tạo migration mới** để lấy đúng số tiếp theo tại thời điểm code (bài học lặp lại
-  nhiều lần: M32/M33/M34, M47/M48/M49/M50) — đặc biệt vì 8 việc chạy song song, mỗi
-  worktree base trên cùng `origin/main` nên **sẽ đụng số nhau**; coordinator renumber
-  lúc tích hợp tuần tự theo thứ tự PR merge (xem mục Thứ tự & phụ thuộc).
-- **Nhánh dự phòng đã tồn tại `PR #218` (`claude/feat-m49-pr3-sso-oidc`, chưa merge)**
-  dùng `migrations/0059_sso_audit.sql` trên nhánh riêng của nó — **không có trên `main`
-  nên không đụng trực tiếp** 8 việc dưới đây, nhưng khi #218 merge sau này có thể phải
-  renumber tiếp — ghi chú vào `PROGRESS.md` khi báo cáo, không phải việc coordinator xử
-  lý ngay.
-- `lib/auth.ts` hiện có **49 hàm trong map `CAN`** (đếm thật `grep -c "^\s*[a-zA-Z]*: (r"`),
-  không phải số ước lượng trong đặc tả cũ — worker PR M52-PR3/PR4 cứ đọc trực tiếp file
-  thật, không dựa số trong đặc tả.
-- `app/tracking/[sheet]/page.tsx` hiện có **3215 dòng** (đếm thật) — khớp mô tả "~3000
-  dòng" của đặc tả M52 PR5, không cần đính chính thêm.
-- `public/sw.js` hiện `CACHE = "xboss-v11"`; loại trừ cache đã có `/api/photos/` và
-  `/api/events` (đúng mô tả đặc tả M52 PR3 mục `swExclude`) — worker PR3 đối chiếu đúng
-  2 pattern này khi viết `scripts/check-sw-exclude.ts`.
-- `migrations/0026_nav_settings.sql` (bảng `nav_settings` hiện có) là bảng M52 PR4 sẽ
-  "di trú" — worker PR4 đọc đúng file này trước khi viết migration `feature_flags`.
+- **Số migration hiện tại cao nhất trên `main`: `0063_feature_flags.sql`.** Đặc tả M53
+  ghi `0064`, M57 ghi `0067` — đều là số tạm. **Mỗi worker PHẢI tự chạy
+  `ls migrations/ | sort -V | tail -5` ngay trước khi tạo migration mới** để lấy đúng số
+  tại thời điểm code — 2 việc chạy song song trên cùng base `origin/main` nên **sẽ đụng
+  số nhau** (M53 PR2 và M57 PR1 cùng cần 1 migration mới); coordinator renumber lúc tích
+  hợp theo thứ tự merge thực tế (xem mục Thứ tự & phụ thuộc).
+- **`lib/log.ts`**: hàm log là `log.warn(msg, fields?)` (object `log` gộp `info/warn/error`),
+  **không phải `logWarn`** như đặc tả M53 PR1 ghi — worker PR1 dùng đúng `log.warn`.
+  `fields` là `Record<string, unknown>` tuỳ ý (vd `{ sql, durationMs }`).
+- **`app/api/health/route.ts` hiện public thật** (không `getCurrentUser()`), gọi thẳng
+  `checkHealth()` từ `lib/health.ts` (đã tách hàm thuần khỏi route, có test riêng) — trả
+  4 trường `status/db/migration/uptime_s`. Đặc tả M53 PR1 đúng như dự đoán: phần ping DB
+  (`status/db/migration/uptime_s`) giữ nguyên public; phần metrics mới (`pool`,
+  `sseStreams`) chỉ trả khi có session Admin/PM (`getCurrentUser()` + check role trong
+  route, KHÔNG đổi `checkHealth()` — hàm đó giữ thuần/test được, ghép field ở route).
+- **`lib/version.ts::sheetVersion(slug)` hiện tại** đúng như mô tả trong đặc tả M53 PR2
+  (aggregate `MAX(updated_at)+COUNT` JOIN 3 bảng) — worker PR2 viết lại đúng thân hàm
+  theo đặc tả, giữ nguyên chữ ký `(sheetSlug: string): Promise<string>`.
+  callers: `app/api/events/route.ts`, `app/api/tasks/version/route.ts` (đọc trước khi
+  sửa để chắc không đổi chữ ký).
+- **`lib/db/index.ts::getPool()` hiện tại**: `new Pool({ connectionString: url, max: 10 })`
+  — không có `statement_timeout`/`idle_in_transaction_session_timeout`/
+  `connectionTimeoutMillis` nào. `lib/db/migrate.ts` dùng client riêng cho migration —
+  worker PR3 đọc file này trước khi thêm timeout, đảm bảo client migration đặt
+  `statement_timeout=0` (không bị timeout khi backfill dài).
+- **`lib/env.ts`**: `serverSchema` dùng `zod`, hiện KHÔNG có field số nào qua
+  `z.coerce.number()` — mọi biến hiện có đều `z.string().optional()`. Worker PR3 thêm 3
+  biến mới (`XBOSS_PG_POOL_MAX`, `XBOSS_PG_STMT_TIMEOUT_MS`, `XBOSS_SLOW_QUERY_MS`, dùng
+  cho cả PR1 lẫn PR3) theo đúng pattern `z.string().optional()` hiện có — parse
+  `Number(...)` + validate khoảng giá trị + áp mặc định ngay tại nơi dùng
+  (`lib/db/index.ts`), không cần đổi cách khai báo schema hiện tại.
+- **`app/api/search/route.ts` hiện tại** đã dùng `plainto_tsquery('simple', ...)` trên
+  `to_tsvector('simple', ...)` **tính inline không index** cho `tasks.name`/
+  `work_packages.name` (đúng mô tả "điểm nghẽn" trong đặc tả M57) + prefix match
+  ILIKE cho mã/BOQCODE/hệ + lọc theo `getCurrentProjectId(user)` (JOIN `towers`).
+  Route **KHÔNG có `unaccent`** hiện tại. Worker M57 PR1 giữ nguyên shape kết quả cũ cho
+  `kind: "task"|"package"` (client `GlobalSearch.tsx` không đổi đột ngột theo đúng đặc
+  tả), thêm nhóm nguồn mới qua `lib/search.ts`.
+- **Đọc `docs/ERD.md` (đã sinh tự động, `npm run gen:erd`) để lấy đúng tên cột thật**
+  của `site_diaries`, `correspondences`, `meetings`, `ncrs`, `drawings`,
+  `project_documents`, `task_comments`, `contracts` trước khi viết migration FTS M57
+  PR1 — đặc tả chỉ liệt kê cột theo trí nhớ, có thể lệch tên cột thật.
 
 ---
 
 ### Việc
 
-#### 1. M51 PR3 — Template dự án (clone-config)
+#### 1. M53 PR1 — Quan trắc tải (nền, không phụ thuộc)
 
-- route: `spec`
-- nhánh: `claude/feat-m51-pr3-template-du-an`
-- đọc trước: `docs/nang-cap/M51-da-du-an-rls.md` mục "PR3 — Template dự án" (dòng 51-55)
-  + `PROGRESS.md` mục M22 (đa dự án — cấu trúc `projects`/`user_projects` hiện có)
+- route: `standard`
+- nhánh: `claude/feat-m53-pr1-quan-trac-tai`
+- đọc trước: `docs/nang-cap/M53-scale-headroom.md` mục PR1 + đính chính ở trên (đặc biệt
+  `log.warn` không phải `logWarn`, health route public thật)
 - việc:
-  - `POST /api/projects/:id/clone-config` (quyền admin, dùng `getCurrentUser()` +
-    check role admin trực tiếp — không có perm `manageProjects` riêng, xác nhận trong
-    `lib/auth.ts` trước khi code; nếu đã có perm tương ứng thì dùng lại, không tạo mới
-    trùng chức năng).
-  - Sao chép **cấu hình**, không sao chép dữ liệu giao dịch: `sheet_types` (kèm hệ/
-    `discipline_id`), `towers`, cost codes/norms mẫu (bảng `norms`/`cost_codes` nếu đã
-    tồn tại — kiểm bằng `grep -rn "CREATE TABLE.*norms\|CREATE TABLE.*cost_codes"
-    migrations/`), `nav_settings`, `approval_flows` (M46, nếu bảng tồn tại), `alert_rules`
-    (M47 PR4). **KHÔNG** copy role overrides (`role_permissions`, M50 — toàn cục theo
-    đúng đặc tả).
-  - Chạy trong 1 `withTransaction`; map id cũ→mới giữ trong biến JS cục bộ trong request
-    (không lưu bảng mapping riêng — dữ liệu tạm thời dùng 1 lần).
-  - BOQCODE của các bản ghi mẫu (nếu `sheet_types`/norms có mã) phải tôn trọng unique
-    toàn hệ — gọi `boqTakenBy`/registry `boq_codes` (migration `0029`) đúng cách hiện
-    có, không tự sinh mã trùng.
-  - UI: bước "Sao chép cấu hình từ dự án có sẵn" trong flow tạo dự án ở `/projects`
-    (đọc file trang hiện có trước khi thêm — tái dùng modal/form pattern sẵn có, không
-    tạo trang mới).
-- test: `tests/clone-config.test.ts` (integration) — clone đủ nhóm cấu hình đã liệt kê,
-  BOQCODE không trùng, xác nhận KHÔNG copy dữ liệu giao dịch (vd `tasks`, `contracts`
-  của dự án nguồn không xuất hiện ở dự án đích).
+  - `lib/db/index.ts`: export `poolStats()` trả `{ total, idle, waiting }` từ
+    `pool.totalCount/idleCount/waitingCount` (API sẵn có của `pg`).
+  - `lib/db/index.ts`: trong `query`/`run`/`insertId` (3 hàm export chính, đọc file để
+    xác nhận đủ 3 chỗ gọi `pool.query`/`tx.query`), đo `Date.now()` quanh câu query;
+    vượt ngưỡng `XBOSS_SLOW_QUERY_MS` (env, mặc định 500ms, giá trị `0` = tắt hẳn) thì
+    gọi `log.warn("slow_query", { sql: sql.slice(0,120), durationMs })` — **KHÔNG log
+    params** (tránh lộ dữ liệu nhạy cảm).
+  - `app/api/events/route.ts`: đếm SSE stream đang mở qua counter module-level
+    (`let openStreams = 0`, tăng lúc `start` của `ReadableStream`, giảm lúc đóng/huỷ
+    connection — đọc kỹ code hiện tại để gắn đúng chỗ cleanup, không rò rỉ counter khi
+    client ngắt kết nối đột ngột); export getter `getOpenStreamCount()`.
+  - `app/api/health/route.ts`: thêm nhánh — nếu có session Admin/PM
+    (`getCurrentUser()` + role check trực tiếp trong route, không tạo `CAN.*` mới cho
+    việc này) thì gộp thêm `{ pool: poolStats(), sseStreams: getOpenStreamCount() }` vào
+    JSON trả về của `checkHealth()`; không có session/không phải Admin-PM thì trả y hệt
+    4 trường cũ (giữ public, không đổi status code/behavior hiện có).
 - tiêu chí chấp nhận:
-  - [ ] lint/typecheck/test/build xanh
-  - [ ] Clone 1 dự án có ≥2 sheet + 1 alert_rule → dự án mới có đủ cấu hình, 0 dòng dữ
-        liệu giao dịch (test integration xác nhận bằng đếm dòng)
-  - [ ] BOQCODE mẫu không đụng mã đã tồn tại (test tạo trùng → 409 hoặc tự đổi mã theo
-        đúng cơ chế registry hiện có, không throw không rõ nghĩa)
-  - [ ] `npm run gen:erd` không có drift nếu có thêm cột/bảng (PR này không migration
-        mới theo đặc tả — xác nhận không cần)
+  - `GET /api/health` không đăng nhập → y hệt hành vi cũ (4 trường, public, 200/503).
+  - `GET /api/health` với session Admin → có thêm `pool`/`sseStreams` đúng số liệu thật
+    (verify thật: mở 3 tab tracking → `sseStreams: 3`, đóng cả 3 → về 0 sau ≤35s).
+  - Giả lập `SELECT pg_sleep(1)` qua 1 câu query nội bộ (test/script) sinh đúng 1 dòng
+    `log.warn` không chứa params.
+  - Không đổi hành vi nào khác; `npm run lint`/`npm run typecheck`/`npm run build`/
+    test liên quan xanh.
 
-#### 2. M52 PR1 — Danh mục mềm `code_lists`
+#### 2. M53 PR2 — Watermark SSE O(1) (`sheet_versions` + trigger)
 
-- route: `spec`
-- nhánh: `claude/feat-m52-pr1-code-lists`
-- đọc trước: `docs/nang-cap/M52-mo-rong-cau-hinh.md` mục PR1 (dòng 5-25) + `lib/delay.ts`
-  (`DELAY_REASON_LABEL` — hằng số thật cần seed, đã xác nhận tồn tại đúng tên)
+- route: `complex` — chạm đường nóng tracking (SSE mọi client tracking), vùng rủi ro
+  cao theo `docs/audit.md` (đường ghi `tasks`/`work_packages`); ranh giới quyết định
+  được phép: cách viết thân trigger PL/pgSQL (miễn giữ đúng bất biến "mọi INSERT/UPDATE/
+  DELETE trên `tasks` hoặc đổi `sheet_type_id`/`package_id` trên `work_packages` đều
+  bump đúng (các) sheet liên quan"), tên các biến trung gian trong trigger.
+- nhánh: `claude/feat-m53-pr2-sheet-versions`
+- đọc trước: `docs/nang-cap/M53-scale-headroom.md` mục PR2 (đầy đủ, kể cả khối SQL mẫu)
+  + đính chính ở trên (`lib/version.ts` hiện tại, số migration thật)
 - việc:
-  - Migration `migrations/00XX_code_lists.sql` (XX = số thật tại thời điểm code, xem
-    "Đính chính chung"): bảng `code_lists` đúng schema trong đặc tả.
-  - Seed từ `DELAY_REASON_LABEL` (`lib/delay.ts`) vào `domain='delay_reason'`; rà thêm
-    2-3 hằng số enum-mềm rõ ràng khác đang hard-code rải trong `lib/*.ts` (loại tài
-    liệu, nhóm chi phí, đơn vị tính) — nếu không tìm thấy hằng số tương ứng rõ ràng thì
-    **chỉ seed `delay_reason`**, không tự bịa domain khác (đúng luật "không đoán khi
-    thiếu đặc tả cụ thể").
-  - `lib/code-lists.ts`: `getList(domain)` cache memory + watermark version (pattern
-    `sheetVersion` đã dùng ở SSE — đọc `app/api/events/route.ts` để bám đúng pattern).
-  - `GET /api/code-lists?domain=` (mọi role đọc), `GET/POST/PATCH/DELETE
-    /api/admin/code-lists` (Admin CRUD) — DELETE chặn khi domain/code đang được tham
-    chiếu (kiểm theo domain tương ứng, vd `delay_reason` tham chiếu ở `tasks.delay_reason`)
-    → 409 kèm số bản ghi.
-  - Chuyển call-site: **chỉ chuyển 1 nơi rõ ràng nhất trong đợt này** — nơi hiển thị/
-    chọn lý do trễ (UI dashboard Pareto + form gán lý do trễ) đọc qua `getList('delay_reason')`
-    thay vì import `DELAY_REASON_LABEL` trực tiếp. **KHÔNG chuyển `lib/status.ts`**
-    (giữ cứng theo đúng đặc tả — enum có logic recompute).
-  - UI `/admin/code-lists`: bảng theo domain, kéo sắp `sort` (dùng cùng cơ chế
-    drag-reorder nếu dự án đã có sẵn pattern nào tương tự — nếu không có, làm bằng nút
-    ↑↓ đơn giản, không thêm thư viện drag-drop mới), bật/tắt `active`.
-- test: `tests/code-lists.test.ts` — CRUD, chặn xoá đang tham chiếu, cache version đúng
-  invalidate khi ghi.
-- tiêu chí chấp nhận:
-  - [ ] lint/typecheck/test/build xanh
-  - [ ] Seed `delay_reason` khớp đúng 6 lý do hiện có trong `DELAY_REASON_LABEL`
-  - [ ] Xoá code đang dùng bởi ≥1 task → 409; xoá code không dùng → 200
-  - [ ] `lib/status.ts` không bị đụng (kiểm diff)
-  - [ ] `npm run gen:erd` cập nhật, không drift
+  - Migration mới (số lấy đúng theo `ls migrations/ | sort -V | tail -5` lúc code):
+    bảng `sheet_versions(sheet_type_id PK, version BIGINT DEFAULT 1, updated_at)` +
+    trigger `bump_sheet_version()` trên `tasks` (AFTER INSERT/UPDATE/DELETE — UPDATE đổi
+    `package_id` bump CẢ sheet cũ lẫn mới, dùng `NEW`/`OLD` đúng theo `TG_OP`) + trigger
+    tương tự trên `work_packages` (UPDATE đổi `sheet_type_id` — bump cả sheet cũ và
+    mới). Backfill 1 dòng `version=1` cho mọi `sheet_types` hiện có
+    (`ON CONFLICT DO NOTHING`). Tham khảo pattern trigger có tiền lệ:
+    `boq_codes_sync` (migration `0029`), `audit_row_change` (migration `0049`).
+  - `lib/version.ts::sheetVersion(slug)`: đổi thân hàm thành
+    `SELECT version::text FROM sheet_versions sv JOIN sheet_types st ON sv.sheet_type_id = st.id WHERE st.slug = ?`;
+    sheet chưa có dòng (phòng thủ, không nên xảy ra sau backfill) → trả `'0'`. Giữ
+    nguyên chữ ký hàm, không đổi bất kỳ caller nào.
+- test:
+  - `tests/sheet-versions.test.ts` (integration, import `tests/setup.ts` đầu tiên đúng
+    quy ước dự án): (1) tick dimension qua `recomputeTask` → version bump; (2) tạo/xoá
+    task → bump; (3) move task sang package thuộc sheet khác → CẢ 2 sheet bump; (4) move
+    work_package sang sheet khác → cả 2 sheet bump; (5) sửa task không đổi tiến độ (vd
+    note) vẫn bump là CHẤP NHẬN ĐƯỢC (false-positive rẻ, chỉ khiến client refresh thừa —
+    ghi comment giải thích rõ trong test).
+  - Đo `EXPLAIN ANALYZE` trước/sau trên DB seed thật, ghi kết quả vào phần báo cáo của
+    worker (không cần file riêng — nêu trong tóm tắt gửi coordinator).
+  - Verify thật: 2 trình duyệt/2 tab mở cùng sheet, tick ở A → B nhận event `version`
+    trong ≤3s (hành vi y hệt trước khi đổi).
+- tiêu chí chấp nhận: test trên xanh; verify SSE 2 tab thật; lint/typecheck/build xanh;
+  `npm test` toàn bộ không có test cũ nào đỏ do đổi hành vi `sheetVersion`.
 
-#### 3. M52 PR2 — Custom fields
+#### 3. M53 PR3 — Pool cứng cáp qua env
 
-- route: `spec`
-- nhánh: `claude/feat-m52-pr2-custom-fields`
-- đọc trước: `docs/nang-cap/M52-mo-rong-cau-hinh.md` mục PR2 (dòng 27-52)
-- việc: đúng theo đặc tả — migration `custom_field_defs` + cột `custom JSONB` trên 4
-  bảng (`tasks`, `contracts`, `materials`, `work_packages`); `lib/custom-fields.ts`
-  (`validateCustom`); UI `CustomFieldsSection` gắn vào modal chi tiết 4 entity (đọc
-  đúng modal hiện có của từng trang trước khi chèn — không tạo modal mới); trang
-  `/admin/custom-fields` CRUD defs.
-  - **Không PATCH toàn bộ entity chỉ để đổi `custom`**: field `custom` merge shallow
-    khi PATCH entity qua route PATCH **hiện có** của từng entity (`/api/tasks/:id`,
-    `/api/contracts/:id`, `/api/materials/:id`, `/api/workpackages/:id`) — không tạo
-    route PATCH riêng cho `custom`.
-- test: `tests/custom-fields.test.ts` — validate type/options/required; PATCH merge
-  đúng (không đè các field khác); đổi `type` khi đã có dữ liệu tham chiếu key đó → 409.
-- tiêu chí chấp nhận:
-  - [ ] lint/typecheck/test/build xanh
-  - [ ] PATCH `custom` trên 1 task không ảnh hưởng field khác của task đó
-  - [ ] Đổi `type` của 1 def đã có ≥1 entity dùng key đó → 409
-  - [ ] `npm run gen:erd` cập nhật, không drift
-
-#### 4. M52 PR3 — Module registry (refactor nội bộ, không đổi hành vi)
-
-- route: `spec`
-- nhánh: `claude/feat-m52-pr3-module-registry`
-- đọc trước: `docs/nang-cap/M52-mo-rong-cau-hinh.md` mục PR3 (dòng 54-70) + `app/lib/dashboardTree.ts`
-  (601 dòng thật) + `lib/auth.ts` (49 hàm `CAN` thật) + `public/sw.js` (2 pattern loại
-  trừ cache thật: `/api/photos/`, `/api/events`)
+- route: `standard` — độc lập PR2, không đụng file chung với việc 2.
+- nhánh: `claude/feat-m53-pr3-pool-env`
+- đọc trước: `docs/nang-cap/M53-scale-headroom.md` mục PR3 + đính chính `lib/env.ts`/
+  `lib/db/index.ts` ở trên
 - việc:
-  - `lib/modules.ts` (mới): mảng `MODULES: ModuleDef[]` đúng shape trong đặc tả.
-    **Không bắt buộc liệt kê hết 100% module ngay trong PR này** — bắt đầu với nhóm
-    module mới nhất/rõ ràng nhất (M43-M50 + node "Sắp có" hiện tại trong `dashboardTree`)
-    để chứng minh cơ chế hoạt động đúng, không đổi hành vi hiện tại; ghi rõ trong PR
-    description module nào đã đưa vào registry, module nào chưa (để PR sau tiếp tục).
-  - **Điều kiện nghiệm thu cứng: hành vi UI/API sau PR phải giống hệt trước PR** — mọi
-    thay đổi ở `dashboardTree`/`lib/auth.ts`/notifications chỉ là đổi NGUỒN đọc (từ
-    hard-code sang đọc `MODULES`), không đổi kết quả render/quyền.
-  - `scripts/check-sw-exclude.ts` (mới, CI check) đối chiếu `swExclude` khai báo trong
-    `lib/modules.ts` với 2 pattern thật đã xác nhận trong `public/sw.js`.
-  - Cập nhật `docs/nang-cap/README.md` mục "Quy ước chung" thêm dòng: thêm module mới
-    phải thêm 1 entry `MODULES`.
-- test: chạy lại **toàn bộ** `e2e/authed/appshell.spec.ts` (đủ menu theo vai trò) +
-  test liên quan `CAN`/notifications hiện có — đây chính là bằng chứng "không đổi hành
-  vi", không viết test mới riêng cho registry (theo đúng ghi chú đặc tả "PR3: script
-  check-sw-exclude chính là gate").
-- tiêu chí chấp nhận:
-  - [ ] lint/typecheck/test/build xanh
-  - [ ] `e2e/authed/appshell.spec.ts` (desktop + mobile) xanh nguyên trạng — 0 thay đổi
-        assertion, chỉ xác nhận hành vi cũ giữ nguyên
-  - [ ] `scripts/check-sw-exclude.ts` chạy được, phát hiện đúng khi cố tình gỡ 1 pattern
-        loại trừ khỏi `sw.js` lúc test tay (rồi khôi phục lại)
-  - [ ] Diff không đổi bất kỳ chuỗi hiển thị/quyền nào (review bằng mắt của `reviewer`)
+  - `lib/db/index.ts::getPool()`: `max` đọc từ env `XBOSS_PG_POOL_MAX` (parse số, mặc
+    định 10, clamp về khoảng 1–100 nếu ngoài khoảng — không throw, chỉ ghim về biên).
+    Thêm vào config `Pool`: `options: "-c statement_timeout=<N> -c idle_in_transaction_session_timeout=15000"`
+    với N từ env `XBOSS_PG_STMT_TIMEOUT_MS` (mặc định 30000). Thêm
+    `connectionTimeoutMillis: 10_000`.
+  - `lib/db/migrate.ts`: client chạy migration (đọc file để xác nhận có tạo `Pool`/
+    `Client` riêng hay dùng chung `getPool()`) phải đặt `statement_timeout=0` — nếu
+    dùng chung `getPool()` thì cần `SET LOCAL statement_timeout=0` trong phiên chạy
+    migration hoặc tạo client riêng cho migration, chọn cách nào ít thay đổi nhất sau
+    khi đọc code thật.
+  - `lib/env.ts`: thêm 3 field `z.string().optional()` vào `serverSchema`:
+    `XBOSS_PG_POOL_MAX`, `XBOSS_PG_STMT_TIMEOUT_MS`, `XBOSS_SLOW_QUERY_MS` (field thứ 3
+    dùng chung với việc 1 — nếu việc 1 đã merge trước, chỉ cần xác nhận không khai báo
+    trùng; nếu 2 nhánh song song cùng thêm, coordinator gộp tay lúc tích hợp — xung đột
+    nhỏ, không phải logic).
+  - `DEPLOY.md`: thêm mục liệt kê 3 biến env mới (mô tả ngắn + mặc định).
+- test: integration — query `pg_sleep` vượt `statement_timeout` → lỗi Postgres `57014`,
+  connection được trả về pool đúng (`poolStats().waiting` về 0 sau khi lỗi, không rò rỉ
+  connection).
+- tiêu chí chấp nhận: không đặt env nào → hành vi mặc định y hệt trước (10 connection) +
+  có timeout mới; test trên xanh; `DEPLOY.md` cập nhật; lint/typecheck/build xanh.
 
-#### 5. M52 PR4 — Feature flags theo dự án
+#### 4. M53 PR4 — Cluster-ready: audit state in-process + tài liệu vận hành
 
-- route: `spec`
-- nhánh: `claude/feat-m52-pr4-feature-flags` (base trên nhánh PR3 đã xong — xem Thứ tự
-  & phụ thuộc, PR này đọc `lib/modules.ts` từ PR3)
-- đọc trước: `docs/nang-cap/M52-mo-rong-cau-hinh.md` mục PR4 (dòng 72-76) +
-  `migrations/0026_nav_settings.sql` (bảng đang di trú)
-- việc: đúng đặc tả — migration `feature_flags`; helper `assertModuleEnabled(moduleKey,
-  projectId)` gọi đầu route thuộc `routePrefix` (đọc từ `lib/modules.ts` của PR3) → 404
-  khi tắt; sidebar ẩn nav module tắt; `nav_settings` giữ API cũ 1 bản release (đánh dấu
-  `@deprecated` trong comment, không xoá ngay); UI `/admin/features` ma trận module ×
-  dự án.
-  - **Mặc định không có dòng = bật** (đúng đặc tả) — xác nhận test không có flow nào bị
-    404 khi bảng rỗng (tương thích ngược tuyệt đối).
-- test: `tests/feature-flags.test.ts` — route module tắt → 404; bật lại → 200; bảng
-  rỗng → mọi route 200 (mặc định bật).
-- tiêu chí chấp nhận:
-  - [ ] lint/typecheck/test/build xanh
-  - [ ] Bảng `feature_flags` rỗng → không route nào đổi hành vi so với trước PR (test +
-        review diff)
-  - [ ] Tắt 1 module thật (vd module vừa đăng ký ở PR3) → route con trả 404, sidebar ẩn
-  - [ ] `npm run gen:erd` cập nhật, không drift
+- route: `standard` — làm SAU việc 1–3 (đọc kết quả 3 việc trước để audit, đặc biệt
+  counter SSE của việc 1).
+- nhánh: `claude/feat-m53-pr4-cluster-audit` (tạo sau khi việc 1–3 đã tích hợp vào
+  nhánh tổng hợp của đợt này — xem Thứ tự & phụ thuộc)
+- đọc trước: `docs/nang-cap/M53-scale-headroom.md` mục PR4
+- việc:
+  - Quét `lib/` + `app/api/` tìm state module-level ghi-được (`Map`/`let`/biến global)
+    ngoài các chỗ đã biết an toàn (`lib/permissions.ts` SWR cache — thiết kế sẵn cho đa
+    instance; biến "pool ready"/"schema ready" per-process — đúng thiết kế). Mỗi phát
+    hiện: phân loại an-toàn/không-an-toàn cho chạy nhiều instance; sửa nếu nhỏ (vd đổi
+    sang đọc DB), ghi vào `PROGRESS.md` mục Nợ kỹ thuật nếu lớn/cần thiết kế lại. Counter
+    SSE của việc 1 ghi rõ là per-process (health mỗi instance chỉ trả số của chính nó —
+    chấp nhận, ghi chú trong code).
+  - Rà 6 endpoint `app/api/cron/*` (đọc danh sách file thật): xác nhận idempotent +
+    chống chạy chồng khi có ≥2 instance (sync vật tư đã có `sync_locks`; xác nhận
+    daily-report/weekly-report gửi trùng có hại thật không — nếu có, thêm khoá
+    `sync_locks` cùng pattern có sẵn, không tạo cơ chế khoá mới).
+  - `DEPLOY.md`: thêm mục "Chạy nhiều instance" — lệnh `pm2 start npm -i 2 --name xboss -- start`,
+    điều kiện tiên quyết (hạ `XBOSS_PG_POOL_MAX` mỗi process hoặc dùng PgBouncer
+    transaction-pooling, lưu ý `withTransaction` dùng `SET LOCAL` nên tương thích
+    PgBouncer transaction mode), xác nhận cron chỉ gọi từ ngoài 1 lần (không tự nhân đôi
+    khi có nhiều instance).
+  - `PROGRESS.md`: thêm khối mục "Điều kiện kích hoạt các việc đang hoãn" y nguyên nội
+    dung cuối file đặc tả M53 (object storage, SSE bậc 2/3, PgBouncer, read-replica) vào
+    mục Nợ kỹ thuật — đây là ghi chú, không phải code.
+- tiêu chí chấp nhận: báo cáo quét kèm theo (liệt kê state phát hiện + phân loại); chạy
+  `pm2 -i 2` cục bộ + smoke test thủ công (login, tick 1 dimension, xác nhận SSE 2 tab
+  vẫn nhận event đúng) xanh; lint/typecheck/build xanh.
 
-#### 6. M52 PR5 — Trả nợ tách `app/tracking/[sheet]/page.tsx` (~3215 dòng)
+#### 5. M57 PR1 — Hạ tầng FTS + nâng `/api/search`
 
-- route: `complex`
-- nhánh: `claude/refactor-m52-pr5-tracking-split`
-- đọc trước: `docs/nang-cap/M52-mo-rong-cau-hinh.md` mục PR5 (dòng 78-81) + toàn bộ
-  `app/tracking/[sheet]/page.tsx` (3215 dòng — đọc hết trước khi tách, không tách theo
-  đoán) + `app/components/offlineQueue.ts` (`useOfflineTickQueue`)
-- **ranh giới quyết định được phép** (đây là lý do route `complex` thay vì `spec`):
-  đặc tả chỉ nêu tên 4 thành phần cần tách (`TrackingToolbar`, `TrackingGrid`,
-  `BulkEditModal`, `DateEditModal`, `useTrackingData`) nhưng KHÔNG vẽ ranh giới state
-  chính xác (state nào ở component con, state nào phải nâng lên page cha để chia sẻ
-  giữa toolbar/grid/modal) — worker tự quyết ranh giới này miễn **hành vi render y hệt
-  trước tách** (không đổi UX, không đổi thứ tự gọi API, không đổi cách SSE/offline
-  queue hoạt động).
-  - **Điều kiện nghiệm thu tuyệt đối**: diff hành vi = 0. Không sửa bug nhân tiện, không
-    tối ưu nhân tiện — chỉ tách file. Nếu phát hiện bug trong lúc đọc code, ghi lại
-    trong báo cáo, KHÔNG sửa trong PR này.
-  - `useTrackingData`: giữ nguyên logic fetch + SSE (`/api/events?sheet=`) + offline
-    queue wiring từ `offlineQueue.ts` — copy logic, không viết lại.
-  - Page còn lại (~300 dòng theo ước tính đặc tả, không bắt buộc đúng số) chỉ lắp ghép
-    component con + truyền props.
-- test: chạy lại **toàn bộ** e2e tracking sẵn có (`e2e/authed/tracking.spec.ts` +
-  mọi spec khác chạm `/tracking/[sheet]`) — đây là bằng chứng chính "không đổi hành vi".
-  Không cần viết e2e mới.
-- tiêu chí chấp nhận:
-  - [ ] lint/typecheck/test/build xanh
-  - [ ] `e2e/authed/tracking.spec.ts` (desktop + mobile) xanh nguyên trạng, 0 sửa
-        assertion
-  - [ ] Test tay: mở 1 sheet, tick checkbox offline rồi online lại → tự PATCH đúng như
-        trước (offline queue không đổi hành vi)
-  - [ ] SSE version-refresh vẫn hoạt động (mở 2 tab, sửa 1 tab, tab kia tự cập nhật)
-  - [ ] Page cha còn lại là file lắp ghép, không còn logic nghiệp vụ nặng
-
-#### 7. M49 PR1 — API keys (đọc-only) + namespace `/api/v1`
-
-- route: `spec`
-- nhánh: `claude/feat-m49-pr1-api-keys`
-- đọc trước: `docs/nang-cap/M49-api-mo-sso.md` mục PR1 (dòng 24-129) toàn bộ + `lib/ratelimit.ts`
-  (hàm `bump()` hiện có, cần refactor cẩn thận không đổi hành vi login)
-- việc: đúng đặc tả — migration `api_keys` (kèm audit trigger M43 theo đúng khối `DO $$`
-  mẫu `migrations/0053_approvals.sql`); helper generic `hitRateLimit` trong
-  `lib/ratelimit.ts` (refactor `bump()` gọi qua helper mới, **test rate-limit login hiện
-  có phải pass nguyên trạng — chạy lại trước khi coi PR xong**); `lib/api-keys.ts`
-  (`generateApiKey`/`hashApiKey`/`verifyApiKey`/`requireApiKey`); 5 route `app/api/v1/*`
-  đúng bảng trong đặc tả; API quản lý `GET/POST /api/admin/api-keys` +
-  `DELETE /api/admin/api-keys/:id` (dùng lại `CAN.manageIntegrations` có sẵn từ M48 PR1
-  — xác nhận đã tồn tại trong `lib/auth.ts:283-284`, không tạo perm mới); UI thêm section
-  "API keys" vào `app/admin/integrations/page.tsx` (trang đã tồn tại từ M48 PR1 — đọc
-  file thật trước khi chèn); `docs/api-v1.md` mới.
-- test: `tests/api-keys.test.ts` đúng 5 ca trong đặc tả. **Đặc biệt quan trọng**: chạy
-  lại toàn bộ test rate-limit login hiện có (`tests/*rate*limit*` hoặc test auth có ca
-  rate-limit) để xác nhận refactor `bump()` không đổi hành vi.
-- tiêu chí chấp nhận:
-  - [ ] lint/typecheck/test/build xanh
-  - [ ] Test rate-limit login hiện có (trước PR) vẫn pass nguyên trạng sau refactor
-        `lib/ratelimit.ts`
-  - [ ] Key đúng/sai/revoked/thiếu header đúng 401; scope sai → 403; key toàn cục thiếu
-        `?project=` → 422; vượt 120 req/phút → 429 + `Retry-After`
-  - [ ] `npm run gen:erd` cập nhật, không drift
-
-#### 8. M49 PR2 — Webhook ra ngoài
-
-- route: `complex`
-- nhánh: `claude/feat-m49-pr2-webhooks` (base trên nhánh PR1 đã xong nếu PR1 merge
-  trước — xem Thứ tự & phụ thuộc; nếu chạy song song thì base `origin/main`, coordinator
-  rebase lúc tích hợp)
-- đọc trước: `docs/nang-cap/M49-api-mo-sso.md` mục PR2 (dòng 132-246) toàn bộ, **đặc
-  biệt bảng "5 điểm phát sự kiện" (dòng 207-217)** — đọc đúng 5 route nghiệp vụ thật
-  trước khi sửa (`app/api/tasks/[id]/approve/route.ts`, `app/api/approvals/route.ts`,
-  `app/api/variations/[id]/decide/route.ts`, `app/api/payment-certs/[id]/decide/route.ts`,
-  `app/api/notifications/route.ts`, `app/api/inspection-requests/route.ts`)
-- **ranh giới quyết định được phép** (lý do route `complex`): đặc tả đã liệt kê đúng 5-6
-  điểm emit nhưng **không biết trước cấu trúc code thật của từng route đó ở thời điểm
-  code** (có thể đã đổi từ lúc viết đặc tả) — worker tự xác định đúng vị trí chèn
-  `emitWebhook(...)` trong ranh giới nguyên tắc: **chỉ phát khi trạng thái thực thể
-  CHUYỂN SANG approved thật trong chính request đó** (không phát khi không đổi trạng
-  thái, không phát ở bước giữa của flow nhiều bước M46 dormant).
-  - `lib/webhooks.ts`, migration `webhooks`/`webhook_deliveries`, chống SSRF (validate
-    URL khi tạo/sửa — không phải lúc gửi), cron `GET /api/cron/deliver-webhooks`,
-    API quản lý + UI (section "Webhook" trong `app/admin/integrations/page.tsx`) đúng
-    đặc tả.
-  - `vercel.json` + `DEPLOY.md` cập nhật cron mẫu theo đúng đặc tả (dòng 224-226).
-- test: `tests/webhooks.test.ts` đúng 5 ca trong đặc tả (mock `globalThis.fetch`).
-- tiêu chí chấp nhận:
-  - [ ] lint/typecheck/test/build xanh
-  - [ ] `emitWebhook` chỉ tạo delivery khi entity thật sự chuyển approved trong request
-        (test qua từng điểm emit — duyệt VO test qua `POST /api/variations/:id/decide`
-        thật, không chỉ unit hàm)
-  - [ ] Validate URL chặn `http://` production + IP private → 422
-  - [ ] Backoff đúng bảng `[5m, 30m, 2h, 2h, 2h]`, `attempts>=5` → `status='failed'`
-  - [ ] Chữ ký HMAC `X-Xboss-Signature` verify lại đúng bằng secret
-  - [ ] `npm run gen:erd` cập nhật, không drift
+- route: `complex` — quyết định biểu thức index thống nhất (ranh giới được phép quyết:
+  cách viết `ftsExpr()`/tên hàm `xboss_unaccent`/thứ tự cột trong từng nguồn, miễn mọi
+  index và mọi câu query dùng **đúng cùng 1 biểu thức** — đây là bất biến cứng, lệch 1
+  ký tự là planner bỏ index; KHÔNG được tự quyết đổi phạm vi quyền xem theo nguồn —
+  phần đó đã chốt trong đặc tả, xem dưới).
+- nhánh: `claude/feat-m57-pr1-fts`
+- đọc trước: `docs/nang-cap/M57-tim-kiem-toan-van.md` mục PR1 (đầy đủ) + đính chính ở
+  trên (đọc `docs/ERD.md` lấy đúng tên cột thật trước khi viết migration; trạng thái
+  thật của `app/api/search/route.ts` hiện tại)
+- việc:
+  - Migration mới (số lấy đúng theo `ls migrations/ | sort -V | tail -5` lúc code, thuần
+    thêm → CREATE EXTENSION/FUNCTION/INDEX, không đụng dữ liệu):
+    `CREATE EXTENSION IF NOT EXISTS unaccent;` + hàm `xboss_unaccent(text)` IMMUTABLE
+    bọc `unaccent('unaccent', $1)` (bắt buộc bọc vì `unaccent` gốc là STABLE, Postgres
+    từ chối index trực tiếp trên hàm STABLE). Index GIN biểu thức
+    `to_tsvector('simple', xboss_unaccent(coalesce(col1,'') || ' ' || coalesce(col2,'') ...))`
+    cho đợt 1: `tasks(code_excel, boq_code, name)`, `work_packages(code_excel, boq_code, name)`,
+    `contracts(code, name, contractor)`, `correspondences(code, subject, content)`,
+    `meetings(title, minutes)`, `site_diaries(...)` (đọc ERD lấy đúng cột nội dung thật),
+    `ncrs(code, title, description)`, `materials(boq_code, name)`, `drawings(code, name)`,
+    `project_documents(name)`, `task_comments(content)`. Nếu bảng nào lớn và runner
+    migration (`lib/db/migrate.ts`) chạy trong 1 transaction (đọc code xác nhận trước) —
+    `CREATE INDEX CONCURRENTLY` không chạy được trong transaction → tách bước
+    CONCURRENTLY thành script riêng trong `scripts/` (chạy tay lúc thấp điểm), migration
+    chỉ tạo extension/hàm + index thường cho bảng nhỏ; ghi rõ quyết định này trong báo
+    cáo worker gửi coordinator.
+  - `lib/search.ts` (mới): registry nguồn tìm kiếm — mỗi nguồn khai báo bảng, cột index
+    (dùng chung `ftsExpr(cols)` sinh đúng biểu thức khớp index, neo comment 2 chiều với
+    migration), cột hiển thị, URL đích, quyền xem (tái dùng triết lý whitelist của
+    `lib/reports.ts` — đọc file đó trước để bám đúng pattern). **Quyền đã chốt (không tự
+    quyết)**: nguồn `contracts` chỉ hiện cho `PAYMENT_VIEW_ROLES`; mọi nguồn lọc theo
+    `project_id` (trực tiếp hoặc qua chuỗi JOIN đúng bài học "project-scope-invariant"
+    đã áp cho `/api/notifications` ở M22) + loại bản ghi đã soft-delete (nếu bảng có cột
+    soft-delete — kiểm ERD). Xếp hạng theo `ts_rank` + ưu tiên khớp mã chính xác (mã
+    hiệu vẫn qua nhánh ILIKE prefix hiện có cho `code`/`boq_code` — GIỮ NGUYÊN nhánh này,
+    không thay bằng FTS, vì FTS tách token kém với mã dạng `A1,03`).
+  - `app/api/search/route.ts`: giữ nguyên `SearchHit` shape cũ cho `kind: "task"|"package"`
+    (không đổi contract với `GlobalSearch.tsx` hiện có), thêm nhóm kết quả mới theo từng
+    nguồn trong registry — mỗi nguồn tự lọc quyền/project scope theo đúng khai báo.
+  - `app/components/GlobalSearch.tsx`: nhóm kết quả hiển thị theo loại (icon `lucide-react`
+    theo module — bám bảng icon đã dùng ở sidebar `app/lib/nav.ts` cho nhất quán), điều
+    hướng đúng trang đích từng loại, giữ nguyên keyboard navigation + `aria-*` hiện có
+    (đọc file trước khi sửa, không viết lại từ đầu).
+- test:
+  - `tests/search.test.ts` (integration): (1) gõ "nghiem thu" khớp bản ghi chứa
+    "nghiệm thu" và ngược lại (gõ có dấu ra bản ghi không dấu); (2) kết quả tôn trọng
+    project scope — 2 dự án dựng riêng trong test không lẫn kết quả — + không trả bản
+    ghi đã soft-delete; (3) role `engineer` không thấy nhóm `contracts`, `admin` thấy;
+    (4) `EXPLAIN` xác nhận dùng index GIN (assert plan output chứa `Bitmap Index Scan`
+    trên ít nhất 1 bảng seed đủ lớn để planner chọn index thay vì seq scan).
+  - Verify UI thật: gõ có dấu/không dấu ra cùng tập kết quả trong `GlobalSearch`; đo thời
+    gian phản hồi trên DB seed < 200ms (ghi số đo vào báo cáo worker).
+- tiêu chí chấp nhận: test trên xanh; `SearchHit` cũ không đổi field (không phá client
+  cũ nếu có nơi khác dùng shape này — grep trước khi sửa); axe không phát sinh vi phạm
+  mới trên `GlobalSearch.tsx`; lint/typecheck/build xanh.
 
 ---
 
 ### Thứ tự & phụ thuộc
 
-- **Chạy song song ngay từ đầu** (7 worktree độc lập, base `origin/main` mới nhất tại
-  lúc dispatch): việc 1 (M51 PR3), việc 2 (M52 PR1), việc 3 (M52 PR2), việc 4 (M52 PR3),
-  việc 6 (M52 PR5), việc 7 (M49 PR1), việc 8 (M49 PR2).
-- **Việc 5 (M52 PR4) chờ việc 4 (M52 PR3) merge/hoàn tất** — đọc `lib/modules.ts` do PR3
-  tạo ra. Coordinator dispatch việc 5 SAU khi việc 4 qua reviewer + tích hợp xong (rebase
-  nhánh việc 5 lên nhánh/kết quả việc 4).
-- **Va chạm số migration dự kiến chắc chắn xảy ra** (6/8 việc đều thêm migration, tất cả
-  base cùng `origin/main` 0058): coordinator xử lý renumber tuần tự theo thứ tự PR merge
-  thực tế (không có thứ tự ưu tiên bắt buộc giữa việc 1/2/3/6/7/8 — merge được cái nào
-  trước renumber cái đó, cái sau rebase nhận số tiếp theo) — đúng pattern đã làm nhiều
-  lần trong `PROGRESS.md` (M24-M31, xem cách renumber `0031_hr.sql` → ... → `0038`).
-- Việc 8 (M49 PR2) sửa 5 route nghiệp vụ đang sống — **có khả năng đụng nhánh khác nếu
-  người dùng có sửa gì khác đồng thời trên các route đó** (ngoài phạm vi 8 việc này) —
-  coordinator kiểm `git log` các file đó trước khi dispatch, báo phiên chính nếu thấy
-  hoạt động khác đang chạm cùng file.
+- **Việc 1 (M53 PR1)** không phụ thuộc gì — dispatch ngay.
+- **Việc 2 (M53 PR2)** và **việc 3 (M53 PR3)** không phụ thuộc việc 1 về mặt code (chỉ
+  đụng file khác nhau trong `lib/db/`), nhưng **cùng có khả năng thêm field vào
+  `lib/env.ts`** với việc 1/việc 3 (biến `XBOSS_SLOW_QUERY_MS` dùng chung việc 1+3) — có
+  thể dispatch cả 3 việc 1/2/3 song song ngay từ đầu (base cùng `origin/main`), xung đột
+  nhỏ ở `lib/env.ts` xử lý lúc tích hợp (gộp tay, không phải logic).
+- **Việc 4 (M53 PR4)** dispatch SAU KHI việc 1, 2, 3 đã tích hợp xong vào 1 nhánh tổng
+  hợp của đợt M53 — vì cần đọc code thật của cả 3 việc trước (đặc biệt counter SSE của
+  việc 1) để audit đúng.
+- **Việc 5 (M57 PR1)** hoàn toàn độc lập với cả 4 việc M53 — dispatch song song ngay từ
+  đầu cùng lúc với việc 1/2/3.
+- Việc 2 (`sheet_versions`) và việc 5 (FTS) đều cần thêm 1 migration mới, base cùng
+  `origin/main` → **sẽ đụng số migration** — coordinator renumber theo thứ tự merge
+  thực tế lúc tích hợp (ghi rõ số cuối cùng trong báo cáo tổng hợp).
 
 ### Sau khi worker xong (coordinator thực hiện)
 
 - Đối chiếu kết quả từng việc với tiêu chí chấp nhận ghi trong việc đó; chạy lại
   `npm run lint`/`npm run typecheck`/test liên quan để xác nhận độc lập với báo cáo
   worker.
-- Gọi `reviewer` soát diff từng nhánh — đặc biệt chú ý việc 4 (M52 PR3) và việc 6 (M52
-  PR5): tiêu chí chính là "0 thay đổi hành vi", reviewer phải xác nhận diff không lẫn
-  logic mới ngoài mục đích tách/đăng ký.
-  - Việc 8 (M49 PR2): reviewer đối chiếu đúng 5-6 điểm emit với nguyên tắc "chỉ phát khi
-    chuyển approved thật trong request đó" — đây là điểm dễ sai nhất (phát nhầm ở bước
-    giữa flow nhiều bước, hoặc phát trùng khi route có 2 nhánh xử lý cùng kết quả).
-- Tích hợp: xử lý renumber migration theo đúng thứ tự merge thực tế; việc 5 chỉ dispatch
-  sau khi việc 4 tích hợp xong.
-- Báo cáo tổng hợp về phiên chính theo đúng 8 việc — trạng thái, nhánh + commit, kết quả
-  reviewer, quyết định worker tự đưa ra (việc 6 và việc 8, route `complex`), điểm vướng.
+- Gọi `reviewer` soát diff từng nhánh — **đặc biệt chú ý việc 2 (M53 PR2, `route: complex`,
+  đường nóng tracking — bám checklist "vùng rủi ro cao" `docs/audit.md`)** và **việc 5
+  (M57 PR1, `route: complex`, quyền xem theo nguồn tìm kiếm — xác nhận không rò rỉ chéo
+  dự án/vai trò qua kết quả search)**.
+- Tích hợp: renumber migration theo đúng thứ tự merge thực tế; gộp tay xung đột nhỏ
+  `lib/env.ts` nếu việc 1/3 cùng thêm field; dispatch việc 4 chỉ sau khi việc 1-3 đã
+  tích hợp xong.
+- Báo cáo tổng hợp về phiên chính theo từng việc — trạng thái (xong/vướng/bỏ), nhánh +
+  commit, kết quả reviewer, quyết định worker tự đưa ra (việc 2 và việc 5, route
+  `complex`), số migration cuối cùng sau renumber, và danh sách điểm vướng cần phiên
+  chính xử lý.
 
 ### Duyệt cuối (phiên chính thực hiện)
 
-- [ ] Đối chiếu diff 8 việc với đặc tả nguồn (`M51-da-du-an-rls.md` PR3,
-      `M52-mo-rong-cau-hinh.md` cả 5 PR, `M49-api-mo-sso.md` PR1+PR2) + báo cáo coordinator
-- [ ] Xác nhận việc 4 (module registry) và việc 6 (tách tracking) đúng "0 đổi hành vi"
-      bằng chạy tay thêm 1 lượt (không chỉ tin CI)
-- [ ] Cập nhật `PROGRESS.md` (thêm mục đợt này, ghi rõ M51 chỉ làm PR3 — PR1/PR2/PR4 để
-      dành, lý do) + `docs/nang-cap/README.md` (đổi trạng thái các module đã xong)
-- [ ] Push nhánh + mở PR draft theo template cho từng việc (8 PR)
-- [ ] Nhắc người dùng quyết định đang chờ: **M51 PR1/PR2 (RLS)** cần xác nhận RÕ RÀNG
-      sẵn sàng tạo role Postgres `xboss_app` + tách `MIGRATE_DATABASE_URL` trên
-      production trước khi lập kế hoạch đợt sau cho phần này.
+- [ ] Đối chiếu diff 5 việc với đặc tả nguồn (`M53-scale-headroom.md` cả 4 PR,
+      `M57-tim-kiem-toan-van.md` mục PR1) + báo cáo coordinator
+- [ ] Xác nhận việc 2 (watermark SSE) verify thật bằng 2 tab trình duyệt (không chỉ tin
+      test) — đây là đường nóng ảnh hưởng mọi người dùng tracking đồng thời
+- [ ] Xác nhận việc 5 (FTS) không rò rỉ chéo dự án/vai trò qua `GlobalSearch` (tự thao
+      tác thử với 1 tài khoản `engineer` + 1 tài khoản `admin`)
+- [ ] Cập nhật `PROGRESS.md` (thêm mục đợt này) + đối chiếu thứ tự đã chốt (dòng 22) —
+      việc kế tiếp sau đợt này là **M56 (2FA/TOTP)**
+- [ ] Push nhánh + mở PR draft theo template cho từng việc (5 PR, hoặc gộp M53 thành 1
+      PR nếu coordinator thấy hợp lý hơn khi tích hợp — quyết định lúc đó, ghi rõ lý do)
