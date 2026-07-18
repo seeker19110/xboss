@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { buildAuditFilter } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,8 @@ export async function GET(req: NextRequest) {
   if (!CAN.viewAudit(me.role))
     return NextResponse.json({ error: "Không có quyền xem audit trail" }, { status: 403 });
 
-  const { where, params } = buildAuditFilter(req.nextUrl.searchParams);
+  const projectId = await getCurrentProjectId(me);
+  const { where, params } = buildAuditFilter(req.nextUrl.searchParams, projectId);
   const page = Math.max(Number(req.nextUrl.searchParams.get("page")) || 0, 0);
   const offset = page * PAGE_SIZE;
 

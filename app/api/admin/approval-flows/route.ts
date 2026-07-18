@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import { APPROVAL_ENTITY_TYPES, createApprovalFlow, listApprovalFlows } from "@/lib/approvals";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +13,8 @@ export async function GET() {
   if (!CAN.viewApprovalFlows(user.role))
     return NextResponse.json({ error: "Không có quyền xem cấu hình duyệt" }, { status: 403 });
 
-  const flows = await listApprovalFlows();
+  const projectId = await getCurrentProjectId(user);
+  const flows = await listApprovalFlows(projectId);
   return NextResponse.json({ flows });
 }
 
