@@ -14,6 +14,7 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "gen:erd": "tsx scripts/gen-erd.ts",
     "check:sw-exclude": "tsx scripts/check-sw-exclude.ts",
+    "check:migrations": "tsx scripts/check-migration-numbers.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:seed": "tsx scripts/seed.ts",

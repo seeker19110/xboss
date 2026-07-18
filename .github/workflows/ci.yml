@@ -54,6 +54,10 @@ jobs:
       - name: Kiểm swExclude registry khớp sw.js
         run: npm run check:sw-exclude
 
+      # Chặn 2+ file migration cùng số thứ tự (đã xảy ra ở đợt M52/M49 song song). Static.
+      - name: Kiểm số thứ tự migration không trùng
+        run: npm run check:migrations
+
       # "npm test" chạy từng file test trong 1 process Node riêng, tuần tự (xem
       # scripts/run-tests.mjs) — cô lập để nhiều file cùng chạm 1 Postgres CI không đụng
       # nhau gây fail ngẫu nhiên. Cùng lệnh với chạy test cục bộ (local === CI).
