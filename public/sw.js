@@ -85,6 +85,20 @@ self.addEventListener("message", (e) => {
   }
 });
 
+// Background Sync (M58 PR2): trình duyệt đánh thức khi có mạng lại (kể cả sau khi tab bị
+// treo) → báo mọi client mở để đẩy hàng đợi offline. Logic hàng đợi nằm ở phía trang
+// (offlineQueue/index.ts) nên SW chỉ chuyển tiếp tín hiệu, không tự gửi. Không client nào
+// mở thì cơ chế listener 'online' + interval lúc mở lại app vẫn gửi bù.
+self.addEventListener("sync", (e) => {
+  if (e.tag === "xboss-flush") {
+    e.waitUntil(
+      self.clients
+        .matchAll({ type: "window", includeUncontrolled: true })
+        .then((list) => list.forEach((c) => c.postMessage({ type: "FLUSH_QUEUE" }))),
+    );
+  }
+});
+
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== location.origin) return;
