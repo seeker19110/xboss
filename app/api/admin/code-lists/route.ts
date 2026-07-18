@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { ROLES } from "@/lib/roles";
 import {
   getList,
   getById,
@@ -45,6 +46,14 @@ export async function POST(req: NextRequest) {
   const label = String(body.label ?? "").trim();
   if (!domain || !code || !label)
     return NextResponse.json({ error: "Thiếu domain, code hoặc label" }, { status: 400 });
+
+  // M56 PR2: domain require_2fa_roles chỉ nhận mã = 1 trong 7 vai trò hợp lệ (lib/roles.ts)
+  // — nếu không, dòng rác không khớp vai trò nào, gây hiểu nhầm là "đã bắt buộc" mà vô hiệu.
+  if (domain === "require_2fa_roles" && !(ROLES as string[]).includes(code))
+    return NextResponse.json(
+      { error: `Mã phải là một vai trò hợp lệ: ${ROLES.join(", ")}` },
+      { status: 400 },
+    );
 
   const sort = body.sort != null ? Number(body.sort) : undefined;
   const active = typeof body.active === "boolean" ? body.active : undefined;

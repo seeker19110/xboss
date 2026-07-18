@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, makeToken, COOKIE, COOKIE_MAX_AGE } from "@/lib/auth";
 import { queryOne, run } from "@/lib/db";
 import { decryptTotpSecret, verifyTotpCode } from "@/lib/totp";
 
@@ -16,17 +16,35 @@ export async function POST(req: NextRequest) {
   if (typeof code !== "string" || !code)
     return NextResponse.json({ error: "Thiếu mã xác nhận" }, { status: 400 });
 
-  const row = await queryOne<{ totp_secret: string | null }>(
-    `SELECT totp_secret FROM users WHERE id = ?`,
+  const row = await queryOne<{ totp_secret: string | null; password_hash: string }>(
+    `SELECT totp_secret, password_hash FROM users WHERE id = ?`,
     user.id,
   );
   if (!row?.totp_secret)
-    return NextResponse.json({ error: "Chưa gọi /setup — chưa có secret chờ xác nhận" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Chưa gọi /setup — chưa có secret chờ xác nhận" },
+      { status: 400 },
+    );
 
   const secret = decryptTotpSecret(row.totp_secret);
   const result = await verifyTotpCode(secret, code.trim());
   if (!result.valid) return NextResponse.json({ error: "Mã không đúng" }, { status: 401 });
 
-  await run(`UPDATE users SET totp_enabled_at = now(), totp_last_step = ? WHERE id = ?`, result.step, user.id);
-  return NextResponse.json({ ok: true });
+  await run(
+    `UPDATE users SET totp_enabled_at = now(), totp_last_step = ? WHERE id = ?`,
+    result.step,
+    user.id,
+  );
+
+  // M56 PR2: vừa bật 2FA thành công → phát lại cookie phiên với mustSetup2fa=false để mở
+  // khoá NGAY (proxy hết chặn), user không phải đăng xuất/đăng nhập lại. Giữ nguyên body.
+  const res = NextResponse.json({ ok: true });
+  res.cookies.set(COOKIE, makeToken(user.id, row.password_hash, false), {
+    httpOnly: true,
+    path: "/",
+    maxAge: COOKIE_MAX_AGE,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+  return res;
 }

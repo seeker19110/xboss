@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
-import { getCurrentUser, hashPassword, verifyPassword, makeToken, COOKIE, COOKIE_MAX_AGE } from "@/lib/auth";
+import {
+  getCurrentUser,
+  hashPassword,
+  verifyPassword,
+  makeToken,
+  requiredRoles,
+  computeMustSetup2fa,
+  COOKIE,
+  COOKIE_MAX_AGE,
+} from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +25,10 @@ export async function PATCH(req: NextRequest) {
   if (newPassword.length < 6)
     return NextResponse.json({ error: "Mật khẩu mới tối thiểu 6 ký tự" }, { status: 400 });
 
-  const u = await queryOne<{ password_hash: string }>(
-    `SELECT password_hash FROM users WHERE id = ?`, me.id);
+  const u = await queryOne<{ password_hash: string; totp_enabled_at: string | null }>(
+    `SELECT password_hash, totp_enabled_at FROM users WHERE id = ?`,
+    me.id,
+  );
   if (!u || !verifyPassword(oldPassword, u.password_hash))
     return NextResponse.json({ error: "Mật khẩu hiện tại không đúng" }, { status: 401 });
 
@@ -26,9 +37,16 @@ export async function PATCH(req: NextRequest) {
 
   // pwFrag đổi → token cũ hết hiệu lực; cấp lại cookie để giữ phiên hiện tại
   // (các phiên khác trên thiết bị khác vẫn bị huỷ — đúng ý đồ bảo mật).
+  // M56 PR2: giữ nguyên trạng thái mustSetup2fa của phiên (đọc lại từ user hiện tại) —
+  // đổi mật khẩu không mở khoá 2FA (chỉ bật 2FA thật mới mở, qua /api/auth/totp/confirm).
+  const required = await requiredRoles();
+  const mustSetup2fa = computeMustSetup2fa(me.role, u.totp_enabled_at, required);
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(COOKIE, makeToken(me.id, newHash), {
-    httpOnly: true, path: "/", maxAge: COOKIE_MAX_AGE, sameSite: "lax",
+  res.cookies.set(COOKIE, makeToken(me.id, newHash, mustSetup2fa), {
+    httpOnly: true,
+    path: "/",
+    maxAge: COOKIE_MAX_AGE,
+    sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
   });
   return res;

@@ -9,12 +9,20 @@ let _promise: Promise<Me | null> | null = null;
 export function fetchMe(): Promise<Me | null> {
   if (!_promise) {
     _promise = fetch("/api/auth/me")
-      .then((r) => {
+      .then(async (r) => {
         if (r.status === 401) {
           redirectToLogin();
           return null;
         }
-        return r.ok ? r.json().then((j: { user: Me }) => j.user) : null;
+        const j = await r.json().catch(() => null);
+        // M56 PR2: tài khoản bị bắt buộc bật 2FA nhưng chưa bật — proxy trả 403 kèm
+        // code "2fa_required" cho mọi API ngoài /api/auth/*. Điều hướng sang trang bật 2FA
+        // thay vì đăng xuất (phiên vẫn hợp lệ).
+        if (j?.code === "2fa_required") {
+          redirectTo2faSetup();
+          return null;
+        }
+        return r.ok && j ? (j.user as Me) : null;
       })
       .catch(() => null);
   }
@@ -40,4 +48,11 @@ export async function redirectToLogin() {
     navigator.serviceWorker.controller.postMessage({ type: "CLEAR_CACHE" });
   }
   window.location.href = "/login";
+}
+
+// M56 PR2: chuyển tới trang bật 2FA khi tài khoản bị bắt buộc mà chưa bật. KHÁC
+// redirectToLogin — KHÔNG xoá cache/hàng đợi offline vì đây vẫn là phiên ĐĂNG NHẬP HỢP LỆ,
+// chỉ cần bật 2FA để mở khoá; xoá cache sẽ mất dữ liệu offline vô ích.
+export function redirectTo2faSetup() {
+  window.location.href = "/account?require2fa=1";
 }

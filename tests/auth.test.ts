@@ -26,14 +26,16 @@ test("verifyPassword: hash rỗng / không hợp lệ trả false", () => {
   assert.equal(verifyPassword("secret", "onlyonesegment"), false);
 });
 
-test("makeToken: token chứa userId + pwFrag + exp", () => {
+test("makeToken: token chứa userId + pwFrag + exp + cờ mustSetup2fa", () => {
   process.env.XBOSS_SECRET = "test-secret-for-unit";
   const hash = hashPassword("pw");
-  const token = makeToken(42, hash);
+  const token = makeToken(42, hash, false);
   const parts = token.split(".");
-  assert.equal(parts.length, 4, "Token phải có 4 phần");
+  assert.equal(parts.length, 5, "Token phải có 5 phần (M56 PR2: thêm cờ mustSetup2fa)");
   assert.equal(parts[0], "42", "phần đầu là userId");
   assert.equal(parts[2], hash.slice(0, 12), "phần 3 là pwFrag");
+  assert.equal(parts[3], "0", "phần 4 là cờ mustSetup2fa = 0 khi false");
+  assert.equal(makeToken(42, hash, true).split(".")[3], "1", "cờ = 1 khi mustSetup2fa true");
 });
 
 // ===== Integration tests: DB =====
@@ -84,7 +86,7 @@ test("password change invalidates old token (pwFrag check)", { skip: !HAS_TEST_D
     hash1,
   );
 
-  const token = mt(userId, hash1);
+  const token = mt(userId, hash1, false);
   const pwFrag = hash1.slice(0, 12);
 
   // Trước khi đổi mật khẩu: pwFrag khớp
