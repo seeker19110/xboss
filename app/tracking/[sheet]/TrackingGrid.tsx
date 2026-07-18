@@ -21,7 +21,9 @@ import {
   FileText,
   Lock,
   ShieldAlert,
+  WifiOff,
 } from "lucide-react";
+import { enqueuePhoto, offlineQueue } from "@/app/components/offlineQueue";
 import CustomFieldsSection from "@/app/components/CustomFieldsSection";
 import { Modal, appAlert, appConfirm, appPrompt } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
@@ -1814,15 +1816,55 @@ function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => void })
   const [error, setError] = useState("");
   const [me, setMe] = useState<{ id: number; role: string } | null>(null);
   const [viewer, setViewer] = useState<Photo | null>(null);
+  // Ảnh chụp offline đang chờ gửi — hiển thị cùng lưới ảnh thật với badge "Chờ gửi".
+  const [pendingPhotos, setPendingPhotos] = useState<
+    { id: number; caption: string; size: number; queuedAt: number; tries: number }[]
+  >([]);
+  const urlMapRef = useRef<Map<number, string>>(new Map());
 
   const load = useCallback(() => {
     fetch(`/api/tasks/${task.id}/photos`)
       .then((r) => r.json())
       .then((j) => setPhotos(j.photos ?? []));
   }, [task.id]);
+
+  // Đọc lại danh sách ảnh chờ gửi của task + dựng/thu hồi object URL preview.
+  const refreshPending = useCallback(async () => {
+    const list = await offlineQueue.getQueuedPhotos(task.id);
+    const map = urlMapRef.current;
+    const liveIds = new Set(list.map((p) => p.id));
+    for (const [id, url] of map) {
+      if (!liveIds.has(id)) {
+        URL.revokeObjectURL(url);
+        map.delete(id);
+      }
+    }
+    for (const p of list) {
+      if (!map.has(p.id)) {
+        const blob = await offlineQueue.getQueuedPhotoBlob(p.id);
+        if (blob) map.set(p.id, URL.createObjectURL(blob));
+      }
+    }
+    setPendingPhotos(list);
+  }, [task.id]);
+
   useEffect(() => {
     load();
   }, [load]);
+  useEffect(() => {
+    refreshPending();
+    // Hàng đợi vừa gửi hết → nạp lại ảnh thật từ server + xoá mục chờ.
+    const off = offlineQueue.onFlushed(() => {
+      load();
+      refreshPending();
+    });
+    const map = urlMapRef.current;
+    return () => {
+      off();
+      for (const url of map.values()) URL.revokeObjectURL(url);
+      map.clear();
+    };
+  }, [load, refreshPending]);
   useEffect(() => {
     fetchMe().then((user) => user && setMe({ id: user.id, role: user.role }));
   }, []);
@@ -1832,15 +1874,48 @@ function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => void })
     setError("");
     // Nén ảnh về ~20% dung lượng gốc trước khi upload
     const file = await compressImage(rawFile);
-    const fd = new FormData();
-    fd.append("file", file);
     const caption =
       (await appPrompt("Ghi chú cho ảnh (tuỳ chọn)", "", {
         placeholder: "VD: đã lắp xong nhánh trục 24F",
       })) ?? "";
-    if (caption.trim()) fd.append("caption", caption.trim());
-    const res = await fetch(`/api/tasks/${task.id}/photos`, { method: "POST", body: fd });
+    const trimmed = caption.trim();
+
+    // Xếp ảnh vào hàng đợi offline (tự nén lại + tự gửi khi có mạng).
+    const queue = async (): Promise<boolean> => {
+      const r = await enqueuePhoto({
+        taskId: task.id,
+        blob: file,
+        caption: trimmed || undefined,
+      });
+      if (!r.ok) {
+        setError(r.error);
+        return false;
+      }
+      showToast("Đã xếp vào hàng đợi offline — tự gửi khi có mạng");
+      await refreshPending();
+      return true;
+    };
+
+    if (!navigator.onLine) {
+      await queue();
+      setUploading(false);
+      return;
+    }
+
+    const fd = new FormData();
+    fd.append("file", file);
+    if (trimmed) fd.append("caption", trimmed);
+    let res: Response;
+    try {
+      res = await fetch(`/api/tasks/${task.id}/photos`, { method: "POST", body: fd });
+    } catch {
+      // Mất mạng giữa chừng → fallback xếp hàng đợi như nhánh offline.
+      await queue();
+      setUploading(false);
+      return;
+    }
     if (!res.ok) {
+      // Lỗi nghiệp vụ thật (quyền/định dạng) — báo lỗi, KHÔNG xếp hàng đợi.
       const j = await res.json().catch(() => ({}));
       setError(j.error ?? "Upload thất bại");
     }
@@ -1894,14 +1969,47 @@ function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => void })
       <div className="overflow-auto p-4">
         {error && <p className="text-sm text-red-400 mb-3">{error}</p>}
         {photos === null && <p className="text-sm text-zinc-500">Đang tải...</p>}
-        {photos?.length === 0 && (
+        {photos?.length === 0 && pendingPhotos.length === 0 && (
           <p className="text-sm text-zinc-500">
             Chưa có ảnh nào. Chụp ảnh hiện trường làm bằng chứng thi công/nghiệm thu.
           </p>
         )}
-        {!!photos?.length && (
+        {(!!photos?.length || pendingPhotos.length > 0) && (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {photos.map((p) => (
+            {pendingPhotos.map((p) => {
+              const url = urlMapRef.current.get(p.id);
+              return (
+                <div
+                  key={`pending-${p.id}`}
+                  className="relative bg-zinc-950/60 border border-amber-800/60 rounded-lg overflow-hidden"
+                >
+                  {url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={url}
+                      alt={p.caption || "Ảnh chờ gửi"}
+                      className="w-full h-32 object-cover opacity-80"
+                    />
+                  ) : (
+                    <div className="w-full h-32 bg-zinc-900" />
+                  )}
+                  <span className="absolute top-1 left-1 flex items-center gap-1 bg-amber-900/90 text-amber-200 text-[10px] px-1.5 py-0.5 rounded">
+                    <WifiOff className="w-3 h-3" /> Chờ gửi
+                  </span>
+                  <div className="px-2 py-1.5">
+                    {p.caption && (
+                      <p className="text-xs truncate" title={p.caption}>
+                        {p.caption}
+                      </p>
+                    )}
+                    <p className="text-[10px] text-zinc-500 truncate">
+                      Chưa gửi · {formatDateTimeVN(new Date(p.queuedAt).toISOString())}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+            {photos?.map((p) => (
               <div
                 key={p.id}
                 className="bg-zinc-950/60 border border-zinc-800 rounded-lg overflow-hidden group"

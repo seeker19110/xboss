@@ -8,15 +8,31 @@ import {
   shouldAttempt,
   shouldRetry,
   tickDedupeIds,
+  diaryDedupeIds,
   wouldExceedPhotoQuota,
   photoQueueBytes,
   computeStats,
   opEndpoint,
   flushQueue,
   PHOTO_QUOTA_BYTES,
+  type DiaryNotePayload,
   type QueuedOp,
   type SendOutcome,
 } from "@/app/components/offlineQueue/logic";
+
+// Payload nhật ký hợp lệ (full-replace body PUT /api/diaries/:date) cho test.
+function diaryPayload(date: string, workDone: string | null = null): DiaryNotePayload {
+  return {
+    date,
+    weatherAm: null,
+    weatherPm: null,
+    workDone,
+    obstacles: null,
+    safetyNote: null,
+    manpower: [],
+    photoIds: [],
+  };
+}
 
 // Nhái enqueueTick của manager: dedup theo dimId rồi thêm bản mới nhất.
 async function enqueueTick(store: MemoryQueueStore, dimId: number, installed: boolean) {
@@ -99,7 +115,7 @@ test("flushQueue giữ thứ tự FIFO 3 loại thao tác", async () => {
   });
   await store.add({
     kind: "diary_note",
-    payload: { date: "2026-07-18", text: "x" },
+    payload: diaryPayload("2026-07-18", "x"),
     queuedAt: 3,
     tries: 0,
   });
@@ -166,7 +182,7 @@ test("opEndpoint ánh xạ URL đúng theo loại", () => {
     opEndpoint({
       id: 1,
       kind: "diary_note",
-      payload: { date: "2026-07-18", text: "x" },
+      payload: diaryPayload("2026-07-18", "x"),
       queuedAt: 0,
       tries: 0,
     }),
@@ -174,12 +190,90 @@ test("opEndpoint ánh xạ URL đúng theo loại", () => {
   );
 });
 
+test("diaryDedupeIds: mỗi ngày chỉ giữ 1 bản nhật ký mới nhất", async () => {
+  const store = new MemoryQueueStore();
+  // Nhái enqueueDiaryNote: dedup theo date rồi thêm bản mới.
+  const enqueue = async (date: string, workDone: string) => {
+    const ops = await store.getAll();
+    for (const id of diaryDedupeIds(ops, date)) await store.remove(id);
+    await store.add({
+      kind: "diary_note",
+      payload: diaryPayload(date, workDone),
+      queuedAt: 0,
+      tries: 0,
+    });
+  };
+  await enqueue("2026-07-18", "bản 1");
+  await enqueue("2026-07-18", "bản 2"); // ghi đè cùng ngày
+  await enqueue("2026-07-19", "ngày khác");
+  const ops = await store.getAll();
+  assert.equal(ops.length, 2);
+  const d18 = ops.find((o) => o.kind === "diary_note" && o.payload.date === "2026-07-18");
+  assert.ok(d18 && d18.kind === "diary_note");
+  assert.equal(d18.payload.workDone, "bản 2"); // giữ bản mới nhất
+});
+
+test("discardDiaryDraft: xoá nháp nhật ký của 1 ngày, giữ nguyên ngày khác", async () => {
+  const store = new MemoryQueueStore();
+  const enqueue = async (date: string, workDone: string) => {
+    const ops = await store.getAll();
+    for (const id of diaryDedupeIds(ops, date)) await store.remove(id);
+    await store.add({
+      kind: "diary_note",
+      payload: diaryPayload(date, workDone),
+      queuedAt: 0,
+      tries: 0,
+    });
+  };
+  // Nhái discardDiaryDraft của manager: lấy id op diary_note cùng ngày rồi xoá.
+  const discard = async (date: string) => {
+    const ops = await store.getAll();
+    for (const id of diaryDedupeIds(ops, date)) await store.remove(id);
+  };
+
+  await enqueue("2026-07-18", "nháp X");
+  await enqueue("2026-07-19", "nháp Y");
+  await store.add({ kind: "tick", payload: { dimId: 3, installed: true }, queuedAt: 0, tries: 0 });
+
+  await discard("2026-07-18"); // đã lưu trực tiếp thành công ngày 18 → xoá nháp cũ
+  const ops = await store.getAll();
+  // Không còn op diary_note ngày 18…
+  assert.equal(
+    ops.some((o) => o.kind === "diary_note" && o.payload.date === "2026-07-18"),
+    false,
+  );
+  // …nhưng nháp ngày 19 và tick vẫn còn.
+  assert.ok(ops.some((o) => o.kind === "diary_note" && o.payload.date === "2026-07-19"));
+  assert.ok(ops.some((o) => o.kind === "tick"));
+
+  // Discard ngày không có nháp → vô hại, không đổi hàng đợi.
+  const before = (await store.getAll()).length;
+  await discard("2026-07-20");
+  assert.equal((await store.getAll()).length, before);
+});
+
+test("payload diary_note là full-replace body — không còn field text", () => {
+  const p = diaryPayload("2026-07-18", "làm việc");
+  // Đủ trường của body PUT /api/diaries/:date (thiếu → server ghi NULL, xoá dữ liệu ngày).
+  assert.deepEqual(Object.keys(p).sort(), [
+    "date",
+    "manpower",
+    "obstacles",
+    "photoIds",
+    "safetyNote",
+    "weatherAm",
+    "weatherPm",
+    "workDone",
+  ]);
+  assert.equal("text" in p, false); // không còn placeholder text của PR2
+});
+
 test("clear làm rỗng hàng đợi (bất biến bảo mật logout)", async () => {
   const store = new MemoryQueueStore();
   await store.add({ kind: "tick", payload: { dimId: 1, installed: true }, queuedAt: 0, tries: 0 });
   await store.add({
     kind: "diary_note",
-    payload: { date: "2026-07-18", text: "y" },
+    payload: diaryPayload("2026-07-18", "y"),
     queuedAt: 0,
     tries: 0,
   });
