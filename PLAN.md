@@ -73,6 +73,47 @@ hoạch này chỉ đính chính + phân việc, không lặp lại đặc tả.
 
 ### Việc
 
+### Đính chính vòng 2 (sau khi spec-executor PR1 dừng lại báo lệch đặc tả, người dùng đã chốt 2026-07-18)
+
+Spec-executor PR1 xác minh 4/12 bảng trong đặc tả gốc lệch code thật, đã dừng đúng luật.
+Người dùng đã quyết:
+
+- **Map tên bảng** (không đổi ngữ nghĩa, chỉ tên): `variations` → `variation_orders`,
+  `payrolls` → `payroll` (số ít), `tenders` → `tender_packages`. Cả 3 đã có cột
+  `project_id` trực tiếp (từ `migrations/0027_multi_project.sql`) — dùng thẳng, không
+  cần thêm cột.
+- **`payment_certs`**: LOẠI khỏi phạm vi PR1 (giữ nguyên nguyên tắc "chỉ bảng có
+  project_id trực tiếp"; bảng này cố ý scope qua `contract_id NOT NULL` theo ADR-0004,
+  không RLS đợt này).
+- **`costs`**: không có bảng tên này; bảng chi phí/thanh toán thực tế gần nhất là
+  `payment_bills` (`migrations/0001_baseline.sql`) — người dùng chọn **thêm cột
+  `project_id` vào `payment_bills` trước rồi mới áp RLS**, theo đúng cùng pattern
+  `migrations/0027_multi_project.sql` đã dùng cho các bảng "gốc cụm" khác:
+  - Trong migration RLS (số thật, dự kiến `0067_rls.sql`): `ALTER TABLE payment_bills
+    ADD COLUMN IF NOT EXISTS project_id INTEGER REFERENCES projects(id)` + backfill
+    `UPDATE payment_bills SET project_id = (SELECT MIN(id) FROM projects) WHERE
+    project_id IS NULL` (an toàn cho DB 1 dự án hiện tại, đúng pattern 0027) + `CREATE
+    INDEX idx_payment_bills_project ON payment_bills(project_id)`.
+  - Cập nhật 3 điểm ghi `INSERT INTO payment_bills` để set `project_id` cho bản ghi mới
+    (đi kèm cùng PR1, KHÔNG tách PR riêng — cùng 1 migration nên phải sửa cùng lúc để
+    tránh cửa sổ dữ liệu thiếu project_id):
+    - `app/api/payments/bills/route.ts` (tạo bill thủ công) — set
+      `project_id = await getCurrentProjectId(user)` (đã có hàm này ở `lib/projects.ts`,
+      import theo pattern route khác đã dùng).
+    - `app/api/payment-certs/[id]/decide/route.ts` (tự sinh bill khi duyệt IPC) — set
+      `project_id` = `project_id` của hợp đồng (`cert.contractId` → `contracts.project_id`,
+      đã join sẵn trong route này, xác nhận lại bằng đọc code trước khi sửa).
+    - `lib/proposals.ts` (tự sinh bill khi duyệt đề xuất) — tương tự, suy qua
+      `p.contractId` → `contracts.project_id`.
+  - 12 bảng phạm vi PR1 sau đính chính (thay cho danh sách gốc trong đặc tả):
+    `contracts, variation_orders, payment_bills, invoices, payroll, insurance_bonds,
+    claims, tender_packages, purchase_orders, advances, cash_transactions` — **CHỈ 11
+    bảng** (đặc tả gốc có `costs`+`payment_certs` = 2 mục không hợp lệ, thay bằng đúng 1
+    `payment_bills`; nếu worker đếm ra số khác 11 sau khi tự xác minh lại thì dừng và báo
+    coordinator, không tự ý thêm bớt thêm nữa ngoài đính chính này).
+- **`WITH CHECK` cho `payment_bills`**: dùng đúng biểu thức 3 nhánh như 11 bảng còn lại
+  (không cần logic khác vì đã có cột `project_id` thật sau bước ALTER ở trên).
+
 #### 1. M51 PR1 — RLS trên nhóm bảng tài chính + ADR-0005
 
 - route: `spec`
