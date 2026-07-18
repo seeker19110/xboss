@@ -54,9 +54,9 @@ const ACTION_LABEL: Record<AuditAction, string> = {
 
 // Màu badge hành động — bám tinh thần lib/status.ts (lookup class tĩnh, không nối chuỗi).
 const ACTION_CLS: Record<AuditAction, string> = {
-  INSERT: "bg-emerald-900/60 text-emerald-300 border border-emerald-800",
-  UPDATE: "bg-amber-900/60 text-amber-300 border border-amber-800",
-  DELETE: "bg-red-900/60 text-red-300 border border-red-800",
+  INSERT: "bg-emerald-900 text-emerald-200",
+  UPDATE: "bg-amber-900 text-amber-200",
+  DELETE: "bg-red-900 text-red-200",
 };
 
 function fmtDt(s: string) {
