@@ -30,8 +30,8 @@ export function invalidateMe() {
 // chuyển về /login. Dùng ở MỌI nơi phát hiện 401 (không chỉ nút "Đăng xuất") — nếu không,
 // trên tablet dùng chung, phiên hết hạn/đóng tab mà không bấm đăng xuất sẽ để lại dữ liệu
 // (thông báo, task, dashboard...) của người trước trong cache cho người đăng nhập sau thấy.
-export function redirectToLogin() {
-  clearOfflineQueue();
+export async function redirectToLogin() {
+  await clearOfflineQueue();
   if (
     typeof navigator !== "undefined" &&
     "serviceWorker" in navigator &&

@@ -58,17 +58,17 @@ export default function LoginPage() {
       return;
     }
     if (res.ok) {
-      onLoginOk();
+      await onLoginOk();
     } else {
       setError(j.error ?? "Đăng nhập thất bại");
       setBusy(false);
     }
   }
 
-  function onLoginOk() {
+  async function onLoginOk() {
     // Đăng nhập mới trên thiết bị dùng chung: dọn cache API + hàng đợi tick offline còn sót
     // lại từ phiên trước (có thể của người khác) để không lẫn dữ liệu giữa 2 người dùng.
-    clearOfflineQueue();
+    await clearOfflineQueue();
     if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage({ type: "CLEAR_CACHE" });
     }
@@ -90,7 +90,7 @@ export default function LoginPage() {
       body: JSON.stringify({ pending, code: totpCode }),
     });
     if (res.ok) {
-      onLoginOk();
+      await onLoginOk();
     } else {
       const j = await res.json().catch(() => ({}));
       setError(j.error ?? "Mã không đúng");
