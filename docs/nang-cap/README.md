@@ -42,9 +42,9 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 | `M51-da-du-an-rls.md`        | RLS phòng tuyến 2 (kèm ADR-0005), template dự án, organizations          | ❌ **chưa** | — (GĐ0 của M54, chưa có RLS/`organizations`)             |
 | `M52-mo-rong-cau-hinh.md`    | code_lists, custom fields, module registry, feature flags, tách tracking | ✅ xong     | `0060_code_lists`/`0062_custom_fields`/`0063_feature_flags` |
 
-## Đặc tả chờ triển khai — đợt Scale/SaaS/BI + bổ sung (M53–M59, viết 07/2026)
+## Đặc tả chờ triển khai — đợt Scale/SaaS/BI + bổ sung (M53–M59 viết 07/2026, M61 viết 2026-07-18)
 
-Từ phân tích so XBoss với ERP chuyên nghiệp (`PROGRESS.md`). **Thứ tự thi hành đã chốt:** M53 → M56 PR2 → M51 (GĐ0 của M54) → M55 → M57 → M58 → M54 GĐ1 → M59.
+Từ phân tích so XBoss với ERP chuyên nghiệp (`PROGRESS.md`). **Thứ tự thi hành đã chốt:** M53 → M56 PR2 → M51 (GĐ0 của M54) → M55 → M57 → M58 → M54 GĐ1 → M59. M61 độc lập (không phụ thuộc chuỗi trên), chèn khi tiện — lưu ý migration có DROP CONSTRAINT phải qua staging.
 
 | File                         | Hạng mục                                                                 | Trạng thái | Ghi chú                                       |
 | ---------------------------- | ------------------------------------------------------------------------ | ---------- | --------------------------------------------- |
@@ -56,6 +56,7 @@ Từ phân tích so XBoss với ERP chuyên nghiệp (`PROGRESS.md`). **Thứ t�
 | `M58-qr-offline-hien-truong.md` | QR tem in `/r/<kind>/<id>` + offline queue IndexedDB ảnh/nhật ký       | ❌ chưa     | —                                             |
 | `M54-multi-tenant-saas.md`   | Trục `org_id` + RLS org + object storage uploads (GĐ1)                    | ❌ chưa     | Phụ thuộc cứng M51                             |
 | `M59-tai-nguyen.md`          | Histogram nhân lực/thiết bị kế hoạch-vs-thực-tế, cảnh báo gán chồng      | ❌ chưa     | Không migration, chỉ tổng hợp                  |
+| `M61-phan-quyen-theo-du-an.md` | Override quyền theo dự án (`role_permissions.project_id`, đóng nợ M52 PR4 module `permissions`) | ❌ chưa | Chạm `lib/auth.ts` (vùng rủi ro cao); migration DROP CONSTRAINT → qua staging |
 
 ## Hoãn có chủ đích (không tự nhặt lại — xem `PROGRESS.md`)
 
