@@ -197,8 +197,9 @@ SELECT m.project_id,
   FROM mv_cost_by_month m
   LEFT JOIN projects p ON p.id = m.project_id;
 
--- bi.cash_fin — dòng tiền thanh toán (payment_bills). amount/labor là cột tiền. project_id suy
--- qua sheet_type → tower → project (payment_bills không có cột project_id trực tiếp).
+-- bi.cash_fin — dòng tiền thanh toán (payment_bills). amount/labor là cột tiền. project_id lấy
+-- TRỰC TIẾP từ payment_bills.project_id (thêm ở 0069_rls) — đúng cột mà RLS scope theo, và
+-- không rớt dòng khi bill chưa gắn sheet_type.
 CREATE OR REPLACE VIEW bi.cash_fin AS
 SELECT pb.id AS bill_id,
        pb.type,
@@ -212,12 +213,10 @@ SELECT pb.id AS bill_id,
        pb.payment_cert_id,
        pb.sheet_type_id,
        pb.floor_label,
-       tw.project_id,
+       pb.project_id,
        p.name AS project_name
   FROM payment_bills pb
-  LEFT JOIN sheet_types st ON st.id = pb.sheet_type_id
-  LEFT JOIN towers tw ON tw.id = st.tower_id
-  LEFT JOIN projects p ON p.id = tw.project_id;
+  LEFT JOIN projects p ON p.id = pb.project_id;
 
 -- ============================ NHÓM VẬT TƯ / MUA SẮM ============================
 -- Không lộ đơn giá (unit_price ở po_items/boq_items) — các view này chỉ ở mức số lượng.
