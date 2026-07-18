@@ -7,6 +7,8 @@
 > **Luật cứng:** việc nào chưa có đặc tả chi tiết → KHÔNG ghi vào kế hoạch với đặc tả
 > tự chế; dừng lại, hỏi người dùng bằng `AskUserQuestion`, chốt xong mới lập kế hoạch.
 > Kế hoạch phải tự chứa — coordinator và worker không thấy hội thoại của phiên chính.
+>
+> **⚠ Trước khi giao số migration mới cho bất kỳ kế hoạch nào: `ls migrations | sort -V | tail -3` để lấy số thật mới nhất — ĐỪNG suy đoán/copy số từ kế hoạch cũ.** Bài học 2026-07-18: PR #265 và PR #266 merge gần nhau cùng chọn số `0071` cho 2 migration khác nhau (do 2 phiên song song không đồng bộ `main` ngay trước lúc code) → chặn CI mọi PR (`check-migration-numbers.ts`) đến khi vá bằng PR #269 (đổi `0071_material_tx_idempotency.sql` → `0072_material_tx_idempotency.sql`). **Số migration tiếp theo cần dùng: `0073`** (đúng tại thời điểm cập nhật file này, đã áp dụng cho kế hoạch M58 PR3 dưới đây — luôn xác nhận lại bằng lệnh trên trước khi dùng, vì có thể đã có PR khác chiếm thêm số sau thời điểm này).
 
 ---
 
@@ -55,7 +57,10 @@ song song trên 2 nhánh/worktree riêng.
 
 ### PR3.1 — Migration + idempotency ảnh
 
-- File mới `migrations/0071_task_photos_hash.sql` (thêm thuần tuý, đi thẳng production
+- File mới `migrations/0073_task_photos_hash.sql` (số đã cập nhật — `0071`/`0072` đã bị
+  chiếm bởi `0071_extracted_text.sql`/`0072_material_tx_idempotency.sql`, xác nhận lại
+  bằng `ls migrations | sort -V | tail -3` trước khi code, đừng dùng số `0071` như bản
+  nháp ban đầu của mục này) (thêm thuần tuý, đi thẳng production
   theo DoD — không đụng dữ liệu hiện có):
   ```sql
   ALTER TABLE task_photos ADD COLUMN IF NOT EXISTS sha256 TEXT;
@@ -187,7 +192,7 @@ phạm vi PR3, đã là hành vi đã chốt từ PR2).
 
 ### Tiêu chí chấp nhận (PR3)
 
-- [ ] Migration `0071` thêm thuần tuý (`ADD COLUMN`/`CREATE INDEX`), `npm run gen:erd` cập nhật.
+- [ ] Migration `0073` thêm thuần tuý (`ADD COLUMN`/`CREATE INDEX`), `npm run gen:erd` cập nhật.
 - [ ] POST ảnh trùng hash cùng task trong 24h → 200 + không nhân đôi dòng DB.
 - [ ] Offline chụp ảnh → xếp hàng đợi, có badge "Chờ gửi", tự gửi khi online, không mất/trùng.
 - [ ] Offline lưu nhật ký → xếp hàng đợi (dedupe theo ngày), tự gửi khi online, **không xoá**
