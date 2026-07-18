@@ -5,6 +5,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { Pool, PoolClient, types } from "pg";
 import { getServerEnv } from "@/lib/env";
 import { getRequestContext } from "@/lib/request-context";
+import { log } from "@/lib/log";
 import { runMigrations } from "./migrate";
 
 // DATE (oid 1082) → giữ nguyên chuỗi 'YYYY-MM-DD' (code so sánh ngày dạng chuỗi).
@@ -27,6 +28,41 @@ export function getPool(): Pool {
     g.__xbossPool = new Pool({ connectionString: url, max: 10 });
   }
   return g.__xbossPool;
+}
+
+// Số liệu quan trắc pool (M53 PR1) — dùng cho GET /api/health (chỉ trả cho Admin/PM).
+// pool.totalCount/idleCount/waitingCount là API có sẵn của thư viện `pg`.
+export function poolStats(): { total: number; idle: number; waiting: number } {
+  const pool = getPool();
+  return { total: pool.totalCount, idle: pool.idleCount, waiting: pool.waitingCount };
+}
+
+// Ngưỡng cảnh báo query chậm (ms) — env XBOSS_SLOW_QUERY_MS, mặc định 500, 0 = tắt hẳn.
+// Đọc lại mỗi lần gọi (không cache) — parseServerEnv chỉ validate biến có mặt hay không
+// (schema z.string().optional()), giá trị số áp mặc định ngay tại đây.
+function slowQueryThresholdMs(): number {
+  const raw = getServerEnv().XBOSS_SLOW_QUERY_MS;
+  const n = raw != null ? Number(raw) : NaN;
+  return Number.isFinite(n) ? n : 500;
+}
+
+// Đo thời gian 1 lượt gọi pg query thật (client.query hoặc pool.query) — cảnh báo nếu
+// vượt ngưỡng. KHÔNG log params (tránh lộ dữ liệu nhạy cảm vào log).
+async function timedPgQuery(
+  exec: () => Promise<import("pg").QueryResult>,
+  sql: string,
+): Promise<import("pg").QueryResult> {
+  const threshold = slowQueryThresholdMs();
+  if (threshold <= 0) return exec();
+  const startedAt = Date.now();
+  try {
+    return await exec();
+  } finally {
+    const durationMs = Date.now() - startedAt;
+    if (durationMs > threshold) {
+      log.warn("slow_query", { sql: sql.slice(0, 120), durationMs });
+    }
+  }
 }
 
 // Tự áp migration 1 lần mỗi process khi query đầu tiên chạy. runMigrations dùng
@@ -54,7 +90,11 @@ export async function query<T = Record<string, unknown>>(
 ): Promise<T[]> {
   await ensureSchema();
   const tx = txStorage.getStore();
-  const r = tx ? await tx.query(toPg(sql), params) : await getPool().query(toPg(sql), params);
+  const pgSql = toPg(sql);
+  const r = await timedPgQuery(
+    () => (tx ? tx.query(pgSql, params) : getPool().query(pgSql, params)),
+    sql,
+  );
   return r.rows as T[];
 }
 
@@ -69,7 +109,11 @@ export async function queryOne<T = Record<string, unknown>>(
 export async function run(sql: string, ...params: unknown[]): Promise<{ changes: number }> {
   await ensureSchema();
   const tx = txStorage.getStore();
-  const r = tx ? await tx.query(toPg(sql), params) : await getPool().query(toPg(sql), params);
+  const pgSql = toPg(sql);
+  const r = await timedPgQuery(
+    () => (tx ? tx.query(pgSql, params) : getPool().query(pgSql, params)),
+    sql,
+  );
   return { changes: r.rowCount ?? 0 };
 }
 
@@ -81,7 +125,10 @@ export async function insertId(sql: string, ...params: unknown[]): Promise<numbe
   const needsReturning = !/returning\s+id\s*$/i.test(pgSql.trim());
   const finalSql = needsReturning ? pgSql + " RETURNING id" : pgSql;
   const tx = txStorage.getStore();
-  const r = tx ? await tx.query(finalSql, params) : await getPool().query(finalSql, params);
+  const r = await timedPgQuery(
+    () => (tx ? tx.query(finalSql, params) : getPool().query(finalSql, params)),
+    sql,
+  );
   return Number(r.rows[0].id);
 }
 

@@ -62,6 +62,9 @@ const serverSchema = z.object({
   // Seed dữ liệu (scripts/seed)
   XLSX_FILE: z.string().optional(),
 
+  // Ngưỡng cảnh báo query chậm (ms) — mặc định 500, 0 = tắt hẳn (M53 PR1, lib/db/index.ts).
+  XBOSS_SLOW_QUERY_MS: z.string().optional(),
+
   // Theo dõi lỗi (Sentry) — thiếu thì sentry.server.config.ts/sentry.edge.config.ts tự
   // enabled=false (đọc trực tiếp process.env.SENTRY_DSN, không qua getServerEnv(), vì
   // instrumentation.ts chạy lúc server bootstrap, trước khi chắc chắn có DATABASE_URL để
