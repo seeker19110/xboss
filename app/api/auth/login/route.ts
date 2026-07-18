@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne } from "@/lib/db";
-import { verifyPassword, makeToken, ensureDefaultUsers, COOKIE, COOKIE_MAX_AGE } from "@/lib/auth";
+import {
+  verifyPassword,
+  makeToken,
+  makeTotpPendingToken,
+  ensureDefaultUsers,
+  COOKIE,
+  COOKIE_MAX_AGE,
+} from "@/lib/auth";
 import { loginBlockedSeconds, recordLoginFailure, recordLoginSuccess } from "@/lib/ratelimit";
 
 export const dynamic = "force-dynamic";
@@ -38,13 +45,26 @@ export async function POST(req: NextRequest) {
     email: string;
     role: string;
     password_hash: string;
-  }>(`SELECT id, name, email, role, password_hash FROM users WHERE email = ?`, emailNorm);
+    totp_enabled_at: string | null;
+  }>(
+    `SELECT id, name, email, role, password_hash, totp_enabled_at FROM users WHERE email = ?`,
+    emailNorm,
+  );
   if (!u || !verifyPassword(password, u.password_hash)) {
     await recordLoginFailure(ip, emailNorm);
     return NextResponse.json({ error: "Email hoặc mật khẩu không đúng" }, { status: 401 });
   }
 
   await recordLoginSuccess(ip, emailNorm);
+
+  // Đã bật 2FA: KHÔNG set cookie phiên ngay — trả token tạm 5 phút, bước 2 xác minh mã
+  // TOTP/recovery qua POST /api/auth/login/2fa.
+  if (u.totp_enabled_at) {
+    return NextResponse.json({
+      need2fa: true,
+      pending: makeTotpPendingToken(u.id, u.password_hash),
+    });
+  }
   const res = NextResponse.json({ user: { id: u.id, name: u.name, email: u.email, role: u.role } });
   res.cookies.set(COOKIE, makeToken(u.id, u.password_hash), {
     httpOnly: true,

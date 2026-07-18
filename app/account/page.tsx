@@ -6,6 +6,7 @@ import AppHeader from "@/app/components/AppHeader";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { fetchMe, invalidateMe, redirectToLogin } from "@/app/lib/me";
 import { ROLE_LABELS } from "@/lib/roles";
+import TwoFactorSection from "@/app/components/TwoFactorSection";
 
 type Me = { id: number; name: string; email: string; role: string };
 const ROLE_LABEL: Record<string, string> = ROLE_LABELS;
@@ -82,6 +83,8 @@ export default function AccountPage() {
             <p className="text-xs text-emerald-400 mt-0.5">{ROLE_LABEL[me.role] ?? me.role}</p>
           </div>
         </div>
+
+        <TwoFactorSection />
 
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl divide-y divide-zinc-800 overflow-hidden">
           {links.map((l) => (
