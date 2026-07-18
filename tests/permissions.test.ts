@@ -41,6 +41,29 @@ test("validatePermOverride: chặn role/permKey sai + luật mở quyền ghi", 
   assert.equal(validatePermOverride("pm", "manageUsers", false), null);
 });
 
+// ── M61: luật validate áp cho MỌI phạm vi (toàn hệ + theo dự án) ──────────────────
+test("validatePermOverride: luật LOCKED_PERMS + chống tự khoá áp cả phạm vi dự án", async () => {
+  const { validatePermOverride } = await import("@/lib/auth");
+
+  // Mở quyền GHI theo dự án (projectId số) vẫn bị chặn — LOCKED_PERMS áp mọi phạm vi.
+  assert.equal(typeof validatePermOverride("engineer", "approve", true, 7), "string");
+  // Siết quyền ghi theo dự án → hợp lệ.
+  assert.equal(validatePermOverride("engineer", "editProgress", false, 7), null);
+  // Mở quyền XEM theo dự án → hợp lệ.
+  assert.equal(validatePermOverride("viewer", "viewPayments", true, 7), null);
+
+  // Chống tự khoá admin/manageUsers áp cả khi siết chỉ trong 1 dự án.
+  assert.equal(typeof validatePermOverride("admin", "manageUsers", false, 7), "string");
+  // Siết manageUsers của vai trò khác theo dự án → hợp lệ.
+  assert.equal(validatePermOverride("pm", "manageUsers", false, 7), null);
+
+  // projectId null (toàn hệ) hợp lệ; số nguyên dương hợp lệ; số/kiểu sai → lỗi.
+  assert.equal(validatePermOverride("pm", "approve", false, null), null);
+  assert.equal(typeof validatePermOverride("pm", "approve", false, 0), "string");
+  assert.equal(typeof validatePermOverride("pm", "approve", false, -3), "string");
+  assert.equal(typeof validatePermOverride("pm", "approve", false, 1.5), "string");
+});
+
 // ── Lớp tích hợp: cache + CAN + audit (cần Postgres) ─────────────────────────────
 test(
   "override: default → siết pm.approve → xoá về default; mở viewer.viewPayments; audit ghi",

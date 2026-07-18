@@ -181,7 +181,7 @@ Parse file tracking gốc (sheet OGTĐ/OGHL/OGCH/ODNN) thành WBS — chứa log
 
 ## Quy trình & Definition of Done
 
-Luồng chuẩn: hiểu yêu cầu → khám phá & tái dùng → code → cập nhật test khi đổi logic → `npm run lint` + `npm run typecheck` (+ `npm test` khi có thể) → commit → push branch → mở **PR draft**.
+Luồng chuẩn: hiểu yêu cầu → khám phá & tái dùng → code → cập nhật test khi đổi logic → `npm run lint` + `npm run typecheck` (+ `npm test` khi có thể) → **cập nhật `PROGRESS.md` (và `docs/nang-cap/README.md` nếu đóng/mở 1 mục `M<xx>`)** → commit → push branch → mở **PR draft**.
 
 Trước khi push, đảm bảo:
 
@@ -191,3 +191,4 @@ Trước khi push, đảm bảo:
 - [ ] File test chạm DB import `tests/setup.ts` **đầu tiên**; đã tự review diff đúng phạm vi.
 - [ ] CI (`.github/workflows/ci.yml`) xanh: `npm audit` → lint → typecheck → test (Postgres 16) → build.
 - [ ] **Migration đụng dữ liệu** (`UPDATE`/backfill/đổi kiểu cột `ALTER COLUMN ... TYPE`/`DROP COLUMN`) phải chạy qua staging trước (`bash deploy.sh --staging`, xem `docs/ops/staging.md`) rồi mới lên production; kiểm trước bằng `npm run db:migrate -- --dry-run`. Migration chỉ `CREATE TABLE`/`ADD COLUMN`/`CREATE INDEX` (thêm thuần tuý, không đụng dòng dữ liệu hiện có) được đi thẳng production.
+- [ ] **Mọi commit thêm tính năng/fix có ý nghĩa đã ghi vào `PROGRESS.md`** (mục "Đã làm"/"Tiếp theo" đúng chỗ, kèm số PR khi đã mở) **trước khi push** — không để tài liệu lệch code (bài học lặp lại nhiều lần: dở dang tưởng đã xong hoặc ngược lại vì tài liệu quên cập nhật). Nếu commit đóng/mở 1 mục `M<xx>` trong `docs/nang-cap/`, cập nhật luôn trạng thái trong `docs/nang-cap/README.md`.
