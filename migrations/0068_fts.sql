@@ -20,9 +20,19 @@
 
 CREATE EXTENSION IF NOT EXISTS unaccent;
 
--- Bọc IMMUTABLE + PARALLEL SAFE + STRICT để dùng được trong index biểu thức.
+-- Bọc IMMUTABLE + PARALLEL SAFE + STRICT để dùng được trong index biểu thức. Cả tên
+-- HÀM (public.unaccent) lẫn tên DICTIONARY ('public.unaccent', đối số đầu — Postgres
+-- tra cứu text search dictionary cũng theo search_path) đều phải schema-qualify vì hàm
+-- IMMUTABLE đơn giản này bị Postgres planner "inline" vào câu gọi (kể cả autovacuum
+-- ANALYZE trên index biểu thức) — lúc đó search_path hiệu lực là của tiến trình gọi, và
+-- autovacuum worker chạy với search_path thu hẹp chỉ pg_catalog (không có public), nên
+-- thiếu tiền tố ở BẤT KỲ chỗ nào trong 2 chỗ trên đều lỗi (đã tái hiện + xác nhận cả 2
+-- lỗi thật bằng SET search_path=pg_catalog rồi thử tay: "function unaccent(unknown,
+-- unknown) does not exist" khi thiếu tiền tố hàm; "text search dictionary \"unaccent\"
+-- does not exist" khi thiếu tiền tố dictionary — đúng khớp lỗi lặp lại trong log CI mỗi
+-- chu kỳ autovacuum ANALYZE bảng có index FTS).
 CREATE OR REPLACE FUNCTION xboss_unaccent(text) RETURNS text AS
-  $$ SELECT unaccent('unaccent', $1) $$ LANGUAGE sql IMMUTABLE PARALLEL SAFE STRICT;
+  $$ SELECT public.unaccent('public.unaccent', $1) $$ LANGUAGE sql IMMUTABLE PARALLEL SAFE STRICT;
 
 -- WBS: nâng FTS tasks/work_packages từ name-only (không dấu) sang biểu thức gộp
 -- mã + BOQ + tên, bỏ dấu. Index cũ idx_tasks_fts/idx_wp_fts (0001_baseline) giữ

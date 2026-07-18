@@ -104,6 +104,7 @@
 - `idx_wp_boq_lower`: INDEX idx_wp_boq_lower ON public.work_packages USING btree (lower(boq_code)) WHERE (boq_code IS NOT NULL)
 - `idx_wp_code_lower`: INDEX idx_wp_code_lower ON public.work_packages USING btree (lower(code))
 - `idx_wp_fts`: INDEX idx_wp_fts ON public.work_packages USING gin (to_tsvector('simple'::regconfig, COALESCE(name, ''::text)))
+- `idx_wp_fts_ua`: INDEX idx_wp_fts_ua ON public.work_packages USING gin (to_tsvector('simple'::regconfig, xboss_unaccent(((((COALESCE(code, ''::text) || ' '::text) || COALESCE(boq_code, ''::text)) || ' '::text) || COALESCE(name, ''::text)))))
 - `idx_wp_sheet`: INDEX idx_wp_sheet ON public.work_packages USING btree (sheet_type_id)
 - `uniq_wp_boq`: UNIQUE INDEX uniq_wp_boq ON public.work_packages USING btree (boq_code) WHERE (boq_code IS NOT NULL)
 - `uniq_wp_sheet_code`: UNIQUE INDEX uniq_wp_sheet_code ON public.work_packages USING btree (sheet_type_id, lower(code))
@@ -145,6 +146,7 @@
 - `idx_tasks_code_lower`: INDEX idx_tasks_code_lower ON public.tasks USING btree (lower(code))
 - `idx_tasks_end`: INDEX idx_tasks_end ON public.tasks USING btree (end_date)
 - `idx_tasks_fts`: INDEX idx_tasks_fts ON public.tasks USING gin (to_tsvector('simple'::regconfig, COALESCE(name, ''::text)))
+- `idx_tasks_fts_ua`: INDEX idx_tasks_fts_ua ON public.tasks USING gin (to_tsvector('simple'::regconfig, xboss_unaccent(((((COALESCE(code, ''::text) || ' '::text) || COALESCE(boq_code, ''::text)) || ' '::text) || COALESCE(name, ''::text)))))
 - `idx_tasks_package`: INDEX idx_tasks_package ON public.tasks USING btree (package_id)
 - `idx_tasks_start`: INDEX idx_tasks_start ON public.tasks USING btree (start_date)
 - `idx_tasks_updated_at`: INDEX idx_tasks_updated_at ON public.tasks USING btree (updated_at DESC)
@@ -400,6 +402,7 @@
 
 **Index:**
 - `idx_comments_task`: INDEX idx_comments_task ON public.task_comments USING btree (task_id)
+- `idx_task_comments_fts`: INDEX idx_task_comments_fts ON public.task_comments USING gin (to_tsvector('simple'::regconfig, xboss_unaccent(COALESCE(body, ''::text))))
 - `task_comments_pkey`: UNIQUE INDEX task_comments_pkey ON public.task_comments USING btree (id)
 
 ### task_documents
@@ -717,6 +720,7 @@
 - `contracts_code_key`: UNIQUE INDEX contracts_code_key ON public.contracts USING btree (code)
 - `contracts_pkey`: UNIQUE INDEX contracts_pkey ON public.contracts USING btree (id)
 - `idx_contracts_alive`: INDEX idx_contracts_alive ON public.contracts USING btree (id) WHERE (deleted_at IS NULL)
+- `idx_contracts_fts`: INDEX idx_contracts_fts ON public.contracts USING gin (to_tsvector('simple'::regconfig, xboss_unaccent(((((COALESCE(code, ''::text) || ' '::text) || COALESCE(title, ''::text)) || ' '::text) || COALESCE(party_name, ''::text)))))
 - `idx_contracts_kind`: INDEX idx_contracts_kind ON public.contracts USING btree (kind)
 - `idx_contracts_project`: INDEX idx_contracts_project ON public.contracts USING btree (project_id)
 
@@ -1376,6 +1380,7 @@
 - `task_id` → `tasks(id)`
 
 **Index:**
+- `idx_materials_fts`: INDEX idx_materials_fts ON public.materials USING gin (to_tsvector('simple'::regconfig, xboss_unaccent(((COALESCE(boq_code, ''::text) || ' '::text) || COALESCE(name, ''::text)))))
 - `idx_materials_project`: INDEX idx_materials_project ON public.materials USING btree (project_id)
 - `idx_materials_sheet`: INDEX idx_materials_sheet ON public.materials USING btree (sheet_type_id)
 - `idx_materials_updated_at`: INDEX idx_materials_updated_at ON public.materials USING btree (updated_at DESC)
@@ -1810,6 +1815,7 @@
 
 **Index:**
 - `idx_ncrs_assigned`: INDEX idx_ncrs_assigned ON public.ncrs USING btree (assigned_to)
+- `idx_ncrs_fts`: INDEX idx_ncrs_fts ON public.ncrs USING gin (to_tsvector('simple'::regconfig, xboss_unaccent(((COALESCE(code, ''::text) || ' '::text) || COALESCE(description, ''::text)))))
 - `idx_ncrs_project`: INDEX idx_ncrs_project ON public.ncrs USING btree (project_id)
 - `idx_ncrs_status`: INDEX idx_ncrs_status ON public.ncrs USING btree (status)
 - `idx_ncrs_task`: INDEX idx_ncrs_task ON public.ncrs USING btree (task_id)
@@ -2069,6 +2075,7 @@
 - `project_id` → `projects(id)`
 
 **Index:**
+- `idx_site_diaries_fts`: INDEX idx_site_diaries_fts ON public.site_diaries USING gin (to_tsvector('simple'::regconfig, xboss_unaccent(((((COALESCE(work_done, ''::text) || ' '::text) || COALESCE(obstacles, ''::text)) || ' '::text) || COALESCE(safety_note, ''::text)))))
 - `idx_site_diaries_project`: INDEX idx_site_diaries_project ON public.site_diaries USING btree (project_id)
 - `site_diaries_pkey`: UNIQUE INDEX site_diaries_pkey ON public.site_diaries USING btree (id)
 - `uq_site_diaries_date_project`: UNIQUE INDEX uq_site_diaries_date_project ON public.site_diaries USING btree (diary_date, project_id)
@@ -2560,6 +2567,7 @@
 **Index:**
 - `drawings_code_key`: UNIQUE INDEX drawings_code_key ON public.drawings USING btree (code)
 - `drawings_pkey`: UNIQUE INDEX drawings_pkey ON public.drawings USING btree (id)
+- `idx_drawings_fts`: INDEX idx_drawings_fts ON public.drawings USING gin (to_tsvector('simple'::regconfig, xboss_unaccent(((COALESCE(code, ''::text) || ' '::text) || COALESCE(name, ''::text)))))
 - `idx_drawings_kind`: INDEX idx_drawings_kind ON public.drawings USING btree (kind)
 - `idx_drawings_project`: INDEX idx_drawings_project ON public.drawings USING btree (project_id)
 - `idx_drawings_wp`: INDEX idx_drawings_wp ON public.drawings USING btree (work_package_id)
@@ -2673,6 +2681,7 @@
 - `uploaded_by` → `users(id)`
 
 **Index:**
+- `idx_project_documents_fts`: INDEX idx_project_documents_fts ON public.project_documents USING gin (to_tsvector('simple'::regconfig, xboss_unaccent(COALESCE(title, ''::text))))
 - `idx_project_documents_project`: INDEX idx_project_documents_project ON public.project_documents USING btree (project_id)
 - `project_documents_pkey`: UNIQUE INDEX project_documents_pkey ON public.project_documents USING btree (id)
 
@@ -2709,6 +2718,7 @@
 **Index:**
 - `correspondences_pkey`: UNIQUE INDEX correspondences_pkey ON public.correspondences USING btree (id)
 - `idx_correspondences_drawing`: INDEX idx_correspondences_drawing ON public.correspondences USING btree (drawing_id)
+- `idx_correspondences_fts`: INDEX idx_correspondences_fts ON public.correspondences USING gin (to_tsvector('simple'::regconfig, xboss_unaccent(((((COALESCE(code, ''::text) || ' '::text) || COALESCE(subject, ''::text)) || ' '::text) || COALESCE(note, ''::text)))))
 - `idx_correspondences_project`: INDEX idx_correspondences_project ON public.correspondences USING btree (project_id)
 - `idx_correspondences_reply`: INDEX idx_correspondences_reply ON public.correspondences USING btree (reply_id)
 - `idx_correspondences_status`: INDEX idx_correspondences_status ON public.correspondences USING btree (status)
@@ -2756,6 +2766,7 @@
 
 **Index:**
 - `idx_meetings_date`: INDEX idx_meetings_date ON public.meetings USING btree (meeting_date)
+- `idx_meetings_fts`: INDEX idx_meetings_fts ON public.meetings USING gin (to_tsvector('simple'::regconfig, xboss_unaccent(((COALESCE(title, ''::text) || ' '::text) || COALESCE(content, ''::text)))))
 - `idx_meetings_project`: INDEX idx_meetings_project ON public.meetings USING btree (project_id)
 - `meetings_pkey`: UNIQUE INDEX meetings_pkey ON public.meetings USING btree (id)
 
@@ -3256,6 +3267,20 @@
 - `ix_saved_reports_owner`: INDEX ix_saved_reports_owner ON public.saved_reports USING btree (owner_id)
 - `ix_saved_reports_project`: INDEX ix_saved_reports_project ON public.saved_reports USING btree (project_id)
 - `saved_reports_pkey`: UNIQUE INDEX saved_reports_pkey ON public.saved_reports USING btree (id)
+
+### sheet_versions
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| sheet_type_id | integer |  |  |
+| version | bigint |  | `1` |
+| updated_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `sheet_type_id` → `sheet_types(id)`
+
+**Index:**
+- `sheet_versions_pkey`: UNIQUE INDEX sheet_versions_pkey ON public.sheet_versions USING btree (sheet_type_id)
 
 ### totp_recovery_codes
 
