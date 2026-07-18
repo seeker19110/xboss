@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { query, insertId } from "@/lib/db";
+import { query, insertId, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import {
@@ -32,17 +32,19 @@ export async function GET(
   if (isNaN(claimId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
-  const claim = await getClaim(claimId, projectId);
-  if (!claim) return NextResponse.json({ error: "Không tìm thấy claim" }, { status: 404 });
-
-  const documents = await query(
-    `SELECT d.id, d.title, d.original_name AS "originalName", d.mime_type AS "mimeType",
-            d.size_bytes AS "sizeBytes", d.created_at AS "createdAt", d.sha256,
-            d.uploaded_by AS "uploadedBy", u.name AS "uploaderName"
-       FROM claim_documents d LEFT JOIN users u ON u.id = d.uploaded_by
-      WHERE d.claim_id = ? ORDER BY d.id DESC`,
-    claimId,
-  );
+  const documents = await withProjectScope(projectId ?? "*", async () => {
+    const claim = await getClaim(claimId, projectId);
+    if (!claim) return null;
+    return query(
+      `SELECT d.id, d.title, d.original_name AS "originalName", d.mime_type AS "mimeType",
+              d.size_bytes AS "sizeBytes", d.created_at AS "createdAt", d.sha256,
+              d.uploaded_by AS "uploadedBy", u.name AS "uploaderName"
+         FROM claim_documents d LEFT JOIN users u ON u.id = d.uploaded_by
+        WHERE d.claim_id = ? ORDER BY d.id DESC`,
+      claimId,
+    );
+  });
+  if (!documents) return NextResponse.json({ error: "Không tìm thấy claim" }, { status: 404 });
   return NextResponse.json({ documents });
 }
 

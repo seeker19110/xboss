@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne } from "@/lib/db";
+import { query, queryOne, withProjectScope } from "@/lib/db";
 import { requireApiKey } from "@/lib/api-keys";
 
 export const dynamic = "force-dynamic";
@@ -21,17 +21,19 @@ export async function GET(req: NextRequest) {
        JOIN contracts c ON pc.contract_id = c.id
       WHERE c.project_id = ?`;
 
-  const totalRow = await queryOne<{ total: number }>(`SELECT COUNT(*) AS total ${from}`, projectId);
-  const rows = await query(
-    `SELECT pc.id, pc.code, pc.contract_id AS "contractId", pc.period_no AS "periodNo",
-            pc.status, pc.submitted_at AS "submittedAt", pc.decided_at AS "decidedAt"
-       ${from}
-      ORDER BY pc.id
-      LIMIT ? OFFSET ?`,
-    projectId,
-    limit,
-    offset,
-  );
+  const { totalRow, rows } = await withProjectScope(projectId, async () => ({
+    totalRow: await queryOne<{ total: number }>(`SELECT COUNT(*) AS total ${from}`, projectId),
+    rows: await query(
+      `SELECT pc.id, pc.code, pc.contract_id AS "contractId", pc.period_no AS "periodNo",
+              pc.status, pc.submitted_at AS "submittedAt", pc.decided_at AS "decidedAt"
+         ${from}
+        ORDER BY pc.id
+        LIMIT ? OFFSET ?`,
+      projectId,
+      limit,
+      offset,
+    ),
+  }));
 
   return NextResponse.json({ data: rows, page, total: totalRow?.total ?? 0 });
 }

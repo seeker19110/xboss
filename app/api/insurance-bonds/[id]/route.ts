@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { writeFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
-import { queryOne, run } from "@/lib/db";
+import { queryOne, run, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import {
@@ -60,20 +60,22 @@ export async function GET(
   const projectId = await getCurrentProjectId(user);
   const bond =
     projectId != null
-      ? await queryOne<Record<string, unknown>>(
-          `SELECT b.id, b.project_id AS "projectId", b.contract_id AS "contractId",
-                  c.title AS "contractTitle", c.code AS "contractCode",
-                  b.kind, b.title, b.provider, b.code, b.value,
-                  b.issued_date AS "issuedDate", b.expiry_date AS "expiryDate", b.status, b.note,
-                  b.file_name AS "fileName", b.original_name AS "originalName",
-                  b.mime_type AS "mimeType", b.size_bytes AS "sizeBytes",
-                  b.created_by AS "createdBy", u.name AS "createdByName", b.created_at AS "createdAt"
-             FROM insurance_bonds b
-             LEFT JOIN contracts c ON c.id = b.contract_id
-             LEFT JOIN users u ON u.id = b.created_by
-            WHERE b.id = ? AND b.project_id = ?`,
-          id,
-          projectId,
+      ? await withProjectScope(projectId, () =>
+          queryOne<Record<string, unknown>>(
+            `SELECT b.id, b.project_id AS "projectId", b.contract_id AS "contractId",
+                    c.title AS "contractTitle", c.code AS "contractCode",
+                    b.kind, b.title, b.provider, b.code, b.value,
+                    b.issued_date AS "issuedDate", b.expiry_date AS "expiryDate", b.status, b.note,
+                    b.file_name AS "fileName", b.original_name AS "originalName",
+                    b.mime_type AS "mimeType", b.size_bytes AS "sizeBytes",
+                    b.created_by AS "createdBy", u.name AS "createdByName", b.created_at AS "createdAt"
+               FROM insurance_bonds b
+               LEFT JOIN contracts c ON c.id = b.contract_id
+               LEFT JOIN users u ON u.id = b.created_by
+              WHERE b.id = ? AND b.project_id = ?`,
+            id,
+            projectId,
+          ),
         )
       : undefined;
   if (!bond)

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne, run, withTransaction } from "@/lib/db";
+import { query, queryOne, run, withTransaction, withProjectScope } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { assertModuleEnabled } from "@/lib/feature-flags";
@@ -35,47 +35,56 @@ export async function GET(
   const projectId = await getCurrentProjectId(user);
   const blocked = await assertModuleEnabled("materials", projectId);
   if (blocked) return blocked;
-  const exists = projectId != null ? await getPurchaseOrder(id, projectId) : undefined;
-  if (!exists) return NextResponse.json({ error: "Không tìm thấy đơn hàng" }, { status: 404 });
+  const result = await withProjectScope(projectId ?? "*", async () => {
+    const exists = projectId != null ? await getPurchaseOrder(id, projectId) : undefined;
+    if (!exists) return null;
 
-  const po = await queryOne(
-    `SELECT po.id, po.po_code AS "poCode", po.status,
-            po.expected_date AS "expectedDate", po.note,
-            po.created_at AS "createdAt",
-            s.id AS "supplierId", s.name AS "supplierName", s.phone AS "supplierPhone",
-            u.name AS "createdByName"
-       FROM purchase_orders po
-       LEFT JOIN suppliers s ON po.supplier_id = s.id
-       LEFT JOIN users u ON po.created_by = u.id
-      WHERE po.id = ?`,
-    id,
-  );
-  if (!po) return NextResponse.json({ error: "Không tìm thấy đơn hàng" }, { status: 404 });
+    const po = await queryOne(
+      `SELECT po.id, po.po_code AS "poCode", po.status,
+              po.expected_date AS "expectedDate", po.note,
+              po.created_at AS "createdAt",
+              s.id AS "supplierId", s.name AS "supplierName", s.phone AS "supplierPhone",
+              u.name AS "createdByName"
+         FROM purchase_orders po
+         LEFT JOIN suppliers s ON po.supplier_id = s.id
+         LEFT JOIN users u ON po.created_by = u.id
+        WHERE po.id = ?`,
+      id,
+    );
+    if (!po) return null;
 
-  const items = await query(
-    `SELECT pi.id, pi.material_id AS "materialId", m.name AS "materialName",
-            m.unit AS "unit", m.boq_code AS "boqCode",
-            pi.qty_ordered AS "qtyOrdered", pi.qty_received AS "qtyReceived",
-            pi.unit_price AS "unitPrice", pi.note,
-            pi.pr_id AS "prId"
-       FROM po_items pi
-       LEFT JOIN materials m ON pi.material_id = m.id
-      WHERE pi.po_id = ?
-      ORDER BY pi.id`,
-    id,
-  );
+    const items = await query(
+      `SELECT pi.id, pi.material_id AS "materialId", m.name AS "materialName",
+              m.unit AS "unit", m.boq_code AS "boqCode",
+              pi.qty_ordered AS "qtyOrdered", pi.qty_received AS "qtyReceived",
+              pi.unit_price AS "unitPrice", pi.note,
+              pi.pr_id AS "prId"
+         FROM po_items pi
+         LEFT JOIN materials m ON pi.material_id = m.id
+        WHERE pi.po_id = ?
+        ORDER BY pi.id`,
+      id,
+    );
 
-  const history = await query(
-    `SELECT h.from_status AS "fromStatus", h.to_status AS "toStatus",
-            h.changed_at AS "changedAt", u.name AS "changedByName"
-       FROM po_status_history h
-       LEFT JOIN users u ON u.id = h.changed_by
-      WHERE h.po_id = ?
-      ORDER BY h.changed_at`,
-    id,
-  );
+    const history = await query(
+      `SELECT h.from_status AS "fromStatus", h.to_status AS "toStatus",
+              h.changed_at AS "changedAt", u.name AS "changedByName"
+         FROM po_status_history h
+         LEFT JOIN users u ON u.id = h.changed_by
+        WHERE h.po_id = ?
+        ORDER BY h.changed_at`,
+      id,
+    );
 
-  return NextResponse.json({ po, items: stripSensitive("poItem", items, user), history });
+    return { po, items, history };
+  });
+  if (!result) return NextResponse.json({ error: "Không tìm thấy đơn hàng" }, { status: 404 });
+
+  return NextResponse.json({
+    po: result.po,
+    items: stripSensitive("poItem", result.items, user),
+    history: result.history,
+  });
 }
 
 // PATCH /api/purchase-orders/:id  body: { status?, supplierId?, expectedDate?, note? }

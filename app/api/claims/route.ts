@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { insertId } from "@/lib/db";
+import { insertId, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { withUniqueRetry } from "@/lib/seqcode";
@@ -39,12 +39,14 @@ export async function GET(req: NextRequest) {
   const deletedView =
     user.role === "admin" && sp.get("includeDeleted") === "1" ? "deleted" : "alive";
   const projectId = await getCurrentProjectId(user);
-  const items = await listClaims(projectId, {
-    kind: kindRaw as ClaimKind | undefined,
-    status: statusRaw as ClaimStatus | undefined,
-    contractId,
-    deletedView,
-  });
+  const items = await withProjectScope(projectId ?? "*", () =>
+    listClaims(projectId, {
+      kind: kindRaw as ClaimKind | undefined,
+      status: statusRaw as ClaimStatus | undefined,
+      contractId,
+      deletedView,
+    }),
+  );
   return NextResponse.json({ items });
 }
 

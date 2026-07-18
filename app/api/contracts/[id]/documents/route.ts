@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { query, queryOne, insertId } from "@/lib/db";
+import { query, queryOne, insertId, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import {
@@ -32,24 +32,26 @@ export async function GET(
   if (isNaN(contractId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
-  const contract =
+  const documents =
     projectId != null
-      ? await queryOne<{ id: number }>(
-          `SELECT id FROM contracts WHERE id = ? AND project_id = ?`,
-          contractId,
-          projectId,
-        )
-      : undefined;
-  if (!contract) return NextResponse.json({ error: "Không tìm thấy hợp đồng" }, { status: 404 });
-
-  const documents = await query(
-    `SELECT d.id, d.original_name AS "originalName", d.mime_type AS "mimeType",
-            d.size_bytes AS "sizeBytes", d.caption, d.created_at AS "createdAt", d.sha256,
-            d.uploaded_by AS "uploadedBy", u.name AS "uploaderName"
-       FROM contract_documents d LEFT JOIN users u ON u.id = d.uploaded_by
-      WHERE d.contract_id = ? ORDER BY d.id DESC`,
-    contractId,
-  );
+      ? await withProjectScope(projectId, async () => {
+          const contract = await queryOne<{ id: number }>(
+            `SELECT id FROM contracts WHERE id = ? AND project_id = ?`,
+            contractId,
+            projectId,
+          );
+          if (!contract) return null;
+          return query(
+            `SELECT d.id, d.original_name AS "originalName", d.mime_type AS "mimeType",
+                    d.size_bytes AS "sizeBytes", d.caption, d.created_at AS "createdAt", d.sha256,
+                    d.uploaded_by AS "uploadedBy", u.name AS "uploaderName"
+               FROM contract_documents d LEFT JOIN users u ON u.id = d.uploaded_by
+              WHERE d.contract_id = ? ORDER BY d.id DESC`,
+            contractId,
+          );
+        })
+      : null;
+  if (!documents) return NextResponse.json({ error: "Không tìm thấy hợp đồng" }, { status: 404 });
   return NextResponse.json({ documents });
 }
 

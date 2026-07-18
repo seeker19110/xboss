@@ -99,8 +99,10 @@ export async function POST(
         title: string;
         partyName: string | null;
         supplierName: string | null;
+        projectId: number | null;
       }>(
-        `SELECT ct.title, ct.party_name AS "partyName", s.name AS "supplierName"
+        `SELECT ct.title, ct.party_name AS "partyName", s.name AS "supplierName",
+                ct.project_id AS "projectId"
            FROM contracts ct LEFT JOIN suppliers s ON s.id = ct.party_supplier_id
           WHERE ct.id = ?`,
         cert.contractId,
@@ -108,9 +110,11 @@ export async function POST(
       const totals = await certTotals(id);
       const responsible = contract?.supplierName ?? contract?.partyName ?? contract?.title ?? "—";
 
+      // M51 PR1: project_id của bill lấy từ hợp đồng (cert.contractId → contracts.project_id)
+      // để RLS lọc đúng dự án.
       await insertId(
-        `INSERT INTO payment_bills (responsible, type, amount, description, paid_date, contract_id, payment_cert_id, created_by)
-         VALUES (?, 'bill', ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO payment_bills (responsible, type, amount, description, paid_date, contract_id, payment_cert_id, created_by, project_id)
+         VALUES (?, 'bill', ?, ?, ?, ?, ?, ?, ?)`,
         responsible,
         totals.approvedValue,
         `Đợt ${cert.periodNo} — ${contract?.title ?? ""}`,
@@ -118,6 +122,7 @@ export async function POST(
         cert.contractId,
         id,
         user.id,
+        contract?.projectId ?? null,
       );
       await run(
         `UPDATE payment_certs SET status = 'approved', decided_at = ?, decided_by = ? WHERE id = ?`,

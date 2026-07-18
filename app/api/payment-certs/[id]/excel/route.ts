@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
-import { queryOne } from "@/lib/db";
+import { queryOne, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { getCert, certTotals } from "@/lib/paymentcerts";
@@ -41,13 +41,17 @@ export async function GET(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
-  const scoped = await certInProject(id, projectId);
-  if (!scoped)
+  const detail = await withProjectScope(projectId ?? "*", async () => {
+    const scoped = await certInProject(id, projectId);
+    if (!scoped) return null;
+    const cert = await getCert(id);
+    if (!cert) return null;
+    const totals = await certTotals(id);
+    return { cert, totals };
+  });
+  if (!detail)
     return NextResponse.json({ error: "Không tìm thấy đợt thanh toán" }, { status: 404 });
-
-  const cert = await getCert(id);
-  if (!cert) return NextResponse.json({ error: "Không tìm thấy đợt thanh toán" }, { status: 404 });
-  const totals = await certTotals(id);
+  const { cert, totals } = detail;
 
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet(`Đợt ${cert.periodNo}`.slice(0, 31));

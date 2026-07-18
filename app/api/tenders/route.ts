@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, run, insertId, withTransaction } from "@/lib/db";
+import { queryOne, run, insertId, withTransaction, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { withUniqueRetry, isUniqueViolation } from "@/lib/seqcode";
@@ -21,7 +21,8 @@ export async function GET() {
     return NextResponse.json({ error: "Bạn không có quyền xem đấu thầu" }, { status: 403 });
 
   const projectId = await getCurrentProjectId(user);
-  const tenders = projectId != null ? await listTenders(projectId) : [];
+  const tenders =
+    projectId != null ? await withProjectScope(projectId, () => listTenders(projectId)) : [];
   return NextResponse.json({ tenders });
 }
 

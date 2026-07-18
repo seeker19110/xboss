@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readFile, unlink } from "node:fs/promises";
-import { queryOne, run } from "@/lib/db";
+import { queryOne, run, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { getClaim } from "@/lib/claims";
@@ -39,7 +39,7 @@ export async function GET(
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
   const projectId = await getCurrentProjectId(user);
-  const claim = await getClaim(doc.claim_id, projectId);
+  const claim = await withProjectScope(projectId ?? "*", () => getClaim(doc.claim_id, projectId));
   if (!claim) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
   const path = photoPath(doc.file_name);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { query, queryOne, insertId } from "@/lib/db";
+import { getCurrentProjectId } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
 
@@ -132,13 +133,16 @@ export async function POST(req: NextRequest) {
   if (!Number.isFinite(amount) || amount <= 0)
     return NextResponse.json({ error: "Số tiền không hợp lệ" }, { status: 400 });
 
+  // M51 PR1: gắn project_id để RLS lọc đúng dự án (suy từ dự án đang chọn, không tin client).
+  const projectId = await getCurrentProjectId(user);
+
   const id = await insertId(
     `
     INSERT INTO payment_bills
            (responsible, type, period, amount, description, paid_date,
             progress_snapshot, note, unit, quantity, labor,
-            sheet_type_id, floor_label, pct_this_period, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            sheet_type_id, floor_label, pct_this_period, created_by, project_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     responsible,
     type,
     period,
@@ -154,6 +158,7 @@ export async function POST(req: NextRequest) {
     floorLabel,
     pctThisPeriod,
     user.id,
+    projectId,
   );
 
   return NextResponse.json({ ok: true, id, amount });
