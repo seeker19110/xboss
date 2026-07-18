@@ -23,6 +23,10 @@
 | logo | text | ✓ |  |
 | status | text |  | `'active'::text` |
 | color | text | ✓ |  |
+| org_id | integer | ✓ |  |
+
+**Khóa ngoại:**
+- `org_id` → `organizations(id)`
 
 **Index:**
 - `projects_code_key`: UNIQUE INDEX projects_code_key ON public.projects USING btree (code)
@@ -894,16 +898,19 @@
 | responsible_supplier_id | integer | ✓ |  |
 | contract_id | integer | ✓ |  |
 | payment_cert_id | integer | ✓ |  |
+| project_id | integer | ✓ |  |
 
 **Khóa ngoại:**
 - `contract_id` → `contracts(id)`
 - `created_by` → `users(id)`
 - `payment_cert_id` → `payment_certs(id)`
+- `project_id` → `projects(id)`
 - `responsible_supplier_id` → `suppliers(id)`
 - `sheet_type_id` → `sheet_types(id)`
 
 **Index:**
 - `idx_payment_bills_contract`: INDEX idx_payment_bills_contract ON public.payment_bills USING btree (contract_id)
+- `idx_payment_bills_project`: INDEX idx_payment_bills_project ON public.payment_bills USING btree (project_id)
 - `idx_payment_bills_resp`: INDEX idx_payment_bills_resp ON public.payment_bills USING btree (responsible)
 - `idx_payment_bills_resp_supplier`: INDEX idx_payment_bills_resp_supplier ON public.payment_bills USING btree (responsible_supplier_id)
 - `payment_bills_pkey`: UNIQUE INDEX payment_bills_pkey ON public.payment_bills USING btree (id)
@@ -3245,6 +3252,17 @@
 
 **Index:**
 - `feature_flags_pkey`: UNIQUE INDEX feature_flags_pkey ON public.feature_flags USING btree (module_key, project_id)
+
+### organizations
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | integer |  | `nextval('organizations_id_seq'::regclass)` |
+| name | text |  |  |
+| tax_code | text | ✓ |  |
+
+**Index:**
+- `organizations_pkey`: UNIQUE INDEX organizations_pkey ON public.organizations USING btree (id)
 
 ### saved_reports
 

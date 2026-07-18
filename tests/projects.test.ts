@@ -128,3 +128,55 @@ test(
     await run(`DELETE FROM projects WHERE id IN (?, ?)`, p1, p2);
   },
 );
+
+test(
+  "listProjects(orgId)/listOrganizations: lọc theo tổ chức; org_id NULL không tạo mục org (M51 PR4)",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, insertId } = await import("@/lib/db");
+    const { listProjects, listOrganizations } = await import("@/lib/projects");
+
+    const o1 = await insertId(
+      `INSERT INTO organizations (name, tax_code) VALUES ('Tổ chức A', '0100000001')`,
+    );
+    const o2 = await insertId(`INSERT INTO organizations (name) VALUES ('Tổ chức B')`);
+    const pA = await insertId(
+      `INSERT INTO projects (name, code, org_id) VALUES ('DA Org A', 'PJT-ORGA', ?)`,
+      o1,
+    );
+    const pB = await insertId(
+      `INSERT INTO projects (name, code, org_id) VALUES ('DA Org B', 'PJT-ORGB', ?)`,
+      o2,
+    );
+    const pNull = await insertId(
+      `INSERT INTO projects (name, code) VALUES ('DA không org', 'PJT-ORGN')`,
+    );
+
+    const admin = { id: -1, role: "admin" as const };
+
+    // Không truyền orgId → thấy cả 3.
+    const all = await listProjects(admin);
+    const allIds = all.map((p) => p.id);
+    assert.ok(
+      allIds.includes(pA) && allIds.includes(pB) && allIds.includes(pNull),
+      "không lọc → thấy hết",
+    );
+    assert.equal(all.find((p) => p.id === pA)!.orgId, o1);
+    assert.equal(all.find((p) => p.id === pNull)!.orgId, null);
+
+    // Lọc theo org A → chỉ dự án org A.
+    const onlyA = await listProjects(admin, o1);
+    assert.deepEqual(
+      onlyA.map((p) => p.id),
+      [pA],
+    );
+
+    // listOrganizations chỉ liệt kê org có dự án user thấy, không tính dự án org_id NULL.
+    const orgs = await listOrganizations(admin);
+    const orgIds = orgs.map((o) => o.id);
+    assert.ok(orgIds.includes(o1) && orgIds.includes(o2));
+
+    await run(`DELETE FROM projects WHERE id IN (?, ?, ?)`, pA, pB, pNull);
+    await run(`DELETE FROM organizations WHERE id IN (?, ?)`, o1, o2);
+  },
+);

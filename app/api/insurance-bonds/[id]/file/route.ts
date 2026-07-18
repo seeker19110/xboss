@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readFile } from "node:fs/promises";
-import { queryOne } from "@/lib/db";
+import { queryOne, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { photoPath } from "@/lib/photos";
@@ -30,11 +30,13 @@ export async function GET(
   const projectId = await getCurrentProjectId(user);
   const bond =
     projectId != null
-      ? await queryOne<FileRow>(
-          `SELECT file_name AS "fileName", mime_type AS "mimeType", original_name AS "originalName"
-             FROM insurance_bonds WHERE id = ? AND project_id = ?`,
-          id,
-          projectId,
+      ? await withProjectScope(projectId, () =>
+          queryOne<FileRow>(
+            `SELECT file_name AS "fileName", mime_type AS "mimeType", original_name AS "originalName"
+               FROM insurance_bonds WHERE id = ? AND project_id = ?`,
+            id,
+            projectId,
+          ),
         )
       : undefined;
   if (!bond?.fileName)

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne, run } from "@/lib/db";
+import { query, queryOne, run, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import {
@@ -32,48 +32,54 @@ export async function GET(
 
   const projectId = await getCurrentProjectId(user);
   // Tái dùng query tổng hợp của danh sách (1 dự án — số HĐ ít, lọc trong JS đủ rẻ).
-  const contract =
+  // Toàn bộ truy vấn (kể cả các bảng liên quan) bọc trong 1 withProjectScope — cùng
+  // GUC app.project_id cho lưới an toàn RLS (migration 0069).
+  const result =
     projectId != null
-      ? (await listContracts(undefined, projectId)).find((c) => c.id === id)
-      : undefined;
-  if (!contract) return NextResponse.json({ error: "Không tìm thấy hợp đồng" }, { status: 404 });
-
-  const [addenda, documents, bills, purchaseOrders, floorContracts] = await Promise.all([
-    query(
-      `SELECT a.id, a.code, a.title, a.value_delta AS "valueDelta", a.signed_date AS "signedDate",
-              a.note, a.created_at AS "createdAt", u.name AS "createdByName"
-         FROM contract_addenda a LEFT JOIN users u ON u.id = a.created_by
-        WHERE a.contract_id = ? ORDER BY a.id`,
-      id,
-    ),
-    query(
-      `SELECT d.id, d.original_name AS "originalName", d.mime_type AS "mimeType",
-              d.size_bytes AS "sizeBytes", d.caption, d.created_at AS "createdAt", d.sha256,
-              d.uploaded_by AS "uploadedBy", u.name AS "uploaderName"
-         FROM contract_documents d LEFT JOIN users u ON u.id = d.uploaded_by
-        WHERE d.contract_id = ? ORDER BY d.id DESC`,
-      id,
-    ),
-    query(
-      `SELECT id, responsible, type, amount, paid_date AS "paidDate", description
-         FROM payment_bills WHERE contract_id = ? ORDER BY paid_date DESC, id DESC`,
-      id,
-    ),
-    query(
-      `SELECT po.id, po.po_code AS "poCode", po.status, po.expected_date AS "expectedDate",
-              s.name AS "supplierName"
-         FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id
-        WHERE po.contract_id = ? ORDER BY po.id DESC`,
-      id,
-    ),
-    query(
-      `SELECT fc.id, fc.floor_label AS "floorLabel", fc.contract_value AS "contractValue",
-              st.name AS "sheetName", st.slug AS "sheetSlug"
-         FROM floor_contracts fc JOIN sheet_types st ON st.id = fc.sheet_type_id
-        WHERE fc.contract_id = ? ORDER BY st.id, fc.floor_label`,
-      id,
-    ),
-  ]);
+      ? await withProjectScope(projectId, async () => {
+          const contract = (await listContracts(undefined, projectId)).find((c) => c.id === id);
+          if (!contract) return null;
+          const [addenda, documents, bills, purchaseOrders, floorContracts] = await Promise.all([
+            query(
+              `SELECT a.id, a.code, a.title, a.value_delta AS "valueDelta", a.signed_date AS "signedDate",
+                      a.note, a.created_at AS "createdAt", u.name AS "createdByName"
+                 FROM contract_addenda a LEFT JOIN users u ON u.id = a.created_by
+                WHERE a.contract_id = ? ORDER BY a.id`,
+              id,
+            ),
+            query(
+              `SELECT d.id, d.original_name AS "originalName", d.mime_type AS "mimeType",
+                      d.size_bytes AS "sizeBytes", d.caption, d.created_at AS "createdAt", d.sha256,
+                      d.uploaded_by AS "uploadedBy", u.name AS "uploaderName"
+                 FROM contract_documents d LEFT JOIN users u ON u.id = d.uploaded_by
+                WHERE d.contract_id = ? ORDER BY d.id DESC`,
+              id,
+            ),
+            query(
+              `SELECT id, responsible, type, amount, paid_date AS "paidDate", description
+                 FROM payment_bills WHERE contract_id = ? ORDER BY paid_date DESC, id DESC`,
+              id,
+            ),
+            query(
+              `SELECT po.id, po.po_code AS "poCode", po.status, po.expected_date AS "expectedDate",
+                      s.name AS "supplierName"
+                 FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id
+                WHERE po.contract_id = ? ORDER BY po.id DESC`,
+              id,
+            ),
+            query(
+              `SELECT fc.id, fc.floor_label AS "floorLabel", fc.contract_value AS "contractValue",
+                      st.name AS "sheetName", st.slug AS "sheetSlug"
+                 FROM floor_contracts fc JOIN sheet_types st ON st.id = fc.sheet_type_id
+                WHERE fc.contract_id = ? ORDER BY st.id, fc.floor_label`,
+              id,
+            ),
+          ]);
+          return { contract, addenda, documents, bills, purchaseOrders, floorContracts };
+        })
+      : null;
+  if (!result) return NextResponse.json({ error: "Không tìm thấy hợp đồng" }, { status: 404 });
+  const { contract, addenda, documents, bills, purchaseOrders, floorContracts } = result;
 
   // M50 PR2: che tiền/tỷ lệ cho user thiếu viewPayments — HĐ + phụ lục + dòng thanh
   // toán + giao thầu tầng (phòng thủ — gate route hiện cũng là viewPayments).

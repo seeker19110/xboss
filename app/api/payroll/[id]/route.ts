@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, run } from "@/lib/db";
+import { queryOne, run, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { parsePayrollBody, validatePayrollInput, type PayrollInput } from "@/lib/finance";
@@ -35,7 +35,7 @@ export async function GET(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
-  const payroll = await loadExisting(id, projectId);
+  const payroll = await withProjectScope(projectId ?? "*", () => loadExisting(id, projectId));
   if (!payroll) return NextResponse.json({ error: "Không tìm thấy kỳ lương" }, { status: 404 });
 
   return NextResponse.json({ payroll: { ...payroll, id } });

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { insertId, run, withTransaction, todayISO } from "@/lib/db";
+import { insertId, run, withTransaction, todayISO, withProjectScope } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { assertModuleEnabled } from "@/lib/feature-flags";
@@ -24,7 +24,10 @@ export async function GET(req: NextRequest) {
   const projectId = await getCurrentProjectId(user);
   const blocked = await assertModuleEnabled("materials", projectId);
   if (blocked) return blocked;
-  const orders = projectId != null ? await listPurchaseOrders({ status, projectId }) : [];
+  const orders =
+    projectId != null
+      ? await withProjectScope(projectId, () => listPurchaseOrders({ status, projectId }))
+      : [];
 
   return NextResponse.json({ orders });
 }

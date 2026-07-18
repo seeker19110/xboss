@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readFile, unlink } from "node:fs/promises";
-import { queryOne, run } from "@/lib/db";
+import { queryOne, run, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { photoPath, sha256Hex } from "@/lib/photos";
@@ -51,7 +51,7 @@ export async function GET(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
-  const doc = await getDocInProject(id, projectId);
+  const doc = await withProjectScope(projectId ?? "*", () => getDocInProject(id, projectId));
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
   const path = photoPath(doc.file_name);

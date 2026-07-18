@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, insertId, withTransaction } from "@/lib/db";
+import { queryOne, insertId, withTransaction, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { isUniqueViolation, withUniqueRetry } from "@/lib/seqcode";
@@ -29,17 +29,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Thiếu contractId" }, { status: 422 });
 
   const projectId = await getCurrentProjectId(user);
-  const contract =
+  const certs =
     projectId != null
-      ? await queryOne<{ id: number }>(
-          `SELECT id FROM contracts WHERE id = ? AND project_id = ?`,
-          contractId,
-          projectId,
-        )
-      : undefined;
-  if (!contract) return NextResponse.json({ error: "Hợp đồng không tồn tại" }, { status: 422 });
-
-  const certs = await listCertsByContract(contractId);
+      ? await withProjectScope(projectId, async () => {
+          const contract = await queryOne<{ id: number }>(
+            `SELECT id FROM contracts WHERE id = ? AND project_id = ?`,
+            contractId,
+            projectId,
+          );
+          if (!contract) return null;
+          return listCertsByContract(contractId);
+        })
+      : null;
+  if (!certs) return NextResponse.json({ error: "Hợp đồng không tồn tại" }, { status: 422 });
   // M50 PR2: che đơn giá dòng KL cho user thiếu viewPayments (phòng thủ — gate route
   // hiện cũng là viewPayments).
   return NextResponse.json({ certs: stripSensitive("paymentCert", certs, user) });

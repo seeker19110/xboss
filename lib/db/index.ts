@@ -197,6 +197,25 @@ export async function withTransaction<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+// Bọc đường ĐỌC (GET) nhóm bảng tài chính trong 1 transaction read-only có đặt GUC
+// app.project_id — lưới an toàn RLS (migration 0069) chỉ áp được khi GUC tồn tại; đọc
+// ngoài transaction (như trước PR2) không có GUC nên rơi vào nhánh "chuyển tiếp" của
+// policy. Tái dùng nguyên `withTransaction` (không viết cơ chế set GUC mới): mở transaction,
+// set_config LOCAL rồi chạy fn, COMMIT khi xong (SET TRANSACTION READ ONLY vì chỉ đọc).
+// projectId = '*' cho ngữ cảnh cross-project hợp lệ (portfolio/cron/export toàn cục).
+export async function withProjectScope<T>(
+  projectId: number | "*",
+  fn: () => Promise<T>,
+): Promise<T> {
+  return withTransaction(async () => {
+    const client = txStorage.getStore();
+    if (!client) throw new Error("withProjectScope: thiếu transaction client (không thể xảy ra)");
+    await client.query("SET TRANSACTION READ ONLY");
+    await client.query(`SELECT set_config('app.project_id', $1, true)`, [String(projectId)]);
+    return fn();
+  });
+}
+
 // todayISO/daysFromTodayISO chuyển sang lib/date.ts (thuần, không phụ thuộc pg)
 // để dùng lại được ở client — re-export ở đây cho code server hiện có.
 export { todayISO, daysFromTodayISO } from "@/lib/date";

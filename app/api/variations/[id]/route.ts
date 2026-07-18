@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne, run } from "@/lib/db";
+import { query, queryOne, run, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { VO_REASONS, type VoReason, getVariation, canEditVo } from "@/lib/vo";
@@ -24,21 +24,27 @@ export async function GET(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
-  const variation = projectId != null ? await getVariation(id, projectId) : undefined;
-  if (!variation) return NextResponse.json({ error: "Không tìm thấy phát sinh" }, { status: 404 });
-
-  const documents = await query(
-    `SELECT d.id, d.original_name AS "originalName", d.mime_type AS "mimeType",
-            d.size_bytes AS "sizeBytes", d.caption, d.created_at AS "createdAt",
-            d.uploaded_by AS "uploadedBy", u.name AS "uploaderName"
-       FROM vo_documents d LEFT JOIN users u ON u.id = d.uploaded_by
-      WHERE d.vo_id = ? ORDER BY d.id DESC`,
-    id,
-  );
-
-  // Trạng thái duyệt engine (M46 PR2) — null khi chưa có flow cấu hình cho loại "variation"
-  // (hành xử dormant, không đổi UI cũ).
-  const approvalStatus = await getEntityApprovalStatus("variation", id);
+  const scoped =
+    projectId != null
+      ? await withProjectScope(projectId, async () => {
+          const variation = await getVariation(id, projectId);
+          if (!variation) return null;
+          const documents = await query(
+            `SELECT d.id, d.original_name AS "originalName", d.mime_type AS "mimeType",
+                    d.size_bytes AS "sizeBytes", d.caption, d.created_at AS "createdAt",
+                    d.uploaded_by AS "uploadedBy", u.name AS "uploaderName"
+               FROM vo_documents d LEFT JOIN users u ON u.id = d.uploaded_by
+              WHERE d.vo_id = ? ORDER BY d.id DESC`,
+            id,
+          );
+          // Trạng thái duyệt engine (M46 PR2) — null khi chưa có flow cấu hình cho loại
+          // "variation" (hành xử dormant, không đổi UI cũ).
+          const approvalStatus = await getEntityApprovalStatus("variation", id);
+          return { variation, documents, approvalStatus };
+        })
+      : null;
+  if (!scoped) return NextResponse.json({ error: "Không tìm thấy phát sinh" }, { status: 404 });
+  const { variation, documents, approvalStatus } = scoped;
 
   // M50 PR2: che giá trị/đơn giá VO cho user thiếu viewPayments trước khi trả.
   const [maskedVariation] = stripSensitive("variation", [variation], user);

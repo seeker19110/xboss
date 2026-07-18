@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { insertId } from "@/lib/db";
+import { insertId, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import {
@@ -36,10 +36,12 @@ export async function GET(req: NextRequest) {
   const projectId = await getCurrentProjectId(user);
   const bonds =
     projectId != null
-      ? await listInsuranceBonds(projectId, {
-          kind: (kindRaw as InsuranceKind) ?? undefined,
-          deletedView,
-        })
+      ? await withProjectScope(projectId, () =>
+          listInsuranceBonds(projectId, {
+            kind: (kindRaw as InsuranceKind) ?? undefined,
+            deletedView,
+          }),
+        )
       : [];
   return NextResponse.json({ bonds });
 }

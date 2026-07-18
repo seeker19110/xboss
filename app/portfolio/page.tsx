@@ -4,7 +4,7 @@ import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { systemColorClasses } from "@/lib/systemColors";
-import type { ProjectListItem, PortfolioKpi } from "@/lib/projects";
+import type { ProjectListItem, PortfolioKpi, OrganizationItem } from "@/lib/projects";
 
 const STATUS_LABEL: Record<string, string> = {
   active: "Đang thi công",
@@ -77,11 +77,20 @@ function ProjectCard({ project }: { project: ProjectListItem }) {
 export default function PortfolioPage() {
   const [projects, setProjects] = useState<ProjectListItem[] | null>(null);
   const [kpi, setKpi] = useState<PortfolioKpi | null>(null);
+  const [orgs, setOrgs] = useState<OrganizationItem[]>([]);
+  const [orgId, setOrgId] = useState<number | null>(null);
 
   useEffect(() => {
-    fetch("/api/projects")
+    const qs = orgId != null ? `?org=${orgId}` : "";
+    fetch(`/api/projects${qs}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setProjects(d?.projects ?? []));
+      .then((d) => {
+        setProjects(d?.projects ?? []);
+        setOrgs(d?.orgs ?? []);
+      });
+  }, [orgId]);
+
+  useEffect(() => {
     fetch("/api/portfolio/kpi")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => setKpi(d ?? null));
@@ -99,6 +108,27 @@ export default function PortfolioPage() {
             <KpiTile label="Đang thi công" value={String(kpi.activeCount)} />
             <KpiTile label="Tiến độ TB" value={`${Math.round(kpi.avgProgress * 100)}%`} />
             <KpiTile label="Tổng việc trễ" value={String(kpi.totalDelayed)} />
+          </div>
+        )}
+
+        {orgs.length > 1 && (
+          <div className="flex items-center gap-2">
+            <label htmlFor="org-filter" className="text-xs text-zinc-400">
+              Tổ chức
+            </label>
+            <select
+              id="org-filter"
+              value={orgId ?? ""}
+              onChange={(e) => setOrgId(e.target.value ? Number(e.target.value) : null)}
+              className="bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-sm text-zinc-200"
+            >
+              <option value="">Tất cả tổ chức</option>
+              {orgs.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
           </div>
         )}
 

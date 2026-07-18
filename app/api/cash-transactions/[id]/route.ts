@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, run } from "@/lib/db";
+import { queryOne, run, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import {
@@ -40,7 +40,7 @@ export async function GET(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
-  const transaction = await loadExisting(id, projectId);
+  const transaction = await withProjectScope(projectId ?? "*", () => loadExisting(id, projectId));
   if (!transaction)
     return NextResponse.json({ error: "Không tìm thấy giao dịch" }, { status: 404 });
 

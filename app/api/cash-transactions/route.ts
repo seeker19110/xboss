@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { insertId, query } from "@/lib/db";
+import { insertId, query, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import {
@@ -38,17 +38,19 @@ export async function GET(req: NextRequest) {
     conds.push("ct.direction = ?");
     args.push(direction);
   }
-  const transactions = await query<CashTransactionRow>(
-    `SELECT ct.id, ct.tx_date AS "txDate", ct.direction, ct.category, ct.amount,
-            ct.is_petty_cash AS "isPettyCash", ct.contract_id AS "contractId",
-            ct.supplier_id AS "supplierId", ct.voucher_code AS "voucherCode",
-            ct.description, ct.recorded_by AS "recordedBy", u.name AS "recordedByName",
-            ct.created_at AS "createdAt"
-       FROM cash_transactions ct
-       LEFT JOIN users u ON u.id = ct.recorded_by
-      WHERE ${conds.join(" AND ")}
-      ORDER BY ct.tx_date DESC, ct.id DESC`,
-    ...args,
+  const transactions = await withProjectScope(projectId, () =>
+    query<CashTransactionRow>(
+      `SELECT ct.id, ct.tx_date AS "txDate", ct.direction, ct.category, ct.amount,
+              ct.is_petty_cash AS "isPettyCash", ct.contract_id AS "contractId",
+              ct.supplier_id AS "supplierId", ct.voucher_code AS "voucherCode",
+              ct.description, ct.recorded_by AS "recordedBy", u.name AS "recordedByName",
+              ct.created_at AS "createdAt"
+         FROM cash_transactions ct
+         LEFT JOIN users u ON u.id = ct.recorded_by
+        WHERE ${conds.join(" AND ")}
+        ORDER BY ct.tx_date DESC, ct.id DESC`,
+      ...args,
+    ),
   );
   return NextResponse.json({ transactions });
 }

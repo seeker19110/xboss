@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { insertId, query } from "@/lib/db";
+import { insertId, query, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { parseInvoiceBody, validateInvoiceInput, type InvoiceInput } from "@/lib/finance";
@@ -39,17 +39,19 @@ export async function GET(req: NextRequest) {
   const showDeleted =
     user.role === "admin" && req.nextUrl.searchParams.get("includeDeleted") === "1";
   conds.push(showDeleted ? "i.deleted_at IS NOT NULL" : "i.deleted_at IS NULL");
-  const invoices = await query<InvoiceRow>(
-    `SELECT i.id, i.invoice_no AS "invoiceNo", i.invoice_date AS "invoiceDate", i.direction,
-            i.net_amount AS "netAmount", i.vat_amount AS "vatAmount", i.vat_rate AS "vatRate",
-            i.counterparty, i.contract_id AS "contractId", i.payment_bill_id AS "paymentBillId",
-            i.created_by AS "createdBy", u.name AS "createdByName", i.created_at AS "createdAt",
-            i.deleted_at AS "deletedAt"
-       FROM invoices i
-       LEFT JOIN users u ON u.id = i.created_by
-      WHERE ${conds.join(" AND ")}
-      ORDER BY i.invoice_date DESC NULLS LAST, i.id DESC`,
-    ...args,
+  const invoices = await withProjectScope(projectId, () =>
+    query<InvoiceRow>(
+      `SELECT i.id, i.invoice_no AS "invoiceNo", i.invoice_date AS "invoiceDate", i.direction,
+              i.net_amount AS "netAmount", i.vat_amount AS "vatAmount", i.vat_rate AS "vatRate",
+              i.counterparty, i.contract_id AS "contractId", i.payment_bill_id AS "paymentBillId",
+              i.created_by AS "createdBy", u.name AS "createdByName", i.created_at AS "createdAt",
+              i.deleted_at AS "deletedAt"
+         FROM invoices i
+         LEFT JOIN users u ON u.id = i.created_by
+        WHERE ${conds.join(" AND ")}
+        ORDER BY i.invoice_date DESC NULLS LAST, i.id DESC`,
+      ...args,
+    ),
   );
   return NextResponse.json({ invoices });
 }

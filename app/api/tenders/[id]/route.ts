@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, run } from "@/lib/db";
+import { queryOne, run, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { getTender, comparisonTable, TENDER_STATUSES, type TenderStatus } from "@/lib/tender";
@@ -22,11 +22,14 @@ export async function GET(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
-  const tender = projectId != null ? await getTender(id, projectId) : undefined;
-  if (!tender) return NextResponse.json({ error: "Không tìm thấy gói thầu" }, { status: 404 });
-
-  const { items, bids } = await comparisonTable(id);
-  return NextResponse.json({ tender, items, bids });
+  const result = await withProjectScope(projectId ?? "*", async () => {
+    const tender = projectId != null ? await getTender(id, projectId) : undefined;
+    if (!tender) return null;
+    const { items, bids } = await comparisonTable(id);
+    return { tender, items, bids };
+  });
+  if (!result) return NextResponse.json({ error: "Không tìm thấy gói thầu" }, { status: 404 });
+  return NextResponse.json(result);
 }
 
 // PATCH /api/tenders/:id — sửa thông tin chung/chuyển trạng thái (draft→open→closed,

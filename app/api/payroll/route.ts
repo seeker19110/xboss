@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { insertId, query, queryOne } from "@/lib/db";
+import { insertId, query, queryOne, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import {
@@ -45,22 +45,23 @@ export async function GET(req: NextRequest) {
     conds.push("p.period = ?");
     args.push(period);
   }
-  const payroll = await query<PayrollRow>(
-    `SELECT p.id, p.period, p.crew_id AS "crewId", c.name AS "crewName",
-            p.personnel_id AS "personnelId", pe.full_name AS "personnelName",
-            p.workdays, p.rate, p.gross, p.deductions, p.net, p.status,
-            p.created_by AS "createdBy", u.name AS "createdByName", p.created_at AS "createdAt"
-       FROM payroll p
-       LEFT JOIN crews c ON c.id = p.crew_id
-       LEFT JOIN personnel pe ON pe.id = p.personnel_id
-       LEFT JOIN users u ON u.id = p.created_by
-      WHERE ${conds.join(" AND ")}
-      ORDER BY p.period DESC, p.id DESC`,
-    ...args,
-  );
-
   const suggest = req.nextUrl.searchParams.get("suggest");
-  const suggestions = suggest && period ? await payrollFromAttendance(period, projectId) : [];
+  const { payroll, suggestions } = await withProjectScope(projectId, async () => ({
+    payroll: await query<PayrollRow>(
+      `SELECT p.id, p.period, p.crew_id AS "crewId", c.name AS "crewName",
+              p.personnel_id AS "personnelId", pe.full_name AS "personnelName",
+              p.workdays, p.rate, p.gross, p.deductions, p.net, p.status,
+              p.created_by AS "createdBy", u.name AS "createdByName", p.created_at AS "createdAt"
+         FROM payroll p
+         LEFT JOIN crews c ON c.id = p.crew_id
+         LEFT JOIN personnel pe ON pe.id = p.personnel_id
+         LEFT JOIN users u ON u.id = p.created_by
+        WHERE ${conds.join(" AND ")}
+        ORDER BY p.period DESC, p.id DESC`,
+      ...args,
+    ),
+    suggestions: suggest && period ? await payrollFromAttendance(period, projectId) : [],
+  }));
 
   // M50 PR2: che số tiền lương (đơn giá/gộp/khấu trừ/thực nhận) cho user thiếu
   // viewPayroll — vd bch vào được trang lương (gate route = viewPayments) nhưng không

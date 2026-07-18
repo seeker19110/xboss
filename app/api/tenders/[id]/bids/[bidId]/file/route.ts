@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { writeFile, unlink, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { queryOne, run } from "@/lib/db";
+import { queryOne, run, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import {
@@ -36,12 +36,14 @@ export async function GET(
   const projectId = await getCurrentProjectId(user);
   const bid =
     projectId != null
-      ? await queryOne<BidFileRow>(
-          `SELECT tb.file_name AS "fileName", tb.mime_type AS "mimeType", tb.original_name AS "originalName"
-             FROM tender_bids tb JOIN tender_packages tp ON tp.id = tb.tender_id
-            WHERE tb.id = ? AND tp.project_id = ?`,
-          bidId,
-          projectId,
+      ? await withProjectScope(projectId, () =>
+          queryOne<BidFileRow>(
+            `SELECT tb.file_name AS "fileName", tb.mime_type AS "mimeType", tb.original_name AS "originalName"
+               FROM tender_bids tb JOIN tender_packages tp ON tp.id = tb.tender_id
+              WHERE tb.id = ? AND tp.project_id = ?`,
+            bidId,
+            projectId,
+          ),
         )
       : undefined;
   if (!bid?.fileName) return NextResponse.json({ error: "Chưa có file đính kèm" }, { status: 404 });
