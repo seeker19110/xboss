@@ -3,7 +3,7 @@
 // tin `project_id` client gửi qua body/query — luôn suy qua getCurrentProjectId(user).
 import { cookies } from "next/headers";
 import { query, todayISO } from "@/lib/db";
-import { patchRequestContext } from "@/lib/request-context";
+import { patchRequestContext, getRequestContext } from "@/lib/request-context";
 import type { Role } from "@/lib/roles";
 
 export const PROJECT_COOKIE = "xboss_project";
@@ -48,6 +48,12 @@ export async function getCurrentProjectId(user: {
   id: number;
   role: Role;
 }): Promise<number | null> {
+  // M61: memoize trong request — projectId chỉ được patch vào request-context SAU khi đã
+  // qua resolveProjectId (đối chiếu visibleProjectIds) nên tin được trong cùng request.
+  // Route gọi cả getCurrentUser (patch sớm) lẫn getCurrentProjectId chỉ tốn 1 lần query.
+  const cached = getRequestContext()?.projectId;
+  if (cached != null) return cached;
+
   const visible = await visibleProjectIds(user);
   const store = await cookies();
   const projectId = resolveProjectId(visible, store.get(PROJECT_COOKIE)?.value);

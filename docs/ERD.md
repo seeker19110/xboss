@@ -346,10 +346,14 @@
 | allowed | boolean |  |  |
 | updated_by | integer | ✓ |  |
 | updated_at | timestamptz |  | `now()` |
+| project_id | integer | ✓ |  |
+
+**Khóa ngoại:**
+- `project_id` → `projects(id)`
 
 **Index:**
 - `role_permissions_pkey`: UNIQUE INDEX role_permissions_pkey ON public.role_permissions USING btree (id)
-- `role_permissions_role_perm_key_key`: UNIQUE INDEX role_permissions_role_perm_key_key ON public.role_permissions USING btree (role, perm_key)
+- `uq_role_perm_scope`: UNIQUE INDEX uq_role_perm_scope ON public.role_permissions USING btree (role, perm_key, COALESCE(project_id, 0))
 
 ## Kèm task (ảnh/bình luận/tài liệu/nghiệm thu)
 
