@@ -5,6 +5,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { Pool, PoolClient, types } from "pg";
 import { getServerEnv } from "@/lib/env";
 import { getRequestContext } from "@/lib/request-context";
+import { log } from "@/lib/log";
 import { runMigrations } from "./migrate";
 
 // DATE (oid 1082) → giữ nguyên chuỗi 'YYYY-MM-DD' (code so sánh ngày dạng chuỗi).
@@ -21,12 +22,74 @@ const txStorage = new AsyncLocalStorage<PoolClient>();
 // Schema DB được quản qua các file .sql đánh số trong migrations/ (chạy bởi runMigrations,
 // xem lib/db/migrate.ts + docs/adr/0003-migrations.md). Không còn chuỗi SCHEMA inline ở đây.
 
+// Đọc số nguyên từ env, clamp về [min, max]; giá trị thiếu/không hợp lệ → dùng mặc định.
+// Không throw — cấu hình sai chỉ bị ghim về biên thay vì sập app (M53 PR3).
+function envIntClamped(
+  raw: string | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  const n = raw !== undefined ? Number(raw) : NaN;
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.trunc(n)));
+}
+
 export function getPool(): Pool {
   if (!g.__xbossPool) {
-    const url = getServerEnv().DATABASE_URL;
-    g.__xbossPool = new Pool({ connectionString: url, max: 10 });
+    const env = getServerEnv();
+    const url = env.DATABASE_URL;
+    // Số connection tối đa trong pool — mặc định 10 (giữ nguyên hành vi cũ), chỉnh qua
+    // XBOSS_PG_POOL_MAX khi cần scale (clamp 1–100 để tránh cấu hình sai làm cạn connection
+    // Postgres phía server).
+    const max = envIntClamped(env.XBOSS_PG_POOL_MAX, 10, 1, 100);
+    // Chặn query treo vô hạn (khoá chết, quên WHERE...) — mặc định 30s, chỉnh qua
+    // XBOSS_PG_STMT_TIMEOUT_MS (clamp 1s–5 phút). idle_in_transaction cố định 15s: transaction
+    // mở rồi bỏ đó (quên COMMIT/ROLLBACK) sẽ tự bị Postgres đóng để không giữ khoá.
+    const stmtTimeoutMs = envIntClamped(env.XBOSS_PG_STMT_TIMEOUT_MS, 30_000, 1_000, 300_000);
+    g.__xbossPool = new Pool({
+      connectionString: url,
+      max,
+      connectionTimeoutMillis: 10_000,
+      options: `-c statement_timeout=${stmtTimeoutMs} -c idle_in_transaction_session_timeout=15000`,
+    });
   }
   return g.__xbossPool;
+}
+
+// Số liệu quan trắc pool (M53 PR1) — dùng cho GET /api/health (chỉ trả cho Admin/PM).
+// pool.totalCount/idleCount/waitingCount là API có sẵn của thư viện `pg`.
+export function poolStats(): { total: number; idle: number; waiting: number } {
+  const pool = getPool();
+  return { total: pool.totalCount, idle: pool.idleCount, waiting: pool.waitingCount };
+}
+
+// Ngưỡng cảnh báo query chậm (ms) — env XBOSS_SLOW_QUERY_MS, mặc định 500, 0 = tắt hẳn.
+// Đọc lại mỗi lần gọi (không cache) — parseServerEnv chỉ validate biến có mặt hay không
+// (schema z.string().optional()), giá trị số áp mặc định ngay tại đây.
+function slowQueryThresholdMs(): number {
+  const raw = getServerEnv().XBOSS_SLOW_QUERY_MS;
+  const n = raw != null ? Number(raw) : NaN;
+  return Number.isFinite(n) ? n : 500;
+}
+
+// Đo thời gian 1 lượt gọi pg query thật (client.query hoặc pool.query) — cảnh báo nếu
+// vượt ngưỡng. KHÔNG log params (tránh lộ dữ liệu nhạy cảm vào log).
+async function timedPgQuery(
+  exec: () => Promise<import("pg").QueryResult>,
+  sql: string,
+): Promise<import("pg").QueryResult> {
+  const threshold = slowQueryThresholdMs();
+  if (threshold <= 0) return exec();
+  const startedAt = Date.now();
+  try {
+    return await exec();
+  } finally {
+    const durationMs = Date.now() - startedAt;
+    if (durationMs > threshold) {
+      log.warn("slow_query", { sql: sql.slice(0, 120), durationMs });
+    }
+  }
 }
 
 // Tự áp migration 1 lần mỗi process khi query đầu tiên chạy. runMigrations dùng
@@ -54,7 +117,11 @@ export async function query<T = Record<string, unknown>>(
 ): Promise<T[]> {
   await ensureSchema();
   const tx = txStorage.getStore();
-  const r = tx ? await tx.query(toPg(sql), params) : await getPool().query(toPg(sql), params);
+  const pgSql = toPg(sql);
+  const r = await timedPgQuery(
+    () => (tx ? tx.query(pgSql, params) : getPool().query(pgSql, params)),
+    sql,
+  );
   return r.rows as T[];
 }
 
@@ -69,7 +136,11 @@ export async function queryOne<T = Record<string, unknown>>(
 export async function run(sql: string, ...params: unknown[]): Promise<{ changes: number }> {
   await ensureSchema();
   const tx = txStorage.getStore();
-  const r = tx ? await tx.query(toPg(sql), params) : await getPool().query(toPg(sql), params);
+  const pgSql = toPg(sql);
+  const r = await timedPgQuery(
+    () => (tx ? tx.query(pgSql, params) : getPool().query(pgSql, params)),
+    sql,
+  );
   return { changes: r.rowCount ?? 0 };
 }
 
@@ -81,7 +152,10 @@ export async function insertId(sql: string, ...params: unknown[]): Promise<numbe
   const needsReturning = !/returning\s+id\s*$/i.test(pgSql.trim());
   const finalSql = needsReturning ? pgSql + " RETURNING id" : pgSql;
   const tx = txStorage.getStore();
-  const r = tx ? await tx.query(finalSql, params) : await getPool().query(finalSql, params);
+  const r = await timedPgQuery(
+    () => (tx ? tx.query(finalSql, params) : getPool().query(finalSql, params)),
+    sql,
+  );
   return Number(r.rows[0].id);
 }
 

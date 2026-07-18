@@ -116,6 +116,10 @@ async function main() {
     "Tháp A",
   );
 
+  // M61 PR2: dự án thứ 2 (không tracking data) — phục vụ e2e selector phạm vi trên
+  // /admin/permissions (đổi phạm vi cần ≥2 dự án trong danh sách).
+  await run(`INSERT INTO projects (name, code) VALUES (?, ?)`, "Dự án thử nghiệm B", "TESTB");
+
   let totalWp = 0,
     totalTask = 0,
     totalDim = 0;

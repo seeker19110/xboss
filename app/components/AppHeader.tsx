@@ -10,6 +10,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import NotificationBell from "@/app/components/NotificationBell";
+import OfflineQueueBadge from "@/app/components/OfflineQueueBadge";
 import ProjectSwitcher from "@/app/components/ProjectSwitcher";
 import GlobalSearch from "@/app/components/GlobalSearch";
 import ThemeToggle from "@/app/components/ThemeToggle";
@@ -354,6 +355,7 @@ export default function AppHeader({
 
           <div className="flex items-center gap-1 shrink-0 ml-1">
             {children}
+            <OfflineQueueBadge />
             <ThemeToggle />
             <OnlineUsers isAdmin={me?.role === "admin"} />
             <NotificationBell />

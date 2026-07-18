@@ -6,8 +6,13 @@
 // Ma trận vai trò × quyền, nhóm theo module (app/lib/permissionMeta.ts). Mỗi ô 3 trạng
 // thái: Mặc định (theo CAN_DEFAULT) / Mở (bật) / Siết (tắt). KHÔNG import lib/auth (kéo
 // node:crypto) — mọi dữ liệu quyền lấy từ API; nhãn/nhóm từ permissionMeta client-safe.
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ShieldCheck, Info, Lock, FileSpreadsheet, ShieldAlert } from "lucide-react";
+//
+// M61 PR2: thêm selector PHẠM VI (toàn hệ thống / theo dự án). Ở phạm vi dự án, ô "Mặc
+// định" hiển thị giá trị HIỆU LỰC KẾ THỪA (CAN_DEFAULT + override toàn hệ nếu có) kèm chú
+// thích nguồn — không phải CAN_DEFAULT thô như phạm vi toàn hệ thống. Phạm vi toàn hệ
+// thống giữ nguyên hành vi cũ (không đổi state/logic).
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ShieldCheck, Info, Lock, FileSpreadsheet, ShieldAlert, Globe2 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import { Skeleton, PageSkeleton } from "@/app/components/Skeleton";
@@ -16,12 +21,17 @@ import { fetchMe, type Me } from "@/app/lib/me";
 import { ROLE_LABELS, type Role } from "@/lib/roles";
 import { PERM_GROUP_ORDER, permMeta } from "@/app/lib/permissionMeta";
 
+type ProjectOption = { id: number; name: string };
+
 type MatrixData = {
   roles: Role[];
   perms: string[];
   lockedPerms: string[];
   defaults: Record<string, Record<Role, boolean>>;
-  overrides: { role: Role; permKey: string; allowed: boolean }[];
+  // M61: mỗi override kèm projectId (null = toàn hệ). Ở phạm vi dự án, mảng này gồm CẢ
+  // override toàn hệ lẫn override riêng dự án (phân biệt qua field projectId).
+  overrides: { role: Role; permKey: string; allowed: boolean; projectId: number | null }[];
+  projects: ProjectOption[];
 };
 
 type CellState = "default" | "on" | "off";
@@ -31,27 +41,49 @@ export default function PermissionsPage() {
   const [meLoading, setMeLoading] = useState(true);
   const [data, setData] = useState<MatrixData | null>(null);
   const [loading, setLoading] = useState(true);
-  // Map key `${role}|${permKey}` → allowed (override hiện có).
-  const [overrides, setOverrides] = useState<Map<string, boolean>>(new Map());
+  // M61: phạm vi đang chọn — null = "Toàn hệ thống" (mặc định, hành vi y hệt trước M61).
+  const [scopeProjectId, setScopeProjectId] = useState<number | null>(null);
+  // Map key `${role}|${permKey}` → allowed, TÁCH riêng override toàn hệ và override của
+  // dự án đang chọn (cần cả 2 để vẽ giá trị "mặc định" kế thừa ở phạm vi dự án).
+  const [globalOverrides, setGlobalOverrides] = useState<Map<string, boolean>>(new Map());
+  const [scopedOverrides, setScopedOverrides] = useState<Map<string, boolean>>(new Map());
   const [savingKey, setSavingKey] = useState<string | null>(null);
   // M50 PR3: tab "Báo cáo SoD" thêm cạnh ma trận quyền — không đổi state/logic ma trận.
   const [tab, setTab] = useState<"matrix" | "sod">("matrix");
 
   const isAdmin = me?.role === "admin";
 
-  const load = useCallback(() => {
+  // M61: chống race khi đổi phạm vi nhanh liên tiếp — chỉ áp response của lần gọi MỚI
+  // NHẤT (so khớp qua requestId), bỏ qua response cũ đến trễ.
+  const latestRequestId = useRef(0);
+
+  const load = useCallback((projectId: number | null) => {
+    const requestId = ++latestRequestId.current;
     setLoading(true);
-    return fetch("/api/admin/role-permissions")
+    const qs = projectId != null ? `?projectId=${projectId}` : "";
+    return fetch(`/api/admin/role-permissions${qs}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((j: MatrixData | null) => {
-        if (!j) return;
+        if (!j || requestId !== latestRequestId.current) return;
         setData(j);
-        const m = new Map<string, boolean>();
-        for (const o of j.overrides) m.set(`${o.role}|${o.permKey}`, o.allowed);
-        setOverrides(m);
+        const g = new Map<string, boolean>();
+        const s = new Map<string, boolean>();
+        for (const o of j.overrides) {
+          const key = `${o.role}|${o.permKey}`;
+          if (o.projectId === null) g.set(key, o.allowed);
+          else s.set(key, o.allowed);
+        }
+        setGlobalOverrides(g);
+        setScopedOverrides(s);
       })
-      .catch(() => showToast("Không tải được ma trận phân quyền", "error"))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (requestId === latestRequestId.current) {
+          showToast("Không tải được ma trận phân quyền", "error");
+        }
+      })
+      .finally(() => {
+        if (requestId === latestRequestId.current) setLoading(false);
+      });
   }, []);
 
   useEffect(() => {
@@ -62,9 +94,9 @@ export default function PermissionsPage() {
 
   useEffect(() => {
     if (!me || me.role !== "admin") return;
-    load();
+    load(scopeProjectId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [me]);
+  }, [me, scopeProjectId]);
 
   // Nhóm quyền theo module, giữ thứ tự PERM_GROUP_ORDER.
   const grouped = useMemo(() => {
@@ -92,13 +124,14 @@ export default function PermissionsPage() {
       const res = await fetch("/api/admin/role-permissions", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role, permKey, allowed }),
+        body: JSON.stringify({ role, permKey, allowed, projectId: scopeProjectId }),
       });
       if (!res.ok) {
         const j = await res.json().catch(() => null);
         showToast(j?.error ?? "Lưu thất bại", "error");
         return;
       }
+      const setOverrides = scopeProjectId === null ? setGlobalOverrides : setScopedOverrides;
       setOverrides((prev) => {
         const m = new Map(prev);
         if (allowed === null) m.delete(key);
@@ -173,6 +206,37 @@ export default function PermissionsPage() {
 
         {tab === "matrix" && (
           <>
+            {/* M61 PR2: selector phạm vi — "Toàn hệ thống" (mặc định, hành vi y hệt trước
+                M61) hoặc 1 dự án cụ thể (override chỉ áp dụng trong dự án đó). */}
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-sm">
+              <Globe2 className="h-4 w-4 shrink-0 text-sky-300" aria-hidden />
+              <label htmlFor="perm-scope" className="text-zinc-400">
+                Phạm vi áp dụng:
+              </label>
+              <select
+                id="perm-scope"
+                aria-label="Phạm vi áp dụng"
+                value={scopeProjectId ?? ""}
+                onChange={(e) =>
+                  setScopeProjectId(e.target.value === "" ? null : Number(e.target.value))
+                }
+                className="min-w-[10rem] rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-zinc-200"
+              >
+                <option value="">Toàn hệ thống</option>
+                {(data?.projects ?? []).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+              {scopeProjectId !== null && (
+                <span className="text-xs text-zinc-500">
+                  Override chỉ áp dụng trong dự án này; ô &ldquo;Mặc định&rdquo; hiển thị giá trị kế
+                  thừa từ toàn hệ thống.
+                </span>
+              )}
+            </div>
+
             <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 space-y-2 text-sm text-zinc-300">
               <p className="flex items-start gap-2">
                 <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-300" />
@@ -247,15 +311,29 @@ export default function PermissionsPage() {
                               </td>
                               {data.roles.map((role) => {
                                 const key = `${role}|${permKey}`;
-                                const ov = overrides.get(key);
+                                // Trạng thái override CỦA PHẠM VI ĐANG CHỌN (toàn hệ →
+                                // globalOverrides; dự án → scopedOverrides, không lẫn
+                                // override toàn hệ vào state của ô).
+                                const activeMap =
+                                  scopeProjectId === null ? globalOverrides : scopedOverrides;
+                                const ov = activeMap.get(key);
                                 const state: CellState =
                                   ov === undefined ? "default" : ov ? "on" : "off";
-                                const def = data.defaults[permKey]?.[role] ?? false;
+                                // Giá trị hiển thị cho lựa chọn "Mặc định": ở phạm vi toàn hệ
+                                // = CAN_DEFAULT (như cũ); ở phạm vi dự án = giá trị HIỆU LỰC
+                                // KẾ THỪA (override toàn hệ nếu có, không thì CAN_DEFAULT).
+                                const canDefault = data.defaults[permKey]?.[role] ?? false;
+                                const inheritedFromGlobal =
+                                  scopeProjectId !== null && globalOverrides.has(key);
+                                const def = inheritedFromGlobal
+                                  ? globalOverrides.get(key)!
+                                  : canDefault;
                                 return (
                                   <td key={role} className="px-2 py-1.5 text-center">
                                     <CellSelect
                                       state={state}
                                       defaultVal={def}
+                                      inheritedFromGlobal={inheritedFromGlobal}
                                       isWrite={isWrite}
                                       disabled={savingKey === key}
                                       onChange={(next) => changeCell(role, permKey, next)}
@@ -401,12 +479,16 @@ function SodReportTab() {
 function CellSelect({
   state,
   defaultVal,
+  inheritedFromGlobal = false,
   isWrite,
   disabled,
   onChange,
 }: {
   state: CellState;
   defaultVal: boolean;
+  // M61: true khi đang ở phạm vi dự án và giá trị "Mặc định" hiển thị thực chất là kế
+  // thừa từ 1 override toàn hệ (không phải CAN_DEFAULT gốc) — hiện chú thích nguồn.
+  inheritedFromGlobal?: boolean;
   isWrite: boolean;
   disabled: boolean;
   onChange: (next: CellState) => void;
@@ -426,7 +508,10 @@ function CellSelect({
       onChange={(e) => onChange(e.target.value as CellState)}
       className={`w-full min-w-[6.5rem] rounded-md border bg-zinc-800 px-1.5 py-1 text-xs disabled:opacity-50 ${tone}`}
     >
-      <option value="default">Mặc định ({defaultVal ? "có" : "không"})</option>
+      <option value="default">
+        Mặc định ({defaultVal ? "có" : "không"}
+        {inheritedFromGlobal ? " — kế thừa toàn hệ" : ""})
+      </option>
       <option value="on" disabled={isWrite}>
         Mở (bật){isWrite ? " — khoá" : ""}
       </option>

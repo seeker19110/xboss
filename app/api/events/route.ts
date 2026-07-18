@@ -9,6 +9,16 @@ export const dynamic = "force-dynamic";
 const CHECK_MS = 3_000; // chu kỳ kiểm tra watermark
 const REFRESH_EVERY = 10; // ~30s gửi lại version 1 lần (bắt kịp client bỏ lỡ lúc đang edit)
 
+// Đếm số SSE stream đang mở (M53 PR1) — module-level, chỉ đúng trong phạm vi 1 process
+// (chạy nhiều instance thì mỗi instance tự đếm số của nó, /api/health trả số riêng —
+// chấp nhận được, xem docs/nang-cap/M53-scale-headroom.md PR4).
+let openStreams = 0;
+
+/** Getter cho GET /api/health (Admin/PM) — số SSE stream đang mở trên process này. */
+export function getOpenStreamCount(): number {
+  return openStreams;
+}
+
 // GET /api/events?sheet= → SSE stream: đẩy event `version` khi sheet đổi watermark.
 // Client (trang tracking) nghe để reload ngay ~3s thay vì poll 10s.
 // Lưu ý môi trường serverless (Vercel) giới hạn thời gian function — kết nối bị cắt
@@ -26,15 +36,24 @@ export async function GET(req: NextRequest) {
 
   const encoder = new TextEncoder();
   let timer: ReturnType<typeof setInterval> | undefined;
+  // Chia sẻ giữa start()/cancel() để không đếm trừ 2 lần khi cả abort lẫn cancel cùng bắn
+  // (client ngắt kết nối đột ngột có thể trigger cả hai).
+  let closed = false;
+  let counted = false;
 
   const stream = new ReadableStream({
     async start(controller) {
       let last = "";
       let tick = 0;
-      let closed = false;
+      openStreams++;
+      counted = true;
       const close = () => {
         if (closed) return;
         closed = true;
+        if (counted) {
+          openStreams--;
+          counted = false;
+        }
         if (timer) clearInterval(timer);
         try {
           controller.close();
@@ -71,6 +90,11 @@ export async function GET(req: NextRequest) {
     },
     cancel() {
       if (timer) clearInterval(timer);
+      closed = true;
+      if (counted) {
+        openStreams--;
+        counted = false;
+      }
     },
   });
 
