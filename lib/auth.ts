@@ -107,6 +107,37 @@ export async function getCurrentUser(): Promise<User | null> {
 
 export const COOKIE_MAX_AGE = SESSION_DAYS * 86400;
 
+// ===== Token tạm "chờ 2FA" (M56 PR1) =====
+// Sau khi verifyPassword đúng nhưng user đã bật TOTP: KHÔNG set cookie phiên ngay, trả
+// token tạm 5 phút để bước 2 (/api/auth/login/2fa) xác minh mã TOTP/recovery rồi mới
+// set cookie phiên thật. Purpose "2fa" gắn vào payload đã ký nên không thể dùng lẫn với
+// bất kỳ token nào khác (kể cả cấu trúc payload giống makeToken ở trên).
+const TOTP_PENDING_TTL_MS = 5 * 60_000;
+
+export function makeTotpPendingToken(userId: number, passwordHash: string): string {
+  const exp = Date.now() + TOTP_PENDING_TTL_MS;
+  const pwFrag = passwordHash.slice(0, 12);
+  const payload = `${userId}.${exp}.${pwFrag}.2fa`;
+  return `${payload}.${sign(payload)}`;
+}
+
+export function parseTotpPendingToken(token: string): { uid: number; pwFrag: string } | null {
+  const parts = token.split(".");
+  if (parts.length !== 5) return null;
+  const [uid, exp, pwFrag, purpose, mac] = parts;
+  if (purpose !== "2fa") return null;
+  const expected = Buffer.from(sign(`${uid}.${exp}.${pwFrag}.${purpose}`), "hex");
+  let given: Buffer;
+  try {
+    given = Buffer.from(mac, "hex");
+  } catch {
+    return null;
+  }
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
+  if (Number(exp) < Date.now()) return null;
+  return { uid: Number(uid), pwFrag };
+}
+
 // ===== Tạo user mặc định (chạy 1 lần nếu DB chưa có user) =====
 const DEFAULTS: { name: string; email: string; pw: string; role: Role }[] = [
   { name: "Quản trị", email: "admin@xboss.vn", pw: "admin123", role: "admin" },

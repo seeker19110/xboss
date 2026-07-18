@@ -17,6 +17,9 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [projectName, setProjectName] = useState<string | null>(null);
+  // Bước 2 (M56 PR1): server trả { need2fa: true, pending } thay vì set cookie ngay.
+  const [pending, setPending] = useState<string | null>(null);
+  const [totpCode, setTotpCode] = useState("");
 
   useEffect(() => {
     fetch("/api/project")
@@ -33,17 +36,44 @@ export default function LoginPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
+    const j = await res.json().catch(() => ({}));
+    if (res.ok && j.need2fa) {
+      setPending(j.pending);
+      setBusy(false);
+      return;
+    }
     if (res.ok) {
-      // Đăng nhập mới trên thiết bị dùng chung: dọn cache API + hàng đợi tick offline còn sót
-      // lại từ phiên trước (có thể của người khác) để không lẫn dữ liệu giữa 2 người dùng.
-      clearOfflineQueue();
-      if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({ type: "CLEAR_CACHE" });
-      }
-      window.location.href = "/";
+      onLoginOk();
+    } else {
+      setError(j.error ?? "Đăng nhập thất bại");
+      setBusy(false);
+    }
+  }
+
+  function onLoginOk() {
+    // Đăng nhập mới trên thiết bị dùng chung: dọn cache API + hàng đợi tick offline còn sót
+    // lại từ phiên trước (có thể của người khác) để không lẫn dữ liệu giữa 2 người dùng.
+    clearOfflineQueue();
+    if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ type: "CLEAR_CACHE" });
+    }
+    window.location.href = "/";
+  }
+
+  async function submit2fa(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    const res = await fetch("/api/auth/login/2fa", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pending, code: totpCode }),
+    });
+    if (res.ok) {
+      onLoginOk();
     } else {
       const j = await res.json().catch(() => ({}));
-      setError(j.error ?? "Đăng nhập thất bại");
+      setError(j.error ?? "Mã không đúng");
       setBusy(false);
     }
   }
@@ -58,6 +88,45 @@ export default function LoginPage() {
           <h1 className="text-2xl font-bold">🏗️ XBoss</h1>
           <p className="text-sm text-zinc-400">{projectName ?? "Quản lý tiến độ thi công MEP"}</p>
         </div>
+        {pending ? (
+          <form
+            onSubmit={submit2fa}
+            className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4"
+          >
+            <div>
+              <label htmlFor="login-totp" className="text-xs text-zinc-400">
+                Mã xác thực 2 lớp (từ app hoặc recovery code)
+              </label>
+              <input
+                id="login-totp"
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value)}
+                autoFocus
+                required
+                className="w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600"
+              />
+            </div>
+            {error && <p className="text-sm text-red-400">{error}</p>}
+            <button
+              disabled={busy}
+              type="submit"
+              className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 disabled:bg-zinc-700 py-2.5 rounded-lg font-medium transition text-on-accent"
+            >
+              <LogIn className="w-4 h-4" /> {busy ? "Đang xác thực..." : "Xác nhận"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPending(null);
+                setTotpCode("");
+                setError("");
+              }}
+              className="w-full text-xs text-zinc-500 hover:text-zinc-300 transition"
+            >
+              Quay lại đăng nhập
+            </button>
+          </form>
+        ) : (
         <form
           onSubmit={submit}
           className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4"
@@ -97,7 +166,8 @@ export default function LoginPage() {
             <LogIn className="w-4 h-4" /> {busy ? "Đang đăng nhập..." : "Đăng nhập"}
           </button>
         </form>
-        {process.env.NODE_ENV === "development" && (
+        )}
+        {!pending && process.env.NODE_ENV === "development" && (
           <div className="mt-4 text-xs text-zinc-500">
             <p className="mb-1">Tài khoản demo (bấm để điền):</p>
             <div className="grid grid-cols-2 gap-2">
