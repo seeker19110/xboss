@@ -35,7 +35,16 @@ export async function GET(_req: NextRequest) {
   if (!CAN.viewPayments(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM/BCH được xem thanh toán" }, { status: 403 });
 
-  const bills = await query<Bill>(`
+  // Dự án đang chọn — lọc chéo dự án (giống pattern M22). null = DB chưa có dự án nào
+  // → giữ hành vi không lọc (tương thích ngược). payment_bills đã có project_id trực
+  // tiếp (migration 0069_rls.sql); dòng cũ chưa gán dự án (NULL) vẫn hiện.
+  const projectId = await getCurrentProjectId(user);
+  const projectFilter =
+    projectId != null ? " WHERE pb.project_id = ? OR pb.project_id IS NULL" : "";
+  const projectParams = projectId != null ? [projectId] : [];
+
+  const bills = await query<Bill>(
+    `
     SELECT pb.id, pb.responsible, pb.type, pb.period,
            pb.amount, pb.description,
            pb.paid_date        AS "paidDate",
@@ -56,8 +65,10 @@ export async function GET(_req: NextRequest) {
         SELECT name FROM work_packages
         WHERE sheet_type_id = pb.sheet_type_id AND floor_label = pb.floor_label
         LIMIT 1
-      ) wp ON pb.sheet_type_id IS NOT NULL AND pb.floor_label IS NOT NULL
-     ORDER BY pb.paid_date ASC, pb.id ASC`);
+      ) wp ON pb.sheet_type_id IS NOT NULL AND pb.floor_label IS NOT NULL${projectFilter}
+     ORDER BY pb.paid_date ASC, pb.id ASC`,
+    ...projectParams,
+  );
 
   return NextResponse.json({ bills });
 }
