@@ -20,9 +20,13 @@ const REFERENCE_SQL: Record<string, string> = {
   delay_reason: `SELECT COUNT(*)::int AS n FROM tasks WHERE delay_reason = ?`,
 };
 
-// Watermark thay đổi toàn cục của danh mục — tăng mỗi lần ghi để cache tự làm mới.
+// Watermark thay đổi toàn cục của danh mục — tăng mỗi lần ghi để cache tự làm mới NGAY
+// trong cùng process. M53 PR4: chạy nhiều instance thì ghi ở instance A không tự bump được
+// version ở instance B/C — thêm TTL làm trần độ trễ tối đa (instance khác thấy đổi chậm
+// nhất sau TTL_MS, thay vì có thể không bao giờ thấy như trước PR4).
+const TTL_MS = 60_000;
 let version = 0;
-const cache = new Map<string, { v: number; rows: CodeListItem[] }>();
+const cache = new Map<string, { v: number; rows: CodeListItem[]; loadedAt: number }>();
 
 export function bumpCodeListVersion(): void {
   version++;
@@ -38,8 +42,9 @@ export async function getList(
   opts?: { includeInactive?: boolean },
 ): Promise<CodeListItem[]> {
   const cached = cache.get(domain);
+  const fresh = cached && cached.v === version && Date.now() - cached.loadedAt < TTL_MS;
   let rows: CodeListItem[];
-  if (cached && cached.v === version) {
+  if (fresh) {
     rows = cached.rows;
   } else {
     rows = await query<CodeListItem>(
@@ -47,7 +52,7 @@ export async function getList(
          FROM code_lists WHERE domain = ? ORDER BY sort, code`,
       domain,
     );
-    cache.set(domain, { v: version, rows });
+    cache.set(domain, { v: version, rows, loadedAt: Date.now() });
   }
   return opts?.includeInactive ? rows : rows.filter((r) => r.active);
 }

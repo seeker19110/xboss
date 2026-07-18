@@ -6,8 +6,11 @@ import { buildDailyReport, reportToHtml, reportToTelegramText, sendTelegram } fr
 import { sendPushToAll } from "@/lib/push";
 import { getEvmSeries } from "@/lib/evm";
 import { getAlertThreshold } from "@/lib/alerts";
+import { acquireSyncLock, releaseSyncLock } from "@/lib/sync-locks";
 
 export const dynamic = "force-dynamic";
+
+const LOCK_NAME = "cron:daily-report";
 
 // GET /api/cron/daily-report
 // Gọi bởi cron (Vercel Cron / crontab) lúc 8:00 sáng VN, hoặc Admin/PM gọi tay để xem trước.
@@ -22,6 +25,23 @@ export async function GET(req: NextRequest) {
       { status: 401 },
     );
 
+  // M53 PR4: chống gửi trùng email/Telegram/Push khi 2 request chạm route gần như đồng
+  // thời (cron thật trùng lúc admin bấm xem trước, hoặc caller ngoài retry) — khoá ngắn
+  // hạn, tự hết hạn sau 10 phút nếu process crash giữa chừng (không treo vĩnh viễn).
+  if (!(await acquireSyncLock(LOCK_NAME)))
+    return NextResponse.json(
+      { error: "Báo cáo ngày đang được gửi bởi tiến trình khác — thử lại sau ít phút" },
+      { status: 429 },
+    );
+
+  try {
+    return await handleDailyReport();
+  } finally {
+    await releaseSyncLock(LOCK_NAME);
+  }
+}
+
+async function handleDailyReport(): Promise<NextResponse> {
   const report = await buildDailyReport();
 
   // Cảnh báo SPI/CPI (M47 PR4): đánh giá trên toàn hệ (projectId=null — DB hiện chưa

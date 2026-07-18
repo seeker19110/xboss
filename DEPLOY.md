@@ -140,6 +140,45 @@ cần scale lên nhiều instance/traffic cao:
 
 ---
 
+## Chạy nhiều instance (cluster, tuỳ chọn — M53 PR4)
+
+Mặc định XBoss chạy 1 instance (đủ cho quy mô hiện tại). Khi cần scale ngang trên cùng máy
+(nhiều CPU) hoặc chuẩn bị cho nhiều máy:
+
+```bash
+pm2 start npm -i 2 --name xboss -- start
+```
+
+**Điều kiện tiên quyết:**
+
+- **Hạ `XBOSS_PG_POOL_MAX` mỗi process** — Postgres có giới hạn `max_connections` chung
+  (mặc định 100); N instance × pool 10 connection/instance dễ vượt ngưỡng. Đặt sao cho
+  `N × XBOSS_PG_POOL_MAX < max_connections` của Postgres, chừa chỗ cho kết nối khác
+  (migration, psql thủ công). Ví dụ 4 instance trên Postgres `max_connections=100`: đặt
+  `XBOSS_PG_POOL_MAX=15` (4×15=60, còn dư).
+- **Hoặc dựng PgBouncer** ở chế độ **transaction pooling** phía trước — `lib/db/index.ts`
+  (`withTransaction`) dùng `SET LOCAL` để set GUC `app.project_id`/ngữ cảnh audit, chỉ có
+  hiệu lực trong 1 transaction nên **tương thích transaction-pooling mode** của PgBouncer
+  (KHÔNG dùng session-pooling nếu có code nào set GUC ngoài transaction — hiện tại không có).
+- **Cron chỉ gọi từ ngoài 1 lần** (1 dòng crontab/1 Vercel Cron job trỏ 1 URL) — bộ cân bằng
+  tải sẽ đưa request cron tới đúng 1 instance mỗi lần gọi, không tự nhân đôi. Các endpoint
+  `sync-sheets`/`sync-integrations` đã có khoá `sync_locks`; `deliver-webhooks` dùng
+  `SELECT ... FOR UPDATE SKIP LOCKED`; `daily-report`/`weekly-report` đã thêm khoá ngắn hạn
+  (M53 PR4, `lib/sync-locks.ts`) chống gửi email/Telegram trùng nếu 2 request chạm gần như
+  đồng thời; `refresh-views` tự an toàn vì Postgres chặn `REFRESH CONCURRENTLY` trùng view.
+
+**Giới hạn đã biết khi chạy nhiều instance (chấp nhận ở quy mô hiện tại, xem `PROGRESS.md`
+mục Nợ kỹ thuật nếu cần nâng cấp):**
+
+- Trang **Traffic monitor** (`/admin/traffic`, SSE) chỉ thấy traffic của đúng instance bạn
+  đang kết nối — không gộp traffic toàn cluster.
+- **Danh mục mềm** (`/admin/code-lists`) và **cờ tính năng theo dự án** (`/admin/feature-flags`):
+  đổi ở 1 instance lan sang instance khác **chậm nhất 60 giây** (cache TTL), không tức thời.
+- Đếm **SSE stream đang mở** trong `GET /api/health` (M53 PR1) là số của riêng instance đó,
+  không phải tổng toàn cluster.
+
+---
+
 ## ✅ Checklist trước khi chạy thật
 
 - [ ] Đổi `XBOSS_SECRET` thành chuỗi ngẫu nhiên dài (bảo mật cookie đăng nhập).
