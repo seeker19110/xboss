@@ -32,31 +32,40 @@ function promisify<T>(req: IDBRequest<T>): Promise<T> {
 }
 
 export class IdbQueueStore implements QueueStore {
+  // Cache 1 connection duy nhất cho cả instance thay vì mở mới mỗi thao tác — tránh tích
+  // luỹ handle IDB trong phiên dài, mở cùng DB/store/version như trước.
+  private dbPromise: Promise<IDBDatabase> | null = null;
+
+  private getDb(): Promise<IDBDatabase> {
+    if (!this.dbPromise) this.dbPromise = openDB();
+    return this.dbPromise;
+  }
+
   async getAll(): Promise<QueuedOp[]> {
-    const db = await openDB();
+    const db = await this.getDb();
     const tx = db.transaction(STORE, "readonly");
     const all = await promisify(tx.objectStore(STORE).getAll() as IDBRequest<QueuedOp[]>);
     return all.sort((a, b) => a.id - b.id);
   }
   async add(op: QueuedOpInput): Promise<number> {
-    const db = await openDB();
+    const db = await this.getDb();
     const tx = db.transaction(STORE, "readwrite");
     // add() với autoIncrement trả về key (id) vừa cấp.
     const key = await promisify(tx.objectStore(STORE).add(op) as IDBRequest<IDBValidKey>);
     return Number(key);
   }
   async update(op: QueuedOp): Promise<void> {
-    const db = await openDB();
+    const db = await this.getDb();
     const tx = db.transaction(STORE, "readwrite");
     await promisify(tx.objectStore(STORE).put(op) as IDBRequest<IDBValidKey>);
   }
   async remove(id: number): Promise<void> {
-    const db = await openDB();
+    const db = await this.getDb();
     const tx = db.transaction(STORE, "readwrite");
     await promisify(tx.objectStore(STORE).delete(id));
   }
   async clear(): Promise<void> {
-    const db = await openDB();
+    const db = await this.getDb();
     const tx = db.transaction(STORE, "readwrite");
     await promisify(tx.objectStore(STORE).clear());
   }

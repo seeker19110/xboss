@@ -123,9 +123,6 @@ class OfflineQueueManager {
     if (this.started || typeof window === "undefined") return;
     this.started = true;
     this.setSnap({ online: navigator.onLine });
-    migrateFromLocalStorage(this.store)
-      .then(() => this.refreshStats())
-      .catch(() => {});
 
     window.addEventListener("online", () => {
       this.setSnap({ online: true });
@@ -148,7 +145,12 @@ class OfflineQueueManager {
       }
     });
 
-    this.flush();
+    // Đợi di trú dữ liệu cũ từ localStorage xong rồi mới flush lần đầu, tránh bỏ lỡ
+    // tick vừa di trú vào IndexedDB.
+    migrateFromLocalStorage(this.store)
+      .then(() => this.refreshStats())
+      .catch(() => {})
+      .finally(() => this.flush());
   }
 
   async flush() {
