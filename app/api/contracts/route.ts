@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { insertId } from "@/lib/db";
+import { insertId, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import {
@@ -35,7 +35,9 @@ export async function GET(req: NextRequest) {
   const projectId = await getCurrentProjectId(user);
   const contracts =
     projectId != null
-      ? await listContracts((kindRaw as ContractKind) ?? undefined, projectId, deletedView)
+      ? await withProjectScope(projectId, () =>
+          listContracts((kindRaw as ContractKind) ?? undefined, projectId, deletedView),
+        )
       : [];
   // M50 PR2: che giá trị/tỷ lệ HĐ cho user thiếu viewPayments (phòng thủ — gate route
   // hiện cũng là viewPayments nên không đổi ai hiện tại).

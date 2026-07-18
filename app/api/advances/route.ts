@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { insertId, query } from "@/lib/db";
+import { insertId, query, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import {
@@ -42,15 +42,17 @@ export async function GET(req: NextRequest) {
     conds.push("a.status = ?");
     args.push(status);
   }
-  const advances = await query<AdvanceRow>(
-    `SELECT a.id, a.code, a.advance_date AS "advanceDate", a.amount, a.recipient, a.reason,
-            a.settled_amount AS "settledAmount", a.status, a.proposal_id AS "proposalId",
-            a.created_by AS "createdBy", u.name AS "createdByName", a.created_at AS "createdAt"
-       FROM advances a
-       LEFT JOIN users u ON u.id = a.created_by
-      WHERE ${conds.join(" AND ")}
-      ORDER BY a.advance_date DESC NULLS LAST, a.id DESC`,
-    ...args,
+  const advances = await withProjectScope(projectId, () =>
+    query<AdvanceRow>(
+      `SELECT a.id, a.code, a.advance_date AS "advanceDate", a.amount, a.recipient, a.reason,
+              a.settled_amount AS "settledAmount", a.status, a.proposal_id AS "proposalId",
+              a.created_by AS "createdBy", u.name AS "createdByName", a.created_at AS "createdAt"
+         FROM advances a
+         LEFT JOIN users u ON u.id = a.created_by
+        WHERE ${conds.join(" AND ")}
+        ORDER BY a.advance_date DESC NULLS LAST, a.id DESC`,
+      ...args,
+    ),
   );
   return NextResponse.json({ advances });
 }

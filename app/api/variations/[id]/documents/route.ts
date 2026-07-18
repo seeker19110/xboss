@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { query, queryOne, insertId } from "@/lib/db";
+import { query, queryOne, insertId, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import {
@@ -34,24 +34,26 @@ export async function GET(
   if (isNaN(voId)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
-  const vo =
+  const documents =
     projectId != null
-      ? await queryOne<{ id: number }>(
-          `SELECT id FROM variation_orders WHERE id = ? AND project_id = ?`,
-          voId,
-          projectId,
-        )
-      : undefined;
-  if (!vo) return NextResponse.json({ error: "Không tìm thấy phát sinh" }, { status: 404 });
-
-  const documents = await query(
-    `SELECT d.id, d.original_name AS "originalName", d.mime_type AS "mimeType",
-            d.size_bytes AS "sizeBytes", d.caption, d.created_at AS "createdAt", d.sha256,
-            d.uploaded_by AS "uploadedBy", u.name AS "uploaderName"
-       FROM vo_documents d LEFT JOIN users u ON u.id = d.uploaded_by
-      WHERE d.vo_id = ? ORDER BY d.id DESC`,
-    voId,
-  );
+      ? await withProjectScope(projectId, async () => {
+          const vo = await queryOne<{ id: number }>(
+            `SELECT id FROM variation_orders WHERE id = ? AND project_id = ?`,
+            voId,
+            projectId,
+          );
+          if (!vo) return null;
+          return query(
+            `SELECT d.id, d.original_name AS "originalName", d.mime_type AS "mimeType",
+                    d.size_bytes AS "sizeBytes", d.caption, d.created_at AS "createdAt", d.sha256,
+                    d.uploaded_by AS "uploadedBy", u.name AS "uploaderName"
+               FROM vo_documents d LEFT JOIN users u ON u.id = d.uploaded_by
+              WHERE d.vo_id = ? ORDER BY d.id DESC`,
+            voId,
+          );
+        })
+      : null;
+  if (!documents) return NextResponse.json({ error: "Không tìm thấy phát sinh" }, { status: 404 });
   return NextResponse.json({ documents });
 }
 

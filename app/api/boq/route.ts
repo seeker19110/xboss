@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne, insertId } from "@/lib/db";
+import { query, queryOne, insertId, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { assertModuleEnabled } from "@/lib/feature-flags";
@@ -67,33 +67,35 @@ export async function GET(req: NextRequest) {
   }
   const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
 
-  const rows = await query<BoqRow>(
-    `SELECT bi.id, bi.code, bi.name, bi.unit,
-            bi.system_id AS "systemId", d.code AS "systemCode",
-            d.name AS "systemName", d.color AS "systemColor",
-            bi.qty_contract AS "qtyContract", bi.unit_price AS "unitPrice",
-            bi.qty_sub AS "qtySub", bi.sub_unit_price AS "subUnitPrice",
-            bi.note, bi.sort_order AS "sortOrder",
-            bi.vo_id AS "voId", vo.code AS "voCode", vo.status AS "voStatus",
-            bi.qty_approved AS "qtyApproved",
-            COALESCE(
-              json_agg(
-                json_build_object(
-                  'taskId', t.id, 'taskCode', t.code, 'taskName', t.name,
-                  'weight', m.weight, 'progressPercent', t.progress_percent
-                ) ORDER BY t.code
-              ) FILTER (WHERE t.id IS NOT NULL),
-              '[]'
-            ) AS map
-       FROM boq_items bi
-       LEFT JOIN systems d ON d.id = bi.system_id
-       LEFT JOIN variation_orders vo ON vo.id = bi.vo_id
-       LEFT JOIN boq_task_map m ON m.boq_item_id = bi.id
-       LEFT JOIN tasks t ON t.id = m.task_id
-      ${where}
-      GROUP BY bi.id, d.code, d.name, d.color, vo.code, vo.status
-      ORDER BY bi.sort_order, bi.id`,
-    ...args,
+  const rows = await withProjectScope(projectId ?? "*", () =>
+    query<BoqRow>(
+      `SELECT bi.id, bi.code, bi.name, bi.unit,
+              bi.system_id AS "systemId", d.code AS "systemCode",
+              d.name AS "systemName", d.color AS "systemColor",
+              bi.qty_contract AS "qtyContract", bi.unit_price AS "unitPrice",
+              bi.qty_sub AS "qtySub", bi.sub_unit_price AS "subUnitPrice",
+              bi.note, bi.sort_order AS "sortOrder",
+              bi.vo_id AS "voId", vo.code AS "voCode", vo.status AS "voStatus",
+              bi.qty_approved AS "qtyApproved",
+              COALESCE(
+                json_agg(
+                  json_build_object(
+                    'taskId', t.id, 'taskCode', t.code, 'taskName', t.name,
+                    'weight', m.weight, 'progressPercent', t.progress_percent
+                  ) ORDER BY t.code
+                ) FILTER (WHERE t.id IS NOT NULL),
+                '[]'
+              ) AS map
+         FROM boq_items bi
+         LEFT JOIN systems d ON d.id = bi.system_id
+         LEFT JOIN variation_orders vo ON vo.id = bi.vo_id
+         LEFT JOIN boq_task_map m ON m.boq_item_id = bi.id
+         LEFT JOIN tasks t ON t.id = m.task_id
+        ${where}
+        GROUP BY bi.id, d.code, d.name, d.color, vo.code, vo.status
+        ORDER BY bi.sort_order, bi.id`,
+      ...args,
+    ),
   );
 
   let contractValue = 0;

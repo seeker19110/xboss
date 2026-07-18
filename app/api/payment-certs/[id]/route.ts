@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, run } from "@/lib/db";
+import { queryOne, run, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import {
@@ -47,17 +47,20 @@ export async function GET(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
-  const scoped = await certInProject(id, projectId);
-  if (!scoped)
+  const detail = await withProjectScope(projectId ?? "*", async () => {
+    const scoped = await certInProject(id, projectId);
+    if (!scoped) return null;
+    const cert = await getCert(id);
+    if (!cert) return null;
+    const totals = await certTotals(id);
+    // Trạng thái duyệt engine (M46 PR2) — null khi chưa có flow cấu hình cho loại
+    // "payment_cert" (hành xử dormant, không đổi UI cũ).
+    const approvalStatus = await getEntityApprovalStatus("payment_cert", id);
+    return { cert, totals, approvalStatus };
+  });
+  if (!detail)
     return NextResponse.json({ error: "Không tìm thấy đợt thanh toán" }, { status: 404 });
-
-  const cert = await getCert(id);
-  if (!cert) return NextResponse.json({ error: "Không tìm thấy đợt thanh toán" }, { status: 404 });
-
-  const totals = await certTotals(id);
-  // Trạng thái duyệt engine (M46 PR2) — null khi chưa có flow cấu hình cho loại
-  // "payment_cert" (hành xử dormant, không đổi UI cũ).
-  const approvalStatus = await getEntityApprovalStatus("payment_cert", id);
+  const { cert, totals, approvalStatus } = detail;
   // M50 PR2: che đơn giá dòng KL + tổng tiền đợt cho user thiếu viewPayments (phòng thủ
   // — gate route hiện cũng là viewPayments).
   const [maskedCert] = stripSensitive("paymentCert", [cert], user);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, insertId, withTransaction } from "@/lib/db";
+import { queryOne, insertId, withTransaction, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { isUniqueViolation, withUniqueRetry } from "@/lib/seqcode";
@@ -33,7 +33,10 @@ export async function GET(req: NextRequest) {
       : undefined;
 
   const projectId = await getCurrentProjectId(user);
-  const items = projectId != null ? await listVariations({ status, projectId }) : [];
+  const items =
+    projectId != null
+      ? await withProjectScope(projectId, () => listVariations({ status, projectId }))
+      : [];
   // M50 PR2: che giá trị/đơn giá VO cho user thiếu viewPayments (vd engineer xem được
   // VO nhưng không thấy tiền) — che tại API trước khi trả.
   return NextResponse.json({ items: stripSensitive("variation", items, user) });

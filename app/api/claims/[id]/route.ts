@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { run } from "@/lib/db";
+import { run, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import {
@@ -27,7 +27,7 @@ export async function GET(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const projectId = await getCurrentProjectId(user);
-  const claim = await getClaim(id, projectId);
+  const claim = await withProjectScope(projectId ?? "*", () => getClaim(id, projectId));
   if (!claim) return NextResponse.json({ error: "Không tìm thấy claim" }, { status: 404 });
   return NextResponse.json({ claim });
 }

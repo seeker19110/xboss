@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { insertId, queryOne } from "@/lib/db";
+import { insertId, queryOne, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import {
@@ -25,9 +25,11 @@ export async function GET(req: NextRequest) {
   const projectId = await getCurrentProjectId(user);
   const items =
     projectId != null
-      ? await listWarrantyItems(projectId, {
-          status: (statusRaw as WarrantyItemStatus) ?? undefined,
-        })
+      ? await withProjectScope(projectId, () =>
+          listWarrantyItems(projectId, {
+            status: (statusRaw as WarrantyItemStatus) ?? undefined,
+          }),
+        )
       : [];
   return NextResponse.json({ items });
 }
