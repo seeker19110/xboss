@@ -68,8 +68,6 @@ const WHITELIST: Record<string, string> = {
   "my-tasks": "task theo assigned_to của người dùng hiện tại",
   timeline: "dòng thời gian theo sheet/tracking",
   payments: "tổng hợp thanh toán theo sheet/hệ",
-  "payments/bills": "phiếu chi theo sheet/hệ",
-  "payments/floors": "thanh toán theo tầng của sheet",
   "floor-stage-fronts": "mặt trận theo tầng/giai đoạn của sheet",
 };
 
