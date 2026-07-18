@@ -1,4 +1,4 @@
--- 0067_rls.sql — M51 PR1: Row-Level Security làm phòng tuyến thứ hai chống lỗi "quên
+-- 0069_rls.sql — M51 PR1: Row-Level Security làm phòng tuyến thứ hai chống lỗi "quên
 -- scope project_id" trên nhóm bảng tài chính/hợp đồng. RLS KHÔNG thay check app —
 -- app vẫn filter `project_id = ?`; RLS chỉ đảm bảo nếu app quên thì trả RỖNG thay vì lộ
 -- chéo dự án. Xem docs/adr/0005-rls.md + docs/nang-cap/M51-da-du-an-rls.md.

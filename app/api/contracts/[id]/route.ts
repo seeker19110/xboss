@@ -33,7 +33,7 @@ export async function GET(
   const projectId = await getCurrentProjectId(user);
   // Tái dùng query tổng hợp của danh sách (1 dự án — số HĐ ít, lọc trong JS đủ rẻ).
   // Toàn bộ truy vấn (kể cả các bảng liên quan) bọc trong 1 withProjectScope — cùng
-  // GUC app.project_id cho lưới an toàn RLS (migration 0067).
+  // GUC app.project_id cho lưới an toàn RLS (migration 0069).
   const result =
     projectId != null
       ? await withProjectScope(projectId, async () => {

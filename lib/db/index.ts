@@ -198,7 +198,7 @@ export async function withTransaction<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 // Bọc đường ĐỌC (GET) nhóm bảng tài chính trong 1 transaction read-only có đặt GUC
-// app.project_id — lưới an toàn RLS (migration 0067) chỉ áp được khi GUC tồn tại; đọc
+// app.project_id — lưới an toàn RLS (migration 0069) chỉ áp được khi GUC tồn tại; đọc
 // ngoài transaction (như trước PR2) không có GUC nên rơi vào nhánh "chuyển tiếp" của
 // policy. Tái dùng nguyên `withTransaction` (không viết cơ chế set GUC mới): mở transaction,
 // set_config LOCAL rồi chạy fn, COMMIT khi xong (SET TRANSACTION READ ONLY vì chỉ đọc).

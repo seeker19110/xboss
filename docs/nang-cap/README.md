@@ -39,7 +39,7 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 | `M48-tich-hop-tai-chinh.md`  | Khung integrations, adapter kế toán, hoá đơn điện tử NĐ 70/2025          | ✅ xong                                                | `0057_integrations.sql`                                                                  |
 | `M49-api-mo-sso.md`          | API keys `/api/v1`, webhook ra ngoài, SSO OIDC                           | ⚠️ PR1/PR2 xong; PR3 SSO OIDC merge nhưng **flag tắt** | `app/api/v1`, `0064_webhooks`/`0061_api_keys`                                            |
 | `M50-phan-quyen-nang-cao.md` | Override quyền trong DB, quyền theo trường, báo cáo SoD                  | ✅ xong                                                | `0058_role_permissions.sql`, `lib/permissions.ts`                                        |
-| `M51-da-du-an-rls.md`        | RLS phòng tuyến 2 (kèm ADR-0005), template dự án, organizations          | ⚠️ **GĐ0 xong (PR1/PR2/PR4), chờ merge**               | `0067_rls.sql`/`0068_organizations.sql`, `docs/adr/0005-rls.md`; nợ: bước "khoá cửa" PR2 |
+| `M51-da-du-an-rls.md`        | RLS phòng tuyến 2 (kèm ADR-0005), template dự án, organizations          | ⚠️ **GĐ0 xong (PR1/PR2/PR4), chờ merge**               | `0069_rls.sql`/`0070_organizations.sql`, `docs/adr/0005-rls.md`; nợ: bước "khoá cửa" PR2 |
 | `M52-mo-rong-cau-hinh.md`    | code_lists, custom fields, module registry, feature flags, tách tracking | ✅ xong                                                | `0060_code_lists`/`0062_custom_fields`/`0063_feature_flags`                              |
 
 ## Đặc tả chờ triển khai — đợt Scale/SaaS/BI + bổ sung (M53–M59 viết 07/2026, M61 viết 2026-07-18)

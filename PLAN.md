@@ -296,7 +296,7 @@ Người dùng đã quyết:
   `payment_bills` (`migrations/0001_baseline.sql`) — người dùng chọn **thêm cột
   `project_id` vào `payment_bills` trước rồi mới áp RLS**, theo đúng cùng pattern
   `migrations/0027_multi_project.sql` đã dùng cho các bảng "gốc cụm" khác:
-  - Trong migration RLS (số thật, dự kiến `0067_rls.sql`): `ALTER TABLE payment_bills
+  - Trong migration RLS (số thật, dự kiến `0069_rls.sql`): `ALTER TABLE payment_bills
 ADD COLUMN IF NOT EXISTS project_id INTEGER REFERENCES projects(id)` + backfill
     `UPDATE payment_bills SET project_id = (SELECT MIN(id) FROM projects) WHERE
 project_id IS NULL` (an toàn cho DB 1 dự án hiện tại, đúng pattern 0027) + `CREATE

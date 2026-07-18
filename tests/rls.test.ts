@@ -6,7 +6,7 @@ import { Pool } from "pg";
 // ===== Test tích hợp RLS (M51 PR1) — cần Postgres riêng qua TEST_DATABASE_URL =====
 // RLS chỉ áp thật khi app chạy bằng role NOBYPASSRLS (không owner/superuser). TEST_DATABASE_URL
 // thường trỏ superuser (chạy migration) — superuser BỎ QUA RLS. Vì vậy test mở POOL RIÊNG kết
-// nối bằng role `xboss_app` (migration 0067 tạo, NOBYPASSRLS, mật khẩu placeholder) để kiểm RLS
+// nối bằng role `xboss_app` (migration 0069 tạo, NOBYPASSRLS, mật khẩu placeholder) để kiểm RLS
 // đúng như production.
 
 // Đổi user/password của connection string sang xboss_app.
