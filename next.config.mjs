@@ -5,6 +5,12 @@ const nextConfig = {
   // Cho phép deploy.sh build vào thư mục tạm rồi swap atomic vào ".next" thật —
   // tránh app đang chạy (đọc ".next" hiện tại) bị vỡ chunk giữa lúc build ghi đè.
   distDir: process.env.NEXT_DIST_DIR || ".next",
+  // Bỏ bước type-check của `next build`: pha "Running TypeScript" ngốn thêm RAM và từng
+  // làm deploy trên VPS bị OOM-kill (exit 137 — "Killed" sau khi compile xong). Type-check
+  // KHÔNG bị buông lỏng: CI (`npm run typecheck` = tsc --noEmit) là cổng bắt buộc trước khi
+  // merge vào main, còn deploy chỉ chạy trên main sau merge nên code đã qua type-check rồi —
+  // chạy lại trong build production chỉ tốn bộ nhớ vô ích.
+  typescript: { ignoreBuildErrors: true },
   serverExternalPackages: ["pg", "better-sqlite3"],
   images: {
     formats: ["image/avif", "image/webp"],
