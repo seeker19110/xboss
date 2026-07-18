@@ -3,7 +3,7 @@
 // Mất mạng (hầm, tầng kỹ thuật) vẫn xem được dữ liệu tracking đã tải lần cuối.
 // App Shell: precache /offline + asset tĩnh cốt lõi lúc cài đặt (M0) — trang HTML chưa
 // từng ghé mà mất mạng hoàn toàn sẽ thấy /offline thay vì lỗi mạng mặc định của trình duyệt.
-const CACHE = "xboss-v11";
+const CACHE = "xboss-v12";
 const SHELL_URLS = [
   "/offline",
   "/manifest.webmanifest",
@@ -81,6 +81,20 @@ self.addEventListener("message", (e) => {
               ),
             ),
         ),
+    );
+  }
+});
+
+// Background Sync (M58 PR2): trình duyệt đánh thức khi có mạng lại (kể cả sau khi tab bị
+// treo) → báo mọi client mở để đẩy hàng đợi offline. Logic hàng đợi nằm ở phía trang
+// (offlineQueue/index.ts) nên SW chỉ chuyển tiếp tín hiệu, không tự gửi. Không client nào
+// mở thì cơ chế listener 'online' + interval lúc mở lại app vẫn gửi bù.
+self.addEventListener("sync", (e) => {
+  if (e.tag === "xboss-flush") {
+    e.waitUntil(
+      self.clients
+        .matchAll({ type: "window", includeUncontrolled: true })
+        .then((list) => list.forEach((c) => c.postMessage({ type: "FLUSH_QUEUE" }))),
     );
   }
 });
