@@ -1410,6 +1410,7 @@
 | receipt_item_id | integer | ✓ |  |
 | floor_label | text | ✓ |  |
 | crew | text | ✓ |  |
+| idempotency_key | text | ✓ |  |
 
 **Khóa ngoại:**
 - `created_by` → `users(id)`
@@ -1421,6 +1422,7 @@
 - `idx_mat_trans`: INDEX idx_mat_trans ON public.material_transactions USING btree (material_id)
 - `idx_mat_trans_floor`: INDEX idx_mat_trans_floor ON public.material_transactions USING btree (floor_label) WHERE (floor_label IS NOT NULL)
 - `idx_mat_trans_type`: INDEX idx_mat_trans_type ON public.material_transactions USING btree (type)
+- `material_transactions_idem_key`: UNIQUE INDEX material_transactions_idem_key ON public.material_transactions USING btree (material_id, type, idempotency_key) WHERE (idempotency_key IS NOT NULL)
 - `material_transactions_pkey`: UNIQUE INDEX material_transactions_pkey ON public.material_transactions USING btree (id)
 
 ### material_sync
