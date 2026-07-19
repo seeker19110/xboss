@@ -83,14 +83,18 @@ export async function getCurrentUser(): Promise<User | null> {
   if (!token) return null;
   const parsed = parseToken(token);
   if (!parsed) return null;
-  const u = await queryOne<User & { password_hash: string }>(
-    `SELECT id, name, email, role, password_hash FROM users WHERE id = ?`,
+  const u = await queryOne<User & { password_hash: string; session_version: number }>(
+    `SELECT id, name, email, role, password_hash, session_version FROM users WHERE id = ?`,
     parsed.uid,
   );
   if (!u) return null;
   // Fragment không khớp → mật khẩu đã đổi, phiên cũ không còn hợp lệ.
   if (!u.password_hash.startsWith(parsed.pwFrag)) return null;
-  const { password_hash: _, ...user } = u;
+  // V5 — thu hồi phiên chủ động: session_version trong token < DB nghĩa là admin đã bấm
+  // "thu hồi phiên" cho user này (tăng bộ đếm) → mọi token phát trước đó hết hiệu lực. Dùng
+  // cột đã có sẵn trong SELECT trên nên KHÔNG thêm round-trip DB nào.
+  if (Number(u.session_version) !== parsed.sessionVersion) return null;
+  const { password_hash: _, session_version: _sv, ...user } = u;
   patchRequestContext({ userId: user.id, role: user.role });
   // M61: chỉ giải + patch projectId khi cache có ≥1 override THEO DỰ ÁN — để giải quyền
   // theo phạm vi dự án trong CAN.x (resolvePerm đọc projectId từ request-context). Bảng

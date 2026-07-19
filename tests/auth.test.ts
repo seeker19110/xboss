@@ -1,7 +1,7 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { hashPassword, verifyPassword, makeToken } from "@/lib/auth";
+import { hashPassword, verifyPassword, makeToken, parseToken } from "@/lib/auth";
 
 // ===== Unit tests: hash + verify mật khẩu =====
 
@@ -26,16 +26,41 @@ test("verifyPassword: hash rỗng / không hợp lệ trả false", () => {
   assert.equal(verifyPassword("secret", "onlyonesegment"), false);
 });
 
-test("makeToken: token chứa userId + pwFrag + exp + cờ mustSetup2fa", () => {
+test("makeToken: token chứa userId + pwFrag + exp + cờ mustSetup2fa + session_version", () => {
   process.env.XBOSS_SECRET = "test-secret-for-unit";
   const hash = hashPassword("pw");
-  const token = makeToken(42, hash, false);
+  const token = makeToken(42, hash, false, 0);
   const parts = token.split(".");
-  assert.equal(parts.length, 5, "Token phải có 5 phần (M56 PR2: thêm cờ mustSetup2fa)");
+  assert.equal(parts.length, 6, "Token phải có 6 phần (V5: thêm session_version)");
   assert.equal(parts[0], "42", "phần đầu là userId");
   assert.equal(parts[2], hash.slice(0, 12), "phần 3 là pwFrag");
   assert.equal(parts[3], "0", "phần 4 là cờ mustSetup2fa = 0 khi false");
-  assert.equal(makeToken(42, hash, true).split(".")[3], "1", "cờ = 1 khi mustSetup2fa true");
+  assert.equal(parts[4], "0", "phần 5 là session_version");
+  assert.equal(makeToken(42, hash, true, 0).split(".")[3], "1", "cờ = 1 khi mustSetup2fa true");
+  assert.equal(
+    makeToken(42, hash, false, 7).split(".")[4],
+    "7",
+    "phần 5 = session_version truyền vào",
+  );
+});
+
+test("parseToken: token 5 phần cũ (M56 PR2, chưa có session_version) bị coi không hợp lệ", async () => {
+  process.env.XBOSS_SECRET = "test-secret-for-unit";
+  const { parseToken, sign } = await import("@/lib/session-token");
+  const hash = hashPassword("pw");
+  const pwFrag = hash.slice(0, 12);
+  const exp = Date.now() + 86400_000;
+  // Dựng token 5 phần đúng chữ ký kiểu cũ — vẫn phải bị từ chối (breaking có chủ đích).
+  const legacyPayload = `42.${exp}.${pwFrag}.0`;
+  const legacyToken = `${legacyPayload}.${sign(legacyPayload)}`;
+  assert.equal(parseToken(legacyToken), null, "Token 5 phần cũ phải bị từ chối sau V5");
+});
+
+test("parseToken: round-trip session_version", () => {
+  process.env.XBOSS_SECRET = "test-secret-for-unit";
+  const hash = hashPassword("pw");
+  const parsed = parseToken(makeToken(42, hash, false, 3));
+  assert.equal(parsed?.sessionVersion, 3, "parseToken trả đúng session_version đã nhúng");
 });
 
 // ===== Integration tests: DB =====
@@ -86,7 +111,7 @@ test("password change invalidates old token (pwFrag check)", { skip: !HAS_TEST_D
     hash1,
   );
 
-  const token = mt(userId, hash1, false);
+  const token = mt(userId, hash1, false, 0);
   const pwFrag = hash1.slice(0, 12);
 
   // Trước khi đổi mật khẩu: pwFrag khớp
@@ -110,6 +135,59 @@ test("password change invalidates old token (pwFrag check)", { skip: !HAS_TEST_D
   // Cleanup
   await run(`DELETE FROM users WHERE id = ?`, userId);
   void token; // suppress unused warning
+});
+
+// V5 — thu hồi phiên: tăng session_version → token cũ (sv thấp hơn) hết hiệu lực.
+// getCurrentUser gọi next/headers nên không test trực tiếp được ngoài request scope; test
+// tái hiện ĐÚNG bước đối chiếu trong getCurrentUser (Number(u.session_version) !== parsed.sessionVersion)
+// cộng với UPDATE của route revoke-sessions.
+test("revoke sessions: tăng session_version vô hiệu token cũ", { skip: !HAS_TEST_DB }, async () => {
+  const { run, insertId, queryOne } = await import("@/lib/db");
+  const { hashPassword: hp, makeToken: mt, parseToken: pt } = await import("@/lib/auth");
+
+  const hash = hp("password1");
+  const userId = await insertId(
+    `INSERT INTO users (name, email, password_hash, role) VALUES ('Test','revoke@test.vn',?,'engineer')
+     ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash RETURNING id`,
+    hash,
+  );
+
+  // Phát token với session_version hiện tại của user (0 mặc định).
+  const sv0 = await queryOne<{ session_version: number }>(
+    `SELECT session_version FROM users WHERE id = ?`,
+    userId,
+  );
+  const token = mt(userId, hash, false, Number(sv0?.session_version));
+  const parsed = pt(token);
+  assert.ok(parsed);
+
+  // Trước thu hồi: sv token khớp DB → getCurrentUser sẽ chấp nhận.
+  const before = await queryOne<{ session_version: number }>(
+    `SELECT session_version FROM users WHERE id = ?`,
+    userId,
+  );
+  assert.equal(
+    Number(before?.session_version),
+    parsed!.sessionVersion,
+    "sv token khớp DB trước thu hồi",
+  );
+
+  // Route revoke-sessions: UPDATE users SET session_version = session_version + 1.
+  await run(`UPDATE users SET session_version = session_version + 1 WHERE id = ?`, userId);
+
+  // Sau thu hồi: sv DB tăng, khác sv trong token → bước đối chiếu của getCurrentUser cho null.
+  const after = await queryOne<{ session_version: number }>(
+    `SELECT session_version FROM users WHERE id = ?`,
+    userId,
+  );
+  assert.equal(Number(after?.session_version), 1, "session_version tăng đúng 1 sau thu hồi");
+  assert.notEqual(
+    Number(after?.session_version),
+    parsed!.sessionVersion,
+    "token cũ có sv khác DB → getCurrentUser coi phiên hết hiệu lực",
+  );
+
+  await run(`DELETE FROM users WHERE id = ?`, userId);
 });
 
 test("material issue: race condition không xuất quá tồn kho", { skip: !HAS_TEST_DB }, async () => {
