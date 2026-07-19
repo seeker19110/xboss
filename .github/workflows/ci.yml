@@ -111,7 +111,7 @@ jobs:
       DATABASE_URL: postgres://ci:ci@localhost:5432/xboss_test
       # Secret ký phiên (production) + mật khẩu admin tạo lần đầu — giá trị test, DB ephemeral.
       # gitleaks:allow — không phải secret thật (biến tên có "SECRET" nên generic-api-key báo nhầm).
-      XBOSS_SECRET: e2e-ci-secret-khong-bi-mat # gitleaks:allow
+      XBOSS_SECRET: e2e-ci-secret-khong-bi-mat-du-32-ky-tu # gitleaks:allow
       XBOSS_ADMIN_PASSWORD: e2e-ci-admin-pw # gitleaks:allow
 
     steps:
