@@ -249,6 +249,15 @@ liệt kê trong kết quả). Cột `Đã dùng`/`Tồn kho`/`Ngưỡng tối t
   Ví dụ crontab mỗi 5 phút: `*/5 * * * * curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://<APP_URL>/api/cron/deliver-webhooks`
   (hoặc khai báo trong `vercel.json` nếu deploy Vercel).
 
+## BI/khám phá dữ liệu qua Metabase (tuỳ chọn, M55)
+
+Metabase self-host đọc dữ liệu qua schema `bi` (view whitelist chỉ-đọc, KHÔNG đọc `public`) qua
+role Postgres riêng `xboss_bi`. Mật khẩu role này tạo **tay** lúc deploy bằng `CREATE ROLE xboss_bi
+LOGIN PASSWORD '...'` — đây là mật khẩu **Postgres role**, không phải biến môi trường app, nên
+**không đưa vào `.env`/`.env.local`/Git**. Hướng dẫn dựng đầy đủ (docker-compose, thứ tự tạo role
+trước migration, Nginx/HTTPS, backup, cập nhật phiên bản): xem
+[`docs/ops/metabase.md`](./docs/ops/metabase.md).
+
 ## Đăng nhập bằng tài khoản công ty — SSO OIDC (tuỳ chọn)
 
 Cho phép đăng nhập bằng Google Workspace / Microsoft Entra (OIDC chuẩn). Thiếu bất kỳ biến
