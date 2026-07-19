@@ -18,16 +18,13 @@ test("parseServerEnv: DATABASE_URL rỗng → throw (min 1)", () => {
 });
 
 test("parseServerEnv: NODE_ENV lạ → throw", () => {
-  assert.throws(
-    () => parseServerEnv({ DATABASE_URL: "x", NODE_ENV: "staging" }),
-    /NODE_ENV/,
-  );
+  assert.throws(() => parseServerEnv({ DATABASE_URL: "x", NODE_ENV: "staging" }), /NODE_ENV/);
 });
 
 test("parseServerEnv: giữ nguyên các biến tích hợp tuỳ chọn khi có", () => {
   const env = parseServerEnv({
     DATABASE_URL: "x",
-    NODE_ENV: "production",
+    NODE_ENV: "development",
     XBOSS_SECRET: "s3cret",
     TELEGRAM_BOT_TOKEN: "tok",
     GOOGLE_SHEET_ID: "sheet1",
@@ -53,4 +50,53 @@ test("getServerEnv: đọc process.env và memoize", () => {
     else process.env.DATABASE_URL = prev;
     __resetServerEnvCache();
   }
+});
+
+test("parseServerEnv: XBOSS_SECRET quá ngắn ở production → throw", () => {
+  assert.throws(
+    () =>
+      parseServerEnv({
+        DATABASE_URL: "postgres://x@localhost/db",
+        NODE_ENV: "production",
+        XBOSS_SECRET: "short",
+      }),
+    /XBOSS_SECRET|quá ngắn/,
+  );
+});
+
+test("parseServerEnv: XBOSS_SECRET đủ dài ở production → hợp lệ", () => {
+  const env = parseServerEnv({
+    DATABASE_URL: "postgres://x@localhost/db",
+    NODE_ENV: "production",
+    XBOSS_SECRET: "thirtytwocharacterssecret1234567",
+  });
+  assert.equal(env.XBOSS_SECRET, "thirtytwocharacterssecret1234567");
+});
+
+test("parseServerEnv: XBOSS_SECRET ngắn ở development → hợp lệ", () => {
+  const env = parseServerEnv({
+    DATABASE_URL: "postgres://x@localhost/db",
+    NODE_ENV: "development",
+    XBOSS_SECRET: "short",
+  });
+  assert.equal(env.XBOSS_SECRET, "short");
+});
+
+test("parseServerEnv: CRON_SECRET quá ngắn → throw", () => {
+  assert.throws(
+    () =>
+      parseServerEnv({
+        DATABASE_URL: "postgres://x@localhost/db",
+        CRON_SECRET: "short",
+      }),
+    /CRON_SECRET|quá ngắn/,
+  );
+});
+
+test("parseServerEnv: CRON_SECRET đủ dài → hợp lệ", () => {
+  const env = parseServerEnv({
+    DATABASE_URL: "postgres://x@localhost/db",
+    CRON_SECRET: "sixteencharsecret1",
+  });
+  assert.equal(env.CRON_SECRET, "sixteencharsecret1");
 });

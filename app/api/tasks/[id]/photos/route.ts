@@ -12,6 +12,7 @@ import {
   newPhotoFileName,
   MAX_PHOTO_BYTES,
   isContentTooLarge,
+  sha256Hex,
 } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
@@ -106,14 +107,37 @@ export async function POST(
       { status: 415 },
     );
 
+  // Chống trùng khi hàng đợi offline (offlineQueue) gửi lại cùng ảnh: cùng task +
+  // cùng hash nội dung trong 24h gần nhất → trả về ảnh đã có, không ghi file/dòng mới.
+  const hash = sha256Hex(fileBuf);
+  const existing = await queryOne<{ id: number; caption: string | null; sizeBytes: number }>(
+    `SELECT id, caption, size_bytes AS "sizeBytes"
+       FROM task_photos
+      WHERE task_id = ? AND sha256 = ? AND created_at > now() - interval '24 hours'
+      ORDER BY id DESC LIMIT 1`,
+    taskId,
+    hash,
+  );
+  if (existing)
+    return NextResponse.json(
+      {
+        id: existing.id,
+        taskId,
+        caption: existing.caption,
+        sizeBytes: existing.sizeBytes,
+        deduped: true,
+      },
+      { status: 200 },
+    );
+
   const caption = String(form.get("caption") ?? "").trim() || null;
   const fileName = newPhotoFileName(taskId, file.type);
   const dir = ensureUploadDir();
   await writeFile(join(dir, fileName), fileBuf);
 
   const id = await insertId(
-    `INSERT INTO task_photos (task_id, file_name, original_name, mime_type, size_bytes, caption, uploaded_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO task_photos (task_id, file_name, original_name, mime_type, size_bytes, caption, uploaded_by, sha256)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     taskId,
     fileName,
     file.name || null,
@@ -121,6 +145,7 @@ export async function POST(
     file.size,
     caption,
     user.id,
+    hash,
   );
 
   return NextResponse.json({ id, taskId, caption, sizeBytes: file.size }, { status: 201 });
