@@ -10,6 +10,26 @@
 
 ## Việc tạm hoãn — chờ bên ngoài (không phải "tiếp theo", đừng tự nhặt lại)
 
+**🔴 Ghi nhận 2026-07-19 — Auto-deploy production kẹt từ 2026-07-18 ~10:50 (commit `cefda6a4`,
+20 lần deploy liên tiếp thất bại tính tới `dcd99f3`), cần DBA chạy 1 câu SQL trên VPS mới hết
+kẹt:** migration `0068_fts.sql` (M57 PR1, `unaccent`) lỗi `permission denied to create
+extension "unaccent"` — role migration (`MIGRATE_DATABASE_URL`) thiếu quyền CREATE **cấp
+DATABASE** (khác quyền cấp schema/bảng đã có sẵn, xem `docs/adr/0005-rls.md` mục "Cạm bẫy
+#2" để hiểu vì sao). App đang chạy (bản deploy thành công gần nhất, commit `8671a41b`) vẫn
+phục vụ bình thường — **không sập, chỉ đứng yên không nhận code mới** (migration chặn tuần
+tự, mọi migration sau 0068 — bao gồm RLS 0069-0073 — cũng chưa lên được production). Cần
+người có quyền superuser Postgres trên VPS chạy 1 lần (không lặp lại):
+
+```sql
+CREATE EXTENSION IF NOT EXISTS unaccent;
+```
+
+rồi để auto-deploy (`.github/workflows/deploy.yml`, chạy khi push `main`) tự chạy lại bình
+thường ở lần push kế tiếp, hoặc re-run job "Deploy to VPS" thất bản gần nhất trong GitHub
+Actions ngay khi đã chạy xong câu SQL trên. Cải tiến đã thêm kèm sự cố này (xem mục "Đã
+xong" bên dưới): `lib/db/migrate.ts` giờ tự đính kèm gợi ý fix ngay trong thông báo lỗi khi
+gặp lại lớp lỗi `42501` (thiếu quyền) tương tự.
+
 Ghi nhận 2026-07-18: **M49 PR3 — SSO OIDC** (PR #218, `docs/nang-cap/M49-api-mo-sso.md`) — merge code vào `main` ở trạng thái **feature-flag tắt mặc định** (quyết định người dùng 2026-07-18: "merge trước, xác minh sau"). PR đã rebase lên `main` mới nhất (sau M50/M52/M56 PR1), lint/typecheck/build/test xanh (92 file). **KHÔNG set biến môi trường production** (`OIDC_ISSUER`/`OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET`/`APP_URL`) cho đến khi có người xác minh tay end-to-end với 1 IdP thật (Google Workspace/Microsoft Entra) — thiếu biến bắt buộc thì `ssoEnabled()=false`, nút SSO tự ẩn, route `/api/auth/oidc/*` trả 404, không ảnh hưởng đăng nhập mật khẩu hiện có nên an toàn để merge/deploy ở trạng thái tắt. Việc còn treo trước khi BẬT thật: chạy tay đủ luồng SSO (đăng nhập → callback → nhận cookie phiên; cả nhánh lỗi state/cookie hết hạn), ghi kết quả vào `DEPLOY.md`/mục này trước khi set biến env trên VPS.
 
 Các mục dưới đây đã có kết luận rõ, **không cần AI chủ động làm** cho tới khi có tín hiệu bên ngoài nêu rõ — không phải việc "quên làm":
@@ -22,6 +42,15 @@ Các mục dưới đây đã có kết luận rõ, **không cần AI chủ đ�
 
 - **Script sinh CHANGELOG.md từ conventional commits** (2026-07-19): tạo `scripts/gen-changelog.mjs` (Node thuần, không thêm dependency) đọc `git log HEAD --reverse` (chỉ HEAD, không `--all` để tránh duyệt nhánh khác/worktree) theo conventional prefix (feat/fix/docs/chore/refactor/perf/ci/test), nhóm theo loại, sinh Markdown theo format Keep a Changelog. Thêm npm script `"changelog": "node scripts/gen-changelog.mjs"` vào `package.json`. Chạy script backfill mục `[0.1.0]`, `[0.2.0]`, `[0.3.0]` vào `CHANGELOG.md` bằng cách chia 52 commits conventional thực trên HEAD thành 3 phần (17/17/18): `[0.1.0]` 17 commits đầu, `[0.2.0]` 17 commits giữa, `[0.3.0]` 18 commits cuối (2 commits không match regex conventional bị loại). Giữ `[Unreleased]` rỗng ở đầu cho lần release kế tiếp. Script idempotent — chạy 3 lần liên tiếp không tích luỹ dòng trống (trim header trailing whitespace, không dùng `--all` trong git log). Verify: `npm run lint`/`typecheck` xanh; chạy script 3 lần → dòng trống không tăng.
 
+- **Chẩn đoán + hàng rào cho sự cố auto-deploy kẹt (2026-07-19)** — xem chi tiết sự cố ở mục
+  "Việc tạm hoãn — chờ bên ngoài" phía trên (root cause + fix SQL cần DBA chạy tay, ngoài
+  phạm vi sửa bằng code). Phần đã sửa trong code: `lib/db/migrate.ts` — bắt lỗi Postgres
+  `42501` (insufficient_privilege) trong `runMigrations`, đính kèm gợi ý fix ngay trong
+  message lỗi (trỏ `docs/adr/0005-rls.md` mục "Cạm bẫy #2") thay vì chỉ ném lại stack trace
+  thô — lần sau gặp lớp lỗi tương tự (thiếu quyền CREATE cấp DATABASE cho extension/schema
+  khác) đỡ phải tra lại từ đầu. `docs/adr/0005-rls.md` bổ sung mục "Cạm bẫy #2" ghi lại đầy
+  đủ nguyên nhân gốc + câu SQL khắc phục 1 lần. `npm run lint`/`typecheck` xanh (không đụng
+  logic migration hiện có, chỉ thêm nhánh gợi ý khi có lỗi).
 - **M56 PR2 — Bắt buộc 2FA theo vai trò** (2026-07-18, `docs/nang-cap/M56-2fa-totp.md` mục PR2, nhánh `claude/feat-m56-pr2-bat-buoc-2fa`, **KHÔNG có migration** — tái dùng bảng `code_lists` từ M52 PR1): admin bật yêu cầu 2FA cho từng vai trò qua danh mục mềm `require_2fa_roles` (`/admin/code-lists`, mỗi dòng active = 1 vai trò bị bắt buộc; domain rỗng = không ai bị bắt buộc = hành vi y hệt trước PR2). Vai trò bị bắt buộc mà chưa bật 2FA → **chặn 403 mọi API trừ whitelist `/api/auth/*`**, buộc bật 2FA trước khi tiếp tục.
   - **Cơ chế: nhúng cờ `mustSetup2fa` (0/1) TRONG token phiên đã ký** — token đổi từ 4 phần sang 5 phần `userId.exp.pwFrag.flag.mac` (`flag` nằm trong phần ký, không giả mạo được bằng cách sửa cookie). `makeToken(userId, passwordHash, mustSetup2fa)` — **tham số thứ 3 bắt buộc** (không optional, để không sót call-site). Tính TẠI THỜI ĐIỂM phát token: `computeMustSetup2fa(role, totp_enabled_at, requiredRoles())` — admin bật yêu cầu SAU khi user đã có phiên chỉ ảnh hưởng **từ lần đăng nhập kế tiếp** (không hồi tố phiên đang mở, đúng nghĩa đen đặc tả).
   - **Tách `lib/session-token.ts`** (mới, thuần `node:crypto` — không `next/headers`/`lib/db`): `sign`/`makeToken`/`parseToken`/`COOKIE`/`COOKIE_MAX_AGE`. `lib/auth.ts` re-export để mọi call-site cũ không đổi import; thêm `requiredRoles()` (đọc `code_lists` qua cache watermark) + `computeMustSetup2fa()` (thuần, test riêng).
@@ -389,6 +418,77 @@ Trước khi audit, bổ sung `docs/audit.md` (rà thật trong code, không suy
 **KẾT LUẬN đợt này: Cần xử lý** (còn 1 phát hiện mức Cao chưa đóng — payments chưa scope theo dự án) — nhưng không chặn merge PR audit này vì đây là nợ đã biết từ trước (không phải regression do PR này gây ra), 3 lỗi mới phát hiện đã sửa + có test hồi quy, mọi cổng tự động xanh.
 
 - **M55 — BI qua Metabase self-host (PR1+PR2, 2026-07-18, nhánh `claude/feat-m55-bi-metabase`, `docs/nang-cap/M55-bi-metabase.md`, `docs/ops/metabase.md`):** schema `bi` gồm 18 view whitelist cột chỉ-đọc để Metabase kết nối, không bao giờ chạm schema `public` (an toàn chéo dự án — view thành thạo `project_id`/RLS M51). Role Postgres `xboss_bi` tạo TAY lúc deploy (không trong migration, security-first mật khẩu não lưu git), migration `0073_bi_schema.sql` chỉ GRANT → idempotent khi role chưa có lúc CI chạy (KHÔNG fail). Test bất biến: `tests/bi-schema.test.ts` (3 ca đa-tầng) kiểm role xboss_bi SELECT mọi view, **không có cột PII/tiền lộ sai view** (password_hash/email ≠ view nào, cột tiền chỉ ở view `_fin`), mọi view từ soft-delete tables phải `WHERE deleted_at IS NULL`. Verify: `npm run lint`/`typecheck`/`build` xanh; `npm test` (Postgres 16 cục bộ, `TEST_DATABASE_URL` sẽ chạy role check + bất biến, không skip). Tài liệu vận hành đầy đủ: cách tạo role, chạy migration, dựng Metabase từ scratch, kết nối XBoss, HTTPS reverse proxy, tạo tài khoản, backup DB Metabase riêng.
+
+## Đợt audit toàn dự án lần 7 (2026-07-19, kiến trúc/khung/kỹ thuật toàn diện theo `docs/audit.md`)
+
+Audit tổng thể toàn dự án theo yêu cầu người dùng ("audit toàn diện kiến trúc, khung công nghệ, kỹ thuật, đưa ra đề xuất tốt nhất") — chạy 3 subagent song song theo đúng §9: (1) Bảo mật & phân quyền §3, (2) Logic nghiệp vụ & toàn vẹn dữ liệu §4 + Vận hành/Offline §7, (3) CI/CD, dependency, hiệu năng, hạ tầng §6. Mỗi agent đọc code thật, không đoán; phát hiện #1 (idempotency vật tư) đã tự xác nhận độc lập bằng grep trước khi ghi nhận.
+
+```
+=== BÁO CÁO AUDIT TOÀN DIỆN — 2026-07-19 09:07 giờ VN · nhánh claude/project-architecture-audit-2imqvc · 767e303 ===
+
+CỔNG TỰ ĐỘNG (chặn)
+  lint ✅ | typecheck ✅ | test ✅ (103/103 file, 0 fail) | build ✅
+
+§3 BẢO MẬT & PHÂN QUYỀN
+  Route mới có getCurrentUser()+401 ✅ (335/335) | CAN/canTouchTask/canTouchPackage đối xứng ✅
+  | scope projectId (M22) ✅ (app WHERE + RLS 2 lớp) | secret hardcode: 0 | .env track: chỉ .env.example ✅
+  | npm audit: không chạy trong lượt này (đã có trong CI job) | cron Bearer-only ✅ (6/6) | rate-limit atomic ✅
+
+§4 LOGIC & TOÀN VẸN DỮ LIỆU
+  Làm tròn % ✅ | FOR UPDATE trong transaction ✅ | race/idempotency ❌ (3 phát hiện, xem dưới)
+  | tiền tính trong SQL (không float JS) ❌ (server-side, mức Thấp) | ngày Asia/Ho_Chi_Minh ✅
+  | nghiem_thu không tự hạ cấp ✅ | migration append-only idempotent ✅ (0069 có UPDATE data-touch, cần staging)
+
+§5 UI/UX & A11Y
+  Không nằm trong phạm vi 3 agent lần này (đã phủ ở "Đợt audit toàn dự án lần 4/5" + Phụ lục A) — 5 trang phát hiện thiếu spec axe (xem §6 dưới) là khoảng trống a11y, không riêng UX.
+
+§6 HIỆU NĂNG / DEPENDENCY / CI
+  Lighthouse ≥ ngưỡng error ✅ | uses: pin SHA ✅ | permissions tường minh ✅
+  | deploy needs CI success ⚠️ (dựa branch protection ngoài repo, không tự-chứng-minh được từ code)
+  | index bảng lớn ✅ (phủ tốt; 1 nghi vấn COALESCE(t.end_date, wp.end_date) trong dashboard/notifications chưa xác nhận bằng EXPLAIN thật)
+  | Coverage: chưa đo (đúng khoảng trống đã biết, không phải phát hiện mới)
+  | Vùng thiếu test: `/account`, `/order`, `/reports`, `/schedule-control`, `/scurve` không có spec axe/e2e nào
+
+§7 VẬN HÀNH / OFFLINE / XUẤT BẢN
+  SSE watermark+fallback ✅ | offline queue idempotent, bỏ 4xx/giữ 5xx ✅
+  | sw.js CACHE version + loại trừ events/photos/documents ✅ | dedup notif ✅
+  | vercel.json chỉ khai 2/6 cron thật (thiếu sync-sheets/refresh-views/sync-integrations/weekly-report — chỉ ảnh hưởng nếu deploy Cách C/Vercel, hạ tầng chính là VPS+crontab)
+
+ĐỐI CHIẾU TÀI LIỆU & HẠ TẦNG
+  Git: origin/main 1 commit mới hơn nhánh này (M55 BI, không xung đột) | working tree ✅ sạch
+  | PROGRESS khớp thực tế: ❌ trước đợt này — mục "Nợ kỹ thuật" còn 1 nợ [Cao] `payments` đã đóng thật từ PR #263 nhưng chưa gỡ khỏi danh sách (đã sửa tài liệu trong đợt này)
+  | Migration chưa áp production: không tra được (không có kết nối Postgres trong phiên) | Nợ kỹ thuật còn đúng: idempotency vật tư (nay rõ nguyên nhân: client không gửi header), PO receive, tiền float JS server, chờ SENTRY_DSN, M60 (giữ TS7/ESLint10/Node26 có chủ đích), ký số PAdES
+
+--- PHÂN LOẠI VIỆC ---
+  [AI] tự làm được: (1) wire `Idempotency-Key` + disable nút ở `app/materials/page.tsx` (issue/return) — hạ tầng server đã sẵn, chỉ cần 2 chỗ ở client; (2) thêm idempotency cho `POST /api/purchase-orders/:id/receive` (cần đặc tả schema trước); (3) dời tổng tiền `lib/finance.ts`/`lib/cost.ts`/`lib/subcontractors.ts` vào SQL; (4) sửa comment header sai số trong `migrations/0072_material_tx_idempotency.sql`; (5) viết 5 spec axe còn thiếu; (6) bổ sung 4 cron thiếu vào `vercel.json` hoặc xoá file + mục "Cách C" trong `DEPLOY.md`; (7) EXPLAIN ANALYZE xác nhận nghi vấn COALESCE trước khi quyết định có cần denormalize `effective_end_date` không.
+  [Người dùng] cần thao tác tay: xác nhận role Postgres production đã đổi sang `xboss_app` (NOBYPASSRLS) để RLS thật sự có hiệu lực (không chỉ lớp WHERE ứng dụng); xác nhận branch protection `main` yêu cầu status check "CI" (cả job `e2e`) pass kể cả với admin trước khi `deploy.yml` tự động deploy.
+  Rủi ro/ảnh hưởng: cao nhất là 2 lỗ idempotency vật tư/PO receive — dữ liệu tồn kho sai khi mạng công trường chập chờn (đúng bối cảnh sử dụng thật của app); còn lại là nợ chuẩn hoá/hạ tầng chất lượng, không có lỗ hổng bảo mật Cao/Trung bình mới.
+  Góp ý cải tiến: cân nhắc `workflow_run` gate tường minh cho `deploy.yml` thay vì phụ thuộc hoàn toàn branch protection ngoài repo (tự-chứng-minh được trong mọi audit sau); cân nhắc mở đặc tả riêng cho "idempotency toàn diện vật tư + PO" một lần thay vì vá từng route.
+
+KẾT LUẬN: Cần xử lý — không có lỗ hổng bảo mật Cao/Trung bình mới; 2 phát hiện logic dữ liệu mức Trung (idempotency vật tư chưa hoạt động thật, PO receive thiếu idempotency) là ưu tiên sửa trước vì đúng bối cảnh thực tế (mạng công trường); phần còn lại là nợ hạ tầng chất lượng/chuẩn hoá, không chặn vận hành hiện tại.
+```
+
+**Chi tiết đầy đủ 3 báo cáo con** (bảo mật §3, logic/vận hành §4+§7, CI/dependency/hiệu năng §6) — xem lịch sử phiên audit 2026-07-19 hoặc yêu cầu người dùng nếu cần bản dài; bản trên là tổng hợp theo mẫu §12.
+
+**Kết quả cụ thể đáng chú ý:**
+
+- **Bảo mật (335/335 route rà)**: không có lỗ hổng Cao/Trung mới. 2 điểm Thấp ghi nhận: SSRF webhook qua DNS rebinding (đã có `redirect:"manual"` giảm nhẹ, chưa resolve DNS trước `fetch`), `requireApiKey` không rate-limit key sai (không khai thác được, chỉ DoS nhẹ).
+- **Logic & dữ liệu**: các quy tắc lõi (làm tròn %, FOR UPDATE, BOQCODE ràng buộc DB thật, material-sync snapshot-sau-ghi, ngày Asia/Ho_Chi_Minh, nghiem_thu không tự hạ cấp) đều đúng — không hồi quy. Phát hiện thật duy nhất mới: 2 lỗ idempotency thực thi (mục Nợ kỹ thuật phía trên).
+- **CI/hạ tầng**: pin SHA, permissions, secret-scan, dependabot, husky/commitlint, deploy atomic swap, index bảng lớn đều đúng chuẩn. 3 điểm Trung bình: `deploy.yml` phụ thuộc branch protection ngoài repo (không tự-chứng-minh), nghi vấn hiệu năng `COALESCE` trong 2 route hot (dashboard/notifications, chưa có `EXPLAIN` thật để xác nhận), 5 trang thiếu spec axe/e2e.
+- **Tài liệu**: phát hiện + sửa 1 chỗ tài liệu lệch code (nợ `payments` project-scope đã đóng thật từ PR #263 nhưng còn sót trong "Nợ kỹ thuật") — đúng nguyên tắc §1 "đối chiếu, không tin trí nhớ".
+
+## Đợt đánh giá chi tiết toàn dự án lần 8 (2026-07-19, sau audit lần 7, theo `docs/audit.md`)
+
+Đánh giá chi tiết theo yêu cầu người dùng ("tìm, liệt kê những điểm không hợp lý, không hợp chuẩn, cần cải tiến nâng cấp") — chạy tại commit `36d8036`, nhánh `claude/xboss-detailed-evaluation-bc56d0`. Cổng tự động: lint ✅ | typecheck ✅ | test ✅ (105/105 file, 0 fail) | build ✅ | `npm audit` 0 lỗ hổng. Không có lỗ hổng bảo mật Cao/Trung bình mới; các quy tắc lõi (335/335 route auth, force-dynamic 100%, workflows pin SHA, không hex/`dark:` sai chỗ trong component) xác nhận lại đều đúng.
+
+**Phát hiện mới của đợt này (ngoài tồn đọng đã biết từ audit lần 7):**
+
+- Doc drift: `CLAUDE.md:54` ghi "46 file trong tests/" — thực tế 105 file.
+- `vercel.json` chỉ khai 2/6 cron (thiếu `sync-sheets`/`refresh-views`/`sync-integrations`/`weekly-report`) — xác nhận lại vẫn còn nguyên từ audit lần 7.
+
+**Tồn đọng xác nhận còn đúng** (đã ghi đầy đủ vào mục Nợ kỹ thuật cuối file, đợt này bổ sung các mục còn thiếu): RLS chưa hiệu lực thật trên production (role owner, chưa "khoá cửa", 3 route chưa bọc `withProjectScope`), `deploy.yml` phụ thuộc branch protection ngoài repo, nghi vấn hiệu năng COALESCE dashboard/notifications, tiền float JS server, comment header 0072, SSRF DNS rebinding webhook + `requireApiKey` không rate-limit, 5 trang thiếu spec axe, coverage chưa đo, chờ `SENTRY_DSN`, CodeQL bị chặn GHAS.
+
+KẾT LUẬN: Cần xử lý — không chặn vận hành hiện tại; ưu tiên (1) đổi role production `xboss_app` + khoá cửa RLS, (2) gate `workflow_run` cho deploy, (3) PR dọn nhỏ (doc drift, 0072, vercel.json, tiền vào SQL), (4) 5 spec axe + đo coverage lần đầu, (5) EXPLAIN xác nhận COALESCE.
 
 ## Tiếp theo
 
@@ -793,8 +893,12 @@ Verify hạ tầng: Postgres 16 local (`pg_ctlcluster`, đã có sẵn trong má
 
 ## Nợ kỹ thuật (chỗ "làm tạm" cần quay lại)
 
-- **[Cao] `payments`/`payments/bills`/`payments/floors` chưa scope theo `projectId` (M22)** — xem chi tiết "Đợt audit toàn dự án lần 6" ở trên. `GET` đã whitelist có chủ đích trong `tests/project-scope-invariant.test.ts` ("nợ đa dự án đã biết") nhưng `PATCH`/`DELETE /api/payments/bills/:id` ngoài phạm vi whitelist đó (chỉ kiểm GET+SELECT) — user dự án B sửa/xoá được bill dự án A nếu đoán được `id`. Cần đặc tả riêng kiểu M22 (`payment-certs`) trước khi làm — không tự chế cách scope.
-- **[Trung] `materials/:id/issue` và `.../return` không có cơ chế idempotency** — đã bọc `withTransaction`+`FOR UPDATE` chống race condition nhưng gửi lại cùng request (double-submit, mạng công trường chập chờn) vẫn tạo 2 dòng `material_transactions`/trừ-cộng tồn kho 2 lần. Cần đặc tả (schema lưu idempotency-key, TTL, nơi sinh key ở client) trước khi làm.
+- ~~**[Cao] `payments`/`payments/bills`/`payments/floors` chưa scope theo `projectId` (M22)**~~ → **đã đóng, tài liệu lệch code** (xác nhận lại 2026-07-19, đợt audit lần 7): đọc thẳng `app/api/payments/bills/[id]/route.ts` — `PATCH`/`DELETE` đã có `billBelongsToProject()` (404 khi bill không thuộc dự án đang chọn) từ PR #263 (2026-07-18, đúng như "Đợt audit toàn dự án lần 6" ghi "ĐÃ SỬA"); `GET /api/payments` cũng đã JOIN `towers`/lọc `projectId`; `tests/project-scope-invariant.test.ts` không còn nhắc `payments` trong whitelist. Mục nợ này bị bỏ sót không gỡ khỏi "Nợ kỹ thuật" sau khi PR #263 merge — bài học: luôn gỡ nợ khỏi danh sách này trong cùng PR đóng nợ, không tách riêng.
+- ~~**[Trung] `materials/:id/issue` và `.../return` — hạ tầng idempotency "chết" trên đường thực thi (client không gửi header)**~~ → **đã đóng (2026-07-19)**: `app/materials/page.tsx` — sinh `crypto.randomUUID()` lúc mở modal xuất/hoàn kho (`issueKey`), gửi qua header `Idempotency-Key`; thêm `issueSubmitting` chặn double-submit + disable 2 nút (submit/huỷ) + hiện "Đang lưu..." lúc gửi; bọc `try/catch/finally` báo lỗi mất mạng thay vì kẹt trạng thái. Không đổi route/migration (đã đúng từ trước).
+- ~~**[Trung, mới 2026-07-19] `POST /api/purchase-orders/:id/receive` không có cơ chế idempotency**~~ → **đã đóng (2026-07-19)**: `migrations/0074_warehouse_receipt_idempotency.sql` (cùng mẫu `0072`) thêm `warehouse_receipts.idempotency_key` + unique index `(po_id, idempotency_key) WHERE idempotency_key IS NOT NULL`. Route khoá dòng `purchase_orders FOR UPDATE` đầu transaction (serialize double-submit, tránh race giữa check-trùng-key và insert) rồi kiểm `warehouse_receipts` đã có key đó cho PO này chưa — có thì trả lại đúng receipt cũ (không tạo phiếu/không cộng kho lần 2), chưa thì tạo mới như cũ. Client `app/materials/purchase-orders/page.tsx` sinh key lúc mở modal nhận hàng (`receiveKey`), gửi qua header; `submitReceive` đã có guard `saving` từ trước, thêm chặn sớm `if (saving) return`.
+  Test hồi quy mới: `tests/idempotency.test.ts` (3 ca, chạy thật trên Postgres 16 cục bộ — không skip) — unique index `material_transactions` chặn trùng key/cho phép key khác/không chặn NULL; unique index `warehouse_receipts` tương tự (thêm ca khác PO cùng key vẫn được); mô phỏng đúng luồng route "gọi lại cùng key → trả receipt cũ, không tạo phiếu mới, `COUNT(*) = 1`". Verify: `npm run lint`/`typecheck`/`build` xanh; `npm test` (Postgres 16 cục bộ, `pg_ctlcluster`) — cả 3 ca mới pass thật.
+- **[Thấp, mới 2026-07-19] Cộng/nhân tiền trên float JS ở tầng server** (vi phạm quy ước CLAUDE.md mục Quy ước/Tiền tệ) — `lib/finance.ts:45,55` (`receivables`/`payables` cộng `c.value + c.addendaTotal - c.paid` trong JS), `lib/cost.ts:181-188` (`costTotals` reduce budget/committed/actual), `lib/subcontractors.ts:213-214`. Tác động thực tế thấp (VND nguyên, tổng dự án `< 2^53` nên double vẫn chính xác) nhưng là nợ chuẩn hoá — nên dời `SUM`/phép cộng vào SQL theo đúng quy ước đã ghi.
+- **[Thấp, mới 2026-07-19] `migrations/0072_material_tx_idempotency.sql` dòng 1 — comment header ghi nhầm `0071_material_tx_idempotency.sql`** (sự cố đổi số 0071→0072 ngày 2026-07-18 chưa cập nhật comment trong chính file). Chỉ nhầm nhãn, không ảnh hưởng khi chạy.
 - ~~**M56 PR2 — auto-redirect client `/account?require2fa=1` chưa thực sự kích hoạt**~~ →
   **đã đóng** (2026-07-18, nhánh `claude/plan-md-30cmcp`, đúng cách vá đã dự kiến): thêm
   `app/api/auth/me/route.ts` tự đọc cờ `mustSetup2fa` từ token đang hiệu lực (`parseToken`,
@@ -866,4 +970,13 @@ Verify hạ tầng: Postgres 16 local (`pg_ctlcluster`, đã có sẵn trong má
   - **M61 PR2 (2026-07-18) — đóng hẳn dòng nợ "Còn lại 6/10 module chưa gate" ở trên, kết cục cuối cùng cho từng module quản trị:** `audit`/`approval-flows`/`alert-rules`/`integrations` đã scope shape theo `project_id = ? OR project_id IS NULL` (mục ngay trên); `permissions` xử lý xong bằng M61 (`role_permissions.project_id` — override quyền theo dự án qua 3 tầng giải quyền dự án > toàn hệ > `CAN_DEFAULT`, PR1 nền + PR2 UI/export, xem `docs/nang-cap/M61-phan-quyen-theo-du-an.md`); `ops` (`/api/health`) **không áp dụng** — không auth, phục vụ uptime monitor, không hợp gate theo dự án. **Quyết định chốt: không gate module `permissions` bằng feature flag** (trang `/admin/permissions` là cấu hình xuyên dự án, admin-only) — khớp mục "Không làm" đầu file đặc tả M61. Không còn module quản trị nào tồn đọng trong hàng đợi gate theo dự án.
   - **M61 PR2 — UI ma trận quyền theo phạm vi dự án + export snapshot** (2026-07-18): `/admin/permissions` thêm selector phạm vi ("Toàn hệ thống" mặc định + danh sách dự án từ `GET /api/admin/role-permissions` field `projects`); ở phạm vi dự án, ô "Mặc định" hiển thị giá trị hiệu lực kế thừa (override toàn hệ nếu có, kèm chú thích "kế thừa toàn hệ", không thì `CAN_DEFAULT`), đổi ô → `PATCH` kèm `projectId`; phạm vi "Toàn hệ thống" giữ nguyên hành vi cũ. `GET /api/admin/permissions-snapshot` thêm cột "Phạm vi": ma trận toàn hệ đầy đủ như cũ + với mỗi dự án có override riêng chỉ thêm các dòng chênh lệch (không nhân bản toàn ma trận × N dự án), nguồn ghi "Mặc định"/"Override toàn hệ"/"Override dự án <tên>". `e2e/authed/admin-config.spec.ts` mở rộng thêm ca test selector phạm vi (chọn dự án, kiểm chú thích kế thừa, axe); `scripts/seed-sample.ts` thêm 1 dự án phụ để test có ≥2 dự án chọn được. Verify thật: dựng Postgres 16 cục bộ + `.env.local`, `npm run db:migrate` áp sạch tới `0066`, `npm run db:seed` (dev) + PATCH tay qua API xác nhận đúng ngữ nghĩa kế thừa (override toàn hệ + override dự án cùng tồn tại, `GET ?projectId=` trả cả 2 phân biệt qua `projectId`) và export snapshot đúng — không nhân bản ma trận (371 dòng ma trận toàn hệ + đúng 1 dòng chênh lệch cho override dự án, xác minh bằng đọc `sharedStrings.xml`/số dòng thật trong `.xlsx`); `npm run lint`/`typecheck`/`build` xanh; `npx playwright test e2e/authed/admin-config.spec.ts -g permissions` 7/7 pass (cả `authed-desktop` lẫn `authed-mobile`, axe không lỗi nghiêm trọng); `npm test` 93/93 file xanh (bao gồm `tests/permissions.test.ts`/`tests/auth-perms-project.test.ts` của PR1, chạy thật qua `TEST_DATABASE_URL`).
   - **M51 PR4 — Nền đa pháp nhân `organizations` (2026-07-18)**: `migrations/0070_organizations.sql` (thêm thuần tuý) — `organizations(id, name, tax_code)` + `projects.org_id` (nullable, FK). `/api/portfolio` thêm filter `?org=`; UI portfolio chỉ hiện select tổ chức khi `count(distinct org_id) > 1` (mặc định 1 org NULL nên hiện tại ẩn, đúng thiết kế tránh UI thừa). Không làm hợp nhất tài chính đa pháp nhân/cây tổ chức (ngoài phạm vi GĐ0). Verify: ERD sinh lại khớp; lint/typecheck/build xanh; test `/api/portfolio` liên quan xanh.
+- **[Trung, đánh giá lần 8 — 2026-07-19] RLS chưa thực sự có hiệu lực trên production** — **đặc tả đã viết: `docs/nang-cap/M62-rls-khoa-cua.md`** (2 PR `route: spec`, chờ triển khai; PR2 chỉ chạy sau khi đổi role production + 1 tuần log sạch) (gom các nợ con M51 GĐ0 rải rác thành 1 mục theo dõi): (1) `[Người dùng]` đổi `DATABASE_URL` production sang role `xboss_app` (NOBYPASSRLS) — hiện chạy owner role nên policy `0069_rls.sql` không chặn gì, chỉ còn lớp WHERE ứng dụng; (2) `[AI]` bọc `withProjectScope` cho 3 route còn thiếu (`payments/bills`, `payments/floors`, `notifications` — route notifications đọc xen ghi, cần đặc tả tách đọc/ghi riêng); (3) `[AI]` sau ~1 tuần theo dõi production không còn query nhóm 11 bảng thiếu GUC, ra migration "khoá cửa" bỏ nhánh thiếu-ngữ-cảnh + cập nhật `tests/rls.test.ts`.
+- **[Trung, đánh giá lần 8] `deploy.yml` không tự-chứng-minh được điều kiện "CI xanh mới deploy"** — phụ thuộc hoàn toàn branch protection cấu hình ngoài repo (không kiểm chứng được từ code trong audit). `[AI]` chuyển sang gate `workflow_run` tường minh (chỉ chạy khi workflow CI kết thúc `success`, kể cả job e2e); `[Người dùng]` trong lúc chờ, xác nhận branch protection `main` yêu cầu status check CI (cả e2e) pass kể cả với admin.
+- **[Trung, đánh giá lần 8] Nghi vấn hiệu năng `COALESCE(t.end_date, wp.end_date)`** trong 2 route hot `/api/dashboard` và `/api/notifications` (chạy on-fetch mỗi lần mở app) — chưa có `EXPLAIN ANALYZE` thật xác nhận. `[AI]` chạy EXPLAIN trên DB có dữ liệu thật/giả lập đủ lớn trước khi quyết định index biểu thức hoặc denormalize `effective_end_date`; không tự sửa khi chưa có số đo.
+- **[Thấp, đánh giá lần 8] SSRF webhook qua DNS rebinding** — đã có `redirect: "manual"` giảm nhẹ nhưng chưa resolve DNS trước `fetch` (từ audit lần 7, chưa vá). **Đặc tả đã viết: `docs/nang-cap/M63-webhook-ssrf-dns-pinning.md`** (1 PR `route: spec`, pin IP qua undici `connect.lookup`, chờ triển khai).
+- **[Thấp, đánh giá lần 8] `requireApiKey` không rate-limit khi key sai** — không khai thác được dữ liệu, chỉ rủi ro DoS nhẹ (từ audit lần 7, chưa vá). `[AI]` tái dùng pattern `lib/ratelimit.ts` (upsert atomic Postgres) cho đường API key.
+- **[Thấp, đánh giá lần 8] Doc drift `CLAUDE.md:54`** — ghi "46 file trong tests/", thực tế 105 file. `[AI]` sửa hoặc bỏ con số cứng (con số tuyệt đối trong doc luôn lỗi thời).
+- **[Thấp, đánh giá lần 8] `vercel.json` chỉ khai 2/6 cron** (thiếu `sync-sheets`/`refresh-views`/`sync-integrations`/`weekly-report`) — chỉ ảnh hưởng deploy Cách C/Vercel, hạ tầng chính là VPS+crontab. `[AI]` hoặc bổ sung đủ 6 cron, hoặc xoá file + mục "Cách C" trong `DEPLOY.md` để khỏi gây hiểu nhầm.
+- **[Thấp, đánh giá lần 8] 5 trang chưa có spec axe/e2e**: `/account`, `/order`, `/reports`, `/schedule-control`, `/scurve` — trái quy tắc `docs/audit.md` §5 "spec axe là cổng merge cho trang mới". `[AI]` viết 5 spec theo khuôn `e2e/authed/*.spec.ts` (desktop + mobile, assert không vi phạm serious/critical).
+- **[Thấp, đánh giá lần 8] Coverage chưa từng đo** — cơ chế ratchet `docs/audit.md` §6 chưa khởi động. `[AI]` đo lần đầu bằng `node --experimental-test-coverage` (chỉ `lib/**` + `app/api/**`), ghi mốc stmts/branches/funcs/lines vào đây làm chuẩn "không tệ hơn".
 - **M51 GĐ0 tổng kết (PR1 + PR2 + PR4, 2026-07-18)**: cả 3 PR đã tích hợp qua PR #256, **đã merge vào `main`**. **Còn nợ trước khi coi M51 GĐ0 hoàn tất 100%**: bước "khoá cửa" RLS (bỏ nhánh thiếu-ngữ-cảnh trong policy `0069_rls.sql`, cần ~1 tuần theo dõi production) + bọc `withProjectScope` cho 3 route còn thiếu (`payments/bills`, `payments/floors`, `notifications`) trước khi khoá cửa. Đổi `DATABASE_URL` production sang role `xboss_app` là thao tác vận hành riêng, làm sau khi merge + test staging (chưa làm — production vẫn đang chạy owner role, RLS chưa thực sự chặn gì).
