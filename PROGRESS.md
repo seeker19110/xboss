@@ -10,25 +10,34 @@
 
 ## Việc tạm hoãn — chờ bên ngoài (không phải "tiếp theo", đừng tự nhặt lại)
 
-**🔴 Ghi nhận 2026-07-19 — Auto-deploy production kẹt từ 2026-07-18 ~10:50 (commit `cefda6a4`,
-20 lần deploy liên tiếp thất bại tính tới `dcd99f3`), cần DBA chạy 1 câu SQL trên VPS mới hết
-kẹt:** migration `0068_fts.sql` (M57 PR1, `unaccent`) lỗi `permission denied to create
-extension "unaccent"` — role migration (`MIGRATE_DATABASE_URL`) thiếu quyền CREATE **cấp
-DATABASE** (khác quyền cấp schema/bảng đã có sẵn, xem `docs/adr/0005-rls.md` mục "Cạm bẫy
-#2" để hiểu vì sao). App đang chạy (bản deploy thành công gần nhất, commit `8671a41b`) vẫn
-phục vụ bình thường — **không sập, chỉ đứng yên không nhận code mới** (migration chặn tuần
-tự, mọi migration sau 0068 — bao gồm RLS 0069-0073 — cũng chưa lên được production). Cần
-người có quyền superuser Postgres trên VPS chạy 1 lần (không lặp lại):
+~~**Auto-deploy kẹt vì thiếu quyền `CREATE EXTENSION unaccent`**~~ → **đã hết** (xác nhận
+2026-07-19 13:xx qua log CI thật, `mcp__github__get_job_logs` trên 2 run gần nhất): bước
+"4/7 Áp migration" nay in `✅ DB đã cập nhật — không có migration mới` — DBA đã chạy
+`CREATE EXTENSION unaccent` trên VPS như hướng dẫn cũ, migration 0068+ đã lên production.
 
-```sql
-CREATE EXTENSION IF NOT EXISTS unaccent;
-```
+**🔴 Ghi nhận 2026-07-19 (phát hiện khi audit lại — blocker MỚI, khác blocker cũ đã đóng ở
+trên) — Auto-deploy production vẫn kẹt, nhưng nay do OOM-kill lúc build, không phải
+migration:** 2 lần chạy liên tiếp (run `29689527953` lúc 13:49, `29689586264` lúc 14:05,
+commit `125945e`) đều dừng ở bước "5/7 Build" — log dừng ngay sau dòng `Creating an
+optimized production build ...` (Turbopack), ~16 phút sau in `Killed` / `Process exited
+with status 137` (mã OOM-kill của Linux cgroup, không phải lỗi trong code). `next.config.mjs`
+đã tắt type-check trong build (`typescript.ignoreBuildErrors: true`, thêm từ lần OOM trước)
+nên đây là lượt VRAM/RAM vượt ngưỡng mới — codebase đã lớn thêm nhiều module (M53–M62) từ
+lần cấu hình đó. Deploy lần thành công gần nhất: run `29679745513` (2026-07-19 08:23, commit
+`7365568`) — **app đang chạy vẫn phục vụ bình thường**, chỉ đứng yên không nhận code mới
+(cùng cơ chế chặn tuần tự như trước — mọi migration/code sau `125945e` chưa lên production).
 
-rồi để auto-deploy (`.github/workflows/deploy.yml`, chạy khi push `main`) tự chạy lại bình
-thường ở lần push kế tiếp, hoặc re-run job "Deploy to VPS" thất bản gần nhất trong GitHub
-Actions ngay khi đã chạy xong câu SQL trên. Cải tiến đã thêm kèm sự cố này (xem mục "Đã
-xong" bên dưới): `lib/db/migrate.ts` giờ tự đính kèm gợi ý fix ngay trong thông báo lỗi khi
-gặp lại lớp lỗi `42501` (thiếu quyền) tương tự.
+Không có quyền SSH VPS trong phiên này nên không tự thêm swap được. Cần người có quyền
+VPS (ops) làm 1 trong các cách sau (ưu tiên theo thứ tự, không loại trừ nhau):
+
+1. **Thêm swap trên VPS** (khuyến nghị đầu tiên — không đổi code, chỉ đổi hạ tầng, đảo ngược
+   được): `free -h` xem RAM hiện có, nếu &lt;1-2GB rảnh lúc build thì `fallocate -l 2G
+   /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile` (+ ghi vào
+   `/etc/fstab` để giữ qua reboot).
+2. Nếu không thêm được swap: cân nhắc build với ít song song hơn hoặc nâng RAM VPS (đổi gói
+   hosting — quyết định ngoài phạm vi code).
+3. Sau khi xử lý xong, không cần push gì — chỉ cần re-run job "Deploy to VPS" thất bại gần
+   nhất trong GitHub Actions, hoặc để lần push `main` kế tiếp tự kích hoạt lại.
 
 Ghi nhận 2026-07-18: **M49 PR3 — SSO OIDC** (PR #218, `docs/nang-cap/M49-api-mo-sso.md`) — merge code vào `main` ở trạng thái **feature-flag tắt mặc định** (quyết định người dùng 2026-07-18: "merge trước, xác minh sau"). PR đã rebase lên `main` mới nhất (sau M50/M52/M56 PR1), lint/typecheck/build/test xanh (92 file). **KHÔNG set biến môi trường production** (`OIDC_ISSUER`/`OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET`/`APP_URL`) cho đến khi có người xác minh tay end-to-end với 1 IdP thật (Google Workspace/Microsoft Entra) — thiếu biến bắt buộc thì `ssoEnabled()=false`, nút SSO tự ẩn, route `/api/auth/oidc/*` trả 404, không ảnh hưởng đăng nhập mật khẩu hiện có nên an toàn để merge/deploy ở trạng thái tắt. Việc còn treo trước khi BẬT thật: chạy tay đủ luồng SSO (đăng nhập → callback → nhận cookie phiên; cả nhánh lỗi state/cookie hết hạn), ghi kết quả vào `DEPLOY.md`/mục này trước khi set biến env trên VPS.
 
