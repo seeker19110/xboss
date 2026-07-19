@@ -5,8 +5,9 @@ import AxeBuilder from "@axe-core/playwright";
 
 async function gotoAccount(page: Page) {
   await page.goto("/account");
-  // Trang render TwoFactorSection khi /api/auth/totp đã về — chờ heading "Xác thực 2 lớp".
-  await expect(page.getByRole("heading", { name: "Xác thực 2 lớp" })).toBeVisible({
+  // Trang render TwoFactorSection khi /api/auth/totp đã về — chờ text "Xác thực 2 lớp (TOTP)"
+  // (TwoFactorSection.tsx:116 render dạng <p>, không phải heading).
+  await expect(page.getByText("Xác thực 2 lớp (TOTP)")).toBeVisible({
     timeout: 15_000,
   });
 }
