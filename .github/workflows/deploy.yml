@@ -1,11 +1,11 @@
 name: Deploy to VPS
 
-# Deploy ngay khi có push lên main — không chờ workflow CI chạy lại lần nữa. CI đã chặn ở
-# bước merge PR (branch protection yêu cầu check "CI" pass trước khi cho merge), nên code
-# trên main tại thời điểm này đã qua lint/typecheck/test/build rồi, chờ thêm là dư thừa.
+# Deploy khi workflow CI trên main hoàn tất VÀ pass — loại bỏ phụ thuộc ngầm vào
+# branch-protection setting ngoài repo.
 on:
-  push:
-    branches: [main]
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
 
 # 2 push liên tiếp trong lúc build trước chưa xong từng làm deploy sau đá deploy trước
 # ("Another next build process is already running", build tạm dùng chung thư mục
@@ -23,6 +23,7 @@ permissions: {}
 
 jobs:
   deploy:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to VPS via SSH

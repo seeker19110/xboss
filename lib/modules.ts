@@ -204,4 +204,14 @@ export const MODULES: ModuleDef[] = [
     routePrefix: ["/api/r", "/api/qr"],
     swExclude: ["/api/r/", "/api/qr/"],
   },
+  {
+    // Tổng hợp tài nguyên (M59 PR1) — histogram tải nhân lực kế hoạch/thực tế + cảnh báo
+    // gán chồng người. Chỉ đọc, mọi vai trò đăng nhập xem (subcon chỉ thấy của mình).
+    key: "resources",
+    nav: [
+      { group: "Thi công hiện trường", label: "Tài nguyên", href: "/resources", icon: "Users" },
+    ],
+    permKeys: [],
+    routePrefix: ["/api/resources"],
+  },
 ];

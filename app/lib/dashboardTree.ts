@@ -171,6 +171,7 @@ export const DASHBOARD_TREE: DashCluster[] = [
           { href: "/approvals", label: "Nghiệm thu", icon: CheckSquare },
           { href: "/diary", label: "Nhật ký", icon: NotebookPen },
           { href: "/work-fronts", label: "Mặt bằng", icon: LandPlot },
+          { href: "/resources", label: "Tài nguyên", icon: Users }, // M59 PR1
         ],
       },
     ],
