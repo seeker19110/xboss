@@ -84,8 +84,20 @@ export async function runMigrations(pool: Pool): Promise<string[]> {
         ran.push(file);
       } catch (err) {
         await client.query("ROLLBACK");
+        // Postgres 42501 = insufficient_privilege. Riêng CREATE EXTENSION/CREATE SCHEMA cần
+        // quyền CREATE ở cấp DATABASE — khác quyền cấp schema/bảng mà role migration
+        // (MIGRATE_DATABASE_URL, xem ADR-0005) thường đã có sẵn nên dễ tưởng đủ quyền. Đã tái
+        // hiện thật trên production (migration 0068_fts.sql, "permission denied to create
+        // extension unaccent") — thêm gợi ý fix ngay trong lỗi để không phải tự tra lại.
+        const pgCode = (err as { code?: string } | null | undefined)?.code;
+        const hint =
+          pgCode === "42501"
+            ? " — nếu lỗi liên quan CREATE EXTENSION/CREATE SCHEMA: role migration thiếu quyền" +
+              " CREATE cấp DATABASE (không phải cấp schema/bảng); DBA cần chạy 1 lần bằng" +
+              ' superuser trên DB production, xem docs/adr/0005-rls.md mục "Cạm bẫy #2".'
+            : "";
         throw new Error(
-          `Migration ${file} lỗi: ${err instanceof Error ? err.message : String(err)}`,
+          `Migration ${file} lỗi: ${err instanceof Error ? err.message : String(err)}${hint}`,
           {
             cause: err,
           },

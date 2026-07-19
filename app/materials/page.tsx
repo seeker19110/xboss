@@ -154,6 +154,8 @@ export default function MaterialsPage() {
   const [issueNote, setIssueNote] = useState("");
   const [issueFloor, setIssueFloor] = useState("");
   const [issueCrew, setIssueCrew] = useState("");
+  const [issueKey, setIssueKey] = useState("");
+  const [issueSubmitting, setIssueSubmitting] = useState(false);
   const [allocationMeta, setAllocationMeta] = useState<{ floors: string[]; crews: string[] }>({
     floors: [],
     crews: [],
@@ -1201,6 +1203,7 @@ export default function MaterialsPage() {
                                     setIssueNote("");
                                     setIssueFloor("");
                                     setIssueCrew("");
+                                    setIssueKey(crypto.randomUUID());
                                     fetch("/api/materials/allocation-meta")
                                       .then((r) => r.json())
                                       .then((j) =>
@@ -1223,6 +1226,7 @@ export default function MaterialsPage() {
                                     setIssueMode("return");
                                     setIssueQty("");
                                     setIssueNote("");
+                                    setIssueKey(crypto.randomUUID());
                                   }}
                                   title="Hoàn vật tư về kho"
                                   className="text-zinc-500 hover:text-amber-400 p-2"
@@ -1524,44 +1528,60 @@ export default function MaterialsPage() {
             </div>
             <div className="flex gap-2 pt-1">
               <button
+                disabled={issueSubmitting}
                 onClick={async () => {
+                  if (issueSubmitting) return;
                   const qty = Number(issueQty);
                   if (!qty || qty <= 0) {
                     setError("Số lượng không hợp lệ");
                     return;
                   }
-                  const r = await fetch(
-                    `/api/materials/${issueMat.id}/${issueMode === "issue" ? "issue" : "return"}`,
-                    {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify(
-                        issueMode === "issue"
-                          ? {
-                              qty,
-                              note: issueNote.trim() || undefined,
-                              floorLabel: issueFloor.trim() || undefined,
-                              crew: issueCrew.trim() || undefined,
-                            }
-                          : { qty, note: issueNote.trim() || undefined },
-                      ),
-                    },
-                  );
-                  if (r.ok) {
-                    setIssueMat(null);
-                    load();
-                  } else {
-                    const j = await r.json();
-                    setError(j.error ?? (issueMode === "issue" ? "Lỗi xuất kho" : "Lỗi hoàn kho"));
+                  setIssueSubmitting(true);
+                  try {
+                    const r = await fetch(
+                      `/api/materials/${issueMat.id}/${issueMode === "issue" ? "issue" : "return"}`,
+                      {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json",
+                          "Idempotency-Key": issueKey,
+                        },
+                        body: JSON.stringify(
+                          issueMode === "issue"
+                            ? {
+                                qty,
+                                note: issueNote.trim() || undefined,
+                                floorLabel: issueFloor.trim() || undefined,
+                                crew: issueCrew.trim() || undefined,
+                              }
+                            : { qty, note: issueNote.trim() || undefined },
+                        ),
+                      },
+                    );
+                    if (r.ok) {
+                      setIssueMat(null);
+                      load();
+                    } else {
+                      const j = await r.json();
+                      setError(
+                        j.error ?? (issueMode === "issue" ? "Lỗi xuất kho" : "Lỗi hoàn kho"),
+                      );
+                    }
+                  } catch {
+                    setError("Mất kết nối mạng — thử lại");
+                  } finally {
+                    setIssueSubmitting(false);
                   }
                 }}
-                className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium ${
+                className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed ${
                   issueMode === "issue"
                     ? "bg-blue-600 hover:bg-blue-700"
                     : "bg-amber-600 hover:bg-amber-700"
                 }`}
               >
-                {issueMode === "issue" ? (
+                {issueSubmitting ? (
+                  "Đang lưu..."
+                ) : issueMode === "issue" ? (
                   <>
                     <ArrowDownToLine className="w-4 h-4" /> Xuất kho
                   </>
@@ -1573,7 +1593,8 @@ export default function MaterialsPage() {
               </button>
               <button
                 onClick={() => setIssueMat(null)}
-                className="px-4 border border-zinc-700 hover:border-zinc-500 rounded-lg text-sm text-zinc-400"
+                disabled={issueSubmitting}
+                className="px-4 border border-zinc-700 hover:border-zinc-500 rounded-lg text-sm text-zinc-400 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 Huỷ
               </button>
