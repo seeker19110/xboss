@@ -15,17 +15,11 @@
 "4/7 Áp migration" nay in `✅ DB đã cập nhật — không có migration mới` — DBA đã chạy
 `CREATE EXTENSION unaccent` trên VPS như hướng dẫn cũ, migration 0068+ đã lên production.
 
-**🔴 Ghi nhận 2026-07-19 (phát hiện khi audit lại — blocker MỚI, khác blocker cũ đã đóng ở
-trên) — Auto-deploy production vẫn kẹt, nhưng nay do OOM-kill lúc build, không phải
-migration:** 2 lần chạy liên tiếp (run `29689527953` lúc 13:49, `29689586264` lúc 14:05,
-commit `125945e`) đều dừng ở bước "5/7 Build" — log dừng ngay sau dòng `Creating an
-optimized production build ...` (Turbopack), ~16 phút sau in `Killed` / `Process exited
-with status 137` (mã OOM-kill của Linux cgroup, không phải lỗi trong code). `next.config.mjs`
-đã tắt type-check trong build (`typescript.ignoreBuildErrors: true`, thêm từ lần OOM trước)
-nên đây là lượt VRAM/RAM vượt ngưỡng mới — codebase đã lớn thêm nhiều module (M53–M62) từ
-lần cấu hình đó. Deploy lần thành công gần nhất: run `29679745513` (2026-07-19 08:23, commit
-`7365568`) — **app đang chạy vẫn phục vụ bình thường**, chỉ đứng yên không nhận code mới
-(cùng cơ chế chặn tuần tự như trước — mọi migration/code sau `125945e` chưa lên production).
+~~**Ghi nhận 2026-07-19 (blocker OOM-kill lúc build)**~~ → **đã đổi dạng, không còn OOM-kill nữa** (kiểm lại cùng ngày, sau khi ghi nhận blocker OOM ở trên — run `29689527953` lúc 13:46 vẫn `Killed`/137 như mô tả, nhưng **retry lần 2 cùng commit `125945e` (run `29689586264`, attempt 2, 15:16→15:37) build sống sót, xong trong ~20 phút** — không còn thấy `Killed`. Nghi ngờ swap đĩa đã được thêm ở tầng VPS (đúng khuyến nghị "thêm swap" từng đưa ra) — đổi lại triệu chứng: build không còn bị OOM-kill nhưng **chậm bất thường (20-23 phút thay vì vài phút)** do swap đĩa chậm hơn RAM.
+
+**🔴 Blocker MỚI (2026-07-19, phát hiện ngay sau khi OOM hết): build chậm sát/vượt `command_timeout: 25m` của `appleboy/ssh-action`, cắt ngang deploy đúng lúc build vừa xong.** Run `29693453254` (commit `3115794` — HEAD hiện tại, 15:44→16:09): log in đủ route table (`Compiled successfully in 19.6min` + generate 73 trang tĩnh) nhưng **không có dòng `==> 6/7 Swap...` nào** — script bị cắt bởi `Run Command Timeout` ở phút thứ 25 tính từ lúc SSH bắt đầu, ngay sau khi `next build` in xong output (có thể còn đang ở bước finalize ngầm của Next.js). **Hệ quả: commit `3115794` (mới nhất trên `main`) CHƯA lên production** — production vẫn đứng ở `125945e` (deploy thành công gần nhất, qua retry). Không mất dữ liệu/an toàn (script dừng trước bước `mv` swap `.next`, app đang chạy không bị đụng).
+
+**Đã vá phần tôi kiểm soát được (repo code):** tăng `command_timeout` trong `.github/workflows/deploy.yml` từ `25m` → `40m` (nhánh này, chưa merge `main`) — chỉ tránh bị cắt ngang, KHÔNG giải quyết gốc rễ (build chậm do swap đĩa thay RAM thật). **Còn cần ops:** (1) re-run job "Deploy to VPS" thất bại gần nhất (hoặc chờ lần push kế tiếp) sau khi PR nới timeout này merge; (2) xác nhận có đúng là đã thêm swap trên VPS chưa, và cân nhắc thêm RAM thật thay vì tiếp tục dựa vào swap (swap chỉ là giải pháp tạm, build 20+ phút sẽ tiếp tục kéo dài khi codebase lớn thêm).
 
 Không có quyền SSH VPS trong phiên này nên không tự thêm swap được. Cần người có quyền
 VPS (ops) làm 1 trong các cách sau (ưu tiên theo thứ tự, không loại trừ nhau):
