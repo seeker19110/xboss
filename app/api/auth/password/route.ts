@@ -34,10 +34,11 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Thử lại sau ít phút" }, { status: 429 });
   }
 
-  const u = await queryOne<{ password_hash: string; totp_enabled_at: string | null }>(
-    `SELECT password_hash, totp_enabled_at FROM users WHERE id = ?`,
-    me.id,
-  );
+  const u = await queryOne<{
+    password_hash: string;
+    totp_enabled_at: string | null;
+    session_version: number;
+  }>(`SELECT password_hash, totp_enabled_at, session_version FROM users WHERE id = ?`, me.id);
   if (!u || !verifyPassword(oldPassword, u.password_hash))
     return NextResponse.json({ error: "Mật khẩu hiện tại không đúng" }, { status: 401 });
 
@@ -51,7 +52,7 @@ export async function PATCH(req: NextRequest) {
   const required = await requiredRoles();
   const mustSetup2fa = computeMustSetup2fa(me.role, u.totp_enabled_at, required);
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(COOKIE, makeToken(me.id, newHash, mustSetup2fa), {
+  res.cookies.set(COOKIE, makeToken(me.id, newHash, mustSetup2fa, u.session_version), {
     httpOnly: true,
     path: "/",
     maxAge: COOKIE_MAX_AGE,
