@@ -12,4 +12,5 @@ description = "Secret/mật khẩu test cho E2E (DB ephemeral, không phải bí
 regexes = [
   '''e2e-ci-secret-khong-bi-mat''',
   '''e2e-ci-admin-pw''',
+  '''thirtytwocharacterssecret1234567''',
 ]

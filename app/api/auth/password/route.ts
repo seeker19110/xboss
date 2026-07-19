@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
+import { hitRateLimit } from "@/lib/ratelimit";
 import {
   getCurrentUser,
   hashPassword,
@@ -24,6 +25,11 @@ export async function PATCH(req: NextRequest) {
 
   if (newPassword.length < 6)
     return NextResponse.json({ error: "Mật khẩu mới tối thiểu 6 ký tự" }, { status: 400 });
+
+  // Rate-limit đổi mật khẩu: 5 lần sai / 15 phút / user
+  if (await hitRateLimit(`password:${me.id}`, 5, 15)) {
+    return NextResponse.json({ error: "Thử lại sau ít phút" }, { status: 429 });
+  }
 
   const u = await queryOne<{ password_hash: string; totp_enabled_at: string | null }>(
     `SELECT password_hash, totp_enabled_at FROM users WHERE id = ?`,
