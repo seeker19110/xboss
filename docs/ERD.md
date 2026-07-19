@@ -1275,6 +1275,7 @@
 | received_by | integer | ✓ |  |
 | received_at | timestamptz | ✓ | `now()` |
 | note | text | ✓ |  |
+| idempotency_key | text | ✓ |  |
 
 **Khóa ngoại:**
 - `po_id` → `purchase_orders(id)`
@@ -1282,6 +1283,7 @@
 
 **Index:**
 - `idx_receipt_po`: INDEX idx_receipt_po ON public.warehouse_receipts USING btree (po_id)
+- `warehouse_receipts_idem_key`: UNIQUE INDEX warehouse_receipts_idem_key ON public.warehouse_receipts USING btree (po_id, idempotency_key) WHERE (idempotency_key IS NOT NULL)
 - `warehouse_receipts_pkey`: UNIQUE INDEX warehouse_receipts_pkey ON public.warehouse_receipts USING btree (id)
 - `warehouse_receipts_receipt_code_key`: UNIQUE INDEX warehouse_receipts_receipt_code_key ON public.warehouse_receipts USING btree (receipt_code)
 
