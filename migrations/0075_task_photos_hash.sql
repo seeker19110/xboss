@@ -1,4 +1,4 @@
--- 0074_task_photos_hash.sql — chống trùng ảnh hiện trường khi hàng đợi offline
+-- 0075_task_photos_hash.sql — chống trùng ảnh hiện trường khi hàng đợi offline
 -- (offlineQueue enqueuePhoto) retry/gửi lại cùng ảnh: lưu hash nội dung file, dùng
 -- để dedupe trong POST /api/tasks/:id/photos (cùng task + cùng hash trong 24h →
 -- trả lại ảnh đã có, không ghi file/dòng mới). Thêm thuần tuý (ADD COLUMN nullable
