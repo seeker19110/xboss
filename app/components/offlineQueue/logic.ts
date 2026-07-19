@@ -15,7 +15,20 @@ export type PhotoPayload = {
   size: number; // = blob.size — tách ra để tính hạn mức không cần chạm Blob (test node)
   mime: string;
 };
-export type DiaryNotePayload = { date: string; text: string };
+// Nhật ký ngày (M58 PR3): PUT /api/diaries/:date là FULL-REPLACE — payload phải là
+// TOÀN BỘ body PUT (thiếu trường nào ghi NULL). Chứa đủ thời tiết/nhân lực/ảnh để không
+// xoá sạch dữ liệu đã có của ngày khi gửi lại.
+export type DiaryManpowerInput = { crew: string; headcount: number; note?: string | null };
+export type DiaryNotePayload = {
+  date: string;
+  weatherAm: string | null;
+  weatherPm: string | null;
+  workDone: string | null;
+  obstacles: string | null;
+  safetyNote: string | null;
+  manpower: DiaryManpowerInput[];
+  photoIds: number[];
+};
 
 // Discriminated union theo `kind` — payload gắn đúng kiểu, tránh `any`.
 type OpBody =
@@ -78,6 +91,12 @@ export function shouldRetry(outcome: { networkError?: boolean; status?: number }
 // xoá trước khi thêm tick mới (giữ đúng hành vi dedup của khung cũ).
 export function tickDedupeIds(ops: QueuedOp[], dimId: number): number[] {
   return ops.filter((o) => o.kind === "tick" && o.payload.dimId === dimId).map((o) => o.id);
+}
+
+// Mỗi ngày chỉ giữ 1 bản nhật ký offline MỚI NHẤT — PUT /api/diaries/:date là full-replace
+// nên bản sau đã chứa trọn trạng thái, các bản cũ cùng ngày thừa (trả id cần xoá trước khi thêm).
+export function diaryDedupeIds(ops: QueuedOp[], date: string): number[] {
+  return ops.filter((o) => o.kind === "diary_note" && o.payload.date === date).map((o) => o.id);
 }
 
 // Tổng byte ảnh đang chờ trong hàng đợi.
