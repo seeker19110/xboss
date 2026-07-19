@@ -52,12 +52,13 @@ tin cho UI). Đặt SAU bước lấy `me` (đã có `me.id`), TRƯỚC query `q
 ### 1b. Dependabot theo dõi GitHub Actions
 
 `.github/dependabot.yml` — thêm entry thứ 2:
+
 ```yaml
-  - package-ecosystem: "github-actions"
-    directory: /
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+- package-ecosystem: "github-actions"
+  directory: /
+  schedule:
+    interval: weekly
+  open-pull-requests-limit: 5
 ```
 
 ### 1c. Validate secret lúc boot (fail-fast)
@@ -96,11 +97,13 @@ mới) — secret ngắn ở production → throw; secret ngắn ở development
 File `migrations/00NN_task_photos_hash.sql` (số `NN` xác nhận qua
 `ls migrations | sort -V | tail -3` **ngay trước khi commit** — KHÔNG dùng `0073` cố
 định vì PR #270 có thể đã chiếm):
+
 ```sql
 ALTER TABLE task_photos ADD COLUMN IF NOT EXISTS sha256 TEXT;
 CREATE INDEX IF NOT EXISTS idx_task_photos_task_hash
   ON task_photos(task_id, sha256) WHERE sha256 IS NOT NULL;
 ```
+
 Chạy `npm run gen:erd` sau khi thêm.
 
 ### Route `app/api/tasks/[id]/photos/route.ts` (POST)
@@ -110,12 +113,14 @@ tính `const hash = sha256Hex(fileBuf)` — nếu `sha256Hex` chưa tồn tại 
 thêm hàm thuần `export function sha256Hex(buf: Buffer): string` dùng
 `crypto.createHash("sha256").update(buf).digest("hex")` (import `node:crypto`). Trước
 khi `writeFile`+`insertId`, query:
+
 ```sql
 SELECT id, caption, size_bytes AS "sizeBytes"
   FROM task_photos
  WHERE task_id = ? AND sha256 = ? AND created_at > now() - interval '24 hours'
  ORDER BY id DESC LIMIT 1
 ```
+
 Có kết quả → **không ghi file, không insert dòng mới**, trả
 `NextResponse.json({ id: existing.id, taskId, caption: existing.caption, sizeBytes: existing.sizeBytes, deduped: true }, { status: 200 })`.
 Không có kết quả → giữ nguyên luồng cũ, thêm cột `sha256` (giá trị `hash`) vào câu
@@ -209,12 +214,14 @@ hệt).
 
 Đổi trigger từ `on: push: branches: [main]` sang
 `on: workflow_run: workflows: ["CI"], types: [completed]`, thêm điều kiện job:
+
 ```yaml
 jobs:
   deploy:
     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
     runs-on: ubuntu-latest
 ```
+
 Sửa lại comment đầu file (hiện đang giải thích lý do KHÔNG chờ CI — comment này sẽ sai
 sau khi đổi, viết lại ngắn gọn: "Deploy khi workflow CI trên main hoàn tất VÀ pass —
 loại bỏ phụ thuộc ngầm vào branch-protection setting ngoài repo, khớp đúng comment đã
@@ -256,6 +263,7 @@ Giữ nguyên khối `concurrency`/`permissions: {}`.
 
 File `migrations/00NN_session_version.sql` (số xác nhận lại trước khi commit, PHẢI SAU
 số đã dùng bởi V2 nếu V2 đã merge — chạy `ls migrations | sort -V | tail -3`):
+
 ```sql
 ALTER TABLE users ADD COLUMN IF NOT EXISTS session_version INT NOT NULL DEFAULT 0;
 ```
@@ -291,8 +299,7 @@ lại file thật trước khi sửa, không giả định thứ tự merge), `o
 ### API mới: thu hồi phiên
 
 `app/api/users/[id]/revoke-sessions/route.ts` (mới) — `POST`, quyền `CAN.manageUsers`
-(Admin, đúng quyền quản lý user hiện có, KHÔNG tạo perm key mới). `getCurrentUser()` →
-401. Check quyền → 403. `UPDATE users SET session_version = session_version + 1 WHERE id = ?`.
+(Admin, đúng quyền quản lý user hiện có, KHÔNG tạo perm key mới). `getCurrentUser()` → 401. Check quyền → 403. `UPDATE users SET session_version = session_version + 1 WHERE id = ?`.
 Trả `{ ok: true }`. **Không tự revoke chính session admin đang gọi nếu `id === me.id`**
 — nếu admin tự thu hồi phiên chính mình, request tiếp theo (kể cả response hiện tại)
 vẫn nên thành công bình thường (không cần đặc biệt chặn, chỉ cần accept rằng admin sẽ
@@ -355,13 +362,17 @@ export function isSameOrigin(req: NextRequest): boolean {
 ```
 
 ### Áp dụng vào 4 route nhạy cảm nhất (không mở rộng toàn bộ ~335 route — phạm vi đúng
+
 đặc tả "route mutating nhạy cảm nhất")
 
 Ngay đầu mỗi handler, SAU `getCurrentUser()` (401 trước, same-origin check sau — không
 lộ thông tin xác thực trước khi check nguồn gốc request):
+
 ```ts
-if (!isSameOrigin(req)) return NextResponse.json({ error: "Yêu cầu không hợp lệ" }, { status: 403 });
+if (!isSameOrigin(req))
+  return NextResponse.json({ error: "Yêu cầu không hợp lệ" }, { status: 403 });
 ```
+
 - `app/api/auth/password/route.ts` (PATCH)
 - `app/api/users/[id]/route.ts` (DELETE — tìm đúng method, nếu route xoá user nằm ở
   path khác thì áp đúng chỗ đó)
@@ -423,9 +434,11 @@ riêng cho từng trang).
 ### Việc cần làm
 
 Thêm script vào `package.json`:
+
 ```json
 "test:coverage": "node --experimental-test-coverage scripts/run-tests.mjs"
 ```
+
 Chạy thử, đọc kết quả `stmts/branches/funcs/lines` cho phạm vi `lib/**` + `app/api/**`
 (coverage built-in Node 22 báo theo file — nếu công cụ không tự lọc theo thư mục, viết
 thêm bước lọc output trong `scripts/run-tests.mjs` hoặc 1 script nhỏ mới
