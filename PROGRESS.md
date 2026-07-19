@@ -386,6 +386,64 @@ Trước khi audit, bổ sung `docs/audit.md` (rà thật trong code, không suy
 
 **KẾT LUẬN đợt này: Cần xử lý** (còn 1 phát hiện mức Cao chưa đóng — payments chưa scope theo dự án) — nhưng không chặn merge PR audit này vì đây là nợ đã biết từ trước (không phải regression do PR này gây ra), 3 lỗi mới phát hiện đã sửa + có test hồi quy, mọi cổng tự động xanh.
 
+## Đợt audit toàn dự án lần 7 (2026-07-19, kiến trúc/khung/kỹ thuật toàn diện theo `docs/audit.md`)
+
+Audit tổng thể toàn dự án theo yêu cầu người dùng ("audit toàn diện kiến trúc, khung công nghệ, kỹ thuật, đưa ra đề xuất tốt nhất") — chạy 3 subagent song song theo đúng §9: (1) Bảo mật & phân quyền §3, (2) Logic nghiệp vụ & toàn vẹn dữ liệu §4 + Vận hành/Offline §7, (3) CI/CD, dependency, hiệu năng, hạ tầng §6. Mỗi agent đọc code thật, không đoán; phát hiện #1 (idempotency vật tư) đã tự xác nhận độc lập bằng grep trước khi ghi nhận.
+
+```
+=== BÁO CÁO AUDIT TOÀN DIỆN — 2026-07-19 09:07 giờ VN · nhánh claude/project-architecture-audit-2imqvc · 767e303 ===
+
+CỔNG TỰ ĐỘNG (chặn)
+  lint ✅ | typecheck ✅ | test ✅ (103/103 file, 0 fail) | build ✅
+
+§3 BẢO MẬT & PHÂN QUYỀN
+  Route mới có getCurrentUser()+401 ✅ (335/335) | CAN/canTouchTask/canTouchPackage đối xứng ✅
+  | scope projectId (M22) ✅ (app WHERE + RLS 2 lớp) | secret hardcode: 0 | .env track: chỉ .env.example ✅
+  | npm audit: không chạy trong lượt này (đã có trong CI job) | cron Bearer-only ✅ (6/6) | rate-limit atomic ✅
+
+§4 LOGIC & TOÀN VẸN DỮ LIỆU
+  Làm tròn % ✅ | FOR UPDATE trong transaction ✅ | race/idempotency ❌ (3 phát hiện, xem dưới)
+  | tiền tính trong SQL (không float JS) ❌ (server-side, mức Thấp) | ngày Asia/Ho_Chi_Minh ✅
+  | nghiem_thu không tự hạ cấp ✅ | migration append-only idempotent ✅ (0069 có UPDATE data-touch, cần staging)
+
+§5 UI/UX & A11Y
+  Không nằm trong phạm vi 3 agent lần này (đã phủ ở "Đợt audit toàn dự án lần 4/5" + Phụ lục A) — 5 trang phát hiện thiếu spec axe (xem §6 dưới) là khoảng trống a11y, không riêng UX.
+
+§6 HIỆU NĂNG / DEPENDENCY / CI
+  Lighthouse ≥ ngưỡng error ✅ | uses: pin SHA ✅ | permissions tường minh ✅
+  | deploy needs CI success ⚠️ (dựa branch protection ngoài repo, không tự-chứng-minh được từ code)
+  | index bảng lớn ✅ (phủ tốt; 1 nghi vấn COALESCE(t.end_date, wp.end_date) trong dashboard/notifications chưa xác nhận bằng EXPLAIN thật)
+  | Coverage: chưa đo (đúng khoảng trống đã biết, không phải phát hiện mới)
+  | Vùng thiếu test: `/account`, `/order`, `/reports`, `/schedule-control`, `/scurve` không có spec axe/e2e nào
+
+§7 VẬN HÀNH / OFFLINE / XUẤT BẢN
+  SSE watermark+fallback ✅ | offline queue idempotent, bỏ 4xx/giữ 5xx ✅
+  | sw.js CACHE version + loại trừ events/photos/documents ✅ | dedup notif ✅
+  | vercel.json chỉ khai 2/6 cron thật (thiếu sync-sheets/refresh-views/sync-integrations/weekly-report — chỉ ảnh hưởng nếu deploy Cách C/Vercel, hạ tầng chính là VPS+crontab)
+
+ĐỐI CHIẾU TÀI LIỆU & HẠ TẦNG
+  Git: origin/main 1 commit mới hơn nhánh này (M55 BI, không xung đột) | working tree ✅ sạch
+  | PROGRESS khớp thực tế: ❌ trước đợt này — mục "Nợ kỹ thuật" còn 1 nợ [Cao] `payments` đã đóng thật từ PR #263 nhưng chưa gỡ khỏi danh sách (đã sửa tài liệu trong đợt này)
+  | Migration chưa áp production: không tra được (không có kết nối Postgres trong phiên) | Nợ kỹ thuật còn đúng: idempotency vật tư (nay rõ nguyên nhân: client không gửi header), PO receive, tiền float JS server, chờ SENTRY_DSN, M60 (giữ TS7/ESLint10/Node26 có chủ đích), ký số PAdES
+
+--- PHÂN LOẠI VIỆC ---
+  [AI] tự làm được: (1) wire `Idempotency-Key` + disable nút ở `app/materials/page.tsx` (issue/return) — hạ tầng server đã sẵn, chỉ cần 2 chỗ ở client; (2) thêm idempotency cho `POST /api/purchase-orders/:id/receive` (cần đặc tả schema trước); (3) dời tổng tiền `lib/finance.ts`/`lib/cost.ts`/`lib/subcontractors.ts` vào SQL; (4) sửa comment header sai số trong `migrations/0072_material_tx_idempotency.sql`; (5) viết 5 spec axe còn thiếu; (6) bổ sung 4 cron thiếu vào `vercel.json` hoặc xoá file + mục "Cách C" trong `DEPLOY.md`; (7) EXPLAIN ANALYZE xác nhận nghi vấn COALESCE trước khi quyết định có cần denormalize `effective_end_date` không.
+  [Người dùng] cần thao tác tay: xác nhận role Postgres production đã đổi sang `xboss_app` (NOBYPASSRLS) để RLS thật sự có hiệu lực (không chỉ lớp WHERE ứng dụng); xác nhận branch protection `main` yêu cầu status check "CI" (cả job `e2e`) pass kể cả với admin trước khi `deploy.yml` tự động deploy.
+  Rủi ro/ảnh hưởng: cao nhất là 2 lỗ idempotency vật tư/PO receive — dữ liệu tồn kho sai khi mạng công trường chập chờn (đúng bối cảnh sử dụng thật của app); còn lại là nợ chuẩn hoá/hạ tầng chất lượng, không có lỗ hổng bảo mật Cao/Trung bình mới.
+  Góp ý cải tiến: cân nhắc `workflow_run` gate tường minh cho `deploy.yml` thay vì phụ thuộc hoàn toàn branch protection ngoài repo (tự-chứng-minh được trong mọi audit sau); cân nhắc mở đặc tả riêng cho "idempotency toàn diện vật tư + PO" một lần thay vì vá từng route.
+
+KẾT LUẬN: Cần xử lý — không có lỗ hổng bảo mật Cao/Trung bình mới; 2 phát hiện logic dữ liệu mức Trung (idempotency vật tư chưa hoạt động thật, PO receive thiếu idempotency) là ưu tiên sửa trước vì đúng bối cảnh thực tế (mạng công trường); phần còn lại là nợ hạ tầng chất lượng/chuẩn hoá, không chặn vận hành hiện tại.
+```
+
+**Chi tiết đầy đủ 3 báo cáo con** (bảo mật §3, logic/vận hành §4+§7, CI/dependency/hiệu năng §6) — xem lịch sử phiên audit 2026-07-19 hoặc yêu cầu người dùng nếu cần bản dài; bản trên là tổng hợp theo mẫu §12.
+
+**Kết quả cụ thể đáng chú ý:**
+
+- **Bảo mật (335/335 route rà)**: không có lỗ hổng Cao/Trung mới. 2 điểm Thấp ghi nhận: SSRF webhook qua DNS rebinding (đã có `redirect:"manual"` giảm nhẹ, chưa resolve DNS trước `fetch`), `requireApiKey` không rate-limit key sai (không khai thác được, chỉ DoS nhẹ).
+- **Logic & dữ liệu**: các quy tắc lõi (làm tròn %, FOR UPDATE, BOQCODE ràng buộc DB thật, material-sync snapshot-sau-ghi, ngày Asia/Ho_Chi_Minh, nghiem_thu không tự hạ cấp) đều đúng — không hồi quy. Phát hiện thật duy nhất mới: 2 lỗ idempotency thực thi (mục Nợ kỹ thuật phía trên).
+- **CI/hạ tầng**: pin SHA, permissions, secret-scan, dependabot, husky/commitlint, deploy atomic swap, index bảng lớn đều đúng chuẩn. 3 điểm Trung bình: `deploy.yml` phụ thuộc branch protection ngoài repo (không tự-chứng-minh), nghi vấn hiệu năng `COALESCE` trong 2 route hot (dashboard/notifications, chưa có `EXPLAIN` thật để xác nhận), 5 trang thiếu spec axe/e2e.
+- **Tài liệu**: phát hiện + sửa 1 chỗ tài liệu lệch code (nợ `payments` project-scope đã đóng thật từ PR #263 nhưng còn sót trong "Nợ kỹ thuật") — đúng nguyên tắc §1 "đối chiếu, không tin trí nhớ".
+
 ## Tiếp theo
 
 - **Hàng đợi thi hành đã chốt lại (cập nhật 2026-07-18, rà lại code thật sau merge #252/#256/#259/#260/#261/#262/#263 — nguồn chuẩn duy nhất: `docs/nang-cap/README.md` mục "Đặc tả chờ triển khai"):** M53 (cả 4 PR — PR4 merge qua **PR #262**, xem mục "M53 PR4" phía dưới), M56 (cả 2 PR), M61, M51 GĐ0, M58 PR1 đều **đã xong**. Ngoài hàng đợi thứ tự chính (không nằm trong dây chuyền phụ thuộc): **M57 PR2** (extract text PDF, xem mục riêng bên dưới) cũng vừa xong. Ngoài hàng đợi module chính: vừa đóng thêm 1 nợ kỹ thuật phát sinh ngoài kế hoạch — rò rỉ chéo dự án `payments/bills`/`payments/floors` (PR #263, **đã merge**, xem mục ngay phía trên). Hàng đợi module còn lại (chưa triển khai): **M55** (BI/Metabase, đã có PR #261 kế hoạch — chờ thi hành) → **M58 PR3** (wire ảnh/nhật ký vào offline queue — PR1+PR2 đã xong) → **M54 GĐ1** (multi-tenant SaaS, phụ thuộc M51) → **M59** (histogram tài nguyên). Các dòng "thứ tự thi hành" cũ hơn trong log dưới đây là lịch sử, không sửa lại. **LUẬT trước khi thi hành BẤT KỲ hạng mục nào (yêu cầu người dùng 2026-07-18): kiểm tra trên code thật xem hạng mục đã được làm chưa** — grep điểm chạm chính ghi trong đặc tả (bảng/migration, hàm lib, route, trang UI) trước khi lập nhánh/giao worker; đã có rồi thì cập nhật tài liệu thay vì code lại (bài học 2026-07-17: 3/5 mục "dở dang" thực ra đã xong; lặp lại 2026-07-18 **hai lần liên tiếp**: lần 1 tài liệu vẫn ghi M53/M57 PR1 "chưa" dù đã merge từ trước; lần 2 phát hiện M53 PR4 đã có code sẵn trên nhánh `claude/plan-md-30cmcp` — làm bởi phiên khác — nhưng chưa merge/chưa có PR, suýt bị code trùng lại nếu không kiểm tra `git log --all`/branch trước khi bắt tay code — luôn grep + kiểm tra branch/PR đang mở trước, đừng tin bảng trạng thái).
@@ -789,8 +847,11 @@ Verify hạ tầng: Postgres 16 local (`pg_ctlcluster`, đã có sẵn trong má
 
 ## Nợ kỹ thuật (chỗ "làm tạm" cần quay lại)
 
-- **[Cao] `payments`/`payments/bills`/`payments/floors` chưa scope theo `projectId` (M22)** — xem chi tiết "Đợt audit toàn dự án lần 6" ở trên. `GET` đã whitelist có chủ đích trong `tests/project-scope-invariant.test.ts` ("nợ đa dự án đã biết") nhưng `PATCH`/`DELETE /api/payments/bills/:id` ngoài phạm vi whitelist đó (chỉ kiểm GET+SELECT) — user dự án B sửa/xoá được bill dự án A nếu đoán được `id`. Cần đặc tả riêng kiểu M22 (`payment-certs`) trước khi làm — không tự chế cách scope.
-- **[Trung] `materials/:id/issue` và `.../return` không có cơ chế idempotency** — đã bọc `withTransaction`+`FOR UPDATE` chống race condition nhưng gửi lại cùng request (double-submit, mạng công trường chập chờn) vẫn tạo 2 dòng `material_transactions`/trừ-cộng tồn kho 2 lần. Cần đặc tả (schema lưu idempotency-key, TTL, nơi sinh key ở client) trước khi làm.
+- ~~**[Cao] `payments`/`payments/bills`/`payments/floors` chưa scope theo `projectId` (M22)**~~ → **đã đóng, tài liệu lệch code** (xác nhận lại 2026-07-19, đợt audit lần 7): đọc thẳng `app/api/payments/bills/[id]/route.ts` — `PATCH`/`DELETE` đã có `billBelongsToProject()` (404 khi bill không thuộc dự án đang chọn) từ PR #263 (2026-07-18, đúng như "Đợt audit toàn dự án lần 6" ghi "ĐÃ SỬA"); `GET /api/payments` cũng đã JOIN `towers`/lọc `projectId`; `tests/project-scope-invariant.test.ts` không còn nhắc `payments` trong whitelist. Mục nợ này bị bỏ sót không gỡ khỏi "Nợ kỹ thuật" sau khi PR #263 merge — bài học: luôn gỡ nợ khỏi danh sách này trong cùng PR đóng nợ, không tách riêng.
+- **[Trung] `materials/:id/issue` và `.../return` — hạ tầng idempotency đã có (migration `0072`, header `Idempotency-Key` tuỳ chọn) nhưng "chết" trên đường thực thi** — xác nhận lại 2026-07-19: **không có client nào trong repo gửi header `Idempotency-Key`** (grep toàn repo chỉ khớp 2 route server + migration + `PROGRESS.md`; `app/materials/page.tsx` gọi `/issue`/`/return` chỉ với `Content-Type`, nút "Xuất kho"/"Hoàn kho" cũng không `disabled` lúc đang gửi) → double-submit (mạng công trường chập chờn, bấm 2 lần) vẫn trừ/cộng tồn kho 2 lần y như trước migration 0072. Cần: (1) client sinh `crypto.randomUUID()` lúc mở modal, gửi qua header; (2) disable nút khi đang submit. Đổi từ "cần đặc tả" → **đã đủ đặc tả, chỉ cần thi hành** (route/migration đã đúng, chỉ thiếu 2 dòng ở client).
+- **[Trung, mới 2026-07-19] `POST /api/purchase-orders/:id/receive` không có cơ chế idempotency** — không đối xứng với `materials/:id/issue`/`.../return` (đã có ít nhất hạ tầng migration 0072). Chỉ chặn được `qty_received + qty > qty_ordered` (409 OVERRECEIVE); nếu PO còn dư hạn mức, double-submit phiếu nhập từng phần cộng dồn `qty_stock` 2 lần + tạo 2 `warehouse_receipts`. Cần đặc tả idempotency-key cho `warehouse_receipts` trước khi làm (cùng mẫu 0072).
+- **[Thấp, mới 2026-07-19] Cộng/nhân tiền trên float JS ở tầng server** (vi phạm quy ước CLAUDE.md mục Quy ước/Tiền tệ) — `lib/finance.ts:45,55` (`receivables`/`payables` cộng `c.value + c.addendaTotal - c.paid` trong JS), `lib/cost.ts:181-188` (`costTotals` reduce budget/committed/actual), `lib/subcontractors.ts:213-214`. Tác động thực tế thấp (VND nguyên, tổng dự án `< 2^53` nên double vẫn chính xác) nhưng là nợ chuẩn hoá — nên dời `SUM`/phép cộng vào SQL theo đúng quy ước đã ghi.
+- **[Thấp, mới 2026-07-19] `migrations/0072_material_tx_idempotency.sql` dòng 1 — comment header ghi nhầm `0071_material_tx_idempotency.sql`** (sự cố đổi số 0071→0072 ngày 2026-07-18 chưa cập nhật comment trong chính file). Chỉ nhầm nhãn, không ảnh hưởng khi chạy.
 - ~~**M56 PR2 — auto-redirect client `/account?require2fa=1` chưa thực sự kích hoạt**~~ →
   **đã đóng** (2026-07-18, nhánh `claude/plan-md-30cmcp`, đúng cách vá đã dự kiến): thêm
   `app/api/auth/me/route.ts` tự đọc cờ `mustSetup2fa` từ token đang hiệu lực (`parseToken`,
