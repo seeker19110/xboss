@@ -1,4 +1,4 @@
--- 0071_material_tx_idempotency.sql — chống double-submit khi xuất/hoàn kho vật tư
+-- 0072_material_tx_idempotency.sql — chống double-submit khi xuất/hoàn kho vật tư
 -- (materials/:id/issue, materials/:id/return): client gửi header Idempotency-Key,
 -- lưu vào material_transactions; unique index chặn 2 giao dịch trùng key cho cùng
 -- vật tư + loại thao tác. Thêm thuần tuý (ADD COLUMN nullable + CREATE INDEX) →
