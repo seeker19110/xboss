@@ -138,3 +138,56 @@ test(
     }
   },
 );
+
+// ===== M62 PR1: withProjectScope đọc-ghi (opts.readOnly) =====
+test(
+  "withProjectScope: readOnly:false cho phép ghi trong cùng transaction có GUC; mặc định vẫn chặn ghi",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { withProjectScope, query, run, insertId } = await import("@/lib/db");
+
+    const projA = await insertId(`INSERT INTO projects (name) VALUES ('RLS scope A')`);
+    const userId = await insertId(
+      `INSERT INTO users (name, email, password_hash, role) VALUES ('RLS scope test', ?, 'x', 'admin')`,
+      `rls-scope-${projA}@test.local`,
+    );
+    try {
+      // readOnly:false: GUC được set đúng, và ghi vào bảng KHÔNG-RLS (notifications) trong
+      // cùng transaction thành công — đúng luồng notifications route (đọc bảng phạm vi RLS
+      // rồi INSERT/DELETE notifications).
+      const insertedId = await withProjectScope(
+        projA,
+        async () => {
+          const guc = await query<{ v: string }>(
+            `SELECT current_setting('app.project_id', true) AS v`,
+          );
+          assert.equal(guc[0]?.v, String(projA), "GUC app.project_id phải khớp projA");
+          return insertId(
+            `INSERT INTO notifications (user_id, type, message) VALUES (?, 'comment', 'test M62')`,
+            userId,
+          );
+        },
+        { readOnly: false },
+      );
+      assert.ok(insertedId > 0, "INSERT trong transaction readOnly:false phải thành công");
+      await run(`DELETE FROM notifications WHERE id = ?`, insertedId);
+
+      // Mặc định (readOnly không truyền, tương đương true) — ghi phải bị Postgres chặn
+      // bằng "cannot execute ... in a read-only transaction", không liên quan tới RLS.
+      await assert.rejects(
+        () =>
+          withProjectScope(projA, async () => {
+            await run(
+              `INSERT INTO notifications (user_id, type, message) VALUES (?, 'comment', 'must fail')`,
+              userId,
+            );
+          }),
+        /read-only transaction/i,
+        "withProjectScope mặc định (readOnly:true) phải chặn ghi",
+      );
+    } finally {
+      await run(`DELETE FROM users WHERE id = ?`, userId);
+      await run(`DELETE FROM projects WHERE id = ?`, projA);
+    }
+  },
+);

@@ -6,6 +6,9 @@
 //   - deliverDueWebhooks(): gọi TỪ cron — gửi thật các delivery đến hạn, retry theo backoff.
 // Xem migrations/0064_webhooks.sql + docs/nang-cap/M49-api-mo-sso.md (PR2).
 import { createHmac } from "node:crypto";
+import dns, { type LookupAddress, type LookupOptions } from "node:dns";
+import { isIP } from "node:net";
+import { Agent } from "undici";
 import { query, run, withTransaction } from "@/lib/db";
 import { log } from "@/lib/log";
 
@@ -28,24 +31,85 @@ const MAX_ATTEMPTS = 5;
 const SEND_TIMEOUT_MS = 10_000;
 const DELIVER_BATCH = 50;
 
-// Chống SSRF: chặn URL trỏ về nội bộ/loopback/link-local. Chỉ literal IP mới bị chặn ở đây
-// (theo đặc tả) — domain thường được cho qua (validate ở API quản lý lúc tạo/sửa webhook,
-// KHÔNG lúc gửi để không chặn nhầm khi DNS đổi).
-function isPrivateIp(host: string): boolean {
-  if (host === "::1") return true; // IPv6 loopback
-  if (host.startsWith("fe80:")) return true; // IPv6 link-local
-  if (host.startsWith("fc") || host.startsWith("fd")) return true; // IPv6 unique-local
-  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
-  if (!m) return false; // không phải literal IPv4 → domain, cho qua
-  const a = Number(m[1]);
-  const b = Number(m[2]);
+// Chống SSRF: chặn IP trỏ về nội bộ/loopback/link-local/CGNAT/multicast/reserved. Dùng
+// net.isIP để xác định họ địa chỉ + parse số từng octet/group (không so chuỗi thô) — chuẩn
+// hoá trước khi so để không bỏ sót biến thể viết tắt (vd fe80::1 vs FE80:0000:...).
+function isPrivateIpv4(a: number, b: number, c: number): boolean {
   if (a === 0) return true; // 0.0.0.0/8
   if (a === 10) return true; // 10.0.0.0/8
   if (a === 127) return true; // loopback 127.0.0.0/8
   if (a === 169 && b === 254) return true; // link-local 169.254.0.0/16
   if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
   if (a === 192 && b === 168) return true; // 192.168.0.0/16
+  if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT 100.64.0.0/10
+  if (a === 192 && b === 0 && c === 0) return true; // 192.0.0.0/24 (IETF protocol assignments)
+  if (a === 198 && (b === 18 || b === 19)) return true; // benchmark 198.18.0.0/15
+  if (a >= 224) return true; // multicast 224.0.0.0/4 + reserved 240.0.0.0/4 + 255.255.255.255
   return false;
+}
+
+// Nối 8 group IPv6 (số 0-65535) từ chuỗi địa chỉ đã chuẩn hoá bởi net.isIP === 6. Hỗ trợ nén
+// "::" và địa chỉ IPv4-mapped/embedded ở cuối (vd "::ffff:127.0.0.1"). Trả null nếu không
+// parse được (không nên xảy ra vì net.isIP đã xác nhận hợp lệ).
+function expandIPv6(raw: string): number[] | null {
+  let addr = raw.split("%")[0]; // bỏ zone id (vd "fe80::1%eth0")
+  const lastColon = addr.lastIndexOf(":");
+  const tail = addr.slice(lastColon + 1);
+  if (tail.includes(".") && isIP(tail) === 4) {
+    const [a, b, c, d] = tail.split(".").map(Number);
+    const hi = ((a << 8) | b).toString(16);
+    const lo = ((c << 8) | d).toString(16);
+    addr = `${addr.slice(0, lastColon + 1)}${hi}:${lo}`;
+  }
+  const halves = addr.split("::");
+  if (halves.length > 2) return null;
+  const head = halves[0] ? halves[0].split(":").filter(Boolean) : [];
+  let groups: string[];
+  if (halves.length === 2) {
+    const tailGroups = halves[1] ? halves[1].split(":").filter(Boolean) : [];
+    const missing = 8 - head.length - tailGroups.length;
+    if (missing < 0) return null;
+    groups = [...head, ...Array(missing).fill("0"), ...tailGroups];
+  } else {
+    groups = head;
+  }
+  if (groups.length !== 8) return null;
+  return groups.map((g) => parseInt(g || "0", 16));
+}
+
+// Chống SSRF: chặn IP nội bộ/loopback/link-local/CGNAT/multicast/reserved cho cả IPv4 lẫn
+// IPv6 (kể cả IPv4-mapped `::ffff:x.x.x.x` — bóc IPv4 ra kiểm lại bằng nhánh IPv4). Chuỗi
+// không phải IP hợp lệ (domain) → false, cho qua (validate domain ở lúc tạo/sửa webhook).
+export function isPrivateIp(host: string): boolean {
+  const family = isIP(host);
+  if (family === 4) {
+    const [a, b, c] = host.split(".").map(Number);
+    return isPrivateIpv4(a, b, c);
+  }
+  if (family === 6) {
+    const groups = expandIPv6(host);
+    if (!groups) return false;
+    // ::ffff:x.x.x.x (IPv4-mapped) → bóc IPv4 ra kiểm lại bằng nhánh IPv4.
+    if (
+      groups[0] === 0 &&
+      groups[1] === 0 &&
+      groups[2] === 0 &&
+      groups[3] === 0 &&
+      groups[4] === 0 &&
+      groups[5] === 0xffff
+    ) {
+      const a = groups[6] >> 8;
+      const b = groups[6] & 0xff;
+      const c = groups[7] >> 8;
+      return isPrivateIpv4(a, b, c);
+    }
+    const leadingSeven = groups.slice(0, 7);
+    if (leadingSeven.every((g) => g === 0) && (groups[7] === 0 || groups[7] === 1)) return true; // :: hoặc ::1
+    if ((groups[0] & 0xffc0) === 0xfe80) return true; // link-local fe80::/10
+    if ((groups[0] & 0xfe00) === 0xfc00) return true; // unique-local fc00::/7
+    return false;
+  }
+  return false; // không phải IP → domain, cho qua
 }
 
 // Validate URL webhook lúc tạo/sửa (API quản lý). https bắt buộc; http chỉ khi không phải
@@ -74,6 +138,45 @@ export function validateWebhookUrl(
   if (host === "localhost" || isPrivateIp(host))
     return { ok: false, error: "URL webhook không được trỏ tới địa chỉ nội bộ/loopback" };
   return { ok: true, url: u.toString() };
+}
+
+// Chống SSRF DNS rebinding: resolve TẤT CẢ IP của hostname rồi kiểm private ngay trong hàm
+// lookup dùng để connect — không "resolve → kiểm → fetch bằng hostname" (DNS có thể đổi giữa
+// 2 bước, rebinding đúng nghĩa). Fail-closed: có 1 IP private trong danh sách là chặn hết,
+// không tự chọn IP public còn lại. Chữ ký tương thích `dns.lookup` để dùng làm
+// `connect: { lookup }` của undici Agent (pin IP tại tầng connect, TLS/SNI/Host header vẫn
+// theo hostname gốc nên chứng chỉ verify đúng domain).
+export function safeLookup(
+  hostname: string,
+  options: LookupOptions,
+  callback: (
+    err: NodeJS.ErrnoException | null,
+    address: string | LookupAddress[],
+    family?: number,
+  ) => void,
+): void {
+  dns.promises
+    .lookup(hostname, { all: true })
+    .then((addresses) => {
+      const bad = addresses.find((addr) => isPrivateIp(addr.address));
+      if (bad) {
+        callback(
+          Object.assign(new Error(`DNS trỏ về địa chỉ nội bộ: ${bad.address}`), {
+            code: "EAI_SSRF_BLOCKED",
+          }),
+          "",
+        );
+        return;
+      }
+      if (options.all) {
+        callback(null, addresses);
+      } else {
+        callback(null, addresses[0].address, addresses[0].family);
+      }
+    })
+    .catch((err: unknown) => {
+      callback(err instanceof Error ? err : new Error(String(err)), "");
+    });
 }
 
 // Payload chuẩn gửi ra: { event, sentAt, projectId, data }.
@@ -130,6 +233,11 @@ type DueDelivery = {
   secret: string;
 };
 
+// Agent undici pin IP qua safeLookup cho MỌI lần gửi thật (M63) — tạo 1 lần module-level để
+// tái dùng connection pool, không tạo mới mỗi lần gửi. Chỉ áp cho sendOne; validateWebhookUrl
+// (lúc tạo/sửa webhook) giữ nguyên hành vi cũ (không resolve DNS).
+const webhookAgent = new Agent({ connect: { lookup: safeLookup } });
+
 // Gửi 1 delivery thật + cập nhật trạng thái. Trả true nếu 2xx (thành công).
 async function sendOne(d: DueDelivery): Promise<boolean> {
   const body = JSON.stringify(d.payload); // stringify đúng 1 lần — ký & gửi trên cùng chuỗi
@@ -148,11 +256,17 @@ async function sendOne(d: DueDelivery): Promise<boolean> {
         "X-Xboss-Signature": `sha256=${signature}`,
       },
       signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
+      // @ts-expect-error dispatcher là tuỳ chọn của undici, chưa có trong type chuẩn lib.dom fetch
+      dispatcher: webhookAgent,
     });
     if (res.status >= 200 && res.status < 300) ok = true;
     else lastError = `HTTP ${res.status}`;
   } catch (err) {
-    lastError = err instanceof Error ? err.message : String(err);
+    // fetch của Node (undici) bọc lỗi tầng connect (kể cả lỗi safeLookup chặn SSRF) thành
+    // TypeError "fetch failed" với `cause` mang lỗi gốc — lấy cause để last_error có ý nghĩa
+    // thay vì chỉ "fetch failed" chung chung.
+    const cause = err instanceof Error && err.cause instanceof Error ? err.cause : null;
+    lastError = cause ? cause.message : err instanceof Error ? err.message : String(err);
   }
 
   if (ok) {

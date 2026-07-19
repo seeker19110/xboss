@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/auth";
-import { query } from "@/lib/db";
+import { query, withProjectScope } from "@/lib/db";
 import { getCurrentProjectId } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
@@ -42,9 +42,13 @@ export async function GET(req: NextRequest) {
   const billProjectFilter = projectId != null ? " AND (project_id = ? OR project_id IS NULL)" : "";
   const billProjectParam = projectId != null ? [projectId] : [];
 
-  const [floorRows, histRows] = await Promise.all([
-    query<FloorBase>(
-      `
+  // M62 PR1: bọc trong withProjectScope("*") — route cố ý đọc xuyên dự án (lọc thật đã
+  // nằm ở towerFilter/billProjectFilter phía trên); '*' chỉ để tránh rơi vào nhánh
+  // thiếu-GUC sau khi khoá cửa RLS, không đổi hành vi hiện tại.
+  const [floorRows, histRows] = await withProjectScope("*", () =>
+    Promise.all([
+      query<FloorBase>(
+        `
       SELECT st.id AS "sheetTypeId", st.code AS "sheetType",
              wp.floor_label AS "floorLabel",
              COALESCE(fc.contract_value, 0) AS "contractValue"
@@ -56,12 +60,12 @@ export async function GET(req: NextRequest) {
          AND wp.floor_label IS NOT NULL AND wp.floor_label <> ''${towerFilter}
        GROUP BY st.id, st.code, wp.floor_label, fc.contract_value
        ORDER BY st.id, wp.floor_label`,
-      person,
-      ...towerParam,
-    ),
+        person,
+        ...towerParam,
+      ),
 
-    query<BillHistory>(
-      `
+      query<BillHistory>(
+        `
       SELECT sheet_type_id AS "sheetTypeId", floor_label AS "floorLabel",
              period, pct_this_period AS "pctThisPeriod",
              amount, paid_date AS "paidDate"
@@ -69,10 +73,11 @@ export async function GET(req: NextRequest) {
        WHERE responsible = ? AND type = 'bill'
          AND sheet_type_id IS NOT NULL AND floor_label IS NOT NULL${billProjectFilter}
        ORDER BY paid_date ASC, id ASC`,
-      person,
-      ...billProjectParam,
-    ),
-  ]);
+        person,
+        ...billProjectParam,
+      ),
+    ]),
+  );
 
   // Gộp history vào từng tầng
   const histMap = new Map<string, BillHistory[]>();

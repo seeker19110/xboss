@@ -44,6 +44,7 @@
     "react-dom": "^19.2.7",
     "react-is": "^19.2.7",
     "recharts": "^3.9.2",
+    "undici": "^7.28.0",
     "web-push": "^3.6.7",
     "xlsx": "npm:@e965/xlsx@^0.20.3",
     "zod": "^4.4.3"
