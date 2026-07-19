@@ -1,9 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Lock, Unlock, Download, RotateCcw, X } from "lucide-react";
+import { Plus, Trash2, Lock, Unlock, Download, RotateCcw, X, WifiOff } from "lucide-react";
 import { Modal, appConfirm } from "@/app/components/dialogs";
 import EmptyState from "@/app/components/EmptyState";
 import { showToast } from "@/app/components/Toast";
+import {
+  enqueueDiaryNote,
+  getQueuedDiaryNote,
+  discardDiaryDraft,
+} from "@/app/components/offlineQueue";
 import { formatDateDMY, formatDateTimeVN } from "@/lib/date";
 
 type ManpowerRow = { crew: string; headcount: string; note: string };
@@ -50,6 +55,7 @@ export default function DiaryEditorModal({
   const [manpower, setManpower] = useState<ManpowerRow[]>([]);
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [hasOfflineDraft, setHasOfflineDraft] = useState(false);
 
   const canEdit = role === "admin" || role === "pm" || role === "engineer";
   const canLock = role === "admin" || role === "pm";
@@ -59,12 +65,34 @@ export default function DiaryEditorModal({
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch(`/api/diaries/${date}`)
-      .then((r) => r.json())
-      .then((j) => {
-        if (cancelled) return;
-        setDiary(j.diary ?? null);
-        setPrefill(j.prefill ?? { workDone: "", updatedBy: [], photos: [] });
+    (async () => {
+      // Có bản nháp offline chưa gửi của ngày này → ưu tiên nạp form từ đó (không phải từ
+      // server), nhưng vẫn lấy trạng thái khoá + danh sách ảnh prefill từ server.
+      const queued = await getQueuedDiaryNote(date);
+      const j = await fetch(`/api/diaries/${date}`)
+        .then((r) => r.json())
+        .catch(() => ({}));
+      if (cancelled) return;
+      setDiary(j.diary ?? null);
+      setPrefill(j.prefill ?? { workDone: "", updatedBy: [], photos: [] });
+      if (queued && queued.kind === "diary_note") {
+        const p = queued.payload;
+        setHasOfflineDraft(true);
+        setWeatherAm(p.weatherAm ?? "");
+        setWeatherPm(p.weatherPm ?? "");
+        setWorkDone(p.workDone ?? "");
+        setObstacles(p.obstacles ?? "");
+        setSafetyNote(p.safetyNote ?? "");
+        setManpower(
+          p.manpower.map((m) => ({
+            crew: m.crew,
+            headcount: String(m.headcount),
+            note: m.note ?? "",
+          })),
+        );
+        setSelectedPhotoIds(new Set<number>(p.photoIds));
+      } else {
+        setHasOfflineDraft(false);
         setWeatherAm(j.diary?.weatherAm ?? "");
         setWeatherPm(j.diary?.weatherPm ?? "");
         setWorkDone(j.diary?.workDone ?? j.prefill?.workDone ?? "");
@@ -78,8 +106,8 @@ export default function DiaryEditorModal({
           })),
         );
         setSelectedPhotoIds(new Set<number>(j.photoIds ?? []));
-      })
-      .finally(() => !cancelled && setLoading(false));
+      }
+    })().finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
@@ -102,38 +130,56 @@ export default function DiaryEditorModal({
 
   const save = async () => {
     setSaving(true);
+    // Body PUT = toàn bộ trạng thái form (full-replace); dùng chung cho gửi online lẫn xếp offline.
+    const body = {
+      weatherAm: weatherAm || null,
+      weatherPm: weatherPm || null,
+      workDone: workDone || null,
+      obstacles: obstacles || null,
+      safetyNote: safetyNote || null,
+      manpower: manpower
+        .filter((m) => m.crew.trim())
+        .map((m) => ({
+          crew: m.crew.trim(),
+          headcount: Number(m.headcount) || 0,
+          note: m.note || null,
+        })),
+      photoIds: Array.from(selectedPhotoIds),
+    };
+    // Mất mạng → xếp hàng đợi offline (full-replace theo ngày), đóng modal.
+    const queueOffline = async () => {
+      await enqueueDiaryNote({ date, ...body });
+      showToast("Đã lưu offline — sẽ tự gửi khi có mạng");
+      setSaving(false);
+      onClose();
+    };
+    if (!navigator.onLine) {
+      await queueOffline();
+      return;
+    }
     try {
       const r = await fetch(`/api/diaries/${date}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          weatherAm: weatherAm || null,
-          weatherPm: weatherPm || null,
-          workDone: workDone || null,
-          obstacles: obstacles || null,
-          safetyNote: safetyNote || null,
-          manpower: manpower
-            .filter((m) => m.crew.trim())
-            .map((m) => ({
-              crew: m.crew.trim(),
-              headcount: Number(m.headcount) || 0,
-              note: m.note || null,
-            })),
-          photoIds: Array.from(selectedPhotoIds),
-        }),
+        body: JSON.stringify(body),
       });
       const j = await r.json().catch(() => ({}));
       if (r.ok) {
+        // Đã lưu trực tiếp thành công → xoá nháp offline cũ của ngày này (nếu có) để nó
+        // không tự flush sau đó và đè (full-replace) lên bản vừa lưu, gây mất dữ liệu.
+        await discardDiaryDraft(date);
+        setHasOfflineDraft(false);
         showToast("Đã lưu nhật ký");
         setDiary(j.diary ?? diary);
         onChanged();
       } else {
+        // Lỗi nghiệp vụ thật (409 khoá sổ, 422 hợp lệ…) — giữ nguyên lỗi cũ, KHÔNG xếp offline.
         showToast(j.error ?? "Lỗi lưu nhật ký", "error");
       }
-    } catch {
-      showToast("Mất kết nối mạng — vui lòng thử lại", "error");
-    } finally {
       setSaving(false);
+    } catch {
+      // Mất mạng giữa chừng → fallback xếp hàng đợi offline.
+      await queueOffline();
     }
   };
 
@@ -194,6 +240,13 @@ export default function DiaryEditorModal({
               <Lock className="w-4 h-4 shrink-0" />
               Đã khoá bởi {diary?.lockedByName ?? "—"} lúc{" "}
               {diary?.lockedAt ? formatDateTimeVN(diary.lockedAt) : "—"}
+            </div>
+          )}
+
+          {hasOfflineDraft && (
+            <div className="bg-amber-950 border border-amber-800 rounded-lg px-3 py-2 text-sm text-amber-200 flex items-center gap-2">
+              <WifiOff className="w-4 h-4 shrink-0" />
+              Có bản nháp đang chờ gửi offline
             </div>
           )}
 

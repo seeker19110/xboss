@@ -11,9 +11,11 @@ import {
   flushQueue,
   opEndpoint,
   tickDedupeIds,
+  diaryDedupeIds,
   wouldExceedPhotoQuota,
   FLUSH_INTERVAL_MS,
   PHOTO_QUOTA_BYTES,
+  type DiaryNotePayload,
   type QueuedOp,
   type QueueStats,
   type SendOutcome,
@@ -22,8 +24,8 @@ import {
 const SYNC_TAG = "xboss-flush";
 
 // Dựng request gửi theo loại thao tác. Trả outcome {status} hoặc {networkError} để
-// logic.shouldRetry quyết định giữ/bỏ. Endpoint `tick`/`photo` là thật; `diary_note`
-// gửi tạm workDone qua PUT /api/diaries/:date — PR3 sẽ chốt lại đường ghi nhật ký.
+// logic.shouldRetry quyết định giữ/bỏ. `diary_note` gửi trọn body PUT /api/diaries/:date
+// (full-replace) trừ `date` đã ở URL.
 async function sendOp(op: QueuedOp): Promise<SendOutcome> {
   const { url, method } = opEndpoint(op);
   try {
@@ -40,10 +42,13 @@ async function sendOp(op: QueuedOp): Promise<SendOutcome> {
         body: JSON.stringify({ installed: op.payload.installed }),
       });
     } else {
+      // Nhật ký: gửi TOÀN BỘ payload trừ `date` (đã nằm trên URL) — PUT full-replace.
+      const { date: _d, ...body } = op.payload;
+      void _d;
       res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workDone: op.payload.text }),
+        body: JSON.stringify(body),
       });
     }
     return { status: res.status };
@@ -211,20 +216,64 @@ class OfflineQueueManager {
     return { ok: true };
   }
 
-  // Xếp ghi chú nhật ký text (PR3 nối UI).
-  async enqueueDiaryNote(input: {
-    date: string;
-    text: string;
-  }): Promise<{ ok: true } | { ok: false; error: string }> {
+  // Xếp nhật ký ngày — full-replace, mỗi ngày chỉ giữ bản mới nhất (dedup theo date).
+  async enqueueDiaryNote(
+    input: DiaryNotePayload,
+  ): Promise<{ ok: true } | { ok: false; error: string }> {
+    const ops = await this.store.getAll();
+    for (const id of diaryDedupeIds(ops, input.date)) await this.store.remove(id);
     await this.store.add({
       kind: "diary_note",
-      payload: { date: input.date, text: input.text },
+      payload: input,
       queuedAt: Date.now(),
       tries: 0,
     });
     await this.refreshStats();
     this.afterEnqueue();
     return { ok: true };
+  }
+
+  // Ảnh đang chờ gửi của 1 task (PhotosModal hiện badge "Chờ gửi").
+  async getQueuedPhotos(
+    taskId: number,
+  ): Promise<{ id: number; caption: string; size: number; queuedAt: number; tries: number }[]> {
+    const ops = await this.store.getAll();
+    return ops
+      .filter((o) => o.kind === "photo" && o.payload.taskId === taskId)
+      .map((o) => {
+        const p = o as Extract<QueuedOp, { kind: "photo" }>;
+        return {
+          id: p.id,
+          caption: p.payload.caption,
+          size: p.payload.size,
+          queuedAt: p.queuedAt,
+          tries: p.tries,
+        };
+      });
+  }
+
+  // Blob ảnh đang chờ của 1 task (để preview trong PhotosModal).
+  async getQueuedPhotoBlob(id: number): Promise<Blob | undefined> {
+    const ops = await this.store.getAll();
+    const op = ops.find((o) => o.id === id && o.kind === "photo");
+    return op && op.kind === "photo" ? op.payload.blob : undefined;
+  }
+
+  // Bản nhật ký offline đang chờ của 1 ngày (nạp lại vào form khi mở modal).
+  async getQueuedDiaryNote(date: string): Promise<QueuedOp | undefined> {
+    const ops = await this.store.getAll();
+    return ops.find((o) => o.kind === "diary_note" && o.payload.date === date);
+  }
+
+  // Xoá mọi nháp nhật ký offline của 1 ngày khỏi hàng đợi. Gọi khi đã lưu THÀNH CÔNG
+  // trực tiếp qua PUT (có mạng) để nháp cũ không tự flush sau đó và đè (full-replace)
+  // lên bản vừa lưu — chống mất dữ liệu âm thầm. Vô hại nếu không có nháp nào.
+  async discardDiaryDraft(date: string): Promise<void> {
+    const ops = await this.store.getAll();
+    const ids = diaryDedupeIds(ops, date);
+    if (!ids.length) return;
+    for (const id of ids) await this.store.remove(id);
+    await this.refreshStats();
   }
 
   private afterEnqueue() {
@@ -251,8 +300,14 @@ export const offlineQueue = new OfflineQueueManager();
 export function enqueuePhoto(input: { taskId: number; blob: Blob; caption?: string }) {
   return offlineQueue.enqueuePhoto(input);
 }
-export function enqueueDiaryNote(input: { date: string; text: string }) {
+export function enqueueDiaryNote(input: DiaryNotePayload) {
   return offlineQueue.enqueueDiaryNote(input);
+}
+export function getQueuedDiaryNote(date: string) {
+  return offlineQueue.getQueuedDiaryNote(date);
+}
+export function discardDiaryDraft(date: string) {
+  return offlineQueue.discardDiaryDraft(date);
 }
 
 /** Xoá hàng đợi offline (IndexedDB + localStorage cũ) — gọi khi đăng xuất/hết phiên để
