@@ -176,6 +176,7 @@ body {
 .sheet-stable {
   color-scheme: light;
   --color-white: #ffffff;
+  --color-black: #000000;
   --color-zinc-50: #fafafa;
   --color-zinc-100: #f4f4f5;
   --color-zinc-200: #e4e4e7;
