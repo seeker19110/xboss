@@ -27,7 +27,7 @@ const TYPE_ORDER = ["feat", "fix", "docs", "refactor", "perf", "chore", "ci", "t
  * @returns {Array} Mảng commits {hash, type, subject, scope}
  */
 function getCommits() {
-  const gitLog = execSync("git log --all --reverse --pretty=format:%H%n%s", {
+  const gitLog = execSync("git log HEAD --reverse --pretty=format:%H%n%s", {
     encoding: "utf8",
   });
 
@@ -195,7 +195,7 @@ function main() {
     process.exit(1);
   }
 
-  const header = headerMatch[1];
+  const header = headerMatch[1].trimEnd();
   const newContent = `${header}\n\n## [Unreleased]\n\n### Added (Thêm)\n\n-\n\n### Changed (Đổi)\n\n-\n\n### Fixed (Sửa)\n\n-\n\n### Removed (Bỏ)\n\n-\n\n${newSections}`;
 
   // Ghi file
