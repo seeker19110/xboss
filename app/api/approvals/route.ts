@@ -8,6 +8,7 @@ import { requiredInspectionMissing } from "@/lib/qaqc";
 import { decideNext, getActiveFlow, openApproval, advanceApproval } from "@/lib/approvals";
 import { emitWebhook } from "@/lib/webhooks";
 import { log } from "@/lib/log";
+import { isSameOrigin } from "@/lib/csrf";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +77,8 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.approve(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM được duyệt nghiệm thu" }, { status: 403 });
+  if (!isSameOrigin(req))
+    return NextResponse.json({ error: "Yêu cầu không hợp lệ" }, { status: 403 });
 
   const body = await req.json().catch(() => null);
   const sheetTypeId = parseInt(String(body?.sheetTypeId ?? ""));
