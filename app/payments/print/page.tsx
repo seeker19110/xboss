@@ -183,7 +183,7 @@ export default function PrintPage() {
               // eslint-disable-next-line @next/next/no-img-element
               <img src={logo} alt="Logo nhà thầu" className="w-full h-full object-contain" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center border-2 border-zinc-300 rounded text-[10px] text-zinc-400 text-center leading-tight print:border-zinc-400">
+              <div className="w-full h-full flex items-center justify-center border-2 border-zinc-300 rounded text-[10px] text-zinc-600 text-center leading-tight print:border-zinc-400">
                 LOGO
                 <br />
                 M&amp;E
@@ -271,7 +271,7 @@ export default function PrintPage() {
             <SectionHeader label="A" title="CÔNG VIỆC HOÀN THÀNH" />
             {billRows.length === 0 && (
               <tr>
-                <td className="border border-black px-2 py-1.5 text-zinc-400 italic" colSpan={7}>
+                <td className="border border-black px-2 py-1.5 text-zinc-600 italic" colSpan={7}>
                   Chưa có khoản thanh toán
                 </td>
               </tr>
@@ -343,7 +343,7 @@ export default function PrintPage() {
 
             {/* ── Tạm ứng ── */}
             {advances.map((b, i) => (
-              <tr key={b.id} className="bg-[#fff2cc]">
+              <tr key={b.id} className="bg-[#fff2cc] text-black">
                 <td className="border border-black px-1 py-1.5 text-center font-bold text-[11px]">
                   {i === 0 ? "(TU)" : ""}
                 </td>
@@ -418,7 +418,7 @@ export default function PrintPage() {
 
 function SectionHeader({ label, title }: { label: string; title: string }) {
   return (
-    <tr className="bg-[#d9e1f2]">
+    <tr className="bg-[#d9e1f2] text-black">
       <td className="border border-black px-1 py-1.5 text-center font-bold">{label}</td>
       <td className="border border-black px-2 py-1.5 font-bold" colSpan={6}>
         {title}
@@ -443,7 +443,7 @@ function SummaryRow({
   highlight?: boolean;
 }) {
   return (
-    <tr className={highlight ? "bg-[#e2efda]" : "bg-[#fff2cc]"}>
+    <tr className={`${highlight ? "bg-[#e2efda]" : "bg-[#fff2cc]"} text-black`}>
       <td
         className={`border border-black px-1 py-1.5 text-center text-[11px] ${bold ? "font-bold" : ""}`}
       >

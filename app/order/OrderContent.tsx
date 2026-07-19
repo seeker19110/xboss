@@ -430,7 +430,7 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
           <EditModeToggle canEdit editMode={editMode} onToggle={() => setEditMode((v) => !v)} />
           <button
             onClick={() => window.print()}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg px-4 py-1.5 text-sm font-medium text-on-accent transition"
+            className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 rounded-lg px-4 py-1.5 text-sm font-medium text-on-accent transition"
           >
             <Printer className="w-4 h-4" /> In / Xuất PDF
           </button>
