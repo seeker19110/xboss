@@ -16,66 +16,84 @@ import { ROLES } from "@/lib/roles";
 // VAPID/Google) là TUỲ CHỌN — module liên quan tự no-op/throw on-demand khi thiếu.
 // XBOSS_SECRET để optional ở đây; quy tắc "bắt buộc trong production" do lib/auth giữ
 // (kèm fallback dev), không lặp lại để tránh hai nguồn sự thật.
-const serverSchema = z.object({
-  // Lõi
-  DATABASE_URL: z.string().min(1, "bắt buộc — chuỗi kết nối Postgres"),
-  XBOSS_SECRET: z.string().min(1).optional(),
-  XBOSS_ADMIN_PASSWORD: z.string().min(1).optional(),
-  CRON_SECRET: z.string().min(1).optional(),
-  APP_URL: z.string().min(1).optional(),
-  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+const serverSchema = z
+  .object({
+    // Lõi
+    DATABASE_URL: z.string().min(1, "bắt buộc — chuỗi kết nối Postgres"),
+    XBOSS_SECRET: z.string().min(1).optional(),
+    XBOSS_ADMIN_PASSWORD: z.string().min(1).optional(),
+    CRON_SECRET: z.string().min(1).optional(),
+    APP_URL: z.string().min(1).optional(),
+    NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 
-  // Email (SMTP) — báo cáo trễ hạn
-  SMTP_HOST: z.string().optional(),
-  SMTP_PORT: z.string().optional(),
-  SMTP_USER: z.string().optional(),
-  SMTP_PASS: z.string().optional(),
-  SMTP_FROM: z.string().optional(),
-  REPORT_EMAIL_TO: z.string().optional(),
+    // Email (SMTP) — báo cáo trễ hạn
+    SMTP_HOST: z.string().optional(),
+    SMTP_PORT: z.string().optional(),
+    SMTP_USER: z.string().optional(),
+    SMTP_PASS: z.string().optional(),
+    SMTP_FROM: z.string().optional(),
+    REPORT_EMAIL_TO: z.string().optional(),
 
-  // Telegram (báo cáo song song email)
-  TELEGRAM_BOT_TOKEN: z.string().optional(),
-  TELEGRAM_CHAT_ID: z.string().optional(),
+    // Telegram (báo cáo song song email)
+    TELEGRAM_BOT_TOKEN: z.string().optional(),
+    TELEGRAM_CHAT_ID: z.string().optional(),
 
-  // Web Push (VAPID) — thiếu thì nút bật push tự ẩn, lib/push là no-op
-  VAPID_PUBLIC_KEY: z.string().optional(),
-  VAPID_PRIVATE_KEY: z.string().optional(),
-  VAPID_SUBJECT: z.string().optional(),
+    // Web Push (VAPID) — thiếu thì nút bật push tự ẩn, lib/push là no-op
+    VAPID_PUBLIC_KEY: z.string().optional(),
+    VAPID_PRIVATE_KEY: z.string().optional(),
+    VAPID_SUBJECT: z.string().optional(),
 
-  // Đồng bộ Google Sheet
-  GOOGLE_SERVICE_ACCOUNT_JSON: z.string().optional(),
-  GOOGLE_SA_EMAIL: z.string().optional(),
-  GOOGLE_SA_PRIVATE_KEY: z.string().optional(),
-  GOOGLE_SHEET_ID: z.string().optional(),
-  GOOGLE_SHEET_TAB: z.string().optional(),
+    // Đồng bộ Google Sheet
+    GOOGLE_SERVICE_ACCOUNT_JSON: z.string().optional(),
+    GOOGLE_SA_EMAIL: z.string().optional(),
+    GOOGLE_SA_PRIVATE_KEY: z.string().optional(),
+    GOOGLE_SHEET_ID: z.string().optional(),
+    GOOGLE_SHEET_TAB: z.string().optional(),
 
-  // SSO OIDC (M49 PR3) — thiếu bất kỳ biến bắt buộc (OIDC_ISSUER/CLIENT_ID/CLIENT_SECRET +
-  // APP_URL) → nút SSO tự ẩn, đăng nhập mật khẩu như cũ. lib/oidc.ts đọc trực tiếp
-  // process.env (như VAPID/Google Sheets) để resolveSsoUser thuần, không phụ thuộc DATABASE_URL;
-  // khai báo ở đây để liệt kê đủ biến môi trường tuỳ chọn của dự án.
-  OIDC_ISSUER: z.string().optional(),
-  OIDC_CLIENT_ID: z.string().optional(),
-  OIDC_CLIENT_SECRET: z.string().optional(),
-  OIDC_ROLE_CLAIM: z.string().optional(), // tên claim chứa vai trò (tuỳ chọn)
-  OIDC_DEFAULT_ROLE: z.enum(ROLES as [string, ...string[]]).optional(), // mặc định 'viewer' trong lib/oidc.ts
+    // SSO OIDC (M49 PR3) — thiếu bất kỳ biến bắt buộc (OIDC_ISSUER/CLIENT_ID/CLIENT_SECRET +
+    // APP_URL) → nút SSO tự ẩn, đăng nhập mật khẩu như cũ. lib/oidc.ts đọc trực tiếp
+    // process.env (như VAPID/Google Sheets) để resolveSsoUser thuần, không phụ thuộc DATABASE_URL;
+    // khai báo ở đây để liệt kê đủ biến môi trường tuỳ chọn của dự án.
+    OIDC_ISSUER: z.string().optional(),
+    OIDC_CLIENT_ID: z.string().optional(),
+    OIDC_CLIENT_SECRET: z.string().optional(),
+    OIDC_ROLE_CLAIM: z.string().optional(), // tên claim chứa vai trò (tuỳ chọn)
+    OIDC_DEFAULT_ROLE: z.enum(ROLES as [string, ...string[]]).optional(), // mặc định 'viewer' trong lib/oidc.ts
 
-  // Seed dữ liệu (scripts/seed)
-  XLSX_FILE: z.string().optional(),
+    // Seed dữ liệu (scripts/seed)
+    XLSX_FILE: z.string().optional(),
 
-  // Pool Postgres & ngưỡng cảnh báo (M53 — Scale headroom). Đọc chuỗi rồi tự parse/clamp
-  // ngay tại nơi dùng (vd lib/db/index.ts) — không coerce ở schema để giữ nguyên pattern
-  // optional string sẵn có của file này.
-  XBOSS_PG_POOL_MAX: z.string().optional(),
-  XBOSS_PG_STMT_TIMEOUT_MS: z.string().optional(),
-  // Ngưỡng cảnh báo query chậm (ms) — mặc định 500, 0 = tắt hẳn (M53 PR1, lib/db/index.ts).
-  XBOSS_SLOW_QUERY_MS: z.string().optional(),
+    // Pool Postgres & ngưỡng cảnh báo (M53 — Scale headroom). Đọc chuỗi rồi tự parse/clamp
+    // ngay tại nơi dùng (vd lib/db/index.ts) — không coerce ở schema để giữ nguyên pattern
+    // optional string sẵn có của file này.
+    XBOSS_PG_POOL_MAX: z.string().optional(),
+    XBOSS_PG_STMT_TIMEOUT_MS: z.string().optional(),
+    // Ngưỡng cảnh báo query chậm (ms) — mặc định 500, 0 = tắt hẳn (M53 PR1, lib/db/index.ts).
+    XBOSS_SLOW_QUERY_MS: z.string().optional(),
 
-  // Theo dõi lỗi (Sentry) — thiếu thì sentry.server.config.ts/sentry.edge.config.ts tự
-  // enabled=false (đọc trực tiếp process.env.SENTRY_DSN, không qua getServerEnv(), vì
-  // instrumentation.ts chạy lúc server bootstrap, trước khi chắc chắn có DATABASE_URL để
-  // validate cả schema). Khai báo ở đây chỉ để liệt kê đủ biến môi trường tuỳ chọn của dự án.
-  SENTRY_DSN: z.string().optional(),
-});
+    // Theo dõi lỗi (Sentry) — thiếu thì sentry.server.config.ts/sentry.edge.config.ts tự
+    // enabled=false (đọc trực tiếp process.env.SENTRY_DSN, không qua getServerEnv(), vì
+    // instrumentation.ts chạy lúc server bootstrap, trước khi chắc chắn có DATABASE_URL để
+    // validate cả schema). Khai báo ở đây chỉ để liệt kê đủ biến môi trường tuỳ chọn của dự án.
+    SENTRY_DSN: z.string().optional(),
+  })
+  .refine(
+    (data) => {
+      // XBOSS_SECRET: production + có giá trị → độ dài ≥ 32 ký tự
+      if (data.NODE_ENV === "production" && data.XBOSS_SECRET && data.XBOSS_SECRET.length < 32) {
+        return false;
+      }
+      // CRON_SECRET: có giá trị → độ dài ≥ 16 ký tự
+      if (data.CRON_SECRET && data.CRON_SECRET.length < 16) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: "XBOSS_SECRET quá ngắn (production cần ≥32 ký tự), CRON_SECRET quá ngắn (≥16 ký tự)",
+      path: ["XBOSS_SECRET", "CRON_SECRET"],
+    },
+  );
 
 export type ServerEnv = z.infer<typeof serverSchema>;
 
