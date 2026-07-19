@@ -533,6 +533,16 @@ KẾT LUẬN: Cần xử lý — không có lỗ hổng bảo mật Cao/Trung b�
 - **CI/hạ tầng**: pin SHA, permissions, secret-scan, dependabot, husky/commitlint, deploy atomic swap, index bảng lớn đều đúng chuẩn. 3 điểm Trung bình: `deploy.yml` phụ thuộc branch protection ngoài repo (không tự-chứng-minh), nghi vấn hiệu năng `COALESCE` trong 2 route hot (dashboard/notifications, chưa có `EXPLAIN` thật để xác nhận), 5 trang thiếu spec axe/e2e.
 - **Tài liệu**: phát hiện + sửa 1 chỗ tài liệu lệch code (nợ `payments` project-scope đã đóng thật từ PR #263 nhưng còn sót trong "Nợ kỹ thuật") — đúng nguyên tắc §1 "đối chiếu, không tin trí nhớ".
 
+## Đối chiếu code ↔ tài liệu (2026-07-19, sau đợt V1-V9 + PR #294)
+
+Quét lại: `git fetch origin` xác nhận nhánh làm việc hiện tại **trùng khớp `origin/main`** (`59b20ea`, không có nhánh feature nào khác còn treo trên remote ngoài `main`) — không có PR/nhánh dở dang bị bỏ sót. Đối chiếu các claim gần nhất trong `PLAN.md`/`PROGRESS.md` với code thật:
+
+- **9 việc V1-V9 (`PLAN.md`)**: xác nhận cả 9 đã merge vào `main`, không còn việc nào dở dang (khớp mục tổng kết đã ghi ở trên).
+- **V7 (axe coverage 14 trang)**: xác nhận **đủ 14 file spec** tồn tại trong `e2e/authed/` (`account`, `password`, `order`, `reports`, `scurve`, `schedule-control`, `progress`, `hub`, `materials-order-form`, `materials-suppliers`, `payments-print`, cộng các trang đã có từ trước) — khớp đúng báo cáo.
+- **Nợ kỹ thuật còn treo, xác nhận vẫn đúng nguyên trạng (chưa ai âm thầm sửa)**: `vercel.json` vẫn chỉ khai 2/6 cron; `M59 PR2` (notification `resource_conflict`) — grep toàn repo không thấy code, xác nhận **chưa triển khai**; RLS "khoá cửa" (M62) vẫn đang chờ đổi role production.
+- **Doc drift đóng**: `CLAUDE.md:54` số file test cứng đã sửa (xem mục Nợ kỹ thuật).
+- Không chạy được `npm run lint`/`typecheck`/`build` trong phiên này (môi trường không có `node_modules` cài sẵn — không phải lỗi code, không kết luận gì từ đó).
+
 ## Đợt đánh giá chi tiết toàn dự án lần 8 (2026-07-19, sau audit lần 7, theo `docs/audit.md`)
 
 Đánh giá chi tiết theo yêu cầu người dùng ("tìm, liệt kê những điểm không hợp lý, không hợp chuẩn, cần cải tiến nâng cấp") — chạy tại commit `36d8036`, nhánh `claude/xboss-detailed-evaluation-bc56d0`. Cổng tự động: lint ✅ | typecheck ✅ | test ✅ (105/105 file, 0 fail) | build ✅ | `npm audit` 0 lỗ hổng. Không có lỗ hổng bảo mật Cao/Trung bình mới; các quy tắc lõi (335/335 route auth, force-dynamic 100%, workflows pin SHA, không hex/`dark:` sai chỗ trong component) xác nhận lại đều đúng.
@@ -1035,7 +1045,7 @@ Verify hạ tầng: Postgres 16 local (`pg_ctlcluster`, đã có sẵn trong má
 - **[Trung, đánh giá lần 8] Nghi vấn hiệu năng `COALESCE(t.end_date, wp.end_date)`** trong 2 route hot `/api/dashboard` và `/api/notifications` (chạy on-fetch mỗi lần mở app) — chưa có `EXPLAIN ANALYZE` thật xác nhận. `[AI]` chạy EXPLAIN trên DB có dữ liệu thật/giả lập đủ lớn trước khi quyết định index biểu thức hoặc denormalize `effective_end_date`; không tự sửa khi chưa có số đo.
 - **[Thấp, đánh giá lần 8] SSRF webhook qua DNS rebinding** — đã có `redirect: "manual"` giảm nhẹ nhưng chưa resolve DNS trước `fetch` (từ audit lần 7, chưa vá). **Đặc tả đã viết: `docs/nang-cap/M63-webhook-ssrf-dns-pinning.md`** (1 PR `route: spec`, pin IP qua undici `connect.lookup`, chờ triển khai).
 - **[Thấp, đánh giá lần 8] `requireApiKey` không rate-limit khi key sai** — không khai thác được dữ liệu, chỉ rủi ro DoS nhẹ (từ audit lần 7, chưa vá). `[AI]` tái dùng pattern `lib/ratelimit.ts` (upsert atomic Postgres) cho đường API key.
-- **[Thấp, đánh giá lần 8] Doc drift `CLAUDE.md:54`** — ghi "46 file trong tests/", thực tế 105 file. `[AI]` sửa hoặc bỏ con số cứng (con số tuyệt đối trong doc luôn lỗi thời).
+- ~~**[Thấp, đánh giá lần 8] Doc drift `CLAUDE.md:54`**~~ → **đã sửa (2026-07-19, đối chiếu code↔tài liệu toàn dự án)**: bỏ con số tuyệt đối (108 file hiện tại, sẽ lại lệch), đổi thành "hơn 100 file" để không tái phát doc drift.
 - **[Thấp, đánh giá lần 8] `vercel.json` chỉ khai 2/6 cron** (thiếu `sync-sheets`/`refresh-views`/`sync-integrations`/`weekly-report`) — chỉ ảnh hưởng deploy Cách C/Vercel, hạ tầng chính là VPS+crontab. `[AI]` hoặc bổ sung đủ 6 cron, hoặc xoá file + mục "Cách C" trong `DEPLOY.md` để khỏi gây hiểu nhầm.
 - **[Thấp, đánh giá lần 8] 5 trang chưa có spec axe/e2e**: `/account`, `/order`, `/reports`, `/schedule-control`, `/scurve` — trái quy tắc `docs/audit.md` §5 "spec axe là cổng merge cho trang mới". `[AI]` viết 5 spec theo khuôn `e2e/authed/*.spec.ts` (desktop + mobile, assert không vi phạm serious/critical).
 - **[Thấp, đánh giá lần 8] Coverage chưa từng đo** — cơ chế ratchet `docs/audit.md` §6 chưa khởi động. `[AI]` đo lần đầu bằng `node --experimental-test-coverage` (chỉ `lib/**` + `app/api/**`), ghi mốc stmts/branches/funcs/lines vào đây làm chuẩn "không tệ hơn".

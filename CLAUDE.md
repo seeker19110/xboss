@@ -51,7 +51,7 @@ npm run dev          # dev server (cần .env.local với DATABASE_URL)
 npm run build        # build production (không cần DB thật — pool kết nối lazy)
 npm run lint         # next lint (eslint.config.mjs — flat config, next/core-web-vitals)
 npm run typecheck    # tsc --noEmit
-npm test             # node:test qua tsx — 46 file trong tests/
+npm test             # node:test qua tsx — hơn 100 file trong tests/ (không hard-code số tuyệt đối, dễ lệch)
 npx tsx --test tests/status.test.ts   # chạy 1 file test
 npm run db:seed      # import Excel gốc trong attachments/ vào DB
 ```
