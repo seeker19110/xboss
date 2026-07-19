@@ -70,11 +70,15 @@ Script tự làm: `git fetch` + `reset --hard origin/main` (VPS luôn chạy nh�
 `main`) → `npm ci` → `npm run db:migrate` (áp migration DB còn thiếu, dừng
 deploy nếu lỗi) → build vào thư mục tạm `.next-build` (không đụng `.next`
 đang được app chạy thật đọc) → swap atomic `.next-build` vào `.next` → `pm2
-reload xboss --update-env`. Build vào thư mục tạm rồi swap thay vì ghi đè
+reload xboss --update-env` → **health-check** `GET /api/health` (retry tối đa
+5 lần, cách nhau 3 giây). Build vào thư mục tạm rồi swap thay vì ghi đè
 thẳng lên `.next` đang chạy giúp tránh 2 rủi ro: client đã tải HTML cũ xin lại
 chunk JS/CSS đúng lúc file đó vừa bị ghi đè giữa chừng (ChunkLoadError thoáng
 qua), và build lỗi giữa chừng làm `.next` bị bỏ dở không rollback được (giờ
-`.next` đang chạy chỉ bị thay khi build mới đã hoàn tất chắc chắn).
+`.next` đang chạy chỉ bị thay khi build mới đã hoàn tất chắc chắn). Nếu
+health-check vẫn thất bại sau 5 lần thử, script **tự rollback** về bản build
+trước (`.next-old`) và `pm2 reload` lại rồi thoát với mã lỗi — bản cũ đang
+chạy chỉ bị dọn (`rm -rf .next-old`) khi health-check pass.
 
 > ⚠️ `reset --hard` sẽ **xoá mọi sửa đổi cục bộ** trên VPS để khớp đúng
 > `origin/main` — đừng sửa file trực tiếp trên server, hãy đổi cấu hình qua
