@@ -21,6 +21,7 @@
     "db:seed": "tsx scripts/seed.ts",
     "db:seed:sample": "tsx scripts/seed-sample.ts",
     "audit:verify-chain": "tsx scripts/verify-audit-chain.ts",
+    "changelog": "node scripts/gen-changelog.mjs",
     "prepare": "husky || true"
   },
   "dependencies": {
