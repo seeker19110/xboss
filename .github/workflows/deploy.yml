@@ -32,7 +32,12 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          command_timeout: 25m
+          # 2026-07-19: build trên VPS đang chạy ~20-23 phút (nghi do đã bù OOM bằng swap
+          # đĩa thay vì RAM thật — chậm hơn nhiều so với trước) nên sát/vượt quá 25m cũ,
+          # cắt ngang đúng lúc build vừa xong, chưa kịp swap ".next"/pm2 reload. Nới lên
+          # 40m để có đệm — không giải quyết gốc rễ (RAM/swap VPS), chỉ tránh cắt ngang
+          # deploy đang chạy đúng.
+          command_timeout: 40m
           script: |
             set -e
             cd /var/www/xboss
