@@ -22,29 +22,46 @@ export function sign(payload: string): string {
   return createHmac("sha256", getSecret()).update(payload).digest("hex");
 }
 
-// Token phiên: `userId.exp.pwFrag.flag.HMAC(userId.exp.pwFrag.flag)`
+// Token phiên: `userId.exp.pwFrag.flag.sv.HMAC(userId.exp.pwFrag.flag.sv)`
 // - pwFrag = 12 ký tự đầu password_hash — đổi mật khẩu là token cũ tự hết hiệu lực.
 // - flag = "1" nếu tài khoản BẮT BUỘC bật 2FA nhưng CHƯA bật (mustSetup2fa), "0" nếu không.
 //   flag nằm TRONG phần được ký nên không thể giả mạo bằng cách sửa cookie tay (M56 PR2 —
 //   proxy.ts đọc flag để chặn mọi API ngoài /api/auth/* khi flag = "1", không cần chạm DB).
-export function makeToken(userId: number, passwordHash: string, mustSetup2fa: boolean): string {
+// - sv = session_version của user lúc phát token (V5 — thu hồi phiên chủ động). Admin tăng
+//   session_version trong DB → getCurrentUser thấy sv trong token < DB → coi phiên hết hiệu
+//   lực. sv nằm trong phần được ký nên không giả mạo được bằng sửa cookie tay.
+// Token 5 phần cũ (M56 PR2, chưa có sv) sẽ bị parseToken coi là KHÔNG hợp lệ (breaking có
+// chủ đích — mọi user bị đăng xuất 1 lần sau deploy, đúng tiền lệ M56 PR2).
+export function makeToken(
+  userId: number,
+  passwordHash: string,
+  mustSetup2fa: boolean,
+  sessionVersion: number,
+): string {
   const exp = Date.now() + SESSION_DAYS * 86400_000;
   const pwFrag = passwordHash.slice(0, 12);
   const flag = mustSetup2fa ? "1" : "0";
-  const payload = `${userId}.${exp}.${pwFrag}.${flag}`;
+  const payload = `${userId}.${exp}.${pwFrag}.${flag}.${sessionVersion}`;
   return `${payload}.${sign(payload)}`;
 }
 
-export type ParsedToken = { uid: number; pwFrag: string; mustSetup2fa: boolean };
+export type ParsedToken = {
+  uid: number;
+  pwFrag: string;
+  mustSetup2fa: boolean;
+  sessionVersion: number;
+};
 
 export function parseToken(token: string): ParsedToken | null {
   const parts = token.split(".");
-  if (parts.length !== 5) return null;
-  const [uid, exp, pwFrag, flag, mac] = parts;
-  // Chỉ chấp nhận flag "0"/"1" — chặn nhầm token tạm "chờ 2FA" (makeTotpPendingToken cũng
-  // 5 phần, phần thứ 4 = "2fa") bị dùng làm cookie phiên.
+  if (parts.length !== 6) return null;
+  const [uid, exp, pwFrag, flag, sv, mac] = parts;
+  // Chỉ chấp nhận flag "0"/"1" — chặn nhầm token tạm "chờ 2FA" (makeTotpPendingToken 5 phần,
+  // phần thứ 4 = "2fa") bị dùng làm cookie phiên.
   if (flag !== "0" && flag !== "1") return null;
-  const expected = Buffer.from(sign(`${uid}.${exp}.${pwFrag}.${flag}`), "hex");
+  // sv phải là số nguyên không âm hợp lệ.
+  if (!/^\d+$/.test(sv)) return null;
+  const expected = Buffer.from(sign(`${uid}.${exp}.${pwFrag}.${flag}.${sv}`), "hex");
   let given: Buffer;
   try {
     given = Buffer.from(mac, "hex");
@@ -53,5 +70,5 @@ export function parseToken(token: string): ParsedToken | null {
   }
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
   if (Number(exp) < Date.now()) return null;
-  return { uid: Number(uid), pwFrag, mustSetup2fa: flag === "1" };
+  return { uid: Number(uid), pwFrag, mustSetup2fa: flag === "1", sessionVersion: Number(sv) };
 }

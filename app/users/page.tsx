@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { UserPlus, Trash2, KeyRound, Users } from "lucide-react";
+import { UserPlus, Trash2, KeyRound, Users, LogOut } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { appConfirm, appPrompt } from "@/app/components/dialogs";
 import { fetchMe } from "@/app/lib/me";
@@ -90,6 +90,22 @@ export default function UsersPage() {
         body: JSON.stringify({ password: pw }),
       });
       await handle(res, `Đã đặt lại mật khẩu cho ${u.email}`);
+    } catch {
+      setError("Mất kết nối mạng — vui lòng thử lại");
+    }
+  }
+
+  async function revokeSessions(u: User) {
+    if (
+      !(await appConfirm(
+        `Thu hồi mọi phiên đăng nhập của ${u.email}? Người dùng sẽ bị đăng xuất trên mọi thiết bị và phải đăng nhập lại.`,
+        { danger: true, confirmLabel: "Thu hồi" },
+      ))
+    )
+      return;
+    try {
+      const res = await fetch(`/api/users/${u.id}/revoke-sessions`, { method: "POST" });
+      await handle(res, `Đã thu hồi phiên đăng nhập của ${u.email}`);
     } catch {
       setError("Mất kết nối mạng — vui lòng thử lại");
     }
@@ -235,6 +251,13 @@ export default function UsersPage() {
                       className="text-zinc-400 hover:text-amber-400 p-1.5"
                     >
                       <KeyRound className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => revokeSessions(u)}
+                      title="Thu hồi phiên đăng nhập"
+                      className="text-zinc-400 hover:text-sky-400 p-1.5"
+                    >
+                      <LogOut className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => removeUser(u)}

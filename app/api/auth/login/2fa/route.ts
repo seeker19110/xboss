@@ -47,8 +47,9 @@ export async function POST(req: NextRequest) {
     password_hash: string;
     totp_secret: string | null;
     totp_last_step: number | null;
+    session_version: number;
   }>(
-    `SELECT id, name, email, role, password_hash, totp_secret, totp_last_step FROM users WHERE id = ?`,
+    `SELECT id, name, email, role, password_hash, totp_secret, totp_last_step, session_version FROM users WHERE id = ?`,
     parsed.uid,
   );
   // pwFrag không khớp → mật khẩu đã đổi từ lúc phát pending token, token cũ không còn hợp lệ.
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
   // M56 PR2: đã verify TOTP/recovery xong nghĩa là user CHẮC CHẮN đã bật 2FA (totp_secret
   // + totp_enabled_at có giá trị) → không bao giờ còn phải "setup" nữa → mustSetup2fa=false.
   const res = NextResponse.json({ user: { id: u.id, name: u.name, email: u.email, role: u.role } });
-  res.cookies.set(COOKIE, makeToken(u.id, u.password_hash, false), {
+  res.cookies.set(COOKIE, makeToken(u.id, u.password_hash, false, u.session_version), {
     httpOnly: true,
     path: "/",
     maxAge: COOKIE_MAX_AGE,
