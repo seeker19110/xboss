@@ -116,6 +116,10 @@ if [ "$HEALTHY" = true ]; then
   echo "==> Xong! Deploy hoàn tất ($([ "$STAGING" = true ] && echo staging || echo production))."
 else
   echo "==> Health-check thất bại sau 5 lần thử ($HEALTH_URL) — rollback về bản build trước"
+  # ".next" đang là bản build MỚI (vừa mv vào ở bước 6/7, chưa bị xoá) — phải rm -rf trước
+  # thì "mv OLD_DIR .next" mới THAY THẾ đúng chỗ, không thì mv sẽ đẩy OLD_DIR vào TRONG
+  # ".next" (thành ".next/.next-old") vì đích đã tồn tại là thư mục.
+  rm -rf .next
   mv "$OLD_DIR" .next
   pm2 reload "$PM2_NAME" --update-env
   echo "==> Health-check thất bại — đã rollback về bản trước"
