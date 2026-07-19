@@ -16,6 +16,7 @@ import AppHeader from "@/app/components/AppHeader";
 import EditableText from "@/app/components/EditableText";
 import { Modal, appConfirm } from "@/app/components/dialogs";
 import { PageSkeleton } from "@/app/components/Skeleton";
+import { ErrorState } from "@/app/components/ErrorState";
 import { toSlug } from "@/lib/sheets";
 import { useEditMode } from "@/app/components/useEditMode";
 import EditModeToggle from "@/app/components/EditModeToggle";
@@ -46,6 +47,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
   const {
     data,
     loading,
+    loadError,
     load,
     refreshKey,
     syncToast,
@@ -256,6 +258,8 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
   }
 
   if (loading) return <PageSkeleton />;
+  if (loadError && !data)
+    return <ErrorState message="Không tải được dữ liệu — kiểm tra kết nối mạng" onRetry={load} />;
 
   const floors = [
     ...new Set((data?.packages ?? []).map((p) => p.floorLabel).filter((f): f is string => !!f)),

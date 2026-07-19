@@ -9,6 +9,7 @@ const SYNC_POLL_MS = 10_000;
 export function useTrackingData(sheet: string) {
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [syncToast, setSyncToast] = useState(false);
   const versionRef = useRef<string | null>(null);
@@ -25,9 +26,12 @@ export function useTrackingData(sheet: string) {
       .then((d: Data) => {
         setData(d);
         if (d?.version) versionRef.current = d.version;
+        setLoadError(false);
       })
       .catch(() => {
-        /* mất mạng — giữ dữ liệu đang hiển thị */
+        // mất mạng — giữ dữ liệu đang hiển thị nếu đã có (chỉ chặn màn hình khi
+        // đây là lần tải đầu, chưa có gì để hiển thị)
+        setLoadError(true);
       })
       .finally(() => setLoading(false));
   }, [sheet]);
@@ -130,6 +134,7 @@ export function useTrackingData(sheet: string) {
   return {
     data,
     loading,
+    loadError,
     load,
     refreshKey,
     syncToast,

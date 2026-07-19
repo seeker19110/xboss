@@ -379,6 +379,7 @@
 | created_at | timestamptz | ✓ | `now()` |
 | ncr_id | integer | ✓ |  |
 | album_id | integer | ✓ |  |
+| sha256 | text | ✓ |  |
 
 **Khóa ngoại:**
 - `album_id` → `progress_albums(id)`
@@ -389,6 +390,7 @@
 **Index:**
 - `idx_photos_album`: INDEX idx_photos_album ON public.task_photos USING btree (album_id)
 - `idx_photos_task`: INDEX idx_photos_task ON public.task_photos USING btree (task_id)
+- `idx_task_photos_task_hash`: INDEX idx_task_photos_task_hash ON public.task_photos USING btree (task_id, sha256) WHERE (sha256 IS NOT NULL)
 - `task_photos_pkey`: UNIQUE INDEX task_photos_pkey ON public.task_photos USING btree (id)
 
 ### task_comments
