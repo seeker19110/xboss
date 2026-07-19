@@ -7,6 +7,7 @@ import { query, queryOne } from "@/lib/db";
 import { listContracts } from "@/lib/contracts";
 import { attendanceSummary } from "@/lib/hr";
 import { daysFromTodayISO } from "@/lib/date";
+import { parseMoney, addMoney, moneyToNumber } from "@/lib/money";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const PERIOD_RE = /^\d{4}-\d{2}$/;
@@ -42,7 +43,9 @@ export async function cashflowActual(projectId: number, months = 12): Promise<Ca
 // Tái dùng listContracts (lib/contracts.ts) đã tổng hợp addendaTotal/paid theo HĐ.
 export async function receivables(projectId: number): Promise<number> {
   const contracts = await listContracts("nhan_thau", projectId);
-  return contracts.reduce((sum, c) => sum + c.value + c.addendaTotal - c.paid, 0);
+  return moneyToNumber(
+    addMoney(...contracts.map((c) => parseMoney(c.value + c.addendaTotal - c.paid))),
+  );
 }
 
 // Phải trả NCC/NTP = Σ (giá trị gốc + phụ lục − đã thanh toán) của các HĐ giao
@@ -50,10 +53,10 @@ export async function receivables(projectId: number): Promise<number> {
 // nợ phải trả) — không tính PO đã huỷ.
 export async function payables(projectId: number): Promise<number> {
   const contracts = await listContracts(undefined, projectId);
-  let total = 0;
-  for (const c of contracts) {
-    if (c.kind === "giao_thau" || c.kind === "ncc") total += c.value + c.addendaTotal - c.paid;
-  }
+  const contractLines = contracts
+    .filter((c) => c.kind === "giao_thau" || c.kind === "ncc")
+    .map((c) => parseMoney(c.value + c.addendaTotal - c.paid));
+  let total = moneyToNumber(addMoney(...contractLines));
   const poRow = await queryOne<{ total: number }>(
     `SELECT COALESCE(SUM(poi.qty_ordered * COALESCE(poi.unit_price, 0)), 0) AS total
        FROM purchase_orders po

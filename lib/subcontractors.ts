@@ -6,6 +6,7 @@
 // Xem docs/nang-cap/M33-nha-thau-phu.md.
 import { query, queryOne, run } from "@/lib/db";
 import { listContracts } from "@/lib/contracts";
+import { parseMoney, addMoney, moneyToNumber } from "@/lib/money";
 
 const PERIOD_RE = /^\d{4}-(Q[1-4]|\d{2})$/;
 
@@ -210,8 +211,10 @@ export type SubcontractorDebt = {
 export async function subcontractorDebt(supplierId: number): Promise<SubcontractorDebt> {
   const all = await listContracts();
   const mine = all.filter((c) => c.partySupplierId === supplierId);
-  const contractValue = mine.reduce((s, c) => s + Number(c.value) + Number(c.addendaTotal), 0);
-  const paid = mine.reduce((s, c) => s + Number(c.paid), 0);
+  const contractValue = moneyToNumber(
+    addMoney(...mine.map((c) => parseMoney(Number(c.value) + Number(c.addendaTotal)))),
+  );
+  const paid = moneyToNumber(addMoney(...mine.map((c) => parseMoney(Number(c.paid)))));
   return {
     contractValue,
     paid,
