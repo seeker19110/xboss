@@ -449,6 +449,7 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
               <input
                 value={docTitle}
                 onChange={(e) => setDocTitle(e.target.value)}
+                aria-label="Tiêu đề chứng từ"
                 className="no-print text-[15px] font-bold text-teal-700 outline-none bg-transparent flex-1 hover:bg-teal-50/50 focus:bg-teal-50/50 rounded px-1 -mx-1"
               />
               <p className="print-only text-[15px] font-bold text-teal-700 flex-1">{docTitle}</p>
@@ -808,7 +809,7 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
                     className="no-print font-bold text-teal-800 text-[10px] text-center outline-none bg-transparent border-b border-transparent hover:border-gray-300 focus:border-teal-400 w-full"
                   />
                   <p className="print-only font-bold text-teal-800">{s.role}</p>
-                  <p className="text-gray-400 text-[9px]">(Ký, ghi rõ họ tên)</p>
+                  <p className="text-gray-600 text-[9px]">(Ký, ghi rõ họ tên)</p>
                   <div className="mt-20" />
                   <input
                     value={s.name}
