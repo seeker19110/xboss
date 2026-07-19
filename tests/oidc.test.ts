@@ -144,8 +144,10 @@ test(
       assert.equal(u1.role, "viewer"); // default khi không có claim + không đặt OIDC_DEFAULT_ROLE
       assert.ok(u1.password_hash && u1.password_hash.length > 0); // NOT NULL thoả
       // Token phiên nhúng pwFrag từ hash — chứng minh makeToken hoạt động với hash ngẫu nhiên.
-      // M56 PR2: token có 5 phần (thêm cờ mustSetup2fa); SSO luôn false (MFA ở IdP).
-      assert.ok(makeToken(u1.id, u1.password_hash, false).split(".").length === 5);
+      // V5: token có 6 phần (thêm session_version); SSO luôn mustSetup2fa=false (MFA ở IdP).
+      assert.ok(
+        makeToken(u1.id, u1.password_hash, false, u1.session_version).split(".").length === 6,
+      );
 
       // Gọi lần 2 cùng email → cùng id, không tạo trùng.
       const u2 = await upsertSsoUser({ email, name: "SSO Mới", roleFromClaim: null });

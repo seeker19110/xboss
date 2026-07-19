@@ -16,10 +16,11 @@ export async function POST(req: NextRequest) {
   if (typeof code !== "string" || !code)
     return NextResponse.json({ error: "Thiếu mã xác nhận" }, { status: 400 });
 
-  const row = await queryOne<{ totp_secret: string | null; password_hash: string }>(
-    `SELECT totp_secret, password_hash FROM users WHERE id = ?`,
-    user.id,
-  );
+  const row = await queryOne<{
+    totp_secret: string | null;
+    password_hash: string;
+    session_version: number;
+  }>(`SELECT totp_secret, password_hash, session_version FROM users WHERE id = ?`, user.id);
   if (!row?.totp_secret)
     return NextResponse.json(
       { error: "Chưa gọi /setup — chưa có secret chờ xác nhận" },
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
   // M56 PR2: vừa bật 2FA thành công → phát lại cookie phiên với mustSetup2fa=false để mở
   // khoá NGAY (proxy hết chặn), user không phải đăng xuất/đăng nhập lại. Giữ nguyên body.
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(COOKIE, makeToken(user.id, row.password_hash, false), {
+  res.cookies.set(COOKIE, makeToken(user.id, row.password_hash, false, row.session_version), {
     httpOnly: true,
     path: "/",
     maxAge: COOKIE_MAX_AGE,

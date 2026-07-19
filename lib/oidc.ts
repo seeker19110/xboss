@@ -83,8 +83,7 @@ export function resolveSsoUser(claims: SsoClaims): ResolvedSsoUser | { error: st
   // không gửi) → coi như verified, không chặn nhầm.
   if (claims.email_verified === false) return { error: "IdP chưa xác minh email này" };
   const email = rawEmail.toLowerCase();
-  const name =
-    (typeof claims.name === "string" && claims.name.trim()) || email.split("@")[0];
+  const name = (typeof claims.name === "string" && claims.name.trim()) || email.split("@")[0];
   return { email, name, roleFromClaim: roleFromClaims(claims) };
 }
 
@@ -95,11 +94,12 @@ export type SsoUser = {
   email: string;
   role: Role;
   password_hash: string;
+  session_version: number;
 };
 
 export async function upsertSsoUser(resolved: ResolvedSsoUser): Promise<SsoUser> {
   const existing = await queryOne<SsoUser>(
-    `SELECT id, name, email, role, password_hash FROM users WHERE email = ?`,
+    `SELECT id, name, email, role, password_hash, session_version FROM users WHERE email = ?`,
     resolved.email,
   );
 
@@ -134,7 +134,7 @@ export async function upsertSsoUser(resolved: ResolvedSsoUser): Promise<SsoUser>
   const created = await queryOne<SsoUser>(
     `INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)
      ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
-     RETURNING id, name, email, role, password_hash`,
+     RETURNING id, name, email, role, password_hash, session_version`,
     resolved.name,
     resolved.email,
     passwordHash,

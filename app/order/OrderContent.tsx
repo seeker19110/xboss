@@ -430,7 +430,7 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
           <EditModeToggle canEdit editMode={editMode} onToggle={() => setEditMode((v) => !v)} />
           <button
             onClick={() => window.print()}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg px-4 py-1.5 text-sm font-medium text-on-accent transition"
+            className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 rounded-lg px-4 py-1.5 text-sm font-medium text-on-accent transition"
           >
             <Printer className="w-4 h-4" /> In / Xuất PDF
           </button>
@@ -449,6 +449,7 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
               <input
                 value={docTitle}
                 onChange={(e) => setDocTitle(e.target.value)}
+                aria-label="Tiêu đề chứng từ"
                 className="no-print text-[15px] font-bold text-teal-700 outline-none bg-transparent flex-1 hover:bg-teal-50/50 focus:bg-teal-50/50 rounded px-1 -mx-1"
               />
               <p className="print-only text-[15px] font-bold text-teal-700 flex-1">{docTitle}</p>
@@ -482,6 +483,7 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
                       e.preventDefault();
                       saveLogo(null);
                     }}
+                    aria-label="Xoá logo"
                     className="absolute top-0.5 right-0.5 bg-white/80 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition text-gray-500 hover:text-red-500"
                   >
                     <X className="w-3 h-3" />
@@ -502,6 +504,7 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
               <input
                 value={orderDate}
                 onChange={(e) => setOrderDate(e.target.value)}
+                aria-label="Ngày khởi tạo đơn hàng"
                 className="no-print outline-none bg-transparent border-b border-teal-300 italic text-[10px] text-teal-700 w-24 focus:border-teal-500"
               />
               <span className="print-only">{orderDate}</span>
@@ -734,6 +737,7 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
                 <input
                   value={delivery.time}
                   onChange={(e) => setDelivery((d) => ({ ...d, time: e.target.value }))}
+                  aria-label="Thời gian giao hàng"
                   className="no-print flex-1 outline-none border-b border-gray-300 bg-transparent py-[1px] focus:border-teal-400"
                 />
                 <span className="print-only flex-1 border-b border-gray-200 min-h-[14px]">
@@ -746,6 +750,7 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
                   <input
                     value={delivery.contact}
                     onChange={(e) => setDelivery((d) => ({ ...d, contact: e.target.value }))}
+                    aria-label="Người liên hệ khi giao hàng"
                     className="no-print flex-1 min-w-0 outline-none border-b border-gray-300 bg-transparent py-[1px] focus:border-teal-400"
                   />
                   <span className="print-only flex-1 border-b border-gray-200 min-h-[14px]">
@@ -757,6 +762,7 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
                   <input
                     value={delivery.phone}
                     onChange={(e) => setDelivery((d) => ({ ...d, phone: e.target.value }))}
+                    aria-label="Số điện thoại liên hệ giao hàng"
                     className="no-print w-32 outline-none border-b border-gray-300 bg-transparent py-[1px] focus:border-teal-400"
                   />
                   <span className="print-only border-b border-gray-200 min-h-[14px] min-w-[8rem]">
@@ -769,6 +775,7 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
                 <input
                   value={delivery.note}
                   onChange={(e) => setDelivery((d) => ({ ...d, note: e.target.value }))}
+                  aria-label="Ghi chú khác"
                   className="no-print flex-1 outline-none border-b border-gray-300 bg-transparent py-[1px] focus:border-teal-400"
                 />
                 <span className="print-only flex-1 border-b border-gray-200 min-h-[14px]">
@@ -804,10 +811,11 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
                         prev.map((x, j) => (j === i ? { ...x, role: e.target.value } : x)),
                       )
                     }
+                    aria-label={`Chức danh người ký ${i + 1}`}
                     className="no-print font-bold text-teal-800 text-[10px] text-center outline-none bg-transparent border-b border-transparent hover:border-gray-300 focus:border-teal-400 w-full"
                   />
                   <p className="print-only font-bold text-teal-800">{s.role}</p>
-                  <p className="text-gray-400 text-[9px]">(Ký, ghi rõ họ tên)</p>
+                  <p className="text-gray-600 text-[9px]">(Ký, ghi rõ họ tên)</p>
                   <div className="mt-20" />
                   <input
                     value={s.name}
@@ -816,6 +824,7 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
                         prev.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)),
                       )
                     }
+                    aria-label={`Họ tên người ký ${i + 1}`}
                     className="no-print mt-1 font-bold text-teal-800 text-[10px] text-center outline-none bg-transparent border-b border-transparent hover:border-gray-300 focus:border-teal-400 w-full"
                   />
                   <p className="print-only mt-1 font-bold text-teal-800">{s.name}</p>

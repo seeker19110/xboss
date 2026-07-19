@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
+import { hitRateLimit } from "@/lib/ratelimit";
+import { isSameOrigin } from "@/lib/csrf";
 import {
   getCurrentUser,
   hashPassword,
@@ -17,6 +19,8 @@ export const dynamic = "force-dynamic";
 export async function PATCH(req: NextRequest) {
   const me = await getCurrentUser();
   if (!me) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (!isSameOrigin(req))
+    return NextResponse.json({ error: "Yêu cầu không hợp lệ" }, { status: 403 });
 
   const body = await req.json().catch(() => ({}));
   const oldPassword = String(body.oldPassword ?? "");
@@ -25,10 +29,16 @@ export async function PATCH(req: NextRequest) {
   if (newPassword.length < 6)
     return NextResponse.json({ error: "Mật khẩu mới tối thiểu 6 ký tự" }, { status: 400 });
 
-  const u = await queryOne<{ password_hash: string; totp_enabled_at: string | null }>(
-    `SELECT password_hash, totp_enabled_at FROM users WHERE id = ?`,
-    me.id,
-  );
+  // Rate-limit đổi mật khẩu: 5 lần sai / 15 phút / user
+  if (await hitRateLimit(`password:${me.id}`, 5, 15)) {
+    return NextResponse.json({ error: "Thử lại sau ít phút" }, { status: 429 });
+  }
+
+  const u = await queryOne<{
+    password_hash: string;
+    totp_enabled_at: string | null;
+    session_version: number;
+  }>(`SELECT password_hash, totp_enabled_at, session_version FROM users WHERE id = ?`, me.id);
   if (!u || !verifyPassword(oldPassword, u.password_hash))
     return NextResponse.json({ error: "Mật khẩu hiện tại không đúng" }, { status: 401 });
 
@@ -42,7 +52,7 @@ export async function PATCH(req: NextRequest) {
   const required = await requiredRoles();
   const mustSetup2fa = computeMustSetup2fa(me.role, u.totp_enabled_at, required);
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(COOKIE, makeToken(me.id, newHash, mustSetup2fa), {
+  res.cookies.set(COOKIE, makeToken(me.id, newHash, mustSetup2fa, u.session_version), {
     httpOnly: true,
     path: "/",
     maxAge: COOKIE_MAX_AGE,
