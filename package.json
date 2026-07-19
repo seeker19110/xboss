@@ -8,6 +8,7 @@
     "start": "next start -H 0.0.0.0",
     "lint": "eslint .",
     "test": "node scripts/run-tests.mjs",
+    "test:coverage": "node --experimental-test-coverage scripts/run-tests.mjs",
     "test:single": "tsx --test",
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
