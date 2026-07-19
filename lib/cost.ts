@@ -2,6 +2,7 @@
 // (payment_bills) theo hệ hoặc theo tầng. Logic tách khỏi route để test tích hợp trực
 // tiếp qua DB (cùng pattern lib/report.ts, lib/systems.ts). Xem docs/nang-cap/M02-chi-phi.md.
 import { query, queryOne, run } from "@/lib/db";
+import { parseMoney, moneyToNumber } from "@/lib/money";
 
 export type CostRow = {
   key: string;
@@ -178,14 +179,22 @@ export async function costTotals(
   projectId?: number,
 ): Promise<{ budget: number; committed: number; actual: number }> {
   const rows = await costSummary("system", includeVo, projectId);
-  return rows.reduce(
+  // Mỗi r.budget/committed/actual đã là tổng SQL theo hệ (costSummary) — cộng dồn
+  // NHIỀU hệ ở đây làm trên bigint đơn vị nhỏ (lib/money.ts) thay vì float JS, đúng
+  // quy ước tiền tệ CLAUDE.md.
+  const totals = rows.reduce(
     (acc, r) => ({
-      budget: acc.budget + r.budget,
-      committed: acc.committed + r.committed,
-      actual: acc.actual + r.actual,
+      budget: acc.budget + parseMoney(r.budget),
+      committed: acc.committed + parseMoney(r.committed),
+      actual: acc.actual + parseMoney(r.actual),
     }),
-    { budget: 0, committed: 0, actual: 0 },
+    { budget: 0n, committed: 0n, actual: 0n },
   );
+  return {
+    budget: moneyToNumber(totals.budget),
+    committed: moneyToNumber(totals.committed),
+    actual: moneyToNumber(totals.actual),
+  };
 }
 
 // Ngân sách của 1 hệ (dùng cho khối `budget` trong getSystemSummary — lib/systems.ts).

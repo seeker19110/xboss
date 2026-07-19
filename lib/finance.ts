@@ -7,6 +7,7 @@ import { query, queryOne } from "@/lib/db";
 import { listContracts } from "@/lib/contracts";
 import { attendanceSummary } from "@/lib/hr";
 import { daysFromTodayISO } from "@/lib/date";
+import { parseMoney, moneyToNumber } from "@/lib/money";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const PERIOD_RE = /^\d{4}-\d{2}$/;
@@ -42,7 +43,14 @@ export async function cashflowActual(projectId: number, months = 12): Promise<Ca
 // Tái dùng listContracts (lib/contracts.ts) đã tổng hợp addendaTotal/paid theo HĐ.
 export async function receivables(projectId: number): Promise<number> {
   const contracts = await listContracts("nhan_thau", projectId);
-  return contracts.reduce((sum, c) => sum + c.value + c.addendaTotal - c.paid, 0);
+  // Mỗi c.value/addendaTotal/paid đã là tổng SQL (per-contract) từ listContracts —
+  // cộng dồn NHIỀU hợp đồng ở đây làm trên bigint đơn vị nhỏ (lib/money.ts) thay vì
+  // float JS, đúng quy ước tiền tệ CLAUDE.md (cấm cộng/nhân tiền trên float JS).
+  const total = contracts.reduce(
+    (sum, c) => sum + parseMoney(c.value) + parseMoney(c.addendaTotal) - parseMoney(c.paid),
+    0n,
+  );
+  return moneyToNumber(total);
 }
 
 // Phải trả NCC/NTP = Σ (giá trị gốc + phụ lục − đã thanh toán) của các HĐ giao
@@ -50,9 +58,10 @@ export async function receivables(projectId: number): Promise<number> {
 // nợ phải trả) — không tính PO đã huỷ.
 export async function payables(projectId: number): Promise<number> {
   const contracts = await listContracts(undefined, projectId);
-  let total = 0;
+  let total = 0n;
   for (const c of contracts) {
-    if (c.kind === "giao_thau" || c.kind === "ncc") total += c.value + c.addendaTotal - c.paid;
+    if (c.kind === "giao_thau" || c.kind === "ncc")
+      total += parseMoney(c.value) + parseMoney(c.addendaTotal) - parseMoney(c.paid);
   }
   const poRow = await queryOne<{ total: number }>(
     `SELECT COALESCE(SUM(poi.qty_ordered * COALESCE(poi.unit_price, 0)), 0) AS total
@@ -61,8 +70,8 @@ export async function payables(projectId: number): Promise<number> {
       WHERE po.project_id = ? AND po.contract_id IS NULL AND po.status <> 'cancelled'`,
     projectId,
   );
-  total += Number(poRow?.total ?? 0);
-  return total;
+  total += parseMoney(poRow?.total ?? 0);
+  return moneyToNumber(total);
 }
 
 // --- Tạm ứng & hoàn ứng -------------------------------------------------------------

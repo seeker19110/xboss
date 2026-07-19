@@ -103,7 +103,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { costSummary } = await import("@/lib/cost");
+    const { costSummary, costTotals } = await import("@/lib/cost");
 
     const dien = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'dien'`);
     assert.ok(dien);
@@ -210,6 +210,19 @@ test(
     assert.equal(rowB!.budget, 200_000); // 200 x 1000, không lẫn BOQ A
     assert.equal(rowB!.committed, 7_000 + 30_000); // PO B + giao thầu B
     assert.equal(rowB!.actual, 4_000); // bill B
+
+    // costTotals cộng dồn NHIỀU hệ (lib/money.ts, không phải float JS — đợt audit
+    // 2026-07-19) — dự án A/B chỉ có dữ liệu ở hệ "dien" nên tổng phải khớp đúng
+    // rowA/rowB (các hệ khác toàn 0, không lệch do cộng dồn).
+    const totalsA = await costTotals(true, projA);
+    assert.equal(totalsA.budget, rowA!.budget);
+    assert.equal(totalsA.committed, rowA!.committed);
+    assert.equal(totalsA.actual, rowA!.actual);
+
+    const totalsB = await costTotals(true, projB);
+    assert.equal(totalsB.budget, rowB!.budget);
+    assert.equal(totalsB.committed, rowB!.committed);
+    assert.equal(totalsB.actual, rowB!.actual);
 
     // Dọn dữ liệu test.
     await run(`DELETE FROM payment_bills WHERE sheet_type_id IN (?, ?)`, stA, stB);
