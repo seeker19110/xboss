@@ -10,6 +10,26 @@
 
 ## Việc tạm hoãn — chờ bên ngoài (không phải "tiếp theo", đừng tự nhặt lại)
 
+**🔴 Ghi nhận 2026-07-19 — Auto-deploy production kẹt từ 2026-07-18 ~10:50 (commit `cefda6a4`,
+20 lần deploy liên tiếp thất bại tính tới `dcd99f3`), cần DBA chạy 1 câu SQL trên VPS mới hết
+kẹt:** migration `0068_fts.sql` (M57 PR1, `unaccent`) lỗi `permission denied to create
+extension "unaccent"` — role migration (`MIGRATE_DATABASE_URL`) thiếu quyền CREATE **cấp
+DATABASE** (khác quyền cấp schema/bảng đã có sẵn, xem `docs/adr/0005-rls.md` mục "Cạm bẫy
+#2" để hiểu vì sao). App đang chạy (bản deploy thành công gần nhất, commit `8671a41b`) vẫn
+phục vụ bình thường — **không sập, chỉ đứng yên không nhận code mới** (migration chặn tuần
+tự, mọi migration sau 0068 — bao gồm RLS 0069-0073 — cũng chưa lên được production). Cần
+người có quyền superuser Postgres trên VPS chạy 1 lần (không lặp lại):
+
+```sql
+CREATE EXTENSION IF NOT EXISTS unaccent;
+```
+
+rồi để auto-deploy (`.github/workflows/deploy.yml`, chạy khi push `main`) tự chạy lại bình
+thường ở lần push kế tiếp, hoặc re-run job "Deploy to VPS" thất bản gần nhất trong GitHub
+Actions ngay khi đã chạy xong câu SQL trên. Cải tiến đã thêm kèm sự cố này (xem mục "Đã
+xong" bên dưới): `lib/db/migrate.ts` giờ tự đính kèm gợi ý fix ngay trong thông báo lỗi khi
+gặp lại lớp lỗi `42501` (thiếu quyền) tương tự.
+
 Ghi nhận 2026-07-18: **M49 PR3 — SSO OIDC** (PR #218, `docs/nang-cap/M49-api-mo-sso.md`) — merge code vào `main` ở trạng thái **feature-flag tắt mặc định** (quyết định người dùng 2026-07-18: "merge trước, xác minh sau"). PR đã rebase lên `main` mới nhất (sau M50/M52/M56 PR1), lint/typecheck/build/test xanh (92 file). **KHÔNG set biến môi trường production** (`OIDC_ISSUER`/`OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET`/`APP_URL`) cho đến khi có người xác minh tay end-to-end với 1 IdP thật (Google Workspace/Microsoft Entra) — thiếu biến bắt buộc thì `ssoEnabled()=false`, nút SSO tự ẩn, route `/api/auth/oidc/*` trả 404, không ảnh hưởng đăng nhập mật khẩu hiện có nên an toàn để merge/deploy ở trạng thái tắt. Việc còn treo trước khi BẬT thật: chạy tay đủ luồng SSO (đăng nhập → callback → nhận cookie phiên; cả nhánh lỗi state/cookie hết hạn), ghi kết quả vào `DEPLOY.md`/mục này trước khi set biến env trên VPS.
 
 Các mục dưới đây đã có kết luận rõ, **không cần AI chủ động làm** cho tới khi có tín hiệu bên ngoài nêu rõ — không phải việc "quên làm":
@@ -20,6 +40,15 @@ Các mục dưới đây đã có kết luận rõ, **không cần AI chủ đ�
 
 ## Đã xong
 
+- **Chẩn đoán + hàng rào cho sự cố auto-deploy kẹt (2026-07-19)** — xem chi tiết sự cố ở mục
+  "Việc tạm hoãn — chờ bên ngoài" phía trên (root cause + fix SQL cần DBA chạy tay, ngoài
+  phạm vi sửa bằng code). Phần đã sửa trong code: `lib/db/migrate.ts` — bắt lỗi Postgres
+  `42501` (insufficient_privilege) trong `runMigrations`, đính kèm gợi ý fix ngay trong
+  message lỗi (trỏ `docs/adr/0005-rls.md` mục "Cạm bẫy #2") thay vì chỉ ném lại stack trace
+  thô — lần sau gặp lớp lỗi tương tự (thiếu quyền CREATE cấp DATABASE cho extension/schema
+  khác) đỡ phải tra lại từ đầu. `docs/adr/0005-rls.md` bổ sung mục "Cạm bẫy #2" ghi lại đầy
+  đủ nguyên nhân gốc + câu SQL khắc phục 1 lần. `npm run lint`/`typecheck` xanh (không đụng
+  logic migration hiện có, chỉ thêm nhánh gợi ý khi có lỗi).
 - **M56 PR2 — Bắt buộc 2FA theo vai trò** (2026-07-18, `docs/nang-cap/M56-2fa-totp.md` mục PR2, nhánh `claude/feat-m56-pr2-bat-buoc-2fa`, **KHÔNG có migration** — tái dùng bảng `code_lists` từ M52 PR1): admin bật yêu cầu 2FA cho từng vai trò qua danh mục mềm `require_2fa_roles` (`/admin/code-lists`, mỗi dòng active = 1 vai trò bị bắt buộc; domain rỗng = không ai bị bắt buộc = hành vi y hệt trước PR2). Vai trò bị bắt buộc mà chưa bật 2FA → **chặn 403 mọi API trừ whitelist `/api/auth/*`**, buộc bật 2FA trước khi tiếp tục.
   - **Cơ chế: nhúng cờ `mustSetup2fa` (0/1) TRONG token phiên đã ký** — token đổi từ 4 phần sang 5 phần `userId.exp.pwFrag.flag.mac` (`flag` nằm trong phần ký, không giả mạo được bằng cách sửa cookie). `makeToken(userId, passwordHash, mustSetup2fa)` — **tham số thứ 3 bắt buộc** (không optional, để không sót call-site). Tính TẠI THỜI ĐIỂM phát token: `computeMustSetup2fa(role, totp_enabled_at, requiredRoles())` — admin bật yêu cầu SAU khi user đã có phiên chỉ ảnh hưởng **từ lần đăng nhập kế tiếp** (không hồi tố phiên đang mở, đúng nghĩa đen đặc tả).
   - **Tách `lib/session-token.ts`** (mới, thuần `node:crypto` — không `next/headers`/`lib/db`): `sign`/`makeToken`/`parseToken`/`COOKIE`/`COOKIE_MAX_AGE`. `lib/auth.ts` re-export để mọi call-site cũ không đổi import; thêm `requiredRoles()` (đọc `code_lists` qua cache watermark) + `computeMustSetup2fa()` (thuần, test riêng).
