@@ -1,376 +1,511 @@
-# PLAN.md — mẫu kế hoạch của phiên chính (opusplan · Fable 5)
+# PLAN.md — Đợt nâng cấp chuyên nghiệp hoá (audit 2026-07-19)
 
-> Phiên chính (Fable 5) xuất kế hoạch theo mẫu này, rồi giao **nguyên văn** cho
-> `coordinator` (Opus · low) thi hành — coordinator dispatch từng việc theo nhãn `route:`
-> (khớp bảng định tuyến trong `CLAUDE.md` mục **Lập kế hoạch → điều phối → thi hành**),
-> theo dõi, gọi reviewer, tích hợp và báo cáo lại; phiên chính duyệt cuối.
-> **Luật cứng:** việc nào chưa có đặc tả chi tiết → KHÔNG ghi vào kế hoạch với đặc tả
-> tự chế; dừng lại, hỏi người dùng bằng `AskUserQuestion`, chốt xong mới lập kế hoạch.
-> Kế hoạch phải tự chứa — coordinator và worker không thấy hội thoại của phiên chính.
->
-> **⚠ Trước khi giao số migration mới cho bất kỳ kế hoạch nào: `ls migrations | sort -V | tail -3` để lấy số thật mới nhất — ĐỪNG suy đoán/copy số từ kế hoạch cũ.** Bài học 2026-07-18: PR #265 và PR #266 merge gần nhau cùng chọn số `0071` cho 2 migration khác nhau (do 2 phiên song song không đồng bộ `main` ngay trước lúc code) → chặn CI mọi PR (`check-migration-numbers.ts`) đến khi vá bằng PR #269 (đổi `0071_material_tx_idempotency.sql` → `0072_material_tx_idempotency.sql`). **Số migration tiếp theo cần dùng: `0073`** (đúng tại thời điểm cập nhật file này, đã áp dụng cho kế hoạch M58 PR3 dưới đây — luôn xác nhận lại bằng lệnh trên trước khi dùng, vì có thể đã có PR khác chiếm thêm số sau thời điểm này).
+> Phiên chính (Fable 5) xuất kế hoạch theo mẫu này, giao **nguyên văn** cho `coordinator`
+> (Opus · low) thi hành — dispatch từng việc theo nhãn `route:`, theo dõi, gọi `reviewer`,
+> tích hợp, báo cáo lại; phiên chính duyệt cuối. Coordinator/worker KHÔNG thấy hội thoại
+> trước đó — kế hoạch dưới đây tự chứa.
 
----
+## Bối cảnh
 
-## Bối cảnh chung (đọc trước khi dispatch cả 2 việc)
+Nguồn: 3 audit song song (bảo mật+logic nghiệp vụ / UI-UX+vận hành / tech-stack+CI-CD)
+chạy 2026-07-19 theo `docs/audit.md` §2 mục "Audit nâng cấp chuyên nghiệp hoá" (vừa bổ
+sung). Người dùng chốt: **thi hành hết trong 1 đợt**. 14 phát hiện gộp thành **9 việc**
+(nhóm theo file/chủ đề liên quan để giảm số worktree). **1 việc bị loại khỏi đợt này**
+(xem mục "Loại khỏi đợt" cuối file) vì thiếu đặc tả kín — đúng luật cứng `CLAUDE.md`.
 
-Người dùng yêu cầu thi hành **M58 PR3** (wire ảnh/nhật ký vào khung offline queue) và
-**M59** (histogram tài nguyên) — 2 việc **độc lập nhau, không đụng file chung**, chạy
-song song trên 2 nhánh/worktree riêng.
+Đã xác nhận trước khi lập kế hoạch: `git fetch origin`, `origin/main` = nhánh hiện tại
+(sạch). Migration mới nhất trên `main`: `0072_material_tx_idempotency.sql`. **⚠ PR #270
+(M55 BI Metabase, đang mở) chiếm số `0073` trên nhánh riêng — CHƯA merge `main`.** Số
+migration thật cho các việc dưới đây (V2, V5) phải xác nhận lại bằng
+`ls migrations | sort -V | tail -3` **ngay trước khi commit từng migration**, không dùng
+số cố định ghi sẵn trong kế hoạch này.
 
-Đã kiểm tra trên code thật trước khi lập kế hoạch (LUẬT bắt buộc, xem `docs/nang-cap/README.md`):
-- `git fetch origin` xong, `origin/main` = `d851b5e` = HEAD nhánh hiện tại — đồng bộ.
-- `enqueuePhoto`/`enqueueDiaryNote` đã tồn tại trong `app/components/offlineQueue/index.ts`
-  (M58 PR2, đã merge) nhưng **CHƯA có UI nào gọi tới** (grep xác nhận 0 call site ngoài
-  `offlineQueue/`) → đúng M58 PR3 chưa làm.
-- Không có schema/lib/route nào cho histogram tài nguyên (`grep -rl "histogram" lib/ app/`
-  chỉ trúng file đặc tả) → M59 chưa làm.
-- **M59 PR2 KHÔNG nằm trong đợt này** — đặc tả tự ghi rõ "sau PR1 dùng thật ≥1 tuần",
-  chưa đủ điều kiện. Chỉ dispatch PR1.
+## Cảnh báo xung đột file giữa các việc (đọc trước khi dispatch)
 
----
-
-## Kế hoạch A: M58 PR3 — Wire ảnh + nhật ký vào khung offline queue
-
-- `route: spec-executor` (đặc tả dưới đây đã đóng kín toàn bộ điểm chạm + quyết định
-  thiết kế còn thiếu trong `docs/nang-cap/M58-qr-offline-hien-truong.md` — worker CHỈ
-  thi hành đúng, không tự quyết thêm kiến trúc)
-- Nhánh: `claude/feat-m58-pr3-wire-offline`
-- Đặc tả gốc: `docs/nang-cap/M58-qr-offline-hien-truong.md` mục **PR3** (đọc trước, brief
-  dưới đây là bản đã đóng kín + điểm chạm code thật, KHÔNG lặp lại toàn văn đặc tả gốc).
-
-### Phát hiện quan trọng — SỬA đặc tả gốc trước khi thi hành
-
-1. **`sha256` chưa có trên `task_photos`** — đặc tả gốc viết "idempotency ảnh qua hash
-   sha256 sẵn có (M43)" nhưng M43 PR3 (`migrations/0050_document_hash.sql`) chỉ thêm cột
-   `sha256` cho `task_documents`/`claim_documents`/`vo_documents`/`contract_documents` —
-   **KHÔNG có `task_photos`**. Phải thêm migration mới (xem PR3.1 dưới).
-2. **`diary_note` trong PR2 là placeholder SAI, PHẢI sửa lại, không giữ nguyên** —
-   `PUT /api/diaries/:date` là **full-replace** (xoá-ghi-lại toàn bộ `diary_manpower` +
-   `diary_photos`, và các cột `weatherAm/weatherPm/obstacles/safetyNote` không gửi thì
-   ghi `NULL`, xem `app/api/diaries/[date]/route.ts` dòng ~95-140). Payload hiện tại của
-   `diary_note` trong `logic.ts`/`index.ts` chỉ có `{date, text}` rồi gửi
-   `{workDone: op.payload.text}` — nếu dùng nguyên trạng, offline-save sẽ **XOÁ SẠCH**
-   thời tiết/nhân lực/ảnh đã nhập trước đó của đúng ngày đó. Đây là lỗi mất dữ liệu thật
-   nếu triển khai theo đúng chữ đặc tả gốc — PR3 BẮT BUỘC đổi payload `diary_note` thành
-   **toàn bộ body PUT** (xem PR3.3 dưới), không phải chỉ text.
-
-### PR3.1 — Migration + idempotency ảnh
-
-- File mới `migrations/0073_task_photos_hash.sql` (số đã cập nhật — `0071`/`0072` đã bị
-  chiếm bởi `0071_extracted_text.sql`/`0072_material_tx_idempotency.sql`, xác nhận lại
-  bằng `ls migrations | sort -V | tail -3` trước khi code, đừng dùng số `0071` như bản
-  nháp ban đầu của mục này) (thêm thuần tuý, đi thẳng production
-  theo DoD — không đụng dữ liệu hiện có):
-  ```sql
-  ALTER TABLE task_photos ADD COLUMN IF NOT EXISTS sha256 TEXT;
-  CREATE INDEX IF NOT EXISTS idx_task_photos_task_hash
-    ON task_photos(task_id, sha256) WHERE sha256 IS NOT NULL;
-  ```
-  Chạy `npm run gen:erd` sau khi thêm.
-- `app/api/tasks/[id]/photos/route.ts` (POST): sau đoạn `verifyFileMime(fileBuf, file.type)`
-  (đã có buffer `fileBuf` sẵn), tính `const hash = sha256Hex(fileBuf)` (import từ
-  `@/lib/photos`, hàm đã có sẵn — KHÔNG viết hàm hash mới). Trước khi `writeFile`+`insertId`,
-  query:
-  ```sql
-  SELECT id, caption, size_bytes AS "sizeBytes"
-    FROM task_photos
-   WHERE task_id = ? AND sha256 = ? AND created_at > now() - interval '24 hours'
-   ORDER BY id DESC LIMIT 1
-  ```
-  Có kết quả → **KHÔNG ghi file, KHÔNG insert dòng mới** — trả thẳng
-  `NextResponse.json({ id: existing.id, taskId, caption: existing.caption, sizeBytes: existing.sizeBytes, deduped: true }, { status: 200 })`.
-  Không có kết quả → giữ nguyên luồng cũ, thêm cột `sha256` vào câu `INSERT INTO task_photos`
-  (giá trị `hash`).
-- Test tích hợp mới trong `tests/photos.test.ts` nếu file đã tồn tại (nếu chưa có file test
-  cho route này, tạo `tests/task-photos-dedupe.test.ts`, import `tests/setup.ts` đầu tiên):
-  POST cùng buffer ảnh 2 lần liên tiếp cùng task → lần 2 trả `200` + cùng `id` với lần 1,
-  không có dòng `task_photos` thứ 2 trong DB (đếm `COUNT(*)`); POST buffer khác task khác
-  hoặc task khác nhưng cùng nội dung ảnh → tạo dòng mới bình thường (không bị dedupe chéo
-  task).
-
-### PR3.2 — Wire ảnh vào `PhotosModal` (`app/tracking/[sheet]/TrackingGrid.tsx`)
-
-- Import `enqueuePhoto`, `useOfflineQueueStatus` (hoặc hàm đọc riêng — xem dưới) từ
-  `@/app/components/offlineQueue`.
-- Hàm `upload(rawFile: File)` hiện tại (dòng ~1830): giữ nguyên bước nén ảnh
-  (`compressImage` cục bộ của file này, KHÔNG đổi sang `compressImage` của
-  `offlineQueue/image.ts` — 2 hàm khác nhau, giữ nguyên hàm cục bộ đang dùng vì UI đã quen
-  UX nén 20% của nó) và bước hỏi caption. Sau khi có `file`+`caption`:
-  - Nếu `!navigator.onLine` → gọi thẳng `enqueuePhoto({ taskId: task.id, blob: file, caption: caption.trim() || undefined })`
-    (hàm này tự nén lại bằng `compressImage` của `offlineQueue/image.ts` bên trong — chấp
-    nhận nén 2 lần, không tối ưu lại luồng nén, ngoài phạm vi PR3), rồi `showToast`
-    "Đã xếp vào hàng đợi offline — tự gửi khi có mạng" (tìm import `showToast`/toast hiện
-    có trong file — dùng đúng cơ chế toast đang dùng ở nơi khác trong `TrackingGrid.tsx`,
-    không tạo cơ chế mới), set `uploading=false`, **không gọi `load()`** (server chưa có ảnh).
-  - Nếu `navigator.onLine`, thử `fetch` như cũ; nếu `fetch` **throw** (mất mạng giữa
-    chừng) → catch, fallback y hệt nhánh offline ở trên (enqueue).
-  - Nếu `fetch` trả về nhưng không `res.ok` → giữ nguyên hành vi cũ (hiện `error`, KHÔNG
-    enqueue — đây là lỗi nghiệp vụ thật như quyền/định dạng, không phải lỗi mạng, enqueue
-    sẽ vô nghĩa vì server sẽ từ chối y hệt khi flush).
-- Hiển thị ảnh đang chờ gửi: thêm state `pendingPhotos` (đọc qua hàm mới
-  `offlineQueue.getQueuedPhotos(taskId: number)` — thêm method này vào class
-  `OfflineQueueManager` trong `app/components/offlineQueue/index.ts`, đọc `this.store.getAll()`
-  rồi filter `kind==='photo' && payload.taskId===taskId`, trả về
-  `{id, caption, size, queuedAt, tries}[]`). Gọi lại `pendingPhotos` sau mỗi `enqueuePhoto`
-  thành công và trong callback `onFlushed` đã có sẵn ở hook (nếu `PhotosModal` chưa dùng
-  `useOfflineTickQueue`, chỉ cần gọi lại thủ công sau `enqueuePhoto` và đăng ký
-  `offlineQueue.onFlushed(load)` trong `useEffect` của modal — sau khi hàng đợi rỗng thì
-  `load()` lấy đúng ảnh thật từ server, xoá state `pendingPhotos` bằng cách đọc lại rỗng).
-  Render các mục `pendingPhotos` **cùng lưới ảnh thật**, dùng `URL.createObjectURL` để
-  preview blob cục bộ, kèm badge nhỏ "Chờ gửi" (icon `WifiOff` hoặc `Clock`, tái dùng style
-  badge sẵn có trong file — không tạo component badge mới) — không cho xoá/sửa mục đang
-  chờ gửi (ngoài phạm vi PR3, YAGNI).
-
-### PR3.3 — Wire nhật ký vào `DiaryEditorModal` (`app/diary/DiaryEditorModal.tsx`)
-
-- **Đổi shape `diary_note` trong `app/components/offlineQueue/logic.ts`**: type
-  `QueuedOp` nhánh `diary_note` đổi `payload: { date: string; text: string }` thành
-  ```ts
-  payload: {
-    date: string;
-    weatherAm: string | null;
-    weatherPm: string | null;
-    workDone: string | null;
-    obstacles: string | null;
-    safetyNote: string | null;
-    manpower: { crew: string; headcount: number; note?: string | null }[];
-    photoIds: number[];
-  }
-  ```
-  (khớp đúng field mà `PUT /api/diaries/:date` đọc). Thêm hàm thuần
-  `diaryDedupeIds(ops: QueuedOp[], date: string): number[]` (cùng khuôn `tickDedupeIds`) —
-  **mỗi ngày chỉ giữ 1 bản offline mới nhất** (vì PUT là full-replace, xếp hàng 2 bản cho
-  cùng ngày rồi gửi tuần tự sẽ khiến bản cũ đè lên bản mới nếu gửi không đúng thứ tự —
-  dedupe loại bỏ rủi ro này, cùng lý do dedupe tick theo `dimId`).
-- `app/components/offlineQueue/index.ts`:
-  - `enqueueDiaryNote(input)` đổi tham số thành đúng object payload trên (không phải
-    `{date, text}` nữa); bên trong gọi `diaryDedupeIds` xoá bản cũ cùng `date` trước khi
-    `store.add` (giống hệt cách `enqueueTick` gọi `tickDedupeIds`).
-  - `sendOp()`: nhánh `diary_note` đổi từ `JSON.stringify({ workDone: op.payload.text })`
-    sang gửi thẳng `JSON.stringify(op.payload)` (đã đúng shape body PUT, trừ field `date`
-    không cần gửi trong body vì đã nằm trên URL — loại `date` ra khỏi object trước
-    `JSON.stringify`, ví dụ dùng destructure `const { date: _d, ...body } = op.payload`).
-  - Thêm export `getQueuedDiaryNote(date: string): Promise<QueuedOp | undefined>` (đọc
-    `store.getAll()`, tìm `kind==='diary_note' && payload.date===date`) — modal dùng để
-    biết có bản nháp offline đang chờ hay không (ưu tiên hiển thị bản chờ gửi thay vì bản
-    đã lưu trên server, tránh mất thao tác của chính phiên đó nếu mở lại modal).
-- `DiaryEditorModal.tsx`, hàm `save()` (dòng ~106): body object hiện đang dựng để `fetch`
-  PUT — giữ nguyên cách dựng, chỉ bọc: nếu `!navigator.onLine` → gọi
-  `enqueueDiaryNote({ date, weatherAm, weatherPm, workDone: workDone || null, obstacles, safetyNote, manpower: manpowerInput, photoIds })`
-  (dùng đúng biến state hiện có trong file — đọc lại tên biến thật khi code, không suy
-  đoán), đóng modal với toast "Đã lưu offline — sẽ tự gửi khi có mạng", **không gọi** PUT.
-  Nếu `fetch` throw (mất mạng giữa chừng) → catch, fallback y hệt nhánh offline. Nếu
-  `fetch` trả về nhưng không `ok` (409 khoá sổ, 422 validate...) → giữ nguyên hành vi lỗi
-  cũ, KHÔNG enqueue (lỗi nghiệp vụ thật, không phải lỗi mạng).
-- Mở modal: nếu `getQueuedDiaryNote(date)` có kết quả, ưu tiên nạp giá trị từ đó vào state
-  form (không phải từ response `GET /api/diaries/:date`) + hiện banner nhỏ "Có bản nháp
-  đang chờ gửi offline" (tái dùng style banner "Đã khoá bởi..." đã có trong file).
-
-### PR3.4 — Giữ nguyên hành vi 4xx/dedup từ PR2
-
-Hành vi `shouldRetry` (4xx bỏ khỏi hàng đợi không retry, 5xx/mạng giữ + backoff) **giữ
-nguyên, không mở rộng** — không thêm cơ chế thông báo khi 1 thao tác bị bỏ do 4xx (ngoài
-phạm vi PR3, đã là hành vi đã chốt từ PR2).
-
-### Test + verify (PR3)
-
-- Mở rộng `tests/offline-queue.test.ts`: thêm ca cho `diaryDedupeIds` (2 lần enqueue cùng
-  ngày → chỉ còn 1 bản, giữ bản mới nhất), `sendOp`/payload shape của `diary_note` không
-  còn field `text` (đổi từ ca test cũ nếu có), quota ảnh/dedup tick không đổi (không được
-  vỡ test cũ).
-- `npm run lint`/`typecheck`/`build` xanh; `npm test` toàn bộ file xanh (kể cả test tích
-  hợp mới nếu có `TEST_DATABASE_URL`).
-- Verify thật bằng Chromium DevTools (offline mode) đúng kịch bản đặc tả: mở task, bật
-  offline, chụp 5 ảnh (nén, xếp hàng, thấy badge "Chờ gửi"), mở `/diary` hôm đó, sửa
-  workDone + thêm 1 dòng nhân lực, lưu offline (banner nháp chờ gửi) → bật lại mạng → đợi
-  tự flush → xác nhận: 5 ảnh lên đúng task không trùng (đếm `task_photos` = 5, không phải
-  10 nếu lỡ gửi lại), nhật ký ngày đó giữ đúng field đã sửa (thời tiết/nhân lực cũ nếu có
-  từ trước KHÔNG bị xoá) + workDone mới đúng.
-- Không sửa hành vi tick (đã đúng từ PR2) — chạy lại `e2e/authed/tracking.spec.ts` nếu có
-  sẵn, xác nhận không vỡ.
-
-### Tiêu chí chấp nhận (PR3)
-
-- [ ] Migration `0073` thêm thuần tuý (`ADD COLUMN`/`CREATE INDEX`), `npm run gen:erd` cập nhật.
-- [ ] POST ảnh trùng hash cùng task trong 24h → 200 + không nhân đôi dòng DB.
-- [ ] Offline chụp ảnh → xếp hàng đợi, có badge "Chờ gửi", tự gửi khi online, không mất/trùng.
-- [ ] Offline lưu nhật ký → xếp hàng đợi (dedupe theo ngày), tự gửi khi online, **không xoá**
-      thời tiết/nhân lực/ảnh đã có sẵn của ngày đó (test tay: nhập online trước → offline sửa
-      1 field → online lại → field khác vẫn còn).
-- [ ] `npm run lint`/`typecheck`/`build` xanh, `npm test` xanh toàn bộ.
-- [ ] Cập nhật `PROGRESS.md` mục "Đã xong" + đóng dòng M58 PR3 trong `docs/nang-cap/README.md`.
+- `app/api/auth/password/route.ts` bị chạm bởi **V1** (rate-limit), **V5** (session
+  revocation — đổi `makeToken` call), **V6** (CSRF same-origin). Dispatch **tuần tự**:
+  V1 trước (nhỏ nhất, xong nhanh) → merge → V6 base trên `main` mới → merge → V5 base
+  trên `main` mới nhất (V5 vốn đã phải làm sau cùng vì rủi ro cao nhất). **Không chạy
+  V1/V5/V6 song song trên 3 worktree cùng lúc.**
+- `lib/auth.ts`/`lib/session-token.ts` (vùng rủi ro cao theo `docs/audit.md` §8) chỉ V5
+  chạm — không xung đột với việc khác.
+- Các việc còn lại (V2, V3, V4, V7, V8, V9) không chạm file chung với nhau hoặc với
+  V1/V5/V6 — dispatch song song bình thường.
 
 ---
 
-## Kế hoạch B: M59 PR1 — API tổng hợp tài nguyên + trang `/resources`
+## V1 — Vá nhỏ bảo mật + cấu hình (gộp 3 phát hiện nhỏ, cùng mức "mechanical")
 
-- `route: complex` (đúng như đặc tả gốc `docs/nang-cap/M59-tai-nguyen.md` — có điểm phải
-  tự quyết trong ranh giới nêu dưới, không phải kiến trúc tự do)
-- Nhánh: `claude/feat-m59-pr1-resources`
-- Đặc tả gốc: `docs/nang-cap/M59-tai-nguyen.md` mục **PR1**. Brief dưới đây bổ sung schema
-  thật (đã đọc trực tiếp từ `migrations/`, KHÔNG suy đoán) + đóng sẵn 1 điểm mà đặc tả gốc
-  để ngỏ.
+- `route: mechanical`
+- Nhánh: `claude/chore-security-config-patches`
+- **Dispatch đầu tiên trong nhóm password route** (xem cảnh báo xung đột trên).
 
-### Đã đóng sẵn (KHÔNG cần tự quyết thêm): xung đột thiết bị
+### 1a. Rate-limit đổi mật khẩu
 
-Đặc tả gốc cho phép "bỏ nếu dữ liệu không cho phép" đối với xung đột phân bổ thiết bị. Đã
-đọc `migrations/0021_equipment.sql`: bảng `equipment_logs` chỉ có `action` (điểm sự kiện
-`issue/return/move/maintain/calibrate` tại 1 `created_at`), **KHÔNG có cột dải ngày** (không
-`start_date`/`end_date`) → không đủ dữ liệu để tính "2 phân bổ giao nhau cùng thiết bị" đúng
-nghĩa. **QUYẾT ĐỊNH: PR1 KHÔNG làm xung đột thiết bị, chỉ làm `assignmentConflicts` cho
-NGƯỜI (user/task).** `equipmentUsageByWeek` (mật độ dùng, không phải xung đột) vẫn làm theo
-mô tả dưới.
+`app/api/auth/password/route.ts` — thêm rate-limit theo `user.id` trước khi verify
+`oldPassword`, dùng đúng `hitRateLimit` đã có (`@/lib/ratelimit`, xem cách `login/2fa`
+dùng). Giới hạn: 5 lần sai / 15 phút / user. Khi vượt → `429` kèm body
+`{ error: "Thử lại sau ít phút" }` (tiếng Việt, không lộ số giây chính xác — đủ thông
+tin cho UI). Đặt SAU bước lấy `me` (đã có `me.id`), TRƯỚC query `queryOne` lấy
+`password_hash`. Không đổi response thành công.
 
-### Schema thật (đọc trước khi code — KHÔNG suy đoán cột)
+### 1b. Dependabot theo dõi GitHub Actions
 
-```sql
--- crews (migrations/0031_hr.sql)
-crews(id, project_id, name, discipline_id, supplier_id, leader_id)
-crew_members(crew_id, personnel_id)  -- PK ghép
-attendance(id, project_id, work_date DATE, crew_id, personnel_id NULL,
-           headcount INT, present BOOLEAN, hours NUMERIC(4,1), note, recorded_by, created_at)
-  -- personnel_id NULL = chấm gộp theo tổ (dùng headcount); personnel_id có giá trị =
-  -- chấm từng người (headcount thường NULL trong trường hợp này, dùng present/hours)
-
--- equipment_logs (migrations/0021_equipment.sql)
-equipment_logs(id, equipment_id, action, to_location, to_crew, note, logged_by, created_at)
-
--- tasks/work_packages (đã có từ baseline) — kế thừa ngày/người phụ trách từ nhóm khi NULL:
---   COALESCE(t.start_date, wp.start_date), COALESCE(t.end_date, wp.end_date)
---   (assigned_to KHÔNG kế thừa tự động trong lib/recompute.ts hiện tại — task.assigned_to
---    NULL nghĩa là chưa gán tay, KHÔNG suy ra từ wp.assigned_to; workloadByWeek chỉ tính
---    task có assigned_to trực tiếp KHÔNG NULL — khớp đúng nghĩa "tải đã gán cho ai")
+`.github/dependabot.yml` — thêm entry thứ 2:
+```yaml
+  - package-ecosystem: "github-actions"
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
 ```
 
-### `lib/resources.ts` (mới) — không migration, chỉ đọc
+### 1c. Validate secret lúc boot (fail-fast)
 
-- `workloadByWeek({ projectId, from, to, subconUserId }: { projectId: number | null; from: string; to: string; subconUserId?: number })`:
-  SQL 1 câu dùng `generate_series(date_trunc('week', ?::date), date_trunc('week', ?::date), interval '1 week') AS week`
-  CROSS/LEFT JOIN với task đang chạy giao nhau tuần đó — điều kiện giao nhau:
-  `COALESCE(t.start_date, wp.start_date) <= week + interval '6 days' AND COALESCE(t.end_date, wp.end_date) >= week`,
-  loại `t.status IN ('hoan_thanh','nghiem_thu')`, `t.assigned_to IS NOT NULL`, scope
-  `projectId` qua JOIN `work_packages wp → sheet_types st → towers tw` lọc `tw.project_id = ?`
-  (đúng pattern JOIN scope dùng ở `lib/dashboardext.ts`/`lib/assignments.ts` — copy cách
-  JOIN, không tự chế). Nếu `subconUserId` có giá trị → thêm `AND t.assigned_to = ?` (dùng
-  cho vai trò `subcon` chỉ thấy tải chính mình). Group theo `week, t.assigned_to, u.name,
-  st.discipline_id` (JOIN `users u`, `disciplines`), trả `{ week, userId, userName,
-  disciplineCode, taskCount }[]`.
-- `manpowerByWeek({ projectId, from, to })`: `GROUP BY date_trunc('week', work_date), crew_id`
-  trên `attendance` JOIN `crews`, `SUM(COALESCE(headcount, 0)) + COUNT(*) FILTER (WHERE personnel_id IS NOT NULL AND present)`
-  — **quyết định trong ranh giới cho phép**: vì `attendance` có 2 kiểu chấm công (gộp theo
-  headcount HOẶC từng người qua personnel_id+present) không loại trừ nhau trong schema,
-  cách cộng phải tránh đếm đôi — ghi rõ trong code comment: dòng nào có `personnel_id IS NOT NULL`
-  đếm 1 người (nếu `present`), dòng nào `personnel_id IS NULL` cộng `headcount`; đây là 2
-  tập dữ liệu tách biệt theo thiết kế bảng (không có UNIQUE ràng buộc chống nhập cả 2 kiểu
-  cho cùng crew/ngày — nếu dữ liệu thật có trùng, tổng sẽ cao hơn thực tế, ghi nợ 1 dòng
-  trong `PROGRESS.md`/comment code thay vì tự chế ràng buộc DB mới ngoài phạm vi "không
-  migration"). Scope `projectId` trực tiếp qua `attendance.project_id`.
-- `equipmentUsageByWeek({ projectId, from, to })`: đếm SỐ SỰ KIỆN `equipment_logs` theo
-  tuần × `action` (KHÔNG phải dải ngày sử dụng liên tục — đã quyết định ở trên là bỏ mô
-  hình dải ngày do thiếu cột) — `GROUP BY date_trunc('week', created_at), action`, JOIN
-  `equipment e` lọc theo `e.project_id = ?` nếu bảng `equipment` có cột đó (đọc
-  `migrations/0021_equipment.sql` xác nhận trước khi code — nếu không có, bỏ scope dự án
-  cho khối này và ghi rõ lý do trong comment, KHÔNG suy đoán JOIN sai bảng).
-- `assignmentConflicts({ projectId, minTasks = 5 }: { projectId: number | null; minTasks?: number })`:
-  với mỗi `assigned_to` KHÔNG NULL, đếm số task **đang hoạt động cùng lúc** (giao nhau theo
-  ngày, cùng điều kiện loại `hoan_thanh`/`nghiem_thu` như trên) ≥ `minTasks` → trả về
-  `{ userId, userName, overlappingTaskCount, tasks: {id, code, name, startDate, endDate}[] }[]`,
-  sắp theo `overlappingTaskCount DESC`. Tính bằng self-JOIN 2 task cùng `assigned_to` giao
-  nhau ngày rồi đếm nhóm liên thông đơn giản (đếm số task chồng lấn tại **1 thời điểm bất kỳ**
-  qua kỹ thuật sweep: với mỗi task, đếm số task khác cùng người có khoảng ngày giao nhau nó
-  — lấy MAX trong nhóm người đó làm `overlappingTaskCount`) — đây là điểm thuật toán, viết
-  bằng SQL window function hoặc CTE, KHÔNG kéo hết task về JS rồi lặp lồng (điều đặc tả
-  gốc đã cấm — "toàn bộ tính trên SQL"). Quyền xem: dùng quyền xem chung (mọi vai trò đăng
-  nhập); `subcon` chỉ thấy dòng có `userId = user.id` (lọc sau câu SQL hoặc thêm điều kiện
-  `WHERE t.assigned_to = ?` khi role subcon).
+`lib/env.ts` — thêm `.refine()` vào `serverSchema` (hoặc `superRefine` nếu cần nhiều
+điều kiện) cho `XBOSS_SECRET`: khi `NODE_ENV === "production"` VÀ có giá trị, bắt buộc
+độ dài ≥ 32 ký tự (secret yếu là lỗi cấu hình thật, nên fail-fast giống các bắt buộc
+khác trong file — không đổi bất biến "XBOSS_SECRET optional ở schema, bắt buộc do
+`lib/auth` giữ" đã ghi trong comment đầu file, chỉ thêm điều kiện độ dài KHI đã có giá
+trị). Tương tự cho `CRON_SECRET` nếu có giá trị: độ dài ≥ 16 ký tự. Viết thông báo lỗi
+tiếng Việt rõ ràng ("XBOSS_SECRET quá ngắn, cần tối thiểu 32 ký tự production").
+Test: thêm ca trong `tests/env.test.ts` nếu file đã tồn tại (grep trước khi tạo file
+mới) — secret ngắn ở production → throw; secret ngắn ở development → không throw (giữ
+đúng bất biến "dev không bắt buộc").
 
-### API: `GET /api/resources`
+### Tiêu chí chấp nhận V1
 
-- `app/api/resources/route.ts` (mới): `export const dynamic = "force-dynamic"`.
-  `getCurrentUser()` → 401. Query params: `from`, `to` (mặc định 8 tuần quanh hôm nay nếu
-  thiếu — `todayISO()` trừ/cộng, xem cách `lib/lookahead.ts`-tương-tự nếu có, không thì tự
-  tính bằng `Date`), `view=manpower|equipment|conflicts` (mặc định trả cả `workload` +
-  `manpower`, `equipment`/`conflicts` chỉ trả khi `view` khớp — theo đúng câu đặc tả gốc
-  "GET /api/resources?from=&to=&view=..."). `projectId = await getCurrentProjectId(user)`.
-  `subconUserId = user.role === 'subcon' ? user.id : undefined` truyền vào
-  `workloadByWeek`/`assignmentConflicts`. KHÔNG có gate quyền nào khác ngoài đăng nhập
-  (đúng quyết định "dùng quyền xem chung, không dữ liệu tiền" trong đặc tả gốc).
-
-### UI: `app/resources/page.tsx` (mới)
-
-- `'use client'`, fetch `/api/resources`, loading `Skeleton`, empty-state khi rỗng **bắt
-  buộc theo đặc tả gốc** — thông điệp tiếng Việt hướng dẫn rõ "cần phân công người phụ
-  trách (assigned_to) + chấm công (attendance) mới có số liệu, xem trang Nhân sự/Nhật ký".
-  Chart cột chồng theo tuần (`recharts` `BarChart`/`ComposedChart`, palette theo hệ —
-  tái dùng token màu hệ đã có, xem `lib/disciplineColors.ts`), toggle "Kế hoạch" (workload)
-  / "Thực tế" (manpower) 2 đường cạnh nhau. Bảng xung đột: mỗi dòng bấm nhảy tới
-  `/tracking/<sheet>?task=<id>` (dùng khuôn panel Pareto trễ đã có trên Dashboard —
-  tìm component đó trong `app/page.tsx`/`app/components/` để tái dùng style, không viết
-  mới từ đầu). Mobile: chart cuộn ngang trong container riêng (`overflow-x-auto`), bảng
-  sticky header — đúng chuẩn UI/UX bảng dữ liệu dày trong `CLAUDE.md`.
-- Sidebar: thêm node vào `app/lib/dashboardTree.ts`, nhóm "Thi công hiện trường" →
-  dashboard `dash.hien-truong` → thêm vào mảng `children` (cạnh "Mặt bằng"):
-  `{ href: "/resources", label: "Tài nguyên", icon: Users }` (icon `Users` đã import sẵn
-  trong file — dùng lại, không thêm icon mới nếu không cần thiết; nếu trùng ý nghĩa icon
-  khác trong cùng nhóm thì chọn icon khác đã import sẵn, ưu tiên không thêm import
-  lucide-react mới).
-- `lib/modules.ts`: thêm 1 entry `ModuleDef` mới (bắt buộc theo `docs/nang-cap/README.md`
-  mục "Module registry"):
-  ```ts
-  {
-    key: "resources",
-    nav: [{ group: "Thi công hiện trường", label: "Tài nguyên", href: "/resources", icon: "Users" }],
-    permKeys: [],
-    routePrefix: ["/api/resources"],
-  }
-  ```
-  (không `notificationTypes`/`swExclude` — PR1 chưa có notification, `/api/resources` là
-  API đọc thường, không cần loại trừ cache SW theo đúng pattern `/api/dashboard`/`/api/costs`
-  hiện không bị loại trừ).
-
-### Test + tiêu chí (PR1)
-
-- `tests/resources.test.ts` (integration, import `tests/setup.ts` đầu tiên): dựng 2 dự án,
-  ≥2 user × ≥6 task chồng lịch (đối chiếu số tay từng tuần cho `workloadByWeek`), 1 task
-  kế thừa ngày từ `work_packages` (không set `t.start_date`/`end_date`) tính đúng qua
-  `COALESCE`; `attendance` trộn cả 2 kiểu chấm (headcount gộp + personnel_id từng người)
-  cộng đúng theo đúng quy tắc đã ghi ở trên; `assignmentConflicts` bắt đúng ngưỡng
-  `minTasks` (test với `minTasks=2` cho dễ dựng dữ liệu nhỏ); `subcon` chỉ thấy tải/xung
-  đột của chính mình; 2 dự án không lẫn số liệu.
-- `npm run lint`/`typecheck`/`build` xanh; `npm test` xanh toàn bộ (kể cả file mới, chạy
-  thật nếu có `TEST_DATABASE_URL`).
-- Verify UI thật (Postgres cục bộ + seed dữ liệu chồng lịch thật): chart 2 đường kế
-  hoạch/thực tế render đúng, bấm dòng xung đột nhảy đúng tới task trên lưới tracking,
-  empty-state hiện đúng khi test trên dự án chưa có `attendance`/`assigned_to`.
-
-### Tiêu chí chấp nhận (PR1)
-
-- [ ] Không có migration nào (chỉ đọc dữ liệu có sẵn).
-- [ ] `workloadByWeek`/`manpowerByWeek`/`equipmentUsageByWeek`/`assignmentConflicts` đều
-      scope đúng theo `projectId`, subcon chỉ thấy dữ liệu của mình.
-- [ ] Toàn bộ tính trên SQL (không kéo bảng về JS lặp lồng).
-- [ ] Trang `/resources` có trong sidebar, empty-state rõ ràng, mobile không vỡ layout.
-- [ ] `lib/modules.ts` có entry `resources`.
+- [ ] 3 thay đổi trên, không đụng file nào khác.
 - [ ] `npm run lint`/`typecheck`/`build` xanh, `npm test` xanh toàn bộ.
-- [ ] Cập nhật `PROGRESS.md` mục "Đã xong" (ghi rõ quyết định bỏ xung đột thiết bị) +
-      cập nhật trạng thái M59 trong `docs/nang-cap/README.md` (chỉ PR1 xong, PR2 vẫn
-      "chưa" — chờ dùng thật ≥1 tuần theo đúng đặc tả gốc, KHÔNG dispatch PR2 trong đợt này).
+- [ ] Cập nhật `PROGRESS.md` mục "Đã xong".
+
+---
+
+## V2 — Idempotency ảnh (`task_photos`)
+
+- `route: standard`
+- Nhánh: `claude/feat-photos-idempotency`
+- Bối cảnh: `offlineQueue/index.ts` đã có `enqueuePhoto`/`sendOp` (kind `photo`, từ M58
+  PR2) gửi `POST /api/tasks/:id/photos` nhưng route đích **chưa có cơ chế chống trùng**
+  — khác vật tư đã có (`migrations/0072_material_tx_idempotency.sql`). Việc này CHỈ vá
+  server-side idempotency, KHÔNG wire UI offline cho ảnh (đó là M58 PR3, việc riêng
+  trong `docs/nang-cap/M58-qr-offline-hien-truong.md`, không thuộc đợt này).
+
+### Migration mới
+
+File `migrations/00NN_task_photos_hash.sql` (số `NN` xác nhận qua
+`ls migrations | sort -V | tail -3` **ngay trước khi commit** — KHÔNG dùng `0073` cố
+định vì PR #270 có thể đã chiếm):
+```sql
+ALTER TABLE task_photos ADD COLUMN IF NOT EXISTS sha256 TEXT;
+CREATE INDEX IF NOT EXISTS idx_task_photos_task_hash
+  ON task_photos(task_id, sha256) WHERE sha256 IS NOT NULL;
+```
+Chạy `npm run gen:erd` sau khi thêm.
+
+### Route `app/api/tasks/[id]/photos/route.ts` (POST)
+
+Sau đoạn `verifyFileMime(fileBuf, file.type)` (buffer `fileBuf` đã có sẵn trong file),
+tính `const hash = sha256Hex(fileBuf)` — nếu `sha256Hex` chưa tồn tại trong `lib/photos.ts`,
+thêm hàm thuần `export function sha256Hex(buf: Buffer): string` dùng
+`crypto.createHash("sha256").update(buf).digest("hex")` (import `node:crypto`). Trước
+khi `writeFile`+`insertId`, query:
+```sql
+SELECT id, caption, size_bytes AS "sizeBytes"
+  FROM task_photos
+ WHERE task_id = ? AND sha256 = ? AND created_at > now() - interval '24 hours'
+ ORDER BY id DESC LIMIT 1
+```
+Có kết quả → **không ghi file, không insert dòng mới**, trả
+`NextResponse.json({ id: existing.id, taskId, caption: existing.caption, sizeBytes: existing.sizeBytes, deduped: true }, { status: 200 })`.
+Không có kết quả → giữ nguyên luồng cũ, thêm cột `sha256` (giá trị `hash`) vào câu
+`INSERT INTO task_photos`.
+
+### Test
+
+`tests/task-photos-dedupe.test.ts` (mới, import `tests/setup.ts` đầu tiên): POST cùng
+buffer ảnh 2 lần liên tiếp cùng task → lần 2 trả `200` + cùng `id`, `COUNT(*)` bảng
+`task_photos` không tăng; POST buffer khác hoặc task khác → tạo dòng mới bình thường
+(không dedupe chéo task).
+
+### Tiêu chí chấp nhận V2
+
+- [ ] Migration thêm thuần tuý (`ADD COLUMN`/`CREATE INDEX`), `gen:erd` cập nhật.
+- [ ] POST ảnh trùng hash cùng task trong 24h → 200 + không nhân đôi dòng DB.
+- [ ] `npm run lint`/`typecheck`/`build` xanh, `npm test` xanh toàn bộ.
+- [ ] Cập nhật `PROGRESS.md`.
+
+---
+
+## V3 — Xử lý lỗi UI: trang tracking + error boundary theo segment
+
+- `route: standard`
+- Nhánh: `claude/fix-error-handling-ui`
+
+### 3a. Lỗi mạng bị nuốt ở trang tracking
+
+`app/tracking/[sheet]/useTrackingData.ts`, hàm `load()` (dòng ~21-31): thêm state mới
+`const [loadError, setLoadError] = useState(false)`. Trong `.catch()` của `load()`:
+set `loadError = true` (giữ nguyên comment cũ, không xoá `data` đang có nếu là lần
+refresh — chỉ hiển thị lỗi khi **lần đầu load `data === null`**). Trong `.then()` khi
+thành công: `setLoadError(false)`. Export `loadError` trong return object của hook.
+
+`app/tracking/[sheet]/page.tsx` (dòng ~258, ngay sau `if (loading) return <PageSkeleton />;`):
+thêm `if (loadError && !data) return <ErrorState message="Không tải được dữ liệu — kiểm tra kết nối mạng" onRetry={load} />;`
+— nếu component `ErrorState` chưa tồn tại trong `app/components/`, tạo mới (đơn giản:
+icon `WifiOff` từ `lucide-react`, thông điệp, nút "Thử lại" gọi `onRetry`) theo đúng
+style Tailwind zinc dark-first đã dùng trong file (không hardcode hex, không `dark:`).
+Nếu trang đã có `data` cũ (refresh lỗi, không phải lần đầu) → **giữ nguyên hành vi cũ**
+(hiện dữ liệu cũ, không chèn error state đè lên) — chỉ chặn màn hình khi thật sự
+`data === null`.
+
+### 3b. Error boundary theo route segment
+
+Thêm `app/error.tsx` (mới, `'use client'`) bọc trong `<body>` (khác `global-error.tsx`
+đã có — file đó thay cả root layout khi lỗi ở tầng cao nhất, `app/error.tsx` bắt lỗi ở
+tầng con mà vẫn giữ được `AppHeader`/sidebar nếu lỗi nằm trong page cụ thể). Props
+`{ error, reset }`. Gọi `Sentry.captureException(error)` trong `useEffect` (cùng pattern
+`global-error.tsx`). UI: thông điệp tiếng Việt "Trang này gặp sự cố", nút "Thử lại"
+(`reset()`) + nút "Về Dashboard" (`<Link href="/">`). Không cần thêm error.tsx riêng cho
+từng segment con (`tracking/[sheet]/error.tsx`...) trong đợt này — `app/error.tsx` ở gốc
+đã đủ để không phá toàn bộ layout, ngoại trừ AppHeader (chỉ có nếu nằm trong
+`app/(authed)/layout.tsx` hay tương đương — kiểm cấu trúc thư mục thật trước khi quyết
+định `app/error.tsx` có kế thừa được header/sidebar hay không; nếu layout hiện tại không
+tách nhóm route `(authed)`, `app/error.tsx` ở gốc sẽ mất luôn header/sidebar giống
+`global-error.tsx` — nếu vậy, GHI RÕ NỢ trong `PROGRESS.md` thay vì tự tái cấu trúc
+layout ngoài phạm vi việc này).
+
+### Test + tiêu chí V3
+
+- Verify tay: tắt mạng trước khi mở `/tracking/<sheet>` lần đầu (DevTools offline) →
+  thấy `ErrorState` + nút Thử lại hoạt động; mở lại có mạng bình thường không bị ảnh
+  hưởng; ném lỗi giả (throw trong 1 component con tạm thời) → `app/error.tsx` bắt được,
+  không crash trắng trang.
+- `npm run lint`/`typecheck`/`build` xanh, `npm test` xanh toàn bộ.
+- [ ] Cập nhật `PROGRESS.md`, ghi rõ nợ nếu `app/error.tsx` không giữ được header/sidebar.
+
+---
+
+## V4 — An toàn CI/CD: health-check deploy + gate CI thật
+
+- `route: standard`
+- Nhánh: `claude/chore-deploy-safety`
+
+### 4a. Health-check + rollback trong `deploy.sh`
+
+Sau bước `7/7 pm2 reload` (trước dòng `rm -rf "$OLD_DIR"` hiện tại là dòng cuối cùng),
+thêm bước kiểm tra sức khoẻ: đọc cổng app từ `.env.local`/`.env.staging` đang dùng (biến
+`PORT`, mặc định `3000` nếu không có — kiểm file env thật để biết tên biến đúng, đừng
+đoán) hoặc dùng URL cục bộ `http://localhost:$PORT/api/health`. Retry tối đa 5 lần, mỗi
+lần cách 3 giây (`curl -sf ... || sleep 3`). Thành công (`curl` exit 0) → xoá `OLD_DIR`
+như cũ, in "Deploy hoàn tất". Thất bại sau 5 lần → **rollback**: `mv "$OLD_DIR" .next`
+(khôi phục bản cũ), `pm2 reload "$PM2_NAME" --update-env`, in lỗi rõ ràng "Health-check
+thất bại — đã rollback về bản trước", `exit 1` (script vốn đã `set -e`, nhưng bước
+health-check dùng `curl` cần tự bắt lỗi bằng vòng lặp, không để `set -e` dừng giữa
+chừng vòng retry). Không đổi hành vi khi health-check pass (giữ nguyên các bước 1-7 y
+hệt).
+
+### 4b. `deploy.yml` gate theo CI xanh thật
+
+Đổi trigger từ `on: push: branches: [main]` sang
+`on: workflow_run: workflows: ["CI"], types: [completed]`, thêm điều kiện job:
+```yaml
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+```
+Sửa lại comment đầu file (hiện đang giải thích lý do KHÔNG chờ CI — comment này sẽ sai
+sau khi đổi, viết lại ngắn gọn: "Deploy khi workflow CI trên main hoàn tất VÀ pass —
+loại bỏ phụ thuộc ngầm vào branch-protection setting ngoài repo, khớp đúng comment đã
+ghi sẵn trong `ci.yml` dòng ~85 nhắc `workflow_run` nhưng trước đây chưa áp dụng thật").
+Giữ nguyên khối `concurrency`/`permissions: {}`.
+
+### Tiêu chí chấp nhận V4
+
+- [ ] `deploy.sh` có health-check + rollback, không đổi hành vi khi thành công.
+- [ ] `deploy.yml` dùng `workflow_run` đúng điều kiện `success` + đúng `head_branch`.
+- [ ] Không cần chạy CI thật để verify (không có VPS trong môi trường code) — verify bằng
+      đọc kỹ logic bash (dry-run cú pháp `bash -n deploy.sh`) + `actionlint`/YAML lint
+      nếu có sẵn trong repo (kiểm `package.json`/CI xem có action lint yaml không, nếu
+      không có thì bỏ qua bước này, không tự cài mới).
+- [ ] Cập nhật `PROGRESS.md`, `DEPLOY.md` (mục mô tả hành vi deploy) nếu có đoạn mô tả cũ
+      cần sửa theo hành vi mới.
+
+---
+
+## V5 — Session revocation (thu hồi phiên chủ động)
+
+- `route: complex` — vùng rủi ro cao (`lib/auth.ts`/`lib/session-token.ts`), có điểm
+  phải tự quyết trong ranh giới nêu dưới (KHÔNG phải tự do thiết kế lại auth).
+- Nhánh: `claude/feat-session-revocation`
+- **Dispatch sau cùng trong nhóm password route** — base trên `main` mới nhất sau khi
+  V1 + V6 đã merge (xem cảnh báo xung đột đầu file).
+
+### Ranh giới quyết định được phép
+
+- Cách đặt tên cột/tham số có thể điều chỉnh cho khớp convention thật của file (không
+  bắt buộc đúng y tên dưới đây nếu code hiện có convention khác), miễn giữ đúng ngữ
+  nghĩa: mỗi user có 1 bộ đếm phiên, tăng bộ đếm = mọi token cũ phát hành trước đó hết
+  hiệu lực ngay lần request kế tiếp.
+- Được tự quyết vị trí thêm bước so sánh `session_version` trong `getCurrentUser()` (đọc
+  cùng query hiện có lấy role hay thêm query riêng) — ưu tiên **không** thêm round-trip
+  DB mới nếu `getCurrentUser()` đã query bảng `users` sẵn cho mỗi request.
+
+### Migration mới
+
+File `migrations/00NN_session_version.sql` (số xác nhận lại trước khi commit, PHẢI SAU
+số đã dùng bởi V2 nếu V2 đã merge — chạy `ls migrations | sort -V | tail -3`):
+```sql
+ALTER TABLE users ADD COLUMN IF NOT EXISTS session_version INT NOT NULL DEFAULT 0;
+```
+
+### `lib/session-token.ts`
+
+Token hiện tại 5 phần `userId.exp.pwFrag.flag.mac` (từ M56 PR2). Đổi sang 6 phần
+`userId.exp.pwFrag.flag.sv.mac` — `sv` = `session_version` tại thời điểm phát token.
+`makeToken(userId, passwordHash, mustSetup2fa, sessionVersion)` — **tham số thứ 4 bắt
+buộc** (đúng convention đã lập ở M56: không optional, để không sót call-site — dùng
+`grep -rn "makeToken(" app/ lib/` để tìm đủ mọi call-site trước khi sửa chữ ký).
+`parseToken` trả thêm field `sessionVersion: number` trong object kết quả. Token cũ
+(5 phần, phát hành trước đợt này) → `parseToken` coi là không hợp lệ (đổi format là
+breaking thay đổi có chủ đích, đúng tiền lệ M56 PR2 khi thêm cờ `mustSetup2fa` — mọi
+người dùng bị đăng xuất 1 lần sau khi deploy, chấp nhận được, ghi rõ trong
+`PROGRESS.md`).
+
+### `lib/auth.ts::getCurrentUser()`
+
+Sau khi parse token hợp lệ (chữ ký đúng, chưa hết hạn), đối chiếu `sessionVersion` trong
+token với `session_version` hiện tại của user trong DB (đọc từ query đã có sẵn cho
+user đó, hoặc thêm cột vào `SELECT` hiện có nếu đang query `users`) — không khớp → coi
+như chưa đăng nhập (trả `null`, giống các nhánh invalid khác trong hàm này).
+
+### 4 call-site `makeToken` — cập nhật đủ cả 4 (đối chiếu M56 PR2 đã liệt kê đúng 4 chỗ)
+
+`login`, `login/2fa`, `password` (V1 rate-limit + V6 CSRF nếu đã merge trước đó — đọc
+lại file thật trước khi sửa, không giả định thứ tự merge), `oidc/callback`, `totp/confirm`
+— mỗi chỗ đọc `session_version` từ query `users` đã có sẵn trong hàm đó (hầu hết đã
+`SELECT` từ bảng `users` để lấy password_hash/role/totp — thêm `session_version` vào
+`SELECT`, không thêm query riêng nếu tránh được).
+
+### API mới: thu hồi phiên
+
+`app/api/users/[id]/revoke-sessions/route.ts` (mới) — `POST`, quyền `CAN.manageUsers`
+(Admin, đúng quyền quản lý user hiện có, KHÔNG tạo perm key mới). `getCurrentUser()` →
+401. Check quyền → 403. `UPDATE users SET session_version = session_version + 1 WHERE id = ?`.
+Trả `{ ok: true }`. **Không tự revoke chính session admin đang gọi nếu `id === me.id`**
+— nếu admin tự thu hồi phiên chính mình, request tiếp theo (kể cả response hiện tại)
+vẫn nên thành công bình thường (không cần đặc biệt chặn, chỉ cần accept rằng admin sẽ
+bị đăng xuất ở request KẾ TIẾP — hành vi đúng, không phải bug, không cần code thêm gì
+đặc biệt cho ca này).
+
+### UI
+
+Trang quản lý user hiện có (tìm `app/admin/users` hoặc tương đương qua
+`grep -rl "manageUsers" app/`) — thêm nút "Thu hồi phiên đăng nhập" cạnh nút đổi mật
+khẩu đã có (nếu có), gọi API trên, `confirm()` trước khi gửi (hành động có tác động —
+đăng xuất user khỏi mọi thiết bị), toast kết quả.
+
+### Test + tiêu chí V5
+
+- Mở rộng test auth hiện có (tìm file test đụng `getCurrentUser`/`makeToken`, vd
+  `tests/auth.test.ts`/`tests/totp.test.ts` — grep trước khi tạo file mới): token với
+  `sessionVersion` cũ (sau khi tăng `session_version` trong DB) → `getCurrentUser()` trả
+  `null`; token với `sessionVersion` khớp → hợp lệ như cũ; `POST /revoke-sessions` tăng
+  đúng cột, chỉ Admin gọi được (403 cho role khác qua test tích hợp DB thật).
+- `npm run lint`/`typecheck`/`build` xanh, `npm test` xanh toàn bộ.
+- Verify tay: đăng nhập 2 tab (hoặc 2 trình duyệt), gọi thu hồi phiên từ tab Admin khác
+  → tab đã đăng nhập trước đó bị 401 ở request kế tiếp, phải đăng nhập lại.
+
+### Tiêu chí chấp nhận V5
+
+- [ ] Migration thêm thuần tuý.
+- [ ] 5 call-site `makeToken` đều cập nhật đủ tham số mới (grep xác nhận không sót).
+- [ ] Token cũ (5 phần) bị coi là không hợp lệ sau deploy — ghi rõ vào `PROGRESS.md`.
+- [ ] `POST /api/users/:id/revoke-sessions` chỉ Admin gọi được, tăng đúng session_version.
+- [ ] `npm run lint`/`typecheck`/`build` xanh, `npm test` xanh toàn bộ.
+- [ ] `reviewer` soát kỹ (vùng rủi ro cao) TRƯỚC khi merge, không tự merge khi reviewer
+      còn phát hiện chưa xử lý.
+
+---
+
+## V6 — CSRF phòng thủ theo chiều sâu (same-origin check)
+
+- `route: standard`
+- Nhánh: `claude/feat-csrf-same-origin`
+- **Dispatch sau V1, trước V5** (xem cảnh báo xung đột đầu file).
+
+### `lib/csrf.ts` (mới)
+
+```ts
+import type { NextRequest } from "next/server";
+
+// Same-origin check bổ sung cho sameSite:"lax" — chặn thêm 1 lớp cho route mutating
+// nhạy cảm nhất. Origin header vắng mặt (một số client cũ/tool nội bộ) → cho qua, dựa
+// vào sameSite làm lớp chính; Origin có mặt nhưng khác host hiện tại → chặn.
+export function isSameOrigin(req: NextRequest): boolean {
+  const origin = req.headers.get("origin");
+  if (!origin) return true;
+  try {
+    return new URL(origin).host === req.headers.get("host");
+  } catch {
+    return false;
+  }
+}
+```
+
+### Áp dụng vào 4 route nhạy cảm nhất (không mở rộng toàn bộ ~335 route — phạm vi đúng
+đặc tả "route mutating nhạy cảm nhất")
+
+Ngay đầu mỗi handler, SAU `getCurrentUser()` (401 trước, same-origin check sau — không
+lộ thông tin xác thực trước khi check nguồn gốc request):
+```ts
+if (!isSameOrigin(req)) return NextResponse.json({ error: "Yêu cầu không hợp lệ" }, { status: 403 });
+```
+- `app/api/auth/password/route.ts` (PATCH)
+- `app/api/users/[id]/route.ts` (DELETE — tìm đúng method, nếu route xoá user nằm ở
+  path khác thì áp đúng chỗ đó)
+- `app/api/tasks/[id]/approve/route.ts` (POST, DELETE)
+- `app/api/approvals/route.ts` (POST)
+
+### Test + tiêu chí V6
+
+- Test tích hợp mới hoặc mở rộng file test route sẵn có: gọi handler với header `origin`
+  giả mạo khác host → 403; không có header `origin` → qua bình thường (như request cùng
+  origin thật từ browser đôi khi không gửi); `origin` đúng host → qua bình thường.
+- `npm run lint`/`typecheck`/`build` xanh, `npm test` xanh toàn bộ.
+- [ ] Cập nhật `PROGRESS.md`.
+
+---
+
+## V7 — Mở rộng axe coverage (22 trang còn thiếu)
+
+- `route: mechanical` — bám khuôn `e2e/authed/*.spec.ts` đã có sẵn rất nhiều, chỉ lặp
+  lại đúng mẫu cho trang mới, không cần quyết định kiến trúc.
+- Nhánh: `claude/test-axe-coverage-expand`
+
+### Việc cần làm
+
+Với MỖI trang trong danh sách dưới, viết `e2e/authed/<ten-trang>.spec.ts` theo đúng
+khuôn đã có (mở 1 file bất kỳ trong `e2e/authed/` làm mẫu — `goto` → chờ nội dung chính
+render → `new AxeBuilder({ page }).withTags([...]).analyze()` → assert không có vi phạm
+`serious`/`critical`, chạy cả desktop + mobile theo cấu hình `playwright.config.ts` đã
+tách project sẵn — không cần sửa config):
+
+`/offline`, `/account`, `/password`, `/order`, `/reports`, `/scurve`, `/schedule-control`,
+`/progress/[system]` (dùng 1 system id thật có trong seed test), `/hub/[id]` (dùng 1 id
+thật có trong seed test), `/r/[kind]/[id]` (test redirect — nếu axe không áp dụng được
+do trang chỉ redirect, GHI CHÚ trong file test lý do bỏ qua thay vì ép viết ca vô nghĩa),
+`/materials/order-form`, `/materials/suppliers`, `/payments/print`,
+`/admin/integrations` (đã có test click theo audit — bổ sung **assertion axe** vào đúng
+test đó, không tạo file trùng).
+
+Nếu trang cần dữ liệu seed chưa có trong `e2e/global-setup.ts` (vd `/progress/[system]`,
+`/hub/[id]` cần id thật), kiểm fixture hiện có trước — nếu thiếu, thêm tối thiểu 1 dòng
+seed cần thiết vào `global-setup.ts` theo đúng pattern đang dùng (không viết fixture
+riêng cho từng trang).
+
+### Tiêu chí chấp nhận V7
+
+- [ ] Đủ 14 trang trong danh sách có spec axe (hoặc ghi chú rõ lý do bỏ qua cho `/r/[kind]/[id]`
+      nếu không áp dụng được).
+- [ ] `npm run test:e2e` xanh toàn bộ (không chỉ file mới — không phá spec cũ).
+- [ ] Cập nhật `PROGRESS.md`.
+
+---
+
+## V8 — `test:coverage` script + ratchet ghi mốc
+
+- `route: standard`
+- Nhánh: `claude/chore-test-coverage-gate`
+- Theo đúng hướng dẫn đã có sẵn trong `docs/audit.md` §6 (chưa làm, giờ đóng lại).
+
+### Việc cần làm
+
+Thêm script vào `package.json`:
+```json
+"test:coverage": "node --experimental-test-coverage scripts/run-tests.mjs"
+```
+Chạy thử, đọc kết quả `stmts/branches/funcs/lines` cho phạm vi `lib/**` + `app/api/**`
+(coverage built-in Node 22 báo theo file — nếu công cụ không tự lọc theo thư mục, viết
+thêm bước lọc output trong `scripts/run-tests.mjs` hoặc 1 script nhỏ mới
+`scripts/coverage-summary.mjs` tổng hợp đúng 2 phạm vi này, bỏ qua file UI/test). **Đây
+là bước đo/ghi mốc, KHÔNG phải cổng CI cứng** (đúng đặc tả `docs/audit.md` §6 — "nếu
+muốn chốt thành cổng CI thì mở thay đổi riêng"). Ghi số đo được vào `PROGRESS.md` mục
+mới "Coverage cơ sở (lib/**, app/api/**)" kèm ngày đo — đây là mốc **ratchet đầu tiên**
+để các đợt sau đối chiếu "không tệ hơn lần trước".
+
+### Tiêu chí chấp nhận V8
+
+- [ ] `npm run test:coverage` chạy được, in ra số liệu 4 chỉ số.
+- [ ] Mốc đo đầu tiên ghi vào `PROGRESS.md`.
+- [ ] Không thêm gate CI cứng trong việc này (ngoài phạm vi, để đợt sau nếu cần).
+- [ ] `npm run lint`/`typecheck`/`build` xanh.
+
+---
+
+## V9 — CHANGELOG.md tự sinh từ conventional commits
+
+- `route: mechanical`
+- Nhánh: `claude/chore-changelog-gen`
+
+### Việc cần làm
+
+`CHANGELOG.md` hiện chỉ có `[Unreleased]` rỗng + `[0.1.0]`, lệch xa `package.json`
+đang ở `0.3.0`. Thêm script `scripts/gen-changelog.mjs` (mới, dùng `tsx` hoặc Node
+thuần — không thêm dependency mới nếu tránh được, `git log` đủ dữ liệu): đọc
+`git log --oneline` theo conventional prefix (`feat:`, `fix:`, `chore:`, `docs:`...)
+kể từ tag/commit mốc gần nhất, nhóm theo loại, in ra block Markdown theo đúng format
+Keep a Changelog đã có trong file (đối chiếu 2 mục cũ làm mẫu). Thêm npm script
+`"changelog": "tsx scripts/gen-changelog.mjs"` vào `package.json`.
+
+Chạy thử script để **backfill 1 lần** mục `[0.2.0]`/`[0.3.0]` (dựa `git log` thật giữa
+các mốc version bump trong lịch sử — tìm commit đổi `package.json` `version` field làm
+mốc chia) — điền vào `CHANGELOG.md`, giữ mục `[Unreleased]` rỗng ở đầu cho lần release
+kế tiếp. Không cần tự động hoá chạy trong CI/release flow (ngoài phạm vi, chỉ cần công
+cụ sẵn sàng dùng tay mỗi lần release).
+
+### Tiêu chí chấp nhận V9
+
+- [ ] `CHANGELOG.md` có mục `[0.2.0]` và `[0.3.0]` (hoặc gộp hợp lý nếu ranh giới version
+      trong git log không rõ — ghi chú cách chia trong `PROGRESS.md`).
+- [ ] Script `npm run changelog` chạy được không lỗi.
+- [ ] `npm run lint`/`typecheck` xanh (script mới phải qua TS nếu dùng `.ts`, hoặc thuần
+      `.mjs` không cần typecheck).
+
+---
+
+## Loại khỏi đợt này — cần quyết định thêm, không tự chế đặc tả
+
+**Chuẩn hoá data-fetching (`useApiResource`/SWR/TanStack Query)** — audit phát hiện mỗi
+trang tự viết `fetch`+`useState` lặp lại, dễ lệch xử lý lỗi (đúng nguyên nhân gốc của
+V3a). Đây là quyết định kiến trúc ảnh hưởng nhiều trang, KHÔNG có đặc tả kín (chưa chọn
+thư viện, chưa chốt phạm vi — toàn bộ app hay chỉ trang mới). Theo luật cứng
+`CLAUDE.md`, việc này cần hỏi người dùng chốt trước khi lập kế hoạch riêng — KHÔNG đưa
+vào đợt này để tránh việc worker tự quyết kiến trúc thay người dùng. **Đề xuất khi hỏi
+lại**: SWR (nhẹ, phù hợp pattern fetch hiện có) vs tự viết 1 hook `useApiResource` dùng
+nội bộ (không thêm dependency) — và phạm vi: chỉ trang mới từ nay hay refactor dần các
+trang hiện có.
+
+Storybook/visual regression testing (nhắc trong audit UI/UX) — cùng lý do, chưa có
+quyết định công cụ + chi phí duy trì, để backlog.
 
 ---
 
 ## Điều phối
 
-- Cả 2 việc độc lập, dispatch song song trên 2 worktree riêng
-  (`claude/feat-m58-pr3-wire-offline`, `claude/feat-m59-pr1-resources`), base từ
-  `origin/main` (`d851b5e`) — không chia sẻ working tree.
-- Sau khi mỗi việc code xong: gọi `reviewer` soát diff (đặc biệt soát kỹ PR3.3 — đúng là
-  vùng dễ sai vì liên quan mất dữ liệu nhật ký nếu payload sai shape; và PR1 phần SQL
-  window function của `assignmentConflicts` — đúng là vùng dễ sai N+1/JS loop).
-- Không xung đột file giữa 2 việc (M58 PR3 chỉ chạm `offlineQueue/`, `TrackingGrid.tsx`,
-  `DiaryEditorModal.tsx`, `tasks/[id]/photos/route.ts`, 1 migration mới; M59 PR1 chỉ chạm
-  file mới + `dashboardTree.ts`/`modules.ts` — 2 file này CÓ THỂ đụng nhau nếu M58 PR3 cũng
-  sửa, nhưng PR3 không cần sửa `dashboardTree.ts`/`modules.ts` nên an toàn) — merge tuần tự
-  bình thường, không cần dàn xếp đặc biệt.
-- Báo cáo tổng hợp về phiên chính: kết quả 2 PR, số PR GitHub nếu đã mở, kết quả reviewer,
-  bất kỳ điểm nào worker báo vướng đặc tả (dừng lại, không tự chế) để phiên chính xử lý.
+- 9 việc, dispatch theo 2 lô để tránh xung đột file (xem cảnh báo đầu file):
+  - **Lô 1 (song song)**: V1, V2, V3, V4, V7, V8, V9 (7 worktree độc lập).
+  - **Lô 2 (tuần tự, sau khi V1 merge)**: V6 (base `main` mới) → merge → V5 (base `main`
+    mới nhất, dispatch sau cùng vì rủi ro cao nhất).
+- Trước khi merge V2 hoặc V5 (2 việc có migration): chạy `ls migrations | sort -V | tail -3`
+  lấy số thật, không tin số ghi trong kế hoạch này.
+- `reviewer` soát diff MỌI việc trước khi merge; **V5 bắt buộc reviewer xác nhận đạt**
+  trước khi merge (vùng rủi ro cao `docs/audit.md` §8) — không tự merge nếu còn phát
+  hiện chưa xử lý.
+- Sau khi cả 9 việc merge: cập nhật `PROGRESS.md` 1 mục tổng "Đợt nâng cấp chuyên nghiệp
+  hoá (audit 2026-07-19)" liệt kê đủ 9 việc + số PR + kết quả reviewer, và dọn nợ đã ghi
+  (nếu `app/error.tsx` không giữ được header ở V3, ghi rõ).
+- Báo cáo tổng hợp về phiên chính: kết quả từng việc, PR nào cần phiên chính tự soát kỹ
+  hơn (đặc biệt V5), việc nào worker báo vướng đặc tả (dừng lại, không tự chế) để phiên
+  chính xử lý.
