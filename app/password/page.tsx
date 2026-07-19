@@ -45,7 +45,7 @@ export default function PasswordPage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <header className="border-b border-zinc-800 px-6 py-4 flex items-center gap-3">
-        <Link href="/" className="text-zinc-400 hover:text-white">
+        <Link href="/" aria-label="Về Dashboard" className="text-zinc-400 hover:text-white">
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <h1 className="text-lg font-bold flex items-center gap-2">

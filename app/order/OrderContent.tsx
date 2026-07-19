@@ -482,6 +482,7 @@ export default function OrderContent({ isEmbed = false }: { isEmbed?: boolean })
                       e.preventDefault();
                       saveLogo(null);
                     }}
+                    aria-label="Xoá logo"
                     className="absolute top-0.5 right-0.5 bg-white/80 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition text-gray-500 hover:text-red-500"
                   >
                     <X className="w-3 h-3" />
