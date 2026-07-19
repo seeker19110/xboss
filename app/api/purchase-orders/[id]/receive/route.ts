@@ -51,6 +51,10 @@ export async function POST(
   if (!items.length)
     return NextResponse.json({ error: "Không có dòng nào có số lượng nhập" }, { status: 400 });
 
+  // Chống double-submit (bấm nhanh 2 lần / mất mạng công trường retry): client gửi
+  // header Idempotency-Key, unique index (po_id, key) chặn tạo phiếu nhập trùng.
+  const idempotencyKey = req.headers.get("Idempotency-Key")?.trim().slice(0, 200) || null;
+
   const ym = todayISO().slice(0, 7).replace("-", "");
 
   // Lấy toàn bộ po_items để kiểm tra hợp lệ
@@ -85,14 +89,29 @@ export async function POST(
     // Sinh mã phiếu WR-YYYYMM-NNN trong retry — đụng mã (tạo đồng thời) thì sinh lại.
     ({ receiptId, receiptCode } = await withUniqueRetry(() =>
       withTransaction(async () => {
+        // Khoá dòng PO trong transaction để serialize các lần nhập kho đồng thời
+        // trên cùng PO — cần thiết để check trùng idempotency-key bên dưới không
+        // bị race (2 request cùng key cùng lúc đều thấy "chưa có" rồi cùng insert).
+        await queryOne(`SELECT id FROM purchase_orders WHERE id = ? FOR UPDATE`, poId);
+
+        if (idempotencyKey) {
+          const dup = await queryOne<{ id: number; receipt_code: string }>(
+            `SELECT id, receipt_code FROM warehouse_receipts WHERE po_id = ? AND idempotency_key = ?`,
+            poId,
+            idempotencyKey,
+          );
+          if (dup) return { receiptId: dup.id, receiptCode: dup.receipt_code };
+        }
+
         const receiptCode = await nextSeqCode("warehouse_receipts", "receipt_code", `WR-${ym}-`);
         const rid = await insertId(
-          `INSERT INTO warehouse_receipts (receipt_code, po_id, received_by, note)
-       VALUES (?, ?, ?, ?)`,
+          `INSERT INTO warehouse_receipts (receipt_code, po_id, received_by, note, idempotency_key)
+       VALUES (?, ?, ?, ?, ?)`,
           receiptCode,
           poId,
           user.id,
           body.note ? String(body.note).trim() : null,
+          idempotencyKey,
         );
 
         for (const item of items) {

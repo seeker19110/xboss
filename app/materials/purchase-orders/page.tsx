@@ -146,6 +146,7 @@ export default function PurchaseOrdersPage() {
   const [receiveItems, setReceiveItems] = useState<Record<number, string>>({});
   const [receiveNote, setReceiveNote] = useState("");
   const [receivePoItems, setReceivePoItems] = useState<POItem[]>([]);
+  const [receiveKey, setReceiveKey] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [ratingPo, setRatingPo] = useState<PO | null>(null);
@@ -278,11 +279,12 @@ export default function PurchaseOrdersPage() {
     });
     setReceiveItems(initQty);
     setReceiveNote("");
+    setReceiveKey(crypto.randomUUID());
     setShowReceive(po);
   };
 
   const submitReceive = async () => {
-    if (!showReceive) return;
+    if (!showReceive || saving) return;
     const items = receivePoItems
       .map((i) => ({ poItemId: i.id, qtyReceived: Number(receiveItems[i.id] ?? 0), note: "" }))
       .filter((i) => i.qtyReceived > 0);
@@ -294,7 +296,7 @@ export default function PurchaseOrdersPage() {
     try {
       const r = await fetch(`/api/purchase-orders/${showReceive.id}/receive`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Idempotency-Key": receiveKey },
         body: JSON.stringify({ note: receiveNote || null, items }),
       });
       if (r.ok) {
