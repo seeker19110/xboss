@@ -44,9 +44,11 @@ test(
       "schema_migrations phải khớp danh sách file",
     );
 
-    // Baseline đã tạo bảng thật (kiểm 1 bảng lõi).
+    // Baseline đã tạo bảng thật (kiểm 1 bảng lõi). Lọc theo table_schema='public':
+    // từ M55 (0073_bi_schema.sql) có thêm view bi.tasks (whitelist cho Metabase) —
+    // không schema-qualify sẽ khớp cả 2 quan hệ tên "tasks" (bảng public + view bi).
     const tbl = await pool.query(
-      `SELECT 1 FROM information_schema.tables WHERE table_name = 'tasks'`,
+      `SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'tasks'`,
     );
     assert.equal(tbl.rowCount, 1, "bảng tasks phải tồn tại sau migrate");
 
