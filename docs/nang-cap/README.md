@@ -44,7 +44,7 @@ Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 tr�
 
 ## Đặc tả chờ triển khai — đợt Scale/SaaS/BI + bổ sung (M53–M59 viết 07/2026, M61 viết 2026-07-18, M62–M63 viết 2026-07-19)
 
-> **M62 (`M62-rls-khoa-cua.md`)** — đóng nốt RLS: `withProjectScope` đọc-ghi + bọc 3 route còn lại (`notifications`, `payments/bills`, `payments/floors`) rồi migration "khoá cửa" bỏ nhánh thiếu-ngữ-cảnh (2 PR, `route: spec`; PR2 có điều kiện tiên quyết vận hành). **M63 (`M63-webhook-ssrf-dns-pinning.md`)** — chống SSRF DNS rebinding cho webhook: resolve + pin IP qua undici `connect.lookup`, mở rộng `isPrivateIp` (1 PR, `route: spec`). Cả 2 sinh từ đợt đánh giá chi tiết lần 8 (`PROGRESS.md`).
+> **M62 (`M62-rls-khoa-cua.md`)** — đóng nốt RLS: `withProjectScope` đọc-ghi + bọc 3 route còn lại (`notifications`, `payments/bills`, `payments/floors`) rồi migration "khoá cửa" bỏ nhánh thiếu-ngữ-cảnh (2 PR, `route: spec`; PR2 có điều kiện tiên quyết vận hành). **PR1 đã xong 2026-07-19** (nhánh `claude/plan-m62-m63-7osrkh`); **PR2 chờ điều kiện tiên quyết vận hành** (đổi role production sang `xboss_app` + 1 tuần theo dõi log), xem `PROGRESS.md`. **M63 (`M63-webhook-ssrf-dns-pinning.md`)** — chống SSRF DNS rebinding cho webhook: resolve + pin IP qua undici `connect.lookup`, mở rộng `isPrivateIp` (1 PR, `route: spec`). **Đã xong 2026-07-19** (nhánh `claude/plan-m62-m63-7osrkh`). Cả 2 sinh từ đợt đánh giá chi tiết lần 8 (`PROGRESS.md`).
 
 Từ phân tích so XBoss với ERP chuyên nghiệp (`PROGRESS.md`). **Thứ tự thi hành đã chốt (cập nhật 2026-07-18, rà lại code thật sau khi merge #252):**
 
