@@ -7,12 +7,9 @@ import AxeBuilder from "@axe-core/playwright";
 async function gotoScurve(page: Page) {
   await page.goto("/scurve");
   // Biểu đồ S-curve render sau khi API /api/dashboard/scurve đã về.
-  // Chờ heading hoặc biểu đồ hiển thị.
+  // SCurveChart component có h2 "S-curve: Kế hoạch vs Thực tế".
   await expect(
-    page
-      .getByRole("heading", { level: 1 })
-      .filter({ hasText: /Đường cong S|S-Curve/ })
-      .first(),
+    page.getByRole("heading", { level: 2 }).filter({ hasText: "S-curve" }).first(),
   ).toBeVisible({
     timeout: 15_000,
   });

@@ -6,13 +6,9 @@ import AxeBuilder from "@axe-core/playwright";
 
 async function gotoOrderForm(page: Page) {
   await page.goto("/materials/order-form");
-  // Form render với các trường nhập và nút gửi.
-  await expect(
-    page
-      .getByRole("heading", { level: 1 })
-      .filter({ hasText: /Tạo đơn|Form|Đặt hàng/ })
-      .first(),
-  ).toBeVisible({
+  // OrderContent component render với heading "Đơn đặt hàng" (không phải h1,
+  // mà là <span> trong toolbar). Chờ text "Đơn đặt hàng" để xác nhận component đã load.
+  await expect(page.getByText("Đơn đặt hàng", { exact: true })).toBeVisible({
     timeout: 15_000,
   });
 }

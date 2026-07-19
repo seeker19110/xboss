@@ -1,13 +1,12 @@
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
-// Trang Tài khoản (/account) — cài đặt hồ sơ user (tên, email, avatar, ngôn ngữ).
+// Trang Tài khoản (/account) — cài đặt hồ sơ user (avatar, email, liên kết quản trị, 2FA).
 
 async function gotoAccount(page: Page) {
   await page.goto("/account");
-  // Tiêu đề trang hiển thị trong AppHeader dạng <span>, không phải heading —
-  // các nút cài đặt chỉ render khi /api/account đã về.
-  await expect(page.getByRole("button").filter({ hasText: "Lưu thay đổi" }).first()).toBeVisible({
+  // Trang render TwoFactorSection khi /api/auth/totp đã về — chờ heading "Xác thực 2 lớp".
+  await expect(page.getByRole("heading", { name: "Xác thực 2 lớp" })).toBeVisible({
     timeout: 15_000,
   });
 }

@@ -6,9 +6,8 @@ import AxeBuilder from "@axe-core/playwright";
 
 async function gotoPaymentsPrint(page: Page) {
   await page.goto("/payments/print");
-  // Bảng hóa đơn hoặc empty state render khi API đã về.
-  // Kiểu bên trong thường ẩn nav/sidebar ở layout in, nhưng nội dung chính vẫn visible.
-  await expect(page.getByRole("main")).toBeVisible({
+  // Trang in không có <main>. Chờ nút "In / Xuất PDF" để xác nhận trang đã load.
+  await expect(page.getByRole("button", { name: /In|Xuất PDF/ })).toBeVisible({
     timeout: 15_000,
   });
 }

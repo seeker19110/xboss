@@ -7,12 +7,10 @@ import AxeBuilder from "@axe-core/playwright";
 
 async function gotoProgressSystem(page: Page, system: string = "acmv") {
   await page.goto(`/progress/${system}`);
-  // Tiêu đề hệ render khi API summary đã về.
+  // Tiêu đề hệ (AppHeader) dùng <span>, không phải h1. Chờ h2 "Tổng quan tiến độ"
+  // khi API summary đã về.
   await expect(
-    page
-      .getByRole("heading", { level: 1 })
-      .filter({ hasText: /ACMV|Tiến độ/ })
-      .first(),
+    page.getByRole("heading", { level: 2 }).filter({ hasText: "Tổng quan tiến độ" }).first(),
   ).toBeVisible({
     timeout: 15_000,
   });

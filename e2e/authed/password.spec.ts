@@ -5,8 +5,8 @@ import AxeBuilder from "@axe-core/playwright";
 
 async function gotoPassword(page: Page) {
   await page.goto("/password");
-  // Form đổi mật khẩu render với nút Lưu và Reset.
-  await expect(page.getByRole("button", { name: /Lưu|Cập nhật/ }).first()).toBeVisible({
+  // Form đổi mật khẩu render với nút "Đổi mật khẩu" hoặc "Đang lưu..." khi submit.
+  await expect(page.getByRole("button", { name: "Đổi mật khẩu" })).toBeVisible({
     timeout: 15_000,
   });
 }

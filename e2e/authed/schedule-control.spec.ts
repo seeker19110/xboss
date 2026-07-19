@@ -6,12 +6,10 @@ import AxeBuilder from "@axe-core/playwright";
 
 async function gotoScheduleControl(page: Page) {
   await page.goto("/schedule-control");
-  // Tiêu đề trang và danh sách/biểu đồ task trễ render khi API đã về.
+  // Tiêu đề trang (AppHeader) dùng <span>, không phải h1. Chờ h2 "Nguyên nhân trễ (Pareto)"
+  // hoặc ScheduleControlPanel render.
   await expect(
-    page
-      .getByRole("heading", { level: 1 })
-      .filter({ hasText: /Đường găng|Chậm tiến độ|Lookahead/ })
-      .first(),
+    page.getByRole("heading", { level: 2 }).filter({ hasText: "Nguyên nhân trễ" }).first(),
   ).toBeVisible({
     timeout: 15_000,
   });

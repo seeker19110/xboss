@@ -1,18 +1,13 @@
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
-// Trang Đặt hàng (/order) — quản lý đơn đặt hàng vật tư (tạo/sửa/xem chi tiết).
+// Trang Đặt hàng (/order) — redirect tới /materials/order-form (quản lý đơn đặt hàng vật tư).
 
 async function gotoOrder(page: Page) {
   await page.goto("/order");
-  // Tiêu đề trang và bảng danh sách đơn hàng render khi API đã về.
-  // Nếu empty state thì hiện EmptyState.
-  await expect(
-    page
-      .getByRole("heading", { level: 1 })
-      .filter({ hasText: /Đơn đặt hàng|Yêu cầu mua sắm/ })
-      .first(),
-  ).toBeVisible({
+  // /order chuyển hướng sang /materials/order-form. Chờ heading "Đơn đặt hàng"
+  // trong OrderContent component.
+  await expect(page.getByText("Đơn đặt hàng", { exact: true })).toBeVisible({
     timeout: 15_000,
   });
 }
