@@ -289,6 +289,7 @@
 | totp_secret | text | ✓ |  |
 | totp_enabled_at | timestamptz | ✓ |  |
 | totp_last_step | bigint | ✓ |  |
+| session_version | integer |  | `0` |
 
 **Khóa ngoại:**
 - `supplier_id` → `suppliers(id)`
