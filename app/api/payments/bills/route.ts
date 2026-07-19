@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/auth";
-import { query, queryOne, insertId } from "@/lib/db";
+import { query, queryOne, insertId, withProjectScope } from "@/lib/db";
 import { getCurrentProjectId } from "@/lib/projects";
 
 export const dynamic = "force-dynamic";
@@ -43,8 +43,12 @@ export async function GET(_req: NextRequest) {
     projectId != null ? " WHERE pb.project_id = ? OR pb.project_id IS NULL" : "";
   const projectParams = projectId != null ? [projectId] : [];
 
-  const bills = await query<Bill>(
-    `
+  // M62 PR1: bọc trong withProjectScope("*") — khai báo tường minh "route này cố ý đọc
+  // xuyên dự án" (UI hiển thị vậy, lọc thật đã nằm ở projectFilter phía trên). '*' giữ
+  // đúng hành vi hiện tại, chỉ để route không rơi vào nhánh thiếu-GUC sau khi khoá cửa RLS.
+  const bills = await withProjectScope("*", () =>
+    query<Bill>(
+      `
     SELECT pb.id, pb.responsible, pb.type, pb.period,
            pb.amount, pb.description,
            pb.paid_date        AS "paidDate",
@@ -67,7 +71,8 @@ export async function GET(_req: NextRequest) {
         LIMIT 1
       ) wp ON pb.sheet_type_id IS NOT NULL AND pb.floor_label IS NOT NULL${projectFilter}
      ORDER BY pb.paid_date ASC, pb.id ASC`,
-    ...projectParams,
+      ...projectParams,
+    ),
   );
 
   return NextResponse.json({ bills });

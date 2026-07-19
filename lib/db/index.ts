@@ -203,14 +203,19 @@ export async function withTransaction<T>(fn: () => Promise<T>): Promise<T> {
 // policy. Tái dùng nguyên `withTransaction` (không viết cơ chế set GUC mới): mở transaction,
 // set_config LOCAL rồi chạy fn, COMMIT khi xong (SET TRANSACTION READ ONLY vì chỉ đọc).
 // projectId = '*' cho ngữ cảnh cross-project hợp lệ (portfolio/cron/export toàn cục).
+// opts.readOnly (mặc định true — giữ nguyên hành vi cũ) chỉ chặn ghi bằng SET TRANSACTION
+// READ ONLY; đặt false cho route đọc-xen-ghi (vd notifications: đọc bảng phạm vi RLS rồi
+// INSERT/DELETE bảng notifications không-RLS trong cùng 1 transaction).
 export async function withProjectScope<T>(
   projectId: number | "*",
   fn: () => Promise<T>,
+  opts?: { readOnly?: boolean },
 ): Promise<T> {
+  const readOnly = opts?.readOnly ?? true;
   return withTransaction(async () => {
     const client = txStorage.getStore();
     if (!client) throw new Error("withProjectScope: thiếu transaction client (không thể xảy ra)");
-    await client.query("SET TRANSACTION READ ONLY");
+    if (readOnly) await client.query("SET TRANSACTION READ ONLY");
     await client.query(`SELECT set_config('app.project_id', $1, true)`, [String(projectId)]);
     return fn();
   });

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { query, queryOne, run, todayISO, daysFromTodayISO } from "@/lib/db";
-import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/auth";
+import { query, queryOne, run, todayISO, daysFromTodayISO, withProjectScope } from "@/lib/db";
+import { getCurrentUser, CAN, isAdminOrPm, type User } from "@/lib/auth";
 import { costSummary, getCostSettings } from "@/lib/cost";
 import { poLateList, vehicleLateList } from "@/lib/procurement";
 import { missingDiaryDates } from "@/lib/diary";
@@ -62,6 +62,20 @@ export async function GET(req: Request) {
   // null = DB chưa có project nào → giữ hành vi không lọc (tương thích ngược).
   const projectId = await getCurrentProjectId(user);
 
+  // Bọc toàn bộ phần đọc-ghi trong 1 transaction có GUC app.project_id đúng (M62 PR1) —
+  // policy RLS trên 11 bảng tài chính chỉ lọc đúng khi có GUC. readOnly:false vì route này
+  // xen kẽ INSERT/DELETE trên notifications (bảng không-RLS) sau mỗi khối đọc. projectId
+  // null (DB chưa có project) → GUC '*' (hành vi y hệt trước — không lọc gì).
+  return withProjectScope(
+    projectId ?? "*",
+    () => syncAndListNotifications(user, projectId, limit),
+    {
+      readOnly: false,
+    },
+  );
+}
+
+async function syncAndListNotifications(user: User, projectId: number | null, limit: number) {
   const today = todayISO();
 
   // Task đang trễ mà user này chưa có thông báo → tạo mới (UNIQUE chặn trùng).
