@@ -93,5 +93,35 @@ mv "$BUILD_DIR" .next
 echo "==> 7/7 Reload app qua PM2 (graceful, kèm nạp lại biến môi trường) — process \"$PM2_NAME\""
 pm2 reload "$PM2_NAME" --update-env
 
-rm -rf "$OLD_DIR"
-echo "==> Xong! Deploy hoàn tất ($([ "$STAGING" = true ] && echo staging || echo production))."
+echo "==> Health-check sau reload (tối đa 5 lần, cách nhau 3 giây) — endpoint /api/health"
+# Đọc cổng app từ file env đang dùng ($ENV_FILE — biến "PORT", mặc định 3000 nếu không đặt,
+# xem DEPLOY.md). "/api/health" public, không cần đăng nhập (xem app/api/health/route.ts).
+PORT_VAL=$(grep -E '^PORT=' "$ENV_FILE" 2>/dev/null | tail -n1 | cut -d '=' -f2- | tr -d '"' | tr -d "'")
+PORT_VAL="${PORT_VAL:-3000}"
+HEALTH_URL="http://localhost:$PORT_VAL/api/health"
+
+# curl có thể fail vài lần đầu (app chưa kịp sẵn sàng sau reload) — không để "set -e" dừng
+# ngang vòng retry, tự bắt lỗi bằng "if" rồi mới quyết định rollback sau khi thử đủ 5 lần.
+HEALTHY=false
+for i in 1 2 3 4 5; do
+  if curl -sf "$HEALTH_URL" > /dev/null; then
+    HEALTHY=true
+    break
+  fi
+  sleep 3
+done
+
+if [ "$HEALTHY" = true ]; then
+  rm -rf "$OLD_DIR"
+  echo "==> Xong! Deploy hoàn tất ($([ "$STAGING" = true ] && echo staging || echo production))."
+else
+  echo "==> Health-check thất bại sau 5 lần thử ($HEALTH_URL) — rollback về bản build trước"
+  # ".next" đang là bản build MỚI (vừa mv vào ở bước 6/7, chưa bị xoá) — phải rm -rf trước
+  # thì "mv OLD_DIR .next" mới THAY THẾ đúng chỗ, không thì mv sẽ đẩy OLD_DIR vào TRONG
+  # ".next" (thành ".next/.next-old") vì đích đã tồn tại là thư mục.
+  rm -rf .next
+  mv "$OLD_DIR" .next
+  pm2 reload "$PM2_NAME" --update-env
+  echo "==> Health-check thất bại — đã rollback về bản trước"
+  exit 1
+fi
