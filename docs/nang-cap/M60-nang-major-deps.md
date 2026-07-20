@@ -104,6 +104,13 @@
 
 ---
 
+## Kiểm lại 2026-07-20 (kết quả `npm info` thật — cả 3 vẫn CHƯA đạt điều kiện)
+
+- **PR1 (ESLint 10):** `eslint-config-next@16.2.10` đã **lỏng** peer thành `eslint: '>=9.0.0'` (tiến triển so với ghi nhận 2026-07-18, không còn cap `^9` tường minh) — nhưng 2 gói nó **bundle cứng trong `dependencies`** vẫn chặn: `eslint-plugin-react@^7.37` peer `eslint: '^3 || … || ^9.7'` (không có `^10`), `eslint-plugin-jsx-a11y@^6.10` peer `eslint: '^3 || … || ^9'` (không có `^10`). Cài ESLint 10 sẽ báo lỗi peer dep ở 2 gói này qua chuỗi phụ thuộc của `eslint-config-next` → **vẫn chưa đủ điều kiện**, đổi lý do chặn từ "chính `eslint-config-next`" sang "2 plugin nó bundle".
+- **PR2 (TypeScript 7):** xa hơn lúc ghi nhận. `typescript@latest` = `7.0.2` (đã GA), nhưng `typescript-eslint@latest` (8.46) khai peer **`typescript: '>=4.8.4 <6.1.0'`** — **loại trừ hẳn dải 7.x**, không phải kiểu "chờ 7.1 có JS API" như ghi nhận 2026-07-18 mà là hoàn toàn chưa hỗ trợ TS7 ở bất kỳ bản nào. **Chưa đủ điều kiện, cách đích còn xa hơn dự kiến trước.**
+- **PR3 (Node 26):** không fetch được `endoflife.date/nodejs` để xác nhận trực tiếp (403 qua proxy môi trường này). Theo lịch dự kiến ghi trong đặc tả (Node 26 LTS ~2026-10), hôm nay 2026-07-20 còn ~2.5 tháng → nhiều khả năng **vẫn Current, chưa Active LTS**. Cần xác nhận lại bằng nguồn khác khi kiểm định kỳ kế tiếp.
+- **Quyết định:** giữ nguyên trạng thái ĐANG HOÃN, không lập PLAN.md/mở PR nào trong đợt này — đúng nguyên tắc "không tự nhặt lại khi chưa đạt điều kiện". Kiểm lại vào lần rà deps kế tiếp.
+
 ## Kiểm tra định kỳ (đưa vào các đợt rà deps hằng tháng, KHÔNG tự thi hành khi chưa đạt)
 
 ```bash
