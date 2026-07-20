@@ -7,260 +7,391 @@
 
 ## Bối cảnh
 
-Đặc tả gốc: `docs/nang-cap/M54-multi-tenant-saas.md`. Giai đoạn 0 (M51 — RLS theo dự án +
-`organizations` + `withProjectScope`) đã **xong hoàn toàn** (M51 GĐ0 PR1/PR2/PR4 + M62 PR1/PR2
-"khoá cửa" — xác nhận lại 2026-07-20, migration `0077_rls_lock.sql` đã merge `main`, điều kiện
-vận hành production đã đủ). Không còn blocker phụ thuộc để bắt đầu Giai đoạn 1.
+Đặc tả gốc: `docs/nang-cap/M54-multi-tenant-saas.md` mục "Giai đoạn 1". Giai đoạn 0 (M51
+PR1/PR2/PR4 — RLS theo dự án + bảng `organizations`) **đã merge vào `main`** (PR #256).
+Nợ còn lại của GĐ0 là bước "khoá cửa" RLS production (`docs/nang-cap/M62-rls-khoa-cua.md`)
+— đó là thao tác vận hành/production riêng, **KHÔNG chặn** việc bắt đầu GĐ1 (GĐ1 xây trục
+`org_id` mới, độc lập với việc khoá policy RLS dự án đã có).
 
-**Quyết định đã chốt với người dùng trước khi lập kế hoạch này (không tự đoán):**
+**Quyết định đã chốt với người dùng trước khi lập kế hoạch này**: `users.email` giữ
+**UNIQUE toàn cục** (không đổi thành `(org_id, email)`) — đơn giản, login không cần chọn
+tenant. Chỉ thêm cột `org_id` vào `users` để biết user thuộc tổ chức nào; **không đổi**
+ràng buộc UNIQUE hiện có trên `email`.
 
-- `users.email` UNIQUE **toàn cục** (không theo tenant) — 1 email chỉ dùng ở 1 tổ chức. Login
-  không cần chọn tenant trước khi nhập mật khẩu.
-- Mô hình giá/quota, secret store per-tenant cho Google Sheet/Telegram/SMTP, cron per-tenant —
-  **đều thuộc Giai đoạn 2**, KHÔNG nằm trong phạm vi kế hoạch này, không tự làm.
+Đã xác nhận trước khi lập kế hoạch: `git fetch origin`, nhánh làm việc
+`claude/thuc-thi-m54-gd1-89fddh` đã đồng bộ `origin/main`. Migration mới nhất trên
+`main`: `0076_session_version.sql`. **Số migration thật cho PR1 phải xác nhận lại bằng
+`ls migrations | sort -V | tail -3` ngay trước khi commit** — không tin số `0077` ghi cố
+định dưới đây nếu có PR khác chiếm số trước khi dispatch.
 
-**Đã xác nhận trước khi lập kế hoạch**: `git fetch origin`, `origin/main` khớp nhánh hiện tại
-(sạch). Migration mới nhất trên `main`: `0077_rls_lock.sql`. **Số migration cho PR1 PHẢI xác
-nhận lại bằng `ls migrations | sort -V | tail -3` ngay trước khi commit** (tại thời điểm lập kế
-hoạch này là `0078`, có thể đã đổi — bài học lặp lại nhiều lần, xem `docs/nang-cap/README.md`
-mục "LUẬT số migration").
+**Kiểm kê đã xác nhận trên code thật** (không phải suy đoán từ đặc tả):
+- `organizations` (migration `0070_organizations.sql`): hiện chỉ có `id, name, tax_code`.
+  `projects.org_id` đã có (nullable, từ M51 PR4) — PR1 phải đổi thành `NOT NULL` (backfill
+  trước), KHÔNG thêm cột trùng.
+- `boq_codes` (migration `0029_boq_codes.sql`): PK hiện tại `(code)` — registry toàn cục
+  qua trigger `boq_codes_sync()` chạy trên `tasks`/`work_packages`/`materials`/`boq_items`.
+- `projects.code TEXT UNIQUE` (nullable) — cần đổi UNIQUE toàn cục → UNIQUE theo org.
+- `suppliers` **không có cột định danh nào có UNIQUE constraint hiện tại** (chỉ
+  `name/phone/email/address/note`) — khác giả định trong đặc tả gốc M54, **không cần đổi
+  UNIQUE gì cho `suppliers`**, chỉ thêm cột `org_id`.
+- `users.email TEXT UNIQUE NOT NULL` — **giữ nguyên UNIQUE toàn cục** theo quyết định trên.
+- Token phiên hiện tại (`lib/session-token.ts`) đã 6 phần:
+  `userId.exp.pwFrag.flag.sv.HMAC` (`sv` = `session_version`, thêm bởi đợt V5 trước đó).
+  PR2 thêm phần thứ 7 `orgId` → token 7 phần.
+- `withProjectScope` (`lib/db/index.ts`) đã có, dùng làm khuôn cho GUC `app.org_id` ở PR2.
+- Vùng rủi ro cao theo `docs/audit.md` bị chạm: `lib/boq.ts` (PR1), `lib/auth.ts` (PR2) —
+  **bắt buộc `reviewer` soát kỹ trước khi merge cả 2 PR này**, không tự merge nếu còn phát
+  hiện chưa xử lý.
 
-**Đây là thay đổi mô hình dữ liệu lớn nhất từ đầu dự án — đi theo đúng 4 PR tuần tự của đặc tả
-gốc, KHÔNG dồn vào 1 PR, KHÔNG tự rút gọn phạm vi.** PR1→PR2→PR3 phụ thuộc cứng lẫn nhau (mỗi
-PR chỉ bắt đầu SAU khi PR trước đã merge vào `main` — không dùng worktree song song cho 3 PR
-này). PR4 (object storage) phụ thuộc PR1 (cần cột `org_id` tồn tại trên `users`/`projects` để
-tính prefix key) nhưng **độc lập với PR2/PR3** về mặt file — có thể dispatch song song với PR2
-ngay sau khi PR1 merge.
+## Thứ tự bắt buộc — KHÔNG dispatch song song PR1-PR4
 
-## VIỆC 1 — PR1: Migration trục `org_id` (nền dữ liệu)
+Đây là 1 dây chuyền schema phụ thuộc chặt: PR2 cần cột `org_id` từ PR1; PR3 (RLS) cần
+GUC `app.org_id` do PR2 đặt; PR4 (object storage) cần `orgId` từ ngữ cảnh request (PR2)
+để tạo prefix key. **Dispatch tuần tự, mỗi PR base trên `main` mới nhất SAU KHI PR trước
+đã merge**:
 
-- `route: complex` — đặc tả đã nêu rõ mục tiêu và ràng buộc, nhưng từng bảng cụ thể cần tự đọc
-  constraint thật (tên UNIQUE/PK hiện có khác nhau giữa các bảng, không đoán) rồi viết ALTER
-  đúng — đúng "ranh giới quyết định được phép" mô tả bên dưới.
-- Nhánh: `claude/feat-m54-gd1-pr1-org-trunk`
-- **BẮT BUỘC qua staging trước production** (đụng dữ liệu — backfill + đổi UNIQUE/PK), theo DoD
-  `CLAUDE.md`. Không tự áp production.
-- Đặc tả đầy đủ: `docs/nang-cap/M54-multi-tenant-saas.md` mục "Giai đoạn 1 → PR1".
+1. **PR1** (migration trục org) — làm trước, một mình.
+2. **PR2** (auth + context org) — base trên `main` sau khi PR1 merge.
+3. **PR3** (RLS theo org) và **PR4** (object storage) — cả hai base trên `main` sau khi
+   PR2 merge; **PR3 và PR4 có thể chạy song song với nhau** (không chạm chung file: PR3
+   chỉ thêm migration + policy + test, PR4 chỉ chạm `lib/photos.ts` + route serve file).
 
-### Nội dung bắt buộc
-
-1. **Xác nhận số migration thật** bằng `ls migrations | sort -V | tail -3` ngay trước khi tạo
-   file — không dùng số `0078` cố định ghi trong kế hoạch này nếu đã có PR khác chiếm số đó.
-2. `organizations` (đã có từ M51 PR4, `migrations/0070_organizations.sql`) — thêm cột:
-   `slug TEXT UNIQUE NOT NULL` (định danh tenant, dùng slug tạm sinh từ tên cho org backfill
-   nếu tên không hợp lệ làm slug — vd lowercase + thay khoảng trắng bằng `-`), `status TEXT
-   NOT NULL DEFAULT 'active'`, `plan TEXT`, `created_at TIMESTAMPTZ NOT NULL DEFAULT now()`.
-3. Gắn `org_id INT NOT NULL REFERENCES organizations(id)` vào **đúng danh sách bảng gốc** liệt
-   kê trong đặc tả — KHÔNG thêm bảng nào ngoài danh sách này, KHÔNG bỏ sót:
-   `users`, `projects`, `suppliers`, `code_lists`, `role_permissions`, `custom_field_defs`,
-   `feature_flags`, `alert_rules`, `approval_flows`, `api_keys`, `webhooks`, `integrations`,
-   `saved_reports`, `boq_codes`.
-   - Các bảng đã có cột nullable liên quan (vd `code_lists`/`role_permissions` đã có
-     `project_id` từ M61) giữ nguyên cột đó — `org_id` là cột MỚI, độc lập, không thay thế.
-   - Bảng có `project_id` (137 bảng còn lại — WBS/tài chính/vật tư...) **KHÔNG thêm `org_id`**
-     — suy ra qua `project_id → projects.org_id` khi cần (đúng quyết định đặc tả, tránh
-     denormalize + lớp bug đồng bộ 2 cột). Không tự ý mở rộng phạm vi.
-4. **Backfill**: tạo 1 tổ chức mặc định (`slug='default'` hoặc tương đương, `status='active'`)
-   nếu bảng `organizations` đang rỗng; mọi dòng cũ trong 14 bảng ở mục 3 nhận `org_id` = id tổ
-   chức mặc định đó. Script backfill **idempotent** (chạy lại không đổi kết quả — `UPDATE ...
-   WHERE org_id IS NULL` trước khi `SET NOT NULL`, không giả định org mặc định luôn `id=1`).
-5. Đổi UNIQUE liên quan đến các bảng ở mục 3 sang có phạm vi tổ chức — **đọc constraint thật
-   của từng bảng trước khi ALTER** (`grep -n "CREATE TABLE IF NOT EXISTS <bảng>\|UNIQUE" trong
-   migrations/*.sql`, không đoán tên constraint — đúng pattern đã dùng ở `0066` cho
-   `role_permissions`):
-   - `boq_codes`: PK đổi từ `(code)` → `(org_id, code)`; `trigger boq_codes_sync()`
-     (`migrations/0029_boq_codes.sql`) phải đọc `org_id` qua chuỗi JOIN đúng bảng nguồn của
-     từng loại dòng (`tasks`/`work_packages`/`materials`/`boq_items` → `projects.org_id`);
-     `lib/boq.ts::boqTakenBy` thêm tham số `orgId` bắt buộc, mọi call site cập nhật theo.
-   - `projects.code`, định danh `suppliers` (kiểm cột định danh thật, có thể là `name` hoặc mã
-     riêng — đọc `migrations/0001_baseline.sql`), và UNIQUE của các bảng còn lại trong danh
-     sách mục 3 nếu có (`webhooks`, `api_keys`, `code_lists` domain+code, v.v.) → đổi thành
-     UNIQUE `(org_id, <cột định danh cũ>)`.
-   - `users.email` **GIỮ NGUYÊN UNIQUE toàn cục** — quyết định đã chốt, KHÔNG đổi thành
-     `(org_id, email)`.
-6. Migration **idempotent, append-only** (không sửa file đã áp production — ADR-0003); backfill
-   phức tạp có thể tách thành script riêng trong `scripts/` nếu migration SQL thuần không đủ
-   biểu cảm (đúng tiền lệ `scripts/backfill-boq.ts`).
-7. `npm run gen:erd` cùng PR — ERD phải khớp schema mới.
-
-### Tiêu chí chấp nhận VIỆC 1
-
-- [ ] Cả 14 bảng gốc có cột `org_id NOT NULL` trỏ đúng tổ chức mặc định sau backfill; không có
-      dòng nào `org_id IS NULL`.
-- [ ] `boq_codes` PK `(org_id, code)`; trigger + `boqTakenBy` hoạt động đúng theo tổ chức (2 mã
-      trùng nhau ở 2 org khác nhau đều tạo được — verify tay/test tích hợp).
-- [ ] `users.email` vẫn UNIQUE toàn cục (không đổi).
-- [ ] Migration chạy lại lần 2 trên cùng DB không lỗi, không đổi kết quả (idempotent).
-- [ ] `npm run db:migrate -- --dry-run` sạch; đã chạy qua `bash deploy.sh --staging` xác nhận
-      trước khi coi PR1 "sẵn sàng" (nhưng PR1 chỉ cần code + test xong, KHÔNG tự áp production —
-      áp production là quyết định vận hành của người dùng sau khi review, đúng khuôn mẫu M62).
-- [ ] `npm run lint`/`typecheck`/`test`/`build` xanh; `npm run gen:erd` khớp, CI gate không lệch.
-- [ ] Test tích hợp mới (tối thiểu): tạo 2 tổ chức, xác nhận `boq_codes` trùng mã giữa 2 org
-      không đụng nhau; `users.email` trùng vẫn bị chặn dù khác org.
-- [ ] Cập nhật `PROGRESS.md` mục "Đã làm" — ghi rõ **CHƯA áp production**, chờ staging.
+Migration đụng dữ liệu (PR1) **bắt buộc qua staging trước production** theo DoD hiện
+hành (`bash deploy.sh --staging`, xem `docs/ops/staging.md`) — coordinator không tự lên
+production, chỉ tới bước merge PR + verify staging; việc chạy migration thật trên
+production là thao tác vận hành của người dùng sau khi merge.
 
 ---
 
-## VIỆC 2 — PR2: Auth + context org
+## PR1 — Migration trục `org_id` (`route: complex`, BẮT BUỘC qua staging)
 
-- `route: complex` — chạm `lib/auth.ts`/`lib/session-token.ts` (**vùng rủi ro cao**,
-  `docs/audit.md`). Đặc tả nêu rõ mục tiêu (org trong token, GUC `app.org_id`, chặn đổi project
-  xuyên org) nhưng cách sửa từng call site cụ thể cần tự cân nhắc trong ranh giới: KHÔNG đổi
-  ngữ nghĩa quyền hiện có (`CAN`, `canTouchTask`...) ngoài việc thêm điều kiện `org_id`.
+- Nhánh: `claude/feat-m54-gd1-pr1-org-axis`
+- Vùng rủi ro cao: `lib/boq.ts` — đọc kỹ `docs/audit.md` mục liên quan trước khi sửa.
+
+### Ranh giới quyết định được phép (đây KHÔNG phải giấy phép tự do thiết kế)
+
+- Được tự quyết cách viết script backfill (1 file migration SQL thuần hay kèm 1 bước
+  `UPDATE` riêng) miễn: idempotent (`WHERE org_id IS NULL` guard), dry-run được qua
+  `npm run db:migrate -- --dry-run`, và mọi dòng cũ nhận đúng `org_id = 1`.
+- Được tự quyết thứ tự các câu `ALTER TABLE` trong file miễn tôn trọng phụ thuộc khoá
+  ngoại (tạo `organizations` id=1 trước, rồi mới `ALTER ... REFERENCES organizations(id)`).
+- KHÔNG được tự quyết đổi `users.email` sang UNIQUE theo org — đã chốt giữ toàn cục, xem
+  mục Bối cảnh.
+
+### Migration mới `migrations/00NN_org_axis.sql`
+
+(`NN` xác nhận lại bằng `ls migrations | sort -V | tail -3` ngay trước khi commit)
+
+1. **`organizations`** thêm cột: `slug TEXT UNIQUE`, `status TEXT NOT NULL DEFAULT 'active'`,
+   `plan TEXT`, `created_at TIMESTAMPTZ NOT NULL DEFAULT now()`. Backfill: nếu bảng đang
+   rỗng hoặc không có dòng id=1, `INSERT` dòng mặc định
+   `('Tổ chức mặc định', NULL, 'xboss-mac-dinh', 'active', NULL, now())` với `id = 1` —
+   dùng `INSERT ... ON CONFLICT (id) DO NOTHING` hoặc `SELECT ... WHERE NOT EXISTS` (id
+   cụ thể `1` cần ép bằng `OVERRIDING SYSTEM VALUE` nếu `SERIAL` đã tăng qua 1 — kiểm tra
+   thực tế trước, KHÔNG giả định `id=1` còn trống nếu đã có dữ liệu organizations thật từ
+   M51 GĐ0 chạy trên môi trường nào đó).
+2. Thêm cột `org_id INT REFERENCES organizations(id)` (nullable trước) vào: `users`,
+   `suppliers`, `code_lists`, `role_permissions`, `custom_field_defs`, `feature_flags`,
+   `alert_rules`, `approval_flows`, `api_keys`, `webhooks`, `integrations`, `saved_reports`.
+   `projects.org_id` **đã tồn tại** (nullable) — không thêm lại.
+3. Backfill toàn bộ: `UPDATE <bảng> SET org_id = 1 WHERE org_id IS NULL` cho từng bảng ở
+   bước 2 + `projects`.
+4. Sau backfill, `ALTER COLUMN org_id SET NOT NULL` cho toàn bộ 13 bảng (12 bảng mới +
+   `projects`).
+5. `boq_codes`: đổi PK từ `(code)` sang `(org_id, code)` — cần thêm cột `org_id INT NOT
+   NULL REFERENCES organizations(id)` trước, backfill qua JOIN suy ra org từ bảng nguồn
+   (`tasks`/`work_packages`/`materials` → `work_packages`→`sheet_types`→`towers`→`projects`
+   → `org_id`; `boq_items` → `work_packages` cùng chuỗi), rồi `DROP CONSTRAINT` PK cũ +
+   `ADD PRIMARY KEY (org_id, code)`. Sửa `boq_codes_sync()`: hàm hiện dùng
+   `to_jsonb(NEW) ->> TG_ARGV[0]` để lấy `new_code` — thêm logic suy `org_id` tương tự (mỗi
+   bảng nguồn JOIN đúng chuỗi tới `projects.org_id`), đưa vào mọi câu `INSERT`/`DELETE`/
+   `ON CONFLICT` trong hàm (khoá xung đột đổi từ `code` sang `(org_id, code)`). Giữ nguyên
+   toàn bộ 4 trigger gắn trên `tasks/work_packages/materials/boq_items` (chỉ sửa thân hàm
+   `boq_codes_sync()`, không đổi trigger definition).
+6. `projects.code`: đổi `UNIQUE` toàn cục → `UNIQUE (org_id, code)` (drop constraint cũ,
+   tạo lại). Xác nhận tên constraint thật bằng
+   `\d projects` hoặc query `information_schema.table_constraints` trước khi `DROP
+   CONSTRAINT <tên>` — không đoán tên.
+7. **KHÔNG** đổi `users.email` (giữ `UNIQUE NOT NULL` toàn cục nguyên trạng).
+8. **KHÔNG** thêm `org_id` vào `suppliers` với UNIQUE mới — bảng này không có cột định
+   danh UNIQUE hiện tại (đã xác nhận bằng đọc `migrations/0001_baseline.sql`), chỉ thêm
+   cột `org_id` như bước 2.
+9. Chạy `npm run gen:erd` sau khi thêm.
+
+### `lib/boq.ts::boqTakenBy`
+
+Thêm tham số `orgId: number` (bắt buộc, không optional — theo đúng convention đã lập ở
+M56/V5 cho các đổi chữ ký tương tự: dùng `grep -rn "boqTakenBy(" app/ lib/` tìm ĐỦ mọi
+call-site trước khi sửa, không sót). Hàm truy vấn `boq_codes` thêm điều kiện
+`AND org_id = ?`. Route gọi `boqTakenBy` (14 chỗ theo comment trong `0029_boq_codes.sql`)
+lấy `orgId` từ user hiện tại đã đăng nhập qua `getCurrentUser()` — **giai đoạn này user
+CHƯA có `orgId` trong session (đó là việc của PR2)**, nên tạm thời truyền hằng số
+`1` (org mặc định) tại mọi call-site trong PR1 kèm `// TODO(M54 PR2): lấy orgId thật từ
+session` — PR2 sẽ thay `1` bằng giá trị thật từ `getCurrentUser()`. Ghi rõ TODO này trong
+`PROGRESS.md` khi báo cáo PR1 xong, để PR2 không bỏ sót.
+
+### Test
+
+Mở rộng/viết `tests/boq-codes.test.ts` (grep xem đã có file test boq_codes chưa trước
+khi tạo mới): 2 org khác nhau tạo **CÙNG** mã BOQ trên 2 task khác nhau → cả hai thành
+công (đúng mục tiêu cô lập tenant); cùng org, cùng mã trên 2 bảng khác nhau → vẫn bị
+chặn như trước (hành vi cũ giữ nguyên trong phạm vi 1 org). Test backfill: sau migration,
+mọi dòng cũ có `org_id = 1` (query trực tiếp).
+
+### Tiêu chí chấp nhận PR1
+
+- [ ] Migration mới thuần `ALTER`/backfill, dry-run qua (`npm run db:migrate --
+      --dry-run`), chạy staging trước khi coi là xong theo DoD.
+- [ ] `npm run gen:erd` cập nhật đúng số bảng/cột mới.
+- [ ] `boqTakenBy` nhận `orgId`, mọi call-site cập nhật đủ (grep xác nhận không sót).
+- [ ] 2 org tạo trùng mã BOQ đều thành công; trong cùng 1 org hành vi chặn trùng như cũ.
+- [ ] `npm run lint`/`typecheck`/`build` xanh, `npm test` xanh toàn bộ.
+- [ ] `reviewer` soát kỹ (chạm `lib/boq.ts`, vùng rủi ro cao) TRƯỚC khi merge.
+- [ ] Cập nhật `PROGRESS.md` — ghi rõ TODO `orgId` tạm hằng số `1` để PR2 xử lý tiếp.
+
+---
+
+## PR2 — Auth + context org (`route: complex`, vùng rủi ro cao `lib/auth.ts`)
+
 - Nhánh: `claude/feat-m54-gd1-pr2-auth-org-context`
-- **Phụ thuộc cứng vào VIỆC 1 đã merge vào `main`.**
-- Đặc tả đầy đủ: `docs/nang-cap/M54-multi-tenant-saas.md` mục "Giai đoạn 1 → PR2".
+- Base trên `main` SAU KHI PR1 đã merge.
 
-### Nội dung bắt buộc
+### Ranh giới quyết định được phép
 
-1. `lib/session-token.ts`: token phiên hiện là 6 phần
-   (`userId.exp.pwFrag.flag.sessionVersion.HMAC`, xem code hiện tại). Thêm `orgId` vào payload
-   ký (token 7 phần: `userId.exp.pwFrag.flag.sessionVersion.orgId.HMAC`) — **breaking có chủ
-   đích**, đúng tiền lệ M56 PR2/V5 (`parseToken` cũ 6 phần bị coi KHÔNG hợp lệ sau đổi, mọi user
-   bị đăng xuất 1 lần sau deploy — chấp nhận được, ghi rõ trong PR). `makeToken`/`parseToken`
-   cập nhật chữ ký + mọi call site (`lib/auth.ts`, route `/api/auth/login*`).
-2. `lib/auth.ts::getCurrentUser()` trả kèm `orgId` trong `User` type; `lib/request-context.ts`
-   thêm field `orgId` (mirror `projectId` hiện có).
-3. `lib/db/index.ts::withTransaction` — thêm `set_config('app.org_id', ...)` vào cùng câu lệnh
-   `set_config` đã có sẵn (dòng đặt `app.project_id`/`app.user_id`/`app.role`/`app.request_id`)
-   — tái dùng đúng cơ chế GUC hiện có, KHÔNG viết cơ chế mới.
-4. `lib/projects.ts::visibleProjectIds`/`getCurrentProjectId`: lọc thêm theo `org_id` của user
-   hiện tại — kể cả nhánh admin (`SELECT id FROM projects ORDER BY id`) phải giới hạn đúng
-   `WHERE org_id = ?` (admin KHÔNG còn thấy xuyên tổ chức — vai trò admin là per-tenant từ nay,
-   super-admin xuyên tổ chức là việc của Giai đoạn 2, ngoài phạm vi PR2). `resolveProjectId`
-   (hàm thuần) không cần đổi nếu `visible` đã lọc đúng ở tầng gọi.
-5. Test bất biến org-scope mới (`tests/org-scope-invariant.test.ts`, mirror
-   `tests/project-scope-invariant.test.ts`): quét route GET+SELECT chạm 1 trong 14 bảng gốc mà
-   thiếu điều kiện `org_id` → đỏ. Whitelist tường minh nếu có ngoại lệ hợp lý (ghi rõ lý do,
-   đúng pattern whitelist của `project-scope-invariant`).
-6. **KHÔNG** làm ở PR2 (thuộc PR3/PR4 hoặc GĐ2): policy RLS theo org, đổi `data/uploads/`,
-   super-admin xuyên tổ chức, provisioning/signup.
+- Được tự quyết cách đọc `org_id` của user vào `getCurrentUser()` (thêm vào `SELECT`
+  hiện có hay query riêng) — ưu tiên **không** thêm round-trip DB mới nếu hàm đã
+  `SELECT` từ bảng `users`.
+- Được tự quyết vị trí đặt GUC `app.org_id` trong `withTransaction` (cùng khối
+  `set_config` đã có với `app.user_id`/`app.role`/`app.project_id`/`app.request_id`, xem
+  `lib/db/index.ts` dòng ~179) — thêm vào CÙNG câu lệnh `set_config` nhiều tham số hiện
+  có, không tạo câu lệnh riêng.
+- KHÔNG được tự quyết đổi cấu trúc RLS policy — đó là PR3.
 
-### Tiêu chí chấp nhận VIỆC 2
+### `lib/session-token.ts`
 
-- [ ] Token phiên chứa `orgId` đã ký (giả mạo bằng sửa cookie tay bị chặn — test xác nhận).
-- [ ] `getCurrentUser()` trả đúng `orgId`; mọi route dùng `getCurrentProjectId` chỉ thấy project
-      thuộc org của user (đoán ID project org khác → không thấy, không lỗi 500).
-- [ ] `withTransaction` set đúng GUC `app.org_id` — verify bằng `current_setting('app.org_id')`
-      trong 1 test tích hợp.
-- [ ] `tests/org-scope-invariant.test.ts` chạy trong CI, whitelist (nếu có) tối thiểu và có lý
-      do ghi rõ.
-- [ ] Đăng nhập/đăng xuất/đổi mật khẩu/2FA/thu hồi phiên (các luồng đã có trước đó) không hồi
-      quy — chạy lại toàn bộ `tests/auth*.test.ts`, `tests/totp.test.ts`.
-- [ ] `npm run lint`/`typecheck`/`test`/`build` xanh.
-- [ ] `reviewer` **bắt buộc** soát diff (đụng `lib/auth.ts`, vùng rủi ro cao theo
-      `docs/audit.md`).
-- [ ] Cập nhật `PROGRESS.md`.
+Token hiện 6 phần `userId.exp.pwFrag.flag.sv.mac` → đổi thành 7 phần
+`userId.exp.pwFrag.flag.sv.orgId.mac`. `makeToken` thêm tham số **bắt buộc thứ 5**
+`orgId: number` (đúng convention không optional đã lập ở các đợt trước — tìm đủ call-site
+bằng `grep -rn "makeToken(" app/ lib/`). `parseToken` trả thêm field `orgId: number`
+trong `ParsedToken`, validate `orgId` là số nguyên dương hợp lệ (giống cách `sv` đang
+validate bằng regex `^\d+$`). Token cũ (6 phần, phát hành trước đợt này) → `parseToken`
+coi là không hợp lệ (breaking có chủ đích, đúng tiền lệ M56 PR2/V5 — mọi user bị đăng
+xuất 1 lần sau deploy, ghi rõ trong `PROGRESS.md`).
+
+### Cập nhật ĐỦ mọi call-site `makeToken`
+
+Dùng `grep -rn "makeToken(" app/ lib/` xác nhận danh sách thật (đợt V5 trước liệt kê 5
+chỗ: `login`, `login/2fa`, `password`, `totp/confirm`, `oidc/callback` — kiểm lại xem có
+đổi/thêm chỗ nào từ đó tới nay không). Mỗi chỗ lấy `org_id` từ query `users` đã có sẵn
+trong hàm đó (thêm cột vào `SELECT`, không thêm query riêng nếu tránh được) —
+`lib/oidc.ts::SsoUser`/`upsertSsoUser` cũng cần `org_id` (giống cách đã thêm
+`session_version` ở đợt V5 trước).
+
+### `lib/auth.ts::getCurrentUser()`
+
+Sau khi `parseToken` hợp lệ + đối chiếu `session_version`, đọc thêm `orgId` từ token và
+gắn vào object `User` trả về (`User` type thêm field `orgId: number`, tìm định nghĩa
+type `User` trong `lib/auth.ts` hoặc `lib/types.ts` — cập nhật đúng chỗ). **Không** cần
+đối chiếu `orgId` với DB mỗi request (khác `session_version` — đổi org của user là thao
+tác hiếm, hiếm hơn thu hồi phiên, chấp nhận độ trễ tới lần user login lại; nếu về sau cần
+đổi org ngay lập tức thì đó là việc riêng ngoài phạm vi PR2 này).
+
+### `withTransaction` (`lib/db/index.ts`)
+
+Thêm `app.org_id` vào câu `set_config` nhiều tham số đã có (dòng ~179), lấy giá trị từ
+ngữ cảnh actor hiện có (cùng cách `app.project_id`/`app.user_id` đang được truyền vào
+hàm này — đọc kỹ chữ ký `withTransaction` thật trước khi sửa, không đoán).
+
+### `getCurrentProjectId` (`lib/projects.ts`, theo import ở đầu `lib/auth.ts`)
+
+Thêm xác nhận: project mà `current_project` cookie/state trỏ tới phải có
+`org_id = user.orgId` — nếu không khớp (user cố đổi sang project thuộc org khác bằng đoán
+ID), coi như không có project hiện tại (trả `null`, không throw — giữ nguyên kiểu trả về
+`number | null` đã có).
+
+### Mọi query trên 13 bảng nhóm gốc (PR1) — thêm điều kiện `org_id = ?`
+
+Quét bằng test bất biến mới `tests/org-scope-invariant.test.ts` (mở rộng đúng pattern có
+sẵn từ `tests/project-scope-invariant.test.ts` — đọc file đó làm mẫu): route GET SELECT
+chạm 1 trong 13 bảng nhóm gốc (`users`, `projects`, `suppliers`, `code_lists`,
+`role_permissions`, `custom_field_defs`, `feature_flags`, `alert_rules`,
+`approval_flows`, `api_keys`, `webhooks`, `integrations`, `saved_reports`, `boq_codes`)
+mà thiếu `org_id` trong WHERE → test đỏ. Route nào bị bắt lỗi thì sửa thêm điều kiện
+`org_id = user.orgId` (không dùng `withProjectScope`/GUC bắt buộc ở PR2 này — đó là PR3,
+PR2 chỉ đảm bảo app-level filter đúng, giống PR1 của M51 làm với `project_id`).
+
+### Thay TODO tạm của PR1
+
+Ở PR1, `boqTakenBy` mọi call-site tạm truyền hằng số `1`. PR2 thay bằng
+`getCurrentUser()`/`user.orgId` thật tại đúng các call-site đó (grep lại comment
+`TODO(M54 PR2)` để tìm đủ, không sót).
+
+### Test + tiêu chí chấp nhận PR2
+
+- Mở rộng test auth hiện có: token 7 phần với `orgId` đúng → hợp lệ; token 6 phần cũ →
+  `null`; `getCurrentProjectId` chặn khi project thuộc org khác.
+- `tests/org-scope-invariant.test.ts` mới, chạy trong CI như `project-scope-invariant`.
+- [ ] `npm run lint`/`typecheck`/`build` xanh, `npm test` xanh toàn bộ.
+- [ ] `reviewer` soát kỹ (vùng rủi ro cao `lib/auth.ts`) TRƯỚC khi merge, không tự merge
+      nếu còn phát hiện chưa xử lý.
+- [ ] Cập nhật `PROGRESS.md` — ghi rõ mọi user bị đăng xuất 1 lần sau deploy (token đổi
+      định dạng).
 
 ---
 
-## VIỆC 3 — PR3: RLS theo org
+## PR3 — RLS theo org (`route: spec` — đặc tả kín sau khi PR1/PR2 chốt)
 
-- `route: spec` — đặc tả kín SAU KHI PR1/PR2 đã chốt xong (cùng khuôn `migrations/0077_rls_lock.sql`
-  của M62 PR2 — chỉ cần lặp lại đúng pattern policy 2 nhánh cho trục org).
 - Nhánh: `claude/feat-m54-gd1-pr3-rls-org`
-- **Phụ thuộc cứng vào VIỆC 2 đã merge vào `main`** (đọc GUC `app.org_id` do PR2 thiết lập).
-- Đặc tả đầy đủ: `docs/nang-cap/M54-multi-tenant-saas.md` mục "Giai đoạn 1 → PR3".
+- Base trên `main` SAU KHI PR2 đã merge. Có thể chạy song song với PR4.
+- Đặc tả kín — thi hành chính xác, KHÔNG sáng tạo thêm.
 
-### Nội dung
+### Migration mới `migrations/00NN_rls_org.sql`
 
-- Migration mới (số xác nhận lại bằng `ls migrations | sort -V | tail -3` ngay trước khi
-  commit): `CREATE POLICY` trên 14 bảng gốc (mục 3 của VIỆC 1) — `org_id::text =
-  current_setting('app.org_id', true)` (so text, KHÔNG cast int — lý do đã ghi ở
-  `migrations/0077_rls_lock.sql`, không lặp lại sai lầm cast từng gặp ở M51 PR1).
-- Bảng có `project_id` (nhóm 11 bảng tài chính đã có RLS theo project từ M51/M62) **giữ nguyên**
-  policy hiện có — cô lập theo org đã bắc cầu qua `project_id → projects.org_id` (project thuộc
-  đúng 1 org), KHÔNG thêm policy org trùng lặp lên các bảng đó.
-- Theo đúng lộ trình chuyển tiếp đã dùng ở M51/M62 (`IS NULL cho qua` trong giai đoạn đầu →
-  khoá bằng migration riêng sau khi đủ điều kiện vận hành) — **PR3 này áp dụng NGAY policy 2
-  nhánh cuối cùng** (không cần giai đoạn chuyển tiếp trung gian riêng vì PR2 đã đảm bảo GUC
-  luôn có mặt ở mọi transaction ghi/đọc quan trọng — khác bối cảnh M51 PR1 lúc đó chưa có
-  `withProjectScope` cho route đọc). Nếu review phát hiện còn đường đọc thiếu GUC (ngoài
-  transaction), báo lại phiên chính thay vì tự thêm giai đoạn chuyển tiếp.
+Đúng khuôn `migrations/0069_rls.sql` (M51 PR1) — đọc file đó làm mẫu chính xác trước khi
+viết. Với mỗi bảng trong 13 bảng nhóm gốc (PR1, liệt kê ở PR2):
 
-### Tiêu chí chấp nhận VIỆC 3
+```sql
+ALTER TABLE <bảng> ENABLE ROW LEVEL SECURITY;
+ALTER TABLE <bảng> FORCE ROW LEVEL SECURITY;
+CREATE POLICY p_<bảng>_org ON <bảng>
+  USING (org_id::text = current_setting('app.org_id', true)
+         OR current_setting('app.org_id', true) = ''
+         OR current_setting('app.org_id', true) IS NULL
+         OR current_setting('app.org_id', true) = '*')
+  WITH CHECK (org_id::text = current_setting('app.org_id', true)
+         OR current_setting('app.org_id', true) = ''
+         OR current_setting('app.org_id', true) IS NULL
+         OR current_setting('app.org_id', true) = '*');
+```
 
-- [ ] Test tích hợp: query 14 bảng gốc bằng role `xboss_app`, KHÔNG có GUC `app.org_id` → trả 0
-      dòng; có GUC đúng → chỉ thấy tổ chức đó.
-- [ ] `tests/org-isolation.test.ts` (đặc tả gốc mục "Test & tiêu chí chấp nhận xuyên suốt"): 2
-      org × 2 project, xác nhận qua ROUTE THẬT (không chỉ lib) — user org A không đọc/ghi/đoán-ID
-      được tài nguyên org B trên mẫu đại diện mỗi nhóm bảng; BOQCODE trùng giữa 2 org đều tạo
-      được; RLS chặn khi cố tình bỏ WHERE ở tầng app.
-- [ ] `npm run lint`/`typecheck`/`test`/`build` xanh.
-- [ ] Cập nhật `PROGRESS.md` — ghi rõ trạng thái áp production (nếu có điều kiện vận hành cần
-      chờ, ghi rõ như đã làm với M62 PR2, không tự nhận "xong hẳn" nếu chưa xác nhận).
+(So sánh `::text` thay vì cast GUC sang `int` — đúng lý do đã ghi trong
+`migrations/0069_rls.sql`/`PROGRESS.md` mục M51 PR1: Postgres không đảm bảo short-circuit
+AND/OR nên cast `''`/`'*'` sang int sẽ lỗi.)
+
+Bảng có `project_id` (137 bảng còn lại) **giữ nguyên** policy theo project của M51 —
+không đụng, cô lập org đã bắc cầu qua `projects.org_id`.
+
+`boq_codes` là bảng có PK tổ hợp `(org_id, code)` từ PR1 — policy dùng cùng biểu thức
+trên cột `org_id`, không cần xử lý gì đặc biệt thêm.
+
+### Test
+
+`tests/rls-org.test.ts` (integration, role `xboss_app`, đúng khuôn `tests/rls.test.ts`
+của M51): (1) GUC org A không thấy dòng org B dù SQL không có WHERE `org_id`; (2) GUC
+trống → vẫn đọc được (lộ trình chuyển tiếp, giống M51 PR1 — khoá cửa để dành đợt sau như
+M62); (3) `'*'` thấy tất; (4) INSERT sai `org_id` với GUC khác → chặn bởi `WITH CHECK`.
+
+### Tiêu chí chấp nhận PR3
+
+- [ ] Migration theo đúng khuôn `0069_rls.sql`, 13 bảng nhóm gốc có RLS org.
+- [ ] `tests/rls-org.test.ts` đủ 4 kịch bản, pass với Postgres cục bộ role `xboss_app`.
+- [ ] `npm run lint`/`typecheck`/`build` xanh, `npm test` xanh toàn bộ.
+- [ ] Cập nhật `PROGRESS.md` — ghi rõ nợ "khoá cửa" RLS org (bỏ nhánh thiếu-ngữ-cảnh) để
+      dành đợt sau, giống mô hình M62 đã làm cho RLS theo project.
 
 ---
 
-## VIỆC 4 — PR4: Object storage (`data/uploads/` → S3-compatible)
+## PR4 — Object storage cho `data/uploads/` (`route: complex`)
 
-- `route: complex` — đặc tả nêu kiến trúc (`storagePut/storageGet/storageDelete`) nhưng cách
-  giữ nguyên toàn bộ hàng rào hiện có (mime sniffing, hash, max size) trong lúc trừu tượng hoá
-  I/O cần tự cân nhắc; ranh giới: KHÔNG đổi bất kỳ rule validate/an toàn nào đang có trong
-  `lib/photos.ts`, chỉ đổi nơi lưu trữ.
 - Nhánh: `claude/feat-m54-gd1-pr4-object-storage`
-- **Phụ thuộc VIỆC 1 đã merge** (cần cột `org_id` trên `projects` để tính prefix key) — **độc
-  lập với VIỆC 2/VIỆC 3 về file chạm**, dispatch song song với VIỆC 2 ngay sau khi VIỆC 1 merge.
-- Đặc tả đầy đủ: `docs/nang-cap/M54-multi-tenant-saas.md` mục "Giai đoạn 1 → PR4".
+- Base trên `main` SAU KHI PR2 đã merge (cần `user.orgId` từ context request). Có thể
+  chạy song song với PR3.
 
-### Nội dung
+### Ranh giới quyết định được phép
 
-1. `lib/photos.ts` (và mọi module ghi file tương tự — `lib/drawings.ts` nếu có logic file
-   riêng, rà toàn bộ nơi ghi trực tiếp vào `data/uploads/`) trừu tượng hoá qua 3 hàm
-   `storagePut(key, buf, mime)`/`storageGet(key)`/`storageDelete(key)` — giữ nguyên: path sinh
-   ở server (không tin tên file client gửi), mime sniffing (`sniffMime`/`verifyFileMime`), hash
-   sha256, kiểm dung lượng trước khi buffer hết `formData()`.
-2. Backend mặc định: MinIO tự host (S3-compatible) qua biến môi trường mới (đặt tên theo quy
-   ước hiện có, vd `S3_ENDPOINT`/`S3_BUCKET`/`S3_ACCESS_KEY`/`S3_SECRET_KEY` — thiếu biến ⇒ rơi
-   về ghi đĩa cục bộ như hiện tại, KHÔNG throw, để môi trường dev/CI không cần MinIO thật —
-   đúng tinh thần "thiếu cấu hình tuỳ chọn = no-op/fallback" của các tích hợp khác trong dự án
-   như `lib/push.ts`/`lib/google-sheets.ts`).
-3. Key có prefix `org/<org_id>/...` (org lấy qua project của resource, hoặc `orgId` trong
-   request-context khi route đã set).
-4. Route serve file (`GET .../file`, `GET .../photos/:id`...) giữ nguyên URL/response — chỉ đổi
-   nguồn đọc bytes (stream từ storage thay vì `fs.readFile`), client không cần đổi.
-5. Script di trú file cũ (`scripts/migrate-uploads-to-s3.ts` hoặc tên tương tự) — đọc từng file
-   trong `data/uploads/`, tính hash, upload, verify hash khớp trước khi coi là di trú xong; có
-   chế độ `--dry-run`. **KHÔNG tự chạy trên production** — bàn giao cho vận hành, giống mọi
-   script backfill khác trong dự án.
+- Được tự quyết chi tiết client S3 dùng (SDK `@aws-sdk/client-s3` hay thư viện MinIO
+  chính thức) miễn tương thích cả MinIO tự host lẫn S3 thật qua đổi `endpoint`/region —
+  không khoá cứng vào 1 nhà cung cấp.
+- Được tự quyết cấu trúc file mới (`lib/storage.ts` mới hay mở rộng trong `lib/photos.ts`)
+  miễn giữ đúng chữ ký trừu tượng `storagePut/storageGet/storageDelete` nêu dưới và
+  KHÔNG đổi hành vi các hàm hiện có trong `lib/photos.ts` (mime sniffing, hash sha256, max
+  size) — chỉ đổi nơi lưu byte cuối cùng.
+- KHÔNG được tự quyết đổi URL route serve file hiện tại (client không đổi).
 
-### Tiêu chí chấp nhận VIỆC 4
+### `lib/storage.ts` (mới) hoặc mở rộng `lib/photos.ts`
 
-- [ ] Thiếu biến môi trường S3 → toàn bộ luồng upload/xem/xoá file hoạt động y hệt trước PR4
-      (ghi đĩa cục bộ) — không hồi quy khi MinIO chưa cấu hình (CI/dev).
-- [ ] Có biến môi trường S3 (test bằng MinIO cục bộ nếu môi trường CI cho phép, hoặc mock) →
-      upload/xem/xoá qua storage mới hoạt động đúng, mime sniffing/hash/max-size không đổi hành
-      vi.
-- [ ] Script di trú có `--dry-run`, verify hash từng file, không xoá file gốc tới khi xác nhận
-      upload + hash khớp.
-- [ ] `npm run lint`/`typecheck`/`test`/`build` xanh.
-- [ ] `DEPLOY.md` cập nhật mục vận hành MinIO/S3 (biến môi trường, cách chạy script di trú).
+```ts
+export async function storagePut(key: string, buf: Buffer, mime: string): Promise<void>;
+export async function storageGet(key: string): Promise<Buffer | null>;
+export async function storageDelete(key: string): Promise<void>;
+```
+
+Key có prefix `org/<org_id>/...` (lấy `org_id` từ `user.orgId` tại route gọi, không đọc
+GUC DB). Biến môi trường mới (thêm vào `lib/env.ts` theo đúng pattern `serverSchema` đã
+có — optional, thiếu thì fallback filesystem cũ để dev không cần dựng MinIO):
+`XBOSS_S3_ENDPOINT`, `XBOSS_S3_BUCKET`, `XBOSS_S3_ACCESS_KEY`, `XBOSS_S3_SECRET_KEY`,
+`XBOSS_S3_REGION` (mặc định `us-east-1` cho MinIO). Thiếu đủ biến này →
+`storagePut/storageGet/storageDelete` fallback về `fs` filesystem hiện có (path
+`data/uploads/`) — giữ nguyên hành vi dev/staging chưa có MinIO, đúng pattern các tích
+hợp tuỳ chọn khác trong dự án (`lib/push.ts`, `lib/google-sheets.ts`).
+
+### Điểm chạm route hiện có
+
+Mọi nơi hiện đang `fs.writeFile`/`fs.readFile`/`fs.unlink` trực tiếp vào
+`data/uploads/` (grep `data/uploads` và `fs\.(writeFile|readFile|unlink)` trong
+`app/api/`/`lib/photos.ts` để liệt kê đủ — bao gồm ảnh hiện trường `task_photos`, biên
+bản nghiệm thu `task_documents`, tài liệu hợp đồng/dự án nếu có dùng cùng cơ chế lưu
+file) — đổi sang gọi `storagePut/storageGet/storageDelete`, giữ nguyên toàn bộ hàng rào
+đã có TRƯỚC bước ghi (verify mime, hash sha256, max size không đổi vị trí kiểm tra).
+
+### Script di trú file cũ
+
+`scripts/migrate-uploads-to-storage.ts` (mới) — quét toàn bộ file trong `data/uploads/`,
+với mỗi file: tra bảng tương ứng (`task_photos`/`task_documents`/...) lấy `id` + tính
+`org_id` (qua chuỗi JOIN từ task → project → org), upload qua `storagePut` với key
+`org/<org_id>/<tên file cũ>`, verify hash sha256 sau khi đọc lại từ storage khớp hash gốc
+trước khi coi là xong (không tự xoá file gốc trong script này — để người vận hành tự xoá
+sau khi xác nhận thủ công, tránh mất dữ liệu nếu script có bug).
+
+### Test
+
+`tests/storage.test.ts` (mới, unit thuần không cần S3 thật nếu thiếu env — test fallback
+filesystem; nếu có `TEST_S3_*` env thì test thật với MinIO local, tự skip nếu thiếu, đúng
+pattern `TEST_DATABASE_URL`).
+
+### Tiêu chí chấp nhận PR4
+
+- [ ] `storagePut/storageGet/storageDelete` hoạt động cả 2 chế độ (S3 thật khi có env,
+      fallback filesystem khi thiếu).
+- [ ] URL route serve file không đổi với client.
+- [ ] Script di trú chạy được, verify hash từng file, không tự xoá file gốc.
+- [ ] `npm run lint`/`typecheck`/`build` xanh, `npm test` xanh toàn bộ.
+- [ ] `DEPLOY.md` thêm mục cấu hình MinIO/S3 (biến môi trường mới, cách chạy script di
+      trú) — chỉ tài liệu, không yêu cầu người dùng đổi hạ tầng ngay trong PR này.
 - [ ] Cập nhật `PROGRESS.md`.
 
 ---
+
+## Test & tiêu chí chấp nhận xuyên suốt (toàn GĐ1, chạy sau khi PR3+PR4 merge)
+
+`tests/org-isolation.test.ts` (mới, integration, route thật — không chỉ lib): dựng 2 org
+× 2 project, xác nhận qua ROUTE THẬT: user org A không đọc/ghi/đoán-ID được bất kỳ tài
+nguyên org B nào trên mẫu đại diện mỗi nhóm bảng (tài chính, WBS, vật tư, tài liệu, cấu
+hình); BOQCODE trùng nhau giữa 2 org đều tạo được; RLS chặn khi cố tình bỏ WHERE (query
+trực tiếp bằng role `xboss_app`). Việc viết test tổng hợp này giao cho `coordinator` sau
+khi cả 4 PR đã merge — không thuộc riêng PR nào ở trên (cần schema đầy đủ của cả 4 PR).
 
 ## Điều phối
 
-- **Thứ tự bắt buộc** (không dispatch song song ngoài ngoại lệ đã nêu):
-  1. VIỆC 1 (PR1) một mình trước — mọi việc khác phụ thuộc nó.
-  2. Sau khi VIỆC 1 merge vào `main`: dispatch **song song** VIỆC 2 (PR2) và VIỆC 4 (PR4) — 2
-     worktree độc lập, không chạm file chung.
-  3. Sau khi VIỆC 2 merge vào `main`: dispatch VIỆC 3 (PR3) — base worktree trên `main` mới
-     nhất sau merge VIỆC 2 (không cần chờ VIỆC 4, độc lập file).
-- Trước khi commit BẤT KỲ migration nào ở VIỆC 1/VIỆC 3: chạy
-  `ls migrations | sort -V | tail -3` lấy số thật, không tin số ghi trong đặc tả gốc hay kế
-  hoạch này.
-- `reviewer` soát diff cả 4 việc trước khi merge; **VIỆC 2 bắt buộc reviewer xác nhận đạt**
-  (đụng `lib/auth.ts`, vùng rủi ro cao theo `docs/audit.md`) — không merge nếu reviewer báo
-  blocker.
-- VIỆC 1 và VIỆC 3 chỉ coi là hoàn tất về mặt CODE — migration đụng dữ liệu/đổi policy RLS
-  KHÔNG tự động nghĩa là đã áp production; ghi rõ trạng thái "chờ staging"/"chờ điều kiện vận
-  hành" (nếu có) trong báo cáo cuối, để phiên chính/người dùng quyết định thời điểm áp
-  production — đúng tiền lệ M62.
-- Sau khi cả 4 việc merge: cập nhật `docs/nang-cap/README.md` (đổi trạng thái M54 từ "❌ chưa"
-  sang đúng thực tế — có thể vẫn "GĐ1 code xong, chờ staging" nếu chưa áp production) và
-  `PROGRESS.md` mục "Đã làm" + "Tiếp theo" (Giai đoạn 2 chỉ mới có phác thảo, cần viết đặc tả
-  riêng khi đến lượt — không tự viết đặc tả GĐ2 trong đợt này).
-- Báo cáo tổng hợp về phiên chính: kết quả từng việc, số PR, kết quả reviewer (đặc biệt VIỆC 2),
-  và làm rõ trạng thái treo (staging/production) của VIỆC 1 và VIỆC 3 để phiên chính không nhầm
-  là đã xong hoàn toàn.
+- 4 PR, dispatch **tuần tự theo thứ tự PR1 → PR2 → {PR3, PR4}** (xem mục "Thứ tự bắt
+  buộc" đầu file) — KHÔNG dispatch song song PR1/PR2 với nhau, chỉ PR3/PR4 song song sau
+  khi PR2 merge.
+- Trước khi merge mỗi PR có migration (PR1, PR3): chạy `ls migrations | sort -V | tail -3`
+  lấy số thật, không tin số ghi trong kế hoạch này.
+- `reviewer` soát diff MỌI PR trước khi merge; **PR1 (chạm `lib/boq.ts`) và PR2 (chạm
+  `lib/auth.ts`) bắt buộc `reviewer` xác nhận đạt** trước khi merge (vùng rủi ro cao
+  `docs/audit.md`) — không tự merge nếu còn phát hiện chưa xử lý.
+- PR1 là migration đụng dữ liệu — bắt buộc qua staging trước khi coi PR1 "xong" theo DoD
+  (`bash deploy.sh --staging`); coordinator merge PR sau khi verify staging xanh, việc áp
+  migration lên production thật là thao tác vận hành riêng của người dùng.
+- Sau khi PR2 merge: viết `tests/org-isolation.test.ts` tổng hợp (mục trên) — có thể giao
+  cùng lúc với PR3/PR4 hoặc làm riêng sau khi cả 2 merge, coordinator tự quyết thời điểm.
+- Sau khi cả 4 PR merge: cập nhật `docs/nang-cap/README.md` — đổi trạng thái
+  `M54-multi-tenant-saas.md` từ "❌ chưa" sang "✅ GĐ1 xong", ghi số PR từng phần; cập nhật
+  `PROGRESS.md` mục tổng kết GĐ1, liệt kê rõ nợ còn lại cho Giai đoạn 2 (provisioning,
+  billing/quota, secret store per-org cho Google Sheet/Telegram/SMTP, cron per-tenant —
+  đã ghi trong đặc tả gốc mục "Rủi ro & quyết định mở", KHÔNG tự thi hành GĐ2 trong đợt
+  này).
+- Báo cáo tổng hợp về phiên chính: kết quả từng PR, đặc biệt PR1/PR2 reviewer có phát
+  hiện gì; việc nào worker báo vướng đặc tả (dừng lại, không tự chế) để phiên chính xử lý;
+  xác nhận staging đã chạy migration PR1 thành công trước khi phiên chính duyệt cuối.
