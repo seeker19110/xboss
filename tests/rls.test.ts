@@ -87,14 +87,15 @@ test(
         );
       });
 
-      // (2) GUC trống (chưa đặt) — giai đoạn chuyển tiếp PR1: nhánh IS NULL cho qua, đọc được cả 2.
+      // (2) GUC trống (chưa đặt) — M62 PR2 "khoá cửa": nhánh cho-qua đã bị bỏ, không có GUC
+      // thì RLS trả RỖNG (không lộ dòng nào của cả 2 dự án).
       const allSeen = await appPool.query<{ project_id: number }>(
         `SELECT project_id FROM contracts WHERE project_id IN (${projA}, ${projB})`,
       );
-      const seenProjects = new Set(allSeen.rows.map((r) => r.project_id));
-      assert.ok(
-        seenProjects.has(projA) && seenProjects.has(projB),
-        "GUC trống (chưa đặt) phải đọc được cả 2 dự án ở PR1 (nhánh IS NULL)",
+      assert.equal(
+        allSeen.rows.length,
+        0,
+        "GUC trống (chưa đặt) phải trả 0 dòng sau khi khoá cửa (M62 PR2)",
       );
 
       // (3) GUC = '*' — ngữ cảnh cross-project: thấy tất.
