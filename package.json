@@ -53,6 +53,9 @@
     "postcss": ">=8.5.10",
     "exceljs": {
       "uuid": "^11.1.1"
+    },
+    "minimatch@10.2.5": {
+      "brace-expansion": "^5.0.7"
     }
   },
   "devDependencies": {
