@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, run } from "@/lib/db";
+import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, type Role } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { assertModuleEnabled } from "@/lib/feature-flags";
@@ -95,48 +95,59 @@ export async function PATCH(
 
   vals.push(id);
   try {
-    await run(
-      `UPDATE materials SET ${sets.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      ...vals,
-    );
+    // Khoá dòng (FOR UPDATE) rồi mới đọc qty_used/qty_stock hiện hành để tính delta ghi
+    // audit — tránh lost update khi có POST /transactions chạy xen giữa lúc load form và
+    // lúc PATCH này gửi đi (m ở trên chỉ dùng để kiểm tồn tại/quyền, đã có thể lỗi thời).
+    await withTransaction(async () => {
+      const locked = await queryOne<{ qty_used: number; qty_stock: number }>(
+        `SELECT qty_used, COALESCE(qty_stock, 0) AS qty_stock FROM materials WHERE id = ? FOR UPDATE`,
+        id,
+      );
+      if (!locked) return;
+
+      await run(
+        `UPDATE materials SET ${sets.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        ...vals,
+      );
+
+      // Sửa trực tiếp số đã dùng cũng phải truy vết được — ghi giao dịch với delta chênh lệch.
+      if (body.qtyUsed !== undefined) {
+        const newQty = Number(body.qtyUsed) || 0;
+        const delta = newQty - locked.qty_used;
+        if (delta !== 0) {
+          await run(
+            `INSERT INTO material_transactions (material_id, delta, qty_after, note, created_by)
+             VALUES (?, ?, ?, 'Sửa trực tiếp tổng đã dùng', ?)`,
+            id,
+            delta,
+            newQty,
+            user.id,
+          );
+        }
+      }
+
+      // Điều chỉnh tồn kho trực tiếp cũng phải truy vết (nhất quán với nhập/xuất kho).
+      if (body.qtyStock !== undefined) {
+        const newStock = Number(body.qtyStock) || 0;
+        const delta = newStock - locked.qty_stock;
+        if (delta !== 0) {
+          await run(
+            `INSERT INTO material_transactions (material_id, delta, qty_after, type, note, created_by)
+             VALUES (?, ?, ?, 'dieu_chinh_kho', 'Điều chỉnh tồn kho trực tiếp', ?)`,
+            id,
+            delta,
+            newStock,
+            user.id,
+          );
+        }
+      }
+    });
   } catch (e: unknown) {
     log.error("PATCH /api/materials/:id lỗi", {
       route: "PATCH /api/materials/:id",
       err: e instanceof Error ? e.message : String(e),
     });
     return NextResponse.json({ error: "Lỗi máy chủ khi cập nhật vật tư" }, { status: 500 });
-  }
-
-  // Sửa trực tiếp số đã dùng cũng phải truy vết được — ghi giao dịch với delta chênh lệch.
-  if (body.qtyUsed !== undefined) {
-    const newQty = Number(body.qtyUsed) || 0;
-    const delta = newQty - (m.qty_used ?? 0);
-    if (delta !== 0) {
-      await run(
-        `INSERT INTO material_transactions (material_id, delta, qty_after, note, created_by)
-         VALUES (?, ?, ?, 'Sửa trực tiếp tổng đã dùng', ?)`,
-        id,
-        delta,
-        newQty,
-        user.id,
-      );
-    }
-  }
-
-  // Điều chỉnh tồn kho trực tiếp cũng phải truy vết (nhất quán với nhập/xuất kho).
-  if (body.qtyStock !== undefined) {
-    const newStock = Number(body.qtyStock) || 0;
-    const delta = newStock - (m.qty_stock ?? 0);
-    if (delta !== 0) {
-      await run(
-        `INSERT INTO material_transactions (material_id, delta, qty_after, type, note, created_by)
-         VALUES (?, ?, ?, 'dieu_chinh_kho', 'Điều chỉnh tồn kho trực tiếp', ?)`,
-        id,
-        delta,
-        newStock,
-        user.id,
-      );
-    }
   }
 
   const material = await queryOne(

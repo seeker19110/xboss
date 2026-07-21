@@ -87,16 +87,21 @@ export async function PATCH(
       status,
       id,
     );
-    await run(
-      `INSERT INTO task_history (task_id, old_progress, new_progress, status, note, changed_by)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-      id,
-      task.progress_percent ?? 0,
-      progress,
-      status,
-      body.note ?? null,
-      user.name,
-    );
+    // Chỉ ghi lịch sử khi % thực sự đổi — đối xứng với recomputeTask (lib/recompute.ts),
+    // tránh nhân bản dòng lịch sử khi double-submit/offline-retry gửi lại cùng giá trị.
+    const oldProgress = task.progress_percent ?? 0;
+    if (progress !== oldProgress) {
+      await run(
+        `INSERT INTO task_history (task_id, old_progress, new_progress, status, note, changed_by)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+        id,
+        oldProgress,
+        progress,
+        status,
+        body.note ?? null,
+        user.name,
+      );
+    }
 
     return { packageId: task.package_id, status } as const;
   });
