@@ -112,7 +112,8 @@ export function parseVoBody(body: Record<string, unknown>): VoInput {
 // Trả thông điệp lỗi dòng đầu tiên bị trùng, hoặc null nếu tất cả đều rảnh.
 export async function checkVoLinesTaken(lines: VoLineInput[]): Promise<string | null> {
   for (const line of lines) {
-    const takenBy = await boqTakenBy(line.code.trim());
+    // TODO(M54 PR2): lấy orgId thật từ session
+    const takenBy = await boqTakenBy(line.code.trim(), 1);
     if (takenBy) return `Mã "${line.code}" đã được dùng bởi ${takenBy}`;
   }
   return null;

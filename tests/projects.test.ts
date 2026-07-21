@@ -130,7 +130,7 @@ test(
 );
 
 test(
-  "listProjects(orgId)/listOrganizations: lọc theo tổ chức; org_id NULL không tạo mục org (M51 PR4)",
+  "listProjects(orgId)/listOrganizations: lọc theo tổ chức; dự án omit org_id → org mặc định 1 (M54 GĐ1 PR1)",
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
@@ -148,8 +148,10 @@ test(
       `INSERT INTO projects (name, code, org_id) VALUES ('DA Org B', 'PJT-ORGB', ?)`,
       o2,
     );
-    const pNull = await insertId(
-      `INSERT INTO projects (name, code) VALUES ('DA không org', 'PJT-ORGN')`,
+    // M54 GĐ1 PR1: org_id giờ NOT NULL DEFAULT 1 — dự án omit org_id thuộc org mặc định 1
+    // (không còn NULL như M51 PR4 nữa).
+    const pDefault = await insertId(
+      `INSERT INTO projects (name, code) VALUES ('DA org mặc định', 'PJT-ORGN')`,
     );
 
     const admin = { id: -1, role: "admin" as const };
@@ -158,11 +160,11 @@ test(
     const all = await listProjects(admin);
     const allIds = all.map((p) => p.id);
     assert.ok(
-      allIds.includes(pA) && allIds.includes(pB) && allIds.includes(pNull),
+      allIds.includes(pA) && allIds.includes(pB) && allIds.includes(pDefault),
       "không lọc → thấy hết",
     );
     assert.equal(all.find((p) => p.id === pA)!.orgId, o1);
-    assert.equal(all.find((p) => p.id === pNull)!.orgId, null);
+    assert.equal(all.find((p) => p.id === pDefault)!.orgId, 1);
 
     // Lọc theo org A → chỉ dự án org A.
     const onlyA = await listProjects(admin, o1);
@@ -171,12 +173,12 @@ test(
       [pA],
     );
 
-    // listOrganizations chỉ liệt kê org có dự án user thấy, không tính dự án org_id NULL.
+    // listOrganizations liệt kê org có dự án user thấy — gồm cả org mặc định 1 (pDefault).
     const orgs = await listOrganizations(admin);
     const orgIds = orgs.map((o) => o.id);
-    assert.ok(orgIds.includes(o1) && orgIds.includes(o2));
+    assert.ok(orgIds.includes(o1) && orgIds.includes(o2) && orgIds.includes(1));
 
-    await run(`DELETE FROM projects WHERE id IN (?, ?, ?)`, pA, pB, pNull);
+    await run(`DELETE FROM projects WHERE id IN (?, ?, ?)`, pA, pB, pDefault);
     await run(`DELETE FROM organizations WHERE id IN (?, ?)`, o1, o2);
   },
 );

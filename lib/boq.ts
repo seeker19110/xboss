@@ -8,25 +8,39 @@ export function makeBoq(sheetCode: string, rowCode: string): string {
   return `${prefix}-${rowCode.replace(/,/g, "-")}`;
 }
 
-// BOQCODE phải duy nhất trên TOÀN BỘ hệ thống (nhóm + task + vật tư + dòng BOQ)
-// để mã đặt hàng/nghiệm thu không bao giờ nhập nhằng.
-// Trả về mô tả nơi đang dùng mã, hoặc null nếu chưa ai dùng.
+// BOQCODE phải duy nhất trong PHẠM VI 1 org (M54 GĐ1) — trên nhóm + task + vật tư + dòng
+// BOQ — để mã đặt hàng/nghiệm thu không bao giờ nhập nhằng. Hai org khác nhau vẫn được đặt
+// cùng 1 mã (cô lập tenant). Trả về mô tả nơi đang dùng mã trong org đó, hoặc null nếu chưa
+// ai dùng. Lọc theo org qua bảng đăng ký boq_codes (nguồn sự thật, PK (org_id, code)).
 export async function boqTakenBy(
   boq: string,
+  orgId: number,
   exclude?: { table: "tasks" | "work_packages" | "materials" | "boq_items"; id: number },
 ): Promise<string | null> {
   const rows = await query<{ kind: string; id: number; code: string | null; name: string }>(
-    `(SELECT 'task'    AS kind, id, code, name FROM tasks         WHERE boq_code = ?)
+    `(SELECT 'task'    AS kind, t.id, t.code, t.name FROM tasks t
+        JOIN boq_codes bc ON bc.table_name = 'tasks' AND bc.row_id = t.id
+       WHERE t.boq_code = ? AND bc.org_id = ?)
      UNION ALL
-     (SELECT 'package' AS kind, id, code, name FROM work_packages WHERE boq_code = ?)
+     (SELECT 'package' AS kind, w.id, w.code, w.name FROM work_packages w
+        JOIN boq_codes bc ON bc.table_name = 'work_packages' AND bc.row_id = w.id
+       WHERE w.boq_code = ? AND bc.org_id = ?)
      UNION ALL
-     (SELECT 'material' AS kind, id, NULL,  name FROM materials   WHERE boq_code = ?)
+     (SELECT 'material' AS kind, m.id, NULL, m.name FROM materials m
+        JOIN boq_codes bc ON bc.table_name = 'materials' AND bc.row_id = m.id
+       WHERE m.boq_code = ? AND bc.org_id = ?)
      UNION ALL
-     (SELECT 'boq_item' AS kind, id, code, name FROM boq_items    WHERE code = ?)`,
+     (SELECT 'boq_item' AS kind, b.id, b.code, b.name FROM boq_items b
+        JOIN boq_codes bc ON bc.table_name = 'boq_items' AND bc.row_id = b.id
+       WHERE b.code = ? AND bc.org_id = ?)`,
     boq,
+    orgId,
     boq,
+    orgId,
     boq,
+    orgId,
     boq,
+    orgId,
   );
 
   for (const r of rows) {

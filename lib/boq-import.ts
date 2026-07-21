@@ -167,7 +167,8 @@ export async function previewBoqImport(
   for (const row of rows) {
     const code = `${prefix}${String(seq).padStart(4, "0")}`;
     seq++;
-    const takenBy = await boqTakenBy(code);
+    // TODO(M54 PR2): lấy orgId thật từ session
+    const takenBy = await boqTakenBy(code, 1);
     out.push(
       takenBy
         ? { ...row, code, action: "error", reason: `Mã "${code}" đã được dùng bởi ${takenBy}` }
@@ -196,7 +197,8 @@ export async function commitBoqImport(
     for (const row of rows) {
       const code = `${prefix}${String(seq).padStart(4, "0")}`;
       seq++;
-      const takenBy = await boqTakenBy(code);
+      // TODO(M54 PR2): lấy orgId thật từ session
+      const takenBy = await boqTakenBy(code, 1);
       if (takenBy) {
         errors.push(`Bỏ qua "${row.name}" — mã "${code}" đã được dùng bởi ${takenBy}`);
         continue;
