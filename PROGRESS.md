@@ -8,6 +8,17 @@
 
 - **GĐ 4–5 — Phát triển & nâng chất lượng.** Sản phẩm đã chạy thật (v0.2.1, tự host VPS), đang phát triển/tinh chỉnh tính năng liên tục **và** đang áp bộ khung quy trình/chất lượng (brownfield) theo `docs/framework/AP-DUNG-vao-du-an-co-san.md`.
 
+## Đợt audit hẹp vùng rủi ro cao (2026-07-21) — lib/recompute.ts, lib/auth.ts, lib/material-sync.ts, lib/boq.ts
+
+Audit ĐỌC + BÁO CÁO trước (3 subagent song song đúng vùng rủi ro cao `docs/audit.md` §8), tự xác minh lại 2 điểm agent nghi ngờ (cookie `secure` — báo động giả, không cần sửa; race PATCH materials — xác nhận thật), sau đó sửa 2 bug xác nhận chắc; 1 phát hiện còn lại cần chốt ý đồ nghiệp vụ với người dùng nên **để riêng, chưa sửa**.
+
+- **[AI, đã sửa] Lost update + audit sai khi PATCH `qtyUsed`/`qtyStock` song song `POST /transactions`** (`app/api/materials/[id]/route.ts`): route PATCH đọc `qty_used`/`qty_stock` snapshot cũ ngoài transaction rồi ghi đè bằng giá trị tuyệt đối, trong khi `POST /transactions` cùng resource ghi atomic qua `UPDATE ... qty_used + delta RETURNING`. 2 request chạy gần nhau → giao dịch của request kia "biến mất" khỏi tồn kho dù dòng lịch sử vẫn còn, `material_transactions` lệch khỏi `materials.qty_used` thật. Sửa: bọc toàn bộ UPDATE + tính delta trong `withTransaction`, khoá dòng bằng `SELECT ... FOR UPDATE` trước khi tính delta cho cả `qtyUsed` và `qtyStock`.
+- **[AI, đã sửa] `task_history` ghi vô điều kiện, không idempotent** (`app/api/tasks/[id]/progress/route.ts`): không đối xứng với `recomputeTask` (`lib/recompute.ts`) vốn chỉ ghi lịch sử khi `progress !== old`. Double-submit/offline-retry PATCH cùng giá trị progress sẽ nhân bản dòng lịch sử. Sửa: thêm guard `progress !== oldProgress` giống `recomputeTask`.
+- **[Chờ người dùng chốt ý đồ, CHƯA sửa] `PATCH /api/tasks/:id/progress` nhận `status` độc lập với `progress`**: client có thể gửi `{progress:0.3, status:"hoan_thanh"}`, phá bất biến "hoan_thanh ⇔ progress≥1" mà mọi route khác giữ đúng qua `deriveStatus`. Cần xác nhận đây có phải override thủ công chủ đích cho PM không trước khi chặn lại — không tự đoán theo luật cứng CLAUDE.md.
+- **Đã rà, không thấy vấn đề**: làm tròn %, transaction+`FOR UPDATE`+idempotency ở `lib/recompute.ts`/2 route approve, `getCurrentUser()`+401, `CAN`/`canTouchTask`/`canTouchPackage` đối xứng, SQL injection (100% qua placeholder), scope `project_id` M22, cookie `secure` (5 route login đều đủ 3 cờ — tự xác minh lại, agent báo nhầm), `material_sync` (thứ tự lưu snapshot, merge theo BOQCODE, `boq_codes` có ràng buộc DB thật qua trigger, 3-way merge, `sync_locks` atomic).
+- **Nợ ghi nhận (thấp, không sửa trong đợt này)**: TOCTOU nhẹ ở gate hold-point (`handoverBlocked`/`methodStatementBlocked`) đọc trước `FOR UPDATE` ở `dimensions/[id]`, `dimensions/batch`, `progress/route.ts` — cửa sổ hẹp, chỉ ảnh hưởng guardrail nghiệp vụ. `lib/material-sync.ts::loadDbMaterials()` không lọc `project_id` — cần xác minh materials có multi-tenant theo dự án không trước khi coi là bug. Trùng lặp nhỏ: logic ghim trần `0.99` lặp giữa `recomputeTask`/`recomputePackage`, có thể tách hàm chung (thuần cấu trúc, không phải bug).
+- Verify: `npm run lint`/`typecheck` xanh, `npm test` 108/108 file 0 fail (test race/idempotency mới cho PATCH materials cần `TEST_DATABASE_URL` — môi trường này không có Postgres cục bộ nên chưa viết được, ghi nợ bổ sung test hồi quy khi có DB test), `npm run build` xanh.
+
 ## Việc tạm hoãn — chờ bên ngoài (không phải "tiếp theo", đừng tự nhặt lại)
 
 ~~**Auto-deploy kẹt vì thiếu quyền `CREATE EXTENSION unaccent`**~~ → **đã hết** (xác nhận
