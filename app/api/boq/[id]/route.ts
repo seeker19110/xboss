@@ -41,7 +41,8 @@ export async function PATCH(
   if (body.code !== undefined) {
     const code = String(body.code).trim();
     if (!code) return NextResponse.json({ error: "Mã không được để trống" }, { status: 422 });
-    const takenBy = await boqTakenBy(code, { table: "boq_items", id });
+    // TODO(M54 PR2): lấy orgId thật từ session
+    const takenBy = await boqTakenBy(code, 1, { table: "boq_items", id });
     if (takenBy)
       return NextResponse.json(
         { error: `Mã "${code}" đã được dùng bởi ${takenBy}` },

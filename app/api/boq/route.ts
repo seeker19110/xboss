@@ -143,7 +143,8 @@ export async function POST(req: NextRequest) {
   if (!code || !name || !unit)
     return NextResponse.json({ error: "Thiếu mã, tên hoặc đơn vị tính" }, { status: 422 });
 
-  const takenBy = await boqTakenBy(code);
+  // TODO(M54 PR2): lấy orgId thật từ session
+  const takenBy = await boqTakenBy(code, 1);
   if (takenBy)
     return NextResponse.json(
       { error: `Mã "${code}" đã được dùng bởi ${takenBy}` },

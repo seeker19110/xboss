@@ -23,13 +23,13 @@
 | logo | text | ✓ |  |
 | status | text |  | `'active'::text` |
 | color | text | ✓ |  |
-| org_id | integer | ✓ |  |
+| org_id | integer |  | `1` |
 
 **Khóa ngoại:**
 - `org_id` → `organizations(id)`
 
 **Index:**
-- `projects_code_key`: UNIQUE INDEX projects_code_key ON public.projects USING btree (code)
+- `projects_org_code_key`: UNIQUE INDEX projects_org_code_key ON public.projects USING btree (org_id, code)
 - `projects_pkey`: UNIQUE INDEX projects_pkey ON public.projects USING btree (id)
 
 ### towers
@@ -110,7 +110,6 @@
 - `idx_wp_fts`: INDEX idx_wp_fts ON public.work_packages USING gin (to_tsvector('simple'::regconfig, COALESCE(name, ''::text)))
 - `idx_wp_fts_ua`: INDEX idx_wp_fts_ua ON public.work_packages USING gin (to_tsvector('simple'::regconfig, xboss_unaccent(((((COALESCE(code, ''::text) || ' '::text) || COALESCE(boq_code, ''::text)) || ' '::text) || COALESCE(name, ''::text)))))
 - `idx_wp_sheet`: INDEX idx_wp_sheet ON public.work_packages USING btree (sheet_type_id)
-- `uniq_wp_boq`: UNIQUE INDEX uniq_wp_boq ON public.work_packages USING btree (boq_code) WHERE (boq_code IS NOT NULL)
 - `uniq_wp_sheet_code`: UNIQUE INDEX uniq_wp_sheet_code ON public.work_packages USING btree (sheet_type_id, lower(code))
 - `work_packages_pkey`: UNIQUE INDEX work_packages_pkey ON public.work_packages USING btree (id)
 - `work_packages_sheet_type_id_code_key`: UNIQUE INDEX work_packages_sheet_type_id_code_key ON public.work_packages USING btree (sheet_type_id, code)
@@ -156,7 +155,6 @@
 - `idx_tasks_updated_at`: INDEX idx_tasks_updated_at ON public.tasks USING btree (updated_at DESC)
 - `tasks_package_id_code_key`: UNIQUE INDEX tasks_package_id_code_key ON public.tasks USING btree (package_id, code)
 - `tasks_pkey`: UNIQUE INDEX tasks_pkey ON public.tasks USING btree (id)
-- `uniq_tasks_boq`: UNIQUE INDEX uniq_tasks_boq ON public.tasks USING btree (boq_code) WHERE (boq_code IS NOT NULL)
 
 ### progress_dimensions
 
@@ -290,8 +288,10 @@
 | totp_enabled_at | timestamptz | ✓ |  |
 | totp_last_step | bigint | ✓ |  |
 | session_version | integer |  | `0` |
+| org_id | integer |  | `1` |
 
 **Khóa ngoại:**
+- `org_id` → `organizations(id)`
 - `supplier_id` → `suppliers(id)`
 
 **Index:**
@@ -354,8 +354,10 @@
 | updated_by | integer | ✓ |  |
 | updated_at | timestamptz |  | `now()` |
 | project_id | integer | ✓ |  |
+| org_id | integer |  | `1` |
 
 **Khóa ngoại:**
+- `org_id` → `organizations(id)`
 - `project_id` → `projects(id)`
 
 **Index:**
@@ -686,9 +688,13 @@
 | code | text |  |  |
 | table_name | text |  |  |
 | row_id | integer |  |  |
+| org_id | integer |  |  |
+
+**Khóa ngoại:**
+- `org_id` → `organizations(id)`
 
 **Index:**
-- `boq_codes_pkey`: UNIQUE INDEX boq_codes_pkey ON public.boq_codes USING btree (code)
+- `boq_codes_pkey`: UNIQUE INDEX boq_codes_pkey ON public.boq_codes USING btree (org_id, code)
 - `boq_codes_table_name_row_id_key`: UNIQUE INDEX boq_codes_table_name_row_id_key ON public.boq_codes USING btree (table_name, row_id)
 
 ## Hợp đồng & tài chính
@@ -1399,7 +1405,6 @@
 - `idx_materials_sheet`: INDEX idx_materials_sheet ON public.materials USING btree (sheet_type_id)
 - `idx_materials_updated_at`: INDEX idx_materials_updated_at ON public.materials USING btree (updated_at DESC)
 - `materials_pkey`: UNIQUE INDEX materials_pkey ON public.materials USING btree (id)
-- `uniq_materials_boq`: UNIQUE INDEX uniq_materials_boq ON public.materials USING btree (boq_code) WHERE (boq_code IS NOT NULL)
 
 ### material_transactions
 
@@ -1487,6 +1492,10 @@
 | delivery_phone | text | ✓ |  |
 | delivery_note | text | ✓ |  |
 | delivery_order | text | ✓ |  |
+| org_id | integer |  | `1` |
+
+**Khóa ngoại:**
+- `org_id` → `organizations(id)`
 
 **Index:**
 - `suppliers_pkey`: UNIQUE INDEX suppliers_pkey ON public.suppliers USING btree (id)
@@ -2966,8 +2975,10 @@
 | entity_type | text |  |  |
 | name | text |  |  |
 | active | boolean |  | `true` |
+| org_id | integer |  | `1` |
 
 **Khóa ngoại:**
+- `org_id` → `organizations(id)`
 - `project_id` → `projects(id)`
 
 **Index:**
@@ -3047,8 +3058,10 @@
 | project_id | integer | ✓ |  |
 | config | jsonb |  | `'{}'::jsonb` |
 | active | boolean |  | `false` |
+| org_id | integer |  | `1` |
 
 **Khóa ngoại:**
+- `org_id` → `organizations(id)`
 - `project_id` → `projects(id)`
 
 **Index:**
@@ -3174,6 +3187,10 @@
 | sort | integer |  | `0` |
 | active | boolean |  | `true` |
 | meta | jsonb |  | `'{}'::jsonb` |
+| org_id | integer |  | `1` |
+
+**Khóa ngoại:**
+- `org_id` → `organizations(id)`
 
 **Index:**
 - `code_lists_domain_code_key`: UNIQUE INDEX code_lists_domain_code_key ON public.code_lists USING btree (domain, code)
@@ -3194,9 +3211,11 @@
 | active | boolean |  | `true` |
 | created_by | integer | ✓ |  |
 | created_at | timestamptz |  | `now()` |
+| org_id | integer |  | `1` |
 
 **Khóa ngoại:**
 - `created_by` → `users(id)`
+- `org_id` → `organizations(id)`
 - `project_id` → `projects(id)`
 
 **Index:**
@@ -3216,9 +3235,11 @@
 | created_at | timestamptz | ✓ | `now()` |
 | last_used_at | timestamptz | ✓ |  |
 | revoked_at | timestamptz | ✓ |  |
+| org_id | integer |  | `1` |
 
 **Khóa ngoại:**
 - `created_by` → `users(id)`
+- `org_id` → `organizations(id)`
 - `project_id` → `projects(id)`
 
 **Index:**
@@ -3239,8 +3260,10 @@
 | required | boolean |  | `false` |
 | sort | integer |  | `0` |
 | active | boolean |  | `true` |
+| org_id | integer |  | `1` |
 
 **Khóa ngoại:**
+- `org_id` → `organizations(id)`
 - `project_id` → `projects(id)`
 
 **Index:**
@@ -3256,8 +3279,10 @@
 | enabled | boolean |  | `true` |
 | updated_by | integer | ✓ |  |
 | updated_at | timestamptz | ✓ | `now()` |
+| org_id | integer |  | `1` |
 
 **Khóa ngoại:**
+- `org_id` → `organizations(id)`
 - `project_id` → `projects(id)`
 - `updated_by` → `users(id)`
 
@@ -3271,9 +3296,14 @@
 | id | integer |  | `nextval('organizations_id_seq'::regclass)` |
 | name | text |  |  |
 | tax_code | text | ✓ |  |
+| slug | text | ✓ |  |
+| status | text |  | `'active'::text` |
+| plan | text | ✓ |  |
+| created_at | timestamptz |  | `now()` |
 
 **Index:**
 - `organizations_pkey`: UNIQUE INDEX organizations_pkey ON public.organizations USING btree (id)
+- `organizations_slug_key`: UNIQUE INDEX organizations_slug_key ON public.organizations USING btree (slug)
 
 ### saved_reports
 
@@ -3287,8 +3317,10 @@
 | config | jsonb |  | `'{}'::jsonb` |
 | shared | boolean |  | `false` |
 | created_at | timestamptz |  | `now()` |
+| org_id | integer |  | `1` |
 
 **Khóa ngoại:**
+- `org_id` → `organizations(id)`
 - `owner_id` → `users(id)`
 - `project_id` → `projects(id)`
 
@@ -3361,9 +3393,11 @@
 | active | boolean |  | `true` |
 | created_by | integer |  |  |
 | created_at | timestamptz | ✓ | `now()` |
+| org_id | integer |  | `1` |
 
 **Khóa ngoại:**
 - `created_by` → `users(id)`
+- `org_id` → `organizations(id)`
 - `project_id` → `projects(id)`
 
 **Index:**

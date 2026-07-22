@@ -107,7 +107,8 @@ export async function listProjects(
 export type OrganizationItem = { id: number; name: string };
 
 /** Tổ chức có ít nhất 1 dự án user thấy — dùng để trang Portfolio quyết định có hiện
- *  select tổ chức hay không (chỉ hiện khi >1 org). Dự án org_id NULL không tạo mục. */
+ *  select tổ chức hay không (chỉ hiện khi >1 org). M54 GĐ1 PR1: projects.org_id nay NOT
+ *  NULL DEFAULT 1 nên dự án không gán tổ chức thuộc org mặc định 1 (không còn NULL). */
 export async function listOrganizations(user: {
   id: number;
   role: Role;

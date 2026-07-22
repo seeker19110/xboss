@@ -191,27 +191,27 @@ test(
       `INSERT INTO materials (name, boq_code) VALUES ('Vật tư test', 'BOQ-MAT-01')`,
     );
 
-    // Chưa ai dùng → null.
-    assert.equal(await boqTakenBy("BOQ-CHUA-DUNG"), null);
+    // Chưa ai dùng → null. (org 1 = tổ chức mặc định giai đoạn 1-org)
+    assert.equal(await boqTakenBy("BOQ-CHUA-DUNG", 1), null);
 
     // Trùng với task ở bảng khác (work_packages) → phát hiện.
-    const takenByTask = await boqTakenBy("BOQ-TASK-01");
+    const takenByTask = await boqTakenBy("BOQ-TASK-01", 1);
     assert.match(takenByTask ?? "", /task .*Task test/);
 
-    const takenByPkg = await boqTakenBy("BOQ-PKG-01");
+    const takenByPkg = await boqTakenBy("BOQ-PKG-01", 1);
     assert.match(takenByPkg ?? "", /nhóm .*Nhóm test/);
 
-    const takenByMaterial = await boqTakenBy("BOQ-MAT-01");
+    const takenByMaterial = await boqTakenBy("BOQ-MAT-01", 1);
     assert.match(takenByMaterial ?? "", /vật tư .*Vật tư test/);
 
     // Loại trừ chính bản ghi đang sửa → không báo trùng với chính nó.
-    assert.equal(await boqTakenBy("BOQ-TASK-01", { table: "tasks", id: taskId }), null);
-    assert.equal(await boqTakenBy("BOQ-PKG-01", { table: "work_packages", id: pkgId }), null);
-    assert.equal(await boqTakenBy("BOQ-MAT-01", { table: "materials", id: materialId }), null);
+    assert.equal(await boqTakenBy("BOQ-TASK-01", 1, { table: "tasks", id: taskId }), null);
+    assert.equal(await boqTakenBy("BOQ-PKG-01", 1, { table: "work_packages", id: pkgId }), null);
+    assert.equal(await boqTakenBy("BOQ-MAT-01", 1, { table: "materials", id: materialId }), null);
 
     // exclude không khớp record đang trùng → vẫn báo trùng như thường.
     assert.match(
-      (await boqTakenBy("BOQ-TASK-01", { table: "tasks", id: taskId + 999 })) ?? "",
+      (await boqTakenBy("BOQ-TASK-01", 1, { table: "tasks", id: taskId + 999 })) ?? "",
       /task/,
     );
 
@@ -236,9 +236,9 @@ test(
       `INSERT INTO boq_items (code, name, unit) VALUES ('BOQ-ITEM-01', 'Ống gió D200', 'm')`,
     );
 
-    const takenBy = await boqTakenBy("BOQ-ITEM-01");
+    const takenBy = await boqTakenBy("BOQ-ITEM-01", 1);
     assert.match(takenBy ?? "", /dòng BOQ .*Ống gió D200/);
-    assert.equal(await boqTakenBy("BOQ-ITEM-01", { table: "boq_items", id: boqId }), null);
+    assert.equal(await boqTakenBy("BOQ-ITEM-01", 1, { table: "boq_items", id: boqId }), null);
 
     await run(`DELETE FROM boq_items WHERE id = ?`, boqId);
   },

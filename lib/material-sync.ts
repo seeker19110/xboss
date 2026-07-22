@@ -443,7 +443,8 @@ export async function runMaterialSync(sheetClient?: SheetClient): Promise<SyncSu
 
       let boqCode: string | null = f.boqCode || null;
       if (boqCode) {
-        const usedBy = await boqTakenBy(boqCode);
+        // TODO(M54 PR2): lấy orgId thật từ session
+        const usedBy = await boqTakenBy(boqCode, 1);
         if (usedBy) {
           summary.skipped.push({
             row: rowNum,
