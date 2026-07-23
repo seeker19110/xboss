@@ -56,6 +56,7 @@ export default function DiaryEditorModal({
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState(false);
   const [hasOfflineDraft, setHasOfflineDraft] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const canEdit = role === "admin" || role === "pm" || role === "engineer";
   const canLock = role === "admin" || role === "pm";
@@ -70,8 +71,19 @@ export default function DiaryEditorModal({
       // server), nhưng vẫn lấy trạng thái khoá + danh sách ảnh prefill từ server.
       const queued = await getQueuedDiaryNote(date);
       const j = await fetch(`/api/diaries/${date}`)
-        .then((r) => r.json())
-        .catch(() => ({}));
+        .then(async (r) => {
+          if (!r.ok) {
+            // Lỗi thật (401/403/404/500...) — không được nuốt thành ngày chưa lập nhật ký.
+            const err = await r.json().catch(() => null);
+            setLoadError(err?.error ?? `Lỗi tải nhật ký ngày này (${r.status})`);
+            return {};
+          }
+          return r.json();
+        })
+        .catch(() => {
+          setLoadError("Mất kết nối mạng — không tải được nhật ký ngày này");
+          return {};
+        });
       if (cancelled) return;
       setDiary(j.diary ?? null);
       setPrefill(j.prefill ?? { workDone: "", updatedBy: [], photos: [] });
@@ -235,6 +247,13 @@ export default function DiaryEditorModal({
         <p className="text-sm text-zinc-400 py-8 text-center">Đang tải…</p>
       ) : (
         <div className="space-y-4">
+          {loadError && (
+            <div className="bg-red-950 border border-red-800 rounded-lg px-3 py-2 text-sm text-red-200 flex items-center gap-2">
+              <WifiOff className="w-4 h-4 shrink-0" />
+              {loadError}
+            </div>
+          )}
+
           {isLocked && (
             <div className="bg-emerald-950 border border-emerald-800 rounded-lg px-3 py-2 text-sm text-emerald-200 flex items-center gap-2">
               <Lock className="w-4 h-4 shrink-0" />

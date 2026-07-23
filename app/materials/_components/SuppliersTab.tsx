@@ -304,13 +304,19 @@ function Stars({ value }: { value: number | null }) {
 function SupplierSummaryPanel({ supplierId }: { supplierId: number }) {
   const [expanded, setExpanded] = useState(false);
   const [summary, setSummary] = useState<SupplierSummary | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/suppliers/${supplierId}/summary`)
-      .then((r) => r.json())
-      .then(setSummary);
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then(setSummary)
+      .catch(() => setLoadError("Không tải được thống kê NCC"));
   }, [supplierId]);
 
+  if (loadError)
+    return (
+      <p className="mt-2 pt-2 border-t border-zinc-700/50 text-xs text-zinc-500">{loadError}</p>
+    );
   if (!summary) return null;
 
   return (

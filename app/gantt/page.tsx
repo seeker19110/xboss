@@ -5,6 +5,7 @@ import { slugFromCode } from "@/lib/sheets";
 import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
 import AppHeader from "@/app/components/AppHeader";
 import { PageSkeleton } from "@/app/components/Skeleton";
+import { ErrorState } from "@/app/components/ErrorState";
 import { Modal, appAlert } from "@/app/components/dialogs";
 import { useEditMode } from "@/app/components/useEditMode";
 import EditModeToggle from "@/app/components/EditModeToggle";
@@ -52,6 +53,7 @@ export default function GanttPage() {
   const [system, setSystem] = useState("");
   const [depFor, setDepFor] = useState<Bar | null>(null); // nhóm đang sửa phụ thuộc
   const [arrows, setArrows] = useState<Arrow[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const barRefs = useRef<Map<number, HTMLElement>>(new Map());
@@ -59,9 +61,19 @@ export default function GanttPage() {
   async function load(systemCode: string) {
     const r = await fetch(
       `/api/gantt${systemCode ? `?system=${encodeURIComponent(systemCode)}` : ""}`,
-    );
+    ).catch(() => null);
+    if (!r) {
+      setLoadError("Mất kết nối mạng — không tải được biểu đồ Gantt");
+      return;
+    }
     if (r.status === 401) {
       redirectToLogin();
+      return;
+    }
+    if (!r.ok) {
+      // Lỗi thật (403/500...) — không được nuốt thành danh sách rỗng.
+      const j = await r.json().catch(() => null);
+      setLoadError(j?.error ?? `Lỗi tải biểu đồ Gantt (${r.status})`);
       return;
     }
     const j = await r.json();
@@ -71,6 +83,7 @@ export default function GanttPage() {
     setCritical(j.critical ?? []);
     setCriticalDeps(j.criticalDeps ?? []);
     setFloatDays(j.float ?? {});
+    setLoadError(null);
   }
 
   // Đọc `?system=` và `?sheet=` lúc mount để link chia sẻ/từ hub trỏ thẳng vào đúng bộ lọc (M36).
@@ -160,6 +173,15 @@ export default function GanttPage() {
       window.removeEventListener("resize", recompute);
     };
   }, [view, deps, criticalDepSet, sheetFilter, bars]);
+
+  if (loadError && !bars) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-white flex flex-col">
+        <AppHeader />
+        <ErrorState message={loadError} onRetry={() => load(system)} />
+      </div>
+    );
+  }
 
   if (!bars || !view) return <PageSkeleton />;
 

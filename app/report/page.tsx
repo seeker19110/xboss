@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { Printer, Download } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import SystemFilter from "@/app/components/SystemFilter";
+import { ErrorState } from "@/app/components/ErrorState";
+import { redirectToLogin } from "@/app/lib/me";
 import ReportPrintable, {
   type ReportDelayedTask,
   type ReportKpi,
@@ -22,6 +24,7 @@ export default function ReportPage() {
   const [system, setSystem] = useState("");
   const [systemName, setSystemName] = useState<string | null>(null);
   const [range, setRange] = useState<ReportRange>("day");
+  const [loadError, setLoadError] = useState<string | null>(null);
   // Chặn effect fetch bên dưới chạy lần đầu với system=""/range="day" mặc định trước khi
   // effect đọc URL kịp cập nhật state (race condition — xem M36).
   const [systemReady, setSystemReady] = useState(false);
@@ -54,8 +57,20 @@ export default function ReportPage() {
     if (range !== "day") params.set("range", range);
     const qs = params.toString() ? `?${params.toString()}` : "";
     fetch(`/api/dashboard${qs}`)
-      .then((r) => r.json())
-      .then(setData);
+      .then(async (r) => {
+        if (r.status === 401) {
+          await redirectToLogin();
+          return;
+        }
+        if (!r.ok) {
+          const j = await r.json().catch(() => null);
+          setLoadError(j?.error ?? `Lỗi tải dữ liệu báo cáo (${r.status})`);
+          return;
+        }
+        setData(await r.json());
+        setLoadError(null);
+      })
+      .catch(() => setLoadError("Không tải được dữ liệu — kiểm tra kết nối mạng"));
     // /api/dashboard/forecast chưa hỗ trợ `system` (ngoài phạm vi PR1) — giữ nguyên không lọc.
     fetch("/api/dashboard/forecast")
       .then((r) => (r.ok ? r.json() : null))
@@ -120,13 +135,17 @@ export default function ReportPage() {
       />
 
       <main className="p-4 sm:p-6 pb-24 print:p-0">
-        <ReportPrintable
-          data={data}
-          forecast={forecast}
-          projectName={projectName}
-          systemName={systemName}
-          range={range}
-        />
+        {loadError ? (
+          <ErrorState message={loadError} />
+        ) : (
+          <ReportPrintable
+            data={data}
+            forecast={forecast}
+            projectName={projectName}
+            systemName={systemName}
+            range={range}
+          />
+        )}
       </main>
     </div>
   );
