@@ -48,9 +48,9 @@ test(
       subconA,
     );
 
-    const userA = { id: subconA, role: "subcon" as const, name: "A", email: "a" };
-    const userB = { id: subconB, role: "subcon" as const, name: "B", email: "b" };
-    const userEng = { id: engineer, role: "engineer" as const, name: "E", email: "e" };
+    const userA = { id: subconA, role: "subcon" as const, name: "A", email: "a", orgId: 1 };
+    const userB = { id: subconB, role: "subcon" as const, name: "B", email: "b", orgId: 1 };
+    const userEng = { id: engineer, role: "engineer" as const, name: "E", email: "e", orgId: 1 };
 
     assert.equal(await canTouchTask(userA, taskId), true, "subcon được giao → true");
     assert.equal(await canTouchTask(userB, taskId), false, "subcon KHÔNG được giao → false");
@@ -101,8 +101,8 @@ test(
       subconOwner,
     );
 
-    const owner = { id: subconOwner, role: "subcon" as const, name: "O", email: "o" };
-    const other = { id: subconOther, role: "subcon" as const, name: "X", email: "x" };
+    const owner = { id: subconOwner, role: "subcon" as const, name: "O", email: "o", orgId: 1 };
+    const other = { id: subconOther, role: "subcon" as const, name: "X", email: "x", orgId: 1 };
 
     assert.equal(await canTouchPackage(owner, pkgId), true, "subcon được giao nhóm → true");
     assert.equal(await canTouchPackage(other, pkgId), false, "subcon KHÔNG được giao nhóm → false");

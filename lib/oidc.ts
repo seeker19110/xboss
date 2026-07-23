@@ -95,11 +95,12 @@ export type SsoUser = {
   role: Role;
   password_hash: string;
   session_version: number;
+  org_id: number;
 };
 
 export async function upsertSsoUser(resolved: ResolvedSsoUser): Promise<SsoUser> {
   const existing = await queryOne<SsoUser>(
-    `SELECT id, name, email, role, password_hash, session_version FROM users WHERE email = ?`,
+    `SELECT id, name, email, role, password_hash, session_version, org_id FROM users WHERE email = ?`,
     resolved.email,
   );
 
@@ -134,7 +135,7 @@ export async function upsertSsoUser(resolved: ResolvedSsoUser): Promise<SsoUser>
   const created = await queryOne<SsoUser>(
     `INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)
      ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
-     RETURNING id, name, email, role, password_hash, session_version`,
+     RETURNING id, name, email, role, password_hash, session_version, org_id`,
     resolved.name,
     resolved.email,
     passwordHash,

@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Hệ không hợp lệ" }, { status: 422 });
   }
 
-  const takenErr = await checkVoLinesTaken(input.lines);
+  const takenErr = await checkVoLinesTaken(input.lines, user.orgId);
   if (takenErr) return NextResponse.json({ error: takenErr }, { status: 409 });
 
   try {

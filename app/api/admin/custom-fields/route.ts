@@ -12,11 +12,14 @@ export async function GET() {
   if (!CAN.viewCustomFields(user.role))
     return NextResponse.json({ error: "Không có quyền xem trường tuỳ biến" }, { status: 403 });
 
+  // M54 GĐ1 PR2: cô lập tenant — chỉ định nghĩa của org người gọi (vẫn xuyên dự án trong org).
   const defs = await query(
     `SELECT id, project_id AS "projectId", entity_type AS "entityType", key, label, type,
             options, required, sort, active
        FROM custom_field_defs
+      WHERE org_id = ?
       ORDER BY entity_type, sort, id`,
+    user.orgId,
   );
   return NextResponse.json({ defs });
 }

@@ -91,13 +91,17 @@ export async function GET(req: NextRequest) {
   // M56 PR2: 2FA theo vai trò chỉ áp cho tài khoản mật khẩu — SSO đã đẩy MFA về IdP
   // (đúng phạm vi "Không làm" của docs/nang-cap/M56-2fa-totp.md), nên LUÔN mustSetup2fa=false.
   const res = NextResponse.redirect(new URL("/", req.url));
-  res.cookies.set(COOKIE, makeToken(user.id, user.password_hash, false, user.session_version), {
-    httpOnly: true,
-    path: "/",
-    maxAge: COOKIE_MAX_AGE,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-  });
+  res.cookies.set(
+    COOKIE,
+    makeToken(user.id, user.password_hash, false, user.session_version, user.org_id),
+    {
+      httpOnly: true,
+      path: "/",
+      maxAge: COOKIE_MAX_AGE,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    },
+  );
   res.cookies.delete({ name: OIDC_TMP_COOKIE, path: "/api/auth/oidc" });
   return res;
 }

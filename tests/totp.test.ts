@@ -85,9 +85,9 @@ test("makeTotpPendingToken/parseTotpPendingToken: round-trip đúng userId + pwF
 test("parseTotpPendingToken: token phiên đăng nhập thường (không có purpose 2fa) bị từ chối", async () => {
   const { makeToken, parseTotpPendingToken, hashPassword } = await import("@/lib/auth");
   const hash = hashPassword("pw123");
-  // Token phiên có 6 phần (userId.exp.pwFrag.flag.sv.mac từ V5) — pending 2FA 5 phần với
-  // phần thứ 4 = "2fa" → khác cấu trúc, vẫn bị từ chối.
-  const sessionToken = makeToken(7, hash, false, 0);
+  // Token phiên có 7 phần (userId.exp.pwFrag.flag.sv.orgId.mac từ M54 PR2) — pending 2FA 5
+  // phần với phần thứ 4 = "2fa" → khác cấu trúc, vẫn bị từ chối.
+  const sessionToken = makeToken(7, hash, false, 0, 1);
   assert.equal(parseTotpPendingToken(sessionToken), null);
 });
 
@@ -118,8 +118,8 @@ test("computeMustSetup2fa: role bắt buộc + chưa bật 2FA → true; các bi
 test("parseToken: round-trip cờ mustSetup2fa (0/1); từ chối token pending 2FA (flag lạ)", async () => {
   const { makeToken, parseToken, hashPassword, makeTotpPendingToken } = await import("@/lib/auth");
   const hash = hashPassword("pw");
-  assert.equal(parseToken(makeToken(9, hash, true, 0))?.mustSetup2fa, true);
-  const t0 = parseToken(makeToken(9, hash, false, 0));
+  assert.equal(parseToken(makeToken(9, hash, true, 0, 1))?.mustSetup2fa, true);
+  const t0 = parseToken(makeToken(9, hash, false, 0, 1));
   assert.equal(t0?.mustSetup2fa, false);
   assert.equal(t0?.uid, 9);
   // Token tạm "chờ 2FA" (phần thứ 4 = "2fa", cũng 5 phần) KHÔNG được nhận là cookie phiên.
@@ -130,8 +130,8 @@ test("proxy: cờ mustSetup2fa=1 chặn API ngoài whitelist (403 2fa_required);
   const { makeToken, hashPassword } = await import("@/lib/auth");
   const { proxy } = await import("@/proxy");
   const hash = hashPassword("pw");
-  const locked = makeToken(1, hash, true, 0);
-  const free = makeToken(1, hash, false, 0);
+  const locked = makeToken(1, hash, true, 0, 1);
+  const free = makeToken(1, hash, false, 0, 1);
   const reqWith = (path: string, token?: string): NextRequest =>
     new NextRequest(
       `http://localhost${path}`,

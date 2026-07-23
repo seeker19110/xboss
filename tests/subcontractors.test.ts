@@ -231,6 +231,7 @@ test(
       name: "Subcon Test",
       email: "subcontest@test.local",
       role: "subcon" as const,
+      orgId: 1,
     };
 
     assert.equal(await canViewSubcontractor(user, supplierAId), true);

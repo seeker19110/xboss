@@ -2,7 +2,7 @@
 // chọn = cookie `xboss_project`, đối chiếu quyền qua bảng `user_projects`. Route KHÔNG
 // tin `project_id` client gửi qua body/query — luôn suy qua getCurrentProjectId(user).
 import { cookies } from "next/headers";
-import { query, todayISO } from "@/lib/db";
+import { query, queryOne, todayISO } from "@/lib/db";
 import { patchRequestContext, getRequestContext } from "@/lib/request-context";
 import type { Role } from "@/lib/roles";
 
@@ -47,17 +47,27 @@ export function resolveProjectId(
 export async function getCurrentProjectId(user: {
   id: number;
   role: Role;
+  orgId: number;
 }): Promise<number | null> {
   // M61: memoize trong request — projectId chỉ được patch vào request-context SAU khi đã
-  // qua resolveProjectId (đối chiếu visibleProjectIds) nên tin được trong cùng request.
-  // Route gọi cả getCurrentUser (patch sớm) lẫn getCurrentProjectId chỉ tốn 1 lần query.
+  // qua resolveProjectId (đối chiếu visibleProjectIds) + đối chiếu org nên tin được trong
+  // cùng request. Route gọi cả getCurrentUser (patch sớm) lẫn getCurrentProjectId chỉ tốn 1 query.
   const cached = getRequestContext()?.projectId;
   if (cached != null) return cached;
 
   const visible = await visibleProjectIds(user);
   const store = await cookies();
   const projectId = resolveProjectId(visible, store.get(PROJECT_COOKIE)?.value);
-  if (projectId != null) patchRequestContext({ projectId });
+  if (projectId == null) return null;
+  // M54 GĐ1 PR2: chống nhảy org — project được chọn PHẢI thuộc đúng org của user. Admin thấy
+  // mọi project xuyên org (visibleProjectIds) nhưng ngữ cảnh dự án hiện tại vẫn phải cùng org
+  // (user đoán id project org khác qua cookie → coi như không có dự án, trả null, không throw).
+  const row = await queryOne<{ orgId: number }>(
+    `SELECT org_id AS "orgId" FROM projects WHERE id = ?`,
+    projectId,
+  );
+  if (!row || row.orgId !== user.orgId) return null;
+  patchRequestContext({ projectId });
   return projectId;
 }
 

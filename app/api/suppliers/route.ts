@@ -59,7 +59,9 @@ export async function GET() {
                ) AS avg_rating
            FROM supplier_ratings GROUP BY supplier_id
        ) r ON r.supplier_id = s.id
+      WHERE s.org_id = ?
       ORDER BY s.name`,
+    user.orgId,
   );
   return NextResponse.json({ suppliers });
 }

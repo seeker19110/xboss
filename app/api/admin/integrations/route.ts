@@ -38,9 +38,13 @@ export async function GET() {
 
   // projectId != null → chỉ tích hợp của dự án đó + tích hợp toàn cục (project_id IS NULL),
   // nhất quán với cách scope theo dự án của M22; projectId = null → không lọc (tương thích ngược).
+  // M54 GĐ1 PR2: luôn cô lập tenant theo org người gọi; project scope là lớp lọc thêm.
   const projectId = await getCurrentProjectId(user);
-  const scopeWhere = projectId != null ? `WHERE (i.project_id = ? OR i.project_id IS NULL)` : "";
-  const scopeParams = projectId != null ? [projectId] : [];
+  const scopeWhere =
+    projectId != null
+      ? `WHERE i.org_id = ? AND (i.project_id = ? OR i.project_id IS NULL)`
+      : `WHERE i.org_id = ?`;
+  const scopeParams = projectId != null ? [user.orgId, projectId] : [user.orgId];
   // LATERAL lấy lần chạy mới nhất mỗi integration_id (order theo started_at DESC).
   const rows = await query<IntegrationRow>(
     `SELECT i.id, i.provider, i.project_id AS "projectId", p.name AS "projectName",

@@ -144,9 +144,10 @@ test(
       assert.equal(u1.role, "viewer"); // default khi không có claim + không đặt OIDC_DEFAULT_ROLE
       assert.ok(u1.password_hash && u1.password_hash.length > 0); // NOT NULL thoả
       // Token phiên nhúng pwFrag từ hash — chứng minh makeToken hoạt động với hash ngẫu nhiên.
-      // V5: token có 6 phần (thêm session_version); SSO luôn mustSetup2fa=false (MFA ở IdP).
+      // M54 PR2: token có 7 phần (thêm orgId); SSO luôn mustSetup2fa=false (MFA ở IdP).
       assert.ok(
-        makeToken(u1.id, u1.password_hash, false, u1.session_version).split(".").length === 6,
+        makeToken(u1.id, u1.password_hash, false, u1.session_version, u1.org_id).split(".")
+          .length === 7,
       );
 
       // Gọi lần 2 cùng email → cùng id, không tạo trùng.

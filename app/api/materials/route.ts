@@ -79,8 +79,7 @@ export async function POST(req: NextRequest) {
   // BOQCODE duy nhất toàn hệ thống (nhóm + task + vật tư) — chống đặt hàng nhầm mã.
   const boqCode = String(body.boqCode ?? "").trim() || null;
   if (boqCode) {
-    // TODO(M54 PR2): lấy orgId thật từ session
-    const usedBy = await boqTakenBy(boqCode, 1);
+    const usedBy = await boqTakenBy(boqCode, user.orgId);
     if (usedBy)
       return NextResponse.json(
         { error: `Mã BOQ "${boqCode}" đã được dùng bởi ${usedBy}` },

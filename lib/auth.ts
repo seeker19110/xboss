@@ -14,7 +14,7 @@ import { COOKIE, COOKIE_MAX_AGE, sign, makeToken, parseToken } from "@/lib/sessi
 export { ROLES, ROLE_LABELS, VIEW_ONLY_ROLES, PAYMENT_VIEW_ROLES, type Role };
 export { COOKIE, COOKIE_MAX_AGE, makeToken, parseToken };
 
-export type User = { id: number; name: string; email: string; role: Role };
+export type User = { id: number; name: string; email: string; role: Role; orgId: number };
 
 // So sánh chuỗi chống timing-attack (dùng cho secret tĩnh: CRON_SECRET, bearer token).
 // Khác độ dài → trả false ngay; cùng độ dài → so sánh constant-time.
@@ -83,7 +83,9 @@ export async function getCurrentUser(): Promise<User | null> {
   if (!token) return null;
   const parsed = parseToken(token);
   if (!parsed) return null;
-  const u = await queryOne<User & { password_hash: string; session_version: number }>(
+  const u = await queryOne<
+    Omit<User, "orgId"> & { password_hash: string; session_version: number }
+  >(
     `SELECT id, name, email, role, password_hash, session_version FROM users WHERE id = ?`,
     parsed.uid,
   );
@@ -94,8 +96,11 @@ export async function getCurrentUser(): Promise<User | null> {
   // "thu hồi phiên" cho user này (tăng bộ đếm) → mọi token phát trước đó hết hiệu lực. Dùng
   // cột đã có sẵn trong SELECT trên nên KHÔNG thêm round-trip DB nào.
   if (Number(u.session_version) !== parsed.sessionVersion) return null;
-  const { password_hash: _, session_version: _sv, ...user } = u;
-  patchRequestContext({ userId: user.id, role: user.role });
+  // M54 GĐ1 PR2: orgId lấy TỪ TOKEN (đã ký), KHÔNG đối chiếu DB mỗi request — đổi org của
+  // user là thao tác hiếm (hiếm hơn thu hồi phiên), chấp nhận độ trễ tới lần user login lại.
+  const { password_hash: _, session_version: _sv, ...rest } = u;
+  const user: User = { ...rest, orgId: parsed.orgId };
+  patchRequestContext({ userId: user.id, role: user.role, orgId: user.orgId });
   // M61: chỉ giải + patch projectId khi cache có ≥1 override THEO DỰ ÁN — để giải quyền
   // theo phạm vi dự án trong CAN.x (resolvePerm đọc projectId từ request-context). Bảng
   // chưa có override dự án → bỏ qua hoàn toàn, chi phí = 0, hành vi = trước M61.
@@ -103,7 +108,7 @@ export async function getCurrentUser(): Promise<User | null> {
   // nuốt lỗi + log warn, rơi về override toàn hệ/mặc định (an toàn).
   if (hasProjectOverrides()) {
     try {
-      await getCurrentProjectId(user as User);
+      await getCurrentProjectId(user);
     } catch (e) {
       log.warn("Không giải được projectId cho override quyền — rơi về toàn hệ", {
         route: "getCurrentUser",
@@ -111,7 +116,7 @@ export async function getCurrentUser(): Promise<User | null> {
       });
     }
   }
-  return user as User;
+  return user;
 }
 
 // ===== Token tạm "chờ 2FA" (M56 PR1) =====

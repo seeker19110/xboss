@@ -76,7 +76,7 @@ test(
     );
 
     // PM (viewPayments=true): thấy cả 2 nguồn, cả 2 task.
-    const pmUser = { id: pmId, name: "PM", email: "x", role: "pm" as const };
+    const pmUser = { id: pmId, name: "PM", email: "x", role: "pm" as const, orgId: 1 };
     const pmDocs = await listAllDocuments(pmUser, null);
     const pmIds = pmDocs.map((d) => `${d.source}:${d.id}`);
     assert.ok(pmIds.includes(`task:${assignedDocId}`));
@@ -84,7 +84,13 @@ test(
     assert.ok(pmIds.includes(`contract:${contractDocId}`));
 
     // Subcon: chỉ thấy tài liệu của task được giao; không thấy nguồn contract (viewPayments=false).
-    const subconUser = { id: subconId, name: "Subcon", email: "x", role: "subcon" as const };
+    const subconUser = {
+      id: subconId,
+      name: "Subcon",
+      email: "x",
+      role: "subcon" as const,
+      orgId: 1,
+    };
     const subconDocs = await listAllDocuments(subconUser, null);
     const subconIds = subconDocs.map((d) => `${d.source}:${d.id}`);
     assert.ok(subconIds.includes(`task:${assignedDocId}`));
@@ -92,7 +98,13 @@ test(
     assert.ok(!subconIds.includes(`contract:${contractDocId}`));
 
     // Viewer: không thấy nguồn contract (CAN.viewPayments=false) nhưng vẫn thấy task documents.
-    const viewerUser = { id: viewerId, name: "Viewer", email: "x", role: "viewer" as const };
+    const viewerUser = {
+      id: viewerId,
+      name: "Viewer",
+      email: "x",
+      role: "viewer" as const,
+      orgId: 1,
+    };
     const viewerDocs = await listAllDocuments(viewerUser, null);
     const viewerIds = viewerDocs.map((d) => `${d.source}:${d.id}`);
     assert.ok(viewerIds.includes(`task:${assignedDocId}`));
@@ -152,7 +164,13 @@ test(
       drawingId,
     );
 
-    const subconUser = { id: 999_999, name: "Subcon", email: "x", role: "subcon" as const };
+    const subconUser = {
+      id: 999_999,
+      name: "Subcon",
+      email: "x",
+      role: "subcon" as const,
+      orgId: 1,
+    };
     const docs = await listAllDocuments(subconUser, null);
     assert.ok(docs.some((d) => d.source === "drawing" && d.id === revId));
 
@@ -173,7 +191,7 @@ test(
     const pmId = await insertId(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('PM Test Hub Scope', 'pm-hub-scope-test@test.local', 'x', 'pm')`,
     );
-    const pmUser = { id: pmId, name: "PM", email: "x", role: "pm" as const };
+    const pmUser = { id: pmId, name: "PM", email: "x", role: "pm" as const, orgId: 1 };
 
     // Dựng 2 dự án A/B, mỗi dự án có đủ 5 nguồn tài liệu.
     async function seedProject(label: string) {

@@ -21,10 +21,12 @@ export async function GET() {
             (r.owner_id = ?) AS "isMine"
        FROM saved_reports r
        LEFT JOIN users u ON u.id = r.owner_id
-      WHERE (r.project_id = ? OR r.project_id IS NULL)
+      WHERE r.org_id = ?
+        AND (r.project_id = ? OR r.project_id IS NULL)
         AND (r.owner_id = ? OR r.shared = TRUE)
       ORDER BY r.name`,
     user.id,
+    user.orgId,
     projectId,
     user.id,
   );

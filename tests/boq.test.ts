@@ -106,13 +106,13 @@ test(
       `INSERT INTO boq_items (code, name, unit) VALUES ('ACMV-0001', 'Đã có sẵn', 'm')`,
     );
 
-    const preview = await previewBoqImport(parsed.rows, "acmv");
+    const preview = await previewBoqImport(parsed.rows, "acmv", 1);
     assert.equal(preview.length, 2);
     assert.equal(preview[0].code, "ACMV-0002");
     assert.equal(preview[1].code, "ACMV-0003");
     assert.ok(preview.every((p) => p.action === "add"));
 
-    const result = await commitBoqImport(parsed.rows, systemId, "acmv", testProjectId);
+    const result = await commitBoqImport(parsed.rows, systemId, "acmv", testProjectId, 1);
     assert.equal(result.inserted, 2);
     assert.equal(result.skipped, 0);
 
@@ -145,7 +145,7 @@ test(
       pkgId,
     );
 
-    const preview2 = await previewBoqImport(parsed.rows.slice(0, 1), "acmv");
+    const preview2 = await previewBoqImport(parsed.rows.slice(0, 1), "acmv", 1);
     assert.equal(preview2[0].code, "ACMV-0004");
     assert.equal(preview2[0].action, "error");
     assert.match(preview2[0].reason ?? "", /đã được dùng/);

@@ -177,12 +177,14 @@ export async function withTransaction<T>(fn: () => Promise<T>): Promise<T> {
     if (ctx) {
       await client.query(
         `SELECT set_config('app.user_id', $1, true), set_config('app.role', $2, true),
-                set_config('app.project_id', $3, true), set_config('app.request_id', $4, true)`,
+                set_config('app.project_id', $3, true), set_config('app.request_id', $4, true),
+                set_config('app.org_id', $5, true)`,
         [
           ctx.userId != null ? String(ctx.userId) : "",
           ctx.role ?? "",
           ctx.projectId != null ? String(ctx.projectId) : "",
           ctx.requestId ?? "",
+          ctx.orgId != null ? String(ctx.orgId) : "",
         ],
       );
     }
