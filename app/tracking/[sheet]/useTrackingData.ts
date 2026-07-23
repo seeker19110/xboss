@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useOfflineTickQueue } from "@/app/components/offlineQueue";
+import { redirectToLogin } from "@/app/lib/me";
 import type { Data } from "./types";
 
 const SYNC_POLL_MS = 10_000;
@@ -10,6 +11,7 @@ export function useTrackingData(sheet: string) {
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [syncToast, setSyncToast] = useState(false);
   const versionRef = useRef<string | null>(null);
@@ -22,15 +24,29 @@ export function useTrackingData(sheet: string) {
 
   const load = useCallback(() => {
     fetch(`/api/tasks?sheet=${sheet}`)
-      .then((r) => r.json())
-      .then((d: Data) => {
+      .then(async (r) => {
+        if (r.status === 401) {
+          await redirectToLogin();
+          return;
+        }
+        if (!r.ok) {
+          // Lỗi thật từ server (404 sheet không khớp/module tắt, 403, 500...) — KHÔNG
+          // được nuốt thành "không có dữ liệu" (nhầm sang rỗng, che mất lỗi thật).
+          const j = await r.json().catch(() => null);
+          setLoadErrorMessage(j?.error ?? `Lỗi tải dữ liệu (${r.status})`);
+          setLoadError(true);
+          return;
+        }
+        const d: Data = await r.json();
         setData(d);
         if (d?.version) versionRef.current = d.version;
+        setLoadErrorMessage(null);
         setLoadError(false);
       })
       .catch(() => {
         // mất mạng — giữ dữ liệu đang hiển thị nếu đã có (chỉ chặn màn hình khi
         // đây là lần tải đầu, chưa có gì để hiển thị)
+        setLoadErrorMessage(null);
         setLoadError(true);
       })
       .finally(() => setLoading(false));
@@ -135,6 +151,7 @@ export function useTrackingData(sheet: string) {
     data,
     loading,
     loadError,
+    loadErrorMessage,
     load,
     refreshKey,
     syncToast,
