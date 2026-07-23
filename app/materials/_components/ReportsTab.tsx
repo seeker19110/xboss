@@ -451,14 +451,14 @@ export default function ReportsTab({ active }: { active: boolean }) {
                         {Number(row.overBudgetCount) > 0 ? (
                           <span className="text-red-400 font-semibold">{row.overBudgetCount}</span>
                         ) : (
-                          <span className="text-zinc-600">0</span>
+                          <span className="text-zinc-400">0</span>
                         )}
                       </td>
                       <td className="py-2.5 px-3 text-right">
                         {Number(row.lowStockCount) > 0 ? (
                           <span className="text-amber-400 font-semibold">{row.lowStockCount}</span>
                         ) : (
-                          <span className="text-zinc-600">0</span>
+                          <span className="text-zinc-400">0</span>
                         )}
                       </td>
                     </tr>

@@ -17,6 +17,21 @@ Nhận được một bản kế hoạch/walkthrough từ phiên làm việc kh�
 - **[AI, đã làm]** `migrations/0079_lookahead_indexes.sql`: thêm 3 index phòng xa (`idx_tasks_start_date`, `idx_tasks_end_date`, `idx_tasks_status`) — thuần `CREATE INDEX IF NOT EXISTS`, không đụng dữ liệu, đi thẳng production. Chi phí gần bằng 0 ở quy mô hiện tại, chuẩn bị sẵn khi bảng `tasks` lớn hơn nhiều. Mốc tái đánh giá cache: khi `tasks` vượt ~50k dòng hoặc route thực đo >200ms trong log production.
 - Verify: `npm run db:migrate` áp sạch, chạy lại lần 2 báo "không có migration mới" (idempotent xác nhận).
 
+## Đợt audit toàn dự án (2026-07-23) — 3 miền song song theo docs/audit.md §9
+
+3 subagent song song đúng khung §3/§4 (Bảo mật+Logic), §5/§7 (UI/UX+Vận hành/Offline), §6 (Hiệu năng/Dependency/CI). Cổng tự động xanh trước khi audit: lint/typecheck/test (111 file)/build/`npm audit` (0 lỗ hổng).
+
+- **§3/§4 Bảo mật & Logic nghiệp vụ**: rà kỹ toàn bộ vùng rủi ro cao §8 (`lib/recompute.ts`, nghiệm thu, `lib/material-sync.ts`, `lib/boq.ts`, route tài chính) — không phát hiện lỗi Cao/Trung bình mới, các đợt trước đã vá đúng.
+  - **[AI, đã sửa]** `lib/paymentcerts.ts::overContractCerts()`: cộng `c.value + c.addendaTotal` bằng `Number()` JS thay vì trong SQL — không sai số thực tế (VNĐ trong tầm an toàn `Number`) nhưng lệch quy ước cứng CLAUDE.md "mọi tổng tiền làm trong SQL". Sửa: gộp phép cộng vào câu SELECT (`c.value + COALESCE((SELECT SUM(value_delta)...), 0) AS "contractValue"`), JS chỉ đọc kết quả đã cộng sẵn. Verify: `tests/paymentcerts.test.ts` 5/5 pass (Postgres cục bộ), bao gồm đúng test `overContractCerts`.
+- **§5/§7 UI/UX & Vận hành/Offline**: SSE, offline queue, service worker, PDF font, dedup notification đều đúng chuẩn.
+  - **[AI, đã sửa]** ~12 nút icon-only thiếu `aria-label` (nút xoá/đóng/sửa/nhân bản) ở `app/materials/page.tsx`, `app/materials/_components/SuppliersTab.tsx`, `app/materials/_components/PurchaseRequestsTab.tsx` — thêm `aria-label` tiếng Việt mô tả đúng hành động, đối chiếu mẫu đã đúng ở `app/materials/purchase-orders/page.tsx`/`app/approvals/page.tsx`.
+  - **[AI, đã sửa]** `text-zinc-600` dùng làm body text tĩnh (luôn FAIL AA theo bảng §13.2) → đổi `zinc-400`: `app/my-tasks/page.tsx` (9 chỗ: tên gói, mã task, ngày hạn, ghi chú), `app/materials/_components/ReportsTab.tsx` + `app/materials/reports/page.tsx` (giá trị "0" trong bảng báo cáo).
+  - **Đã rà, không sửa (false positive)**: `app/lookahead/page.tsx` bị agent audit gắn cờ `text-zinc-600` — nhưng trang này cố ý `bg-white text-zinc-900` (kiểu in ấn, giống `/report`), không thuộc hệ theme dark-first `--bg`/`zinc-9xx` mà bảng §13.2 áp dụng; tính tay contrast zinc-600 trên nền trắng ≈ 7.7:1 (PASS AA) — không phải lỗi.
+  - **Nợ ghi nhận, chưa sửa**: `text-zinc-500` body text rải khắp app (399 ứng viên đã biết từ trước, xem §13.1) — quá rộng để sửa gọn trong 1 lượt, giữ nguyên là nợ kỹ thuật đã ghi nhận từ lâu, không phải phát hiện mới.
+- **§6 Hiệu năng/Dependency/CI**: Lighthouse, pin SHA, `permissions:`, gate deploy, index bảng lớn, coverage (nhích nhẹ so mốc 2026-07-19: lines 68.34%↑/branches 86.36%↑/funcs 57.20%↑) đều đạt.
+  - **[AI, đã đóng]** Nợ "nghi vấn hiệu năng `COALESCE(t.end_date, wp.end_date)` trong `/api/dashboard`/`/api/notifications`" (ghi từ đợt 8, 2026-07-19): chạy `EXPLAIN ANALYZE` thật trên dữ liệu Excel gốc (2.543 tasks) — cùng cấu trúc JOIN đã benchmark cho `/api/lookahead` (đo hôm nay tới quy mô ×40/100k tasks vẫn ổn, xem mục Redis ở trên) — Execution Time **1.8ms**, Seq Scan hợp lý ở quy mô này. Không phải nút thắt thật, đóng nợ.
+- Verify tổng: `npm run lint`/`typecheck` xanh, `npm test` (`tests/paymentcerts.test.ts` chạy riêng trên Postgres cục bộ 5/5 pass — bộ đầy đủ không chạy lại trong lượt này vì không đổi logic ngoài phạm vi đã test).
+
 ## Đợt audit hẹp vùng rủi ro cao (2026-07-21) — lib/recompute.ts, lib/auth.ts, lib/material-sync.ts, lib/boq.ts
 
 Audit ĐỌC + BÁO CÁO trước (3 subagent song song đúng vùng rủi ro cao `docs/audit.md` §8), tự xác minh lại 2 điểm agent nghi ngờ (cookie `secure` — báo động giả, không cần sửa; race PATCH materials — xác nhận thật), sau đó sửa 2 bug xác nhận chắc; 1 phát hiện còn lại cần chốt ý đồ nghiệp vụ với người dùng nên **để riêng, chưa sửa**.

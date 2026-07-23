@@ -554,7 +554,7 @@ export default function SuppliersTab({ role }: { role: string }) {
       {error && (
         <div className="p-3 bg-red-900/50 border border-red-700 rounded text-sm flex justify-between">
           {error}{" "}
-          <button onClick={() => setError("")}>
+          <button onClick={() => setError("")} aria-label="Đóng">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -616,6 +616,7 @@ export default function SuppliersTab({ role }: { role: string }) {
                   </button>
                   <button
                     onClick={() => setEditingTitle(null)}
+                    aria-label="Huỷ sửa tiêu đề"
                     className="text-zinc-500 hover:text-zinc-300"
                   >
                     <X className="w-3.5 h-3.5" />
@@ -715,6 +716,7 @@ export default function SuppliersTab({ role }: { role: string }) {
                         onClick={() => startEdit(s)}
                         className="p-1.5 rounded hover:bg-zinc-700 text-zinc-400 hover:text-zinc-100"
                         title="Sửa"
+                        aria-label={`Sửa ${s.name}`}
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
@@ -722,6 +724,7 @@ export default function SuppliersTab({ role }: { role: string }) {
                         onClick={() => copySupplier(s)}
                         className="p-1.5 rounded hover:bg-zinc-700 text-zinc-400 hover:text-blue-400"
                         title="Nhân bản"
+                        aria-label={`Nhân bản ${s.name}`}
                       >
                         <Copy className="w-3.5 h-3.5" />
                       </button>
@@ -730,6 +733,7 @@ export default function SuppliersTab({ role }: { role: string }) {
                           onClick={() => del(s.id, s.name)}
                           className="p-1.5 rounded text-zinc-500 hover:text-red-300 hover:bg-red-950/40"
                           title="Xoá"
+                          aria-label={`Xoá ${s.name}`}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>

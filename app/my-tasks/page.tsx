@@ -242,7 +242,7 @@ function FeedTaskCard({
             </span>
             <ExternalLink className="w-3 h-3 text-zinc-600 group-hover:text-zinc-400 shrink-0 mt-0.5" />
           </div>
-          <p className="text-xs text-zinc-600 truncate mt-0.5">{item.packageName}</p>
+          <p className="text-xs text-zinc-400 truncate mt-0.5">{item.packageName}</p>
           <div className="mt-2.5">
             <ProgressBar value={item.progress} warn={variant === "overdue"} />
           </div>
@@ -265,7 +265,7 @@ function FeedTaskCard({
                   : `Bắt đầu sau ${days} ngày · ${item.startDate}`}
             </span>
             {item.assignedTo && (
-              <span className="flex items-center gap-1 text-xs text-zinc-600">
+              <span className="flex items-center gap-1 text-xs text-zinc-400">
                 <Users className="w-3 h-3" /> {item.assignedTo}
               </span>
             )}
@@ -325,7 +325,7 @@ function SheetGroup({ group }: { group: SheetActivity }) {
               </span>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-xs text-zinc-600 font-mono">{ev.taskCode}</span>
+                  <span className="text-xs text-zinc-400 font-mono">{ev.taskCode}</span>
                   <span className="text-sm text-zinc-200 flex-1 truncate">{ev.taskName}</span>
                   <ExternalLink className="w-3 h-3 text-zinc-700 group-hover/ev:text-zinc-400 shrink-0" />
                 </div>
@@ -336,8 +336,8 @@ function SheetGroup({ group }: { group: SheetActivity }) {
                   <span className="text-xs text-zinc-500 truncate">{ev.detail}</span>
                 </div>
                 <div className="flex items-center gap-2 mt-1">
-                  {ev.by && <span className="text-[11px] text-zinc-600">{ev.by}</span>}
-                  <span className="text-[11px] text-zinc-600">{timeAgo(ev.at)}</span>
+                  {ev.by && <span className="text-[11px] text-zinc-400">{ev.by}</span>}
+                  <span className="text-[11px] text-zinc-400">{timeAgo(ev.at)}</span>
                 </div>
               </div>
             </a>
@@ -722,7 +722,7 @@ export default function MyTasksPage() {
                               {pct}%
                             </span>
                           </div>
-                          <p className="text-xs text-zinc-600 mt-1">
+                          <p className="text-xs text-zinc-400 mt-1">
                             {g.done}/{g.total} hoàn thành
                           </p>
                         </div>
@@ -748,7 +748,7 @@ export default function MyTasksPage() {
                                 className="flex-1 min-w-0"
                               >
                                 <div className="flex items-start gap-1.5 flex-wrap">
-                                  <span className="font-mono text-[11px] text-zinc-600 shrink-0 mt-0.5">
+                                  <span className="font-mono text-[11px] text-zinc-400 shrink-0 mt-0.5">
                                     {t.code}
                                   </span>
                                   <span className="text-sm text-zinc-200 flex-1 leading-snug">
@@ -766,7 +766,7 @@ export default function MyTasksPage() {
                                     {pctTask}%
                                   </span>
                                   {t.endDate && (
-                                    <span className="text-[11px] text-zinc-600">
+                                    <span className="text-[11px] text-zinc-400">
                                       · hạn {formatDateVN(t.endDate)}
                                     </span>
                                   )}
@@ -1095,7 +1095,7 @@ export default function MyTasksPage() {
                           />
                         </>
                       )}
-                      <div className="py-3 text-xs text-zinc-600">
+                      <div className="py-3 text-xs text-zinc-400">
                         {savingPref ? "Đang lưu..." : "Thay đổi được lưu tự động."}
                       </div>
                     </div>

@@ -317,11 +317,10 @@ export async function overContractCerts(projectId?: number): Promise<OverContrac
     id: number;
     code: string;
     title: string;
-    value: number;
-    addendaTotal: number;
+    contractValue: number;
   }>(
-    `SELECT c.id, c.code, c.title, c.value,
-            COALESCE((SELECT SUM(value_delta) FROM contract_addenda WHERE contract_id = c.id), 0) AS "addendaTotal"
+    `SELECT c.id, c.code, c.title,
+            c.value + COALESCE((SELECT SUM(value_delta) FROM contract_addenda WHERE contract_id = c.id), 0) AS "contractValue"
        FROM contracts c
       WHERE ${conds.join(" AND ")}`,
     ...args,
@@ -330,7 +329,7 @@ export async function overContractCerts(projectId?: number): Promise<OverContrac
   const result: OverContractCert[] = [];
   for (const c of contracts) {
     const cumulativeValue = await contractCumulativeValue(c.id);
-    const contractValue = Number(c.value) + Number(c.addendaTotal);
+    const contractValue = c.contractValue;
     if (cumulativeValue > contractValue)
       result.push({
         contractId: c.id,
