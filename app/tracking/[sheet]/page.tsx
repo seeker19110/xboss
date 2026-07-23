@@ -48,6 +48,7 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
     data,
     loading,
     loadError,
+    loadErrorMessage,
     load,
     refreshKey,
     syncToast,
@@ -259,7 +260,12 @@ export default function TrackingPage({ params }: { params: Promise<{ sheet: stri
 
   if (loading) return <PageSkeleton />;
   if (loadError && !data)
-    return <ErrorState message="Không tải được dữ liệu — kiểm tra kết nối mạng" onRetry={load} />;
+    return (
+      <ErrorState
+        message={loadErrorMessage ?? "Không tải được dữ liệu — kiểm tra kết nối mạng"}
+        onRetry={load}
+      />
+    );
 
   const floors = [
     ...new Set((data?.packages ?? []).map((p) => p.floorLabel).filter((f): f is string => !!f)),
