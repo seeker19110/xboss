@@ -8,6 +8,15 @@
 
 - **GĐ 4–5 — Phát triển & nâng chất lượng.** Sản phẩm đã chạy thật (v0.2.1, tự host VPS), đang phát triển/tinh chỉnh tính năng liên tục **và** đang áp bộ khung quy trình/chất lượng (brownfield) theo `docs/framework/AP-DUNG-vao-du-an-co-san.md`.
 
+## Đánh giá đề xuất Redis pre-computation cho S-Curve/Pareto/Lookahead (2026-07-23) — kết luận: không cần
+
+Nhận được một bản kế hoạch/walkthrough từ phiên làm việc khác đề xuất kiến trúc Redis pre-computation (cron warm-up mọi project/system, đẩy dữ liệu S-Curve/Lookahead/Pareto vào Redis) để giải quyết "nợ kỹ thuật hiệu năng". Kiểm tra thấy bản đó **chưa từng áp dụng** vào repo này (không có `lib/scurve.ts`, `redis`/`ioredis` trong `package.json`, không có route cron mở rộng) — thuần là đề xuất chưa kiểm chứng.
+
+- **Đo thực tế** (Postgres 16 local, seed dữ liệu Excel gốc TT AVIO Tháp A — 149 nhóm, 2.543 tasks, 50.465 ô dimension): `getScheduleControlData()` (`lib/schedule-control.ts`, Pareto + đường găng) avg **4.8ms**; 2 truy vấn của `/api/lookahead` avg **6.5ms**. Nhân bản dữ liệu ×10 (25.430 tasks, gấp 10 lần quy mô dự án hiện tại): schedule-control avg **12.1ms**, lookahead avg **24ms** — vẫn xa dưới ngưỡng cảm nhận được (~100-200ms). `EXPLAIN ANALYZE` cho thấy Seq Scan toàn bảng `tasks` (chưa có index trên `start_date/end_date/status`) nhưng vẫn nhanh vì bảng nhỏ.
+- **Kết luận**: không có nút thắt hiệu năng thật ở quy mô XBoss hiện tại lẫn tương lai gần. Đề xuất Redis giải quyết vấn đề không tồn tại, thêm hạ tầng ngoài Postgres trái ADR-0001, và trùng lặp cơ chế materialized view đã có (M47 PR2, `mv_progress_daily` + cron `refresh-views`) cho S-Curve. **Không triển khai Redis/pre-computation.**
+- **[AI, đã làm]** `migrations/0079_lookahead_indexes.sql`: thêm 3 index phòng xa (`idx_tasks_start_date`, `idx_tasks_end_date`, `idx_tasks_status`) — thuần `CREATE INDEX IF NOT EXISTS`, không đụng dữ liệu, đi thẳng production. Chi phí gần bằng 0 ở quy mô hiện tại, chuẩn bị sẵn khi bảng `tasks` lớn hơn nhiều. Mốc tái đánh giá cache: khi `tasks` vượt ~50k dòng hoặc route thực đo >200ms trong log production.
+- Verify: `npm run db:migrate` áp sạch, chạy lại lần 2 báo "không có migration mới" (idempotent xác nhận).
+
 ## Đợt audit hẹp vùng rủi ro cao (2026-07-21) — lib/recompute.ts, lib/auth.ts, lib/material-sync.ts, lib/boq.ts
 
 Audit ĐỌC + BÁO CÁO trước (3 subagent song song đúng vùng rủi ro cao `docs/audit.md` §8), tự xác minh lại 2 điểm agent nghi ngờ (cookie `secure` — báo động giả, không cần sửa; race PATCH materials — xác nhận thật), sau đó sửa 2 bug xác nhận chắc; 1 phát hiện còn lại cần chốt ý đồ nghiệp vụ với người dùng nên **để riêng, chưa sửa**.
