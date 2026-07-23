@@ -29,8 +29,10 @@ export async function GET(
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
 
   const r = await queryOne<Row>(
-    `SELECT id, owner_id AS "ownerId", name, source, config, shared FROM saved_reports WHERE id = ?`,
+    `SELECT id, owner_id AS "ownerId", name, source, config, shared
+       FROM saved_reports WHERE id = ? AND org_id = ?`,
     id,
+    user.orgId,
   );
   if (!r) return NextResponse.json({ error: "Không tìm thấy báo cáo" }, { status: 404 });
   if (r.ownerId !== user.id && !r.shared && user.role !== "admin")

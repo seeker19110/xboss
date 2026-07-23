@@ -38,9 +38,13 @@ export async function GET() {
 
   // projectId != null → chỉ tích hợp của dự án đó + tích hợp toàn cục (project_id IS NULL),
   // nhất quán với cách scope theo dự án của M22; projectId = null → không lọc (tương thích ngược).
+  // M54 GĐ1 PR2: luôn cô lập tenant theo org người gọi; project scope là lớp lọc thêm.
   const projectId = await getCurrentProjectId(user);
-  const scopeWhere = projectId != null ? `WHERE (i.project_id = ? OR i.project_id IS NULL)` : "";
-  const scopeParams = projectId != null ? [projectId] : [];
+  const scopeWhere =
+    projectId != null
+      ? `WHERE i.org_id = ? AND (i.project_id = ? OR i.project_id IS NULL)`
+      : `WHERE i.org_id = ?`;
+  const scopeParams = projectId != null ? [user.orgId, projectId] : [user.orgId];
   // LATERAL lấy lần chạy mới nhất mỗi integration_id (order theo started_at DESC).
   const rows = await query<IntegrationRow>(
     `SELECT i.id, i.provider, i.project_id AS "projectId", p.name AS "projectName",
@@ -115,8 +119,9 @@ export async function POST(req: NextRequest) {
   // ON CONFLICT (provider, project_id) upsert — với project_id NULL, UNIQUE coi NULL là
   // khác nhau nên không kích hoạt DO UPDATE (chèn mới); tích hợp thật luôn có project_id
   // (cron chỉ quét hàng project_id IS NOT NULL) nên không ảnh hưởng luồng dùng thực.
+  // M54 GĐ1 PR2: tích hợp thuộc org người tạo (không dựa DEFAULT org_id=1).
   const rows = await query<{ id: number }>(
-    `INSERT INTO integrations (provider, project_id, config, active) VALUES (?, ?, ?, ?)
+    `INSERT INTO integrations (provider, project_id, config, active, org_id) VALUES (?, ?, ?, ?, ?)
      ON CONFLICT (provider, project_id)
      DO UPDATE SET config = EXCLUDED.config, active = EXCLUDED.active
      RETURNING id`,
@@ -124,6 +129,7 @@ export async function POST(req: NextRequest) {
     projectId,
     JSON.stringify(config),
     active,
+    user.orgId,
   );
   return NextResponse.json({ id: rows[0].id }, { status: 201 });
 }

@@ -111,6 +111,7 @@ export async function upsertAlertRule(input: {
   threshold: number;
   active?: boolean;
   userId?: number | null;
+  orgId: number;
 }): Promise<{ id: number } | string> {
   if (!isAlertMetric(input.metric)) return "Metric không hợp lệ";
   if (!Number.isFinite(input.threshold)) return "Ngưỡng phải là số hữu hạn";
@@ -143,14 +144,15 @@ export async function upsertAlertRule(input: {
   }
 
   const id = await insertId(
-    `INSERT INTO alert_rules (project_id, metric, operator, threshold, active, created_by)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO alert_rules (project_id, metric, operator, threshold, active, created_by, org_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
     input.projectId,
     input.metric,
     operator,
     input.threshold,
     active,
     input.userId ?? null,
+    input.orgId,
   );
   return { id };
 }

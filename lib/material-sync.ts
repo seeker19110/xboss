@@ -443,7 +443,9 @@ export async function runMaterialSync(sheetClient?: SheetClient): Promise<SyncSu
 
       let boqCode: string | null = f.boqCode || null;
       if (boqCode) {
-        // TODO(M54 PR2): lấy orgId thật từ session
+        // M54 GĐ1 PR2: đồng bộ Google Sheet chạy qua cron/nút Admin, KHÔNG có session mang
+        // orgId — integration hiện là single-tenant toàn cục (1 Sheet ↔ 1 DB). Org hoá luồng
+        // đồng bộ hệ ngoài per-org là việc Giai đoạn 2, ngoài phạm vi PR2 → giữ org mặc định 1.
         const usedBy = await boqTakenBy(boqCode, 1);
         if (usedBy) {
           summary.skipped.push({

@@ -116,6 +116,7 @@ test(
       srcId,
       { name: "Đích clone-config", code: `DICH-${Date.now()}` },
       actorId,
+      1,
     );
     const dstId = res.projectId;
 

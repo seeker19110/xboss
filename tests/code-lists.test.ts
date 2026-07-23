@@ -31,7 +31,7 @@ test("code_lists: CRUD + cache version invalidate khi ghi", { skip: !HAS_TEST_DB
   const v0 = cl.codeListVersion();
 
   // Tạo mục → version bump → lần đọc sau thấy ngay (cache đã bị vô hiệu).
-  const created = await cl.createItem({ domain, code: "aaa", label: "Nhãn A", sort: 0 });
+  const created = await cl.createItem({ domain, code: "aaa", label: "Nhãn A", sort: 0, orgId: 1 });
   assert.ok(typeof created !== "string", "tạo phải thành công");
   assert.ok(cl.codeListVersion() > v0, "ghi phải tăng version");
   const afterCreate = await cl.getList(domain, { includeInactive: true });
@@ -40,7 +40,7 @@ test("code_lists: CRUD + cache version invalidate khi ghi", { skip: !HAS_TEST_DB
   const id = (created as { id: number }).id;
 
   // Trùng (domain, code) → trả chuỗi lỗi (nguồn của 409).
-  const dup = await cl.createItem({ domain, code: "aaa", label: "Trùng", sort: 1 });
+  const dup = await cl.createItem({ domain, code: "aaa", label: "Trùng", sort: 1, orgId: 1 });
   assert.equal(typeof dup, "string");
 
   // Sửa nhãn + tắt active → getList mặc định (chỉ active) không còn thấy.
@@ -70,6 +70,7 @@ test(
       code: "test_ref_reason",
       label: "Lý do test",
       sort: 99,
+      orgId: 1,
     });
     assert.ok(typeof r !== "string");
     const refId = (r as { id: number }).id;

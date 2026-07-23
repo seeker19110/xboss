@@ -79,6 +79,8 @@ export type CodeListInput = {
   sort?: number;
   active?: boolean;
   meta?: Record<string, unknown>;
+  // M54 GĐ1 PR2: org của người tạo — mục danh mục thuộc tenant, không dựa DEFAULT org_id=1.
+  orgId: number;
 };
 
 // Tạo mục mới; trả chuỗi lỗi khi trùng (domain, code).
@@ -90,14 +92,15 @@ export async function createItem(input: CodeListInput): Promise<{ id: number } |
   );
   if (exists) return "Mã đã tồn tại trong danh mục này";
   const id = await insertId(
-    `INSERT INTO code_lists (domain, code, label, sort, active, meta)
-     VALUES (?, ?, ?, ?, ?, ?::jsonb)`,
+    `INSERT INTO code_lists (domain, code, label, sort, active, meta, org_id)
+     VALUES (?, ?, ?, ?, ?, ?::jsonb, ?)`,
     input.domain,
     input.code,
     input.label,
     input.sort ?? 0,
     input.active ?? true,
     JSON.stringify(input.meta ?? {}),
+    input.orgId,
   );
   bumpCodeListVersion();
   return { id };

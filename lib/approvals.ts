@@ -489,6 +489,7 @@ export type FlowInput = {
   entityType: string;
   name: string;
   steps: FlowStepInput[];
+  orgId: number;
 };
 
 export type ApprovalFlowAdmin = {
@@ -599,10 +600,11 @@ export async function createApprovalFlow(input: FlowInput): Promise<{ id: number
   try {
     return await withTransaction(async () => {
       const flowId = await insertId(
-        `INSERT INTO approval_flows (project_id, entity_type, name) VALUES (?, ?, ?)`,
+        `INSERT INTO approval_flows (project_id, entity_type, name, org_id) VALUES (?, ?, ?, ?)`,
         input.projectId,
         input.entityType,
         input.name.trim(),
+        input.orgId,
       );
       for (const s of input.steps) {
         await insertId(

@@ -12,11 +12,14 @@ export async function GET() {
   if (!CAN.viewCustomFields(user.role))
     return NextResponse.json({ error: "Không có quyền xem trường tuỳ biến" }, { status: 403 });
 
+  // M54 GĐ1 PR2: cô lập tenant — chỉ định nghĩa của org người gọi (vẫn xuyên dự án trong org).
   const defs = await query(
     `SELECT id, project_id AS "projectId", entity_type AS "entityType", key, label, type,
             options, required, sort, active
        FROM custom_field_defs
+      WHERE org_id = ?
       ORDER BY entity_type, sort, id`,
+    user.orgId,
   );
   return NextResponse.json({ defs });
 }
@@ -72,9 +75,10 @@ export async function POST(req: NextRequest) {
   const active = body.active === undefined ? true : !!body.active;
 
   try {
+    // M54 GĐ1 PR2: định nghĩa trường tuỳ biến thuộc org người tạo (không dựa DEFAULT org_id=1).
     const id = await insertId(
-      `INSERT INTO custom_field_defs (project_id, entity_type, key, label, type, options, required, sort, active)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO custom_field_defs (project_id, entity_type, key, label, type, options, required, sort, active, org_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       projectId,
       entityType,
       key,
@@ -84,6 +88,7 @@ export async function POST(req: NextRequest) {
       required,
       sort,
       active,
+      user.orgId,
     );
     return NextResponse.json({ id }, { status: 201 });
   } catch (err) {

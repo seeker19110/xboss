@@ -55,16 +55,18 @@ export async function setFlag(
   projectId: number,
   enabled: boolean,
   actorId: number,
+  orgId: number,
 ): Promise<void> {
   await run(
-    `INSERT INTO feature_flags (module_key, project_id, enabled, updated_by)
-     VALUES (?, ?, ?, ?)
+    `INSERT INTO feature_flags (module_key, project_id, enabled, updated_by, org_id)
+     VALUES (?, ?, ?, ?, ?)
      ON CONFLICT (module_key, project_id) DO UPDATE
        SET enabled = EXCLUDED.enabled, updated_by = EXCLUDED.updated_by, updated_at = NOW()`,
     moduleKey,
     projectId,
     enabled,
     actorId,
+    orgId,
   );
   bumpFeatureFlagsVersion();
 }

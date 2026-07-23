@@ -103,6 +103,13 @@ export async function PATCH(req: NextRequest) {
   if (projectId !== null && !(await projectExists(projectId)))
     return NextResponse.json({ error: "Dự án không tồn tại" }, { status: 422 });
 
-  await setPermissionOverride(role as Role, permKey as PermKey, allowed, user.id, projectId);
+  await setPermissionOverride(
+    role as Role,
+    permKey as PermKey,
+    allowed,
+    user.id,
+    user.orgId,
+    projectId,
+  );
   return NextResponse.json({ ok: true });
 }

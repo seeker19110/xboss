@@ -26,41 +26,57 @@ test("verifyPassword: hash rỗng / không hợp lệ trả false", () => {
   assert.equal(verifyPassword("secret", "onlyonesegment"), false);
 });
 
-test("makeToken: token chứa userId + pwFrag + exp + cờ mustSetup2fa + session_version", () => {
+test("makeToken: token chứa userId + pwFrag + exp + cờ mustSetup2fa + session_version + orgId", () => {
   process.env.XBOSS_SECRET = "test-secret-for-unit";
   const hash = hashPassword("pw");
-  const token = makeToken(42, hash, false, 0);
+  const token = makeToken(42, hash, false, 0, 1);
   const parts = token.split(".");
-  assert.equal(parts.length, 6, "Token phải có 6 phần (V5: thêm session_version)");
+  assert.equal(parts.length, 7, "Token phải có 7 phần (M54 PR2: thêm orgId)");
   assert.equal(parts[0], "42", "phần đầu là userId");
   assert.equal(parts[2], hash.slice(0, 12), "phần 3 là pwFrag");
   assert.equal(parts[3], "0", "phần 4 là cờ mustSetup2fa = 0 khi false");
   assert.equal(parts[4], "0", "phần 5 là session_version");
-  assert.equal(makeToken(42, hash, true, 0).split(".")[3], "1", "cờ = 1 khi mustSetup2fa true");
+  assert.equal(parts[5], "1", "phần 6 là orgId");
+  assert.equal(makeToken(42, hash, true, 0, 1).split(".")[3], "1", "cờ = 1 khi mustSetup2fa true");
   assert.equal(
-    makeToken(42, hash, false, 7).split(".")[4],
+    makeToken(42, hash, false, 7, 1).split(".")[4],
     "7",
     "phần 5 = session_version truyền vào",
   );
+  assert.equal(makeToken(42, hash, false, 0, 9).split(".")[5], "9", "phần 6 = orgId truyền vào");
 });
 
-test("parseToken: token 5 phần cũ (M56 PR2, chưa có session_version) bị coi không hợp lệ", async () => {
+test("parseToken: token 6 phần cũ (V5, chưa có orgId) bị coi không hợp lệ", async () => {
   process.env.XBOSS_SECRET = "test-secret-for-unit";
   const { parseToken, sign } = await import("@/lib/session-token");
   const hash = hashPassword("pw");
   const pwFrag = hash.slice(0, 12);
   const exp = Date.now() + 86400_000;
-  // Dựng token 5 phần đúng chữ ký kiểu cũ — vẫn phải bị từ chối (breaking có chủ đích).
-  const legacyPayload = `42.${exp}.${pwFrag}.0`;
+  // Dựng token 6 phần đúng chữ ký kiểu V5 (userId.exp.pwFrag.flag.sv) — vẫn phải bị từ chối
+  // sau M54 PR2 (breaking có chủ đích — mọi user bị đăng xuất 1 lần sau deploy).
+  const legacyPayload = `42.${exp}.${pwFrag}.0.0`;
   const legacyToken = `${legacyPayload}.${sign(legacyPayload)}`;
-  assert.equal(parseToken(legacyToken), null, "Token 5 phần cũ phải bị từ chối sau V5");
+  assert.equal(parseToken(legacyToken), null, "Token 6 phần cũ phải bị từ chối sau M54 PR2");
 });
 
-test("parseToken: round-trip session_version", () => {
+test("parseToken: round-trip session_version + orgId", () => {
   process.env.XBOSS_SECRET = "test-secret-for-unit";
   const hash = hashPassword("pw");
-  const parsed = parseToken(makeToken(42, hash, false, 3));
+  const parsed = parseToken(makeToken(42, hash, false, 3, 7));
   assert.equal(parsed?.sessionVersion, 3, "parseToken trả đúng session_version đã nhúng");
+  assert.equal(parsed?.orgId, 7, "parseToken trả đúng orgId đã nhúng");
+});
+
+test("parseToken: orgId phải là số nguyên dương (0 → null)", async () => {
+  process.env.XBOSS_SECRET = "test-secret-for-unit";
+  const { parseToken, sign } = await import("@/lib/session-token");
+  const hash = hashPassword("pw");
+  const pwFrag = hash.slice(0, 12);
+  const exp = Date.now() + 86400_000;
+  // orgId = 0 (không hợp lệ, id tổ chức luôn ≥ 1) → dù chữ ký đúng vẫn bị từ chối.
+  const badPayload = `42.${exp}.${pwFrag}.0.0.0`;
+  const badToken = `${badPayload}.${sign(badPayload)}`;
+  assert.equal(parseToken(badToken), null, "orgId = 0 phải bị từ chối");
 });
 
 // ===== Integration tests: DB =====
@@ -111,7 +127,7 @@ test("password change invalidates old token (pwFrag check)", { skip: !HAS_TEST_D
     hash1,
   );
 
-  const token = mt(userId, hash1, false, 0);
+  const token = mt(userId, hash1, false, 0, 1);
   const pwFrag = hash1.slice(0, 12);
 
   // Trước khi đổi mật khẩu: pwFrag khớp
@@ -157,7 +173,7 @@ test("revoke sessions: tăng session_version vô hiệu token cũ", { skip: !HAS
     `SELECT session_version FROM users WHERE id = ?`,
     userId,
   );
-  const token = mt(userId, hash, false, Number(sv0?.session_version));
+  const token = mt(userId, hash, false, Number(sv0?.session_version), 1);
   const parsed = pt(token);
   assert.ok(parsed);
 

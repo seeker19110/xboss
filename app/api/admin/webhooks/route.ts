@@ -45,12 +45,15 @@ export async function GET() {
   if (!CAN.manageIntegrations(user.role))
     return NextResponse.json({ error: "Chỉ Admin được quản lý webhook" }, { status: 403 });
 
+  // M54 GĐ1 PR2: cô lập tenant — chỉ webhook thuộc org người gọi.
   const webhooks = await query<WebhookRow>(
     `SELECT w.id, w.project_id AS "projectId", p.name AS "projectName", w.url, w.events,
             w.active, w.created_at AS "createdAt"
        FROM webhooks w
        LEFT JOIN projects p ON p.id = w.project_id
+      WHERE w.org_id = ?
       ORDER BY w.id DESC`,
+    user.orgId,
   );
 
   // 10 delivery gần nhất mỗi webhook (ROW_NUMBER phân vùng theo webhook_id) — 1 truy vấn.
@@ -104,20 +107,21 @@ export async function POST(req: NextRequest) {
       { status: 422 },
     );
 
-  const projectId =
-    body.projectId != null && body.projectId !== "" ? Number(body.projectId) : null;
+  const projectId = body.projectId != null && body.projectId !== "" ? Number(body.projectId) : null;
   if (projectId != null && !Number.isInteger(projectId))
     return NextResponse.json({ error: "projectId không hợp lệ" }, { status: 400 });
 
   const secret = randomBytes(32).toString("hex");
+  // M54 GĐ1 PR2: webhook thuộc org người tạo (không dựa DEFAULT org_id=1).
   const id = await insertId(
-    `INSERT INTO webhooks (project_id, url, secret, events, active, created_by)
-     VALUES (?, ?, ?, ?, TRUE, ?)`,
+    `INSERT INTO webhooks (project_id, url, secret, events, active, created_by, org_id)
+     VALUES (?, ?, ?, ?, TRUE, ?, ?)`,
     projectId,
     urlCheck.url,
     secret,
     events,
     user.id,
+    user.orgId,
   );
 
   return NextResponse.json({ id, secret }, { status: 201 });

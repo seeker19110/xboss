@@ -68,16 +68,18 @@ export async function cloneProjectConfig(
   sourceProjectId: number,
   input: NewProjectInput,
   actorId: number,
+  orgId: number,
 ): Promise<CloneResult> {
   return withTransaction(async () => {
     // 1) Tạo dự án mới.
     const projectId = await insertId(
-      `INSERT INTO projects (name, code, investor, contractor, color) VALUES (?, ?, ?, ?, ?) RETURNING id`,
+      `INSERT INTO projects (name, code, investor, contractor, color, org_id) VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
       input.name,
       input.code ?? null,
       input.investor ?? null,
       input.contractor ?? null,
       input.color ?? null,
+      orgId,
     );
 
     // 2) towers — map id cũ→mới.
@@ -156,11 +158,12 @@ export async function cloneProjectConfig(
     let approvalSteps = 0;
     for (const f of flows) {
       const newFlowId = await insertId(
-        `INSERT INTO approval_flows (project_id, entity_type, name, active) VALUES (?, ?, ?, ?) RETURNING id`,
+        `INSERT INTO approval_flows (project_id, entity_type, name, active, org_id) VALUES (?, ?, ?, ?, ?) RETURNING id`,
         projectId,
         f.entity_type,
         f.name,
         f.active,
+        orgId,
       );
       // Chép step bằng INSERT...SELECT — min_amount (tiền, NUMERIC) giữ nguyên trong SQL,
       // KHÔNG roundtrip qua float JS (quy ước tiền M45).
@@ -175,10 +178,11 @@ export async function cloneProjectConfig(
 
     // 6) alert_rules gắn dự án nguồn → gắn dự án mới (created_by = người sao chép).
     const alerts = await run(
-      `INSERT INTO alert_rules (project_id, metric, operator, threshold, channel, active, created_by)
-       SELECT ?, metric, operator, threshold, channel, active, ? FROM alert_rules WHERE project_id = ?`,
+      `INSERT INTO alert_rules (project_id, metric, operator, threshold, channel, active, created_by, org_id)
+       SELECT ?, metric, operator, threshold, channel, active, ?, ? FROM alert_rules WHERE project_id = ?`,
       projectId,
       actorId,
+      orgId,
       sourceProjectId,
     );
 

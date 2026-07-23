@@ -50,8 +50,9 @@ export async function POST(req: NextRequest) {
     password_hash: string;
     totp_enabled_at: string | null;
     session_version: number;
+    org_id: number;
   }>(
-    `SELECT id, name, email, role, password_hash, totp_enabled_at, session_version FROM users WHERE email = ?`,
+    `SELECT id, name, email, role, password_hash, totp_enabled_at, session_version, org_id FROM users WHERE email = ?`,
     emailNorm,
   );
   if (!u || !verifyPassword(password, u.password_hash)) {
@@ -75,12 +76,16 @@ export async function POST(req: NextRequest) {
   const required = await requiredRoles();
   const mustSetup2fa = computeMustSetup2fa(u.role as Role, u.totp_enabled_at, required);
   const res = NextResponse.json({ user: { id: u.id, name: u.name, email: u.email, role: u.role } });
-  res.cookies.set(COOKIE, makeToken(u.id, u.password_hash, mustSetup2fa, u.session_version), {
-    httpOnly: true,
-    path: "/",
-    maxAge: COOKIE_MAX_AGE,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production", // dev qua HTTP vẫn set được
-  });
+  res.cookies.set(
+    COOKIE,
+    makeToken(u.id, u.password_hash, mustSetup2fa, u.session_version, u.org_id),
+    {
+      httpOnly: true,
+      path: "/",
+      maxAge: COOKIE_MAX_AGE,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production", // dev qua HTTP vẫn set được
+    },
+  );
   return res;
 }

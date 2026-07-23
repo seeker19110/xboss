@@ -86,7 +86,7 @@ test(
 
     // (2) Siết approve của pm → false thật sau khi ghi (setPermissionOverride tự invalidate).
     await runWithRequestContext({ userId: 1, role: "admin" }, async () => {
-      await setPermissionOverride("pm", "approve", false, 1);
+      await setPermissionOverride("pm", "approve", false, 1, 1);
     });
     assert.equal(CAN.approve("pm"), false, "sau siết: pm không còn approve");
     assert.equal(CAN.approve("admin"), true, "siết pm không ảnh hưởng admin");
@@ -97,7 +97,7 @@ test(
 
     // (4) Mở quyền XEM viewPayments cho viewer → true.
     await runWithRequestContext({ userId: 1, role: "admin" }, async () => {
-      await setPermissionOverride("viewer", "viewPayments", true, 1);
+      await setPermissionOverride("viewer", "viewPayments", true, 1, 1);
     });
     assert.equal(CAN.viewPayments("viewer"), true, "sau mở: viewer xem được thanh toán");
 
@@ -114,7 +114,7 @@ test(
 
     // (5) Xoá override (allowed=null) → về default.
     await runWithRequestContext({ userId: 1, role: "admin" }, async () => {
-      await setPermissionOverride("pm", "approve", null, 1);
+      await setPermissionOverride("pm", "approve", null, 1, 1);
     });
     assert.equal(CAN.approve("pm"), true, "sau xoá override: pm approve về mặc định");
     assert.equal(getPermissionOverride("pm", "approve"), undefined);

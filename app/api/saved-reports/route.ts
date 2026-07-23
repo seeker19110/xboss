@@ -21,10 +21,12 @@ export async function GET() {
             (r.owner_id = ?) AS "isMine"
        FROM saved_reports r
        LEFT JOIN users u ON u.id = r.owner_id
-      WHERE (r.project_id = ? OR r.project_id IS NULL)
+      WHERE r.org_id = ?
+        AND (r.project_id = ? OR r.project_id IS NULL)
         AND (r.owner_id = ? OR r.shared = TRUE)
       ORDER BY r.name`,
     user.id,
+    user.orgId,
     projectId,
     user.id,
   );
@@ -60,15 +62,17 @@ export async function POST(req: NextRequest) {
 
   const projectId = await getCurrentProjectId(user);
   const shared = body?.shared === true;
+  // M54 GĐ1 PR2: báo cáo lưu thuộc org người tạo (không dựa DEFAULT org_id=1).
   const id = await insertId(
-    `INSERT INTO saved_reports (project_id, owner_id, name, source, config, shared)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO saved_reports (project_id, owner_id, name, source, config, shared, org_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
     projectId,
     user.id,
     name,
     source,
     JSON.stringify(config),
     shared,
+    user.orgId,
   );
 
   return NextResponse.json({ id, name, source, config, shared }, { status: 201 });

@@ -70,8 +70,7 @@ export async function PATCH(
     const boq = String(body.boqCode ?? "").trim();
     body.boqCode = boq || null;
     if (boq) {
-      // TODO(M54 PR2): lấy orgId thật từ session
-      const usedBy = await boqTakenBy(boq, 1, { table: "tasks", id });
+      const usedBy = await boqTakenBy(boq, me.orgId, { table: "tasks", id });
       if (usedBy)
         return NextResponse.json(
           { error: `Mã BOQ "${boq}" đã được dùng bởi ${usedBy}` },

@@ -12,8 +12,11 @@ export async function GET() {
   if (!CAN.manageUsers(me.role) && !CAN.assign(me.role))
     return NextResponse.json({ error: "Không có quyền xem danh sách người dùng" }, { status: 403 });
 
+  // M54 GĐ1 PR2: cô lập tenant — chỉ trả user cùng org với người gọi.
   const users = await query(
-    `SELECT id, name, email, role, created_at AS "createdAt" FROM users ORDER BY id`);
+    `SELECT id, name, email, role, created_at AS "createdAt" FROM users WHERE org_id = ? ORDER BY id`,
+    me.orgId,
+  );
   return NextResponse.json({ users });
 }
 
@@ -26,7 +29,9 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}));
   const name = String(body.name ?? "").trim();
-  const email = String(body.email ?? "").toLowerCase().trim();
+  const email = String(body.email ?? "")
+    .toLowerCase()
+    .trim();
   const password = String(body.password ?? "");
   const role = String(body.role ?? "") as Role;
 
@@ -40,9 +45,15 @@ export async function POST(req: NextRequest) {
   const dup = await queryOne(`SELECT id FROM users WHERE email = ?`, email);
   if (dup) return NextResponse.json({ error: "Email đã tồn tại" }, { status: 409 });
 
+  // M54 GĐ1 PR2: user mới thuộc org của chính admin tạo (không dựa DEFAULT org_id=1).
   const id = await insertId(
-    `INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)`,
-    name, email, hashPassword(password), role);
+    `INSERT INTO users (name, email, password_hash, role, org_id) VALUES (?, ?, ?, ?, ?)`,
+    name,
+    email,
+    hashPassword(password),
+    role,
+    me.orgId,
+  );
 
   return NextResponse.json({ user: { id, name, email, role } }, { status: 201 });
 }

@@ -38,8 +38,7 @@ export async function POST(req: NextRequest) {
 
   const boqCode = String(body.boqCode ?? "").trim() || null;
   if (boqCode) {
-    // TODO(M54 PR2): lấy orgId thật từ session
-    const taken = await boqTakenBy(boqCode, 1);
+    const taken = await boqTakenBy(boqCode, user.orgId);
     if (taken)
       return NextResponse.json(
         { error: `MÃ£ BOQ "${boqCode}" Ä‘Ã£ Ä‘Æ°á»£c dÃ¹ng bá»Ÿi ${taken}` },

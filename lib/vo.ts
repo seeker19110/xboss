@@ -108,12 +108,15 @@ export function parseVoBody(body: Record<string, unknown>): VoInput {
   };
 }
 
-// Check mã dòng KL không trùng BOQCODE toàn hệ thống (task/package/material/boq_item khác).
-// Trả thông điệp lỗi dòng đầu tiên bị trùng, hoặc null nếu tất cả đều rảnh.
-export async function checkVoLinesTaken(lines: VoLineInput[]): Promise<string | null> {
+// Check mã dòng KL không trùng BOQCODE trong org (task/package/material/boq_item khác).
+// Trả thông điệp lỗi dòng đầu tiên bị trùng, hoặc null nếu tất cả đều rảnh. orgId truyền từ
+// route gọi (user.orgId) — cô lập tenant, không dùng hằng số.
+export async function checkVoLinesTaken(
+  lines: VoLineInput[],
+  orgId: number,
+): Promise<string | null> {
   for (const line of lines) {
-    // TODO(M54 PR2): lấy orgId thật từ session
-    const takenBy = await boqTakenBy(line.code.trim(), 1);
+    const takenBy = await boqTakenBy(line.code.trim(), orgId);
     if (takenBy) return `Mã "${line.code}" đã được dùng bởi ${takenBy}`;
   }
   return null;

@@ -153,6 +153,7 @@ export async function setPermissionOverride(
   permKey: string,
   allowed: boolean | null,
   updatedBy: number | null,
+  orgId: number, // M54 GĐ1 PR2: org của người thao tác — override thuộc tenant, không dựa DEFAULT
   projectId: number | null = null, // mặc định null = override TOÀN HỆ (tương thích ngược M50)
 ): Promise<void> {
   await withTransaction(async () => {
@@ -168,8 +169,8 @@ export async function setPermissionOverride(
       );
     } else {
       await run(
-        `INSERT INTO role_permissions (role, perm_key, allowed, project_id, updated_by, updated_at)
-         VALUES (?, ?, ?, ?, ?, now())
+        `INSERT INTO role_permissions (role, perm_key, allowed, project_id, updated_by, org_id, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, now())
          ON CONFLICT (role, perm_key, COALESCE(project_id, 0))
          DO UPDATE SET allowed = EXCLUDED.allowed, updated_by = EXCLUDED.updated_by, updated_at = now()`,
         role,
@@ -177,6 +178,7 @@ export async function setPermissionOverride(
         allowed,
         projectId,
         updatedBy,
+        orgId,
       );
     }
   });

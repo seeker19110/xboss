@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
   const commit = req.nextUrl.searchParams.get("commit") === "1";
 
   if (!commit) {
-    const preview = await previewBoqImport(parsed.rows, system.code);
+    const preview = await previewBoqImport(parsed.rows, system.code, user.orgId);
     return NextResponse.json({
       preview,
       detectedSystemCode: parsed.detectedSystemCode,
@@ -86,6 +86,6 @@ export async function POST(req: NextRequest) {
   if (projectId == null)
     return NextResponse.json({ error: "Chưa có dự án nào để import BOQ" }, { status: 422 });
 
-  const result = await commitBoqImport(parsed.rows, systemId, system.code, projectId);
+  const result = await commitBoqImport(parsed.rows, systemId, system.code, projectId, user.orgId);
   return NextResponse.json(result);
 }
