@@ -1,18 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, unlink, readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { queryOne, run, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import {
-  ensureUploadDir,
   extForDocMime,
   verifyFileMime,
   newTenderBidFileName,
-  photoPath,
   MAX_DOC_BYTES,
   isContentTooLarge,
 } from "@/lib/photos";
+import { storagePut, storageGet, storageDelete } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -48,15 +45,8 @@ export async function GET(
       : undefined;
   if (!bid?.fileName) return NextResponse.json({ error: "Chưa có file đính kèm" }, { status: 404 });
 
-  const path = photoPath(bid.fileName);
-  if (!path) return NextResponse.json({ error: "Tên file không hợp lệ" }, { status: 400 });
-
-  let buf: Buffer;
-  try {
-    buf = await readFile(path);
-  } catch {
-    return NextResponse.json({ error: "File không còn trên đĩa" }, { status: 404 });
-  }
+  const buf = await storageGet(user.orgId, bid.fileName);
+  if (!buf) return NextResponse.json({ error: "File không còn trên đĩa" }, { status: 404 });
 
   return new NextResponse(new Uint8Array(buf), {
     headers: {
@@ -130,17 +120,10 @@ export async function POST(
     );
 
   // Xoá file cũ nếu có (mỗi báo giá chỉ giữ 1 file chào thầu gốc).
-  if (bid.fileName) {
-    const oldPath = photoPath(bid.fileName);
-    if (oldPath)
-      await unlink(oldPath).catch(() => {
-        /* file đã mất trên đĩa — bỏ qua */
-      });
-  }
+  if (bid.fileName) await storageDelete(user.orgId, bid.fileName);
 
   const fileName = newTenderBidFileName(bidId, file.type);
-  const dir = ensureUploadDir();
-  await writeFile(join(dir, fileName), fileBuf);
+  await storagePut(user.orgId, fileName, fileBuf);
 
   await run(
     `UPDATE tender_bids SET file_name = ?, original_name = ?, mime_type = ?, size_bytes = ? WHERE id = ?`,

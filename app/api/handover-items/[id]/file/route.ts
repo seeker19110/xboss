@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFile } from "node:fs/promises";
+import { storageGet } from "@/lib/storage";
 import { extname } from "node:path";
 import { queryOne } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
-import { photoPath } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
 
@@ -45,15 +44,8 @@ export async function GET(
   if (!item?.minutesFile)
     return NextResponse.json({ error: "Chưa có biên bản đính kèm" }, { status: 404 });
 
-  const path = photoPath(item.minutesFile);
-  if (!path) return NextResponse.json({ error: "Tên file không hợp lệ" }, { status: 400 });
-
-  let buf: Buffer;
-  try {
-    buf = await readFile(path);
-  } catch {
-    return NextResponse.json({ error: "File không còn trên đĩa" }, { status: 404 });
-  }
+  const buf = await storageGet(user.orgId, item.minutesFile);
+  if (!buf) return NextResponse.json({ error: "File không còn trên đĩa" }, { status: 404 });
 
   const mime = EXT_MIME[extname(item.minutesFile).toLowerCase()] ?? "application/octet-stream";
 

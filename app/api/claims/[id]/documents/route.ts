@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { storagePut } from "@/lib/storage";
 import { query, insertId, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import {
-  ensureUploadDir,
   extForDocMime,
   verifyFileMime,
   newClaimDocFileName,
@@ -101,8 +99,7 @@ export async function POST(
 
   const title = String(form.get("title") ?? "").trim() || null;
   const fileName = newClaimDocFileName(claimId, file.type);
-  const dir = ensureUploadDir();
-  await writeFile(join(dir, fileName), fileBuf);
+  await storagePut(user.orgId, fileName, fileBuf);
   const sha256 = sha256Hex(fileBuf);
 
   const id = await insertId(

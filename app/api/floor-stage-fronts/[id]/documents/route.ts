@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { storagePut } from "@/lib/storage";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import {
-  ensureUploadDir,
   extForDocMime,
   verifyFileMime,
   newFloorStageFrontFileName,
@@ -100,8 +98,7 @@ export async function POST(
     );
 
   const fileName = newFloorStageFrontFileName(frontId, file.type);
-  const dir = ensureUploadDir();
-  await writeFile(join(dir, fileName), fileBuf);
+  await storagePut(user.orgId, fileName, fileBuf);
 
   const id = await insertId(
     `INSERT INTO floor_stage_front_documents

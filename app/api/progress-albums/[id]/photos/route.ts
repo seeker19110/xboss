@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { storagePut } from "@/lib/storage";
 import { queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import {
-  ensureUploadDir,
   extForMime,
   verifyFileMime,
   newAlbumPhotoFileName,
@@ -107,8 +105,7 @@ export async function POST(
 
   const caption = String(form.get("caption") ?? "").trim() || null;
   const fileName = newAlbumPhotoFileName(albumId, file.type);
-  const dir = ensureUploadDir();
-  await writeFile(join(dir, fileName), fileBuf);
+  await storagePut(user.orgId, fileName, fileBuf);
 
   const id = await insertId(
     `INSERT INTO task_photos (task_id, album_id, file_name, original_name, mime_type, size_bytes, caption, uploaded_by)

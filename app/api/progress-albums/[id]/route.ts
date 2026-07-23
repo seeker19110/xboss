@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { unlink } from "node:fs/promises";
 import { query, queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { parseAlbumBody, validateAlbumInput, listAlbumPhotos, type AlbumInput } from "@/lib/tech";
-import { photoPath } from "@/lib/photos";
+import { storageDelete } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -113,11 +112,7 @@ export async function DELETE(
   await run(`DELETE FROM progress_albums WHERE id = ?`, id);
 
   for (const f of fileRows) {
-    const p = photoPath(f.fileName);
-    if (p)
-      await unlink(p).catch(() => {
-        /* file đã mất trên đĩa — bỏ qua */
-      });
+    await storageDelete(user.orgId, f.fileName);
   }
 
   return NextResponse.json({ deleted: id, photosDeleted: fileRows.length });

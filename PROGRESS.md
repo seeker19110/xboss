@@ -8,6 +8,18 @@
 
 - **GĐ 4–5 — Phát triển & nâng chất lượng.** Sản phẩm đã chạy thật (v0.2.1, tự host VPS), đang phát triển/tinh chỉnh tính năng liên tục **và** đang áp bộ khung quy trình/chất lượng (brownfield) theo `docs/framework/AP-DUNG-vao-du-an-co-san.md`.
 
+## M54 GĐ1 PR4 — Object storage abstraction (2026-07-23)
+
+Tiếp nối PR3 (RLS theo org, cùng ngày) — theo đặc tả `docs/nang-cap/M54-multi-tenant-saas.md` PR4 (route: complex, giao `complex-implementer`). Không có MinIO/S3 thật trong môi trường code/test hiện tại nên quyết định trong ranh giới brief: backend mặc định (thiếu env S3) là **local disk, hành vi y hệt trước PR4** (không đổi file đã upload trên production); backend S3 (khi đủ 4 biến env) mới dùng prefix `org/<org_id>/`.
+
+- **[AI, đã làm]** `lib/storage.ts` (mới): `storagePut/storageGet/storageDelete(orgId, fileName, ...)` — tự chọn backend theo `S3_ENDPOINT`/`S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY`/`S3_BUCKET` (thiếu ≥1 → local disk, cảnh báo qua `lib/log.ts`, không throw); path traversal check tập trung 1 chỗ cho cả 2 backend.
+- **[AI, đã làm]** Migrate 43 route file (`app/api/**`) từ gọi `fs.writeFile/readFile/unlink` trực tiếp trên `UPLOAD_DIR` sang `storagePut/storageGet/storageDelete` — đã tự review từng nhóm diff (ảnh task, tài liệu nghiệm thu/hợp đồng/bảo hiểm/pháp lý/HSE, bản vẽ, export ZIP QC...), không còn route nào đụng `fs` trực tiếp trên uploads.
+- **[AI, đã làm]** `@aws-sdk/client-s3` thêm vào `package.json`; `.env.example`/`lib/env.ts` liệt kê 6 biến S3 tuỳ chọn (pattern giống `SENTRY_DSN`/VAPID — không throw khi thiếu).
+- **[AI, đã làm]** `scripts/ops/migrate-uploads-to-s3.ts`: di trú `data/uploads/` → S3, verify sha256 từng file, không tự xoá file gốc. **Chưa chạy thật** (không có S3 thật trong môi trường này) — chạy khi người vận hành đã cấu hình MinIO/S3 production.
+- **[AI, đã làm]** `tests/storage.test.ts`: round-trip + path traversal + not-found trên backend local (không cần S3 thật để test).
+- Verify (tự chạy lại độc lập, không chỉ tin báo cáo của worker): `npm run lint`/`typecheck` xanh; **`npm test` đầy đủ 113/113 file pass** (112 cũ + `storage.test.ts` mới — không regression, vì backend mặc định khi thiếu S3 env hành vi y hệt cũ); `npm run build` xanh (không cần `DATABASE_URL`/S3 env — nguyên tắc lazy env); `npm run gen:erd` không đổi (PR4 không đụng schema).
+- **Nợ kỹ thuật ghi nhận**: (1) thống kê dung lượng lưu trữ cho admin panel (`lib/tech.ts`/`app/api/admin/storage`) chỉ đúng cho backend local — chưa có thống kê S3; (2) script di trú chưa chạy thật, cần MinIO/S3 production trước; (3) test S3 backend thật chưa có (không có MinIO trong CI) — chỉ xác nhận qua `typecheck`.
+
 ## M54 GĐ1 PR3 — RLS theo org (2026-07-23)
 
 Tiếp nối PR1 (trục `org_id`, 2026-07-21) + PR2 (session mang orgId, 2026-07-23) — theo đúng đặc tả `docs/nang-cap/M54-multi-tenant-saas.md` PR3 (route: spec, "cùng khuôn M51 PR1").

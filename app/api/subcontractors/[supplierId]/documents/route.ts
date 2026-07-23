@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { storagePut } from "@/lib/storage";
 import { queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, canViewSubcontractor, CAN } from "@/lib/auth";
 import {
-  ensureUploadDir,
   extForDocMime,
   verifyFileMime,
   newSubconDocFileName,
@@ -96,8 +94,7 @@ export async function POST(
 
   const docKind = String(form.get("docKind") ?? "").trim() || null;
   const fileName = newSubconDocFileName(supplierId, file.type);
-  const dir = ensureUploadDir();
-  await writeFile(join(dir, fileName), fileBuf);
+  await storagePut(user.orgId, fileName, fileBuf);
 
   const id = await insertId(
     `INSERT INTO subcon_documents (supplier_id, title, doc_kind, file_name, original_name, mime_type, size_bytes, uploaded_by)

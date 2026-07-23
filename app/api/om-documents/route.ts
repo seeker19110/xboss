@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { storagePut } from "@/lib/storage";
 import { insertId, queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { listOmDocs } from "@/lib/warranty";
 import {
-  ensureUploadDir,
   extForDocMime,
   verifyFileMime,
   newOmDocFileName,
@@ -86,8 +84,7 @@ export async function POST(req: NextRequest) {
     );
 
   const fileName = newOmDocFileName(projectId, file.type);
-  const dir = ensureUploadDir();
-  await writeFile(join(dir, fileName), fileBuf);
+  await storagePut(user.orgId, fileName, fileBuf);
 
   const id = await insertId(
     `INSERT INTO om_documents (project_id, title, system_id, file_name, original_name,

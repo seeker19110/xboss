@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { storagePut } from "@/lib/storage";
 import { query, queryOne, insertId, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import {
-  ensureUploadDir,
   extForDocMime,
   verifyFileMime,
   newContractDocFileName,
@@ -118,8 +116,7 @@ export async function POST(
 
   const caption = String(form.get("caption") ?? "").trim() || null;
   const fileName = newContractDocFileName(contractId, file.type);
-  const dir = ensureUploadDir();
-  await writeFile(join(dir, fileName), fileBuf);
+  await storagePut(user.orgId, fileName, fileBuf);
   const sha256 = sha256Hex(fileBuf);
   // Trích text-layer PDF để lập chỉ mục tìm kiếm (M57 PR2) — êm nếu không extract
   // được (scan ảnh, hỏng, quá giới hạn trang/thời gian), không chặn upload.

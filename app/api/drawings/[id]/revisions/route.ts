@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { storagePut } from "@/lib/storage";
 import { queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import {
-  ensureUploadDir,
   extForDocMime,
   verifyFileMime,
   newDrawingRevisionFileName,
@@ -88,8 +86,7 @@ export async function POST(
   const submittedAt = String(form.get("submittedAt") ?? "").trim() || null;
 
   const fileName = newDrawingRevisionFileName(drawingId, rev, file.type);
-  const dir = ensureUploadDir();
-  await writeFile(join(dir, fileName), fileBuf);
+  await storagePut(user.orgId, fileName, fileBuf);
 
   let id: number;
   try {
