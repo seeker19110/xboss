@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { storagePut } from "@/lib/storage";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import {
-  ensureUploadDir,
   extForDocMime,
   verifyFileMime,
   newCorrespondenceFileName,
@@ -116,8 +114,7 @@ export async function POST(
     );
 
   const fileName = newCorrespondenceFileName(correspondenceId, file.type);
-  const dir = ensureUploadDir();
-  await writeFile(join(dir, fileName), fileBuf);
+  await storagePut(user.orgId, fileName, fileBuf);
 
   const id = await insertId(
     `INSERT INTO correspondence_files (correspondence_id, file_name, original_name, mime_type, size_bytes, uploaded_by)

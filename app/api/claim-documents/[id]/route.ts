@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFile, unlink } from "node:fs/promises";
+import { storageGet, storageDelete } from "@/lib/storage";
 import { queryOne, run, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { getClaim } from "@/lib/claims";
-import { photoPath, sha256Hex } from "@/lib/photos";
+import { sha256Hex } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
 
@@ -42,15 +42,8 @@ export async function GET(
   const claim = await withProjectScope(projectId ?? "*", () => getClaim(doc.claim_id, projectId));
   if (!claim) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
-  const path = photoPath(doc.file_name);
-  if (!path) return NextResponse.json({ error: "Tên file không hợp lệ" }, { status: 400 });
-
-  let buf: Buffer;
-  try {
-    buf = await readFile(path);
-  } catch {
-    return NextResponse.json({ error: "File không còn trên đĩa" }, { status: 404 });
-  }
+  const buf = await storageGet(user.orgId, doc.file_name);
+  if (!buf) return NextResponse.json({ error: "File không còn trên đĩa" }, { status: 404 });
 
   if (doc.sha256 && sha256Hex(buf) !== doc.sha256) {
     return NextResponse.json(
@@ -98,11 +91,7 @@ export async function DELETE(
     );
 
   await run(`DELETE FROM claim_documents WHERE id = ?`, id);
-  const path = photoPath(doc.file_name);
-  if (path)
-    await unlink(path).catch(() => {
-      /* file đã mất trên đĩa — bỏ qua */
-    });
+  await storageDelete(user.orgId, doc.file_name);
 
   return NextResponse.json({ deleted: id });
 }

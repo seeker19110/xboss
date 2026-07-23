@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { storagePut } from "@/lib/storage";
 import { query, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { assertModuleEnabled } from "@/lib/feature-flags";
 import {
-  ensureUploadDir,
   extForDocMime,
   verifyFileMime,
   newProjectDocFileName,
@@ -96,8 +94,7 @@ export async function POST(req: NextRequest) {
 
   const category = String(form.get("category") ?? "").trim() || null;
   const fileName = newProjectDocFileName(file.type);
-  const dir = ensureUploadDir();
-  await writeFile(join(dir, fileName), fileBuf);
+  await storagePut(user.orgId, fileName, fileBuf);
   // Trích text-layer PDF để lập chỉ mục tìm kiếm (M57 PR2) — êm nếu không extract
   // được (scan ảnh, hỏng, quá giới hạn trang/thời gian), không chặn upload.
   const extractedText = ext === ".pdf" ? await extractPdfText(fileBuf) : null;

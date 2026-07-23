@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { storagePut } from "@/lib/storage";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import {
-  ensureUploadDir,
   extForMime,
   verifyFileMime,
   newHseFileName,
@@ -103,8 +101,7 @@ export async function POST(
     );
 
   const fileName = newHseFileName(recordId, file.type);
-  const dir = ensureUploadDir();
-  await writeFile(join(dir, fileName), fileBuf);
+  await storagePut(user.orgId, fileName, fileBuf);
 
   const id = await insertId(
     `INSERT INTO hse_photos (record_id, file_path, mime, uploaded_by) VALUES (?, ?, ?, ?)`,

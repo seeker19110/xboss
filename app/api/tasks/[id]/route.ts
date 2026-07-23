@@ -7,8 +7,7 @@ import { boqTakenBy } from "@/lib/boq";
 import { recomputeTask, recomputePackage } from "@/lib/recompute";
 import { assignTask } from "@/lib/assignments";
 import { validateCustom } from "@/lib/custom-fields";
-import { unlink } from "fs/promises";
-import { join } from "path";
+import { storageDelete } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -167,7 +166,6 @@ export async function DELETE(
   if (!task) return NextResponse.json({ error: "Task không tồn tại" }, { status: 404 });
 
   // Đọc file trước khi xoá DB — tên file do server sinh nên không cần kiểm tra traversal.
-  const uploadDir = join(process.cwd(), "data", "uploads");
   const photos = await query<{ file_name: string }>(
     `SELECT file_name FROM task_photos WHERE task_id = ?`,
     id,
@@ -197,9 +195,7 @@ export async function DELETE(
 
   // Xoá file sau khi DB commit thành công — file mồ côi trên disk ít hại hơn row mồ côi trong DB.
   for (const f of [...photos, ...docs]) {
-    await unlink(join(uploadDir, f.file_name)).catch(() => {
-      /* file đã xoá hoặc không tồn tại */
-    });
+    await storageDelete(user.orgId, f.file_name);
   }
 
   await recomputePackage(task.package_id);

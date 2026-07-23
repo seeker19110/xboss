@@ -8,6 +8,52 @@
 
 - **GĐ 4–5 — Phát triển & nâng chất lượng.** Sản phẩm đã chạy thật (v0.2.1, tự host VPS), đang phát triển/tinh chỉnh tính năng liên tục **và** đang áp bộ khung quy trình/chất lượng (brownfield) theo `docs/framework/AP-DUNG-vao-du-an-co-san.md`.
 
+## M54 GĐ1 PR4 — Object storage abstraction (2026-07-23)
+
+Tiếp nối PR3 (RLS theo org, cùng ngày) — theo đặc tả `docs/nang-cap/M54-multi-tenant-saas.md` PR4 (route: complex, giao `complex-implementer`). Không có MinIO/S3 thật trong môi trường code/test hiện tại nên quyết định trong ranh giới brief: backend mặc định (thiếu env S3) là **local disk, hành vi y hệt trước PR4** (không đổi file đã upload trên production); backend S3 (khi đủ 4 biến env) mới dùng prefix `org/<org_id>/`.
+
+- **[AI, đã làm]** `lib/storage.ts` (mới): `storagePut/storageGet/storageDelete(orgId, fileName, ...)` — tự chọn backend theo `S3_ENDPOINT`/`S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY`/`S3_BUCKET` (thiếu ≥1 → local disk, cảnh báo qua `lib/log.ts`, không throw); path traversal check tập trung 1 chỗ cho cả 2 backend.
+- **[AI, đã làm]** Migrate 43 route file (`app/api/**`) từ gọi `fs.writeFile/readFile/unlink` trực tiếp trên `UPLOAD_DIR` sang `storagePut/storageGet/storageDelete` — đã tự review từng nhóm diff (ảnh task, tài liệu nghiệm thu/hợp đồng/bảo hiểm/pháp lý/HSE, bản vẽ, export ZIP QC...), không còn route nào đụng `fs` trực tiếp trên uploads.
+- **[AI, đã làm]** `@aws-sdk/client-s3` thêm vào `package.json`; `.env.example`/`lib/env.ts` liệt kê 6 biến S3 tuỳ chọn (pattern giống `SENTRY_DSN`/VAPID — không throw khi thiếu).
+- **[AI, đã làm]** `scripts/ops/migrate-uploads-to-s3.ts`: di trú `data/uploads/` → S3, verify sha256 từng file, không tự xoá file gốc. **Chưa chạy thật** (không có S3 thật trong môi trường này) — chạy khi người vận hành đã cấu hình MinIO/S3 production.
+- **[AI, đã làm]** `tests/storage.test.ts`: round-trip + path traversal + not-found trên backend local (không cần S3 thật để test).
+- Verify (tự chạy lại độc lập, không chỉ tin báo cáo của worker): `npm run lint`/`typecheck` xanh; **`npm test` đầy đủ 113/113 file pass** (112 cũ + `storage.test.ts` mới — không regression, vì backend mặc định khi thiếu S3 env hành vi y hệt cũ); `npm run build` xanh (không cần `DATABASE_URL`/S3 env — nguyên tắc lazy env); `npm run gen:erd` không đổi (PR4 không đụng schema).
+- **Nợ kỹ thuật ghi nhận**: (1) thống kê dung lượng lưu trữ cho admin panel (`lib/tech.ts`/`app/api/admin/storage`) chỉ đúng cho backend local — chưa có thống kê S3; (2) script di trú chưa chạy thật, cần MinIO/S3 production trước; (3) test S3 backend thật chưa có (không có MinIO trong CI) — chỉ xác nhận qua `typecheck`.
+
+## M54 GĐ1 PR3 — RLS theo org (2026-07-23)
+
+Tiếp nối PR1 (trục `org_id`, 2026-07-21) + PR2 (session mang orgId, 2026-07-23) — theo đúng đặc tả `docs/nang-cap/M54-multi-tenant-saas.md` PR3 (route: spec, "cùng khuôn M51 PR1").
+
+- **[AI, đã làm]** `migrations/0080_org_rls.sql`: áp RLS (ENABLE + FORCE) cho 14 bảng gốc gắn `org_id` (users/projects/suppliers/code_lists/role_permissions/custom_field_defs/feature_flags/alert_rules/approval_flows/api_keys/webhooks/integrations/saved_reports/boq_codes) — policy 3 nhánh y hệt mẫu `0069_rls.sql` (M51 PR1): khớp GUC `app.org_id`, GUC rỗng cho qua (giai đoạn chuyển tiếp — tránh vỡ đường đọc chưa bọc transaction như `login` tra `users` trước khi có org context), hoặc GUC `'*'` (ngữ cảnh cross-org). GUC `app.org_id` đã được set trong mọi `withTransaction`/`withProjectScope` từ PR2, không cần đổi code app.
+- **[AI, đã làm]** `tests/org-rls.test.ts`: test tích hợp bằng role `xboss_app` thật (không phải superuser) — xác nhận đọc lọc đúng org dù SQL không có WHERE, GUC rỗng cho qua, GUC `'*'` thấy mọi org, `WITH CHECK` chặn INSERT sai org.
+- Verify: `npm run db:migrate` áp sạch; `tests/org-rls.test.ts` + `tests/rls.test.ts` (M51, không regression) pass trên Postgres cục bộ; **`npm test` đầy đủ 112/112 file pass** (không file nào vỡ vì RLS org mới — đặc biệt các test chạm `users`/`projects`/`suppliers` qua `insertId`/`run` thường không set GUC nên rơi đúng nhánh "chuyển tiếp"); `lint`/`typecheck` xanh.
+- **Còn lại theo đặc tả**: PR4 (object storage thay `data/uploads/`) chưa làm. Khoá cửa RLS org (bỏ nhánh GUC rỗng) để riêng, làm sau ~1 tuần theo dõi production không còn query nhóm bảng này thiếu GUC — y hệt tiền lệ M62 PR2 cho `project_id`, **cần người dùng xác nhận đủ điều kiện vận hành trước khi merge** (không tự quyết).
+- Đồng bộ `docs/nang-cap/README.md`: sửa 3 chỗ lệch tài liệu (M51/M55 đã xong hoàn toàn thay vì "nợ"/"PR mở"; M54 ghi thêm PR2/PR3).
+
+## Đánh giá đề xuất Redis pre-computation cho S-Curve/Pareto/Lookahead (2026-07-23) — kết luận: không cần
+
+Nhận được một bản kế hoạch/walkthrough từ phiên làm việc khác đề xuất kiến trúc Redis pre-computation (cron warm-up mọi project/system, đẩy dữ liệu S-Curve/Lookahead/Pareto vào Redis) để giải quyết "nợ kỹ thuật hiệu năng". Kiểm tra thấy bản đó **chưa từng áp dụng** vào repo này (không có `lib/scurve.ts`, `redis`/`ioredis` trong `package.json`, không có route cron mở rộng) — thuần là đề xuất chưa kiểm chứng.
+
+- **Đo thực tế** (Postgres 16 local, seed dữ liệu Excel gốc TT AVIO Tháp A — 149 nhóm, 2.543 tasks, 50.465 ô dimension): `getScheduleControlData()` (`lib/schedule-control.ts`, Pareto + đường găng) avg **4.8ms**; 2 truy vấn của `/api/lookahead` avg **6.5ms**. Nhân bản dữ liệu ×10 (25.430 tasks, gấp 10 lần quy mô dự án hiện tại): schedule-control avg **12.1ms**, lookahead avg **24ms** — vẫn xa dưới ngưỡng cảm nhận được (~100-200ms). `EXPLAIN ANALYZE` cho thấy Seq Scan toàn bảng `tasks` (chưa có index trên `start_date/end_date/status`) nhưng vẫn nhanh vì bảng nhỏ.
+- **Kết luận**: không có nút thắt hiệu năng thật ở quy mô XBoss hiện tại lẫn tương lai gần. Đề xuất Redis giải quyết vấn đề không tồn tại, thêm hạ tầng ngoài Postgres trái ADR-0001, và trùng lặp cơ chế materialized view đã có (M47 PR2, `mv_progress_daily` + cron `refresh-views`) cho S-Curve. **Không triển khai Redis/pre-computation.**
+- **[AI, đã làm]** `migrations/0079_lookahead_indexes.sql`: thêm 3 index phòng xa (`idx_tasks_start_date`, `idx_tasks_end_date`, `idx_tasks_status`) — thuần `CREATE INDEX IF NOT EXISTS`, không đụng dữ liệu, đi thẳng production. Chi phí gần bằng 0 ở quy mô hiện tại, chuẩn bị sẵn khi bảng `tasks` lớn hơn nhiều. Mốc tái đánh giá cache: khi `tasks` vượt ~50k dòng hoặc route thực đo >200ms trong log production.
+- Verify: `npm run db:migrate` áp sạch, chạy lại lần 2 báo "không có migration mới" (idempotent xác nhận).
+
+## Đợt audit toàn dự án (2026-07-23) — 3 miền song song theo docs/audit.md §9
+
+3 subagent song song đúng khung §3/§4 (Bảo mật+Logic), §5/§7 (UI/UX+Vận hành/Offline), §6 (Hiệu năng/Dependency/CI). Cổng tự động xanh trước khi audit: lint/typecheck/test (111 file)/build/`npm audit` (0 lỗ hổng).
+
+- **§3/§4 Bảo mật & Logic nghiệp vụ**: rà kỹ toàn bộ vùng rủi ro cao §8 (`lib/recompute.ts`, nghiệm thu, `lib/material-sync.ts`, `lib/boq.ts`, route tài chính) — không phát hiện lỗi Cao/Trung bình mới, các đợt trước đã vá đúng.
+  - **[AI, đã sửa]** `lib/paymentcerts.ts::overContractCerts()`: cộng `c.value + c.addendaTotal` bằng `Number()` JS thay vì trong SQL — không sai số thực tế (VNĐ trong tầm an toàn `Number`) nhưng lệch quy ước cứng CLAUDE.md "mọi tổng tiền làm trong SQL". Sửa: gộp phép cộng vào câu SELECT (`c.value + COALESCE((SELECT SUM(value_delta)...), 0) AS "contractValue"`), JS chỉ đọc kết quả đã cộng sẵn. Verify: `tests/paymentcerts.test.ts` 5/5 pass (Postgres cục bộ), bao gồm đúng test `overContractCerts`.
+- **§5/§7 UI/UX & Vận hành/Offline**: SSE, offline queue, service worker, PDF font, dedup notification đều đúng chuẩn.
+  - **[AI, đã sửa]** ~12 nút icon-only thiếu `aria-label` (nút xoá/đóng/sửa/nhân bản) ở `app/materials/page.tsx`, `app/materials/_components/SuppliersTab.tsx`, `app/materials/_components/PurchaseRequestsTab.tsx` — thêm `aria-label` tiếng Việt mô tả đúng hành động, đối chiếu mẫu đã đúng ở `app/materials/purchase-orders/page.tsx`/`app/approvals/page.tsx`.
+  - **[AI, đã sửa]** `text-zinc-600` dùng làm body text tĩnh (luôn FAIL AA theo bảng §13.2) → đổi `zinc-400`: `app/my-tasks/page.tsx` (9 chỗ: tên gói, mã task, ngày hạn, ghi chú), `app/materials/_components/ReportsTab.tsx` + `app/materials/reports/page.tsx` (giá trị "0" trong bảng báo cáo).
+  - **Đã rà, không sửa (false positive)**: `app/lookahead/page.tsx` bị agent audit gắn cờ `text-zinc-600` — nhưng trang này cố ý `bg-white text-zinc-900` (kiểu in ấn, giống `/report`), không thuộc hệ theme dark-first `--bg`/`zinc-9xx` mà bảng §13.2 áp dụng; tính tay contrast zinc-600 trên nền trắng ≈ 7.7:1 (PASS AA) — không phải lỗi.
+  - **Nợ ghi nhận, chưa sửa**: `text-zinc-500` body text rải khắp app (399 ứng viên đã biết từ trước, xem §13.1) — quá rộng để sửa gọn trong 1 lượt, giữ nguyên là nợ kỹ thuật đã ghi nhận từ lâu, không phải phát hiện mới.
+- **§6 Hiệu năng/Dependency/CI**: Lighthouse, pin SHA, `permissions:`, gate deploy, index bảng lớn, coverage (nhích nhẹ so mốc 2026-07-19: lines 68.34%↑/branches 86.36%↑/funcs 57.20%↑) đều đạt.
+  - **[AI, đã đóng]** Nợ "nghi vấn hiệu năng `COALESCE(t.end_date, wp.end_date)` trong `/api/dashboard`/`/api/notifications`" (ghi từ đợt 8, 2026-07-19): chạy `EXPLAIN ANALYZE` thật trên dữ liệu Excel gốc (2.543 tasks) — cùng cấu trúc JOIN đã benchmark cho `/api/lookahead` (đo hôm nay tới quy mô ×40/100k tasks vẫn ổn, xem mục Redis ở trên) — Execution Time **1.8ms**, Seq Scan hợp lý ở quy mô này. Không phải nút thắt thật, đóng nợ.
+- Verify tổng: `npm run lint`/`typecheck` xanh, `npm test` (`tests/paymentcerts.test.ts` chạy riêng trên Postgres cục bộ 5/5 pass — bộ đầy đủ không chạy lại trong lượt này vì không đổi logic ngoài phạm vi đã test).
+
 ## Đợt audit hẹp vùng rủi ro cao (2026-07-21) — lib/recompute.ts, lib/auth.ts, lib/material-sync.ts, lib/boq.ts
 
 Audit ĐỌC + BÁO CÁO trước (3 subagent song song đúng vùng rủi ro cao `docs/audit.md` §8), tự xác minh lại 2 điểm agent nghi ngờ (cookie `secure` — báo động giả, không cần sửa; race PATCH materials — xác nhận thật), sau đó sửa 2 bug xác nhận chắc; 1 phát hiện còn lại cần chốt ý đồ nghiệp vụ với người dùng nên **để riêng, chưa sửa**.

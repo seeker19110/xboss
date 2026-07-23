@@ -2,18 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN, canTouchPackage } from "@/lib/auth";
 import {
-  ensureUploadDir,
   newDrawingFileName,
-  photoPath,
   MAX_DOC_BYTES,
   extForDocMime,
   verifyFileMime,
   isContentTooLarge,
 } from "@/lib/photos";
-import { createReadStream, statSync, existsSync } from "node:fs";
-import { unlink, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-import { Readable } from "node:stream";
+import { storagePut, storageGet, storageDelete } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -51,11 +46,9 @@ export async function GET(
   if (!wp.drawingFileName)
     return NextResponse.json({ error: "Chưa có file bản vẽ" }, { status: 404 });
 
-  const filePath = photoPath(wp.drawingFileName);
-  if (!filePath || !existsSync(filePath))
-    return NextResponse.json({ error: "File không tồn tại" }, { status: 404 });
+  const buf = await storageGet(user.orgId, wp.drawingFileName);
+  if (!buf) return NextResponse.json({ error: "File không tồn tại" }, { status: 404 });
 
-  const stat = statSync(filePath);
   const ext = wp.drawingFileName.split(".").pop()?.toLowerCase() ?? "";
   const mime =
     ext === "pdf"
@@ -69,12 +62,11 @@ export async function GET(
             : "application/octet-stream";
 
   const displayName = wp.drawingOriginalName ?? wp.drawingFileName;
-  const stream = createReadStream(filePath);
-  return new NextResponse(Readable.toWeb(stream) as ReadableStream, {
+  return new NextResponse(new Uint8Array(buf), {
     headers: {
       "Content-Type": mime,
       "X-Content-Type-Options": "nosniff", // chặn browser sniff nội dung khác mime
-      "Content-Length": String(stat.size),
+      "Content-Length": String(buf.length),
       "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(displayName)}`,
       "Cache-Control": "private, max-age=3600",
     },
@@ -125,7 +117,6 @@ export async function POST(
   if (!extForDocMime(mime))
     return NextResponse.json({ error: "Chỉ nhận PDF hoặc ảnh" }, { status: 415 });
 
-  const dir = ensureUploadDir();
   const fileName = newDrawingFileName(id, mime);
   const bytes = await file.arrayBuffer();
   const fileBuf = Buffer.from(bytes);
@@ -134,13 +125,10 @@ export async function POST(
       { error: "Nội dung file không khớp định dạng khai báo (Content-Type giả mạo?)" },
       { status: 415 },
     );
-  await writeFile(join(dir, fileName), fileBuf);
+  await storagePut(user.orgId, fileName, fileBuf);
 
   // Xoá file cũ sau khi ghi file mới thành công
-  if (wp.drawingFileName) {
-    const oldPath = photoPath(wp.drawingFileName);
-    if (oldPath) await unlink(oldPath).catch(() => {});
-  }
+  if (wp.drawingFileName) await storageDelete(user.orgId, wp.drawingFileName);
 
   const drawingUrl = `/api/workpackages/${id}/drawing`;
   await run(
@@ -183,10 +171,7 @@ export async function DELETE(
     id,
   );
 
-  if (wp?.drawingFileName) {
-    const oldPath = photoPath(wp.drawingFileName);
-    if (oldPath) await unlink(oldPath).catch(() => {});
-  }
+  if (wp?.drawingFileName) await storageDelete(user.orgId, wp.drawingFileName);
 
   return NextResponse.json({ deleted: true });
 }

@@ -2,7 +2,7 @@
 // metadata trong bảng task_photos. Tên file do server sinh, không tin client.
 import { mkdirSync, existsSync } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
-import { join, normalize, sep } from "node:path";
+import { join } from "node:path";
 import { randomBytes, createHash } from "node:crypto";
 
 export const UPLOAD_DIR = join(process.cwd(), "data", "uploads");
@@ -253,17 +253,11 @@ export function newPhotoFileName(taskId: number, mime: string): string {
   return `t${taskId}-${Date.now()}-${randomBytes(4).toString("hex")}${MIME_EXT[mime]}`;
 }
 
+// (Đã bỏ photoPath() ở PR4 M54 — kiểm path traversal + dựng đường dẫn cục bộ chuyển hết
+// vào lib/storage.ts để tập trung 1 chỗ cho cả 2 backend local/S3.)
+
 // Ảnh album mốc tiến độ (M31, register `progress_albums` — tái dùng task_photos qua
 // album_id, task_id NULL): cùng whitelist mime với ảnh hiện trường.
 export function newAlbumPhotoFileName(albumId: number, mime: string): string {
   return `alb${albumId}-${Date.now()}-${randomBytes(4).toString("hex")}${MIME_EXT[mime]}`;
-}
-
-// Đường dẫn tuyệt đối tới file ảnh — chặn path traversal (file_name luôn do server sinh,
-// nhưng vẫn kiểm tra phòng dữ liệu DB bị sửa tay).
-export function photoPath(fileName: string): string | null {
-  const p = normalize(join(UPLOAD_DIR, fileName));
-  // Bắt buộc nằm TRONG UPLOAD_DIR — thêm separator để 'data/uploads-evil' không lọt.
-  if (p !== UPLOAD_DIR && !p.startsWith(UPLOAD_DIR + sep)) return null;
-  return p;
 }

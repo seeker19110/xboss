@@ -1250,6 +1250,7 @@ export default function MaterialsPage() {
                                 <button
                                   onClick={() => copyRow(m)}
                                   title="Nhân đôi hàng"
+                                  aria-label="Nhân đôi hàng"
                                   className="text-zinc-500 hover:text-sky-400 p-2"
                                 >
                                   <Copy className="w-3.5 h-3.5" />
@@ -1259,6 +1260,7 @@ export default function MaterialsPage() {
                                 <button
                                   onClick={() => remove(m)}
                                   title="Xoá hàng"
+                                  aria-label="Xoá hàng"
                                   className="text-zinc-500 hover:text-red-400 p-2"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -1307,7 +1309,11 @@ export default function MaterialsPage() {
           <div className="px-5 py-4 border-b border-zinc-800 flex items-center gap-2">
             <RefreshCw className="w-4 h-4 text-emerald-400" />
             <h3 className="font-semibold text-sm flex-1">Kết quả đồng bộ Google Sheet</h3>
-            <button onClick={() => setSyncResult(null)} className="text-zinc-400 hover:text-white">
+            <button
+              onClick={() => setSyncResult(null)}
+              aria-label="Đóng"
+              className="text-zinc-400 hover:text-white"
+            >
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -1369,7 +1375,11 @@ export default function MaterialsPage() {
         <Modal onClose={closeBoqModal} className="max-w-sm">
           <div className="px-5 py-4 border-b border-zinc-800 flex items-center gap-2">
             <h3 className="font-semibold text-sm flex-1">Mã BOQ — {boqEditMat.name}</h3>
-            <button onClick={closeBoqModal} className="text-zinc-400 hover:text-white">
+            <button
+              onClick={closeBoqModal}
+              aria-label="Đóng"
+              className="text-zinc-400 hover:text-white"
+            >
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -1459,7 +1469,11 @@ export default function MaterialsPage() {
             <h3 className="font-semibold text-sm flex-1">
               {issueMode === "issue" ? "Xuất kho" : "Hoàn kho"} — {issueMat.name}
             </h3>
-            <button onClick={() => setIssueMat(null)} className="text-zinc-400 hover:text-white">
+            <button
+              onClick={() => setIssueMat(null)}
+              aria-label="Đóng"
+              className="text-zinc-400 hover:text-white"
+            >
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -1807,7 +1821,11 @@ function MaterialHistoryModal({
             {material.qtyPlanned > 0 && <> / ĐM {material.qtyPlanned}</>}
           </p>
         </div>
-        <button onClick={onClose} className="ml-auto text-zinc-400 hover:text-white shrink-0">
+        <button
+          onClick={onClose}
+          aria-label="Đóng"
+          className="ml-auto text-zinc-400 hover:text-white shrink-0"
+        >
           <X className="w-4 h-4" />
         </button>
       </div>

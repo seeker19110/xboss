@@ -2,19 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN, canTouchPackage } from "@/lib/auth";
 import {
-  ensureUploadDir,
   newBbntFileName,
-  photoPath,
   MAX_DOC_BYTES,
   extForDocMime,
   extForMime,
   verifyFileMime,
   isContentTooLarge,
 } from "@/lib/photos";
-import { createReadStream, statSync, existsSync } from "node:fs";
-import { unlink, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-import { Readable } from "node:stream";
+import { storagePut, storageGet, storageDelete } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -52,11 +47,9 @@ export async function GET(
   if (!wp.bbntFileName)
     return NextResponse.json({ error: "Chưa có file biên bản" }, { status: 404 });
 
-  const filePath = photoPath(wp.bbntFileName);
-  if (!filePath || !existsSync(filePath))
-    return NextResponse.json({ error: "File không tồn tại" }, { status: 404 });
+  const buf = await storageGet(user.orgId, wp.bbntFileName);
+  if (!buf) return NextResponse.json({ error: "File không tồn tại" }, { status: 404 });
 
-  const stat = statSync(filePath);
   const ext = wp.bbntFileName.split(".").pop()?.toLowerCase() ?? "";
   const mime =
     ext === "pdf"
@@ -72,12 +65,11 @@ export async function GET(
               : "application/octet-stream";
 
   const displayName = wp.bbntOriginalName ?? wp.bbntFileName;
-  const stream = createReadStream(filePath);
-  return new NextResponse(Readable.toWeb(stream) as ReadableStream, {
+  return new NextResponse(new Uint8Array(buf), {
     headers: {
       "Content-Type": mime,
       "X-Content-Type-Options": "nosniff", // chặn browser sniff nội dung khác mime
-      "Content-Length": String(stat.size),
+      "Content-Length": String(buf.length),
       "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(displayName)}`,
       "Cache-Control": "private, max-age=3600",
     },
@@ -136,15 +128,11 @@ export async function POST(
       { status: 415 },
     );
 
-  const dir = ensureUploadDir();
   const fileName = newBbntFileName(id, mime);
-  await writeFile(join(dir, fileName), fileBuf);
+  await storagePut(user.orgId, fileName, fileBuf);
 
   // Xoá file cũ sau khi ghi file mới thành công
-  if (wp.bbntFileName) {
-    const oldPath = photoPath(wp.bbntFileName);
-    if (oldPath) await unlink(oldPath).catch(() => {});
-  }
+  if (wp.bbntFileName) await storageDelete(user.orgId, wp.bbntFileName);
 
   const bbntUrl = `/api/workpackages/${id}/bbnt`;
   await run(
@@ -187,10 +175,7 @@ export async function DELETE(
     id,
   );
 
-  if (wp?.bbntFileName) {
-    const oldPath = photoPath(wp.bbntFileName);
-    if (oldPath) await unlink(oldPath).catch(() => {});
-  }
+  if (wp?.bbntFileName) await storageDelete(user.orgId, wp.bbntFileName);
 
   return NextResponse.json({ deleted: true });
 }

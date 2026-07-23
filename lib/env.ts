@@ -76,6 +76,17 @@ const serverSchema = z
     // instrumentation.ts chạy lúc server bootstrap, trước khi chắc chắn có DATABASE_URL để
     // validate cả schema). Khai báo ở đây chỉ để liệt kê đủ biến môi trường tuỳ chọn của dự án.
     SENTRY_DSN: z.string().optional(),
+
+    // Object storage S3-compatible/MinIO (M54 GĐ1 PR4) — lib/storage.ts đọc TRỰC TIẾP
+    // process.env (như VAPID/Sentry) để chọn backend không phụ thuộc DATABASE_URL. Thiếu ≥1
+    // trong 4 biến bắt buộc (ENDPOINT/ACCESS_KEY_ID/SECRET_ACCESS_KEY/BUCKET) → dùng local
+    // disk data/uploads/. Khai báo ở đây chỉ để liệt kê đủ biến môi trường tuỳ chọn của dự án.
+    S3_ENDPOINT: z.string().optional(),
+    S3_ACCESS_KEY_ID: z.string().optional(),
+    S3_SECRET_ACCESS_KEY: z.string().optional(),
+    S3_BUCKET: z.string().optional(),
+    S3_REGION: z.string().optional(), // mặc định 'us-east-1' trong lib/storage.ts
+    S3_FORCE_PATH_STYLE: z.string().optional(), // mặc định 'true' khi có S3_ENDPOINT (MinIO)
   })
   .refine(
     (data) => {

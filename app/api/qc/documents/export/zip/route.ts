@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { existsSync } from "node:fs";
 import { ZipArchive } from "archiver";
 import { query } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { DOC_CATEGORIES, type DocCategory } from "@/lib/qaqc";
-import { photoPath } from "@/lib/photos";
+import { storageGet } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -74,13 +73,15 @@ export async function GET(req: NextRequest) {
   const usedNames = new Set<string>();
   for (const r of rows) {
     if (!r.fileName) continue;
-    const p = photoPath(r.fileName);
-    if (!p || !existsSync(p)) continue;
+    // Đọc qua lớp storage (local disk hoặc S3) rồi nạp buffer vào zip — không phụ thuộc
+    // đường dẫn cục bộ, chạy được với cả backend S3.
+    const buf = await storageGet(user.orgId, r.fileName);
+    if (!buf) continue;
     let entryName = `${r.taskCode}_${r.originalName || r.fileName}`;
     // Tránh trùng tên entry trong zip (vd nhiều hồ sơ cùng task + cùng tên file gốc).
     if (usedNames.has(entryName)) entryName = `${r.taskCode}_${r.fileName}`;
     usedNames.add(entryName);
-    archive.file(p, { name: entryName });
+    archive.append(buf, { name: entryName });
   }
   archive.finalize();
   await done;

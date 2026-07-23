@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { unlink, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { storagePut, storageDelete } from "@/lib/storage";
 import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import {
-  ensureUploadDir,
   extForDocMime,
   verifyFileMime,
   newHandoverMinutesFileName,
-  photoPath,
   MAX_DOC_BYTES,
   isContentTooLarge,
 } from "@/lib/photos";
@@ -168,16 +165,9 @@ export async function PATCH(
         { status: 415 },
       );
 
-    if (existing.minutesFile) {
-      const oldPath = photoPath(existing.minutesFile);
-      if (oldPath)
-        await unlink(oldPath).catch(() => {
-          /* file đã mất trên đĩa — bỏ qua */
-        });
-    }
+    if (existing.minutesFile) await storageDelete(user.orgId, existing.minutesFile);
     minutesFile = newHandoverMinutesFileName(id, file.type);
-    const dir = ensureUploadDir();
-    await writeFile(join(dir, minutesFile), fileBuf);
+    await storagePut(user.orgId, minutesFile, fileBuf);
   }
 
   try {
@@ -233,13 +223,7 @@ export async function DELETE(
   if (!existing) return NextResponse.json({ error: "Không tìm thấy hạng mục" }, { status: 404 });
 
   await run(`DELETE FROM handover_items WHERE id = ?`, id);
-  if (existing.minutesFile) {
-    const p = photoPath(existing.minutesFile);
-    if (p)
-      await unlink(p).catch(() => {
-        /* file đã mất trên đĩa — bỏ qua */
-      });
-  }
+  if (existing.minutesFile) await storageDelete(user.orgId, existing.minutesFile);
 
   return NextResponse.json({ deleted: id });
 }

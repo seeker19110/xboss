@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFile, unlink } from "node:fs/promises";
+import { storageGet, storageDelete } from "@/lib/storage";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
-import { photoPath } from "@/lib/photos";
 
 export const dynamic = "force-dynamic";
 
@@ -26,15 +25,8 @@ export async function GET(
   );
   if (!doc) return NextResponse.json({ error: "Không tìm thấy tài liệu" }, { status: 404 });
 
-  const path = photoPath(doc.file_name);
-  if (!path) return NextResponse.json({ error: "Tên file không hợp lệ" }, { status: 400 });
-
-  let buf: Buffer;
-  try {
-    buf = await readFile(path);
-  } catch {
-    return NextResponse.json({ error: "File không còn trên đĩa" }, { status: 404 });
-  }
+  const buf = await storageGet(user.orgId, doc.file_name);
+  if (!buf) return NextResponse.json({ error: "File không còn trên đĩa" }, { status: 404 });
 
   return new NextResponse(new Uint8Array(buf), {
     headers: {
@@ -70,11 +62,7 @@ export async function DELETE(
     );
 
   await run(`DELETE FROM work_front_documents WHERE id = ?`, id);
-  const path = photoPath(doc.file_name);
-  if (path)
-    await unlink(path).catch(() => {
-      /* file đã mất trên đĩa — bỏ qua */
-    });
+  await storageDelete(user.orgId, doc.file_name);
 
   return NextResponse.json({ deleted: id });
 }

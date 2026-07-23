@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { storagePut } from "@/lib/storage";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, canTouchTask, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { assertModuleEnabled } from "@/lib/feature-flags";
 import {
-  ensureUploadDir,
   extForDocMime,
   verifyFileMime,
   newDocFileName,
@@ -118,8 +116,7 @@ export async function POST(
     return NextResponse.json({ error: "Loại hồ sơ không hợp lệ" }, { status: 422 });
   const docCategory = docCategoryRaw || null;
   const fileName = newDocFileName(taskId, file.type);
-  const dir = ensureUploadDir();
-  await writeFile(join(dir, fileName), fileBuf);
+  await storagePut(user.orgId, fileName, fileBuf);
   const sha256 = sha256Hex(fileBuf);
   // Trích text-layer PDF để lập chỉ mục tìm kiếm (M57 PR2) — êm nếu không extract
   // được (scan ảnh, hỏng, quá giới hạn trang/thời gian), không chặn upload.

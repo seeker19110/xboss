@@ -1,19 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, readFile, unlink } from "node:fs/promises";
-import { join } from "node:path";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { getEquipment } from "@/lib/equipment";
 import {
-  ensureUploadDir,
   extForDocMime,
   verifyFileMime,
   newEquipmentCertFileName,
-  photoPath,
   MAX_DOC_BYTES,
   isContentTooLarge,
 } from "@/lib/photos";
+import { storagePut, storageGet, storageDelete } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -43,15 +40,8 @@ export async function GET(
   if (!eq || !eq.certFileName)
     return NextResponse.json({ error: "Chưa có giấy kiểm định" }, { status: 404 });
 
-  const path = photoPath(eq.certFileName);
-  if (!path) return NextResponse.json({ error: "Tên file không hợp lệ" }, { status: 400 });
-
-  let buf: Buffer;
-  try {
-    buf = await readFile(path);
-  } catch {
-    return NextResponse.json({ error: "File không còn trên đĩa" }, { status: 404 });
-  }
+  const buf = await storageGet(user.orgId, eq.certFileName);
+  if (!buf) return NextResponse.json({ error: "File không còn trên đĩa" }, { status: 404 });
 
   return new NextResponse(new Uint8Array(buf), {
     headers: {
@@ -121,10 +111,9 @@ export async function POST(
     );
 
   const fileName = newEquipmentCertFileName(id, file.type);
-  const dir = ensureUploadDir();
-  await writeFile(join(dir, fileName), fileBuf);
+  await storagePut(user.orgId, fileName, fileBuf);
 
-  const oldPath = eq.certFileName ? photoPath(eq.certFileName) : null;
+  const oldFileName = eq.certFileName;
   await run(
     `UPDATE equipment SET cert_file_path = ?, cert_file_name = ?, cert_mime = ? WHERE id = ?`,
     fileName,
@@ -132,10 +121,7 @@ export async function POST(
     file.type,
     id,
   );
-  if (oldPath)
-    await unlink(oldPath).catch(() => {
-      /* file cũ đã mất trên đĩa — bỏ qua */
-    });
+  if (oldFileName) await storageDelete(user.orgId, oldFileName);
 
   return NextResponse.json({ ok: true }, { status: 201 });
 }

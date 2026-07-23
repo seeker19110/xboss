@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, unlink } from "node:fs/promises";
-import { join } from "node:path";
+import { storagePut, storageDelete } from "@/lib/storage";
 import { queryOne, run, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import {
-  ensureUploadDir,
   extForDocMime,
   verifyFileMime,
   newInsuranceDocFileName,
-  photoPath,
   MAX_DOC_BYTES,
   isContentTooLarge,
 } from "@/lib/photos";
@@ -183,17 +180,10 @@ export async function PATCH(
         { status: 415 },
       );
 
-    if (existing.fileName) {
-      const oldPath = photoPath(existing.fileName);
-      if (oldPath)
-        await unlink(oldPath).catch(() => {
-          /* file đã mất trên đĩa — bỏ qua */
-        });
-    }
+    if (existing.fileName) await storageDelete(user.orgId, existing.fileName);
 
     const fileName = newInsuranceDocFileName(id, file.type);
-    const dir = ensureUploadDir();
-    await writeFile(join(dir, fileName), fileBuf);
+    await storagePut(user.orgId, fileName, fileBuf);
     fileCols = {
       fileName,
       originalName: file.name || null,

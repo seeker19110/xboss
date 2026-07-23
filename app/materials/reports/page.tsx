@@ -230,7 +230,7 @@ export default function MaterialReportsPage() {
                                   {row.overBudgetCount}
                                 </span>
                               ) : (
-                                <span className="text-zinc-600">0</span>
+                                <span className="text-zinc-400">0</span>
                               )}
                             </td>
                             <td className="py-3 text-right">
@@ -239,7 +239,7 @@ export default function MaterialReportsPage() {
                                   {row.lowStockCount}
                                 </span>
                               ) : (
-                                <span className="text-zinc-600">0</span>
+                                <span className="text-zinc-400">0</span>
                               )}
                             </td>
                           </tr>

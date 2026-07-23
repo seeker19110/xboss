@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { storagePut } from "@/lib/storage";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN, canTouchFloor } from "@/lib/auth";
 import {
-  ensureUploadDir,
   extForDocMime,
   verifyFileMime,
   newFloorDocFileName,
@@ -135,8 +133,7 @@ export async function POST(
 
   const caption = String(form.get("caption") ?? "").trim() || null;
   const fileName = newFloorDocFileName(approvalId, file.type);
-  const dir = ensureUploadDir();
-  await writeFile(join(dir, fileName), fileBuf);
+  await storagePut(user.orgId, fileName, fileBuf);
   const sha256 = sha256Hex(fileBuf);
 
   const id = await insertId(

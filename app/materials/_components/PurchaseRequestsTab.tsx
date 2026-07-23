@@ -298,7 +298,7 @@ export default function PurchaseRequestsTab({
           className={`p-3 border rounded text-sm flex justify-between ${error.startsWith("✓") ? "bg-green-900 border-green-700 text-green-200" : "bg-red-900 border-red-700 text-red-200"}`}
         >
           {error}{" "}
-          <button onClick={() => setError("")}>
+          <button onClick={() => setError("")} aria-label="Đóng">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -373,6 +373,7 @@ export default function PurchaseRequestsTab({
             </p>
             <button
               onClick={() => setShowCreatePO(false)}
+              aria-label="Đóng"
               className="text-zinc-400 hover:text-zinc-100"
             >
               <X className="w-4 h-4" />
