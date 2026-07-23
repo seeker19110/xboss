@@ -17,7 +17,7 @@ import {
 import AppHeader from "@/app/components/AppHeader";
 import { appConfirm, appPrompt } from "@/app/components/dialogs";
 import EmptyState from "@/app/components/EmptyState";
-import { fetchMe } from "@/app/lib/me";
+import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import { todayISO } from "@/lib/date";
 
 type Vehicle = {
@@ -89,15 +89,29 @@ export default function VehiclesPage() {
 
   const load = useCallback(() => {
     fetch(`/api/vehicles?date=${date}`)
-      .then((r) => r.json())
-      .then((j) => setVehicles(j.vehicles ?? []));
+      .then(async (r) => {
+        if (r.status === 401) {
+          await redirectToLogin();
+          return;
+        }
+        if (!r.ok) {
+          // Lỗi thật (403/500...) — không được nuốt thành danh sách rỗng.
+          const j = await r.json().catch(() => null);
+          setError(j?.error ?? `Lỗi tải danh sách xe (${r.status})`);
+          return;
+        }
+        setVehicles((await r.json()).vehicles ?? []);
+        setError("");
+      })
+      .catch(() => setError("Mất kết nối mạng — không tải được danh sách xe"));
   }, [date]);
 
   useEffect(() => {
     fetchMe().then((u) => setRole(u?.role ?? ""));
     fetch("/api/suppliers")
-      .then((r) => r.json())
-      .then((j) => setSuppliers(j.suppliers ?? []));
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setSuppliers(j?.suppliers ?? []))
+      .catch(() => setSuppliers([]));
   }, []);
   useEffect(() => {
     load();

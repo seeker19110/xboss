@@ -28,7 +28,7 @@ import {
   LockOpen,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
-import { fetchMe } from "@/app/lib/me";
+import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import EditableText from "@/app/components/EditableText";
 import EditModeToggle from "@/app/components/EditModeToggle";
 import { Modal, appConfirm, appPrompt } from "@/app/components/dialogs";
@@ -190,15 +190,27 @@ export default function MaterialsPage() {
 
       const q = sheetFilter ? `?sheetTypeId=${sheetFilter}` : "";
       fetch(`/api/materials${q}`)
-        .then((r) => r.json().catch(() => ({ materials: [] })))
-        .then((j) => {
+        .then(async (r) => {
+          if (r.status === 401) {
+            await redirectToLogin();
+            return;
+          }
+          if (!r.ok) {
+            // Lỗi thật từ server (403/500...) — không được nuốt thành danh sách rỗng.
+            const j = await r.json().catch(() => null);
+            setError(j?.error ?? `Lỗi tải danh sách vật tư (${r.status})`);
+            setLoading(false);
+            return;
+          }
+          const j = await r.json().catch(() => ({ materials: [] }));
           const data: Material[] = j.materials ?? [];
           materialsCache = { key: cacheKey, data, ts: Date.now() };
           setMaterials(data);
+          setError("");
           setLoading(false);
         })
         .catch(() => {
-          setMaterials([]);
+          setError("Mất kết nối mạng — không tải được danh sách vật tư");
           setLoading(false);
         });
     },

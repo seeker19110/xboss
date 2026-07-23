@@ -87,8 +87,16 @@ export default function PurchaseRequestsTab({
   const load = useCallback(() => {
     const q = statusFilter ? `?status=${statusFilter}` : "";
     fetch(`/api/purchase-requests${q}`)
-      .then((r) => r.json())
-      .then((j) => setRequests(j.requests ?? []));
+      .then(async (r) => {
+        if (!r.ok) {
+          // Lỗi thật (401/403/500...) — không được nuốt thành danh sách rỗng.
+          const j = await r.json().catch(() => null);
+          setError(j?.error ?? `Lỗi tải danh sách yêu cầu mua (${r.status})`);
+          return;
+        }
+        setRequests((await r.json()).requests ?? []);
+      })
+      .catch(() => setError("Mất kết nối mạng — không tải được danh sách yêu cầu mua"));
   }, [statusFilter]);
 
   useEffect(() => {
@@ -96,8 +104,9 @@ export default function PurchaseRequestsTab({
   }, [load]);
   useEffect(() => {
     fetch("/api/suppliers")
-      .then((r) => r.json())
-      .then((j) => setSuppliers(j.suppliers ?? []));
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setSuppliers(j?.suppliers ?? []))
+      .catch(() => setSuppliers([]));
   }, []);
 
   // --- PR actions ---

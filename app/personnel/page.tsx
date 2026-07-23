@@ -3,10 +3,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus, X, Users, Trash2, Pencil, AlertTriangle, Upload, Paperclip } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
+import { ErrorState } from "@/app/components/ErrorState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
-import { fetchMe, type Me } from "@/app/lib/me";
+import { fetchMe, redirectToLogin, type Me } from "@/app/lib/me";
 import { formatDateVN, todayISO } from "@/lib/date";
 
 type Personnel = {
@@ -58,6 +59,7 @@ export default function PersonnelPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<Personnel | null>(null);
   const [detail, setDetail] = useState<Personnel | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const canManage = me?.role === "admin" || me?.role === "pm";
 
@@ -65,9 +67,24 @@ export default function PersonnelPage() {
     const sp = new URLSearchParams();
     if (crewFilter !== "") sp.set("crewId", String(crewFilter));
     if (supplierFilter !== "") sp.set("supplierId", String(supplierFilter));
-    const res = await fetch(`/api/personnel?${sp.toString()}`);
+    const res = await fetch(`/api/personnel?${sp.toString()}`).catch(() => null);
+    if (!res) {
+      setLoadError("Mất kết nối mạng — không tải được danh sách nhân sự");
+      return;
+    }
+    if (res.status === 401) {
+      await redirectToLogin();
+      return;
+    }
+    if (!res.ok) {
+      // Lỗi thật từ server (403/500...) — không được nuốt thành danh sách rỗng.
+      const j = await res.json().catch(() => null);
+      setLoadError(j?.error ?? `Lỗi tải danh sách nhân sự (${res.status})`);
+      return;
+    }
     const j = await res.json().catch(() => null);
     setPersonnel(j?.personnel ?? []);
+    setLoadError(null);
   }
 
   useEffect(() => {
@@ -150,7 +167,9 @@ export default function PersonnelPage() {
           </select>
         </div>
 
-        {personnel.length === 0 ? (
+        {loadError ? (
+          <ErrorState message={loadError} onRetry={loadPersonnel} />
+        ) : personnel.length === 0 ? (
           <EmptyState
             icon={Users}
             title="Chưa có nhân sự"

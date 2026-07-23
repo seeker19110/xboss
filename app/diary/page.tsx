@@ -3,7 +3,8 @@ import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Lock, FileEdit, NotebookPen, Users } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { PageSkeleton } from "@/app/components/Skeleton";
-import { fetchMe } from "@/app/lib/me";
+import { ErrorState } from "@/app/components/ErrorState";
+import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import { todayISO } from "@/lib/date";
 import DiaryEditorModal from "@/app/diary/DiaryEditorModal";
 import ManpowerChart from "@/app/diary/ManpowerChart";
@@ -31,14 +32,27 @@ export default function DiaryPage() {
   const [role, setRole] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(() => {
     return fetch(`/api/diaries?month=${month}`)
-      .then((r) => r.json())
-      .then((j) => {
+      .then(async (r) => {
+        if (r.status === 401) {
+          await redirectToLogin();
+          return;
+        }
+        if (!r.ok) {
+          // Lỗi thật (403/500...) — không được nuốt thành lịch rỗng.
+          const j = await r.json().catch(() => null);
+          setLoadError(j?.error ?? `Lỗi tải nhật ký công trường (${r.status})`);
+          return;
+        }
+        const j = await r.json();
         setDays(j.days ?? []);
         setManpower(j.manpower ?? []);
-      });
+        setLoadError(null);
+      })
+      .catch(() => setLoadError("Mất kết nối mạng — không tải được nhật ký công trường"));
   }, [month]);
 
   useEffect(() => {
@@ -50,6 +64,15 @@ export default function DiaryPage() {
   }, [load]);
 
   if (loading) return <PageSkeleton />;
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-white flex flex-col">
+        <AppHeader title="Nhật ký thi công" subtitle="Nhật ký công trường · Nhân lực" />
+        <ErrorState message={loadError} onRetry={load} />
+      </div>
+    );
+  }
 
   const statusByDate = new Map(days.map((d) => [d.date, d.status]));
   const [y, m] = month.split("-").map(Number);

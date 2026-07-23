@@ -16,7 +16,7 @@ import {
 import AppHeader from "@/app/components/AppHeader";
 import { appConfirm } from "@/app/components/dialogs";
 import SpreadsheetGrid, { type GridColumn, type GridEdit } from "@/app/components/SpreadsheetGrid";
-import { fetchMe } from "@/app/lib/me";
+import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import { todayISO, formatDateVN } from "@/lib/date";
 import RatingModal from "./RatingModal";
 
@@ -169,8 +169,20 @@ export default function PurchaseOrdersPage() {
   const load = useCallback(() => {
     const q = statusFilter ? `?status=${statusFilter}` : "";
     fetch(`/api/purchase-orders${q}`)
-      .then((r) => r.json())
-      .then((j) => setOrders(j.orders ?? []));
+      .then(async (r) => {
+        if (r.status === 401) {
+          await redirectToLogin();
+          return;
+        }
+        if (!r.ok) {
+          // Lỗi thật (403/500...) — không được nuốt thành danh sách rỗng.
+          const j = await r.json().catch(() => null);
+          setError(j?.error ?? `Lỗi tải danh sách đơn hàng (${r.status})`);
+          return;
+        }
+        setOrders((await r.json()).orders ?? []);
+      })
+      .catch(() => setError("Mất kết nối mạng — không tải được danh sách đơn hàng"));
   }, [statusFilter]);
 
   useEffect(() => {
@@ -179,19 +191,22 @@ export default function PurchaseOrdersPage() {
       setCanManage(user.role === "admin" || user.role === "pm");
     });
     fetch("/api/suppliers")
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
         // Gợi ý NCC điểm cao hơn lên trước khi chọn cho PO mới (chưa có đánh giá → cuối danh sách).
-        const list: Supplier[] = j.suppliers ?? [];
+        const list: Supplier[] = j?.suppliers ?? [];
         list.sort((a, b) => (b.avgRating ?? -1) - (a.avgRating ?? -1));
         setSuppliers(list);
-      });
+      })
+      .catch(() => setSuppliers([]));
     fetch("/api/purchase-requests?status=approved")
-      .then((r) => r.json())
-      .then((j) => setApprovedPRs(j.requests ?? []));
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setApprovedPRs(j?.requests ?? []))
+      .catch(() => setApprovedPRs([]));
     fetch("/api/materials")
-      .then((r) => r.json())
-      .then((j) => setMaterials(j.materials ?? []));
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setMaterials(j?.materials ?? []))
+      .catch(() => setMaterials([]));
     // Hợp đồng NCC — chỉ Admin/PM/BCH xem được (CAN.viewPayments); vai trò khác 403, bỏ qua lặng lẽ.
     fetch("/api/contracts?kind=ncc")
       .then((r) => (r.ok ? r.json() : null))
