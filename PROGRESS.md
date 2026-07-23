@@ -8,6 +8,16 @@
 
 - **GĐ 4–5 — Phát triển & nâng chất lượng.** Sản phẩm đã chạy thật (v0.2.1, tự host VPS), đang phát triển/tinh chỉnh tính năng liên tục **và** đang áp bộ khung quy trình/chất lượng (brownfield) theo `docs/framework/AP-DUNG-vao-du-an-co-san.md`.
 
+## M54 GĐ1 PR3 — RLS theo org (2026-07-23)
+
+Tiếp nối PR1 (trục `org_id`, 2026-07-21) + PR2 (session mang orgId, 2026-07-23) — theo đúng đặc tả `docs/nang-cap/M54-multi-tenant-saas.md` PR3 (route: spec, "cùng khuôn M51 PR1").
+
+- **[AI, đã làm]** `migrations/0080_org_rls.sql`: áp RLS (ENABLE + FORCE) cho 14 bảng gốc gắn `org_id` (users/projects/suppliers/code_lists/role_permissions/custom_field_defs/feature_flags/alert_rules/approval_flows/api_keys/webhooks/integrations/saved_reports/boq_codes) — policy 3 nhánh y hệt mẫu `0069_rls.sql` (M51 PR1): khớp GUC `app.org_id`, GUC rỗng cho qua (giai đoạn chuyển tiếp — tránh vỡ đường đọc chưa bọc transaction như `login` tra `users` trước khi có org context), hoặc GUC `'*'` (ngữ cảnh cross-org). GUC `app.org_id` đã được set trong mọi `withTransaction`/`withProjectScope` từ PR2, không cần đổi code app.
+- **[AI, đã làm]** `tests/org-rls.test.ts`: test tích hợp bằng role `xboss_app` thật (không phải superuser) — xác nhận đọc lọc đúng org dù SQL không có WHERE, GUC rỗng cho qua, GUC `'*'` thấy mọi org, `WITH CHECK` chặn INSERT sai org.
+- Verify: `npm run db:migrate` áp sạch; `tests/org-rls.test.ts` + `tests/rls.test.ts` (M51, không regression) pass trên Postgres cục bộ; **`npm test` đầy đủ 112/112 file pass** (không file nào vỡ vì RLS org mới — đặc biệt các test chạm `users`/`projects`/`suppliers` qua `insertId`/`run` thường không set GUC nên rơi đúng nhánh "chuyển tiếp"); `lint`/`typecheck` xanh.
+- **Còn lại theo đặc tả**: PR4 (object storage thay `data/uploads/`) chưa làm. Khoá cửa RLS org (bỏ nhánh GUC rỗng) để riêng, làm sau ~1 tuần theo dõi production không còn query nhóm bảng này thiếu GUC — y hệt tiền lệ M62 PR2 cho `project_id`, **cần người dùng xác nhận đủ điều kiện vận hành trước khi merge** (không tự quyết).
+- Đồng bộ `docs/nang-cap/README.md`: sửa 3 chỗ lệch tài liệu (M51/M55 đã xong hoàn toàn thay vì "nợ"/"PR mở"; M54 ghi thêm PR2/PR3).
+
 ## Đánh giá đề xuất Redis pre-computation cho S-Curve/Pareto/Lookahead (2026-07-23) — kết luận: không cần
 
 Nhận được một bản kế hoạch/walkthrough từ phiên làm việc khác đề xuất kiến trúc Redis pre-computation (cron warm-up mọi project/system, đẩy dữ liệu S-Curve/Lookahead/Pareto vào Redis) để giải quyết "nợ kỹ thuật hiệu năng". Kiểm tra thấy bản đó **chưa từng áp dụng** vào repo này (không có `lib/scurve.ts`, `redis`/`ioredis` trong `package.json`, không có route cron mở rộng) — thuần là đề xuất chưa kiểm chứng.
