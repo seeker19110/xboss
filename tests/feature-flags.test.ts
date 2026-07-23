@@ -37,10 +37,10 @@ test(
 
     assert.equal(await ff.isModuleEnabled("documents", p), true);
 
-    await ff.setFlag("documents", p, false, u);
+    await ff.setFlag("documents", p, false, u, 1);
     assert.equal(await ff.isModuleEnabled("documents", p), false);
 
-    await ff.setFlag("documents", p, true, u);
+    await ff.setFlag("documents", p, true, u, 1);
     assert.equal(await ff.isModuleEnabled("documents", p), true);
 
     // Module khác không bị ảnh hưởng bởi override của module này.
@@ -69,13 +69,13 @@ test(
     assert.equal(await ff.assertModuleEnabled("documents", p), null);
 
     // Tắt module → 404.
-    await ff.setFlag("documents", p, false, u);
+    await ff.setFlag("documents", p, false, u, 1);
     const blocked = await ff.assertModuleEnabled("documents", p);
     assert.ok(blocked, "phải trả về response chặn");
     assert.equal(blocked!.status, 404);
 
     // Bật lại → không chặn nữa.
-    await ff.setFlag("documents", p, true, u);
+    await ff.setFlag("documents", p, true, u, 1);
     assert.equal(await ff.assertModuleEnabled("documents", p), null);
   },
 );

@@ -45,12 +45,14 @@ export async function POST(req: NextRequest) {
   const dup = await queryOne(`SELECT id FROM users WHERE email = ?`, email);
   if (dup) return NextResponse.json({ error: "Email đã tồn tại" }, { status: 409 });
 
+  // M54 GĐ1 PR2: user mới thuộc org của chính admin tạo (không dựa DEFAULT org_id=1).
   const id = await insertId(
-    `INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)`,
+    `INSERT INTO users (name, email, password_hash, role, org_id) VALUES (?, ?, ?, ?, ?)`,
     name,
     email,
     hashPassword(password),
     role,
+    me.orgId,
   );
 
   return NextResponse.json({ user: { id, name, email, role } }, { status: 201 });

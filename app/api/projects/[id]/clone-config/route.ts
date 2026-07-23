@@ -34,13 +34,17 @@ export async function POST(
     typeof body?.contractor === "string" && body.contractor.trim() ? body.contractor.trim() : null;
   const color = typeof body?.color === "string" && body.color.trim() ? body.color.trim() : null;
 
-  if (code && (await queryOne(`SELECT id FROM projects WHERE code = ?`, code)))
+  if (
+    code &&
+    (await queryOne(`SELECT id FROM projects WHERE code = ? AND org_id = ?`, code, user.orgId))
+  )
     return NextResponse.json({ error: `Mã dự án "${code}" đã tồn tại` }, { status: 409 });
 
   const result = await cloneProjectConfig(
     sourceId,
     { name, code, investor, contractor, color },
     user.id,
+    user.orgId,
   );
   return NextResponse.json({ id: result.projectId, cloned: result }, { status: 201 });
 }

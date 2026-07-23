@@ -135,6 +135,7 @@ test(
           { seq: 1, role: "pm", minAmount: null, slaDays: 3 },
           { seq: 2, role: "cdt", minAmount: 500_000_000, slaDays: 5 },
         ],
+        orgId: 1,
       });
       assert.equal(typeof result, "object");
       flowId = (result as { id: number }).id;
@@ -170,6 +171,7 @@ test(
         entityType: "payment_cert",
         name: `Flow 1 ${S}`,
         steps: [{ seq: 1, role: "pm", minAmount: null, slaDays: null }],
+        orgId: 1,
       });
       assert.equal(typeof r1, "object");
       flowId = (r1 as { id: number }).id;
@@ -179,6 +181,7 @@ test(
         entityType: "payment_cert",
         name: `Flow 2 ${S}`,
         steps: [{ seq: 1, role: "pm", minAmount: null, slaDays: null }],
+        orgId: 1,
       });
       assert.equal(typeof r2, "string");
     } finally {
@@ -212,6 +215,7 @@ test(
         entityType: "task_acceptance",
         name: `Flow chờ duyệt ${S}`,
         steps: [{ seq: 1, role: "pm", minAmount: null, slaDays: null }],
+        orgId: 1,
       });
       flowId = (created as { id: number }).id;
 
@@ -252,6 +256,7 @@ test(
         entityType: "proposal",
         name: `Flow gốc ${S}`,
         steps: [{ seq: 1, role: "pm", minAmount: null, slaDays: null }],
+        orgId: 1,
       });
       flowId = (created as { id: number }).id;
 
@@ -315,6 +320,7 @@ test(
         entityType: "task_acceptance",
         name: `Flow có lịch sử ${S}`,
         steps: [{ seq: 1, role: "pm", minAmount: null, slaDays: null }],
+        orgId: 1,
       });
       flowId = (created as { id: number }).id;
 
@@ -364,6 +370,7 @@ test(
         entityType: "variation",
         name: `Flow xoá được ${S}`,
         steps: [{ seq: 1, role: "pm", minAmount: null, slaDays: null }],
+        orgId: 1,
       });
       flowId = (created as { id: number }).id;
 
@@ -399,18 +406,21 @@ test(
         entityType: "variation",
         name: `G ${S}`,
         steps,
+        orgId: 1,
       });
       const f1 = await createApprovalFlow({
         projectId: p1,
         entityType: "payment_cert",
         name: `F1 ${S}`,
         steps,
+        orgId: 1,
       });
       const f2 = await createApprovalFlow({
         projectId: p2,
         entityType: "payment_cert",
         name: `F2 ${S}`,
         steps,
+        orgId: 1,
       });
       assert.ok(typeof g === "object" && typeof f1 === "object" && typeof f2 === "object");
       const idG = (g as { id: number }).id;

@@ -46,7 +46,13 @@ export async function POST(req: NextRequest) {
       }))
     : [];
 
-  const result = await createApprovalFlow({ projectId, entityType, name, steps });
+  const result = await createApprovalFlow({
+    projectId,
+    entityType,
+    name,
+    steps,
+    orgId: user.orgId,
+  });
   if (typeof result === "string") {
     const status = result.startsWith("Đã có flow") ? 409 : 422;
     return NextResponse.json({ error: result }, { status });

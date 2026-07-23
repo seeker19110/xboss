@@ -75,9 +75,10 @@ export async function POST(req: NextRequest) {
   const active = body.active === undefined ? true : !!body.active;
 
   try {
+    // M54 GĐ1 PR2: định nghĩa trường tuỳ biến thuộc org người tạo (không dựa DEFAULT org_id=1).
     const id = await insertId(
-      `INSERT INTO custom_field_defs (project_id, entity_type, key, label, type, options, required, sort, active)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO custom_field_defs (project_id, entity_type, key, label, type, options, required, sort, active, org_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       projectId,
       entityType,
       key,
@@ -87,6 +88,7 @@ export async function POST(req: NextRequest) {
       required,
       sort,
       active,
+      user.orgId,
     );
     return NextResponse.json({ id }, { status: 201 });
   } catch (err) {

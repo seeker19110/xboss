@@ -304,6 +304,7 @@ test(
       domain: "require_2fa_roles",
       code: "engineer",
       label: "Kỹ sư",
+      orgId: 1,
     });
     const codeItemId = typeof created === "string" ? null : created.id;
     assert.ok(codeItemId, "tạo được dòng require_2fa_roles=engineer");

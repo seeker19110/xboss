@@ -50,6 +50,7 @@ test(
       projectId: null,
       metric: "due_soon_days",
       threshold: 5,
+      orgId: 1,
     });
     assert.ok(typeof globalRule === "object");
     assert.equal(await getAlertThreshold("due_soon_days", p1), 5);
@@ -60,6 +61,7 @@ test(
       projectId: p1,
       metric: "due_soon_days",
       threshold: 2,
+      orgId: 1,
     });
     assert.ok(typeof ownRule === "object");
     assert.equal(await getAlertThreshold("due_soon_days", p1), 2);
@@ -82,9 +84,24 @@ test(
     const p1 = await insertId(`INSERT INTO projects (name) VALUES ('M52 Alerts scope P1')`);
     const p2 = await insertId(`INSERT INTO projects (name) VALUES ('M52 Alerts scope P2')`);
 
-    const rGlobal = await upsertAlertRule({ projectId: null, metric: "spi_below", threshold: 0.9 });
-    const r1 = await upsertAlertRule({ projectId: p1, metric: "cpi_below", threshold: 0.8 });
-    const r2 = await upsertAlertRule({ projectId: p2, metric: "cpi_below", threshold: 0.7 });
+    const rGlobal = await upsertAlertRule({
+      projectId: null,
+      metric: "spi_below",
+      threshold: 0.9,
+      orgId: 1,
+    });
+    const r1 = await upsertAlertRule({
+      projectId: p1,
+      metric: "cpi_below",
+      threshold: 0.8,
+      orgId: 1,
+    });
+    const r2 = await upsertAlertRule({
+      projectId: p2,
+      metric: "cpi_below",
+      threshold: 0.7,
+      orgId: 1,
+    });
     assert.ok(typeof rGlobal === "object" && typeof r1 === "object" && typeof r2 === "object");
     const idG = (rGlobal as { id: number }).id;
     const id1 = (r1 as { id: number }).id;
@@ -121,12 +138,22 @@ test(
 
     const p = await insertId(`INSERT INTO projects (name) VALUES ('M47 Alerts P3')`);
 
-    const r1 = await upsertAlertRule({ projectId: p, metric: "material_over_pct", threshold: 10 });
+    const r1 = await upsertAlertRule({
+      projectId: p,
+      metric: "material_over_pct",
+      threshold: 10,
+      orgId: 1,
+    });
     assert.ok(typeof r1 === "object");
     const id1 = (r1 as { id: number }).id;
 
     // Update cùng (metric, project) → cùng 1 id, không tạo hàng mới.
-    const r2 = await upsertAlertRule({ projectId: p, metric: "material_over_pct", threshold: 20 });
+    const r2 = await upsertAlertRule({
+      projectId: p,
+      metric: "material_over_pct",
+      threshold: 20,
+      orgId: 1,
+    });
     assert.ok(typeof r2 === "object");
     assert.equal((r2 as { id: number }).id, id1);
     assert.equal(await getAlertThreshold("material_over_pct", p), 20);
@@ -154,6 +181,7 @@ test(
       projectId: null,
       metric: "khong_ton_tai",
       threshold: 1,
+      orgId: 1,
     });
     assert.equal(typeof bad1, "string");
 
@@ -161,6 +189,7 @@ test(
       projectId: null,
       metric: "material_over_pct",
       threshold: -5,
+      orgId: 1,
     });
     assert.equal(typeof bad2, "string");
 
@@ -168,6 +197,7 @@ test(
       projectId: null,
       metric: "due_soon_days",
       threshold: Number.NaN,
+      orgId: 1,
     });
     assert.equal(typeof bad3, "string");
   },

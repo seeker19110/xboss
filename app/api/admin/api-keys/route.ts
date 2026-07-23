@@ -63,14 +63,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Scope không hợp lệ" }, { status: 422 });
 
   const raw = generateApiKey();
+  // M54 GĐ1 PR2: API key thuộc org người tạo (không dựa DEFAULT org_id=1).
   const id = await insertId(
-    `INSERT INTO api_keys (name, key_hash, project_id, scopes, created_by)
-     VALUES (?, ?, ?, ?, ?)`,
+    `INSERT INTO api_keys (name, key_hash, project_id, scopes, created_by, org_id)
+     VALUES (?, ?, ?, ?, ?, ?)`,
     name,
     hashApiKey(raw),
     projectId,
     scopes,
     user.id,
+    user.orgId,
   );
 
   // key thô chỉ trả 1 lần — client phải lưu lại ngay, hệ thống không lưu bản thô.

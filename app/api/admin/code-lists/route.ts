@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
   const meta =
     body.meta && typeof body.meta === "object" ? (body.meta as Record<string, unknown>) : undefined;
 
-  const result = await createItem({ domain, code, label, sort, active, meta });
+  const result = await createItem({ domain, code, label, sort, active, meta, orgId: user.orgId });
   if (typeof result === "string") return NextResponse.json({ error: result }, { status: 409 });
   return NextResponse.json({ id: result.id }, { status: 201 });
 }

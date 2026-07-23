@@ -112,14 +112,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "projectId không hợp lệ" }, { status: 400 });
 
   const secret = randomBytes(32).toString("hex");
+  // M54 GĐ1 PR2: webhook thuộc org người tạo (không dựa DEFAULT org_id=1).
   const id = await insertId(
-    `INSERT INTO webhooks (project_id, url, secret, events, active, created_by)
-     VALUES (?, ?, ?, ?, TRUE, ?)`,
+    `INSERT INTO webhooks (project_id, url, secret, events, active, created_by, org_id)
+     VALUES (?, ?, ?, ?, TRUE, ?, ?)`,
     projectId,
     urlCheck.url,
     secret,
     events,
     user.id,
+    user.orgId,
   );
 
   return NextResponse.json({ id, secret }, { status: 201 });

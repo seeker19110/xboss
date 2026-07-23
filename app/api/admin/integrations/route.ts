@@ -119,8 +119,9 @@ export async function POST(req: NextRequest) {
   // ON CONFLICT (provider, project_id) upsert — với project_id NULL, UNIQUE coi NULL là
   // khác nhau nên không kích hoạt DO UPDATE (chèn mới); tích hợp thật luôn có project_id
   // (cron chỉ quét hàng project_id IS NOT NULL) nên không ảnh hưởng luồng dùng thực.
+  // M54 GĐ1 PR2: tích hợp thuộc org người tạo (không dựa DEFAULT org_id=1).
   const rows = await query<{ id: number }>(
-    `INSERT INTO integrations (provider, project_id, config, active) VALUES (?, ?, ?, ?)
+    `INSERT INTO integrations (provider, project_id, config, active, org_id) VALUES (?, ?, ?, ?, ?)
      ON CONFLICT (provider, project_id)
      DO UPDATE SET config = EXCLUDED.config, active = EXCLUDED.active
      RETURNING id`,
@@ -128,6 +129,7 @@ export async function POST(req: NextRequest) {
     projectId,
     JSON.stringify(config),
     active,
+    user.orgId,
   );
   return NextResponse.json({ id: rows[0].id }, { status: 201 });
 }

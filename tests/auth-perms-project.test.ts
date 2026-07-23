@@ -29,10 +29,10 @@ test(
 
     await asAdmin(async () => {
       // engineer/editProgress: chỉ có override THEO DỰ ÁN A (không có toàn hệ).
-      await setPermissionOverride("engineer", "editProgress", false, 1, a);
+      await setPermissionOverride("engineer", "editProgress", false, 1, 1, a);
       // viewer/viewPayments: có toàn hệ (true) + dự án A (false).
-      await setPermissionOverride("viewer", "viewPayments", true, 1, null);
-      await setPermissionOverride("viewer", "viewPayments", false, 1, a);
+      await setPermissionOverride("viewer", "viewPayments", true, 1, 1, null);
+      await setPermissionOverride("viewer", "viewPayments", false, 1, 1, a);
     });
     await invalidatePermissionCache();
 
@@ -83,14 +83,14 @@ test(
 
     // Chỉ override toàn hệ → hasProjectOverrides false.
     await asAdmin(async () => {
-      await setPermissionOverride("pm", "approve", false, 1, null);
+      await setPermissionOverride("pm", "approve", false, 1, 1, null);
     });
     await invalidatePermissionCache();
     assert.equal(hasProjectOverrides(), false, "chỉ toàn hệ → false");
 
     // Thêm 1 override theo dự án → true.
     await asAdmin(async () => {
-      await setPermissionOverride("engineer", "editProgress", false, 1, a);
+      await setPermissionOverride("engineer", "editProgress", false, 1, 1, a);
     });
     await invalidatePermissionCache();
     assert.equal(hasProjectOverrides(), true, "có dòng theo dự án → true");
@@ -116,7 +116,7 @@ test(
 
     // Siết editProgress của engineer CHỈ ở dự án A.
     await asAdmin(async () => {
-      await setPermissionOverride("engineer", "editProgress", false, 1, a);
+      await setPermissionOverride("engineer", "editProgress", false, 1, 1, a);
     });
     await invalidatePermissionCache();
 
@@ -138,8 +138,8 @@ test(
 
     // Mở viewPayments cho viewer TOÀN HỆ + siết ở A → A=false, B=true, không-context=true.
     await asAdmin(async () => {
-      await setPermissionOverride("viewer", "viewPayments", true, 1, null);
-      await setPermissionOverride("viewer", "viewPayments", false, 1, a);
+      await setPermissionOverride("viewer", "viewPayments", true, 1, 1, null);
+      await setPermissionOverride("viewer", "viewPayments", false, 1, 1, a);
     });
     await invalidatePermissionCache();
 
@@ -169,8 +169,8 @@ test(
 
     await run(`DELETE FROM role_permissions`);
     await asAdmin(async () => {
-      await setPermissionOverride("pm", "approve", false, 1, null);
-      await setPermissionOverride("pm", "approve", false, 1, null); // lần 2 phải UPDATE, không INSERT
+      await setPermissionOverride("pm", "approve", false, 1, 1, null);
+      await setPermissionOverride("pm", "approve", false, 1, 1, null); // lần 2 phải UPDATE, không INSERT
     });
     const rows = await query<{ n: number }>(
       `SELECT COUNT(*) AS n FROM role_permissions WHERE role = 'pm' AND perm_key = 'approve' AND project_id IS NULL`,
@@ -190,8 +190,8 @@ test("perm-project: xoá dự án → override theo dự án tự mất (CASCADE
   const a = await insertId(`INSERT INTO projects (name, code) VALUES ('DA Cascade', 'PJT-CAS')`);
 
   await asAdmin(async () => {
-    await setPermissionOverride("engineer", "editProgress", false, 1, a);
-    await setPermissionOverride("pm", "approve", false, 1, null); // toàn hệ, KHÔNG bị xoá theo
+    await setPermissionOverride("engineer", "editProgress", false, 1, 1, a);
+    await setPermissionOverride("pm", "approve", false, 1, 1, null); // toàn hệ, KHÔNG bị xoá theo
   });
 
   let cnt = await query<{ n: number }>(

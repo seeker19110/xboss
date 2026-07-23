@@ -76,8 +76,9 @@ export async function POST(req: NextRequest) {
   const name = String(body.name ?? "").trim();
   if (!name) return NextResponse.json({ error: "Thiếu tên nhà cung cấp" }, { status: 400 });
 
-  const cols = ["name"];
-  const vals: unknown[] = [name];
+  // M54 GĐ1 PR2: NCC mới thuộc org người tạo (không dựa DEFAULT org_id=1).
+  const cols = ["name", "org_id"];
+  const vals: unknown[] = [name, user.orgId];
   for (const f of ALL_FIELDS) {
     if (f === "name") continue;
     const v = body[camel(f)];

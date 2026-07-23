@@ -49,6 +49,6 @@ export async function PATCH(req: NextRequest) {
   if (typeof enabled !== "boolean")
     return NextResponse.json({ error: "enabled phải là boolean" }, { status: 422 });
 
-  await setFlag(moduleKey, projectId, enabled, user.id);
+  await setFlag(moduleKey, projectId, enabled, user.id, user.orgId);
   return NextResponse.json({ moduleKey, projectId, enabled });
 }

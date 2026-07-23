@@ -132,8 +132,11 @@ export async function upsertSsoUser(resolved: ResolvedSsoUser): Promise<SsoUser>
   // không ai biết mật khẩu này nên KHÔNG đăng nhập được bằng form (đúng chủ đích).
   const role = resolved.roleFromClaim ?? defaultRole();
   const passwordHash = hashPassword(randomBytes(32).toString("hex"));
+  // M54 GĐ1 PR2: SSO Giai đoạn 1 là single-tenant — luồng OIDC hiện KHÔNG có cơ chế
+  // chọn tổ chức lúc login (không suy org từ domain email). User SSO mới gán org mặc
+  // định 1; org hoá SSO là việc theo sau khi có onboarding đa tổ chức.
   const created = await queryOne<SsoUser>(
-    `INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)
+    `INSERT INTO users (name, email, password_hash, role, org_id) VALUES (?, ?, ?, ?, 1)
      ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
      RETURNING id, name, email, role, password_hash, session_version, org_id`,
     resolved.name,

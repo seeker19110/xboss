@@ -35,7 +35,14 @@ export async function POST(req: NextRequest) {
   const threshold = Number(body.threshold);
   const active = typeof body.active === "boolean" ? body.active : undefined;
 
-  const result = await upsertAlertRule({ projectId, metric, threshold, active, userId: user.id });
+  const result = await upsertAlertRule({
+    projectId,
+    metric,
+    threshold,
+    active,
+    userId: user.id,
+    orgId: user.orgId,
+  });
   if (typeof result === "string") return NextResponse.json({ error: result }, { status: 422 });
   return NextResponse.json({ id: result.id }, { status: 201 });
 }
