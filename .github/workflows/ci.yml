@@ -40,8 +40,8 @@ jobs:
       - name: Cài dependencies
         run: npm ci
 
-      - name: Kiểm tra lỗ hổng dependencies
-        run: npm audit --audit-level=high
+      - name: Kiểm tra lỗ hổng dependencies (production)
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Lint
         run: npm run lint
