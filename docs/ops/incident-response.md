@@ -28,6 +28,44 @@
 7. **Viết post-mortem** (dùng **Mẫu post-mortem** ở cuối file này) cho mọi SEV1/SEV2 — **không đổ lỗi cá nhân**,
    tập trung vào hệ thống. Mọi hành động khắc phục → tạo issue có người phụ trách + hạn.
 
+## Checklist sẵn sàng trước sự cố (rà định kỳ, việc tay trên VPS thật)
+
+> Không phải thiếu quy trình — quy trình đã viết đủ ở file này và `docs/ops/backup.md`.
+> Rủi ro thật nằm ở chỗ **các việc tay trên VPS chưa chắc đã làm/còn chạy đúng**. Rà danh sách
+> này định kỳ (vd đầu mỗi quý) và sau mỗi lần đổi hạ tầng (đổi VPS, đổi remote backup...).
+
+1. **Backup có đang thực sự chạy không**
+   - `crontab -l` có đủ 2 dòng: backup 01:00 hằng đêm + restore-check Chủ nhật 02:00
+     (mẫu ở `docs/ops/backup.md`)?
+   - `ls -la backups/` có file dump của hôm qua, hay cron đã âm thầm lỗi từ lâu?
+   - `BACKUP_REMOTE` (`rclone`) đã cấu hình chưa — thiếu thì backup chỉ nằm trên chính VPS,
+     **không sống sót nếu mất cả VPS** (lỗ hổng hay gặp nhất).
+   - `logs/restore-check.log` — lần chạy gần nhất PASS hay đã âm thầm FAIL nhiều tuần?
+
+2. **Cảnh báo chủ động**
+   - Đã đăng ký uptime monitor (UptimeRobot/BetterStack) ping `/api/health` mỗi phút chưa?
+   - `backup.sh`/`restore-check.sh` có bắn Telegram khi FAIL không (dòng `curl` mẫu đã có
+     trong `docs/ops/backup.md`, chỉ cần thêm vào crontab thật)?
+   - `SENTRY_DSN` đã bật trên production chưa — thiếu thì crash âm thầm không ai biết cho
+     tới khi user báo.
+
+3. **Kho secret dự phòng** (cần khi dựng lại VPS mới — không lấy lại được từ VPS đã chết)
+   - Toàn bộ `.env.local` production có bản lưu ở nơi khác VPS (password manager nhóm/vault)
+     chưa? Thiếu thì bước "tạo lại `.env.local`" trong quy trình mất-VPS bị kẹt.
+   - Biết cách xoay từng secret thật sự (revoke Telegram bot token qua BotFather, tạo lại
+     Google service account key...) hay tới lúc mới tra cứu?
+
+4. **Tập dượt thật, không chỉ đọc quy trình**
+   - Đã chạy `restore-check.sh` thành công ít nhất 1 lần thật, không chỉ tin script?
+   - Đã dry-run kịch bản "mất VPS" trên staging/máy tạm ít nhất 1 lần, đo thời gian thực tế
+     so với RTO ≤4h mục tiêu?
+   - Người sẽ là incident lead có đủ quyền cần (SSH key VPS, quyền DNS, quyền
+     `BACKUP_REMOTE`, secret vault) — hay chỉ 1 người có hết và có thể đang nghỉ phép?
+
+5. **Liên lạc & quyền hạn**
+   - Danh sách người có quyền đổi DNS (kịch bản mất VPS) đã rõ chưa?
+   - Kênh thông báo user khi outage diện rộng (banner/nhóm Telegram) đã xác định trước chưa?
+
 ## Nguyên tắc
 
 - **An toàn trước tốc độ:** thao tác lên dữ liệu thật phải cân nhắc rollback trước khi chạy.
