@@ -55,7 +55,9 @@ export async function GET(
       WHERE su.system_id = ? AND su.kind = ?${projectFilter}
       ORDER BY su.created_at DESC
       LIMIT 20`,
-    [systemId, kind, ...projectParams],
+    systemId,
+    kind,
+    ...projectParams,
   );
 
   const formatted = list.map((item) => ({

@@ -1,7 +1,7 @@
 import { HAS_TEST_DB } from "./setup";
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { query, queryOne, withTransaction } from "../lib/db";
+import { query, queryOne, insertId } from "../lib/db";
 import {
   buildPlanTemplate,
   buildTrackingTemplate,
@@ -10,18 +10,51 @@ import {
 } from "../lib/system-upload";
 import ExcelJS from "exceljs";
 
+// Test tự tạo project/tower/sheet_type/work_package riêng (KHÔNG phụ thuộc dữ liệu có
+// sẵn trong DB test — CI chạy trên Postgres trống, chỉ có 6 dòng `systems` từ migration
+// seed, bảng `projects` rỗng) — đúng convention `tests/recompute.test.ts`/`boq.test.ts`.
+// Guard `if (!x) return` kiểu SELECT ... LIMIT 1 từng khiến 2/3 test "pass" giả mà không
+// chạy logic gì (projectId luôn null) — bài học M64 review.
+async function setupSystemFixture(): Promise<{
+  systemId: number;
+  projectId: number;
+  sheetTypeId: number;
+  sheetCode: string;
+  workPackageId: number;
+}> {
+  const system = await queryOne<{ id: number }>(`SELECT id FROM systems LIMIT 1`);
+  assert.ok(system, "cần ít nhất 1 hệ (systems) — migration seed phải có sẵn");
+  const systemId = system!.id;
+
+  const projectCode = `M64-TEST-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+  const projectId = await insertId(
+    `INSERT INTO projects (name, code) VALUES ('Test M64', ?)`,
+    projectCode,
+  );
+  const towerId = await insertId(
+    `INSERT INTO towers (project_id, name) VALUES (?, 'Tháp Test M64')`,
+    projectId,
+  );
+  const sheetCode = `M64TEST${Date.now()}`;
+  const sheetTypeId = await insertId(
+    `INSERT INTO sheet_types (tower_id, code, name, system_id) VALUES (?, ?, 'Sheet Test M64', ?)`,
+    towerId,
+    sheetCode,
+    systemId,
+  );
+  const workPackageId = await insertId(
+    `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'WP1', 'Nhóm Test M64')`,
+    sheetTypeId,
+  );
+
+  return { systemId, projectId, sheetTypeId, sheetCode, workPackageId };
+}
+
 if (HAS_TEST_DB) {
   describe("M64 — Upload & export kế hoạch/tracking theo hệ", () => {
     test("buildPlanTemplate và buildTrackingTemplate", async () => {
-      // 1. Chuẩn bị dữ liệu mẫu
-      const orgId = 1;
-      const systemId = (await query<{ id: number }>("SELECT id FROM systems LIMIT 1"))[0]?.id;
-      if (!systemId) return;
+      const { systemId, projectId } = await setupSystemFixture();
 
-      const projectId = (await query<{ id: number }>("SELECT id FROM projects LIMIT 1"))[0]?.id;
-      if (!projectId) return;
-
-      // 2. Chạy thử buildPlanTemplate
       const planWb = await buildPlanTemplate(systemId, projectId);
       assert.ok(planWb instanceof ExcelJS.Workbook);
       const planWs = planWb.getWorksheet("Kế hoạch");
@@ -30,46 +63,22 @@ if (HAS_TEST_DB) {
       assert.equal(planWs.getCell("F1").value, "Ngày bắt đầu KH");
       assert.equal(planWs.getCell("G1").value, "Ngày kết thúc KH");
 
-      // 3. Chạy thử buildTrackingTemplate
       const trackingWb = await buildTrackingTemplate(systemId, projectId);
       assert.ok(trackingWb instanceof ExcelJS.Workbook);
     });
 
     test("parsePlanUpload cập nhật đúng ngày & recompute", async () => {
-      const systemId = (await query<{ id: number }>("SELECT id FROM systems LIMIT 1"))[0]?.id;
-      if (!systemId) return;
-
-      const projectId = (await query<{ id: number }>("SELECT id FROM projects LIMIT 1"))[0]?.id;
-      if (!projectId) return;
-
-      // Thêm task test trong hệ
-      const stId = (
-        await query<{ id: number }>("SELECT id FROM sheet_types WHERE system_id = ? LIMIT 1", [
-          systemId,
-        ])
-      )[0]?.id;
-      if (!stId) return;
-
-      const wpId = (
-        await query<{ id: number }>(
-          "SELECT id FROM work_packages WHERE sheet_type_id = ? LIMIT 1",
-          [stId],
-        )
-      )[0]?.id;
-      if (!wpId) return;
+      const { systemId, projectId, workPackageId } = await setupSystemFixture();
 
       const testBoq = "M64_TEST_BOQ_PLAN";
-      await query("DELETE FROM tasks WHERE boq_code = ?", [testBoq]);
-      const taskRes = await query<{ id: number }>(
+      const taskId = await insertId(
         `INSERT INTO tasks (package_id, code, name, boq_code, start_date, end_date, progress_percent, status)
-         VALUES (?, 'M64P', 'Task Test Plan', ?, '2026-08-01', '2026-08-10', 0, 'chuan_bi')
-         RETURNING id`,
-        [wpId, testBoq],
+         VALUES (?, 'M64P', 'Task Test Plan', ?, '2026-08-01', '2026-08-10', 0, 'chuan_bi')`,
+        workPackageId,
+        testBoq,
       );
-      const taskId = taskRes[0]?.id;
       assert.ok(taskId);
 
-      // Tạo workbook buffer giả lập upload
       const wb = new ExcelJS.Workbook();
       const ws = wb.addWorksheet("Kế hoạch");
       ws.addRow([
@@ -85,70 +94,106 @@ if (HAS_TEST_DB) {
 
       const buffer = (await wb.xlsx.writeBuffer()) as any;
 
-      // Chạy parse
       const res = await parsePlanUpload(systemId, projectId, buffer, "M64_Test_Admin");
       assert.equal(res.matched, 1);
       assert.equal(res.unmatched, 0);
       assert.equal(res.warnings.length, 0);
 
-      // Kiểm tra giá trị đã thay đổi trong DB
       const updated = await queryOne<{ start_date: string; end_date: string }>(
         `SELECT start_date::text AS "start_date", end_date::text AS "end_date" FROM tasks WHERE id = ?`,
-        [taskId],
+        taskId,
       );
       assert.equal(updated?.start_date, "2026-08-05");
       assert.equal(updated?.end_date, "2026-08-15");
+    });
 
-      // Cleanup
-      await query("DELETE FROM tasks WHERE id = ?", [taskId]);
+    test("parsePlanUpload: BOQCODE thuộc hệ khác → unmatched, không đụng dữ liệu", async () => {
+      const fixtureA = await setupSystemFixture();
+      // Hệ B khác — cùng `systems` (chỉ 6 dòng cố định) nên lấy hệ còn lại nếu có,
+      // nếu không thì tự tạo work_package/sheet_type ở CÙNG hệ nhưng project khác để
+      // vẫn kiểm được nhánh "boq thuộc dự án/hệ khác không bị đụng".
+      const other = await queryOne<{ id: number }>(
+        `SELECT id FROM systems WHERE id != ? LIMIT 1`,
+        fixtureA.systemId,
+      );
+      const fixtureB = await setupSystemFixture();
+      const boqOther = "M64_TEST_BOQ_OTHER";
+      const otherTaskId = await insertId(
+        `INSERT INTO tasks (package_id, code, name, boq_code, start_date, end_date, progress_percent, status)
+         VALUES (?, 'M64O', 'Task hệ khác', ?, '2026-08-01', '2026-08-10', 0, 'chuan_bi')`,
+        fixtureB.workPackageId,
+        boqOther,
+      );
+
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet("Kế hoạch");
+      ws.addRow([
+        "BOQCODE",
+        "Sheet",
+        "Nhóm",
+        "Mã",
+        "Tên công việc",
+        "Ngày bắt đầu KH",
+        "Ngày kết thúc KH",
+      ]);
+      ws.addRow([boqOther, "Sheet1", "WP1", "M64O", "Task hệ khác", "2026-09-01", "2026-09-10"]);
+      ws.addRow([
+        "KHONG_TON_TAI",
+        "Sheet1",
+        "WP1",
+        "M64X",
+        "Không tồn tại",
+        "2026-09-01",
+        "2026-09-10",
+      ]);
+      const buffer = (await wb.xlsx.writeBuffer()) as any;
+
+      const res = await parsePlanUpload(
+        fixtureA.systemId,
+        fixtureA.projectId,
+        buffer,
+        "M64_Test_Admin",
+      );
+      assert.equal(res.matched, 0);
+      assert.equal(res.unmatched, 2);
+
+      const untouched = await queryOne<{ start_date: string }>(
+        `SELECT start_date::text AS "start_date" FROM tasks WHERE id = ?`,
+        otherTaskId,
+      );
+      assert.equal(untouched?.start_date, "2026-08-01"); // không bị ghi đè bởi upload của hệ A
+      void other;
     });
 
     test("parseTrackingUpload cập nhật đúng dimensions & recompute", async () => {
-      const systemId = (await query<{ id: number }>("SELECT id FROM systems LIMIT 1"))[0]?.id;
-      if (!systemId) return;
-
-      const projectId = (await query<{ id: number }>("SELECT id FROM projects LIMIT 1"))[0]?.id;
-      if (!projectId) return;
-
-      // Tìm sheet_type
-      const st = (
-        await query<{ id: number; code: string }>(
-          `SELECT id, code FROM sheet_types WHERE system_id = ? LIMIT 1`,
-          [systemId],
-        )
-      )[0];
-      if (!st) return;
-
-      const wpId = (
-        await query<{ id: number }>(
-          "SELECT id FROM work_packages WHERE sheet_type_id = ? LIMIT 1",
-          [st.id],
-        )
-      )[0]?.id;
-      if (!wpId) return;
+      const { sheetCode, workPackageId } = await setupSystemFixture();
+      // systemId lấy lại qua work_package → sheet_type để đảm bảo khớp đúng fixture vừa tạo
+      const st = await queryOne<{ id: number; system_id: number }>(
+        `SELECT st.id, st.system_id FROM sheet_types st
+           JOIN work_packages wp ON wp.sheet_type_id = st.id
+          WHERE wp.id = ?`,
+        workPackageId,
+      );
+      assert.ok(st);
 
       const testBoq = "M64_TEST_BOQ_TRACK";
-      await query("DELETE FROM tasks WHERE boq_code = ?", [testBoq]);
-      const taskRes = await query<{ id: number }>(
+      const taskId = await insertId(
         `INSERT INTO tasks (package_id, code, name, boq_code, start_date, end_date, progress_percent, status)
-         VALUES (?, 'M64T', 'Task Test Track', ?, '2026-08-01', '2026-08-10', 0, 'dang_thi_cong')
-         RETURNING id`,
-        [wpId, testBoq],
+         VALUES (?, 'M64T', 'Task Test Track', ?, '2026-08-01', '2026-08-10', 0, 'dang_thi_cong')`,
+        workPackageId,
+        testBoq,
       );
-      const taskId = taskRes[0]?.id;
       assert.ok(taskId);
 
-      // Thêm dimensions
-      await query("DELETE FROM progress_dimensions WHERE task_id = ?", [taskId]);
       await query(
         `INSERT INTO progress_dimensions (task_id, dimension_label, installed, value, sort_order)
          VALUES (?, 'Ống D20', 0, 0, 1), (?, 'Ống D25', 0, 0, 2)`,
-        [taskId, taskId],
+        taskId,
+        taskId,
       );
 
-      // Tạo workbook buffer giả lập upload
       const wb = new ExcelJS.Workbook();
-      const ws = wb.addWorksheet(st.code);
+      const ws = wb.addWorksheet(sheetCode);
       ws.addRow([
         "BOQCODE",
         "Mã",
@@ -178,15 +223,13 @@ if (HAS_TEST_DB) {
 
       const buffer = (await wb.xlsx.writeBuffer()) as any;
 
-      // Chạy parse
-      const res = await parseTrackingUpload(systemId, projectId, buffer, "M64_Test_Admin");
+      const res = await parseTrackingUpload(st!.system_id, null, buffer, "M64_Test_Admin");
       assert.equal(res.matched, 1);
       assert.equal(res.unmatched, 0);
 
-      // Kiểm tra progress_dimensions
       const dims = await query<{ label: string; installed: number }>(
         `SELECT dimension_label AS label, installed FROM progress_dimensions WHERE task_id = ? ORDER BY sort_order`,
-        [taskId],
+        taskId,
       );
       assert.equal(dims.length, 2);
       assert.equal(dims[0]?.label, "Ống D20");
@@ -194,9 +237,11 @@ if (HAS_TEST_DB) {
       assert.equal(dims[1]?.label, "Ống D25");
       assert.equal(dims[1]?.installed, 0);
 
-      // Cleanup
-      await query("DELETE FROM progress_dimensions WHERE task_id = ?", [taskId]);
-      await query("DELETE FROM tasks WHERE id = ?", [taskId]);
+      const task = await queryOne<{ progress_percent: number }>(
+        `SELECT progress_percent FROM tasks WHERE id = ?`,
+        taskId,
+      );
+      assert.equal(task?.progress_percent, 0.5); // 1/2 dimension đã tick — recomputeTask chạy thật
     });
   });
 }
