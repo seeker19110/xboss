@@ -7,6 +7,22 @@
     {
       "path": "/api/cron/deliver-webhooks",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/sync-sheets",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/refresh-views",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/sync-integrations",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/weekly-report",
+      "schedule": "0 1 * * 1"
     }
   ]
 }
