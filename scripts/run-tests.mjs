@@ -18,7 +18,6 @@ import { join } from "node:path";
 import { parseCoverageTable, mergeCoverageMaps, aggregate } from "./coverage-summary.mjs";
 
 const TEST_DIR = "tests";
-const tsx = join("node_modules", ".bin", "tsx");
 const tsxLoader = "./" + join("node_modules", "tsx", "dist", "loader.mjs");
 
 // `npm run test:coverage` gọi `node --experimental-test-coverage scripts/run-tests.mjs` —
@@ -48,7 +47,9 @@ for (const file of files) {
     process.stdout.write(res.stdout ?? "");
     if (res.stdout) coverageMaps.push(parseCoverageTable(res.stdout));
   } else {
-    res = spawnSync(tsx, ["--test", file], { stdio: "inherit" });
+    res = spawnSync(process.execPath, [`--import=${tsxLoader}`, "--test", file], {
+      stdio: "inherit",
+    });
   }
   if (res.status !== 0) failed++;
 }
