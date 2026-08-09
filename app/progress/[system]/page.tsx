@@ -19,6 +19,7 @@ import ProgressMap from "@/app/components/ProgressMap";
 import SpiCards from "@/app/components/SpiCards";
 import ForecastCards from "@/app/components/ForecastCards";
 import DelayedGroupsTable from "@/app/components/DelayedGroupsTable";
+import SystemUploadPanel from "@/app/components/SystemUploadPanel";
 
 // Trang gộp toàn bộ tiến độ 1 hệ (M-tiến-độ-6-hệ): thay 5 view chung Timeline/Gantt/
 // Lookahead/S-Curve/Đường găng bằng 6 trang theo hệ đang thi công, mỗi trang đủ 7 khối
@@ -358,6 +359,9 @@ export default function ProgressSystemPage({ params }: { params: Promise<{ syste
             </div>
           )}
         </section>
+
+        {/* ── Upload kế hoạch & tracking ── */}
+        <SystemUploadPanel systemCode={system} canUpload={me?.role === "admin"} />
 
         {/* ── 2. Biểu đồ kế hoạch so với thực tế ── (SCurveChart tự có tiêu đề riêng) */}
         <section>

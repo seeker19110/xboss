@@ -75,8 +75,14 @@ export const MODULES: ModuleDef[] = [
     ],
     permKeys: ["editProgress", "editStructure", "assign"],
     notificationTypes: ["delayed", "due_soon"],
-    swExclude: ["/api/events"],
-    routePrefix: ["/api/tasks", "/api/dimensions", "/api/events"],
+    swExclude: ["/api/events", "/api/system-uploads/", "/api/systems/"],
+    routePrefix: [
+      "/api/tasks",
+      "/api/dimensions",
+      "/api/events",
+      "/api/system-uploads",
+      "/api/systems",
+    ],
   },
   {
     // Thi công hiện trường — việc của tôi, nghiệm thu, nhật ký, mặt bằng + ảnh hiện trường.

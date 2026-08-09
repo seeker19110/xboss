@@ -261,3 +261,9 @@ export function newPhotoFileName(taskId: number, mime: string): string {
 export function newAlbumPhotoFileName(albumId: number, mime: string): string {
   return `alb${albumId}-${Date.now()}-${randomBytes(4).toString("hex")}${MIME_EXT[mime]}`;
 }
+
+export function newSystemUploadFileName(systemId: number, kind: string, mime: string): string {
+  const ext =
+    mime === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ? ".xlsx" : ".bin";
+  return `sys${systemId}-${kind}-${Date.now()}-${randomBytes(4).toString("hex")}${ext}`;
+}

@@ -8,6 +8,18 @@
 
 - **GĐ 4–5 — Phát triển & nâng chất lượng.** Sản phẩm đã chạy thật (v0.2.1, tự host VPS), đang phát triển/tinh chỉnh tính năng liên tục **và** đang áp bộ khung quy trình/chất lượng (brownfield) theo `docs/framework/AP-DUNG-vao-du-an-co-san.md`.
 
+## Triển khai toàn bộ M64 — Upload kế hoạch & tracking theo hệ (2026-08-09)
+
+Hoàn thành triển khai toàn bộ đặc tả `docs/nang-cap/M64-upload-ke-hoach-tracking-theo-he.md` (DoD đầy đủ, đã xác minh typecheck/lint/test 100% xanh cục bộ):
+
+- **[AI, đã làm]** `migrations/0082_system_uploads.sql`: bảng `system_uploads` lưu trữ lịch sử tải lên Excel, bao gồm trường `project_id` phục vụ kiểm soát quyền truy cập đa dự án.
+- **[AI, đã làm]** Tách `buildTrackingTab` từ `app/api/export/excel/route.ts` sang `lib/excel-tracking.ts` để sử dụng chung.
+- **[AI, đã làm]** `lib/system-upload.ts`: logic tạo file mẫu Excel (`buildPlanTemplate`, `buildTrackingTemplate`) và xử lý tải lên (`parsePlanUpload`, `parseTrackingUpload`). Xử lý cập nhật DB lồng trong transaction và kích hoạt `recomputeTask` cũng như lưu tệp.
+- **[AI, đã làm]** 4 API routes tương ứng: tải tệp mẫu (`GET /api/systems/[code]/upload-template`), tải lên tệp (`POST /api/systems/[code]/upload` - chỉ vai trò `admin`), lịch sử tệp đã tải (`GET /api/systems/[code]/uploads`), tải tệp tin gốc (`GET /api/system-uploads/[id]/file`).
+- **[AI, đã làm]** SW Caching Exclusions: Cấu hình loại trừ cache cho các route dynamic trong `public/sw.js` và `lib/modules.ts`, bump cache version lên `xboss-v13`. Chạy `npm run check:sw-exclude` pass.
+- **[AI, đã làm]** Frontend component: Dựng component `SystemUploadPanel.tsx` cho phép admin tải tệp mẫu, upload tệp Excel kế hoạch/thực tế và theo dõi kết quả, hiển thị lịch sử tải lên. Nhúng component vào trang `app/progress/[system]/page.tsx`.
+- **[AI, đã làm]** Tests: Viết test tích hợp `tests/system-upload.test.ts` kiểm thử toàn bộ luồng tạo và xử lý Excel kế hoạch/thực tế. Chạy `npm test` thành công 114/114 file pass (bao gồm cả test check bất biến đa dự án `project-scope-invariant.test.ts`).
+
 ## Đợt audit toàn dự án lần 9 (2026-08-09) — CI đỏ trên `main` + dependency + index trùng
 
 Audit toàn diện theo `docs/audit.md` (đọc + báo cáo trước, sửa sau — §1). Cổng tự động cục bộ xanh (lint/typecheck/test 113 file/build) nhưng **CI trên `main` (GitHub Actions) đỏ từ commit `d90c899`, 2026-07-26** — job `ci` xanh, job `e2e` đỏ. Vì `deploy.yml` gate bằng `workflow_run` + `conclusion == success`, CI đỏ chặn deploy hoàn toàn. Đã xác nhận + sửa cả 4 phát hiện 🔴/🟡, không chỉ ghi nợ:

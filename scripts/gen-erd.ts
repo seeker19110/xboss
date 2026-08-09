@@ -24,6 +24,7 @@ const MODULES: { title: string; tables: string[] }[] = [
       "baseline_tasks",
       "package_dependencies",
       "construction_stages",
+      "system_uploads",
     ],
   },
   {

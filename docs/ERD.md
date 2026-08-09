@@ -272,6 +272,32 @@
 **Index:**
 - `construction_stages_pkey`: UNIQUE INDEX construction_stages_pkey ON public.construction_stages USING btree (id)
 
+### system_uploads
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | integer |  | `nextval('system_uploads_id_seq'::regclass)` |
+| system_id | integer |  |  |
+| project_id | integer | ✓ |  |
+| kind | text |  |  |
+| file_name | text |  |  |
+| original_name | text | ✓ |  |
+| uploaded_by | integer | ✓ |  |
+| row_count | integer |  | `0` |
+| matched_count | integer |  | `0` |
+| unmatched_count | integer |  | `0` |
+| warnings | jsonb |  | `'[]'::jsonb` |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `project_id` → `projects(id)`
+- `system_id` → `systems(id)`
+- `uploaded_by` → `users(id)`
+
+**Index:**
+- `idx_system_uploads_system`: INDEX idx_system_uploads_system ON public.system_uploads USING btree (project_id, system_id, kind, created_at DESC)
+- `system_uploads_pkey`: UNIQUE INDEX system_uploads_pkey ON public.system_uploads USING btree (id)
+
 ## Người dùng & phân quyền
 
 ### users
