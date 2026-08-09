@@ -70,7 +70,7 @@ if (HAS_TEST_DB) {
     test("parsePlanUpload cập nhật đúng ngày & recompute", async () => {
       const { systemId, projectId, workPackageId } = await setupSystemFixture();
 
-      const testBoq = "M64_TEST_BOQ_PLAN";
+      const testBoq = `M64_TEST_BOQ_PLAN_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
       const taskId = await insertId(
         `INSERT INTO tasks (package_id, code, name, boq_code, start_date, end_date, progress_percent, status)
          VALUES (?, 'M64P', 'Task Test Plan', ?, '2026-08-01', '2026-08-10', 0, 'chuan_bi')`,
@@ -117,7 +117,7 @@ if (HAS_TEST_DB) {
         fixtureA.systemId,
       );
       const fixtureB = await setupSystemFixture();
-      const boqOther = "M64_TEST_BOQ_OTHER";
+      const boqOther = `M64_TEST_BOQ_OTHER_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
       const otherTaskId = await insertId(
         `INSERT INTO tasks (package_id, code, name, boq_code, start_date, end_date, progress_percent, status)
          VALUES (?, 'M64O', 'Task hệ khác', ?, '2026-08-01', '2026-08-10', 0, 'chuan_bi')`,
@@ -176,7 +176,7 @@ if (HAS_TEST_DB) {
       );
       assert.ok(st);
 
-      const testBoq = "M64_TEST_BOQ_TRACK";
+      const testBoq = `M64_TEST_BOQ_TRACK_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
       const taskId = await insertId(
         `INSERT INTO tasks (package_id, code, name, boq_code, start_date, end_date, progress_percent, status)
          VALUES (?, 'M64T', 'Task Test Track', ?, '2026-08-01', '2026-08-10', 0, 'dang_thi_cong')`,
