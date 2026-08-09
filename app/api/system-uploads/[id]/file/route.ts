@@ -22,7 +22,7 @@ export async function GET(_req: Request, { params: paramsP }: { params: Promise<
     project_id: number | null;
   }>(
     `SELECT file_name, original_name, project_id AS "project_id" FROM system_uploads WHERE id = ?`,
-    [uploadId],
+    uploadId,
   );
 
   if (!upload) {

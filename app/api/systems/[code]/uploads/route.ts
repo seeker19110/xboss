@@ -25,6 +25,13 @@ export async function GET(
   }
 
   const projectId = await getCurrentProjectId(user);
+  // `?` đứng riêng chỉ so `IS NULL` khiến Postgres không suy được kiểu tham số ("could
+  // not determine data type of parameter") khi projectId = null (trường hợp mặc định,
+  // DB chưa chọn dự án) — bỏ hẳn nhánh so sánh đó, chỉ thêm điều kiện lọc khi có
+  // projectId thật (đúng convention project-scope đã dùng ở lib/system-upload.ts).
+  const projectFilter =
+    projectId != null ? " AND (su.project_id = ? OR su.project_id IS NULL)" : "";
+  const projectParams = projectId != null ? [projectId] : [];
 
   const list = await query<{
     id: number;
@@ -45,10 +52,12 @@ export async function GET(
             su.created_at AS "createdAt"
        FROM system_uploads su
        LEFT JOIN users u ON su.uploaded_by = u.id
-      WHERE su.system_id = ? AND su.kind = ? AND (su.project_id = ? OR (su.project_id IS NULL AND ? IS NULL))
+      WHERE su.system_id = ? AND su.kind = ?${projectFilter}
       ORDER BY su.created_at DESC
       LIMIT 20`,
-    [systemId, kind, projectId, projectId],
+    systemId,
+    kind,
+    ...projectParams,
   );
 
   const formatted = list.map((item) => ({

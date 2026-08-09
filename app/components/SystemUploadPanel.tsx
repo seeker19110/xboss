@@ -143,7 +143,7 @@ function SystemUploadSection({ systemCode, kind, title, icon, canUpload }: Secti
       <div className="flex items-center">
         <a
           href={`/api/systems/${systemCode}/upload-template?kind=${kind}`}
-          className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white text-xs font-medium rounded-lg transition-colors border border-zinc-700/60"
+          className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-zinc-50 text-xs font-medium rounded-lg transition-colors border border-zinc-700/60"
         >
           <Download className="w-3.5 h-3.5" />
           <span>Tải file mẫu Excel</span>
@@ -165,12 +165,13 @@ function SystemUploadSection({ systemCode, kind, title, icon, canUpload }: Secti
               ref={fileInputRef}
               accept=".xlsx"
               disabled={uploading}
+              aria-label={`Chọn file Excel ${title} để upload`}
               className="block w-full text-xs text-zinc-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-zinc-750 file:text-xs file:font-medium file:bg-zinc-900 file:text-zinc-300 file:hover:bg-zinc-800 cursor-pointer disabled:opacity-50"
             />
             <button
               type="submit"
               disabled={uploading}
-              className="inline-flex items-center space-x-1 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 disabled:bg-emerald-800/50 text-white text-xs font-semibold rounded-lg transition-colors disabled:cursor-not-allowed"
+              className="inline-flex items-center space-x-1 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 disabled:bg-emerald-800/50 text-on-accent text-xs font-semibold rounded-lg transition-colors disabled:cursor-not-allowed"
             >
               <Upload className="w-3.5 h-3.5" />
               <span>{uploading ? "Đang gửi..." : "Gửi"}</span>
@@ -190,9 +191,9 @@ function SystemUploadSection({ systemCode, kind, title, icon, canUpload }: Secti
         >
           <div className="flex items-center space-x-1.5 font-semibold">
             {status.success ? (
-              <CheckCircle className="w-4 h-4 shrink-0 text-emerald-450" />
+              <CheckCircle className="w-4 h-4 shrink-0 text-emerald-400" />
             ) : (
-              <AlertTriangle className="w-4 h-4 shrink-0 text-rose-405" />
+              <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
             )}
             <span>{status.message}</span>
           </div>

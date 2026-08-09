@@ -81,18 +81,16 @@ export async function POST(
       `INSERT INTO system_uploads (system_id, project_id, kind, file_name, original_name, uploaded_by, row_count, matched_count, unmatched_count, warnings)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
        RETURNING id`,
-      [
-        systemId,
-        projectId,
-        kind,
-        fileName,
-        file.name,
-        user.id,
-        result.rowCount,
-        result.matched,
-        result.unmatched,
-        JSON.stringify(result.warnings),
-      ],
+      systemId,
+      projectId,
+      kind,
+      fileName,
+      file.name,
+      user.id,
+      result.rowCount,
+      result.matched,
+      result.unmatched,
+      JSON.stringify(result.warnings),
     );
 
     return NextResponse.json({

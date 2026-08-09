@@ -55,7 +55,8 @@ export async function buildPlanTemplate(
        JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
       WHERE st.system_id = ?${projectFilter}
       ORDER BY st.sort_order, st.id, wp.sort_order, wp.id, t.sort_order, t.id`,
-    [systemId, ...projectParam],
+    systemId,
+    ...projectParam,
   );
 
   const wb = new ExcelJS.Workbook();
@@ -119,7 +120,8 @@ export async function buildTrackingTemplate(
        LEFT JOIN users u ON t.assigned_to = u.id${projectJoin}
       WHERE st.system_id = ?${projectFilter}
       ORDER BY st.sort_order, st.id, wp.sort_order, wp.id, t.sort_order, t.id`,
-    [systemId, ...projectParam],
+    systemId,
+    ...projectParam,
   );
 
   const allDims = await query<DimRow>(
@@ -130,7 +132,8 @@ export async function buildTrackingTemplate(
        JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
       WHERE st.system_id = ?${projectFilter}
       ORDER BY d.task_id, d.sort_order, d.id`,
-    [systemId, ...projectParam],
+    systemId,
+    ...projectParam,
   );
 
   const wb = new ExcelJS.Workbook();
@@ -208,7 +211,7 @@ export async function parsePlanUpload(
           JOIN sheet_types st ON wp.sheet_type_id = st.id${projectJoin}
          WHERE t.boq_code = ? AND st.system_id = ?${projectFilter}
       `;
-      const dbTasks = await query<{ id: number }>(queryStr, [boqCode, systemId, ...projectParam]);
+      const dbTasks = await query<{ id: number }>(queryStr, boqCode, systemId, ...projectParam);
 
       if (dbTasks.length === 0) {
         unmatched++;
@@ -243,11 +246,12 @@ export async function parsePlanUpload(
 
       // Cập nhật ngày cho các task và recompute
       for (const t of dbTasks) {
-        await query(`UPDATE tasks SET start_date = ?, end_date = ? WHERE id = ?`, [
+        await query(
+          `UPDATE tasks SET start_date = ?, end_date = ? WHERE id = ?`,
           startDate,
           endDate,
           t.id,
-        ]);
+        );
         await recomputeTask(t.id, changedBy);
       }
       matched += dbTasks.length;
@@ -287,7 +291,8 @@ export async function parseTrackingUpload(
         `SELECT st.id, st.code
            FROM sheet_types st${projectJoin}
           WHERE st.system_id = ?${projectFilter}`,
-        [systemId, ...projectParam],
+        systemId,
+        ...projectParam,
       );
 
       const matchedSheet = sheetTypes.find((st) => safeTabName(st.code) === sheetName);
@@ -323,7 +328,8 @@ export async function parseTrackingUpload(
           `SELECT t.id FROM tasks t
              JOIN work_packages wp ON t.package_id = wp.id
             WHERE t.boq_code = ? AND wp.sheet_type_id = ?`,
-          [boqCode, matchedSheet.id],
+          boqCode,
+          matchedSheet.id,
         );
 
         if (!dbTask) {
@@ -337,7 +343,7 @@ export async function parseTrackingUpload(
         // Lấy tất cả dimensions của task hiện tại
         const dbDims = await query<{ id: number; label: string }>(
           `SELECT id, dimension_label AS label FROM progress_dimensions WHERE task_id = ?`,
-          [dbTask.id],
+          dbTask.id,
         );
         const dimsByLabel = new Map(dbDims.map((d) => [d.label, d.id]));
 
@@ -358,11 +364,12 @@ export async function parseTrackingUpload(
           }
 
           const installedVal = isInstalled ? 1 : 0;
-          await query(`UPDATE progress_dimensions SET installed = ?, value = ? WHERE id = ?`, [
+          await query(
+            `UPDATE progress_dimensions SET installed = ?, value = ? WHERE id = ?`,
             installedVal,
             installedVal,
             dimId,
-          ]);
+          );
         }
 
         // recompute cho task (nó tự cascade cập nhật work package progress)
