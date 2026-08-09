@@ -67,46 +67,64 @@ test.describe("Quản trị (sau đăng nhập)", () => {
     // biết node này đã bị admin.spec.ts dùng làm mục toggle — CI main #219 fail vì race y hệt
     // cảnh báo ở đây. "Chuyển đổi số & Công nghệ" không xuất hiện ở appshell.spec.ts lẫn
     // tech.spec.ts (tech.spec.ts chỉ đọc heading trên trang /tech, không đọc sidebar).
+    const NODE_KEY = "dash.chuyen-doi-so";
+
+    // Dọn dẹp qua gọi API trực tiếp (không qua UI) trong `finally` — đảm bảo trả lại mặc định
+    // BẬT ngay cả khi assertion giữa chừng throw, tránh lặp lại đúng lớp lỗi đã sửa ở
+    // tests/evm.test.ts/matviews.test.ts (PR #213): cleanup nằm cuối thân test, không bọc
+    // finally, nên fail giữa chừng bỏ dở cleanup và làm hỏng mọi test/retry chạy sau, dùng
+    // chung state DB toàn cục (CI run 30189026442, 2026-07-26, xác nhận đúng nguyên nhân này).
+    try {
+      await gotoAdmin(page);
+      const sidebar = page.locator("#app-sidebar");
+      await expect(sidebar.getByText("Chuyển đổi số & Công nghệ", { exact: true })).toBeVisible({
+        timeout: 15_000,
+      });
+
+      await page.getByRole("tab", { name: "Hiển thị AppShell" }).click();
+      const row = page.getByRole("switch", { name: /Chuyển đổi số & Công nghệ/ });
+      await expect(row).toBeVisible({ timeout: 15_000 });
+      await expect(row).toHaveAttribute("aria-checked", "true");
+
+      // Chờ đúng response PATCH ghi DB xong (aria-checked đổi ngay do cập nhật optimistic,
+      // nhưng KHÔNG đảm bảo request đã tới server — reload quá sớm sẽ đọc lại giá trị cũ).
+      await Promise.all([
+        page.waitForResponse(
+          (r) => r.url().includes("/api/nav-settings") && r.request().method() === "PATCH",
+        ),
+        row.click(),
+      ]);
+      await expect(row).toHaveAttribute("aria-checked", "false");
+
+      // AppHeader chỉ tải nav-settings 1 lần lúc mount (không live-sync trong cùng trang) —
+      // tải lại trang để xác nhận đã ghi DB thật, không phải chỉ optimistic UI.
+      await page.reload();
+      await expect(sidebar.getByText("Chuyển đổi số & Công nghệ", { exact: true })).toHaveCount(0);
+      await page.getByRole("tab", { name: "Hiển thị AppShell" }).click();
+      await expect(row).toHaveAttribute("aria-checked", "false");
+    } finally {
+      // Trả lại mặc định bật để không ảnh hưởng test khác dùng chung storageState — gọi thẳng
+      // API (không qua click UI) nên vẫn chạy được dù khối try phía trên đã throw giữa chừng.
+      // CHỦ Ý dùng `page.evaluate` + `fetch` same-origin (không phải `page.request.patch`):
+      // đã xác nhận thật bằng trace network (2026-08-09) — `page.request` trong môi trường
+      // này gửi PATCH KHÔNG kèm cookie phiên (`cookies: []`), 401 bị nuốt lỗi im lặng vì
+      // response không được kiểm — sidebar reset đúng lớp lỗi này đang cố sửa. `fetch` chạy
+      // trong ngữ cảnh trang (cùng origin, cookie tự đính kèm mặc định) không có vấn đề đó.
+      const ok = await page.evaluate(async (nodeKey) => {
+        const res = await fetch("/api/nav-settings", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nodeKey, enabled: true, scope: "global" }),
+        });
+        return res.ok;
+      }, NODE_KEY);
+      if (!ok) throw new Error(`Dọn dẹp nav_settings "${NODE_KEY}" thất bại — PATCH không ok`);
+    }
+
     await gotoAdmin(page);
-    const sidebar = page.locator("#app-sidebar");
-    await expect(sidebar.getByText("Chuyển đổi số & Công nghệ", { exact: true })).toBeVisible({
-      timeout: 15_000,
-    });
-
-    await page.getByRole("tab", { name: "Hiển thị AppShell" }).click();
-    const row = page.getByRole("switch", { name: /Chuyển đổi số & Công nghệ/ });
-    await expect(row).toBeVisible({ timeout: 15_000 });
-    await expect(row).toHaveAttribute("aria-checked", "true");
-
-    // Chờ đúng response PATCH ghi DB xong (aria-checked đổi ngay do cập nhật optimistic,
-    // nhưng KHÔNG đảm bảo request đã tới server — reload quá sớm sẽ đọc lại giá trị cũ).
-    await Promise.all([
-      page.waitForResponse(
-        (r) => r.url().includes("/api/nav-settings") && r.request().method() === "PATCH",
-      ),
-      row.click(),
-    ]);
-    await expect(row).toHaveAttribute("aria-checked", "false");
-
-    // AppHeader chỉ tải nav-settings 1 lần lúc mount (không live-sync trong cùng trang) —
-    // tải lại trang để xác nhận đã ghi DB thật, không phải chỉ optimistic UI.
-    await page.reload();
-    await expect(sidebar.getByText("Chuyển đổi số & Công nghệ", { exact: true })).toHaveCount(0);
-    await page.getByRole("tab", { name: "Hiển thị AppShell" }).click();
-    await expect(row).toHaveAttribute("aria-checked", "false");
-
-    // Trả lại mặc định bật để không ảnh hưởng test khác dùng chung storageState.
-    await Promise.all([
-      page.waitForResponse(
-        (r) => r.url().includes("/api/nav-settings") && r.request().method() === "PATCH",
-      ),
-      row.click(),
-    ]);
-    await expect(row).toHaveAttribute("aria-checked", "true");
-    await page.reload();
-    await expect(sidebar.getByText("Chuyển đổi số & Công nghệ", { exact: true })).toBeVisible({
-      timeout: 15_000,
-    });
+    await expect(
+      page.locator("#app-sidebar").getByText("Chuyển đổi số & Công nghệ", { exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
   });
 
   test("tab Hiển thị AppShell không có vi phạm a11y nghiêm trọng (axe)", async ({ page }) => {
