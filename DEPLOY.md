@@ -101,6 +101,14 @@ chạy chỉ bị dọn (`rm -rf .next-old`) khi health-check pass.
 3. Environment Variables: thêm `DATABASE_URL` (Supabase) + `XBOSS_SECRET`.
 4. Deploy. Seed dữ liệu chạy từ máy local: `npm run db:seed` (trỏ cùng DATABASE_URL).
 
+**Giới hạn Cron trên gói Hobby:** Vercel Hobby chỉ cho phép cron chạy **tối đa 1 lần/ngày**
+— `vercel.json` chỉ khai 2 cron phù hợp (`daily-report`, `weekly-report`). Các cron tần suất
+cao hơn (`deliver-webhooks` mỗi 5 phút, `sync-sheets`/`sync-integrations` hàng giờ,
+`refresh-views` mỗi 15 phút) **không khai trong `vercel.json`** vì sẽ làm deploy fail
+(`Hobby accounts are limited to daily cron jobs`) — gọi bằng dịch vụ cron ngoài miễn phí
+(vd cron-job.org, GitHub Actions `schedule`) trỏ tới URL kèm header
+`Authorization: Bearer $CRON_SECRET`, hoặc nâng gói Pro để khai thẳng trong `vercel.json`.
+
 ---
 
 ## Di trú từ bản SQLite cũ
