@@ -8,7 +8,7 @@
 
 - **GĐ 4–5 — Phát triển & nâng chất lượng.** Sản phẩm đã chạy thật (v0.2.1, tự host VPS), đang phát triển/tinh chỉnh tính năng liên tục **và** đang áp bộ khung quy trình/chất lượng (brownfield) theo `docs/framework/AP-DUNG-vao-du-an-co-san.md`.
 
-## Đợt audit toàn dự án lần 10 (2026-08-10) — CSRF toàn cục, chuẩn hoá tiền tệ, phủ test module thiếu
+## Đợt audit toàn dự án lần 10 (2026-08-10, PR #327) — CSRF toàn cục, chuẩn hoá tiền tệ, phủ test module thiếu
 
 Kiểm thử toàn bộ tính năng đối chiếu thiết kế trong `CLAUDE.md` rồi sửa 5 phát hiện. **Cổng tự động XANH TOÀN BỘ trước khi audit** (chạy thật, không chỉ đọc code): `lint`/`typecheck` xanh, **`npm test` 114/114 file pass** trên Postgres 16 cục bộ, `build` xanh, `npm audit --omit=dev` 0 vulnerabilities, `check:migrations` OK (82 file), `check:sw-exclude` OK. Đối chiếu quy ước bằng grep có hệ thống cũng sạch: **0/118 nhóm route thiếu `dynamic = "force-dynamic"`**, mọi route không gọi `getCurrentUser()` đều có cơ chế auth khác đúng thiết kế (`requireApiKey` cho `/api/v1/*`, token nội bộ cho traffic ingest), 100% test chạm DB import `tests/setup.ts` đầu tiên, 0 vi phạm `dark:` trong component, 0 `console.log`, 0 `TODO/FIXME` sót. Tức là 5 việc dưới đây là **nâng chất**, không phải vá sự cố.
 
