@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { hitRateLimit } from "@/lib/ratelimit";
-import { isSameOrigin } from "@/lib/csrf";
 import {
   getCurrentUser,
   hashPassword,
@@ -19,8 +18,6 @@ export const dynamic = "force-dynamic";
 export async function PATCH(req: NextRequest) {
   const me = await getCurrentUser();
   if (!me) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!isSameOrigin(req))
-    return NextResponse.json({ error: "Yêu cầu không hợp lệ" }, { status: 403 });
 
   const body = await req.json().catch(() => ({}));
   const oldPassword = String(body.oldPassword ?? "");

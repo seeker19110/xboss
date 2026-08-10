@@ -47,7 +47,8 @@ export async function receivables(projectId: number): Promise<number> {
   // cộng dồn NHIỀU hợp đồng ở đây làm trên bigint đơn vị nhỏ (lib/money.ts) thay vì
   // float JS, đúng quy ước tiền tệ CLAUDE.md (cấm cộng/nhân tiền trên float JS).
   const total = contracts.reduce(
-    (sum, c) => sum + parseMoney(c.value) + parseMoney(c.addendaTotal) - parseMoney(c.paid),
+    (sum, c) =>
+      sum + parseMoney(c.valueText) + parseMoney(c.addendaTotalText) - parseMoney(c.paidText),
     0n,
   );
   return moneyToNumber(total);
@@ -61,16 +62,16 @@ export async function payables(projectId: number): Promise<number> {
   let total = 0n;
   for (const c of contracts) {
     if (c.kind === "giao_thau" || c.kind === "ncc")
-      total += parseMoney(c.value) + parseMoney(c.addendaTotal) - parseMoney(c.paid);
+      total += parseMoney(c.valueText) + parseMoney(c.addendaTotalText) - parseMoney(c.paidText);
   }
-  const poRow = await queryOne<{ total: number }>(
-    `SELECT COALESCE(SUM(poi.qty_ordered * COALESCE(poi.unit_price, 0)), 0) AS total
+  const poRow = await queryOne<{ total: string }>(
+    `SELECT COALESCE(SUM(poi.qty_ordered * COALESCE(poi.unit_price, 0)), 0)::text AS total
        FROM purchase_orders po
        JOIN po_items poi ON poi.po_id = po.id
       WHERE po.project_id = ? AND po.contract_id IS NULL AND po.status <> 'cancelled'`,
     projectId,
   );
-  total += parseMoney(poRow?.total ?? 0);
+  total += parseMoney(poRow?.total ?? "0");
   return moneyToNumber(total);
 }
 

@@ -7,7 +7,6 @@ import { deriveStatus, recomputePackage } from "@/lib/recompute";
 import { requiredInspectionMissing } from "@/lib/qaqc";
 import { getActiveFlow, openApproval, advanceApproval } from "@/lib/approvals";
 import { emitWebhook } from "@/lib/webhooks";
-import { isSameOrigin } from "@/lib/csrf";
 
 export const dynamic = "force-dynamic";
 
@@ -44,8 +43,6 @@ export async function POST(
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.approve(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM được duyệt nghiệm thu" }, { status: 403 });
-  if (!isSameOrigin(req))
-    return NextResponse.json({ error: "Yêu cầu không hợp lệ" }, { status: 403 });
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
@@ -199,8 +196,6 @@ export async function DELETE(
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.approve(user.role))
     return NextResponse.json({ error: "Chỉ Admin/PM được huỷ nghiệm thu" }, { status: 403 });
-  if (!isSameOrigin(req))
-    return NextResponse.json({ error: "Yêu cầu không hợp lệ" }, { status: 403 });
 
   const projectId = await getCurrentProjectId(user);
   const blocked = await assertModuleEnabled("tracking", projectId);

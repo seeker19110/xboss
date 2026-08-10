@@ -1267,7 +1267,7 @@
 | pr_id | integer | ✓ |  |
 | qty_ordered | float8 |  |  |
 | qty_received | float8 | ✓ | `0` |
-| unit_price | float8 | ✓ |  |
+| unit_price | numeric(15,2) | ✓ |  |
 | note | text | ✓ |  |
 
 **Khóa ngoại:**

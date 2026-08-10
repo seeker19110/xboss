@@ -26,6 +26,8 @@
 //   addendaTotal       Σ phụ lục (SQL tính)
 //   paid               đã thanh toán (SQL tính)
 //   poCommitted        giá trị PO gắn HĐ (SQL tính)
+//   valueText / addendaTotalText / paidText   bản ::text của 3 trường tiền ở trên
+//                      (lib/contracts.ts, dùng cho số học tiền qua lib/money)
 //   → Gate route ĐÃ là viewPayments == perm che → phòng thủ/nhất quán (không đổi ai
 //     hiện tại; giữ đúng khi gate được nới về sau).
 //
@@ -75,7 +77,19 @@ export const SENSITIVE: Record<string, SensitiveRule[]> = {
   ],
   contract: [
     {
-      fields: ["value", "advancePct", "retentionPct", "addendaTotal", "paid", "poCommitted"],
+      fields: [
+        "value",
+        "advancePct",
+        "retentionPct",
+        "addendaTotal",
+        "paid",
+        "poCommitted",
+        // Bản `::text` của value/addendaTotal/paid (lib/contracts.ts) — cùng dữ liệu
+        // tiền, phải che kèm, nếu không sẽ rò rỉ qua trường song song.
+        "valueText",
+        "addendaTotalText",
+        "paidText",
+      ],
       perm: "viewPayments",
     },
   ],
