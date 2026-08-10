@@ -1,7 +1,7 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
 // M49 PR1 — API keys đọc-only + namespace /api/v1. Integration (cần Postgres qua
-// TEST_DATABASE_URL, không có thì tự skip). Kiểm 5 nhóm: auth/scope/scope dự án/rate
-// limit/throttle last_used_at.
+// TEST_DATABASE_URL, không có thì tự skip). Kiểm 6 nhóm: auth/scope/scope dự án/rate
+// limit (thành công + key sai)/throttle last_used_at.
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
@@ -20,9 +20,12 @@ let keyGlobal = "";
 let keyRevoked = "";
 let keyReadAId = 0;
 
-function reqOf(path: string, key?: string): NextRequest {
+function reqOf(path: string, key?: string, ip?: string): NextRequest {
   return new NextRequest(`http://localhost${path}`, {
-    headers: key ? { authorization: `Bearer ${key}` } : {},
+    headers: {
+      ...(key ? { authorization: `Bearer ${key}` } : {}),
+      ...(ip ? { "x-forwarded-for": ip } : {}),
+    },
   });
 }
 
@@ -138,7 +141,7 @@ after(async () => {
   await run(`DELETE FROM towers WHERE project_id IN (?, ?)`, pA, pB);
   await run(`DELETE FROM projects WHERE id IN (?, ?)`, pA, pB);
   await run(`DELETE FROM users WHERE id = ?`, U);
-  await run(`DELETE FROM login_rate_limits WHERE key LIKE 'api:%'`);
+  await run(`DELETE FROM login_rate_limits WHERE key LIKE 'api%'`); // gồm cả `api:*` và `api-fail:*`
 });
 
 // (1) key đúng → 200; sai/revoked/thiếu header → 401.
@@ -256,4 +259,31 @@ test("api-keys: last_used_at cập nhật có throttle", S, async () => {
     hash,
   );
   assert.ok(r3?.ts && new Date(r3.ts).getTime() > Date.now() - 60_000, "phải ghi timestamp mới");
+});
+
+// (6) key sai/thu hồi/thiếu header cũng rate-limit theo IP (30 lần/15 phút) — trước đó
+// chỉ rate-limit SAU KHI xác thực thành công, dò key đúng bằng thử liên tục không bị chặn.
+test("api-keys: key sai vượt 30 lần/IP/15 phút → 429 kèm Retry-After", S, async () => {
+  const { GET } = await import("@/app/api/v1/tasks/route");
+  const { run } = await import("@/lib/db");
+  const ip = `198.51.100.${Math.floor(Math.random() * 200) + 1}`; // IP riêng, tránh đụng test khác
+
+  let lastStatus = 0;
+  for (let i = 0; i < 31; i++) {
+    const res = await GET(reqOf("/api/v1/tasks", "xbk_deadbeef", ip));
+    lastStatus = res.status;
+    if (i < 30) assert.equal(res.status, 401, `lần ${i + 1} còn quota phải trả 401`);
+    else {
+      assert.equal(res.status, 429, "lần 31 vượt 30/15 phút phải trả 429");
+      assert.ok(res.headers.get("Retry-After"), "phải có header Retry-After");
+    }
+  }
+  assert.equal(lastStatus, 429);
+
+  // IP khác không bị ảnh hưởng (đếm theo IP, không toàn cục).
+  const otherIp = await GET(reqOf("/api/v1/tasks", "xbk_deadbeef", "203.0.113.5"));
+  assert.equal(otherIp.status, 401);
+
+  await run(`DELETE FROM login_rate_limits WHERE key = ?`, `api-fail:${ip}`);
+  await run(`DELETE FROM login_rate_limits WHERE key = 'api-fail:203.0.113.5'`);
 });

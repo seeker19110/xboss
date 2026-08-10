@@ -18,6 +18,16 @@ export function hashApiKey(raw: string): string {
 
 export type ApiKeyAuth = { keyId: number; projectId: number | null; scopes: string[] };
 
+const FAIL_MAX_PER_IP = 30; // 30 lần key sai/thu hồi/thiếu header — 15 phút/IP
+const FAIL_WINDOW_MINUTES = 15;
+
+// IP client — cùng quy ước header proxy như app/api/auth/login/route.ts.
+function clientIp(req: NextRequest): string {
+  const fwd = req.headers.get("x-forwarded-for");
+  if (fwd) return fwd.split(",")[0].trim();
+  return req.headers.get("x-real-ip") ?? "unknown";
+}
+
 // Đọc header `Authorization: Bearer xbk_...` → tra key_hash (sha256 của input), check
 // revoked_at IS NULL. Trả null khi sai/thiếu/revoked. So khớp bằng lookup UNIQUE key_hash
 // (input đã qua sha256 — không cần constant-time so chuỗi). Cập nhật last_used_at có
@@ -45,13 +55,23 @@ export async function verifyApiKey(authHeader: string | null): Promise<ApiKeyAut
 // `api:${keyId}` 120 req/phút qua hitRateLimit → 429 + Retry-After; suy projectId hiệu
 // lực (key.project_id ?? ?project= — key toàn cục thiếu ?project= → 422). Trả Response
 // lỗi ({ error } tiếng Việt) hoặc ngữ cảnh hợp lệ.
+// Key sai/thu hồi/thiếu header cũng rate-limit theo IP (`api-fail:${ip}`, 30 lần/15 phút) —
+// trước đó chỉ rate-limit sau khi xác thực THÀNH CÔNG nên dò key đúng bằng cách thử liên
+// tục không bị chặn (rủi ro DoS nhẹ, ghi nhận đợt đánh giá lần 8, xem PROGRESS.md).
 export async function requireApiKey(
   req: NextRequest,
   scope: "read" | "read_finance",
 ): Promise<{ auth: ApiKeyAuth; projectId: number } | Response> {
   const auth = await verifyApiKey(req.headers.get("authorization"));
-  if (!auth)
+  if (!auth) {
+    const ip = clientIp(req);
+    if (await hitRateLimit(`api-fail:${ip}`, FAIL_MAX_PER_IP, FAIL_WINDOW_MINUTES))
+      return NextResponse.json(
+        { error: "Vượt giới hạn thử API key sai — thử lại sau" },
+        { status: 429, headers: { "Retry-After": "60" } },
+      );
     return NextResponse.json({ error: "API key không hợp lệ hoặc đã bị thu hồi" }, { status: 401 });
+  }
   if (!auth.scopes.includes(scope))
     return NextResponse.json(
       { error: "API key không có quyền truy cập tài nguyên này" },
