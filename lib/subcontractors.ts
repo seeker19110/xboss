@@ -215,10 +215,10 @@ export async function subcontractorDebt(supplierId: number): Promise<Subcontract
   // cộng dồn NHIỀU hợp đồng ở đây làm trên bigint đơn vị nhỏ (lib/money.ts) thay vì
   // float JS, đúng quy ước tiền tệ CLAUDE.md.
   const contractValueMinor = mine.reduce(
-    (s, c) => s + parseMoney(c.value) + parseMoney(c.addendaTotal),
+    (s, c) => s + parseMoney(c.valueText) + parseMoney(c.addendaTotalText),
     0n,
   );
-  const paidMinor = mine.reduce((s, c) => s + parseMoney(c.paid), 0n);
+  const paidMinor = mine.reduce((s, c) => s + parseMoney(c.paidText), 0n);
   const contractValue = moneyToNumber(contractValueMinor);
   const paid = moneyToNumber(paidMinor);
   return {

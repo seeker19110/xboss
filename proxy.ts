@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { TRAFFIC_TOKEN_HEADER, trafficToken } from "@/lib/traffic-token";
 import { COOKIE, parseToken } from "@/lib/session-token";
+import { isSameOrigin, needsSameOriginCheck } from "@/lib/csrf";
 
 // Proxy (middleware) của Next 16 LUÔN chạy Node.js runtime — chỉ intercept /api/ (trừ chính
 // endpoint traffic/ingest). Fire-and-forget POST đến ingest để ghi ring buffer.
@@ -29,6 +30,16 @@ export function proxy(req: NextRequest) {
         ts: Date.now(),
       }),
     }).catch(() => {});
+  }
+
+  // CSRF phòng thủ theo chiều sâu — kiểm same-origin cho MỌI request mutating tới /api/*
+  // (trừ nhóm không dùng cookie phiên, xem EXEMPT_PREFIXES trong lib/csrf.ts). Đặt ở đây
+  // thay vì rải từng route: V6 trước đây chỉ phủ 4/257 route có POST/PATCH/PUT/DELETE.
+  if (needsSameOriginCheck(req.method, path) && !isSameOrigin(req)) {
+    return NextResponse.json(
+      { error: "Yêu cầu không hợp lệ" },
+      { status: 403, headers: { "x-request-id": requestId } },
+    );
   }
 
   // Chặn tài khoản bắt buộc 2FA chưa bật — mọi API ngoài whitelist /api/auth/*.

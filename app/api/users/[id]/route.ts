@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN, hashPassword, ROLES, type Role } from "@/lib/auth";
-import { isSameOrigin } from "@/lib/csrf";
 
 export const dynamic = "force-dynamic";
 
@@ -70,15 +69,13 @@ export async function PATCH(
 
 // DELETE /api/users/:id → xoá user (Admin). Không xoá chính mình / admin cuối.
 export async function DELETE(
-  req: NextRequest,
+  _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
   const params = await paramsP;
   const me = await getCurrentUser();
   if (!me || !CAN.manageUsers(me.role))
     return NextResponse.json({ error: "Chỉ Admin được xoá người dùng" }, { status: 403 });
-  if (!isSameOrigin(req))
-    return NextResponse.json({ error: "Yêu cầu không hợp lệ" }, { status: 403 });
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });

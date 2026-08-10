@@ -140,6 +140,13 @@ export type ContractRow = {
   addendaTotal: number;
   paid: number;
   poCommitted: number;
+  // Bản `::text` của 3 cột tiền ở trên — parser oid 1700 (lib/db) đưa NUMERIC qua
+  // parseFloat, nên mọi phép CỘNG tiếp ở JS phải đi từ chuỗi qua lib/money (quy ước
+  // M45 PR1, cùng khuôn `valueText` ở lib/evm.ts). Trường `number` phía trên chỉ để
+  // HIỂN THỊ. Đã khai trong SENSITIVE.contract nên vẫn bị che như bản số.
+  valueText: string;
+  addendaTotalText: string;
+  paidText: string;
   custom: Record<string, unknown>;
   deletedAt: string | null;
 };
@@ -181,6 +188,9 @@ export async function listContracts(
             COALESCE(a.total, 0) AS "addendaTotal",
             COALESCE(p.total, 0) AS "paid",
             COALESCE(po.total, 0) AS "poCommitted",
+            c.value::text AS "valueText",
+            COALESCE(a.total, 0)::text AS "addendaTotalText",
+            COALESCE(p.total, 0)::text AS "paidText",
             c.custom,
             c.deleted_at AS "deletedAt"
        FROM contracts c

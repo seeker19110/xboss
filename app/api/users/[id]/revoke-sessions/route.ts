@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/auth";
-import { isSameOrigin } from "@/lib/csrf";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +10,7 @@ export const dynamic = "force-dynamic";
 // Quyền: CAN.manageUsers (Admin). Nếu id === me.id (admin tự thu hồi) KHÔNG chặn — admin bị
 // đăng xuất ở request kế tiếp, đúng hành vi mong muốn.
 export async function POST(
-  req: NextRequest,
+  _req: NextRequest,
   { params: paramsP }: { params: Promise<{ id: string }> },
 ) {
   const params = await paramsP;
@@ -19,9 +18,6 @@ export async function POST(
   if (!me) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.manageUsers(me.role))
     return NextResponse.json({ error: "Chỉ Admin được thu hồi phiên" }, { status: 403 });
-  // Same-origin check (V6) — nhất quán với các route mutating nhạy cảm khác (xoá/đổi mật khẩu).
-  if (!isSameOrigin(req))
-    return NextResponse.json({ error: "Yêu cầu không hợp lệ" }, { status: 403 });
 
   const id = parseInt(params.id);
   if (isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
