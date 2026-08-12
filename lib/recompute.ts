@@ -13,6 +13,18 @@ export function deriveStatus(
   return "chuan_bi";
 }
 
+// % task từ lưới checkbox — QUY TẮC DÙNG CHUNG cho mọi đường ghi % (tick checkbox qua
+// recomputeTask lẫn import Excel, xem lib/import.ts). Chỉ = 1 (100%, "hoàn thành") khi
+// TẤT CẢ ô đã tick — làm tròn 2 chữ số bình thường sẽ đưa 199/200 = 0.995 lên đúng 1.00
+// (Math.round nửa làm tròn lên), báo "hoàn thành" sai trong khi còn 1 ô chưa tick (mở
+// khoá nghiệm thu sai — approve/route.ts chỉ chặn progress < 1). Ghim trần 0.99 cho mọi
+// ca chưa đủ. Hai đường ghi % dùng chung hàm này để không cho ra 2 con số khác nhau
+// trên cùng dữ liệu.
+export function progressFromChecks(checked: number, total: number): number {
+  if (total <= 0) return 0;
+  return checked >= total ? 1 : Math.min(0.99, Math.round((checked / total) * 100) / 100);
+}
+
 // Tính lại % của task từ dimensions (nếu có), cập nhật task + work package cha.
 // changedBy: tên người thao tác — nếu % thay đổi sẽ ghi vào task_history.
 export async function recomputeTask(
@@ -49,14 +61,7 @@ export async function recomputeTask(
   );
   let progress = task.progress_percent ?? 0;
   if (dimCount && dimCount.total > 0) {
-    // Chỉ = 1 (100%, "hoàn thành") khi TẤT CẢ ô đã tick — làm tròn 2 chữ số bình
-    // thường sẽ đưa 199/200 = 0.995 lên đúng 1.00 (Math.round nửa làm tròn lên),
-    // báo "hoàn thành" sai trong khi còn 1 ô chưa tick (mở khoá nghiệm thu sai —
-    // approve/route.ts chỉ chặn progress < 1). Ghim trần 0.99 cho mọi ca chưa đủ.
-    progress =
-      dimCount.checked === dimCount.total
-        ? 1
-        : Math.min(0.99, Math.round((dimCount.checked / dimCount.total) * 100) / 100);
+    progress = progressFromChecks(dimCount.checked, dimCount.total);
   }
   const status = deriveStatus(progress, effectiveEndDate, task.status);
   await run(
@@ -99,8 +104,12 @@ export async function recomputePackage(packageId: number): Promise<void> {
       packageId,
     );
     if (!wp) return;
+    // Trung bình + làm tròn 2 chữ số làm TRONG SQL trên NUMERIC (không phải float8):
+    // cộng dồn % kiểu float làm lệch ở ca nửa-làm-tròn — vd 9 task 100% + 0.25 + 4×0.19
+    // có trung bình thập phân đúng bằng 0.715 (→ 0.72) nhưng cộng float ra
+    // 0.7149999999999999 (→ 0.71). Đã gặp thật trên dữ liệu gốc (nhóm OGHL H6).
     const r = await queryOne<{ avg: number | null; cnt: number; notDone: number }>(
-      `SELECT AVG(progress_percent) AS avg, COUNT(*) AS cnt,
+      `SELECT ROUND(AVG(progress_percent::numeric), 2)::float8 AS avg, COUNT(*) AS cnt,
               COUNT(*) FILTER (WHERE progress_percent < 1) AS "notDone"
          FROM tasks WHERE package_id = ?`,
       packageId,
@@ -112,7 +121,7 @@ export async function recomputePackage(packageId: number): Promise<void> {
     // đã sửa ở recomputeTask).
     let progress = 0;
     if (r && Number(r.cnt) > 0) {
-      progress = Number(r.notDone) === 0 ? 1 : Math.min(0.99, Math.round((r.avg ?? 0) * 100) / 100);
+      progress = Number(r.notDone) === 0 ? 1 : Math.min(0.99, r.avg ?? 0);
     }
     await run(
       `UPDATE work_packages SET progress = ?, status = ? WHERE id = ?`,

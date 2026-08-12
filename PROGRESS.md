@@ -8,6 +8,80 @@
 
 - **GĐ 4–5 — Phát triển & nâng chất lượng.** Sản phẩm đã chạy thật (v0.2.1, tự host VPS), đang phát triển/tinh chỉnh tính năng liên tục **và** đang áp bộ khung quy trình/chất lượng (brownfield) theo `docs/framework/AP-DUNG-vao-du-an-co-san.md`.
 
+## Rà nguồn sai lệch dữ liệu: Excel → WBS → % → S-curve/report, và tiền tệ (2026-08-12)
+
+Rà có hệ thống (lập ma trận "không gian đầu vào × tầng biến đổi" trước, rồi kiểm chứng bằng
+**chạy thật trên file Excel gốc trong `attachments/`** + Postgres 16 cục bộ, không suy từ
+code/comment). Nguồn chân lý cho "% đúng là bao nhiêu" lấy từ **chính công thức trong file
+Excel** (đọc `cell.f`: `COUNTIF(J8:AE8,TRUE)/22`, `AVERAGE(I8:I16)`), không phải từ phỏng đoán.
+
+- **[AI, đã sửa] `toISO` (`lib/import.ts`) làm mọi ngày BĐ/KT lệch **sớm 1 ngày** ở mọi múi
+  giờ dương — gồm chính giờ VN (UTC+7).** Cả 2 đường import thật (`app/api/import/excel/route.ts`
+  và `scripts/seed.ts`) đọc file bằng `cellDates: true`, nên ô ngày về tới `toISO` là `Date`
+  do SheetJS dựng theo **giờ địa phương**; `toISOString().slice(0,10)` quy đổi về UTC nên lùi
+  1 ngày. Đo trên file gốc với `TZ=Asia/Ho_Chi_Minh`: **5859/5859 ô ngày lệch** (dải ngày task
+  `2025-10-31→2027-01-28` thay vì `2025-11-01→2027-01-29`) → sai trạng thái "trễ", S-curve,
+  lookahead, baseline. Sửa: lấy phần ngày theo đúng cách giá trị được dựng (`Date` → lịch địa
+  phương; serial Excel → UTC; chuỗi ISO/có offset → UTC; chuỗi không offset → địa phương).
+  Test: `tests/import-tz.test.ts` (4 TZ trái dấu, có ca chạy trên **file gốc**) +
+  `tests/import-real.test.ts`. Cả 2 **fail trước khi sửa, pass sau khi sửa**.
+- **[AI, đã sửa] Lỗi do chính đợt sửa này gây ra, bắt được ở vòng rà thứ 2:** regex nhận diện
+  offset múi giờ (`[+-]\d{2}:?\d{2}$`) khớp nhầm cả chuỗi ngày kiểu `1-2-2026` (đuôi `-2026`)
+  → lại lệch 1 ngày. Siết regex bắt buộc có phần giờ đứng trước offset, kèm test riêng.
+- **[AI, đã sửa] Hai đường ghi % dùng 2 quy tắc làm tròn khác nhau.** `recomputeTask` ghim
+  trần 0.99 khi chưa tick hết ô, còn import Excel làm tròn thẳng nên 199/200 = 0.995 → **1.00
+  ("hoàn thành", mở khoá nghiệm thu)** rồi lần tick sau bị hạ về 0.99. Gom về một hàm dùng
+  chung `progressFromChecks` (`lib/recompute.ts`). Chưa xảy ra trên file gốc (sheet nhiều cột
+  nhất mới 38 cột, cần ≥200 cột mới chạm) nhưng là lệch thật giữa 2 luồng.
+- **[AI, đã sửa] `recomputePackage` cộng dồn % trên float → lệch 1 điểm phần trăm.** Nhóm
+  **OGHL H6** của file gốc có trung bình thập phân đúng bằng 0.715 (10.01/14 → 0.72) nhưng
+  `AVG` trên `double precision` ra 0.7149999999999999 → **0.71**. Chuyển trung bình + làm tròn
+  vào SQL trên `NUMERIC` (`ROUND(AVG(progress_percent::numeric), 2)`), đúng tinh thần quy ước
+  tiền tệ M45 PR1 áp cho cả % tiến độ. Test tích hợp dùng đúng bộ số của H6.
+- **[AI, đã làm — CẢNH BÁO, KHÔNG tự đổi số] Mẫu số quy lưới checkbox → % không đồng nhất
+  giữa các sheet của file gốc.** Đọc công thức thật: 4/5 sheet chia cứng theo số cột của
+  sheet (khớp hành vi hiện tại), riêng **OGHL có 100 hàng chia `/4` trong khi sheet có 16
+  cột** → XBoss đang báo 25% cho hàng Excel ghi 100% (17 hàng có % số lệch, kéo theo 14 nhóm
+  lệch). **Không tự sửa**: đổi sang "chia theo số ô có dữ liệu trên hàng" chữa được 17 hàng
+  OGHL nhưng lại thổi phồng 3 hàng khác của OGHL/OGCH (đo thật: % trung bình task 0.4472 →
+  0.4515) — mặt trái đối xứng, âm thầm. Thay vào đó: (1) mọi hàng lệch đều được **nêu tên
+  trong đầu ra** (`ImportStats.warnings` + cảnh báo ở bước xem trước, hiển thị trong
+  `app/import/page.tsx`); (2) thêm tuỳ chọn `ImportOptions.dimDenominator` (`columns` mặc
+  định = hành vi cũ | `row-nonempty`), lộ ra qua ô chọn ở trang import để **người dùng tự
+  quyết**.
+- **Đã rà, KHÔNG có lỗi (ghi lại để khỏi rà lại):** vòng khép kín export Excel → đọc lại
+  (279 task OGTĐ, 0 lệch ô "x", 0 lệch %); tính lũy đẳng của import trên file gốc (chạy 2
+  lần, snapshot toàn bộ task khớp tuyệt đối); gộp % nhóm = trung bình task (149/149 nhóm khớp
+  công thức sau khi sửa lỗi float ở trên); `mv_progress_daily` vs tái dựng độc lập bằng SQL
+  khác (285 ngày, lệch 0); `toStatusSlug` phủ đúng 5 chuỗi trạng thái có thật trong file gốc;
+  `floorOf` rút được tầng cho 149/149 nhóm; số học tiền `lib/money.ts` (thêm test biên cho
+  ngưỡng làm tròn thứ 3, trần `NUMERIC(15,2)`, số âm/0/dị dạng — không phát hiện lệch).
+- **[AI, đã làm] `scripts/backfill-import-dates.ts` — sửa dữ liệu ngày đã lệch.** Dữ liệu
+  import trước khi vá không tự đúng lại được. Script **không "cộng 1 ngày cho tất cả"** (server
+  chạy ở UTC/múi giờ âm thì vốn không bị) mà **đọc lại chính file Excel nguồn**, đối chiếu từng
+  hàng theo mã, và chỉ sửa hàng mang đúng dấu vết lệch (ngày trong DB = ngày đúng − 1); hàng
+  lệch kiểu khác (người dùng đã sửa ngày trong app sau khi import) **giữ nguyên**, chỉ liệt kê.
+  Mặc định **chỉ xem trước**, phải `--apply` mới ghi; đổi ngày xong gọi lại
+  `recomputeTask`/`recomputePackage` (kể cả task kế thừa ngày nhóm) để trạng thái "trễ" đúng
+  theo ngày mới; đa dự án trùng mã sheet thì **dừng và yêu cầu `--project=<id>`**, không tự đoán.
+  Verify end-to-end trên Postgres cục bộ với **file gốc**: import đúng → chụp ảnh dữ liệu → dựng
+  lại đúng lỗi cũ (lùi 1 ngày toàn bộ) + 1 hàng sửa tay → chạy script → **2692/2692 hàng khớp
+  lại ảnh đúng, đúng 1 hàng sửa tay được giữ nguyên như thiết kế**; chạy lần 2 báo "không có gì
+  để sửa" (lũy đẳng); chạy ở `TZ=UTC` trên DB lành báo 0 hàng cần sửa (không sửa bừa).
+  **Chưa chạy production** — theo DoD phải qua staging trước.
+- **[AI, đã làm] Tách `classifyRow` (`lib/import.ts`) dùng chung** cho import, xem trước và
+  script backfill — phân loại hàng nhóm/sub-task lệch nhau giữa các nơi đọc cùng một file
+  chính là cách tự tạo ra sai lệch dữ liệu. Không đổi hành vi (test import cũ + test trên file
+  gốc pass nguyên).
+- **Cân nhắc nhưng KHÔNG làm:** (a) đoán định dạng ngày `d/m/yyyy` cho chuỗi nhập nhằng —
+  cả 2 cách đọc đều "hợp lệ", đoán sai là đổi ngày âm thầm; (b) đổi mặc định mẫu số sang
+  `row-nonempty` (lý do ở trên); (c) chạy trực tiếp handler `/api/dashboard/scurve` trong
+  test — route gọi `cookies()` nên không chạy được ngoài request scope của Next, đã kiểm ở
+  tầng dữ liệu thay thế.
+- **Verify:** `npm run lint` (0 lỗi, 10 warning **có sẵn từ trước**, đối chiếu baseline),
+  `npm run typecheck` sạch, `npm test` trên Postgres 16 cục bộ (DB tạo mới), `npm run build`
+  xanh. Mỗi lỗi đều có test tái hiện **fail trước / pass sau**.
+
 ## Dọn nợ kỹ thuật thấp/trung sau đợt audit lần 10 (2026-08-10)
 
 Theo đề xuất "hiện trạng và đề xuất" của người dùng — duyệt triển khai 5 hạng mục ưu tiên thấp/trung còn treo trong "Nợ kỹ thuật". Verify thật trên Postgres 16 cục bộ trước khi push (không chỉ đọc code).

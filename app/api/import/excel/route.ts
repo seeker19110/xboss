@@ -53,7 +53,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ preview });
     }
 
-    const stats = await importWorkbook(workbook);
+    // Mẫu số quy lưới checkbox → % (xem ImportOptions trong lib/import.ts). Mặc định
+    // "columns" = hành vi cũ; chỉ đổi khi người dùng chủ động chọn, vì chọn sai chiều nào
+    // cũng làm lệch % theo chiều ngược lại.
+    const denominator = formData.get("denominator");
+    const dimDenominator = denominator === "row-nonempty" ? "row-nonempty" : "columns";
+    const stats = await importWorkbook(workbook, { dimDenominator });
 
     return NextResponse.json({
       ...stats,

@@ -62,3 +62,48 @@ test("formatVnd: number/chuỗi VND (từ cột NUMERIC)", () => {
   assert.equal(formatVnd("1234567.00"), "1.234.567 ₫");
   assert.equal(formatVnd(999), "999 ₫");
 });
+
+// ===== Giá trị biên của các hằng số trong lib/money.ts =====
+// Hằng số: 100 (đơn vị nhỏ = đồng×100) và ngưỡng '5' ở chữ số thập phân thứ 3.
+
+test("parseMoney: ngay dưới / đúng bằng / ngay trên ngưỡng làm tròn thứ 3", () => {
+  assert.equal(parseMoney("0.494"), 49n);
+  assert.equal(parseMoney("0.495"), 50n); // đúng ngưỡng → lên
+  assert.equal(parseMoney("0.496"), 50n);
+  assert.equal(parseMoney("-0.495"), -50n); // half-up theo ĐỘ LỚN, đối xứng âm/dương
+  assert.equal(parseMoney("0.4949999"), 49n); // chữ số thứ 4 trở đi không kéo lên được
+});
+
+test("parseMoney: biên rỗng/dị dạng đều throw, không trả 0 âm thầm", () => {
+  assert.throws(() => parseMoney(""));
+  assert.throws(() => parseMoney(" "));
+  assert.throws(() => parseMoney("."));
+  assert.throws(() => parseMoney("1e3"));
+  assert.throws(() => parseMoney("+1"));
+  assert.throws(() => parseMoney(NaN));
+  assert.throws(() => parseMoney(Infinity));
+});
+
+test("parseMoney: biên độ lớn — trần NUMERIC(15,2) của mọi cột tiền", () => {
+  // Cột tiền trong schema là NUMERIC(15,2) → giá trị lớn nhất 9999999999999.99.
+  assert.equal(parseMoney("9999999999999.99"), 999999999999999n);
+  assert.equal(parseMoney("-9999999999999.99"), -999999999999999n);
+  assert.equal(parseMoney("0.00"), 0n);
+  assert.equal(parseMoney("-0.00"), 0n);
+});
+
+test("addMoney/mulRate: biên 0 và hệ số 1 giữ nguyên giá trị", () => {
+  assert.equal(mulRate(999999999999999n, 1), 999999999999999n);
+  assert.equal(mulRate(0n, 0.1), 0n);
+  assert.equal(mulRate(-100000n, 0.1), -10000n);
+  assert.throws(() => mulRate(100n, NaN));
+  assert.throws(() => mulRate(100n, Infinity));
+});
+
+test("formatVnd: biên làm tròn quanh nửa đồng và số 0 âm", () => {
+  assert.equal(formatVnd(49n), "0 ₫"); // 0.49 đồng
+  assert.equal(formatVnd(50n), "1 ₫"); // đúng nửa đồng → lên
+  assert.equal(formatVnd(-50n), "-1 ₫");
+  assert.equal(formatVnd(-49n), "0 ₫");
+  assert.equal(formatVnd(999n), "10 ₫");
+});
