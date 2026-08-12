@@ -368,6 +368,7 @@ export async function importWorkbook(
 
     let currentPkgId: number | null = null;
     let currentPkgCode = "";
+    let mismatches = 0;
 
     for (let i = DATA_START; i < rows.length; i++) {
       const row = rows[i];
@@ -450,11 +451,16 @@ export async function importWorkbook(
             const done = rowDims.filter((d) => isChecked(row[d.col])).length;
             progress = progressFromChecks(done, rowDims.length);
             const own = progressMismatch(row, progress);
-            if (own !== null)
-              stats.warnings.push(
-                `Dòng ${i + 1} (${sheetName}) ${taskCode}: % trong file ${Math.round(own * 100)}% ` +
-                  `≠ % XBoss tính ${Math.round(progress * 100)}% (${done}/${rowDims.length} ô)`,
-              );
+            if (own !== null) {
+              mismatches++;
+              // Cùng trần liệt kê với bước xem trước: file hỏng mẫu số có thể lệch hàng
+              // nghìn dòng, đẩy hết vào JSON kết quả import sẽ phình response.
+              if (mismatches <= MAX_MISMATCH_LISTED)
+                stats.warnings.push(
+                  `Dòng ${i + 1} (${sheetName}) ${taskCode}: % trong file ${Math.round(own * 100)}% ` +
+                    `≠ % XBoss tính ${Math.round(progress * 100)}% (${done}/${rowDims.length} ô)`,
+                );
+            }
           }
 
           let taskId: number;
@@ -526,6 +532,12 @@ export async function importWorkbook(
         stats.errors.push(`Dòng ${i + 1} (${sheetName}): ${(err as Error).message}`);
       }
     }
+
+    if (mismatches > MAX_MISMATCH_LISTED)
+      stats.warnings.push(
+        `${sheetName}: và ${mismatches - MAX_MISMATCH_LISTED} dòng nữa cũng lệch % so với file ` +
+          `(tổng ${mismatches} dòng)`,
+      );
   }
 
   // Tính lại % cho từng work package = trung bình các sub-task.
