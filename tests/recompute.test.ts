@@ -1,7 +1,7 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE_URL thật trước khi lib/db load
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { deriveStatus } from "@/lib/recompute";
+import { deriveStatus, progressFromChecks } from "@/lib/recompute";
 
 const YESTERDAY = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
 const TOMORROW = new Date(Date.now() + 86400_000).toISOString().slice(0, 10);
@@ -20,6 +20,74 @@ test("deriveStatus: còn hạn → theo tiến độ", () => {
   assert.equal(deriveStatus(0.3, TOMORROW), "dang_thi_cong");
   assert.equal(deriveStatus(0, null), "chuan_bi");
 });
+
+// ===== progressFromChecks: quy tắc DÙNG CHUNG cho mọi đường ghi % (tick + import Excel) =====
+
+test("progressFromChecks: chỉ đủ 100% khi tick hết ô", () => {
+  assert.equal(progressFromChecks(200, 200), 1);
+  assert.equal(progressFromChecks(13, 13), 1);
+  // Biên của trần 0.99: 199/200 = 0.995, Math.round nửa làm tròn LÊN 1.00 — phải bị ghim
+  // lại 0.99, nếu không sẽ báo "hoàn thành" và mở khoá nghiệm thu khi còn 1 ô chưa tick.
+  assert.equal(progressFromChecks(199, 200), 0.99);
+  assert.equal(progressFromChecks(999, 1000), 0.99);
+  assert.equal(progressFromChecks(198, 200), 0.99);
+});
+
+test("progressFromChecks: biên rỗng/không có ô nào", () => {
+  assert.equal(progressFromChecks(0, 0), 0);
+  assert.equal(progressFromChecks(0, 1), 0);
+  assert.equal(progressFromChecks(1, 1), 1);
+  assert.equal(progressFromChecks(0, 13), 0);
+});
+
+test("progressFromChecks: làm tròn 2 chữ số ở khoảng giữa", () => {
+  assert.equal(progressFromChecks(1, 3), 0.33);
+  assert.equal(progressFromChecks(2, 3), 0.67);
+  assert.equal(progressFromChecks(1, 8), 0.13);
+});
+
+test(
+  "recomputePackage: trung bình % làm trên NUMERIC, không lệch vì cộng dồn float",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { insertId, queryOne } = await import("@/lib/db");
+    const { recomputePackage } = await import("@/lib/recompute");
+
+    // Bộ số lấy từ nhóm OGHL H6 của file gốc: trung bình thập phân đúng bằng 0.715
+    // (10.01/14) → làm tròn half-up phải ra 0.72. Cộng dồn kiểu float ra
+    // 0.7149999999999999 → 0.71 (lệch 1 điểm phần trăm).
+    const VALUES = [1, 1, 1, 1, 1, 1, 1, 1, 1, 0.25, 0.19, 0.19, 0.19, 0.19];
+
+    const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test avg numeric')`);
+    const towerId = await insertId(
+      `INSERT INTO towers (project_id, name) VALUES (?, 'Tháp N')`,
+      projectId,
+    );
+    const stId = await insertId(
+      `INSERT INTO sheet_types (tower_id, code, name) VALUES (?, 'TESTAVG', 'Sheet avg')`,
+      towerId,
+    );
+    const pkgId = await insertId(
+      `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'N1', 'Nhóm avg')`,
+      stId,
+    );
+    for (const [i, v] of VALUES.entries())
+      await insertId(
+        `INSERT INTO tasks (package_id, code, name, progress_percent) VALUES (?, ?, ?, ?)`,
+        pkgId,
+        `N1,${i}`,
+        `Task ${i}`,
+        v,
+      );
+
+    await recomputePackage(pkgId);
+    const pkg = await queryOne<{ progress: number }>(
+      `SELECT progress FROM work_packages WHERE id = ?`,
+      pkgId,
+    );
+    assert.equal(pkg?.progress, 0.72);
+  },
+);
 
 test("deriveStatus: đã nghiệm thu thì giữ nguyên", () => {
   assert.equal(deriveStatus(0.5, YESTERDAY, "nghiem_thu"), "nghiem_thu");

@@ -33,6 +33,7 @@ type Result = {
   tasks?: number;
   sheets?: string[];
   errors?: string[];
+  warnings?: string[];
   message?: string;
   error?: string;
 };
@@ -42,6 +43,9 @@ export default function ImportPage() {
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [result, setResult] = useState<Result | null>(null);
+  // Mẫu số quy lưới checkbox → % (xem ImportOptions trong lib/import.ts). Mặc định tắt =
+  // giữ hành vi cũ (chia theo tổng số cột của sheet).
+  const [rowDenominator, setRowDenominator] = useState(false);
   const [error, setError] = useState("");
   const [allowed, setAllowed] = useState<boolean | null>(null);
 
@@ -63,6 +67,7 @@ export default function ImportPage() {
     const fd = new FormData();
     fd.append("file", file!);
     if (mode) fd.append("mode", mode);
+    if (!mode && rowDenominator) fd.append("denominator", "row-nonempty");
     return fetch("/api/import/excel", { method: "POST", body: fd });
   }
 
@@ -233,6 +238,21 @@ export default function ImportPage() {
               theo nội dung file này.
             </div>
 
+            {/* Người dùng tự quyết mẫu số khi file có hàng chỉ dùng một phần cột lưới —
+                mỗi lựa chọn sai chiều đều làm lệch %, nên không tự đổi giúp. */}
+            <label className="px-4 pt-2 flex items-start gap-2 text-xs text-zinc-400 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={rowDenominator}
+                onChange={(e) => setRowDenominator(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                Tính % theo số ô <b>có dữ liệu trên từng dòng</b> (thay vì tổng số cột của sheet).
+                Chỉ bật khi file có dòng chỉ dùng một phần cột lưới — xem cảnh báo ở trên; bật nhầm
+                sẽ làm % cao hơn thực tế.
+              </span>
+            </label>
             <div className="p-4 flex gap-3">
               <button
                 onClick={handleImport}
@@ -262,9 +282,24 @@ export default function ImportPage() {
             <p className="text-sm text-zinc-400">
               {result.packages} nhóm · {result.tasks} tasks
             </p>
+            {/* Lệch % giữa file Excel và số XBoss tính — nêu rõ ngay trong kết quả import,
+                không để người dùng phát hiện muộn trên dashboard (xem ImportOptions). */}
+            {!!result.warnings?.length && (
+              <details className="mt-2 text-xs text-amber-400">
+                <summary>
+                  {result.warnings.length} dòng lệch % so với file Excel (XBoss đếm ô lưới theo tổng
+                  số cột của sheet)
+                </summary>
+                <ul className="mt-1 space-y-0.5">
+                  {result.warnings.slice(0, 20).map((w, i) => (
+                    <li key={i}>{w}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
             {!!result.errors?.length && (
               <details className="mt-2 text-xs text-amber-400">
-                <summary>{result.errors.length} cảnh báo</summary>
+                <summary>{result.errors.length} lỗi dòng</summary>
                 <ul className="mt-1 space-y-0.5">
                   {result.errors.slice(0, 20).map((e, i) => (
                     <li key={i}>{e}</li>
