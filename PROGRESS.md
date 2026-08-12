@@ -56,6 +56,23 @@ Excel** (đọc `cell.f`: `COUNTIF(J8:AE8,TRUE)/22`, `AVERAGE(I8:I16)`), không 
   khác (285 ngày, lệch 0); `toStatusSlug` phủ đúng 5 chuỗi trạng thái có thật trong file gốc;
   `floorOf` rút được tầng cho 149/149 nhóm; số học tiền `lib/money.ts` (thêm test biên cho
   ngưỡng làm tròn thứ 3, trần `NUMERIC(15,2)`, số âm/0/dị dạng — không phát hiện lệch).
+- **[AI, đã làm] `scripts/backfill-import-dates.ts` — sửa dữ liệu ngày đã lệch.** Dữ liệu
+  import trước khi vá không tự đúng lại được. Script **không "cộng 1 ngày cho tất cả"** (server
+  chạy ở UTC/múi giờ âm thì vốn không bị) mà **đọc lại chính file Excel nguồn**, đối chiếu từng
+  hàng theo mã, và chỉ sửa hàng mang đúng dấu vết lệch (ngày trong DB = ngày đúng − 1); hàng
+  lệch kiểu khác (người dùng đã sửa ngày trong app sau khi import) **giữ nguyên**, chỉ liệt kê.
+  Mặc định **chỉ xem trước**, phải `--apply` mới ghi; đổi ngày xong gọi lại
+  `recomputeTask`/`recomputePackage` (kể cả task kế thừa ngày nhóm) để trạng thái "trễ" đúng
+  theo ngày mới; đa dự án trùng mã sheet thì **dừng và yêu cầu `--project=<id>`**, không tự đoán.
+  Verify end-to-end trên Postgres cục bộ với **file gốc**: import đúng → chụp ảnh dữ liệu → dựng
+  lại đúng lỗi cũ (lùi 1 ngày toàn bộ) + 1 hàng sửa tay → chạy script → **2692/2692 hàng khớp
+  lại ảnh đúng, đúng 1 hàng sửa tay được giữ nguyên như thiết kế**; chạy lần 2 báo "không có gì
+  để sửa" (lũy đẳng); chạy ở `TZ=UTC` trên DB lành báo 0 hàng cần sửa (không sửa bừa).
+  **Chưa chạy production** — theo DoD phải qua staging trước.
+- **[AI, đã làm] Tách `classifyRow` (`lib/import.ts`) dùng chung** cho import, xem trước và
+  script backfill — phân loại hàng nhóm/sub-task lệch nhau giữa các nơi đọc cùng một file
+  chính là cách tự tạo ra sai lệch dữ liệu. Không đổi hành vi (test import cũ + test trên file
+  gốc pass nguyên).
 - **Cân nhắc nhưng KHÔNG làm:** (a) đoán định dạng ngày `d/m/yyyy` cho chuỗi nhập nhằng —
   cả 2 cách đọc đều "hợp lệ", đoán sai là đổi ngày âm thầm; (b) đổi mặc định mẫu số sang
   `row-nonempty` (lý do ở trên); (c) chạy trực tiếp handler `/api/dashboard/scurve` trong

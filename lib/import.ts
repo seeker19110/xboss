@@ -175,6 +175,35 @@ function progressMismatch(row: unknown[], computed: number): number | null {
   return Math.abs(ownPct - computed) > 0.015 ? ownPct : null;
 }
 
+/**
+ * Phân loại một hàng dữ liệu của sheet tracking. Dùng CHUNG cho mọi thứ đọc file gốc
+ * (import, xem trước, script backfill) — phân loại lệch nhau giữa các nơi là tự tạo ra
+ * sai lệch dữ liệu, đúng lớp lỗi mà đợt rà 2026-08-12 đi tìm.
+ *
+ *  - `skip`: hàng trống tên, hoặc đề mục nhóm lớn (STT toàn chữ cái, mã không dạng chữ+số).
+ *  - `pkg`: hàng nhóm (work package) — có mã, mã không chứa dấu phẩy, STT là số nguyên.
+ *  - `task`: hàng sub-task; `code` là mã hàng, hoặc mã tự sinh từ nhóm cha khi ô mã trống.
+ */
+export type RowKind =
+  | { kind: "skip" }
+  | { kind: "pkg"; code: string; stt: string; name: string }
+  | { kind: "task"; code: string; stt: string; name: string };
+
+export function classifyRow(row: unknown[], rowIndex: number, currentPkgCode: string): RowKind {
+  const code = String(row[0] ?? "").trim();
+  const stt = String(row[1] ?? "").trim();
+  const name = String(row[2] ?? "").trim();
+  if (!name) return { kind: "skip" };
+  if (/^[A-Z]+$/.test(stt) && !/^[A-Z]+\d/.test(code)) return { kind: "skip" };
+  if (!!code && !code.includes(",") && intStt(stt)) return { kind: "pkg", code, stt, name };
+  return {
+    kind: "task",
+    code: code || `${currentPkgCode},${stt || "r" + rowIndex}`,
+    stt,
+    name,
+  };
+}
+
 // ===== Preview (dry-run): phân tích file, KHÔNG ghi DB =====
 export type SheetPreview = {
   sheetName: string;
@@ -227,12 +256,9 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): PreviewResult {
     for (let i = DATA_START; i < rows.length; i++) {
       const row = rows[i];
       if (!row) continue;
-      const code = String(row[0] ?? "").trim();
-      const stt = String(row[1] ?? "").trim();
-      const name = String(row[2] ?? "").trim();
-      if (!name) continue;
-      const isTopGroup = /^[A-Z]+$/.test(stt) && !/^[A-Z]+\d/.test(code);
-      if (isTopGroup) continue;
+      const kind = classifyRow(row, i, "");
+      if (kind.kind === "skip") continue;
+      const name = kind.name;
 
       const startDate = toISO(row[4]);
       const endDate = toISO(row[6]);
@@ -249,8 +275,7 @@ export function analyzeWorkbook(workbook: XLSX.WorkBook): PreviewResult {
           `Dòng ${i + 1}: ngày bắt đầu (${startDate}) sau ngày kết thúc (${endDate})`,
         );
 
-      const isPkg = !!code && !code.includes(",") && intStt(stt);
-      if (isPkg) {
+      if (kind.kind === "pkg") {
         sp.packages++;
         hasPkg = true;
       } else if (hasPkg) {
@@ -374,13 +399,9 @@ export async function importWorkbook(
       const row = rows[i];
       if (!row) continue;
 
-      const code = String(row[0] ?? "").trim();
-      const stt = String(row[1] ?? "").trim();
-      const name = String(row[2] ?? "").trim();
-      if (!name) continue;
-
-      const isTopGroup = /^[A-Z]+$/.test(stt) && !/^[A-Z]+\d/.test(code);
-      if (isTopGroup) continue;
+      const kind = classifyRow(row, i, currentPkgCode);
+      if (kind.kind === "skip") continue;
+      const { stt, name } = kind;
 
       stats.totalRows++;
       const startDate = toISO(row[4]);
@@ -389,12 +410,10 @@ export async function importWorkbook(
       const ghiChu = toStatusSlug(row[3]);
 
       try {
-        const isPkg = !!code && !code.includes(",") && intStt(stt);
-
         const drawingUrl = linkCol >= 0 ? urlOf(row[linkCol]) : null;
 
-        if (isPkg) {
-          const wpCode = code;
+        if (kind.kind === "pkg") {
+          const wpCode = kind.code;
           const existing = await queryOne<Row>(
             `SELECT id FROM work_packages WHERE sheet_type_id = ? AND code = ?`,
             st.id,
@@ -435,7 +454,7 @@ export async function importWorkbook(
           // Hàng task. Sheet có cột dimension thì MỌI task đều có lưới checkbox —
           // ô trống nghĩa là chưa lắp, không phải "không có lưới".
           const hasGrid = dimDefs.length > 0;
-          const taskCode = code || `${currentPkgCode},${stt || "r" + i}`;
+          const taskCode = kind.code;
 
           // Cột lưới tính vào mẫu số của hàng này (xem ImportOptions.dimDenominator).
           // Chỉ những cột này được ghi thành ô lưới, để recomputeTask về sau đếm đúng
