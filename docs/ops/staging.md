@@ -1,5 +1,12 @@
 # Staging — môi trường tập dượt migration/deploy
 
+> ⚠️ **KHÔNG còn áp dụng cho production hiện tại (cập nhật 2026-08-12).** Tài liệu này viết
+> cho bản **tự host VPS** (pm2 + `deploy.sh --staging`), mà VPS đã bỏ — production nay chạy
+> **Vercel + Postgres của Supabase**. Cách tập dượt migration/backfill đụng dữ liệu trên môi
+> trường hiện tại: **Supabase branch hoặc bản restore của DB thật**, xem
+> [`DEPLOY.md`](../../DEPLOY.md) mục "Cách C — Vercel + Supabase". Giữ lại file này để tham
+> khảo nếu sau này quay về tự host.
+
 > Cụ thể hóa "quy trình migration an toàn" của M44 PR4. Liên kết:
 > [`DEPLOY.md`](../../DEPLOY.md) (setup production gốc), [`docs/ops/backup.md`](./backup.md)
 > (RPO/RTO, kịch bản phục hồi), [`docs/ops/incident-response.md`](./incident-response.md).

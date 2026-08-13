@@ -2,6 +2,12 @@
 
 - **Trạng thái:** Đã chấp nhận (ghi nhận hồi tố — quyết định đã áp dụng từ đầu dự án)
 - **Ngày:** 2026-06-30
+- **Cập nhật 2026-08-12:** production chuyển từ VPS tự host sang **Vercel + Postgres của
+  Supabase**. Quyết định trong ADR này **không đổi** — vẫn raw SQL qua `pg`, không ORM, không
+  dùng SDK/Auth/RLS của Supabase, phân quyền vẫn ở tầng API. Chỉ lý do "không phụ thuộc nhà
+  cung cấp (tự host VPS)" ở mục Lý do là đã lỗi thời: nay Supabase là nhà cung cấp Postgres,
+  và tính khả chuyển đến từ việc chỉ dùng Postgres thuần (chuyển nhà cung cấp = đổi
+  `DATABASE_URL` + restore dump).
 
 ## Bối cảnh
 

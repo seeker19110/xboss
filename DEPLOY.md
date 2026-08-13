@@ -1,14 +1,25 @@
-# Triển khai XBoss lên VPS/Server (production)
+# Triển khai XBoss (production)
 
-Ứng dụng dùng **PostgreSQL** — cấu hình qua biến môi trường `DATABASE_URL`
-(Supabase free tier hoặc Postgres tự host đều được). Schema áp qua hệ migrate SQL
-(`migrations/*.sql`, xem `docs/adr/0003-migrations.md`): app **tự áp migration chưa chạy khi
-khởi động lần đầu**, hoặc chủ động chạy `npm run db:migrate` trước khi start. Đổi schema về sau
-= thêm file `migrations/000N_*.sql` mới (append-only).
+> **Production hiện tại: Vercel (gói Hobby) + Postgres của Supabase.** VPS tự host đã bỏ
+> (cập nhật 2026-08-12). Đọc **[Cách C — Vercel + Supabase](#cách-c--vercel--supabase-production-hiện-tại)**
+> trước; Cách A/B bên dưới giữ lại làm phương án thay thế nếu sau này quay về tự host.
+>
+> **Hệ quả: những thứ sau CHỈ dành cho VPS, KHÔNG áp dụng cho bản Vercel** — `deploy.sh`
+> (kể cả `--staging`), `docs/ops/staging.md`, `docker-compose.yml`, pm2, `scripts/ops/backup.sh`.
+> Quy trình tương đương trên Vercel nằm trong Cách C.
+
+Ứng dụng dùng **PostgreSQL** — cấu hình qua biến môi trường `DATABASE_URL`. Schema áp qua hệ
+migrate SQL (`migrations/*.sql`, xem `docs/adr/0003-migrations.md`): app **tự áp migration chưa
+chạy khi query đầu tiên** (advisory lock chống chạy chồng — an toàn cả khi nhiều lambda khởi
+động cùng lúc), hoặc chủ động chạy `npm run db:migrate` trước khi deploy. Đổi schema về sau =
+thêm file `migrations/000N_*.sql` mới (append-only).
+
+Lưu ý: Supabase ở đây chỉ đóng vai trò **nhà cung cấp Postgres**. App truy cập thẳng bằng `pg`
+với raw SQL, không dùng SDK/Auth/RLS của Supabase (xem `docs/adr/0001-postgres-raw-sql.md`).
 
 ---
 
-## Cách A — Docker Compose (khuyến nghị, kèm Postgres)
+## Cách A — Docker Compose (phương án tự host, kèm Postgres)
 
 `docker-compose.yml` đã gồm sẵn service Postgres 17 + volume bền.
 
@@ -84,7 +95,10 @@ chạy chỉ bị dọn (`rm -rf .next-old`) khi health-check pass.
 > `origin/main` — đừng sửa file trực tiếp trên server, hãy đổi cấu hình qua
 > biến môi trường hoặc file `.env.local`.
 
-### Vận hành: backup, health check, staging
+### Vận hành: backup, health check, staging (CHỈ áp dụng cho bản tự host)
+
+> Production hiện tại chạy Vercel — phần này không dùng tới. Bản tương đương cho Vercel nằm
+> ở [Cách C](#cách-c--vercel--supabase-production-hiện-tại).
 
 - **Backup + kiểm chứng phục hồi**: `scripts/ops/backup.sh`/`scripts/ops/restore-check.sh` +
   quy trình phục hồi từng bước — xem [`docs/ops/backup.md`](./docs/ops/backup.md).
@@ -94,12 +108,66 @@ chạy chỉ bị dọn (`rm -rf .next-old`) khi health-check pass.
 
 ---
 
-## Cách C — Vercel + Supabase (không cần server)
+## Cách C — Vercel + Supabase (PRODUCTION HIỆN TẠI)
 
 1. Push repo lên GitHub.
 2. Vercel → New Project → import repo.
 3. Environment Variables: thêm `DATABASE_URL` (Supabase) + `XBOSS_SECRET`.
 4. Deploy. Seed dữ liệu chạy từ máy local: `npm run db:seed` (trỏ cùng DATABASE_URL).
+
+### ⚠️ Upload file KHÔNG hoạt động nếu thiếu S3 (kiểm ngay)
+
+`lib/storage.ts` mặc định ghi file vào thư mục `data/uploads/`. Trên Vercel, filesystem chỉ
+ghi được `/tmp` và **mất sau mỗi lambda** → ảnh hiện trường, biên bản nghiệm thu, tài liệu
+hub, bản vẽ sẽ lỗi hoặc bốc hơi. Trên Vercel, backend S3 là **bắt buộc**, không phải tuỳ chọn:
+
+```
+S3_ENDPOINT=...        # MinIO tự host, Cloudflare R2, AWS S3, Supabase Storage (S3-compatible)
+S3_ACCESS_KEY_ID=...
+S3_SECRET_ACCESS_KEY=...
+S3_BUCKET=...
+```
+
+Thiếu **bất kỳ** biến nào trong 4 biến trên là rơi về backend LOCAL (im lặng, không throw —
+đúng pattern của VAPID/Sentry/Google Sheets). Kiểm nhanh: upload 1 ảnh vào task, đợi vài phút
+cho lambda cũ bị thu hồi, tải lại ảnh — 404/lỗi nghĩa là đang chạy LOCAL.
+
+### Migration & backfill trên Vercel
+
+Không có shell thường trực trên Vercel — **mọi script chạy từ máy local hoặc CI**, trỏ
+`DATABASE_URL` vào Supabase (cùng đường với `npm run db:seed` ở bước 4):
+
+```bash
+vercel env pull .env.vercel
+set -a && . ./.env.vercel && set +a
+echo "$DATABASE_URL"                 # xác nhận đúng DB trước khi làm gì
+
+npm run db:migrate -- --dry-run      # xem migration nào sẽ chạy
+npm run db:migrate
+```
+
+- Dùng **direct connection (cổng 5432)**, KHÔNG dùng pooler (6543) cho migration/backfill —
+  pooler ở chế độ transaction không giữ được advisory lock và session state qua nhiều câu lệnh.
+- **Tập dượt migration/backfill đụng dữ liệu bằng Supabase branch** (hoặc restore bản dump vào
+  một DB tạm) rồi mới chạy vào DB thật — đây là bản thay thế cho `deploy.sh --staging` của VPS.
+- **Preview deployment của Vercel mặc định dùng CHUNG `DATABASE_URL` với Production.** Muốn
+  preview thành môi trường thử thật thì phải khai `DATABASE_URL` riêng cho scope Preview, nếu
+  không thì "thử trên preview" chính là chạy thẳng production.
+
+### ⚠️ Múi giờ khi chạy script từ máy local
+
+Runtime Vercel chạy **UTC**, còn máy cá nhân ở VN là **UTC+7**. Script đọc Excel (`db:seed`,
+`scripts/backfill-import-dates.ts`) cho ra ngày khác nhau giữa hai môi trường nếu code không
+xử lý đúng — đây từng là lỗi thật, làm mọi ngày BĐ/KT lệch sớm 1 ngày (đã vá trong
+`lib/import.ts`, xem `PROGRESS.md` mục rà 2026-08-12 và `tests/import-tz.test.ts`). Dữ liệu đã
+seed sai từ trước sửa bằng `npx tsx scripts/backfill-import-dates.ts` (mặc định chỉ xem trước).
+
+### Vận hành: backup & health check trên Vercel
+
+- **Backup**: Supabase Dashboard → Database → Backups (tự động hằng ngày trên free tier).
+  `scripts/ops/backup.sh` là script cho Postgres tự host — không dùng cho bản Vercel; muốn
+  giữ bản sao ngoài Supabase thì `pg_dump` từ máy local/CI theo lịch.
+- **Health check** cho uptime monitor: `GET /api/health`.
 
 **Giới hạn Cron trên gói Hobby:** Vercel Hobby chỉ cho phép cron chạy **tối đa 1 lần/ngày**
 — `vercel.json` chỉ khai 2 cron phù hợp (`daily-report`, `weekly-report`). Các cron tần suất
@@ -108,6 +176,34 @@ cao hơn (`deliver-webhooks` mỗi 5 phút, `sync-sheets`/`sync-integrations` h�
 (`Hobby accounts are limited to daily cron jobs`) — gọi bằng dịch vụ cron ngoài miễn phí
 (vd cron-job.org, GitHub Actions `schedule`) trỏ tới URL kèm header
 `Authorization: Bearer $CRON_SECRET`, hoặc nâng gói Pro để khai thẳng trong `vercel.json`.
+
+**Bản production hiện tại chạy Hobby + cron ngoài.** Danh sách phải có ở dịch vụ cron ngoài —
+thiếu cái nào là tính năng đó im lặng ngừng chạy, không có lỗi nào báo lên:
+
+| Endpoint                      | Tần suất  | Thiếu thì mất gì                               |
+| ----------------------------- | --------- | ---------------------------------------------- |
+| `/api/cron/deliver-webhooks`  | 5 phút    | Webhook ra hệ ngoài không được gửi             |
+| `/api/cron/refresh-views`     | 15 phút   | S-curve rơi về tái dựng mỗi request (chậm hơn) |
+| `/api/cron/sync-sheets`       | hàng giờ  | Vật tư ↔ Google Sheet không đồng bộ            |
+| `/api/cron/sync-integrations` | hàng giờ  | Tích hợp ngoài không đồng bộ                   |
+| `/api/cron/daily-report`      | hằng ngày | (đã khai trong `vercel.json`)                  |
+| `/api/cron/weekly-report`     | thứ Hai   | (đã khai trong `vercel.json`)                  |
+
+Xác minh chúng đang chạy thật (không chỉ tin là đã cấu hình) — xem lịch sử chạy ở dịch vụ cron
+ngoài, hoặc kiểm dấu vết trong DB:
+
+```sql
+-- Matview có được refresh gần đây không (cron refresh-views):
+SELECT MAX(date) FROM mv_progress_daily;          -- phải tới hôm nay
+-- Webhook có bị ứ lại không (cron deliver-webhooks):
+SELECT COUNT(*) FROM webhook_deliveries WHERE status = 'pending' AND next_retry_at < now();
+```
+
+Gọi thử một lần:
+
+```bash
+curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://<APP_URL>/api/cron/refresh-views
+```
 
 ---
 
@@ -195,8 +291,15 @@ mục Nợ kỹ thuật nếu cần nâng cấp):**
 
 - [ ] Đổi `XBOSS_SECRET` thành chuỗi ngẫu nhiên dài (bảo mật cookie đăng nhập).
 - [ ] Đổi mật khẩu 4 tài khoản demo (admin/pm/engineer/subcon).
-- [ ] Đổi `POSTGRES_PASSWORD` nếu dùng Postgres trong compose.
+- [ ] Đổi `POSTGRES_PASSWORD` nếu dùng Postgres trong compose (chỉ bản tự host).
 - [ ] Sao lưu định kỳ DB (Supabase tự backup; Postgres tự host: `pg_dump`).
+
+Riêng bản **Vercel + Supabase** (production hiện tại):
+
+- [ ] Đủ 4 biến `S3_*` — thiếu là **mất file upload** (xem cảnh báo ở Cách C).
+- [ ] Đủ 4 cron tần suất cao ở dịch vụ cron ngoài (Hobby không khai được trong `vercel.json`).
+- [ ] `DATABASE_URL` cho scope **Preview** khai riêng, không dùng chung DB với Production.
+- [ ] Script chạy từ máy local dùng **direct connection (5432)**, không dùng pooler (6543).
 
 ### Tài khoản mặc định
 

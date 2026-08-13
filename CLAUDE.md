@@ -4,7 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Dự án
 
-XBoss — web app quản lý tiến độ thi công MEP/ACMV (dự án TT AVIO Tháp A), thay thế file Excel tracking. Next.js 16 App Router (React 19) + TypeScript + Tailwind 4 + PostgreSQL **tự host, raw SQL** (không Supabase/ORM — xem `docs/adr/0001-postgres-raw-sql.md`). Toàn bộ UI, comment code và commit message viết bằng **tiếng Việt**. Đặc tả đầy đủ trong `spec.md`, ERD trong `docs/ERD.md`, hướng dẫn deploy trong `DEPLOY.md`.
+XBoss — web app quản lý tiến độ thi công MEP/ACMV (dự án TT AVIO Tháp A), thay thế file Excel tracking. Next.js 16 App Router (React 19) + TypeScript + Tailwind 4 + PostgreSQL truy cập **raw SQL** qua `pg` (không ORM, không dùng SDK/Auth/RLS của Supabase — xem `docs/adr/0001-postgres-raw-sql.md`). Toàn bộ UI, comment code và commit message viết bằng **tiếng Việt**. Đặc tả đầy đủ trong `spec.md`, ERD trong `docs/ERD.md`, hướng dẫn deploy trong `DEPLOY.md`.
+
+**Production chạy trên Vercel (gói Hobby) + Postgres của Supabase** (cập nhật 2026-08-12 — VPS tự host đã bỏ). Hệ quả cần nhớ khi làm việc trong repo này:
+
+- **Không có shell thường trực trên production**: mọi script (`db:migrate`, `db:seed`, backfill trong `scripts/`) chạy từ máy local/CI trỏ `DATABASE_URL`, dùng direct connection 5432 (không phải pooler 6543).
+- **Filesystem chỉ đọc** (trừ `/tmp`, không bền giữa các lambda): mọi tính năng lưu file phải đi qua `lib/storage.ts` với backend S3; đừng viết code ghi thẳng `data/uploads/`.
+- **Runtime là UTC**, còn máy dev ở VN là UTC+7 — code đụng ngày phải cho cùng kết quả ở mọi múi giờ (`lib/date.ts` neo cứng UTC+7 cho "hôm nay"; `lib/import.ts` lấy ngày theo lịch địa phương của giá trị đọc được). Đây từng là lỗi thật, xem `PROGRESS.md` mục rà 2026-08-12.
+- **Cron gói Hobby tối đa 1 lần/ngày**: `vercel.json` chỉ khai `daily-report`/`weekly-report`; 4 cron tần suất cao (`deliver-webhooks`, `refresh-views`, `sync-sheets`, `sync-integrations`) gọi từ dịch vụ cron ngoài. Thêm cron mới thì phải nói rõ nó chạy bằng đường nào.
+- `deploy.sh`, `docs/ops/staging.md`, `docker-compose.yml`, pm2, `scripts/ops/backup.sh` là di sản của bản tự host — **không áp dụng cho production hiện tại**.
 
 ## Tài liệu dự án & khung (đọc khi liên quan)
 
@@ -190,5 +198,5 @@ Trước khi push, đảm bảo:
 - [ ] Validate input; không lộ secret; thao tác nhạy cảm có rate-limit; endpoint cron bảo vệ bằng `CRON_SECRET` qua header Bearer.
 - [ ] File test chạm DB import `tests/setup.ts` **đầu tiên**; đã tự review diff đúng phạm vi.
 - [ ] CI (`.github/workflows/ci.yml`) xanh: `npm audit` → lint → typecheck → test (Postgres 16) → build.
-- [ ] **Migration đụng dữ liệu** (`UPDATE`/backfill/đổi kiểu cột `ALTER COLUMN ... TYPE`/`DROP COLUMN`) phải chạy qua staging trước (`bash deploy.sh --staging`, xem `docs/ops/staging.md`) rồi mới lên production; kiểm trước bằng `npm run db:migrate -- --dry-run`. Migration chỉ `CREATE TABLE`/`ADD COLUMN`/`CREATE INDEX` (thêm thuần tuý, không đụng dòng dữ liệu hiện có) được đi thẳng production.
+- [ ] **Migration đụng dữ liệu** (`UPDATE`/backfill/đổi kiểu cột `ALTER COLUMN ... TYPE`/`DROP COLUMN`) phải tập dượt trên **Supabase branch hoặc bản restore của DB thật** trước rồi mới chạy vào production (bản thay thế cho `deploy.sh --staging` thời tự host — xem `DEPLOY.md` Cách C); kiểm trước bằng `npm run db:migrate -- --dry-run`. **Preview deployment của Vercel mặc định dùng CHUNG `DATABASE_URL` với Production** — chạy thử trên preview KHÔNG phải là tập dượt. Migration chỉ `CREATE TABLE`/`ADD COLUMN`/`CREATE INDEX` (thêm thuần tuý, không đụng dòng dữ liệu hiện có) được đi thẳng production.
 - [ ] **Mọi commit thêm tính năng/fix có ý nghĩa đã ghi vào `PROGRESS.md`** (mục "Đã làm"/"Tiếp theo" đúng chỗ, kèm số PR khi đã mở) **trước khi push** — không để tài liệu lệch code (bài học lặp lại nhiều lần: dở dang tưởng đã xong hoặc ngược lại vì tài liệu quên cập nhật). Nếu commit đóng/mở 1 mục `M<xx>` trong `docs/nang-cap/`, cập nhật luôn trạng thái trong `docs/nang-cap/README.md`.
