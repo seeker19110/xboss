@@ -6,13 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 XBoss — web app quản lý tiến độ thi công MEP/ACMV (dự án TT AVIO Tháp A), thay thế file Excel tracking. Next.js 16 App Router (React 19) + TypeScript + Tailwind 4 + PostgreSQL truy cập **raw SQL** qua `pg` (không ORM, không dùng SDK/Auth/RLS của Supabase — xem `docs/adr/0001-postgres-raw-sql.md`). Toàn bộ UI, comment code và commit message viết bằng **tiếng Việt**. Đặc tả đầy đủ trong `spec.md`, ERD trong `docs/ERD.md`, hướng dẫn deploy trong `DEPLOY.md`.
 
-**Production chạy trên Vercel (gói Hobby) + Postgres của Supabase** (cập nhật 2026-08-12 — VPS tự host đã bỏ). Hệ quả cần nhớ khi làm việc trong repo này:
+**Giai đoạn hiện tại chạy hoàn toàn trên Vercel (gói Hobby) + Postgres của Supabase** để thử nghiệm; **kế hoạch quay lại tự host về sau** (cập nhật 2026-08-12). Vì vậy code phải chạy đúng ở CẢ HAI môi trường — đừng viết gì chỉ đúng trên Vercel, và cũng đừng gỡ đường tự host. Ràng buộc của môi trường hiện tại cần nhớ khi viết code:
 
 - **Không có shell thường trực trên production**: mọi script (`db:migrate`, `db:seed`, backfill trong `scripts/`) chạy từ máy local/CI trỏ `DATABASE_URL`, dùng direct connection 5432 (không phải pooler 6543).
 - **Filesystem chỉ đọc** (trừ `/tmp`, không bền giữa các lambda): mọi tính năng lưu file phải đi qua `lib/storage.ts` với backend S3; đừng viết code ghi thẳng `data/uploads/`.
 - **Runtime là UTC**, còn máy dev ở VN là UTC+7 — code đụng ngày phải cho cùng kết quả ở mọi múi giờ (`lib/date.ts` neo cứng UTC+7 cho "hôm nay"; `lib/import.ts` lấy ngày theo lịch địa phương của giá trị đọc được). Đây từng là lỗi thật, xem `PROGRESS.md` mục rà 2026-08-12.
 - **Cron gói Hobby tối đa 1 lần/ngày**: `vercel.json` chỉ khai `daily-report`/`weekly-report`; 4 cron tần suất cao (`deliver-webhooks`, `refresh-views`, `sync-sheets`, `sync-integrations`) gọi từ dịch vụ cron ngoài. Thêm cron mới thì phải nói rõ nó chạy bằng đường nào.
-- `deploy.sh`, `docs/ops/staging.md`, `docker-compose.yml`, pm2, `scripts/ops/backup.sh` là di sản của bản tự host — **không áp dụng cho production hiện tại**.
+- `deploy.sh`, `docs/ops/staging.md`, `docker-compose.yml`, pm2, `scripts/ops/backup.sh` là đường **tự host** — hiện KHÔNG dùng tới, nhưng **giữ nguyên và giữ cho còn chạy được** vì sẽ quay lại dùng. Đổi gì ảnh hưởng chúng thì cập nhật luôn, đừng để mục ruỗng.
 
 ## Tài liệu dự án & khung (đọc khi liên quan)
 

@@ -6,7 +6,7 @@
 
 ## Giai đoạn hiện tại
 
-- **GĐ 4–5 — Phát triển & nâng chất lượng.** Sản phẩm đã chạy thật (v0.2.1, **Vercel gói Hobby + Postgres của Supabase** — VPS tự host đã bỏ, cập nhật 2026-08-12), đang phát triển/tinh chỉnh tính năng liên tục **và** đang áp bộ khung quy trình/chất lượng (brownfield) theo `docs/framework/AP-DUNG-vao-du-an-co-san.md`.
+- **GĐ 4–5 — Phát triển & nâng chất lượng.** Sản phẩm đã chạy thật (v0.2.1; giai đoạn thử nghiệm chạy hoàn toàn trên **Vercel gói Hobby + Postgres của Supabase**, kế hoạch quay lại tự host về sau — cập nhật 2026-08-12), đang phát triển/tinh chỉnh tính năng liên tục **và** đang áp bộ khung quy trình/chất lượng (brownfield) theo `docs/framework/AP-DUNG-vao-du-an-co-san.md`.
 
 ## Rà nguồn sai lệch dữ liệu: Excel → WBS → % → S-curve/report, và tiền tệ (2026-08-12)
 

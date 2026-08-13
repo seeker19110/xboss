@@ -1,12 +1,14 @@
 # Triển khai XBoss (production)
 
-> **Production hiện tại: Vercel (gói Hobby) + Postgres của Supabase.** VPS tự host đã bỏ
-> (cập nhật 2026-08-12). Đọc **[Cách C — Vercel + Supabase](#cách-c--vercel--supabase-production-hiện-tại)**
-> trước; Cách A/B bên dưới giữ lại làm phương án thay thế nếu sau này quay về tự host.
+> **Đang chạy ở đâu (cập nhật 2026-08-12):** giai đoạn thử nghiệm chạy **hoàn toàn trên Vercel
+> (gói Hobby) + Postgres của Supabase** — đọc
+> **[Cách C](#cách-c--vercel--supabase-đang-dùng-giai-đoạn-thử-nghiệm)** trước.
+> **Kế hoạch quay lại tự host về sau**, nên Cách A/B bên dưới vẫn là tài liệu sống, không phải
+> di sản — giữ cho còn chạy được.
 >
-> **Hệ quả: những thứ sau CHỈ dành cho VPS, KHÔNG áp dụng cho bản Vercel** — `deploy.sh`
-> (kể cả `--staging`), `docs/ops/staging.md`, `docker-compose.yml`, pm2, `scripts/ops/backup.sh`.
-> Quy trình tương đương trên Vercel nằm trong Cách C.
+> **Trong giai đoạn này KHÔNG dùng tới** `deploy.sh` (kể cả `--staging`), `docs/ops/staging.md`,
+> `docker-compose.yml`, pm2, `scripts/ops/backup.sh`. Quy trình tương đương trên Vercel nằm ở
+> Cách C.
 
 Ứng dụng dùng **PostgreSQL** — cấu hình qua biến môi trường `DATABASE_URL`. Schema áp qua hệ
 migrate SQL (`migrations/*.sql`, xem `docs/adr/0003-migrations.md`): app **tự áp migration chưa
@@ -19,7 +21,7 @@ với raw SQL, không dùng SDK/Auth/RLS của Supabase (xem `docs/adr/0001-post
 
 ---
 
-## Cách A — Docker Compose (phương án tự host, kèm Postgres)
+## Cách A — Docker Compose (đường tự host, kèm Postgres)
 
 `docker-compose.yml` đã gồm sẵn service Postgres 17 + volume bền.
 
@@ -95,10 +97,11 @@ chạy chỉ bị dọn (`rm -rf .next-old`) khi health-check pass.
 > `origin/main` — đừng sửa file trực tiếp trên server, hãy đổi cấu hình qua
 > biến môi trường hoặc file `.env.local`.
 
-### Vận hành: backup, health check, staging (CHỈ áp dụng cho bản tự host)
+### Vận hành: backup, health check, staging (đường tự host)
 
-> Production hiện tại chạy Vercel — phần này không dùng tới. Bản tương đương cho Vercel nằm
-> ở [Cách C](#cách-c--vercel--supabase-production-hiện-tại).
+> Giai đoạn thử nghiệm đang chạy Vercel nên phần này tạm chưa dùng tới; sẽ dùng lại khi quay
+> về tự host. Bản tương đương cho Vercel nằm ở
+> [Cách C](#cách-c--vercel--supabase-đang-dùng-giai-đoạn-thử-nghiệm).
 
 - **Backup + kiểm chứng phục hồi**: `scripts/ops/backup.sh`/`scripts/ops/restore-check.sh` +
   quy trình phục hồi từng bước — xem [`docs/ops/backup.md`](./docs/ops/backup.md).
@@ -108,7 +111,7 @@ chạy chỉ bị dọn (`rm -rf .next-old`) khi health-check pass.
 
 ---
 
-## Cách C — Vercel + Supabase (PRODUCTION HIỆN TẠI)
+## Cách C — Vercel + Supabase (ĐANG DÙNG, giai đoạn thử nghiệm)
 
 1. Push repo lên GitHub.
 2. Vercel → New Project → import repo.
