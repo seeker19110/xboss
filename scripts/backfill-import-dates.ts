@@ -22,8 +22,21 @@
 //   npx tsx scripts/backfill-import-dates.ts --file=<đường dẫn> # file Excel khác
 //   npx tsx scripts/backfill-import-dates.ts --project=<id>     # chọn dự án khi trùng mã sheet
 //
-// ⚠️ Theo DoD trong CLAUDE.md, đây là thao tác ĐỤNG DỮ LIỆU → chạy staging trước
-//    (`bash deploy.sh --staging`, xem docs/ops/staging.md) rồi mới tới production.
+// ⚠️ Thao tác ĐỤNG DỮ LIỆU → theo DoD trong CLAUDE.md phải tập dượt trên bản sao trước,
+//    KHÔNG chạy thẳng production. Tập dượt ở đâu tuỳ cách deploy:
+//      - VPS tự host: DB staging riêng (`bash deploy.sh --staging`, docs/ops/staging.md).
+//      - Vercel + Postgres quản lý (Supabase/Neon): tạo branch/bản sao DB rồi trỏ
+//        DATABASE_URL vào đó. Lưu ý Preview deployment của Vercel MẶC ĐỊNH dùng chung
+//        DATABASE_URL với Production — "chạy thử trên preview" không phải là staging.
+//
+// Script chạy từ MÁY LOCAL/CI trỏ vào DATABASE_URL đích, không cần chạy trong runtime của
+// app (trên Vercel cũng không chạy được trong runtime: serverless, không có shell thường
+// trực). Cùng đường với `npm run db:seed` mô tả ở DEPLOY.md Cách C.
+//
+// Ghi chú múi giờ: runtime Vercel chạy UTC nên dữ liệu import QUA APP ở đó không dính lỗi
+// (đo trên file gốc: ở UTC, bản toISO cũ và mới cho kết quả y hệt). Đường dính lỗi là nơi
+// process chạy ở múi giờ dương — VPS có set TZ, hoặc `npm run db:seed` chạy từ máy cá nhân
+// ở VN (UTC+7). Chạy xem trước để biết chắc, đừng suy đoán.
 import "./env";
 import * as XLSX from "xlsx";
 import { query, run, withTransaction } from "../lib/db";

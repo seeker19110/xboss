@@ -68,7 +68,14 @@ Excel** (đọc `cell.f`: `COUNTIF(J8:AE8,TRUE)/22`, `AVERAGE(I8:I16)`), không 
   lại đúng lỗi cũ (lùi 1 ngày toàn bộ) + 1 hàng sửa tay → chạy script → **2692/2692 hàng khớp
   lại ảnh đúng, đúng 1 hàng sửa tay được giữ nguyên như thiết kế**; chạy lần 2 báo "không có gì
   để sửa" (lũy đẳng); chạy ở `TZ=UTC` trên DB lành báo 0 hàng cần sửa (không sửa bừa).
-  **Chưa chạy production** — theo DoD phải qua staging trước.
+  **Chưa chạy production** — phải tập dượt trên bản sao dữ liệu trước.
+  **Lưu ý theo môi trường (người dùng xác nhận production chạy trên Vercel, 2026-08-12):**
+  runtime Vercel chạy **UTC** nên dữ liệu import QUA APP ở đó **không dính lỗi lệch ngày**
+  (đo trên file gốc: ở UTC, `toISO` bản cũ và bản mới cho kết quả y hệt, 0/5859 ô lệch).
+  Đường dính lỗi là nơi process chạy ở múi giờ dương — đáng ngờ nhất là **`npm run db:seed`
+  chạy từ máy cá nhân ở VN (UTC+7)** trỏ vào DB production (đúng cách làm mô tả ở `DEPLOY.md`
+  Cách C). Chạy script ở chế độ xem trước để biết chắc, không suy đoán. Script chạy từ máy
+  local/CI trỏ `DATABASE_URL`, không cần (và không thể) chạy trong runtime serverless.
 - **[AI, đã làm] Tách `classifyRow` (`lib/import.ts`) dùng chung** cho import, xem trước và
   script backfill — phân loại hàng nhóm/sub-task lệch nhau giữa các nơi đọc cùng một file
   chính là cách tự tạo ra sai lệch dữ liệu. Không đổi hành vi (test import cũ + test trên file
