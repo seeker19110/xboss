@@ -25,7 +25,7 @@
 ## Repository consolidation plan
 - [x] Stage A defined: keep repositories separate while defining canonical contracts
 - [x] Stage A: audit former MEP-Agents components into KEEP / ADAPT / REWRITE / DEPRECATE / EXTERNALIZE
-- [ ] Stage A: map MEP/CAD/BIM/QTO concepts to canonical Engineering Objects
+- [x] Stage A: define canonical MEP/CAD/BIM/QTO → Engineering Object mapping contract
 - [ ] Stage A: implement M43 Project Kernel
 - [ ] Stage A: implement M44 Provenance
 - [ ] Stage A: implement M45 Domain Events
@@ -39,7 +39,7 @@
 - [ ] Stage C: archive/decommission the former MEP-Agents repository only after final migration verification
 
 ## MEP-Agents audit result
-**Audit complete for Stage A.** The source repository is Python/LangGraph/Streamlit and contains reusable deterministic MEPF engineering, CAD, BIM, QS/BOQ-diff, revision and multi-agent capabilities. The audit and component classification are recorded in `docs/integration/MEP_AGENTS_AUDIT.md`.
+**Stage A audit + canonical mapping are complete.** The source repository is Python/LangGraph/Streamlit and contains reusable deterministic MEPF engineering, CAD, BIM, QS/BOQ-diff, revision and multi-agent capabilities. The detailed audit is in `docs/integration/MEP_AGENTS_AUDIT.md`; the mapping contract is in `docs/integration/CANONICAL_ENGINEERING_MAPPING.md`.
 
 Key architectural decision: **do not copy the MEP-Agents project model, authentication or persistence into XBoss.** Keep specialist Python engineering workers where useful, but integrate them through typed XBoss contracts and canonical Engineering Objects. XBoss remains the owner of identity, project, BOQ, cost, procurement, contract, audit and lifecycle truth.
 
@@ -84,7 +84,7 @@ Status: **SPECIFIED — READY FOR IMPLEMENTATION**
 - [ ] documentation update
 
 ## Immediate integration work after M43
-1. Map MEP/CAD/BIM/geometry/drawing/quantity concepts to canonical Engineering Objects.
+1. Implement the canonical engineering object layer.
 2. Build an adapter/service boundary rather than importing a second project model/database.
 3. Connect one vertical slice end-to-end: **Drawing → Engineering Objects → Quantity → BOQ → Cost impact**.
 4. Add golden-project regression fixtures before deleting or replacing legacy engineering logic.
