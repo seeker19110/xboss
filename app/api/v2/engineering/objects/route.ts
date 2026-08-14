@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import {
   createEngineeringObject,
   listEngineeringObjects,
@@ -8,31 +9,33 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
+async function projectOr401() {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  if (!user) return { error: NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 }) } as const;
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null) return { error: NextResponse.json({ error: "Không có project context hợp lệ" }, { status: 403 }) } as const;
+  return { user, projectId } as const;
+}
 
-  const rawProjectId = req.nextUrl.searchParams.get("projectId");
-  const projectId = Number(rawProjectId);
-  if (!Number.isInteger(projectId) || projectId <= 0) {
-    return NextResponse.json({ error: "projectId không hợp lệ" }, { status: 400 });
-  }
-
+export async function GET(req: NextRequest) {
+  const ctx = await projectOr401();
+  if ("error" in ctx) return ctx.error;
   const objectType = req.nextUrl.searchParams.get("objectType") ?? undefined;
-  const limit = Number(req.nextUrl.searchParams.get("limit") ?? 100);
-  const items = await listEngineeringObjects(projectId, { objectType, limit });
-  return NextResponse.json({ items });
+  const rawLimit = Number(req.nextUrl.searchParams.get("limit") ?? 100);
+  const limit = Number.isFinite(rawLimit) ? rawLimit : 100;
+  return NextResponse.json({ items: await listEngineeringObjects(ctx.projectId, { objectType, limit }) });
 }
 
 export async function POST(req: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-
+  const ctx = await projectOr401();
+  if ("error" in ctx) return ctx.error;
   const parsed = engineeringObjectInputSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Dữ liệu engineering object không hợp lệ", issues: parsed.error.issues }, { status: 400 });
   }
-
-  const created = await createEngineeringObject(parsed.data, user.id);
+  if (parsed.data.projectId !== ctx.projectId) {
+    return NextResponse.json({ error: "projectId không khớp project context" }, { status: 400 });
+  }
+  const created = await createEngineeringObject(parsed.data, ctx.user.id);
   return NextResponse.json({ item: created }, { status: 201 });
 }
