@@ -6,7 +6,7 @@
 ## Product decision
 - [x] Product name: **XBoss**
 - [x] Positioning: **AI-Native Construction & Engineering Operating System**
-- [x] Engineering intelligence source: former `MEP-Agents` capability set
+- [x] Engineering intelligence source: former `MEP-Agents`
 - [x] Fallback brand reserved: **ForgeOS**
 - [x] Consolidation strategy approved: **architecture first → shared contracts → gradual code integration → monorepo only when boundaries are proven**
 - [x] Technical architecture owner decision: canonical stack recorded in `docs/architecture/TECHNOLOGY_STACK.md`
@@ -75,6 +75,7 @@ Status: **IN IMPLEMENTATION — API SLICE LANDED; TEST/CONTRACT GATES PENDING**
 - [x] `/api/v2/engineering/sources/revisions`
 - [x] `/api/v2/engineering/relations`
 - [x] `/api/v2/engineering/health`
+- [x] API routes no longer trust arbitrary client `projectId`; they resolve the authenticated user's current project context
 - [ ] object/relation registry
 - [ ] canonical domain types separated from persistence DTOs
 - [ ] idempotent create/update command semantics
@@ -94,6 +95,7 @@ M43 remains **open** until all are true:
 - [x] migrations are transactional and serialized with advisory lock
 - [x] engineering tables have FK/index/constraint coverage
 - [x] engineering service writes establish `app.project_id` inside a transaction
+- [x] API routes enforce authenticated current-project context
 - [ ] project/org isolation tests pass in CI
 - [ ] backup + restore test passes in a real PostgreSQL environment
 - [ ] API contracts are validated in CI
