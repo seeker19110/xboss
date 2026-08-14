@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { getCurrentProjectId } from "@/lib/projects";
 import {
   createEngineeringRelation,
   engineeringRelationInputSchema,
@@ -8,23 +9,31 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
+async function projectContext() {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  const projectId = Number(req.nextUrl.searchParams.get("projectId"));
+  if (!user) return { error: NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 }) } as const;
+  const projectId = await getCurrentProjectId(user);
+  if (projectId == null) return { error: NextResponse.json({ error: "Không có project context hợp lệ" }, { status: 403 }) } as const;
+  return { user, projectId } as const;
+}
+
+export async function GET(req: NextRequest) {
+  const ctx = await projectContext();
+  if ("error" in ctx) return ctx.error;
   const objectId = req.nextUrl.searchParams.get("objectId");
-  if (!Number.isInteger(projectId) || projectId <= 0 || !objectId) {
-    return NextResponse.json({ error: "projectId/objectId không hợp lệ" }, { status: 400 });
-  }
-  return NextResponse.json({ items: await getEngineeringRelations(projectId, objectId) });
+  if (!objectId) return NextResponse.json({ error: "objectId không hợp lệ" }, { status: 400 });
+  return NextResponse.json({ items: await getEngineeringRelations(ctx.projectId, objectId) });
 }
 
 export async function POST(req: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  const ctx = await projectContext();
+  if ("error" in ctx) return ctx.error;
   const parsed = engineeringRelationInputSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Dữ liệu relation không hợp lệ", issues: parsed.error.issues }, { status: 400 });
   }
-  return NextResponse.json({ item: await createEngineeringRelation(parsed.data, user.id) }, { status: 201 });
+  if (parsed.data.projectId !== ctx.projectId) {
+    return NextResponse.json({ error: "projectId không khớp project context" }, { status: 400 });
+  }
+  return NextResponse.json({ item: await createEngineeringRelation(parsed.data, ctx.user.id) }, { status: 201 });
 }
