@@ -7,6 +7,7 @@
 - [x] Fallback brand reserved: **ForgeOS** (do not use as current repository/product name)
 - [x] Consolidation strategy approved: **architecture first → shared contracts → gradual code integration → monorepo only when boundaries are proven**
 - [x] Technical architecture owner decision: canonical stack recorded in `docs/architecture/TECHNOLOGY_STACK.md`
+- [x] 10-year technology longevity policy recorded in `docs/architecture/TECHNOLOGY_LONGEVITY_PLAN.md`
 
 ## Approved baseline
 - [x] M0–M42 existing XBoss foundation retained
@@ -14,6 +15,23 @@
 - [x] Master roadmap approved
 - [x] Unified product architecture approved
 - [x] Technology stack approved: React/Next.js/TypeScript + NestJS + Python/FastAPI + PostgreSQL/PostGIS/pgvector + Redis/BullMQ + S3 + Three.js + LangGraph adapter + OpenAPI/JSON Schema + pnpm/Turborepo + GitHub Actions
+- [x] Production database policy: PostgreSQL; SQLite only for disposable tests/local tooling
+- [x] 10-year-ready strategy: durable foundations + replaceable adapters + versioned contracts + continuous upgrade radar
+
+## Technology hardening status
+- [x] Identify SQLite as non-production technology
+- [x] Define PostgreSQL as canonical production database
+- [x] Define S3-compatible object storage for large artifacts
+- [x] Define OpenAPI/JSON Schema as cross-runtime contracts
+- [x] Define observability as a platform primitive
+- [x] Define security/supply-chain requirements
+- [x] Define dependency/runtime upgrade cadence
+- [ ] Audit current code for every SQLite dependency
+- [ ] Migrate remaining production SQLite paths to PostgreSQL
+- [ ] Verify migrations, indexes, constraints and project isolation
+- [ ] Implement backup/PITR/restore validation
+- [ ] Implement structured logs, metrics, tracing and correlation IDs
+- [ ] Add dependency/security/SBOM checks to CI
 
 ## Integration rules
 - XBoss Project Kernel is the canonical project/source-of-truth boundary.
@@ -67,7 +85,7 @@ Key architectural decision: **do not copy the MEP-Agents project model, authenti
 - [ ] M53 Controlled Autonomy
 
 ## Current milestone: M43
-Status: **SPECIFIED — READY FOR IMPLEMENTATION**
+Status: **READY FOR IMPLEMENTATION — FOUNDATION HARDENING FIRST**
 
 ### M43 deliverables
 - [ ] engineering_objects migration
@@ -86,12 +104,47 @@ Status: **SPECIFIED — READY FOR IMPLEMENTATION**
 - [ ] generated ERD update
 - [ ] documentation update
 
+### M43 foundation gate
+Before declaring M43 complete:
+- [ ] production path uses PostgreSQL
+- [ ] no production SQLite dependency remains
+- [ ] migrations are reversible/forward-safe where practical
+- [ ] indexes and foreign-key constraints are verified
+- [ ] project/org isolation tests pass
+- [ ] backup + restore test passes
+- [ ] API contracts are validated in CI
+- [ ] structured observability is present
+- [ ] golden engineering fixture exists
+
 ## Immediate integration work after M43
-1. Implement the canonical engineering object layer.
-2. Build a contract-first adapter/service boundary rather than importing a second project model/database.
-3. Connect one vertical slice end-to-end: **Drawing → Engineering Objects → Quantity → BOQ → Cost impact**.
-4. Add golden-project regression fixtures before deleting or replacing legacy engineering logic.
-5. Only after the vertical slice is stable, move validated capabilities into shared packages/services.
+1. Harden the production data foundation first: PostgreSQL, migrations, constraints, backup/restore and isolation.
+2. Implement the canonical engineering object layer.
+3. Build a contract-first adapter/service boundary rather than importing a second project model/database.
+4. Connect one vertical slice end-to-end: **Drawing → Engineering Objects → Quantity → BOQ → Cost impact**.
+5. Add golden-project regression fixtures before deleting or replacing legacy engineering logic.
+6. Only after the vertical slice is stable, move validated capabilities into shared packages/services.
+
+## Long-term technology roadmap
+- [x] Define 2026–2036 technology longevity policy
+- [ ] 2026–2027 Foundation hardening
+- [ ] 2027–2029 Engineering OS maturity
+- [ ] 2029–2031 Intelligence/Digital Twin foundation
+- [ ] 2031–2033 Predictive OS
+- [ ] 2033–2036 Controlled Autonomy and continuous modernization
+- [ ] Annual technology radar review
+- [ ] 2–3 year formal architecture refresh
+
+## Technology radar — evaluate, do not prematurely adopt
+- [ ] WebGPU-native rendering
+- [ ] WASM/WASI portable engineering compute
+- [ ] Rust geometry kernels when benchmarks justify
+- [ ] GPU CAD/vision acceleration
+- [ ] Kafka/Redpanda for proven event-streaming needs
+- [ ] Graph projection/Neo4j if Digital Twin traversal requires it
+- [ ] Dedicated time-series infrastructure for large sensor deployments
+- [ ] Edge compute for site/IoT workloads
+- [ ] emerging multimodal engineering foundation models
+- [ ] emerging AI-agent interoperability standards
 
 ## Deletion policy
 The consolidation effort explicitly removes **duplication, obsolete adapters and superseded domain models**, not working functionality merely because it is old. Every deletion must identify its replacement and be covered by tests or migration verification. Generated artifacts and dead phase patches are candidates for early cleanup once confirmed unused; functional engineering algorithms are not deleted until their replacement is verified.
@@ -101,3 +154,5 @@ The consolidation effort explicitly removes **duplication, obsolete adapters and
 - Do not import engineering source code into the main XBoss runtime until its domain/data ownership is mapped.
 - Do not switch to monorepo until shared contracts have been exercised in production-like integration tests.
 - Do not decommission the former engineering repository until migration and rollback checks pass.
+- Do not introduce Tier C infrastructure merely for perceived scale; require benchmark, operational and migration evidence.
+- Every significant technology replacement must include migration, regression, observability and rollback planning.
