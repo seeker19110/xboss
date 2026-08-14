@@ -333,6 +333,10 @@ const CAN_DEFAULT = {
   // bật/tắt chỉ Admin (đổi hành vi API/sidebar toàn hệ, cùng mức nhạy cảm Alert Rules).
   viewFeatureFlags: (r?: Role) => r === "admin" || r === "pm",
   manageFeatureFlags: (r?: Role) => r === "admin",
+  // Kho nhận Engineering Object từ hệ thống ngoài (ENG-1, docs/nang-cap/ENG-1-mep-agent-
+  // integration.md) — xem/duyệt object chờ duyệt trước khi ảnh hưởng BOQ/cost, chỉ Admin/PM
+  // (đúng boundary track ENG-* — mục 4 docs/nang-cap/ENG-0-roadmap-tich-hop-engineering-os.md).
+  reviewEngineeringObjects: (r?: Role) => r === "admin" || r === "pm",
 };
 
 // ===== M50 PR1 — Override quyền trong DB =====

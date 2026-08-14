@@ -73,6 +73,7 @@ import {
   SlidersHorizontal,
   KeyRound,
   ToggleRight,
+  Boxes,
 } from "lucide-react";
 import type { Role } from "@/lib/roles";
 
@@ -418,6 +419,13 @@ export const DASHBOARD_TREE: DashCluster[] = [
     label: "Hệ thống",
     dashboards: [
       { id: "dash.chuyen-doi-so", href: "/tech", label: "Chuyển đổi số & Công nghệ", icon: Cpu }, // M31 — đã có trang thật
+      {
+        id: "dash.engineering-objects",
+        href: "/engineering",
+        label: "Đối tượng kỹ thuật (AI)",
+        icon: Boxes,
+        roles: ["admin", "pm"],
+      }, // ENG-1 — kho nhận Engineering Object từ hệ thống ngoài, xem docs/nang-cap/ENG-1-mep-agent-integration.md
       {
         id: "dash.import-excel",
         href: "/import",

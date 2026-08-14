@@ -8,6 +8,56 @@
 
 - **GĐ 4–5 — Phát triển & nâng chất lượng.** Sản phẩm đã chạy thật (v0.2.1, tự host VPS), đang phát triển/tinh chỉnh tính năng liên tục **và** đang áp bộ khung quy trình/chất lượng (brownfield) theo `docs/framework/AP-DUNG-vao-du-an-co-san.md`.
 
+## ENG-1 — Kho nhận Engineering Object, tích hợp MEP-Agents (2026-08-14)
+
+Track mới `docs/nang-cap/ENG-0-roadmap-tich-hop-engineering-os.md` (lộ trình Foundation
+Hardening → ENG-1..ENG-4 → Engineering OS, tách khỏi dãy `M<xx>` để tránh đụng số — xem lý
+do trong chính file đó). ENG-1 đặc tả tại `docs/nang-cap/ENG-1-mep-agent-integration.md`.
+
+- **[Sự cố phát hiện + đã vá] Commit `8c84e49 "feat: add M43 engineering kernel domain
+services"` push thẳng `main`, không qua PR/review, thiếu migration** — `lib/engineering-kernel.ts`
+  (254 dòng, đủ hàm CRUD Engineering Object/Source/Revision/Relation qua zod schema, UUID
+  PK) gọi vào 5 bảng chưa từng được tạo bởi bất kỳ migration nào → vỡ ngay khi có route/test
+  nào gọi thật (`relation "engineering_objects" does not exist`). Cũng đụng số "M43" với
+  `docs/nang-cap/M43-audit-trail.md` đã có sẵn (module khác hẳn, đã xong từ lâu — chính là
+  nguồn GUC `app.project_id`/`SET LOCAL` mà RLS M62 tái dùng, xem `docs/adr/0005-rls.md`).
+  **Không sửa/xoá code đã push** (không phải bug logic, chỉ thiếu phần đi kèm) — bổ sung
+  đúng phần thiếu: `migrations/0084_engineering_core.sql` tái dựng nguyên schema đã có trên
+  `main` (không đổi tên bảng/cột) + thêm cổng duyệt `status` (`pending_review`/`approved`/
+  `rejected`/`void`, mặc định `pending_review`) + 2 hàm mới trong `lib/engineering-kernel.ts`
+  (`upsertEngineeringObjectFromExternal` — idempotent theo `external_key`, giữ nguyên
+  `status` khi cập nhật; `reviewEngineeringObject` — duyệt/từ chối, ghi lịch sử qua
+  `engineering_object_revisions` thay vì thêm cột `reviewed_by/at` riêng). Track đổi tên
+  track thành `ENG-*` (không dùng lại `M43`) theo quyết định người dùng qua `AskUserQuestion`.
+- **[AI, đã sửa — bug thật lộ ra lúc viết test] `listEngineeringObjects` (code đã push,
+  chưa từng chạy thật) dùng pattern `(? IS NULL OR col = ?)` với tham số đứng riêng** —
+  đúng lớp lỗi Postgres "could not determine data type of parameter" đã gặp ở M64 PR325
+  (xem mục tương ứng phía dưới trong file này). Sửa: dựng điều kiện WHERE **động** (chỉ
+  thêm `AND col = ?` khi có giá trị lọc), đúng pattern `app/api/v1/tasks/route.ts`.
+- **[AI, đã sửa cùng lúc] Route ingest ban đầu gán nhầm `auth.keyId` (id của `api_keys`)
+  làm `created_by`** (cột FK bắt buộc tới `users(id)`) — vi phạm FK ngay lần chạy thử đầu.
+  Mở rộng `ApiKeyAuth`/`verifyApiKey` (`lib/api-keys.ts`) thêm `createdBy` (đọc từ
+  `api_keys.created_by` — admin đã tạo key) làm "actor" quy về `users(id)` khi route ghi dữ
+  liệu thay mặt hệ thống ngoài.
+- **[AI, đã làm]** `POST /api/v1/engineering/ingest` (API key scope `engineering` mới,
+  1 dự án/key) — nhận source/objects/relations, transaction 1 lần, validate zod, upsert
+  idempotent theo `external_key`. `GET/POST /api/engineering/objects[/:id][/review]` (session
+  auth, `CAN.reviewEngineeringObjects` = Admin/PM mới trong `lib/auth.ts`). Trang
+  `/engineering` (bảng + modal chi tiết + duyệt/từ chối), entry `lib/modules.ts` +
+  `app/lib/dashboardTree.ts` (nhóm "Hệ thống"), checkbox scope `engineering` trong
+  `app/admin/integrations/page.tsx` (UI quản lý API key).
+- **Boundary chống AI tự cấp quyền** (mục 4 `ENG-0`): không route nào trong track ghi vào
+  `api_keys`/`role_permissions`/`CAN_DEFAULT`; cổng duyệt không có đường tắt tự động; không
+  auto-approve theo ngưỡng; agent không có đường ghi trực tiếp `boq_items`/`payment_bills`.
+- **Verify thật** (Postgres 16 cục bộ, DB tạo mới hoàn toàn, `npm run db:migrate` sạch tới
+  `0084`): `tests/engineering.test.ts` (6 ca, chạy 2 lần liên tiếp trên cùng DB đều 6/6 pass
+  — xác nhận cleanup đúng); `npm run lint`/`typecheck` xanh.
+- **Ngoài phạm vi ENG-1** (ghi lại, không tự làm thêm — đúng nguyên tắc #10/#11 track ENG,
+  xem `ENG-0` mục 6–7): map `properties`/quantity → `boq_items`/cost (ENG-2), Digital Twin
+  traversal trên `engineering_object_relations` (ENG-3/4), UI biểu đồ tổng hợp, RLS cho 5
+  bảng mới (chỉ xét khi có nhu cầu thật). Repo đích tích hợp thật là `seeker19110/MEPF-Agents`
+  — người dùng xác nhận "sẽ tích hợp sau này", chưa có route gọi được từ phía họ.
+
 ## Rà nguồn sai lệch dữ liệu: Excel → WBS → % → S-curve/report, và tiền tệ (2026-08-12)
 
 Rà có hệ thống (lập ma trận "không gian đầu vào × tầng biến đổi" trước, rồi kiểm chứng bằng

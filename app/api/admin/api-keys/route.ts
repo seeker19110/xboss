@@ -5,7 +5,7 @@ import { generateApiKey, hashApiKey } from "@/lib/api-keys";
 
 export const dynamic = "force-dynamic";
 
-const VALID_SCOPES = ["read", "read_finance"] as const;
+const VALID_SCOPES = ["read", "read_finance", "engineering"] as const;
 
 // GET /api/admin/api-keys — danh sách API key (không bao giờ trả key thô/hash). Admin.
 export async function GET() {

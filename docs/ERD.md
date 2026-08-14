@@ -3297,6 +3297,138 @@
 - `custom_field_defs_pkey`: UNIQUE INDEX custom_field_defs_pkey ON public.custom_field_defs USING btree (id)
 - `custom_field_defs_scope_key_uidx`: UNIQUE INDEX custom_field_defs_scope_key_uidx ON public.custom_field_defs USING btree (entity_type, COALESCE(project_id, 0), key)
 
+### engineering_object_relations
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| project_id | integer |  |  |
+| from_object_id | uuid |  |  |
+| to_object_id | uuid |  |  |
+| relation_type | text |  |  |
+| properties | jsonb |  | `'{}'::jsonb` |
+| source_revision_id | uuid | ✓ |  |
+| created_by | integer |  |  |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `created_by` → `users(id)`
+- `from_object_id` → `engineering_objects(id)`
+- `project_id` → `projects(id)`
+- `source_revision_id` → `engineering_source_revisions(id)`
+- `to_object_id` → `engineering_objects(id)`
+
+**Index:**
+- `engineering_object_relations_pkey`: UNIQUE INDEX engineering_object_relations_pkey ON public.engineering_object_relations USING btree (id)
+- `idx_engineering_object_relations_from`: INDEX idx_engineering_object_relations_from ON public.engineering_object_relations USING btree (from_object_id)
+- `idx_engineering_object_relations_project`: INDEX idx_engineering_object_relations_project ON public.engineering_object_relations USING btree (project_id)
+- `idx_engineering_object_relations_to`: INDEX idx_engineering_object_relations_to ON public.engineering_object_relations USING btree (to_object_id)
+
+### engineering_object_revisions
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| object_id | uuid |  |  |
+| revision_no | integer |  |  |
+| source_revision_id | uuid | ✓ |  |
+| object_type | text |  |  |
+| discipline | text | ✓ |  |
+| name | text | ✓ |  |
+| status | text |  |  |
+| properties | jsonb |  | `'{}'::jsonb` |
+| geometry_ref | jsonb |  | `'{}'::jsonb` |
+| change_reason | text | ✓ |  |
+| created_by | integer |  |  |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `created_by` → `users(id)`
+- `object_id` → `engineering_objects(id)`
+- `source_revision_id` → `engineering_source_revisions(id)`
+
+**Index:**
+- `engineering_object_revisions_object_id_revision_no_key`: UNIQUE INDEX engineering_object_revisions_object_id_revision_no_key ON public.engineering_object_revisions USING btree (object_id, revision_no)
+- `engineering_object_revisions_pkey`: UNIQUE INDEX engineering_object_revisions_pkey ON public.engineering_object_revisions USING btree (id)
+- `idx_engineering_object_revisions_object`: INDEX idx_engineering_object_revisions_object ON public.engineering_object_revisions USING btree (object_id, revision_no DESC)
+
+### engineering_objects
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| project_id | integer |  |  |
+| object_type | text |  |  |
+| discipline | text | ✓ |  |
+| external_key | text | ✓ |  |
+| name | text | ✓ |  |
+| status | text |  | `'pending_review'::text` |
+| properties | jsonb |  | `'{}'::jsonb` |
+| geometry_ref | jsonb |  | `'{}'::jsonb` |
+| source_revision_id | uuid | ✓ |  |
+| created_by | integer |  |  |
+| updated_by | integer |  |  |
+| created_at | timestamptz |  | `now()` |
+| updated_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `created_by` → `users(id)`
+- `project_id` → `projects(id)`
+- `source_revision_id` → `engineering_source_revisions(id)`
+- `updated_by` → `users(id)`
+
+**Index:**
+- `engineering_objects_pkey`: UNIQUE INDEX engineering_objects_pkey ON public.engineering_objects USING btree (id)
+- `idx_engineering_objects_project_status`: INDEX idx_engineering_objects_project_status ON public.engineering_objects USING btree (project_id, status)
+- `idx_engineering_objects_project_type`: INDEX idx_engineering_objects_project_type ON public.engineering_objects USING btree (project_id, object_type)
+- `uq_engineering_objects_external`: UNIQUE INDEX uq_engineering_objects_external ON public.engineering_objects USING btree (project_id, external_key) WHERE (external_key IS NOT NULL)
+
+### engineering_source_revisions
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| source_id | uuid |  |  |
+| revision_no | integer |  |  |
+| object_key | text | ✓ |  |
+| sha256 | text | ✓ |  |
+| parser_name | text | ✓ |  |
+| parser_version | text | ✓ |  |
+| metadata | jsonb |  | `'{}'::jsonb` |
+| created_by | integer |  |  |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `created_by` → `users(id)`
+- `source_id` → `engineering_sources(id)`
+
+**Index:**
+- `engineering_source_revisions_pkey`: UNIQUE INDEX engineering_source_revisions_pkey ON public.engineering_source_revisions USING btree (id)
+- `engineering_source_revisions_source_id_revision_no_key`: UNIQUE INDEX engineering_source_revisions_source_id_revision_no_key ON public.engineering_source_revisions USING btree (source_id, revision_no)
+
+### engineering_sources
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| project_id | integer |  |  |
+| source_type | text |  |  |
+| title | text |  |  |
+| object_key | text | ✓ |  |
+| mime_type | text | ✓ |  |
+| sha256 | text | ✓ |  |
+| metadata | jsonb |  | `'{}'::jsonb` |
+| created_by | integer |  |  |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `created_by` → `users(id)`
+- `project_id` → `projects(id)`
+
+**Index:**
+- `engineering_sources_pkey`: UNIQUE INDEX engineering_sources_pkey ON public.engineering_sources USING btree (id)
+- `idx_engineering_sources_project`: INDEX idx_engineering_sources_project ON public.engineering_sources USING btree (project_id, created_at DESC)
+
 ### feature_flags
 
 | Cột | Kiểu | Null | Default |
