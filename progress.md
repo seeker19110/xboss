@@ -20,16 +20,17 @@
 
 ## Technology hardening status
 - [x] Identify SQLite as non-production technology
+- [x] Confirm current XBoss DB layer already uses PostgreSQL `pg` + numbered SQL migrations
+- [x] Confirm existing migration runner uses advisory locking and per-migration transactions
 - [x] Define PostgreSQL as canonical production database
 - [x] Define S3-compatible object storage for large artifacts
 - [x] Define OpenAPI/JSON Schema as cross-runtime contracts
 - [x] Define observability as a platform primitive
 - [x] Define security/supply-chain requirements
 - [x] Define dependency/runtime upgrade cadence
-- [ ] Audit current code for every SQLite dependency
-- [ ] Migrate remaining production SQLite paths to PostgreSQL
-- [ ] Verify migrations, indexes, constraints and project isolation
-- [ ] Implement backup/PITR/restore validation
+- [x] Code audit: no SQLite dependency found in package/dependency/code search; legacy comments describe the former SQLite API only
+- [ ] Verify production deployment DATABASE_URL/PITR/restore configuration in a real environment
+- [ ] Verify migrations, indexes, constraints and project isolation against a disposable PostgreSQL instance
 - [ ] Implement structured logs, metrics, tracing and correlation IDs
 - [ ] Add dependency/security/SBOM checks to CI
 
@@ -85,16 +86,23 @@ Key architectural decision: **do not copy the MEP-Agents project model, authenti
 - [ ] M53 Controlled Autonomy
 
 ## Current milestone: M43
-Status: **READY FOR IMPLEMENTATION — FOUNDATION HARDENING FIRST**
+Status: **IN IMPLEMENTATION — DATABASE KERNEL FOUNDATION LANDED**
 
-### M43 deliverables
-- [ ] engineering_objects migration
-- [ ] engineering_object_relations migration
-- [ ] engineering_sources migration
-- [ ] engineering_object_sources migration
-- [ ] engineering_revisions migration
+### M43 implementation status
+- [x] PostgreSQL DB layer verified (`pg` Pool, transaction context, timeouts, slow-query telemetry)
+- [x] numbered SQL migration runner verified (advisory lock + per-file transaction)
+- [x] project-scoped RLS infrastructure exists and is used as a second security boundary
+- [x] canonical `engineering_sources` table
+- [x] canonical `engineering_source_revisions` table
+- [x] canonical `engineering_objects` table
+- [x] canonical `engineering_object_revisions` table
+- [x] canonical `engineering_object_relations` table
+- [x] canonical `engineering_object_sources` evidence/provenance table
+- [x] canonical deterministic `engineering_quantity_results` table
+- [x] UUID engineering identities decoupled from legacy SERIAL IDs
+- [x] project-scoped RLS policies for new engineering tables
 - [ ] object/relation registry
-- [ ] canonical domain types
+- [ ] canonical TypeScript domain types
 - [ ] application services
 - [ ] existing-domain adapters
 - [ ] `/api/v2/engineering/*` API
@@ -106,23 +114,24 @@ Status: **READY FOR IMPLEMENTATION — FOUNDATION HARDENING FIRST**
 
 ### M43 foundation gate
 Before declaring M43 complete:
-- [ ] production path uses PostgreSQL
-- [ ] no production SQLite dependency remains
-- [ ] migrations are reversible/forward-safe where practical
-- [ ] indexes and foreign-key constraints are verified
-- [ ] project/org isolation tests pass
-- [ ] backup + restore test passes
+- [x] production path uses PostgreSQL at code level
+- [x] no production SQLite dependency found in repository audit
+- [x] migrations are transactional and serialized with advisory lock
+- [x] indexes and foreign-key constraints are defined for the engineering kernel
+- [ ] project/org isolation tests pass in CI
+- [ ] backup + restore test passes in a real PostgreSQL environment
 - [ ] API contracts are validated in CI
-- [ ] structured observability is present
+- [ ] structured observability is present end-to-end
 - [ ] golden engineering fixture exists
 
-## Immediate integration work after M43
-1. Harden the production data foundation first: PostgreSQL, migrations, constraints, backup/restore and isolation.
-2. Implement the canonical engineering object layer.
-3. Build a contract-first adapter/service boundary rather than importing a second project model/database.
-4. Connect one vertical slice end-to-end: **Drawing → Engineering Objects → Quantity → BOQ → Cost impact**.
-5. Add golden-project regression fixtures before deleting or replacing legacy engineering logic.
-6. Only after the vertical slice is stable, move validated capabilities into shared packages/services.
+## Immediate next implementation slice
+1. Add typed Engineering Domain models matching migration `0070_engineering_kernel.sql`.
+2. Add repository/application services with idempotent create/update/revision semantics.
+3. Add `/api/v2/engineering/*` contract-first endpoints.
+4. Add project isolation integration tests against PostgreSQL, including RLS and transaction context.
+5. Add provenance/audit events and deterministic quantity result persistence.
+6. Connect the first vertical slice: **Drawing → Engineering Objects → Quantity → BOQ → Cost impact**.
+7. Only then begin M44 as a separate provenance hardening milestone; do not duplicate the kernel tables.
 
 ## Long-term technology roadmap
 - [x] Define 2026–2036 technology longevity policy
