@@ -6,12 +6,14 @@
 - [x] Engineering intelligence source: former `MEP-Agents` capability set
 - [x] Fallback brand reserved: **ForgeOS** (do not use as current repository/product name)
 - [x] Consolidation strategy approved: **architecture first → shared contracts → gradual code integration → monorepo only when boundaries are proven**
+- [x] Technical architecture owner decision: canonical stack recorded in `docs/architecture/TECHNOLOGY_STACK.md`
 
 ## Approved baseline
 - [x] M0–M42 existing XBoss foundation retained
 - [x] Strategic direction: Project OS → Engineering OS → Digital Twin → Controlled Autonomy
 - [x] Master roadmap approved
 - [x] Unified product architecture approved
+- [x] Technology stack approved: React/Next.js/TypeScript + NestJS + Python/FastAPI + PostgreSQL/PostGIS/pgvector + Redis/BullMQ + S3 + Three.js + LangGraph adapter + OpenAPI/JSON Schema + pnpm/Turborepo + GitHub Actions
 
 ## Integration rules
 - XBoss Project Kernel is the canonical project/source-of-truth boundary.
@@ -21,6 +23,7 @@
 - Prefer strangler migration: adapter → canonical write → backfill → verification → read cutover → legacy removal.
 - Do not perform a big-bang repository/database merge.
 - Do not delete legacy code/data until an explicit replacement, migration, regression coverage and rollback path exist.
+- Technology changes must update the architecture ADR with rationale, migration impact, rollback strategy and evidence.
 
 ## Repository consolidation plan
 - [x] Stage A defined: keep repositories separate while defining canonical contracts
@@ -34,7 +37,7 @@
 - [ ] Stage B: integrate CAD/BIM/geometry/quantity/document intelligence through XBoss APIs and domain services
 - [ ] Stage B: migrate AI agents to the XBoss Agent Fabric
 - [ ] Stage B: remove duplicate project/auth/audit/domain persistence from engineering services
-- [ ] Stage C: establish monorepo boundaries only after integration contracts are stable
+- [ ] Stage C: establish monorepo boundaries only after shared contracts are stable
 - [ ] Stage C: move validated engineering packages/services into the XBoss monorepo
 - [ ] Stage C: archive/decommission the former MEP-Agents repository only after final migration verification
 
@@ -85,7 +88,7 @@ Status: **SPECIFIED — READY FOR IMPLEMENTATION**
 
 ## Immediate integration work after M43
 1. Implement the canonical engineering object layer.
-2. Build an adapter/service boundary rather than importing a second project model/database.
+2. Build a contract-first adapter/service boundary rather than importing a second project model/database.
 3. Connect one vertical slice end-to-end: **Drawing → Engineering Objects → Quantity → BOQ → Cost impact**.
 4. Add golden-project regression fixtures before deleting or replacing legacy engineering logic.
 5. Only after the vertical slice is stable, move validated capabilities into shared packages/services.
