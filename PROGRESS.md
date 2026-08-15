@@ -27,6 +27,64 @@
 
 **Nợ kỹ thuật/rủi ro mở:** ~~`audit_log.entity_id` chỉ hỗ trợ khoá `BIGINT` nên `engineering_*` (UUID) nằm ngoài audit trail~~ — **đã đóng** bằng `0090` (cột `entity_key` TEXT, xem mục "C3 §2" bên dưới). Rủi ro còn lại là vận hành, không phải code: cặp `0091`/`0092` phải chạy staging trước khi lên production.
 
+## C3 §6 (PR C3.5) — Chính sách dọn dữ liệu hết hạn (2026-08-15)
+
+- **[AI, đo được — cột hạn có sẵn nhưng chưa ai dùng]** `engineering_ingest_requests` đã có
+  cột `expires_at` (mặc định `NOW() + 30 ngày`, từ `0088`) **và cả index trên cột đó**,
+  nhưng **không chỗ nào xoá dòng hết hạn** — bảng tăng vĩnh viễn. `webhook_deliveries` cũng
+  vậy. (`login_rate_limits` thì đã tự dọn sẵn trong `lib/ratelimit.ts`.)
+- **[AI, đã làm] `lib/retention.ts`** — khai báo tập trung `RETENTION_TARGETS`: mỗi thứ được
+  xoá là một dòng kèm **lý do bằng tiếng Việt**. Muốn biết "hệ thống xoá gì, giữ bao lâu, vì
+  sao" thì đọc đúng một chỗ, thay vì đi tìm `DELETE` rải rác.
+- **[AI, quyết định — KHÔNG BAO GIỜ xoá `audit_log`]** `row_hash` là chuỗi băm móc xích; xoá
+  một dòng giữa chừng là **đứt xích vĩnh viễn** và `verifyAuditChain` không còn phân biệt
+  được "dọn theo chính sách" với "sửa trộm" — tức phá đúng thứ audit trail sinh ra để chứng
+  minh. Ghi hẳn thành hằng `AUDIT_LOG_KHONG_XOA` + test chặn, để người sau không "bổ sung
+  cho đủ". Muốn thu gọn phải lưu trữ ngoài rồi **neo lại xích**, không dùng `DELETE`.
+- **[AI, quyết định — mặc định chạy thử]** `/api/cron/retention` chỉ đếm; phải `?apply=1`
+  mới xoá. Gọi nhầm URL thì ra báo cáo, không mất dữ liệu.
+- **[AI, quyết định — chỉ bật thứ THUẦN KỸ THUẬT]** Bật sẵn: sổ lũy đẳng ingest, nhật ký
+  webhook **đã kết thúc** (`keepWhile: status <> 'pending'` — dòng đang chờ retry mà xoá là
+  mất hẳn sự kiện). Khai báo nhưng **tắt**: source revision, object bị từ chối — dữ liệu
+  nghiệp vụ, chờ chủ sở hữu chốt đúng như C3 §6/DoD. Khai sẵn để người sau thấy câu hỏi còn
+  treo, thay vì tưởng chưa ai nghĩ tới.
+- **[AI, test bắt được lỗi thật của chính mình]** Hai target đang tắt khai `mode: "age"`
+  nhưng **chưa có `days`** → `whereOf` dựng ra `INTERVAL 'NaN days'`, **hỏng cả câu ĐẾM**.
+  Sửa đúng gốc: `days: null` mang nghĩa "chưa chốt thời hạn", `hasPeriod()` bỏ qua khi dựng
+  SQL, và `whereOf` **ném lỗi rõ ràng** nếu bị gọi thiếu `days` — thà chết rõ còn hơn để
+  Postgres báo một lỗi không ai lần ra nguồn. Cố ý **không** đặt đại một con số tạm: đặt bừa
+  365 ngày rồi quên là cách dữ liệu nghiệp vụ biến mất oan.
+- **Verify**: `tests/retention.test.ts` **8/8**; `lint` 0 lỗi, `typecheck` xanh. `DEPLOY.md`
+  có mục cron kèm cảnh báo `audit_log`.
+
+## C3 §5 (PR C3.4) — Sổ import + đóng dấu mẫu số, để % tái lập được (2026-08-15)
+
+Đóng phần **persistence** của C3 §5 ("Denominator/import policy").
+
+- **[AI, vấn đề thật đang có]** `dimDenominator` ("columns" vs "row-nonempty") quyết định
+  **mẫu số** khi quy lưới checkbox → %, nhưng chỉ tồn tại trong bộ nhớ **đúng một lần lúc
+  import**. Sau đó không chỗ nào ghi lại đã dùng chế độ nào, cũng không biết file nguồn là
+  file nào. Nhìn một task 12 ô lưới thì **không ai trả lời được "vì sao 12 mà không phải
+  20"** — con số % không tái lập được.
+- **[AI, đã làm] `migrations/0093`** — bảng `import_batches` (tên file + **SHA-256 nội
+  dung**, chế độ mẫu số, người chạy, `stats` gồm cả `warnings`) + `tasks.import_batch_id`
+  và `tasks.dim_denominator_mode`. Băm theo **nội dung** chứ không theo tên file: nhiều năm
+  sau đổi tên file vẫn đối chiếu được. Thuần thêm, **đi thẳng production được**.
+- **[AI, quyết định] Task cũ để NULL, không bịa mặc định.** NULL mang đúng nghĩa "không biết
+  — import trước khi có sổ này". Điền đại `'columns'` sẽ tạo ra một dữ kiện sai trông như
+  thật, đúng loại nợ mà C3 muốn dọn.
+- **[AI, quyết định] `options.source` là tuỳ chọn** — thiếu thì không ghi sổ và không gán
+  batch. Nhờ vậy `npm run db:seed` và test cũ chạy y như trước, không sinh ra batch giả.
+  Nhưng `dim_denominator_mode` **vẫn đóng dấu** vì đó là sự thật của lần import đó.
+- **[AI, đã làm] `GET /api/import/batches`** (Admin/PM) + hiện chế độ mẫu số & số hiệu sổ
+  ngay trong kết quả import. Không có đường đọc thì dữ liệu đã ghi vẫn nằm im trong DB —
+  ghi mà không tra được thì chưa gọi là tái lập được.
+- **[AI, tự bắt lỗi]** Fixture test đầu tiên đặt cột lưới từ index 8 trong khi `DIM_START`
+  của `lib/import.ts` là **9** → đếm ra 3 thay vì 4. Sửa fixture, không sửa kỳ vọng.
+- **Verify**: `tests/import-batches.test.ts` **4/4**, trong đó có ca chứng minh hai chế độ
+  cho **mẫu số khác nhau thật** (4 ô vs 2 ô) — nếu bằng nhau thì test không chứng minh được
+  gì. 25/25 ca của 3 file import sẵn có vẫn xanh. `lint` 0 lỗi, `typecheck` xanh, ERD khớp.
+
 ## C3 §3 (PR2) — RLS + bất biến chéo dự án cho `engineering_*` (2026-08-15)
 
 Đóng nốt C3 §3 ("Project axis" + "Relational invariants" + "Policy", tương ứng C3.2 + C3.3 trong
@@ -110,6 +168,7 @@ userId: auth.createdBy })` — **một chỗ sửa phủ cả 4 route** `/api/v1
   (`projects` có org-RLS nên đọc ra rỗng; `ensureSchema` cần quyền `CREATE` trên schema).
 - **Verify**: 67/67 ca của 8 file test liên quan (engineering ×5, api-keys, rls, audit-chain);
   `lint` 0 lỗi, `typecheck` xanh. **Chưa bật RLS trong PR này** — không đổi hành vi.
+
 ## ENG-5 §5 — OpenAPI 3.1 + fixture hợp đồng có version (2026-08-15)
 
 Đóng 3 mục của ENG-5 mà **không cần điều kiện ngoài**: §5.1 (OpenAPI máy-đọc-được),

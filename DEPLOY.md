@@ -250,6 +250,29 @@ liệt kê trong kết quả). Cột `Đã dùng`/`Tồn kho`/`Ngưỡng tối t
   Ví dụ crontab mỗi giờ: `0 * * * * curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://<APP_URL>/api/cron/sync-sheets`
   (hoặc khai báo trong `vercel.json` nếu deploy Vercel).
 
+- **Dọn dữ liệu hết hạn (mỗi ngày, C3 §6):** xoá bản ghi kỹ thuật đã quá hạn theo chính
+  sách khai báo trong `lib/retention.ts` — sổ lũy đẳng ingest (`expires_at`, mặc định 30
+  ngày) và nhật ký giao webhook đã kết thúc (30 ngày). **Mặc định chỉ CHẠY THỬ**, phải thêm
+  `?apply=1` mới xoá thật:
+
+  ```bash
+  # xem trước sẽ dọn những gì (không xoá)
+  curl -H "Authorization: Bearer $CRON_SECRET" https://<APP_URL>/api/cron/retention
+
+  # dọn thật — đặt vào crontab hằng ngày
+  curl -fsS -H "Authorization: Bearer $CRON_SECRET" "https://<APP_URL>/api/cron/retention?apply=1"
+  ```
+
+  Ví dụ crontab 3h sáng: `0 3 * * * curl -fsS -H "Authorization: Bearer $CRON_SECRET" "https://<APP_URL>/api/cron/retention?apply=1"`
+
+  > **`audit_log` KHÔNG bao giờ bị dọn** — cột `row_hash` là chuỗi băm móc xích, xoá một
+  > dòng là đứt xích và `verifyAuditChain` không còn phân biệt được "dọn theo chính sách"
+  > với "sửa trộm". Muốn thu gọn phải lưu trữ ra ngoài rồi neo lại xích, cần chủ sở hữu và
+  > pháp chế duyệt riêng.
+  >
+  > Các mục **đụng dữ liệu nghiệp vụ** (source revision, object bị từ chối) đã khai báo sẵn
+  > nhưng **để tắt**, chờ chủ sở hữu chốt thời hạn — xem `RETENTION_TARGETS`.
+
 - **Gửi webhook ra ngoài (mỗi 5 phút):** đẩy các sự kiện đang chờ (nghiệm thu task, duyệt
   VO/IPC, vật tư vượt định mức, yêu cầu nghiệm thu) tới hệ ngoài đã cấu hình — dùng chung
   `CRON_SECRET`:

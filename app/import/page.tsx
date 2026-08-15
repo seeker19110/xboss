@@ -36,6 +36,14 @@ type Result = {
   warnings?: string[];
   message?: string;
   error?: string;
+  /** C3 §5 — chế độ mẫu số đã dùng thật + số hiệu lần import đã ghi sổ. */
+  dimDenominator?: "columns" | "row-nonempty";
+  batchId?: number;
+};
+
+const DENOMINATOR_LABEL: Record<string, string> = {
+  columns: "tổng số cột lưới của sheet",
+  "row-nonempty": "số ô có dữ liệu trên từng dòng",
 };
 
 export default function ImportPage() {
@@ -282,6 +290,14 @@ export default function ImportPage() {
             <p className="text-sm text-zinc-400">
               {result.packages} nhóm · {result.tasks} tasks
             </p>
+            {/* C3 §5: nói rõ % vừa được tính bằng mẫu số nào và lần import này mang số hiệu
+                bao nhiêu — để sau này tra lại được vì sao con số ra như vậy. */}
+            {result.dimDenominator && (
+              <p className="mt-1 text-sm text-zinc-400">
+                Mẫu số tính %: <b>{DENOMINATOR_LABEL[result.dimDenominator]}</b>
+                {result.batchId ? ` · đã ghi sổ import #${result.batchId}` : ""}
+              </p>
+            )}
             {/* Lệch % giữa file Excel và số XBoss tính — nêu rõ ngay trong kết quả import,
                 không để người dùng phát hiện muộn trên dashboard (xem ImportOptions). */}
             {!!result.warnings?.length && (

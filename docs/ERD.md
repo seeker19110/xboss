@@ -138,9 +138,12 @@
 | delay_note | text | ✓ |  |
 | assigned_manual | boolean |  | `false` |
 | custom | jsonb |  | `'{}'::jsonb` |
+| import_batch_id | integer | ✓ |  |
+| dim_denominator_mode | text | ✓ |  |
 
 **Khóa ngoại:**
 - `assigned_to` → `users(id)`
+- `import_batch_id` → `import_batches(id)`
 - `package_id` → `work_packages(id)`
 
 **Index:**
@@ -150,6 +153,7 @@
 - `idx_tasks_end`: INDEX idx_tasks_end ON public.tasks USING btree (end_date)
 - `idx_tasks_fts`: INDEX idx_tasks_fts ON public.tasks USING gin (to_tsvector('simple'::regconfig, COALESCE(name, ''::text)))
 - `idx_tasks_fts_ua`: INDEX idx_tasks_fts_ua ON public.tasks USING gin (to_tsvector('simple'::regconfig, xboss_unaccent(((((COALESCE(code, ''::text) || ' '::text) || COALESCE(boq_code, ''::text)) || ' '::text) || COALESCE(name, ''::text)))))
+- `idx_tasks_import_batch`: INDEX idx_tasks_import_batch ON public.tasks USING btree (import_batch_id)
 - `idx_tasks_package`: INDEX idx_tasks_package ON public.tasks USING btree (package_id)
 - `idx_tasks_start`: INDEX idx_tasks_start ON public.tasks USING btree (start_date)
 - `idx_tasks_status`: INDEX idx_tasks_status ON public.tasks USING btree (status)
@@ -3785,6 +3789,30 @@
 
 **Index:**
 - `feature_flags_pkey`: UNIQUE INDEX feature_flags_pkey ON public.feature_flags USING btree (module_key, project_id)
+
+### import_batches
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | integer |  | `nextval('import_batches_id_seq'::regclass)` |
+| project_id | integer | ✓ |  |
+| source_name | text |  |  |
+| source_sha256 | text |  |  |
+| source_bytes | bigint | ✓ |  |
+| dim_denominator_mode | text |  |  |
+| options | jsonb |  | `'{}'::jsonb` |
+| stats | jsonb |  | `'{}'::jsonb` |
+| imported_by | integer | ✓ |  |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `imported_by` → `users(id)`
+- `project_id` → `projects(id)`
+
+**Index:**
+- `idx_import_batches_project_created`: INDEX idx_import_batches_project_created ON public.import_batches USING btree (project_id, created_at DESC)
+- `idx_import_batches_sha256`: INDEX idx_import_batches_sha256 ON public.import_batches USING btree (source_sha256)
+- `import_batches_pkey`: UNIQUE INDEX import_batches_pkey ON public.import_batches USING btree (id)
 
 ### organizations
 
