@@ -442,6 +442,13 @@ export const DASHBOARD_TREE: DashCluster[] = [
         roles: ["admin", "pm", "engineer", "bch"],
       }, // ENG-3 — ranh giới uỷ quyền, xem docs/nang-cap/ENG-3-engineering-workflow-os.md
       {
+        id: "dash.engineering-agent-sessions",
+        href: "/engineering/agent-sessions",
+        label: "Phiên phối hợp agent",
+        icon: Network,
+        roles: ["admin", "pm", "engineer", "bch"],
+      }, // ENG-4 — hoà giải đa agent, xem docs/nang-cap/ENG-4-multi-agent-engineering-os.md
+      {
         id: "dash.import-excel",
         href: "/import",
         label: "Import Excel",

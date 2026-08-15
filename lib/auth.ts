@@ -351,6 +351,12 @@ const CAN_DEFAULT = {
     r === "admin" || r === "pm" || r === "engineer" || r === "bch",
   createEngineeringWorkflow: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
   approveEngineeringGate: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  // ENG-4 Multi-Agent Engineering OS (docs/nang-cap/ENG-4-multi-agent-engineering-os.md).
+  // Phiên phối hợp đa agent chỉ tạo ra KẾ HOẠCH ĐÃ HOÀ GIẢI (không có tác động thật) nên
+  // mở xem rộng; chốt xung đột là quyết định kỹ thuật có hệ quả → Admin/PM.
+  viewEngineeringAgentSessions: (r?: Role) =>
+    r === "admin" || r === "pm" || r === "engineer" || r === "bch",
+  resolveEngineeringConflicts: (r?: Role) => r === "admin" || r === "pm",
 };
 
 // ===== M50 PR1 — Override quyền trong DB =====

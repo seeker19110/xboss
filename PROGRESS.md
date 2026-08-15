@@ -8,6 +8,41 @@
 
 - **GĐ 4–5 — Phát triển & nâng chất lượng.** Sản phẩm đã chạy thật (v0.2.1, tự host VPS), đang phát triển/tinh chỉnh tính năng liên tục **và** đang áp bộ khung quy trình/chất lượng (brownfield) theo `docs/framework/AP-DUNG-vao-du-an-co-san.md`.
 
+## ENG-4 — Multi-Agent Engineering OS (2026-08-15)
+
+Đặc tả thi hành `docs/nang-cap/ENG-4-multi-agent-engineering-os.md` (cụ thể hoá
+`ENGINEERING-OS-ENG2-ENG3-ENG4.md` §15–§28) viết trước, rồi code. **Đóng track ENG-1→ENG-4.**
+
+- **Vai trò của XBoss trong ENG-4: bên ĐIỀU PHỐI + LƯU VẾT, không phải bên chạy agent.**
+  Agent thật (MEPF-Agents) chạy ở hệ của họ; XBoss nhận claim, phát hiện/phân loại xung đột,
+  đề xuất cách phân xử, ghi mức đồng thuận — đúng vai Reconciler/Verifier của §16.
+- **[AI, đã làm]** `migrations/0087_engineering_agents.sql`: `engineering_agent_sessions`
+  (5 mức đồng thuận §22 + giới hạn cứng `max_rounds`/`conflict_budget` §21),
+  `engineering_agent_claims` (§24 — mỗi claim mang đủ vai trò/nguồn/giả định/độ tin, không
+  truyền hidden state), `engineering_conflicts` (5 loại §17 × 8 giai đoạn của giao thức 7
+  bước §18, **bắt buộc ghi `resolution_method`**).
+- **[AI, đã làm] `lib/engineering-agents.ts` — phân xử KHÔNG dùng majority vote (§19):**
+  `detectConflicts` (nhiều agent nói **cùng** một điều là đồng thuận, không đếm phiếu),
+  `classifyConflict` (chọn loại **khó nhất** trước, không hạ cấp), `proposeResolution` (data
+  → theo `AUTHORITY_ORDER` §20 nên **1 nguồn có thẩm quyền thắng 2 nguồn suy diễn**;
+  interpretation → chênh <2 bậc độ tin thì cần người; constraint chạm `safety_law`/`contract`
+  → luôn cần người; execution/scope → luôn cần người). `assertVoteAllowed()` biến "lỡ dùng
+  vote sai chỗ" thành **lỗi cứng** (4 điều kiện cấm, có test đủ).
+- **[AI, đã làm] `computeConsensus`**: hết `max_rounds` mà còn xung đột → **`no_consensus` +
+  đóng phiên**, và UI cố ý **không tô đỏ** trạng thái này — §21/§22 nói rõ đây là kết quả
+  hợp lệ, không phải sự cố; thà không đồng thuận còn hơn ép consensus giả.
+- **Ranh giới giữ nghiêm (§23, §26):** ENG-3 vẫn là ranh giới uỷ quyền — ENG-4 không tạo/
+  duyệt workflow, không ghi `boq_items`/`payment_bills`/`tasks`. Cột
+  `engineering_agent_sessions.workflow_id` để sẵn nhưng **ENG-4 không bao giờ tự ghi**; có
+  test bất biến ghim đúng điều này.
+- **[AI, đã làm]** 5 route (`/api/v1/engineering/agent-sessions[/:id/claims]` cho agent qua
+  API key; `/api/engineering/agent-sessions[/:id][/conflicts/:cid/resolve]` cho người), 2
+  quyền mới, trang `/engineering/agent-sessions` (claim theo agent + xung đột kèm **phương
+  pháp phân xử và lý do** + banner nhắc "kế hoạch chưa có hiệu lực thi hành").
+- **Verify**: `tests/engineering-agents.test.ts` **13/13 pass ngay lần đầu** (8 ca thuần phủ
+  đủ luật phân xử/cấm vote/5 mức đồng thuận + 5 ca tích hợp); `lint`/`typecheck`/`build`
+  xanh; `gen:erd` khớp (156 bảng); `check:migrations` OK (87 file); `check:sw-exclude` OK.
+
 ## ENG-3 — Engineering Workflow OS (2026-08-15)
 
 Đặc tả thi hành `docs/nang-cap/ENG-3-engineering-workflow-os.md` (cụ thể hoá

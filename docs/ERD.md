@@ -3297,6 +3297,85 @@
 - `custom_field_defs_pkey`: UNIQUE INDEX custom_field_defs_pkey ON public.custom_field_defs USING btree (id)
 - `custom_field_defs_scope_key_uidx`: UNIQUE INDEX custom_field_defs_scope_key_uidx ON public.custom_field_defs USING btree (entity_type, COALESCE(project_id, 0), key)
 
+### engineering_agent_claims
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| session_id | uuid |  |  |
+| agent_role | text |  |  |
+| agent_name | text |  |  |
+| topic | text |  |  |
+| claim | text |  |  |
+| payload | jsonb |  | `'{}'::jsonb` |
+| assumptions | jsonb |  | `'[]'::jsonb` |
+| confidence | text |  | `'unknown'::text` |
+| confidence_signals | jsonb |  | `'{}'::jsonb` |
+| source_authority | text |  | `'derived'::text` |
+| source_revision_id | uuid | ✓ |  |
+| round | integer |  | `1` |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `session_id` → `engineering_agent_sessions(id)`
+- `source_revision_id` → `engineering_source_revisions(id)`
+
+**Index:**
+- `engineering_agent_claims_pkey`: UNIQUE INDEX engineering_agent_claims_pkey ON public.engineering_agent_claims USING btree (id)
+- `idx_eng_ac_session`: INDEX idx_eng_ac_session ON public.engineering_agent_claims USING btree (session_id, topic)
+
+### engineering_agent_sessions
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| project_id | integer |  |  |
+| intent | text |  |  |
+| consensus | text |  | `'pending'::text` |
+| status | text |  | `'open'::text` |
+| max_rounds | integer |  | `5` |
+| round_count | integer |  | `0` |
+| conflict_budget | integer |  | `10` |
+| reconciled_plan | jsonb | ✓ |  |
+| workflow_id | uuid | ✓ |  |
+| trace_id | text | ✓ |  |
+| api_key_id | integer | ✓ |  |
+| created_at | timestamptz |  | `now()` |
+| updated_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `api_key_id` → `api_keys(id)`
+- `project_id` → `projects(id)`
+- `workflow_id` → `engineering_workflows(id)`
+
+**Index:**
+- `engineering_agent_sessions_pkey`: UNIQUE INDEX engineering_agent_sessions_pkey ON public.engineering_agent_sessions USING btree (id)
+- `idx_eng_as_project`: INDEX idx_eng_as_project ON public.engineering_agent_sessions USING btree (project_id, status)
+
+### engineering_conflicts
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| session_id | uuid |  |  |
+| topic | text |  |  |
+| conflict_type | text |  |  |
+| stage | text |  | `'detected'::text` |
+| claim_ids | jsonb |  | `'[]'::jsonb` |
+| resolution | text | ✓ |  |
+| resolution_method | text | ✓ |  |
+| resolved_by | integer | ✓ |  |
+| resolved_at | timestamptz | ✓ |  |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `resolved_by` → `users(id)`
+- `session_id` → `engineering_agent_sessions(id)`
+
+**Index:**
+- `engineering_conflicts_pkey`: UNIQUE INDEX engineering_conflicts_pkey ON public.engineering_conflicts USING btree (id)
+- `idx_eng_cf_session`: INDEX idx_eng_cf_session ON public.engineering_conflicts USING btree (session_id, stage)
+
 ### engineering_evidence
 
 | Cột | Kiểu | Null | Default |

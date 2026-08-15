@@ -240,6 +240,12 @@ export const MODULES: ModuleDef[] = [
         href: "/engineering/workflows",
         icon: "Workflow",
       },
+      {
+        group: "Hệ thống",
+        label: "Phiên phối hợp agent",
+        href: "/engineering/agent-sessions",
+        icon: "Network",
+      },
     ],
     permKeys: [
       "reviewEngineeringObjects",
@@ -248,6 +254,8 @@ export const MODULES: ModuleDef[] = [
       "viewEngineeringWorkflows",
       "createEngineeringWorkflow",
       "approveEngineeringGate",
+      "viewEngineeringAgentSessions",
+      "resolveEngineeringConflicts",
     ],
     notificationTypes: [],
     routePrefix: ["/api/engineering", "/api/v1/engineering"],

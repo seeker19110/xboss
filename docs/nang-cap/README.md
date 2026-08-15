@@ -36,7 +36,15 @@ Quyết định (người dùng chốt): track riêng `ENG-1..ENG-4`, không đ�
   5 approval profile A–E + Gate 0 chặn thật + separation of duties, trang
   `/engineering/workflows`. KHÔNG đụng `lib/approvals.ts` (M46) — xem lý do trong mục 1 của
   đặc tả.
-- **ENG-4 (Multi-Agent Engineering OS)** — đang triển khai tiếp.
+- **`ENG-4-multi-agent-engineering-os.md`** — ✅ **xong** (2026-08-15):
+  `migrations/0087_engineering_agents.sql` (sessions/claims/conflicts), giao thức 7 bước +
+  5 loại xung đột + phân xử theo thẩm quyền/bằng chứng/thứ bậc ràng buộc (**không majority
+  vote**, có hàm chặn cứng), 5 mức đồng thuận với `no_consensus` là kết quả hợp lệ, trang
+  `/engineering/agent-sessions`. ENG-3 vẫn là ranh giới uỷ quyền.
+
+**Track `ENG-*` hoàn tất 4/4 phase.** Các nấc tiếp theo trong lộ trình (Engineering OS →
+AI/Digital Twin → Predictive OS → Controlled Autonomy) chưa có đặc tả — chờ dữ liệu vận
+hành thật từ MEPF-Agents, đúng nguyên tắc #10 (đừng xây hạ tầng trước khi có tải thực tế).
 
 ## Danh mục (nhóm → module gộp bên trong)
 
