@@ -8,6 +8,54 @@
 
 - **GĐ 4–5 — Phát triển & nâng chất lượng.** Sản phẩm đã chạy thật (v0.2.1, tự host VPS), đang phát triển/tinh chỉnh tính năng liên tục **và** đang áp bộ khung quy trình/chất lượng (brownfield) theo `docs/framework/AP-DUNG-vao-du-an-co-san.md`.
 
+## ENG-2 — Engineering Intelligence (2026-08-15)
+
+Đặc tả khái niệm gốc `docs/nang-cap/ENGINEERING-OS-ENG2-ENG3-ENG4.md` (1224 dòng, người
+dùng cung cấp — cherry-pick từ nhánh `agent/engineering-os-spec`) được cụ thể hoá thành đặc
+tả **thi hành** `docs/nang-cap/ENG-2-engineering-intelligence.md` (schema DDL, API, lib,
+test) rồi mới code — đúng yêu cầu "hoàn thiện đặc tả rồi code".
+
+- **Ranh giới phase giữ nghiêm** (§0 core principle): ENG-2 = KNOW/REASON/SUGGEST. Không
+  route/hàm nào ghi sang `boq_items`/`payment_bills`/`tasks`/`engineering_objects.status`.
+  "Accept" một suggestion chỉ đổi `status` của chính nó — biến thành hành động thật là
+  ENG-3 (cột `workflow_id` để sẵn, ENG-2 không ghi).
+- **[AI, đã làm]** `migrations/0085_engineering_intelligence.sql`: 3 bảng —
+  `engineering_intelligence_packages` (§1.3 Intelligence Package + provenance + trace_id),
+  `engineering_suggestions` (8 lớp §2.1 A–H, 7 mức ranking §3, 4 mức confidence §5, 7 trạng
+  thái gồm `needs_review` do hệ tự đặt), `engineering_evidence` (§4 evidence-first: 4 loại
+  `fact`/`inference`/`assumption`/`recommendation`).
+- **[AI, đã làm] `lib/engineering-intel.ts` — 3 hàm XÁC ĐỊNH, không gọi LLM:**
+  `rankSuggestion` (priority là trục chính, confidence **không** vượt mặt được — cảnh báo an
+  toàn `unknown` vẫn xếp trên tối ưu hoá `high`, đúng §3+§10); `computeConfidence` (tính từ
+  6 tín hiệu, `<3` tín hiệu → `unknown` chứ không phải `low`; `ruleValidated=false` ghim
+  trần `medium`); `initialStatus` (thiếu evidence loại `fact` → `needs_review`; cảnh báo an
+  toàn/pháp lý mà `confidence=unknown` cũng → `needs_review`). **Confidence luôn tính lại ở
+  server** — giá trị bên gọi tự khai bị bỏ qua hoàn toàn (§5 "confidence không phải LLM tự
+  chấm điểm"), có test ghim đúng điều này.
+- **[AI, đã làm]** `POST /api/v1/engineering/intelligence` (API key scope `engineering`);
+  `GET /api/engineering/suggestions[/:id]` + `POST .../:id/decide` (session auth); 2 quyền
+  mới `CAN.viewEngineeringSuggestions` (Admin/PM/**Kỹ sư** — kỹ sư là người đọc nội dung kỹ
+  thuật) và `CAN.decideEngineeringSuggestions` (Admin/PM). Trang `/engineering/suggestions`
+  hiển thị evidence **tách bạch 4 loại** kèm nhãn tiếng Việt (Sự thật/Suy luận/Giả định/
+  Khuyến nghị) — điểm cốt lõi chống hallucination, cộng banner giải thích khi `needs_review`.
+- **[AI, phát hiện + xử lý — bug hạ tầng thật] `audit_row_change()` (migration 0049) KHÔNG
+  dùng được cho bảng khoá chính UUID.** Dự định gắn trigger audit như `0061_api_keys.sql`;
+  chạy test thì vỡ thật: hàm khai `v_id BIGINT` rồi ép `(to_jsonb(NEW)->>'id')::bigint`, mà
+  `engineering_*` dùng UUID → `invalid input syntax for type bigint: "45c086c3-…"` ở **mọi**
+  INSERT; `audit_log.entity_id` cũng `BIGINT` nên về bản chất không chứa được UUID. Đã bỏ
+  trigger khỏi `0085` kèm comment giải thích đầy đủ; truy vết thay bằng cột sẵn có
+  (`decided_by`/`decided_at`/`decision_note` + `package_id`→`provenance`/`trace_id`), đủ trả
+  lời "ai quyết, khi nào, vì sao, nguồn nào" theo §27. **Kiểm chứng ENG-1 không dính lỗi
+  này**: đặc tả ENG-1 mục 2.4 có ghi "gắn trigger" nhưng `0084` thực tế **không có** DO-block
+  đó (xác nhận bằng `pg_trigger`) → đã sửa lại đặc tả cho khớp code thật.
+- **Verify** (Postgres 16 cục bộ): `tests/engineering-intel.test.ts` **11/11 pass** (7 ca
+  thuần + 4 ca tích hợp); `lint` (0 lỗi, 10 warning có sẵn từ trước), `typecheck`, `build`
+  xanh; `gen:erd` khớp (150 bảng); `check:migrations` OK (85 file); `check:sw-exclude` OK.
+- **Nợ kỹ thuật mới ghi nhận:** hạ tầng audit (`audit_log.entity_id BIGINT` +
+  `audit_row_change()`) chưa hỗ trợ khoá UUID — mọi bảng `engineering_*` (ENG-1..ENG-4) nằm
+  ngoài audit trail tự động. Nâng lên khoá đa kiểu cần migration đụng cột trên bảng audit
+  lớn → phải qua staging, làm ở PR riêng khi có nhu cầu thật.
+
 ## ENG-1 — Kho nhận Engineering Object, tích hợp MEP-Agents (2026-08-14)
 
 Track mới `docs/nang-cap/ENG-0-roadmap-tich-hop-engineering-os.md` (lộ trình Foundation

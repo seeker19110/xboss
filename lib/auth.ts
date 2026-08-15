@@ -337,6 +337,12 @@ const CAN_DEFAULT = {
   // integration.md) — xem/duyệt object chờ duyệt trước khi ảnh hưởng BOQ/cost, chỉ Admin/PM
   // (đúng boundary track ENG-* — mục 4 docs/nang-cap/ENG-0-roadmap-tich-hop-engineering-os.md).
   reviewEngineeringObjects: (r?: Role) => r === "admin" || r === "pm",
+  // ENG-2 Engineering Intelligence (docs/nang-cap/ENG-2-engineering-intelligence.md) —
+  // XEM đề xuất kỹ thuật mở cho cả kỹ sư (họ là người đọc nội dung kỹ thuật), nhưng
+  // QUYẾT ĐỊNH (accept/reject/false positive) chỉ Admin/PM vì có hệ quả xuôi dòng
+  // (ENG-3 sẽ dựng workflow từ suggestion đã accept).
+  viewEngineeringSuggestions: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  decideEngineeringSuggestions: (r?: Role) => r === "admin" || r === "pm",
 };
 
 // ===== M50 PR1 — Override quyền trong DB =====

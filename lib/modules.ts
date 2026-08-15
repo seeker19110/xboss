@@ -228,8 +228,18 @@ export const MODULES: ModuleDef[] = [
     key: "engineering",
     nav: [
       { group: "Hệ thống", label: "Đối tượng kỹ thuật (AI)", href: "/engineering", icon: "Boxes" },
+      {
+        group: "Hệ thống",
+        label: "Đề xuất kỹ thuật (AI)",
+        href: "/engineering/suggestions",
+        icon: "Lightbulb",
+      },
     ],
-    permKeys: ["reviewEngineeringObjects"],
+    permKeys: [
+      "reviewEngineeringObjects",
+      "viewEngineeringSuggestions",
+      "decideEngineeringSuggestions",
+    ],
     notificationTypes: [],
     routePrefix: ["/api/engineering", "/api/v1/engineering"],
   },

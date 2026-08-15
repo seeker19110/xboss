@@ -23,9 +23,16 @@ Quyết định (người dùng chốt): track riêng `ENG-1..ENG-4`, không đ�
   - cổng duyệt Admin/PM trước khi ảnh hưởng BOQ/cost + `POST /api/v1/engineering/ingest` (API key
     scope `engineering`) + trang `/engineering`. Xem `PROGRESS.md` mục "ENG-1" để biết chi tiết sự
     cố đã vá (schema thiếu migration, bug tham số Postgres, sai FK actor).
-- **ENG-2 (Engineering Intelligence), ENG-3 (Engineering Workflow OS), ENG-4 (Multi-Agent
-  Engineering OS)** — **CHƯA viết đặc tả** (có chủ đích, đúng nguyên tắc #10 "đừng xây hạ tầng
-  trước khi có tải thực tế thật") — chờ ENG-1 chạy thật với dữ liệu MEPF-Agents gửi sang.
+- **`ENGINEERING-OS-ENG2-ENG3-ENG4.md`** — đặc tả **kiến trúc/khái niệm** cho 3 phase còn lại
+  (người dùng cung cấp): pipeline intelligence, evidence-first, 3-gate approval + 5 approval
+  profile, 7-bước conflict protocol, Controlled Autonomy boundary. Là **nguồn yêu cầu**; mỗi
+  phase có thêm 1 file `ENG-<n>-*.md` là bản **thi hành** (schema DDL/route/lib/test) cho XBoss.
+- **`ENG-2-engineering-intelligence.md`** — ✅ **xong** (2026-08-15):
+  `migrations/0085_engineering_intelligence.sql` (packages/suggestions/evidence),
+  `lib/engineering-intel.ts` (ranking + confidence + evidence gate, đều là hàm xác định,
+  không gọi LLM), `POST /api/v1/engineering/intelligence`, trang `/engineering/suggestions`.
+- **ENG-3 (Engineering Workflow OS), ENG-4 (Multi-Agent Engineering OS)** — đang triển khai
+  tiếp theo thứ tự §31 của đặc tả khái niệm.
 
 ## Danh mục (nhóm → module gộp bên trong)
 

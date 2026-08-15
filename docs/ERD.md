@@ -3297,6 +3297,52 @@
 - `custom_field_defs_pkey`: UNIQUE INDEX custom_field_defs_pkey ON public.custom_field_defs USING btree (id)
 - `custom_field_defs_scope_key_uidx`: UNIQUE INDEX custom_field_defs_scope_key_uidx ON public.custom_field_defs USING btree (entity_type, COALESCE(project_id, 0), key)
 
+### engineering_evidence
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| suggestion_id | uuid |  |  |
+| kind | text |  |  |
+| statement | text |  |  |
+| source_revision_id | uuid | ✓ |  |
+| object_id | uuid | ✓ |  |
+| locator | text | ✓ |  |
+| standard_ref | text | ✓ |  |
+| sort_order | integer |  | `0` |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `object_id` → `engineering_objects(id)`
+- `source_revision_id` → `engineering_source_revisions(id)`
+- `suggestion_id` → `engineering_suggestions(id)`
+
+**Index:**
+- `engineering_evidence_pkey`: UNIQUE INDEX engineering_evidence_pkey ON public.engineering_evidence USING btree (id)
+- `idx_eng_evidence_suggestion`: INDEX idx_eng_evidence_suggestion ON public.engineering_evidence USING btree (suggestion_id, sort_order)
+
+### engineering_intelligence_packages
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| project_id | integer |  |  |
+| objective | text |  |  |
+| source_revision_id | uuid | ✓ |  |
+| provenance | jsonb |  | `'{}'::jsonb` |
+| trace_id | text | ✓ |  |
+| api_key_id | integer | ✓ |  |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `api_key_id` → `api_keys(id)`
+- `project_id` → `projects(id)`
+- `source_revision_id` → `engineering_source_revisions(id)`
+
+**Index:**
+- `engineering_intelligence_packages_pkey`: UNIQUE INDEX engineering_intelligence_packages_pkey ON public.engineering_intelligence_packages USING btree (id)
+- `idx_eng_ip_project`: INDEX idx_eng_ip_project ON public.engineering_intelligence_packages USING btree (project_id, created_at DESC)
+
 ### engineering_object_relations
 
 | Cột | Kiểu | Null | Default |
@@ -3428,6 +3474,46 @@
 **Index:**
 - `engineering_sources_pkey`: UNIQUE INDEX engineering_sources_pkey ON public.engineering_sources USING btree (id)
 - `idx_engineering_sources_project`: INDEX idx_engineering_sources_project ON public.engineering_sources USING btree (project_id, created_at DESC)
+
+### engineering_suggestions
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| package_id | uuid | ✓ |  |
+| project_id | integer |  |  |
+| object_id | uuid | ✓ |  |
+| suggestion_class | text |  |  |
+| title | text |  |  |
+| body | text | ✓ |  |
+| priority | text |  |  |
+| severity | text |  | `'medium'::text` |
+| confidence | text |  | `'unknown'::text` |
+| confidence_signals | jsonb |  | `'{}'::jsonb` |
+| impact | text | ✓ |  |
+| urgency | text | ✓ |  |
+| reversible | boolean | ✓ |  |
+| estimated_effort | text | ✓ |  |
+| status | text |  | `'open'::text` |
+| decided_by | integer | ✓ |  |
+| decided_at | timestamptz | ✓ |  |
+| decision_note | text | ✓ |  |
+| workflow_id | uuid | ✓ |  |
+| created_at | timestamptz |  | `now()` |
+| updated_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `decided_by` → `users(id)`
+- `object_id` → `engineering_objects(id)`
+- `package_id` → `engineering_intelligence_packages(id)`
+- `project_id` → `projects(id)`
+
+**Index:**
+- `engineering_suggestions_pkey`: UNIQUE INDEX engineering_suggestions_pkey ON public.engineering_suggestions USING btree (id)
+- `idx_eng_sug_object`: INDEX idx_eng_sug_object ON public.engineering_suggestions USING btree (object_id)
+- `idx_eng_sug_package`: INDEX idx_eng_sug_package ON public.engineering_suggestions USING btree (package_id)
+- `idx_eng_sug_project_class`: INDEX idx_eng_sug_project_class ON public.engineering_suggestions USING btree (project_id, suggestion_class)
+- `idx_eng_sug_project_status`: INDEX idx_eng_sug_project_status ON public.engineering_suggestions USING btree (project_id, status)
 
 ### feature_flags
 
