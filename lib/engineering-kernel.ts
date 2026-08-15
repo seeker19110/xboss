@@ -375,6 +375,211 @@ export async function upsertEngineeringObjectFromExternal(
   });
 }
 
+// ---------------------------------------------------------------------------------------
+// ENG-5 (C1) — ingest theo EXTERNAL KEY, lũy đẳng khi agent retry.
+// Đặc tả: docs/nang-cap/ENG-5-integration-contract-pilot.md §2.2/§3.3.
+// Vì sao: agent ngoài KHÔNG biết UUID nội bộ của XBoss, nên mọi tham chiếu nó gửi sang phải
+// là khoá bền vững của chính nó. Ràng buộc DB tương ứng ở migrations/0088.
+// ---------------------------------------------------------------------------------------
+
+export const engineeringSourceExternalInputSchema = engineeringSourceInputSchema.extend({
+  externalKey: z.string().trim().min(1).max(255),
+});
+export type EngineeringSourceExternalInput = z.infer<typeof engineeringSourceExternalInputSchema>;
+
+export const engineeringSourceRevisionExternalInputSchema = z.object({
+  sourceId: z.string().uuid(),
+  externalRevisionKey: z.string().trim().min(1).max(255),
+  revisionNo: z.coerce.number().int().positive().nullable().optional(),
+  objectKey: z.string().trim().max(2000).nullable().optional(),
+  sha256: z
+    .string()
+    .trim()
+    .regex(/^[a-f0-9]{64}$/i)
+    .nullable()
+    .optional(),
+  parserName: z.string().trim().max(255).nullable().optional(),
+  parserVersion: z.string().trim().max(255).nullable().optional(),
+  metadata: z.record(z.string(), z.unknown()).default({}),
+});
+export type EngineeringSourceRevisionExternalInput = z.infer<
+  typeof engineeringSourceRevisionExternalInputSchema
+>;
+
+// Relation gửi từ agent: 2 đầu là external key, KHÔNG phải UUID (ENG-5 §2.2).
+export const engineeringRelationExternalInputSchema = z.object({
+  projectId: z.coerce.number().int().positive(),
+  fromExternalKey: z.string().trim().min(1).max(255),
+  toExternalKey: z.string().trim().min(1).max(255),
+  relationType: z.string().trim().min(1).max(100),
+  properties: z.record(z.string(), z.unknown()).default({}),
+  sourceRevisionId: z.string().uuid().nullable().optional(),
+});
+export type EngineeringRelationExternalInput = z.infer<
+  typeof engineeringRelationExternalInputSchema
+>;
+
+// Upsert source theo (project_id, external_key). Retry cùng externalKey KHÔNG tạo source mới
+// — cập nhật metadata mô tả rồi trả lại đúng id cũ.
+export async function upsertEngineeringSourceFromExternal(
+  input: EngineeringSourceExternalInput,
+  userId: number,
+): Promise<{ id: string; created: boolean }> {
+  const existing = await queryOne<{ id: string }>(
+    `SELECT id FROM engineering_sources WHERE project_id = ? AND external_key = ?`,
+    input.projectId,
+    input.externalKey,
+  );
+  if (existing) {
+    await run(
+      `UPDATE engineering_sources
+          SET source_type = ?, title = ?, object_key = ?, mime_type = ?, sha256 = ?,
+              metadata = ?::jsonb
+        WHERE id = ?`,
+      input.sourceType,
+      input.title,
+      input.objectKey ?? null,
+      input.mimeType ?? null,
+      input.sha256 ?? null,
+      JSON.stringify(input.metadata),
+      existing.id,
+    );
+    return { id: existing.id, created: false };
+  }
+  const created = await queryOne<{ id: string }>(
+    `INSERT INTO engineering_sources
+       (project_id, source_type, title, external_key, object_key, mime_type, sha256, metadata, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?)
+     RETURNING id`,
+    input.projectId,
+    input.sourceType,
+    input.title,
+    input.externalKey,
+    input.objectKey ?? null,
+    input.mimeType ?? null,
+    input.sha256 ?? null,
+    JSON.stringify(input.metadata),
+    userId,
+  );
+  if (!created) throw new Error("Tạo nguồn kỹ thuật thất bại");
+  return { id: created.id, created: true };
+}
+
+// Upsert revision theo (source_id, external_revision_key). `revisionNo` chỉ để HIỂN THỊ
+// (ENG-5 §3.3) — agent không gửi thì tự cấp số tiếp theo. Khoá dòng source (FOR UPDATE)
+// trước khi tính MAX(revision_no) để 2 request song song không cùng lấy một số (§4).
+export async function upsertSourceRevisionFromExternal(
+  input: EngineeringSourceRevisionExternalInput,
+  userId: number,
+): Promise<{ id: string; created: boolean; revisionNo: number }> {
+  const existing = await queryOne<{ id: string; revisionNo: number }>(
+    `SELECT id, revision_no AS "revisionNo" FROM engineering_source_revisions
+      WHERE source_id = ? AND external_revision_key = ?`,
+    input.sourceId,
+    input.externalRevisionKey,
+  );
+  if (existing) return { id: existing.id, created: false, revisionNo: existing.revisionNo };
+
+  // Khoá source để nối tiếp revision_no an toàn khi có request đồng thời.
+  await queryOne(`SELECT id FROM engineering_sources WHERE id = ? FOR UPDATE`, input.sourceId);
+  const next = await queryOne<{ n: number }>(
+    `SELECT COALESCE(MAX(revision_no), 0) + 1 AS n FROM engineering_source_revisions WHERE source_id = ?`,
+    input.sourceId,
+  );
+  const revisionNo = input.revisionNo ?? next?.n ?? 1;
+  const created = await queryOne<{ id: string; revisionNo: number }>(
+    `INSERT INTO engineering_source_revisions
+       (source_id, revision_no, external_revision_key, object_key, sha256, parser_name,
+        parser_version, metadata, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?)
+     RETURNING id, revision_no AS "revisionNo"`,
+    input.sourceId,
+    revisionNo,
+    input.externalRevisionKey,
+    input.objectKey ?? null,
+    input.sha256 ?? null,
+    input.parserName ?? null,
+    input.parserVersion ?? null,
+    JSON.stringify(input.metadata),
+    userId,
+  );
+  if (!created) throw new Error("Tạo revision nguồn thất bại");
+  return { id: created.id, created: true, revisionNo: created.revisionNo };
+}
+
+// Lỗi có vị trí lỗi theo JSON Pointer (ENG-5 §3.1: 422 trả lỗi theo JSON Pointer).
+export class EngineeringContractError extends Error {
+  constructor(
+    message: string,
+    readonly pointer: string,
+  ) {
+    super(message);
+    this.name = "EngineeringContractError";
+  }
+}
+
+// Resolve 2 external key → UUID rồi upsert relation. Lũy đẳng nhờ unique index logic
+// uq_engineering_object_relations_logical (0088) — retry KHÔNG nhân bản relation.
+// Cách ly dự án được DB bảo đảm bằng composite FK; ở đây chỉ resolve trong đúng project
+// nên key của dự án khác coi như "không tồn tại" (không lộ sự tồn tại của dữ liệu dự án khác).
+export async function upsertEngineeringRelationFromExternal(
+  input: EngineeringRelationExternalInput,
+  userId: number,
+  pointerPrefix = "",
+): Promise<{ id: string; created: boolean }> {
+  const ends = await query<{ externalKey: string; id: string }>(
+    `SELECT external_key AS "externalKey", id FROM engineering_objects
+      WHERE project_id = ? AND external_key IN (?, ?)`,
+    input.projectId,
+    input.fromExternalKey,
+    input.toExternalKey,
+  );
+  const byKey = new Map(ends.map((r) => [r.externalKey, r.id]));
+  const fromId = byKey.get(input.fromExternalKey);
+  const toId = byKey.get(input.toExternalKey);
+  if (!fromId)
+    throw new EngineeringContractError(
+      `fromExternalKey "${input.fromExternalKey}" không tồn tại trong dự án này`,
+      `${pointerPrefix}/fromExternalKey`,
+    );
+  if (!toId)
+    throw new EngineeringContractError(
+      `toExternalKey "${input.toExternalKey}" không tồn tại trong dự án này`,
+      `${pointerPrefix}/toExternalKey`,
+    );
+
+  const created = await queryOne<{ id: string }>(
+    `INSERT INTO engineering_object_relations
+       (project_id, from_object_id, to_object_id, relation_type, properties, source_revision_id, created_by)
+     VALUES (?, ?, ?, ?, ?::jsonb, ?, ?)
+     ON CONFLICT DO NOTHING
+     RETURNING id`,
+    input.projectId,
+    fromId,
+    toId,
+    input.relationType,
+    JSON.stringify(input.properties),
+    input.sourceRevisionId ?? null,
+    userId,
+  );
+  if (created) return { id: created.id, created: true };
+
+  // ON CONFLICT DO NOTHING → relation đã có sẵn (retry). Đọc lại id để trả về ổn định.
+  const existing = await queryOne<{ id: string }>(
+    `SELECT id FROM engineering_object_relations
+      WHERE project_id = ? AND from_object_id = ? AND to_object_id = ? AND relation_type = ?
+        AND COALESCE(source_revision_id, '00000000-0000-0000-0000-000000000000'::uuid)
+            = COALESCE(?::uuid, '00000000-0000-0000-0000-000000000000'::uuid)`,
+    input.projectId,
+    fromId,
+    toId,
+    input.relationType,
+    input.sourceRevisionId ?? null,
+  );
+  if (!existing) throw new Error("Không resolve được relation sau ON CONFLICT");
+  return { id: existing.id, created: false };
+}
+
 // Chuyển status: chỉ pending_review/approved/rejected <-> nhau (KHÔNG đụng 'void' — soft-
 // delete là thao tác riêng, ngoài phạm vi PR1). Ném lỗi nếu object không tồn tại/không
 // thuộc projectId (cách ly đa dự án, pattern billBelongsToProject ở lib/finance.ts) — route

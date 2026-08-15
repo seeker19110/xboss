@@ -3400,6 +3400,32 @@
 - `engineering_evidence_pkey`: UNIQUE INDEX engineering_evidence_pkey ON public.engineering_evidence USING btree (id)
 - `idx_eng_evidence_suggestion`: INDEX idx_eng_evidence_suggestion ON public.engineering_evidence USING btree (suggestion_id, sort_order)
 
+### engineering_ingest_requests
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| project_id | integer |  |  |
+| idempotency_key | text |  |  |
+| request_sha256 | text |  |  |
+| status | text |  | `'completed'::text` |
+| response_status | integer |  |  |
+| response_body | jsonb |  | `'{}'::jsonb` |
+| correlation_id | text | ✓ |  |
+| api_key_id | integer | ✓ |  |
+| contract_version | text | ✓ |  |
+| created_at | timestamptz |  | `now()` |
+| expires_at | timestamptz |  | `(now() + '30 days'::interval)` |
+
+**Khóa ngoại:**
+- `api_key_id` → `api_keys(id)`
+- `project_id` → `projects(id)`
+
+**Index:**
+- `engineering_ingest_requests_pkey`: UNIQUE INDEX engineering_ingest_requests_pkey ON public.engineering_ingest_requests USING btree (id)
+- `idx_engineering_ingest_requests_expires`: INDEX idx_engineering_ingest_requests_expires ON public.engineering_ingest_requests USING btree (expires_at)
+- `uq_engineering_ingest_requests_key`: UNIQUE INDEX uq_engineering_ingest_requests_key ON public.engineering_ingest_requests USING btree (project_id, idempotency_key)
+
 ### engineering_intelligence_packages
 
 | Cột | Kiểu | Null | Default |
@@ -3438,9 +3464,17 @@
 
 **Khóa ngoại:**
 - `created_by` → `users(id)`
+- `from_object_id` → `engineering_objects(project_id)`
 - `from_object_id` → `engineering_objects(id)`
+- `from_object_id` → `engineering_objects(id)`
+- `project_id` → `engineering_objects(project_id)`
+- `project_id` → `engineering_objects(id)`
 - `project_id` → `projects(id)`
+- `project_id` → `engineering_objects(project_id)`
+- `project_id` → `engineering_objects(id)`
 - `source_revision_id` → `engineering_source_revisions(id)`
+- `to_object_id` → `engineering_objects(id)`
+- `to_object_id` → `engineering_objects(project_id)`
 - `to_object_id` → `engineering_objects(id)`
 
 **Index:**
@@ -3448,6 +3482,7 @@
 - `idx_engineering_object_relations_from`: INDEX idx_engineering_object_relations_from ON public.engineering_object_relations USING btree (from_object_id)
 - `idx_engineering_object_relations_project`: INDEX idx_engineering_object_relations_project ON public.engineering_object_relations USING btree (project_id)
 - `idx_engineering_object_relations_to`: INDEX idx_engineering_object_relations_to ON public.engineering_object_relations USING btree (to_object_id)
+- `uq_engineering_object_relations_logical`: UNIQUE INDEX uq_engineering_object_relations_logical ON public.engineering_object_relations USING btree (project_id, from_object_id, to_object_id, relation_type, COALESCE(source_revision_id, '00000000-0000-0000-0000-000000000000'::uuid))
 
 ### engineering_object_revisions
 
@@ -3507,6 +3542,7 @@
 - `idx_engineering_objects_project_status`: INDEX idx_engineering_objects_project_status ON public.engineering_objects USING btree (project_id, status)
 - `idx_engineering_objects_project_type`: INDEX idx_engineering_objects_project_type ON public.engineering_objects USING btree (project_id, object_type)
 - `uq_engineering_objects_external`: UNIQUE INDEX uq_engineering_objects_external ON public.engineering_objects USING btree (project_id, external_key) WHERE (external_key IS NOT NULL)
+- `uq_engineering_objects_id_project`: UNIQUE INDEX uq_engineering_objects_id_project ON public.engineering_objects USING btree (id, project_id)
 
 ### engineering_source_revisions
 
@@ -3522,6 +3558,7 @@
 | metadata | jsonb |  | `'{}'::jsonb` |
 | created_by | integer |  |  |
 | created_at | timestamptz |  | `now()` |
+| external_revision_key | text | ✓ |  |
 
 **Khóa ngoại:**
 - `created_by` → `users(id)`
@@ -3530,6 +3567,7 @@
 **Index:**
 - `engineering_source_revisions_pkey`: UNIQUE INDEX engineering_source_revisions_pkey ON public.engineering_source_revisions USING btree (id)
 - `engineering_source_revisions_source_id_revision_no_key`: UNIQUE INDEX engineering_source_revisions_source_id_revision_no_key ON public.engineering_source_revisions USING btree (source_id, revision_no)
+- `uq_engineering_source_revisions_external`: UNIQUE INDEX uq_engineering_source_revisions_external ON public.engineering_source_revisions USING btree (source_id, external_revision_key) WHERE (external_revision_key IS NOT NULL)
 
 ### engineering_sources
 
@@ -3545,6 +3583,7 @@
 | metadata | jsonb |  | `'{}'::jsonb` |
 | created_by | integer |  |  |
 | created_at | timestamptz |  | `now()` |
+| external_key | text | ✓ |  |
 
 **Khóa ngoại:**
 - `created_by` → `users(id)`
@@ -3553,6 +3592,7 @@
 **Index:**
 - `engineering_sources_pkey`: UNIQUE INDEX engineering_sources_pkey ON public.engineering_sources USING btree (id)
 - `idx_engineering_sources_project`: INDEX idx_engineering_sources_project ON public.engineering_sources USING btree (project_id, created_at DESC)
+- `uq_engineering_sources_external`: UNIQUE INDEX uq_engineering_sources_external ON public.engineering_sources USING btree (project_id, external_key) WHERE (external_key IS NOT NULL)
 
 ### engineering_suggestions
 
