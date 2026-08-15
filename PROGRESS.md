@@ -8,6 +8,136 @@
 
 - **GĐ 4–5 — Phát triển & nâng chất lượng.** Sản phẩm đã chạy thật (v0.2.1, tự host VPS), đang phát triển/tinh chỉnh tính năng liên tục **và** đang áp bộ khung quy trình/chất lượng (brownfield) theo `docs/framework/AP-DUNG-vao-du-an-co-san.md`.
 
+## ENG-4 — Multi-Agent Engineering OS (2026-08-15)
+
+Đặc tả thi hành `docs/nang-cap/ENG-4-multi-agent-engineering-os.md` (cụ thể hoá
+`ENGINEERING-OS-ENG2-ENG3-ENG4.md` §15–§28) viết trước, rồi code. **Đóng track ENG-1→ENG-4.**
+
+- **Vai trò của XBoss trong ENG-4: bên ĐIỀU PHỐI + LƯU VẾT, không phải bên chạy agent.**
+  Agent thật (MEPF-Agents) chạy ở hệ của họ; XBoss nhận claim, phát hiện/phân loại xung đột,
+  đề xuất cách phân xử, ghi mức đồng thuận — đúng vai Reconciler/Verifier của §16.
+- **[AI, đã làm]** `migrations/0087_engineering_agents.sql`: `engineering_agent_sessions`
+  (5 mức đồng thuận §22 + giới hạn cứng `max_rounds`/`conflict_budget` §21),
+  `engineering_agent_claims` (§24 — mỗi claim mang đủ vai trò/nguồn/giả định/độ tin, không
+  truyền hidden state), `engineering_conflicts` (5 loại §17 × 8 giai đoạn của giao thức 7
+  bước §18, **bắt buộc ghi `resolution_method`**).
+- **[AI, đã làm] `lib/engineering-agents.ts` — phân xử KHÔNG dùng majority vote (§19):**
+  `detectConflicts` (nhiều agent nói **cùng** một điều là đồng thuận, không đếm phiếu),
+  `classifyConflict` (chọn loại **khó nhất** trước, không hạ cấp), `proposeResolution` (data
+  → theo `AUTHORITY_ORDER` §20 nên **1 nguồn có thẩm quyền thắng 2 nguồn suy diễn**;
+  interpretation → chênh <2 bậc độ tin thì cần người; constraint chạm `safety_law`/`contract`
+  → luôn cần người; execution/scope → luôn cần người). `assertVoteAllowed()` biến "lỡ dùng
+  vote sai chỗ" thành **lỗi cứng** (4 điều kiện cấm, có test đủ).
+- **[AI, đã làm] `computeConsensus`**: hết `max_rounds` mà còn xung đột → **`no_consensus` +
+  đóng phiên**, và UI cố ý **không tô đỏ** trạng thái này — §21/§22 nói rõ đây là kết quả
+  hợp lệ, không phải sự cố; thà không đồng thuận còn hơn ép consensus giả.
+- **Ranh giới giữ nghiêm (§23, §26):** ENG-3 vẫn là ranh giới uỷ quyền — ENG-4 không tạo/
+  duyệt workflow, không ghi `boq_items`/`payment_bills`/`tasks`. Cột
+  `engineering_agent_sessions.workflow_id` để sẵn nhưng **ENG-4 không bao giờ tự ghi**; có
+  test bất biến ghim đúng điều này.
+- **[AI, đã làm]** 5 route (`/api/v1/engineering/agent-sessions[/:id/claims]` cho agent qua
+  API key; `/api/engineering/agent-sessions[/:id][/conflicts/:cid/resolve]` cho người), 2
+  quyền mới, trang `/engineering/agent-sessions` (claim theo agent + xung đột kèm **phương
+  pháp phân xử và lý do** + banner nhắc "kế hoạch chưa có hiệu lực thi hành").
+- **Verify**: `tests/engineering-agents.test.ts` **13/13 pass ngay lần đầu** (8 ca thuần phủ
+  đủ luật phân xử/cấm vote/5 mức đồng thuận + 5 ca tích hợp); `lint`/`typecheck`/`build`
+  xanh; `gen:erd` khớp (156 bảng); `check:migrations` OK (87 file); `check:sw-exclude` OK.
+
+## ENG-3 — Engineering Workflow OS (2026-08-15)
+
+Đặc tả thi hành `docs/nang-cap/ENG-3-engineering-workflow-os.md` (cụ thể hoá
+`ENGINEERING-OS-ENG2-ENG3-ENG4.md` §7–§14) viết trước, rồi code.
+
+- **ENG-3 là RANH GIỚI UỶ QUYỀN của cả track** (§26): ENG-2 chỉ đề xuất, ENG-4 chỉ phối hợp
+  — mọi thay đổi có side effect phải đi qua đây.
+- **[AI, quyết định kiến trúc] KHÔNG tái dùng `lib/approvals.ts` (M46 Approval Engine).** Đã
+  đọc kỹ trước khi quyết (nguyên tắc "tái dùng trước khi viết mới") — M46 khác bản chất ở 4
+  điểm: loại thực thể khoá đóng 4 giá trị nghiệp vụ, chọn cấp duyệt theo **ngưỡng tiền**,
+  không có Gate 0, vòng đời chỉ 4 trạng thái. ENG-3 cần: workflow kỹ thuật tự do, chọn cấp
+  theo **risk 8 chiều**, Gate 0 bắt buộc, state machine 13 trạng thái. → Bảng/lib riêng,
+  **không đụng M46**; mọi luồng VO/IPC/nghiệm thu hiện có giữ nguyên 100%.
+- **[AI, đã làm]** `migrations/0086_engineering_workflows.sql`: `engineering_workflows`
+  (profile A–E, risk_class, 13 state, `reversible`/`rollback_strategy` bắt buộc khai trước
+  khi duyệt theo §14, `gate0_result`), `engineering_workflow_gates` (§12 — approval **không
+  phải boolean**: ai ký/khi nào/nhận xét/evidence/vai trò yêu cầu),
+  `engineering_workflow_events` (§11 "mọi state transition phải audit được" — tự ghi audit
+  có ngữ nghĩa `from→to`, vì trigger `audit_row_change()` không dùng được cho khoá UUID).
+- **[AI, đã làm] `lib/engineering-workflow.ts` — policy engine không có đường hạ cấp:**
+  `classifyRisk` (safetyRisk → `critical` **bất kể mọi yếu tố khác**; regulatory hoặc
+  non-reversible → `high`; tiền ≥100tr/liên ngành/bất định cao → `medium`), `selectProfile`
+  (A–E), `gatesForProfile` (A=0…E=4 gate). **Hàm không nhận tham số `confidence`/`override`
+  nào** — muốn đổi profile phải đổi chính dữ liệu rủi ro (có audit), đúng §10 "không dùng AI
+  confidence cao để giảm approval level".
+- **[AI, đã làm] Gate 0 (§8) thực sự CHẶN**: 6 kiểm tra (tiêu đề, khai `reversible`,
+  non-reversible phải có `rollbackStrategy`, suggestion nguồn tồn tại + **đã `accepted`**,
+  không trùng workflow đang mở). Fail → ném `Gate0FailedError`, route trả 422 kèm checklist,
+  **không tạo bản ghi nào** (test ghim bằng `COUNT(*)` trước/sau).
+- **[AI, đã làm] Separation of duties (§13)**: người tạo không được tự ký (áp cho mọi mức);
+  với `high`/`critical` thêm luật 1 người không ký 2 gate + QA độc lập phải khác người ký QA
+  chuyên ngành. Ký gate **tuần tự**, không nhảy cóc; từ chối 1 gate → workflow `rejected`
+  ngay. Mọi hàm ghi bọc `withTransaction` + `SELECT … FOR UPDATE` (chống 2 người ký cùng lúc).
+- **Ranh giới có chủ đích:** hệ thống **không tự thực thi** side effect nghiệp vụ.
+  `executing`/`completed` do NGƯỜI xác nhận qua `POST .../transition`, hệ chỉ ghi nhận +
+  audit — autonomy phải được cấp tường minh theo §26, chưa có cơ chế cấp đó nên chưa có
+  executor tự động. Ghi rõ trong đặc tả để không ai tưởng là thiếu sót.
+- **[AI, đã làm]** 5 route `/api/engineering/workflows*`, 3 quyền mới
+  (`viewEngineeringWorkflows` gồm cả BCH, `createEngineeringWorkflow`,
+  `approveEngineeringGate` — từng gate còn kiểm thêm `required_role` ở tầng lib), trang
+  `/engineering/workflows` (checklist Gate 0 giải thích vì sao bị chặn + trạng thái từng
+  cửa + dòng thời gian).
+- **Verify** (Postgres 16 cục bộ): `tests/engineering-workflow.test.ts` **13/13 pass** (5 ca
+  thuần + 8 ca tích hợp gồm đủ kịch bản SoD, Gate 0 chặn, reject sớm, PROFILE-A, cách ly đa
+  dự án); `lint`/`typecheck`/`build` xanh; `gen:erd` khớp (153 bảng); `check:migrations` OK
+  (86 file); `check:sw-exclude` OK.
+
+## ENG-2 — Engineering Intelligence (2026-08-15)
+
+Đặc tả khái niệm gốc `docs/nang-cap/ENGINEERING-OS-ENG2-ENG3-ENG4.md` (1224 dòng, người
+dùng cung cấp — cherry-pick từ nhánh `agent/engineering-os-spec`) được cụ thể hoá thành đặc
+tả **thi hành** `docs/nang-cap/ENG-2-engineering-intelligence.md` (schema DDL, API, lib,
+test) rồi mới code — đúng yêu cầu "hoàn thiện đặc tả rồi code".
+
+- **Ranh giới phase giữ nghiêm** (§0 core principle): ENG-2 = KNOW/REASON/SUGGEST. Không
+  route/hàm nào ghi sang `boq_items`/`payment_bills`/`tasks`/`engineering_objects.status`.
+  "Accept" một suggestion chỉ đổi `status` của chính nó — biến thành hành động thật là
+  ENG-3 (cột `workflow_id` để sẵn, ENG-2 không ghi).
+- **[AI, đã làm]** `migrations/0085_engineering_intelligence.sql`: 3 bảng —
+  `engineering_intelligence_packages` (§1.3 Intelligence Package + provenance + trace_id),
+  `engineering_suggestions` (8 lớp §2.1 A–H, 7 mức ranking §3, 4 mức confidence §5, 7 trạng
+  thái gồm `needs_review` do hệ tự đặt), `engineering_evidence` (§4 evidence-first: 4 loại
+  `fact`/`inference`/`assumption`/`recommendation`).
+- **[AI, đã làm] `lib/engineering-intel.ts` — 3 hàm XÁC ĐỊNH, không gọi LLM:**
+  `rankSuggestion` (priority là trục chính, confidence **không** vượt mặt được — cảnh báo an
+  toàn `unknown` vẫn xếp trên tối ưu hoá `high`, đúng §3+§10); `computeConfidence` (tính từ
+  6 tín hiệu, `<3` tín hiệu → `unknown` chứ không phải `low`; `ruleValidated=false` ghim
+  trần `medium`); `initialStatus` (thiếu evidence loại `fact` → `needs_review`; cảnh báo an
+  toàn/pháp lý mà `confidence=unknown` cũng → `needs_review`). **Confidence luôn tính lại ở
+  server** — giá trị bên gọi tự khai bị bỏ qua hoàn toàn (§5 "confidence không phải LLM tự
+  chấm điểm"), có test ghim đúng điều này.
+- **[AI, đã làm]** `POST /api/v1/engineering/intelligence` (API key scope `engineering`);
+  `GET /api/engineering/suggestions[/:id]` + `POST .../:id/decide` (session auth); 2 quyền
+  mới `CAN.viewEngineeringSuggestions` (Admin/PM/**Kỹ sư** — kỹ sư là người đọc nội dung kỹ
+  thuật) và `CAN.decideEngineeringSuggestions` (Admin/PM). Trang `/engineering/suggestions`
+  hiển thị evidence **tách bạch 4 loại** kèm nhãn tiếng Việt (Sự thật/Suy luận/Giả định/
+  Khuyến nghị) — điểm cốt lõi chống hallucination, cộng banner giải thích khi `needs_review`.
+- **[AI, phát hiện + xử lý — bug hạ tầng thật] `audit_row_change()` (migration 0049) KHÔNG
+  dùng được cho bảng khoá chính UUID.** Dự định gắn trigger audit như `0061_api_keys.sql`;
+  chạy test thì vỡ thật: hàm khai `v_id BIGINT` rồi ép `(to_jsonb(NEW)->>'id')::bigint`, mà
+  `engineering_*` dùng UUID → `invalid input syntax for type bigint: "45c086c3-…"` ở **mọi**
+  INSERT; `audit_log.entity_id` cũng `BIGINT` nên về bản chất không chứa được UUID. Đã bỏ
+  trigger khỏi `0085` kèm comment giải thích đầy đủ; truy vết thay bằng cột sẵn có
+  (`decided_by`/`decided_at`/`decision_note` + `package_id`→`provenance`/`trace_id`), đủ trả
+  lời "ai quyết, khi nào, vì sao, nguồn nào" theo §27. **Kiểm chứng ENG-1 không dính lỗi
+  này**: đặc tả ENG-1 mục 2.4 có ghi "gắn trigger" nhưng `0084` thực tế **không có** DO-block
+  đó (xác nhận bằng `pg_trigger`) → đã sửa lại đặc tả cho khớp code thật.
+- **Verify** (Postgres 16 cục bộ): `tests/engineering-intel.test.ts` **11/11 pass** (7 ca
+  thuần + 4 ca tích hợp); `lint` (0 lỗi, 10 warning có sẵn từ trước), `typecheck`, `build`
+  xanh; `gen:erd` khớp (150 bảng); `check:migrations` OK (85 file); `check:sw-exclude` OK.
+- **Nợ kỹ thuật mới ghi nhận:** hạ tầng audit (`audit_log.entity_id BIGINT` +
+  `audit_row_change()`) chưa hỗ trợ khoá UUID — mọi bảng `engineering_*` (ENG-1..ENG-4) nằm
+  ngoài audit trail tự động. Nâng lên khoá đa kiểu cần migration đụng cột trên bảng audit
+  lớn → phải qua staging, làm ở PR riêng khi có nhu cầu thật.
+
 ## ENG-1 — Kho nhận Engineering Object, tích hợp MEP-Agents (2026-08-14)
 
 Track mới `docs/nang-cap/ENG-0-roadmap-tich-hop-engineering-os.md` (lộ trình Foundation

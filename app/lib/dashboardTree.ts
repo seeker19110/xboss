@@ -74,6 +74,7 @@ import {
   KeyRound,
   ToggleRight,
   Boxes,
+  Lightbulb,
 } from "lucide-react";
 import type { Role } from "@/lib/roles";
 
@@ -426,6 +427,27 @@ export const DASHBOARD_TREE: DashCluster[] = [
         icon: Boxes,
         roles: ["admin", "pm"],
       }, // ENG-1 — kho nhận Engineering Object từ hệ thống ngoài, xem docs/nang-cap/ENG-1-mep-agent-integration.md
+      {
+        id: "dash.engineering-suggestions",
+        href: "/engineering/suggestions",
+        label: "Đề xuất kỹ thuật (AI)",
+        icon: Lightbulb,
+        roles: ["admin", "pm", "engineer"],
+      }, // ENG-2 — đề xuất có bằng chứng, xem docs/nang-cap/ENG-2-engineering-intelligence.md
+      {
+        id: "dash.engineering-workflows",
+        href: "/engineering/workflows",
+        label: "Workflow kỹ thuật",
+        icon: Workflow,
+        roles: ["admin", "pm", "engineer", "bch"],
+      }, // ENG-3 — ranh giới uỷ quyền, xem docs/nang-cap/ENG-3-engineering-workflow-os.md
+      {
+        id: "dash.engineering-agent-sessions",
+        href: "/engineering/agent-sessions",
+        label: "Phiên phối hợp agent",
+        icon: Network,
+        roles: ["admin", "pm", "engineer", "bch"],
+      }, // ENG-4 — hoà giải đa agent, xem docs/nang-cap/ENG-4-multi-agent-engineering-os.md
       {
         id: "dash.import-excel",
         href: "/import",

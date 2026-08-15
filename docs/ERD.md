@@ -3297,6 +3297,131 @@
 - `custom_field_defs_pkey`: UNIQUE INDEX custom_field_defs_pkey ON public.custom_field_defs USING btree (id)
 - `custom_field_defs_scope_key_uidx`: UNIQUE INDEX custom_field_defs_scope_key_uidx ON public.custom_field_defs USING btree (entity_type, COALESCE(project_id, 0), key)
 
+### engineering_agent_claims
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| session_id | uuid |  |  |
+| agent_role | text |  |  |
+| agent_name | text |  |  |
+| topic | text |  |  |
+| claim | text |  |  |
+| payload | jsonb |  | `'{}'::jsonb` |
+| assumptions | jsonb |  | `'[]'::jsonb` |
+| confidence | text |  | `'unknown'::text` |
+| confidence_signals | jsonb |  | `'{}'::jsonb` |
+| source_authority | text |  | `'derived'::text` |
+| source_revision_id | uuid | ✓ |  |
+| round | integer |  | `1` |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `session_id` → `engineering_agent_sessions(id)`
+- `source_revision_id` → `engineering_source_revisions(id)`
+
+**Index:**
+- `engineering_agent_claims_pkey`: UNIQUE INDEX engineering_agent_claims_pkey ON public.engineering_agent_claims USING btree (id)
+- `idx_eng_ac_session`: INDEX idx_eng_ac_session ON public.engineering_agent_claims USING btree (session_id, topic)
+
+### engineering_agent_sessions
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| project_id | integer |  |  |
+| intent | text |  |  |
+| consensus | text |  | `'pending'::text` |
+| status | text |  | `'open'::text` |
+| max_rounds | integer |  | `5` |
+| round_count | integer |  | `0` |
+| conflict_budget | integer |  | `10` |
+| reconciled_plan | jsonb | ✓ |  |
+| workflow_id | uuid | ✓ |  |
+| trace_id | text | ✓ |  |
+| api_key_id | integer | ✓ |  |
+| created_at | timestamptz |  | `now()` |
+| updated_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `api_key_id` → `api_keys(id)`
+- `project_id` → `projects(id)`
+- `workflow_id` → `engineering_workflows(id)`
+
+**Index:**
+- `engineering_agent_sessions_pkey`: UNIQUE INDEX engineering_agent_sessions_pkey ON public.engineering_agent_sessions USING btree (id)
+- `idx_eng_as_project`: INDEX idx_eng_as_project ON public.engineering_agent_sessions USING btree (project_id, status)
+
+### engineering_conflicts
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| session_id | uuid |  |  |
+| topic | text |  |  |
+| conflict_type | text |  |  |
+| stage | text |  | `'detected'::text` |
+| claim_ids | jsonb |  | `'[]'::jsonb` |
+| resolution | text | ✓ |  |
+| resolution_method | text | ✓ |  |
+| resolved_by | integer | ✓ |  |
+| resolved_at | timestamptz | ✓ |  |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `resolved_by` → `users(id)`
+- `session_id` → `engineering_agent_sessions(id)`
+
+**Index:**
+- `engineering_conflicts_pkey`: UNIQUE INDEX engineering_conflicts_pkey ON public.engineering_conflicts USING btree (id)
+- `idx_eng_cf_session`: INDEX idx_eng_cf_session ON public.engineering_conflicts USING btree (session_id, stage)
+
+### engineering_evidence
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| suggestion_id | uuid |  |  |
+| kind | text |  |  |
+| statement | text |  |  |
+| source_revision_id | uuid | ✓ |  |
+| object_id | uuid | ✓ |  |
+| locator | text | ✓ |  |
+| standard_ref | text | ✓ |  |
+| sort_order | integer |  | `0` |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `object_id` → `engineering_objects(id)`
+- `source_revision_id` → `engineering_source_revisions(id)`
+- `suggestion_id` → `engineering_suggestions(id)`
+
+**Index:**
+- `engineering_evidence_pkey`: UNIQUE INDEX engineering_evidence_pkey ON public.engineering_evidence USING btree (id)
+- `idx_eng_evidence_suggestion`: INDEX idx_eng_evidence_suggestion ON public.engineering_evidence USING btree (suggestion_id, sort_order)
+
+### engineering_intelligence_packages
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| project_id | integer |  |  |
+| objective | text |  |  |
+| source_revision_id | uuid | ✓ |  |
+| provenance | jsonb |  | `'{}'::jsonb` |
+| trace_id | text | ✓ |  |
+| api_key_id | integer | ✓ |  |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `api_key_id` → `api_keys(id)`
+- `project_id` → `projects(id)`
+- `source_revision_id` → `engineering_source_revisions(id)`
+
+**Index:**
+- `engineering_intelligence_packages_pkey`: UNIQUE INDEX engineering_intelligence_packages_pkey ON public.engineering_intelligence_packages USING btree (id)
+- `idx_eng_ip_project`: INDEX idx_eng_ip_project ON public.engineering_intelligence_packages USING btree (project_id, created_at DESC)
+
 ### engineering_object_relations
 
 | Cột | Kiểu | Null | Default |
@@ -3428,6 +3553,123 @@
 **Index:**
 - `engineering_sources_pkey`: UNIQUE INDEX engineering_sources_pkey ON public.engineering_sources USING btree (id)
 - `idx_engineering_sources_project`: INDEX idx_engineering_sources_project ON public.engineering_sources USING btree (project_id, created_at DESC)
+
+### engineering_suggestions
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| package_id | uuid | ✓ |  |
+| project_id | integer |  |  |
+| object_id | uuid | ✓ |  |
+| suggestion_class | text |  |  |
+| title | text |  |  |
+| body | text | ✓ |  |
+| priority | text |  |  |
+| severity | text |  | `'medium'::text` |
+| confidence | text |  | `'unknown'::text` |
+| confidence_signals | jsonb |  | `'{}'::jsonb` |
+| impact | text | ✓ |  |
+| urgency | text | ✓ |  |
+| reversible | boolean | ✓ |  |
+| estimated_effort | text | ✓ |  |
+| status | text |  | `'open'::text` |
+| decided_by | integer | ✓ |  |
+| decided_at | timestamptz | ✓ |  |
+| decision_note | text | ✓ |  |
+| workflow_id | uuid | ✓ |  |
+| created_at | timestamptz |  | `now()` |
+| updated_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `decided_by` → `users(id)`
+- `object_id` → `engineering_objects(id)`
+- `package_id` → `engineering_intelligence_packages(id)`
+- `project_id` → `projects(id)`
+
+**Index:**
+- `engineering_suggestions_pkey`: UNIQUE INDEX engineering_suggestions_pkey ON public.engineering_suggestions USING btree (id)
+- `idx_eng_sug_object`: INDEX idx_eng_sug_object ON public.engineering_suggestions USING btree (object_id)
+- `idx_eng_sug_package`: INDEX idx_eng_sug_package ON public.engineering_suggestions USING btree (package_id)
+- `idx_eng_sug_project_class`: INDEX idx_eng_sug_project_class ON public.engineering_suggestions USING btree (project_id, suggestion_class)
+- `idx_eng_sug_project_status`: INDEX idx_eng_sug_project_status ON public.engineering_suggestions USING btree (project_id, status)
+
+### engineering_workflow_events
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| workflow_id | uuid |  |  |
+| from_state | text | ✓ |  |
+| to_state | text |  |  |
+| actor_id | integer | ✓ |  |
+| gate_seq | integer | ✓ |  |
+| reason | text | ✓ |  |
+| detail | jsonb |  | `'{}'::jsonb` |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `actor_id` → `users(id)`
+- `workflow_id` → `engineering_workflows(id)`
+
+**Index:**
+- `engineering_workflow_events_pkey`: UNIQUE INDEX engineering_workflow_events_pkey ON public.engineering_workflow_events USING btree (id)
+- `idx_eng_wf_events_wf`: INDEX idx_eng_wf_events_wf ON public.engineering_workflow_events USING btree (workflow_id, created_at)
+
+### engineering_workflow_gates
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| workflow_id | uuid |  |  |
+| seq | integer |  |  |
+| gate_type | text |  |  |
+| required_role | text |  |  |
+| decision | text | ✓ |  |
+| decided_by | integer | ✓ |  |
+| decided_at | timestamptz | ✓ |  |
+| comments | text | ✓ |  |
+| evidence | jsonb |  | `'{}'::jsonb` |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `decided_by` → `users(id)`
+- `workflow_id` → `engineering_workflows(id)`
+
+**Index:**
+- `engineering_workflow_gates_pkey`: UNIQUE INDEX engineering_workflow_gates_pkey ON public.engineering_workflow_gates USING btree (id)
+- `engineering_workflow_gates_workflow_id_seq_key`: UNIQUE INDEX engineering_workflow_gates_workflow_id_seq_key ON public.engineering_workflow_gates USING btree (workflow_id, seq)
+- `idx_eng_wf_gates_wf`: INDEX idx_eng_wf_gates_wf ON public.engineering_workflow_gates USING btree (workflow_id, seq)
+
+### engineering_workflows
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| project_id | integer |  |  |
+| suggestion_id | uuid | ✓ |  |
+| title | text |  |  |
+| description | text | ✓ |  |
+| profile | text |  |  |
+| risk_class | text |  |  |
+| risk_inputs | jsonb |  | `'{}'::jsonb` |
+| state | text |  | `'draft'::text` |
+| reversible | boolean |  | `false` |
+| rollback_strategy | text | ✓ |  |
+| gate0_result | jsonb |  | `'{}'::jsonb` |
+| created_by | integer |  |  |
+| created_at | timestamptz |  | `now()` |
+| updated_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `created_by` → `users(id)`
+- `project_id` → `projects(id)`
+- `suggestion_id` → `engineering_suggestions(id)`
+
+**Index:**
+- `engineering_workflows_pkey`: UNIQUE INDEX engineering_workflows_pkey ON public.engineering_workflows USING btree (id)
+- `idx_eng_wf_project_state`: INDEX idx_eng_wf_project_state ON public.engineering_workflows USING btree (project_id, state)
+- `idx_eng_wf_suggestion`: INDEX idx_eng_wf_suggestion ON public.engineering_workflows USING btree (suggestion_id)
 
 ### feature_flags
 

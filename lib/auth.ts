@@ -337,6 +337,26 @@ const CAN_DEFAULT = {
   // integration.md) — xem/duyệt object chờ duyệt trước khi ảnh hưởng BOQ/cost, chỉ Admin/PM
   // (đúng boundary track ENG-* — mục 4 docs/nang-cap/ENG-0-roadmap-tich-hop-engineering-os.md).
   reviewEngineeringObjects: (r?: Role) => r === "admin" || r === "pm",
+  // ENG-2 Engineering Intelligence (docs/nang-cap/ENG-2-engineering-intelligence.md) —
+  // XEM đề xuất kỹ thuật mở cho cả kỹ sư (họ là người đọc nội dung kỹ thuật), nhưng
+  // QUYẾT ĐỊNH (accept/reject/false positive) chỉ Admin/PM vì có hệ quả xuôi dòng
+  // (ENG-3 sẽ dựng workflow từ suggestion đã accept).
+  viewEngineeringSuggestions: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  decideEngineeringSuggestions: (r?: Role) => r === "admin" || r === "pm",
+  // ENG-3 Engineering Workflow OS (docs/nang-cap/ENG-3-engineering-workflow-os.md) — tầng
+  // ranh giới uỷ quyền của track ENG. Xem mở cho cả BCH (theo dõi tiến trình duyệt kỹ
+  // thuật); tạo/ký gate giới hạn vai trò thao tác, và từng gate còn kiểm thêm
+  // `required_role` + separation-of-duties ở tầng lib (không chỉ dựa vào CAN).
+  viewEngineeringWorkflows: (r?: Role) =>
+    r === "admin" || r === "pm" || r === "engineer" || r === "bch",
+  createEngineeringWorkflow: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  approveEngineeringGate: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  // ENG-4 Multi-Agent Engineering OS (docs/nang-cap/ENG-4-multi-agent-engineering-os.md).
+  // Phiên phối hợp đa agent chỉ tạo ra KẾ HOẠCH ĐÃ HOÀ GIẢI (không có tác động thật) nên
+  // mở xem rộng; chốt xung đột là quyết định kỹ thuật có hệ quả → Admin/PM.
+  viewEngineeringAgentSessions: (r?: Role) =>
+    r === "admin" || r === "pm" || r === "engineer" || r === "bch",
+  resolveEngineeringConflicts: (r?: Role) => r === "admin" || r === "pm",
 };
 
 // ===== M50 PR1 — Override quyền trong DB =====
