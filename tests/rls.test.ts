@@ -192,3 +192,239 @@ test(
     }
   },
 );
+
+// ===== C3 §3 (PR2): RLS + bất biến chéo dự án cho nhóm engineering_* =====
+// Hai lớp phòng thủ ĐỘC LẬP, test riêng từng lớp:
+//   - migrations/0091: composite FK chặn tham chiếu chéo dự án ngay ở tầng DB (áp cho MỌI
+//     role, kể cả superuser) — kiểm bằng pool owner;
+//   - migrations/0092: policy RLS lọc theo GUC app.project_id — chỉ có hiệu lực với role
+//     NOBYPASSRLS, nên BẮT BUỘC kiểm bằng pool `xboss_app` (superuser bỏ qua RLS hoàn toàn).
+test(
+  "Engineering: composite FK (0091) chặn mọi tham chiếu chéo dự án",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, queryOne, insertId } = await import("@/lib/db");
+
+    const projA = await insertId(`INSERT INTO projects (name) VALUES ('ENG RLS A')`);
+    const projB = await insertId(`INSERT INTO projects (name) VALUES ('ENG RLS B')`);
+    const userId = await insertId(
+      `INSERT INTO users (name, email, password_hash, role) VALUES ('ENG RLS', ?, 'x', 'admin')`,
+      `eng-rls-${projA}@test.local`,
+    );
+    try {
+      // Dự án A: source + revision + object.
+      const srcA = await queryOne<{ id: string }>(
+        `INSERT INTO engineering_sources (project_id, source_type, title, created_by)
+         VALUES (?, 'drawing', 'A', ?) RETURNING id`,
+        projA,
+        userId,
+      );
+      const revA = await queryOne<{ id: string }>(
+        `INSERT INTO engineering_source_revisions (source_id, project_id, revision_no, created_by)
+         VALUES (?, ?, 1, ?) RETURNING id`,
+        srcA!.id,
+        projA,
+        userId,
+      );
+      const objA = await queryOne<{ id: string }>(
+        `INSERT INTO engineering_objects (project_id, object_type, created_by, updated_by)
+         VALUES (?, 'component', ?, ?) RETURNING id`,
+        projA,
+        userId,
+        userId,
+      );
+
+      // Dự án B: package + suggestion (cha của evidence).
+      const pkgB = await queryOne<{ id: string }>(
+        `INSERT INTO engineering_intelligence_packages (project_id, objective)
+         VALUES (?, 'B') RETURNING id`,
+        projB,
+      );
+      const sugB = await queryOne<{ id: string }>(
+        `INSERT INTO engineering_suggestions (project_id, package_id, suggestion_class, title, priority)
+         VALUES (?, ?, 'design', 'B', 'quality') RETURNING id`,
+        projB,
+        pkgB!.id,
+      );
+
+      // (1) evidence của suggestion B trỏ source_revision của A → phải bị FK chặn.
+      await assert.rejects(
+        () =>
+          run(
+            `INSERT INTO engineering_evidence (suggestion_id, project_id, source_revision_id, kind, statement)
+             VALUES (?, ?, ?, 'fact', 'x')`,
+            sugB!.id,
+            projB,
+            revA!.id,
+          ),
+        /foreign key constraint/i,
+        "evidence không được trỏ source_revision của dự án khác",
+      );
+
+      // (2) evidence của suggestion B trỏ object của A → phải bị FK chặn.
+      await assert.rejects(
+        () =>
+          run(
+            `INSERT INTO engineering_evidence (suggestion_id, project_id, object_id, kind, statement)
+             VALUES (?, ?, ?, 'fact', 'x')`,
+            sugB!.id,
+            projB,
+            objA!.id,
+          ),
+        /foreign key constraint/i,
+        "evidence không được trỏ object của dự án khác",
+      );
+
+      // (3) suggestion B trỏ package của A → phải bị FK chặn.
+      const pkgA = await queryOne<{ id: string }>(
+        `INSERT INTO engineering_intelligence_packages (project_id, objective)
+         VALUES (?, 'A') RETURNING id`,
+        projA,
+      );
+      await assert.rejects(
+        () =>
+          run(
+            `INSERT INTO engineering_suggestions (project_id, package_id, suggestion_class, title, priority)
+             VALUES (?, ?, 'design', 'cheo', 'quality')`,
+            projB,
+            pkgA!.id,
+          ),
+        /foreign key constraint/i,
+        "suggestion không được trỏ package của dự án khác",
+      );
+
+      // (4) project_id của CON lệch cha → FK con–cha chặn (dù không trỏ chéo đi đâu).
+      await assert.rejects(
+        () =>
+          run(
+            `INSERT INTO engineering_evidence (suggestion_id, project_id, kind, statement)
+             VALUES (?, ?, 'fact', 'x')`,
+            sugB!.id,
+            projA,
+          ),
+        /foreign key constraint/i,
+        "evidence phải cùng project_id với suggestion cha",
+      );
+
+      // (5) ĐỐI CHỨNG — cùng dự án thì vẫn chèn được bình thường (không chặn nhầm).
+      await run(
+        `INSERT INTO engineering_evidence (suggestion_id, project_id, kind, statement)
+         VALUES (?, ?, 'fact', 'hop le')`,
+        sugB!.id,
+        projB,
+      );
+      const ok = await queryOne<{ n: number }>(
+        `SELECT COUNT(*)::int AS n FROM engineering_evidence WHERE suggestion_id = ?`,
+        sugB!.id,
+      );
+      assert.equal(ok?.n, 1, "evidence cùng dự án phải chèn được");
+    } finally {
+      // Xoá dự án kéo theo toàn bộ engineering_* nhờ ON DELETE CASCADE.
+      await run(`DELETE FROM projects WHERE id IN (?, ?)`, projA, projB);
+      await run(`DELETE FROM users WHERE id = ?`, userId);
+    }
+  },
+);
+
+test(
+  "Engineering: RLS (0092) lọc theo GUC app.project_id, kể cả BẢNG CON",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { run, queryOne, insertId } = await import("@/lib/db");
+
+    // Seed bằng owner (superuser bỏ qua RLS nên dựng được cả 2 dự án).
+    const projA = await insertId(`INSERT INTO projects (name) VALUES ('ENG POL A')`);
+    const projB = await insertId(`INSERT INTO projects (name) VALUES ('ENG POL B')`);
+    const userId = await insertId(
+      `INSERT INTO users (name, email, password_hash, role) VALUES ('ENG POL', ?, 'x', 'admin')`,
+      `eng-pol-${projA}@test.local`,
+    );
+    const wfA = await queryOne<{ id: string }>(
+      `INSERT INTO engineering_workflows (project_id, title, profile, risk_class, created_by)
+       VALUES (?, 'A wf', 'A', 'low', ?) RETURNING id`,
+      projA,
+      userId,
+    );
+    // Bảng CON — chính là thứ 0091 mới cấp cột project_id để 0092 viết được policy.
+    await run(
+      `INSERT INTO engineering_workflow_gates (workflow_id, project_id, seq, gate_type, required_role)
+       VALUES (?, ?, 1, 'technical_review', 'pm')`,
+      wfA!.id,
+      projA,
+    );
+
+    const appPool = new Pool({ connectionString: appConnString(), max: 3 });
+    try {
+      async function countAs(guc: string | undefined, sql: string): Promise<number> {
+        const c = await appPool.connect();
+        try {
+          await c.query("BEGIN");
+          if (guc !== undefined)
+            await c.query(`SELECT set_config('app.project_id', $1, true)`, [guc]);
+          const r = await c.query<{ n: string }>(sql);
+          await c.query("COMMIT");
+          return Number(r.rows[0].n);
+        } finally {
+          c.release();
+        }
+      }
+
+      const gatesSql = `SELECT COUNT(*) AS n FROM engineering_workflow_gates WHERE workflow_id = '${wfA!.id}'`;
+      const wfSql = `SELECT COUNT(*) AS n FROM engineering_workflows WHERE id = '${wfA!.id}'`;
+
+      assert.equal(await countAs(String(projA), wfSql), 1, "GUC dự án A phải thấy workflow của A");
+      assert.equal(
+        await countAs(String(projA), gatesSql),
+        1,
+        "GUC dự án A phải thấy gate (bảng con) của A",
+      );
+
+      assert.equal(
+        await countAs(String(projB), wfSql),
+        0,
+        "GUC dự án B KHÔNG được thấy workflow của A",
+      );
+      assert.equal(
+        await countAs(String(projB), gatesSql),
+        0,
+        "GUC dự án B KHÔNG được thấy gate của A — bảng con cũng phải bị lọc",
+      );
+
+      // Không có GUC → RỖNG. C3 §3: "Không có nhánh missing context → allow".
+      assert.equal(await countAs(undefined, wfSql), 0, "thiếu GUC phải trả rỗng, không cho qua");
+      assert.equal(await countAs(undefined, gatesSql), 0, "thiếu GUC phải trả rỗng ở cả bảng con");
+
+      // '*' = ngữ cảnh cross-project hợp lệ.
+      assert.equal(await countAs("*", wfSql), 1, "GUC '*' phải thấy mọi dự án");
+      assert.equal(await countAs("*", gatesSql), 1, "GUC '*' phải thấy bảng con của mọi dự án");
+
+      // WITH CHECK: ghi sang dự án khác GUC → bị chặn.
+      await assert.rejects(
+        async () => {
+          const c = await appPool.connect();
+          try {
+            await c.query("BEGIN");
+            await c.query(`SELECT set_config('app.project_id', $1, true)`, [String(projB)]);
+            await c.query(
+              `INSERT INTO engineering_workflows (project_id, title, profile, risk_class, created_by)
+               VALUES ($1, 'ghi lan', 'A', 'low', $2)`,
+              [projA, userId],
+            );
+            await c.query("COMMIT");
+          } catch (e) {
+            await c.query("ROLLBACK").catch(() => {});
+            throw e;
+          } finally {
+            c.release();
+          }
+        },
+        /row-level security|row level security|policy/i,
+        "WITH CHECK phải chặn ghi sang dự án khác GUC",
+      );
+    } finally {
+      await appPool.end();
+      await run(`DELETE FROM projects WHERE id IN (?, ?)`, projA, projB);
+      await run(`DELETE FROM users WHERE id = ?`, userId);
+    }
+  },
+);

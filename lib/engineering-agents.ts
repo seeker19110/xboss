@@ -402,8 +402,11 @@ async function reconcileSession(sessionId: string): Promise<ConsensusLevel> {
       );
     } else {
       await run(
-        `INSERT INTO engineering_conflicts (session_id, topic, conflict_type, stage, claim_ids)
-         VALUES (?, ?, ?, 'classified', ?::jsonb)`,
+        // project_id suy từ phiên cha bằng subquery (0091 bắt buộc NOT NULL) — con không
+        // thể lệch dự án với cha vì không có đường truyền giá trị nào khác.
+        `INSERT INTO engineering_conflicts (session_id, project_id, topic, conflict_type, stage, claim_ids)
+         VALUES (?, (SELECT project_id FROM engineering_agent_sessions WHERE id = ?), ?, ?, 'classified', ?::jsonb)`,
+        sessionId,
         sessionId,
         d.topic,
         type,
@@ -434,9 +437,11 @@ async function insertClaims(sessionId: string, round: number, claims: AgentSessi
     const confidence = computeConfidence(c.confidenceSignals as ConfidenceSignals);
     await run(
       `INSERT INTO engineering_agent_claims
-         (session_id, agent_role, agent_name, topic, claim, payload, assumptions,
+         (session_id, project_id, agent_role, agent_name, topic, claim, payload, assumptions,
           confidence, confidence_signals, source_authority, source_revision_id, round)
-       VALUES (?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?::jsonb, ?, ?, ?)`,
+       VALUES (?, (SELECT project_id FROM engineering_agent_sessions WHERE id = ?),
+               ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?::jsonb, ?, ?, ?)`,
+      sessionId,
       sessionId,
       c.agentRole,
       c.agentName,
