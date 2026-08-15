@@ -136,6 +136,10 @@ export type ImportStats = {
   /** Chênh lệch phát hiện được giữa % XBoss tính và % ghi sẵn trong file (xem ImportOptions). */
   warnings: string[];
   sheets: string[];
+  /** Chế độ mẫu số đã DÙNG THẬT cho lần import này (C3 §5) — luôn có, kể cả khi không ghi sổ. */
+  dimDenominator?: "columns" | "row-nonempty";
+  /** id dòng `import_batches` đã ghi; chỉ có khi truyền `options.source`. */
+  batchId?: number;
 };
 
 /**
@@ -153,6 +157,18 @@ export type ImportStats = {
  */
 export type ImportOptions = {
   dimDenominator?: "columns" | "row-nonempty";
+  /**
+   * Nguồn của lần import này, để ghi sổ `import_batches` (C3 §5 — xem migrations/0093).
+   * Thiếu thì KHÔNG ghi sổ và task không bị đóng dấu: giữ nguyên đường gọi cũ
+   * (`npm run db:seed`, test) chạy được như trước, không bịa ra batch giả.
+   */
+  source?: {
+    name: string;
+    /** SHA-256 nội dung file — định danh bền theo NỘI DUNG, không theo tên file. */
+    sha256: string;
+    bytes?: number;
+    importedBy?: number | null;
+  };
 };
 
 // Ô lưới có dữ liệu (đã tick hoặc bỏ tick) — khác với ô rỗng hoàn toàn.
@@ -356,12 +372,31 @@ export async function importWorkbook(
     errors: [],
     warnings: [],
     sheets: [],
+    dimDenominator: denominator,
   };
 
   const projectId = await getOrCreateProject();
   const towerId = await getOrCreateTower(projectId);
   const acmvSystemId = await getAcmvSystemId();
   const touchedPkgs = new Set<number>();
+
+  // Mở sổ import TRƯỚC khi ghi task, để mọi task của lần này đóng dấu được ngay (C3 §5).
+  // `stats` ghi lại ở cuối, lúc đã có số liệu thật.
+  let batchId: number | null = null;
+  if (options.source) {
+    batchId = await insertId(
+      `INSERT INTO import_batches
+         (project_id, source_name, source_sha256, source_bytes, dim_denominator_mode, imported_by)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      projectId,
+      options.source.name,
+      options.source.sha256,
+      options.source.bytes ?? null,
+      denominator,
+      options.source.importedBy ?? null,
+    );
+    stats.batchId = batchId;
+  }
 
   for (const sheetName of workbook.SheetNames) {
     const info = SHEET_MAP[sheetName];
@@ -501,8 +536,10 @@ export async function importWorkbook(
           const status = deriveStatus(progress, endDate, currentStatus);
           if (!existing) {
             taskId = await insertId(
-              `INSERT INTO tasks (boq_code, package_id, code, seq_no, name, note, status, start_date, end_date, duration_days, progress_percent, drawing_url)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              // import_batch_id + dim_denominator_mode: đóng dấu "lưới của task này được
+              // dựng bằng chế độ mẫu số nào, từ lần import nào" (C3 §5).
+              `INSERT INTO tasks (boq_code, package_id, code, seq_no, name, note, status, start_date, end_date, duration_days, progress_percent, drawing_url, import_batch_id, dim_denominator_mode)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
               makeBoq(info.code, taskCode),
               currentPkgId,
               taskCode,
@@ -515,19 +552,28 @@ export async function importWorkbook(
               durationDays,
               progress,
               drawingUrl,
+              batchId,
+              denominator,
             );
             stats.tasks++;
           } else {
             taskId = existing.id;
             // Giữ nguyên boq_code (người dùng có thể đã sửa tay).
             await run(
-              `UPDATE tasks SET status = ?, progress_percent = ?, start_date = ?, end_date = ?, duration_days = ?, drawing_url = COALESCE(?, drawing_url) WHERE id = ?`,
+              // Import đè: lưới bị dựng lại (DELETE progress_dimensions ngay dưới) nên dấu
+              // mẫu số phải cập nhật theo lần import MỚI NHẤT — đó là chế độ đang có hiệu
+              // lực. Lịch sử các lần trước vẫn còn nguyên trong `import_batches`.
+              `UPDATE tasks SET status = ?, progress_percent = ?, start_date = ?, end_date = ?, duration_days = ?, drawing_url = COALESCE(?, drawing_url),
+                      import_batch_id = COALESCE(?, import_batch_id), dim_denominator_mode = ?
+                WHERE id = ?`,
               status,
               progress,
               startDate,
               endDate,
               durationDays,
               drawingUrl,
+              batchId,
+              denominator,
               taskId,
             );
             await run(`DELETE FROM progress_dimensions WHERE task_id = ?`, taskId);
@@ -561,6 +607,17 @@ export async function importWorkbook(
 
   // Tính lại % cho từng work package = trung bình các sub-task.
   for (const pkgId of touchedPkgs) await recomputePackage(pkgId);
+
+  // Chốt sổ: giữ nguyên số liệu + `warnings` TẠI THỜI ĐIỂM import (vd hàng OGHL/OGCH có
+  // công thức Excel không đồng nhất, C3 §5). Không tính lại về sau — bằng chứng phải là
+  // thứ đã thấy lúc đó, không phải thứ suy ra hôm nay.
+  if (batchId !== null) {
+    await run(
+      `UPDATE import_batches SET stats = ?::jsonb WHERE id = ?`,
+      JSON.stringify(stats),
+      batchId,
+    );
+  }
 
   return stats;
 }

@@ -27,6 +27,34 @@
 
 **Nợ kỹ thuật/rủi ro mở:** ~~`audit_log.entity_id` chỉ hỗ trợ khoá `BIGINT` nên `engineering_*` (UUID) nằm ngoài audit trail~~ — **đã đóng** bằng `0090` (cột `entity_key` TEXT, xem mục "C3 §2" bên dưới). Rủi ro còn lại là vận hành, không phải code: cặp `0091`/`0092` phải chạy staging trước khi lên production.
 
+## C3 §5 (PR C3.4) — Sổ import + đóng dấu mẫu số, để % tái lập được (2026-08-15)
+
+Đóng phần **persistence** của C3 §5 ("Denominator/import policy").
+
+- **[AI, vấn đề thật đang có]** `dimDenominator` ("columns" vs "row-nonempty") quyết định
+  **mẫu số** khi quy lưới checkbox → %, nhưng chỉ tồn tại trong bộ nhớ **đúng một lần lúc
+  import**. Sau đó không chỗ nào ghi lại đã dùng chế độ nào, cũng không biết file nguồn là
+  file nào. Nhìn một task 12 ô lưới thì **không ai trả lời được "vì sao 12 mà không phải
+  20"** — con số % không tái lập được.
+- **[AI, đã làm] `migrations/0093`** — bảng `import_batches` (tên file + **SHA-256 nội
+  dung**, chế độ mẫu số, người chạy, `stats` gồm cả `warnings`) + `tasks.import_batch_id`
+  và `tasks.dim_denominator_mode`. Băm theo **nội dung** chứ không theo tên file: nhiều năm
+  sau đổi tên file vẫn đối chiếu được. Thuần thêm, **đi thẳng production được**.
+- **[AI, quyết định] Task cũ để NULL, không bịa mặc định.** NULL mang đúng nghĩa "không biết
+  — import trước khi có sổ này". Điền đại `'columns'` sẽ tạo ra một dữ kiện sai trông như
+  thật, đúng loại nợ mà C3 muốn dọn.
+- **[AI, quyết định] `options.source` là tuỳ chọn** — thiếu thì không ghi sổ và không gán
+  batch. Nhờ vậy `npm run db:seed` và test cũ chạy y như trước, không sinh ra batch giả.
+  Nhưng `dim_denominator_mode` **vẫn đóng dấu** vì đó là sự thật của lần import đó.
+- **[AI, đã làm] `GET /api/import/batches`** (Admin/PM) + hiện chế độ mẫu số & số hiệu sổ
+  ngay trong kết quả import. Không có đường đọc thì dữ liệu đã ghi vẫn nằm im trong DB —
+  ghi mà không tra được thì chưa gọi là tái lập được.
+- **[AI, tự bắt lỗi]** Fixture test đầu tiên đặt cột lưới từ index 8 trong khi `DIM_START`
+  của `lib/import.ts` là **9** → đếm ra 3 thay vì 4. Sửa fixture, không sửa kỳ vọng.
+- **Verify**: `tests/import-batches.test.ts` **4/4**, trong đó có ca chứng minh hai chế độ
+  cho **mẫu số khác nhau thật** (4 ô vs 2 ô) — nếu bằng nhau thì test không chứng minh được
+  gì. 25/25 ca của 3 file import sẵn có vẫn xanh. `lint` 0 lỗi, `typecheck` xanh, ERD khớp.
+
 ## C3 §3 (PR2) — RLS + bất biến chéo dự án cho `engineering_*` (2026-08-15)
 
 Đóng nốt C3 §3 ("Project axis" + "Relational invariants" + "Policy", tương ứng C3.2 + C3.3 trong
@@ -110,6 +138,7 @@ userId: auth.createdBy })` — **một chỗ sửa phủ cả 4 route** `/api/v1
   (`projects` có org-RLS nên đọc ra rỗng; `ensureSchema` cần quyền `CREATE` trên schema).
 - **Verify**: 67/67 ca của 8 file test liên quan (engineering ×5, api-keys, rls, audit-chain);
   `lint` 0 lỗi, `typecheck` xanh. **Chưa bật RLS trong PR này** — không đổi hành vi.
+
 ## ENG-5 §5 — OpenAPI 3.1 + fixture hợp đồng có version (2026-08-15)
 
 Đóng 3 mục của ENG-5 mà **không cần điều kiện ngoài**: §5.1 (OpenAPI máy-đọc-được),

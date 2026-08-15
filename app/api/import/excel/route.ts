@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import * as XLSX from "xlsx";
 import { importWorkbook, analyzeWorkbook } from "@/lib/import";
 import { getCurrentUser, CAN } from "@/lib/auth";
@@ -58,7 +59,17 @@ export async function POST(request: NextRequest) {
     // cũng làm lệch % theo chiều ngược lại.
     const denominator = formData.get("denominator");
     const dimDenominator = denominator === "row-nonempty" ? "row-nonempty" : "columns";
-    const stats = await importWorkbook(workbook, { dimDenominator });
+    // Ghi sổ import (C3 §5): băm NỘI DUNG file để nhiều năm sau còn đối chiếu được đúng
+    // file gốc, kể cả khi tên file đã đổi.
+    const stats = await importWorkbook(workbook, {
+      dimDenominator,
+      source: {
+        name: file.name,
+        sha256: createHash("sha256").update(Buffer.from(buffer)).digest("hex"),
+        bytes: file.size,
+        importedBy: user.id,
+      },
+    });
 
     return NextResponse.json({
       ...stats,
