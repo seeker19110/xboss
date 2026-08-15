@@ -159,6 +159,15 @@ test(
     // đã có test 1 (chuỗi sạch) và test 2 (bắt được dòng bị sửa) lo; việc cần chứng minh ở
     // đây là dòng khoá UUID ĐƯỢC GHI ĐÚNG — trước 0090 thì INSERT còn không chạy nổi.
     assert.ok(audit!.id > 0, "dòng audit phải có id thật");
+
+    // BẮT BUỘC dọn: `engineering_objects.created_by` là FK tới `users(id)` KHÔNG có
+    // ON DELETE, mà `tests/auth.test.ts` (chạy ngay sau file này theo thứ tự abc của
+    // scripts/run-tests.mjs) có bước `DELETE FROM users`. Để sót dòng này là làm file đó
+    // đỏ vì FK — đúng lớp lỗi "fail ngẫu nhiên ở file không liên quan" mà chính runner
+    // sinh ra để tránh. Đã gặp thật khi chạy bộ đầy đủ lần đầu.
+    await run(`DELETE FROM engineering_objects WHERE project_id = ?`, pid);
+    await run(`DELETE FROM projects WHERE id = ?`, pid);
+    await run(`DELETE FROM users WHERE id = ?`, uid);
   },
 );
 
