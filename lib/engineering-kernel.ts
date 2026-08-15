@@ -296,9 +296,11 @@ export async function createObjectRevision(
   userId: number,
 ) {
   return queryOne(
+    // project_id lấy thẳng từ chính dòng object đang SELECT (`o.project_id`) — 0091 bắt buộc
+    // cột này NOT NULL, và lấy từ cha thì bản ghi lịch sử không thể lệch dự án.
     `INSERT INTO engineering_object_revisions
-       (object_id, revision_no, source_revision_id, object_type, discipline, name, status, properties, geometry_ref, change_reason, created_by)
-     SELECT o.id,
+       (object_id, project_id, revision_no, source_revision_id, object_type, discipline, name, status, properties, geometry_ref, change_reason, created_by)
+     SELECT o.id, o.project_id,
             COALESCE((SELECT MAX(r.revision_no) FROM engineering_object_revisions r WHERE r.object_id = o.id), 0) + 1,
             ?, o.object_type, o.discipline, o.name, o.status, o.properties, o.geometry_ref, ?, ?
      FROM engineering_objects o

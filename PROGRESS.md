@@ -9,7 +9,7 @@
 - **GĐ 4–5 — Vận hành có kiểm soát & nâng chất lượng.** Sản phẩm đã chạy thật (v0.2.1, tự host VPS). Track Engineering OS nền tảng (ENG-1→ENG-4) đã hoàn tất về code, migration, API/UI và test; chưa có traffic thật từ MEPF-Agents nên chưa mở các tầng Digital Twin/Predictive OS/Controlled Autonomy.
 - **Ưu tiên hiện hành:** xác minh staging/production cho migration `0084`–`0087`, kết nối thử nghiệm có kiểm soát với MEPF-Agents, và xử lý các nợ kỹ thuật đã ghi nhận trước khi mở rộng phạm vi mới.
 - **`ENG-5` (C1) — PR1 ĐÃ XONG** (external-key relation, idempotency, cách ly dự án ở tầng DB); phần còn lại (OpenAPI sinh tự động, consumer test phía MEPF-Agents, metrics/alert, pilot runbook) chờ điều kiện ngoài. Xem mục "ENG-5 PR1" bên dưới.
-- **⚠️ Migration CHỜ CHẠY STAGING:** `0089_engineering_project_invariants.sql` **đụng dữ liệu** (backfill `project_id` cho `engineering_source_revisions`) → theo DoD phải qua staging trước, **chưa được đưa thẳng production**. `0088` thì thuần thêm, đi thẳng được.
+- **⚠️ Migration CHỜ CHẠY STAGING:** `0089_engineering_project_invariants.sql` và `0091_engineering_child_project_axis.sql` **đụng dữ liệu** (backfill `project_id`) → theo DoD phải qua staging trước, **chưa được đưa thẳng production**. `0092` (policy RLS) không đụng dòng nào nhưng **phụ thuộc `0091`**, nên đi cùng cặp. `0088`/`0090` thuần thêm, đi thẳng được.
 - **Lộ trình hoàn thành (chờ duyệt, chưa code):** `PROJECT-COMPLETION-ROADMAP.md` chốt C0→C6 để đạt XBoss v1.0/Product Complete và O1→O5 cho Engineering OS/Vision Complete theo gate; không coi tài liệu là quyền tự triển khai production hoặc A3+.
 - **Spec pack chi tiết (chờ duyệt):** C0, C2–C6 và OS-1–OS-5 đã có file thi hành riêng (C1 dùng ENG-5), mỗi file gồm scope, data/API/UI/ops, test, chia PR và DoD. Chưa phase nào được đánh dấu triển khai chỉ vì đặc tả đã viết.
 
@@ -25,7 +25,51 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
-**Nợ kỹ thuật/rủi ro mở:** `audit_log.entity_id` và trigger audit hiện chỉ hỗ trợ khoá `BIGINT`; các bảng `engineering_*` dùng UUID nên chưa nằm trong audit trail tự động. Không mở rộng cấu trúc audit trên production khi chưa có kế hoạch migration, thử nghiệm staging và rollback riêng.
+**Nợ kỹ thuật/rủi ro mở:** ~~`audit_log.entity_id` chỉ hỗ trợ khoá `BIGINT` nên `engineering_*` (UUID) nằm ngoài audit trail~~ — **đã đóng** bằng `0090` (cột `entity_key` TEXT, xem mục "C3 §2" bên dưới). Rủi ro còn lại là vận hành, không phải code: cặp `0091`/`0092` phải chạy staging trước khi lên production.
+
+## C3 §3 (PR2) — RLS + bất biến chéo dự án cho `engineering_*` (2026-08-15)
+
+Đóng nốt C3 §3 ("Project axis" + "Relational invariants" + "Policy", tương ứng C3.2 + C3.3 trong
+bảng chia PR của đặc tả). PR1 (#347) đã nối ngữ cảnh `app.project_id`; PR này mới thực sự
+**khoá cửa**.
+
+- **[AI, đo trước khi sửa — 10/10 đường chéo dự án đang HỞ]** Chèn thử trên DB thật (schema
+  sau `0090`) 10 dòng tham chiếu chéo dự án: **cả 10 đều LỌT, không lỗi nào**. `0088`/`0089`
+  mới khoá nhánh sources/objects/relations; nhánh intelligence (ENG-2), workflow (ENG-3),
+  multi-agent (ENG-4) thì chưa đụng tới: `evidence→source_rev`, `evidence→object`,
+  `suggestion→package`, `suggestion→object`, `suggestion→workflow`, `package→source_rev`,
+  `obj_rev→source_rev`, `claim→source_rev`, `session→workflow`, `workflow→suggestion`.
+- **[AI, đã làm] `migrations/0091`** — mang `project_id` NOT NULL xuống **6 bảng con**
+  (`object_revisions`, `evidence`, `workflow_gates`, `workflow_events`, `agent_claims`,
+  `conflicts`), backfill từ cha, + composite FK khoá cả 10 đường trên. Không có cột này thì
+  **policy RLS không viết được** cho bảng con — đó là lý do kỹ thuật, không phải cho gọn.
+- **[AI, tự sửa cách báo lỗi]** Bản đầu để dữ liệu bẩn làm migration chết bằng lỗi `23503`
+  thô, chỉ nêu **đúng một dòng** đầu tiên gặp phải → người vận hành phải chạy lại nhiều vòng
+  mới biết hết. Thêm bước **tiền kiểm** đếm vi phạm của cả 10 đường rồi `RAISE` một lần đủ
+  danh sách. Đã thử trên DB bẩn: in ra đúng 9 đường có dữ liệu vi phạm kèm số dòng.
+- **[AI, bắt lỗi của chính mình]** `RAISE` trong PL/pgSQL dùng placeholder `%`, **không phải
+  `%s`** như `format()` — bản đầu viết `%s` nên thông báo in thừa chữ "s" ("1 dòngs"). Đã sửa
+  cả 2 chỗ và ghi chú ngay trong migration để không lặp lại.
+- **[AI, đã làm] Vá 6 điểm INSERT trong `lib/`** — `NOT NULL project_id` làm **mọi INSERT
+  bảng con hiện có gãy**. Sửa bằng cách suy `project_id` **từ chính cha bằng subquery**
+  (`(SELECT project_id FROM <cha> WHERE id = ?)`) thay vì truyền biến: con **không thể** lệch
+  dự án với cha vì không còn đường truyền giá trị nào khác. `createObjectRevision` là
+  `INSERT..SELECT` nên lấy thẳng `o.project_id`.
+- **[AI, đã làm] `migrations/0092`** — bật RLS + `FORCE ROW LEVEL SECURITY` cho **cả 15 bảng**
+  `engineering_*`, policy **nghiêm ngặt 2 nhánh** (khớp `app.project_id`, hoặc `'*'`).
+  **Khác `0069`: KHÔNG có giai đoạn chuyển tiếp "thiếu GUC → cho qua"** — C3 §3 cấm nhánh đó,
+  và nhóm này không có đường đọc cũ ngoài transaction như nhóm tài chính hồi M51.
+- **[AI, verify bằng role thật]** Đo bằng `xboss_app` (NOBYPASSRLS — superuser bỏ qua RLS
+  hoàn toàn, cạm bẫy đã mắc ở PR1): đọc đúng dự án ✓, **không thấy dự án khác** ✓, thiếu GUC
+  → **rỗng** ✓, `'*'` → thấy hết ✓, ghi chéo dự án → chặn ✓, ghi đúng dự án → lọt ✓,
+  `UPDATE`/`DELETE` sang dự án khác → **0 dòng** ✓. Lặp lại đủ cho **cả bảng con**.
+- **[AI, verify đường code thật]** Không chỉ kiểm SQL trần: chạy `createWorkflow` →
+  `submitForApproval` → `openAgentSession` **bằng role `xboss_app` dưới RLS** → tất cả chạy
+  được, và `project_id` con↔cha lệch **0/0/0**.
+- **[AI, chứng minh test không phải trang trí]** Bỏ 1 policy + 1 composite FK khỏi DB rồi chạy
+  lại → **đúng 2 ca đỏ ngay** tại chỗ bị bỏ; khôi phục thì xanh lại.
+- **Verify**: `tests/rls.test.ts` **4/4** (2 ca cũ + 2 ca mới); `lint` 0 lỗi, `typecheck` xanh;
+  ERD sinh lại khớp schema.
 
 ## C3 §3 (PR1) — Project scope cho toàn bộ đường engineering (2026-08-15)
 

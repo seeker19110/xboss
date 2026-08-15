@@ -3317,14 +3317,20 @@
 | source_revision_id | uuid | ✓ |  |
 | round | integer |  | `1` |
 | created_at | timestamptz |  | `now()` |
+| project_id | integer |  |  |
 
 **Khóa ngoại:**
+- `project_id` → `engineering_agent_sessions(project_id)`
+- `project_id` → `engineering_source_revisions(project_id)`
 - `session_id` → `engineering_agent_sessions(id)`
+- `session_id` → `engineering_agent_sessions(id)`
+- `source_revision_id` → `engineering_source_revisions(id)`
 - `source_revision_id` → `engineering_source_revisions(id)`
 
 **Index:**
 - `engineering_agent_claims_pkey`: UNIQUE INDEX engineering_agent_claims_pkey ON public.engineering_agent_claims USING btree (id)
 - `idx_eng_ac_session`: INDEX idx_eng_ac_session ON public.engineering_agent_claims USING btree (session_id, topic)
+- `idx_engineering_agent_claims_project`: INDEX idx_engineering_agent_claims_project ON public.engineering_agent_claims USING btree (project_id)
 
 ### engineering_agent_sessions
 
@@ -3348,11 +3354,14 @@
 **Khóa ngoại:**
 - `api_key_id` → `api_keys(id)`
 - `project_id` → `projects(id)`
+- `project_id` → `engineering_workflows(project_id)`
+- `workflow_id` → `engineering_workflows(id)`
 - `workflow_id` → `engineering_workflows(id)`
 
 **Index:**
 - `engineering_agent_sessions_pkey`: UNIQUE INDEX engineering_agent_sessions_pkey ON public.engineering_agent_sessions USING btree (id)
 - `idx_eng_as_project`: INDEX idx_eng_as_project ON public.engineering_agent_sessions USING btree (project_id, status)
+- `uq_engineering_agent_sessions_id_project`: UNIQUE INDEX uq_engineering_agent_sessions_id_project ON public.engineering_agent_sessions USING btree (id, project_id)
 
 ### engineering_conflicts
 
@@ -3369,14 +3378,18 @@
 | resolved_by | integer | ✓ |  |
 | resolved_at | timestamptz | ✓ |  |
 | created_at | timestamptz |  | `now()` |
+| project_id | integer |  |  |
 
 **Khóa ngoại:**
+- `project_id` → `engineering_agent_sessions(project_id)`
 - `resolved_by` → `users(id)`
+- `session_id` → `engineering_agent_sessions(id)`
 - `session_id` → `engineering_agent_sessions(id)`
 
 **Index:**
 - `engineering_conflicts_pkey`: UNIQUE INDEX engineering_conflicts_pkey ON public.engineering_conflicts USING btree (id)
 - `idx_eng_cf_session`: INDEX idx_eng_cf_session ON public.engineering_conflicts USING btree (session_id, stage)
+- `idx_engineering_conflicts_project`: INDEX idx_engineering_conflicts_project ON public.engineering_conflicts USING btree (project_id)
 
 ### engineering_evidence
 
@@ -3392,15 +3405,23 @@
 | standard_ref | text | ✓ |  |
 | sort_order | integer |  | `0` |
 | created_at | timestamptz |  | `now()` |
+| project_id | integer |  |  |
 
 **Khóa ngoại:**
 - `object_id` → `engineering_objects(id)`
+- `object_id` → `engineering_objects(id)`
+- `project_id` → `engineering_objects(project_id)`
+- `project_id` → `engineering_suggestions(project_id)`
+- `project_id` → `engineering_source_revisions(project_id)`
 - `source_revision_id` → `engineering_source_revisions(id)`
+- `source_revision_id` → `engineering_source_revisions(id)`
+- `suggestion_id` → `engineering_suggestions(id)`
 - `suggestion_id` → `engineering_suggestions(id)`
 
 **Index:**
 - `engineering_evidence_pkey`: UNIQUE INDEX engineering_evidence_pkey ON public.engineering_evidence USING btree (id)
 - `idx_eng_evidence_suggestion`: INDEX idx_eng_evidence_suggestion ON public.engineering_evidence USING btree (suggestion_id, sort_order)
+- `idx_engineering_evidence_project`: INDEX idx_engineering_evidence_project ON public.engineering_evidence USING btree (project_id)
 
 ### engineering_ingest_requests
 
@@ -3444,11 +3465,14 @@
 **Khóa ngoại:**
 - `api_key_id` → `api_keys(id)`
 - `project_id` → `projects(id)`
+- `project_id` → `engineering_source_revisions(project_id)`
+- `source_revision_id` → `engineering_source_revisions(id)`
 - `source_revision_id` → `engineering_source_revisions(id)`
 
 **Index:**
 - `engineering_intelligence_packages_pkey`: UNIQUE INDEX engineering_intelligence_packages_pkey ON public.engineering_intelligence_packages USING btree (id)
 - `idx_eng_ip_project`: INDEX idx_eng_ip_project ON public.engineering_intelligence_packages USING btree (project_id, created_at DESC)
+- `uq_engineering_intelligence_packages_id_project`: UNIQUE INDEX uq_engineering_intelligence_packages_id_project ON public.engineering_intelligence_packages USING btree (id, project_id)
 
 ### engineering_object_relations
 
@@ -3501,16 +3525,22 @@
 | change_reason | text | ✓ |  |
 | created_by | integer |  |  |
 | created_at | timestamptz |  | `now()` |
+| project_id | integer |  |  |
 
 **Khóa ngoại:**
 - `created_by` → `users(id)`
 - `object_id` → `engineering_objects(id)`
+- `object_id` → `engineering_objects(id)`
+- `project_id` → `engineering_objects(project_id)`
+- `project_id` → `engineering_source_revisions(project_id)`
+- `source_revision_id` → `engineering_source_revisions(id)`
 - `source_revision_id` → `engineering_source_revisions(id)`
 
 **Index:**
 - `engineering_object_revisions_object_id_revision_no_key`: UNIQUE INDEX engineering_object_revisions_object_id_revision_no_key ON public.engineering_object_revisions USING btree (object_id, revision_no)
 - `engineering_object_revisions_pkey`: UNIQUE INDEX engineering_object_revisions_pkey ON public.engineering_object_revisions USING btree (id)
 - `idx_engineering_object_revisions_object`: INDEX idx_engineering_object_revisions_object ON public.engineering_object_revisions USING btree (object_id, revision_no DESC)
+- `idx_engineering_object_revisions_project`: INDEX idx_engineering_object_revisions_project ON public.engineering_object_revisions USING btree (project_id)
 
 ### engineering_objects
 
@@ -3632,8 +3662,14 @@
 **Khóa ngoại:**
 - `decided_by` → `users(id)`
 - `object_id` → `engineering_objects(id)`
+- `object_id` → `engineering_objects(id)`
+- `package_id` → `engineering_intelligence_packages(id)`
 - `package_id` → `engineering_intelligence_packages(id)`
 - `project_id` → `projects(id)`
+- `project_id` → `engineering_objects(project_id)`
+- `project_id` → `engineering_intelligence_packages(project_id)`
+- `project_id` → `engineering_workflows(project_id)`
+- `workflow_id` → `engineering_workflows(id)`
 
 **Index:**
 - `engineering_suggestions_pkey`: UNIQUE INDEX engineering_suggestions_pkey ON public.engineering_suggestions USING btree (id)
@@ -3641,6 +3677,7 @@
 - `idx_eng_sug_package`: INDEX idx_eng_sug_package ON public.engineering_suggestions USING btree (package_id)
 - `idx_eng_sug_project_class`: INDEX idx_eng_sug_project_class ON public.engineering_suggestions USING btree (project_id, suggestion_class)
 - `idx_eng_sug_project_status`: INDEX idx_eng_sug_project_status ON public.engineering_suggestions USING btree (project_id, status)
+- `uq_engineering_suggestions_id_project`: UNIQUE INDEX uq_engineering_suggestions_id_project ON public.engineering_suggestions USING btree (id, project_id)
 
 ### engineering_workflow_events
 
@@ -3655,14 +3692,18 @@
 | reason | text | ✓ |  |
 | detail | jsonb |  | `'{}'::jsonb` |
 | created_at | timestamptz |  | `now()` |
+| project_id | integer |  |  |
 
 **Khóa ngoại:**
 - `actor_id` → `users(id)`
+- `project_id` → `engineering_workflows(project_id)`
+- `workflow_id` → `engineering_workflows(id)`
 - `workflow_id` → `engineering_workflows(id)`
 
 **Index:**
 - `engineering_workflow_events_pkey`: UNIQUE INDEX engineering_workflow_events_pkey ON public.engineering_workflow_events USING btree (id)
 - `idx_eng_wf_events_wf`: INDEX idx_eng_wf_events_wf ON public.engineering_workflow_events USING btree (workflow_id, created_at)
+- `idx_engineering_workflow_events_project`: INDEX idx_engineering_workflow_events_project ON public.engineering_workflow_events USING btree (project_id)
 
 ### engineering_workflow_gates
 
@@ -3679,15 +3720,19 @@
 | comments | text | ✓ |  |
 | evidence | jsonb |  | `'{}'::jsonb` |
 | created_at | timestamptz |  | `now()` |
+| project_id | integer |  |  |
 
 **Khóa ngoại:**
 - `decided_by` → `users(id)`
+- `project_id` → `engineering_workflows(project_id)`
+- `workflow_id` → `engineering_workflows(id)`
 - `workflow_id` → `engineering_workflows(id)`
 
 **Index:**
 - `engineering_workflow_gates_pkey`: UNIQUE INDEX engineering_workflow_gates_pkey ON public.engineering_workflow_gates USING btree (id)
 - `engineering_workflow_gates_workflow_id_seq_key`: UNIQUE INDEX engineering_workflow_gates_workflow_id_seq_key ON public.engineering_workflow_gates USING btree (workflow_id, seq)
 - `idx_eng_wf_gates_wf`: INDEX idx_eng_wf_gates_wf ON public.engineering_workflow_gates USING btree (workflow_id, seq)
+- `idx_engineering_workflow_gates_project`: INDEX idx_engineering_workflow_gates_project ON public.engineering_workflow_gates USING btree (project_id)
 
 ### engineering_workflows
 
@@ -3712,12 +3757,15 @@
 **Khóa ngoại:**
 - `created_by` → `users(id)`
 - `project_id` → `projects(id)`
+- `project_id` → `engineering_suggestions(project_id)`
+- `suggestion_id` → `engineering_suggestions(id)`
 - `suggestion_id` → `engineering_suggestions(id)`
 
 **Index:**
 - `engineering_workflows_pkey`: UNIQUE INDEX engineering_workflows_pkey ON public.engineering_workflows USING btree (id)
 - `idx_eng_wf_project_state`: INDEX idx_eng_wf_project_state ON public.engineering_workflows USING btree (project_id, state)
 - `idx_eng_wf_suggestion`: INDEX idx_eng_wf_suggestion ON public.engineering_workflows USING btree (suggestion_id)
+- `uq_engineering_workflows_id_project`: UNIQUE INDEX uq_engineering_workflows_id_project ON public.engineering_workflows USING btree (id, project_id)
 
 ### feature_flags
 

@@ -313,8 +313,11 @@ export async function createWorkflow(
 
     for (const g of gatesForProfile(profile)) {
       await run(
-        `INSERT INTO engineering_workflow_gates (workflow_id, seq, gate_type, required_role)
-         VALUES (?, ?, ?, ?)`,
+        // project_id suy TRỰC TIẾP từ workflow cha bằng subquery (migration 0091 bắt buộc
+        // cột này NOT NULL). Không truyền từ biến để con không thể lệch dự án với cha.
+        `INSERT INTO engineering_workflow_gates (workflow_id, project_id, seq, gate_type, required_role)
+         VALUES (?, (SELECT project_id FROM engineering_workflows WHERE id = ?), ?, ?, ?)`,
+        wf.id,
         wf.id,
         g.seq,
         g.gateType,
@@ -323,8 +326,9 @@ export async function createWorkflow(
     }
 
     await run(
-      `INSERT INTO engineering_workflow_events (workflow_id, from_state, to_state, actor_id, reason)
-       VALUES (?, NULL, 'draft', ?, 'Tạo workflow')`,
+      `INSERT INTO engineering_workflow_events (workflow_id, project_id, from_state, to_state, actor_id, reason)
+       VALUES (?, (SELECT project_id FROM engineering_workflows WHERE id = ?), NULL, 'draft', ?, 'Tạo workflow')`,
+      wf.id,
       wf.id,
       userId,
     );
@@ -413,8 +417,9 @@ async function applyTransition(
     workflowId,
   );
   await run(
-    `INSERT INTO engineering_workflow_events (workflow_id, from_state, to_state, actor_id, gate_seq, reason)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO engineering_workflow_events (workflow_id, project_id, from_state, to_state, actor_id, gate_seq, reason)
+     VALUES (?, (SELECT project_id FROM engineering_workflows WHERE id = ?), ?, ?, ?, ?, ?)`,
+    workflowId,
     workflowId,
     from,
     to,

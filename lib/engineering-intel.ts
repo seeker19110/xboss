@@ -301,9 +301,11 @@ export async function ingestIntelligencePackage(
           ? await resolveObjectId(projectId, e.externalObjectKey)
           : objectId;
         await run(
+          // project_id suy từ suggestion cha bằng subquery (0091 bắt buộc NOT NULL).
           `INSERT INTO engineering_evidence
-             (suggestion_id, kind, statement, source_revision_id, object_id, locator, standard_ref, sort_order)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+             (suggestion_id, project_id, kind, statement, source_revision_id, object_id, locator, standard_ref, sort_order)
+           VALUES (?, (SELECT project_id FROM engineering_suggestions WHERE id = ?), ?, ?, ?, ?, ?, ?, ?)`,
+          row.id,
           row.id,
           e.kind,
           e.statement,
