@@ -22,7 +22,11 @@ const PAGE_SIZE = 2000;
 
 type AuditChainDbRow = {
   id: number;
-  entityId: number; // v_id trong trigger — id của thực thể gốc, KHÔNG phải id của audit_log
+  // v_key trong trigger — định danh thực thể gốc dạng TEXT, KHÔNG phải id của audit_log.
+  // Đọc bằng COALESCE(entity_key, entity_id::text): dòng ghi trước migration 0090 chưa có
+  // entity_key, nhưng khoá của chúng đều là số nên entity_id::text ra ĐÚNG chuỗi đã được
+  // hash lúc đó → chuỗi hash cũ vẫn kiểm được, không cần backfill cả bảng.
+  entityKey: string | null;
   at: string; // ép về text ngay trong SQL (at::text) — khớp đúng now()::text dùng trong trigger
   changesText: string | null; // changes::text — khớp đúng v_changes::text dùng trong trigger
   rowHash: string | null;
@@ -52,7 +56,7 @@ export async function verifyAuditChain(): Promise<AuditChainResult> {
 
   for (;;) {
     const rows = await query<AuditChainDbRow>(
-      `SELECT id, entity_id AS "entityId", at::text AS at,
+      `SELECT id, COALESCE(entity_key, entity_id::text) AS "entityKey", at::text AS at,
               changes::text AS "changesText", row_hash AS "rowHash"
          FROM audit_log WHERE id > ? ORDER BY id ASC LIMIT ?`,
       lastId,
@@ -72,7 +76,7 @@ export async function verifyAuditChain(): Promise<AuditChainResult> {
       }
 
       const expected = createHash("sha256")
-        .update(prevHash + String(r.entityId) + r.at + (r.changesText ?? ""))
+        .update(prevHash + (r.entityKey ?? "") + r.at + (r.changesText ?? ""))
         .digest("hex");
       checked++;
       if (expected !== r.rowHash) {
