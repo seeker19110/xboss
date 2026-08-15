@@ -428,3 +428,91 @@ test(
     }
   },
 );
+
+// ===== C0 (doc drift) — canh gác TẬP BẢNG có RLS =====
+// Vì sao cần: bài học lặp lại nhiều lần của repo này là TÀI LIỆU TRÔI KHỎI CODE. Riêng
+// phạm vi RLS thì trôi là nguy hiểm thật — hoặc tưởng một bảng được bảo vệ mà thực ra không,
+// hoặc ngược lại. Đếm route/bảng thì đổi liên tục nên không canh (canh sẽ thành nhiễu), còn
+// TẬP BẢNG BẬT RLS thì hiếm khi đổi và mỗi lần đổi đều là quyết định bảo mật đáng review.
+//
+// Test này bắt CẢ HAI CHIỀU: thêm bảng vào RLS mà quên khai, hoặc bảng mất RLS ngoài ý muốn.
+test(
+  "Phạm vi RLS khớp đúng danh sách đã khai — thêm/bớt đều phải sửa test này",
+  { skip: !HAS_TEST_DB },
+  async () => {
+    const { query } = await import("@/lib/db");
+
+    // 11 bảng tài chính/hợp đồng — ADR-0005 + migrations/0069, khoá cửa ở 0077.
+    const TAI_CHINH = [
+      "advances",
+      "cash_transactions",
+      "claims",
+      "contracts",
+      "insurance_bonds",
+      "invoices",
+      "payment_bills",
+      "payroll",
+      "purchase_orders",
+      "tender_packages",
+      "variation_orders",
+    ];
+    // Nhóm bảng theo tổ chức/cấu hình (M51 GĐ0 + M50/M52).
+    const TO_CHUC = [
+      "alert_rules",
+      "api_keys",
+      "approval_flows",
+      "boq_codes",
+      "code_lists",
+      "custom_field_defs",
+      "feature_flags",
+      "integrations",
+      "projects",
+      "role_permissions",
+      "saved_reports",
+      "suppliers",
+      "users",
+      "webhooks",
+    ];
+
+    const rows = await query<{ t: string }>(
+      `SELECT c.relname AS t FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relrowsecurity
+      ORDER BY 1`,
+    );
+    const thucTe = rows.map((r) => r.t);
+
+    // Nhóm engineering: khai theo TIỀN TỐ chứ không liệt kê tay — thêm bảng engineering_* mới
+    // mà quên bật RLS thì bị bắt ở assert bên dưới, không phải ở đây.
+    const eng = thucTe.filter((t) => t.startsWith("engineering_"));
+    const khai = new Set([...TAI_CHINH, ...TO_CHUC, ...eng]);
+
+    const laKhaiThieu = thucTe.filter((t) => !khai.has(t));
+    assert.deepEqual(
+      laKhaiThieu,
+      [],
+      "Có bảng BẬT RLS nhưng chưa khai trong test/tài liệu — bổ sung vào danh sách trên và cập nhật PROJECT.md + ADR-0005",
+    );
+
+    const matRls = [...TAI_CHINH, ...TO_CHUC].filter((t) => !thucTe.includes(t));
+    assert.deepEqual(
+      matRls,
+      [],
+      "Có bảng ĐÁNG LẼ có RLS nhưng đã mất — kiểm tra migration nào DROP/DISABLE nhầm",
+    );
+
+    // Mọi bảng engineering_* đều phải nằm trong vùng RLS (0092). Bảng mới thêm sau này mà
+    // quên bật thì đây là chỗ báo.
+    const engCoRls = new Set(eng);
+    const engTatCa = await query<{ t: string }>(
+      `SELECT table_name AS t FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+        AND table_name LIKE 'engineering\\_%' ORDER BY 1`,
+    );
+    const engThieu = engTatCa.map((r) => r.t).filter((t) => !engCoRls.has(t));
+    assert.deepEqual(
+      engThieu,
+      [],
+      "Bảng engineering_* mới thêm nhưng CHƯA bật RLS — mọi bảng nhóm này phải nằm trong policy (C3 §3)",
+    );
+  },
+);

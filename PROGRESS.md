@@ -27,6 +27,33 @@
 
 **Nợ kỹ thuật/rủi ro mở:** ~~`audit_log.entity_id` chỉ hỗ trợ khoá `BIGINT` nên `engineering_*` (UUID) nằm ngoài audit trail~~ — **đã đóng** bằng `0090` (cột `entity_key` TEXT, xem mục "C3 §2" bên dưới). Rủi ro còn lại là vận hành, không phải code: cặp `0091`/`0092` phải chạy staging trước khi lên production.
 
+## C0 — Sửa doc drift + canh gác phạm vi RLS (2026-08-15)
+
+C0 yêu cầu "`PROJECT.md`/`spec.md` phải phản ánh RLS thật, phiên bản app, số route/bảng và
+track ENG". **Đo trước, không sửa theo cảm tính:**
+
+| Tài liệu khai                               | Thực tế đo được                        | Kết luận         |
+| ------------------------------------------- | -------------------------------------- | ---------------- |
+| RLS trên "11 bảng tài chính + nhóm tổ chức" | **+15 bảng `engineering_*`** (`0092`)  | trôi — đã sửa    |
+| "~107 nhóm route"                           | **119** nhóm (361 file `route.ts`)     | trôi — đã sửa    |
+| "đã hoàn tất M0–M42"                        | M0–M52 + M56/M58/M59/M61–M64 + ENG-1→5 | trôi — đã sửa    |
+| `v0.3.0`                                    | `package.json` = 0.3.0                 | khớp, giữ nguyên |
+
+- **[AI, đã làm]** Sửa 3 chỗ trôi trong `PROJECT.md`; bổ sung mục "Cập nhật 2026-08-15" vào
+  `docs/adr/0005-rls.md` ghi rõ `0077` khoá cửa nhóm tài chính và `0092` mở rộng sang
+  `engineering_*`, **kèm lý do vì sao nhóm này đi thẳng policy nghiêm ngặt** thay vì qua giai
+  đoạn chuyển tiếp như nhóm tài chính.
+- **[AI, quyết định — canh cái ÍT ĐỔI, không canh con số]** Thêm test canh **TẬP BẢNG bật
+  RLS** thay vì canh số route/bảng. Số route đổi gần như mỗi PR nên canh sẽ thành nhiễu rồi
+  bị tắt; còn tập bảng có RLS thì hiếm khi đổi và **mỗi lần đổi đều là quyết định bảo mật
+  đáng review**. Test bắt **cả hai chiều**: bảng lặng lẽ được bật RLS mà chưa khai, và bảng
+  mất RLS ngoài ý muốn. Riêng nhóm `engineering_*` khai theo **tiền tố**, nên thêm bảng mới
+  mà quên bật là đỏ ngay.
+- **[AI, chứng minh guard không phải trang trí]** `DISABLE ROW LEVEL SECURITY` trên
+  `engineering_conflicts` → test đỏ đúng thông điệp "Bảng engineering_\* mới thêm nhưng CHƯA
+  bật RLS"; bật lại thì xanh.
+- **Verify**: `tests/rls.test.ts` **5/5**; `lint` 0 lỗi, `typecheck` xanh.
+
 ## C3 §6 (PR C3.5) — Chính sách dọn dữ liệu hết hạn (2026-08-15)
 
 - **[AI, đo được — cột hạn có sẵn nhưng chưa ai dùng]** `engineering_ingest_requests` đã có
