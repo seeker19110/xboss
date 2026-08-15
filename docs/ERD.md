@@ -3157,17 +3157,19 @@
 | actor_id | integer | ✓ |  |
 | actor_role | text | ✓ |  |
 | entity_type | text |  |  |
-| entity_id | bigint |  |  |
+| entity_id | bigint | ✓ |  |
 | action | text |  |  |
 | changes | jsonb | ✓ |  |
 | project_id | integer | ✓ |  |
 | request_id | text | ✓ |  |
 | row_hash | text | ✓ |  |
+| entity_key | text | ✓ |  |
 
 **Index:**
 - `audit_log_pkey`: UNIQUE INDEX audit_log_pkey ON public.audit_log USING btree (id)
 - `idx_audit_at`: INDEX idx_audit_at ON public.audit_log USING btree (at DESC)
 - `idx_audit_entity`: INDEX idx_audit_entity ON public.audit_log USING btree (entity_type, entity_id)
+- `idx_audit_entity_key`: INDEX idx_audit_entity_key ON public.audit_log USING btree (entity_type, entity_key, at DESC)
 
 ### assignment_log
 

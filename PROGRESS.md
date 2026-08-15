@@ -27,6 +27,44 @@
 
 **Nợ kỹ thuật/rủi ro mở:** `audit_log.entity_id` và trigger audit hiện chỉ hỗ trợ khoá `BIGINT`; các bảng `engineering_*` dùng UUID nên chưa nằm trong audit trail tự động. Không mở rộng cấu trúc audit trên production khi chưa có kế hoạch migration, thử nghiệm staging và rollback riêng.
 
+## C3 §2 — Audit trail nhận khoá UUID + vá crash ngữ cảnh cross-project (2026-08-15)
+
+Đóng nợ kỹ thuật ghi từ ENG-2 ("mọi bảng `engineering_*` nằm NGOÀI audit trail tự động").
+Đặc tả: `docs/nang-cap/C3-data-audit-rls-hardening.md` §2.
+
+- **[AI, đo trên DB — 2 lỗi thật, độc lập nhau]**
+  1. Gắn trigger audit lên bảng khoá UUID → **mọi INSERT vỡ**:
+     `invalid input syntax for type bigint: "ee7a6766-…"`. Hàm khai `v_id BIGINT` rồi ép
+     `(to_jsonb(NEW)->>'id')::bigint`, và `audit_log.entity_id` cũng `BIGINT NOT NULL`.
+  2. **Lỗi thứ 2 phát hiện thêm khi đọc hàm**: ghi vào **bất kỳ** bảng đang có trigger audit
+     trong ngữ cảnh `app.project_id = '*'` → vỡ `invalid input syntax for type integer: "*"`.
+     `'*'` là ngữ cảnh cross-project **hợp lệ** do chính RLS định nghĩa. **Tổ hợp "ghi trong
+     ngữ cảnh `'*'`" đang được dùng thật** ở `app/api/notifications/route.ts`
+     (`withProjectScope(projectId ?? "*", …, { readOnly: false })`) — hiện chưa nổ **chỉ vì**
+     bảng `notifications` không gắn trigger audit. Gắn trigger cho bất kỳ bảng nào được ghi
+     trong ngữ cảnh đó là thành sự cố production.
+- **[AI, đã làm] `migrations/0090_audit_uuid_entity_key.sql` — THUẦN THÊM**, không `UPDATE`,
+  không backfill → đi thẳng production được theo DoD: `audit_log.entity_key TEXT`,
+  `entity_id` bỏ `NOT NULL`, index `(entity_type, entity_key, at DESC)`, viết lại
+  `audit_row_change()` (chỉ điền `entity_id` khi khoá thật sự là số trong tầm BIGINT; chỉ
+  điền `project_id` khi GUC là chuỗi số), rồi **gắn audit cho 5 bảng `engineering_*`**.
+- **[AI, quyết định] Giữ nguyên cơ chế hash-chain, hash trên `v_key`** — với khoá số thì
+  `v_key` **chính là** chuỗi mà bản cũ đã hash (`v_id::text`), nên **hash của mọi dòng cũ
+  không đổi**, chuỗi tamper-evidence vẫn kiểm được. `lib/audit-chain.ts` đọc
+  `COALESCE(entity_key, entity_id::text)` → **không cần backfill** `audit_log` (bảng chỉ-ghi-
+  thêm, có thể rất lớn; một UPDATE toàn bảng vừa khoá lâu vừa thừa). **Kiểm chứng thật**: set
+  `entity_key = NULL` cho 1 dòng (giả lập dòng ghi trước 0090) → `verifyAuditChain` vẫn báo
+  **0 lỗi**.
+- **[AI, cố ý KHÔNG gắn audit]** cho `engineering_workflow_events` và
+  `engineering_object_revisions` — vốn đã là sổ append-only có ngữ nghĩa riêng, gắn thêm sẽ
+  **đếm trùng sự kiện** (đúng cảnh báo "không copy event workflow vào hai bảng" của C3 §2).
+- **[AI, tự sửa test sai của chính mình]** Ca test đầu tiên viết ra assert `verifyAuditChain()`
+  sạch toàn cục → đỏ giả khi chạy chung nhiều file, vì chuỗi hash là **trạng thái toàn cục**
+  và có test khác cố ý phá 1 dòng. Bỏ assert đó (tính hợp lệ chuỗi đã có 2 ca cũ lo), giữ
+  đúng thứ cần chứng minh: dòng khoá UUID **được ghi đúng**.
+- **Verify**: `tests/audit-chain.test.ts` 4/4; audit + engineering 70 ca;
+  `lint` 0 lỗi, `typecheck` xanh.
+
 ## C3 §3 — Khoá nốt tham chiếu chéo dự án qua source revision (2026-08-15)
 
 Tiếp `ENG-5 PR1`: `0088` mới khoá được 2 đầu **object** của relation, còn đường qua **source
