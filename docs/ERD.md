@@ -3467,8 +3467,10 @@
 - `from_object_id` → `engineering_objects(id)`
 - `from_object_id` → `engineering_objects(id)`
 - `project_id` → `projects(id)`
+- `project_id` → `engineering_source_revisions(project_id)`
 - `project_id` → `engineering_objects(project_id)`
 - `project_id` → `engineering_objects(project_id)`
+- `source_revision_id` → `engineering_source_revisions(id)`
 - `source_revision_id` → `engineering_source_revisions(id)`
 - `to_object_id` → `engineering_objects(id)`
 - `to_object_id` → `engineering_objects(id)`
@@ -3530,6 +3532,8 @@
 **Khóa ngoại:**
 - `created_by` → `users(id)`
 - `project_id` → `projects(id)`
+- `project_id` → `engineering_source_revisions(project_id)`
+- `source_revision_id` → `engineering_source_revisions(id)`
 - `source_revision_id` → `engineering_source_revisions(id)`
 - `updated_by` → `users(id)`
 
@@ -3555,14 +3559,19 @@
 | created_by | integer |  |  |
 | created_at | timestamptz |  | `now()` |
 | external_revision_key | text | ✓ |  |
+| project_id | integer |  |  |
 
 **Khóa ngoại:**
 - `created_by` → `users(id)`
+- `project_id` → `engineering_sources(project_id)`
+- `source_id` → `engineering_sources(id)`
 - `source_id` → `engineering_sources(id)`
 
 **Index:**
 - `engineering_source_revisions_pkey`: UNIQUE INDEX engineering_source_revisions_pkey ON public.engineering_source_revisions USING btree (id)
 - `engineering_source_revisions_source_id_revision_no_key`: UNIQUE INDEX engineering_source_revisions_source_id_revision_no_key ON public.engineering_source_revisions USING btree (source_id, revision_no)
+- `idx_engineering_source_revisions_project`: INDEX idx_engineering_source_revisions_project ON public.engineering_source_revisions USING btree (project_id)
+- `uq_eng_source_rev_id_project`: UNIQUE INDEX uq_eng_source_rev_id_project ON public.engineering_source_revisions USING btree (id, project_id)
 - `uq_engineering_source_revisions_external`: UNIQUE INDEX uq_engineering_source_revisions_external ON public.engineering_source_revisions USING btree (source_id, external_revision_key) WHERE (external_revision_key IS NOT NULL)
 
 ### engineering_sources
@@ -3589,6 +3598,7 @@
 - `engineering_sources_pkey`: UNIQUE INDEX engineering_sources_pkey ON public.engineering_sources USING btree (id)
 - `idx_engineering_sources_project`: INDEX idx_engineering_sources_project ON public.engineering_sources USING btree (project_id, created_at DESC)
 - `uq_engineering_sources_external`: UNIQUE INDEX uq_engineering_sources_external ON public.engineering_sources USING btree (project_id, external_key) WHERE (external_key IS NOT NULL)
+- `uq_engineering_sources_id_project`: UNIQUE INDEX uq_engineering_sources_id_project ON public.engineering_sources USING btree (id, project_id)
 
 ### engineering_suggestions
 

@@ -8,7 +8,8 @@
 
 - **GĐ 4–5 — Vận hành có kiểm soát & nâng chất lượng.** Sản phẩm đã chạy thật (v0.2.1, tự host VPS). Track Engineering OS nền tảng (ENG-1→ENG-4) đã hoàn tất về code, migration, API/UI và test; chưa có traffic thật từ MEPF-Agents nên chưa mở các tầng Digital Twin/Predictive OS/Controlled Autonomy.
 - **Ưu tiên hiện hành:** xác minh staging/production cho migration `0084`–`0087`, kết nối thử nghiệm có kiểm soát với MEPF-Agents, và xử lý các nợ kỹ thuật đã ghi nhận trước khi mở rộng phạm vi mới.
-- **Đặc tả kế tiếp (chờ duyệt, chưa code):** `ENG-5 — Integration Contract & Pilot MEPF-Agents` — đóng các khoảng trống external-key relation, idempotency, project isolation, OpenAPI/fixture và runbook pilot trước khi mở traffic thật.
+- **`ENG-5` (C1) — PR1 ĐÃ XONG** (external-key relation, idempotency, cách ly dự án ở tầng DB); phần còn lại (OpenAPI sinh tự động, consumer test phía MEPF-Agents, metrics/alert, pilot runbook) chờ điều kiện ngoài. Xem mục "ENG-5 PR1" bên dưới.
+- **⚠️ Migration CHỜ CHẠY STAGING:** `0089_engineering_project_invariants.sql` **đụng dữ liệu** (backfill `project_id` cho `engineering_source_revisions`) → theo DoD phải qua staging trước, **chưa được đưa thẳng production**. `0088` thì thuần thêm, đi thẳng được.
 - **Lộ trình hoàn thành (chờ duyệt, chưa code):** `PROJECT-COMPLETION-ROADMAP.md` chốt C0→C6 để đạt XBoss v1.0/Product Complete và O1→O5 cho Engineering OS/Vision Complete theo gate; không coi tài liệu là quyền tự triển khai production hoặc A3+.
 - **Spec pack chi tiết (chờ duyệt):** C0, C2–C6 và OS-1–OS-5 đã có file thi hành riêng (C1 dùng ENG-5), mỗi file gồm scope, data/API/UI/ops, test, chia PR và DoD. Chưa phase nào được đánh dấu triển khai chỉ vì đặc tả đã viết.
 
@@ -25,6 +26,33 @@
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
 **Nợ kỹ thuật/rủi ro mở:** `audit_log.entity_id` và trigger audit hiện chỉ hỗ trợ khoá `BIGINT`; các bảng `engineering_*` dùng UUID nên chưa nằm trong audit trail tự động. Không mở rộng cấu trúc audit trên production khi chưa có kế hoạch migration, thử nghiệm staging và rollback riêng.
+
+## C3 §3 — Khoá nốt tham chiếu chéo dự án qua source revision (2026-08-15)
+
+Tiếp `ENG-5 PR1`: `0088` mới khoá được 2 đầu **object** của relation, còn đường qua **source
+revision** vẫn hở. Đặc tả: `docs/nang-cap/C3-data-audit-rls-hardening.md` §3 "Relational
+invariants".
+
+- **[AI, đo trên DB trước khi sửa — lỗ hổng thật]** Chèn thẳng SQL: 1 object thuộc **dự án B**
+  trỏ `source_revision_id` của **dự án A** → DB **vẫn nhận** (`INSERT 0 1`). Gốc rễ:
+  `engineering_source_revisions` **không mang `project_id`** nên bất biến không diễn đạt được
+  bằng FK. Sau `0089`: cùng câu lệnh đó bị `fk_eng_object_source_rev_same_project` chặn.
+- **[AI, đã làm] `migrations/0089_engineering_project_invariants.sql`** — thêm `project_id` vào
+  `engineering_source_revisions` (nullable → backfill từ source cha → `NOT NULL`), rồi 3 composite
+  FK khoá 3 bất biến của C3 §3: (A) revision cùng dự án với source cha, (B) object trỏ revision
+  cùng dự án, (C) relation trỏ revision cùng dự án. Có DO-block **dừng có thông báo rõ** nếu còn
+  dòng mồ côi không suy được `project_id`, thay vì để `ALTER ... SET NOT NULL` fail khó hiểu.
+- **⚠️ Migration này ĐỤNG DỮ LIỆU** (backfill) → theo DoD **phải chạy staging trước**, khác `0088`
+  (thuần thêm, đi thẳng production được). Backfill lũy đẳng (chỉ điền dòng đang lệch) nên chạy lại
+  nhiều lần vẫn an toàn.
+- **[AI, quyết định] `project_id` của revision SUY TỪ SOURCE CHA ngay trong câu `INSERT`**
+  (`SELECT s.id, s.project_id … FROM engineering_sources s WHERE s.id = ?`), **không nhận từ bên
+  gọi** — bất biến đúng ngay từ lúc ghi chứ không phụ thuộc caller truyền chuẩn; FK composite chỉ
+  là lưới an toàn thứ 2. Áp cho cả `createSourceRevision` lẫn `upsertSourceRevisionFromExternal`.
+- **Verify**: `tests/engineering-ingest.test.ts` thêm 2 ca ghim đúng lỗ hổng trên (ca 11: object
+  không trỏ được revision dự án khác; ca 12: revision luôn mang `project_id` của source cha và
+  khai lệch thì bị chặn) → **12/12 pass**; toàn bộ test engineering **55/55**; `lint` 0 lỗi,
+  `typecheck`/`build` xanh; `check:migrations` OK (89 file); `gen:erd` cập nhật.
 
 ## ENG-5 PR1 (C1) — Hợp đồng ingest lũy đẳng + cách ly dự án ở tầng DB (2026-08-15)
 
