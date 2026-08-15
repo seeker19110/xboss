@@ -6,7 +6,22 @@
 
 ## Giai đoạn hiện tại
 
-- **GĐ 4–5 — Phát triển & nâng chất lượng.** Sản phẩm đã chạy thật (v0.2.1, tự host VPS), đang phát triển/tinh chỉnh tính năng liên tục **và** đang áp bộ khung quy trình/chất lượng (brownfield) theo `docs/framework/AP-DUNG-vao-du-an-co-san.md`.
+- **GĐ 4–5 — Vận hành có kiểm soát & nâng chất lượng.** Sản phẩm đã chạy thật (v0.2.1, tự host VPS). Track Engineering OS nền tảng (ENG-1→ENG-4) đã hoàn tất về code, migration, API/UI và test; chưa có traffic thật từ MEPF-Agents nên chưa mở các tầng Digital Twin/Predictive OS/Controlled Autonomy.
+- **Ưu tiên hiện hành:** xác minh staging/production cho migration `0084`–`0087`, kết nối thử nghiệm có kiểm soát với MEPF-Agents, và xử lý các nợ kỹ thuật đã ghi nhận trước khi mở rộng phạm vi mới.
+
+## Snapshot điều hành — 14–15/08/2026
+
+| Track                                             | Trạng thái chuẩn hoá                                 | Bằng chứng chính                                                                   | Cổng tiếp theo                                                             |
+| ------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| M64 — Upload kế hoạch/tracking theo hệ            | ✅ Hoàn tất (09/08), không còn là kế hoạch đang chạy | `0082_system_uploads.sql`, UI upload, test và CI đã xanh                           | Vận hành/nhận phản hồi người dùng; không code lại                          |
+| Chất lượng dữ liệu Excel → WBS → báo cáo          | ✅ Đã vá; ⚠ cần backfill production có kiểm soát     | `cdecf55`, test timezone/file Excel thật, `backfill-import-dates.ts` preview-first | Chạy staging rồi mới `--apply` trên production, có backup/xác nhận dữ liệu |
+| ENG-1 — Engineering Object Hub                    | ✅ Hoàn tất về code                                  | `0084`, ingest idempotent, review gate, API-key scope, UI                          | Nhận traffic thử nghiệm từ MEPF-Agents                                     |
+| ENG-2 — Engineering Intelligence                  | ✅ Hoàn tất về code                                  | `0085`, evidence/provenance, ranking, suggestion review                            | Đánh giá chất lượng suggestion trên dữ liệu thật                           |
+| ENG-3 — Engineering Workflow OS                   | ✅ Hoàn tất về code                                  | `0086`, Gate 0, risk profile, SoD, transition audit                                | UAT luồng phê duyệt với PM/QA trước khi dùng vận hành                      |
+| ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
+| Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
+
+**Nợ kỹ thuật/rủi ro mở:** `audit_log.entity_id` và trigger audit hiện chỉ hỗ trợ khoá `BIGINT`; các bảng `engineering_*` dùng UUID nên chưa nằm trong audit trail tự động. Không mở rộng cấu trúc audit trên production khi chưa có kế hoạch migration, thử nghiệm staging và rollback riêng.
 
 ## ENG-4 — Multi-Agent Engineering OS (2026-08-15)
 

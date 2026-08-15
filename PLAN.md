@@ -1,50 +1,51 @@
-# PLAN.md — M64: Upload kế hoạch & tracking theo hệ
+# PLAN.md — Sau ENG-4: kiểm chứng trước, mở rộng sau
 
-> Phiên chính (Fable 5) xuất kế hoạch theo mẫu này, giao **nguyên văn** cho `coordinator`
-> (Opus · low) thi hành — dispatch từng việc theo nhãn `route:`, theo dõi, gọi `reviewer`,
-> tích hợp, báo cáo lại; phiên chính duyệt cuối. Coordinator/worker KHÔNG thấy hội thoại
-> trước đó — kế hoạch dưới đây tự chứa.
+**Cập nhật:** 2026-08-15
+**Nguồn trạng thái:** `PROGRESS.md` và các commit `cdecf55`, `a6f98da`, `f14ea21`, `1186efb`.
 
-## Bối cảnh
+## Trạng thái kế hoạch trước đó
 
-Đặc tả đầy đủ: `docs/nang-cap/M64-upload-ke-hoach-tracking-theo-he.md` (đã chốt phạm vi
-với người dùng qua `AskUserQuestion` — không còn điểm mơ hồ). 1 việc duy nhất, không cần
-chia nhiều PR song song.
+M64 — Upload kế hoạch & tracking theo hệ đã hoàn tất ngày 2026-08-09 (migration `0082`, API/UI/test và CI). Không còn là công việc đang thực hiện; không lập lại triển khai M64 trừ khi có lỗi hoặc yêu cầu nghiệp vụ mới được xác nhận.
 
-Yêu cầu gốc: trong mỗi trang hệ (`/progress/[system]`, 6 hệ: acmv/dien/nuoc/pccc/ket_cau/
-xay_to), cho phép Admin xuất file Excel mẫu từ DB, tải xuống, điền, upload lại để cập
-nhật **kế hoạch** (ngày BĐ/KT) và **tracking** (lưới x/○ dimension) — kỹ sư theo dõi và
-tuân theo dữ liệu sau khi admin cập nhật.
+## Mục tiêu giai đoạn
 
-## Việc 1 — Upload kế hoạch & tracking theo hệ (`route: spec`)
+Đưa nền tảng Engineering OS ENG-1→ENG-4 vừa hoàn tất từ trạng thái **đã có code** sang **đã được xác minh có kiểm soát trong vận hành**. Không triển khai Digital Twin, Predictive OS hoặc autonomy trước các cổng bên dưới.
 
-- **Nhánh**: `claude/feat-m64-upload-ke-hoach-tracking`
-- **Agent**: `spec-executor` (Opus · low) — đặc tả đã kín (schema DDL, API, hành vi từng
-  dòng lỗi của lib, UI touch point, test, tiêu chí chấp nhận đều có sẵn trong file đặc
-  tả), chỉ cần thi hành chính xác, không sáng tạo.
-- **Brief cho worker**: Đọc và thi hành ĐÚNG theo
-  `docs/nang-cap/M64-upload-ke-hoach-tracking-theo-he.md` (đủ 7 mục: schema, lib
-  `lib/system-upload.ts` + tách `lib/excel-tracking.ts` từ
-  `app/api/export/excel/route.ts`, 4 route API dưới `app/api/systems/[code]/...` +
-  `app/api/system-uploads/[id]/file`, UI `app/components/SystemUploadPanel.tsx` gắn vào
-  `app/progress/[system]/page.tsx`, test `tests/system-upload.test.ts`, Definition of
-  Done). Không tự suy diễn thêm phạm vi ngoài file đặc tả — thiếu chi tiết nào thì dừng
-  việc đó, ghi rõ vào báo cáo cuối thay vì tự đoán.
-- **Vùng rủi ro cao chạm tới**: gọi `recomputeTask`/`recomputePackage`
-  (`lib/recompute.ts`) sau khi UPDATE ngày/dimension hàng loạt — PHẢI đúng pattern
-  transaction mô tả ở mục 3 file đặc tả (đối chiếu cách `app/api/tasks/[id]/route.ts`
-  PATCH ngày đang làm), **không tự đổi logic** `recomputeTask`/`deriveStatus` sẵn có.
-  Route upload chỉ cho `user.role === "admin"` (chặt hơn `CAN.import`/`CAN.export` hiện
-  có vốn cho cả Admin/PM) — đúng yêu cầu gốc, không nới lỏng.
-- **Tiêu chí chấp nhận**: mục 7 file đặc tả (Definition of Done) — đủ hết mới coi là
-  xong, bao gồm lint/typecheck/test/build xanh.
-- **Sau khi worker xong**: `reviewer` soát diff — đặc biệt điểm chạm `lib/recompute.ts`,
-  bọc transaction, kiểm quyền admin-only ở route upload, an toàn tên file
-  (`storagePut`/path traversal), và việc tách `lib/excel-tracking.ts` không làm đổi hành
-  vi export hiện có (`/api/export/excel`).
-- **Trước khi báo cáo về phiên chính**: cập nhật `PROGRESS.md` (mục "Đã làm", có số PR
-  khi đã mở) + `docs/nang-cap/README.md` (thêm/đóng mục M64).
+## Việc 1 — Xác minh phát hành ENG-1→ENG-4 (`route: verification`)
 
-## Loại khỏi đợt này
+- **Phạm vi:** staging trước production cho migrations `0084_engineering_core.sql` đến `0087_engineering_agents.sql`; chạy đầy đủ integration test với `TEST_DATABASE_URL`, E2E, build và kiểm tra rollback/backup theo quy trình deploy.
+- **Tiêu chí đạt:** migration append-only chạy sạch trên bản sao dữ liệu; không lỗi RLS/quyền/API key; các luồng ingest → suggestion → workflow → agent session hoạt động đúng phân quyền; không có thay đổi tự động vào task/BOQ/thanh toán.
+- **Điểm dừng:** bất kỳ lỗi migration, cách ly dự án/tổ chức, hoặc Gate/SoD sai phải được sửa và kiểm thử lại trước production.
 
-Không có — 1 việc trọn vẹn, không phát sinh nhánh song song.
+## Việc 2 — Pilot tích hợp MEPF-Agents (`route: integration`)
+
+- **Repository đối tác:** [seeker19110/MEPF-Agents](https://github.com/seeker19110/MEPF-Agents) — hệ Multi-Agent tư vấn MEPF (HVAC, điện, nước, PCCC, QS, CAD/BIM và reviewer). Đây là nguồn tích hợp chính thức; chưa cần clone, vendor hoặc chia sẻ database.
+- **Phạm vi:** cấp API key scope `engineering` theo từng dự án, gửi dữ liệu mẫu có `external_key` ổn định, kiểm thử ingest lặp lại, evidence/provenance, claims và conflict resolution.
+- **Tiêu chí đạt:** idempotency xác nhận bằng gửi lại cùng payload; object và suggestion không lẫn dự án; người có quyền duyệt được nội dung/evidence; conflict có cách phân xử và người chốt rõ ràng.
+- **Ranh giới cứng:** XBoss là bên điều phối/lưu vết. Agent không có quyền tự ghi task, BOQ, payment hoặc tự duyệt workflow.
+
+## Việc 3 — Khắc phục dữ liệu ngày Excel cũ (`route: operations`)
+
+- **Phạm vi:** sao lưu, chạy `scripts/backfill-import-dates.ts` ở chế độ preview trên staging; đối chiếu danh sách dòng dự kiến sửa với file Excel nguồn; chỉ khi được xác nhận mới chạy `--apply` trên production.
+- **Tiêu chí đạt:** dữ liệu chỉ thay đổi khi có đúng dấu vết lệch ngày; các dòng đã người dùng sửa tay được giữ nguyên; script chạy lại không tạo thay đổi mới.
+- **Điểm dừng:** có mã task trùng đa dự án/chênh nguồn không giải thích được thì dừng và chọn `--project=<id>` hoặc xử lý thủ công.
+
+## Việc 4 — Lập kế hoạch riêng cho audit UUID (`route: specification`)
+
+- **Phạm vi:** thiết kế migration tương thích ngược để audit các thực thể UUID `engineering_*`, bao gồm dữ liệu lịch sử, index, truy vấn UI, rollback và tải trên bảng `audit_log`.
+- **Tiêu chí đạt:** đặc tả + proof-of-concept trên staging; không sửa migration cũ hay chạy trực tiếp trên production khi chưa có kế hoạch triển khai được phê duyệt.
+
+## Cổng mở rộng sau đó
+
+Chỉ cân nhắc Engineering OS nâng cao, Digital Twin, Predictive OS hoặc Controlled Autonomy khi đồng thời đạt:
+
+1. ENG-1→ENG-4 có traffic thật từ MEPF-Agents và pilot qua ít nhất một chu kỳ vận hành.
+2. UAT của PM/QA xác nhận Gate 0, risk profile, SoD và cơ chế `no_consensus` hoạt động phù hợp.
+3. Monitoring, audit và quy trình xử lý sự cố đủ cho dữ liệu kỹ thuật thật.
+4. Có owner nghiệp vụ, phạm vi side effect và cơ chế rollback được phê duyệt bằng workflow.
+
+## Loại khỏi giai đoạn này
+
+- Không thêm mô hình AI/LLM tự quyết hoặc cơ chế majority vote.
+- Không tự động thực thi thay đổi nghiệp vụ.
+- Không mở rộng module mới chỉ vì đã có khung dữ liệu kỹ thuật.
