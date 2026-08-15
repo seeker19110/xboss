@@ -1,7 +1,11 @@
-# PLAN.md — Sau ENG-4: kiểm chứng trước, mở rộng sau
+# PLAN.md — Hoàn thành XBoss v1.0, rồi mở Engineering OS theo gate
 
 **Cập nhật:** 2026-08-15
 **Nguồn trạng thái:** `PROGRESS.md` và các commit `cdecf55`, `a6f98da`, `f14ea21`, `1186efb`.
+
+**Đặc tả tổng:** `docs/nang-cap/PROJECT-COMPLETION-ROADMAP.md` — C0→C6 để đạt Product Complete v1.0; O1→O5 là lộ trình Engineering OS có điều kiện.
+
+Mỗi phase đã có file đặc tả thi hành riêng trong `docs/nang-cap/` (index tại mục 3 của roadmap tổng); worker không thi hành từ đoạn tóm tắt trong `PLAN.md`.
 
 ## Trạng thái kế hoạch trước đó
 
@@ -10,6 +14,8 @@ M64 — Upload kế hoạch & tracking theo hệ đã hoàn tất ngày 2026-08-
 ## Mục tiêu giai đoạn
 
 Đưa nền tảng Engineering OS ENG-1→ENG-4 vừa hoàn tất từ trạng thái **đã có code** sang **đã được xác minh có kiểm soát trong vận hành**. Không triển khai Digital Twin, Predictive OS hoặc autonomy trước các cổng bên dưới.
+
+**Đặc tả dẫn đường:** `docs/nang-cap/ENG-5-integration-contract-pilot.md` chốt hợp đồng ingest, idempotency, cách ly dự án, observability và pilot trước khi kết nối traffic thật.
 
 ## Việc 1 — Xác minh phát hành ENG-1→ENG-4 (`route: verification`)
 
@@ -35,6 +41,16 @@ M64 — Upload kế hoạch & tracking theo hệ đã hoàn tất ngày 2026-08-
 - **Phạm vi:** thiết kế migration tương thích ngược để audit các thực thể UUID `engineering_*`, bao gồm dữ liệu lịch sử, index, truy vấn UI, rollback và tải trên bảng `audit_log`.
 - **Tiêu chí đạt:** đặc tả + proof-of-concept trên staging; không sửa migration cũ hay chạy trực tiếp trên production khi chưa có kế hoạch triển khai được phê duyệt.
 
+## Việc 5 — Quality/Security/DR release gate (`route: verification`)
+
+- **Phạm vi:** C3→C4 của đặc tả tổng — audit UUID, RLS engineering, backfill ngày, integration/E2E trên DB thật, load/security/restore drill.
+- **Tiêu chí đạt:** lỗi P0/P1 bằng 0; cách ly project/org được kiểm bằng negative test; SLO và RPO/RTO đã được owner ký; restore staging thành công.
+
+## Việc 6 — UAT, rollout và đóng v1.0 (`route: operations`)
+
+- **Phạm vi:** C5→C6 — UAT theo 7 vai trò, đối soát Excel/MEPF fixtures, canary production, tài liệu vận hành/đào tạo/ownership và release sign-off.
+- **Tiêu chí đạt:** Product Complete theo mục 10 của đặc tả tổng; chỉ sau đó mới tag `v1.0.0`.
+
 ## Cổng mở rộng sau đó
 
 Chỉ cân nhắc Engineering OS nâng cao, Digital Twin, Predictive OS hoặc Controlled Autonomy khi đồng thời đạt:
@@ -43,6 +59,8 @@ Chỉ cân nhắc Engineering OS nâng cao, Digital Twin, Predictive OS hoặc C
 2. UAT của PM/QA xác nhận Gate 0, risk profile, SoD và cơ chế `no_consensus` hoạt động phù hợp.
 3. Monitoring, audit và quy trình xử lý sự cố đủ cho dữ liệu kỹ thuật thật.
 4. Có owner nghiệp vụ, phạm vi side effect và cơ chế rollback được phê duyệt bằng workflow.
+
+Sau cổng này, thi hành tuần tự O1 System of Record → O2 Digital Twin → O3 Predictive OS → O4 Controlled Autonomy → O5 closeout. A3+ cần người dùng phê duyệt riêng theo từng workflow type; không suy ra quyền từ việc O1–O3 đã hoàn thành.
 
 ## Loại khỏi giai đoạn này
 

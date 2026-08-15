@@ -13,6 +13,10 @@ Lộ trình riêng cho hướng tích hợp với hệ multi-agent kỹ thuật 
 dùng nhãn "M43" cho việc này, đụng độ với `M43-audit-trail.md` (module khác hẳn, đã xong từ lâu).
 Quyết định (người dùng chốt): track riêng `ENG-1..ENG-4`, không đụng số `M<xx>`.
 
+- **`PROJECT-COMPLETION-ROADMAP.md`** — 📝 **draft chờ duyệt** (2026-08-15): đặc tả tổng từ C0 baseline → C6 XBoss v1.0/Product Complete, sau đó O1 System of Record → O5 Engineering OS/Vision Complete theo gate. Đây là nguồn trình tự/exit gate; chi tiết contract pilot nằm ở ENG-5.
+- **Spec pack Product Complete:** `C0-release-baseline-governance.md`, `ENG-5-integration-contract-pilot.md` (C1), `C2-mepf-connector-pilot.md`, `C3-data-audit-rls-hardening.md`, `C4-quality-security-dr-release-gate.md`, `C5-uat-production-rollout.md`, `C6-v1-release-closeout.md` — tất cả 📝 draft chờ duyệt.
+- **Spec pack Vision Complete:** `OS-1-engineering-system-of-record.md`, `OS-2-digital-twin.md`, `OS-3-predictive-os.md`, `OS-4-controlled-autonomy.md`, `OS-5-engineering-os-closeout.md` — conditional draft; OS-4 A3+ vẫn cần phê duyệt riêng theo capability.
+
 - **`ENG-0-roadmap-tich-hop-engineering-os.md`** — lộ trình tổng (Foundation Hardening → ENG-1 →
   ENG-2 → ENG-3 → ENG-4 → Engineering OS/AI-Digital-Twin/Predictive OS/Controlled Autonomy), 12
   nguyên tắc khoá kiến trúc kế thừa từ MEP-Agents, boundary chống AI tự cấp quyền, Foundation Gate.
@@ -41,6 +45,10 @@ Quyết định (người dùng chốt): track riêng `ENG-1..ENG-4`, không đ�
   5 loại xung đột + phân xử theo thẩm quyền/bằng chứng/thứ bậc ràng buộc (**không majority
   vote**, có hàm chặn cứng), 5 mức đồng thuận với `no_consensus` là kết quả hợp lệ, trang
   `/engineering/agent-sessions`. ENG-3 vẫn là ranh giới uỷ quyền.
+- **`ENG-5-integration-contract-pilot.md`** — 📝 **draft chờ duyệt** (2026-08-15): hợp đồng
+  pilot giữa MEPF-Agents và XBoss. Chốt external-key relation (agent không biết UUID XBoss),
+  idempotency source/relation/request, project isolation, OpenAPI/fixtures, observability và
+  runbook staging; chưa có migration hoặc code.
 - **`ENGINEERING-OS-FUTURE-SYSTEMS.md`** (2026-08-15) — đặc tả **tầm nhìn kiến trúc**
   (không phải spec thi hành) cho 4 tầng sau ENG-4: Engineering OS (system-of-record +
   knowledge graph), Digital Twin (7 lớp L0–L6), Predictive OS (uncertainty-first, model
@@ -54,7 +62,7 @@ Quyết định (người dùng chốt): track riêng `ENG-1..ENG-4`, không đ�
   nghiệp vụ) bắt buộc người dùng chốt tường minh qua `AskUserQuestion` trước khi viết
   bất kỳ đặc tả thi hành nào — không tự suy diễn quyền hạn từ tài liệu tầm nhìn này.
 
-**Track `ENG-*` hoàn tất 4/4 phase.** Các nấc tiếp theo trong lộ trình (Engineering OS →
+**Track nền tảng `ENG-1..ENG-4` hoàn tất 4/4 phase; ENG-5 đang chờ duyệt.** Các nấc tiếp theo trong lộ trình (Engineering OS →
 AI/Digital Twin → Predictive OS → Controlled Autonomy) đã có tài liệu tầm nhìn (mục trên)
 nhưng **chưa có đặc tả thi hành** — chờ dữ liệu vận hành thật từ MEPF-Agents, đúng nguyên
 tắc #10 (đừng xây hạ tầng trước khi có tải thực tế).
@@ -83,7 +91,7 @@ tắc #10 (đừng xây hạ tầng trước khi có tải thực tế).
 Xuất phát từ `docs/nghien-cuu-nang-cap-erp-2026-07.md` (nghiên cứu 9 trục + bảng điểm). Thứ tự ưu tiên P0 → P3; số migration thực tế đã dùng khác số tạm trong đặc tả (bài học M32/M33). **Toàn bộ M43–M52 đã merge vào `main`** — cột dưới ghi migration/điểm chạm thực tế để tra cứu.
 
 | File                         | Hạng mục                                                                 | Trạng thái                                             | Migration/điểm chạm thực tế                                                                          |
-| ----------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| ---------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
 | `M43-audit-trail.md`         | Ngữ cảnh request + audit trail toàn hệ (trigger + SET LOCAL)             | ✅ xong                                                | `0049_audit_log.sql`, `0059_sso_audit.sql`                                                           |
 | `M44-van-hanh.md`            | Backup/DR, health, structured logging, Sentry, staging                   | ✅ xong                                                | `app/api/health`, Sentry scaffold (chờ ops đặt DSN)                                                  |
 | `M45-chat-luong-du-lieu.md`  | Money helper, CHECK, ERD tự sinh, soft-delete, test bất biến scope       | ✅ xong                                                | `lib/money.ts`, `0050`/`0051_checks`/`0052_soft_delete`                                              |
@@ -117,7 +125,7 @@ M57 PR2 (extract text PDF) — đã làm 2026-07-18 (xem bảng dưới), KHÔNG
 **LUẬT số migration (bài học 2026-07-18):** trước khi giao/code bất kỳ migration mới nào, chạy `ls migrations | sort -V | tail -3` để lấy số thật mới nhất — không suy đoán/copy số từ đặc tả hay kế hoạch cũ. PR #265 và PR #266 (2 phiên chạy song song) cùng chọn số `0071` cho 2 migration khác nhau vì không đồng bộ `main` ngay trước lúc code → chặn CI mọi PR (`check-migration-numbers.ts`) đến khi vá bằng PR #269 (đổi `0071_material_tx_idempotency.sql` → `0072_material_tx_idempotency.sql`). Số migration tiếp theo cần dùng tại thời điểm cập nhật mục này: **`0076`** (max hiện tại `0075_task_photos_hash.sql` của M58 PR3) — luôn xác nhận lại bằng lệnh trên, không tin số ghi trong tài liệu.
 
 | File                                      | Hạng mục                                                                                        | Trạng thái                                             | Ghi chú                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ------------------------------------------ | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `M53-scale-headroom.md`                   | Đo tải → watermark SSE O(1) thay aggregate JOIN 3s/client, pool env, audit cluster-ready        | ✅ xong cả 4 PR                                        | PR1-3 merge #252 (`cefda6a`, 2026-07-18); PR4 xong 2026-07-18 (`lib/sync-locks.ts`, TTL `lib/code-lists.ts`/`lib/feature-flags.ts`, `DEPLOY.md`)                                                                                                                                                                                                                                                                                                               |
 | `M56-2fa-totp.md`                         | TOTP RFC 6238 + recovery codes; PR2 bắt buộc theo vai trò                                       | ✅ xong cả 2 PR                                        | PR1 `0065_totp.sql`; PR2 (nhánh `claude/feat-m56-pr2-bat-buoc-2fa`) KHÔNG migration — cờ `mustSetup2fa` trong token phiên 5 phần, chặn ở `proxy.ts` (Node Middleware) 403 mọi API trừ `/api/auth/*`; domain `require_2fa_roles` trong `code_lists`                                                                                                                                                                                                             |
 | `M61-phan-quyen-theo-du-an.md`            | Override quyền theo dự án (`role_permissions.project_id`, đóng nợ M52 PR4 module `permissions`) | ✅ xong                                                | `0066_role_permissions_project.sql`, `lib/permissions.ts`/`lib/auth.ts`, UI `/admin/permissions` + export snapshot (PR2)                                                                                                                                                                                                                                                                                                                                       |
@@ -158,7 +166,7 @@ M57 PR2 (extract text PDF) — đã làm 2026-07-18 (xem bảng dưới), KHÔNG
 - **Thang typography (chuẩn hoá, M37 PR2.1)**: dùng đúng recipe Tailwind theo vai trò, không tạo class CSS mới.
 
   | Vai trò            | Recipe                                                         | Ghi chú                                               |
-  | ------------------ | ---------------------------------------------------------------- | ------------------------------------------------------- |
+  | ------------------ | -------------------------------------------------------------- | ----------------------------------------------------- |
   | Tiêu đề trang (h1) | `text-lg font-semibold text-zinc-50`                           | chỉ nâng tiêu đề trang cấp cao nhất                   |
   | Tiêu đề mục (h2)   | `text-base font-semibold text-zinc-100`                        | chỉ áp cho header section-level                       |
   | Tiêu đề thẻ (h3)   | `text-sm font-semibold`                                        | giữ nguyên                                            |

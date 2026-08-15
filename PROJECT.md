@@ -44,6 +44,7 @@ Xem `CLAUDE.md` mục **Quy trình & Definition of Done** và `.github/PULL_REQU
 ## 7. Lộ trình & Mốc thời gian
 
 - **Đã ra mắt nội bộ** (v0.3.0) — đã hoàn tất M0–M42 (tracking lõi + toàn bộ mở rộng chuỗi giá trị xây dựng), đang tinh chỉnh chất lượng/UX liên tục (xem `git log`, `PROGRESS.md`).
+- **Đường tới v1.0/Product Complete và Engineering OS:** xem `docs/nang-cap/PROJECT-COMPLETION-ROADMAP.md`. C0→C6 là phạm vi đóng sản phẩm; O1→O5 chỉ kích hoạt tuần tự khi đạt gate dữ liệu/vận hành và có phê duyệt cần thiết.
 
 ## 8. Rủi ro & Giả định còn mở
 
