@@ -9,7 +9,7 @@
 // KHÔNG dùng lib/approvals.ts (M46): engine đó chọn cấp duyệt theo ngưỡng TIỀN cho 4 loại
 // thực thể đóng, ENG-3 chọn theo RISK 8 chiều + bắt buộc Gate 0. Hai hệ sống song song.
 import { z } from "zod";
-import { query, queryOne, run, withTransaction } from "@/lib/db";
+import { query, queryOne, run, withProjectScope, withTransaction } from "@/lib/db";
 import type { Role } from "@/lib/roles";
 
 // ---------- §10 Risk engine ----------
@@ -352,10 +352,14 @@ export async function listWorkflows(
     conds.push("state = ?");
     args.push(filter.state);
   }
-  return query<WorkflowRow>(
-    `${WF_SELECT} WHERE ${conds.join(" AND ")} ORDER BY created_at DESC LIMIT ?`,
-    ...args,
-    limit,
+  // Đọc ngoài transaction không có GUC app.project_id → RLS không có gì để so. Bọc
+  // withProjectScope, cùng pattern các hàm đọc của lib/engineering-kernel.ts.
+  return withProjectScope(projectId, () =>
+    query<WorkflowRow>(
+      `${WF_SELECT} WHERE ${conds.join(" AND ")} ORDER BY created_at DESC LIMIT ?`,
+      ...args,
+      limit,
+    ),
   );
 }
 
@@ -363,27 +367,31 @@ export async function getWorkflow(
   projectId: number,
   id: string,
 ): Promise<{ workflow: WorkflowRow; gates: GateRow[]; events: WorkflowEventRow[] } | null> {
-  const workflow = await queryOne<WorkflowRow>(
-    `${WF_SELECT} WHERE id = ? AND project_id = ?`,
-    id,
-    projectId,
-  );
-  if (!workflow) return null;
-  const [gates, events] = await Promise.all([
-    query<GateRow>(
-      `SELECT id, seq, gate_type AS "gateType", required_role AS "requiredRole", decision,
+  // Gates/events không có cột project_id (ràng buộc qua workflow cha) nên phải đọc TRONG
+  // cùng phạm vi GUC với workflow.
+  return withProjectScope(projectId, async () => {
+    const workflow = await queryOne<WorkflowRow>(
+      `${WF_SELECT} WHERE id = ? AND project_id = ?`,
+      id,
+      projectId,
+    );
+    if (!workflow) return null;
+    const [gates, events] = await Promise.all([
+      query<GateRow>(
+        `SELECT id, seq, gate_type AS "gateType", required_role AS "requiredRole", decision,
               decided_by AS "decidedBy", decided_at AS "decidedAt", comments
          FROM engineering_workflow_gates WHERE workflow_id = ? ORDER BY seq`,
-      id,
-    ),
-    query<WorkflowEventRow>(
-      `SELECT id, from_state AS "fromState", to_state AS "toState", actor_id AS "actorId",
+        id,
+      ),
+      query<WorkflowEventRow>(
+        `SELECT id, from_state AS "fromState", to_state AS "toState", actor_id AS "actorId",
               gate_seq AS "gateSeq", reason, created_at AS "createdAt"
          FROM engineering_workflow_events WHERE workflow_id = ? ORDER BY created_at`,
-      id,
-    ),
-  ]);
-  return { workflow, gates, events };
+        id,
+      ),
+    ]);
+    return { workflow, gates, events };
+  });
 }
 
 // Ghi 1 dòng event + đổi state. Luôn gọi TRONG transaction đang mở (caller lo).

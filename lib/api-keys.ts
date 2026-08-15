@@ -5,6 +5,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
 import { hitRateLimit } from "@/lib/ratelimit";
+import { patchRequestContext } from "@/lib/request-context";
 
 // Sinh key thô: `xbk_` + 32 byte ngẫu nhiên hex (64 ký tự). Chỉ trả về 1 lần lúc tạo.
 export function generateApiKey(): string {
@@ -106,5 +107,17 @@ export async function requireApiKey(
       { error: "Key toàn cục cần chỉ định dự án qua ?project=<id>" },
       { status: 422 },
     );
+
+  // Đặt ngữ cảnh request cho ĐƯỜNG API KEY — đối xứng với getCurrentProjectId() ở đường
+  // phiên đăng nhập (lib/projects.ts). `withTransaction` (lib/db) đọc ngữ cảnh này để
+  // SET LOCAL app.project_id/app.user_id, tức:
+  //   1) RLS mới có GUC để so — thiếu bước này thì mọi route /api/v1/* chạy bằng role
+  //      xboss_app (NOBYPASSRLS) sẽ bị policy chặn "new row violates row-level security
+  //      policy" (đã đo thật: 9/12 ca ingest fail khi bật RLS nghiêm ngặt trên
+  //      engineering_*, chỉ những ca lỗi TRƯỚC khi chạm DB mới qua);
+  //   2) trigger audit ghi được actor thay vì để NULL.
+  // actor quy về `auth.createdBy` (admin đã tạo key) — cùng quy ước mà route ingest dùng
+  // làm created_by/updated_by, vì hệ ngoài không phải một user trong `users`.
+  patchRequestContext({ projectId, userId: auth.createdBy });
   return { auth, projectId };
 }
