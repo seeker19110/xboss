@@ -26,6 +26,45 @@
 
 **Nợ kỹ thuật/rủi ro mở:** `audit_log.entity_id` và trigger audit hiện chỉ hỗ trợ khoá `BIGINT`; các bảng `engineering_*` dùng UUID nên chưa nằm trong audit trail tự động. Không mở rộng cấu trúc audit trên production khi chưa có kế hoạch migration, thử nghiệm staging và rollback riêng.
 
+## Dọn PR tồn đọng track `ENG-*` + spec tầm nhìn Engineering OS tương lai (2026-08-15)
+
+Rà soát phát hiện track `ENG-1..ENG-4` (mục dưới) đã **merge thẳng vào `main`** qua PR #337 +
+PR #340 từ một phiên khác trước đó — nhánh làm việc của phiên này hoá ra trùng hệt nội dung đã
+merge nên không cần mở PR mới. Đồng thời phát hiện 4 PR draft còn mở (`agent/*`, tác giả người
+dùng) chưa được xử lý:
+
+- **Đóng 3 PR trùng/lỗi thời** (kèm comment giải thích, không xoá nhánh): **#335** "docs: define
+  Engineering OS roadmap and M43 implementation spec" — chứa migration `0070`/`0071` đụng số với
+  `main` (đã tới `0087`), `lib/engineering-kernel.ts`/API `/api/v2/engineering/*` khác hẳn schema
+  UUID + `/api/v1/` đã chọn, và nhãn "M43" đụng `M43-audit-trail.md`. **#336** "m43: add MEP-Agents
+  integration specification" — đề xuất kiến trúc Agent Registry/Tool Runtime/Model Router (XBoss tự
+  làm agent orchestrator) khác hẳn hướng đã chọn (XBoss chỉ là kho nhận, MEP-Agents chạy ở hệ họ).
+  **#338** "eng: define Engineering Intelligence, Workflow OS and Multi-Agent OS" — trùng 100%,
+  nội dung file `ENGINEERING-OS-ENG2-ENG3-ENG4.md` đã được cherry-pick nguyên văn vào `main` làm
+  nguồn đặc tả cho ENG-2/3/4 (đúng nhánh `agent/engineering-os-spec` của PR này).
+- **Merge #339** "eng: specify Engineering OS, Digital Twin, Predictive OS and Controlled
+  Autonomy" — thêm `docs/nang-cap/ENGINEERING-OS-FUTURE-SYSTEMS.md` (1110 dòng, **tầm nhìn kiến
+  trúc, không phải spec thi hành**): Engineering OS (system-of-record + knowledge graph), Digital
+  Twin (7 lớp L0–L6), Predictive OS (uncertainty-first, model governance, drift detection),
+  Controlled Autonomy (6 mức A0–A5, policy envelope, kill switch, maturity gate A–F). Người dùng
+  duyệt merge sau khi được báo cáo nội dung + rủi ro (đối chiếu 12 nguyên tắc + boundary chống tự
+  cấp quyền của `ENG-0`).
+- **Bổ sung ghi chú gating vào `docs/nang-cap/README.md`** (commit theo sau #339): tài liệu tầm
+  nhìn **không phải giấy phép bắt đầu code OS-1..OS-9** — mỗi giai đoạn `OS-<n>` vẫn cần (1)
+  traffic thật từ MEPF-Agents qua ENG-1..4 (hiện **chưa có**) và (2) đặc tả **thi hành** riêng
+  (schema/API/lib/test) mới được lập kế hoạch/code, đúng nguyên tắc #10 `ENG-0`. Controlled
+  Autonomy mức A3 trở lên (hệ tự thực thi side effect) bắt buộc người dùng chốt qua
+  `AskUserQuestion` trước khi viết bất kỳ đặc tả thi hành nào.
+- **[Sự cố tự gây ra + đã vá ngay]** Lần đầu ghi ghi chú gating, dùng nhầm cú pháp shell
+  `$(cat ...)` làm giá trị `content` cho GitHub API `create_or_update_file` — API không thực thi
+  shell nên ghi đè `docs/nang-cap/README.md` trên `main` bằng đúng chuỗi placeholder đó (97 byte)
+  trong khoảng ~2 phút. Phát hiện ngay ở bước xác minh kế tiếp (đọc lại file thấy sai), khôi phục
+  bằng commit thứ 2 với nội dung đầy đủ dán trực tiếp (không qua shell), xác minh lại bằng cách
+  đọc lại toàn bộ file (32266 byte, khớp) trước khi báo cáo xong.
+- **Trước khi merge/đóng**: đã chạy lại `npm run lint`/`typecheck`/`build` + `npm test` (122/122
+  file pass, Postgres 16 cục bộ) + `check:migrations`/`check:sw-exclude`/`gen:erd` trên nhánh
+  chứa ENG-1..4 để xác nhận trạng thái xanh trước khi kết luận không cần PR mới.
+
 ## ENG-4 — Multi-Agent Engineering OS (2026-08-15)
 
 Đặc tả thi hành `docs/nang-cap/ENG-4-multi-agent-engineering-os.md` (cụ thể hoá
