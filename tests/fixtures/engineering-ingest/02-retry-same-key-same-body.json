@@ -1,0 +1,8 @@
+{
+  "name": "Retry cùng Idempotency-Key + cùng body → 200 replay, không nhân bản dữ liệu",
+  "contractVersion": "2026-08-15",
+  "dependsOn": "01-happy-path.json",
+  "reuseIdempotencyKeyFrom": "01-happy-path.json",
+  "request": "SAME_AS:01-happy-path.json",
+  "expect": { "status": 200, "sameResponseAsDependency": true }
+}

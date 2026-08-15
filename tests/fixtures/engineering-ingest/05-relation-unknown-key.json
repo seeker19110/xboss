@@ -1,0 +1,16 @@
+{
+  "name": "Relation trỏ external key KHÔNG tồn tại → 422, pointer đúng chỉ số phần tử",
+  "contractVersion": "2026-08-15",
+  "request": {
+    "contractVersion": "2026-08-15",
+    "objects": [{ "externalKey": "duct:fx:orphan", "objectType": "component" }],
+    "relations": [
+      {
+        "fromExternalKey": "duct:fx:orphan",
+        "toExternalKey": "khong-ton-tai:zzz",
+        "relationType": "SERVES"
+      }
+    ]
+  },
+  "expect": { "status": 422, "pointer": "/relations/0/toExternalKey" }
+}

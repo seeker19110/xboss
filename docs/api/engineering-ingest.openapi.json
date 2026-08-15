@@ -1,0 +1,224 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "XBoss — Engineering Ingest API",
+    "version": "2026-08-15",
+    "description": "Hợp đồng máy-đọc-được cho POST /api/v1/engineering/ingest (ENG-5 §5.1).\n\nDùng để hệ agent kỹ thuật ngoài (MEPF-Agents) nạp Engineering Object vào KHO NHẬN của XBoss. Dữ liệu nạp vào LUÔN ở trạng thái `pending_review`; không endpoint nào trong namespace này ghi được sang tasks/boq_items/payment_bills hay tự duyệt workflow (boundary ENG-0 mục 4).\n\nFile này KHÔNG viết tay tự do: `tests/engineering-contract.test.ts` đối chiếu enum/giới hạn ở đây với schema Zod và hằng số route thật — lệch là CI đỏ (chống runtime-validation drift, ENG-5 §5.2)."
+  },
+  "servers": [
+    { "url": "https://{host}", "variables": { "host": { "default": "xboss.example.vn" } } }
+  ],
+  "paths": {
+    "/api/v1/engineering/ingest": {
+      "post": {
+        "summary": "Nạp source/revision + objects + relations",
+        "description": "Lũy đẳng theo external key. Retry cùng `Idempotency-Key` + cùng body trả LẠI NGUYÊN response cũ (200); cùng key nhưng body khác → 409.",
+        "operationId": "ingestEngineering",
+        "security": [{ "bearerApiKey": [] }],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "minLength": 1 },
+            "description": "Khoá lũy đẳng do client sinh (khuyến nghị UUID v4). BẮT BUỘC — thiếu thì trả 422."
+          },
+          {
+            "name": "X-Correlation-Id",
+            "in": "header",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "Thiếu thì server tự sinh; luôn trả lại trong header và body response."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/IngestRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Request mới, đã xử lý",
+            "headers": { "X-Correlation-Id": { "schema": { "type": "string" } } },
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/IngestResponse" } }
+            }
+          },
+          "200": {
+            "description": "Replay — cùng Idempotency-Key và cùng body; trả lại NGUYÊN response cũ",
+            "headers": { "X-Correlation-Id": { "schema": { "type": "string" } } },
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/IngestResponse" } }
+            }
+          },
+          "401": {
+            "description": "API key không hợp lệ hoặc đã bị thu hồi",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "403": {
+            "description": "API key thiếu scope `engineering`",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "409": {
+            "description": "Idempotency-Key đã dùng cho payload KHÁC",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "413": {
+            "description": "Body vượt 5 MiB",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "422": {
+            "description": "Lỗi validate — `pointer` chỉ đúng vị trí theo JSON Pointer (vd `/relations/0/toExternalKey`). External key không tồn tại HOẶC thuộc dự án khác đều rơi vào đây.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "429": {
+            "description": "Vượt rate limit (120 request/phút mỗi key)",
+            "headers": { "Retry-After": { "schema": { "type": "string" } } },
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerApiKey": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "API key scope `engineering`, BẮT BUỘC gắn đúng 1 dự án (ENG-0 mục 4.5 — không có key toàn cục cho scope này)."
+      }
+    },
+    "schemas": {
+      "IngestRequest": {
+        "type": "object",
+        "required": ["objects"],
+        "properties": {
+          "contractVersion": { "type": "string", "examples": ["2026-08-15"] },
+          "source": { "$ref": "#/components/schemas/Source" },
+          "objects": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 500,
+            "items": { "$ref": "#/components/schemas/ObjectInput" }
+          },
+          "relations": {
+            "type": "array",
+            "maxItems": 2000,
+            "items": { "$ref": "#/components/schemas/RelationInput" }
+          }
+        }
+      },
+      "Source": {
+        "type": "object",
+        "required": ["externalKey", "sourceType", "title"],
+        "description": "Lũy đẳng theo (dự án, externalKey) — retry KHÔNG tạo source mới.",
+        "properties": {
+          "externalKey": { "type": "string", "minLength": 1, "maxLength": 255 },
+          "sourceType": {
+            "type": "string",
+            "enum": ["drawing", "document", "bim", "cad", "model", "photo", "spreadsheet", "other"]
+          },
+          "title": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "objectKey": { "type": ["string", "null"], "maxLength": 2000 },
+          "mimeType": { "type": ["string", "null"], "maxLength": 255 },
+          "sha256": { "type": ["string", "null"], "pattern": "^[a-fA-F0-9]{64}$" },
+          "metadata": { "type": "object", "additionalProperties": true },
+          "revision": { "$ref": "#/components/schemas/SourceRevision" }
+        }
+      },
+      "SourceRevision": {
+        "type": "object",
+        "required": ["externalRevisionKey"],
+        "description": "Lũy đẳng theo (source, externalRevisionKey). `revisionNo` CHỈ để hiển thị — không gửi thì server tự cấp số tiếp theo.",
+        "properties": {
+          "externalRevisionKey": { "type": "string", "minLength": 1, "maxLength": 255 },
+          "revisionNo": { "type": ["integer", "null"], "minimum": 1 },
+          "objectKey": { "type": ["string", "null"], "maxLength": 2000 },
+          "sha256": { "type": ["string", "null"], "pattern": "^[a-fA-F0-9]{64}$" },
+          "parserName": { "type": ["string", "null"], "maxLength": 255 },
+          "parserVersion": { "type": ["string", "null"], "maxLength": 255 },
+          "metadata": { "type": "object", "additionalProperties": true }
+        }
+      },
+      "ObjectInput": {
+        "type": "object",
+        "required": ["externalKey", "objectType"],
+        "description": "Lũy đẳng theo (dự án, externalKey). Object mới LUÔN `pending_review`; upsert KHÔNG reset trạng thái đã duyệt.",
+        "properties": {
+          "externalKey": { "type": "string", "minLength": 1, "maxLength": 255 },
+          "objectType": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "discipline": { "type": ["string", "null"], "maxLength": 80 },
+          "name": { "type": ["string", "null"], "maxLength": 500 },
+          "properties": { "type": "object", "additionalProperties": true },
+          "geometryRef": { "type": "object", "additionalProperties": true }
+        }
+      },
+      "RelationInput": {
+        "type": "object",
+        "required": ["fromExternalKey", "toExternalKey", "relationType"],
+        "description": "Hai đầu tham chiếu bằng EXTERNAL KEY — agent không cần (và không được kỳ vọng) biết UUID nội bộ của XBoss (ENG-5 §2.2). XBoss resolve trong cùng transaction sau khi upsert objects. Key không tồn tại hoặc thuộc dự án khác → 422.",
+        "properties": {
+          "fromExternalKey": { "type": "string", "minLength": 1, "maxLength": 255 },
+          "toExternalKey": { "type": "string", "minLength": 1, "maxLength": 255 },
+          "relationType": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "properties": { "type": "object", "additionalProperties": true }
+        }
+      },
+      "IngestResponse": {
+        "type": "object",
+        "properties": {
+          "contractVersion": { "type": ["string", "null"] },
+          "correlationId": { "type": "string" },
+          "sourceRevisionId": { "type": ["string", "null"], "format": "uuid" },
+          "objects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "externalKey": { "type": "string" },
+                "id": { "type": "string", "format": "uuid" },
+                "created": { "type": "boolean" }
+              }
+            }
+          },
+          "relations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string", "format": "uuid" },
+                "created": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": { "type": "string", "description": "Thông điệp tiếng Việt" },
+          "pointer": {
+            "type": "string",
+            "description": "JSON Pointer tới vị trí lỗi (chỉ có ở 422/409/413)"
+          }
+        }
+      }
+    }
+  }
+}

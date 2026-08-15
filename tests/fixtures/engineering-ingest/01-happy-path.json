@@ -1,0 +1,40 @@
+{
+  "name": "Nạp đủ source + revision + 2 object + 1 relation theo external key",
+  "contractVersion": "2026-08-15",
+  "request": {
+    "contractVersion": "2026-08-15",
+    "source": {
+      "externalKey": "drawing:fx:hvac:l03",
+      "sourceType": "drawing",
+      "title": "HVAC Level 03",
+      "revision": {
+        "externalRevisionKey": "drawing:fx:hvac:l03:R02",
+        "revisionNo": 2,
+        "parserName": "mepf-cad-parser",
+        "parserVersion": "1.4.0"
+      }
+    },
+    "objects": [
+      {
+        "externalKey": "duct:fx:4a7c",
+        "objectType": "component",
+        "discipline": "hvac",
+        "name": "Ống gió cấp AHU-03"
+      },
+      {
+        "externalKey": "ahu:fx:2b91",
+        "objectType": "component",
+        "discipline": "hvac",
+        "name": "AHU-03"
+      }
+    ],
+    "relations": [
+      {
+        "fromExternalKey": "duct:fx:4a7c",
+        "toExternalKey": "ahu:fx:2b91",
+        "relationType": "SERVES"
+      }
+    ]
+  },
+  "expect": { "status": 201, "objectCount": 2, "relationCount": 1, "hasSourceRevisionId": true }
+}

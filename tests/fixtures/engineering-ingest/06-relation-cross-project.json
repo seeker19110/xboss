@@ -1,0 +1,23 @@
+{
+  "name": "CÁCH LY DỰ ÁN — relation trỏ external key của dự án KHÁC → 422, không tạo gì",
+  "contractVersion": "2026-08-15",
+  "setupInOtherProject": {
+    "objects": [{ "externalKey": "ahu:fx:cross", "objectType": "component" }]
+  },
+  "request": {
+    "contractVersion": "2026-08-15",
+    "objects": [{ "externalKey": "duct:fx:cross", "objectType": "component" }],
+    "relations": [
+      {
+        "fromExternalKey": "duct:fx:cross",
+        "toExternalKey": "ahu:fx:cross",
+        "relationType": "SERVES"
+      }
+    ]
+  },
+  "expect": {
+    "status": 422,
+    "pointer": "/relations/0/toExternalKey",
+    "note": "Key của dự án khác phải coi như KHÔNG TỒN TẠI — không được lộ sự tồn tại của dữ liệu dự án khác."
+  }
+}

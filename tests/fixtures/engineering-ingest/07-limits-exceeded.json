@@ -1,0 +1,6 @@
+{
+  "name": "Vượt giới hạn objects (>500) → 422",
+  "contractVersion": "2026-08-15",
+  "generate": { "objects": 501 },
+  "expect": { "status": 422, "pointer": "/objects" }
+}
