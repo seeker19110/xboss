@@ -95,6 +95,32 @@ Thi hành phần **đã kín đặc tả** của `docs/nang-cap/ENG-5-integratio
   phía `MEPF-Agents` (§5.4 — repo khác), metrics/alert threshold (§6 — cần chốt ngưỡng +
   backend giám sát), pilot runbook (§7 — cần staging + người hai bên ký).
 
+## C0 (phần 1) — Sửa doc drift RLS + `lib/env.ts` (2026-08-15)
+
+Bước đầu của **C0 — Chốt nguồn sự thật** (`docs/nang-cap/C0-release-baseline-governance.md`):
+sửa các phát biểu **sai sự thật** trong tài liệu nền, đúng nợ đã ghi từ `ENG-0` mục 5 ("ghi nhận
+lệch tài liệu, sửa ở PR riêng").
+
+- **[AI, đã sửa] `PROJECT.md` (2 chỗ) + `SECURITY.md` (1 chỗ) ghi "XBoss không dùng RLS
+  Postgres" — SAI kể từ ADR-0005 (2026-07-18).** Kiểm chứng trên code thật trước khi sửa (không
+  tin tài liệu cũ lẫn tài liệu mới): `migrations/0069_rls.sql` bật `ENABLE` + **`FORCE ROW LEVEL
+SECURITY`** cho **11 bảng** tài chính/hợp đồng (`contracts`, `variation_orders`,
+  `payment_bills`, `invoices`, `payroll`, `insurance_bonds`, `claims`, `tender_packages`,
+  `purchase_orders`, `advances`, `cash_transactions`) kèm role riêng `xboss_app` **NOBYPASSRLS**;
+  `0077_rls_lock.sql` khoá cửa (bỏ nhánh thiếu ngữ cảnh); `0080_org_rls.sql` thêm RLS theo tổ
+  chức; `withProjectScope` xuất hiện ở **39 file** `app/`+`lib/`. Sửa lại thành mô tả đúng 2 lớp
+  (API là kiểm soát **chính**, RLS là **phòng tuyến thứ 2**, không thay tầng app) + bảng phạm vi
+  từng lớp + điều kiện vận hành bắt buộc (chạy bằng `xboss_app`, không owner/superuser — nếu
+  không policy bị **bỏ qua âm thầm**).
+- **[AI, đã sửa] `SECURITY.md` liệt kê `lib/env.ts` (Zod) trong mục "DỰ KIẾN — chưa bật"** dù
+  file đã tồn tại và được **8 file** import (`lib/db/index.ts`, ...), có `.refine()` kiểm
+  `XBOSS_SECRET` ≥32 ký tự ở production và `CRON_SECRET` ≥16 ký tự từ đợt V1 (2026-07-19, xem mục
+  V1 cuối file). Chuyển sang bảng hàng rào **đang có hiệu lực**, ghi đúng ngưỡng đọc từ chính
+  `lib/env.ts:93-105`.
+- `spec.md` **không** có phát biểu sai về RLS (im lặng, không nhắc) → không sửa, tránh đụng file
+  ngoài phạm vi nợ.
+- Chỉ đổi tài liệu, không chạm code/schema.
+
 ## Dọn PR tồn đọng track `ENG-*` + spec tầm nhìn Engineering OS tương lai (2026-08-15)
 
 Rà soát phát hiện track `ENG-1..ENG-4` (mục dưới) đã **merge thẳng vào `main`** qua PR #337 +
