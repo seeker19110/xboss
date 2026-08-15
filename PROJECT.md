@@ -20,14 +20,14 @@
 ## 3. Yêu cầu phi chức năng
 
 - **Hiệu năng:** ngân sách Lighthouse CI chính thức (`lighthouserc.json`, đo trên `/login`, 3 lần chạy) — cả 4 category `performance`/`accessibility`/`best-practices`/`seo` đã siết ngưỡng `error` (0.9/0.9/0.9/0.8), chặn merge khi tụt điểm. Mục tiêu định hướng thêm: LCP ≤ 2.5s, INP ≤ 200ms, CLS ≤ 0.1.
-- **Bảo mật:** **API là ranh giới bảo mật duy nhất** — mọi route gọi `getCurrentUser()` + kiểm quyền `CAN`/`canTouchTask`. Phiên stateless HMAC; rate-limit login; SQL tham số hoá qua `lib/db`. (Không dùng RLS Postgres — quyền ở tầng app.)
+- **Bảo mật:** **API là ranh giới bảo mật duy nhất** — mọi route gọi `getCurrentUser()` + kiểm quyền `CAN`/`canTouchTask`. Phiên stateless HMAC; rate-limit login; SQL tham số hoá qua `lib/db`. **RLS Postgres là phòng tuyến thứ 2** (không thay tầng app): bật trên 11 bảng tài chính + nhóm bảng theo tổ chức, chạy bằng role `xboss_app` NOBYPASSRLS — xem ADR-0005.
 - **Accessibility:** mục tiêu WCAG AA cả hai theme; **đã có** axe-core tự động qua Playwright (`e2e/authed/*.spec.ts`, desktop + mobile, mọi trang mới bắt buộc thêm case axe) — quy tắc tương phản + quy trình ground-truth ở `docs/audit.md` §13.
 - **Mobile-first:** vùng chạm ~40px, nav cuộn ngang `.scrollbar-none`, bảng dày sticky header + cuộn ngang.
 - **Theme:** **dark-first** với cơ chế đảo màu qua biến CSS (`app/globals.css`): các class `html.dark` / `html.light` / `html.kingblue` / `html.darkblue` / `html.navy`. **Không** dùng `styles/theme.css`/`data-theme` của khung (xem ADR nếu cần) — không hard-code hex, không dùng biến thể `dark:`.
 
 ## 4. Tech stack, thiết kế dữ liệu & kiến trúc
 
-Xem đầy đủ ở `spec.md` §3 (schema/migrate), §9 (tech stack) và `docs/ERD.md` (bảng/cột/FK) — không lặp lại ở đây để tránh 2 nguồn trôi khỏi nhau. Tóm tắt: Next.js 16.2 + React 19.2 + TypeScript strict + Tailwind 4.3, PostgreSQL qua `pg` raw SQL với hệ migrate nhẹ (ADR-0003, **không** auto-init/ORM/Supabase), ~107 nhóm route trong `app/api/*`, không RLS — kiểm soát quyền ở tầng API (`CAN`/`canTouchTask`, `lib/auth.ts`).
+Xem đầy đủ ở `spec.md` §3 (schema/migrate), §9 (tech stack) và `docs/ERD.md` (bảng/cột/FK) — không lặp lại ở đây để tránh 2 nguồn trôi khỏi nhau. Tóm tắt: Next.js 16.2 + React 19.2 + TypeScript strict + Tailwind 4.3, PostgreSQL qua `pg` raw SQL với hệ migrate nhẹ (ADR-0003, **không** auto-init/ORM/Supabase), ~107 nhóm route trong `app/api/*`, kiểm soát quyền ở tầng API (`CAN`/`canTouchTask`, `lib/auth.ts`) **cộng RLS Postgres làm phòng tuyến thứ 2** trên các bảng tài chính/tổ chức (ADR-0005, `lib/db/index.ts::withProjectScope`).
 
 - **Luồng:** client (`'use client'`) → `/api/*` (route handler, `force-dynamic`) → `lib/*` → `lib/db` → Postgres.
 - **Chuỗi tính toán:** tick dimension → `recomputeTask` → `deriveStatus` → `recomputePackage` → ghi `task_history` (`lib/recompute.ts`, xem `spec.md` §7).
