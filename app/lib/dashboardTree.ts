@@ -435,6 +435,13 @@ export const DASHBOARD_TREE: DashCluster[] = [
         roles: ["admin", "pm", "engineer"],
       }, // ENG-2 — đề xuất có bằng chứng, xem docs/nang-cap/ENG-2-engineering-intelligence.md
       {
+        id: "dash.engineering-workflows",
+        href: "/engineering/workflows",
+        label: "Workflow kỹ thuật",
+        icon: Workflow,
+        roles: ["admin", "pm", "engineer", "bch"],
+      }, // ENG-3 — ranh giới uỷ quyền, xem docs/nang-cap/ENG-3-engineering-workflow-os.md
+      {
         id: "dash.import-excel",
         href: "/import",
         label: "Import Excel",

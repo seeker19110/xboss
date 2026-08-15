@@ -9,7 +9,7 @@
 // Confidence và ranking đều là hàm XÁC ĐỊNH (deterministic), test được, không gọi LLM —
 // đúng nguyên tắc #1/#2/#9 của track ENG (ENG-0 mục 3): LLM không phải nguồn sự thật.
 import { z } from "zod";
-import { query, queryOne, run, insertId as _insertId, withTransaction } from "@/lib/db";
+import { query, queryOne, run, withTransaction } from "@/lib/db";
 
 // --- §2.1 — 8 lớp suggestion (A–H) ---
 export const SUGGESTION_CLASSES = [

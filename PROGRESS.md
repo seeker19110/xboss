@@ -8,6 +8,53 @@
 
 - **GĐ 4–5 — Phát triển & nâng chất lượng.** Sản phẩm đã chạy thật (v0.2.1, tự host VPS), đang phát triển/tinh chỉnh tính năng liên tục **và** đang áp bộ khung quy trình/chất lượng (brownfield) theo `docs/framework/AP-DUNG-vao-du-an-co-san.md`.
 
+## ENG-3 — Engineering Workflow OS (2026-08-15)
+
+Đặc tả thi hành `docs/nang-cap/ENG-3-engineering-workflow-os.md` (cụ thể hoá
+`ENGINEERING-OS-ENG2-ENG3-ENG4.md` §7–§14) viết trước, rồi code.
+
+- **ENG-3 là RANH GIỚI UỶ QUYỀN của cả track** (§26): ENG-2 chỉ đề xuất, ENG-4 chỉ phối hợp
+  — mọi thay đổi có side effect phải đi qua đây.
+- **[AI, quyết định kiến trúc] KHÔNG tái dùng `lib/approvals.ts` (M46 Approval Engine).** Đã
+  đọc kỹ trước khi quyết (nguyên tắc "tái dùng trước khi viết mới") — M46 khác bản chất ở 4
+  điểm: loại thực thể khoá đóng 4 giá trị nghiệp vụ, chọn cấp duyệt theo **ngưỡng tiền**,
+  không có Gate 0, vòng đời chỉ 4 trạng thái. ENG-3 cần: workflow kỹ thuật tự do, chọn cấp
+  theo **risk 8 chiều**, Gate 0 bắt buộc, state machine 13 trạng thái. → Bảng/lib riêng,
+  **không đụng M46**; mọi luồng VO/IPC/nghiệm thu hiện có giữ nguyên 100%.
+- **[AI, đã làm]** `migrations/0086_engineering_workflows.sql`: `engineering_workflows`
+  (profile A–E, risk_class, 13 state, `reversible`/`rollback_strategy` bắt buộc khai trước
+  khi duyệt theo §14, `gate0_result`), `engineering_workflow_gates` (§12 — approval **không
+  phải boolean**: ai ký/khi nào/nhận xét/evidence/vai trò yêu cầu),
+  `engineering_workflow_events` (§11 "mọi state transition phải audit được" — tự ghi audit
+  có ngữ nghĩa `from→to`, vì trigger `audit_row_change()` không dùng được cho khoá UUID).
+- **[AI, đã làm] `lib/engineering-workflow.ts` — policy engine không có đường hạ cấp:**
+  `classifyRisk` (safetyRisk → `critical` **bất kể mọi yếu tố khác**; regulatory hoặc
+  non-reversible → `high`; tiền ≥100tr/liên ngành/bất định cao → `medium`), `selectProfile`
+  (A–E), `gatesForProfile` (A=0…E=4 gate). **Hàm không nhận tham số `confidence`/`override`
+  nào** — muốn đổi profile phải đổi chính dữ liệu rủi ro (có audit), đúng §10 "không dùng AI
+  confidence cao để giảm approval level".
+- **[AI, đã làm] Gate 0 (§8) thực sự CHẶN**: 6 kiểm tra (tiêu đề, khai `reversible`,
+  non-reversible phải có `rollbackStrategy`, suggestion nguồn tồn tại + **đã `accepted`**,
+  không trùng workflow đang mở). Fail → ném `Gate0FailedError`, route trả 422 kèm checklist,
+  **không tạo bản ghi nào** (test ghim bằng `COUNT(*)` trước/sau).
+- **[AI, đã làm] Separation of duties (§13)**: người tạo không được tự ký (áp cho mọi mức);
+  với `high`/`critical` thêm luật 1 người không ký 2 gate + QA độc lập phải khác người ký QA
+  chuyên ngành. Ký gate **tuần tự**, không nhảy cóc; từ chối 1 gate → workflow `rejected`
+  ngay. Mọi hàm ghi bọc `withTransaction` + `SELECT … FOR UPDATE` (chống 2 người ký cùng lúc).
+- **Ranh giới có chủ đích:** hệ thống **không tự thực thi** side effect nghiệp vụ.
+  `executing`/`completed` do NGƯỜI xác nhận qua `POST .../transition`, hệ chỉ ghi nhận +
+  audit — autonomy phải được cấp tường minh theo §26, chưa có cơ chế cấp đó nên chưa có
+  executor tự động. Ghi rõ trong đặc tả để không ai tưởng là thiếu sót.
+- **[AI, đã làm]** 5 route `/api/engineering/workflows*`, 3 quyền mới
+  (`viewEngineeringWorkflows` gồm cả BCH, `createEngineeringWorkflow`,
+  `approveEngineeringGate` — từng gate còn kiểm thêm `required_role` ở tầng lib), trang
+  `/engineering/workflows` (checklist Gate 0 giải thích vì sao bị chặn + trạng thái từng
+  cửa + dòng thời gian).
+- **Verify** (Postgres 16 cục bộ): `tests/engineering-workflow.test.ts` **13/13 pass** (5 ca
+  thuần + 8 ca tích hợp gồm đủ kịch bản SoD, Gate 0 chặn, reject sớm, PROFILE-A, cách ly đa
+  dự án); `lint`/`typecheck`/`build` xanh; `gen:erd` khớp (153 bảng); `check:migrations` OK
+  (86 file); `check:sw-exclude` OK.
+
 ## ENG-2 — Engineering Intelligence (2026-08-15)
 
 Đặc tả khái niệm gốc `docs/nang-cap/ENGINEERING-OS-ENG2-ENG3-ENG4.md` (1224 dòng, người

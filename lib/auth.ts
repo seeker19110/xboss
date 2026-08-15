@@ -343,6 +343,14 @@ const CAN_DEFAULT = {
   // (ENG-3 sẽ dựng workflow từ suggestion đã accept).
   viewEngineeringSuggestions: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
   decideEngineeringSuggestions: (r?: Role) => r === "admin" || r === "pm",
+  // ENG-3 Engineering Workflow OS (docs/nang-cap/ENG-3-engineering-workflow-os.md) — tầng
+  // ranh giới uỷ quyền của track ENG. Xem mở cho cả BCH (theo dõi tiến trình duyệt kỹ
+  // thuật); tạo/ký gate giới hạn vai trò thao tác, và từng gate còn kiểm thêm
+  // `required_role` + separation-of-duties ở tầng lib (không chỉ dựa vào CAN).
+  viewEngineeringWorkflows: (r?: Role) =>
+    r === "admin" || r === "pm" || r === "engineer" || r === "bch",
+  createEngineeringWorkflow: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  approveEngineeringGate: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
 };
 
 // ===== M50 PR1 — Override quyền trong DB =====

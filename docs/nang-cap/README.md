@@ -31,8 +31,12 @@ Quyết định (người dùng chốt): track riêng `ENG-1..ENG-4`, không đ�
   `migrations/0085_engineering_intelligence.sql` (packages/suggestions/evidence),
   `lib/engineering-intel.ts` (ranking + confidence + evidence gate, đều là hàm xác định,
   không gọi LLM), `POST /api/v1/engineering/intelligence`, trang `/engineering/suggestions`.
-- **ENG-3 (Engineering Workflow OS), ENG-4 (Multi-Agent Engineering OS)** — đang triển khai
-  tiếp theo thứ tự §31 của đặc tả khái niệm.
+- **`ENG-3-engineering-workflow-os.md`** — ✅ **xong** (2026-08-15): ranh giới uỷ quyền của
+  track. `migrations/0086_engineering_workflows.sql` (workflows/gates/events), risk engine +
+  5 approval profile A–E + Gate 0 chặn thật + separation of duties, trang
+  `/engineering/workflows`. KHÔNG đụng `lib/approvals.ts` (M46) — xem lý do trong mục 1 của
+  đặc tả.
+- **ENG-4 (Multi-Agent Engineering OS)** — đang triển khai tiếp.
 
 ## Danh mục (nhóm → module gộp bên trong)
 

@@ -3515,6 +3515,83 @@
 - `idx_eng_sug_project_class`: INDEX idx_eng_sug_project_class ON public.engineering_suggestions USING btree (project_id, suggestion_class)
 - `idx_eng_sug_project_status`: INDEX idx_eng_sug_project_status ON public.engineering_suggestions USING btree (project_id, status)
 
+### engineering_workflow_events
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| workflow_id | uuid |  |  |
+| from_state | text | ✓ |  |
+| to_state | text |  |  |
+| actor_id | integer | ✓ |  |
+| gate_seq | integer | ✓ |  |
+| reason | text | ✓ |  |
+| detail | jsonb |  | `'{}'::jsonb` |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `actor_id` → `users(id)`
+- `workflow_id` → `engineering_workflows(id)`
+
+**Index:**
+- `engineering_workflow_events_pkey`: UNIQUE INDEX engineering_workflow_events_pkey ON public.engineering_workflow_events USING btree (id)
+- `idx_eng_wf_events_wf`: INDEX idx_eng_wf_events_wf ON public.engineering_workflow_events USING btree (workflow_id, created_at)
+
+### engineering_workflow_gates
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| workflow_id | uuid |  |  |
+| seq | integer |  |  |
+| gate_type | text |  |  |
+| required_role | text |  |  |
+| decision | text | ✓ |  |
+| decided_by | integer | ✓ |  |
+| decided_at | timestamptz | ✓ |  |
+| comments | text | ✓ |  |
+| evidence | jsonb |  | `'{}'::jsonb` |
+| created_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `decided_by` → `users(id)`
+- `workflow_id` → `engineering_workflows(id)`
+
+**Index:**
+- `engineering_workflow_gates_pkey`: UNIQUE INDEX engineering_workflow_gates_pkey ON public.engineering_workflow_gates USING btree (id)
+- `engineering_workflow_gates_workflow_id_seq_key`: UNIQUE INDEX engineering_workflow_gates_workflow_id_seq_key ON public.engineering_workflow_gates USING btree (workflow_id, seq)
+- `idx_eng_wf_gates_wf`: INDEX idx_eng_wf_gates_wf ON public.engineering_workflow_gates USING btree (workflow_id, seq)
+
+### engineering_workflows
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | uuid |  | `gen_random_uuid()` |
+| project_id | integer |  |  |
+| suggestion_id | uuid | ✓ |  |
+| title | text |  |  |
+| description | text | ✓ |  |
+| profile | text |  |  |
+| risk_class | text |  |  |
+| risk_inputs | jsonb |  | `'{}'::jsonb` |
+| state | text |  | `'draft'::text` |
+| reversible | boolean |  | `false` |
+| rollback_strategy | text | ✓ |  |
+| gate0_result | jsonb |  | `'{}'::jsonb` |
+| created_by | integer |  |  |
+| created_at | timestamptz |  | `now()` |
+| updated_at | timestamptz |  | `now()` |
+
+**Khóa ngoại:**
+- `created_by` → `users(id)`
+- `project_id` → `projects(id)`
+- `suggestion_id` → `engineering_suggestions(id)`
+
+**Index:**
+- `engineering_workflows_pkey`: UNIQUE INDEX engineering_workflows_pkey ON public.engineering_workflows USING btree (id)
+- `idx_eng_wf_project_state`: INDEX idx_eng_wf_project_state ON public.engineering_workflows USING btree (project_id, state)
+- `idx_eng_wf_suggestion`: INDEX idx_eng_wf_suggestion ON public.engineering_workflows USING btree (suggestion_id)
+
 ### feature_flags
 
 | Cột | Kiểu | Null | Default |
