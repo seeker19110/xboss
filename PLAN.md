@@ -11,6 +11,8 @@ M64 — Upload kế hoạch & tracking theo hệ đã hoàn tất ngày 2026-08-
 
 Đưa nền tảng Engineering OS ENG-1→ENG-4 vừa hoàn tất từ trạng thái **đã có code** sang **đã được xác minh có kiểm soát trong vận hành**. Không triển khai Digital Twin, Predictive OS hoặc autonomy trước các cổng bên dưới.
 
+**Đặc tả dẫn đường:** `docs/nang-cap/ENG-5-integration-contract-pilot.md` chốt hợp đồng ingest, idempotency, cách ly dự án, observability và pilot trước khi kết nối traffic thật.
+
 ## Việc 1 — Xác minh phát hành ENG-1→ENG-4 (`route: verification`)
 
 - **Phạm vi:** staging trước production cho migrations `0084_engineering_core.sql` đến `0087_engineering_agents.sql`; chạy đầy đủ integration test với `TEST_DATABASE_URL`, E2E, build và kiểm tra rollback/backup theo quy trình deploy.
