@@ -27,6 +27,46 @@
 
 **Nợ kỹ thuật/rủi ro mở:** `audit_log.entity_id` và trigger audit hiện chỉ hỗ trợ khoá `BIGINT`; các bảng `engineering_*` dùng UUID nên chưa nằm trong audit trail tự động. Không mở rộng cấu trúc audit trên production khi chưa có kế hoạch migration, thử nghiệm staging và rollback riêng.
 
+## C3 §3 (PR1) — Project scope cho toàn bộ đường engineering (2026-08-15)
+
+Bước bắt buộc TRƯỚC khi bật RLS cho `engineering_*` (C3 §3 "Policy"): mọi đường đọc/ghi phải
+đặt được GUC `app.project_id`, nếu không policy sẽ **trả rỗng âm thầm** — kiểu hỏng tệ nhất.
+
+- **[AI, khảo sát trước khi sửa — bức tranh KHÁC hẳn ước lượng ban đầu]** Đo thật thay vì
+  đếm số hàm: **route phiên đăng nhập ĐÃ có sẵn GUC** (`getCurrentProjectId` →
+  `patchRequestContext` → `withTransaction` tự `SET LOCAL`, một điểm chạm duy nhất của M43).
+  Thiếu chỉ ở 2 chỗ: (1) **đường API key** — `requireApiKey` không patch ngữ cảnh; (2) **6 hàm
+  đọc** của ENG-2/3/4 dùng `query()` trần, ngoài transaction nên không có GUC.
+- **[AI, đo bằng RLS nghiêm ngặt]** Bật policy strict trên `engineering_*` rồi chạy test bằng
+  role **`xboss_app` (NOBYPASSRLS)**: **9/12 ca ingest fail** `new row violates row-level
+security policy` — đúng đường API key; 3 ca qua được là 3 ca lỗi TRƯỚC khi chạm DB.
+- **[AI, đã làm] `lib/api-keys.ts`**: `requireApiKey` gọi `patchRequestContext({ projectId,
+userId: auth.createdBy })` — **một chỗ sửa phủ cả 4 route** `/api/v1/engineering/*`. Kèm lợi
+  ích thứ 2: trigger audit ghi được actor thay vì NULL.
+- **[AI, đã làm] Bọc `withProjectScope` cho 6 hàm đọc** (`listSuggestions`/`getSuggestion`,
+  `listWorkflows`/`getWorkflow`, `listAgentSessions`/`getAgentSession`) — cùng pattern 7 hàm
+  đọc của `engineering-kernel`. Với hàm đọc nhiều bảng, **cả cụm truy vấn nằm trong CÙNG một
+  scope** vì bảng con (`engineering_evidence`, `*_gates`, `*_events`, claims/conflicts) không
+  có cột `project_id`, chỉ ràng buộc qua cha.
+- **[AI, kiểm rủi ro trước khi bọc]** `withProjectScope` mặc định `readOnly: true` và
+  `withTransaction` **tái nhập** — bọc một hàm được gọi TỪ TRONG transaction ghi sẽ ném
+  `SET TRANSACTION READ ONLY` lên transaction ngoài và làm hỏng nó. Đã rà: cả 6 hàm chỉ được
+  gọi từ route, không có lời gọi nội bộ trong `lib/`; ca `openAgentSession` → `getAgentSession`
+  là **tuần tự sau khi commit**, không lồng nhau. → an toàn.
+- **[AI, 3 lần tự bắt lỗi phương pháp của chính mình]**
+  1. Lần đo đầu dùng role `xboss_test` cho ra **12/12 "pass" giả** — role đó là **superuser**
+     nên bỏ qua RLS hoàn toàn, đúng cạm bẫy #1 mà `0069_rls.sql` đã cảnh báo.
+  2. Probe ngữ cảnh dùng đường dẫn tuyệt đối trong khi `lib/db` dùng alias `@/` → **2 bản
+     module, 2 `AsyncLocalStorage` khác nhau** → kết luận sai rằng cơ chế hỏng. Làm lại đúng
+     alias thì GUC ra `"42"`.
+  3. Đổi mật khẩu role `xboss_app` để thử → làm đỏ `tests/rls.test.ts` (role dùng chung cả
+     cluster). Đã khôi phục về placeholder.
+- **Ghi nhận cho PR2:** negative test RLS phải viết trong `tests/rls.test.ts` (đã có sẵn pool
+  riêng bằng `xboss_app`), **không** trỏ cả bộ test sang role đó — đã thử và bất khả thi
+  (`projects` có org-RLS nên đọc ra rỗng; `ensureSchema` cần quyền `CREATE` trên schema).
+- **Verify**: 67/67 ca của 8 file test liên quan (engineering ×5, api-keys, rls, audit-chain);
+  `lint` 0 lỗi, `typecheck` xanh. **Chưa bật RLS trong PR này** — không đổi hành vi.
+
 ## C3 §2 — Audit trail nhận khoá UUID + vá crash ngữ cảnh cross-project (2026-08-15)
 
 Đóng nợ kỹ thuật ghi từ ENG-2 ("mọi bảng `engineering_*` nằm NGOÀI audit trail tự động").

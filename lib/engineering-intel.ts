@@ -9,7 +9,7 @@
 // Confidence và ranking đều là hàm XÁC ĐỊNH (deterministic), test được, không gọi LLM —
 // đúng nguyên tắc #1/#2/#9 của track ENG (ENG-0 mục 3): LLM không phải nguồn sự thật.
 import { z } from "zod";
-import { query, queryOne, run, withTransaction } from "@/lib/db";
+import { query, queryOne, run, withProjectScope, withTransaction } from "@/lib/db";
 
 // --- §2.1 — 8 lớp suggestion (A–H) ---
 export const SUGGESTION_CLASSES = [
@@ -356,8 +356,12 @@ export async function listSuggestions(
     args.push(filter.objectId);
   }
 
-  return query<SuggestionRow>(
-    `SELECT id, package_id AS "packageId", project_id AS "projectId", object_id AS "objectId",
+  // Bọc withProjectScope: đọc NGOÀI transaction không có GUC app.project_id nên RLS không
+  // có gì để so (xem lib/db/index.ts + migrations/0069). Cùng pattern các hàm đọc của
+  // lib/engineering-kernel.ts.
+  return withProjectScope(projectId, () =>
+    query<SuggestionRow>(
+      `SELECT id, package_id AS "packageId", project_id AS "projectId", object_id AS "objectId",
             suggestion_class AS "suggestionClass", title, body, priority, severity, confidence,
             confidence_signals AS "confidenceSignals", impact, urgency, reversible,
             status, decided_by AS "decidedBy", decided_at AS "decidedAt",
@@ -369,8 +373,9 @@ export async function listSuggestions(
                array_position(ARRAY['high','medium','low','unknown']::text[], confidence),
                created_at DESC
       LIMIT ?`,
-    ...args,
-    limit,
+      ...args,
+      limit,
+    ),
   );
 }
 
@@ -378,24 +383,28 @@ export async function getSuggestion(
   projectId: number,
   id: string,
 ): Promise<{ suggestion: SuggestionRow; evidence: EvidenceRow[] } | null> {
-  const suggestion = await queryOne<SuggestionRow>(
-    `SELECT id, package_id AS "packageId", project_id AS "projectId", object_id AS "objectId",
+  // Cả 2 truy vấn nằm trong CÙNG một withProjectScope: `engineering_evidence` không có cột
+  // project_id, chỉ ràng buộc qua suggestion cha — nên GUC phải còn hiệu lực khi đọc nó.
+  return withProjectScope(projectId, async () => {
+    const suggestion = await queryOne<SuggestionRow>(
+      `SELECT id, package_id AS "packageId", project_id AS "projectId", object_id AS "objectId",
             suggestion_class AS "suggestionClass", title, body, priority, severity, confidence,
             confidence_signals AS "confidenceSignals", impact, urgency, reversible,
             status, decided_by AS "decidedBy", decided_at AS "decidedAt",
             decision_note AS "decisionNote", created_at AS "createdAt"
        FROM engineering_suggestions WHERE id = ? AND project_id = ?`,
-    id,
-    projectId,
-  );
-  if (!suggestion) return null;
-  const evidence = await query<EvidenceRow>(
-    `SELECT id, kind, statement, locator, standard_ref AS "standardRef",
+      id,
+      projectId,
+    );
+    if (!suggestion) return null;
+    const evidence = await query<EvidenceRow>(
+      `SELECT id, kind, statement, locator, standard_ref AS "standardRef",
             object_id AS "objectId", sort_order AS "sortOrder"
        FROM engineering_evidence WHERE suggestion_id = ? ORDER BY sort_order, created_at`,
-    id,
-  );
-  return { suggestion, evidence };
+      id,
+    );
+    return { suggestion, evidence };
+  });
 }
 
 export const SUGGESTION_DECISIONS = [

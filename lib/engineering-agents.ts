@@ -9,7 +9,7 @@
 // XBoss đóng vai Reconciler/Verifier, KHÔNG chạy agent: agent thật (MEPF-Agents) chạy ở hệ
 // của họ và gửi claim vào đây.
 import { z } from "zod";
-import { query, queryOne, run, withTransaction } from "@/lib/db";
+import { query, queryOne, run, withProjectScope, withTransaction } from "@/lib/db";
 import {
   computeConfidence,
   type ConfidenceLevel,
@@ -516,15 +516,19 @@ export async function listAgentSessions(
     conds.push("status = ?");
     args.push(filter.status);
   }
-  return query<SessionRow>(
-    `SELECT id, project_id AS "projectId", intent, consensus, status,
+  // Đọc ngoài transaction không có GUC app.project_id → RLS không có gì để so. Bọc
+  // withProjectScope, cùng pattern các hàm đọc của lib/engineering-kernel.ts.
+  return withProjectScope(projectId, () =>
+    query<SessionRow>(
+      `SELECT id, project_id AS "projectId", intent, consensus, status,
             max_rounds AS "maxRounds", round_count AS "roundCount",
             workflow_id AS "workflowId", created_at AS "createdAt"
        FROM engineering_agent_sessions
       WHERE ${conds.join(" AND ")}
       ORDER BY created_at DESC LIMIT ?`,
-    ...args,
-    limit,
+      ...args,
+      limit,
+    ),
   );
 }
 
@@ -536,32 +540,36 @@ export async function getAgentSession(
   claims: ClaimLike[];
   conflicts: (ConflictRow & { proposal: ResolutionProposal })[];
 } | null> {
-  const session = await queryOne<SessionRow>(
-    `SELECT id, project_id AS "projectId", intent, consensus, status,
+  // claims/conflicts không có cột project_id (ràng buộc qua session cha) nên phải đọc TRONG
+  // cùng phạm vi GUC với session.
+  return withProjectScope(projectId, async () => {
+    const session = await queryOne<SessionRow>(
+      `SELECT id, project_id AS "projectId", intent, consensus, status,
             max_rounds AS "maxRounds", round_count AS "roundCount",
             workflow_id AS "workflowId", created_at AS "createdAt"
        FROM engineering_agent_sessions WHERE id = ? AND project_id = ?`,
-    id,
-    projectId,
-  );
-  if (!session) return null;
+      id,
+      projectId,
+    );
+    if (!session) return null;
 
-  const claims = await loadClaims(id);
-  const rows = await query<ConflictRow>(
-    `SELECT id, topic, conflict_type AS "conflictType", stage, claim_ids AS "claimIds",
+    const claims = await loadClaims(id);
+    const rows = await query<ConflictRow>(
+      `SELECT id, topic, conflict_type AS "conflictType", stage, claim_ids AS "claimIds",
             resolution, resolution_method AS "resolutionMethod",
             resolved_by AS "resolvedBy", resolved_at AS "resolvedAt"
        FROM engineering_conflicts WHERE session_id = ? ORDER BY created_at`,
-    id,
-  );
-  const conflicts = rows.map((c) => ({
-    ...c,
-    proposal: proposeResolution(
-      c.conflictType,
-      claims.filter((cl) => (c.claimIds ?? []).includes(cl.id)),
-    ),
-  }));
-  return { session, claims, conflicts };
+      id,
+    );
+    const conflicts = rows.map((c) => ({
+      ...c,
+      proposal: proposeResolution(
+        c.conflictType,
+        claims.filter((cl) => (c.claimIds ?? []).includes(cl.id)),
+      ),
+    }));
+    return { session, claims, conflicts };
+  });
 }
 
 // Người có thẩm quyền chốt 1 xung đột. Ghi rõ PHƯƠNG PHÁP đi tới kết luận (§19) —
