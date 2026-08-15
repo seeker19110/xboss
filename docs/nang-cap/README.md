@@ -13,6 +13,8 @@ Lộ trình riêng cho hướng tích hợp với hệ multi-agent kỹ thuật 
 dùng nhãn "M43" cho việc này, đụng độ với `M43-audit-trail.md` (module khác hẳn, đã xong từ lâu).
 Quyết định (người dùng chốt): track riêng `ENG-1..ENG-4`, không đụng số `M<xx>`.
 
+- **`PROJECT-COMPLETION-ROADMAP.md`** — 📝 **draft chờ duyệt** (2026-08-15): đặc tả tổng từ C0 baseline → C6 XBoss v1.0/Product Complete, sau đó O1 System of Record → O5 Engineering OS/Vision Complete theo gate. Đây là nguồn trình tự/exit gate; chi tiết contract pilot nằm ở ENG-5.
+
 - **`ENG-0-roadmap-tich-hop-engineering-os.md`** — lộ trình tổng (Foundation Hardening → ENG-1 →
   ENG-2 → ENG-3 → ENG-4 → Engineering OS/AI-Digital-Twin/Predictive OS/Controlled Autonomy), 12
   nguyên tắc khoá kiến trúc kế thừa từ MEP-Agents, boundary chống AI tự cấp quyền, Foundation Gate.

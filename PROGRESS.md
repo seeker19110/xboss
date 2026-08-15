@@ -9,6 +9,7 @@
 - **GĐ 4–5 — Vận hành có kiểm soát & nâng chất lượng.** Sản phẩm đã chạy thật (v0.2.1, tự host VPS). Track Engineering OS nền tảng (ENG-1→ENG-4) đã hoàn tất về code, migration, API/UI và test; chưa có traffic thật từ MEPF-Agents nên chưa mở các tầng Digital Twin/Predictive OS/Controlled Autonomy.
 - **Ưu tiên hiện hành:** xác minh staging/production cho migration `0084`–`0087`, kết nối thử nghiệm có kiểm soát với MEPF-Agents, và xử lý các nợ kỹ thuật đã ghi nhận trước khi mở rộng phạm vi mới.
 - **Đặc tả kế tiếp (chờ duyệt, chưa code):** `ENG-5 — Integration Contract & Pilot MEPF-Agents` — đóng các khoảng trống external-key relation, idempotency, project isolation, OpenAPI/fixture và runbook pilot trước khi mở traffic thật.
+- **Lộ trình hoàn thành (chờ duyệt, chưa code):** `PROJECT-COMPLETION-ROADMAP.md` chốt C0→C6 để đạt XBoss v1.0/Product Complete và O1→O5 cho Engineering OS/Vision Complete theo gate; không coi tài liệu là quyền tự triển khai production hoặc A3+.
 
 ## Snapshot điều hành — 14–15/08/2026
 
