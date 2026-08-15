@@ -3,6 +3,7 @@ import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE
 // integration.md). Integration (cần Postgres qua TEST_DATABASE_URL, không có thì tự skip).
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { NextRequest } from "next/server";
 
 const S = { skip: !HAS_TEST_DB };
@@ -16,7 +17,14 @@ let keyReadA = "";
 function reqOf(path: string, key: string, body?: unknown): NextRequest {
   return new NextRequest(`http://localhost${path}`, {
     method: "POST",
-    headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
+    headers: {
+      authorization: `Bearer ${key}`,
+      "content-type": "application/json",
+      // ENG-5 §3.1 làm Idempotency-Key thành BẮT BUỘC trên /ingest. Mỗi lần gọi dùng key
+      // mới để test ENG-1 giữ nguyên ý nghĩa cũ (xử lý thật, không rơi vào nhánh replay);
+      // hành vi lũy đẳng/replay được phủ riêng ở tests/engineering-ingest.test.ts.
+      "idempotency-key": randomUUID(),
+    },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 }
@@ -207,6 +215,9 @@ test("POST /api/v1/engineering/ingest: scope read → 403, scope engineering →
 
   const payload = {
     source: {
+      // ENG-5 §3.3: source/revision nay định danh bằng external key (lũy đẳng khi retry).
+      externalKey: "drawing:m-101:l3",
+      externalRevisionKey: "drawing:m-101:l3:R01",
       sourceType: "drawing",
       title: "M-101 Tầng 3",
       revisionNo: 1,

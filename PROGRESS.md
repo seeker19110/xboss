@@ -26,6 +26,75 @@
 
 **Nợ kỹ thuật/rủi ro mở:** `audit_log.entity_id` và trigger audit hiện chỉ hỗ trợ khoá `BIGINT`; các bảng `engineering_*` dùng UUID nên chưa nằm trong audit trail tự động. Không mở rộng cấu trúc audit trên production khi chưa có kế hoạch migration, thử nghiệm staging và rollback riêng.
 
+## ENG-5 PR1 (C1) — Hợp đồng ingest lũy đẳng + cách ly dự án ở tầng DB (2026-08-15)
+
+Thi hành phần **đã kín đặc tả** của `docs/nang-cap/ENG-5-integration-contract-pilot.md`
+(§2 bất biến, §3 contract HTTP, §4 validation/concurrency). Đây là việc C1 trong
+`PROJECT-COMPLETION-ROADMAP.md`.
+
+- **[AI, phát hiện — lỗ hổng thật, đã đo trên DB]** Đường ingest ENG-1 **không lũy đẳng** và
+  **không dùng được** cho agent ngoài:
+  1. `engineering_sources` **không có `external_key`** → mỗi request tạo 1 source + revision
+     mới; agent retry (timeout/mạng) là sinh dữ liệu trùng, không cách nào khớp lại.
+  2. `engineering_object_relations` **không có ràng buộc duy nhất nào** → retry nhân bản relation.
+  3. Relation nhận `fromObjectId`/`toObjectId` là **UUID nội bộ XBoss** — agent ngoài không
+     biết UUID đó (chính `ENG-0`/`ENG-5` §2.2 cấm), nên đường relation **trên thực tế không
+     dùng được**.
+     **Đo thật trên schema cũ (0087)**: chèn 2 relation y hệt nhau + 1 relation **chéo dự án** →
+     cả **3/3 đều lọt**. Trên schema mới (0088): 3/3 đều bị DB chặn.
+- **[AI, đã làm] `migrations/0088_engineering_ingest_contract.sql` — thuần THÊM** (ADD COLUMN
+  nullable / CREATE INDEX / CREATE TABLE / ADD CONSTRAINT, **không UPDATE, không backfill**,
+  không đụng dòng dữ liệu nào → theo DoD được đi thẳng production, không cần cổng staging):
+  `external_key` cho source (+ partial unique theo dự án), `external_revision_key` cho
+  revision, unique **logic** cho relation (dùng `COALESCE` vì `NULL <> NULL` trong unique
+  index của Postgres — không có nó thì 2 relation giống hệt mà `source_revision_id` NULL vẫn
+  lọt), bảng `engineering_ingest_requests` (sổ lũy đẳng, TTL 30 ngày).
+- **[AI, quyết định] Bất biến "2 đầu relation cùng dự án" đặt ở DB bằng composite FK**, không
+  bằng trigger — đúng ưu tiên của `ENG-5` §4 ("app-layer check đơn lẻ không đủ"). Cần thêm
+  `UNIQUE (id, project_id)` trên `engineering_objects` làm đích FK (không siết thêm gì vì `id`
+  vốn là PK).
+- **[AI, đã làm] `lib/engineering-kernel.ts`**: `upsertEngineeringSourceFromExternal`,
+  `upsertSourceRevisionFromExternal` (khoá dòng source `FOR UPDATE` trước khi cấp
+  `revision_no` để 2 request song song không đua số), `upsertEngineeringRelationFromExternal`
+  (resolve external key → UUID **trong đúng dự án**, `ON CONFLICT DO NOTHING` cho lũy đẳng).
+  Key của dự án khác coi như "không tồn tại" — không lộ sự tồn tại của dữ liệu dự án khác.
+- **[AI, đã làm] `POST /api/v1/engineering/ingest`** theo đúng §3.1: `Idempotency-Key` **bắt
+  buộc**, `X-Correlation-Id` tự sinh khi thiếu và luôn trả lại, giới hạn 500 objects / 2 000
+  relations / 5 MiB, mã trạng thái `201` mới · `200` replay (trả **nguyên** response cũ) ·
+  `409` trùng key khác body · `413` body quá lớn · `422` kèm `pointer` JSON Pointer.
+  **Giữ tương thích ngược**: relation dạng UUID cũ vẫn chạy (§5.5 — v1 chỉ đổi theo kiểu
+  additive), nhánh external key là đường chuẩn mới.
+- **[AI, đã sửa doc drift phát hiện khi làm] `docs/api-v1.md` mở đầu bằng "Chỉ đọc — không có
+  endpoint ghi ở v1"** — sai từ ENG-1 (đã có 4 route `POST /api/v1/engineering/*`). Sửa tiêu
+  đề + phần mở đầu, thêm scope `engineering` vào bảng scope và mục contract đầy đủ cho
+  `/ingest` (headers, giới hạn, mã lỗi, bảng khoá lũy đẳng, ví dụ `curl`).
+- **Verify** (Postgres 16 cục bộ, DB dựng mới chạy sạch tới `0088`): `tests/engineering-ingest.test.ts`
+  **10/10 pass** (lũy đẳng replay, 409 khác body, thiếu header, không nhân bản khi
+  Idempotency-Key mới, relation key không tồn tại, **cách ly dự án**, giới hạn payload,
+  correlation ID, sai scope); toàn bộ 5 file test engineering **53/53 pass**;
+  `lint` (0 lỗi), `typecheck`, `build` xanh; `check:migrations` OK (88 file);
+  `check:sw-exclude` OK; `gen:erd` cập nhật (157 bảng).
+- **[AI, đã sửa test cũ theo hợp đồng mới]** `tests/engineering.test.ts` fail sau thay đổi vì
+  `Idempotency-Key` nay bắt buộc và source cần `externalKey` — cập nhật đúng hợp đồng mới
+  (không nới lỏng code cho test dễ qua), 6/6 pass lại.
+- **[AI, phát hiện + đã sửa — bug hạ tầng thật, lộ ra từ chính CI đỏ] `scripts/gen-erd.ts` sinh
+  SAI khoá ngoại nhiều cột (composite FK).** CI của PR này đỏ ở bước **"Kiểm ERD khớp schema"**
+  (bước `npm test` **xanh** — 123/123 file, tức code không sai). Nguyên nhân: truy vấn FK cũ
+  join `information_schema.key_column_usage` × `constraint_column_usage` theo `constraint_name`
+  → với FK nhiều cột sinh **tích đề-các**: FK 2 cột ra **4 dòng** thay vì 2, kèm cặp cột **bịa**
+  (vd `from_object_id → engineering_objects(project_id)` trong khi thực tế là
+  `(from_object_id, project_id) → (id, project_id)`). Thứ tự các dòng thừa **không xác định**
+  → `docs/ERD.md` sinh khác nhau giữa các lần chạy, cổng CI đỏ. Bug có sẵn từ M45 PR3 nhưng
+  **chưa lộ vì dự án chưa từng có composite FK nào** — `0088` là cái đầu tiên.
+  Sửa: đọc từ `pg_constraint` + `unnest(conkey, confkey) WITH ORDINALITY` để ghép cột nguồn ↔
+  cột đích **theo vị trí** (đúng cho cả FK 1 cột lẫn nhiều cột), `ORDER BY` có tiebreaker đủ để
+  ổn định. Kiểm chứng: sinh 2 lần liên tiếp cho ra file **giống hệt nhau**; diff so ERD cũ chỉ
+  còn đúng phần sửa thật (bỏ 5 dòng FK bịa), không xáo trộn bảng khác.
+- **Còn lại của ENG-5 (KHÔNG làm trong PR này, cần điều kiện ngoài):** OpenAPI 3.1 sinh từ
+  nguồn type chung (§5.1-5.2 — cần chốt thư viện, thêm dependency), consumer-contract test
+  phía `MEPF-Agents` (§5.4 — repo khác), metrics/alert threshold (§6 — cần chốt ngưỡng +
+  backend giám sát), pilot runbook (§7 — cần staging + người hai bên ký).
+
 ## C0 (phần 1) — Sửa doc drift RLS + `lib/env.ts` (2026-08-15)
 
 Bước đầu của **C0 — Chốt nguồn sự thật** (`docs/nang-cap/C0-release-baseline-governance.md`):
