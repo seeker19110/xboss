@@ -52,6 +52,7 @@ npm run build        # build production (không cần DB thật — pool kết n
 npm run lint         # next lint (eslint.config.mjs — flat config, next/core-web-vitals)
 npm run typecheck    # tsc --noEmit
 npm test             # node:test qua tsx — hơn 100 file trong tests/ (không hard-code số tuyệt đối, dễ lệch)
+npm test -- --release-gate   # như trên, nhưng ca bị SKIP = LỖI (trừ file có lý do trong scripts/test-skip-allowlist.json). CI dùng cờ này.
 npx tsx --test tests/status.test.ts   # chạy 1 file test
 npm run db:seed      # import Excel gốc trong attachments/ vào DB
 ```

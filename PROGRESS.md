@@ -27,6 +27,33 @@
 
 **Nợ kỹ thuật/rủi ro mở:** ~~`audit_log.entity_id` chỉ hỗ trợ khoá `BIGINT` nên `engineering_*` (UUID) nằm ngoài audit trail~~ — **đã đóng** bằng `0090` (cột `entity_key` TEXT, xem mục "C3 §2" bên dưới). Rủi ro còn lại là vận hành, không phải code: cặp `0091`/`0092` phải chạy staging trước khi lên production.
 
+## C4 §2 — Runner test xuất pass/fail/skip, skip phải có lý do (2026-08-15)
+
+C4 §2: _"CI phải xuất số pass/fail/skip; skip bắt buộc whitelist và lý do"_ và _"Không tính
+test 'pass' nếu bị skip do thiếu DB ở release gate"_.
+
+- **[AI, đo được — con số gây giật mình]** `scripts/run-tests.mjs` trước đây chỉ đếm **SỐ
+  FILE fail**. Chạy `npm test` mà **quên `TEST_DATABASE_URL`** thì toàn bộ test tích hợp tự
+  skip, mọi file vẫn thoát mã 0, bản tóm tắt vẫn báo **"0 file fail"** — trông y hệt một lần
+  chạy xanh thật. Đo thật: **358/698 ca bị skip (hơn một nửa)** mà vẫn "xanh". Đó đúng là
+  cách một bộ test mục ruỗng mà không ai thấy.
+- **[AI, đã làm]** Runner nay đếm tới **từng CA** (`pass/fail/skip/todo`) và **liệt kê skip
+  theo file**. Thêm cờ `--release-gate` (hoặc `RELEASE_GATE=1`): ca bị skip là **LỖI** trừ khi
+  file có lý do trong `scripts/test-skip-allowlist.json`. CI đã bật cờ này.
+- **[AI, quyết định — không cho phép "khai để cho qua"]** Allowlist chỉ dành cho ca **không
+  thể chạy dù đã có DB**. Ghi thẳng trong file: _"Thiếu Postgres thì đặt `TEST_DATABASE_URL`
+  rồi chạy lại — ĐỪNG thêm file vào đây để cho qua cổng"_. Mặc định chặt, mở từng trường hợp
+  có lý do, không mở sẵn.
+- **[AI, rà đủ TRƯỚC khi bật cổng ở CI]** Không đoán "chắc chỉ có DB mới gây skip": grep hết
+  mọi cơ chế skip trong `tests/` — 293 ca dùng `!HAS_TEST_DB`, cộng đúng **3 ngoại lệ** có
+  thể skip **dù đã có DB**: `health.test.ts` (1 ca cố ý **đảo** điều kiện — kiểm `/api/health`
+  trả 503 khi KHÔNG có DB), `import-real.test.ts` (2 ca) và `import-tz.test.ts` (1 ca dùng
+  `t.skip()`) cần file Excel thật. Đã kiểm: file Excel đó **có trong git** nên CI vẫn chạy đủ.
+  Cả 3 đã khai lý do.
+- **[AI, chứng minh cổng chặn thật]** Chạy `--release-gate` khi thiếu `TEST_DATABASE_URL` →
+  **thoát mã 1** kèm danh sách file skip chưa có lý do.
+- **Verify**: `npm test` không DB → `340 pass / 0 fail / 358 skip`, báo cáo đúng; `lint` 0 lỗi.
+
 ## C0 — Sửa doc drift + canh gác phạm vi RLS (2026-08-15)
 
 C0 yêu cầu "`PROJECT.md`/`spec.md` phải phản ánh RLS thật, phiên bản app, số route/bảng và

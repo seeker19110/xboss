@@ -61,8 +61,12 @@ jobs:
       # "npm test" chạy từng file test trong 1 process Node riêng, tuần tự (xem
       # scripts/run-tests.mjs) — cô lập để nhiều file cùng chạm 1 Postgres CI không đụng
       # nhau gây fail ngẫu nhiên. Cùng lệnh với chạy test cục bộ (local === CI).
+      # `--release-gate` (C4 §2): in số pass/fail/skip tới từng CA, và coi ca bị SKIP là LỖI
+      # trừ khi file có lý do trong scripts/test-skip-allowlist.json. Trước đây runner chỉ
+      # đếm SỐ FILE fail — chạy thiếu TEST_DATABASE_URL thì 358/698 ca tự skip mà bản tóm tắt
+      # vẫn báo "0 file fail", trông y hệt một lần chạy xanh thật.
       - name: Test (kèm test tích hợp trên Postgres)
-        run: npm test
+        run: npm test -- --release-gate
         env:
           TEST_DATABASE_URL: postgres://ci:ci@localhost:5432/xboss_test
 
