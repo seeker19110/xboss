@@ -252,14 +252,16 @@ export async function createEngineeringSource(input: EngineeringSourceInput, use
 
 export async function createSourceRevision(input: EngineeringSourceRevisionInput, userId: number) {
   return queryOne(
+    // project_id LẤY TỪ CHÍNH SOURCE CHA (s.project_id) chứ không nhận từ bên gọi — bất
+    // biến "revision cùng dự án với source" (C3 §3) đúng ngay từ lúc ghi, không phụ thuộc
+    // caller truyền đúng. FK composite ở 0089 là lưới an toàn thứ 2.
     `INSERT INTO engineering_source_revisions
-       (source_id, revision_no, object_key, sha256, parser_name, parser_version, metadata, created_by)
-     SELECT ?, ?, ?, ?, ?, ?, ?::jsonb, ?
-     WHERE EXISTS (SELECT 1 FROM engineering_sources s WHERE s.id = ?)
+       (source_id, project_id, revision_no, object_key, sha256, parser_name, parser_version, metadata, created_by)
+     SELECT s.id, s.project_id, ?, ?, ?, ?, ?, ?::jsonb, ?
+       FROM engineering_sources s WHERE s.id = ?
      RETURNING id, source_id AS "sourceId", revision_no AS "revisionNo", object_key AS "objectKey",
                sha256, parser_name AS "parserName", parser_version AS "parserVersion", metadata,
                created_by AS "createdBy", created_at AS "createdAt"`,
-    input.sourceId,
     input.revisionNo,
     input.objectKey ?? null,
     input.sha256 ?? null,
@@ -488,12 +490,13 @@ export async function upsertSourceRevisionFromExternal(
   );
   const revisionNo = input.revisionNo ?? next?.n ?? 1;
   const created = await queryOne<{ id: string; revisionNo: number }>(
+    // Như createSourceRevision: project_id suy từ source cha, không nhận từ bên gọi (C3 §3).
     `INSERT INTO engineering_source_revisions
-       (source_id, revision_no, external_revision_key, object_key, sha256, parser_name,
+       (source_id, project_id, revision_no, external_revision_key, object_key, sha256, parser_name,
         parser_version, metadata, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?)
+     SELECT s.id, s.project_id, ?, ?, ?, ?, ?, ?, ?::jsonb, ?
+       FROM engineering_sources s WHERE s.id = ?
      RETURNING id, revision_no AS "revisionNo"`,
-    input.sourceId,
     revisionNo,
     input.externalRevisionKey,
     input.objectKey ?? null,
@@ -502,6 +505,7 @@ export async function upsertSourceRevisionFromExternal(
     input.parserVersion ?? null,
     JSON.stringify(input.metadata),
     userId,
+    input.sourceId,
   );
   if (!created) throw new Error("Tạo revision nguồn thất bại");
   return { id: created.id, created: true, revisionNo: created.revisionNo };

@@ -297,6 +297,82 @@ test("(9) X-Correlation-Id: giữ nguyên khi client gửi, tự sinh khi thiế
   assert.ok(generated && generated.length >= 36, "thiếu header thì server phải tự sinh");
 });
 
+// --- C3 §3 "Relational invariants": chặn tham chiếu chéo dự án qua source revision.
+// Trước migrations/0089, cả 2 ca dưới đây đều LỌT (đã đo trực tiếp trên DB) — object của
+// dự án B trỏ được source_revision của dự án A. Test này ghim lại lỗ hổng đó.
+
+test("(11) BẤT BIẾN: object không trỏ được source revision của dự án khác", S, async () => {
+  const { queryOne, run } = await import("@/lib/db");
+
+  // dựng source + revision ở dự án A qua đường ingest thật
+  const rA = await post(keyA, payload("inv1", false));
+  assert.equal(rA.status, 201);
+  const revId = rA.body.sourceRevisionId as string;
+  assert.ok(revId);
+
+  // object của dự án B cố trỏ revision của A → DB phải chặn
+  await assert.rejects(
+    () =>
+      run(
+        `INSERT INTO engineering_objects (project_id, object_type, external_key, source_revision_id, created_by, updated_by)
+         VALUES (?, 'component', 'inv:cross-rev', ?, ?, ?)`,
+        pB,
+        revId,
+        U,
+        U,
+      ),
+    /fk_eng_object_source_rev_same_project|foreign key/i,
+    "object dự án B trỏ revision dự án A phải bị FK chặn",
+  );
+
+  const leak = await queryOne<{ n: number }>(
+    `SELECT COUNT(*)::int AS n FROM engineering_objects WHERE external_key = ?`,
+    "inv:cross-rev",
+  );
+  assert.equal(leak?.n, 0, "không được tồn tại object chéo dự án");
+});
+
+test(
+  "(12) BẤT BIẾN: revision luôn mang project_id của source cha, không nhận từ bên gọi",
+  S,
+  async () => {
+    const { queryOne, run } = await import("@/lib/db");
+
+    const r = await post(keyA, payload("inv2", false));
+    assert.equal(r.status, 201);
+
+    // project_id của revision phải bằng project_id của source cha (suy trong SQL, không do caller)
+    const row = await queryOne<{ revProject: number; srcProject: number }>(
+      `SELECT rev.project_id AS "revProject", s.project_id AS "srcProject"
+       FROM engineering_source_revisions rev
+       JOIN engineering_sources s ON s.id = rev.source_id
+      WHERE rev.id = ?`,
+      r.body.sourceRevisionId as string,
+    );
+    assert.equal(row?.revProject, row?.srcProject);
+    assert.equal(row?.revProject, pA);
+
+    // khai project_id lệch source cha → DB chặn
+    const src = await queryOne<{ id: string }>(
+      `SELECT id FROM engineering_sources WHERE project_id = ? AND external_key = ?`,
+      pA,
+      "drawing:test:inv2",
+    );
+    await assert.rejects(
+      () =>
+        run(
+          `INSERT INTO engineering_source_revisions (source_id, project_id, revision_no, external_revision_key, created_by)
+         VALUES (?, ?, 99, 'inv2:bad', ?)`,
+          src!.id,
+          pB,
+          U,
+        ),
+      /fk_eng_source_rev_same_project|foreign key/i,
+      "revision khai project khác source cha phải bị FK chặn",
+    );
+  },
+);
+
 test("(10) key sai scope không vào được ingest", S, async () => {
   const { insertId, run } = await import("@/lib/db");
   const { generateApiKey, hashApiKey } = await import("@/lib/api-keys");
