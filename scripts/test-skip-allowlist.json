@@ -1,0 +1,9 @@
+{
+  "_README": "C4 §2 — File được phép có ca SKIP ở cổng phát hành (npm test -- --release-gate hoặc RELEASE_GATE=1). Khoá = tên file trong tests/, giá trị = LÝ DO. Chỉ khai ở đây khi ca đó KHÔNG THỂ chạy ngay cả khi đã có TEST_DATABASE_URL. Thiếu Postgres thì đặt TEST_DATABASE_URL rồi chạy lại — ĐỪNG thêm file vào đây để cho qua cổng.",
+
+  "health.test.ts": "1 ca cố ý đảo điều kiện (`skip: HAS_TEST_DB`): kiểm /api/health trả 503 'degraded' khi KHÔNG có DB. Có DB thì tình huống đó không dựng được, nên ca này chỉ chạy ở lần chạy không-DB — đúng chủ đích, không phải test bị bỏ quên.",
+
+  "import-real.test.ts": "2 ca cần file Excel tracking THẬT (đường dẫn trong hằng XLSX_FILE). File này CÓ trong git nên CI vẫn chạy đủ; mục này chỉ để lần chạy trên máy thiếu file không chết ở cổng.",
+
+  "import-tz.test.ts": "1 ca dùng `t.skip()` khi thiếu cùng file Excel thật như trên — lý do y hệt import-real.test.ts."
+}

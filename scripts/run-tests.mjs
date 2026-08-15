@@ -12,7 +12,7 @@
 //
 // Cách chạy 1 file lẻ khi debug: `npx tsx --test tests/<ten>.test.ts` (như cũ).
 
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { parseCoverageTable, mergeCoverageMaps, aggregate } from "./coverage-summary.mjs";
@@ -31,6 +31,35 @@ const files = readdirSync(TEST_DIR)
   .sort()
   .map((f) => join(TEST_DIR, f));
 
+// C4 §2: "CI phải xuất số pass/fail/skip; skip bắt buộc whitelist và lý do."
+//
+// Vì sao cần: trước đây runner chỉ đếm SỐ FILE fail. Chạy mà KHÔNG có TEST_DATABASE_URL thì
+// toàn bộ test tích hợp tự skip (xem tests/setup.ts) — mọi file vẫn thoát mã 0 và bản tóm tắt
+// vẫn báo "0 file fail", trông y hệt một lần chạy xanh thật. Đó là cách một bộ test mục ruỗng
+// mà không ai thấy. Nay đếm tới từng CA và tách riêng skip.
+//
+// `--release-gate` (hoặc RELEASE_GATE=1): mọi ca bị skip đều là LỖI, trừ file có trong
+// scripts/test-skip-allowlist.json kèm lý do. Dùng ở cổng phát hành, không dùng khi dev cục bộ
+// (dev thường không dựng Postgres).
+const releaseGate = process.argv.includes("--release-gate") || process.env.RELEASE_GATE === "1";
+
+let skipAllowlist = {};
+try {
+  skipAllowlist = JSON.parse(readFileSync(join("scripts", "test-skip-allowlist.json"), "utf8"));
+} catch {
+  // Không có file allowlist = không cho phép skip nào ở release gate. Mặc định chặt là đúng.
+}
+
+// TAP tóm tắt của node:test in ra các dòng "# pass 12" / "# fail 0" / "# skipped 3".
+function tapCount(out, label) {
+  const m = out.match(new RegExp(`^# ${label} (\\d+)$`, "m"));
+  return m ? Number(m[1]) : 0;
+}
+
+const total = { pass: 0, fail: 0, skipped: 0, todo: 0 };
+/** file → số ca bị skip, chỉ ghi khi > 0 */
+const skippedByFile = {};
+
 let failed = 0;
 const coverageMaps = [];
 for (const file of files) {
@@ -47,14 +76,50 @@ for (const file of files) {
     process.stdout.write(res.stdout ?? "");
     if (res.stdout) coverageMaps.push(parseCoverageTable(res.stdout));
   } else {
+    // Bắt stdout để đếm được pass/fail/skip rồi in lại NGUYÊN VẸN — người xem log vẫn thấy
+    // đúng những gì trước đây thấy, chỉ thêm phần tổng kết ở cuối.
     res = spawnSync(process.execPath, [`--import=${tsxLoader}`, "--test", file], {
-      stdio: "inherit",
+      stdio: ["inherit", "pipe", "inherit"],
+      encoding: "utf8",
     });
+    process.stdout.write(res.stdout ?? "");
   }
   if (res.status !== 0) failed++;
+
+  const out = res.stdout ?? "";
+  total.pass += tapCount(out, "pass");
+  total.fail += tapCount(out, "fail");
+  total.todo += tapCount(out, "todo");
+  const skipped = tapCount(out, "skipped");
+  total.skipped += skipped;
+  if (skipped > 0) skippedByFile[file] = skipped;
 }
 
-process.stdout.write(`\n=== Tổng: ${files.length} file, ${failed} file fail ===\n`);
+process.stdout.write(
+  `\n=== Tổng: ${files.length} file, ${failed} file fail ` +
+    `· ${total.pass} ca pass, ${total.fail} ca fail, ${total.skipped} ca skip, ${total.todo} todo ===\n`,
+);
+
+// Skip không phải là pass. Ở chế độ thường chỉ nhắc; ở release gate thì chặn.
+if (total.skipped > 0) {
+  const base = (f) => f.replace(/^tests[\\/]/, "");
+  const khongCoLyDo = Object.keys(skippedByFile).filter((f) => !skipAllowlist[base(f)]);
+
+  process.stdout.write(`\nCa bị SKIP theo file (skip KHÔNG phải pass):\n`);
+  for (const [f, n] of Object.entries(skippedByFile)) {
+    const lyDo = skipAllowlist[base(f)];
+    process.stdout.write(`  - ${f}: ${n} ca${lyDo ? ` — ${lyDo}` : " — CHƯA CÓ LÝ DO"}\n`);
+  }
+
+  if (releaseGate && khongCoLyDo.length > 0) {
+    process.stdout.write(
+      `\n❌ RELEASE GATE: ${khongCoLyDo.length} file có ca bị skip mà chưa khai lý do trong\n` +
+        `   scripts/test-skip-allowlist.json. Ở cổng phát hành, test bị skip KHÔNG được tính là pass\n` +
+        `   (C4 §2). Thiếu Postgres thì đặt TEST_DATABASE_URL rồi chạy lại, đừng thêm vào allowlist.\n`,
+    );
+    failed++;
+  }
+}
 
 if (coverageMode) {
   const merged = mergeCoverageMaps(coverageMaps);

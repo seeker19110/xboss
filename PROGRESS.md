@@ -27,6 +27,60 @@
 
 **Nợ kỹ thuật/rủi ro mở:** ~~`audit_log.entity_id` chỉ hỗ trợ khoá `BIGINT` nên `engineering_*` (UUID) nằm ngoài audit trail~~ — **đã đóng** bằng `0090` (cột `entity_key` TEXT, xem mục "C3 §2" bên dưới). Rủi ro còn lại là vận hành, không phải code: cặp `0091`/`0092` phải chạy staging trước khi lên production.
 
+## C4 §2 — Runner test xuất pass/fail/skip, skip phải có lý do (2026-08-15)
+
+C4 §2: _"CI phải xuất số pass/fail/skip; skip bắt buộc whitelist và lý do"_ và _"Không tính
+test 'pass' nếu bị skip do thiếu DB ở release gate"_.
+
+- **[AI, đo được — con số gây giật mình]** `scripts/run-tests.mjs` trước đây chỉ đếm **SỐ
+  FILE fail**. Chạy `npm test` mà **quên `TEST_DATABASE_URL`** thì toàn bộ test tích hợp tự
+  skip, mọi file vẫn thoát mã 0, bản tóm tắt vẫn báo **"0 file fail"** — trông y hệt một lần
+  chạy xanh thật. Đo thật: **358/698 ca bị skip (hơn một nửa)** mà vẫn "xanh". Đó đúng là
+  cách một bộ test mục ruỗng mà không ai thấy.
+- **[AI, đã làm]** Runner nay đếm tới **từng CA** (`pass/fail/skip/todo`) và **liệt kê skip
+  theo file**. Thêm cờ `--release-gate` (hoặc `RELEASE_GATE=1`): ca bị skip là **LỖI** trừ khi
+  file có lý do trong `scripts/test-skip-allowlist.json`. CI đã bật cờ này.
+- **[AI, quyết định — không cho phép "khai để cho qua"]** Allowlist chỉ dành cho ca **không
+  thể chạy dù đã có DB**. Ghi thẳng trong file: _"Thiếu Postgres thì đặt `TEST_DATABASE_URL`
+  rồi chạy lại — ĐỪNG thêm file vào đây để cho qua cổng"_. Mặc định chặt, mở từng trường hợp
+  có lý do, không mở sẵn.
+- **[AI, rà đủ TRƯỚC khi bật cổng ở CI]** Không đoán "chắc chỉ có DB mới gây skip": grep hết
+  mọi cơ chế skip trong `tests/` — 293 ca dùng `!HAS_TEST_DB`, cộng đúng **3 ngoại lệ** có
+  thể skip **dù đã có DB**: `health.test.ts` (1 ca cố ý **đảo** điều kiện — kiểm `/api/health`
+  trả 503 khi KHÔNG có DB), `import-real.test.ts` (2 ca) và `import-tz.test.ts` (1 ca dùng
+  `t.skip()`) cần file Excel thật. Đã kiểm: file Excel đó **có trong git** nên CI vẫn chạy đủ.
+  Cả 3 đã khai lý do.
+- **[AI, chứng minh cổng chặn thật]** Chạy `--release-gate` khi thiếu `TEST_DATABASE_URL` →
+  **thoát mã 1** kèm danh sách file skip chưa có lý do.
+- **Verify**: `npm test` không DB → `340 pass / 0 fail / 358 skip`, báo cáo đúng; `lint` 0 lỗi.
+
+## C0 — Sửa doc drift + canh gác phạm vi RLS (2026-08-15)
+
+C0 yêu cầu "`PROJECT.md`/`spec.md` phải phản ánh RLS thật, phiên bản app, số route/bảng và
+track ENG". **Đo trước, không sửa theo cảm tính:**
+
+| Tài liệu khai                               | Thực tế đo được                        | Kết luận         |
+| ------------------------------------------- | -------------------------------------- | ---------------- |
+| RLS trên "11 bảng tài chính + nhóm tổ chức" | **+15 bảng `engineering_*`** (`0092`)  | trôi — đã sửa    |
+| "~107 nhóm route"                           | **119** nhóm (361 file `route.ts`)     | trôi — đã sửa    |
+| "đã hoàn tất M0–M42"                        | M0–M52 + M56/M58/M59/M61–M64 + ENG-1→5 | trôi — đã sửa    |
+| `v0.3.0`                                    | `package.json` = 0.3.0                 | khớp, giữ nguyên |
+
+- **[AI, đã làm]** Sửa 3 chỗ trôi trong `PROJECT.md`; bổ sung mục "Cập nhật 2026-08-15" vào
+  `docs/adr/0005-rls.md` ghi rõ `0077` khoá cửa nhóm tài chính và `0092` mở rộng sang
+  `engineering_*`, **kèm lý do vì sao nhóm này đi thẳng policy nghiêm ngặt** thay vì qua giai
+  đoạn chuyển tiếp như nhóm tài chính.
+- **[AI, quyết định — canh cái ÍT ĐỔI, không canh con số]** Thêm test canh **TẬP BẢNG bật
+  RLS** thay vì canh số route/bảng. Số route đổi gần như mỗi PR nên canh sẽ thành nhiễu rồi
+  bị tắt; còn tập bảng có RLS thì hiếm khi đổi và **mỗi lần đổi đều là quyết định bảo mật
+  đáng review**. Test bắt **cả hai chiều**: bảng lặng lẽ được bật RLS mà chưa khai, và bảng
+  mất RLS ngoài ý muốn. Riêng nhóm `engineering_*` khai theo **tiền tố**, nên thêm bảng mới
+  mà quên bật là đỏ ngay.
+- **[AI, chứng minh guard không phải trang trí]** `DISABLE ROW LEVEL SECURITY` trên
+  `engineering_conflicts` → test đỏ đúng thông điệp "Bảng engineering_\* mới thêm nhưng CHƯA
+  bật RLS"; bật lại thì xanh.
+- **Verify**: `tests/rls.test.ts` **5/5**; `lint` 0 lỗi, `typecheck` xanh.
+
 ## C3 §6 (PR C3.5) — Chính sách dọn dữ liệu hết hạn (2026-08-15)
 
 - **[AI, đo được — cột hạn có sẵn nhưng chưa ai dùng]** `engineering_ingest_requests` đã có
