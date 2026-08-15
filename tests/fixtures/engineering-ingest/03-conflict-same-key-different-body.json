@@ -1,0 +1,11 @@
+{
+  "name": "Cùng Idempotency-Key nhưng body KHÁC → 409",
+  "contractVersion": "2026-08-15",
+  "dependsOn": "01-happy-path.json",
+  "reuseIdempotencyKeyFrom": "01-happy-path.json",
+  "request": {
+    "contractVersion": "2026-08-15",
+    "objects": [{ "externalKey": "duct:fx:khac", "objectType": "component" }]
+  },
+  "expect": { "status": 409, "pointer": "/headers/Idempotency-Key" }
+}

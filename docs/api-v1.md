@@ -77,6 +77,9 @@ chuỗi `YYYY-MM-DD`. Trường trả về dạng `camelCase`.
 Endpoint **ghi** cho hệ agent kỹ thuật ngoài (MEPF-Agents). Hợp đồng đầy đủ:
 `docs/nang-cap/ENG-5-integration-contract-pilot.md`.
 
+- **Hợp đồng máy-đọc-được:** [`docs/api/engineering-ingest.openapi.json`](api/engineering-ingest.openapi.json) (OpenAPI 3.1). Không viết tay tự do — `tests/engineering-contract.test.ts` đối chiếu enum/giới hạn trong file đó với schema Zod và hằng số route thật, lệch là CI đỏ.
+- **Fixture hợp đồng có version:** `tests/fixtures/engineering-ingest/` — 7 ca (happy path, replay, xung đột key, thiếu header, relation không tồn tại, **relation chéo dự án**, vượt giới hạn). Copy nguyên thư mục sang repo `MEPF-Agents` làm consumer-contract test, hai bên pin cùng `contractVersion`.
+
 | Method & path                                        | Mục đích                                      |
 | ---------------------------------------------------- | --------------------------------------------- |
 | `POST /api/v1/engineering/ingest`                    | Nạp source/revision + objects + relations     |

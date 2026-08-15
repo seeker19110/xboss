@@ -8,6 +8,13 @@ import { queryOne, run } from "@/lib/db";
 //   - key mới                                 → xử lý thật, ghi sổ, HTTP 201
 // Bảng: engineering_ingest_requests (migrations/0088), unique (project_id, idempotency_key).
 
+// Giới hạn cứng của hợp đồng (ENG-5 §3.1). Đặt ở lib thay vì trong route để CHỈ CÓ MỘT
+// nguồn sự thật: `tests/engineering-contract.test.ts` import đúng các hằng này rồi đối chiếu
+// với docs/api/engineering-ingest.openapi.json — sửa một bên mà quên bên kia là CI đỏ.
+export const MAX_OBJECTS = 500;
+export const MAX_RELATIONS = 2000;
+export const MAX_BODY_BYTES = 5 * 1024 * 1024; // 5 MiB
+
 export function hashRequestBody(raw: string): string {
   return createHash("sha256").update(raw, "utf8").digest("hex");
 }

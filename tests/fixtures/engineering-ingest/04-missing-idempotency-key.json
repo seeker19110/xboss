@@ -1,0 +1,10 @@
+{
+  "name": "Thiếu header Idempotency-Key → 422 kèm JSON Pointer",
+  "contractVersion": "2026-08-15",
+  "omitIdempotencyKey": true,
+  "request": {
+    "contractVersion": "2026-08-15",
+    "objects": [{ "externalKey": "duct:fx:noidem", "objectType": "component" }]
+  },
+  "expect": { "status": 422, "pointer": "/headers/Idempotency-Key" }
+}

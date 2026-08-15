@@ -66,6 +66,39 @@ userId: auth.createdBy })` — **một chỗ sửa phủ cả 4 route** `/api/v1
   (`projects` có org-RLS nên đọc ra rỗng; `ensureSchema` cần quyền `CREATE` trên schema).
 - **Verify**: 67/67 ca của 8 file test liên quan (engineering ×5, api-keys, rls, audit-chain);
   `lint` 0 lỗi, `typecheck` xanh. **Chưa bật RLS trong PR này** — không đổi hành vi.
+## ENG-5 §5 — OpenAPI 3.1 + fixture hợp đồng có version (2026-08-15)
+
+Đóng 3 mục của ENG-5 mà **không cần điều kiện ngoài**: §5.1 (OpenAPI máy-đọc-được),
+§5.2 (chống runtime-validation drift), §5.3 (fixture có version).
+
+- **[AI, kiểm chứng repo đối tác]** Người dùng cho biết đã lưu link `seeker19110/MEPF-Agents`;
+  clone đọc thật (public, phiên này **chỉ đọc, không push được**) rồi grep:
+  **`grep -rli "xboss"` → 0 file**. Tức phía đối tác **chưa có gì** về XBoss — không connector,
+  không adapter, không cấu hình. Xác nhận cụ thể điều mà ENG-1..5 vẫn ghi chung chung
+  ("sẽ tích hợp sau này"): hợp đồng ingest hiện **chưa có bên nào gọi**.
+- **[AI, đã làm] `docs/api/engineering-ingest.openapi.json`** — OpenAPI 3.1 đầy đủ cho
+  `POST /api/v1/engineering/ingest`: header (`Idempotency-Key` bắt buộc, `X-Correlation-Id`),
+  schema source/revision/object/relation bám đúng ràng buộc Zod thật, 8 mã trạng thái
+  (200/201/401/403/409/413/422/429), bảng khoá lũy đẳng. **JSON chứ không YAML** — repo không
+  có yaml parser, chọn JSON để không thêm dependency chỉ để đọc được file.
+- **[AI, quyết định — đạt mục tiêu §5.2 mà KHÔNG thêm gói]** Đặc tả gợi ý "sinh Zod và OpenAPI
+  từ một nguồn type chung", làm vậy phải thêm thư viện sinh mã. Thay vào đó đạt **đúng mục
+  tiêu** (không lệch) bằng test đối chiếu: `tests/engineering-contract.test.ts` so enum
+  `sourceType` với `engineeringSourceInputSchema` và so `maxItems` với hằng số thật. Dời
+  `MAX_OBJECTS`/`MAX_RELATIONS`/`MAX_BODY_BYTES` từ route sang `lib/engineering-ingest.ts` để
+  chỉ còn **một nguồn sự thật** cho test import.
+  **Đã chứng minh guard thật sự bắt được**: đổi `MAX_OBJECTS` 500→499 trong code → test đỏ
+  ngay (2 ca), khôi phục thì xanh lại. Không phải guard trang trí.
+- **[AI, đã làm] `tests/fixtures/engineering-ingest/`** — 7 fixture có version theo §5.3:
+  happy path, replay 200, xung đột key 409, thiếu header 422, relation key không tồn tại,
+  **relation chéo dự án** (kèm ghi chú "key dự án khác phải coi như KHÔNG TỒN TẠI, không được
+  lộ sự tồn tại"), vượt giới hạn. Kèm `README.md` hướng dẫn copy nguyên thư mục sang repo
+  MEPF-Agents làm consumer-contract test (§5.4), hai bên pin cùng `contractVersion`.
+- **Còn lại của ENG-5 (vẫn cần điều kiện ngoài):** connector/outbox **phía MEPF-Agents**
+  (§5.4/C2 — phiên này không push được sang repo đó), metrics/alert threshold (§6 — cần chốt
+  ngưỡng + backend giám sát), pilot runbook trên staging (§7).
+- **Verify**: `tests/engineering-contract.test.ts` **8/8** (3 ca chống drift thuần + 5 ca chạy
+  fixture qua route thật); `lint` 0 lỗi, `typecheck` xanh.
 
 ## C3 §2 — Audit trail nhận khoá UUID + vá crash ngữ cảnh cross-project (2026-08-15)
 

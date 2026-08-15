@@ -15,14 +15,19 @@ import {
   createEngineeringRelation,
   EngineeringContractError,
 } from "@/lib/engineering-kernel";
-import { hashRequestBody, findIngestRequest, saveIngestRequest } from "@/lib/engineering-ingest";
+import {
+  hashRequestBody,
+  findIngestRequest,
+  saveIngestRequest,
+  MAX_OBJECTS,
+  MAX_RELATIONS,
+  MAX_BODY_BYTES,
+} from "@/lib/engineering-ingest";
 
 export const dynamic = "force-dynamic";
 
-// Giới hạn cứng theo ENG-5 §3.1 — chặn payload khổng lồ làm nghẽn transaction/bộ nhớ.
-const MAX_OBJECTS = 500;
-const MAX_RELATIONS = 2000;
-const MAX_BODY_BYTES = 5 * 1024 * 1024; // 5 MiB
+// Giới hạn cứng theo ENG-5 §3.1 (chặn payload khổng lồ làm nghẽn transaction/bộ nhớ) — định
+// nghĩa ở lib/engineering-ingest.ts để hợp đồng OpenAPI đối chiếu được, xem chú thích ở đó.
 
 // Lỗi hợp đồng kèm vị trí theo JSON Pointer (§3.1: 422 trả lỗi theo JSON Pointer).
 class ValidationError extends Error {
