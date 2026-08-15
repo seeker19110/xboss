@@ -684,6 +684,23 @@ export default function IntegrationsPage() {
                       read_finance — thêm dữ liệu tài chính
                     </span>
                   </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={keyScopes.includes("engineering")}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setKeyScopes([...keyScopes, "engineering"]);
+                        } else {
+                          setKeyScopes(keyScopes.filter((s) => s !== "engineering"));
+                        }
+                      }}
+                      className="w-4 h-4 bg-zinc-800 border border-zinc-700 rounded cursor-pointer accent-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 focus:ring-offset-zinc-900"
+                    />
+                    <span className="text-sm text-zinc-300">
+                      engineering — gửi/nhận Engineering Object (tích hợp hệ ngoài, ENG-1)
+                    </span>
+                  </label>
                 </div>
               </div>
               <div className="flex justify-end gap-2 pt-1">

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { query, queryOne, withProjectScope } from "@/lib/db";
+import { query, queryOne, run, withProjectScope, withTransaction } from "@/lib/db";
 
 export const engineeringObjectTypeSchema = z.string().trim().min(1).max(80);
 export const disciplineSchema = z.string().trim().max(80).nullable().optional();
@@ -32,11 +32,25 @@ export const engineeringRelationInputSchema = z.object({
 
 export const engineeringSourceInputSchema = z.object({
   projectId: z.coerce.number().int().positive(),
-  sourceType: z.enum(["drawing", "document", "bim", "cad", "model", "photo", "spreadsheet", "other"]),
+  sourceType: z.enum([
+    "drawing",
+    "document",
+    "bim",
+    "cad",
+    "model",
+    "photo",
+    "spreadsheet",
+    "other",
+  ]),
   title: z.string().trim().min(1).max(500),
   objectKey: z.string().trim().max(2000).nullable().optional(),
   mimeType: z.string().trim().max(255).nullable().optional(),
-  sha256: z.string().trim().regex(/^[a-f0-9]{64}$/i).nullable().optional(),
+  sha256: z
+    .string()
+    .trim()
+    .regex(/^[a-f0-9]{64}$/i)
+    .nullable()
+    .optional(),
   metadata: z.record(z.string(), z.unknown()).default({}),
 });
 
@@ -44,7 +58,12 @@ export const engineeringSourceRevisionInputSchema = z.object({
   sourceId: z.string().uuid(),
   revisionNo: z.coerce.number().int().positive(),
   objectKey: z.string().trim().max(2000).nullable().optional(),
-  sha256: z.string().trim().regex(/^[a-f0-9]{64}$/i).nullable().optional(),
+  sha256: z
+    .string()
+    .trim()
+    .regex(/^[a-f0-9]{64}$/i)
+    .nullable()
+    .optional(),
   parserName: z.string().trim().max(255).nullable().optional(),
   parserVersion: z.string().trim().max(255).nullable().optional(),
   metadata: z.record(z.string(), z.unknown()).default({}),
@@ -55,8 +74,25 @@ export type EngineeringRelationInput = z.infer<typeof engineeringRelationInputSc
 export type EngineeringSourceInput = z.infer<typeof engineeringSourceInputSchema>;
 export type EngineeringSourceRevisionInput = z.infer<typeof engineeringSourceRevisionInputSchema>;
 
-export async function listEngineeringObjects(projectId: number, opts?: { objectType?: string; limit?: number }) {
+export async function listEngineeringObjects(
+  projectId: number,
+  opts?: { objectType?: string; status?: string; limit?: number },
+) {
   const limit = Math.min(Math.max(opts?.limit ?? 100, 1), 500);
+  // Điều kiện lọc dựng ĐỘNG (không dùng "? IS NULL OR col = ?" với tham số đứng riêng) —
+  // Postgres không suy được kiểu tham số khi vế trái của OR không so trực tiếp với cột,
+  // lỗi thật "could not determine data type of parameter" (đúng lớp lỗi đã gặp ở M64 PR325,
+  // xem PROGRESS.md). Pattern đúng: chỉ thêm điều kiện khi có giá trị lọc.
+  const conds = ["project_id = ?", "status <> 'void'"];
+  const args: unknown[] = [projectId];
+  if (opts?.objectType) {
+    conds.push("object_type = ?");
+    args.push(opts.objectType);
+  }
+  if (opts?.status) {
+    conds.push("status = ?");
+    args.push(opts.status);
+  }
   return withProjectScope(projectId, () =>
     query(
       `SELECT id, project_id AS "projectId", object_type AS "objectType", discipline,
@@ -64,13 +100,10 @@ export async function listEngineeringObjects(projectId: number, opts?: { objectT
               source_revision_id AS "sourceRevisionId", created_by AS "createdBy", updated_by AS "updatedBy",
               created_at AS "createdAt", updated_at AS "updatedAt"
        FROM engineering_objects
-       WHERE project_id = ? AND status <> 'void'
-         AND (? IS NULL OR object_type = ?)
+       WHERE ${conds.join(" AND ")}
        ORDER BY created_at DESC
        LIMIT ?`,
-      projectId,
-      opts?.objectType ?? null,
-      opts?.objectType ?? null,
+      ...args,
       limit,
     ),
   );
@@ -87,6 +120,28 @@ export async function getEngineeringObject(projectId: number, id: string) {
        WHERE project_id = ? AND id = ?`,
       projectId,
       id,
+    ),
+  );
+}
+
+// 5 revision gần nhất của 1 object (ai đổi/khi nào/lý do) — dùng cho modal chi tiết
+// trang /engineering (ENG-1 mục 9). JOIN engineering_objects chỉ để lọc đúng project_id
+// (cách ly đa dự án) mà không cần cột project_id riêng trên bảng revision.
+export async function listObjectRevisions(projectId: number, objectId: string, limit = 5) {
+  return withProjectScope(projectId, () =>
+    query(
+      `SELECT r.id, r.object_id AS "objectId", r.revision_no AS "revisionNo",
+              r.source_revision_id AS "sourceRevisionId", r.object_type AS "objectType",
+              r.discipline, r.name, r.status, r.change_reason AS "changeReason",
+              r.created_by AS "createdBy", r.created_at AS "createdAt"
+       FROM engineering_object_revisions r
+       JOIN engineering_objects o ON o.id = r.object_id
+       WHERE o.project_id = ? AND r.object_id = ?
+       ORDER BY r.revision_no DESC
+       LIMIT ?`,
+      projectId,
+      objectId,
+      limit,
     ),
   );
 }
@@ -234,7 +289,10 @@ export async function createEngineeringRelation(input: EngineeringRelationInput,
   );
 }
 
-export async function createObjectRevision(input: z.infer<typeof engineeringObjectRevisionInputSchema>, userId: number) {
+export async function createObjectRevision(
+  input: z.infer<typeof engineeringObjectRevisionInputSchema>,
+  userId: number,
+) {
   return queryOne(
     `INSERT INTO engineering_object_revisions
        (object_id, revision_no, source_revision_id, object_type, discipline, name, status, properties, geometry_ref, change_reason, created_by)
@@ -251,4 +309,107 @@ export async function createObjectRevision(input: z.infer<typeof engineeringObje
     userId,
     input.objectId,
   );
+}
+
+// --- M65 PR1 — kho nhận từ MEP-Agents (docs/nang-cap/M65-tich-hop-mep-agents-engineering-core.md) ---
+
+export const engineeringObjectExternalInputSchema = engineeringObjectInputSchema.extend({
+  // Ingest từ hệ thống ngoài LUÔN phải có externalKey (khác input tạo tay trong XBoss, nơi
+  // trường này optional) — đây là object_id bất biến bên MEP-Agents, dùng để idempotent.
+  externalKey: z.string().trim().min(1).max(255),
+});
+export type EngineeringObjectExternalInput = z.infer<typeof engineeringObjectExternalInputSchema>;
+
+// Upsert theo (project_id, external_key) — MEP-Agents gửi lại cùng object (object_id bất
+// biến phía họ) không được tạo dòng mới. Có sẵn thì UPDATE properties/geometry_ref/name/
+// discipline/object_type, GIỮ NGUYÊN status (object đã duyệt nhận bản cập nhật không tự
+// mất trạng thái duyệt — "duyệt lại khi đổi" là quyết định để dành PR2). Chưa có thì INSERT
+// như createEngineeringObject. Cả 2 nhánh đều ghi 1 dòng vào engineering_object_revisions
+// để có lịch sử (change_reason cố định theo nhánh).
+export async function upsertEngineeringObjectFromExternal(
+  input: EngineeringObjectExternalInput,
+  userId: number,
+): Promise<{ id: string; created: boolean }> {
+  return withTransaction(async () => {
+    const existing = await queryOne<{ id: string }>(
+      `SELECT id FROM engineering_objects WHERE project_id = ? AND external_key = ?`,
+      input.projectId,
+      input.externalKey,
+    );
+    if (existing) {
+      await run(
+        `UPDATE engineering_objects
+            SET object_type = ?, discipline = ?, name = ?, properties = ?::jsonb, geometry_ref = ?::jsonb,
+                source_revision_id = ?, updated_by = ?, updated_at = NOW()
+          WHERE id = ?`,
+        input.objectType,
+        input.discipline ?? null,
+        input.name ?? null,
+        JSON.stringify(input.properties),
+        JSON.stringify(input.geometryRef),
+        input.sourceRevisionId ?? null,
+        userId,
+        existing.id,
+      );
+      await createObjectRevision(
+        {
+          objectId: existing.id,
+          sourceRevisionId: input.sourceRevisionId ?? null,
+          changeReason: "Cập nhật từ MEP-Agents (ingest)",
+        },
+        userId,
+      );
+      return { id: existing.id, created: false };
+    }
+    const created = (await createEngineeringObject(input, userId)) as { id: string } | undefined;
+    if (!created) throw new Error("Tạo đối tượng kỹ thuật thất bại");
+    await createObjectRevision(
+      {
+        objectId: created.id,
+        sourceRevisionId: input.sourceRevisionId ?? null,
+        changeReason: "Tạo mới từ MEP-Agents (ingest)",
+      },
+      userId,
+    );
+    return { id: created.id, created: true };
+  });
+}
+
+// Chuyển status: chỉ pending_review/approved/rejected <-> nhau (KHÔNG đụng 'void' — soft-
+// delete là thao tác riêng, ngoài phạm vi PR1). Ném lỗi nếu object không tồn tại/không
+// thuộc projectId (cách ly đa dự án, pattern billBelongsToProject ở lib/finance.ts) — route
+// gọi hàm này tự bắt lỗi để trả 404. Ghi lịch sử qua createObjectRevision thay vì thêm cột
+// reviewed_by/reviewed_at riêng (tránh 2 nơi lưu cùng 1 sự thật — xem mục 4 đặc tả).
+export async function reviewEngineeringObject(
+  projectId: number,
+  objectId: string,
+  decision: "approved" | "rejected",
+  reviewerId: number,
+  note?: string,
+): Promise<void> {
+  return withTransaction(async () => {
+    const current = await queryOne<{ status: string }>(
+      `SELECT status FROM engineering_objects WHERE id = ? AND project_id = ?`,
+      objectId,
+      projectId,
+    );
+    if (!current)
+      throw new Error("Đối tượng kỹ thuật không tồn tại hoặc không thuộc dự án đang chọn");
+    if (current.status === "void")
+      throw new Error("Đối tượng đã bị xoá mềm, không thể duyệt/từ chối");
+    await run(
+      `UPDATE engineering_objects SET status = ?, updated_by = ?, updated_at = NOW() WHERE id = ?`,
+      decision,
+      reviewerId,
+      objectId,
+    );
+    await createObjectRevision(
+      {
+        objectId,
+        sourceRevisionId: null,
+        changeReason: note?.trim() || (decision === "approved" ? "Duyệt" : "Từ chối"),
+      },
+      reviewerId,
+    );
+  });
 }

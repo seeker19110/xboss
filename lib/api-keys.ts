@@ -16,7 +16,15 @@ export function hashApiKey(raw: string): string {
   return createHash("sha256").update(raw).digest("hex");
 }
 
-export type ApiKeyAuth = { keyId: number; projectId: number | null; scopes: string[] };
+export type ApiKeyAuth = {
+  keyId: number;
+  projectId: number | null;
+  scopes: string[];
+  // Admin đã tạo key này (api_keys.created_by) — dùng làm "actor" quy về users(id) cho
+  // các bảng FK bắt buộc tới users (vd created_by/updated_by của engineering_objects,
+  // ENG-1) khi route ghi dữ liệu thay mặt 1 hệ thống ngoài, không phải người đăng nhập.
+  createdBy: number;
+};
 
 const FAIL_MAX_PER_IP = 30; // 30 lần key sai/thu hồi/thiếu header — 15 phút/IP
 const FAIL_WINDOW_MINUTES = 15;
@@ -37,8 +45,13 @@ export async function verifyApiKey(authHeader: string | null): Promise<ApiKeyAut
   const m = /^Bearer\s+(xbk_[0-9a-fA-F]+)$/.exec(authHeader.trim());
   if (!m) return null;
   const hash = hashApiKey(m[1]);
-  const row = await queryOne<{ id: number; projectId: number | null; scopes: string[] }>(
-    `SELECT id, project_id AS "projectId", scopes
+  const row = await queryOne<{
+    id: number;
+    projectId: number | null;
+    scopes: string[];
+    createdBy: number;
+  }>(
+    `SELECT id, project_id AS "projectId", scopes, created_by AS "createdBy"
        FROM api_keys WHERE key_hash = ? AND revoked_at IS NULL`,
     hash,
   );
@@ -48,7 +61,12 @@ export async function verifyApiKey(authHeader: string | null): Promise<ApiKeyAut
       WHERE id = ? AND (last_used_at IS NULL OR last_used_at < now() - INTERVAL '60 seconds')`,
     row.id,
   );
-  return { keyId: row.id, projectId: row.projectId, scopes: row.scopes ?? [] };
+  return {
+    keyId: row.id,
+    projectId: row.projectId,
+    scopes: row.scopes ?? [],
+    createdBy: row.createdBy,
+  };
 }
 
 // Gói dùng chung cho mọi route v1: verify → 401; check scope → 403; rate limit
@@ -60,7 +78,7 @@ export async function verifyApiKey(authHeader: string | null): Promise<ApiKeyAut
 // tục không bị chặn (rủi ro DoS nhẹ, ghi nhận đợt đánh giá lần 8, xem PROGRESS.md).
 export async function requireApiKey(
   req: NextRequest,
-  scope: "read" | "read_finance",
+  scope: "read" | "read_finance" | "engineering",
 ): Promise<{ auth: ApiKeyAuth; projectId: number } | Response> {
   const auth = await verifyApiKey(req.headers.get("authorization"));
   if (!auth) {

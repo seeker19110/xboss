@@ -220,4 +220,17 @@ export const MODULES: ModuleDef[] = [
     permKeys: [],
     routePrefix: ["/api/resources"],
   },
+  {
+    // Kho nhận Engineering Object từ hệ thống ngoài (ENG-1, docs/nang-cap/ENG-1-mep-agent-
+    // integration.md) — Admin/PM xem/duyệt object chờ duyệt trước khi ảnh hưởng BOQ/cost.
+    // Ingest thật (/api/v1/engineering/ingest) qua API key scope "engineering", chưa có
+    // route API v1 nào cho đọc lại (YAGNI — thêm khi có nhu cầu thật, xem ENG-1 mục 7.1).
+    key: "engineering",
+    nav: [
+      { group: "Hệ thống", label: "Đối tượng kỹ thuật (AI)", href: "/engineering", icon: "Boxes" },
+    ],
+    permKeys: ["reviewEngineeringObjects"],
+    notificationTypes: [],
+    routePrefix: ["/api/engineering", "/api/v1/engineering"],
+  },
 ];

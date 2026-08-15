@@ -6,6 +6,27 @@
 >
 > Khi cần đặc tả cho **module mới**, viết file `M<xx>-*.md` riêng theo khung ở mục Quy ước chung bên dưới TRƯỚC khi code — chỉ gộp vào `G<nn>` cùng nhóm sau khi đã triển khai xong.
 
+## Track `ENG-*` — tích hợp Engineering OS (MEP-Agents/MEPF-Agents), TÁCH khỏi dãy `M<xx>`
+
+Lộ trình riêng cho hướng tích hợp với hệ multi-agent kỹ thuật ngoài (`seeker19110/MEPF-Agents`),
+**không dùng chung dãy số `M<xx>` ở trên** — lý do: 2026-08-14 một commit push thẳng `main` đã lỡ
+dùng nhãn "M43" cho việc này, đụng độ với `M43-audit-trail.md` (module khác hẳn, đã xong từ lâu).
+Quyết định (người dùng chốt): track riêng `ENG-1..ENG-4`, không đụng số `M<xx>`.
+
+- **`ENG-0-roadmap-tich-hop-engineering-os.md`** — lộ trình tổng (Foundation Hardening → ENG-1 →
+  ENG-2 → ENG-3 → ENG-4 → Engineering OS/AI-Digital-Twin/Predictive OS/Controlled Autonomy), 12
+  nguyên tắc khoá kiến trúc kế thừa từ MEP-Agents, boundary chống AI tự cấp quyền, Foundation Gate.
+  **Đọc file này trước** mọi đặc tả `ENG-<n>`.
+- **`ENG-1-mep-agent-integration.md`** — ✅ **xong** (2026-08-14): kho nhận Engineering Object
+  (`engineering_objects`/`engineering_sources`/`engineering_source_revisions`/
+  `engineering_object_revisions`/`engineering_object_relations`, `migrations/0084_engineering_core.sql`)
+  - cổng duyệt Admin/PM trước khi ảnh hưởng BOQ/cost + `POST /api/v1/engineering/ingest` (API key
+    scope `engineering`) + trang `/engineering`. Xem `PROGRESS.md` mục "ENG-1" để biết chi tiết sự
+    cố đã vá (schema thiếu migration, bug tham số Postgres, sai FK actor).
+- **ENG-2 (Engineering Intelligence), ENG-3 (Engineering Workflow OS), ENG-4 (Multi-Agent
+  Engineering OS)** — **CHƯA viết đặc tả** (có chủ đích, đúng nguyên tắc #10 "đừng xây hạ tầng
+  trước khi có tải thực tế thật") — chờ ENG-1 chạy thật với dữ liệu MEPF-Agents gửi sang.
+
 ## Danh mục (nhóm → module gộp bên trong)
 
 | File                        | Nhóm nghiệp vụ                       | Module gộp bên trong                            |
