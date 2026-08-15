@@ -77,6 +77,19 @@ Thi hành phần **đã kín đặc tả** của `docs/nang-cap/ENG-5-integratio
 - **[AI, đã sửa test cũ theo hợp đồng mới]** `tests/engineering.test.ts` fail sau thay đổi vì
   `Idempotency-Key` nay bắt buộc và source cần `externalKey` — cập nhật đúng hợp đồng mới
   (không nới lỏng code cho test dễ qua), 6/6 pass lại.
+- **[AI, phát hiện + đã sửa — bug hạ tầng thật, lộ ra từ chính CI đỏ] `scripts/gen-erd.ts` sinh
+  SAI khoá ngoại nhiều cột (composite FK).** CI của PR này đỏ ở bước **"Kiểm ERD khớp schema"**
+  (bước `npm test` **xanh** — 123/123 file, tức code không sai). Nguyên nhân: truy vấn FK cũ
+  join `information_schema.key_column_usage` × `constraint_column_usage` theo `constraint_name`
+  → với FK nhiều cột sinh **tích đề-các**: FK 2 cột ra **4 dòng** thay vì 2, kèm cặp cột **bịa**
+  (vd `from_object_id → engineering_objects(project_id)` trong khi thực tế là
+  `(from_object_id, project_id) → (id, project_id)`). Thứ tự các dòng thừa **không xác định**
+  → `docs/ERD.md` sinh khác nhau giữa các lần chạy, cổng CI đỏ. Bug có sẵn từ M45 PR3 nhưng
+  **chưa lộ vì dự án chưa từng có composite FK nào** — `0088` là cái đầu tiên.
+  Sửa: đọc từ `pg_constraint` + `unnest(conkey, confkey) WITH ORDINALITY` để ghép cột nguồn ↔
+  cột đích **theo vị trí** (đúng cho cả FK 1 cột lẫn nhiều cột), `ORDER BY` có tiebreaker đủ để
+  ổn định. Kiểm chứng: sinh 2 lần liên tiếp cho ra file **giống hệt nhau**; diff so ERD cũ chỉ
+  còn đúng phần sửa thật (bỏ 5 dòng FK bịa), không xáo trộn bảng khác.
 - **Còn lại của ENG-5 (KHÔNG làm trong PR này, cần điều kiện ngoài):** OpenAPI 3.1 sinh từ
   nguồn type chung (§5.1-5.2 — cần chốt thư viện, thêm dependency), consumer-contract test
   phía `MEPF-Agents` (§5.4 — repo khác), metrics/alert threshold (§6 — cần chốt ngưỡng +

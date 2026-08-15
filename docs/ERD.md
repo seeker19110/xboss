@@ -3464,17 +3464,13 @@
 
 **Khóa ngoại:**
 - `created_by` → `users(id)`
-- `from_object_id` → `engineering_objects(project_id)`
 - `from_object_id` → `engineering_objects(id)`
 - `from_object_id` → `engineering_objects(id)`
-- `project_id` → `engineering_objects(project_id)`
-- `project_id` → `engineering_objects(id)`
 - `project_id` → `projects(id)`
 - `project_id` → `engineering_objects(project_id)`
-- `project_id` → `engineering_objects(id)`
+- `project_id` → `engineering_objects(project_id)`
 - `source_revision_id` → `engineering_source_revisions(id)`
 - `to_object_id` → `engineering_objects(id)`
-- `to_object_id` → `engineering_objects(project_id)`
 - `to_object_id` → `engineering_objects(id)`
 
 **Index:**

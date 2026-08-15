@@ -220,16 +220,30 @@ async function main() {
       ORDER BY table_name, ordinal_position`,
   );
 
+  // FK đọc từ pg_constraint thay vì information_schema.
+  //
+  // Vì sao KHÔNG dùng key_column_usage JOIN constraint_column_usage (cách cũ): với FK
+  // NHIỀU CỘT (composite), join theo constraint_name sinh TÍCH ĐỀ-CÁC — FK 2 cột ra 4 dòng
+  // thay vì 2, kèm cặp cột SAI hoàn toàn (vd "from_object_id → engineering_objects(project_id)"
+  // trong khi thực tế là (from_object_id, project_id) → (id, project_id)). Thứ tự các dòng
+  // thừa đó cũng không xác định → docs/ERD.md sinh ra khác nhau giữa các lần chạy, làm cổng
+  // CI "Kiểm ERD khớp schema" đỏ ngẫu nhiên. Lỗi lộ ra khi migrations/0088 thêm composite FK
+  // đầu tiên của dự án.
+  //
+  // unnest(conkey, confkey) ghép cột nguồn với cột đích THEO VỊ TRÍ — đúng cho cả FK 1 cột
+  // lẫn nhiều cột, và cho thứ tự ổn định.
   const fks = await query<{ table: string; column: string; refTable: string; refColumn: string }>(
-    `SELECT tc.table_name AS "table", kcu.column_name AS "column",
-            ccu.table_name AS "refTable", ccu.column_name AS "refColumn"
-       FROM information_schema.table_constraints tc
-       JOIN information_schema.key_column_usage kcu
-         ON kcu.constraint_name = tc.constraint_name AND kcu.table_schema = tc.table_schema
-       JOIN information_schema.constraint_column_usage ccu
-         ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema
-      WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = 'public'
-      ORDER BY tc.table_name, kcu.column_name`,
+    `SELECT src.relname AS "table", srcatt.attname AS "column",
+            ref.relname AS "refTable", refatt.attname AS "refColumn"
+       FROM pg_constraint con
+       JOIN pg_class src ON src.oid = con.conrelid
+       JOIN pg_class ref ON ref.oid = con.confrelid
+       CROSS JOIN LATERAL unnest(con.conkey, con.confkey) WITH ORDINALITY AS u(attnum, refattnum, ord)
+       JOIN pg_attribute srcatt ON srcatt.attrelid = con.conrelid AND srcatt.attnum = u.attnum
+       JOIN pg_attribute refatt ON refatt.attrelid = con.confrelid AND refatt.attnum = u.refattnum
+      WHERE con.contype = 'f'
+        AND con.connamespace = 'public'::regnamespace
+      ORDER BY src.relname, srcatt.attname, con.conname, u.ord`,
   );
 
   const idx = await query<{ table: string; name: string; def: string }>(
