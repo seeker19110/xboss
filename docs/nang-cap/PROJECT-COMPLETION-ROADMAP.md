@@ -43,6 +43,25 @@ C0 Chốt nguồn sự thật
   → O5 Đóng chương trình Engineering OS (Vision Complete)
 ```
 
+### Bộ đặc tả thi hành
+
+| Phase | Đặc tả chi tiết                          |
+| ----- | ---------------------------------------- |
+| C0    | `C0-release-baseline-governance.md`      |
+| C1    | `ENG-5-integration-contract-pilot.md`    |
+| C2    | `C2-mepf-connector-pilot.md`             |
+| C3    | `C3-data-audit-rls-hardening.md`         |
+| C4    | `C4-quality-security-dr-release-gate.md` |
+| C5    | `C5-uat-production-rollout.md`           |
+| C6    | `C6-v1-release-closeout.md`              |
+| O1    | `OS-1-engineering-system-of-record.md`   |
+| O2    | `OS-2-digital-twin.md`                   |
+| O3    | `OS-3-predictive-os.md`                  |
+| O4    | `OS-4-controlled-autonomy.md`            |
+| O5    | `OS-5-engineering-os-closeout.md`        |
+
+Master này quyết định trình tự/gate; file phase quyết định schema/API/UI/test/PR/DoD. Khi có mâu thuẫn, phải sửa cả hai trong cùng PR hoặc ghi ADR, không tự chọn bản thuận tiện hơn.
+
 ## 4. C0 — Chốt nguồn sự thật và baseline phát hành
 
 ### Phạm vi

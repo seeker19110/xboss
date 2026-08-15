@@ -5,6 +5,8 @@
 
 **Đặc tả tổng:** `docs/nang-cap/PROJECT-COMPLETION-ROADMAP.md` — C0→C6 để đạt Product Complete v1.0; O1→O5 là lộ trình Engineering OS có điều kiện.
 
+Mỗi phase đã có file đặc tả thi hành riêng trong `docs/nang-cap/` (index tại mục 3 của roadmap tổng); worker không thi hành từ đoạn tóm tắt trong `PLAN.md`.
+
 ## Trạng thái kế hoạch trước đó
 
 M64 — Upload kế hoạch & tracking theo hệ đã hoàn tất ngày 2026-08-09 (migration `0082`, API/UI/test và CI). Không còn là công việc đang thực hiện; không lập lại triển khai M64 trừ khi có lỗi hoặc yêu cầu nghiệp vụ mới được xác nhận.

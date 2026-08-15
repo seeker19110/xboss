@@ -14,6 +14,8 @@ dùng nhãn "M43" cho việc này, đụng độ với `M43-audit-trail.md` (mod
 Quyết định (người dùng chốt): track riêng `ENG-1..ENG-4`, không đụng số `M<xx>`.
 
 - **`PROJECT-COMPLETION-ROADMAP.md`** — 📝 **draft chờ duyệt** (2026-08-15): đặc tả tổng từ C0 baseline → C6 XBoss v1.0/Product Complete, sau đó O1 System of Record → O5 Engineering OS/Vision Complete theo gate. Đây là nguồn trình tự/exit gate; chi tiết contract pilot nằm ở ENG-5.
+- **Spec pack Product Complete:** `C0-release-baseline-governance.md`, `ENG-5-integration-contract-pilot.md` (C1), `C2-mepf-connector-pilot.md`, `C3-data-audit-rls-hardening.md`, `C4-quality-security-dr-release-gate.md`, `C5-uat-production-rollout.md`, `C6-v1-release-closeout.md` — tất cả 📝 draft chờ duyệt.
+- **Spec pack Vision Complete:** `OS-1-engineering-system-of-record.md`, `OS-2-digital-twin.md`, `OS-3-predictive-os.md`, `OS-4-controlled-autonomy.md`, `OS-5-engineering-os-closeout.md` — conditional draft; OS-4 A3+ vẫn cần phê duyệt riêng theo capability.
 
 - **`ENG-0-roadmap-tich-hop-engineering-os.md`** — lộ trình tổng (Foundation Hardening → ENG-1 →
   ENG-2 → ENG-3 → ENG-4 → Engineering OS/AI-Digital-Twin/Predictive OS/Controlled Autonomy), 12

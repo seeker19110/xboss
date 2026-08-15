@@ -10,6 +10,7 @@
 - **Ưu tiên hiện hành:** xác minh staging/production cho migration `0084`–`0087`, kết nối thử nghiệm có kiểm soát với MEPF-Agents, và xử lý các nợ kỹ thuật đã ghi nhận trước khi mở rộng phạm vi mới.
 - **Đặc tả kế tiếp (chờ duyệt, chưa code):** `ENG-5 — Integration Contract & Pilot MEPF-Agents` — đóng các khoảng trống external-key relation, idempotency, project isolation, OpenAPI/fixture và runbook pilot trước khi mở traffic thật.
 - **Lộ trình hoàn thành (chờ duyệt, chưa code):** `PROJECT-COMPLETION-ROADMAP.md` chốt C0→C6 để đạt XBoss v1.0/Product Complete và O1→O5 cho Engineering OS/Vision Complete theo gate; không coi tài liệu là quyền tự triển khai production hoặc A3+.
+- **Spec pack chi tiết (chờ duyệt):** C0, C2–C6 và OS-1–OS-5 đã có file thi hành riêng (C1 dùng ENG-5), mỗi file gồm scope, data/API/UI/ops, test, chia PR và DoD. Chưa phase nào được đánh dấu triển khai chỉ vì đặc tả đã viết.
 
 ## Snapshot điều hành — 14–15/08/2026
 
