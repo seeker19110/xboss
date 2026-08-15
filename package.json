@@ -22,7 +22,8 @@
     "db:seed:sample": "tsx scripts/seed-sample.ts",
     "audit:verify-chain": "tsx scripts/verify-audit-chain.ts",
     "changelog": "node scripts/gen-changelog.mjs",
-    "prepare": "husky || true"
+    "prepare": "husky || true",
+    "test:mutation": "node scripts/mutation-check.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1106.0",

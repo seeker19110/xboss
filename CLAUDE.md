@@ -53,6 +53,7 @@ npm run lint         # next lint (eslint.config.mjs — flat config, next/core-w
 npm run typecheck    # tsc --noEmit
 npm test             # node:test qua tsx — hơn 100 file trong tests/ (không hard-code số tuyệt đối, dễ lệch)
 npm test -- --release-gate   # như trên, nhưng ca bị SKIP = LỖI (trừ file có lý do trong scripts/test-skip-allowlist.json). CI dùng cờ này.
+npm run test:mutation        # C4 §4 — cố ý phá 9 bất biến (progress/delayed/nghiệm thu/RBAC/risk/gates/idempotency/RLS/tiền) rồi ĐÒI test phải đỏ. Cần TEST_DATABASE_URL.
 npx tsx --test tests/status.test.ts   # chạy 1 file test
 npm run db:seed      # import Excel gốc trong attachments/ vào DB
 ```
