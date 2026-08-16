@@ -197,6 +197,9 @@ test("redaction: chuỗi 'Bearer <token>' và API key thô xbk_... trong message
 
 test("redaction: chuỗi dạng JWT độc lập (không đứng sau 'Bearer') cũng bị che", async () => {
   const { log } = await import("@/lib/log");
+  // JWT mẫu công khai của jwt.io (header/payload rỗng ý nghĩa, chữ ký minh hoạ) — không
+  // phải bí mật thật, nhưng đúng cấu trúc JWT nên gitleaks báo nhầm theo rule "jwt".
+  // gitleaks:allow
   const jwt =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
   const entry = await captureProdLog(() => {
