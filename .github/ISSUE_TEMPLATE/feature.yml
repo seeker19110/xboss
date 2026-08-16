@@ -1,0 +1,46 @@
+name: "💡 Nghiên cứu tính năng"
+description: Research và đặc tả trước khi code capability mới
+title: "research: "
+labels: ["type: feature", "status: discovery"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Không code trước khi spec `docs/nang-cap/*` được **Approved for implementation**.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Vấn đề, vai trò và bằng chứng
+    validations: {required: true}
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome, baseline, target và guardrails
+    validations: {required: true}
+  - type: textarea
+    id: research
+    attributes:
+      label: Kế hoạch nghiên cứu
+      description: Code/DB/permission/project scope/offline/a11y/ops và nguồn cần kiểm.
+    validations: {required: true}
+  - type: textarea
+    id: options
+    attributes:
+      label: Phương án cần so sánh
+    validations: {required: true}
+  - type: textarea
+    id: unknowns
+    attributes:
+      label: Giả định, câu hỏi và quyết định cần owner chốt
+    validations: {required: true}
+  - type: checkboxes
+    id: gate
+    attributes:
+      label: Cổng bắt buộc
+      options:
+        - label: Chưa sửa source trước khi research hoàn tất.
+          required: true
+        - label: Sẽ viết spec theo template hoặc M/G spec tương đương.
+          required: true
+        - label: Chỉ code sau khi spec có người/ngày duyệt và Approved for implementation.
+          required: true
