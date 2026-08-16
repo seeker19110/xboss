@@ -27,6 +27,19 @@
 
 **Nợ kỹ thuật/rủi ro mở:** ~~`audit_log.entity_id` chỉ hỗ trợ khoá `BIGINT` nên `engineering_*` (UUID) nằm ngoài audit trail~~ — **đã đóng** bằng `0090` (cột `entity_key` TEXT, xem mục "C3 §2" bên dưới). Rủi ro còn lại là vận hành, không phải code: cặp `0091`/`0092` phải chạy staging trước khi lên production.
 
+## C4 §6 — Chặn lộ secret qua log (2026-08-16)
+
+C4 §6 (Security verification): _"Log redaction scan: secret/token/password/raw sensitive payload không xuất hiện."_
+
+- **[AI, đo được — không phải suy đoán]** Đọc `lib/log.ts`: `write()` **spread thẳng `fields` vào JSON không lọc gì**. Bất kỳ route nào lỡ đặt tên field `password`/`token`/`secret`, hoặc nối `error.message` của thư viện ngoài vào log, đều bay thẳng vào log production (pm2 gom stdout, giữ lâu dài). Tìm được ví dụ THẬT đang tồn tại: `app/api/auth/oidc/callback/route.ts` log `e.message` của `openid-client` khi đổi token lỗi — thư viện OAuth có thể mang theo token/JWT trong message lỗi.
+- **[AI, đã làm]** 2 lớp lọc trong `lib/log.ts`, áp cho **mọi lời gọi** (chặn ở lớp ghi log, không bắt call site tự nhớ "đừng log secret"):
+  1. **Theo tên trường** — field khớp `password|secret|token|api[_-]?key|authoriz(e|ation)|cookie|private[_-]?key|credential` (không phân biệt hoa/thường, khớp cả khi là 1 phần của tên dài hơn, vd `dbPassword`) → thay nguyên giá trị bằng `[REDACTED]`, đệ quy vào object/mảng lồng nhau (giới hạn độ sâu 6, chống vòng lặp).
+  2. **Theo giá trị chuỗi** — quét cả `msg` lẫn từng field kiểu string tìm 4 dạng bí mật cụ thể: mật khẩu trong connection string Postgres, `Bearer <token>`, API key thô `xbk_...` (`lib/api-keys.ts`), chuỗi dạng JWT (`eyJ...eyJ...sig`, khớp OIDC).
+- **[AI, quyết định — cố ý KHÔNG dò entropy chung chung]** Bó hẹp vào 4 dạng biết trước thay vì kiểu dò entropy/độ dài như gitleaks — dò chung dễ báo nhầm số điện thoại/mã hợp đồng dài thành "bí mật", làm log mất tác dụng debug thật.
+- **[AI, chứng minh test không phải trang trí]** Tắt tạm 2 dòng gọi `redactFields`/`redactSecretPatterns` trong `write()` (quay về spread thô) → **7/13 ca đỏ ngay** đúng các ca redaction; khôi phục lại xanh 13/13.
+- **[AI, gitleaks CI đỏ trên chính PR này — tự sửa]** Fixture JWT mẫu công khai của jwt.io (dùng để test redact "chuỗi dạng JWT độc lập") đúng cấu trúc JWT nên rule `jwt` của gitleaks báo nhầm là bí mật thật. `.gitleaks.toml` sẵn có ghi rõ lý do KHÔNG dùng inline `# gitleaks:allow`: comment đó chỉ che được commit chứa nó, không che commit gốc đã introduce chuỗi (gitleaks quét lại toàn bộ lịch sử mỗi lần chạy). Sửa đúng theo quy ước đã có: thêm regex khớp đoạn chữ ký JWT vào `[allowlist]` của `.gitleaks.toml`, cùng chỗ 3 secret test E2E đã có. Verify: tải gitleaks 8.21.2 chạy cục bộ đúng commit từng bị flag → "no leaks found".
+- **Verify**: đã rà toàn bộ call site `log.info/warn/error` hiện có trong `app/`/`lib/` — không ca nào dùng tên field trùng nhóm nhạy cảm cho mục đích KHÔNG phải bí mật (không có false-positive thật). `tests/log.test.ts` **13/13** (5 ca cũ + 8 ca redaction mới); `lint` 0 lỗi, `typecheck` xanh.
+
 ## Phủ test 8/10 module `lib/` còn nợ từ audit lần 10 (2026-08-16)
 
 Đóng nốt debt ghi trong "Đợt audit toàn dự án lần 10" (2026-08-10, PR #327, mục "Còn nợ"): 10 module `lib/` chưa có test nào — `google-sheets`/`push` cần dịch vụ ngoài thật nên vẫn để ngỏ, **8 module thuần logic còn lại đã đóng đợt này**.
