@@ -35,6 +35,17 @@ Khi mục tiêu cần nhiều PR, làm theo `docs/AI_DELIVERY_LOOP.md` và tạo
 Không lặp vô hạn: cùng một failure tối đa ba repair attempts. Không làm gate xanh bằng cách skip
 test, hạ threshold, nới auth/validation hoặc che lỗi.
 
+## Phối hợp subagent song song
+
+- Chỉ tách song song các việc thực sự độc lập; đọc, khảo sát và phân tích độc lập có thể chạy song
+  song rộng hơn, nhưng số subagent không vượt số luồng công việc hữu ích.
+- Trước khi giao việc, chốt interface/contract dùng chung và khai báo rõ phạm vi cùng tập file được
+  phép sửa của từng subagent. Không giao hai subagent sửa cùng file hoặc cùng generated artifact.
+- Chạy tuần tự mọi thay đổi vào dependency dùng chung, schema/migration, lockfile, cấu hình sinh mã
+  hoặc phần có thứ tự phụ thuộc; chỉ mở lại song song sau khi contract nền đã ổn định.
+- Mỗi subagent phải báo file đã đổi, checks đã chạy, kết quả và rủi ro/còn thiếu. Agent chính review
+  toàn bộ diff, tích hợp, xử lý xung đột rồi chạy đầy đủ lint, typecheck, test và build liên quan.
+
 ## Verification
 
 Chạy targeted checks trước, sau đó gate liên quan:
