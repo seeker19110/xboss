@@ -13,4 +13,7 @@ regexes = [
   '''e2e-ci-secret-khong-bi-mat''',
   '''e2e-ci-admin-pw''',
   '''thirtytwocharacterssecret1234567''',
+  # tests/log.test.ts (C4 §6 — redact log) — JWT mẫu công khai của jwt.io dùng làm fixture
+  # kiểm redaction, không phải bí mật thật; rule "jwt" của gitleaks báo nhầm vì đúng cấu trúc.
+  '''SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c''',
 ]
