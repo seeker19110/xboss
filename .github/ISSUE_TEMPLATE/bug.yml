@@ -1,0 +1,43 @@
+name: "🐛 Báo lỗi"
+description: Lỗi có thể tái hiện, mức ảnh hưởng và tiêu chí xác minh
+title: "fix: "
+labels: ["type: bug", "status: triage"]
+body:
+  - type: textarea
+    id: impact
+    attributes:
+      label: Ảnh hưởng, vai trò, dự án và tần suất
+    validations: {required: true}
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Các bước tái hiện
+    validations: {required: true}
+  - type: textarea
+    id: expected
+    attributes: {label: Kết quả mong đợi}
+    validations: {required: true}
+  - type: textarea
+    id: actual
+    attributes: {label: Kết quả thực tế}
+    validations: {required: true}
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Mức độ
+      options:
+        - S1 — security/mất dữ liệu/sai tiền/production down
+        - S2 — critical flow hỏng, không workaround
+        - S3 — suy giảm có workaround
+        - S4 — nhỏ/cosmetic
+    validations: {required: true}
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Môi trường và bằng chứng đã loại dữ liệu nhạy cảm
+    validations: {required: true}
+  - type: textarea
+    id: verify
+    attributes:
+      label: Regression test và tiêu chí xác minh bản sửa
+    validations: {required: true}
