@@ -25,6 +25,16 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
+## M70 — AI Reality Scan-to-BIM & Closed-Loop Autonomous Sync Engine (2026-08-19)
+
+- **[AI, đã làm] Migration 0104:** `migrations/0104_scan_to_bim_closed_loop.sql` tạo các bảng `engineering_scan_to_bim_runs`, `engineering_closed_loop_sync_logs` kèm RLS strict.
+- **[AI, đã làm] Core Scan-to-BIM & Sync Engines:**
+  - `lib/engineering-scan-to-bim.ts`: Thuật toán Scan-vs-BIM Deviation Mesh tính sai lệch không gian Euclid $\Delta X, \Delta Y, \Delta Z$, phân loại 3 ngưỡng sai số ($\le 15\text{mm}$, $15-35\text{mm}$, $> 35\text{mm}$) và tự động đề xuất phương án khắc phục (Remediation).
+  - `lib/engineering-closed-loop-sync.ts`: Thuật toán đồng bộ khép kín 2 chiều (Spool Nghiệm Thu $\rightarrow$ WBS Task $\%$ $\rightarrow$ Chứng chỉ thanh toán IPC) kèm mã băm Provenance Token SHA-256 bất biến.
+- **[AI, đã làm] Bộ REST API:** `GET/POST /api/engineering/scan-to-bim`, `GET/POST /api/engineering/closed-loop-sync`.
+- **[AI, đã làm] Kiểm thử tự động:** `tests/engineering-scan-to-bim.test.ts`, `tests/engineering-closed-loop-sync.test.ts` (2 tests pass).
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 104 migrations hợp lệ, 35 tests pass 100%.
+
 ## M69 — Siêu Năng Lực Shopdrawing & Bóc Tách Khối Lượng Toàn Năng (2026-08-19)
 
 - **[AI, đã làm] Migration 0103:** `migrations/0103_omnipotent_shopdrawing_qs.sql` tạo các bảng `engineering_shopdrawing_lod400_runs`, `engineering_qs_bom_explosions` kèm RLS strict.
