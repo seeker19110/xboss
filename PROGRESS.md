@@ -25,6 +25,17 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
+## M71 — AI Predictive Operations, Carbon LCA & Digital Handover Passport (2026-08-19)
+
+- **[AI, đã làm] Migration 0105:** `migrations/0105_predictive_carbon_handover.sql` tạo các bảng `engineering_mepf_predictive_assets`, `engineering_carbon_lca_reports`, `engineering_digital_handover_passports` kèm RLS strict.
+- **[AI, đã làm] Core Predictive, Carbon LCA & Handover Engines:**
+  - `lib/engineering-mepf-predictive.ts`: Thuật toán phân phối xác suất Weibull tính MTBF/RUL, chấm điểm Health Score % và tự động lập lịch bảo trì thiết bị MEPF trước sự cố.
+  - `lib/engineering-carbon-lca.ts`: Thuật toán định lượng phát thải Carbon ($kg\text{ CO}_2\text{e}$), cường độ carbon trên $m^2$ sàn và ước lượng điểm thưởng LEED v4.1 / LOTUS.
+  - `lib/engineering-digital-handover.ts`: Thuật toán đóng gói Hồ Sơ Hoàn Công Số LOD 500 thành Digital Handover Passport kèm mã băm SHA-256 bất biến.
+- **[AI, đã làm] Bộ REST API:** `GET/POST /api/engineering/mepf-predictive`, `GET/POST /api/engineering/carbon-lca`, `GET/POST /api/engineering/digital-handover`.
+- **[AI, đã làm] Kiểm thử tự động:** `tests/engineering-mepf-predictive.test.ts`, `tests/engineering-carbon-lca.test.ts`, `tests/engineering-digital-handover.test.ts` (4 tests pass).
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 105 migrations hợp lệ, 39 tests pass 100%.
+
 ## M70 — AI Reality Scan-to-BIM & Closed-Loop Autonomous Sync Engine (2026-08-19)
 
 - **[AI, đã làm] Migration 0104:** `migrations/0104_scan_to_bim_closed_loop.sql` tạo các bảng `engineering_scan_to_bim_runs`, `engineering_closed_loop_sync_logs` kèm RLS strict.
