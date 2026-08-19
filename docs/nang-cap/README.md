@@ -45,6 +45,7 @@ Quyết định (người dùng chốt): track riêng `ENG-1..ENG-4`, không đ�
   5 loại xung đột + phân xử theo thẩm quyền/bằng chứng/thứ bậc ràng buộc (**không majority
   vote**, có hàm chặn cứng), 5 mức đồng thuận với `no_consensus` là kết quả hợp lệ, trang
   `/engineering/agent-sessions`. ENG-3 vẫn là ranh giới uỷ quyền.
+<<<<<<< HEAD
 - **`ENG-5-integration-contract-pilot.md`** — 🚧 **PR1 xong (2026-08-15), phần còn lại chờ điều
   kiện ngoài.** Hợp đồng pilot giữa MEPF-Agents và XBoss. **Đã làm (PR1):**
   `migrations/0088_engineering_ingest_contract.sql` (external key cho source/revision, unique
@@ -54,6 +55,12 @@ Quyết định (người dùng chốt): track riêng `ENG-1..ENG-4`, không đ�
   `docs/api-v1.md` mục Engineering. **Chưa làm (cần điều kiện ngoài):** OpenAPI 3.1 sinh từ
   nguồn type chung (§5.1-5.2), consumer-contract test phía repo `MEPF-Agents` (§5.4),
   metrics/alert threshold (§6), pilot runbook trên staging (§7).
+=======
+- **`ENG-5-integration-contract-pilot.md`** — 📝 **draft chờ duyệt** (2026-08-15): hợp đồng
+  pilot giữa MEPF-Agents và XBoss. Chốt external-key relation (agent không biết UUID XBoss),
+  idempotency source/relation/request, project isolation, OpenAPI/fixtures, observability và
+  runbook staging; chưa có migration hoặc code.
+>>>>>>> codex/eng5-integration-contract-pilot
 - **`ENGINEERING-OS-FUTURE-SYSTEMS.md`** (2026-08-15) — đặc tả **tầm nhìn kiến trúc**
   (không phải spec thi hành) cho 4 tầng sau ENG-4: Engineering OS (system-of-record +
   knowledge graph), Digital Twin (7 lớp L0–L6), Predictive OS (uncertainty-first, model
