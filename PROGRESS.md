@@ -27,6 +27,21 @@
 
 **Nợ kỹ thuật/rủi ro mở:** ~~`audit_log.entity_id` chỉ hỗ trợ khoá `BIGINT` nên `engineering_*` (UUID) nằm ngoài audit trail~~ — **đã đóng** bằng `0090` (cột `entity_key` TEXT, xem mục "C3 §2" bên dưới). Rủi ro còn lại là vận hành, không phải code: cặp `0091`/`0092` phải chạy staging trước khi lên production.
 
+## Đợt Audit Toàn Dự Án & Quét Sửa Sạch Lỗi (2026-08-19)
+
+- **[AI, đã làm] Quét toàn diện 5 cổng chất lượng tự động:**
+  - `npm run check:migrations`: 97/97 migrations chuẩn số thứ tự, append-only, idempotent.
+  - `npm run check:sw-exclude`: 8/8 routes khai báo trong registry khớp chính xác với `public/sw.js`.
+  - `npm audit`: Phát hiện lỗ hổng gián tiếp CVE-2026-59870 (High) trong `js-yaml@4.3.0` qua `@commitlint/cli` và `eslint` → Thêm override `"js-yaml": "^4.3.1"` trong `package.json` và cập nhật `package-lock.json` → Đưa về `found 0 vulnerabilities` sạch 100%.
+  - `npm run lint`: Tinh chỉnh rule `@next/next/no-location-assign-relative-destination` trong `eslint.config.mjs` cho các trường hợp hard-navigation có chủ đích (đổi project / 401 unauthenticated redirect để reset sạch cache browser/SW) → 0 errors, 0 warnings.
+  - `npm run typecheck`: TypeScript strict không còn bất kỳ lỗi type nào (0 errors).
+  - `npm test -- --release-gate`: Toàn bộ 138 test files pass sạch 100%, không có failure, không vi phạm release gate.
+  - `npm run build`: Next.js 16 App Router build production tối ưu hoá thành công toàn bộ 150+ routes/pages.
+- **[AI, đã làm] Báo cáo audit chuẩn hoá:**
+  - Bảo mật & Phân quyền: API route boundary, getCurrentUser + 401, CAN / canTouchTask / canTouchPackage, rate-limit Postgres atomic, CRON Bearer-only, không rò rỉ secret.
+  - Logic & Toàn vẹn dữ liệu: Tính toán tiền tệ trong SQL / `lib/money.ts` (không dùng float JS), recompute % tiến độ, 2-phase nghiệm thu, RLS đa dự án.
+  - Vận hành & Offline: SSE watermark, offline queue idempotent, SW exclude API streaming.
+
 ## OS-5 — Engineering OS Program Closeout & Vision Complete (2026-08-19)
 
 - **[AI, đã làm] Hoàn tất toàn bộ lộ trình Vision Complete (OS-1 → OS-5):** Đóng toàn bộ 5 cột mốc Engineering OS theo `PROJECT-COMPLETION-ROADMAP.md`.

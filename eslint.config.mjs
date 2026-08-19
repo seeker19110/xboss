@@ -15,6 +15,9 @@ const config = [
       "react-hooks/refs": "off",
       "react-hooks/purity": "off",
       "react-hooks/incompatible-library": "off",
+      // Dự án dùng hard navigation (window.location.href) có chủ đích khi đổi project/401/logout
+      // để reset hoàn toàn cache trình duyệt, service worker và state client
+      "@next/next/no-location-assign-relative-destination": "off",
     },
   },
 ];
