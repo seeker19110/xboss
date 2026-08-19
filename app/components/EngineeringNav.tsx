@@ -16,6 +16,9 @@ import {
   Code,
   Layers,
   Zap,
+  Route,
+  QrCode,
+  Scale,
 } from "lucide-react";
 
 interface NavItem {
@@ -25,6 +28,13 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { href: "/engineering/fidic-claims", label: "FIDIC Claims & EOT (M79)", icon: Scale },
+  { href: "/engineering/qr-logistics", label: "Smart QR Logistics (M78)", icon: QrCode },
+  { href: "/engineering/auto-routing", label: "Auto-Routing & Sleeve (M77)", icon: Route },
+  { href: "/engineering/site-copilot", label: "Site Telegram & Voice (M76)", icon: Bot },
+  { href: "/engineering/bidding-matrix", label: "Smart Bidding Matrix (M75)", icon: Layers },
+  { href: "/engineering/spatial-viewer", label: "Spatial Viewer & Pinning (M74)", icon: Layers },
+  { href: "/engineering/mepf-studio", label: "MEPF Agent Studio", icon: Cpu },
   { href: "/engineering/quantum-hub", label: "Quantum Core & Merkle (M73)", icon: Zap },
   { href: "/engineering/mepf-lifecycle", label: "MEPF AI Lifecycle (M67)", icon: Cpu },
   { href: "/engineering/cad-tracking", label: "CAD & QTO Tracking (M66)", icon: Layers },

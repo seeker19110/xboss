@@ -55,3 +55,24 @@ export * from "./engineering-task-queue";
 
 // 18. Merkle Tree Provenance Ledger (M73)
 export * from "./engineering-merkle-ledger";
+
+// 19. MEPF Worker Closed-Loop Bridge (PR2)
+export * from "./engineering-worker-bridge";
+
+// 20. Spatial Viewer & Field Pinning Engine (M74)
+export * from "./engineering-spatial-pinning";
+
+// 21. Smart Bidding & Subcon Procurement Matrix (M75)
+export * from "./engineering-bidding-matrix";
+
+// 22. Site Telegram Gateway & Voice Copilot (M76)
+export * from "./engineering-site-bot";
+
+// 23. AI Auto-Routing & Beam Sleeve Matrix (M77)
+export * from "./engineering-auto-routing";
+
+// 24. Smart Materials QR Logistics & Mobile Scanner (M78)
+export * from "./engineering-qr-logistics";
+
+// 25. AI FIDIC Contract Dispute & Delay Defense (M79)
+export * from "./engineering-fidic-claim";

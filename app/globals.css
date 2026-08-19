@@ -44,22 +44,22 @@ html.kingblue {
   --color-zinc-50: #f4f8fe;
 }
 
-/* Dark Blue — xanh dương đậm, dịu hơn King Blue */
+/* Dark Blue — xanh dương slate dịu mắt, nhạt và mờ êm dịu */
 html.darkblue {
   color-scheme: dark;
-  --background: #0c1a2e;
-  --foreground: #dbeafe;
-  --color-zinc-950: #0f2138;
-  --color-zinc-900: #152b48;
-  --color-zinc-800: #1e3a5f;
-  --color-zinc-700: #2a4d73;
-  --color-zinc-600: #3b6188;
-  --color-zinc-500: #5a7ca0;
-  --color-zinc-400: #8aacc8;
-  --color-zinc-300: #b6d3e8;
-  --color-zinc-200: #d7e8f5;
-  --color-zinc-100: #eaf3fb;
-  --color-zinc-50: #f5fafd;
+  --background: #0e1726;
+  --foreground: #e2e8f0;
+  --color-zinc-950: #121e33;
+  --color-zinc-900: #182741;
+  --color-zinc-800: #223554;
+  --color-zinc-700: #2f466c;
+  --color-zinc-600: #445e89;
+  --color-zinc-500: #6582ab;
+  --color-zinc-400: #92a9cb;
+  --color-zinc-300: #bcd0e8;
+  --color-zinc-200: #dae6f4;
+  --color-zinc-100: #ecf2fa;
+  --color-zinc-50: #f6f9fd;
 }
 
 /* Navy — xanh hải quân thâm trầm nhất, tông slate xanh-xám */

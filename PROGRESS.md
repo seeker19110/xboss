@@ -25,6 +25,100 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
+## M79 — AI FIDIC Contract Dispute & Delay Defense Dossier Generator (2026-08-19)
+
+- **[AI, đã làm] Migration 0113:** `migrations/0113_fidic_delay_claims.sql` tạo 2 bảng `engineering_fidic_claims` và `engineering_fidic_claim_evidences` kèm RLS strict.
+- **[AI, đã làm] Core FIDIC Claim & TIA Engine (`lib/engineering-fidic-claim.ts`):**
+  - Động cơ ánh xạ điều khoản FIDIC Red/Yellow Book 1999/2017 (`mapDelayEventToFidicClause`): Tự động xác định quyền lợi EOT, Chi phí kéo dài (Cost) và Lợi nhuận (Profit).
+  - Trạm gác tuân thủ thời hạn thông báo 28 ngày (`checkNoticeCompliance`): Cảnh báo rủi ro Time-Bar theo Điều 20.1 FIDIC.
+  - Thuật toán phân tích tác động đường găng TIA (`calculateTimeImpactAnalysis`) và tính toán chi phí quản lý gián tiếp ($Days \times Overhead$).
+  - Động cơ tự động biên soạn Hồ sơ khiếu nại song ngữ hoàn chỉnh (`generateFidicClaimDossier`).
+- **[AI, đã làm] Bộ REST API:** `GET/POST /api/engineering/fidic/claims`, `POST /api/engineering/fidic/claims/generate-dossier`.
+- **[AI, đã làm] Giao diện người dùng:** `app/engineering/fidic-claims/page.tsx` (FIDIC Claims Studio) với form thiết lập sự kiện trễ, thẻ cảnh báo Time-Bar Sentinel và khung hiển thị hồ sơ khiếu nại Markdown.
+- **[AI, đã làm] Kiểm thử tự động:** `tests/engineering-fidic-claim.test.ts` (3 unit tests pass).
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 113 migrations hợp lệ, test suite pass 100%.
+
+## M78 — Smart Materials QR Logistics & Mobile Barcode Receiving Scanner (2026-08-19)
+
+- **[AI, đã làm] Migration 0112:** `migrations/0112_materials_qr_logistics.sql` tạo 3 bảng `engineering_material_shipments`, `engineering_material_qr_tags`, `engineering_goods_receipt_notes` kèm RLS strict.
+- **[AI, đã làm] Core QR Generator & Reconciliation Engine (`lib/engineering-qr-logistics.ts`):**
+  - Thuật toán sinh mã QR định danh chuẩn hoá (`generateMaterialQrCode`) và phân tích cú pháp (`parseMaterialQrCode`) kèm chữ ký kiểm tra Checksum SHA-256 chống giả mạo.
+  - Thuật toán đối soát 3 bên giao nhận (`reconcileShipmentReceiving`): So sánh số lượng Manifest (DO) vs Scanned Tags vs Đơn đặt hàng (PO), phát hiện thiếu/thừa và tự động cấp mã Biên Bản Nhập Kho (`GRN-YYYYMMDD-XXXX`).
+  - Theo dõi hành trình vật tư (Chain of Custody) từ xuất xưởng tới nghiệm thu lắp đặt.
+- **[AI, đã làm] Bộ REST API:** `GET/POST /api/engineering/logistics/shipments`, `POST /api/engineering/logistics/scan-receive`.
+- **[AI, đã làm] Giao diện người dùng:** `app/engineering/qr-logistics/page.tsx` (QR Logistics Studio) với trình tạo nhãn mã QR, trình giả lập máy quét Barcode/Camera PWA và báo cáo đối soát GRN thời gian thực.
+- **[AI, đã làm] Kiểm thử tự động:** `tests/engineering-qr-logistics.test.ts` (2 unit tests pass).
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 112 migrations hợp lệ, test suite pass 100%.
+
+## M77 — AI Automated CAD/BIM Multi-Trade Auto-Routing & Beam Sleeve Clash Solver (2026-08-19)
+
+- **[AI, đã làm] Migration 0111:** `migrations/0111_auto_routing_sleeve_matrix.sql` tạo 2 bảng `engineering_sleeve_schedules` và `engineering_auto_routes` kèm RLS strict.
+- **[AI, đã làm] Core Auto-Routing & Beam Sleeve Engine (`lib/engineering-auto-routing.ts`):**
+  - Thuật toán 3D A* Pathfinding (`findOptimalRoute3D`) tránh hộp chướng ngại vật AABB và tối ưu hóa số lượng Co lơ (Elbows) giảm sụt áp $Pa$.
+  - Thuật toán kiểm chuẩn kết cấu lỗ khoét dầm (`validateBeamSleeve`): Kiểm tra đường kính $D \le 0.33H$, vị trí $0.2L \le x \le 0.4L$ và chiều dày lớp bảo vệ trên/dưới.
+  - Ma trận phân cấp ưu tiên nhường đường đa hệ (`recommendClashResolution`): Thoát nước trọng lực $>$ Ống gió lớn HVAC $>$ PCCC Sprinkler $>$ Cấp nước $>$ Máng cáp điện.
+- **[AI, đã làm] Bộ REST API:** `POST /api/engineering/routing/compute`, `GET/POST /api/engineering/routing/sleeves`.
+- **[AI, đã làm] Giao diện người dùng:** `app/engineering/auto-routing/page.tsx` (Auto-Routing Studio) với console tính toán tuyến 3D, danh sách toạ độ Waypoints, và bảng thống kê lỗ khoét dầm Beam Sleeve.
+- **[AI, đã làm] Kiểm thử tự động:** `tests/engineering-auto-routing.test.ts` (3 unit tests pass).
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 111 migrations hợp lệ, test suite pass 100%.
+
+## M76 — Trợ Lý Hiện Trường Telegram 2 Chiều & Voice Copilot (2026-08-19)
+
+- **[AI, đã làm] Migration 0110:** `migrations/0110_telegram_field_copilot.sql` tạo 2 bảng `telegram_user_bindings` và `telegram_bot_message_logs` có chỉ mục tối ưu hoá truy vấn.
+- **[AI, đã làm] Core NLP Intent Parser & Bot Engine (`lib/engineering-site-bot.ts`):**
+  - Thuật toán nhận diện ý định tiếng Việt (`parseVietnameseFieldIntent`) cho 4 nhóm nghiệp vụ: `PROGRESS_UPDATE`, `ISSUE_REPORT` (kèm độ nghiêm trọng), `DIARY_LOG` và `QUERY_STOCK`.
+  - Cơ chế sinh mã và xác minh OTP 6 chữ số (`generateTelegramLinkOtp`, `verifyTelegramLinkOtp`) liên kết an toàn tài khoản Telegram với User ID XBoss.
+  - Bộ xử lý tin nhắn đến (`processIncomingTelegramMessage`) tự động sinh phản hồi tiếng Việt và ghi log audit.
+- **[AI, đã làm] Bộ REST API:** `POST /api/telegram/webhook`, `POST /api/telegram/link-otp`, `GET/POST /api/telegram/simulate-voice`.
+- **[AI, đã làm] Giao diện người dùng:** `app/engineering/site-copilot/page.tsx` (Site Copilot Studio) với bảng điều khiển Chat & Voice Simulator thời gian thực, thẻ OTP link Telegram và nhật ký tin nhắn công trường.
+- **[AI, đã làm] Kiểm thử tự động:** `tests/engineering-site-bot.test.ts` (3 unit tests pass).
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 110 migrations hợp lệ, test suite pass 100%.
+
+## M75 — Ma Trận So Sánh Đấu Thầu & Kiểm Soát Đơn Giá Thầu Phụ (2026-08-19)
+
+- **[AI, đã làm] Migration 0109:** `migrations/0109_smart_bidding_procurement.sql` tạo 3 bảng `engineering_bidding_packages`, `engineering_bidding_vendor_quotes`, `engineering_bidding_analysis_runs` kèm RLS strict.
+- **[AI, đã làm] Core Bidding & Skewing Analysis Engine (`lib/engineering-bidding-matrix.ts`):**
+  - Thuật toán đối soát độ lệch chi tiết từng dòng (`calculateLineItemVariances`) giữa Target Budget và các Vendor.
+  - Thuật toán phát hiện bất thường đơn giá (`detectPriceSkewing`): Tính Skew Ratio, phát hiện rủi ro Front-Loading (Ứng tiền sớm) và Unbalanced Bidding.
+  - Thuật toán xếp hạng đa tiêu chí (`evaluateVendorRanking`): Giá (50%), Năng lực (25%), An toàn (15%), Kỹ thuật (10%) và tự động xuất đề xuất chọn thầu tối ưu.
+- **[AI, đã làm] Bộ REST API:** `GET/POST /api/engineering/bidding/packages`, `GET/POST /api/engineering/bidding/quotes`, `POST /api/engineering/bidding/analyze`.
+- **[AI, đã làm] Giao diện người dùng:** `app/engineering/bidding-matrix/page.tsx` (Smart Bidding Matrix Studio) quản lý gói thầu, bảng đối soát đa chiều nhiều nhà thầu, radar cảnh báo Front-loading và card đề xuất chọn thầu tối ưu.
+- **[AI, đã làm] Kiểm thử tự động:** `tests/engineering-bidding-matrix.test.ts` (3 unit tests pass).
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 109 migrations hợp lệ, test suite pass 100%.
+
+## M74 — Trình Xem Bản Vẽ Tương Tác WebGL 2D/3D & Chấm Mốc Không Gian (2026-08-19)
+
+- **[AI, đã làm] Migration 0108:** `migrations/0108_spatial_annotations_pinning.sql` tạo bảng `engineering_spatial_annotations` kèm RLS strict đa dự án.
+- **[AI, đã làm] Core Spatial Pinning & Computational Geometry Engine (`lib/engineering-spatial-pinning.ts`):**
+  - Quản lý điểm ghim (Spatial Pinning) 5 loại (`progress_pin`, `ncr_issue`, `bbnt_request`, `rfi_markup`, `general_note`).
+  - Thuật toán Ray-Casting đa giác Polyline (`isPointInPolygon`) kiểm tra toạ độ rơi vào vùng phòng/khu vực.
+  - Thuật toán hộp bao AABB Bounding Box (`computeBoundingBoxFromPoints`) và tính chiều dài 3D Polyline (`calculatePolylineLength`).
+  - Liên kết điểm ghim với Thực thể Nghiệp vụ (WBS Task, NCR, BBNT).
+- **[AI, đã làm] Bộ REST API:** `GET/POST /api/engineering/spatial/annotations`, `PATCH/DELETE /api/engineering/spatial/annotations/[id]`.
+- **[AI, đã làm] Giao diện người dùng:** `app/engineering/spatial-viewer/page.tsx` (Spatial Viewer Studio) hỗ trợ 2D Vector CAD Canvas tương tác Pan/Zoom, Bật/Tắt Layer (`HVAC`, `PLUMBING`, `ELECTRICAL`, `FIREFIGHTING`, `GRID`), Chấm mốc trực tiếp và Chế độ 3D Spatial Mesh.
+- **[AI, đã làm] Kiểm thử tự động:** `tests/engineering-spatial-pinning.test.ts` (4 unit tests pass).
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 108 migrations hợp lệ, test suite pass 100%.
+
+## MEPF-Agents Hybrid Worker Module — PR2 Closed-Loop Ingestion & Gate 0 Bridge (2026-08-19)
+
+Nối toàn bộ kết quả xử lý từ Python Background Worker vào hệ sinh thái Engineering OS của XBoss: tự động tạo Engineering Objects, liên kết nguồn gốc (Provenance Trace), tạo đề xuất kỹ thuật (ENG-2) và đẩy vào luồng thẩm định Gate 0 (ENG-3 Workflow OS).
+
+- **[AI, đã làm] Core Ingestion Bridge (`lib/engineering-worker-bridge.ts`):**
+  - Trích xuất tự động các thực thể kỹ thuật (Duct Spools, Pipes, Fittings, Equipment, Clash Items) từ JSON payload kết quả của Worker.
+  - Khởi tạo `engineering_sources` & `engineering_source_revisions` (mã băm SHA-256 nội dung kết quả).
+  - Khởi tạo hàng loạt `engineering_objects` với trạng thái `pending_review`.
+  - Khởi tạo `engineering_intelligence_packages` & `engineering_suggestions` (ENG-2) với cơ sở bằng chứng (Evidence-first).
+  - Tự động tạo `engineering_workflows` (ENG-3) và submit vào cổng **Gate 0 (Technical Review)** để Kỹ sư/PM thẩm định.
+- **[AI, đã làm] Bộ 2 REST API mới:**
+  - `POST /api/engineering/queue/tasks/[id]/bridge`: Chuyển đổi tác vụ hoàn tất thành đối tượng kỹ thuật và luồng duyệt.
+  - `POST /api/engineering/queue/upload`: Tải lên tệp bản vẽ/mô hình (`.dxf`, `.ifc`, `.json`, `.xlsx`) lưu trữ tại `data/uploads/mepf` và đẩy tác vụ vào hàng đợi.
+- **[AI, đã làm] Nâng cấp Giao diện MEPF Studio (`app/engineering/mepf-studio/page.tsx`):**
+  - Thêm tab Tải lên tệp Bản vẽ/IFC với vùng kéo thả trực quan.
+  - Bổ sung nút hành động "Chuyển thành Đối tượng Kỹ thuật & Trình Duyệt Gate 0" cho các tác vụ đã hoàn thành.
+  - Hiển thị huy hiệu trạng thái Gate 0 và liên kết trực tiếp sang `/engineering/workflows` và `/engineering/suggestions`.
+- **[AI, đã làm] Kiểm thử tự động:** `tests/engineering-worker-bridge.test.ts`.
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 107 migrations hợp lệ, 164 test files pass 100%, build production thành công.
+
 ## MEPF-Agents Hybrid Worker Module — PR1 Scaffold (2026-08-19)
 
 Tích hợp MEPF-Agents (`seeker19110/MEPF-Agents`) vào XBoss dưới dạng **module nội bộ**: cùng repo, cùng Docker Compose, cùng giao diện — nhưng phần xử lý AI Agent (Python/LangGraph/ezdxf) chạy ngầm dưới dạng Background Worker Service để bảo vệ hiệu năng web app.
