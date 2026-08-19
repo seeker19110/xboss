@@ -27,6 +27,18 @@
 
 **Nợ kỹ thuật/rủi ro mở:** ~~`audit_log.entity_id` chỉ hỗ trợ khoá `BIGINT` nên `engineering_*` (UUID) nằm ngoài audit trail~~ — **đã đóng** bằng `0090` (cột `entity_key` TEXT, xem mục "C3 §2" bên dưới). Rủi ro còn lại là vận hành, không phải code: cặp `0091`/`0092` phải chạy staging trước khi lên production.
 
+## OS-1 — Engineering System of Record & Knowledge Graph (2026-08-19)
+
+- **[AI, đã làm] Migration 0094:** `migrations/0094_engineering_knowledge_graph.sql` tạo taxonomy `engineering_object_types`, `engineering_relation_types` và sổ chất lượng dữ liệu `engineering_data_quality_issues`, kích hoạt RLS strict cho toàn bộ bảng mới.
+- **[AI, đã làm] Core Engine (`lib/engineering-graph.ts`):** Xây dựng engine BFS traversal đa tầng với giới hạn chiều sâu và số node, truy vấn phả hệ toàn vẹn (lineage provenance), phân tích tác động (impact analysis) và cơ chế tự động quét/giải quyết vấn đề chất lượng dữ liệu.
+- **[AI, đã làm] Bộ REST API:** Cung cấp 6 endpoint hoàn chỉnh: `/api/engineering/taxonomy`, `/api/engineering/graph`, `/api/engineering/lineage/[id]`, `/api/engineering/impact/[id]`, `/api/engineering/data-quality`, `/api/engineering/data-quality/[id]/resolve`.
+- **[AI, đã làm] Giao diện người dùng & Navigation:**
+  - `app/components/EngineeringNav.tsx`: Thanh điều hướng đồng bộ cho toàn bộ 6 phân hệ Engineering OS.
+  - `app/engineering/graph/page.tsx`: Giao diện trực quan hoá đồ thị quan hệ, phả hệ nguồn gốc, phân tích tác động có fallback accessible table.
+  - `app/engineering/data-quality/page.tsx`: Dashboard theo dõi và xử lý chất lượng dữ liệu kỹ thuật.
+- **[AI, đã làm] Kiểm thử tích hợp:** `tests/engineering-graph.test.ts` kiểm thử toàn diện traversal, lineage, impact, data-quality và cách ly đa dự án.
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 94 migrations hợp lệ, test suite 135 files, build production thành công.
+
 ## C5 & C6 — UAT & Release Manifest v1.0.0 (Product Complete) (2026-08-19)
 
 - **[AI, đã làm] Đóng toàn bộ lộ trình C0→C6:** Hoàn tất toàn bộ 7 cột mốc Product Complete của XBoss v1.0 theo `PROJECT-COMPLETION-ROADMAP.md`.

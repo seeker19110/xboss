@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Workflow, ShieldAlert, Check, X } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
+import EngineeringNav from "@/app/components/EngineeringNav";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { redirectToLogin } from "@/app/lib/me";
@@ -193,6 +194,7 @@ export default function WorkflowsPage() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <AppHeader title="Workflow kỹ thuật" />
       <main className="mx-auto max-w-6xl px-4 py-6">
+        <EngineeringNav />
         <div className="mb-4">
           <label htmlFor="wf-state" className="mb-1 block text-xs text-zinc-400">
             Trạng thái

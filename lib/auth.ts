@@ -357,6 +357,10 @@ const CAN_DEFAULT = {
   viewEngineeringAgentSessions: (r?: Role) =>
     r === "admin" || r === "pm" || r === "engineer" || r === "bch",
   resolveEngineeringConflicts: (r?: Role) => r === "admin" || r === "pm",
+  // OS-1 Engineering Knowledge Graph & System of Record (docs/nang-cap/OS-1-engineering-system-of-record.md)
+  viewEngineeringGraph: (r?: Role) =>
+    r === "admin" || r === "pm" || r === "engineer" || r === "bch",
+  manageEngineeringDataQuality: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
 };
 
 // ===== M50 PR1 — Override quyền trong DB =====
