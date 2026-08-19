@@ -361,6 +361,9 @@ const CAN_DEFAULT = {
   viewEngineeringGraph: (r?: Role) =>
     r === "admin" || r === "pm" || r === "engineer" || r === "bch",
   manageEngineeringDataQuality: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  // OS-2 Digital Twin theo cấp độ L0–L3 (docs/nang-cap/OS-2-digital-twin.md)
+  viewEngineeringTwin: (r?: Role) => r === "admin" || r === "pm" || r === "engineer" || r === "bch",
+  manageEngineeringTwin: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
 };
 
 // ===== M50 PR1 — Override quyền trong DB =====

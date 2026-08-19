@@ -27,6 +27,17 @@
 
 **Nợ kỹ thuật/rủi ro mở:** ~~`audit_log.entity_id` chỉ hỗ trợ khoá `BIGINT` nên `engineering_*` (UUID) nằm ngoài audit trail~~ — **đã đóng** bằng `0090` (cột `entity_key` TEXT, xem mục "C3 §2" bên dưới). Rủi ro còn lại là vận hành, không phải code: cặp `0091`/`0092` phải chạy staging trước khi lên production.
 
+## OS-2 — Digital Twin theo cấp độ L0–L3 (2026-08-19)
+
+- **[AI, đã làm] Migration 0095:** `migrations/0095_engineering_digital_twin.sql` tạo bảng `engineering_twin_bindings` (L1 liên kết tầng, khu vực, hệ thống, task, bản vẽ, BIM) và `engineering_twin_states` (L3 snapshot trạng thái hiện trường có đóng dấu thời gian quan sát), kích hoạt RLS strict.
+- **[AI, đã làm] Core Engine (`lib/engineering-twin.ts`):** Xây dựng engine Digital Twin L0–L3 tổng hợp hồ sơ đối tượng (L0), bindings không gian/mô hình (L1), tính toán độ tươi mới (`computeFreshness`: live/recent/stale/unknown), ghi nhận snapshot đo kiểm/vận hành (L3), truy vấn chuỗi biến thiên (Timeline) và tích hợp Knowledge Graph để đánh giá tác động vận hành (Twin Impact).
+- **[AI, đã làm] Bộ REST API:** Cung cấp 5 endpoint: `GET /api/engineering/twin/[id]`, `GET /api/engineering/twin/[id]/timeline`, `GET /api/engineering/twin/[id]/impact`, `POST /api/engineering/twin/[id]/bindings`, `POST /api/engineering/twin/[id]/states`.
+- **[AI, đã làm] Giao diện người dùng & Navigation:**
+  - `app/components/EngineeringNav.tsx`: Bổ sung tab Digital Twin (L0–L3).
+  - `app/engineering/twin/page.tsx`: Giao diện Digital Twin Viewer hiển thị thẻ trạng thái hiện trường L3, liên kết không gian L1, dòng thời gian biến thiên Timeline và cảnh báo tác động vận hành.
+- **[AI, đã làm] Kiểm thử tích hợp:** `tests/engineering-twin.test.ts` kiểm thử toàn diện L1 bindings, L3 field states, timeline pagination, freshness, twin impact và project isolation.
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 95 migrations hợp lệ, test suite 136 files, build production thành công.
+
 ## OS-1 — Engineering System of Record & Knowledge Graph (2026-08-19)
 
 - **[AI, đã làm] Migration 0094:** `migrations/0094_engineering_knowledge_graph.sql` tạo taxonomy `engineering_object_types`, `engineering_relation_types` và sổ chất lượng dữ liệu `engineering_data_quality_issues`, kích hoạt RLS strict cho toàn bộ bảng mới.
