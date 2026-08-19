@@ -27,6 +27,29 @@
 
 **Nợ kỹ thuật/rủi ro mở:** ~~`audit_log.entity_id` chỉ hỗ trợ khoá `BIGINT` nên `engineering_*` (UUID) nằm ngoài audit trail~~ — **đã đóng** bằng `0090` (cột `entity_key` TEXT, xem mục "C3 §2" bên dưới). Rủi ro còn lại là vận hành, không phải code: cặp `0091`/`0092` phải chạy staging trước khi lên production.
 
+## OS-5 — Engineering OS Program Closeout & Vision Complete (2026-08-19)
+
+- **[AI, đã làm] Hoàn tất toàn bộ lộ trình Vision Complete (OS-1 → OS-5):** Đóng toàn bộ 5 cột mốc Engineering OS theo `PROJECT-COMPLETION-ROADMAP.md`.
+- **[AI, đã làm] Release Manifest v1.0.0 (OS-5):** `docs/ops/engineering-os-manifest-v1.0.md` chốt toàn bộ kiến trúc 5 phân hệ Engineering OS, 97 migration và danh mục 20+ API endpoints.
+- **[AI, đã làm] Sổ tay quản trị & Vận hành (OS-5):** `docs/ops/engineering-os-governance-and-runbook.md` ban hành ma trận trách nhiệm RACI, P0 Runbook kích hoạt Kill Switch và quy trình bảo trì định kỳ.
+
+## OS-4 — Controlled Autonomy & Safe Execution (A0–A2) (2026-08-19)
+
+- **[AI, đã làm] Migration 0097:** `migrations/0097_engineering_autonomy.sql` tạo catalog `engineering_autonomy_capabilities`, chính sách `engineering_autonomy_policies`, hàng đợi `engineering_execution_requests` và công tắc `engineering_autonomy_kill_switches`.
+- **[AI, đã làm] Core Engine (`lib/engineering-autonomy.ts`):** Xây dựng engine Deny-by-default, kiểm soát trần quyền A0-A2, tạo Dry-run diff mô phỏng, phát hành Approval Token dùng 1 lần (Single-use token) và cơ chế ngắt khẩn cấp (Kill Switch).
+- **[AI, đã làm] Bộ REST API:** Cung cấp 6 endpoint: `GET /api/engineering/autonomy/policies`, `GET/POST /api/engineering/autonomy/requests`, `POST .../authorize`, `POST .../execute`, `POST /api/engineering/autonomy/kill-switch`.
+- **[AI, đã làm] Giao diện người dùng:** `app/engineering/autonomy/page.tsx` quản lý chính sách tự động hóa, hàng đợi yêu cầu, trình duyệt Dry-run diff và nút công tắc ngắt khẩn cấp.
+- **[AI, đã làm] Kiểm thử tích hợp:** `tests/engineering-autonomy.test.ts` kiểm thử toàn diện deny-by-default, dry-run diff, token authorization, execution và kill-switch.
+
+## OS-3 — Predictive OS, Uncertainty-First (2026-08-19)
+
+- **[AI, đã làm] Migration 0096:** `migrations/0096_engineering_predictions.sql` tạo catalog mô hình `engineering_prediction_models`, phiên bản `engineering_prediction_model_versions`, lượt chạy `engineering_prediction_runs` và kết quả `engineering_prediction_outputs`.
+- **[AI, đã làm] Core Engine (`lib/engineering-predictions.ts`):** Xây dựng pipeline dự báo rủi ro tiến độ WBS (`schedule_risk`), bất thường chi phí/vật tư (`cost_anomaly`) và xếp hạng xung đột MEP (`clash_priority`) kèm phân loại độ bất định (`uncertainty_bin`), cơ sở giải trình (Explainability) và tự động tạo đề xuất kỹ thuật (`engineering_suggestions` ENG-2).
+- **[AI, đã làm] Bộ REST API:** Cung cấp 4 endpoint: `GET /api/engineering/predictions`, `POST /api/engineering/predictions/run`, `POST /api/engineering/predictions/[id]/decide`.
+- **[AI, đã làm] Giao diện người dùng:** `app/engineering/predictions/page.tsx` hiển thị dashboard dự báo rủi ro, thẻ xác suất/độ bất định, nút kích hoạt suy luận và phản hồi chấp nhận/bỏ qua.
+- **[AI, đã làm] Kiểm thử tích hợp:** `tests/engineering-predictions.test.ts` kiểm thử toàn diện catalog, pipeline run, uncertainty bins và liên kết suggestions.
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 97 migrations hợp lệ, test suite 138 files, build production thành công.
+
 ## OS-2 — Digital Twin theo cấp độ L0–L3 (2026-08-19)
 
 - **[AI, đã làm] Migration 0095:** `migrations/0095_engineering_digital_twin.sql` tạo bảng `engineering_twin_bindings` (L1 liên kết tầng, khu vực, hệ thống, task, bản vẽ, BIM) và `engineering_twin_states` (L3 snapshot trạng thái hiện trường có đóng dấu thời gian quan sát), kích hoạt RLS strict.

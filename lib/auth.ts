@@ -364,6 +364,14 @@ const CAN_DEFAULT = {
   // OS-2 Digital Twin theo cấp độ L0–L3 (docs/nang-cap/OS-2-digital-twin.md)
   viewEngineeringTwin: (r?: Role) => r === "admin" || r === "pm" || r === "engineer" || r === "bch",
   manageEngineeringTwin: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  // OS-3 Predictive OS (docs/nang-cap/OS-3-predictive-os.md)
+  viewEngineeringPredictions: (r?: Role) =>
+    r === "admin" || r === "pm" || r === "engineer" || r === "bch",
+  manageEngineeringPredictions: (r?: Role) => r === "admin" || r === "pm",
+  // OS-4 Controlled Autonomy (docs/nang-cap/OS-4-controlled-autonomy.md)
+  viewEngineeringAutonomy: (r?: Role) =>
+    r === "admin" || r === "pm" || r === "engineer" || r === "bch",
+  manageEngineeringAutonomy: (r?: Role) => r === "admin" || r === "pm",
 };
 
 // ===== M50 PR1 — Override quyền trong DB =====

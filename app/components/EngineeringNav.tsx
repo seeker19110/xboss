@@ -1,7 +1,17 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Boxes, Lightbulb, GitBranch, Bot, Network, ShieldCheck, Cpu } from "lucide-react";
+import {
+  Boxes,
+  Lightbulb,
+  GitBranch,
+  Bot,
+  Network,
+  ShieldCheck,
+  Cpu,
+  TrendingUp,
+  ShieldAlert,
+} from "lucide-react";
 
 interface NavItem {
   href: string;
@@ -16,6 +26,8 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/engineering/agent-sessions", label: "Phiên Agent", icon: Bot },
   { href: "/engineering/graph", label: "Knowledge Graph", icon: Network },
   { href: "/engineering/twin", label: "Digital Twin (L0–L3)", icon: Cpu },
+  { href: "/engineering/predictions", label: "Dự báo rủi ro (OS-3)", icon: TrendingUp },
+  { href: "/engineering/autonomy", label: "Tự động hóa (OS-4)", icon: ShieldAlert },
   { href: "/engineering/data-quality", label: "Chất lượng dữ liệu", icon: ShieldCheck },
 ];
 
