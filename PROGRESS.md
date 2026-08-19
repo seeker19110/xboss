@@ -25,6 +25,20 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
+## M88 — Unified Engineering Pinnacle Cockpit & Apex Pulse Synergy (2026-08-20)
+
+- **[AI, đã làm] Migration 0121:** `migrations/0121_engineering_pinnacle_apex_pulse.sql` tạo 2 bảng `engineering_apex_system_pulses` và `engineering_apex_command_actions` kèm RLS strict.
+- **[AI, đã làm] Core Pinnacle Synergy Engine (`lib/engineering-pinnacle-synergy.ts`):**
+  - Thuật toán tính toán chỉ số sức khỏe tổng thể $\Omega_{\text{Apex}}$ (0-100) tổng hợp từ 5 trục (Không gian/BIM, Dòng tiền/Vốn, Pháp lý/e-Sign, An toàn HSE, Tác tử/Merkle).
+  - Động cơ phân cấp trạng thái 4 mức độ: OPTIMAL, RESILIENT, ATTENTION, CRITICAL.
+  - Bộ điều phối lệnh liên phân hệ (Cross-System Command Dispatcher).
+- **[AI, đã làm] Bộ REST API:** `GET/POST /api/engineering/pinnacle/pulse`.
+- **[AI, đã làm] Tinh hoa hoá Điều hướng & Giao diện người dùng:**
+  - `app/components/EngineeringNav.tsx`: Phân nhóm 5 chuyên khoa kỹ thuật trực quan kèm bộ lọc tìm kiếm và chuẩn UI/UX Craftsman.
+  - `app/engineering/page.tsx`: Nâng cấp toàn diện thành Unified Apex Cockpit (Bento Grid) kết nối 32+ siêu hệ thống, trực quan hóa 5-Axis radar và tích hợp drawer duyệt đối tượng ENG-1.
+- **[AI, đã làm] Kiểm thử tự động:** `tests/engineering-pinnacle-synergy.test.ts`.
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 121 migrations hợp lệ, test suite pass 100%, build production thành công.
+
 ## M87 — HSE AI Computer Vision Sentinel & Safety Hazard Detection (2026-08-20)
 
 - **[AI, đã làm] Migration 0120:** `migrations/0120_hse_ai_vision_sentinel.sql` tạo 3 bảng `engineering_hse_vision_scans`, `engineering_hse_detected_hazards`, `engineering_hse_action_tickets` kèm RLS strict.
