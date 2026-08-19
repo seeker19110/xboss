@@ -27,6 +27,11 @@
 
 **Nợ kỹ thuật/rủi ro mở:** ~~`audit_log.entity_id` chỉ hỗ trợ khoá `BIGINT` nên `engineering_*` (UUID) nằm ngoài audit trail~~ — **đã đóng** bằng `0090` (cột `entity_key` TEXT, xem mục "C3 §2" bên dưới). Rủi ro còn lại là vận hành, không phải code: cặp `0091`/`0092` phải chạy staging trước khi lên production.
 
+## Goal Tracker & C4 §8 — DR Restore Verification (2026-08-19)
+
+- **[AI, đã làm] Khởi tạo Goal Tracker:** `docs/goals/goal-2026-c-v1-release.md` theo chuẩn `docs/goals/TEMPLATE.md` để theo dõi xuyên suốt hành trình C0→C6 đạt Product Complete (XBoss v1.0).
+- **[AI, đã làm] Script kiểm tra khôi phục DR & toàn vẹn dữ liệu:** `scripts/verify-dr-restore.ts` (lệnh `npm run audit:verify-dr`) tự động hóa diễn tập phục hồi DR theo C4 §8: kiểm tra kết nối DB, đối soát toàn bộ 93 migration, thống kê số lượng bản ghi các bảng lõi, xác minh chuỗi hash audit-log (`verifyAuditChain`), và kiểm tra bất biến cách ly `engineering_relations` chéo dự án.
+
 ## C4 §6 — Chặn lộ secret qua log (2026-08-16)
 
 C4 §6 (Security verification): _"Log redaction scan: secret/token/password/raw sensitive payload không xuất hiện."_

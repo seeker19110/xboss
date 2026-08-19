@@ -64,6 +64,19 @@ test("validatePermOverride: luật LOCKED_PERMS + chống tự khoá áp cả ph
   assert.equal(typeof validatePermOverride("pm", "approve", false, 1.5), "string");
 });
 
+// ── Lớp thuần: CAN mặc định theo vai trò (C4 §4 canh bất biến RBAC không cần DB) ──
+test("CAN: mặc định chỉ Admin và PM có quyền approve nghiệm thu (C4 §4)", async () => {
+  const { CAN } = await import("@/lib/auth");
+  assert.equal(CAN.approve("admin"), true, "admin phải được approve");
+  assert.equal(CAN.approve("pm"), true, "pm phải được approve");
+  assert.equal(CAN.approve("engineer"), false, "engineer không được approve");
+  assert.equal(CAN.approve("subcon"), false, "subcon không được approve");
+  assert.equal(CAN.approve("viewer"), false, "viewer không được approve");
+  assert.equal(CAN.approve("bch"), false, "bch không được approve");
+  assert.equal(CAN.approve("cdt"), false, "cdt không được approve");
+  assert.equal(CAN.approve(undefined), false, "chưa đăng nhập không được approve");
+});
+
 // ── Lớp tích hợp: cache + CAN + audit (cần Postgres) ─────────────────────────────
 test(
   "override: default → siết pm.approve → xoá về default; mở viewer.viewPayments; audit ghi",
