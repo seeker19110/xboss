@@ -13,6 +13,7 @@ import {
   ShieldAlert,
   Radio,
   Sliders,
+  Code,
 } from "lucide-react";
 
 interface NavItem {
@@ -22,6 +23,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { href: "/engineering/cad", label: "CAD Studio (M65)", icon: Code },
   { href: "/engineering/bim", label: "BIM-CAD 3D/4D/5D", icon: Boxes },
   { href: "/engineering/swarm", label: "Swarm Debates & RFI (PIN-3)", icon: Bot },
   { href: "/engineering/memory", label: "Memory Bank (PIN-4)", icon: Cpu },

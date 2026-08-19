@@ -8,8 +8,8 @@ import {
   oidcCallbackBlocked,
   recordOidcCallbackFailure,
   type SsoClaims,
+  OIDC_TMP_COOKIE,
 } from "@/lib/oidc";
-import { OIDC_TMP_COOKIE } from "../login/route";
 import { makeToken, COOKIE, COOKIE_MAX_AGE } from "@/lib/auth";
 import { log } from "@/lib/log";
 

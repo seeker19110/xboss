@@ -25,6 +25,20 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
+## M65 — Nâng Cấp Toàn Diện Năng Lực & Công Cụ CAD Thông Minh (2026-08-19)
+
+- **[AI, đã làm] Migration 0099:** `migrations/0099_engineering_cad_skills.sql` tạo các bảng `engineering_cad_diff_sessions`, `engineering_cad_block_catalogs`, `engineering_cad_lisp_templates` kèm RLS strict.
+- **[AI, đã làm] Core CAD Engine (`lib/engineering-cad-skills.ts`):**
+  - Thuật toán so sánh vector trực quan (Visual CAD Diffing) phát hiện thực thể thêm/xóa/sửa và tự động ước tính rủi ro phát sinh chi phí hợp đồng (Potential VO Impact).
+  - Trích xuất thuộc tính Block động (Dynamic Block QTO Extractor) và tự động khớp mã BOQ.
+  - Bộ sinh mã AutoLISP / AutoCAD Script tự động vẽ chi tiết mặt cắt giá đỡ ty treo (`DRAW_TRAPEZE_HANGER`) và lỗ mở sleeve (`DRAW_SLEEVE_OPENING`).
+  - Bộ chuẩn hóa Layer theo AIA/MEPF và bộ chuyển đổi font chữ tiếng Việt TCVN3/VNI sang Unicode UTF-8 (`convertTcvn3ToUnicode`).
+  - Đùn khối 3D Bounding Box từ đường tim polyline 2D và text cao độ (`extrude2dPolylineTo3d`).
+- **[AI, đã làm] Bộ REST API:** Cung cấp 4 endpoint: `GET/POST /api/engineering/cad/diff`, `GET/POST /api/engineering/cad/blocks`, `GET/POST /api/engineering/cad/lisp`, `POST /api/engineering/cad/normalize`.
+- **[AI, đã làm] Giao diện người dùng:** `app/engineering/cad/page.tsx` (CAD Engineering Studio) cung cấp 4 tab: Visual CAD Redline Diff, Block QTO Inspector, AutoLISP Drafter và Font & Layer Doctor.
+- **[AI, đã làm] Kiểm thử tự động:** `tests/engineering-cad-skills.test.ts` (5 tests pass).
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 99 migrations hợp lệ, test suite 144 files pass 100%, build production thành công.
+
 ## PIN-3 & PIN-4 & BIM-CAD — Multi-Agent Swarm, Cross-Project Memory Bank & 3D/4D/5D Spatial Engine (2026-08-19)
 
 - **[AI, đã làm] Core BIM-CAD Engine (`lib/engineering-bim-cad.ts`):** Xử lý không gian 3D/4D/5D, thuật toán phát hiện va chạm AABB 3D (Hard Clash & Soft Clearance), Heatmap tiến độ 4D theo thời gian thực, bóc tách khối lượng tự động (5D Auto-QTO cho ống gió $m^2$, ống nước $m$, bê tông $m^3$) và Prescriptive Auto-Reroute Solver sinh 3 phương án nắn tuyến tối ưu Pareto.

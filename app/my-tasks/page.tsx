@@ -31,7 +31,7 @@ import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import AppHeader from "@/app/components/AppHeader";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { DELAY_REASON_LABEL } from "@/lib/delay";
-import type { PrefKey, Prefs } from "@/app/api/notifications/prefs/route";
+import type { PrefKey, Prefs } from "@/lib/notification-prefs";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

@@ -13,6 +13,8 @@ import { hashPassword } from "@/lib/auth";
 import { log } from "@/lib/log";
 import { ROLES, type Role } from "@/lib/roles";
 
+export const OIDC_TMP_COOKIE = "xboss_oidc";
+
 // ===== Bật/tắt SSO =====
 // Đủ cả 4 biến bắt buộc → true. KHÔNG suy redirect_uri từ request origin (sau proxy dễ
 // sai) — redirect_uri tường minh từ APP_URL.

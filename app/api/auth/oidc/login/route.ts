@@ -1,19 +1,13 @@
 import { NextResponse } from "next/server";
 import * as oidc from "openid-client";
-import { ssoEnabled, getOidcConfig, redirectUri } from "@/lib/oidc";
+import { ssoEnabled, getOidcConfig, redirectUri, OIDC_TMP_COOKIE } from "@/lib/oidc";
 import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 
-// Cookie tạm giữ state/nonce/verifier giữa 2 chặng OIDC — httpOnly, dùng 1 lần, phạm vi
-// hẹp /api/auth/oidc, sống 10 phút. Không cần ký: httpOnly chỉ chủ trình duyệt sửa được và
-// sửa chỉ tự hại phiên của chính họ (openid-client so khớp server-side).
-export const OIDC_TMP_COOKIE = "xboss_oidc";
-
 // GET /api/auth/oidc/login → khởi tạo luồng Authorization Code + PKCE, redirect tới IdP.
 export async function GET() {
-  if (!ssoEnabled())
-    return NextResponse.json({ error: "SSO chưa được bật" }, { status: 404 });
+  if (!ssoEnabled()) return NextResponse.json({ error: "SSO chưa được bật" }, { status: 404 });
 
   let config: oidc.Configuration;
   try {

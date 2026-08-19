@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { PageSkeleton } from "@/app/components/Skeleton";
-import type { PrefKey, Prefs } from "@/app/api/notifications/prefs/route";
+import type { PrefKey, Prefs } from "@/lib/notification-prefs";
 import { redirectToLogin } from "@/app/lib/me";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
