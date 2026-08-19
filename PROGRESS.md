@@ -25,6 +25,22 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
+## PIN-3 & PIN-4 & BIM-CAD — Multi-Agent Swarm, Cross-Project Memory Bank & 3D/4D/5D Spatial Engine (2026-08-19)
+
+- **[AI, đã làm] Core BIM-CAD Engine (`lib/engineering-bim-cad.ts`):** Xử lý không gian 3D/4D/5D, thuật toán phát hiện va chạm AABB 3D (Hard Clash & Soft Clearance), Heatmap tiến độ 4D theo thời gian thực, bóc tách khối lượng tự động (5D Auto-QTO cho ống gió $m^2$, ống nước $m$, bê tông $m^3$) và Prescriptive Auto-Reroute Solver sinh 3 phương án nắn tuyến tối ưu Pareto.
+- **[AI, đã làm] Multi-Agent Swarm & Autonomous Drafting (`lib/engineering-swarm.ts`):** Giao thức tranh biện Swarm Debate Protocol đa chuyên ngành (Kết cấu, Cơ điện MEPF, An toàn PCCC, Chi phí QS/BOQ, Pháp lý), thuật toán tổng hợp đồng thuận dựa trên cấp bậc thẩm quyền nguồn (`primary_code` > `design_spec` > `derived_calculation`), bộ soạn thảo tự động hồ sơ kỹ thuật RFI / Material Submittal bảo vệ bằng Single-use Cryptographic Token (A2 Human-in-the-loop Gate).
+- **[AI, đã làm] Cross-Project Memory Bank (`lib/engineering-memory-bank.ts`):** Ngân hàng tri thức tích hợp liên dự án, mã hóa vân tay quy luật ẩn (Pattern Fingerprinting SHA-256) cho hao hụt vật tư/năng suất nhân công/độ tin cậy thầu phụ, thuật toán đối soát tương đồng và tự động chuyển giao bài học kinh nghiệm (Lesson Transfer) kèm khuyến nghị điều chỉnh hệ số an toàn định mức.
+- **[AI, đã làm] 10 REST API mới:**
+  - `GET /api/engineering/bim/elements`, `GET /api/engineering/bim/clashes`, `POST /api/engineering/bim/clashes/[id]/reroute`
+  - `GET/POST /api/engineering/swarm/debates`, `GET /api/engineering/swarm/debates/[id]`, `POST /api/engineering/swarm/debates/[id]/arguments`, `POST /api/engineering/swarm/debates/[id]/synthesize`, `POST /api/engineering/swarm/drafts`
+  - `GET/POST /api/engineering/memory/patterns`, `GET/POST /api/engineering/memory/lessons`, `POST /api/engineering/memory/transfer`
+- **[AI, đã làm] 3 Giao diện người dùng tiên tiến:**
+  - `app/engineering/bim/page.tsx`: Khung nhìn 3D trực quan không gian, Heatmap 4D theo trạng thái thi công, bảng bóc tách 5D BOQ và Drawer nắn tuyến xung đột.
+  - `app/engineering/swarm/page.tsx`: Bàn điều khiển Swarm Debate Console, dòng thời gian lập luận đa tác tử, bảng kết luận hòa giải và Drawer ký số phát hành RFI.
+  - `app/engineering/memory/page.tsx`: Gallery các mẫu quy luật ẩn, sổ bài học kinh nghiệm và Cockpit tra cứu chuyển giao tri thức cho gói thầu mới.
+- **[AI, đã làm] Kiểm thử tự động:** `tests/engineering-bim-cad.test.ts`, `tests/engineering-swarm.test.ts`, `tests/engineering-memory-bank.test.ts` pass 100% (11/11 tests).
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 143 test files pass 100%, build production thành công.
+
 **Nợ kỹ thuật/rủi ro mở:** ~~`audit_log.entity_id` chỉ hỗ trợ khoá `BIGINT` nên `engineering_*` (UUID) nằm ngoài audit trail~~ — **đã đóng** bằng `0090` (cột `entity_key` TEXT, xem mục "C3 §2" bên dưới). Rủi ro còn lại là vận hành, không phải code: cặp `0091`/`0092` phải chạy staging trước khi lên production.
 
 ## PIN-2 — Prescriptive Engine & Standards Compliance (O3+) (2026-08-19)
