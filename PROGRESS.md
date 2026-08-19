@@ -25,6 +25,17 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
+## M69 — Siêu Năng Lực Shopdrawing & Bóc Tách Khối Lượng Toàn Năng (2026-08-19)
+
+- **[AI, đã làm] Migration 0103:** `migrations/0103_omnipotent_shopdrawing_qs.sql` tạo các bảng `engineering_shopdrawing_lod400_runs`, `engineering_qs_bom_explosions` kèm RLS strict.
+- **[AI, đã làm] Core Omnipotent Engines:**
+  - `lib/engineering-shopdrawing-omnipotent.ts`: Thuật toán Auto-LOD 400 DfMA Converter (chia Spool $\le 5.8\text{m}$, dốc $2\%$, chèn bích, bảo ôn Aeroflex), Ma trận Lỗ mở Sleeve xuyên dầm ($D_{\text{sleeve}} \le 1/3 H_{\text{beam}}$), Sinh bản vẽ Isometric Spool Sheet kèm mã QR, và Phân tích thông thủy trần Plenum.
+  - `lib/engineering-qs-omnipotent.ts`: Thuật toán Reverse Unit-Rate Breakdown giải mã 5 thành phần đơn giá (vật tư chính, phụ 12%, nhân công, ca máy, lợi nhuận), Bung chi tiết BOM 4 tầng (bu lông M16, gioăng, que hàn, ty ren M12, Clevis hanger, sơn lót), và Tự động sinh hồ sơ Đòi phát sinh FIDIC/EOT kèm mã băm SHA-256.
+- **[AI, đã làm] Bộ REST API:** `GET/POST /api/engineering/shopdrawing-lod400`, `GET/POST /api/engineering/qs-bom-explosion`.
+- **[AI, đã làm] Giao diện người dùng:** `app/engineering/mepf-lifecycle/page.tsx` nâng cấp lên 10 tab điều hành siêu năng lực toàn diện.
+- **[AI, đã làm] Kiểm thử tự động:** `tests/engineering-shopdrawing-omnipotent.test.ts`, `tests/engineering-qs-omnipotent.test.ts` (8 tests pass).
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 103 migrations hợp lệ, 33 tests pass 100%.
+
 ## M68 — Hệ Thống Super Skills MEPF AI Đỉnh Cao Toàn Diện (2026-08-19)
 
 - **[AI, đã làm] Migration 0102:** `migrations/0102_mepf_super_skills.sql` tạo các bảng `engineering_mepf_hydraulic_calculations`, `engineering_mepf_nesting_plans`, `engineering_mepf_voice_logs` kèm RLS strict.

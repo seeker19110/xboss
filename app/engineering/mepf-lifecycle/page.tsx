@@ -25,7 +25,10 @@ import {
   Scissors,
   Mic,
   Volume2,
-  TrendingUp,
+  QrCode,
+  Box,
+  Sliders,
+  Scale,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EngineeringNav from "@/app/components/EngineeringNav";
@@ -35,14 +38,15 @@ import { redirectToLogin } from "@/app/lib/me";
 
 type TabMode =
   | "floorplan"
+  | "lod400"
+  | "bomqs"
   | "takeoff"
-  | "routing"
   | "hydraulic"
   | "nesting"
   | "voice"
+  | "routing"
   | "variance"
-  | "tc"
-  | "twin";
+  | "tc";
 
 interface TakeoffRunItem {
   id: string;
@@ -140,6 +144,18 @@ export default function MepfLifecyclePage() {
   );
   const [runningVoice, setRunningVoice] = useState(false);
   const [voiceParsedResult, setVoiceParsedResult] = useState<Record<string, unknown> | null>(null);
+
+  // M69: LOD 400 DfMA & Sleeve Matrix State
+  const [runningLod400, setRunningLod400] = useState(false);
+  const [lod400Result, setLod400Result] = useState<Record<string, unknown> | null>(null);
+  const [sampleIsoSheet, setSampleIsoSheet] = useState<Record<string, unknown> | null>(null);
+
+  // M69: QS BOM Explosion & Reverse Rate State
+  const [runningBomExplosion, setRunningBomExplosion] = useState(false);
+  const [bomExplosionResult, setBomExplosionResult] = useState<Record<string, unknown> | null>(
+    null,
+  );
+  const [fidicClaimResult, setFidicClaimResult] = useState<Record<string, unknown> | null>(null);
 
   // Form mock test hydrostatic
   const [initPressure, setInitPressure] = useState("10.0");
@@ -283,6 +299,79 @@ export default function MepfLifecyclePage() {
       console.error("Lỗi khi chạy AI Takeoff:", err);
     } finally {
       setRunningTakeoff(false);
+    }
+  };
+
+  const handleRunLod400Dfma = async () => {
+    try {
+      setRunningLod400(true);
+      const res = await fetch("/api/engineering/shopdrawing-lod400", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "convert_lod400" }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setLod400Result(data.lod400);
+        setSampleIsoSheet(data.sampleIsoSheet);
+      }
+    } catch (err) {
+      console.error("Lỗi chạy LOD 400 DfMA:", err);
+    } finally {
+      setRunningLod400(false);
+    }
+  };
+
+  const handleRunBomExplosion = async () => {
+    try {
+      setRunningBomExplosion(true);
+      const res = await fetch("/api/engineering/qs-bom-explosion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "explode_bom",
+          itemCode: "BOQ-FP-DN100",
+          itemDescription: "Cung cấp và lắp đặt ống thép tráng kẽm nhúng nóng DN100 SCH40",
+          contractRateVnd: 520000,
+          quantity: 25.5,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setBomExplosionResult(data);
+      }
+    } catch (err) {
+      console.error("Lỗi bung BOM Explosion:", err);
+    } finally {
+      setRunningBomExplosion(false);
+    }
+  };
+
+  const handleRunFidicClaim = async () => {
+    try {
+      const res = await fetch("/api/engineering/qs-bom-explosion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "fidic_claim",
+          projectName: "TT AVIO Tháp A (MEPF)",
+          claimCode: `CLM-FIDIC-${Date.now().toString(36).toUpperCase()}`,
+          eventDescription:
+            "Bổ sung 25.5m ống cứu hỏa DN100 do thay đổi thiết kế mặt bằng phân phòng Tầng 5",
+          deltaVoQty: 25.5,
+          unitRateVnd: 520000,
+          impactDays: 7,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setFidicClaimResult(data.claimDoc);
+      }
+    } catch (err) {
+      console.error("Lỗi sinh hồ sơ FIDIC:", err);
     }
   };
 
@@ -435,14 +524,15 @@ export default function MepfLifecyclePage() {
           <div>
             <div className="flex items-center gap-2 text-blue-400 font-mono text-xs uppercase tracking-wider mb-2">
               <Cpu className="w-4 h-4" />
-              Autonomous & Cognitive MEPF Super Skills OS (M65 – M68)
+              Omnipotent & Cognitive MEPF Super Skills OS (M65 – M69)
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold text-neutral-100 tracking-tight">
-              Trung Tâm Điều Hành MEPF AI Toàn Vòng Đời
+              Trung Tâm Điều Hành MEPF AI Toàn Năng
             </h1>
             <p className="text-sm text-neutral-400 mt-1 max-w-2xl">
-              Hợp nhất Trí tuệ Nhân tạo từ Thiết kế CAD/BIM $\rightarrow$ Thủy Lực $\rightarrow$ Xếp
-              Cắt Phôi Nesting $\rightarrow$ Tracking Giọng Nói $\rightarrow$ BBNT Nghị định 06.
+              Hợp nhất Trí tuệ Nhân tạo từ Shopdrawing LOD 400 DfMA $\rightarrow$ Lỗ Mở Sleeve
+              $\rightarrow$ Giải Mã Đơn Giá Thầu $\rightarrow$ BOM 4 Tầng $\rightarrow$ Thủy Lực
+              $\rightarrow$ Xếp Cắt Phôi $\rightarrow$ BBNT Nghị định 06.
             </p>
           </div>
 
@@ -461,7 +551,7 @@ export default function MepfLifecyclePage() {
               className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-lg shadow-lg shadow-blue-600/20 transition"
             >
               <Sparkles className={`w-3.5 h-3.5 ${runningTakeoff ? "animate-spin" : ""}`} />
-              {runningTakeoff ? "AI Đang Bóc Tách..." : "Chạy AI Takeoff (Bản Vẽ Mẫu)"}
+              {runningTakeoff ? "AI Đang Bóc Tách..." : "Chạy AI Takeoff (Mẫu)"}
             </button>
           </div>
         </div>
@@ -480,6 +570,28 @@ export default function MepfLifecyclePage() {
             1. Mặt Bằng CAD Số
           </button>
           <button
+            onClick={() => setActiveTab("lod400")}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg whitespace-nowrap transition ${
+              activeTab === "lod400"
+                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold"
+                : "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900"
+            }`}
+          >
+            <Box className="w-3.5 h-3.5 text-cyan-400" />
+            2. Shopdrawing LOD 400
+          </button>
+          <button
+            onClick={() => setActiveTab("bomqs")}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg whitespace-nowrap transition ${
+              activeTab === "bomqs"
+                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold"
+                : "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900"
+            }`}
+          >
+            <Scale className="w-3.5 h-3.5 text-amber-400" />
+            3. Giải Mã Đơn Giá & BOM
+          </button>
+          <button
             onClick={() => setActiveTab("takeoff")}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-lg whitespace-nowrap transition ${
               activeTab === "takeoff"
@@ -488,7 +600,7 @@ export default function MepfLifecyclePage() {
             }`}
           >
             <Compass className="w-3.5 h-3.5" />
-            2. AI Takeoff & QS
+            4. AI Takeoff & QS
           </button>
           <button
             onClick={() => setActiveTab("hydraulic")}
@@ -499,7 +611,7 @@ export default function MepfLifecyclePage() {
             }`}
           >
             <Droplets className="w-3.5 h-3.5 text-sky-400" />
-            3. AI Thủy Lực & Cỡ Ống
+            5. Thủy Lực & Cỡ Ống
           </button>
           <button
             onClick={() => setActiveTab("nesting")}
@@ -510,7 +622,7 @@ export default function MepfLifecyclePage() {
             }`}
           >
             <Scissors className="w-3.5 h-3.5 text-purple-400" />
-            4. 1D Nesting Cắt Phôi
+            6. 1D Nesting Cắt Phôi
           </button>
           <button
             onClick={() => setActiveTab("voice")}
@@ -521,7 +633,7 @@ export default function MepfLifecyclePage() {
             }`}
           >
             <Mic className="w-3.5 h-3.5 text-emerald-400" />
-            5. Tracking Giọng Nói
+            7. Tracking Giọng Nói
           </button>
           <button
             onClick={() => setActiveTab("routing")}
@@ -532,7 +644,7 @@ export default function MepfLifecyclePage() {
             }`}
           >
             <GitBranch className="w-3.5 h-3.5" />
-            6. Generative 3D Routing
+            8. Generative 3D Routing
           </button>
           <button
             onClick={() => setActiveTab("variance")}
@@ -543,7 +655,7 @@ export default function MepfLifecyclePage() {
             }`}
           >
             <DollarSign className="w-3.5 h-3.5" />
-            7. Đối Soát BOQ & VO
+            9. Đối Soát BOQ & VO
           </button>
           <button
             onClick={() => setActiveTab("tc")}
@@ -554,7 +666,7 @@ export default function MepfLifecyclePage() {
             }`}
           >
             <Gauge className="w-3.5 h-3.5" />
-            8. Smart T&C Thử Áp
+            10. Smart T&C Thử Áp
           </button>
         </div>
 
@@ -807,7 +919,359 @@ export default function MepfLifecyclePage() {
               </div>
             )}
 
-            {/* TAB 3: HYDRAULIC AUTO-SIZING */}
+            {/* TAB 2: SHOPDRAWING LOD 400 DfMA & SLEEVE MATRIX */}
+            {activeTab === "lod400" && (
+              <div className="space-y-6">
+                <div className="bg-neutral-900/50 border border-neutral-800 p-5 rounded-xl space-y-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <h3 className="font-semibold text-neutral-100 flex items-center gap-2 text-sm">
+                        <Box className="w-4 h-4 text-cyan-400" />
+                        Động Cơ Shopdrawing LOD 400 DfMA & Ma Trận Lỗ Mở Xuyên Dầm (Sleeve Matrix)
+                      </h3>
+                      <p className="text-xs text-neutral-400 mt-0.5">
+                        Tự động phân chia Spool gia công xưởng (L &le; 5.8m), giật dốc 2% thoát
+                        nước, chèn mặt bích, bọc bảo ôn và quét lỗ mở xuyên dầm an toàn kết cấu.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={handleRunLod400Dfma}
+                      disabled={runningLod400}
+                      className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold transition shadow flex items-center gap-2"
+                    >
+                      <Sparkles className={`w-3.5 h-3.5 ${runningLod400 ? "animate-spin" : ""}`} />
+                      {runningLod400
+                        ? "Đang Sinh Bản Vẽ..."
+                        : "Chạy AI Auto-LOD 400 & Lỗ Mở Sleeve"}
+                    </button>
+                  </div>
+
+                  {lod400Result && (
+                    <div className="space-y-6 pt-3 border-t border-neutral-800">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                        <div className="bg-neutral-950 p-3 rounded-lg border border-neutral-800">
+                          <span className="text-neutral-400 block text-[11px]">
+                            Tổng Spool Gia Công
+                          </span>
+                          <span className="font-bold text-cyan-400 font-mono text-base">
+                            {String(lod400Result.totalSpoolsGenerated)} Spools
+                          </span>
+                        </div>
+                        <div className="bg-neutral-950 p-3 rounded-lg border border-neutral-800">
+                          <span className="text-neutral-400 block text-[11px]">Độ Dốc Áp Dụng</span>
+                          <span className="font-bold text-emerald-400 font-mono text-base">
+                            {String(lod400Result.slopeAppliedPercent)}% (TCVN 4474)
+                          </span>
+                        </div>
+                        <div className="bg-neutral-950 p-3 rounded-lg border border-neutral-800">
+                          <span className="text-neutral-400 block text-[11px]">
+                            Cặp Bích Chèn Tự Động
+                          </span>
+                          <span className="font-bold text-amber-400 font-mono text-base">
+                            {String(lod400Result.flangePairsInserted)} cặp PN16
+                          </span>
+                        </div>
+                        <div className="bg-neutral-950 p-3 rounded-lg border border-neutral-800">
+                          <span className="text-neutral-400 block text-[11px]">
+                            Lỗ Mở Xuyên Dầm (Sleeve)
+                          </span>
+                          <span className="font-bold text-purple-400 font-mono text-base">
+                            {String(lod400Result.sleevesCount)} vị trí
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Bảng danh mục lỗ mở Sleeve */}
+                      <div className="space-y-2">
+                        <span className="text-xs font-bold text-neutral-300">
+                          Ma Trận Lỗ Mở Chờ Xuyên Dầm Đặt Trước Đổ Bê Tông (Sleeve Schedule):
+                        </span>
+                        <div className="overflow-x-auto border border-neutral-800 rounded-lg">
+                          <table className="w-full text-left text-[11px]">
+                            <thead className="bg-neutral-950 text-neutral-400 border-b border-neutral-800">
+                              <tr>
+                                <th className="p-2.5">Mã Sleeve</th>
+                                <th className="p-2.5">Dầm Kết Cấu</th>
+                                <th className="p-2.5">Cỡ Ống MEPF</th>
+                                <th className="p-2.5">Đường Kính Lỗ Mở (OD)</th>
+                                <th className="p-2.5">Tọa Độ [X, Y, Z]</th>
+                                <th className="p-2.5">Đánh Giá An Toàn Kết Cấu</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-neutral-800 text-neutral-300">
+                              {(lod400Result.sleeveDetails as Array<Record<string, unknown>>)?.map(
+                                (s, sIdx) => (
+                                  <tr key={sIdx} className="hover:bg-neutral-800/30">
+                                    <td className="p-2.5 font-mono font-bold text-cyan-400">
+                                      {String(s.sleeveCode)}
+                                    </td>
+                                    <td className="p-2.5 font-mono">{String(s.beamCode)}</td>
+                                    <td className="p-2.5">{String(s.pipeSpec)}</td>
+                                    <td className="p-2.5 font-mono font-bold text-amber-400">
+                                      &Phi; {String(s.sleeveDiameterMm)} mm
+                                    </td>
+                                    <td className="p-2.5 font-mono text-neutral-400">
+                                      [
+                                      {Array.isArray(s.centerCoordinate)
+                                        ? (s.centerCoordinate as number[]).join(", ")
+                                        : ""}
+                                      ]
+                                    </td>
+                                    <td className="p-2.5 font-bold text-emerald-400">
+                                      ĐẠT CHUẨN AN TOÀN CHỊU CẮT (&le; H/3)
+                                    </td>
+                                  </tr>
+                                ),
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* Mẫu bản vẽ Isometric Spool Sheet */}
+                      {sampleIsoSheet && (
+                        <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 space-y-3">
+                          <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
+                            <span className="text-xs font-mono font-bold text-cyan-400 flex items-center gap-1.5">
+                              <QrCode className="w-4 h-4 text-cyan-400" />
+                              MẪU BẢN VẼ GIA CÔNG ISOMETRIC SPOOL SHEET (DfMA)
+                            </span>
+                            <span className="text-[10px] font-mono text-neutral-400">
+                              {String(sampleIsoSheet.qrFabricationToken)}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                            <div>
+                              <span className="text-neutral-400 block text-[11px]">Mã Spool:</span>
+                              <span className="font-mono font-bold text-neutral-100">
+                                {String(sampleIsoSheet.spoolCode)}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-neutral-400 block text-[11px]">
+                                Chiều dài cắt phôi:
+                              </span>
+                              <span className="font-mono font-bold text-emerald-400">
+                                {String(sampleIsoSheet.cutLengthM)} m
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-neutral-400 block text-[11px]">
+                                Số mối hàn / cặp bích:
+                              </span>
+                              <span className="font-mono font-bold text-amber-400">
+                                {String(sampleIsoSheet.weldingSeamsCount)} mối hàn •{" "}
+                                {String(sampleIsoSheet.flangePairsCount)} bích
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: QS BOM EXPLOSION & REVERSE RATE */}
+            {activeTab === "bomqs" && (
+              <div className="space-y-6">
+                <div className="bg-neutral-900/50 border border-neutral-800 p-5 rounded-xl space-y-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <h3 className="font-semibold text-neutral-100 flex items-center gap-2 text-sm">
+                        <Scale className="w-4 h-4 text-amber-400" />
+                        Giải Mã Ngược Đơn Giá Thầu & Multi-Level BOM Explosion (Level 1-4)
+                      </h3>
+                      <p className="text-xs text-neutral-400 mt-0.5">
+                        Tự động bóc tách đơn giá khoán thành 5 thành phần gốc (Vật tư chính, Phụ
+                        15%, Nhân công, Ca máy, Lợi nhuận) và bung chi tiết bu lông, gioăng, que
+                        hàn, ty ren.
+                      </p>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleRunFidicClaim}
+                        className="px-3.5 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-lg text-xs font-bold transition border border-neutral-700 flex items-center gap-1.5"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-blue-400" />
+                        1-Click Hồ Sơ FIDIC / EOT
+                      </button>
+                      <button
+                        onClick={handleRunBomExplosion}
+                        disabled={runningBomExplosion}
+                        className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold transition shadow flex items-center gap-2"
+                      >
+                        <Sparkles
+                          className={`w-3.5 h-3.5 ${runningBomExplosion ? "animate-spin" : ""}`}
+                        />
+                        {runningBomExplosion ? "Đang Phân Tích..." : "Chạy Giải Mã Đơn Giá & BOM"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {bomExplosionResult && (
+                    <div className="space-y-6 pt-3 border-t border-neutral-800">
+                      {/* Phân rã 5 thành phần đơn giá */}
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+                        <div className="bg-neutral-950 p-3 rounded-lg border border-neutral-800">
+                          <span className="text-neutral-400 block text-[11px]">
+                            1. Vật Tư Chính (58%)
+                          </span>
+                          <span className="font-bold text-neutral-100 font-mono text-sm">
+                            {Number(
+                              (
+                                bomExplosionResult.breakdown as Record<
+                                  string,
+                                  Record<string, number>
+                                >
+                              )?.breakdown?.materialMainVnd || 0,
+                            ).toLocaleString()}{" "}
+                            đ
+                          </span>
+                        </div>
+                        <div className="bg-neutral-950 p-3 rounded-lg border border-neutral-800">
+                          <span className="text-neutral-400 block text-[11px]">
+                            2. Vật Tư Phụ (12%)
+                          </span>
+                          <span className="font-bold text-cyan-400 font-mono text-sm">
+                            {Number(
+                              (
+                                bomExplosionResult.breakdown as Record<
+                                  string,
+                                  Record<string, number>
+                                >
+                              )?.breakdown?.materialAuxVnd || 0,
+                            ).toLocaleString()}{" "}
+                            đ
+                          </span>
+                        </div>
+                        <div className="bg-neutral-950 p-3 rounded-lg border border-neutral-800">
+                          <span className="text-neutral-400 block text-[11px]">
+                            3. Nhân Công Lắp (18%)
+                          </span>
+                          <span className="font-bold text-blue-400 font-mono text-sm">
+                            {Number(
+                              (
+                                bomExplosionResult.breakdown as Record<
+                                  string,
+                                  Record<string, number>
+                                >
+                              )?.breakdown?.laborDirectVnd || 0,
+                            ).toLocaleString()}{" "}
+                            đ
+                          </span>
+                        </div>
+                        <div className="bg-neutral-950 p-3 rounded-lg border border-neutral-800">
+                          <span className="text-neutral-400 block text-[11px]">
+                            4. Ca Máy/Dụng Cụ (5%)
+                          </span>
+                          <span className="font-bold text-purple-400 font-mono text-sm">
+                            {Number(
+                              (
+                                bomExplosionResult.breakdown as Record<
+                                  string,
+                                  Record<string, number>
+                                >
+                              )?.breakdown?.machineryToolsVnd || 0,
+                            ).toLocaleString()}{" "}
+                            đ
+                          </span>
+                        </div>
+                        <div className="bg-neutral-950 p-3 rounded-lg border border-neutral-800">
+                          <span className="text-neutral-400 block text-[11px]">
+                            5. Điểm Hòa Vốn (Break-even)
+                          </span>
+                          <span className="font-bold text-emerald-400 font-mono text-sm">
+                            {Number(
+                              (bomExplosionResult.breakdown as Record<string, number>)
+                                ?.breakEvenCostVnd || 0,
+                            ).toLocaleString()}{" "}
+                            đ
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Danh mục vật tư nổ tung BOM 4 tầng */}
+                      <div className="space-y-2">
+                        <span className="text-xs font-bold text-neutral-300">
+                          Danh Mục Chi Tiết Nổ Tung Vật Tư (BOM Explosion Level 1-4):
+                        </span>
+                        <div className="overflow-x-auto border border-neutral-800 rounded-lg">
+                          <table className="w-full text-left text-[11px]">
+                            <thead className="bg-neutral-950 text-neutral-400 border-b border-neutral-800">
+                              <tr>
+                                <th className="p-2.5">Tầng BOM</th>
+                                <th className="p-2.5">Nhóm Vật Tư</th>
+                                <th className="p-2.5">Tên Vật Tư & Quy Cách</th>
+                                <th className="p-2.5">Định Mức / Đơn Vị</th>
+                                <th className="p-2.5">Đơn Giá</th>
+                                <th className="p-2.5 text-right">Thành Tiền (VND)</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-neutral-800 text-neutral-300">
+                              {(
+                                (bomExplosionResult.bom as Record<string, unknown>)?.items as Array<
+                                  Record<string, unknown>
+                                >
+                              )?.map((item, idx) => (
+                                <tr key={idx} className="hover:bg-neutral-800/30">
+                                  <td className="p-2.5 font-mono font-bold text-amber-400">
+                                    Level {String(item.level)}
+                                  </td>
+                                  <td className="p-2.5 uppercase text-[10px] text-neutral-400">
+                                    {String(item.category)}
+                                  </td>
+                                  <td className="p-2.5">
+                                    <div className="font-bold text-neutral-200">
+                                      {String(item.itemName)}
+                                    </div>
+                                    <div className="text-[10px] text-neutral-400">
+                                      {String(item.spec)}
+                                    </div>
+                                  </td>
+                                  <td className="p-2.5 font-mono">
+                                    {String(item.quantityPerUnit)} {String(item.unit)}
+                                  </td>
+                                  <td className="p-2.5 font-mono">
+                                    {Number(item.unitCostVnd || 0).toLocaleString()} đ
+                                  </td>
+                                  <td className="p-2.5 text-right font-mono font-bold text-emerald-400">
+                                    {Number(item.totalCostVnd || 0).toLocaleString()} đ
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Modal hiển thị Hồ Sơ FIDIC Claim */}
+                  {fidicClaimResult && (
+                    <div className="bg-neutral-950 p-5 rounded-xl border border-blue-900/60 space-y-3">
+                      <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
+                        <span className="text-xs font-mono font-bold text-blue-400 flex items-center gap-1.5">
+                          <ShieldCheck className="w-4 h-4 text-blue-400" />
+                          HỒ SƠ ĐÒI BỒI THƯỜNG PHÁT SINH & GIA HẠN TIẾN ĐỘ CHUẨN FIDIC
+                        </span>
+                        <span className="text-[10px] font-mono text-neutral-400">
+                          SHA-256: {String(fidicClaimResult.provenanceHash)}
+                        </span>
+                      </div>
+                      <pre className="text-[11px] font-mono text-neutral-300 whitespace-pre-wrap bg-neutral-900/60 p-4 rounded-lg border border-neutral-800">
+                        {String(fidicClaimResult.legalNoticeContent)}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 5: HYDRAULIC AUTO-SIZING */}
             {activeTab === "hydraulic" && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -929,7 +1393,7 @@ export default function MepfLifecyclePage() {
               </div>
             )}
 
-            {/* TAB 4: NESTING OPTIMIZER */}
+            {/* TAB 6: NESTING OPTIMIZER */}
             {activeTab === "nesting" && (
               <div className="space-y-6">
                 <div className="bg-neutral-900/50 border border-neutral-800 p-5 rounded-xl space-y-4">
@@ -1034,7 +1498,7 @@ export default function MepfLifecyclePage() {
               </div>
             )}
 
-            {/* TAB 5: VOICE LOGGER */}
+            {/* TAB 7: VOICE LOGGER */}
             {activeTab === "voice" && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1115,7 +1579,7 @@ export default function MepfLifecyclePage() {
               </div>
             )}
 
-            {/* TAB 2: TAKEOFF */}
+            {/* TAB 4: TAKEOFF */}
             {activeTab === "takeoff" && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1240,7 +1704,7 @@ export default function MepfLifecyclePage() {
               </div>
             )}
 
-            {/* TAB 6: GENERATIVE ROUTING */}
+            {/* TAB 8: GENERATIVE ROUTING */}
             {activeTab === "routing" && (
               <div className="space-y-6">
                 <div className="bg-neutral-900/50 border border-neutral-800 p-6 rounded-xl space-y-4">
@@ -1309,7 +1773,7 @@ export default function MepfLifecyclePage() {
               </div>
             )}
 
-            {/* TAB 7: VARIANCE */}
+            {/* TAB 9: VARIANCE */}
             {activeTab === "variance" && (
               <div className="space-y-6">
                 <div className="bg-neutral-900/50 border border-neutral-800 p-6 rounded-xl space-y-4">
@@ -1337,7 +1801,7 @@ export default function MepfLifecyclePage() {
               </div>
             )}
 
-            {/* TAB 8: SMART T&C */}
+            {/* TAB 10: SMART T&C */}
             {activeTab === "tc" && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
