@@ -25,6 +25,18 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
+## M73 — Nền Tảng Siêu Tính Toán Không Gian, Hàng Đợi Tác Vụ Phân Tán & Sổ Cái Merkle Bất Biến (2026-08-19)
+
+- **[AI, đã làm] Migration 0107:** `migrations/0107_spatial_queue_merkle_ledger.sql` tạo các bảng `engineering_async_tasks`, `engineering_merkle_roots`, `engineering_spatial_compute_cache` kèm RLS strict.
+- **[AI, đã làm] Core Spatial WASM, Task Queue & Merkle Ledger Engines:**
+  - `lib/engineering-spatial-wasm.ts`: Thuật toán quét thể tích không gian Polyline 3D Sweep Volume ($V = \sum A_i \cdot L_i$), Spatial AABB Voxel Clash Grid, và thuật toán 2D Sheet Nesting Shelf Packing tối ưu xếp phôi tấm tôn.
+  - `lib/engineering-task-queue.ts`: Thuật toán hàng đợi phân tán (Atomic Claim bằng PostgreSQL Advisory Locks/Skip Locked), quản lý tiến trình heartbeat progress %, retry cơ chế và thu hồi tác vụ kẹt (Stale Lease Reclamation).
+  - `lib/engineering-merkle-ledger.ts`: Thuật toán xây dựng cây băm Merkle Tree nhị phân, sinh Merkle Proof $\pi$, hàm xác minh $V(\text{leaf}, \pi, \text{root}) \rightarrow \text{bool}$ toán học và niêm phong Merkle Batch.
+- **[AI, đã làm] Bộ 5 REST API:** `POST /api/engineering/spatial/compute`, `GET/POST /api/engineering/queue/tasks`, `POST /api/engineering/queue/tasks/[id]/cancel`, `GET/POST /api/engineering/ledger/merkle`, `POST /api/engineering/ledger/verify-proof`.
+- **[AI, đã làm] Giao diện người dùng:** `app/engineering/quantum-hub/page.tsx` (Quantum Core & Merkle Ledger Cockpit) với 3 tab: Siêu Tính Toán Không Gian, Bảng Giám Sát Hàng Đợi Phân Tán, và Sổ Cái Mật Mã Merkle.
+- **[AI, đã làm] Kiểm thử tự động:** `tests/engineering-spatial-wasm.test.ts`, `tests/engineering-task-queue.test.ts`, `tests/engineering-merkle-ledger.test.ts` (9 tests pass).
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 107 migrations hợp lệ, 163 test files pass 100%, build production thành công.
+
 ## M72 — Autonomous Multi-Agent Engineering Co-Pilot & Real-Time Decision Swarm (2026-08-19)
 
 - **[AI, đã làm] Migration 0106:** `migrations/0106_multi_agent_copilot_health.sql` tạo các bảng `engineering_agent_debate_sessions`, `engineering_project_health_snapshots` kèm RLS strict.

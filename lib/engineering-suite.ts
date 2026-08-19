@@ -46,3 +46,12 @@ export * from "./engineering-multi-agent-copilot";
 
 // 15. Dynamic Project Health Cockpit & Monte Carlo (M72)
 export * from "./engineering-project-health";
+
+// 16. Hyper-Spatial WASM Geometry & Cache (M73)
+export * from "./engineering-spatial-wasm";
+
+// 17. Distributed Engineering Task Queue (M73)
+export * from "./engineering-task-queue";
+
+// 18. Merkle Tree Provenance Ledger (M73)
+export * from "./engineering-merkle-ledger";

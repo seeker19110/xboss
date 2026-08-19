@@ -15,6 +15,7 @@ import {
   Sliders,
   Code,
   Layers,
+  Zap,
 } from "lucide-react";
 
 interface NavItem {
@@ -24,6 +25,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { href: "/engineering/quantum-hub", label: "Quantum Core & Merkle (M73)", icon: Zap },
   { href: "/engineering/mepf-lifecycle", label: "MEPF AI Lifecycle (M67)", icon: Cpu },
   { href: "/engineering/cad-tracking", label: "CAD & QTO Tracking (M66)", icon: Layers },
   { href: "/engineering/cad", label: "CAD Studio (M65)", icon: Code },
