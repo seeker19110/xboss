@@ -19,6 +19,8 @@ import {
   Route,
   QrCode,
   Scale,
+  Users,
+  Activity,
 } from "lucide-react";
 
 interface NavItem {
@@ -28,6 +30,9 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { href: "/engineering/subcon-ai", label: "AI Subcon Trust (M82)", icon: Users },
+  { href: "/engineering/iot-telemetry", label: "IoT Smart Telemetry (M83)", icon: Activity },
+  { href: "/engineering/bim-viewer", label: "3D BIM & 4D Simulation (M80)", icon: Boxes },
   { href: "/engineering/fidic-claims", label: "FIDIC Claims & EOT (M79)", icon: Scale },
   { href: "/engineering/qr-logistics", label: "Smart QR Logistics (M78)", icon: QrCode },
   { href: "/engineering/auto-routing", label: "Auto-Routing & Sleeve (M77)", icon: Route },
