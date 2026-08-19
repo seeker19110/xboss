@@ -25,6 +25,18 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
+## M68 — Hệ Thống Super Skills MEPF AI Đỉnh Cao Toàn Diện (2026-08-19)
+
+- **[AI, đã làm] Migration 0102:** `migrations/0102_mepf_super_skills.sql` tạo các bảng `engineering_mepf_hydraulic_calculations`, `engineering_mepf_nesting_plans`, `engineering_mepf_voice_logs` kèm RLS strict.
+- **[AI, đã làm] Core Super-Skills Engines:**
+  - `lib/engineering-mepf-hydraulic.ts`: Thuật toán tính toán thủy lực Hazen-Williams, tự động chọn cỡ ống tối ưu vận tốc ($DN15 \rightarrow DN350$) và tính tải trọng bố trí ty treo SMACNA/TCVN.
+  - `lib/engineering-mepf-nesting.ts`: Thuật toán 1D Cutting Stock Optimization (Best-Fit Decreasing) tối ưu hóa việc cắt cây ống $6\text{m}$ cho các đoạn Spool lẻ, hạ phế liệu phôi thừa xuống $< 1.8\%$.
+  - `lib/engineering-mepf-voice.ts`: Thuật toán trích xuất thực thể tiếng Việt từ giọng nói hiện trường và tính chỉ số năng suất lao động thực tế.
+- **[AI, đã làm] Bộ REST API:** Cung cấp các endpoint: `GET/POST /api/engineering/mepf-hydraulic`, `GET/POST /api/engineering/mepf-nesting`, `GET/POST /api/engineering/mepf-voice`.
+- **[AI, đã làm] Giao diện người dùng:** `app/engineering/mepf-lifecycle/page.tsx` nâng cấp toàn diện với 8 tab điều khiển tích hợp đầy đủ công cụ Thủy Lực, Nesting Cắt Phôi và Voice Logger.
+- **[AI, đã làm] Kiểm thử tự động:** `tests/engineering-mepf-hydraulic.test.ts`, `tests/engineering-mepf-nesting.test.ts`, `tests/engineering-mepf-voice.test.ts` (9 tests pass).
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 102 migrations hợp lệ, 25 tests pass 100%.
+
 ## M67 — Hệ Sinh Thái AI & Tự Động Hoá Đỉnh Cao Toàn Chuỗi Vòng Đời Thi Công MEPF (2026-08-19)
 
 - **[AI, đã làm] Migration 0101:** `migrations/0101_mepf_ai_lifecycle.sql` tạo các bảng `engineering_mepf_takeoff_runs`, `engineering_mepf_tc_matrices`, `engineering_mepf_tc_logs` kèm RLS strict.

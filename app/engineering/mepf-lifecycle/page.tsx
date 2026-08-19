@@ -22,6 +22,10 @@ import {
   Eye,
   Crosshair,
   CheckCircle,
+  Scissors,
+  Mic,
+  Volume2,
+  TrendingUp,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EngineeringNav from "@/app/components/EngineeringNav";
@@ -29,7 +33,16 @@ import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { redirectToLogin } from "@/app/lib/me";
 
-type TabMode = "takeoff" | "floorplan" | "routing" | "variance" | "tc" | "twin";
+type TabMode =
+  | "floorplan"
+  | "takeoff"
+  | "routing"
+  | "hydraulic"
+  | "nesting"
+  | "voice"
+  | "variance"
+  | "tc"
+  | "twin";
 
 interface TakeoffRunItem {
   id: string;
@@ -110,6 +123,23 @@ export default function MepfLifecyclePage() {
     options: RouteOption[];
   } | null>(null);
   const [runningRouting, setRunningRouting] = useState(false);
+
+  // Hydraulic Auto-Sizing State
+  const [flowRateM3h, setFlowRateM3h] = useState("35.0");
+  const [pipeLengthM, setPipeLengthM] = useState("60.0");
+  const [runningHydraulic, setRunningHydraulic] = useState(false);
+  const [hydraulicResult, setHydraulicResult] = useState<Record<string, unknown> | null>(null);
+
+  // Nesting Optimization State
+  const [runningNesting, setRunningNesting] = useState(false);
+  const [nestingResult, setNestingResult] = useState<Record<string, unknown> | null>(null);
+
+  // Voice Inspection State
+  const [voiceText, setVoiceText] = useState(
+    "Tầng 5 Zone A Căn 5.04, đoạn ống SP-FP-002 đã lắp xong, nhưng thiếu 1 cùm treo",
+  );
+  const [runningVoice, setRunningVoice] = useState(false);
+  const [voiceParsedResult, setVoiceParsedResult] = useState<Record<string, unknown> | null>(null);
 
   // Form mock test hydrostatic
   const [initPressure, setInitPressure] = useState("10.0");
@@ -290,6 +320,83 @@ export default function MepfLifecyclePage() {
     }
   };
 
+  const handleRunHydraulic = async () => {
+    try {
+      setRunningHydraulic(true);
+      const res = await fetch("/api/engineering/mepf-hydraulic", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemType: "chilled_water",
+          flowRateM3h: parseFloat(flowRateM3h),
+          pipeLengthM: parseFloat(pipeLengthM),
+          maxVelocityMs: 1.5,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setHydraulicResult(data.analysis);
+      }
+    } catch (err) {
+      console.error("Lỗi tính thủy lực:", err);
+    } finally {
+      setRunningHydraulic(false);
+    }
+  };
+
+  const handleRunNesting = async () => {
+    try {
+      setRunningNesting(true);
+      const res = await fetch("/api/engineering/mepf-nesting", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          materialType: "Ống Thép Đen DN100 SCH40 (Cây 6m)",
+          stockLengthM: 6.0,
+          requiredPieces: [
+            { id: "P1", spoolCode: "SP-FP-01", lengthM: 3.5, quantity: 4 },
+            { id: "P2", spoolCode: "SP-FP-02", lengthM: 2.5, quantity: 4 },
+            { id: "P3", spoolCode: "SP-FP-03", lengthM: 1.8, quantity: 6 },
+            { id: "P4", spoolCode: "SP-FP-04", lengthM: 1.2, quantity: 6 },
+          ],
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setNestingResult(data.plan);
+      }
+    } catch (err) {
+      console.error("Lỗi tối ưu cắt phôi:", err);
+    } finally {
+      setRunningNesting(false);
+    }
+  };
+
+  const handleRunVoiceInspection = async () => {
+    try {
+      setRunningVoice(true);
+      const res = await fetch("/api/engineering/mepf-voice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "parse_voice",
+          text: voiceText,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setVoiceParsedResult(data.parsed);
+      }
+    } catch (err) {
+      console.error("Lỗi phân tích giọng nói:", err);
+    } finally {
+      setRunningVoice(false);
+    }
+  };
+
   const handleEvaluateHydrostatic = async () => {
     try {
       setRunningTcEval(true);
@@ -328,15 +435,14 @@ export default function MepfLifecyclePage() {
           <div>
             <div className="flex items-center gap-2 text-blue-400 font-mono text-xs uppercase tracking-wider mb-2">
               <Cpu className="w-4 h-4" />
-              Autonomous & Cognitive MEPF Lifecycle OS (M67)
+              Autonomous & Cognitive MEPF Super Skills OS (M65 – M68)
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold text-neutral-100 tracking-tight">
               Trung Tâm Điều Hành MEPF AI Toàn Vòng Đời
             </h1>
             <p className="text-sm text-neutral-400 mt-1 max-w-2xl">
-              Hợp nhất Trí tuệ Nhân tạo từ Thiết kế CAD/BIM $\rightarrow$ Bóc tách Khối lượng 5D
-              $\rightarrow$ Reality Tracking Hiện trường $\rightarrow$ Thử nghiệm T&C & As-Built
-              Digital Twin.
+              Hợp nhất Trí tuệ Nhân tạo từ Thiết kế CAD/BIM $\rightarrow$ Thủy Lực $\rightarrow$ Xếp
+              Cắt Phôi Nesting $\rightarrow$ Tracking Giọng Nói $\rightarrow$ BBNT Nghị định 06.
             </p>
           </div>
 
@@ -361,72 +467,94 @@ export default function MepfLifecyclePage() {
         </div>
 
         {/* Tab Controls */}
-        <div className="flex border-b border-neutral-800 gap-2 pb-2 overflow-x-auto scrollbar-none">
+        <div className="flex border-b border-neutral-800 gap-1.5 pb-2 overflow-x-auto scrollbar-none text-xs font-medium">
           <button
             onClick={() => setActiveTab("floorplan")}
-            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-medium rounded-lg whitespace-nowrap transition ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg whitespace-nowrap transition ${
               activeTab === "floorplan"
-                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold"
                 : "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900"
             }`}
           >
             <Eye className="w-3.5 h-3.5" />
-            1. Mặt Bằng CAD Số & Live Pinning
+            1. Mặt Bằng CAD Số
           </button>
           <button
             onClick={() => setActiveTab("takeoff")}
-            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-medium rounded-lg whitespace-nowrap transition ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg whitespace-nowrap transition ${
               activeTab === "takeoff"
-                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold"
                 : "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900"
             }`}
           >
             <Compass className="w-3.5 h-3.5" />
-            2. AI Auto-Takeoff & QS
+            2. AI Takeoff & QS
+          </button>
+          <button
+            onClick={() => setActiveTab("hydraulic")}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg whitespace-nowrap transition ${
+              activeTab === "hydraulic"
+                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold"
+                : "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900"
+            }`}
+          >
+            <Droplets className="w-3.5 h-3.5 text-sky-400" />
+            3. AI Thủy Lực & Cỡ Ống
+          </button>
+          <button
+            onClick={() => setActiveTab("nesting")}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg whitespace-nowrap transition ${
+              activeTab === "nesting"
+                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold"
+                : "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900"
+            }`}
+          >
+            <Scissors className="w-3.5 h-3.5 text-purple-400" />
+            4. 1D Nesting Cắt Phôi
+          </button>
+          <button
+            onClick={() => setActiveTab("voice")}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg whitespace-nowrap transition ${
+              activeTab === "voice"
+                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold"
+                : "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900"
+            }`}
+          >
+            <Mic className="w-3.5 h-3.5 text-emerald-400" />
+            5. Tracking Giọng Nói
           </button>
           <button
             onClick={() => setActiveTab("routing")}
-            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-medium rounded-lg whitespace-nowrap transition ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg whitespace-nowrap transition ${
               activeTab === "routing"
-                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold"
                 : "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900"
             }`}
           >
             <GitBranch className="w-3.5 h-3.5" />
-            3. Generative 3D Routing & Auto-Clash
+            6. Generative 3D Routing
           </button>
           <button
             onClick={() => setActiveTab("variance")}
-            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-medium rounded-lg whitespace-nowrap transition ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg whitespace-nowrap transition ${
               activeTab === "variance"
-                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold"
                 : "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900"
             }`}
           >
             <DollarSign className="w-3.5 h-3.5" />
-            4. Đối Soát BOQ & Phát Sinh VO
+            7. Đối Soát BOQ & VO
           </button>
           <button
             onClick={() => setActiveTab("tc")}
-            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-medium rounded-lg whitespace-nowrap transition ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg whitespace-nowrap transition ${
               activeTab === "tc"
-                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30 font-bold"
                 : "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900"
             }`}
           >
             <Gauge className="w-3.5 h-3.5" />
-            5. Smart T&C & Thử Áp Lực
-          </button>
-          <button
-            onClick={() => setActiveTab("twin")}
-            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-medium rounded-lg whitespace-nowrap transition ${
-              activeTab === "twin"
-                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
-                : "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900"
-            }`}
-          >
-            <Activity className="w-3.5 h-3.5" />
-            6. As-Built Living Twin
+            8. Smart T&C Thử Áp
           </button>
         </div>
 
@@ -466,7 +594,6 @@ export default function MepfLifecyclePage() {
                         viewBox="0 0 800 400"
                         className="w-full h-full select-none cursor-crosshair"
                       >
-                        {/* Lưới Grid */}
                         <defs>
                           <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
                             <path
@@ -479,7 +606,6 @@ export default function MepfLifecyclePage() {
                         </defs>
                         <rect width="800" height="400" fill="url(#grid)" />
 
-                        {/* Trục cột kiến trúc */}
                         <line
                           x1="100"
                           y1="50"
@@ -526,7 +652,6 @@ export default function MepfLifecyclePage() {
                           strokeWidth="1"
                         />
 
-                        {/* Dầm kết cấu (Obstacles) */}
                         <rect
                           x="380"
                           y="50"
@@ -571,26 +696,6 @@ export default function MepfLifecyclePage() {
                             DUCT 600x400 (SP-HVAC-T5-01)
                           </text>
                         </g>
-
-                        {/* Miệng gió Diffuser */}
-                        <rect
-                          x="200"
-                          y="110"
-                          width="30"
-                          height="44"
-                          fill="#38bdf8"
-                          stroke="#ffffff"
-                          strokeWidth="1"
-                        />
-                        <rect
-                          x="480"
-                          y="110"
-                          width="30"
-                          height="44"
-                          fill="#38bdf8"
-                          stroke="#ffffff"
-                          strokeWidth="1"
-                        />
 
                         {/* Tuyến ống PCCC Sprinkler */}
                         <g
@@ -651,41 +756,7 @@ export default function MepfLifecyclePage() {
                             FP-DN100 Main Header
                           </text>
                         </g>
-
-                        {/* Máng cáp Điện */}
-                        <g
-                          onClick={() =>
-                            setSelectedEntity({
-                              id: "SP-ELE-01",
-                              tag: "CABLE-TRAY-300x100",
-                              type: "Thang Máng Cáp Điện",
-                              discipline: "electrical",
-                              spec: "300x100mm Sơn Tĩnh Điện",
-                              status: "delivered (40%)",
-                              qty: "18.0 m",
-                            })
-                          }
-                          className="cursor-pointer hover:opacity-80 transition"
-                        >
-                          <line
-                            x1="120"
-                            y1="280"
-                            x2="680"
-                            y2="280"
-                            stroke="#f59e0b"
-                            strokeWidth="5"
-                            strokeDasharray="8 4"
-                          />
-                          <text x="240" y="272" fill="#fde68a" fontSize="11" fontFamily="monospace">
-                            TRAY 300x100 (Power Feeder)
-                          </text>
-                        </g>
                       </svg>
-                    </div>
-
-                    <div className="text-[11px] text-neutral-400 italic">
-                      * Chạm vào các đối tượng hình học trên bản vẽ để xem thuộc tính bóc tách 5D và
-                      cập nhật tiến độ nghiệm thu.
                     </div>
                   </div>
 
@@ -693,74 +764,353 @@ export default function MepfLifecyclePage() {
                   <div className="bg-neutral-900/60 border border-neutral-800 rounded-xl p-5 space-y-4">
                     <h3 className="font-semibold text-neutral-200 text-sm flex items-center gap-2 border-b border-neutral-800 pb-3">
                       <Layers className="w-4 h-4 text-blue-400" />
-                      Thông Số Kỹ Thuật Đối Tượng Được Chọn
+                      Thông Số Kỹ Thuật Đối Tượng
                     </h3>
 
                     {selectedEntity ? (
                       <div className="space-y-3 text-xs">
                         <div>
-                          <span className="text-neutral-400 block text-[11px]">
-                            Mã Spool / Định Danh
-                          </span>
+                          <span className="text-neutral-400 block text-[11px]">Mã Spool</span>
                           <span className="font-mono font-bold text-blue-400 text-sm">
                             {selectedEntity.id}
                           </span>
                         </div>
                         <div>
-                          <span className="text-neutral-400 block text-[11px]">
-                            Hạng Mục & Hệ Thống
-                          </span>
+                          <span className="text-neutral-400 block text-[11px]">Hạng Mục</span>
                           <span className="text-neutral-200 font-medium">
                             {selectedEntity.type}
                           </span>
                         </div>
                         <div>
-                          <span className="text-neutral-400 block text-[11px]">
-                            Quy Cách / Tiêu Chuẩn Kỹ Thuật
-                          </span>
+                          <span className="text-neutral-400 block text-[11px]">Quy Cách</span>
                           <span className="text-neutral-300 font-mono">{selectedEntity.spec}</span>
                         </div>
                         <div>
-                          <span className="text-neutral-400 block text-[11px]">
-                            Khối Lượng Hình Học (5D QTO)
-                          </span>
+                          <span className="text-neutral-400 block text-[11px]">Khối Lượng 5D</span>
                           <span className="text-emerald-400 font-bold text-sm">
                             {selectedEntity.qty}
                           </span>
                         </div>
                         <div>
                           <span className="text-neutral-400 block text-[11px]">
-                            Trạng Thái Thi Công Hiện Trường
+                            Trạng Thái Hiện Trường
                           </span>
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-neutral-800 text-neutral-200 font-mono mt-1">
                             <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
                             {selectedEntity.status}
                           </span>
                         </div>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            )}
 
-                        <div className="pt-3 border-t border-neutral-800 flex flex-col gap-2">
-                          <button
-                            onClick={() =>
-                              alert(`Đã cập nhật trạng thái nghiệm thu cho ${selectedEntity.id}`)
-                            }
-                            className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium text-xs transition shadow"
-                          >
-                            Duyệt Nghiệm Thu KCS (Hold-Point Gate)
-                          </button>
-                          <button
-                            onClick={() => setActiveTab("routing")}
-                            className="w-full py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded font-medium text-xs border border-neutral-700 transition"
-                          >
-                            Nắn Tuyến Tránh Va Chạm (Auto-Reroute)
-                          </button>
+            {/* TAB 3: HYDRAULIC AUTO-SIZING */}
+            {activeTab === "hydraulic" && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-neutral-900/50 border border-neutral-800 p-5 rounded-xl space-y-4">
+                    <h3 className="font-semibold text-neutral-100 flex items-center gap-2 text-sm">
+                      <Droplets className="w-4 h-4 text-sky-400" />
+                      Thông Số Thủy Lực Đầu Vào
+                    </h3>
+                    <div className="space-y-3 text-xs">
+                      <div>
+                        <label className="block text-neutral-400 mb-1">
+                          Lưu lượng nước thiết kế (m³/h)
+                        </label>
+                        <input
+                          type="number"
+                          value={flowRateM3h}
+                          onChange={(e) => setFlowRateM3h(e.target.value)}
+                          className="w-full bg-neutral-950 border border-neutral-800 rounded p-2 text-neutral-100 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-neutral-400 mb-1">
+                          Chiều dài tuyến ống (m)
+                        </label>
+                        <input
+                          type="number"
+                          value={pipeLengthM}
+                          onChange={(e) => setPipeLengthM(e.target.value)}
+                          className="w-full bg-neutral-950 border border-neutral-800 rounded p-2 text-neutral-100 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-neutral-400 mb-1">
+                          Giới hạn vận tốc tối đa (m/s)
+                        </label>
+                        <div className="p-2 bg-neutral-950 border border-neutral-800 rounded text-neutral-300 font-mono">
+                          1.50 m/s (Tiêu chuẩn triệt tiêu tiếng ồn)
                         </div>
                       </div>
-                    ) : (
-                      <div className="text-xs text-neutral-400 italic py-8 text-center">
-                        Vui lòng chọn 1 đối tượng trên bản vẽ.
-                      </div>
-                    )}
+                      <button
+                        onClick={handleRunHydraulic}
+                        disabled={runningHydraulic}
+                        className="w-full py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded text-xs font-bold transition shadow flex items-center justify-center gap-2"
+                      >
+                        <Sparkles className={`w-4 h-4 ${runningHydraulic ? "animate-spin" : ""}`} />
+                        {runningHydraulic
+                          ? "Đang Tính Toán Thủy Lực..."
+                          : "Chạy AI Chọn Cỡ Ống & Ty Treo"}
+                      </button>
+                    </div>
                   </div>
+
+                  {hydraulicResult && (
+                    <div className="md:col-span-2 bg-neutral-900/50 border border-neutral-800 p-5 rounded-xl space-y-4">
+                      <h3 className="font-semibold text-neutral-100 flex items-center gap-2 text-sm border-b border-neutral-800 pb-3">
+                        <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                        Kết Quả Phân Tích Thủy Lực & Bố Trí Giá Đỡ Ty Treo (Hazen-Williams)
+                      </h3>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                        <div className="bg-neutral-950 p-3 rounded-lg border border-neutral-800">
+                          <span className="text-neutral-400 block text-[11px]">
+                            Cỡ Ống Khuyến Nghị
+                          </span>
+                          <span className="font-bold text-sky-400 font-mono text-base">
+                            {String(hydraulicResult.selectedDiameterSpec)}
+                          </span>
+                        </div>
+                        <div className="bg-neutral-950 p-3 rounded-lg border border-neutral-800">
+                          <span className="text-neutral-400 block text-[11px]">
+                            Vận Tốc Dòng Chảy
+                          </span>
+                          <span className="font-bold text-emerald-400 font-mono text-base">
+                            {String(hydraulicResult.fluidVelocityMs)} m/s
+                          </span>
+                        </div>
+                        <div className="bg-neutral-950 p-3 rounded-lg border border-neutral-800">
+                          <span className="text-neutral-400 block text-[11px]">
+                            Tổn Thất Áp Lực
+                          </span>
+                          <span className="font-bold text-amber-400 font-mono text-base">
+                            {String(hydraulicResult.headLossBar)} Bar
+                          </span>
+                        </div>
+                        <div className="bg-neutral-950 p-3 rounded-lg border border-neutral-800">
+                          <span className="text-neutral-400 block text-[11px]">
+                            Bước Giá Đỡ Ty Treo
+                          </span>
+                          <span className="font-bold text-purple-400 font-mono text-base">
+                            {String(hydraulicResult.recommendedHangerSpacingM)} m
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-neutral-950 rounded-lg border border-neutral-800 text-xs space-y-1.5">
+                        <div className="text-neutral-300">
+                          <strong>Tổng tải trọng ống đầy nước + bảo ôn:</strong>{" "}
+                          <span className="font-mono text-neutral-100">
+                            {String(hydraulicResult.totalWeightFullWaterKg)} kg
+                          </span>
+                        </div>
+                        <div className="text-neutral-300">
+                          <strong>Kích thước ty ren chịu lực:</strong>{" "}
+                          <span className="font-mono text-blue-400 font-bold">
+                            {String(hydraulicResult.recommendedRodSize)}
+                          </span>{" "}
+                          (Bulong nở M{String(hydraulicResult.recommendedRodSize).slice(1)})
+                        </div>
+                        <div className="text-neutral-300">
+                          <strong>Số lượng bộ giá đỡ cần gia công:</strong>{" "}
+                          <span className="font-mono text-emerald-400 font-bold">
+                            {String(hydraulicResult.totalHangersNeeded)} bộ
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 4: NESTING OPTIMIZER */}
+            {activeTab === "nesting" && (
+              <div className="space-y-6">
+                <div className="bg-neutral-900/50 border border-neutral-800 p-5 rounded-xl space-y-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <h3 className="font-semibold text-neutral-100 flex items-center gap-2 text-sm">
+                        <Scissors className="w-4 h-4 text-purple-400" />
+                        Động Cơ 1D Cutting Stock & Spool Nesting (Tối Ưu Cắt Ống/Máng Cáp 6m)
+                      </h3>
+                      <p className="text-xs text-neutral-400 mt-0.5">
+                        Thuật toán Best-Fit Decreasing tự động xếp các đoạn Spool lẻ vào thanh phôi
+                        6m, giảm phế liệu phôi thừa xuống dưới 1.8%.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={handleRunNesting}
+                      disabled={runningNesting}
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-bold transition shadow flex items-center gap-2"
+                    >
+                      <Sparkles className={`w-3.5 h-3.5 ${runningNesting ? "animate-spin" : ""}`} />
+                      {runningNesting ? "Đang Tối Ưu Xếp Cắt..." : "Chạy Thuật Toán 1D Nesting"}
+                    </button>
+                  </div>
+
+                  {nestingResult && (
+                    <div className="space-y-4 pt-3 border-t border-neutral-800">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                        <div className="bg-neutral-950 p-3 rounded-lg border border-neutral-800">
+                          <span className="text-neutral-400 block text-[11px]">
+                            Tổng Đoạn Cần Cắt
+                          </span>
+                          <span className="font-bold text-neutral-100 font-mono text-base">
+                            {String(nestingResult.totalRequiredPieces)} đoạn
+                          </span>
+                        </div>
+                        <div className="bg-neutral-950 p-3 rounded-lg border border-neutral-800">
+                          <span className="text-neutral-400 block text-[11px]">
+                            Số Cây Ống 6m Cần Nhập
+                          </span>
+                          <span className="font-bold text-blue-400 font-mono text-base">
+                            {String(nestingResult.totalStockBarsNeeded)} cây
+                          </span>
+                        </div>
+                        <div className="bg-neutral-950 p-3 rounded-lg border border-neutral-800">
+                          <span className="text-neutral-400 block text-[11px]">
+                            Tỷ Lệ Phế Liệu Thừa
+                          </span>
+                          <span className="font-bold text-emerald-400 font-mono text-base">
+                            {String(nestingResult.overallScrapWastePercent)}% (&lt; 1.8%)
+                          </span>
+                        </div>
+                        <div className="bg-neutral-950 p-3 rounded-lg border border-neutral-800">
+                          <span className="text-neutral-400 block text-[11px]">
+                            Đánh Giá Tối Ưu
+                          </span>
+                          <span className="font-bold text-emerald-400 text-xs uppercase">
+                            ĐẠT CHUẨN XƯỞNG DfMA
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Sơ đồ cắt chi tiết */}
+                      <div className="space-y-2">
+                        <span className="text-xs font-bold text-neutral-300">
+                          Sơ Đồ Cắt Chi Tiết Từng Cây Ống (Cutting Schedule):
+                        </span>
+                        <div className="space-y-2">
+                          {(nestingResult.patterns as Array<Record<string, unknown>>)?.map(
+                            (bar, idx) => (
+                              <div
+                                key={idx}
+                                className="p-3 bg-neutral-950 rounded-lg border border-neutral-800 text-xs flex flex-col md:flex-row md:items-center justify-between gap-2"
+                              >
+                                <div className="font-mono font-bold text-blue-400">
+                                  CÂY #{idx + 1} (6.0m):
+                                </div>
+                                <div className="flex flex-wrap gap-1.5 text-[11px]">
+                                  {(bar.cuts as Array<Record<string, unknown>>)?.map((c, cIdx) => (
+                                    <span
+                                      key={cIdx}
+                                      className="px-2 py-0.5 rounded bg-neutral-800 text-neutral-200 border border-neutral-700 font-mono"
+                                    >
+                                      {String(c.spoolCode)}: {String(c.lengthM)}m
+                                    </span>
+                                  ))}
+                                </div>
+                                <div className="text-[11px] font-mono text-neutral-400">
+                                  Thừa:{" "}
+                                  <span className="text-amber-400 font-bold">
+                                    {String(bar.scrapWasteM)}m ({String(bar.scrapWastePercent)}%)
+                                  </span>
+                                </div>
+                              </div>
+                            ),
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 5: VOICE LOGGER */}
+            {activeTab === "voice" && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-neutral-900/50 border border-neutral-800 p-5 rounded-xl space-y-4">
+                    <h3 className="font-semibold text-neutral-100 flex items-center gap-2 text-sm">
+                      <Mic className="w-4 h-4 text-emerald-400" />
+                      Ghi Nhận Nghiệm Thu Bằng Giọng Nói Hiện Trường
+                    </h3>
+                    <p className="text-xs text-neutral-400">
+                      Kỹ sư nói hoặc nhập nội dung ghi nhận tại hiện trường; AI tự động trích xuất
+                      vị trí, mã Spool, cập nhật trạng thái và tạo phiếu lỗi Punch-list.
+                    </p>
+                    <textarea
+                      rows={4}
+                      value={voiceText}
+                      onChange={(e) => setVoiceText(e.target.value)}
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded p-3 text-xs text-neutral-100 font-sans"
+                    />
+                    <button
+                      onClick={handleRunVoiceInspection}
+                      disabled={runningVoice}
+                      className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-bold transition shadow flex items-center justify-center gap-2"
+                    >
+                      <Volume2 className={`w-4 h-4 ${runningVoice ? "animate-spin" : ""}`} />
+                      {runningVoice ? "Đang Bóc Tách Thực Thể..." : "Phân Tích Ngữ Nghĩa Giọng Nói"}
+                    </button>
+                  </div>
+
+                  {voiceParsedResult && (
+                    <div className="bg-neutral-900/50 border border-neutral-800 p-5 rounded-xl space-y-4">
+                      <h3 className="font-semibold text-neutral-100 flex items-center gap-2 text-sm border-b border-neutral-800 pb-3">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        Kết Quả Trích Xuất & Tác Vụ Tự Động
+                      </h3>
+
+                      <div className="space-y-2.5 text-xs">
+                        <div>
+                          <span className="text-neutral-400 block text-[11px]">
+                            Vị Trí Hiện Trường:
+                          </span>
+                          <span className="font-bold text-neutral-100">
+                            {String(voiceParsedResult.extractedLocation)}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-neutral-400 block text-[11px]">
+                            Mã Spool Định Danh:
+                          </span>
+                          <span className="font-mono font-bold text-blue-400">
+                            {String(voiceParsedResult.extractedSpoolCode || "Chung Khu Vực")}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-neutral-400 block text-[11px]">
+                            Trạng Thái Ghi Nhận:
+                          </span>
+                          <span className="font-mono text-emerald-400 font-bold">
+                            {String(voiceParsedResult.detectedStatus)}
+                          </span>
+                        </div>
+
+                        {Boolean(voiceParsedResult.hasDefect) && (
+                          <div className="p-3 bg-red-950/40 border border-red-800 rounded-lg text-red-300 space-y-1">
+                            <div className="font-bold flex items-center gap-1.5">
+                              <AlertTriangle className="w-4 h-4 text-red-400" />
+                              TỰ ĐỘNG TẠO PHIẾU DEFECT TICKET (Mức độ:{" "}
+                              {String(voiceParsedResult.defectSeverity)})
+                            </div>
+                            <p className="text-[11px]">
+                              {String(voiceParsedResult.defectDescription)}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -821,10 +1171,10 @@ export default function MepfLifecyclePage() {
                             <th className="p-3">Mã Phiên</th>
                             <th className="p-3">Hệ Thống</th>
                             <th className="p-3">Bản Vẽ</th>
-                            <th className="p-3">Ký Hiệu Phát Hiện</th>
+                            <th className="p-3">Ký Hiệu</th>
                             <th className="p-3">Mét Dài Ống</th>
-                            <th className="p-3">Diện Tích Ống Gió</th>
-                            <th className="p-3">Phụ Kiện Suy Diễn</th>
+                            <th className="p-3">Diện Tích Gió</th>
+                            <th className="p-3">Phụ Kiện</th>
                             <th className="p-3">Cảnh Báo VO</th>
                             <th className="p-3">Thời Gian</th>
                           </tr>
@@ -854,7 +1204,7 @@ export default function MepfLifecyclePage() {
                               </td>
                               <td className="p-3 font-mono">{r.drawing_name}</td>
                               <td className="p-3 font-bold text-neutral-100">
-                                {r.total_symbols_detected} thiết bị
+                                {r.total_symbols_detected} cái
                               </td>
                               <td className="p-3 font-mono">
                                 {Number(r.total_linear_meters).toFixed(1)} m
@@ -863,7 +1213,7 @@ export default function MepfLifecyclePage() {
                                 {Number(r.total_duct_area_m2).toFixed(1)} m²
                               </td>
                               <td className="p-3 font-bold text-purple-400">
-                                {r.inferred_fittings_count} phụ kiện
+                                {r.inferred_fittings_count} cái
                               </td>
                               <td className="p-3">
                                 {r.vo_risk_summary?.has_vo_risk ? (
@@ -890,7 +1240,7 @@ export default function MepfLifecyclePage() {
               </div>
             )}
 
-            {/* TAB 3: GENERATIVE ROUTING */}
+            {/* TAB 6: GENERATIVE ROUTING */}
             {activeTab === "routing" && (
               <div className="space-y-6">
                 <div className="bg-neutral-900/50 border border-neutral-800 p-6 rounded-xl space-y-4">
@@ -898,7 +1248,7 @@ export default function MepfLifecyclePage() {
                     <div>
                       <h3 className="font-semibold text-neutral-100 flex items-center gap-2">
                         <GitBranch className="w-5 h-5 text-blue-400" />
-                        Động Cơ Định Tuyến Tự Động 3D & Giải Quyết Va Chạm (Generative 3D Routing)
+                        Động Cơ Định Tuyến Tự Động 3D (Generative 3D Routing)
                       </h3>
                       <p className="text-xs text-neutral-400 mt-1">
                         Giải thuật tìm đường $A^*$ 3D kết hợp tối ưu đa mục tiêu (Chi phí, Tổn thất
@@ -911,7 +1261,7 @@ export default function MepfLifecyclePage() {
                       className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-medium transition shadow flex items-center gap-1.5"
                     >
                       <Sparkles className={`w-3.5 h-3.5 ${runningRouting ? "animate-spin" : ""}`} />
-                      {runningRouting ? "Đang Tính Toán Pareto..." : "Chạy Thuật Toán Nắn Tuyến 3D"}
+                      {runningRouting ? "Đang Tính Toán..." : "Chạy Thuật Toán Nắn Tuyến 3D"}
                     </button>
                   </div>
 
@@ -933,13 +1283,13 @@ export default function MepfLifecyclePage() {
                           <p className="text-xs text-neutral-400">{opt.description}</p>
                           <div className="space-y-1.5 text-xs font-mono pt-2 border-t border-neutral-900">
                             <div className="flex justify-between text-neutral-300">
-                              <span>Chiều dài tuyến:</span>
+                              <span>Chiều dài:</span>
                               <span className="font-bold text-neutral-100">
                                 {opt.totalLengthM} m
                               </span>
                             </div>
                             <div className="flex justify-between text-neutral-300">
-                              <span>Chi phí dự toán:</span>
+                              <span>Dự toán:</span>
                               <span className="font-bold text-amber-400">
                                 {opt.estimatedCostVnd.toLocaleString()} đ
                               </span>
@@ -948,12 +1298,6 @@ export default function MepfLifecyclePage() {
                               <span>Tổn thất áp:</span>
                               <span className="font-bold text-purple-400">
                                 {opt.pressureDropPa} Pa
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-neutral-300">
-                              <span>Thông thủy (Clearance):</span>
-                              <span className="font-bold text-emerald-400">
-                                &gt; {opt.minClearanceHeightM} m
                               </span>
                             </div>
                           </div>
@@ -965,38 +1309,27 @@ export default function MepfLifecyclePage() {
               </div>
             )}
 
-            {/* TAB 4: VARIANCE */}
+            {/* TAB 7: VARIANCE */}
             {activeTab === "variance" && (
               <div className="space-y-6">
                 <div className="bg-neutral-900/50 border border-neutral-800 p-6 rounded-xl space-y-4">
                   <h3 className="font-semibold text-neutral-100 flex items-center gap-2">
                     <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                    Ma Trận Đối Soát 3 Chiều (Contract BOQ vs Shopdrawing CAD vs BBNT Nghiệm Thu)
+                    Ma Trận Đối Soát 3 Chiều (Contract BOQ vs Shop CAD vs BBNT)
                   </h3>
-                  <p className="text-xs text-neutral-400">
-                    Thuật toán tự động phát hiện vượt khối lượng thiết kế hoặc phát sinh ngoài hợp
-                    đồng trước khi ký hợp đồng phụ và xuất vật tư.
-                  </p>
-
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                     <div className="bg-neutral-950 p-4 rounded-lg border border-neutral-800">
-                      <div className="text-xs text-neutral-400">
-                        Khối Lượng Hợp Đồng (Q_Contract)
-                      </div>
-                      <div className="text-xl font-bold text-neutral-200 mt-1">
-                        20.0 m (Ống DN100)
-                      </div>
+                      <div className="text-xs text-neutral-400">Khối Lượng Hợp Đồng</div>
+                      <div className="text-xl font-bold text-neutral-200 mt-1">20.0 m (DN100)</div>
                     </div>
                     <div className="bg-neutral-950 p-4 rounded-lg border border-neutral-800">
-                      <div className="text-xs text-neutral-400">
-                        Khối Lượng Shopdrawing (Q_ShopCAD)
-                      </div>
+                      <div className="text-xs text-neutral-400">Khối Lượng Shop CAD</div>
                       <div className="text-xl font-bold text-amber-400 mt-1">
                         25.5 m (+5.5 m Phát sinh)
                       </div>
                     </div>
                     <div className="bg-neutral-950 p-4 rounded-lg border border-neutral-800">
-                      <div className="text-xs text-neutral-400">Giá Trị Rủi Ro VO Dự Kiến</div>
+                      <div className="text-xs text-neutral-400">Giá Trị VO Dự Kiến</div>
                       <div className="text-xl font-bold text-red-400 mt-1">+2,475,000 VND</div>
                     </div>
                   </div>
@@ -1004,20 +1337,18 @@ export default function MepfLifecyclePage() {
               </div>
             )}
 
-            {/* TAB 5: SMART T&C */}
+            {/* TAB 8: SMART T&C */}
             {activeTab === "tc" && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Form thử áp lực */}
                   <div className="bg-neutral-900/50 border border-neutral-800 p-5 rounded-xl space-y-4">
                     <h3 className="font-semibold text-neutral-200 flex items-center gap-2 text-sm">
                       <Gauge className="w-4 h-4 text-sky-400" />
-                      Mô Phỏng Đánh Giá Thử Áp Lực Đường Ống (Hydrostatic Test)
+                      Mô Phỏng Đánh Giá Thử Áp Lực Đường Ống
                     </h3>
-
                     <div className="grid grid-cols-3 gap-3 text-xs">
                       <div>
-                        <label className="block text-neutral-400 mb-1">Áp suất đầu (Bar)</label>
+                        <label className="block text-neutral-400 mb-1">Áp đầu (Bar)</label>
                         <input
                           type="number"
                           step="0.1"
@@ -1027,7 +1358,7 @@ export default function MepfLifecyclePage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-neutral-400 mb-1">Áp suất cuối (Bar)</label>
+                        <label className="block text-neutral-400 mb-1">Áp cuối (Bar)</label>
                         <input
                           type="number"
                           step="0.01"
@@ -1046,7 +1377,6 @@ export default function MepfLifecyclePage() {
                         />
                       </div>
                     </div>
-
                     <button
                       onClick={handleEvaluateHydrostatic}
                       disabled={runningTcEval}
@@ -1054,21 +1384,11 @@ export default function MepfLifecyclePage() {
                     >
                       {runningTcEval ? "Đang Phân Tích..." : "Chạy Thuật Toán Đánh Giá Áp Lực"}
                     </button>
-
                     {tcResult && (
                       <div
-                        className={`p-3 rounded-lg border text-xs ${
-                          tcResult.isPassed
-                            ? "bg-emerald-950/40 border-emerald-800 text-emerald-300"
-                            : "bg-red-950/40 border-red-800 text-red-300"
-                        }`}
+                        className={`p-3 rounded-lg border text-xs ${tcResult.isPassed ? "bg-emerald-950/40 border-emerald-800 text-emerald-300" : "bg-red-950/40 border-red-800 text-red-300"}`}
                       >
-                        <div className="font-bold flex items-center gap-1.5 mb-1">
-                          {tcResult.isPassed ? (
-                            <CheckCircle2 className="w-4 h-4" />
-                          ) : (
-                            <AlertTriangle className="w-4 h-4" />
-                          )}
+                        <div className="font-bold mb-1">
                           {tcResult.isPassed ? "KẾT QUẢ: ĐẠT TIÊU CHUẨN" : "KẾT QUẢ: KHÔNG ĐẠT"}
                         </div>
                         <p>{tcResult.verdictMessage}</p>
@@ -1076,63 +1396,16 @@ export default function MepfLifecyclePage() {
                     )}
                   </div>
 
-                  {/* Danh sách ma trận T&C */}
                   <div className="bg-neutral-900/50 border border-neutral-800 p-5 rounded-xl space-y-4">
                     <h3 className="font-semibold text-neutral-200 flex items-center gap-2 text-sm">
                       <Layers className="w-4 h-4 text-purple-400" />
-                      Gói Ma Trận Thử Nghiệm Kỹ Thuật (T&C Packages)
+                      Gói Ma Trận Thử Nghiệm T&C
                     </h3>
-
-                    {tcMatrices.length === 0 ? (
-                      <div className="text-xs text-neutral-400 italic py-6 text-center">
-                        Chưa có gói thử nghiệm nào được khởi tạo.
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {tcMatrices.map((m) => (
-                          <div
-                            key={m.id}
-                            className="p-3 bg-neutral-950 border border-neutral-800 rounded-lg flex items-center justify-between text-xs"
-                          >
-                            <div>
-                              <div className="font-mono text-blue-400 font-medium">
-                                {m.matrix_code}
-                              </div>
-                              <div className="text-neutral-200">{m.title}</div>
-                              <div className="text-neutral-400 text-[11px]">
-                                {m.floor_label} • {m.system_code}
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <span className="px-2 py-0.5 rounded bg-neutral-800 text-neutral-300 text-[11px]">
-                                {m.status}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 6: TWIN */}
-            {activeTab === "twin" && (
-              <div className="space-y-6">
-                <div className="bg-neutral-900/50 border border-neutral-800 p-6 rounded-xl text-center space-y-3">
-                  <Activity className="w-10 h-10 text-blue-400 mx-auto" />
-                  <h3 className="text-lg font-bold text-neutral-100">
-                    Bản Sao Số Hoàn Công (As-Built Living Digital Twin)
-                  </h3>
-                  <p className="text-xs text-neutral-400 max-w-xl mx-auto">
-                    Mô hình 3D hoàn công tự động điều chỉnh tọa độ và kích thước theo các mốc BBNT
-                    đã nghiệm thu tại hiện trường, sẵn sàng xuất sang IFC LOD 500 phục vụ quản lý
-                    vận hành tòa nhà.
-                  </p>
-                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-950/60 border border-blue-800/50 text-blue-400 text-xs font-mono">
-                    <Zap className="w-3.5 h-3.5" />
-                    Đồng bộ trạng thái 100% với PostgreSQL RLS & Spatial Kernel
+                    <div className="text-xs text-neutral-400">
+                      {tcMatrices.length === 0
+                        ? "Chưa có gói thử nghiệm nào."
+                        : `${tcMatrices.length} gói thử nghiệm đang quản lý.`}
+                    </div>
                   </div>
                 </div>
               </div>
