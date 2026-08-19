@@ -25,6 +25,16 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
+## M72 — Autonomous Multi-Agent Engineering Co-Pilot & Real-Time Decision Swarm (2026-08-19)
+
+- **[AI, đã làm] Migration 0106:** `migrations/0106_multi_agent_copilot_health.sql` tạo các bảng `engineering_agent_debate_sessions`, `engineering_project_health_snapshots` kèm RLS strict.
+- **[AI, đã làm] Core Multi-Agent & Project Health Engines:**
+  - `lib/engineering-multi-agent-copilot.ts`: Thuật toán Swarm Debate kích hoạt 3 Persona Agent (Lead Engineer, Chief QS, Site Commander) và tự động sinh Bản Quyết Nghị Đồng Thuận Kỹ Thuật có mã token `SIG-CONSENSUS-...`.
+  - `lib/engineering-project-health.ts`: Thuật toán tính toán chỉ số sức khỏe dự án tổng thể EHI % (5 trụ cột EV, Cost, QC, BIM, LCA) và chạy mô phỏng Monte Carlo 1000 kịch bản ngẫu nhiên dự báo ngày hoàn thành $P50/P80/P95$.
+- **[AI, đã làm] Bộ REST API:** `GET/POST /api/engineering/multi-agent-copilot`, `GET/POST /api/engineering/project-health`.
+- **[AI, đã làm] Kiểm thử tự động:** `tests/engineering-multi-agent-copilot.test.ts`, `tests/engineering-project-health.test.ts` (2 tests pass).
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 106 migrations hợp lệ, 41 tests pass 100%.
+
 ## M71 — AI Predictive Operations, Carbon LCA & Digital Handover Passport (2026-08-19)
 
 - **[AI, đã làm] Migration 0105:** `migrations/0105_predictive_carbon_handover.sql` tạo các bảng `engineering_mepf_predictive_assets`, `engineering_carbon_lca_reports`, `engineering_digital_handover_passports` kèm RLS strict.
