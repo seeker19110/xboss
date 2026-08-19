@@ -25,6 +25,19 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
+## M66 — Hợp Nhất CAD — Khối Lượng (QTO) — Tracking Tiến Độ & Nghiệm Thu (2026-08-19)
+
+- **[AI, đã làm] Migration 0100:** `migrations/0100_cad_qto_tracking.sql` tạo các bảng `engineering_cad_spools` (quản lý phân đoạn Spool CAD, kích thước, khối lượng 5D và trạng thái tiến độ 5 mốc) và `engineering_cad_qto_variances` (ma trận đối soát 3 chiều) kèm RLS strict.
+- **[AI, đã làm] Core CAD-QTO Engine (`lib/engineering-cad-qto.ts`):**
+  - Thuật toán 5D Auto-QTO: Tính diện tích tôn ống gió ($m^2$) kèm hệ số bù bích (`calculateDuctQtoM2`), độ dài ống nước/cáp điện ($m$).
+  - Thuật toán Earned Value Khối lượng Thực tế (`calculatePhysicalEarnedValue`): Tính $EV_{\text{qty}}$ theo trọng số mốc (`fabricated` 20% $\rightarrow$ `delivered` 40% $\rightarrow$ `installed` 75% $\rightarrow$ `qc_passed` 90% $\rightarrow$ `bbnt_approved` 100%).
+  - Ma trận Đối soát Khối lượng 3 Chiều (`compute3WayVariance`): Đối soát $Q_{\text{Contract}}$ vs $Q_{\text{Shop}}$ vs $Q_{\text{Installed}}$ vs $Q_{\text{Approved}}$, tự động phát hiện nguy cơ phát sinh chi phí VO và cảnh báo hao hụt vượt định mức.
+  - Chu trình Nghiệm thu Tự động (`generateInspectionRequestForSpools`): Gom nhóm các Spool đã đạt KCS nội bộ để sinh phiếu `inspection_requests` và bảng phụ lục khối lượng nghiệm thu.
+- **[AI, đã làm] Bộ REST API:** Cung cấp 4 endpoint: `GET /api/engineering/cad-qto/spools`, `GET /api/engineering/cad-qto/variance`, `POST /api/engineering/cad-qto/progress`, `POST /api/engineering/cad-qto/bbnt-generate`.
+- **[AI, đã làm] Giao diện người dùng:** `app/engineering/cad-tracking/page.tsx` (CAD & QTO Tracking Studio) cung cấp 3 tab tương tác: Mặt bằng CAD & Chấm Mốc (Pinning), Đối soát 3 Chiều & Cảnh báo VO, và Tạo Hồ sơ Nghiệm thu BBNT.
+- **[AI, đã làm] Kiểm thử tự động:** `tests/engineering-cad-qto.test.ts` (4 tests pass).
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 100 migrations hợp lệ, test suite 145 files pass 100%, build production thành công.
+
 ## M65 — Nâng Cấp Toàn Diện Năng Lực & Công Cụ CAD Thông Minh (2026-08-19)
 
 - **[AI, đã làm] Migration 0099:** `migrations/0099_engineering_cad_skills.sql` tạo các bảng `engineering_cad_diff_sessions`, `engineering_cad_block_catalogs`, `engineering_cad_lisp_templates` kèm RLS strict.

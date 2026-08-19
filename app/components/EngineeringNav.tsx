@@ -14,6 +14,7 @@ import {
   Radio,
   Sliders,
   Code,
+  Layers,
 } from "lucide-react";
 
 interface NavItem {
@@ -23,6 +24,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { href: "/engineering/cad-tracking", label: "CAD & QTO Tracking (M66)", icon: Layers },
   { href: "/engineering/cad", label: "CAD Studio (M65)", icon: Code },
   { href: "/engineering/bim", label: "BIM-CAD 3D/4D/5D", icon: Boxes },
   { href: "/engineering/swarm", label: "Swarm Debates & RFI (PIN-3)", icon: Bot },
