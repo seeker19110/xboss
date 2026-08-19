@@ -25,6 +25,20 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
+## M67 — Hệ Sinh Thái AI & Tự Động Hoá Đỉnh Cao Toàn Chuỗi Vòng Đời Thi Công MEPF (2026-08-19)
+
+- **[AI, đã làm] Migration 0101:** `migrations/0101_mepf_ai_lifecycle.sql` tạo các bảng `engineering_mepf_takeoff_runs`, `engineering_mepf_tc_matrices`, `engineering_mepf_tc_logs` kèm RLS strict.
+- **[AI, đã làm] Core MEPF AI Engine (`lib/engineering-mepf-takeoff.ts` & `lib/engineering-mepf-tc.ts`):**
+  - Thuật toán bóc tách hình học MEPF đa hệ (HVAC $m^2$, Plumbing/Firefighting $m$, Điện $m$, Thiết bị $cái$).
+  - Thuật toán suy diễn phụ kiện tự động (Fitting Inference) từ mạng topo đường ống (cút 90°, cút 45°, tê nhánh, côn thu).
+  - Thuật toán kiểm tra tuân thủ quy chuẩn kỹ thuật (TCVN 5687:2010, QCVN 06:2022/BXD, TCVN 7336:2021).
+  - Thuật toán đánh giá thử áp lực đường ống (Hydrostatic Pressure Hold) và phân tích rò rỉ.
+  - Thuật toán ma trận thử liên động PCCC (Fire Interlock Matrix).
+- **[AI, đã làm] Bộ REST API:** Cung cấp các endpoint: `GET/POST /api/engineering/mepf-takeoff`, `GET/POST /api/engineering/mepf-tc`.
+- **[AI, đã làm] Giao diện người dùng:** `app/engineering/mepf-lifecycle/page.tsx` (MEPF AI Lifecycle Hub) cung cấp 4 phân hệ: AI Auto-Takeoff & QS, Đối Soát BOQ & VO Delta, Smart T&C & Thử Áp Lực, và As-Built Living Twin.
+- **[AI, đã làm] Kiểm thử tự động:** `tests/engineering-mepf-takeoff.test.ts`, `tests/engineering-mepf-tc.test.ts` (5 tests pass).
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 101 migrations hợp lệ, test suite pass 100%.
+
 ## M66 — Hợp Nhất CAD — Khối Lượng (QTO) — Tracking Tiến Độ & Nghiệm Thu (2026-08-19)
 
 - **[AI, đã làm] Migration 0100:** `migrations/0100_cad_qto_tracking.sql` tạo các bảng `engineering_cad_spools` (quản lý phân đoạn Spool CAD, kích thước, khối lượng 5D và trạng thái tiến độ 5 mốc) và `engineering_cad_qto_variances` (ma trận đối soát 3 chiều) kèm RLS strict.

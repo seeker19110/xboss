@@ -204,6 +204,35 @@ export default function CadQtoTrackingPage() {
   const [selectedSpool, setSelectedSpool] = useState<CadSpoolItem | null>(null);
   const [selectedForBbnt, setSelectedForBbnt] = useState<Set<string>>(new Set());
   const [bbntSuccessMsg, setBbntSuccessMsg] = useState("");
+  const [previewBbntDoc, setPreviewBbntDoc] = useState<{
+    bbntNumber: string;
+    projectName: string;
+    inspectionDate: string;
+    standardReference: string;
+    participants: {
+      investorSupervisor: string;
+      generalContractorPM: string;
+      mepfSubcontractorLeader: string;
+    };
+    workPackageDescription: string;
+    totalSpoolCount: number;
+    totalCalculatedQty: number;
+    unit: string;
+    spoolAppendix: Array<{
+      spoolCode: string;
+      discipline: string;
+      systemCode: string;
+      floor: string;
+      zone: string;
+      dimensionSpec: string;
+      qty: number;
+      unit: string;
+      kcsStatus: string;
+    }>;
+    complianceVerdict: string;
+    provenanceHash: string;
+    cryptographicSignatureToken: string;
+  } | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -281,6 +310,9 @@ export default function CadQtoTrackingPage() {
         setBbntSuccessMsg(
           `Đã tạo thành công ${data.code} với tổng khối lượng nghiệm thu: ${data.totalQty} đơn vị.`,
         );
+        if (data.electronicBbnt) {
+          setPreviewBbntDoc(data.electronicBbnt);
+        }
         setSelectedForBbnt(new Set());
         loadData();
       }
@@ -755,6 +787,162 @@ export default function CadQtoTrackingPage() {
                     })}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* MODAL XEM & IN BIÊN BẢN NGHIỆM THU ĐIỆN TỬ (ELECTRONIC BBNT NGHỊ ĐỊNH 06) */}
+        {previewBbntDoc && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm overflow-y-auto">
+            <div className="relative w-full max-w-4xl rounded-2xl border border-zinc-700 bg-zinc-950 p-6 sm:p-8 shadow-2xl text-zinc-100 space-y-6 my-8">
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
+                <div className="flex items-center gap-2 text-emerald-400 font-mono text-xs uppercase">
+                  <ShieldCheck className="w-4 h-4" />
+                  Hồ Sơ Nghiệm Thu Điện Tử Hợp Chuẩn (Nghị định 06/2021/NĐ-CP)
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => window.print()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-bold transition shadow"
+                  >
+                    <FileText className="w-3.5 h-3.5" /> In Biên Bản (Print)
+                  </button>
+                  <button
+                    onClick={() => setPreviewBbntDoc(null)}
+                    className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs transition"
+                  >
+                    Đóng
+                  </button>
+                </div>
+              </div>
+
+              {/* Khung tài liệu BBNT chuẩn văn bản */}
+              <div className="bg-white text-zinc-900 p-8 rounded-xl shadow-inner space-y-6 font-serif text-sm">
+                <div className="text-center space-y-1 border-b pb-4">
+                  <div className="font-bold text-xs uppercase tracking-wider">
+                    CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
+                  </div>
+                  <div className="text-xs italic underline">Độc lập - Tự do - Hạnh phúc</div>
+                  <div className="pt-4 font-bold text-base uppercase text-zinc-950">
+                    BIÊN BẢN NGHIỆM THU CÔNG VIỆC XÂY DỰNG & LẮP ĐẶT THIẾT BỊ MEPF
+                  </div>
+                  <div className="text-xs font-mono text-zinc-600">
+                    Số: {previewBbntDoc.bbntNumber} • Ngày: {previewBbntDoc.inspectionDate}
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-xs">
+                  <div>
+                    <strong>1. Công trình / Dự án:</strong> {previewBbntDoc.projectName}
+                  </div>
+                  <div>
+                    <strong>2. Căn cứ pháp lý & kỹ thuật:</strong>{" "}
+                    {previewBbntDoc.standardReference}
+                  </div>
+                  <div>
+                    <strong>3. Thành phần nghiệm thu:</strong>
+                  </div>
+                  <ul className="list-disc list-inside pl-4 text-zinc-700 space-y-0.5">
+                    <li>
+                      Đại diện TVGS / Chủ đầu tư: {previewBbntDoc.participants.investorSupervisor}
+                    </li>
+                    <li>
+                      Đại diện Tổng thầu thi công: {previewBbntDoc.participants.generalContractorPM}
+                    </li>
+                    <li>
+                      Đại diện Thầu phụ chuyên ngành MEPF:{" "}
+                      {previewBbntDoc.participants.mepfSubcontractorLeader}
+                    </li>
+                  </ul>
+                  <div>
+                    <strong>4. Nội dung nghiệm thu:</strong> {previewBbntDoc.workPackageDescription}
+                  </div>
+                  <div>
+                    <strong>5. Tổng khối lượng nghiệm thu:</strong>{" "}
+                    <span className="font-bold text-blue-700 font-mono text-sm">
+                      {previewBbntDoc.totalCalculatedQty} {previewBbntDoc.unit}
+                    </span>{" "}
+                    ({previewBbntDoc.totalSpoolCount} phân đoạn)
+                  </div>
+                </div>
+
+                {/* Bảng phụ lục khối lượng */}
+                <div className="space-y-2">
+                  <div className="font-bold text-xs">
+                    PHỤ LỤC CHI TIẾT DANH MỤC PHÂN ĐOẠN CAD SPOOL NGHIỆM THU:
+                  </div>
+                  <div className="border border-zinc-300 rounded overflow-hidden">
+                    <table className="w-full text-left text-[11px] font-sans">
+                      <thead className="bg-zinc-100 border-b border-zinc-300 font-bold text-zinc-700">
+                        <tr>
+                          <th className="p-2">Mã Spool</th>
+                          <th className="p-2">Hệ Thống</th>
+                          <th className="p-2">Vị Trí</th>
+                          <th className="p-2">Quy Cách Tiết Diện</th>
+                          <th className="p-2 text-right">Khối Lượng 5D</th>
+                          <th className="p-2">Đánh Giá KCS</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-200">
+                        {previewBbntDoc.spoolAppendix.map((item, idx) => (
+                          <tr key={idx}>
+                            <td className="p-2 font-mono font-bold">{item.spoolCode}</td>
+                            <td className="p-2">
+                              {item.discipline} ({item.systemCode})
+                            </td>
+                            <td className="p-2">
+                              {item.floor} - {item.zone}
+                            </td>
+                            <td className="p-2 font-mono">{item.dimensionSpec}</td>
+                            <td className="p-2 text-right font-mono font-bold">
+                              {item.qty} {item.unit}
+                            </td>
+                            <td className="p-2 font-bold text-emerald-700">{item.kcsStatus}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Kết luận & Chữ ký số */}
+                <div className="border-t pt-4 space-y-4 text-xs">
+                  <div>
+                    <strong>6. Kết luận:</strong>{" "}
+                    <span className="font-bold text-emerald-800">
+                      {previewBbntDoc.complianceVerdict}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4 text-center pt-4 font-sans text-xs">
+                    <div>
+                      <div className="font-bold">ĐẠI DIỆN TVGS</div>
+                      <div className="text-[10px] text-zinc-500 italic">(Ký, ghi rõ họ tên)</div>
+                      <div className="mt-8 font-mono text-[10px] text-zinc-400">
+                        [Đã Ký Điện Tử]
+                      </div>
+                    </div>
+                    <div>
+                      <div className="font-bold">TỔNG THẦU THI CÔNG</div>
+                      <div className="text-[10px] text-zinc-500 italic">(Ký, ghi rõ họ tên)</div>
+                      <div className="mt-8 font-mono text-[10px] text-blue-700 font-bold">
+                        {previewBbntDoc.participants.generalContractorPM}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="font-bold">THẦU PHỤ MEPF</div>
+                      <div className="text-[10px] text-zinc-500 italic">(Ký, ghi rõ họ tên)</div>
+                      <div className="mt-8 font-mono text-[10px] text-zinc-400">
+                        [Đã Ký Điện Tử]
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-zinc-200 flex items-center justify-between text-[10px] font-mono text-zinc-500">
+                    <div>Mã Xác Thực Provenance: {previewBbntDoc.provenanceHash}</div>
+                    <div>Token Ký Duyệt: {previewBbntDoc.cryptographicSignatureToken}</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

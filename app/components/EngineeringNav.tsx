@@ -24,6 +24,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { href: "/engineering/mepf-lifecycle", label: "MEPF AI Lifecycle (M67)", icon: Cpu },
   { href: "/engineering/cad-tracking", label: "CAD & QTO Tracking (M66)", icon: Layers },
   { href: "/engineering/cad", label: "CAD Studio (M65)", icon: Code },
   { href: "/engineering/bim", label: "BIM-CAD 3D/4D/5D", icon: Boxes },

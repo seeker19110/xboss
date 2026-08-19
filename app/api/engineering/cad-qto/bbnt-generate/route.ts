@@ -28,10 +28,19 @@ export async function POST(req: Request) {
     }
 
     const result = await generateInspectionRequestForSpools(projectId, spoolIds, user.id, note);
+    const { listCadSpools, generateElectronicBbntDocument } =
+      await import("@/lib/engineering-cad-qto");
+    const spools = await listCadSpools(projectId);
+    const selectedSpools = spools.filter((s) => spoolIds.includes(s.id));
+    const electronicBbnt = generateElectronicBbntDocument("TT AVIO Tháp A (MEPF)", selectedSpools, {
+      name: user.name,
+      role: user.role,
+    });
 
     return NextResponse.json({
       success: true,
       ...result,
+      electronicBbnt,
       message: `Đã tạo thành công phiếu nghiệm thu ${result.code} cho ${result.spoolCount} phân đoạn Spool.`,
     });
   } catch (err: unknown) {

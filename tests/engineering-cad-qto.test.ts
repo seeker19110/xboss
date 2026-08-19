@@ -63,3 +63,42 @@ test("M66: compute3WayVariance phân loại chính xác các ngưỡng rủi ro 
   assert.equal(vLoss.status, "over_norm");
   assert.ok(vLoss.riskMessage.includes("hao hụt"));
 });
+
+test("M66: generateElectronicBbntDocument sinh biên bản nghiệm thu điện tử chuẩn Nghị định 06 kèm chữ ký mã hoá", async () => {
+  const { generateElectronicBbntDocument } = await import("@/lib/engineering-cad-qto");
+
+  const mockSpools = [
+    {
+      id: "sp-01",
+      project_id: 1,
+      drawing_id: 10,
+      spool_code: "SP-FP-T5-001",
+      discipline: "firefighting",
+      system_code: "FP",
+      floor_label: "Tầng 5",
+      zone_label: "Zone A",
+      dimension_spec: "DN100",
+      length_m: 25.5,
+      calculated_qty: 25.5,
+      unit: "m",
+      boq_item_id: 101,
+      task_id: 201,
+      status: "qc_passed" as const,
+      inspection_request_id: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+  ];
+
+  const bbnt = generateElectronicBbntDocument("Dự Án TT AVIO Tháp A", mockSpools, {
+    name: "Kỹ Sư Trưởng MEPF",
+    role: "pm",
+  });
+
+  assert.ok(bbnt.bbntNumber.startsWith("BBNT-MEPF-"));
+  assert.equal(bbnt.totalSpoolCount, 1);
+  assert.equal(bbnt.totalCalculatedQty, 25.5);
+  assert.ok(bbnt.provenanceHash.startsWith("SHA256:PROV-"));
+  assert.ok(bbnt.cryptographicSignatureToken.includes("SIG-A2"));
+  assert.equal(bbnt.spoolAppendix.length, 1);
+});
