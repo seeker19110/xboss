@@ -35,13 +35,13 @@
 
 ## Milestones và slices
 
-| ID    | Outcome/AC                                | Dependency | Spec                                              | Issue | PR  | State | Evidence                                                                              |
-| ----- | ----------------------------------------- | ---------- | ------------------------------------------------- | ----- | --- | ----- | ------------------------------------------------------------------------------------- |
-| PIN-1 | Living Twin & Spatial Deviation Ingestion | OS-5       | `PINNACLE-AUTONOMOUS-COGNITIVE-ENGINEERING-OS.md` | -     | -   | DONE  | Migration 0098, `lib/engineering-twin-pinnacle.ts`, 5 APIs, UI `/engineering/reality` |
-| PIN-2 | Prescriptive Pareto Solver & Compliance   | PIN-1      | `PINNACLE-AUTONOMOUS-COGNITIVE-ENGINEERING-OS.md` | -     | -   | READY | `lib/engineering-prescriptive.ts`                                                     |
-| PIN-3 | Multi-Agent Swarm Debates & Drafting      | PIN-2      | `PINNACLE-AUTONOMOUS-COGNITIVE-ENGINEERING-OS.md` | -     | -   | READY | `lib/engineering-swarm.ts`                                                            |
-| PIN-4 | Cross-Project Memory Bank & Closed-Loop   | PIN-3      | `PINNACLE-AUTONOMOUS-COGNITIVE-ENGINEERING-OS.md` | -     | -   | READY | `lib/engineering-memory-bank.ts`                                                      |
-| PIN-5 | Pinnacle Release Closeout & Governance    | PIN-4      | `PINNACLE-AUTONOMOUS-COGNITIVE-ENGINEERING-OS.md` | -     | -   | READY | Release Manifest & Final Audit                                                        |
+| ID    | Outcome/AC                                | Dependency | Spec                                              | Issue | PR  | State | Evidence                                                                                  |
+| ----- | ----------------------------------------- | ---------- | ------------------------------------------------- | ----- | --- | ----- | ----------------------------------------------------------------------------------------- |
+| PIN-1 | Living Twin & Spatial Deviation Ingestion | OS-5       | `PINNACLE-AUTONOMOUS-COGNITIVE-ENGINEERING-OS.md` | -     | -   | DONE  | Migration 0098, `lib/engineering-twin-pinnacle.ts`, 5 APIs, UI `/engineering/reality`     |
+| PIN-2 | Prescriptive Pareto Solver & Compliance   | PIN-1      | `PINNACLE-AUTONOMOUS-COGNITIVE-ENGINEERING-OS.md` | -     | -   | DONE  | `lib/engineering-prescriptive.ts`, 7 APIs, UI `/engineering/prescriptive`, Unit/E2E Tests |
+| PIN-3 | Multi-Agent Swarm Debates & Drafting      | PIN-2      | `PINNACLE-AUTONOMOUS-COGNITIVE-ENGINEERING-OS.md` | -     | -   | READY | `lib/engineering-swarm.ts`                                                                |
+| PIN-4 | Cross-Project Memory Bank & Closed-Loop   | PIN-3      | `PINNACLE-AUTONOMOUS-COGNITIVE-ENGINEERING-OS.md` | -     | -   | READY | `lib/engineering-memory-bank.ts`                                                          |
+| PIN-5 | Pinnacle Release Closeout & Governance    | PIN-4      | `PINNACLE-AUTONOMOUS-COGNITIVE-ENGINEERING-OS.md` | -     | -   | READY | Release Manifest & Final Audit                                                            |
 
 ## Risk register
 
@@ -53,7 +53,7 @@
 
 ## Current truth
 
-- **Goal gap:** Đã hoàn thành Slice PIN-1 (Living Digital Twin & Spatial Deviations).
-- **Production/migration truth:** 98 migrations liên tục, 139 test files xanh 100%, build production pass.
+- **Goal gap:** Đã hoàn thành Slice PIN-1 (Living Digital Twin) và PIN-2 (Prescriptive Pareto Solver & Standards Compliance).
+- **Production/migration truth:** 98 migrations liên tục, 140 test files xanh 100%, build production pass.
 - **Blocker/câu hỏi:** Không còn blocker.
-- **Next best slice:** Bắt đầu Slice PIN-2 (Prescriptive Pareto Solver & Standards Compliance).
+- **Next best slice:** Bắt đầu Slice PIN-3 (Multi-Agent Swarm Debates & Drafting).

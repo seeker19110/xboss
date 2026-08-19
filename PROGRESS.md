@@ -27,6 +27,29 @@
 
 **Nợ kỹ thuật/rủi ro mở:** ~~`audit_log.entity_id` chỉ hỗ trợ khoá `BIGINT` nên `engineering_*` (UUID) nằm ngoài audit trail~~ — **đã đóng** bằng `0090` (cột `entity_key` TEXT, xem mục "C3 §2" bên dưới). Rủi ro còn lại là vận hành, không phải code: cặp `0091`/`0092` phải chạy staging trước khi lên production.
 
+## PIN-2 — Prescriptive Engine & Standards Compliance (O3+) (2026-08-19)
+
+- **[AI, đã làm] Core Prescriptive & Compliance Engine (`lib/engineering-prescriptive.ts`):**
+  - Thuật toán mô phỏng Monte Carlo đa phương án bù tiến độ & giải tỏa xung đột MEPF.
+  - Thuật toán Non-dominated Sorting tính toán đường bao tối ưu đa mục tiêu (Pareto Frontier: Ngày rút ngắn vs Chi phí bù vs Chỉ số rủi ro).
+  - Thuật toán xác định điểm uốn cân bằng (Recommended Knee Point) theo khoảng cách chuẩn hóa đa tiêu chí.
+  - Động cơ đối soát quy chuẩn kỹ thuật (QCVN 06:2022/BXD, NFPA 13, TCVN 9385:2012) và quét theo lô toàn dự án (Batch Scan) tự động lập hồ sơ Không phù hợp (NCR).
+- **[AI, đã làm] Hệ thống REST API (7 endpoints):**
+  - `GET /api/engineering/prescriptive/scenarios`
+  - `POST /api/engineering/prescriptive/simulate`
+  - `POST /api/engineering/prescriptive/scenarios/[id]/approve`
+  - `GET /api/engineering/compliance/rules`
+  - `POST /api/engineering/compliance/audit-element`
+  - `POST /api/engineering/compliance/scan-all`
+  - `GET /api/engineering/compliance/audits`
+- **[AI, đã làm] Giao diện người dùng (`app/engineering/prescriptive/page.tsx`):**
+  - Bảng điều khiển What-If và trực quan hóa tương tác đồ thị phân tán Pareto Frontier (`recharts`).
+  - So sánh chi tiết các gói giải cứu tiến độ (Max Acceleration, Balanced Pareto Knee, Minimal Budget).
+  - Danh mục quy chuẩn và trung tâm quản lý hồ sơ vi phạm NCR kèm bộ lọc trạng thái.
+  - Cập nhật mục điều hướng `Prescriptive & Quy chuẩn (O3+)` trong `app/components/EngineeringNav.tsx`.
+- **[AI, đã làm] Kiểm thử tự động:** `tests/engineering-prescriptive.test.ts` kiểm thử toàn diện Non-dominated Sorting, tìm Knee Point, đối soát quy chuẩn QCVN 06 / NFPA 13 / TCVN 9385, mô phỏng Monte Carlo và batch audit scan trên Postgres DB.
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 98 migrations hợp lệ, test suite 140 files pass, build production thành công.
+
 ## PIN-1 — Living Digital Twin & Continuous Reality Ingestion (L4–L6) (2026-08-19)
 
 - **[AI, đã làm] Migration 0098:** `migrations/0098_engineering_pinnacle_autonomous_os.sql` tạo các bảng `engineering_twin_reality_captures`, `engineering_twin_spatial_deviations`, `engineering_twin_sensor_streams`, `engineering_prescriptive_scenarios`, `engineering_compliance_rules`, `engineering_compliance_audits`, `engineering_swarm_debates`, `engineering_knowledge_patterns` và kích hoạt RLS strict.

@@ -372,6 +372,13 @@ const CAN_DEFAULT = {
   viewEngineeringAutonomy: (r?: Role) =>
     r === "admin" || r === "pm" || r === "engineer" || r === "bch",
   manageEngineeringAutonomy: (r?: Role) => r === "admin" || r === "pm",
+  // PIN-2 Prescriptive Engine & Standards Compliance (docs/nang-cap/PINNACLE-AUTONOMOUS-COGNITIVE-ENGINEERING-OS.md)
+  viewEngineeringPrescriptive: (r?: Role) =>
+    r === "admin" || r === "pm" || r === "engineer" || r === "bch" || r === "cdt" || r === "viewer",
+  manageEngineeringPrescriptive: (r?: Role) => r === "admin" || r === "pm",
+  viewEngineeringCompliance: (r?: Role) =>
+    r === "admin" || r === "pm" || r === "engineer" || r === "bch" || r === "cdt" || r === "viewer",
+  manageEngineeringCompliance: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
 };
 
 // ===== M50 PR1 — Override quyền trong DB =====
