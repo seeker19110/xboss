@@ -25,6 +25,54 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
+## M87 — HSE AI Computer Vision Sentinel & Safety Hazard Detection (2026-08-20)
+
+- **[AI, đã làm] Migration 0120:** `migrations/0120_hse_ai_vision_sentinel.sql` tạo 3 bảng `engineering_hse_vision_scans`, `engineering_hse_detected_hazards`, `engineering_hse_action_tickets` kèm RLS strict.
+- **[AI, đã làm] Core HSE Vision Engine (`lib/engineering-hse-vision.ts`):**
+  - Thuật toán chấm điểm an toàn Site Safety Index (0-100) và phân cấp 4 mức độ rủi ro (SAFE, WARNING, DANGER, CRITICAL).
+  - Động cơ thị giác AI nhận diện vi phạm bảo hộ lao động (PPE: mũ, áo, dây an toàn), mép sàn nguy hiểm và rào chắn tạm thời.
+  - Tự động sinh phiếu xử phạt vi phạm an toàn công trường kèm căn cứ QCVN 18:2021/BXD và TCVN 5308:1991.
+- **[AI, đã làm] Bộ REST API:** `POST /api/engineering/hse-vision/scan`, `GET /api/engineering/hse-vision/scans`.
+- **[AI, đã làm] Giao diện người dùng:** `app/engineering/hse-vision/page.tsx` (HSE AI Vision Cockpit).
+- **[AI, đã làm] Kiểm thử tự động:** `tests/engineering-hse-vision.test.ts`.
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 120 migrations hợp lệ, test suite pass 100%, build production thành công.
+
+## M86 — Smart Zalo Field Copilot & Interactive Site Gateway (2026-08-20)
+
+- **[AI, đã làm] Migration 0119:** `migrations/0119_zalo_field_copilot_gateway.sql` tạo 3 bảng `zalo_user_bindings`, `zalo_site_message_logs`, `zalo_field_action_dispatches` kèm RLS strict.
+- **[AI, đã làm] Core Zalo NLP Engine (`lib/engineering-zalo-copilot.ts`):**
+  - Động cơ nhận diện Intent tiếng Việt công trường (Báo cáo sản lượng, Lập phiếu NCR, Tra cứu tồn kho, Yêu cầu nghiệm thu BBNT).
+  - Thuật toán bóc tách số lượng, đơn vị đo lường và định vị hệ cơ điện MEPF.
+  - Cơ chế sinh/xác thực mã OTP liên kết tài khoản Zalo với User ID XBoss trong 15 phút.
+- **[AI, đã làm] Bộ REST API:** `GET/POST /api/zalo/webhook`, `POST /api/zalo/link-otp`, `POST /api/zalo/simulate-action`.
+- **[AI, đã làm] Giao diện người dùng:** `app/engineering/zalo-copilot/page.tsx` (Zalo Field Copilot Hub).
+- **[AI, đã làm] Kiểm thử tự động:** `tests/engineering-zalo-copilot.test.ts`.
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 119 migrations hợp lệ, test suite pass 100%.
+
+## M85 — Dynamic Cashflow Forecasting & Working Capital Simulation Engine (2026-08-20)
+
+- **[AI, đã làm] Migration 0118:** `migrations/0118_dynamic_cashflow_working_capital.sql` tạo 3 bảng `engineering_cashflow_forecast_runs`, `engineering_cashflow_period_projections`, `engineering_working_capital_risks` kèm RLS strict.
+- **[AI, đã làm] Core Cashflow & S-Curve Engine (`lib/engineering-cashflow.ts`):**
+  - Thuật toán phân phối đường cong S-Curve hình chuông chuẩn hóa tích lũy.
+  - Động cơ mô phỏng dòng tiền Thu/Chi ($Cash-In$ vs $Cash-Out$) kết hợp tỷ lệ tạm ứng, giữ lại bảo hành, độ trễ phê duyệt IPC và chi phí hiện trường.
+  - Thuật toán phát hiện điểm uốn thâm hụt vốn lưu động (Working Capital Dip Period) và tự động sinh khuyến nghị ứng phó tài chính.
+- **[AI, đã làm] Bộ REST API:** `POST /api/engineering/cashflow/simulate`, `GET /api/engineering/cashflow/forecasts`.
+- **[AI, đã làm] Giao diện người dùng:** `app/engineering/cashflow/page.tsx` (Dynamic Cashflow Cockpit).
+- **[AI, đã làm] Kiểm thử tự động:** `tests/engineering-cashflow.test.ts`.
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 118 migrations hợp lệ, test suite pass 100%.
+
+## M84 — Paperless Smart e-Signature & Legal PKI BBNT Protocol (2026-08-20)
+
+- **[AI, đã làm] Migration 0117:** `migrations/0117_esignature_bbnt_legal_protocol.sql` tạo 3 bảng `engineering_esign_envelopes`, `engineering_esign_signatories`, `engineering_esign_audit_certificates` kèm RLS strict.
+- **[AI, đã làm] Core e-Signature Engine (`lib/engineering-esignature.ts`):**
+  - Thuật toán niêm phong mật mã bất biến SHA-256 (`createDocumentEnvelopeHash`).
+  - Quản lý quy trình ký số 3 bên theo thứ tự (Kỹ sư Nhà thầu $\rightarrow$ Tư vấn Giám sát $\rightarrow$ Đại diện CĐT).
+  - Tự động đóng gói và sinh Chứng thư kiểm toán điện tử (`CERT-BBNT-...`) kèm mã token chống chối bỏ.
+- **[AI, đã làm] Bộ REST API:** `GET/POST /api/engineering/esign/envelopes`, `POST /api/engineering/esign/sign`.
+- **[AI, đã làm] Giao diện người dùng:** `app/engineering/esign/page.tsx` (Paperless Smart e-Signature Studio).
+- **[AI, đã làm] Kiểm thử tự động:** `tests/engineering-esignature.test.ts`.
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 117 migrations hợp lệ, test suite pass 100%.
+
 ## M79 — AI FIDIC Contract Dispute & Delay Defense Dossier Generator (2026-08-19)
 
 - **[AI, đã làm] Migration 0113:** `migrations/0113_fidic_delay_claims.sql` tạo 2 bảng `engineering_fidic_claims` và `engineering_fidic_claim_evidences` kèm RLS strict.

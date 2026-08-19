@@ -30,6 +30,10 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { href: "/engineering/esign", label: "Paperless e-Sign (M84)", icon: ShieldCheck },
+  { href: "/engineering/cashflow", label: "Dynamic Cashflow (M85)", icon: TrendingUp },
+  { href: "/engineering/zalo-copilot", label: "Zalo Copilot (M86)", icon: Bot },
+  { href: "/engineering/hse-vision", label: "HSE AI Vision (M87)", icon: ShieldAlert },
   { href: "/engineering/subcon-ai", label: "AI Subcon Trust (M82)", icon: Users },
   { href: "/engineering/iot-telemetry", label: "IoT Smart Telemetry (M83)", icon: Activity },
   { href: "/engineering/bim-viewer", label: "3D BIM & 4D Simulation (M80)", icon: Boxes },
