@@ -15,6 +15,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { NextRequest } from "next/server";
+import type { ClaimLike } from "@/lib/engineering-agents";
 
 const S = { skip: !HAS_TEST_DB };
 const FIXTURE_DIR = join(process.cwd(), "tests", "fixtures", "engineering-ingest");
@@ -236,4 +237,43 @@ test("Fixture 07: vượt giới hạn objects → 422", S, async () => {
   const r = await post(keyA, { contractVersion: fx.contractVersion, objects }, randomUUID());
   assert.equal(r.status, (fx.expect as { status: number }).status);
   assert.equal(r.body.pointer, (fx.expect as { pointer: string }).pointer);
+});
+
+test("Fixture 08: Agent claims conflict — phân loại và phân xử theo authority (C2 §5.7)", async () => {
+  const { detectConflicts, classifyConflict, proposeResolution } =
+    await import("@/lib/engineering-agents");
+  const fx = fixture("08-agent-claims-conflict.json") as {
+    request: { topic: string; claims: Array<Partial<ClaimLike>> };
+    expect: {
+      hasConflict: boolean;
+      conflictType: string;
+      winningAuthority: string;
+      majorityVoteApplied: boolean;
+      selectedClaimIndex: number;
+      humanResolutionRequired: boolean;
+    };
+  };
+
+  const claims: ClaimLike[] = fx.request.claims.map((c, i) => ({
+    id: `claim-${i}`,
+    agentRole: c.agentRole ?? "specialist",
+    topic: fx.request.topic,
+    claim: c.claim ?? "",
+    assumptions: c.assumptions ?? [],
+    confidence: c.confidence ?? "medium",
+    sourceAuthority: c.sourceAuthority ?? "derived",
+    sourceRevisionId: c.sourceRevisionId ?? null,
+    payload: c.payload ?? {},
+  }));
+
+  const conflicts = detectConflicts(claims);
+  assert.equal(conflicts.length > 0, fx.expect.hasConflict);
+
+  const conflictType = classifyConflict(claims);
+  assert.equal(conflictType, fx.expect.conflictType);
+
+  const resolution = proposeResolution("data", claims);
+  assert.equal(resolution.winnerClaimId, claims[fx.expect.selectedClaimIndex].id);
+  assert.equal(resolution.method, "source_authority");
+  assert.equal(resolution.needsHuman, fx.expect.humanResolutionRequired);
 });

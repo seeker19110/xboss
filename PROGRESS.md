@@ -27,6 +27,19 @@
 
 **Nợ kỹ thuật/rủi ro mở:** ~~`audit_log.entity_id` chỉ hỗ trợ khoá `BIGINT` nên `engineering_*` (UUID) nằm ngoài audit trail~~ — **đã đóng** bằng `0090` (cột `entity_key` TEXT, xem mục "C3 §2" bên dưới). Rủi ro còn lại là vận hành, không phải code: cặp `0091`/`0092` phải chạy staging trước khi lên production.
 
+## C5 & C6 — UAT & Release Manifest v1.0.0 (Product Complete) (2026-08-19)
+
+- **[AI, đã làm] Đóng toàn bộ lộ trình C0→C6:** Hoàn tất toàn bộ 7 cột mốc Product Complete của XBoss v1.0 theo `PROJECT-COMPLETION-ROADMAP.md`.
+- **[AI, đã làm] Tài liệu UAT & Rollout (C5):** `docs/ops/uat-checklist-and-rollout-plan.md` quy định chi tiết ma trận kiểm thử 7 vai trò, 6 hành trình trọng yếu (end-to-end journeys), kế hoạch triển khai phân tầng (cohort rollout) và kịch bản rollback an toàn.
+- **[AI, đã làm] Release Manifest v1.0.0 (C6):** `docs/ops/release-manifest-v1.0.md` chốt toàn bộ thông số kỹ thuật, hồ sơ 93 migration, báo cáo chất lượng (typecheck/lint/tests 134 files/mutation/build), và danh mục tài liệu vận hành.
+- **[AI, đã làm] Goal Tracker Complete:** `docs/goals/goal-2026-c-v1-release.md` đã vượt qua 8/8 tiêu chí Final Audit và chuyển trạng thái sang **COMPLETE**.
+
+## C2 — MEPF-Agents Connector & Pilot Readiness (2026-08-19)
+
+- **[AI, đã làm] Fixture 08 kiểm tra xung đột Agent Claims:** `tests/fixtures/engineering-ingest/08-agent-claims-conflict.json` kiểm chứng phân xử xung đột theo cấp độ thẩm quyền nguồn (`sourceAuthority`: `primary_spec` > `derived`), không áp dụng đa số phiếu (`majorityVoteApplied: false`).
+- **[AI, đã làm] Hướng dẫn diễn tập Staging Pilot:** `docs/api/mepf-connector-pilot-guide.md` chuẩn hóa đầy đủ cấu hình environment, endpoint ingest, giao thức lũy đẳng (idempotency replay snapshot), và 5 kịch bản diễn tập P0→P4.
+- **[AI, đã làm] Contract Test:** Bổ sung ca kiểm thử cho Fixture 08 vào `tests/engineering-contract.test.ts`, chạy pass 100%.
+
 ## Goal Tracker & C4 §8 — DR Restore Verification (2026-08-19)
 
 - **[AI, đã làm] Khởi tạo Goal Tracker:** `docs/goals/goal-2026-c-v1-release.md` theo chuẩn `docs/goals/TEMPLATE.md` để theo dõi xuyên suốt hành trình C0→C6 đạt Product Complete (XBoss v1.0).
