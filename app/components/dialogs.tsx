@@ -84,7 +84,9 @@ export function Modal({
 
   return (
     <div
-      className={`fixed inset-0 ${zIndex} bg-black/60 flex ${drawer ? "items-stretch justify-start" : "items-center justify-center p-4"}`}
+      className={`fixed inset-0 ${zIndex} bg-black/70 backdrop-blur-xs flex transition-opacity ${
+        drawer ? "items-stretch justify-start" : "items-center justify-center p-4"
+      }`}
       role="dialog"
       aria-modal="true"
       onClick={onClose}
@@ -94,8 +96,8 @@ export function Modal({
         id={id}
         className={
           drawer
-            ? `bg-zinc-950 border-r border-zinc-800 h-full overflow-y-auto safe-top ${className}`
-            : `bg-zinc-900 border border-zinc-700 rounded-xl w-full max-h-[90vh] overflow-y-auto ${className}`
+            ? `bg-zinc-950 border-r border-zinc-800 h-full overflow-y-auto safe-top shadow-2xl ${className}`
+            : `bg-zinc-900 border border-zinc-700/80 rounded-2xl shadow-2xl w-full max-h-[90vh] overflow-y-auto ${className}`
         }
         onClick={(e) => e.stopPropagation()}
       >
@@ -227,11 +229,11 @@ export default function AppDialogs() {
             className={`w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600 ${current.mono ? "font-mono" : ""}`}
           />
         )}
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-2.5 pt-1">
           {current.kind !== "alert" && (
             <button
               onClick={cancel}
-              className="px-3 py-1.5 text-sm bg-zinc-800 hover:bg-zinc-700 rounded-lg"
+              className="px-4 py-2 text-sm bg-zinc-800 hover:bg-zinc-750 text-zinc-300 rounded-xl transition font-medium min-h-[40px]"
             >
               Huỷ
             </button>
@@ -239,9 +241,9 @@ export default function AppDialogs() {
           <button
             onClick={ok}
             autoFocus={current.kind !== "prompt"}
-            className={`px-4 py-1.5 text-sm rounded-lg font-medium ${
+            className={`px-5 py-2 text-sm rounded-xl font-medium text-white transition active:scale-[0.98] min-h-[40px] shadow-sm ${
               current.kind === "confirm" && current.danger
-                ? "bg-red-700 hover:bg-red-600"
+                ? "bg-red-600 hover:bg-red-700"
                 : "bg-emerald-600 hover:bg-emerald-700"
             }`}
           >

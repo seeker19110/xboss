@@ -19,11 +19,13 @@ function ChildCard({ child }: { child: DashNode }) {
       <span
         aria-disabled="true"
         title={`${child.label} — sắp có`}
-        className="flex items-center gap-3 bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 text-zinc-500 select-none"
+        className="flex items-center gap-3.5 bg-zinc-900/40 border border-zinc-800/80 rounded-2xl p-4 text-zinc-500 select-none shadow-xs"
       >
-        <Icon className="w-5 h-5 shrink-0" strokeWidth={1.75} />
+        <div className="w-10 h-10 rounded-xl bg-zinc-900 flex items-center justify-center text-zinc-600 shrink-0">
+          <Icon className="w-5 h-5" strokeWidth={1.5} />
+        </div>
         <span className="flex-1 text-sm font-medium truncate">{child.label}</span>
-        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-zinc-800 text-amber-300 shrink-0">
+        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-zinc-800 text-amber-400/80 shrink-0 border border-zinc-700/50">
           Sắp có
         </span>
       </span>
@@ -32,10 +34,14 @@ function ChildCard({ child }: { child: DashNode }) {
   return (
     <a
       href={child.href}
-      className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-xl p-4 hover:border-zinc-600 transition"
+      className="flex items-center gap-3.5 bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-4 hover:border-zinc-700 hover:bg-zinc-850 active:scale-[0.99] transition-all duration-150 group shadow-xs"
     >
-      <Icon className="w-5 h-5 shrink-0 text-emerald-400" strokeWidth={1.75} />
-      <span className="flex-1 text-sm font-medium truncate">{child.label}</span>
+      <div className="w-10 h-10 rounded-xl bg-zinc-800/80 group-hover:bg-emerald-950/40 flex items-center justify-center text-emerald-400 shrink-0 transition-colors">
+        <Icon className="w-5 h-5" strokeWidth={1.75} />
+      </div>
+      <span className="flex-1 text-sm font-semibold text-zinc-200 group-hover:text-white truncate transition-colors">
+        {child.label}
+      </span>
     </a>
   );
 }

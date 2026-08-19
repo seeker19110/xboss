@@ -258,7 +258,50 @@ body {
 :focus-visible {
   outline: 2px solid #34d399; /* emerald-400 */
   outline-offset: 2px;
-  border-radius: 2px;
+  border-radius: 4px;
+}
+
+/* ─── Modern UI/UX Utility Classes (ui-ux-craftsman) ─────────────────────── */
+.card-surface {
+  background-color: var(--color-zinc-900);
+  border: 1px solid var(--color-zinc-800);
+  border-radius: 0.75rem;
+  transition:
+    border-color 0.15s ease-out,
+    box-shadow 0.15s ease-out;
+}
+.card-surface:hover {
+  border-color: var(--color-zinc-700);
+}
+
+.interactive-press {
+  transition:
+    transform 0.15s ease-out,
+    background-color 0.15s ease-out,
+    opacity 0.15s ease-out;
+}
+.interactive-press:active {
+  transform: scale(0.98);
+}
+
+/* Custom scrollbar thanh lịch */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-zinc-700) transparent;
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--color-zinc-700);
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-zinc-600);
 }
 
 /* Safe area padding cho thiết bị có notch/home indicator (iPhone X+, Android notch) */

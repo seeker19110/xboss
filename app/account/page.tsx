@@ -96,14 +96,18 @@ export default function AccountPage() {
         )}
 
         {!require2fa && (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center text-lg font-bold text-emerald-400 shrink-0">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 flex items-center gap-4 shadow-sm">
+            <div className="w-13 h-13 rounded-2xl bg-emerald-950/80 border border-emerald-800/60 flex items-center justify-center text-xl font-bold text-emerald-300 shrink-0 shadow-inner">
               {me.name.trim().charAt(0).toUpperCase()}
             </div>
-            <div className="min-w-0">
-              <p className="font-semibold truncate">{me.name}</p>
-              <p className="text-sm text-zinc-400 truncate">{me.email}</p>
-              <p className="text-xs text-emerald-400 mt-0.5">{ROLE_LABEL[me.role] ?? me.role}</p>
+            <div className="min-w-0 flex-1">
+              <p className="font-bold text-base text-zinc-100 truncate">{me.name}</p>
+              <p className="text-xs text-zinc-400 truncate mt-0.5">{me.email}</p>
+              <div className="mt-2">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-zinc-800 text-emerald-400 border border-zinc-700/60">
+                  {ROLE_LABEL[me.role] ?? me.role}
+                </span>
+              </div>
             </div>
           </div>
         )}
@@ -113,30 +117,36 @@ export default function AccountPage() {
         {require2fa ? (
           <button
             onClick={logout}
-            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 bg-zinc-900 border border-zinc-800 rounded-xl hover:bg-zinc-800 transition text-left"
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-red-400 bg-zinc-900 border border-zinc-800 rounded-2xl hover:bg-zinc-850 active:scale-[0.99] transition text-left min-h-[44px]"
           >
             <LogOut className="w-4 h-4 shrink-0" />
             <span className="flex-1">Đăng xuất</span>
           </button>
         ) : (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl divide-y divide-zinc-800 overflow-hidden">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl divide-y divide-zinc-800/80 overflow-hidden shadow-sm">
             {links.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
-                className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-zinc-800 transition"
+                className="flex items-center gap-3.5 px-4 py-3.5 text-sm hover:bg-zinc-850 active:scale-[0.99] transition group"
               >
-                <l.icon className={`w-4 h-4 shrink-0 ${l.color}`} />
-                <span className="flex-1">{l.label}</span>
-                <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
+                <div className="w-8 h-8 rounded-lg bg-zinc-800/80 flex items-center justify-center shrink-0 group-hover:bg-zinc-750 transition-colors">
+                  <l.icon className={`w-4 h-4 shrink-0 ${l.color}`} />
+                </div>
+                <span className="flex-1 font-medium text-zinc-200 group-hover:text-white transition-colors">
+                  {l.label}
+                </span>
+                <ChevronRight className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
               </Link>
             ))}
             <button
               onClick={logout}
-              className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-zinc-800 transition text-left"
+              className="w-full flex items-center gap-3.5 px-4 py-3.5 text-sm font-medium text-red-400 hover:bg-red-950/20 active:scale-[0.99] transition text-left group"
             >
-              <LogOut className="w-4 h-4 shrink-0" />
-              <span className="flex-1">Đăng xuất</span>
+              <div className="w-8 h-8 rounded-lg bg-red-950/40 flex items-center justify-center shrink-0 text-red-400 group-hover:bg-red-900/50 transition-colors">
+                <LogOut className="w-4 h-4 shrink-0" />
+              </div>
+              <span className="flex-1 font-medium">Đăng xuất</span>
             </button>
           </div>
         )}

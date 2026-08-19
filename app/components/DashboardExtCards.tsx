@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { ShieldAlert, FilePlus2, MapPinned, Inbox } from "lucide-react";
 import EditableText from "@/app/components/EditableText";
+import { systemColorClasses } from "@/lib/systemColors";
 
 export type QualityBlock = {
   ncrOpen: number;
@@ -128,35 +129,43 @@ export default function DashboardExtCards({
                 </tr>
               </thead>
               <tbody>
-                {bySystem.map((d) => (
-                  <tr key={d.code} className="border-b border-zinc-800/60 last:border-0">
-                    <td className="p-3">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className={`w-2 h-2 rounded-full bg-${d.color ?? "zinc"}-400`} />
-                        {d.name}
-                      </span>
-                    </td>
-                    <td className="p-3 min-w-[120px]">
-                      <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
-                        <div
-                          className={`h-full bg-${d.color ?? "zinc"}-400`}
-                          style={{ width: `${Math.min(100, Math.round(d.progressPct))}%` }}
-                        />
-                      </div>
-                      <p className="text-xs text-zinc-400 mt-1">{Math.round(d.progressPct)}%</p>
-                    </td>
-                    <td
-                      className={`p-3 text-right ${d.delayedCount > 0 ? "text-rose-300 font-medium" : "text-zinc-300"}`}
+                {bySystem.map((d) => {
+                  const c = systemColorClasses(d.color);
+                  return (
+                    <tr
+                      key={d.code}
+                      className="border-b border-zinc-800/60 last:border-0 hover:bg-zinc-800/30 transition-colors"
                     >
-                      {d.delayedCount}
-                    </td>
-                    <td
-                      className={`p-3 text-right ${d.ncrOpen > 0 ? "text-amber-300 font-medium" : "text-zinc-300"}`}
-                    >
-                      {d.ncrOpen}
-                    </td>
-                  </tr>
-                ))}
+                      <td className="p-3">
+                        <span className="inline-flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${c.dot}`} />
+                          <span className="font-medium">{d.name}</span>
+                        </span>
+                      </td>
+                      <td className="p-3 min-w-[120px]">
+                        <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+                          <div
+                            className={`h-full ${c.dot}`}
+                            style={{ width: `${Math.min(100, Math.round(d.progressPct))}%` }}
+                          />
+                        </div>
+                        <p className={`text-xs font-semibold mt-1 tabular-nums ${c.text}`}>
+                          {Math.round(d.progressPct)}%
+                        </p>
+                      </td>
+                      <td
+                        className={`p-3 text-right tabular-nums ${d.delayedCount > 0 ? "text-rose-400 font-semibold" : "text-zinc-400"}`}
+                      >
+                        {d.delayedCount > 0 ? `${d.delayedCount} tầng` : "—"}
+                      </td>
+                      <td
+                        className={`p-3 text-right tabular-nums ${d.ncrOpen > 0 ? "text-amber-400 font-semibold" : "text-zinc-400"}`}
+                      >
+                        {d.ncrOpen > 0 ? d.ncrOpen : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
