@@ -27,6 +27,15 @@
 
 **Nợ kỹ thuật/rủi ro mở:** ~~`audit_log.entity_id` chỉ hỗ trợ khoá `BIGINT` nên `engineering_*` (UUID) nằm ngoài audit trail~~ — **đã đóng** bằng `0090` (cột `entity_key` TEXT, xem mục "C3 §2" bên dưới). Rủi ro còn lại là vận hành, không phải code: cặp `0091`/`0092` phải chạy staging trước khi lên production.
 
+## PIN-1 — Living Digital Twin & Continuous Reality Ingestion (L4–L6) (2026-08-19)
+
+- **[AI, đã làm] Migration 0098:** `migrations/0098_engineering_pinnacle_autonomous_os.sql` tạo các bảng `engineering_twin_reality_captures`, `engineering_twin_spatial_deviations`, `engineering_twin_sensor_streams`, `engineering_prescriptive_scenarios`, `engineering_compliance_rules`, `engineering_compliance_audits`, `engineering_swarm_debates`, `engineering_knowledge_patterns` và kích hoạt RLS strict.
+- **[AI, đã làm] Core Engine (`lib/engineering-twin-pinnacle.ts`):** Ingestion dữ liệu đám mây điểm LiDAR/Drone, tính toán sai lệch hình học 3D ($\Delta x, \Delta y, \Delta z, \|\Delta\|_2$), phân loại mức độ nghiêm trọng (Low/Medium/High/Critical), quản lý quy trình khắc phục và xử lý luồng cảm biến IoT phát hiện bất thường.
+- **[AI, đã làm] Bộ REST API:** Cung cấp 5 endpoint: `GET/POST /api/engineering/twin/reality-capture`, `GET/POST /api/engineering/twin/deviations`, `POST /api/engineering/twin/deviations/[id]/remediate`, `POST /api/engineering/twin/sensors/telemetry`, `GET /api/engineering/twin/sensors`.
+- **[AI, đã làm] Giao diện người dùng:** `app/engineering/reality/page.tsx` quản lý đợt quét thực địa, bảng tra cứu sai lệch BIM vs As-Built kèm hành động tiếp nhận/khắc phục, và dashboard giám sát cảm biến IoT thời gian thực.
+- **[AI, đã làm] Kiểm thử tích hợp:** `tests/engineering-twin-pinnacle.test.ts` kiểm thử toàn diện tính toán hình học sai lệch, ingestion, remediation và anomaly status.
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi, 98 migrations hợp lệ, test suite 139 files pass, build production thành công.
+
 ## Đợt Audit Toàn Dự Án & Quét Sửa Sạch Lỗi (2026-08-19)
 
 - **[AI, đã làm] Quét toàn diện 5 cổng chất lượng tự động:**
