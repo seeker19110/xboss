@@ -25,6 +25,24 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
+## MEPF-Agents Hybrid Worker Module — PR1 Scaffold (2026-08-19)
+
+Tích hợp MEPF-Agents (`seeker19110/MEPF-Agents`) vào XBoss dưới dạng **module nội bộ**: cùng repo, cùng Docker Compose, cùng giao diện — nhưng phần xử lý AI Agent (Python/LangGraph/ezdxf) chạy ngầm dưới dạng Background Worker Service để bảo vệ hiệu năng web app.
+
+**Kiến trúc:** `mepf-worker` (Python daemon) poll hàng đợi `engineering_async_tasks` (PostgreSQL SKIP LOCKED, đã có từ migration `0107`) thay vì Celery/Redis — giảm độ phức tạp infra, tận dụng RLS + audit trail sẵn có của XBoss.
+
+- **[AI, đã làm] Git Submodule:** `mepf-worker/` → `seeker19110/MEPF-Agents` (clone thành công, có `.gitmodules`).
+- **[AI, đã làm] `Dockerfile.mepf-worker`:** 2-stage build (Python 3.12-slim), cài MEPF-Agents + deps (ezdxf, LangGraph, psycopg2...), entrypoint `worker_entry.py`.
+- **[AI, đã làm] `scripts/mepf/worker_entry.py`:** Python daemon — poll `SKIP LOCKED`, claim task, dispatch sang 8 handler MEPF (HVAC/CAD/BIM/QS/PCCC/Điện/Nước/Agent), heartbeat 30s, retry, graceful shutdown SIGTERM. Có `DRY_RUN` mode (giả lập không gọi LLM) để test mà không cần API key.
+- **[AI, đã làm] `docker-compose.yml`:** Thêm service `mepf-worker` (kết nối cùng DB, không expose port, volume `mepf-workspace` riêng cho file DXF/IFC).
+- **[AI, đã làm] `.env.example`:** Thêm phần `MEPF-Agents Worker` — `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `MEPF_WORKER_*` tuning vars, model per-role.
+- **[AI, đã làm] `app/api/engineering/queue/tasks/[id]/progress/route.ts`:** Endpoint poll tiến độ realtime từng task (`status`, `progress_percent`, `result`, `elapsedMs`).
+- **[AI, đã làm] `app/engineering/mepf-studio/page.tsx`:** Trang UI `/engineering/mepf-studio` — gửi tác vụ 8 loại (form chọn type + payload JSON), danh sách hàng đợi realtime (poll 3s, progress bar), xem kết quả JSON, huỷ task.
+- **[AI, đã làm] `eslint.config.mjs`:** Thêm `mepf-worker/**` vào ignores để ESLint không lint file Python/JSX của submodule.
+- **Verify:** `npm run lint` ✅ 0 lỗi · `npm run typecheck` ✅ 0 lỗi.
+
+**Cổng tiếp theo (PR2):** Test end-to-end: `docker compose up -d` → gửi task `mepf.hvac.calc` từ `/engineering/mepf-studio` → worker claim → xử lý → thấy kết quả trên UI. Sau đó nối kết quả worker vào `engineering_objects` pending review qua Gate 0 ENG-3.
+
 ## M73 — Nền Tảng Siêu Tính Toán Không Gian, Hàng Đợi Tác Vụ Phân Tán & Sổ Cái Merkle Bất Biến (2026-08-19)
 
 - **[AI, đã làm] Migration 0107:** `migrations/0107_spatial_queue_merkle_ledger.sql` tạo các bảng `engineering_async_tasks`, `engineering_merkle_roots`, `engineering_spatial_compute_cache` kèm RLS strict.

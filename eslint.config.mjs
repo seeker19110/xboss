@@ -5,6 +5,8 @@ const config = [
   { ignores: ["_framework-dropins/**"] },
   // Worktree tạm của agent (chứa build artifact .next riêng) — không lint, xem .gitignore
   { ignores: [".claude/**"] },
+  // MEPF-Agents submodule (Python project + React app riêng) — không lint
+  { ignores: ["mepf-worker/**"] },
   ...nextConfig,
   {
     rules: {

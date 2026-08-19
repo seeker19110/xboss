@@ -14,6 +14,37 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # ---------------------------------------------------------------------------
+  # MEPF-Agents Worker — Python daemon xử lý tác vụ AI kỹ thuật ngầm
+  # Poll hàng đợi engineering_async_tasks (SKIP LOCKED, không cần Redis/Celery)
+  # Thiếu ANTHROPIC_API_KEY/OPENAI_API_KEY → worker chạy dry-run tự động
+  # ---------------------------------------------------------------------------
+  mepf-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.mepf-worker
+    environment:
+      - DATABASE_URL=postgres://xboss:xboss@db:5432/xboss
+      # LLM provider — khai ít nhất 1 key để worker gọi agent thật
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # Cấu hình worker
+      - MEPF_WORKER_ID=${MEPF_WORKER_ID:-mepf-worker-1}
+      - MEPF_WORKER_CONCURRENCY=${MEPF_WORKER_CONCURRENCY:-2}
+      - MEPF_DRY_RUN=${MEPF_DRY_RUN:-false}
+      - MEPF_POLL_INTERVAL=${MEPF_POLL_INTERVAL:-3}
+      # Model cho từng vai trò agent (để trống = dùng mặc định MEPF-Agents)
+      - CAD_MODEL_NAME=${MEPF_CAD_MODEL:-}
+      - REVIEWER_LLM_PROVIDER=${MEPF_REVIEWER_LLM_PROVIDER:-}
+    volumes:
+      # Workspace riêng cho từng phiên MEPF (file DXF/IFC tải lên)
+      - mepf-workspace:/app/workspace
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    # Worker không expose port — internal daemon
+
   db:
     image: postgres:17-alpine
     environment:
@@ -31,3 +62,4 @@ services:
 
 volumes:
   xboss-pgdata:
+  mepf-workspace:   # Workspace file DXF/IFC cho MEPF-Agents

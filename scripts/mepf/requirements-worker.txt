@@ -1,0 +1,4 @@
+# Dependencies cho XBoss MEPF Worker entry point
+# Các dep của MEPF-Agents (LangGraph, ezdxf, v.v.) cài riêng từ mepf-worker/pyproject.toml
+psycopg2-binary>=2.9.9
+python-dotenv>=1.0.0
