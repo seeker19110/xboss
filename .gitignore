@@ -25,8 +25,7 @@ backups/
 cloudflared.exe
 cloudflared-*.txt
 
-# Skill/agent của công cụ dev — không đưa vào repo dự án
-.agents/
+# Claude settings — không đưa vào repo dự án
 .claude/
 
 # SQLite cũ (đã chuyển sang Postgres) — giữ file local làm backup
