@@ -155,21 +155,25 @@ export default function HubShell({
           {/* Scrollable Tabs */}
           <nav
             role="tablist"
+            aria-label="Các phân hệ nghiệp vụ"
             className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none touch-pan-x"
           >
-            {tabs.map((tab) => {
+            {tabs.map((tab, idx) => {
               const TabIcon = tab.icon;
               const isSelected = tab.id === activeTab;
               return (
                 <button
                   key={tab.id}
                   role="tab"
+                  id={`tab-${tab.id}`}
+                  aria-controls={`tabpanel-${tab.id}`}
                   aria-selected={isSelected}
                   onClick={() => handleTabChange(tab.id)}
-                  className={`flex min-h-[40px] items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs sm:text-sm font-medium transition-all ${
+                  title={`${tab.label} (Phím tắt: Alt+${idx + 1})`}
+                  className={`flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-xl px-3.5 py-2 text-xs sm:text-sm font-medium transition-all ${
                     isSelected
                       ? "bg-zinc-800 text-amber-300 border border-amber-500/40 shadow-inner font-semibold"
-                      : "bg-zinc-950/60 text-zinc-400 border border-zinc-800/80 hover:bg-zinc-800/60 hover:text-zinc-200"
+                      : "bg-zinc-950/70 text-zinc-400 border border-zinc-800 hover:bg-zinc-800/70 hover:text-zinc-100 hover:border-zinc-700"
                   }`}
                 >
                   <TabIcon
@@ -180,10 +184,10 @@ export default function HubShell({
                   <span>{tab.label}</span>
                   {tab.badge !== undefined && (
                     <span
-                      className={`rounded-full px-1.5 py-0.2 text-[10px] font-mono font-semibold ${
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-mono font-bold tabular-nums ${
                         isSelected
                           ? "bg-amber-400/20 text-amber-300 border border-amber-400/30"
-                          : "bg-zinc-800 text-zinc-400"
+                          : "bg-zinc-800/80 text-zinc-400 border border-zinc-700/50"
                       }`}
                     >
                       {tab.badge}
@@ -197,13 +201,13 @@ export default function HubShell({
           {/* Search Filter */}
           {onSearchChange && (
             <div className="relative min-w-[220px] max-w-md w-full md:w-auto">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
                 placeholder={searchPlaceholder}
-                className="w-full rounded-lg border border-zinc-800 bg-zinc-950/90 py-1.5 pl-8 pr-3 text-xs text-zinc-200 placeholder:text-zinc-500 focus:border-amber-500 focus:outline-none"
+                className="w-full min-h-[44px] rounded-xl border border-zinc-800 bg-zinc-950/90 py-2 pl-9 pr-3 text-xs text-zinc-100 placeholder:text-zinc-500 focus:border-amber-500 focus:outline-none transition-colors"
               />
             </div>
           )}
@@ -211,10 +215,10 @@ export default function HubShell({
 
         {/* Tab Description banner if available */}
         {currentTabObj?.description && (
-          <div className="px-3.5 py-2 rounded-lg bg-zinc-900/40 border border-zinc-800/60 text-xs text-zinc-400 flex items-center justify-between">
-            <span>{currentTabObj.description}</span>
+          <div className="px-4 py-2.5 rounded-xl bg-zinc-900/50 border border-zinc-800/70 text-xs text-zinc-400 flex items-center justify-between shadow-xs">
+            <span className="leading-relaxed">{currentTabObj.description}</span>
             {isPending && (
-              <span className="text-[11px] text-amber-400 font-medium animate-pulse">
+              <span className="text-[11px] text-amber-400 font-mono font-medium animate-pulse shrink-0 ml-3">
                 Đang chuyển chế độ...
               </span>
             )}
@@ -222,7 +226,12 @@ export default function HubShell({
         )}
 
         {/* Active Tab Workspace Content */}
-        <div className="tab-content transition-opacity duration-150">
+        <div
+          id={`tabpanel-${currentTabObj?.id || "default"}`}
+          role="tabpanel"
+          aria-labelledby={`tab-${currentTabObj?.id || "default"}`}
+          className="tab-content transition-opacity duration-150"
+        >
           {currentTabObj ? currentTabObj.content : null}
         </div>
       </main>

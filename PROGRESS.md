@@ -25,6 +25,23 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
+## Chuẩn Hóa UI/UX Đẳng Cấp Thần Thánh & Khép Kín Vòng Đời Dự Án 6 Giai Đoạn (2026-08-21)
+
+- **[AI, đã làm] Tái Cấu Trúc Toàn Diện Giao Diện Theo Chuỗi Quy Trình Nghiệp Vụ:**
+  - **Hero Lifecycle Flow Banner ([`app/page.tsx`](file:///c:/Users/liend/xboss/app/page.tsx)):** Thiết lập tiến trình vòng đời dự án khép kín 6 giai đoạn (GĐ 0: Khởi Động & Pháp Lý $\rightarrow$ GĐ 1: Kỹ Thuật CAD/BIM $\rightarrow$ GĐ 2: Cung Ứng & Vật Tư $\rightarrow$ GĐ 3: Thi Công Hiện Trường $\rightarrow$ GĐ 4: Nghiệm Thu & IPC $\rightarrow$ GĐ 5: Hoàn Công & Bàn Giao).
+  - **7 Đại Trung Tâm Điều Hành Hợp Nhất (7 Unified Hubs):** Chuẩn hóa toàn bộ Bento Cards điều hành, Live Status Indicators, và kết nối trực tiếp với 114 tính năng chuyên sâu.
+  - **Nâng Cấp Khung [`app/components/HubShell.tsx`](file:///c:/Users/liend/xboss/app/components/HubShell.tsx):** Bổ sung phím tắt chuyển tab Alt+1..9, tối ưu vùng chạm ngón cái công trường $\ge 44\text{px}$ (Thumb-Zone), ARIA Accessibility (`role="tablist"`, `aria-selected`, `aria-controls`), và Zero Cumulative Layout Shift (Zero CLS).
+  - **10 Nguyên Tắc Bất Biến Tối Thượng (The 10 Apex Invariants):**
+    - Đảm bảo 100% Dark-First qua biến CSS, tương thích hoàn hảo cả 5 theme (`dark`, `light`, `kingblue`, `darkblue`, `navy`).
+    - Chuẩn tương phản quốc tế **WCAG 2.2 AA** ($\ge 4.5:1$), số liệu tài chính/tiến độ `font-mono tabular-nums text-right`.
+    - 100% tiếng Việt chuẩn văn phong kỹ thuật xây dựng cơ điện.
+  - **Kiểm Thử & Verification:**
+    - `npm run lint` & `npm run typecheck`: 0 lỗi.
+    - `npm run check:sw-exclude`: 100% passed.
+    - `npm run check:migrations`: 129 migrations hợp lệ.
+    - `npm test -- --release-gate`: 199/199 test files pass 100% (0 errors).
+    - `npm run build`: Production Build biên dịch thành công 100% routes.
+
 ## Dọn Dẹp & Hợp Nhất Toàn Diện Các Nhóm Tính Năng (2026-08-21)
 
 - **[AI, đã làm] Tinh Gọn 19 Cụm Điều Hướng Phân Mảnh Thành 8 Phân Hệ Hợp Nhất:**

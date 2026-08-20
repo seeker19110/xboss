@@ -357,6 +357,118 @@ export default function Dashboard() {
 
       {/* pb-24 chừa chỗ cho thanh cố định dưới đáy (tìm kiếm/Nghiệm thu/Excel/PDF/Import) */}
       <main className="px-4 sm:px-6 py-6 pb-24 space-y-6 max-w-screen-xl mx-auto">
+        {/* ── Vòng Đời Dự Án 6 Giai Đoạn (6-Stage Construction Lifecycle Progression) ── */}
+        <section className="p-4 sm:p-5 rounded-2xl bg-zinc-950/90 border border-zinc-800 shadow-sm space-y-3.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800/80 pb-3">
+            <div className="flex items-center gap-2.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <div>
+                <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-zinc-200">
+                  Chuỗi Quy Trình Vòng Đời Dự Án Xây Dựng MEPF (6 Giai Đoạn)
+                </h2>
+                <p className="text-[11px] text-zinc-400">
+                  Tiến trình khép kín từ Khởi động, BIM/CAD, Cung ứng, Thi công, Nghiệm thu đến Bàn
+                  giao số
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20 font-bold">
+                TT AVIO — Tháp A
+              </span>
+            </div>
+          </div>
+
+          {/* 6 Stage Lifecycle Steps Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+            {[
+              {
+                stage: "GĐ 0",
+                title: "Khởi Động & Pháp Lý",
+                desc: "Điều 107 • ĐTM • BOQ TT12",
+                href: "/governance?tab=lifecycle",
+                status: "Đạt chuẩn",
+                color: "text-emerald-400",
+                bg: "bg-emerald-500/10",
+                border: "border-emerald-500/30",
+              },
+              {
+                stage: "GĐ 1",
+                title: "Kỹ Thuật Không Gian",
+                desc: "3D BIM • Routing • Nesting",
+                href: "/mepf-cad-bim-studio",
+                status: "LOD 400",
+                color: "text-amber-400",
+                bg: "bg-amber-500/10",
+                border: "border-amber-500/30",
+              },
+              {
+                stage: "GĐ 2",
+                title: "Cung Ứng & Vật Tư",
+                desc: "PO 6 bước • QR GRN Cổng",
+                href: "/procurement",
+                status: "100% Khớp",
+                color: "text-blue-400",
+                bg: "bg-blue-500/10",
+                border: "border-blue-500/30",
+              },
+              {
+                stage: "GĐ 3",
+                title: "Hiện Trường & HSE",
+                desc: "Nhật ký TT06 • AI Vision",
+                href: "/site",
+                status: "Đang thi công",
+                color: "text-emerald-400",
+                bg: "bg-emerald-500/10",
+                border: "border-emerald-500/30",
+              },
+              {
+                stage: "GĐ 4",
+                title: "Nghiệm Thu & IPC",
+                desc: "Ký số e-Sign • TT96 • FIDIC",
+                href: "/commercial",
+                status: "Quyết toán kỳ 6",
+                color: "text-violet-400",
+                bg: "bg-violet-500/10",
+                border: "border-violet-500/30",
+              },
+              {
+                stage: "GĐ 5",
+                title: "Hoàn Công & Bàn Giao",
+                desc: "T&C • Điều 24 • Digital Twin",
+                href: "/governance?tab=lifecycle",
+                status: "Chuẩn bị",
+                color: "text-zinc-300",
+                bg: "bg-zinc-900",
+                border: "border-zinc-700",
+              },
+            ].map((stg, idx) => (
+              <a
+                key={idx}
+                href={stg.href}
+                className={`p-3 rounded-xl border ${stg.border} bg-zinc-900/60 hover:bg-zinc-900 transition-all flex flex-col justify-between group shadow-2xs hover:shadow-sm`}
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase">
+                      {stg.stage}
+                    </span>
+                    <span
+                      className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-semibold ${stg.bg} ${stg.color}`}
+                    >
+                      {stg.status}
+                    </span>
+                  </div>
+                  <h4 className="text-xs font-semibold text-zinc-200 group-hover:text-amber-300 transition-colors leading-snug">
+                    {stg.title}
+                  </h4>
+                </div>
+                <p className="text-[10px] text-zinc-400 mt-2 font-mono truncate">{stg.desc}</p>
+              </a>
+            ))}
+          </div>
+        </section>
+
         {/* ── 7 Đại Trung Tâm Điều Hành Hợp Nhất (The 7 Master Hubs) ── */}
         <section className="space-y-3">
           <div className="flex items-center justify-between">
