@@ -5,7 +5,7 @@ description: "Quy chuẩn chỉ huy tác nghiệp hiện trường, điều ph�
 
 # SITE FIELD COMMANDER — QUY CHUẨN CHỈ HUY HIỆN TRƯỜNG, ĐIỀU PHỐI MẶT BẰNG & LOGISTICS QR
 
-Bộ Skill này đóng gói toàn bộ tri thức chỉ huy công trường xây dựng, quy trình bàn giao mặt bằng thi công (Work-Front Custody), tiêu chuẩn nhật ký thi công điện tử theo Thông tư 06/2021/TT-BXD, và quy trình tiếp nhận vật tư bằng mã QR di động cho nền tảng XBoss.
+Bộ Skill này đóng gói toàn bộ tri thức chỉ huy công trường xây dựng, quy trình bàn giao mặt bằng thi công (Work-Front Custody), tiêu chuẩn nhật ký thi công điện tử theo **Thông tư 06/2021/TT-BXD**, và quy trình tiếp nhận vật tư bằng mã QR di động cho nền tảng XBoss.
 
 ---
 
@@ -14,12 +14,14 @@ Bộ Skill này đóng gói toàn bộ tri thức chỉ huy công trường xây
 1. **Bất biến Bàn giao Mặt bằng (Work-Front Custody Invariant):**
    - Một phân vùng mặt bằng thi công (theo Tầng, Zone, Phòng máy) tại một thời điểm chỉ có DUY NHẤT một đơn vị/tổ đội nắm quyền kiểm soát chính (Custody Owner).
    - Mọi hoạt động bàn giao mặt bằng giữa Thầu chính - Thầu phụ hoặc giữa các Nhà thầu chuyên ngành phải có Biên bản bàn giao hiện trường (Site Handover Record) kèm hình ảnh xác nhận hiện trạng mặt bằng sạch sẽ, mốc trắc đạc và hệ thống điện/nước tạm.
+
 2. **Bất biến Nhật ký Thi công (Diary Completeness Invariant):**
    - Theo Thông tư 06/2021/TT-BXD, nhật ký thi công mỗi ngày BẮT BUỘC có đủ 4 trường nội dung:
      1. Tình hình thời tiết (Nhiệt độ, Trời nắng/mưa, Ảnh hưởng thi công).
      2. Quân số nhân lực thi công thực tế theo từng tổ đội/nhà thầu phụ.
      3. Danh mục máy móc, thiết bị thi công đang hoạt động trên công trường.
      4. Khối lượng và vị trí các công việc chính đã thực hiện trong ngày, các sự cố phát sinh (nếu có).
+
 3. **Bất biến Ngoại tuyến Bất biến (Offline Queue Idempotency):**
    - Khi kỹ sư thao tác tại tầng hầm hoặc vùng mất sóng: Dữ liệu được đóng gói vào IndexedDB kèm UUID, mã băm SHA-256 nội dung và mốc thời gian cục bộ.
    - Khi kết nối mạng phục hồi: Tự động gửi lại (Replay) theo cơ chế Lũy đẳng (Idempotent) — lặp lại nhiều lần không gây sinh thừa bản ghi hoặc ghi đè sai lệch dữ liệu người khác.
@@ -63,3 +65,30 @@ Bộ Skill này đóng gói toàn bộ tri thức chỉ huy công trường xây
 - Lưu trữ dữ liệu tác nghiệp (Tick tiến độ, Chụp ảnh hiện trường, Ghi nháp nhật ký) vào IndexedDB bộ nhớ đệm 50MB.
 - Cơ chế Dedup ảnh 24h bằng mã băm SHA-256 (`0075_task_photos_hash.sql`) chống gửi trùng ảnh khi mạng chập chờn.
 - Khi online: Service Worker tự động giải phóng hàng đợi, hiển thị Toast thông báo kết quả đồng bộ thành công cho kỹ sư.
+
+---
+
+## 3. TẬP HỢP CẨM NANG & QUY CHUẨN THAM CHIẾU KỸ THUẬT CHI TIẾT (CONSOLIDATED TECHNICAL REFERENCE COMPENDIUM)
+
+### 3.1. [Cẩm nang kỹ thuật] tt06-diary-and-qr-logistics
+
+# CẨM NANG NHẬT KÝ THI CÔNG TT06 & LOGISTICS QR CÔNG TRƯỜNG
+
+## 1. QUY CHUẨN NHẬT KÝ THI CÔNG ĐIỆN TỬ THEO THÔNG TƯ 06/2021/TT-BXD
+
+Mỗi bản ghi nhật ký ngày (`daily_diary`) trong XBoss bảo toàn 4 khối thông tin:
+
+1. **Khối Thời tiết & Môi trường:** `weather_condition` (Nắng, Mưa, Giông), `temperature_c` (Nhiệt độ $\text{}^\circ\text{C}$), `rain_impact_hours` (Số giờ dừng thi công do mưa).
+2. **Khối Quân số Nhân lực:** Tổng hợp số lượng kỹ sư, công nhân kỹ thuật, lao động phổ thông phân theo từng tổ đội (`contractor_personnel`).
+3. **Khối Thiết bị Thi công:** Danh mục xe cẩu, vận thăng, máy hàn, máy phát điện đang vận hành (`equipment_deployments`).
+4. **Khối Sản lượng & Nghiệm thu:** Chi tiết công việc đã hoàn thành, vị trí tầng/zone, vật tư đã sử dụng và các sự cố phát sinh.
+
+---
+
+## 2. QUY CHUẨN ĐỊNH DANH QR LOGISTICS CÔNG TRƯỜNG
+
+Cú pháp chuỗi mã QR/DataMatrix dán trên kiện hàng:
+
+$$\text{QR Code} = \text{"XBOSS|PO:"} + \text{PO\_CODE} + \text{"|MAT:"} + \text{BOQ\_CODE} + \text{"|QTY:"} + Q + \text{"|TAG:"} + \text{TAG\_ID} + \text{"|H:"} + \text{SHA256}(Payload)_{\text{first 8}}$$
+
+---

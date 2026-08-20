@@ -5,7 +5,7 @@ description: "Quy chuẩn thiết kế UI/UX đỉnh cao và quy trình triển 
 
 # UI/UX CRAFTSMAN — QUY CHUẨN THIẾT KẾ & QUY TRÌNH TRIỂN KHAI GIAO DIỆN XBOSS
 
-Bộ Skill này đóng gói toàn bộ tri thức thiết kế UI/UX chuyên nghiệp, công thái học (ergonomics), chuẩn khả năng tiếp cận (WCAG 2.2 AA) và quy trình triển khai trang chuẩn mực cho nền tảng XBoss.
+Bộ Skill này đóng gói toàn bộ tri thức thiết kế UI/UX chuyên nghiệp, công thái học (ergonomics), chuẩn khả năng tiếp cận (**WCAG 2.2 AA**) và quy trình triển khai trang chuẩn mực cho nền tảng XBoss.
 
 ---
 
@@ -161,3 +161,26 @@ export function PrimaryActionButton({
   );
 }
 ```
+
+---
+
+## 3. TẬP HỢP CẨM NANG & QUY CHUẨN THAM CHIẾU KỸ THUẬT CHI TIẾT (CONSOLIDATED TECHNICAL REFERENCE COMPENDIUM)
+
+### 3.1. [Cẩm nang kỹ thuật] wcag-contrast-matrix-and-tokens
+
+# CẨM NANG BẢNG MA TRẬN TƯƠNG PHẢN WCAG 2.2 AA TRÊN 5 THEMES
+
+## 1. QUY TẮC TƯƠNG PHẢN BODY TEXT THANG ZINC
+
+| Theme        | `text-zinc-400` trên `--bg` / `zinc-950` / `zinc-900` | Kết luận đạt chuẩn |
+| :----------- | :---------------------------------------------------- | :----------------- |
+| **dark**     | $7.72:1 - 6.91:1$ (Ngưỡng AA $\ge 4.5:1$)             | **PASS (An toàn)** |
+| **light**    | $7.73:1 - 7.03:1$                                     | **PASS (An toàn)** |
+| **kingblue** | $6.93:1 - 5.35:1$                                     | **PASS (An toàn)** |
+| **darkblue** | $7.33:1 - 5.99:1$                                     | **PASS (An toàn)** |
+| **navy**     | $7.66:1 - 6.64:1$                                     | **PASS (An toàn)** |
+
+- **Quy tắc vàng 1:** Tuyệt đối dùng `text-zinc-400` hoặc `text-zinc-300` cho body text. Cấm dùng `text-zinc-600` hoặc `text-zinc-500` vì sẽ vi phạm chuẩn tương phản ở chế độ Dark/Darkblue/Navy.
+- **Quy tắc vàng 2:** Nút accent chữ trắng luôn sử dụng mức màu `-600` hoặc `-700` (`bg-emerald-600`, `bg-blue-600`, `bg-rose-700`).
+
+---

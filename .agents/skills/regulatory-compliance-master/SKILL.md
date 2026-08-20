@@ -24,26 +24,28 @@ Bộ Skill này đóng gói toàn bộ tri thức pháp lý xây dựng Việt N
      2. Thợ vận hành chưa có Chứng chỉ vận hành thiết bị nâng và Thẻ an toàn lao động Nhóm 3 (Nghị định 44/2016/NĐ-CP).
 
 3. **Bất biến Điều Kiện Khởi Công (Permit-to-Start Invariant):**
-   - Không được phép kích hoạt kế hoạch thi công thực tế trên hệ thống nếu chưa đạt \%$ các điều kiện khởi công theo Điều 107 Luật Xây dựng (Mặt bằng sạch, Giấy phép xây dựng, Thiết kế bản vẽ thi công được duyệt, Hợp đồng thi công, Biện pháp bảo đảm an toàn và bảo vệ môi trường, Đã gửi thông báo khởi công).
+   - Không được phép kích hoạt kế hoạch thi công thực tế trên hệ thống nếu chưa đạt $100\%$ các điều kiện khởi công theo Điều 107 Luật Xây dựng (Mặt bằng sạch, Giấy phép xây dựng, Thiết kế bản vẽ thi công được duyệt, Hợp đồng thi công, Biện pháp bảo đảm an toàn và bảo vệ môi trường, Đã gửi thông báo khởi công).
 
 ---
 
 ## 2. QUY TRÌNH 5 BƯỚC QUẢN TRỊ PHÁP LÝ & TUÂN THỦ QUY CHUẨN
 
-`[B1: Rà soát Pháp lý Đầu vào] ──► [B2: Giám sát Hiệu lực 30 ngày] ──► [B3: Kiểm định An toàn Thiết bị] ──► [B4: Quản trị Thanh tra & Kiểm toán] ──► [B5: Đóng gói Pháp lý Hoàn công]`
+```
+[B1: Rà soát Pháp lý Đầu vào] ──► [B2: Giám sát Hiệu lực 30 ngày] ──► [B3: Kiểm định An toàn Thiết bị] ──► [B4: Quản trị Thanh tra & Kiểm toán] ──► [B5: Đóng gói Pháp lý Hoàn công]
+```
 
 ### Bước 1: Rà Soát & Thiết Lập Danh Mục Hồ Sơ Pháp Lý Dự Án (Legal Inventory Setup)
 
-- Số hóa và phân loại toàn bộ hồ sơ pháp lý (legal_documents):
-  - Nhóm 1: Quyết định chủ trương đầu tư, Phê duyệt quy hoạch /500$.
+- Số hóa và phân loại toàn bộ hồ sơ pháp lý (`legal_documents`):
+  - Nhóm 1: Quyết định chủ trương đầu tư, Phê duyệt quy hoạch $1/500$.
   - Nhóm 2: Báo cáo đánh giá tác động môi trường (ĐTM) / Giấy phép môi trường (GPMT).
   - Nhóm 3: Giấy chứng nhận thẩm duyệt thiết kế PCCC (Cục Cảnh sát PCCC & CNCH).
   - Nhóm 4: Giấy phép xây dựng và Hồ sơ thông báo khởi công.
 
 ### Bước 2: Giám Sát Thời Hạn & Cảnh Báo Gia Hạn Tự Động (Legal Sentinel & Expiry Alert)
 
-- Quét định kỳ mỗi 24h bảng legal_documents, insurance_bonds, certifications.
-- Tự động kích hoạt thông báo Push Notification/Email/Telegram cho Ban Giám đốc và Kỹ sư Pháp lý khi tài liệu bước vào vùng cảnh báo $ ngày trước khi hết hạn.
+- Quét định kỳ mỗi 24h bảng `legal_documents`, `insurance_bonds`, `certifications`.
+- Tự động kích hoạt thông báo Push Notification/Email/Telegram cho Ban Giám đốc và Kỹ sư Pháp lý khi tài liệu bước vào vùng cảnh báo $30$ ngày trước khi hết hạn.
 
 ### Bước 3: Kiểm Định Kỹ Thuật An Toàn Máy Móc & Thiết Bị Nghiêm Ngặt (Machinery Safety Pass)
 
@@ -65,17 +67,17 @@ Bộ Skill này đóng gói toàn bộ tri thức pháp lý xây dựng Việt N
 
 ---
 
-## 4. TẬP HỢP CẨM NANG & QUY CHUẨN THAM CHIẾU KỸ THUẬT CHI TIẾT (CONSOLIDATED TECHNICAL REFERENCE COMPENDIUM)
+## 3. TẬP HỢP CẨM NANG & QUY CHUẨN THAM CHIẾU KỸ THUẬT CHI TIẾT (CONSOLIDATED TECHNICAL REFERENCE COMPENDIUM)
 
-### 4.1. [Cẩm nang kỹ thuật] construction-permits-and-vietnam-laws
+### 3.1. [Cẩm nang kỹ thuật] construction-permits-and-vietnam-laws
 
 # CẨM NANG PHÁP LÝ XÂY DỰNG, ĐIỀU KIỆN KHỞI CÔNG & HỒ SƠ HOÀN CÔNG
 
 ## 1. ĐIỀU KIỆN KHỞI CÔNG XÂY DỰNG CÔNG TRÌNH (ĐIỀU 107 LUẬT XÂY DỰNG 2014)
 
-Để khởi công một dự án hoặc gói thầu, hệ thống XBoss kiểm tra \%$ 6 điều kiện tiên quyết:
+Để khởi công một dự án hoặc gói thầu, hệ thống XBoss kiểm tra $100\%$ 6 điều kiện tiên quyết:
 
-\text{Permit-to-Start} = \bigwedge_{k=1}^{6} \text{Condition}_k = \text{TRUE}
+$$\text{Permit-to-Start} = \bigwedge_{k=1}^{6} \text{Condition}_k = \text{TRUE}$$
 
 1. **Mặt bằng xây dựng:** Đã bàn giao toàn bộ hoặc từng phần theo tiến độ dự án.
 2. **Giấy phép xây dựng:** Đã được cấp và còn hiệu lực (đối với công trình thuộc diện phải cấp phép).
@@ -101,19 +103,19 @@ Danh mục 8 tập hồ sơ bắt buộc số hóa và lưu trữ vĩnh viễn t
 
 ---
 
-### 4.2. [Cẩm nang kỹ thuật] machinery-inspection-and-safety-pass
+### 3.2. [Cẩm nang kỹ thuật] machinery-inspection-and-safety-pass
 
 # CẨM NANG KIỂM ĐỊNH MÁY THI CÔNG NGHIÊM NGẶT & AN TOÀN LAO ĐỘNG
 
 ## 1. DANH MỤC THIẾT BỊ CÓ YÊU CẦU NGHIÊM NGẶT VỀ AN TOÀN (THÔNG TƯ 36/2019/TT-BLĐTBXH)
 
-| Nhóm thiết bị                       | Chu kỳ kiểm định định kỳ    | Yêu cầu kỹ thuật bắt buộc                                                        | Điều kiện người vận hành                    |
-| :---------------------------------- | :-------------------------- | :------------------------------------------------------------------------------- | :------------------------------------------ |
-| **Cần trục tháp**                   | 01 năm / lần                | Thử tải tĩnh .25 \times P_{\text{SWL}}$, thử tải động .10 \times P_{\text{SWL}}$ | Chứng chỉ thợ lái cẩu + Thẻ an toàn Nhóm 3  |
-| **Vận thăng lồng chở người/hàng**   | 01 năm / lần                | Thử nghiệm phanh chống rơi (Drop Test) tự động dừng trong $\le 0.5\text{m}$      | Chứng chỉ vận hành vận thăng + Thẻ Nhóm 3   |
-| **Bình tích áp máy nén khí**        | 02 năm / lần                | Thử áp lực thủy lực .5 \times P_{\text{thiết kế}}$, kiểm định van an toàn        | Thẻ an toàn lao động Nhóm 3                 |
-| **Xe cẩu tự hành / Xe nâng người**  | 01 năm / lần                | Kiểm tra hệ thống chân chống thủy lực, cảm biến nghiêng lật                      | Bằng lái xe chuyên dùng + Thẻ Nhóm 3        |
-| **Hệ giàn giáo bao che ngoài trời** | Trước khi sử dụng & Sau bão | Kiểm tra độ liên kết neo tường, tải trọng phân bố sàn thao tác                   | Thợ lắp dựng giàn giáo có chứng chỉ đào tạo |
+| Nhóm thiết bị                       | Chu kỳ kiểm định định kỳ    | Yêu cầu kỹ thuật bắt buộc                                                            | Điều kiện người vận hành                    |
+| :---------------------------------- | :-------------------------- | :----------------------------------------------------------------------------------- | :------------------------------------------ |
+| **Cần trục tháp**                   | 01 năm / lần                | Thử tải tĩnh $1.25 \times P_{\text{SWL}}$, thử tải động $1.10 \times P_{\text{SWL}}$ | Chứng chỉ thợ lái cẩu + Thẻ an toàn Nhóm 3  |
+| **Vận thăng lồng chở người/hàng**   | 01 năm / lần                | Thử nghiệm phanh chống rơi (Drop Test) tự động dừng trong $\le 0.5\text{m}$          | Chứng chỉ vận hành vận thăng + Thẻ Nhóm 3   |
+| **Bình tích áp máy nén khí**        | 02 năm / lần                | Thử áp lực thủy lực $1.5 \times P_{\text{thiết kế}}$, kiểm định van an toàn          | Thẻ an toàn lao động Nhóm 3                 |
+| **Xe cẩu tự hành / Xe nâng người**  | 01 năm / lần                | Kiểm tra hệ thống chân chống thủy lực, cảm biến nghiêng lật                          | Bằng lái xe chuyên dùng + Thẻ Nhóm 3        |
+| **Hệ giàn giáo bao che ngoài trời** | Trước khi sử dụng & Sau bão | Kiểm tra độ liên kết neo tường, tải trọng phân bố sàn thao tác                       | Thợ lắp dựng giàn giáo có chứng chỉ đào tạo |
 
 ---
 
@@ -123,6 +125,6 @@ Danh mục 8 tập hồ sơ bắt buộc số hóa và lưu trữ vĩnh viễn t
 
 1. **Hot Work Permit (Công việc sinh nhiệt/hàn cắt):** Yêu cầu chuẩn bị bình chữa cháy xách tay, bạt chống cháy cách ly và cử người canh lửa (Fire Watch).
 2. **Working at Height Permit (Làm việc trên cao $\ge 2\text{m}$):** Yêu cầu dây an toàn toàn thân 2 móc, điểm neo cố định đạt lực kéo $\ge 22\text{kN}$ và lưới hứng rơi bên dưới.
-3. **Confined Space Permit (Làm việc không gian kín/bể ngầm):** Yêu cầu đo nồng độ khí oxy (.5\% - 23.5\%$) và quạt hút thông gió cưỡng bức liên tục.
+3. **Confined Space Permit (Làm việc không gian kín/bể ngầm):** Yêu cầu đo nồng độ khí oxy ($19.5\% - 23.5\%$) và quạt hút thông gió cưỡng bức liên tục.
 
 ---

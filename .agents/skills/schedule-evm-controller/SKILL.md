@@ -17,12 +17,15 @@ Bộ Skill này đóng gói toàn bộ tri thức điều độ công trình chu
    - Chi phí thực tế: $AC = \text{Tổng chi phí đã ghi nhận thực tế}$.
    - Chỉ số tiến độ: $SPI = \frac{EV}{PV}$; Chỉ số chi phí: $CPI = \frac{EV}{AC}$.
    - Sai lệch tiến độ: $SV = EV - PV$; Sai lệch chi phí: $CV = EV - AC$.
+
 2. **Bất biến Cấp bậc Trạng thái (Status Hierarchy Invariant):**
    - Trạng thái `nghiem_thu` là trạng thái hoàn tất tuyệt đối, chỉ kích hoạt khi $Progress = 100\%$ và có phê duyệt từ Kỹ sư trưởng/PM.
    - Tuyệt đối không để chuỗi tính toán tự động (Cron/Recompute) hạ cấp trạng thái `nghiem_thu` sang `tre` hay `dang_thi_cong`.
+
 3. **Bất biến Đường găng (Critical Path Invariant):**
    - Mọi công việc có Tổng dự trữ tự do (Total Float) $= 0$ ngày nằm trên Đường găng (Critical Path).
    - Bất kỳ độ trễ nào trên công việc đường găng đều làm lùi ngày hoàn thành toàn dự án đúng bằng số ngày trễ đó $(\Delta T_{\text{project}} = \Delta T_{\text{critical}})$.
+
 4. **Bảo tồn Mẫu số Kế hoạch (Denominator Persistence):**
    - Tổng số lượng công việc/kích thước trong ma trận tiến độ (Dimension Denominator) không bao giờ bị thay đổi ngầm khi tick chọn tiến độ; chỉ được điều chỉnh khi có phê duyệt điều chỉnh WBS/Baseline.
 
@@ -84,3 +87,26 @@ Khi phát hiện công việc bị trễ hạn ($End < Today \land Progress < 10
 6. **Thời tiết & Khách quan (Weather/Force Majeure):** Mưa bão lớn, dịch bệnh, dừng thi công theo lệnh cơ quan chức năng.
 
 Phân bổ tần suất và tác động thời gian theo biểu đồ Pareto 80/20 để tập trung xử lý nhóm 20% nguyên nhân gây ra 80% độ trễ dự án.
+
+---
+
+## 4. TẬP HỢP CẨM NANG & QUY CHUẨN THAM CHIẾU KỸ THUẬT CHI TIẾT (CONSOLIDATED TECHNICAL REFERENCE COMPENDIUM)
+
+### 4.1. [Cẩm nang kỹ thuật] cpm-and-evm-algorithms
+
+# CẨM NANG THUẬT TOÁN CPM & CHỈ SỐ DỰ BÁO TÀI CHÍNH EVM
+
+## 1. THUẬT TOÁN ĐƯỜNG GĂNG CPM (CRITICAL PATH METHOD)
+
+1. **Forward Pass (Tính thời gian sớm nhất):**
+   - $ES_i = \max_{p \in \text{Predecessors}(i)} (EF_p)$
+   - $EF_i = ES_i + \text{Duration}_i$
+2. **Backward Pass (Tính thời gian muộn nhất):**
+   - $LF_i = \min_{s \in \text{Successors}(i)} (LS_s)$
+   - $LS_i = LF_i - \text{Duration}_i$
+3. **Tính Dự trữ thời gian (Float):**
+   - $\text{Total Float}_i = LS_i - ES_i = LF_i - EF_i$
+   - $\text{Free Float}_i = \min_{s} (ES_s) - EF_i$
+   - Công việc nằm trên đường găng khi $\text{Total Float} = 0$.
+
+---

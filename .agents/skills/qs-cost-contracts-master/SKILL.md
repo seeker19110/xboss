@@ -5,7 +5,7 @@ description: "Quy chuẩn chuyên sâu về định mức dự toán BOQ, quản
 
 # QS, COST & CONTRACTS MASTER — ĐỊNH MỨC DỰ TOÁN, FIDIC CLAIMS & QUẢN TRỊ DÒNG TIỀN
 
-Bộ Skill này đóng gói toàn bộ tri thức kỹ sư định giá (Quantity Surveyor - QS), chuyên gia quản lý hợp đồng FIDIC (Red/Yellow Book), kỹ thuật phân tích tranh chấp tiến độ TIA (Delay & Disruption Protocol của SCL), và mô hình dự báo tài chính xây dựng cho nền tảng XBoss.
+Bộ Skill này đóng gói toàn bộ tri thức kỹ sư định giá (Quantity Surveyor - QS), chuyên gia quản lý hợp đồng FIDIC (Red/Yellow Book 1999/2017), kỹ thuật phân tích tranh chấp tiến độ TIA (Delay & Disruption Protocol của SCL), quyết toán A-B theo **Thông tư 96/2021/TT-BTC & Nghị định 99/2021/NĐ-CP**, và mô hình dự báo tài chính xây dựng cho nền tảng XBoss.
 
 ---
 
@@ -14,20 +14,23 @@ Bộ Skill này đóng gói toàn bộ tri thức kỹ sư định giá (Quantit
 1. **Thời hạn Thông báo Khiếu nại 28 ngày (FIDIC 28-Day Time-Bar Invariant):**
    - Theo Điều 20.1 (FIDIC 1999) và Điều 20.2 (FIDIC 2017), Nhà thầu BẮT BUỘC phải phát hành Thông báo Khiếu nại (Notice of Claim) trong vòng **28 ngày** kể từ khi nhận biết hoặc lẽ ra phải nhận biết sự kiện chậm trễ/phát sinh chi phí.
    - Nếu quá 28 ngày: Hệ thống phải tự động đánh dấu cờ rủi ro nghiêm trọng (Time-Bar Risk) và đề xuất các biện pháp bảo vệ quyền lợi hợp pháp (phân tích sự kiện tiếp diễn Continuous Event).
+
 2. **Bất biến Tính toán Tiền tệ (Money Arithmetic Invariant):**
    - Tuyệt đối KHÔNG thực hiện phép cộng, trừ, nhân tiền tệ trên kiểu số thực dấu phẩy động (float) của JavaScript.
-   - Mọi phép tính tiền tệ phải làm trong CSDL PostgreSQL (`NUMERIC`, `SUM`, `* rate`) hoặc chuyển qua `lib/money.ts` (`parseMoney`, `addMoney`, `mulRate` làm việc trên đơn vị BigInt = $đồng \times 100$).
+   - Mọi phép tính tiền tệ phải làm trong CSDL PostgreSQL (`NUMERIC`, `SUM`, `* rate`) hoặc chuyển qua `lib/money.ts` (`parseMoney`, `addMoney`, `mulRate` làm việc trên đơn vị BigInt = $\text{đồng} \times 100$).
+
 3. **Bất biến Cân đối Thanh toán (IPC Balance Invariant):**
    $$\text{Giá trị Đề nghị Kỳ này (Net Payable)} = \text{Khối lượng Luỹ kế Kỳ này} - \text{Khối lượng Luỹ kế Kỳ trước} - \text{Thu hồi Tạm ứng} - \text{Giữ lại Bảo hành (5-10\%)} + \text{Phát sinh VO được duyệt}$$
+
 4. **Tính Duy nhất của Mã BOQ (Global BOQ Code Invariant):**
    - Mã `boq_code` là định danh duy nhất trên toàn hệ thống cho cả công việc (`tasks`), gói thầu (`work_packages`) và vật tư (`materials`).
 
 ---
 
-## 2. QUY TRÌNH 5 BƯỚC QUẢN TRỊ CHI PHÍ, HỢP ĐỒNG & FIDIC CLAIMS
+## 2. QUY TRÌNH 6 BƯỚC QUẢN TRỊ CHI PHÍ, HỢP ĐỒNG & FIDIC CLAIMS
 
 ```
-[B1: Bóc tách BOQ & Định mức] ──► [B2: Quản trị Hợp đồng & Cam kết] ──► [B3: Giám sát Sự kiện Trễ & Notice] ──► [B4: Phân tích TIA & Lập Claim] ──► [B5: Nghiệm thu IPC & Cashflow S-Curve]
+[B1: Bóc tách BOQ & Định mức] ──► [B2: Quản trị Hợp đồng & Cam kết] ──► [B3: Giám sát Sự kiện Trễ & Notice] ──► [B4: Phân tích TIA & Lập Claim] ──► [B5: Nghiệm thu IPC & Cashflow] ──► [B6: Quyết toán A-B & Bù giá]
 ```
 
 ### Bước 1: Chuẩn hóa BOQ & Ánh xạ Định mức Xây dựng Việt Nam (BOQ & Norm Mapping)
@@ -72,3 +75,33 @@ Bộ Skill này đóng gói toàn bộ tri thức kỹ sư định giá (Quantit
   $$\Delta \text{QTO} = \text{QTO}_{\text{As-Built}} - \text{QTO}_{\text{BOQ Hợp đồng}} - \text{QTO}_{\text{VO được duyệt}}$$
 - **Lập Bảng Quyết toán A-B Hợp đồng & Thanh lý Hợp đồng:** Khấu trừ toàn bộ tạm ứng, chuyển đổi tiền giữ lại sang Thư bảo lãnh bảo hành (`insurance_bonds`), chốt công nợ cuối cùng.
 - **Báo cáo Quyết toán Vốn Đầu tư Dự án Hoàn thành (Thông tư 96/2021/TT-BTC & Nghị định 99/2021/NĐ-CP):** Tổng hợp toàn bộ chi phí xây dựng, thiết bị, quản lý dự án, tư vấn và chi phí khác phục vụ kiểm toán độc lập và cơ quan thẩm tra quyết toán.
+
+---
+
+## 3. TẬP HỢP CẨM NANG & QUY CHUẨN THAM CHIẾU KỸ THUẬT CHI TIẾT (CONSOLIDATED TECHNICAL REFERENCE COMPENDIUM)
+
+### 3.1. [Cẩm nang kỹ thuật] fidic-claims-and-tia-protocols
+
+# CẨM NANG ÁNH XẠ ĐIỀU KHOẢN FIDIC & PHÂN TÍCH TIA
+
+## 1. MA TRẬN ÁNH XẠ ĐIỀU KHOẢN FIDIC 1999 (RED BOOK)
+
+| Tình huống sự kiện công trường                            | Điều khoản FIDIC | Quyền lợi Nhà thầu (Entitlement)  | Thủ tục bắt buộc                          |
+| :-------------------------------------------------------- | :--------------- | :-------------------------------- | :---------------------------------------- |
+| **Chậm trễ bàn giao mặt bằng / mốc trắc đạc**             | Điều 2.1         | Gia hạn EOT + Chi phí (Cost)      | Thông báo Điều 20.1 trong 28 ngày         |
+| **Chậm trễ phát hành bản vẽ thiết kế / chỉ dẫn kỹ thuật** | Điều 1.9         | Gia hạn EOT + Chi phí + Lợi nhuận | Thông báo nhắc nhở trước 14 ngày          |
+| **Điều kiện vật chất không lường trước (Địa chất xấu)**   | Điều 4.12        | Gia hạn EOT + Chi phí             | Lập biên bản hiện trường có chữ ký TVGS   |
+| **Tạm dừng thi công theo lệnh Kỹ sư Tư vấn**              | Điều 8.8 / 8.9   | Gia hạn EOT + Chi phí             | Ghi nhật ký máy móc/nhân lực nằm chờ      |
+| **Thay đổi thiết kế / Biến động khối lượng lớn (VO)**     | Điều 13.1 / 13.3 | Điều chỉnh Giá hợp đồng + EOT     | Đệ trình đề xuất giá (Variation Proposal) |
+
+---
+
+## 2. QUY TRÌNH PHÂN TÍCH TIA (TIME IMPACT ANALYSIS) THEO SCL PROTOCOL
+
+$$\Delta EOT = \text{Project Completion Date}_{\text{Impacted CPM}} - \text{Project Completion Date}_{\text{Baseline CPM}}$$
+
+1. **Trích xuất Tiến độ Cơ sở (Unimpacted Baseline Schedule):** Cập nhật tiến độ dự án đến ngày xảy ra sự kiện chậm trễ.
+2. **Xây dựng Mạng công việc Fragnet:** Mô tả chuỗi sự kiện phát sinh (thời gian làm rõ RFI, chờ phê duyệt mẫu, thi công sửa đổi) kèm logic phụ thuộc.
+3. **Chèn Fragnet vào Tiến độ & Tính toán CPM:** Chạy tính toán CPM Forward/Backward Pass. Nếu ngày kết thúc toàn dự án bị lùi $\rightarrow$ Số ngày lùi đó chính là $\Delta EOT$ hợp lệ để đòi bồi thường.
+
+---

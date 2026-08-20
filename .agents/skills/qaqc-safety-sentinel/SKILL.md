@@ -5,7 +5,7 @@ description: "Quy chuẩn kiểm soát chất lượng QA/QC theo Nghị định
 
 # QA/QC & SAFETY SENTINEL — QUY CHUẨN CHẤT LƯỢNG 3 BÊN, BBNT & GIÁM SÁT HSE AI
 
-Bộ Skill này đóng gói toàn bộ tri thức kiểm soát chất lượng công trình (Nghị định 06/2021/NĐ-CP), quy trình nghiệm thu điểm dừng (Hold-Point Inspection), quản lý lỗi NCR/Punch-list, quy trình ký số điện tử pháp lý 3 bên, và thuật toán thị giác máy tính AI phát hiện mối nguy an toàn lao động (QCVN 18:2021/BXD) cho nền tảng XBoss.
+Bộ Skill này đóng gói toàn bộ tri thức kiểm soát chất lượng công trình (**Nghị định 06/2021/NĐ-CP**), quy trình nghiệm thu điểm dừng (Hold-Point Inspection), quản lý lỗi NCR/Punch-list, quy trình ký số điện tử pháp lý 3 bên, và thuật toán thị giác máy tính AI phát hiện mối nguy an toàn lao động (**QCVN 18:2021/BXD**) cho nền tảng XBoss.
 
 ---
 
@@ -14,11 +14,13 @@ Bộ Skill này đóng gói toàn bộ tri thức kiểm soát chất lượng c
 1. **Khóa Chặn Điểm Dừng Nghiệm thu (Hold-Point Lock Invariant):**
    - Đối với các hạng mục công việc quan trọng (Lắp đặt ống ngầm trong bê tông dầm sàn, Thử áp lực đường ống nước, Thử kín ống gió, Thử nghiệm liên động PCCC): Tuyệt đối KHÔNG được tiến hành công việc tiếp theo (Đổ bê tông, Đóng trần, Lấp đất) nếu chưa có Biên bản nghiệm thu công việc (BBNT) ký duyệt bởi Tư vấn Giám sát (TVGS).
    - Mọi nỗ lực cập nhật tiến độ công việc liên quan vượt quá giai đoạn Hold-Point sẽ bị API chặn đứng với mã lỗi 403 / 422.
+
 2. **Quy trình Khép kín Phiếu Không phù hợp (NCR Closure Invariant):**
    - Một phiếu NCR (Non-Conformance Report) hoặc đầu việc Punch-List chỉ được phép đóng (Status = `CLOSED`) khi có đầy đủ bộ chứng cứ 3 bước:
      1. Bức ảnh chụp hiện trạng sai lỗi ban đầu kèm vị trí không gian 3D.
      2. Báo cáo nguyên nhân & Biện pháp khắc phục đã được TVGS phê duyệt.
      3. Bức ảnh chụp nghiệm thu lại sau khi nhà thầu đã sửa chữa hoàn tất.
+
 3. **Thang Phân cấp An toàn & Cảnh báo Tức thời (Safety Escalation Invariant):**
    - Phát hiện vi phạm an toàn cấp độ `CRITICAL` (Công nhân làm việc trên cao $\ge 2\text{m}$ không đeo dây an toàn móc vào điểm neo cố định, Mép sàn/lỗ mở không có lan can rào chắn, Làm việc dưới tầm quay cẩu tháp không đội mũ bảo hộ):
    - Hệ thống BẮT BUỘC tự động sinh Phiếu xử lý an toàn (HSE Action Ticket) và gửi thông báo khẩn cấp Push Notification/Telegram cho Chỉ huy trưởng và Kỹ sư An toàn.
@@ -64,7 +66,8 @@ Bộ Skill này đóng gói toàn bộ tri thức kiểm soát chất lượng c
   - Nhận diện phương tiện bảo hộ cá nhân (PPE: Mũ bảo hộ, Áo phản quang, Dây đai an toàn, Kính bảo hộ).
   - Phát hiện vùng nguy hiểm: Khu vực bán kính quay cẩu tháp, Hố đào sâu không che chắn, Mép sàn chưa lắp lan can.
   - Phát hiện hành vi nguy hiểm: Hút thuốc nơi chứa vật liệu dễ cháy, Đi lại dưới vật thể đang cẩu nâng.
-- Tính toán Chỉ số An toàn Công trường (Site Safety Index - SSI) hàng ngày.
+- Tính toán Chỉ số An toàn Công trường (Site Safety Index - SSI) hàng ngày:
+  $$SSI = 100 - \sum (\text{Defect Count}_i \times \text{Weight}_i)$$
 - Tự động sinh phiếu xử phạt vi phạm an toàn kèm ảnh trích xuất và căn cứ pháp lý QCVN 18:2021/BXD.
 
 ### Bước 5: Tiếp nhận Quan trắc Môi trường IoT & Đóng Dấu Hồ Sơ Hoàn Công Pháp Lý
@@ -77,7 +80,30 @@ Bộ Skill này đóng gói toàn bộ tri thức kiểm soát chất lượng c
 
 ---
 
-## 3. TÀI LIỆU THAM CHIẾU KỸ THUẬT (REFERENCES)
+## 3. TẬP HỢP CẨM NANG & QUY CHUẨN THAM CHIẾU KỸ THUẬT CHI TIẾT (CONSOLIDATED TECHNICAL REFERENCE COMPENDIUM)
 
-- [cad-bim-master/references/asbuilt-redline-and-handover-standards.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/asbuilt-redline-and-handover-standards.md): Quy chuẩn mẫu dấu hoàn công Mẫu 01 & 02 và tiêu chuẩn trắc đạc Scan-to-BIM.
-- [cad-bim-master/references/drawing-defect-taxonomy-and-healing.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/drawing-defect-taxonomy-and-healing.md): Phân loại dị tật kỹ thuật và tiêu chuẩn nghiệm thu hình học.
+### 3.1. [Cẩm nang kỹ thuật] hold-points-and-ncr-closure-sop
+
+# CẨM NANG ĐIỂM DỪNG KỸ THUẬT (HOLD-POINTS) & MA TRẬN ĐÓNG PHIẾU NCR 3 BƯỚC
+
+## 1. MA TRẬN ĐIỂM DỪNG KỸ THUẬT (HOLD-POINT MATRIX)
+
+| Hạng mục thi công                    | Điểm dừng (Hold Point)        | Tiêu chí nghiệm thu bắt buộc                                   | Bên ký duyệt          |
+| :----------------------------------- | :---------------------------- | :------------------------------------------------------------- | :-------------------- |
+| **Ống luồn điện/nước trong sàn dầm** | Trước khi đổ bê tông          | Cố định chắc chắn, bịt kín đầu ống, không gãy dập, đúng cao độ | Kỹ sư NT + TVGS       |
+| **Đường ống cấp nước áp lực**        | Trước khi đóng trần / hộp gen | Thử áp lực $1.5 \times P_{\text{làm việc}}$ duy trì 2 giờ      | Kỹ sư NT + TVGS       |
+| **Đường ống gió điều hòa/hút khói**  | Trước khi bọc cách nhiệt      | Thử kín khói / rò rỉ áp suất DW143                             | Kỹ sư NT + TVGS       |
+| **Cáp điện động lực ngầm**           | Trước khi lấp đất mương cáp   | Đo điện trở cách điện Megger $\ge 10\text{ M}\Omega$           | Kỹ sư NT + TVGS       |
+| **Liên động PCCC tòa nhà**           | Trước khi mời Cảnh sát PCCC   | $100\%$ kịch bản Cause \& Effect kích hoạt đúng                | Kỹ sư NT + TVGS + CĐT |
+
+---
+
+## 2. QUY TRÌNH ĐÓNG PHIẾU NCR 3 BƯỚC KHÉP KÍN
+
+$$\text{Status(NCR)}: \text{ISSUED} \xrightarrow[\text{Bằng chứng ảnh lỗi}]{\text{Bước 1}} \text{UNDER\_RECTIFICATION} \xrightarrow[\text{Biện pháp khắc phục}]{\text{Bước 2}} \text{RE-INSPECTED} \xrightarrow[\text{TVGS ký duyệt}]{\text{Bước 3}} \text{CLOSED}$$
+
+1. **Bước 1 (Phát hành):** TVGS/Kỹ sư QA chụp ảnh lỗi, gán mã vị trí tầng/zone và phát hành phiếu NCR với thời hạn khắc phục 48h-72h.
+2. **Bước 2 (Khắc phục):** Nhà thầu tiến hành sửa chữa hiện trường, nộp Bản giải trình nguyên nhân & Biện pháp khắc phục kèm ảnh sau sửa.
+3. **Bước 3 (Nghiệm thu lại & Đóng phiếu):** TVGS kiểm tra thực địa, nếu đạt yêu cầu thì ký số đóng phiếu NCR. Dữ liệu tự động lưu vào Sổ tay Chất lượng dự án.
+
+---

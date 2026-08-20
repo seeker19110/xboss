@@ -5,7 +5,7 @@ description: "Quy chuẩn điều phối mạng lưới 11 tác tử AI Swarm, r
 
 # ENGINEERING AGENT ORCHESTRATOR — ĐIỀU PHỐI ĐA TÁC TỬ & BẢO ĐẢM TỰ TRỊ CÓ KIỂM SOÁT
 
-Bộ Skill này đóng gói toàn bộ tri thức điều phối mạng lưới AI 11 tác tử chuyên sâu (11-Agent Swarm Ecosystem), ranh giới ủy quyền Gate 0, giao thức hòa giải tranh chấp kỹ thuật 7 bước, và kiến trúc sổ cái mật mã Merkle Tree chống can thiệp ngầm cho nền tảng XBoss.
+Bộ Skill này đóng gói toàn bộ tri thức điều phối mạng lưới AI 12 tác tử chuyên sâu (12-Agent Swarm Ecosystem), ranh giới ủy quyền Gate 0, giao thức hòa giải tranh chấp kỹ thuật 7 bước (**ENG-4**), và kiến trúc sổ cái mật mã Merkle Tree chống can thiệp ngầm (**M73**) cho nền tảng XBoss.
 
 ---
 
@@ -64,7 +64,35 @@ Khi có $\ge 2$ Tác tử AI đưa ra các nhận định hoặc đề xuất tr
 
 ---
 
-## 4. TÀI LIỆU THAM CHIẾU KỸ THUẬT (REFERENCES)
+## 4. TẬP HỢP CẨM NANG & QUY CHUẨN THAM CHIẾU KỸ THUẬT CHI TIẾT (CONSOLIDATED TECHNICAL REFERENCE COMPENDIUM)
 
-- [cad-bim-master/references/clash-solver-and-generative-shopdrawing.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/clash-solver-and-generative-shopdrawing.md): Ma trận ưu tiên không gian và giải thuật hòa giải xung đột hình học.
-- [cad-bim-master/references/asbuilt-redline-and-handover-standards.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/asbuilt-redline-and-handover-standards.md): Cân đối khối lượng quyết toán 3 chiều và chữ ký số phân quyền Gate 0.
+### 4.1. [Cẩm nang kỹ thuật] swarm-debate-and-gate0-verification
+
+# CẨM NANG ĐIỀU PHỐI AI SWARM & TRẠM GÁC GATE 0
+
+## 1. THUẬT TOÁN ĐỒNG THUẬN KỸ THUẬT SWARM DEBATE
+
+Khi khởi tạo một phiên tranh luận kỹ thuật đa tác tử (`engineering_agent_debate_sessions`):
+
+1. Kích hoạt 3 Persona Agent nòng cốt:
+   - **Lead Engineer Persona:** Đại diện cho tuân thủ tiêu chuẩn kỹ thuật và chất lượng.
+   - **Chief QS Persona:** Đại diện cho ngân sách, hợp đồng và chi phí.
+   - **Site Commander Persona:** Đại diện cho tính khả thi thi công hiện trường và tiến độ.
+2. Mỗi Persona Agent xuất một Claim với điểm tự tin $C \in [0.0, 1.0]$ và danh mục bằng chứng (Evidence Tokens).
+3. Thuật toán hòa giải tính toán Consensus Matrix:
+   $$\text{Score}_{\text{consensus}} = w_E \cdot S_{\text{Engineer}} + w_Q \cdot S_{\text{QS}} + w_S \cdot S_{\text{Site}}$$
+4. Nếu $\text{Score}_{\text{consensus}} \ge 0.80$ và không vi phạm bất biến thẩm quyền $\rightarrow$ Cấp mã chứng thực `SIG-CONSENSUS-...` và đẩy sang Trạm gác Gate 0.
+
+---
+
+## 2. CHECKLIST KIỂM ĐỊNH TRẠM GÁC GATE 0 (GATE 0 VERIFICATION)
+
+Trạm gác Gate 0 kiểm tra 5 điều kiện tiên quyết trước khi cho phép dữ liệu AI tác động vào hệ thống:
+
+- [ ] **Provenance Trace:** Đối tượng có nguồn gốc rõ ràng (Source Hash SHA-256).
+- [ ] **Role Authorization:** Đề xuất nằm trong cấp độ tự trị cho phép (A1/A2).
+- [ ] **Evidence Sufficiency:** Bằng chứng định lượng đầy đủ (không ảo giác).
+- [ ] **Conflict Resolution:** Không còn xung đột chưa được hòa giải.
+- [ ] **Merkle Sealing:** Đã sinh mã Leaf Hash sẵn sàng niêm phong.
+
+---

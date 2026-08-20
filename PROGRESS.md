@@ -25,10 +25,25 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
-## Master Skills Blueprint & Hệ Sinh Thái 11 Kỹ Năng Đẳng Cấp Thế Giới (2026-08-20)
+## Master Skills Apex Ecosystem & 12-Agent Closed-Loop Verification (2026-08-20)
+
+- **[AI, đã làm] Rà soát toàn diện Codebase & CI Gates:**
+  - TypeScript strict: 0 lỗi (`tsc --noEmit`).
+  - ESLint Flat Config: 0 lỗi, 0 warnings.
+  - CSDL & Migrations: 126 migrations tuần tự, append-only, idempotent (`check:migrations`).
+  - Service Worker Cache Exclude: 100% đồng bộ giữa `public/sw.js` và `lib/modules.ts` (`check:sw-exclude`).
+  - Test Suite: 194 test files pass 100% (`npm test`).
+  - Next.js Production Build: Biên dịch và tối ưu thành công hơn 100 trang và API route.
+- **[AI, đã làm] Nâng cấp & Hoàn thiện Trọn Bộ 12 Master Skills (`.agents/skills/`):**
+  - Chuẩn hóa 100% công thức toán học LaTeX, bảng ánh xạ và cẩm nang kỹ thuật tự thân (Self-Contained Compendium) cho cả 12 kỹ năng.
+  - Tích hợp cẩm nang chuyên sâu: Quy trình nghiệm thu Điều 24 NĐ 06, Khớp 3 chiều PO-GRN-Invoice, FIDIC Claims 28 ngày, CPM & EVM, Bàn giao mặt bằng Work-Front TT06, Ma trận Hold-Point & NCR, Swarm Debate Gate 0, và Ma trận Tương phản WCAG 2.2 AA.
+- **[AI, đã làm] Xây dựng Master Skills Verification Suite (`tests/master-skills-ecosystem.test.ts`):**
+  - 12/12 ca kiểm thử tự động kiểm chứng các bất biến (Invariants) toán học và quy chuẩn kỹ thuật của toàn bộ 12 kỹ năng và chuỗi vòng đời dự án 6 giai đoạn.
+
+## Master Skills Blueprint & Hệ Sinh Thái 12 Kỹ Năng Đẳng Cấp Thế Giới (2026-08-20)
 
 - **[AI, đã làm] Quy hoạch Vòng Đời Dự Án 6 Giai Đoạn:** Rà soát và chuẩn hóa toàn bộ chuỗi quy trình từ Khởi đầu đến Hoàn công & Quyết toán (GĐ 0: Pre-Construction & Tendering $\rightarrow$ GĐ 1: Mobilization & Setup $\rightarrow$ GĐ 2: Field Execution & DfMA $\rightarrow$ GĐ 3: QA/QC, HSE & Claims $\rightarrow$ GĐ 4: Measurement & IPC $\rightarrow$ GĐ 5: Commissioning, As-Built & Closeout).
-- **[AI, đã làm] Đóng gói Trọn Bộ 11 Master Skills (`.agents/skills/`):**
+- **[AI, đã làm] Đóng gói Trọn Bộ 12 Master Skills (`.agents/skills/`):**
   - `user-error-healing-master`: Tự Chữa Lành Lỗi Người Dùng 4 cấp độ, 4 Bất biến Tối thượng, Chuẩn hóa Dữ liệu Bẩn, Fuzzy Intent, 3-Way Merge Field-Level.
   - `cad-bim-master`: Kỹ thuật Không gian, MEPF, AutoLISP, Nesting 1D/2D, Scan-to-BIM, BCF ISO 21597.
   - `schedule-evm-controller`: WBS Roll-up, CPM Critical Path, EVM (SPI/CPI/EAC), Lookahead 7/14/21, Pareto.
