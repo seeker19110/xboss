@@ -25,18 +25,21 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
-## Master Skills Blueprint & Nghiên cứu Nâng cấp Toàn diện Tính năng (2026-08-20)
+## Master Skills Blueprint & Hệ Sinh Thái 11 Kỹ Năng Đẳng Cấp Thế Giới (2026-08-20)
 
-- **[AI, đã làm] Quy hoạch Nâng cấp Toàn diện:** Xuất bản tài liệu `docs/nghien-cuu-nang-cap-toan-dien-tinh-nang-va-skill-2026.md` phân rã chi tiết 17 Cụm nghiệp vụ và 34 phân hệ kỹ thuật theo chuẩn TCVN, FIDIC 1999/2017, ISO 19650, ISO 21597 và QCVN 18:2021/BXD.
-- **[AI, đã làm] Đóng gói Bộ 8 Master Skills (`.agents/skills/`):**
+- **[AI, đã làm] Quy hoạch Vòng Đời Dự Án 6 Giai Đoạn:** Rà soát và chuẩn hóa toàn bộ chuỗi quy trình từ Khởi đầu đến Hoàn công & Quyết toán (GĐ 0: Pre-Construction & Tendering $\rightarrow$ GĐ 1: Mobilization & Setup $\rightarrow$ GĐ 2: Field Execution & DfMA $\rightarrow$ GĐ 3: QA/QC, HSE & Claims $\rightarrow$ GĐ 4: Measurement & IPC $\rightarrow$ GĐ 5: Commissioning, As-Built & Closeout).
+- **[AI, đã làm] Đóng gói Trọn Bộ 11 Master Skills (`.agents/skills/`):**
   - `user-error-healing-master`: Tự Chữa Lành Lỗi Người Dùng 4 cấp độ, 4 Bất biến Tối thượng, Chuẩn hóa Dữ liệu Bẩn, Fuzzy Intent, 3-Way Merge Field-Level.
   - `cad-bim-master`: Kỹ thuật Không gian, MEPF, AutoLISP, Nesting 1D/2D, Scan-to-BIM, BCF ISO 21597.
   - `schedule-evm-controller`: WBS Roll-up, CPM Critical Path, EVM (SPI/CPI/EAC), Lookahead 7/14/21, Pareto.
-  - `qs-cost-contracts-master`: Định mức TT12, Điều khoản FIDIC, Time-Bar 28 ngày, TIA Claims, Dynamic Cashflow S-Curve.
+  - `qs-cost-contracts-master`: Định mức TT12, Điều khoản FIDIC, Time-Bar 28 ngày, TIA Claims, Bù giá trượt giá, Quyết toán A-B TT 96/2021.
   - `site-field-commander`: Bàn giao mặt bằng Work-Front, Nhật ký TT06, NLP Copilot Gateway, QR Logistics, PWA Offline.
   - `qaqc-safety-sentinel`: Điểm dừng Hold-Point, NCR 3 bước, e-Sign 3 bên NĐ06, HSE AI Computer Vision QCVN 18.
+  - 🆕 `procurement-supplychain-master`: Quản trị Mua sắm Long-Lead, Đấu thầu PO, Khớp đơn hàng 3 chiều ($\text{PO} \equiv \text{GRN} \equiv \text{Invoice}$), Kiểm định CO/CQ/Mill Test, Kho phôi DfMA.
+  - 🆕 `commissioning-handover-master`: Thử nghiệm T&C, HVAC TAB (NEBB/ASHRAE), Liên động báo cháy PCCC QCVN 06:2022/BXD, Nghiệm thu Điều 24 NĐ 06, Bàn giao COBie LOD 500 sang BMS/FM.
+  - 🆕 `regulatory-compliance-master`: Điều kiện khởi công Điều 107 Luật XD, Cảnh báo sớm 30 ngày giấy phép/bảo lãnh, Kiểm định an toàn máy móc nghiêm ngặt (TT 36/2019/TT-BLĐTBXH).
   - `ui-ux-craftsman`: Bento Grid, Data-Dense Tabular, Thumb-Zone Mobile, Dark-First CSS Tokens, WCAG 2.2 AA.
-  - `engineering-agent-orchestrator`: AI Swarm, Gate 0, Hòa giải 7 bước, Sổ cái Merkle Tree, Controlled Autonomy A0-A2.
+  - `engineering-agent-orchestrator`: AI Swarm 11 Tác tử, Gate 0, Hòa giải 7 bước, Sổ cái Merkle Tree, Controlled Autonomy A0-A2.
 
 ## M89 — CAD/BIM Professional Pinnacle Upgrade & Fabrication Nesting Suite (2026-08-20)
 

@@ -62,3 +62,13 @@ Bộ Skill này đóng gói toàn bộ tri thức kỹ sư định giá (Quantit
 - Tự động áp dụng công thức khấu trừ tạm ứng lũy tiến và trích giữ tiền bảo hành.
 - Tích hợp xuất hóa đơn điện tử theo Nghị định 70/2025/NĐ-CP.
 - Chạy mô phỏng dòng tiền Dynamic Cashflow S-Curve ($Cash\text{-}In$ vs $Cash\text{-}Out$) theo phân phối chuẩn tích lũy để dự báo trước 30/60/90 ngày nguy cơ thâm hụt vốn lưu động (Working Capital Deficit).
+
+### Bước 6: Quyết Toán Hợp Đồng A-B, Bù Giá Trượt Giá & Quyết Toán Vốn Hoàn Thành
+
+- **Công thức Bù giá Trượt giá đa thành phần:**
+  $$P_n = P_0 \times \left( a + b \frac{L_n}{L_0} + c \frac{M_n}{M_0} + d \frac{E_n}{E_0} \right)$$
+  _(với $a$ là tỷ lệ không điều chỉnh, $b, c, d$ là tỷ lệ nhân công, vật liệu, máy thi công)._
+- **Đối soát Quyết toán Khối lượng Hoàn công 3 Chiều:**
+  $$\Delta \text{QTO} = \text{QTO}_{\text{As-Built}} - \text{QTO}_{\text{BOQ Hợp đồng}} - \text{QTO}_{\text{VO được duyệt}}$$
+- **Lập Bảng Quyết toán A-B Hợp đồng & Thanh lý Hợp đồng:** Khấu trừ toàn bộ tạm ứng, chuyển đổi tiền giữ lại sang Thư bảo lãnh bảo hành (`insurance_bonds`), chốt công nợ cuối cùng.
+- **Báo cáo Quyết toán Vốn Đầu tư Dự án Hoàn thành (Thông tư 96/2021/TT-BTC & Nghị định 99/2021/NĐ-CP):** Tổng hợp toàn bộ chi phí xây dựng, thiết bị, quản lý dự án, tư vấn và chi phí khác phục vụ kiểm toán độc lập và cơ quan thẩm tra quyết toán.
