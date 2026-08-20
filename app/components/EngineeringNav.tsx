@@ -31,6 +31,10 @@ import {
   ChevronDown,
   ChevronUp,
   UserCheck,
+  HardHat,
+  CalendarCheck,
+  Package,
+  Landmark,
 } from "lucide-react";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { ROLE_LABELS, type Role } from "@/lib/roles";
@@ -52,7 +56,7 @@ export interface NavItem {
 
 const CATEGORIES: { key: NavCategory; label: string }[] = [
   { key: "all", label: "Tất cả" },
-  { key: "unified", label: "🏛️ Trung Tâm Hợp Nhất" },
+  { key: "unified", label: "🏛️ 7 Đại Trung Tâm Hợp Nhất" },
   { key: "spatial", label: "📐 MEPF & Không Gian" },
   { key: "copilot", label: "🤖 AI & Hiện Trường" },
   { key: "commercial", label: "💼 Thương Mại & Pháp Lý" },
@@ -71,6 +75,30 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["admin", "pm", "engineer", "subcon", "bch", "cdt", "viewer"],
   },
   {
+    href: "/site",
+    label: "Chỉ Huy Tác Nghiệp Hiện Trường & HSE",
+    category: "unified",
+    icon: HardHat,
+    badge: "Hub Hiện Trường",
+    roles: ["admin", "pm", "engineer", "subcon", "bch", "cdt", "viewer"],
+  },
+  {
+    href: "/schedule",
+    label: "Quản Trị Kế Hoạch & Tiến Độ WBS",
+    category: "unified",
+    icon: CalendarCheck,
+    badge: "Hub Tiến Độ",
+    roles: ["admin", "pm", "engineer", "subcon", "bch", "cdt", "viewer"],
+  },
+  {
+    href: "/procurement",
+    label: "Chuỗi Cung Ứng, Mua Sắm & Kho Vận",
+    category: "unified",
+    icon: Package,
+    badge: "Hub Cung Ứng",
+    roles: ["admin", "pm", "engineer", "subcon", "bch", "cdt", "viewer"],
+  },
+  {
     href: "/commercial",
     label: "Hợp Đồng, Chi Phí & Pháp Lý FIDIC",
     category: "unified",
@@ -84,6 +112,14 @@ const NAV_ITEMS: NavItem[] = [
     category: "unified",
     icon: Brain,
     badge: "Hub Trí Tuệ",
+    roles: ["admin", "pm", "engineer", "bch", "cdt", "viewer"],
+  },
+  {
+    href: "/governance",
+    label: "Quản Trị Dự Án, Bàn Giao & Cấu Hình",
+    category: "unified",
+    icon: Landmark,
+    badge: "Hub Quản Trị",
     roles: ["admin", "pm", "engineer", "bch", "cdt", "viewer"],
   },
 

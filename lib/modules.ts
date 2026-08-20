@@ -130,7 +130,7 @@ export const MODULES: ModuleDef[] = [
   {
     // Hồ sơ dự án — kho tài liệu chung, tải/stream file có kiểm quyền.
     key: "documents",
-    nav: [{ group: "Hồ sơ dự án", label: "Hồ sơ dự án", href: "/documents", icon: "FolderOpen" }],
+    nav: [{ group: "Hệ thống", label: "Hồ sơ dự án", href: "/documents", icon: "FolderOpen" }],
     permKeys: [],
     swExclude: ["/api/documents/"],
     routePrefix: ["/api/documents", "/api/project-documents", "/api/documents-hub"],

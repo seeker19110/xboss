@@ -114,7 +114,7 @@ export type DashCluster = {
 };
 
 export const DASHBOARD_TREE: DashCluster[] = [
-  // Cụm 7 Đại Trung Tâm Điều Hành Hợp Nhất (7 Unified Cockpits & Command Centers)
+  // Cụm 1: 7 Đại Trung Tâm Điều Hành Hợp Nhất (7 Unified Cockpits & Command Centers)
   {
     label: "🏛️ 7 Đại Trung Tâm Điều Hành (Unified Hubs)",
     dashboards: [
@@ -162,7 +162,7 @@ export const DASHBOARD_TREE: DashCluster[] = [
       },
     ],
   },
-  // Cụm Kỹ thuật Không gian & AI (Engineering OS) — Đỉnh cao công nghệ XBoss
+  // Cụm 2: Kỹ thuật Không gian & AI (Engineering OS) — Đỉnh cao công nghệ XBoss
   {
     label: "Kỹ thuật Không gian & AI (Engineering OS)",
     dashboards: [
@@ -264,34 +264,13 @@ export const DASHBOARD_TREE: DashCluster[] = [
       },
     ],
   },
-  // Thứ tự 17 cụm bám mockup xBoss-mockup.xlsx bản mới (commit "chore(attachments):
-  // update xBoss mockup"), sắp theo đúng thứ tự 24 dashboard cấp cao của mockup —
-  // tách nhỏ các cụm cũ không còn liền kề thay vì gộp cưỡng ép. Riêng 2 cụm
-  // "Bản vẽ (BIM-Shop)" + "Thiết kế & BPTC" của mockup đã GỘP làm 1, nhãn hiển thị
-  // đổi thành "Thiết Kế-BIM-Shopdrawings" (cùng trỏ /drawings, để riêng gây trùng
-  // lặp — quyết định 2026-07-15):
-  // 1. Tổng quan & Báo cáo · 2. Kế hoạch & Tiến độ · 3. Thi công hiện trường ·
-  // 4. Thiết Kế-BIM-Shopdrawings (gộp Bản vẽ BIM-Shop + Thiết kế & BPTC) · 5. Quản lý vật tư ·
-  // 6. Chất lượng (QA/QC) · 7. An toàn – HSE & Rủi ro · 8. Thiết bị & Máy móc ·
-  // 9. Đấu thầu & Nhà thầu phụ · 10. Môi trường & Quan trắc · 11. Họp – Công văn ·
-  // 12. Chi phí · Hợp đồng · Tài chính (Claim đứng trước Bảo hiểm & Bảo lãnh) ·
-  // 13. Bàn giao & Vận hành · 14. Hệ thống (Chuyển đổi số đứng trước Import Excel) ·
-  // 15. Hồ sơ dự án · 16. Nhân sự & Tổ chức · 17. Khởi động & Pháp lý (dời xuống cuối).
+  // Cụm 3: Kế hoạch & Tiến độ WBS — Gộp Dashboard tổng quan, Báo cáo & 6 Phân hệ thi công
   {
-    label: "Tổng quan & Báo cáo",
+    label: "Kế hoạch & Tiến độ",
     dashboards: [
       { id: "dash.dashboard", href: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
       { id: "dash.bao-cao", href: "/report", label: "Báo cáo", icon: FileText },
       { id: "dash.bao-cao-luu", href: "/reports", label: "Báo cáo lưu", icon: BookMarked },
-    ],
-  },
-  {
-    // Kế hoạch & Tiến độ — 6 hệ đang thi công, mỗi hệ 1 trang `/progress/[system]` gộp
-    // đủ 7 khối tiến độ của riêng hệ đó: tổng quan, S-curve, timeline, SPI, dự báo,
-    // nguyên nhân trễ, danh sách trễ. Bỏ nhóm cha "Tiến độ" (chỉ gập/mở, không phải
-    // trang riêng) — hiển thị thẳng 6 hệ dưới cụm, không qua bước gập/mở thừa.
-    label: "Kế hoạch & Tiến độ",
-    dashboards: [
       { id: "dash.tien-do-acmv", href: "/progress/acmv", label: "ACMV", icon: Wind },
       { id: "dash.tien-do-dien", href: "/progress/dien", label: "Điện", icon: Zap },
       {
@@ -313,15 +292,10 @@ export const DASHBOARD_TREE: DashCluster[] = [
         label: "Xây tô",
         icon: PaintRoller,
       },
-      // Cụm chỉ còn 6 hệ đang thi công — bỏ hẳn view chung KHÔNG lọc theo hệ (từng có
-      // S-Curve, trước đó là nhóm gập/mở Timeline/Gantt/Lookahead/Đường găng). Các trang
-      // đó vẫn tồn tại (S-Curve nhúng trong từng `/progress/[system]` + Dashboard tổng
-      // qua `ScheduleControlPanel`; Timeline/Gantt/Lookahead vào qua link trong trang hệ
-      // hoặc URL trực tiếp) — chỉ không còn link riêng trong sidebar.
     ],
   },
+  // Cụm 4: Thi công hiện trường, QA/QC & HSE — Gộp Tác nghiệp, Nghiệm thu, Chất lượng, HSE, Thiết bị & Xe
   {
-    // Thi công hiện trường (mockup: 1 dashboard "Hiện Trường").
     label: "Thi công hiện trường",
     dashboards: [
       {
@@ -333,18 +307,47 @@ export const DASHBOARD_TREE: DashCluster[] = [
           { href: "/approvals", label: "Nghiệm thu", icon: CheckSquare },
           { href: "/diary", label: "Nhật ký", icon: NotebookPen },
           { href: "/work-fronts", label: "Mặt bằng", icon: LandPlot },
-          { href: "/resources", label: "Tài nguyên", icon: Users }, // M59 PR1
+          { href: "/resources", label: "Tài nguyên", icon: Users },
+        ],
+      },
+      {
+        id: "dash.chat-luong",
+        href: "/quality",
+        label: "Chất lượng (QA/QC)",
+        icon: ClipboardCheck,
+      },
+      {
+        id: "dash.an-toan",
+        label: "An toàn – HSE & Rủi ro",
+        icon: ShieldAlert,
+        children: [
+          {
+            href: "/hse",
+            label: "HSE",
+            icon: ShieldAlert,
+            roles: ["admin", "pm", "engineer", "subcon"],
+          },
+          {
+            href: "/risks",
+            label: "Rủi ro",
+            icon: AlertTriangle,
+            roles: ["admin", "pm", "engineer", "bch", "cdt", "viewer"],
+          },
+        ],
+      },
+      {
+        id: "dash.thiet-bi",
+        label: "Thiết bị & Máy móc",
+        icon: Wrench,
+        children: [
+          { href: "/equipment", label: "Thiết bị", icon: Wrench },
+          { href: "/vehicles", label: "Xe ra vào", icon: CarFront },
         ],
       },
     ],
   },
+  // Cụm 5: Thiết Kế-BIM-Shopdrawings — Gộp Bản vẽ Thiết kế, BPTC, BIM, Shop, As-built
   {
-    // Thiết kế & BPTC (nhãn hiển thị "Thiết Kế-BIM-Shopdrawings") — gộp cụm "Bản vẽ
-    // (BIM-Shop)" cũ vào đây (2 cụm cùng trỏ /drawings gây trùng lặp): mục "Tất cả bản
-    // vẽ" (thay node "Thiết kế & Biện pháp thi công" cũ trùng tên cụm) + 5 loại bản vẽ
-    // deep-link ?kind= — trang /drawings đã BỎ hàng chip lọc loại, sidebar là nơi duy
-    // nhất chọn loại (nhãn/thứ tự khớp DRAWING_KINDS ở lib/drawings.ts). "Tất cả bản
-    // vẽ" cần `exact` để không sáng chung khi đang xem 1 loại (xem isLeafActive).
     label: "Thiết Kế-BIM-Shopdrawings",
     dashboards: [
       {
@@ -376,10 +379,8 @@ export const DASHBOARD_TREE: DashCluster[] = [
       { id: "dash.as-built", href: "/drawings?kind=asbuilt", label: "As-built", icon: BadgeCheck },
     ],
   },
+  // Cụm 6: Quản lý vật tư & Chuỗi cung ứng — Gộp BOQ, Kho, PO/PR, Quét QR, NCC & Đấu thầu thầu phụ
   {
-    // Quản lý vật tư (mockup đổi tên dashboard "Dashboard Vật Tư" → "Quản Lý Vật Tư").
-    // Giữ 3 lá phẳng (không gộp nhóm) — gộp sẽ trùng nhãn "Vật tư" giữa hàng tiêu đề
-    // nhóm và trang /materials chính của nó, rối cho người dùng (quyết định cũ M21).
     label: "Quản lý vật tư",
     dashboards: [
       {
@@ -413,59 +414,6 @@ export const DASHBOARD_TREE: DashCluster[] = [
         label: "Nhà cung cấp",
         icon: Building2,
       },
-    ],
-  },
-  {
-    // Chất lượng (QA/QC) — tách ra cụm riêng khỏi cụm QA/QC · An toàn · Môi trường cũ.
-    label: "Chất lượng (QA/QC)",
-    dashboards: [
-      { id: "dash.chat-luong", href: "/quality", label: "Chất lượng", icon: ClipboardCheck },
-    ],
-  },
-  {
-    // An toàn – HSE & Rủi ro — tách ra cụm riêng khỏi cụm QA/QC · An toàn · Môi trường cũ.
-    label: "An toàn – HSE & Rủi ro",
-    dashboards: [
-      {
-        id: "dash.an-toan",
-        label: "An toàn – HSE & Rủi ro",
-        icon: ShieldAlert,
-        children: [
-          {
-            href: "/hse",
-            label: "HSE",
-            icon: ShieldAlert,
-            roles: ["admin", "pm", "engineer", "subcon"],
-          },
-          {
-            href: "/risks",
-            label: "Rủi ro",
-            icon: AlertTriangle,
-            roles: ["admin", "pm", "engineer", "bch", "cdt", "viewer"],
-          },
-        ],
-      },
-    ],
-  },
-  {
-    // Thiết bị & Máy móc — tách khỏi cụm "Vật tư & Thiết bị" cũ.
-    label: "Thiết bị & Máy móc",
-    dashboards: [
-      {
-        id: "dash.thiet-bi",
-        label: "Thiết bị & Máy móc",
-        icon: Wrench,
-        children: [
-          { href: "/equipment", label: "Thiết bị", icon: Wrench },
-          { href: "/vehicles", label: "Xe ra vào", icon: CarFront },
-        ],
-      },
-    ],
-  },
-  {
-    // Đấu thầu & Nhà thầu phụ (mockup: Đấu Thầu & Chọn Thầu Phụ; NTP).
-    label: "Đấu thầu & Nhà thầu phụ",
-    dashboards: [
       {
         id: "dash.dau-thau",
         href: "/tenders",
@@ -473,52 +421,11 @@ export const DASHBOARD_TREE: DashCluster[] = [
         icon: Gavel,
         roles: ["admin", "pm", "engineer", "bch"],
       },
-      { id: "dash.nha-thau-phu", href: "/subcontractors", label: "Nhà thầu phụ", icon: HardHat }, // M33: hồ sơ năng lực + đánh giá NTP
+      { id: "dash.nha-thau-phu", href: "/subcontractors", label: "Nhà thầu phụ", icon: HardHat },
     ],
   },
+  // Cụm 7: Chi phí · Hợp đồng · Tài chính — Gộp Hợp đồng, Chi phí, Đề xuất chi, IPC, Tài chính, Claim, Bảo hiểm
   {
-    // Môi trường & Quan trắc — tách khỏi cụm "Chất lượng · An toàn · Môi trường" cũ.
-    // Giữ 2 dashboard này chung cụm vì mockup mới xếp liền kề nhau.
-    label: "Môi trường & Quan trắc",
-    dashboards: [
-      {
-        id: "dash.moi-truong",
-        href: "/environment",
-        label: "Môi trường & Giấy phép",
-        icon: Leaf,
-      }, // M25
-      {
-        id: "dash.quan-he-quan-trac",
-        href: "/monitoring",
-        label: "Quan hệ & Quan trắc",
-        icon: Radar,
-      }, // M26
-    ],
-  },
-  {
-    // Họp – Công văn — tách khỏi cụm "Điều hành & Hồ sơ" cũ.
-    label: "Họp – Công văn",
-    dashboards: [
-      {
-        id: "dash.hop-cong-van",
-        label: "Họp – Công văn",
-        icon: MessagesSquare,
-        children: [
-          { href: "/meetings", label: "Họp", icon: MessagesSquare },
-          {
-            href: "/correspondences",
-            label: "Công văn",
-            icon: Mail,
-            roles: ["admin", "pm", "engineer", "bch", "cdt", "viewer"],
-          },
-        ],
-      },
-    ],
-  },
-  {
-    // Chi phí, hợp đồng, tài chính (mockup: Chi Phí & Hợp Đồng; Tài Chính – Kế Toán;
-    // Claim & Thay Đổi; Bảo Hiểm & Bảo Lãnh — mockup mới đổi chỗ Claim đứng TRƯỚC
-    // Bảo hiểm & Bảo lãnh so với thứ tự cũ).
     label: "Chi phí · Hợp đồng · Tài chính",
     dashboards: [
       {
@@ -549,7 +456,7 @@ export const DASHBOARD_TREE: DashCluster[] = [
         label: "Tài chính – Kế toán",
         icon: Banknote,
         roles: ["admin", "pm", "bch"],
-      }, // M27
+      },
       {
         id: "dash.claim",
         label: "Claim & Thay đổi",
@@ -566,7 +473,7 @@ export const DASHBOARD_TREE: DashCluster[] = [
             label: "Claim chi phí",
             icon: Scale,
             roles: ["admin", "pm", "engineer", "bch"],
-          }, // M34
+          },
         ],
       },
       {
@@ -575,34 +482,71 @@ export const DASHBOARD_TREE: DashCluster[] = [
         label: "Bảo hiểm & Bảo lãnh",
         icon: Umbrella,
         roles: ["admin", "pm", "bch"],
-      }, // M28
+      },
     ],
   },
+  // Cụm 8: Quản trị dự án, Bàn giao & Hệ thống — Gộp Khởi động, Bàn giao, Bảo hành, CDE, Họp, Môi trường, Nhân sự & Cấu hình Admin
   {
-    // Bàn giao & Vận hành (mockup: Bàn Giao & Kết Thúc; Bảo Hành – Bảo Trì) — mới hoàn toàn.
-    label: "Bàn giao & Vận hành",
+    label: "Hệ thống",
     dashboards: [
+      {
+        id: "dash.khoi-dong-phap-ly",
+        href: "/kickoff",
+        label: "Khởi động & Pháp lý",
+        icon: Landmark,
+      },
       {
         id: "dash.ban-giao-ket-thuc",
         href: "/handover",
         label: "Bàn giao & Kết thúc",
         icon: PackageCheck,
-      }, // M29
+      },
       {
         id: "dash.bao-hanh-bao-tri",
         href: "/warranty",
         label: "Bảo hành – Bảo trì",
         icon: Cog,
-      }, // M30
-    ],
-  },
-  {
-    // Hệ thống: quản trị + cụm Công nghệ & Số hoá của mockup (gộp theo gợi ý tài liệu
-    // để không phình số cụm — CDE/mobile/luồng duyệt đã có nền, xem M31). Mockup xếp
-    // Chuyển đổi số & Công nghệ TRƯỚC Import Excel (tiện ích quản trị không có trong mockup).
-    label: "Hệ thống",
-    dashboards: [
-      { id: "dash.chuyen-doi-so", href: "/tech", label: "Chuyển đổi số & Công nghệ", icon: Cpu }, // M31 — đã có trang thật
+      },
+      { id: "dash.ho-so-du-an", href: "/documents", label: "Hồ sơ dự án", icon: FolderOpen },
+      {
+        id: "dash.hop-cong-van",
+        label: "Họp – Công văn",
+        icon: MessagesSquare,
+        children: [
+          { href: "/meetings", label: "Họp", icon: MessagesSquare },
+          {
+            href: "/correspondences",
+            label: "Công văn",
+            icon: Mail,
+            roles: ["admin", "pm", "engineer", "bch", "cdt", "viewer"],
+          },
+        ],
+      },
+      {
+        id: "dash.moi-truong",
+        href: "/environment",
+        label: "Môi trường & Giấy phép",
+        icon: Leaf,
+      },
+      {
+        id: "dash.quan-he-quan-trac",
+        href: "/monitoring",
+        label: "Quan hệ & Quan trắc",
+        icon: Radar,
+      },
+      {
+        id: "dash.nhan-su",
+        label: "Nhân sự & Tổ chức",
+        icon: Users,
+        children: [
+          { href: "/users", label: "Tài khoản", icon: Users, roles: ["admin"] },
+          { href: "/admin", label: "Phân công", icon: ShieldCheck, roles: ["admin", "pm"] },
+          { href: "/attendance", label: "Chấm công", icon: CalendarCheck },
+          { href: "/personnel", label: "Nhân sự", icon: UserCog },
+          { href: "/org", label: "Sơ đồ tổ chức", icon: Network },
+        ],
+      },
+      { id: "dash.chuyen-doi-so", href: "/tech", label: "Chuyển đổi số & Công nghệ", icon: Cpu },
       {
         id: "dash.import-excel",
         href: "/import",
@@ -616,97 +560,56 @@ export const DASHBOARD_TREE: DashCluster[] = [
         label: "Audit trail (tài chính)",
         icon: History,
         roles: ["admin"],
-      }, // M43 PR2 — sổ audit toàn hệ (bảng audit_log ghi bằng trigger), chỉ Admin
+      },
       {
         id: "dash.approval-flows",
         href: "/admin/approval-flows",
         label: "Cấu hình duyệt",
         icon: Workflow,
         roles: ["admin", "pm"],
-      }, // M46 PR4 — Approval Engine: cấu hình luồng duyệt nhiều cấp; PM chỉ xem, Admin sửa
+      },
       {
         id: "dash.permissions",
         href: "/admin/permissions",
         label: "Phân quyền",
         icon: KeyRound,
         roles: ["admin"],
-      }, // M50 PR1 — ma trận override quyền (role_permissions); chỉ Admin
+      },
       {
         id: "dash.alert-rules",
         href: "/admin/alert-rules",
         label: "Ngưỡng cảnh báo",
         icon: BellRing,
         roles: ["admin", "pm"],
-      }, // M47 PR4 — alert_rules: cấu hình ngưỡng cảnh báo (hạn/vật tư/SPI/CPI); PM chỉ xem, Admin sửa
+      },
       {
         id: "dash.integrations",
         href: "/admin/integrations",
         label: "Tích hợp hệ ngoài",
         icon: Cable,
         roles: ["admin", "pm"],
-      }, // M48 PR1 — khung tích hợp (integrations): đồng bộ hệ ngoài; PM chỉ xem+đồng bộ, Admin bật/tắt
+      },
       {
         id: "dash.code-lists",
         href: "/admin/code-lists",
         label: "Danh mục mềm",
         icon: ListTree,
         roles: ["admin"],
-      }, // M52 PR1 — code_lists: danh mục enum-mềm (nguyên nhân trễ…); chỉ Admin
+      },
       {
         id: "dash.custom-fields",
         href: "/admin/custom-fields",
         label: "Trường tuỳ biến",
         icon: SlidersHorizontal,
         roles: ["admin", "pm"],
-      }, // M52 PR2 — custom_field_defs: trường tuỳ biến cho 4 entity; Admin sửa, PM xem
+      },
       {
         id: "dash.feature-flags",
         href: "/admin/features",
         label: "Cờ tính năng",
         icon: ToggleRight,
         roles: ["admin", "pm"],
-      }, // M52 PR4 — feature_flags: bật/tắt module theo dự án; PM chỉ xem, Admin sửa
-    ],
-  },
-  {
-    // Hồ sơ dự án — tách khỏi cụm "Điều hành & Hồ sơ" cũ, dời xuống gần cuối vì
-    // mockup xếp "Dashboard Hồ Sơ" ở vị trí #22.
-    label: "Hồ sơ dự án",
-    dashboards: [
-      { id: "dash.ho-so-du-an", href: "/documents", label: "Hồ sơ dự án", icon: FolderOpen },
-    ],
-  },
-  {
-    // Nhân sự & Tổ chức — tách khỏi cụm "Khởi động & Tổ chức" cũ, dời xuống vị trí #23
-    // vì mockup xếp cuối.
-    label: "Nhân sự & Tổ chức",
-    dashboards: [
-      {
-        id: "dash.nhan-su",
-        label: "Nhân sự & Tổ chức",
-        icon: Users,
-        children: [
-          { href: "/users", label: "Tài khoản", icon: Users, roles: ["admin"] },
-          { href: "/admin", label: "Phân công", icon: ShieldCheck, roles: ["admin", "pm"] },
-          { href: "/attendance", label: "Chấm công", icon: CalendarCheck }, // M24
-          { href: "/personnel", label: "Nhân sự", icon: UserCog }, // M24
-          { href: "/org", label: "Sơ đồ tổ chức", icon: Network }, // M24
-        ],
       },
-    ],
-  },
-  {
-    // Khởi động & Pháp lý — tách khỏi cụm "Khởi động & Tổ chức" cũ, dời xuống CUỐI
-    // CÙNG vì mockup xếp ở vị trí #24. Thay đổi lớn nhất so với thứ tự cũ (trước đây
-    // node này nằm gần đầu sidebar).
-    label: "Khởi động & Pháp lý",
-    dashboards: [
-      {
-        id: "dash.khoi-dong-phap-ly",
-        href: "/kickoff",
-        label: "Khởi động & Pháp lý",
-        icon: Landmark,
-      }, // M23
     ],
   },
 ];

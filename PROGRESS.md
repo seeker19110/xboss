@@ -25,6 +25,29 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
+## Dọn Dẹp & Hợp Nhất Toàn Diện Các Nhóm Tính Năng (2026-08-21)
+
+- **[AI, đã làm] Tinh Gọn 19 Cụm Điều Hướng Phân Mảnh Thành 8 Phân Hệ Hợp Nhất:**
+  - **Vấn đề đã xử lý:** Trước đây cây điều hướng AppShell (`DASHBOARD_TREE`) bị phân mảnh thành 19 cụm riêng lẻ với hơn 80 liên kết gây rối mắt và chồng chéo giữa 7 Hubs, Engineering OS và các nhóm con kế thừa.
+  - **Tái cấu trúc thành 8 Cụm Phân Hệ Cốt Lõi:**
+    1. `🏛️ 7 Đại Trung Tâm Điều Hành (Unified Hubs)`: 7 Command Cockpits chính.
+    2. `Kỹ thuật Không gian & AI (Engineering OS)`: 16 phân hệ kỹ thuật chuyên sâu (Apex Cockpit, 3D BIM, Nesting LOD 400, Auto-Routing, Scan-to-BIM, HSE Vision, Zalo Copilot, Dynamic Cashflow, Smart e-Sign, FIDIC Claims, QR Logistics, Quantum Ledger, Gate 0 Workflows, AI Suggestions).
+    3. `Kế hoạch & Tiến độ`: Dashboard tổng quan, Báo cáo in ấn & 6 phân hệ thi công (ACMV, Điện, Cấp thoát nước, PCCC, Kết cấu, Xây tô).
+    4. `Thi công hiện trường`: Tác nghiệp hiện trường (Việc của tôi, Nghiệm thu, Nhật ký, Mặt bằng, Tài nguyên), Chất lượng QA/QC, An toàn HSE & Rủi ro, Thiết bị & Xe ra vào.
+    5. `Thiết Kế-BIM-Shopdrawings`: Tất cả bản vẽ, Bản vẽ thiết kế, Biện pháp thi công, BIM, Shop drawing, As-built.
+    6. `Quản lý vật tư`: Tổng quan Chuỗi cung ứng, Định mức BOQ, Kho & Tồn kho, Đơn hàng PO/PR, Quét QR & GRN, Nhà cung cấp, Đấu thầu & Nhà thầu phụ.
+    7. `Chi phí · Hợp đồng · Tài chính`: Chi phí & Hợp đồng, Đề xuất & duyệt chi, Thanh toán & Chứng chỉ IPC, Tài chính - Kế toán, Claim & Thay đổi VO, Bảo hiểm & Bảo lãnh.
+    8. `Hệ thống`: Bàn giao & Kết thúc, Bảo hành - Bảo trì, Khởi động & Pháp lý, Hồ sơ dự án CDE, Họp - Công văn, Môi trường & Quan trắc, Nhân sự & Tổ chức, Toàn bộ cài đặt quản trị (Audit trail, Approval Engine, Phân quyền, Ngưỡng cảnh báo, Tích hợp, Danh mục mềm, Trường tuỳ biến, Cờ tính năng, Import Excel, Chuyển đổi số).
+  - **Bảo Toàn 100% Khả Năng Tương Thích & Tính Bất Biến:**
+    - Toàn bộ 67 mã `id` ổn định của các dashboard được bảo toàn nguyên vẹn, đảm bảo tương thích 100% với `nav_settings`, `feature_flags`, phân quyền RBAC và `flattenDashboards()`.
+    - Đồng bộ `app/components/EngineeringNav.tsx` với 7 Master Hubs và các danh mục phân loại chuẩn xác.
+    - Cập nhật manifest registry `lib/modules.ts` và kiểm tra khớp nối `swExclude` với Service Worker.
+  - **Kiểm Thử & Verification:**
+    - `npm test -- --release-gate`: 199/199 test files pass 100% (0 errors).
+    - `npm run lint` & `npm run typecheck`: 0 lỗi.
+    - `npm run check:sw-exclude`: 100% passed.
+    - `npm run build`: Production Build biên dịch thành công 100% routes.
+
 ## Hợp Nhất Toàn Bộ Vòng Đời Vật Tư (Materials / PO / QR Logistics) Vào /procurement (2026-08-20)
 
 - **[AI, đã làm] Triệt Tiêu Phân Mảnh & Hợp Nhất 100% Vòng Đời Vật Tư:**
