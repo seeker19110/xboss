@@ -3,6 +3,11 @@ services:
     build: .
     ports:
       - "3000:3000"
+    env_file:
+      - path: .env.local
+        required: false
+      - path: .env
+        required: false
     environment:
       # ⚠️ ĐỔI thành chuỗi ngẫu nhiên dài (ký session đăng nhập >= 32 ký tự).
       - XBOSS_SECRET=xboss-secret-key-local-development-32chars
