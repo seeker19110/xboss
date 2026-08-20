@@ -20,14 +20,15 @@
              ┌─────────────────────────────────┴─────────────────────────────────┐
              │                                                                   │
     ┌────────▼────────┐                                                 ┌────────▼────────┐
-    │ 7 MASTER SKILLS │                                                 │ 17 CỤM PHÂN HỆ  │
-    │  - CAD/BIM      │ ──────────── Trang bị tri thức ────────────►   │  - Tiến độ/BIM  │
-    │  - EVM Schedule │                                                 │  - Hiện trường  │
-    │  - QS Contracts │                                                 │  - QA/QC & HSE  │
-    │  - Field Comms  │                                                 │  - Chi phí/Vốn  │
-    │  - QAQC Safety  │                                                 │  - Đấu thầu/NTP │
-    │  - UI/UX Craft  │                                                 │  - Bàn giao/CDE │
-    │  - Swarm Orchest│                                                 │  - Apex AI Hub  │
+    │ 8 MASTER SKILLS │                                                 │ 17 CỤM PHÂN HỆ  │
+    │  - User Healing │ ──────────── Trang bị tri thức ────────────►   │  - Tiến độ/BIM  │
+    │  - CAD/BIM      │                                                 │  - Hiện trường  │
+    │  - EVM Schedule │                                                 │  - QA/QC & HSE  │
+    │  - QS Contracts │                                                 │  - Chi phí/Vốn  │
+    │  - Field Comms  │                                                 │  - Đấu thầu/NTP │
+    │  - QAQC Safety  │                                                 │  - Bàn giao/CDE │
+    │  - UI/UX Craft  │                                                 │  - Apex AI Hub  │
+    │  - Swarm Orchest│                                                 │                 │
     └─────────────────┘                                                 └─────────────────┘
 ```
 
@@ -128,6 +129,18 @@ Mỗi Skill được đóng gói thành một tài nguyên tri thức chuyên s�
   1. _Gate 0 Pre-execution Invariant:_ Mọi đề xuất thay đổi mô hình, BOQ hoặc chi phí phát sinh từ AI bắt buộc phải vượt qua Gate 0 trước khi trình người duyệt.
   2. _No Majority Voting in Engineering:_ Tranh chấp kỹ thuật bắt buộc giải quyết theo Thứ bậc Thẩm quyền Nguồn dữ liệu (Authority Hierarchy).
   3. _Cryptographic Provenance Token:_ Mỗi bản ghi điều chỉnh dữ liệu quan trọng đều được gắn kèm mã băm Merkle Leaf để đảm bảo tính toàn vẹn.
+
+---
+
+### SKILL 8: `user-error-healing-master` (Đại Bậc Thầy Tự Chữa Lành Lỗi Người Dùng & Phòng Vệ Đa Tầng)
+
+- **Mục tiêu:** Tự động phát hiện sớm, nắn chỉnh sai lệch, phân giải mờ nghĩa, phục hồi dữ liệu hỏng (#REF!/#VALUE!) và chữa lành hoàn hảo mọi sai sót, nhầm lẫn từ phía người dùng (kỹ sư hiện trường, thầu phụ, QS, PM, CĐT).
+- **Quy chuẩn & Pháp lý:** 7 Trụ Cột Tự Chữa Lành Tự Trị, Bậc thang 4 cấp độ (L1-L4), Lá chắn Blast-Radius & Bản chụp Time-Travel Undo 24 giờ.
+- **Nguyên tắc Bất biến (Invariants):**
+  1. _Intent Preservation & Zero Data Loss:_ Không bao giờ âm thầm cắt xén dữ liệu thô. Luôn lưu snapshot gốc trước khi nắn chỉnh.
+  2. _Idempotency & Replay Protection:_ Gán mã băm SHA-256 + Idempotency-Key đảm bảo $f(f(x)) = f(x)$.
+  3. _Statistical Anomaly Detection:_ Thuật toán $Z\text{-Score}$ nhận diện và cảnh báo ngay lập tức sai lệch khối lượng bất thường.
+  4. _Field-Level CRDT & 3-Way Merge:_ Hợp nhất dữ liệu đa người dùng và ngoại tuyến theo từng trường riêng biệt.
 
 ---
 

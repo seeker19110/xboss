@@ -28,7 +28,8 @@
 ## Master Skills Blueprint & Nghiên cứu Nâng cấp Toàn diện Tính năng (2026-08-20)
 
 - **[AI, đã làm] Quy hoạch Nâng cấp Toàn diện:** Xuất bản tài liệu `docs/nghien-cuu-nang-cap-toan-dien-tinh-nang-va-skill-2026.md` phân rã chi tiết 17 Cụm nghiệp vụ và 34 phân hệ kỹ thuật theo chuẩn TCVN, FIDIC 1999/2017, ISO 19650, ISO 21597 và QCVN 18:2021/BXD.
-- **[AI, đã làm] Đóng gói Bộ 7 Master Skills (`.agents/skills/`):**
+- **[AI, đã làm] Đóng gói Bộ 8 Master Skills (`.agents/skills/`):**
+  - `user-error-healing-master`: Tự Chữa Lành Lỗi Người Dùng 4 cấp độ, 4 Bất biến Tối thượng, Chuẩn hóa Dữ liệu Bẩn, Fuzzy Intent, 3-Way Merge Field-Level.
   - `cad-bim-master`: Kỹ thuật Không gian, MEPF, AutoLISP, Nesting 1D/2D, Scan-to-BIM, BCF ISO 21597.
   - `schedule-evm-controller`: WBS Roll-up, CPM Critical Path, EVM (SPI/CPI/EAC), Lookahead 7/14/21, Pareto.
   - `qs-cost-contracts-master`: Định mức TT12, Điều khoản FIDIC, Time-Bar 28 ngày, TIA Claims, Dynamic Cashflow S-Curve.
