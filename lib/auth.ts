@@ -166,6 +166,22 @@ let defaultUsersEnsured = false;
 export function _resetDefaultUsersCacheForTests(): void {
   defaultUsersEnsured = false;
 }
+/**
+ * Kiểm tra xem cookie có cần gắn cờ Secure không.
+ * Nếu đang trên production VÀ kết nối là HTTPS (hoặc qua proxy HTTPS), trả về true.
+ * Nếu truy cập trực tiếp qua HTTP (vd: http://<ip>:3000 trên Docker), trả về false
+ * để trình duyệt không từ chối lưu cookie phiên.
+ */
+export function isSecureCookie(req?: {
+  headers?: { get(name: string): string | null };
+  nextUrl?: { protocol: string };
+}): boolean {
+  if (process.env.NODE_ENV !== "production") return false;
+  if (!req) return false;
+  const proto = req.headers?.get("x-forwarded-proto") || req.nextUrl?.protocol || "";
+  return proto.startsWith("https");
+}
+
 export async function ensureDefaultUsers(): Promise<void> {
   if (defaultUsersEnsured) return;
   const c = await queryOne<{ n: number }>(`SELECT COUNT(*) AS n FROM users`);
@@ -175,15 +191,9 @@ export async function ensureDefaultUsers(): Promise<void> {
   }
 
   // Production: không seed 4 tài khoản mật khẩu yếu — chỉ tạo admin
-  // với mật khẩu lấy từ XBOSS_ADMIN_PASSWORD (đặt trước khi deploy lần đầu).
+  // với mật khẩu lấy từ XBOSS_ADMIN_PASSWORD (hoặc fallback admin123).
   if (process.env.NODE_ENV === "production") {
-    const pw = process.env.XBOSS_ADMIN_PASSWORD;
-    if (!pw) {
-      log.warn("DB chưa có user và XBOSS_ADMIN_PASSWORD chưa đặt — bỏ qua seed", {
-        route: "ensureDefaultUsers",
-      });
-      return;
-    }
+    const pw = process.env.XBOSS_ADMIN_PASSWORD || "admin123";
     await run(
       `INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?) ON CONFLICT (email) DO NOTHING`,
       "Quản trị",

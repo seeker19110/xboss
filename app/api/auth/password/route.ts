@@ -8,6 +8,7 @@ import {
   makeToken,
   requiredRoles,
   computeMustSetup2fa,
+  isSecureCookie,
   COOKIE,
   COOKIE_MAX_AGE,
 } from "@/lib/auth";
@@ -58,7 +59,7 @@ export async function PATCH(req: NextRequest) {
     path: "/",
     maxAge: COOKIE_MAX_AGE,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: isSecureCookie(req),
   });
   return res;
 }

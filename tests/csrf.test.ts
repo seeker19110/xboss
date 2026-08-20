@@ -17,6 +17,19 @@ test("isSameOrigin: origin cùng host → cho qua", () => {
   assert.equal(isSameOrigin(makeReq({ host: "xboss.local", origin: "https://xboss.local" })), true);
 });
 
+test("isSameOrigin: origin khác host nhưng khớp x-forwarded-host (reverse proxy) → cho qua", () => {
+  assert.equal(
+    isSameOrigin(
+      makeReq({
+        host: "localhost:3000",
+        "x-forwarded-host": "xboss.mycompany.com",
+        origin: "https://xboss.mycompany.com",
+      }),
+    ),
+    true,
+  );
+});
+
 test("isSameOrigin: origin khác host → chặn", () => {
   assert.equal(isSameOrigin(makeReq({ host: "xboss.local", origin: "https://evil.com" })), false);
 });

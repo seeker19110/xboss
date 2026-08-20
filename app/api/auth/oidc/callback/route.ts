@@ -10,7 +10,7 @@ import {
   type SsoClaims,
   OIDC_TMP_COOKIE,
 } from "@/lib/oidc";
-import { makeToken, COOKIE, COOKIE_MAX_AGE } from "@/lib/auth";
+import { makeToken, isSecureCookie, COOKIE, COOKIE_MAX_AGE } from "@/lib/auth";
 import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
@@ -99,7 +99,7 @@ export async function GET(req: NextRequest) {
       path: "/",
       maxAge: COOKIE_MAX_AGE,
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      secure: isSecureCookie(req),
     },
   );
   res.cookies.delete({ name: OIDC_TMP_COOKIE, path: "/api/auth/oidc" });

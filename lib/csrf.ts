@@ -11,7 +11,10 @@ export function isSameOrigin(req: NextRequest): boolean {
   const origin = req.headers.get("origin");
   if (!origin) return true;
   try {
-    return new URL(origin).host === req.headers.get("host");
+    const originHost = new URL(origin).host;
+    const fwdHost = req.headers.get("x-forwarded-host");
+    const host = req.headers.get("host");
+    return originHost === host || (!!fwdHost && originHost === fwdHost);
   } catch {
     return false;
   }

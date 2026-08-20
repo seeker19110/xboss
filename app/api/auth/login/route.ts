@@ -7,6 +7,7 @@ import {
   ensureDefaultUsers,
   requiredRoles,
   computeMustSetup2fa,
+  isSecureCookie,
   COOKIE,
   COOKIE_MAX_AGE,
   type Role,
@@ -84,7 +85,7 @@ export async function POST(req: NextRequest) {
       path: "/",
       maxAge: COOKIE_MAX_AGE,
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production", // dev qua HTTP vẫn set được
+      secure: isSecureCookie(req),
     },
   );
   return res;

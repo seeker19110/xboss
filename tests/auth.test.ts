@@ -1,7 +1,7 @@
 import { HAS_TEST_DB } from "./setup"; // phải đứng đầu
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { hashPassword, verifyPassword, makeToken, parseToken } from "@/lib/auth";
+import { hashPassword, verifyPassword, makeToken, parseToken, isSecureCookie } from "@/lib/auth";
 
 // ===== Unit tests: hash + verify mật khẩu =====
 
@@ -77,6 +77,40 @@ test("parseToken: orgId phải là số nguyên dương (0 → null)", async () 
   const badPayload = `42.${exp}.${pwFrag}.0.0.0`;
   const badToken = `${badPayload}.${sign(badPayload)}`;
   assert.equal(parseToken(badToken), null, "orgId = 0 phải bị từ chối");
+});
+
+test("isSecureCookie: dev mode luôn trả false", () => {
+  const orig = process.env.NODE_ENV;
+  const envObj = process.env as Record<string, string | undefined>;
+  try {
+    envObj.NODE_ENV = "development";
+    assert.equal(isSecureCookie({ headers: new Headers({ "x-forwarded-proto": "https" }) }), false);
+  } finally {
+    envObj.NODE_ENV = orig;
+  }
+});
+
+test("isSecureCookie: production HTTP trả false để trình duyệt lưu cookie", () => {
+  const orig = process.env.NODE_ENV;
+  const envObj = process.env as Record<string, string | undefined>;
+  try {
+    envObj.NODE_ENV = "production";
+    assert.equal(isSecureCookie({ headers: new Headers() }), false);
+    assert.equal(isSecureCookie({ headers: new Headers({ "x-forwarded-proto": "http" }) }), false);
+  } finally {
+    envObj.NODE_ENV = orig;
+  }
+});
+
+test("isSecureCookie: production HTTPS trả true", () => {
+  const orig = process.env.NODE_ENV;
+  const envObj = process.env as Record<string, string | undefined>;
+  try {
+    envObj.NODE_ENV = "production";
+    assert.equal(isSecureCookie({ headers: new Headers({ "x-forwarded-proto": "https" }) }), true);
+  } finally {
+    envObj.NODE_ENV = orig;
+  }
 });
 
 // ===== Integration tests: DB =====
