@@ -25,6 +25,21 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
+## Hợp Nhất Toàn Bộ Vòng Đời Vật Tư (Materials / PO / QR Logistics) Vào /procurement (2026-08-20)
+
+- **[AI, đã làm] Triệt Tiêu Phân Mảnh & Hợp Nhất 100% Vòng Đời Vật Tư:**
+  - **Vấn đề đã xử lý:** Trước đây, các thao tác nhập vật tư, xem danh bạ nhà cung cấp, lên đơn mua PO và quét QR kho bị phân tách rải rác ở `/materials/*` và `/engineering/qr-logistics`.
+  - **Hợp nhất toàn diện tại [`/procurement`](file:///c:/Users/liend/xboss/app/procurement/page.tsx):**
+    1. **Tab `inventory` (Kho & Định Mức Vật Tư):** Tích hợp [`InventoryTab.tsx`](file:///c:/Users/liend/xboss/app/procurement/_components/InventoryTab.tsx) đầy đủ tính năng lưới SpreadsheetGrid / Bảng, định mức BOQ vs Tháp A vs Thực xuất, tồn kho an toàn, đồng bộ Google Sheets 2 chiều và in tem QR.
+    2. **Tab `orders` (Đơn Hàng PO & Yêu Cầu PR):** Tích hợp [`OrdersTab.tsx`](file:///c:/Users/liend/xboss/app/procurement/_components/OrdersTab.tsx) quản lý trọn vẹn tiến trình PO 6 bước (PO Stepper), tạo PO, nhập hàng cập nhật tồn kho (Goods Receipt GRN), đánh giá xếp hạng Nhà cung cấp và quy trình xét duyệt Yêu cầu mua sắm PR.
+    3. **Tab `qr-logistics` (Quét QR & Tiếp Nhận GRN):** Tích hợp [`QrLogisticsTab.tsx`](file:///c:/Users/liend/xboss/app/procurement/_components/QrLogisticsTab.tsx) quét mã QR/Barcode hiện trường, sinh mã QR chuẩn hoá `XB-MAT|...`, đối soát 3 bên đại số (PO ≡ GRN ≡ Invoice) và cấp Phiếu Nhập Kho GRN điện tử.
+    4. **Tab `suppliers` (Danh Bạ Nhà Cung Cấp):** Tích hợp [`SuppliersTab.tsx`](file:///c:/Users/liend/xboss/app/procurement/_components/SuppliersTab.tsx) quản lý thông tin pháp nhân bên Mua/Bán/Nhận hàng, địa chỉ giao nhận và xếp hạng uy tín.
+    5. **Tab `boq` (Định Mức BOQ & Đấu Thầu):** Tích hợp [`BoqBiddingTab.tsx`](file:///c:/Users/liend/xboss/app/procurement/_components/BoqBiddingTab.tsx) bóc tách khối lượng dự toán, kiểm soát tiêu hao và ma trận so sánh đơn giá chào thầu chống rủi ro Front-Loading.
+  - **Chuyển Hướng Tương Thích & Điều Hướng Toàn Hệ Thống:**
+    - Thiết lập chuyển hướng tự động (Client-side redirects) tại `/materials`, `/materials/purchase-orders`, `/materials/suppliers`, `/engineering/qr-logistics` về các tab tương ứng của `/procurement`.
+    - Đồng bộ cây điều hướng [`app/lib/dashboardTree.ts`](file:///c:/Users/liend/xboss/app/lib/dashboardTree.ts), [`EngineeringNav.tsx`](file:///c:/Users/liend/xboss/app/components/EngineeringNav.tsx), [`GlobalSearch.tsx`](file:///c:/Users/liend/xboss/app/components/GlobalSearch.tsx), [`costs/page.tsx`](file:///c:/Users/liend/xboss/app/costs/page.tsx) và [`finance/page.tsx`](file:///c:/Users/liend/xboss/app/finance/page.tsx).
+  - **Kiểm Thử & Verification:** Typecheck 0 lỗi (`tsc --noEmit`), Linter 0 lỗi, Test suites liên quan passed 100%, Next.js Production Build thành công 100% routes.
+
 ## The 7-Hub Unified Ecosystem — Hợp Nhất 114 Tính Năng Thành 7 Đại Trung Tâm Điều Hành (2026-08-20)
 
 - **[AI, đã làm] Tái Cấu Trúc & Tinh Gọn Hệ Thống Tính Năng Toàn Diện:**

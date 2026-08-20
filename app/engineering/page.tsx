@@ -600,7 +600,7 @@ export default function EngineeringApexCockpitPage() {
                     <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
                   </Link>
                   <Link
-                    href="/engineering/qr-logistics"
+                    href="/procurement?tab=qr-logistics"
                     className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
                   >
                     <span>Smart Materials QR Logistics (M78)</span>

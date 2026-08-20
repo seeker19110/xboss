@@ -384,7 +384,7 @@ function DrillDown({
       </div>
       <div className="mt-4 pt-3 border-t border-zinc-800 space-y-2">
         <a
-          href={groupBy === "system" ? "/materials/purchase-orders" : "/payments"}
+          href={groupBy === "system" ? "/procurement?tab=orders" : "/payments"}
           className="block text-xs text-emerald-400 hover:underline"
         >
           → Xem đơn đặt hàng / thanh toán chi tiết

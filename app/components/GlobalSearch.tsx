@@ -172,7 +172,7 @@ const STATIC_MODULE_HITS: ModuleHit[] = [
     code: "M78",
     title: "Smart QR Logistics & Barcode",
     subtitle: "Quản lý chuỗi cung ứng vật tư & đối soát GRN",
-    url: "/engineering/qr-logistics",
+    url: "/procurement?tab=qr-logistics",
     icon: QrCode,
   },
   {

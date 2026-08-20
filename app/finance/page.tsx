@@ -468,7 +468,7 @@ function DebtTab({ receivables, payables }: { receivables: number; payables: num
             Xem hợp đồng <ExternalLink className="w-3.5 h-3.5" />
           </a>
           <a
-            href="/materials/purchase-orders"
+            href="/procurement?tab=orders"
             className="inline-flex items-center gap-1 text-sky-400 hover:text-sky-300 text-xs"
           >
             Xem đơn đặt hàng <ExternalLink className="w-3.5 h-3.5" />

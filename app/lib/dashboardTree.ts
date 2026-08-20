@@ -215,52 +215,10 @@ export const DASHBOARD_TREE: DashCluster[] = [
         icon: ShieldAlert,
       },
       {
-        id: "dash.zalo-copilot",
-        href: "/engineering/zalo-copilot",
-        label: "Zalo Copilot (M86)",
-        icon: Bot,
-      },
-      {
-        id: "dash.dynamic-cashflow",
-        href: "/engineering/cashflow",
-        label: "Dynamic Cashflow (M85)",
-        icon: TrendingUp,
-      },
-      {
-        id: "dash.esign-protocol",
-        href: "/engineering/esign",
-        label: "Smart e-Sign (M84)",
-        icon: ShieldCheck,
-      },
-      {
-        id: "dash.fidic-claims",
-        href: "/engineering/fidic-claims",
-        label: "FIDIC Claims & EOT (M79)",
-        icon: Scale,
-      },
-      {
         id: "dash.qr-logistics",
-        href: "/engineering/qr-logistics",
+        href: "/procurement?tab=qr-logistics",
         label: "QR Logistics (M78)",
         icon: QrCode,
-      },
-      {
-        id: "dash.quantum-hub",
-        href: "/engineering/quantum-hub",
-        label: "Quantum & Merkle (M73)",
-        icon: Zap,
-      },
-      {
-        id: "dash.gate0-workflows",
-        href: "/engineering/workflows",
-        label: "Workflow Gate 0 (ENG-3)",
-        icon: Workflow,
-      },
-      {
-        id: "dash.ai-suggestions",
-        href: "/engineering/suggestions",
-        label: "Đề xuất AI (ENG-2)",
-        icon: Lightbulb,
       },
     ],
   },
@@ -382,13 +340,36 @@ export const DASHBOARD_TREE: DashCluster[] = [
     // nhóm và trang /materials chính của nó, rối cho người dùng (quyết định cũ M21).
     label: "Quản lý vật tư",
     dashboards: [
-      { id: "dash.boq", href: "/boq", label: "BOQ", icon: Calculator },
-      { id: "dash.vat-tu", href: "/materials", label: "Vật tư", icon: Package },
+      {
+        id: "dash.procurement-all",
+        href: "/procurement",
+        label: "Tổng quan Chuỗi cung ứng",
+        icon: Package,
+      },
+      { id: "dash.boq", href: "/procurement?tab=boq", label: "Định mức BOQ", icon: Calculator },
+      {
+        id: "dash.vat-tu",
+        href: "/procurement?tab=inventory",
+        label: "Kho & Tồn kho",
+        icon: Package,
+      },
       {
         id: "dash.don-dat-hang",
-        href: "/materials/purchase-orders",
-        label: "Đơn đặt hàng",
+        href: "/procurement?tab=orders",
+        label: "Đơn hàng PO & PR",
         icon: Truck,
+      },
+      {
+        id: "dash.qr-nhap-kho",
+        href: "/procurement?tab=qr-logistics",
+        label: "Quét QR & GRN",
+        icon: QrCode,
+      },
+      {
+        id: "dash.nha-cung-cap",
+        href: "/procurement?tab=suppliers",
+        label: "Nhà cung cấp",
+        icon: Building2,
       },
     ],
   },
@@ -580,34 +561,6 @@ export const DASHBOARD_TREE: DashCluster[] = [
     label: "Hệ thống",
     dashboards: [
       { id: "dash.chuyen-doi-so", href: "/tech", label: "Chuyển đổi số & Công nghệ", icon: Cpu }, // M31 — đã có trang thật
-      {
-        id: "dash.engineering-objects",
-        href: "/engineering",
-        label: "Đối tượng kỹ thuật (AI)",
-        icon: Boxes,
-        roles: ["admin", "pm"],
-      }, // ENG-1 — kho nhận Engineering Object từ hệ thống ngoài, xem docs/nang-cap/ENG-1-mep-agent-integration.md
-      {
-        id: "dash.engineering-suggestions",
-        href: "/engineering/suggestions",
-        label: "Đề xuất kỹ thuật (AI)",
-        icon: Lightbulb,
-        roles: ["admin", "pm", "engineer"],
-      }, // ENG-2 — đề xuất có bằng chứng, xem docs/nang-cap/ENG-2-engineering-intelligence.md
-      {
-        id: "dash.engineering-workflows",
-        href: "/engineering/workflows",
-        label: "Workflow kỹ thuật",
-        icon: Workflow,
-        roles: ["admin", "pm", "engineer", "bch"],
-      }, // ENG-3 — ranh giới uỷ quyền, xem docs/nang-cap/ENG-3-engineering-workflow-os.md
-      {
-        id: "dash.engineering-agent-sessions",
-        href: "/engineering/agent-sessions",
-        label: "Phiên phối hợp agent",
-        icon: Network,
-        roles: ["admin", "pm", "engineer", "bch"],
-      }, // ENG-4 — hoà giải đa agent, xem docs/nang-cap/ENG-4-multi-agent-engineering-os.md
       {
         id: "dash.import-excel",
         href: "/import",
