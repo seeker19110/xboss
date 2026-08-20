@@ -50,6 +50,20 @@ const CATEGORIES: { key: NavCategory; label: string }[] = [
 
 const NAV_ITEMS: NavItem[] = [
   {
+    href: "/cad-bim",
+    label: "Studio Không Gian & BIM/CAD",
+    category: "spatial",
+    icon: Sparkles,
+    badge: "Unified Hub",
+  },
+  {
+    href: "/engineering-intelligence",
+    label: "Trí Tuệ AI & Digital Twin",
+    category: "copilot",
+    icon: Sparkles,
+    badge: "Unified Hub",
+  },
+  {
     href: "/engineering/pipe-stash-hunter",
     label: "Pipe Stash Hunter (M95)",
     category: "spatial",

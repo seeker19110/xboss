@@ -77,6 +77,8 @@ import {
   Lightbulb,
   Sparkles,
   Scissors,
+  Brain,
+  LayoutGrid,
   Scan,
   Route,
   QrCode,
@@ -112,6 +114,54 @@ export type DashCluster = {
 };
 
 export const DASHBOARD_TREE: DashCluster[] = [
+  // Cụm 7 Đại Trung Tâm Điều Hành Hợp Nhất (7 Unified Cockpits & Command Centers)
+  {
+    label: "🏛️ 7 Đại Trung Tâm Điều Hành (Unified Hubs)",
+    dashboards: [
+      {
+        id: "dash.cad-bim-studio",
+        href: "/cad-bim",
+        label: "Studio Kỹ Thuật Không Gian & BIM/CAD",
+        icon: Sparkles,
+      },
+      {
+        id: "dash.site-command",
+        href: "/site",
+        label: "Chỉ Huy Tác Nghiệp Hiện Trường & HSE",
+        icon: HardHat,
+      },
+      {
+        id: "dash.schedule-control",
+        href: "/schedule",
+        label: "Quản Trị Kế Hoạch & Tiến Độ WBS",
+        icon: CalendarCheck,
+      },
+      {
+        id: "dash.procurement-hub",
+        href: "/procurement",
+        label: "Chuỗi Cung Ứng, Mua Sắm & Kho Vận",
+        icon: Package,
+      },
+      {
+        id: "dash.commercial-cockpit",
+        href: "/commercial",
+        label: "Hợp Đồng, Chi Phí & Pháp Lý FIDIC",
+        icon: Coins,
+      },
+      {
+        id: "dash.engineering-intelligence-hub",
+        href: "/engineering-intelligence",
+        label: "Trí Tuệ Kỹ Thuật AI & Digital Twin",
+        icon: Brain,
+      },
+      {
+        id: "dash.governance-hub",
+        href: "/governance",
+        label: "Quản Trị Dự Án, Bàn Giao & Cấu Hình",
+        icon: Landmark,
+      },
+    ],
+  },
   // Cụm Kỹ thuật Không gian & AI (Engineering OS) — Đỉnh cao công nghệ XBoss
   {
     label: "Kỹ thuật Không gian & AI (Engineering OS)",

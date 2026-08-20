@@ -25,6 +25,21 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
+## The 7-Hub Unified Ecosystem — Hợp Nhất 114 Tính Năng Thành 7 Đại Trung Tâm Điều Hành (2026-08-20)
+
+- **[AI, đã làm] Tái Cấu Trúc & Tinh Gọn Hệ Thống Tính Năng Toàn Diện:**
+  - Quy hoạch và hợp nhất 114 trang đơn lẻ và 38 phân hệ kỹ thuật thành **Hệ Sinh Thái 7 Đại Trung Tâm Điều Hành (7 Unified Master Cockpits)**:
+    1. `/cad-bim` — **Studio Kỹ Thuật Không Gian & BIM/CAD**: Tích hợp 14 công cụ CAD, BIM 3D/4D, Auto-Routing, DfMA Nesting, Scan-to-BIM và Kho bản vẽ vào 1 Studio 5 Chế độ.
+    2. `/site` — **Trung Tâm Chỉ Huy Tác Nghiệp Hiện Trường & QA/QC/HSE**: Tích hợp 14 công cụ Việc của tôi, Nhật ký TT06, Nghiệm thu 2 bước, Mặt bằng, HSE Vision và Thiết bị vào 1 Trạm chỉ huy 5 Tab.
+    3. `/schedule` — **Trung Tâm Quản Trị Kế Hoạch & Tiến Độ WBS/EVM**: Tích hợp 15 công cụ Lưới WBS 6 hệ, Sơ đồ CPM Gantt, Lookahead, S-Curve, EVM và Báo cáo in ấn A4.
+    4. `/procurement` — **Trung Tâm Chuỗi Cung Ứng, Mua Sắm & Kho Vận**: Tích hợp 11 công cụ Định mức BOQ, Đơn hàng PO, Kho bãi, Tiếp nhận QR GRN và Đấu thầu báo giá.
+    5. `/commercial` — **Trung Tâm Hợp Đồng, Chi Phí, Quyết Toán & FIDIC**: Tích hợp 13 công cụ Hợp đồng A-B, Quyết toán IPC TT96, Phát sinh VO, Claims FIDIC 28 ngày, e-Sign và Dòng tiền.
+    6. `/engineering-intelligence` — **Trung Tâm Trí Tuệ Kỹ Thuật AI & Digital Twin**: Tích hợp 19 công cụ Trợ lý Zalo/Telegram Copilot, Thẩm định Gate 0, AI Swarm Debates, Digital Twin và IoT Telemetry.
+    7. `/governance` — **Trung Tâm Quản Trị Dự Án, Bàn Giao & Cấu Hình**: Tích hợp 22 công cụ Khởi công Đ107, Bàn giao Đ24, Hồ sơ CDE, Phân quyền RBAC 7 vai trò và Sổ kiểm toán Audit Trail.
+  - **Khung Giao Diện Dùng Chung:** Tạo component [`app/components/HubShell.tsx`](file:///c:/Users/liend/xboss/app/components/HubShell.tsx) chuẩn UI/UX Craftsman (Dark-first, Tabs Segmented Pills cuộn ngang tối ưu Thumb-Zone $\ge 44\text{px}$, đồng bộ URL query `?tab=...`, thanh tìm kiếm và KPI strip).
+  - **Cập Nhật Điều Hướng Toàn Cục:** Đưa cụm `🏛️ 7 Đại Trung Tâm Điều Hành (Unified Hubs)` lên đầu [`app/lib/dashboardTree.ts`](file:///c:/Users/liend/xboss/app/lib/dashboardTree.ts), gắn Bento Grid 7 Hubs vào đầu trang chủ [`app/page.tsx`](file:///c:/Users/liend/xboss/app/page.tsx) và đồng bộ [`app/components/EngineeringNav.tsx`](file:///c:/Users/liend/xboss/app/components/EngineeringNav.tsx).
+  - **Kiểm Thử Toàn Diện & Release Gates:** Tạo mới test suite [`tests/unified-master-hubs.test.ts`](file:///c:/Users/liend/xboss/tests/unified-master-hubs.test.ts); 199/199 test files pass 100%; Typecheck 0 lỗi; Lint 0 lỗi; Production Build biên dịch thành công 100% routes.
+
 ## Module M96 — God-Tier CAD/BIM Apex Integration & 3 Extensions (2026-08-20)
 
 - **[AI, đã làm] Triển khai Đặc tả M96 & Hội tụ Trọn bộ 3 Phân hệ Mở rộng God-Tier CAD/BIM:**

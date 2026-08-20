@@ -12,6 +12,14 @@ import {
   Trash2,
   TrendingDown,
   GripVertical,
+  Sparkles,
+  HardHat,
+  CalendarCheck,
+  Package,
+  Coins,
+  Brain,
+  Landmark,
+  ArrowUpRight,
 } from "lucide-react";
 import { slugFromCode, toSlug } from "@/lib/sheets";
 import AppHeader from "@/app/components/AppHeader";
@@ -349,6 +357,119 @@ export default function Dashboard() {
 
       {/* pb-24 chừa chỗ cho thanh cố định dưới đáy (tìm kiếm/Nghiệm thu/Excel/PDF/Import) */}
       <main className="px-4 sm:px-6 py-6 pb-24 space-y-6 max-w-screen-xl mx-auto">
+        {/* ── 7 Đại Trung Tâm Điều Hành Hợp Nhất (The 7 Master Hubs) ── */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-300">
+                7 Đại Trung Tâm Điều Hành XBoss (Unified Cockpits)
+              </h2>
+            </div>
+            <span className="text-[11px] font-mono text-amber-400/90 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+              Hệ Thống Tinh Gọn v1.0
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {[
+              {
+                title: "1. Kỹ Thuật Không Gian & BIM/CAD",
+                desc: "3D/4D BIM, 2D CAD, Auto-Routing, DfMA Nesting & Scan-to-BIM",
+                href: "/cad-bim",
+                icon: Sparkles,
+                badge: "5 Chế Độ",
+                color: "text-amber-400",
+                border: "border-amber-500/30",
+              },
+              {
+                title: "2. Chỉ Huy Hiện Trường & An Toàn",
+                desc: "Việc của tôi, Nhật ký TT06, Nghiệm thu, Mặt bằng & AI HSE",
+                href: "/site",
+                icon: HardHat,
+                badge: "5 Trạm",
+                color: "text-emerald-400",
+                border: "border-emerald-500/30",
+              },
+              {
+                title: "3. Kế Hoạch & Tiến Độ WBS",
+                desc: "Lưới 6 hệ, CPM Gantt, Lookahead, EVM SPI/CPI & Báo cáo A4",
+                href: "/schedule",
+                icon: CalendarCheck,
+                badge: "4 Trụ Cột",
+                color: "text-sky-400",
+                border: "border-sky-500/30",
+              },
+              {
+                title: "4. Chuỗi Cung Ứng & Vật Tư",
+                desc: "Định mức BOQ, Đấu thầu Vendor, Đơn hàng PO & QR GRN",
+                href: "/procurement",
+                icon: Package,
+                badge: "4 Khâu",
+                color: "text-blue-400",
+                border: "border-blue-500/30",
+              },
+              {
+                title: "5. Hợp Đồng, Chi Phí & FIDIC",
+                desc: "Hợp đồng A-B, Chứng chỉ IPC, Phát sinh VO, Claims & Dòng tiền",
+                href: "/commercial",
+                icon: Coins,
+                badge: "4 Khối",
+                color: "text-violet-400",
+                border: "border-violet-500/30",
+              },
+              {
+                title: "6. Trí Tuệ AI & Digital Twin",
+                desc: "Zalo/Voice Copilot, Gate 0, AI Swarm Debates & IoT Telemetry",
+                href: "/engineering-intelligence",
+                icon: Brain,
+                badge: "AI Apex",
+                color: "text-rose-400",
+                border: "border-rose-500/30",
+              },
+              {
+                title: "7. Quản Trị Dự Án & Hệ Thống",
+                desc: "Khởi công Đ107, Bàn giao Đ24, CDE Hồ sơ, Nhân sự & Audit Log",
+                href: "/governance",
+                icon: Landmark,
+                badge: "Governance",
+                color: "text-zinc-200",
+                border: "border-zinc-700",
+                colSpan: "sm:col-span-2 lg:col-span-2",
+              },
+            ].map((hub, idx) => {
+              const HubIcon = hub.icon;
+              return (
+                <a
+                  key={idx}
+                  href={hub.href}
+                  className={`p-4 rounded-2xl bg-zinc-950/80 hover:bg-zinc-900/90 border ${hub.border} transition-all space-y-2.5 flex flex-col justify-between group shadow-sm hover:shadow-md hover:border-amber-500/50 ${
+                    hub.colSpan || ""
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 group-hover:scale-105 transition-transform">
+                        <HubIcon className={`w-4 h-4 ${hub.color}`} />
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-semibold text-zinc-100 group-hover:text-amber-300 transition-colors">
+                          {hub.title}
+                        </h3>
+                        <span className="text-[10px] font-mono text-zinc-400">{hub.badge}</span>
+                      </div>
+                    </div>
+                    <ArrowUpRight className="w-4 h-4 text-zinc-600 group-hover:text-amber-400 transition-colors shrink-0" />
+                  </div>
+                  <p className="text-[11px] text-zinc-400 line-clamp-2 leading-relaxed">
+                    {hub.desc}
+                  </p>
+                </a>
+              );
+            })}
+          </div>
+        </section>
+
         {/* ── Card hệ (M15) — nhìn nhanh từng hệ, bấm vào trang hub riêng ── */}
         {systems.length > 0 && (
           <section>
