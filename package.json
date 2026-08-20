@@ -20,6 +20,7 @@
     "format:check": "prettier --check .",
     "db:seed": "tsx scripts/seed.ts",
     "db:seed:sample": "tsx scripts/seed-sample.ts",
+    "db:reset-admin": "tsx scripts/reset-admin.ts",
     "audit:verify-chain": "tsx scripts/verify-audit-chain.ts",
     "audit:verify-dr": "tsx scripts/verify-dr-restore.ts",
     "changelog": "node scripts/gen-changelog.mjs",

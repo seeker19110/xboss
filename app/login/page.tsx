@@ -218,10 +218,10 @@ export default function LoginPage() {
             </a>
           </div>
         )}
-        {!pending && process.env.NODE_ENV === "development" && (
+        {!pending && (
           <div className="mt-6 text-xs text-zinc-400">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
-              Tài khoản demo (bấm để điền nhanh):
+              Tài khoản mặc định (bấm để điền nhanh):
             </p>
             <div className="grid grid-cols-2 gap-2">
               {DEMO.map((d) => (

@@ -184,11 +184,6 @@ export function isSecureCookie(req?: {
 
 export async function ensureDefaultUsers(): Promise<void> {
   if (defaultUsersEnsured) return;
-  const c = await queryOne<{ n: number }>(`SELECT COUNT(*) AS n FROM users`);
-  if (c && Number(c.n) > 0) {
-    defaultUsersEnsured = true;
-    return;
-  }
 
   const adminPw = process.env.XBOSS_ADMIN_PASSWORD || "admin123";
   for (const u of DEFAULTS) {
