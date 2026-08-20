@@ -345,9 +345,9 @@ export default function ProgressMap({
   );
 
   return (
-    <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 sm:p-5 space-y-4">
+    <section className="bento-card p-4 sm:p-6 space-y-5">
       {/* Tiêu đề bản đồ + quản trị tháp (Admin/PM) */}
-      <div>
+      <div className="border-b border-zinc-800/80 pb-3">
         <div className="flex items-center gap-2 mb-1">
           <Building2 className="w-4 h-4 text-emerald-400 shrink-0" />
           {editingTitle ? (
@@ -360,18 +360,21 @@ export default function ProgressMap({
                   if (e.key === "Enter") saveTitle();
                   if (e.key === "Escape") setEditingTitle(false);
                 }}
-                className="bg-zinc-800 border border-emerald-600 rounded px-2 py-0.5 text-sm font-semibold outline-none w-64"
+                className="bg-zinc-900 border border-emerald-500 rounded-xl px-2.5 py-1 text-sm font-bold text-zinc-100 outline-none w-64"
               />
-              <button onClick={saveTitle} className="text-emerald-400">
+              <button onClick={saveTitle} className="text-emerald-400 hover:text-emerald-300 p-1">
                 <Check className="w-4 h-4" />
               </button>
-              <button onClick={() => setEditingTitle(false)} className="text-zinc-500">
+              <button
+                onClick={() => setEditingTitle(false)}
+                className="text-zinc-400 hover:text-zinc-200 p-1"
+              >
                 <X className="w-4 h-4" />
               </button>
             </>
           ) : (
             <>
-              <h2 className="font-semibold text-sm text-zinc-300">{title}</h2>
+              <h2 className="font-bold text-base text-zinc-100">{title}</h2>
               {canEdit && (
                 <button
                   onClick={() => {
@@ -379,7 +382,7 @@ export default function ProgressMap({
                     setEditingTitle(true);
                   }}
                   title="Sửa tiêu đề"
-                  className="text-zinc-600 hover:text-emerald-400 transition"
+                  className="text-zinc-400 hover:text-emerald-400 transition p-1"
                 >
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
@@ -393,7 +396,7 @@ export default function ProgressMap({
                 setNewName("");
               }}
               title="Thêm tháp mới"
-              className="ml-1 text-zinc-600 hover:text-emerald-400 transition"
+              className="ml-1 text-zinc-400 hover:text-emerald-400 transition p-1"
             >
               <Plus className="w-4 h-4" />
             </button>
@@ -413,12 +416,15 @@ export default function ProgressMap({
                 if (e.key === "Escape") setAdding(false);
               }}
               placeholder="Tên tháp mới (vd: Tháp B)"
-              className="bg-zinc-800 border border-emerald-600 rounded px-2 py-1 text-sm outline-none w-48"
+              className="bg-zinc-900 border border-emerald-500 rounded-xl px-3 py-1.5 text-sm text-zinc-100 outline-none w-48"
             />
-            <button onClick={addTower} className="text-emerald-400 hover:text-emerald-300">
+            <button onClick={addTower} className="text-emerald-400 hover:text-emerald-300 p-1">
               <Check className="w-4 h-4" />
             </button>
-            <button onClick={() => setAdding(false)} className="text-zinc-500 hover:text-zinc-300">
+            <button
+              onClick={() => setAdding(false)}
+              className="text-zinc-400 hover:text-zinc-200 p-1"
+            >
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -429,21 +435,29 @@ export default function ProgressMap({
           và lọc "Tất cả hệ" chỉ liệt kê sheet của chính hệ đang xem nên thừa/gây nhầm. */}
       {!hideControls && (
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex gap-1 p-1 bg-zinc-950 border border-zinc-800 rounded-xl shrink-0">
+          <div className="flex items-center gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-xl shrink-0">
             <button
               onClick={() => setMode("current")}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${mode === "current" ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                mode === "current"
+                  ? "bg-zinc-800 text-white shadow-xs"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
             >
               <Layers className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden sm:inline">Hiện tại</span>
+              <span className="hidden sm:inline">Hiện tại (Tầng × Hệ)</span>
               <span className="sm:hidden">Tầng×Hệ</span>
             </button>
             <button
               onClick={() => setMode("history")}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${mode === "history" ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                mode === "history"
+                  ? "bg-zinc-800 text-white shadow-xs"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
             >
               <TrendingUp className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden sm:inline">Lịch sử</span>
+              <span className="hidden sm:inline">Lịch sử (Tầng × Tuần)</span>
               <span className="sm:hidden">Tầng×Tuần</span>
             </button>
           </div>

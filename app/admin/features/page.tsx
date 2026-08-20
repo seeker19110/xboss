@@ -105,55 +105,62 @@ export default function FeatureFlagsPage() {
             message="Tạo dự án trước khi cấu hình cờ tính năng."
           />
         ) : (
-          <div className="overflow-x-auto bg-zinc-900 border border-zinc-800 rounded-xl">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-zinc-400 border-b border-zinc-800">
-                  <th className="text-left py-2 px-3 sticky left-0 bg-zinc-900">Module</th>
-                  {projects.map((p) => (
-                    <th key={p.projectId} className="text-center py-2 px-3 whitespace-nowrap">
-                      {p.projectName}
+          <div className="bento-card overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-xs font-semibold text-zinc-400 border-b border-zinc-800">
+                    <th className="text-left py-3 px-4 sticky left-0 bg-zinc-900/90 backdrop-blur-xs">
+                      Module
                     </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {modules.map((m) => (
-                  <tr key={m.key} className="border-b border-zinc-900 last:border-0">
-                    <td className="py-2 px-3 sticky left-0 bg-zinc-900 font-medium text-zinc-200 whitespace-nowrap">
-                      {m.label}
-                      <span className="block text-[11px] text-zinc-500 font-mono">{m.key}</span>
-                    </td>
-                    {projects.map((p) => {
-                      const enabled = p.flags[m.key] ?? true;
-                      const cellKey = `${m.key}:${p.projectId}`;
-                      return (
-                        <td key={p.projectId} className="text-center py-2 px-3">
-                          <button
-                            onClick={() => isAdmin && toggle(m.key, p.projectId, !enabled)}
-                            disabled={!isAdmin || saving === cellKey}
-                            title={
-                              isAdmin
-                                ? enabled
-                                  ? "Bấm để tắt module này cho dự án"
-                                  : "Bấm để bật module này cho dự án"
-                                : "Chỉ Admin sửa được"
-                            }
-                            className={`inline-flex items-center justify-center disabled:opacity-50 ${isAdmin ? "cursor-pointer" : "cursor-default"}`}
-                          >
-                            {enabled ? (
-                              <ToggleRight className="w-8 h-8 text-emerald-400" />
-                            ) : (
-                              <ToggleLeft className="w-8 h-8 text-zinc-600" />
-                            )}
-                          </button>
-                        </td>
-                      );
-                    })}
+                    {projects.map((p) => (
+                      <th key={p.projectId} className="text-center py-3 px-4 whitespace-nowrap">
+                        {p.projectName}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {modules.map((m) => (
+                    <tr
+                      key={m.key}
+                      className="border-b border-zinc-800/60 last:border-0 hover:bg-zinc-900/40 transition-colors"
+                    >
+                      <td className="py-3 px-4 sticky left-0 bg-zinc-900/90 backdrop-blur-xs font-medium text-zinc-200 whitespace-nowrap">
+                        {m.label}
+                        <span className="block text-[11px] text-zinc-500 font-mono">{m.key}</span>
+                      </td>
+                      {projects.map((p) => {
+                        const enabled = p.flags[m.key] ?? true;
+                        const cellKey = `${m.key}:${p.projectId}`;
+                        return (
+                          <td key={p.projectId} className="text-center py-3 px-4">
+                            <button
+                              onClick={() => isAdmin && toggle(m.key, p.projectId, !enabled)}
+                              disabled={!isAdmin || saving === cellKey}
+                              title={
+                                isAdmin
+                                  ? enabled
+                                    ? "Bấm để tắt module này cho dự án"
+                                    : "Bấm để bật module này cho dự án"
+                                  : "Chỉ Admin sửa được"
+                              }
+                              className={`inline-flex items-center justify-center disabled:opacity-50 transition active:scale-95 ${isAdmin ? "cursor-pointer" : "cursor-default"}`}
+                            >
+                              {enabled ? (
+                                <ToggleRight className="w-8 h-8 text-emerald-400" />
+                              ) : (
+                                <ToggleLeft className="w-8 h-8 text-zinc-600" />
+                              )}
+                            </button>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </main>

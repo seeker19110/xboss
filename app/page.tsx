@@ -352,10 +352,13 @@ export default function Dashboard() {
         {/* ── Card hệ (M15) — nhìn nhanh từng hệ, bấm vào trang hub riêng ── */}
         {systems.length > 0 && (
           <section>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-3">
-              Theo hệ thi công
-            </h2>
-            <div className="flex gap-3 overflow-x-auto scrollbar-none pb-1">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                Theo hệ thi công
+              </h2>
+              <span className="text-xs text-zinc-500 font-medium">{systems.length} hệ</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               {systems.map((d) => {
                 const c = systemColorClasses(d.color);
                 const dpct = Math.round((d.avgProgress ?? 0) * 100);
@@ -363,19 +366,32 @@ export default function Dashboard() {
                   <a
                     key={d.code}
                     href={`/system/${d.code}`}
-                    className={`shrink-0 w-40 bg-zinc-900 border border-zinc-800 border-l-4 ${c.border} rounded-xl p-3 hover:border-zinc-600 transition`}
+                    className={`bento-card p-3.5 flex flex-col justify-between hover:border-zinc-700 transition-all border-l-4 ${c.border} group`}
                   >
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span
-                        className={`w-2 h-2 rounded-full shrink-0 ${c.dot}`}
-                        aria-hidden="true"
-                      />
-                      <p className="text-sm font-medium truncate">{d.name}</p>
+                    <div className="flex items-center justify-between gap-1 min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span
+                          className={`w-2 h-2 rounded-full shrink-0 ${c.dot}`}
+                          aria-hidden="true"
+                        />
+                        <p className="text-xs font-semibold truncate text-zinc-200 group-hover:text-white transition-colors">
+                          {d.name}
+                        </p>
+                      </div>
                     </div>
-                    <p className={`text-2xl font-bold mt-1 ${c.text}`}>{dpct}%</p>
-                    {d.delayed > 0 && (
-                      <p className="text-xs text-rose-300 mt-0.5">{d.delayed} trễ</p>
-                    )}
+                    <div className="mt-3">
+                      <p className={`text-2xl font-bold font-mono tabular-nums ${c.text}`}>
+                        {dpct}%
+                      </p>
+                      <div className="flex items-center justify-between mt-1 text-[11px]">
+                        <span className="text-zinc-500">{d.sheetCount} bảng</span>
+                        {d.delayed > 0 ? (
+                          <span className="font-semibold text-rose-400">{d.delayed} trễ</span>
+                        ) : (
+                          <span className="text-emerald-500 font-medium">Đúng hạn</span>
+                        )}
+                      </div>
+                    </div>
                   </a>
                 );
               })}
@@ -385,9 +401,9 @@ export default function Dashboard() {
 
         {/* ── KPI ── */}
         <section>
-          {/* Tổng trễ — banner nổi bật */}
+          {/* Header tiến độ & Thêm trang */}
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
               Tổng quan tiến độ
             </h2>
             {canImport && (
@@ -401,9 +417,9 @@ export default function Dashboard() {
                     copyFromId: sheets[sheets.length - 1]?.id ?? "",
                   });
                 }}
-                className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-emerald-400 transition"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-800 text-xs font-medium text-zinc-300 hover:text-white hover:border-zinc-700 transition shadow-xs"
               >
-                <Plus className="w-3.5 h-3.5" /> Thêm trang
+                <Plus className="w-3.5 h-3.5 text-emerald-400" /> Thêm trang
               </button>
             )}
           </div>
@@ -412,23 +428,24 @@ export default function Dashboard() {
           {(data?.totalDelayed ?? 0) > 0 && (
             <a
               href="#delayed-table"
-              className="flex items-center gap-4 bg-orange-950/20 border border-orange-900/50 rounded-xl px-5 py-4 mb-4 hover:bg-orange-950/30 transition"
+              className="flex items-center gap-4 bg-orange-950/25 border border-orange-900/60 rounded-2xl px-5 py-4 mb-4 hover:bg-orange-950/35 hover:border-orange-800/80 transition-all shadow-sm group"
             >
-              <div className="p-2.5 bg-orange-950/30 rounded-lg shrink-0">
-                <TrendingDown className="w-5 h-5 text-orange-400" />
+              <div className="p-3 bg-orange-900/40 border border-orange-800/60 rounded-xl shrink-0 text-orange-400 group-hover:scale-105 transition-transform">
+                <TrendingDown className="w-6 h-6" />
               </div>
               <div className="flex-1 min-w-0">
-                {/* Nền tint mờ (bg-orange-950/20) đổi độ sáng nhiều theo theme — chữ màu (vd
-                    text-orange-400) không đủ tương phản AA trên nền đã sáng ở theme sáng (đo axe:
-                    2.93 < 4.5 khi từng thử với đỏ). Dùng token zinc thích ứng cho chữ (đảm bảo AA
-                    mọi theme), giữ sắc cam ở icon/nền/viền. */}
-                <p className="text-xs text-zinc-400 uppercase tracking-wider font-medium mb-0.5">
-                  Tổng số hạng mục đang trễ
+                <p className="text-xs text-zinc-400 uppercase tracking-wider font-semibold mb-0.5">
+                  Tổng số hạng mục đang trễ hạn
                 </p>
-                <p className="text-4xl font-bold leading-none">{data?.totalDelayed ?? 0}</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-3xl font-bold font-mono tabular-nums leading-none text-zinc-100">
+                    {data?.totalDelayed ?? 0}
+                  </p>
+                  <span className="text-xs text-orange-300 font-medium">cần xử lý ngay</span>
+                </div>
               </div>
-              <span className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 transition shrink-0">
-                Xem chi tiết <ChevronRight className="w-3.5 h-3.5" />
+              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-900/30 border border-orange-800/40 text-xs font-semibold text-orange-200 group-hover:bg-orange-900/50 transition shrink-0">
+                Xem phân tích trễ <ChevronRight className="w-3.5 h-3.5" />
               </span>
             </a>
           )}
@@ -440,28 +457,32 @@ export default function Dashboard() {
               const pct = Math.round((k.avgProgress ?? 0) * 100);
               const hasDelay = k.delayed > 0;
               const cardContent = (
-                <div className="flex flex-col h-full gap-3">
+                <div className="flex flex-col h-full justify-between gap-3">
                   <div className="flex items-start justify-between gap-1">
-                    <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wide leading-snug">
+                    <span className="text-xs font-bold text-zinc-300 uppercase tracking-wide leading-snug group-hover/card:text-white transition-colors">
                       {k.sheetType}
                     </span>
                     {hasDelay && (
                       <span
                         title={`${k.delayed} hạng mục đang trễ`}
-                        className="flex items-center gap-0.5 text-[10px] text-red-950 bg-orange-500 px-1.5 py-0.5 rounded-full shrink-0 font-medium"
+                        className="flex items-center gap-1 text-[10px] text-orange-200 bg-orange-950/80 border border-orange-800/70 px-2 py-0.5 rounded-full shrink-0 font-semibold"
                       >
-                        <AlertTriangle className="w-2.5 h-2.5" /> {k.delayed}
+                        <AlertTriangle className="w-2.5 h-2.5 text-orange-400" /> {k.delayed}
                       </span>
                     )}
                   </div>
                   <div>
-                    <p className="text-3xl font-bold leading-none">{pct}%</p>
+                    <p className="text-3xl font-bold font-mono tabular-nums leading-none text-zinc-100">
+                      {pct}%
+                    </p>
                     <p className="text-[11px] text-zinc-400 mt-1">{k.total} công việc</p>
                   </div>
                   <div className="mt-auto">
-                    <div className="bg-zinc-800 rounded-full h-2 overflow-hidden">
+                    <div className="bg-zinc-900 rounded-full h-2 overflow-hidden border border-zinc-800/80">
                       <div
-                        className={`h-2 rounded-full transition-all ${pct >= 80 ? "bg-emerald-500" : pct >= 50 ? "bg-sky-500" : "bg-amber-500"}`}
+                        className={`h-2 rounded-full transition-all duration-300 ${
+                          pct >= 80 ? "bg-emerald-500" : pct >= 50 ? "bg-sky-500" : "bg-amber-500"
+                        }`}
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -469,10 +490,8 @@ export default function Dashboard() {
                 </div>
               );
 
-              const cardCls = `relative group/card bg-zinc-900 border rounded-xl p-4 flex flex-col transition min-h-[120px] ${
-                slug
-                  ? "hover:border-emerald-700/60 cursor-pointer border-zinc-800"
-                  : "border-zinc-800"
+              const cardCls = `bento-card relative group/card p-4 flex flex-col transition-all min-h-[128px] ${
+                slug ? "hover:border-emerald-700/60 cursor-pointer" : ""
               }`;
 
               return (
@@ -503,9 +522,9 @@ export default function Dashboard() {
                           deleteSheet(k.sheetId, k.sheetType);
                         }}
                         title="Xoá trang tracking"
-                        className="absolute top-2 right-2 p-1 rounded-md bg-zinc-800/80 text-zinc-500 hover:text-red-300 hover:bg-red-950/40 opacity-100 sm:opacity-0 sm:group-hover/wrap:opacity-100 transition z-10"
+                        className="absolute top-2 right-2 p-1.5 rounded-lg bg-zinc-900/90 border border-zinc-800 text-zinc-500 hover:text-red-300 hover:bg-red-950/50 hover:border-red-800/60 opacity-100 sm:opacity-0 sm:group-hover/wrap:opacity-100 transition z-10"
                       >
-                        <Trash2 className="w-3 h-3" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </>
                   )}

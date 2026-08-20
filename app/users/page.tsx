@@ -141,54 +141,54 @@ export default function UsersPage() {
         back
         title={
           <>
-            <Users className="w-5 h-5" /> Quản lý người dùng
+            <Users className="w-5 h-5 text-emerald-400" /> Quản lý người dùng
           </>
         }
       />
 
-      <main className="p-6 max-w-3xl mx-auto space-y-6">
+      <main className="p-4 sm:p-6 max-w-4xl mx-auto space-y-6">
         {error && (
-          <div className="rounded-lg border border-red-800 bg-red-950 text-red-200 px-4 py-2.5 text-sm">
+          <div className="rounded-xl border border-red-800 bg-red-950 text-red-200 px-4 py-2.5 text-xs sm:text-sm">
             {error}
           </div>
         )}
         {okMsg && (
-          <div className="rounded-lg border border-emerald-800 bg-emerald-950 text-emerald-200 px-4 py-2.5 text-sm">
+          <div className="rounded-xl border border-emerald-800 bg-emerald-950 text-emerald-200 px-4 py-2.5 text-xs sm:text-sm">
             {okMsg}
           </div>
         )}
 
         {/* Tạo user */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-          <h2 className="font-semibold mb-3 flex items-center gap-2 text-sm">
-            <UserPlus className="w-4 h-4 text-emerald-400" /> Thêm người dùng
+        <div className="bento-card p-5 space-y-4">
+          <h2 className="font-bold text-sm text-zinc-100 flex items-center gap-2">
+            <UserPlus className="w-4 h-4 text-emerald-400" /> Thêm người dùng mới
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2.5">
             <input
               placeholder="Họ tên"
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600"
+              className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-emerald-500 transition"
             />
             <input
               placeholder="Email"
               type="email"
               value={form.email}
               onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-              className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600"
+              className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-emerald-500 transition"
             />
             <input
               placeholder="Mật khẩu (≥6)"
               type="password"
               value={form.password}
               onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-              className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-600"
+              className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-emerald-500 transition"
             />
             <select
               aria-label="Vai trò tài khoản mới"
               value={form.role}
               onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
-              className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none"
+              className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 transition"
             >
               {Object.entries(ROLE_LABEL).map(([k, v]) => (
                 <option key={k} value={k}>
@@ -199,43 +199,45 @@ export default function UsersPage() {
             <button
               onClick={createUser}
               disabled={busy || !form.name || !form.email || !form.password}
-              className="bg-emerald-700 hover:bg-emerald-800 disabled:bg-zinc-800 disabled:text-zinc-500 rounded-lg px-3 py-2 text-sm font-medium transition"
+              className="bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] disabled:bg-zinc-800 disabled:text-zinc-500 disabled:opacity-50 text-white rounded-xl px-4 py-2 text-xs sm:text-sm font-semibold transition shadow-sm h-10 md:h-auto"
             >
-              {busy ? "Đang tạo..." : "Tạo"}
+              {busy ? "Đang tạo..." : "Thêm mới"}
             </button>
           </div>
         </div>
 
         {/* Danh sách */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+        <div className="bento-card overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-xs text-zinc-400 border-b border-zinc-800">
-                <th className="text-left p-3">Họ tên</th>
-                <th className="text-left p-3">Email</th>
-                <th className="text-left p-3">Vai trò</th>
-                <th className="text-right p-3">Thao tác</th>
+              <tr className="text-xs font-semibold text-zinc-400 border-b border-zinc-800">
+                <th className="text-left p-3.5">Họ tên</th>
+                <th className="text-left p-3.5">Email</th>
+                <th className="text-left p-3.5">Vai trò</th>
+                <th className="text-right p-3.5">Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {users.map((u) => (
                 <tr
                   key={u.id}
-                  className="border-b border-zinc-800/50 odd:bg-zinc-900/50 even:bg-zinc-800/20 hover:bg-zinc-700/40 transition-colors"
+                  className="border-b border-zinc-800/60 last:border-0 hover:bg-zinc-900/50 transition-colors"
                 >
-                  <td className="p-3 font-medium">
+                  <td className="p-3.5 font-medium text-zinc-200">
                     {u.name}
                     {me?.id === u.id && (
-                      <span className="ml-2 text-[10px] text-emerald-400">(bạn)</span>
+                      <span className="ml-2 text-[10px] font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-800/60 px-1.5 py-0.5 rounded-md">
+                        (bạn)
+                      </span>
                     )}
                   </td>
-                  <td className="p-3 text-zinc-400">{u.email}</td>
-                  <td className="p-3">
+                  <td className="p-3.5 text-zinc-400 font-mono text-xs">{u.email}</td>
+                  <td className="p-3.5">
                     <select
                       aria-label={`Vai trò của ${u.name}`}
                       value={u.role}
                       onChange={(e) => changeRole(u, e.target.value)}
-                      className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs outline-none"
+                      className="bg-zinc-900 border border-zinc-800 rounded-xl px-2.5 py-1 text-xs text-zinc-200 outline-none focus:border-emerald-500 transition"
                     >
                       {Object.entries(ROLE_LABEL).map(([k, v]) => (
                         <option key={k} value={k}>
@@ -244,29 +246,32 @@ export default function UsersPage() {
                       ))}
                     </select>
                   </td>
-                  <td className="p-3 text-right">
-                    <button
-                      onClick={() => resetPassword(u)}
-                      title="Đặt lại mật khẩu"
-                      className="text-zinc-400 hover:text-amber-400 p-1.5"
-                    >
-                      <KeyRound className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => revokeSessions(u)}
-                      title="Thu hồi phiên đăng nhập"
-                      className="text-zinc-400 hover:text-sky-400 p-1.5"
-                    >
-                      <LogOut className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => removeUser(u)}
-                      title="Xoá"
-                      disabled={me?.id === u.id}
-                      className="text-zinc-400 hover:text-red-400 disabled:opacity-30 p-1.5"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                  <td className="p-3.5 text-right">
+                    <div className="inline-flex items-center gap-1">
+                      <button
+                        onClick={() => resetPassword(u)}
+                        title="Đặt lại mật khẩu"
+                        className="text-zinc-400 hover:text-amber-400 transition p-1.5"
+                      >
+                        <KeyRound className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => revokeSessions(u)}
+                        title="Đăng xuất khỏi mọi thiết bị"
+                        className="text-zinc-400 hover:text-amber-400 transition p-1.5"
+                      >
+                        <LogOut className="w-4 h-4" />
+                      </button>
+                      {me?.id !== u.id && (
+                        <button
+                          onClick={() => removeUser(u)}
+                          title="Xoá người dùng"
+                          className="text-zinc-400 hover:text-rose-400 transition p-1.5"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

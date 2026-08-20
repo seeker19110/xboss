@@ -28,6 +28,7 @@ import {
   type DashCluster,
 } from "@/app/lib/dashboardTree";
 import { MODULES } from "@/lib/modules";
+import { ROLE_LABELS, type Role } from "@/lib/roles";
 
 type Me = { id: number; name: string; email: string; role: string };
 
@@ -353,7 +354,7 @@ export default function AppHeader({
             )}
           </div>
 
-          <div className="flex items-center gap-1 shrink-0 ml-1">
+          <div className="flex items-center gap-1.5 shrink-0 ml-1">
             {children}
             <OfflineQueueBadge />
             <ThemeToggle />
@@ -362,14 +363,24 @@ export default function AppHeader({
             {me && (
               <a
                 href="/account"
-                title="Tài khoản"
+                title={`Tài khoản: ${me.name} (${ROLE_LABELS[me.role as Role] ?? me.role})`}
                 aria-label={`Tài khoản — ${me.name}`}
-                className="flex items-center gap-1.5 ml-1 pl-2 min-h-[44px] border-l border-zinc-800 rounded-lg text-zinc-400 hover:text-white transition"
+                className="flex items-center gap-2 ml-1 pl-2.5 py-1 min-h-[40px] border-l border-zinc-800 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-900/60 transition group"
               >
-                <span className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center text-[11px] font-bold text-emerald-400 shrink-0">
-                  {me.name.trim().charAt(0).toUpperCase()}
-                </span>
-                <span className="hidden lg:inline text-xs font-medium">{me.name}</span>
+                <div className="relative">
+                  <span className="w-7 h-7 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-xs font-bold text-emerald-400 group-hover:border-emerald-500/50 transition-colors shrink-0 shadow-xs">
+                    {me.name.trim().charAt(0).toUpperCase()}
+                  </span>
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-zinc-950" />
+                </div>
+                <div className="hidden xl:flex flex-col text-left leading-tight">
+                  <span className="text-xs font-semibold text-zinc-200 group-hover:text-white truncate max-w-[120px]">
+                    {me.name}
+                  </span>
+                  <span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">
+                    {ROLE_LABELS[me.role as Role] ?? me.role}
+                  </span>
+                </div>
               </a>
             )}
           </div>

@@ -96,7 +96,7 @@ export default function AccountPage() {
         )}
 
         {!require2fa && (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 flex items-center gap-4 shadow-sm">
+          <div className="bento-card p-5 flex items-center gap-4">
             <div className="w-13 h-13 rounded-2xl bg-emerald-950/80 border border-emerald-800/60 flex items-center justify-center text-xl font-bold text-emerald-300 shrink-0 shadow-inner">
               {me.name.trim().charAt(0).toUpperCase()}
             </div>
@@ -104,7 +104,7 @@ export default function AccountPage() {
               <p className="font-bold text-base text-zinc-100 truncate">{me.name}</p>
               <p className="text-xs text-zinc-400 truncate mt-0.5">{me.email}</p>
               <div className="mt-2">
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-zinc-800 text-emerald-400 border border-zinc-700/60">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-zinc-800 text-emerald-400 border border-zinc-700/60">
                   {ROLE_LABEL[me.role] ?? me.role}
                 </span>
               </div>
@@ -117,13 +117,13 @@ export default function AccountPage() {
         {require2fa ? (
           <button
             onClick={logout}
-            className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-red-400 bg-zinc-900 border border-zinc-800 rounded-2xl hover:bg-zinc-850 active:scale-[0.99] transition text-left min-h-[44px]"
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-red-400 bento-card hover:bg-zinc-850 active:scale-[0.99] transition text-left min-h-[44px]"
           >
             <LogOut className="w-4 h-4 shrink-0" />
             <span className="flex-1">Đăng xuất</span>
           </button>
         ) : (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl divide-y divide-zinc-800/80 overflow-hidden shadow-sm">
+          <div className="bento-card divide-y divide-zinc-800/80 overflow-hidden">
             {links.map((l) => (
               <Link
                 key={l.href}

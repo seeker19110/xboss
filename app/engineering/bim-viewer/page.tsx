@@ -608,7 +608,7 @@ export default function BimViewerPage() {
           {/* Cột trái: Cây Thư Mục Layer & Danh sách Phần tử (3 cols) */}
           <div className="flex flex-col gap-4 lg:col-span-3">
             {/* Bộ lọc Layer Hệ thống */}
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 backdrop-blur">
+            <div className="bento-card p-4">
               <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">
                 <Layers className="h-4 w-4 text-sky-400" /> Layer Hệ Thống MEPF
               </h3>
@@ -617,7 +617,7 @@ export default function BimViewerPage() {
                 {Object.entries(activeLayers).map(([sys, active]) => (
                   <div
                     key={sys}
-                    className="flex cursor-pointer items-center justify-between rounded-lg bg-zinc-950/60 p-2 transition hover:bg-zinc-950"
+                    className="flex cursor-pointer items-center justify-between rounded-xl bg-zinc-900/60 p-2.5 transition hover:bg-zinc-800/80"
                     onClick={() => setActiveLayers((prev) => ({ ...prev, [sys]: !prev[sys] }))}
                   >
                     <div className="flex items-center gap-2">
@@ -646,7 +646,7 @@ export default function BimViewerPage() {
             </div>
 
             {/* Danh sách Phần tử BIM */}
-            <div className="flex max-h-[360px] flex-1 flex-col rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 backdrop-blur">
+            <div className="bento-card flex max-h-[360px] flex-1 flex-col p-4">
               <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">
                 <Box className="h-4 w-4 text-sky-400" /> Cấu Kiện ({elements.length})
               </h3>
@@ -656,10 +656,10 @@ export default function BimViewerPage() {
                   <div
                     key={el.id}
                     onClick={() => setSelectedElement(el)}
-                    className={`cursor-pointer rounded-lg p-2 transition ${
+                    className={`cursor-pointer rounded-xl p-2.5 transition ${
                       selectedElement?.id === el.id
                         ? "border border-amber-500/50 bg-amber-950/40 text-amber-200"
-                        : "border border-transparent bg-zinc-950/40 text-zinc-300 hover:bg-zinc-950"
+                        : "border border-transparent bg-zinc-900/40 text-zinc-300 hover:bg-zinc-850"
                     }`}
                   >
                     <div className="truncate font-medium">{el.name}</div>
@@ -676,7 +676,7 @@ export default function BimViewerPage() {
           {/* Cột giữa: Khung nhìn 3D Canvas & Điều khiển 4D Time-Lapse (6 cols) */}
           <div className="flex flex-col gap-4 lg:col-span-6">
             {/* Viewport 3D Canvas */}
-            <div className="relative h-[550px] w-full overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl">
+            <div className="bento-card relative h-[550px] w-full overflow-hidden p-0">
               <canvas
                 ref={canvasRef}
                 width={800}

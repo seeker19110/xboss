@@ -435,21 +435,29 @@ export default function SpatialViewerPage() {
 
         {/* KPI Metrics */}
         <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3">
-            <p className="text-[11px] font-medium text-zinc-400">Tổng điểm ghim</p>
-            <p className="mt-1 text-2xl font-bold text-zinc-100">{summary.total}</p>
+          <div className="bento-card p-4">
+            <p className="text-xs font-medium text-zinc-400">Tổng điểm ghim</p>
+            <p className="mt-1 text-2xl font-bold font-mono tabular-nums text-zinc-100">
+              {summary.total}
+            </p>
           </div>
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3">
-            <p className="text-[11px] font-medium text-amber-400">Đang xử lý / Mở</p>
-            <p className="mt-1 text-2xl font-bold text-amber-400">{summary.open}</p>
+          <div className="bento-card p-4">
+            <p className="text-xs font-medium text-amber-400">Đang xử lý / Mở</p>
+            <p className="mt-1 text-2xl font-bold font-mono tabular-nums text-amber-400">
+              {summary.open}
+            </p>
           </div>
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3">
-            <p className="text-[11px] font-medium text-rose-400">Cảnh báo nghiêm trọng</p>
-            <p className="mt-1 text-2xl font-bold text-rose-400">{summary.critical}</p>
+          <div className="bento-card p-4">
+            <p className="text-xs font-medium text-rose-400">Cảnh báo nghiêm trọng</p>
+            <p className="mt-1 text-2xl font-bold font-mono tabular-nums text-rose-400">
+              {summary.critical}
+            </p>
           </div>
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3">
-            <p className="text-[11px] font-medium text-emerald-400">Ghim Tiến độ WBS</p>
-            <p className="mt-1 text-2xl font-bold text-emerald-400">{summary.progress}</p>
+          <div className="bento-card p-4">
+            <p className="text-xs font-medium text-emerald-400">Ghim Tiến độ WBS</p>
+            <p className="mt-1 text-2xl font-bold font-mono tabular-nums text-emerald-400">
+              {summary.progress}
+            </p>
           </div>
         </div>
 

@@ -121,85 +121,131 @@ export default function CostsPage() {
         }
       />
 
-      <main className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-5 space-y-4">
-        {/* KPI tổng */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 sm:px-4 py-3">
-            <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-zinc-400 mb-1">
-              Ngân sách
-            </p>
+      <main className="max-w-5xl mx-auto px-3 sm:px-6 py-6 pb-24 space-y-6">
+        {/* KPI Bento Summary Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="bento-card p-4 flex flex-col justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              Tổng ngân sách
+            </span>
             <p
-              className="text-lg sm:text-2xl font-bold tabular-nums"
+              className="text-2xl font-bold font-mono tabular-nums text-zinc-100 mt-2"
               title={fmtFull(data.totals.budget)}
             >
               {fmtVND(data.totals.budget)}
             </p>
+            <p className="text-[11px] text-zinc-500 mt-1">Định mức BOQ + VO được duyệt</p>
           </div>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 sm:px-4 py-3">
-            <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-zinc-400 mb-1">
-              Cam kết
-            </p>
+
+          <div className="bento-card p-4 flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                Giá trị cam kết
+              </span>
+              <span className="text-xs font-bold font-mono text-sky-400">
+                {data.totals.budget > 0
+                  ? `${Math.round((data.totals.committed / data.totals.budget) * 100)}%`
+                  : "0%"}
+              </span>
+            </div>
             <p
-              className="text-lg sm:text-2xl font-bold tabular-nums text-sky-300"
+              className="text-2xl font-bold font-mono tabular-nums text-sky-400 mt-2"
               title={fmtFull(data.totals.committed)}
             >
               {fmtVND(data.totals.committed)}
             </p>
+            <p className="text-[11px] text-zinc-500 mt-1">Hợp đồng giao thầu + Đơn đặt hàng</p>
           </div>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 sm:px-4 py-3">
-            <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-zinc-400 mb-1">
-              Thực chi
-            </p>
+
+          <div className="bento-card p-4 flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                Thực chi tích lũy
+              </span>
+              <span className="text-xs font-bold font-mono text-emerald-400">
+                {data.totals.budget > 0
+                  ? `${Math.round((data.totals.actual / data.totals.budget) * 100)}%`
+                  : "0%"}
+              </span>
+            </div>
             <p
-              className="text-lg sm:text-2xl font-bold tabular-nums text-emerald-300"
+              className="text-2xl font-bold font-mono tabular-nums text-emerald-400 mt-2"
               title={fmtFull(data.totals.actual)}
             >
               {fmtVND(data.totals.actual)}
             </p>
+            <div className="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden mt-2 border border-zinc-800">
+              <div
+                className="bg-emerald-500 h-full rounded-full transition-all"
+                style={{
+                  width: `${data.totals.budget > 0 ? Math.min(100, Math.round((data.totals.actual / data.totals.budget) * 100)) : 0}%`,
+                }}
+              />
+            </div>
           </div>
         </div>
 
         {/* Cảnh báo đang active */}
         {data.alerts.length > 0 && (
-          <div className="bg-amber-950/40 border border-amber-900/60 rounded-xl px-4 py-3 space-y-1.5">
-            <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-300">
-              <TriangleAlert className="w-3.5 h-3.5" aria-hidden="true" />
-              {data.alerts.length} nhóm đang cảnh báo vượt ngân sách
+          <div className="bento-card p-4 border-amber-900/60 bg-amber-950/20 space-y-2">
+            <p className="flex items-center gap-2 text-xs font-bold text-amber-300 uppercase tracking-wide">
+              <TriangleAlert className="w-4 h-4 text-amber-400" aria-hidden="true" />
+              {data.alerts.length} nhóm cảnh báo vượt ngân sách
             </p>
-            {data.alerts.map((a) => (
-              <p key={a.key} className="text-xs text-amber-200/90">
-                {a.label}: {a.pct.toFixed(0)}% ngân sách {a.over ? "— đã vượt" : ""}
-              </p>
-            ))}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              {data.alerts.map((a) => (
+                <div
+                  key={a.key}
+                  className="px-3 py-2 rounded-lg bg-zinc-900/80 border border-zinc-800 text-xs text-zinc-300 flex items-center justify-between"
+                >
+                  <span className="font-semibold text-zinc-200">{a.label}</span>
+                  <span
+                    className={`font-mono font-bold ${a.over ? "text-rose-400" : "text-amber-400"}`}
+                  >
+                    {a.pct.toFixed(0)}% {a.over ? "(Đã vượt)" : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* Toggle nhóm */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-xl w-fit">
+        {/* Toggle nhóm & Filter */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-xl">
             <button
               onClick={() => switchGroup("system")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${groupBy === "system" ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                groupBy === "system"
+                  ? "bg-zinc-800 text-white shadow-xs"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
             >
               Theo hệ
             </button>
             <button
               onClick={() => switchGroup("floor")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${groupBy === "floor" ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                groupBy === "floor"
+                  ? "bg-zinc-800 text-white shadow-xs"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
             >
               Theo tầng
             </button>
           </div>
-          <label className="inline-flex items-center gap-2 text-sm text-zinc-300">
+
+          <label className="inline-flex items-center gap-2 text-xs font-medium text-zinc-300 cursor-pointer select-none">
             <input
               type="checkbox"
               checked={includeVo}
               onChange={(e) => toggleIncludeVo(e.target.checked)}
-              className="rounded border-zinc-600 bg-zinc-800"
+              className="rounded border-zinc-700 bg-zinc-900 text-emerald-600 focus:ring-emerald-500"
             />
             Gồm phát sinh (VO)
           </label>
         </div>
+
         {groupBy === "floor" && (
           <p className="text-[11px] text-zinc-400">
             BOQ chưa có chiều tầng — ở chế độ này, ngân sách và cam kết dùng chung giá trị hợp đồng
@@ -215,7 +261,7 @@ export default function CostsPage() {
             message="Nhập BOQ (ngân sách), đơn đặt hàng/hợp đồng giao thầu (cam kết) hoặc bill thanh toán (thực chi) để xem báo cáo."
           />
         ) : (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+          <div className="bento-card overflow-hidden">
             <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Bảng chi phí">
               <table className="w-full text-sm min-w-[640px]">
                 <thead>

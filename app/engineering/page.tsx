@@ -229,54 +229,40 @@ export default function EngineeringApexCockpitPage() {
         <EngineeringNav />
 
         {/* Master Pulse Banner */}
-        <div className="relative overflow-hidden rounded-2xl border border-zinc-800 bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 p-6 shadow-xl">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  <Sparkles className="h-5 w-5" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold tracking-tight text-zinc-100">
-                    XBoss Apex Synergy & Command Center
-                  </h1>
-                  <p className="text-xs text-zinc-400">
-                    Hợp nhất 32+ siêu hệ thống: AI Copilot, CAD/BIM Không gian, Dòng tiền & Sổ cái
-                    Merkle
-                  </p>
-                </div>
+        <div className="bento-card p-6 shadow-xl space-y-6">
+          {/* Apex Synergy Pulse Indicator Card */}
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between border-b border-zinc-800/80 pb-6">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 live-pulse" />
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 font-mono">
+                  HỆ ĐIỀU HÀNH KỸ THUẬT APEX V2.0
+                </span>
               </div>
-
-              {pulse?.pulseSummary?.recommendations &&
-                pulse.pulseSummary.recommendations.length > 0 && (
-                  <div className="mt-3 flex items-center gap-2 rounded-lg bg-zinc-900/80 px-3 py-2 text-xs text-zinc-300 border border-zinc-800">
-                    <span className="font-semibold text-emerald-400">Trạng thái Nhịp Xung:</span>
-                    <span>{pulse.pulseSummary.recommendations[0]}</span>
-                  </div>
-                )}
+              <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-zinc-100">
+                Pinnacle Multi-Agent Synergy Cockpit
+              </h1>
+              <p className="text-xs text-zinc-400 max-w-2xl leading-relaxed">
+                Đồng bộ ma trận 5 chiều: Không gian CAD/BIM — Dòng tiền & Chi phí — Pháp lý & Ký số
+                — An toàn HSE — Khối tác tử Merkle Tree bất biến.
+              </p>
             </div>
 
-            {/* Apex Score & Pulse Refresh Button */}
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900/90 p-4 text-center">
-                <div className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">
-                  Apex Health Index (Ω)
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <div className="text-xs font-semibold text-zinc-400">CHỈ SỐ SỨC KHỎE HỢP LỰC</div>
+                <div className="font-mono text-3xl font-extrabold text-emerald-400 tabular-nums">
+                  {pulse?.apexIndex ?? 96.8}%
                 </div>
-                <div className="mt-1 flex items-baseline justify-center gap-1">
-                  <span className="font-mono text-3xl font-extrabold text-emerald-400 tabular-nums">
-                    {pulse?.apexIndex ?? 96.8}
-                  </span>
-                  <span className="text-xs text-zinc-400">/ 100</span>
-                </div>
-                <div className="mt-1 inline-block rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
-                  {pulse?.statusTier ?? "OPTIMAL EQUILIBRIUM"}
+                <div className="mt-1 inline-block rounded-md bg-emerald-950/80 border border-emerald-800 px-2 py-0.5 text-[10px] font-bold text-emerald-300 font-mono">
+                  {pulse?.statusTier ?? "OPTIMAL"}
                 </div>
               </div>
 
               <button
                 onClick={triggerPulseScan}
                 disabled={refreshing}
-                className="flex min-h-[44px] items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-emerald-700 active:scale-[0.98] disabled:opacity-50"
+                className="flex min-h-[44px] items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-emerald-700 active:scale-[0.98] shadow-sm disabled:opacity-50"
               >
                 <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
                 <span>{refreshing ? "Đang quét toàn hệ..." : "Quét Đồng Bộ 5 Trục"}</span>
@@ -287,71 +273,71 @@ export default function EngineeringApexCockpitPage() {
           {/* 5-Axis Radar Cards */}
           <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {/* Axis 1: Spatial & BIM */}
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3.5 transition hover:border-zinc-700">
+            <div className="bento-card p-4">
               <div className="flex items-center justify-between text-zinc-400">
-                <span className="text-[11px] font-medium">1. Không gian & BIM</span>
+                <span className="text-xs font-semibold">1. Không gian & BIM</span>
                 <Boxes className="h-4 w-4 text-sky-400" />
               </div>
-              <div className="mt-2 font-mono text-xl font-bold text-zinc-100 tabular-nums">
+              <div className="mt-2 font-mono text-2xl font-bold text-zinc-100 tabular-nums">
                 {pulse?.spatialScore ?? 96.5}%
               </div>
-              <div className="mt-1 text-[10px] text-zinc-400">
+              <div className="mt-1 text-xs text-zinc-400">
                 {pulse?.pulseSummary?.spatialClashesCount ?? 0} va chạm không gian
               </div>
             </div>
 
             {/* Axis 2: Financial & Cashflow */}
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3.5 transition hover:border-zinc-700">
+            <div className="bento-card p-4">
               <div className="flex items-center justify-between text-zinc-400">
-                <span className="text-[11px] font-medium">2. Vốn & Dòng tiền</span>
+                <span className="text-xs font-semibold">2. Vốn & Dòng tiền</span>
                 <TrendingUp className="h-4 w-4 text-emerald-400" />
               </div>
-              <div className="mt-2 font-mono text-xl font-bold text-zinc-100 tabular-nums">
+              <div className="mt-2 font-mono text-2xl font-bold text-zinc-100 tabular-nums">
                 {pulse?.financialScore ?? 94.0}%
               </div>
-              <div className="mt-1 text-[10px] text-zinc-400">
+              <div className="mt-1 text-xs text-zinc-400">
                 Runway an toàn: {pulse?.pulseSummary?.cashflowRunwayMonths ?? 6.5} tháng
               </div>
             </div>
 
             {/* Axis 3: Legal & e-Sign */}
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3.5 transition hover:border-zinc-700">
+            <div className="bento-card p-4">
               <div className="flex items-center justify-between text-zinc-400">
-                <span className="text-[11px] font-medium">3. Pháp lý & e-Sign</span>
+                <span className="text-xs font-semibold">3. Pháp lý & e-Sign</span>
                 <Scale className="h-4 w-4 text-violet-400" />
               </div>
-              <div className="mt-2 font-mono text-xl font-bold text-zinc-100 tabular-nums">
+              <div className="mt-2 font-mono text-2xl font-bold text-zinc-100 tabular-nums">
                 {pulse?.legalScore ?? 98.0}%
               </div>
-              <div className="mt-1 text-[10px] text-zinc-400">
+              <div className="mt-1 text-xs text-zinc-400">
                 FIDIC Time-bar risk: {pulse?.pulseSummary?.fidicTimeBarRiskCount ?? 0} vụ
               </div>
             </div>
 
             {/* Axis 4: Site & Safety */}
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3.5 transition hover:border-zinc-700">
+            <div className="bento-card p-4">
               <div className="flex items-center justify-between text-zinc-400">
-                <span className="text-[11px] font-medium">4. An toàn HSE</span>
+                <span className="text-xs font-semibold">4. An toàn HSE</span>
                 <ShieldAlert className="h-4 w-4 text-amber-400" />
               </div>
-              <div className="mt-2 font-mono text-xl font-bold text-zinc-100 tabular-nums">
+              <div className="mt-2 font-mono text-2xl font-bold text-zinc-100 tabular-nums">
                 {pulse?.siteScore ?? 97.5}%
               </div>
-              <div className="mt-1 text-[10px] text-zinc-400">
+              <div className="mt-1 text-xs text-zinc-400">
                 Site Safety Index: {pulse?.pulseSummary?.hseSafetyScore ?? 98} điểm
               </div>
             </div>
 
             {/* Axis 5: Multi-Agent & Merkle */}
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3.5 transition hover:border-zinc-700">
+            <div className="bento-card p-4">
               <div className="flex items-center justify-between text-zinc-400">
-                <span className="text-[11px] font-medium">5. Tác tử & Merkle</span>
+                <span className="text-xs font-semibold">5. Tác tử & Merkle</span>
                 <Zap className="h-4 w-4 text-rose-400" />
               </div>
-              <div className="mt-2 font-mono text-xl font-bold text-zinc-100 tabular-nums">
+              <div className="mt-2 font-mono text-2xl font-bold text-zinc-100 tabular-nums">
                 {pulse?.agentScore ?? 99.0}%
               </div>
-              <div className="mt-1 text-[10px] text-zinc-400">
+              <div className="mt-1 text-xs text-zinc-400">
                 Block Height #{pulse?.pulseSummary?.merkleBlockHeight ?? 128}
               </div>
             </div>
@@ -360,7 +346,7 @@ export default function EngineeringApexCockpitPage() {
           {/* Cross-System Command Dispatcher Actions */}
           <div className="mt-6 border-t border-zinc-800/80 pt-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-2 text-xs font-semibold text-zinc-300">
+              <div className="flex items-center gap-2 text-xs font-bold text-zinc-200 uppercase tracking-wide">
                 <Sparkles size={14} className="text-emerald-400" />
                 <span>Bộ Điều Phối Lệnh Liên Phân Hệ (Cross-System Command Dispatcher):</span>
               </div>
@@ -470,14 +456,14 @@ export default function EngineeringApexCockpitPage() {
           /* Bento Grid 5 Phân Hệ Kỹ Thuật Đỉnh Cao */
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             {/* Bento Item 1: AI Copilot & Tác tử Hiện trường */}
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5 transition hover:border-zinc-700 flex flex-col justify-between">
+            <div className="bento-card p-5 flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80">
                   <div className="flex items-center gap-2 text-sm font-bold text-zinc-100">
                     <Bot className="h-4 w-4 text-emerald-400" />
                     <span>AI Copilot & Tác tử Hiện trường</span>
                   </div>
-                  <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-400 border border-emerald-500/20">
+                  <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-400 border border-emerald-500/20 font-mono">
                     Active Swarm
                   </span>
                 </div>
@@ -525,14 +511,14 @@ export default function EngineeringApexCockpitPage() {
             </div>
 
             {/* Bento Item 2: Kỹ thuật Không gian & CAD/BIM */}
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5 transition hover:border-zinc-700 flex flex-col justify-between">
+            <div className="bento-card p-5 flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80">
                   <div className="flex items-center gap-2 text-sm font-bold text-zinc-100">
                     <Boxes className="h-4 w-4 text-sky-400" />
                     <span>Kỹ thuật Không gian & CAD/BIM</span>
                   </div>
-                  <span className="rounded bg-sky-500/10 px-2 py-0.5 text-[10px] text-sky-400 border border-sky-500/20">
+                  <span className="rounded bg-sky-500/10 px-2 py-0.5 text-[10px] text-sky-400 border border-sky-500/20 font-mono">
                     Auto-Routing 3D
                   </span>
                 </div>
@@ -580,14 +566,14 @@ export default function EngineeringApexCockpitPage() {
             </div>
 
             {/* Bento Item 3: Tài chính, Pháp lý & Chuỗi cung ứng */}
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5 transition hover:border-zinc-700 flex flex-col justify-between">
+            <div className="bento-card p-5 flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80">
                   <div className="flex items-center gap-2 text-sm font-bold text-zinc-100">
                     <Scale className="h-4 w-4 text-violet-400" />
                     <span>Tài chính, Pháp lý & Logistics</span>
                   </div>
-                  <span className="rounded bg-violet-500/10 px-2 py-0.5 text-[10px] text-violet-400 border border-violet-500/20">
+                  <span className="rounded bg-violet-500/10 px-2 py-0.5 text-[10px] text-violet-400 border border-violet-500/20 font-mono">
                     PKI Sealed
                   </span>
                 </div>
@@ -635,14 +621,14 @@ export default function EngineeringApexCockpitPage() {
             </div>
 
             {/* Bento Item 4: Siêu Tính toán, Digital Twin & Merkle Ledger */}
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5 transition hover:border-zinc-700 flex flex-col justify-between">
+            <div className="bento-card p-5 flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80">
                   <div className="flex items-center gap-2 text-sm font-bold text-zinc-100">
                     <Zap className="h-4 w-4 text-amber-400" />
                     <span>Siêu Tính toán & Sổ cái Merkle</span>
                   </div>
-                  <span className="rounded bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-400 border border-amber-500/20">
+                  <span className="rounded bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-400 border border-amber-500/20 font-mono">
                     Immutable
                   </span>
                 </div>
@@ -683,14 +669,14 @@ export default function EngineeringApexCockpitPage() {
             </div>
 
             {/* Bento Item 5: Quản trị Quy trình & Chất lượng (ENG-3 / ENG-2) */}
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5 transition hover:border-zinc-700 flex flex-col justify-between lg:col-span-2">
+            <div className="bento-card p-5 flex flex-col justify-between lg:col-span-2">
               <div>
                 <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80">
                   <div className="flex items-center gap-2 text-sm font-bold text-zinc-100">
                     <Activity className="h-4 w-4 text-emerald-400" />
                     <span>Quản trị Quy trình Phê duyệt & Đề xuất Kỹ thuật (Gate 0 OS)</span>
                   </div>
-                  <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-400 border border-emerald-500/20">
+                  <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-400 border border-emerald-500/20 font-mono">
                     Gate 0 Enforced
                   </span>
                 </div>

@@ -116,50 +116,52 @@ export default function HseVisionPage() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Cột trái: Form phân tích ảnh */}
           <div className="space-y-6 lg:col-span-1">
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 backdrop-blur-sm">
-              <h2 className="mb-4 text-base font-semibold text-zinc-200 flex items-center gap-2">
+            <div className="bento-card p-5 space-y-4">
+              <h2 className="text-base font-bold text-zinc-100 flex items-center gap-2">
                 <Camera size={18} className="text-amber-400" />
                 Quét Thị Giác Ảnh Hiện Trường
               </h2>
               <form onSubmit={handleScan} className="space-y-4">
                 <div>
-                  <label className="mb-1 block text-xs text-zinc-400">Tên phiên kiểm tra</label>
+                  <label className="mb-1 block text-xs font-semibold text-zinc-300">
+                    Tên phiên kiểm tra
+                  </label>
                   <input
                     type="text"
                     value={scanName}
                     onChange={(e) => setScanName(e.target.value)}
-                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 focus:border-rose-500 focus:outline-none"
+                    className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-rose-500 transition"
                     required
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-zinc-400">
+                  <label className="mb-1 block text-xs font-semibold text-zinc-300">
                     URL hình ảnh công trường
                   </label>
                   <input
                     type="text"
                     value={imageUrl}
                     onChange={(e) => setImageUrl(e.target.value)}
-                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 focus:border-rose-500 focus:outline-none"
+                    className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-rose-500 transition"
                     required
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-zinc-400">
+                  <label className="mb-1 block text-xs font-semibold text-zinc-300">
                     Đơn vị thi công phụ trách
                   </label>
                   <input
                     type="text"
                     value={assignedSubcon}
                     onChange={(e) => setAssignedSubcon(e.target.value)}
-                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 focus:border-rose-500 focus:outline-none"
+                    className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-rose-500 transition"
                     required
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={scanning}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-rose-500 disabled:opacity-50"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white transition hover:bg-rose-500 active:scale-[0.98] disabled:opacity-50 shadow-sm"
                 >
                   {scanning ? <RefreshCw className="animate-spin" size={16} /> : <Eye size={16} />}
                   Quét Phát Hiện Vi Phạm An Toàn AI
@@ -168,14 +170,14 @@ export default function HseVisionPage() {
             </div>
 
             {/* Lịch sử các đợt quét */}
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 backdrop-blur-sm">
-              <h2 className="mb-3 text-base font-semibold text-zinc-200">
-                Lịch Sử Đợt Quét An Toàn
-              </h2>
+            <div className="bento-card p-5 space-y-4">
+              <h2 className="text-base font-bold text-zinc-100">Lịch Sử Đợt Quét An Toàn</h2>
               {loading ? (
-                <div className="text-center py-6 text-sm text-zinc-500">Đang tải lịch sử...</div>
+                <div className="text-center py-6 text-xs sm:text-sm text-zinc-500">
+                  Đang tải lịch sử...
+                </div>
               ) : scans.length === 0 ? (
-                <div className="text-center py-6 text-sm text-zinc-500">
+                <div className="text-center py-6 text-xs sm:text-sm text-zinc-500">
                   Chưa có dữ liệu quét an toàn.
                 </div>
               ) : (
@@ -183,23 +185,23 @@ export default function HseVisionPage() {
                   {scans.map((s) => (
                     <div
                       key={s.id}
-                      className="rounded-lg border border-zinc-800 bg-zinc-800/40 p-3"
+                      className="rounded-xl border border-zinc-800/80 bg-zinc-900/60 p-3.5 space-y-2 hover:bg-zinc-850 transition"
                     >
                       <div className="flex items-center justify-between text-xs font-semibold">
                         <span className="text-zinc-200 line-clamp-1">{s.scanName}</span>
                         <span
-                          className={`rounded px-2 py-0.5 text-[10px] ${
+                          className={`rounded-lg px-2 py-0.5 text-[11px] font-bold ${
                             s.riskTier === "CRITICAL"
-                              ? "bg-rose-950 text-rose-400"
+                              ? "bg-rose-950/90 text-rose-400 border border-rose-800/60"
                               : s.riskTier === "DANGER"
-                                ? "bg-amber-950 text-amber-400"
-                                : "bg-emerald-950 text-emerald-400"
+                                ? "bg-amber-950/90 text-amber-400 border border-amber-800/60"
+                                : "bg-emerald-950/90 text-emerald-400 border border-emerald-800/60"
                           }`}
                         >
                           Điểm: {Number(s.siteSafetyScore).toFixed(0)}/100
                         </span>
                       </div>
-                      <div className="mt-2 flex items-center justify-between text-[11px] text-zinc-400">
+                      <div className="flex items-center justify-between text-[11px] text-zinc-400 font-mono">
                         <span>Phát hiện: {s.totalHazardsFound} lỗi</span>
                         <span>{new Date(s.analyzedAt).toLocaleDateString("vi-VN")}</span>
                       </div>
@@ -216,12 +218,12 @@ export default function HseVisionPage() {
               <div className="space-y-6">
                 {/* Thẻ chỉ số an toàn */}
                 <div
-                  className={`rounded-xl border p-5 ${
+                  className={`bento-card p-5 ${
                     currentResult.scan.riskTier === "CRITICAL"
-                      ? "border-rose-700 bg-rose-950/30"
+                      ? "border-rose-700/60 bg-rose-950/30"
                       : currentResult.scan.riskTier === "DANGER"
-                        ? "border-amber-700 bg-amber-950/30"
-                        : "border-emerald-700 bg-emerald-950/30"
+                        ? "border-amber-700/60 bg-amber-950/30"
+                        : "border-emerald-700/60 bg-emerald-950/30"
                   }`}
                 >
                   <div className="flex items-center justify-between">
@@ -233,16 +235,18 @@ export default function HseVisionPage() {
                       </h3>
                       <div className="mt-1 text-xs text-zinc-300">
                         Phân cấp rủi ro:{" "}
-                        <strong className="text-rose-300">{currentResult.scan.riskTier}</strong> •
-                        Tìm thấy {currentResult.scan.totalHazardsFound} vị trí nguy cơ
+                        <strong className="text-rose-300 font-bold">
+                          {currentResult.scan.riskTier}
+                        </strong>{" "}
+                        • Tìm thấy {currentResult.scan.totalHazardsFound} vị trí nguy cơ
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Danh sách các vi phạm phát hiện */}
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 space-y-4">
-                  <h3 className="text-base font-semibold text-zinc-200 flex items-center gap-2">
+                <div className="bento-card p-5 space-y-4">
+                  <h3 className="text-base font-bold text-zinc-100 flex items-center gap-2">
                     <FileWarning size={18} className="text-amber-400" />
                     Chi Tiết Vi Phạm & Vé Xử Phạt Tự Động
                   </h3>
@@ -250,13 +254,13 @@ export default function HseVisionPage() {
                     {currentResult.hazards.map((h: Hazard, idx: number) => (
                       <div
                         key={idx}
-                        className="rounded-lg border border-zinc-800 bg-zinc-800/40 p-4 space-y-2"
+                        className="rounded-xl border border-zinc-800/80 bg-zinc-900/60 p-4 space-y-2"
                       >
                         <div className="flex items-center justify-between">
-                          <span className="rounded bg-rose-950 px-2 py-0.5 text-xs font-bold text-rose-400">
+                          <span className="rounded-lg bg-rose-950/80 border border-rose-800/60 px-2 py-0.5 text-xs font-bold text-rose-400">
                             [{h.hazardType}] - Mức độ: {h.severity}
                           </span>
-                          <span className="text-xs font-mono text-emerald-400">
+                          <span className="text-xs font-mono font-bold text-emerald-400">
                             Độ tin cậy AI: {h.confidence}%
                           </span>
                         </div>
@@ -278,7 +282,7 @@ export default function HseVisionPage() {
                 </div>
               </div>
             ) : (
-              <div className="flex h-96 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900/40 text-sm text-zinc-500">
+              <div className="bento-card flex h-96 items-center justify-center p-6 text-xs sm:text-sm text-zinc-400">
                 Nhập thông tin bên trái và bấm &quot;Quét Phát Hiện Vi Phạm An Toàn AI&quot; để xem
                 kết quả phân tích
               </div>

@@ -88,15 +88,15 @@ export default function DiaryPage() {
     <div className="min-h-screen bg-zinc-950 text-white">
       <AppHeader title="Nhật ký thi công" subtitle="Nhật ký công trường · Nhân lực" />
 
-      <main className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-5 space-y-4">
+      <main className="max-w-4xl mx-auto px-3 sm:px-6 py-6 pb-24 space-y-6">
         <div
-          className="flex gap-1 border-b border-zinc-800 overflow-x-auto scrollbar-none"
+          className="flex items-center gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-xl w-fit"
           role="tablist"
         >
           {(
             [
-              ["calendar", "Lịch", NotebookPen],
-              ["manpower", "Nhân lực", Users],
+              ["calendar", "Lịch nhật ký", NotebookPen],
+              ["manpower", "Biểu đồ nhân lực", Users],
             ] as const
           ).map(([key, label, Icon]) => (
             <button
@@ -104,10 +104,10 @@ export default function DiaryPage() {
               role="tab"
               aria-selected={tab === key}
               onClick={() => setTab(key)}
-              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition shrink-0 ${
+              className={`flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transition shrink-0 ${
                 tab === key
-                  ? "border-sky-500 text-white"
-                  : "border-transparent text-zinc-400 hover:text-white"
+                  ? "bg-zinc-800 text-white shadow-xs"
+                  : "text-zinc-400 hover:text-zinc-200"
               }`}
             >
               <Icon className="w-4 h-4" /> {label}
@@ -116,33 +116,36 @@ export default function DiaryPage() {
         </div>
 
         {tab === "calendar" && (
-          <>
-            <div className="flex items-center justify-between">
+          <div className="bento-card p-4 sm:p-6 space-y-5">
+            <div className="flex items-center justify-between border-b border-zinc-800/80 pb-4">
               <button
                 onClick={() => setMonth((mo) => shiftMonth(mo, -1))}
                 aria-label="Tháng trước"
-                className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-300"
+                className="p-2 rounded-xl border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 transition"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
-              <h2 className="text-base font-semibold">{monthLabel(month)}</h2>
+              <h2 className="text-base sm:text-lg font-bold text-zinc-100">{monthLabel(month)}</h2>
               <button
                 onClick={() => setMonth((mo) => shiftMonth(mo, 1))}
                 aria-label="Tháng sau"
-                className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-300"
+                className="p-2 rounded-xl border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 transition"
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="grid grid-cols-7 gap-1.5 text-center">
+            <div className="grid grid-cols-7 gap-2 text-center">
               {WEEKDAYS.map((w) => (
-                <div key={w} className="text-xs text-zinc-400 py-1">
+                <div
+                  key={w}
+                  className="text-xs font-semibold text-zinc-400 py-1 uppercase tracking-wide"
+                >
                   {w}
                 </div>
               ))}
               {cells.map((date, i) => {
-                if (!date) return <div key={i} />;
+                if (!date) return <div key={i} className="aspect-square" />;
                 const status = statusByDate.get(date);
                 const isToday = date === todayISO();
                 const dayNum = parseInt(date.slice(8, 10));
@@ -150,36 +153,40 @@ export default function DiaryPage() {
                   <button
                     key={date}
                     onClick={() => setSelectedDate(date)}
-                    className={`aspect-square rounded-lg border flex flex-col items-center justify-center gap-1 text-sm transition ${
+                    className={`aspect-square rounded-xl border flex flex-col items-center justify-center gap-1 text-sm transition active:scale-95 ${
                       isToday
-                        ? "border-sky-500 bg-sky-950/40"
-                        : "border-zinc-800 bg-zinc-900 hover:bg-zinc-800"
+                        ? "border-sky-500 bg-sky-950/40 text-sky-200 font-bold ring-1 ring-sky-500/50 shadow-xs"
+                        : "border-zinc-800/80 bg-zinc-900/60 hover:bg-zinc-800/80 text-zinc-200"
                     }`}
                   >
-                    <span className="text-white">{dayNum}</span>
+                    <span className="font-mono text-xs sm:text-sm">{dayNum}</span>
                     {status === "locked" && <Lock className="w-3 h-3 text-emerald-400" />}
                     {status === "draft" && <FileEdit className="w-3 h-3 text-amber-400" />}
-                    {!status && <span className="w-1.5 h-1.5 rounded-full bg-zinc-700" />}
+                    {!status && <span className="w-1 h-1 rounded-full bg-zinc-700" />}
                   </button>
                 );
               })}
             </div>
 
-            <div className="flex items-center gap-4 text-xs text-zinc-400 flex-wrap">
+            <div className="flex items-center gap-4 text-xs text-zinc-400 flex-wrap pt-3 border-t border-zinc-800/80">
               <span className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-zinc-700" /> Chưa lập
               </span>
               <span className="flex items-center gap-1.5">
-                <FileEdit className="w-3 h-3 text-amber-400" /> Nháp
+                <FileEdit className="w-3 h-3 text-amber-400" /> Bản nháp
               </span>
               <span className="flex items-center gap-1.5">
-                <Lock className="w-3 h-3 text-emerald-400" /> Đã khoá
+                <Lock className="w-3 h-3 text-emerald-400" /> Đã duyệt khoá
               </span>
             </div>
-          </>
+          </div>
         )}
 
-        {tab === "manpower" && <ManpowerChart manpower={manpower} />}
+        {tab === "manpower" && (
+          <div className="bento-card p-4 sm:p-6">
+            <ManpowerChart manpower={manpower} />
+          </div>
+        )}
       </main>
 
       {selectedDate && (

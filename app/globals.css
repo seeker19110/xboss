@@ -258,30 +258,82 @@ body {
 :focus-visible {
   outline: 2px solid #34d399; /* emerald-400 */
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 /* ─── Modern UI/UX Utility Classes (ui-ux-craftsman) ─────────────────────── */
 .card-surface {
   background-color: var(--color-zinc-900);
   border: 1px solid var(--color-zinc-800);
-  border-radius: 0.75rem;
+  border-radius: 0.875rem;
   transition:
-    border-color 0.15s ease-out,
-    box-shadow 0.15s ease-out;
+    border-color 0.2s ease-out,
+    box-shadow 0.2s ease-out,
+    transform 0.2s ease-out;
 }
 .card-surface:hover {
   border-color: var(--color-zinc-700);
+}
+
+.bento-card {
+  background-color: var(--color-zinc-950);
+  border: 1px solid var(--color-zinc-800);
+  border-radius: 1rem;
+  transition:
+    border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.bento-card:hover {
+  border-color: var(--color-zinc-700);
+  box-shadow: 0 8px 30px -4px rgba(0, 0, 0, 0.3);
+}
+
+.glass-surface {
+  background-color: color-mix(in srgb, var(--color-zinc-950) 85%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--color-zinc-800);
 }
 
 .interactive-press {
   transition:
     transform 0.15s ease-out,
     background-color 0.15s ease-out,
+    border-color 0.15s ease-out,
     opacity 0.15s ease-out;
 }
 .interactive-press:active {
   transform: scale(0.98);
+}
+
+/* Live Pulse indicator cho sự kiện trực tiếp / SSE */
+.live-pulse {
+  position: relative;
+  display: inline-flex;
+}
+.live-pulse::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 9999px;
+  background-color: inherit;
+  opacity: 0.75;
+  animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0;
+  }
 }
 
 /* Custom scrollbar thanh lịch */

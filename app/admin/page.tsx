@@ -464,7 +464,7 @@ export default function AdminPage() {
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
         aria-label={label}
-        className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm w-[200px] shrink-0"
+        className="bg-zinc-900 border border-zinc-800 rounded-xl px-2.5 py-1.5 text-xs sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 w-[210px] shrink-0 transition"
       >
         <option value="">— Kế thừa / chưa gán —</option>
         {users.map((u) => {
@@ -522,9 +522,9 @@ export default function AdminPage() {
         )}
       </AppHeader>
 
-      <main className="max-w-5xl mx-auto px-6 py-6 space-y-4">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         <div
-          className="flex gap-1 border-b border-zinc-800 overflow-x-auto scrollbar-none"
+          className="flex items-center gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-xl overflow-x-auto scrollbar-none w-fit flex-wrap"
           role="tablist"
         >
           {(
@@ -544,7 +544,11 @@ export default function AdminPage() {
                 role="tab"
                 aria-selected={tab === key}
                 onClick={() => setTab(key as "assign" | "nav" | "projects" | "audit" | "traffic")}
-                className={`px-3 py-2 text-sm flex items-center gap-1 border-b-2 shrink-0 transition ${tab === key ? "border-emerald-500 text-white" : "border-transparent text-zinc-400 hover:text-white"}`}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition ${
+                  tab === key
+                    ? "bg-zinc-800 text-white shadow-xs"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
               >
                 {icon === "nav" && <LayoutDashboard className="w-3.5 h-3.5" />}
                 {icon === "projects" && <Building2 className="w-3.5 h-3.5" />}

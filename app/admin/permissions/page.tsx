@@ -171,14 +171,18 @@ export default function PermissionsPage() {
       />
 
       <main className="p-4 sm:p-6 pb-24 space-y-5">
-        {/* M50 PR3: tab ma trận / báo cáo SoD + nút xuất ma trận quyền hiệu lực */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex gap-1 rounded-lg border border-zinc-800 bg-zinc-900 p-1 text-sm">
+          <div
+            className="flex items-center gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-xl"
+            role="tablist"
+          >
             <button
               type="button"
               onClick={() => setTab("matrix")}
-              className={`rounded-md px-3 py-1.5 font-medium transition-colors ${
-                tab === "matrix" ? "bg-zinc-800 text-zinc-100" : "text-zinc-400 hover:text-zinc-200"
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                tab === "matrix"
+                  ? "bg-zinc-800 text-white shadow-xs"
+                  : "text-zinc-400 hover:text-zinc-200"
               }`}
             >
               Ma trận quyền
@@ -186,8 +190,10 @@ export default function PermissionsPage() {
             <button
               type="button"
               onClick={() => setTab("sod")}
-              className={`rounded-md px-3 py-1.5 font-medium transition-colors ${
-                tab === "sod" ? "bg-zinc-800 text-zinc-100" : "text-zinc-400 hover:text-zinc-200"
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                tab === "sod"
+                  ? "bg-zinc-800 text-white shadow-xs"
+                  : "text-zinc-400 hover:text-zinc-200"
               }`}
             >
               Báo cáo SoD
@@ -195,9 +201,9 @@ export default function PermissionsPage() {
           </div>
           <a
             href="/api/admin/permissions-snapshot"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm font-medium text-zinc-200 hover:bg-zinc-800"
+            className="inline-flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900 px-3.5 py-2 text-xs font-medium text-zinc-200 hover:bg-zinc-800 transition"
           >
-            <FileSpreadsheet className="h-4 w-4 text-emerald-300" aria-hidden />
+            <FileSpreadsheet className="h-4 w-4 text-emerald-400" aria-hidden />
             Xuất ma trận quyền (.xlsx)
           </a>
         </div>
@@ -208,9 +214,9 @@ export default function PermissionsPage() {
           <>
             {/* M61 PR2: selector phạm vi — "Toàn hệ thống" (mặc định, hành vi y hệt trước
                 M61) hoặc 1 dự án cụ thể (override chỉ áp dụng trong dự án đó). */}
-            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-sm">
-              <Globe2 className="h-4 w-4 shrink-0 text-sky-300" aria-hidden />
-              <label htmlFor="perm-scope" className="text-zinc-400">
+            <div className="bento-card p-3.5 flex flex-wrap items-center gap-3 text-xs sm:text-sm">
+              <Globe2 className="h-4 w-4 shrink-0 text-sky-400" aria-hidden />
+              <label htmlFor="perm-scope" className="font-semibold text-zinc-300">
                 Phạm vi áp dụng:
               </label>
               <select
@@ -220,7 +226,7 @@ export default function PermissionsPage() {
                 onChange={(e) =>
                   setScopeProjectId(e.target.value === "" ? null : Number(e.target.value))
                 }
-                className="min-w-[10rem] rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-zinc-200"
+                className="min-w-[12rem] bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 transition"
               >
                 <option value="">Toàn hệ thống</option>
                 {(data?.projects ?? []).map((p) => (
@@ -230,20 +236,20 @@ export default function PermissionsPage() {
                 ))}
               </select>
               {scopeProjectId !== null && (
-                <span className="text-xs text-zinc-500">
+                <span className="text-xs text-zinc-400">
                   Override chỉ áp dụng trong dự án này; ô &ldquo;Mặc định&rdquo; hiển thị giá trị kế
                   thừa từ toàn hệ thống.
                 </span>
               )}
             </div>
 
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 space-y-2 text-sm text-zinc-300">
+            <div className="bento-card p-4 space-y-2 text-xs sm:text-sm text-zinc-300">
               <p className="flex items-start gap-2">
-                <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-300" />
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-400" />
                 <span>
                   Mỗi ô 3 trạng thái: <b className="text-zinc-100">Mặc định</b> (theo cấu hình gốc),{" "}
-                  <b className="text-emerald-300">Mở</b> (bật thêm),{" "}
-                  <b className="text-amber-300">Siết</b> (tắt bớt). Chỉ <b>quyền xem</b> mới được
+                  <b className="text-emerald-400">Mở</b> (bật thêm),{" "}
+                  <b className="text-amber-400">Siết</b> (tắt bớt). Chỉ <b>quyền xem</b> mới được
                   Mở; <b>quyền ghi dữ liệu</b> chỉ Siết được hoặc để Mặc định (không mở qua ma
                   trận).
                 </span>
@@ -269,10 +275,7 @@ export default function PermissionsPage() {
               </div>
             ) : (
               grouped.map(({ group, perms }) => (
-                <section
-                  key={group}
-                  className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900"
-                >
+                <section key={group} className="bento-card overflow-hidden">
                   <h2 className="border-b border-zinc-800 px-4 py-2.5 text-sm font-semibold text-zinc-200">
                     {group}
                   </h2>

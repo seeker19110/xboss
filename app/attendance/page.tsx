@@ -160,20 +160,24 @@ export default function AttendancePage() {
       />
 
       <main className="p-4 sm:p-6 pb-24 space-y-4">
-        <div className="flex items-center gap-3">
-          <label className="text-xs text-zinc-400 flex items-center gap-2">
-            Ngày
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <label className="flex items-center gap-2 text-xs font-semibold text-zinc-300">
+            Ngày làm việc:
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white"
+              className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-zinc-100 outline-none focus:border-emerald-500 h-10 transition"
               aria-label="Chọn ngày chấm công"
             />
           </label>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-center ml-auto">
-            <p className="text-lg font-bold text-emerald-400">{totalToday}</p>
-            <p className="text-xs text-zinc-400">Tổng nhân công ngày này</p>
+          <div className="bento-card px-4 py-2 text-center ml-auto flex items-center gap-3">
+            <div>
+              <p className="text-xl font-bold font-mono tabular-nums text-emerald-400">
+                {totalToday}
+              </p>
+              <p className="text-[11px] text-zinc-400">Tổng quân số hôm nay</p>
+            </div>
           </div>
         </div>
 
@@ -184,37 +188,42 @@ export default function AttendancePage() {
             message="Vào trang Nhân sự để tạo tổ đội trước khi chấm công."
           />
         ) : (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl divide-y divide-zinc-800/60">
+          <div className="bento-card divide-y divide-zinc-800/80 overflow-hidden">
             {crews.map((c) => {
               const rec = groupedByCrew.get(c.id);
               const headcount = rec?.headcount ?? 0;
               return (
-                <div key={c.id} className="flex items-center justify-between p-3 gap-3">
-                  <span className="text-sm truncate">{c.name}</span>
+                <div
+                  key={c.id}
+                  className="flex items-center justify-between p-3.5 gap-3 hover:bg-zinc-900/40 transition-colors"
+                >
+                  <span className="text-sm font-semibold text-zinc-200 truncate">{c.name}</span>
                   {canRecord ? (
                     <div className="flex items-center gap-2 shrink-0">
                       <button
                         onClick={() => bumpCrew(c.id, -1)}
                         disabled={busyCrewId === c.id || headcount <= 0}
                         aria-label={`Giảm số người tổ ${c.name}`}
-                        className="w-10 h-10 flex items-center justify-center rounded-lg bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-white"
+                        className="w-9 h-9 flex items-center justify-center rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 disabled:opacity-30 text-zinc-300 transition active:scale-95"
                       >
                         <Minus className="w-4 h-4" />
                       </button>
-                      <span className="w-8 text-center font-semibold tabular-nums">
+                      <span className="w-8 text-center font-mono font-bold text-sm text-zinc-100 tabular-nums">
                         {headcount}
                       </span>
                       <button
                         onClick={() => bumpCrew(c.id, 1)}
                         disabled={busyCrewId === c.id}
                         aria-label={`Tăng số người tổ ${c.name}`}
-                        className="w-10 h-10 flex items-center justify-center rounded-lg bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-on-accent"
+                        className="w-9 h-9 flex items-center justify-center rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 disabled:opacity-30 text-white transition shadow-xs"
                       >
                         <Plus className="w-4 h-4" />
                       </button>
                     </div>
                   ) : (
-                    <span className="font-semibold tabular-nums">{headcount}</span>
+                    <span className="font-mono font-bold text-sm text-zinc-100 tabular-nums">
+                      {headcount}
+                    </span>
                   )}
                 </div>
               );
@@ -235,7 +244,7 @@ export default function AttendancePage() {
         )}
 
         {individualItems.length > 0 && (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+          <div className="bento-card overflow-hidden">
             <div
               className="overflow-x-auto"
               tabIndex={0}
@@ -253,22 +262,29 @@ export default function AttendancePage() {
                 </thead>
                 <tbody>
                   {individualItems.map((it) => (
-                    <tr key={it.id} className="border-b border-zinc-800/60 last:border-0">
-                      <td className="p-3">{it.personnelName ?? "—"}</td>
+                    <tr
+                      key={it.id}
+                      className="border-b border-zinc-800/60 last:border-0 hover:bg-zinc-900/50 transition-colors"
+                    >
+                      <td className="p-3 font-medium text-zinc-200">{it.personnelName ?? "—"}</td>
                       <td className="p-3">
                         {it.present === false ? (
-                          <span className="text-rose-400">Vắng</span>
+                          <span className="px-2 py-0.5 rounded text-xs font-semibold bg-rose-950 text-rose-300 border border-rose-800/60">
+                            Vắng
+                          </span>
                         ) : (
-                          <span className="text-emerald-400">Có mặt</span>
+                          <span className="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-950 text-emerald-300 border border-emerald-800/60">
+                            Có mặt
+                          </span>
                         )}
                       </td>
-                      <td className="p-3 text-zinc-400">{it.hours ?? "—"}</td>
+                      <td className="p-3 font-mono text-zinc-400">{it.hours ?? "—"}</td>
                       <td className="p-3">
                         {canRecord && (
                           <button
                             onClick={() => deleteItem(it.id)}
                             aria-label="Xoá bản ghi"
-                            className="text-zinc-400 hover:text-rose-400"
+                            className="text-zinc-500 hover:text-rose-400 transition"
                             title="Xoá"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -283,9 +299,9 @@ export default function AttendancePage() {
           </div>
         )}
 
-        <section aria-label="Tổng công theo tháng" className="space-y-2">
-          <h2 className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
-            <CalendarCheck className="w-4 h-4" /> Tổng công theo tháng
+        <section aria-label="Tổng công theo tháng" className="bento-card p-4 sm:p-6 space-y-3">
+          <h2 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
+            <CalendarCheck className="w-4 h-4 text-emerald-400" /> Tổng công theo tháng
           </h2>
           <AttendanceChart rows={byDate} />
         </section>

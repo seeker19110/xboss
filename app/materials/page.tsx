@@ -763,14 +763,14 @@ export default function MaterialsPage() {
             })()}
 
             {/* Thanh tìm kiếm + hành động */}
-            <div className="flex gap-2">
-              <div className="relative flex-1">
+            <div className="flex flex-wrap gap-2.5 items-center">
+              <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Tìm theo Mã BOQ, tên vật tư, hệ, ĐVT..."
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 py-2.5 text-sm outline-none focus:border-zinc-600 placeholder:text-zinc-600"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-8 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 transition h-10"
                 />
                 {search && (
                   <button
@@ -789,10 +789,10 @@ export default function MaterialsPage() {
                       ? "Tắt chế độ bảng tính"
                       : "Bật chế độ bảng tính (copy/paste/fill như Excel)"
                   }
-                  className={`flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-medium transition shrink-0 border ${
+                  className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold transition shrink-0 border h-10 ${
                     sheetMode
-                      ? "bg-sky-600/20 border-sky-600 text-sky-300"
-                      : "border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-white"
+                      ? "bg-sky-950/80 border-sky-600 text-sky-300 shadow-sm"
+                      : "bg-zinc-900 border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white"
                   }`}
                 >
                   <Table2 className="w-4 h-4" /> Bảng tính
@@ -800,14 +800,14 @@ export default function MaterialsPage() {
               )}
               <a
                 href="/materials/order-form"
-                className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 rounded-xl px-4 py-2.5 text-sm font-medium transition shrink-0 text-on-accent"
+                className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold transition shrink-0 text-white shadow-sm h-10"
               >
                 <Plus className="w-4 h-4" /> Đặt hàng
               </a>
               {canEdit && (
                 <a
                   href="/materials/import"
-                  className="flex items-center gap-1.5 border border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-white rounded-xl px-4 py-2.5 text-sm font-medium transition shrink-0"
+                  className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold transition shrink-0 h-10"
                 >
                   <FileUp className="w-4 h-4" /> Import Excel
                 </a>
@@ -817,10 +817,10 @@ export default function MaterialsPage() {
                   onClick={runSync}
                   disabled={syncing}
                   title="Đồng bộ hai chiều bảng vật tư với Google Sheet"
-                  className="flex items-center gap-1.5 border border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-white rounded-xl px-4 py-2.5 text-sm font-medium transition shrink-0 disabled:opacity-50"
+                  className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold transition shrink-0 disabled:opacity-50 h-10"
                 >
                   <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />{" "}
-                  {syncing ? "Đang đồng bộ…" : "Đồng bộ Google Sheet"}
+                  {syncing ? "Đang đồng bộ…" : "Đồng bộ Sheet"}
                 </button>
               )}
               {canAdmin && (
@@ -828,7 +828,7 @@ export default function MaterialsPage() {
                   onClick={() => setLabelModalOpen(true)}
                   aria-label="In tem QR vật tư"
                   title="Chọn vật tư để in tem QR"
-                  className="flex items-center gap-1.5 border border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-white rounded-xl px-4 py-2.5 text-sm font-medium transition shrink-0"
+                  className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold transition shrink-0 h-10"
                 >
                   <QrCode className="w-4 h-4" /> In tem QR
                 </button>

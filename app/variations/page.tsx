@@ -159,7 +159,7 @@ export default function VariationsPage() {
             <button
               onClick={() => setAddOpen(true)}
               aria-label="Thêm phát sinh"
-              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0 text-on-accent"
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-white shadow-sm h-10"
             >
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm phát sinh</span>
             </button>
@@ -167,19 +167,21 @@ export default function VariationsPage() {
         }
       />
 
-      <main className="p-4 sm:p-6 pb-24 space-y-4">
+      <main className="p-4 sm:p-6 pb-24 space-y-6 max-w-screen-2xl mx-auto">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {(
             [
-              ["draft", "Nháp"],
-              ["submitted", "Đã trình"],
-              ["approved", "Được duyệt"],
-              ["rejected", "Từ chối"],
+              ["draft", "Nháp", "text-zinc-300"],
+              ["submitted", "Đã trình", "text-amber-400"],
+              ["approved", "Được duyệt", "text-emerald-400"],
+              ["rejected", "Từ chối", "text-rose-400"],
             ] as const
-          ).map(([key, label]) => (
-            <div key={key} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
-              <p className="text-xs text-zinc-400 uppercase tracking-wide">{label}</p>
-              <p className="text-lg font-semibold mt-1">
+          ).map(([key, label, colorCls]) => (
+            <div key={key} className="bento-card p-4 flex flex-col justify-between">
+              <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">
+                {label}
+              </span>
+              <p className={`text-xl font-bold font-mono tabular-nums mt-2 ${colorCls}`}>
                 <MaskedValue value={totals[key]} format={fmtVND} />
               </p>
             </div>
@@ -193,7 +195,7 @@ export default function VariationsPage() {
             message={canCreate ? 'Bấm "Thêm phát sinh" để bắt đầu.' : "Chưa có dữ liệu phát sinh."}
           />
         ) : (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+          <div className="bento-card overflow-hidden">
             <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Bảng phát sinh">
               <table className="w-full text-sm sm:min-w-[820px]">
                 <thead>

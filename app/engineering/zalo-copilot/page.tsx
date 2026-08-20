@@ -108,25 +108,25 @@ export default function ZaloCopilotPage() {
           {/* Cột trái: Trạm kết nối OTP & Mẫu lệnh nhanh */}
           <div className="space-y-6 lg:col-span-1">
             {/* Thẻ liên kết OTP Zalo */}
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 backdrop-blur-sm">
-              <h2 className="mb-3 text-base font-semibold text-zinc-200 flex items-center gap-2">
+            <div className="bento-card p-5 space-y-4">
+              <h2 className="text-base font-bold text-zinc-100 flex items-center gap-2">
                 <Key size={18} className="text-amber-400" />
                 Liên Kết Tài Khoản Zalo Công Trường
               </h2>
-              <p className="text-xs text-zinc-400 mb-4">
+              <p className="text-xs text-zinc-400 leading-relaxed">
                 Sinh mã OTP để cấp quyền cho tài khoản Zalo của Kỹ sư / Đội trưởng thầu phụ cập nhật
                 tiến độ từ xa.
               </p>
               <button
                 onClick={handleGenerateOtp}
-                className="w-full rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-500 transition-colors"
+                className="w-full rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-blue-500 active:scale-[0.98] transition shadow-sm"
               >
                 Tạo Mã OTP Liên Kết Zalo (15 phút)
               </button>
               {otpCode && (
-                <div className="mt-3 rounded bg-zinc-800 border border-amber-500/50 p-3 text-center">
+                <div className="rounded-xl bg-zinc-900 border border-amber-500/50 p-4 text-center">
                   <div className="text-xs text-zinc-400">Mã xác thực của bạn:</div>
-                  <div className="text-2xl font-mono font-bold text-amber-400 tracking-widest">
+                  <div className="text-2xl font-mono font-bold text-amber-400 tracking-widest mt-1">
                     {otpCode}
                   </div>
                 </div>
@@ -134,8 +134,8 @@ export default function ZaloCopilotPage() {
             </div>
 
             {/* Mẫu câu lệnh tiếng Việt thông dụng */}
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 backdrop-blur-sm">
-              <h2 className="mb-3 text-base font-semibold text-zinc-200 flex items-center gap-2">
+            <div className="bento-card p-5 space-y-3">
+              <h2 className="text-base font-bold text-zinc-100 flex items-center gap-2">
                 <Sparkles size={18} className="text-amber-400" />
                 Mẫu Câu Lệnh Hiện Trường
               </h2>
@@ -150,7 +150,7 @@ export default function ZaloCopilotPage() {
                   <button
                     key={idx}
                     onClick={() => handleSendMessage(sample)}
-                    className="w-full text-left rounded border border-zinc-800 bg-zinc-800/40 p-2.5 text-xs text-zinc-300 hover:border-blue-500/60 hover:bg-zinc-800 transition-all"
+                    className="w-full text-left rounded-xl border border-zinc-800 bg-zinc-900/60 p-3 text-xs text-zinc-300 hover:border-blue-500/60 hover:bg-zinc-850 transition"
                   >
                     💬 &ldquo;{sample}&rdquo;
                   </button>
@@ -160,7 +160,7 @@ export default function ZaloCopilotPage() {
           </div>
 
           {/* Cột phải: Khung chat mô phỏng Zalo tương tác */}
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 backdrop-blur-sm flex flex-col h-[560px] lg:col-span-2">
+          <div className="bento-card p-5 flex flex-col h-[560px] lg:col-span-2">
             <div className="border-b border-zinc-800 pb-3 mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="h-3 w-3 rounded-full bg-emerald-500 animate-pulse" />
@@ -184,14 +184,16 @@ export default function ZaloCopilotPage() {
                     className={`max-w-md rounded-2xl px-4 py-2.5 text-xs leading-relaxed ${
                       msg.sender === "user"
                         ? "bg-blue-600 text-white rounded-br-none"
-                        : "bg-zinc-800 text-zinc-200 border border-zinc-700/60 rounded-bl-none"
+                        : "bg-zinc-900 text-zinc-200 border border-zinc-800 rounded-bl-none"
                     }`}
                   >
                     {msg.text}
                   </div>
                   <div className="mt-1 flex items-center gap-2 text-[10px] text-zinc-500 font-mono px-1">
                     <span>{msg.time}</span>
-                    {msg.intent && <span className="text-amber-400">[{msg.intent}]</span>}
+                    {msg.intent && (
+                      <span className="text-amber-400 font-semibold">[{msg.intent}]</span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -210,12 +212,12 @@ export default function ZaloCopilotPage() {
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
                 placeholder="Nhập tin nhắn tiếng Việt hoặc chọn mẫu lệnh..."
-                className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-xs text-zinc-100 focus:border-blue-500 focus:outline-none"
+                className="flex-1 rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-xs text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500 transition"
               />
               <button
                 onClick={() => handleSendMessage()}
                 disabled={sending}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-500 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                className="rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-blue-500 active:scale-[0.98] transition disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
               >
                 <Send size={14} />
                 Gửi

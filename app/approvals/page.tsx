@@ -503,13 +503,14 @@ function ApprovalsPageInner() {
                 <button
                   onClick={() => approveFloor(g)}
                   disabled={isBusy}
-                  className="flex items-center gap-1 text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent rounded-lg px-2.5 py-1.5 transition font-medium"
+                  className="flex items-center gap-1 text-xs bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] disabled:opacity-50 text-white rounded-xl px-3 py-2 transition font-semibold shadow-xs"
                 >
-                  <CheckSquare className="w-3 h-3" /> Duyệt nghiệm thu
+                  <CheckSquare className="w-3.5 h-3.5" /> Duyệt nghiệm thu
                 </button>
               ) : (
-                <span className="flex items-center gap-1 text-xs text-zinc-400">
-                  <Clock className="w-3 h-3" /> Chờ {g.totalTasks - g.doneTasks} task
+                <span className="flex items-center gap-1 text-xs text-zinc-400 font-medium px-2 py-1 bg-zinc-900/60 rounded-lg border border-zinc-800">
+                  <Clock className="w-3.5 h-3.5 text-amber-400" /> Chờ {g.totalTasks - g.doneTasks}{" "}
+                  task
                 </span>
               )
             ) : (
@@ -518,7 +519,7 @@ function ApprovalsPageInner() {
                 <button
                   onClick={() => unapproveFloor(g)}
                   disabled={isBusy}
-                  className="text-xs bg-red-700 hover:bg-red-600 disabled:opacity-50 text-on-accent rounded-lg px-2 py-1 transition"
+                  className="text-xs bg-rose-600 hover:bg-rose-700 active:scale-[0.98] disabled:opacity-50 text-white rounded-xl px-3 py-1.5 transition font-medium"
                 >
                   Huỷ NT
                 </button>
@@ -541,26 +542,26 @@ function ApprovalsPageInner() {
     const pct = g.totalTasks > 0 ? Math.round((g.doneTasks / g.totalTasks) * 100) : 0;
 
     return (
-      <div key={key} className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-3 space-y-2.5">
+      <div key={key} className="bento-card p-4 space-y-3">
         <div>
-          <div className="font-semibold text-sm">
+          <div className="font-bold text-sm text-zinc-100">
             {g.sheetType} · Tầng {g.floorLabel}
           </div>
           {g.wpName && <div className="text-xs text-zinc-400 mt-0.5">{g.wpName}</div>}
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="flex-1 h-1.5 bg-zinc-700 rounded-full overflow-hidden">
+          <div className="flex-1 h-2 bg-zinc-900 rounded-full overflow-hidden border border-zinc-800">
             <div
-              className={`h-full rounded-full transition-all ${allDone ? "bg-emerald-500" : "bg-blue-500"}`}
+              className={`h-full rounded-full transition-all ${allDone ? "bg-emerald-500" : "bg-sky-500"}`}
               style={{ width: `${pct}%` }}
             />
           </div>
           <span
-            className={`text-xs font-medium shrink-0 ${allDone ? "text-emerald-400" : "text-zinc-400"}`}
+            className={`text-xs font-semibold shrink-0 ${allDone ? "text-emerald-400" : "text-zinc-400"}`}
           >
             {g.doneTasks}/{g.totalTasks}
-            {allDone && <CheckCircle2 className="w-3 h-3 inline ml-1" />}
+            {allDone && <CheckCircle2 className="w-3.5 h-3.5 inline ml-1 text-emerald-400" />}
           </span>
         </div>
 
@@ -571,14 +572,14 @@ function ApprovalsPageInner() {
           </div>
         )}
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap pt-1">
           <button
             onClick={() => openDocsForGroup(g)}
             disabled={isBusy}
-            className={`flex items-center gap-1 text-xs px-2.5 rounded-lg border transition min-h-[40px] ${
+            className={`flex items-center gap-1.5 text-xs px-3 rounded-xl border transition min-h-[40px] font-medium ${
               g.docCount > 0
-                ? "bg-emerald-950 border-emerald-900 text-emerald-200"
-                : "bg-zinc-800 border-zinc-700 text-zinc-400"
+                ? "bg-emerald-950/80 border-emerald-800 text-emerald-300 hover:bg-emerald-900"
+                : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
             }`}
           >
             <Paperclip className="w-3.5 h-3.5" /> {g.docCount} biên bản
@@ -588,7 +589,7 @@ function ApprovalsPageInner() {
             disabled={isBusy}
             title="Upload PDF/ảnh"
             aria-label="Upload PDF/ảnh"
-            className="flex items-center justify-center min-w-[40px] min-h-[40px] bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 border border-zinc-700 rounded-lg transition"
+            className="flex items-center justify-center min-w-[40px] min-h-[40px] bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 border border-zinc-800 text-zinc-300 rounded-xl transition"
           >
             <Upload className="w-4 h-4" />
           </button>
@@ -597,7 +598,7 @@ function ApprovalsPageInner() {
             disabled={isBusy}
             title="Thêm link"
             aria-label="Thêm link"
-            className="flex items-center justify-center min-w-[40px] min-h-[40px] bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 border border-zinc-700 rounded-lg transition"
+            className="flex items-center justify-center min-w-[40px] min-h-[40px] bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 border border-zinc-800 text-zinc-300 rounded-xl transition"
           >
             <Link2 className="w-4 h-4" />
           </button>
@@ -608,13 +609,13 @@ function ApprovalsPageInner() {
             <button
               onClick={() => approveFloor(g)}
               disabled={isBusy}
-              className="w-full flex items-center justify-center gap-1.5 text-sm bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent rounded-lg py-3 font-medium transition min-h-[44px]"
+              className="w-full flex items-center justify-center gap-2 text-sm bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] disabled:opacity-50 text-white rounded-xl py-3 font-semibold transition min-h-[44px] shadow-sm"
             >
               <CheckSquare className="w-4 h-4" /> Duyệt nghiệm thu
             </button>
           ) : (
-            <div className="flex items-center justify-center gap-1 text-xs text-zinc-400 py-2">
-              <Clock className="w-3.5 h-3.5" /> Chờ {g.totalTasks - g.doneTasks} task
+            <div className="flex items-center justify-center gap-1.5 text-xs text-zinc-400 py-2 bg-zinc-950/60 rounded-xl border border-zinc-800/80">
+              <Clock className="w-3.5 h-3.5 text-amber-400" /> Chờ {g.totalTasks - g.doneTasks} task
             </div>
           )
         ) : (
@@ -623,7 +624,7 @@ function ApprovalsPageInner() {
             <button
               onClick={() => unapproveFloor(g)}
               disabled={isBusy}
-              className="w-full text-sm bg-red-700 hover:bg-red-600 disabled:opacity-50 text-on-accent rounded-lg py-3 transition min-h-[44px]"
+              className="w-full text-sm bg-rose-600 hover:bg-rose-700 active:scale-[0.98] disabled:opacity-50 text-white rounded-xl py-3 transition min-h-[44px] font-medium"
             >
               Huỷ NT
             </button>
@@ -644,18 +645,21 @@ function ApprovalsPageInner() {
       />
       <AppHeader />
 
-      <main className="p-4 sm:p-6 space-y-8">
+      <main className="p-4 sm:p-6 space-y-6 max-w-screen-xl mx-auto">
         {/* Chờ tôi duyệt — hộp thư hợp nhất M46 PR3 (VO/IPC/đề xuất/nghiệm thu task).
             Chỉ hiện khi có ít nhất 1 mục — trống nghĩa là chưa cấu hình flow nào (PR4). */}
         {inbox.length > 0 && (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
-            <div className="p-4 border-b border-zinc-800">
-              <h2 className="font-semibold text-sm flex items-center gap-2">
-                <Inbox className="w-4 h-4 text-sky-400" /> Chờ tôi duyệt ({inbox.length})
-              </h2>
-              <p className="text-xs text-zinc-400 mt-0.5">
-                Phát sinh/thanh toán/đề xuất/nghiệm thu đang chờ đúng bước duyệt của bạn.
-              </p>
+          <div className="bento-card overflow-hidden">
+            <div className="p-4 border-b border-zinc-800 bg-zinc-950/40 flex items-center justify-between">
+              <div>
+                <h2 className="font-bold text-sm text-zinc-100 flex items-center gap-2">
+                  <Inbox className="w-4 h-4 text-sky-400" /> Hộp thư chờ duyệt ({inbox.length})
+                </h2>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Phát sinh/thanh toán/đề xuất/nghiệm thu đang chờ bước duyệt của bạn.
+                </p>
+              </div>
+              <span className="w-2.5 h-2.5 rounded-full bg-sky-400 live-pulse" />
             </div>
             <div className="divide-y divide-zinc-800/70">
               {inbox.map((it) => {
@@ -668,46 +672,53 @@ function ApprovalsPageInner() {
                 return (
                   <div
                     key={it.id}
-                    className="p-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3"
+                    className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-zinc-900/50 transition-colors"
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 shrink-0">
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-300 shrink-0">
                           {ENTITY_TYPE_LABEL[it.entityType]}
                         </span>
                         <a
                           href={it.linkUrl}
-                          className="text-sm font-medium hover:underline truncate"
+                          className="text-sm font-semibold text-zinc-100 hover:text-emerald-400 transition-colors truncate"
                         >
                           {it.label}
                         </a>
                       </div>
-                      <div className="text-xs text-zinc-400 mt-0.5">
-                        Bước {it.currentSeq} · vai trò {it.stepRole}
-                        {it.amount != null && <> · {formatVnd(it.amount)}</>}
+                      <div className="text-xs text-zinc-400 mt-1 flex items-center gap-2 flex-wrap">
+                        <span>
+                          Bước {it.currentSeq} · Vai trò {it.stepRole}
+                        </span>
+                        {it.amount != null && (
+                          <span className="font-mono font-semibold text-emerald-400">
+                            · {formatVnd(it.amount)}
+                          </span>
+                        )}
                         {deadline && (
-                          <span className={overdue ? "text-red-400 font-medium" : ""}>
-                            {" "}
-                            · hạn {formatDateVN(deadline)}
-                            {overdue && " (quá hạn)"}
+                          <span
+                            className={overdue ? "text-rose-400 font-semibold" : "text-zinc-500"}
+                          >
+                            · Hạn {formatDateVN(deadline)}
+                            {overdue && " (Quá hạn)"}
                           </span>
                         )}
                       </div>
                     </div>
-                    <div className="flex gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0">
                       <button
                         onClick={() => decideInboxItem(it, true)}
                         disabled={isBusy}
-                        className="flex items-center gap-1 text-xs bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent rounded-lg px-2.5 py-1.5 transition font-medium"
+                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs font-semibold shadow-sm transition disabled:opacity-50 min-h-[38px]"
                       >
-                        <ThumbsUp className="w-3 h-3" /> Duyệt
+                        <ThumbsUp className="w-3.5 h-3.5" /> Duyệt
                       </button>
                       <button
                         onClick={() => decideInboxItem(it, false)}
                         disabled={isBusy}
-                        className="flex items-center gap-1 text-xs bg-red-700 hover:bg-red-600 disabled:opacity-50 text-on-accent rounded-lg px-2.5 py-1.5 transition"
+                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-rose-950/60 hover:text-rose-300 hover:border-rose-800/80 border border-zinc-800 text-zinc-400 text-xs font-medium transition disabled:opacity-50 min-h-[38px]"
                       >
-                        <ThumbsDown className="w-3 h-3" /> Từ chối
+                        <ThumbsDown className="w-3.5 h-3.5" /> Từ chối
                       </button>
                     </div>
                   </div>
@@ -718,9 +729,11 @@ function ApprovalsPageInner() {
         )}
 
         {/* Chờ nghiệm thu */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
-          <div className="p-4 border-b border-zinc-800">
-            <h2 className="font-semibold text-sm">Chờ nghiệm thu ({pending.length} tầng · hệ)</h2>
+        <div className="bento-card overflow-hidden">
+          <div className="p-4 border-b border-zinc-800 bg-zinc-950/40">
+            <h2 className="font-bold text-sm text-zinc-100">
+              Chờ nghiệm thu ({pending.length} tầng · hệ)
+            </h2>
             <p className="text-xs text-zinc-400 mt-0.5">
               Chỉ duyệt được khi tất cả task trong tầng đạt 100%
             </p>
@@ -796,9 +809,9 @@ function ApprovalsPageInner() {
         </div>
 
         {/* Đã nghiệm thu */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
-          <div className="p-4 border-b border-zinc-800">
-            <h2 className="font-semibold text-sm text-emerald-400">
+        <div className="bento-card overflow-hidden">
+          <div className="p-4 border-b border-zinc-800 bg-zinc-950/40">
+            <h2 className="font-bold text-sm text-emerald-400">
               Đã nghiệm thu ({approved.length} tầng · hệ)
             </h2>
           </div>

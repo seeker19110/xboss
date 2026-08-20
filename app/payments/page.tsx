@@ -136,16 +136,16 @@ function KpiCard({
   accent?: string;
 }) {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 sm:px-4 py-3 sm:py-3.5">
-      <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-zinc-400 mb-1 leading-tight">
+    <div className="bento-card p-3.5 sm:p-4 flex flex-col justify-between">
+      <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-zinc-400">
         {label}
-      </p>
+      </span>
       <p
-        className={`text-xl sm:text-2xl font-bold tabular-nums truncate ${accent ?? "text-white"}`}
+        className={`text-lg sm:text-2xl font-bold font-mono tabular-nums truncate mt-1.5 ${accent ?? "text-zinc-100"}`}
       >
         {value}
       </p>
-      {sub && <p className="text-[10px] sm:text-xs text-zinc-400 mt-0.5 truncate">{sub}</p>}
+      {sub && <p className="text-[10px] sm:text-xs text-zinc-400 mt-1 truncate">{sub}</p>}
     </div>
   );
 }

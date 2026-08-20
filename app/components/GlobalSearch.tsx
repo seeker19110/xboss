@@ -225,7 +225,11 @@ function hitUrl(h: Hit): string {
   return `/tracking/${slug}${h.floorLabel ? `?floor=${encodeURIComponent(h.floorLabel)}` : ""}`;
 }
 
-export default function GlobalSearch() {
+export default function GlobalSearch({
+  placement = "bottom",
+}: {
+  placement?: "top" | "bottom";
+} = {}) {
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<Hit[]>([]);
   const [open, setOpen] = useState(false);
@@ -345,7 +349,11 @@ export default function GlobalSearch() {
       </div>
 
       {open && (
-        <div className="absolute left-0 right-0 bottom-full mb-2 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden backdrop-blur-md">
+        <div
+          className={`absolute left-0 right-0 ${
+            placement === "top" ? "top-full mt-2" : "bottom-full mb-2"
+          } bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden backdrop-blur-md`}
+        >
           <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 bg-zinc-950/60 text-xs text-zinc-400">
             <span className="flex items-center gap-1.5 font-medium">
               <Command size={12} className="text-emerald-400" />
