@@ -1921,6 +1921,7 @@ function PhotosModal({ task, onClose }: { task: GridTask; onClose: () => void })
     }
     setUploading(false);
     load();
+    refreshPending();
   }
 
   async function remove(p: Photo) {
