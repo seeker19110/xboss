@@ -21,6 +21,8 @@ Bộ Skill này đóng gói toàn bộ tri thức kỹ thuật không gian (Spat
 5. **Bất biến Nét đỏ Hoàn công (As-Built Redline Invariant):** Mọi sai lệch hình học giữa hiện trường và bản vẽ Shopdrawing được duyệt phải được thể hiện bằng đường nét đỏ (Revision Cloud) kèm mã trỏ đến Phiếu yêu cầu thay đổi hiện trường (FCR), Phiếu làm rõ thiết kế (RFI) hoặc Biên bản nghiệm thu (BBNT) đã ký duyệt.
 6. **Bất biến Khung Dấu Hoàn công Pháp lý (NĐ 06/2021/NĐ-CP Invariant):** Bản vẽ hoàn công bắt buộc phải có khung dấu hoàn công chuẩn kích thước $120\text{mm} \times 60\text{mm}$ (Mẫu số 01 - 3 chữ ký) hoặc $120\text{mm} \times 80\text{mm}$ (Mẫu số 02 - 4 chữ ký) theo Phụ lục II Nghị định 06/2021/NĐ-CP tại góc dưới bên phải bản vẽ.
 7. **Bất biến Sổ cái Mật mã Bàn giao (Merkle Provenance Invariant):** Toàn bộ bản vẽ As-Built, BBNT ký số 3 bên, kết quả T&C và bảng cân đối khối lượng quyết toán $\Delta \text{QTO}$ được băm SHA-256 đóng vào Cây Merkle bất biến để xuất Hộ chiếu số bàn giao LOD 500 (Living Digital Twin Passport).
+8. **Bảo toàn Bù trừ Dung sai Mối nối & Chiều dài Cắt Thực tế (Fitting Deduction & Cut-Length Invariant):** Chiều dài ống cắt thực tế ($L_{\text{cut}}$) tại xưởng chế tạo DfMA bắt buộc phải được bù trừ chính xác theo độ ngập âm phụ kiện (Socket Insertion Depth), gờ chặn măng xông ($t_{\text{stop}}$), chiều dài ren ăn khớp (Thread Makeup), khe hở rãnh Grooved, đệm gioăng mặt bích và khe hở đáy hàn, kết hợp dung sai hiện trường (Field Fit Allowance $+50\dots +100\text{mm}$) cho đốt đóng tuyến nhằm triệt tiêu hoàn toàn sai số lắp ráp và đạt phế liệu $< 1.2\%$.
+9. **Bảo toàn Dung sai Thông thủy Gót Hộp Gió & Bù trừ Dài Tích Lũy Tuyến Ống Gió (Duct Length Accumulation & Diffuser +10mm Clearance Invariant):** Kích thước miệng đón / gót hộp gió ($W_{\text{plenum}} \times H_{\text{plenum}}$) bắt buộc phải rộng hơn cổ miệng gió đúng $+10\text{mm}$ ($+5\text{mm}$ mỗi mép) để đảm bảo lắp ráp nhẹ nhàng không bị kích kẹt; đồng thời mọi độ dài dôi tích lũy từ bích TDC, bích V, nẹp C, van VCD/FD và khớp mềm canvas bắt buộc phải được bù trừ tự động bằng cách cắt ngắn đoạn ống thẳng liền kề để giữ đúng $100\%$ tim miệng gió vào ô trần thiết kế ($600\times 600\text{mm}$).
 
 ---
 
@@ -44,11 +46,13 @@ Bộ Skill này đóng gói toàn bộ tri thức kỹ thuật không gian (Spat
 - Áp dụng ma trận ưu tiên không gian theo tài liệu [references/clash-solver-and-generative-shopdrawing.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/clash-solver-and-generative-shopdrawing.md).
 - Khi có xung đột: Hệ áp lực tự động uốn né $45^\circ$, bảo toàn độ dốc $1.0\% - 2.0\%$ cho hệ thoát nước, và định vị lỗ xuyên dầm tại $L/3 \le x \le 2L/3$.
 
-### Bước 3: Tự động Sinh RFI & Xuất Bản vẽ Thi công Shopdrawing LOD 400 (RFI & Generative Shop)
+### Bước 3: Tự động Sinh RFI, Chia Đốt DfMA Spool LOD 400 & Bóc Tách Micro-BOM 5 Cấp (RFI, Spooling & Micro-BOM)
 
 - Khi phát hiện xung đột vượt thẩm quyền A2 (cần khoét dầm mới hoặc hạ trần kiến trúc): Tự động phát hành phiếu RFI gửi Kỹ sư Thiết kế và TVGS.
-- Tự động bẻ phân đoạn ống gia công xưởng (Prefabrication Spools $\le 5.8\text{m}$), chèn cặp mặt bích và ty treo.
-- Áp dụng giải thuật First-Fit Decreasing (FFD) Nesting để cắt phôi cây thép $6.0\text{m}$ với độ hao hụt $< 1.8\%$.
+- Tự động bẻ phân đoạn ống gia công xưởng (Prefabrication Spools $\le 5.8\text{m}$, Khối lượng $\le 50\text{kg}$), chèn cặp mặt bích và ty treo.
+- Tự động tính toán bù trừ dung sai mối nối (Fitting Take-Off & Socket Insertion Depth), độ ngập âm măng xông $t_{\text{stop}}$, và gán lượng bù Field Fit Allowance $+50\dots +100\text{mm}$ cho đốt đóng tuyến theo [references/pipe-spooling-and-fitting-deduction-standards.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/pipe-spooling-and-fitting-deduction-standards.md).
+- Tự động bùng nổ Micro-BOM 5 cấp độ (Ống chính $\rightarrow$ Phụ kiện $\rightarrow$ Van thiết bị $\rightarrow$ Bu lông/Gioăng/Keo/Que hàn $\rightarrow$ Giá treo/Bảo ôn/Mã QR Kitting).
+- Áp dụng giải thuật Best-Fit Decreasing kết hợp quét kho phôi thừa (Remnant Pool Nesting) để cắt phôi cây thép/ống nhựa $6.0\text{m}$ với độ hao hụt phế liệu $< 1.2\%$.
 
 ### Bước 4: Cổng Ký số 3 Bên Duyệt Shopdrawing & Phân phối Ngoại tuyến PWA (Gate 0 & Mobile Sync)
 
@@ -85,6 +89,8 @@ Bộ Skill này đóng gói toàn bộ tri thức kỹ thuật không gian (Spat
 
 ## 3. TÀI LIỆU THAM CHIẾU KỸ THUẬT (REFERENCES)
 
+- [references/ductwork-drift-and-diffuser-clearance-standards.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/ductwork-drift-and-diffuser-clearance-standards.md): Cẩm nang độ dài dôi ống gió, căn chỉnh tim miệng gió trần và dung sai gót hộp gió +10mm.
+- [references/pipe-spooling-and-fitting-deduction-standards.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/pipe-spooling-and-fitting-deduction-standards.md): Cẩm nang tra cứu dung sai mối nối, ngập âm socket, DfMA Spooling và Micro-BOM 5 cấp.
 - [references/drawing-defect-taxonomy-and-healing.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/drawing-defect-taxonomy-and-healing.md): Cẩm nang phân loại 12 dị tật bản vẽ và giải thuật tự chữa lành.
 - [references/clash-solver-and-generative-shopdrawing.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/clash-solver-and-generative-shopdrawing.md): Ma trận ưu tiên không gian, quy chuẩn xuyên dầm $L/3$ và xuất Shopdrawing LOD 400.
 - [references/asbuilt-redline-and-handover-standards.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/asbuilt-redline-and-handover-standards.md): Quy chuẩn vẽ nét đỏ Redline, mẫu con dấu hoàn công NĐ 06/2021/NĐ-CP và Hộ chiếu số LOD 500.
