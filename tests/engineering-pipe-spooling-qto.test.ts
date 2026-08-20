@@ -85,6 +85,7 @@ describe("M74 / M90: Siêu Động Cơ Bóc Tách Khối Lượng Lắp Đặt &
     // L_cut = 3000 - 58 - 58 = 2884.0mm
     assert.equal(res.cutLengthMm, 2884.0);
     assert.equal(res.warnings.length, 0);
+    assert.ok(res.engineeringRationale.includes("2884"), "Có giải trình kỹ thuật chi tiết");
   });
 
   it("M90-CUT: Đốt đóng tuyến (Closing Spool) tự động cộng Field Fit Allowance +50mm", () => {
@@ -106,6 +107,7 @@ describe("M74 / M90: Siêu Động Cơ Bóc Tách Khối Lượng Lắp Đặt &
     assert.equal(res.startTakeOffMm, 34.0);
     assert.equal(res.fieldFitAllowanceMm, 50.0);
     assert.ok(res.cutLengthMm > 2000 - 34 - 50, "Được bù thêm 50mm dung sai hiện trường");
+    assert.ok(res.engineeringRationale.includes("Field Fit Allowance"));
   });
 
   // ==========================================================================
@@ -134,6 +136,8 @@ describe("M74 / M90: Siêu Động Cơ Bóc Tách Khối Lượng Lắp Đặt &
       assert.ok(sp.cutLengthMm <= 5800, `Spool ${sp.spoolCode} dài ${sp.cutLengthMm}mm <= 5800mm`);
       assert.equal(sp.slopePercent, 2.0);
       assert.ok(sp.weightKg < 50.0, "Cân nặng phù hợp bê tay");
+      assert.ok(sp.engineeringRationale.length > 50, "Có giải trình Spool");
+      assert.ok(sp.installationInstructions.includes("mã QR"), "Có hướng dẫn lắp ráp");
     }
 
     assert.ok(
@@ -313,7 +317,7 @@ describe("M74 / M90: Siêu Động Cơ Bóc Tách Khối Lượng Lắp Đặt &
     assert.ok(fpShaft.pipeSummaryBySpec["STEEL_GROOVED_DN100"]);
   });
 
-  it("M90-MANIFEST: Sinh phiếu đóng thùng Apartment Kitting Manifest cho Căn hộ", () => {
+  it("M90-MANIFEST: Sinh phiếu đóng thùng Apartment Kitting Manifest cho Căn hộ kèm Hướng dẫn", () => {
     const segs: PipeSegmentInput[] = [
       {
         id: "SEG-APT-A1201-01",
@@ -343,6 +347,7 @@ describe("M74 / M90: Siêu Động Cơ Bóc Tách Khối Lượng Lắp Đặt &
     assert.equal(manifest.spoolChecklist.length, 1);
     assert.ok(manifest.fittingsKitList.length > 0, "Có danh sách phụ kiện kitting");
     assert.ok(manifest.totalCrateWeightKg > 0, "Tính đúng khối lượng thùng hàng");
+    assert.ok(manifest.kittingInstructions.includes("HƯỚNG DẪN KITTING"), "Có chỉ dẫn đóng thùng");
   });
 
   // ==========================================================================
@@ -403,7 +408,7 @@ describe("M74 / M90: Siêu Động Cơ Bóc Tách Khối Lượng Lắp Đặt &
   // ==========================================================================
   // 7. KIỂM THỬ XUẤT BẢN VẼ CHẾ TẠO TRỤC ĐO & TEM NHÃN QR KITTING
   // ==========================================================================
-  it("M90-FAB-PACKAGE: Sinh bản vẽ Isometric 30°, checklist QC xưởng và QR Token", () => {
+  it("M90-FAB-PACKAGE: Sinh bản vẽ Isometric 30°, ghi chú chế tạo và checklist QC", () => {
     const spool: any = {
       spoolCode: "SP-WATER-001",
       systemCode: "PLUMBING_WATER",
@@ -426,6 +431,7 @@ describe("M74 / M90: Siêu Động Cơ Bóc Tách Khối Lượng Lắp Đặt &
       shaftLabel: "SHAFT-01",
       fittingsAttached: [],
       qrFabricationToken: "QR-SPOOL-TEST-001",
+      engineeringRationale: "Spool mẫu thử nghiệm",
     };
 
     const pkg = generateSpoolFabricationPackage(spool, []);
@@ -434,6 +440,7 @@ describe("M74 / M90: Siêu Động Cơ Bóc Tách Khối Lượng Lắp Đặt &
     assert.equal(pkg.isometricNodes.length, 3);
     assert.ok(pkg.qrFabricationToken.includes("QR-SPOOL"));
     assert.ok(pkg.qrKittingBoxToken.includes("QR-KIT"));
+    assert.ok(pkg.technicalNotes.length >= 4, "Có đầy đủ danh sách ghi chú kỹ thuật");
     assert.equal(pkg.qcChecklist.length, 4);
     assert.ok(pkg.qcChecklist.every((q) => q.pass));
   });

@@ -89,6 +89,7 @@ Bộ Skill này đóng gói toàn bộ tri thức kỹ thuật không gian (Spat
 
 ## 3. TÀI LIỆU THAM CHIẾU KỸ THUẬT (REFERENCES)
 
+- [references/engineering-rationale-and-annotation-standards.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/engineering-rationale-and-annotation-standards.md): Cẩm nang quy chuẩn ghi chú, giải thích lý do kỹ thuật và từ điển giải trình chế tạo MEPF.
 - [references/ductwork-drift-and-diffuser-clearance-standards.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/ductwork-drift-and-diffuser-clearance-standards.md): Cẩm nang độ dài dôi ống gió, căn chỉnh tim miệng gió trần và dung sai gót hộp gió +10mm.
 - [references/pipe-spooling-and-fitting-deduction-standards.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/pipe-spooling-and-fitting-deduction-standards.md): Cẩm nang tra cứu dung sai mối nối, ngập âm socket, DfMA Spooling và Micro-BOM 5 cấp.
 - [references/drawing-defect-taxonomy-and-healing.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/drawing-defect-taxonomy-and-healing.md): Cẩm nang phân loại 12 dị tật bản vẽ và giải thuật tự chữa lành.

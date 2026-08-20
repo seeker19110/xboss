@@ -47,6 +47,10 @@ describe("M75 / M91: Căn Chỉnh Độ Dài Ống Gió, Bù Trừ Tim Miệng G
     assert.equal(res.spigotDiaMm, 195.0, "Spigot OD = 200 - 5 = 195mm để lồng ống mềm mượt mà");
     assert.ok(res.sheetMetalAreaM2 > 0, "Tính đúng diện tích tôn");
     assert.ok(res.qrPlenumToken.includes("QR-PLENUM"));
+
+    // Kiểm tra giải trình kỹ thuật và hướng dẫn lắp đặt
+    assert.ok(res.engineeringRationale.includes("+10mm"), "Có giải trình lý do +10mm");
+    assert.ok(res.installationNotes.includes("ty ren M8"), "Có hướng dẫn lắp đặt trần");
   });
 
   it("M91-PLENUM: Tính toán hộp miệng gió khe dài Linear Slot Diffuser", () => {
@@ -64,6 +68,7 @@ describe("M75 / M91: Căn Chỉnh Độ Dài Ống Gió, Bù Trừ Tim Miệng G
     const res = calculatePlenumBoxDimensions(spec);
     assert.equal(res.plenumOpeningWidthMm, 1210.0, "1200 + 10 = 1210mm");
     assert.equal(res.plenumOpeningHeightMm, 160.0, "150 + 10 = 160mm");
+    assert.ok(res.engineeringRationale.length > 50, "Có giải trình kỹ thuật rõ ràng");
   });
 
   // ==========================================================================
@@ -134,8 +139,12 @@ describe("M75 / M91: Căn Chỉnh Độ Dài Ống Gió, Bù Trừ Tim Miệng G
     assert.equal(alignRes.finalDeviationFromGridMm, 0.0);
     assert.equal(alignRes.isAlignedZeroDrift, true);
 
-    // Kiểm tra độ chùng uốn ống mềm nhôm bảo ôn (+12%)
-    assert.ok(alignRes.flexibleDuctCutLengthM > alignRes.flexibleDuctDirectDistanceM);
+    // Kiểm tra giải trình kỹ thuật và độ chùng ống mềm
+    assert.ok(alignRes.engineeringRationale.includes("2814"), "Có giải trình cắt ngắn ống thẳng");
+    assert.ok(
+      alignRes.flexibleDuctRationale.includes("Sag Factor"),
+      "Có giải trình độ chùng ống mềm",
+    );
     assert.equal(alignRes.sagFactorAppliedPercent, 12.0);
   });
 
@@ -210,6 +219,7 @@ describe("M75 / M91: Căn Chỉnh Độ Dài Ống Gió, Bù Trừ Tim Miệng G
     assert.equal(fabPkg.cuttingCoordinates2D.length, 4);
     assert.ok(fabPkg.qrPlenumToken.includes("QR-PLENUM"));
     assert.ok(fabPkg.qrCeilingLocationToken.includes("QR-CEILING"));
+    assert.ok(fabPkg.fabricationNotes.length >= 4, "Có đầy đủ ghi chú chế tạo xưởng");
     assert.equal(fabPkg.qcChecklist.length, 4);
     assert.ok(fabPkg.qcChecklist.every((q) => q.pass));
   });

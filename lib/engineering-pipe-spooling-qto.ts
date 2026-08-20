@@ -101,6 +101,7 @@ export interface CutLengthCalculationResult {
   stopRidgeEndMm: number;
   fieldFitAllowanceMm: number;
   isClosingSpool: boolean;
+  engineeringRationale: string; // Giải trình kỹ thuật chi tiết
   warnings: string[];
 }
 
@@ -137,6 +138,8 @@ export interface Lod400Spool {
     isFieldInstalled: boolean;
   }>;
   qrFabricationToken: string;
+  engineeringRationale: string; // Giải trình lý do chế tạo đốt Spool
+  installationInstructions: string; // Hướng dẫn lắp dựng tại chỗ
 }
 
 export interface MicroBomItem {
@@ -163,7 +166,7 @@ export interface MicroBomItem {
 
 export interface SpatialBreakdownSummary {
   dimensionType: SpatialDimensionType;
-  dimensionKey: string; // e.g. "A10.01", "SHAFT-PL01", "FL-10", "Tower-A", "RUN-WATER-01"
+  dimensionKey: string;
   filterScope: {
     towerLabel?: string;
     floorLabel?: string;
@@ -218,6 +221,7 @@ export interface ApartmentKittingManifest {
   consumablesKitList: Array<{ itemName: string; quantity: number; unit: string }>;
   supportsKitList: Array<{ itemName: string; quantity: number; unit: string }>;
   totalCrateWeightKg: number;
+  kittingInstructions: string; // Hướng dẫn đóng thùng và giao nhận căn hộ
 }
 
 export interface RemnantPieceInput {
@@ -263,7 +267,7 @@ export interface PipeNestingWithRemnantsResult {
   totalKerfWasteMm: number;
   totalScrapWasteMm: number;
   overallScrapPercent: number;
-  isUnderTargetScrapRate: boolean; // < 1.2% phế liệu thực sự
+  isUnderTargetScrapRate: boolean;
   bars: NestingBarResult[];
   newRemnantsProduced: Array<{ code: string; lengthMm: number; status: string }>;
 }
@@ -284,6 +288,8 @@ export interface SpoolFabricationPackage {
   shaftLabel: string;
   qrFabricationToken: string;
   qrKittingBoxToken: string;
+  engineeringRationale: string; // Giải trình lý do kỹ thuật cho bản vẽ xưởng
+  technicalNotes: string[]; // Các ghi chú chuẩn mực thi công
   isometricNodes: Array<{
     nodeIndex: number;
     x2d: number;
@@ -791,6 +797,19 @@ export function calculatePipeCutLength(seg: PipeSegmentInput): CutLengthCalculat
 
   const outerDiaMm = getPipeOuterDiameterMm(seg.material, seg.nominalDiaMm);
 
+  // Xây dựng giải trình lý do kỹ thuật chi tiết
+  let rationale = `Kích thước tâm-tâm L_c-to-c = ${cToCLengthMm}mm.`;
+  if (startTakeOffMm > 0) {
+    rationale += ` Đầu 1 (${seg.startConnection.fittingType}) trừ ${startTakeOffMm}mm (Center-to-Face ${startDim.centerToFaceMm}mm - Độ ngập ${startDim.socketDepthMm || startDim.threadEngagementMm || 0}mm).`;
+  }
+  if (endTakeOffMm > 0) {
+    rationale += ` Đầu 2 (${seg.endConnection.fittingType}) trừ ${endTakeOffMm}mm (Center-to-Face ${endDim.centerToFaceMm}mm - Độ ngập ${endDim.socketDepthMm || endDim.threadEngagementMm || 0}mm).`;
+  }
+  if (fieldFitMm > 0) {
+    rationale += ` Đốt đóng tuyến cộng ${fieldFitMm}mm dung sai hiện trường (Field Fit Allowance) để thợ cắt tinh chỉnh tại chỗ sau khi định vị thiết bị.`;
+  }
+  rationale += ` -> Chiều dài cắt thực tế L_cut = ${cutLengthMm}mm.`;
+
   return {
     segmentId: seg.id,
     nominalDiaMm: seg.nominalDiaMm,
@@ -806,6 +825,7 @@ export function calculatePipeCutLength(seg: PipeSegmentInput): CutLengthCalculat
     stopRidgeEndMm: endDim.stopRidgeMm,
     fieldFitAllowanceMm: fieldFitMm,
     isClosingSpool: !!seg.isClosingSpool,
+    engineeringRationale: rationale,
     warnings,
   };
 }
@@ -921,6 +941,10 @@ export function segmentPipelineIntoSpools(
 
       const qrFabricationToken = `QR-SPOOL-${spoolCode}-${Date.now().toString(36).toUpperCase()}`;
 
+      const engineeringRationale = `Spool phân đoạn ${p + 1}/${piecesCount} của tuyến ${seg.systemCode} (L_cut=${pieceCutLenMm}mm, Trọng lượng ${pieceWeight}kg). Phương thức gia công: Đầu 1 (${end1Prep}), Đầu 2 (${end2Prep}).${isDrain ? ` Giật dốc thoát nước ${actualSlope}% (Cao độ Z: ${currentZ}mm -> ${endZ}mm).` : ""}${isClosing ? ` Đã cộng ${fieldFitMm}mm bù dung sai hiện trường (Field Fit).` : ""}`;
+
+      const installationInstructions = `1. Quét mã QR ${spoolCode} kiểm tra thông số kỹ thuật. 2. Định vị đầu 1 (${end1Prep}) khớp nối tuyến ống. 3. Treo cùm đỡ cách mối nối <= 500mm. 4. Cân chỉnh độ dốc ${actualSlope}%. 5. ${isClosing ? "Đo khoảng cách thực tế trước khi cắt gọt đoạn bù Field Fit và dán/hàn nối cố định." : "Xiết chặt/dán mối nối theo quy chuẩn."}`;
+
       spools.push({
         spoolCode,
         segmentId: seg.id,
@@ -949,6 +973,8 @@ export function segmentPipelineIntoSpools(
         pipelineCode: seg.pipelineCode || seg.id,
         fittingsAttached,
         qrFabricationToken,
+        engineeringRationale,
+        installationInstructions,
       });
 
       currentZ = endZ;
@@ -1243,7 +1269,6 @@ export function aggregateQtoBySpatialHierarchy(
     pipelineCode?: string;
   },
 ): SpatialBreakdownSummary[] {
-  // 1. Áp dụng bộ lọc scope nếu có
   let filteredSpools = spools;
   let filteredBom = bomItems;
 
@@ -1276,7 +1301,6 @@ export function aggregateQtoBySpatialHierarchy(
     }
   }
 
-  // 2. Hàm trích xuất Dimension Key theo từng phần tử
   const getKey = (item: {
     towerLabel?: string;
     floorLabel?: string;
@@ -1303,7 +1327,6 @@ export function aggregateQtoBySpatialHierarchy(
     }
   };
 
-  // 3. Gom nhóm Spools và BOM Items
   const groupedSpools: Record<string, Lod400Spool[]> = {};
   const groupedBom: Record<string, MicroBomItem[]> = {};
 
@@ -1377,7 +1400,7 @@ export function aggregateQtoBySpatialHierarchy(
     for (const b of bList.filter((x) => x.levelTier === 5)) {
       if (b.itemCode.includes("CLEVIS")) {
         clevisCount += b.quantity;
-        rodM += b.quantity * 1.0; // 1m ty ren mỗi cùm
+        rodM += b.quantity * 1.0;
       }
     }
 
@@ -1426,7 +1449,6 @@ export function aggregateQtoBySpatialHierarchy(
     });
   }
 
-  // Sắp xếp theo tên Dimension Key
   summaries.sort((a, b) => a.dimensionKey.localeCompare(b.dimensionKey));
   return summaries;
 }
@@ -1487,7 +1509,9 @@ export function generateApartmentKittingManifest(
     }));
 
   const totalCrateWeightKg =
-    Math.round(aptSpools.reduce((sum, s) => sum + s.weightKg, 0) * 10) / 10 + 2.5; // +2.5kg trọng lượng thùng và phụ kiện
+    Math.round(aptSpools.reduce((sum, s) => sum + s.weightKg, 0) * 10) / 10 + 2.5;
+
+  const kittingInstructions = `HƯỚNG DẪN KITTING THÙNG VẬT TƯ CĂN HỘ ${apartmentLabel}: 1. Xếp toàn bộ ${aptSpools.length} đốt Spool vào khoang thùng chính. 2. Đóng gói phụ kiện và vật tư phụ vào túi kitting riêng. 3. Dán tem niêm phong mã QR ${qrCrateToken}. 4. Bàn giao nguyên thùng cho tổ đội lắp ráp tại căn hộ ${apartmentLabel}.`;
 
   return {
     apartmentLabel,
@@ -1503,6 +1527,7 @@ export function generateApartmentKittingManifest(
     consumablesKitList,
     supportsKitList,
     totalCrateWeightKg,
+    kittingInstructions,
   };
 }
 
@@ -1768,6 +1793,14 @@ export function generateSpoolFabricationPackage(
 
   const spoolBom = bomItems.filter((b) => b.spoolCode === spool.spoolCode);
 
+  const technicalNotes = [
+    `GHI CHÚ CHẾ TẠO: Spool ${spool.spoolCode} gia công từ ống ${spool.material.toUpperCase()} DN${spool.nominalDiaMm}.`,
+    `Chiều dài cắt thực tế L_cut = ${spool.cutLengthMm}mm (Kích thước tâm-tâm thiết kế L_c-to-c = ${spool.cToCLengthMm}mm).`,
+    `Đầu 1: ${spool.end1Prep} | Đầu 2: ${spool.end2Prep}${spool.isClosingSpool ? " [Đốt đóng tuyến: Đã cộng bù 50mm dung sai hiện trường, cắt tinh chỉnh tại chỗ]" : ""}.`,
+    `Độ dốc thoát nước: ${spool.slopePercent}% (Cao độ bắt đầu Z=${spool.startElevationMm}mm, kết thúc Z=${spool.endElevationMm}mm).`,
+    `Kiểm soát chất lượng: Thử áp lực thủy tĩnh xưởng 1.5 lần áp suất làm việc trong 15 phút trước khi xuất xưởng.`,
+  ];
+
   const qcChecklist = [
     {
       item: "Kiểm tra độ ô van & đường kính ngoài",
@@ -1807,6 +1840,8 @@ export function generateSpoolFabricationPackage(
     shaftLabel: spool.shaftLabel,
     qrFabricationToken,
     qrKittingBoxToken,
+    engineeringRationale: spool.engineeringRationale,
+    technicalNotes,
     isometricNodes,
     jointPreps: {
       end1: {
@@ -1890,6 +1925,8 @@ export async function saveSpoolFabricationRun(
           startElevation: s.startElevationMm,
           endElevation: s.endElevationMm,
           fittings: s.fittingsAttached,
+          engineeringRationale: s.engineeringRationale,
+          installationInstructions: s.installationInstructions,
         }),
         "designed",
       ],

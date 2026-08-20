@@ -65,6 +65,8 @@ export interface PlenumBoxCalculationResult {
   weightKg: number;
   qrPlenumToken: string;
   isClearanceVerified: boolean;
+  engineeringRationale: string; // Giải trình lý do kỹ thuật +10mm & viền che
+  installationNotes: string; // Hướng dẫn lắp đặt trần cho thợ
 }
 
 export interface DuctJointInput {
@@ -101,6 +103,8 @@ export interface DiffuserCeilingAlignmentResult {
   flexibleDuctDirectDistanceM: number;
   flexibleDuctCutLengthM: number;
   sagFactorAppliedPercent: number;
+  engineeringRationale: string; // Giải trình tại sao cắt ngắn ống thẳng
+  flexibleDuctRationale: string; // Giải trình độ chùng ống mềm
   notes: string;
 }
 
@@ -131,6 +135,8 @@ export interface PlenumFabricationPackage {
   insulationSpec: string;
   qrPlenumToken: string;
   qrCeilingLocationToken: string;
+  engineeringRationale: string;
+  fabricationNotes: string[];
   cuttingCoordinates2D: Array<{ pointIndex: number; xMm: number; yMm: number; label: string }>;
   qcChecklist: Array<{ item: string; standard: string; pass: boolean }>;
 }
@@ -188,7 +194,6 @@ export function calculatePlenumBoxDimensions(spec: DiffuserSpecInput): PlenumBox
   const spigotLengthMm = 60.0;
 
   // Tính diện tích tôn khai triển hộp gió (m2)
-  // Đáy + 4 mặt bên + Cổ trích
   const bottomArea = (plenumOpeningWidthMm * plenumOpeningHeightMm) / 1e6;
   const sideArea = (2 * (plenumOpeningWidthMm + plenumOpeningHeightMm) * plenumBoxHeightMm) / 1e6;
   const spigotArea = Math.PI * (spigotDiaMm / 1000) * (spigotLengthMm / 1000);
@@ -202,6 +207,10 @@ export function calculatePlenumBoxDimensions(spec: DiffuserSpecInput): PlenumBox
   const weightKg = Math.round((sheetMetalAreaM2 * 6.0 + (spec.hasObdDamper ? 1.5 : 0)) * 10) / 10;
 
   const qrPlenumToken = `QR-PLENUM-${spec.plenumCode}-${Date.now().toString(36).toUpperCase()}`;
+
+  const engineeringRationale = `Cổ miệng gió nhôm danh nghĩa ${neckW}x${neckH}mm. Gót hộp gió gia công lọt lòng ${plenumOpeningWidthMm}x${plenumOpeningHeightMm}mm (rộng hơn đúng +10mm, tức +5mm mỗi mép) để cổ miệng gió trượt vào nhẹ nhàng, không bị kích kẹt bavia tôn. Viền mặt miệng gió ${faceW}x${faceH}mm có cánh phủ ${faceFlangeCoverageMm}mm che kín hoàn toàn 100% khe hở 5mm trên trần. Cổ trích spigot D=${spigotDiaMm}mm (nhỏ hơn ống mềm 5mm) để lồng ống mềm D${rawFlexDia}mm dễ dàng.`;
+
+  const installationNotes = `1. Treo hộp gió vào 4 ty ren M8 cân chỉnh cao độ đáy hộp bằng mặt khung xương trần. 2. Lồng ống mềm D${rawFlexDia} vào cổ trích D=${spigotDiaMm}mm, dùng đai siết Inox 304 siết chặt và dán băng nhôm kín khí. 3. Đưa cổ miệng gió ${neckW}x${neckH}mm vào gót hộp gió ${plenumOpeningWidthMm}x${plenumOpeningHeightMm}mm, viền miệng gió che kín viền trần.`;
 
   return {
     plenumCode: spec.plenumCode,
@@ -225,6 +234,8 @@ export function calculatePlenumBoxDimensions(spec: DiffuserSpecInput): PlenumBox
     qrPlenumToken,
     isClearanceVerified:
       plenumOpeningWidthMm - neckW === 10.0 && plenumOpeningHeightMm - neckH === 10.0,
+    engineeringRationale,
+    installationNotes,
   };
 }
 
@@ -261,7 +272,6 @@ export function calculateDuctlineAccumulatedLength(
     });
 
     if (acc.accessoryType === "canvas_flexible_joint" && isUnderStaticPressure) {
-      // Khớp mềm canvas khi có áp suất tĩnh bị thổi căng dãn nở thêm ~15mm
       canvasDynamicExpansionMm += 15.0;
       breakdown.push({
         item: "Khớp mềm Canvas dãn nở động khi quạt chạy",
@@ -303,7 +313,6 @@ export function realignDuctSpoolsToCeilingGrid(
   const accumulatedDriftMm = driftCalc.netAccumulatedDriftMm;
 
   // 2. Thuật toán tự động cắt ngắn đoạn ống thẳng liền trước nhánh rẽ
-  // L_cut = L_nominal - Delta_accumulated
   const rawAdjusted = nominalStraightDuctLengthMm - accumulatedDriftMm;
   const adjustedStraightDuctLengthMm = Math.max(100.0, Math.round(rawAdjusted * 10) / 10);
 
@@ -320,6 +329,10 @@ export function realignDuctSpoolsToCeilingGrid(
   const sagFactor = 0.12; // +12%
   const flexibleDuctCutLengthM = Math.round(directDistanceM * (1 + sagFactor) * 1000) / 1000;
 
+  const engineeringRationale = `Tuyến ống gió có ${joints.length} mối bích và ${accessories.length} phụ kiện/van làm dôi chiều dài tích lũy +${accumulatedDriftMm}mm (${driftCalc.breakdown.map((b) => `${b.item}: +${b.addedLengthMm}mm`).join(", ")}). Để giữ đúng 100% tim miệng gió vào ô trần ${gridSpacingMm}x${gridSpacingMm}mm (tọa độ [${targetDiffuser.targetCeilingCoordinate?.[0] || 0}, ${targetDiffuser.targetCeilingCoordinate?.[1] || 0}, ${targetDiffuser.targetCeilingCoordinate?.[2] || 2700}]), đoạn ống thẳng thiết kế ${nominalStraightDuctLengthMm}mm được tự động cắt ngắn còn ${adjustedStraightDuctLengthMm}mm (sai lệch tim = 0.0mm).`;
+
+  const flexibleDuctRationale = `Khoảng cách hình học từ ống gió xuống hộp gió ${directDistanceM}m được cắt thực tế ${flexibleDuctCutLengthM}m (bù +12% hệ số uốn chùng - Sag Factor) để ống mềm nhôm bọc bông thủy tinh lượn cong 90 độ mượt mà, không bị bẹp gập (Kinking) gây nghẽn dòng khí.`;
+
   return {
     alignmentCode,
     ductlineCode: `DUCT-${targetDiffuser.systemCode}`,
@@ -333,6 +346,8 @@ export function realignDuctSpoolsToCeilingGrid(
     flexibleDuctDirectDistanceM: directDistanceM,
     flexibleDuctCutLengthM,
     sagFactorAppliedPercent: 12.0,
+    engineeringRationale,
+    flexibleDuctRationale,
     notes: `Đã tự động cắt ngắn đoạn ống thẳng ${accumulatedDriftMm}mm để triệt tiêu độ dôi bích & van, giữ đúng tim ô trần ${gridSpacingMm}x${gridSpacingMm}mm.`,
   };
 }
@@ -445,7 +460,7 @@ export function explodeDiffuserMicroBom(
       itemCode: "FAST-HOSE-CLAMP-SS304",
       itemName: "Đai siết Inox 304 xiết ống mềm vào cổ trích",
       spec: "Bản rộng 12.7mm kèm ốc siết chống tuột",
-      quantity: 2, // 1 đầu hộp gió, 1 đầu ống chính
+      quantity: 2,
       unit: "cái",
       unitCostVnd: defaultRates.hose_clamp_ss304,
       totalCostVnd: 2 * defaultRates.hose_clamp_ss304,
@@ -481,7 +496,6 @@ export function generatePlenumFabricationSheet(
 ): PlenumFabricationPackage {
   const qrCeilingLocationToken = `QR-CEILING-LOC-${plenum.plenumCode}-${Date.now().toString(36).toUpperCase()}`;
 
-  // Tọa độ khai triển tôn 2D (Đáy + 4 cánh gập)
   const cuttingCoordinates2D = [
     { pointIndex: 1, xMm: 0, yMm: 0, label: "GÓC TẤM TÔN BAN ĐẦU" },
     {
@@ -502,6 +516,14 @@ export function generatePlenumFabricationSheet(
       yMm: plenum.plenumOpeningHeightMm,
       label: `MÉP GẬP THÀNH HỘP H=${plenum.plenumBoxHeightMm}mm`,
     },
+  ];
+
+  const fabricationNotes = [
+    `GHI CHÚ CHẾ TẠO: Hộp miệng gió ${plenum.plenumCode} gấp tôn tráng kẽm Z18 dày 0.75mm.`,
+    `Kích thước miệng đón gót hộp gió: ${plenum.plenumOpeningWidthMm}x${plenum.plenumOpeningHeightMm}mm (Đã cộng đúng +10mm dung sai lọt lòng so với cổ miệng gió ${plenum.diffuserNeckWidthMm}x${plenum.diffuserNeckHeightMm}mm).`,
+    `Cổ trích nối ống mềm: Spigot đường kính ngoài D=${plenum.spigotDiaMm}mm dài ${plenum.spigotLengthMm}mm (nhỏ hơn đường kính trong ống mềm 5mm để lồng êm).`,
+    `Bảo ôn: Dán mút cao su lưu hóa chống đọng sương bên trong dày 15mm hoặc bọc ngoài theo spec thiết kế.`,
+    `Kiểm tra góc vuông và bôi keo silicon kín góc trước khi xuất xưởng.`,
   ];
 
   const qcChecklist = [
@@ -536,6 +558,8 @@ export function generatePlenumFabricationSheet(
     insulationSpec: `Bảo ôn bên trong ${plenum.insulationAreaM2}m2`,
     qrPlenumToken: plenum.qrPlenumToken,
     qrCeilingLocationToken,
+    engineeringRationale: plenum.engineeringRationale,
+    fabricationNotes,
     cuttingCoordinates2D,
     qcChecklist,
   };
