@@ -1,11 +1,69 @@
-// lib/engineering-carbon-lca.ts — Embodied Carbon & Lifecycle Assessment (LCA) Engine (M71)
-import { query, queryOne } from "@/lib/db";
+// lib/engineering-carbon-lca.ts — Unified 6D Embodied Carbon LCA & 7D Predictive Asset Lifecycle Engine (M71 / M76 / M92)
+import { query, queryOne, run } from "@/lib/db";
+
+export type MaterialCarbonCategory =
+  | "galvanized_steel" // Tôn kẽm, máng cáp
+  | "black_steel" // Ống thép đúc Sch40, giá đỡ Unistrut
+  | "copper" // Ống đồng, cáp điện Cu
+  | "ppr_plastic" // Ống PPR cấp nước
+  | "upvc_plastic" // Ống uPVC thoát nước
+  | "concrete" // Bê tông dầm sàn
+  | "insulation_rubber"; // Cao su lưu hóa Aeroflex
+
+export const EMBODIED_CARBON_FACTORS: Record<
+  MaterialCarbonCategory,
+  { factorKgCo2ePerKg: number; standardRef: string; description: string }
+> = {
+  galvanized_steel: {
+    factorKgCo2ePerKg: 2.85,
+    standardRef: "World Steel Association / ICE DB v3",
+    description: "Tôn mạ kẽm Z80-Z275 gia công ống gió và máng cáp",
+  },
+  black_steel: {
+    factorKgCo2ePerKg: 2.15,
+    standardRef: "ICE Database / EN 15804",
+    description: "Ống thép đen hàn/đúc Sch40 và thép hình Unistrut",
+  },
+  copper: {
+    factorKgCo2ePerKg: 3.82,
+    standardRef: "ICA / European Copper Institute",
+    description: "Ống đồng điều hòa VRV/Chiller và lõi cáp điện lực",
+  },
+  ppr_plastic: {
+    factorKgCo2ePerKg: 2.41,
+    standardRef: "PlasticsEurope / Ecoinvent",
+    description: "Ống nhựa PPR hàn nhiệt cấp nước nóng lạnh",
+  },
+  upvc_plastic: {
+    factorKgCo2ePerKg: 2.18,
+    standardRef: "PlasticsEurope / Ecoinvent",
+    description: "Ống uPVC dán keo thoát nước thải và thông hơi",
+  },
+  concrete: {
+    factorKgCo2ePerKg: 0.14,
+    standardRef: "TCVN / VGBC Carbon Database",
+    description: "Bê tông thương phẩm kết cấu dầm, cột, sàn",
+  },
+  insulation_rubber: {
+    factorKgCo2ePerKg: 3.2,
+    standardRef: "EPD International",
+    description: "Vật liệu cách nhiệt cao su lưu hóa kín cell",
+  },
+};
+
+export const DEFAULT_EPD_FACTORS: Record<string, number> = {
+  steel_pipe: 2.85,
+  galvanized_duct: 2.4,
+  copper_cable: 5.6,
+  plastic_ppr: 1.9,
+  cast_iron: 2.1,
+};
 
 export interface MaterialLcaItem {
   materialType: "steel_pipe" | "galvanized_duct" | "copper_cable" | "plastic_ppr" | "cast_iron";
   description: string;
   weightKg: number;
-  epdCarbonFactorKgCo2ePerKg?: number; // Hệ số EPD tùy chỉnh
+  epdCarbonFactorKgCo2ePerKg?: number;
 }
 
 export interface CarbonBreakdownEntry {
@@ -24,27 +82,50 @@ export interface CarbonLcaReportResult {
   totalEmbodiedCarbonTonCo2e: number;
   grossFloorAreaM2: number;
   carbonIntensityKgCo2ePerM2: number;
-  leedPointsEstimated: number; // 1-5 điểm LEED MR Credit Building Life-Cycle Impact Reduction
+  leedPointsEstimated: number;
   greenCertificationTier: "LEED Platinum Eligible" | "LEED Gold Eligible" | "Standard Code";
   breakdown: CarbonBreakdownEntry[];
 }
 
-const DEFAULT_EPD_FACTORS: Record<string, number> = {
-  steel_pipe: 2.85, // 2.85 kg CO2e / kg ống thép SCH40
-  galvanized_duct: 2.4, // 2.40 kg CO2e / kg tôn kẽm
-  copper_cable: 5.6, // 5.60 kg CO2e / kg cáp đồng (rất cao do khai khoáng & tinh luyện)
-  plastic_ppr: 1.9, // 1.90 kg CO2e / kg nhựa PPR/HDPE
-  cast_iron: 2.1, // 2.10 kg CO2e / kg gang cầu
-};
+export interface CarbonLcaSummary {
+  totalWeightKg: number;
+  totalEmbodiedCarbonKgCo2e: number;
+  totalEmbodiedCarbonTonCo2e: number;
+  carbonIntensityPerM2: number;
+  breakdownByMaterial: Array<{
+    category: MaterialCarbonCategory;
+    weightKg: number;
+    carbonKgCo2e: number;
+    percentShare: number;
+  }>;
+  complianceRating: "Low-Carbon Apex (A+)" | "Standard (B)" | "High-Emissions Alert (C)";
+}
+
+export interface Asset7DLifeCycleRecord {
+  recordCode: string;
+  assetGuid: string;
+  equipmentName: string;
+  systemCode: string;
+  serialNumber: string;
+  installedDate: string;
+  expectedLifespanYears: number;
+  mtbfHours: number;
+  currentOperatingHours: number;
+  remainingUsefulLifePercent: number;
+  maintenanceCycleDays: number;
+  nextMaintenanceDate: string;
+  healthScorePercent: number;
+  maintenanceLog: Array<{ date: string; action: string; technician: string }>;
+}
 
 // ============================================================================
-// 1. THUẬT TOÁN ĐỊNH LƯỢNG VẾT CARBON & ĐÁNH GIÁ VÒNG ĐỜI VẬT TƯ (LCA)
+// 1. THUẬT TOÁN ĐỊNH LƯỢNG VẾT CARBON LCA
 // ============================================================================
 
 export function calculateEmbodiedCarbonLCA(
   reportCode: string,
   materials: MaterialLcaItem[],
-  grossFloorAreaM2 = 25000.0, // Diện tích sàn GFA mẫu 25,000 m2
+  grossFloorAreaM2 = 25000.0,
 ): CarbonLcaReportResult {
   let totalWeight = 0;
   let totalCarbon = 0;
@@ -74,7 +155,6 @@ export function calculateEmbodiedCarbonLCA(
   const carbonIntensityKgCo2ePerM2 =
     grossFloorAreaM2 > 0 ? Math.round((totalCarbon / grossFloorAreaM2) * 100) / 100 : 0;
 
-  // Đánh giá điểm LEED v4.1 (Cường độ carbon < 45 kgCO2e/m2 -> 5 điểm Platinum)
   let leedPoints = 2;
   let tier: CarbonLcaReportResult["greenCertificationTier"] = "Standard Code";
 
@@ -99,8 +179,110 @@ export function calculateEmbodiedCarbonLCA(
   };
 }
 
+export function calculate6dCarbonLca(
+  elements: Array<{
+    category: MaterialCarbonCategory;
+    weightKg: number;
+  }>,
+  grossFloorAreaM2 = 5000,
+): CarbonLcaSummary {
+  let totalWeight = 0;
+  let totalCarbonKg = 0;
+
+  const map = new Map<MaterialCarbonCategory, { weightKg: number; carbonKg: number }>();
+
+  for (const el of elements) {
+    const factor = EMBODIED_CARBON_FACTORS[el.category]?.factorKgCo2ePerKg || 2.0;
+    const carbon = el.weightKg * factor;
+
+    totalWeight += el.weightKg;
+    totalCarbonKg += carbon;
+
+    const existing = map.get(el.category) || { weightKg: 0, carbonKg: 0 };
+    map.set(el.category, {
+      weightKg: existing.weightKg + el.weightKg,
+      carbonKg: existing.carbonKg + carbon,
+    });
+  }
+
+  const breakdown = Array.from(map.entries()).map(([category, val]) => ({
+    category,
+    weightKg: Math.round(val.weightKg * 10) / 10,
+    carbonKgCo2e: Math.round(val.carbonKg * 10) / 10,
+    percentShare: totalCarbonKg > 0 ? Math.round((val.carbonKg / totalCarbonKg) * 1000) / 10 : 0,
+  }));
+
+  const carbonIntensity = grossFloorAreaM2 > 0 ? totalCarbonKg / grossFloorAreaM2 : 0;
+  const rating: CarbonLcaSummary["complianceRating"] =
+    carbonIntensity < 45.0
+      ? "Low-Carbon Apex (A+)"
+      : carbonIntensity < 80.0
+        ? "Standard (B)"
+        : "High-Emissions Alert (C)";
+
+  return {
+    totalWeightKg: Math.round(totalWeight * 10) / 10,
+    totalEmbodiedCarbonKgCo2e: Math.round(totalCarbonKg * 10) / 10,
+    totalEmbodiedCarbonTonCo2e: Math.round((totalCarbonKg / 1000) * 100) / 100,
+    carbonIntensityPerM2: Math.round(carbonIntensity * 10) / 10,
+    breakdownByMaterial: breakdown,
+    complianceRating: rating,
+  };
+}
+
 // ============================================================================
-// 2. PERSISTENCE & DATABASE
+// 2. 7D ASSET LIFECYCLE & MTBF/RUL PREDICTIVE ENGINE
+// ============================================================================
+
+export function evaluateAssetHealthAndRul(asset: {
+  installedDateISO: string;
+  expectedLifespanYears: number;
+  mtbfHours: number;
+  operatingHours: number;
+  breakdownCount?: number;
+  incidentCount?: number;
+}): {
+  healthScorePercent: number;
+  rulPercent: number;
+  estimatedRemainingYears: number;
+  status: "GOOD" | "MAINTENANCE_REQUIRED" | "CRITICAL_REPLACEMENT_DUE";
+  recommendation: string;
+} {
+  const totalExpectedHours = asset.expectedLifespanYears * 365 * 24;
+  const remainingHours = Math.max(0, totalExpectedHours - asset.operatingHours);
+  const rulPercent = Math.min(
+    100,
+    Math.max(0, Math.round((remainingHours / totalExpectedHours) * 100)),
+  );
+  const breakdowns = (asset.breakdownCount || 0) + (asset.incidentCount || 0);
+
+  let healthScore = 100 - (100 - rulPercent) * 0.7 - breakdowns * 8;
+  healthScore = Math.max(5, Math.min(100, Math.round(healthScore)));
+
+  let status: "GOOD" | "MAINTENANCE_REQUIRED" | "CRITICAL_REPLACEMENT_DUE" = "GOOD";
+  let recommendation = "Thiết bị vận hành ổn định trong vòng đời thiết kế.";
+
+  if (rulPercent < 15 || healthScore < 40) {
+    status = "CRITICAL_REPLACEMENT_DUE";
+    recommendation =
+      "CẢNH BÁO: Thiết bị đã gần hết tuổi thọ hoặc suy giảm sức khỏe trầm trọng. Cần lập kế hoạch thay mới.";
+  } else if (rulPercent < 35 || healthScore < 70) {
+    status = "MAINTENANCE_REQUIRED";
+    recommendation =
+      "Cần bảo trì phòng ngừa lớn (Overhaul) và kiểm tra lại thông số rung lắc/nhiệt độ.";
+  }
+
+  return {
+    healthScorePercent: healthScore,
+    rulPercent,
+    estimatedRemainingYears: Math.round((remainingHours / (365 * 24)) * 10) / 10,
+    status,
+    recommendation,
+  };
+}
+
+// ============================================================================
+// 3. PERSISTENCE & DATABASE
 // ============================================================================
 
 export async function saveCarbonLcaReport(

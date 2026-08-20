@@ -1,365 +1,96 @@
-// lib/engineering-cad-nesting.ts — 1D/2D Fabrication Nesting & MEPF Hydraulic Engine (M89)
-import { query, queryOne, run } from "@/lib/db";
+// lib/engineering-cad-nesting.ts — Facade for Unified DfMA Spooling & Hydraulic Engine (M89)
+import { query, queryOne } from "@/lib/db";
 
-// ============================================================================
-// 1. 1D PIPE NESTING ENGINE (FIRST-FIT DECREASING ALGORITHM)
-// ============================================================================
+export {
+  type PipeSegmentInput,
+  type CutItem,
+  type NestingStockBar,
+  type Nesting1DResult,
+  nestPipeSegments1D,
+  type DuctSheetRectInput,
+  type PlacedSheetRect,
+  type DuctSheetMetalBar,
+  type Nesting2DResult,
+  nestDuctSheets2D,
+  generateSpoolQrPayload,
+} from "./engineering-dfma-spooling";
 
-export interface PipeSegmentInput {
-  spoolCode: string;
-  lengthMm: number;
-  discipline?: string;
-  systemCode?: string;
-  diameterMm?: number;
-  quantity?: number; // Số lượng đoạn giống nhau (default 1)
-}
+export function calcHazenWilliams(
+  flowRateLps: number,
+  pipeDiameterMm: number,
+  pipeLengthM = 1.0,
+  cFactor = 120,
+): {
+  velocityMs: number;
+  headLossPerMeterPa: number;
+  totalHeadLossPa: number;
+  pressureDropBar: number;
+} {
+  const dM = pipeDiameterMm / 1000;
+  const qM3s = flowRateLps / 1000;
+  const areaM2 = (Math.PI * dM * dM) / 4;
+  const velocity = areaM2 > 0 ? qM3s / areaM2 : 0;
 
-export interface CutItem {
-  spoolCode: string;
-  lengthMm: number;
-  systemCode?: string;
-  cutIndex: number;
-}
+  const headLossPerM =
+    (10.67 * Math.pow(Math.max(1e-6, qM3s), 1.852)) /
+    (Math.pow(cFactor, 1.852) * Math.pow(dM, 4.87));
 
-export interface NestingStockBar {
-  barIndex: number;
-  stockLengthMm: number;
-  cuts: CutItem[];
-  usedLengthMm: number;
-  wasteLengthMm: number;
-  utilizationPercent: number;
-}
-
-export interface Nesting1DResult {
-  runCode: string;
-  stockLengthMm: number;
-  kerfMm: number;
-  totalSegments: number;
-  totalBarsUsed: number;
-  totalUsedLengthMm: number;
-  totalWasteMm: number;
-  wastePercent: number;
-  utilizationPercent: number;
-  efficiencyGrade: "A" | "B" | "C" | "D" | "F";
-  bars: NestingStockBar[];
-  unplacedSegments: PipeSegmentInput[];
-}
-
-/**
- * Thuật toán First-Fit Decreasing (FFD) giải bài toán 1D Cutting Stock Problem.
- * Sắp xếp các đoạn ống giảm dần, xếp tham lam vào cây phôi đầu tiên còn đủ chỗ (bù trừ vết cắt kerf).
- */
-export function nestPipeSegments1D(
-  segments: PipeSegmentInput[],
-  stockLengthMm = 6000.0,
-  kerfMm = 2.0,
-): Nesting1DResult {
-  const runCode = `NEST-1D-${Date.now().toString(36).toUpperCase()}`;
-
-  if (!segments || segments.length === 0) {
-    return {
-      runCode,
-      stockLengthMm,
-      kerfMm,
-      totalSegments: 0,
-      totalBarsUsed: 0,
-      totalUsedLengthMm: 0,
-      totalWasteMm: 0,
-      wastePercent: 0,
-      utilizationPercent: 100,
-      efficiencyGrade: "A",
-      bars: [],
-      unplacedSegments: [],
-    };
-  }
-
-  // 1. Mở rộng các segment có quantity > 1
-  const expanded: Array<{ spoolCode: string; lengthMm: number; systemCode?: string }> = [];
-  for (const seg of segments) {
-    const qty = Math.max(1, seg.quantity || 1);
-    for (let q = 0; q < qty; q++) {
-      expanded.push({
-        spoolCode: qty > 1 ? `${seg.spoolCode}-${q + 1}` : seg.spoolCode,
-        lengthMm: Number(seg.lengthMm),
-        systemCode: seg.systemCode,
-      });
-    }
-  }
-
-  // 2. Sắp xếp giảm dần theo chiều dài (Decreasing Order)
-  expanded.sort((a, b) => b.lengthMm - a.lengthMm);
-
-  const bars: NestingStockBar[] = [];
-  const unplaced: PipeSegmentInput[] = [];
-
-  for (const item of expanded) {
-    if (item.lengthMm > stockLengthMm) {
-      // Đoạn dài hơn chiều dài tiêu chuẩn của cây phôi
-      unplaced.push({
-        spoolCode: item.spoolCode,
-        lengthMm: item.lengthMm,
-        systemCode: item.systemCode,
-      });
-      continue;
-    }
-
-    let placed = false;
-
-    // Tìm bar đầu tiên có thể chứa (First-Fit)
-    for (const bar of bars) {
-      const neededSpace = bar.cuts.length > 0 ? item.lengthMm + kerfMm : item.lengthMm;
-      if (bar.usedLengthMm + neededSpace <= stockLengthMm) {
-        bar.cuts.push({
-          spoolCode: item.spoolCode,
-          lengthMm: item.lengthMm,
-          systemCode: item.systemCode,
-          cutIndex: bar.cuts.length + 1,
-        });
-        bar.usedLengthMm += neededSpace;
-        bar.wasteLengthMm = Math.max(0, stockLengthMm - bar.usedLengthMm);
-        bar.utilizationPercent =
-          Math.round(((stockLengthMm - bar.wasteLengthMm) / stockLengthMm) * 10000) / 100;
-        placed = true;
-        break;
-      }
-    }
-
-    // Nếu không đặt được vào bar nào hiện có -> Mở bar mới
-    if (!placed) {
-      const newBar: NestingStockBar = {
-        barIndex: bars.length + 1,
-        stockLengthMm,
-        cuts: [
-          {
-            spoolCode: item.spoolCode,
-            lengthMm: item.lengthMm,
-            systemCode: item.systemCode,
-            cutIndex: 1,
-          },
-        ],
-        usedLengthMm: item.lengthMm,
-        wasteLengthMm: Math.max(0, stockLengthMm - item.lengthMm),
-        utilizationPercent:
-          Math.round(((stockLengthMm - (stockLengthMm - item.lengthMm)) / stockLengthMm) * 10000) /
-          100,
-      };
-      bars.push(newBar);
-    }
-  }
-
-  // 3. Tổng hợp chỉ số hiệu quả
-  let totalUsed = 0;
-  let totalWaste = 0;
-
-  for (const b of bars) {
-    totalUsed += b.usedLengthMm;
-    totalWaste += b.wasteLengthMm;
-  }
-
-  const totalStockProvided = bars.length * stockLengthMm;
-  const wastePct =
-    totalStockProvided > 0 ? Math.round((totalWaste / totalStockProvided) * 10000) / 100 : 0;
-  const utilPct = totalStockProvided > 0 ? Math.round((100 - wastePct) * 100) / 100 : 100;
-
-  let grade: Nesting1DResult["efficiencyGrade"] = "F";
-  if (wastePct <= 1.8) grade = "A";
-  else if (wastePct <= 3.5) grade = "B";
-  else if (wastePct <= 6.0) grade = "C";
-  else if (wastePct <= 10.0) grade = "D";
+  const headLossPerMPa = headLossPerM * 9806.65;
+  const totalHeadLossPa = headLossPerMPa * pipeLengthM;
+  const pressureDropBar = totalHeadLossPa / 100000;
 
   return {
-    runCode,
-    stockLengthMm,
-    kerfMm,
-    totalSegments: expanded.length - unplaced.length,
-    totalBarsUsed: bars.length,
-    totalUsedLengthMm: Math.round(totalUsed * 100) / 100,
-    totalWasteMm: Math.round(totalWaste * 100) / 100,
-    wastePercent: wastePct,
-    utilizationPercent: utilPct,
-    efficiencyGrade: grade,
-    bars,
-    unplacedSegments: unplaced,
+    velocityMs: Math.round(velocity * 1000) / 1000,
+    headLossPerMeterPa: Math.round(headLossPerMPa * 100) / 100,
+    totalHeadLossPa: Math.round(totalHeadLossPa * 100) / 100,
+    pressureDropBar: Math.round(pressureDropBar * 10000) / 10000,
   };
 }
 
-// ============================================================================
-// 2. 2D DUCT SHEET METAL NESTING (GUILLOTINE ALGORITHM)
-// ============================================================================
+export function calcDarcyWeisbach(
+  flowRateLps: number,
+  pipeDiameterMm: number,
+  roughnessMm = 0.046,
+  pipeLengthM = 1.0,
+  fluidTempC = 25.0,
+): {
+  velocityMs: number;
+  reynoldsNumber: number;
+  frictionFactor: number;
+  headLossPerMeterPa: number;
+  totalHeadLossPa: number;
+  pressureDropBar: number;
+} {
+  const dM = pipeDiameterMm / 1000;
+  const qM3s = flowRateLps / 1000;
+  const areaM2 = (Math.PI * dM * dM) / 4;
+  const velocity = areaM2 > 0 ? qM3s / areaM2 : 0;
 
-export interface DuctSheetRectInput {
-  spoolCode: string;
-  widthMm: number;
-  heightMm: number;
-  tag?: string;
-}
+  const nu = 1.79e-6 / (1 + 0.0337 * fluidTempC + 0.00022 * fluidTempC * fluidTempC);
+  const reynolds = (velocity * dM) / Math.max(1e-9, nu);
 
-export interface PlacedSheetRect {
-  spoolCode: string;
-  x: number;
-  y: number;
-  widthMm: number;
-  heightMm: number;
-  rotated: boolean;
-}
-
-export interface DuctSheetMetalBar {
-  sheetIndex: number;
-  sheetWidthMm: number;
-  sheetHeightMm: number;
-  placedRects: PlacedSheetRect[];
-  usedAreaM2: number;
-  totalAreaM2: number;
-  wastePercent: number;
-}
-
-export interface Nesting2DResult {
-  runCode: string;
-  sheetWidthMm: number;
-  sheetHeightMm: number;
-  totalSheets: number;
-  totalPlacedRects: number;
-  totalUsedAreaM2: number;
-  totalWasteAreaM2: number;
-  overallWastePercent: number;
-  sheets: DuctSheetMetalBar[];
-}
-
-/**
- * Thuật toán 2D Guillotine Cắt Tôn Ống Gió tấm tiêu chuẩn (1200x2400mm).
- */
-export function nestDuctSheets2D(
-  rects: DuctSheetRectInput[],
-  sheetWidthMm = 1200.0,
-  sheetHeightMm = 2400.0,
-  marginMm = 10.0,
-): Nesting2DResult {
-  const runCode = `NEST-2D-${Date.now().toString(36).toUpperCase()}`;
-
-  if (!rects || rects.length === 0) {
-    return {
-      runCode,
-      sheetWidthMm,
-      sheetHeightMm,
-      totalSheets: 0,
-      totalPlacedRects: 0,
-      totalUsedAreaM2: 0,
-      totalWasteAreaM2: 0,
-      overallWastePercent: 0,
-      sheets: [],
-    };
+  const eps = roughnessMm / 1000;
+  let f = 0.02;
+  if (reynolds < 2300) {
+    f = reynolds > 0 ? 64 / reynolds : 0.02;
+  } else {
+    f = 0.25 / Math.pow(Math.log10(eps / (3.7 * dM) + 5.74 / Math.pow(reynolds, 0.9)), 2);
   }
 
-  // Sắp xếp diện tích giảm dần
-  const sorted = [...rects].sort((a, b) => b.widthMm * b.heightMm - a.widthMm * a.heightMm);
-
-  const sheets: DuctSheetMetalBar[] = [];
-  const singleSheetAreaM2 = (sheetWidthMm * sheetHeightMm) / 1_000_000;
-
-  for (const r of sorted) {
-    let placed = false;
-
-    for (const sheet of sheets) {
-      // Tìm vị trí trống đơn giản theo lưới hàng (Row shelf packing)
-      let curX = marginMm;
-      let curY = marginMm;
-      let rowMaxH = 0;
-
-      for (const p of sheet.placedRects) {
-        if (p.x + p.widthMm + marginMm > curX) {
-          curX = p.x + p.widthMm + marginMm;
-        }
-        if (p.heightMm > rowMaxH) {
-          rowMaxH = p.heightMm;
-        }
-      }
-
-      const rw = r.widthMm;
-      const rh = r.heightMm;
-
-      if (curX + rw + marginMm <= sheetWidthMm && curY + rh + marginMm <= sheetHeightMm) {
-        sheet.placedRects.push({
-          spoolCode: r.spoolCode,
-          x: curX,
-          y: curY,
-          widthMm: rw,
-          heightMm: rh,
-          rotated: false,
-        });
-        sheet.usedAreaM2 += (rw * rh) / 1_000_000;
-        sheet.wastePercent =
-          Math.round(((singleSheetAreaM2 - sheet.usedAreaM2) / singleSheetAreaM2) * 10000) / 100;
-        placed = true;
-        break;
-      }
-    }
-
-    if (!placed) {
-      const rw = r.widthMm;
-      const rh = r.heightMm;
-      const newSheet: DuctSheetMetalBar = {
-        sheetIndex: sheets.length + 1,
-        sheetWidthMm,
-        sheetHeightMm,
-        placedRects: [
-          {
-            spoolCode: r.spoolCode,
-            x: marginMm,
-            y: marginMm,
-            widthMm: rw,
-            heightMm: rh,
-            rotated: false,
-          },
-        ],
-        usedAreaM2: (rw * rh) / 1_000_000,
-        totalAreaM2: singleSheetAreaM2,
-        wastePercent:
-          Math.round(((singleSheetAreaM2 - (rw * rh) / 1_000_000) / singleSheetAreaM2) * 10000) /
-          100,
-      };
-      sheets.push(newSheet);
-    }
-  }
-
-  const totalUsedM2 = sheets.reduce((s, sh) => s + sh.usedAreaM2, 0);
-  const totalAreaM2 = sheets.length * singleSheetAreaM2;
-  const totalWasteM2 = Math.max(0, totalAreaM2 - totalUsedM2);
-  const overallWastePct =
-    totalAreaM2 > 0 ? Math.round((totalWasteM2 / totalAreaM2) * 10000) / 100 : 0;
+  const rho = 1000;
+  const dpPerM = f * (1 / dM) * ((rho * velocity * velocity) / 2);
+  const totalDp = dpPerM * pipeLengthM;
+  const dpBar = totalDp / 100000;
 
   return {
-    runCode,
-    sheetWidthMm,
-    sheetHeightMm,
-    totalSheets: sheets.length,
-    totalPlacedRects: sorted.length,
-    totalUsedAreaM2: Math.round(totalUsedM2 * 1000) / 1000,
-    totalWasteAreaM2: Math.round(totalWasteM2 * 1000) / 1000,
-    overallWastePercent: overallWastePct,
-    sheets,
+    velocityMs: Math.round(velocity * 1000) / 1000,
+    reynoldsNumber: Math.round(reynolds),
+    frictionFactor: Math.round(f * 10000) / 10000,
+    headLossPerMeterPa: Math.round(dpPerM * 100) / 100,
+    totalHeadLossPa: Math.round(totalDp * 100) / 100,
+    pressureDropBar: Math.round(dpBar * 10000) / 10000,
   };
 }
-
-// ============================================================================
-// 3. QR SPOOL CODE GENERATOR FOR LOGISTICS & FABRICATION
-// ============================================================================
-
-export function generateSpoolQrPayload(spool: {
-  projectId: number | string;
-  spoolCode: string;
-  discipline?: string;
-  systemCode?: string;
-  dimensionSpec?: string;
-  floorLabel?: string;
-}): { qrData: string; displayLabel: string } {
-  const qrData = `XBOSS|PRJ:${spool.projectId}|SPOOL:${spool.spoolCode}|SPEC:${spool.dimensionSpec || "N/A"}|SYS:${spool.systemCode || "MEPF"}|FL:${spool.floorLabel || "L1"}`;
-  const displayLabel = `${spool.spoolCode} [${spool.dimensionSpec || ""}]`;
-  return { qrData, displayLabel };
-}
-
-// ============================================================================
-// 4. BỘ TÍNH TOÁN THỦY LỰC & KHÍ ĐỘNG MEPF (HYDRAULIC & DUCT SIZING)
-// ============================================================================
 
 export type SystemVelocityCategory =
   | "domestic_water"
@@ -411,102 +142,6 @@ export const VELOCITY_LIMITS: Record<
   },
 };
 
-/**
- * Tính toán thủy lực theo công thức Hazen-Williams (Áp dụng cho nước 10°C - 30°C).
- * h_f = 10.67 * L * Q^1.852 / (C^1.852 * D^4.87)
- */
-export function calcHazenWilliams(
-  flowRateLps: number,
-  pipeDiameterMm: number,
-  pipeLengthM = 1.0,
-  cFactor = 120, // 120: Ống thép mới, 140: Ống nhựa PPR/HDPE, 100: Thép cũ
-): {
-  velocityMs: number;
-  headLossPerMeterPa: number;
-  totalHeadLossPa: number;
-  pressureDropBar: number;
-} {
-  const dM = pipeDiameterMm / 1000;
-  const qM3s = flowRateLps / 1000;
-  const areaM2 = (Math.PI * dM * dM) / 4;
-
-  const velocity = areaM2 > 0 ? qM3s / areaM2 : 0;
-
-  // Hazen-Williams head loss S (m H2O / m pipe)
-  // S = 10.67 * Q^1.852 / (C^1.852 * D^4.87)
-  const headLossPerM =
-    (10.67 * Math.pow(Math.max(1e-6, qM3s), 1.852)) /
-    (Math.pow(cFactor, 1.852) * Math.pow(dM, 4.87));
-
-  // 1 m H2O = 9806.65 Pa
-  const headLossPerMPa = headLossPerM * 9806.65;
-  const totalHeadLossPa = headLossPerMPa * pipeLengthM;
-  const pressureDropBar = totalHeadLossPa / 100000;
-
-  return {
-    velocityMs: Math.round(velocity * 1000) / 1000,
-    headLossPerMeterPa: Math.round(headLossPerMPa * 100) / 100,
-    totalHeadLossPa: Math.round(totalHeadLossPa * 100) / 100,
-    pressureDropBar: Math.round(pressureDropBar * 10000) / 10000,
-  };
-}
-
-/**
- * Tính toán thủy lực chính xác theo công thức Darcy-Weisbach & Colebrook-White.
- */
-export function calcDarcyWeisbach(
-  flowRateLps: number,
-  pipeDiameterMm: number,
-  roughnessMm = 0.046, // Thép thương mại: 0.046mm, Nhựa: 0.007mm
-  pipeLengthM = 1.0,
-  fluidTempC = 25.0,
-): {
-  velocityMs: number;
-  reynoldsNumber: number;
-  frictionFactor: number;
-  headLossPerMeterPa: number;
-  totalHeadLossPa: number;
-  pressureDropBar: number;
-} {
-  const dM = pipeDiameterMm / 1000;
-  const qM3s = flowRateLps / 1000;
-  const areaM2 = (Math.PI * dM * dM) / 4;
-  const velocity = areaM2 > 0 ? qM3s / areaM2 : 0;
-
-  // Độ nhớt động học nước theo nhiệt độ xấp xỉ: nu = 1.79e-6 / (1 + 0.0337*T + 0.00022*T^2)
-  const nu = 1.79e-6 / (1 + 0.0337 * fluidTempC + 0.00022 * fluidTempC * fluidTempC);
-  const reynolds = (velocity * dM) / Math.max(1e-9, nu);
-
-  // Hệ số ma sát Darcy f (Swamee-Jain approximation)
-  const eps = roughnessMm / 1000;
-  let f = 0.02;
-  if (reynolds < 2300) {
-    // Dòng chảy tầng (Laminar)
-    f = reynolds > 0 ? 64 / reynolds : 0.02;
-  } else {
-    // Dòng chảy rối (Turbulent)
-    f = 0.25 / Math.pow(Math.log10(eps / (3.7 * dM) + 5.74 / Math.pow(reynolds, 0.9)), 2);
-  }
-
-  const rho = 1000; // Khối lượng riêng nước ~ 1000 kg/m3
-  // deltaP = f * (L/D) * (rho * v^2 / 2)
-  const dpPerM = f * (1 / dM) * ((rho * velocity * velocity) / 2);
-  const totalDp = dpPerM * pipeLengthM;
-  const dpBar = totalDp / 100000;
-
-  return {
-    velocityMs: Math.round(velocity * 1000) / 1000,
-    reynoldsNumber: Math.round(reynolds),
-    frictionFactor: Math.round(f * 10000) / 10000,
-    headLossPerMeterPa: Math.round(dpPerM * 100) / 100,
-    totalHeadLossPa: Math.round(totalDp * 100) / 100,
-    pressureDropBar: Math.round(dpBar * 10000) / 10000,
-  };
-}
-
-/**
- * Kiểm tra tính hợp lệ của vận tốc dòng chảy theo quy chuẩn Invariant.
- */
 export function validateVelocityLimit(
   velocityMs: number,
   systemType: SystemVelocityCategory,
@@ -544,35 +179,24 @@ export function validateVelocityLimit(
   };
 }
 
-/**
- * Tính toán kích thước ống gió dựa trên lưu lượng (CFM) và vận tốc khống chế (Velocity Method).
- */
 export function sizeDuctByVelocity(
   airflowCfm: number,
   targetVelocityMs = 6.0,
-  aspectRatio = 1.5, // Tỷ lệ W/H chuẩn
+  aspectRatio = 1.5,
 ): {
   widthMm: number;
   heightMm: number;
   actualVelocityMs: number;
   equivalentDiameterMm: number;
 } {
-  // 1 CFM = 0.000471947 m3/s
   const qM3s = airflowCfm * 0.000471947;
   const reqAreaM2 = qM3s / Math.max(0.1, targetVelocityMs);
-
-  // Area = W * H = (r * H) * H = r * H^2  => H = sqrt(Area / r)
   const hM = Math.sqrt(reqAreaM2 / aspectRatio);
   const wM = hM * aspectRatio;
-
-  // Làm tròn theo nấc 50mm chuẩn gia công ống gió
   const hMm = Math.max(100, Math.round((hM * 1000) / 50) * 50);
   const wMm = Math.max(100, Math.round((wM * 1000) / 50) * 50);
-
   const actAreaM2 = (wMm * hMm) / 1_000_000;
   const actVelocity = actAreaM2 > 0 ? qM3s / actAreaM2 : 0;
-
-  // Đường kính tương đương Huebscher: De = 1.30 * (W*H)^0.625 / (W + H)^0.25
   const eqD = (1.3 * Math.pow(wMm * hMm, 0.625)) / Math.pow(Math.max(1, wMm + hMm), 0.25);
 
   return {
@@ -582,10 +206,6 @@ export function sizeDuctByVelocity(
     equivalentDiameterMm: Math.round(eqD),
   };
 }
-
-// ============================================================================
-// 5. DATABASE PERSISTENCE & CRUD
-// ============================================================================
 
 export interface NestingRunRecord {
   id: string;
@@ -600,7 +220,7 @@ export interface NestingRunRecord {
   total_waste_mm: number;
   waste_percent: number;
   efficiency_grade: string;
-  nesting_plan: NestingStockBar[];
+  nesting_plan: any[];
   created_at: string;
 }
 
@@ -631,7 +251,7 @@ export interface HydraulicCheckRecord {
 export async function saveNestingRun(
   projectId: number,
   discipline: string,
-  result: Nesting1DResult,
+  result: any,
   userId?: number | null,
 ): Promise<{ id: string }> {
   const row = await queryOne<{ id: string }>(

@@ -1,43 +1,15 @@
-// lib/engineering-cad-hydraulic-network.ts — Topological Graph Network & Hydraulic Loop Balancing (M76 / M92)
-import { query, queryOne, run } from "@/lib/db";
+// lib/engineering-cad-hydraulic-network.ts — Facade for Unified Hydraulic Network Engine (M76 / M92)
+import { query, queryOne } from "@/lib/db";
+
 import {
-  calcDarcyWeisbach,
-  calcHazenWilliams,
-  validateVelocityLimit,
-} from "./engineering-cad-nesting";
+  type NetworkNode,
+  type NetworkEdge,
+  type BalancingValveScheduleItem,
+} from "./engineering-hydraulic-engine";
 
-export interface NetworkNode {
-  id: string;
-  name: string;
-  type: "source" | "junction_tee" | "cross" | "valve" | "terminal" | "equipment";
-  elevationM: number;
-  demandFlowLps: number; // Lưu lượng tiêu thụ tại nút (vd vòi sen, AHU, đầu phun)
-  pressureAvailableBar?: number;
-}
+export { type NetworkNode, type NetworkEdge, type BalancingValveScheduleItem };
 
-export interface NetworkEdge {
-  id: string;
-  fromNodeId: string;
-  toNodeId: string;
-  lengthM: number;
-  nominalDiameterMm: number;
-  flowRateLps: number; // Lưu lượng dòng chảy qua đoạn
-  velocityMs: number;
-  headLossPa: number;
-  pressureDropBar: number;
-  fittingLossFactorSum: number; // Tổng hệ số tổn thất cục bộ zeta (elbow, tee, valve)
-  isCriticalPath: boolean;
-}
-
-export interface BalancingValveScheduleItem {
-  valveCode: string;
-  edgeId: string;
-  locationNode: string;
-  designFlowLps: number;
-  targetPressureDropBar: number; // Chênh áp cần triệt tiêu để cân bằng
-  requiredKvCoefficient: number; // Kv = Q(m3/h) / sqrt(deltaP_bar)
-  valveSettingPresetPercent: number; // 0..100% độ mở van
-}
+import { calcDarcyWeisbach, validateVelocityLimit } from "./engineering-cad-nesting";
 
 export interface HydraulicNetworkResult {
   networkCode: string;
@@ -45,7 +17,7 @@ export interface HydraulicNetworkResult {
   totalFlowRateLps: number;
   nodes: NetworkNode[];
   edges: NetworkEdge[];
-  criticalRunPath: string[]; // Danh sách edgeId trên tuyến trở lực lớn nhất
+  criticalRunPath: string[];
   criticalPressureDropPa: number;
   criticalPressureDropBar: number;
   balancingValves: BalancingValveScheduleItem[];
@@ -53,14 +25,6 @@ export interface HydraulicNetworkResult {
   warnings: string[];
 }
 
-// ============================================================================
-// 1. AUTO-SIZING & NETWORK ACCUMULATION ENGINE
-// ============================================================================
-
-/**
- * Tự động chọn đường kính ống tiêu chuẩn dựa trên lưu lượng dòng chảy và vận tốc khống chế:
- * DN15 -> DN20 -> DN25 -> DN32 -> DN40 -> DN50 -> DN65 -> DN80 -> DN100 -> DN125 -> DN150 -> DN200
- */
 export function autoSizePipeDiameter(
   flowRateLps: number,
   targetMaxVelocityMs = 1.8,
@@ -103,10 +67,6 @@ export function autoSizePipeDiameter(
   };
 }
 
-// ============================================================================
-// 2. HYDRAULIC NETWORK GRAPH BALANCING & CRITICAL RUN SOLVER
-// ============================================================================
-
 export function solveHydraulicNetwork(
   networkCode: string,
   systemType: "chilled_water" | "domestic_water" | "fire_sprinkler",
@@ -121,17 +81,13 @@ export function solveHydraulicNetwork(
   }>,
 ): HydraulicNetworkResult {
   const warnings: string[] = [];
-
-  // 1. Xây dựng cấu trúc đồ thị kề
   const nodeMap = new Map<string, NetworkNode>();
   for (const n of nodesInput) {
     nodeMap.set(n.id, { ...n });
   }
 
-  // 2. Tính toán lưu lượng tích lũy từ ngọn (Terminal) về nguồn (Source)
   const edgeFlows = new Map<string, number>();
 
-  // Thuật toán DFS ngược từ lá về gốc để cộng dồn lưu lượng
   function computeFlowForEdge(edgeId: string): number {
     const edge = rawEdges.find((e) => e.id === edgeId);
     if (!edge) return 0;
@@ -139,7 +95,6 @@ export function solveHydraulicNetwork(
     const targetNode = nodeMap.get(edge.toNodeId);
     let childFlow = targetNode ? targetNode.demandFlowLps : 0;
 
-    // Tìm các edge đi ra từ targetNode
     const outgoingEdges = rawEdges.filter((e) => e.fromNodeId === edge.toNodeId);
     for (const outE of outgoingEdges) {
       childFlow += computeFlowForEdge(outE.id);
@@ -159,7 +114,6 @@ export function solveHydraulicNetwork(
     }
   }
 
-  // 3. Tính toán thủy lực từng đoạn ống (Darcy-Weisbach)
   const resolvedEdges: NetworkEdge[] = [];
 
   for (const re of rawEdges) {
@@ -176,13 +130,12 @@ export function solveHydraulicNetwork(
     const dw = calcDarcyWeisbach(
       flowLps,
       sizing.diameterMm,
-      0.046, // roughness mm (thép)
+      0.046,
       re.lengthM,
       systemType === "chilled_water" ? 7.0 : 25.0,
     );
 
-    // Tổn thất cục bộ deltaP_local = zeta * rho * v^2 / 2
-    const zeta = re.fittingLossFactorSum || 1.5; // Mặc định ~1.5 (cút, tê, van)
+    const zeta = re.fittingLossFactorSum || 1.5;
     const localLossPa = (zeta * 1000 * Math.pow(dw.velocityMs, 2)) / 2;
     const totalHeadLossPa = dw.totalHeadLossPa + localLossPa;
     const totalDpBar = totalHeadLossPa / 100000;
@@ -210,14 +163,12 @@ export function solveHydraulicNetwork(
     });
   }
 
-  // 4. Tìm tuyến bất lợi nhất (Critical Index Run Path) — Tuyến có tổng chênh áp lớn nhất từ Source đến Terminal
   let maxPathPressurePa = 0;
   let criticalPathEdges: string[] = [];
 
   function tracePath(currentNodeId: string, currentAccumPa: number, currentPath: string[]) {
     const outgoing = resolvedEdges.filter((e) => e.fromNodeId === currentNodeId);
     if (outgoing.length === 0) {
-      // Đã tới lá (Terminal)
       if (currentAccumPa > maxPathPressurePa) {
         maxPathPressurePa = currentAccumPa;
         criticalPathEdges = [...currentPath];
@@ -240,8 +191,6 @@ export function solveHydraulicNetwork(
     }
   }
 
-  // 5. Cân bằng áp suất & Tính toán van cân bằng (Balancing Valves Schedule)
-  // Các nhánh ngắn hơn cần triệt tiêu áp lực dư thừa để đạt lưu lượng thiết kế
   const balancingValves: BalancingValveScheduleItem[] = [];
 
   function calculateBalancingForBranch(currentNodeId: string, currentAccumPa: number) {
@@ -252,8 +201,6 @@ export function solveHydraulicNetwork(
       const excessPressureBar = excessPressurePa / 100000;
 
       if (excessPressureBar > 0.05 && outE.flowRateLps > 0.1 && !outE.isCriticalPath) {
-        // Cần van cân bằng để triệt tiêu chênh áp dư thừa
-        // Kv = Q(m3/h) / sqrt(deltaP_bar)
         const qM3h = outE.flowRateLps * 3.6;
         const reqKv = excessPressureBar > 0 ? qM3h / Math.sqrt(excessPressureBar) : 10.0;
         const presetPercent = Math.min(100, Math.max(10, Math.round((reqKv / 25.0) * 100)));
@@ -294,10 +241,6 @@ export function solveHydraulicNetwork(
     warnings,
   };
 }
-
-// ============================================================================
-// 3. DATABASE CRUD & PERSISTENCE
-// ============================================================================
 
 export async function saveHydraulicNetwork(
   projectId: number,
