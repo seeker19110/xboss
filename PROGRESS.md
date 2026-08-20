@@ -25,6 +25,18 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
+## Module M96 — God-Tier CAD/BIM Apex Integration & 3 Extensions (2026-08-20)
+
+- **[AI, đã làm] Triển khai Đặc tả M96 & Hội tụ Trọn bộ 3 Phân hệ Mở rộng God-Tier CAD/BIM:**
+  - **Cơ sở Dữ liệu & RLS 2 tầng:** Migration `0129_god_tier_cad_bim_apex_integration.sql` tạo bảng `engineering_god_tier_models` và `engineering_god_tier_clashes`, áp dụng policy cách ly dự án an toàn.
+  - **Lõi Hình học & WebGPU Instanced Mesh:** Thư viện [`lib/engineering-god-tier.ts`](file:///c:/Users/liend/xboss/lib/engineering-god-tier.ts) gom nhóm Draw Calls trên GPU, thuật toán quét va chạm AABB + Ma trận thứ bậc không gian, giải thuật nắn tuyến $45^\circ$, mô phỏng 4D WBS thời gian thực, và băm cây Merkle Tree SHA-256 niêm phong Hộ chiếu số LOD 500.
+  - **Mở rộng 1 — LiDAR Scan-to-BIM & Point Cloud:** Thuật toán RANSAC Cylinder Fitting so khớp sai lệch $\Delta$ thực địa so với BIM ($\le 15\text{mm}$: Pass; $15-35\text{mm}$: Warning; $> 35\text{mm}$: Critical tự động lập phiếu NCR).
+  - **Mở rộng 2 — openBIM BCF 3.0 Live Sync API:** Chuẩn hóa giao tiếp 2 chiều với Autodesk Revit, Rhino Grasshopper, Solibri và BlenderBIM.
+  - **Mở rộng 3 — DfMA CNC Cutting & G-Code Generator:** Tự động khai triển hình gò ống gió 2D, sinh mã G-Code (G00/G01/M03/M05) cho máy cắt Plasma/Laser CNC, bóc tách 1D Spooling và gán mã QR phôi thừa $\ge 1200\text{mm}$.
+  - **API Routes chuẩn OpenAPI/REST:** 7 route mới `/api/engineering/god-tier/models`, `/clashes`, `/ai-diagnose`, `/simulate-4d`, `/point-cloud`, `/bcf/topics`, `/cnc-export`.
+  - **Studio 4D God-Tier UI:** Trang `/engineering/god-tier-studio` mở rộng 7 Tabs điều khiển chuyên sâu, tích hợp trực tiếp vào sidebar AppShell.
+  - **Kiểm thử Toàn diện:** 11/11 ca test passed trong `tests/engineering-god-tier.test.ts` & `tests/engineering-god-tier-extensions.test.ts`; build 191 routes thành công.
+
 ## Master Skills Apex Ecosystem & 12-Agent Closed-Loop Verification (2026-08-20)
 
 - **[AI, đã làm] Rà soát toàn diện Codebase & CI Gates:**

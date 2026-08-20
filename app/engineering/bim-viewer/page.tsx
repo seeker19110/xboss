@@ -108,7 +108,7 @@ export interface SimulationTimeStepResult {
   elements: Element4DState[];
 }
 
-export const SYSTEM_DEFAULT_COLORS: Record<string, string> = {
+const SYSTEM_DEFAULT_COLORS: Record<string, string> = {
   HVAC_SUPPLY: "#0284c7",
   HVAC_RETURN: "#f59e0b",
   PLUMBING_WATER: "#06b6d4",
@@ -118,7 +118,7 @@ export const SYSTEM_DEFAULT_COLORS: Record<string, string> = {
   STRUCTURE: "#64748b",
 };
 
-export const STATUS_4D_COLORS: Record<Element4DVisualStatus, string> = {
+const STATUS_4D_COLORS: Record<Element4DVisualStatus, string> = {
   not_started: "#3f3f46",
   in_progress: "#38bdf8",
   completed: "#34d399",

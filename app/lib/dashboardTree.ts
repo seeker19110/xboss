@@ -117,6 +117,12 @@ export const DASHBOARD_TREE: DashCluster[] = [
     label: "Kỹ thuật Không gian & AI (Engineering OS)",
     dashboards: [
       {
+        id: "dash.god-tier-studio",
+        href: "/engineering/god-tier-studio",
+        label: "God-Tier 4D Studio (M96)",
+        icon: Sparkles,
+      },
+      {
         id: "dash.apex-cockpit",
         href: "/engineering",
         label: "Apex Cockpit (M88)",
