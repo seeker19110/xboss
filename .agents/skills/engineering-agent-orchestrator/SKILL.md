@@ -42,3 +42,10 @@ Khi có $\ge 2$ Tác tử AI đưa ra các nhận định hoặc đề xuất tr
 5. **Bước 5 — Xác định Mức độ Đồng thuận (Consensus Level):** Đánh giá mức độ đồng thuận (Full Consensus, Qualified Consensus, Divergent, No Consensus).
 6. **Bước 6 — Kiểm tra Trạm gác Gate 0 (Gate 0 Verification):** Kiểm tra tính toàn vẹn dữ liệu, kiểm tra quyền hạn và định dạng.
 7. **Bước 7 — Trình Duyệt Kèm Hồ sơ Bằng chứng (Human Review Dossier):** Đóng gói đề xuất tối ưu cùng phân tích rủi ro trình PM/Chỉ huy trưởng phê duyệt một chạm.
+
+---
+
+## 3. TÀI LIỆU THAM CHIẾU KỸ THUẬT (REFERENCES)
+
+- [cad-bim-master/references/clash-solver-and-generative-shopdrawing.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/clash-solver-and-generative-shopdrawing.md): Ma trận ưu tiên không gian và giải thuật hòa giải xung đột hình học.
+- [cad-bim-master/references/asbuilt-redline-and-handover-standards.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/asbuilt-redline-and-handover-standards.md): Cân đối khối lượng quyết toán 3 chiều và chữ ký số phân quyền Gate 0.

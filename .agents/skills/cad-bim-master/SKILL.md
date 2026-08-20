@@ -3,68 +3,91 @@ name: cad-bim-master
 description: "Quy chuẩn kỹ thuật chuyên sâu và quy trình tự động hóa CAD/BIM, MEPF Engineering, bóc tách QTO, giải quyết xung đột không gian (Clash Solver), tối ưu cắt phôi (Nesting) và đồng bộ Scan-to-BIM trong XBoss. Bắt buộc kích hoạt khi phân tích, thiết kế, xuất mã vẽ hoặc xử lý dữ liệu bản vẽ kỹ thuật."
 ---
 
-# CAD/BIM MASTER — QUY CHUẨN KỸ THUẬT & TỰ ĐỘNG HÓA KỸ THUẬT KHÔNG GIAN
+# CAD/BIM MASTER — QUY CHUẨN KỸ THUẬT & TỰ ĐỘNG HÓA TỪ BẢN VẼ LỖI ĐẾN HOÀN CÔNG
 
-Bộ Skill này đóng gói toàn bộ tri thức kỹ thuật không gian (Spatial Engineering), công thức tính toán thủy lực MEPF, quy chuẩn phân tầng layer AIA/BS1192, định mức dự toán xây dựng Việt Nam và giải thuật tối ưu gia công chế tạo cho nền tảng XBoss.
+Bộ Skill này đóng gói toàn bộ tri thức kỹ thuật không gian (Spatial Engineering), công thức tính toán thủy lực MEPF, quy chuẩn phân tầng layer AIA/BS1192, định mức dự toán xây dựng Việt Nam, giải thuật giải quyết xung đột không gian (Clash Solver), và quy trình khép kín pháp lý từ **Bản vẽ lỗi $\rightarrow$ Bản vẽ hoàn công & Hồ sơ nghiệm thu hoàn công số** theo **Nghị định 06/2021/NĐ-CP** và **Thông tư 10/2021/TT-BXD** cho nền tảng XBoss.
 
 ---
 
-## 1. NGUYÊN TẮC BẤT BIẾN (INVARIANTS)
+## 1. BẢY NGUYÊN TẮC BẤT BIẾN (THE 7 INVARIANTS)
 
-1. **Bảo toàn Độ dốc Trọng lực (Gravity-Pipe Slope Invariant):** Tuyệt đối không được bẻ góc vượt chướng ngại vật làm triệt tiêu độ dốc của hệ thống thoát nước trọng lực ($1.0\% - 2.0\%$). Mọi xung đột giữa ống thoát nước và ống áp lực (Cấp nước, Cứu hỏa, Gas lạnh) thì hệ áp lực bắt buộc phải uốn né hệ trọng lực.
-2. **Nguyên tắc Vùng Khoét Dầm (Structural Penetration Zone):** Vị trí lỗ mở xuyên dầm bê tông cốt thép (Sleeve Opening) chỉ được đặt trong khoảng $1/3$ giữa nhịp dầm ($L/3 \le x \le 2L/3$) và cách mép trên/dưới dầm tối thiểu $50\text{mm}$. Tuyệt đối không khoét lỗ tại $1/3$ hai đầu dầm (vùng chịu lực cắt lớn).
-3. **Bảo tồn Định dạng & Font (Zero Corruption):** Mọi văn bản CAD tiếng Việt trích xuất từ font nhị phân `.shx`, VNI hoặc TCVN3-ABC phải được chuyển đổi chuẩn xác sang Unicode UTF-8 trước khi lưu trữ vào cơ sở dữ liệu.
-4. **Giới hạn Vận tốc Dòng chảy (Velocity Limit Invariant):**
+1. **Bảo toàn Độ dốc Trọng lực (Gravity-Pipe Slope Invariant):** Tuyệt đối không được bẻ góc vượt chướng ngại vật làm triệt tiêu độ dốc của hệ thống thoát nước trọng lực ($1.0\% - 2.0\%$). Mọi xung đột giữa ống thoát nước và ống áp lực (Cấp nước, Cứu hỏa, Chiller) thì hệ áp lực bắt buộc phải uốn né hệ trọng lực.
+2. **Nguyên tắc Vùng Khoét Dầm (Structural Penetration Zone):** Vị trí lỗ mở xuyên dầm bê tông cốt thép (Sleeve Opening) chỉ được đặt trong khoảng $1/3$ giữa nhịp dầm ($L/3 \le x \le 2L/3$) và cách mép trên/dưới dầm tối thiểu $50\text{mm}$. Đường kính ngoài ống luồn $D_{\text{sleeve}} \le H_{\text{dầm}}/3$. Tuyệt đối không khoét lỗ tại $1/3$ hai đầu dầm (vùng chịu lực cắt lớn).
+3. **Bảo tồn Định dạng & Font Tiếng Việt (Zero Corruption):** Mọi văn bản CAD trích xuất từ font nhị phân `.shx`, VNI hoặc TCVN3-ABC phải được tự động chuyển đổi chuẩn xác sang Unicode UTF-8 trước khi lưu trữ vào cơ sở dữ liệu.
+4. **Giới hạn Vận tốc Thủy lực & Khí động (Velocity Limit Invariant):**
    - Ống nước cấp/chiller: Vận tốc $v \le 1.5 - 2.5\text{m/s}$ (tránh xói mòn và tiếng ồn).
    - Ống hút bơm: $v \le 1.2\text{m/s}$ (chống xâm thực khí - cavitation).
    - Ống gió nhánh: $v \le 4.0 - 6.0\text{m/s}$; Ống gió trục chính: $v \le 8.0 - 10.0\text{m/s}$.
-5. **Cổng Kiểm soát Con người (A2 Human Gate):** Mọi bản vẽ phát hành chính thức, bảng khối lượng BOQ chênh lệch $(\Delta \text{QTO})$ và chứng chỉ thanh toán IPC liên kết với mô hình phải có xác thực chữ ký số/token từ Kỹ sư trưởng hoặc Giám đốc Dự án.
+5. **Bất biến Nét đỏ Hoàn công (As-Built Redline Invariant):** Mọi sai lệch hình học giữa hiện trường và bản vẽ Shopdrawing được duyệt phải được thể hiện bằng đường nét đỏ (Revision Cloud) kèm mã trỏ đến Phiếu yêu cầu thay đổi hiện trường (FCR), Phiếu làm rõ thiết kế (RFI) hoặc Biên bản nghiệm thu (BBNT) đã ký duyệt.
+6. **Bất biến Khung Dấu Hoàn công Pháp lý (NĐ 06/2021/NĐ-CP Invariant):** Bản vẽ hoàn công bắt buộc phải có khung dấu hoàn công chuẩn kích thước $120\text{mm} \times 60\text{mm}$ (Mẫu số 01 - 3 chữ ký) hoặc $120\text{mm} \times 80\text{mm}$ (Mẫu số 02 - 4 chữ ký) theo Phụ lục II Nghị định 06/2021/NĐ-CP tại góc dưới bên phải bản vẽ.
+7. **Bất biến Sổ cái Mật mã Bàn giao (Merkle Provenance Invariant):** Toàn bộ bản vẽ As-Built, BBNT ký số 3 bên, kết quả T&C và bảng cân đối khối lượng quyết toán $\Delta \text{QTO}$ được băm SHA-256 đóng vào Cây Merkle bất biến để xuất Hộ chiếu số bàn giao LOD 500 (Living Digital Twin Passport).
 
 ---
 
-## 2. QUY TRÌNH 5 BƯỚC XỬ LÝ DỮ LIỆU CAD/BIM
-
-Mỗi khi AI Agent xử lý tác vụ liên quan đến bản vẽ hoặc mô hình 3D, hãy tuân thủ chu trình 5 bước sau:
+## 2. QUY TRÌNH 8 BƯỚC KHÉP KÍN: TỪ BẢN VẼ LỖI ──► HOÀN CÔNG SỐ
 
 ```
-[B1: Ingestion & Sanitize] ──► [B2: Semantic Parse & QTO] ──► [B3: Spatial Clash & Solver] ──► [B4: Code/Fabrication Gen] ──► [B5: Verification & Gate]
+[B1: Ingestion & Lọc 12 Dị Tật] ──► [B2: Tự Chữa Lành & Clash Solver] ──► [B3: RFI & Shop LOD 400] ──► [B4: Ký Số 3 Bên & PWA Sync]
+               │
+               ▼
+[B8: Chốt ΔQTO & Merkle Passport] ◄── [B7: Redline & Dấu Hoàn Công] ◄── [B6: Hold-Points & Scan 3D] ◄── [B5: Quét QR & Nhật Ký TT 06]
 ```
 
-### Bước 1: Tiếp nhận, Chuẩn hóa Layer & Khắc phục Lỗi Font (Ingestion & Sanitize)
+### Bước 1: Tiếp nhận Bản vẽ Đầu vào & Chẩn đoán 12 Dạng Dị tật (Ingestion & Defect Diagnostic)
 
-- Quét và kiểm tra bảng mã ký tự trong toàn bộ Text/MText/Attributes. Áp dụng bảng ánh xạ font tại [references/cad-layer-standards.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/cad-layer-standards.md) để chuyển đổi sạch sang UTF-8.
-- Chuẩn hóa hệ layer về chuẩn thống nhất (ví dụ: `M-HVAC-DUCT`, `P-PLUM-PIPE`, `E-POWR-CABL`, `F-PROT-PIPE`).
+- Quét toàn bộ thực thể CAD/BIM để phát hiện 12 dị tật phổ biến theo tài liệu [references/drawing-defect-taxonomy-and-healing.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/drawing-defect-taxonomy-and-healing.md).
+- Kiểm tra font nhị phân `.shx`/TCVN3, tỷ lệ DimText so với hình học (Scale 1:1), tên Layer không chuẩn, và Block attributes bị thiếu thông số kỹ thuật.
 
-### Bước 2: Phân tích Thực thể & Bóc tách Khối lượng Tự động (Semantic Parse & QTO)
+### Bước 2: Tự Chữa Lành Dữ liệu & Động cơ Giải quyết Xung đột Không gian (Healing & Clash Solver)
 
-- Đọc sâu Block Definitions: Trích xuất Name, X, Y, Z, Rotation, và các dynamic attributes (Công suất kW, Lưu lượng CFM/LPS, Kích thước WxH, Đường kính DN).
-- Tính chiều dài ống/dây thực tế: Bù trừ chiều dài fitting (Cút 90°, Tê, Côn thu) và nhân hệ số uốn lượn/chùng dây ($1.05 - 1.10$).
-- Ánh xạ mã BOQ sang Định mức Xây dựng Việt Nam theo tài liệu [references/vietnam-norms-mapping.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/vietnam-norms-mapping.md).
+- Tự động chuyển font sang UTF-8 và chuẩn hóa layer theo AIA/BS1192.
+- Áp dụng ma trận ưu tiên không gian theo tài liệu [references/clash-solver-and-generative-shopdrawing.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/clash-solver-and-generative-shopdrawing.md).
+- Khi có xung đột: Hệ áp lực tự động uốn né $45^\circ$, bảo toàn độ dốc $1.0\% - 2.0\%$ cho hệ thoát nước, và định vị lỗ xuyên dầm tại $L/3 \le x \le 2L/3$.
 
-### Bước 3: Kiểm tra Xung đột Không gian & Đề xuất Hướng Tuyến (Spatial Clash & Solver)
+### Bước 3: Tự động Sinh RFI & Xuất Bản vẽ Thi công Shopdrawing LOD 400 (RFI & Generative Shop)
 
-- Tính toán va chạm 3D Bounding Box (AABB) và khoảng hở cách nhiệt (_Soft clearance_ tối thiểu $50\text{mm}$).
-- Khi phát hiện xung đột:
-  - Nếu là Xung đột Cứng với Kết cấu $\rightarrow$ Đề xuất hạ cao độ hoặc kiểm tra vùng khoét dầm hợp lệ.
-  - Nếu là Xung đột Cơ điện (MEP vs MEP) $\rightarrow$ Ưu tiên giữ thẳng hệ Ống gió chính & Ống thoát nước tự chảy; bẻ uốn ống cấp nước/cáp điện góc $45^\circ$.
+- Khi phát hiện xung đột vượt thẩm quyền A2 (cần khoét dầm mới hoặc hạ trần kiến trúc): Tự động phát hành phiếu RFI gửi Kỹ sư Thiết kế và TVGS.
+- Tự động bẻ phân đoạn ống gia công xưởng (Prefabrication Spools $\le 5.8\text{m}$), chèn cặp mặt bích và ty treo.
+- Áp dụng giải thuật First-Fit Decreasing (FFD) Nesting để cắt phôi cây thép $6.0\text{m}$ với độ hao hụt $< 1.8\%$.
 
-### Bước 4: Sinh Mã Bản vẽ & Tối ưu Gia công Xưởng (Generative Drafting & Nesting)
+### Bước 4: Cổng Ký số 3 Bên Duyệt Shopdrawing & Phân phối Ngoại tuyến PWA (Gate 0 & Mobile Sync)
 
-- Tự động sinh mã AutoLISP (`.lsp`) hoặc AutoCAD Script (`.scr`) dựa trên các mẫu chuẩn tại [references/autolisp-templates.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/autolisp-templates.md).
-- Khi có danh mục đoạn ống cần chế tạo tại xưởng (Prefabrication Spools): Áp dụng giải thuật First-Fit Decreasing (FFD) tại [references/1d-2d-nesting-recipes.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/1d-2d-nesting-recipes.md) để xếp phôi vào cây tiêu chuẩn $6.0\text{m}$ với độ hao hụt $< 1.8\%$.
+- Ký số thông minh 3 bên (Nhà thầu - TVGS - CĐT) phê duyệt bản vẽ Shopdrawing chính thức (`/engineering/esign`).
+- Tự động đồng bộ bản vẽ số và danh mục Spools xuống ứng dụng di động công trường (PWA Offline Cache).
 
-### Bước 5: Kiểm tra Sai lệch Thực tế & Đóng Vòng Lặp Thanh toán (Verification & Closed-Loop)
+### Bước 5: Chỉ huy Tác nghiệp Hiện trường, QR Logistics & Ghi Nhật ký (Field & Logistics QR)
 
-- So khớp dữ liệu đo đạc LiDAR / Reality Scan với tọa độ thiết kế:
-  - $\Delta \le 15\text{mm}$: Pass (Chấp thuận nghiệm thu).
-  - $15\text{mm} < \Delta \le 35\text{mm}$: Warning (Chỉnh sửa ty treo/giá đỡ).
-  - $\Delta > 35\text{mm}$: Critical Defect (Tạo phiếu lỗi kèm tọa độ 3D và chặn nghiệm thu).
-- Tự động đồng bộ khối lượng nghiệm thu sang tiến độ WBS và chứng chỉ thanh toán IPC.
+- Bàn giao quyền kiểm soát mặt bằng thi công (Work-Front Custody).
+- Quét mã QR tại cổng công trường đối chiếu danh mục PO, kiểm tra CO/CQ và tình trạng vật tư đầu vào trước khi lắp đặt.
+- Ghi nhật ký thi công điện tử theo Thông tư 06/2021/TT-BXD qua NLP Voice/Chat Copilot.
+
+### Bước 6: Kiểm soát Điểm dừng Nghiệm thu, Quét 3D Scan-to-BIM & Vòng lặp NCR (Hold-Points & QA/QC)
+
+- Chặn cứng thi công tại các điểm dừng Hold-Points (không cho đổ bê tông nếu chưa nghiệm thu ống luồn trong sàn).
+- So khớp dữ liệu quét LiDAR / Scan-to-BIM với bản vẽ Shopdrawing:
+  - $\Delta \le 15\text{mm}$: Pass (Chấp thuận).
+  - $15\text{mm} < \Delta \le 35\text{mm}$: Warning (Chỉnh sửa ty treo/căn chỉnh lại).
+  - $\Delta > 35\text{mm}$: Critical Defect (Tạo phiếu NCR 3 bước hoặc kích hoạt FCR nếu do chướng ngại vật hiện trường).
+
+### Bước 7: Tự động Cập nhật Bản vẽ Hoàn công & Đóng Dấu Pháp lý Nghị định 06 (Redline & As-Built Stamp)
+
+- Cập nhật tọa độ thực tế từ điểm đo trắc đạc vào mô hình CAD/BIM As-Built.
+- Tự động vẽ nét đỏ (Revision Cloud) và ghi chú mã tham chiếu FCR/RFI theo quy chuẩn [references/asbuilt-redline-and-handover-standards.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/asbuilt-redline-and-handover-standards.md).
+- Tự động sinh khung con dấu bản vẽ hoàn công chuẩn Phụ lục II Nghị định 06/2021/NĐ-CP (Mẫu số 01 hoặc Mẫu số 02).
+
+### Bước 8: Ký số 3 Bên Hồ sơ Hoàn công, Chốt $\Delta \text{QTO}$ & Merkle Passport LOD 500 (Final Handover)
+
+- Ký số 3 bên điện tử niêm phong bản vẽ Hoàn công và Biên bản nghiệm thu hoàn thành hạng mục.
+- Chạy động cơ đối soát 3 chiều: $\Delta \text{QTO} = \text{QTO}_{\text{As-Built}} - \text{QTO}_{\text{BOQ}} - \text{QTO}_{\text{VO}}$ để chốt quyết toán hợp đồng.
+- Nối toàn bộ mã băm tài liệu vào Cây Merkle (`engineering_merkle_roots`), xuất Hộ chiếu số bàn giao LOD 500 (Living Digital Twin Passport) chuyển giao sang hệ thống Quản trị Vận hành BMS/FM.
 
 ---
 
 ## 3. TÀI LIỆU THAM CHIẾU KỸ THUẬT (REFERENCES)
 
+- [references/drawing-defect-taxonomy-and-healing.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/drawing-defect-taxonomy-and-healing.md): Cẩm nang phân loại 12 dị tật bản vẽ và giải thuật tự chữa lành.
+- [references/clash-solver-and-generative-shopdrawing.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/clash-solver-and-generative-shopdrawing.md): Ma trận ưu tiên không gian, quy chuẩn xuyên dầm $L/3$ và xuất Shopdrawing LOD 400.
+- [references/asbuilt-redline-and-handover-standards.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/asbuilt-redline-and-handover-standards.md): Quy chuẩn vẽ nét đỏ Redline, mẫu con dấu hoàn công NĐ 06/2021/NĐ-CP và Hộ chiếu số LOD 500.
 - [references/cad-layer-standards.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/cad-layer-standards.md): Chuẩn layer AIA/BS1192 & Bảng màu ACI.
 - [references/mepf-hydraulic-formulas.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/mepf-hydraulic-formulas.md): Công thức Hazen-Williams, Darcy-Weisbach, tính tải trọng ty treo.
 - [references/vietnam-norms-mapping.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/vietnam-norms-mapping.md): Bảng mã định mức Thông tư 12/2021/TT-BXD cho hệ Cơ điện.

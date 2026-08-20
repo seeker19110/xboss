@@ -67,8 +67,17 @@ Bộ Skill này đóng gói toàn bộ tri thức kiểm soát chất lượng c
 - Tính toán Chỉ số An toàn Công trường (Site Safety Index - SSI) hàng ngày.
 - Tự động sinh phiếu xử phạt vi phạm an toàn kèm ảnh trích xuất và căn cứ pháp lý QCVN 18:2021/BXD.
 
-### Bước 5: Tiếp nhận Quan trắc Môi trường IoT & Hồ sơ Đóng dấu Hoàn công
+### Bước 5: Tiếp nhận Quan trắc Môi trường IoT & Đóng Dấu Hồ Sơ Hoàn Công Pháp Lý
 
-- Kết nối dữ liệu cảm biến IoT trắc đạc, độ nghiêng lún, đo nồng độ bụi PM2.5 và độ ồn dB.
-- Cảnh báo khi chỉ số môi trường vượt ngưỡng cho phép của QCVN 05:2023/BTNMT.
-- Tự động đóng gói toàn bộ BBNT đã ký số và kết quả thí nghiệm đạt chuẩn thành Hồ sơ Quản lý Chất lượng Hoàn công (As-Built Quality Dossier) phục vụ bàn giao công trình.
+- Kết nối dữ liệu cảm biến IoT trắc đạc, độ nghiêng lún, đo nồng độ bụi PM2.5 và độ ồn dB (QCVN 05:2023/BTNMT).
+- So khớp kiểm tra dung sai hình học Scan-to-BIM / LiDAR trước khi cho phép đóng dấu bản vẽ hoàn công:
+  - $\Delta \le 15\text{mm}$: Đạt chuẩn nghiệm thu.
+  - $\Delta > 35\text{mm}$: Buộc phải có NCR đóng hoặc Phiếu phê duyệt thay đổi hiện trường (FCR) kèm chữ ký TVGS.
+- Tự động đóng gói toàn bộ BBNT đã ký số 3 bên, kết quả thí nghiệm T&C và bản vẽ As-Built Redline có đóng khung dấu hoàn công theo **Nghị định 06/2021/NĐ-CP (Phụ lục II)** thành Hồ sơ Quản lý Chất lượng Hoàn công (As-Built Quality Dossier LOD 500) phục vụ bàn giao công trình.
+
+---
+
+## 3. TÀI LIỆU THAM CHIẾU KỸ THUẬT (REFERENCES)
+
+- [cad-bim-master/references/asbuilt-redline-and-handover-standards.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/asbuilt-redline-and-handover-standards.md): Quy chuẩn mẫu dấu hoàn công Mẫu 01 & 02 và tiêu chuẩn trắc đạc Scan-to-BIM.
+- [cad-bim-master/references/drawing-defect-taxonomy-and-healing.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/drawing-defect-taxonomy-and-healing.md): Phân loại dị tật kỹ thuật và tiêu chuẩn nghiệm thu hình học.
