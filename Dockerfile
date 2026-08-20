@@ -37,6 +37,9 @@ COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/migrations ./migrations
 COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/lib ./lib
+COPY --from=builder /app/attachments ./attachments
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
 EXPOSE 3000
 CMD ["npm", "start"]

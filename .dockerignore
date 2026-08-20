@@ -8,7 +8,6 @@ mepf-workspace
 mepf-worker/.venv
 mepf-worker/**/__pycache__
 mepf-worker/.git
-attachments/*.xlsx
 coverage
 tests
 playwright-report

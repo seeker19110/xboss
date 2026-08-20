@@ -4,8 +4,10 @@ services:
     ports:
       - "3000:3000"
     environment:
-      # ⚠️ ĐỔI thành chuỗi ngẫu nhiên dài (ký session đăng nhập).
-      - XBOSS_SECRET=doi-thanh-chuoi-bi-mat-that-dai
+      # ⚠️ ĐỔI thành chuỗi ngẫu nhiên dài (ký session đăng nhập >= 32 ký tự).
+      - XBOSS_SECRET=xboss-secret-key-local-development-32chars
+      # Mật khẩu khởi tạo tài khoản admin@xboss.vn khi DB mới
+      - XBOSS_ADMIN_PASSWORD=admin123
       # Trỏ tới Postgres: dùng service db bên dưới, hoặc thay bằng chuỗi Supabase.
       - DATABASE_URL=postgres://xboss:xboss@db:5432/xboss
       - PORT=3000
@@ -48,7 +50,7 @@ services:
   db:
     image: postgres:17-alpine
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:5433:5432"
     environment:
       - POSTGRES_USER=xboss
       - POSTGRES_PASSWORD=xboss   # ⚠️ đổi khi chạy production

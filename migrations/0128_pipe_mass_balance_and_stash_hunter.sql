@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS engineering_pipe_spool_tracking (
     holding_time_hours NUMERIC(8, 2) DEFAULT 0.00,
     installed_at TIMESTAMPTZ,
     scan_deviation_mm NUMERIC(6, 2),
-    assigned_subcon_id BIGINT REFERENCES subcontractors(id) ON DELETE SET NULL,
+    assigned_subcon_id BIGINT REFERENCES suppliers(id) ON DELETE SET NULL,
     qr_spool_token TEXT NOT NULL,
     merkle_leaf_hash TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
