@@ -25,6 +25,7 @@ import {
   Building2,
   Save,
   MessageSquare,
+  X,
 } from "lucide-react";
 
 export type Element4DVisualStatus =
@@ -149,6 +150,13 @@ export default function BimViewerPage() {
   const [bcfIssues, setBcfIssues] = useState<BcfIssueSummary[]>([]);
   const [savingSim, setSavingSim] = useState(false);
   const [simSavedToast, setSimSavedToast] = useState<string | null>(null);
+  const [showNewBcfModal, setShowNewBcfModal] = useState(false);
+  const [newBcfTitle, setNewBcfTitle] = useState("");
+  const [newBcfDiscipline, setNewBcfDiscipline] = useState("HVAC");
+  const [newBcfSeverity, setNewBcfSeverity] = useState<"low" | "medium" | "high" | "critical">(
+    "critical",
+  );
+  const [creatingBcf, setCreatingBcf] = useState(false);
 
   // 3D Canvas Viewport Controls
   const [viewMode, setViewMode] = useState<"standard" | "xray" | "4d">("4d");
@@ -325,6 +333,43 @@ export default function BimViewerPage() {
       console.error(e);
     } finally {
       setSavingSim(false);
+    }
+  };
+
+  // Tạo mới openBIM BCF Issue gắn góc nhìn 3D Viewpoint
+  const handleCreateBcf = async () => {
+    if (!newBcfTitle.trim()) return;
+    setCreatingBcf(true);
+    try {
+      const res = await fetch("/api/engineering/bim-routing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "bcf_create",
+          title: newBcfTitle.trim(),
+          discipline: newBcfDiscipline,
+          issueType: "clash",
+          severity: newBcfSeverity,
+          clashElementAGuid: selectedElement?.guid || undefined,
+          cameraViewpoint: {
+            position: [rotX, rotY, zoom],
+            target: [0, 0, 0],
+            upVector: [0, 1, 0],
+            fieldOfView: 60,
+          },
+        }),
+      });
+      if (res.ok) {
+        setNewBcfTitle("");
+        setShowNewBcfModal(false);
+        await loadBcfIssues();
+        setSimSavedToast("Đã ghi nhận BCF Issue openBIM kèm Camera 3D Viewpoint!");
+        setTimeout(() => setSimSavedToast(null), 3000);
+      }
+    } catch (e) {
+      console.error("Lỗi tạo BCF:", e);
+    } finally {
+      setCreatingBcf(false);
     }
   };
 
@@ -924,40 +969,151 @@ export default function BimViewerPage() {
               )}
 
               {sidebarTab === "bcf" && (
-                <div className="flex flex-1 flex-col gap-2 overflow-y-auto pr-1 text-xs">
-                  {bcfIssues.map((issue) => (
-                    <div
-                      key={issue.id}
-                      className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5 transition hover:border-zinc-700"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-[10px] font-bold text-sky-400">
-                          {issue.bcf_code}
-                        </span>
-                        <span
-                          className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${
-                            issue.severity === "critical"
-                              ? "bg-red-950 text-red-400 border border-red-800"
-                              : "bg-amber-950 text-amber-300 border border-amber-800"
-                          }`}
-                        >
-                          {issue.severity}
-                        </span>
+                <div className="flex flex-1 flex-col gap-3 overflow-y-auto pr-1 text-xs">
+                  <button
+                    onClick={() => setShowNewBcfModal(true)}
+                    className="flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-500 shadow-sm"
+                  >
+                    <Sparkles size={13} />
+                    <span>Ghi Nhận Vấn Đề BCF Từ Viewpoint</span>
+                  </button>
+
+                  <div className="space-y-2">
+                    {bcfIssues.map((issue) => (
+                      <div
+                        key={issue.id}
+                        className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5 transition hover:border-zinc-700"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-[10px] font-bold text-sky-400">
+                            {issue.bcf_code}
+                          </span>
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${
+                              issue.severity === "critical"
+                                ? "bg-red-950 text-red-400 border border-red-800"
+                                : "bg-amber-950 text-amber-300 border border-amber-800"
+                            }`}
+                          >
+                            {issue.severity}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs font-medium text-zinc-200">{issue.title}</p>
+                        <div className="mt-2 flex items-center justify-between text-[10px] text-zinc-500">
+                          <span>{issue.discipline}</span>
+                          <span className="font-semibold text-emerald-400">
+                            {issue.status.toUpperCase()}
+                          </span>
+                        </div>
                       </div>
-                      <p className="mt-1 text-xs font-medium text-zinc-200">{issue.title}</p>
-                      <div className="mt-2 flex items-center justify-between text-[10px] text-zinc-500">
-                        <span>{issue.discipline}</span>
-                        <span className="font-semibold text-emerald-400">
-                          {issue.status.toUpperCase()}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
           </div>
         </div>
+
+        {/* Modal Tạo Mới BCF Issue */}
+        {showNewBcfModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-900 p-5 shadow-2xl space-y-4">
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                <div className="flex items-center gap-2 text-sm font-bold text-zinc-100">
+                  <MessageSquare size={16} className="text-emerald-400" />
+                  <span>Tạo Vấn Đề openBIM BCF Issue (ISO 21597)</span>
+                </div>
+                <button
+                  onClick={() => setShowNewBcfModal(false)}
+                  className="text-zinc-500 hover:text-zinc-300"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div>
+                  <label className="block text-zinc-400 mb-1 font-medium">
+                    Tiêu đề vấn đề va chạm / sự cố
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newBcfTitle}
+                    onChange={(e) => setNewBcfTitle(e.target.value)}
+                    placeholder="VD: Xung đột ống gió HVAC với dầm D3-A1..."
+                    className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs text-zinc-200 outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-zinc-400 mb-1 font-medium">
+                      Hệ thống (Discipline)
+                    </label>
+                    <select
+                      value={newBcfDiscipline}
+                      onChange={(e) => setNewBcfDiscipline(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs text-zinc-200"
+                    >
+                      <option value="HVAC">HVAC (Thông gió)</option>
+                      <option value="PLUMBING">PLUMBING (Cấp thoát nước)</option>
+                      <option value="ELECTRICAL">ELECTRICAL (Điện)</option>
+                      <option value="FIREFIGHTING">FIREFIGHTING (PCCC)</option>
+                      <option value="STRUCTURE">STRUCTURE (Kết cấu)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-zinc-400 mb-1 font-medium">
+                      Mức độ nghiêm trọng
+                    </label>
+                    <select
+                      value={newBcfSeverity}
+                      onChange={(e) => setNewBcfSeverity(e.target.value as any)}
+                      className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs text-zinc-200"
+                    >
+                      <option value="low">Thấp (Low)</option>
+                      <option value="medium">Trung bình (Medium)</option>
+                      <option value="high">Cao (High)</option>
+                      <option value="critical">Nghiêm trọng (Critical)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {selectedElement && (
+                  <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5 text-[11px] text-zinc-400">
+                    <span className="font-semibold text-zinc-300">Cấu kiện đính kèm:</span>{" "}
+                    {selectedElement.name} ({selectedElement.guid})
+                  </div>
+                )}
+
+                <div className="rounded-lg border border-emerald-800/40 bg-emerald-950/20 p-2.5 text-[11px] text-emerald-300">
+                  <span className="font-semibold">3D Camera Viewpoint Đã Bắt:</span> Góc X=
+                  {rotX.toFixed(1)}°, Y={rotY.toFixed(1)}°, Zoom={zoom.toFixed(2)}x
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setShowNewBcfModal(false)}
+                  className="rounded-lg bg-zinc-800 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-700"
+                >
+                  Huỷ
+                </button>
+                <button
+                  type="button"
+                  disabled={creatingBcf || !newBcfTitle.trim()}
+                  onClick={handleCreateBcf}
+                  className="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+                >
+                  {creatingBcf ? "Đang lưu..." : "Xác nhận & Lưu BCF"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

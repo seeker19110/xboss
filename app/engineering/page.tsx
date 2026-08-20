@@ -85,6 +85,36 @@ export default function EngineeringApexCockpitPage() {
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "objects">("overview");
+  const [commandRunning, setCommandRunning] = useState<string | null>(null);
+  const [commandFeedback, setCommandFeedback] = useState<string | null>(null);
+
+  async function dispatchCommand(actionType: string, label: string) {
+    setCommandRunning(actionType);
+    setCommandFeedback(null);
+    try {
+      const res = await fetch("/api/engineering/pinnacle/pulse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actionType }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setCommandFeedback(`Đã thực thi thành công: ${label}`);
+        if (json.data?.pulse) {
+          setPulse(json.data.pulse);
+        } else {
+          await loadData();
+        }
+      } else {
+        setCommandFeedback(`Lỗi khi thực thi: ${label}`);
+      }
+    } catch {
+      setCommandFeedback("Mất kết nối tới máy chủ");
+    } finally {
+      setCommandRunning(null);
+      setTimeout(() => setCommandFeedback(null), 4000);
+    }
+  }
 
   async function loadData() {
     try {
@@ -324,6 +354,83 @@ export default function EngineeringApexCockpitPage() {
               <div className="mt-1 text-[10px] text-zinc-400">
                 Block Height #{pulse?.pulseSummary?.merkleBlockHeight ?? 128}
               </div>
+            </div>
+          </div>
+
+          {/* Cross-System Command Dispatcher Actions */}
+          <div className="mt-6 border-t border-zinc-800/80 pt-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2 text-xs font-semibold text-zinc-300">
+                <Sparkles size={14} className="text-emerald-400" />
+                <span>Bộ Điều Phối Lệnh Liên Phân Hệ (Cross-System Command Dispatcher):</span>
+              </div>
+
+              {commandFeedback && (
+                <div className="flex items-center gap-1.5 rounded-md bg-emerald-950/60 px-2.5 py-1 text-xs text-emerald-300 border border-emerald-800 animate-fade-in">
+                  <Check size={12} />
+                  <span>{commandFeedback}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                onClick={() =>
+                  dispatchCommand("AUTO_RESOLVE_CLASHES", "Tự động nắn tuyến xử lý va chạm")
+                }
+                disabled={commandRunning !== null}
+                className="flex items-center gap-1.5 rounded-lg border border-sky-800/50 bg-sky-950/40 px-3 py-2 text-xs font-medium text-sky-200 transition hover:bg-sky-900/60 disabled:opacity-50"
+              >
+                <Route size={13} />
+                <span>
+                  {commandRunning === "AUTO_RESOLVE_CLASHES"
+                    ? "Đang xử lý..."
+                    : "Khắc Phục Va Chạm 3D"}
+                </span>
+              </button>
+
+              <button
+                onClick={() => dispatchCommand("SEAL_MERKLE_BATCH", "Niêm phong lô sổ cái Merkle")}
+                disabled={commandRunning !== null}
+                className="flex items-center gap-1.5 rounded-lg border border-amber-800/50 bg-amber-950/40 px-3 py-2 text-xs font-medium text-amber-200 transition hover:bg-amber-900/60 disabled:opacity-50"
+              >
+                <Zap size={13} />
+                <span>
+                  {commandRunning === "SEAL_MERKLE_BATCH"
+                    ? "Đang niêm phong..."
+                    : "Niêm Phong Cây Merkle"}
+                </span>
+              </button>
+
+              <button
+                onClick={() =>
+                  dispatchCommand("GENERATE_HSE_ACTION_PLAN", "Tạo kế hoạch an toàn HSE AI")
+                }
+                disabled={commandRunning !== null}
+                className="flex items-center gap-1.5 rounded-lg border border-rose-800/50 bg-rose-950/40 px-3 py-2 text-xs font-medium text-rose-200 transition hover:bg-rose-900/60 disabled:opacity-50"
+              >
+                <ShieldAlert size={13} />
+                <span>
+                  {commandRunning === "GENERATE_HSE_ACTION_PLAN"
+                    ? "Đang tạo..."
+                    : "Kế Hoạch An Toàn HSE"}
+                </span>
+              </button>
+
+              <button
+                onClick={() =>
+                  dispatchCommand("SIMULATE_CASHFLOW_STRESS", "Mô phỏng áp lực dòng tiền")
+                }
+                disabled={commandRunning !== null}
+                className="flex items-center gap-1.5 rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-2 text-xs font-medium text-emerald-200 transition hover:bg-emerald-900/60 disabled:opacity-50"
+              >
+                <TrendingUp size={13} />
+                <span>
+                  {commandRunning === "SIMULATE_CASHFLOW_STRESS"
+                    ? "Đang mô phỏng..."
+                    : "Mô Phỏng Dòng Tiền P80"}
+                </span>
+              </button>
             </div>
           </div>
         </div>

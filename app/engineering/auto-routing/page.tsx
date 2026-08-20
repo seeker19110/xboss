@@ -79,6 +79,10 @@ export default function AutoRoutingPage() {
   const [tradeB, setTradeB] = useState("LARGE_HVAC_DUCT");
   const [clashAdvice, setClashAdvice] = useState<any>(null);
 
+  // Spatial Grid Clash State
+  const [spatialClashResults, setSpatialClashResults] = useState<any[]>([]);
+  const [spatialClashLoading, setSpatialClashLoading] = useState(false);
+
   const fetchSleeves = useCallback(async () => {
     try {
       setSleevesLoading(true);
@@ -93,6 +97,51 @@ export default function AutoRoutingPage() {
       setSleevesLoading(false);
     }
   }, []);
+
+  const handleRunSpatialClash = async () => {
+    setSpatialClashLoading(true);
+    try {
+      const sampleBoxes = [
+        {
+          elementGuid: "ELEM-DUCT-01",
+          discipline: "HVAC",
+          min: [1000, 800, 2800],
+          max: [3000, 1400, 3400],
+        },
+        {
+          elementGuid: "ELEM-BEAM-D2",
+          discipline: "STRUCTURE",
+          min: [1800, 800, 2800],
+          max: [2400, 3200, 3600],
+        },
+        {
+          elementGuid: "ELEM-PIPE-DN100",
+          discipline: "PLUMBING",
+          min: [1500, 1000, 3100],
+          max: [1600, 2800, 3200],
+        },
+      ];
+
+      const res = await fetch("/api/engineering/bim-routing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "spatial_clash",
+          boundingBoxes: sampleBoxes,
+          softClearanceMm: 50,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setSpatialClashResults(data.clashes || []);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSpatialClashLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchSleeves();
@@ -326,6 +375,62 @@ export default function AutoRoutingPage() {
                     <p className="font-semibold">{clashAdvice.solution}</p>
                     <p className="mt-0.5 text-[11px] text-zinc-400">{clashAdvice.actionRequired}</p>
                   </div>
+                )}
+              </div>
+
+              {/* Spatial Grid Clash Detection Panel */}
+              <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sky-400">
+                    <Box size={16} />
+                    <span className="text-xs font-semibold">
+                      Quét Va Chạm Lưới Không Gian (Spatial Grid Clash Index)
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRunSpatialClash}
+                    disabled={spatialClashLoading}
+                    className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1 text-xs font-medium text-white hover:bg-sky-500 disabled:opacity-50"
+                  >
+                    <Play size={11} />
+                    {spatialClashLoading ? "Đang quét..." : "Quét Va Chạm O(n log n)"}
+                  </button>
+                </div>
+
+                {spatialClashResults.length > 0 ? (
+                  <div className="space-y-2 pt-2 border-t border-zinc-800">
+                    <div className="text-[11px] text-zinc-400">
+                      Phát hiện{" "}
+                      <span className="font-bold text-rose-400">{spatialClashResults.length}</span>{" "}
+                      điểm xung đột không gian:
+                    </div>
+                    {spatialClashResults.map((c: any, i: number) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between rounded-lg bg-zinc-950 p-2.5 text-xs border border-zinc-800"
+                      >
+                        <div className="space-y-0.5">
+                          <span className="font-bold text-zinc-200">
+                            {c.elementA} &harr; {c.elementB}
+                          </span>
+                          <div className="text-[10px] text-zinc-400">
+                            Khoảng hở đo được:{" "}
+                            <span className="font-mono text-amber-300">{c.clearanceMm} mm</span>{" "}
+                            (Soft clearance tối thiểu: 50mm)
+                          </div>
+                        </div>
+                        <span className="rounded px-2 py-0.5 text-[10px] font-bold bg-rose-950 text-rose-400 border border-rose-800 uppercase">
+                          {c.clashType.replace("_", " ")}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-zinc-500">
+                    Bấm &ldquo;Quét Va Chạm&rdquo; để kiểm tra giao cắt giữa các khối bounding box
+                    cơ điện và dầm kết cấu.
+                  </p>
                 )}
               </div>
             </div>

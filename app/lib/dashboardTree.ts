@@ -75,6 +75,14 @@ import {
   ToggleRight,
   Boxes,
   Lightbulb,
+  Sparkles,
+  Scissors,
+  Scan,
+  Route,
+  QrCode,
+  Bot,
+  TrendingUp,
+  Layers,
 } from "lucide-react";
 import type { Role } from "@/lib/roles";
 
@@ -104,6 +112,102 @@ export type DashCluster = {
 };
 
 export const DASHBOARD_TREE: DashCluster[] = [
+  // Cụm Kỹ thuật Không gian & AI (Engineering OS) — Đỉnh cao công nghệ XBoss
+  {
+    label: "Kỹ thuật Không gian & AI (Engineering OS)",
+    dashboards: [
+      {
+        id: "dash.apex-cockpit",
+        href: "/engineering",
+        label: "Apex Cockpit (M88)",
+        icon: Sparkles,
+      },
+      {
+        id: "dash.bim-viewer",
+        href: "/engineering/bim-viewer",
+        label: "3D BIM & 4D Sim (M80)",
+        icon: Building2,
+      },
+      {
+        id: "dash.cad-nesting",
+        href: "/engineering/cad-nesting",
+        label: "Fabrication Nesting (M89)",
+        icon: Scissors,
+      },
+      {
+        id: "dash.auto-routing",
+        href: "/engineering/auto-routing",
+        label: "Auto-Routing 3D (M77)",
+        icon: Route,
+      },
+      {
+        id: "dash.scan-to-bim",
+        href: "/engineering/scan-to-bim",
+        label: "Scan-to-BIM (M70)",
+        icon: Scan,
+      },
+      {
+        id: "dash.spatial-viewer",
+        href: "/engineering/spatial-viewer",
+        label: "Spatial Viewer (M74)",
+        icon: Layers,
+      },
+      {
+        id: "dash.hse-vision",
+        href: "/engineering/hse-vision",
+        label: "HSE AI Vision (M87)",
+        icon: ShieldAlert,
+      },
+      {
+        id: "dash.zalo-copilot",
+        href: "/engineering/zalo-copilot",
+        label: "Zalo Copilot (M86)",
+        icon: Bot,
+      },
+      {
+        id: "dash.dynamic-cashflow",
+        href: "/engineering/cashflow",
+        label: "Dynamic Cashflow (M85)",
+        icon: TrendingUp,
+      },
+      {
+        id: "dash.esign-protocol",
+        href: "/engineering/esign",
+        label: "Smart e-Sign (M84)",
+        icon: ShieldCheck,
+      },
+      {
+        id: "dash.fidic-claims",
+        href: "/engineering/fidic-claims",
+        label: "FIDIC Claims & EOT (M79)",
+        icon: Scale,
+      },
+      {
+        id: "dash.qr-logistics",
+        href: "/engineering/qr-logistics",
+        label: "QR Logistics (M78)",
+        icon: QrCode,
+      },
+      {
+        id: "dash.quantum-hub",
+        href: "/engineering/quantum-hub",
+        label: "Quantum & Merkle (M73)",
+        icon: Zap,
+      },
+      {
+        id: "dash.gate0-workflows",
+        href: "/engineering/workflows",
+        label: "Workflow Gate 0 (ENG-3)",
+        icon: Workflow,
+      },
+      {
+        id: "dash.ai-suggestions",
+        href: "/engineering/suggestions",
+        label: "Đề xuất AI (ENG-2)",
+        icon: Lightbulb,
+      },
+    ],
+  },
   // Thứ tự 17 cụm bám mockup xBoss-mockup.xlsx bản mới (commit "chore(attachments):
   // update xBoss mockup"), sắp theo đúng thứ tự 24 dashboard cấp cao của mockup —
   // tách nhỏ các cụm cũ không còn liền kề thay vì gộp cưỡng ép. Riêng 2 cụm
