@@ -9,9 +9,9 @@ Bộ Skill này đóng gói toàn bộ tri thức điều phối mạng lưới 
 
 ---
 
-## 1. MẠNG LƯỚI 11 TÁC TỬ CHUYÊN SÂU (11-AGENT SWARM ECOSYSTEM)
+## 1. MẠNG LƯỚI 12 TÁC TỬ CHUYÊN SÂU (12-AGENT SWARM ECOSYSTEM)
 
-Hệ thống XBoss vận hành bởi mạng lưới 11 AI Agents chuyên trách tương ứng 6 giai đoạn vòng đời dự án:
+Hệ thống XBoss vận hành bởi mạng lưới 12 AI Agents chuyên trách tương ứng 6 giai đoạn vòng đời dự án:
 
 1. **`cad-bim-master` (Spatial & Shopdrawing Agent):** Không gian, hình học 3D, MEPF, bóc tách QTO, Clash Solver, Spooling DfMA.
 2. **`qs-cost-contracts-master` (Commercial & Cost Agent):** BOQ TT 12/2021, Hợp đồng FIDIC, IPC, Claim EOT/Cost, Quyết toán A-B.
@@ -23,7 +23,8 @@ Hệ thống XBoss vận hành bởi mạng lưới 11 AI Agents chuyên trách 
 8. **`regulatory-compliance-master` (Legal & Permitting Agent):** Điều kiện khởi công Đ107 Luật XD, Cảnh báo 30 ngày, Kiểm định máy TT 36/2019.
 9. **`user-error-healing-master` (Guardian & Self-Healing Agent):** Tự sửa lỗi nhập liệu L1-L4, CRDT Merge, Lũy đẳng, Time-Travel Undo.
 10. **`ui-ux-craftsman` (Interface & Ergonomics Agent):** Thiết kế giao diện WCAG AA, Mobile-first công trường, Bento Grid, 5 States.
-11. **`engineering-agent-orchestrator` (Supreme Swarm Commander):** Trọng tài phân xử, Điều phối Swarm Debate, Gate 0, Merkle Tree Invariant.
+11. **`zero-error-construction-tracker` (Anti-Fraud & Ground-Truth Sentinel):** Chống gian lận ảnh/GPS, đối soát định lượng 4 chiều, triệt tiêu ảo giác AI và ngắt mạch công tác ngầm.
+12. **`engineering-agent-orchestrator` (Supreme Swarm Commander):** Trọng tài phân xử, Điều phối Swarm Debate, Gate 0, Merkle Tree Invariant.
 
 ---
 

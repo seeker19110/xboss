@@ -9,7 +9,7 @@ Bộ Skill này đóng gói toàn bộ tri thức kỹ thuật không gian (Spat
 
 ---
 
-## 1. BẢY NGUYÊN TẮC BẤT BIẾN (THE 7 INVARIANTS)
+## 1. MƯỜI HAI NGUYÊN TẮC BẤT BIẾN (THE 12 APEX INVARIANTS)
 
 1. **Bảo toàn Độ dốc Trọng lực (Gravity-Pipe Slope Invariant):** Tuyệt đối không được bẻ góc vượt chướng ngại vật làm triệt tiêu độ dốc của hệ thống thoát nước trọng lực ($1.0\% - 2.0\%$). Mọi xung đột giữa ống thoát nước và ống áp lực (Cấp nước, Cứu hỏa, Chiller) thì hệ áp lực bắt buộc phải uốn né hệ trọng lực.
 2. **Nguyên tắc Vùng Khoét Dầm (Structural Penetration Zone):** Vị trí lỗ mở xuyên dầm bê tông cốt thép (Sleeve Opening) chỉ được đặt trong khoảng $1/3$ giữa nhịp dầm ($L/3 \le x \le 2L/3$) và cách mép trên/dưới dầm tối thiểu $50\text{mm}$. Đường kính ngoài ống luồn $D_{\text{sleeve}} \le H_{\text{dầm}}/3$. Tuyệt đối không khoét lỗ tại $1/3$ hai đầu dầm (vùng chịu lực cắt lớn).
@@ -23,16 +23,22 @@ Bộ Skill này đóng gói toàn bộ tri thức kỹ thuật không gian (Spat
 7. **Bất biến Sổ cái Mật mã Bàn giao (Merkle Provenance Invariant):** Toàn bộ bản vẽ As-Built, BBNT ký số 3 bên, kết quả T&C và bảng cân đối khối lượng quyết toán $\Delta \text{QTO}$ được băm SHA-256 đóng vào Cây Merkle bất biến để xuất Hộ chiếu số bàn giao LOD 500 (Living Digital Twin Passport).
 8. **Bảo toàn Bù trừ Dung sai Mối nối & Chiều dài Cắt Thực tế (Fitting Deduction & Cut-Length Invariant):** Chiều dài ống cắt thực tế ($L_{\text{cut}}$) tại xưởng chế tạo DfMA bắt buộc phải được bù trừ chính xác theo độ ngập âm phụ kiện (Socket Insertion Depth), gờ chặn măng xông ($t_{\text{stop}}$), chiều dài ren ăn khớp (Thread Makeup), khe hở rãnh Grooved, đệm gioăng mặt bích và khe hở đáy hàn, kết hợp dung sai hiện trường (Field Fit Allowance $+50\dots +100\text{mm}$) cho đốt đóng tuyến nhằm triệt tiêu hoàn toàn sai số lắp ráp và đạt phế liệu $< 1.2\%$.
 9. **Bảo toàn Dung sai Thông thủy Gót Hộp Gió & Bù trừ Dài Tích Lũy Tuyến Ống Gió (Duct Length Accumulation & Diffuser +10mm Clearance Invariant):** Kích thước miệng đón / gót hộp gió ($W_{\text{plenum}} \times H_{\text{plenum}}$) bắt buộc phải rộng hơn cổ miệng gió đúng $+10\text{mm}$ ($+5\text{mm}$ mỗi mép) để đảm bảo lắp ráp nhẹ nhàng không bị kích kẹt; đồng thời mọi độ dài dôi tích lũy từ bích TDC, bích V, nẹp C, van VCD/FD và khớp mềm canvas bắt buộc phải được bù trừ tự động bằng cách cắt ngắn đoạn ống thẳng liền kề để giữ đúng $100\%$ tim miệng gió vào ô trần thiết kế ($600\times 600\text{mm}$).
+10. **Bất biến Phân tầng Hành lang Kỹ thuật & Khoảng cách Cách ly An toàn (Multi-Tier Corridor & Electrical-Thermal Isolation Invariant):** Thang máng cáp điện phải cách ống dẫn nhiệt / ống Chiller tối thiểu $150\text{mm}$ và bố trí phía trên hoặc có khay hứng rò rỉ khi đi cùng hành lang với ống nước để triệt tiêu rủi ro chập cháy điện.
+11. **Bất biến Cột áp Thủy lực Tuyến Bất Lợi & Cân Bằng Áp Suất (Critical Index Run & Balancing Damper Invariant):** Tổn thất áp suất trên tuyến dài nhất không được vượt quá cột áp danh định của bơm/quạt; mọi nhánh phụ bắt buộc phải có van cân bằng với hệ số $K_v$ được tính toán triệt tiêu chênh áp dư thừa.
+12. **Bất biến Hạn mức Phát thải Carbon & Hộ chiếu Số Bàn giao LOD 500 (Embodied Carbon Cap & Digital Twin Asset Passport Invariant):** Mọi dự án phải kiểm soát định mức carbon ẩn ($\text{kgCO}_2\text{e/m}^2$) theo ISO 14040/14044 và đóng gói trọn bộ thuộc tính vận hành MTBF/RUL trước khi bàn giao số sang hệ thống BMS/FM tòa nhà.
 
 ---
 
-## 2. QUY TRÌNH 8 BƯỚC KHÉP KÍN: TỪ BẢN VẼ LỖI ──► HOÀN CÔNG SỐ
+## 2. QUY TRÌNH 10 BƯỚC KHÉP KÍN SIÊU TRÍ TUỆ: TỪ BẢN VẼ LỖI ──► HOÀN CÔNG SỐ & VẬN HÀNH 7D
 
 ```
-[B1: Ingestion & Lọc 12 Dị Tật] ──► [B2: Tự Chữa Lành & Clash Solver] ──► [B3: RFI & Shop LOD 400] ──► [B4: Ký Số 3 Bên & PWA Sync]
-               │
-               ▼
-[B8: Chốt ΔQTO & Merkle Passport] ◄── [B7: Redline & Dấu Hoàn Công] ◄── [B6: Hold-Points & Scan 3D] ◄── [B5: Quét QR & Nhật Ký TT 06]
+[B1: Ingestion & Lọc 12 Dị Tật] ──► [B2: Tự Chữa Lành & Clash Solver] ──► [B3: Multi-Tier Corridor & Trapeze] ──► [B4: RFI & DfMA Spool LOD 400]
+                                                                                                                          │
+                                                                                                                          ▼
+[B8: Chốt ΔQTO & Merkle Passport] ◄── [B7: Redline & Dấu Hoàn Công] ◄── [B6: Hold-Points & Scan 3D] ◄── [B5: Ký Số 3 Bên & QR Logistics]
+        │
+        ▼
+[B9: 6D Carbon Footprint LCA] ──► [B10: 7D Predictive Asset Lifecycle & Living Twin Handover]
 ```
 
 ### Bước 1: Tiếp nhận Bản vẽ Đầu vào & Chẩn đoán 12 Dạng Dị tật (Ingestion & Defect Diagnostic)
@@ -46,49 +52,61 @@ Bộ Skill này đóng gói toàn bộ tri thức kỹ thuật không gian (Spat
 - Áp dụng ma trận ưu tiên không gian theo tài liệu [references/clash-solver-and-generative-shopdrawing.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/clash-solver-and-generative-shopdrawing.md).
 - Khi có xung đột: Hệ áp lực tự động uốn né $45^\circ$, bảo toàn độ dốc $1.0\% - 2.0\%$ cho hệ thoát nước, và định vị lỗ xuyên dầm tại $L/3 \le x \le 2L/3$.
 
-### Bước 3: Tự động Sinh RFI, Chia Đốt DfMA Spool LOD 400 & Bóc Tách Micro-BOM 5 Cấp (RFI, Spooling & Micro-BOM)
+### Bước 3: Quy Hoạch Hành Lang Kỹ Thuật Đa Tầng & Tính Toán Kết Cấu Giá Đỡ Trapeze (Corridor & Trapeze)
 
-- Khi phát hiện xung đột vượt thẩm quyền A2 (cần khoét dầm mới hoặc hạ trần kiến trúc): Tự động phát hành phiếu RFI gửi Kỹ sư Thiết kế và TVGS.
-- Tự động bẻ phân đoạn ống gia công xưởng (Prefabrication Spools $\le 5.8\text{m}$, Khối lượng $\le 50\text{kg}$), chèn cặp mặt bích và ty treo.
-- Tự động tính toán bù trừ dung sai mối nối (Fitting Take-Off & Socket Insertion Depth), độ ngập âm măng xông $t_{\text{stop}}$, và gán lượng bù Field Fit Allowance $+50\dots +100\text{mm}$ cho đốt đóng tuyến theo [references/pipe-spooling-and-fitting-deduction-standards.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/pipe-spooling-and-fitting-deduction-standards.md).
-- Tự động bùng nổ Micro-BOM 5 cấp độ (Ống chính $\rightarrow$ Phụ kiện $\rightarrow$ Van thiết bị $\rightarrow$ Bu lông/Gioăng/Keo/Que hàn $\rightarrow$ Giá treo/Bảo ôn/Mã QR Kitting).
-- Áp dụng giải thuật Best-Fit Decreasing kết hợp quét kho phôi thừa (Remnant Pool Nesting) để cắt phôi cây thép/ống nhựa $6.0\text{m}$ với độ hao hụt phế liệu $< 1.2\%$.
+- Tự động phân tầng cao độ 3 tầng: Tier 1 (Top: Ống gió), Tier 2 (Mid: Máng cáp), Tier 3 (Bot: Ống nước/Chiller).
+- Tự động tính toán tải trọng phân bố $Q_{\text{factored}} = Q_{\text{service}} \times 1.4$, kiểm tra ứng suất uốn $\sigma \le 160\text{MPa}$, độ võng $f \le L/360$, tự động chọn loại Unistrut và ty ren M10/M12/M16 theo [references/multi-tier-corridor-and-trapeze-engineering.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/multi-tier-corridor-and-trapeze-engineering.md).
 
-### Bước 4: Cổng Ký số 3 Bên Duyệt Shopdrawing & Phân phối Ngoại tuyến PWA (Gate 0 & Mobile Sync)
+### Bước 4: Tự động Sinh RFI, Chia Đốt DfMA Spool LOD 400 & Bóc Tách Micro-BOM 5 Cấp (RFI, Spooling & Micro-BOM)
+
+- Khi phát hiện xung đột vượt thẩm quyền A2: Tự động phát hành phiếu RFI gửi Kỹ sư Thiết kế và TVGS.
+- Tự động xuất bản vẽ Isometric chế tạo từng Spool (kèm Bubble tags, tọa độ đường cắt $L_{\text{cut}}$) và module hóa cụm thiết bị Skid theo [references/dfma-spool-isometric-and-skid-modularization.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/dfma-spool-isometric-and-skid-modularization.md).
+- Áp dụng giải thuật Genetic Nesting kết hợp kho phôi thừa (`engineering_remnant_inventory`) để khống chế phế liệu $< 0.8\%$.
+
+### Bước 5: Cổng Ký số 3 Bên Duyệt Shopdrawing & Phân phối Ngoại tuyến PWA (Gate 0 & Mobile Sync)
 
 - Ký số thông minh 3 bên (Nhà thầu - TVGS - CĐT) phê duyệt bản vẽ Shopdrawing chính thức (`/engineering/esign`).
 - Tự động đồng bộ bản vẽ số và danh mục Spools xuống ứng dụng di động công trường (PWA Offline Cache).
 
-### Bước 5: Chỉ huy Tác nghiệp Hiện trường, QR Logistics & Ghi Nhật ký (Field & Logistics QR)
+### Bước 6: Chỉ huy Tác nghiệp Hiện trường, QR Logistics & Ghi Nhật ký (Field & Logistics QR)
 
 - Bàn giao quyền kiểm soát mặt bằng thi công (Work-Front Custody).
 - Quét mã QR tại cổng công trường đối chiếu danh mục PO, kiểm tra CO/CQ và tình trạng vật tư đầu vào trước khi lắp đặt.
 - Ghi nhật ký thi công điện tử theo Thông tư 06/2021/TT-BXD qua NLP Voice/Chat Copilot.
 
-### Bước 6: Kiểm soát Điểm dừng Nghiệm thu, Quét 3D Scan-to-BIM & Vòng lặp NCR (Hold-Points & QA/QC)
+### Bước 7: Kiểm soát Điểm dừng Nghiệm thu, RANSAC LiDAR Scan-to-BIM & Vòng lặp NCR (Hold-Points & QA/QC)
 
 - Chặn cứng thi công tại các điểm dừng Hold-Points (không cho đổ bê tông nếu chưa nghiệm thu ống luồn trong sàn).
-- So khớp dữ liệu quét LiDAR / Scan-to-BIM với bản vẽ Shopdrawing:
+- Áp dụng RANSAC Cylinder Fitting so khớp đám mây điểm 3D với bản vẽ Shop:
   - $\Delta \le 15\text{mm}$: Pass (Chấp thuận).
   - $15\text{mm} < \Delta \le 35\text{mm}$: Warning (Chỉnh sửa ty treo/căn chỉnh lại).
-  - $\Delta > 35\text{mm}$: Critical Defect (Tạo phiếu NCR 3 bước hoặc kích hoạt FCR nếu do chướng ngại vật hiện trường).
+  - $\Delta > 35\text{mm}$: Critical Defect (Tạo phiếu NCR 3 bước).
 
-### Bước 7: Tự động Cập nhật Bản vẽ Hoàn công & Đóng Dấu Pháp lý Nghị định 06 (Redline & As-Built Stamp)
+### Bước 8: Tự động Cập nhật Bản vẽ Hoàn công & Đóng Dấu Pháp lý Nghị định 06 (Redline & As-Built Stamp)
 
 - Cập nhật tọa độ thực tế từ điểm đo trắc đạc vào mô hình CAD/BIM As-Built.
-- Tự động vẽ nét đỏ (Revision Cloud) và ghi chú mã tham chiếu FCR/RFI theo quy chuẩn [references/asbuilt-redline-and-handover-standards.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/asbuilt-redline-and-handover-standards.md).
-- Tự động sinh khung con dấu bản vẽ hoàn công chuẩn Phụ lục II Nghị định 06/2021/NĐ-CP (Mẫu số 01 hoặc Mẫu số 02).
+- Tự động vẽ nét đỏ (Revision Cloud) và ghi chú mã tham chiếu FCR/RFI theo [references/asbuilt-redline-and-handover-standards.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/asbuilt-redline-and-handover-standards.md).
+- Tự động sinh khung con dấu hoàn công chuẩn Phụ lục II Nghị định 06/2021/NĐ-CP (Mẫu số 01 hoặc Mẫu số 02).
 
-### Bước 8: Ký số 3 Bên Hồ sơ Hoàn công, Chốt $\Delta \text{QTO}$ & Merkle Passport LOD 500 (Final Handover)
+### Bước 9: Ký số 3 Bên Hồ sơ Hoàn công, Chốt $\Delta \text{QTO}$ & Đánh Giá Carbon Ẩn 6D LCA (Final Handover & 6D LCA)
 
 - Ký số 3 bên điện tử niêm phong bản vẽ Hoàn công và Biên bản nghiệm thu hoàn thành hạng mục.
 - Chạy động cơ đối soát 3 chiều: $\Delta \text{QTO} = \text{QTO}_{\text{As-Built}} - \text{QTO}_{\text{BOQ}} - \text{QTO}_{\text{VO}}$ để chốt quyết toán hợp đồng.
-- Nối toàn bộ mã băm tài liệu vào Cây Merkle (`engineering_merkle_roots`), xuất Hộ chiếu số bàn giao LOD 500 (Living Digital Twin Passport) chuyển giao sang hệ thống Quản trị Vận hành BMS/FM.
+- Bóc tách toàn bộ khối lượng vật tư xuất Báo cáo Carbon ẩn 6D ($\text{kgCO}_2\text{e}$) theo ISO 14040/14044.
+
+### Bước 10: Quản Trị Vòng Đời Tài Sản Số 7D & Bàn Giao Hộ Chiếu Sống LOD 500 (Living Twin Handover)
+
+- Tích hợp thông số MTBF, RUL %, chu kỳ bảo dưỡng định kỳ O&M vào từng thiết bị BIM theo [references/6d-7d-carbon-asset-lifecycle-handover.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/6d-7d-carbon-asset-lifecycle-handover.md).
+- Nối toàn bộ mã băm tài liệu vào Cây Merkle (`engineering_merkle_roots`), xuất Hộ chiếu số bàn giao Living Digital Twin Passport LOD 500 chuyển giao sang hệ thống Quản trị Tòa nhà BMS/FM.
 
 ---
 
 ## 3. TÀI LIỆU THAM CHIẾU KỸ THUẬT (REFERENCES)
 
+- [references/multi-tier-corridor-and-trapeze-engineering.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/multi-tier-corridor-and-trapeze-engineering.md): Cẩm nang quy hoạch hành lang kỹ thuật đa tầng, khoảng cách cách ly an toàn và tính toán tải trọng giá đỡ Trapeze.
+- [references/hydraulic-network-balancing-and-sizing.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/hydraulic-network-balancing-and-sizing.md): Cẩm nang cân bằng thủy lực mạng lưới, phương pháp Darcy-Weisbach và xác định tuyến trở lực lớn nhất.
+- [references/dfma-spool-isometric-and-skid-modularization.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/dfma-spool-isometric-and-skid-modularization.md): Cẩm nang xuất bản vẽ Isometric chế tạo DfMA Spool và module hóa cụm thiết bị Skid tiền chế.
+- [references/6d-7d-carbon-asset-lifecycle-handover.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/6d-7d-carbon-asset-lifecycle-handover.md): Cẩm nang định mức carbon 6D LCA và quản trị vòng đời tài sản số 7D LOD 500.
 - [references/engineering-rationale-and-annotation-standards.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/engineering-rationale-and-annotation-standards.md): Cẩm nang quy chuẩn ghi chú, giải thích lý do kỹ thuật và từ điển giải trình chế tạo MEPF.
 - [references/ductwork-drift-and-diffuser-clearance-standards.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/ductwork-drift-and-diffuser-clearance-standards.md): Cẩm nang độ dài dôi ống gió, căn chỉnh tim miệng gió trần và dung sai gót hộp gió +10mm.
 - [references/pipe-spooling-and-fitting-deduction-standards.md](file:///c:/Users/liend/xboss/.agents/skills/cad-bim-master/references/pipe-spooling-and-fitting-deduction-standards.md): Cẩm nang tra cứu dung sai mối nối, ngập âm socket, DfMA Spooling và Micro-BOM 5 cấp.

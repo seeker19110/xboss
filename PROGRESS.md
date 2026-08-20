@@ -41,6 +41,32 @@
   - `ui-ux-craftsman`: Bento Grid, Data-Dense Tabular, Thumb-Zone Mobile, Dark-First CSS Tokens, WCAG 2.2 AA.
   - `engineering-agent-orchestrator`: AI Swarm 11 Tác tử, Gate 0, Hòa giải 7 bước, Sổ cái Merkle Tree, Controlled Autonomy A0-A2.
 
+## M92 — CAD/BIM Super-Intelligence Apex Upgrade & Generative Multi-Tier Ecosystem (2026-08-20)
+
+- **[AI, đã làm] Migration 0126:** `migrations/0126_cad_bim_super_intelligence_apex.sql` tạo 7 bảng CSDL mới:
+  - `engineering_corridor_layouts`: Quy hoạch ma trận cao độ hành lang kỹ thuật đa tầng (Tier 1 Top Duct $\rightarrow$ Tier 2 Mid Tray $\rightarrow$ Tier 3 Bot Pipes $\rightarrow$ Sprinkler).
+  - `engineering_trapeze_hangers`: Tính toán kết cấu tải trọng / ứng suất uốn $\sigma \le 160\text{MPa}$ / độ võng $f \le L/360$ của giá đỡ Trapeze (Unistrut P1000/P1001 + Ty ren M10/M12/M16).
+  - `engineering_hydraulic_networks`: Đồ thị không gian mạng thủy lực, tự động định cỡ (Auto-Sizing), cân bằng vòng kín và van cân bằng $K_v$ trên tuyến trở lực lớn nhất (Critical Index Run).
+  - `engineering_spool_isometrics`: Tự động sinh bản vẽ chế tạo Isometric DfMA Spool góc $30^\circ$, Micro-BOM 5 cấp, mã QR tem xưởng và trừ độ ngập âm Socket Depth.
+  - `engineering_modular_skids`: Module hóa cụm thiết bị đúc sẵn (PRV Station, Booster Pump Skid, Chiller Manifold).
+  - `engineering_carbon_lifecycle_records`: Bóc tách phát thải carbon ẩn 6D ($\text{kgCO}_2\text{e}$) và quản trị vòng đời tài sản số 7D (MTBF, RUL %, O&M).
+  - `engineering_remnant_inventory`: Bảng quản lý kho phôi thừa tái sử dụng phục vụ giải thuật Genetic Nesting khống chế phế liệu $< 0.8\%$.
+- **[AI, đã làm] Động cơ TypeScript cốt lõi (`lib/`):**
+  - `lib/engineering-cad-corridor.ts`: Generative Multi-Tier Corridor Planner & Trapeze Structural Engine.
+  - `lib/engineering-cad-hydraulic-network.ts`: Flow Graph Builder, Darcy-Weisbach / Colebrook-White Pressure Drop & Critical Run Solver.
+  - `lib/engineering-cad-dfma-isometric.ts`: 3D-to-2D Axonometric Isometric Projector, Bubble Tags, Modular Skid Assembler & Remnant-First Genetic Nesting.
+  - `lib/engineering-cad-carbon-lifecycle.ts`: 6D Embodied Carbon LCA & 7D Predictive Asset MTBF/RUL Engine, Living Digital Twin Passport LOD 500 Export.
+  - `lib/engineering-scan-to-bim.ts`: Bổ sung giải thuật RANSAC 3D Cylinder Fitting & Tự động sinh Nét Đỏ Hoàn Công (Revision Cloud) và Con dấu hoàn công chuẩn NĐ 06/2021/NĐ-CP (Mẫu 01 và 02).
+- **[AI, đã làm] API Routes:**
+  - `app/api/engineering/cad-corridor/route.ts`
+  - `app/api/engineering/cad-isometric/route.ts`
+  - `app/api/engineering/cad-carbon-lifecycle/route.ts`
+- **[AI, đã làm] Nâng cấp Siêu Skill `cad-bim-master` (12 Invariants & 4 Cẩm nang mới):**
+  - Bổ sung 12 Nguyên Tắc Bất Biến (The 12 Apex Invariants).
+  - Mở rộng Quy trình 10 Bước Siêu Trí Tuệ (The 10-Step Apex Closed Loop).
+  - Bổ sung 4 cẩm nang tham chiếu chuyên sâu: `multi-tier-corridor-and-trapeze-engineering.md`, `hydraulic-network-balancing-and-sizing.md`, `dfma-spool-isometric-and-skid-modularization.md`, `6d-7d-carbon-asset-lifecycle-handover.md`.
+- **[AI, đã làm] Kiểm thử & Release Gate:** 14/14 ca test mới trong 4 test suites (`tests/engineering-cad-corridor.test.ts`, `tests/engineering-cad-dfma-isometric.test.ts`, `tests/engineering-cad-hydraulic-network.test.ts`, `tests/engineering-cad-carbon-lifecycle.test.ts`) và toàn bộ 193 file test trong release gate đều đạt 100% PASS.
+
 ## M89 — CAD/BIM Professional Pinnacle Upgrade & Fabrication Nesting Suite (2026-08-20)
 
 - **[AI, đã làm] Migration 0122:** `migrations/0122_cad_bim_professional_upgrade.sql` tạo 4 bảng mới:

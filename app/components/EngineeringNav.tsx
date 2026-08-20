@@ -40,7 +40,7 @@ export interface NavItem {
 }
 
 const CATEGORIES: { key: NavCategory; label: string }[] = [
-  { key: "all", label: "Tất cả (34)" },
+  { key: "all", label: "Tất cả (35)" },
   { key: "copilot", label: "AI & Copilot" },
   { key: "spatial", label: "BIM/CAD & Không gian" },
   { key: "commercial", label: "Tài chính & Pháp lý" },
@@ -55,6 +55,13 @@ const NAV_ITEMS: NavItem[] = [
     category: "governance",
     icon: Sparkles,
     badge: "Master",
+  },
+  {
+    href: "/engineering/zero-error",
+    label: "Zero-Error & Anti-Fraud (M90)",
+    category: "governance",
+    icon: ShieldCheck,
+    badge: "Zero-Defect",
   },
   {
     href: "/engineering/esign",
