@@ -26,6 +26,7 @@ import { Skeleton } from "@/app/components/Skeleton";
 import ScheduleControlPanel from "@/app/components/ScheduleControlPanel";
 import DelayedGroupsTable from "@/app/components/DelayedGroupsTable";
 import SCurveChart from "@/app/components/SCurveChart";
+import ProgressMap from "@/app/components/ProgressMap";
 import { LookaheadTable } from "@/app/components/LookaheadTable";
 import SystemFilter from "@/app/components/SystemFilter";
 import { formatDateVN } from "@/lib/date";
@@ -246,6 +247,17 @@ function ScheduleControlContent() {
           </div>
         </div>
       )}
+
+      {/* Tiến Độ Theo Tầng (ProgressMap Matrix) */}
+      <div className="p-5 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-3">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+          <Layers className="w-4 h-4 text-sky-400" />
+          Bản Đồ Tiến Độ Theo Tầng & Hệ (Progress Map)
+        </h3>
+        <div className="pt-2">
+          <ProgressMap system={system} hideControls={true} />
+        </div>
+      </div>
     </div>
   );
 

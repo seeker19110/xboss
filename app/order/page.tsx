@@ -1,6 +1,6 @@
-import { redirect } from 'next/navigation';
+import { redirect } from "next/navigation";
 
-// Trang đơn đặt hàng đã chuyển sang /materials/order-form.
+// Trang đơn đặt hàng đã chuyển sang /procurement?tab=orders.
 export default function OrderPage() {
-  redirect('/materials/order-form');
+  redirect("/procurement?tab=orders");
 }

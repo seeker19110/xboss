@@ -1,3 +1,3 @@
 "use client";
 
-export { default } from "@/app/mepf-cad-bim-studio/page";
+export { default } from "@/app/engineering/god-tier-studio/page";

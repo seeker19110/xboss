@@ -25,6 +25,38 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
+## Hợp Nhất Toàn Diện Code Các Tính Năng Cùng Nhóm Vào 7 Unified Hubs (2026-08-21)
+
+- **[AI, đã làm] Hợp Nhất & Tinh Gọn Triệt Để Mã Nguồn Theo 4 Cụm Phân Hệ Cốt Lõi:**
+  - **1. Triệt Tiêu Chuỗi Alias Stubs & Dọn Dẹp Routing (PR-1):**
+    - [`app/cad-bim/page.tsx`](file:///c:/Users/liend/xboss/app/cad-bim/page.tsx): Re-export trực tiếp từ `engineering/god-tier-studio`, xóa bỏ lớp trung gian `mepf-cad-bim-studio`.
+    - [`app/order/page.tsx`](file:///c:/Users/liend/xboss/app/order/page.tsx) & [`app/materials/order-form/page.tsx`](file:///c:/Users/liend/xboss/app/materials/order-form/page.tsx): Đồng bộ redirect trực tiếp về `/procurement?tab=orders`.
+  - **2. Hợp Nhất Trung Tâm Kế Hoạch & Tiến Độ WBS/EVM (PR-2):**
+    - [`app/schedule/page.tsx`](file:///c:/Users/liend/xboss/app/schedule/page.tsx): Nhúng trực tiếp ma trận `ProgressMap` theo tầng vào tab `wbs` (Lưới WBS & Kiểm Soát Trễ).
+    - Chuẩn hóa các trang đơn lẻ [`app/scurve/page.tsx`](file:///c:/Users/liend/xboss/app/scurve/page.tsx) ($\rightarrow$ `/schedule?tab=scurve`), [`app/timeline/page.tsx`](file:///c:/Users/liend/xboss/app/timeline/page.tsx) ($\rightarrow$ `/schedule?tab=wbs`), [`app/schedule-control/page.tsx`](file:///c:/Users/liend/xboss/app/schedule-control/page.tsx) ($\rightarrow$ `/schedule?tab=wbs`) thành client-side redirects bảo toàn 100% backward compatibility.
+  - **3. Hợp Nhất Trung Tâm Hợp Đồng, Chi Phí, Quyết Toán & FIDIC (PR-3):**
+    - Tách và nhúng trọn bộ 5 tab chuyên sâu tại `app/commercial/_components/`:
+      - [`ContractsTab.tsx`](file:///c:/Users/liend/xboss/app/commercial/_components/ContractsTab.tsx): Quản trị hợp đồng A-B/B-B', Hạn mức chi phí & Bảo hiểm bảo lãnh.
+      - [`IpcPaymentsTab.tsx`](file:///c:/Users/liend/xboss/app/commercial/_components/IpcPaymentsTab.tsx): Sổ chứng chỉ IPC TT96/2021, Đề nghị thanh toán & Đề xuất duyệt chi.
+      - [`VariationsTab.tsx`](file:///c:/Users/liend/xboss/app/commercial/_components/VariationsTab.tsx): Sổ thay đổi phát sinh VO & Bù giá trượt giá GSO Điều 12.3 FIDIC.
+      - [`ClaimsTab.tsx`](file:///c:/Users/liend/xboss/app/commercial/_components/ClaimsTab.tsx): Sổ khiếu nại Claims, trạm gác Time-Bar 28 ngày & Phân tích TIA.
+      - [`FinanceCashflowTab.tsx`](file:///c:/Users/liend/xboss/app/commercial/_components/FinanceCashflowTab.tsx): Sổ kế toán dự án, Dòng tiền Dynamic Cashflow M85 & Ký số e-Sign M84.
+    - Chuyển hướng tự động an toàn tại `/contracts`, `/costs`, `/insurance`, `/payment-certs`, `/payments`, `/proposals`, `/variations`, `/claims`, `/finance` về các tab/sub-section tương ứng trong `/commercial`.
+  - **4. Hợp Nhất Trung Tâm Chỉ Huy Tác Nghiệp Hiện Trường & QA/QC/HSE (PR-4):**
+    - Tách và nhúng trọn bộ 5 tab tác nghiệp tại `app/site/_components/`:
+      - [`TasksDiaryTab.tsx`](file:///c:/Users/liend/xboss/app/site/_components/TasksDiaryTab.tsx): Nhật ký thi công TT06/2021/TT-BXD, Chấm công hiện trường, Tải nhân lực & Lối tắt My Tasks / Voice Copilot.
+      - [`ApprovalsQcTab.tsx`](file:///c:/Users/liend/xboss/app/site/_components/ApprovalsQcTab.tsx): Nghiệm thu 2 bước, Ma trận Hold-Points & Sổ phiếu NCR.
+      - [`WorkFrontsTab.tsx`](file:///c:/Users/liend/xboss/app/site/_components/WorkFrontsTab.tsx): Điều phối mặt bằng thi công & Giải phóng phân khu.
+      - [`HseSafetyTab.tsx`](file:///c:/Users/liend/xboss/app/site/_components/HseSafetyTab.tsx): An toàn HSE QCVN 18:2021, Camera AI Vision M87 & Ma trận rủi ro.
+      - [`EquipmentVehiclesTab.tsx`](file:///c:/Users/liend/xboss/app/site/_components/EquipmentVehiclesTab.tsx): Kiểm định máy móc TT36/2019/TT-BLĐTBXH & Nhật trình xe ra vào.
+    - Chuyển hướng tự động an toàn tại `/diary`, `/attendance`, `/resources`, `/quality`, `/work-fronts`, `/hse`, `/risks`, `/equipment`, `/vehicles` về các tab tương ứng trong `/site`.
+- **[AI, đã làm] Verification & Release Gates:**
+  - `npm run lint` & `npm run typecheck`: 0 lỗi, 0 warnings.
+  - `npm run check:sw-exclude`: 100% passed.
+  - `npm run check:migrations`: 129 migrations tuần tự hợp lệ.
+  - `npm test -- --release-gate`: 199/199 test files pass 100% (0 errors).
+  - `npm run build`: Production Build biên dịch thành công 100% routes.
+
 ## Chuẩn Hóa UI/UX Đẳng Cấp Thần Thánh & Khép Kín Vòng Đời Dự Án 6 Giai Đoạn (2026-08-21)
 
 - **[AI, đã làm] Tái Cấu Trúc Toàn Diện Giao Diện Theo Chuỗi Quy Trình Nghiệp Vụ:**

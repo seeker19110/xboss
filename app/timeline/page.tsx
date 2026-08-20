@@ -1,27 +1,39 @@
 "use client";
-import { useEffect, useState } from "react";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Layers, ArrowRight } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
-import ProgressMap from "@/app/components/ProgressMap";
-import SystemFilter from "@/app/components/SystemFilter";
 
-export default function TimelinePage() {
-  const [system, setSystem] = useState("");
-  // Chỉ mount ProgressMap SAU khi đã đọc xong `?system=` từ URL — tránh nó fetch lần đầu
-  // với system="" rồi lại fetch lại khi state cập nhật (race condition, xem M36).
-  const [ready, setReady] = useState(false);
+export default function TimelineRedirectPage() {
+  const router = useRouter();
 
-  // Đọc `?system=` lúc mount để link chia sẻ/từ hub trỏ thẳng vào đúng bộ lọc (M36).
   useEffect(() => {
-    setSystem(new URLSearchParams(window.location.search).get("system") ?? "");
-    setReady(true);
-  }, []);
+    router.replace("/schedule?tab=wbs");
+  }, [router]);
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
-      <AppHeader title="Timeline tầng" back>
-        <SystemFilter value={system} onChange={setSystem} />
-      </AppHeader>
-      <main className="px-3 sm:px-6 py-4 w-full">{ready && <ProgressMap system={system} />}</main>
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
+      <AppHeader />
+      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-4">
+        <div className="p-4 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-sky-400">
+          <Layers className="w-10 h-10 animate-pulse" />
+        </div>
+        <div className="space-y-1">
+          <h2 className="text-lg font-bold text-zinc-100">
+            Đang chuyển tiếp đến Bản Đồ Tiến Độ Theo Tầng...
+          </h2>
+          <p className="text-xs text-zinc-400">
+            Timeline tầng đã được hợp nhất tại <b>/schedule?tab=wbs</b>.
+          </p>
+        </div>
+        <a
+          href="/schedule?tab=wbs"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-semibold text-xs transition shadow"
+        >
+          Truy Cập Ngay <ArrowRight size={14} />
+        </a>
+      </div>
     </div>
   );
 }
