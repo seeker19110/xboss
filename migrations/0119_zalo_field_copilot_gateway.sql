@@ -48,7 +48,7 @@ ALTER TABLE zalo_user_bindings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE zalo_site_message_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE zalo_field_action_dispatches ENABLE ROW LEVEL SECURITY;
 
-DO  BEGIN
+DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'zalo_user_bindings_project_scope') THEN
         CREATE POLICY zalo_user_bindings_project_scope ON zalo_user_bindings
             USING (project_id::text = current_setting('app.project_id', true) OR current_setting('app.project_id', true) = '*');
@@ -61,4 +61,4 @@ DO  BEGIN
         CREATE POLICY zalo_field_action_dispatches_project_scope ON zalo_field_action_dispatches
             USING (project_id::text = current_setting('app.project_id', true) OR current_setting('app.project_id', true) = '*');
     END IF;
-END ;
+END $$;

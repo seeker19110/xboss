@@ -49,7 +49,7 @@ ALTER TABLE engineering_cashflow_forecast_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE engineering_cashflow_period_projections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE engineering_working_capital_risks ENABLE ROW LEVEL SECURITY;
 
-DO  BEGIN
+DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'engineering_cashflow_forecast_runs_project_scope') THEN
         CREATE POLICY engineering_cashflow_forecast_runs_project_scope ON engineering_cashflow_forecast_runs
             USING (project_id::text = current_setting('app.project_id', true) OR current_setting('app.project_id', true) = '*');
@@ -62,4 +62,4 @@ DO  BEGIN
         CREATE POLICY engineering_working_capital_risks_project_scope ON engineering_working_capital_risks
             USING (project_id::text = current_setting('app.project_id', true) OR current_setting('app.project_id', true) = '*');
     END IF;
-END ;
+END $$;

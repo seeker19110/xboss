@@ -113,7 +113,12 @@ export type ServerEnv = z.infer<typeof serverSchema>;
  * Thiếu/sai biến bắt buộc → throw Error với danh sách lỗi rõ ràng.
  */
 export function parseServerEnv(source: Record<string, string | undefined>): ServerEnv {
-  const parsed = serverSchema.safeParse(source);
+  // Chuẩn hoá: biến rỗng ("") xem như undefined (không cấu hình)
+  const normalized: Record<string, string | undefined> = {};
+  for (const [k, v] of Object.entries(source)) {
+    normalized[k] = v === "" ? undefined : v;
+  }
+  const parsed = serverSchema.safeParse(normalized);
   if (!parsed.success) {
     const lines = parsed.error.issues
       .map((i) => `  - ${i.path.join(".") || "(root)"}: ${i.message}`)

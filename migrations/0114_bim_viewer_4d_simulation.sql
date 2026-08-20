@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS engineering_bim_models (
     project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     discipline TEXT NOT NULL DEFAULT 'mepf', -- hvac | plumbing | electrical | firefighting | structure | combined
-    floor_id BIGINT REFERENCES floors(id) ON DELETE SET NULL,
+    floor_id BIGINT,
     format TEXT NOT NULL DEFAULT 'json_mesh', -- ifc | gltf | json_mesh
     file_url TEXT,
     file_hash TEXT,

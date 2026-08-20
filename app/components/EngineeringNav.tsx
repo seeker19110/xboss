@@ -50,6 +50,20 @@ const CATEGORIES: { key: NavCategory; label: string }[] = [
 
 const NAV_ITEMS: NavItem[] = [
   {
+    href: "/engineering/pipe-stash-hunter",
+    label: "Pipe Stash Hunter (M95)",
+    category: "spatial",
+    icon: Scale,
+    badge: "5-Way Mass",
+  },
+  {
+    href: "/engineering/nextgen-apex",
+    label: "Next-Gen Apex OS (M93/M94)",
+    category: "governance",
+    icon: Zap,
+    badge: "Next-Gen",
+  },
+  {
     href: "/engineering",
     label: "Apex Cockpit (M88)",
     category: "governance",

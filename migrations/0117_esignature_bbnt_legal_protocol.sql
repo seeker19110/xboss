@@ -56,7 +56,7 @@ ALTER TABLE engineering_esign_envelopes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE engineering_esign_signatories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE engineering_esign_audit_certificates ENABLE ROW LEVEL SECURITY;
 
-DO  BEGIN
+DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'engineering_esign_envelopes_project_scope') THEN
         CREATE POLICY engineering_esign_envelopes_project_scope ON engineering_esign_envelopes
             USING (project_id::text = current_setting('app.project_id', true) OR current_setting('app.project_id', true) = '*');
@@ -69,4 +69,4 @@ DO  BEGIN
         CREATE POLICY engineering_esign_audit_certificates_project_scope ON engineering_esign_audit_certificates
             USING (project_id::text = current_setting('app.project_id', true) OR current_setting('app.project_id', true) = '*');
     END IF;
-END ;
+END $$;

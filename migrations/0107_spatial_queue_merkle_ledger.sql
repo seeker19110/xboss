@@ -49,17 +49,46 @@ CREATE TABLE IF NOT EXISTS engineering_spatial_compute_cache (
 );
 
 ALTER TABLE engineering_async_tasks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE engineering_merkle_roots ENABLE ROW LEVEL SECURITY;
-ALTER TABLE engineering_spatial_compute_cache ENABLE ROW LEVEL SECURITY;
-
+ALTER TABLE engineering_async_tasks FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS rls_engineering_async_tasks ON engineering_async_tasks;
 CREATE POLICY rls_engineering_async_tasks ON engineering_async_tasks
-  FOR ALL USING (project_id IN (SELECT project_id FROM project_members WHERE user_id = NULLIF(current_setting('app.current_user_id', true), '')::BIGINT));
+  FOR ALL
+  USING (
+    project_id = NULLIF(current_setting('app.project_id', true), '')::bigint
+    OR current_setting('app.project_id', true) = '*'
+  )
+  WITH CHECK (
+    project_id = NULLIF(current_setting('app.project_id', true), '')::bigint
+    OR current_setting('app.project_id', true) = '*'
+  );
 
+ALTER TABLE engineering_merkle_roots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE engineering_merkle_roots FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS rls_engineering_merkle_roots ON engineering_merkle_roots;
 CREATE POLICY rls_engineering_merkle_roots ON engineering_merkle_roots
-  FOR ALL USING (project_id IN (SELECT project_id FROM project_members WHERE user_id = NULLIF(current_setting('app.current_user_id', true), '')::BIGINT));
+  FOR ALL
+  USING (
+    project_id = NULLIF(current_setting('app.project_id', true), '')::bigint
+    OR current_setting('app.project_id', true) = '*'
+  )
+  WITH CHECK (
+    project_id = NULLIF(current_setting('app.project_id', true), '')::bigint
+    OR current_setting('app.project_id', true) = '*'
+  );
 
+ALTER TABLE engineering_spatial_compute_cache ENABLE ROW LEVEL SECURITY;
+ALTER TABLE engineering_spatial_compute_cache FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS rls_engineering_spatial_compute_cache ON engineering_spatial_compute_cache;
 CREATE POLICY rls_engineering_spatial_compute_cache ON engineering_spatial_compute_cache
-  FOR ALL USING (project_id IN (SELECT project_id FROM project_members WHERE user_id = NULLIF(current_setting('app.current_user_id', true), '')::BIGINT));
+  FOR ALL
+  USING (
+    project_id = NULLIF(current_setting('app.project_id', true), '')::bigint
+    OR current_setting('app.project_id', true) = '*'
+  )
+  WITH CHECK (
+    project_id = NULLIF(current_setting('app.project_id', true), '')::bigint
+    OR current_setting('app.project_id', true) = '*'
+  );
 
 CREATE INDEX IF NOT EXISTS idx_async_tasks_queue ON engineering_async_tasks(project_id, status, priority DESC, created_at ASC);
 CREATE INDEX IF NOT EXISTS idx_merkle_roots_proj ON engineering_merkle_roots(project_id, created_at DESC);

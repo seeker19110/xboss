@@ -48,7 +48,7 @@ ALTER TABLE engineering_hse_vision_scans ENABLE ROW LEVEL SECURITY;
 ALTER TABLE engineering_hse_detected_hazards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE engineering_hse_action_tickets ENABLE ROW LEVEL SECURITY;
 
-DO  BEGIN
+DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'engineering_hse_vision_scans_project_scope') THEN
         CREATE POLICY engineering_hse_vision_scans_project_scope ON engineering_hse_vision_scans
             USING (project_id::text = current_setting('app.project_id', true) OR current_setting('app.project_id', true) = '*');
@@ -61,4 +61,4 @@ DO  BEGIN
         CREATE POLICY engineering_hse_action_tickets_project_scope ON engineering_hse_action_tickets
             USING (project_id::text = current_setting('app.project_id', true) OR current_setting('app.project_id', true) = '*');
     END IF;
-END ;
+END $$;
