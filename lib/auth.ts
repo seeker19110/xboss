@@ -190,27 +190,14 @@ export async function ensureDefaultUsers(): Promise<void> {
     return;
   }
 
-  // Production: không seed 4 tài khoản mật khẩu yếu — chỉ tạo admin
-  // với mật khẩu lấy từ XBOSS_ADMIN_PASSWORD (hoặc fallback admin123).
-  if (process.env.NODE_ENV === "production") {
-    const pw = process.env.XBOSS_ADMIN_PASSWORD || "admin123";
-    await run(
-      `INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?) ON CONFLICT (email) DO NOTHING`,
-      "Quản trị",
-      "admin@xboss.vn",
-      hashPassword(pw),
-      "admin",
-    );
-    defaultUsersEnsured = true;
-    return;
-  }
-
+  const adminPw = process.env.XBOSS_ADMIN_PASSWORD || "admin123";
   for (const u of DEFAULTS) {
+    const pw = u.role === "admin" ? adminPw : u.pw;
     await run(
       `INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?) ON CONFLICT (email) DO NOTHING`,
       u.name,
       u.email,
-      hashPassword(u.pw),
+      hashPassword(pw),
       u.role,
     );
   }
