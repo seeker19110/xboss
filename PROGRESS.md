@@ -25,6 +25,18 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
+## Master Skills Blueprint & Nghiên cứu Nâng cấp Toàn diện Tính năng (2026-08-20)
+
+- **[AI, đã làm] Quy hoạch Nâng cấp Toàn diện:** Xuất bản tài liệu `docs/nghien-cuu-nang-cap-toan-dien-tinh-nang-va-skill-2026.md` phân rã chi tiết 17 Cụm nghiệp vụ và 34 phân hệ kỹ thuật theo chuẩn TCVN, FIDIC 1999/2017, ISO 19650, ISO 21597 và QCVN 18:2021/BXD.
+- **[AI, đã làm] Đóng gói Bộ 7 Master Skills (`.agents/skills/`):**
+  - `cad-bim-master`: Kỹ thuật Không gian, MEPF, AutoLISP, Nesting 1D/2D, Scan-to-BIM, BCF ISO 21597.
+  - `schedule-evm-controller`: WBS Roll-up, CPM Critical Path, EVM (SPI/CPI/EAC), Lookahead 7/14/21, Pareto.
+  - `qs-cost-contracts-master`: Định mức TT12, Điều khoản FIDIC, Time-Bar 28 ngày, TIA Claims, Dynamic Cashflow S-Curve.
+  - `site-field-commander`: Bàn giao mặt bằng Work-Front, Nhật ký TT06, NLP Copilot Gateway, QR Logistics, PWA Offline.
+  - `qaqc-safety-sentinel`: Điểm dừng Hold-Point, NCR 3 bước, e-Sign 3 bên NĐ06, HSE AI Computer Vision QCVN 18.
+  - `ui-ux-craftsman`: Bento Grid, Data-Dense Tabular, Thumb-Zone Mobile, Dark-First CSS Tokens, WCAG 2.2 AA.
+  - `engineering-agent-orchestrator`: AI Swarm, Gate 0, Hòa giải 7 bước, Sổ cái Merkle Tree, Controlled Autonomy A0-A2.
+
 ## M89 — CAD/BIM Professional Pinnacle Upgrade & Fabrication Nesting Suite (2026-08-20)
 
 - **[AI, đã làm] Migration 0122:** `migrations/0122_cad_bim_professional_upgrade.sql` tạo 4 bảng mới:
