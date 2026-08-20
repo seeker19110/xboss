@@ -1,5 +1,7 @@
-// lib/engineering-scan-to-bim.ts — AI Reality Scan-to-BIM & Deviation Mesh Engine (M70)
-import { query, queryOne } from "@/lib/db";
+// lib/engineering-scan-to-bim.ts — AI Reality Scan-to-BIM & Deviation Mesh Engine (M70 / M89)
+// M89: Fix B1 (SQL placeholder $→?), B5 (nearest-neighbor thật), thêm closedLoopSync
+import { query, queryOne, run } from "@/lib/db";
+import { createHash } from "crypto";
 
 export interface ScannedPoint3D {
   pointId: string;
@@ -45,7 +47,38 @@ export interface ScanToBimResult {
 }
 
 // ============================================================================
-// 1. THUẬT TOÁN PHÂN TÍCH SAI LỆCH SCAN-VS-BIM & REMEDIATION ENGINE
+// 1. NEAREST-NEIGHBOR MATCHING (Linear scan O(n))
+// ============================================================================
+
+export function findNearestScannedPoint(
+  target: [number, number, number],
+  points: ScannedPoint3D[],
+): ScannedPoint3D | null {
+  if (points.length === 0) return null;
+
+  let nearest = points[0];
+  let minDist = Math.sqrt(
+    (points[0].x - target[0]) ** 2 +
+      (points[0].y - target[1]) ** 2 +
+      (points[0].z - target[2]) ** 2,
+  );
+
+  for (let i = 1; i < points.length; i++) {
+    const pt = points[i];
+    const dist = Math.sqrt(
+      (pt.x - target[0]) ** 2 + (pt.y - target[1]) ** 2 + (pt.z - target[2]) ** 2,
+    );
+    if (dist < minDist) {
+      minDist = dist;
+      nearest = pt;
+    }
+  }
+
+  return nearest;
+}
+
+// ============================================================================
+// 2. THUẬT TOÁN PHÂN TÍCH SAI LỆCH SCAN-VS-BIM & REMEDIATION ENGINE
 // ============================================================================
 
 export function analyzeScanVsBimDeviations(
@@ -53,25 +86,35 @@ export function analyzeScanVsBimDeviations(
   pointCloudSource: string,
   spoolModels: BimSpoolModel[],
   scannedPoints: ScannedPoint3D[],
-  toleranceThresholdMm = 15.0, // Sai số cho phép 15mm theo TCVN 5687
+  toleranceThresholdMm = 15.0,
 ): ScanToBimResult {
   const deviations: DeviationItem[] = [];
   let maxDev = 0;
   let defects = 0;
 
+  const availablePoints = [...scannedPoints];
+
   for (let i = 0; i < spoolModels.length; i++) {
     const spool = spoolModels[i];
-    // Tìm điểm quét thực tế tương ứng (gần nhất)
-    const scanPt = scannedPoints[i] || {
-      pointId: `PT-${i + 1}`,
-      x: spool.designStartPoint[0] + (Math.random() * 20 - 10),
-      y: spool.designStartPoint[1] + (Math.random() * 20 - 10),
-      z: spool.designStartPoint[2] + (Math.random() * 20 - 10),
+    const target = spool.designStartPoint;
+
+    const nearestPt = findNearestScannedPoint(target, availablePoints);
+
+    const scanPt = nearestPt ?? {
+      pointId: `PT-DESIGN-${i + 1}`,
+      x: target[0],
+      y: target[1],
+      z: target[2],
     };
 
-    const deltaX = Math.round((scanPt.x - spool.designStartPoint[0]) * 10) / 10;
-    const deltaY = Math.round((scanPt.y - spool.designStartPoint[1]) * 10) / 10;
-    const deltaZ = Math.round((scanPt.z - spool.designStartPoint[2]) * 10) / 10;
+    if (nearestPt) {
+      const idx = availablePoints.findIndex((p) => p.pointId === nearestPt.pointId);
+      if (idx !== -1) availablePoints.splice(idx, 1);
+    }
+
+    const deltaX = Math.round((scanPt.x - target[0]) * 10) / 10;
+    const deltaY = Math.round((scanPt.y - target[1]) * 10) / 10;
+    const deltaZ = Math.round((scanPt.z - target[2]) * 10) / 10;
 
     const euclideanDev =
       Math.round(Math.sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ) * 10) / 10;
@@ -123,7 +166,46 @@ export function analyzeScanVsBimDeviations(
 }
 
 // ============================================================================
-// 2. PERSISTENCE & DATABASE
+// 3. CLOSED-LOOP SYNC ENGINE (WBS → IPC Payment)
+// ============================================================================
+
+export async function closedLoopSyncSpoolToWbs(
+  projectId: number,
+  spoolId: string,
+  wbsTaskId: number,
+  syncedQty: number,
+  syncedAmountVnd: number,
+): Promise<string> {
+  const syncCode = `SYNC-${Date.now()}-${spoolId.slice(0, 8).toUpperCase()}`;
+  const provenanceToken = createHash("sha256")
+    .update(
+      JSON.stringify({
+        projectId,
+        spoolId,
+        wbsTaskId,
+        syncedQty,
+        syncedAmountVnd,
+        syncCode,
+        ts: new Date().toISOString(),
+      }),
+    )
+    .digest("hex")
+    .substring(0, 32)
+    .toUpperCase();
+
+  await run(
+    `INSERT INTO engineering_closed_loop_sync_logs
+      (project_id, sync_code, spool_id, wbs_task_id, synced_qty, synced_amount_vnd, provenance_token)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (project_id, sync_code) DO NOTHING`,
+    [projectId, syncCode, spoolId, wbsTaskId, syncedQty, syncedAmountVnd, provenanceToken],
+  );
+
+  return provenanceToken;
+}
+
+// ============================================================================
+// 4. PERSISTENCE & DATABASE (B1 Fix: $1,$2 → ?)
 // ============================================================================
 
 export async function saveScanToBimRun(
@@ -136,9 +218,9 @@ export async function saveScanToBimRun(
       spools_analyzed_count, pass_rate_percent, max_deviation_mm,
       defects_count, deviation_details
     ) VALUES (
-      $1, $2, $3, $4,
-      $5, $6, $7,
-      $8, $9::jsonb
+      ?, ?, ?, ?,
+      ?, ?, ?,
+      ?, ?::jsonb
     )
     ON CONFLICT (project_id, scan_code) DO UPDATE SET
       pass_rate_percent = EXCLUDED.pass_rate_percent,
@@ -167,7 +249,10 @@ export async function listScanToBimRuns(
   projectId: number,
 ): Promise<Array<Record<string, unknown>>> {
   return query<Record<string, unknown>>(
-    `SELECT * FROM engineering_scan_to_bim_runs WHERE project_id = $1 ORDER BY created_at DESC LIMIT 50`,
+    `SELECT * FROM engineering_scan_to_bim_runs
+     WHERE project_id = ?
+     ORDER BY created_at DESC
+     LIMIT 50`,
     [projectId],
   );
 }

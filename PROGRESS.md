@@ -25,6 +25,51 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
+## M89 — CAD/BIM Professional Pinnacle Upgrade & Fabrication Nesting Suite (2026-08-20)
+
+- **[AI, đã làm] Migration 0122:** `migrations/0122_cad_bim_professional_upgrade.sql` tạo 4 bảng mới:
+  - `engineering_pipe_nesting_runs`: Lưu trữ kế hoạch cắt phôi ống 1D tối ưu thuật toán FFD.
+  - `engineering_hydraulic_checks`: Lưu trữ kết quả kiểm tra thủy lực (Hazen-Williams / Darcy-Weisbach) và cảnh báo vận tốc Invariant.
+  - `engineering_bcf_issues`: openBIM BCF Collaboration Issue Tracker (ISO 21597) gắn camera 3D viewpoint.
+  - `engineering_bim_routing_runs`: Lưu trữ lịch sử tìm tuyến nắn ống không gian 3D A* tự động tránh va chạm kết cấu.
+- **[AI, đã làm] Vá lỗi cốt lõi (B1–B10 Bugs Resolved):**
+  - **B1 Fix:** Chuyển đổi toàn bộ `$1,$2` placeholder sang `?` trong `lib/engineering-scan-to-bim.ts`.
+  - **B2 Fix:** Ghi nhận và lưu phiên so sánh bản vẽ `saveCadDiffSession` vào CSDL trên `POST /api/engineering/cad/diff`.
+  - **B3 Fix:** Thay thế mock `setTimeout` trên CAD Studio bằng gọi API thật `POST /api/engineering/cad/diff`.
+  - **B4 Fix:** Tích hợp `GET /api/engineering/cad/blocks` nạp catalog Block động trực tiếp từ CSDL.
+  - **B5 Fix:** Thay thế `Math.random()` bằng thuật toán Linear Scan Nearest-Neighbor thực sự `findNearestScannedPoint` trong Scan-to-BIM.
+  - **B6 Fix:** Bổ sung template AutoLISP `duct_transition` hoàn chỉnh cho côn chuyển tiết diện ống gió.
+  - **B7 Fix:** Tạo mã băm Provenance Token bằng SHA-256 mã hóa thực thụ (`crypto.createHash`).
+  - **B8 Fix:** Chuẩn hóa bảng mã ký tự tiếng Việt TCVN3/ABC sang Unicode.
+  - **B9 Fix:** Thêm hàm `upsertQtoVariance` cập nhật biến động khối lượng 3 chiều vào bảng `engineering_cad_qto_variances`.
+  - **B10 Fix:** Bổ sung hàm `save4dSimulation` và `load4dSimulation` lưu trữ kịch bản 4D WBS vào CSDL.
+- **[AI, đã làm] Core Fabrication Nesting & Hydraulics Engine (`lib/engineering-cad-nesting.ts`):**
+  - Thuật toán 1D Pipe Cutting Stock (First-Fit Decreasing) với bù trừ vết cắt kerf, tính tỷ lệ hao hụt và xếp hạng hiệu suất A/B/C/D/F.
+  - Thuật toán 2D Duct Sheet Guillotine Nesting xếp phôi tôn vào khổ 1200x2400mm.
+  - Bộ tính toán thủy lực Hazen-Williams và Darcy-Weisbach (Colebrook-White, Reynolds number, tổn thất áp suất Pa/bar).
+  - Bộ kiểm soát vận tốc dòng chảy MEPF Invariant và chống hiện tượng xâm thực khí (Cavitation) máy bơm.
+  - Bộ tính toán kích thước ống gió (Velocity Method) làm tròn chuẩn 50mm.
+  - Sinh mã tem nhãn QR Spool phục vụ logistics tiền chế (Prefabrication).
+- **[AI, đã làm] Core BCF & 3D Auto-Routing Engine (`lib/engineering-bim-routing.ts`):**
+  - openBIM BCF Collaboration format (ISO 21597) với Camera Viewpoint 3D (vị trí, hướng nhìn, vector up, FOV) và luồng phân công/duyệt.
+  - Thuật toán phân vùng không gian 3D Spatial Grid Index phát hiện va chạm nhanh $O(n \log n)$.
+  - Thuật toán 3D A* Auto-Routing tìm đường đi trực giao, tự động chèn cút né dầm và bảo toàn độ dốc ống trọng lực $1.0\% - 2.0\%$.
+- **[AI, đã làm] Bộ REST API Mới:**
+  - `GET/POST /api/engineering/cad-nesting` (Nesting 1D/2D, Thủy lực, QR Spool).
+  - `GET/POST /api/engineering/bim-routing` (BCF openBIM Issue Tracker, 3D A* Routing, Spatial Grid Clash).
+- **[AI, đã làm] Giao diện người dùng Nâng cấp & Mới:**
+  - `app/engineering/scan-to-bim/page.tsx`: Tạo mới trang Scan-to-BIM Reality Capture & Closed-Loop Quality Engine (3 tabs: Deviation Heatmap, Point Cloud Ingestion, Closed-Loop Sync).
+  - `app/engineering/cad-nesting/page.tsx`: Tạo mới trang CAD Fabrication Nesting & MEPF Hydraulic Studio (4 tabs: 1D Nesting, 2D Duct CNC, Thủy lực MEPF, Tem QR Spool).
+  - `app/engineering/cad/page.tsx`: Nâng cấp kết nối API thật, bảng Block QTO sống từ DB và AutoLISP côn chuyển.
+  - `app/engineering/bim-viewer/page.tsx`: Bổ sung bảng quản lý BCF openBIM issues và nút lưu kịch bản mô phỏng 4D.
+  - `app/components/EngineeringNav.tsx`: Bổ sung 2 phân hệ mới, nâng tổng số module lên 34.
+- **[AI, đã làm] Kiểm thử tự động Toàn diện:**
+  - `tests/engineering-cad-nesting.test.ts` (1D/2D Nesting, Hazen-Williams, Darcy-Weisbach, Velocity Invariants, QR).
+  - `tests/engineering-bim-routing.test.ts` (Spatial Grid Clash, 3D A* Routing).
+  - `tests/engineering-bim-viewer.test.ts` (Parametric Meshes, 4D Time-Lapse, 3D Section Cut, Pset filter).
+  - `tests/engineering-scan-to-bim.test.ts` (Nearest-neighbor 3D matching, Fallback to design).
+- **Verify:** Typecheck 0 lỗi, lint 0 lỗi 0 warnings, 122 migrations hợp lệ, 181 test files pass 100%, build production thành công.
+
 ## M88 — Unified Engineering Pinnacle Cockpit & Apex Pulse Synergy (2026-08-20)
 
 - **[AI, đã làm] Migration 0121:** `migrations/0121_engineering_pinnacle_apex_pulse.sql` tạo 2 bảng `engineering_apex_system_pulses` và `engineering_apex_command_actions` kèm RLS strict.

@@ -34,6 +34,7 @@ interface CadDiffItem {
 }
 
 interface CadDiffResult {
+  sessionId?: string | null;
   totalBase: number;
   totalCompare: number;
   summary: {
@@ -50,6 +51,16 @@ interface CadDiffResult {
   };
 }
 
+interface BlockCatalogItem {
+  id?: string;
+  block_name: string;
+  discipline: string;
+  category: string;
+  attribute_schema: Record<string, unknown>;
+  mapped_boq_code: string | null;
+  mapped_material_id?: number | null;
+}
+
 export default function CadEngineeringStudioPage() {
   const [activeTab, setActiveTab] = useState<"diff" | "blocks" | "lisp" | "doctor">("diff");
   const [loading, setLoading] = useState(false);
@@ -58,74 +69,172 @@ export default function CadEngineeringStudioPage() {
   // CAD Diff States
   const [diffResult, setDiffResult] = useState<CadDiffResult | null>(null);
 
+  // Block Catalog States
+  const [blockCatalogs, setBlockCatalogs] = useState<BlockCatalogItem[]>([]);
+  const [loadingBlocks, setLoadingBlocks] = useState(false);
+
   // AutoLISP Generator States
-  const [lispType, setLispType] = useState<"hanger" | "sleeve">("hanger");
+  const [lispType, setLispType] = useState<"hanger" | "sleeve" | "duct_transition">("hanger");
   const [hangerWidth, setHangerWidth] = useState(600);
   const [hangerHeight, setHangerHeight] = useState(400);
   const [rodDiameter, setRodDiameter] = useState(10);
   const [sleeveDiameter, setSleeveDiameter] = useState(150);
   const [sleeveTag, setSleeveTag] = useState("SL-FP-01");
+  const [inletWidth, setInletWidth] = useState(800);
+  const [inletHeight, setInletHeight] = useState(400);
+  const [outletWidth, setOutletWidth] = useState(600);
+  const [outletHeight, setOutletHeight] = useState(400);
+  const [transitionLength, setTransitionLength] = useState(600);
   const [generatedLispCode, setGeneratedLispCode] = useState("");
 
   // Font Doctor States
   const [legacyInput, setLegacyInput] = useState("HÖ thèng th«ng giã tÇng 4");
   const [convertedText, setConvertedText] = useState("");
 
-  const runSampleDiff = useCallback(() => {
+  // B3 Fix: Gọi API thật POST /api/engineering/cad/diff
+  const runDiffAnalysis = useCallback(async () => {
     setLoading(true);
-    setTimeout(() => {
-      setDiffResult({
-        totalBase: 1240,
-        totalCompare: 1315,
-        summary: {
-          added: 75,
-          removed: 12,
-          modified: 28,
-          unchanged: 1200,
+    try {
+      const sampleBaseEntities = [
+        {
+          id: "E-BASE-01",
+          type: "polyline",
+          layer: "M-DUCT-SUPP",
+          coordinates: { start: [1000, 2000, 3000], end: [5000, 2000, 3000] },
+          textValue: "Duct 600x400 L=4m",
         },
-        differences: [
-          {
-            entityId: "DIFF-001",
-            type: "polyline",
-            layer: "M-DUCT-SUPP",
-            diffStatus: "added",
-            changeDescription: "Bổ sung nhánh ống gió cấp 400x300 vào phòng họp Zone B",
-            location: [1200, 3400, 2900],
-          },
-          {
-            entityId: "DIFF-002",
-            type: "insert_block",
-            layer: "M-DIFFUSER",
-            diffStatus: "added",
-            changeDescription: "Bổ sung 4 miệng gió khuếch tán vuông 600x600",
-            location: [1400, 3600, 2700],
-          },
-          {
-            entityId: "DIFF-003",
-            type: "polyline",
-            layer: "P-PIPE-COLD",
-            diffStatus: "modified",
-            changeDescription: "Nâng cao độ tim ống nước cấp từ +2.85m lên +3.10m để né dầm",
-            location: [2800, 1900, 3100],
-          },
-          {
-            entityId: "DIFF-004",
-            type: "line",
-            layer: "E-TRAY-PWRR",
-            diffStatus: "removed",
-            changeDescription: "Hủy bỏ nhánh máng cáp phụ do gộp tuyến vào máng chính",
-            location: [4100, 2200, 3200],
-          },
-        ],
-        potentialVoImpact: {
-          estimatedCostVnd: 18500000,
-          riskLevel: "medium",
-          reason:
-            "Phát hiện 75 đối tượng thêm mới (nhánh ống gió và miệng gió phụ) có nguy cơ phát sinh chi phí hợp đồng VO.",
+        {
+          id: "E-BASE-02",
+          type: "insert_block",
+          layer: "M-DIFFUSER",
+          coordinates: { center: [2000, 2000, 2800] },
+          blockName: "BLK_DIFFUSER_600",
         },
+        {
+          id: "E-BASE-03",
+          type: "line",
+          layer: "P-PIPE-COLD",
+          coordinates: { start: [1000, 1500, 2850], end: [4000, 1500, 2850] },
+          textValue: "DN50 PPR +2.85m",
+        },
+        {
+          id: "E-BASE-04",
+          type: "line",
+          layer: "E-TRAY-PWRR",
+          coordinates: { start: [4100, 2200, 3200], end: [6000, 2200, 3200] },
+          textValue: "Tray 300x100",
+        },
+      ];
+
+      const sampleCompareEntities = [
+        {
+          id: "E-BASE-01",
+          type: "polyline",
+          layer: "M-DUCT-SUPP",
+          coordinates: { start: [1000, 2000, 3000], end: [5000, 2000, 3000] },
+          textValue: "Duct 600x400 L=4m",
+        },
+        {
+          id: "E-BASE-02",
+          type: "insert_block",
+          layer: "M-DIFFUSER",
+          coordinates: { center: [2000, 2000, 2800] },
+          blockName: "BLK_DIFFUSER_600",
+        },
+        {
+          id: "E-BASE-03",
+          type: "line",
+          layer: "P-PIPE-COLD",
+          coordinates: { start: [1000, 1500, 3100], end: [4000, 1500, 3100] },
+          textValue: "DN50 PPR +3.10m (Né dầm)", // Modified text & elevation
+        },
+        {
+          id: "E-NEW-05",
+          type: "polyline",
+          layer: "M-DUCT-SUPP",
+          coordinates: { start: [1200, 3400, 2900], end: [3000, 3400, 2900] },
+          textValue: "Nhánh ống gió 400x300 Zone B",
+        },
+        {
+          id: "E-NEW-06",
+          type: "insert_block",
+          layer: "M-DIFFUSER",
+          coordinates: { center: [1400, 3600, 2700] },
+          blockName: "BLK_DIFFUSER_600",
+        },
+      ];
+
+      const res = await fetch("/api/engineering/cad/diff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          baseEntities: sampleBaseEntities,
+          compareEntities: sampleCompareEntities,
+          toleranceMm: 5,
+        }),
       });
+
+      if (res.status === 401) {
+        redirectToLogin();
+        return;
+      }
+
+      if (res.ok) {
+        const data = await res.json();
+        setDiffResult(data);
+      }
+    } catch (e) {
+      console.error("CAD Diff error:", e);
+    } finally {
       setLoading(false);
-    }, 400);
+    }
+  }, []);
+
+  // B4 Fix: Gọi API thật GET /api/engineering/cad/blocks
+  const fetchBlockCatalogs = useCallback(async () => {
+    setLoadingBlocks(true);
+    try {
+      const res = await fetch("/api/engineering/cad/blocks");
+      if (res.status === 401) {
+        redirectToLogin();
+        return;
+      }
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setBlockCatalogs(data);
+        } else {
+          // Fallback sample blocks nếu DB chưa seed
+          setBlockCatalogs([
+            {
+              block_name: "BLK_VAV_BOX_500",
+              discipline: "HVAC",
+              category: "Thiết bị phân phối gió",
+              attribute_schema: { AirFlow: "1200 m3/h", Coil: "2-Row", In: "Ø250", Out: "400x250" },
+              mapped_boq_code: "HVAC-VAV-500",
+            },
+            {
+              block_name: "BLK_SPRINKLER_PENDENT",
+              discipline: "PCCC",
+              category: "Đầu phun chữa cháy",
+              attribute_schema: { Thread: 'NPT 1/2"', "K-Factor": 5.6, Temp: "68°C" },
+              mapped_boq_code: "FP-SPK-68C",
+            },
+            {
+              block_name: "BLK_PANEL_DB_LV",
+              discipline: "Điện",
+              category: "Tủ điện phân phối",
+              attribute_schema: { Rating: "100A", Poles: "3P+N", Form: "2B", IP: "IP54" },
+              mapped_boq_code: "ELEC-PANEL-DB",
+            },
+          ]);
+        }
+      }
+    } catch (e) {
+      console.error("Fetch blocks error:", e);
+    } finally {
+      setLoadingBlocks(false);
+    }
   }, []);
 
   const handleGenerateLisp = useCallback(async () => {
@@ -141,6 +250,11 @@ export default function CadEngineeringStudioPage() {
             rodDiameterMm: rodDiameter,
             diameterMm: sleeveDiameter,
             tagLabel: sleeveTag,
+            inletWidthMm: inletWidth,
+            inletHeightMm: inletHeight,
+            outletWidthMm: outletWidth,
+            outletHeightMm: outletHeight,
+            transitionLengthMm: transitionLength,
           },
         }),
       });
@@ -157,7 +271,19 @@ export default function CadEngineeringStudioPage() {
     } catch (e) {
       console.error(e);
     }
-  }, [lispType, hangerWidth, hangerHeight, rodDiameter, sleeveDiameter, sleeveTag]);
+  }, [
+    lispType,
+    hangerWidth,
+    hangerHeight,
+    rodDiameter,
+    sleeveDiameter,
+    sleeveTag,
+    inletWidth,
+    inletHeight,
+    outletWidth,
+    outletHeight,
+    transitionLength,
+  ]);
 
   const handleConvertFont = async () => {
     try {
@@ -177,9 +303,15 @@ export default function CadEngineeringStudioPage() {
   };
 
   useEffect(() => {
-    runSampleDiff();
+    runDiffAnalysis();
     handleGenerateLisp();
-  }, [runSampleDiff, handleGenerateLisp]);
+  }, [runDiffAnalysis, handleGenerateLisp]);
+
+  useEffect(() => {
+    if (activeTab === "blocks") {
+      fetchBlockCatalogs();
+    }
+  }, [activeTab, fetchBlockCatalogs]);
 
   const handleCopyCode = () => {
     if (!generatedLispCode) return;
@@ -209,7 +341,7 @@ export default function CadEngineeringStudioPage() {
           <div>
             <h1 className="flex items-center gap-2 text-2xl font-bold text-zinc-100">
               <Code className="text-amber-400" size={28} />
-              CAD Engineering Studio & Autonomous Drafting (M65)
+              CAD Engineering Studio & Autonomous Drafting (M65 / M89)
             </h1>
             <p className="mt-1 text-sm text-zinc-400">
               So sánh vector phiên bản (CAD Visual Diff), bóc tách Block động, tự động sinh mã
@@ -217,7 +349,7 @@ export default function CadEngineeringStudioPage() {
             </p>
           </div>
 
-          <div className="flex rounded-lg border border-zinc-800 bg-zinc-900 p-1">
+          <div className="flex flex-wrap rounded-lg border border-zinc-800 bg-zinc-900 p-1">
             <button
               onClick={() => setActiveTab("diff")}
               className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold ${
@@ -266,119 +398,162 @@ export default function CadEngineeringStudioPage() {
         </div>
 
         {/* Tab 1: Visual CAD Diff */}
-        {activeTab === "diff" && diffResult && (
+        {activeTab === "diff" && (
           <div className="space-y-6">
-            {/* KPI Banner */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 backdrop-blur">
-                <span className="text-xs text-zinc-400 font-semibold uppercase">
-                  Tổng thực thể Rev A vs B
-                </span>
-                <div className="mt-1 text-2xl font-bold font-mono text-zinc-100">
-                  {diffResult.totalBase} &rarr; {diffResult.totalCompare}
+            {loading && <PageSkeleton />}
+            {!loading && diffResult && (
+              <>
+                {/* KPI Banner */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 backdrop-blur">
+                    <span className="text-xs font-semibold uppercase text-zinc-400">
+                      Tổng thực thể Base &rarr; Compare
+                    </span>
+                    <div className="mt-1 font-mono text-2xl font-bold text-zinc-100">
+                      {diffResult.totalBase} &rarr; {diffResult.totalCompare}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-emerald-800/40 bg-emerald-950/20 p-4 backdrop-blur">
+                    <span className="text-xs font-semibold uppercase text-emerald-400">
+                      Thêm mới (Added)
+                    </span>
+                    <div className="mt-1 font-mono text-2xl font-bold text-emerald-400">
+                      +{diffResult.summary.added} đối tượng
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-red-800/40 bg-red-950/20 p-4 backdrop-blur">
+                    <span className="text-xs font-semibold uppercase text-red-400">
+                      Bị xóa (Removed)
+                    </span>
+                    <div className="mt-1 font-mono text-2xl font-bold text-red-400">
+                      -{diffResult.summary.removed} đối tượng
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-amber-800/40 bg-amber-950/20 p-4 backdrop-blur">
+                    <span className="text-xs font-semibold uppercase text-amber-400">
+                      Thay đổi (Modified)
+                    </span>
+                    <div className="mt-1 font-mono text-2xl font-bold text-amber-400">
+                      ~{diffResult.summary.modified} đối tượng
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="rounded-xl border border-emerald-800/40 bg-emerald-950/20 p-4 backdrop-blur">
-                <span className="text-xs text-emerald-400 font-semibold uppercase">
-                  Thêm mới (Added)
-                </span>
-                <div className="mt-1 text-2xl font-bold font-mono text-emerald-400">
-                  +{diffResult.summary.added} đối tượng
-                </div>
-              </div>
-              <div className="rounded-xl border border-red-800/40 bg-red-950/20 p-4 backdrop-blur">
-                <span className="text-xs text-red-400 font-semibold uppercase">
-                  Bị xóa (Removed)
-                </span>
-                <div className="mt-1 text-2xl font-bold font-mono text-red-400">
-                  -{diffResult.summary.removed} đối tượng
-                </div>
-              </div>
-              <div className="rounded-xl border border-amber-800/40 bg-amber-950/20 p-4 backdrop-blur">
-                <span className="text-xs text-amber-400 font-semibold uppercase">
-                  Thay đổi (Modified)
-                </span>
-                <div className="mt-1 text-2xl font-bold font-mono text-amber-300">
-                  {diffResult.summary.modified} đối tượng
-                </div>
-              </div>
-            </div>
 
-            {/* VO Impact Alert Box */}
-            <div className="rounded-xl border border-amber-500/40 bg-amber-950/30 p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 font-bold text-amber-300 text-sm">
-                  <ShieldAlert size={18} />
-                  Cảnh báo Phát sinh Khối lượng & Chi phí (Potential VO Impact):
-                </div>
-                <span className="rounded bg-amber-500 px-2 py-0.5 text-xs font-bold text-zinc-950 uppercase">
-                  Ước tính: +{diffResult.potentialVoImpact.estimatedCostVnd.toLocaleString("vi-VN")}{" "}
-                  đ
-                </span>
-              </div>
-              <p className="mt-2 text-xs text-amber-200/90">
-                {diffResult.potentialVoImpact.reason}
-              </p>
-            </div>
-
-            {/* Diff Elements Table */}
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 backdrop-blur">
-              <h2 className="flex items-center gap-2 border-b border-zinc-800 pb-3 text-base font-bold text-zinc-200">
-                <FileDiff size={18} className="text-amber-400" />
-                Danh mục Chi tiết Sai khác Hình học & Thuộc tính CAD
-              </h2>
-
-              <div className="mt-4 overflow-x-auto">
-                <table className="w-full text-left text-xs text-zinc-300">
-                  <thead className="border-b border-zinc-800 bg-zinc-950 font-semibold uppercase tracking-wider text-zinc-400">
-                    <tr>
-                      <th className="p-3">Mã thực thể</th>
-                      <th className="p-3">Loại đối tượng</th>
-                      <th className="p-3">Layer CAD</th>
-                      <th className="p-3">Trạng thái Diff</th>
-                      <th className="p-3">Nội dung thay đổi chi tiết</th>
-                      <th className="p-3">Tọa độ</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-800/60">
-                    {diffResult.differences.map((item) => (
-                      <tr key={item.entityId} className="hover:bg-zinc-800/40">
-                        <td className="p-3 font-mono font-bold text-zinc-300">{item.entityId}</td>
-                        <td className="p-3 font-mono uppercase">{item.type}</td>
-                        <td className="p-3 font-mono text-zinc-400">{item.layer}</td>
-                        <td className="p-3">
-                          <span
-                            className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${
-                              item.diffStatus === "added"
-                                ? "bg-emerald-950 text-emerald-400 border border-emerald-800"
-                                : item.diffStatus === "removed"
-                                  ? "bg-red-950 text-red-400 border border-red-800"
-                                  : "bg-amber-950 text-amber-300 border border-amber-800"
-                            }`}
-                          >
-                            {item.diffStatus}
+                {/* VO Impact Card */}
+                <div className="rounded-xl border border-amber-800/40 bg-amber-950/20 p-5 backdrop-blur">
+                  <div className="flex items-start gap-4">
+                    <ShieldAlert className="mt-0.5 text-amber-400" size={24} />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-amber-300">
+                          Đánh giá Nguy cơ Phát sinh Hợp đồng (VO Potential Impact)
+                        </h3>
+                        <span className="rounded bg-amber-900/60 px-2.5 py-0.5 text-xs font-bold text-amber-200">
+                          MỨC ĐỘ: {diffResult.potentialVoImpact.riskLevel.toUpperCase()}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-zinc-300">
+                        {diffResult.potentialVoImpact.reason}
+                      </p>
+                      <div className="mt-3 flex items-center gap-6">
+                        <div>
+                          <span className="text-[10px] text-zinc-400">Chi phí ước tính VO:</span>
+                          <span className="ml-2 font-mono text-base font-bold text-amber-400">
+                            {diffResult.potentialVoImpact.estimatedCostVnd.toLocaleString("vi-VN")}{" "}
+                            đ
                           </span>
-                        </td>
-                        <td className="p-3 text-zinc-200">{item.changeDescription}</td>
-                        <td className="p-3 font-mono text-zinc-400">
-                          [{item.location.join(", ")}]
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                        </div>
+                        {diffResult.sessionId && (
+                          <div className="text-[10px] text-zinc-500">
+                            Session DB ID: {diffResult.sessionId}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Diff Table */}
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 backdrop-blur">
+                  <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                    <h2 className="flex items-center gap-2 text-base font-bold text-zinc-200">
+                      <FileDiff size={18} className="text-amber-400" />
+                      Chi tiết Các đối tượng Khác biệt giữa 2 phiên bản
+                    </h2>
+                    <button
+                      onClick={runDiffAnalysis}
+                      className="flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1 text-xs font-semibold text-zinc-200 hover:bg-zinc-700"
+                    >
+                      <RefreshCw size={12} />
+                      Chạy lại So sánh
+                    </button>
+                  </div>
+
+                  <div className="mt-4 overflow-x-auto">
+                    <table className="w-full text-left text-xs text-zinc-300">
+                      <thead className="border-b border-zinc-800 bg-zinc-950 font-semibold uppercase tracking-wider text-zinc-400">
+                        <tr>
+                          <th className="p-3">Entity ID</th>
+                          <th className="p-3">Loại đối tượng</th>
+                          <th className="p-3">Layer</th>
+                          <th className="p-3">Trạng thái Diff</th>
+                          <th className="p-3">Mô tả Thay đổi</th>
+                          <th className="p-3">Tọa độ [X, Y, Z]</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-800/60">
+                        {diffResult.differences.map((item, idx) => (
+                          <tr key={idx} className="hover:bg-zinc-800/40">
+                            <td className="p-3 font-mono font-bold text-zinc-100">
+                              {item.entityId}
+                            </td>
+                            <td className="p-3 font-mono uppercase text-zinc-400">{item.type}</td>
+                            <td className="p-3 font-mono text-zinc-300">{item.layer}</td>
+                            <td className="p-3">
+                              <span
+                                className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${
+                                  item.diffStatus === "added"
+                                    ? "border border-emerald-800 bg-emerald-950 text-emerald-400"
+                                    : item.diffStatus === "removed"
+                                      ? "border border-red-800 bg-red-950 text-red-400"
+                                      : "border border-amber-800 bg-amber-950 text-amber-300"
+                                }`}
+                              >
+                                {item.diffStatus}
+                              </span>
+                            </td>
+                            <td className="p-3 text-zinc-200">{item.changeDescription}</td>
+                            <td className="p-3 font-mono text-zinc-400">
+                              [{item.location.join(", ")}]
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
 
         {/* Tab 2: Dynamic Block QTO */}
         {activeTab === "blocks" && (
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 backdrop-blur">
-            <h2 className="flex items-center gap-2 border-b border-zinc-800 pb-3 text-base font-bold text-zinc-200">
-              <Boxes size={18} className="text-amber-400" />
-              Bóc tách Thuộc tính Block Động CAD & Liên kết BOQ
-            </h2>
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <h2 className="flex items-center gap-2 text-base font-bold text-zinc-200">
+                <Boxes size={18} className="text-amber-400" />
+                Bóc tách Thuộc tính Block Động CAD & Liên kết BOQ
+              </h2>
+              <button
+                onClick={fetchBlockCatalogs}
+                disabled={loadingBlocks}
+                className="flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1 text-xs font-semibold text-zinc-200 hover:bg-zinc-700"
+              >
+                <RefreshCw size={12} className={loadingBlocks ? "animate-spin" : ""} />
+                Làm mới
+              </button>
+            </div>
 
             <div className="mt-4 overflow-x-auto">
               <table className="w-full text-left text-xs text-zinc-300">
@@ -386,55 +561,33 @@ export default function CadEngineeringStudioPage() {
                   <tr>
                     <th className="p-3">Tên Block CAD</th>
                     <th className="p-3">Bộ môn</th>
-                    <th className="p-3">Số lượng đếm</th>
+                    <th className="p-3">Phân loại</th>
                     <th className="p-3">Thuộc tính Trích xuất (Dynamic Attributes)</th>
                     <th className="p-3">Mã BOQ Ánh xạ</th>
-                    <th className="p-3">Hành động</th>
+                    <th className="p-3">Trạng thái</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-800/60">
-                  <tr className="hover:bg-zinc-800/40">
-                    <td className="p-3 font-mono font-bold text-zinc-100">BLK_VAV_BOX_500</td>
-                    <td className="p-3 uppercase">HVAC</td>
-                    <td className="p-3 font-mono font-bold text-emerald-400">18 bộ</td>
-                    <td className="p-3 font-mono text-zinc-300">
-                      AirFlow: 1200 m3/h | Coil: 2-Row | In: Ø250 | Out: 400x250
-                    </td>
-                    <td className="p-3 font-mono text-amber-300">HVAC-VAV-500</td>
-                    <td className="p-3">
-                      <span className="rounded bg-emerald-950 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
-                        ĐÃ KHỚP BOQ
-                      </span>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-zinc-800/40">
-                    <td className="p-3 font-mono font-bold text-zinc-100">BLK_SPRINKLER_PENDENT</td>
-                    <td className="p-3 uppercase">PCCC</td>
-                    <td className="p-3 font-mono font-bold text-emerald-400">240 cái</td>
-                    <td className="p-3 font-mono text-zinc-300">
-                      Thread: NPT 1/2&quot; | K-Factor: 5.6 | Temp: 68°C
-                    </td>
-                    <td className="p-3 font-mono text-amber-300">FP-SPK-68C</td>
-                    <td className="p-3">
-                      <span className="rounded bg-emerald-950 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
-                        ĐÃ KHỚP BOQ
-                      </span>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-zinc-800/40">
-                    <td className="p-3 font-mono font-bold text-zinc-100">BLK_PANEL_DB_LV</td>
-                    <td className="p-3 uppercase">Điện</td>
-                    <td className="p-3 font-mono font-bold text-emerald-400">6 tủ</td>
-                    <td className="p-3 font-mono text-zinc-300">
-                      Rating: 100A | Poles: 3P+N | Form: 2B | IP: IP54
-                    </td>
-                    <td className="p-3 font-mono text-amber-300">ELEC-PANEL-DB</td>
-                    <td className="p-3">
-                      <span className="rounded bg-emerald-950 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
-                        ĐÃ KHỚP BOQ
-                      </span>
-                    </td>
-                  </tr>
+                  {blockCatalogs.map((b, i) => (
+                    <tr key={i} className="hover:bg-zinc-800/40">
+                      <td className="p-3 font-mono font-bold text-zinc-100">{b.block_name}</td>
+                      <td className="p-3 uppercase text-zinc-400">{b.discipline}</td>
+                      <td className="p-3 text-zinc-300">{b.category}</td>
+                      <td className="p-3 font-mono text-zinc-300">
+                        {Object.entries(b.attribute_schema)
+                          .map(([k, v]) => `${k}: ${v}`)
+                          .join(" | ")}
+                      </td>
+                      <td className="p-3 font-mono text-amber-300">
+                        {b.mapped_boq_code || "CHƯA MAP"}
+                      </td>
+                      <td className="p-3">
+                        <span className="rounded bg-emerald-950 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
+                          ĐÃ KHỚP BOQ
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -458,15 +611,18 @@ export default function CadEngineeringStudioPage() {
                   </label>
                   <select
                     value={lispType}
-                    onChange={(e) => setLispType(e.target.value as "hanger" | "sleeve")}
+                    onChange={(e) =>
+                      setLispType(e.target.value as "hanger" | "sleeve" | "duct_transition")
+                    }
                     className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-xs text-zinc-100"
                   >
                     <option value="hanger">Giá đỡ ty treo chữ U (Trapeze Hanger)</option>
                     <option value="sleeve">Lỗ mở sleeve xuyên dầm sàn</option>
+                    <option value="duct_transition">Côn chuyển tiết diện ống gió</option>
                   </select>
                 </div>
 
-                {lispType === "hanger" ? (
+                {lispType === "hanger" && (
                   <>
                     <div>
                       <label className="block text-xs font-semibold uppercase text-zinc-400">
@@ -502,11 +658,13 @@ export default function CadEngineeringStudioPage() {
                       />
                     </div>
                   </>
-                ) : (
+                )}
+
+                {lispType === "sleeve" && (
                   <>
                     <div>
                       <label className="block text-xs font-semibold uppercase text-zinc-400">
-                        Đường kính lỗ sleeve (mm)
+                        Đường kính ống Sleeve (mm)
                       </label>
                       <input
                         type="number"
@@ -517,7 +675,7 @@ export default function CadEngineeringStudioPage() {
                     </div>
                     <div>
                       <label className="block text-xs font-semibold uppercase text-zinc-400">
-                        Nhãn ký hiệu (Tag)
+                        Ký hiệu Sleeve
                       </label>
                       <input
                         type="text"
@@ -529,33 +687,97 @@ export default function CadEngineeringStudioPage() {
                   </>
                 )}
 
+                {lispType === "duct_transition" && (
+                  <>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-semibold uppercase text-zinc-400">
+                          Rộng đầu vào (mm)
+                        </label>
+                        <input
+                          type="number"
+                          value={inletWidth}
+                          onChange={(e) => setInletWidth(Number(e.target.value))}
+                          className="mt-1 w-full rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold uppercase text-zinc-400">
+                          Cao đầu vào (mm)
+                        </label>
+                        <input
+                          type="number"
+                          value={inletHeight}
+                          onChange={(e) => setInletHeight(Number(e.target.value))}
+                          className="mt-1 w-full rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-100"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-semibold uppercase text-zinc-400">
+                          Rộng đầu ra (mm)
+                        </label>
+                        <input
+                          type="number"
+                          value={outletWidth}
+                          onChange={(e) => setOutletWidth(Number(e.target.value))}
+                          className="mt-1 w-full rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold uppercase text-zinc-400">
+                          Cao đầu ra (mm)
+                        </label>
+                        <input
+                          type="number"
+                          value={outletHeight}
+                          onChange={(e) => setOutletHeight(Number(e.target.value))}
+                          className="mt-1 w-full rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-100"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold uppercase text-zinc-400">
+                        Chiều dài côn chuyển L (mm)
+                      </label>
+                      <input
+                        type="number"
+                        value={transitionLength}
+                        onChange={(e) => setTransitionLength(Number(e.target.value))}
+                        className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-xs text-zinc-100"
+                      />
+                    </div>
+                  </>
+                )}
+
                 <button
                   onClick={handleGenerateLisp}
-                  className="w-full rounded-lg bg-amber-500 py-2 text-xs font-bold text-zinc-950 transition-colors hover:bg-amber-400"
+                  className="w-full rounded-lg bg-amber-500 py-2 text-xs font-bold text-zinc-950 hover:bg-amber-400"
                 >
                   Sinh mã AutoLISP
                 </button>
               </div>
             </div>
 
-            {/* Code Output Panel */}
+            {/* Code Preview */}
             <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 backdrop-blur lg:col-span-8">
               <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-                <h2 className="text-base font-bold text-zinc-200">
-                  Mã Nguồn AutoLISP Tự Động (
-                  {lispType === "hanger" ? "DRAW_TRAPEZE_HANGER" : "DRAW_SLEEVE_OPENING"})
+                <h2 className="flex items-center gap-2 text-base font-bold text-zinc-200">
+                  <Code size={18} className="text-amber-400" />
+                  Mã AutoLISP Generated (.lsp / .scr)
                 </h2>
                 <div className="flex gap-2">
                   <button
                     onClick={handleCopyCode}
-                    className="flex items-center gap-1.5 rounded border border-zinc-700 bg-zinc-800 px-2.5 py-1 text-xs font-medium text-zinc-200 hover:bg-zinc-700"
+                    className="flex items-center gap-1 rounded bg-zinc-800 px-2.5 py-1 text-xs font-semibold text-zinc-300 hover:bg-zinc-700"
                   >
                     {copied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
-                    {copied ? "Đã copy" : "Copy mã"}
+                    {copied ? "Đã sao chép" : "Copy Code"}
                   </button>
                   <button
                     onClick={handleDownloadLisp}
-                    className="flex items-center gap-1.5 rounded bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-500"
+                    className="flex items-center gap-1 rounded bg-amber-500 px-2.5 py-1 text-xs font-bold text-zinc-950 hover:bg-amber-400"
                   >
                     <Download size={14} />
                     Tải file .lsp
@@ -563,84 +785,106 @@ export default function CadEngineeringStudioPage() {
                 </div>
               </div>
 
-              <pre className="mt-4 max-h-[420px] overflow-x-auto rounded-lg bg-zinc-950 p-4 font-mono text-xs text-amber-300 leading-relaxed">
-                {generatedLispCode}
-              </pre>
+              <div className="mt-4">
+                <pre className="max-h-[460px] overflow-auto rounded-lg border border-zinc-800 bg-zinc-950 p-4 font-mono text-xs text-emerald-400">
+                  {generatedLispCode}
+                </pre>
+              </div>
             </div>
           </div>
         )}
 
         {/* Tab 4: Font & Layer Doctor */}
         {activeTab === "doctor" && (
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             {/* Font Doctor */}
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 backdrop-blur">
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 backdrop-blur">
               <h2 className="flex items-center gap-2 border-b border-zinc-800 pb-3 text-base font-bold text-zinc-200">
                 <Wrench size={18} className="text-amber-400" />
-                Sửa Lỗi Font Chữ Tiếng Việt (SHX / TCVN3 / VNI &rarr; Unicode)
+                Khắc phục Lỗi Font Tiếng Việt (TCVN3 / VNI &rarr; Unicode)
               </h2>
 
-              <div className="mt-4 space-y-3">
+              <div className="mt-4 space-y-4">
                 <div>
                   <label className="block text-xs font-semibold uppercase text-zinc-400">
-                    Chuỗi ký tự bị lỗi hiển thị (VNI / TCVN3):
+                    Văn bản CAD lỗi font (MText / DText TCVN3-ABC)
                   </label>
-                  <input
-                    type="text"
+                  <textarea
+                    rows={4}
                     value={legacyInput}
                     onChange={(e) => setLegacyInput(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-xs text-zinc-100 font-mono"
+                    className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-800 p-3 font-mono text-xs text-zinc-100"
                   />
                 </div>
 
                 <button
                   onClick={handleConvertFont}
-                  className="rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-zinc-950 hover:bg-amber-400"
+                  className="w-full rounded-lg bg-amber-500 py-2 text-xs font-bold text-zinc-950 hover:bg-amber-400"
                 >
-                  Giải mã sang Unicode UTF-8
+                  Chuyển đổi sang Chuẩn Unicode UTF-8
                 </button>
 
                 {convertedText && (
-                  <div className="mt-4 rounded-lg border border-emerald-500/40 bg-zinc-950 p-3">
-                    <span className="text-xs text-zinc-400 font-semibold uppercase">
-                      Kết quả chuẩn hóa:
+                  <div className="rounded-lg border border-emerald-800/40 bg-emerald-950/20 p-3">
+                    <span className="text-[10px] font-bold uppercase text-emerald-400">
+                      Kết quả Chuyển đổi:
                     </span>
-                    <div className="mt-1 text-base font-bold text-emerald-300 font-sans">
-                      {convertedText}
-                    </div>
+                    <p className="mt-1 text-sm font-semibold text-emerald-200">{convertedText}</p>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Layer Normalizer */}
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 backdrop-blur">
+            {/* Layer Doctor */}
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 backdrop-blur">
               <h2 className="flex items-center gap-2 border-b border-zinc-800 pb-3 text-base font-bold text-zinc-200">
                 <Layers size={18} className="text-amber-400" />
-                Chuẩn Hóa Hệ Layer Theo Tiêu Chuẩn AIA / MEPF
+                Quy chuẩn Phân tầng Layer AIA / BS1192 cho MEPF
               </h2>
 
-              <div className="mt-4 space-y-2 text-xs text-zinc-300">
-                <div className="flex justify-between border-b border-zinc-800 pb-2">
-                  <span className="font-mono text-red-400">ONG_GIO_CAP_LV4</span>
-                  <span className="text-zinc-500">&rarr;</span>
-                  <span className="font-mono font-bold text-emerald-400">M-DUCT-SUPP</span>
-                </div>
-                <div className="flex justify-between border-b border-zinc-800 pb-2">
-                  <span className="font-mono text-red-400">ONG_NUOC_LANH_CHW</span>
-                  <span className="text-zinc-500">&rarr;</span>
-                  <span className="font-mono font-bold text-emerald-400">P-PIPE-SANR</span>
-                </div>
-                <div className="flex justify-between border-b border-zinc-800 pb-2">
-                  <span className="font-mono text-red-400">MANG_CAP_DIEN</span>
-                  <span className="text-zinc-500">&rarr;</span>
-                  <span className="font-mono font-bold text-emerald-400">E-TRAY-PWRR</span>
-                </div>
-                <div className="flex justify-between border-b border-zinc-800 pb-2">
-                  <span className="font-mono text-red-400">DUONG_ONG_PCCC_SPK</span>
-                  <span className="text-zinc-500">&rarr;</span>
-                  <span className="font-mono font-bold text-emerald-400">F-SPRN-PIPE</span>
-                </div>
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full text-left text-xs text-zinc-300">
+                  <thead className="border-b border-zinc-800 bg-zinc-950 font-semibold uppercase tracking-wider text-zinc-400">
+                    <tr>
+                      <th className="p-2.5">Layer Gốc Thường Gặp</th>
+                      <th className="p-2.5">&rarr;</th>
+                      <th className="p-2.5">Layer Chuẩn AIA/MEPF</th>
+                      <th className="p-2.5">Màu ACI</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/60">
+                    <tr>
+                      <td className="p-2.5 font-mono text-zinc-400">ONG_GIO, DUCT_SA</td>
+                      <td className="p-2.5">&rarr;</td>
+                      <td className="p-2.5 font-mono font-bold text-sky-400">M-DUCT-SUPP</td>
+                      <td className="p-2.5 text-zinc-400">Cyan (4)</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2.5 font-mono text-zinc-400">ONG_NUOC_LANH, PIPE_CHW</td>
+                      <td className="p-2.5">&rarr;</td>
+                      <td className="p-2.5 font-mono font-bold text-blue-400">M-CWTR-PIPE</td>
+                      <td className="p-2.5 text-zinc-400">Blue (5)</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2.5 font-mono text-zinc-400">THOAT_NUOC, DRAIN</td>
+                      <td className="p-2.5">&rarr;</td>
+                      <td className="p-2.5 font-mono font-bold text-emerald-400">P-PIPE-SANR</td>
+                      <td className="p-2.5 text-zinc-400">Green (3)</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2.5 font-mono text-zinc-400">MANG_DIEN, CABLE_TRAY</td>
+                      <td className="p-2.5">&rarr;</td>
+                      <td className="p-2.5 font-mono font-bold text-amber-400">E-TRAY-PWRR</td>
+                      <td className="p-2.5 text-zinc-400">Yellow (2)</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2.5 font-mono text-zinc-400">CHUA_CHAY, SPRINKLER</td>
+                      <td className="p-2.5">&rarr;</td>
+                      <td className="p-2.5 font-mono font-bold text-red-400">F-SPRN-PIPE</td>
+                      <td className="p-2.5 text-zinc-400">Red (1)</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>

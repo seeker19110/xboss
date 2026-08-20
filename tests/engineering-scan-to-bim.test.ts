@@ -2,11 +2,24 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   analyzeScanVsBimDeviations,
+  findNearestScannedPoint,
   BimSpoolModel,
   ScannedPoint3D,
 } from "@/lib/engineering-scan-to-bim";
 
-test("M70: analyzeScanVsBimDeviations tính toán chính xác sai lệch không gian và phân loại ngưỡng", () => {
+test("M70/M89: findNearestScannedPoint tìm chính xác điểm scan gần nhất trong không gian 3D", () => {
+  const points: ScannedPoint3D[] = [
+    { pointId: "PT-01", x: 1000, y: 1000, z: 1000 },
+    { pointId: "PT-02", x: 5000, y: 5000, z: 5000 },
+    { pointId: "PT-03", x: 1005, y: 1005, z: 1005 }, // Cách [1000,1000,1000] ~8.66mm
+  ];
+
+  const nearest = findNearestScannedPoint([1000, 1000, 1000], points);
+  assert.ok(nearest !== null);
+  assert.equal(nearest?.pointId, "PT-01"); // Distance 0
+});
+
+test("M70/M89: analyzeScanVsBimDeviations tính toán chính xác sai lệch không gian và phân loại ngưỡng", () => {
   const models: BimSpoolModel[] = [
     {
       spoolCode: "SP-01",
@@ -52,4 +65,23 @@ test("M70: analyzeScanVsBimDeviations tính toán chính xác sai lệch không 
   assert.equal(res.defectsCount, 2);
   assert.ok(res.maxDeviationMm > 50);
   assert.ok(res.deviations[2].remediationRecommendation.includes("LỆCH LỚN"));
+});
+
+test("M70/M89: analyzeScanVsBimDeviations hoạt động an toàn khi không có điểm scan (fallback to design)", () => {
+  const models: BimSpoolModel[] = [
+    {
+      spoolCode: "SP-01",
+      discipline: "hvac",
+      systemCode: "SA",
+      nominalSpec: "Duct",
+      designStartPoint: [1000, 2000, 3000],
+      designEndPoint: [5000, 2000, 3000],
+      lengthM: 4.0,
+    },
+  ];
+
+  const res = analyzeScanVsBimDeviations("SCAN-EMPTY", "Manual", models, []);
+  assert.equal(res.spoolsAnalyzedCount, 1);
+  assert.equal(res.deviations[0].euclideanDeviationMm, 0);
+  assert.equal(res.deviations[0].status, "within_tolerance");
 });

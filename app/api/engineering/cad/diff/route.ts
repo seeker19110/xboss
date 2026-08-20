@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
-import { computeCadVectorDiff, listCadDiffSessions, CadEntity } from "@/lib/engineering-cad-skills";
+import {
+  computeCadVectorDiff,
+  listCadDiffSessions,
+  saveCadDiffSession,
+  CadEntity,
+} from "@/lib/engineering-cad-skills";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +30,7 @@ export async function GET() {
   }
 }
 
-// POST /api/engineering/cad/diff — Thực hiện so sánh vector trực quan giữa 2 phiên bản bản vẽ
+// POST /api/engineering/cad/diff — Thực hiện so sánh vector trực quan và lưu phiên vào DB
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -33,9 +38,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Không có quyền chạy CAD Diff" }, { status: 403 });
   }
 
+  const projectId = await getCurrentProjectId(user);
+  if (!projectId) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+
   try {
     const body = await req.json();
-    const { baseEntities, compareEntities, toleranceMm } = body;
+    const { baseEntities, compareEntities, toleranceMm, baseDrawingId, compareDrawingId } = body;
 
     if (!baseEntities || !compareEntities) {
       return NextResponse.json(
@@ -50,7 +58,22 @@ export async function POST(req: Request) {
       Number(toleranceMm || 5),
     );
 
-    return NextResponse.json(diffResult);
+    // Lưu phiên diff vào CSDL (B2 Fix)
+    let savedSessionId: string | null = null;
+    try {
+      const saved = await saveCadDiffSession(
+        projectId,
+        baseDrawingId ? Number(baseDrawingId) : null,
+        compareDrawingId ? Number(compareDrawingId) : null,
+        diffResult,
+        user.id,
+      );
+      savedSessionId = saved.id;
+    } catch {
+      // Non-blocking nếu DB save lỗi
+    }
+
+    return NextResponse.json({ ...diffResult, sessionId: savedSessionId });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: msg }, { status: 500 });

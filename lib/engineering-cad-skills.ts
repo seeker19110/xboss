@@ -1,5 +1,5 @@
-// lib/engineering-cad-skills.ts — Cognitive CAD Engine & Autonomous Drafting (M65)
-import { query, queryOne } from "@/lib/db";
+// lib/engineering-cad-skills.ts — Cognitive CAD Engine & Autonomous Drafting (M65 / M89)
+import { query, queryOne, run } from "@/lib/db";
 
 export type CadEntityType =
   "line" | "polyline" | "circle" | "arc" | "text" | "insert_block" | "dimension";
@@ -91,7 +91,6 @@ export function computeCadVectorDiff(
   const matchedBaseIds = new Set<string>();
 
   for (const cmp of compareEntities) {
-    // Tìm thực thể tương ứng trong base theo ID hoặc vị trí không gian
     const match = baseEntities.find((base) => {
       if (base.id === cmp.id) return true;
       if (base.type === cmp.type && base.layer === cmp.layer) {
@@ -118,7 +117,6 @@ export function computeCadVectorDiff(
       (cmp.coordinates.points && cmp.coordinates.points[0]) || [0, 0, 0];
 
     if (!match) {
-      // Thực thể mới được thêm vào (Added)
       addedCount++;
       const cost =
         cmp.type === "insert_block"
@@ -138,7 +136,6 @@ export function computeCadVectorDiff(
       });
     } else {
       matchedBaseIds.add(match.id);
-      // Kiểm tra có bị sửa đổi thuộc tính hay text ghi chú không
       const isTextModified = baseTextOf(match) !== baseTextOf(cmp);
       const isLayerModified = match.layer !== cmp.layer;
 
@@ -161,7 +158,6 @@ export function computeCadVectorDiff(
     }
   }
 
-  // Các thực thể trong base không tìm thấy trong compare -> Bị xóa (Removed)
   for (const base of baseEntities) {
     if (!matchedBaseIds.has(base.id)) {
       removedCount++;
@@ -218,6 +214,11 @@ export function generateAutoLispDetailScript(
     rodDiameterMm?: number;
     layerName?: string;
     tagLabel?: string;
+    inletWidthMm?: number;
+    inletHeightMm?: number;
+    outletWidthMm?: number;
+    outletHeightMm?: number;
+    transitionLengthMm?: number;
   },
 ): string {
   const layer = params.layerName || "M-DETAIL-SHOP";
@@ -307,6 +308,56 @@ export function generateAutoLispDetailScript(
 (princ)`;
   }
 
+  if (templateType === "duct_transition") {
+    const inW = params.inletWidthMm || params.widthMm || 800;
+    const inH = params.inletHeightMm || params.heightMm || 400;
+    const outW = params.outletWidthMm || Math.round(inW * 0.75);
+    const outH = params.outletHeightMm || inH;
+    const transL = params.transitionLengthMm || 600;
+
+    return `;; =====================================================================
+;; AutoLISP Generator — XBoss Engineering CAD Engine
+;; Chi tiết: Côn chuyển tiết diện ống gió (Duct Transition Detail)
+;; Kích thước: ${inW}x${inH}mm -> ${outW}x${outH}mm | Chiều dài: ${transL}mm
+;; =====================================================================
+(defun c:DRAW_DUCT_TRANSITION ( / pt p1 p2 p3 p4 oldLayer oldOsm)
+  (setq oldLayer (getvar "CLAYER"))
+  (setq oldOsm (getvar "OSMODE"))
+  (setvar "CMDECHO" 0)
+  (setvar "OSMODE" 0)
+
+  (if (not (tblsearch "LAYER" "${layer}"))
+    (command "_.LAYER" "_M" "${layer}" "_C" "3" "${layer}" "")
+  )
+  (setvar "CLAYER" "${layer}")
+
+  (setq pt (getpoint "\\nChon diem tim dau vao con chuyen: "))
+  (if pt
+    (progn
+      (setq p1 (list (car pt) (+ (cadr pt) ${inW / 2})))
+      (setq p2 (list (car pt) (- (cadr pt) ${inW / 2})))
+      (setq p3 (list (+ (car pt) ${transL}) (- (cadr pt) ${outW / 2})))
+      (setq p4 (list (+ (car pt) ${transL}) (+ (cadr pt) ${outW / 2})))
+
+      (command "_.LINE" p1 p2 "")
+      (command "_.LINE" p2 p3 "")
+      (command "_.LINE" p3 p4 "")
+      (command "_.LINE" p4 p1 "")
+      (command "_.LINE" p1 p3 "")
+      (command "_.LINE" p2 p4 "")
+      (command "_.TEXT" "_J" "_MC" (list (+ (car pt) ${transL / 2}) (cadr pt)) 40 0 "CON ${inW}x${inH}->${outW}x${outH} L=${transL}")
+      (princ "\\n[XBoss] Ve con chuyen ong gio thanh cong.")
+    )
+  )
+  (setvar "CLAYER" oldLayer)
+  (setvar "OSMODE" oldOsm)
+  (setvar "CMDECHO" 1)
+  (princ)
+)
+(princ "\\nLenh ve con chuyen: DRAW_DUCT_TRANSITION")
+(princ)`;
+  }
+
   return `;; Default script\n(princ "\\n[XBoss CAD Script]")`;
 }
 
@@ -377,6 +428,13 @@ const TCVN3_MAP: Record<string, string> = {
   ỷ: "ỷ",
   ỹ: "ỹ",
   ỵ: "ỵ",
+  "¡": "Ă",
+  "¢": "Â",
+  "£": "Ê",
+  "¤": "Ô",
+  "¥": "Ơ",
+  "¦": "Ư",
+  "§": "Đ",
 };
 
 export function convertTcvn3ToUnicode(text: string): string {
@@ -408,7 +466,7 @@ export function normalizeCadLayers(layers: string[]): Record<string, string> {
     } else if (l.includes("TEXT") || l.includes("DIM") || l.includes("GHI")) {
       mapping[layer] = "G-ANNO-TEXT";
     } else {
-      mapping[layer] = layer; // Giữ nguyên nếu không khớp
+      mapping[layer] = layer;
     }
   }
 
@@ -437,7 +495,6 @@ export function extrude2dPolylineTo3d(polyline: {
     maxY = Math.max(maxY, pt[1]);
   }
 
-  // Mở rộng bán kính tiết diện theo width
   const halfW = polyline.widthMm / 2;
   return {
     min: [Math.round(minX - halfW), Math.round(minY - halfW), Math.round(polyline.bopElevationMm)],
@@ -448,6 +505,42 @@ export function extrude2dPolylineTo3d(polyline: {
 // ============================================================================
 // 6. DATABASE CRUD OPERATIONS
 // ============================================================================
+
+export async function saveCadDiffSession(
+  projectId: number,
+  baseDrawingId: number | null,
+  compareDrawingId: number | null,
+  result: CadDiffResult,
+  userId?: number | null,
+): Promise<{ id: string }> {
+  const row = await queryOne<{ id: string }>(
+    `INSERT INTO engineering_cad_diff_sessions (
+      project_id, base_drawing_id, compare_drawing_id,
+      total_entities_base, total_entities_compare,
+      diff_summary, diff_details, potential_vo_impact,
+      created_by
+    ) VALUES (
+      ?, ?, ?,
+      ?, ?,
+      ?::jsonb, ?::jsonb, ?::jsonb,
+      ?
+    ) RETURNING id`,
+    [
+      projectId,
+      baseDrawingId,
+      compareDrawingId,
+      result.totalBase,
+      result.totalCompare,
+      JSON.stringify(result.summary),
+      JSON.stringify(result.differences),
+      JSON.stringify(result.potentialVoImpact),
+      userId ?? null,
+    ],
+  );
+
+  if (!row) throw new Error("Failed to save CAD Diff session");
+  return row;
+}
 
 export async function listCadDiffSessions(projectId: number) {
   return await query(

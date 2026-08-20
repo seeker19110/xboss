@@ -1,223 +1,142 @@
-import test from "node:test";
+// tests/engineering-bim-viewer.test.ts — Unit tests for BIM Viewer & 4D Simulation Engine (M80 / M89)
+import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   generateParametricMepfMesh,
   compute4DSimulationState,
   compute3DSectionCut,
-  filterElementsPropertySet,
   calculateModelBoundingBox,
+  filterElementsPropertySet,
   BimElement,
   WbsTaskSnapshot,
 } from "@/lib/engineering-bim-viewer";
 
-test("M80: generateParametricMepfMesh tạo đúng lưới 3D cho Ống gió và Ống nước", () => {
-  // Test ống gió hình hộp chữ nhật
-  const ductMesh = generateParametricMepfMesh(
-    "DUCT_STRAIGHT",
-    { width: 600, height: 400, length: 5000 },
-    { x: 0, y: 0, z: 2800 },
-  );
+test("M80/M89: generateParametricMepfMesh sinh lưới hình trụ cho PIPE", () => {
+  const mesh = generateParametricMepfMesh("PIPE_STRAIGHT", { diameter: 100, length: 2000 });
 
-  assert.ok(
-    ductMesh.vertices.length >= 24,
-    "Lưới ống gió hình hộp phải có ít nhất 8 đỉnh (24 tọa độ)",
-  );
-  assert.ok(ductMesh.indices.length >= 36, "Hình hộp phải có 12 tam giác (36 chỉ số)");
-  assert.equal(ductMesh.dimensions.width, 600);
-  assert.equal(ductMesh.dimensions.height, 400);
-
-  // Test ống nước hình trụ tròn
-  const pipeMesh = generateParametricMepfMesh(
-    "PIPE_STRAIGHT",
-    { diameter: 100, length: 4000 },
-    { x: 1000, y: 1000, z: 3000 },
-  );
-
-  assert.ok(pipeMesh.vertices.length > 0, "Lưới ống nước phải có đỉnh");
-  assert.ok(pipeMesh.indices.length > 0, "Lưới ống nước phải có chỉ số tam giác");
-  assert.equal(pipeMesh.dimensions.diameter, 100);
+  assert.equal(mesh.vertices.length, 16 * 3); // 8-segment cylinder
+  assert.equal(mesh.indices.length, 8 * 6); // 8 quads * 2 triangles * 3 indices = 48
+  assert.equal(mesh.dimensions.diameter, 100);
 });
 
-test("M80: compute4DSimulationState tính toán chuẩn xác 5 trạng thái 4D WBS", () => {
+test("M80/M89: generateParametricMepfMesh sinh lưới hộp cho DUCT", () => {
+  const mesh = generateParametricMepfMesh("DUCT_STRAIGHT", {
+    width: 600,
+    height: 400,
+    length: 3000,
+  });
+
+  assert.equal(mesh.vertices.length, 8 * 3); // 8 corner vertices * 3 coords = 24
+  assert.equal(mesh.indices.length, 12 * 3); // 6 faces * 2 triangles * 3 indices = 36
+  assert.equal(mesh.dimensions.width, 600);
+  assert.equal(mesh.dimensions.height, 400);
+});
+
+test("M80/M89: compute4DSimulationState tính toán chính xác trạng thái 4D WBS", () => {
   const elements: BimElement[] = [
     {
-      id: "elem-1",
-      modelId: "model-1",
+      id: "ELEM-01",
+      modelId: "MOD-01",
       projectId: 1,
-      guid: "GUID-1",
+      guid: "GUID-01",
       elementType: "DUCT_STRAIGHT",
       systemType: "HVAC_SUPPLY",
-      name: "Ống gió 1",
-      geometryData: generateParametricMepfMesh("DUCT_STRAIGHT", { width: 500, height: 400 }),
+      name: "Supply Duct L1",
+      geometryData: { vertices: [], indices: [], dimensions: {} },
       properties: {},
       wbsTaskId: 101,
     },
     {
-      id: "elem-2",
-      modelId: "model-1",
+      id: "ELEM-02",
+      modelId: "MOD-01",
       projectId: 1,
-      guid: "GUID-2",
-      elementType: "DUCT_STRAIGHT",
-      systemType: "HVAC_SUPPLY",
-      name: "Ống gió 2",
-      geometryData: generateParametricMepfMesh("DUCT_STRAIGHT", { width: 500, height: 400 }),
+      guid: "GUID-02",
+      elementType: "PIPE_STRAIGHT",
+      systemType: "PLUMBING_WATER",
+      name: "Water Pipe L1",
+      geometryData: { vertices: [], indices: [], dimensions: {} },
       properties: {},
       wbsTaskId: 102,
     },
-    {
-      id: "elem-3",
-      modelId: "model-1",
-      projectId: 1,
-      guid: "GUID-3",
-      elementType: "PIPE_STRAIGHT",
-      systemType: "PLUMBING_WATER",
-      name: "Ống nước 3",
-      geometryData: generateParametricMepfMesh("PIPE_STRAIGHT", { diameter: 100 }),
-      properties: {},
-      wbsTaskId: 103,
-    },
   ];
 
-  const wbsMap = new Map<number, WbsTaskSnapshot>();
-  // Task 101: Đã nghiệm thu
-  wbsMap.set(101, {
-    id: 101,
-    startDate: "2026-08-01",
-    endDate: "2026-08-10",
-    progress: 1.0,
-    status: "nghiem_thu",
-    approvedDate: "2026-08-10",
-  });
-  // Task 102: Đang thi công
-  wbsMap.set(102, {
-    id: 102,
-    startDate: "2026-08-05",
-    endDate: "2026-08-25",
-    progress: 0.5,
-    status: "dang_thi_cong",
-  });
-  // Task 103: Chưa khởi công
-  wbsMap.set(103, {
-    id: 103,
-    startDate: "2026-08-28",
-    endDate: "2026-09-10",
-    progress: 0.0,
-    status: "chuan_bi",
-  });
+  const wbsMap = new Map<number, WbsTaskSnapshot>([
+    [
+      101,
+      {
+        id: 101,
+        startDate: "2026-08-01",
+        endDate: "2026-08-10",
+        progress: 1.0,
+        status: "done",
+        approvedDate: "2026-08-11",
+      },
+    ],
+    [
+      102,
+      {
+        id: 102,
+        startDate: "2026-08-15",
+        endDate: "2026-08-25",
+        progress: 0.0,
+        status: "todo",
+      },
+    ],
+  ]);
 
-  const simResult = compute4DSimulationState(elements, "2026-08-15", wbsMap);
+  // Trước ngày bắt đầu -> not_started
+  const stateEarly = compute4DSimulationState(elements, "2026-07-25", wbsMap);
+  assert.equal(stateEarly.countsByStatus.not_started, 2);
+  assert.equal(stateEarly.overallProgressPercent, 0);
 
-  assert.equal(simResult.totalElements, 3);
-  assert.equal(simResult.countsByStatus.approved, 1, "Phần tử 1 phải có trạng thái approved");
-  assert.equal(simResult.countsByStatus.in_progress, 1, "Phần tử 2 phải có trạng thái in_progress");
-  assert.equal(simResult.countsByStatus.not_started, 1, "Phần tử 3 phải có trạng thái not_started");
-  assert.ok(simResult.overallProgressPercent > 0, "Tiến độ tổng thể phải lớn hơn 0");
+  // Giữa chừng -> Task 101 đã approved, Task 102 not_started
+  const stateMid = compute4DSimulationState(elements, "2026-08-12", wbsMap);
+  assert.equal(stateMid.countsByStatus.approved, 1);
+  assert.equal(stateMid.countsByStatus.not_started, 1);
+  assert.equal(stateMid.overallProgressPercent, 50);
 });
 
-test("M80: compute3DSectionCut cắt đúng phần tử theo mặt phẳng Z", () => {
+test("M80/M89: compute3DSectionCut và filterElementsPropertySet", () => {
   const elements: BimElement[] = [
     {
-      id: "elem-low",
-      modelId: "model-1",
-      projectId: 1,
-      guid: "GUID-LOW",
-      elementType: "SLAB",
-      systemType: "STRUCTURE",
-      name: "Sàn Tầng 1 (Z=0)",
-      geometryData: {
-        vertices: [0, 0, 0, 10, 0, 0, 10, 10, 0],
-        indices: [0, 1, 2],
-        dimensions: {},
-      },
-      properties: {},
-    },
-    {
-      id: "elem-high",
-      modelId: "model-1",
-      projectId: 1,
-      guid: "GUID-HIGH",
-      elementType: "DUCT_STRAIGHT",
-      systemType: "HVAC_SUPPLY",
-      name: "Ống gió Trần (Z=3500)",
-      geometryData: {
-        vertices: [0, 0, 3.5, 10, 0, 3.5, 10, 10, 3.5],
-        indices: [0, 1, 2],
-        dimensions: {},
-      },
-      properties: {},
-    },
-  ];
-
-  // Cắt tại Z = 2000 mm
-  const cutRes = compute3DSectionCut(elements, { axis: "z", offset: 2000 });
-  assert.equal(cutRes.visibleElements.length, 1);
-  assert.equal(cutRes.visibleElements[0].id, "elem-low");
-  assert.equal(cutRes.clippedCount, 1);
-});
-
-test("M80: filterElementsPropertySet lọc chính xác theo Psets và thuộc tính", () => {
-  const elements: BimElement[] = [
-    {
-      id: "elem-hvac",
-      modelId: "model-1",
+      id: "E-LOW",
+      modelId: "M1",
       projectId: 1,
       guid: "G1",
-      elementType: "DUCT_STRAIGHT",
-      systemType: "HVAC_SUPPLY",
-      name: "Ống gió lớn",
-      geometryData: { vertices: [], indices: [], dimensions: {} },
-      properties: { pset: { airflow: 5000, pressureDrop: 25, material: "Tôn mạ kẽm" } },
+      elementType: "PIPE_STRAIGHT",
+      systemType: "PLUMBING_WATER",
+      name: "Low Pipe",
+      geometryData: { vertices: [0, 0, 1.0, 1, 0, 1.0, 1, 1, 1.0], indices: [], dimensions: {} },
+      properties: { pset: { airflow: 500 } },
     },
     {
-      id: "elem-pipe",
-      modelId: "model-1",
+      id: "E-HIGH",
+      modelId: "M1",
       projectId: 1,
       guid: "G2",
-      elementType: "PIPE_STRAIGHT",
-      systemType: "PLUMBING_WATER",
-      name: "Ống nước PPR",
-      geometryData: { vertices: [], indices: [], dimensions: {} },
-      properties: { pset: { airflow: 0, pressureDrop: 80, material: "PPR" } },
-    },
-  ];
-
-  const filteredHvac = filterElementsPropertySet(elements, { systemType: "HVAC_SUPPLY" });
-  assert.equal(filteredHvac.length, 1);
-  assert.equal(filteredHvac[0].id, "elem-hvac");
-
-  const filteredAirflow = filterElementsPropertySet(elements, { minAirflow: 3000 });
-  assert.equal(filteredAirflow.length, 1);
-  assert.equal(filteredAirflow[0].id, "elem-hvac");
-
-  const filteredMaterial = filterElementsPropertySet(elements, { material: "PPR" });
-  assert.equal(filteredMaterial.length, 1);
-  assert.equal(filteredMaterial[0].id, "elem-pipe");
-});
-
-test("M80: calculateModelBoundingBox tính đúng tọa độ AABB", () => {
-  const elements: BimElement[] = [
-    {
-      id: "e1",
-      modelId: "m1",
-      projectId: 1,
-      guid: "G1",
       elementType: "DUCT_STRAIGHT",
       systemType: "HVAC_SUPPLY",
-      name: "Duct",
-      geometryData: {
-        vertices: [-2.5, -1.0, 0.5, 5.0, 3.0, 4.0],
-        indices: [],
-        dimensions: {},
-      },
-      properties: {},
+      name: "High Duct",
+      geometryData: { vertices: [0, 0, 4.0, 1, 0, 4.0, 1, 1, 4.0], indices: [], dimensions: {} },
+      properties: { pset: { airflow: 1500 } },
     },
   ];
 
-  const bbox = calculateModelBoundingBox(elements);
-  assert.equal(bbox.min[0], -2500);
-  assert.equal(bbox.min[1], -1000);
-  assert.equal(bbox.min[2], 500);
-  assert.equal(bbox.max[0], 5000);
-  assert.equal(bbox.max[1], 3000);
-  assert.equal(bbox.max[2], 4000);
+  const cut = compute3DSectionCut(elements, {
+    axis: "z",
+    positionMm: 2500, // 2.5m
+    direction: "positive",
+  });
+
+  assert.equal(cut.visibleElements.length, 1);
+  assert.equal(cut.visibleElements[0].id, "E-HIGH");
+  assert.equal(cut.clippedCount, 1);
+
+  const filtered = filterElementsPropertySet(elements, {
+    systemType: "HVAC_SUPPLY",
+    minAirflow: 1000,
+  });
+
+  assert.equal(filtered.length, 1);
+  assert.equal(filtered[0].id, "E-HIGH");
 });

@@ -25,6 +25,8 @@ import {
   Search,
   Sparkles,
   LayoutGrid,
+  Scan,
+  Scissors,
 } from "lucide-react";
 
 export type NavCategory = "all" | "copilot" | "spatial" | "commercial" | "twin" | "governance";
@@ -38,7 +40,7 @@ export interface NavItem {
 }
 
 const CATEGORIES: { key: NavCategory; label: string }[] = [
-  { key: "all", label: "Tất cả (32)" },
+  { key: "all", label: "Tất cả (34)" },
   { key: "copilot", label: "AI & Copilot" },
   { key: "spatial", label: "BIM/CAD & Không gian" },
   { key: "commercial", label: "Tài chính & Pháp lý" },
@@ -89,6 +91,18 @@ const NAV_ITEMS: NavItem[] = [
     label: "IoT Smart Telemetry (M83)",
     category: "governance",
     icon: Activity,
+  },
+  {
+    href: "/engineering/cad-nesting",
+    label: "Fabrication Nesting (M89)",
+    category: "spatial",
+    icon: Scissors,
+  },
+  {
+    href: "/engineering/scan-to-bim",
+    label: "Scan-to-BIM (M70)",
+    category: "spatial",
+    icon: Scan,
   },
   {
     href: "/engineering/bim-viewer",

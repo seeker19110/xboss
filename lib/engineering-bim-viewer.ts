@@ -1,7 +1,9 @@
 /**
  * Core Engine cho Module M80: 3D BIM/IFC Web Viewer & 4D Construction Simulation Studio
  * Xử lý hình học tham số 3D MEPF, mô phỏng dòng thời gian 4D kết nối WBS, và cắt mặt phẳng 3D Section Box.
+ * M89: Thêm DB Persistence (save/load 4D simulation, list models/elements).
  */
+import { query, queryOne, run } from "@/lib/db";
 
 export interface Point3D {
   x: number;
@@ -98,155 +100,206 @@ export interface SimulationTimeStepResult {
 export const SYSTEM_DEFAULT_COLORS: Record<string, string> = {
   HVAC_SUPPLY: "#0284c7", // Sky blue
   HVAC_RETURN: "#f59e0b", // Amber
-  PLUMBING_WATER: "#10b981", // Emerald
-  PLUMBING_DRAINAGE: "#8b5cf6", // Violet
+  PLUMBING_WATER: "#06b6d4", // Cyan
+  PLUMBING_DRAINAGE: "#84cc16", // Lime green
   ELECTRICAL_POWER: "#eab308", // Yellow
   FIRE_SPRINKLER: "#ef4444", // Red
-  STRUCTURE: "#64748b", // Slate
+  STRUCTURE: "#64748b", // Slate gray
 };
 
 export const STATUS_4D_COLORS: Record<Element4DVisualStatus, string> = {
-  not_started: "#475569", // Mờ wireframe
-  in_progress: "#f97316", // Cam rực rỡ
-  completed: "#10b981", // Xanh lá
-  approved: "#06b6d4", // Xanh cyan ngọc
-  delayed: "#dc2626", // Đỏ cảnh báo
+  not_started: "#3f3f46", // Dark Zinc ghost
+  in_progress: "#38bdf8", // Glowing Sky Blue
+  completed: "#34d399", // Solid Emerald Green
+  approved: "#10b981", // Deep Verified Green
+  delayed: "#f43f5e", // Flashing Rose/Red Alert
 };
 
-/**
- * Sinh lưới hình học tham số 3D (Parametric Mesh Generator) cho các cấu kiện MEPF
- */
+// ============================================================================
+// 1. THUẬT TOÁN SINH HÌNH HỌC THAM SỐ 3D MEPF (PARAMETRIC MESH GENERATOR)
+// ============================================================================
+
 export function generateParametricMepfMesh(
   elementType: string,
-  dimensions: { width?: number; height?: number; length?: number; diameter?: number },
+  dimensions: {
+    width?: number;
+    height?: number;
+    length?: number;
+    diameter?: number;
+  },
   startPoint: Point3D = { x: 0, y: 0, z: 0 },
   endPoint?: Point3D,
 ): MeshGeometry3D {
+  const isPipe = elementType.includes("PIPE");
+  const isDuctOrTray =
+    elementType.includes("DUCT") || elementType.includes("TRAY") || elementType.includes("BEAM");
+
   const length =
-    dimensions.length ??
+    dimensions.length ||
     (endPoint
-      ? Math.hypot(endPoint.x - startPoint.x, endPoint.y - startPoint.y, endPoint.z - startPoint.z)
+      ? Math.sqrt(
+          (endPoint.x - startPoint.x) ** 2 +
+            (endPoint.y - startPoint.y) ** 2 +
+            (endPoint.z - startPoint.z) ** 2,
+        )
       : 1000);
-  const w = (dimensions.width ?? 300) / 1000; // m
-  const h = (dimensions.height ?? 200) / 1000; // m
-  const l = length / 1000; // m
-  const d = (dimensions.diameter ?? 100) / 1000; // m
 
-  const x0 = startPoint.x / 1000;
-  const y0 = startPoint.y / 1000;
-  const z0 = startPoint.z / 1000;
+  const l = length / 1000;
+  const sx = startPoint.x / 1000;
+  const sy = startPoint.y / 1000;
+  const sz = startPoint.z / 1000;
 
-  if (elementType.startsWith("PIPE")) {
-    // Trụ tròn 8 cạnh xấp xỉ ống nước tròn
+  if (isPipe) {
+    const d = (dimensions.diameter || 100) / 1000;
+    const r = d / 2;
     const segments = 8;
     const vertices: number[] = [];
     const indices: number[] = [];
-    const r = d / 2;
 
     for (let i = 0; i < segments; i++) {
-      const angle = (i / segments) * Math.PI * 2;
-      const cos = Math.cos(angle);
-      const sin = Math.sin(angle);
-      // Điểm đầu
-      vertices.push(x0 + cos * r, y0 + sin * r, z0);
-      // Điểm cuối
-      vertices.push(x0 + cos * r, y0 + sin * r, z0 + l);
+      const theta = (i / segments) * Math.PI * 2;
+      const vy = Math.cos(theta) * r;
+      const vz = Math.sin(theta) * r;
+      vertices.push(sx, sy + vy, sz + vz);
+    }
+    for (let i = 0; i < segments; i++) {
+      const theta = (i / segments) * Math.PI * 2;
+      const vy = Math.cos(theta) * r;
+      const vz = Math.sin(theta) * r;
+      vertices.push(sx + l, sy + vy, sz + vz);
     }
 
     for (let i = 0; i < segments; i++) {
       const next = (i + 1) % segments;
-      const i0 = i * 2;
-      const i1 = i * 2 + 1;
-      const i2 = next * 2;
-      const i3 = next * 2 + 1;
+      const p1 = i;
+      const p2 = next;
+      const p3 = i + segments;
+      const p4 = next + segments;
 
-      // 2 tam giác cho mỗi mặt bên
-      indices.push(i0, i1, i2);
-      indices.push(i1, i3, i2);
+      indices.push(p1, p2, p3);
+      indices.push(p2, p4, p3);
     }
 
     return {
       vertices,
       indices,
-      dimensions: { diameter: dimensions.diameter ?? 100, length },
-      path: [
-        startPoint,
-        endPoint ?? { x: startPoint.x, y: startPoint.y, z: startPoint.z + length },
-      ],
+      dimensions,
+      color: SYSTEM_DEFAULT_COLORS.PLUMBING_WATER,
     };
   }
 
-  // Mặc định hình hộp chữ nhật (Ống gió / Máng cáp)
-  const vertices = [
-    // Mặt trước (z = z0)
-    x0 - w / 2,
-    y0 - h / 2,
-    z0,
-    x0 + w / 2,
-    y0 - h / 2,
-    z0,
-    x0 + w / 2,
-    y0 + h / 2,
-    z0,
-    x0 - w / 2,
-    y0 + h / 2,
-    z0,
-    // Mặt sau (z = z0 + l)
-    x0 - w / 2,
-    y0 - h / 2,
-    z0 + l,
-    x0 + w / 2,
-    y0 - h / 2,
-    z0 + l,
-    x0 + w / 2,
-    y0 + h / 2,
-    z0 + l,
-    x0 - w / 2,
-    y0 + h / 2,
-    z0 + l,
-  ];
+  if (isDuctOrTray) {
+    const w = (dimensions.width || 600) / 1000;
+    const h = (dimensions.height || 400) / 1000;
 
-  const indices = [
-    // Trước
-    0, 1, 2, 0, 2, 3,
-    // Sau
-    4, 6, 5, 4, 7, 6,
-    // Trái
-    0, 3, 7, 0, 7, 4,
-    // Phải
-    1, 5, 6, 1, 6, 2,
-    // Dưới
-    0, 4, 5, 0, 5, 1,
-    // Trên
-    3, 2, 6, 3, 6, 7,
-  ];
+    const hw = w / 2;
+    const hh = h / 2;
 
+    const vertices = [
+      sx,
+      sy - hw,
+      sz - hh,
+      sx,
+      sy + hw,
+      sz - hh,
+      sx,
+      sy + hw,
+      sz + hh,
+      sx,
+      sy - hw,
+      sz + hh,
+      sx + l,
+      sy - hw,
+      sz - hh,
+      sx + l,
+      sy + hw,
+      sz - hh,
+      sx + l,
+      sy + hw,
+      sz + hh,
+      sx + l,
+      sy - hw,
+      sz + hh,
+    ];
+
+    const indices = [
+      0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6, 0, 4, 5, 0, 5, 1, 1, 5, 6, 1, 6, 2, 2, 6, 7, 2, 7, 3, 3,
+      7, 4, 3, 4, 0,
+    ];
+
+    return {
+      vertices,
+      indices,
+      dimensions,
+      color: SYSTEM_DEFAULT_COLORS.HVAC_SUPPLY,
+    };
+  }
+
+  const s = (dimensions.width || 500) / 1000;
   return {
-    vertices,
-    indices,
-    dimensions: { width: dimensions.width ?? 300, height: dimensions.height ?? 200, length },
-    path: [startPoint, endPoint ?? { x: startPoint.x, y: startPoint.y, z: startPoint.z + length }],
+    vertices: [
+      sx,
+      sy,
+      sz,
+      sx + s,
+      sy,
+      sz,
+      sx + s,
+      sy + s,
+      sz,
+      sx,
+      sy + s,
+      sz,
+      sx,
+      sy,
+      sz + s,
+      sx + s,
+      sy,
+      sz + s,
+      sx + s,
+      sy + s,
+      sz + s,
+      sx,
+      sy + s,
+      sz + s,
+    ],
+    indices: [
+      0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6, 0, 4, 5, 0, 5, 1, 1, 5, 6, 1, 6, 2, 2, 6, 7, 2, 7, 3, 3,
+      7, 4, 3, 4, 0,
+    ],
+    dimensions,
+    color: SYSTEM_DEFAULT_COLORS.ELECTRICAL_POWER,
   };
 }
+
+// ============================================================================
+// 2. ĐỘNG CƠ MÔ PHỎNG DÒNG THỜI GIAN 4D (4D TIME-LAPSE SIMULATION ENGINE)
+// ============================================================================
 
 export interface WbsTaskSnapshot {
   id: number;
   startDate: string; // YYYY-MM-DD
   endDate: string; // YYYY-MM-DD
-  progress: number; // 0.0 -> 1.0
-  status: string; // chuan_bi | dang_thi_cong | hoan_thanh | tre | nghiem_thu
+  progress: number; // 0..1
+  status: string;
   approvedDate?: string | null;
 }
 
-/**
- * Động cơ tính toán trạng thái mô phỏng 4D (4D Time-Lapse Engine)
- */
 export function compute4DSimulationState(
   elements: BimElement[],
   targetDateISO: string,
   wbsMap: Map<number, WbsTaskSnapshot>,
-  options: { showGhostNotStarted?: boolean } = { showGhostNotStarted: true },
+  options: {
+    ghostOpacity?: number;
+    completedOpacity?: number;
+    inProgressBlink?: boolean;
+    showGhostNotStarted?: boolean;
+  } = {},
 ): SimulationTimeStepResult {
+  const targetTime = new Date(targetDateISO).getTime();
+  const ghostOpacity = options.ghostOpacity ?? 0.15;
+  const completedOpacity = options.completedOpacity ?? 0.95;
+
   const counts: Record<Element4DVisualStatus, number> = {
     not_started: 0,
     in_progress: 0,
@@ -256,145 +309,157 @@ export function compute4DSimulationState(
   };
 
   let totalWeightedProgress = 0;
+  let linkedElementCount = 0;
 
   const states: Element4DState[] = elements.map((elem) => {
-    const task = elem.wbsTaskId ? wbsMap.get(elem.wbsTaskId) : undefined;
-
-    if (!task) {
-      // Không gắn task WBS -> hiển thị màu hệ thống mặc định
-      const sysColor = SYSTEM_DEFAULT_COLORS[elem.systemType] ?? "#94a3b8";
+    if (!elem.wbsTaskId || !wbsMap.has(elem.wbsTaskId)) {
+      counts.not_started++;
       return {
         elementId: elem.id,
         guid: elem.guid,
+        wbsTaskId: elem.wbsTaskId,
         status: "not_started",
         progressPercent: 0,
-        colorHex: sysColor,
-        opacity: 0.35,
-        visible: options.showGhostNotStarted ?? true,
+        colorHex: STATUS_4D_COLORS.not_started,
+        opacity: ghostOpacity,
+        visible: true,
       };
     }
 
+    linkedElementCount++;
+    const task = wbsMap.get(elem.wbsTaskId)!;
+    const startTime = new Date(task.startDate).getTime();
+    const endTime = new Date(task.endDate).getTime();
+    const isApproved = Boolean(
+      task.approvedDate && new Date(task.approvedDate).getTime() <= targetTime,
+    );
+
     let status: Element4DVisualStatus = "not_started";
-    let progress = 0;
+    let progressPercent = 0;
     let colorHex = STATUS_4D_COLORS.not_started;
-    let opacity = 0.3;
-    let visible = options.showGhostNotStarted ?? true;
+    let opacity = ghostOpacity;
     let highlightAlert = false;
 
-    const start = task.startDate;
-    const end = task.endDate;
-
-    if (targetDateISO < start) {
-      status = "not_started";
-      progress = 0;
-      opacity = 0.25;
-      colorHex = STATUS_4D_COLORS.not_started;
-      visible = options.showGhostNotStarted ?? true;
-    } else if (
-      task.status === "nghiem_thu" ||
-      (task.approvedDate && targetDateISO >= task.approvedDate)
-    ) {
+    if (isApproved) {
       status = "approved";
-      progress = 100;
-      opacity = 1.0;
+      progressPercent = 100;
       colorHex = STATUS_4D_COLORS.approved;
-      visible = true;
-    } else if (targetDateISO >= end && task.progress < 1) {
-      status = "delayed";
-      progress = Math.round(task.progress * 100);
-      opacity = 1.0;
-      colorHex = STATUS_4D_COLORS.delayed;
-      visible = true;
-      highlightAlert = true;
-    } else if (task.progress >= 1 || targetDateISO >= end) {
-      status = "completed";
-      progress = 100;
-      opacity = 0.95;
-      colorHex = STATUS_4D_COLORS.completed;
-      visible = true;
-    } else {
+      opacity = completedOpacity;
+    } else if (targetTime < startTime) {
+      status = "not_started";
+      progressPercent = 0;
+      colorHex = STATUS_4D_COLORS.not_started;
+      opacity = ghostOpacity;
+    } else if (targetTime >= startTime && targetTime <= endTime) {
+      const plannedDuration = Math.max(1, endTime - startTime);
+      const elapsed = targetTime - startTime;
+      const expectedLinearProgress = Math.min(100, Math.round((elapsed / plannedDuration) * 100));
+
+      progressPercent = Math.round(task.progress * 100);
       status = "in_progress";
-      // Nội suy tuyến tính theo ngày nếu task đang chạy
-      progress = Math.min(95, Math.max(10, Math.round(task.progress * 100)));
-      opacity = 0.85;
       colorHex = STATUS_4D_COLORS.in_progress;
-      visible = true;
+      opacity = 0.85;
+
+      if (progressPercent < expectedLinearProgress - 15) {
+        status = "delayed";
+        colorHex = STATUS_4D_COLORS.delayed;
+        highlightAlert = true;
+      }
+    } else if (targetTime > endTime) {
+      if (task.progress >= 1) {
+        status = "completed";
+        progressPercent = 100;
+        colorHex = STATUS_4D_COLORS.completed;
+        opacity = completedOpacity;
+      } else {
+        status = "delayed";
+        progressPercent = Math.round(task.progress * 100);
+        colorHex = STATUS_4D_COLORS.delayed;
+        opacity = 0.9;
+        highlightAlert = true;
+      }
     }
 
     counts[status]++;
-    totalWeightedProgress += progress;
+    totalWeightedProgress += progressPercent;
 
     return {
       elementId: elem.id,
       guid: elem.guid,
       wbsTaskId: elem.wbsTaskId,
       status,
-      progressPercent: progress,
+      progressPercent,
       colorHex,
       opacity,
-      visible,
+      visible: true,
       highlightAlert,
     };
   });
 
-  const totalElements = elements.length;
-  const overallProgressPercent =
-    totalElements > 0 ? Math.round(totalWeightedProgress / totalElements) : 0;
+  const overallProgress =
+    linkedElementCount > 0 ? Math.round(totalWeightedProgress / linkedElementCount) : 0;
 
   return {
     targetDate: targetDateISO,
-    totalElements,
+    totalElements: elements.length,
     countsByStatus: counts,
-    overallProgressPercent,
+    overallProgressPercent: overallProgress,
     elements: states,
   };
 }
 
-/**
- * Động cơ Cắt Mặt Phẳng 3D Section Plane (Section Cut Engine)
- */
+// ============================================================================
+// 3. MẶT PHẲNG CẮT 3D SECTION BOX CLIPPING
+// ============================================================================
+
+export interface SectionPlane {
+  axis: "x" | "y" | "z";
+  positionMm?: number;
+  offset?: number;
+  direction?: "positive" | "negative";
+}
+
 export function compute3DSectionCut(
   elements: BimElement[],
-  sectionPlane: { axis: "x" | "y" | "z"; offset: number; inverted?: boolean },
-): { visibleElements: BimElement[]; clippedCount: number } {
-  const { axis, offset, inverted = false } = sectionPlane;
+  sectionPlane: SectionPlane,
+): {
+  visibleElements: BimElement[];
+  clippedCount: number;
+} {
+  const posMm = sectionPlane.positionMm ?? sectionPlane.offset ?? 0;
+  const planePosM = posMm / 1000;
+  const dir = sectionPlane.direction ?? "positive";
+  const axisIdx = sectionPlane.axis === "x" ? 0 : sectionPlane.axis === "y" ? 1 : 2;
 
-  const visibleElements = elements.filter((elem) => {
+  let clipped = 0;
+  const visible = elements.filter((elem) => {
     const verts = elem.geometryData.vertices;
     if (!verts || verts.length === 0) return true;
 
-    // Lấy tọa độ trung bình
-    let sum = 0;
-    const stride = 3;
-    const coordIdx = axis === "x" ? 0 : axis === "y" ? 1 : 2;
-    const vertexCount = verts.length / stride;
-
-    for (let i = 0; i < verts.length; i += stride) {
-      sum += verts[i + coordIdx];
+    let centerVal = 0;
+    const vertexCount = verts.length / 3;
+    for (let i = 0; i < verts.length; i += 3) {
+      centerVal += verts[i + axisIdx];
     }
-    const centerVal = (sum / vertexCount) * 1000; // về mm
+    centerVal /= vertexCount;
 
-    if (!inverted) {
-      return centerVal <= offset;
-    } else {
-      return centerVal >= offset;
-    }
+    const isVisible = dir === "positive" ? centerVal >= planePosM : centerVal <= planePosM;
+
+    if (!isVisible) clipped++;
+    return isVisible;
   });
 
   return {
-    visibleElements,
-    clippedCount: elements.length - visibleElements.length,
+    visibleElements: visible,
+    clippedCount: clipped,
   };
 }
 
-/**
- * Tính toán Hộp bao 3D (Bounding Box AABB) tổng thể
- */
-export function calculateModelBoundingBox(elements: BimElement[]): BoundingBox3D {
-  if (elements.length === 0) {
-    return { min: [0, 0, 0], max: [100, 100, 30] };
-  }
+// ============================================================================
+// 4. TIỆN ÍCH HÌNH HỌC VÀ THUỘC TÍNH PROPERTY SET (PSETS)
+// ============================================================================
 
+export function calculateModelBoundingBox(elements: BimElement[]): BoundingBox3D {
   let minX = Infinity;
   let minY = Infinity;
   let minZ = Infinity;
@@ -433,9 +498,6 @@ export function calculateModelBoundingBox(elements: BimElement[]): BoundingBox3D
   };
 }
 
-/**
- * Lọc thực thể BIM theo Psets và thuộc tính kỹ thuật
- */
 export function filterElementsPropertySet(
   elements: BimElement[],
   filters: {
@@ -469,4 +531,79 @@ export function filterElementsPropertySet(
     }
     return true;
   });
+}
+
+// ============================================================================
+// 5. DATABASE PERSISTENCE & CRUD (B10 Fix)
+// ============================================================================
+
+export interface BimSimulationRecord {
+  id: string;
+  project_id: number;
+  model_id: string;
+  title: string;
+  start_date: string;
+  end_date: string;
+  current_time_step: number;
+  settings: Record<string, unknown>;
+  created_by: number | null;
+  created_at: string;
+}
+
+export async function save4dSimulation(
+  projectId: number,
+  modelId: string,
+  title: string,
+  startDate: string,
+  endDate: string,
+  settings: Record<string, unknown> = {},
+  userId?: number | null,
+): Promise<{ id: string }> {
+  const row = await queryOne<{ id: string }>(
+    `INSERT INTO engineering_bim_4d_simulations (
+      project_id, model_id, title, start_date, end_date, settings, created_by
+    ) VALUES (
+      ?, ?, ?, ?, ?, ?::jsonb, ?
+    ) RETURNING id`,
+    [projectId, modelId, title, startDate, endDate, JSON.stringify(settings), userId ?? null],
+  );
+
+  if (!row) throw new Error("Failed to save 4D simulation");
+  return row;
+}
+
+export async function load4dSimulation(
+  projectId: number,
+  modelId: string,
+): Promise<BimSimulationRecord | null> {
+  const row = await queryOne<BimSimulationRecord>(
+    `SELECT * FROM engineering_bim_4d_simulations 
+     WHERE project_id = ? AND model_id = ? 
+     ORDER BY created_at DESC LIMIT 1`,
+    [projectId, modelId],
+  );
+  return row ?? null;
+}
+
+export async function list4dSimulations(projectId: number): Promise<BimSimulationRecord[]> {
+  return await query<BimSimulationRecord>(
+    `SELECT * FROM engineering_bim_4d_simulations 
+     WHERE project_id = ? 
+     ORDER BY created_at DESC LIMIT 50`,
+    [projectId],
+  );
+}
+
+export async function listBimModels(projectId: number): Promise<BimModel[]> {
+  return await query<BimModel>(
+    `SELECT * FROM engineering_bim_models WHERE project_id = ? ORDER BY created_at DESC`,
+    [projectId],
+  );
+}
+
+export async function listBimElements(projectId: number, modelId: string): Promise<BimElement[]> {
+  return await query<BimElement>(
+    `SELECT * FROM engineering_bim_elements WHERE project_id = ? AND model_id = ?`,
+    [projectId, modelId],
+  );
 }

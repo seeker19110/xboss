@@ -1,5 +1,6 @@
-// lib/engineering-cad-qto.ts — Closed-Loop CAD-QTO-Tracking Engine (M66)
+// lib/engineering-cad-qto.ts — Closed-Loop CAD-QTO-Tracking Engine (M66 / M89)
 import { query, queryOne, run } from "@/lib/db";
+import { createHash } from "crypto";
 
 export type SpoolStatus = "fabricated" | "delivered" | "installed" | "qc_passed" | "bbnt_approved";
 
@@ -198,6 +199,44 @@ export async function updateSpoolProgressStage(
   return spool || null;
 }
 
+export async function upsertQtoVariance(
+  projectId: number,
+  boqItemId: number,
+  qtyContract: number,
+  qtyShopCad: number,
+  qtyInstalled: number,
+  qtyApprovedBbnt: number,
+  estimatedVoVnd: number,
+  status: "normal" | "vo_risk" | "over_norm" | "critical_variance",
+): Promise<void> {
+  await run(
+    `INSERT INTO engineering_cad_qto_variances (
+      project_id, boq_item_id, qty_contract, qty_shop_cad, qty_installed,
+      qty_approved_bbnt, estimated_vo_vnd, status
+    ) VALUES (
+      ?, ?, ?, ?, ?,
+      ?, ?, ?
+    )
+    ON CONFLICT (project_id, boq_item_id) DO UPDATE SET
+      qty_contract = EXCLUDED.qty_contract,
+      qty_shop_cad = EXCLUDED.qty_shop_cad,
+      qty_installed = EXCLUDED.qty_installed,
+      qty_approved_bbnt = EXCLUDED.qty_approved_bbnt,
+      estimated_vo_vnd = EXCLUDED.estimated_vo_vnd,
+      status = EXCLUDED.status`,
+    [
+      projectId,
+      boqItemId,
+      qtyContract,
+      qtyShopCad,
+      qtyInstalled,
+      qtyApprovedBbnt,
+      estimatedVoVnd,
+      status,
+    ],
+  );
+}
+
 export async function generateInspectionRequestForSpools(
   projectId: number,
   spoolIds: string[],
@@ -221,7 +260,7 @@ export async function generateInspectionRequestForSpools(
 
   const insId = Number(insertRow?.id || 0);
 
-  // 2. Gán inspection_request_id cho các spools và chuyển trạng thái sang qc_passed/bbnt_approved
+  // 2. Gán inspection_request_id cho các spools và chuyển trạng thái sang qc_passed
   for (const sId of spoolIds) {
     await run(
       `UPDATE engineering_cad_spools 
@@ -300,14 +339,11 @@ export function generateElectronicBbntDocument(
     kcsStatus: "ĐẠT CHUẨN KCS (QC PASSED)",
   }));
 
-  const payloadString = `${bbntNumber}|${projectName}|${totalQty}|${spools.length}|${signatoryUser.name}`;
-  // Tạo token chữ ký số mẫu dạng SHA256 fragment
-  let hashVal = 0;
-  for (let i = 0; i < payloadString.length; i++) {
-    hashVal = (hashVal << 5) - hashVal + payloadString.charCodeAt(i);
-    hashVal |= 0;
-  }
-  const provenanceHash = `SHA256:PROV-${Math.abs(hashVal).toString(16).padStart(16, "0").toUpperCase()}`;
+  const payloadString = `${bbntNumber}|${projectName}|${totalQty}|${spools.length}|${signatoryUser.name}|${new Date().toISOString()}`;
+
+  // B7 Fix: Real cryptographic SHA-256 hash
+  const rawHash = createHash("sha256").update(payloadString).digest("hex").toUpperCase();
+  const provenanceHash = `SHA256:PROV-${rawHash.substring(0, 24)}`;
   const cryptographicSignatureToken = `SIG-A2-${Date.now().toString(36).toUpperCase()}-${signatoryUser.role.toUpperCase()}`;
 
   return {
