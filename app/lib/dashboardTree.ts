@@ -119,9 +119,9 @@ export const DASHBOARD_TREE: DashCluster[] = [
     label: "🏛️ 7 Đại Trung Tâm Điều Hành (Unified Hubs)",
     dashboards: [
       {
-        id: "dash.cad-bim-studio",
-        href: "/cad-bim",
-        label: "God-Tier 4D CAD/BIM Studio (M96)",
+        id: "dash.mepf-cad-bim-studio",
+        href: "/mepf-cad-bim-studio",
+        label: "MEPF CAD/BIM Studio",
         icon: Sparkles,
       },
       {
@@ -168,8 +168,8 @@ export const DASHBOARD_TREE: DashCluster[] = [
     dashboards: [
       {
         id: "dash.god-tier-studio",
-        href: "/engineering/god-tier-studio",
-        label: "God-Tier 4D Studio (M96)",
+        href: "/mepf-cad-bim-studio",
+        label: "MEPF CAD/BIM Studio (M96)",
         icon: Sparkles,
       },
       {

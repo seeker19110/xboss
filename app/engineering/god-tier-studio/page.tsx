@@ -511,7 +511,7 @@ export default function GodTierStudioPage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans">
       <AppHeader
-        title="God-Tier CAD/BIM Apex Studio"
+        title="MEPF CAD/BIM Studio"
         subtitle="LiDAR Scan-to-BIM • openBIM BCF 3.0 • DfMA CNC G-Code • Merkle Tree NĐ 06"
       />
 

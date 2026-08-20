@@ -374,11 +374,11 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               {
-                title: "1. God-Tier 4D CAD/BIM Studio (M96)",
+                title: "1. MEPF CAD/BIM Studio",
                 desc: "3D/4D BIM WebGPU, LiDAR Scan-to-BIM, BCF 3.0, CNC G-Code & Auto-Routing",
-                href: "/engineering/god-tier-studio",
+                href: "/mepf-cad-bim-studio",
                 icon: Sparkles,
-                badge: "God-Tier Apex",
+                badge: "MEPF Core",
                 color: "text-amber-400",
                 border: "border-amber-500/40",
               },

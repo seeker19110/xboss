@@ -50,11 +50,11 @@ const CATEGORIES: { key: NavCategory; label: string }[] = [
 
 const NAV_ITEMS: NavItem[] = [
   {
-    href: "/cad-bim",
-    label: "Studio Không Gian & BIM/CAD",
+    href: "/mepf-cad-bim-studio",
+    label: "MEPF CAD/BIM Studio",
     category: "spatial",
     icon: Sparkles,
-    badge: "Unified Hub",
+    badge: "Master Studio",
   },
   {
     href: "/engineering-intelligence",
