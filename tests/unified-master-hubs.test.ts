@@ -7,6 +7,7 @@ import {
   resolveVisibleTree,
   flattenDashboards,
   isNavItemActive,
+  type DashNode,
 } from "@/app/lib/dashboardTree";
 
 test("Unified Master Hubs: DASHBOARD_TREE chứa cụm 7 Đại Trung Tâm Điều Hành Hợp Nhất", () => {
@@ -14,10 +15,10 @@ test("Unified Master Hubs: DASHBOARD_TREE chứa cụm 7 Đại Trung Tâm Đi�
     (c) => c.label === "🏛️ 7 Đại Trung Tâm Điều Hành (Unified Hubs)",
   );
   assert.ok(hubsCluster, "Phải có cụm 7 Đại Trung Tâm Điều Hành trên Sidebar AppShell");
-  assert.equal(hubsCluster?.dashboards.length, 7, "Cụm phải có đúng 7 Đại Trung Tâm Điều Hành");
+  assert.equal(hubsCluster.dashboards.length, 7, "Cụm phải có đúng 7 Đại Trung Tâm Điều Hành");
 
   const expectedHubs = [
-    { href: "/cad-bim", label: "Studio Kỹ Thuật Không Gian & BIM/CAD" },
+    { href: "/cad-bim", label: "God-Tier 4D CAD/BIM Studio (M96)" },
     { href: "/site", label: "Chỉ Huy Tác Nghiệp Hiện Trường & HSE" },
     { href: "/schedule", label: "Quản Trị Kế Hoạch & Tiến Độ WBS" },
     { href: "/procurement", label: "Chuỗi Cung Ứng, Mua Sắm & Kho Vận" },
@@ -27,16 +28,18 @@ test("Unified Master Hubs: DASHBOARD_TREE chứa cụm 7 Đại Trung Tâm Đi�
   ];
 
   for (const exp of expectedHubs) {
-    const found = hubsCluster?.dashboards.find((d) => d.href === exp.href);
-    assert.ok(found, `Phải tìm thấy Hub ${exp.label} với href ${exp.href}`);
-    assert.equal(found?.label, exp.label);
-    assert.ok(found?.icon, `Hub ${exp.label} phải có Icon`);
+    const foundNode: DashNode | undefined = hubsCluster.dashboards.find(
+      (d: DashNode) => d.href === exp.href,
+    );
+    assert.ok(foundNode, `Phải tìm thấy Hub ${exp.label} với href ${exp.href}`);
+    assert.equal(foundNode.label, exp.label);
+    assert.ok(foundNode.icon, `Hub ${exp.label} phải có Icon`);
   }
 });
 
 test("Unified Master Hubs: findActiveNav định tuyến chính xác cho cả 7 Đại Trung Tâm", () => {
   const hubPaths = [
-    { path: "/cad-bim", expectedLabel: "Studio Kỹ Thuật Không Gian & BIM/CAD" },
+    { path: "/cad-bim", expectedLabel: "God-Tier 4D CAD/BIM Studio (M96)" },
     { path: "/site", expectedLabel: "Chỉ Huy Tác Nghiệp Hiện Trường & HSE" },
     { path: "/schedule", expectedLabel: "Quản Trị Kế Hoạch & Tiến Độ WBS" },
     { path: "/procurement", expectedLabel: "Chuỗi Cung Ứng, Mua Sắm & Kho Vận" },

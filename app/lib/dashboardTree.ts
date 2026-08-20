@@ -121,7 +121,7 @@ export const DASHBOARD_TREE: DashCluster[] = [
       {
         id: "dash.cad-bim-studio",
         href: "/cad-bim",
-        label: "Studio Kỹ Thuật Không Gian & BIM/CAD",
+        label: "God-Tier 4D CAD/BIM Studio (M96)",
         icon: Sparkles,
       },
       {

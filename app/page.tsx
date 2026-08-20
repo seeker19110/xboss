@@ -374,13 +374,13 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               {
-                title: "1. Kỹ Thuật Không Gian & BIM/CAD",
-                desc: "3D/4D BIM, 2D CAD, Auto-Routing, DfMA Nesting & Scan-to-BIM",
-                href: "/cad-bim",
+                title: "1. God-Tier 4D CAD/BIM Studio (M96)",
+                desc: "3D/4D BIM WebGPU, LiDAR Scan-to-BIM, BCF 3.0, CNC G-Code & Auto-Routing",
+                href: "/engineering/god-tier-studio",
                 icon: Sparkles,
-                badge: "5 Chế Độ",
+                badge: "God-Tier Apex",
                 color: "text-amber-400",
-                border: "border-amber-500/30",
+                border: "border-amber-500/40",
               },
               {
                 title: "2. Chỉ Huy Hiện Trường & An Toàn",

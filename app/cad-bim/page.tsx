@@ -507,10 +507,10 @@ function CadBimStudioContent() {
 
   return (
     <HubShell
-      title="Studio Kỹ Thuật Không Gian & BIM/CAD"
-      subtitle="Phân hệ tích hợp 14 công cụ CAD, BIM 3D/4D, Shopdrawing, Auto-Routing, Nesting và Scan-to-BIM"
+      title="God-Tier 4D CAD/BIM Studio (M96)"
+      subtitle="Phân hệ đỉnh cao công nghệ hợp nhất WebGPU 3D/4D, LiDAR Scan-to-BIM, openBIM BCF 3.0, CNC G-Code & Auto-Routing"
       icon={Sparkles}
-      badge="Spatial Apex"
+      badge="God-Tier Apex"
       tabs={tabs}
       defaultTab="bim"
       stats={stats}
