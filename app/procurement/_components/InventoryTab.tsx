@@ -16,6 +16,7 @@ import {
   Pencil,
   Check,
   FileUp,
+  Download,
   Search,
   Building2,
   ShoppingCart,
@@ -63,14 +64,14 @@ const DVT_OPTIONS = ["Cái", "Mét", "m2", "Ống", "Bộ", "Kg", "Cây", "Cuộ
 }));
 
 function budgetStatus(m: Material): "none" | "over" | "within" {
-  if ((m.qtyBoq ?? 0) <= 0) return "none";
+  if ((m.qtyPlanned ?? 0) <= 0) return "none";
   return (m.qtyPlanned ?? 0) > (m.qtyBoq ?? 0) ? "over" : "within";
 }
 
 const BUDGET_LABEL: Record<"none" | "over" | "within", string> = {
-  none: "—",
-  over: "Vượt ĐM",
-  within: "Trong ĐM",
+  none: "⚠️ Chưa bóc tách",
+  over: "❌ CHẶN ĐẶT HÀNG",
+  within: "✅ CHO PHÉP ĐẶT HÀNG",
 };
 
 type ColKey =
@@ -96,7 +97,7 @@ const DEFAULT_LABELS: Record<ColKey, string> = {
   qtyStock: "Tồn kho",
   qtyUsed: "Đã xuất",
   diff: "Chênh lệch ĐM",
-  status: "Trạng thái",
+  status: "Kiểm soát ĐH",
   note: "Ghi chú",
 };
 
@@ -560,6 +561,15 @@ export default function InventoryTab({ onSwitchToOrders }: { onSwitchToOrders?: 
               {syncing ? "Đang đồng bộ…" : "Đồng bộ Sheet"}
             </button>
           )}
+
+          <a
+            href="/api/materials/template"
+            download="MAU-KHOI-LUONG-BOQ.xlsx"
+            title="Tải file biểu mẫu BOQ & Định mức vật tư chuẩn xBOSS (.xlsx)"
+            className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold transition shrink-0 h-10"
+          >
+            <Download className="w-4 h-4" /> Tải mẫu BOQ
+          </a>
 
           <a
             href="/materials/import"
