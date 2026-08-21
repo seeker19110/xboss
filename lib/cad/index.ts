@@ -24,3 +24,6 @@ export * from "@/lib/engineering-cad-hydraulic-network";
 
 // 7. 6D Embodied Carbon Footprint LCA & 7D Asset Living Digital Twin
 export * from "@/lib/engineering-cad-carbon-lifecycle";
+
+// 8. DXF Parser, Standardizer & 2D-to-3D Centerline Spatial Extrusion Engine
+export * from "@/lib/cad/dxf-parser";

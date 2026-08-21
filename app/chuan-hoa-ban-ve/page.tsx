@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   Layers,
@@ -14,29 +14,38 @@ import {
   Check,
   AlertTriangle,
   FileCheck,
-  Wrench,
   Search,
   ArrowRight,
   TrendingUp,
-  ShieldAlert,
-  Compass,
   CheckCircle2,
   Box,
   SlidersHorizontal,
-  ChevronRight,
   Split,
-  Maximize2,
-  ShieldCheck,
-  FileText,
   Activity,
-  FolderSync,
   HelpCircle,
   Play,
-  Share2,
+  UploadCloud,
+  FileSpreadsheet,
+  Layers2,
+  Cuboid,
+  FileCode2,
+  FileUp,
+  Compass,
+  Filter,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { showToast } from "@/app/components/Toast";
 import { redirectToLogin } from "@/app/lib/me";
+import { parseDxf, DxfParseResult, DxfLayerInfo } from "@/lib/cad/dxf-parser";
+
+interface DrawingOption {
+  id: number;
+  code: string;
+  name: string;
+  kind: string;
+  systemGroup: string | null;
+  floorLabel: string | null;
+}
 
 interface CadDiffItem {
   entityId: string;
@@ -75,138 +84,36 @@ interface BlockCatalogItem {
   mapped_material_id?: number | null;
 }
 
-interface StandardLayerRule {
-  discipline: "M" | "E" | "P" | "F" | "ELV" | "S";
-  originalLayer: string;
-  standardLayer: string;
-  colorCode: string;
-  colorName: string;
-  lineWeight: string;
-  description: string;
-  status: "matched" | "standardized" | "pending";
-}
-
-interface CenterlineSpatialRoute {
-  id: string;
-  system: "HVAC" | "WATER" | "ELECTRICAL" | "FIRE";
-  name: string;
-  startPoint: [number, number, number];
-  endPoint: [number, number, number];
-  lengthMm: number;
-  sectionDimensions: string;
-  insulationMm: number;
-  elevationBopMm: number;
-  corridorTier: "Tier 1 (Gió)" | "Tier 2 (Điện)" | "Tier 3 (Nước)";
-  combineStatus: "clean" | "clash_risk" | "verified";
-  soffitClearanceMm: number;
-}
-
 export default function ChuanHoaBanVePage() {
+  // ── Source Selection: [design] (from project design drawings) vs [upload] (upload custom DXF) ──
+  const [sourceMode, setSourceMode] = useState<"design" | "upload">("design");
+  const [designDrawings, setDesignDrawings] = useState<DrawingOption[]>([]);
+  const [selectedDrawingId, setSelectedDrawingId] = useState<number | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // ── 2-Phase Workflow Navigation ──
+  // Phase 1: CAD Normalization (diagnostic -> layers -> font_doctor -> blocks -> diff -> lisp)
+  // Phase 2: 3D Model Extrusion & Spatial BIM Normalization from DXF (spatial_bim)
+  const [activePhase, setActivePhase] = useState<"phase1_cad" | "phase2_3d">("phase1_cad");
   const [activeTab, setActiveTab] = useState<
-    "layers" | "font_doctor" | "diff" | "blocks" | "spatial_bim" | "lisp"
-  >("spatial_bim");
+    "diagnostic" | "layers" | "font_doctor" | "blocks" | "diff" | "lisp" | "spatial_bim"
+  >("diagnostic");
+
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // 1. Layer Standardization States
+  // ── DXF Parsed Model State ──
+  const [dxfData, setDxfData] = useState<DxfParseResult | null>(null);
+  const [scrScript, setScrScript] = useState<string>("");
+
+  // ── Filter States ──
   const [selectedDisciplineFilter, setSelectedDisciplineFilter] = useState<string>("all");
   const [layerSearch, setLayerSearch] = useState("");
-  const [layerRules, setLayerRules] = useState<StandardLayerRule[]>([
-    {
-      discipline: "M",
-      originalLayer: "01_ONG_GIO_CAP",
-      standardLayer: "M-HVAC-DUCT-SUPP",
-      colorCode: "#38bdf8",
-      colorName: "Sky Blue (140)",
-      lineWeight: "0.35 mm",
-      description: "Tuyến ống gió cấp lạnh chính và nhánh kèm bọc cách nhiệt",
-      status: "standardized",
-    },
-    {
-      discipline: "M",
-      originalLayer: "02_ONG_GIO_HOI",
-      standardLayer: "M-HVAC-DUCT-RETN",
-      colorCode: "#0284c7",
-      colorName: "Dark Blue (150)",
-      lineWeight: "0.30 mm",
-      description: "Tuyến ống gió hồi và ống hút khói hành lang",
-      status: "standardized",
-    },
-    {
-      discipline: "E",
-      originalLayer: "DIEN_MANG_CAP_DONG_LUC",
-      standardLayer: "E-TRAY-POWR-PRIM",
-      colorCode: "#fbbf24",
-      colorName: "Amber Yellow (40)",
-      lineWeight: "0.40 mm",
-      description: "Thang máng cáp nguồn động lực hạ thế 3P+N",
-      status: "standardized",
-    },
-    {
-      discipline: "E",
-      originalLayer: "DIEN_CHIEU_SANG_DAY",
-      standardLayer: "E-LITE-WIRE-CIRC",
-      colorCode: "#f59e0b",
-      colorName: "Orange (30)",
-      lineWeight: "0.25 mm",
-      description: "Dây dẫn và ống luồn mềm chiếu sáng âm trần",
-      status: "standardized",
-    },
-    {
-      discipline: "P",
-      originalLayer: "CAP_THOAT_NUOC_THAI",
-      standardLayer: "P-SAN-PIPE-SOIL",
-      colorCode: "#818cf8",
-      colorName: "Indigo (170)",
-      lineWeight: "0.35 mm",
-      description: "Ống thoát phân và thoát nước thải sinh hoạt (dốc 1.5% - 2%)",
-      status: "standardized",
-    },
-    {
-      discipline: "P",
-      originalLayer: "NUOC_LANH_PPR",
-      standardLayer: "P-DOM-PIPE-COLD",
-      colorCode: "#34d399",
-      colorName: "Emerald Green (70)",
-      lineWeight: "0.30 mm",
-      description: "Ống cấp nước sinh hoạt PPR áp lực PN10/PN16",
-      status: "standardized",
-    },
-    {
-      discipline: "F",
-      originalLayer: "PCCC_ONG_CHUA_CHAY",
-      standardLayer: "F-PROT-PIPE-MAIN",
-      colorCode: "#f87171",
-      colorName: "Red (10)",
-      lineWeight: "0.50 mm",
-      description: "Tuyến ống thép đen hàn/ren cấp nước chữa cháy vách tường & sprinkler",
-      status: "standardized",
-    },
-    {
-      discipline: "ELV",
-      originalLayer: "MANG_LAN_DATA_RACK",
-      standardLayer: "ELV-DATA-TRAY-COMM",
-      colorCode: "#c084fc",
-      colorName: "Purple (210)",
-      lineWeight: "0.30 mm",
-      description: "Máng cáp mạng viễn thông, CCTV, BMS và âm thanh PA",
-      status: "standardized",
-    },
-    {
-      discipline: "S",
-      originalLayer: "TRUC_LUOI_DANG_THEP",
-      standardLayer: "S-GRID-AXIS-COOR",
-      colorCode: "#a1a1aa",
-      colorName: "Zinc Gray (8)",
-      lineWeight: "0.15 mm",
-      description: "Trục định vị kết cấu dầm cột để neo tọa độ BIM 0,0,0",
-      status: "standardized",
-    },
-  ]);
 
-  // 2. Font Doctor States
+  // ── Font Doctor States ──
   const [legacyInput, setLegacyInput] = useState(
-    "HÖ thèng th«ng giã tÇng 4 - èng giã 600x400 BOP=+2.85m",
+    "HÖ thèng th«ng giã tÇng 4 - èng giã 600x400 BOP=+2.85m %%c150",
   );
   const [convertedText, setConvertedText] = useState("");
   const [sampleFontSnippets] = useState([
@@ -232,74 +139,14 @@ export default function ChuanHoaBanVePage() {
     },
   ]);
 
-  // 3. CAD Diff States
+  // ── CAD Diff States ──
   const [diffResult, setDiffResult] = useState<CadDiffResult | null>(null);
 
-  // 4. Block Catalog States
+  // ── Block Catalog States ──
   const [blockCatalogs, setBlockCatalogs] = useState<BlockCatalogItem[]>([]);
   const [loadingBlocks, setLoadingBlocks] = useState(false);
 
-  // 5. Spatial BIM & Combine Readiness States
-  const [routes, setRoutes] = useState<CenterlineSpatialRoute[]>([
-    {
-      id: "R-DUCT-01",
-      system: "HVAC",
-      name: "Tuyến ống gió cấp chính Trục A-D",
-      startPoint: [1200, 2400, 3100],
-      endPoint: [15400, 2400, 3100],
-      lengthMm: 14200,
-      sectionDimensions: "800 x 400 mm",
-      insulationMm: 25,
-      elevationBopMm: 2875,
-      corridorTier: "Tier 1 (Gió)",
-      combineStatus: "verified",
-      soffitClearanceMm: 225,
-    },
-    {
-      id: "R-TRAY-01",
-      system: "ELECTRICAL",
-      name: "Thang máng cáp nguồn động lực chính",
-      startPoint: [1200, 3200, 2900],
-      endPoint: [15400, 3200, 2900],
-      lengthMm: 14200,
-      sectionDimensions: "400 x 100 mm",
-      insulationMm: 0,
-      elevationBopMm: 2800,
-      corridorTier: "Tier 2 (Điện)",
-      combineStatus: "verified",
-      soffitClearanceMm: 450,
-    },
-    {
-      id: "R-CHILL-01",
-      system: "WATER",
-      name: "Cặp ống nước lạnh Chiller Supply/Return DN150",
-      startPoint: [1200, 3800, 2600],
-      endPoint: [15400, 3800, 2600],
-      lengthMm: 14200,
-      sectionDimensions: "Ø168 mm (DN150)",
-      insulationMm: 32,
-      elevationBopMm: 2368,
-      corridorTier: "Tier 3 (Nước)",
-      combineStatus: "clean",
-      soffitClearanceMm: 600,
-    },
-    {
-      id: "R-DRAIN-01",
-      system: "WATER",
-      name: "Ống thoát nước thải sinh hoạt dốc 1.5%",
-      startPoint: [1200, 4200, 2550],
-      endPoint: [15400, 4200, 2337],
-      lengthMm: 14200,
-      sectionDimensions: "Ø114 mm (uPVC)",
-      insulationMm: 0,
-      elevationBopMm: 2223,
-      corridorTier: "Tier 3 (Nước)",
-      combineStatus: "clash_risk",
-      soffitClearanceMm: 150,
-    },
-  ]);
-
-  // 6. AutoLISP Generator States
+  // ── AutoLISP Generator States ──
   const [lispType, setLispType] = useState<"hanger" | "sleeve" | "duct_transition">("hanger");
   const [hangerWidth, setHangerWidth] = useState(600);
   const [hangerHeight, setHangerHeight] = useState(400);
@@ -313,9 +160,92 @@ export default function ChuanHoaBanVePage() {
   const [transitionLength, setTransitionLength] = useState(600);
   const [generatedLispCode, setGeneratedLispCode] = useState("");
 
-  // CAD Diff Runner
+  // ── Fetch Design Drawings from Project ──
+  const fetchDesignDrawings = useCallback(async () => {
+    try {
+      const res = await fetch("/api/drawings?kind=design");
+      if (res.status === 401) {
+        redirectToLogin();
+        return;
+      }
+      if (res.ok) {
+        const d = await res.json();
+        const list: DrawingOption[] = d.drawings || [];
+        setDesignDrawings(list);
+        if (list.length > 0 && !selectedDrawingId) {
+          setSelectedDrawingId(list[0].id);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, [selectedDrawingId]);
+
+  // ── Trigger DXF Parsing (via API or direct client fallback) ──
+  const runDxfAnalysis = useCallback(
+    async (options?: { drawingId?: number | null; customDxfContent?: string; name?: string }) => {
+      setLoading(true);
+      try {
+        const res = await fetch("/api/engineering/cad/parse-dxf", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            drawingId: options?.drawingId ?? selectedDrawingId,
+            dxfContent: options?.customDxfContent,
+            fileName: options?.name || uploadedFileName || "AVIO-DWG-M-FL04-01.dxf",
+          }),
+        });
+
+        if (res.status === 401) {
+          redirectToLogin();
+          return;
+        }
+
+        if (res.ok) {
+          const json = await res.json();
+          if (json.data) {
+            setDxfData(json.data);
+            setScrScript(json.scrScript || "");
+          }
+        }
+      } catch (e) {
+        console.error("Parse DXF error:", e);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [selectedDrawingId, uploadedFileName],
+  );
+
+  // ── Handle File Upload (.DXF / .DWG) ──
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadedFileName(file.name);
+    const reader = new FileReader();
+
+    reader.onload = async (event) => {
+      const content = event.target?.result as string;
+      if (content) {
+        // Parse locally and via API
+        try {
+          const parsed = parseDxf(content, file.name);
+          setDxfData(parsed);
+          await runDxfAnalysis({ customDxfContent: content, name: file.name });
+          showToast(`Đã nạp và chuẩn hóa tệp ${file.name} (${parsed.entities.length} thực thể)!`);
+        } catch (err) {
+          console.error("Local parse error:", err);
+          showToast("Lỗi khi đọc file CAD DXF");
+        }
+      }
+    };
+
+    reader.readAsText(file);
+  };
+
+  // ── CAD Diff Runner ──
   const runDiffAnalysis = useCallback(async () => {
-    setLoading(true);
     try {
       const sampleBaseEntities = [
         {
@@ -396,31 +326,20 @@ export default function ChuanHoaBanVePage() {
         }),
       });
 
-      if (res.status === 401) {
-        redirectToLogin();
-        return;
-      }
-
       if (res.ok) {
         const data = await res.json();
         setDiffResult(data);
       }
     } catch (e) {
       console.error("CAD Diff error:", e);
-    } finally {
-      setLoading(false);
     }
   }, []);
 
-  // Block Catalogs Fetcher
+  // ── Block Catalogs Fetcher ──
   const fetchBlockCatalogs = useCallback(async () => {
     setLoadingBlocks(true);
     try {
       const res = await fetch("/api/engineering/cad/blocks");
-      if (res.status === 401) {
-        redirectToLogin();
-        return;
-      }
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
@@ -431,7 +350,12 @@ export default function ChuanHoaBanVePage() {
               block_name: "BLK_VAV_BOX_500",
               discipline: "HVAC",
               category: "Thiết bị phân phối gió",
-              attribute_schema: { AirFlow: "1200 m3/h", Coil: "2-Row", In: "Ø250", Out: "400x250" },
+              attribute_schema: {
+                AirFlow: "1200 m3/h",
+                Coil: "2-Row",
+                In: "Ø250",
+                Out: "400x250",
+              },
               mapped_boq_code: "HVAC-VAV-500",
             },
             {
@@ -472,7 +396,7 @@ export default function ChuanHoaBanVePage() {
     }
   }, []);
 
-  // LISP Generator
+  // ── AutoLISP Code Generator ──
   const handleGenerateLisp = useCallback(async () => {
     try {
       const res = await fetch("/api/engineering/cad/lisp", {
@@ -495,11 +419,6 @@ export default function ChuanHoaBanVePage() {
         }),
       });
 
-      if (res.status === 401) {
-        redirectToLogin();
-        return;
-      }
-
       if (res.ok) {
         const data = await res.json();
         setGeneratedLispCode(data.lispCode);
@@ -521,7 +440,7 @@ export default function ChuanHoaBanVePage() {
     transitionLength,
   ]);
 
-  // Font Doctor Convert
+  // ── Font Doctor Convert ──
   const handleConvertFont = async (customText?: string) => {
     const textToConvert = customText !== undefined ? customText : legacyInput;
     try {
@@ -542,10 +461,18 @@ export default function ChuanHoaBanVePage() {
   };
 
   useEffect(() => {
+    fetchDesignDrawings();
+    runDxfAnalysis();
     runDiffAnalysis();
     handleGenerateLisp();
     fetchBlockCatalogs();
-  }, [runDiffAnalysis, handleGenerateLisp, fetchBlockCatalogs]);
+  }, [
+    fetchDesignDrawings,
+    runDxfAnalysis,
+    runDiffAnalysis,
+    handleGenerateLisp,
+    fetchBlockCatalogs,
+  ]);
 
   const handleCopyCode = () => {
     if (!generatedLispCode) return;
@@ -567,15 +494,29 @@ export default function ChuanHoaBanVePage() {
     showToast("Đã tải tệp .lsp về máy!");
   };
 
-  const filteredLayers = layerRules.filter((r) => {
+  const handleDownloadScr = () => {
+    if (!scrScript) return;
+    const element = document.createElement("a");
+    const file = new Blob([scrScript], { type: "text/plain" });
+    element.href = URL.createObjectURL(file);
+    element.download = `xboss_layer_standardize.scr`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+    showToast("Đã tải kịch bản AutoCAD Script (.scr)!");
+  };
+
+  const layersList = dxfData?.layers || [];
+  const filteredLayers = layersList.filter((r) => {
     const matchDisc =
       selectedDisciplineFilter === "all" || r.discipline === selectedDisciplineFilter;
     const matchSearch =
-      r.originalLayer.toLowerCase().includes(layerSearch.toLowerCase()) ||
-      r.standardLayer.toLowerCase().includes(layerSearch.toLowerCase()) ||
-      r.description.toLowerCase().includes(layerSearch.toLowerCase());
+      r.name.toLowerCase().includes(layerSearch.toLowerCase()) ||
+      r.standardName.toLowerCase().includes(layerSearch.toLowerCase());
     return matchDisc && matchSearch;
   });
+
+  const routes = dxfData?.spatialRoutes || [];
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
@@ -588,15 +529,15 @@ export default function ChuanHoaBanVePage() {
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
                 <span className="font-bold tracking-tight text-zinc-100 text-sm sm:text-base uppercase">
-                  CHUẨN HÓA BẢN VẼ (CAD → BIM)
+                  CHUẨN HÓA BẢN VẼ (CAD 2D → DỰNG KHỐI 3D BIM)
                 </span>
                 <span className="rounded-md bg-emerald-500/10 px-2 py-0.5 text-[10px] font-mono font-bold text-emerald-400 border border-emerald-500/20">
                   LOD 300–400 • TT AVIO
                 </span>
               </div>
               <span className="text-[11px] text-zinc-400 line-clamp-1">
-                Chuẩn hóa Layer AIA, Sửa Font Tiếng Việt, Vector Diff, Dựng Khối 3D Chuẩn Bị Định
-                Tuyến & Phối Hợp Combine
+                Chuẩn Hóa File CAD Trước (Layer AIA, Font Doctor, Block BOQ, Diff) → Sau Đó Đùn Khối
+                3D Từ DXF & Phối Hợp Combine
               </span>
             </div>
           </div>
@@ -608,7 +549,7 @@ export default function ChuanHoaBanVePage() {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700 transition"
             >
               <Box className="w-3.5 h-3.5 text-sky-400" />
-              <span>Xem Mô hình BIM</span>
+              <span>Mô hình BIM 3D</span>
             </Link>
             <Link
               href="/engineering/cad-corridor"
@@ -621,14 +562,144 @@ export default function ChuanHoaBanVePage() {
         }
       />
 
-      <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 py-4 space-y-5">
-        {/* ── 5-STEP PIPELINE BANNER: CAD TO BIM STANDARDIZATION WORKFLOW ── */}
+      <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 py-4 space-y-4">
+        {/* ══════════════════════════════════════════════════════════════════════
+            TOP BAR: CHỌN NGUỒN CAD (TỪ THIẾT KẾ HOẶC TẢI LÊN FILE .DXF)
+        ══════════════════════════════════════════════════════════════════════ */}
         <div className="p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800 pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-200">
+                <Layers2 className="w-4 h-4 text-amber-400" />
+                <span>Nguồn Bản Vẽ CAD Đầu Vào</span>
+              </div>
+              <p className="text-[11px] text-zinc-400">
+                Chọn bản vẽ thiết kế sẵn có trong dự án hoặc tải lên tệp tin CAD (.DXF) từ máy tính
+                để chuẩn hóa.
+              </p>
+            </div>
+
+            {/* Toggle Switcher: Thiết Kế vs Tải Lên */}
+            <div className="flex items-center p-1 rounded-xl bg-zinc-950 border border-zinc-800 shrink-0">
+              <button
+                onClick={() => setSourceMode("design")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                  sourceMode === "design"
+                    ? "bg-amber-500 text-zinc-950 font-bold shadow-xs"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>1. Bản Vẽ Thiết Kế Dự Án</span>
+              </button>
+
+              <button
+                onClick={() => setSourceMode("upload")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                  sourceMode === "upload"
+                    ? "bg-amber-500 text-zinc-950 font-bold shadow-xs"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                <FileUp className="w-3.5 h-3.5" />
+                <span>2. Tải Lên Tệp CAD (.DXF)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Source 1: Chọn từ danh sách bản vẽ thiết kế */}
+          {sourceMode === "design" && (
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+              <div className="sm:col-span-8">
+                <label className="block text-[11px] font-semibold text-zinc-400 mb-1">
+                  Chọn Bản Vẽ Thiết Kế (Hệ thống / Tầng / Phân hệ MEPF):
+                </label>
+                <div className="relative">
+                  <select
+                    value={selectedDrawingId || ""}
+                    onChange={(e) => {
+                      const id = Number(e.target.value);
+                      setSelectedDrawingId(id);
+                      runDxfAnalysis({ drawingId: id });
+                    }}
+                    className="w-full pl-3 pr-8 py-2 text-xs bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-200 focus:outline-none focus:border-amber-500 appearance-none"
+                  >
+                    {designDrawings.length > 0 ? (
+                      designDrawings.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          [{d.code}] {d.name} {d.floorLabel ? `• ${d.floorLabel}` : ""}{" "}
+                          {d.systemGroup ? `• (${d.systemGroup})` : ""}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="">
+                        [AVIO-DWG-M-FL04-01] Bản vẽ HVAC & Cấp Thoát Nước Tầng 4 Tháp A (Mẫu TT
+                        AVIO)
+                      </option>
+                    )}
+                  </select>
+                </div>
+              </div>
+
+              <div className="sm:col-span-4 flex items-center justify-end gap-2 pt-4 sm:pt-0">
+                <button
+                  onClick={() => runDxfAnalysis()}
+                  disabled={loading}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700 transition"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+                  <span>Nạp Lại Bản Vẽ</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Source 2: Tải lên tệp DXF */}
+          {sourceMode === "upload" && (
+            <div className="space-y-3">
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="p-5 rounded-xl border-2 border-dashed border-zinc-800 hover:border-amber-500/60 bg-zinc-950/60 flex flex-col items-center justify-center gap-2 cursor-pointer transition group text-center"
+              >
+                <div className="p-3 rounded-full bg-amber-500/10 text-amber-400 group-hover:scale-110 transition">
+                  <UploadCloud className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-zinc-200">
+                    Kéo thả hoặc bấm để tải lên tệp tin bản vẽ CAD (.DXF / .DWG)
+                  </div>
+                  <p className="text-[11px] text-zinc-400 mt-0.5">
+                    Hỗ trợ tệp ASCII DXF phiên bản AutoCAD R12/2000/2018 (Chẩn đoán dị tật & đùn
+                    khối tức thì)
+                  </p>
+                </div>
+                {uploadedFileName && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono font-bold">
+                    <FileCheck className="w-3.5 h-3.5" />
+                    <span>Đã nạp: {uploadedFileName}</span>
+                  </div>
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".dxf,.dwg,.txt,.json"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            2-PHASE WORKFLOW BANNER: CAD 2D NORMALIZATION -> 3D BIM EXTRUSION
+        ══════════════════════════════════════════════════════════════════════ */}
+        <div className="p-3 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800 pb-2">
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-amber-400" />
               <span className="text-xs font-bold uppercase tracking-wider text-zinc-200">
-                Quy Trình Chuẩn Hóa Bản Vẽ Thiết Kế Sẵn Sàng Dựng BIM, Định Tuyến & Combine
+                Quy Trình Chuẩn Hóa Tuần Tự: (Giai Đoạn 1: CAD 2D → Giai Đoạn 2: Dựng Khối 3D BIM)
               </span>
             </div>
             <span className="text-[11px] font-mono text-zinc-400">
@@ -636,323 +707,287 @@ export default function ChuanHoaBanVePage() {
             </span>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 pt-1">
-            <div className="p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800/80 space-y-1">
-              <div className="flex items-center gap-1.5 text-sky-400 text-xs font-bold">
-                <span className="w-4 h-4 rounded-full bg-sky-500/20 flex items-center justify-center text-[10px]">
-                  1
-                </span>
-                <span>Chẩn Đoán Dị Tật</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+            {/* Phase 1 Card */}
+            <div
+              onClick={() => {
+                setActivePhase("phase1_cad");
+                if (activeTab === "spatial_bim") setActiveTab("diagnostic");
+              }}
+              className={`p-3 rounded-xl border cursor-pointer transition space-y-1.5 ${
+                activePhase === "phase1_cad"
+                  ? "bg-amber-500/10 border-amber-500/40 text-amber-300"
+                  : "bg-zinc-950/60 border-zinc-800 hover:border-zinc-700 text-zinc-400"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center text-xs font-bold text-amber-400">
+                    1
+                  </span>
+                  <span className="text-xs font-bold uppercase tracking-tight text-zinc-100">
+                    Giai Đoạn 1: Chuẩn Hóa File CAD 2D
+                  </span>
+                </div>
+                {activePhase === "phase1_cad" && (
+                  <span className="px-2 py-0.5 rounded-full bg-amber-500 text-zinc-950 font-bold text-[10px]">
+                    Đang Thao Tác
+                  </span>
+                )}
               </div>
               <p className="text-[11px] text-zinc-400 line-clamp-2">
-                Quét lỗi font .shx, layer rác, tỷ lệ scale sai lệch
+                Quét chẩn đoán dị tật, chuẩn hóa Layer AIA/BS1192, sửa font chữ Tiếng Việt (Font
+                Doctor), trích xuất Block BOQ, so sánh Vector Diff & xuất AutoLISP.
               </p>
             </div>
 
-            <div className="p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800/80 space-y-1">
-              <div className="flex items-center gap-1.5 text-amber-400 text-xs font-bold">
-                <span className="w-4 h-4 rounded-full bg-amber-500/20 flex items-center justify-center text-[10px]">
-                  2
-                </span>
-                <span>Chuẩn Hóa Layer</span>
+            {/* Phase 2 Card */}
+            <div
+              onClick={() => {
+                setActivePhase("phase2_3d");
+                setActiveTab("spatial_bim");
+              }}
+              className={`p-3 rounded-xl border cursor-pointer transition space-y-1.5 ${
+                activePhase === "phase2_3d"
+                  ? "bg-sky-500/10 border-sky-500/40 text-sky-300"
+                  : "bg-zinc-950/60 border-zinc-800 hover:border-zinc-700 text-zinc-400"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-sky-500/20 flex items-center justify-center text-xs font-bold text-sky-400">
+                    2
+                  </span>
+                  <span className="text-xs font-bold uppercase tracking-tight text-zinc-100">
+                    Giai Đoạn 2: Dựng 3D từ DXF & Chuẩn Hóa File 3D
+                  </span>
+                </div>
+                {activePhase === "phase2_3d" && (
+                  <span className="px-2 py-0.5 rounded-full bg-sky-500 text-zinc-950 font-bold text-[10px]">
+                    Đang Thao Tác
+                  </span>
+                )}
               </div>
               <p className="text-[11px] text-zinc-400 line-clamp-2">
-                Quy chuẩn AIA/BS1192 cho 5 phân hệ MEPF
+                Đùn polyline 2D thành bao không gian 3D Bounding Envelope (AABB), phân tầng hành
+                lang kỹ thuật Multi-Tier Corridor, kiểm tra khoảng sáng đáy dầm & kết nối BIM Viewer
+                3D.
               </p>
             </div>
-
-            <div className="p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800/80 space-y-1">
-              <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-bold">
-                <span className="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center text-[10px]">
-                  3
-                </span>
-                <span>Font Doctor UTF-8</span>
-              </div>
-              <p className="text-[11px] text-zinc-400 line-clamp-2">
-                Chữa lành font SHX/VNI và bảo toàn text cao độ
-              </p>
-            </div>
-
-            <div className="p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800/80 space-y-1">
-              <div className="flex items-center gap-1.5 text-purple-400 text-xs font-bold">
-                <span className="w-4 h-4 rounded-full bg-purple-500/20 flex items-center justify-center text-[10px]">
-                  4
-                </span>
-                <span>Trích Xuất Block</span>
-              </div>
-              <p className="text-[11px] text-zinc-400 line-clamp-2">
-                Bóc tách tag, tọa độ và ánh xạ sang BIM Family
-              </p>
-            </div>
-
-            <div className="p-2.5 rounded-xl bg-zinc-950/60 border border-amber-500/30 bg-amber-500/5 space-y-1">
-              <div className="flex items-center gap-1.5 text-amber-300 text-xs font-bold">
-                <span className="w-4 h-4 rounded-full bg-amber-500/30 flex items-center justify-center text-[10px]">
-                  5
-                </span>
-                <span>Định Tuyến & Combine</span>
-              </div>
-              <p className="text-[11px] text-zinc-300 line-clamp-2">
-                Dựng khối 3D AABB, phân tầng hành lang và né xung đột
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* ── TOOL NAVIGATION TABS ── */}
-        <div className="p-2 sm:p-2.5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm">
-          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
-            <button
-              onClick={() => setActiveTab("spatial_bim")}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
-                activeTab === "spatial_bim"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
-                  : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
-              }`}
-            >
-              <Split className="w-3.5 h-3.5" />
-              <span>1. Dựng Khối 3D & Định Tuyến Combine</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("layers")}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
-                activeTab === "layers"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
-                  : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>2. Chuẩn Hóa Layer AIA/BS1192</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("font_doctor")}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
-                activeTab === "font_doctor"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
-                  : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
-              }`}
-            >
-              <FileCheck className="w-3.5 h-3.5" />
-              <span>3. Font Doctor (SHX/VNI → UTF-8)</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("diff")}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
-                activeTab === "diff"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
-                  : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
-              }`}
-            >
-              <FileDiff className="w-3.5 h-3.5" />
-              <span>4. So Sánh Phiên Bản (Vector Diff)</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("blocks")}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
-                activeTab === "blocks"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
-                  : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
-              }`}
-            >
-              <Boxes className="w-3.5 h-3.5" />
-              <span>5. Trích Xuất Block sang Family BIM</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("lisp")}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
-                activeTab === "lisp"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
-                  : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
-              }`}
-            >
-              <Code className="w-3.5 h-3.5" />
-              <span>6. AutoLISP Sinh Chi Tiết CAD</span>
-            </button>
           </div>
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════════
-            TAB 1: DỰNG KHỐI 3D & CHUẨN BỊ ĐỊNH TUYẾN / COMBINE (SPATIAL BIM)
+            TOOL NAVIGATION TABS (DỰA THEO GIAI ĐOẠN ĐANG CHỌN)
         ══════════════════════════════════════════════════════════════════════ */}
-        {activeTab === "spatial_bim" && (
-          <div className="space-y-5">
-            {/* Header / Intro Card */}
-            <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
-                      <Split className="w-5 h-5" />
-                    </span>
-                    <h2 className="text-base font-bold text-zinc-100 uppercase tracking-tight">
-                      Chuẩn Hóa Tuyến Centerline & Đùn Khối 3D Cho Định Tuyến & Combine
-                    </h2>
-                  </div>
-                  <p className="text-xs text-zinc-400">
-                    Chuyển đổi đường tim polyline 2D từ bản vẽ thiết kế thành bao không gian 3D
-                    Bounding Envelope (AABB). Thiết lập phân tầng hành lang kỹ thuật đa tầng
-                    (Multi-Tier Corridor) và kiểm tra cao độ thông thủy trước khi import vào mô hình
-                    BIM.
-                  </p>
-                </div>
+        <div className="p-2 sm:p-2.5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm">
+          {activePhase === "phase1_cad" ? (
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+              <button
+                onClick={() => setActiveTab("diagnostic")}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
+                  activeTab === "diagnostic"
+                    ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                    : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
+                }`}
+              >
+                <Activity className="w-3.5 h-3.5" />
+                <span>1.1 Chẩn Đoán Dị Tật CAD</span>
+              </button>
 
-                <div className="flex items-center gap-2 shrink-0">
-                  <Link
-                    href="/mo-hinh-bim"
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-sm transition"
-                  >
-                    <Box className="w-4 h-4" />
-                    <span>Mở BIM Viewer 3D</span>
-                  </Link>
-                  <Link
-                    href="/engineering/cad-corridor"
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-zinc-950 font-bold text-xs shadow-sm transition"
-                  >
-                    <SlidersHorizontal className="w-4 h-4" />
-                    <span>Điều Hướng Clash Solver</span>
-                  </Link>
-                </div>
-              </div>
+              <button
+                onClick={() => setActiveTab("layers")}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
+                  activeTab === "layers"
+                    ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                    : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>1.2 Chuẩn Hóa Layer AIA/BS1192</span>
+              </button>
 
-              {/* Invariants & Rules Checklist */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
-                <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Bảo toàn Độ dốc Trọng lực</span>
-                  </div>
-                  <p className="text-[11px] text-zinc-400">
-                    Ống thoát nước giữ dốc 1.0% - 2.0%. Tuyệt đối không uốn né dầm làm gãy độ dốc.
-                    Hệ áp lực né 45°.
-                  </p>
-                </div>
+              <button
+                onClick={() => setActiveTab("font_doctor")}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
+                  activeTab === "font_doctor"
+                    ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                    : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
+                }`}
+              >
+                <FileCheck className="w-3.5 h-3.5" />
+                <span>1.3 Font Doctor (UTF-8 & Ký Hiệu)</span>
+              </button>
 
-                <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-400">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Phân Tầng Hành Lang Kỹ Thuật</span>
-                  </div>
-                  <p className="text-[11px] text-zinc-400">
-                    Tier 1: Ống gió trên cùng • Tier 2: Thang máng cáp điện (cách ống chiller ≥
-                    150mm) • Tier 3: Ống nước lạnh/chiller.
-                  </p>
-                </div>
+              <button
+                onClick={() => setActiveTab("blocks")}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
+                  activeTab === "blocks"
+                    ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                    : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
+                }`}
+              >
+                <Boxes className="w-3.5 h-3.5" />
+                <span>1.4 Trích Xuất Block Sang BOQ</span>
+              </button>
 
-                <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-sky-400">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Vùng An Toàn Xuyên Dầm (Sleeve)</span>
-                  </div>
-                  <p className="text-[11px] text-zinc-400">
-                    Lỗ mở xuyên dầm bê tông chỉ đặt tại 1/3 giữa nhịp (L/3 ≤ x ≤ 2L/3) và Dsleeve ≤
-                    Hdầm/3.
-                  </p>
-                </div>
-              </div>
+              <button
+                onClick={() => setActiveTab("diff")}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
+                  activeTab === "diff"
+                    ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                    : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
+                }`}
+              >
+                <FileDiff className="w-3.5 h-3.5" />
+                <span>1.5 So Sánh Phiên Bản (CAD Diff)</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab("lisp")}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
+                  activeTab === "lisp"
+                    ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                    : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
+                }`}
+              >
+                <Code className="w-3.5 h-3.5" />
+                <span>1.6 AutoLISP Sinh Chi Tiết CAD</span>
+              </button>
             </div>
+          ) : (
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+              <button
+                onClick={() => setActiveTab("spatial_bim")}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition shrink-0 min-h-[40px] bg-sky-500 text-zinc-950 shadow-sm"
+              >
+                <Split className="w-3.5 h-3.5" />
+                <span>2.1 Dựng Khối 3D Đùn từ Centerline DXF & Định Tuyến Combine</span>
+              </button>
+            </div>
+          )}
+        </div>
 
-            {/* Centerline Extrusion Table */}
-            <div className="p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-200">
-                  Danh Sách Tuyến Centerline Đã Chuẩn Hóa Sang Khối 3D Spatial Envelope
-                </h3>
-                <span className="text-[11px] font-mono text-zinc-400">
-                  {routes.length} tuyến ống chính • Tầng 4 Tháp A
-                </span>
+        {/* ══════════════════════════════════════════════════════════════════════
+            TAB 1.1: CHẨN ĐOÁN DỊ TẬT BẢN VẼ CAD (DIAGNOSTIC OVERVIEW)
+        ══════════════════════════════════════════════════════════════════════ */}
+        {activePhase === "phase1_cad" && activeTab === "diagnostic" && (
+          <div className="space-y-4">
+            <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+                <div className="space-y-1">
+                  <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-100 flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-amber-400" />
+                    Báo Cáo Chẩn Đoán Dị Tật Bản Vẽ CAD ({dxfData?.fileName || "DXF Model"})
+                  </h2>
+                  <p className="text-xs text-zinc-400">
+                    Tự động phân tích toàn bộ thực thể CAD, phát hiện lỗi font SHX/TCVN3, layer rác,
+                    kiểm tra tỷ lệ chuẩn AIA và sự sẵn sàng cho đùn 3D BIM.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleDownloadScr}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs shadow-sm transition"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Xuất Kịch Bản .SCR</span>
+                  </button>
+                </div>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b border-zinc-800 bg-zinc-950/60 text-zinc-400 font-semibold">
-                      <th className="py-2.5 px-3">Mã Tuyến</th>
-                      <th className="py-2.5 px-3">Tên Tuyến & Hệ Thống</th>
-                      <th className="py-2.5 px-3">Tiết Diện</th>
-                      <th className="py-2.5 px-3">Chiều Dài</th>
-                      <th className="py-2.5 px-3">Cao Độ BOP</th>
-                      <th className="py-2.5 px-3">Phân Tầng Hành Lang</th>
-                      <th className="py-2.5 px-3">Khoảng Sáng Đáy Dầm</th>
-                      <th className="py-2.5 px-3">Trạng Thái Combine</th>
-                      <th className="py-2.5 px-3 text-right">Thao Tác</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-800/60 font-mono">
-                    {routes.map((r) => (
-                      <tr key={r.id} className="hover:bg-zinc-800/40 transition">
-                        <td className="py-2.5 px-3 font-bold text-amber-400">{r.id}</td>
-                        <td className="py-2.5 px-3 font-sans font-medium text-zinc-200">
-                          <div>{r.name}</div>
-                          <div className="text-[10px] text-zinc-400 font-mono">
-                            Hệ: <span className="text-zinc-300 font-bold">{r.system}</span> • Bọc
-                            cách nhiệt: {r.insulationMm}mm
-                          </div>
-                        </td>
-                        <td className="py-2.5 px-3 text-zinc-300">{r.sectionDimensions}</td>
-                        <td className="py-2.5 px-3 text-zinc-300 text-right tabular-nums">
-                          {(r.lengthMm / 1000).toFixed(1)} m
-                        </td>
-                        <td className="py-2.5 px-3 text-amber-300 font-bold text-right tabular-nums">
-                          +{r.elevationBopMm} mm
-                        </td>
-                        <td className="py-2.5 px-3 text-zinc-300">
-                          <span className="px-2 py-0.5 rounded-md bg-zinc-800 border border-zinc-700 text-[10px]">
-                            {r.corridorTier}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-right tabular-nums">
-                          <span
-                            className={
-                              r.soffitClearanceMm < 200
-                                ? "text-rose-400 font-bold"
-                                : "text-emerald-400"
-                            }
-                          >
-                            {r.soffitClearanceMm} mm
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3">
-                          {r.combineStatus === "verified" ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-sans font-semibold">
-                              <CheckCircle2 className="w-3 h-3" /> Đạt Combine
-                            </span>
-                          ) : r.combineStatus === "clash_risk" ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[10px] font-sans font-semibold">
-                              <AlertTriangle className="w-3 h-3" /> Giao Cắt Dầm
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-400 border border-sky-500/20 text-[10px] font-sans font-semibold">
-                              <Activity className="w-3 h-3" /> Chờ Phối Hợp
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-3 text-right">
-                          <Link
-                            href="/engineering/cad-corridor"
-                            className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 inline-flex items-center gap-1 text-[11px] font-sans"
-                          >
-                            <span>Định Tuyến</span>
-                            <ArrowRight className="w-3 h-3" />
-                          </Link>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              {/* Health Score & Key Metrics */}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div className="p-3.5 rounded-xl bg-zinc-950 border border-amber-500/30 space-y-1">
+                  <span className="text-[11px] text-zinc-400">Điểm Chuẩn Hóa CAD</span>
+                  <div className="text-2xl font-bold font-mono text-amber-400">
+                    {dxfData?.diagnostic.healthScore || 85} / 100
+                  </div>
+                  <span className="text-[10px] text-emerald-400">Đủ điều kiện dựng 3D</span>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
+                  <span className="text-[11px] text-zinc-400">Tổng Thực Thể (Entities)</span>
+                  <div className="text-2xl font-bold font-mono text-zinc-200">
+                    {dxfData?.diagnostic.totalEntities || 18}
+                  </div>
+                  <span className="text-[10px] text-zinc-400">Line, Polyline, Text, Block</span>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
+                  <span className="text-[11px] text-zinc-400">Layer Chuẩn AIA</span>
+                  <div className="text-2xl font-bold font-mono text-emerald-400">
+                    {dxfData?.diagnostic.standardLayersCount || 7} /{" "}
+                    {dxfData?.diagnostic.totalLayers || 8}
+                  </div>
+                  <span className="text-[10px] text-zinc-400">Đã map phân hệ MEPF</span>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
+                  <span className="text-[11px] text-zinc-400">Text Lỗi Font / Mã Cũ</span>
+                  <div className="text-2xl font-bold font-mono text-rose-400">
+                    {dxfData?.diagnostic.corruptedTextCount || 0}
+                  </div>
+                  <span className="text-[10px] text-zinc-400">Đã tự động chữa lành</span>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
+                  <span className="text-[11px] text-zinc-400">Kích Thước Bao Bản Vẽ</span>
+                  <div className="text-xs font-bold font-mono text-sky-400 pt-1">
+                    {dxfData
+                      ? `${(dxfData.diagnostic.boundingDimensions.widthMm / 1000).toFixed(1)}m × ${(dxfData.diagnostic.boundingDimensions.lengthMm / 1000).toFixed(1)}m`
+                      : "15.0m × 5.0m"}
+                  </div>
+                  <span className="text-[10px] text-zinc-400">Tọa độ gốc 0,0,0</span>
+                </div>
+              </div>
+
+              {/* Recommendations & Action list */}
+              <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span>Khuyến Nghị Xử Lý Kỹ Thuật Tự Động</span>
+                </h3>
+                <ul className="space-y-1 text-xs text-zinc-300">
+                  {dxfData?.diagnostic.recommendations.map((rec, idx) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <span className="text-amber-400 font-bold">•</span>
+                      <span>{rec}</span>
+                    </li>
+                  )) || (
+                    <li className="flex items-start gap-2">
+                      <span className="text-amber-400 font-bold">•</span>
+                      <span>
+                        Bản vẽ sẵn sàng đùn khối 3D AABB và thiết lập phân tầng hành lang.
+                      </span>
+                    </li>
+                  )}
+                </ul>
+              </div>
+
+              {/* Next Step CTA */}
+              <div className="flex items-center justify-between p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                <div className="text-xs text-zinc-300">
+                  <span className="font-bold text-amber-300">Bước tiếp theo:</span> Xem xét bảng
+                  chuẩn hóa Layer AIA/BS1192 và kiểm tra Font Doctor.
+                </div>
+                <button
+                  onClick={() => setActiveTab("layers")}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs transition"
+                >
+                  <span>Chuyển Sang Bước 1.2: Chuẩn Hóa Layer</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
           </div>
         )}
 
         {/* ══════════════════════════════════════════════════════════════════════
-            TAB 2: CHUẨN HÓA LAYER THEO TIÊU CHUẨN AIA / BS1192
+            TAB 1.2: CHUẨN HÓA LAYER THEO TIÊU CHUẨN AIA / BS1192
         ══════════════════════════════════════════════════════════════════════ */}
-        {activeTab === "layers" && (
+        {activePhase === "phase1_cad" && activeTab === "layers" && (
           <div className="space-y-4">
             <div className="p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -962,8 +997,8 @@ export default function ChuanHoaBanVePage() {
                     Bảng Quy Chuẩn Layer AIA/BS1192 Sang Mô Hình BIM MEPF
                   </h2>
                   <p className="text-xs text-zinc-400">
-                    Tự động lọc layer rác (PURGE), quy hoạch tên layer chuẩn, phân loại mã màu và
-                    gán độ dày nét cho toàn bộ 5 phân hệ kỹ thuật.
+                    Tự động ánh xạ layer gốc sang tên chuẩn AIA/BS1192, phân loại mã màu và gán độ
+                    dày nét cho 5 phân hệ kỹ thuật.
                   </p>
                 </div>
 
@@ -981,9 +1016,7 @@ export default function ChuanHoaBanVePage() {
                   </div>
 
                   <button
-                    onClick={() => {
-                      showToast("Đã xuất kịch bản chuẩn hóa AutoCAD Script (.scr) thành công!");
-                    }}
+                    onClick={handleDownloadScr}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs shadow-sm transition"
                   >
                     <Download className="w-3.5 h-3.5" />
@@ -1024,10 +1057,9 @@ export default function ChuanHoaBanVePage() {
                     <tr className="border-b border-zinc-800 bg-zinc-950/60 text-zinc-400 font-semibold">
                       <th className="py-2.5 px-3">Phân Hệ</th>
                       <th className="py-2.5 px-3">Tên Layer Gốc (Bản Vẽ Thiết Kế)</th>
-                      <th className="py-2.5 px-3">Layer Chuẩn Hóa BIM</th>
+                      <th className="py-2.5 px-3">Layer Chuẩn Hóa BIM (AIA)</th>
                       <th className="py-2.5 px-3">Mã Màu Chuẩn</th>
-                      <th className="py-2.5 px-3">Nét Vẽ</th>
-                      <th className="py-2.5 px-3">Mô Tả Chức Năng</th>
+                      <th className="py-2.5 px-3">Số Đối Tượng</th>
                       <th className="py-2.5 px-3 text-right">Trạng Thái</th>
                     </tr>
                   </thead>
@@ -1039,28 +1071,23 @@ export default function ChuanHoaBanVePage() {
                             {r.discipline}
                           </span>
                         </td>
-                        <td className="py-2.5 px-3 text-zinc-400 line-through">
-                          {r.originalLayer}
-                        </td>
-                        <td className="py-2.5 px-3 text-emerald-400 font-bold">
-                          {r.standardLayer}
-                        </td>
+                        <td className="py-2.5 px-3 text-zinc-400 line-through">{r.name}</td>
+                        <td className="py-2.5 px-3 text-emerald-400 font-bold">{r.standardName}</td>
                         <td className="py-2.5 px-3">
                           <div className="flex items-center gap-1.5 font-sans">
                             <span
                               className="w-3 h-3 rounded-full border border-zinc-700"
-                              style={{ backgroundColor: r.colorCode }}
+                              style={{ backgroundColor: r.colorHex }}
                             />
-                            <span className="text-[11px] text-zinc-300">{r.colorName}</span>
+                            <span className="text-[11px] text-zinc-300">Mã {r.colorNumber}</span>
                           </div>
                         </td>
-                        <td className="py-2.5 px-3 text-zinc-300">{r.lineWeight}</td>
-                        <td className="py-2.5 px-3 font-sans text-zinc-400 text-[11px] max-w-xs truncate">
-                          {r.description}
+                        <td className="py-2.5 px-3 text-zinc-300 tabular-nums">
+                          {r.entityCount} entities
                         </td>
                         <td className="py-2.5 px-3 text-right">
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-sans font-semibold">
-                            <CheckCircle2 className="w-3 h-3" /> Đã Khớp
+                            <CheckCircle2 className="w-3 h-3" /> Đã Chuẩn Hóa
                           </span>
                         </td>
                       </tr>
@@ -1073,9 +1100,9 @@ export default function ChuanHoaBanVePage() {
         )}
 
         {/* ══════════════════════════════════════════════════════════════════════
-            TAB 3: FONT DOCTOR (SHX / VNI / TCVN3 -> UNICODE UTF-8)
+            TAB 1.3: FONT DOCTOR (SHX / VNI / TCVN3 -> UNICODE UTF-8)
         ══════════════════════════════════════════════════════════════════════ */}
-        {activeTab === "font_doctor" && (
+        {activePhase === "phase1_cad" && activeTab === "font_doctor" && (
           <div className="space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
               {/* Left Column: Interactive Font Converter */}
@@ -1173,139 +1200,9 @@ export default function ChuanHoaBanVePage() {
         )}
 
         {/* ══════════════════════════════════════════════════════════════════════
-            TAB 4: SO SÁNH PHIÊN BẢN (VECTOR DIFF & REDLINE)
+            TAB 1.4: TRÍCH XUẤT BLOCK SANG BIM FAMILY & BOQ
         ══════════════════════════════════════════════════════════════════════ */}
-        {activeTab === "diff" && (
-          <div className="space-y-4">
-            <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
-                <div className="space-y-1">
-                  <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-100 flex items-center gap-2">
-                    <FileDiff className="w-4 h-4 text-amber-400" />
-                    So Sánh Đối Soát Vector Giữa Các Phiên Bản Thiết Kế (Rev A vs Rev B)
-                  </h2>
-                  <p className="text-xs text-zinc-400">
-                    Phát hiện mọi thay đổi hình học tuyến ống, dời vị trí thiết bị trước khi nạp vào
-                    mô hình BIM. Dự báo tác động chi phí phát sinh (Variation Orders - VO).
-                  </p>
-                </div>
-
-                <button
-                  onClick={runDiffAnalysis}
-                  disabled={loading}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition shrink-0"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-                  <span>Chạy Lại Đối Soát Vector</span>
-                </button>
-              </div>
-
-              {diffResult && (
-                <div className="space-y-4">
-                  {/* Summary Cards */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div className="p-3 rounded-xl bg-zinc-950 border border-emerald-500/30 space-y-1">
-                      <span className="text-[11px] text-zinc-400">Thêm Mới (Added)</span>
-                      <div className="text-xl font-bold font-mono text-emerald-400">
-                        +{diffResult.summary.added}
-                      </div>
-                    </div>
-                    <div className="p-3 rounded-xl bg-zinc-950 border border-amber-500/30 space-y-1">
-                      <span className="text-[11px] text-zinc-400">Sửa Đổi / Di Dời (Modified)</span>
-                      <div className="text-xl font-bold font-mono text-amber-400">
-                        {diffResult.summary.modified}
-                      </div>
-                    </div>
-                    <div className="p-3 rounded-xl bg-zinc-950 border border-rose-500/30 space-y-1">
-                      <span className="text-[11px] text-zinc-400">Bị Xóa Bỏ (Removed)</span>
-                      <div className="text-xl font-bold font-mono text-rose-400">
-                        -{diffResult.summary.removed}
-                      </div>
-                    </div>
-                    <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
-                      <span className="text-[11px] text-zinc-400">Giữ Nguyên (Unchanged)</span>
-                      <div className="text-xl font-bold font-mono text-zinc-300">
-                        {diffResult.summary.unchanged}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Potential VO Impact */}
-                  {diffResult.potentialVoImpact && (
-                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2.5">
-                        <TrendingUp className="w-5 h-5 text-amber-400 shrink-0" />
-                        <div>
-                          <span className="text-xs font-bold text-amber-300">
-                            Dự báo Phát Sinh Khối Lượng (VO Impact):
-                          </span>
-                          <p className="text-[11px] text-zinc-300">
-                            {diffResult.potentialVoImpact.reason}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <span className="text-xs font-mono font-bold text-amber-300">
-                          {diffResult.potentialVoImpact.estimatedCostVnd.toLocaleString("vi-VN")} đ
-                        </span>
-                        <div className="text-[10px] text-zinc-400">Mức độ rủi ro: Cao</div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Differences Table */}
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead>
-                        <tr className="border-b border-zinc-800 bg-zinc-950/60 text-zinc-400 font-semibold">
-                          <th className="py-2.5 px-3">Mã Thực Thể</th>
-                          <th className="py-2.5 px-3">Loại Đối Tượng</th>
-                          <th className="py-2.5 px-3">Layer</th>
-                          <th className="py-2.5 px-3">Chi Tiết Biến Động</th>
-                          <th className="py-2.5 px-3 text-right">Trạng Thái</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-800/60 font-mono">
-                        {diffResult.differences.map((d, i) => (
-                          <tr key={i} className="hover:bg-zinc-800/40 transition">
-                            <td className="py-2.5 px-3 text-zinc-300">{d.entityId}</td>
-                            <td className="py-2.5 px-3 text-zinc-400 font-sans">{d.type}</td>
-                            <td className="py-2.5 px-3 text-sky-400">{d.layer}</td>
-                            <td className="py-2.5 px-3 font-sans text-zinc-200">
-                              {d.changeDescription}
-                            </td>
-                            <td className="py-2.5 px-3 text-right font-sans">
-                              {d.diffStatus === "added" && (
-                                <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-semibold">
-                                  + Thêm mới
-                                </span>
-                              )}
-                              {d.diffStatus === "modified" && (
-                                <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-semibold">
-                                  Sửa đổi
-                                </span>
-                              )}
-                              {d.diffStatus === "removed" && (
-                                <span className="px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[10px] font-semibold">
-                                  - Xóa bỏ
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ══════════════════════════════════════════════════════════════════════
-            TAB 5: TRÍCH XUẤT BLOCK SANG BIM FAMILY (BLOCK CATALOG)
-        ══════════════════════════════════════════════════════════════════════ */}
-        {activeTab === "blocks" && (
+        {activePhase === "phase1_cad" && activeTab === "blocks" && (
           <div className="space-y-4">
             <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
@@ -1316,7 +1213,7 @@ export default function ChuanHoaBanVePage() {
                   </h2>
                   <p className="text-xs text-zinc-400">
                     Bóc tách tự động tên block, thuộc tính công suất, lưu lượng, kích thước và ánh
-                    xạ sang Revit BIM Family Components.
+                    xạ sang Revit BIM Family Components LOD 300.
                   </p>
                 </div>
 
@@ -1366,12 +1263,138 @@ export default function ChuanHoaBanVePage() {
         )}
 
         {/* ══════════════════════════════════════════════════════════════════════
-            TAB 6: TRÌNH SINH MÃ AUTOLISP & SCRIPT SHOPDRAWING
+            TAB 1.5: SO SÁNH PHIÊN BẢN (VECTOR DIFF)
         ══════════════════════════════════════════════════════════════════════ */}
-        {activeTab === "lisp" && (
+        {activePhase === "phase1_cad" && activeTab === "diff" && (
+          <div className="space-y-4">
+            <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+                <div className="space-y-1">
+                  <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-100 flex items-center gap-2">
+                    <FileDiff className="w-4 h-4 text-amber-400" />
+                    So Sánh Đối Soát Vector Giữa Các Phiên Bản Thiết Kế (Rev A vs Rev B)
+                  </h2>
+                  <p className="text-xs text-zinc-400">
+                    Phát hiện mọi thay đổi hình học tuyến ống, dời vị trí thiết bị trước khi nạp vào
+                    mô hình BIM. Dự báo tác động chi phí phát sinh (Variation Orders - VO).
+                  </p>
+                </div>
+
+                <button
+                  onClick={runDiffAnalysis}
+                  disabled={loading}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition shrink-0"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+                  <span>Chạy Lại Đối Soát Vector</span>
+                </button>
+              </div>
+
+              {diffResult && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="p-3 rounded-xl bg-zinc-950 border border-emerald-500/30 space-y-1">
+                      <span className="text-[11px] text-zinc-400">Thêm Mới (Added)</span>
+                      <div className="text-xl font-bold font-mono text-emerald-400">
+                        +{diffResult.summary.added}
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-xl bg-zinc-950 border border-amber-500/30 space-y-1">
+                      <span className="text-[11px] text-zinc-400">Sửa Đổi / Di Dời (Modified)</span>
+                      <div className="text-xl font-bold font-mono text-amber-400">
+                        {diffResult.summary.modified}
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-xl bg-zinc-950 border border-rose-500/30 space-y-1">
+                      <span className="text-[11px] text-zinc-400">Bị Xóa Bỏ (Removed)</span>
+                      <div className="text-xl font-bold font-mono text-rose-400">
+                        -{diffResult.summary.removed}
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
+                      <span className="text-[11px] text-zinc-400">Giữ Nguyên (Unchanged)</span>
+                      <div className="text-xl font-bold font-mono text-zinc-300">
+                        {diffResult.summary.unchanged}
+                      </div>
+                    </div>
+                  </div>
+
+                  {diffResult.potentialVoImpact && (
+                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <TrendingUp className="w-5 h-5 text-amber-400 shrink-0" />
+                        <div>
+                          <span className="text-xs font-bold text-amber-300">
+                            Dự báo Phát Sinh Khối Lượng (VO Impact):
+                          </span>
+                          <p className="text-[11px] text-zinc-300">
+                            {diffResult.potentialVoImpact.reason}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-xs font-mono font-bold text-amber-300">
+                          {diffResult.potentialVoImpact.estimatedCostVnd.toLocaleString("vi-VN")} đ
+                        </span>
+                        <div className="text-[10px] text-zinc-400">Mức độ rủi ro: Cao</div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-zinc-800 bg-zinc-950/60 text-zinc-400 font-semibold">
+                          <th className="py-2.5 px-3">Mã Thực Thể</th>
+                          <th className="py-2.5 px-3">Loại Đối Tượng</th>
+                          <th className="py-2.5 px-3">Layer</th>
+                          <th className="py-2.5 px-3">Chi Tiết Biến Động</th>
+                          <th className="py-2.5 px-3 text-right">Trạng Thái</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-800/60 font-mono">
+                        {diffResult.differences.map((d, i) => (
+                          <tr key={i} className="hover:bg-zinc-800/40 transition">
+                            <td className="py-2.5 px-3 text-zinc-300">{d.entityId}</td>
+                            <td className="py-2.5 px-3 text-zinc-400 font-sans">{d.type}</td>
+                            <td className="py-2.5 px-3 text-sky-400">{d.layer}</td>
+                            <td className="py-2.5 px-3 font-sans text-zinc-200">
+                              {d.changeDescription}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-sans">
+                              {d.diffStatus === "added" && (
+                                <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-semibold">
+                                  + Thêm mới
+                                </span>
+                              )}
+                              {d.diffStatus === "modified" && (
+                                <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-semibold">
+                                  Sửa đổi
+                                </span>
+                              )}
+                              {d.diffStatus === "removed" && (
+                                <span className="px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[10px] font-semibold">
+                                  - Xóa bỏ
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            TAB 1.6: TRÌNH SINH MÃ AUTOLISP & SCRIPT SHOPDRAWING
+        ══════════════════════════════════════════════════════════════════════ */}
+        {activePhase === "phase1_cad" && activeTab === "lisp" && (
           <div className="space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-              {/* Left Column: Generator Configuration */}
               <div className="lg:col-span-5 p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
                 <div className="space-y-1">
                   <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-100 flex items-center gap-2">
@@ -1384,7 +1407,6 @@ export default function ChuanHoaBanVePage() {
                   </p>
                 </div>
 
-                {/* Detail Category Selector */}
                 <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-zinc-950 border border-zinc-800 text-[11px] font-semibold text-center">
                   <button
                     onClick={() => setLispType("hanger")}
@@ -1418,7 +1440,6 @@ export default function ChuanHoaBanVePage() {
                   </button>
                 </div>
 
-                {/* Dynamic Parameter Fields */}
                 {lispType === "hanger" && (
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
@@ -1535,7 +1556,6 @@ export default function ChuanHoaBanVePage() {
                 </button>
               </div>
 
-              {/* Right Column: Code Viewer */}
               <div className="lg:col-span-7 p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-zinc-200 font-mono">
@@ -1568,6 +1588,177 @@ export default function ChuanHoaBanVePage() {
                     {generatedLispCode || ";; Đang sinh mã LISP..."}
                   </pre>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            GIAI ĐOẠN 2: DỰNG KHỐI 3D TỪ DXF & CHUẨN HÓA MÔ HÌNH 3D (SPATIAL BIM)
+        ══════════════════════════════════════════════════════════════════════ */}
+        {activePhase === "phase2_3d" && (
+          <div className="space-y-4">
+            <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="p-2 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-400">
+                      <Cuboid className="w-5 h-5" />
+                    </span>
+                    <h2 className="text-base font-bold text-zinc-100 uppercase tracking-tight">
+                      Dựng Khối 3D Bounding Envelope (AABB) & Phân Tầng Hành Lang Từ DXF
+                    </h2>
+                  </div>
+                  <p className="text-xs text-zinc-400">
+                    Đã chuẩn hóa toàn bộ file CAD 2D. Đùn các tuyến Centerline thành bao không gian
+                    3D, phân chia Tier 1 (Gió), Tier 2 (Điện), Tier 3 (Nước) và kiểm tra tĩnh không
+                    đáy dầm Soffit Clearance.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <Link
+                    href="/mo-hinh-bim"
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-sm transition"
+                  >
+                    <Box className="w-4 h-4" />
+                    <span>Mở BIM Viewer 3D</span>
+                  </Link>
+                  <Link
+                    href="/engineering/cad-corridor"
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-zinc-950 font-bold text-xs shadow-sm transition"
+                  >
+                    <SlidersHorizontal className="w-4 h-4" />
+                    <span>Điều Hướng Clash Solver</span>
+                  </Link>
+                </div>
+              </div>
+
+              {/* 3 Rules Invariants */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+                <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Bảo toàn Độ dốc Trọng lực</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-400">
+                    Ống thoát nước giữ dốc 1.0% - 2.0%. Tuyệt đối không uốn né dầm làm gãy độ dốc.
+                    Hệ áp lực né 45°.
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-400">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Phân Tầng Hành Lang Kỹ Thuật</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-400">
+                    Tier 1: Ống gió trên cùng • Tier 2: Thang máng cáp điện (cách ống chiller ≥
+                    150mm) • Tier 3: Ống nước lạnh/chiller.
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-sky-400">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Vùng An Toàn Xuyên Dầm (Sleeve)</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-400">
+                    Lỗ mở xuyên dầm bê tông chỉ đặt tại 1/3 giữa nhịp (L/3 ≤ x ≤ 2L/3) và Dsleeve ≤
+                    Hdầm/3.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Extruded Spatial Routes Table */}
+            <div className="p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-200">
+                  Danh Sách Tuyến Centerline Đã Đùn Thành Khối 3D Spatial Envelope
+                </h3>
+                <span className="text-[11px] font-mono text-zinc-400">
+                  {routes.length} tuyến ống chính • Tầng 4 Tháp A
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-zinc-800 bg-zinc-950/60 text-zinc-400 font-semibold">
+                      <th className="py-2.5 px-3">Mã Tuyến</th>
+                      <th className="py-2.5 px-3">Tên Tuyến & Layer CAD</th>
+                      <th className="py-2.5 px-3">Tiết Diện</th>
+                      <th className="py-2.5 px-3">Chiều Dài</th>
+                      <th className="py-2.5 px-3">Cao Độ Đáy (BOP)</th>
+                      <th className="py-2.5 px-3">Phân Tầng Hành Lang</th>
+                      <th className="py-2.5 px-3">Khoảng Sáng Đáy Dầm</th>
+                      <th className="py-2.5 px-3">Trạng Thái Combine</th>
+                      <th className="py-2.5 px-3 text-right">Thao Tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/60 font-mono">
+                    {routes.map((r) => (
+                      <tr key={r.id} className="hover:bg-zinc-800/40 transition">
+                        <td className="py-2.5 px-3 font-bold text-amber-400">{r.id}</td>
+                        <td className="py-2.5 px-3 font-sans font-medium text-zinc-200">
+                          <div>{r.name}</div>
+                          <div className="text-[10px] text-zinc-400 font-mono">
+                            Hệ: <span className="text-zinc-300 font-bold">{r.system}</span> • Bọc
+                            cách nhiệt: {r.insulationMm}mm
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 text-zinc-300">{r.sectionDimensions}</td>
+                        <td className="py-2.5 px-3 text-zinc-300 text-right tabular-nums">
+                          {(r.lengthMm / 1000).toFixed(1)} m
+                        </td>
+                        <td className="py-2.5 px-3 text-amber-300 font-bold text-right tabular-nums">
+                          +{r.elevationBopMm} mm
+                        </td>
+                        <td className="py-2.5 px-3 text-zinc-300">
+                          <span className="px-2 py-0.5 rounded-md bg-zinc-800 border border-zinc-700 text-[10px]">
+                            {r.corridorTier}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-right tabular-nums">
+                          <span
+                            className={
+                              r.soffitClearanceMm < 200
+                                ? "text-rose-400 font-bold"
+                                : "text-emerald-400"
+                            }
+                          >
+                            {r.soffitClearanceMm} mm
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          {r.combineStatus === "verified" ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-sans font-semibold">
+                              <CheckCircle2 className="w-3 h-3" /> Đạt Combine
+                            </span>
+                          ) : r.combineStatus === "clash_risk" ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[10px] font-sans font-semibold">
+                              <AlertTriangle className="w-3 h-3" /> Cần Kiểm Tra Dốc
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-400 border border-sky-500/20 text-[10px] font-sans font-semibold">
+                              <Activity className="w-3 h-3" /> Sẵn Sàng
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <Link
+                            href="/engineering/cad-corridor"
+                            className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 inline-flex items-center gap-1 text-[11px] font-sans"
+                          >
+                            <span>Định Tuyến</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>

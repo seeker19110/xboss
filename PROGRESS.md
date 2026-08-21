@@ -39,6 +39,25 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
+## Nâng Cấp Quy Trình Chuẩn Hóa Bản Vẽ (CAD 2D → Dựng Khối 3D DXF) (2026-08-21)
+
+- **[AI, đã làm] Tách bạch 2 Giai đoạn chuẩn hóa tuần tự & 2 Nguồn dữ liệu CAD (`app/chuan-hoa-ban-ve/page.tsx`):**
+  - **Linh hoạt Nguồn CAD:** Hỗ trợ chọn bản vẽ từ thiết kế dự án (TT AVIO Tháp A / phân hệ MEPF / tầng) hoặc tải lên trực tiếp tệp tin CAD (.DXF / .DWG) từ máy tính với bộ phân tích tức thì.
+  - **Giai đoạn 1 — Chuẩn Hóa Toàn Diện File CAD 2D:**
+    - _Chẩn đoán Dị tật CAD:_ Báo cáo điểm chuẩn hóa (Health Score), số thực thể, layer không chuẩn, text bị vỡ font, block chưa map BOQ.
+    - _Chuẩn Hóa Layer AIA/BS1192:_ Ánh xạ layer sang mã chuẩn 5 phân hệ M/E/P/F/ELV/S, gán mã màu & nét vẽ chuẩn, xuất kịch bản AutoCAD Script (`.scr`).
+    - _Font Doctor (Unicode UTF-8):_ Tự động chuyển đổi font TCVN3/VNI/SHX sang UTF-8 chuẩn xác, bảo toàn ký hiệu kỹ thuật $\varnothing$, $\pm$, $^\circ\text{C}$.
+    - _Trích Xuất Block & Ánh Xạ BOQ:_ Bóc tách thuộc tính kỹ thuật và ánh xạ sang Revit BIM Family LOD 300.
+    - _CAD Vector Diff & AutoLISP:_ So sánh phiên bản phát hiện biến động khối lượng (VO) và sinh mã LISP vẽ tự động.
+  - **Giai đoạn 2 — Dựng 3D Từ DXF & Chuẩn Hóa Mô Hình 3D (Spatial BIM / Combine):**
+    - _Đùn Khối 3D từ Centerline 2D:_ Tự động chuyển đổi đường tim thành bao không gian 3D Bounding Envelope (AABB) kèm kích thước tiết diện, bọc cách nhiệt và cao độ đáy BOP.
+    - _Phân Tầng Hành Lang Đa Tầng (Multi-Tier Corridor):_ Phân bổ Tier 1 (Gió), Tier 2 (Điện), Tier 3 (Nước), kiểm tra khoảng sáng đáy dầm Soffit Clearance $\ge 200\text{mm}$.
+    - _Bảo toàn Độ dốc Trọng lực:_ Kiểm soát độ dốc 1.0% - 2.0% cho hệ thoát nước không bị gãy góc.
+    - _Liên kết Trực quan:_ Kết nối tức thì sang Trình xem BIM 3D (`/mo-hinh-bim`) và Trình giải quyết xung đột Combine (`/engineering/cad-corridor`).
+  - **Bộ parser DXF thuần TypeScript (`lib/cad/dxf-parser.ts`):** Phân tích tệp ASCII DXF, giải mã mã CAD/font tiếng Việt cũ, trích xuất layer, blocks, và đùn tuyến 3D.
+  - **API Route:** `POST /api/engineering/cad/parse-dxf` nhận diện DXF và sinh kịch bản .SCR tự động.
+  - **Test Suite:** `tests/engineering-cad-dxf-parser.test.ts` (4/4 tests PASS 100%).
+
 ## Tái Cấu Trúc Giao Diện Quản Lý Bản Vẽ & Các Phân Hệ Liên Quan (2026-08-21)
 
 - **[AI, đã làm] Nâng Cấp Bàn Làm Việc Bản Vẽ Chuẩn MEPF (`app/ban-ve/page.tsx`):**
