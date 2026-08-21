@@ -42,7 +42,8 @@ export type RevisionStatus =
 
 export type TradeDiscipline = "all" | "M" | "E" | "P" | "F" | "ELV";
 
-export type DrawingViewTab = "all" | "design" | "submitted" | "approved" | "unapproved";
+export type DrawingViewTab =
+  "all" | "design" | "approved" | "submitted" | "unapproved" | "rejected";
 
 const KIND_LABEL: Record<DrawingKind, string> = {
   design: "Bản vẽ thiết kế",
@@ -265,6 +266,7 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
     const unapprovedCount = base.filter(
       (d) => d.latestStatus !== "approved" && d.latestStatus !== "approved_with_comments",
     ).length;
+    const rejectedCount = base.filter((d) => d.latestStatus === "rejected").length;
 
     return {
       all: allCount,
@@ -272,6 +274,7 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
       submitted: submittedCount,
       approved: approvedCount,
       unapproved: unapprovedCount,
+      rejected: rejectedCount,
     };
   }, [items, pageBaseItems, defaultKind]);
 
@@ -283,9 +286,6 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
 
     const base = defaultKind === "all" ? items : pageBaseItems;
 
-    if (viewTab === "submitted") {
-      return base.filter((d) => d.latestStatus === "submitted" || d.latestStatus === "commented");
-    }
     if (viewTab === "approved") {
       return base.filter(
         (d) =>
@@ -294,10 +294,16 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
           d.approvedRevisionId != null,
       );
     }
+    if (viewTab === "submitted") {
+      return base.filter((d) => d.latestStatus === "submitted" || d.latestStatus === "commented");
+    }
     if (viewTab === "unapproved") {
       return base.filter(
         (d) => d.latestStatus !== "approved" && d.latestStatus !== "approved_with_comments",
       );
+    }
+    if (viewTab === "rejected") {
+      return base.filter((d) => d.latestStatus === "rejected");
     }
     return base;
   }, [items, pageBaseItems, viewTab, defaultKind]);
@@ -480,16 +486,10 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
               <h1 className="text-sm sm:text-base font-bold text-zinc-100 uppercase tracking-tight">
                 {pageTitle}
               </h1>
-              <p className="text-xs text-zinc-400 mt-0.5">
-                Tổng cộng: <b className="text-zinc-100 font-mono">{stats.total}</b> • Đã duyệt:{" "}
-                <b className="text-emerald-400 font-mono">{stats.approved}</b> ({stats.pct}%) • Chờ
-                duyệt: <b className="text-amber-400 font-mono">{stats.pending}</b> • Từ chối:{" "}
-                <b className="text-rose-400 font-mono">{stats.rejected}</b>
-              </p>
             </div>
           </div>
 
-          {/* 4 Tabs Bộ Lọc (Bản vẽ thiết kế, Bản vẽ trình duyệt, Bản vẽ đã duyệt, Bản vẽ chưa duyệt + Tất cả) */}
+          {/* 4 Tabs Bộ Lọc (Bản vẽ thiết kế, Bản vẽ đã duyệt, Bản vẽ trình duyệt, Bản vẽ chưa duyệt + Tất cả) */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0 scrollbar-none">
             {/* Tab Tất cả */}
             <button
@@ -533,28 +533,6 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
               </span>
             </button>
 
-            {/* Tab Bản vẽ trình duyệt */}
-            <button
-              onClick={() => setViewTab("submitted")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition shrink-0 min-h-[38px] ${
-                viewTab === "submitted"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
-                  : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
-              }`}
-            >
-              <Clock className="w-3.5 h-3.5" />
-              <span>Bản vẽ trình duyệt</span>
-              <span
-                className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-md ${
-                  viewTab === "submitted"
-                    ? "bg-zinc-950/20 text-zinc-950"
-                    : "bg-zinc-900 text-amber-400"
-                }`}
-              >
-                {tabCounts.submitted}
-              </span>
-            </button>
-
             {/* Tab Bản vẽ đã duyệt */}
             <button
               onClick={() => setViewTab("approved")}
@@ -574,6 +552,28 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
                 }`}
               >
                 {tabCounts.approved}
+              </span>
+            </button>
+
+            {/* Tab Bản vẽ trình duyệt */}
+            <button
+              onClick={() => setViewTab("submitted")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition shrink-0 min-h-[38px] ${
+                viewTab === "submitted"
+                  ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                  : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5" />
+              <span>Bản vẽ trình duyệt</span>
+              <span
+                className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-md ${
+                  viewTab === "submitted"
+                    ? "bg-zinc-950/20 text-zinc-950"
+                    : "bg-zinc-900 text-amber-400"
+                }`}
+              >
+                {tabCounts.submitted}
               </span>
             </button>
 
@@ -598,62 +598,28 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
                 {tabCounts.unapproved}
               </span>
             </button>
-          </div>
-        </div>
 
-        {/* ── 4 KPI STATS CARDS RIBBON ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          <div className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800 flex items-center justify-between">
-            <div>
-              <span className="text-[10px] font-mono text-zinc-400 uppercase font-semibold">
-                Tổng Bản Vẽ
+            {/* Tab Từ chối */}
+            <button
+              onClick={() => setViewTab("rejected")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition shrink-0 min-h-[38px] ${
+                viewTab === "rejected"
+                  ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                  : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
+              }`}
+            >
+              <XCircle className="w-3.5 h-3.5" />
+              <span>Từ chối</span>
+              <span
+                className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-md ${
+                  viewTab === "rejected"
+                    ? "bg-zinc-950/20 text-zinc-950"
+                    : "bg-zinc-900 text-rose-400"
+                }`}
+              >
+                {tabCounts.rejected}
               </span>
-              <p className="text-lg font-bold text-zinc-100 mt-0.5 font-mono">{stats.total}</p>
-            </div>
-            <div className="p-2 rounded-lg bg-zinc-800 text-zinc-400">
-              <FolderOpen className="w-4 h-4" />
-            </div>
-          </div>
-
-          <div className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800 flex items-center justify-between">
-            <div>
-              <span className="text-[10px] font-mono text-emerald-400 uppercase font-semibold">
-                Đã Duyệt Thi Công
-              </span>
-              <p className="text-lg font-bold text-emerald-400 mt-0.5 font-mono">
-                {stats.approved}{" "}
-                <span className="text-xs font-normal text-emerald-400 font-mono">
-                  ({stats.pct}%)
-                </span>
-              </p>
-            </div>
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-          </div>
-
-          <div className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800 flex items-center justify-between">
-            <div>
-              <span className="text-[10px] font-mono text-amber-400 uppercase font-semibold">
-                Đang Chờ Duyệt
-              </span>
-              <p className="text-lg font-bold text-amber-400 mt-0.5 font-mono">{stats.pending}</p>
-            </div>
-            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400">
-              <Clock className="w-4 h-4" />
-            </div>
-          </div>
-
-          <div className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800 flex items-center justify-between">
-            <div>
-              <span className="text-[10px] font-mono text-rose-400 uppercase font-semibold">
-                Từ Chối / NCR
-              </span>
-              <p className="text-lg font-bold text-rose-400 mt-0.5 font-mono">{stats.rejected}</p>
-            </div>
-            <div className="p-2 rounded-lg bg-rose-500/10 text-rose-400">
-              <XCircle className="w-4 h-4" />
-            </div>
+            </button>
           </div>
         </div>
 

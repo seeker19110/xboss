@@ -28,8 +28,8 @@
 ## Tái Cấu Trúc Giao Diện Quản Lý Bản Vẽ & Các Phân Hệ Liên Quan (2026-08-21)
 
 - **[AI, đã làm] Nâng Cấp Bàn Làm Việc Bản Vẽ Chuẩn MEPF (`app/ban-ve/page.tsx`):**
-  - Loại bỏ 2 nút cũ bên phải ("Bản Vẽ & BPTC", "Thay Đổi Thiết Kế").
-  - Thêm 4 tab nghiệp vụ mới kèm badge đếm số lượng thời gian thực: _Bản vẽ thiết kế_, _Bản vẽ trình duyệt_, _Bản vẽ đã duyệt_, _Bản vẽ chưa duyệt_ (kèm tab _Tất cả_).
+  - Loại bỏ 2 nút cũ bên phải ("Bản Vẽ & BPTC", "Thay Đổi Thiết Kế") và các khối thống kê thừa; tinh gọn thanh điều khiển.
+  - Chuẩn hóa 6 tab nghiệp vụ kèm badge đếm số lượng thời gian thực: _Tất cả_, _Bản vẽ thiết kế_, _Bản vẽ đã duyệt_, _Bản vẽ trình duyệt_, _Bản vẽ chưa duyệt_, _Từ chối_.
   - **Cột bên trái:** Gom nhóm danh sách bản vẽ theo từng tầng (Floor Accordion) với chỉ số tiến độ duyệt từng tầng (`✓ đã duyệt`, `⏳ chờ duyệt`, `✕ từ chối`), nút đóng/mở tầng và bộ lọc 5 phân hệ (M-E-P-F-ELV).
   - **Cột bên phải:** Liệt kê đầy đủ toàn bộ lịch sử các phiên bản chỉnh sửa của bản vẽ (Revisions: Rev C $\rightarrow$ Rev B $\rightarrow$ Rev A), xem file đính kèm, kích thước, ngày trình/duyệt, kỹ sư tải, ghi chú chỉnh sửa, các nút duyệt cho Admin/PM và khu vực tải lên revision mới.
   - Đồng bộ tự động trên toàn bộ các trang: `/shopdrawings`, `/ban-ve`, `/ban-ve-thiet-ke`, `/ban-ve-hoan-cong`, `/bien-phap-thi-cong`, `/mo-hinh-bim`.
