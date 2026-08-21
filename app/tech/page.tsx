@@ -217,7 +217,7 @@ export default function TechPage() {
               </div>
             </a>
             <a
-              href="/proposals"
+              href="/commercial?tab=ipc-payments&sub=proposals"
               className="bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-xl p-4 flex items-center gap-3 transition"
             >
               <ShieldCheck className="w-8 h-8 text-emerald-400 shrink-0" />

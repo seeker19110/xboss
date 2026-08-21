@@ -110,7 +110,7 @@ const STAGES: StageData[] = [
     statusColor: "text-amber-400",
     statusBg: "bg-amber-500/10",
     statusBorder: "border-amber-500/30",
-    href: "/mepf-cad-bim-studio",
+    href: "/engineering/god-tier-studio",
     durationEst: "4-6 Tuần",
     milestoneKey: "Approved for Construction (AFC)",
   },
@@ -1059,7 +1059,7 @@ const UNIFIED_COCKPITS = [
     title: "MEPF CAD/BIM Studio",
     sub: "MEPF Core",
     desc: "3D/4D BIM WebGPU, Scan-to-BIM, BCF 3.0, CNC G-Code",
-    href: "/mepf-cad-bim-studio",
+    href: "/engineering/god-tier-studio",
     icon: Sparkles,
   },
   {

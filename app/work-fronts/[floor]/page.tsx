@@ -86,7 +86,7 @@ export default function FloorStageFrontsPage({ params }: { params: Promise<{ flo
 
       <main className="p-4 sm:p-6 pb-24 space-y-4">
         <Link
-          href="/work-fronts"
+          href="/site?tab=work-fronts"
           className="inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white"
         >
           <ArrowLeft className="w-4 h-4" /> Quay lại danh sách tầng

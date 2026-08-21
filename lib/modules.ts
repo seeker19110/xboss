@@ -100,8 +100,18 @@ export const MODULES: ModuleDef[] = [
         href: "/approvals",
         icon: "CheckSquare",
       },
-      { group: "Thi công hiện trường", label: "Nhật ký", href: "/diary", icon: "NotebookPen" },
-      { group: "Thi công hiện trường", label: "Mặt bằng", href: "/work-fronts", icon: "LandPlot" },
+      {
+        group: "Thi công hiện trường",
+        label: "Nhật ký",
+        href: "/site?tab=tasks-diary&sub=diary",
+        icon: "NotebookPen",
+      },
+      {
+        group: "Thi công hiện trường",
+        label: "Mặt bằng",
+        href: "/site?tab=work-fronts",
+        icon: "LandPlot",
+      },
     ],
     permKeys: ["editProgress", "approve", "manageWorkFronts"],
     notificationTypes: ["comment"],
@@ -113,11 +123,16 @@ export const MODULES: ModuleDef[] = [
     key: "materials",
     nav: [
       { group: "Quản lý vật tư", label: "BOQ", href: "/boq", icon: "Calculator" },
-      { group: "Quản lý vật tư", label: "Vật tư", href: "/materials", icon: "Package" },
+      {
+        group: "Quản lý vật tư",
+        label: "Vật tư",
+        href: "/procurement?tab=inventory",
+        icon: "Package",
+      },
       {
         group: "Quản lý vật tư",
         label: "Đơn đặt hàng",
-        href: "/materials/purchase-orders",
+        href: "/procurement?tab=orders",
         icon: "Truck",
       },
     ],
@@ -215,7 +230,12 @@ export const MODULES: ModuleDef[] = [
     // gán chồng người. Chỉ đọc, mọi vai trò đăng nhập xem (subcon chỉ thấy của mình).
     key: "resources",
     nav: [
-      { group: "Thi công hiện trường", label: "Tài nguyên", href: "/resources", icon: "Users" },
+      {
+        group: "Thi công hiện trường",
+        label: "Tài nguyên",
+        href: "/site?tab=tasks-diary&sub=resources",
+        icon: "Users",
+      },
     ],
     permKeys: [],
     routePrefix: ["/api/resources"],

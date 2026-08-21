@@ -949,7 +949,7 @@ export default function BimViewerPage() {
                           <FileCheck className="h-3.5 w-3.5" /> Tạo Phiếu Nghiệm Thu (BBNT)
                         </a>
                         <a
-                          href={`/quality?guid=${selectedElement.guid}&name=${encodeURIComponent(selectedElement.name)}`}
+                          href={`/site?tab=approvals-qc&sub=ncr&guid=${selectedElement.guid}&name=${encodeURIComponent(selectedElement.name)}`}
                           className="flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-center text-xs font-medium text-zinc-200 transition hover:bg-zinc-700"
                         >
                           <AlertTriangle className="h-3.5 w-3.5 text-amber-400" /> Báo Sự Cố NCR 3D

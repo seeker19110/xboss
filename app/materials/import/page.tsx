@@ -268,7 +268,7 @@ export default function ImportMaterialsPage() {
 
             {result.inserted > 0 && (
               <a
-                href="/materials"
+                href="/procurement?tab=inventory"
                 className="inline-flex items-center gap-2 text-sm text-emerald-400 hover:text-emerald-300 underline"
               >
                 <ArrowLeft className="w-3.5 h-3.5" /> Xem danh sách vật tư

@@ -68,7 +68,7 @@ const CATEGORIES: { key: NavCategory; label: string }[] = [
 const NAV_ITEMS: NavItem[] = [
   // ── Unified Cockpits & Master Hubs ──
   {
-    href: "/mepf-cad-bim-studio",
+    href: "/engineering/god-tier-studio",
     label: "MEPF CAD/BIM Studio",
     category: "unified",
     icon: Sparkles,

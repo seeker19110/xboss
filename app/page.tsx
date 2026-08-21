@@ -402,7 +402,7 @@ export default function Dashboard() {
                 stage: "GĐ 1",
                 title: "Kỹ Thuật Không Gian",
                 desc: "3D BIM • Routing • Nesting",
-                href: "/mepf-cad-bim-studio",
+                href: "/engineering/god-tier-studio",
                 status: "LOD 400",
                 color: "text-amber-400",
                 bg: "bg-amber-500/10",
@@ -494,7 +494,7 @@ export default function Dashboard() {
               {
                 title: "1. MEPF CAD/BIM Studio",
                 desc: "3D/4D BIM WebGPU, LiDAR Scan-to-BIM, BCF 3.0, CNC G-Code & Auto-Routing",
-                href: "/mepf-cad-bim-studio",
+                href: "/engineering/god-tier-studio",
                 icon: Sparkles,
                 badge: "MEPF Core",
                 color: "text-amber-400",

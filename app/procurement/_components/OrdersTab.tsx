@@ -20,7 +20,7 @@ import {
 import { appConfirm, Modal } from "@/app/components/dialogs";
 import { fetchMe } from "@/app/lib/me";
 import { todayISO, formatDateVN } from "@/lib/date";
-import RatingModal from "@/app/materials/purchase-orders/RatingModal";
+import RatingModal from "@/app/procurement/_components/RatingModal";
 
 type PO = {
   id: number;

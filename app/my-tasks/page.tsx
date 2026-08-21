@@ -589,7 +589,7 @@ export default function MyTasksPage() {
         {/* ── Thanh toán tiến độ — chỉ Admin/PM/BCH ── */}
         {myRole && PAYMENT_VIEW_ROLES.includes(myRole as Role) && (
           <a
-            href="/payments"
+            href="/commercial?tab=ipc-payments&sub=payments"
             className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3.5 hover:border-emerald-700 transition group"
           >
             <span className="p-2 bg-emerald-950/60 rounded-lg shrink-0">
@@ -964,7 +964,7 @@ export default function MyTasksPage() {
                         {feed.materialOver.map((m) => (
                           <a
                             key={m.id}
-                            href="/materials"
+                            href="/procurement?tab=inventory"
                             className="flex items-center gap-3 px-4 py-3.5 hover:bg-zinc-800/50 transition group"
                           >
                             <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />

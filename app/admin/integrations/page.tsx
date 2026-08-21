@@ -339,7 +339,7 @@ export default function IntegrationsPage() {
               </p>
             </div>
             <Link
-              href="/materials"
+              href="/procurement?tab=inventory"
               className="inline-flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg text-xs font-medium transition shrink-0"
             >
               <ExternalLink className="w-3.5 h-3.5" /> Trang Vật tư

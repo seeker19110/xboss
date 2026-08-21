@@ -64,7 +64,7 @@ const SOURCES: SearchSource[] = [
     softDelete: true,
     canView: (role) => PAYMENT_VIEW_ROLES.includes(role),
     extraSelect: "",
-    toUrl: () => "/contracts",
+    toUrl: () => "/commercial?tab=contracts",
     limit: 6,
   },
   {
@@ -115,7 +115,7 @@ const SOURCES: SearchSource[] = [
     softDelete: false,
     canView: () => true,
     extraSelect: "",
-    toUrl: () => "/diary",
+    toUrl: () => "/site?tab=tasks-diary&sub=diary",
     limit: 6,
   },
   {
@@ -132,7 +132,7 @@ const SOURCES: SearchSource[] = [
     softDelete: false,
     canView: () => true,
     extraSelect: "",
-    toUrl: () => "/quality?tab=ncrs",
+    toUrl: () => "/site?tab=approvals-qc&sub=ncr",
     limit: 6,
   },
   {
@@ -149,7 +149,7 @@ const SOURCES: SearchSource[] = [
     softDelete: false,
     canView: () => true,
     extraSelect: "",
-    toUrl: () => "/materials",
+    toUrl: () => "/procurement?tab=inventory",
     limit: 8,
   },
   {
