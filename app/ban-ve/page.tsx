@@ -475,22 +475,9 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
       />
 
       <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 py-4 space-y-4">
-        {/* ── TOP STATS STRIP & VIEW TABS (4 TABS CHÍNH THEO YÊU CẦU) ── */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm">
-          {/* Quick Info & Stats */}
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
-              <CurrentKindIcon className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-sm sm:text-base font-bold text-zinc-100 uppercase tracking-tight">
-                {pageTitle}
-              </h1>
-            </div>
-          </div>
-
-          {/* 4 Tabs Bộ Lọc (Bản vẽ thiết kế, Bản vẽ đã duyệt, Bản vẽ trình duyệt, Bản vẽ chưa duyệt + Tất cả) */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0 scrollbar-none">
+        {/* ── VIEW TABS ── */}
+        <div className="p-2 sm:p-2.5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm">
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
             {/* Tab Tất cả */}
             <button
               onClick={() => setViewTab("all")}
