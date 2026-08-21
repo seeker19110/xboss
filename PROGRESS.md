@@ -25,7 +25,12 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
-## Hợp Nhất Toàn Diện Code Các Tính Năng Cùng Nhóm Vào 7 Unified Hubs (2026-08-21)
+## Hợp Nhất Toàn Diện Code Các Tính Năng Cùng Nhóm Vào 7 Unified Hubs & Facades (2026-08-21)
+
+- **[AI, đã làm] Hợp Nhất Toàn Diện Năng Lực CAD Vào Unified Facade (`lib/cad/index.ts`):**
+  - Re-export toàn bộ 7 phân hệ CAD/BIM cốt lõi: Vector Diffing, AutoLISP, Font Doctor, QTO Tracking, Fabrication 1D/2D Nesting, Multi-Tier Corridor Trapeze, DfMA Spool Isometric, Mạng thủy lực & 6D Carbon LCA.
+  - Tạo test suite kiểm thử tích hợp [`tests/cad-unified-facade.test.ts`](file:///c:/Users/liend/xboss/tests/cad-unified-facade.test.ts) (7/7 tests PASS 100%).
+  - Cập nhật `.gitignore` phòng vệ biến môi trường.
 
 - **[AI, đã làm] Hợp Nhất & Tinh Gọn Triệt Để Mã Nguồn Theo 4 Cụm Phân Hệ Cốt Lõi:**
   - **1. Triệt Tiêu Chuỗi Alias Stubs & Dọn Dẹp Routing (PR-1):**

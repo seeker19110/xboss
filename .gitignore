@@ -4,6 +4,7 @@ node_modules/
 .next-old/
 .next-build-staging/
 .next-old-staging/
+.env
 .env.local
 .env.staging
 .env*.local
