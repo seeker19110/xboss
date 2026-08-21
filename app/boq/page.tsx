@@ -9,6 +9,7 @@ import {
   Trash2,
   AlertTriangle,
   FileUp,
+  Download,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
@@ -679,10 +680,30 @@ function ImportBoqModal({
           </div>
         ) : (
           <>
+            <div className="flex items-center justify-between bg-zinc-800/80 p-3 rounded-lg border border-zinc-700/60">
+              <div className="text-xs text-zinc-300 pr-2">
+                <p className="font-medium text-white">
+                  Biểu mẫu BOQ & Kiểm soát Đặt hàng chuẩn xBOSS
+                </p>
+                <p className="text-zinc-400 mt-0.5">
+                  Bao gồm hướng dẫn 4 nguyên tắc cốt lõi, bảng điều khiển định mức, mẫu trống và dữ
+                  liệu mẫu TT AVIO.
+                </p>
+              </div>
+              <a
+                href="/api/boq/template"
+                download="MAU-KHOI-LUONG-BOQ.xlsx"
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-700 hover:bg-emerald-600 text-on-accent rounded-lg text-xs font-semibold shrink-0 transition"
+              >
+                <Download className="w-4 h-4" />
+                Tải file mẫu
+              </a>
+            </div>
+
             <p className="text-xs text-zinc-400">
-              Nhận file &quot;Bảng khối lượng thanh toán&quot; — chỉ lấy phần khối lượng theo hợp
-              đồng gốc (bỏ qua phát sinh/khấu trừ/phạt) và chỉ khối lượng Tháp A. File không có cột
-              mã nên hệ thống tự sinh BOQCODE tuần tự theo hệ đã chọn.
+              Hỗ trợ file biểu mẫu chuẩn (tự động nhận diện Mã BOQ duy nhất, KL Hợp đồng, KL Định
+              mức bóc tách) hoặc file Bảng khối lượng thanh toán (IPC). Với các dòng chưa có mã, hệ
+              thống sẽ tự sinh BOQCODE tuần tự theo hệ đã chọn.
             </p>
             <div className="grid grid-cols-2 gap-3">
               <label className="text-xs text-zinc-400 col-span-2">
@@ -698,7 +719,7 @@ function ImportBoqModal({
                 />
               </label>
               <label className="text-xs text-zinc-400 col-span-2">
-                Hệ (dùng để sinh mã, vd ACMV-0001)
+                Hệ (dùng để sinh mã cho các dòng chưa có mã, vd ACMV-0001)
                 <select
                   value={systemId}
                   onChange={(e) => {

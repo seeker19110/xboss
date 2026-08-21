@@ -18,7 +18,7 @@ test("Unified Master Hubs: DASHBOARD_TREE chứa cụm 7 Đại Trung Tâm Đi�
   assert.equal(hubsCluster.dashboards.length, 7, "Cụm phải có đúng 7 Đại Trung Tâm Điều Hành");
 
   const expectedHubs = [
-    { href: "/mepf-cad-bim-studio", label: "MEPF CAD/BIM Studio" },
+    { href: "/engineering/god-tier-studio", label: "MEPF CAD/BIM Studio" },
     { href: "/site", label: "Chỉ Huy Tác Nghiệp Hiện Trường & HSE" },
     { href: "/schedule", label: "Quản Trị Kế Hoạch & Tiến Độ WBS" },
     { href: "/procurement", label: "Chuỗi Cung Ứng, Mua Sắm & Kho Vận" },
@@ -39,7 +39,7 @@ test("Unified Master Hubs: DASHBOARD_TREE chứa cụm 7 Đại Trung Tâm Đi�
 
 test("Unified Master Hubs: findActiveNav định tuyến chính xác cho cả 7 Đại Trung Tâm", () => {
   const hubPaths = [
-    { path: "/mepf-cad-bim-studio", expectedLabel: "MEPF CAD/BIM Studio" },
+    { path: "/engineering/god-tier-studio", expectedLabel: "MEPF CAD/BIM Studio" },
     { path: "/site", expectedLabel: "Chỉ Huy Tác Nghiệp Hiện Trường & HSE" },
     { path: "/schedule", expectedLabel: "Quản Trị Kế Hoạch & Tiến Độ WBS" },
     { path: "/procurement", expectedLabel: "Chuỗi Cung Ứng, Mua Sắm & Kho Vận" },
