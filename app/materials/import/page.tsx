@@ -35,7 +35,15 @@ type ImportResult = {
   results: RowResult[];
 };
 
-type SheetType = { id: number; code: string; name: string };
+type SheetType = {
+  id: number;
+  code: string;
+  name: string;
+  systemId?: number | null;
+  systemCode?: string | null;
+  systemName?: string | null;
+  systemColor?: string | null;
+};
 
 export default function ImportMaterialsPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -116,7 +124,7 @@ export default function ImportMaterialsPage() {
   async function doImport() {
     if (!file) return;
     if (!sheetId) {
-      setError("Vui lòng chọn hệ trước khi import (hệ nào nhập hệ đó)");
+      setError("Vui lòng chọn hệ MEPF trước khi import (hệ nào nhập hệ đó)");
       return;
     }
 
@@ -160,13 +168,24 @@ export default function ImportMaterialsPage() {
   const selectedSheetObj = sheets.find((s) => String(s.id) === sheetId);
   const errRows = result?.results.filter((r) => r.status === "error") ?? [];
 
+  // Nhóm phân hệ theo Hệ thống MEPF (System)
+  const groupedSheets = (() => {
+    const map = new Map<string, SheetType[]>();
+    for (const s of sheets) {
+      const sysName = s.systemName ? `Hệ ${s.systemName}` : "Hệ thống Cơ điện MEPF";
+      if (!map.has(sysName)) map.set(sysName, []);
+      map.get(sysName)!.push(s);
+    }
+    return Array.from(map.entries());
+  })();
+
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <AppHeader
         back
         title={
           <>
-            <Package className="w-5 h-5 text-emerald-400" /> Import vật tư & BOQ
+            <Package className="w-5 h-5 text-emerald-400" /> Import vật tư & BOQ theo Hệ MEPF
           </>
         }
       >
@@ -185,12 +204,13 @@ export default function ImportMaterialsPage() {
           <Layers className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
           <div>
             <p className="font-semibold text-emerald-300 text-sm mb-0.5">
-              Quy tắc: Hệ nào nhập hệ đó
+              Quy tắc MEPF: Hệ nào nhập hệ đó (System Isolation)
             </p>
             <p>
-              Chọn đúng <strong>Hệ thống / Phân hệ WBS</strong> cần nhập và chọn tab Sheet dữ liệu
-              trong file Excel. Hệ thống sẽ lưu giữ trọn vẹn mã BOQ, khối lượng dự toán và định mức
-              bản vẽ để bảo vệ khối lượng và kiểm soát đặt hàng.
+              Chọn đúng <strong>Hệ thống MEPF</strong> (ACMV, Điện, Cấp thoát nước, PCCC...) cần
+              nhập và chọn tab Sheet dữ liệu trong file Excel. Toàn bộ mã BOQ, khối lượng dự toán và
+              định mức bóc tách sẽ được gán trực tiếp vào hệ đã chọn để bảo vệ khối lượng và kiểm
+              soát đặt hàng.
             </p>
           </div>
         </div>
@@ -280,7 +300,7 @@ export default function ImportMaterialsPage() {
               htmlFor="sheet-select"
               className="font-semibold text-sm text-zinc-200 flex items-center gap-1"
             >
-              2. Chọn Hệ cần nhập (Phân hệ WBS) <span className="text-red-400">*</span>
+              2. Chọn Hệ MEPF cần nhập (Engineering System) <span className="text-red-400">*</span>
             </label>
             <p className="text-xs text-zinc-400">
               Hệ nào nhập hệ đó — tất cả các dòng vật tư trong file sẽ được gán trực tiếp vào hệ
@@ -290,14 +310,26 @@ export default function ImportMaterialsPage() {
               id="sheet-select"
               value={sheetId}
               onChange={(e) => setSheetId(e.target.value)}
-              aria-label="Chọn hệ WBS cần nhập vật tư"
+              aria-label="Chọn hệ MEPF cần nhập vật tư"
               className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition"
             >
-              <option value="">-- Vui lòng chọn hệ --</option>
-              {sheets.map((s) => (
-                <option key={s.id} value={String(s.id)}>
-                  {s.code} — {s.name}
-                </option>
+              <option value="">-- Vui lòng chọn hệ MEPF --</option>
+              {groupedSheets.map(([groupName, items]) => (
+                <optgroup
+                  key={groupName}
+                  label={groupName}
+                  className="bg-zinc-900 text-zinc-300 font-semibold"
+                >
+                  {items.map((s) => (
+                    <option
+                      key={s.id}
+                      value={String(s.id)}
+                      className="bg-zinc-800 text-white font-normal"
+                    >
+                      {s.code} — {s.name}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>

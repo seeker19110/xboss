@@ -27,3 +27,4 @@ export * from "@/lib/engineering-cad-carbon-lifecycle";
 
 // 8. DXF Parser, Standardizer & 2D-to-3D Centerline Spatial Extrusion Engine
 export * from "@/lib/cad/dxf-parser";
+export { convertTcvn3ToUnicode, normalizeCadLayers } from "@/lib/cad/dxf-parser";

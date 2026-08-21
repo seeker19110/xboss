@@ -11,17 +11,18 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
   const today = todayISO();
-  // COALESCE(t.end_date, wp.end_date): task.end_date NULL = kế thừa ngày KT nhóm (lib/recompute.ts).
   const sheets = await query(
-    `SELECT st.id, st.code, st.name, st.responsible, st.slug,
+    `SELECT st.id, st.code, st.name, st.responsible, st.slug, st.system_id AS "systemId",
+            sys.code AS "systemCode", sys.name AS "systemName", sys.color AS "systemColor",
             COUNT(t.id) AS total,
             COALESCE(AVG(t.progress_percent), 0) AS "avgProgress",
             COALESCE(SUM(CASE WHEN COALESCE(t.end_date, wp.end_date) IS NOT NULL AND COALESCE(t.end_date, wp.end_date) < ? AND t.progress_percent < 1
                               AND t.status NOT IN ('hoan_thanh','nghiem_thu') THEN 1 ELSE 0 END), 0) AS delayed
        FROM sheet_types st
+       LEFT JOIN systems sys ON sys.id = st.system_id
        LEFT JOIN work_packages wp ON wp.sheet_type_id = st.id
        LEFT JOIN tasks t ON t.package_id = wp.id
-      GROUP BY st.id, st.code, st.name, st.responsible, st.slug
+      GROUP BY st.id, st.code, st.name, st.responsible, st.slug, st.system_id, sys.code, sys.name, sys.color
       ORDER BY st.sort_order, st.id`,
     today,
   );
