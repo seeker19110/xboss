@@ -35,14 +35,11 @@ type ImportResult = {
   results: RowResult[];
 };
 
-type SheetType = {
+type SystemType = {
   id: number;
   code: string;
   name: string;
-  systemId?: number | null;
-  systemCode?: string | null;
-  systemName?: string | null;
-  systemColor?: string | null;
+  color?: string | null;
 };
 
 export default function ImportMaterialsPage() {
@@ -50,8 +47,8 @@ export default function ImportMaterialsPage() {
   const [excelSheets, setExcelSheets] = useState<string[]>([]);
   const [selectedExcelSheet, setSelectedExcelSheet] = useState("");
   const [mode, setMode] = useState<"append" | "replace">("append");
-  const [sheetId, setSheetId] = useState("");
-  const [sheets, setSheets] = useState<SheetType[]>([]);
+  const [systemId, setSystemId] = useState("");
+  const [systems, setSystems] = useState<SystemType[]>([]);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState("");
@@ -59,18 +56,25 @@ export default function ImportMaterialsPage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetch("/api/sheets")
+    fetch("/api/systems")
       .then((r) => r.json())
       .then((d) => {
-        const list: SheetType[] = d.sheets ?? d ?? [];
-        setSheets(list);
-        // Đọc query param ?sheetId= nếu có
+        const list: SystemType[] = d.systems ?? d ?? [];
+        setSystems(list);
+        // Đọc query param ?system= hoặc ?systemId= nếu có
         const params = new URLSearchParams(window.location.search);
-        const qSheetId = params.get("sheetId");
-        if (qSheetId && list.some((s) => String(s.id) === qSheetId)) {
-          setSheetId(qSheetId);
-        } else if (list.length > 0) {
-          setSheetId(String(list[0].id));
+        const qSystem = params.get("system") || params.get("systemId");
+        if (qSystem) {
+          const match = list.find((s) => String(s.id) === qSystem || s.code === qSystem);
+          if (match) {
+            setSystemId(String(match.id));
+            return;
+          }
+        }
+        if (list.length > 0) {
+          // Ưu tiên chọn hệ HVAC / ACMV mặc định
+          const hvac = list.find((s) => s.code === "acmv" || s.code === "hvac") || list[0];
+          setSystemId(String(hvac.id));
         }
       })
       .catch(() => {});
@@ -123,7 +127,7 @@ export default function ImportMaterialsPage() {
 
   async function doImport() {
     if (!file) return;
-    if (!sheetId) {
+    if (!systemId) {
       setError("Vui lòng chọn hệ MEPF trước khi import (hệ nào nhập hệ đó)");
       return;
     }
@@ -135,7 +139,7 @@ export default function ImportMaterialsPage() {
     try {
       const form = new FormData();
       form.append("file", file);
-      form.append("sheetId", sheetId);
+      form.append("systemId", systemId);
       form.append("mode", mode);
       if (selectedExcelSheet) {
         form.append("sheetName", selectedExcelSheet);
@@ -165,19 +169,8 @@ export default function ImportMaterialsPage() {
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  const selectedSheetObj = sheets.find((s) => String(s.id) === sheetId);
+  const selectedSystemObj = systems.find((s) => String(s.id) === systemId);
   const errRows = result?.results.filter((r) => r.status === "error") ?? [];
-
-  // Nhóm phân hệ theo Hệ thống MEPF (System)
-  const groupedSheets = (() => {
-    const map = new Map<string, SheetType[]>();
-    for (const s of sheets) {
-      const sysName = s.systemName ? `Hệ ${s.systemName}` : "Hệ thống Cơ điện MEPF";
-      if (!map.has(sysName)) map.set(sysName, []);
-      map.get(sysName)!.push(s);
-    }
-    return Array.from(map.entries());
-  })();
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -204,13 +197,12 @@ export default function ImportMaterialsPage() {
           <Layers className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
           <div>
             <p className="font-semibold text-emerald-300 text-sm mb-0.5">
-              Quy tắc MEPF: Hệ nào nhập hệ đó (System Isolation)
+              Quy tắc MEPF: Hệ nào nhập hệ đó (HVAC, Điện, Cấp Thoát Nước, PCCC)
             </p>
             <p>
-              Chọn đúng <strong>Hệ thống MEPF</strong> (ACMV, Điện, Cấp thoát nước, PCCC...) cần
-              nhập và chọn tab Sheet dữ liệu trong file Excel. Toàn bộ mã BOQ, khối lượng dự toán và
-              định mức bóc tách sẽ được gán trực tiếp vào hệ đã chọn để bảo vệ khối lượng và kiểm
-              soát đặt hàng.
+              Chọn đúng <strong>Hệ thống MEPF</strong> cần nhập và chọn tab Sheet dữ liệu trong file
+              Excel. Toàn bộ mã BOQ, khối lượng dự toán và định mức bóc tách sẽ được gán trực tiếp
+              vào hệ đã chọn để bảo vệ khối lượng và kiểm soát đặt hàng.
             </p>
           </div>
         </div>
@@ -297,39 +289,30 @@ export default function ImportMaterialsPage() {
           {/* 2. Chọn hệ (Bắt buộc) */}
           <div className="space-y-1.5">
             <label
-              htmlFor="sheet-select"
+              htmlFor="system-select"
               className="font-semibold text-sm text-zinc-200 flex items-center gap-1"
             >
-              2. Chọn Hệ MEPF cần nhập (Engineering System) <span className="text-red-400">*</span>
+              2. Chọn Hệ MEPF cần nhập (HVAC, Điện, Cấp Thoát Nước, PCCC...){" "}
+              <span className="text-red-400">*</span>
             </label>
             <p className="text-xs text-zinc-400">
               Hệ nào nhập hệ đó — tất cả các dòng vật tư trong file sẽ được gán trực tiếp vào hệ
               này.
             </p>
             <select
-              id="sheet-select"
-              value={sheetId}
-              onChange={(e) => setSheetId(e.target.value)}
+              id="system-select"
+              value={systemId}
+              onChange={(e) => setSystemId(e.target.value)}
               aria-label="Chọn hệ MEPF cần nhập vật tư"
               className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition"
             >
-              <option value="">-- Vui lòng chọn hệ MEPF --</option>
-              {groupedSheets.map(([groupName, items]) => (
-                <optgroup
-                  key={groupName}
-                  label={groupName}
-                  className="bg-zinc-900 text-zinc-300 font-semibold"
-                >
-                  {items.map((s) => (
-                    <option
-                      key={s.id}
-                      value={String(s.id)}
-                      className="bg-zinc-800 text-white font-normal"
-                    >
-                      {s.code} — {s.name}
-                    </option>
-                  ))}
-                </optgroup>
+              <option value="">
+                -- Vui lòng chọn hệ MEPF (HVAC, Điện, Cấp Thoát Nước, PCCC...) --
+              </option>
+              {systems.map((s) => (
+                <option key={s.id} value={String(s.id)}>
+                  {s.name}
+                </option>
               ))}
             </select>
           </div>
@@ -374,7 +357,7 @@ export default function ImportMaterialsPage() {
               <p className="text-xs text-red-400 flex items-center gap-1.5 mt-1 bg-red-950/30 border border-red-900/50 rounded-lg p-2">
                 <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />
                 Cảnh báo: Chế độ Thay thế sẽ xoá toàn bộ danh mục vật tư hiện tại của hệ &quot;
-                {selectedSheetObj?.name ?? sheetId}&quot; trước khi import.
+                {selectedSystemObj?.name ?? systemId}&quot; trước khi import.
               </p>
             )}
           </div>
@@ -390,7 +373,7 @@ export default function ImportMaterialsPage() {
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <button
               onClick={doImport}
-              disabled={!file || !sheetId || busy}
+              disabled={!file || !systemId || busy}
               className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-white rounded-xl px-6 py-2.5 text-sm font-semibold transition shadow-md shadow-emerald-950"
             >
               <Upload className="w-4 h-4" />
@@ -413,7 +396,7 @@ export default function ImportMaterialsPage() {
             <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-zinc-800">
               <p className="font-bold text-sm text-white">
                 Kết quả import cho hệ:{" "}
-                <span className="text-emerald-400">{selectedSheetObj?.name ?? sheetId}</span>
+                <span className="text-emerald-400">{selectedSystemObj?.name ?? systemId}</span>
               </p>
               {result.sheetUsed && (
                 <span className="text-xs text-zinc-400">
@@ -451,7 +434,7 @@ export default function ImportMaterialsPage() {
             {(result.inserted > 0 || (result.updated ?? 0) > 0) && (
               <div className="pt-1">
                 <a
-                  href={`/procurement?tab=inventory&sheetTypeId=${sheetId}`}
+                  href={`/procurement?tab=inventory&systemId=${systemId}`}
                   className="inline-flex items-center gap-2 bg-emerald-600/20 border border-emerald-700/50 hover:bg-emerald-600/30 text-emerald-300 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition"
                 >
                   <ArrowLeft className="w-4 h-4" /> Mở Danh mục vật tư / Bảng định mức hệ này

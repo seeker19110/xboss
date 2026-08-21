@@ -56,7 +56,7 @@ export type Material = {
   sheetCode: string | null;
 };
 
-type Sheet = { id: number; code: string; name: string };
+type Sheet = { id: number; code: string; name: string; systemId?: number | null };
 
 const DVT_OPTIONS = ["Cái", "Mét", "m2", "Ống", "Bộ", "Kg", "Cây", "Cuộn"].map((u) => ({
   value: u,
@@ -129,6 +129,8 @@ export default function InventoryTab({ onSwitchToOrders }: { onSwitchToOrders?: 
   const [userId, setUserId] = useState<number | null>(null);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [sheets, setSheets] = useState<Sheet[]>([]);
+  const [systems, setSystems] = useState<{ id: number; code: string; name: string }[]>([]);
+  const [systemFilter, setSystemFilter] = useState("");
   const [sheetFilter, setSheetFilter] = useState("");
   const [canEdit, setCanEdit] = useState(false);
   const [canDelete, setCanDelete] = useState(false);
@@ -152,8 +154,11 @@ export default function InventoryTab({ onSwitchToOrders }: { onSwitchToOrders?: 
   const load = useCallback(
     (revalidate = false) => {
       setLoading(true);
-      const q = sheetFilter ? `?sheetTypeId=${sheetFilter}` : "";
-      fetch(`/api/materials${q}`)
+      const params = new URLSearchParams();
+      if (systemFilter) params.set("systemId", systemFilter);
+      if (sheetFilter) params.set("sheetTypeId", sheetFilter);
+      const qs = params.toString() ? `?${params.toString()}` : "";
+      fetch(`/api/materials${qs}`)
         .then(async (r) => {
           if (r.status === 401) {
             await redirectToLogin();
@@ -175,29 +180,39 @@ export default function InventoryTab({ onSwitchToOrders }: { onSwitchToOrders?: 
           setLoading(false);
         });
     },
-    [sheetFilter],
+    [systemFilter, sheetFilter],
   );
 
   useEffect(() => {
-    Promise.all([fetchMe(), fetch("/api/sheets"), fetch("/api/materials/columns")]).then(
-      async ([user, sheetsRes, colsRes]) => {
-        if (!user) return;
-        const [sheetsJ, colsJ] = await Promise.all([
-          sheetsRes.json(),
-          colsRes.json().catch(() => ({})),
-        ]);
-        const r = user.role;
-        setRole(r ?? "");
-        setUserId(user.id ?? null);
-        setCanEdit(r === "admin" || r === "pm" || r === "engineer");
-        setCanDelete(r === "admin" || r === "pm");
-        setCanAdmin(r === "admin" || r === "pm");
-        setSheets(sheetsJ.sheets ?? []);
-        if (colsJ.labels && typeof colsJ.labels === "object") {
-          setColLabels((prev) => ({ ...prev, ...colsJ.labels }));
-        }
-      },
-    );
+    // Đọc URL query param ?systemId=
+    const searchParams = new URLSearchParams(window.location.search);
+    const qSysId = searchParams.get("systemId");
+    if (qSysId) setSystemFilter(qSysId);
+
+    Promise.all([
+      fetchMe(),
+      fetch("/api/sheets"),
+      fetch("/api/systems"),
+      fetch("/api/materials/columns"),
+    ]).then(async ([user, sheetsRes, sysRes, colsRes]) => {
+      if (!user) return;
+      const [sheetsJ, sysJ, colsJ] = await Promise.all([
+        sheetsRes.json(),
+        sysRes.json().catch(() => ({})),
+        colsRes.json().catch(() => ({})),
+      ]);
+      const r = user.role;
+      setRole(r ?? "");
+      setUserId(user.id ?? null);
+      setCanEdit(r === "admin" || r === "pm" || r === "engineer");
+      setCanDelete(r === "admin" || r === "pm");
+      setCanAdmin(r === "admin" || r === "pm");
+      setSheets(sheetsJ.sheets ?? []);
+      setSystems(sysJ.systems ?? []);
+      if (colsJ.labels && typeof colsJ.labels === "object") {
+        setColLabels((prev) => ({ ...prev, ...colsJ.labels }));
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -500,17 +515,33 @@ export default function InventoryTab({ onSwitchToOrders }: { onSwitchToOrders?: 
           </div>
 
           <select
-            value={sheetFilter}
-            onChange={(e) => setSheetFilter(e.target.value)}
-            aria-label="Lọc theo hệ WBS"
-            className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-zinc-200 outline-none focus:border-amber-500 h-10"
+            value={systemFilter}
+            onChange={(e) => setSystemFilter(e.target.value)}
+            aria-label="Lọc theo Hệ MEPF"
+            className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-zinc-200 outline-none focus:border-amber-500 h-10 font-medium"
           >
-            <option value="">Tất cả phân hệ WBS</option>
-            {sheets.map((s) => (
+            <option value="">Tất cả Hệ MEPF</option>
+            {systems.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.code} - {s.name}
+                {s.name}
               </option>
             ))}
+          </select>
+
+          <select
+            value={sheetFilter}
+            onChange={(e) => setSheetFilter(e.target.value)}
+            aria-label="Lọc theo hạng mục tracking"
+            className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-zinc-200 outline-none focus:border-amber-500 h-10"
+          >
+            <option value="">Tất cả hạng mục tracking</option>
+            {sheets
+              .filter((s) => !systemFilter || String(s.systemId) === systemFilter)
+              .map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.code} - {s.name}
+                </option>
+              ))}
           </select>
         </div>
 

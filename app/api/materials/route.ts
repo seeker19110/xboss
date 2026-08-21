@@ -16,7 +16,8 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
   const sheetTypeId = parseInt(req.nextUrl.searchParams.get("sheetTypeId") ?? "");
-  const hasFilter = !isNaN(sheetTypeId);
+  const systemId = parseInt(req.nextUrl.searchParams.get("systemId") ?? "");
+  const systemCode = req.nextUrl.searchParams.get("system")?.trim() || null;
   const projectId = await getCurrentProjectId(user);
   if (projectId == null) return NextResponse.json({ materials: [] });
   const blocked = await assertModuleEnabled("materials", projectId);
@@ -24,23 +25,32 @@ export async function GET(req: NextRequest) {
 
   const conds = ["m.project_id = ?"];
   const args: unknown[] = [projectId];
-  if (hasFilter) {
+  if (!isNaN(sheetTypeId)) {
     conds.push("m.sheet_type_id = ?");
     args.push(sheetTypeId);
+  }
+  if (!isNaN(systemId)) {
+    conds.push("(m.system_id = ? OR st.system_id = ?)");
+    args.push(systemId, systemId);
+  } else if (systemCode) {
+    conds.push("(sys.code = ? OR st.system_id = (SELECT id FROM systems WHERE code = ?))");
+    args.push(systemCode, systemCode);
   }
 
   let materials;
   try {
     materials = await query(
-      `SELECT m.id, m.sheet_type_id AS "sheetTypeId", m.task_id AS "taskId",
+      `SELECT m.id, m.system_id AS "systemId", m.sheet_type_id AS "sheetTypeId", m.task_id AS "taskId",
               m.boq_code AS "boqCode",
               m.name, m.unit,
               m.qty_boq AS "qtyBoq", m.qty_planned AS "qtyPlanned", m.qty_used AS "qtyUsed",
               COALESCE(m.qty_stock, 0) AS "qtyStock",
               COALESCE(m.min_stock_level, 0) AS "minStockLevel",
               m.status, m.note, m.custom, m.updated_at AS "updatedAt",
-              st.code AS "sheetCode"
+              sys.code AS "systemCode", sys.name AS "systemName",
+              st.code AS "sheetCode", st.name AS "sheetName"
          FROM materials m
+         LEFT JOIN systems sys ON m.system_id = sys.id
          LEFT JOIN sheet_types st ON m.sheet_type_id = st.id
         WHERE ${conds.join(" AND ")}
         ORDER BY m.sort_order, m.id`,

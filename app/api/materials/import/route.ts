@@ -75,24 +75,50 @@ export async function POST(req: NextRequest) {
   const file = form.get("file") as File | null;
   if (!file) return NextResponse.json({ error: "Thiếu file Excel" }, { status: 400 });
 
-  const sheetIdRaw = form.get("sheetId");
-  const targetSheetId = parseInt(String(sheetIdRaw ?? "")) || null;
-  if (!targetSheetId) {
+  const systemIdRaw = form.get("systemId") ?? form.get("sheetId");
+  const targetSystemId = parseInt(String(systemIdRaw ?? "")) || null;
+  if (!targetSystemId) {
     return NextResponse.json(
-      { error: "Vui lòng chọn hệ trước khi import (hệ nào nhập hệ đó)" },
+      { error: "Vui lòng chọn hệ MEPF trước khi import (HVAC, Điện, Cấp Thoát Nước, PCCC...)" },
       { status: 400 },
     );
   }
 
-  // Xác minh sheetId tồn tại
-  const sheetType = await queryOne<{ id: number; name: string }>(
-    `SELECT id, name FROM sheet_types WHERE id = ?`,
-    targetSheetId,
+  // Xác minh systemId tồn tại trong systems hoặc sheet_types
+  let system = await queryOne<{ id: number; name: string; code: string }>(
+    `SELECT id, name, code FROM systems WHERE id = ?`,
+    targetSystemId,
   );
-  if (!sheetType) {
-    return NextResponse.json({ error: "Hệ đã chọn không tồn tại trong hệ thống" }, { status: 400 });
+  let defaultSheetId: number | null = null;
+
+  if (system) {
+    const defaultSheet = await queryOne<{ id: number }>(
+      `SELECT id FROM sheet_types WHERE system_id = ? ORDER BY id LIMIT 1`,
+      system.id,
+    );
+    defaultSheetId = defaultSheet?.id ?? null;
+  } else {
+    // Fallback: nếu truyền sheet_type_id
+    const st = await queryOne<{ id: number; name: string; system_id: number | null }>(
+      `SELECT id, name, system_id FROM sheet_types WHERE id = ?`,
+      targetSystemId,
+    );
+    if (!st) {
+      return NextResponse.json(
+        { error: "Hệ đã chọn không tồn tại trong hệ thống" },
+        { status: 400 },
+      );
+    }
+    defaultSheetId = st.id;
+    if (st.system_id) {
+      system = await queryOne<{ id: number; name: string; code: string }>(
+        `SELECT id, name, code FROM systems WHERE id = ?`,
+        st.system_id,
+      );
+    }
   }
 
+  const resolvedSystemId = system?.id ?? null;
   const mode = String(form.get("mode") ?? "append"); // append | replace
   const requestedSheetName = form.get("sheetName") ? String(form.get("sheetName")).trim() : null;
 
@@ -227,21 +253,37 @@ export async function POST(req: NextRequest) {
 
   // mode=replace: xoá toàn bộ vật tư của đúng hệ được chọn trong dự án hiện tại
   if (mode === "replace") {
-    await run(
-      `DELETE FROM materials WHERE sheet_type_id = ? AND project_id = ?`,
-      targetSheetId,
-      projectId,
-    );
+    if (resolvedSystemId) {
+      await run(
+        `DELETE FROM materials WHERE (system_id = ? OR sheet_type_id IN (SELECT id FROM sheet_types WHERE system_id = ?)) AND project_id = ?`,
+        resolvedSystemId,
+        resolvedSystemId,
+        projectId,
+      );
+    } else if (defaultSheetId) {
+      await run(
+        `DELETE FROM materials WHERE sheet_type_id = ? AND project_id = ?`,
+        defaultSheetId,
+        projectId,
+      );
+    }
   }
 
   // sort_order counter
   let currentSortOrder = 0;
   if (mode !== "replace") {
-    const maxRow = await queryOne<{ m: number | null }>(
-      `SELECT MAX(sort_order) AS m FROM materials WHERE sheet_type_id = ? AND project_id = ?`,
-      targetSheetId,
-      projectId,
-    );
+    const maxRow = resolvedSystemId
+      ? await queryOne<{ m: number | null }>(
+          `SELECT MAX(sort_order) AS m FROM materials WHERE (system_id = ? OR sheet_type_id IN (SELECT id FROM sheet_types WHERE system_id = ?)) AND project_id = ?`,
+          resolvedSystemId,
+          resolvedSystemId,
+          projectId,
+        )
+      : await queryOne<{ m: number | null }>(
+          `SELECT MAX(sort_order) AS m FROM materials WHERE sheet_type_id = ? AND project_id = ?`,
+          defaultSheetId,
+          projectId,
+        );
     currentSortOrder = maxRow?.m ?? 0;
   }
 
@@ -276,21 +318,30 @@ export async function POST(req: NextRequest) {
 
     // Nếu mã BOQ đã tồn tại trong cùng hệ của dự án → Cập nhật số liệu
     if (boqCode) {
-      const existing = await queryOne<{ id: number }>(
-        `SELECT id FROM materials WHERE boq_code = ? AND sheet_type_id = ? AND project_id = ?`,
-        boqCode,
-        targetSheetId,
-        projectId,
-      );
+      const existing = resolvedSystemId
+        ? await queryOne<{ id: number }>(
+            `SELECT id FROM materials WHERE boq_code = ? AND (system_id = ? OR sheet_type_id IN (SELECT id FROM sheet_types WHERE system_id = ?)) AND project_id = ?`,
+            boqCode,
+            resolvedSystemId,
+            resolvedSystemId,
+            projectId,
+          )
+        : await queryOne<{ id: number }>(
+            `SELECT id FROM materials WHERE boq_code = ? AND sheet_type_id = ? AND project_id = ?`,
+            boqCode,
+            defaultSheetId,
+            projectId,
+          );
       if (existing) {
         await run(
-          `UPDATE materials SET name=?, unit=?, qty_boq=?, qty_planned=?, note=?, sort_order=? WHERE id=? AND project_id=?`,
+          `UPDATE materials SET name=?, unit=?, qty_boq=?, qty_planned=?, note=?, sort_order=?, system_id=COALESCE(?, system_id) WHERE id=? AND project_id=?`,
           name,
           unit,
           qtyBoq,
           qtyPlanned,
           note,
           sortOrder,
+          resolvedSystemId,
           existing.id,
           projectId,
         );
@@ -314,9 +365,10 @@ export async function POST(req: NextRequest) {
 
     try {
       await insertId(
-        `INSERT INTO materials (sheet_type_id, boq_code, name, unit, qty_boq, qty_planned, qty_used, status, note, sort_order, project_id)
+        `INSERT INTO materials (system_id, sheet_type_id, boq_code, name, unit, qty_boq, qty_planned, qty_used, status, note, sort_order, project_id)
          VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
-        targetSheetId,
+        resolvedSystemId,
+        defaultSheetId,
         boqCode,
         name,
         unit,
