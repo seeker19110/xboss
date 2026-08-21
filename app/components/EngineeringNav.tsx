@@ -35,6 +35,7 @@ import {
   CalendarCheck,
   Package,
   Landmark,
+  Workflow,
 } from "lucide-react";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { ROLE_LABELS, type Role } from "@/lib/roles";
@@ -335,6 +336,14 @@ const NAV_ITEMS: NavItem[] = [
     icon: Sparkles,
     badge: "Tổng chỉ huy",
     roles: ["admin", "pm", "engineer", "bch", "cdt", "viewer"],
+  },
+  {
+    href: "/mepf-process",
+    label: "Quy trình Thi công MEPF (6 GĐ)",
+    category: "governance",
+    icon: Workflow,
+    badge: "Master Lifecycle",
+    roles: ["admin", "pm", "engineer", "subcon", "bch", "cdt", "viewer"],
   },
   {
     href: "/engineering/workflows",

@@ -363,9 +363,15 @@ export default function Dashboard() {
             <div className="flex items-center gap-2.5">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
               <div>
-                <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-zinc-200">
-                  Chuỗi Quy Trình Vòng Đời Dự Án Xây Dựng MEPF (6 Giai Đoạn)
-                </h2>
+                <a
+                  href="/mepf-process"
+                  className="group inline-flex items-center gap-1.5 hover:text-amber-300 transition-colors"
+                >
+                  <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-zinc-200 group-hover:text-amber-300">
+                    Chuỗi Quy Trình Vòng Đời Dự Án Xây Dựng MEPF (6 Giai Đoạn)
+                  </h2>
+                  <ArrowUpRight className="w-3.5 h-3.5 text-zinc-500 group-hover:text-amber-400" />
+                </a>
                 <p className="text-[11px] text-zinc-400">
                   Tiến trình khép kín từ Khởi động, BIM/CAD, Cung ứng, Thi công, Nghiệm thu đến Bàn
                   giao số

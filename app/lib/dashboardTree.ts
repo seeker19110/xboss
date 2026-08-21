@@ -269,6 +269,12 @@ export const DASHBOARD_TREE: DashCluster[] = [
     label: "Kế hoạch & Tiến độ",
     dashboards: [
       { id: "dash.dashboard", href: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
+      {
+        id: "dash.mepf-process",
+        href: "/mepf-process",
+        label: "Quy trình thi công MEPF",
+        icon: Workflow,
+      },
       { id: "dash.bao-cao", href: "/report", label: "Báo cáo", icon: FileText },
       { id: "dash.bao-cao-luu", href: "/reports", label: "Báo cáo lưu", icon: BookMarked },
       { id: "dash.tien-do-acmv", href: "/progress/acmv", label: "ACMV", icon: Wind },
