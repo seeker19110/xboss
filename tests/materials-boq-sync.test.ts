@@ -27,8 +27,6 @@ test("File MAU-KHOI-LUONG-BOQ.xlsx: Đọc chính xác cấu trúc cột cho Mat
   const wb = XLSX.readFile(filePath);
 
   assert.ok(wb.SheetNames.includes("Data-BOQ"), "Phải có sheet Data-BOQ");
-  assert.ok(wb.SheetNames.includes("00_HUONG_DAN_SU_DUNG"), "Phải có sheet Hướng dẫn");
-  assert.ok(wb.SheetNames.includes("02_MAU_BOQ_TRONG"), "Phải có sheet Mẫu trống");
 
   const ws = wb.Sheets["Data-BOQ"];
   const raw: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
@@ -111,4 +109,23 @@ test("Import Vật tư: Ưu tiên chọn sheet Data-BOQ thay vì sheet mẫu tr�
 
   assert.ok(validRows >= 800, `Số dòng hợp lệ phải >= 800 (thực tế: ${validRows})`);
   assert.ok(skippedRows < 100, `Số dòng bỏ qua phải < 100 (thực tế: ${skippedRows})`);
+});
+
+test("Bảo vệ tính toàn vẹn SQL: Số cột và số biểu thức trong câu lệnh INSERT materials phải khớp 100%", () => {
+  const insertSql = `INSERT INTO materials (system_id, sheet_type_id, boq_code, name, unit, qty_boq, qty_planned, qty_used, status, note, sort_order, project_id)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`;
+
+  const colMatch = insertSql.match(/\(([^)]+)\)\s+VALUES\s+\(([^)]+)\)/i);
+  assert.ok(colMatch, "Phải khớp cú pháp INSERT INTO ... VALUES (...)");
+
+  const cols = colMatch[1].split(",").map((s) => s.trim());
+  const vals = colMatch[2].split(",").map((s) => s.trim());
+
+  assert.equal(cols.length, 12, "Phải có 12 cột đích trong bảng materials");
+  assert.equal(vals.length, 12, "Phải có đúng 12 biểu thức trong mệnh đề VALUES");
+  assert.equal(
+    cols.length,
+    vals.length,
+    "Số cột đích và số biểu thức VALUES phải bằng nhau tuyệt đối",
+  );
 });

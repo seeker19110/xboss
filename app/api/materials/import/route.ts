@@ -366,7 +366,7 @@ export async function POST(req: NextRequest) {
     try {
       await insertId(
         `INSERT INTO materials (system_id, sheet_type_id, boq_code, name, unit, qty_boq, qty_planned, qty_used, status, note, sort_order, project_id)
-         VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
         resolvedSystemId,
         defaultSheetId,
         boqCode,
