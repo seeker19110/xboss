@@ -34,7 +34,6 @@ const WHITELIST: Record<string, string> = {
   "cron/weekly-report": "cron báo cáo tuần, quét mọi dự án nội bộ",
 
   // --- Static/meta (không đọc dữ liệu nghiệp vụ của dự án cụ thể) ---
-  "materials/template": "mẫu import vật tư tĩnh",
   "materials/allocation-meta": "metadata cấu hình phân bổ, không theo dự án",
 
   // --- Scope qua thực thể CHA theo id (không có cột project_id trực tiếp) ---

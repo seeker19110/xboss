@@ -60,3 +60,55 @@ test("File MAU-KHOI-LUONG-BOQ.xlsx: Đọc chính xác cấu trúc cột cho Mat
   assert.equal(unit, "Bộ");
   assert.equal(qtyBoq, 2);
 });
+
+test("Import Vật tư: Ưu tiên chọn sheet Data-BOQ thay vì sheet mẫu trống và đọc đầy đủ >800 dòng", () => {
+  const filePath = path.join(process.cwd(), "attachments", "MAU-KHOI-LUONG-BOQ.xlsx");
+  const wb = XLSX.readFile(filePath);
+
+  const IGNORE_PATTERNS = [
+    /HUONG_DAN/i,
+    /HDSD/i,
+    /GUIDE/i,
+    /DASHBOARD/i,
+    /KIEM_SOAT/i,
+    /In phieu/i,
+    /Phieu xuat/i,
+  ];
+
+  // Logic chọn sheet mới: ưu tiên Data-BOQ / Vật tư / BOQ
+  const targetSheetName =
+    wb.SheetNames.find((s) => s === "Data-BOQ" || s === "Vật tư" || s === "BOQ") ||
+    wb.SheetNames.find((s) => !IGNORE_PATTERNS.some((p) => p.test(s))) ||
+    wb.SheetNames[0];
+
+  assert.equal(
+    targetSheetName,
+    "Data-BOQ",
+    "Phải chọn đúng sheet Data-BOQ thay vì 02_MAU_BOQ_TRONG",
+  );
+
+  const ws = wb.Sheets[targetSheetName];
+  const raw: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+
+  let validRows = 0;
+  let skippedRows = 0;
+  const headerRow = 5;
+
+  for (let i = headerRow + 1; i < raw.length; i++) {
+    const r = raw[i];
+    if (!r) {
+      skippedRows++;
+      continue;
+    }
+    const code = String(r[0] ?? "").trim();
+    const name = String(r[2] ?? "").trim();
+    if (!name && !code) {
+      skippedRows++;
+      continue;
+    }
+    validRows++;
+  }
+
+  assert.ok(validRows >= 800, `Số dòng hợp lệ phải >= 800 (thực tế: ${validRows})`);
+  assert.ok(skippedRows < 100, `Số dòng bỏ qua phải < 100 (thực tế: ${skippedRows})`);
+});
