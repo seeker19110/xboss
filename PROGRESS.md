@@ -27,6 +27,10 @@
 
 ## Hợp Nhất Toàn Diện Code Các Tính Năng Cùng Nhóm Vào 7 Unified Hubs & Facades (2026-08-21)
 
+- **[AI, đã làm] Hợp Nhất Toàn Diện Năng Lực BIM Vào Unified Facade (`lib/bim/index.ts`):**
+  - Re-export toàn bộ 6 phân hệ BIM cốt lõi: 3D Parametric Mesh & 4D WBS Timeline Simulation, AI 3D Multi-Trade Auto-Routing & Beam Sleeve Validation, Spatial Grid Clash Solver $O(n \log n)$ & openBIM BCF 3.0, 5D QTO bóc tách khối lượng & AABB Collision Geometry, LiDAR Scan-to-BIM RANSAC Cylinder Fitting & Triện dấu hoàn công, Apex God-Tier WebGL Instanced Mesh & Sổ cái Merkle Root Hex.
+  - Tạo test suite kiểm thử tích hợp [`tests/bim-unified-facade.test.ts`](file:///c:/Users/liend/xboss/tests/bim-unified-facade.test.ts) (6/6 tests PASS 100%).
+
 - **[AI, đã làm] Hợp Nhất Toàn Diện Năng Lực CAD Vào Unified Facade (`lib/cad/index.ts`):**
   - Re-export toàn bộ 7 phân hệ CAD/BIM cốt lõi: Vector Diffing, AutoLISP, Font Doctor, QTO Tracking, Fabrication 1D/2D Nesting, Multi-Tier Corridor Trapeze, DfMA Spool Isometric, Mạng thủy lực & 6D Carbon LCA.
   - Tạo test suite kiểm thử tích hợp [`tests/cad-unified-facade.test.ts`](file:///c:/Users/liend/xboss/tests/cad-unified-facade.test.ts) (7/7 tests PASS 100%).
