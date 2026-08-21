@@ -2,6 +2,7 @@
 
 **Ngày lập:** 2026-08-21 · **Nhánh:** `claude/route-restructure-plan-bgbwve`
 **Phạm vi chốt với người dùng:** tái cấu trúc **page route theo chức năng**; **đổi thẳng URL, KHÔNG redirect**; **gộp trang trùng chức năng vào hub**.
+**Bối cảnh:** app **chưa có người dùng thật** — không cần giữ tương thích ngược cho URL cũ, và được phép đổi/xoá URL mạnh tay.
 **Ngoài phạm vi:** `app/api/*` (tên route API đã bám entity, đổi chỉ tạo rủi ro cho client fetch mà không được lợi ích IA nào).
 
 ---
@@ -85,7 +86,9 @@ Lý do: `?tab=x&sub=y` không deep-link được sạch, không tách bundle đ�
 **QĐ-3 — Gộp trang trùng bằng query param, không bằng trang re-export.**
 5 trang bản vẽ → `/ban-ve?kind=design|shop|asbuilt|method|bim`. `/cad-bim` + `/mepf-cad-bim-studio` → chỉ giữ `/engineering/god-tier-studio`.
 
-**QĐ-4 — Không redirect (theo yêu cầu người dùng).** Trang shim bị **xoá**, URL cũ 404. Bù lại, mọi link nội bộ trong `app/**` phải được sửa trong cùng PR — đây là tiêu chí chặn merge, không phải việc dọn sau.
+**QĐ-4 — Không redirect.** Trang shim bị **xoá**, URL cũ 404. **App chưa có người dùng thật** (xác nhận với người dùng ngày 2026-08-21), nên không có bookmark, email báo cáo hay tin nhắn Telegram cũ nào ngoài kia trỏ vào URL cũ — không cần lớp redirect tương thích ngược, và cũng không cần rà URL tuyệt đối gửi ra ngoài app.
+
+Ràng buộc còn lại thuần nội bộ: mọi link trong `app/**` và `lib/**` phải được sửa trong cùng PR với việc xoá/di chuyển trang — đây là tiêu chí chặn merge, không phải việc dọn sau.
 
 **QĐ-5 — `/engineering/*` (35 trang) giữ nguyên namespace.** Nó đã đúng quy tắc QĐ-1 sẵn. Chỉ đổi `/engineering-intelligence` → `/engineering` (hub launcher hiện tại của nó) ở PR cuối, khi mọi thứ khác đã ổn định.
 
@@ -163,7 +166,7 @@ Mỗi việc = 1 nhánh/worktree riêng, 1 PR draft. Thứ tự bắt buộc: **
 
 | Rủi ro | Chặn bằng |
 | --- | --- |
-| Không redirect ⇒ bookmark/link ngoài (email báo cáo, Telegram, QR nhãn) 404 | Trước V1: `grep -rn` trong `lib/` (`lib/push.ts`, cron report, `lib/qr*`, `app/api/r/[kind]/[id]`) mọi URL tuyệt đối gửi ra ngoài; sửa cùng lúc. **Đây là điểm dễ sót nhất của quyết định "đổi thẳng".** |
+| Link nội bộ sót lại sau khi xoá/di chuyển trang ⇒ 404 trong app | `grep -rn` toàn bộ `app/**` và `lib/**` (kể cả URL tuyệt đối trong `lib/push.ts`, cron report, nhãn QR, `app/api/r/[kind]/[id]` — chưa gửi ra ngoài nhưng vẫn phải đúng) là bước cuối của mọi việc. Vì chưa có người dùng, đây là rủi ro sửa được ngay, không phải rủi ro vận hành. |
 | `useSearchParams` không bọc `Suspense` ⇒ build fail | `npm run build` là tiêu chí đạt của mọi việc, không chỉ lint/typecheck |
 | Service worker cache URL cũ ⇒ người dùng cũ thấy 404 dai dẳng | Tăng `CACHE` trong `public/sw.js` ở V6 và một lần nữa ở V8 |
 | Di trú đồng thời nhiều hub ⇒ xung đột `HubShell` | V3 phải merge trước khi mở V4–V7; mỗi việc một worktree riêng, `git fetch origin` trước khi tạo nhánh |
