@@ -19,34 +19,29 @@ import {
   ShieldCheck,
   ShieldAlert,
   FileText,
-  FileCheck2,
   ChevronRight,
-  Filter,
   Search,
   Printer,
-  FileDown,
-  RefreshCw,
   Layers,
   Zap,
   Droplets,
   Wind,
   Flame,
-  Radio,
-  Sliders,
   Check,
   X,
   Eye,
-  Crosshair,
   BadgeCheck,
   Workflow,
-  HelpCircle,
-  TrendingUp,
+  CheckSquare,
+  Square,
+  SlidersHorizontal,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EngineeringNav from "@/app/components/EngineeringNav";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { ROLE_LABELS, type Role } from "@/lib/roles";
 
 // ── TYPES & INTERFACES ──
 
@@ -86,15 +81,13 @@ export interface StageData {
   statusBg: string;
   statusBorder: string;
   href: string;
-  stepsCount: number;
-  approvedCount: number;
   durationEst: string;
   milestoneKey: string;
 }
 
-// ── MASTER STAGE DEFINITIONS ──
+// ── 6 GIAI ĐOẠN VÒNG ĐỜI DỰ ÁN ──
 
-const INITIAL_STAGES: StageData[] = [
+const STAGES: StageData[] = [
   {
     index: 0,
     stageCode: "GĐ 0",
@@ -104,9 +97,7 @@ const INITIAL_STAGES: StageData[] = [
     statusColor: "text-emerald-400",
     statusBg: "bg-emerald-500/10",
     statusBorder: "border-emerald-500/30",
-    href: "/governance?tab=lifecycle",
-    stepsCount: 6,
-    approvedCount: 6,
+    href: "/governance",
     durationEst: "2-4 Tuần",
     milestoneKey: "Permit to Start",
   },
@@ -120,8 +111,6 @@ const INITIAL_STAGES: StageData[] = [
     statusBg: "bg-amber-500/10",
     statusBorder: "border-amber-500/30",
     href: "/mepf-cad-bim-studio",
-    stepsCount: 6,
-    approvedCount: 6,
     durationEst: "4-6 Tuần",
     milestoneKey: "Approved for Construction (AFC)",
   },
@@ -135,8 +124,6 @@ const INITIAL_STAGES: StageData[] = [
     statusBg: "bg-blue-500/10",
     statusBorder: "border-blue-500/30",
     href: "/procurement",
-    stepsCount: 5,
-    approvedCount: 5,
     durationEst: "6-8 Tuần",
     milestoneKey: "Material Inspection Report (MIR)",
   },
@@ -150,8 +137,6 @@ const INITIAL_STAGES: StageData[] = [
     statusBg: "bg-emerald-500/10",
     statusBorder: "border-emerald-500/30",
     href: "/site",
-    stepsCount: 8,
-    approvedCount: 5,
     durationEst: "16-24 Tuần",
     milestoneKey: "Pour-Permit & Riser Complete",
   },
@@ -165,8 +150,6 @@ const INITIAL_STAGES: StageData[] = [
     statusBg: "bg-violet-500/10",
     statusBorder: "border-violet-500/30",
     href: "/commercial",
-    stepsCount: 6,
-    approvedCount: 3,
     durationEst: "8-12 Tuần",
     milestoneKey: "T&C & Integrated Fire Matrix",
   },
@@ -179,15 +162,13 @@ const INITIAL_STAGES: StageData[] = [
     statusColor: "text-zinc-300",
     statusBg: "bg-zinc-900",
     statusBorder: "border-zinc-700",
-    href: "/governance?tab=lifecycle",
-    stepsCount: 5,
-    approvedCount: 0,
+    href: "/governance",
     durationEst: "4-6 Tuần",
     milestoneKey: "Sở Xây Dựng Điều 24 & COBie LOD 500",
   },
 ];
 
-// ── MASTER 36 STEPS EXECUTION DATABASE ──
+// ── MASTER 36 BƯỚC THI CÔNG CHI TIẾT ──
 
 const MASTER_STEPS: StepItem[] = [
   // ── GIAI ĐOẠN 0: KHỞI ĐỘNG & PHÁP LÝ (6 BƯỚC) ──
@@ -222,8 +203,8 @@ const MASTER_STEPS: StepItem[] = [
     code: "B0.2",
     seq: 2,
     stageIndex: 0,
-    title: "Thẩm Duyệt Thiết Kế PCCC & Đánh Giá Tác Động Môi Trường ĐTM",
-    desc: "Tiếp nhận và kiểm tra tính pháp lý của Giấy chứng nhận Thẩm duyệt Thiết kế PCCC của Cục/Phòng Cảnh sát PCCC và Quyết định phê duyệt ĐTM.",
+    title: "Thẩm Duyệt Thiết Kế PCCC & ĐTM",
+    desc: "Tiếp nhận và kiểm tra Giấy chứng nhận Thẩm duyệt Thiết kế PCCC của Cục/Phòng Cảnh sát PCCC và Quyết định phê duyệt ĐTM.",
     discipline: ["F", "M", "P"],
     isHoldPoint: true,
     standards: ["Nghị định 136/2020/NĐ-CP", "Nghị định 50/2024/NĐ-CP", "QCVN 06:2022/BXD"],
@@ -273,10 +254,10 @@ const MASTER_STEPS: StepItem[] = [
     seq: 4,
     stageIndex: 0,
     title: "Phê Duyệt Kế Hoạch Đảm Bảo Chất Lượng (PQP) & Kế Hoạch ITP",
-    desc: "Ban hành Kế hoạch Quản lý Chất lượng Dự án (Project Quality Plan) và Kế hoạch Kiểm tra Thử nghiệm (ITP) xác định rõ điểm dừng Hold-Points.",
+    desc: "Ban hành Kế hoạch Quản lý Chất lượng Dự án (PQP) và Kế hoạch Kiểm tra Thử nghiệm (ITP) xác định rõ điểm dừng Hold-Points.",
     discipline: ["M", "E", "P", "F", "ELV"],
     isHoldPoint: false,
-    standards: ["ISO 9001:2015", "Nghị định 06/2021/NĐ-CP", "Tiêu chuẩn Quản trị XBoss"],
+    standards: ["ISO 9001:2015", "Nghị định 06/2021/NĐ-CP"],
     deliverables: [
       "Sổ tay PQP Dự án",
       "Bảng Ma trận ITP Toàn bộ 5 Hệ MEPF",
@@ -297,7 +278,7 @@ const MASTER_STEPS: StepItem[] = [
     code: "B0.5",
     seq: 5,
     stageIndex: 0,
-    title: "Kiểm Định Kỹ Thuật Máy Móc Nghiêm Ngặt (Thông Tư 36/2019/TT-BLĐTBXH)",
+    title: "Kiểm Định Máy Móc Nghiêm Ngặt (Thông Tư 36/2019/TT-BLĐTBXH)",
     desc: "Kiểm tra tem kiểm định an toàn, hồ sơ chứng chỉ thợ vận hành Nhóm 3 đối với máy nén khí, cẩu tháp, vận thăng, xe nâng thi công.",
     discipline: ["M", "E"],
     isHoldPoint: true,
@@ -322,11 +303,11 @@ const MASTER_STEPS: StepItem[] = [
     code: "B0.6",
     seq: 6,
     stageIndex: 0,
-    title: "Lập Tiến Độ Tổng Thể Master Schedule & Thiết Lập Baseline Lưới 6 Hệ",
+    title: "Khóa Baseline Master Schedule Đường Găng CPM",
     desc: "Lập tiến độ thi công tổng thể đường găng CPM, phân bổ tài nguyên, khóa đường cơ sở Baseline và phân rã WBS 4 cấp độ.",
     discipline: ["M", "E", "P", "F", "ELV"],
     isHoldPoint: false,
-    standards: ["FIDIC Red Book 1999 (Cl 8.3)", "Phương pháp CPM Gantt"],
+    standards: ["FIDIC Red Book 1999", "Phương pháp CPM Gantt"],
     deliverables: [
       "Kế hoạch Tiến độ Master Schedule",
       "Đường cơ sở Baseline 0",
@@ -349,11 +330,11 @@ const MASTER_STEPS: StepItem[] = [
     code: "B1.1",
     seq: 7,
     stageIndex: 1,
-    title: "Thẩm Tra Thiết Kế Kỹ Thuật, Giới Hạn Vận Tốc & Chẩn Đoán Dị Tật CAD",
+    title: "Thẩm Tra Thiết Kế Kỹ Thuật & Giới Hạn Vận Tốc Thủy Lực/Khí Động",
     desc: "Quét dị tật font chữ CAD UTF-8, kiểm tra dung sai, rà soát vận tốc thủy lực ống nước (v ≤ 1.5 - 2.5 m/s) và khí động ống gió (v ≤ 6.0 - 10.0 m/s).",
     discipline: ["M", "E", "P", "F"],
     isHoldPoint: false,
-    standards: ["TCVN 5687:2024", "ASHRAE Fundamentals", "Tiêu chuẩn AIA CAD Layer"],
+    standards: ["TCVN 5687:2024", "ASHRAE Fundamentals"],
     deliverables: [
       "Báo cáo Thẩm tra Kỹ thuật MEPF",
       "Bảng Chẩn đoán Lỗi CAD Ingestion",
@@ -374,7 +355,7 @@ const MASTER_STEPS: StepItem[] = [
     code: "B1.2",
     seq: 8,
     stageIndex: 1,
-    title: "Mô Hình Hóa 3D BIM LOD 350 - 400 & Động Cơ Xử Lý Xung Đột (Clash Solver)",
+    title: "Mô Hình Hóa 3D BIM LOD 350 - 400 & Giải Quyết Xung Đột (Clash Solver)",
     desc: "Dựng mô hình phối hợp liên ngành M-E-P-F, chạy kiểm tra va chạm Navisworks, bảo toàn tuyệt đối độ dốc 1-2% cho hệ thoát nước trọng lực.",
     discipline: ["M", "E", "P", "F", "ELV"],
     isHoldPoint: true,
@@ -605,7 +586,7 @@ const MASTER_STEPS: StepItem[] = [
     desc: "Theo dõi tiến độ sản xuất tại nhà máy nước ngoài, vận chuyển đường biển và thủ tục hải quan cho Chiller, Máy biến áp, Máy phát điện dự phòng.",
     discipline: ["M", "E", "F"],
     isHoldPoint: false,
-    standards: ["Incoterms 2020 (CIF/DDP)", "Lịch trình Reverse Scheduling"],
+    standards: ["Incoterms 2020", "Lịch trình Reverse Scheduling"],
     deliverables: [
       "Vận đơn Đường biển B/L",
       "Tờ khai Hải quan Thông quan",
@@ -682,7 +663,7 @@ const MASTER_STEPS: StepItem[] = [
     desc: "Đóng cọc đồng phi 16 L=2.4m, hàn hóa nhiệt cáp đồng trần 70-120mm2 vào đài móng, đo điện trở tiếp địa R ≤ 10Ω (chống sét) và R ≤ 1Ω (server).",
     discipline: ["E", "ELV"],
     isHoldPoint: true,
-    standards: ["TCVN 9385:2012", "IEEE Std 80", "QCVN 12:2014/BXD"],
+    standards: ["TCVN 9385:2012", "IEEE Std 80"],
     deliverables: [
       "Biên bản Nghiệm thu Hàn Hóa Nhiệt",
       "Phiếu Kết quả Đo Điện trở Tiếp địa",
@@ -707,7 +688,7 @@ const MASTER_STEPS: StepItem[] = [
     desc: "Đào rãnh, đầm cát đáy dày 100mm, đặt ống thoát uPVC dốc 1-2% có gối đỡ bê tông, hàn nhiệt đối đầu ống cấp nước HDPE, thử kín trước lấp.",
     discipline: ["P"],
     isHoldPoint: true,
-    standards: ["TCVN 4474:1987", "TCVN 4513:1988", "QCVN 14:2008/BTNMT"],
+    standards: ["TCVN 4474:1987", "TCVN 4513:1988"],
     deliverables: [
       "Biên bản Nghiệm thu Đặt Ống Ngầm",
       "Biên bản Thử Thủy tĩnh Tuyến Ngầm",
@@ -728,7 +709,7 @@ const MASTER_STEPS: StepItem[] = [
     code: "B3.5",
     seq: 22,
     stageIndex: 3,
-    title: "KHÓA CỨNG: CẤP PHÉP ĐỔ BÊ TÔNG SÀN / DẦM (POUR-PERMIT HARD LOCK)",
+    title: "CẤP PHÉP ĐỔ BÊ TÔNG SÀN / DẦM (POUR-PERMIT CIRCUIT BREAKER)",
     desc: "Cổng ngắt mạch an toàn công tác ngầm: Tổng rà soát 100% sleeve, conduit, tiếp địa của tầng thi công trước khi cấp phép đổ bê tông.",
     discipline: ["M", "E", "P", "F", "ELV"],
     isHoldPoint: true,
@@ -1070,19 +1051,16 @@ const MASTER_STEPS: StepItem[] = [
   },
 ];
 
-// ── 7 MASTER UNIFIED COCKPITS DEFINITIONS ──
+// ── 7 ĐẠI TRUNG TÂM ĐIỀU HÀNH THU GỌN ──
 
 const UNIFIED_COCKPITS = [
   {
     num: "1",
     title: "MEPF CAD/BIM Studio",
     sub: "MEPF Core",
-    desc: "3D/4D BIM WebGPU, LiDAR Scan-to-BIM, BCF 3.0, CNC G-Code & Auto-Routing",
+    desc: "3D/4D BIM WebGPU, Scan-to-BIM, BCF 3.0, CNC G-Code",
     href: "/mepf-cad-bim-studio",
     icon: Sparkles,
-    badgeColor: "text-amber-400 border-amber-500/30 bg-amber-500/10",
-    hoverBorder: "hover:border-amber-500/60",
-    activeTasks: "12 Mô hình",
   },
   {
     num: "2",
@@ -1091,20 +1069,14 @@ const UNIFIED_COCKPITS = [
     desc: "Việc của tôi, Nhật ký TT06, Nghiệm thu, Mặt bằng & AI HSE",
     href: "/site",
     icon: HardHat,
-    badgeColor: "text-emerald-400 border-emerald-500/30 bg-emerald-500/10",
-    hoverBorder: "hover:border-emerald-500/60",
-    activeTasks: "4 Đội thi công",
   },
   {
     num: "3",
     title: "Kế Hoạch & Tiến Độ WBS",
     sub: "4 Trụ Cột",
-    desc: "Lưới 6 hệ, CPM Gantt, Lookahead, EVM SPI/CPI & Báo cáo A4",
+    desc: "Lưới 6 hệ, CPM Gantt, Lookahead, EVM SPI/CPI",
     href: "/schedule",
     icon: CalendarCheck,
-    badgeColor: "text-sky-400 border-sky-500/30 bg-sky-500/10",
-    hoverBorder: "hover:border-sky-500/60",
-    activeTasks: "SPI 0.98",
   },
   {
     num: "4",
@@ -1113,63 +1085,51 @@ const UNIFIED_COCKPITS = [
     desc: "Định mức BOQ, Đấu thầu Vendor, Đơn hàng PO & QR GRN",
     href: "/procurement",
     icon: Package,
-    badgeColor: "text-blue-400 border-blue-500/30 bg-blue-500/10",
-    hoverBorder: "hover:border-blue-500/60",
-    activeTasks: "100% MIR Khớp",
   },
   {
     num: "5",
     title: "Hợp Đồng, Chi Phí & FIDIC",
     sub: "4 Khối",
-    desc: "Hợp đồng A-B, Chứng chỉ IPC, Phát sinh VO, Claims & Dòng tiền",
+    desc: "Hợp đồng A-B, Chứng chỉ IPC, Phát sinh VO, Claims",
     href: "/commercial",
     icon: Coins,
-    badgeColor: "text-violet-400 border-violet-500/30 bg-violet-500/10",
-    hoverBorder: "hover:border-violet-500/60",
-    activeTasks: "IPC Kỳ 6",
   },
   {
     num: "6",
     title: "Trí Tuệ AI & Digital Twin",
     sub: "AI Apex",
-    desc: "Zalo/Voice Copilot, Gate 0, AI Swarm Debates & IoT Telemetry",
+    desc: "Zalo Copilot, Gate 0, AI Swarm Debates & IoT Telemetry",
     href: "/engineering-intelligence",
     icon: Brain,
-    badgeColor: "text-rose-400 border-rose-500/30 bg-rose-500/10",
-    hoverBorder: "hover:border-rose-500/60",
-    activeTasks: "8 Tác tử",
   },
   {
     num: "7",
     title: "Quản Trị Dự Án & Hệ Thống",
     sub: "Governance",
-    desc: "Khởi công Đ107, Bàn giao Đ24, CDE Hồ sơ, Nhân sự & Audit Log",
+    desc: "Khởi công Đ107, Bàn giao Đ24, CDE Hồ sơ & Audit Log",
     href: "/governance",
     icon: Landmark,
-    badgeColor: "text-zinc-200 border-zinc-700 bg-zinc-800",
-    hoverBorder: "hover:border-zinc-500/60",
-    activeTasks: "Điều 107 Đạt",
-    colSpan: "sm:col-span-2 lg:col-span-2",
   },
 ];
 
-// ── COMPONENT ──
-
-export default function MepfProcessMasterPage() {
+export default function CleanMepfProcessPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedStage, setSelectedStage] = useState<number>(3); // Default Stage 3 (Hiện Trường & HSE)
+  const [selectedStage, setSelectedStage] = useState<number>(3); // GĐ 3 default
   const [selectedDiscipline, setSelectedDiscipline] = useState<TradeDiscipline>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [steps, setSteps] = useState<StepItem[]>(MASTER_STEPS);
-  const [activeTab, setActiveTab] = useState<"stepper" | "matrix" | "audit" | "print">("stepper");
+  const [activeStepId, setActiveStepId] = useState<string>("step-3-6");
+  const [activeView, setActiveView] = useState<"workspace" | "matrix" | "cockpits" | "audit">(
+    "workspace",
+  );
 
-  // Modal Sign-off & Reject States
-  const [signingStep, setSigningStep] = useState<StepItem | null>(null);
-  const [rejectingStep, setRejectingStep] = useState<StepItem | null>(null);
+  // Checklist Item interactive state
+  const [checkedCriteria, setCheckedCriteria] = useState<Record<string, boolean>>({});
+  const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
-  const [submittingAction, setSubmittingAction] = useState(false);
-  const [detailModalStep, setDetailModalStep] = useState<StepItem | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showCockpitsDrawer, setShowCockpitsDrawer] = useState(false);
 
   useEffect(() => {
     fetchMe().then((u) => {
@@ -1178,7 +1138,7 @@ export default function MepfProcessMasterPage() {
     });
   }, []);
 
-  // Filtered steps
+  // Filtered steps in current stage
   const currentStageSteps = useMemo(() => {
     return steps.filter((s) => s.stageIndex === selectedStage);
   }, [steps, selectedStage]);
@@ -1192,35 +1152,34 @@ export default function MepfProcessMasterPage() {
         !searchQuery ||
         s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.standards.some((std) => std.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        s.desc.toLowerCase().includes(searchQuery.toLowerCase());
+        s.standards.some((std) => std.toLowerCase().includes(searchQuery.toLowerCase()));
       return matchDisc && matchQuery;
     });
   }, [currentStageSteps, selectedDiscipline, searchQuery]);
 
-  // Overall Statistics
-  const overallStats = useMemo(() => {
+  // Selected Active Step
+  const activeStep = useMemo(() => {
+    return steps.find((s) => s.id === activeStepId) ?? filteredSteps[0] ?? currentStageSteps[0];
+  }, [steps, activeStepId, filteredSteps, currentStageSteps]);
+
+  // Summary Metrics
+  const summary = useMemo(() => {
     const total = steps.length;
     const approved = steps.filter((s) => s.gateStatus === "approved").length;
     const pending = steps.filter((s) => s.gateStatus === "pending").length;
     const rejected = steps.filter((s) => s.gateStatus === "rejected").length;
     const locked = steps.filter((s) => s.gateStatus === "locked").length;
-    const holdPoints = steps.filter((s) => s.isHoldPoint).length;
-    const holdPointsCleared = steps.filter(
-      (s) => s.isHoldPoint && s.gateStatus === "approved",
-    ).length;
     const pct = Math.round((approved / total) * 100);
-
-    return { total, approved, pending, rejected, locked, holdPoints, holdPointsCleared, pct };
+    return { total, approved, pending, rejected, locked, pct };
   }, [steps]);
 
-  // Interactive Gate Sign-off Handler
-  function handleApproveStep(step: StepItem) {
-    setSubmittingAction(true);
+  // Sign-off Gate Handler
+  function handleApprove(stepId: string) {
+    setIsSubmitting(true);
     setTimeout(() => {
       setSteps((prev) => {
         const next = [...prev];
-        const idx = next.findIndex((s) => s.id === step.id);
+        const idx = next.findIndex((s) => s.id === stepId);
         if (idx !== -1) {
           next[idx] = {
             ...next[idx],
@@ -1230,7 +1189,7 @@ export default function MepfProcessMasterPage() {
             hashSignature: `SHA256:${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`,
           };
 
-          // Unlock next step sequentially
+          // Unlock next step
           if (idx + 1 < next.length && next[idx + 1].gateStatus === "locked") {
             next[idx + 1] = {
               ...next[idx + 1],
@@ -1240,19 +1199,18 @@ export default function MepfProcessMasterPage() {
         }
         return next;
       });
-      setSubmittingAction(false);
-      setSigningStep(null);
-    }, 400);
+      setIsSubmitting(false);
+    }, 300);
   }
 
-  // Interactive Rejection / NCR Handler
-  function handleRejectStep(step: StepItem) {
+  // Reject / NCR Handler
+  function handleReject(stepId: string) {
     if (!rejectReason.trim()) return;
-    setSubmittingAction(true);
+    setIsSubmitting(true);
     setTimeout(() => {
       setSteps((prev) => {
         const next = [...prev];
-        const idx = next.findIndex((s) => s.id === step.id);
+        const idx = next.findIndex((s) => s.id === stepId);
         if (idx !== -1) {
           next[idx] = {
             ...next[idx],
@@ -1262,10 +1220,10 @@ export default function MepfProcessMasterPage() {
         }
         return next;
       });
-      setSubmittingAction(false);
-      setRejectingStep(null);
+      setIsSubmitting(false);
+      setShowRejectModal(false);
       setRejectReason("");
-    }, 400);
+    }, 300);
   }
 
   if (loading) return <PageSkeleton />;
@@ -1274,924 +1232,757 @@ export default function MepfProcessMasterPage() {
     <div className="min-h-screen bg-zinc-950 text-white flex flex-col font-sans">
       <AppHeader
         title="Quy Trình Triển Khai Thi Công MEPF"
-        subtitle="Chuỗi vòng đời 6 giai đoạn khép kín & Cổng phê duyệt kỹ sư từng bước"
+        subtitle="Hệ thống điều hành tuần tự 6 giai đoạn & Cổng kiểm soát kỹ sư từng bước"
       />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6 pb-24">
-        {/* Navigation Breadcrumb & Tool Hierarchy */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-5 pb-24">
+        {/* Navigation Breadcrumb */}
         <EngineeringNav />
 
-        {/* ─────────────────────────────────────────────────────────────
-            SECTION 1: CHUỖI QUY TRÌNH VÒNG ĐỜI DỰ ÁN MEPF (6 GIAI ĐOẠN)
-            Exact match with user-provided cockpit design & upgraded
-            ───────────────────────────────────────────────────────────── */}
-        <section className="p-4 sm:p-5 rounded-2xl bg-zinc-950/90 border border-zinc-800 shadow-sm space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800/80 pb-3.5">
-            <div className="flex items-center gap-2.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-zinc-200">
-                    CHUỖI QUY TRÌNH VÒNG ĐỜI DỰ ÁN XÂY DỰNG MEPF (6 GIAI ĐOẠN)
-                  </h2>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-950/80 text-emerald-300 border border-emerald-800 font-semibold">
-                    Tiến độ: {overallStats.pct}%
+        {/* ── TOP HEADER BAR: KHOA HỌC & GỌN GÀNG ── */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-2xl bg-zinc-900/80 border border-zinc-800 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
+              <Workflow className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-sm sm:text-base font-bold text-zinc-100 uppercase tracking-tight">
+                  QUY TRÌNH THI CÔNG MEPF & CỔNG DUYỆT KỸ SƯ
+                </h1>
+                <span className="text-[11px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md">
+                  TT AVIO — Tháp A
+                </span>
+              </div>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Tiến độ: <b className="text-zinc-200">{summary.pct}%</b> ({summary.approved}/
+                {summary.total} bước) • Đang chờ duyệt:{" "}
+                <b className="text-amber-400">{summary.pending}</b>
+              </p>
+            </div>
+          </div>
+
+          {/* View Mode Switcher */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+            <button
+              onClick={() => setActiveView("workspace")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                activeView === "workspace"
+                  ? "bg-amber-500 text-zinc-950 shadow-sm"
+                  : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
+              }`}
+            >
+              <Workflow className="w-3.5 h-3.5" />
+              Bàn Làm Việc Tác Nghiệp
+            </button>
+            <button
+              onClick={() => setActiveView("matrix")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                activeView === "matrix"
+                  ? "bg-amber-500 text-zinc-950 shadow-sm"
+                  : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              Ma Trận 5 Hệ
+            </button>
+            <button
+              onClick={() => setActiveView("cockpits")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                activeView === "cockpits"
+                  ? "bg-amber-500 text-zinc-950 shadow-sm"
+                  : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />7 Đại Trung Tâm
+            </button>
+            <button
+              onClick={() => setActiveView("audit")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                activeView === "audit"
+                  ? "bg-amber-500 text-zinc-950 shadow-sm"
+                  : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              Sổ Cái Ký Số
+            </button>
+          </div>
+        </div>
+
+        {/* ── 6 GIAI ĐOẠN PROGRESS STEPPER RIBBON (GỌN GÀNG, DỄ BẤM) ── */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+          {STAGES.map((stg) => {
+            const isSelected = selectedStage === stg.index;
+            const stageSteps = steps.filter((s) => s.stageIndex === stg.index);
+            const approvedCount = stageSteps.filter((s) => s.gateStatus === "approved").length;
+            const totalCount = stageSteps.length;
+            const stagePct = totalCount > 0 ? Math.round((approvedCount / totalCount) * 100) : 0;
+
+            return (
+              <button
+                key={stg.index}
+                onClick={() => {
+                  setSelectedStage(stg.index);
+                  const firstInStage = steps.find((s) => s.stageIndex === stg.index);
+                  if (firstInStage) setActiveStepId(firstInStage.id);
+                }}
+                className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between group ${
+                  isSelected
+                    ? "bg-zinc-900 border-amber-500/80 ring-1 ring-amber-500/40 shadow-sm"
+                    : "bg-zinc-900/50 border-zinc-800 hover:bg-zinc-900 hover:border-zinc-700"
+                }`}
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`text-[10px] font-mono font-bold uppercase ${
+                        isSelected ? "text-amber-400" : "text-zinc-400"
+                      }`}
+                    >
+                      {stg.stageCode}
+                    </span>
+                    <span
+                      className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-semibold ${
+                        stagePct === 100
+                          ? "bg-emerald-500/10 text-emerald-400"
+                          : stagePct > 0
+                            ? "bg-amber-500/10 text-amber-400"
+                            : "bg-zinc-800 text-zinc-400"
+                      }`}
+                    >
+                      {stagePct}%
+                    </span>
+                  </div>
+                  <h4
+                    className={`text-xs font-semibold truncate leading-tight ${
+                      isSelected
+                        ? "text-white font-bold"
+                        : "text-zinc-300 group-hover:text-amber-300"
+                    }`}
+                  >
+                    {stg.name}
+                  </h4>
+                  <p className="text-[10px] text-zinc-500 font-mono truncate">{stg.shortDesc}</p>
+                </div>
+
+                <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden mt-2.5">
+                  <div
+                    className={`h-full transition-all duration-300 ${
+                      stagePct >= 100
+                        ? "bg-emerald-500"
+                        : stagePct >= 50
+                          ? "bg-amber-500"
+                          : "bg-sky-500"
+                    }`}
+                    style={{ width: `${stagePct}%` }}
+                  />
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ── WORKSPACE VIEW: MASTER-DETAIL 2-COLUMN ERGONOMIC LAYOUT ── */}
+        {activeView === "workspace" && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 items-start">
+            {/* ── CỘT TRÁI (4/12): DANH SÁCH BƯỚC TUẦN TỰ (PIPELINE) ── */}
+            <div className="lg:col-span-4 p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-3 shadow-sm">
+              {/* Filter by Discipline & Search */}
+              <div className="space-y-2 pb-3 border-b border-zinc-800">
+                <div className="flex items-center justify-between text-xs font-semibold text-zinc-300">
+                  <span className="flex items-center gap-1.5">
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
+                    Lọc Phân Hệ:
+                  </span>
+                  <span className="font-mono text-zinc-500 text-[11px]">
+                    {filteredSteps.length} bước
                   </span>
                 </div>
-                <p className="text-[11px] text-zinc-400 mt-0.5">
-                  Tiến trình khép kín từ Khởi động, BIM/CAD, Cung ứng, Thi công, Nghiệm thu đến Bàn
-                  giao số
+
+                {/* 5-Trade Filter Pills */}
+                <div className="grid grid-cols-6 gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800 text-[10px] font-mono font-bold text-center">
+                  {(["all", "M", "E", "P", "F", "ELV"] as TradeDiscipline[]).map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => setSelectedDiscipline(d)}
+                      className={`py-1 rounded-lg transition ${
+                        selectedDiscipline === d
+                          ? "bg-zinc-800 text-amber-300 shadow-xs border border-zinc-700"
+                          : "text-zinc-400 hover:text-zinc-200"
+                      }`}
+                    >
+                      {d === "all" ? "Tất Cả" : d}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Quick Search */}
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Tìm theo mã hoặc tên bước..."
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-1.5 pl-8 pr-3 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-500/50"
+                  />
+                </div>
+              </div>
+
+              {/* Vertical Stepper List */}
+              <div className="space-y-1.5 max-h-[600px] overflow-y-auto pr-1">
+                {filteredSteps.map((step) => {
+                  const isActive = step.id === activeStep.id;
+                  const isApproved = step.gateStatus === "approved";
+                  const isPending = step.gateStatus === "pending";
+                  const isRejected = step.gateStatus === "rejected";
+                  const isLocked = step.gateStatus === "locked";
+
+                  return (
+                    <button
+                      key={step.id}
+                      onClick={() => setActiveStepId(step.id)}
+                      className={`w-full text-left p-3 rounded-xl border transition-all flex items-start gap-2.5 group ${
+                        isActive
+                          ? "bg-zinc-800/90 border-amber-500/60 ring-1 ring-amber-500/30 shadow-xs"
+                          : "bg-zinc-950/60 border-zinc-800/80 hover:bg-zinc-800/50 hover:border-zinc-700"
+                      }`}
+                    >
+                      {/* Gate Status Icon */}
+                      <div
+                        className={`p-1.5 rounded-lg border shrink-0 mt-0.5 ${
+                          isApproved
+                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                            : isPending
+                              ? "bg-amber-500/10 border-amber-500/40 text-amber-400 animate-pulse"
+                              : isRejected
+                                ? "bg-rose-500/10 border-rose-500/30 text-rose-400"
+                                : "bg-zinc-900 border-zinc-800 text-zinc-600"
+                        }`}
+                      >
+                        {isApproved ? (
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                        ) : isPending ? (
+                          <Clock className="w-3.5 h-3.5" />
+                        ) : isRejected ? (
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                        ) : (
+                          <Lock className="w-3.5 h-3.5" />
+                        )}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-1">
+                          <span
+                            className={`font-mono text-[10px] font-bold ${
+                              isActive ? "text-amber-400" : "text-zinc-400"
+                            }`}
+                          >
+                            {step.code}
+                          </span>
+                          {step.isHoldPoint && (
+                            <span className="text-[9px] font-mono font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-1.5 py-0.2 rounded">
+                              HOLD
+                            </span>
+                          )}
+                        </div>
+                        <h4
+                          className={`text-xs font-semibold truncate mt-0.5 ${
+                            isActive
+                              ? "text-white font-bold"
+                              : "text-zinc-300 group-hover:text-zinc-100"
+                          }`}
+                        >
+                          {step.title}
+                        </h4>
+                        <div className="flex items-center gap-1 mt-1">
+                          {step.discipline.map((d) => (
+                            <span
+                              key={d}
+                              className="text-[9px] font-mono text-zinc-400 bg-zinc-900 px-1 py-0.2 rounded border border-zinc-800"
+                            >
+                              {d}
+                            </span>
+                          ))}
+                          <span className="text-[10px] text-zinc-500 ml-auto font-mono">
+                            {isApproved
+                              ? "✓ Đã duyệt"
+                              : isPending
+                                ? "⏳ Chờ duyệt"
+                                : isRejected
+                                  ? "✕ NCR"
+                                  : "🔒 Khóa"}
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ── CỘT PHẢI (8/12): TRỌNG TÂM TÁC NGHIỆP BƯỚC ĐANG CHỌN (ACTIVE STEP FOCUS HUB) ── */}
+            <div className="lg:col-span-8 p-5 sm:p-6 rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-5 shadow-sm">
+              {/* Header của Bước */}
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-zinc-800 pb-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-lg">
+                      {activeStep.code} • {STAGES[activeStep.stageIndex].stageCode}
+                    </span>
+                    {activeStep.isHoldPoint && (
+                      <span className="text-[11px] font-mono font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                        <ShieldAlert className="w-3.5 h-3.5" /> ĐIỂM DỪNG KỸ THUẬT (HOLD-POINT)
+                      </span>
+                    )}
+                    <span
+                      className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-lg border ${
+                        activeStep.gateStatus === "approved"
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                          : activeStep.gateStatus === "pending"
+                            ? "bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse"
+                            : activeStep.gateStatus === "rejected"
+                              ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                              : "bg-zinc-800 text-zinc-400 border-zinc-700"
+                      }`}
+                    >
+                      {activeStep.gateStatus === "approved"
+                        ? "ĐÃ PHÊ DUYỆT (PASSED)"
+                        : activeStep.gateStatus === "pending"
+                          ? "CHỜ KỸ SƯ DUYỆT CỔNG"
+                          : activeStep.gateStatus === "rejected"
+                            ? "TỪ CHỐI (CÓ PHIẾU NCR)"
+                            : "ĐANG BỊ KHÓA TUẦN TỰ"}
+                    </span>
+                  </div>
+                  <h2 className="text-base sm:text-lg font-bold text-zinc-100">
+                    {activeStep.title}
+                  </h2>
+                  <p className="text-xs text-zinc-400 leading-relaxed">{activeStep.desc}</p>
+                </div>
+              </div>
+
+              {/* 4 Khối Tác Nghiệp Rõ Ràng & Khoa Học */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                {/* Khối 1: Checklist Kiểm Tra Thực Tế */}
+                <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
+                      <CheckSquare className="w-4 h-4 text-emerald-400" />
+                      Checklist Tiêu Chí Nghiệm Thu:
+                    </span>
+                    <span className="text-[10px] font-mono text-zinc-500">Tương tác kiểm tra</span>
+                  </div>
+
+                  <div className="space-y-1.5 pt-1">
+                    {activeStep.criteria.map((cr, idx) => {
+                      const key = `${activeStep.id}-${idx}`;
+                      const isChecked =
+                        checkedCriteria[key] ?? activeStep.gateStatus === "approved";
+
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setCheckedCriteria((p) => ({ ...p, [key]: !isChecked }))}
+                          className="w-full text-left p-2 rounded-lg bg-zinc-900/60 hover:bg-zinc-900 border border-zinc-800/80 flex items-start gap-2 text-xs transition"
+                        >
+                          {isChecked ? (
+                            <CheckSquare className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                          ) : (
+                            <Square className="w-4 h-4 text-zinc-600 shrink-0 mt-0.5" />
+                          )}
+                          <span
+                            className={isChecked ? "text-zinc-200 font-medium" : "text-zinc-400"}
+                          >
+                            {cr}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Khối 2: Quy Chuẩn & Tiêu Chuẩn Kỹ Thuật */}
+                <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2.5 flex flex-col justify-between">
+                  <div className="space-y-2.5">
+                    <span className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
+                      <FileText className="w-4 h-4 text-sky-400" />
+                      Quy Chuẩn & Hồ Sơ Bàn Giao:
+                    </span>
+
+                    <div className="space-y-2 text-xs">
+                      <div>
+                        <span className="text-[10px] text-zinc-500 font-semibold uppercase block mb-1">
+                          Tiêu chuẩn viện dẫn:
+                        </span>
+                        <div className="flex flex-wrap gap-1">
+                          {activeStep.standards.map((std, sidx) => (
+                            <span
+                              key={sidx}
+                              className="text-[11px] font-mono text-zinc-300 bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded"
+                            >
+                              {std}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] text-zinc-500 font-semibold uppercase block mb-1">
+                          Hồ sơ / BBNT yêu cầu:
+                        </span>
+                        <div className="flex flex-wrap gap-1">
+                          {activeStep.deliverables.map((del, didx) => (
+                            <span
+                              key={didx}
+                              className="text-[11px] text-emerald-300 bg-emerald-950/40 border border-emerald-800/60 px-2 py-0.5 rounded font-medium"
+                            >
+                              {del}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-zinc-800/60 text-[11px] text-zinc-400 flex items-center justify-between">
+                    <span>
+                      Thực hiện: <b>{activeStep.roles.responsible}</b>
+                    </span>
+                    <span>
+                      Duyệt: <b>{activeStep.roles.approver}</b>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── CỔNG DUYỆT KỸ SƯ 3 BÊN (ENGINEER SIGN-OFF GATE ACTION HUB) ── */}
+              <div className="p-4 sm:p-5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-xs sm:text-sm font-bold text-zinc-100 flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-amber-400" />
+                      CỔNG PHÊ DUYỆT KỸ SƯ CHUYỂN BƯỚC (ENGINEER SIGN-OFF GATE)
+                    </h3>
+                    <p className="text-xs text-zinc-400 mt-0.5">
+                      {activeStep.gateStatus === "approved"
+                        ? `Đã được phê duyệt bởi: ${activeStep.approvedBy} lúc ${activeStep.approvedAt}`
+                        : activeStep.gateStatus === "pending"
+                          ? "Kỹ sư TVGS kiểm tra thực tế đạt các tiêu chuẩn trên để mở khóa bước tiếp theo."
+                          : activeStep.gateStatus === "rejected"
+                            ? `Bị từ chối: “${activeStep.rejectionReason}”`
+                            : "Bị khóa — Hoàn thành các bước trước đó để mở khóa cổng này."}
+                    </p>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {activeStep.gateStatus === "pending" && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setShowRejectModal(true)}
+                          disabled={isSubmitting}
+                          className="px-3.5 py-2 rounded-xl bg-rose-950/60 hover:bg-rose-900 text-rose-300 text-xs font-semibold border border-rose-800/80 transition"
+                        >
+                          ✕ Từ Chối / Lập NCR
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleApprove(activeStep.id)}
+                          disabled={isSubmitting}
+                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md flex items-center gap-1.5 transition disabled:opacity-50"
+                        >
+                          <Check className="w-4 h-4" /> Kỹ Sư Ký Duyệt Chuyển Bước
+                        </button>
+                      </>
+                    )}
+
+                    {activeStep.gateStatus === "approved" && activeStep.hashSignature && (
+                      <div className="flex items-center gap-2 bg-emerald-950/40 border border-emerald-800/60 px-3 py-1.5 rounded-xl text-xs font-mono text-emerald-300">
+                        <BadgeCheck className="w-4 h-4 text-emerald-400" />
+                        <span>Chữ Ký Số: {activeStep.hashSignature.substring(0, 16)}...</span>
+                      </div>
+                    )}
+
+                    {activeStep.gateStatus === "locked" && (
+                      <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-mono bg-zinc-900 px-3 py-1.5 rounded-xl border border-zinc-800">
+                        <Lock className="w-3.5 h-3.5" /> Bị Khóa Tuần Tự
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB 2: MA TRẬN 5 HỆ MEPF ── */}
+        {activeView === "matrix" && (
+          <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-4">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-amber-400" />
+                  MA TRẬN PHÂN KHAI 5 PHÂN HỆ MEPF & ĐIỂM DỪNG KỸ THUẬT
+                </h3>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Bóc tách chi tiết từng cấu kiện, giai đoạn thi công và tiêu chí kiểm soát chất
+                  lượng
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20 font-bold">
-                TT AVIO — Tháp A
-              </span>
-              <button
-                onClick={() => setActiveTab("print")}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 text-xs font-medium transition"
-              >
-                <Printer className="w-3.5 h-3.5 text-amber-400" />
-                <span className="hidden sm:inline">In Sổ Tay A4</span>
-              </button>
-            </div>
-          </div>
-
-          {/* 6 Stage Lifecycle Steps Grid (Interactive Phase Selector) */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-            {INITIAL_STAGES.map((stg) => {
-              const isSelected = selectedStage === stg.index;
-              const stageSteps = steps.filter((s) => s.stageIndex === stg.index);
-              const approvedInStage = stageSteps.filter((s) => s.gateStatus === "approved").length;
-              const totalInStage = stageSteps.length;
-              const stagePct =
-                totalInStage > 0 ? Math.round((approvedInStage / totalInStage) * 100) : 0;
-
-              return (
-                <button
-                  key={stg.index}
-                  onClick={() => setSelectedStage(stg.index)}
-                  className={`text-left p-3 rounded-xl border transition-all flex flex-col justify-between group shadow-2xs ${
-                    isSelected
-                      ? "bg-zinc-900 border-amber-500/60 ring-1 ring-amber-500/40 shadow-md"
-                      : `${stg.statusBorder} bg-zinc-900/60 hover:bg-zinc-900 hover:border-zinc-700`
-                  }`}
-                >
-                  <div className="space-y-1.5 w-full">
-                    <div className="flex items-center justify-between">
-                      <span
-                        className={`text-[10px] font-mono font-bold uppercase ${
-                          isSelected ? "text-amber-400" : "text-zinc-400"
-                        }`}
-                      >
-                        {stg.stageCode}
-                      </span>
-                      <span
-                        className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-semibold ${stg.statusBg} ${stg.statusColor}`}
-                      >
-                        {stg.statusBadge}
-                      </span>
-                    </div>
-                    <h4
-                      className={`text-xs font-semibold leading-snug transition-colors ${
-                        isSelected
-                          ? "text-white font-bold"
-                          : "text-zinc-200 group-hover:text-amber-300"
-                      }`}
-                    >
-                      {stg.name}
-                    </h4>
-                  </div>
-
-                  <div className="mt-3 w-full space-y-1.5">
-                    <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400">
-                      <span>{stg.shortDesc}</span>
-                      <span className="font-bold text-zinc-300">{stagePct}%</span>
-                    </div>
-                    <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full transition-all duration-300 ${
-                          stagePct >= 100
-                            ? "bg-emerald-500"
-                            : stagePct >= 50
-                              ? "bg-amber-500"
-                              : "bg-sky-500"
-                        }`}
-                        style={{ width: `${stagePct}%` }}
-                      />
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* ─────────────────────────────────────────────────────────────
-            SECTION 2: 7 ĐẠI TRUNG TÂM ĐIỀU HÀNH XBOSS (UNIFIED COCKPITS)
-            Exact match with user-provided cockpit design & upgraded
-            ───────────────────────────────────────────────────────────── */}
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-300">
-                7 ĐẠI TRUNG TÂM ĐIỀU HÀNH XBOSS (UNIFIED COCKPITS)
-              </h2>
-            </div>
-            <span className="text-[11px] font-mono text-amber-400/90 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-              Hệ Thống Tinh Gọn v1.0
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {UNIFIED_COCKPITS.map((hub, idx) => {
-              const HubIcon = hub.icon;
-              return (
-                <Link
-                  key={idx}
-                  href={hub.href}
-                  className={`p-4 rounded-2xl bg-zinc-950/80 hover:bg-zinc-900/90 border border-zinc-800 transition-all space-y-2.5 flex flex-col justify-between group shadow-sm hover:shadow-md ${hub.hoverBorder} ${
-                    hub.colSpan || ""
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 group-hover:scale-105 transition-transform">
-                        <HubIcon className="w-4 h-4 text-amber-400" />
-                      </div>
-                      <div>
-                        <h3 className="text-xs font-semibold text-zinc-100 group-hover:text-amber-300 transition-colors">
-                          {hub.num}. {hub.title}
-                        </h3>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[10px] font-mono text-zinc-400">{hub.sub}</span>
-                          <span className="text-[9px] font-mono text-zinc-500">•</span>
-                          <span className="text-[10px] font-mono text-emerald-400 font-semibold">
-                            {hub.activeTasks}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <ArrowUpRight className="w-4 h-4 text-zinc-600 group-hover:text-amber-400 transition-colors shrink-0" />
-                  </div>
-                  <p className="text-[11px] text-zinc-400 line-clamp-2 leading-relaxed">
-                    {hub.desc}
-                  </p>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* ─────────────────────────────────────────────────────────────
-            SECTION 3: INTERACTIVE WORKBENCH & ENGINEER SIGN-OFF GATES
-            Detailed Step-by-Step execution with Hold-Points & Sign-off
-            ───────────────────────────────────────────────────────────── */}
-        <section className="p-5 rounded-2xl bg-zinc-950 border border-zinc-800 shadow-sm space-y-5">
-          {/* Workbench Tabs & Filter Toolbar */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800/80 pb-4">
-            {/* View Tabs */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
-              <button
-                onClick={() => setActiveTab("stepper")}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition ${
-                  activeTab === "stepper"
-                    ? "bg-amber-500 text-zinc-950 shadow-sm"
-                    : "bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800"
-                }`}
-              >
-                <Workflow className="w-3.5 h-3.5" />
-                Tiến Trình & Cổng Duyệt Kỹ Sư
-              </button>
-              <button
-                onClick={() => setActiveTab("matrix")}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition ${
-                  activeTab === "matrix"
-                    ? "bg-amber-500 text-zinc-950 shadow-sm"
-                    : "bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800"
-                }`}
-              >
-                <Layers className="w-3.5 h-3.5" />
-                Ma Trận Phân Khai 5 Hệ MEPF
-              </button>
-              <button
-                onClick={() => setActiveTab("audit")}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition ${
-                  activeTab === "audit"
-                    ? "bg-amber-500 text-zinc-950 shadow-sm"
-                    : "bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800"
-                }`}
-              >
-                <ShieldCheck className="w-3.5 h-3.5" />
-                Sổ Cái Ký Số & Audit Trail
-              </button>
-            </div>
-
-            {/* Trade Filter & Search */}
-            <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
-              {/* Discipline Switcher */}
-              <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-xl border border-zinc-800 text-[11px] font-mono">
-                {(["all", "M", "E", "P", "F", "ELV"] as TradeDiscipline[]).map((d) => (
-                  <button
-                    key={d}
-                    onClick={() => setSelectedDiscipline(d)}
-                    className={`px-2 py-1 rounded-lg transition font-semibold ${
-                      selectedDiscipline === d
-                        ? "bg-zinc-800 text-amber-300 border border-zinc-700 shadow-xs"
-                        : "text-zinc-400 hover:text-zinc-200"
-                    }`}
-                  >
-                    {d === "all" ? "Tất Cả" : d}
-                  </button>
-                ))}
-              </div>
-
-              {/* Search Box */}
-              <div className="relative w-full sm:w-48">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Tìm bước, tiêu chuẩn..."
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-1.5 pl-8 pr-3 text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-amber-500/50"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* ── TAB 1: SEQUENTIAL STEPPER & ENGINEER SIGN-OFF GATES ── */}
-          {activeTab === "stepper" && (
-            <div className="space-y-4">
-              {/* Stage Header Info Banner */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-zinc-900/60 border border-zinc-800/80">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-bold text-amber-400 uppercase">
-                      {INITIAL_STAGES[selectedStage].stageCode}
-                    </span>
-                    <span className="text-zinc-600">•</span>
-                    <h3 className="text-sm font-bold text-zinc-100">
-                      {INITIAL_STAGES[selectedStage].name}
-                    </h3>
-                  </div>
-                  <p className="text-xs text-zinc-400">
-                    Thời lượng ước tính: <b>{INITIAL_STAGES[selectedStage].durationEst}</b> • Mốc
-                    trọng yếu: <b>{INITIAL_STAGES[selectedStage].milestoneKey}</b>
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-3 text-xs font-mono">
-                  <div className="px-3 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800">
-                    <span className="text-zinc-400">Đã duyệt: </span>
-                    <span className="text-emerald-400 font-bold">
-                      {currentStageSteps.filter((s) => s.gateStatus === "approved").length}/
-                      {currentStageSteps.length}
-                    </span>
-                  </div>
-                  <div className="px-3 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800">
-                    <span className="text-zinc-400">Hold-Points: </span>
-                    <span className="text-amber-400 font-bold">
-                      {currentStageSteps.filter((s) => s.isHoldPoint).length} Điểm
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Step Cards Stepper */}
-              <div className="space-y-3">
-                {filteredSteps.length === 0 ? (
-                  <div className="py-12 text-center text-xs text-zinc-400">
-                    Không tìm thấy bước thi công phù hợp với bộ lọc hiện tại.
-                  </div>
-                ) : (
-                  filteredSteps.map((step, idx) => {
-                    const isApproved = step.gateStatus === "approved";
-                    const isPending = step.gateStatus === "pending";
-                    const isRejected = step.gateStatus === "rejected";
-                    const isLocked = step.gateStatus === "locked";
-
-                    return (
-                      <div
-                        key={step.id}
-                        className={`p-4 rounded-xl border transition-all space-y-3.5 ${
-                          isApproved
-                            ? "bg-zinc-900/40 border-zinc-800 hover:border-zinc-700"
-                            : isPending
-                              ? "bg-zinc-900/90 border-amber-500/40 ring-1 ring-amber-500/20 shadow-sm"
-                              : isRejected
-                                ? "bg-rose-950/20 border-rose-800/60"
-                                : "bg-zinc-950/40 border-zinc-800/40 opacity-70"
-                        }`}
-                      >
-                        {/* Step Header */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                          <div className="flex items-start gap-3">
-                            {/* Sequence Status Icon */}
-                            <div
-                              className={`p-2 rounded-xl border shrink-0 mt-0.5 ${
-                                isApproved
-                                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-                                  : isPending
-                                    ? "bg-amber-500/10 border-amber-500/40 text-amber-400 animate-pulse"
-                                    : isRejected
-                                      ? "bg-rose-500/10 border-rose-500/30 text-rose-400"
-                                      : "bg-zinc-900 border-zinc-800 text-zinc-600"
-                              }`}
-                            >
-                              {isApproved ? (
-                                <CheckCircle2 className="w-4 h-4" />
-                              ) : isPending ? (
-                                <Clock className="w-4 h-4" />
-                              ) : isRejected ? (
-                                <AlertTriangle className="w-4 h-4" />
-                              ) : (
-                                <Lock className="w-4 h-4" />
-                              )}
-                            </div>
-
-                            <div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-mono text-xs font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-                                  {step.code}
-                                </span>
-                                <h4 className="text-xs sm:text-sm font-semibold text-zinc-100">
-                                  {step.title}
-                                </h4>
-                                {step.isHoldPoint && (
-                                  <span className="text-[10px] font-mono font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                    <ShieldAlert className="w-3 h-3" /> HOLD-POINT
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
-                                {step.desc}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Trade Badges */}
-                          <div className="flex items-center gap-1.5 shrink-0 self-start sm:self-center">
-                            {step.discipline.map((d) => (
-                              <span
-                                key={d}
-                                className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border ${
-                                  d === "M"
-                                    ? "text-sky-400 border-sky-500/30 bg-sky-500/10"
-                                    : d === "E"
-                                      ? "text-amber-400 border-amber-500/30 bg-amber-500/10"
-                                      : d === "P"
-                                        ? "text-blue-400 border-blue-500/30 bg-blue-500/10"
-                                        : d === "F"
-                                          ? "text-rose-400 border-rose-500/30 bg-rose-500/10"
-                                          : "text-violet-400 border-violet-500/30 bg-violet-500/10"
-                                }`}
-                              >
-                                {d}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Standards & Deliverables Tags */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-1">
-                          <div className="p-2.5 rounded-lg bg-zinc-900/70 border border-zinc-800/80 space-y-1">
-                            <span className="text-zinc-500 font-medium">
-                              Quy chuẩn / Tiêu chuẩn viện dẫn:
-                            </span>
-                            <div className="flex flex-wrap gap-1.5">
-                              {step.standards.map((std, sidx) => (
-                                <span
-                                  key={sidx}
-                                  className="font-mono text-[10px] text-zinc-300 bg-zinc-800 px-1.5 py-0.5 rounded"
-                                >
-                                  {std}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="p-2.5 rounded-lg bg-zinc-900/70 border border-zinc-800/80 space-y-1">
-                            <span className="text-zinc-500 font-medium">
-                              Hồ sơ bàn giao / BBNT yêu cầu:
-                            </span>
-                            <div className="flex flex-wrap gap-1.5">
-                              {step.deliverables.map((del, didx) => (
-                                <span
-                                  key={didx}
-                                  className="text-[10px] text-emerald-300 bg-emerald-950/40 border border-emerald-800/60 px-1.5 py-0.5 rounded font-medium"
-                                >
-                                  {del}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Sign-off Gate Status & Action Controls */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-zinc-800/60">
-                          {/* Gate Details */}
-                          <div className="text-xs space-y-0.5">
-                            {isApproved && (
-                              <div className="flex items-center gap-2 text-emerald-400 font-mono text-[11px]">
-                                <BadgeCheck className="w-3.5 h-3.5" />
-                                <span>
-                                  Đã duyệt bởi: <b>{step.approvedBy}</b> • {step.approvedAt}
-                                </span>
-                              </div>
-                            )}
-                            {isPending && (
-                              <div className="flex items-center gap-2 text-amber-300 font-mono text-[11px]">
-                                <Clock className="w-3.5 h-3.5" />
-                                <span>
-                                  Chờ Kỹ sư TVGS ({step.roles.approver}) kiểm tra thực tế & ký duyệt
-                                </span>
-                              </div>
-                            )}
-                            {isRejected && (
-                              <div className="text-rose-400 font-mono text-[11px]">
-                                <span>
-                                  Lý do từ chối: “{step.rejectionReason}” — Đang mở phiếu NCR
-                                </span>
-                              </div>
-                            )}
-                            {isLocked && (
-                              <div className="flex items-center gap-1.5 text-zinc-500 font-mono text-[11px]">
-                                <Lock className="w-3 h-3" />
-                                <span>Bị khóa tuần tự — Cần hoàn tất và duyệt các bước trước</span>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Gate Action Buttons */}
-                          <div className="flex items-center gap-2 shrink-0">
-                            <button
-                              onClick={() => setDetailModalStep(step)}
-                              className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium border border-zinc-700 transition"
-                            >
-                              Chi Tiết
-                            </button>
-
-                            {isPending && (
-                              <>
-                                <button
-                                  onClick={() => setRejectingStep(step)}
-                                  className="px-3 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900 text-rose-300 text-xs font-semibold border border-rose-800/70 transition"
-                                >
-                                  Từ Chối / NCR
-                                </button>
-                                <button
-                                  onClick={() => setSigningStep(step)}
-                                  className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow transition flex items-center gap-1.5"
-                                >
-                                  <Check className="w-3.5 h-3.5" /> Kỹ Sư Ký Duyệt
-                                </button>
-                              </>
-                            )}
-
-                            {isApproved && step.hashSignature && (
-                              <span
-                                title={step.hashSignature}
-                                className="font-mono text-[10px] text-zinc-500 bg-zinc-900 px-2 py-1 rounded border border-zinc-800"
-                              >
-                                {step.hashSignature.substring(0, 16)}...
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ── TAB 2: TRADE-BY-TRADE 5 MEPF MATRIX ── */}
-          {activeTab === "matrix" && (
-            <div className="space-y-4">
-              <div className="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800 text-xs text-zinc-400">
-                Bảng ma trận phân rã chi tiết toàn bộ các phân hệ MEPF theo từng công đoạn thi công
-                và quy chuẩn kiểm soát chất lượng bắt buộc.
-              </div>
-
-              <div className="overflow-x-auto rounded-xl border border-zinc-800">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-zinc-900 text-zinc-400 font-semibold border-b border-zinc-800">
-                    <tr>
-                      <th className="p-3">Phân Hệ</th>
-                      <th className="p-3">Hạng Mục Cấu Kiện</th>
-                      <th className="p-3">Công Đoạn Lắp Đặt</th>
-                      <th className="p-3">Tiêu Chuẩn & Dung Sai</th>
-                      <th className="p-3">Hold-Point ITP</th>
-                      <th className="p-3 text-right">Trạng Thái</th>
+            <div className="overflow-x-auto rounded-xl border border-zinc-800">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-zinc-950 text-zinc-400 font-semibold border-b border-zinc-800">
+                  <tr>
+                    <th className="p-3">Hệ</th>
+                    <th className="p-3">Hạng Mục Cấu Kiện</th>
+                    <th className="p-3">Giai Đoạn Thi Công</th>
+                    <th className="p-3">Quy Chuẩn & Tiêu Chuẩn</th>
+                    <th className="p-3">Điểm Dừng Hold-Point</th>
+                    <th className="p-3 text-right">Trạng Thái</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-800/70 font-sans">
+                  {[
+                    {
+                      trade: "M (HVAC)",
+                      item: "Đường ống Nước lạnh Chilled Water",
+                      phase: "Trục Đứng & Hành Lang",
+                      spec: "Thử áp 1.5 x Plv (2h), sụt áp ≤ 0.2 bar; bọc bảo ôn không cầu nhiệt",
+                      hold: "Bắt buộc thử áp tĩnh",
+                      status: "Đã duyệt",
+                      color: "text-emerald-400",
+                    },
+                    {
+                      trade: "M (HVAC)",
+                      item: "Tuyến Ống Gió Hút Khói & Tăng Áp",
+                      phase: "Trục Đứng & Tầng",
+                      spec: "Độ kín chuẩn DW143 Class B/C; bọc chống cháy EI 60 / EI 120",
+                      hold: "Thử rò rỉ DW143",
+                      status: "Đang thi công",
+                      color: "text-amber-400",
+                    },
+                    {
+                      trade: "E (Điện)",
+                      item: "Trục Busduct & Máng Cáp Động Lực",
+                      phase: "Trục Đứng Riser",
+                      spec: "Megger 1000V R ≥ 100 MΩ; siết cờ lê lực gãy chốt; tiếp địa đẳng thế",
+                      hold: "Đo điện trở cách điện",
+                      status: "Chờ kiểm tra",
+                      color: "text-amber-400",
+                    },
+                    {
+                      trade: "E (Điện)",
+                      item: "Bãi Tiếp Địa & Lưới Chống Sét",
+                      phase: "Ngầm Móng",
+                      spec: "R ≤ 10 Ω (Chống sét), R ≤ 4 Ω (Biến áp), R ≤ 1 Ω (Data Center)",
+                      hold: "Nghiệm thu trước đổ bê tông",
+                      status: "Đã duyệt",
+                      color: "text-emerald-400",
+                    },
+                    {
+                      trade: "P (Cấp Thoát)",
+                      item: "Tuyến Ống Thoát Nước Trọng Lực",
+                      phase: "Âm Sàn & Trục Đứng",
+                      spec: "Bảo toàn độ dốc 1.0% - 2.0%; bẫy nước ngăn mùi H ≥ 50mm",
+                      hold: "Thử kín thông thủy",
+                      status: "Đã duyệt",
+                      color: "text-emerald-400",
+                    },
+                    {
+                      trade: "F (PCCC)",
+                      item: "Mạng Lưới Đầu Phun Chữa Cháy Sprinkler",
+                      phase: "Phân Phối Tầng",
+                      spec: "Ống Sch40 cùm Grooved; thử áp 15 bar trong 2h; hạ ty đúng tâm trần",
+                      hold: "Thử áp lực thủy tĩnh",
+                      status: "Đang thi công",
+                      color: "text-amber-400",
+                    },
+                    {
+                      trade: "ELV (Điện Nhẹ)",
+                      item: "Hạ Tầng Cáp Mạng & BMS DDC Control",
+                      phase: "Hành Lang & Phòng Server",
+                      spec: "Fluke Test Cat6 Pass 100%; cách ly cáp động lực ≥ 150mm chống nhiễu EMI",
+                      hold: "Fluke Channel Test",
+                      status: "Chuẩn bị",
+                      color: "text-zinc-500",
+                    },
+                  ].map((row, ridx) => (
+                    <tr key={ridx} className="hover:bg-zinc-950/60 transition">
+                      <td className="p-3 font-mono font-bold text-amber-400">{row.trade}</td>
+                      <td className="p-3 font-semibold text-zinc-200">{row.item}</td>
+                      <td className="p-3 text-zinc-400">{row.phase}</td>
+                      <td className="p-3 text-zinc-300 font-mono text-[11px]">{row.spec}</td>
+                      <td className="p-3">
+                        <span className="text-[10px] font-mono font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded">
+                          {row.hold}
+                        </span>
+                      </td>
+                      <td className={`p-3 text-right font-semibold font-mono ${row.color}`}>
+                        {row.status}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-800/70">
-                    {[
-                      {
-                        trade: "M (HVAC)",
-                        item: "Đường ống Nước lạnh Chilled Water",
-                        phase: "Trục Đứng & Hành Lang",
-                        spec: "Thử áp 1.5 x Plv (2h), sụt áp ≤ 0.2 bar; bọc bảo ôn không cầu nhiệt",
-                        hold: "Bắt buộc thử áp tĩnh",
-                        status: "Đã duyệt",
-                        color: "text-emerald-400",
-                      },
-                      {
-                        trade: "M (HVAC)",
-                        item: "Tuyến Ống Gió Hút Khói & Tăng Áp",
-                        phase: "Trục Đứng & Tầng",
-                        spec: "Độ kín chuẩn DW143 Class B/C; bọc chống cháy EI 60 / EI 120",
-                        hold: "Thử rò rỉ DW143",
-                        status: "Đang thi công",
-                        color: "text-amber-400",
-                      },
-                      {
-                        trade: "E (Điện)",
-                        item: "Trục Busduct & Máng Cáp Động Lực",
-                        phase: "Trục Đứng Riser",
-                        spec: "Megger 1000V R ≥ 100 MΩ; siết cờ lê lực gãy chốt; tiếp địa đẳng thế",
-                        hold: "Đo điện trở cách điện",
-                        status: "Chờ kiểm tra",
-                        color: "text-amber-400",
-                      },
-                      {
-                        trade: "E (Điện)",
-                        item: "Bãi Tiếp Địa & Lưới Chống Sét",
-                        phase: "Ngầm Móng",
-                        spec: "R ≤ 10 Ω (Chống sét), R ≤ 4 Ω (Biến áp), R ≤ 1 Ω (Data Center)",
-                        hold: "Nghiệm thu trước đổ bê tông",
-                        status: "Đã duyệt",
-                        color: "text-emerald-400",
-                      },
-                      {
-                        trade: "P (Cấp Thoát)",
-                        item: "Tuyến Ống Thoát Nước Trọng Lực",
-                        phase: "Âm Sàn & Trục Đứng",
-                        spec: "Bảo toàn độ dốc 1.0% - 2.0%; bẫy nước ngăn mùi H ≥ 50mm",
-                        hold: "Thử kín thông thủy",
-                        status: "Đã duyệt",
-                        color: "text-emerald-400",
-                      },
-                      {
-                        trade: "F (PCCC)",
-                        item: "Mạng Lưới Đầu Phun Chữa Cháy Sprinkler",
-                        phase: "Phân Phối Tầng",
-                        spec: "Ống Sch40 cùm Grooved; thử áp 15 bar trong 2h; hạ ty đúng tâm trần",
-                        hold: "Thử áp lực thủy tĩnh",
-                        status: "Đang thi công",
-                        color: "text-amber-400",
-                      },
-                      {
-                        trade: "ELV (Điện Nhẹ)",
-                        item: "Hạ Tầng Cáp Mạng & BMS DDC Control",
-                        phase: "Hành Lang & Phòng Server",
-                        spec: "Fluke Test Cat6 Pass 100%; cách ly cáp động lực ≥ 150mm chống nhiễu EMI",
-                        hold: "Fluke Channel Test",
-                        status: "Chuẩn bị",
-                        color: "text-zinc-500",
-                      },
-                    ].map((row, ridx) => (
-                      <tr key={ridx} className="hover:bg-zinc-900/60 transition">
-                        <td className="p-3 font-mono font-bold text-amber-400">{row.trade}</td>
-                        <td className="p-3 font-semibold text-zinc-200">{row.item}</td>
-                        <td className="p-3 text-zinc-400">{row.phase}</td>
-                        <td className="p-3 text-zinc-300 font-mono text-[11px]">{row.spec}</td>
-                        <td className="p-3">
-                          <span className="text-[10px] font-mono font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded">
-                            {row.hold}
-                          </span>
-                        </td>
-                        <td className={`p-3 text-right font-semibold font-mono ${row.color}`}>
-                          {row.status}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* ── TAB 3: AUDIT TRAIL & MERKLE LEDGER ── */}
-          {activeTab === "audit" && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 rounded-xl bg-zinc-900/60 border border-zinc-800">
-                <div className="space-y-0.5">
-                  <h4 className="text-xs font-bold text-zinc-200 flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                    Sổ Cái Mật Mã Bất Biến Merkle Tree (M73 Audit Ledger)
-                  </h4>
-                  <p className="text-[11px] text-zinc-400">
-                    Toàn bộ sự kiện ký duyệt cổng kỹ sư được niêm phong băm SHA-256 kèm tọa độ GPS
-                    và dấu thời gian chống gian dối.
-                  </p>
-                </div>
-                <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded border border-emerald-500/20 font-bold">
-                  Block Height #142
-                </span>
-              </div>
-
-              <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-                {steps
-                  .filter((s) => s.gateStatus === "approved" && s.hashSignature)
-                  .map((s) => (
-                    <div
-                      key={s.id}
-                      className="p-3 rounded-xl bg-zinc-900/40 border border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-mono"
-                    >
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="text-amber-400 font-bold">{s.code}</span>
-                          <span className="text-zinc-200">{s.title}</span>
-                        </div>
-                        <div className="text-[11px] text-zinc-500">
-                          Người ký: <b>{s.approvedBy}</b> • Thời gian: {s.approvedAt}
-                        </div>
-                      </div>
-
-                      <div className="text-right shrink-0">
-                        <div className="text-emerald-400 font-bold text-[11px]">
-                          {s.hashSignature}
-                        </div>
-                        <div className="text-[10px] text-zinc-500">
-                          GPS: 10.8231° N, 106.6297° E (Bán kính 22m)
-                        </div>
-                      </div>
-                    </div>
                   ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB 3: 7 ĐẠI TRUNG TÂM ĐIỀU HÀNH ── */}
+        {activeView === "cockpits" && (
+          <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-4">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-400" />7 ĐẠI TRUNG TÂM ĐIỀU HÀNH HỢP NHẤT
+                  XBOSS (UNIFIED COCKPITS)
+                </h3>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Các cổng chỉ huy phân hệ kỹ thuật, hiện trường, tiến độ, chi phí và AI
+                </p>
               </div>
             </div>
-          )}
 
-          {/* ── TAB 4: PRINTABLE A4 PROCESS COMPENDIUM ── */}
-          {activeTab === "print" && (
-            <div className="space-y-4 p-6 bg-zinc-900/40 rounded-2xl border border-zinc-800">
-              <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
-                <div>
-                  <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
-                    <Printer className="w-4 h-4 text-amber-400" />
-                    Sổ Tay Quy Trình Kỹ Thuật Triển Khai Thi Công MEPF Dự Án
-                  </h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    Định dạng chuẩn khổ A4 sẵn sàng in ấn nộp Chủ Đầu Tư và Tư Vấn Giám Sát.
-                  </p>
-                </div>
-                <button
-                  onClick={() => window.print()}
-                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs shadow flex items-center gap-2 transition"
-                >
-                  <Printer className="w-4 h-4" /> In Báo Cáo A4 Ngay
-                </button>
-              </div>
-
-              <div className="space-y-6 pt-2 text-xs text-zinc-300 leading-relaxed">
-                <div className="border border-zinc-800 rounded-xl p-4 bg-zinc-950">
-                  <h4 className="font-bold text-zinc-100 text-sm mb-2 uppercase">
-                    1. NGUYÊN TẮC BẤT BIẾN TỐI THƯỢNG
-                  </h4>
-                  <ul className="list-disc list-inside space-y-1 text-zinc-400">
-                    <li>
-                      <b>Khóa cứng tuần tự (Hard Lock):</b> Mỗi bước con bắt buộc có chữ ký duyệt
-                      của Kỹ sư TVGS mới được chuyển sang bước tiếp theo.
-                    </li>
-                    <li>
-                      <b>Bảo toàn độ dốc trọng lực:</b> Ống thoát dốc 1-2% giữ quyền ưu tiên không
-                      gian cao nhất, hệ áp lực uốn né 45 độ.
-                    </li>
-                    <li>
-                      <b>Ngắt mạch đổ bê tông:</b> Cấm đổ bê tông sàn/dầm nếu còn bất kỳ sleeve hoặc
-                      conduit nào chưa đạt BBNT.
-                    </li>
-                    <li>
-                      <b>Thử áp suất thủy tĩnh:</b> 1.5 x Plv trong 2 giờ liên tục bằng đồng hồ kiểm
-                      định IoT.
-                    </li>
-                  </ul>
-                </div>
-
-                <div className="border border-zinc-800 rounded-xl p-4 bg-zinc-950">
-                  <h4 className="font-bold text-zinc-100 text-sm mb-2 uppercase">
-                    2. TIẾN ĐỘ THỰC HIỆN TỔNG THỂ DỰ ÁN
-                  </h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 font-mono text-xs">
-                    {INITIAL_STAGES.map((s) => (
-                      <div
-                        key={s.index}
-                        className="p-2.5 rounded-lg bg-zinc-900 border border-zinc-800"
-                      >
-                        <span className="text-zinc-400 font-bold">{s.stageCode}: </span>
-                        <span className="text-zinc-200">{s.name}</span>
-                        <div className="text-emerald-400 font-bold mt-1">
-                          Trạng thái: {s.statusBadge}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {UNIFIED_COCKPITS.map((hub, idx) => {
+                const HubIcon = hub.icon;
+                return (
+                  <Link
+                    key={idx}
+                    href={hub.href}
+                    className="p-4 rounded-xl bg-zinc-950 hover:bg-zinc-950/80 border border-zinc-800 hover:border-amber-500/50 transition-all space-y-2 flex flex-col justify-between group shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-amber-400">
+                          <HubIcon className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-semibold text-zinc-100 group-hover:text-amber-300 transition-colors">
+                            {hub.num}. {hub.title}
+                          </h4>
+                          <span className="text-[10px] font-mono text-zinc-500">{hub.sub}</span>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+                      <ArrowUpRight className="w-4 h-4 text-zinc-600 group-hover:text-amber-400 transition-colors" />
+                    </div>
+                    <p className="text-[11px] text-zinc-400 line-clamp-2 leading-relaxed">
+                      {hub.desc}
+                    </p>
+                  </Link>
+                );
+              })}
             </div>
-          )}
-        </section>
+          </div>
+        )}
+
+        {/* ── TAB 4: SỔ CÁI KÝ SỐ MẬT MÃ ── */}
+        {activeView === "audit" && (
+          <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-4">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  SỔ CÁI MẬT MÃ BẤT BIẾN MERKLE TREE (M73 AUDIT TRAIL)
+                </h3>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Niêm phong băm SHA-256 các biên bản nghiệm thu và quyết định duyệt cổng của Kỹ sư
+                </p>
+              </div>
+              <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                Block Height #142
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {steps
+                .filter((s) => s.gateStatus === "approved" && s.hashSignature)
+                .map((s) => (
+                  <div
+                    key={s.id}
+                    className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-mono"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-amber-400 font-bold">{s.code}</span>
+                        <span className="text-zinc-200">{s.title}</span>
+                      </div>
+                      <span className="text-[11px] text-zinc-500">
+                        Ký duyệt bởi: <b>{s.approvedBy}</b> • {s.approvedAt}
+                      </span>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-emerald-400 font-bold text-[11px]">
+                        {s.hashSignature}
+                      </div>
+                      <div className="text-[10px] text-zinc-600">GPS Verified (r ≤ 25m)</div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
       </main>
 
-      {/* ── MODAL: KỸ SƯ KÝ DUYỆT CỔNG (ENGINEER SIGN-OFF) ── */}
-      {signingStep && (
+      {/* ── MODAL: TỪ CHỐI / LẬP PHIẾU NCR ── */}
+      {showRejectModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-5 shadow-2xl">
-            <div className="flex items-start justify-between border-b border-zinc-800 pb-3">
-              <div>
-                <span className="text-[10px] font-mono font-bold text-amber-400 uppercase bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-                  {signingStep.code} • CỔNG KIỂM SOÁT KỸ SƯ
-                </span>
-                <h3 className="text-base font-bold text-zinc-100 mt-1">{signingStep.title}</h3>
-              </div>
-              <button
-                onClick={() => setSigningStep(null)}
-                className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1.5">
-                <span className="text-zinc-400 font-medium">Tiêu chí nghiệm thu bắt buộc:</span>
-                <ul className="space-y-1">
-                  {signingStep.criteria.map((c, cidx) => (
-                    <li key={cidx} className="flex items-start gap-2 text-zinc-200">
-                      <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                      <span>{c}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="text-[11px] text-zinc-400 space-y-1 font-mono">
-                <div>
-                  Người thực hiện ký: <b>{me?.name ?? "Kỹ sư Giám Sát TVGS"}</b>
-                </div>
-                <div>Vai trò: Kỹ sư Trưởng / Giám sát Cơ điện (SoD Verified)</div>
-                <div>Dấu thời gian: {new Date().toLocaleString("vi-VN")}</div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-zinc-800">
-              <button
-                onClick={() => setSigningStep(null)}
-                disabled={submittingAction}
-                className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold transition"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={() => handleApproveStep(signingStep)}
-                disabled={submittingAction}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow flex items-center gap-2 transition disabled:opacity-50"
-              >
-                <ShieldCheck className="w-4 h-4" />
-                {submittingAction ? "Đang ký số niêm phong..." : "Xác Nhận Ký Duyệt & Mở Bước Tiếp"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── MODAL: TỪ CHỐI / PHÁT HÀNH NCR ── */}
-      {rejectingStep && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-5 shadow-2xl">
+          <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 p-5 space-y-4 shadow-2xl">
             <div className="flex items-start justify-between border-b border-zinc-800 pb-3">
               <div>
                 <span className="text-[10px] font-mono font-bold text-rose-400 uppercase bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">
-                  {rejectingStep.code} • TỪ CHỐI & MỞ PHIẾU NCR
+                  {activeStep.code} • TỪ CHỐI / LẬP PHIẾU NCR
                 </span>
-                <h3 className="text-base font-bold text-zinc-100 mt-1">{rejectingStep.title}</h3>
+                <h3 className="text-sm font-bold text-zinc-100 mt-1">{activeStep.title}</h3>
               </div>
               <button
-                onClick={() => setRejectingStep(null)}
+                onClick={() => setShowRejectModal(false)}
                 className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-2 text-xs">
               <label className="block text-zinc-300 font-semibold">
-                Lý do từ chối & Yêu cầu khắc phục (Bắt buộc theo Invariant):
+                Lý do từ chối & Hướng dẫn khắc phục (Bắt buộc theo Invariant):
               </label>
               <textarea
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="Nhập chi tiết sai sót kỹ thuật, vị trí vi phạm, nguyên nhân 5-Whys và yêu cầu nhà thầu sửa chữa..."
+                placeholder="Nhập sai sót kỹ thuật thực tế hiện trường, vị trí trục/tầng và biện pháp CAPA yêu cầu nhà thầu sửa chữa..."
                 rows={4}
                 className="w-full rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-100 placeholder:text-zinc-600 focus:border-rose-500/60 focus:outline-none"
               />
               <p className="text-[11px] text-zinc-500">
-                Thao tác này sẽ tự động khóa cứng cổng chuyển bước của hạng mục và phát hành phiếu
-                NCR tới Chỉ huy trưởng.
+                Thao tác này sẽ khóa cứng cổng chuyển bước và gửi thông báo khẩn cấp tới Chỉ huy
+                trưởng.
               </p>
             </div>
 
-            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-zinc-800">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-800">
               <button
-                onClick={() => setRejectingStep(null)}
-                disabled={submittingAction}
-                className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold transition"
+                type="button"
+                onClick={() => setShowRejectModal(false)}
+                disabled={isSubmitting}
+                className="px-3.5 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold"
               >
                 Hủy
               </button>
               <button
-                onClick={() => handleRejectStep(rejectingStep)}
-                disabled={submittingAction || !rejectReason.trim()}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow flex items-center gap-2 transition disabled:opacity-50"
+                type="button"
+                onClick={() => handleReject(activeStep.id)}
+                disabled={isSubmitting || !rejectReason.trim()}
+                className="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow flex items-center gap-1.5 transition disabled:opacity-50"
               >
-                <AlertTriangle className="w-4 h-4" />
-                {submittingAction ? "Đang phát hành..." : "Phát Hành Phiếu NCR & Khóa Bước"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── MODAL: CHI TIẾT HỒ SƠ BƯỚC ── */}
-      {detailModalStep && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-5 shadow-2xl">
-            <div className="flex items-start justify-between border-b border-zinc-800 pb-3">
-              <div>
-                <span className="text-[10px] font-mono font-bold text-amber-400 uppercase bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-                  {detailModalStep.code} • HỒ SƠ KỸ THUẬT CHI TIẾT
-                </span>
-                <h3 className="text-base font-bold text-zinc-100 mt-1">{detailModalStep.title}</h3>
-              </div>
-              <button
-                onClick={() => setDetailModalStep(null)}
-                className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4 text-xs">
-              <div className="space-y-1">
-                <span className="text-zinc-400 font-semibold uppercase tracking-wider text-[10px]">
-                  Mô tả phạm vi thực hiện:
-                </span>
-                <p className="text-zinc-200 leading-relaxed bg-zinc-950 p-3 rounded-xl border border-zinc-800">
-                  {detailModalStep.desc}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1.5">
-                  <span className="text-zinc-400 font-semibold text-[10px] uppercase">
-                    Tiêu chuẩn viện dẫn:
-                  </span>
-                  <ul className="list-disc list-inside text-zinc-300 font-mono text-[11px] space-y-0.5">
-                    {detailModalStep.standards.map((s, idx) => (
-                      <li key={idx}>{s}</li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1.5">
-                  <span className="text-zinc-400 font-semibold text-[10px] uppercase">
-                    Hồ sơ bàn giao:
-                  </span>
-                  <ul className="list-disc list-inside text-emerald-300 text-[11px] space-y-0.5">
-                    {detailModalStep.deliverables.map((d, idx) => (
-                      <li key={idx}>{d}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1.5">
-                <span className="text-zinc-400 font-semibold text-[10px] uppercase">
-                  Phân định trách nhiệm:
-                </span>
-                <div className="grid grid-cols-2 gap-2 text-zinc-300">
-                  <div>
-                    Đơn vị thực hiện: <b>{detailModalStep.roles.responsible}</b>
-                  </div>
-                  <div>
-                    Đơn vị phê duyệt: <b>{detailModalStep.roles.approver}</b>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end pt-3 border-t border-zinc-800">
-              <button
-                onClick={() => setDetailModalStep(null)}
-                className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold transition"
-              >
-                Đóng
+                <AlertTriangle className="w-3.5 h-3.5" />
+                {isSubmitting ? "Đang xử lý..." : "Phát Hành NCR & Khóa Bước"}
               </button>
             </div>
           </div>
