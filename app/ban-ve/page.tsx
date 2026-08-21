@@ -1,4 +1,5 @@
 "use client";
+
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
@@ -18,6 +19,11 @@ import {
   ExternalLink,
   Pencil,
   Compass,
+  Layers,
+  Workflow,
+  ShieldCheck,
+  SlidersHorizontal,
+  FolderOpen,
   type LucideIcon,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
@@ -27,23 +33,22 @@ import { Modal, appPrompt, appAlert, appConfirm } from "@/app/components/dialogs
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
 
-// M8 — Drawing register (bản vẽ thiết kế/shop/asbuilt/BIM + biện pháp thi công).
-// Trang danh sách + chi tiết + upload rev + duyệt. Xem docs/nang-cap/G06-ban-ve-ho-so.md.
-// Lọc theo LOẠI chỉ qua URL ?kind= (5 mục trong cụm sidebar "Thiết kế & BPTC" —
-// dashboardTree.ts), trang không còn hàng chip loại riêng.
+// ── TYPES & INTERFACES ──
 
-type DrawingKind = "design" | "shop" | "asbuilt" | "bim" | "method";
-type RevisionStatus =
+export type DrawingKind = "design" | "shop" | "asbuilt" | "bim" | "method";
+export type RevisionStatus =
   "submitted" | "commented" | "approved" | "approved_with_comments" | "rejected" | "superseded";
 
-// Thứ tự khớp thứ tự mục sidebar (lib/drawings.ts DRAWING_KINDS).
+export type TradeDiscipline = "all" | "M" | "E" | "P" | "F" | "ELV";
+
 const KIND_LABEL: Record<DrawingKind, string> = {
   design: "Thiết kế",
-  method: "Biện pháp thi công",
-  bim: "BIM",
+  bim: "Mô hình BIM",
   shop: "Shop drawing",
-  asbuilt: "As-built",
+  method: "Biện pháp thi công",
+  asbuilt: "Bản vẽ hoàn công",
 };
+
 const KIND_ICON: Record<DrawingKind, LucideIcon> = {
   design: Compass,
   shop: FileText,
@@ -60,14 +65,16 @@ const STATUS_LABEL: Record<RevisionStatus, string> = {
   rejected: "Từ chối",
   superseded: "Đã thay thế",
 };
+
 const STATUS_BADGE: Record<RevisionStatus, string> = {
-  submitted: "bg-sky-900 text-sky-200",
-  commented: "bg-amber-900 text-amber-200",
-  approved: "bg-emerald-900 text-emerald-200",
-  approved_with_comments: "bg-emerald-900 text-emerald-200",
-  rejected: "bg-rose-900 text-rose-200",
-  superseded: "bg-zinc-800 text-zinc-400 line-through decoration-zinc-600",
+  submitted: "bg-sky-500/10 text-sky-400 border-sky-500/30",
+  commented: "bg-amber-500/10 text-amber-400 border-amber-500/30",
+  approved: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
+  approved_with_comments: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
+  rejected: "bg-rose-500/10 text-rose-400 border-rose-500/30",
+  superseded: "bg-zinc-800 text-zinc-500 border-zinc-700 line-through",
 };
+
 const STATUS_ICON: Record<RevisionStatus, LucideIcon> = {
   submitted: Clock,
   commented: MessageSquare,
@@ -77,7 +84,7 @@ const STATUS_ICON: Record<RevisionStatus, LucideIcon> = {
   superseded: History,
 };
 
-type DrawingRow = {
+export type DrawingRow = {
   id: number;
   code: string;
   name: string;
@@ -99,7 +106,7 @@ type DrawingRow = {
   approvedDecidedAt: string | null;
 };
 
-type DrawingRevisionRow = {
+export type DrawingRevisionRow = {
   id: number;
   rev: string;
   fileName: string;
@@ -118,10 +125,6 @@ type DrawingRevisionRow = {
 const fmtSize = (b: number) =>
   b > 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)}MB` : `${Math.round(b / 1024)}KB`;
 
-// sw.js áp stale-while-revalidate cho mọi GET /api/* (đọc được khi mất mạng ngoài công
-// trường) — nghĩa là gọi lại đúng URL ngay sau khi tự mình vừa ghi (upload/duyệt) có thể
-// nhận lại bản cache cũ. Thêm query nonce để bỏ qua cache đúng những lần load lại này
-// (đọc lần đầu/khi đổi filter vẫn dùng fetch thường, hưởng lợi ích offline).
 function fetchFresh(url: string): Promise<Response> {
   const sep = url.includes("?") ? "&" : "?";
   return fetch(`${url}${sep}_=${Date.now()}`, { cache: "no-store" });
@@ -133,6 +136,14 @@ function canManageDrawings(role?: string) {
 function canDecideRevision(role?: string) {
   return role === "admin" || role === "pm";
 }
+
+function suggestNextRev(revisions: DrawingRevisionRow[]): string {
+  const last = revisions[0]?.rev ?? "";
+  if (/^[A-Z]$/.test(last)) return String.fromCharCode(last.charCodeAt(0) + 1);
+  return "";
+}
+
+// ── COMPONENT ROOT ──
 
 export default function DrawingsPage({ fixedKind }: { fixedKind?: DrawingKind } = {}) {
   return (
@@ -146,8 +157,6 @@ const DRAWING_KIND_VALUES = ["design", "method", "bim", "shop", "asbuilt"] as co
 
 function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
   const searchParams = useSearchParams();
-  // Loại bản vẽ lấy từ fixedKind (khi truy cập route riêng như /ban-ve-thiet-ke)
-  // hoặc từ URL ?kind= (khi truy cập /ban-ve?kind=...).
   const kindParam = searchParams.get("kind");
   const kindFilter: DrawingKind | "all" =
     fixedKind ??
@@ -159,16 +168,18 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
   const [items, setItems] = useState<DrawingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<RevisionStatus | "all">("all");
+  const [selectedDiscipline, setSelectedDiscipline] = useState<TradeDiscipline>("all");
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
-  // Tab "Thay đổi thiết kế" (M32) — trang bản vẽ trở thành hub 2 tab, tab hiện có
-  // ("Bản vẽ") giữ nguyên hành vi.
+  // Tab switcher: Bản vẽ & BPTC ↔ Thay đổi thiết kế
   const [tab, setTab] = useState<"drawings" | "design-changes">("drawings");
   const [dcAddOpen, setDcAddOpen] = useState(false);
 
   const canCreate = canManageDrawings(me?.role);
+  const canDecide = canDecideRevision(me?.role);
 
   function load() {
     const sp = new URLSearchParams();
@@ -185,7 +196,13 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
   useEffect(() => {
     setLoading(true);
     load()
-      .then((d) => setItems(d?.drawings ?? []))
+      .then((d) => {
+        const drawings: DrawingRow[] = d?.drawings ?? [];
+        setItems(drawings);
+        if (drawings.length > 0 && selectedId == null) {
+          setSelectedId(drawings[0].id);
+        }
+      })
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kindFilter, statusFilter]);
@@ -197,215 +214,428 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
     const qs = sp.toString();
     const res = await fetchFresh(`/api/drawings${qs ? `?${qs}` : ""}`);
     const d = res.ok ? await res.json() : null;
-    setItems(d?.drawings ?? []);
+    const drawings: DrawingRow[] = d?.drawings ?? [];
+    setItems(drawings);
+    if (drawings.length > 0 && !drawings.some((x) => x.id === selectedId)) {
+      setSelectedId(drawings[0].id);
+    }
   }
 
   const filtered = useMemo(() => {
+    let res = items;
+    if (selectedDiscipline !== "all") {
+      res = res.filter((d) => {
+        const sys = (d.systemGroup || "").toUpperCase();
+        if (selectedDiscipline === "M")
+          return sys.includes("M") || sys.includes("ACMV") || sys.includes("HVAC");
+        if (selectedDiscipline === "E")
+          return sys.includes("E") || sys.includes("ĐIỆN") || sys.includes("DIEN");
+        if (selectedDiscipline === "P")
+          return sys.includes("P") || sys.includes("NƯỚC") || sys.includes("PLUMB");
+        if (selectedDiscipline === "F")
+          return sys.includes("F") || sys.includes("PCCC") || sys.includes("FIRE");
+        if (selectedDiscipline === "ELV") return sys.includes("ELV") || sys.includes("TEL");
+        return true;
+      });
+    }
     const q = search.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((d) =>
-      [d.code, d.name, d.systemGroup, d.floorLabel, d.workPackageCode, d.workPackageName]
-        .filter(Boolean)
-        .some((v) => (v as string).toLowerCase().includes(q)),
-    );
-  }, [items, search]);
+    if (q) {
+      res = res.filter((d) =>
+        [d.code, d.name, d.systemGroup, d.floorLabel, d.workPackageCode, d.workPackageName]
+          .filter(Boolean)
+          .some((v) => (v as string).toLowerCase().includes(q)),
+      );
+    }
+    return res;
+  }, [items, search, selectedDiscipline]);
 
-  const selected = items.find((d) => d.id === selectedId) ?? null;
+  const selected =
+    items.find((d) => d.id === selectedId) ?? (filtered.length > 0 ? filtered[0] : null);
+
+  // Thống kê nhanh KPI
+  const stats = useMemo(() => {
+    const total = items.length;
+    const approved = items.filter(
+      (d) => d.latestStatus === "approved" || d.latestStatus === "approved_with_comments",
+    ).length;
+    const pending = items.filter(
+      (d) => d.latestStatus === "submitted" || d.latestStatus === "commented",
+    ).length;
+    const rejected = items.filter((d) => d.latestStatus === "rejected").length;
+    const pct = total > 0 ? Math.round((approved / total) * 100) : 0;
+    return { total, approved, pending, rejected, pct };
+  }, [items]);
+
+  const CurrentKindIcon = kindFilter === "all" ? FileText : KIND_ICON[kindFilter];
 
   if (loading && items.length === 0) return <PageSkeleton />;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
       <AppHeader
-        title={kindFilter === "all" ? "Bản vẽ" : KIND_LABEL[kindFilter]}
+        title={
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 rounded-lg bg-zinc-800/80 border border-zinc-700/60 text-amber-400">
+              <CurrentKindIcon className="w-5 h-5 shrink-0" />
+            </div>
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2">
+                <span className="font-bold tracking-tight text-zinc-100 text-sm sm:text-base uppercase">
+                  {kindFilter === "all"
+                    ? "Hồ Sơ Bản Vẽ Kỹ Thuật"
+                    : `Bản Vẽ: ${KIND_LABEL[kindFilter]}`}
+                </span>
+                <span className="rounded-md bg-emerald-500/10 px-2 py-0.5 text-[10px] font-mono font-bold text-emerald-400 border border-emerald-500/20">
+                  LOD 400 • TT AVIO
+                </span>
+              </div>
+              <span className="text-[11px] text-zinc-400 line-clamp-1">
+                Tiến độ: <b className="text-zinc-200">{stats.pct}%</b> ({stats.approved}/
+                {stats.total} bản vẽ) • Chờ duyệt: <b className="text-amber-400">{stats.pending}</b>
+              </span>
+            </div>
+          </div>
+        }
         bottomActions={
           tab === "drawings" ? (
             canCreate ? (
               <button
                 onClick={() => setAddOpen(true)}
                 aria-label="Thêm bản vẽ"
-                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-white shadow-sm h-10"
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-white shadow-sm h-10"
               >
-                <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Thêm bản vẽ</span>
+                <Plus className="w-4 h-4" /> <span>Thêm bản vẽ</span>
               </button>
             ) : undefined
           ) : canCreate ? (
             <button
               onClick={() => setDcAddOpen(true)}
               aria-label="Thêm thay đổi thiết kế"
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-white shadow-sm h-10"
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-white shadow-sm h-10"
             >
-              <Plus className="w-4 h-4" />{" "}
-              <span className="hidden sm:inline">Thêm thay đổi thiết kế</span>
+              <Plus className="w-4 h-4" /> <span>Thêm thay đổi thiết kế</span>
             </button>
           ) : undefined
         }
       />
 
-      <main className="p-4 sm:p-6 pb-24 space-y-6 max-w-screen-2xl mx-auto">
-        <div className="flex items-center gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-xl w-fit">
-          <button
-            onClick={() => setTab("drawings")}
-            className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition ${
-              tab === "drawings"
-                ? "bg-zinc-800 text-white shadow-xs"
-                : "text-zinc-400 hover:text-zinc-200"
-            }`}
-          >
-            Bản vẽ & BPTC
-          </button>
-          <button
-            onClick={() => setTab("design-changes")}
-            className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition ${
-              tab === "design-changes"
-                ? "bg-zinc-800 text-white shadow-xs"
-                : "text-zinc-400 hover:text-zinc-200"
-            }`}
-          >
-            Thay đổi thiết kế
-          </button>
+      <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 py-4 space-y-4">
+        {/* ── TOP STATS STRIP & VIEW SWITCHER (CHUẨN MEPF-PROCESS) ── */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm">
+          {/* Quick Info & Stats */}
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
+              <CurrentKindIcon className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-sm sm:text-base font-bold text-zinc-100 uppercase tracking-tight">
+                {kindFilter === "all"
+                  ? "BÀN LÀM VIỆC BẢN VẼ TÁC NGHIỆP"
+                  : `QUẢN LÝ BẢN VẼ: ${KIND_LABEL[kindFilter].toUpperCase()}`}
+              </h1>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Tổng cộng: <b className="text-zinc-100">{stats.total}</b> • Đã duyệt:{" "}
+                <b className="text-emerald-400">{stats.approved}</b> ({stats.pct}%) • Chờ duyệt:{" "}
+                <b className="text-amber-400">{stats.pending}</b> • Từ chối:{" "}
+                <b className="text-rose-400">{stats.rejected}</b>
+              </p>
+            </div>
+          </div>
+
+          {/* Tab Mode Switcher */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+            <button
+              onClick={() => setTab("drawings")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                tab === "drawings"
+                  ? "bg-amber-500 text-zinc-950 shadow-sm font-bold"
+                  : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
+              }`}
+            >
+              <Workflow className="w-3.5 h-3.5" />
+              Bản Vẽ & BPTC
+            </button>
+            <button
+              onClick={() => setTab("design-changes")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                tab === "design-changes"
+                  ? "bg-amber-500 text-zinc-950 shadow-sm font-bold"
+                  : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
+              }`}
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Thay Đổi Thiết Kế
+            </button>
+          </div>
         </div>
 
         {tab === "drawings" ? (
           <>
-            <div className="flex flex-wrap gap-2.5 items-center">
-              <div className="relative flex-1 min-w-[200px] max-w-sm">
-                <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Tìm mã, tên, hệ, tầng..."
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-8 py-2 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 transition h-10"
-                />
-                {search && (
+            {/* ── 4 KPI STATS CARDS RIBBON ── */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-mono text-zinc-500 uppercase font-semibold">
+                    Tổng Bản Vẽ
+                  </span>
+                  <p className="text-lg font-bold text-zinc-100 mt-0.5">{stats.total}</p>
+                </div>
+                <div className="p-2 rounded-lg bg-zinc-800 text-zinc-400">
+                  <FolderOpen className="w-4 h-4" />
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-mono text-emerald-500 uppercase font-semibold">
+                    Đã Duyệt (AFC)
+                  </span>
+                  <p className="text-lg font-bold text-emerald-400 mt-0.5">
+                    {stats.approved}{" "}
+                    <span className="text-xs font-normal text-emerald-500 font-mono">
+                      ({stats.pct}%)
+                    </span>
+                  </p>
+                </div>
+                <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+                  <CheckCircle2 className="w-4 h-4" />
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-mono text-amber-500 uppercase font-semibold">
+                    Chờ Kỹ Sư Duyệt
+                  </span>
+                  <p className="text-lg font-bold text-amber-400 mt-0.5">{stats.pending}</p>
+                </div>
+                <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400">
+                  <Clock className="w-4 h-4" />
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-mono text-rose-500 uppercase font-semibold">
+                    Từ Chối / NCR
+                  </span>
+                  <p className="text-lg font-bold text-rose-400 mt-0.5">{stats.rejected}</p>
+                </div>
+                <div className="p-2 rounded-lg bg-rose-500/10 text-rose-400">
+                  <XCircle className="w-4 h-4" />
+                </div>
+              </div>
+            </div>
+
+            {/* ── WORKSPACE VIEW: MASTER-DETAIL 2-COLUMN ERGONOMIC LAYOUT (GIỐNG MEPF-PROCESS) ── */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 items-start">
+              {/* ── CỘT TRÁI (4/12): DANH SÁCH BẢN VẼ (PIPELINE REGISTER) ── */}
+              <div className="lg:col-span-4 p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-3 shadow-sm">
+                {/* 5-Trade Discipline Filter Pills */}
+                <div className="space-y-1.5 pb-2.5 border-b border-zinc-800">
+                  <div className="flex items-center justify-between text-xs font-semibold text-zinc-300">
+                    <span className="flex items-center gap-1.5">
+                      <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
+                      Lọc Phân Hệ:
+                    </span>
+                    <span className="font-mono text-zinc-500 text-[11px]">
+                      {filtered.length} bản vẽ
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-6 gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800 text-[10px] font-mono font-bold text-center">
+                    {(["all", "M", "E", "P", "F", "ELV"] as TradeDiscipline[]).map((d) => (
+                      <button
+                        key={d}
+                        onClick={() => setSelectedDiscipline(d)}
+                        className={`py-1 rounded-lg transition ${
+                          selectedDiscipline === d
+                            ? "bg-zinc-800 text-amber-300 shadow-xs border border-zinc-700"
+                            : "text-zinc-400 hover:text-zinc-200"
+                        }`}
+                      >
+                        {d === "all" ? "Tất Cả" : d}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Quick Search */}
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Tìm mã, tên, hệ, tầng..."
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-8 pr-7 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-500 outline-none focus:border-amber-500 transition"
+                  />
+                  {search && (
+                    <button
+                      onClick={() => setSearch("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Status Chips */}
+                <div className="flex flex-wrap gap-1">
+                  <FilterChip
+                    label="Tất cả"
+                    active={statusFilter === "all"}
+                    onClick={() => setStatusFilter("all")}
+                  />
+                  <FilterChip
+                    label="Đã duyệt"
+                    active={statusFilter === "approved"}
+                    onClick={() => setStatusFilter("approved")}
+                  />
+                  <FilterChip
+                    label="Chờ duyệt"
+                    active={statusFilter === "submitted"}
+                    onClick={() => setStatusFilter("submitted")}
+                  />
+                  <FilterChip
+                    label="Từ chối"
+                    active={statusFilter === "rejected"}
+                    onClick={() => setStatusFilter("rejected")}
+                  />
+                </div>
+
+                {/* List of Drawing Cards */}
+                <div className="space-y-1.5 max-h-[calc(100vh-360px)] min-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+                  {filtered.length === 0 ? (
+                    <div className="p-6 text-center text-xs text-zinc-500 border border-dashed border-zinc-800 rounded-xl">
+                      Chưa có bản vẽ nào khớp bộ lọc.
+                    </div>
+                  ) : (
+                    filtered.map((d) => {
+                      const isSelected = selected?.id === d.id;
+                      const isApproved =
+                        d.latestStatus === "approved" ||
+                        d.latestStatus === "approved_with_comments";
+                      const isPending =
+                        d.latestStatus === "submitted" || d.latestStatus === "commented";
+                      const isRejected = d.latestStatus === "rejected";
+
+                      return (
+                        <button
+                          key={d.id}
+                          onClick={() => setSelectedId(d.id)}
+                          className={`w-full text-left p-3 rounded-xl border transition-all flex items-start gap-2.5 group ${
+                            isSelected
+                              ? "bg-zinc-900 border-amber-500/80 ring-1 ring-amber-500/40 shadow-sm"
+                              : "bg-zinc-950/60 border-zinc-800/80 hover:bg-zinc-900 hover:border-zinc-700"
+                          }`}
+                        >
+                          <div className="mt-0.5">
+                            {isApproved ? (
+                              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                            ) : isPending ? (
+                              <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+                            ) : isRejected ? (
+                              <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                            ) : (
+                              <FileText className="w-4 h-4 text-zinc-500 shrink-0" />
+                            )}
+                          </div>
+
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-mono text-[11px] font-bold text-amber-400 truncate">
+                                {d.code}
+                              </span>
+                              <span className="text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded bg-zinc-900 border border-zinc-800 text-zinc-300">
+                                {d.latestRev ? `Rev ${d.latestRev}` : "Gốc"}
+                              </span>
+                            </div>
+
+                            <p
+                              className={`text-xs font-semibold leading-tight line-clamp-1 ${
+                                isSelected
+                                  ? "text-white"
+                                  : "text-zinc-300 group-hover:text-amber-300"
+                              }`}
+                            >
+                              {d.name}
+                            </p>
+
+                            <div className="flex items-center gap-2 text-[10px] text-zinc-400 flex-wrap">
+                              {d.systemGroup && (
+                                <span className="bg-zinc-900 px-1 py-0.2 rounded border border-zinc-800">
+                                  Hệ {d.systemGroup}
+                                </span>
+                              )}
+                              {d.floorLabel && <span>Tầng {d.floorLabel}</span>}
+                              <span className="ml-auto font-mono text-[9px] text-zinc-500">
+                                {isApproved
+                                  ? "✓ Đã duyệt"
+                                  : isPending
+                                    ? "⏳ Chờ duyệt"
+                                    : isRejected
+                                      ? "✕ Từ chối"
+                                      : "—"}
+                              </span>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+
+                {canCreate && (
                   <button
-                    onClick={() => setSearch("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
+                    onClick={() => setAddOpen(true)}
+                    className="w-full py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-xs font-bold text-zinc-200 flex items-center justify-center gap-1.5 transition"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <Plus className="w-3.5 h-3.5 text-amber-400" /> Thêm Bản Vẽ Mới
                   </button>
                 )}
               </div>
-            </div>
 
-            <div className="flex flex-wrap gap-1.5">
-              <FilterChip
-                label="Tất cả trạng thái"
-                active={statusFilter === "all"}
-                onClick={() => setStatusFilter("all")}
-              />
-              {(Object.keys(STATUS_LABEL) as RevisionStatus[]).map((s) => (
-                <FilterChip
-                  key={s}
-                  label={STATUS_LABEL[s]}
-                  active={statusFilter === s}
-                  onClick={() => setStatusFilter(s)}
-                />
-              ))}
-            </div>
-
-            {filtered.length === 0 ? (
-              <EmptyState
-                icon={FileText}
-                title={
-                  kindFilter === "all"
-                    ? "Chưa có bản vẽ nào"
-                    : `Chưa có bản vẽ ${KIND_LABEL[kindFilter]}`
-                }
-                message={canCreate ? 'Bấm "Thêm bản vẽ" để bắt đầu.' : "Chưa có dữ liệu bản vẽ."}
-              />
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {filtered.map((d) => {
-                  const KindIcon = KIND_ICON[d.kind];
-                  const StatusIcon = d.latestStatus ? STATUS_ICON[d.latestStatus] : null;
-                  return (
-                    <button
-                      key={d.id}
-                      onClick={() => setSelectedId(d.id)}
-                      className="text-left bento-card p-4 transition group"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="font-mono text-xs text-zinc-400">{d.code}</p>
-                          <p className="font-bold text-sm text-zinc-100 group-hover:text-emerald-400 transition-colors truncate mt-0.5">
-                            {d.name}
-                          </p>
-                        </div>
-                        {d.latestStatus && StatusIcon && (
-                          <span
-                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-semibold shrink-0 ${STATUS_BADGE[d.latestStatus]}`}
-                          >
-                            <StatusIcon className="w-3 h-3" /> {STATUS_LABEL[d.latestStatus]}
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-2.5 flex items-center gap-3 text-xs text-zinc-400 flex-wrap">
-                        <span className="inline-flex items-center gap-1 font-medium text-zinc-300">
-                          <KindIcon className="w-3.5 h-3.5 text-zinc-400" /> {KIND_LABEL[d.kind]}
-                        </span>
-                        {d.systemGroup && <span>Hệ {d.systemGroup}</span>}
-                        {d.floorLabel && <span>Tầng {d.floorLabel}</span>}
-                      </div>
-                      <div className="mt-3 pt-2.5 border-t border-zinc-800/80 flex items-center justify-between text-xs">
-                        <span className="text-zinc-400">
-                          Rev hiện hành:{" "}
-                          <span className="font-mono font-bold text-zinc-100">
-                            {d.latestRev ?? "—"}
-                          </span>
-                        </span>
-                        <span className="text-zinc-500 font-mono">
-                          {d.latestDecidedAt ?? d.latestSubmittedAt ?? "—"}
-                        </span>
-                      </div>
-                      {d.kind === "method" && (
-                        <div className="mt-2 pt-2 border-t border-zinc-800/60 flex items-center justify-between gap-2 text-xs">
-                          <span className="text-zinc-400 truncate">
-                            Nhóm:{" "}
-                            {d.workPackageCode
-                              ? `${d.workPackageCode} — ${d.workPackageName}`
-                              : "Chưa gán"}
-                          </span>
-                          {d.workPackageRequiresMethodStatement && (
-                            <span
-                              className={`shrink-0 px-2 py-0.5 rounded-full font-semibold ${
-                                d.approvedRevisionId != null
-                                  ? "bg-emerald-900 text-emerald-200"
-                                  : "bg-amber-900 text-amber-200"
-                              }`}
-                            >
-                              {d.approvedRevisionId != null
-                                ? "Đủ điều kiện"
-                                : "Chờ duyệt — đang chặn"}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
+              {/* ── CỘT PHẢI (8/12): TRỌNG TÂM TÁC NGHIỆP BẢN VẼ (ACTIVE DRAWING FOCUS HUB) ── */}
+              <div className="lg:col-span-8 p-5 sm:p-6 rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-5 shadow-sm">
+                {selected ? (
+                  <DrawingWorkspaceDetail
+                    drawing={selected}
+                    canManage={canCreate}
+                    canDecide={canDecide}
+                    onChanged={refresh}
+                    onOpenEdit={() => setEditOpen(true)}
+                  />
+                ) : (
+                  <div className="py-16 text-center space-y-3">
+                    <div className="w-12 h-12 mx-auto rounded-2xl bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-zinc-500">
+                      <CurrentKindIcon className="w-6 h-6" />
+                    </div>
+                    <p className="text-sm font-semibold text-zinc-300">
+                      Chọn một bản vẽ từ danh sách bên trái
+                    </p>
+                    <p className="text-xs text-zinc-500 max-w-sm mx-auto">
+                      Xem chi tiết revision, thẩm duyệt kỹ thuật, tải lên bản vẽ mới và kích hoạt
+                      cổng phê duyệt kỹ sư.
+                    </p>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </>
         ) : (
-          <DesignChangesTab
-            me={me}
-            addOpen={dcAddOpen}
-            onCloseAdd={() => setDcAddOpen(false)}
-            drawings={items}
-          />
+          /* ── TAB THAY ĐỔI THIẾT KẾ ── */
+          <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-4">
+            <DesignChangesTab
+              me={me}
+              addOpen={dcAddOpen}
+              onCloseAdd={() => setDcAddOpen(false)}
+              drawings={items}
+            />
+          </div>
         )}
       </main>
 
-      {selected && (
-        <DrawingDetailModal
-          drawing={selected}
-          canManage={canCreate}
-          canDecide={canDecideRevision(me?.role)}
-          onClose={() => setSelectedId(null)}
-          onChanged={refresh}
-        />
-      )}
+      {/* ── MODALS ── */}
       {addOpen && (
         <DrawingFormModal
           defaultKind={kindFilter === "all" ? undefined : kindFilter}
@@ -416,9 +646,406 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
           }}
         />
       )}
+
+      {editOpen && selected && (
+        <DrawingFormModal
+          drawing={selected}
+          onClose={() => setEditOpen(false)}
+          onSaved={() => {
+            setEditOpen(false);
+            refresh();
+          }}
+        />
+      )}
     </div>
   );
 }
+
+// ── COMPONENT CHI TIẾT BẢN VẼ TRỌNG TÂM (CỘT PHẢI WORKSPACE) ──
+
+function DrawingWorkspaceDetail({
+  drawing,
+  canManage,
+  canDecide,
+  onChanged,
+  onOpenEdit,
+}: {
+  drawing: DrawingRow;
+  canManage: boolean;
+  canDecide: boolean;
+  onChanged: () => void;
+  onOpenEdit: () => void;
+}) {
+  const [revisions, setRevisions] = useState<DrawingRevisionRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [busyRevId, setBusyRevId] = useState<number | null>(null);
+  const [newRev, setNewRev] = useState("");
+  const [newSubmittedAt, setNewSubmittedAt] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function loadRevs(opts?: { fresh?: boolean }) {
+    setLoading(true);
+    const url = `/api/drawings/${drawing.id}`;
+    const req = opts?.fresh ? fetchFresh(url) : fetch(url);
+    req
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        const revs: DrawingRevisionRow[] = j?.revisions ?? [];
+        setRevisions(revs);
+        setNewRev(suggestNextRev(revs));
+      })
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    loadRevs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawing.id]);
+
+  async function uploadRevision(file: File) {
+    if (!newRev.trim()) {
+      showToast("Nhập số rev trước khi tải lên", "error");
+      return;
+    }
+    setUploading(true);
+    const form = new FormData();
+    form.append("file", file);
+    form.append("rev", newRev.trim());
+    if (newSubmittedAt) form.append("submittedAt", newSubmittedAt);
+    try {
+      const res = await fetch(`/api/drawings/${drawing.id}/revisions`, {
+        method: "POST",
+        body: form,
+      });
+      const j = await res.json().catch(() => null);
+      if (!res.ok) {
+        showToast(j?.error ?? "Tải lên thất bại", "error");
+        return;
+      }
+      showToast("Đã tải lên rev mới");
+      setNewSubmittedAt("");
+      loadRevs({ fresh: true });
+      onChanged();
+    } catch {
+      showToast("Mất kết nối — kiểm tra mạng rồi thử lại", "error");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function decide(rev: DrawingRevisionRow, status: RevisionStatus) {
+    let decisionNote: string | null = null;
+    if (status === "rejected" || status === "approved_with_comments" || status === "commented") {
+      const note = await appPrompt(
+        `Ghi chú cho quyết định "${STATUS_LABEL[status]}" (tuỳ chọn):`,
+        "",
+      );
+      if (note === null) return;
+      decisionNote = note.trim() || null;
+    }
+    setBusyRevId(rev.id);
+    try {
+      const res = await fetch(`/api/drawings/revisions/${rev.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, decisionNote }),
+      });
+      const j = await res.json().catch(() => null);
+      if (!res.ok) {
+        showToast(j?.error ?? "Không cập nhật được trạng thái", "error");
+        return;
+      }
+      loadRevs({ fresh: true });
+      onChanged();
+    } catch {
+      showToast("Mất kết nối — kiểm tra mạng rồi thử lại", "error");
+    } finally {
+      setBusyRevId(null);
+    }
+  }
+
+  function viewFile(revId: number) {
+    window.open(`/api/drawings/revisions/${revId}/file`, "_blank", "noopener,noreferrer");
+  }
+
+  const hasPendingNewerThanApproved =
+    drawing.approvedRevisionId != null &&
+    drawing.latestRevisionId !== drawing.approvedRevisionId &&
+    drawing.latestStatus !== "approved" &&
+    drawing.latestStatus !== "approved_with_comments";
+
+  const KindIcon = KIND_ICON[drawing.kind];
+
+  return (
+    <div className="space-y-4">
+      {/* ── HEADER CỦA BẢN VẼ ĐANG CHỌN ── */}
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-zinc-800 pb-4">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-mono text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-lg flex items-center gap-1">
+              <KindIcon className="w-3.5 h-3.5" />
+              {drawing.code} • {KIND_LABEL[drawing.kind]}
+            </span>
+            {drawing.latestStatus && (
+              <span
+                className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-lg border ${
+                  STATUS_BADGE[drawing.latestStatus]
+                }`}
+              >
+                {STATUS_LABEL[drawing.latestStatus].toUpperCase()}
+              </span>
+            )}
+            {drawing.floorLabel && (
+              <span className="text-[11px] font-mono text-zinc-400 bg-zinc-800 border border-zinc-700 px-2 py-0.5 rounded-lg">
+                Tầng {drawing.floorLabel}
+              </span>
+            )}
+            {drawing.systemGroup && (
+              <span className="text-[11px] font-mono text-zinc-400 bg-zinc-800 border border-zinc-700 px-2 py-0.5 rounded-lg">
+                Hệ {drawing.systemGroup}
+              </span>
+            )}
+          </div>
+
+          <h2 className="text-base sm:text-lg font-bold text-zinc-100">{drawing.name}</h2>
+          {drawing.workPackageName && (
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              Gói thầu liên kết:{" "}
+              <b className="text-zinc-200">
+                {drawing.workPackageCode} — {drawing.workPackageName}
+              </b>
+            </p>
+          )}
+        </div>
+
+        {canManage && (
+          <button
+            onClick={onOpenEdit}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 border border-zinc-700 shrink-0 transition"
+          >
+            <Pencil className="w-3.5 h-3.5 text-amber-400" /> Sửa Thông Tin
+          </button>
+        )}
+      </div>
+
+      {/* ── NÚT TO: XEM BẢN VẼ MỚI NHẤT ĐÃ DUYỆT (AFC ACTION HERO) ── */}
+      <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2">
+        <button
+          onClick={() => drawing.approvedRevisionId && viewFile(drawing.approvedRevisionId)}
+          disabled={!drawing.approvedRevisionId}
+          className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition text-white shadow-md"
+        >
+          <ExternalLink className="w-4 h-4" />
+          {drawing.approvedRevisionId
+            ? `Xem Bản Mới Nhất Đã Duyệt Thi Công (Rev ${drawing.approvedRev})`
+            : "Chưa có revision nào được phê duyệt thi công"}
+        </button>
+
+        {hasPendingNewerThanApproved && (
+          <p className="text-xs bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-lg px-3 py-2">
+            ⚠️ Revision <b>{drawing.latestRev}</b> đang chờ phê duyệt — hiện trường tiếp tục sử dụng
+            bản duyệt <b>Rev {drawing.approvedRev ?? "—"}</b>.
+          </p>
+        )}
+      </div>
+
+      {/* ── 2 KHỐI TÁC NGHIỆP: GATE BPTC & TẢI LÊN REV MỚI ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+        {/* Khối 1: Gate Biện Pháp Thi Công (nếu kind === 'method') hoặc Thông số kỹ thuật */}
+        <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2.5">
+          {drawing.kind === "method" ? (
+            <MethodGateSection drawing={drawing} canManageGate={canDecide} onChanged={onChanged} />
+          ) : (
+            <div className="space-y-2">
+              <span className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
+                <FileText className="w-4 h-4 text-sky-400" />
+                Thông Tin Kỹ Thuật Hồ Sơ:
+              </span>
+              <div className="space-y-1.5 text-xs text-zinc-400 pt-1">
+                <p>
+                  Mã bản vẽ: <b className="font-mono text-zinc-200">{drawing.code}</b>
+                </p>
+                <p>
+                  Loại hồ sơ: <b className="text-zinc-200">{KIND_LABEL[drawing.kind]}</b>
+                </p>
+                <p>
+                  Vị trí thi công:{" "}
+                  <b className="text-zinc-200">{drawing.floorLabel ?? "Toàn tháp"}</b>
+                </p>
+                <p>
+                  Ngày khởi tạo:{" "}
+                  <b className="font-mono text-zinc-300">{drawing.createdAt?.slice(0, 10)}</b>
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Khối 2: Tải lên Revision Mới */}
+        <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2.5">
+          <span className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
+            <Upload className="w-4 h-4 text-emerald-400" />
+            Tải Lên Revision Bản Vẽ Mới:
+          </span>
+
+          {canManage ? (
+            <div className="space-y-2 pt-1">
+              <div className="flex gap-2">
+                <input
+                  value={newRev}
+                  onChange={(e) => setNewRev(e.target.value)}
+                  placeholder="Rev (A, B...)"
+                  className="w-24 bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                />
+                <input
+                  type="date"
+                  value={newSubmittedAt}
+                  onChange={(e) => setNewSubmittedAt(e.target.value)}
+                  className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                />
+              </div>
+
+              <input
+                ref={fileRef}
+                type="file"
+                accept="application/pdf,image/*,.dwg,.dxf,.ifc,.zip"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f) uploadRevision(f);
+                }}
+              />
+
+              <button
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading || !newRev.trim()}
+                className="w-full flex items-center justify-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 border border-zinc-700 rounded-lg py-2 text-xs font-bold transition"
+              >
+                <Upload className="w-3.5 h-3.5 text-amber-400" />{" "}
+                {uploading ? "Đang tải lên..." : "Chọn File Bản Vẽ (PDF, DWG, IFC)"}
+              </button>
+            </div>
+          ) : (
+            <p className="text-xs text-zinc-500 pt-2">
+              Chỉ Kỹ sư / Quản trị viên mới có quyền upload revision mới.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* ── CỔNG PHÊ DUYỆT KỸ SƯ & DÒNG THỜI GIAN REVISIONS (ENGINEER SIGN-OFF GATE) ── */}
+      <div className="p-4 sm:p-5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3">
+        <h3 className="text-xs sm:text-sm font-bold text-zinc-100 flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-amber-400" />
+          LỊCH SỬ REVISION & CỔNG DUYỆT KỸ SƯ 3 BÊN
+        </h3>
+
+        {loading ? (
+          <p className="text-xs text-zinc-500">Đang tải danh sách revision...</p>
+        ) : revisions.length === 0 ? (
+          <p className="text-xs text-zinc-500 py-3">
+            Chưa có revision nào được tải lên cho bản vẽ này.
+          </p>
+        ) : (
+          <div className="space-y-2.5">
+            {revisions.map((r) => {
+              const StatusIcon = STATUS_ICON[r.status];
+              const isBusy = busyRevId === r.id;
+              const isApproved = r.status === "approved" || r.status === "approved_with_comments";
+
+              return (
+                <div
+                  key={r.id}
+                  className={`p-3.5 rounded-xl border transition ${
+                    isApproved
+                      ? "bg-zinc-900/90 border-emerald-500/30"
+                      : r.status === "rejected"
+                        ? "bg-zinc-900/90 border-rose-500/30"
+                        : "bg-zinc-900/90 border-zinc-800"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-sm text-amber-400">
+                        Rev {r.rev}
+                      </span>
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold border ${STATUS_BADGE[r.status]}`}
+                      >
+                        <StatusIcon className="w-3 h-3" /> {STATUS_LABEL[r.status].toUpperCase()}
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={() => viewFile(r.id)}
+                      className="flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 font-semibold"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" /> Xem File (
+                      {r.originalName || r.fileName})
+                      {r.sizeBytes != null && (
+                        <span className="text-zinc-500 ml-1 font-mono text-[10px]">
+                          {fmtSize(r.sizeBytes)}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+
+                  <p className="text-[11px] text-zinc-400 mt-1 font-mono">
+                    Trình: {r.submittedAt ?? "—"} • Duyệt: {r.decidedAt ?? "—"} • Người tải:{" "}
+                    {r.uploaderName ?? "—"}
+                  </p>
+
+                  {r.decisionNote && (
+                    <p className="text-xs text-zinc-300 italic mt-1.5 p-2 rounded-lg bg-zinc-950 border border-zinc-800">
+                      &ldquo;{r.decisionNote}&rdquo;
+                    </p>
+                  )}
+
+                  {canDecide && (r.status === "submitted" || r.status === "commented") && (
+                    <div className="mt-2.5 pt-2 border-t border-zinc-800 flex gap-1.5 flex-wrap">
+                      <button
+                        disabled={isBusy}
+                        onClick={() => decide(r, "approved")}
+                        className="flex items-center gap-1 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg transition"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Duyệt
+                      </button>
+                      <button
+                        disabled={isBusy}
+                        onClick={() => decide(r, "approved_with_comments")}
+                        className="text-xs font-bold bg-emerald-900 hover:bg-emerald-800 disabled:opacity-50 text-emerald-200 px-3 py-1.5 rounded-lg transition"
+                      >
+                        Duyệt Kèm Ý Kiến
+                      </button>
+                      <button
+                        disabled={isBusy}
+                        onClick={() => decide(r, "commented")}
+                        className="flex items-center gap-1 text-xs font-semibold bg-amber-950 hover:bg-amber-900 disabled:opacity-50 text-amber-200 border border-amber-800 px-2.5 py-1.5 rounded-lg transition"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" /> Có Ý Kiến
+                      </button>
+                      <button
+                        disabled={isBusy}
+                        onClick={() => decide(r, "rejected")}
+                        className="flex items-center gap-1 text-xs font-semibold bg-rose-950 hover:bg-rose-900 disabled:opacity-50 text-rose-200 border border-rose-800 px-2.5 py-1.5 rounded-lg transition"
+                      >
+                        <XCircle className="w-3.5 h-3.5" /> Từ Chối
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── FILTER CHIP COMPONENT ──
 
 function FilterChip({
   label,
@@ -432,10 +1059,10 @@ function FilterChip({
   return (
     <button
       onClick={onClick}
-      className={`px-2.5 py-1 rounded-full text-xs font-medium border transition ${
+      className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition ${
         active
-          ? "bg-emerald-800/60 border-emerald-700 text-white"
-          : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600"
+          ? "bg-amber-500/10 border-amber-500/40 text-amber-300 font-semibold"
+          : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700"
       }`}
     >
       {label}
@@ -443,7 +1070,7 @@ function FilterChip({
   );
 }
 
-// ── Form tạo/sửa bản vẽ ──────────────────────────────────────────────────────
+// ── FORM TẠO/SỬA BẢN VẼ MODAL ──
 
 function DrawingFormModal({
   drawing,
@@ -452,7 +1079,6 @@ function DrawingFormModal({
   onSaved,
 }: {
   drawing?: DrawingRow;
-  /** Loại chọn sẵn khi tạo mới từ trang đang lọc theo loại (sidebar ?kind=). */
   defaultKind?: DrawingKind;
   onClose: () => void;
   onSaved: () => void;
@@ -501,7 +1127,7 @@ function DrawingFormModal({
     <Modal onClose={onClose} className="max-w-lg" zIndex="z-[60]">
       <div className="p-5 space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold">{editing ? "Sửa bản vẽ" : "Thêm bản vẽ"}</h2>
+          <h2 className="font-semibold text-base">{editing ? "Sửa bản vẽ" : "Thêm bản vẽ mới"}</h2>
           <button onClick={onClose} aria-label="Đóng" className="text-zinc-400 hover:text-white">
             <X className="w-5 h-5" />
           </button>
@@ -518,7 +1144,7 @@ function DrawingFormModal({
             />
           </label>
           <label className="text-xs text-zinc-400">
-            Loại
+            Loại bản vẽ
             <select
               value={kind}
               onChange={(e) => setKind(e.target.value as DrawingKind)}
@@ -581,314 +1207,7 @@ function DrawingFormModal({
   );
 }
 
-// ── Chi tiết bản vẽ: timeline revision + upload + duyệt ──────────────────────
-
-function suggestNextRev(revisions: DrawingRevisionRow[]): string {
-  const last = revisions[0]?.rev ?? "";
-  if (/^[A-Z]$/.test(last)) return String.fromCharCode(last.charCodeAt(0) + 1);
-  return "";
-}
-
-function DrawingDetailModal({
-  drawing,
-  canManage,
-  canDecide,
-  onClose,
-  onChanged,
-}: {
-  drawing: DrawingRow;
-  canManage: boolean;
-  canDecide: boolean;
-  onClose: () => void;
-  onChanged: () => void;
-}) {
-  const [revisions, setRevisions] = useState<DrawingRevisionRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [editOpen, setEditOpen] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [busyRevId, setBusyRevId] = useState<number | null>(null);
-  const [newRev, setNewRev] = useState("");
-  const [newSubmittedAt, setNewSubmittedAt] = useState("");
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  function load(opts?: { fresh?: boolean }) {
-    setLoading(true);
-    const url = `/api/drawings/${drawing.id}`;
-    const req = opts?.fresh ? fetchFresh(url) : fetch(url);
-    req
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => {
-        const revs: DrawingRevisionRow[] = j?.revisions ?? [];
-        setRevisions(revs);
-        setNewRev(suggestNextRev(revs));
-      })
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drawing.id]);
-
-  async function uploadRevision(file: File) {
-    if (!newRev.trim()) {
-      showToast("Nhập số rev trước khi tải lên", "error");
-      return;
-    }
-    setUploading(true);
-    const form = new FormData();
-    form.append("file", file);
-    form.append("rev", newRev.trim());
-    if (newSubmittedAt) form.append("submittedAt", newSubmittedAt);
-    try {
-      const res = await fetch(`/api/drawings/${drawing.id}/revisions`, {
-        method: "POST",
-        body: form,
-      });
-      const j = await res.json().catch(() => null);
-      if (!res.ok) {
-        showToast(j?.error ?? "Tải lên thất bại", "error");
-        return;
-      }
-      showToast("Đã tải lên rev mới");
-      setNewSubmittedAt("");
-      load({ fresh: true });
-      onChanged();
-    } catch {
-      showToast("Mất kết nối — kiểm tra mạng rồi thử lại", "error");
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  async function decide(rev: DrawingRevisionRow, status: RevisionStatus) {
-    let decisionNote: string | null = null;
-    if (status === "rejected" || status === "approved_with_comments" || status === "commented") {
-      const note = await appPrompt(
-        `Ghi chú cho quyết định "${STATUS_LABEL[status]}" (tuỳ chọn):`,
-        "",
-      );
-      if (note === null) return;
-      decisionNote = note.trim() || null;
-    }
-    setBusyRevId(rev.id);
-    try {
-      const res = await fetch(`/api/drawings/revisions/${rev.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, decisionNote }),
-      });
-      const j = await res.json().catch(() => null);
-      if (!res.ok) {
-        showToast(j?.error ?? "Không cập nhật được trạng thái", "error");
-        return;
-      }
-      load({ fresh: true });
-      onChanged();
-    } catch {
-      showToast("Mất kết nối — kiểm tra mạng rồi thử lại", "error");
-    } finally {
-      setBusyRevId(null);
-    }
-  }
-
-  function viewFile(revId: number) {
-    window.open(`/api/drawings/revisions/${revId}/file`, "_blank", "noopener,noreferrer");
-  }
-
-  const hasPendingNewerThanApproved =
-    drawing.approvedRevisionId != null &&
-    drawing.latestRevisionId !== drawing.approvedRevisionId &&
-    drawing.latestStatus !== "approved" &&
-    drawing.latestStatus !== "approved_with_comments";
-
-  return (
-    <Modal onClose={onClose} className="max-w-2xl" zIndex="z-50">
-      <div className="p-5 space-y-4 max-h-[85vh] overflow-y-auto">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="font-mono text-xs text-zinc-400">{drawing.code}</p>
-            <h2 className="font-semibold text-lg truncate">{drawing.name}</h2>
-            <p className="text-xs text-zinc-400 mt-0.5">
-              {KIND_LABEL[drawing.kind]}
-              {drawing.systemGroup ? ` · Hệ ${drawing.systemGroup}` : ""}
-              {drawing.floorLabel ? ` · Tầng ${drawing.floorLabel}` : ""}
-              {drawing.workPackageName ? ` · Nhóm: ${drawing.workPackageName}` : ""}
-            </p>
-          </div>
-          <div className="flex items-center gap-1 shrink-0">
-            {canManage && (
-              <button
-                onClick={() => setEditOpen(true)}
-                aria-label="Sửa bản vẽ"
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800"
-              >
-                <Pencil className="w-4 h-4" />
-              </button>
-            )}
-            <button onClick={onClose} aria-label="Đóng" className="text-zinc-400 hover:text-white">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        <button
-          onClick={() => drawing.approvedRevisionId && viewFile(drawing.approvedRevisionId)}
-          disabled={!drawing.approvedRevisionId}
-          className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg px-4 py-2.5 text-sm font-semibold transition text-on-accent"
-        >
-          <ExternalLink className="w-4 h-4" />
-          {drawing.approvedRevisionId
-            ? `Xem bản mới nhất đã duyệt (rev ${drawing.approvedRev})`
-            : "Chưa có rev nào được duyệt"}
-        </button>
-
-        {hasPendingNewerThanApproved && (
-          <p className="text-xs bg-amber-950 border border-amber-900 text-amber-200 rounded-lg px-3 py-2">
-            Rev {drawing.latestRev} đang chờ duyệt — hiện trường vẫn dùng rev{" "}
-            {drawing.approvedRev ?? "—"} (bản đã duyệt).
-          </p>
-        )}
-
-        {drawing.kind === "method" && (
-          <MethodGateSection drawing={drawing} canManageGate={canDecide} onChanged={onChanged} />
-        )}
-
-        {canManage && (
-          <div className="bg-zinc-800/60 border border-zinc-700 rounded-lg p-3 space-y-2">
-            <p className="text-xs font-semibold text-zinc-300">Tải lên rev mới</p>
-            <div className="flex flex-wrap gap-2">
-              <input
-                value={newRev}
-                onChange={(e) => setNewRev(e.target.value)}
-                placeholder="Rev (A, B...)"
-                className="w-24 bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-sm"
-              />
-              <input
-                type="date"
-                value={newSubmittedAt}
-                onChange={(e) => setNewSubmittedAt(e.target.value)}
-                className="bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-sm"
-              />
-              <input
-                ref={fileRef}
-                type="file"
-                accept="application/pdf,image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  e.target.value = "";
-                  if (f) uploadRevision(f);
-                }}
-              />
-              <button
-                onClick={() => fileRef.current?.click()}
-                disabled={uploading || !newRev.trim()}
-                className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-700 disabled:opacity-50 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm transition"
-              >
-                <Upload className="w-4 h-4" /> {uploading ? "Đang tải..." : "Chọn file"}
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div>
-          <p className="text-xs font-semibold text-zinc-400 mb-2">Lịch sử revision</p>
-          {loading ? (
-            <p className="text-sm text-zinc-400">Đang tải...</p>
-          ) : revisions.length === 0 ? (
-            <p className="text-sm text-zinc-400">Chưa có revision nào.</p>
-          ) : (
-            <div className="space-y-2">
-              {revisions.map((r) => {
-                const StatusIcon = STATUS_ICON[r.status];
-                const isBusy = busyRevId === r.id;
-                return (
-                  <div key={r.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-                    <div className="flex items-start justify-between gap-3 flex-wrap">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-lg">{r.rev}</span>
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${STATUS_BADGE[r.status]}`}
-                        >
-                          <StatusIcon className="w-3 h-3" /> {STATUS_LABEL[r.status]}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => viewFile(r.id)}
-                        className="flex items-center gap-1 text-xs text-sky-400 hover:underline"
-                      >
-                        <ExternalLink className="w-3 h-3" /> Xem file
-                        {r.sizeBytes != null && (
-                          <span className="text-zinc-400 ml-1">{fmtSize(r.sizeBytes)}</span>
-                        )}
-                      </button>
-                    </div>
-                    <p className="text-[11px] text-zinc-400 mt-1">
-                      Trình: {r.submittedAt ?? "—"} · Quyết định: {r.decidedAt ?? "—"} · Người tải:{" "}
-                      {r.uploaderName ?? "—"}
-                    </p>
-                    {r.decisionNote && (
-                      <p className="text-xs text-zinc-300 italic mt-1">
-                        &ldquo;{r.decisionNote}&rdquo;
-                      </p>
-                    )}
-                    {canDecide && (r.status === "submitted" || r.status === "commented") && (
-                      <div className="mt-2 flex gap-1.5 flex-wrap">
-                        <button
-                          disabled={isBusy}
-                          onClick={() => decide(r, "approved")}
-                          className="flex items-center gap-1 text-[11px] bg-emerald-800 hover:bg-emerald-700/60 disabled:opacity-50 text-emerald-200 px-2 py-1 rounded-lg transition"
-                        >
-                          <CheckCircle2 className="w-3 h-3" /> Duyệt
-                        </button>
-                        <button
-                          disabled={isBusy}
-                          onClick={() => decide(r, "approved_with_comments")}
-                          className="text-[11px] bg-emerald-900 hover:bg-emerald-800 disabled:opacity-50 text-emerald-200 px-2 py-1 rounded-lg transition"
-                        >
-                          Duyệt kèm ý kiến
-                        </button>
-                        <button
-                          disabled={isBusy}
-                          onClick={() => decide(r, "commented")}
-                          className="flex items-center gap-1 text-[11px] bg-amber-900 hover:bg-amber-800 disabled:opacity-50 text-amber-200 px-2 py-1 rounded-lg transition"
-                        >
-                          <MessageSquare className="w-3 h-3" /> Có ý kiến
-                        </button>
-                        <button
-                          disabled={isBusy}
-                          onClick={() => decide(r, "rejected")}
-                          className="flex items-center gap-1 text-[11px] bg-rose-900 hover:bg-rose-800 disabled:opacity-50 text-rose-200 px-2 py-1 rounded-lg transition"
-                        >
-                          <XCircle className="w-3 h-3" /> Từ chối
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {editOpen && (
-        <DrawingFormModal
-          drawing={drawing}
-          onClose={() => setEditOpen(false)}
-          onSaved={() => {
-            setEditOpen(false);
-            load({ fresh: true });
-            onChanged();
-          }}
-        />
-      )}
-    </Modal>
-  );
-}
-
-// ── Gate biện pháp thi công (M8 PR 3/3): gán nhóm công việc + đánh dấu bắt buộc ──────
+// ── GATE BIỆN PHÁP THI CÔNG ──
 
 type PackageHit = { kind: string; id: number; code: string; name: string };
 
@@ -959,13 +1278,17 @@ function MethodGateSection({
   const gateReady = drawing.approvedRevisionId != null;
 
   return (
-    <div className="bg-zinc-800/60 border border-zinc-700 rounded-lg p-3 space-y-2">
-      <p className="text-xs font-semibold text-zinc-300">Gate biện pháp thi công</p>
+    <div className="space-y-2">
+      <span className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
+        <HardHat className="w-4 h-4 text-amber-400" />
+        Gate Biện Pháp Thi Công:
+      </span>
 
       {drawing.workPackageId ? (
-        <div className="flex items-center justify-between gap-2 text-sm">
+        <div className="flex items-center justify-between gap-2 text-xs">
           <span>
-            Nhóm áp dụng: <span className="font-mono text-xs">{drawing.workPackageCode}</span>{" "}
+            Nhóm áp dụng:{" "}
+            <span className="font-mono text-amber-300">{drawing.workPackageCode}</span>{" "}
             {drawing.workPackageName}
           </span>
           {canManageGate && (
@@ -978,7 +1301,7 @@ function MethodGateSection({
           )}
         </div>
       ) : (
-        <p className="text-sm text-zinc-400">Chưa gán nhóm công việc — gate chưa áp dụng.</p>
+        <p className="text-xs text-zinc-400">Chưa gán nhóm công việc — gate chưa áp dụng.</p>
       )}
 
       {canManageGate && drawing.workPackageId && (
@@ -1009,7 +1332,7 @@ function MethodGateSection({
       )}
 
       {canManageGate && (picking || !drawing.workPackageId) && (
-        <div className="relative">
+        <div className="relative pt-1">
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -1049,7 +1372,7 @@ function MethodGateSection({
   );
 }
 
-// ── Tab "Thay đổi thiết kế" (M32) ────────────────────────────────────────────
+// ── TAB THAY ĐỔI THIẾT KẾ (DESIGN CHANGES) ──
 
 type DesignChangeStatus = "submitted" | "assessing" | "approved" | "rejected" | "drawing_updated";
 
@@ -1061,11 +1384,11 @@ const DC_STATUS_LABEL: Record<DesignChangeStatus, string> = {
   drawing_updated: "Đã cập nhật bản vẽ",
 };
 const DC_STATUS_BADGE: Record<DesignChangeStatus, string> = {
-  submitted: "bg-sky-900 text-sky-200",
-  assessing: "bg-amber-900 text-amber-200",
-  approved: "bg-emerald-900 text-emerald-200",
-  rejected: "bg-rose-900 text-rose-200",
-  drawing_updated: "bg-violet-900 text-violet-200",
+  submitted: "bg-sky-500/10 text-sky-400 border-sky-500/30",
+  assessing: "bg-amber-500/10 text-amber-400 border-amber-500/30",
+  approved: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
+  rejected: "bg-rose-500/10 text-rose-400 border-rose-500/30",
+  drawing_updated: "bg-violet-500/10 text-violet-400 border-violet-500/30",
 };
 const DC_STATUS_ICON: Record<DesignChangeStatus, LucideIcon> = {
   submitted: Clock,
@@ -1140,8 +1463,6 @@ function DesignChangesTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
-  // Gọi sau khi tự ghi (tạo/quyết định/đánh dấu) — dùng fetchFresh để bỏ qua cache SW
-  // (stale-while-revalidate), khác với load() ở trên chỉ dùng cho tải lần đầu/đổi filter.
   async function refresh() {
     const qs = buildQuery();
     const res = await fetchFresh(`/api/design-changes${qs ? `?${qs}` : ""}`);
@@ -1152,21 +1473,23 @@ function DesignChangesTab({
   const selected = items.find((d) => d.id === selectedId) ?? null;
 
   return (
-    <>
-      <div className="flex flex-wrap gap-1.5">
-        <FilterChip
-          label="Tất cả trạng thái"
-          active={statusFilter === "all"}
-          onClick={() => setStatusFilter("all")}
-        />
-        {(Object.keys(DC_STATUS_LABEL) as DesignChangeStatus[]).map((s) => (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex flex-wrap gap-1.5">
           <FilterChip
-            key={s}
-            label={DC_STATUS_LABEL[s]}
-            active={statusFilter === s}
-            onClick={() => setStatusFilter(s)}
+            label="Tất cả trạng thái"
+            active={statusFilter === "all"}
+            onClick={() => setStatusFilter("all")}
           />
-        ))}
+          {(Object.keys(DC_STATUS_LABEL) as DesignChangeStatus[]).map((s) => (
+            <FilterChip
+              key={s}
+              label={DC_STATUS_LABEL[s]}
+              active={statusFilter === s}
+              onClick={() => setStatusFilter(s)}
+            />
+          ))}
+        </div>
       </div>
 
       {loading ? (
@@ -1189,25 +1512,27 @@ function DesignChangesTab({
               <button
                 key={dc.id}
                 onClick={() => setSelectedId(dc.id)}
-                className="text-left bg-zinc-900 border border-zinc-800 hover:border-zinc-600 rounded-xl p-4 transition"
+                className="text-left bg-zinc-950/80 border border-zinc-800 hover:border-zinc-700 rounded-xl p-4 transition space-y-2"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="font-mono text-xs text-zinc-400">{dc.code}</p>
-                    <p className="font-semibold text-sm truncate">{dc.title}</p>
+                    <p className="font-mono text-xs font-bold text-amber-400">{dc.code}</p>
+                    <p className="font-semibold text-sm text-zinc-100 truncate">{dc.title}</p>
                   </div>
                   <span
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold shrink-0 ${DC_STATUS_BADGE[dc.status]}`}
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold border shrink-0 ${DC_STATUS_BADGE[dc.status]}`}
                   >
                     <StatusIcon className="w-3 h-3" /> {DC_STATUS_LABEL[dc.status]}
                   </span>
                 </div>
-                <div className="mt-2 flex items-center gap-3 text-xs text-zinc-400 flex-wrap">
+                <div className="flex items-center gap-3 text-xs text-zinc-400 flex-wrap">
                   {dc.systemName && <span>Hệ {dc.systemName}</span>}
                   {dc.drawingCode && <span>Bản vẽ {dc.drawingCode}</span>}
                 </div>
-                <p className="mt-2 text-xs text-zinc-400 line-clamp-2">{dc.reason}</p>
-                <div className="mt-2 text-xs text-zinc-400">{dc.createdAt?.slice(0, 10)}</div>
+                <p className="text-xs text-zinc-400 line-clamp-2">{dc.reason}</p>
+                <div className="text-[11px] text-zinc-500 font-mono">
+                  {dc.createdAt?.slice(0, 10)}
+                </div>
               </button>
             );
           })}
@@ -1234,7 +1559,7 @@ function DesignChangesTab({
           }}
         />
       )}
-    </>
+    </div>
   );
 }
 
@@ -1293,7 +1618,7 @@ function DesignChangeFormModal({
     <Modal onClose={onClose} className="max-w-lg" zIndex="z-[60]">
       <div className="p-5 space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold">Thêm thay đổi thiết kế</h2>
+          <h2 className="font-semibold text-base">Thêm thay đổi thiết kế</h2>
           <button onClick={onClose} aria-label="Đóng" className="text-zinc-400 hover:text-white">
             <X className="w-5 h-5" />
           </button>
@@ -1352,7 +1677,7 @@ function DesignChangeFormModal({
           />
         </label>
         <label className="text-xs text-zinc-400 block">
-          Tác động chi phí (mô tả định tính, tuỳ chọn)
+          Tác động chi phí (tuỳ chọn)
           <textarea
             value={impactCost}
             onChange={(e) => setImpactCost(e.target.value)}
@@ -1483,8 +1808,8 @@ function DesignChangeDetailModal({
       <div className="p-5 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <p className="font-mono text-xs text-zinc-400">{dc.code}</p>
-            <h2 className="font-semibold">{dc.title}</h2>
+            <p className="font-mono text-xs font-bold text-amber-400">{dc.code}</p>
+            <h2 className="font-semibold text-base">{dc.title}</h2>
           </div>
           <button onClick={onClose} aria-label="Đóng" className="text-zinc-400 hover:text-white">
             <X className="w-5 h-5" />
@@ -1492,7 +1817,7 @@ function DesignChangeDetailModal({
         </div>
 
         <span
-          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${DC_STATUS_BADGE[dc.status]}`}
+          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold border ${DC_STATUS_BADGE[dc.status]}`}
         >
           <StatusIcon className="w-3 h-3" /> {DC_STATUS_LABEL[dc.status]}
         </span>
@@ -1505,33 +1830,37 @@ function DesignChangeDetailModal({
 
         <div className="space-y-2 text-sm">
           <div>
-            <p className="text-xs text-zinc-400">Lý do thay đổi</p>
-            <p className="whitespace-pre-wrap">{dc.reason}</p>
+            <p className="text-xs text-zinc-400 font-semibold">Lý do thay đổi:</p>
+            <p className="whitespace-pre-wrap text-xs text-zinc-200 mt-0.5">{dc.reason}</p>
           </div>
           {dc.impactTechnical && (
             <div>
-              <p className="text-xs text-zinc-400">Tác động kỹ thuật</p>
-              <p className="whitespace-pre-wrap">{dc.impactTechnical}</p>
+              <p className="text-xs text-zinc-400 font-semibold">Tác động kỹ thuật:</p>
+              <p className="whitespace-pre-wrap text-xs text-zinc-200 mt-0.5">
+                {dc.impactTechnical}
+              </p>
             </div>
           )}
           {dc.impactCost && (
             <div>
-              <p className="text-xs text-zinc-400">Tác động chi phí</p>
-              <p className="whitespace-pre-wrap">{dc.impactCost}</p>
+              <p className="text-xs text-zinc-400 font-semibold">Tác động chi phí:</p>
+              <p className="whitespace-pre-wrap text-xs text-zinc-200 mt-0.5">{dc.impactCost}</p>
             </div>
           )}
           {dc.impactSchedule && (
             <div>
-              <p className="text-xs text-zinc-400">Tác động tiến độ</p>
-              <p className="whitespace-pre-wrap">{dc.impactSchedule}</p>
+              <p className="text-xs text-zinc-400 font-semibold">Tác động tiến độ:</p>
+              <p className="whitespace-pre-wrap text-xs text-zinc-200 mt-0.5">
+                {dc.impactSchedule}
+              </p>
             </div>
           )}
           {dc.decisionNote && (
             <div>
-              <p className="text-xs text-zinc-400">Ghi chú quyết định</p>
-              <p className="whitespace-pre-wrap">{dc.decisionNote}</p>
+              <p className="text-xs text-zinc-400 font-semibold">Ghi chú quyết định:</p>
+              <p className="whitespace-pre-wrap text-xs text-zinc-200 mt-0.5">{dc.decisionNote}</p>
               {dc.decidedByName && (
-                <p className="text-xs text-zinc-400 mt-1">
+                <p className="text-[11px] text-zinc-400 font-mono mt-1">
                   Quyết bởi {dc.decidedByName}
                   {dc.decidedAt ? ` — ${dc.decidedAt.slice(0, 10)}` : ""}
                 </p>
@@ -1543,7 +1872,7 @@ function DesignChangeDetailModal({
         {linkedDrawing ? (
           <div className="text-xs text-zinc-400 border-t border-zinc-800 pt-2">
             Bản vẽ liên quan:{" "}
-            <span className="font-mono">
+            <span className="font-mono text-zinc-200">
               {linkedDrawing.code} — {linkedDrawing.name}
             </span>
           </div>
@@ -1559,14 +1888,14 @@ function DesignChangeDetailModal({
               <button
                 onClick={() => decide("rejected")}
                 disabled={busy}
-                className="px-3 py-2 text-sm rounded-lg border border-rose-700 text-rose-200 hover:bg-rose-900 disabled:opacity-50"
+                className="px-3 py-2 text-xs font-semibold rounded-lg border border-rose-700 text-rose-200 hover:bg-rose-900 disabled:opacity-50"
               >
                 Từ chối
               </button>
               <button
                 onClick={() => decide("approved")}
                 disabled={busy}
-                className="px-3 py-2 text-sm rounded-lg bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 font-semibold text-on-accent"
+                className="px-3 py-2 text-xs font-bold rounded-lg bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent"
               >
                 Duyệt
               </button>
@@ -1576,7 +1905,7 @@ function DesignChangeDetailModal({
             <button
               onClick={markDrawingUpdated}
               disabled={busy}
-              className="px-3 py-2 text-sm rounded-lg bg-violet-700 hover:bg-violet-600 disabled:opacity-50 font-semibold text-on-accent"
+              className="px-3 py-2 text-xs font-bold rounded-lg bg-violet-700 hover:bg-violet-600 disabled:opacity-50 text-on-accent"
             >
               Đánh dấu đã cập nhật bản vẽ
             </button>

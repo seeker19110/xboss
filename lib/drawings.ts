@@ -4,14 +4,14 @@
 import { query, queryOne, run, withTransaction } from "@/lib/db";
 
 // Thứ tự khớp thứ tự mục trong cụm sidebar "Thiết kế & BPTC" (dashboardTree.ts).
-export const DRAWING_KINDS = ["design", "method", "bim", "shop", "asbuilt"] as const;
+export const DRAWING_KINDS = ["design", "bim", "shop", "method", "asbuilt"] as const;
 export type DrawingKind = (typeof DRAWING_KINDS)[number];
 export const DRAWING_KIND_LABEL: Record<DrawingKind, string> = {
   design: "Thiết kế",
-  method: "Biện pháp thi công",
-  bim: "BIM",
+  bim: "Mô hình BIM",
   shop: "Shop drawing",
-  asbuilt: "As-built",
+  method: "Biện pháp thi công",
+  asbuilt: "Bản vẽ hoàn công",
 };
 
 export const REVISION_STATUSES = [
