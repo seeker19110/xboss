@@ -977,7 +977,10 @@ function DebtTab({ detail }: { detail: SubcontractorDetail }) {
                 return (
                   <tr key={c.id} className="border-b border-zinc-800/60 last:border-0">
                     <td className="p-2">
-                      <a href="/contracts" className="text-sky-400 hover:text-sky-300 font-medium">
+                      <a
+                        href="/commercial?tab=contracts"
+                        className="text-sky-400 hover:text-sky-300 font-medium"
+                      >
                         {c.code}
                       </a>
                     </td>

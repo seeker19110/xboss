@@ -45,7 +45,7 @@ export default function DashboardExtCards({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {approvals != null && (
           <a
-            href="/proposals"
+            href="/commercial?tab=ipc-payments&sub=proposals"
             className="bento-card p-4 flex flex-col justify-between hover:border-amber-700/60 transition-all group"
           >
             <div className="flex items-center justify-between">
@@ -69,7 +69,7 @@ export default function DashboardExtCards({
         )}
 
         <a
-          href="/quality"
+          href="/site?tab=approvals-qc&sub=ncr"
           className="bento-card p-4 flex flex-col justify-between hover:border-rose-700/60 transition-all group"
         >
           <div className="flex items-center justify-between">
@@ -97,7 +97,7 @@ export default function DashboardExtCards({
 
         {vo != null && (
           <a
-            href="/variations"
+            href="/commercial?tab=vo-variations"
             className="bento-card p-4 flex flex-col justify-between hover:border-sky-700/60 transition-all group"
           >
             <div className="flex items-center justify-between">
@@ -118,7 +118,7 @@ export default function DashboardExtCards({
 
         {workfront != null && (
           <Link
-            href="/work-fronts"
+            href="/site?tab=work-fronts"
             className="bento-card p-4 flex flex-col justify-between hover:border-emerald-700/60 transition-all group"
           >
             <div className="flex items-center justify-between">

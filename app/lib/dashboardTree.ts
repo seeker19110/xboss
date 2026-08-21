@@ -120,7 +120,7 @@ export const DASHBOARD_TREE: DashCluster[] = [
     dashboards: [
       {
         id: "dash.mepf-cad-bim-studio",
-        href: "/mepf-cad-bim-studio",
+        href: "/engineering/god-tier-studio",
         label: "MEPF CAD/BIM Studio",
         icon: Sparkles,
       },
@@ -168,7 +168,7 @@ export const DASHBOARD_TREE: DashCluster[] = [
     dashboards: [
       {
         id: "dash.god-tier-studio",
-        href: "/mepf-cad-bim-studio",
+        href: "/engineering/god-tier-studio",
         label: "MEPF CAD/BIM Studio (M96)",
         icon: Sparkles,
       },
@@ -240,7 +240,7 @@ export const DASHBOARD_TREE: DashCluster[] = [
       },
       {
         id: "dash.qr-logistics",
-        href: "/engineering/qr-logistics",
+        href: "/procurement?tab=qr-logistics",
         label: "QR Logistics (M78)",
         icon: QrCode,
       },
@@ -311,14 +311,14 @@ export const DASHBOARD_TREE: DashCluster[] = [
         children: [
           { href: "/my-tasks", label: "Việc của tôi", icon: ClipboardList },
           { href: "/approvals", label: "Nghiệm thu", icon: CheckSquare },
-          { href: "/diary", label: "Nhật ký", icon: NotebookPen },
-          { href: "/work-fronts", label: "Mặt bằng", icon: LandPlot },
-          { href: "/resources", label: "Tài nguyên", icon: Users },
+          { href: "/site?tab=tasks-diary&sub=diary", label: "Nhật ký", icon: NotebookPen },
+          { href: "/site?tab=work-fronts", label: "Mặt bằng", icon: LandPlot },
+          { href: "/site?tab=tasks-diary&sub=resources", label: "Tài nguyên", icon: Users },
         ],
       },
       {
         id: "dash.chat-luong",
-        href: "/quality",
+        href: "/site?tab=approvals-qc&sub=ncr",
         label: "Chất lượng (QA/QC)",
         icon: ClipboardCheck,
       },
@@ -328,13 +328,13 @@ export const DASHBOARD_TREE: DashCluster[] = [
         icon: ShieldAlert,
         children: [
           {
-            href: "/hse",
+            href: "/site?tab=hse-safety",
             label: "HSE",
             icon: ShieldAlert,
             roles: ["admin", "pm", "engineer", "subcon"],
           },
           {
-            href: "/risks",
+            href: "/site?tab=hse-safety",
             label: "Rủi ro",
             icon: AlertTriangle,
             roles: ["admin", "pm", "engineer", "bch", "cdt", "viewer"],
@@ -346,8 +346,8 @@ export const DASHBOARD_TREE: DashCluster[] = [
         label: "Thiết bị & Máy móc",
         icon: Wrench,
         children: [
-          { href: "/equipment", label: "Thiết bị", icon: Wrench },
-          { href: "/vehicles", label: "Xe ra vào", icon: CarFront },
+          { href: "/site?tab=equipment&sub=equipment", label: "Thiết bị", icon: Wrench },
+          { href: "/site?tab=equipment&sub=vehicles", label: "Xe ra vào", icon: CarFront },
         ],
       },
     ],
@@ -444,17 +444,26 @@ export const DASHBOARD_TREE: DashCluster[] = [
         label: "Chi phí & Hợp đồng",
         icon: Coins,
         children: [
-          { href: "/proposals", label: "Đề xuất & duyệt", icon: FileCheck2 },
-          { href: "/payments", label: "Thanh toán", icon: Wallet },
-          { href: "/costs", label: "Chi phí", icon: Coins, roles: ["admin", "pm", "bch"] },
           {
-            href: "/contracts",
+            href: "/commercial?tab=ipc-payments&sub=proposals",
+            label: "Đề xuất & duyệt",
+            icon: FileCheck2,
+          },
+          { href: "/commercial?tab=ipc-payments&sub=payments", label: "Thanh toán", icon: Wallet },
+          {
+            href: "/commercial?tab=contracts&sub=costs",
+            label: "Chi phí",
+            icon: Coins,
+            roles: ["admin", "pm", "bch"],
+          },
+          {
+            href: "/commercial?tab=contracts",
             label: "Hợp đồng",
             icon: FileSignature,
             roles: ["admin", "pm", "bch"],
           },
           {
-            href: "/payment-certs",
+            href: "/commercial?tab=ipc-payments&sub=ipc",
             label: "Thanh toán KL",
             icon: Receipt,
             roles: ["admin", "pm", "bch"],
@@ -463,7 +472,7 @@ export const DASHBOARD_TREE: DashCluster[] = [
       },
       {
         id: "dash.tai-chinh-ke-toan",
-        href: "/finance",
+        href: "/commercial?tab=cashflow-esign",
         label: "Tài chính – Kế toán",
         icon: Banknote,
         roles: ["admin", "pm", "bch"],
@@ -474,13 +483,13 @@ export const DASHBOARD_TREE: DashCluster[] = [
         icon: Scale,
         children: [
           {
-            href: "/variations",
+            href: "/commercial?tab=vo-variations",
             label: "Phát sinh",
             icon: FilePlus2,
             roles: ["admin", "pm", "engineer", "bch"],
           },
           {
-            href: "/claims",
+            href: "/commercial?tab=fidic-claims",
             label: "Claim chi phí",
             icon: Scale,
             roles: ["admin", "pm", "engineer", "bch"],
@@ -489,7 +498,7 @@ export const DASHBOARD_TREE: DashCluster[] = [
       },
       {
         id: "dash.bao-hiem-bao-lanh",
-        href: "/insurance",
+        href: "/commercial?tab=contracts&sub=insurance",
         label: "Bảo hiểm & Bảo lãnh",
         icon: Umbrella,
         roles: ["admin", "pm", "bch"],
@@ -552,7 +561,7 @@ export const DASHBOARD_TREE: DashCluster[] = [
         children: [
           { href: "/users", label: "Tài khoản", icon: Users, roles: ["admin"] },
           { href: "/admin", label: "Phân công", icon: ShieldCheck, roles: ["admin", "pm"] },
-          { href: "/attendance", label: "Chấm công", icon: CalendarCheck },
+          { href: "/site?tab=tasks-diary&sub=attendance", label: "Chấm công", icon: CalendarCheck },
           { href: "/personnel", label: "Nhân sự", icon: UserCog },
           { href: "/org", label: "Sơ đồ tổ chức", icon: Network },
         ],

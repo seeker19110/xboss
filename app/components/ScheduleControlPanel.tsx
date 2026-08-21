@@ -42,7 +42,7 @@ export default function ScheduleControlPanel({
             trang /schedule-control (truyền `critical`) thì thừa. */}
         {selfFetch && (
           <a
-            href="/schedule-control"
+            href="/schedule?tab=wbs"
             className="ml-auto flex items-center gap-1 text-xs text-zinc-400 hover:text-emerald-400 transition shrink-0"
           >
             Đường găng &amp; Chậm tiến độ <ExternalLink className="w-3 h-3" />

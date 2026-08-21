@@ -13,6 +13,20 @@
 - **Lộ trình hoàn thành (chờ duyệt, chưa code):** `PROJECT-COMPLETION-ROADMAP.md` chốt C0→C6 để đạt XBoss v1.0/Product Complete và O1→O5 cho Engineering OS/Vision Complete theo gate; không coi tài liệu là quyền tự triển khai production hoặc A3+.
 - **Spec pack chi tiết (chờ duyệt):** C0, C2–C6 và OS-1–OS-5 đã có file thi hành riêng (C1 dùng ENG-5), mỗi file gồm scope, data/API/UI/ops, test, chia PR và DoD. Chưa phase nào được đánh dấu triển khai chỉ vì đặc tả đã viết.
 
+## M97 V1 — Dọn trang shim, trang re-export trùng và code chết (2026-08-21)
+
+- **Đặc tả:** `docs/nang-cap/M97-tai-cau-truc-route.md` (kế hoạch 8 việc V1–V8 tái cấu trúc page route theo hub chức năng; API route ngoài phạm vi).
+- **Đã làm (V1, `route: mechanical`):**
+  - Xoá 26 trang chỉ `router.replace`/`redirect` sang hub (`/attendance`, `/claims`, `/contracts`, `/costs`, `/diary`, `/engineering/qr-logistics`, `/equipment`, `/finance`, `/hse`, `/insurance`, `/materials`, `/materials/order-form`, `/materials/purchase-orders`, `/materials/suppliers`, `/payment-certs`, `/payments`, `/proposals`, `/quality`, `/resources`, `/risks`, `/schedule-control`, `/scurve`, `/timeline`, `/variations`, `/vehicles`, `/work-fronts`, `/order`).
+  - Xoá 2 trang re-export trùng `/cad-bim` và `/mepf-cad-bim-studio` (cả hai cùng trỏ `/engineering/god-tier-studio` — giữ URL duy nhất còn lại).
+  - Xoá 1339 dòng code chết: `app/materials/_components/{PurchaseRequestsTab,ReportsTab}.tsx` (không còn ai import từ khi `/materials` thành shim).
+  - Xoá 4 component chỉ được dùng bởi các trang shim đã xoá và không còn nơi tham chiếu (`AttendanceChart`, `DiaryEditorModal`, `ManpowerChart`, `OrderContent`).
+  - Sửa toàn bộ link nội bộ trỏ tới 27 URL đã xoá (đổi thẳng sang đích cuối `/hub?tab=...`, **không redirect** — app chưa có người dùng thật nên không cần tương thích ngược): `app/lib/dashboardTree.ts`, `lib/modules.ts`, `lib/approvals.ts`, `lib/search.ts`, `app/components/{DashboardExtCards,EngineeringNav,ScheduleControlPanel}.tsx`, `app/error.tsx`, `app/page.tsx`, `app/my-tasks/page.tsx`, `app/notifications/page.tsx`, `app/tech/page.tsx`, `app/mepf-process/page.tsx`, `app/subcontractors/page.tsx`, `app/admin/integrations/page.tsx`, `app/materials/import/page.tsx`, `app/work-fronts/[floor]/page.tsx`, `app/engineering/bim-viewer/page.tsx`.
+  - Di chuyển `RatingModal.tsx` (đang dùng thật trong `OrdersTab.tsx`, suýt bị xoá nhầm vì nằm cùng thư mục trang shim `/materials/purchase-orders`) sang `app/procurement/_components/RatingModal.tsx`.
+  - `npm run lint` + `npm run typecheck` + `npm run build` xanh.
+- **Giữ nguyên (không phải shim):** `app/materials/import/page.tsx`, `app/materials/reports/page.tsx`, `app/payments/print/page.tsx`, `app/work-fronts/[floor]/page.tsx` — trang thật, có nội dung.
+- **Tiếp theo:** V2 (gộp 5 trang bản vẽ vào `/ban-ve?kind=`) → V3 (`HubShell` chuyển tab-điều-hướng + `layout.tsx`, làm mẫu ở `/site`) → V4–V7 di trú `/procurement`, `/commercial`, `/schedule`, `/governance` (song song sau khi V3 merge) → V8 viết lại nav + chốt tài liệu.
+
 ## Snapshot điều hành — 14–15/08/2026
 
 | Track                                             | Trạng thái chuẩn hoá                                 | Bằng chứng chính                                                                   | Cổng tiếp theo                                                             |

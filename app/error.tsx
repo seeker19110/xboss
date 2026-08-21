@@ -143,14 +143,14 @@ Stack: ${error.stack || "N/A"}`;
                 <span>Nghiệm Thu (BBNT)</span>
               </Link>
               <Link
-                href="/materials"
+                href="/procurement?tab=inventory"
                 className="p-3 rounded-lg bg-zinc-950/80 border border-zinc-800 hover:border-amber-500/50 hover:bg-amber-950/20 text-xs font-medium transition flex items-center gap-2 text-zinc-200"
               >
                 <Package className="w-4 h-4 text-amber-400" />
                 <span>Vật Tư & Thiết Bị</span>
               </Link>
               <Link
-                href="/finance"
+                href="/commercial?tab=cashflow-esign"
                 className="p-3 rounded-lg bg-zinc-950/80 border border-zinc-800 hover:border-violet-500/50 hover:bg-violet-950/20 text-xs font-medium transition flex items-center gap-2 text-zinc-200"
               >
                 <DollarSign className="w-4 h-4 text-violet-400" />

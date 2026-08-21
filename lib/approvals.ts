@@ -306,7 +306,7 @@ export async function pendingForUserDisplay(
     );
     for (const r of rows) {
       label.set(key("variation", r.id), `${r.code} — ${r.title}`);
-      linkUrl.set(key("variation", r.id), "/variations");
+      linkUrl.set(key("variation", r.id), "/commercial?tab=vo-variations");
     }
   }
   const certIds = idsByType.get("payment_cert");
@@ -319,7 +319,7 @@ export async function pendingForUserDisplay(
     );
     for (const r of rows) {
       label.set(key("payment_cert", r.id), `${r.code} — ${r.contractTitle}`);
-      linkUrl.set(key("payment_cert", r.id), "/payments");
+      linkUrl.set(key("payment_cert", r.id), "/commercial?tab=ipc-payments&sub=payments");
     }
   }
   const proposalIds = idsByType.get("proposal");
@@ -330,7 +330,7 @@ export async function pendingForUserDisplay(
     );
     for (const r of rows) {
       label.set(key("proposal", r.id), `${r.code} — ${r.title}`);
-      linkUrl.set(key("proposal", r.id), "/proposals");
+      linkUrl.set(key("proposal", r.id), "/commercial?tab=ipc-payments&sub=proposals");
     }
   }
   const taskIds = idsByType.get("task_acceptance");

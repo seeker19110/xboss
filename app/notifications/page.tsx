@@ -679,7 +679,7 @@ export default function NotificationsPage() {
                   {materialOver.map((m) => (
                     <a
                       key={m.id}
-                      href="/materials"
+                      href="/procurement?tab=inventory"
                       className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/50 transition group"
                     >
                       <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
