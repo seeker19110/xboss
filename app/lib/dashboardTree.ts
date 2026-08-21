@@ -78,6 +78,7 @@ import {
   Sparkles,
   Scissors,
   Brain,
+  Split,
   LayoutGrid,
   Scan,
   Route,
@@ -369,6 +370,7 @@ export const DASHBOARD_TREE: DashCluster[] = [
         icon: PencilRuler,
       },
       { id: "dash.bim", href: "/mo-hinh-bim", label: "Mô hình BIM", icon: Box },
+      { id: "dash.combine", href: "/combine", label: "Combine", icon: Split },
       {
         id: "dash.shop-drawing",
         href: "/shopdrawings",
