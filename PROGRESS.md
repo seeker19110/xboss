@@ -25,6 +25,15 @@
 | ENG-4 — Multi-Agent Engineering OS                | ✅ Hoàn tất về code                                  | `0087`, claims/conflicts, authority-based reconciliation, no-consensus             | Chạy pilot với agent thật; XBoss không tự thực thi thay đổi                |
 | Tầng tương lai (Digital Twin/Predictive/Autonomy) | ⏸ Hoãn có chủ đích                                   | `ENGINEERING-OS-FUTURE-SYSTEMS.md`                                                 | Chỉ mở khi ENG-1..4 có traffic thật, chỉ số chất lượng và owner vận hành   |
 
+## Tái Cấu Trúc Giao Diện Quản Lý Bản Vẽ & Các Phân Hệ Liên Quan (2026-08-21)
+
+- **[AI, đã làm] Nâng Cấp Bàn Làm Việc Bản Vẽ Chuẩn MEPF (`app/ban-ve/page.tsx`):**
+  - Loại bỏ 2 nút cũ bên phải ("Bản Vẽ & BPTC", "Thay Đổi Thiết Kế").
+  - Thêm 4 tab nghiệp vụ mới kèm badge đếm số lượng thời gian thực: _Bản vẽ thiết kế_, _Bản vẽ trình duyệt_, _Bản vẽ đã duyệt_, _Bản vẽ chưa duyệt_ (kèm tab _Tất cả_).
+  - **Cột bên trái:** Gom nhóm danh sách bản vẽ theo từng tầng (Floor Accordion) với chỉ số tiến độ duyệt từng tầng (`✓ đã duyệt`, `⏳ chờ duyệt`, `✕ từ chối`), nút đóng/mở tầng và bộ lọc 5 phân hệ (M-E-P-F-ELV).
+  - **Cột bên phải:** Liệt kê đầy đủ toàn bộ lịch sử các phiên bản chỉnh sửa của bản vẽ (Revisions: Rev C $\rightarrow$ Rev B $\rightarrow$ Rev A), xem file đính kèm, kích thước, ngày trình/duyệt, kỹ sư tải, ghi chú chỉnh sửa, các nút duyệt cho Admin/PM và khu vực tải lên revision mới.
+  - Đồng bộ tự động trên toàn bộ các trang: `/shopdrawings`, `/ban-ve`, `/ban-ve-thiet-ke`, `/ban-ve-hoan-cong`, `/bien-phap-thi-cong`, `/mo-hinh-bim`.
+
 ## Hợp Nhất Toàn Diện Code Các Tính Năng Cùng Nhóm Vào 7 Unified Hubs & Facades (2026-08-21)
 
 - **[AI, đã làm] Hợp Nhất Toàn Diện Năng Lực BIM Vào Unified Facade (`lib/bim/index.ts`):**
