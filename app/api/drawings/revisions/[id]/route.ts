@@ -66,7 +66,7 @@ async function notifyRevisionDecision(
     );
   }
 
-  await sendPushToUsers(recipients, { title: "Bản vẽ", body: message, url: "/drawings" }).catch(
+  await sendPushToUsers(recipients, { title: "Bản vẽ", body: message, url: "/ban-ve" }).catch(
     () => {
       /* push lỗi không được chặn việc cập nhật trạng thái */
     },

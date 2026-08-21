@@ -6,7 +6,7 @@ import AxeBuilder from "@axe-core/playwright";
 // tạo mới, mở chi tiết và a11y.
 
 async function gotoDrawings(page: Page) {
-  await page.goto("/drawings");
+  await page.goto("/ban-ve");
   await expect(page.getByPlaceholder("Tìm mã, tên, hệ, tầng...")).toBeVisible({ timeout: 15_000 });
 }
 

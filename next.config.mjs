@@ -16,6 +16,15 @@ const nextConfig = {
     formats: ["image/avif", "image/webp"],
     minimumCacheTTL: 3600,
   },
+  async redirects() {
+    return [
+      {
+        source: "/drawings",
+        destination: "/ban-ve",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       // Chunk JS/CSS build Next (tên file hash) — cache vĩnh viễn, immutable

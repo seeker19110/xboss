@@ -111,7 +111,7 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     const link = sidebar.getByRole("link", { name: "Biện pháp thi công", exact: true });
     await expect(link).toBeVisible();
     await link.click();
-    await expect(page).toHaveURL(/\/drawings\?kind=method$/);
+    await expect(page).toHaveURL(/\/bien-phap-thi-cong$/);
 
     // Topbar hiển thị đúng loại đang xem; hàng chip lọc loại đã bỏ khỏi trang.
     await expect(

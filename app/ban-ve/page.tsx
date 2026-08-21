@@ -134,26 +134,26 @@ function canDecideRevision(role?: string) {
   return role === "admin" || role === "pm";
 }
 
-export default function DrawingsPage() {
+export default function DrawingsPage({ fixedKind }: { fixedKind?: DrawingKind } = {}) {
   return (
     <Suspense fallback={<PageSkeleton />}>
-      <DrawingsPageInner />
+      <DrawingsPageInner fixedKind={fixedKind} />
     </Suspense>
   );
 }
 
 const DRAWING_KIND_VALUES = ["design", "method", "bim", "shop", "asbuilt"] as const;
 
-function DrawingsPageInner() {
+function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
   const searchParams = useSearchParams();
-  // Loại bản vẽ lấy THẲNG từ URL — chọn loại bằng 5 link cụm "Thiết kế & BPTC" ở
-  // sidebar (không còn chip loại trên trang), đổi loại = điều hướng sang ?kind= khác.
+  // Loại bản vẽ lấy từ fixedKind (khi truy cập route riêng như /ban-ve-thiet-ke)
+  // hoặc từ URL ?kind= (khi truy cập /ban-ve?kind=...).
   const kindParam = searchParams.get("kind");
-  const kindFilter: DrawingKind | "all" = (DRAWING_KIND_VALUES as readonly string[]).includes(
-    kindParam ?? "",
-  )
-    ? (kindParam as DrawingKind)
-    : "all";
+  const kindFilter: DrawingKind | "all" =
+    fixedKind ??
+    ((DRAWING_KIND_VALUES as readonly string[]).includes(kindParam ?? "")
+      ? (kindParam as DrawingKind)
+      : "all");
 
   const [me, setMe] = useState<Me | null>(null);
   const [items, setItems] = useState<DrawingRow[]>([]);

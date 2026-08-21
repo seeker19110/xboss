@@ -358,31 +358,31 @@ export const DASHBOARD_TREE: DashCluster[] = [
     dashboards: [
       {
         id: "dash.ban-ve",
-        href: "/drawings",
+        href: "/ban-ve",
         label: "Tất cả bản vẽ",
         icon: PencilRuler,
         exact: true,
       },
       {
         id: "dash.thiet-ke",
-        href: "/drawings?kind=design",
+        href: "/ban-ve-thiet-ke",
         label: "Thiết kế",
         icon: Compass,
       },
       {
         id: "dash.bien-phap-thi-cong",
-        href: "/drawings?kind=method",
+        href: "/bien-phap-thi-cong",
         label: "Biện pháp thi công",
         icon: HardHat,
       },
-      { id: "dash.bim", href: "/drawings?kind=bim", label: "BIM", icon: Box },
+      { id: "dash.bim", href: "/mo-hinh-bim", label: "BIM", icon: Box },
       {
         id: "dash.shop-drawing",
-        href: "/drawings?kind=shop",
+        href: "/shopdrawings",
         label: "Shop drawing",
         icon: FileText,
       },
-      { id: "dash.as-built", href: "/drawings?kind=asbuilt", label: "As-built", icon: BadgeCheck },
+      { id: "dash.as-built", href: "/ban-ve-hoan-cong", label: "As-built", icon: BadgeCheck },
     ],
   },
   // Cụm 6: Quản lý vật tư & Chuỗi cung ứng — Gộp BOQ, Kho, PO/PR, Quét QR, NCC & Đấu thầu thầu phụ

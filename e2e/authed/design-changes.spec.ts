@@ -8,7 +8,7 @@ import AxeBuilder from "@axe-core/playwright";
 // project desktop/mobile (cùng chia sẻ 1 DB test, chạy song song).
 
 async function gotoDesignChanges(page: Page) {
-  await page.goto("/drawings");
+  await page.goto("/ban-ve");
   await expect(page.getByPlaceholder("Tìm mã, tên, hệ, tầng...")).toBeVisible({ timeout: 15_000 });
   await page.getByRole("button", { name: "Thay đổi thiết kế" }).click();
   await expect(page.getByRole("button", { name: "Tất cả trạng thái" })).toBeVisible();
