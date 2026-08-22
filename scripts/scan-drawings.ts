@@ -91,19 +91,47 @@ function parseDrawingInfo(filename: string) {
   };
 }
 
+function getAllDrawingFilesRecursively(
+  dir: string,
+): Array<{ fullPath: string; relativePath: string; fileName: string }> {
+  const results: Array<{ fullPath: string; relativePath: string; fileName: string }> = [];
+  try {
+    const stack: string[] = [""];
+    while (stack.length > 0) {
+      const currentRel = stack.pop()!;
+      const currentFull = join(dir, currentRel);
+      const entries = readdirSync(currentFull, { withFileTypes: true });
+      for (const entry of entries) {
+        const relPath = currentRel ? `${currentRel}/${entry.name}` : entry.name;
+        if (entry.isDirectory()) {
+          stack.push(relPath);
+        } else if (entry.isFile()) {
+          const ext = extname(entry.name).toLowerCase();
+          if (
+            [".dwg", ".dxf", ".pdf", ".png", ".jpg", ".ifc"].includes(ext) &&
+            !entry.name.endsWith(".dwl") &&
+            !entry.name.endsWith(".dwl2") &&
+            !entry.name.endsWith(".bak")
+          ) {
+            results.push({
+              fullPath: join(currentFull, entry.name),
+              relativePath: relPath,
+              fileName: entry.name,
+            });
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    console.error(`❌ Không đọc được thư mục ${dir}:`, err.message);
+  }
+  return results;
+}
+
 async function main() {
   console.log(`🔍 Bắt đầu quét thư mục bản vẽ: ${DRAWINGS_DIR}`);
 
-  let files: string[] = [];
-  try {
-    files = readdirSync(DRAWINGS_DIR).filter((f) => {
-      const ext = extname(f).toLowerCase();
-      return [".pdf", ".dwg", ".dxf", ".png", ".jpg", ".ifc"].includes(ext);
-    });
-  } catch (err: any) {
-    console.error(`❌ Không đọc được thư mục ${DRAWINGS_DIR}:`, err.message);
-    process.exit(1);
-  }
+  const files = getAllDrawingFilesRecursively(DRAWINGS_DIR);
 
   if (files.length === 0) {
     console.log(`ℹ️ Thư mục ${DRAWINGS_DIR} hiện chưa có file bản vẽ nào.`);
@@ -117,12 +145,12 @@ async function main() {
   console.log(`📦 Tìm thấy ${files.length} file bản vẽ. Đang đồng bộ vào Database...`);
 
   let syncedCount = 0;
-  for (const filename of files) {
-    const fullPath = join(DRAWINGS_DIR, filename);
+  for (const item of files) {
+    const fullPath = item.fullPath;
     const stat = statSync(fullPath);
     const content = readFileSync(fullPath);
     const sha256 = createHash("sha256").update(content).digest("hex");
-    const info = parseDrawingInfo(filename);
+    const info = parseDrawingInfo(item.fileName);
 
     // Lấy default project nếu có
     const defaultProject = await queryOne<{ id: number }>(
@@ -172,12 +200,12 @@ async function main() {
          ) VALUES (?, ?, 'approved', ?, ?, ?, NOW(), 1, NOW())`,
         drawing.id,
         info.rev,
-        `drawings/${filename}`,
+        `drawings/${item.relativePath}`,
         stat.size,
         sha256,
       );
       console.log(
-        `    -> Đã đăng ký phiên bản ${info.rev} (File: ${filename}, Size: ${(stat.size / 1024).toFixed(1)} KB)`,
+        `    -> Đã đăng ký phiên bản ${info.rev} (File: ${item.fileName}, Size: ${(stat.size / 1024).toFixed(1)} KB)`,
       );
       syncedCount++;
     }

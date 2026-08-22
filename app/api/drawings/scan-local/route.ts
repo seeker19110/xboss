@@ -92,6 +92,46 @@ function parseDrawingInfo(filename: string) {
   };
 }
 
+function getAllDrawingFilesRecursively(
+  dir: string,
+): Array<{ fullPath: string; relativePath: string; fileName: string }> {
+  const results: Array<{ fullPath: string; relativePath: string; fileName: string }> = [];
+  if (!existsSync(dir)) return results;
+
+  const stack: string[] = [""];
+  while (stack.length > 0) {
+    const currentRel = stack.pop()!;
+    const currentFull = join(dir, currentRel);
+    try {
+      const entries = readdirSync(currentFull, { withFileTypes: true });
+      for (const entry of entries) {
+        const relPath = currentRel ? `${currentRel}/${entry.name}` : entry.name;
+        if (entry.isDirectory()) {
+          stack.push(relPath);
+        } else if (entry.isFile()) {
+          const ext = extname(entry.name).toLowerCase();
+          if (
+            [".dwg", ".dxf", ".pdf", ".png", ".jpg", ".ifc"].includes(ext) &&
+            !entry.name.endsWith(".dwl") &&
+            !entry.name.endsWith(".dwl2") &&
+            !entry.name.endsWith(".bak")
+          ) {
+            results.push({
+              fullPath: join(currentFull, entry.name),
+              relativePath: relPath,
+              fileName: entry.name,
+            });
+          }
+        }
+      }
+    } catch {
+      // skip errors
+    }
+  }
+
+  return results;
+}
+
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -105,20 +145,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const files = readdirSync(DRAWINGS_DIR).filter((f) => {
-    const ext = extname(f).toLowerCase();
-    return [".pdf", ".dwg", ".dxf", ".png", ".jpg", ".ifc"].includes(ext);
-  });
-
+  const files = getAllDrawingFilesRecursively(DRAWINGS_DIR);
   const projectId = (await getCurrentProjectId(user)) || 1;
   let synced = 0;
 
-  for (const filename of files) {
-    const fullPath = join(DRAWINGS_DIR, filename);
+  for (const item of files) {
+    const fullPath = item.fullPath;
     const stat = statSync(fullPath);
     const content = readFileSync(fullPath);
     const sha256 = createHash("sha256").update(content).digest("hex");
-    const info = parseDrawingInfo(filename);
+    const info = parseDrawingInfo(item.fileName);
 
     let drawing = await queryOne<{ id: number }>(
       `SELECT id FROM drawings WHERE code = ? AND project_id = ?`,
@@ -157,7 +193,7 @@ export async function POST(req: NextRequest) {
          ) VALUES (?, ?, 'approved', ?, ?, ?, NOW(), ?, NOW())`,
         drawing.id,
         info.rev,
-        `drawings/${filename}`,
+        `drawings/${item.relativePath}`,
         stat.size,
         sha256,
         user.id,
@@ -170,6 +206,6 @@ export async function POST(req: NextRequest) {
     ok: true,
     totalFilesOnDisk: files.length,
     newlySyncedRevisions: synced,
-    message: `Đã quét và đồng bộ ${synced} bản vẽ mới từ thư mục vào hệ thống.`,
+    message: `Đã quét và đồng bộ ${synced} bản vẽ mới (${files.length} tệp trên đĩa) vào hệ thống.`,
   });
 }

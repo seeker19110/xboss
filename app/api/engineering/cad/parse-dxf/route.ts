@@ -1,69 +1,67 @@
 import { NextResponse } from "next/server";
+import { readdirSync, statSync, readFileSync, existsSync } from "node:fs";
+import { join, basename, extname } from "node:path";
 import { getCurrentUser, CAN } from "@/lib/auth";
-import { parseDxf, generateStandardizedAutocadScript } from "@/lib/cad/dxf-parser";
+import { parseDxf, parseDwgBinary, generateStandardizedAutocadScript } from "@/lib/cad/dxf-parser";
 import { queryOne } from "@/lib/db";
+import { storageGet } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
-// Sample DXF generator for design drawing preview when drawing has no raw file uploaded yet
-function generateSampleDxfForDrawing(
-  code: string,
-  name: string,
-  systemGroup?: string | null,
-): string {
-  const isHvac =
-    !systemGroup ||
-    systemGroup.includes("M") ||
-    systemGroup.includes("GIÓ") ||
-    systemGroup.includes("HVAC");
-  const isPlumb = systemGroup?.includes("P") || systemGroup?.includes("NƯỚC");
-  const isElec = systemGroup?.includes("E") || systemGroup?.includes("ĐIỆN");
-  const isFire = systemGroup?.includes("F") || systemGroup?.includes("PCCC");
+const DRAWINGS_DIR = join(process.cwd(), "data", "uploads", "drawings");
 
-  let dxf = `0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n`;
+/**
+ * Tìm kiếm đệ quy tệp trong thư mục data/uploads/drawings
+ */
+function findRealFileOnDisk(
+  queryStr: string,
+): { fullPath: string; relativePath: string; fileName: string } | null {
+  if (!existsSync(DRAWINGS_DIR)) return null;
 
-  // Layers
-  dxf += `0\nLAYER\n2\n01_ONG_GIO_CAP\n62\n140\n6\nCONTINUOUS\n`;
-  dxf += `0\nLAYER\n2\n02_ONG_GIO_HOI\n62\n150\n6\nCONTINUOUS\n`;
-  dxf += `0\nLAYER\n2\nDIEN_MANG_CAP_DONG_LUC\n62\n40\n6\nCONTINUOUS\n`;
-  dxf += `0\nLAYER\n2\nNUOC_LANH_PPR\n62\n70\n6\nCONTINUOUS\n`;
-  dxf += `0\nLAYER\n2\nCAP_THOAT_NUOC_THAI\n62\n170\n6\nCONTINUOUS\n`;
-  dxf += `0\nLAYER\n2\nPCCC_ONG_CHUA_CHAY\n62\n10\n6\nCONTINUOUS\n`;
-  dxf += `0\nLAYER\n2\nTRUC_LUOI_DANG_THEP\n62\n8\n6\nCENTER\n`;
-  dxf += `0\nLAYER\n2\nTEXT_GHI_CHU\n62\n7\n6\nCONTINUOUS\n`;
-  dxf += `0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n`;
+  const cleanQuery = queryStr
+    .trim()
+    .toLowerCase()
+    .replace(/\.(dwg|dxf|pdf|bak)$/i, "");
+  const stack: string[] = [""];
 
-  // HVAC Routes
-  dxf += `0\nLINE\n8\n01_ONG_GIO_CAP\n10\n1200\n20\n2400\n30\n3100\n11\n15400\n21\n2400\n31\n3100\n`;
-  dxf += `0\nLINE\n8\n02_ONG_GIO_HOI\n10\n1200\n1600\n30\n3100\n11\n15400\n21\n1600\n31\n3100\n`;
-  dxf += `0\nTEXT\n8\nTEXT_GHI_CHU\n10\n4000\n20\n2450\n30\n3100\n1\nèng giã cÊp l¹nh AHU-01 800x500 BOP=+2.85m\n`;
+  while (stack.length > 0) {
+    const currentRel = stack.pop()!;
+    const currentFull = join(DRAWINGS_DIR, currentRel);
+    try {
+      const entries = readdirSync(currentFull, { withFileTypes: true });
+      for (const entry of entries) {
+        const relPath = currentRel ? `${currentRel}/${entry.name}` : entry.name;
+        if (entry.isDirectory()) {
+          stack.push(relPath);
+        } else if (entry.isFile()) {
+          const ext = extname(entry.name).toLowerCase();
+          if ([".dwg", ".dxf", ".pdf"].includes(ext)) {
+            const entryBase = basename(entry.name, ext).toLowerCase();
+            if (
+              entryBase === cleanQuery ||
+              entry.name.toLowerCase() === queryStr.toLowerCase() ||
+              entryBase.includes(cleanQuery) ||
+              cleanQuery.includes(entryBase) ||
+              relPath.toLowerCase().includes(queryStr.toLowerCase())
+            ) {
+              return {
+                fullPath: join(currentFull, entry.name),
+                relativePath: relPath,
+                fileName: entry.name,
+              };
+            }
+          }
+        }
+      }
+    } catch {
+      // skip unreadable directories
+    }
+  }
 
-  // Electrical Tray
-  dxf += `0\nLINE\n8\nDIEN_MANG_CAP_DONG_LUC\n10\n1200\n3200\n30\n2900\n11\n15400\n21\n3200\n31\n2900\n`;
-  dxf += `0\nTEXT\n8\nTEXT_GHI_CHU\n10\n5000\n20\n3250\n30\n2900\n1\nM¸ng c¸p 400x100 ®éng lùc h¹ thÕ\n`;
-
-  // Chiller Pipes & Drainage
-  dxf += `0\nLINE\n8\nNUOC_LANH_PPR\n10\n1200\n3800\n30\n2600\n11\n15400\n21\n3800\n31\n2600\n`;
-  dxf += `0\nTEXT\n8\nTEXT_GHI_CHU\n10\n6000\n20\n3850\n30\n2600\n1\nèng n−íc l¹nh Chiller Supply DN150 %%c168\n`;
-  dxf += `0\nLINE\n8\nCAP_THOAT_NUOC_THAI\n10\n1200\n4200\n30\n2550\n11\n15400\n21\n4200\n31\n2337\n`;
-  dxf += `0\nTEXT\n8\nTEXT_GHI_CHU\n10\n7000\n20\n4250\n30\n2450\n1\nèng thãt n−íc D114 dèc i=1.5% BOP=+2250\n`;
-
-  // Firefighting
-  dxf += `0\nLINE\n8\nPCCC_ONG_CHUA_CHAY\n10\n1200\n4600\n30\n2700\n11\n15400\n21\n4600\n31\n2700\n`;
-  dxf += `0\nINSERT\n8\nPCCC_ONG_CHUA_CHAY\n2\nBLK_SPRINKLER_PENDENT\n10\n3000\n20\n4600\n30\n2700\n`;
-  dxf += `0\nINSERT\n8\nPCCC_ONG_CHUA_CHAY\n2\nBLK_SPRINKLER_PENDENT\n10\n6000\n20\n4600\n30\n2700\n`;
-  dxf += `0\nINSERT\n8\n01_ONG_GIO_CAP\n2\nBLK_DIFFUSER_600\n10\n3500\n20\n2400\n30\n2800\n`;
-
-  // Grid
-  dxf += `0\nLINE\n8\nTRUC_LUOI_DANG_THEP\n10\n1000\n1000\n30\n0\n11\n1000\n5000\n31\n0\n`;
-  dxf += `0\nLINE\n8\nTRUC_LUOI_DANG_THEP\n10\n16000\n1000\n30\n0\n11\n16000\n5000\n31\n0\n`;
-  dxf += `0\nTEXT\n8\nTRUC_LUOI_DANG_THEP\n10\n1000\n800\n30\n0\n1\nTrôc A cao ®é %%p0.000\n`;
-
-  dxf += `0\nENDSEC\n0\nEOF\n`;
-  return dxf;
+  return null;
 }
 
-// POST /api/engineering/cad/parse-dxf — Phân tích tệp DXF và sinh chuẩn hóa
+// POST /api/engineering/cad/parse-dxf — Phân tích tệp CAD thật (DXF/DWG/PDF) hoặc nội dung tải lên
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -74,35 +72,105 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     let dxfContent: string = body.dxfContent || "";
+    let fileBase64: string = body.fileBase64 || "";
     let fileName = body.fileName || "drawing_model.dxf";
+    let realFileFound = false;
+    let sourcePath = fileName;
+    let fileBuffer: Buffer | null = null;
 
-    // Nếu chọn từ bản vẽ thiết kế sẵn có
-    if (!dxfContent && body.drawingId) {
-      const drawing = await queryOne<{ code: string; name: string; system_group: string | null }>(
-        `SELECT code, name, system_group FROM drawings WHERE id = ?`,
-        [Number(body.drawingId)],
-      );
-      if (drawing) {
-        fileName = `${drawing.code}.dxf`;
-        dxfContent = generateSampleDxfForDrawing(drawing.code, drawing.name, drawing.system_group);
+    // 1. Nếu client truyền tệp Base64 (upload tệp nhị phân DWG / PDF / DXF trực tiếp)
+    if (fileBase64) {
+      fileBuffer = Buffer.from(fileBase64, "base64");
+      realFileFound = true;
+    }
+
+    // 2. Nếu truyền đường dẫn tệp cụ thể trên đĩa (filePath)
+    if (!fileBuffer && body.filePath) {
+      const explicitPath = join(DRAWINGS_DIR, body.filePath);
+      if (existsSync(explicitPath) && statSync(explicitPath).isFile()) {
+        fileBuffer = readFileSync(explicitPath);
+        fileName = basename(explicitPath);
+        sourcePath = body.filePath;
+        realFileFound = true;
       }
     }
 
-    if (!dxfContent) {
-      // Fallback to default full AVIO Tower A sample drawing
-      dxfContent = generateSampleDxfForDrawing(
-        "AVIO-DWG-M-FL04-01",
-        "Bản vẽ HVAC & Cấp Thoát Nước Tầng 4 Tháp A",
-      );
+    // 3. Nếu chọn từ bản vẽ thiết kế trong cơ sở dữ liệu (drawingId)
+    if (!fileBuffer && body.drawingId) {
+      const drawing = await queryOne<{
+        id: number;
+        code: string;
+        name: string;
+        system_group: string | null;
+      }>(`SELECT id, code, name, system_group FROM drawings WHERE id = ?`, [
+        Number(body.drawingId),
+      ]);
+
+      if (drawing) {
+        fileName = `${drawing.code}.dwg`;
+        // Kiểm tra trong drawing_revisions
+        const rev = await queryOne<{ file_name: string; original_name: string | null }>(
+          `SELECT file_name, original_name FROM drawing_revisions WHERE drawing_id = ? ORDER BY id DESC LIMIT 1`,
+          [drawing.id],
+        );
+
+        if (rev?.file_name) {
+          const revBuf = await storageGet(user.orgId, rev.file_name);
+          if (revBuf) {
+            fileBuffer = Buffer.from(revBuf);
+            fileName = rev.original_name || rev.file_name;
+            sourcePath = rev.file_name;
+            realFileFound = true;
+          }
+        }
+
+        // Nếu chưa có trong storage, tìm kiếm đệ quy trong thư mục data/uploads/drawings
+        if (!fileBuffer) {
+          const diskMatch = findRealFileOnDisk(drawing.code) || findRealFileOnDisk(drawing.name);
+          if (diskMatch) {
+            fileBuffer = readFileSync(diskMatch.fullPath);
+            fileName = diskMatch.fileName;
+            sourcePath = diskMatch.relativePath;
+            realFileFound = true;
+          }
+        }
+      }
     }
 
-    const result = parseDxf(dxfContent, fileName);
+    // 4. Nếu truyền fileName hoặc chưa tìm thấy, thử tìm trên đĩa theo fileName
+    if (!fileBuffer && !dxfContent && fileName) {
+      const diskMatch = findRealFileOnDisk(fileName);
+      if (diskMatch) {
+        fileBuffer = readFileSync(diskMatch.fullPath);
+        fileName = diskMatch.fileName;
+        sourcePath = diskMatch.relativePath;
+        realFileFound = true;
+      }
+    }
+
+    let result;
+    if (fileBuffer) {
+      const ext = extname(fileName).toLowerCase();
+      if (ext === ".dwg" || fileBuffer.subarray(0, 4).toString("ascii").startsWith("AC10")) {
+        result = parseDwgBinary(fileBuffer, fileName);
+      } else {
+        result = parseDxf(fileBuffer.toString("utf8"), fileName);
+      }
+      result.isRealDrawing = true;
+      result.sourcePath = sourcePath;
+      result.fileSizeBytes = fileBuffer.length;
+    } else {
+      result = parseDxf(dxfContent, fileName);
+    }
+
     const scrScript = generateStandardizedAutocadScript(result.layers);
 
     return NextResponse.json({
       success: true,
       data: result,
       scrScript,
+      realFileFound,
+      sourcePath,
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
