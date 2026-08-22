@@ -8,6 +8,7 @@ import {
   DxfEntityRaw,
   resolveXrefDependencies,
   bindXrefToMaster,
+  DwgUnsupportedError,
 } from "@/lib/cad/dxf-parser";
 
 describe("CAD DXF Parser & 2D-to-3D Spatial Extrusion Suite", () => {
@@ -190,17 +191,13 @@ EOF`;
     assert.ok(scr.includes("AUDIT Y"));
   });
 
-  it("5. parseDxf giải mã và trích xuất cấu trúc layer và metadata khi nạp tệp DWG nhị phân", () => {
+  it("5. parseDxf từ chối tệp DWG nhị phân thay vì bịa layer/metadata (M99 PR0)", () => {
     const sampleDwgBuffer = Buffer.alloc(512);
     sampleDwgBuffer.write("AC1027", 0, 6, "ascii");
     sampleDwgBuffer.write("M-HVAC-DUCT-SUPP", 64, "latin1");
     sampleDwgBuffer.write("P-PIPE-COLD", 128, "latin1");
 
-    const parsed = parseDxf(sampleDwgBuffer, "23056-VHT-CD-A-M-205.dwg");
-
-    assert.equal(parsed.isRealDrawing, true);
-    assert.ok(parsed.layers.length >= 2, "Phải trích xuất được layer từ DWG binary");
-    assert.equal(parsed.fileName, "23056-VHT-CD-A-M-205.dwg");
+    assert.throws(() => parseDxf(sampleDwgBuffer, "23056-VHT-CD-A-M-205.dwg"), DwgUnsupportedError);
   });
 
   it("6. resolveXrefDependencies & bindXrefToMaster tự động nhận diện và gộp XREF", () => {

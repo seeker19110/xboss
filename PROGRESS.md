@@ -13,6 +13,76 @@
 - **Lộ trình hoàn thành (chờ duyệt, chưa code):** `PROJECT-COMPLETION-ROADMAP.md` chốt C0→C6 để đạt XBoss v1.0/Product Complete và O1→O5 cho Engineering OS/Vision Complete theo gate; không coi tài liệu là quyền tự triển khai production hoặc A3+.
 - **Spec pack chi tiết (chờ duyệt):** C0, C2–C6 và OS-1–OS-5 đã có file thi hành riêng (C1 dùng ENG-5), mỗi file gồm scope, data/API/UI/ops, test, chia PR và DoD. Chưa phase nào được đánh dấu triển khai chỉ vì đặc tả đã viết.
 
+## Kế hoạch tổng thể chuẩn hóa bản vẽ: ADR-0006 + M99 (2026-08-22, **Draft, chờ duyệt**)
+
+- **Quyết định kiến trúc (`docs/adr/0006-plugin-autocad-va-pipeline-server.md`):** ngừng
+  viết lại AutoCAD bằng TypeScript. Chuẩn hóa bản vẽ chuyển sang **plugin AutoCAD .NET**
+  chạy trên máy kỹ sư (**tầng 2**), pipeline server giữ vai kiểm định + chạy hàng loạt +
+  xuất R2000 (**tầng 3**). **Bỏ tầng 1** (`.SCR`/AutoLISP) — chỉ có giá trị khi phải phủ
+  AutoCAD LT / CAD hãng khác, mà người dùng chạy **AutoCAD full**.
+- **Hai bài toán tự biến mất:** plugin đọc/ghi DWG gốc → **không cần ODA File Converter**;
+  AutoCAD tự ghi tệp → **không còn khả năng sinh tệp hỏng**, và câu hỏi R12/R2000 rời khỏi
+  đường chính (R2000 chỉ còn cần cho tầng 3).
+- **3 nguyên tắc ràng buộc:** (1) **một nguồn quy tắc** — XBoss phát hành _rule pack_ có
+  version, plugin tải về chứ không nhúng cứng, nếu không 2 tầng chắc chắn trôi khác nhau;
+  (2) **không tin client** — server kiểm định lại mọi thứ nhận vào, plugin tải lên DWG kèm
+  **DXF sidecar** để server kiểm mà không phải đọc DWG; (3) **không sửa bản vẽ âm thầm** —
+  mặc định là chế độ chỉ-kiểm, mọi thay đổi nằm trong **1 nhóm UNDO**, luôn kèm báo cáo diff.
+- **Đặc tả tầng 2 (`docs/nang-cap/M99-plugin-autocad-chuan-hoa.md`):** 8 PR (PR0→PR7). Tách
+  `XBoss.Cad.Core` (quy tắc thuần C#, **unit test chạy được trên CI không cần AutoCAD**) khỏi
+  Adapter gọi API AutoCAD. Thêm bảng `api_tokens` cho ghép thiết bị desktop — **vùng rủi ro
+  cao, chạm `lib/auth.ts`, phải rà `docs/audit.md`**.
+- **M98 thu hẹp còn tầng 3**, PR4 (ODA) bị bỏ.
+- **Rủi ro số 1: trôi quy tắc giữa 2 tầng** → chống bằng rule pack một nguồn + test đối chứng
+  chạy cùng bộ bản vẽ mẫu qua cả 2 tầng (AC6 của M99).
+- **Đời AutoCAD — ĐÃ CHỐT (M99 §9.1): AutoCAD 2026, một bản build .NET 8.** Không hỗ trợ
+  2021–2024 (Autodesk đổi runtime Managed API từ 2025: 2021–2024 = .NET Framework 4.8,
+  2025+ = .NET 8; plugin build cho nền này không nạp được trên nền kia). Đơn giản hoá kèm
+  theo: `XBoss.Cad.Core` target thẳng **`net8.0`** (không cần `netstandard2.0` nữa),
+  `XBoss.Cad.Acad` target `net8.0-windows` tham chiếu ObjectARX SDK 2026; plugin kiểm
+  `ACADVER` lúc nạp và từ chối có thông báo nếu không phải 2026. Định dạng DWG vẫn là
+  DWG 2018 (AC1032) nên tệp do 2026 ghi ra vẫn mở được trên máy đời cũ — nâng phiên bản
+  không cô lập ai về trao đổi tệp. Máy đời cũ vẫn dùng được **tầng 3**.
+- **Quyết định còn mở, chặn PR3 của M99:** có runner Windows có license AutoCAD 2026 cho CI
+  không (`accoreconsole`) — nếu không, test tích hợp phải chạy tay theo release và ghi rõ
+  trong DoD. Kèm 1 assumption phải xác minh ở đầu PR3: đọc `ImageRuntimeVersion` của
+  `acmgd.dll` 2026 để chốt đúng `TargetFramework`, không tin con số trong tài liệu.
+- **PR0 (bỏ nhánh bịa hình học trong `parseDwgBinary`) tách làm ngay**, độc lập mọi thứ khác.
+- **PR0 — ĐÃ LÀM (2026-08-22, PR #366):** `parseDwgBinary` (`lib/cad/dxf-parser.ts`) không
+  còn quét chuỗi/bịa toạ độ — giờ **luôn ném `DwgUnsupportedError`** kèm thông báo tiếng Việt
+  hướng dẫn lưu sang DXF trong AutoCAD (`DWG_UNSUPPORTED_MESSAGE`). Cập nhật mọi điểm gọi:
+  `POST /api/engineering/cad/convert-to-dxf` trả 422 thẳng cho DWG (bỏ gọi parser);
+  `POST /api/engineering/cad/parse-dxf` bắt `DwgUnsupportedError` → 422; trang
+  `/engineering/chuan-hoa-ban-ve` (upload tệp đơn + upload thư mục + chọn bản vẽ trong thư
+  mục) hiện toast thông báo thay vì gọi parser. Test cũ kỳ vọng trích xuất layer/entity giả
+  từ DWG đã đổi thành `assert.throws(DwgUnsupportedError)`
+  (`tests/dxf-real-drawing-parser.test.ts`, `tests/engineering-cad-dxf-parser.test.ts`).
+
+## Đặc tả M98 — DXF R2000 & tệp DWG (2026-08-22, **Draft, chờ duyệt**)
+
+- **Phát hiện nghiêm trọng, CHƯA sửa (chờ duyệt PR1):** `parseDwgBinary`
+  (`lib/cad/dxf-parser.ts:649`) **không phải bộ đọc DWG**. Nó quét chuỗi trong khối nhị
+  phân, đoán tên layer bằng regex, rồi **bịa toạ độ** từ chỉ số mảng
+  (`center: [1000 + (idx % 8) * 4000, ...]`). Toàn hàm chỉ sinh `TEXT` và `INSERT` —
+  **không có một đường nét hình học nào**. Hệ quả: `POST /api/engineering/cad/convert-to-dxf`
+  nhận DWG rồi trả về tệp DXF **mở được, trông hợp lệ, nhưng nội dung là bịa** — nguy hiểm
+  hơn tệp hỏng vì kỹ sư không nhận ra bằng mắt.
+- **Trả lời câu hỏi đọc thẳng DWG:** không khả thi bằng TypeScript. DWG là định dạng đóng,
+  không công bố, khác nhau theo phiên bản, nén LZ77 + đóng gói bit. Phương án chọn: **ODA
+  File Converter** chạy cục bộ trong image worker (bản vẽ không rời hạ tầng tự host); tạm
+  thời từ chối DWG kèm hướng dẫn xuất DXF từ AutoCAD.
+- **Kế hoạch R2000:** **không tự viết bộ ghi R2000 bằng TS** — R2000 đòi handle cho mọi thực
+  thể + `$HANDSEED` + con trỏ owner + subclass marker + đủ 9 bảng + section `OBJECTS` +
+  block `*D<n>` cho dimension; sai 1 chỗ là AutoCAD không mở, đúng lớp lỗi vừa xảy ra. Thay
+  vào đó **uỷ thác cho `ezdxf`** — thư viện chuẩn **đã cài sẵn** trong worker Python của dự
+  án (`Dockerfile.mepf-worker:25`), điều phối qua `lib/engineering-worker-bridge.ts`.
+- **Chia PR:** PR1 bỏ nhánh bịa hình học + từ chối DWG có hướng dẫn (**tách làm trước, độc
+  lập**); PR2 handler `export_dxf_r2000` trong worker + golden file; PR3 endpoint/UI chọn
+  định dạng; PR4 ODA File Converter (cần duyệt điều khoản).
+- **2 quyết định đang mở, chặn PR2/PR3:** (1) kỹ sư có thật sự cần dimension liên kết không,
+  hay R12 hiện tại đã đủ; (2) điều khoản redistribution của ODA. Xem
+  `docs/nang-cap/M98-dxf-r2000-va-dwg.md`.
+
 ## Sửa bug CI có sẵn trên main phát hiện khi mở PR health-check (2026-08-22)
 
 - **Bug thật, đã sửa:** `lib/db/index.ts::withProjectScope` — lời gọi LỒNG bên trong 1

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/auth";
-import { parseDwgBinary, exportDxf } from "@/lib/cad/dxf-parser";
+import { DWG_UNSUPPORTED_MESSAGE } from "@/lib/cad/dxf-parser";
 
 export const dynamic = "force-dynamic";
 
@@ -14,31 +14,16 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const fileName = body.fileName || "drawing.dwg";
-    const dxfFileName = fileName.replace(/\.dwg$/i, ".dxf");
-    const fileBase64 = body.fileBase64;
-
-    if (!fileBase64) {
+    if (!body.fileBase64) {
       return NextResponse.json(
         { error: "Cần cung cấp dữ liệu tệp DWG (fileBase64) để thực hiện chuyển đổi." },
         { status: 422 },
       );
     }
 
-    const buffer = Buffer.from(fileBase64, "base64");
-    const parsed = parseDwgBinary(buffer, fileName);
-
-    // Xuất chuỗi DXF ASCII hoàn chỉnh theo chuẩn AutoCAD
-    const dxfContent = exportDxf(parsed, { applyStandardLayers: true });
-
-    return NextResponse.json({
-      success: true,
-      originalFileName: fileName,
-      dxfFileName,
-      dxfContent,
-      entityCount: parsed.entities.length,
-      message: `Đã chuyển đổi thành công tệp thật ${fileName} sang ${dxfFileName} (${parsed.entities.length} thực thể)!`,
-    });
+    // XBoss không đọc DWG bằng TypeScript (ADR-0006/M99 PR0) — bản đọc cũ bịa hình học.
+    // Chuyển đổi DWG→DXF nay do người dùng thực hiện trong AutoCAD, hoặc plugin AutoCAD (M99).
+    return NextResponse.json({ error: DWG_UNSUPPORTED_MESSAGE }, { status: 422 });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: msg }, { status: 500 });
