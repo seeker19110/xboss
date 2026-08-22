@@ -39,12 +39,12 @@ Kỹ sư MEPF (chạy **AutoCAD full**) nhận bản vẽ thiết kế từ CĐT
 
 Đã chốt ở ADR-0006. Trong đặc tả này chỉ còn lựa chọn nội bộ:
 
-| Điểm              | Phương án                                         | Kết luận                                                                                           |
-| ----------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| Ngôn ngữ          | C# .NET (AutoCAD Managed API) vs C++ ObjectARX    | **C#** — API quản lý đủ dùng, năng suất cao hơn nhiều                                              |
-| Nạp plugin        | Installer MSI vs **thư mục `.bundle` autoloader** | **`.bundle`** đặt tại `%APPDATA%\Autodesk\ApplicationPlugins\` — tự nạp, không cần quyền admin     |
-| Nền build         | 1 bản duy nhất                                    | **2 bản**: AutoCAD 2021–2024 (.NET Framework 4.8) và 2025+ (.NET 8) — Autodesk đổi runtime từ 2025 |
-| Quy tắc chuẩn hóa | Nhúng trong plugin vs **tải rule pack từ XBoss**  | **Tải** — bắt buộc, chống trôi quy tắc giữa 2 tầng (ADR-0006 nguyên tắc 1)                         |
+| Điểm              | Phương án                                         | Kết luận                                                                                                                                                                                                                               |
+| ----------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ngôn ngữ          | C# .NET (AutoCAD Managed API) vs C++ ObjectARX    | **C#** — API quản lý đủ dùng, năng suất cao hơn nhiều                                                                                                                                                                                  |
+| Nạp plugin        | Installer MSI vs **thư mục `.bundle` autoloader** | **`.bundle`** đặt tại `%APPDATA%\Autodesk\ApplicationPlugins\` — tự nạp, không cần quyền admin                                                                                                                                         |
+| Nền build         | 1 bản duy nhất vs đa nền                          | **Ưu tiên 1 bản duy nhất trên AutoCAD 2025+ (.NET 8)**; chỉ làm bản thứ hai (.NET Framework 4.8, AutoCAD 2021–2024) nếu đội máy thực tế bắt buộc. `XBoss.Cad.Core` target **`netstandard2.0`** để biên dịch được vào cả hai — xem §9.1 |
+| Quy tắc chuẩn hóa | Nhúng trong plugin vs **tải rule pack từ XBoss**  | **Tải** — bắt buộc, chống trôi quy tắc giữa 2 tầng (ADR-0006 nguyên tắc 1)                                                                                                                                                             |
 
 ## 5. Scope / non-goals
 
@@ -106,6 +106,27 @@ Máy kỹ sư (Windows + AutoCAD full)          Server XBoss (Linux, tự host)
 
 Thư mục dự kiến: `plugin-autocad/` (`XBoss.Cad.Core/`, `XBoss.Cad.Acad/`, `XBoss.Cad.Tests/`, `bundle/PackageContents.xml`).
 File server: `lib/cad/rule-pack.ts`, `app/api/engineering/cad/rule-pack/route.ts`, `app/api/engineering/cad/plugin-upload/route.ts`, `lib/api-tokens.ts`, `app/api/tokens/*`.
+
+### 9.1 Chọn đời AutoCAD và cách đa nền
+
+Autodesk đổi runtime của Managed API từ **AutoCAD 2025**: 2021–2024 chạy trên .NET Framework 4.8, 2025 trở đi chạy trên .NET 8. Plugin biên dịch cho nền này **không nạp được** trên nền kia — đây là ranh giới quyết định, không phải chi tiết đóng gói.
+
+**Khuyến nghị: chuẩn hoá đội máy về AutoCAD 2025 trở lên và chỉ build 1 bản (.NET 8).**
+
+Lý do, theo thứ tự quan trọng với dự án này:
+
+1. **Tích hợp AI thực chất nằm ở runtime, không nằm ở tính năng AI của AutoCAD.** Thứ XBoss cần là plugin gọi được API (HTTP/JSON) và dùng được SDK hiện đại. Hệ sinh thái NuGet cho AI/HTTP hiện nhắm .NET 6/8+; nhiều gói **đã bỏ hỗ trợ .NET Framework 4.8**. Ở lại 4.8 là tự chuốc lấy phụ thuộc lỗi thời và cảnh báo bảo mật.
+2. **`System.Text.Json`, `HttpClient`, `async/await`, `IAsyncEnumerable`** (hữu ích khi đọc phản hồi AI dạng stream) chín hơn hẳn trên .NET 8.
+3. **1 nền = một nửa chi phí bảo trì**: 1 pipeline build, 1 bộ test tích hợp, 1 gói phát hành.
+4. **Tính năng AI sẵn có của Autodesk** (Smart Blocks, Markup Assist…) **không phải điểm tích hợp** — chúng không mở API cho bên thứ ba. Không lấy chúng làm lý do chọn phiên bản.
+5. **Định dạng DWG không phải ràng buộc**: từ AutoCAD 2018 tới nay Autodesk vẫn dùng định dạng DWG 2018 (AC1032). Máy đời cũ hơn vẫn mở được tệp do 2025/2026 ghi ra — nên nâng phiên bản **không chia rẽ tệp** trong nội bộ dự án.
+6. **Chi phí thường bằng 0**: hợp đồng subscription của Autodesk thường cho cài bản hiện hành + 3 bản trước, nên nâng lên 2025/2026 không tốn thêm license (cần đối chiếu hợp đồng cụ thể).
+
+**Nếu buộc phải giữ máy 2021–2024**, kiến trúc đã lường sẵn: `XBoss.Cad.Core` (toàn bộ quy tắc) target **`netstandard2.0`** — biên dịch được vào cả .NET Framework 4.8 lẫn .NET 8; chỉ `XBoss.Cad.Acad` (Adapter) build 2 lần, tham chiếu `acmgd.dll`/`acdbmgd.dll` của đúng đời AutoCAD. Chi phí tăng thêm nằm ở test tích hợp (phải chạy trên cả 2 nền), không ở logic nghiệp vụ.
+
+**Nguyên tắc build:** biên dịch Adapter tham chiếu SDK của **đời AutoCAD CŨ NHẤT** cần hỗ trợ trong mỗi nền — Managed API tương thích tiến, không tương thích lùi.
+
+> **Lưu ý xác minh:** các mốc phiên bản trên đúng tới hiểu biết hiện tại của tài liệu này (2026-08). Trước khi chốt PR3, đối chiếu lại đời AutoCAD mới nhất đang phát hành và ghi chú release của Autodesk về runtime — Autodesk có thể đã nâng .NET ở đời sau 2026.
 
 ## 10. API contract
 
@@ -193,14 +214,14 @@ Pilot 1–2 kỹ sư trên bản vẽ thật trước khi mở rộng. Luồng w
 
 ## 18. Risk/assumption/open decisions
 
-| Mục                                       | Xác minh/giảm thiểu                                                                                           | Owner | Hạn | Quyết định               |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ----- | --- | ------------------------ |
-| **Trôi quy tắc giữa 2 tầng**              | Rule pack một nguồn + test đối chứng AC6 chạy trong CI phần server                                            |       |     | Giảm thiểu — rủi ro số 1 |
-| Không có runner Windows có license cho CI | Xác nhận có máy chạy được `accoreconsole`; nếu không, test tích hợp chạy tay theo release và ghi rõ trong DoD |       |     | **Mở — chặn PR3**        |
-| Đời AutoCAD cụ thể đang dùng              | Chốt danh sách để quyết build .NET 4.8 và/hoặc .NET 8                                                         |       |     | **Mở — chặn PR3**        |
-| Token desktop mở rộng bề mặt tấn công     | Scope hẹp, có hạn, thu hồi được, chỉ lưu hash, rate limit; rà `docs/audit.md`                                 |       |     | Giảm thiểu               |
-| Plugin làm hỏng bản vẽ thật               | Chỉ-kiểm là mặc định; 1 nhóm UNDO; giữ bản gốc; pilot hẹp                                                     |       |     | Giảm thiểu               |
-| Chi phí duy trì stack C#                  | Chấp nhận có chủ đích (ADR-0006)                                                                              |       |     | Đã chấp nhận             |
+| Mục                                       | Xác minh/giảm thiểu                                                                                                          | Owner | Hạn | Quyết định               |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ----- | --- | ------------------------ |
+| **Trôi quy tắc giữa 2 tầng**              | Rule pack một nguồn + test đối chứng AC6 chạy trong CI phần server                                                           |       |     | Giảm thiểu — rủi ro số 1 |
+| Không có runner Windows có license cho CI | Xác nhận có máy chạy được `accoreconsole`; nếu không, test tích hợp chạy tay theo release và ghi rõ trong DoD                |       |     | **Mở — chặn PR3**        |
+| Đời AutoCAD cụ thể đang dùng              | **Đề xuất: chuẩn hoá về 2025+ và chỉ build .NET 8** (lý do §9.1). Cần kiểm kê đội máy thật + đối chiếu hợp đồng subscription |       |     | **Mở — chặn PR3**        |
+| Token desktop mở rộng bề mặt tấn công     | Scope hẹp, có hạn, thu hồi được, chỉ lưu hash, rate limit; rà `docs/audit.md`                                                |       |     | Giảm thiểu               |
+| Plugin làm hỏng bản vẽ thật               | Chỉ-kiểm là mặc định; 1 nhóm UNDO; giữ bản gốc; pilot hẹp                                                                    |       |     | Giảm thiểu               |
+| Chi phí duy trì stack C#                  | Chấp nhận có chủ đích (ADR-0006)                                                                                             |       |     | Đã chấp nhận             |
 
 ## 19. Approval
 

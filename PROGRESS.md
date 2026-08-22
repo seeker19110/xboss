@@ -35,10 +35,15 @@
 - **M98 thu hẹp còn tầng 3**, PR4 (ODA) bị bỏ.
 - **Rủi ro số 1: trôi quy tắc giữa 2 tầng** → chống bằng rule pack một nguồn + test đối chứng
   chạy cùng bộ bản vẽ mẫu qua cả 2 tầng (AC6 của M99).
+- **Đời AutoCAD (M99 §9.1):** đề xuất **chuẩn hoá về AutoCAD 2025+ và chỉ build 1 bản .NET 8**.
+  Autodesk đổi runtime Managed API từ 2025 (2021–2024 = .NET Framework 4.8), plugin build cho
+  nền này không nạp được trên nền kia. Lý do chọn 2025+: hệ sinh thái NuGet cho AI/HTTP đã bỏ
+  dần .NET Framework 4.8; 1 nền = một nửa chi phí bảo trì; định dạng DWG vẫn là DWG 2018
+  (AC1032) từ 2018 tới nay nên nâng phiên bản **không chia rẽ tệp**. Nếu buộc giữ máy cũ:
+  `XBoss.Cad.Core` target `netstandard2.0` để dùng chung, chỉ Adapter build 2 lần.
 - **2 quyết định đang mở, chặn PR3 của M99:** (1) có runner Windows có license AutoCAD cho CI
-  không (`accoreconsole`), nếu không thì test tích hợp phải chạy tay theo release; (2) chốt
-  danh sách đời AutoCAD đang dùng để quyết build .NET Framework 4.8 (2021–2024) và/hoặc
-  .NET 8 (2025+).
+  không (`accoreconsole`), nếu không thì test tích hợp phải chạy tay theo release; (2) kiểm kê
+  đội máy thật để xác nhận đề xuất 2025+ ở trên.
 - **PR0 (bỏ nhánh bịa hình học trong `parseDwgBinary`) tách làm ngay**, độc lập mọi thứ khác.
 
 ## Đặc tả M98 — DXF R2000 & tệp DWG (2026-08-22, **Draft, chờ duyệt**)
