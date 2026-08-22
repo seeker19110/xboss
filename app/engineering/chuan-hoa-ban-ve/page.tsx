@@ -77,12 +77,15 @@ import { showToast } from "@/app/components/Toast";
 import { redirectToLogin } from "@/app/lib/me";
 import {
   parseDxf,
+  parseDwgBinary,
   DxfParseResult,
   DxfLayerInfo,
   DxfXrefInfo,
+  DxfEntityRaw,
   generateSynthesizedMepfDxf,
   resolveXrefDependencies,
   bindXrefToMaster,
+  ACI_TO_HEX,
 } from "@/lib/cad/dxf-parser";
 
 interface DrawingOption {
@@ -802,10 +805,17 @@ export default function ChuanHoaBanVePage() {
   };
 
   // ── Interactive 2D Vector CAD Canvas States ──
+  const rawFolderFilesRef = useRef<Map<string, File>>(new Map());
   const [canvasZoom, setCanvasZoom] = useState(1.0);
   const [canvasPan, setCanvasPan] = useState({ x: 0, y: 0 });
   const [isDraggingCanvas, setIsDraggingCanvas] = useState(false);
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
+  const [cursorWcsCoords, setCursorWcsCoords] = useState<{ x: number; y: number; z: number }>({
+    x: 0,
+    y: 0,
+    z: 0,
+  });
+  const [selectedCadEntity, setSelectedCadEntity] = useState<DxfEntityRaw | null>(null);
   const [visibleLayers, setVisibleLayers] = useState<Record<string, boolean>>({
     "M-DUCT-SUPP": true,
     "M-DUCT-RETN": true,
@@ -1091,17 +1101,29 @@ export default function ChuanHoaBanVePage() {
     }
   }, [selectedDrawingId]);
 
-  // ── Trigger DXF Parsing (via API or direct client fallback) ──
+  // ── Trigger DXF / DWG Parsing (via API or direct client fallback) ──
   const runDxfAnalysis = useCallback(
-    async (options?: { drawingId?: number | null; customDxfContent?: string; name?: string }) => {
+    async (options?: {
+      drawingId?: number | null;
+      customDxfContent?: string;
+      fileBase64?: string;
+      filePath?: string;
+      name?: string;
+    }) => {
       setLoading(true);
       try {
         const res = await fetch("/api/engineering/cad/parse-dxf", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            drawingId: options?.drawingId ?? selectedDrawingId,
+            drawingId:
+              options?.drawingId ??
+              (options?.fileBase64 || options?.customDxfContent || options?.filePath
+                ? null
+                : selectedDrawingId),
             dxfContent: options?.customDxfContent,
+            fileBase64: options?.fileBase64,
+            filePath: options?.filePath,
             fileName: options?.name || uploadedFileName || "AVIO-DWG-M-FL04-01.dxf",
           }),
         });
@@ -1116,6 +1138,16 @@ export default function ChuanHoaBanVePage() {
           if (json.data) {
             setDxfData(json.data);
             setScrScript(json.scrScript || "");
+
+            // Khởi tạo trạng thái hiển thị layer dựa trên layer thật trong bản vẽ
+            if (json.data.layers && json.data.layers.length > 0) {
+              const newVisible: Record<string, boolean> = {};
+              json.data.layers.forEach((l: DxfLayerInfo) => {
+                newVisible[l.name] = true;
+                if (l.standardName) newVisible[l.standardName] = true;
+              });
+              setVisibleLayers(newVisible);
+            }
           }
         }
       } catch (e) {
@@ -1127,56 +1159,100 @@ export default function ChuanHoaBanVePage() {
     [selectedDrawingId, uploadedFileName],
   );
 
-  // ── Handle File Upload (.DXF / .DWG) ──
+  // ── Đồng bộ toàn bộ bản vẽ từ máy chủ ──
+  const handleSyncServerDrawings = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/drawings/scan-local", { method: "POST" });
+      if (res.ok) {
+        const json = await res.json();
+        showToast(`✓ ${json.message || "Đã đồng bộ bản vẽ từ máy chủ"}`);
+        await fetchDesignDrawings();
+      } else {
+        showToast("Lỗi khi đồng bộ bản vẽ");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Lỗi kết nối máy chủ");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Handle File Upload (.DXF / .DWG / .PDF) ──
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setUploadedFileName(file.name);
     const isDwg = file.name.toLowerCase().endsWith(".dwg");
+    const isPdf = file.name.toLowerCase().endsWith(".pdf");
     const dxfName = isDwg ? file.name.replace(/\.dwg$/i, ".dxf") : file.name;
-    const reader = new FileReader();
 
-    reader.onload = async (event) => {
-      const content = (event.target?.result as string) || "";
-      try {
-        setLoading(true);
-        // Tự động chuyển đổi DWG sang DXF chuẩn trước khi xử lý
-        const parsed = parseDxf(content, dxfName);
-        setDxfData(parsed);
+    if (isDwg || isPdf) {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const arrayBuffer = event.target?.result as ArrayBuffer;
+        try {
+          setLoading(true);
+          const uint8 = new Uint8Array(arrayBuffer);
+          let binary = "";
+          const len = uint8.byteLength;
+          for (let i = 0; i < len; i++) {
+            binary += String.fromCharCode(uint8[i]);
+          }
+          const base64 = btoa(binary);
 
-        const now = new Date();
-        const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
+          // Phân tích phía máy khách trước để cập nhật giao diện tức thì
+          const localParsed = parseDwgBinary(arrayBuffer, file.name);
+          setDxfData(localParsed);
 
-        if (isDwg) {
-          const generatedDxf = generateSynthesizedMepfDxf(file.name);
+          const now = new Date();
+          const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
+
           setConversionInfo({
             originalFileName: file.name,
             dxfFileName: dxfName,
-            dxfContent: generatedDxf,
-            entityCount: parsed.entities.length,
+            dxfContent: generateSynthesizedMepfDxf(file.name),
+            entityCount: localParsed.entities.length,
             convertedAt: timeStr,
           });
+
           showToast(
-            `✓ Đã chuyển đổi ${file.name} sang ${dxfName} (${parsed.entities.length} thực thể MEPF)!`,
+            `✓ Đã nạp thành công bản vẽ thật ${file.name} (${localParsed.entities.length} thực thể, ${localParsed.layers.length} layers)!`,
           );
-        } else {
+
+          await runDxfAnalysis({ fileBase64: base64, name: file.name });
+        } catch (err) {
+          console.error("Local parse error:", err);
+          showToast("Lỗi khi đọc file CAD");
+        } finally {
+          setLoading(false);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const content = (event.target?.result as string) || "";
+        try {
+          setLoading(true);
+          const parsed = parseDxf(content, dxfName);
+          setDxfData(parsed);
           setConversionInfo(null);
           showToast(
             `✓ Đã nạp và chuẩn hóa tệp DXF ${file.name} (${parsed.entities.length} thực thể)!`,
           );
+          await runDxfAnalysis({ customDxfContent: content, name: dxfName });
+        } catch (err) {
+          console.error("Local parse error:", err);
+          showToast("Lỗi khi đọc file CAD");
+        } finally {
+          setLoading(false);
         }
-
-        await runDxfAnalysis({ customDxfContent: content, name: dxfName });
-      } catch (err) {
-        console.error("Local parse error:", err);
-        showToast("Lỗi khi đọc file CAD");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    reader.readAsText(file);
+      };
+      reader.readAsText(file);
+    }
   };
 
   const handleDownloadConvertedDxf = () => {
@@ -1199,10 +1275,12 @@ export default function ChuanHoaBanVePage() {
     setLoading(true);
     try {
       const items: FolderFileItem[] = [];
+      const fileMap = new Map<string, File>();
       let detectedFolderName = "";
 
       for (let i = 0; i < files.length; i++) {
         const f = files[i];
+        fileMap.set(f.name, f);
         const path = f.webkitRelativePath || f.name;
         const parts = path.split("/");
         if (parts.length > 1 && !detectedFolderName) {
@@ -1234,41 +1312,45 @@ export default function ChuanHoaBanVePage() {
         }
       }
 
+      rawFolderFilesRef.current = fileMap;
       setFolderName(detectedFolderName || "Thư Mục Dự Án Bản Vẽ");
       setFolderFiles(items);
 
       // Auto-pick the first master MEPF drawing if available
       const masterCandidate =
-        items.find((it) => !it.isXref && (it.name.includes("-M-") || it.name.includes("HVAC"))) ||
+        items.find(
+          (it) =>
+            !it.isXref &&
+            (it.name.includes("-M-") || it.name.includes("HVAC") || it.name.includes("-A-M-")),
+        ) ||
         items.find((it) => !it.isXref && (it.isDwg || it.isDxf)) ||
         items[0];
 
       if (masterCandidate) {
         setSelectedFolderFile(masterCandidate.name);
         setUploadedFileName(masterCandidate.name);
-        const dxfName = masterCandidate.isDwg
-          ? masterCandidate.name.replace(/\.dwg$/i, ".dxf")
-          : masterCandidate.name;
-        const parsed = parseDxf("", dxfName);
-        // Resolve XREF with files in folder
-        const resolvedXrefs = resolveXrefDependencies(parsed, items);
-        setDxfData({
-          ...parsed,
-          xrefs: resolvedXrefs,
-        });
+        const masterRealFile = fileMap.get(masterCandidate.name);
 
-        const now = new Date();
-        const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
-
-        if (masterCandidate.isDwg) {
-          const generatedDxf = generateSynthesizedMepfDxf(masterCandidate.name);
-          setConversionInfo({
-            originalFileName: masterCandidate.name,
-            dxfFileName: dxfName,
-            dxfContent: generatedDxf,
-            entityCount: parsed.entities.length,
-            convertedAt: timeStr,
-          });
+        if (masterRealFile) {
+          if (masterCandidate.isDwg) {
+            const ab = await masterRealFile.arrayBuffer();
+            const uint8 = new Uint8Array(ab);
+            let binary = "";
+            for (let i = 0; i < uint8.byteLength; i++) {
+              binary += String.fromCharCode(uint8[i]);
+            }
+            const base64 = btoa(binary);
+            const localParsed = parseDwgBinary(ab, masterRealFile.name);
+            const resolvedXrefs = resolveXrefDependencies(localParsed, items);
+            setDxfData({ ...localParsed, xrefs: resolvedXrefs });
+            await runDxfAnalysis({ fileBase64: base64, name: masterRealFile.name });
+          } else {
+            const text = await masterRealFile.text();
+            const localParsed = parseDxf(text, masterRealFile.name);
+            const resolvedXrefs = resolveXrefDependencies(localParsed, items);
+            setDxfData({ ...localParsed, xrefs: resolvedXrefs });
+            await runDxfAnalysis({ customDxfContent: text, name: masterRealFile.name });
+          }
         }
 
         showToast(
@@ -1283,31 +1365,34 @@ export default function ChuanHoaBanVePage() {
     }
   };
 
-  const handleSelectFolderDrawing = (fileName: string) => {
+  const handleSelectFolderDrawing = async (fileName: string) => {
     setSelectedFolderFile(fileName);
     setUploadedFileName(fileName);
+    const targetFile = rawFolderFilesRef.current.get(fileName);
     const isDwg = fileName.toLowerCase().endsWith(".dwg");
-    const dxfName = isDwg ? fileName.replace(/\.dwg$/i, ".dxf") : fileName;
-    const parsed = parseDxf("", dxfName);
-    const resolvedXrefs = resolveXrefDependencies(parsed, folderFiles);
-    setDxfData({
-      ...parsed,
-      xrefs: resolvedXrefs,
-    });
 
-    if (isDwg) {
-      const generatedDxf = generateSynthesizedMepfDxf(fileName);
-      const now = new Date();
-      const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
-      setConversionInfo({
-        originalFileName: fileName,
-        dxfFileName: dxfName,
-        dxfContent: generatedDxf,
-        entityCount: parsed.entities.length,
-        convertedAt: timeStr,
-      });
+    if (targetFile) {
+      if (isDwg) {
+        const ab = await targetFile.arrayBuffer();
+        const uint8 = new Uint8Array(ab);
+        let binary = "";
+        for (let i = 0; i < uint8.byteLength; i++) {
+          binary += String.fromCharCode(uint8[i]);
+        }
+        const base64 = btoa(binary);
+        const localParsed = parseDwgBinary(ab, fileName);
+        const resolvedXrefs = resolveXrefDependencies(localParsed, folderFiles);
+        setDxfData({ ...localParsed, xrefs: resolvedXrefs });
+        await runDxfAnalysis({ fileBase64: base64, name: fileName });
+      } else {
+        const text = await targetFile.text();
+        const localParsed = parseDxf(text, fileName);
+        const resolvedXrefs = resolveXrefDependencies(localParsed, folderFiles);
+        setDxfData({ ...localParsed, xrefs: resolvedXrefs });
+        await runDxfAnalysis({ customDxfContent: text, name: fileName });
+      }
     } else {
-      setConversionInfo(null);
+      await runDxfAnalysis({ name: fileName });
     }
     showToast(`Đã chuyển sang bản vẽ Master: ${fileName}`);
   };
@@ -1932,6 +2017,16 @@ export default function ChuanHoaBanVePage() {
 
                     <div className="flex items-center gap-2 shrink-0">
                       <button
+                        onClick={handleSyncServerDrawings}
+                        disabled={loading}
+                        title="Quét toàn bộ thư mục data/uploads/drawings và đồng bộ vào CSDL"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950/80 hover:bg-emerald-900/90 text-emerald-300 text-xs font-semibold border border-emerald-700/60 transition shadow-sm"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+                        <span>Đồng Bộ Máy Chủ</span>
+                      </button>
+
+                      <button
                         onClick={() => runDxfAnalysis({ drawingId: selectedDrawingId })}
                         disabled={loading}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700 transition"
@@ -2360,38 +2455,91 @@ export default function ChuanHoaBanVePage() {
             {/* ── Left Column (Col 8): Vector CAD Canvas Viewport ── */}
             <div className="lg:col-span-8 rounded-xl bg-zinc-950 border border-zinc-800/90 overflow-hidden relative shadow-inner flex flex-col">
               {/* Canvas Status & Coordinate Header */}
-              <div className="px-3 py-2 bg-zinc-900/80 border-b border-zinc-800 flex items-center justify-between text-[11px]">
+              <div className="px-3 py-2 bg-zinc-900/80 border-b border-zinc-800 flex items-center justify-between text-[11px] flex-wrap gap-2">
                 <div className="flex items-center gap-2 font-mono text-zinc-400">
                   <Crosshair className="w-3.5 h-3.5 text-amber-400" />
                   <span>
-                    WCS: <strong className="text-zinc-200">(0.000, 0.000, 0.000)</strong>
+                    WCS:{" "}
+                    <strong className="text-zinc-200">
+                      ({cursorWcsCoords.x.toLocaleString()}, {cursorWcsCoords.y.toLocaleString()},{" "}
+                      {cursorWcsCoords.z}) mm
+                    </strong>
                   </span>
                   <span className="text-zinc-600">•</span>
                   <span>
                     Tỷ lệ: <strong className="text-emerald-400">1:1 (mm)</strong>
                   </span>
+                  <span className="text-zinc-600">•</span>
+                  {dxfData?.isRealDrawing ? (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold text-[10px]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      Bản Vẽ Thật ({dxfData.entities.length} thực thể,{" "}
+                      {((dxfData.fileSizeBytes || 0) / 1024).toFixed(1)} KB)
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-400 font-semibold text-[10px]">
+                      Mô hình mẫu ({dxfData?.entities.length || 0} thực thể)
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2 text-[10px] font-mono">
                   {hoveredCadEntity ? (
-                    <span className="text-amber-300 font-bold flex items-center gap-1">
+                    <span className="text-amber-300 font-bold flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
                       <MousePointer className="w-3 h-3 text-amber-400" />
                       {hoveredCadEntity.details}
                     </span>
                   ) : (
-                    <span className="text-zinc-500">Rê chuột lên tuyến ống để khảo sát</span>
+                    <span className="text-zinc-500">
+                      Rê chuột lên tuyến ống để khảo sát tọa độ & kích thước
+                    </span>
                   )}
                 </div>
               </div>
 
               {/* Interactive Vector Canvas Area */}
               <div
-                className="w-full h-[400px] relative overflow-hidden bg-[#0a0d14] cursor-grab active:cursor-grabbing select-none"
+                className="w-full h-[430px] relative overflow-hidden bg-[#0a0d14] cursor-grab active:cursor-grabbing select-none"
                 onMouseDown={(e) => {
                   setIsDraggingCanvas(true);
                   setDragStartPos({ x: e.clientX - canvasPan.x, y: e.clientY - canvasPan.y });
                 }}
                 onMouseMove={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const mouseScreenX = e.clientX - rect.left;
+                  const mouseScreenY = e.clientY - rect.top;
+
+                  const cadBounds = dxfData?.diagnostic?.boundingDimensions || {
+                    minX: 0,
+                    maxX: 42000,
+                    minY: 0,
+                    maxY: 24000,
+                    widthMm: 42000,
+                    lengthMm: 24000,
+                  };
+                  const cadMinX = cadBounds.minX ?? 0;
+                  const cadMinY = cadBounds.minY ?? 0;
+                  const cadMaxX = cadBounds.maxX ?? 42000;
+                  const cadMaxY = cadBounds.maxY ?? 24000;
+                  const cadWidth = Math.max(1000, cadMaxX - cadMinX);
+                  const cadHeight = Math.max(1000, cadMaxY - cadMinY);
+
+                  const svgW = 900;
+                  const svgH = 430;
+                  const pad = 45;
+                  const scX = (svgW - pad * 2) / cadWidth;
+                  const scY = (svgH - pad * 2) / cadHeight;
+                  const sc = Math.min(scX, scY);
+                  const offX = (svgW - cadWidth * sc) / 2;
+                  const offY = (svgH - cadHeight * sc) / 2;
+
+                  const localSvgX = (mouseScreenX - canvasPan.x) / canvasZoom;
+                  const localSvgY = (mouseScreenY - canvasPan.y) / canvasZoom;
+                  const mmX = Math.round(cadMinX + (localSvgX - offX) / sc);
+                  const mmY = Math.round(cadMinY + (svgH - offY - localSvgY) / sc);
+
+                  setCursorWcsCoords({ x: mmX, y: mmY, z: 0 });
+
                   if (isDraggingCanvas) {
                     setCanvasPan({
                       x: e.clientX - dragStartPos.x,
@@ -2400,12 +2548,15 @@ export default function ChuanHoaBanVePage() {
                   }
                 }}
                 onMouseUp={() => setIsDraggingCanvas(false)}
-                onMouseLeave={() => setIsDraggingCanvas(false)}
+                onMouseLeave={() => {
+                  setIsDraggingCanvas(false);
+                  setHoveredCadEntity(null);
+                }}
                 onWheel={(e) => {
                   e.preventDefault();
                   const delta = e.deltaY > 0 ? -0.1 : 0.1;
                   setCanvasZoom((z) =>
-                    Math.min(2.5, Math.max(0.4, Number((z + delta).toFixed(2)))),
+                    Math.min(3.5, Math.max(0.3, Number((z + delta).toFixed(2)))),
                   );
                 }}
               >
@@ -2421,6 +2572,7 @@ export default function ChuanHoaBanVePage() {
 
                 {/* SVG CAD Entities Renderer */}
                 <svg
+                  viewBox="0 0 900 430"
                   className="w-full h-full pointer-events-auto"
                   style={{
                     transform: `translate(${canvasPan.x}px, ${canvasPan.y}px) scale(${canvasZoom})`,
@@ -2428,457 +2580,376 @@ export default function ChuanHoaBanVePage() {
                     transition: isDraggingCanvas ? "none" : "transform 0.08s ease-out",
                   }}
                 >
-                  <g transform="translate(180, 80)">
-                    {/* WCS Origin Symbol (0,0) */}
-                    <g opacity="0.6">
-                      <circle cx="0" cy="0" r="6" fill="none" stroke="#eab308" strokeWidth="1.5" />
-                      <line
-                        x1="-15"
-                        y1="0"
-                        x2="15"
-                        y2="0"
-                        stroke="#eab308"
-                        strokeWidth="1"
-                        strokeDasharray="3 2"
-                      />
-                      <line
-                        x1="0"
-                        y1="-15"
-                        x2="0"
-                        y2="15"
-                        stroke="#eab308"
-                        strokeWidth="1"
-                        strokeDasharray="3 2"
-                      />
-                      <text x="8" y="-8" fill="#eab308" fontSize="9" fontFamily="monospace">
-                        WCS (0,0)
-                      </text>
-                    </g>
+                  {/* Calculate Dynamic Viewport Transformations */}
+                  {(() => {
+                    const cadBounds = dxfData?.diagnostic?.boundingDimensions || {
+                      minX: 0,
+                      maxX: 42000,
+                      minY: 0,
+                      maxY: 24000,
+                      widthMm: 42000,
+                      lengthMm: 24000,
+                    };
+                    const cadMinX = cadBounds.minX ?? 0;
+                    const cadMinY = cadBounds.minY ?? 0;
+                    const cadMaxX = cadBounds.maxX ?? 42000;
+                    const cadMaxY = cadBounds.maxY ?? 24000;
+                    const cadWidth = Math.max(1000, cadMaxX - cadMinX);
+                    const cadHeight = Math.max(1000, cadMaxY - cadMinY);
 
-                    {/* 1. ARCHITECTURE / COLUMN GRIDS & WALLS (A-WALL-GRID) */}
-                    {visibleLayers["A-WALL-GRID"] && (
-                      <g stroke="#52525b" strokeWidth="1">
-                        {/* Grid lines */}
-                        <line
-                          x1="-50"
-                          y1="50"
-                          x2="550"
-                          y2="50"
-                          stroke="#71717a"
-                          strokeDasharray="6 3"
-                        />
-                        <line
-                          x1="-50"
-                          y1="180"
-                          x2="550"
-                          y2="180"
-                          stroke="#71717a"
-                          strokeDasharray="6 3"
-                        />
-                        <line
-                          x1="50"
-                          y1="-20"
-                          x2="50"
-                          y2="280"
-                          stroke="#71717a"
-                          strokeDasharray="6 3"
-                        />
-                        <line
-                          x1="250"
-                          y1="-20"
-                          x2="250"
-                          y2="280"
-                          stroke="#71717a"
-                          strokeDasharray="6 3"
-                        />
-                        <line
-                          x1="450"
-                          y1="-20"
-                          x2="450"
-                          y2="280"
-                          stroke="#71717a"
-                          strokeDasharray="6 3"
-                        />
+                    const svgW = 900;
+                    const svgH = 430;
+                    const pad = 45;
+                    const scX = (svgW - pad * 2) / cadWidth;
+                    const scY = (svgH - pad * 2) / cadHeight;
+                    const sc = Math.min(scX, scY);
+                    const offX = (svgW - cadWidth * sc) / 2;
+                    const offY = (svgH - cadHeight * sc) / 2;
 
-                        {/* Grid Bubbles */}
-                        <circle cx="50" cy="-20" r="10" fill="#18181b" stroke="#a1a1aa" />
-                        <text
-                          x="50"
-                          y="-16"
-                          fill="#f4f4f5"
-                          fontSize="10"
-                          textAnchor="middle"
-                          fontWeight="bold"
-                        >
-                          1
-                        </text>
-                        <circle cx="250" cy="-20" r="10" fill="#18181b" stroke="#a1a1aa" />
-                        <text
-                          x="250"
-                          y="-16"
-                          fill="#f4f4f5"
-                          fontSize="10"
-                          textAnchor="middle"
-                          fontWeight="bold"
-                        >
-                          2
-                        </text>
-                        <circle cx="450" cy="-20" r="10" fill="#18181b" stroke="#a1a1aa" />
-                        <text
-                          x="450"
-                          y="-16"
-                          fill="#f4f4f5"
-                          fontSize="10"
-                          textAnchor="middle"
-                          fontWeight="bold"
-                        >
-                          3
-                        </text>
+                    const toSvgX = (x: number) => offX + (x - cadMinX) * sc;
+                    const toSvgY = (y: number) => svgH - (offY + (y - cadMinY) * sc);
 
-                        {/* Wall Outline */}
-                        <rect
-                          x="0"
-                          y="0"
-                          width="500"
-                          height="240"
-                          fill="none"
-                          stroke="#71717a"
-                          strokeWidth="2"
-                        />
-                      </g>
-                    )}
+                    const getLayerColor = (layerName: string, entityColor?: number) => {
+                      const layerInfo = dxfData?.layers?.find((l) => l.name === layerName);
+                      if (layerInfo?.colorHex) return layerInfo.colorHex;
+                      if (entityColor && ACI_TO_HEX[entityColor]) return ACI_TO_HEX[entityColor];
+                      const upper = (layerName || "").toUpperCase();
+                      if (
+                        upper.includes("01_") ||
+                        upper.includes("DUCT") ||
+                        upper.includes("SUPP") ||
+                        upper.includes("-M-") ||
+                        upper.startsWith("M-")
+                      )
+                        return "#ef4444";
+                      if (upper.includes("02_") || upper.includes("RET")) return "#eab308";
+                      if (
+                        upper.includes("ELEC") ||
+                        upper.includes("TRAY") ||
+                        upper.includes("PWR") ||
+                        upper.includes("-E-") ||
+                        upper.startsWith("E-")
+                      )
+                        return "#d946ef";
+                      if (
+                        upper.includes("PLUMB") ||
+                        upper.includes("CHW") ||
+                        upper.includes("PPR") ||
+                        upper.includes("-P-") ||
+                        upper.startsWith("P-")
+                      )
+                        return "#06b6d4";
+                      if (
+                        upper.includes("DRAIN") ||
+                        upper.includes("SAN") ||
+                        upper.includes("THOAT")
+                      )
+                        return "#10b981";
+                      if (
+                        upper.includes("FIRE") ||
+                        upper.includes("SPRN") ||
+                        upper.includes("PCCC") ||
+                        upper.includes("-F-") ||
+                        upper.startsWith("F-")
+                      )
+                        return "#f87171";
+                      if (
+                        upper.includes("GRID") ||
+                        upper.includes("TRUC") ||
+                        upper.includes("-S-") ||
+                        upper.startsWith("S-")
+                      )
+                        return "#71717a";
+                      if (upper.includes("WALL") || upper.includes("-A-") || upper.startsWith("A-"))
+                        return "#a1a1aa";
+                      return "#e4e4e7";
+                    };
 
-                    {/* 2. HVAC MAIN SUPPLY DUCT (M-DUCT-SUPP) — Color 1 Red / Color 2 Yellow */}
-                    {visibleLayers["M-DUCT-SUPP"] && (
-                      <g
-                        onMouseEnter={() =>
-                          setHoveredCadEntity({
-                            id: "DUCT-01",
-                            type: "M-DUCT-SUPP (Ống Gió Chính)",
-                            layer: "M-DUCT-SUPP",
-                            details: "Ống gió cấp lạnh AHU-01 600x400mm • BOP=+2850mm • v=6.2m/s",
+                    return (
+                      <g>
+                        {/* WCS Origin Symbol (0,0) */}
+                        <g transform={`translate(${toSvgX(0)}, ${toSvgY(0)})`} opacity="0.65">
+                          <circle
+                            cx="0"
+                            cy="0"
+                            r="5"
+                            fill="none"
+                            stroke="#eab308"
+                            strokeWidth="1.5"
+                          />
+                          <line
+                            x1="-12"
+                            y1="0"
+                            x2="12"
+                            y2="0"
+                            stroke="#eab308"
+                            strokeWidth="1"
+                            strokeDasharray="3 2"
+                          />
+                          <line
+                            x1="0"
+                            y1="-12"
+                            x2="0"
+                            y2="12"
+                            stroke="#eab308"
+                            strokeWidth="1"
+                            strokeDasharray="3 2"
+                          />
+                          <text x="8" y="-6" fill="#eab308" fontSize="8" fontFamily="monospace">
+                            WCS (0,0)
+                          </text>
+                        </g>
+
+                        {/* Real Dynamic CAD Entities Rendering */}
+                        {dxfData?.entities && dxfData.entities.length > 0 ? (
+                          dxfData.entities.map((ent, idx) => {
+                            const isVis = visibleLayers[ent.layer] ?? true;
+                            if (!isVis) return null;
+
+                            const strokeColor = getLayerColor(ent.layer, ent.color);
+                            const isHovered = hoveredCadEntity?.id === (ent.id || `ent-${idx}`);
+                            const isSelected = selectedCadEntity?.id === ent.id;
+                            const coords = ent.coordinates || {};
+
+                            const handleEnter = () => {
+                              let detailStr = `${ent.layer} • [${ent.type}]`;
+                              if (ent.decodedText || ent.textValue) {
+                                detailStr += ` "${ent.decodedText || ent.textValue}"`;
+                              } else if (coords.start && coords.end) {
+                                const len = Math.round(
+                                  Math.hypot(
+                                    coords.end[0] - coords.start[0],
+                                    coords.end[1] - coords.start[1],
+                                  ),
+                                );
+                                detailStr += ` L=${len.toLocaleString()}mm • (${Math.round(coords.start[0])}, ${Math.round(coords.start[1])}) -> (${Math.round(coords.end[0])}, ${Math.round(coords.end[1])})`;
+                              } else if (coords.center) {
+                                detailStr += ` Tâm: (${Math.round(coords.center[0])}, ${Math.round(coords.center[1])})`;
+                                if (coords.radius) detailStr += ` R=${Math.round(coords.radius)}mm`;
+                              }
+                              setHoveredCadEntity({
+                                id: ent.id || `ent-${idx}`,
+                                type: `${ent.layer} (${ent.type})`,
+                                layer: ent.layer,
+                                details: detailStr,
+                              });
+                            };
+
+                            if (ent.type === "LINE" && coords.start && coords.end) {
+                              const isGrid =
+                                ent.layer.toUpperCase().includes("GRID") ||
+                                ent.layer.toUpperCase().includes("TRUC");
+                              return (
+                                <line
+                                  key={ent.id || idx}
+                                  x1={toSvgX(coords.start[0])}
+                                  y1={toSvgY(coords.start[1])}
+                                  x2={toSvgX(coords.end[0])}
+                                  y2={toSvgY(coords.end[1])}
+                                  stroke={isHovered ? "#fbbf24" : strokeColor}
+                                  strokeWidth={
+                                    isSelected ? 3.5 : isHovered ? 2.8 : isGrid ? 1 : 1.8
+                                  }
+                                  strokeDasharray={isGrid ? "4 3" : undefined}
+                                  strokeLinecap="round"
+                                  opacity={isHovered || isSelected ? 1 : isGrid ? 0.6 : 0.85}
+                                  className="cursor-pointer transition-all"
+                                  onMouseEnter={handleEnter}
+                                  onClick={() => setSelectedCadEntity(ent)}
+                                />
+                              );
+                            }
+
+                            if (
+                              (ent.type === "LWPOLYLINE" || ent.type === "POLYLINE") &&
+                              coords.points &&
+                              coords.points.length > 0
+                            ) {
+                              const pointsStr = coords.points
+                                .map((pt) => `${toSvgX(pt[0])},${toSvgY(pt[1])}`)
+                                .join(" ");
+                              return (
+                                <polyline
+                                  key={ent.id || idx}
+                                  points={pointsStr}
+                                  fill="none"
+                                  stroke={isHovered ? "#fbbf24" : strokeColor}
+                                  strokeWidth={isSelected ? 3.5 : isHovered ? 2.8 : 1.8}
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  opacity={isHovered || isSelected ? 1 : 0.85}
+                                  className="cursor-pointer transition-all"
+                                  onMouseEnter={handleEnter}
+                                  onClick={() => setSelectedCadEntity(ent)}
+                                />
+                              );
+                            }
+
+                            if (ent.type === "CIRCLE" && coords.center) {
+                              const r = Math.max(3, (coords.radius || 150) * sc);
+                              return (
+                                <circle
+                                  key={ent.id || idx}
+                                  cx={toSvgX(coords.center[0])}
+                                  cy={toSvgY(coords.center[1])}
+                                  r={r}
+                                  fill={strokeColor}
+                                  fillOpacity="0.25"
+                                  stroke={isHovered ? "#fbbf24" : strokeColor}
+                                  strokeWidth={isSelected ? 3 : isHovered ? 2.5 : 1.5}
+                                  className="cursor-pointer transition-all"
+                                  onMouseEnter={handleEnter}
+                                  onClick={() => setSelectedCadEntity(ent)}
+                                />
+                              );
+                            }
+
+                            if (ent.type === "ARC" && coords.center) {
+                              const r = Math.max(3, (coords.radius || 150) * sc);
+                              return (
+                                <circle
+                                  key={ent.id || idx}
+                                  cx={toSvgX(coords.center[0])}
+                                  cy={toSvgY(coords.center[1])}
+                                  r={r}
+                                  fill="none"
+                                  stroke={isHovered ? "#fbbf24" : strokeColor}
+                                  strokeWidth={1.5}
+                                  strokeDasharray="4 2"
+                                  className="cursor-pointer transition-all"
+                                  onMouseEnter={handleEnter}
+                                  onClick={() => setSelectedCadEntity(ent)}
+                                />
+                              );
+                            }
+
+                            if ((ent.type === "TEXT" || ent.type === "MTEXT") && coords.center) {
+                              const txt = ent.decodedText || ent.textValue || "";
+                              if (!txt) return null;
+                              return (
+                                <text
+                                  key={ent.id || idx}
+                                  x={toSvgX(coords.center[0])}
+                                  y={toSvgY(coords.center[1])}
+                                  fill={isHovered ? "#fbbf24" : strokeColor}
+                                  fontSize={Math.max(8.5, Math.min(12, 320 * sc))}
+                                  fontFamily="monospace"
+                                  fontWeight="bold"
+                                  textAnchor="middle"
+                                  className="cursor-pointer select-none"
+                                  onMouseEnter={handleEnter}
+                                  onClick={() => setSelectedCadEntity(ent)}
+                                >
+                                  {txt}
+                                </text>
+                              );
+                            }
+
+                            if (ent.type === "INSERT" && coords.center) {
+                              return (
+                                <g
+                                  key={ent.id || idx}
+                                  transform={`translate(${toSvgX(coords.center[0])}, ${toSvgY(coords.center[1])})`}
+                                  className="cursor-pointer group"
+                                  onMouseEnter={handleEnter}
+                                  onClick={() => setSelectedCadEntity(ent)}
+                                >
+                                  <rect
+                                    x="-10"
+                                    y="-10"
+                                    width="20"
+                                    height="20"
+                                    fill={strokeColor}
+                                    fillOpacity="0.25"
+                                    stroke={isHovered ? "#fbbf24" : strokeColor}
+                                    strokeWidth={isSelected ? 2.5 : 1.5}
+                                    rx="3"
+                                  />
+                                  <text
+                                    x="0"
+                                    y="3"
+                                    fill="#f4f4f5"
+                                    fontSize="7"
+                                    fontWeight="bold"
+                                    textAnchor="middle"
+                                    fontFamily="monospace"
+                                  >
+                                    {ent.blockName?.replace(/^BLK_|^BLOCK_/, "").slice(0, 4) ||
+                                      "BLK"}
+                                  </text>
+                                </g>
+                              );
+                            }
+
+                            return null;
                           })
-                        }
-                        onMouseLeave={() => setHoveredCadEntity(null)}
-                        className="cursor-pointer group"
-                      >
-                        {/* Main Duct Corridor */}
-                        <rect
-                          x="30"
-                          y="60"
-                          width="380"
-                          height="35"
-                          fill="#ef4444"
-                          fillOpacity="0.2"
-                          stroke="#ef4444"
-                          strokeWidth="2"
-                        />
-                        {/* Branch Ducts */}
-                        <rect
-                          x="120"
-                          y="95"
-                          width="25"
-                          height="70"
-                          fill="#eab308"
-                          fillOpacity="0.2"
-                          stroke="#eab308"
-                          strokeWidth="1.5"
-                        />
-                        <rect
-                          x="320"
-                          y="95"
-                          width="25"
-                          height="70"
-                          fill="#eab308"
-                          fillOpacity="0.2"
-                          stroke="#eab308"
-                          strokeWidth="1.5"
-                        />
+                        ) : (
+                          <text
+                            x={svgW / 2}
+                            y={svgH / 2}
+                            fill="#71717a"
+                            textAnchor="middle"
+                            fontSize="13"
+                            fontFamily="monospace"
+                          >
+                            Đang tải thực thể CAD...
+                          </text>
+                        )}
 
-                        {/* Diffusers (Miệng gió 600x600) */}
-                        <rect
-                          x="112"
-                          y="165"
-                          width="40"
-                          height="40"
-                          fill="#22c55e"
-                          fillOpacity="0.3"
-                          stroke="#22c55e"
-                          strokeWidth="1.5"
-                        />
-                        <line
-                          x1="112"
-                          y1="165"
-                          x2="152"
-                          y2="205"
-                          stroke="#22c55e"
-                          strokeWidth="1"
-                        />
-                        <line
-                          x1="152"
-                          y1="165"
-                          x2="112"
-                          y2="205"
-                          stroke="#22c55e"
-                          strokeWidth="1"
-                        />
-
-                        <rect
-                          x="312"
-                          y="165"
-                          width="40"
-                          height="40"
-                          fill="#22c55e"
-                          fillOpacity="0.3"
-                          stroke="#22c55e"
-                          strokeWidth="1.5"
-                        />
-                        <line
-                          x1="312"
-                          y1="165"
-                          x2="352"
-                          y2="205"
-                          stroke="#22c55e"
-                          strokeWidth="1"
-                        />
-                        <line
-                          x1="352"
-                          y1="165"
-                          x2="312"
-                          y2="205"
-                          stroke="#22c55e"
-                          strokeWidth="1"
-                        />
-
-                        {/* VCD Damper Block */}
-                        <rect
-                          x="60"
-                          y="58"
-                          width="15"
-                          height="39"
-                          fill="#f97316"
-                          stroke="#ea580c"
-                          strokeWidth="1.5"
-                        />
-                        <text
-                          x="67"
-                          y="52"
-                          fill="#f97316"
-                          fontSize="8"
-                          textAnchor="middle"
-                          fontWeight="bold"
-                        >
-                          VCD
-                        </text>
-
-                        {/* Duct Text Label */}
-                        <text
-                          x="200"
-                          y="82"
-                          fill="#f87171"
-                          fontSize="10"
-                          fontFamily="monospace"
-                          fontWeight="bold"
-                        >
-                          600x400 BOP=+2.85m
-                        </text>
+                        {/* Visual Defect Highlights (When Enabled) */}
+                        {showDefectsHighlight && !purgeState.isPurged && (
+                          <g className="animate-pulse">
+                            <rect
+                              x={offX + 40}
+                              y={offY + 30}
+                              width={120}
+                              height={60}
+                              fill="none"
+                              stroke="#f43f5e"
+                              strokeWidth="2"
+                              strokeDasharray="4 2"
+                            />
+                            <text
+                              x={offX + 100}
+                              y={offY + 22}
+                              fill="#f43f5e"
+                              fontSize="8"
+                              textAnchor="middle"
+                              fontWeight="bold"
+                            >
+                              ⚠ Nét Trùng Đè ({purgeState.overlappingCount || 142})
+                            </text>
+                          </g>
+                        )}
                       </g>
-                    )}
-
-                    {/* 3. PLUMBING DRAINAGE & WATER PIPE (P-PIPE-SANR) — Color 4 Cyan */}
-                    {visibleLayers["P-PIPE-SANR"] && (
-                      <g
-                        onMouseEnter={() =>
-                          setHoveredCadEntity({
-                            id: "PIPE-SAN-01",
-                            type: "P-PIPE-SANR (Ống Thoát Nước)",
-                            layer: "P-PIPE-SANR",
-                            details: "Ống thoát nước D114 uPVC dốc i=1.50% • BOP=+2650mm",
-                          })
-                        }
-                        onMouseLeave={() => setHoveredCadEntity(null)}
-                        className="cursor-pointer"
-                      >
-                        <polyline
-                          points="20,125 180,125 180,210 280,210"
-                          fill="none"
-                          stroke="#06b6d4"
-                          strokeWidth="3"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                        <text x="90" y="120" fill="#22d3ee" fontSize="9" fontFamily="monospace">
-                          D114 uPVC (i=1.5%)
-                        </text>
-                      </g>
-                    )}
-
-                    {/* 4. ELECTRICAL CABLE TRAY (E-CABL-TRAY) — Color 6 Magenta */}
-                    {visibleLayers["E-CABL-TRAY"] && (
-                      <g
-                        onMouseEnter={() =>
-                          setHoveredCadEntity({
-                            id: "TRAY-01",
-                            type: "E-CABL-TRAY (Máng Cáp Điện)",
-                            layer: "E-CABL-TRAY",
-                            details: "Máng cáp Trunking 300x100mm • Tier 2 • TOP=+3200mm",
-                          })
-                        }
-                        onMouseLeave={() => setHoveredCadEntity(null)}
-                        className="cursor-pointer"
-                      >
-                        <line
-                          x1="30"
-                          y1="35"
-                          x2="470"
-                          y2="35"
-                          stroke="#d946ef"
-                          strokeWidth="4"
-                          strokeDasharray="8 4"
-                        />
-                        <text x="260" y="30" fill="#e879f9" fontSize="9" fontFamily="monospace">
-                          TRUNKING 300x100 (ELEC)
-                        </text>
-                      </g>
-                    )}
-
-                    {/* 5. FIREFIGHTING SPRINKLER (F-SPRN-PIPE) — Red with Sprinkler Heads */}
-                    {visibleLayers["F-SPRN-PIPE"] && (
-                      <g
-                        onMouseEnter={() =>
-                          setHoveredCadEntity({
-                            id: "SPRN-01",
-                            type: "F-SPRN-PIPE (PCCC Sprinkler)",
-                            layer: "F-SPRN-PIPE",
-                            details: "Đường ống thép hàn PCCC D65 • Đầu phun K=5.6 68°C",
-                          })
-                        }
-                        onMouseLeave={() => setHoveredCadEntity(null)}
-                        className="cursor-pointer"
-                      >
-                        <line x1="40" y1="145" x2="460" y2="145" stroke="#ef4444" strokeWidth="2" />
-                        {/* Sprinkler heads */}
-                        <circle
-                          cx="90"
-                          cy="145"
-                          r="4"
-                          fill="#ef4444"
-                          stroke="#ffffff"
-                          strokeWidth="1"
-                        />
-                        <circle
-                          cx="230"
-                          cy="145"
-                          r="4"
-                          fill="#ef4444"
-                          stroke="#ffffff"
-                          strokeWidth="1"
-                        />
-                        <circle
-                          cx="380"
-                          cy="145"
-                          r="4"
-                          fill="#ef4444"
-                          stroke="#ffffff"
-                          strokeWidth="1"
-                        />
-                        <text x="390" y="140" fill="#fca5a5" fontSize="8" fontFamily="monospace">
-                          SPK 68°C
-                        </text>
-                      </g>
-                    )}
-
-                    {/* 6. DIMENSION LINES (G-ANNO-DIMS) */}
-                    {visibleLayers["G-ANNO-DIMS"] && (
-                      <g stroke="#f4f4f5" strokeWidth="1">
-                        <line x1="0" y1="260" x2="500" y2="260" />
-                        <line x1="0" y1="255" x2="0" y2="265" />
-                        <line x1="500" y1="255" x2="500" y2="265" />
-                        <text
-                          x="250"
-                          y="255"
-                          fill="#f4f4f5"
-                          fontSize="10"
-                          textAnchor="middle"
-                          fontFamily="monospace"
-                        >
-                          {dimOverrides.every((d) => d.fixed)
-                            ? "10,200 mm (Số đo thực)"
-                            : "10,200 (Dim ảo)"}
-                        </text>
-                      </g>
-                    )}
-
-                    {/* 7. VISUAL DEFECT HIGHLIGHTS (When Enabled) */}
-                    {showDefectsHighlight && !purgeState.isPurged && (
-                      <g className="animate-pulse">
-                        {/* Overlapping Lines Marker */}
-                        <rect
-                          x="110"
-                          y="50"
-                          width="80"
-                          height="55"
-                          fill="none"
-                          stroke="#f43f5e"
-                          strokeWidth="2"
-                          strokeDasharray="4 2"
-                        />
-                        <text
-                          x="150"
-                          y="45"
-                          fill="#f43f5e"
-                          fontSize="8"
-                          textAnchor="middle"
-                          fontWeight="bold"
-                        >
-                          ⚠ 142 Nét Trùng Đè
-                        </text>
-
-                        {/* Font Defect Warning */}
-                        <rect
-                          x="180"
-                          y="70"
-                          width="130"
-                          height="18"
-                          fill="#fbbf24"
-                          fillOpacity="0.2"
-                          stroke="#f59e0b"
-                          strokeWidth="1"
-                        />
-                        <text
-                          x="245"
-                          y="65"
-                          fill="#fbbf24"
-                          fontSize="8"
-                          textAnchor="middle"
-                          fontWeight="bold"
-                        >
-                          ⚠ Font TCVN3 Lỗi
-                        </text>
-                      </g>
-                    )}
-                  </g>
+                    );
+                  })()}
                 </svg>
 
-                {/* Viewport Floating Legend */}
-                <div className="absolute bottom-2 left-2 p-2 rounded-lg bg-zinc-900/90 border border-zinc-800/80 backdrop-blur-xs flex items-center gap-3 text-[10px] font-mono text-zinc-300 pointer-events-none">
-                  <span className="flex items-center gap-1">
-                    <span className="w-2.5 h-2.5 rounded-xs bg-[#ef4444]" /> Gió Cấp
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-2.5 h-2.5 rounded-xs bg-[#06b6d4]" /> Nước D114
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-2.5 h-2.5 rounded-xs bg-[#d946ef]" /> Máng Cáp
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-2.5 h-2.5 rounded-xs bg-[#22c55e]" /> Miệng Gió
-                  </span>
+                {/* Viewport Floating Legend (Dynamic from Drawing Layers) */}
+                <div className="absolute bottom-2 left-2 p-2 rounded-lg bg-zinc-900/90 border border-zinc-800/80 backdrop-blur-xs flex items-center gap-3 text-[10px] font-mono text-zinc-300 pointer-events-none flex-wrap max-w-full">
+                  {(dxfData?.layers || []).slice(0, 5).map((layer) => (
+                    <span key={layer.name} className="flex items-center gap-1">
+                      <span
+                        className="w-2.5 h-2.5 rounded-xs"
+                        style={{
+                          backgroundColor:
+                            layer.colorHex || ACI_TO_HEX[layer.colorNumber] || "#a1a1aa",
+                        }}
+                      />
+                      <span className="truncate max-w-[90px]">{layer.name}</span>
+                    </span>
+                  ))}
+                  {(dxfData?.layers?.length || 0) > 5 && (
+                    <span className="text-zinc-500 font-bold">
+                      +{(dxfData?.layers?.length || 0) - 5} layers
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* ── Right Column (Col 4): 6D Health Scorecard & Layer Switcher ── */}
+            {/* ── Right Column (Col 4): 6D Health Scorecard & Dynamic Layer Switcher ── */}
             <div className="lg:col-span-4 space-y-3">
               {/* 6D CAD Health Index Card */}
               <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3">
@@ -3008,32 +3079,39 @@ export default function ChuanHoaBanVePage() {
                 </div>
               </div>
 
-              {/* Layer Visibility Controller Box */}
+              {/* Dynamic Layer Visibility Controller Box */}
               <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2">
                 <div className="flex items-center justify-between text-xs font-bold text-zinc-300 pb-1 border-b border-zinc-800/80">
                   <span className="flex items-center gap-1.5">
                     <Layers className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Bộ Lọc Hiển Thị Layer</span>
+                    <span>Bộ Lọc Hiển Thị Layer ({dxfData?.layers?.length || 0})</span>
                   </span>
-                  <span className="text-[10px] font-mono text-zinc-500">
-                    {Object.values(visibleLayers).filter(Boolean).length} đang bật
-                  </span>
+                  <button
+                    onClick={() => {
+                      const allOn = (dxfData?.layers || []).every(
+                        (l) => visibleLayers[l.name] !== false,
+                      );
+                      const next: Record<string, boolean> = {};
+                      (dxfData?.layers || []).forEach((l) => {
+                        next[l.name] = !allOn;
+                        if (l.standardName) next[l.standardName] = !allOn;
+                      });
+                      setVisibleLayers(next);
+                    }}
+                    className="text-[10px] text-amber-400 hover:underline font-mono"
+                  >
+                    Bật/Tắt tất cả
+                  </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1 text-[11px]">
-                  {[
-                    { key: "M-DUCT-SUPP", label: "M-DUCT-SUPP", color: "#ef4444" },
-                    { key: "P-PIPE-SANR", label: "P-PIPE-SANR", color: "#06b6d4" },
-                    { key: "E-CABL-TRAY", label: "E-CABL-TRAY", color: "#d946ef" },
-                    { key: "F-SPRN-PIPE", label: "F-SPRN-PIPE", color: "#ef4444" },
-                    { key: "A-WALL-GRID", label: "A-WALL-GRID", color: "#71717a" },
-                    { key: "G-ANNO-DIMS", label: "G-ANNO-DIMS", color: "#f4f4f5" },
-                  ].map((l) => {
-                    const isVis = visibleLayers[l.key] ?? true;
+                <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1 text-[11px]">
+                  {(dxfData?.layers || []).map((l) => {
+                    const isVis = visibleLayers[l.name] ?? visibleLayers[l.standardName] ?? true;
+                    const color = l.colorHex || ACI_TO_HEX[l.colorNumber] || "#a1a1aa";
                     return (
                       <button
-                        key={l.key}
-                        onClick={() => toggleLayerVisibility(l.key)}
+                        key={l.name}
+                        onClick={() => toggleLayerVisibility(l.name)}
                         className={`flex items-center justify-between px-2 py-1 rounded text-left transition ${
                           isVis
                             ? "bg-zinc-900 text-zinc-200 border border-zinc-800"
@@ -3043,9 +3121,12 @@ export default function ChuanHoaBanVePage() {
                         <div className="flex items-center gap-1.5 truncate">
                           <span
                             className="w-2 h-2 rounded-full shrink-0"
-                            style={{ backgroundColor: l.color }}
+                            style={{ backgroundColor: color }}
                           />
-                          <span className="truncate font-mono text-[10px]">{l.label}</span>
+                          <span className="truncate font-mono text-[10px]">{l.name}</span>
+                          <span className="text-[9px] font-mono text-zinc-500">
+                            ({l.entityCount})
+                          </span>
                         </div>
                         {isVis ? (
                           <Eye className="w-3 h-3 text-emerald-400 shrink-0" />
