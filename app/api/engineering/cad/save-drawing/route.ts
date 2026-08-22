@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { writeFileSync, mkdirSync, existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { queryOne, insertId, run } from "@/lib/db";
+import {
+  CAD_DRAWING_KINDS,
+  DESIGN_SUB_FOLDERS,
+  ALL_DRAWING_SYSTEMS,
+  type CadDrawingKind,
+  type DesignSubFolder,
+  drawingRelativePath,
+  drawingRoots,
+  ensureDrawingDirs,
+} from "@/lib/cad/drawing-storage";
+import { validateDxf } from "@/lib/cad/dxf-writer";
 
 export const dynamic = "force-dynamic";
 
@@ -13,118 +24,117 @@ export const dynamic = "force-dynamic";
 // - Khi Kỹ Sư Trưởng phê duyệt Gate 0: Lưu chính thức vào đúng vị trí drawings/{systems}/{kind}/{subFolder?}/ và dọn sạch file tạm.
 // Tên file quy chuẩn: [project_code]_[work_package_code]_[systems]_[kind-subfolder]_[name]_[date]_[drawing_versions].[ext]
 
+// Chuẩn hóa chuỗi an toàn cho tên file/đường dẫn (không khoảng trắng, không ký tự
+// đặc biệt — nên cũng loại sạch `.`/`/` gây path traversal).
+function cleanStr(v: unknown, fallback: string): string {
+  const s = typeof v === "string" ? v : typeof v === "number" ? String(v) : "";
+  const cleaned = s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9_-]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return cleaned || fallback;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
     }
+    // Ghi bản vẽ = tạo drawing/revision mới → cùng quyền với sổ bản vẽ (M8).
+    if (!CAN.manageDrawings(user.role)) {
+      return NextResponse.json({ error: "Không có quyền lưu bản vẽ" }, { status: 403 });
+    }
 
     const body = await req.json();
     const {
       projectId: inputProjectId,
-      projectCode = "PRJ01",
-      systems = "HVAC",
       workPackageId = null,
-      workPackageCode = "WP-MEPF-01",
-      kind = "design", // 'design' | 'bim' | 'shop' | 'asbuilt'
-      subFolder = "iso", // 'origin' | 'iso' (for design)
       name = "Bản_Vẽ_Chuẩn_Hóa",
-      date = new Date().toISOString().slice(0, 10).replace(/-/g, ""),
-      drawingVersions = "Rev01",
       fileContent = "",
-      fileExtension = "dxf",
       isApproved = false, // true = Phê duyệt chính thức -> Lưu vào đúng vị trí; false = Lưu tạm vào {systems}/temp
       approverName = "Kỹ Sư Trưởng MEPF",
       approvalNotes = "Bản vẽ đã qua chuẩn hóa CAD 2D và kiểm tra chất lượng Gate 0.",
     } = body;
 
+    const approved = isApproved === true;
+    // Ký duyệt Gate 0 là quyết định kỹ thuật của Kỹ sư trưởng — dùng quyền gate
+    // kỹ thuật (Admin/PM/engineer), không phải quyền duyệt revision của sổ bản vẽ.
+    if (approved && !CAN.approveEngineeringGate(user.role)) {
+      return NextResponse.json({ error: "Không có quyền phê duyệt bản vẽ" }, { status: 403 });
+    }
+
     const projectId = inputProjectId || (await getCurrentProjectId(user)) || 1;
 
-    // Chuẩn hóa chuỗi an toàn cho tên file (không khoảng trắng, ký tự đặc biệt)
-    const cleanStr = (s: string) =>
-      s
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-zA-Z0-9_-]/g, "_")
-        .replace(/_+/g, "_")
-        .replace(/^_+|_+$/g, "");
+    // Chỉ nhận phân hệ/loại/thư mục con trong danh mục hợp lệ — chặn giá trị lạ từ
+    // client chui vào đường dẫn ghi file.
+    const cSys = cleanStr(body.systems, "HVAC").toUpperCase();
+    if (!ALL_DRAWING_SYSTEMS.includes(cSys)) {
+      return NextResponse.json({ error: "Phân hệ bản vẽ không hợp lệ" }, { status: 400 });
+    }
+    const cKind = cleanStr(body.kind, "design").toLowerCase() as CadDrawingKind;
+    if (!(CAD_DRAWING_KINDS as readonly string[]).includes(cKind)) {
+      return NextResponse.json({ error: "Loại bản vẽ không hợp lệ" }, { status: 400 });
+    }
+    const cSub = cleanStr(body.subFolder, "iso").toLowerCase() as DesignSubFolder;
+    if (cKind === "design" && !(DESIGN_SUB_FOLDERS as readonly string[]).includes(cSub)) {
+      return NextResponse.json({ error: "Thư mục con bản vẽ không hợp lệ" }, { status: 400 });
+    }
 
-    const cProject = cleanStr(projectCode || "PRJ01");
-    const cWp = cleanStr(workPackageCode || "WP01");
-    const cSys = cleanStr(systems || "HVAC");
-    const cKind = kind.toLowerCase();
-    const cSub = cKind === "design" ? cleanStr(subFolder || "iso").toLowerCase() : "";
-    const cName = cleanStr(name || "Ban_Ve");
-    const cDate = cleanStr(date || new Date().toISOString().slice(0, 10).replace(/-/g, ""));
-    const cRev = cleanStr(drawingVersions || "Rev01");
-    const cExt = cleanStr(fileExtension || "dxf").toLowerCase();
+    const cProject = cleanStr(body.projectCode, "PRJ01");
+    const cWp = cleanStr(body.workPackageCode, "WP01");
+    const cName = cleanStr(name, "Ban_Ve");
+    const cDate = cleanStr(body.date, new Date().toISOString().slice(0, 10).replace(/-/g, ""));
+    const cRev = cleanStr(body.drawingVersions, "Rev01");
+    const cExt = cleanStr(body.fileExtension, "dxf").toLowerCase();
 
     // Sinh tên file quy chuẩn
     const kindTag = cKind === "design" ? `DESIGN-${cSub.toUpperCase()}` : cKind.toUpperCase();
     const standardFileName = `${cProject}_${cWp}_${cSys}_${kindTag}_${cName}_${cDate}_${cRev}.${cExt}`;
 
     // Xác định thư mục đích theo trạng thái phê duyệt:
-    // - Chưa duyệt (isApproved === false): lưu vào drawings/{systems}/temp/
-    // - Đã duyệt (isApproved === true): lưu chính thức vào drawings/{systems}/{kind}/{subfolder?}
-    let relativeSubPath = "";
-    if (!isApproved) {
-      relativeSubPath = join(cSys, "temp");
-    } else {
-      if (cKind === "design") {
-        relativeSubPath = join(cSys, "design", cSub || "iso");
-      } else if (cKind === "bim") {
-        relativeSubPath = join(cSys, "bim");
-      } else if (cKind === "shop") {
-        relativeSubPath = join(cSys, "shop");
-      } else if (cKind === "asbuilt") {
-        relativeSubPath = join(cSys, "asbuilt");
-      } else {
-        relativeSubPath = join(cSys, "design", "iso");
+    // - Chưa duyệt: drawings/{systems}/temp/
+    // - Đã duyệt: drawings/{systems}/{kind}/{subfolder?}
+    const relativeSubPath = drawingRelativePath(cSys, cKind, cSub, approved);
+    const content =
+      typeof fileContent === "string" && fileContent
+        ? fileContent
+        : ";; Standardized CAD Drawing by XBoss\n";
+
+    // Kiểm trước khi ghi: bản vẽ DXF phải mở lại được trên AutoCAD. Ghi ra một tệp
+    // hỏng rồi mới phát hiện lúc kỹ sư mở ngoài công trường là quá muộn.
+    if (cExt === "dxf") {
+      const check = validateDxf(content);
+      if (!check.valid) {
+        return NextResponse.json(
+          {
+            error: `Bản vẽ DXF không đạt chuẩn AutoCAD (${check.errors.length} lỗi cấu trúc) — chưa lưu.`,
+            validation: check,
+          },
+          { status: 422 },
+        );
       }
     }
 
-    // 1. Ghi tệp vào data/uploads/drawings/
-    const dataUploadsDir = join(process.cwd(), "data", "uploads", "drawings", relativeSubPath);
-    if (!existsSync(dataUploadsDir)) {
-      mkdirSync(dataUploadsDir, { recursive: true });
-    }
-    const fullDataPath = join(dataUploadsDir, standardFileName);
-    writeFileSync(fullDataPath, fileContent || ";; Standardized CAD Drawing by XBoss\n", "utf8");
-
-    // 2. Ghi tệp vào root drawings/
-    const rootDrawingsDir = join(process.cwd(), "drawings", relativeSubPath);
-    if (!existsSync(rootDrawingsDir)) {
-      mkdirSync(rootDrawingsDir, { recursive: true });
-    }
-    const fullRootPath = join(rootDrawingsDir, standardFileName);
-    writeFileSync(fullRootPath, fileContent || ";; Standardized CAD Drawing by XBoss\n", "utf8");
-
-    // 3. Nếu đã phê duyệt chính thức, dọn sạch bản sao tạm trong thư mục temp (nếu có)
-    if (isApproved) {
-      const tempPathData = join(
-        process.cwd(),
-        "data",
-        "uploads",
-        "drawings",
-        cSys,
-        "temp",
-        standardFileName,
-      );
-      if (existsSync(tempPathData)) {
-        try {
-          unlinkSync(tempPathData);
-        } catch {}
-      }
-      const tempPathRoot = join(process.cwd(), "drawings", cSys, "temp", standardFileName);
-      if (existsSync(tempPathRoot)) {
-        try {
-          unlinkSync(tempPathRoot);
-        } catch {}
+    // Ghi tệp vào cả 2 gốc lưu trữ (drawings/ và data/uploads/drawings/).
+    ensureDrawingDirs();
+    for (const root of drawingRoots()) {
+      mkdirSync(join(root, relativeSubPath), { recursive: true });
+      writeFileSync(join(root, relativeSubPath, standardFileName), content, "utf8");
+      // Đã phê duyệt chính thức → dọn sạch bản sao tạm trong thư mục temp (nếu có).
+      if (approved) {
+        const tempPath = join(root, cSys, "temp", standardFileName);
+        if (existsSync(tempPath)) {
+          try {
+            unlinkSync(tempPath);
+          } catch {}
+        }
       }
     }
 
-    // 4. Ghi nhận vào Cơ sở dữ liệu bảng drawings & drawing_revisions
+    // Ghi nhận vào Cơ sở dữ liệu bảng drawings & drawing_revisions
     const drawingCode = `${cSys}-${kindTag}-${cRev}-${cDate.slice(-4)}`;
     const drawingTitle = `${name} (${kindTag} - ${cRev})`;
 
@@ -136,16 +146,12 @@ export async function POST(req: NextRequest) {
 
     let drawingId = existing?.id;
     if (!drawingId) {
-      const validKind = ["shop", "asbuilt", "bim", "method", "design"].includes(cKind)
-        ? cKind
-        : "design";
-
       drawingId = await insertId(
         `INSERT INTO drawings (code, name, kind, system_group, work_package_id, project_id, created_by, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
         drawingCode,
         drawingTitle,
-        validKind,
+        cKind,
         cSys,
         workPackageId ? Number(workPackageId) : null,
         projectId,
@@ -153,7 +159,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Tạo hoặc cập nhật bản ghi revision
+    // Tạo hoặc cập nhật bản ghi revision. Trạng thái phải nằm trong enum của
+    // drawing_revisions (lib/drawings.ts) — chưa duyệt = 'submitted' (đã trình).
     const existingRev = await queryOne<{ id: number }>(
       `SELECT id FROM drawing_revisions WHERE drawing_id = ? AND rev = ?`,
       drawingId,
@@ -161,8 +168,8 @@ export async function POST(req: NextRequest) {
     );
 
     let revisionId = existingRev?.id;
-    const revStatus = isApproved ? "approved" : "pending";
-    const noteText = isApproved
+    const revStatus = approved ? "approved" : "submitted";
+    const noteText = approved
       ? `[Phê duyệt Gate 0 - ${approverName}]: ${approvalNotes}`
       : `[Lưu Tạm Thời Chờ Duyệt - ${user.name || "Kỹ Sư"}]: ${approvalNotes}`;
 
@@ -171,21 +178,21 @@ export async function POST(req: NextRequest) {
         `INSERT INTO drawing_revisions (
           drawing_id, rev, file_name, original_name, mime_type, size_bytes,
           status, submitted_at, decided_at, decision_note, uploaded_by, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_DATE, ${isApproved ? "CURRENT_DATE" : "NULL"}, ?, ?, NOW())`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_DATE, ${approved ? "CURRENT_DATE" : "NULL"}, ?, ?, NOW())`,
         drawingId,
         cRev,
         join(relativeSubPath, standardFileName).replace(/\\/g, "/"),
         standardFileName,
         cExt === "dxf" ? "application/dxf" : "application/octet-stream",
-        Buffer.byteLength(fileContent || "", "utf8"),
+        Buffer.byteLength(content, "utf8"),
         revStatus,
         noteText,
         user.id,
       );
     } else if (revisionId) {
       await run(
-        `UPDATE drawing_revisions 
-         SET status = ?, file_name = ?, decision_note = ?, decided_at = ${isApproved ? "CURRENT_DATE" : "NULL"}
+        `UPDATE drawing_revisions
+         SET status = ?, file_name = ?, decision_note = ?, decided_at = ${approved ? "CURRENT_DATE" : "NULL"}
          WHERE id = ?`,
         revStatus,
         join(relativeSubPath, standardFileName).replace(/\\/g, "/"),
@@ -194,9 +201,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Chỉ 1 revision "đang hiệu lực" mỗi bản vẽ — rev vừa duyệt thay thế rev cũ.
+    if (approved && drawingId && revisionId) {
+      await run(
+        `UPDATE drawing_revisions SET status = 'superseded'
+          WHERE drawing_id = ? AND id <> ? AND status IN ('approved','approved_with_comments')`,
+        drawingId,
+        revisionId,
+      );
+    }
+
     return NextResponse.json({
       success: true,
-      isApproved,
+      isApproved: approved,
       standardFileName,
       relativeDirectory: join("drawings", relativeSubPath).replace(/\\/g, "/"),
       fullUploadPath: `data/uploads/drawings/${relativeSubPath}/${standardFileName}`.replace(
@@ -206,15 +223,13 @@ export async function POST(req: NextRequest) {
       drawingId,
       revisionId,
       drawingCode,
-      message: isApproved
+      message: approved
         ? `✓ Bản vẽ đã được Kỹ Sư Trưởng PHÊ DUYỆT và lưu chính thức vào drawings/${relativeSubPath}/${standardFileName}`
         : `⏳ Bản vẽ đã lưu vào THƯ MỤC TẠM drawings/${cSys}/temp/${standardFileName}. Ký Duyệt Gate 0 để lưu vào vị trí chính thức.`,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Save standardized drawing error:", error);
-    return NextResponse.json(
-      { error: error?.message || "Lỗi lưu trữ bản vẽ chuẩn hóa" },
-      { status: 500 },
-    );
+    const message = error instanceof Error ? error.message : "Lỗi lưu trữ bản vẽ chuẩn hóa";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

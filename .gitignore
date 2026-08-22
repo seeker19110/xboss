@@ -48,3 +48,6 @@ xboss.tar.gz
 /playwright/.cache/
 /playwright/.auth/
 .lighthouseci/
+
+# Kho bản vẽ CAD chuẩn hóa dựng lúc chạy (route save-drawing) — không đưa vào git
+/drawings/

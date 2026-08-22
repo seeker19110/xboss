@@ -2,6 +2,11 @@ import { describe, it } from "node:test";
 import assert from "node:assert";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import {
+  DRAWING_SYSTEMS,
+  drawingRelativePath,
+  ensureDrawingDirs,
+} from "../lib/cad/drawing-storage";
 
 describe("CAD Standardized Drawing Storage & Directory Structure Suite", () => {
   it("1. Thư mục quy chuẩn drawings/ và data/uploads/drawings/ chứa đầy đủ các phân hệ, nhóm con và thư mục tạm (temp/)", () => {
@@ -10,7 +15,10 @@ describe("CAD Standardized Drawing Storage & Directory Structure Suite", () => {
       join(process.cwd(), "data", "uploads", "drawings"),
     ];
 
-    const systems = ["HVAC", "PLUMBING", "ELECTRICAL", "FIREFIGHTING", "ELV"];
+    // Cây thư mục được dựng lúc lưu bản vẽ đầu tiên (route save-drawing gọi hàm này);
+    // gọi trực tiếp để kiểm đúng bộ thư mục quy chuẩn mà hàm tạo ra.
+    ensureDrawingDirs();
+    const systems = DRAWING_SYSTEMS;
 
     for (const base of basePaths) {
       for (const sys of systems) {
@@ -68,22 +76,12 @@ describe("CAD Standardized Drawing Storage & Directory Structure Suite", () => {
     const kind = "design";
     const subFolder = "iso";
 
-    const getRelativePath = (isApproved: boolean) => {
-      if (!isApproved) {
-        return join(systems, "temp");
-      }
-      if (kind === "design") {
-        return join(systems, "design", subFolder || "iso");
-      }
-      return join(systems, kind);
-    };
-
     // Khi chưa duyệt
-    const draftPath = getRelativePath(false).replace(/\\/g, "/");
+    const draftPath = drawingRelativePath(systems, kind, subFolder, false).replace(/\\/g, "/");
     assert.strictEqual(draftPath, "HVAC/temp");
 
     // Khi kỹ sư trưởng đã duyệt Gate 0
-    const approvedPath = getRelativePath(true).replace(/\\/g, "/");
+    const approvedPath = drawingRelativePath(systems, kind, subFolder, true).replace(/\\/g, "/");
     assert.strictEqual(approvedPath, "HVAC/design/iso");
   });
 });
