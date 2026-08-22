@@ -275,6 +275,7 @@ export async function executeExecutionRequest(
   projectId: number,
   requestId: string,
   token: string,
+  userRole?: string,
 ): Promise<ExecutionRequest> {
   return withProjectScope(
     projectId,
@@ -305,6 +306,7 @@ export async function executeExecutionRequest(
         projectId,
         req.capabilityKey,
         req.autonomyLevel,
+        userRole,
       );
       if (!allowance.allowed) {
         await run(

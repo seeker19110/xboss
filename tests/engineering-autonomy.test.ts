@@ -52,7 +52,7 @@ test(
       assert.ok(authResult.token.startsWith("tok_"), "Token phải có tiền tố tok_");
 
       // 5. Execute Request
-      const executed = await executeExecutionRequest(projId, req.id, authResult.token);
+      const executed = await executeExecutionRequest(projId, req.id, authResult.token, "admin");
       assert.equal(executed.status, "completed");
       assert.ok(executed.executionResult);
 

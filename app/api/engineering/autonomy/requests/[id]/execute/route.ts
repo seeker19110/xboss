@@ -25,7 +25,7 @@ export async function POST(req: Request, props: { params: Promise<{ id: string }
   }
 
   try {
-    const updated = await executeExecutionRequest(projectId, id, token);
+    const updated = await executeExecutionRequest(projectId, id, token, user.role);
     return NextResponse.json({ request: updated });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
