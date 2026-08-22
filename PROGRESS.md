@@ -53,6 +53,14 @@
   validate zod `NODE_ENV` ở `lib/env.ts` lỗi cho các test chạy sau trong cùng process (CI không
   set `NODE_ENV` nên giá trị gốc luôn là `undefined`). Sửa bằng helper xoá key đúng cách khi gốc
   là `undefined`.
+- **Bug thật thêm, đã sửa (phát hiện sau khi bug READ ONLY ở trên được sửa — trước đó lỗi
+  transaction che khuất mọi lỗi sâu hơn):** `lib/engineering-worker-bridge.ts` — (1) thiếu
+  `{ readOnly: false }` ở `withProjectScope` bọc toàn hàm `bridgeTaskResultToEngineering`
+  (nhiều câu ghi bên trong); (2) `ingestIntelligencePackage(...)` được gọi với
+  `externalObjectKey: createdObjectIds[0]` — nhưng `resolveObjectId` tra theo cột
+  `external_key`, không phải `id` nội bộ, nên luôn ném `UnknownObjectKeyError`. Sửa: theo dõi
+  song song mảng `createdObjectExternalKeys` khi tạo từng `engineering_objects` và dùng đúng
+  external key thay vì id nội bộ.
 - **Còn tồn đọng, CHƯA sửa (ngoài phạm vi commit này — đụng schema/thiết kế tính năng, cần spec
   gốc mới sửa đúng, không đoán theo LUẬT CỨNG):** `engineering-fidic-claim` (INSERT nhắm cột
   không tồn tại trên `engineering_fidic_claims`, ví dụ `title`/`executive_summary` — bảng thật
@@ -61,8 +69,15 @@
   `engineering_source_revisions`, không có cột nào khớp ngữ nghĩa "tên hiển thị"); tương tự ở
   `engineering-predictions`/`engineering-prescriptive`/`engineering-twin-pinnacle` (nhắm
   `tasks.project_id`, `engineering_objects.metadata`, `engineering_objects.code` — đều không có
-  thật trong schema). Và bộ e2e (`npm test` job `e2e`) fail trên diện rộng, xác nhận có từ
-  trước trên nhiều commit `main` không liên quan — cần điều tra riêng, ngoài phạm vi PR
+  thật trong schema); `engineering-worker-bridge` (sau 2 fix ở trên, lộ ra khoảng trống thiết
+  kế sâu hơn — `bridgeTaskResultToEngineering` gọi `createWorkflow` ngay sau
+  `ingestIntelligencePackage`, nhưng `initialStatus()` trong `lib/engineering-intel.ts` chỉ trả
+  `"open"`/`"needs_review"`, KHÔNG BAO GIỜ `"accepted"` — mà Gate 0 của `createWorkflow` yêu cầu
+  đề xuất nguồn đã ở trạng thái `"accepted"` mới cho tạo workflow (ENG-2 quyết định trước, ENG-3
+  mới lập kế hoạch, theo comment trong code). Chưa rõ ý đồ đúng: bridge có nên tự động chấp
+  nhận đề xuất tự sinh, hay dừng lại trước bước tạo workflow chờ kỹ sư duyệt tay — cần quyết
+  định thiết kế, không đoán). Và bộ e2e (`npm test` job `e2e`) fail trên diện rộng, xác nhận có
+  từ trước trên nhiều commit `main` không liên quan — cần điều tra riêng, ngoài phạm vi PR
   health-check.
 
 ## Kiểm tra trạng thái hoạt động (health check) cho Admin (2026-08-22)
