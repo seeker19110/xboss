@@ -13,6 +13,31 @@
 - **Lộ trình hoàn thành (chờ duyệt, chưa code):** `PROJECT-COMPLETION-ROADMAP.md` chốt C0→C6 để đạt XBoss v1.0/Product Complete và O1→O5 cho Engineering OS/Vision Complete theo gate; không coi tài liệu là quyền tự triển khai production hoặc A3+.
 - **Spec pack chi tiết (chờ duyệt):** C0, C2–C6 và OS-1–OS-5 đã có file thi hành riêng (C1 dùng ENG-5), mỗi file gồm scope, data/API/UI/ops, test, chia PR và DoD. Chưa phase nào được đánh dấu triển khai chỉ vì đặc tả đã viết.
 
+## Đặc tả M98 — DXF R2000 & tệp DWG (2026-08-22, **Draft, chờ duyệt**)
+
+- **Phát hiện nghiêm trọng, CHƯA sửa (chờ duyệt PR1):** `parseDwgBinary`
+  (`lib/cad/dxf-parser.ts:649`) **không phải bộ đọc DWG**. Nó quét chuỗi trong khối nhị
+  phân, đoán tên layer bằng regex, rồi **bịa toạ độ** từ chỉ số mảng
+  (`center: [1000 + (idx % 8) * 4000, ...]`). Toàn hàm chỉ sinh `TEXT` và `INSERT` —
+  **không có một đường nét hình học nào**. Hệ quả: `POST /api/engineering/cad/convert-to-dxf`
+  nhận DWG rồi trả về tệp DXF **mở được, trông hợp lệ, nhưng nội dung là bịa** — nguy hiểm
+  hơn tệp hỏng vì kỹ sư không nhận ra bằng mắt.
+- **Trả lời câu hỏi đọc thẳng DWG:** không khả thi bằng TypeScript. DWG là định dạng đóng,
+  không công bố, khác nhau theo phiên bản, nén LZ77 + đóng gói bit. Phương án chọn: **ODA
+  File Converter** chạy cục bộ trong image worker (bản vẽ không rời hạ tầng tự host); tạm
+  thời từ chối DWG kèm hướng dẫn xuất DXF từ AutoCAD.
+- **Kế hoạch R2000:** **không tự viết bộ ghi R2000 bằng TS** — R2000 đòi handle cho mọi thực
+  thể + `$HANDSEED` + con trỏ owner + subclass marker + đủ 9 bảng + section `OBJECTS` +
+  block `*D<n>` cho dimension; sai 1 chỗ là AutoCAD không mở, đúng lớp lỗi vừa xảy ra. Thay
+  vào đó **uỷ thác cho `ezdxf`** — thư viện chuẩn **đã cài sẵn** trong worker Python của dự
+  án (`Dockerfile.mepf-worker:25`), điều phối qua `lib/engineering-worker-bridge.ts`.
+- **Chia PR:** PR1 bỏ nhánh bịa hình học + từ chối DWG có hướng dẫn (**tách làm trước, độc
+  lập**); PR2 handler `export_dxf_r2000` trong worker + golden file; PR3 endpoint/UI chọn
+  định dạng; PR4 ODA File Converter (cần duyệt điều khoản).
+- **2 quyết định đang mở, chặn PR2/PR3:** (1) kỹ sư có thật sự cần dimension liên kết không,
+  hay R12 hiện tại đã đủ; (2) điều khoản redistribution của ODA. Xem
+  `docs/nang-cap/M98-dxf-r2000-va-dwg.md`.
+
 ## Sửa bug CI có sẵn trên main phát hiện khi mở PR health-check (2026-08-22)
 
 - **Bug thật, đã sửa:** `lib/db/index.ts::withProjectScope` — lời gọi LỒNG bên trong 1
