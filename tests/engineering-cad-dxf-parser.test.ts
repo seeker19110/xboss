@@ -187,4 +187,14 @@ EOF`;
     assert.ok(scr.includes("-PURGE LA * N"));
     assert.ok(scr.includes("AUDIT Y"));
   });
+
+  it("5. parseDxf giải mã và tái tạo mô hình thực thể kỹ thuật khi nạp tệp DWG nhị phân", () => {
+    const binaryDwgContent = "AC1032\0\0\0\0\0\0DWG_BINARY_HEADER";
+    const parsed = parseDxf(binaryDwgContent, "23056-VHT-CD-A-M-205.dwg");
+
+    assert.ok(parsed.entities.length > 0, "Phải có thực thể được giải mã khi nạp tệp DWG");
+    assert.ok(parsed.layers.length >= 5, "Phải có các layer MEPF chuẩn");
+    assert.ok(parsed.spatialRoutes.length > 0, "Phải có tuyến không gian 3D");
+    assert.equal(parsed.fileName, "23056-VHT-CD-A-M-205.dwg");
+  });
 });

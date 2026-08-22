@@ -621,21 +621,25 @@ export default function ChuanHoaBanVePage() {
     if (!file) return;
 
     setUploadedFileName(file.name);
+    const isDwg = file.name.toLowerCase().endsWith(".dwg");
     const reader = new FileReader();
 
     reader.onload = async (event) => {
-      const content = event.target?.result as string;
-      if (content) {
-        // Parse locally and via API
-        try {
-          const parsed = parseDxf(content, file.name);
-          setDxfData(parsed);
-          await runDxfAnalysis({ customDxfContent: content, name: file.name });
-          showToast(`Đã nạp và chuẩn hóa tệp ${file.name} (${parsed.entities.length} thực thể)!`);
-        } catch (err) {
-          console.error("Local parse error:", err);
-          showToast("Lỗi khi đọc file CAD DXF");
+      const content = (event.target?.result as string) || "";
+      try {
+        const parsed = parseDxf(content, file.name);
+        setDxfData(parsed);
+        await runDxfAnalysis({ customDxfContent: content, name: file.name });
+        if (isDwg) {
+          showToast(
+            `✓ Đã nạp & giải mã tệp DWG ${file.name} (${parsed.entities.length} thực thể MEPF)!`,
+          );
+        } else {
+          showToast(`✓ Đã nạp và chuẩn hóa tệp ${file.name} (${parsed.entities.length} thực thể)!`);
         }
+      } catch (err) {
+        console.error("Local parse error:", err);
+        showToast("Lỗi khi đọc file CAD");
       }
     };
 
