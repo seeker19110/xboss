@@ -1,20 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { writeFileSync, mkdirSync, existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
-import { queryOne, run, insertId } from "@/lib/db";
+import { queryOne, insertId, run } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-// POST /api/engineering/cad/save-drawing — Lưu trữ bản vẽ chuẩn hóa theo cấu trúc thư mục quy chuẩn:
-// drawings/
-//   ├── design/
-//   │   ├── origin/ (file gốc)
-//   │   └── iso/    (chuẩn hóa)
-//   ├── bim/
-//   ├── shop/
-//   └── asbuilt/
+// POST /api/engineering/cad/save-drawing — Lưu trữ bản vẽ chuẩn hóa
+// Quy chuẩn quản trị:
+// - Khi chưa duyệt (hoặc đang chỉnh sửa): Lưu tại thư mục tạm drawings/{systems}/temp/
+// - Khi Kỹ Sư Trưởng phê duyệt Gate 0: Lưu chính thức vào đúng vị trí drawings/{systems}/{kind}/{subFolder?}/ và dọn sạch file tạm.
 // Tên file quy chuẩn: [project_code]_[work_package_code]_[systems]_[kind-subfolder]_[name]_[date]_[drawing_versions].[ext]
 
 export async function POST(req: NextRequest) {
@@ -38,8 +34,9 @@ export async function POST(req: NextRequest) {
       drawingVersions = "Rev01",
       fileContent = "",
       fileExtension = "dxf",
+      isApproved = false, // true = Phê duyệt chính thức -> Lưu vào đúng vị trí; false = Lưu tạm vào {systems}/temp
       approverName = "Kỹ Sư Trưởng MEPF",
-      approvalNotes = "Bản vẽ đã qua 5 bước chuẩn hóa CAD 2D và kiểm tra chất lượng Gate 0.",
+      approvalNotes = "Bản vẽ đã qua chuẩn hóa CAD 2D và kiểm tra chất lượng Gate 0.",
     } = body;
 
     const projectId = inputProjectId || (await getCurrentProjectId(user)) || 1;
@@ -67,22 +64,27 @@ export async function POST(req: NextRequest) {
     const kindTag = cKind === "design" ? `DESIGN-${cSub.toUpperCase()}` : cKind.toUpperCase();
     const standardFileName = `${cProject}_${cWp}_${cSys}_${kindTag}_${cName}_${cDate}_${cRev}.${cExt}`;
 
-    // Xác định thư mục đích theo cấu trúc: drawings/[systems]/[kind]/[subfolder?]
-    // Cả thư mục data/uploads/drawings và root drawings đều được đồng bộ
+    // Xác định thư mục đích theo trạng thái phê duyệt:
+    // - Chưa duyệt (isApproved === false): lưu vào drawings/{systems}/temp/
+    // - Đã duyệt (isApproved === true): lưu chính thức vào drawings/{systems}/{kind}/{subfolder?}
     let relativeSubPath = "";
-    if (cKind === "design") {
-      relativeSubPath = join(cSys, "design", cSub || "iso");
-    } else if (cKind === "bim") {
-      relativeSubPath = join(cSys, "bim");
-    } else if (cKind === "shop") {
-      relativeSubPath = join(cSys, "shop");
-    } else if (cKind === "asbuilt") {
-      relativeSubPath = join(cSys, "asbuilt");
+    if (!isApproved) {
+      relativeSubPath = join(cSys, "temp");
     } else {
-      relativeSubPath = join(cSys, "design", "iso");
+      if (cKind === "design") {
+        relativeSubPath = join(cSys, "design", cSub || "iso");
+      } else if (cKind === "bim") {
+        relativeSubPath = join(cSys, "bim");
+      } else if (cKind === "shop") {
+        relativeSubPath = join(cSys, "shop");
+      } else if (cKind === "asbuilt") {
+        relativeSubPath = join(cSys, "asbuilt");
+      } else {
+        relativeSubPath = join(cSys, "design", "iso");
+      }
     }
 
-    // 1. Thư mục trong data/uploads/drawings/
+    // 1. Ghi tệp vào data/uploads/drawings/
     const dataUploadsDir = join(process.cwd(), "data", "uploads", "drawings", relativeSubPath);
     if (!existsSync(dataUploadsDir)) {
       mkdirSync(dataUploadsDir, { recursive: true });
@@ -90,7 +92,7 @@ export async function POST(req: NextRequest) {
     const fullDataPath = join(dataUploadsDir, standardFileName);
     writeFileSync(fullDataPath, fileContent || ";; Standardized CAD Drawing by XBoss\n", "utf8");
 
-    // 2. Thư mục root drawings/
+    // 2. Ghi tệp vào root drawings/
     const rootDrawingsDir = join(process.cwd(), "drawings", relativeSubPath);
     if (!existsSync(rootDrawingsDir)) {
       mkdirSync(rootDrawingsDir, { recursive: true });
@@ -98,11 +100,34 @@ export async function POST(req: NextRequest) {
     const fullRootPath = join(rootDrawingsDir, standardFileName);
     writeFileSync(fullRootPath, fileContent || ";; Standardized CAD Drawing by XBoss\n", "utf8");
 
-    // 3. Ghi nhận vào Cơ sở dữ liệu bảng drawings & drawing_revisions
+    // 3. Nếu đã phê duyệt chính thức, dọn sạch bản sao tạm trong thư mục temp (nếu có)
+    if (isApproved) {
+      const tempPathData = join(
+        process.cwd(),
+        "data",
+        "uploads",
+        "drawings",
+        cSys,
+        "temp",
+        standardFileName,
+      );
+      if (existsSync(tempPathData)) {
+        try {
+          unlinkSync(tempPathData);
+        } catch {}
+      }
+      const tempPathRoot = join(process.cwd(), "drawings", cSys, "temp", standardFileName);
+      if (existsSync(tempPathRoot)) {
+        try {
+          unlinkSync(tempPathRoot);
+        } catch {}
+      }
+    }
+
+    // 4. Ghi nhận vào Cơ sở dữ liệu bảng drawings & drawing_revisions
     const drawingCode = `${cSys}-${kindTag}-${cRev}-${cDate.slice(-4)}`;
     const drawingTitle = `${name} (${kindTag} - ${cRev})`;
 
-    // Kiểm tra xem drawing code đã tồn tại chưa
     const existing = await queryOne<{ id: number }>(
       `SELECT id FROM drawings WHERE code = ? AND project_id = ?`,
       drawingCode,
@@ -128,7 +153,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Tạo bản ghi revision
+    // Tạo hoặc cập nhật bản ghi revision
     const existingRev = await queryOne<{ id: number }>(
       `SELECT id FROM drawing_revisions WHERE drawing_id = ? AND rev = ?`,
       drawingId,
@@ -136,25 +161,42 @@ export async function POST(req: NextRequest) {
     );
 
     let revisionId = existingRev?.id;
+    const revStatus = isApproved ? "approved" : "pending";
+    const noteText = isApproved
+      ? `[Phê duyệt Gate 0 - ${approverName}]: ${approvalNotes}`
+      : `[Lưu Tạm Thời Chờ Duyệt - ${user.name || "Kỹ Sư"}]: ${approvalNotes}`;
+
     if (!revisionId && drawingId) {
       revisionId = await insertId(
         `INSERT INTO drawing_revisions (
           drawing_id, rev, file_name, original_name, mime_type, size_bytes,
           status, submitted_at, decided_at, decision_note, uploaded_by, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, 'approved', CURRENT_DATE, CURRENT_DATE, ?, ?, NOW())`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_DATE, ${isApproved ? "CURRENT_DATE" : "NULL"}, ?, ?, NOW())`,
         drawingId,
         cRev,
         join(relativeSubPath, standardFileName).replace(/\\/g, "/"),
         standardFileName,
         cExt === "dxf" ? "application/dxf" : "application/octet-stream",
         Buffer.byteLength(fileContent || "", "utf8"),
-        `[Phê duyệt Gate 0 - ${approverName}]: ${approvalNotes}`,
+        revStatus,
+        noteText,
         user.id,
+      );
+    } else if (revisionId) {
+      await run(
+        `UPDATE drawing_revisions 
+         SET status = ?, file_name = ?, decision_note = ?, decided_at = ${isApproved ? "CURRENT_DATE" : "NULL"}
+         WHERE id = ?`,
+        revStatus,
+        join(relativeSubPath, standardFileName).replace(/\\/g, "/"),
+        noteText,
+        revisionId,
       );
     }
 
     return NextResponse.json({
       success: true,
+      isApproved,
       standardFileName,
       relativeDirectory: join("drawings", relativeSubPath).replace(/\\/g, "/"),
       fullUploadPath: `data/uploads/drawings/${relativeSubPath}/${standardFileName}`.replace(
@@ -164,7 +206,9 @@ export async function POST(req: NextRequest) {
       drawingId,
       revisionId,
       drawingCode,
-      message: `Đã lưu bản vẽ thành công vào drawings/${relativeSubPath}/${standardFileName}`,
+      message: isApproved
+        ? `✓ Bản vẽ đã được Kỹ Sư Trưởng PHÊ DUYỆT và lưu chính thức vào drawings/${relativeSubPath}/${standardFileName}`
+        : `⏳ Bản vẽ đã lưu vào THƯ MỤC TẠM drawings/${cSys}/temp/${standardFileName}. Ký Duyệt Gate 0 để lưu vào vị trí chính thức.`,
     });
   } catch (error: any) {
     console.error("Save standardized drawing error:", error);

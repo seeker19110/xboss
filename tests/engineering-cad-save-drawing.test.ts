@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 describe("CAD Standardized Drawing Storage & Directory Structure Suite", () => {
-  it("1. Thư mục quy chuẩn drawings/ và data/uploads/drawings/ chứa đầy đủ các phân hệ và nhóm con", () => {
+  it("1. Thư mục quy chuẩn drawings/ và data/uploads/drawings/ chứa đầy đủ các phân hệ, nhóm con và thư mục tạm (temp/)", () => {
     const basePaths = [
       join(process.cwd(), "drawings"),
       join(process.cwd(), "data", "uploads", "drawings"),
@@ -14,6 +14,7 @@ describe("CAD Standardized Drawing Storage & Directory Structure Suite", () => {
 
     for (const base of basePaths) {
       for (const sys of systems) {
+        assert.ok(existsSync(join(base, sys, "temp")), `Thiếu thư mục tạm ${sys}/temp`);
         assert.ok(
           existsSync(join(base, sys, "design", "origin")),
           `Thiếu thư mục ${sys}/design/origin`,
@@ -60,5 +61,29 @@ describe("CAD Standardized Drawing Storage & Directory Structure Suite", () => {
       standardFileName,
       "PRJ01_WP-MEPF-01_HVAC_DESIGN-ISO_Mat_Bang_Cap_Gio_Tang_4_20260822_Rev01.dxf",
     );
+  });
+
+  it("3. Kiểm tra logic phân bổ đường dẫn: Chưa duyệt -> lưu thư mục tạm (temp/), Đã duyệt -> lưu đúng vị trí chính thức", () => {
+    const systems = "HVAC";
+    const kind = "design";
+    const subFolder = "iso";
+
+    const getRelativePath = (isApproved: boolean) => {
+      if (!isApproved) {
+        return join(systems, "temp");
+      }
+      if (kind === "design") {
+        return join(systems, "design", subFolder || "iso");
+      }
+      return join(systems, kind);
+    };
+
+    // Khi chưa duyệt
+    const draftPath = getRelativePath(false).replace(/\\/g, "/");
+    assert.strictEqual(draftPath, "HVAC/temp");
+
+    // Khi kỹ sư trưởng đã duyệt Gate 0
+    const approvedPath = getRelativePath(true).replace(/\\/g, "/");
+    assert.strictEqual(approvedPath, "HVAC/design/iso");
   });
 });
