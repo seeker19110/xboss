@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/auth";
-import { parseDwgBinary, DxfLayerInfo, DxfEntityRaw } from "@/lib/cad/dxf-parser";
+import { parseDwgBinary, exportDxf } from "@/lib/cad/dxf-parser";
 
 export const dynamic = "force-dynamic";
 
@@ -28,20 +28,8 @@ export async function POST(req: Request) {
     const buffer = Buffer.from(fileBase64, "base64");
     const parsed = parseDwgBinary(buffer, fileName);
 
-    // Xuất chuỗi DXF ASCII thật từ các thực thể đã trích xuất
-    let dxfContent = `0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n`;
-    parsed.layers.forEach((l) => {
-      dxfContent += `0\nLAYER\n2\n${l.name}\n62\n${l.colorNumber}\n6\n${l.lineType}\n`;
-    });
-    dxfContent += `0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n`;
-    parsed.entities.forEach((ent) => {
-      if (ent.type === "LINE" && ent.coordinates.start && ent.coordinates.end) {
-        dxfContent += `0\nLINE\n8\n${ent.layer}\n10\n${ent.coordinates.start[0]}\n20\n${ent.coordinates.start[1]}\n30\n${ent.coordinates.start[2]}\n11\n${ent.coordinates.end[0]}\n21\n${ent.coordinates.end[1]}\n31\n${ent.coordinates.end[2]}\n`;
-      } else if (ent.type === "TEXT" && ent.coordinates.center) {
-        dxfContent += `0\nTEXT\n8\n${ent.layer}\n10\n${ent.coordinates.center[0]}\n20\n${ent.coordinates.center[1]}\n30\n${ent.coordinates.center[2]}\n1\n${ent.decodedText || ent.textValue || ""}\n`;
-      }
-    });
-    dxfContent += `0\nENDSEC\n0\nEOF\n`;
+    // Xuất chuỗi DXF ASCII hoàn chỉnh theo chuẩn AutoCAD
+    const dxfContent = exportDxf(parsed, { applyStandardLayers: true });
 
     return NextResponse.json({
       success: true,

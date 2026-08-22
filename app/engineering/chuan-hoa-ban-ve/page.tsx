@@ -78,6 +78,7 @@ import { redirectToLogin } from "@/app/lib/me";
 import {
   parseDxf,
   parseDwgBinary,
+  exportDxf,
   DxfParseResult,
   DxfLayerInfo,
   DxfXrefInfo,
@@ -427,6 +428,9 @@ export default function ChuanHoaBanVePage() {
     const finalApproved = overrideApproved !== undefined ? overrideApproved : is2dApproved;
     setSavingToServer(true);
     try {
+      const realDxf = dxfData
+        ? exportDxf(dxfData, { applyStandardLayers: true })
+        : conversionInfo?.dxfContent || ";; Standardized CAD Drawing DXF\n";
       const res = await fetch("/api/engineering/cad/save-drawing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -439,7 +443,7 @@ export default function ChuanHoaBanVePage() {
           name: saveConfig.name,
           date: saveConfig.date,
           drawingVersions: saveConfig.drawingVersions,
-          fileContent: conversionInfo?.dxfContent || ";; Standardized CAD Drawing DXF\n",
+          fileContent: realDxf,
           fileExtension: "dxf",
           isApproved: finalApproved,
           approverName,
@@ -466,7 +470,11 @@ export default function ChuanHoaBanVePage() {
   };
 
   const handleDownloadStandardizedNamedDxf = () => {
-    const content = conversionInfo?.dxfContent || ";; Standardized CAD Drawing DXF\n";
+    if (!dxfData || !dxfData.entities || dxfData.entities.length === 0) {
+      showToast("⚠️ Bản vẽ chưa có dữ liệu thực thể CAD để xuất tệp DXF.");
+      return;
+    }
+    const content = exportDxf(dxfData, { applyStandardLayers: true });
     const blob = new Blob([content], { type: "application/dxf;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -476,7 +484,7 @@ export default function ChuanHoaBanVePage() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast(`✓ Đã tải xuống file: ${generatedFileName}`);
+    showToast(`✓ Đã tải xuống file AutoCAD DXF: ${generatedFileName}`);
   };
 
   // ── Interactive 2D Vector CAD Canvas States ──
@@ -1097,11 +1105,12 @@ export default function ChuanHoaBanVePage() {
 
           const now = new Date();
           const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
+          const exportedInitialDxf = exportDxf(localParsed, { applyStandardLayers: true });
 
           setConversionInfo({
             originalFileName: file.name,
             dxfFileName: dxfName,
-            dxfContent: "",
+            dxfContent: exportedInitialDxf,
             entityCount: localParsed.entities.length,
             convertedAt: timeStr,
           });
@@ -1127,7 +1136,19 @@ export default function ChuanHoaBanVePage() {
           setLoading(true);
           const parsed = parseDxf(content, dxfName);
           setDxfData(parsed);
-          setConversionInfo(null);
+
+          const now = new Date();
+          const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
+          const exportedInitialDxf = exportDxf(parsed, { applyStandardLayers: true });
+
+          setConversionInfo({
+            originalFileName: file.name,
+            dxfFileName: dxfName,
+            dxfContent: exportedInitialDxf,
+            entityCount: parsed.entities.length,
+            convertedAt: timeStr,
+          });
+
           showToast(
             `✓ Đã nạp và chuẩn hóa tệp DXF ${file.name} (${parsed.entities.length} thực thể)!`,
           );
@@ -1144,15 +1165,22 @@ export default function ChuanHoaBanVePage() {
   };
 
   const handleDownloadConvertedDxf = () => {
-    if (!conversionInfo?.dxfContent) return;
-    const blob = new Blob([conversionInfo.dxfContent], { type: "application/dxf;charset=utf-8" });
+    const content =
+      (dxfData ? exportDxf(dxfData, { applyStandardLayers: true }) : conversionInfo?.dxfContent) ||
+      "";
+    if (!content) {
+      showToast("⚠️ Chưa có dữ liệu bản vẽ để tải xuống.");
+      return;
+    }
+    const targetFileName = conversionInfo?.dxfFileName || generatedFileName;
+    const blob = new Blob([content], { type: "application/dxf;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = conversionInfo.dxfFileName;
+    a.download = targetFileName;
     a.click();
     URL.revokeObjectURL(url);
-    showToast(`Đã tải về tệp tin ${conversionInfo.dxfFileName}!`);
+    showToast(`✓ Đã tải về tệp tin AutoCAD DXF ${targetFileName}!`);
   };
 
   // ── Handle Folder Upload (Whole Folder with XREFs, DWG, DXF, CTB) ──

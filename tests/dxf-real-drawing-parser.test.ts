@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseDxf, parseDwgBinary, generateStandardizedAutocadScript } from "@/lib/cad/dxf-parser";
+import {
+  parseDxf,
+  parseDwgBinary,
+  exportDxf,
+  generateStandardizedAutocadScript,
+} from "@/lib/cad/dxf-parser";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
@@ -97,4 +102,27 @@ test("Drawing Synchronizer: Nhận diện cấu trúc phân hệ MEPF và tầng
   assert.ok(hvacFile.includes("-M-"), "HVAC code phải chứa -M-");
   assert.ok(elecFile.includes("-EP-"), "Điện lực code phải chứa -EP-");
   assert.ok(elvFile.includes("-ELV-"), "Điện nhẹ code phải chứa -ELV-");
+});
+
+test("exportDxf: Xuất chuỗi DXF ASCII chuẩn AutoCAD đầy đủ HEADER, TABLES, BLOCKS, ENTITIES", () => {
+  const sampleDxf = `0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n0\nLAYER\n2\n01_ONG_GIO_CAP\n62\n140\n6\nCONTINUOUS\n0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n0\nLINE\n8\n01_ONG_GIO_CAP\n10\n1000\n20\n2000\n30\n0\n11\n5000\n21\n2000\n31\n0\n0\nTEXT\n8\n01_ONG_GIO_CAP\n10\n2500\n20\n2100\n30\n0\n1\nAHU-01\n0\nENDSEC\n0\nEOF`;
+
+  const parsed = parseDxf(sampleDxf, "original.dxf");
+  assert.equal(parsed.entities.length, 2);
+
+  const exportedDxf = exportDxf(parsed, { applyStandardLayers: true });
+  assert.ok(exportedDxf.includes("SECTION"), "DXF xuất phải có SECTION");
+  assert.ok(exportedDxf.includes("HEADER"), "DXF xuất phải có HEADER");
+  assert.ok(exportedDxf.includes("$ACADVER"), "DXF xuất phải có $ACADVER");
+  assert.ok(exportedDxf.includes("AC1015"), "DXF xuất phải tương thích AC1015");
+  assert.ok(exportedDxf.includes("TABLES"), "DXF xuất phải có TABLES");
+  assert.ok(exportedDxf.includes("LAYER"), "DXF xuất phải có bảng LAYER");
+  assert.ok(exportedDxf.includes("BLOCKS"), "DXF xuất phải có BLOCKS");
+  assert.ok(exportedDxf.includes("ENTITIES"), "DXF xuất phải có ENTITIES");
+  assert.ok(exportedDxf.includes("EOF"), "DXF xuất phải kết thúc bằng EOF");
+
+  // Re-parse exported DXF
+  const reParsed = parseDxf(exportedDxf, "exported.dxf");
+  assert.equal(reParsed.entities.length, 2);
+  assert.ok(reParsed.layers.length >= 1);
 });
