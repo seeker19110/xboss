@@ -1179,6 +1179,26 @@ export default function ChuanHoaBanVePage() {
     }
   };
 
+  // ── Safe Chunked ArrayBuffer to Base64 ──
+  const safeArrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+    try {
+      const bytes = new Uint8Array(buffer);
+      let binary = "";
+      const len = bytes.byteLength;
+      const chunkSize = 16384;
+      for (let i = 0; i < len; i += chunkSize) {
+        const end = Math.min(i + chunkSize, len);
+        const chunk = bytes.subarray(i, end);
+        for (let j = 0; j < chunk.length; j++) {
+          binary += String.fromCharCode(chunk[j]);
+        }
+      }
+      return btoa(binary);
+    } catch {
+      return "";
+    }
+  };
+
   // ── Handle File Upload (.DXF / .DWG / .PDF) ──
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1195,13 +1215,7 @@ export default function ChuanHoaBanVePage() {
         const arrayBuffer = event.target?.result as ArrayBuffer;
         try {
           setLoading(true);
-          const uint8 = new Uint8Array(arrayBuffer);
-          let binary = "";
-          const len = uint8.byteLength;
-          for (let i = 0; i < len; i++) {
-            binary += String.fromCharCode(uint8[i]);
-          }
-          const base64 = btoa(binary);
+          const base64 = safeArrayBufferToBase64(arrayBuffer);
 
           // Phân tích phía máy khách trước để cập nhật giao diện tức thì
           const localParsed = parseDwgBinary(arrayBuffer, file.name);
@@ -1220,10 +1234,12 @@ export default function ChuanHoaBanVePage() {
           });
 
           showToast(
-            `✓ Đã nạp thành công bản vẽ thật ${file.name} (${localParsed.entities.length} thực thể, ${localParsed.layers.length} layers)!`,
+            `✓ Đã nạp thành công bản vẽ ${file.name} (${localParsed.entities.length} thực thể, ${localParsed.layers.length} layers)!`,
           );
 
-          await runDxfAnalysis({ fileBase64: base64, name: file.name });
+          if (base64) {
+            await runDxfAnalysis({ fileBase64: base64, name: file.name });
+          }
         } catch (err) {
           console.error("Local parse error:", err);
           showToast("Lỗi khi đọc file CAD");
@@ -1283,6 +1299,7 @@ export default function ChuanHoaBanVePage() {
     a.href = url;
     a.download = targetFileName;
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
     showToast(`✓ Đã tải về tệp tin AutoCAD DXF ${targetFileName}!`);
   };
@@ -1354,16 +1371,13 @@ export default function ChuanHoaBanVePage() {
         if (masterRealFile) {
           if (masterCandidate.isDwg) {
             const ab = await masterRealFile.arrayBuffer();
-            const uint8 = new Uint8Array(ab);
-            let binary = "";
-            for (let i = 0; i < uint8.byteLength; i++) {
-              binary += String.fromCharCode(uint8[i]);
-            }
-            const base64 = btoa(binary);
+            const base64 = safeArrayBufferToBase64(ab);
             const localParsed = parseDwgBinary(ab, masterRealFile.name);
             const resolvedXrefs = resolveXrefDependencies(localParsed, items);
             setDxfData({ ...localParsed, xrefs: resolvedXrefs });
-            await runDxfAnalysis({ fileBase64: base64, name: masterRealFile.name });
+            if (base64) {
+              await runDxfAnalysis({ fileBase64: base64, name: masterRealFile.name });
+            }
           } else {
             const text = await masterRealFile.text();
             const localParsed = parseDxf(text, masterRealFile.name);
@@ -1394,16 +1408,13 @@ export default function ChuanHoaBanVePage() {
     if (targetFile) {
       if (isDwg) {
         const ab = await targetFile.arrayBuffer();
-        const uint8 = new Uint8Array(ab);
-        let binary = "";
-        for (let i = 0; i < uint8.byteLength; i++) {
-          binary += String.fromCharCode(uint8[i]);
-        }
-        const base64 = btoa(binary);
+        const base64 = safeArrayBufferToBase64(ab);
         const localParsed = parseDwgBinary(ab, fileName);
         const resolvedXrefs = resolveXrefDependencies(localParsed, folderFiles);
         setDxfData({ ...localParsed, xrefs: resolvedXrefs });
-        await runDxfAnalysis({ fileBase64: base64, name: fileName });
+        if (base64) {
+          await runDxfAnalysis({ fileBase64: base64, name: fileName });
+        }
       } else {
         const text = await targetFile.text();
         const localParsed = parseDxf(text, fileName);

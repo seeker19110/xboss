@@ -642,11 +642,27 @@ export function parseDwgBinary(
   rawBuffer: Buffer | ArrayBuffer | Uint8Array,
   fileName = "model.dwg",
 ): DxfParseResult {
-  const buf = Buffer.isBuffer(rawBuffer)
-    ? rawBuffer
-    : Buffer.from(rawBuffer instanceof ArrayBuffer ? rawBuffer : rawBuffer.buffer);
+  const bytes =
+    rawBuffer instanceof Uint8Array
+      ? rawBuffer
+      : rawBuffer instanceof ArrayBuffer
+        ? new Uint8Array(rawBuffer)
+        : typeof (rawBuffer as any)?.buffer !== "undefined"
+          ? new Uint8Array(
+              (rawBuffer as any).buffer,
+              (rawBuffer as any).byteOffset || 0,
+              (rawBuffer as any).byteLength || 0,
+            )
+          : new Uint8Array(0);
 
-  const header = buf.subarray(0, 6).toString("ascii");
+  const view =
+    bytes.length > 0 ? new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength) : null;
+
+  let header = "";
+  for (let i = 0; i < Math.min(6, bytes.length); i++) {
+    header += String.fromCharCode(bytes[i]);
+  }
+
   let autocadVersion = "AutoCAD 2000/2004";
   if (header.startsWith("AC1015")) autocadVersion = "AutoCAD 2000 (AC1015)";
   else if (header.startsWith("AC1018")) autocadVersion = "AutoCAD 2004 (AC1018)";
@@ -662,40 +678,60 @@ export function parseDwgBinary(
   const metadata: Record<string, string> = {
     dwgVersion: header,
     software: autocadVersion,
-    fileSize: `${(buf.length / 1024).toFixed(1)} KB`,
+    fileSize: `${(bytes.length / 1024).toFixed(1)} KB`,
   };
 
+  const utf16Decoder = typeof TextDecoder !== "undefined" ? new TextDecoder("utf-16le") : null;
+
   // Scan UTF-16LE strings (AutoCAD 2007+)
-  for (let i = 0; i < buf.length - 8; i += 2) {
-    let len = 0;
-    while (i + len * 2 + 1 < buf.length && len < 120) {
-      const code = buf.readUInt16LE(i + len * 2);
-      if ((code >= 32 && code <= 126) || (code >= 0x00c0 && code <= 0x1ef9)) {
-        len++;
-      } else {
-        break;
-      }
-    }
-    if (len >= 3) {
-      const s = buf.toString("utf16le", i, i + len * 2).trim();
-      if (s && !/^[0-9a-f]{8,}$/i.test(s) && !/^\s+$/.test(s)) {
-        extractedTexts.push(s);
-        if (s.includes("AutoCAD") || s.includes("build_version")) {
-          metadata.generator = s.slice(0, 100);
-        }
-        if (s.includes("<prop id=") || s.includes("<datetime>")) {
-          const dtMatch = s.match(/<datetime>([^<]+)<\/datetime>/);
-          if (dtMatch) metadata.lastSaved = dtMatch[1];
-          const userMatch = s.match(/<prop id="8"><string>([^<]+)<\/string>/);
-          if (userMatch) metadata.author = userMatch[1];
+  if (view) {
+    for (let i = 0; i < bytes.length - 8; i += 2) {
+      let len = 0;
+      while (i + len * 2 + 1 < bytes.length && len < 120) {
+        const code = view.getUint16(i + len * 2, true);
+        if ((code >= 32 && code <= 126) || (code >= 0x00c0 && code <= 0x1ef9)) {
+          len++;
+        } else {
+          break;
         }
       }
-      i += len * 2;
+      if (len >= 3) {
+        let s = "";
+        if (utf16Decoder) {
+          s = utf16Decoder.decode(bytes.subarray(i, i + len * 2)).trim();
+        } else {
+          for (let k = 0; k < len; k++) {
+            s += String.fromCharCode(view.getUint16(i + k * 2, true));
+          }
+          s = s.trim();
+        }
+        if (s && !/^[0-9a-f]{8,}$/i.test(s) && !/^\s+$/.test(s)) {
+          extractedTexts.push(s);
+          if (s.includes("AutoCAD") || s.includes("build_version")) {
+            metadata.generator = s.slice(0, 100);
+          }
+          if (s.includes("<prop id=") || s.includes("<datetime>")) {
+            const dtMatch = s.match(/<datetime>([^<]+)<\/datetime>/);
+            if (dtMatch) metadata.lastSaved = dtMatch[1];
+            const userMatch = s.match(/<prop id="8"><string>([^<]+)<\/string>/);
+            if (userMatch) metadata.author = userMatch[1];
+          }
+        }
+        i += len * 2;
+      }
     }
   }
 
   // Scan ASCII tokens
-  const latin = buf.toString("latin1");
+  let latin = "";
+  const latinDecoder = typeof TextDecoder !== "undefined" ? new TextDecoder("latin1") : null;
+  if (latinDecoder) {
+    latin = latinDecoder.decode(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i++) {
+      latin += String.fromCharCode(bytes[i]);
+    }
+  }
   const words = latin.match(/[A-Za-z0-9_.-]{3,40}/g) || [];
   for (const w of words) {
     if (
@@ -885,7 +921,7 @@ export function parseDwgBinary(
     fileName,
     sourcePath: fileName,
     fileFormat: autocadVersion ? `AutoCAD (${autocadVersion})` : "AutoCAD DWG (Binary)",
-    fileSizeBytes: buf.length,
+    fileSizeBytes: bytes.length,
     isRealDrawing: true,
     extractedMetadata: metadata,
     layers,
@@ -926,20 +962,21 @@ export function parseDwgBinary(
  * Phân tích tệp ASCII DXF hoặc nhị phân DWG thành cấu trúc đối tượng hình học & kỹ thuật.
  */
 export function parseDxf(
-  dxfContent: string | Buffer | ArrayBuffer,
+  dxfContent: string | Buffer | ArrayBuffer | Uint8Array,
   fileName = "model.dxf",
 ): DxfParseResult {
-  // Nếu là Buffer hoặc ArrayBuffer hoặc fileName là .dwg hoặc chuỗi nhị phân AC10
-  if (
-    Buffer.isBuffer(dxfContent) ||
+  // Nếu là Buffer/Uint8Array/ArrayBuffer hoặc fileName là .dwg hoặc chuỗi nhị phân AC10
+  const isBinary =
+    (typeof Buffer !== "undefined" && Buffer.isBuffer(dxfContent)) ||
     dxfContent instanceof ArrayBuffer ||
+    dxfContent instanceof Uint8Array ||
     (typeof dxfContent === "string" &&
       (dxfContent.startsWith("AC10") ||
         dxfContent.includes("\0") ||
-        fileName.toLowerCase().endsWith(".dwg")))
-  ) {
-    const rawBuf = typeof dxfContent === "string" ? Buffer.from(dxfContent, "binary") : dxfContent;
-    return parseDwgBinary(rawBuf, fileName);
+        fileName.toLowerCase().endsWith(".dwg")));
+
+  if (isBinary) {
+    return parseDwgBinary(dxfContent as any, fileName);
   }
 
   const contentToParse = String(dxfContent || "").trim();
