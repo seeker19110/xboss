@@ -13,6 +13,32 @@
 - **Lộ trình hoàn thành (chờ duyệt, chưa code):** `PROJECT-COMPLETION-ROADMAP.md` chốt C0→C6 để đạt XBoss v1.0/Product Complete và O1→O5 cho Engineering OS/Vision Complete theo gate; không coi tài liệu là quyền tự triển khai production hoặc A3+.
 - **Spec pack chi tiết (chờ duyệt):** C0, C2–C6 và OS-1–OS-5 đã có file thi hành riêng (C1 dùng ENG-5), mỗi file gồm scope, data/API/UI/ops, test, chia PR và DoD. Chưa phase nào được đánh dấu triển khai chỉ vì đặc tả đã viết.
 
+## Rà soát & sửa luồng chuẩn hóa bản vẽ CAD `/engineering/chuan-hoa-ban-ve` (2026-08-22)
+
+- **Bug chặn luồng lưu nháp, đã sửa:** `app/api/engineering/cad/save-drawing/route.ts` ghi
+  `drawing_revisions.status = 'pending'` — giá trị KHÔNG nằm trong CHECK constraint của
+  `migrations/0016_drawings.sql` (`submitted|commented|approved|approved_with_comments|
+rejected|superseded`) → mọi lần "Lưu tạm chờ duyệt" đều 500. Sửa thành `'submitted'`.
+- **Lỗ hổng phân quyền, đã sửa:** route chỉ kiểm `getCurrentUser()`, nên mọi vai trò kể cả
+  chỉ-xem (`viewer`/`cdt`) ghi được file vào `drawings/` lẫn `data/uploads/drawings/` và tự
+  đặt `isApproved: true` để "Ký duyệt Gate 0". Nay ghi bản vẽ đòi `CAN.manageDrawings`
+  (Admin/PM/engineer) và phê duyệt đòi `CAN.decideDrawingRevision` (Admin/PM) — đồng bộ với
+  sổ bản vẽ M8.
+- **Path traversal, đã sửa:** `kind` nhận thẳng từ body chỉ qua `.toLowerCase()` rồi ghép vào
+  tên file (`kindTag`), nên `kind: "../../x"` đẩy `writeFileSync` ra ngoài thư mục bản vẽ
+  (và ném 500 khi `kind` không phải chuỗi). Nay `systems`/`kind`/`subFolder` đều làm sạch +
+  đối chiếu danh mục hợp lệ, sai thì 400.
+- **Toàn vẹn dữ liệu:** rev vừa duyệt tự `superseded` các rev đang hiệu lực khác của cùng bản
+  vẽ (đúng bất biến "1 rev hiệu lực" trong `lib/drawings.ts`).
+- **Test đỏ có sẵn trên nhánh, đã sửa:** `tests/engineering-cad-save-drawing.test.ts` đòi cây
+  thư mục `drawings/`+`data/uploads/drawings/` tồn tại sẵn trên đĩa, trong khi 2 gốc này chỉ
+  dựng lúc chạy và `data/uploads/` bị gitignore → luôn fail ở clone sạch/CI. Tách logic kho
+  lưu ra `lib/cad/drawing-storage.ts` (`DRAWING_SYSTEMS`, `ensureDrawingDirs`,
+  `drawingRelativePath`); test gọi thẳng helper nên kiểm đúng thứ code tạo ra, route dùng
+  chung một nguồn. Thêm `/drawings/` vào `.gitignore`.
+- **Kết quả:** `npm run lint` + `npm run typecheck` + `npm run build` xanh; `npm test` 208 file,
+  0 fail (trước đó 1 file fail).
+
 ## Sửa bug CI có sẵn trên main phát hiện khi mở PR health-check (2026-08-22)
 
 - **Bug thật, đã sửa:** `lib/db/index.ts::withProjectScope` — lời gọi LỒNG bên trong 1
