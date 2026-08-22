@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   parseDxf,
   parseDwgBinary,
+  DwgUnsupportedError,
   exportDxf,
   generateStandardizedAutocadScript,
 } from "@/lib/cad/dxf-parser";
@@ -28,20 +29,15 @@ test("parseDxf: Phân tích DXF chuẩn MEPF và trích xuất đúng thực th�
   assert.ok(textEnt, "Phải có thực thể TEXT");
 });
 
-test("parseDwgBinary: Phân tích tệp DWG nhị phân và trích xuất metadata", () => {
+test("parseDwgBinary: Từ chối đọc DWG nhị phân thay vì bịa hình học (M99 PR0)", () => {
   const mockDwgHeader = Buffer.alloc(1024);
   mockDwgHeader.write("AC1021", 0, 6, "ascii");
 
-  const result = parseDwgBinary(mockDwgHeader, "23056-VHT-CD-A-M-205.dwg");
-  assert.equal(result.isRealDrawing, true);
-  assert.ok(result.fileFormat, "fileFormat phải có giá trị");
-  assert.equal(
-    result.entities.length,
-    0,
-    "Không được tự sinh thực thể giả khi binary không có text/block",
+  assert.throws(
+    () => parseDwgBinary(mockDwgHeader, "23056-VHT-CD-A-M-205.dwg"),
+    DwgUnsupportedError,
+    "parseDwgBinary phải luôn ném DwgUnsupportedError — XBoss không đọc DWG bằng TypeScript",
   );
-  assert.equal(result.layers.length, 1, "Chỉ có layer 0 mặc định");
-  assert.equal(result.fileSizeBytes, 1024);
 });
 
 test("parseDxf: Trả về trạng thái rỗng trung thực khi tệp không hợp lệ (Chống Ảo Giác)", () => {
@@ -52,7 +48,7 @@ test("parseDxf: Trả về trạng thái rỗng trung thực khi tệp không h�
   assert.equal(result.diagnostic.healthScore, 0, "Điểm sức khỏe phải bằng 0");
 });
 
-test("parseDwgBinary: Đọc và giải mã tệp DWG thật trên đĩa nếu có", () => {
+test("parseDwgBinary: Từ chối cả DWG thật trên đĩa nếu có (không còn đọc DWG bằng TS)", () => {
   const realDwgPath = join(
     process.cwd(),
     "data",
@@ -66,11 +62,7 @@ test("parseDwgBinary: Đọc và giải mã tệp DWG thật trên đĩa nếu c
 
   if (existsSync(realDwgPath)) {
     const buf = readFileSync(realDwgPath);
-    const result = parseDwgBinary(buf, "23056-VHT-CD-A-M-205.dwg");
-    assert.equal(result.isRealDrawing, true);
-    assert.ok(result.fileSizeBytes && result.fileSizeBytes > 1000);
-    assert.ok(result.entities.length > 0);
-    assert.ok(result.diagnostic.healthScore > 0);
+    assert.throws(() => parseDwgBinary(buf, "23056-VHT-CD-A-M-205.dwg"), DwgUnsupportedError);
   }
 });
 

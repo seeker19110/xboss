@@ -48,6 +48,15 @@
   trong DoD. Kèm 1 assumption phải xác minh ở đầu PR3: đọc `ImageRuntimeVersion` của
   `acmgd.dll` 2026 để chốt đúng `TargetFramework`, không tin con số trong tài liệu.
 - **PR0 (bỏ nhánh bịa hình học trong `parseDwgBinary`) tách làm ngay**, độc lập mọi thứ khác.
+- **PR0 — ĐÃ LÀM (2026-08-22, PR #366):** `parseDwgBinary` (`lib/cad/dxf-parser.ts`) không
+  còn quét chuỗi/bịa toạ độ — giờ **luôn ném `DwgUnsupportedError`** kèm thông báo tiếng Việt
+  hướng dẫn lưu sang DXF trong AutoCAD (`DWG_UNSUPPORTED_MESSAGE`). Cập nhật mọi điểm gọi:
+  `POST /api/engineering/cad/convert-to-dxf` trả 422 thẳng cho DWG (bỏ gọi parser);
+  `POST /api/engineering/cad/parse-dxf` bắt `DwgUnsupportedError` → 422; trang
+  `/engineering/chuan-hoa-ban-ve` (upload tệp đơn + upload thư mục + chọn bản vẽ trong thư
+  mục) hiện toast thông báo thay vì gọi parser. Test cũ kỳ vọng trích xuất layer/entity giả
+  từ DWG đã đổi thành `assert.throws(DwgUnsupportedError)`
+  (`tests/dxf-real-drawing-parser.test.ts`, `tests/engineering-cad-dxf-parser.test.ts`).
 
 ## Đặc tả M98 — DXF R2000 & tệp DWG (2026-08-22, **Draft, chờ duyệt**)
 

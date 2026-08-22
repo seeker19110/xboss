@@ -78,7 +78,8 @@ import { showToast } from "@/app/components/Toast";
 import { redirectToLogin } from "@/app/lib/me";
 import {
   parseDxf,
-  parseDwgBinary,
+  DwgUnsupportedError,
+  DWG_UNSUPPORTED_MESSAGE,
   exportDxf,
   DxfParseResult,
   DxfLayerInfo,
@@ -1229,34 +1230,20 @@ export default function ChuanHoaBanVePage() {
     const isPdf = file.name.toLowerCase().endsWith(".pdf");
     const dxfName = isDwg ? file.name.replace(/\.dwg$/i, ".dxf") : file.name;
 
-    if (isDwg || isPdf) {
+    if (isDwg) {
+      // XBoss không đọc DWG bằng TypeScript (ADR-0006/M99 PR0) — bịa hình học là rủi ro
+      // đã xảy ra thật. Yêu cầu người dùng lưu sang DXF trong AutoCAD trước.
+      showToast(DWG_UNSUPPORTED_MESSAGE);
+      return;
+    }
+
+    if (isPdf) {
       const reader = new FileReader();
       reader.onload = async (event) => {
         const arrayBuffer = event.target?.result as ArrayBuffer;
         try {
           setLoading(true);
           const base64 = safeArrayBufferToBase64(arrayBuffer);
-
-          // Phân tích phía máy khách trước để cập nhật giao diện tức thì
-          const localParsed = parseDwgBinary(arrayBuffer, file.name);
-          setDxfData(localParsed);
-
-          const now = new Date();
-          const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
-          const exportedInitialDxf = exportDxf(localParsed, { applyStandardLayers: true });
-
-          setConversionInfo({
-            originalFileName: file.name,
-            dxfFileName: dxfName,
-            dxfContent: exportedInitialDxf,
-            entityCount: localParsed.entities.length,
-            convertedAt: timeStr,
-          });
-
-          showToast(
-            `✓ Đã nạp thành công bản vẽ ${file.name} (${localParsed.entities.length} thực thể, ${localParsed.layers.length} layers)!`,
-          );
-
           if (base64) {
             await runDxfAnalysis({ fileBase64: base64, name: file.name });
           }
@@ -1394,14 +1381,8 @@ export default function ChuanHoaBanVePage() {
 
         if (masterRealFile) {
           if (masterCandidate.isDwg) {
-            const ab = await masterRealFile.arrayBuffer();
-            const base64 = safeArrayBufferToBase64(ab);
-            const localParsed = parseDwgBinary(ab, masterRealFile.name);
-            const resolvedXrefs = resolveXrefDependencies(localParsed, items);
-            setDxfData({ ...localParsed, xrefs: resolvedXrefs });
-            if (base64) {
-              await runDxfAnalysis({ fileBase64: base64, name: masterRealFile.name });
-            }
+            // XBoss không đọc DWG bằng TypeScript (ADR-0006/M99 PR0)
+            showToast(DWG_UNSUPPORTED_MESSAGE);
           } else {
             const text = await masterRealFile.text();
             const localParsed = parseDxf(text, masterRealFile.name);
@@ -1417,7 +1398,9 @@ export default function ChuanHoaBanVePage() {
       }
     } catch (err) {
       console.error("Folder upload error:", err);
-      showToast("Lỗi khi đọc thư mục bản vẽ");
+      showToast(
+        err instanceof DwgUnsupportedError ? DWG_UNSUPPORTED_MESSAGE : "Lỗi khi đọc thư mục bản vẽ",
+      );
     } finally {
       setLoading(false);
     }
@@ -1429,27 +1412,28 @@ export default function ChuanHoaBanVePage() {
     const targetFile = rawFolderFilesRef.current.get(fileName);
     const isDwg = fileName.toLowerCase().endsWith(".dwg");
 
-    if (targetFile) {
+    try {
       if (isDwg) {
-        const ab = await targetFile.arrayBuffer();
-        const base64 = safeArrayBufferToBase64(ab);
-        const localParsed = parseDwgBinary(ab, fileName);
-        const resolvedXrefs = resolveXrefDependencies(localParsed, folderFiles);
-        setDxfData({ ...localParsed, xrefs: resolvedXrefs });
-        if (base64) {
-          await runDxfAnalysis({ fileBase64: base64, name: fileName });
-        }
-      } else {
+        // XBoss không đọc DWG bằng TypeScript (ADR-0006/M99 PR0)
+        showToast(DWG_UNSUPPORTED_MESSAGE);
+        return;
+      }
+      if (targetFile) {
         const text = await targetFile.text();
         const localParsed = parseDxf(text, fileName);
         const resolvedXrefs = resolveXrefDependencies(localParsed, folderFiles);
         setDxfData({ ...localParsed, xrefs: resolvedXrefs });
         await runDxfAnalysis({ customDxfContent: text, name: fileName });
+      } else {
+        await runDxfAnalysis({ name: fileName });
       }
-    } else {
-      await runDxfAnalysis({ name: fileName });
+      showToast(`Đã chuyển sang bản vẽ Master: ${fileName}`);
+    } catch (err) {
+      console.error("Select folder drawing error:", err);
+      showToast(
+        err instanceof DwgUnsupportedError ? DWG_UNSUPPORTED_MESSAGE : "Lỗi khi đọc file CAD",
+      );
     }
-    showToast(`Đã chuyển sang bản vẽ Master: ${fileName}`);
   };
 
   const handleToggleXrefBind = (xrefId: string) => {
