@@ -42,7 +42,12 @@ test("M76: NLP Intent Parser — Nhận diện Ghi Nhật Ký Thi Công & Tra C�
 });
 
 test("M76: Vòng đời OTP & Telegram Message Gateway trong DB", { skip: !HAS_DB }, async () => {
-  const userId = 1;
+  const { insertId } = await import("@/lib/db");
+  const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Site Bot Proj')`);
+  const userId = await insertId(
+    `INSERT INTO users (name, email, password_hash, role) VALUES ('Site Bot Tester', ?, 'x', 'admin')`,
+    `site-bot-test-${projectId}@x.vn`,
+  );
   const chatId = 99998888;
 
   // 1. Sinh OTP
@@ -58,6 +63,7 @@ test("M76: Vòng đời OTP & Telegram Message Gateway trong DB", { skip: !HAS_D
   const msgRes = await processIncomingTelegramMessage({
     chatId,
     rawText: "Cập nhật tiến độ task A2.01 đạt 90%",
+    projectId,
   });
 
   assert.equal(msgRes.actionTaken, true);

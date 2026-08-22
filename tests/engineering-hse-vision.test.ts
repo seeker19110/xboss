@@ -40,7 +40,8 @@ test("M87: HSE Vision Safety Scoring & Risk Tiering", () => {
 });
 
 test("M87: HSE Vision DB Lifecycle & Action Tickets", { skip: !HAS_DB }, async () => {
-  const projectId = 1;
+  const { insertId } = await import("@/lib/db");
+  const projectId = await insertId(`INSERT INTO projects (name) VALUES ('HSE Vision Proj')`);
 
   const result = await runAndSaveHseVisionScan({
     projectId,

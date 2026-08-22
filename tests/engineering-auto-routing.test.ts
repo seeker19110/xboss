@@ -94,7 +94,8 @@ test("M77: Multi-Trade Clash Hierarchy — Đề xuất nhường đường ưu 
 });
 
 test("M77: Vòng đời Beam Sleeve Schedule trong DB", { skip: !HAS_DB }, async () => {
-  const projectId = 1;
+  const { insertId } = await import("@/lib/db");
+  const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Auto-Routing Proj')`);
   const drawingCode = "DWG-TEST-SLEEVE";
 
   // 1. Tạo Sleeve

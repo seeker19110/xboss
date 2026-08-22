@@ -273,26 +273,30 @@ export async function createBiddingPackage(params: {
     createdBy = null,
   } = params;
 
-  return withProjectScope(projectId, async () => {
-    const rows = await query<any>(
-      `INSERT INTO engineering_bidding_packages
+  return withProjectScope(
+    projectId,
+    async () => {
+      const rows = await query<any>(
+        `INSERT INTO engineering_bidding_packages
          (project_id, package_code, title, discipline, target_budget_vnd, status, rfq_specs, created_by)
        VALUES (?, ?, ?, ?, ?, 'draft', ?::jsonb, ?)
        RETURNING id, project_id AS "projectId", package_code AS "packageCode", title, discipline,
                  target_budget_vnd::bigint AS "targetBudgetVnd", status, rfq_specs AS "rfqSpecs",
                  awarded_vendor AS "awardedVendor", awarded_amount_vnd::bigint AS "awardedAmountVnd",
                  metadata, created_by AS "createdBy", created_at AS "createdAt", updated_at AS "updatedAt"`,
-      projectId,
-      packageCode,
-      title,
-      discipline,
-      targetBudgetVnd,
-      JSON.stringify(rfqSpecs),
-      createdBy,
-    );
+        projectId,
+        packageCode,
+        title,
+        discipline,
+        targetBudgetVnd,
+        JSON.stringify(rfqSpecs),
+        createdBy,
+      );
 
-    return rows[0] as BiddingPackageRecord;
-  });
+      return rows[0] as BiddingPackageRecord;
+    },
+    { readOnly: false },
+  );
 }
 
 export async function listBiddingPackages(
@@ -355,9 +359,11 @@ export async function createVendorQuote(params: {
     createdBy = null,
   } = params;
 
-  return withProjectScope(projectId, async () => {
-    const rows = await query<any>(
-      `INSERT INTO engineering_bidding_vendor_quotes
+  return withProjectScope(
+    projectId,
+    async () => {
+      const rows = await query<any>(
+        `INSERT INTO engineering_bidding_vendor_quotes
          (project_id, package_id, vendor_name, vendor_type, total_amount_vnd, line_items,
           capacity_score, safety_score, technical_compliance_score, status, created_by)
        VALUES (?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, 'submitted', ?)
@@ -367,20 +373,22 @@ export async function createVendorQuote(params: {
                  safety_score::float AS "safetyScore",
                  technical_compliance_score::float AS "technicalComplianceScore",
                  submitted_at AS "submittedAt", status, metadata`,
-      projectId,
-      packageId,
-      vendorName,
-      vendorType,
-      totalAmountVnd,
-      JSON.stringify(lineItems),
-      capacityScore,
-      safetyScore,
-      technicalComplianceScore,
-      createdBy,
-    );
+        projectId,
+        packageId,
+        vendorName,
+        vendorType,
+        totalAmountVnd,
+        JSON.stringify(lineItems),
+        capacityScore,
+        safetyScore,
+        technicalComplianceScore,
+        createdBy,
+      );
 
-    return rows[0] as VendorQuoteRecord;
-  });
+      return rows[0] as VendorQuoteRecord;
+    },
+    { readOnly: false },
+  );
 }
 
 export async function listVendorQuotes(
@@ -418,62 +426,72 @@ export async function runBiddingAnalysis(
   skewReports: SkewAnalysisResult[];
   provenanceToken: string;
 }> {
-  return withProjectScope(projectId, async () => {
-    const pkg = await queryOne<BiddingPackageRecord>(
-      `SELECT id, project_id AS "projectId", package_code AS "packageCode", title, discipline,
+  return withProjectScope(
+    projectId,
+    async () => {
+      const pkg = await queryOne<BiddingPackageRecord>(
+        `SELECT id, project_id AS "projectId", package_code AS "packageCode", title, discipline,
               target_budget_vnd::bigint AS "targetBudgetVnd", status, rfq_specs AS "rfqSpecs",
               awarded_vendor AS "awardedVendor", awarded_amount_vnd::bigint AS "awardedAmountVnd",
               metadata, created_by AS "createdBy", created_at AS "createdAt", updated_at AS "updatedAt"
        FROM engineering_bidding_packages
        WHERE id = ? AND project_id = ?`,
-      packageId,
-      projectId,
-    );
+        packageId,
+        projectId,
+      );
 
-    if (!pkg) throw new Error(`Không tìm thấy gói thầu ${packageId}`);
+      if (!pkg) throw new Error(`Không tìm thấy gói thầu ${packageId}`);
 
-    const quotes = await listVendorQuotes(projectId, packageId);
-    const targetItems = ((pkg.rfqSpecs?.lineItems as BiddingLineItem[]) || []) as BiddingLineItem[];
+      const quotes = await listVendorQuotes(projectId, packageId);
+      const targetItems = ((pkg.rfqSpecs?.lineItems as BiddingLineItem[]) ||
+        []) as BiddingLineItem[];
 
-    // 1. Phân tích Price Skewing cho từng nhà thầu
-    const skewReports: SkewAnalysisResult[] = quotes.map((q) => {
-      const lineVars = calculateLineItemVariances(targetItems, q.lineItems || []);
-      return detectPriceSkewing(q.vendorName, lineVars);
-    });
+      // 1. Phân tích Price Skewing cho từng nhà thầu
+      const skewReports: SkewAnalysisResult[] = quotes.map((q) => {
+        const lineVars = calculateLineItemVariances(targetItems, q.lineItems || []);
+        return detectPriceSkewing(q.vendorName, lineVars);
+      });
 
-    // 2. Đánh giá xếp hạng Ranking
-    const rankings = evaluateVendorRanking(quotes, pkg.targetBudgetVnd);
+      // 2. Đánh giá xếp hạng Ranking
+      const rankings = evaluateVendorRanking(quotes, pkg.targetBudgetVnd);
 
-    // 3. Khởi tạo Provenance Token
-    const payloadHash = createHash("sha256")
-      .update(
-        JSON.stringify({ packageId, rankings, skewReports, analyzedAt: new Date().toISOString() }),
-      )
-      .digest("hex");
-    const provenanceToken = `BID-ANALYTICS-${payloadHash.slice(0, 16).toUpperCase()}`;
+      // 3. Khởi tạo Provenance Token
+      const payloadHash = createHash("sha256")
+        .update(
+          JSON.stringify({
+            packageId,
+            rankings,
+            skewReports,
+            analyzedAt: new Date().toISOString(),
+          }),
+        )
+        .digest("hex");
+      const provenanceToken = `BID-ANALYTICS-${payloadHash.slice(0, 16).toUpperCase()}`;
 
-    // 4. Lưu lại kết quả phân tích
-    await query(
-      `INSERT INTO engineering_bidding_analysis_runs
+      // 4. Lưu lại kết quả phân tích
+      await query(
+        `INSERT INTO engineering_bidding_analysis_runs
          (project_id, package_id, variance_matrix, skew_metrics, ranking_results,
           recommendation_summary, provenance_token, created_by)
        VALUES (?, ?, ?::jsonb, ?::jsonb, ?::jsonb, ?, ?, ?)`,
-      projectId,
-      packageId,
-      JSON.stringify(targetItems),
-      JSON.stringify(skewReports),
-      JSON.stringify(rankings),
-      rankings[0]?.recommendation || "Đã phân tích hoàn tất.",
-      provenanceToken,
-      userId || null,
-    );
+        projectId,
+        packageId,
+        JSON.stringify(targetItems),
+        JSON.stringify(skewReports),
+        JSON.stringify(rankings),
+        rankings[0]?.recommendation || "Đã phân tích hoàn tất.",
+        provenanceToken,
+        userId || null,
+      );
 
-    return {
-      package: pkg,
-      quotesCount: quotes.length,
-      rankings,
-      skewReports,
-      provenanceToken,
-    };
-  });
+      return {
+        package: pkg,
+        quotesCount: quotes.length,
+        rankings,
+        skewReports,
+        provenanceToken,
+      };
+    },
+    { readOnly: false },
+  );
 }

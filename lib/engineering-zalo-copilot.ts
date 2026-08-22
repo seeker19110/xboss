@@ -117,19 +117,23 @@ export async function generateZaloLinkOtp(
   const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
-  await withProjectScope(projectId, async () => {
-    await query(
-      `INSERT INTO zalo_user_bindings (project_id, user_id, zalo_user_id, zalo_display_name, verification_otp, otp_expires_at, is_verified)
+  await withProjectScope(
+    projectId,
+    async () => {
+      await query(
+        `INSERT INTO zalo_user_bindings (project_id, user_id, zalo_user_id, zalo_display_name, verification_otp, otp_expires_at, is_verified)
        VALUES (?, ?, ?, ?, ?, ?, false)
        ON CONFLICT (id) DO NOTHING`,
-      projectId,
-      userId,
-      zaloUserId,
-      displayName,
-      otpCode,
-      expiresAt,
-    );
-  });
+        projectId,
+        userId,
+        zaloUserId,
+        displayName,
+        otpCode,
+        expiresAt,
+      );
+    },
+    { readOnly: false },
+  );
 
   return otpCode;
 }
@@ -191,35 +195,39 @@ export async function processIncomingZaloMessage(params: {
       replyText = `🤖 XBoss Copilot đã nhận tin nhắn: "${rawText}". Gõ "tiến độ", "lỗi", "kho vật tư" hoặc "nghiệm thu" để thực hiện lệnh nhanh.`;
   }
 
-  await withProjectScope(projectId, async () => {
-    return withTransaction(async () => {
-      await query(
-        `INSERT INTO zalo_site_message_logs
+  await withProjectScope(
+    projectId,
+    async () => {
+      return withTransaction(async () => {
+        await query(
+          `INSERT INTO zalo_site_message_logs
            (project_id, zalo_user_id, message_direction, raw_text, intent, confidence, parsed_entities, response_text)
          VALUES (?, ?, 'INCOMING', ?, ?, ?, ?, ?)`,
-        projectId,
-        zaloUserId,
-        rawText,
-        parsed.intent,
-        parsed.confidence * 100,
-        JSON.stringify(parsed.entities),
-        replyText,
-      );
-
-      if (actionDispatched) {
-        await query(
-          `INSERT INTO zalo_field_action_dispatches
-             (project_id, zalo_user_id, action_type, payload, execution_status, result_summary)
-           VALUES (?, ?, ?, ?, 'SUCCESS', ?)`,
           projectId,
           zaloUserId,
+          rawText,
           parsed.intent,
+          parsed.confidence * 100,
           JSON.stringify(parsed.entities),
           replyText,
         );
-      }
-    });
-  });
+
+        if (actionDispatched) {
+          await query(
+            `INSERT INTO zalo_field_action_dispatches
+             (project_id, zalo_user_id, action_type, payload, execution_status, result_summary)
+           VALUES (?, ?, ?, ?, 'SUCCESS', ?)`,
+            projectId,
+            zaloUserId,
+            parsed.intent,
+            JSON.stringify(parsed.entities),
+            replyText,
+          );
+        }
+      });
+    },
+    { readOnly: false },
+  );
 
   return {
     replyText,

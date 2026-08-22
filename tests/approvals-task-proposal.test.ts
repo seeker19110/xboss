@@ -318,7 +318,7 @@ test(
       const pmInbox = await pendingForUserDisplay({ id: pm, role: "pm" }, projectId);
       assert.equal(pmInbox.length, 1);
       assert.equal(pmInbox[0].label, `DX-DISP-${S} — Đề xuất test nhãn`);
-      assert.equal(pmInbox[0].linkUrl, "/proposals");
+      assert.equal(pmInbox[0].linkUrl, "/commercial?tab=ipc-payments&sub=proposals");
 
       // SoD: người tạo (dù giả sử có vai trò pm) không thấy chính request mình tạo.
       const creatorInbox = await pendingForUserDisplay({ id: creator, role: "pm" }, projectId);

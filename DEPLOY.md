@@ -284,6 +284,20 @@ liệt kê trong kết quả). Cột `Đã dùng`/`Tồn kho`/`Ngưỡng tối t
   Ví dụ crontab mỗi 5 phút: `*/5 * * * * curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://<APP_URL>/api/cron/deliver-webhooks`
   (hoặc khai báo trong `vercel.json` nếu deploy Vercel).
 
+- **Kiểm tra trạng thái hoạt động (2 lần/ngày):** kiểm tra các tính năng dùng API (kết nối
+  Postgres, Telegram Bot API) và không dùng API (cấu hình SMTP/VAPID/Google Sheet, lưu trữ
+  `data/uploads`, bảng chống brute-force) — chỉ gửi email + Telegram cho **Admin** khi phát
+  hiện lỗi/cảnh báo (chạy sạch thì im lặng, chỉ ghi log). Xem panel "Hệ thống" trên `/tech`
+  để kiểm tra thủ công và xem lịch sử. Vượt giới hạn cron hằng ngày của Vercel Hobby (2
+  lần/ngày > 1 lần/ngày) nên **không khai trong `vercel.json`** — dùng dịch vụ cron ngoài
+  (vd cron-job.org, GitHub Actions `schedule`) hoặc crontab VPS:
+
+  ```bash
+  curl -H "Authorization: Bearer $CRON_SECRET" https://<APP_URL>/api/cron/health-check
+  ```
+
+  Ví dụ crontab 8h sáng + 20h tối: `0 8,20 * * * curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://<APP_URL>/api/cron/health-check`
+
 ## BI/khám phá dữ liệu qua Metabase (tuỳ chọn, M55)
 
 Metabase self-host đọc dữ liệu qua schema `bi` (view whitelist chỉ-đọc, KHÔNG đọc `public`) qua

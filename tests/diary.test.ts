@@ -87,7 +87,10 @@ test(
     );
 
     const prefill = await buildDiaryPrefill(date);
-    assert.match(prefill.workDone, /Điện T5: cập nhật 2 hạng mục \(D1,01 → D1,02\)/);
+    assert.match(
+      prefill.workDone,
+      /Điện & Điện nhẹ \(ELV\) T5: cập nhật 2 hạng mục \(D1,01 → D1,02\)/,
+    );
     assert.deepEqual(prefill.updatedBy, ["Nguyễn Văn A", "Trần Thị B"]);
     assert.equal(prefill.photos.length, 0);
 

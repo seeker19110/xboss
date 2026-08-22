@@ -119,7 +119,8 @@ test("M75: Thuật toán xếp hạng đa tiêu chí Nhà thầu (Composite Rank
 });
 
 test("M75: Vòng đời Smart Bidding trong DB", { skip: !HAS_DB }, async () => {
-  const projectId = 1;
+  const { insertId } = await import("@/lib/db");
+  const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Bidding Matrix Proj')`);
   const packageCode = "PKG-TEST-001";
 
   // 1. Tạo gói thầu

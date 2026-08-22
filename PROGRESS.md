@@ -13,6 +13,92 @@
 - **Lộ trình hoàn thành (chờ duyệt, chưa code):** `PROJECT-COMPLETION-ROADMAP.md` chốt C0→C6 để đạt XBoss v1.0/Product Complete và O1→O5 cho Engineering OS/Vision Complete theo gate; không coi tài liệu là quyền tự triển khai production hoặc A3+.
 - **Spec pack chi tiết (chờ duyệt):** C0, C2–C6 và OS-1–OS-5 đã có file thi hành riêng (C1 dùng ENG-5), mỗi file gồm scope, data/API/UI/ops, test, chia PR và DoD. Chưa phase nào được đánh dấu triển khai chỉ vì đặc tả đã viết.
 
+## Sửa bug CI có sẵn trên main phát hiện khi mở PR health-check (2026-08-22)
+
+- **Bug thật, đã sửa:** `lib/db/index.ts::withProjectScope` — lời gọi LỒNG bên trong 1
+  transaction đang mở (vd hàm ghi gọi 1 hàm đọc nội bộ trước khi ghi) tự chạy lại
+  `SET TRANSACTION READ ONLY` theo `opts.readOnly` mặc định `true` của chính nó, kể cả khi
+  transaction cha đã mở với `readOnly:false` — Postgres không cho hạ READ ONLY về READ WRITE
+  giữa chừng nên mọi câu ghi SAU đó trong transaction cha lỗi "cannot execute ... in a
+  read-only transaction". Sửa: chỉ `SET TRANSACTION READ ONLY` khi ĐANG MỞ transaction mới
+  (không phải lồng lại). Đồng thời bổ sung `{ readOnly: false }` còn thiếu ở 9 module
+  `engineering-*` (auto-routing, bidding-matrix, cashflow, esignature, hse-vision,
+  qr-logistics, spatial-pinning, zalo-copilot, autonomy đã có sẵn) — trước đây mặc định
+  `readOnly:true` tự khoá transaction của chính mình trước khi ghi.
+- **Bug test có sẵn, đã sửa:** 10 file test tích hợp `engineering-*` (`auto-routing`,
+  `bidding-matrix`, `cashflow`, `esignature`, `hse-vision`, `qr-logistics`, `spatial-pinning`,
+  `zalo-copilot`, `site-bot`, `task-queue`, `worker-bridge`, `pinnacle-synergy`) hard-code
+  `projectId = 1`/`userId = 1` giả định hàng đã tồn tại thay vì tự `INSERT INTO projects/users`
+  như quy ước còn lại của repo — DB test trống nên insert lỗi FK. Sửa theo đúng pattern
+  `insertId(...)`; `engineering-worker-bridge` còn thiếu bước `claimNextAsyncTask()` để chuyển
+  task `pending → processing` trước khi `completeAsyncTask` (chỉ update được task đang
+  `processing`).
+- **Bug bind-param thật, đã sửa:** `query()`/`queryOne()` là hàm variadic `(sql, ...params)`,
+  không phải `(sql, params[])` — `lib/merkle-audit-ledger.ts::verifyAuditChain` và 7 chỗ trong
+  `lib/engineering-pinnacle-synergy.ts` (4 truy vấn tính Apex Pulse metrics + insert
+  `recordApexSystemPulse` + select `getLatestApexSystemPulse` + insert command-log) truyền
+  mảng thay vì spread — với Pinnacle Synergy, do bọc try/catch fallback giá trị mặc định nên
+  **production luôn trả metrics mặc định, chưa từng tính từ dữ liệu thật**. Đã sửa toàn bộ
+  sang spread tham số.
+- **Bug logic thật, đã sửa:** `lib/engineering-autonomy.ts::executeExecutionRequest` quên
+  truyền `userRole` khi re-check `checkAutonomyAllowance` lúc thực thi (chỉ nhận qua tham số
+  thứ 4 mới thêm) — khiến việc re-check Kill Switch/deny-by-default lúc EXECUTE không đánh giá
+  đúng theo vai trò người dùng. Đã cập nhật chữ ký hàm, route
+  `app/api/engineering/autonomy/requests/[id]/execute/route.ts` truyền `user.role`, và test.
+- **Assertion cũ lệch code, đã sửa:** `approvals-task-proposal.test.ts` (link thông báo PM đổi
+  từ `/proposals` sang `/commercial?tab=ipc-payments&sub=proposals`), `diary.test.ts` (tên hệ
+  đổi từ "Điện T5" sang "Điện & Điện nhẹ (ELV) T5").
+- **Bug ô nhiễm state giữa test, đã sửa:** `auth.test.ts` gán `process.env.NODE_ENV = undefined`
+  trong `finally` để khôi phục — JS stringify thành chuỗi `"undefined"` thay vì xoá key, làm
+  validate zod `NODE_ENV` ở `lib/env.ts` lỗi cho các test chạy sau trong cùng process (CI không
+  set `NODE_ENV` nên giá trị gốc luôn là `undefined`). Sửa bằng helper xoá key đúng cách khi gốc
+  là `undefined`.
+- **Bug thật thêm, đã sửa (phát hiện sau khi bug READ ONLY ở trên được sửa — trước đó lỗi
+  transaction che khuất mọi lỗi sâu hơn):** `lib/engineering-worker-bridge.ts` — (1) thiếu
+  `{ readOnly: false }` ở `withProjectScope` bọc toàn hàm `bridgeTaskResultToEngineering`
+  (nhiều câu ghi bên trong); (2) `ingestIntelligencePackage(...)` được gọi với
+  `externalObjectKey: createdObjectIds[0]` — nhưng `resolveObjectId` tra theo cột
+  `external_key`, không phải `id` nội bộ, nên luôn ném `UnknownObjectKeyError`. Sửa: theo dõi
+  song song mảng `createdObjectExternalKeys` khi tạo từng `engineering_objects` và dùng đúng
+  external key thay vì id nội bộ.
+- **Còn tồn đọng, CHƯA sửa (ngoài phạm vi commit này — đụng schema/thiết kế tính năng, cần spec
+  gốc mới sửa đúng, không đoán theo LUẬT CỨNG):** `engineering-fidic-claim` (INSERT nhắm cột
+  không tồn tại trên `engineering_fidic_claims`, ví dụ `title`/`executive_summary` — bảng thật
+  là `event_title`/không có `executive_summary`; thiếu cả `event_date`/`notice_date` NOT NULL);
+  `engineering-graph`/`engineering-twin` (cột `revision_name` không tồn tại trên
+  `engineering_source_revisions`, không có cột nào khớp ngữ nghĩa "tên hiển thị"); tương tự ở
+  `engineering-predictions`/`engineering-prescriptive`/`engineering-twin-pinnacle` (nhắm
+  `tasks.project_id`, `engineering_objects.metadata`, `engineering_objects.code` — đều không có
+  thật trong schema); `engineering-worker-bridge` (sau 2 fix ở trên, lộ ra khoảng trống thiết
+  kế sâu hơn — `bridgeTaskResultToEngineering` gọi `createWorkflow` ngay sau
+  `ingestIntelligencePackage`, nhưng `initialStatus()` trong `lib/engineering-intel.ts` chỉ trả
+  `"open"`/`"needs_review"`, KHÔNG BAO GIỜ `"accepted"` — mà Gate 0 của `createWorkflow` yêu cầu
+  đề xuất nguồn đã ở trạng thái `"accepted"` mới cho tạo workflow (ENG-2 quyết định trước, ENG-3
+  mới lập kế hoạch, theo comment trong code). Chưa rõ ý đồ đúng: bridge có nên tự động chấp
+  nhận đề xuất tự sinh, hay dừng lại trước bước tạo workflow chờ kỹ sư duyệt tay — cần quyết
+  định thiết kế, không đoán). Và bộ e2e (`npm test` job `e2e`) fail trên diện rộng, xác nhận có
+  từ trước trên nhiều commit `main` không liên quan — cần điều tra riêng, ngoài phạm vi PR
+  health-check.
+
+## Kiểm tra trạng thái hoạt động (health check) cho Admin (2026-08-22)
+
+- Thêm `lib/healthcheck.ts::runHealthChecks()` — kiểm 9 hạng mục dùng API (Postgres `SELECT 1`,
+  Telegram Bot API `getMe`) và không dùng API (XBOSS_SECRET/CRON_SECRET/SMTP/VAPID/Google Sheet
+  đã cấu hình chưa, `data/uploads` ghi được + dung lượng, số dòng `login_rate_limits` bất thường).
+- `GET /api/tech/health-check` (chỉ Admin) chạy thủ công — nút "Kiểm tra ngay" trên panel
+  "Hệ thống" của `/tech`. `GET /api/cron/health-check` (Bearer `CRON_SECRET` hoặc session
+  Admin/PM, khoá `sync_locks` chống chạy chồng) chạy 2 lần/ngày qua cron ngoài (xem `DEPLOY.md`
+  — vượt giới hạn Vercel Hobby 1 lần/ngày) — chỉ gửi email + Telegram cho Admin khi có lỗi/cảnh
+  báo, chạy sạch thì im lặng.
+- Migration `0131_health_check_runs.sql` (bảng `health_check_runs`, thuần thêm — đi thẳng
+  production) lưu lịch sử mỗi lần chạy (thủ công lẫn cron).
+- Cập nhật `docs/nang-cap/G10-cong-nghe.md` (thuộc nhóm G10 — cùng panel "Hệ thống" trên `/tech`)
+  — bổ sung spec ghi lại **sau khi code** (Approved for implementation, theo yêu cầu trực tiếp
+  người dùng, không qua quy trình duyệt spec trước-khi-code tiêu chuẩn — ghi nhận công khai).
+- Bổ sung `tests/healthcheck.test.ts` (thiếu ở đợt code đầu) — kiểm shape `HealthCheckReport`
+  đủ 9 hạng mục + tính đúng `failCount`/`warnCount`/`hasIssues`, và tích hợp `runHealthChecks()`
+  với DB test thật (hạng mục `database` phải `ok`).
+
 ## M97 V1 — Dọn trang shim, trang re-export trùng và code chết (2026-08-21)
 
 - **Đặc tả:** `docs/nang-cap/M97-tai-cau-truc-route.md` (kế hoạch 8 việc V1–V8 tái cấu trúc page route theo hub chức năng; API route ngoài phạm vi).

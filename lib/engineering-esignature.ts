@@ -79,54 +79,58 @@ export async function createEsignEnvelope(params: {
 
   const docHash = createDocumentEnvelopeHash(documentPayload);
 
-  return withProjectScope(projectId, async () => {
-    return withTransaction(async () => {
-      const rows = await query<any>(
-        `INSERT INTO engineering_esign_envelopes
+  return withProjectScope(
+    projectId,
+    async () => {
+      return withTransaction(async () => {
+        const rows = await query<any>(
+          `INSERT INTO engineering_esign_envelopes
            (project_id, title, document_type, reference_id, reference_code, status, document_hash, document_payload, created_by)
          VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?)
          RETURNING id, project_id AS "projectId", title, document_type AS "documentType",
                    reference_id AS "referenceId", reference_code AS "referenceCode",
                    status, document_hash AS "documentHash", document_payload AS "documentPayload",
                    created_by AS "createdBy", created_at AS "createdAt"`,
-        projectId,
-        title,
-        documentType,
-        referenceId,
-        referenceCode,
-        docHash,
-        JSON.stringify(documentPayload),
-        createdBy,
-      );
+          projectId,
+          title,
+          documentType,
+          referenceId,
+          referenceCode,
+          docHash,
+          JSON.stringify(documentPayload),
+          createdBy,
+        );
 
-      const envelope = rows[0];
+        const envelope = rows[0];
 
-      const insertedSignatories: EsignSignatoryRow[] = [];
-      for (let i = 0; i < signatories.length; i++) {
-        const s = signatories[i];
-        const initialStatus = (s.signingOrder || i + 1) === 1 ? "ready" : "waiting";
-        const sRows = await query<any>(
-          `INSERT INTO engineering_esign_signatories
+        const insertedSignatories: EsignSignatoryRow[] = [];
+        for (let i = 0; i < signatories.length; i++) {
+          const s = signatories[i];
+          const initialStatus = (s.signingOrder || i + 1) === 1 ? "ready" : "waiting";
+          const sRows = await query<any>(
+            `INSERT INTO engineering_esign_signatories
              (envelope_id, project_id, user_id, signer_name, signer_role, signing_order, status)
            VALUES (?, ?, ?, ?, ?, ?, ?)
            RETURNING id, envelope_id AS "envelopeId", project_id AS "projectId",
                      user_id AS "userId", signer_name AS "signerName", signer_role AS "signerRole",
                      signing_order AS "signingOrder", status, created_at AS "createdAt"`,
-          envelope.id,
-          projectId,
-          s.userId || null,
-          s.signerName,
-          s.signerRole,
-          s.signingOrder || i + 1,
-          initialStatus,
-        );
-        insertedSignatories.push(sRows[0]);
-      }
+            envelope.id,
+            projectId,
+            s.userId || null,
+            s.signerName,
+            s.signerRole,
+            s.signingOrder || i + 1,
+            initialStatus,
+          );
+          insertedSignatories.push(sRows[0]);
+        }
 
-      envelope.signatories = insertedSignatories;
-      return envelope;
-    });
-  });
+        envelope.signatories = insertedSignatories;
+        return envelope;
+      });
+    },
+    { readOnly: false },
+  );
 }
 
 export async function generateSignerOtp(
@@ -137,18 +141,22 @@ export async function generateSignerOtp(
   const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
-  await withProjectScope(projectId, async () => {
-    await query(
-      `UPDATE engineering_esign_signatories
+  await withProjectScope(
+    projectId,
+    async () => {
+      await query(
+        `UPDATE engineering_esign_signatories
        SET otp_code = ?, otp_expires_at = ?
        WHERE id = ? AND envelope_id = ? AND project_id = ?`,
-      otpCode,
-      expiresAt,
-      signatoryId,
-      envelopeId,
-      projectId,
-    );
-  });
+        otpCode,
+        expiresAt,
+        signatoryId,
+        envelopeId,
+        projectId,
+      );
+    },
+    { readOnly: false },
+  );
 
   return otpCode;
 }
@@ -172,117 +180,121 @@ export async function executeSignEnvelope(params: {
     geoLocation,
   } = params;
 
-  return withProjectScope(projectId, async () => {
-    return withTransaction(async () => {
-      const signatory = await queryOne<any>(
-        `SELECT id, signing_order AS "signingOrder", status, otp_code AS "otpCode", otp_expires_at AS "otpExpiresAt", signer_name AS "signerName", signer_role AS "signerRole"
+  return withProjectScope(
+    projectId,
+    async () => {
+      return withTransaction(async () => {
+        const signatory = await queryOne<any>(
+          `SELECT id, signing_order AS "signingOrder", status, otp_code AS "otpCode", otp_expires_at AS "otpExpiresAt", signer_name AS "signerName", signer_role AS "signerRole"
          FROM engineering_esign_signatories
          WHERE id = ? AND envelope_id = ? AND project_id = ?`,
-        signatoryId,
-        envelopeId,
-        projectId,
-      );
-
-      if (!signatory) {
-        throw new Error("Không tìm thấy người ký trong hồ sơ");
-      }
-
-      if (signatory.status === "signed") {
-        throw new Error("Người này đã hoàn tất ký trước đó");
-      }
-
-      if (signatory.otpCode && otpCode) {
-        if (signatory.otpCode !== otpCode) {
-          throw new Error("Mã OTP xác thực không chính xác");
-        }
-        if (signatory.otpExpiresAt && new Date(signatory.otpExpiresAt).getTime() < Date.now()) {
-          throw new Error("Mã OTP xác thực đã hết hạn");
-        }
-      }
-
-      const signedAt = new Date().toISOString();
-
-      await query(
-        `UPDATE engineering_esign_signatories
-         SET status = 'signed', signature_data = ?, signed_at = ?, ip_address = ?, geo_location = ?
-         WHERE id = ?`,
-        signatureData,
-        signedAt,
-        ipAddress,
-        geoLocation ? JSON.stringify(geoLocation) : null,
-        signatoryId,
-      );
-
-      await query(
-        `UPDATE engineering_esign_signatories
-         SET status = 'ready'
-         WHERE envelope_id = ? AND project_id = ? AND signing_order = ? AND status = 'waiting'`,
-        envelopeId,
-        projectId,
-        signatory.signingOrder + 1,
-      );
-
-      const pendingSigners = await query<any>(
-        `SELECT id FROM engineering_esign_signatories
-         WHERE envelope_id = ? AND project_id = ? AND status != 'signed'`,
-        envelopeId,
-        projectId,
-      );
-
-      const isEnvelopeComplete = pendingSigners.length === 0;
-      let certificateCode: string | undefined;
-
-      if (isEnvelopeComplete) {
-        const envelope = await queryOne<any>(
-          `SELECT id, document_type AS "documentType", document_hash AS "documentHash"
-           FROM engineering_esign_envelopes
-           WHERE id = ?`,
+          signatoryId,
           envelopeId,
+          projectId,
         );
 
-        const allSigners = await query<any>(
-          `SELECT signer_name AS "signerName", signer_role AS "signerRole", signed_at AS "signedAt", ip_address AS "ipAddress"
+        if (!signatory) {
+          throw new Error("Không tìm thấy người ký trong hồ sơ");
+        }
+
+        if (signatory.status === "signed") {
+          throw new Error("Người này đã hoàn tất ký trước đó");
+        }
+
+        if (signatory.otpCode && otpCode) {
+          if (signatory.otpCode !== otpCode) {
+            throw new Error("Mã OTP xác thực không chính xác");
+          }
+          if (signatory.otpExpiresAt && new Date(signatory.otpExpiresAt).getTime() < Date.now()) {
+            throw new Error("Mã OTP xác thực đã hết hạn");
+          }
+        }
+
+        const signedAt = new Date().toISOString();
+
+        await query(
+          `UPDATE engineering_esign_signatories
+         SET status = 'signed', signature_data = ?, signed_at = ?, ip_address = ?, geo_location = ?
+         WHERE id = ?`,
+          signatureData,
+          signedAt,
+          ipAddress,
+          geoLocation ? JSON.stringify(geoLocation) : null,
+          signatoryId,
+        );
+
+        await query(
+          `UPDATE engineering_esign_signatories
+         SET status = 'ready'
+         WHERE envelope_id = ? AND project_id = ? AND signing_order = ? AND status = 'waiting'`,
+          envelopeId,
+          projectId,
+          signatory.signingOrder + 1,
+        );
+
+        const pendingSigners = await query<any>(
+          `SELECT id FROM engineering_esign_signatories
+         WHERE envelope_id = ? AND project_id = ? AND status != 'signed'`,
+          envelopeId,
+          projectId,
+        );
+
+        const isEnvelopeComplete = pendingSigners.length === 0;
+        let certificateCode: string | undefined;
+
+        if (isEnvelopeComplete) {
+          const envelope = await queryOne<any>(
+            `SELECT id, document_type AS "documentType", document_hash AS "documentHash"
+           FROM engineering_esign_envelopes
+           WHERE id = ?`,
+            envelopeId,
+          );
+
+          const allSigners = await query<any>(
+            `SELECT signer_name AS "signerName", signer_role AS "signerRole", signed_at AS "signedAt", ip_address AS "ipAddress"
            FROM engineering_esign_signatories
            WHERE envelope_id = ?
            ORDER BY signing_order ASC`,
-          envelopeId,
-        );
+            envelopeId,
+          );
 
-        certificateCode = generateCertificateCode(envelope?.documentType || "DOC");
-        const leafHash = crypto
-          .createHash("sha256")
-          .update((envelope?.documentHash || "") + ":" + certificateCode + ":" + signedAt)
-          .digest("hex");
-        const tamperProofToken = "SIG-TOKEN-" + leafHash.slice(0, 16).toUpperCase();
+          certificateCode = generateCertificateCode(envelope?.documentType || "DOC");
+          const leafHash = crypto
+            .createHash("sha256")
+            .update((envelope?.documentHash || "") + ":" + certificateCode + ":" + signedAt)
+            .digest("hex");
+          const tamperProofToken = "SIG-TOKEN-" + leafHash.slice(0, 16).toUpperCase();
 
-        await query(
-          `INSERT INTO engineering_esign_audit_certificates
+          await query(
+            `INSERT INTO engineering_esign_audit_certificates
              (envelope_id, project_id, certificate_code, merkle_leaf_hash, tamper_proof_token, signatory_summary)
            VALUES (?, ?, ?, ?, ?, ?)`,
-          envelopeId,
-          projectId,
-          certificateCode,
-          leafHash,
-          tamperProofToken,
-          JSON.stringify(allSigners),
-        );
+            envelopeId,
+            projectId,
+            certificateCode,
+            leafHash,
+            tamperProofToken,
+            JSON.stringify(allSigners),
+          );
 
-        await query(
-          `UPDATE engineering_esign_envelopes
+          await query(
+            `UPDATE engineering_esign_envelopes
            SET status = 'signed', completed_at = ?
            WHERE id = ?`,
-          signedAt,
-          envelopeId,
-        );
-      }
+            signedAt,
+            envelopeId,
+          );
+        }
 
-      return {
-        success: true,
-        isEnvelopeComplete,
-        certificateCode,
-      };
-    });
-  });
+        return {
+          success: true,
+          isEnvelopeComplete,
+          certificateCode,
+        };
+      });
+    },
+    { readOnly: false },
+  );
 }
 
 export async function listEsignEnvelopes(projectId: number): Promise<EsignEnvelopeRow[]> {

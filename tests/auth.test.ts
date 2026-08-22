@@ -3,6 +3,15 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { hashPassword, verifyPassword, makeToken, parseToken, isSecureCookie } from "@/lib/auth";
 
+// process.env stringify hoá mọi giá trị gán — set lại "= undefined" biến thành chuỗi
+// "undefined" thật (không xoá biến), làm hỏng NODE_ENV cho mọi test chạy sau. Phải
+// delete khi giá trị gốc là undefined.
+function restoreNodeEnv(orig: string | undefined) {
+  const envObj = process.env as Record<string, string | undefined>;
+  if (orig === undefined) delete envObj.NODE_ENV;
+  else envObj.NODE_ENV = orig;
+}
+
 // ===== Unit tests: hash + verify mật khẩu =====
 
 test("hashPassword: hash khác nhau mỗi lần (do salt ngẫu nhiên)", () => {
@@ -86,7 +95,7 @@ test("isSecureCookie: dev mode luôn trả false", () => {
     envObj.NODE_ENV = "development";
     assert.equal(isSecureCookie({ headers: new Headers({ "x-forwarded-proto": "https" }) }), false);
   } finally {
-    envObj.NODE_ENV = orig;
+    restoreNodeEnv(orig);
   }
 });
 
@@ -98,7 +107,7 @@ test("isSecureCookie: production HTTP trả false để trình duyệt lưu cook
     assert.equal(isSecureCookie({ headers: new Headers() }), false);
     assert.equal(isSecureCookie({ headers: new Headers({ "x-forwarded-proto": "http" }) }), false);
   } finally {
-    envObj.NODE_ENV = orig;
+    restoreNodeEnv(orig);
   }
 });
 
@@ -109,7 +118,7 @@ test("isSecureCookie: production HTTPS trả true", () => {
     envObj.NODE_ENV = "production";
     assert.equal(isSecureCookie({ headers: new Headers({ "x-forwarded-proto": "https" }) }), true);
   } finally {
-    envObj.NODE_ENV = orig;
+    restoreNodeEnv(orig);
   }
 });
 

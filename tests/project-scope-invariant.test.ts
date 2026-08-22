@@ -32,6 +32,8 @@ const WHITELIST: Record<string, string> = {
   // --- Cron (xác thực CRON_SECRET; tự lặp theo từng dự án trong logic) ---
   "cron/daily-report": "cron báo cáo ngày, quét mọi dự án nội bộ",
   "cron/weekly-report": "cron báo cáo tuần, quét mọi dự án nội bộ",
+  "cron/health-check": "cron kiểm tra hệ thống toàn cục (DB/SMTP/Telegram/...), không scope dự án",
+  "tech/health-check": "kiểm tra hệ thống toàn cục (DB/SMTP/Telegram/...), không scope dự án",
 
   // --- Static/meta (không đọc dữ liệu nghiệp vụ của dự án cụ thể) ---
   "materials/allocation-meta": "metadata cấu hình phân bổ, không theo dự án",
