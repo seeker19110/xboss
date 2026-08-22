@@ -1,6 +1,12 @@
 # G10 — Công nghệ (chuyển đổi số)
 
 > Từ M31 (chuyển đổi số & công nghệ). Đã triển khai — tóm tắt tra cứu, lịch sử PR xem `PROGRESS.md`.
+>
+> **Bổ sung "Kiểm tra trạng thái hoạt động" (2026-08-22) — Approved for implementation.** Spec
+> ghi lại sau khi code, theo yêu cầu trực tiếp của người dùng (liendv@live.com) trong phiên làm
+> việc; không qua quy trình duyệt spec trước-khi-code tiêu chuẩn của dự án. Ghi nhận công khai
+> để không giả vờ đã qua đúng quy trình — chấp nhận được vì phạm vi nhỏ, không đụng schema
+> nghiệp vụ tài chính/nghiệm thu, không đổi hành vi tính năng hiện có. Xem chi tiết bên dưới.
 
 Dashboard tổng hợp công nghệ — chủ yếu **gom & nhúng**, không tự xây camera/IoT/BIM engine (ngoài phạm vi, phụ thuộc hạ tầng ngoài): CDE (link nhanh tới `/documents`, M20), giám sát bằng công nghệ (camera/album ảnh drone theo mốc tiến độ), phần mềm QLDA (link P6/MS Project ngoài), tích hợp BIM (viewer nhúng iframe), an toàn thông tin & trạng thái hệ thống (admin).
 
@@ -11,4 +17,4 @@ Dashboard tổng hợp công nghệ — chủ yếu **gom & nhúng**, không t�
 
 ## Test
 
-`tests/tech.test.ts` (thuần: `validateTechLink` chặn URL không https/embed ngoài whitelist; tích hợp: lọc category, album gắn ảnh); `e2e/authed/tech.spec.ts` (desktop+mobile+axe, không load host ngoài trong test).
+`tests/tech.test.ts` (thuần: `validateTechLink` chặn URL không https/embed ngoài whitelist; tích hợp: lọc category, album gắn ảnh); `e2e/authed/tech.spec.ts` (desktop+mobile+axe, không load host ngoài trong test); `tests/healthcheck.test.ts` (shape `HealthCheckReport` đủ 9 hạng mục, `failCount`/`warnCount`/`hasIssues` tính đúng theo item; tích hợp `runHealthChecks()` với DB test thật).

@@ -92,7 +92,12 @@
   báo, chạy sạch thì im lặng.
 - Migration `0131_health_check_runs.sql` (bảng `health_check_runs`, thuần thêm — đi thẳng
   production) lưu lịch sử mỗi lần chạy (thủ công lẫn cron).
-- Cập nhật `docs/nang-cap/G10-cong-nghe.md` (thuộc nhóm G10 — cùng panel "Hệ thống" trên `/tech`).
+- Cập nhật `docs/nang-cap/G10-cong-nghe.md` (thuộc nhóm G10 — cùng panel "Hệ thống" trên `/tech`)
+  — bổ sung spec ghi lại **sau khi code** (Approved for implementation, theo yêu cầu trực tiếp
+  người dùng, không qua quy trình duyệt spec trước-khi-code tiêu chuẩn — ghi nhận công khai).
+- Bổ sung `tests/healthcheck.test.ts` (thiếu ở đợt code đầu) — kiểm shape `HealthCheckReport`
+  đủ 9 hạng mục + tính đúng `failCount`/`warnCount`/`hasIssues`, và tích hợp `runHealthChecks()`
+  với DB test thật (hạng mục `database` phải `ok`).
 
 ## M97 V1 — Dọn trang shim, trang re-export trùng và code chết (2026-08-21)
 
