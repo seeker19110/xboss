@@ -13,6 +13,33 @@
 - **Lộ trình hoàn thành (chờ duyệt, chưa code):** `PROJECT-COMPLETION-ROADMAP.md` chốt C0→C6 để đạt XBoss v1.0/Product Complete và O1→O5 cho Engineering OS/Vision Complete theo gate; không coi tài liệu là quyền tự triển khai production hoặc A3+.
 - **Spec pack chi tiết (chờ duyệt):** C0, C2–C6 và OS-1–OS-5 đã có file thi hành riêng (C1 dùng ENG-5), mỗi file gồm scope, data/API/UI/ops, test, chia PR và DoD. Chưa phase nào được đánh dấu triển khai chỉ vì đặc tả đã viết.
 
+## Sửa bug CI có sẵn trên main phát hiện khi mở PR health-check (2026-08-22)
+
+- **Bug thật, đã sửa:** `lib/db/index.ts::withProjectScope` — lời gọi LỒNG bên trong 1
+  transaction đang mở (vd hàm ghi gọi 1 hàm đọc nội bộ trước khi ghi) tự chạy lại
+  `SET TRANSACTION READ ONLY` theo `opts.readOnly` mặc định `true` của chính nó, kể cả khi
+  transaction cha đã mở với `readOnly:false` — Postgres không cho hạ READ ONLY về READ WRITE
+  giữa chừng nên mọi câu ghi SAU đó trong transaction cha lỗi "cannot execute ... in a
+  read-only transaction". Sửa: chỉ `SET TRANSACTION READ ONLY` khi ĐANG MỞ transaction mới
+  (không phải lồng lại). Đồng thời bổ sung `{ readOnly: false }` còn thiếu ở 9 module
+  `engineering-*` (auto-routing, bidding-matrix, cashflow, esignature, hse-vision,
+  qr-logistics, spatial-pinning, zalo-copilot, autonomy đã có sẵn) — trước đây mặc định
+  `readOnly:true` tự khoá transaction của chính mình trước khi ghi.
+- **Bug test có sẵn, đã sửa:** 8 file test tích hợp `engineering-*` hard-code `projectId = 1`
+  (2 file thêm `userId = 1`) giả định hàng đã tồn tại thay vì tự `INSERT INTO
+projects/users` như quy ước còn lại của repo — DB test trống nên insert lỗi FK. Sửa theo
+  đúng pattern `insertId(...)`.
+- **Còn tồn đọng, CHƯA sửa (ngoài phạm vi commit này, cần đánh giá riêng vì đụng schema/logic
+  nghiệp vụ — rủi ro cao hơn):** schema drift (cột thiếu/đổi tên) ở `engineering-fidic-claim`,
+  `engineering-graph`, `engineering-predictions`, `engineering-prescriptive`,
+  `engineering-twin`, `engineering-twin-pinnacle`; bug số lượng tham số bind ở
+  `audit-chain`/`lib/merkle-audit-ledger.ts` và `engineering-pinnacle-synergy`; thiếu setup FK
+  ở `engineering-site-bot`/`engineering-task-queue`/`engineering-worker-bridge`; assertion cũ
+  lệch route/nhãn ở `approvals-task-proposal`/`diary`; lỗi validate `NODE_ENV` ở `auth.test.ts`
+  (nghi do cấu hình CI, chưa xác nhận); logic "Deny by default" trả sai kỳ vọng ở
+  `engineering-autonomy` (không phải bug transaction — đã verify riêng); và bộ e2e (`npm run
+test` job `e2e`) fail trên diện rộng từ trước, cần điều tra riêng.
+
 ## Kiểm tra trạng thái hoạt động (health check) cho Admin (2026-08-22)
 
 - Thêm `lib/healthcheck.ts::runHealthChecks()` — kiểm 9 hạng mục dùng API (Postgres `SELECT 1`,
