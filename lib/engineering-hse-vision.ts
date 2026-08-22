@@ -134,65 +134,69 @@ export async function runAndSaveHseVisionScan(params: {
     .update(imageUrl + scanName)
     .digest("hex");
 
-  return withProjectScope(projectId, async () => {
-    return withTransaction(async () => {
-      const scanRows = await query<any>(
-        `INSERT INTO engineering_hse_vision_scans
+  return withProjectScope(
+    projectId,
+    async () => {
+      return withTransaction(async () => {
+        const scanRows = await query<any>(
+          `INSERT INTO engineering_hse_vision_scans
            (project_id, scan_name, image_url, image_hash, total_hazards_found, site_safety_score, risk_tier)
          VALUES (?, ?, ?, ?, ?, ?, ?)
          RETURNING id, project_id AS "projectId", scan_name AS "scanName", image_url AS "imageUrl",
                    total_hazards_found AS "totalHazardsFound", site_safety_score AS "siteSafetyScore",
                    risk_tier AS "riskTier", analyzed_at AS "analyzedAt"`,
-        projectId,
-        scanName,
-        imageUrl,
-        imageHash,
-        result.totalHazards,
-        result.siteSafetyScore,
-        result.riskTier,
-      );
+          projectId,
+          scanName,
+          imageUrl,
+          imageHash,
+          result.totalHazards,
+          result.siteSafetyScore,
+          result.riskTier,
+        );
 
-      const scan = scanRows[0];
+        const scan = scanRows[0];
 
-      for (let i = 0; i < result.hazards.length; i++) {
-        const h = result.hazards[i];
-        const hazardRows = await query<any>(
-          `INSERT INTO engineering_hse_detected_hazards
+        for (let i = 0; i < result.hazards.length; i++) {
+          const h = result.hazards[i];
+          const hazardRows = await query<any>(
+            `INSERT INTO engineering_hse_detected_hazards
              (scan_id, project_id, hazard_type, severity, confidence, bounding_box, description, standard_violation)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
            RETURNING id`,
-          scan.id,
-          projectId,
-          h.hazardType,
-          h.severity,
-          h.confidence,
-          JSON.stringify(h.boundingBox),
-          h.description,
-          h.standardViolation,
-        );
+            scan.id,
+            projectId,
+            h.hazardType,
+            h.severity,
+            h.confidence,
+            JSON.stringify(h.boundingBox),
+            h.description,
+            h.standardViolation,
+          );
 
-        const hazardId = hazardRows[0].id;
-        const ticketCode = `TICKET-HSE-${Date.now().toString().slice(-6)}-${i + 1}`;
+          const hazardId = hazardRows[0].id;
+          const ticketCode = `TICKET-HSE-${Date.now().toString().slice(-6)}-${i + 1}`;
 
-        await query(
-          `INSERT INTO engineering_hse_action_tickets
+          await query(
+            `INSERT INTO engineering_hse_action_tickets
              (scan_id, hazard_id, project_id, ticket_code, assigned_subcon, fine_amount, deadline_hours, status)
            VALUES (?, ?, ?, ?, ?, ?, 4, 'OPEN')`,
-          scan.id,
-          hazardId,
-          projectId,
-          ticketCode,
-          assignedSubcon,
-          h.fineAmountVnd,
-        );
-      }
+            scan.id,
+            hazardId,
+            projectId,
+            ticketCode,
+            assignedSubcon,
+            h.fineAmountVnd,
+          );
+        }
 
-      return {
-        scan,
-        hazards: result.hazards,
-      };
-    });
-  });
+        return {
+          scan,
+          hazards: result.hazards,
+        };
+      });
+    },
+    { readOnly: false },
+  );
 }
 
 export async function listHseVisionScans(projectId: number) {

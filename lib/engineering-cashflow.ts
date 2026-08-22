@@ -181,64 +181,68 @@ export async function runAndSaveCashflowForecast(params: {
     durationPeriods,
   });
 
-  return withProjectScope(projectId, async () => {
-    return withTransaction(async () => {
-      const runs = await query<any>(
-        `INSERT INTO engineering_cashflow_forecast_runs
+  return withProjectScope(
+    projectId,
+    async () => {
+      return withTransaction(async () => {
+        const runs = await query<any>(
+          `INSERT INTO engineering_cashflow_forecast_runs
            (project_id, run_name, parameters, total_contract_value, advance_percent, retention_percent, payment_delay_days, created_by)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
          RETURNING id, project_id AS "projectId", run_name AS "runName", total_contract_value AS "totalContractValue",
                    advance_percent AS "advancePercent", retention_percent AS "retentionPercent", payment_delay_days AS "paymentDelayDays",
                    created_at AS "createdAt"`,
-        projectId,
-        runName,
-        JSON.stringify(params),
-        totalContractValue,
-        advancePercent,
-        retentionPercent,
-        paymentDelayDays,
-        createdBy,
-      );
+          projectId,
+          runName,
+          JSON.stringify(params),
+          totalContractValue,
+          advancePercent,
+          retentionPercent,
+          paymentDelayDays,
+          createdBy,
+        );
 
-      const run = runs[0];
+        const run = runs[0];
 
-      for (const p of simulation.projections) {
-        await query(
-          `INSERT INTO engineering_cashflow_period_projections
+        for (const p of simulation.projections) {
+          await query(
+            `INSERT INTO engineering_cashflow_period_projections
              (run_id, project_id, period_index, period_label, projected_earned_value, projected_cash_in, projected_cash_out, net_cash_flow, cumulative_cash_flow, working_capital_gap)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          run.id,
-          projectId,
-          p.periodIndex,
-          p.periodLabel,
-          p.projectedEarnedValue,
-          p.projectedCashIn,
-          p.projectedCashOut,
-          p.netCashFlow,
-          p.cumulativeCashFlow,
-          p.workingCapitalGap,
-        );
-      }
+            run.id,
+            projectId,
+            p.periodIndex,
+            p.periodLabel,
+            p.projectedEarnedValue,
+            p.projectedCashIn,
+            p.projectedCashOut,
+            p.netCashFlow,
+            p.cumulativeCashFlow,
+            p.workingCapitalGap,
+          );
+        }
 
-      await query(
-        `INSERT INTO engineering_working_capital_risks
+        await query(
+          `INSERT INTO engineering_working_capital_risks
            (run_id, project_id, risk_level, dip_period, max_deficit_amount, mitigation_recommendation)
          VALUES (?, ?, ?, ?, ?, ?)`,
-        run.id,
-        projectId,
-        simulation.risk.riskLevel,
-        simulation.risk.dipPeriod,
-        simulation.risk.maxDeficitAmount,
-        simulation.risk.mitigationRecommendation,
-      );
+          run.id,
+          projectId,
+          simulation.risk.riskLevel,
+          simulation.risk.dipPeriod,
+          simulation.risk.maxDeficitAmount,
+          simulation.risk.mitigationRecommendation,
+        );
 
-      return {
-        run,
-        projections: simulation.projections,
-        risk: simulation.risk,
-      };
-    });
-  });
+        return {
+          run,
+          projections: simulation.projections,
+          risk: simulation.risk,
+        };
+      });
+    },
+    { readOnly: false },
+  );
 }
 
 export async function listCashflowForecasts(projectId: number) {

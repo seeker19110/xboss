@@ -270,9 +270,11 @@ export async function createSleeveSchedule(params: {
     sleeveElevationMm: beamDepthMm / 2,
   });
 
-  return withProjectScope(projectId, async () => {
-    const rows = await query<any>(
-      `INSERT INTO engineering_sleeve_schedules
+  return withProjectScope(
+    projectId,
+    async () => {
+      const rows = await query<any>(
+        `INSERT INTO engineering_sleeve_schedules
          (project_id, drawing_code, floor_id, beam_ref, sleeve_type, diameter_mm, width_mm,
           height_mm, beam_depth_mm, beam_span_mm, coord_x, coord_y, coord_z, is_structural_approved,
           validation_result, status, created_by)
@@ -280,27 +282,29 @@ export async function createSleeveSchedule(params: {
        RETURNING id, project_id AS "projectId", drawing_code AS "drawingCode", beam_ref AS "beamRef",
                  diameter_mm AS "diameterMm", is_structural_approved AS "isStructuralApproved",
                  validation_result AS "validationResult", status, created_at AS "createdAt"`,
-      projectId,
-      drawingCode,
-      floorId,
-      beamRef,
-      sleeveType,
-      diameterMm,
-      widthMm,
-      heightMm,
-      beamDepthMm,
-      beamSpanMm,
-      coordX,
-      coordY,
-      coordZ,
-      validation.isValid,
-      JSON.stringify(validation),
-      validation.isValid ? "proposed" : "rejected",
-      createdBy,
-    );
+        projectId,
+        drawingCode,
+        floorId,
+        beamRef,
+        sleeveType,
+        diameterMm,
+        widthMm,
+        heightMm,
+        beamDepthMm,
+        beamSpanMm,
+        coordX,
+        coordY,
+        coordZ,
+        validation.isValid,
+        JSON.stringify(validation),
+        validation.isValid ? "proposed" : "rejected",
+        createdBy,
+      );
 
-    return rows[0];
-  });
+      return rows[0];
+    },
+    { readOnly: false },
+  );
 }
 
 export async function listSleeveSchedules(projectId: number, drawingCode?: string) {

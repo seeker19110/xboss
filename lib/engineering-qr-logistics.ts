@@ -162,11 +162,13 @@ export async function createMaterialShipment(params: {
     createdBy = null,
   } = params;
 
-  return withProjectScope(projectId, async () => {
-    const totalItemsCount = manifest.reduce((sum, it) => sum + it.deliveredQty, 0);
+  return withProjectScope(
+    projectId,
+    async () => {
+      const totalItemsCount = manifest.reduce((sum, it) => sum + it.deliveredQty, 0);
 
-    const rows = await query<any>(
-      `INSERT INTO engineering_material_shipments
+      const rows = await query<any>(
+        `INSERT INTO engineering_material_shipments
          (project_id, shipment_code, do_number, po_number, supplier_name, status,
           total_items_count, manifest_payload, created_by)
        VALUES (?, ?, ?, ?, ?, 'dispatched', ?, ?::jsonb, ?)
@@ -174,18 +176,20 @@ export async function createMaterialShipment(params: {
                  po_number AS "poNumber", supplier_name AS "supplierName", status,
                  total_items_count AS "totalItemsCount", received_items_count AS "receivedItemsCount",
                  created_at AS "createdAt"`,
-      projectId,
-      shipmentCode,
-      doNumber,
-      poNumber,
-      supplierName,
-      totalItemsCount,
-      JSON.stringify(manifest),
-      createdBy,
-    );
+        projectId,
+        shipmentCode,
+        doNumber,
+        poNumber,
+        supplierName,
+        totalItemsCount,
+        JSON.stringify(manifest),
+        createdBy,
+      );
 
-    return rows[0];
-  });
+      return rows[0];
+    },
+    { readOnly: false },
+  );
 }
 
 export async function listMaterialShipments(projectId: number, status?: string) {
@@ -220,16 +224,18 @@ export async function scanReceiveQrTag(params: {
 }) {
   const { projectId, qrCode, userId, locationNote = "Kho A Tầng Hầm" } = params;
 
-  return withProjectScope(projectId, async () => {
-    return withTransaction(async () => {
-      const parsed = parseMaterialQrCode(qrCode);
-      if (!parsed) {
-        throw new Error("Mã QR không hợp lệ hoặc sai định dạng XBoss");
-      }
+  return withProjectScope(
+    projectId,
+    async () => {
+      return withTransaction(async () => {
+        const parsed = parseMaterialQrCode(qrCode);
+        if (!parsed) {
+          throw new Error("Mã QR không hợp lệ hoặc sai định dạng XBoss");
+        }
 
-      // Upsert Tag vào bảng QR Tags
-      const rows = await query<any>(
-        `INSERT INTO engineering_material_qr_tags
+        // Upsert Tag vào bảng QR Tags
+        const rows = await query<any>(
+          `INSERT INTO engineering_material_qr_tags
            (project_id, qr_code, tag_type, item_code, item_name, quantity, status, scanned_at, scanned_by, location_note)
          VALUES (?, ?, ?, ?, ?, ?, 'scanned_on_site', CURRENT_TIMESTAMP, ?, ?)
          ON CONFLICT (qr_code) DO UPDATE
@@ -238,17 +244,19 @@ export async function scanReceiveQrTag(params: {
                scanned_by = EXCLUDED.scanned_by,
                location_note = EXCLUDED.location_note
          RETURNING id, qr_code AS "qrCode", item_code AS "itemCode", quantity, status, scanned_at AS "scannedAt"`,
-        projectId,
-        qrCode,
-        parsed.tagType,
-        parsed.itemCode,
-        `Vật tư ${parsed.itemCode}`,
-        parsed.quantity,
-        userId,
-        locationNote,
-      );
+          projectId,
+          qrCode,
+          parsed.tagType,
+          parsed.itemCode,
+          `Vật tư ${parsed.itemCode}`,
+          parsed.quantity,
+          userId,
+          locationNote,
+        );
 
-      return rows[0];
-    });
-  });
+        return rows[0];
+      });
+    },
+    { readOnly: false },
+  );
 }

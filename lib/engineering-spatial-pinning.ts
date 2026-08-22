@@ -76,9 +76,11 @@ export async function createSpatialAnnotation(
     createdBy = null,
   } = params;
 
-  return withProjectScope(projectId, async () => {
-    const rows = await query<any>(
-      `INSERT INTO engineering_spatial_annotations
+  return withProjectScope(
+    projectId,
+    async () => {
+      const rows = await query<any>(
+        `INSERT INTO engineering_spatial_annotations
          (project_id, drawing_code, floor_id, annot_type, coord_x, coord_y, coord_z,
           geom_payload, entity_ref_type, entity_ref_id, title, description, severity,
           status, metadata, created_by)
@@ -88,25 +90,27 @@ export async function createSpatialAnnotation(
                  coord_z::float AS "coordZ", geom_payload AS "geomPayload", entity_ref_type AS "entityRefType",
                  entity_ref_id AS "entityRefId", title, description, severity, status, metadata,
                  created_by AS "createdBy", created_at AS "createdAt", updated_at AS "updatedAt"`,
-      projectId,
-      drawingCode,
-      floorId,
-      annotType,
-      coordX,
-      coordY,
-      coordZ,
-      JSON.stringify(geomPayload),
-      entityRefType,
-      entityRefId,
-      title,
-      description,
-      severity,
-      JSON.stringify(metadata),
-      createdBy,
-    );
+        projectId,
+        drawingCode,
+        floorId,
+        annotType,
+        coordX,
+        coordY,
+        coordZ,
+        JSON.stringify(geomPayload),
+        entityRefType,
+        entityRefId,
+        title,
+        description,
+        severity,
+        JSON.stringify(metadata),
+        createdBy,
+      );
 
-    return rows[0] as SpatialAnnotationRecord;
-  });
+      return rows[0] as SpatialAnnotationRecord;
+    },
+    { readOnly: false },
+  );
 }
 
 /**
@@ -171,33 +175,38 @@ export async function updateAnnotationStatus(
   status: AnnotationStatus,
   resolutionNote?: string,
 ): Promise<boolean> {
-  return withProjectScope(projectId, async () => {
-    return withTransaction(async () => {
-      const existing = await queryOne<{ id: string; metadata: Record<string, unknown> }>(
-        `SELECT id, metadata FROM engineering_spatial_annotations WHERE id = ? AND project_id = ?`,
-        annotationId,
-        projectId,
-      );
-      if (!existing) return false;
+  return withProjectScope(
+    projectId,
+    async () => {
+      return withTransaction(async () => {
+        const existing = await queryOne<{ id: string; metadata: Record<string, unknown> }>(
+          `SELECT id, metadata FROM engineering_spatial_annotations WHERE id = ? AND project_id = ?`,
+          annotationId,
+          projectId,
+        );
+        if (!existing) return false;
 
-      const newMetadata = {
-        ...(existing.metadata || {}),
-        resolvedAt: status === "resolved" || status === "closed" ? new Date().toISOString() : null,
-        resolutionNote: resolutionNote || null,
-      };
+        const newMetadata = {
+          ...(existing.metadata || {}),
+          resolvedAt:
+            status === "resolved" || status === "closed" ? new Date().toISOString() : null,
+          resolutionNote: resolutionNote || null,
+        };
 
-      await query(
-        `UPDATE engineering_spatial_annotations
+        await query(
+          `UPDATE engineering_spatial_annotations
          SET status = ?, metadata = ?::jsonb, updated_at = CURRENT_TIMESTAMP
          WHERE id = ?`,
-        status,
-        JSON.stringify(newMetadata),
-        annotationId,
-      );
+          status,
+          JSON.stringify(newMetadata),
+          annotationId,
+        );
 
-      return true;
-    });
-  });
+        return true;
+      });
+    },
+    { readOnly: false },
+  );
 }
 
 /**
@@ -209,19 +218,23 @@ export async function linkAnnotationToEntity(
   entityRefType: string,
   entityRefId: string,
 ): Promise<boolean> {
-  return withProjectScope(projectId, async () => {
-    const res = await query(
-      `UPDATE engineering_spatial_annotations
+  return withProjectScope(
+    projectId,
+    async () => {
+      const res = await query(
+        `UPDATE engineering_spatial_annotations
        SET entity_ref_type = ?, entity_ref_id = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ? AND project_id = ?
        RETURNING id`,
-      entityRefType,
-      entityRefId,
-      annotationId,
-      projectId,
-    );
-    return res.length > 0;
-  });
+        entityRefType,
+        entityRefId,
+        annotationId,
+        projectId,
+      );
+      return res.length > 0;
+    },
+    { readOnly: false },
+  );
 }
 
 // ---------------------------------------------------------------------------

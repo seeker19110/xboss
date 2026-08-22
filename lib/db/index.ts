@@ -214,10 +214,18 @@ export async function withProjectScope<T>(
   opts?: { readOnly?: boolean },
 ): Promise<T> {
   const readOnly = opts?.readOnly ?? true;
+  // Lồng bên trong 1 withProjectScope/withTransaction khác (vd hàm đọc gọi lại chính nó,
+  // hoặc 1 hàm ghi gọi 1 hàm đọc nội bộ trước khi ghi) tái dùng transaction hiện có — CHỈ
+  // set TRANSACTION READ ONLY khi ĐANG MỞ transaction mới (client này thật sự chạy BEGIN).
+  // Postgres không cho hạ READ ONLY về READ WRITE giữa chừng: nếu lời gọi lồng bên trong
+  // (mặc định readOnly=true vì là đọc) tự đặt READ ONLY trên transaction cha ĐANG GHI, mọi
+  // câu lệnh ghi sau đó trong transaction cha sẽ lỗi "cannot execute ... in a read-only
+  // transaction" dù bản thân transaction cha gọi với readOnly:false.
+  const alreadyInTransaction = !!txStorage.getStore();
   return withTransaction(async () => {
     const client = txStorage.getStore();
     if (!client) throw new Error("withProjectScope: thiếu transaction client (không thể xảy ra)");
-    if (readOnly) await client.query("SET TRANSACTION READ ONLY");
+    if (readOnly && !alreadyInTransaction) await client.query("SET TRANSACTION READ ONLY");
     await client.query(`SELECT set_config('app.project_id', $1, true)`, [String(projectId)]);
     return fn();
   });
