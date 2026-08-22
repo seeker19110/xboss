@@ -88,7 +88,8 @@ test("M74: Tổng hợp chỉ số Spatial Pin Summary", () => {
 });
 
 test("M74: Vòng đời Spatial Annotation & Pinning trong DB", { skip: !HAS_DB }, async () => {
-  const projectId = 1;
+  const { insertId } = await import("@/lib/db");
+  const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Spatial Pinning Proj')`);
   const drawingCode = "DWG-TEST-001";
 
   // 1. Tạo pin

@@ -31,8 +31,12 @@ test("M86: Zalo NLP Intent Parsing — Phân tích tiếng Việt công trườn
 });
 
 test("M86: Zalo OTP & Message Processing DB Lifecycle", { skip: !HAS_DB }, async () => {
-  const projectId = 1;
-  const userId = 1;
+  const { insertId } = await import("@/lib/db");
+  const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Zalo Copilot Proj')`);
+  const userId = await insertId(
+    `INSERT INTO users (name, email, password_hash, role) VALUES ('Zalo Copilot Tester', ?, 'x', 'admin')`,
+    `zalo-copilot-test-${projectId}@x.vn`,
+  );
   const zaloUserId = "ZALO_TEST_USER_99";
 
   const otp = await generateZaloLinkOtp(projectId, userId, zaloUserId, "Thầu phụ Test");

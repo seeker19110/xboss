@@ -32,7 +32,8 @@ test("M85: S-Curve Distribution & Cashflow Calculation Engine", () => {
 });
 
 test("M85: Cashflow Forecast DB Lifecycle", { skip: !HAS_DB }, async () => {
-  const projectId = 1;
+  const { insertId } = await import("@/lib/db");
+  const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Cashflow Proj')`);
 
   const result = await runAndSaveCashflowForecast({
     projectId,

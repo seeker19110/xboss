@@ -73,8 +73,12 @@ test("M78: Receiving Reconciliation — Đối soát 3 bên giao nhận và lậ
 });
 
 test("M78: Vòng đời QR Logistics trong DB", { skip: !HAS_DB }, async () => {
-  const projectId = 1;
-  const userId = 1;
+  const { insertId } = await import("@/lib/db");
+  const projectId = await insertId(`INSERT INTO projects (name) VALUES ('QR Logistics Proj')`);
+  const userId = await insertId(
+    `INSERT INTO users (name, email, password_hash, role) VALUES ('QR Logistics Tester', ?, 'x', 'admin')`,
+    `qr-logistics-test-${projectId}@x.vn`,
+  );
 
   // 1. Tạo Shipment
   const shipment = await createMaterialShipment({

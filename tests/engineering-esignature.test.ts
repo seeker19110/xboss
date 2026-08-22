@@ -31,7 +31,8 @@ test(
   "M84: e-Signature DB Lifecycle — Tạo phong bì, ký 3 bên & sinh chứng thư",
   { skip: !HAS_DB },
   async () => {
-    const projectId = 1;
+    const { insertId } = await import("@/lib/db");
+    const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Esignature Proj')`);
 
     const envelope = await createEsignEnvelope({
       projectId,
