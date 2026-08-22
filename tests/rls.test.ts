@@ -481,10 +481,14 @@ test(
     );
     const thucTe = rows.map((r) => r.t);
 
+    // 3 bảng Zalo Field Copilot (M86, migration 0119) — scope theo project_id, policy cùng
+    // dạng USING (project_id::text = current_setting('app.project_id', true) OR ... = '*').
+    const ZALO = ["zalo_field_action_dispatches", "zalo_site_message_logs", "zalo_user_bindings"];
+
     // Nhóm engineering: khai theo TIỀN TỐ chứ không liệt kê tay — thêm bảng engineering_* mới
     // mà quên bật RLS thì bị bắt ở assert bên dưới, không phải ở đây.
     const eng = thucTe.filter((t) => t.startsWith("engineering_"));
-    const khai = new Set([...TAI_CHINH, ...TO_CHUC, ...eng]);
+    const khai = new Set([...TAI_CHINH, ...TO_CHUC, ...ZALO, ...eng]);
 
     const laKhaiThieu = thucTe.filter((t) => !khai.has(t));
     assert.deepEqual(
@@ -493,7 +497,7 @@ test(
       "Có bảng BẬT RLS nhưng chưa khai trong test/tài liệu — bổ sung vào danh sách trên và cập nhật PROJECT.md + ADR-0005",
     );
 
-    const matRls = [...TAI_CHINH, ...TO_CHUC].filter((t) => !thucTe.includes(t));
+    const matRls = [...TAI_CHINH, ...TO_CHUC, ...ZALO].filter((t) => !thucTe.includes(t));
     assert.deepEqual(
       matRls,
       [],
