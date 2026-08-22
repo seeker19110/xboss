@@ -159,7 +159,8 @@ export async function verifyAuditChain(): Promise<AuditChainResult> {
        WHERE id > ?
        ORDER BY id ASC
        LIMIT ?`,
-      [lastId, PAGE_SIZE],
+      lastId,
+      PAGE_SIZE,
     );
 
     if (rows.length === 0) break;

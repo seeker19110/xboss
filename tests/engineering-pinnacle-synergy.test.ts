@@ -58,7 +58,8 @@ test("M88: computeApexScore composite scoring and tiering", () => {
 });
 
 test("M88: Apex Pulse DB lifecycle & command actions", { skip: !HAS_DB }, async () => {
-  const projectId = 1;
+  const { insertId } = await import("@/lib/db");
+  const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Pinnacle Synergy Proj')`);
 
   // 1. Ghi nhận snapshot Apex Pulse
   const pulse = await recordApexSystemPulse(projectId, {

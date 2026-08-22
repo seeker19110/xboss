@@ -81,7 +81,7 @@ export async function calculatePinnacleApexMetrics(projectId: number): Promise<A
   try {
     const clashRow = await queryOne<{ total: string }>(
       `SELECT COUNT(*)::text as total FROM engineering_spatial_annotations WHERE project_id = ? AND annotation_type = 'ncr_issue'`,
-      [projectId],
+      projectId,
     );
     if (clashRow) {
       spatialClashesCount = parseInt(clashRow.total, 10) || 0;
@@ -97,7 +97,7 @@ export async function calculatePinnacleApexMetrics(projectId: number): Promise<A
   try {
     const cfRow = await queryOne<{ runway: string }>(
       `SELECT MIN(cumulative_balance)::text as runway FROM engineering_cashflow_period_projections WHERE project_id = ?`,
-      [projectId],
+      projectId,
     );
     if (cfRow && cfRow.runway && parseFloat(cfRow.runway) < 0) {
       financialScore = 78.0;
@@ -113,7 +113,7 @@ export async function calculatePinnacleApexMetrics(projectId: number): Promise<A
   try {
     const claimRow = await queryOne<{ total: string }>(
       `SELECT COUNT(*)::text as total FROM engineering_fidic_claims WHERE project_id = ? AND notice_status = 'TIME_BARRED_RISK'`,
-      [projectId],
+      projectId,
     );
     if (claimRow) {
       fidicTimeBarRiskCount = parseInt(claimRow.total, 10) || 0;
@@ -129,7 +129,7 @@ export async function calculatePinnacleApexMetrics(projectId: number): Promise<A
   try {
     const hseRow = await queryOne<{ avg_score: string }>(
       `SELECT AVG(site_safety_score)::text as avg_score FROM engineering_hse_vision_scans WHERE project_id = ?`,
-      [projectId],
+      projectId,
     );
     if (hseRow && hseRow.avg_score) {
       hseSafetyScore = parseFloat(hseRow.avg_score);
@@ -146,7 +146,7 @@ export async function calculatePinnacleApexMetrics(projectId: number): Promise<A
   try {
     const merkleRow = await queryOne<{ total: string }>(
       `SELECT COUNT(*)::text as total FROM engineering_merkle_roots WHERE project_id = ?`,
-      [projectId],
+      projectId,
     );
     if (merkleRow) {
       merkleBlockHeight = Math.max(1, parseInt(merkleRow.total, 10) || 128);
@@ -250,17 +250,15 @@ export async function recordApexSystemPulse(
       (project_id, apex_index, spatial_score, financial_score, legal_score, site_score, agent_score, status_tier, pulse_summary)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
      RETURNING id, project_id, apex_index, spatial_score, financial_score, legal_score, site_score, agent_score, status_tier, pulse_summary, created_at`,
-    [
-      projectId,
-      finalMetrics.apexIndex,
-      finalMetrics.spatialScore,
-      finalMetrics.financialScore,
-      finalMetrics.legalScore,
-      finalMetrics.siteScore,
-      finalMetrics.agentScore,
-      finalMetrics.statusTier,
-      JSON.stringify(finalMetrics.pulseSummary),
-    ],
+    projectId,
+    finalMetrics.apexIndex,
+    finalMetrics.spatialScore,
+    finalMetrics.financialScore,
+    finalMetrics.legalScore,
+    finalMetrics.siteScore,
+    finalMetrics.agentScore,
+    finalMetrics.statusTier,
+    JSON.stringify(finalMetrics.pulseSummary),
   );
 
   if (!res) {
@@ -304,7 +302,7 @@ export async function getLatestApexSystemPulse(projectId: number): Promise<ApexP
      WHERE project_id = ?
      ORDER BY created_at DESC
      LIMIT 1`,
-    [projectId],
+    projectId,
   );
 
   if (!row) return null;
@@ -349,7 +347,11 @@ export async function dispatchApexCommandAction(
       (project_id, action_type, initiated_by, action_payload, result_status, result_summary)
      VALUES (?, ?, ?, ?::jsonb, 'COMPLETED', ?)
      RETURNING id, project_id, action_type, initiated_by, action_payload, result_status, result_summary, created_at`,
-    [projectId, actionType, userId ?? null, JSON.stringify(payload), resultSummary],
+    projectId,
+    actionType,
+    userId ?? null,
+    JSON.stringify(payload),
+    resultSummary,
   );
 
   if (!row) {
