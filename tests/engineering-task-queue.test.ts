@@ -24,7 +24,8 @@ test("M73: Task Queue API signatures và logic xử lý", () => {
 });
 
 test("M73: Vòng đời Task Queue trong môi trường tích hợp DB", { skip: !HAS_DB }, async () => {
-  const projectId = 1;
+  const { insertId } = await import("@/lib/db");
+  const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Task Queue Proj')`);
   const taskType = "test_spatial_clash_detection";
   const payload = { modelId: "BIM-01", meshCount: 1200 };
 
