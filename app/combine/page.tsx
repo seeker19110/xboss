@@ -413,7 +413,7 @@ export default function CombinePage() {
               <span>Mô hình BIM 3D</span>
             </Link>
             <Link
-              href="/chuan-hoa-ban-ve"
+              href="/engineering/chuan-hoa-ban-ve"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700 transition"
             >
               <Layers className="w-3.5 h-3.5 text-amber-400" />

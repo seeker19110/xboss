@@ -552,10 +552,10 @@ export default function EngineeringApexCockpitPage() {
                     <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
                   </Link>
                   <Link
-                    href="/engineering/cad"
+                    href="/engineering/chuan-hoa-ban-ve"
                     className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
                   >
-                    <span>AutoLISP Generator & CAD Doctor (M65)</span>
+                    <span>Chuẩn Hóa CAD 2D & 3D BIM (5 Bước)</span>
                     <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
                   </Link>
                 </div>

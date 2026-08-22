@@ -365,7 +365,7 @@ export const DASHBOARD_TREE: DashCluster[] = [
       },
       {
         id: "dash.chuan-hoa-ban-ve",
-        href: "/chuan-hoa-ban-ve",
+        href: "/engineering/chuan-hoa-ban-ve",
         label: "Chuẩn hóa bản vẽ",
         icon: PencilRuler,
       },

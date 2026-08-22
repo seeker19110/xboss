@@ -183,11 +183,12 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["admin", "pm", "engineer", "bch"],
   },
   {
-    href: "/engineering/cad",
-    label: "AutoLISP & CAD Doctor",
+    href: "/engineering/chuan-hoa-ban-ve",
+    label: "Chuẩn hóa CAD 2D & 3D BIM",
     category: "spatial",
     icon: Code,
-    roles: ["admin", "pm", "engineer"],
+    badge: "5 Bước",
+    roles: ["admin", "pm", "engineer", "bch"],
   },
   {
     href: "/engineering/mepf-lifecycle",
