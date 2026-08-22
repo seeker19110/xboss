@@ -80,8 +80,10 @@ interface DrawingOption {
   code: string;
   name: string;
   kind: string;
+  subFolder?: string;
   systemGroup: string | null;
   floorLabel: string | null;
+  latestRev?: string | null;
 }
 
 interface CadDiffItem {
@@ -137,10 +139,141 @@ export default function ChuanHoaBanVePage() {
   // ── Source Selection: [design] (from project design drawings) vs [upload] (single file) vs [folder] (whole folder with XREFs) ──
   const [sourceMode, setSourceMode] = useState<"design" | "upload" | "folder">("design");
   const [designDrawings, setDesignDrawings] = useState<DrawingOption[]>([]);
-  const [selectedDrawingId, setSelectedDrawingId] = useState<number | null>(null);
+  const [selectedDrawingId, setSelectedDrawingId] = useState<number | null>(101);
   const [uploadedFileName, setUploadedFileName] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const folderInputRef = useRef<HTMLInputElement | null>(null);
+
+  // ── Mode 1: 2-Column Directory Tree Browser States ──
+  const [explorerCategory, setExplorerCategory] = useState<string>("all");
+  const [drawingSearchQuery, setDrawingSearchQuery] = useState("");
+
+  const defaultSampleDrawings: DrawingOption[] = [
+    {
+      id: 101,
+      code: "AVIO-DWG-M-FL04-01",
+      name: "Bản vẽ HVAC & Cấp Thoát Nước Tầng 4 Tháp A (Mẫu TT AVIO)",
+      kind: "design",
+      subFolder: "origin",
+      systemGroup: "HVAC",
+      floorLabel: "Tầng 4",
+      latestRev: "Rev01",
+    },
+    {
+      id: 102,
+      code: "AVIO-DWG-P-FL04-01",
+      name: "Mặt bằng Cấp Thoát Nước Sinh Hoạt & Nước Thải Tầng 4",
+      kind: "design",
+      subFolder: "origin",
+      systemGroup: "PLUMBING",
+      floorLabel: "Tầng 4",
+      latestRev: "Rev01",
+    },
+    {
+      id: 103,
+      code: "AVIO-DWG-E-FL04-01",
+      name: "Mặt bằng Máng Cáp & Chiếu Sáng Động Lực Tầng 4",
+      kind: "design",
+      subFolder: "origin",
+      systemGroup: "ELECTRICAL",
+      floorLabel: "Tầng 4",
+      latestRev: "Rev01",
+    },
+    {
+      id: 104,
+      code: "AVIO-DWG-F-FL04-01",
+      name: "Mặt bằng Chữa Cháy Tự Động Sprinkler & Trụ Nước Tầng 4",
+      kind: "design",
+      subFolder: "origin",
+      systemGroup: "FIREFIGHTING",
+      floorLabel: "Tầng 4",
+      latestRev: "Rev01",
+    },
+    {
+      id: 105,
+      code: "AVIO-DWG-ELV-FL04-01",
+      name: "Mặt bằng Hệ Thống Điện Nhẹ, Camera An Ninh & BMS Tầng 4",
+      kind: "design",
+      subFolder: "origin",
+      systemGroup: "ELV",
+      floorLabel: "Tầng 4",
+      latestRev: "Rev01",
+    },
+    {
+      id: 106,
+      code: "AVIO-ISO-M-FL04-01",
+      name: "Mặt bằng Chuẩn Hóa ISO MEPF Hệ Thống Gió Tầng 4",
+      kind: "design",
+      subFolder: "iso",
+      systemGroup: "HVAC",
+      floorLabel: "Tầng 4",
+      latestRev: "Rev02",
+    },
+    {
+      id: 107,
+      code: "AVIO-SHOP-M-FL04-02",
+      name: "Bản vẽ Shopdrawing Chi Tiết Tuyến Ống Gió Thi Công Tầng 4",
+      kind: "shop",
+      subFolder: "",
+      systemGroup: "HVAC",
+      floorLabel: "Tầng 4",
+      latestRev: "Rev02",
+    },
+    {
+      id: 108,
+      code: "AVIO-BIM-MEPF-FL04",
+      name: "Mô hình Không Gian 3D BIM MEPF Tầng 4 (IFC / DXF 3D)",
+      kind: "bim",
+      subFolder: "",
+      systemGroup: "HVAC",
+      floorLabel: "Tầng 4",
+      latestRev: "v1.0",
+    },
+    {
+      id: 109,
+      code: "AVIO-ASBUILT-MEPF-01",
+      name: "Bản vẽ Hoàn Công Tổng Thể Tuyến Trục Kỹ Thuật MEPF",
+      kind: "asbuilt",
+      subFolder: "",
+      systemGroup: "HVAC",
+      floorLabel: "Tầng Điển Hình",
+      latestRev: "Rev01",
+    },
+  ];
+
+  const allDrawingsList = designDrawings.length > 0 ? designDrawings : defaultSampleDrawings;
+
+  const filteredExplorerDrawings = allDrawingsList.filter((d) => {
+    let matchCat = true;
+    if (explorerCategory === "design_origin") {
+      matchCat = d.kind === "design" && (d.subFolder === "origin" || !d.subFolder);
+    } else if (explorerCategory === "design_iso") {
+      matchCat = d.subFolder === "iso";
+    } else if (["shop", "bim", "asbuilt"].includes(explorerCategory)) {
+      matchCat = d.kind === explorerCategory;
+    } else if (
+      [
+        "HVAC",
+        "PLUMBING",
+        "ELECTRICAL",
+        "FIREFIGHTING",
+        "ELV",
+        "STRUCTURE",
+        "ARCHITECTURE",
+      ].includes(explorerCategory)
+    ) {
+      matchCat = d.systemGroup === explorerCategory;
+    }
+
+    const matchSearch =
+      !drawingSearchQuery ||
+      d.code.toLowerCase().includes(drawingSearchQuery.toLowerCase()) ||
+      d.name.toLowerCase().includes(drawingSearchQuery.toLowerCase()) ||
+      (d.floorLabel && d.floorLabel.toLowerCase().includes(drawingSearchQuery.toLowerCase())) ||
+      (d.systemGroup && d.systemGroup.toLowerCase().includes(drawingSearchQuery.toLowerCase()));
+
+    return matchCat && matchSearch;
+  });
 
   // ── Folder Upload & XREF States ──
   const [folderFiles, setFolderFiles] = useState<FolderFileItem[]>([]);
@@ -1321,49 +1454,308 @@ export default function ChuanHoaBanVePage() {
             </div>
           </div>
 
-          {/* Source 1: Chọn từ danh sách bản vẽ thiết kế */}
+          {/* Source 1: Trình Duyệt Cây Thư Mục & Danh Sách Bản Vẽ (2 Cột File Explorer) */}
           {sourceMode === "design" && (
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
-              <div className="sm:col-span-8">
-                <label className="block text-[11px] font-semibold text-zinc-400 mb-1">
-                  Chọn Bản Vẽ Thiết Kế (Hệ thống / Tầng / Phân hệ MEPF):
-                </label>
-                <div className="relative">
-                  <select
-                    value={selectedDrawingId || ""}
-                    onChange={(e) => {
-                      const id = Number(e.target.value);
-                      setSelectedDrawingId(id);
-                      runDxfAnalysis({ drawingId: id });
-                    }}
-                    className="w-full pl-3 pr-8 py-2 text-xs bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-200 focus:outline-none focus:border-amber-500 appearance-none"
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 pt-1">
+              {/* Cột 1 (Trái): Cây Thư Mục Phân Cấp (Directory Tree & Phân Hệ MEPF) */}
+              <div className="lg:col-span-4 p-3 rounded-xl bg-zinc-950/80 border border-zinc-800 space-y-3">
+                <div className="flex items-center justify-between border-b border-zinc-800/80 pb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
+                    <FolderTree className="w-4 h-4 text-amber-400" />
+                    <span>Cây Thư Mục Bản Vẽ</span>
+                  </span>
+                  <span className="text-[10px] font-mono text-zinc-500">
+                    {allDrawingsList.length} tệp
+                  </span>
+                </div>
+
+                {/* Nhóm Thư Mục Quy Chuẩn drawings/ */}
+                <div className="space-y-1">
+                  <div className="text-[10px] uppercase font-bold text-zinc-500 px-2 py-0.5 tracking-wider">
+                    📂 Cấu Trúc drawings/
+                  </div>
+
+                  <button
+                    onClick={() => setExplorerCategory("all")}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition text-left ${
+                      explorerCategory === "all"
+                        ? "bg-amber-500/15 text-amber-300 font-bold border border-amber-500/30"
+                        : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
+                    }`}
                   >
-                    {designDrawings.length > 0 ? (
-                      designDrawings.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          [{d.code}] {d.name} {d.floorLabel ? `• ${d.floorLabel}` : ""}{" "}
-                          {d.systemGroup ? `• (${d.systemGroup})` : ""}
-                        </option>
-                      ))
-                    ) : (
-                      <option value="">
-                        [AVIO-DWG-M-FL04-01] Bản vẽ HVAC & Cấp Thoát Nước Tầng 4 Tháp A (Mẫu TT
-                        AVIO)
-                      </option>
-                    )}
-                  </select>
+                    <div className="flex items-center gap-2 truncate">
+                      <Folder className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      <span className="truncate">drawings/ (Tất cả)</span>
+                    </div>
+                    <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">
+                      {allDrawingsList.length}
+                    </span>
+                  </button>
+
+                  {/* Sub-folder: design/origin */}
+                  <button
+                    onClick={() => setExplorerCategory("design_origin")}
+                    className={`w-full flex items-center justify-between pl-6 pr-2.5 py-1.5 rounded-lg text-xs transition text-left ${
+                      explorerCategory === "design_origin"
+                        ? "bg-amber-500/15 text-amber-300 font-bold border border-amber-500/30"
+                        : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <FolderOpen className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                      <span className="truncate">design/origin/ (Gốc)</span>
+                    </div>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800/80 text-zinc-400">
+                      {
+                        allDrawingsList.filter(
+                          (d) => d.kind === "design" && (d.subFolder === "origin" || !d.subFolder),
+                        ).length
+                      }
+                    </span>
+                  </button>
+
+                  {/* Sub-folder: design/iso */}
+                  <button
+                    onClick={() => setExplorerCategory("design_iso")}
+                    className={`w-full flex items-center justify-between pl-6 pr-2.5 py-1.5 rounded-lg text-xs transition text-left ${
+                      explorerCategory === "design_iso"
+                        ? "bg-amber-500/15 text-amber-300 font-bold border border-amber-500/30"
+                        : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <Folder className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span className="truncate">design/iso/ (Chuẩn hóa)</span>
+                    </div>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800/80 text-zinc-400">
+                      {allDrawingsList.filter((d) => d.subFolder === "iso").length}
+                    </span>
+                  </button>
+
+                  {/* Sub-folder: shop */}
+                  <button
+                    onClick={() => setExplorerCategory("shop")}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition text-left ${
+                      explorerCategory === "shop"
+                        ? "bg-amber-500/15 text-amber-300 font-bold border border-amber-500/30"
+                        : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <Folder className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                      <span className="truncate">shop/ (Shopdrawing)</span>
+                    </div>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800/80 text-zinc-400">
+                      {allDrawingsList.filter((d) => d.kind === "shop").length}
+                    </span>
+                  </button>
+
+                  {/* Sub-folder: bim */}
+                  <button
+                    onClick={() => setExplorerCategory("bim")}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition text-left ${
+                      explorerCategory === "bim"
+                        ? "bg-amber-500/15 text-amber-300 font-bold border border-amber-500/30"
+                        : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <Folder className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                      <span className="truncate">bim/ (Mô hình 3D)</span>
+                    </div>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800/80 text-zinc-400">
+                      {allDrawingsList.filter((d) => d.kind === "bim").length}
+                    </span>
+                  </button>
+
+                  {/* Sub-folder: asbuilt */}
+                  <button
+                    onClick={() => setExplorerCategory("asbuilt")}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition text-left ${
+                      explorerCategory === "asbuilt"
+                        ? "bg-amber-500/15 text-amber-300 font-bold border border-amber-500/30"
+                        : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <Folder className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                      <span className="truncate">asbuilt/ (Hoàn công)</span>
+                    </div>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800/80 text-zinc-400">
+                      {allDrawingsList.filter((d) => d.kind === "asbuilt").length}
+                    </span>
+                  </button>
+                </div>
+
+                {/* Nhóm Phân Hệ Kỹ Thuật MEPF */}
+                <div className="space-y-1 pt-2 border-t border-zinc-800/80">
+                  <div className="text-[10px] uppercase font-bold text-zinc-500 px-2 py-0.5 tracking-wider">
+                    ⚡ Phân Hệ Kỹ Thuật
+                  </div>
+                  {[
+                    { id: "HVAC", label: "HVAC (Gió & ĐHKK)", icon: "🌀" },
+                    { id: "PLUMBING", label: "PLUMBING (Nước)", icon: "💧" },
+                    { id: "ELECTRICAL", label: "ELECTRICAL (Điện)", icon: "⚡" },
+                    { id: "FIREFIGHTING", label: "PCCC (Sprinkler)", icon: "🔥" },
+                    { id: "ELV", label: "ELV (Điện nhẹ/BMS)", icon: "📡" },
+                  ].map((sys) => (
+                    <button
+                      key={sys.id}
+                      onClick={() => setExplorerCategory(sys.id)}
+                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition text-left ${
+                        explorerCategory === sys.id
+                          ? "bg-amber-500/15 text-amber-300 font-bold border border-amber-500/30"
+                          : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <span className="text-xs">{sys.icon}</span>
+                        <span className="truncate">{sys.label}</span>
+                      </div>
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800/80 text-zinc-400">
+                        {allDrawingsList.filter((d) => d.systemGroup === sys.id).length}
+                      </span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              <div className="sm:col-span-4 flex items-center justify-end gap-2 pt-4 sm:pt-0">
-                <button
-                  onClick={() => runDxfAnalysis()}
-                  disabled={loading}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700 transition"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-                  <span>Nạp Lại Bản Vẽ</span>
-                </button>
+              {/* Cột 2 (Phải): Danh Sách Tệp Bản Vẽ & Chi Tiết Lựa Chọn */}
+              <div className="lg:col-span-8 p-3 rounded-xl bg-zinc-950/80 border border-zinc-800 space-y-3 flex flex-col justify-between">
+                <div className="space-y-3">
+                  {/* Search & Actions Bar */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800/80 pb-2.5">
+                    <div className="relative flex-1">
+                      <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+                      <input
+                        type="text"
+                        placeholder="Tìm theo tên bản vẽ, mã CAD, tầng..."
+                        value={drawingSearchQuery}
+                        onChange={(e) => setDrawingSearchQuery(e.target.value)}
+                        className="w-full pl-8 pr-3 py-1.5 text-xs bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => runDxfAnalysis({ drawingId: selectedDrawingId })}
+                        disabled={loading}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700 transition"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+                        <span>Nạp Lại Bản Vẽ</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* File Grid / Explorer List */}
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                    {filteredExplorerDrawings.length > 0 ? (
+                      filteredExplorerDrawings.map((d) => {
+                        const isSelected = selectedDrawingId === d.id;
+                        return (
+                          <div
+                            key={d.id}
+                            onClick={() => {
+                              setSelectedDrawingId(d.id);
+                              runDxfAnalysis({ drawingId: d.id, name: `${d.code}.dxf` });
+                            }}
+                            className={`p-3 rounded-xl border cursor-pointer transition flex items-center justify-between gap-3 ${
+                              isSelected
+                                ? "bg-amber-500/10 border-amber-500 shadow-sm"
+                                : "bg-zinc-900/60 border-zinc-800/80 hover:border-zinc-700 hover:bg-zinc-900"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div
+                                className={`p-2 rounded-lg shrink-0 ${
+                                  isSelected
+                                    ? "bg-amber-500 text-zinc-950"
+                                    : "bg-zinc-800 text-zinc-300"
+                                }`}
+                              >
+                                <FileCode2 className="w-4 h-4" />
+                              </div>
+
+                              <div className="space-y-0.5 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-mono font-bold text-xs text-amber-400">
+                                    [{d.code}]
+                                  </span>
+                                  <span className="text-xs font-semibold text-zinc-200 truncate">
+                                    {d.name}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-2 text-[11px] text-zinc-400 flex-wrap">
+                                  {d.systemGroup && (
+                                    <span className="px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-300 font-mono text-[10px]">
+                                      {d.systemGroup}
+                                    </span>
+                                  )}
+                                  {d.floorLabel && <span>• {d.floorLabel}</span>}
+                                  {d.latestRev && (
+                                    <span className="font-mono text-emerald-400">
+                                      • {d.latestRev}
+                                    </span>
+                                  )}
+                                  <span className="font-mono text-zinc-500">
+                                    •{" "}
+                                    {d.kind === "design"
+                                      ? "drawings/design/"
+                                      : `drawings/${d.kind}/`}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="shrink-0 flex items-center gap-2">
+                              {isSelected ? (
+                                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3" /> Đang Chọn
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-zinc-500 font-mono hover:text-amber-400">
+                                  Chọn nạp →
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="p-8 text-center text-xs text-zinc-500 space-y-1">
+                        <FolderOpen className="w-8 h-8 mx-auto text-zinc-600 mb-2" />
+                        <p>Không tìm thấy bản vẽ phù hợp trong thư mục này.</p>
+                        <button
+                          onClick={() => {
+                            setExplorerCategory("all");
+                            setDrawingSearchQuery("");
+                          }}
+                          className="text-amber-400 underline text-xs pt-1"
+                        >
+                          Xem tất cả bản vẽ dự án
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Selected Item Info Footer */}
+                {selectedDrawingId && (
+                  <div className="p-2.5 rounded-lg bg-zinc-900 border border-zinc-800/80 flex items-center justify-between text-xs mt-2">
+                    <div className="flex items-center gap-2 truncate">
+                      <span className="text-zinc-400 font-mono text-[11px]">Đang nạp xử lý:</span>
+                      <span className="font-bold font-mono text-amber-300 truncate">
+                        {allDrawingsList.find((d) => d.id === selectedDrawingId)?.code ||
+                          "AVIO-DWG-M-FL04-01"}
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-mono text-emerald-400 shrink-0 font-bold">
+                      Sẵn sàng chuẩn hóa 5 bước ✓
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           )}
