@@ -67,19 +67,19 @@ export async function POST(req: NextRequest) {
     const kindTag = cKind === "design" ? `DESIGN-${cSub.toUpperCase()}` : cKind.toUpperCase();
     const standardFileName = `${cProject}_${cWp}_${cSys}_${kindTag}_${cName}_${cDate}_${cRev}.${cExt}`;
 
-    // Xác định thư mục đích
+    // Xác định thư mục đích theo cấu trúc: drawings/[systems]/[kind]/[subfolder?]
     // Cả thư mục data/uploads/drawings và root drawings đều được đồng bộ
     let relativeSubPath = "";
     if (cKind === "design") {
-      relativeSubPath = join("design", cSub || "iso");
+      relativeSubPath = join(cSys, "design", cSub || "iso");
     } else if (cKind === "bim") {
-      relativeSubPath = "bim";
+      relativeSubPath = join(cSys, "bim");
     } else if (cKind === "shop") {
-      relativeSubPath = "shop";
+      relativeSubPath = join(cSys, "shop");
     } else if (cKind === "asbuilt") {
-      relativeSubPath = "asbuilt";
+      relativeSubPath = join(cSys, "asbuilt");
     } else {
-      relativeSubPath = join("design", "iso");
+      relativeSubPath = join(cSys, "design", "iso");
     }
 
     // 1. Thư mục trong data/uploads/drawings/

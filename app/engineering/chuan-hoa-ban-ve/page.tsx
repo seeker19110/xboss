@@ -144,15 +144,29 @@ export default function ChuanHoaBanVePage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const folderInputRef = useRef<HTMLInputElement | null>(null);
 
-  // ── Mode 1: 2-Column Directory Tree Browser States ──
+  // ── Mode 1: 2-Column Directory Tree Browser States (drawings/[systems]/...) ──
   const [explorerCategory, setExplorerCategory] = useState<string>("all");
+  const [expandedSystems, setExpandedSystems] = useState<string[]>([
+    "HVAC",
+    "PLUMBING",
+    "ELECTRICAL",
+    "FIREFIGHTING",
+    "ELV",
+  ]);
   const [drawingSearchQuery, setDrawingSearchQuery] = useState("");
 
+  const toggleSystemExpand = (sys: string) => {
+    setExpandedSystems((prev) =>
+      prev.includes(sys) ? prev.filter((s) => s !== sys) : [...prev, sys],
+    );
+  };
+
   const defaultSampleDrawings: DrawingOption[] = [
+    // ── 1. HVAC ──
     {
       id: 101,
       code: "AVIO-DWG-M-FL04-01",
-      name: "Bản vẽ HVAC & Cấp Thoát Nước Tầng 4 Tháp A (Mẫu TT AVIO)",
+      name: "Bản vẽ HVAC Cấp Gió & Hút Khói Tầng 4 (Gốc Thiết Kế)",
       kind: "design",
       subFolder: "origin",
       systemGroup: "HVAC",
@@ -161,6 +175,48 @@ export default function ChuanHoaBanVePage() {
     },
     {
       id: 102,
+      code: "AVIO-ISO-M-FL04-01",
+      name: "Bản vẽ Chuẩn Hóa ISO MEPF Tuyến Ống Gió Tầng 4",
+      kind: "design",
+      subFolder: "iso",
+      systemGroup: "HVAC",
+      floorLabel: "Tầng 4",
+      latestRev: "Rev02",
+    },
+    {
+      id: 103,
+      code: "AVIO-BIM-M-FL04",
+      name: "Mô hình Không Gian 3D BIM Hệ Gió Tầng 4 (IFC / DXF 3D)",
+      kind: "bim",
+      subFolder: "",
+      systemGroup: "HVAC",
+      floorLabel: "Tầng 4",
+      latestRev: "v1.0",
+    },
+    {
+      id: 104,
+      code: "AVIO-SHOP-M-FL04-02",
+      name: "Bản vẽ Shopdrawing Chi Tiết Tuyến Ống Gió Gia Công Tầng 4",
+      kind: "shop",
+      subFolder: "",
+      systemGroup: "HVAC",
+      floorLabel: "Tầng 4",
+      latestRev: "Rev02",
+    },
+    {
+      id: 105,
+      code: "AVIO-ASBUILT-M-01",
+      name: "Bản vẽ Hoàn Công Tuyến Ống Gió Trục Kỹ Thuật",
+      kind: "asbuilt",
+      subFolder: "",
+      systemGroup: "HVAC",
+      floorLabel: "Tầng Điển Hình",
+      latestRev: "Rev01",
+    },
+
+    // ── 2. PLUMBING ──
+    {
+      id: 201,
       code: "AVIO-DWG-P-FL04-01",
       name: "Mặt bằng Cấp Thoát Nước Sinh Hoạt & Nước Thải Tầng 4",
       kind: "design",
@@ -170,7 +226,49 @@ export default function ChuanHoaBanVePage() {
       latestRev: "Rev01",
     },
     {
-      id: 103,
+      id: 202,
+      code: "AVIO-ISO-P-FL04-01",
+      name: "Bản vẽ Cấp Thoát Nước Chuẩn Hóa ISO MEPF Tầng 4",
+      kind: "design",
+      subFolder: "iso",
+      systemGroup: "PLUMBING",
+      floorLabel: "Tầng 4",
+      latestRev: "Rev01",
+    },
+    {
+      id: 203,
+      code: "AVIO-BIM-P-FL04",
+      name: "Mô hình 3D BIM Cấp Thoát Nước Trục Đứng Tầng 4",
+      kind: "bim",
+      subFolder: "",
+      systemGroup: "PLUMBING",
+      floorLabel: "Tầng 4",
+      latestRev: "v1.0",
+    },
+    {
+      id: 204,
+      code: "AVIO-SHOP-P-FL04-01",
+      name: "Shopdrawing Tuyến Ống PPR & PVC Thoát Nước Tầng 4",
+      kind: "shop",
+      subFolder: "",
+      systemGroup: "PLUMBING",
+      floorLabel: "Tầng 4",
+      latestRev: "Rev01",
+    },
+    {
+      id: 205,
+      code: "AVIO-ASBUILT-P-01",
+      name: "Hoàn Công Hệ Thống Cấp Thoát Nước Toàn Nhà",
+      kind: "asbuilt",
+      subFolder: "",
+      systemGroup: "PLUMBING",
+      floorLabel: "Tầng Điển Hình",
+      latestRev: "Rev01",
+    },
+
+    // ── 3. ELECTRICAL ──
+    {
+      id: 301,
       code: "AVIO-DWG-E-FL04-01",
       name: "Mặt bằng Máng Cáp & Chiếu Sáng Động Lực Tầng 4",
       kind: "design",
@@ -180,7 +278,39 @@ export default function ChuanHoaBanVePage() {
       latestRev: "Rev01",
     },
     {
-      id: 104,
+      id: 302,
+      code: "AVIO-ISO-E-FL04-01",
+      name: "Mặt bằng Điện & Máng Cáp Chuẩn Hóa ISO Tầng 4",
+      kind: "design",
+      subFolder: "iso",
+      systemGroup: "ELECTRICAL",
+      floorLabel: "Tầng 4",
+      latestRev: "Rev01",
+    },
+    {
+      id: 303,
+      code: "AVIO-BIM-E-FL04",
+      name: "Mô hình 3D BIM Tuyến Thang Máng Cáp Cable Tray Tầng 4",
+      kind: "bim",
+      subFolder: "",
+      systemGroup: "ELECTRICAL",
+      floorLabel: "Tầng 4",
+      latestRev: "v1.0",
+    },
+    {
+      id: 304,
+      code: "AVIO-SHOP-E-FL04-01",
+      name: "Shopdrawing Chi Tiết Lắp Đặt Tủ Điện & Máng Cáp Tầng 4",
+      kind: "shop",
+      subFolder: "",
+      systemGroup: "ELECTRICAL",
+      floorLabel: "Tầng 4",
+      latestRev: "Rev01",
+    },
+
+    // ── 4. FIREFIGHTING ──
+    {
+      id: 401,
       code: "AVIO-DWG-F-FL04-01",
       name: "Mặt bằng Chữa Cháy Tự Động Sprinkler & Trụ Nước Tầng 4",
       kind: "design",
@@ -190,7 +320,39 @@ export default function ChuanHoaBanVePage() {
       latestRev: "Rev01",
     },
     {
-      id: 105,
+      id: 402,
+      code: "AVIO-ISO-F-FL04-01",
+      name: "Mặt bằng PCCC Chuẩn Hóa ISO MEPF Tầng 4",
+      kind: "design",
+      subFolder: "iso",
+      systemGroup: "FIREFIGHTING",
+      floorLabel: "Tầng 4",
+      latestRev: "Rev01",
+    },
+    {
+      id: 403,
+      code: "AVIO-BIM-F-FL04",
+      name: "Mô hình 3D BIM Đầu Phun Sprinkler & Tuyến Ống Thép PCCC",
+      kind: "bim",
+      subFolder: "",
+      systemGroup: "FIREFIGHTING",
+      floorLabel: "Tầng 4",
+      latestRev: "v1.0",
+    },
+    {
+      id: 404,
+      code: "AVIO-SHOP-F-FL04-01",
+      name: "Shopdrawing Định Vị Đầu Phun Sprinkler & Giá Treo PCCC",
+      kind: "shop",
+      subFolder: "",
+      systemGroup: "FIREFIGHTING",
+      floorLabel: "Tầng 4",
+      latestRev: "Rev01",
+    },
+
+    // ── 5. ELV ──
+    {
+      id: 501,
       code: "AVIO-DWG-ELV-FL04-01",
       name: "Mặt bằng Hệ Thống Điện Nhẹ, Camera An Ninh & BMS Tầng 4",
       kind: "design",
@@ -200,43 +362,13 @@ export default function ChuanHoaBanVePage() {
       latestRev: "Rev01",
     },
     {
-      id: 106,
-      code: "AVIO-ISO-M-FL04-01",
-      name: "Mặt bằng Chuẩn Hóa ISO MEPF Hệ Thống Gió Tầng 4",
+      id: 502,
+      code: "AVIO-ISO-ELV-FL04-01",
+      name: "Mặt bằng Điện Nhẹ ELV Chuẩn Hóa ISO Tầng 4",
       kind: "design",
       subFolder: "iso",
-      systemGroup: "HVAC",
+      systemGroup: "ELV",
       floorLabel: "Tầng 4",
-      latestRev: "Rev02",
-    },
-    {
-      id: 107,
-      code: "AVIO-SHOP-M-FL04-02",
-      name: "Bản vẽ Shopdrawing Chi Tiết Tuyến Ống Gió Thi Công Tầng 4",
-      kind: "shop",
-      subFolder: "",
-      systemGroup: "HVAC",
-      floorLabel: "Tầng 4",
-      latestRev: "Rev02",
-    },
-    {
-      id: 108,
-      code: "AVIO-BIM-MEPF-FL04",
-      name: "Mô hình Không Gian 3D BIM MEPF Tầng 4 (IFC / DXF 3D)",
-      kind: "bim",
-      subFolder: "",
-      systemGroup: "HVAC",
-      floorLabel: "Tầng 4",
-      latestRev: "v1.0",
-    },
-    {
-      id: 109,
-      code: "AVIO-ASBUILT-MEPF-01",
-      name: "Bản vẽ Hoàn Công Tổng Thể Tuyến Trục Kỹ Thuật MEPF",
-      kind: "asbuilt",
-      subFolder: "",
-      systemGroup: "HVAC",
-      floorLabel: "Tầng Điển Hình",
       latestRev: "Rev01",
     },
   ];
@@ -245,23 +377,24 @@ export default function ChuanHoaBanVePage() {
 
   const filteredExplorerDrawings = allDrawingsList.filter((d) => {
     let matchCat = true;
-    if (explorerCategory === "design_origin") {
-      matchCat = d.kind === "design" && (d.subFolder === "origin" || !d.subFolder);
-    } else if (explorerCategory === "design_iso") {
-      matchCat = d.subFolder === "iso";
-    } else if (["shop", "bim", "asbuilt"].includes(explorerCategory)) {
-      matchCat = d.kind === explorerCategory;
-    } else if (
-      [
-        "HVAC",
-        "PLUMBING",
-        "ELECTRICAL",
-        "FIREFIGHTING",
-        "ELV",
-        "STRUCTURE",
-        "ARCHITECTURE",
-      ].includes(explorerCategory)
-    ) {
+    if (explorerCategory === "all") {
+      matchCat = true;
+    } else if (explorerCategory.includes("/")) {
+      const parts = explorerCategory.split("/");
+      const sys = parts[0];
+      const kind = parts[1];
+      const sub = parts[2];
+
+      if (kind === "design") {
+        matchCat =
+          d.systemGroup === sys &&
+          d.kind === "design" &&
+          (sub ? (d.subFolder || "origin") === sub : true);
+      } else {
+        matchCat = d.systemGroup === sys && d.kind === kind;
+      }
+    } else {
+      // Just system name
       matchCat = d.systemGroup === explorerCategory;
     }
 
@@ -601,8 +734,8 @@ export default function ChuanHoaBanVePage() {
 
   const targetFolderDisplay =
     saveConfig.kind === "design"
-      ? `drawings/design/${saveConfig.subFolder}/`
-      : `drawings/${saveConfig.kind}/`;
+      ? `drawings/${saveConfig.systems}/design/${saveConfig.subFolder}/`
+      : `drawings/${saveConfig.systems}/${saveConfig.kind}/`;
 
   const handleSaveToProjectServer = async () => {
     setSavingToServer(true);
@@ -1469,12 +1602,9 @@ export default function ChuanHoaBanVePage() {
                   </span>
                 </div>
 
-                {/* Nhóm Thư Mục Quy Chuẩn drawings/ */}
-                <div className="space-y-1">
-                  <div className="text-[10px] uppercase font-bold text-zinc-500 px-2 py-0.5 tracking-wider">
-                    📂 Cấu Trúc drawings/
-                  </div>
-
+                {/* Cấu Trúc drawings/[SYSTEMS]/... */}
+                <div className="space-y-1.5 max-h-[380px] overflow-y-auto pr-1">
+                  {/* Root drawings/ */}
                   <button
                     onClick={() => setExplorerCategory("all")}
                     className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition text-left ${
@@ -1484,139 +1614,173 @@ export default function ChuanHoaBanVePage() {
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
-                      <Folder className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                      <span className="truncate">drawings/ (Tất cả)</span>
+                      <Folder className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span className="truncate font-semibold">drawings/ (Tất cả)</span>
                     </div>
                     <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">
                       {allDrawingsList.length}
                     </span>
                   </button>
 
-                  {/* Sub-folder: design/origin */}
-                  <button
-                    onClick={() => setExplorerCategory("design_origin")}
-                    className={`w-full flex items-center justify-between pl-6 pr-2.5 py-1.5 rounded-lg text-xs transition text-left ${
-                      explorerCategory === "design_origin"
-                        ? "bg-amber-500/15 text-amber-300 font-bold border border-amber-500/30"
-                        : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <FolderOpen className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                      <span className="truncate">design/origin/ (Gốc)</span>
-                    </div>
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800/80 text-zinc-400">
-                      {
-                        allDrawingsList.filter(
-                          (d) => d.kind === "design" && (d.subFolder === "origin" || !d.subFolder),
-                        ).length
-                      }
-                    </span>
-                  </button>
-
-                  {/* Sub-folder: design/iso */}
-                  <button
-                    onClick={() => setExplorerCategory("design_iso")}
-                    className={`w-full flex items-center justify-between pl-6 pr-2.5 py-1.5 rounded-lg text-xs transition text-left ${
-                      explorerCategory === "design_iso"
-                        ? "bg-amber-500/15 text-amber-300 font-bold border border-amber-500/30"
-                        : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <Folder className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                      <span className="truncate">design/iso/ (Chuẩn hóa)</span>
-                    </div>
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800/80 text-zinc-400">
-                      {allDrawingsList.filter((d) => d.subFolder === "iso").length}
-                    </span>
-                  </button>
-
-                  {/* Sub-folder: shop */}
-                  <button
-                    onClick={() => setExplorerCategory("shop")}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition text-left ${
-                      explorerCategory === "shop"
-                        ? "bg-amber-500/15 text-amber-300 font-bold border border-amber-500/30"
-                        : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <Folder className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                      <span className="truncate">shop/ (Shopdrawing)</span>
-                    </div>
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800/80 text-zinc-400">
-                      {allDrawingsList.filter((d) => d.kind === "shop").length}
-                    </span>
-                  </button>
-
-                  {/* Sub-folder: bim */}
-                  <button
-                    onClick={() => setExplorerCategory("bim")}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition text-left ${
-                      explorerCategory === "bim"
-                        ? "bg-amber-500/15 text-amber-300 font-bold border border-amber-500/30"
-                        : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <Folder className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                      <span className="truncate">bim/ (Mô hình 3D)</span>
-                    </div>
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800/80 text-zinc-400">
-                      {allDrawingsList.filter((d) => d.kind === "bim").length}
-                    </span>
-                  </button>
-
-                  {/* Sub-folder: asbuilt */}
-                  <button
-                    onClick={() => setExplorerCategory("asbuilt")}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition text-left ${
-                      explorerCategory === "asbuilt"
-                        ? "bg-amber-500/15 text-amber-300 font-bold border border-amber-500/30"
-                        : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <Folder className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                      <span className="truncate">asbuilt/ (Hoàn công)</span>
-                    </div>
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800/80 text-zinc-400">
-                      {allDrawingsList.filter((d) => d.kind === "asbuilt").length}
-                    </span>
-                  </button>
-                </div>
-
-                {/* Nhóm Phân Hệ Kỹ Thuật MEPF */}
-                <div className="space-y-1 pt-2 border-t border-zinc-800/80">
-                  <div className="text-[10px] uppercase font-bold text-zinc-500 px-2 py-0.5 tracking-wider">
-                    ⚡ Phân Hệ Kỹ Thuật
-                  </div>
+                  {/* Systems Folders */}
                   {[
-                    { id: "HVAC", label: "HVAC (Gió & ĐHKK)", icon: "🌀" },
-                    { id: "PLUMBING", label: "PLUMBING (Nước)", icon: "💧" },
-                    { id: "ELECTRICAL", label: "ELECTRICAL (Điện)", icon: "⚡" },
-                    { id: "FIREFIGHTING", label: "PCCC (Sprinkler)", icon: "🔥" },
-                    { id: "ELV", label: "ELV (Điện nhẹ/BMS)", icon: "📡" },
-                  ].map((sys) => (
-                    <button
-                      key={sys.id}
-                      onClick={() => setExplorerCategory(sys.id)}
-                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition text-left ${
-                        explorerCategory === sys.id
-                          ? "bg-amber-500/15 text-amber-300 font-bold border border-amber-500/30"
-                          : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 truncate">
-                        <span className="text-xs">{sys.icon}</span>
-                        <span className="truncate">{sys.label}</span>
+                    { id: "HVAC", label: "HVAC", desc: "Gió & ĐHKK", icon: "🌀" },
+                    { id: "PLUMBING", label: "PLUMBING", desc: "Cấp thoát nước", icon: "💧" },
+                    { id: "ELECTRICAL", label: "ELECTRICAL", desc: "Điện & Máng cáp", icon: "⚡" },
+                    {
+                      id: "FIREFIGHTING",
+                      label: "FIREFIGHTING",
+                      desc: "PCCC & Sprinkler",
+                      icon: "🔥",
+                    },
+                    { id: "ELV", label: "ELV", desc: "Điện nhẹ & BMS", icon: "📡" },
+                  ].map((sys) => {
+                    const isExpanded = expandedSystems.includes(sys.id);
+                    const sysDrawings = allDrawingsList.filter((d) => d.systemGroup === sys.id);
+                    const isSysActive = explorerCategory === sys.id;
+
+                    return (
+                      <div
+                        key={sys.id}
+                        className="space-y-0.5 rounded-lg border border-zinc-800/60 bg-zinc-900/40 p-1"
+                      >
+                        {/* System Header */}
+                        <div className="flex items-center justify-between gap-1">
+                          <button
+                            onClick={() => setExplorerCategory(sys.id)}
+                            className={`flex-1 flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition text-left truncate ${
+                              isSysActive
+                                ? "bg-amber-500/20 text-amber-300 font-bold"
+                                : "text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800/50"
+                            }`}
+                          >
+                            <span className="text-xs">{sys.icon}</span>
+                            <span className="font-bold font-mono">{sys.id}/</span>
+                            <span className="text-[10px] text-zinc-500 truncate font-normal">
+                              ({sys.desc})
+                            </span>
+                          </button>
+
+                          <div className="flex items-center gap-1 shrink-0 pr-1">
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800/80 text-zinc-400">
+                              {sysDrawings.length}
+                            </span>
+                            <button
+                              onClick={() => toggleSystemExpand(sys.id)}
+                              className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition"
+                            >
+                              {isExpanded ? (
+                                <Minus className="w-3 h-3" />
+                              ) : (
+                                <Plus className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Expanded Subfolders */}
+                        {isExpanded && (
+                          <div className="pl-3.5 pr-1 py-1 space-y-0.5 border-l border-zinc-800 ml-3">
+                            {/* 1. design/origin */}
+                            <button
+                              onClick={() => setExplorerCategory(`${sys.id}/design/origin`)}
+                              className={`w-full flex items-center justify-between px-2 py-1 rounded text-[11px] transition text-left ${
+                                explorerCategory === `${sys.id}/design/origin`
+                                  ? "bg-sky-500/15 text-sky-300 font-bold border border-sky-500/30"
+                                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
+                              }`}
+                            >
+                              <div className="flex items-center gap-1.5 truncate">
+                                <FolderOpen className="w-3 h-3 text-sky-400 shrink-0" />
+                                <span className="truncate">design/origin/ (Gốc)</span>
+                              </div>
+                              <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-zinc-800/80 text-zinc-400">
+                                {
+                                  sysDrawings.filter(
+                                    (d) =>
+                                      d.kind === "design" &&
+                                      (d.subFolder === "origin" || !d.subFolder),
+                                  ).length
+                                }
+                              </span>
+                            </button>
+
+                            {/* 2. design/iso */}
+                            <button
+                              onClick={() => setExplorerCategory(`${sys.id}/design/iso`)}
+                              className={`w-full flex items-center justify-between px-2 py-1 rounded text-[11px] transition text-left ${
+                                explorerCategory === `${sys.id}/design/iso`
+                                  ? "bg-emerald-500/15 text-emerald-300 font-bold border border-emerald-500/30"
+                                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
+                              }`}
+                            >
+                              <div className="flex items-center gap-1.5 truncate">
+                                <Folder className="w-3 h-3 text-emerald-400 shrink-0" />
+                                <span className="truncate">design/iso/ (Chuẩn hóa)</span>
+                              </div>
+                              <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-zinc-800/80 text-zinc-400">
+                                {sysDrawings.filter((d) => d.subFolder === "iso").length}
+                              </span>
+                            </button>
+
+                            {/* 3. shop */}
+                            <button
+                              onClick={() => setExplorerCategory(`${sys.id}/shop`)}
+                              className={`w-full flex items-center justify-between px-2 py-1 rounded text-[11px] transition text-left ${
+                                explorerCategory === `${sys.id}/shop`
+                                  ? "bg-purple-500/15 text-purple-300 font-bold border border-purple-500/30"
+                                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
+                              }`}
+                            >
+                              <div className="flex items-center gap-1.5 truncate">
+                                <Folder className="w-3 h-3 text-purple-400 shrink-0" />
+                                <span className="truncate">shop/ (Shopdrawing)</span>
+                              </div>
+                              <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-zinc-800/80 text-zinc-400">
+                                {sysDrawings.filter((d) => d.kind === "shop").length}
+                              </span>
+                            </button>
+
+                            {/* 4. bim */}
+                            <button
+                              onClick={() => setExplorerCategory(`${sys.id}/bim`)}
+                              className={`w-full flex items-center justify-between px-2 py-1 rounded text-[11px] transition text-left ${
+                                explorerCategory === `${sys.id}/bim`
+                                  ? "bg-blue-500/15 text-blue-300 font-bold border border-blue-500/30"
+                                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
+                              }`}
+                            >
+                              <div className="flex items-center gap-1.5 truncate">
+                                <Folder className="w-3 h-3 text-blue-400 shrink-0" />
+                                <span className="truncate">bim/ (Mô hình 3D)</span>
+                              </div>
+                              <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-zinc-800/80 text-zinc-400">
+                                {sysDrawings.filter((d) => d.kind === "bim").length}
+                              </span>
+                            </button>
+
+                            {/* 5. asbuilt */}
+                            <button
+                              onClick={() => setExplorerCategory(`${sys.id}/asbuilt`)}
+                              className={`w-full flex items-center justify-between px-2 py-1 rounded text-[11px] transition text-left ${
+                                explorerCategory === `${sys.id}/asbuilt`
+                                  ? "bg-rose-500/15 text-rose-300 font-bold border border-rose-500/30"
+                                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
+                              }`}
+                            >
+                              <div className="flex items-center gap-1.5 truncate">
+                                <Folder className="w-3 h-3 text-rose-400 shrink-0" />
+                                <span className="truncate">asbuilt/ (Hoàn công)</span>
+                              </div>
+                              <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-zinc-800/80 text-zinc-400">
+                                {sysDrawings.filter((d) => d.kind === "asbuilt").length}
+                              </span>
+                            </button>
+                          </div>
+                        )}
                       </div>
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800/80 text-zinc-400">
-                        {allDrawingsList.filter((d) => d.systemGroup === sys.id).length}
-                      </span>
-                    </button>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1700,10 +1864,10 @@ export default function ChuanHoaBanVePage() {
                                     </span>
                                   )}
                                   <span className="font-mono text-zinc-500">
-                                    •{" "}
+                                    • drawings/{d.systemGroup}/
                                     {d.kind === "design"
-                                      ? "drawings/design/"
-                                      : `drawings/${d.kind}/`}
+                                      ? `design/${d.subFolder || "origin"}/`
+                                      : `${d.kind}/`}
                                   </span>
                                 </div>
                               </div>

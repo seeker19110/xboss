@@ -1,21 +1,28 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 describe("CAD Standardized Drawing Storage & Directory Structure Suite", () => {
-  it("1. Thư mục quy chuẩn drawings/ và data/uploads/drawings/ chứa đầy đủ các phân nhóm con", () => {
+  it("1. Thư mục quy chuẩn drawings/ và data/uploads/drawings/ chứa đầy đủ các phân hệ và nhóm con", () => {
     const basePaths = [
       join(process.cwd(), "drawings"),
       join(process.cwd(), "data", "uploads", "drawings"),
     ];
 
+    const systems = ["HVAC", "PLUMBING", "ELECTRICAL", "FIREFIGHTING", "ELV"];
+
     for (const base of basePaths) {
-      assert.ok(existsSync(join(base, "design", "origin")), "Thiếu thư mục design/origin");
-      assert.ok(existsSync(join(base, "design", "iso")), "Thiếu thư mục design/iso");
-      assert.ok(existsSync(join(base, "bim")), "Thiếu thư mục bim");
-      assert.ok(existsSync(join(base, "shop")), "Thiếu thư mục shop");
-      assert.ok(existsSync(join(base, "asbuilt")), "Thiếu thư mục asbuilt");
+      for (const sys of systems) {
+        assert.ok(
+          existsSync(join(base, sys, "design", "origin")),
+          `Thiếu thư mục ${sys}/design/origin`,
+        );
+        assert.ok(existsSync(join(base, sys, "design", "iso")), `Thiếu thư mục ${sys}/design/iso`);
+        assert.ok(existsSync(join(base, sys, "bim")), `Thiếu thư mục ${sys}/bim`);
+        assert.ok(existsSync(join(base, sys, "shop")), `Thiếu thư mục ${sys}/shop`);
+        assert.ok(existsSync(join(base, sys, "asbuilt")), `Thiếu thư mục ${sys}/asbuilt`);
+      }
     }
   });
 
