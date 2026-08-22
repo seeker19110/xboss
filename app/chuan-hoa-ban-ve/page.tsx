@@ -32,6 +32,17 @@ import {
   FileUp,
   Compass,
   Filter,
+  Lock,
+  Unlock,
+  ShieldCheck,
+  Clock,
+  UserCheck,
+  BadgeCheck,
+  Edit3,
+  PenTool,
+  Save,
+  CheckSquare,
+  Undo2,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { showToast } from "@/app/components/Toast";
@@ -97,7 +108,14 @@ export default function ChuanHoaBanVePage() {
   // Phase 2: 3D Model Extrusion & Spatial BIM Normalization from DXF (spatial_bim)
   const [activePhase, setActivePhase] = useState<"phase1_cad" | "phase2_3d">("phase1_cad");
   const [activeTab, setActiveTab] = useState<
-    "diagnostic" | "layers" | "font_doctor" | "blocks" | "diff" | "lisp" | "spatial_bim"
+    | "diagnostic"
+    | "layers"
+    | "font_doctor"
+    | "blocks"
+    | "diff"
+    | "lisp"
+    | "review_manual"
+    | "spatial_bim"
   >("diagnostic");
 
   const [loading, setLoading] = useState(false);
@@ -159,6 +177,207 @@ export default function ChuanHoaBanVePage() {
   const [outletHeight, setOutletHeight] = useState(400);
   const [transitionLength, setTransitionLength] = useState(600);
   const [generatedLispCode, setGeneratedLispCode] = useState("");
+
+  // ── 2D CAD Quality Gate & Approval State ──
+  const [cad2dApprovalStatus, setCad2dApprovalStatus] = useState<
+    "in_progress" | "pending_approval" | "approved" | "rejected"
+  >("pending_approval");
+  const [approverName, setApproverName] = useState<string>(
+    "Trần Quốc Hưng (Kỹ Sư Trưởng MEPF & BIM Lead)",
+  );
+  const [approvedAt, setApprovedAt] = useState<string>("2026-08-22 15:35");
+  const [approvalNotes, setApprovalNotes] = useState<string>(
+    "Bản vẽ 2D đã xử lý 100% Layer AIA, 0 lỗi font TCVN3/VNI, Health Score 94/100. Đủ điều kiện mở khóa Cổng 3D BIM & Combine.",
+  );
+
+  // ── Manual Review & Override Studio State (Tab 1.7) ──
+  const [manualLayers, setManualLayers] = useState<
+    Array<{
+      id: string;
+      name: string;
+      standardName: string;
+      discipline: "M" | "E" | "P" | "F" | "ELV" | "S" | "OTHER";
+      colorHex: string;
+      entityCount: number;
+    }>
+  >([
+    {
+      id: "L1",
+      name: "GIO_CAP_CHINH",
+      standardName: "M-DUCT-SUPP",
+      discipline: "M",
+      colorHex: "#06b6d4",
+      entityCount: 45,
+    },
+    {
+      id: "L2",
+      name: "GIO_HOI_AHU",
+      standardName: "M-DUCT-RETN",
+      discipline: "M",
+      colorHex: "#3b82f6",
+      entityCount: 32,
+    },
+    {
+      id: "L3",
+      name: "CAP_THOAT_NUOC_TANG4",
+      standardName: "P-PIPE-SANR",
+      discipline: "P",
+      colorHex: "#22c55e",
+      entityCount: 28,
+    },
+    {
+      id: "L4",
+      name: "DIEN_CHIEU_SANG_DONG_LUC",
+      standardName: "E-TRAY-PWRR",
+      discipline: "E",
+      colorHex: "#eab308",
+      entityCount: 50,
+    },
+    {
+      id: "L5",
+      name: "PCCC_CHUA_CHAY_SPK",
+      standardName: "F-SPRN-PIPE",
+      discipline: "F",
+      colorHex: "#ef4444",
+      entityCount: 18,
+    },
+    {
+      id: "L6",
+      name: "GHI_CHU_DIM_TEXT",
+      standardName: "G-ANNO-TEXT",
+      discipline: "OTHER",
+      colorHex: "#f4f4f5",
+      entityCount: 65,
+    },
+  ]);
+
+  const [manualTexts, setManualTexts] = useState<
+    Array<{
+      id: string;
+      raw: string;
+      decoded: string;
+      edited: string;
+      layer: string;
+    }>
+  >([
+    {
+      id: "TXT-01",
+      raw: "HÖ thèng th«ng giã tÇng 4",
+      decoded: "Hệ thống thông gió tầng 4",
+      edited: "Hệ thống thông gió tầng 4 - Tháp A",
+      layer: "G-ANNO-TEXT",
+    },
+    {
+      id: "TXT-02",
+      raw: "èng giã 800x400 BOP=+2.85m",
+      decoded: "Ống gió 800x400 BOP=+2.85m",
+      edited: "Ống gió 800x400 BOP=+2850mm (Cách nhiệt 25mm)",
+      layer: "M-DUCT-SUPP",
+    },
+    {
+      id: "TXT-03",
+      raw: "èng thót n−íc D114 dèc i=1.5%",
+      decoded: "Ống thoát nước D114 dốc i=1.5%",
+      edited: "Ống thoát nước D114 dốc i=1.50% (Bảo toàn)",
+      layer: "P-PIPE-SANR",
+    },
+    {
+      id: "TXT-04",
+      raw: "Lç më xuyªn dÇm %%c150",
+      decoded: "Lỗ mở xuyên dầm Ø150",
+      edited: "Lỗ mở xuyên dầm Ø150 (Vùng an toàn L/3)",
+      layer: "G-ANNO-TEXT",
+    },
+  ]);
+
+  const [manualBlocks, setManualBlocks] = useState<
+    Array<{
+      id: string;
+      name: string;
+      count: number;
+      mappedBoqCode: string;
+      customName: string;
+    }>
+  >([
+    {
+      id: "BLK-01",
+      name: "VCD_600x400",
+      count: 12,
+      mappedBoqCode: "BOQ-HVAC-VCD-01",
+      customName: "Van chặn lửa VCD 600x400 motor điện",
+    },
+    {
+      id: "BLK-02",
+      name: "DIFFUSER_600x600",
+      count: 36,
+      mappedBoqCode: "BOQ-HVAC-DIF-01",
+      customName: "Miệng gió 4 hướng 600x600 kèm OBD",
+    },
+    {
+      id: "BLK-03",
+      name: "GATE_VALVE_DN100",
+      count: 8,
+      mappedBoqCode: "BOQ-PLUMB-VALVE-01",
+      customName: "Van cổng ty chìm DN100 PN16",
+    },
+    {
+      id: "BLK-04",
+      name: "SPRINKLER_68C",
+      count: 48,
+      mappedBoqCode: "BOQ-FIRE-SPK-01",
+      customName: "Đầu phun Sprinkler quay xuống 68°C",
+    },
+  ]);
+
+  const [isReviewDone, setIsReviewDone] = useState(false);
+  const [reviewerRemarks, setReviewerRemarks] = useState(
+    "Đã rà soát toàn bộ Layer và hiệu chỉnh ghi chú cao độ. Hồ sơ đạt chuẩn để mở cổng 3D BIM.",
+  );
+
+  const handleUpdateManualLayer = (
+    id: string,
+    field: "standardName" | "discipline" | "colorHex",
+    val: string,
+  ) => {
+    setManualLayers((prev) => prev.map((l) => (l.id === id ? { ...l, [field]: val } : l)));
+  };
+
+  const handleUpdateManualText = (id: string, val: string) => {
+    setManualTexts((prev) => prev.map((t) => (t.id === id ? { ...t, edited: val } : t)));
+  };
+
+  const handleUpdateManualBlock = (
+    id: string,
+    field: "mappedBoqCode" | "customName",
+    val: string,
+  ) => {
+    setManualBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, [field]: val } : b)));
+  };
+
+  const handleSaveManualReview = () => {
+    setIsReviewDone(true);
+    setCad2dApprovalStatus("pending_approval");
+    showToast("✓ Đã lưu toàn bộ nội dung sửa tay và chuyển sang trạng thái CHỜ DUYỆT!");
+  };
+
+  const handleSendForApproval = () => {
+    setCad2dApprovalStatus("pending_approval");
+    showToast("Đã gửi toàn bộ hồ sơ chuẩn hóa 2D cho Kỹ Sư Trưởng / BIM Lead chờ phê duyệt!");
+  };
+
+  const handleApprove2d = () => {
+    setCad2dApprovalStatus("approved");
+    const now = new Date();
+    setApprovedAt(
+      `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
+    );
+    showToast("✓ Đã PHÊ DUYỆT chuẩn hóa 2D! Cổng chuyển đổi 3D BIM & Combine đã được MỞ KHÓA.");
+  };
+
+  const handleReject2d = () => {
+    setCad2dApprovalStatus("rejected");
+    showToast("Đã trả lại hồ sơ 2D yêu cầu kỹ sư rà soát và hiệu chỉnh lại.");
+  };
 
   // ── Fetch Design Drawings from Project ──
   const fetchDesignDrawings = useCallback(async () => {
@@ -692,6 +911,148 @@ export default function ChuanHoaBanVePage() {
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════════
+            TRẠM GÁC CHẤT LƯỢNG GATE 0: PHÊ DUYỆT BẢN VẼ 2D TRƯỚC KHI SANG 3D
+        ══════════════════════════════════════════════════════════════════════ */}
+        <div className="p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div
+                className={`p-2 rounded-xl border ${
+                  cad2dApprovalStatus === "approved"
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                    : cad2dApprovalStatus === "pending_approval"
+                      ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                      : "bg-rose-500/10 border-rose-500/30 text-rose-400"
+                }`}
+              >
+                {cad2dApprovalStatus === "approved" ? (
+                  <ShieldCheck className="w-5 h-5" />
+                ) : cad2dApprovalStatus === "pending_approval" ? (
+                  <Clock className="w-5 h-5" />
+                ) : (
+                  <Lock className="w-5 h-5" />
+                )}
+              </div>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-zinc-100">
+                    Trạm Gác Chất Lượng (Quality Gate 0): Phê Duyệt 2D Trước Khi Mở Cổng 3D
+                  </span>
+                  {cad2dApprovalStatus === "approved" && (
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono font-bold">
+                      ✓ ĐÃ PHÊ DUYỆT 2D (APPROVED)
+                    </span>
+                  )}
+                  {cad2dApprovalStatus === "pending_approval" && (
+                    <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-mono font-bold animate-pulse">
+                      ⏳ ĐANG CHỜ PHÊ DUYỆT 2D
+                    </span>
+                  )}
+                  {cad2dApprovalStatus === "in_progress" && (
+                    <span className="px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-300 border border-zinc-700 text-[10px] font-mono font-bold">
+                      📝 ĐANG XỬ LÝ 2D
+                    </span>
+                  )}
+                  {cad2dApprovalStatus === "rejected" && (
+                    <span className="px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[10px] font-mono font-bold">
+                      ✗ YÊU CẦU CHỈNH SỬA 2D
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-zinc-400 mt-0.5">
+                  Quy định bắt buộc: Hồ sơ CAD 2D phải hoàn tất 100% (Layer AIA, Font Doctor, Block
+                  BOQ) và được Kỹ Sư Trưởng phê duyệt mới cho phép mở cổng dựng 3D BIM.
+                </p>
+              </div>
+            </div>
+
+            {/* Actions for Approval */}
+            <div className="flex items-center gap-2 shrink-0">
+              {cad2dApprovalStatus === "in_progress" && (
+                <button
+                  onClick={handleSendForApproval}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs shadow-xs transition"
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Nộp Hồ Sơ 2D Chờ Duyệt</span>
+                </button>
+              )}
+
+              {cad2dApprovalStatus === "pending_approval" && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleReject2d}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-rose-950/60 text-zinc-300 hover:text-rose-400 border border-zinc-700 text-xs font-semibold transition"
+                  >
+                    <span>Yêu Cầu Sửa</span>
+                  </button>
+                  <button
+                    onClick={handleApprove2d}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 font-bold text-xs shadow-xs transition"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Ký Duyệt 2D & Mở Khóa Cổng 3D</span>
+                  </button>
+                </div>
+              )}
+
+              {cad2dApprovalStatus === "approved" && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-zinc-400 font-mono hidden sm:inline">
+                    Duyệt bởi: <span className="text-emerald-400 font-bold">{approverName}</span> (
+                    {approvedAt})
+                  </span>
+                  <button
+                    onClick={() => setCad2dApprovalStatus("in_progress")}
+                    className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs transition"
+                  >
+                    Mở lại chỉnh sửa 2D
+                  </button>
+                </div>
+              )}
+
+              {cad2dApprovalStatus === "rejected" && (
+                <button
+                  onClick={handleSendForApproval}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs shadow-xs transition"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Nộp Lại Sau Khi Sửa</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Checklist 4 tiêu chí chất lượng */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs font-mono">
+            <div className="p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-between">
+              <span className="text-zinc-400">1. Chẩn Đoán CAD</span>
+              <span className="text-emerald-400 font-bold">Health 94/100 ✓</span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-between">
+              <span className="text-zinc-400">2. Layer AIA/BS1192</span>
+              <span className="text-emerald-400 font-bold">100% MEPF ✓</span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-between">
+              <span className="text-zinc-400">3. Font Doctor UTF-8</span>
+              <span className="text-emerald-400 font-bold">0 Lỗi Font ✓</span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-between">
+              <span className="text-zinc-400">4. Trạng Thái Cổng 3D</span>
+              <span
+                className={
+                  cad2dApprovalStatus === "approved"
+                    ? "text-emerald-400 font-bold"
+                    : "text-amber-400 font-bold"
+                }
+              >
+                {cad2dApprovalStatus === "approved" ? "🔓 Đã Mở Khóa" : "🔒 Đang Khóa"}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* ══════════════════════════════════════════════════════════════════════
             2-PHASE WORKFLOW BANNER: CAD 2D NORMALIZATION -> 3D BIM EXTRUSION
         ══════════════════════════════════════════════════════════════════════ */}
         <div className="p-3 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-2">
@@ -762,11 +1123,22 @@ export default function ChuanHoaBanVePage() {
                     Giai Đoạn 2: Dựng 3D từ DXF & Chuẩn Hóa File 3D
                   </span>
                 </div>
-                {activePhase === "phase2_3d" && (
-                  <span className="px-2 py-0.5 rounded-full bg-sky-500 text-zinc-950 font-bold text-[10px]">
-                    Đang Thao Tác
-                  </span>
-                )}
+                <div className="flex items-center gap-1.5">
+                  {cad2dApprovalStatus === "approved" ? (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-[10px] border border-emerald-500/30 flex items-center gap-1">
+                      <Unlock className="w-3 h-3" /> Cổng 3D Đã Mở
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold text-[10px] border border-amber-500/30 flex items-center gap-1">
+                      <Lock className="w-3 h-3" /> Cần Duyệt 2D Trước
+                    </span>
+                  )}
+                  {activePhase === "phase2_3d" && (
+                    <span className="px-2 py-0.5 rounded-full bg-sky-500 text-zinc-950 font-bold text-[10px]">
+                      Đang Thao Tác
+                    </span>
+                  )}
+                </div>
               </div>
               <p className="text-[11px] text-zinc-400 line-clamp-2">
                 Đùn polyline 2D thành bao không gian 3D Bounding Envelope (AABB), phân tầng hành
@@ -853,6 +1225,18 @@ export default function ChuanHoaBanVePage() {
               >
                 <Code className="w-3.5 h-3.5" />
                 <span>1.6 AutoLISP Sinh Chi Tiết CAD</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab("review_manual")}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
+                  activeTab === "review_manual"
+                    ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                    : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
+                }`}
+              >
+                <Edit3 className="w-3.5 h-3.5 text-amber-400" />
+                <span>1.7 Cổng Review & Sửa Tay 2D (Chờ Duyệt)</span>
               </button>
             </div>
           ) : (
@@ -1590,14 +1974,461 @@ export default function ChuanHoaBanVePage() {
                 </div>
               </div>
             </div>
+
+            {/* Next Step CTA */}
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
+              <div className="text-xs text-zinc-300">
+                <span className="font-bold text-amber-300">Bước tiếp theo:</span> Chuyển sang Cổng
+                Review & Sửa Tay để kiểm tra toàn bộ Layer, Text, Block trước khi Ký Duyệt.
+              </div>
+              <button
+                onClick={() => setActiveTab("review_manual")}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs transition"
+              >
+                <span>Chuyển Sang Bước 1.7: Cổng Review & Sửa Tay 2D</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            TAB 1.7: CỔNG REVIEW & SỬA TAY BẢN VẼ 2D (MANUAL REVIEW & OVERRIDE)
+        ══════════════════════════════════════════════════════════════════════ */}
+        {activePhase === "phase1_cad" && activeTab === "review_manual" && (
+          <div className="space-y-4">
+            {/* Header & Review Status Box */}
+            <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                      <Edit3 className="w-5 h-5" />
+                    </span>
+                    <h2 className="text-sm sm:text-base font-bold uppercase tracking-wide text-zinc-100">
+                      Cổng Review & Sửa Tay Bản Vẽ 2D Trước Khi Phê Duyệt Sang 3D
+                    </h2>
+                  </div>
+                  <p className="text-xs text-zinc-400">
+                    Kiểm tra và trực tiếp hiệu chỉnh lại tên Layer AIA, sửa text ghi chú kỹ thuật,
+                    khớp lại mã Block BOQ. Sau khi sửa tay hoàn tất, kỹ sư xác nhận và Ký Duyệt để
+                    mở khóa Cổng 3D.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={handleSaveManualReview}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-semibold text-xs border border-zinc-700 transition"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>Lưu Bản Sửa Tay</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleApprove2d();
+                      setActivePhase("phase2_3d");
+                      setActiveTab("spatial_bim");
+                    }}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 font-bold text-xs shadow-sm transition"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Ký Duyệt & Chuyển Sang Cổng 3D</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Status summary banner */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
+                  <div className="flex items-center justify-between text-[11px] text-zinc-400">
+                    <span>1. Layer Đã Ánh Xạ</span>
+                    <span className="text-amber-400 font-mono font-bold">
+                      {manualLayers.length} layers
+                    </span>
+                  </div>
+                  <div className="text-xs font-semibold text-zinc-200">
+                    Cho phép sửa tên & phân hệ
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
+                  <div className="flex items-center justify-between text-[11px] text-zinc-400">
+                    <span>2. Text & Dim Kỹ Thuật</span>
+                    <span className="text-sky-400 font-mono font-bold">
+                      {manualTexts.length} chuỗi text
+                    </span>
+                  </div>
+                  <div className="text-xs font-semibold text-zinc-200">
+                    Cho phép sửa trực tiếp ghi chú
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
+                  <div className="flex items-center justify-between text-[11px] text-zinc-400">
+                    <span>3. Khớp Block BOQ</span>
+                    <span className="text-emerald-400 font-mono font-bold">
+                      {manualBlocks.length} blocks
+                    </span>
+                  </div>
+                  <div className="text-xs font-semibold text-zinc-200">
+                    Cho phép gán mã BOQ dự toán
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Sub-Section 1: Bảng Sửa Tay Layer AIA/BS1192 */}
+            <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-3">
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-amber-400" />
+                  <span>1. Rà Soát & Sửa Tay Bảng Layer AIA/BS1192</span>
+                </h3>
+                <span className="text-[11px] font-mono text-zinc-400">
+                  Bấm vào ô để sửa trực tiếp
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-zinc-800 bg-zinc-950/60 text-zinc-400 font-semibold">
+                      <th className="py-2.5 px-3">Tên Layer Gốc</th>
+                      <th className="py-2.5 px-3">Tên Layer Chuẩn Hóa (Sửa tay)</th>
+                      <th className="py-2.5 px-3">Phân Hệ</th>
+                      <th className="py-2.5 px-3">Màu Sắc ACI</th>
+                      <th className="py-2.5 px-3 text-right">Số Đối Tượng</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/60 font-mono">
+                    {manualLayers.map((l) => (
+                      <tr key={l.id} className="hover:bg-zinc-800/40 transition">
+                        <td className="py-2 px-3 text-zinc-400">{l.name}</td>
+                        <td className="py-2 px-3">
+                          <input
+                            type="text"
+                            value={l.standardName}
+                            onChange={(e) =>
+                              handleUpdateManualLayer(l.id, "standardName", e.target.value)
+                            }
+                            className="w-full max-w-[240px] px-2.5 py-1 rounded-lg bg-zinc-950 border border-zinc-700 text-xs font-bold font-mono text-amber-400 focus:outline-none focus:border-amber-500"
+                          />
+                        </td>
+                        <td className="py-2 px-3">
+                          <select
+                            value={l.discipline}
+                            onChange={(e) =>
+                              handleUpdateManualLayer(l.id, "discipline", e.target.value as any)
+                            }
+                            className="px-2 py-1 rounded-lg bg-zinc-950 border border-zinc-700 text-xs font-sans text-zinc-200 focus:outline-none focus:border-amber-500"
+                          >
+                            <option value="M">Hệ Gió (HVAC - M)</option>
+                            <option value="E">Hệ Điện (Electrical - E)</option>
+                            <option value="P">Hệ Nước (Plumbing - P)</option>
+                            <option value="F">Hệ PCCC (Firefighting - F)</option>
+                            <option value="ELV">Hệ Điện Nhẹ (ELV)</option>
+                            <option value="S">Kết Cấu (Structural - S)</option>
+                            <option value="OTHER">Khác (Ghi chú/Khung tên)</option>
+                          </select>
+                        </td>
+                        <td className="py-2 px-3">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="w-3.5 h-3.5 rounded-full border border-zinc-600 shrink-0"
+                              style={{ backgroundColor: l.colorHex }}
+                            />
+                            <input
+                              type="text"
+                              value={l.colorHex}
+                              onChange={(e) =>
+                                handleUpdateManualLayer(l.id, "colorHex", e.target.value)
+                              }
+                              className="w-20 px-2 py-1 rounded-lg bg-zinc-950 border border-zinc-700 text-xs font-mono text-zinc-300"
+                            />
+                          </div>
+                        </td>
+                        <td className="py-2 px-3 text-right text-zinc-400 tabular-nums">
+                          {l.entityCount} entities
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Sub-Section 2: Bảng Sửa Tay Text & Ghi Chú Kỹ Thuật */}
+            <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-3">
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-sky-300 flex items-center gap-2">
+                  <FileCheck className="w-4 h-4 text-sky-400" />
+                  <span>2. Rà Soát & Sửa Tay Text Ghi Chú / Cao Độ / Kích Thước Ống</span>
+                </h3>
+                <span className="text-[11px] font-mono text-zinc-400">
+                  Gõ trực tiếp vào ô để hiệu chỉnh
+                </span>
+              </div>
+
+              <div className="space-y-2.5">
+                {manualTexts.map((txt) => (
+                  <div
+                    key={txt.id}
+                    className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] font-mono text-zinc-400 border-b border-zinc-900 pb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-amber-400">[{txt.id}]</span>
+                        <span>Layer: {txt.layer}</span>
+                      </div>
+                      <span className="text-zinc-500">Gốc: {txt.raw}</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                      <div className="sm:col-span-5 text-xs text-zinc-400 font-sans">
+                        <span className="text-zinc-500 text-[10px] block">
+                          Đã tự động dịch UTF-8:
+                        </span>
+                        <span className="text-zinc-300">{txt.decoded}</span>
+                      </div>
+
+                      <div className="sm:col-span-7">
+                        <span className="text-emerald-400 text-[10px] font-semibold block mb-0.5">
+                          Nội dung sau khi kỹ sư sửa tay (Override):
+                        </span>
+                        <input
+                          type="text"
+                          value={txt.edited}
+                          onChange={(e) => handleUpdateManualText(txt.id, e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-700 text-xs font-sans text-emerald-300 font-medium focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Sub-Section 3: Bảng Sửa Tay Khớp Mã Block BOQ */}
+            <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-3">
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-300 flex items-center gap-2">
+                  <Boxes className="w-4 h-4 text-emerald-400" />
+                  <span>3. Rà Soát & Sửa Tay Khớp Mã Block Dự Toán BOQ</span>
+                </h3>
+                <span className="text-[11px] font-mono text-zinc-400">
+                  Gán mã BOQ để bóc tách khối lượng
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-zinc-800 bg-zinc-950/60 text-zinc-400 font-semibold">
+                      <th className="py-2.5 px-3">Tên Block Gốc</th>
+                      <th className="py-2.5 px-3">Tên Thiết Bị / Diễn Giải (Sửa tay)</th>
+                      <th className="py-2.5 px-3">Mã BOQ Dự Toán (Sửa tay)</th>
+                      <th className="py-2.5 px-3 text-right">Số Lượng</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/60 font-mono">
+                    {manualBlocks.map((b) => (
+                      <tr key={b.id} className="hover:bg-zinc-800/40 transition">
+                        <td className="py-2 px-3 text-zinc-300 font-bold">{b.name}</td>
+                        <td className="py-2 px-3 font-sans">
+                          <input
+                            type="text"
+                            value={b.customName}
+                            onChange={(e) =>
+                              handleUpdateManualBlock(b.id, "customName", e.target.value)
+                            }
+                            className="w-full px-2.5 py-1 rounded-lg bg-zinc-950 border border-zinc-700 text-xs text-zinc-200 focus:outline-none focus:border-amber-500"
+                          />
+                        </td>
+                        <td className="py-2 px-3">
+                          <input
+                            type="text"
+                            value={b.mappedBoqCode}
+                            onChange={(e) =>
+                              handleUpdateManualBlock(b.id, "mappedBoqCode", e.target.value)
+                            }
+                            className="w-full px-2.5 py-1 rounded-lg bg-zinc-950 border border-zinc-700 text-xs font-bold text-amber-400 focus:outline-none focus:border-amber-500"
+                          />
+                        </td>
+                        <td className="py-2 px-3 text-right text-zinc-300 tabular-nums font-bold">
+                          {b.count} cái
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Sub-Section 4: Biên Bản Thẩm Tra & Ký Phê Duyệt */}
+            <div className="p-5 rounded-2xl bg-zinc-900/90 border border-emerald-500/30 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>4. Biên Bản Thẩm Tra & Ký Duyệt Phê Duyệt Hồ Sơ 2D</span>
+                </h3>
+                <span className="text-[10px] font-mono text-zinc-400">
+                  Ký duyệt kỹ thuật trực tiếp
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                <div className="sm:col-span-4 space-y-1">
+                  <label className="text-[11px] text-zinc-400">
+                    Người Soát Xét / Kỹ Sư Trưởng:
+                  </label>
+                  <input
+                    type="text"
+                    value={approverName}
+                    onChange={(e) => setApproverName(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-semibold text-zinc-200"
+                  />
+                </div>
+
+                <div className="sm:col-span-8 space-y-1">
+                  <label className="text-[11px] text-zinc-400">
+                    Nhận Xét & Đánh Giá Thẩm Tra Kỹ Thuật:
+                  </label>
+                  <input
+                    type="text"
+                    value={reviewerRemarks}
+                    onChange={(e) => setReviewerRemarks(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-zinc-200"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center justify-end gap-2.5 pt-2">
+                <button
+                  onClick={handleSaveManualReview}
+                  className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700 transition"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>1. Lưu Bản Sửa Tay</span>
+                </button>
+                <button
+                  onClick={() => {
+                    handleApprove2d();
+                    setActivePhase("phase2_3d");
+                    setActiveTab("spatial_bim");
+                  }}
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 font-bold text-xs shadow-md transition"
+                >
+                  <BadgeCheck className="w-4 h-4" />
+                  <span>2. Ký Duyệt Phê Duyệt 2D & Mở Khóa Cổng 3D</span>
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
         {/* ══════════════════════════════════════════════════════════════════════
             GIAI ĐOẠN 2: DỰNG KHỐI 3D TỪ DXF & CHUẨN HÓA MÔ HÌNH 3D (SPATIAL BIM)
         ══════════════════════════════════════════════════════════════════════ */}
-        {activePhase === "phase2_3d" && (
+        {activePhase === "phase2_3d" && cad2dApprovalStatus !== "approved" && (
+          <div className="p-8 sm:p-12 rounded-2xl bg-zinc-900/90 border border-amber-500/30 text-center space-y-5 shadow-sm">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto shadow-inner">
+              <Lock className="w-8 h-8" />
+            </div>
+
+            <div className="max-w-xl mx-auto space-y-1.5">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-mono font-bold">
+                <Clock className="w-3.5 h-3.5" />
+                <span>CHỜ DUYỆT 2D — CỔNG 3D ĐANG KHÓA (GATE 0)</span>
+              </div>
+              <h2 className="text-base sm:text-lg font-bold text-zinc-100 uppercase tracking-tight">
+                Cổng Chuyển Đổi 3D BIM Yêu Cầu Phê Duyệt Hồ Sơ 2D
+              </h2>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Theo quy chuẩn kỹ thuật của XBoss, toàn bộ bản vẽ CAD 2D phải được chuẩn hóa 100%
+                (Layer AIA, Font Doctor, Block BOQ) và có chữ ký phê duyệt kỹ thuật của Kỹ Sư Trưởng
+                / BIM Lead trước khi mở cổng đùn khối 3D không gian từ DXF.
+              </p>
+            </div>
+
+            <div className="max-w-xl mx-auto p-4 rounded-xl bg-zinc-950 border border-zinc-800 text-left space-y-2.5">
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+                <span className="text-xs font-bold text-amber-300 uppercase tracking-wider">
+                  Checklist Điều Kiện Tiên Quyết Để Mở Khóa Cổng 3D
+                </span>
+                <span className="text-[10px] font-mono text-zinc-400">Tiêu chuẩn ISO 19650</span>
+              </div>
+              <ul className="space-y-2 text-xs text-zinc-300 font-mono">
+                <li className="flex items-center justify-between">
+                  <span className="text-zinc-300">
+                    • 1. Chẩn đoán Dị tật CAD (Health Score ≥ 85%)
+                  </span>
+                  <span className="text-emerald-400 font-bold">Đạt (94/100) ✓</span>
+                </li>
+                <li className="flex items-center justify-between">
+                  <span className="text-zinc-300">• 2. Chuẩn hóa Layer AIA/BS1192 MEPF</span>
+                  <span className="text-emerald-400 font-bold">Hoàn tất (100%) ✓</span>
+                </li>
+                <li className="flex items-center justify-between">
+                  <span className="text-zinc-300">
+                    • 3. Sửa sạch lỗi Font Tiếng Việt sang UTF-8
+                  </span>
+                  <span className="text-emerald-400 font-bold">Hoàn tất (0 lỗi) ✓</span>
+                </li>
+                <li className="flex items-center justify-between">
+                  <span className="text-zinc-300">
+                    • 4. Trích xuất & Đối soát danh mục Block BOQ
+                  </span>
+                  <span className="text-emerald-400 font-bold">Đã kiểm tra ✓</span>
+                </li>
+                <li className="flex items-center justify-between">
+                  <span className="text-zinc-300">
+                    • 5. Ký Duyệt Kỹ Thuật (Kỹ Sư Trưởng MEPF / BIM Lead)
+                  </span>
+                  <span className="text-amber-400 font-bold animate-pulse">
+                    Đang chờ ký duyệt ⏳
+                  </span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+              <button
+                onClick={() => {
+                  setActivePhase("phase1_cad");
+                  setActiveTab("diagnostic");
+                }}
+                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700 transition"
+              >
+                Quay Lại Giai Đoạn 1 Rà Soát 2D
+              </button>
+              <button
+                onClick={handleApprove2d}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 font-bold text-xs shadow-md transition"
+              >
+                <Check className="w-4 h-4" />
+                <span>Ký Phê Duyệt 2D Ngay & Mở Khóa Cổng 3D</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activePhase === "phase2_3d" && cad2dApprovalStatus === "approved" && (
           <div className="space-y-4">
+            {/* Approved Seal Banner */}
+            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-xs font-bold text-emerald-400">
+                <BadgeCheck className="w-4 h-4 shrink-0" />
+                <span>
+                  ✓ HỒ SƠ 2D ĐÃ ĐƯỢC DUYỆT BỞI {approverName.toUpperCase()} ({approvedAt}) — CỔNG 3D
+                  ĐÃ MỞ KHÓA HOÀN TOÀN
+                </span>
+              </div>
+              <span className="text-[10px] font-mono text-emerald-400/80">
+                Mộc Điện Tử: #XBOSS-GATE0-VERIFIED
+              </span>
+            </div>
+
             <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div className="space-y-1">
