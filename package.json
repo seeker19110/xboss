@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
     "db:migrate": "tsx scripts/migrate.ts",
+    "sync:drawings": "tsx scripts/scan-drawings.ts",
     "gen:erd": "tsx scripts/gen-erd.ts",
     "check:sw-exclude": "tsx scripts/check-sw-exclude.ts",
     "check:migrations": "tsx scripts/check-migration-numbers.ts",
