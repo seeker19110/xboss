@@ -48,7 +48,7 @@ Ba nguyên tắc ràng buộc kiến trúc:
 
 - **Tích cực:** hết bài toán DWG; hết rủi ro sinh tệp hỏng; giữ nguyên fidelity; tái dùng công cụ gốc thay vì viết lại.
 - **Đánh đổi / rủi ro:**
-  - Thêm **stack thứ hai (C#/.NET, Windows)** và kênh phát hành riêng; cần build cho 2 nền: AutoCAD 2021–2024 (.NET Framework 4.8) và 2025+ (.NET 8).
+  - Thêm **stack thứ hai (C#/.NET, Windows)** và kênh phát hành riêng. **Đã chốt 2026-08-22: chỉ hỗ trợ AutoCAD 2026, một bản build .NET 8** (M99 §9.1) — bỏ được chi phí đa nền, đổi lại máy 2024 trở về trước không dùng được plugin (vẫn dùng được tầng 3).
   - **Rủi ro lớn nhất là trôi quy tắc giữa 2 tầng** → chống bằng rule pack có version (nguyên tắc 1) + test đối chứng chạy cùng bộ bản vẽ mẫu qua cả 2 tầng và so kết quả.
   - Cần **token API cho ứng dụng desktop** — chạm `lib/auth.ts`, thuộc vùng rủi ro cao trong `docs/audit.md`.
   - CI không chạy được test tích hợp plugin: GitHub Actions không có AutoCAD → cần runner tự host có license, hoặc chấp nhận test tích hợp chạy tay theo release.

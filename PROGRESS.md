@@ -35,15 +35,18 @@
 - **M98 thu hẹp còn tầng 3**, PR4 (ODA) bị bỏ.
 - **Rủi ro số 1: trôi quy tắc giữa 2 tầng** → chống bằng rule pack một nguồn + test đối chứng
   chạy cùng bộ bản vẽ mẫu qua cả 2 tầng (AC6 của M99).
-- **Đời AutoCAD (M99 §9.1):** đề xuất **chuẩn hoá về AutoCAD 2025+ và chỉ build 1 bản .NET 8**.
-  Autodesk đổi runtime Managed API từ 2025 (2021–2024 = .NET Framework 4.8), plugin build cho
-  nền này không nạp được trên nền kia. Lý do chọn 2025+: hệ sinh thái NuGet cho AI/HTTP đã bỏ
-  dần .NET Framework 4.8; 1 nền = một nửa chi phí bảo trì; định dạng DWG vẫn là DWG 2018
-  (AC1032) từ 2018 tới nay nên nâng phiên bản **không chia rẽ tệp**. Nếu buộc giữ máy cũ:
-  `XBoss.Cad.Core` target `netstandard2.0` để dùng chung, chỉ Adapter build 2 lần.
-- **2 quyết định đang mở, chặn PR3 của M99:** (1) có runner Windows có license AutoCAD cho CI
-  không (`accoreconsole`), nếu không thì test tích hợp phải chạy tay theo release; (2) kiểm kê
-  đội máy thật để xác nhận đề xuất 2025+ ở trên.
+- **Đời AutoCAD — ĐÃ CHỐT (M99 §9.1): AutoCAD 2026, một bản build .NET 8.** Không hỗ trợ
+  2021–2024 (Autodesk đổi runtime Managed API từ 2025: 2021–2024 = .NET Framework 4.8,
+  2025+ = .NET 8; plugin build cho nền này không nạp được trên nền kia). Đơn giản hoá kèm
+  theo: `XBoss.Cad.Core` target thẳng **`net8.0`** (không cần `netstandard2.0` nữa),
+  `XBoss.Cad.Acad` target `net8.0-windows` tham chiếu ObjectARX SDK 2026; plugin kiểm
+  `ACADVER` lúc nạp và từ chối có thông báo nếu không phải 2026. Định dạng DWG vẫn là
+  DWG 2018 (AC1032) nên tệp do 2026 ghi ra vẫn mở được trên máy đời cũ — nâng phiên bản
+  không cô lập ai về trao đổi tệp. Máy đời cũ vẫn dùng được **tầng 3**.
+- **Quyết định còn mở, chặn PR3 của M99:** có runner Windows có license AutoCAD 2026 cho CI
+  không (`accoreconsole`) — nếu không, test tích hợp phải chạy tay theo release và ghi rõ
+  trong DoD. Kèm 1 assumption phải xác minh ở đầu PR3: đọc `ImageRuntimeVersion` của
+  `acmgd.dll` 2026 để chốt đúng `TargetFramework`, không tin con số trong tài liệu.
 - **PR0 (bỏ nhánh bịa hình học trong `parseDwgBinary`) tách làm ngay**, độc lập mọi thứ khác.
 
 ## Đặc tả M98 — DXF R2000 & tệp DWG (2026-08-22, **Draft, chờ duyệt**)
