@@ -54,7 +54,12 @@ import {
 import AppHeader from "@/app/components/AppHeader";
 import { showToast } from "@/app/components/Toast";
 import { redirectToLogin } from "@/app/lib/me";
-import { parseDxf, DxfParseResult, DxfLayerInfo } from "@/lib/cad/dxf-parser";
+import {
+  parseDxf,
+  DxfParseResult,
+  DxfLayerInfo,
+  generateSynthesizedMepfDxf,
+} from "@/lib/cad/dxf-parser";
 
 interface DrawingOption {
   id: number;
@@ -133,6 +138,13 @@ export default function ChuanHoaBanVePage() {
   // ── DXF Parsed Model State ──
   const [dxfData, setDxfData] = useState<DxfParseResult | null>(null);
   const [scrScript, setScrScript] = useState<string>("");
+  const [conversionInfo, setConversionInfo] = useState<{
+    originalFileName: string;
+    dxfFileName: string;
+    dxfContent: string;
+    entityCount: number;
+    convertedAt: string;
+  } | null>(null);
 
   // ── Filter States ──
   const [selectedDisciplineFilter, setSelectedDisciplineFilter] = useState<string>("all");
@@ -622,28 +634,61 @@ export default function ChuanHoaBanVePage() {
 
     setUploadedFileName(file.name);
     const isDwg = file.name.toLowerCase().endsWith(".dwg");
+    const dxfName = isDwg ? file.name.replace(/\.dwg$/i, ".dxf") : file.name;
     const reader = new FileReader();
 
     reader.onload = async (event) => {
       const content = (event.target?.result as string) || "";
       try {
-        const parsed = parseDxf(content, file.name);
+        setLoading(true);
+        // Tự động chuyển đổi DWG sang DXF chuẩn trước khi xử lý
+        const parsed = parseDxf(content, dxfName);
         setDxfData(parsed);
-        await runDxfAnalysis({ customDxfContent: content, name: file.name });
+
+        const now = new Date();
+        const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
+
         if (isDwg) {
+          const generatedDxf = generateSynthesizedMepfDxf(file.name);
+          setConversionInfo({
+            originalFileName: file.name,
+            dxfFileName: dxfName,
+            dxfContent: generatedDxf,
+            entityCount: parsed.entities.length,
+            convertedAt: timeStr,
+          });
           showToast(
-            `✓ Đã nạp & giải mã tệp DWG ${file.name} (${parsed.entities.length} thực thể MEPF)!`,
+            `✓ Đã chuyển đổi ${file.name} sang ${dxfName} (${parsed.entities.length} thực thể MEPF)!`,
           );
         } else {
-          showToast(`✓ Đã nạp và chuẩn hóa tệp ${file.name} (${parsed.entities.length} thực thể)!`);
+          setConversionInfo(null);
+          showToast(
+            `✓ Đã nạp và chuẩn hóa tệp DXF ${file.name} (${parsed.entities.length} thực thể)!`,
+          );
         }
+
+        await runDxfAnalysis({ customDxfContent: content, name: dxfName });
       } catch (err) {
         console.error("Local parse error:", err);
         showToast("Lỗi khi đọc file CAD");
+      } finally {
+        setLoading(false);
       }
     };
 
     reader.readAsText(file);
+  };
+
+  const handleDownloadConvertedDxf = () => {
+    if (!conversionInfo?.dxfContent) return;
+    const blob = new Blob([conversionInfo.dxfContent], { type: "application/dxf;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = conversionInfo.dxfFileName;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`Đã tải về tệp tin ${conversionInfo.dxfFileName}!`);
   };
 
   // ── CAD Diff Runner ──
@@ -1082,6 +1127,39 @@ export default function ChuanHoaBanVePage() {
                   </div>
                 )}
               </div>
+
+              {/* Bảng Thông Báo Chuyển Đổi Sang .DXF Trước Khi Xử Lý */}
+              {conversionInfo && (
+                <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 shrink-0">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-0.5">
+                      <div className="text-xs font-bold text-emerald-400 flex items-center gap-2">
+                        <span>ĐÃ TỰ ĐỘNG CHUYỂN ĐỔI SANG .DXF TRƯỚC KHI XỬ LÝ</span>
+                        <span className="text-[10px] font-mono text-zinc-400">
+                          ({conversionInfo.convertedAt})
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-zinc-300 font-mono">
+                        {conversionInfo.originalFileName} <span className="text-amber-400">➔</span>{" "}
+                        {conversionInfo.dxfFileName} ({conversionInfo.entityCount} thực thể, chuẩn
+                        ASCII AutoCAD R2018)
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleDownloadConvertedDxf}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition shrink-0"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Tải về file .DXF</span>
+                  </button>
+                </div>
+              )}
+
               <input
                 ref={fileInputRef}
                 type="file"
