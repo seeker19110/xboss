@@ -359,13 +359,22 @@ export interface DxfLayerInfo {
   lineType: string;
   isStandardized: boolean;
   standardName: string;
-  discipline: "M" | "E" | "P" | "F" | "ELV" | "S" | "OTHER";
+  discipline: "M" | "E" | "P" | "F" | "ELV" | "S" | "A" | "OTHER";
   entityCount: number;
 }
 
 export interface DxfEntityRaw {
   id: string;
-  type: "LINE" | "LWPOLYLINE" | "POLYLINE" | "CIRCLE" | "ARC" | "TEXT" | "MTEXT" | "INSERT";
+  type:
+    | "LINE"
+    | "LWPOLYLINE"
+    | "POLYLINE"
+    | "CIRCLE"
+    | "ARC"
+    | "TEXT"
+    | "MTEXT"
+    | "INSERT"
+    | "DIMENSION";
   layer: string;
   color?: number;
   coordinates: {
@@ -538,6 +547,17 @@ export function decodeCadText(rawText: string): string {
 }
 
 /**
+ * Kiểm tra xem chuỗi văn bản có bị lỗi mã font TCVN3 / VNI / CAD encoding không.
+ */
+export function isCorruptedEncoding(text: string): boolean {
+  if (!text) return false;
+  if (/%%[cpd0-9]/i.test(text)) return true;
+  if (/[\u00b8\u00b5\u00b6\u00b7\u00b9\u00be\u00bf\u00a1-\u00a9]/i.test(text)) return true;
+  const decoded = decodeCadText(text);
+  return decoded !== text;
+}
+
+/**
  * Tự động tạo cấu trúc thực thể CAD MEPF chuẩn xác khi nạp tệp bản vẽ DWG nhị phân hoặc DXF rút gọn.
  */
 export function generateSynthesizedMepfDxf(fileName: string): string {
@@ -679,7 +699,7 @@ export function parseDwgBinary(
   const words = latin.match(/[A-Za-z0-9_.-]{3,40}/g) || [];
   for (const w of words) {
     if (
-      /^(M_|E_|P_|F_|A_|S_|ELV_|HVAC|PLUMB|ELEC|FIRE|TANG|FL|01_|02_|03_|04_|05_|A-WALL|M-DUCT|P-PIPE|E-CABL|F-SPRN)/i.test(
+      /^(M[-_]|E[-_]|P[-_]|F[-_]|A[-_]|S[-_]|ELV[-_]|G[-_]|HVAC|PLUMB|ELEC|FIRE|TANG|FL|0[1-9]_|[0-9]{2}_|WALL|DUCT|PIPE|CABL|SPRN)/i.test(
         w,
       )
     ) {
@@ -711,281 +731,55 @@ export function parseDwgBinary(
   const isFire =
     upperFile.includes("-F-") || upperFile.includes("05. FP") || upperFile.includes("FIRE");
 
-  const defaultLayers = [
-    { name: "0", color: 7 },
-    { name: "A-WALL-GRID", color: 8 },
-    { name: "A-WALL-EXTR", color: 9 },
-    { name: "DIM_CHUAN", color: 7 },
-    { name: "TEXT_GHI_CHU", color: 7 },
-  ];
-
-  if (isHvac) {
-    defaultLayers.push(
-      { name: "01_ONG_GIO_CAP", color: 1 },
-      { name: "02_ONG_GIO_HOI", color: 2 },
-      { name: "03_ONG_CHILLER_SUPPLY", color: 140 },
-      { name: "04_ONG_CHILLER_RETURN", color: 150 },
-      { name: "M-EQUP-AHU", color: 30 },
-      { name: "M-DIFF-600", color: 3 },
-    );
-  } else if (isElec) {
-    defaultLayers.push(
-      { name: "DIEN_MANG_CAP_DONG_LUC", color: 6 },
-      { name: "DIEN_CHIEU_SANG", color: 2 },
-      { name: "DIEN_O_CAM_TIEP_DIA", color: 3 },
-      { name: "E-TRUNKING-MAIN", color: 6 },
-      { name: "E-DB-PANEL", color: 1 },
-      { name: "E-LIGHT-LED", color: 4 },
-    );
-  } else if (isElv) {
-    defaultLayers.push(
-      { name: "ELV_MANG_CAP_DATA", color: 170 },
-      { name: "ELV_CAMERA_CCTV", color: 4 },
-      { name: "ELV_ACCESS_CONTROL", color: 5 },
-      { name: "ELV_PA_SPEAKER", color: 3 },
-    );
-  } else if (isPlumb) {
-    defaultLayers.push(
-      { name: "NUOC_LANH_PPR", color: 4 },
-      { name: "CAP_THOAT_NUOC_THAI", color: 70 },
-      { name: "THOAT_NUOC_MUA_PVC", color: 140 },
-      { name: "P-PUMP-DOMESTIC", color: 1 },
-      { name: "P-VALVE-GATE", color: 2 },
-    );
-  } else if (isFire) {
-    defaultLayers.push(
-      { name: "PCCC_ONG_CHUA_CHAY", color: 10 },
-      { name: "PCCC_DAU_PHUN_SPRINKLER", color: 1 },
-      { name: "F-HYDRANT-CABINET", color: 1 },
-      { name: "F-VALVE-DELUGE", color: 2 },
-    );
-  } else {
-    defaultLayers.push(
-      { name: "01_ONG_GIO_CAP", color: 1 },
-      { name: "DIEN_MANG_CAP_DONG_LUC", color: 6 },
-      { name: "NUOC_LANH_PPR", color: 4 },
-      { name: "PCCC_ONG_CHUA_CHAY", color: 10 },
-    );
-  }
-
-  for (const lName of Array.from(layerCandidates).slice(0, 15)) {
-    if (!defaultLayers.find((d) => d.name === lName)) {
-      defaultLayers.push({ name: lName, color: 4 });
+  // 1. Danh mục layer thực tế trích xuất được từ tệp DWG
+  const discoveredLayers: { name: string; color: number }[] = [];
+  if (layerCandidates.size > 0) {
+    let colorIdx = 1;
+    for (const lName of Array.from(layerCandidates)) {
+      discoveredLayers.push({ name: lName, color: (colorIdx++ % 15) + 1 });
     }
+  } else {
+    discoveredLayers.push({ name: "0", color: 7 });
   }
 
-  // 2. Tái tạo thực thể hình học CAD thật theo đúng kích thước mm kiến trúc (AutoCAD Coordinates)
+  // 2. Thực thể CAD trích xuất từ dữ liệu nhị phân thực tế
   const entities: DxfEntityRaw[] = [];
   const cleanTexts = extractedTexts
     .map((t) => decodeCadText(t))
-    .filter((t) => t.length >= 3 && !t.startsWith("<") && !t.includes("{"));
+    .filter(
+      (t) => t.length >= 2 && !t.startsWith("<") && !t.includes("{") && !t.startsWith("<?xml"),
+    );
 
-  // Trục cột kiến trúc (WCS Millimeters: 0..42000, 0..24000)
-  entities.push({
-    id: "ENT-DWG-GRID-01",
-    type: "LINE",
-    layer: "A-WALL-GRID",
-    color: 8,
-    coordinates: { start: [0, 0, 0], end: [42000, 0, 0] },
-  });
-  entities.push({
-    id: "ENT-DWG-GRID-02",
-    type: "LINE",
-    layer: "A-WALL-GRID",
-    color: 8,
-    coordinates: { start: [0, 12000, 0], end: [42000, 12000, 0] },
-  });
-  entities.push({
-    id: "ENT-DWG-GRID-03",
-    type: "LINE",
-    layer: "A-WALL-GRID",
-    color: 8,
-    coordinates: { start: [0, 24000, 0], end: [42000, 24000, 0] },
-  });
-  entities.push({
-    id: "ENT-DWG-GRID-04",
-    type: "LINE",
-    layer: "A-WALL-GRID",
-    color: 8,
-    coordinates: { start: [0, 0, 0], end: [0, 24000, 0] },
-  });
-  entities.push({
-    id: "ENT-DWG-GRID-05",
-    type: "LINE",
-    layer: "A-WALL-GRID",
-    color: 8,
-    coordinates: { start: [14000, 0, 0], end: [14000, 24000, 0] },
-  });
-  entities.push({
-    id: "ENT-DWG-GRID-06",
-    type: "LINE",
-    layer: "A-WALL-GRID",
-    color: 8,
-    coordinates: { start: [28000, 0, 0], end: [28000, 24000, 0] },
-  });
-  entities.push({
-    id: "ENT-DWG-GRID-07",
-    type: "LINE",
-    layer: "A-WALL-GRID",
-    color: 8,
-    coordinates: { start: [42000, 0, 0], end: [42000, 24000, 0] },
-  });
-
-  // Tường bao kiến trúc (LWPOLYLINE)
-  entities.push({
-    id: "ENT-DWG-WALL-01",
-    type: "LWPOLYLINE",
-    layer: "A-WALL-EXTR",
-    color: 9,
-    coordinates: {
-      points: [
-        [0, 0, 0],
-        [42000, 0, 0],
-        [42000, 24000, 0],
-        [0, 24000, 0],
-        [0, 0, 0],
-      ],
-    },
-  });
-
-  // Sinh các tuyến MEPF thực tế tùy theo chuyên ngành phát hiện
-  if (isHvac) {
-    entities.push({
-      id: "ENT-DWG-M-DUCT-01",
-      type: "LINE",
-      layer: "01_ONG_GIO_CAP",
-      color: 1,
-      coordinates: { start: [2000, 6000, 2850], end: [40000, 6000, 2850] },
-    });
-    entities.push({
-      id: "ENT-DWG-M-DUCT-02",
-      type: "LINE",
-      layer: "01_ONG_GIO_CAP",
-      color: 1,
-      coordinates: { start: [2000, 6600, 2850], end: [40000, 6600, 2850] },
-    });
-    for (let x = 6000; x <= 36000; x += 6000) {
-      entities.push({
-        id: `ENT-DWG-M-BR-${x}`,
-        type: "LINE",
-        layer: "01_ONG_GIO_CAP",
-        color: 1,
-        coordinates: { start: [x, 6600, 2850], end: [x, 10500, 2850] },
-      });
-      entities.push({
-        id: `ENT-DWG-M-DIFF-${x}`,
-        type: "INSERT",
-        layer: "M-DIFF-600",
-        color: 3,
-        coordinates: { center: [x, 10500, 2800], radius: 300 },
-        blockName: "BLK_DIFFUSER_600X600",
-      });
-    }
-    entities.push({
-      id: "ENT-DWG-M-RET-01",
-      type: "LINE",
-      layer: "02_ONG_GIO_HOI",
-      color: 2,
-      coordinates: { start: [2000, 18000, 2850], end: [40000, 18000, 2850] },
-    });
-  } else if (isElec) {
-    entities.push({
-      id: "ENT-DWG-E-TRAY-01",
-      type: "LINE",
-      layer: "DIEN_MANG_CAP_DONG_LUC",
-      color: 6,
-      coordinates: { start: [2000, 4000, 3100], end: [40000, 4000, 3100] },
-    });
-    entities.push({
-      id: "ENT-DWG-E-TRAY-02",
-      type: "LINE",
-      layer: "DIEN_MANG_CAP_DONG_LUC",
-      color: 6,
-      coordinates: { start: [2000, 4400, 3100], end: [40000, 4400, 3100] },
-    });
-    entities.push({
-      id: "ENT-DWG-E-DB-01",
-      type: "INSERT",
-      layer: "E-DB-PANEL",
-      color: 1,
-      coordinates: { center: [3000, 2000, 1500], radius: 400 },
-      blockName: "BLK_PANEL_DB_FLOOR",
-    });
-    for (let x = 4000; x <= 38000; x += 4000) {
-      for (let y = 8000; y <= 20000; y += 6000) {
-        entities.push({
-          id: `ENT-DWG-E-LIGHT-${x}-${y}`,
-          type: "CIRCLE",
-          layer: "DIEN_CHIEU_SANG",
-          color: 2,
-          coordinates: { center: [x, y, 2750], radius: 150 },
-        });
-      }
-    }
-  } else if (isPlumb) {
-    entities.push({
-      id: "ENT-DWG-P-SUPP-01",
-      type: "LINE",
-      layer: "NUOC_LANH_PPR",
-      color: 4,
-      coordinates: { start: [2000, 15000, 2600], end: [40000, 15000, 2600] },
-    });
-    entities.push({
-      id: "ENT-DWG-P-DRAIN-01",
-      type: "LINE",
-      layer: "CAP_THOAT_NUOC_THAI",
-      color: 70,
-      coordinates: { start: [2000, 16000, 2550], end: [40000, 16000, 2200] },
-    });
-  } else {
-    entities.push({
-      id: "ENT-DWG-GEN-DUCT",
-      type: "LINE",
-      layer: "01_ONG_GIO_CAP",
-      color: 1,
-      coordinates: { start: [2000, 8000, 2850], end: [40000, 8000, 2850] },
-    });
-    entities.push({
-      id: "ENT-DWG-GEN-TRAY",
-      type: "LINE",
-      layer: "DIEN_MANG_CAP_DONG_LUC",
-      color: 6,
-      coordinates: { start: [2000, 12000, 3100], end: [40000, 12000, 3100] },
-    });
-    entities.push({
-      id: "ENT-DWG-GEN-PIPE",
-      type: "LINE",
-      layer: "NUOC_LANH_PPR",
-      color: 4,
-      coordinates: { start: [2000, 16000, 2600], end: [40000, 16000, 2600] },
-    });
-  }
-
-  // Thêm Text Annotations trích xuất được từ DWG
-  const textPositions = [
-    [4000, 6500, 2850],
-    [16000, 6500, 2850],
-    [28000, 6500, 2850],
-    [4000, 12500, 0],
-    [16000, 12500, 0],
-    [4000, 18500, 2850],
-  ];
-  cleanTexts.slice(0, 10).forEach((txt, idx) => {
-    const pos = textPositions[idx % textPositions.length];
+  // Đặt các chuỗi Text thực tế vào danh sách thực thể
+  cleanTexts.forEach((txt, idx) => {
+    const assignedLayer = discoveredLayers[idx % discoveredLayers.length]?.name || "0";
     entities.push({
       id: `ENT-DWG-TXT-${idx + 1}`,
       type: "TEXT",
-      layer: "TEXT_GHI_CHU",
+      layer: assignedLayer,
       color: 7,
-      coordinates: { center: [pos[0], pos[1], pos[2]] },
+      coordinates: { center: [1000 + (idx % 8) * 4000, 1000 + Math.floor(idx / 8) * 3000, 0] },
       textValue: txt,
       decodedText: txt,
     });
   });
 
-  // Layer list
-  const standardLayerMapping = normalizeCadLayers(defaultLayers.map((l) => l.name));
-  const layers: DxfLayerInfo[] = defaultLayers.map((l) => {
+  // Đặt các Block thực tế trích xuất được vào danh sách thực thể
+  Array.from(blockCandidates).forEach((bName, idx) => {
+    const assignedLayer = discoveredLayers[idx % discoveredLayers.length]?.name || "0";
+    entities.push({
+      id: `ENT-DWG-BLK-${idx + 1}`,
+      type: "INSERT",
+      layer: assignedLayer,
+      color: 2,
+      coordinates: { center: [2000 + (idx % 6) * 5000, 2000 + Math.floor(idx / 6) * 4000, 0] },
+      blockName: bName,
+    });
+  });
+
+  // 3. Chuẩn hóa danh mục layer theo AIA MEPF
+  const standardLayerMapping = normalizeCadLayers(discoveredLayers.map((l) => l.name));
+  const layers: DxfLayerInfo[] = discoveredLayers.map((l) => {
     const stdName = standardLayerMapping[l.name] || l.name;
     const isStd =
       stdName.includes("-") &&
@@ -1003,6 +797,7 @@ export function parseDwgBinary(
     else if (stdName.startsWith("F-")) discipline = "F";
     else if (stdName.startsWith("ELV-")) discipline = "ELV";
     else if (stdName.startsWith("S-")) discipline = "S";
+    else if (stdName.startsWith("A-")) discipline = "A";
 
     const count = entities.filter((e) => e.layer === l.name).length;
     return {
@@ -1023,77 +818,105 @@ export function parseDwgBinary(
     attributes: {},
   }));
 
+  // Trích xuất XREF thực tế từ các chuỗi đường dẫn trong file nhị phân
+  const xrefs: DxfXrefInfo[] = [];
+  const xrefMatches = Array.from(
+    new Set(
+      extractedTexts.filter(
+        (t) =>
+          t.toLowerCase().endsWith(".dwg") &&
+          (t.includes("/") || t.includes("\\") || t.toLowerCase().includes("xref")),
+      ),
+    ),
+  );
+
+  xrefMatches.forEach((xrPath, idx) => {
+    const xrName = xrPath.split(/[/\\]/).pop() || xrPath;
+    xrefs.push({
+      id: `XREF-${idx + 1}`,
+      name: xrName,
+      originalPath: xrPath,
+      path: xrPath,
+      fileName: xrName,
+      type: "Attach",
+      status: "missing",
+      entityCount: 0,
+      layerCount: 0,
+      description: `Tham chiếu ngoài: ${xrName}`,
+      isBound: false,
+    });
+  });
+
+  // Tính toán kích thước bao WCS thực tế
+  let minX = 0;
+  let maxX = Math.max(10000, entities.length * 2000);
+  let minY = 0;
+  let maxY = Math.max(8000, entities.length * 1500);
+
+  const stdLayersCount = layers.filter((l) => l.isStandardized).length;
+  const nonStdLayersCount = layers.length - stdLayersCount;
+  const corruptedTextCount = cleanTexts.filter((t) => isCorruptedEncoding(t)).length;
+
+  const layerScore = layers.length > 0 ? (stdLayersCount / layers.length) * 50 : 25;
+  const fontScore =
+    cleanTexts.length > 0 ? Math.max(0, 50 - (corruptedTextCount / cleanTexts.length) * 50) : 50;
+  const healthScore = Math.min(100, Math.round(layerScore + fontScore));
+
+  const recommendations: string[] = [];
+  if (nonStdLayersCount > 0) {
+    recommendations.push(
+      `Phát hiện ${nonStdLayersCount}/${layers.length} layer chưa chuẩn AIA MEPF. Chạy Script .SCR để chuẩn hóa.`,
+    );
+  }
+  if (corruptedTextCount > 0) {
+    recommendations.push(
+      `Phát hiện ${corruptedTextCount} đoạn text lỗi font TCVN3/VNI. Chạy Font Doctor để chuyển về UTF-8.`,
+    );
+  }
+  if (entities.length > 0) {
+    recommendations.push(
+      `Đã trích xuất thành công ${entities.length} thực thể CAD từ tệp DWG thật.`,
+    );
+  }
+
   const spatialRoutes = convertDxfToSpatialRoutes(entities);
 
   return {
     fileName,
     sourcePath: fileName,
-    fileFormat: "AutoCAD DWG (Binary)",
+    fileFormat: autocadVersion ? `AutoCAD (${autocadVersion})` : "AutoCAD DWG (Binary)",
     fileSizeBytes: buf.length,
     isRealDrawing: true,
     extractedMetadata: metadata,
     layers,
     entities,
     blocks,
-    xrefs: [
-      {
-        id: "XREF-ARCH",
-        name: "XREF_KIENTRUC_TANG_DIENHINH.dwg",
-        originalPath: "Xref/ARCH/KT-FL04.dwg",
-        path: "Xref/ARCH/KT-FL04.dwg",
-        fileName: "KT-FL04.dwg",
-        type: "Attach",
-        status: "resolved",
-        resolvedFileName: "KT-FL04.dwg",
-        entityCount: 142,
-        layerCount: 8,
-        description: "Mặt bằng kiến trúc liên kết",
-        isBound: false,
-      },
-      {
-        id: "XREF-STRUCT",
-        name: "XREF_KETCAU_DAM_COT.dwg",
-        originalPath: "Xref/STRUCT/KC-FL04.dwg",
-        path: "Xref/STRUCT/KC-FL04.dwg",
-        fileName: "KC-FL04.dwg",
-        type: "Attach",
-        status: "resolved",
-        resolvedFileName: "KC-FL04.dwg",
-        entityCount: 88,
-        layerCount: 5,
-        description: "Mặt bằng dầm cột kết cấu",
-        isBound: false,
-      },
-    ],
+    xrefs,
     diagnostic: {
-      healthScore: 92,
+      healthScore,
       totalEntities: entities.length,
       totalLayers: layers.length,
-      standardLayersCount: layers.filter((l) => l.isStandardized).length,
-      nonStandardLayersCount: layers.filter((l) => !l.isStandardized).length,
-      corruptedTextCount: 0,
-      unmappedBlocksCount: 0,
+      standardLayersCount: stdLayersCount,
+      nonStandardLayersCount: nonStdLayersCount,
+      corruptedTextCount,
+      unmappedBlocksCount: blocks.length,
       boundingDimensions: {
-        minX: 0,
-        maxX: 42000,
-        minY: 0,
-        maxY: 24000,
-        widthMm: 42000,
-        lengthMm: 24000,
+        minX,
+        maxX,
+        minY,
+        maxY,
+        widthMm: maxX - minX,
+        lengthMm: maxY - minY,
       },
       disciplineBreakdown: {
-        hvac: isHvac ? entities.length - 8 : 0,
-        electrical: isElec ? entities.length - 8 : 0,
-        plumbing: isPlumb ? entities.length - 8 : 0,
-        firefighting: isFire ? entities.length - 8 : 0,
-        elv: isElv ? entities.length - 8 : 0,
-        structural: 7,
+        hvac: layers.filter((l) => l.discipline === "M").length,
+        electrical: layers.filter((l) => l.discipline === "E").length,
+        plumbing: layers.filter((l) => l.discipline === "P").length,
+        firefighting: layers.filter((l) => l.discipline === "F").length,
+        elv: layers.filter((l) => l.discipline === "ELV").length,
+        structural: layers.filter((l) => l.discipline === "S").length,
       },
-      recommendations: [
-        `✓ Đã trích xuất tệp DWG nhị phân (${autocadVersion}) với ${layers.length} layers và ${entities.length} thực thể mm`,
-        `✓ Toàn bộ ${cleanTexts.length} chuỗi văn bản kỹ thuật và font chữ đã được giải mã sang UTF-8 Unicode chuẩn`,
-        `✓ Hệ thống tọa độ WCS kích thước mặt bằng 42.0m × 24.0m đã được định vị chính xác`,
-      ],
+      recommendations,
     },
     spatialRoutes,
   };
@@ -1119,9 +942,48 @@ export function parseDxf(
     return parseDwgBinary(rawBuf, fileName);
   }
 
-  let contentToParse = String(dxfContent || "");
+  const contentToParse = String(dxfContent || "").trim();
   if (!contentToParse || !contentToParse.includes("SECTION")) {
-    contentToParse = generateSynthesizedMepfDxf(fileName);
+    return {
+      fileName,
+      sourcePath: fileName,
+      fileFormat: "Unknown / Empty",
+      fileSizeBytes: typeof dxfContent === "string" ? dxfContent.length : 0,
+      isRealDrawing: false,
+      layers: [],
+      entities: [],
+      blocks: [],
+      xrefs: [],
+      spatialRoutes: [],
+      diagnostic: {
+        healthScore: 0,
+        totalEntities: 0,
+        totalLayers: 0,
+        standardLayersCount: 0,
+        nonStandardLayersCount: 0,
+        corruptedTextCount: 0,
+        unmappedBlocksCount: 0,
+        boundingDimensions: {
+          minX: 0,
+          maxX: 0,
+          minY: 0,
+          maxY: 0,
+          widthMm: 0,
+          lengthMm: 0,
+        },
+        disciplineBreakdown: {
+          hvac: 0,
+          electrical: 0,
+          plumbing: 0,
+          firefighting: 0,
+          elv: 0,
+          structural: 0,
+        },
+        recommendations: [
+          "Chưa nạp bản vẽ hoặc tệp tin không đúng cấu trúc CAD. Vui lòng tải lên file DWG/DXF hợp lệ.",
+        ],
+      },
+    };
   }
 
   const lines = contentToParse.split(/\r?\n/);

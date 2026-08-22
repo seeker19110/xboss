@@ -30,9 +30,21 @@ test("parseDwgBinary: Phân tích tệp DWG nhị phân và trích xuất metada
   const result = parseDwgBinary(mockDwgHeader, "23056-VHT-CD-A-M-205.dwg");
   assert.equal(result.isRealDrawing, true);
   assert.ok(result.fileFormat, "fileFormat phải có giá trị");
-  assert.ok(result.entities.length > 0, "Phải sinh entities");
-  assert.ok(result.layers.length > 0, "Phải sinh layers");
+  assert.equal(
+    result.entities.length,
+    0,
+    "Không được tự sinh thực thể giả khi binary không có text/block",
+  );
+  assert.equal(result.layers.length, 1, "Chỉ có layer 0 mặc định");
   assert.equal(result.fileSizeBytes, 1024);
+});
+
+test("parseDxf: Trả về trạng thái rỗng trung thực khi tệp không hợp lệ (Chống Ảo Giác)", () => {
+  const result = parseDxf("", "empty.dxf");
+  assert.equal(result.isRealDrawing, false);
+  assert.equal(result.entities.length, 0, "Tuyệt đối không sinh thực thể giả khi DXF rỗng");
+  assert.equal(result.layers.length, 0, "Tuyệt đối không sinh layer giả khi DXF rỗng");
+  assert.equal(result.diagnostic.healthScore, 0, "Điểm sức khỏe phải bằng 0");
 });
 
 test("parseDwgBinary: Đọc và giải mã tệp DWG thật trên đĩa nếu có", () => {
@@ -66,7 +78,7 @@ test("generateStandardizedAutocadScript: Sinh script AutoCAD .SCR chuẩn hóa",
       colorHex: "#ef4444",
       lineType: "CONTINUOUS",
       entityCount: 15,
-      isStandard: false,
+      isStandardized: false,
       discipline: "M" as const,
     },
   ];

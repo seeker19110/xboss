@@ -148,6 +148,19 @@ export async function POST(req: Request) {
       }
     }
 
+    if (!fileBuffer && !dxfContent) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Không tìm thấy tệp bản vẽ CAD trên máy chủ hoặc hệ thống lưu trữ. Vui lòng tải file .dwg/.dxf lên.",
+          data: null,
+          realFileFound: false,
+        },
+        { status: 404 },
+      );
+    }
+
     let result;
     if (fileBuffer) {
       const ext = extname(fileName).toLowerCase();

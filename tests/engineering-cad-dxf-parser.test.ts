@@ -190,19 +190,39 @@ EOF`;
     assert.ok(scr.includes("AUDIT Y"));
   });
 
-  it("5. parseDxf giải mã và tái tạo mô hình thực thể kỹ thuật khi nạp tệp DWG nhị phân", () => {
-    const binaryDwgContent = "AC1032\0\0\0\0\0\0DWG_BINARY_HEADER";
-    const parsed = parseDxf(binaryDwgContent, "23056-VHT-CD-A-M-205.dwg");
+  it("5. parseDxf giải mã và trích xuất cấu trúc layer và metadata khi nạp tệp DWG nhị phân", () => {
+    const sampleDwgBuffer = Buffer.alloc(512);
+    sampleDwgBuffer.write("AC1027", 0, 6, "ascii");
+    sampleDwgBuffer.write("M-HVAC-DUCT-SUPP", 64, "latin1");
+    sampleDwgBuffer.write("P-PIPE-COLD", 128, "latin1");
 
-    assert.ok(parsed.entities.length > 0, "Phải có thực thể được giải mã khi nạp tệp DWG");
-    assert.ok(parsed.layers.length >= 5, "Phải có các layer MEPF chuẩn");
-    assert.ok(parsed.spatialRoutes.length > 0, "Phải có tuyến không gian 3D");
+    const parsed = parseDxf(sampleDwgBuffer, "23056-VHT-CD-A-M-205.dwg");
+
+    assert.equal(parsed.isRealDrawing, true);
+    assert.ok(parsed.layers.length >= 2, "Phải trích xuất được layer từ DWG binary");
     assert.equal(parsed.fileName, "23056-VHT-CD-A-M-205.dwg");
   });
 
   it("6. resolveXrefDependencies & bindXrefToMaster tự động nhận diện và gộp XREF", () => {
-    const parsed = parseDxf("", "Master_MEP_T4.dxf");
-    assert.ok(parsed.xrefs.length >= 2, "Phải có danh sách XREF tham chiếu");
+    const baseParsed = parseDxf(sampleDxfContent, "Master_MEP_T4.dxf");
+    const parsedWithXrefs = {
+      ...baseParsed,
+      xrefs: [
+        {
+          id: "XREF-01",
+          name: "A-ARCH-GRID-AXIS.dwg",
+          originalPath: "Xref/ARCH/A-ARCH-GRID-AXIS.dwg",
+          path: "Xref/ARCH/A-ARCH-GRID-AXIS.dwg",
+          fileName: "A-ARCH-GRID-AXIS.dwg",
+          type: "Overlay" as const,
+          status: "missing" as const,
+          entityCount: 0,
+          layerCount: 0,
+          description: "Mặt bằng kiến trúc",
+          isBound: false,
+        },
+      ],
+    };
 
     const folderFiles = [
       { name: "A-ARCH-GRID-AXIS.dwg" },
@@ -210,12 +230,12 @@ EOF`;
       { name: "standard.ctb" },
     ];
 
-    const resolved = resolveXrefDependencies(parsed, folderFiles);
+    const resolved = resolveXrefDependencies(parsedWithXrefs, folderFiles);
     const archXref = resolved.find((x) => x.id === "XREF-01");
     assert.ok(archXref);
     assert.equal(archXref.status, "resolved");
 
-    const bound = bindXrefToMaster(parsed, "XREF-01");
+    const bound = bindXrefToMaster(parsedWithXrefs, "XREF-01");
     const boundXref = bound.xrefs.find((x) => x.id === "XREF-01");
     assert.ok(boundXref);
     assert.equal(boundXref.isBound, true);

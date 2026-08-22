@@ -82,7 +82,9 @@ import {
   DxfLayerInfo,
   DxfXrefInfo,
   DxfEntityRaw,
-  generateSynthesizedMepfDxf,
+  decodeCadText,
+  isCorruptedEncoding,
+  normalizeCadLayers,
   resolveXrefDependencies,
   bindXrefToMaster,
   ACI_TO_HEX,
@@ -152,7 +154,7 @@ export default function ChuanHoaBanVePage() {
   // ── Source Selection: [design] (from project design drawings) vs [upload] (single file) vs [folder] (whole folder with XREFs) ──
   const [sourceMode, setSourceMode] = useState<"design" | "upload" | "folder">("design");
   const [designDrawings, setDesignDrawings] = useState<DrawingOption[]>([]);
-  const [selectedDrawingId, setSelectedDrawingId] = useState<number | null>(101);
+  const [selectedDrawingId, setSelectedDrawingId] = useState<number | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const folderInputRef = useRef<HTMLInputElement | null>(null);
@@ -174,219 +176,7 @@ export default function ChuanHoaBanVePage() {
     );
   };
 
-  const defaultSampleDrawings: DrawingOption[] = [
-    // ── 1. HVAC ──
-    {
-      id: 101,
-      code: "AVIO-DWG-M-FL04-01",
-      name: "Bản vẽ HVAC Cấp Gió & Hút Khói Tầng 4 (Gốc Thiết Kế)",
-      kind: "design",
-      subFolder: "origin",
-      systemGroup: "HVAC",
-      floorLabel: "Tầng 4",
-      latestRev: "Rev01",
-    },
-    {
-      id: 102,
-      code: "AVIO-ISO-M-FL04-01",
-      name: "Bản vẽ Chuẩn Hóa ISO MEPF Tuyến Ống Gió Tầng 4",
-      kind: "design",
-      subFolder: "iso",
-      systemGroup: "HVAC",
-      floorLabel: "Tầng 4",
-      latestRev: "Rev02",
-    },
-    {
-      id: 103,
-      code: "AVIO-BIM-M-FL04",
-      name: "Mô hình Không Gian 3D BIM Hệ Gió Tầng 4 (IFC / DXF 3D)",
-      kind: "bim",
-      subFolder: "",
-      systemGroup: "HVAC",
-      floorLabel: "Tầng 4",
-      latestRev: "v1.0",
-    },
-    {
-      id: 104,
-      code: "AVIO-SHOP-M-FL04-02",
-      name: "Bản vẽ Shopdrawing Chi Tiết Tuyến Ống Gió Gia Công Tầng 4",
-      kind: "shop",
-      subFolder: "",
-      systemGroup: "HVAC",
-      floorLabel: "Tầng 4",
-      latestRev: "Rev02",
-    },
-    {
-      id: 105,
-      code: "AVIO-ASBUILT-M-01",
-      name: "Bản vẽ Hoàn Công Tuyến Ống Gió Trục Kỹ Thuật",
-      kind: "asbuilt",
-      subFolder: "",
-      systemGroup: "HVAC",
-      floorLabel: "Tầng Điển Hình",
-      latestRev: "Rev01",
-    },
-
-    // ── 2. PLUMBING ──
-    {
-      id: 201,
-      code: "AVIO-DWG-P-FL04-01",
-      name: "Mặt bằng Cấp Thoát Nước Sinh Hoạt & Nước Thải Tầng 4",
-      kind: "design",
-      subFolder: "origin",
-      systemGroup: "PLUMBING",
-      floorLabel: "Tầng 4",
-      latestRev: "Rev01",
-    },
-    {
-      id: 202,
-      code: "AVIO-ISO-P-FL04-01",
-      name: "Bản vẽ Cấp Thoát Nước Chuẩn Hóa ISO MEPF Tầng 4",
-      kind: "design",
-      subFolder: "iso",
-      systemGroup: "PLUMBING",
-      floorLabel: "Tầng 4",
-      latestRev: "Rev01",
-    },
-    {
-      id: 203,
-      code: "AVIO-BIM-P-FL04",
-      name: "Mô hình 3D BIM Cấp Thoát Nước Trục Đứng Tầng 4",
-      kind: "bim",
-      subFolder: "",
-      systemGroup: "PLUMBING",
-      floorLabel: "Tầng 4",
-      latestRev: "v1.0",
-    },
-    {
-      id: 204,
-      code: "AVIO-SHOP-P-FL04-01",
-      name: "Shopdrawing Tuyến Ống PPR & PVC Thoát Nước Tầng 4",
-      kind: "shop",
-      subFolder: "",
-      systemGroup: "PLUMBING",
-      floorLabel: "Tầng 4",
-      latestRev: "Rev01",
-    },
-    {
-      id: 205,
-      code: "AVIO-ASBUILT-P-01",
-      name: "Hoàn Công Hệ Thống Cấp Thoát Nước Toàn Nhà",
-      kind: "asbuilt",
-      subFolder: "",
-      systemGroup: "PLUMBING",
-      floorLabel: "Tầng Điển Hình",
-      latestRev: "Rev01",
-    },
-
-    // ── 3. ELECTRICAL ──
-    {
-      id: 301,
-      code: "AVIO-DWG-E-FL04-01",
-      name: "Mặt bằng Máng Cáp & Chiếu Sáng Động Lực Tầng 4",
-      kind: "design",
-      subFolder: "origin",
-      systemGroup: "ELECTRICAL",
-      floorLabel: "Tầng 4",
-      latestRev: "Rev01",
-    },
-    {
-      id: 302,
-      code: "AVIO-ISO-E-FL04-01",
-      name: "Mặt bằng Điện & Máng Cáp Chuẩn Hóa ISO Tầng 4",
-      kind: "design",
-      subFolder: "iso",
-      systemGroup: "ELECTRICAL",
-      floorLabel: "Tầng 4",
-      latestRev: "Rev01",
-    },
-    {
-      id: 303,
-      code: "AVIO-BIM-E-FL04",
-      name: "Mô hình 3D BIM Tuyến Thang Máng Cáp Cable Tray Tầng 4",
-      kind: "bim",
-      subFolder: "",
-      systemGroup: "ELECTRICAL",
-      floorLabel: "Tầng 4",
-      latestRev: "v1.0",
-    },
-    {
-      id: 304,
-      code: "AVIO-SHOP-E-FL04-01",
-      name: "Shopdrawing Chi Tiết Lắp Đặt Tủ Điện & Máng Cáp Tầng 4",
-      kind: "shop",
-      subFolder: "",
-      systemGroup: "ELECTRICAL",
-      floorLabel: "Tầng 4",
-      latestRev: "Rev01",
-    },
-
-    // ── 4. FIREFIGHTING ──
-    {
-      id: 401,
-      code: "AVIO-DWG-F-FL04-01",
-      name: "Mặt bằng Chữa Cháy Tự Động Sprinkler & Trụ Nước Tầng 4",
-      kind: "design",
-      subFolder: "origin",
-      systemGroup: "FIREFIGHTING",
-      floorLabel: "Tầng 4",
-      latestRev: "Rev01",
-    },
-    {
-      id: 402,
-      code: "AVIO-ISO-F-FL04-01",
-      name: "Mặt bằng PCCC Chuẩn Hóa ISO MEPF Tầng 4",
-      kind: "design",
-      subFolder: "iso",
-      systemGroup: "FIREFIGHTING",
-      floorLabel: "Tầng 4",
-      latestRev: "Rev01",
-    },
-    {
-      id: 403,
-      code: "AVIO-BIM-F-FL04",
-      name: "Mô hình 3D BIM Đầu Phun Sprinkler & Tuyến Ống Thép PCCC",
-      kind: "bim",
-      subFolder: "",
-      systemGroup: "FIREFIGHTING",
-      floorLabel: "Tầng 4",
-      latestRev: "v1.0",
-    },
-    {
-      id: 404,
-      code: "AVIO-SHOP-F-FL04-01",
-      name: "Shopdrawing Định Vị Đầu Phun Sprinkler & Giá Treo PCCC",
-      kind: "shop",
-      subFolder: "",
-      systemGroup: "FIREFIGHTING",
-      floorLabel: "Tầng 4",
-      latestRev: "Rev01",
-    },
-
-    // ── 5. ELV ──
-    {
-      id: 501,
-      code: "AVIO-DWG-ELV-FL04-01",
-      name: "Mặt bằng Hệ Thống Điện Nhẹ, Camera An Ninh & BMS Tầng 4",
-      kind: "design",
-      subFolder: "origin",
-      systemGroup: "ELV",
-      floorLabel: "Tầng 4",
-      latestRev: "Rev01",
-    },
-    {
-      id: 502,
-      code: "AVIO-ISO-ELV-FL04-01",
-      name: "Mặt bằng Điện Nhẹ ELV Chuẩn Hóa ISO Tầng 4",
-      kind: "design",
-      subFolder: "iso",
-      systemGroup: "ELV",
-      floorLabel: "Tầng 4",
-      latestRev: "Rev01",
-    },
-  ];
-
-  const allDrawingsList = designDrawings.length > 0 ? designDrawings : defaultSampleDrawings;
+  const allDrawingsList = designDrawings;
 
   const filteredExplorerDrawings = allDrawingsList.filter((d) => {
     let matchCat = true;
@@ -454,9 +244,7 @@ export default function ChuanHoaBanVePage() {
   const [layerSearch, setLayerSearch] = useState("");
 
   // ── Font Doctor States ──
-  const [legacyInput, setLegacyInput] = useState(
-    "HÖ thèng th«ng giã tÇng 4 - èng giã 600x400 BOP=+2.85m %%c150",
-  );
+  const [legacyInput, setLegacyInput] = useState("");
   const [convertedText, setConvertedText] = useState("");
   const [sampleFontSnippets] = useState([
     {
@@ -505,75 +293,22 @@ export default function ChuanHoaBanVePage() {
   // ── 2D CAD Quality Gate & Approval State ──
   const [cad2dApprovalStatus, setCad2dApprovalStatus] = useState<
     "in_progress" | "pending_approval" | "approved" | "rejected"
-  >("pending_approval");
-  const [approverName, setApproverName] = useState<string>(
-    "Trần Quốc Hưng (Kỹ Sư Trưởng MEPF & BIM Lead)",
-  );
-  const [approvedAt, setApprovedAt] = useState<string>("2026-08-22 15:35");
-  const [approvalNotes, setApprovalNotes] = useState<string>(
-    "Bản vẽ 2D đã xử lý 100% Layer AIA, 0 lỗi font TCVN3/VNI, Health Score 94/100. Đủ điều kiện mở khóa Cổng 3D BIM & Combine.",
-  );
+  >("in_progress");
+  const [approverName, setApproverName] = useState<string>("");
+  const [approvedAt, setApprovedAt] = useState<string>("");
+  const [approvalNotes, setApprovalNotes] = useState<string>("");
 
-  // ── Manual Review & Override Studio State (Tab 1.7) ──
+  // ── Manual Review & Override Studio State (Đồng bộ động từ tệp thật) ──
   const [manualLayers, setManualLayers] = useState<
     Array<{
       id: string;
       name: string;
       standardName: string;
-      discipline: "M" | "E" | "P" | "F" | "ELV" | "S" | "OTHER";
+      discipline: DxfLayerInfo["discipline"];
       colorHex: string;
       entityCount: number;
     }>
-  >([
-    {
-      id: "L1",
-      name: "GIO_CAP_CHINH",
-      standardName: "M-DUCT-SUPP",
-      discipline: "M",
-      colorHex: "#06b6d4",
-      entityCount: 45,
-    },
-    {
-      id: "L2",
-      name: "GIO_HOI_AHU",
-      standardName: "M-DUCT-RETN",
-      discipline: "M",
-      colorHex: "#3b82f6",
-      entityCount: 32,
-    },
-    {
-      id: "L3",
-      name: "CAP_THOAT_NUOC_TANG4",
-      standardName: "P-PIPE-SANR",
-      discipline: "P",
-      colorHex: "#22c55e",
-      entityCount: 28,
-    },
-    {
-      id: "L4",
-      name: "DIEN_CHIEU_SANG_DONG_LUC",
-      standardName: "E-TRAY-PWRR",
-      discipline: "E",
-      colorHex: "#eab308",
-      entityCount: 50,
-    },
-    {
-      id: "L5",
-      name: "PCCC_CHUA_CHAY_SPK",
-      standardName: "F-SPRN-PIPE",
-      discipline: "F",
-      colorHex: "#ef4444",
-      entityCount: 18,
-    },
-    {
-      id: "L6",
-      name: "GHI_CHU_DIM_TEXT",
-      standardName: "G-ANNO-TEXT",
-      discipline: "OTHER",
-      colorHex: "#f4f4f5",
-      entityCount: 65,
-    },
-  ]);
+  >([]);
 
   const [manualTexts, setManualTexts] = useState<
     Array<{
@@ -583,36 +318,7 @@ export default function ChuanHoaBanVePage() {
       edited: string;
       layer: string;
     }>
-  >([
-    {
-      id: "TXT-01",
-      raw: "HÖ thèng th«ng giã tÇng 4",
-      decoded: "Hệ thống thông gió tầng 4",
-      edited: "Hệ thống thông gió tầng 4 - Tháp A",
-      layer: "G-ANNO-TEXT",
-    },
-    {
-      id: "TXT-02",
-      raw: "èng giã 800x400 BOP=+2.85m",
-      decoded: "Ống gió 800x400 BOP=+2.85m",
-      edited: "Ống gió 800x400 BOP=+2850mm (Cách nhiệt 25mm)",
-      layer: "M-DUCT-SUPP",
-    },
-    {
-      id: "TXT-03",
-      raw: "èng thót n−íc D114 dèc i=1.5%",
-      decoded: "Ống thoát nước D114 dốc i=1.5%",
-      edited: "Ống thoát nước D114 dốc i=1.50% (Bảo toàn)",
-      layer: "P-PIPE-SANR",
-    },
-    {
-      id: "TXT-04",
-      raw: "Lç më xuyªn dÇm %%c150",
-      decoded: "Lỗ mở xuyên dầm Ø150",
-      edited: "Lỗ mở xuyên dầm Ø150 (Vùng an toàn L/3)",
-      layer: "G-ANNO-TEXT",
-    },
-  ]);
+  >([]);
 
   const [manualBlocks, setManualBlocks] = useState<
     Array<{
@@ -622,41 +328,10 @@ export default function ChuanHoaBanVePage() {
       mappedBoqCode: string;
       customName: string;
     }>
-  >([
-    {
-      id: "BLK-01",
-      name: "VCD_600x400",
-      count: 12,
-      mappedBoqCode: "BOQ-HVAC-VCD-01",
-      customName: "Van chặn lửa VCD 600x400 motor điện",
-    },
-    {
-      id: "BLK-02",
-      name: "DIFFUSER_600x600",
-      count: 36,
-      mappedBoqCode: "BOQ-HVAC-DIF-01",
-      customName: "Miệng gió 4 hướng 600x600 kèm OBD",
-    },
-    {
-      id: "BLK-03",
-      name: "GATE_VALVE_DN100",
-      count: 8,
-      mappedBoqCode: "BOQ-PLUMB-VALVE-01",
-      customName: "Van cổng ty chìm DN100 PN16",
-    },
-    {
-      id: "BLK-04",
-      name: "SPRINKLER_68C",
-      count: 48,
-      mappedBoqCode: "BOQ-FIRE-SPK-01",
-      customName: "Đầu phun Sprinkler quay xuống 68°C",
-    },
-  ]);
+  >([]);
 
   const [isReviewDone, setIsReviewDone] = useState(false);
-  const [reviewerRemarks, setReviewerRemarks] = useState(
-    "Đã rà soát toàn bộ Layer và hiệu chỉnh ghi chú cao độ. Hồ sơ đạt chuẩn để mở cổng 3D BIM.",
-  );
+  const [reviewerRemarks, setReviewerRemarks] = useState("");
 
   const handleUpdateManualLayer = (
     id: string,
@@ -842,35 +517,23 @@ export default function ChuanHoaBanVePage() {
   // ── Tab 1.7: Deep Purge & WCS Coordinate State ──
   const [purgeState, setPurgeState] = useState({
     isPurged: false,
-    overlappingCount: 142,
-    zeroLengthCount: 58,
-    emptyLayersCount: 19,
-    anonymousBlocksCount: 24,
-    originalSizeMb: 38.5,
-    purgedSizeMb: 3.8,
+    overlappingCount: 0,
+    zeroLengthCount: 0,
+    emptyLayersCount: 0,
+    anonymousBlocksCount: 0,
+    originalSizeMb: 0,
+    purgedSizeMb: 0,
   });
 
   const [wcsConfig, setWcsConfig] = useState({
     originX: 0,
     originY: 0,
     originZ: 0,
-    gridAxisReference: "Giao trục chính A-1 (World Coordinate WCS)",
+    gridAxisReference: "Giao trục chính WCS (0,0,0)",
     unit: "mm" as "mm" | "m" | "inch",
     scale: "1:1" as "1:1" | "1:50" | "1:100",
     isAligned: false,
   });
-
-  const handleRunDeepPurge = () => {
-    setPurgeState((prev) => ({ ...prev, isPurged: true }));
-    showToast(
-      `✓ Đã dọn sạch 142 nét trùng đè, 58 nét 0mm, 24 block rác! Dung lượng giảm 90.1% (38.5MB -> 3.8MB)`,
-    );
-  };
-
-  const handleAlignWcsOrigin = () => {
-    setWcsConfig((prev) => ({ ...prev, isAligned: true }));
-    showToast("✓ Đã khóa gốc tọa độ WCS (0,0,0) tại Tim giao trục A-1!");
-  };
 
   // ── Tab 1.8: CTB Lineweight & Dim Override Doctor State ──
   const [dimOverrides, setDimOverrides] = useState<
@@ -882,40 +545,162 @@ export default function ChuanHoaBanVePage() {
       fixed: boolean;
       location: string;
     }>
-  >([
-    {
-      id: "DIM-01",
-      nominalText: "3500 mm",
-      actualMeasMm: 3350,
-      isFake: true,
-      fixed: false,
-      location: "Khoảng cách trục A-B (Tháp A)",
-    },
-    {
-      id: "DIM-02",
-      nominalText: "DN150",
-      actualMeasMm: 100,
-      isFake: true,
-      fixed: false,
-      location: "Đường kính ống Chiller trục đứng",
-    },
-    {
-      id: "DIM-03",
-      nominalText: "2800 mm",
-      actualMeasMm: 2800,
+  >([]);
+
+  // ── Dynamic Sync: Tự Động Trích Xuất Dữ Liệu Thật Từ dxfData (Chống Ảo Giác) ──
+  useEffect(() => {
+    if (!dxfData || !dxfData.entities || dxfData.entities.length === 0) {
+      setManualLayers([]);
+      setManualTexts([]);
+      setManualBlocks([]);
+      setDimOverrides([]);
+      setPurgeState({
+        isPurged: false,
+        overlappingCount: 0,
+        zeroLengthCount: 0,
+        emptyLayersCount: 0,
+        anonymousBlocksCount: 0,
+        originalSizeMb: 0,
+        purgedSizeMb: 0,
+      });
+      return;
+    }
+
+    // 1. Đồng bộ Layers thật
+    const mLayers = (dxfData.layers || []).map((l, idx) => ({
+      id: `L${idx + 1}`,
+      name: l.name,
+      standardName: l.standardName || l.name,
+      discipline: l.discipline || ("OTHER" as const),
+      colorHex: l.colorHex || "#a1a1aa",
+      entityCount: l.entityCount,
+    }));
+    setManualLayers(mLayers);
+
+    // 2. Đồng bộ Texts thật
+    const textEntities = dxfData.entities.filter((e) => e.type === "TEXT" || e.type === "MTEXT");
+    const mTexts = textEntities.map((e, idx) => ({
+      id: e.id || `TXT-${idx + 1}`,
+      raw: e.textValue || "",
+      decoded: e.decodedText || e.textValue || "",
+      edited: e.decodedText || e.textValue || "",
+      layer: e.layer,
+    }));
+    setManualTexts(mTexts);
+
+    // Điền text lỗi đầu tiên vào ô Doctor nếu có
+    const firstCorrupted = mTexts.find((t) => t.raw !== t.decoded);
+    if (firstCorrupted) {
+      setLegacyInput(firstCorrupted.raw);
+      setConvertedText(firstCorrupted.decoded);
+    } else if (mTexts.length > 0) {
+      setLegacyInput(mTexts[0].raw);
+      setConvertedText(mTexts[0].decoded);
+    }
+
+    // 3. Đồng bộ Blocks thật
+    const mBlocks = (dxfData.blocks || []).map((b, idx) => ({
+      id: `BLK-${idx + 1}`,
+      name: b.name,
+      count: b.count,
+      mappedBoqCode: "",
+      customName: b.name,
+    }));
+    setManualBlocks(mBlocks);
+
+    // 4. Đồng bộ Dims thật
+    const dimEntities = dxfData.entities.filter((e) => e.type === "DIMENSION");
+    const mDims = dimEntities.map((d, idx) => ({
+      id: d.id || `DIM-${idx + 1}`,
+      nominalText: d.textValue || "Kích thước CAD",
+      actualMeasMm: 0,
       isFake: false,
       fixed: true,
-      location: "Khoảng sáng thông thủy hành lang",
-    },
-    {
-      id: "DIM-04",
-      nominalText: "800 x 400 mm",
-      actualMeasMm: 750,
-      isFake: true,
-      fixed: false,
-      location: "Tiết diện ống gió cấp AHU-01",
-    },
-  ]);
+      location: `Layer ${d.layer}`,
+    }));
+    setDimOverrides(mDims);
+
+    // 5. Tính toán metrics dọn rác (Purge) thật
+    let zeroLen = 0;
+    let overlapping = 0;
+    const lineMap = new Map<string, number>();
+
+    dxfData.entities.forEach((e) => {
+      if (e.type === "LINE" && e.coordinates.start && e.coordinates.end) {
+        const [x1, y1] = e.coordinates.start;
+        const [x2, y2] = e.coordinates.end;
+        const len = Math.hypot(x2 - x1, y2 - y1);
+        if (len < 1) zeroLen++;
+        const key = `${Math.round(x1)},${Math.round(y1)}-${Math.round(x2)},${Math.round(y2)}`;
+        const revKey = `${Math.round(x2)},${Math.round(y2)}-${Math.round(x1)},${Math.round(y1)}`;
+        if (lineMap.has(key) || lineMap.has(revKey)) {
+          overlapping++;
+        } else {
+          lineMap.set(key, 1);
+        }
+      }
+    });
+
+    const emptyLayers = (dxfData.layers || []).filter((l) => l.entityCount === 0).length;
+    const anonBlocks = (dxfData.blocks || []).filter(
+      (b) => b.name.startsWith("*") || b.name.startsWith("BLK_"),
+    ).length;
+    const sizeMb = dxfData.fileSizeBytes
+      ? Number((dxfData.fileSizeBytes / (1024 * 1024)).toFixed(2))
+      : 0.5;
+
+    setPurgeState({
+      isPurged: false,
+      overlappingCount: overlapping,
+      zeroLengthCount: zeroLen,
+      emptyLayersCount: emptyLayers,
+      anonymousBlocksCount: anonBlocks,
+      originalSizeMb: sizeMb,
+      purgedSizeMb: Number((sizeMb * 0.85).toFixed(2)),
+    });
+
+    // 6. Cập nhật saveConfig từ tên bản vẽ thật
+    if (dxfData?.fileName) {
+      const fName = dxfData.fileName;
+      setSaveConfig((prev) => ({
+        ...prev,
+        name: fName.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9_-]/g, "_"),
+      }));
+    }
+  }, [dxfData]);
+
+  const handleRunDeepPurge = () => {
+    if (!dxfData) return;
+
+    // Lọc bỏ thực sự các nét 0mm và nét trùng đè trong dxfData.entities
+    const seenLines = new Set<string>();
+    const cleanedEntities = dxfData.entities.filter((e) => {
+      if (e.type === "LINE" && e.coordinates.start && e.coordinates.end) {
+        const [x1, y1] = e.coordinates.start;
+        const [x2, y2] = e.coordinates.end;
+        const len = Math.hypot(x2 - x1, y2 - y1);
+        if (len < 1) return false;
+        const key = `${Math.round(x1)},${Math.round(y1)}-${Math.round(x2)},${Math.round(y2)}`;
+        const revKey = `${Math.round(x2)},${Math.round(y2)}-${Math.round(x1)},${Math.round(y1)}`;
+        if (seenLines.has(key) || seenLines.has(revKey)) return false;
+        seenLines.add(key);
+      }
+      return true;
+    });
+
+    const removed = dxfData.entities.length - cleanedEntities.length;
+    setDxfData({
+      ...dxfData,
+      entities: cleanedEntities,
+    });
+    setPurgeState((prev) => ({ ...prev, isPurged: true, overlappingCount: 0, zeroLengthCount: 0 }));
+    showToast(`✓ Đã dọn sạch ${removed} thực thể rác (nét trùng đè & nét 0mm)!`);
+  };
+
+  const handleAlignWcsOrigin = () => {
+    setWcsConfig((prev) => ({ ...prev, isAligned: true }));
+    showToast("✓ Đã khóa gốc tọa độ WCS (0,0,0) tại Tim giao trục chính!");
+  };
 
   const [ctbMappings, setCtbMappings] = useState<
     Array<{
@@ -1013,40 +798,136 @@ export default function ChuanHoaBanVePage() {
     setVisibleLayers((prev) => ({ ...prev, [layerKey]: !prev[layerKey] }));
   };
 
-  // ── 6D CAD Health Scorecard Calculations ──
-  const layerScore = 95;
-  const fontScore = isReviewDone ? 100 : 70;
-  const geometryScore = purgeState.isPurged && wcsConfig.isAligned ? 100 : 60;
-  const dimScore = dimOverrides.every((d) => d.fixed) ? 100 : 65;
-  const blockScore = manualBlocks.every((b) => b.mappedBoqCode) ? 100 : 75;
-  const xrefScore = 100;
+  // ── 6D CAD Health Scorecard Calculations (Chống Ảo Giác - Tính Thật 100%) ──
+  const hasRealData = !!dxfData && dxfData.entities.length > 0;
 
-  const totalHealthScore = Math.round(
-    layerScore * 0.2 +
-      fontScore * 0.2 +
-      geometryScore * 0.2 +
-      dimScore * 0.15 +
-      blockScore * 0.15 +
-      xrefScore * 0.1,
-  );
+  const layerScore =
+    hasRealData && manualLayers.length > 0
+      ? Math.round(
+          (manualLayers.filter(
+            (l) =>
+              l.standardName.startsWith("M-") ||
+              l.standardName.startsWith("E-") ||
+              l.standardName.startsWith("P-") ||
+              l.standardName.startsWith("F-") ||
+              l.standardName.startsWith("ELV-") ||
+              l.standardName.startsWith("A-") ||
+              l.standardName.startsWith("S-") ||
+              l.standardName.startsWith("G-"),
+          ).length /
+            manualLayers.length) *
+            100,
+        )
+      : hasRealData
+        ? 100
+        : 0;
 
-  // ── 1-Click Auto-Healing Engine ──
+  const corruptedCount = manualTexts.filter(
+    (t) => t.raw !== t.decoded && t.edited === t.raw,
+  ).length;
+  const fontScore =
+    hasRealData && manualTexts.length > 0
+      ? Math.round(((manualTexts.length - corruptedCount) / manualTexts.length) * 100)
+      : hasRealData
+        ? 100
+        : 0;
+
+  const geometryScore = hasRealData
+    ? purgeState.isPurged
+      ? 100
+      : Math.max(20, 100 - (purgeState.overlappingCount + purgeState.zeroLengthCount) * 5)
+    : 0;
+
+  const dimScore =
+    hasRealData && dimOverrides.length > 0
+      ? Math.round((dimOverrides.filter((d) => d.fixed).length / dimOverrides.length) * 100)
+      : hasRealData
+        ? 100
+        : 0;
+
+  const blockScore =
+    hasRealData && manualBlocks.length > 0
+      ? Math.round(
+          (manualBlocks.filter((b) => !!b.mappedBoqCode).length / manualBlocks.length) * 100,
+        )
+      : hasRealData
+        ? 100
+        : 0;
+
+  const xrefScore =
+    hasRealData && (dxfData?.xrefs?.length || 0) > 0
+      ? Math.round(
+          (dxfData!.xrefs.filter((x) => x.isBound || x.status === "resolved").length /
+            dxfData!.xrefs.length) *
+            100,
+        )
+      : hasRealData
+        ? 100
+        : 0;
+
+  const totalHealthScore = hasRealData
+    ? Math.round(
+        layerScore * 0.25 +
+          fontScore * 0.2 +
+          geometryScore * 0.2 +
+          dimScore * 0.15 +
+          blockScore * 0.1 +
+          xrefScore * 0.1,
+      )
+    : 0;
+
+  // ── 1-Click Auto-Healing Engine (Áp Dụng Trực Tiếp Lên Dữ Liệu Thật) ──
   const handleAutoHealAll = () => {
-    // 1. Purge & WCS
-    setPurgeState((prev) => ({ ...prev, isPurged: true }));
+    if (!dxfData) {
+      showToast("Chưa nạp bản vẽ để thực hiện chuẩn hóa.");
+      return;
+    }
+
+    // 1. Dọn rác & WCS
+    const seenLines = new Set<string>();
+    const cleanedEntities = dxfData.entities.filter((e) => {
+      if (e.type === "LINE" && e.coordinates.start && e.coordinates.end) {
+        const [x1, y1] = e.coordinates.start;
+        const [x2, y2] = e.coordinates.end;
+        const len = Math.hypot(x2 - x1, y2 - y1);
+        if (len < 1) return false;
+        const key = `${Math.round(x1)},${Math.round(y1)}-${Math.round(x2)},${Math.round(y2)}`;
+        const revKey = `${Math.round(x2)},${Math.round(y2)}-${Math.round(x1)},${Math.round(y1)}`;
+        if (seenLines.has(key) || seenLines.has(revKey)) return false;
+        seenLines.add(key);
+      }
+      return true;
+    });
+
+    // 2. Chuẩn hóa font text cho toàn bộ thực thể
+    const healedEntities = cleanedEntities.map((e) => {
+      if (e.textValue) {
+        const decoded = e.decodedText || decodeCadText(e.textValue);
+        return { ...e, decodedText: decoded, textValue: decoded };
+      }
+      return e;
+    });
+
+    // 3. Chuẩn hóa tên layer
+    const standardLayerMapping = normalizeCadLayers(dxfData.layers.map((l) => l.name));
+    const healedLayers = dxfData.layers.map((l) => ({
+      ...l,
+      isStandardized: true,
+      standardName: standardLayerMapping[l.name] || l.name,
+    }));
+
+    setDxfData({
+      ...dxfData,
+      layers: healedLayers,
+      entities: healedEntities,
+    });
+
+    setPurgeState((prev) => ({ ...prev, isPurged: true, overlappingCount: 0, zeroLengthCount: 0 }));
     setWcsConfig((prev) => ({ ...prev, isAligned: true }));
-    // 2. Font Doctor
-    setConvertedText(
-      "Hệ thống thông gió tầng 4 - ống gió 600x400 BOP=+2.85m Ø150 (Chuyển đổi UTF-8)",
-    );
-    // 3. Dim Doctor
-    setDimOverrides((prev) =>
-      prev.map((d) => ({ ...d, fixed: true, nominalText: `${d.actualMeasMm} mm` })),
-    );
-    // 4. Block & Manual Review Done
     setIsReviewDone(true);
+
     showToast(
-      "✨ ĐÃ TỰ ĐỘNG CHUẨN HÓA TOÀN DIỆN 1-CHẠM THÀNH CÔNG! Sức khỏe bản vẽ đạt 100/100 Điểm (Hạng A+)",
+      "✨ Đã tự động chuẩn hóa toàn diện bản vẽ thật! Các layer, font text và hình học đã được làm sạch.",
     );
   };
 
@@ -1056,7 +937,7 @@ export default function ChuanHoaBanVePage() {
     bundle += `;; XBOSS CAD/BIM MASTER AUTOMATION BUNDLE — ISO 19650 / TCVN STANDARDS\n`;
     bundle += `;; File: ${generatedFileName}\n`;
     bundle += `;; Generated at: ${new Date().toISOString()}\n`;
-    bundle += `;; Health Index: ${totalHealthScore}/100 (Hạng A+ ISO 19650)\n`;
+    bundle += `;; Health Index: ${totalHealthScore}/100 (ISO 19650)\n`;
     bundle += `;; ==========================================================================\n\n`;
 
     bundle += `;; 1. AUTOCAD LAYER SCRIPT (.SCR)\n`;
@@ -1110,6 +991,13 @@ export default function ChuanHoaBanVePage() {
       filePath?: string;
       name?: string;
     }) => {
+      // Không gọi API nếu không có nguồn dữ liệu bản vẽ thật
+      const hasDrawingId = options?.drawingId ?? selectedDrawingId;
+      const hasUploadData = options?.fileBase64 || options?.customDxfContent || options?.filePath;
+      if (!hasDrawingId && !hasUploadData && !options?.name) {
+        return;
+      }
+
       setLoading(true);
       try {
         const res = await fetch("/api/engineering/cad/parse-dxf", {
@@ -1213,7 +1101,7 @@ export default function ChuanHoaBanVePage() {
           setConversionInfo({
             originalFileName: file.name,
             dxfFileName: dxfName,
-            dxfContent: generateSynthesizedMepfDxf(file.name),
+            dxfContent: "",
             entityCount: localParsed.entities.length,
             convertedAt: timeStr,
           });
@@ -1409,95 +1297,10 @@ export default function ChuanHoaBanVePage() {
     }
   };
 
-  // ── CAD Diff Runner ──
+  // ── CAD Diff Runner (Chỉ Chạy Khi Có 2 Phiên Bản Thực Tế Để So Sánh) ──
   const runDiffAnalysis = useCallback(async () => {
-    try {
-      const sampleBaseEntities = [
-        {
-          id: "E-BASE-01",
-          type: "polyline",
-          layer: "M-DUCT-SUPP",
-          coordinates: { start: [1000, 2000, 3000], end: [5000, 2000, 3000] },
-          textValue: "Duct 600x400 L=4m",
-        },
-        {
-          id: "E-BASE-02",
-          type: "insert_block",
-          layer: "M-DIFFUSER",
-          coordinates: { center: [2000, 2000, 2800] },
-          blockName: "BLK_DIFFUSER_600",
-        },
-        {
-          id: "E-BASE-03",
-          type: "line",
-          layer: "P-PIPE-COLD",
-          coordinates: { start: [1000, 1500, 2850], end: [4000, 1500, 2850] },
-          textValue: "DN50 PPR +2.85m",
-        },
-        {
-          id: "E-BASE-04",
-          type: "line",
-          layer: "E-TRAY-PWRR",
-          coordinates: { start: [4100, 2200, 3200], end: [6000, 2200, 3200] },
-          textValue: "Tray 300x100",
-        },
-      ];
-
-      const sampleCompareEntities = [
-        {
-          id: "E-BASE-01",
-          type: "polyline",
-          layer: "M-DUCT-SUPP",
-          coordinates: { start: [1000, 2000, 3000], end: [5000, 2000, 3000] },
-          textValue: "Duct 600x400 L=4m",
-        },
-        {
-          id: "E-BASE-02",
-          type: "insert_block",
-          layer: "M-DIFFUSER",
-          coordinates: { center: [2000, 2000, 2800] },
-          blockName: "BLK_DIFFUSER_600",
-        },
-        {
-          id: "E-BASE-03",
-          type: "line",
-          layer: "P-PIPE-COLD",
-          coordinates: { start: [1000, 1500, 3100], end: [4000, 1500, 3100] },
-          textValue: "DN50 PPR +3.10m (Né dầm D2)",
-        },
-        {
-          id: "E-NEW-05",
-          type: "polyline",
-          layer: "M-DUCT-SUPP",
-          coordinates: { start: [1200, 3400, 2900], end: [3000, 3400, 2900] },
-          textValue: "Nhánh ống gió 400x300 Zone B",
-        },
-        {
-          id: "E-NEW-06",
-          type: "insert_block",
-          layer: "M-DIFFUSER",
-          coordinates: { center: [1400, 3600, 2700] },
-          blockName: "BLK_DIFFUSER_600",
-        },
-      ];
-
-      const res = await fetch("/api/engineering/cad/diff", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          baseEntities: sampleBaseEntities,
-          compareEntities: sampleCompareEntities,
-          toleranceMm: 5,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setDiffResult(data);
-      }
-    } catch (e) {
-      console.error("CAD Diff error:", e);
-    }
+    // Không tự động tạo diff giả khi chưa chọn phiên bản đối chiếu
+    setDiffResult(null);
   }, []);
 
   // ── Block Catalogs Fetcher ──
@@ -1507,55 +1310,15 @@ export default function ChuanHoaBanVePage() {
       const res = await fetch("/api/engineering/cad/blocks");
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setBlockCatalogs(data);
         } else {
-          setBlockCatalogs([
-            {
-              block_name: "BLK_VAV_BOX_500",
-              discipline: "HVAC",
-              category: "Thiết bị phân phối gió",
-              attribute_schema: {
-                AirFlow: "1200 m3/h",
-                Coil: "2-Row",
-                In: "Ø250",
-                Out: "400x250",
-              },
-              mapped_boq_code: "HVAC-VAV-500",
-            },
-            {
-              block_name: "BLK_SPRINKLER_PENDENT",
-              discipline: "PCCC",
-              category: "Đầu phun chữa cháy",
-              attribute_schema: { Thread: 'NPT 1/2"', "K-Factor": 5.6, Temp: "68°C" },
-              mapped_boq_code: "FP-SPK-68C",
-            },
-            {
-              block_name: "BLK_PANEL_DB_LV",
-              discipline: "Điện",
-              category: "Tủ điện phân phối",
-              attribute_schema: { Rating: "100A", Poles: "3P+N", Form: "2B", IP: "IP54" },
-              mapped_boq_code: "ELEC-PANEL-DB",
-            },
-            {
-              block_name: "BLK_FCU_CEILING_4WAY",
-              discipline: "HVAC",
-              category: "Dàn lạnh FCU âm trần",
-              attribute_schema: { Capacity: "3.5 kW", AirFlow: "600 CFM", WaterIn: "DN20" },
-              mapped_boq_code: "HVAC-FCU-035",
-            },
-            {
-              block_name: "BLK_VALVE_BUTTERFLY_DN100",
-              discipline: "Cấp thoát nước",
-              category: "Van bướm tay gạt",
-              attribute_schema: { Size: "DN100", Rating: "PN16", Material: "Ductile Iron" },
-              mapped_boq_code: "PLUMB-VALVE-BF100",
-            },
-          ]);
+          setBlockCatalogs([]);
         }
       }
     } catch (e) {
       console.error("Fetch blocks error:", e);
+      setBlockCatalogs([]);
     } finally {
       setLoadingBlocks(false);
     }
@@ -2476,9 +2239,13 @@ export default function ChuanHoaBanVePage() {
                       Bản Vẽ Thật ({dxfData.entities.length} thực thể,{" "}
                       {((dxfData.fileSizeBytes || 0) / 1024).toFixed(1)} KB)
                     </span>
-                  ) : (
+                  ) : dxfData ? (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-400 font-semibold text-[10px]">
-                      Mô hình mẫu ({dxfData?.entities.length || 0} thực thể)
+                      {dxfData.entities.length} thực thể
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-zinc-800 border border-zinc-700 text-zinc-500 font-semibold text-[10px]">
+                      Chưa nạp bản vẽ
                     </span>
                   )}
                 </div>
@@ -2884,16 +2651,39 @@ export default function ChuanHoaBanVePage() {
                             return null;
                           })
                         ) : (
-                          <text
-                            x={svgW / 2}
-                            y={svgH / 2}
-                            fill="#71717a"
-                            textAnchor="middle"
-                            fontSize="13"
-                            fontFamily="monospace"
-                          >
-                            Đang tải thực thể CAD...
-                          </text>
+                          <g>
+                            <text
+                              x={svgW / 2}
+                              y={svgH / 2 - 30}
+                              fill="#a1a1aa"
+                              textAnchor="middle"
+                              fontSize="14"
+                              fontWeight="bold"
+                              fontFamily="sans-serif"
+                            >
+                              Chưa có bản vẽ nào được nạp
+                            </text>
+                            <text
+                              x={svgW / 2}
+                              y={svgH / 2}
+                              fill="#71717a"
+                              textAnchor="middle"
+                              fontSize="11"
+                              fontFamily="monospace"
+                            >
+                              Tải lên file .DWG / .DXF hoặc chọn bản vẽ từ dự án để bắt đầu
+                            </text>
+                            <text
+                              x={svgW / 2}
+                              y={svgH / 2 + 22}
+                              fill="#52525b"
+                              textAnchor="middle"
+                              fontSize="10"
+                              fontFamily="monospace"
+                            >
+                              Hỗ trợ: AutoCAD 2000–2025 (.dwg), DXF R12–R2025, PDF
+                            </text>
+                          </g>
                         )}
 
                         {/* Visual Defect Highlights (When Enabled) */}
@@ -3315,15 +3105,23 @@ export default function ChuanHoaBanVePage() {
                 <div className="p-3.5 rounded-xl bg-zinc-950 border border-amber-500/30 space-y-1">
                   <span className="text-[11px] text-zinc-400">Điểm Chuẩn Hóa CAD</span>
                   <div className="text-2xl font-bold font-mono text-amber-400">
-                    {dxfData?.diagnostic.healthScore || 85} / 100
+                    {hasRealData ? (dxfData?.diagnostic?.healthScore ?? totalHealthScore) : 0} / 100
                   </div>
-                  <span className="text-[10px] text-emerald-400">Đủ điều kiện dựng 3D</span>
+                  <span className="text-[10px] text-emerald-400">
+                    {hasRealData
+                      ? totalHealthScore >= 80
+                        ? "Đủ điều kiện dựng 3D"
+                        : "Cần hoàn thiện chuẩn hóa"
+                      : "Chưa nạp bản vẽ"}
+                  </span>
                 </div>
 
                 <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
                   <span className="text-[11px] text-zinc-400">Tổng Thực Thể (Entities)</span>
                   <div className="text-2xl font-bold font-mono text-zinc-200">
-                    {dxfData?.diagnostic.totalEntities || 18}
+                    {hasRealData
+                      ? (dxfData?.diagnostic?.totalEntities ?? dxfData?.entities.length ?? 0)
+                      : 0}
                   </div>
                   <span className="text-[10px] text-zinc-400">Line, Polyline, Text, Block</span>
                 </div>
@@ -3331,8 +3129,17 @@ export default function ChuanHoaBanVePage() {
                 <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
                   <span className="text-[11px] text-zinc-400">Layer Chuẩn AIA</span>
                   <div className="text-2xl font-bold font-mono text-emerald-400">
-                    {dxfData?.diagnostic.standardLayersCount || 7} /{" "}
-                    {dxfData?.diagnostic.totalLayers || 8}
+                    {hasRealData
+                      ? (dxfData?.diagnostic?.standardLayersCount ??
+                        manualLayers.filter(
+                          (l) =>
+                            l.standardName.startsWith("M-") ||
+                            l.standardName.startsWith("E-") ||
+                            l.standardName.startsWith("P-") ||
+                            l.standardName.startsWith("F-"),
+                        ).length)
+                      : 0}{" "}
+                    / {hasRealData ? (dxfData?.diagnostic?.totalLayers ?? manualLayers.length) : 0}
                   </div>
                   <span className="text-[10px] text-zinc-400">Đã map phân hệ MEPF</span>
                 </div>
@@ -3340,19 +3147,23 @@ export default function ChuanHoaBanVePage() {
                 <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
                   <span className="text-[11px] text-zinc-400">Text Lỗi Font / Mã Cũ</span>
                   <div className="text-2xl font-bold font-mono text-rose-400">
-                    {dxfData?.diagnostic.corruptedTextCount || 0}
+                    {hasRealData ? (dxfData?.diagnostic?.corruptedTextCount ?? 0) : 0}
                   </div>
-                  <span className="text-[10px] text-zinc-400">Đã tự động chữa lành</span>
+                  <span className="text-[10px] text-zinc-400">
+                    {hasRealData ? "TCVN3 / VNI detected" : "—"}
+                  </span>
                 </div>
 
                 <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
                   <span className="text-[11px] text-zinc-400">Kích Thước Bao Bản Vẽ</span>
                   <div className="text-xs font-bold font-mono text-sky-400 pt-1">
-                    {dxfData
+                    {hasRealData && dxfData?.diagnostic?.boundingDimensions
                       ? `${(dxfData.diagnostic.boundingDimensions.widthMm / 1000).toFixed(1)}m × ${(dxfData.diagnostic.boundingDimensions.lengthMm / 1000).toFixed(1)}m`
-                      : "15.0m × 5.0m"}
+                      : "—"}
                   </div>
-                  <span className="text-[10px] text-zinc-400">Tọa độ gốc 0,0,0</span>
+                  <span className="text-[10px] text-zinc-400">
+                    {hasRealData ? "Tọa độ WCS thực tế" : "Chưa xác định"}
+                  </span>
                 </div>
               </div>
 
@@ -3363,16 +3174,20 @@ export default function ChuanHoaBanVePage() {
                   <span>Khuyến Nghị Xử Lý Kỹ Thuật Tự Động</span>
                 </h3>
                 <ul className="space-y-1 text-xs text-zinc-300">
-                  {dxfData?.diagnostic.recommendations.map((rec, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="text-amber-400 font-bold">•</span>
-                      <span>{rec}</span>
-                    </li>
-                  )) || (
-                    <li className="flex items-start gap-2">
-                      <span className="text-amber-400 font-bold">•</span>
+                  {hasRealData &&
+                  dxfData?.diagnostic?.recommendations &&
+                  dxfData.diagnostic.recommendations.length > 0 ? (
+                    dxfData.diagnostic.recommendations.map((rec, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-amber-400 font-bold">•</span>
+                        <span>{rec}</span>
+                      </li>
+                    ))
+                  ) : (
+                    <li className="flex items-start gap-2 text-zinc-500">
                       <span>
-                        Bản vẽ sẵn sàng đùn khối 3D AABB và thiết lập phân tầng hành lang.
+                        • Vui lòng tải lên hoặc chọn bản vẽ CAD thật để hệ thống tự động chẩn đoán
+                        và đưa ra khuyến nghị.
                       </span>
                     </li>
                   )}
@@ -3862,37 +3677,45 @@ export default function ChuanHoaBanVePage() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {blockCatalogs.map((b, i) => (
-                  <div
-                    key={i}
-                    className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2.5 shadow-xs hover:border-zinc-700 transition"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-bold">
-                        {b.discipline}
-                      </span>
-                      <span className="text-[10px] font-mono text-zinc-400">
-                        {b.mapped_boq_code || "Chưa map BOQ"}
-                      </span>
-                    </div>
+              {blockCatalogs.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {blockCatalogs.map((b, i) => (
+                    <div
+                      key={i}
+                      className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2.5 shadow-xs hover:border-zinc-700 transition"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-bold">
+                          {b.discipline}
+                        </span>
+                        <span className="text-[10px] font-mono text-zinc-400">
+                          {b.mapped_boq_code || "Chưa map BOQ"}
+                        </span>
+                      </div>
 
-                    <div className="space-y-0.5">
-                      <h4 className="text-xs font-bold text-zinc-100 font-mono">{b.block_name}</h4>
-                      <p className="text-[11px] text-zinc-400">{b.category}</p>
-                    </div>
+                      <div className="space-y-0.5">
+                        <h4 className="text-xs font-bold text-zinc-100 font-mono">
+                          {b.block_name}
+                        </h4>
+                        <p className="text-[11px] text-zinc-400">{b.category}</p>
+                      </div>
 
-                    <div className="p-2 rounded-lg bg-zinc-900 border border-zinc-800/80 space-y-1 font-mono text-[10px]">
-                      {Object.entries(b.attribute_schema).map(([k, v]) => (
-                        <div key={k} className="flex items-center justify-between text-zinc-300">
-                          <span className="text-zinc-500">{k}:</span>
-                          <span className="text-zinc-200 font-medium">{String(v)}</span>
-                        </div>
-                      ))}
+                      <div className="p-2 rounded-lg bg-zinc-900 border border-zinc-800/80 space-y-1 font-mono text-[10px]">
+                        {Object.entries(b.attribute_schema).map(([k, v]) => (
+                          <div key={k} className="flex items-center justify-between text-zinc-300">
+                            <span className="text-zinc-500">{k}:</span>
+                            <span className="text-zinc-200 font-medium">{String(v)}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-6 rounded-xl bg-zinc-950 text-center text-xs text-zinc-500 border border-zinc-800/60">
+                  Chưa có danh mục block CAD nào trong cơ sở dữ liệu dự án.
+                </div>
+              )}
             </div>
 
             {/* Phân đoạn 3.2: Dim Override Doctor (Chống Gian Lận Kích Thước) */}
@@ -3909,13 +3732,15 @@ export default function ChuanHoaBanVePage() {
                   </p>
                 </div>
 
-                <button
-                  onClick={handleFixAllDims}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 font-bold text-xs shadow-sm transition shrink-0"
-                >
-                  <Check className="w-3.5 h-3.5" />
-                  <span>Khôi Phục Tất Cả Về Đo Thực Tế</span>
-                </button>
+                {dimOverrides.length > 0 && (
+                  <button
+                    onClick={handleFixAllDims}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 font-bold text-xs shadow-sm transition shrink-0"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Khôi Phục Tất Cả Về Đo Thực Tế</span>
+                  </button>
+                )}
               </div>
 
               <div className="overflow-x-auto">
@@ -4091,7 +3916,7 @@ export default function ChuanHoaBanVePage() {
                 <div className="flex items-center gap-2">
                   <span className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 text-xs font-bold font-mono border border-purple-500/30 flex items-center gap-1.5">
                     <Network className="w-3.5 h-3.5" />
-                    <span>{dxfData?.xrefs?.length || 3} XREFs Đã Khớp</span>
+                    <span>{dxfData?.xrefs?.length || 0} XREFs</span>
                   </span>
                 </div>
               </div>
@@ -4112,62 +3937,74 @@ export default function ChuanHoaBanVePage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-800/60 font-mono">
-                    {(dxfData?.xrefs || []).map((xref) => (
-                      <tr key={xref.id} className="hover:bg-zinc-800/40 transition">
-                        <td className="py-2.5 px-3 font-bold text-purple-400 flex items-center gap-1.5">
-                          <Link2 className="w-3.5 h-3.5 shrink-0 text-purple-400" />
-                          <span>{xref.name}</span>
-                        </td>
-                        <td className="py-2.5 px-3 font-sans text-zinc-300">{xref.description}</td>
-                        <td
-                          className="py-2.5 px-3 text-zinc-400 truncate max-w-[160px]"
-                          title={xref.originalPath}
-                        >
-                          {xref.originalPath}
-                        </td>
-                        <td className="py-2.5 px-3 text-emerald-400 font-semibold truncate max-w-[160px]">
-                          {xref.resolvedFileName || xref.fileName}
-                        </td>
-                        <td className="py-2.5 px-3 text-zinc-300">
-                          <span className="text-sky-400 font-bold">{xref.entityCount}</span> net •{" "}
-                          <span className="text-zinc-400">{xref.layerCount} layers</span>
-                        </td>
-                        <td className="py-2.5 px-3 font-sans">
-                          {xref.isBound ? (
-                            <span className="px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 text-[11px] font-bold border border-sky-500/30">
-                              Attach (Đã Gộp)
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 text-[11px] font-semibold">
-                              Overlay (Nền mờ 50%)
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-3 font-sans">
-                          {xref.status === "resolved" ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-semibold">
-                              <CheckCircle2 className="w-3.5 h-3.5" /> Đã Khớp
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-[11px] text-amber-400 font-semibold">
-                              <AlertTriangle className="w-3.5 h-3.5" /> Thiếu Tệp
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-sans">
-                          <button
-                            onClick={() => handleToggleXrefBind(xref.id)}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition border ${
-                              xref.isBound
-                                ? "bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-700"
-                                : "bg-purple-600 hover:bg-purple-700 text-white border-purple-500 shadow-xs"
-                            }`}
+                    {dxfData?.xrefs && dxfData.xrefs.length > 0 ? (
+                      dxfData.xrefs.map((xref) => (
+                        <tr key={xref.id} className="hover:bg-zinc-800/40 transition">
+                          <td className="py-2.5 px-3 font-bold text-purple-400 flex items-center gap-1.5">
+                            <Link2 className="w-3.5 h-3.5 shrink-0 text-purple-400" />
+                            <span>{xref.name}</span>
+                          </td>
+                          <td className="py-2.5 px-3 font-sans text-zinc-300">
+                            {xref.description}
+                          </td>
+                          <td
+                            className="py-2.5 px-3 text-zinc-400 truncate max-w-[160px]"
+                            title={xref.originalPath}
                           >
-                            {xref.isBound ? "Chuyển sang Overlay" : "Gộp (Bind) vào Master"}
-                          </button>
+                            {xref.originalPath}
+                          </td>
+                          <td className="py-2.5 px-3 text-emerald-400 font-semibold truncate max-w-[160px]">
+                            {xref.resolvedFileName || xref.fileName}
+                          </td>
+                          <td className="py-2.5 px-3 text-zinc-300">
+                            <span className="text-sky-400 font-bold">{xref.entityCount}</span> net •{" "}
+                            <span className="text-zinc-400">{xref.layerCount} layers</span>
+                          </td>
+                          <td className="py-2.5 px-3 font-sans">
+                            {xref.isBound ? (
+                              <span className="px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 text-[11px] font-bold border border-sky-500/30">
+                                Attach (Đã Gộp)
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 text-[11px] font-semibold">
+                                Overlay (Nền mờ 50%)
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3 font-sans">
+                            {xref.status === "resolved" ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-semibold">
+                                <CheckCircle2 className="w-3.5 h-3.5" /> Đã Khớp
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[11px] text-amber-400 font-semibold">
+                                <AlertTriangle className="w-3.5 h-3.5" /> Thiếu Tệp
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-sans">
+                            <button
+                              onClick={() => handleToggleXrefBind(xref.id)}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition border ${
+                                xref.isBound
+                                  ? "bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-700"
+                                  : "bg-purple-600 hover:bg-purple-700 text-white border-purple-500 shadow-xs"
+                              }`}
+                            >
+                              {xref.isBound ? "Chuyển sang Overlay" : "Gộp (Bind) vào Master"}
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={8} className="py-8 text-center text-zinc-500 font-sans">
+                          {hasRealData
+                            ? "✓ Bản vẽ này độc lập, không sử dụng liên kết tham chiếu ngoài (XREF)."
+                            : "Chưa có bản vẽ nào được nạp để kiểm tra liên kết XREF."}
                         </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -4189,13 +4026,13 @@ export default function ChuanHoaBanVePage() {
 
                 <div className="flex items-center gap-2">
                   <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono font-bold">
-                    +{diffResult?.summary?.added ?? 1} Mới
+                    +{diffResult?.summary?.added ?? 0} Mới
                   </span>
                   <span className="px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-mono font-bold">
                     -{diffResult?.summary?.removed ?? 0} Xóa
                   </span>
                   <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-mono font-bold">
-                    ~{diffResult?.summary?.modified ?? 1} Dời
+                    ~{diffResult?.summary?.modified ?? 0} Dời
                   </span>
                 </div>
               </div>
@@ -4203,8 +4040,7 @@ export default function ChuanHoaBanVePage() {
               {/* Action and Refresh */}
               <div className="flex items-center justify-between">
                 <div className="text-xs text-zinc-400">
-                  Phân tích so khớp giữa bản vẽ Thiết kế Cơ sở (Rev A) và Bản vẽ Shopdrawing thi
-                  công (Rev B).
+                  Phân tích so khớp hình học giữa các phiên bản revision bản vẽ (Base vs Compare).
                 </div>
                 <button
                   onClick={runDiffAnalysis}
@@ -4228,42 +4064,52 @@ export default function ChuanHoaBanVePage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-800/60 font-mono">
-                    {(diffResult?.differences || []).map((c, i) => (
-                      <tr key={i} className="hover:bg-zinc-800/40 transition">
-                        <td className="py-2.5 px-3 font-sans">
-                          {c.diffStatus === "added" && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 font-semibold text-[10px]">
-                              <Plus className="w-3 h-3" /> Thêm Mới
+                    {diffResult?.differences && diffResult.differences.length > 0 ? (
+                      diffResult.differences.map((c, i) => (
+                        <tr key={i} className="hover:bg-zinc-800/40 transition">
+                          <td className="py-2.5 px-3 font-sans">
+                            {c.diffStatus === "added" && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 font-semibold text-[10px]">
+                                <Plus className="w-3 h-3" /> Thêm Mới
+                              </span>
+                            )}
+                            {c.diffStatus === "removed" && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 font-semibold text-[10px]">
+                                <Minus className="w-3 h-3" /> Đã Xóa
+                              </span>
+                            )}
+                            {c.diffStatus === "modified" && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 font-semibold text-[10px]">
+                                <RefreshCw className="w-3 h-3" /> Dời Tọa Độ
+                              </span>
+                            )}
+                            {c.diffStatus === "unchanged" && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-400 font-semibold text-[10px]">
+                                Trùng Khớp
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3 text-zinc-300 font-bold">{c.entityId}</td>
+                          <td className="py-2.5 px-3 text-zinc-400">{c.layer}</td>
+                          <td className="py-2.5 px-3 text-zinc-200 font-sans">
+                            {c.changeDescription}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-sans">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400">
+                              {c.type}
                             </span>
-                          )}
-                          {c.diffStatus === "removed" && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 font-semibold text-[10px]">
-                              <Minus className="w-3 h-3" /> Đã Xóa
-                            </span>
-                          )}
-                          {c.diffStatus === "modified" && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 font-semibold text-[10px]">
-                              <RefreshCw className="w-3 h-3" /> Dời Tọa Độ
-                            </span>
-                          )}
-                          {c.diffStatus === "unchanged" && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-400 font-semibold text-[10px]">
-                              Trùng Khớp
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-3 text-zinc-300 font-bold">{c.entityId}</td>
-                        <td className="py-2.5 px-3 text-zinc-400">{c.layer}</td>
-                        <td className="py-2.5 px-3 text-zinc-200 font-sans">
-                          {c.changeDescription}
-                        </td>
-                        <td className="py-2.5 px-3 text-right font-sans">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400">
-                            {c.type}
-                          </span>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={5} className="py-8 text-center text-zinc-500 font-sans">
+                          {hasRealData
+                            ? "Chọn một phiên bản bản vẽ khác để chạy so sánh đối chiếu sai khác hình học (CAD Diff)."
+                            : "Chưa có bản vẽ nào được nạp để so sánh phiên bản."}
                         </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>
