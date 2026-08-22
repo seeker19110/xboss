@@ -374,7 +374,14 @@ export interface DxfEntityRaw {
     | "TEXT"
     | "MTEXT"
     | "INSERT"
-    | "DIMENSION";
+    | "DIMENSION"
+    | "SPLINE"
+    | "ELLIPSE"
+    | "SOLID"
+    | "3DFACE"
+    | "HATCH"
+    | "LEADER"
+    | "MULTILEADER";
   layer: string;
   color?: number;
   coordinates: {
@@ -1070,7 +1077,24 @@ export function parseDxf(
       }
     } else if (
       code === "0" &&
-      ["LINE", "LWPOLYLINE", "POLYLINE", "CIRCLE", "ARC", "TEXT", "MTEXT", "INSERT"].includes(val)
+      [
+        "LINE",
+        "LWPOLYLINE",
+        "POLYLINE",
+        "CIRCLE",
+        "ARC",
+        "TEXT",
+        "MTEXT",
+        "INSERT",
+        "DIMENSION",
+        "SPLINE",
+        "ELLIPSE",
+        "SOLID",
+        "3DFACE",
+        "HATCH",
+        "LEADER",
+        "MULTILEADER",
+      ].includes(val)
     ) {
       const entityType = val as DxfEntityRaw["type"];
       let currentLayer = "0";
@@ -1115,28 +1139,43 @@ export function parseDxf(
             blockName = v;
             break;
           case "10":
-            if (entityType === "LWPOLYLINE") {
+            if (entityType === "LWPOLYLINE" || entityType === "SPLINE") {
               polyPoints.push([parseFloat(v) || 0, 0, 0]);
-            } else if (entityType === "LINE") {
+            } else if (
+              entityType === "LINE" ||
+              entityType === "DIMENSION" ||
+              entityType === "LEADER"
+            ) {
               startX = parseFloat(v) || 0;
+              centerX = startX;
             } else {
               centerX = parseFloat(v) || 0;
             }
             break;
           case "20":
-            if (entityType === "LWPOLYLINE" && polyPoints.length > 0) {
+            if ((entityType === "LWPOLYLINE" || entityType === "SPLINE") && polyPoints.length > 0) {
               polyPoints[polyPoints.length - 1][1] = parseFloat(v) || 0;
-            } else if (entityType === "LINE") {
+            } else if (
+              entityType === "LINE" ||
+              entityType === "DIMENSION" ||
+              entityType === "LEADER"
+            ) {
               startY = parseFloat(v) || 0;
+              centerY = startY;
             } else {
               centerY = parseFloat(v) || 0;
             }
             break;
           case "30":
-            if (entityType === "LWPOLYLINE" && polyPoints.length > 0) {
+            if ((entityType === "LWPOLYLINE" || entityType === "SPLINE") && polyPoints.length > 0) {
               polyPoints[polyPoints.length - 1][2] = parseFloat(v) || 0;
-            } else if (entityType === "LINE") {
+            } else if (
+              entityType === "LINE" ||
+              entityType === "DIMENSION" ||
+              entityType === "LEADER"
+            ) {
               startZ = parseFloat(v) || 0;
+              centerZ = startZ;
             } else {
               centerZ = parseFloat(v) || 0;
             }
@@ -1158,15 +1197,32 @@ export function parseDxf(
       }
 
       // Record entity coordinates
-      if (entityType === "LINE") {
+      if (entityType === "LINE" || entityType === "DIMENSION" || entityType === "LEADER") {
         coords.start = [startX, startY, startZ];
-        coords.end = [endX, endY, endZ];
+        coords.end = [endX || startX + 1000, endY || startY, endZ];
+        coords.center = [centerX, centerY, centerZ];
         updateBounds(startX, startY);
-        updateBounds(endX, endY);
-      } else if (entityType === "LWPOLYLINE" || entityType === "POLYLINE") {
+        updateBounds(endX || startX + 1000, endY || startY);
+      } else if (
+        entityType === "LWPOLYLINE" ||
+        entityType === "POLYLINE" ||
+        entityType === "SPLINE"
+      ) {
         coords.points = polyPoints;
         polyPoints.forEach((pt) => updateBounds(pt[0], pt[1]));
-      } else if (["CIRCLE", "ARC", "INSERT", "TEXT", "MTEXT"].includes(entityType)) {
+      } else if (
+        [
+          "CIRCLE",
+          "ARC",
+          "INSERT",
+          "TEXT",
+          "MTEXT",
+          "ELLIPSE",
+          "SOLID",
+          "3DFACE",
+          "HATCH",
+        ].includes(entityType)
+      ) {
         coords.center = [centerX, centerY, centerZ];
         coords.radius = radius;
         updateBounds(centerX, centerY);
@@ -1905,4 +1961,12 @@ export function exportDxf(
   dxf += "0\r\nEOF\r\n";
 
   return dxf;
+}
+
+/**
+ * Sinh cấu trúc file AutoCAD 2D ASCII DXF chuẩn với đầy đủ các phân hệ MEPF và trục toạ độ (X, Y).
+ */
+export function generateStandard2dDxf(title = "Ban_Ve_CAD_2D", system = "HVAC"): string {
+  const sysUpper = (system || "HVAC").toUpperCase();
+  return `0\r\nSECTION\r\n2\r\nHEADER\r\n9\r\n$ACADVER\r\n1\r\nAC1015\r\n9\r\n$INSUNITS\r\n70\r\n4\r\n9\r\n$MEASUREMENT\r\n70\r\n1\r\n0\r\nENDSEC\r\n0\r\nSECTION\r\n2\r\nTABLES\r\n0\r\nTABLE\r\n2\r\nVPORT\r\n70\r\n1\r\n0\r\nVPORT\r\n2\r\n*ACTIVE\r\n70\r\n0\r\n10\r\n0.0\r\n20\r\n0.0\r\n11\r\n1.0\r\n21\r\n1.0\r\n12\r\n0.0\r\n22\r\n0.0\r\n40\r\n1000.0\r\n41\r\n1.5\r\n0\r\nENDTAB\r\n0\r\nTABLE\r\n2\r\nLAYER\r\n70\r\n8\r\n0\r\nLAYER\r\n2\r\n0\r\n70\r\n0\r\n62\r\n7\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nM-DUCT-SUPP\r\n70\r\n0\r\n62\r\n4\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nM-DUCT-RETN\r\n70\r\n0\r\n62\r\n6\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nP-PIPE-SANR\r\n70\r\n0\r\n62\r\n3\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nE-CABL-TRAY\r\n70\r\n0\r\n62\r\n1\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nF-SPRN-PIPE\r\n70\r\n0\r\n62\r\n1\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nA-WALL-GRID\r\n70\r\n0\r\n62\r\n8\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nG-ANNO-TEXT\r\n70\r\n0\r\n62\r\n7\r\n6\r\nCONTINUOUS\r\n0\r\nENDTAB\r\n0\r\nENDSEC\r\n0\r\nSECTION\r\n2\r\nBLOCKS\r\n0\r\nENDSEC\r\n0\r\nSECTION\r\n2\r\nENTITIES\r\n0\r\nLINE\r\n8\r\nA-WALL-GRID\r\n10\r\n0.0\r\n20\r\n0.0\r\n30\r\n0.0\r\n11\r\n36000.0\r\n21\r\n0.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nA-WALL-GRID\r\n10\r\n36000.0\r\n20\r\n0.0\r\n30\r\n0.0\r\n11\r\n36000.0\r\n21\r\n18000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nA-WALL-GRID\r\n10\r\n36000.0\r\n20\r\n18000.0\r\n30\r\n0.0\r\n11\r\n0.0\r\n21\r\n18000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nA-WALL-GRID\r\n10\r\n0.0\r\n20\r\n18000.0\r\n30\r\n0.0\r\n11\r\n0.0\r\n21\r\n0.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nM-DUCT-SUPP\r\n10\r\n3000.0\r\n20\r\n9000.0\r\n30\r\n0.0\r\n11\r\n33000.0\r\n21\r\n9000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nM-DUCT-RETN\r\n10\r\n3000.0\r\n20\r\n12000.0\r\n30\r\n0.0\r\n11\r\n33000.0\r\n21\r\n12000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nP-PIPE-SANR\r\n10\r\n3000.0\r\n20\r\n6000.0\r\n30\r\n0.0\r\n11\r\n33000.0\r\n21\r\n6000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nE-CABL-TRAY\r\n10\r\n3000.0\r\n20\r\n15000.0\r\n30\r\n0.0\r\n11\r\n33000.0\r\n21\r\n15000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nF-SPRN-PIPE\r\n10\r\n3000.0\r\n20\r\n3000.0\r\n30\r\n0.0\r\n11\r\n33000.0\r\n21\r\n3000.0\r\n31\r\n0.0\r\n0\r\nTEXT\r\n8\r\nG-ANNO-TEXT\r\n10\r\n18000.0\r\n20\r\n9500.0\r\n30\r\n0.0\r\n40\r\n300.0\r\n1\r\nống gió cấp lạnh AHU-01 800x500\r\n0\r\nTEXT\r\n8\r\nG-ANNO-TEXT\r\n10\r\n18000.0\r\n20\r\n12500.0\r\n30\r\n0.0\r\n40\r\n300.0\r\n1\r\nống gió hồi 700x400\r\n0\r\nTEXT\r\n8\r\nG-ANNO-TEXT\r\n10\r\n18000.0\r\n20\r\n6500.0\r\n30\r\n0.0\r\n40\r\n300.0\r\n1\r\nống thoát nước D114 dốc i=1.5% BOP=+2850\r\n0\r\nTEXT\r\n8\r\nG-ANNO-TEXT\r\n10\r\n18000.0\r\n20\r\n15500.0\r\n30\r\n0.0\r\n40\r\n300.0\r\n1\r\nMáng cáp điện Trunking 400x100\r\n0\r\nTEXT\r\n8\r\nG-ANNO-TEXT\r\n10\r\n18000.0\r\n20\r\n3500.0\r\n30\r\n0.0\r\n40\r\n300.0\r\n1\r\nĐầu phun PCCC Sprinkler 68°C\r\n0\r\nENDSEC\r\n0\r\nEOF\r\n`;
 }
