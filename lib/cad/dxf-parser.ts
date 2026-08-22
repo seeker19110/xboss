@@ -1687,9 +1687,9 @@ export function generateStandardizedAutocadScript(layers: DxfLayerInfo[]): strin
 }
 
 /**
- * Xuất dữ liệu đối tượng bản vẽ (DxfParseResult) thành chuỗi ASCII DXF hoàn chỉnh theo chuẩn Autodesk AutoCAD R2000 (AC1015) / AC1027.
- * Bao gồm đầy đủ các phần: HEADER, TABLES (VPORT, LTYPE, LAYER, STYLE, APPID, BLOCK_RECORD), BLOCKS, ENTITIES và EOF.
- * Đảm bảo tương thích 100% khi mở trực tiếp trong AutoCAD mà không bị lỗi hoặc rơi về bản vẽ trắng Drawing1.
+ * Xuất DxfParseResult thành chuỗi ASCII DXF **R12 (AC1009)** 2D thuần — mở lại được
+ * trên mọi phiên bản AutoCAD. Chi tiết vì sao R12 (thay vì R2000) xem `lib/cad/dxf-writer.ts`;
+ * kế hoạch nâng lên R2000 đầy đủ xem `docs/nang-cap/M98-dxf-r2000-va-dwg.md`.
  */
 export function exportDxf(
   parsed: DxfParseResult,
