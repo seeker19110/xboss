@@ -6,9 +6,17 @@
 | Spec owner       | (chờ gán)                                                                                                                            |
 | State            | **Draft** — chờ duyệt                                                                                                                |
 | Người/ngày duyệt |                                                                                                                                      |
-| Cập nhật         | 2026-08-22                                                                                                                           |
+| Cập nhật         | 2026-08-22 (thu hẹp còn **tầng 3** sau ADR-0006)                                                                                     |
+| Quyết định nền   | `docs/adr/0006-plugin-autocad-va-pipeline-server.md`                                                                                 |
 
 > Không code khi chưa **Approved for implementation**.
+
+> **Cập nhật phạm vi 2026-08-22 (ADR-0006).** Đường chính chuẩn hóa bản vẽ chuyển sang
+> **plugin AutoCAD** (`M99`). Đặc tả này thu hẹp còn **tầng 3 — pipeline server**:
+> kiểm định tệp plugin tải lên, chạy hàng loạt không cần license AutoCAD, và xuất DXF
+> R2000 cho luồng chỉ có DXF. **PR4 (ODA File Converter) bị BỎ** — plugin tải lên kèm
+> **DXF sidecar** nên server không cần đọc DWG nữa. Mục 1(a) giữ nguyên vì vẫn là bằng
+> chứng cho việc phải bỏ nhánh bịa hình học (PR1).
 
 ## 1. Problem, vai trò và bằng chứng
 
@@ -191,12 +199,12 @@ Alert khi tỉ lệ audit lỗi > 0. Runbook: worker chết → app tự lùi v�
 
 ## 16. Kế hoạch slice/PR
 
-| PR      | Nội dung                                                                                                                                  | Route      | Phụ thuộc                         |
-| ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------- |
-| **PR1** | **Bỏ nhánh bịa hình học trong `parseDwgBinary`**; DWG → 422 kèm hướng dẫn xuất DXF. Sửa lớp rủi ro hồ sơ **ngay**, không chờ phần còn lại | `standard` | —                                 |
-| PR2     | Hợp đồng dữ liệu bản vẽ + handler `export_dxf_r2000` trong worker (ezdxf) + test golden file                                              | `spec`     | PR1                               |
-| PR3     | Endpoint `export-r2000` + hàng đợi + UI chọn định dạng + `validateDxf` hiểu R2000                                                         | `standard` | PR2                               |
-| PR4     | ODA File Converter trong image worker + luồng DWG→DXF thật + test đối chứng                                                               | `complex`  | PR2; **cần duyệt điều khoản ODA** |
+| PR      | Nội dung                                                                                                                                  | Route      | Phụ thuộc |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------- | --------- |
+| **PR1** | **Bỏ nhánh bịa hình học trong `parseDwgBinary`**; DWG → 422 kèm hướng dẫn xuất DXF. Sửa lớp rủi ro hồ sơ **ngay**, không chờ phần còn lại | `standard` | —         |
+| PR2     | Hợp đồng dữ liệu bản vẽ + handler `export_dxf_r2000` trong worker (ezdxf) + test golden file                                              | `spec`     | PR1       |
+| PR3     | Endpoint `export-r2000` + hàng đợi + UI chọn định dạng + `validateDxf` hiểu R2000                                                         | `standard` | PR2       |
+| ~~PR4~~ | ~~ODA File Converter~~ — **BỎ** theo ADR-0006: plugin tải lên DWG kèm DXF sidecar nên server không cần đọc DWG                            | —          | —         |
 
 **PR1 nên tách và làm trước, độc lập với quyết định R2000.**
 

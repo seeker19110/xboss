@@ -13,6 +13,34 @@
 - **Lộ trình hoàn thành (chờ duyệt, chưa code):** `PROJECT-COMPLETION-ROADMAP.md` chốt C0→C6 để đạt XBoss v1.0/Product Complete và O1→O5 cho Engineering OS/Vision Complete theo gate; không coi tài liệu là quyền tự triển khai production hoặc A3+.
 - **Spec pack chi tiết (chờ duyệt):** C0, C2–C6 và OS-1–OS-5 đã có file thi hành riêng (C1 dùng ENG-5), mỗi file gồm scope, data/API/UI/ops, test, chia PR và DoD. Chưa phase nào được đánh dấu triển khai chỉ vì đặc tả đã viết.
 
+## Kế hoạch tổng thể chuẩn hóa bản vẽ: ADR-0006 + M99 (2026-08-22, **Draft, chờ duyệt**)
+
+- **Quyết định kiến trúc (`docs/adr/0006-plugin-autocad-va-pipeline-server.md`):** ngừng
+  viết lại AutoCAD bằng TypeScript. Chuẩn hóa bản vẽ chuyển sang **plugin AutoCAD .NET**
+  chạy trên máy kỹ sư (**tầng 2**), pipeline server giữ vai kiểm định + chạy hàng loạt +
+  xuất R2000 (**tầng 3**). **Bỏ tầng 1** (`.SCR`/AutoLISP) — chỉ có giá trị khi phải phủ
+  AutoCAD LT / CAD hãng khác, mà người dùng chạy **AutoCAD full**.
+- **Hai bài toán tự biến mất:** plugin đọc/ghi DWG gốc → **không cần ODA File Converter**;
+  AutoCAD tự ghi tệp → **không còn khả năng sinh tệp hỏng**, và câu hỏi R12/R2000 rời khỏi
+  đường chính (R2000 chỉ còn cần cho tầng 3).
+- **3 nguyên tắc ràng buộc:** (1) **một nguồn quy tắc** — XBoss phát hành _rule pack_ có
+  version, plugin tải về chứ không nhúng cứng, nếu không 2 tầng chắc chắn trôi khác nhau;
+  (2) **không tin client** — server kiểm định lại mọi thứ nhận vào, plugin tải lên DWG kèm
+  **DXF sidecar** để server kiểm mà không phải đọc DWG; (3) **không sửa bản vẽ âm thầm** —
+  mặc định là chế độ chỉ-kiểm, mọi thay đổi nằm trong **1 nhóm UNDO**, luôn kèm báo cáo diff.
+- **Đặc tả tầng 2 (`docs/nang-cap/M99-plugin-autocad-chuan-hoa.md`):** 8 PR (PR0→PR7). Tách
+  `XBoss.Cad.Core` (quy tắc thuần C#, **unit test chạy được trên CI không cần AutoCAD**) khỏi
+  Adapter gọi API AutoCAD. Thêm bảng `api_tokens` cho ghép thiết bị desktop — **vùng rủi ro
+  cao, chạm `lib/auth.ts`, phải rà `docs/audit.md`**.
+- **M98 thu hẹp còn tầng 3**, PR4 (ODA) bị bỏ.
+- **Rủi ro số 1: trôi quy tắc giữa 2 tầng** → chống bằng rule pack một nguồn + test đối chứng
+  chạy cùng bộ bản vẽ mẫu qua cả 2 tầng (AC6 của M99).
+- **2 quyết định đang mở, chặn PR3 của M99:** (1) có runner Windows có license AutoCAD cho CI
+  không (`accoreconsole`), nếu không thì test tích hợp phải chạy tay theo release; (2) chốt
+  danh sách đời AutoCAD đang dùng để quyết build .NET Framework 4.8 (2021–2024) và/hoặc
+  .NET 8 (2025+).
+- **PR0 (bỏ nhánh bịa hình học trong `parseDwgBinary`) tách làm ngay**, độc lập mọi thứ khác.
+
 ## Đặc tả M98 — DXF R2000 & tệp DWG (2026-08-22, **Draft, chờ duyệt**)
 
 - **Phát hiện nghiêm trọng, CHƯA sửa (chờ duyệt PR1):** `parseDwgBinary`
