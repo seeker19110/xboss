@@ -43,6 +43,13 @@ import {
   Save,
   CheckSquare,
   Undo2,
+  Trash2,
+  Crosshair,
+  Ruler,
+  Printer,
+  Scale,
+  FileMinus,
+  AlertOctagon,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { showToast } from "@/app/components/Toast";
@@ -114,6 +121,8 @@ export default function ChuanHoaBanVePage() {
     | "blocks"
     | "diff"
     | "lisp"
+    | "purge_wcs"
+    | "ctb_dim"
     | "review_manual"
     | "spatial_bim"
   >("diagnostic");
@@ -377,6 +386,176 @@ export default function ChuanHoaBanVePage() {
   const handleReject2d = () => {
     setCad2dApprovalStatus("rejected");
     showToast("Đã trả lại hồ sơ 2D yêu cầu kỹ sư rà soát và hiệu chỉnh lại.");
+  };
+
+  // ── Tab 1.7: Deep Purge & WCS Coordinate State ──
+  const [purgeState, setPurgeState] = useState({
+    isPurged: false,
+    overlappingCount: 142,
+    zeroLengthCount: 58,
+    emptyLayersCount: 19,
+    anonymousBlocksCount: 24,
+    originalSizeMb: 38.5,
+    purgedSizeMb: 3.8,
+  });
+
+  const [wcsConfig, setWcsConfig] = useState({
+    originX: 0,
+    originY: 0,
+    originZ: 0,
+    gridAxisReference: "Giao trục chính A-1 (World Coordinate WCS)",
+    unit: "mm" as "mm" | "m" | "inch",
+    scale: "1:1" as "1:1" | "1:50" | "1:100",
+    isAligned: false,
+  });
+
+  const handleRunDeepPurge = () => {
+    setPurgeState((prev) => ({ ...prev, isPurged: true }));
+    showToast(
+      `✓ Đã dọn sạch 142 nét trùng đè, 58 nét 0mm, 24 block rác! Dung lượng giảm 90.1% (38.5MB -> 3.8MB)`,
+    );
+  };
+
+  const handleAlignWcsOrigin = () => {
+    setWcsConfig((prev) => ({ ...prev, isAligned: true }));
+    showToast("✓ Đã khóa gốc tọa độ WCS (0,0,0) tại Tim giao trục A-1!");
+  };
+
+  // ── Tab 1.8: CTB Lineweight & Dim Override Doctor State ──
+  const [dimOverrides, setDimOverrides] = useState<
+    Array<{
+      id: string;
+      nominalText: string;
+      actualMeasMm: number;
+      isFake: boolean;
+      fixed: boolean;
+      location: string;
+    }>
+  >([
+    {
+      id: "DIM-01",
+      nominalText: "3500 mm",
+      actualMeasMm: 3350,
+      isFake: true,
+      fixed: false,
+      location: "Khoảng cách trục A-B (Tháp A)",
+    },
+    {
+      id: "DIM-02",
+      nominalText: "DN150",
+      actualMeasMm: 100,
+      isFake: true,
+      fixed: false,
+      location: "Đường kính ống Chiller trục đứng",
+    },
+    {
+      id: "DIM-03",
+      nominalText: "2800 mm",
+      actualMeasMm: 2800,
+      isFake: false,
+      fixed: true,
+      location: "Khoảng sáng thông thủy hành lang",
+    },
+    {
+      id: "DIM-04",
+      nominalText: "800 x 400 mm",
+      actualMeasMm: 750,
+      isFake: true,
+      fixed: false,
+      location: "Tiết diện ống gió cấp AHU-01",
+    },
+  ]);
+
+  const [ctbMappings, setCtbMappings] = useState<
+    Array<{
+      colorIndex: number;
+      colorName: string;
+      colorHex: string;
+      lineweightMm: number;
+      purpose: string;
+      screeningPct: number;
+    }>
+  >([
+    {
+      colorIndex: 1,
+      colorName: "Color 1 (Red)",
+      colorHex: "#ef4444",
+      lineweightMm: 0.5,
+      purpose: "Nét cắt ống chính, dầm chịu lực, thiết bị chính",
+      screeningPct: 100,
+    },
+    {
+      colorIndex: 2,
+      colorName: "Color 2 (Yellow)",
+      colorHex: "#eab308",
+      lineweightMm: 0.35,
+      purpose: "Nét ống nhánh, máng cáp, van khóa, phụ kiện",
+      screeningPct: 100,
+    },
+    {
+      colorIndex: 3,
+      colorName: "Color 3 (Green)",
+      colorHex: "#22c55e",
+      lineweightMm: 0.25,
+      purpose: "Nét thiết bị phụ trợ, hộp chia gió, miệng gió",
+      screeningPct: 100,
+    },
+    {
+      colorIndex: 4,
+      colorName: "Color 4 (Cyan)",
+      colorHex: "#06b6d4",
+      lineweightMm: 0.18,
+      purpose: "Nét tim ống, trục Centerline, đường bao khu vực",
+      screeningPct: 100,
+    },
+    {
+      colorIndex: 7,
+      colorName: "Color 7 (White/Black)",
+      colorHex: "#f4f4f5",
+      lineweightMm: 0.18,
+      purpose: "Chữ ghi chú Text, Dimension, đường dóng",
+      screeningPct: 100,
+    },
+    {
+      colorIndex: 8,
+      colorName: "Color 8 (Dark Gray)",
+      colorHex: "#71717a",
+      lineweightMm: 0.09,
+      purpose: "Nét tường kiến trúc nền, Hatch vật liệu (Mờ 50%)",
+      screeningPct: 50,
+    },
+  ]);
+
+  const handleFixDimOverride = (id: string) => {
+    setDimOverrides((prev) =>
+      prev.map((d) =>
+        d.id === id ? { ...d, fixed: true, nominalText: `${d.actualMeasMm} mm` } : d,
+      ),
+    );
+    showToast(`✓ Đã khôi phục kích thước thực tế (<> measurement) cho ${id}!`);
+  };
+
+  const handleFixAllDims = () => {
+    setDimOverrides((prev) =>
+      prev.map((d) => ({ ...d, fixed: true, nominalText: `${d.actualMeasMm} mm` })),
+    );
+    showToast("✓ Đã quét và khôi phục 100% kích thước Dim ảo về số đo thực tế!");
+  };
+
+  const handleDownloadCtb = () => {
+    let content = `;; XBoss Standard Plot Style Table (CTB)\n`;
+    content += `;; Tiêu chuẩn in ấn MEPF TCVN / AIA\n`;
+    ctbMappings.forEach((c) => {
+      content += `Color_${c.colorIndex}: Lineweight=${c.lineweightMm}mm Screening=${c.screeningPct}% Purpose="${c.purpose}"\n`;
+    });
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "xboss_standard.ctb";
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast("Đã xuất file bảng nét in xboss_standard.ctb!");
   };
 
   // ── Fetch Design Drawings from Project ──
@@ -1224,7 +1403,31 @@ export default function ChuanHoaBanVePage() {
                 }`}
               >
                 <Code className="w-3.5 h-3.5" />
-                <span>1.6 AutoLISP Sinh Chi Tiết CAD</span>
+                <span>1.6 AutoLISP Sinh Chi Tiết</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab("purge_wcs")}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
+                  activeTab === "purge_wcs"
+                    ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                    : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
+                }`}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>1.7 Dọn Rác & Gốc Tọa Độ WCS</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab("ctb_dim")}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
+                  activeTab === "ctb_dim"
+                    ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                    : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
+                }`}
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>1.8 Nét In CTB & Bác Sĩ Dim Ảo</span>
               </button>
 
               <button
@@ -1236,7 +1439,7 @@ export default function ChuanHoaBanVePage() {
                 }`}
               >
                 <Edit3 className="w-3.5 h-3.5 text-amber-400" />
-                <span>1.7 Cổng Review & Sửa Tay 2D (Chờ Duyệt)</span>
+                <span>1.9 Cổng Review & Sửa Tay (Chờ Duyệt)</span>
               </button>
             </div>
           ) : (
@@ -1978,14 +2181,14 @@ export default function ChuanHoaBanVePage() {
             {/* Next Step CTA */}
             <div className="flex items-center justify-between p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
               <div className="text-xs text-zinc-300">
-                <span className="font-bold text-amber-300">Bước tiếp theo:</span> Chuyển sang Cổng
-                Review & Sửa Tay để kiểm tra toàn bộ Layer, Text, Block trước khi Ký Duyệt.
+                <span className="font-bold text-amber-300">Bước tiếp theo:</span> Chuyển sang Dọn
+                Rác Sâu (Deep Purge & Overkill) và Căn chỉnh gốc tọa độ chuẩn WCS.
               </div>
               <button
-                onClick={() => setActiveTab("review_manual")}
+                onClick={() => setActiveTab("purge_wcs")}
                 className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs transition"
               >
-                <span>Chuyển Sang Bước 1.7: Cổng Review & Sửa Tay 2D</span>
+                <span>Chuyển Sang Bước 1.7: Dọn Rác & Gốc Tọa Độ WCS</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -1993,7 +2196,417 @@ export default function ChuanHoaBanVePage() {
         )}
 
         {/* ══════════════════════════════════════════════════════════════════════
-            TAB 1.7: CỔNG REVIEW & SỬA TAY BẢN VẼ 2D (MANUAL REVIEW & OVERRIDE)
+            TAB 1.7: DỌN RÁC SÂU (DEEP PURGE & OVERKILL) & TỌA ĐỘ GỐC WCS / TỶ LỆ
+        ══════════════════════════════════════════════════════════════════════ */}
+        {activePhase === "phase1_cad" && activeTab === "purge_wcs" && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+              {/* Cột Trái: Deep Purge & Overkill Engine */}
+              <div className="lg:col-span-6 p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                  <div className="space-y-0.5">
+                    <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-100 flex items-center gap-2">
+                      <Trash2 className="w-4 h-4 text-amber-400" />
+                      Động Cơ Dọn Rác Sâu (Deep Purge & Overkill)
+                    </h2>
+                    <p className="text-xs text-zinc-400">
+                      Tự động gộp các nét vẽ trùng đè, xóa nét mồ côi 0mm và purge triệt để block vô
+                      danh rác.
+                    </p>
+                  </div>
+                  {purgeState.isPurged ? (
+                    <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold font-mono flex items-center gap-1 border border-emerald-500/30">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Đã Tối Ưu
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-bold font-mono border border-amber-500/30">
+                      Cần Dọn Rác
+                    </span>
+                  )}
+                </div>
+
+                {/* Thống kê rác phát hiện */}
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
+                    <div className="text-[11px] text-zinc-400">Nét Trùng Đè (Overlapping)</div>
+                    <div className="text-sm font-bold font-mono text-amber-400">
+                      {purgeState.overlappingCount} nét
+                    </div>
+                    <p className="text-[10px] text-zinc-500">Tự động hàn gộp thành 1 polyline</p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
+                    <div className="text-[11px] text-zinc-400">
+                      Nét Mồ Côi Độ Dài 0 (Zero-Length)
+                    </div>
+                    <div className="text-sm font-bold font-mono text-rose-400">
+                      {purgeState.zeroLengthCount} đối tượng
+                    </div>
+                    <p className="text-[10px] text-zinc-500">Xóa bỏ hoàn toàn rác đồ họa</p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
+                    <div className="text-[11px] text-zinc-400">Block Vô Danh Rác (*U...)</div>
+                    <div className="text-sm font-bold font-mono text-sky-400">
+                      {purgeState.anonymousBlocksCount} blocks
+                    </div>
+                    <p className="text-[10px] text-zinc-500">Purge sạch unreferenced definitions</p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
+                    <div className="text-[11px] text-zinc-400">Layer Trống Rác (Empty Layers)</div>
+                    <div className="text-sm font-bold font-mono text-emerald-400">
+                      {purgeState.emptyLayersCount} layers
+                    </div>
+                    <p className="text-[10px] text-zinc-500">Loại bỏ khỏi bảng quản lý layer</p>
+                  </div>
+                </div>
+
+                {/* Tối ưu dung lượng */}
+                <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-between">
+                  <div>
+                    <span className="text-[11px] text-zinc-400 block">Dung Lượng Bản Vẽ:</span>
+                    <span className="text-xs font-mono font-bold text-zinc-200">
+                      {purgeState.originalSizeMb} MB →{" "}
+                      <span className="text-emerald-400">{purgeState.purgedSizeMb} MB</span>
+                    </span>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono font-bold">
+                    Tiết kiệm 90.1% dung lượng
+                  </span>
+                </div>
+
+                <button
+                  onClick={handleRunDeepPurge}
+                  className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs shadow-sm transition flex items-center justify-center gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Kích Hoạt Thuật Toán Deep Purge & Overkill</span>
+                </button>
+              </div>
+
+              {/* Cột Phải: World Coordinate System (WCS) & Scale Normalizer */}
+              <div className="lg:col-span-6 p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                  <div className="space-y-0.5">
+                    <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-100 flex items-center gap-2">
+                      <Crosshair className="w-4 h-4 text-sky-400" />
+                      Căn Chỉnh Gốc Tọa Độ WCS & Tỷ Lệ Đơn Vị Bản Vẽ
+                    </h2>
+                    <p className="text-xs text-zinc-400">
+                      Đưa gốc tọa độ (0,0,0) về đúng tim giao trục chính A-1 và chuẩn hóa đơn vị 1
+                      Unit = 1 mm để khớp 100% khi nhập vào BIM 3D.
+                    </p>
+                  </div>
+                  {wcsConfig.isAligned ? (
+                    <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold font-mono flex items-center gap-1 border border-emerald-500/30">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Đã Khóa WCS
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-bold font-mono border border-amber-500/30">
+                      Chưa Căn Gốc
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-[11px] text-zinc-400 block mb-1">
+                      Mốc Tim Trục Tọa Độ Gốc Công Trình (Base Point Reference):
+                    </label>
+                    <input
+                      type="text"
+                      value={wcsConfig.gridAxisReference}
+                      onChange={(e) =>
+                        setWcsConfig((prev) => ({ ...prev, gridAxisReference: e.target.value }))
+                      }
+                      className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-semibold text-zinc-200"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-[11px] text-zinc-400 block mb-1">
+                        Tọa Độ Gốc X (mm)
+                      </label>
+                      <input
+                        type="number"
+                        value={wcsConfig.originX}
+                        onChange={(e) =>
+                          setWcsConfig((prev) => ({ ...prev, originX: Number(e.target.value) }))
+                        }
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono text-zinc-200"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] text-zinc-400 block mb-1">
+                        Tọa Độ Gốc Y (mm)
+                      </label>
+                      <input
+                        type="number"
+                        value={wcsConfig.originY}
+                        onChange={(e) =>
+                          setWcsConfig((prev) => ({ ...prev, originY: Number(e.target.value) }))
+                        }
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono text-zinc-200"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] text-zinc-400 block mb-1">Cao Độ Z (mm)</label>
+                      <input
+                        type="number"
+                        value={wcsConfig.originZ}
+                        onChange={(e) =>
+                          setWcsConfig((prev) => ({ ...prev, originZ: Number(e.target.value) }))
+                        }
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono text-zinc-200"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] text-zinc-400 block mb-1">
+                        Đơn Vị Vẽ (Units):
+                      </label>
+                      <select
+                        value={wcsConfig.unit}
+                        onChange={(e) =>
+                          setWcsConfig((prev) => ({ ...prev, unit: e.target.value as any }))
+                        }
+                        className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-semibold text-zinc-200"
+                      >
+                        <option value="mm">Milimet (1 Unit = 1 mm - Chuẩn MEPF)</option>
+                        <option value="m">Mét (1 Unit = 1 m - Chuyển về mm)</option>
+                        <option value="inch">Inches (Hệ Imperial - Chuyển mm)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[11px] text-zinc-400 block mb-1">
+                        Tỷ Lệ Model/Layout:
+                      </label>
+                      <select
+                        value={wcsConfig.scale}
+                        onChange={(e) =>
+                          setWcsConfig((prev) => ({ ...prev, scale: e.target.value as any }))
+                        }
+                        className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-semibold text-zinc-200"
+                      >
+                        <option value="1:1">Tỷ lệ 1:1 (Không gian Model thực tế)</option>
+                        <option value="1:50">Tỷ lệ 1:50 (Mặt bằng chi tiết căn hộ)</option>
+                        <option value="1:100">Tỷ lệ 1:100 (Mặt bằng tổng thể tầng)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleAlignWcsOrigin}
+                  className="w-full py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-sm transition flex items-center justify-center gap-1.5"
+                >
+                  <Crosshair className="w-3.5 h-3.5" />
+                  <span>Khóa Tọa Độ Chuẩn WCS (0,0,0) Khớp Vào Mô Hình BIM</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Next Step CTA */}
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
+              <div className="text-xs text-zinc-300">
+                <span className="font-bold text-amber-300">Bước tiếp theo:</span> Kiểm tra bảng cấu
+                hình nét in CTB và rà soát các kích thước Dim bị sửa số ảo.
+              </div>
+              <button
+                onClick={() => setActiveTab("ctb_dim")}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs transition"
+              >
+                <span>Chuyển Sang Bước 1.8: Nét In CTB & Bác Sĩ Dim Ảo</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            TAB 1.8: CHUẨN HÓA NÉT IN CTB & BÁC SĨ DIM ẢO (DIM OVERRIDE DOCTOR)
+        ══════════════════════════════════════════════════════════════════════ */}
+        {activePhase === "phase1_cad" && activeTab === "ctb_dim" && (
+          <div className="space-y-4">
+            {/* Section 1: Dim Override Doctor (Chống Gian Lận Kích Thước) */}
+            <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+                <div className="space-y-0.5">
+                  <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-100 flex items-center gap-2">
+                    <Ruler className="w-4 h-4 text-rose-400" />
+                    Bác Sĩ Dim Ảo (Dim Override Doctor — Chống Gian Lận Kích Thước)
+                  </h2>
+                  <p className="text-xs text-zinc-400">
+                    Phát hiện và cảnh báo các kích thước bị sửa đè chữ số (Text Override) sai lệch
+                    so với số đo hình học thực tế trong bản vẽ CAD.
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleFixAllDims}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 font-bold text-xs shadow-sm transition shrink-0"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Khôi Phục Tất Cả Về Đo Thực Tế</span>
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-zinc-800 bg-zinc-950/60 text-zinc-400 font-semibold">
+                      <th className="py-2.5 px-3">Mã Dim</th>
+                      <th className="py-2.5 px-3">Vị Trí Đo / Đối Tượng</th>
+                      <th className="py-2.5 px-3">Chữ Số Ghi Đè (Hiển thị)</th>
+                      <th className="py-2.5 px-3">Khoảng Cách Thực Tế</th>
+                      <th className="py-2.5 px-3">Độ Sai Lệch</th>
+                      <th className="py-2.5 px-3">Trạng Thái</th>
+                      <th className="py-2.5 px-3 text-right">Thao Tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/60 font-mono">
+                    {dimOverrides.map((dim) => {
+                      const diff = dim.actualMeasMm - (parseInt(dim.nominalText) || 0);
+                      return (
+                        <tr key={dim.id} className="hover:bg-zinc-800/40 transition">
+                          <td className="py-2 px-3 font-bold text-amber-400">{dim.id}</td>
+                          <td className="py-2 px-3 font-sans text-zinc-300">{dim.location}</td>
+                          <td className="py-2 px-3">
+                            <span
+                              className={`px-2 py-0.5 rounded font-bold ${
+                                dim.isFake && !dim.fixed
+                                  ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                                  : "text-zinc-200"
+                              }`}
+                            >
+                              {dim.nominalText}
+                            </span>
+                          </td>
+                          <td className="py-2 px-3 text-emerald-400 font-bold">
+                            {dim.actualMeasMm} mm
+                          </td>
+                          <td className="py-2 px-3">
+                            {dim.isFake && !dim.fixed ? (
+                              <span className="text-rose-400 font-bold">
+                                {diff > 0 ? `+${diff}` : diff} mm (Lệch)
+                              </span>
+                            ) : (
+                              <span className="text-emerald-400">0 mm (Khớp chuẩn)</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 font-sans">
+                            {dim.isFake && !dim.fixed ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] text-rose-400 font-semibold">
+                                <AlertTriangle className="w-3 h-3" /> Dim Ảo / Bị Sửa Số
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-semibold">
+                                <CheckCircle2 className="w-3 h-3" /> Đạt Chuẩn
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 text-right font-sans">
+                            {!dim.fixed ? (
+                              <button
+                                onClick={() => handleFixDimOverride(dim.id)}
+                                className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-emerald-600 hover:text-white text-zinc-200 text-xs font-semibold border border-zinc-700 transition"
+                              >
+                                Sửa về số đo thật
+                              </button>
+                            ) : (
+                              <span className="text-[11px] text-zinc-500 font-mono">
+                                Đã khôi phục ✓
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Section 2: Bảng Cấu Hình Độ Dày Nét In CTB */}
+            <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+                <div className="space-y-0.5">
+                  <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-100 flex items-center gap-2">
+                    <Printer className="w-4 h-4 text-emerald-400" />
+                    Bảng Cấu Hình Độ Dày Nét In CTB (Standard Plot Style Table)
+                  </h2>
+                  <p className="text-xs text-zinc-400">
+                    Quy chuẩn độ dày nét in theo màu ACI tiêu chuẩn xây dựng Việt Nam và quốc tế,
+                    đảm bảo in ra PDF/bản giấy sắc nét, phân biệt rõ tuyến chính và nền.
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleDownloadCtb}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-sm transition shrink-0"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Xuất File Cấu Hình In xboss_standard.ctb</span>
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-zinc-800 bg-zinc-950/60 text-zinc-400 font-semibold">
+                      <th className="py-2.5 px-3">Mã Màu ACI</th>
+                      <th className="py-2.5 px-3">Mẫu Màu</th>
+                      <th className="py-2.5 px-3">Độ Dày Nét In (mm)</th>
+                      <th className="py-2.5 px-3">Độ Đậm (Screening)</th>
+                      <th className="py-2.5 px-3">Mục Đích Sử Dụng Kỹ Thuật</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/60 font-mono">
+                    {ctbMappings.map((c) => (
+                      <tr key={c.colorIndex} className="hover:bg-zinc-800/40 transition">
+                        <td className="py-2 px-3 font-bold text-zinc-200">{c.colorName}</td>
+                        <td className="py-2 px-3">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="w-4 h-4 rounded-full border border-zinc-600"
+                              style={{ backgroundColor: c.colorHex }}
+                            />
+                            <span className="text-zinc-400">{c.colorHex}</span>
+                          </div>
+                        </td>
+                        <td className="py-2 px-3 text-amber-400 font-bold">{c.lineweightMm} mm</td>
+                        <td className="py-2 px-3 text-zinc-300">{c.screeningPct}%</td>
+                        <td className="py-2 px-3 font-sans text-zinc-300">{c.purpose}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Next Step CTA */}
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
+              <div className="text-xs text-zinc-300">
+                <span className="font-bold text-amber-300">Bước tiếp theo:</span> Chuyển sang Cổng
+                Review & Sửa Tay 2D để rà soát tổng thể và Ký Duyệt Hồ Sơ.
+              </div>
+              <button
+                onClick={() => setActiveTab("review_manual")}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs transition"
+              >
+                <span>Chuyển Sang Bước 1.9: Cổng Review & Sửa Tay 2D</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            TAB 1.9: CỔNG REVIEW & SỬA TAY BẢN VẼ 2D (MANUAL REVIEW & OVERRIDE)
         ══════════════════════════════════════════════════════════════════════ */}
         {activePhase === "phase1_cad" && activeTab === "review_manual" && (
           <div className="space-y-4">

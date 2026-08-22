@@ -10,7 +10,7 @@
  * - Standardized DXF exporter & AutoCAD .SCR script generation.
  */
 
-// Pure Vietnamese TCVN3 / ABC to Unicode character mapping
+// Complete Vietnamese TCVN3 / ABC to Unicode character mapping (Upper & Lowercase)
 const TCVN3_MAP: Record<string, string> = {
   "¸": "á",
   µ: "à",
@@ -83,6 +83,167 @@ const TCVN3_MAP: Record<string, string> = {
   "§": "Đ",
 };
 
+// Complete VNI-Times / VNI-Helve dual-character tone and mark mapping
+const VNI_PAIRS: Array<[RegExp, string]> = [
+  // Vowels with tone 1 (sắc / acute)
+  [/a1/g, "á"],
+  [/A1/g, "Á"],
+  [/e1/g, "é"],
+  [/E1/g, "É"],
+  [/i1/g, "í"],
+  [/I1/g, "Í"],
+  [/o1/g, "ó"],
+  [/O1/g, "Ó"],
+  [/u1/g, "ú"],
+  [/U1/g, "Ú"],
+  [/y1/g, "ý"],
+  [/Y1/g, "Ý"],
+
+  // Vowels with tone 2 (huyền / grave)
+  [/a2/g, "à"],
+  [/A2/g, "À"],
+  [/e2/g, "è"],
+  [/E2/g, "È"],
+  [/i2/g, "ì"],
+  [/I2/g, "Ì"],
+  [/o2/g, "ò"],
+  [/O2/g, "Ò"],
+  [/u2/g, "ù"],
+  [/U2/g, "Ù"],
+  [/y2/g, "ỳ"],
+  [/Y2/g, "Ỳ"],
+
+  // Vowels with tone 3 (hỏi / hook)
+  [/a3/g, "ả"],
+  [/A3/g, "Ả"],
+  [/e3/g, "ẻ"],
+  [/E3/g, "Ẻ"],
+  [/i3/g, "ỉ"],
+  [/I3/g, "Ỉ"],
+  [/o3/g, "ỏ"],
+  [/O3/g, "Ỏ"],
+  [/u3/g, "ủ"],
+  [/U3/g, "Ủ"],
+  [/y3/g, "ỷ"],
+  [/Y3/g, "Ỷ"],
+
+  // Vowels with tone 4 (ngã / tilde)
+  [/a4/g, "ã"],
+  [/A4/g, "Ã"],
+  [/e4/g, "ẽ"],
+  [/E4/g, "Ẽ"],
+  [/i4/g, "ĩ"],
+  [/I4/g, "Ĩ"],
+  [/o4/g, "õ"],
+  [/O4/g, "Õ"],
+  [/u4/g, "ũ"],
+  [/U4/g, "Ũ"],
+  [/y4/g, "ỹ"],
+  [/Y4/g, "Ỹ"],
+
+  // Vowels with tone 5 (nặng / dot below)
+  [/a5/g, "ạ"],
+  [/A5/g, "Ạ"],
+  [/e5/g, "ẹ"],
+  [/E5/g, "Ẹ"],
+  [/i5/g, "ị"],
+  [/I5/g, "Ị"],
+  [/o5/g, "ọ"],
+  [/O5/g, "Ọ"],
+  [/u5/g, "ụ"],
+  [/U5/g, "Ụ"],
+  [/y5/g, "ỵ"],
+  [/Y5/g, "Ỵ"],
+
+  // Circumflex vowels (â, ê, ô)
+  [/a61/g, "ấ"],
+  [/A61/g, "Ấ"],
+  [/a62/g, "ầ"],
+  [/A62/g, "Ầ"],
+  [/a63/g, "ẩ"],
+  [/A63/g, "Ẩ"],
+  [/a64/g, "ẫ"],
+  [/A64/g, "Ẫ"],
+  [/a65/g, "ậ"],
+  [/A65/g, "Ậ"],
+  [/a6/g, "â"],
+  [/A6/g, "Â"],
+
+  [/e61/g, "ế"],
+  [/E61/g, "Ế"],
+  [/e62/g, "ề"],
+  [/E62/g, "Ề"],
+  [/e63/g, "ể"],
+  [/E63/g, "Ể"],
+  [/e64/g, "ễ"],
+  [/E64/g, "Ễ"],
+  [/e65/g, "ệ"],
+  [/E65/g, "Ệ"],
+  [/e6/g, "ê"],
+  [/E6/g, "Ê"],
+
+  [/o61/g, "ố"],
+  [/O61/g, "Ố"],
+  [/o62/g, "ồ"],
+  [/O62/g, "Ồ"],
+  [/o63/g, "ổ"],
+  [/O63/g, "Ổ"],
+  [/o64/g, "ỗ"],
+  [/O64/g, "Ỗ"],
+  [/o65/g, "ộ"],
+  [/O65/g, "Ộ"],
+  [/o6/g, "ô"],
+  [/O6/g, "Ô"],
+
+  // Breve vowel (ă)
+  [/a81/g, "ắ"],
+  [/A81/g, "Ắ"],
+  [/a82/g, "ằ"],
+  [/A82/g, "Ằ"],
+  [/a83/g, "ẳ"],
+  [/A83/g, "Ẳ"],
+  [/a84/g, "ẵ"],
+  [/A84/g, "Ẵ"],
+  [/a85/g, "ặ"],
+  [/A85/g, "Ặ"],
+  [/a8/g, "ă"],
+  [/A8/g, "Ă"],
+
+  // Horn vowels (ơ, ư)
+  [/o71/g, "ớ"],
+  [/O71/g, "Ớ"],
+  [/o72/g, "ờ"],
+  [/O72/g, "Ờ"],
+  [/o73/g, "ở"],
+  [/O73/g, "Ở"],
+  [/o74/g, "ỡ"],
+  [/O74/g, "Ỡ"],
+  [/o75/g, "ợ"],
+  [/O75/g, "Ợ"],
+  [/o7/g, "ơ"],
+  [/O7/g, "Ơ"],
+
+  [/u71/g, "ứ"],
+  [/U71/g, "Ứ"],
+  [/u72/g, "ừ"],
+  [/U72/g, "Ừ"],
+  [/u73/g, "ử"],
+  [/U73/g, "Ử"],
+  [/u74/g, "ữ"],
+  [/U74/g, "Ữ"],
+  [/u75/g, "ự"],
+  [/U75/g, "Ự"],
+  [/u7/g, "ư"],
+  [/U7/g, "Ư"],
+
+  // Consonant đ / Đ
+  [/d9/g, "đ"],
+  [/D9/g, "Đ"],
+];
+
+/**
+ * Chuyển đổi mã TCVN3 / ABC sang chuẩn Unicode UTF-8 hoàn chỉnh.
+ */
 export function convertTcvn3ToUnicode(text: string): string {
   let result = "";
   for (let i = 0; i < text.length; i++) {
@@ -92,20 +253,96 @@ export function convertTcvn3ToUnicode(text: string): string {
   return result;
 }
 
+/**
+ * Chuyển đổi mã VNI sang chuẩn Unicode UTF-8 hoàn chỉnh.
+ */
+export function convertVniToUnicode(text: string): string {
+  let result = text;
+  for (const [pattern, replacement] of VNI_PAIRS) {
+    result = result.replace(pattern, replacement);
+  }
+  return result;
+}
+
+/**
+ * Chuẩn hóa tên layer AutoCAD về chuẩn AIA / BS1192 / ISO 13567 cho 5 phân hệ MEPF.
+ */
 export function normalizeCadLayers(layers: string[]): Record<string, string> {
   const mapping: Record<string, string> = {};
 
   for (const layer of layers) {
     const l = layer.toUpperCase();
-    if (l.includes("DUCT") || l.includes("GIO") || l.includes("SA") || l.includes("RA")) {
-      mapping[layer] = "M-DUCT-SUPP";
-    } else if (l.includes("PIPE") || l.includes("NUOC") || l.includes("SAN")) {
-      mapping[layer] = "P-PIPE-SANR";
-    } else if (l.includes("ELEC") || l.includes("TRAY") || l.includes("DIEN")) {
-      mapping[layer] = "E-TRAY-PWRR";
-    } else if (l.includes("FIRE") || l.includes("PCCC") || l.includes("SPK")) {
+    if (
+      l.includes("DUCT") ||
+      l.includes("GIO") ||
+      l.includes("AHU") ||
+      l.includes("FCU") ||
+      l.includes("SA") ||
+      l.includes("RA") ||
+      l.includes("EA") ||
+      l.includes("OA")
+    ) {
+      if (l.includes("RETN") || l.includes("HOI") || l.includes("RA")) {
+        mapping[layer] = "M-DUCT-RETN";
+      } else if (l.includes("EXHAUST") || l.includes("THAI") || l.includes("EA")) {
+        mapping[layer] = "M-DUCT-EXHT";
+      } else {
+        mapping[layer] = "M-DUCT-SUPP";
+      }
+    } else if (
+      l.includes("PIPE") ||
+      l.includes("NUOC") ||
+      l.includes("SAN") ||
+      l.includes("CAP") ||
+      l.includes("THOAT") ||
+      l.includes("CHILLER") ||
+      l.includes("CW")
+    ) {
+      if (l.includes("DRAIN") || l.includes("THOAT") || l.includes("SAN")) {
+        mapping[layer] = "P-PIPE-SANR";
+      } else if (l.includes("CHILL") || l.includes("CHW") || l.includes("LANH")) {
+        mapping[layer] = "M-CHW-PIPE";
+      } else {
+        mapping[layer] = "P-PIPE-DOMW";
+      }
+    } else if (
+      l.includes("ELEC") ||
+      l.includes("TRAY") ||
+      l.includes("DIEN") ||
+      l.includes("PWR") ||
+      l.includes("LTG")
+    ) {
+      if (l.includes("LTG") || l.includes("CHIEU") || l.includes("SANG")) {
+        mapping[layer] = "E-LTNG-CKTS";
+      } else {
+        mapping[layer] = "E-TRAY-PWRR";
+      }
+    } else if (
+      l.includes("FIRE") ||
+      l.includes("PCCC") ||
+      l.includes("SPK") ||
+      l.includes("HYDRANT")
+    ) {
       mapping[layer] = "F-SPRN-PIPE";
-    } else if (l.includes("TEXT") || l.includes("DIM") || l.includes("GHI")) {
+    } else if (
+      l.includes("ELV") ||
+      l.includes("TEL") ||
+      l.includes("DATA") ||
+      l.includes("LAN") ||
+      l.includes("CCTV") ||
+      l.includes("BMS")
+    ) {
+      mapping[layer] = "ELV-CABL-TRAY";
+    } else if (
+      l.includes("GRID") ||
+      l.includes("TRUC") ||
+      l.includes("DAM") ||
+      l.includes("COT") ||
+      l.includes("BEAM") ||
+      l.includes("COL")
+    ) {
+      mapping[layer] = "S-GRID-COLS";
+    } else if (l.includes("TEXT") || l.includes("DIM") || l.includes("GHI") || l.includes("ANNO")) {
       mapping[layer] = "G-ANNO-TEXT";
     } else {
       mapping[layer] = layer;
@@ -230,26 +467,52 @@ const ACI_TO_HEX: Record<number, string> = {
 
 /**
  * Clean & decode CAD text strings:
- * - Replace %%c with Ø (Diameter symbol)
- * - Replace %%p with ± (Tolerance symbol)
- * - Replace %%d with ° (Degree symbol)
- * - Replace \U+00B0 with °
- * - Apply TCVN3 / VNI decode
+ * - Replace %%c, \U+00D8 with Ø (Diameter symbol)
+ * - Replace %%p, \U+00B1 with ± (Tolerance symbol)
+ * - Replace %%d, \U+00B0 with ° (Degree symbol)
+ * - Strip MTEXT font tags (\f...;), color tags (\C...;), height tags (\H...;), alignment tags (\A...;)
+ * - Format stacked fractions (\S...^...;) to readable "a/b"
+ * - Apply comprehensive TCVN3 / ABC & VNI decoding to standard Unicode UTF-8
  */
 export function decodeCadText(rawText: string): string {
   if (!rawText) return "";
   let clean = rawText
+    // Control symbols
     .replace(/%%c/gi, "Ø")
+    .replace(/\\U\+00D8/gi, "Ø")
+    .replace(/\\U\+00F8/gi, "Ø")
     .replace(/%%p/gi, "±")
+    .replace(/\\U\+00B1/gi, "±")
     .replace(/%%d/gi, "°")
     .replace(/\\U\+00B0/gi, "°")
+    .replace(/øC/gi, "°C")
+    .replace(/%%[uUoOkK]/g, "") // formatting toggles
+    // MTEXT formatting codes
+    .replace(/\\f[^;]+;/gi, "")
+    .replace(/\\C[0-9]+;/gi, "")
+    .replace(/\\H[0-9.]+x?;/gi, "")
+    .replace(/\\W[0-9.]+;/gi, "")
+    .replace(/\\Q[0-9.]+;/gi, "")
+    .replace(/\\A[0-9];/gi, "")
     .replace(/\\P/g, " ")
-    .replace(/\\A1;/g, "")
-    .replace(/\\H[0-9.]+x;/gi, "")
-    .replace(/\\S([^;^]+)\^([^;]+);/g, "$1/$2");
+    .replace(/\\~/g, " ")
+    .replace(/\\[LlOoKk]/g, "")
+    .replace(/\\S([^;^]+)\^([^;]+);/g, "$1/$2")
+    .replace(/\\S([^;]+);/g, "$1");
 
-  // Convert TCVN3 / ABC fonts if characters fall within old range
+  // Convert TCVN3 / ABC fonts
   clean = convertTcvn3ToUnicode(clean);
+
+  // Convert VNI fonts if any pairs remain
+  clean = convertVniToUnicode(clean);
+
+  // Normalize Unicode NFC canonical composition
+  try {
+    clean = clean.normalize("NFC");
+  } catch {
+    // fallback if environment doesn't support normalize
+  }
+
   return clean.trim();
 }
 
