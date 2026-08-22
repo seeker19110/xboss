@@ -555,7 +555,7 @@ export default function EngineeringApexCockpitPage() {
                     href="/engineering/chuan-hoa-ban-ve"
                     className="flex items-center justify-between rounded-xl bg-zinc-900/70 p-2.5 text-xs text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
                   >
-                    <span>Chuẩn Hóa CAD 2D & 3D BIM (5 Bước)</span>
+                    <span>Chuẩn Hóa Bản Vẽ CAD 2D (ISO 19650)</span>
                     <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
                   </Link>
                 </div>

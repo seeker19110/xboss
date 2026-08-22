@@ -184,10 +184,10 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     href: "/engineering/chuan-hoa-ban-ve",
-    label: "Chuẩn hóa CAD 2D & 3D BIM",
+    label: "Chuẩn hóa bản vẽ CAD 2D",
     category: "spatial",
     icon: Code,
-    badge: "5 Bước",
+    badge: "ISO 19650",
     roles: ["admin", "pm", "engineer", "bch"],
   },
   {

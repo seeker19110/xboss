@@ -220,11 +220,11 @@ export default function ChuanHoaBanVePage() {
   const [folderFilter, setFolderFilter] = useState<"all" | "cad" | "xref" | "ctb">("all");
 
   // ── 2-Step Ultra-Streamlined Workflow ──
-  // Step 1: ⚡ Studio Chuẩn Hóa CAD 2D & 3D BIM (1-Click Auto-Heal & Viewport)
+  // Step 1: ⚡ Studio Chuẩn Hóa CAD 2D (1-Click Auto-Heal, WCS 2D & Viewport)
   // Step 2: 💾 Đặt Tên Chuẩn ISO 19650 & Lưu Trữ Dự Án (Smart Naming & Storage Center)
   const [activeStep, setActiveStep] = useState<1 | 2>(1);
   const [step1SubTab, setStep1SubTab] = useState<
-    "diagnostic_purge" | "layers_font" | "boq_dim_ctb" | "xref_lisp_3d"
+    "diagnostic_purge" | "layers_font" | "boq_dim_ctb" | "xref_diff_lisp"
   >("diagnostic_purge");
 
   const [loading, setLoading] = useState(false);
@@ -379,7 +379,7 @@ export default function ChuanHoaBanVePage() {
     setApprovedAt(
       `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
     );
-    showToast("✓ Đã PHÊ DUYỆT chuẩn hóa 2D! Cổng chuyển đổi 3D BIM & Combine đã được MỞ KHÓA.");
+    showToast("✓ Đã PHÊ DUYỆT chuẩn hóa bản vẽ CAD 2D theo tiêu chuẩn ISO 19650!");
   };
 
   const handleReject2d = () => {
@@ -501,10 +501,9 @@ export default function ChuanHoaBanVePage() {
   const [canvasPan, setCanvasPan] = useState({ x: 0, y: 0 });
   const [isDraggingCanvas, setIsDraggingCanvas] = useState(false);
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
-  const [cursorWcsCoords, setCursorWcsCoords] = useState<{ x: number; y: number; z: number }>({
+  const [cursorWcsCoords, setCursorWcsCoords] = useState<{ x: number; y: number }>({
     x: 0,
     y: 0,
-    z: 0,
   });
   const [selectedCadEntity, setSelectedCadEntity] = useState<DxfEntityRaw | null>(null);
   const [visibleLayers, setVisibleLayers] = useState<Record<string, boolean>>({
@@ -530,7 +529,7 @@ export default function ChuanHoaBanVePage() {
     defectReason?: string;
   } | null>(null);
 
-  // ── Tab 1.7: Deep Purge & WCS Coordinate State ──
+  // ── Tab 1.7: Deep Purge & WCS 2D Coordinate State ──
   const [purgeState, setPurgeState] = useState({
     isPurged: false,
     overlappingCount: 0,
@@ -544,8 +543,7 @@ export default function ChuanHoaBanVePage() {
   const [wcsConfig, setWcsConfig] = useState({
     originX: 0,
     originY: 0,
-    originZ: 0,
-    gridAxisReference: "Giao trục chính WCS (0,0,0)",
+    gridAxisReference: "Giao trục chính WCS 2D (X:0, Y:0)",
     unit: "mm" as "mm" | "m" | "inch",
     scale: "1:1" as "1:1" | "1:50" | "1:100",
     isAligned: false,
@@ -715,7 +713,7 @@ export default function ChuanHoaBanVePage() {
 
   const handleAlignWcsOrigin = () => {
     setWcsConfig((prev) => ({ ...prev, isAligned: true }));
-    showToast("✓ Đã khóa gốc tọa độ WCS (0,0,0) tại Tim giao trục chính!");
+    showToast("✓ Đã khóa gốc tọa độ WCS 2D (X:0, Y:0) tại Tim giao trục chính!");
   };
 
   const [ctbMappings, setCtbMappings] = useState<
@@ -975,7 +973,7 @@ export default function ChuanHoaBanVePage() {
     setIsAutoHealing(true);
     setHealCompleted(false);
     setHealProgress(0);
-    setHealStatusMessage("🧹 Đang dọn rác WCS & xóa nét trùng đè...");
+    setHealStatusMessage("🧹 Đang dọn rác WCS 2D & xóa nét trùng đè...");
 
     let currentPct = 0;
     if (healIntervalRef.current) {
@@ -988,15 +986,15 @@ export default function ChuanHoaBanVePage() {
       setHealProgress(currentPct);
 
       if (currentPct < 25) {
-        setHealStatusMessage("🧹 Đang dọn rác WCS, xóa nét 0mm & nét trùng đè...");
+        setHealStatusMessage("🧹 Đang dọn rác WCS 2D, xóa nét 0mm & nét trùng đè...");
       } else if (currentPct < 55) {
         setHealStatusMessage("🔤 Đang giải mã font TCVN3/VNI sang Unicode UTF-8...");
       } else if (currentPct < 80) {
         setHealStatusMessage("📐 Đang chuẩn hóa hệ thống Layer theo tiêu chuẩn AIA...");
       } else if (currentPct < 98) {
-        setHealStatusMessage("🎯 Đang sửa Dim ảo & tự động đùn tuyến MEPF 3D...");
+        setHealStatusMessage("🎯 Đang sửa Dim ảo & rà soát liên kết XREF...");
       } else {
-        setHealStatusMessage("✨ Hoàn tất tự động chuẩn hóa 100%!");
+        setHealStatusMessage("✨ Hoàn tất tự động chuẩn hóa CAD 2D 100%!");
       }
 
       if (currentPct >= 100) {
@@ -1022,7 +1020,7 @@ export default function ChuanHoaBanVePage() {
   // ── Master Pack Bundle Exporter ──
   const handleDownloadMasterBundle = () => {
     let bundle = `;; ==========================================================================\n`;
-    bundle += `;; XBOSS CAD/BIM MASTER AUTOMATION BUNDLE — ISO 19650 / TCVN STANDARDS\n`;
+    bundle += `;; XBOSS CAD 2D MASTER AUTOMATION BUNDLE — ISO 19650 / TCVN STANDARDS\n`;
     bundle += `;; File: ${generatedFileName}\n`;
     bundle += `;; Generated at: ${new Date().toISOString()}\n`;
     bundle += `;; Health Index: ${totalHealthScore}/100 (ISO 19650)\n`;
@@ -1030,23 +1028,49 @@ export default function ChuanHoaBanVePage() {
 
     bundle += `;; 1. AUTOCAD LAYER SCRIPT (.SCR)\n`;
     bundle += scrScript || ";; Layer standardize script\n";
-    bundle += `\n;; 2. AUTOLISP TOOLS (.LSP)\n`;
-    bundle += `(defun c:XBOSS_MEPF () (princ "\\nXBOSS CAD Automation Active.") (princ))\n`;
+    bundle += `\n;; 2. AUTOLISP TOOLS 2D (.LSP)\n`;
+    bundle += `(defun c:XBOSS_2D () (princ "\\nXBOSS CAD 2D Automation Active.") (princ))\n`;
     bundle += `\n;; 3. PLOT STYLE TABLE (.CTB)\n`;
     bundle += `Color_1: 0.50mm Color_2: 0.35mm Color_3: 0.25mm Color_4: 0.18mm Color_7: 0.18mm Color_8: 0.09mm\n`;
-    bundle += `\n;; 4. 3D SPATIAL ENVELOPE (JSON)\n`;
-    bundle += JSON.stringify(routes, null, 2);
+    bundle += `\n;; 4. BÁO CÁO CHẨN ĐOÁN & THÔNG SỐ CHUẨN HÓA 2D (JSON)\n`;
+    bundle += JSON.stringify(
+      {
+        standardFileName: generatedFileName,
+        projectCode: saveConfig.projectCode,
+        systems: saveConfig.systems,
+        workPackageCode: saveConfig.workPackageCode,
+        totalHealthScore,
+        layerScore,
+        fontScore,
+        geometryScore,
+        dimScore,
+        blockScore,
+        xrefScore,
+        wcsCoordinates: {
+          originX: wcsConfig.originX,
+          originY: wcsConfig.originY,
+          unit: wcsConfig.unit,
+          scale: wcsConfig.scale,
+        },
+        layersCount: manualLayers.length,
+        textCount: manualTexts.length,
+        blocksCount: manualBlocks.length,
+        dimsCount: dimOverrides.length,
+      },
+      null,
+      2,
+    );
 
     const blob = new Blob([bundle], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `XBOSS_MASTER_BUNDLE_${cleanVal(saveConfig.projectCode)}_${cleanVal(saveConfig.systems)}.txt`;
+    a.download = `XBOSS_2D_MASTER_BUNDLE_${cleanVal(saveConfig.projectCode)}_${cleanVal(saveConfig.systems)}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast("✓ Đã tải xuống Trọn Bộ Gói Chuẩn Hóa CAD/BIM Master Bundle!");
+    showToast("✓ Đã tải xuống Trọn Bộ Gói Chuẩn Hóa CAD 2D Master Bundle!");
   };
 
   // ── Fetch Design Drawings from Project ──
@@ -1552,8 +1576,6 @@ export default function ChuanHoaBanVePage() {
     return matchDisc && matchSearch;
   });
 
-  const routes = dxfData?.spatialRoutes || [];
-
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       <AppHeader
@@ -1565,15 +1587,15 @@ export default function ChuanHoaBanVePage() {
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
                 <span className="font-bold tracking-tight text-zinc-100 text-sm sm:text-base uppercase">
-                  CHUẨN HÓA BẢN VẼ (CAD 2D → DỰNG KHỐI 3D BIM)
+                  CHUẨN HÓA BẢN VẼ CAD 2D (ISO 19650)
                 </span>
                 <span className="rounded-md bg-emerald-500/10 px-2 py-0.5 text-[10px] font-mono font-bold text-emerald-400 border border-emerald-500/20">
-                  LOD 300–400 • TT AVIO
+                  TCVN • ISO 19650
                 </span>
               </div>
               <span className="text-[11px] text-zinc-400 line-clamp-1">
-                Chuẩn Hóa File CAD Trước (Layer AIA, Font Doctor, Block BOQ, Diff) → Sau Đó Đùn Khối
-                3D Từ DXF & Phối Hợp Combine
+                Chuẩn Hóa Layer AIA/BS1192, Bác Sĩ Font UTF-8, Gốc Tọa Độ WCS 2D (X, Y), Bóc Tách
+                Block BOQ, Phục Hồi Dim Thực & Cây XREF
               </span>
             </div>
           </div>
@@ -1581,19 +1603,19 @@ export default function ChuanHoaBanVePage() {
         bottomActions={
           <div className="flex items-center gap-2">
             <Link
-              href="/mo-hinh-bim"
+              href="/ban-ve-thiet-ke"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700 transition"
             >
-              <Box className="w-3.5 h-3.5 text-sky-400" />
-              <span>Mô hình BIM 3D</span>
+              <FileSpreadsheet className="w-3.5 h-3.5 text-sky-400" />
+              <span>Bản Vẽ Thiết Kế</span>
             </Link>
-            <Link
-              href="/engineering/cad-corridor"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-zinc-950 font-bold text-xs shadow-sm transition"
+            <button
+              onClick={handleDownloadConvertedDxf}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs shadow-sm transition"
             >
-              <Split className="w-3.5 h-3.5" />
-              <span>Hành Lang Combine</span>
-            </Link>
+              <Download className="w-3.5 h-3.5" />
+              <span>Xuất Tệp DXF 2D</span>
+            </button>
           </div>
         }
       />
@@ -2344,10 +2366,10 @@ export default function ChuanHoaBanVePage() {
                 <div className="flex items-center gap-2 font-mono text-zinc-400">
                   <Crosshair className="w-3.5 h-3.5 text-amber-400" />
                   <span>
-                    WCS:{" "}
-                    <strong className="text-zinc-200">
-                      ({cursorWcsCoords.x.toLocaleString()}, {cursorWcsCoords.y.toLocaleString()},{" "}
-                      {cursorWcsCoords.z}) mm
+                    WCS 2D:{" "}
+                    <strong className="text-zinc-200 font-mono">
+                      (X: {cursorWcsCoords.x.toLocaleString()}, Y:{" "}
+                      {cursorWcsCoords.y.toLocaleString()}) mm
                     </strong>
                   </span>
                   <span className="text-zinc-600">•</span>
@@ -2380,7 +2402,7 @@ export default function ChuanHoaBanVePage() {
                     </span>
                   ) : (
                     <span className="text-zinc-500">
-                      Rê chuột lên tuyến ống để khảo sát tọa độ & kích thước
+                      Rê chuột lên thực thể CAD để khảo sát tọa độ X,Y & thông số
                     </span>
                   )}
                 </div>
@@ -2427,7 +2449,7 @@ export default function ChuanHoaBanVePage() {
                   const mmX = Math.round(cadMinX + (localSvgX - offX) / sc);
                   const mmY = Math.round(cadMinY + (svgH - offY - localSvgY) / sc);
 
-                  setCursorWcsCoords({ x: mmX, y: mmY, z: 0 });
+                  setCursorWcsCoords({ x: mmX, y: mmY });
 
                   if (isDraggingCanvas) {
                     setCanvasPan({
@@ -2975,10 +2997,10 @@ export default function ChuanHoaBanVePage() {
                     </div>
                   </div>
 
-                  {/* Metric 6: XREF & 3D */}
+                  {/* Metric 6: XREF & Reference */}
                   <div className="space-y-0.5">
                     <div className="flex items-center justify-between text-[11px] text-zinc-400">
-                      <span>6. Phân Tuyến XREF & Tuyến 3D BIM</span>
+                      <span>6. Cây Liên Kết XREF & Cấu Trúc File 2D</span>
                       <span className="font-mono font-bold text-emerald-400">{xrefScore}%</span>
                     </div>
                     <div className="w-full h-1.5 rounded-full bg-zinc-800 overflow-hidden">
@@ -3099,7 +3121,7 @@ export default function ChuanHoaBanVePage() {
                 </span>
                 <div>
                   <div className="text-xs sm:text-sm font-bold uppercase tracking-wide text-zinc-100 flex items-center gap-2 flex-wrap">
-                    <span>Bước 1: Studio Chuẩn Hóa CAD 2D & 3D BIM</span>
+                    <span>Bước 1: Studio Chuẩn Hóa Bản Vẽ CAD 2D</span>
                     <span
                       className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold flex items-center gap-1 transition ${
                         isAutoHealing
@@ -3127,7 +3149,7 @@ export default function ChuanHoaBanVePage() {
                         {healStatusMessage}
                       </span>
                     ) : (
-                      "Tự động dọn rác, WCS, sửa font UTF-8, layer AIA, sửa Dim & đùn tuyến 3D"
+                      "Tự động dọn rác, WCS 2D (X,Y), sửa font UTF-8, layer AIA, sửa Dim đo thực & Block BOQ"
                     )}
                   </div>
                 </div>
@@ -3231,7 +3253,7 @@ export default function ChuanHoaBanVePage() {
                 }`}
               >
                 <Activity className="w-3.5 h-3.5" />
-                <span>1. Chẩn Đoán & WCS (0,0,0)</span>
+                <span>1. Chẩn Đoán & WCS 2D (X, Y)</span>
               </button>
 
               <button
@@ -3259,15 +3281,15 @@ export default function ChuanHoaBanVePage() {
               </button>
 
               <button
-                onClick={() => setStep1SubTab("xref_lisp_3d")}
+                onClick={() => setStep1SubTab("xref_diff_lisp")}
                 className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition shrink-0 ${
-                  step1SubTab === "xref_lisp_3d"
+                  step1SubTab === "xref_diff_lisp"
                     ? "bg-sky-500 text-zinc-950 font-bold shadow-xs"
                     : "bg-zinc-800/70 text-zinc-300 hover:text-white"
                 }`}
               >
                 <Split className="w-3.5 h-3.5 text-sky-400" />
-                <span>4. Cây XREF, AutoLISP & Tuyến 3D BIM</span>
+                <span>4. Cây XREF, So Sánh Diff & AutoLISP 2D</span>
               </button>
             </div>
           </div>
@@ -3484,22 +3506,22 @@ export default function ChuanHoaBanVePage() {
                 </button>
               </div>
 
-              {/* Cột Phải: World Coordinate System (WCS) & Scale Normalizer */}
+              {/* Cột Phải: World Coordinate System (WCS) 2D & Scale Normalizer */}
               <div className="lg:col-span-6 p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
                 <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
                   <div className="space-y-0.5">
                     <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-100 flex items-center gap-2">
                       <Crosshair className="w-4 h-4 text-sky-400" />
-                      Căn Chỉnh Gốc Tọa Độ WCS & Tỷ Lệ Đơn Vị Bản Vẽ
+                      Căn Chỉnh Gốc Tọa Độ WCS 2D (X, Y) & Tỷ Lệ Đơn Vị Bản Vẽ
                     </h2>
                     <p className="text-xs text-zinc-400">
-                      Đưa gốc tọa độ (0,0,0) về đúng tim giao trục chính A-1 và chuẩn hóa đơn vị 1
-                      Unit = 1 mm để khớp 100% khi nhập vào BIM 3D.
+                      Đưa gốc tọa độ 2D (X:0, Y:0) về đúng tim giao trục chính A-1 và chuẩn hóa đơn
+                      vị 1 Unit = 1 mm để bản vẽ kỹ thuật đạt độ chính xác hình học tuyệt đối.
                     </p>
                   </div>
                   {wcsConfig.isAligned ? (
                     <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold font-mono flex items-center gap-1 border border-emerald-500/30">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Đã Khóa WCS
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Đã Khóa WCS 2D
                     </span>
                   ) : (
                     <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-bold font-mono border border-amber-500/30">
@@ -3523,7 +3545,7 @@ export default function ChuanHoaBanVePage() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2.5">
                     <div>
                       <label className="text-[11px] text-zinc-400 block mb-1">
                         Tọa Độ Gốc X (mm)
@@ -3550,17 +3572,6 @@ export default function ChuanHoaBanVePage() {
                         className="w-full px-2.5 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono text-zinc-200"
                       />
                     </div>
-                    <div>
-                      <label className="text-[11px] text-zinc-400 block mb-1">Cao Độ Z (mm)</label>
-                      <input
-                        type="number"
-                        value={wcsConfig.originZ}
-                        onChange={(e) =>
-                          setWcsConfig((prev) => ({ ...prev, originZ: Number(e.target.value) }))
-                        }
-                        className="w-full px-2.5 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono text-zinc-200"
-                      />
-                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
@@ -3575,7 +3586,7 @@ export default function ChuanHoaBanVePage() {
                         }
                         className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-semibold text-zinc-200"
                       >
-                        <option value="mm">Milimet (1 Unit = 1 mm - Chuẩn MEPF)</option>
+                        <option value="mm">Milimet (1 Unit = 1 mm - Chuẩn Kỹ Thuật)</option>
                         <option value="m">Mét (1 Unit = 1 m - Chuyển về mm)</option>
                         <option value="inch">Inches (Hệ Imperial - Chuyển mm)</option>
                       </select>
@@ -3604,7 +3615,7 @@ export default function ChuanHoaBanVePage() {
                   className="w-full py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-sm transition flex items-center justify-center gap-1.5"
                 >
                   <Crosshair className="w-3.5 h-3.5" />
-                  <span>Khóa Tọa Độ Chuẩn WCS (0,0,0) Khớp Vào Mô Hình BIM</span>
+                  <span>Khóa Tọa Độ Chuẩn WCS 2D (X:0, Y:0) Cho Bản Vẽ</span>
                 </button>
               </div>
             </div>
@@ -4083,13 +4094,13 @@ export default function ChuanHoaBanVePage() {
             <div className="flex items-center justify-between p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
               <div className="text-xs text-zinc-300">
                 <span className="font-bold text-amber-300">Bước tiếp theo:</span> Quản lý cây liên
-                kết XREF, so sánh chênh lệch phiên bản (Diff), AutoLISP & Tuyến 3D BIM.
+                kết XREF, so sánh chênh lệch phiên bản (CAD 2D Diff) và trình sinh mã AutoLISP 2D.
               </div>
               <button
-                onClick={() => setStep1SubTab("xref_lisp_3d")}
+                onClick={() => setStep1SubTab("xref_diff_lisp")}
                 className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs transition"
               >
-                <span>Chuyển Sang Mục 4: Cây XREF & Tuyến 3D BIM</span>
+                <span>Chuyển Sang Mục 4: Cây XREF, Diff & AutoLISP 2D</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -4097,9 +4108,9 @@ export default function ChuanHoaBanVePage() {
         )}
 
         {/* ══════════════════════════════════════════════════════════════════════
-            BƯỚC 1.4: CÂY LIÊN KẾT XREF, SO SÁNH PHIÊN BẢN DIFF & AUTOLISP
+            BƯỚC 1.4: CÂY LIÊN KẾT XREF, SO SÁNH PHIÊN BẢN DIFF & AUTOLISP 2D
         ══════════════════════════════════════════════════════════════════════ */}
-        {activeStep === 1 && step1SubTab === "xref_lisp_3d" && (
+        {activeStep === 1 && step1SubTab === "xref_diff_lisp" && (
           <div className="space-y-5">
             {/* Phân đoạn 4.1: Cây Liên Kết XREF & Phục Hồi Đường Dẫn Gãy */}
             <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
@@ -4325,11 +4336,11 @@ export default function ChuanHoaBanVePage() {
                 <div className="space-y-1 border-b border-zinc-800 pb-3">
                   <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-100 flex items-center gap-2">
                     <Code className="w-4 h-4 text-amber-400" />
-                    Trình Sinh Mã AutoLISP Chi Tiết Kỹ Thuật
+                    Trình Sinh Mã AutoLISP Chi Tiết Mặt Bằng 2D
                   </h2>
                   <p className="text-xs text-zinc-400">
-                    Tự động tạo lệnh LISP tham số hóa để vẽ nhanh giá treo Trapeze, lỗ mở xuyên dầm
-                    và côn thu ống gió ngay trong AutoCAD.
+                    Tự động tạo lệnh LISP tham số hóa để vẽ nhanh mặt bằng giá treo Trapeze, lỗ mở
+                    xuyên dầm và côn thu ống gió 2D ngay trong AutoCAD.
                   </p>
                 </div>
 
@@ -4519,148 +4530,12 @@ export default function ChuanHoaBanVePage() {
               </div>
             </div>
 
-            {/* Phân đoạn 4.4: Dựng Khối 3D Bounding Envelope (AABB) & Phân Tầng Hành Lang Từ DXF */}
-            <div className="p-5 rounded-2xl bg-zinc-900/90 border border-sky-500/30 shadow-sm space-y-4">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-zinc-800 pb-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="p-2 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-400">
-                      <Cuboid className="w-5 h-5" />
-                    </span>
-                    <h2 className="text-sm sm:text-base font-bold uppercase tracking-wide text-zinc-100">
-                      Dựng Khối 3D Spatial Envelope (AABB) & Phân Tầng Hành Lang Kỹ Thuật
-                    </h2>
-                  </div>
-                  <p className="text-xs text-zinc-400">
-                    Tự động đùn các tuyến Centerline 2D thành bao không gian 3D, phân chia Tier 1
-                    (Gió), Tier 2 (Điện), Tier 3 (Nước) và kiểm soát tĩnh không Soffit Clearance.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  <Link
-                    href="/mo-hinh-bim"
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-sm transition"
-                  >
-                    <Box className="w-4 h-4" />
-                    <span>Mở BIM Viewer 3D</span>
-                  </Link>
-                  <Link
-                    href="/engineering/cad-corridor"
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-zinc-950 font-bold text-xs shadow-sm transition"
-                  >
-                    <SlidersHorizontal className="w-4 h-4" />
-                    <span>Clash Solver</span>
-                  </Link>
-                </div>
-              </div>
-
-              {/* 3 Rules Invariants */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>1. Độ Dốc Trọng Lực</span>
-                  </div>
-                  <p className="text-[11px] text-zinc-400">
-                    Thoát nước dốc 1.0% - 2.0%. Không né dầm làm gãy độ dốc. Hệ áp lực né 45°.
-                  </p>
-                </div>
-
-                <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-400">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>2. Phân Tầng Hành Lang</span>
-                  </div>
-                  <p className="text-[11px] text-zinc-400">
-                    Tier 1: Ống gió • Tier 2: Máng điện (cách ống chiller ≥ 150mm) • Tier 3: Cấp
-                    thoát nước.
-                  </p>
-                </div>
-
-                <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-sky-400">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>3. Sleeve Xuyên Dầm</span>
-                  </div>
-                  <p className="text-[11px] text-zinc-400">
-                    Lỗ xuyên dầm đặt tại 1/3 giữa nhịp (L/3 ≤ x ≤ 2L/3) và Dsleeve ≤ Hdầm/3.
-                  </p>
-                </div>
-              </div>
-
-              {/* Extruded Spatial Routes Table */}
-              <div className="overflow-x-auto pt-1">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b border-zinc-800 bg-zinc-950/60 text-zinc-400 font-semibold">
-                      <th className="py-2.5 px-3">Mã Tuyến</th>
-                      <th className="py-2.5 px-3">Tên Tuyến & Hệ Thống</th>
-                      <th className="py-2.5 px-3">Tiết Diện</th>
-                      <th className="py-2.5 px-3">Chiều Dài</th>
-                      <th className="py-2.5 px-3">Cao Độ BOP</th>
-                      <th className="py-2.5 px-3">Phân Tầng</th>
-                      <th className="py-2.5 px-3">Khoảng Sáng</th>
-                      <th className="py-2.5 px-3">Trạng Thái</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-800/60 font-mono">
-                    {routes.map((r) => (
-                      <tr key={r.id} className="hover:bg-zinc-800/40 transition">
-                        <td className="py-2 px-3 font-bold text-amber-400">{r.id}</td>
-                        <td className="py-2 px-3 font-sans text-zinc-200">
-                          <div>{r.name}</div>
-                          <div className="text-[10px] text-zinc-500 font-mono">
-                            Hệ: {r.system} • Cách nhiệt: {r.insulationMm}mm
-                          </div>
-                        </td>
-                        <td className="py-2 px-3 text-zinc-300">{r.sectionDimensions}</td>
-                        <td className="py-2 px-3 text-zinc-300 tabular-nums">
-                          {(r.lengthMm / 1000).toFixed(1)} m
-                        </td>
-                        <td className="py-2 px-3 text-amber-300 font-bold tabular-nums">
-                          +{r.elevationBopMm} mm
-                        </td>
-                        <td className="py-2 px-3 text-zinc-300">
-                          <span className="px-2 py-0.5 rounded bg-zinc-800 text-[10px]">
-                            {r.corridorTier}
-                          </span>
-                        </td>
-                        <td className="py-2 px-3 tabular-nums">
-                          <span
-                            className={
-                              r.soffitClearanceMm < 200
-                                ? "text-rose-400 font-bold"
-                                : "text-emerald-400 font-bold"
-                            }
-                          >
-                            {r.soffitClearanceMm} mm
-                          </span>
-                        </td>
-                        <td className="py-2 px-3">
-                          {r.combineStatus === "verified" ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-sans font-semibold">
-                              <CheckCircle2 className="w-3 h-3" /> Đạt
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 text-[10px] font-sans font-semibold">
-                              <Activity className="w-3 h-3" /> Sẵn Sàng
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
             {/* Next Step CTA */}
             <div className="flex items-center justify-between p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-emerald-500/10 to-sky-500/10 border border-emerald-500/30">
               <div className="space-y-0.5">
                 <div className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  <span>Hoàn tất Studio Chuẩn Hóa CAD & 3D BIM!</span>
+                  <span>Hoàn tất Studio Chuẩn Hóa Bản Vẽ CAD 2D!</span>
                 </div>
                 <p className="text-[11px] text-zinc-400">
                   Chuyển sang Bước 2 để đặt tên file ISO 19650, Ký Duyệt Gate 0 và lưu vào cây thư
@@ -4898,9 +4773,8 @@ export default function ChuanHoaBanVePage() {
                     <option value="design/origin">
                       design/origin/ (Bản vẽ thiết kế gốc ban đầu)
                     </option>
-                    <option value="bim">bim/ (Mô hình BIM 3D & Không gian)</option>
-                    <option value="shop">shop/ (Bản vẽ Shopdrawing thi công)</option>
-                    <option value="asbuilt">asbuilt/ (Bản vẽ hoàn công)</option>
+                    <option value="shop">shop/ (Bản vẽ Shopdrawing 2D thi công)</option>
+                    <option value="asbuilt">asbuilt/ (Bản vẽ hoàn công 2D)</option>
                   </select>
                 </div>
 
