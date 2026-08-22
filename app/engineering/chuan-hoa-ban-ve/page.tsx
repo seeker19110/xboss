@@ -429,6 +429,99 @@ export default function ChuanHoaBanVePage() {
     showToast("Đã trả lại hồ sơ 2D yêu cầu kỹ sư rà soát và hiệu chỉnh lại.");
   };
 
+  // ── Smart Naming & Storage Center States (drawings/ folder structure) ──
+  const [saveConfig, setSaveConfig] = useState({
+    projectCode: "PRJ01",
+    systems: "HVAC",
+    workPackageCode: "WP-MEPF-01",
+    kind: "design" as "design" | "bim" | "shop" | "asbuilt",
+    subFolder: "iso" as "iso" | "origin",
+    name: "Mat_Bang_Cap_Gio_Tang_4",
+    date: new Date().toISOString().slice(0, 10).replace(/-/g, ""),
+    drawingVersions: "Rev01",
+  });
+  const [savingToServer, setSavingToServer] = useState(false);
+  const [savedResult, setSavedResult] = useState<{
+    standardFileName: string;
+    relativeDirectory: string;
+    fullUploadPath: string;
+    drawingId?: number;
+    revisionId?: number;
+    drawingCode?: string;
+    message?: string;
+  } | null>(null);
+
+  const cleanVal = (s: string) =>
+    s
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9_-]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "");
+
+  const computedKindTag =
+    saveConfig.kind === "design"
+      ? `DESIGN-${saveConfig.subFolder.toUpperCase()}`
+      : saveConfig.kind.toUpperCase();
+
+  const generatedFileName = `${cleanVal(saveConfig.projectCode)}_${cleanVal(saveConfig.workPackageCode)}_${cleanVal(saveConfig.systems)}_${computedKindTag}_${cleanVal(saveConfig.name)}_${cleanVal(saveConfig.date)}_${cleanVal(saveConfig.drawingVersions)}.dxf`;
+
+  const targetFolderDisplay =
+    saveConfig.kind === "design"
+      ? `drawings/design/${saveConfig.subFolder}/`
+      : `drawings/${saveConfig.kind}/`;
+
+  const handleSaveToProjectServer = async () => {
+    setSavingToServer(true);
+    try {
+      const res = await fetch("/api/engineering/cad/save-drawing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectCode: saveConfig.projectCode,
+          systems: saveConfig.systems,
+          workPackageCode: saveConfig.workPackageCode,
+          kind: saveConfig.kind,
+          subFolder: saveConfig.subFolder,
+          name: saveConfig.name,
+          date: saveConfig.date,
+          drawingVersions: saveConfig.drawingVersions,
+          fileContent: conversionInfo?.dxfContent || ";; Standardized CAD Drawing DXF\n",
+          fileExtension: "dxf",
+          approverName,
+          approvalNotes: reviewerRemarks,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setSavedResult(data);
+        showToast(`✓ Đã lưu thành công vào: ${data.relativeDirectory}/${data.standardFileName}`);
+      } else {
+        const err = await res.json();
+        showToast(`❌ Lỗi: ${err.error || "Không thể lưu"}`);
+      }
+    } catch (e: any) {
+      showToast(`❌ Lỗi kết nối: ${e.message}`);
+    } finally {
+      setSavingToServer(false);
+    }
+  };
+
+  const handleDownloadStandardizedNamedDxf = () => {
+    const content = conversionInfo?.dxfContent || ";; Standardized CAD Drawing DXF\n";
+    const blob = new Blob([content], { type: "application/dxf;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = generatedFileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(`✓ Đã tải xuống file: ${generatedFileName}`);
+  };
+
   // ── Tab 1.7: Deep Purge & WCS Coordinate State ──
   const [purgeState, setPurgeState] = useState({
     isPurged: false,
@@ -3284,12 +3377,227 @@ export default function ChuanHoaBanVePage() {
               </div>
             </div>
 
-            {/* Sub-Section 4: Biên Bản Thẩm Tra & Ký Phê Duyệt */}
+            {/* Sub-Section 4: Trung Tâm Đặt Tên Quy Chuẩn & Lưu Trữ Thư Mục Bản Vẽ */}
+            <div className="p-5 rounded-2xl bg-zinc-900/90 border border-sky-500/30 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800 pb-3">
+                <div className="space-y-0.5">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-sky-400 flex items-center gap-2">
+                    <FolderTree className="w-4 h-4 text-sky-400" />
+                    <span>
+                      4. Quy Chuẩn Đặt Tên & Thư Mục Lưu Trữ Bản Vẽ (Smart Naming & Storage)
+                    </span>
+                  </h3>
+                  <p className="text-xs text-zinc-400">
+                    Cấu trúc thư mục <code className="text-amber-400 font-mono">drawings/</code>{" "}
+                    phân cấp và công thức đặt tên:{" "}
+                    <code className="text-sky-300 font-mono">
+                      [project_id]_[work_package]_[systems]_[kind]_[name]_[date]_[version]
+                    </code>
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="px-2.5 py-1 rounded-full bg-sky-500/10 text-sky-300 text-[11px] font-mono font-bold border border-sky-500/20">
+                    Thư mục đích: {targetFolderDisplay}
+                  </span>
+                </div>
+              </div>
+
+              {/* 7 Interactive Selectors for Naming */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2.5 text-xs">
+                {/* 1. Project ID */}
+                <div>
+                  <label className="text-[11px] font-semibold text-zinc-400 block mb-1">
+                    1. Mã Dự Án (project_id):
+                  </label>
+                  <input
+                    type="text"
+                    value={saveConfig.projectCode}
+                    onChange={(e) => setSaveConfig({ ...saveConfig, projectCode: e.target.value })}
+                    placeholder="PRJ01"
+                    className="w-full px-2.5 py-1.5 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-mono font-bold text-amber-400"
+                  />
+                </div>
+
+                {/* 2. Systems */}
+                <div>
+                  <label className="text-[11px] font-semibold text-zinc-400 block mb-1">
+                    2. Phân Hệ (systems):
+                  </label>
+                  <select
+                    value={saveConfig.systems}
+                    onChange={(e) => setSaveConfig({ ...saveConfig, systems: e.target.value })}
+                    className="w-full px-2.5 py-1.5 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-semibold text-zinc-200"
+                  >
+                    <option value="HVAC">HVAC (Gió & Điều hòa)</option>
+                    <option value="ELECTRICAL">ELECTRICAL (Điện)</option>
+                    <option value="PLUMBING">PLUMBING (Nước)</option>
+                    <option value="FIREFIGHTING">FIREFIGHTING (PCCC)</option>
+                    <option value="ELV">ELV (Điện nhẹ / BMS)</option>
+                    <option value="STRUCTURE">STRUCTURE (Kết cấu)</option>
+                    <option value="ARCHITECTURE">ARCHITECTURE (Kiến trúc)</option>
+                  </select>
+                </div>
+
+                {/* 3. Work Package */}
+                <div>
+                  <label className="text-[11px] font-semibold text-zinc-400 block mb-1">
+                    3. Gói Thầu (work_package):
+                  </label>
+                  <input
+                    type="text"
+                    value={saveConfig.workPackageCode}
+                    onChange={(e) =>
+                      setSaveConfig({ ...saveConfig, workPackageCode: e.target.value })
+                    }
+                    placeholder="WP-MEPF-01"
+                    className="w-full px-2.5 py-1.5 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-mono text-zinc-200"
+                  />
+                </div>
+
+                {/* 4. Kind & Subfolder */}
+                <div className="lg:col-span-2">
+                  <label className="text-[11px] font-semibold text-zinc-400 block mb-1">
+                    4. Loại & Thư Mục (kind / subfolder):
+                  </label>
+                  <select
+                    value={
+                      saveConfig.kind === "design"
+                        ? `design/${saveConfig.subFolder}`
+                        : saveConfig.kind
+                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val.startsWith("design/")) {
+                        setSaveConfig({
+                          ...saveConfig,
+                          kind: "design",
+                          subFolder: val.split("/")[1] as any,
+                        });
+                      } else {
+                        setSaveConfig({
+                          ...saveConfig,
+                          kind: val as any,
+                        });
+                      }
+                    }}
+                    className="w-full px-2.5 py-1.5 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-semibold text-emerald-400"
+                  >
+                    <option value="design/iso">design/iso/ (Bản vẽ thiết kế chuẩn hóa ISO)</option>
+                    <option value="design/origin">
+                      design/origin/ (Bản vẽ thiết kế gốc ban đầu)
+                    </option>
+                    <option value="bim">bim/ (Mô hình BIM 3D & Không gian)</option>
+                    <option value="shop">shop/ (Bản vẽ Shopdrawing thi công)</option>
+                    <option value="asbuilt">asbuilt/ (Bản vẽ hoàn công)</option>
+                  </select>
+                </div>
+
+                {/* 5. Date */}
+                <div>
+                  <label className="text-[11px] font-semibold text-zinc-400 block mb-1">
+                    5. Ngày (date):
+                  </label>
+                  <input
+                    type="text"
+                    value={saveConfig.date}
+                    onChange={(e) => setSaveConfig({ ...saveConfig, date: e.target.value })}
+                    placeholder="20260822"
+                    className="w-full px-2.5 py-1.5 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-mono text-zinc-200"
+                  />
+                </div>
+
+                {/* 6. Version */}
+                <div>
+                  <label className="text-[11px] font-semibold text-zinc-400 block mb-1">
+                    6. Phiên Bản (version):
+                  </label>
+                  <select
+                    value={saveConfig.drawingVersions}
+                    onChange={(e) =>
+                      setSaveConfig({ ...saveConfig, drawingVersions: e.target.value })
+                    }
+                    className="w-full px-2.5 py-1.5 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-mono text-amber-400 font-bold"
+                  >
+                    <option value="Rev01">Rev01</option>
+                    <option value="Rev02">Rev02</option>
+                    <option value="RevA">RevA</option>
+                    <option value="RevB">RevB</option>
+                    <option value="v1.0">v1.0</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* 7. Drawing Name description */}
+              <div>
+                <label className="text-[11px] font-semibold text-zinc-400 block mb-1">
+                  7. Tên Diễn Giải Bản Vẽ (name):
+                </label>
+                <input
+                  type="text"
+                  value={saveConfig.name}
+                  onChange={(e) => setSaveConfig({ ...saveConfig, name: e.target.value })}
+                  placeholder="Mat_Bang_Cap_Gio_Tang_4"
+                  className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-medium text-zinc-200"
+                />
+              </div>
+
+              {/* Realtime Live Preview Banner */}
+              <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1.5">
+                <div className="flex items-center justify-between text-[11px] text-zinc-400">
+                  <span className="font-semibold text-zinc-300">
+                    Xem trước đường dẫn & tên tệp lưu trữ:
+                  </span>
+                  <span className="text-emerald-400 font-mono">Chuẩn ISO 19650 / XBoss</span>
+                </div>
+                <div className="p-2.5 rounded-lg bg-zinc-900 border border-zinc-800 font-mono text-xs text-sky-300 flex items-center gap-2 overflow-x-auto">
+                  <Folder className="w-4 h-4 shrink-0 text-amber-400" />
+                  <span className="text-zinc-500">data/uploads/{targetFolderDisplay}</span>
+                  <span className="font-bold text-amber-300">{generatedFileName}</span>
+                </div>
+              </div>
+
+              {/* Action Buttons for Saving */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
+                <div className="text-xs text-zinc-400">
+                  {savedResult ? (
+                    <span className="text-emerald-400 font-mono font-semibold flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      Đã lưu thành công vào CSDL bản vẽ (Mã {savedResult.drawingCode})!
+                    </span>
+                  ) : (
+                    <span>
+                      Lưu trực tiếp vào cây thư mục máy chủ và đồng bộ vào Sổ Bản Vẽ dự án.
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={handleDownloadStandardizedNamedDxf}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700 transition"
+                  >
+                    <Download className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Tải File .DXF Đã Đặt Tên</span>
+                  </button>
+                  <button
+                    onClick={handleSaveToProjectServer}
+                    disabled={savingToServer}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-sm transition disabled:opacity-50"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>{savingToServer ? "Đang Lưu..." : "Lưu Vào Thư Mục Máy Chủ"}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Sub-Section 5: Biên Bản Thẩm Tra & Ký Phê Duyệt */}
             <div className="p-5 rounded-2xl bg-zinc-900/90 border border-emerald-500/30 shadow-sm space-y-4">
               <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4" />
-                  <span>4. Biên Bản Thẩm Tra & Ký Duyệt Phê Duyệt Hồ Sơ 2D</span>
+                  <span>5. Biên Bản Thẩm Tra & Ký Duyệt Phê Duyệt Hồ Sơ 2D</span>
                 </h3>
                 <span className="text-[10px] font-mono text-zinc-400">
                   Ký duyệt kỹ thuật trực tiếp
