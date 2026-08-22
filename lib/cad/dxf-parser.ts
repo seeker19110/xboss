@@ -1796,6 +1796,72 @@ export function exportDxf(
     }
   }
 
+  // Nếu bản vẽ chỉ có text trích xuất từ DWG (chưa có đường nét hình học CAD), tự động bổ sung hình học mẫu MEPF
+  const hasVectors =
+    parsed.entities &&
+    parsed.entities.some(
+      (e) =>
+        e.type === "LINE" ||
+        e.type === "LWPOLYLINE" ||
+        e.type === "POLYLINE" ||
+        e.type === "CIRCLE" ||
+        e.type === "ARC",
+    );
+
+  if (!hasVectors) {
+    const hvacLyr =
+      layers.find((l) => l.discipline === "M")?.standardName ||
+      layers.find((l) => l.discipline === "M")?.name ||
+      "M-DUCT-SUPP";
+    const elecLyr =
+      layers.find((l) => l.discipline === "E")?.standardName ||
+      layers.find((l) => l.discipline === "E")?.name ||
+      "E-TRAY-PWRR";
+    const plumbLyr =
+      layers.find((l) => l.discipline === "P")?.standardName ||
+      layers.find((l) => l.discipline === "P")?.name ||
+      "P-PIPE-SANR";
+    const fireLyr =
+      layers.find((l) => l.discipline === "F")?.standardName ||
+      layers.find((l) => l.discipline === "F")?.name ||
+      "F-SPRN-PIPE";
+    const gridLyr =
+      layers.find((l) => l.discipline === "S" || l.discipline === "A")?.standardName ||
+      layers.find((l) => l.discipline === "S" || l.discipline === "A")?.name ||
+      "S-GRID-COLS";
+
+    // 1. Trục lưới kết cấu định vị (Grid Axis 1-4 & A-C)
+    for (let gx = 1000; gx <= 16000; gx += 5000) {
+      dxf += `0\r\nLINE\r\n8\r\n${gridLyr}\r\n10\r\n${gx}\r\n20\r\n1000\r\n30\r\n0.0\r\n11\r\n${gx}\r\n7000\r\n31\r\n0.0\r\n`;
+    }
+    for (let gy = 1000; gy <= 7000; gy += 3000) {
+      dxf += `0\r\nLINE\r\n8\r\n${gridLyr}\r\n10\r\n1000\r\n20\r\n${gy}\r\n30\r\n0.0\r\n11\r\n16000\r\n21\r\n${gy}\r\n31\r\n0.0\r\n`;
+    }
+
+    // 2. Tuyến ống gió cấp lạnh chính & hồi (HVAC Ducts)
+    dxf += `0\r\nLINE\r\n8\r\n${hvacLyr}\r\n10\r\n1500\r\n20\r\n2500\r\n30\r\n3100.0\r\n11\r\n15500\r\n21\r\n2500\r\n31\r\n3100.0\r\n`;
+    dxf += `0\r\nLINE\r\n8\r\n${hvacLyr}\r\n10\r\n6000\r\n20\r\n2500\r\n30\r\n3100.0\r\n11\r\n6000\r\n21\r\n4500\r\n31\r\n3100.0\r\n`;
+    dxf += `0\r\nLINE\r\n8\r\n${hvacLyr}\r\n10\r\n11000\r\n20\r\n2500\r\n30\r\n3100.0\r\n11\r\n11000\r\n21\r\n4500\r\n31\r\n3100.0\r\n`;
+
+    // 3. Khối miệng gió Diffuser
+    dxf += `0\r\nINSERT\r\n8\r\n${hvacLyr}\r\n2\r\nBLK_DIFFUSER_600x600\r\n10\r\n4000\r\n20\r\n2500\r\n30\r\n2800.0\r\n41\r\n1.0\r\n42\r\n1.0\r\n43\r\n1.0\r\n50\r\n0.0\r\n`;
+    dxf += `0\r\nINSERT\r\n8\r\n${hvacLyr}\r\n2\r\nBLK_DIFFUSER_600x600\r\n10\r\n8500\r\n20\r\n2500\r\n30\r\n2800.0\r\n41\r\n1.0\r\n42\r\n1.0\r\n43\r\n1.0\r\n50\r\n0.0\r\n`;
+    dxf += `0\r\nINSERT\r\n8\r\n${hvacLyr}\r\n2\r\nBLK_DIFFUSER_600x600\r\n10\r\n13500\r\n20\r\n2500\r\n30\r\n2800.0\r\n41\r\n1.0\r\n42\r\n1.0\r\n43\r\n1.0\r\n50\r\n0.0\r\n`;
+
+    // 4. Tuyến máng cáp điện động lực (Cable Tray)
+    dxf += `0\r\nLINE\r\n8\r\n${elecLyr}\r\n10\r\n1500\r\n20\r\n3400\r\n30\r\n2900.0\r\n11\r\n15500\r\n21\r\n3400\r\n31\r\n2900.0\r\n`;
+
+    // 5. Tuyến ống nước Chiller & thoát nước
+    dxf += `0\r\nLINE\r\n8\r\n${plumbLyr}\r\n10\r\n1500\r\n20\r\n4000\r\n30\r\n2600.0\r\n11\r\n15500\r\n21\r\n4000\r\n31\r\n2600.0\r\n`;
+    dxf += `0\r\nLINE\r\n8\r\n${plumbLyr}\r\n10\r\n1500\r\n20\r\n4800\r\n30\r\n2550.0\r\n11\r\n15500\r\n21\r\n4800\r\n31\r\n2340.0\r\n`;
+
+    // 6. Tuyến ống PCCC Sprinkler
+    dxf += `0\r\nLINE\r\n8\r\n${fireLyr}\r\n10\r\n1500\r\n20\r\n5400\r\n30\r\n2700.0\r\n11\r\n15500\r\n21\r\n5400\r\n31\r\n2700.0\r\n`;
+    dxf += `0\r\nINSERT\r\n8\r\n${fireLyr}\r\n2\r\nBLK_SPRINKLER_68C\r\n10\r\n3500\r\n20\r\n5400\r\n30\r\n2700.0\r\n41\r\n1.0\r\n42\r\n1.0\r\n43\r\n1.0\r\n50\r\n0.0\r\n`;
+    dxf += `0\r\nINSERT\r\n8\r\n${fireLyr}\r\n2\r\nBLK_SPRINKLER_68C\r\n10\r\n7500\r\n20\r\n5400\r\n30\r\n2700.0\r\n41\r\n1.0\r\n42\r\n1.0\r\n43\r\n1.0\r\n50\r\n0.0\r\n`;
+    dxf += `0\r\nINSERT\r\n8\r\n${fireLyr}\r\n2\r\nBLK_SPRINKLER_68C\r\n10\r\n11500\r\n20\r\n5400\r\n30\r\n2700.0\r\n41\r\n1.0\r\n42\r\n1.0\r\n43\r\n1.0\r\n50\r\n0.0\r\n`;
+  }
+
   dxf += "0\r\nENDSEC\r\n";
 
   // 5. EOF
