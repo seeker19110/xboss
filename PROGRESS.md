@@ -80,6 +80,44 @@
   từ trước trên nhiều commit `main` không liên quan — cần điều tra riêng, ngoài phạm vi PR
   health-check.
 
+## M66 — Vá đường bóc khối lượng CAD → Spool → BOQ (2026-08-22)
+
+- **Bối cảnh:** rà soát theo yêu cầu người dùng ("bóc khối lượng BOQ và khối lượng chi tiết
+  từng hạng mục") phát hiện `docs/nang-cap/M66-cad-qto-tracking.md` đã "Approved" và có đủ
+  code (`lib/engineering-cad-qto.ts`, migration `0100`, 4 API `cad-qto/*`, trang
+  `/engineering/cad-tracking`) nhưng **chưa từng chạy đúng** — cùng mẫu bug đã ghi ở mục
+  "Sửa bug CI có sẵn trên main" bên dưới (module `engineering-*` viết ra nhưng không test qua
+  đường DB thật). M66 không nằm trong `docs/nang-cap/README.md`/`PROJECT-COMPLETION-ROADMAP.md`
+  nên nợ này chưa từng lộ ra qua gate chính thức.
+- **Bug thật, đã sửa:** `lib/engineering-cad-qto.ts` — toàn bộ 7 lệnh gọi `query/queryOne/run`
+  truyền tham số dạng mảng literal thay vì spread (`(sql, ...params)` là chữ ký thật của
+  `lib/db`) — mọi câu lệnh trong file (list/update/upsert/gen phiếu nghiệm thu) sẽ lỗi bind
+  param khi chạy thật. `app/api/engineering/cad-qto/variance/route.ts` SELECT cột
+  `b.unit_rate` không tồn tại (schema thật `boq_items.unit_price`, `migrations/0005_boq.sql`)
+  + cùng bug tham số mảng.
+- **Thiếu, đã bổ sung:** không có đường nào tạo `engineering_cad_spools` từ kết quả
+  `parse-dxf` — thêm `createCadSpoolsBatch()` (tính `calculated_qty` qua
+  `calculateDuctQtoM2`/`calculatePipeQtoM`, resolve `boq_item_id` theo mã BOQCODE có sẵn
+  trong `boq_items`, sinh `spool_code` duy nhất kiểu `SP-{HỆ}-{TẦNG}-{STT}`, bỏ qua — không
+  throw — item thiếu/sai mã BOQ) + `POST /api/engineering/cad-qto/spools`.
+- **UI mới:** tab "Bóc Khối Lượng Từ CAD" đầu tiên trên `/engineering/cad-tracking` — chọn
+  bản vẽ đã lưu → `parse-dxf` → xem trước hình học (SVG rút gọn từ `dxfData.entities`) →
+  bảng soát từng tuyến (`dxfData.spatialRoutes`) với dropdown bộ môn + ô nhập mã BOQCODE bắt
+  buộc (kỹ sư xác nhận thủ công, không tự động ghi khi thiếu mã) → "Tạo Spool CAD" gọi route
+  mới, refresh sang tab Mặt bằng/Đối soát.
+- **Test:** bổ sung 1 test tích hợp DB thật vào `tests/engineering-cad-qto.test.ts` (import
+  `tests/setup.ts`, skip nếu không có `TEST_DATABASE_URL`) phủ toàn bộ đường DB trước đây
+  không ai test (`createCadSpoolsBatch`/`listCadSpools`/`updateSpoolProgressStage`/
+  `upsertQtoVariance`/`generateInspectionRequestForSpools`) — đã tự chạy xác nhận pass thật
+  trên Postgres 16 cục bộ (migration tự áp), cùng với suite `engineering-cad-dxf-parser`,
+  `dxf-real-drawing-parser`, `boq` không hồi quy. `npm run lint` + `npm run typecheck` +
+  `npm run build` xanh.
+- **Còn lại (chưa làm, không chặn vòng lặp bóc-khối-lượng-cơ-bản này):** M66 vẫn nằm ngoài
+  `PROJECT-COMPLETION-ROADMAP.md`; chưa nối `POST /cad-qto/bbnt-generate` → `payment_certs`
+  (Payment Certification Feed, phần 5 trong spec); trang `/engineering/chuan-hoa-ban-ve`
+  (chuẩn hóa bản vẽ) và luồng QTO/Spool mới này vẫn là 2 trang riêng, chưa hợp nhất 1
+  workflow duy nhất.
+
 ## Kiểm tra trạng thái hoạt động (health check) cho Admin (2026-08-22)
 
 - Thêm `lib/healthcheck.ts::runHealthChecks()` — kiểm 9 hạng mục dùng API (Postgres `SELECT 1`,
