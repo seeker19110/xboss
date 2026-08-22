@@ -13,6 +13,20 @@
 - **Lộ trình hoàn thành (chờ duyệt, chưa code):** `PROJECT-COMPLETION-ROADMAP.md` chốt C0→C6 để đạt XBoss v1.0/Product Complete và O1→O5 cho Engineering OS/Vision Complete theo gate; không coi tài liệu là quyền tự triển khai production hoặc A3+.
 - **Spec pack chi tiết (chờ duyệt):** C0, C2–C6 và OS-1–OS-5 đã có file thi hành riêng (C1 dùng ENG-5), mỗi file gồm scope, data/API/UI/ops, test, chia PR và DoD. Chưa phase nào được đánh dấu triển khai chỉ vì đặc tả đã viết.
 
+## Kiểm tra trạng thái hoạt động (health check) cho Admin (2026-08-22)
+
+- Thêm `lib/healthcheck.ts::runHealthChecks()` — kiểm 9 hạng mục dùng API (Postgres `SELECT 1`,
+  Telegram Bot API `getMe`) và không dùng API (XBOSS_SECRET/CRON_SECRET/SMTP/VAPID/Google Sheet
+  đã cấu hình chưa, `data/uploads` ghi được + dung lượng, số dòng `login_rate_limits` bất thường).
+- `GET /api/tech/health-check` (chỉ Admin) chạy thủ công — nút "Kiểm tra ngay" trên panel
+  "Hệ thống" của `/tech`. `GET /api/cron/health-check` (Bearer `CRON_SECRET` hoặc session
+  Admin/PM, khoá `sync_locks` chống chạy chồng) chạy 2 lần/ngày qua cron ngoài (xem `DEPLOY.md`
+  — vượt giới hạn Vercel Hobby 1 lần/ngày) — chỉ gửi email + Telegram cho Admin khi có lỗi/cảnh
+  báo, chạy sạch thì im lặng.
+- Migration `0131_health_check_runs.sql` (bảng `health_check_runs`, thuần thêm — đi thẳng
+  production) lưu lịch sử mỗi lần chạy (thủ công lẫn cron).
+- Cập nhật `docs/nang-cap/G10-cong-nghe.md` (thuộc nhóm G10 — cùng panel "Hệ thống" trên `/tech`).
+
 ## M97 V1 — Dọn trang shim, trang re-export trùng và code chết (2026-08-21)
 
 - **Đặc tả:** `docs/nang-cap/M97-tai-cau-truc-route.md` (kế hoạch 8 việc V1–V8 tái cấu trúc page route theo hub chức năng; API route ngoài phạm vi).
