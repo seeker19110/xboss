@@ -89,87 +89,21 @@ export default function GodTierStudioPage() {
   const [spoolScrapRate, setSpoolScrapRate] = useState<number>(1.2);
   const [reusableRemnants, setReusableRemnants] = useState<PipeSpoolCutItem[]>([]);
 
-  // Sample Elements for 3D Viewport
-  const sampleElements = useMemo<GodTierElementData[]>(
-    () => [
-      {
-        id: "elem-1",
-        guid: "GUID-DUCT-SUPP-101",
-        elementType: "DUCT_STRAIGHT",
-        systemType: "HVAC_SUPPLY",
-        name: "Ống gió cấp AHU-01 (800x500)",
-        position: { x: -100, y: -50, z: 50 },
-        dimensions: { width: 800, height: 500, length: 6000 },
-        boundingBox: { min: [-400, 0, 2550], max: [400, 6000, 3050] },
-        plannedStartDate: "2026-08-01",
-        plannedEndDate: "2026-08-15",
-        actualProgressPercent: 100,
-      },
-      {
-        id: "elem-2",
-        guid: "GUID-PIPE-DRAIN-201",
-        elementType: "PIPE_STRAIGHT",
-        systemType: "PLUMBING_DRAINAGE",
-        name: "Ống thoát nước uPVC DN110",
-        position: { x: -100, y: 0, z: 40 },
-        dimensions: { diameter: 110, length: 4000 },
-        boundingBox: { min: [-55, 1000, 2695], max: [55, 5000, 2805] },
-        plannedStartDate: "2026-08-10",
-        plannedEndDate: "2026-08-25",
-        actualProgressPercent: 70,
-      },
-      {
-        id: "elem-3",
-        guid: "GUID-CABLE-TRAY-301",
-        elementType: "CABLE_TRAY",
-        systemType: "ELECTRICAL_POWER",
-        name: "Máng cáp điện động lực 300x100",
-        position: { x: 120, y: -80, z: 80 },
-        dimensions: { width: 300, height: 100, length: 6000 },
-        boundingBox: { min: [450, 0, 3050], max: [750, 6000, 3150] },
-        plannedStartDate: "2026-08-15",
-        plannedEndDate: "2026-08-30",
-        actualProgressPercent: 30,
-      },
-      {
-        id: "elem-4",
-        guid: "GUID-BEAM-STR-401",
-        elementType: "BEAM",
-        systemType: "STRUCTURE",
-        name: "Dầm bê tông B40x60 Trục 2-3",
-        position: { x: 0, y: 50, z: 60 },
-        dimensions: { width: 400, height: 600, length: 8000 },
-        boundingBox: { min: [-4000, 3800, 2600], max: [4000, 4200, 3200] },
-        plannedStartDate: "2026-07-20",
-        plannedEndDate: "2026-08-05",
-        actualProgressPercent: 100,
-      },
-    ],
-    [],
-  );
+  // Lấy danh sách cấu kiện thực tế từ mô hình BIM được chọn
+  const modelElements = useMemo<GodTierElementData[]>(() => {
+    if (!selectedModel?.spatial_octree_data) return [];
+    const octree = selectedModel.spatial_octree_data as Record<string, unknown>;
+    const elems = (octree.elements || octree.sampleElements) as GodTierElementData[] | undefined;
+    return Array.isArray(elems) ? elems : [];
+  }, [selectedModel]);
 
-  // Fetch initial data
+  // Fetch initial data (chỉ lấy dữ liệu thực tế đã lưu từ DB)
   const fetchData = useCallback(async () => {
     try {
-      const [modelsRes, clashesRes, aiRes, bcfRes, cncRes, pointRes] = await Promise.all([
+      const [modelsRes, clashesRes, bcfRes] = await Promise.all([
         fetch("/api/engineering/god-tier/models"),
         fetch("/api/engineering/god-tier/clashes"),
-        fetch("/api/engineering/god-tier/ai-diagnose", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "diagnose" }),
-        }),
         fetch("/api/engineering/god-tier/bcf/topics"),
-        fetch("/api/engineering/god-tier/cnc-export", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "generate_pipe_spools" }),
-        }),
-        fetch("/api/engineering/god-tier/point-cloud", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
-        }),
       ]);
 
       if (modelsRes.ok) {
@@ -181,25 +115,9 @@ export default function GodTierStudioPage() {
         const cData = await clashesRes.json();
         setClashes(cData.clashes || []);
       }
-      if (aiRes.ok) {
-        const aData = await aiRes.json();
-        setDiagnosticReport(aData.report || null);
-      }
       if (bcfRes.ok) {
         const bData = await bcfRes.json();
         setBcfTopics(bData.topics || []);
-      }
-      if (cncRes.ok) {
-        const cncData = await cncRes.json();
-        if (cncData.spoolResult) {
-          setPipeSpoolItems(cncData.spoolResult.items || []);
-          setSpoolScrapRate(cncData.spoolResult.scrapRatePercent || 1.2);
-          setReusableRemnants(cncData.spoolResult.reusableRemnants || []);
-        }
-      }
-      if (pointRes.ok) {
-        const pData = await pointRes.json();
-        setPointCloudResult(pData.result || null);
       }
     } catch (err) {
       console.error("Lỗi nạp dữ liệu God-Tier Studio:", err);
@@ -267,7 +185,20 @@ export default function GodTierStudioPage() {
     }
 
     // Vẽ các phần tử 3D dạng Isometric Box
-    sampleElements.forEach((elem, idx) => {
+    if (modelElements.length === 0) {
+      ctx.fillStyle = "#94a3b8";
+      ctx.font = "13px Inter, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(
+        "Chưa có cấu kiện 3D cho dự án này. Vui lòng tải lên tệp IFC/DWG để trực quan hoá.",
+        cx,
+        cy + 10,
+      );
+      ctx.textAlign = "left";
+      return;
+    }
+
+    modelElements.forEach((elem, idx) => {
       const rx = elem.position.x * Math.cos(radYaw) - elem.position.y * Math.sin(radYaw);
       const ry =
         (elem.position.x * Math.sin(radYaw) + elem.position.y * Math.cos(radYaw)) *
@@ -315,7 +246,7 @@ export default function GodTierStudioPage() {
       ctx.font = "10px Inter, sans-serif";
       ctx.fillText(`● ${statusLabel}`, px - sizeW / 2, py + sizeH / 2 + 14);
     });
-  }, [cameraAngle, timelineStep, sampleElements, activeTab, pointCloudResult]);
+  }, [cameraAngle, timelineStep, modelElements, activeTab, pointCloudResult]);
 
   useEffect(() => {
     draw3DScene();
@@ -449,12 +380,16 @@ export default function GodTierStudioPage() {
 
   // Trigger LiDAR Scan Simulation
   const handleRunLidarScan = async () => {
+    if (modelElements.length === 0) {
+      alert("Vui lòng tải lên mô hình có cấu kiện hình học để thực hiện quét LiDAR.");
+      return;
+    }
     setIsScanningLidar(true);
     try {
       const res = await fetch("/api/engineering/god-tier/point-cloud", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ elements: sampleElements }),
+        body: JSON.stringify({ elements: modelElements }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -531,7 +466,7 @@ export default function GodTierStudioPage() {
               </span>
             </div>
             <h1 className="text-xl md:text-2xl font-bold tracking-tight text-zinc-100 flex items-center gap-2">
-              {selectedModel?.name || "Mô hình MEPF God-Tier — TT AVIO Tháp A Tầng 5"}
+              {selectedModel?.name || "Studio Kỹ Thuật Không Gian & BIM/CAD"}
             </h1>
             <p className="text-xs md:text-sm text-zinc-400">
               Định dạng: <span className="text-zinc-200 font-mono">IFC 4.3 / glTF / B3DM</span> •

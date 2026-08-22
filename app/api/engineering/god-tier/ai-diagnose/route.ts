@@ -31,15 +31,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, script });
     }
 
-    // Mặc định: Chẩn đoán 12 dị tật bản vẽ
-    const defaultData = drawingData || {
-      fileName: "SHOP-MEPF-T5-AVIO.dwg",
-      layers: ["0", "layer1", "mep_ong_gio", "A-WALL", "M-HVAC-DUCT"],
-      texts: ["MÆt b»ng cÊp giã TÇng 5", "T-01 AHU-01", "Cao ®é +2800mm"],
-      elementsSummary: { ducts: 120, pipes: 85, clashes: 3 },
-    };
+    if (!drawingData || (!drawingData.layers?.length && !drawingData.texts?.length)) {
+      return NextResponse.json(
+        { error: "Vui lòng cung cấp dữ liệu thực thể bản vẽ CAD/BIM cần chẩn đoán (drawingData)" },
+        { status: 400 },
+      );
+    }
 
-    const report = await diagnoseCadBimDefects(defaultData);
+    const report = await diagnoseCadBimDefects(drawingData);
     return NextResponse.json({ success: true, report });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Lỗi AI chẩn đoán bản vẽ";

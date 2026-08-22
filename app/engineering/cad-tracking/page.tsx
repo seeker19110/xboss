@@ -73,129 +73,6 @@ const STATUS_COLORS: Record<SpoolStatus, string> = {
   bbnt_approved: "bg-emerald-950 text-emerald-300 border-emerald-800",
 };
 
-const SAMPLE_SPOOLS: CadSpoolItem[] = [
-  {
-    id: "SP-001",
-    spool_code: "SP-DUCT-L4-Z1-001",
-    discipline: "hvac",
-    system_code: "ACMV-SA",
-    floor_label: "Tầng 4",
-    zone_label: "Zone A (Văn phòng)",
-    dimension_spec: "600x400",
-    length_m: 4.2,
-    calculated_qty: 8.82,
-    unit: "m2",
-    status: "installed",
-    inspection_request_id: null,
-  },
-  {
-    id: "SP-002",
-    spool_code: "SP-DUCT-L4-Z1-002",
-    discipline: "hvac",
-    system_code: "ACMV-SA",
-    floor_label: "Tầng 4",
-    zone_label: "Zone A (Văn phòng)",
-    dimension_spec: "500x300",
-    length_m: 5.5,
-    calculated_qty: 9.24,
-    unit: "m2",
-    status: "qc_passed",
-    inspection_request_id: null,
-  },
-  {
-    id: "SP-003",
-    spool_code: "SP-PIPE-CHW-L4-001",
-    discipline: "hvac",
-    system_code: "CHW-SUPP",
-    floor_label: "Tầng 4",
-    zone_label: "Trục Kỹ thuật D",
-    dimension_spec: "DN100",
-    length_m: 12.0,
-    calculated_qty: 12.0,
-    unit: "m",
-    status: "bbnt_approved",
-    inspection_request_id: 101,
-  },
-  {
-    id: "SP-004",
-    spool_code: "SP-FP-SPR-L4-015",
-    discipline: "firefighting",
-    system_code: "FP-SPK",
-    floor_label: "Tầng 4",
-    zone_label: "Zone B (Hành lang)",
-    dimension_spec: "DN50",
-    length_m: 18.5,
-    calculated_qty: 18.5,
-    unit: "m",
-    status: "qc_passed",
-    inspection_request_id: null,
-  },
-  {
-    id: "SP-005",
-    spool_code: "SP-ELEC-TRAY-L4-008",
-    discipline: "electrical",
-    system_code: "ELEC-PWR",
-    floor_label: "Tầng 4",
-    zone_label: "Trục Kỹ thuật E",
-    dimension_spec: "300x100",
-    length_m: 8.0,
-    calculated_qty: 8.0,
-    unit: "m",
-    status: "delivered",
-    inspection_request_id: null,
-  },
-];
-
-const SAMPLE_VARIANCES: QtoVarianceItem[] = [
-  {
-    boqItemId: 1,
-    boqCode: "BOQ-HVAC-DUCT-01",
-    boqName: "Gia công & lắp đặt ống gió tôn tráng kẽm Z270 Tầng 4",
-    unit: "m2",
-    qtyContract: 450.0,
-    qtyShopCad: 485.5,
-    qtyInstalled: 320.0,
-    qtyApprovedBbnt: 180.0,
-    deltaVoQty: 35.5,
-    estimatedVoVnd: 28400000,
-    unitRateVnd: 800000,
-    status: "vo_risk",
-    riskMessage:
-      "Bản vẽ Shopdrawing phát sinh +35.50 m2 so với Hợp đồng BOQ do điều chỉnh tuyến né dầm.",
-  },
-  {
-    boqItemId: 2,
-    boqCode: "BOQ-FP-PIPE-02",
-    boqName: "Đường ống thép hàn đen DN50 PCCC TCVN",
-    unit: "m",
-    qtyContract: 620.0,
-    qtyShopCad: 615.0,
-    qtyInstalled: 410.0,
-    qtyApprovedBbnt: 350.0,
-    deltaVoQty: -5.0,
-    estimatedVoVnd: 0,
-    unitRateVnd: 450000,
-    status: "normal",
-    riskMessage: "Khối lượng thi công khớp đúng theo hợp đồng và bản vẽ.",
-  },
-  {
-    boqItemId: 3,
-    boqCode: "BOQ-ELEC-TRAY-01",
-    boqName: "Máng cáp sơn tĩnh điện 300x100 dày 1.5mm",
-    unit: "m",
-    qtyContract: 120.0,
-    qtyShopCad: 155.0,
-    qtyInstalled: 80.0,
-    qtyApprovedBbnt: 40.0,
-    deltaVoQty: 35.0,
-    estimatedVoVnd: 17500000,
-    unitRateVnd: 500000,
-    status: "critical_variance",
-    riskMessage:
-      "Bản vẽ Shopdrawing vượt >15% khối lượng hợp đồng BOQ (Phát sinh +35.00 m). Cần lập hồ sơ VO khẩn cấp.",
-  },
-];
-
 export default function CadQtoTrackingPage() {
   const [activeTab, setActiveTab] = useState<"floorplan" | "variance" | "bbnt">("floorplan");
   const [loading, setLoading] = useState(false);
@@ -244,21 +121,21 @@ export default function CadQtoTrackingPage() {
       }
       if (resSpools.ok) {
         const data = await resSpools.json();
-        setSpools(data.spools?.length > 0 ? data.spools : SAMPLE_SPOOLS);
+        setSpools(Array.isArray(data.spools) ? data.spools : []);
       } else {
-        setSpools(SAMPLE_SPOOLS);
+        setSpools([]);
       }
 
       const resVar = await fetch("/api/engineering/cad-qto/variance");
       if (resVar.ok) {
         const dataVar = await resVar.json();
-        setVariances(dataVar.variances?.length > 0 ? dataVar.variances : SAMPLE_VARIANCES);
+        setVariances(Array.isArray(dataVar.variances) ? dataVar.variances : []);
       } else {
-        setVariances(SAMPLE_VARIANCES);
+        setVariances([]);
       }
     } catch {
-      setSpools(SAMPLE_SPOOLS);
-      setVariances(SAMPLE_VARIANCES);
+      setSpools([]);
+      setVariances([]);
     } finally {
       setLoading(false);
     }
@@ -467,61 +344,68 @@ export default function CadQtoTrackingPage() {
 
                   {/* Interactive Spool Entities */}
                   <div className="my-auto space-y-6">
-                    {spools.map((spool) => {
-                      const isSelected = selectedSpool?.id === spool.id;
-                      return (
-                        <div
-                          key={spool.id}
-                          onClick={() => setSelectedSpool(spool)}
-                          className={`group flex cursor-pointer items-center justify-between rounded-lg border p-3 transition-all ${
-                            isSelected
-                              ? "border-amber-500 bg-zinc-900 shadow-lg shadow-amber-500/10"
-                              : "border-zinc-800 bg-zinc-900/80 hover:border-zinc-700"
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div
-                              className={`h-3 w-3 rounded-full ${
-                                spool.status === "bbnt_approved"
-                                  ? "bg-emerald-400 ring-4 ring-emerald-950"
-                                  : spool.status === "qc_passed"
-                                    ? "bg-indigo-400 ring-4 ring-indigo-950"
-                                    : spool.status === "installed"
-                                      ? "bg-amber-400 ring-4 ring-amber-950"
-                                      : "bg-sky-400 ring-4 ring-sky-950"
-                              }`}
-                            />
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono text-xs font-bold text-zinc-200">
-                                  {spool.spool_code}
-                                </span>
-                                <span className="rounded bg-zinc-800 px-1.5 py-0.2 text-[10px] uppercase text-zinc-400 font-mono">
-                                  {spool.discipline}
-                                </span>
-                              </div>
-                              <div className="mt-0.5 text-[11px] text-zinc-400">
-                                {spool.zone_label} | Tiết diện: {spool.dimension_spec} | Dài:{" "}
-                                {spool.length_m}m
+                    {spools.length === 0 ? (
+                      <div className="text-center py-12 text-zinc-500 text-sm">
+                        Chưa có phân đoạn Spool nào được ghi nhận cho dự án này. Vui lòng tải lên
+                        bản vẽ CAD hoặc tạo Spool.
+                      </div>
+                    ) : (
+                      spools.map((spool) => {
+                        const isSelected = selectedSpool?.id === spool.id;
+                        return (
+                          <div
+                            key={spool.id}
+                            onClick={() => setSelectedSpool(spool)}
+                            className={`group flex cursor-pointer items-center justify-between rounded-lg border p-3 transition-all ${
+                              isSelected
+                                ? "border-amber-500 bg-zinc-900 shadow-lg shadow-amber-500/10"
+                                : "border-zinc-800 bg-zinc-900/80 hover:border-zinc-700"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div
+                                className={`h-3 w-3 rounded-full ${
+                                  spool.status === "bbnt_approved"
+                                    ? "bg-emerald-400 ring-4 ring-emerald-950"
+                                    : spool.status === "qc_passed"
+                                      ? "bg-indigo-400 ring-4 ring-indigo-950"
+                                      : spool.status === "installed"
+                                        ? "bg-amber-400 ring-4 ring-amber-950"
+                                        : "bg-sky-400 ring-4 ring-sky-950"
+                                }`}
+                              />
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-xs font-bold text-zinc-200">
+                                    {spool.spool_code}
+                                  </span>
+                                  <span className="rounded bg-zinc-800 px-1.5 py-0.2 text-[10px] uppercase text-zinc-400 font-mono">
+                                    {spool.discipline}
+                                  </span>
+                                </div>
+                                <div className="mt-0.5 text-[11px] text-zinc-400">
+                                  {spool.zone_label} | Tiết diện: {spool.dimension_spec} | Dài:{" "}
+                                  {spool.length_m}m
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          <div className="flex items-center gap-3">
-                            <span className="font-mono text-xs font-bold text-emerald-400">
-                              {spool.calculated_qty} {spool.unit}
-                            </span>
-                            <span
-                              className={`rounded border px-2 py-0.5 text-[10px] font-semibold ${
-                                STATUS_COLORS[spool.status]
-                              }`}
-                            >
-                              {STATUS_LABELS[spool.status]}
-                            </span>
+                            <div className="flex items-center gap-3">
+                              <span className="font-mono text-xs font-bold text-emerald-400">
+                                {spool.calculated_qty} {spool.unit}
+                              </span>
+                              <span
+                                className={`rounded border px-2 py-0.5 text-[10px] font-semibold ${
+                                  STATUS_COLORS[spool.status]
+                                }`}
+                              >
+                                {STATUS_LABELS[spool.status]}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })
+                    )}
                   </div>
 
                   <div className="flex justify-between text-[11px] font-mono text-zinc-500">
@@ -645,50 +529,58 @@ export default function CadQtoTrackingPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-800/60">
-                  {variances.map((v) => (
-                    <tr key={v.boqItemId} className="hover:bg-zinc-800/40">
-                      <td className="p-3 font-mono font-bold text-zinc-200">{v.boqCode}</td>
-                      <td className="p-3 text-zinc-200 max-w-xs">{v.boqName}</td>
-                      <td className="p-3 font-mono">{v.unit}</td>
-                      <td className="p-3 font-mono text-zinc-400">{v.qtyContract.toFixed(2)}</td>
-                      <td className="p-3 font-mono font-bold text-amber-300">
-                        {v.qtyShopCad.toFixed(2)}
-                      </td>
-                      <td className="p-3 font-mono text-zinc-300">{v.qtyInstalled.toFixed(2)}</td>
-                      <td className="p-3 font-mono font-bold text-emerald-400">
-                        {v.qtyApprovedBbnt.toFixed(2)}
-                      </td>
-                      <td className="p-3 font-mono font-bold">
-                        <span className={v.deltaVoQty > 0 ? "text-amber-400" : "text-zinc-400"}>
-                          {v.deltaVoQty > 0
-                            ? `+${v.deltaVoQty.toFixed(2)}`
-                            : v.deltaVoQty.toFixed(2)}
-                        </span>
-                      </td>
-                      <td className="p-3 font-mono font-bold text-amber-300">
-                        {v.estimatedVoVnd > 0
-                          ? `+${v.estimatedVoVnd.toLocaleString("vi-VN")} đ`
-                          : "—"}
-                      </td>
-                      <td className="p-3">
-                        <span
-                          className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${
-                            v.status === "critical_variance"
-                              ? "bg-red-950 text-red-400 border border-red-800"
-                              : v.status === "vo_risk"
-                                ? "bg-amber-950 text-amber-300 border border-amber-800"
-                                : "bg-emerald-950 text-emerald-400 border border-emerald-800"
-                          }`}
-                        >
-                          {v.status === "critical_variance"
-                            ? "CẢNH BÁO VO >15%"
-                            : v.status === "vo_risk"
-                              ? "PHÁT SINH THIẾT KẾ"
-                              : "CHUẨN ĐỊNH MỨC"}
-                        </span>
+                  {variances.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="p-8 text-center text-zinc-500 text-sm">
+                        Chưa có dữ liệu đối soát BOQ / CAD Variance cho dự án này.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    variances.map((v) => (
+                      <tr key={v.boqItemId} className="hover:bg-zinc-800/40">
+                        <td className="p-3 font-mono font-bold text-zinc-200">{v.boqCode}</td>
+                        <td className="p-3 text-zinc-200 max-w-xs">{v.boqName}</td>
+                        <td className="p-3 font-mono">{v.unit}</td>
+                        <td className="p-3 font-mono text-zinc-400">{v.qtyContract.toFixed(2)}</td>
+                        <td className="p-3 font-mono font-bold text-amber-300">
+                          {v.qtyShopCad.toFixed(2)}
+                        </td>
+                        <td className="p-3 font-mono text-zinc-300">{v.qtyInstalled.toFixed(2)}</td>
+                        <td className="p-3 font-mono font-bold text-emerald-400">
+                          {v.qtyApprovedBbnt.toFixed(2)}
+                        </td>
+                        <td className="p-3 font-mono font-bold">
+                          <span className={v.deltaVoQty > 0 ? "text-amber-400" : "text-zinc-400"}>
+                            {v.deltaVoQty > 0
+                              ? `+${v.deltaVoQty.toFixed(2)}`
+                              : v.deltaVoQty.toFixed(2)}
+                          </span>
+                        </td>
+                        <td className="p-3 font-mono font-bold text-amber-300">
+                          {v.estimatedVoVnd > 0
+                            ? `+${v.estimatedVoVnd.toLocaleString("vi-VN")} đ`
+                            : "—"}
+                        </td>
+                        <td className="p-3">
+                          <span
+                            className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${
+                              v.status === "critical_variance"
+                                ? "bg-red-950 text-red-400 border border-red-800"
+                                : v.status === "vo_risk"
+                                  ? "bg-amber-950 text-amber-300 border border-amber-800"
+                                  : "bg-emerald-950 text-emerald-400 border border-emerald-800"
+                            }`}
+                          >
+                            {v.status === "critical_variance"
+                              ? "CẢNH BÁO VO >15%"
+                              : v.status === "vo_risk"
+                                ? "PHÁT SINH THIẾT KẾ"
+                                : "CHUẨN ĐỊNH MỨC"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

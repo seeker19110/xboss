@@ -28,6 +28,7 @@ Bộ Master Skill này đóng gói toàn bộ tri thức của Kỹ sư Định 
 11. **Bảo Toàn Chuỗi Tính Toán Tiến Độ Đa Cấp (WBS Roll-up 5 Tầng):**
     $$\text{Dimension Tick} \longrightarrow \text{Task \%} \longrightarrow \text{Package \%} \longrightarrow \text{Tower \%} \longrightarrow \text{Project Overall \%}$$
 12. **Bất biến Dự Báo Dòng Tiền Động (Dynamic Cashflow Forecast Invariant):** Dòng tiền chi phí thực tế và thanh toán luỹ kế phải được đối soát tự động với đường cong S-Curve kế hoạch và chỉ số hiệu suất chi phí $CPI$.
+13. **Bất biến Loại Bỏ Ảo Giác AI Dự Toán & Chi Phí BOQ (Zero QS & BOQ Hallucination Invariant):** Tuyệt đối CẤM AI tự suy diễn, phóng đại hoặc bịa đặt số liệu bóc tách khối lượng BOQ, đơn giá hợp đồng, giá trị phát sinh VO (Variation Order), tiến độ EVM lũy kế ($PV, EV, AC$), số ngày trễ hạn, hoặc số tiền thanh toán IPC. Mọi phép tính QS, BOQ và dòng tiền phải là hàm toán học xác định (Deterministic Mathematical Function) thực thi trên dữ liệu thật từ bảng `boq_items`, `tasks`, `materials`, `contracts` và số học BigInt `lib/money.ts`. Khi chưa có dữ liệu hợp đồng/BOQ hoặc người dùng chưa tải lên bảng dự toán, BẮT BUỘC trả về giá trị 0 hoặc giao diện trống yêu cầu nạp dữ liệu, tuyệt đối CẤM dùng số liệu ước tính giả mạo hiển thị như kết quả thật.
 
 ---
 

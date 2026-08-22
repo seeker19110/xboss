@@ -169,90 +169,9 @@ export default function BimCadEngineeringPage() {
 
       if (resEl.ok) {
         const data = await resEl.json();
-        // Dữ liệu mẫu phong phú nếu chưa nạp đủ IFC/CAD
-        if (data.length === 0) {
-          const sampleElements: BimElementRecord[] = [
-            {
-              id: "elem-1",
-              project_id: 1,
-              ifc_guid: "IFC-DUCT-LV4-001",
-              element_type: "IfcDuctSegment",
-              discipline: "hvac",
-              system_name: "HVAC Cung Cấp Gió Lạnh (SA)",
-              storey_level: "Tầng 04",
-              zone_name: "Zone A",
-              properties: { width_mm: 500, height_mm: 300, air_flow_m3h: 2400 },
-              spatial_bounding_box: { min: [1000, 2000, 2800], max: [5000, 2500, 3100] },
-              task_id: 101,
-              boq_code: "HVAC-DUCT-500X300",
-              actual_status: "active",
-              created_at: new Date().toISOString(),
-              task_name: "Lắp đặt ống gió cấp tầng 4 Zone A",
-              task_progress: 0.65,
-              task_status: "dang_thi_cong",
-            },
-            {
-              id: "elem-2",
-              project_id: 1,
-              ifc_guid: "IFC-BEAM-LV4-B12",
-              element_type: "IfcBeam",
-              discipline: "structure",
-              system_name: "Kết Cấu Dầm Bê Tông",
-              storey_level: "Tầng 04",
-              zone_name: "Zone A",
-              properties: { section: "400x600", concrete_grade: "B35" },
-              spatial_bounding_box: { min: [3000, 1800, 2700], max: [3400, 4000, 3300] },
-              task_id: 102,
-              boq_code: "STR-CONC-BEAM",
-              actual_status: "active",
-              created_at: new Date().toISOString(),
-              task_name: "Đổ bê tông dầm sàn tầng 4",
-              task_progress: 1.0,
-              task_status: "nghiem_thu",
-            },
-            {
-              id: "elem-3",
-              project_id: 1,
-              ifc_guid: "IFC-PIPE-LV4-FP02",
-              element_type: "IfcPipeSegment",
-              discipline: "firefighting",
-              system_name: "PCCC Sprinkler D65",
-              storey_level: "Tầng 04",
-              zone_name: "Zone A",
-              properties: { diameter_mm: 65, material: "Thép tráng kẽm SCH40" },
-              spatial_bounding_box: { min: [1500, 2200, 2900], max: [6000, 2300, 3000] },
-              task_id: 103,
-              boq_code: "FP-PIPE-D65",
-              actual_status: "active",
-              created_at: new Date().toISOString(),
-              task_name: "Lắp đặt đường ống PCCC nhánh Zone A",
-              task_progress: 0.15,
-              task_status: "tre",
-            },
-            {
-              id: "elem-4",
-              project_id: 1,
-              ifc_guid: "IFC-TRAY-LV4-EL01",
-              element_type: "IfcCableCarrierSegment",
-              discipline: "electrical",
-              system_name: "Máng Cáp Điện Nặng (Heavy Tray)",
-              storey_level: "Tầng 04",
-              zone_name: "Zone B",
-              properties: { width_mm: 300, height_mm: 100 },
-              spatial_bounding_box: { min: [6000, 2000, 3200], max: [9000, 2300, 3300] },
-              task_id: 104,
-              boq_code: "ELEC-TRAY-300",
-              actual_status: "active",
-              created_at: new Date().toISOString(),
-              task_name: "Lắp máng cáp điện tầng 4 Zone B",
-              task_progress: 1.0,
-              task_status: "nghiem_thu",
-            },
-          ];
-          setElements(sampleElements);
-        } else {
-          setElements(data);
-        }
+        setElements(Array.isArray(data) ? data : []);
+      } else {
+        setElements([]);
       }
 
       if (resClash.ok) {
@@ -447,81 +366,94 @@ export default function BimCadEngineeringPage() {
                 />
 
                 {/* Simulated 3D Elements Canvas */}
-                <div className="relative z-10 grid h-full w-full grid-cols-2 gap-4 p-4 md:grid-cols-2">
-                  {filteredElements.map((el) => {
-                    const statusColor = get4DStatusColor(
-                      el.task_status,
-                      el.task_progress,
-                      clashes.some(
-                        (c) =>
-                          c.element_a_id === el.id ||
-                          c.element_b_id === el.id ||
-                          c.element_a_guid === el.ifc_guid ||
-                          c.element_b_guid === el.ifc_guid,
-                      ),
-                    );
+                <div className="relative z-10 grid h-full w-full grid-cols-1 md:grid-cols-2 gap-4 p-4">
+                  {filteredElements.length === 0 ? (
+                    <div className="col-span-full flex flex-col items-center justify-center h-64 text-center p-8 text-zinc-500">
+                      <Box className="w-12 h-12 text-zinc-600 mb-2" />
+                      <p className="text-sm font-medium text-zinc-300">
+                        Chưa có cấu kiện BIM/CAD nào cho dự án này.
+                      </p>
+                      <p className="text-xs text-zinc-500 mt-1">
+                        Vui lòng nạp mô hình IFC/DWG hoặc liên kết cấu kiện với WBS để hiển thị
+                        3D/4D.
+                      </p>
+                    </div>
+                  ) : (
+                    filteredElements.map((el) => {
+                      const statusColor = get4DStatusColor(
+                        el.task_status,
+                        el.task_progress,
+                        clashes.some(
+                          (c) =>
+                            c.element_a_id === el.id ||
+                            c.element_b_id === el.id ||
+                            c.element_a_guid === el.ifc_guid ||
+                            c.element_b_guid === el.ifc_guid,
+                        ),
+                      );
 
-                    const cardColor =
-                      viewMode === "4d_status"
-                        ? statusColor.colorHex
-                        : getDisciplineColor(el.discipline);
+                      const cardColor =
+                        viewMode === "4d_status"
+                          ? statusColor.colorHex
+                          : getDisciplineColor(el.discipline);
 
-                    const isSelected = selectedElement?.id === el.id;
+                      const isSelected = selectedElement?.id === el.id;
 
-                    return (
-                      <div
-                        key={el.id}
-                        onClick={() => setSelectedElement(el)}
-                        className={`group relative flex cursor-pointer flex-col justify-between rounded-xl border p-4 transition-all duration-300 hover:scale-[1.02] ${
-                          isSelected
-                            ? "border-amber-400 bg-zinc-800/90 shadow-lg shadow-amber-500/10"
-                            : "border-zinc-800 bg-zinc-900/80 hover:border-zinc-700"
-                        }`}
-                        style={{ borderLeftWidth: 6, borderLeftColor: cardColor }}
-                      >
-                        <div>
-                          <div className="flex items-center justify-between">
-                            <span className="font-mono text-xs font-bold text-zinc-400">
-                              {el.ifc_guid}
-                            </span>
-                            <span
-                              className="rounded-full px-2 py-0.5 text-[10px] font-bold"
-                              style={{ backgroundColor: `${cardColor}25`, color: cardColor }}
-                            >
-                              {viewMode === "4d_status"
-                                ? statusColor.statusLabel
-                                : el.discipline.toUpperCase()}
-                            </span>
+                      return (
+                        <div
+                          key={el.id}
+                          onClick={() => setSelectedElement(el)}
+                          className={`group relative flex cursor-pointer flex-col justify-between rounded-xl border p-4 transition-all duration-300 hover:scale-[1.02] ${
+                            isSelected
+                              ? "border-amber-400 bg-zinc-800/90 shadow-lg shadow-amber-500/10"
+                              : "border-zinc-800 bg-zinc-900/80 hover:border-zinc-700"
+                          }`}
+                          style={{ borderLeftWidth: 6, borderLeftColor: cardColor }}
+                        >
+                          <div>
+                            <div className="flex items-center justify-between">
+                              <span className="font-mono text-xs font-bold text-zinc-400">
+                                {el.ifc_guid}
+                              </span>
+                              <span
+                                className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+                                style={{ backgroundColor: `${cardColor}25`, color: cardColor }}
+                              >
+                                {viewMode === "4d_status"
+                                  ? statusColor.statusLabel
+                                  : el.discipline.toUpperCase()}
+                              </span>
+                            </div>
+
+                            <h3 className="mt-2 text-sm font-semibold text-zinc-100">
+                              {el.system_name || el.element_type}
+                            </h3>
+                            <p className="text-xs text-zinc-400">
+                              {el.storey_level} • {el.zone_name}
+                            </p>
                           </div>
 
-                          <h3 className="mt-2 text-sm font-semibold text-zinc-100">
-                            {el.system_name || el.element_type}
-                          </h3>
-                          <p className="text-xs text-zinc-400">
-                            {el.storey_level} • {el.zone_name}
-                          </p>
+                          <div className="mt-4 border-t border-zinc-800/80 pt-2">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-zinc-400">Tiến độ WBS:</span>
+                              <span className="font-mono font-bold text-zinc-200">
+                                {Math.round((el.task_progress || 0) * 100)}%
+                              </span>
+                            </div>
+                            <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+                              <div
+                                className="h-full rounded-full transition-all duration-500"
+                                style={{
+                                  width: `${Math.round((el.task_progress || 0) * 100)}%`,
+                                  backgroundColor: statusColor.colorHex,
+                                }}
+                              />
+                            </div>
+                          </div>
                         </div>
-
-                        <div className="mt-4 border-t border-zinc-800/80 pt-2">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-zinc-400">Tiến độ WBS:</span>
-                            <span className="font-mono font-bold text-zinc-200">
-                              {Math.round((el.task_progress || 0) * 100)}%
-                            </span>
-                          </div>
-                          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
-                            <div
-                              className="h-full rounded-full transition-all duration-500"
-                              style={{
-                                width: `${Math.round((el.task_progress || 0) * 100)}%`,
-                                backgroundColor: statusColor.colorHex,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </div>
 
                 {/* 3D Coordinate Axis Overlay */}

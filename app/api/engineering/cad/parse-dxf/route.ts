@@ -121,6 +121,15 @@ export async function POST(req: Request) {
             fileName = rev.original_name || rev.file_name;
             sourcePath = rev.file_name;
             realFileFound = true;
+          } else {
+            // Thử đọc trực tiếp từ thư mục data/uploads trên đĩa cục bộ
+            const localFile = join(process.cwd(), "data", "uploads", rev.file_name);
+            if (existsSync(localFile) && statSync(localFile).isFile()) {
+              fileBuffer = readFileSync(localFile);
+              fileName = rev.original_name || basename(localFile);
+              sourcePath = rev.file_name;
+              realFileFound = true;
+            }
           }
         }
 

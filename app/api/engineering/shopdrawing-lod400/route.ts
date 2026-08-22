@@ -54,42 +54,20 @@ export async function POST(req: NextRequest) {
     const action = body.action || "convert_lod400";
 
     if (action === "convert_lod400") {
-      const drawingName = body.drawingName || "MB-SHOP-T05-ZONE-A.DWG";
+      const drawingName = body.drawingName || "Bản vẽ Shopdrawing";
       const runCode = body.runCode || `LOD400-${Date.now().toString(36).toUpperCase()}`;
-      const segments: PreliminarySegment[] = body.segments || [
-        {
-          id: "SEG-FP-01",
-          discipline: "firefighting",
-          systemCode: "FP",
-          nominalSpec: "DN100",
-          outerDiameterMm: 114.3,
-          startPoint: [1000, 2000, 2800],
-          endPoint: [12500, 2000, 2800],
-          lengthM: 11.5,
-        },
-        {
-          id: "SEG-PL-02",
-          discipline: "plumbing",
-          systemCode: "DRAIN",
-          nominalSpec: "DN150",
-          outerDiameterMm: 168.3,
-          startPoint: [500, 3000, 2700],
-          endPoint: [8500, 3000, 2700],
-          lengthM: 8.0,
-        },
-      ];
+      const segments: PreliminarySegment[] = body.segments || [];
+      if (!Array.isArray(segments) || segments.length === 0) {
+        return NextResponse.json(
+          {
+            error:
+              "Vui lòng cung cấp danh mục phân đoạn tuyến ống/ống gió thực tế từ bản vẽ (segments)",
+          },
+          { status: 400 },
+        );
+      }
 
-      const beams: StructuralBeam[] = body.beams || [
-        {
-          id: "BEAM-B1",
-          beamCode: "D400x600-T5-01",
-          widthMm: 400,
-          heightMm: 600,
-          spanLengthMm: 8000,
-          minPoint: [4000, 1000, 2400],
-          maxPoint: [4400, 5000, 3000],
-        },
-      ];
+      const beams: StructuralBeam[] = Array.isArray(body.beams) ? body.beams : [];
 
       const lod400 = convertToLod400Dfma(runCode, drawingName, segments, 5.8, 2.0, 25.0);
       const sleeves = detectStructuralSleevePenetrations(segments, beams, 25.0);

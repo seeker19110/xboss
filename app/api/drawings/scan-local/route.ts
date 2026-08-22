@@ -135,12 +135,13 @@ function getAllDrawingFilesRecursively(
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.manageDrawings(user.role))
+  if (!CAN.manageDrawings(user.role) && !CAN.viewEngineeringGraph(user.role)) {
     return NextResponse.json({ error: "Bạn không có quyền đồng bộ bản vẽ" }, { status: 403 });
+  }
 
   if (!existsSync(DRAWINGS_DIR)) {
     return NextResponse.json(
-      { error: "Thư mục data/uploads/drawings chưa tồn tại" },
+      { error: "Thư mục data/uploads/drawings chưa tồn tại trên máy chủ" },
       { status: 404 },
     );
   }
@@ -150,55 +151,78 @@ export async function POST(req: NextRequest) {
   let synced = 0;
 
   for (const item of files) {
-    const fullPath = item.fullPath;
-    const stat = statSync(fullPath);
-    const content = readFileSync(fullPath);
-    const sha256 = createHash("sha256").update(content).digest("hex");
-    const info = parseDrawingInfo(item.fileName);
+    try {
+      const fullPath = item.fullPath;
+      const stat = statSync(fullPath);
+      const info = parseDrawingInfo(item.fileName);
 
-    let drawing = await queryOne<{ id: number }>(
-      `SELECT id FROM drawings WHERE code = ? AND project_id = ?`,
-      info.code,
-      projectId,
-    );
-
-    if (!drawing) {
-      const res = await query<{ id: number }>(
-        `INSERT INTO drawings (project_id, code, name, kind, system_group, floor_label, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, NOW())
-         RETURNING id`,
-        projectId,
+      let drawing = await queryOne<{ id: number }>(
+        `SELECT id FROM drawings WHERE code = ? AND project_id = ?`,
         info.code,
-        info.name,
-        info.kind,
-        info.systemGroup,
-        info.floorLabel,
+        projectId,
       );
-      drawing = res[0];
-    }
 
-    if (!drawing) continue;
+      if (!drawing) {
+        // Kiểm tra xem đã tồn tại code trên toàn hệ thống chưa
+        const existingByCode = await queryOne<{ id: number }>(
+          `SELECT id FROM drawings WHERE code = ?`,
+          info.code,
+        );
+        if (existingByCode) {
+          drawing = existingByCode;
+        } else {
+          const res = await query<{ id: number }>(
+            `INSERT INTO drawings (project_id, code, name, kind, system_group, floor_label, created_by, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+             RETURNING id`,
+            projectId,
+            info.code,
+            info.name,
+            info.kind,
+            info.systemGroup,
+            info.floorLabel,
+            user.id,
+          );
+          drawing = res[0];
+        }
+      }
 
-    const existingRev = await queryOne<{ id: number }>(
-      `SELECT id FROM drawing_revisions WHERE drawing_id = ? AND rev = ?`,
-      drawing.id,
-      info.rev,
-    );
+      if (!drawing) continue;
 
-    if (!existingRev) {
-      await run(
-        `INSERT INTO drawing_revisions (
-           drawing_id, rev, status, file_name, file_size_bytes, file_sha256,
-           submitted_at, created_by, created_at
-         ) VALUES (?, ?, 'approved', ?, ?, ?, NOW(), ?, NOW())`,
+      const existingRev = await queryOne<{ id: number }>(
+        `SELECT id FROM drawing_revisions WHERE drawing_id = ? AND rev = ?`,
         drawing.id,
         info.rev,
-        `drawings/${item.relativePath}`,
-        stat.size,
-        sha256,
-        user.id,
       );
-      synced++;
+
+      if (!existingRev) {
+        let mimeType = "application/octet-stream";
+        if (info.ext === ".dwg") mimeType = "image/vnd.dwg";
+        else if (info.ext === ".dxf") mimeType = "application/dxf";
+        else if (info.ext === ".pdf") mimeType = "application/pdf";
+        else if (info.ext === ".png") mimeType = "image/png";
+        else if (info.ext === ".jpg" || info.ext === ".jpeg") mimeType = "image/jpeg";
+        else if (info.ext === ".ifc") mimeType = "application/x-step";
+
+        const relativePathNormalized = `drawings/${item.relativePath.replace(/\\/g, "/")}`;
+
+        await run(
+          `INSERT INTO drawing_revisions (
+             drawing_id, rev, status, file_name, original_name, mime_type, size_bytes,
+             submitted_at, decided_at, decision_note, uploaded_by, created_at
+           ) VALUES (?, ?, 'approved', ?, ?, ?, ?, CURRENT_DATE, CURRENT_DATE, 'Đồng bộ tự động từ thư mục dự án', ?, NOW())`,
+          drawing.id,
+          info.rev,
+          relativePathNormalized,
+          item.fileName,
+          mimeType,
+          stat.size,
+          user.id,
+        );
+        synced++;
+      }
+    } catch (fileErr) {
+      console.error(`Lỗi đồng bộ tệp ${item.fileName}:`, fileErr);
     }
   }
 

@@ -964,7 +964,7 @@ export default function ChuanHoaBanVePage() {
   // ── Fetch Design Drawings from Project ──
   const fetchDesignDrawings = useCallback(async () => {
     try {
-      const res = await fetch("/api/drawings?kind=design");
+      const res = await fetch("/api/drawings");
       if (res.status === 401) {
         redirectToLogin();
         return;
@@ -1012,7 +1012,7 @@ export default function ChuanHoaBanVePage() {
             dxfContent: options?.customDxfContent,
             fileBase64: options?.fileBase64,
             filePath: options?.filePath,
-            fileName: options?.name || uploadedFileName || "AVIO-DWG-M-FL04-01.dxf",
+            fileName: options?.name || uploadedFileName || "drawing.dxf",
           }),
         });
 
@@ -1052,16 +1052,16 @@ export default function ChuanHoaBanVePage() {
     setLoading(true);
     try {
       const res = await fetch("/api/drawings/scan-local", { method: "POST" });
+      const json = await res.json().catch(() => ({}));
       if (res.ok) {
-        const json = await res.json();
         showToast(`✓ ${json.message || "Đã đồng bộ bản vẽ từ máy chủ"}`);
         await fetchDesignDrawings();
       } else {
-        showToast("Lỗi khi đồng bộ bản vẽ");
+        showToast(json.error || `Lỗi khi đồng bộ bản vẽ (${res.status})`);
       }
     } catch (err) {
       console.error(err);
-      showToast("Lỗi kết nối máy chủ");
+      showToast("Lỗi kết nối máy chủ khi đồng bộ bản vẽ");
     } finally {
       setLoading(false);
     }

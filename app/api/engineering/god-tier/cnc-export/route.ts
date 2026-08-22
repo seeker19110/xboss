@@ -21,15 +21,13 @@ export async function POST(req: NextRequest) {
     const { action, ductParams, spoolDemands } = body;
 
     if (action === "generate_pipe_spools") {
-      const demands = spoolDemands || [
-        { code: "SP-CHW-01", dia: 100, length: 2400 },
-        { code: "SP-CHW-02", dia: 100, length: 1800 },
-        { code: "SP-CHW-03", dia: 100, length: 1200 },
-        { code: "SP-CHW-04", dia: 100, length: 950 },
-        { code: "SP-DRN-01", dia: 110, length: 3000 },
-        { code: "SP-DRN-02", dia: 110, length: 2200 },
-      ];
-      const spoolResult = generatePipeSpoolCutList(demands, 6000);
+      if (!Array.isArray(spoolDemands) || spoolDemands.length === 0) {
+        return NextResponse.json(
+          { error: "Vui lòng cung cấp danh sách nhu cầu cắt phân đoạn ống (spoolDemands)" },
+          { status: 400 },
+        );
+      }
+      const spoolResult = generatePipeSpoolCutList(spoolDemands, 6000);
       return NextResponse.json({ success: true, spoolResult });
     }
 

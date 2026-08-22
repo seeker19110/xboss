@@ -101,33 +101,57 @@ export default function AutoRoutingPage() {
   const handleRunSpatialClash = async () => {
     setSpatialClashLoading(true);
     try {
-      const sampleBoxes = [
-        {
-          elementGuid: "ELEM-DUCT-01",
-          discipline: "HVAC",
-          min: [1000, 800, 2800],
-          max: [3000, 1400, 3400],
-        },
-        {
-          elementGuid: "ELEM-BEAM-D2",
-          discipline: "STRUCTURE",
-          min: [1800, 800, 2800],
-          max: [2400, 3200, 3600],
-        },
-        {
-          elementGuid: "ELEM-PIPE-DN100",
-          discipline: "PLUMBING",
-          min: [1500, 1000, 3100],
-          max: [1600, 2800, 3200],
-        },
-      ];
+      // Tải danh sách bounding boxes thực tế từ các cấu kiện BIM hiện hữu
+      const elRes = await fetch("/api/engineering/bim/elements");
+      let boundingBoxes: Array<{
+        elementGuid: string;
+        discipline: string;
+        min: [number, number, number];
+        max: [number, number, number];
+      }> = [];
+
+      if (elRes.ok) {
+        const elData = await elRes.json();
+        if (Array.isArray(elData) && elData.length > 0) {
+          boundingBoxes = elData
+            .filter(
+              (e: {
+                spatial_bounding_box?: {
+                  min: [number, number, number];
+                  max: [number, number, number];
+                };
+              }) => e.spatial_bounding_box?.min && e.spatial_bounding_box?.max,
+            )
+            .map(
+              (e: {
+                id: string;
+                ifc_guid?: string;
+                discipline?: string;
+                spatial_bounding_box: {
+                  min: [number, number, number];
+                  max: [number, number, number];
+                };
+              }) => ({
+                elementGuid: e.ifc_guid || String(e.id),
+                discipline: e.discipline || "combined",
+                min: e.spatial_bounding_box.min,
+                max: e.spatial_bounding_box.max,
+              }),
+            );
+        }
+      }
+
+      if (boundingBoxes.length === 0) {
+        setSpatialClashResults([]);
+        return;
+      }
 
       const res = await fetch("/api/engineering/bim-routing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type: "spatial_clash",
-          boundingBoxes: sampleBoxes,
+          boundingBoxes,
           softClearanceMm: 50,
         }),
       });

@@ -216,33 +216,7 @@ export default function BimViewerPage() {
       const res = await fetch("/api/engineering/bim-routing?type=bcf");
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setBcfIssues(data);
-        } else {
-          // Fallback sample BCF issues
-          setBcfIssues([
-            {
-              id: "bcf-01",
-              bcf_code: "BCF-2026-001",
-              title: "Xung đột ống cấp nước DN50 xuyên dầm Zone B",
-              discipline: "PLUMBING",
-              issue_type: "clash",
-              severity: "critical",
-              status: "open",
-              created_at: new Date().toISOString(),
-            },
-            {
-              id: "bcf-02",
-              bcf_code: "BCF-2026-002",
-              title: "Khoảng hở ty treo ống gió < 50mm với máng cáp",
-              discipline: "HVAC",
-              issue_type: "observation",
-              severity: "medium",
-              status: "in_review",
-              created_at: new Date().toISOString(),
-            },
-          ]);
-        }
+        setBcfIssues(Array.isArray(data) ? data : []);
       }
     } catch (e) {
       console.error("Lỗi nạp BCF issues:", e);

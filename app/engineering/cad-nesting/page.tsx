@@ -93,37 +93,45 @@ export default function CadNestingHydraulicStudioPage() {
   const [qrSpoolCode, setQrSpoolCode] = useState("SPOOL-CHW-DN100-01");
   const [qrResult, setQrResult] = useState<{ qrData: string; displayLabel: string } | null>(null);
 
-  const runSampleNesting = useCallback(async () => {
+  const handleRunNesting = useCallback(async () => {
     setLoading(true);
     try {
-      const sampleSegments = [
-        { spoolCode: "SP-01", lengthMm: 4200, systemCode: "CHW-S" },
-        { spoolCode: "SP-02", lengthMm: 3600, systemCode: "CHW-S" },
-        { spoolCode: "SP-03", lengthMm: 2300, systemCode: "CHW-S" },
-        { spoolCode: "SP-04", lengthMm: 2100, systemCode: "CHW-S" },
-        { spoolCode: "SP-05", lengthMm: 1700, systemCode: "CHW-R" },
-        { spoolCode: "SP-06", lengthMm: 1500, systemCode: "CHW-R" },
-        { spoolCode: "SP-07", lengthMm: 1200, systemCode: "CHW-R" },
-        { spoolCode: "SP-08", lengthMm: 950, systemCode: "CHW-R" },
-        { spoolCode: "SP-09", lengthMm: 500, systemCode: "CHW-R" },
-      ];
+      // 1. Tải danh sách phân đoạn Spool thực tế từ CSDL
+      const spoolsRes = await fetch("/api/engineering/cad-qto/spools");
+      if (spoolsRes.status === 401) {
+        redirectToLogin();
+        return;
+      }
+      let realSegments: Array<{ spoolCode: string; lengthMm: number; systemCode: string }> = [];
+      if (spoolsRes.ok) {
+        const sData = await spoolsRes.json();
+        if (Array.isArray(sData.spools) && sData.spools.length > 0) {
+          realSegments = sData.spools.map(
+            (s: { spool_code: string; length_m: number; system_code: string }) => ({
+              spoolCode: s.spool_code,
+              lengthMm: Math.round((s.length_m || 1) * 1000),
+              systemCode: s.system_code || "GEN",
+            }),
+          );
+        }
+      }
+
+      if (realSegments.length === 0) {
+        setNestingResult(null);
+        return;
+      }
 
       const res = await fetch("/api/engineering/cad-nesting", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "nest_1d",
-          segments: sampleSegments,
+          segments: realSegments,
           stockLengthMm: stockLength,
           kerfMm,
           discipline,
         }),
       });
-
-      if (res.status === 401) {
-        redirectToLogin();
-        return;
-      }
 
       if (res.ok) {
         const data = await res.json();
@@ -185,10 +193,10 @@ export default function CadNestingHydraulicStudioPage() {
   }, [qrSpoolCode]);
 
   useEffect(() => {
-    runSampleNesting();
+    handleRunNesting();
     handleRunHydraulic();
     handleGenerateQr();
-  }, [runSampleNesting, handleRunHydraulic, handleGenerateQr]);
+  }, [handleRunNesting, handleRunHydraulic, handleGenerateQr]);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -209,7 +217,7 @@ export default function CadNestingHydraulicStudioPage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap rounded-lg border border-zinc-800 bg-zinc-900 p-1">
+          <div className="flex rounded-lg border border-zinc-800 bg-zinc-900 p-1">
             <button
               onClick={() => setActiveTab("pipe_1d")}
               className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold ${
@@ -219,18 +227,7 @@ export default function CadNestingHydraulicStudioPage() {
               }`}
             >
               <Scissors size={14} />
-              1D Pipe Nesting (Cây 6m)
-            </button>
-            <button
-              onClick={() => setActiveTab("duct_2d")}
-              className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold ${
-                activeTab === "duct_2d"
-                  ? "bg-emerald-500 text-zinc-950"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              <Layers size={14} />
-              2D Duct Sheet CNC
+              Xếp phôi 1D (Nesting)
             </button>
             <button
               onClick={() => setActiveTab("hydraulic")}
@@ -241,7 +238,7 @@ export default function CadNestingHydraulicStudioPage() {
               }`}
             >
               <Activity size={14} />
-              Thủy lực & Vận tốc MEPF
+              Thủy lực MEPF
             </button>
             <button
               onClick={() => setActiveTab("qr_spool")}
@@ -261,6 +258,27 @@ export default function CadNestingHydraulicStudioPage() {
 
         {!loading && (
           <div className="space-y-6">
+            {/* Tab 1: 1D Pipe Nesting Empty State */}
+            {activeTab === "pipe_1d" && !nestingResult && (
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-12 text-center text-zinc-400">
+                <Scissors className="mx-auto h-12 w-12 text-zinc-600 mb-3" />
+                <h3 className="text-base font-semibold text-zinc-200">
+                  Chưa có dữ liệu phân đoạn cắt phôi Spool
+                </h3>
+                <p className="text-xs text-zinc-500 mt-1 max-w-md mx-auto">
+                  Dự án hiện tại chưa có phân đoạn Spool trong cơ sở dữ liệu. Vui lòng tạo Spool từ
+                  bản vẽ CAD/BIM để chạy giải thuật tối ưu cắt phôi 1D FFD.
+                </p>
+                <button
+                  onClick={handleRunNesting}
+                  className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-xs font-semibold text-zinc-200 hover:bg-zinc-700"
+                >
+                  <RefreshCw size={14} />
+                  Tải lại từ kho Spool
+                </button>
+              </div>
+            )}
+
             {/* Tab 1: 1D Pipe Nesting */}
             {activeTab === "pipe_1d" && nestingResult && (
               <>
@@ -325,7 +343,7 @@ export default function CadNestingHydraulicStudioPage() {
                       Sơ đồ Xếp Phôi Cắt Tối ưu (Bar Cutting Layouts)
                     </h2>
                     <button
-                      onClick={runSampleNesting}
+                      onClick={handleRunNesting}
                       className="flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1 text-xs font-semibold text-zinc-200 hover:bg-zinc-700"
                     >
                       <RefreshCw size={12} />

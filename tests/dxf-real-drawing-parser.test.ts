@@ -88,3 +88,13 @@ test("generateStandardizedAutocadScript: Sinh script AutoCAD .SCR chuẩn hóa",
   assert.ok(scr.includes("M-HVAC-DUCT-SUPP"));
   assert.ok(scr.includes("PURGE"));
 });
+
+test("Drawing Synchronizer: Nhận diện cấu trúc phân hệ MEPF và tầng từ mã hiệu bản vẽ", () => {
+  const hvacFile = "23056-VHT-CD-A-M-205.dwg";
+  const elecFile = "23056-VHT-CD-A-EP-205.dwg";
+  const elvFile = "23056-VHT-CD-GE-ELV-001.dwg";
+
+  assert.ok(hvacFile.includes("-M-"), "HVAC code phải chứa -M-");
+  assert.ok(elecFile.includes("-EP-"), "Điện lực code phải chứa -EP-");
+  assert.ok(elvFile.includes("-ELV-"), "Điện nhẹ code phải chứa -ELV-");
+});

@@ -48,17 +48,15 @@ export async function POST(req: NextRequest) {
 
     if (body.action === "generative_route") {
       const { solveGenerativeMepfRoute } = await import("@/lib/engineering-mepf-takeoff");
-      const startPoint = body.startPoint || [0, 0, 2600];
-      const endPoint = body.endPoint || [15000, 10000, 2600];
-      const obstacles = body.obstacles || [
-        {
-          id: "B1",
-          name: "Dầm Kết Cấu D400x600",
-          category: "beam",
-          minPoint: [6000, 0, 2400],
-          maxPoint: [6400, 12000, 3000],
-        },
-      ];
+      if (!body.startPoint || !body.endPoint) {
+        return NextResponse.json(
+          { error: "Vui lòng cung cấp tọa độ điểm đầu (startPoint) và điểm cuối (endPoint)" },
+          { status: 400 },
+        );
+      }
+      const startPoint = body.startPoint;
+      const endPoint = body.endPoint;
+      const obstacles = Array.isArray(body.obstacles) ? body.obstacles : [];
       const solution = solveGenerativeMepfRoute(
         startPoint,
         endPoint,
