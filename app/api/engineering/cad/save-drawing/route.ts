@@ -14,6 +14,7 @@ import {
   drawingRoots,
   ensureDrawingDirs,
 } from "@/lib/cad/drawing-storage";
+import { validateDxf } from "@/lib/cad/dxf-writer";
 
 export const dynamic = "force-dynamic";
 
@@ -101,6 +102,21 @@ export async function POST(req: NextRequest) {
       typeof fileContent === "string" && fileContent
         ? fileContent
         : ";; Standardized CAD Drawing by XBoss\n";
+
+    // Kiểm trước khi ghi: bản vẽ DXF phải mở lại được trên AutoCAD. Ghi ra một tệp
+    // hỏng rồi mới phát hiện lúc kỹ sư mở ngoài công trường là quá muộn.
+    if (cExt === "dxf") {
+      const check = validateDxf(content);
+      if (!check.valid) {
+        return NextResponse.json(
+          {
+            error: `Bản vẽ DXF không đạt chuẩn AutoCAD (${check.errors.length} lỗi cấu trúc) — chưa lưu.`,
+            validation: check,
+          },
+          { status: 422 },
+        );
+      }
+    }
 
     // Ghi tệp vào cả 2 gốc lưu trữ (drawings/ và data/uploads/drawings/).
     ensureDrawingDirs();

@@ -9,6 +9,7 @@
  * - 2D-to-3D Spatial Route generation with Multi-Tier Corridor allocation.
  * - Standardized DXF exporter & AutoCAD .SCR script generation.
  */
+import { writeDxfR12 } from "./dxf-writer";
 
 // Complete Vietnamese TCVN3 / ABC to Unicode character mapping (Upper & Lowercase)
 const TCVN3_MAP: Record<string, string> = {
@@ -1694,273 +1695,7 @@ export function exportDxf(
   parsed: DxfParseResult,
   options?: { applyStandardLayers?: boolean; decodeUnicodeText?: boolean },
 ): string {
-  const useStandardLayers = options?.applyStandardLayers ?? true;
-  const layers =
-    parsed.layers && parsed.layers.length > 0
-      ? parsed.layers
-      : [
-          {
-            name: "0",
-            standardName: "0",
-            colorNumber: 7,
-            colorHex: "#ffffff",
-            lineType: "CONTINUOUS",
-            isStandardized: true,
-            discipline: "OTHER" as const,
-            entityCount: 0,
-          },
-        ];
-
-  // Ánh xạ tên layer theo tùy chọn chuẩn hóa
-  const layerMap = new Map<string, string>();
-  layers.forEach((l) => {
-    layerMap.set(l.name, useStandardLayers && l.standardName ? l.standardName : l.name);
-  });
-
-  const getLayer = (name: string) => layerMap.get(name) || name || "0";
-
-  let dxf = "";
-
-  // 1. SECTION HEADER
-  dxf += "0\r\nSECTION\r\n2\r\nHEADER\r\n";
-  dxf += "9\r\n$ACADVER\r\n1\r\nAC1015\r\n";
-  dxf += "9\r\n$INSUNITS\r\n70\r\n4\r\n"; // 4 = Millimeters (Hệ mét xây dựng MEPF)
-  dxf += "9\r\n$MEASUREMENT\r\n70\r\n1\r\n"; // 1 = Metric
-  if (parsed.diagnostic?.boundingDimensions) {
-    const b = parsed.diagnostic.boundingDimensions;
-    dxf += `9\r\n$EXTMIN\r\n10\r\n${b.minX || 0}\r\n20\r\n${b.minY || 0}\r\n30\r\n0.0\r\n`;
-    dxf += `9\r\n$EXTMAX\r\n10\r\n${b.maxX || 10000}\r\n20\r\n${b.maxY || 10000}\r\n30\r\n0.0\r\n`;
-    dxf += `9\r\n$LIMMIN\r\n10\r\n${b.minX || 0}\r\n20\r\n${b.minY || 0}\r\n`;
-    dxf += `9\r\n$LIMMAX\r\n10\r\n${b.maxX || 10000}\r\n20\r\n${b.maxY || 10000}\r\n`;
-  }
-  dxf += "0\r\nENDSEC\r\n";
-
-  // 2. SECTION TABLES
-  dxf += "0\r\nSECTION\r\n2\r\nTABLES\r\n";
-
-  // VPORT Table
-  dxf += "0\r\nTABLE\r\n2\r\nVPORT\r\n70\r\n1\r\n";
-  dxf +=
-    "0\r\nVPORT\r\n2\r\n*ACTIVE\r\n70\r\n0\r\n10\r\n0.0\r\n20\r\n0.0\r\n11\r\n1.0\r\n21\r\n1.0\r\n12\r\n0.0\r\n22\r\n0.0\r\n40\r\n1000.0\r\n41\r\n1.5\r\n";
-  dxf += "0\r\nENDTAB\r\n";
-
-  // LTYPE Table (Các kiểu đường nét CAD cơ bản)
-  dxf += "0\r\nTABLE\r\n2\r\nLTYPE\r\n70\r\n4\r\n";
-  dxf +=
-    "0\r\nLTYPE\r\n2\r\nCONTINUOUS\r\n70\r\n0\r\n3\r\nSolid line\r\n72\r\n65\r\n73\r\n0\r\n40\r\n0.0\r\n";
-  dxf +=
-    "0\r\nLTYPE\r\n2\r\nCENTER\r\n70\r\n0\r\n3\r\nCenter ____ _ ____ _ ____\r\n72\r\n65\r\n73\r\n4\r\n40\r\n50.0\r\n49\r\n30.0\r\n49\r\n-5.0\r\n49\r\n10.0\r\n49\r\n-5.0\r\n";
-  dxf +=
-    "0\r\nLTYPE\r\n2\r\nHIDDEN\r\n70\r\n0\r\n3\r\nHidden __ __ __ __\r\n72\r\n65\r\n73\r\n2\r\n40\r\n10.0\r\n49\r\n5.0\r\n49\r\n-5.0\r\n";
-  dxf +=
-    "0\r\nLTYPE\r\n2\r\nDASHED\r\n70\r\n0\r\n3\r\nDashed __ __ __ __\r\n72\r\n65\r\n73\r\n2\r\n40\r\n20.0\r\n49\r\n15.0\r\n49\r\n-5.0\r\n";
-  dxf += "0\r\nENDTAB\r\n";
-
-  // LAYER Table (Danh mục layer chuẩn hóa)
-  const uniqueLayerEntries = new Map<string, { color: number; lineType: string }>();
-  uniqueLayerEntries.set("0", { color: 7, lineType: "CONTINUOUS" });
-  layers.forEach((l) => {
-    const finalName = useStandardLayers && l.standardName ? l.standardName : l.name;
-    uniqueLayerEntries.set(finalName, {
-      color: l.colorNumber || 7,
-      lineType: l.lineType || "CONTINUOUS",
-    });
-  });
-
-  dxf += `0\r\nTABLE\r\n2\r\nLAYER\r\n70\r\n${uniqueLayerEntries.size}\r\n`;
-  uniqueLayerEntries.forEach((val, name) => {
-    dxf += `0\r\nLAYER\r\n2\r\n${name}\r\n70\r\n0\r\n62\r\n${val.color}\r\n6\r\n${val.lineType}\r\n`;
-  });
-  dxf += "0\r\nENDTAB\r\n";
-
-  // STYLE Table (Font chữ tiêu chuẩn)
-  dxf += "0\r\nTABLE\r\n2\r\nSTYLE\r\n70\r\n1\r\n";
-  dxf +=
-    "0\r\nSTYLE\r\n2\r\nSTANDARD\r\n70\r\n0\r\n40\r\n0.0\r\n41\r\n1.0\r\n50\r\n0.0\r\n71\r\n0\r\n42\r\n250.0\r\n3\r\ntxt\r\n4\r\n\r\n";
-  dxf += "0\r\nENDTAB\r\n";
-
-  // APPID Table
-  dxf += "0\r\nTABLE\r\n2\r\nAPPID\r\n70\r\n1\r\n";
-  dxf += "0\r\nAPPID\r\n2\r\nACAD\r\n70\r\n0\r\n";
-  dxf += "0\r\nENDTAB\r\n";
-
-  // BLOCK_RECORD Table
-  const blockNames = new Set<string>(["*MODEL_SPACE", "*PAPER_SPACE"]);
-  if (parsed.blocks) {
-    parsed.blocks.forEach((b) => blockNames.add(b.name));
-  }
-  if (parsed.entities) {
-    parsed.entities.forEach((e) => {
-      if (e.type === "INSERT" && e.blockName) blockNames.add(e.blockName);
-    });
-  }
-
-  dxf += `0\r\nTABLE\r\n2\r\nBLOCK_RECORD\r\n70\r\n${blockNames.size}\r\n`;
-  blockNames.forEach((bName) => {
-    dxf += `0\r\nBLOCK_RECORD\r\n2\r\n${bName}\r\n70\r\n0\r\n`;
-  });
-  dxf += "0\r\nENDTAB\r\n";
-
-  dxf += "0\r\nENDSEC\r\n";
-
-  // 3. SECTION BLOCKS
-  dxf += "0\r\nSECTION\r\n2\r\nBLOCKS\r\n";
-  dxf +=
-    "0\r\nBLOCK\r\n2\r\n*MODEL_SPACE\r\n70\r\n0\r\n10\r\n0.0\r\n20\r\n0.0\r\n30\r\n0.0\r\n0\r\nENDBLK\r\n";
-  dxf +=
-    "0\r\nBLOCK\r\n2\r\n*PAPER_SPACE\r\n70\r\n0\r\n10\r\n0.0\r\n20\r\n0.0\r\n30\r\n0.0\r\n0\r\nENDBLK\r\n";
-  blockNames.forEach((bName) => {
-    if (bName !== "*MODEL_SPACE" && bName !== "*PAPER_SPACE") {
-      dxf += `0\r\nBLOCK\r\n2\r\n${bName}\r\n70\r\n0\r\n10\r\n0.0\r\n20\r\n0.0\r\n30\r\n0.0\r\n`;
-      // Định nghĩa hình học mẫu đại diện cho khối block trong AutoCAD
-      dxf += `0\r\nLINE\r\n8\r\n0\r\n10\r\n-100\r\n20\r\n0\r\n30\r\n0\r\n11\r\n100\r\n21\r\n0\r\n31\r\n0\r\n`;
-      dxf += `0\r\nLINE\r\n8\r\n0\r\n10\r\n0\r\n20\r\n-100\r\n30\r\n0\r\n11\r\n0\r\n21\r\n100\r\n31\r\n0\r\n`;
-      dxf += "0\r\nENDBLK\r\n";
-    }
-  });
-  dxf += "0\r\nENDSEC\r\n";
-
-  // 4. SECTION ENTITIES
-  dxf += "0\r\nSECTION\r\n2\r\nENTITIES\r\n";
-
-  if (parsed.entities && parsed.entities.length > 0) {
-    for (const ent of parsed.entities) {
-      const lyr = getLayer(ent.layer);
-      const colStr = ent.color ? `62\r\n${ent.color}\r\n` : "";
-
-      if (ent.type === "LINE" && ent.coordinates.start && ent.coordinates.end) {
-        dxf += `0\r\nLINE\r\n8\r\n${lyr}\r\n${colStr}`;
-        dxf += `10\r\n${ent.coordinates.start[0]}\r\n20\r\n${ent.coordinates.start[1]}\r\n30\r\n${ent.coordinates.start[2] || 0}\r\n`;
-        dxf += `11\r\n${ent.coordinates.end[0]}\r\n21\r\n${ent.coordinates.end[1]}\r\n31\r\n${ent.coordinates.end[2] || 0}\r\n`;
-      } else if (
-        (ent.type === "LWPOLYLINE" || ent.type === "POLYLINE") &&
-        ent.coordinates.points &&
-        ent.coordinates.points.length > 0
-      ) {
-        dxf += `0\r\nLWPOLYLINE\r\n8\r\n${lyr}\r\n${colStr}90\r\n${ent.coordinates.points.length}\r\n70\r\n0\r\n`;
-        for (const pt of ent.coordinates.points) {
-          dxf += `10\r\n${pt[0]}\r\n20\r\n${pt[1]}\r\n`;
-        }
-      } else if (ent.type === "CIRCLE" && ent.coordinates.center) {
-        dxf += `0\r\nCIRCLE\r\n8\r\n${lyr}\r\n${colStr}`;
-        dxf += `10\r\n${ent.coordinates.center[0]}\r\n20\r\n${ent.coordinates.center[1]}\r\n30\r\n${ent.coordinates.center[2] || 0}\r\n`;
-        dxf += `40\r\n${ent.coordinates.radius || 100}\r\n`;
-      } else if (ent.type === "ARC" && ent.coordinates.center) {
-        dxf += `0\r\nARC\r\n8\r\n${lyr}\r\n${colStr}`;
-        dxf += `10\r\n${ent.coordinates.center[0]}\r\n20\r\n${ent.coordinates.center[1]}\r\n30\r\n${ent.coordinates.center[2] || 0}\r\n`;
-        dxf += `40\r\n${ent.coordinates.radius || 100}\r\n50\r\n0.0\r\n51\r\n180.0\r\n`;
-      } else if (ent.type === "TEXT" || ent.type === "MTEXT") {
-        const textVal = ent.decodedText || ent.textValue || "";
-        const cx = ent.coordinates.center ? ent.coordinates.center[0] : 0;
-        const cy = ent.coordinates.center ? ent.coordinates.center[1] : 0;
-        const cz = ent.coordinates.center ? ent.coordinates.center[2] || 0 : 0;
-        dxf += `0\r\nTEXT\r\n8\r\n${lyr}\r\n${colStr}`;
-        dxf += `10\r\n${cx}\r\n20\r\n${cy}\r\n30\r\n${cz}\r\n40\r\n250.0\r\n1\r\n${textVal}\r\n7\r\nSTANDARD\r\n`;
-      } else if (ent.type === "INSERT") {
-        const bName = ent.blockName || "BLOCK_DEFAULT";
-        const cx = ent.coordinates.center ? ent.coordinates.center[0] : 0;
-        const cy = ent.coordinates.center ? ent.coordinates.center[1] : 0;
-        const cz = ent.coordinates.center ? ent.coordinates.center[2] || 0 : 0;
-        dxf += `0\r\nINSERT\r\n8\r\n${lyr}\r\n${colStr}2\r\n${bName}\r\n`;
-        dxf += `10\r\n${cx}\r\n20\r\n${cy}\r\n30\r\n${cz}\r\n41\r\n1.0\r\n42\r\n1.0\r\n43\r\n1.0\r\n50\r\n0.0\r\n`;
-      } else if (ent.type === "DIMENSION") {
-        const cx = ent.coordinates.center
-          ? ent.coordinates.center[0]
-          : ent.coordinates.start
-            ? ent.coordinates.start[0]
-            : 0;
-        const cy = ent.coordinates.center
-          ? ent.coordinates.center[1]
-          : ent.coordinates.start
-            ? ent.coordinates.start[1]
-            : 0;
-        const cz = ent.coordinates.center
-          ? ent.coordinates.center[2] || 0
-          : ent.coordinates.start
-            ? ent.coordinates.start[2] || 0
-            : 0;
-        const textVal = ent.decodedText || ent.textValue || "<>";
-        dxf += `0\r\nDIMENSION\r\n8\r\n${lyr}\r\n${colStr}10\r\n${cx}\r\n20\r\n${cy}\r\n30\r\n${cz}\r\n1\r\n${textVal}\r\n70\r\n0\r\n`;
-        if (ent.coordinates.start && ent.coordinates.end) {
-          dxf += `13\r\n${ent.coordinates.start[0]}\r\n23\r\n${ent.coordinates.start[1]}\r\n33\r\n${ent.coordinates.start[2] || 0}\r\n`;
-          dxf += `14\r\n${ent.coordinates.end[0]}\r\n24\r\n${ent.coordinates.end[1]}\r\n34\r\n${ent.coordinates.end[2] || 0}\r\n`;
-        }
-      }
-    }
-  }
-
-  // Nếu bản vẽ chỉ có text trích xuất từ DWG (chưa có đường nét hình học CAD), tự động bổ sung hình học mẫu MEPF
-  const hasVectors =
-    parsed.entities &&
-    parsed.entities.some(
-      (e) =>
-        e.type === "LINE" ||
-        e.type === "LWPOLYLINE" ||
-        e.type === "POLYLINE" ||
-        e.type === "CIRCLE" ||
-        e.type === "ARC",
-    );
-
-  if (!hasVectors) {
-    const hvacLyr =
-      layers.find((l) => l.discipline === "M")?.standardName ||
-      layers.find((l) => l.discipline === "M")?.name ||
-      "M-DUCT-SUPP";
-    const elecLyr =
-      layers.find((l) => l.discipline === "E")?.standardName ||
-      layers.find((l) => l.discipline === "E")?.name ||
-      "E-TRAY-PWRR";
-    const plumbLyr =
-      layers.find((l) => l.discipline === "P")?.standardName ||
-      layers.find((l) => l.discipline === "P")?.name ||
-      "P-PIPE-SANR";
-    const fireLyr =
-      layers.find((l) => l.discipline === "F")?.standardName ||
-      layers.find((l) => l.discipline === "F")?.name ||
-      "F-SPRN-PIPE";
-    const gridLyr =
-      layers.find((l) => l.discipline === "S" || l.discipline === "A")?.standardName ||
-      layers.find((l) => l.discipline === "S" || l.discipline === "A")?.name ||
-      "S-GRID-COLS";
-
-    // 1. Trục lưới kết cấu định vị (Grid Axis 1-4 & A-C)
-    for (let gx = 1000; gx <= 16000; gx += 5000) {
-      dxf += `0\r\nLINE\r\n8\r\n${gridLyr}\r\n10\r\n${gx}\r\n20\r\n1000\r\n30\r\n0.0\r\n11\r\n${gx}\r\n7000\r\n31\r\n0.0\r\n`;
-    }
-    for (let gy = 1000; gy <= 7000; gy += 3000) {
-      dxf += `0\r\nLINE\r\n8\r\n${gridLyr}\r\n10\r\n1000\r\n20\r\n${gy}\r\n30\r\n0.0\r\n11\r\n16000\r\n21\r\n${gy}\r\n31\r\n0.0\r\n`;
-    }
-
-    // 2. Tuyến ống gió cấp lạnh chính & hồi (HVAC Ducts)
-    dxf += `0\r\nLINE\r\n8\r\n${hvacLyr}\r\n10\r\n1500\r\n20\r\n2500\r\n30\r\n3100.0\r\n11\r\n15500\r\n21\r\n2500\r\n31\r\n3100.0\r\n`;
-    dxf += `0\r\nLINE\r\n8\r\n${hvacLyr}\r\n10\r\n6000\r\n20\r\n2500\r\n30\r\n3100.0\r\n11\r\n6000\r\n21\r\n4500\r\n31\r\n3100.0\r\n`;
-    dxf += `0\r\nLINE\r\n8\r\n${hvacLyr}\r\n10\r\n11000\r\n20\r\n2500\r\n30\r\n3100.0\r\n11\r\n11000\r\n21\r\n4500\r\n31\r\n3100.0\r\n`;
-
-    // 3. Khối miệng gió Diffuser
-    dxf += `0\r\nINSERT\r\n8\r\n${hvacLyr}\r\n2\r\nBLK_DIFFUSER_600x600\r\n10\r\n4000\r\n20\r\n2500\r\n30\r\n2800.0\r\n41\r\n1.0\r\n42\r\n1.0\r\n43\r\n1.0\r\n50\r\n0.0\r\n`;
-    dxf += `0\r\nINSERT\r\n8\r\n${hvacLyr}\r\n2\r\nBLK_DIFFUSER_600x600\r\n10\r\n8500\r\n20\r\n2500\r\n30\r\n2800.0\r\n41\r\n1.0\r\n42\r\n1.0\r\n43\r\n1.0\r\n50\r\n0.0\r\n`;
-    dxf += `0\r\nINSERT\r\n8\r\n${hvacLyr}\r\n2\r\nBLK_DIFFUSER_600x600\r\n10\r\n13500\r\n20\r\n2500\r\n30\r\n2800.0\r\n41\r\n1.0\r\n42\r\n1.0\r\n43\r\n1.0\r\n50\r\n0.0\r\n`;
-
-    // 4. Tuyến máng cáp điện động lực (Cable Tray)
-    dxf += `0\r\nLINE\r\n8\r\n${elecLyr}\r\n10\r\n1500\r\n20\r\n3400\r\n30\r\n2900.0\r\n11\r\n15500\r\n21\r\n3400\r\n31\r\n2900.0\r\n`;
-
-    // 5. Tuyến ống nước Chiller & thoát nước
-    dxf += `0\r\nLINE\r\n8\r\n${plumbLyr}\r\n10\r\n1500\r\n20\r\n4000\r\n30\r\n2600.0\r\n11\r\n15500\r\n21\r\n4000\r\n31\r\n2600.0\r\n`;
-    dxf += `0\r\nLINE\r\n8\r\n${plumbLyr}\r\n10\r\n1500\r\n20\r\n4800\r\n30\r\n2550.0\r\n11\r\n15500\r\n21\r\n4800\r\n31\r\n2340.0\r\n`;
-
-    // 6. Tuyến ống PCCC Sprinkler
-    dxf += `0\r\nLINE\r\n8\r\n${fireLyr}\r\n10\r\n1500\r\n20\r\n5400\r\n30\r\n2700.0\r\n11\r\n15500\r\n21\r\n5400\r\n31\r\n2700.0\r\n`;
-    dxf += `0\r\nINSERT\r\n8\r\n${fireLyr}\r\n2\r\nBLK_SPRINKLER_68C\r\n10\r\n3500\r\n20\r\n5400\r\n30\r\n2700.0\r\n41\r\n1.0\r\n42\r\n1.0\r\n43\r\n1.0\r\n50\r\n0.0\r\n`;
-    dxf += `0\r\nINSERT\r\n8\r\n${fireLyr}\r\n2\r\nBLK_SPRINKLER_68C\r\n10\r\n7500\r\n20\r\n5400\r\n30\r\n2700.0\r\n41\r\n1.0\r\n42\r\n1.0\r\n43\r\n1.0\r\n50\r\n0.0\r\n`;
-    dxf += `0\r\nINSERT\r\n8\r\n${fireLyr}\r\n2\r\nBLK_SPRINKLER_68C\r\n10\r\n11500\r\n20\r\n5400\r\n30\r\n2700.0\r\n41\r\n1.0\r\n42\r\n1.0\r\n43\r\n1.0\r\n50\r\n0.0\r\n`;
-  }
-
-  dxf += "0\r\nENDSEC\r\n";
-
-  // 5. EOF
-  dxf += "0\r\nEOF\r\n";
-
-  return dxf;
+  return writeDxfR12(parsed, { applyStandardLayers: options?.applyStandardLayers });
 }
 
 /**
@@ -1968,5 +1703,73 @@ export function exportDxf(
  */
 export function generateStandard2dDxf(title = "Ban_Ve_CAD_2D", system = "HVAC"): string {
   const sysUpper = (system || "HVAC").toUpperCase();
-  return `0\r\nSECTION\r\n2\r\nHEADER\r\n9\r\n$ACADVER\r\n1\r\nAC1015\r\n9\r\n$INSUNITS\r\n70\r\n4\r\n9\r\n$MEASUREMENT\r\n70\r\n1\r\n0\r\nENDSEC\r\n0\r\nSECTION\r\n2\r\nTABLES\r\n0\r\nTABLE\r\n2\r\nVPORT\r\n70\r\n1\r\n0\r\nVPORT\r\n2\r\n*ACTIVE\r\n70\r\n0\r\n10\r\n0.0\r\n20\r\n0.0\r\n11\r\n1.0\r\n21\r\n1.0\r\n12\r\n0.0\r\n22\r\n0.0\r\n40\r\n1000.0\r\n41\r\n1.5\r\n0\r\nENDTAB\r\n0\r\nTABLE\r\n2\r\nLAYER\r\n70\r\n8\r\n0\r\nLAYER\r\n2\r\n0\r\n70\r\n0\r\n62\r\n7\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nM-DUCT-SUPP\r\n70\r\n0\r\n62\r\n4\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nM-DUCT-RETN\r\n70\r\n0\r\n62\r\n6\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nP-PIPE-SANR\r\n70\r\n0\r\n62\r\n3\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nE-CABL-TRAY\r\n70\r\n0\r\n62\r\n1\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nF-SPRN-PIPE\r\n70\r\n0\r\n62\r\n1\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nA-WALL-GRID\r\n70\r\n0\r\n62\r\n8\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nG-ANNO-TEXT\r\n70\r\n0\r\n62\r\n7\r\n6\r\nCONTINUOUS\r\n0\r\nENDTAB\r\n0\r\nENDSEC\r\n0\r\nSECTION\r\n2\r\nBLOCKS\r\n0\r\nENDSEC\r\n0\r\nSECTION\r\n2\r\nENTITIES\r\n0\r\nLINE\r\n8\r\nA-WALL-GRID\r\n10\r\n0.0\r\n20\r\n0.0\r\n30\r\n0.0\r\n11\r\n36000.0\r\n21\r\n0.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nA-WALL-GRID\r\n10\r\n36000.0\r\n20\r\n0.0\r\n30\r\n0.0\r\n11\r\n36000.0\r\n21\r\n18000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nA-WALL-GRID\r\n10\r\n36000.0\r\n20\r\n18000.0\r\n30\r\n0.0\r\n11\r\n0.0\r\n21\r\n18000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nA-WALL-GRID\r\n10\r\n0.0\r\n20\r\n18000.0\r\n30\r\n0.0\r\n11\r\n0.0\r\n21\r\n0.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nM-DUCT-SUPP\r\n10\r\n3000.0\r\n20\r\n9000.0\r\n30\r\n0.0\r\n11\r\n33000.0\r\n21\r\n9000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nM-DUCT-RETN\r\n10\r\n3000.0\r\n20\r\n12000.0\r\n30\r\n0.0\r\n11\r\n33000.0\r\n21\r\n12000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nP-PIPE-SANR\r\n10\r\n3000.0\r\n20\r\n6000.0\r\n30\r\n0.0\r\n11\r\n33000.0\r\n21\r\n6000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nE-CABL-TRAY\r\n10\r\n3000.0\r\n20\r\n15000.0\r\n30\r\n0.0\r\n11\r\n33000.0\r\n21\r\n15000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nF-SPRN-PIPE\r\n10\r\n3000.0\r\n20\r\n3000.0\r\n30\r\n0.0\r\n11\r\n33000.0\r\n21\r\n3000.0\r\n31\r\n0.0\r\n0\r\nTEXT\r\n8\r\nG-ANNO-TEXT\r\n10\r\n18000.0\r\n20\r\n9500.0\r\n30\r\n0.0\r\n40\r\n300.0\r\n1\r\nống gió cấp lạnh AHU-01 800x500\r\n0\r\nTEXT\r\n8\r\nG-ANNO-TEXT\r\n10\r\n18000.0\r\n20\r\n12500.0\r\n30\r\n0.0\r\n40\r\n300.0\r\n1\r\nống gió hồi 700x400\r\n0\r\nTEXT\r\n8\r\nG-ANNO-TEXT\r\n10\r\n18000.0\r\n20\r\n6500.0\r\n30\r\n0.0\r\n40\r\n300.0\r\n1\r\nống thoát nước D114 dốc i=1.5% BOP=+2850\r\n0\r\nTEXT\r\n8\r\nG-ANNO-TEXT\r\n10\r\n18000.0\r\n20\r\n15500.0\r\n30\r\n0.0\r\n40\r\n300.0\r\n1\r\nMáng cáp điện Trunking 400x100\r\n0\r\nTEXT\r\n8\r\nG-ANNO-TEXT\r\n10\r\n18000.0\r\n20\r\n3500.0\r\n30\r\n0.0\r\n40\r\n300.0\r\n1\r\nĐầu phun PCCC Sprinkler 68°C\r\n0\r\nENDSEC\r\n0\r\nEOF\r\n`;
+  // Dùng chung bộ ghi R12 với exportDxf — một đường code duy nhất sinh DXF, nên mẫu
+  // này cũng được escape chữ tiếng Việt, ép Z = 0 và khai đủ bảng LAYER/STYLE.
+  const layers: DxfLayerInfo[] = [
+    ["M-DUCT-SUPP", 4, "M"],
+    ["M-DUCT-RETN", 6, "M"],
+    ["P-PIPE-SANR", 3, "P"],
+    ["E-CABL-TRAY", 1, "E"],
+    ["F-SPRN-PIPE", 1, "F"],
+    ["A-WALL-GRID", 8, "A"],
+    ["G-ANNO-TEXT", 7, "OTHER"],
+  ].map(([name, color, discipline]) => ({
+    name: name as string,
+    standardName: name as string,
+    colorNumber: color as number,
+    colorHex: "#ffffff",
+    lineType: "CONTINUOUS",
+    isStandardized: true,
+    discipline: discipline as DxfLayerInfo["discipline"],
+    entityCount: 0,
+  }));
+
+  let seq = 0;
+  const line = (layer: string, x1: number, y1: number, x2: number, y2: number): DxfEntityRaw => ({
+    id: `E${++seq}`,
+    type: "LINE",
+    layer,
+    coordinates: { start: [x1, y1, 0], end: [x2, y2, 0] },
+  });
+  const text = (layer: string, x: number, y: number, value: string): DxfEntityRaw => ({
+    id: `E${++seq}`,
+    type: "TEXT",
+    layer,
+    coordinates: { center: [x, y, 0] },
+    textValue: value,
+    decodedText: value,
+  });
+
+  const entities: DxfEntityRaw[] = [
+    // Khung bao mặt bằng
+    line("A-WALL-GRID", 0, 0, 36000, 0),
+    line("A-WALL-GRID", 36000, 0, 36000, 18000),
+    line("A-WALL-GRID", 36000, 18000, 0, 18000),
+    line("A-WALL-GRID", 0, 18000, 0, 0),
+    // Tuyến chính từng phân hệ
+    line("M-DUCT-SUPP", 3000, 9000, 33000, 9000),
+    line("M-DUCT-RETN", 3000, 12000, 33000, 12000),
+    line("P-PIPE-SANR", 3000, 6000, 33000, 6000),
+    line("E-CABL-TRAY", 3000, 15000, 33000, 15000),
+    line("F-SPRN-PIPE", 3000, 3000, 33000, 3000),
+    // Ghi chú kỹ thuật
+    text("G-ANNO-TEXT", 18000, 9500, "Ống gió cấp lạnh AHU-01 800x500"),
+    text("G-ANNO-TEXT", 18000, 12500, "Ống gió hồi 700x400"),
+    text("G-ANNO-TEXT", 18000, 6500, "Ống thoát nước D114 dốc i=1.5% BOP=+2850"),
+    text("G-ANNO-TEXT", 18000, 15500, "Máng cáp điện Trunking 400x100"),
+    text("G-ANNO-TEXT", 18000, 3500, "Đầu phun PCCC Sprinkler 68°C"),
+    text("G-ANNO-TEXT", 18000, 16800, `${title} — ${sysUpper}`),
+  ];
+
+  return writeDxfR12(
+    {
+      layers,
+      entities,
+      blocks: [],
+      diagnostic: {
+        boundingDimensions: { minX: 0, minY: 0, maxX: 36000, maxY: 18000 },
+      },
+    } as unknown as DxfParseResult,
+    { applyStandardLayers: true },
+  );
 }

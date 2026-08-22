@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/auth";
 import { parseDwgBinary, exportDxf } from "@/lib/cad/dxf-parser";
+import { validateDxf } from "@/lib/cad/dxf-writer";
 
 export const dynamic = "force-dynamic";
 
@@ -31,12 +32,26 @@ export async function POST(req: Request) {
     // Xuất chuỗi DXF ASCII hoàn chỉnh theo chuẩn AutoCAD
     const dxfContent = exportDxf(parsed, { applyStandardLayers: true });
 
+    // Kiểm NGAY LÚC CONVERT: thà báo lỗi tại đây còn hơn để kỹ sư phát hiện file
+    // không mở được khi đã ra công trường.
+    const check = validateDxf(dxfContent);
+    if (!check.valid) {
+      return NextResponse.json(
+        {
+          error: `Tệp DXF chuyển đổi không đạt chuẩn AutoCAD (${check.errors.length} lỗi cấu trúc) — đã chặn không trả tệp hỏng.`,
+          validation: check,
+        },
+        { status: 422 },
+      );
+    }
+
     return NextResponse.json({
       success: true,
       originalFileName: fileName,
       dxfFileName,
       dxfContent,
       entityCount: parsed.entities.length,
+      validation: check,
       message: `Đã chuyển đổi thành công tệp thật ${fileName} sang ${dxfFileName} (${parsed.entities.length} thực thể)!`,
     });
   } catch (err: unknown) {

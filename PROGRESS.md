@@ -13,6 +13,39 @@
 - **Lộ trình hoàn thành (chờ duyệt, chưa code):** `PROJECT-COMPLETION-ROADMAP.md` chốt C0→C6 để đạt XBoss v1.0/Product Complete và O1→O5 cho Engineering OS/Vision Complete theo gate; không coi tài liệu là quyền tự triển khai production hoặc A3+.
 - **Spec pack chi tiết (chờ duyệt):** C0, C2–C6 và OS-1–OS-5 đã có file thi hành riêng (C1 dùng ENG-5), mỗi file gồm scope, data/API/UI/ops, test, chia PR và DoD. Chưa phase nào được đánh dấu triển khai chỉ vì đặc tả đã viết.
 
+## Sửa bộ ghi DXF: file xuất ra không mở được trên AutoCAD (2026-08-22)
+
+- **Bối cảnh:** mục tiêu của `/engineering/chuan-hoa-ban-ve` là chuẩn hóa bản vẽ **2D
+  thuần** và file DXF **phải mở lại được trên AutoCAD**. Kiểm chứng bằng `ezdxf` (bộ đọc
+  DXF theo spec Autodesk) cho thấy file xuất từ bản vẽ thật **không đọc được kể cả bằng
+  chế độ recovery**: `DXFStructureError: missing 'AcDbPolyline' subclass in LWPOLYLINE`.
+- **Nguyên nhân gốc:** `exportDxf` khai `$ACADVER = AC1015` (R2000) nhưng ghi thực thể
+  theo kiểu R12 — R2000 bắt buộc handle + subclass marker (`100/AcDbEntity`,
+  `AcDbPolyline`…) + section `OBJECTS` cho mọi thực thể. Thiếu là AutoCAD từ chối mở cả
+  tệp, không chỉ bỏ qua 1 thực thể.
+- **Cách sửa:** tách bộ ghi ra `lib/cad/dxf-writer.ts`, xuất **R12 (AC1009)** — đúng nhu
+  cầu 2D thuần, không cần handle/subclass, mọi phiên bản AutoCAD đọc được. Kèm theo:
+  - `LWPOLYLINE` (không tồn tại trong R12) → `POLYLINE` + `VERTEX` + `SEQEND`; `MTEXT` → `TEXT`.
+  - **Ép Z = 0 toàn bộ** — trước đây hình học tổng hợp ghi cao độ 2340–3100mm, trái mục tiêu 2D thuần.
+  - Chữ tiếng Việt escape `\U+XXXX` (ghi thẳng UTF-8 vào DXF R12 sẽ ra ký tự rác — đúng
+    loại lỗi font mà Font Doctor sinh ra để sửa).
+  - Khai đủ bảng `LTYPE`/`LAYER`/`STYLE`, làm sạch tên layer/block theo ràng buộc DXF,
+    `BLOCK` bổ sung mã 8/3/1 còn thiếu, `DIMENSION` (cần block `*D<n>` mới hợp lệ) hạ
+    thành LINE + TEXT thay vì ghi thực thể hỏng.
+  - Bỏ đoạn tự **bịa hình học MEPF** (trục lưới, ống gió, sprinkler) chèn vào bản vẽ thật
+    khi file không có vector — nội dung bịa trong hồ sơ giao nộp.
+  - `generateStandard2dDxf` dùng chung bộ ghi thay vì chuỗi DXF viết tay.
+- **Kiểm lúc convert:** thêm `validateDxf()` chạy **ngay tại thời điểm chuyển đổi/lưu** —
+  `POST /api/engineering/cad/convert-to-dxf` và `POST /api/engineering/cad/save-drawing`
+  trả **422 kèm danh sách lỗi** thay vì giao ra một tệp không mở được. Bắt: SECTION/ENDSEC
+  lệch, thiếu EOF, thiếu `$ACADVER`, khai R2000+ mà không có subclass, thực thể ngoài R12,
+  layer/block/style dùng nhưng chưa khai, số không hợp lệ; cảnh báo khi còn Z ≠ 0.
+- **Vì sao lỗi lọt được:** test cũ chỉ kiểm chuỗi con (`includes("AC1015")`) — tức là
+  _khẳng định_ đúng cái sai. Nay test dựng bản vẽ có đủ LINE/POLYLINE/TEXT/INSERT/DIMENSION
+  rồi bắt buộc qua `validateDxf`, và kiểm mọi mã nhóm 30/31 đều bằng 0.
+- **Kết quả:** `ezdxf` đọc `readfile` thành công, `Auditor` 0 lỗi 0 fix; lint/typecheck/build
+  xanh; `npm test` 672 ca pass, 0 fail.
+
 ## Rà soát & sửa luồng chuẩn hóa bản vẽ CAD `/engineering/chuan-hoa-ban-ve` (2026-08-22)
 
 - **Bug chặn luồng lưu nháp, đã sửa:** `app/api/engineering/cad/save-drawing/route.ts` ghi
