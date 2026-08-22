@@ -58,6 +58,8 @@ import {
   ExternalLink,
   Link2,
   Unlink,
+  Plus,
+  Minus,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { showToast } from "@/app/components/Toast";
@@ -150,18 +152,13 @@ export default function ChuanHoaBanVePage() {
   // Phase 2: 3D Model Extrusion & Spatial BIM Normalization from DXF (spatial_bim)
   const [activePhase, setActivePhase] = useState<"phase1_cad" | "phase2_3d">("phase1_cad");
   const [activeTab, setActiveTab] = useState<
-    | "diagnostic"
-    | "layers"
-    | "font_doctor"
-    | "blocks"
-    | "diff"
-    | "lisp"
-    | "purge_wcs"
-    | "ctb_dim"
-    | "xref_manager"
-    | "review_manual"
+    | "step1_diagnostic_purge"
+    | "step2_layers_font"
+    | "step3_boq_dim_ctb"
+    | "step4_xref_diff_lisp"
+    | "step5_review_approval"
     | "spatial_bim"
-  >("diagnostic");
+  >("step1_diagnostic_purge");
 
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -1651,7 +1648,7 @@ export default function ChuanHoaBanVePage() {
             <div
               onClick={() => {
                 setActivePhase("phase1_cad");
-                if (activeTab === "spatial_bim") setActiveTab("diagnostic");
+                if (activeTab === "spatial_bim") setActiveTab("step1_diagnostic_purge");
               }}
               className={`p-3 rounded-xl border cursor-pointer transition space-y-1.5 ${
                 activePhase === "phase1_cad"
@@ -1732,125 +1729,65 @@ export default function ChuanHoaBanVePage() {
         ══════════════════════════════════════════════════════════════════════ */}
         <div className="p-2 sm:p-2.5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm">
           {activePhase === "phase1_cad" ? (
-            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
               <button
-                onClick={() => setActiveTab("diagnostic")}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
-                  activeTab === "diagnostic"
+                onClick={() => setActiveTab("step1_diagnostic_purge")}
+                className={`flex items-center justify-center sm:justify-start gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition min-h-[42px] ${
+                  activeTab === "step1_diagnostic_purge"
                     ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
                     : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
                 }`}
               >
-                <Activity className="w-3.5 h-3.5" />
-                <span>1.1 Chẩn Đoán Dị Tật CAD</span>
+                <Activity className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">1. Chẩn Đoán & Dọn Rác WCS</span>
               </button>
 
               <button
-                onClick={() => setActiveTab("layers")}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
-                  activeTab === "layers"
+                onClick={() => setActiveTab("step2_layers_font")}
+                className={`flex items-center justify-center sm:justify-start gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition min-h-[42px] ${
+                  activeTab === "step2_layers_font"
                     ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
                     : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
                 }`}
               >
-                <Layers className="w-3.5 h-3.5" />
-                <span>1.2 Chuẩn Hóa Layer AIA/BS1192</span>
+                <Layers className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">2. Layer AIA & Bác Sĩ Font</span>
               </button>
 
               <button
-                onClick={() => setActiveTab("font_doctor")}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
-                  activeTab === "font_doctor"
+                onClick={() => setActiveTab("step3_boq_dim_ctb")}
+                className={`flex items-center justify-center sm:justify-start gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition min-h-[42px] ${
+                  activeTab === "step3_boq_dim_ctb"
                     ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
                     : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
                 }`}
               >
-                <FileCheck className="w-3.5 h-3.5" />
-                <span>1.3 Font Doctor (UTF-8 & Ký Hiệu)</span>
+                <Boxes className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">3. Block BOQ, Dim & Nét In</span>
               </button>
 
               <button
-                onClick={() => setActiveTab("blocks")}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
-                  activeTab === "blocks"
+                onClick={() => setActiveTab("step4_xref_diff_lisp")}
+                className={`flex items-center justify-center sm:justify-start gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition min-h-[42px] ${
+                  activeTab === "step4_xref_diff_lisp"
                     ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
                     : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
                 }`}
               >
-                <Boxes className="w-3.5 h-3.5" />
-                <span>1.4 Trích Xuất Block Sang BOQ</span>
+                <Network className="w-3.5 h-3.5 shrink-0 text-purple-400" />
+                <span className="truncate">4. Cây XREF, Diff & LISP</span>
               </button>
 
               <button
-                onClick={() => setActiveTab("diff")}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
-                  activeTab === "diff"
+                onClick={() => setActiveTab("step5_review_approval")}
+                className={`flex items-center justify-center sm:justify-start gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition min-h-[42px] col-span-2 sm:col-span-1 ${
+                  activeTab === "step5_review_approval"
                     ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
                     : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
                 }`}
               >
-                <FileDiff className="w-3.5 h-3.5" />
-                <span>1.5 So Sánh Phiên Bản (CAD Diff)</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab("lisp")}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
-                  activeTab === "lisp"
-                    ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
-                    : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
-                }`}
-              >
-                <Code className="w-3.5 h-3.5" />
-                <span>1.6 AutoLISP Sinh Chi Tiết</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab("purge_wcs")}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
-                  activeTab === "purge_wcs"
-                    ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
-                    : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
-                }`}
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>1.7 Dọn Rác & Gốc Tọa Độ WCS</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab("ctb_dim")}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
-                  activeTab === "ctb_dim"
-                    ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
-                    : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
-                }`}
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>1.8 Nét In CTB & Bác Sĩ Dim Ảo</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab("xref_manager")}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
-                  activeTab === "xref_manager"
-                    ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
-                    : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
-                }`}
-              >
-                <Link2 className="w-3.5 h-3.5 text-purple-400" />
-                <span>1.9 Cây Liên Kết XREF (Doctor)</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab("review_manual")}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
-                  activeTab === "review_manual"
-                    ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
-                    : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
-                }`}
-              >
-                <Edit3 className="w-3.5 h-3.5 text-amber-400" />
-                <span>1.10 Cổng Review & Sửa Tay (Chờ Duyệt)</span>
+                <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                <span className="truncate">5. Cổng Review (Gate 0)</span>
               </button>
             </div>
           ) : (
@@ -1867,10 +1804,11 @@ export default function ChuanHoaBanVePage() {
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════════
-            TAB 1.1: CHẨN ĐOÁN DỊ TẬT BẢN VẼ CAD (DIAGNOSTIC OVERVIEW)
+            BƯỚC 1: CHẨN ĐOÁN DỊ TẬT, DỌN RÁC SÂU (PURGE/OVERKILL) & GỐC TỌA ĐỘ WCS
         ══════════════════════════════════════════════════════════════════════ */}
-        {activePhase === "phase1_cad" && activeTab === "diagnostic" && (
-          <div className="space-y-4">
+        {activePhase === "phase1_cad" && activeTab === "step1_diagnostic_purge" && (
+          <div className="space-y-5">
+            {/* Phân đoạn 1.1: Chẩn đoán & Health Score */}
             <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
                 <div className="space-y-1">
@@ -1963,654 +1901,9 @@ export default function ChuanHoaBanVePage() {
                   )}
                 </ul>
               </div>
-
-              {/* Next Step CTA */}
-              <div className="flex items-center justify-between p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
-                <div className="text-xs text-zinc-300">
-                  <span className="font-bold text-amber-300">Bước tiếp theo:</span> Xem xét bảng
-                  chuẩn hóa Layer AIA/BS1192 và kiểm tra Font Doctor.
-                </div>
-                <button
-                  onClick={() => setActiveTab("layers")}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs transition"
-                >
-                  <span>Chuyển Sang Bước 1.2: Chuẩn Hóa Layer</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ══════════════════════════════════════════════════════════════════════
-            TAB 1.2: CHUẨN HÓA LAYER THEO TIÊU CHUẨN AIA / BS1192
-        ══════════════════════════════════════════════════════════════════════ */}
-        {activePhase === "phase1_cad" && activeTab === "layers" && (
-          <div className="space-y-4">
-            <div className="p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-100 flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-amber-400" />
-                    Bảng Quy Chuẩn Layer AIA/BS1192 Sang Mô Hình BIM MEPF
-                  </h2>
-                  <p className="text-xs text-zinc-400">
-                    Tự động ánh xạ layer gốc sang tên chuẩn AIA/BS1192, phân loại mã màu và gán độ
-                    dày nét cho 5 phân hệ kỹ thuật.
-                  </p>
-                </div>
-
-                {/* Filter and Search */}
-                <div className="flex items-center gap-2">
-                  <div className="relative">
-                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
-                    <input
-                      type="text"
-                      placeholder="Tìm layer..."
-                      value={layerSearch}
-                      onChange={(e) => setLayerSearch(e.target.value)}
-                      className="pl-8 pr-3 py-1.5 text-xs bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-amber-500 w-40 sm:w-52"
-                    />
-                  </div>
-
-                  <button
-                    onClick={handleDownloadScr}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs shadow-sm transition"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Xuất Kịch Bản .SCR</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Discipline Filter Buttons */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                {[
-                  { id: "all", label: "Tất cả phân hệ" },
-                  { id: "M", label: "M - Gió & Điều hòa" },
-                  { id: "E", label: "E - Điện & Chiếu sáng" },
-                  { id: "P", label: "P - Cấp thoát nước" },
-                  { id: "F", label: "F - Phòng cháy PCCC" },
-                  { id: "ELV", label: "ELV - Điện nhẹ & BMS" },
-                  { id: "S", label: "S - Trục lưới kết cấu" },
-                ].map((d) => (
-                  <button
-                    key={d.id}
-                    onClick={() => setSelectedDisciplineFilter(d.id)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition shrink-0 ${
-                      selectedDisciplineFilter === d.id
-                        ? "bg-zinc-800 text-amber-300 border border-zinc-700"
-                        : "text-zinc-400 hover:text-zinc-200 bg-zinc-950/40"
-                    }`}
-                  >
-                    {d.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Layer Table */}
-              <div className="overflow-x-auto pt-2">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b border-zinc-800 bg-zinc-950/60 text-zinc-400 font-semibold">
-                      <th className="py-2.5 px-3">Phân Hệ</th>
-                      <th className="py-2.5 px-3">Tên Layer Gốc (Bản Vẽ Thiết Kế)</th>
-                      <th className="py-2.5 px-3">Layer Chuẩn Hóa BIM (AIA)</th>
-                      <th className="py-2.5 px-3">Mã Màu Chuẩn</th>
-                      <th className="py-2.5 px-3">Số Đối Tượng</th>
-                      <th className="py-2.5 px-3 text-right">Trạng Thái</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-800/60 font-mono">
-                    {filteredLayers.map((r, i) => (
-                      <tr key={i} className="hover:bg-zinc-800/40 transition">
-                        <td className="py-2.5 px-3">
-                          <span className="px-2 py-0.5 rounded-md bg-zinc-800 text-amber-400 font-bold text-[10px]">
-                            {r.discipline}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-zinc-400 line-through">{r.name}</td>
-                        <td className="py-2.5 px-3 text-emerald-400 font-bold">{r.standardName}</td>
-                        <td className="py-2.5 px-3">
-                          <div className="flex items-center gap-1.5 font-sans">
-                            <span
-                              className="w-3 h-3 rounded-full border border-zinc-700"
-                              style={{ backgroundColor: r.colorHex }}
-                            />
-                            <span className="text-[11px] text-zinc-300">Mã {r.colorNumber}</span>
-                          </div>
-                        </td>
-                        <td className="py-2.5 px-3 text-zinc-300 tabular-nums">
-                          {r.entityCount} entities
-                        </td>
-                        <td className="py-2.5 px-3 text-right">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-sans font-semibold">
-                            <CheckCircle2 className="w-3 h-3" /> Đã Chuẩn Hóa
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ══════════════════════════════════════════════════════════════════════
-            TAB 1.3: FONT DOCTOR (SHX / VNI / TCVN3 -> UNICODE UTF-8)
-        ══════════════════════════════════════════════════════════════════════ */}
-        {activePhase === "phase1_cad" && activeTab === "font_doctor" && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-              {/* Left Column: Interactive Font Converter */}
-              <div className="lg:col-span-7 p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
-                <div className="space-y-1">
-                  <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-100 flex items-center gap-2">
-                    <FileCheck className="w-4 h-4 text-amber-400" />
-                    Trình Chữa Lành Font Chữ Tiếng Việt & Ký Hiệu Kỹ Thuật (Font Doctor)
-                  </h2>
-                  <p className="text-xs text-zinc-400">
-                    Chuyển đổi bảng mã font nhị phân .shx, VNI-Windows và TCVN3-ABC bị vỡ font sang
-                    Unicode UTF-8 chuẩn xác, bảo toàn trọn vẹn số liệu cao độ, đường kính
-                    $\varnothing$ và dung sai $\pm$.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-zinc-300">
-                    Văn bản CAD nguồn (Lỗi font / Bảng mã cũ):
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={legacyInput}
-                    onChange={(e) => setLegacyInput(e.target.value)}
-                    placeholder="Dán text hoặc cao độ từ bản vẽ CAD vào đây..."
-                    className="w-full p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-mono text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleConvertFont()}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-sm transition"
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    <span>Chuyển Đổi Sang Unicode UTF-8</span>
-                  </button>
-                </div>
-
-                {convertedText && (
-                  <div className="p-3.5 rounded-xl bg-zinc-950 border border-emerald-500/30 space-y-2">
-                    <div className="flex items-center justify-between text-xs font-semibold text-emerald-400">
-                      <span>Kết quả chuẩn hóa Unicode:</span>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(convertedText);
-                          showToast("Đã copy text UTF-8!");
-                        }}
-                        className="p-1 hover:text-white transition flex items-center gap-1 text-[11px]"
-                      >
-                        <Copy className="w-3 h-3" />
-                        <span>Copy</span>
-                      </button>
-                    </div>
-                    <p className="text-sm font-medium text-zinc-100 font-sans">{convertedText}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Right Column: Sample Snippets & Technical Symbols */}
-              <div className="lg:col-span-5 p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-3">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-200 flex items-center gap-2">
-                  <HelpCircle className="w-4 h-4 text-sky-400" />
-                  Mẫu Text Thường Gặp & Thử Nghiệm Nhanh
-                </h3>
-
-                <div className="space-y-2 pt-1">
-                  {sampleFontSnippets.map((s, idx) => (
-                    <div
-                      key={idx}
-                      onClick={() => {
-                        setLegacyInput(s.source);
-                        handleConvertFont(s.source);
-                      }}
-                      className="p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800 hover:border-amber-500/50 cursor-pointer transition space-y-1 group"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-semibold text-zinc-300">{s.label}</span>
-                        <span className="text-[10px] text-amber-400 group-hover:underline">
-                          Thử ngay →
-                        </span>
-                      </div>
-                      <div className="text-[11px] font-mono text-zinc-400 line-through">
-                        {s.source}
-                      </div>
-                      <div className="text-xs font-medium text-emerald-400 font-sans">
-                        {s.expected}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ══════════════════════════════════════════════════════════════════════
-            TAB 1.4: TRÍCH XUẤT BLOCK SANG BIM FAMILY & BOQ
-        ══════════════════════════════════════════════════════════════════════ */}
-        {activePhase === "phase1_cad" && activeTab === "blocks" && (
-          <div className="space-y-4">
-            <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
-                <div className="space-y-1">
-                  <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-100 flex items-center gap-2">
-                    <Boxes className="w-4 h-4 text-amber-400" />
-                    Trích Xuất Thuộc Tính Block Thiết Bị sang Family BIM & BOQ
-                  </h2>
-                  <p className="text-xs text-zinc-400">
-                    Bóc tách tự động tên block, thuộc tính công suất, lưu lượng, kích thước và ánh
-                    xạ sang Revit BIM Family Components LOD 300.
-                  </p>
-                </div>
-
-                <button
-                  onClick={fetchBlockCatalogs}
-                  disabled={loadingBlocks}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700 transition shrink-0"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${loadingBlocks ? "animate-spin" : ""}`} />
-                  <span>Cập Nhật Block</span>
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {blockCatalogs.map((b, i) => (
-                  <div
-                    key={i}
-                    className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2.5 shadow-xs hover:border-zinc-700 transition"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-bold">
-                        {b.discipline}
-                      </span>
-                      <span className="text-[10px] font-mono text-zinc-400">
-                        {b.mapped_boq_code || "Chưa map BOQ"}
-                      </span>
-                    </div>
-
-                    <div className="space-y-0.5">
-                      <h4 className="text-xs font-bold text-zinc-100 font-mono">{b.block_name}</h4>
-                      <p className="text-[11px] text-zinc-400">{b.category}</p>
-                    </div>
-
-                    <div className="p-2 rounded-lg bg-zinc-900 border border-zinc-800/80 space-y-1 font-mono text-[10px]">
-                      {Object.entries(b.attribute_schema).map(([k, v]) => (
-                        <div key={k} className="flex items-center justify-between text-zinc-300">
-                          <span className="text-zinc-500">{k}:</span>
-                          <span className="text-zinc-200 font-medium">{String(v)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ══════════════════════════════════════════════════════════════════════
-            TAB 1.5: SO SÁNH PHIÊN BẢN (VECTOR DIFF)
-        ══════════════════════════════════════════════════════════════════════ */}
-        {activePhase === "phase1_cad" && activeTab === "diff" && (
-          <div className="space-y-4">
-            <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
-                <div className="space-y-1">
-                  <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-100 flex items-center gap-2">
-                    <FileDiff className="w-4 h-4 text-amber-400" />
-                    So Sánh Đối Soát Vector Giữa Các Phiên Bản Thiết Kế (Rev A vs Rev B)
-                  </h2>
-                  <p className="text-xs text-zinc-400">
-                    Phát hiện mọi thay đổi hình học tuyến ống, dời vị trí thiết bị trước khi nạp vào
-                    mô hình BIM. Dự báo tác động chi phí phát sinh (Variation Orders - VO).
-                  </p>
-                </div>
-
-                <button
-                  onClick={runDiffAnalysis}
-                  disabled={loading}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition shrink-0"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-                  <span>Chạy Lại Đối Soát Vector</span>
-                </button>
-              </div>
-
-              {diffResult && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div className="p-3 rounded-xl bg-zinc-950 border border-emerald-500/30 space-y-1">
-                      <span className="text-[11px] text-zinc-400">Thêm Mới (Added)</span>
-                      <div className="text-xl font-bold font-mono text-emerald-400">
-                        +{diffResult.summary.added}
-                      </div>
-                    </div>
-                    <div className="p-3 rounded-xl bg-zinc-950 border border-amber-500/30 space-y-1">
-                      <span className="text-[11px] text-zinc-400">Sửa Đổi / Di Dời (Modified)</span>
-                      <div className="text-xl font-bold font-mono text-amber-400">
-                        {diffResult.summary.modified}
-                      </div>
-                    </div>
-                    <div className="p-3 rounded-xl bg-zinc-950 border border-rose-500/30 space-y-1">
-                      <span className="text-[11px] text-zinc-400">Bị Xóa Bỏ (Removed)</span>
-                      <div className="text-xl font-bold font-mono text-rose-400">
-                        -{diffResult.summary.removed}
-                      </div>
-                    </div>
-                    <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
-                      <span className="text-[11px] text-zinc-400">Giữ Nguyên (Unchanged)</span>
-                      <div className="text-xl font-bold font-mono text-zinc-300">
-                        {diffResult.summary.unchanged}
-                      </div>
-                    </div>
-                  </div>
-
-                  {diffResult.potentialVoImpact && (
-                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2.5">
-                        <TrendingUp className="w-5 h-5 text-amber-400 shrink-0" />
-                        <div>
-                          <span className="text-xs font-bold text-amber-300">
-                            Dự báo Phát Sinh Khối Lượng (VO Impact):
-                          </span>
-                          <p className="text-[11px] text-zinc-300">
-                            {diffResult.potentialVoImpact.reason}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <span className="text-xs font-mono font-bold text-amber-300">
-                          {diffResult.potentialVoImpact.estimatedCostVnd.toLocaleString("vi-VN")} đ
-                        </span>
-                        <div className="text-[10px] text-zinc-400">Mức độ rủi ro: Cao</div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead>
-                        <tr className="border-b border-zinc-800 bg-zinc-950/60 text-zinc-400 font-semibold">
-                          <th className="py-2.5 px-3">Mã Thực Thể</th>
-                          <th className="py-2.5 px-3">Loại Đối Tượng</th>
-                          <th className="py-2.5 px-3">Layer</th>
-                          <th className="py-2.5 px-3">Chi Tiết Biến Động</th>
-                          <th className="py-2.5 px-3 text-right">Trạng Thái</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-800/60 font-mono">
-                        {diffResult.differences.map((d, i) => (
-                          <tr key={i} className="hover:bg-zinc-800/40 transition">
-                            <td className="py-2.5 px-3 text-zinc-300">{d.entityId}</td>
-                            <td className="py-2.5 px-3 text-zinc-400 font-sans">{d.type}</td>
-                            <td className="py-2.5 px-3 text-sky-400">{d.layer}</td>
-                            <td className="py-2.5 px-3 font-sans text-zinc-200">
-                              {d.changeDescription}
-                            </td>
-                            <td className="py-2.5 px-3 text-right font-sans">
-                              {d.diffStatus === "added" && (
-                                <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-semibold">
-                                  + Thêm mới
-                                </span>
-                              )}
-                              {d.diffStatus === "modified" && (
-                                <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-semibold">
-                                  Sửa đổi
-                                </span>
-                              )}
-                              {d.diffStatus === "removed" && (
-                                <span className="px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[10px] font-semibold">
-                                  - Xóa bỏ
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ══════════════════════════════════════════════════════════════════════
-            TAB 1.6: TRÌNH SINH MÃ AUTOLISP & SCRIPT SHOPDRAWING
-        ══════════════════════════════════════════════════════════════════════ */}
-        {activePhase === "phase1_cad" && activeTab === "lisp" && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-              <div className="lg:col-span-5 p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
-                <div className="space-y-1">
-                  <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-100 flex items-center gap-2">
-                    <Code className="w-4 h-4 text-amber-400" />
-                    Cấu Hình Chi Tiết AutoLISP
-                  </h2>
-                  <p className="text-xs text-zinc-400">
-                    Sinh mã AutoLISP chuẩn vẽ tự động các chi tiết mặt cắt, giá đỡ và lỗ mở sleeve
-                    an toàn.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-zinc-950 border border-zinc-800 text-[11px] font-semibold text-center">
-                  <button
-                    onClick={() => setLispType("hanger")}
-                    className={`py-1.5 rounded-lg transition ${
-                      lispType === "hanger"
-                        ? "bg-amber-500 text-zinc-950 font-bold"
-                        : "text-zinc-400 hover:text-zinc-200"
-                    }`}
-                  >
-                    Giá Đỡ Trapeze
-                  </button>
-                  <button
-                    onClick={() => setLispType("sleeve")}
-                    className={`py-1.5 rounded-lg transition ${
-                      lispType === "sleeve"
-                        ? "bg-amber-500 text-zinc-950 font-bold"
-                        : "text-zinc-400 hover:text-zinc-200"
-                    }`}
-                  >
-                    Lỗ Mở Sleeve
-                  </button>
-                  <button
-                    onClick={() => setLispType("duct_transition")}
-                    className={`py-1.5 rounded-lg transition ${
-                      lispType === "duct_transition"
-                        ? "bg-amber-500 text-zinc-950 font-bold"
-                        : "text-zinc-400 hover:text-zinc-200"
-                    }`}
-                  >
-                    Côn Thu Gió
-                  </button>
-                </div>
-
-                {lispType === "hanger" && (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[11px] text-zinc-400">Bề rộng Unistrut (mm)</label>
-                        <input
-                          type="number"
-                          value={hangerWidth}
-                          onChange={(e) => setHangerWidth(Number(e.target.value))}
-                          className="w-full mt-1 p-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono text-zinc-200"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[11px] text-zinc-400">Chiều cao thả ty (mm)</label>
-                        <input
-                          type="number"
-                          value={hangerHeight}
-                          onChange={(e) => setHangerHeight(Number(e.target.value))}
-                          className="w-full mt-1 p-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono text-zinc-200"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-[11px] text-zinc-400">Đường kính Ty ren</label>
-                      <select
-                        value={rodDiameter}
-                        onChange={(e) => setRodDiameter(Number(e.target.value))}
-                        className="w-full mt-1 p-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono text-zinc-200"
-                      >
-                        <option value={10}>M10 (Ống gió / Máng cáp nhẹ)</option>
-                        <option value={12}>M12 (Ống Chiller / Nước nặng)</option>
-                        <option value={16}>M16 (Giá đỡ cụm 3 tầng Trapeze)</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
-
-                {lispType === "sleeve" && (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[11px] text-zinc-400">Đường kính Sleeve (mm)</label>
-                        <input
-                          type="number"
-                          value={sleeveDiameter}
-                          onChange={(e) => setSleeveDiameter(Number(e.target.value))}
-                          className="w-full mt-1 p-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono text-zinc-200"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[11px] text-zinc-400">Mã hiệu Tag Sleeve</label>
-                        <input
-                          type="text"
-                          value={sleeveTag}
-                          onChange={(e) => setSleeveTag(e.target.value)}
-                          className="w-full mt-1 p-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono text-zinc-200"
-                        />
-                      </div>
-                    </div>
-                    <p className="text-[10px] text-amber-400">
-                      * Bất biến kỹ thuật: Sleeve định vị an toàn trong khoảng 1/3 giữa nhịp (L/3 ≤
-                      x ≤ 2L/3).
-                    </p>
-                  </div>
-                )}
-
-                {lispType === "duct_transition" && (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[11px] text-zinc-400">Miệng vào W1 x H1 (mm)</label>
-                        <div className="flex gap-1.5 mt-1">
-                          <input
-                            type="number"
-                            value={inletWidth}
-                            onChange={(e) => setInletWidth(Number(e.target.value))}
-                            className="w-1/2 p-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono text-zinc-200"
-                          />
-                          <input
-                            type="number"
-                            value={inletHeight}
-                            onChange={(e) => setInletHeight(Number(e.target.value))}
-                            className="w-1/2 p-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono text-zinc-200"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-[11px] text-zinc-400">Miệng ra W2 x H2 (mm)</label>
-                        <div className="flex gap-1.5 mt-1">
-                          <input
-                            type="number"
-                            value={outletWidth}
-                            onChange={(e) => setOutletWidth(Number(e.target.value))}
-                            className="w-1/2 p-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono text-zinc-200"
-                          />
-                          <input
-                            type="number"
-                            value={outletHeight}
-                            onChange={(e) => setOutletHeight(Number(e.target.value))}
-                            className="w-1/2 p-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono text-zinc-200"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  onClick={handleGenerateLisp}
-                  className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs shadow-sm transition flex items-center justify-center gap-1.5"
-                >
-                  <Play className="w-3.5 h-3.5" />
-                  <span>Sinh Mã AutoLISP Ngay</span>
-                </button>
-              </div>
-
-              <div className="lg:col-span-7 p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-zinc-200 font-mono">
-                    xboss_{lispType}.lsp
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleCopyCode}
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs transition"
-                    >
-                      {copied ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5" />
-                      )}
-                      <span>{copied ? "Đã copy" : "Sao chép"}</span>
-                    </button>
-                    <button
-                      onClick={handleDownloadLisp}
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>Tải về .LSP</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="relative">
-                  <pre className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 font-mono text-xs text-amber-300/90 overflow-x-auto max-h-[420px] leading-relaxed">
-                    {generatedLispCode || ";; Đang sinh mã LISP..."}
-                  </pre>
-                </div>
-              </div>
             </div>
 
-            {/* Next Step CTA */}
-            <div className="flex items-center justify-between p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
-              <div className="text-xs text-zinc-300">
-                <span className="font-bold text-amber-300">Bước tiếp theo:</span> Chuyển sang Dọn
-                Rác Sâu (Deep Purge & Overkill) và Căn chỉnh gốc tọa độ chuẩn WCS.
-              </div>
-              <button
-                onClick={() => setActiveTab("purge_wcs")}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs transition"
-              >
-                <span>Chuyển Sang Bước 1.7: Dọn Rác & Gốc Tọa Độ WCS</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ══════════════════════════════════════════════════════════════════════
-            TAB 1.7: DỌN RÁC SÂU (DEEP PURGE & OVERKILL) & TỌA ĐỘ GỐC WCS / TỶ LỆ
-        ══════════════════════════════════════════════════════════════════════ */}
-        {activePhase === "phase1_cad" && activeTab === "purge_wcs" && (
-          <div className="space-y-4">
+            {/* Phân đoạn 1.2: Dọn rác sâu (Deep Purge & Overkill) & WCS Normalizer */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
               {/* Cột Trái: Deep Purge & Overkill Engine */}
               <div className="lg:col-span-6 p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
@@ -2824,14 +2117,14 @@ export default function ChuanHoaBanVePage() {
             {/* Next Step CTA */}
             <div className="flex items-center justify-between p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
               <div className="text-xs text-zinc-300">
-                <span className="font-bold text-amber-300">Bước tiếp theo:</span> Kiểm tra bảng cấu
-                hình nét in CTB và rà soát các kích thước Dim bị sửa số ảo.
+                <span className="font-bold text-amber-300">Bước tiếp theo:</span> Chuẩn hóa cây
+                Layer theo chuẩn AIA/BS1192 và phục hồi font chữ Tiếng Việt UTF-8.
               </div>
               <button
-                onClick={() => setActiveTab("ctb_dim")}
+                onClick={() => setActiveTab("step2_layers_font")}
                 className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs transition"
               >
-                <span>Chuyển Sang Bước 1.8: Nét In CTB & Bác Sĩ Dim Ảo</span>
+                <span>Chuyển Sang Bước 2: Layer AIA & Bác Sĩ Font</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -2839,11 +2132,293 @@ export default function ChuanHoaBanVePage() {
         )}
 
         {/* ══════════════════════════════════════════════════════════════════════
-            TAB 1.8: CHUẨN HÓA NÉT IN CTB & BÁC SĨ DIM ẢO (DIM OVERRIDE DOCTOR)
+            BƯỚC 2: CHUẨN HÓA LAYER AIA/BS1192 & BÁC SĨ FONT CHỮ UTF-8
         ══════════════════════════════════════════════════════════════════════ */}
-        {activePhase === "phase1_cad" && activeTab === "ctb_dim" && (
-          <div className="space-y-4">
-            {/* Section 1: Dim Override Doctor (Chống Gian Lận Kích Thước) */}
+        {activePhase === "phase1_cad" && activeTab === "step2_layers_font" && (
+          <div className="space-y-5">
+            {/* Phân đoạn 2.1: Chuẩn hóa Layer AIA & Kịch bản .SCR */}
+            <div className="p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-100 flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-amber-400" />
+                    Bảng Quy Chuẩn Layer AIA/BS1192 Sang Mô Hình BIM MEPF
+                  </h2>
+                  <p className="text-xs text-zinc-400">
+                    Tự động ánh xạ layer gốc sang tên chuẩn AIA/BS1192, phân loại mã màu và gán độ
+                    dày nét cho 5 phân hệ kỹ thuật.
+                  </p>
+                </div>
+
+                {/* Filter and Search */}
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+                    <input
+                      type="text"
+                      placeholder="Tìm layer..."
+                      value={layerSearch}
+                      onChange={(e) => setLayerSearch(e.target.value)}
+                      className="pl-8 pr-3 py-1.5 text-xs bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-amber-500 w-40 sm:w-52"
+                    />
+                  </div>
+
+                  <button
+                    onClick={handleDownloadScr}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs shadow-sm transition"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Xuất Kịch Bản .SCR</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Discipline Filter Buttons */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                {[
+                  { id: "all", label: "Tất cả phân hệ" },
+                  { id: "M", label: "M - Gió & Điều hòa" },
+                  { id: "E", label: "E - Điện & Chiếu sáng" },
+                  { id: "P", label: "P - Cấp thoát nước" },
+                  { id: "F", label: "F - Phòng cháy PCCC" },
+                  { id: "ELV", label: "ELV - Điện nhẹ & BMS" },
+                  { id: "S", label: "S - Trục lưới kết cấu" },
+                ].map((d) => (
+                  <button
+                    key={d.id}
+                    onClick={() => setSelectedDisciplineFilter(d.id)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition shrink-0 ${
+                      selectedDisciplineFilter === d.id
+                        ? "bg-zinc-800 text-amber-300 border border-zinc-700"
+                        : "text-zinc-400 hover:text-zinc-200 bg-zinc-950/40"
+                    }`}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Layer Table */}
+              <div className="overflow-x-auto pt-2">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-zinc-800 bg-zinc-950/60 text-zinc-400 font-semibold">
+                      <th className="py-2.5 px-3">Phân Hệ</th>
+                      <th className="py-2.5 px-3">Tên Layer Gốc (Bản Vẽ Thiết Kế)</th>
+                      <th className="py-2.5 px-3">Layer Chuẩn Hóa BIM (AIA)</th>
+                      <th className="py-2.5 px-3">Mã Màu Chuẩn</th>
+                      <th className="py-2.5 px-3">Số Đối Tượng</th>
+                      <th className="py-2.5 px-3 text-right">Trạng Thái</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/60 font-mono">
+                    {filteredLayers.map((r, i) => (
+                      <tr key={i} className="hover:bg-zinc-800/40 transition">
+                        <td className="py-2.5 px-3">
+                          <span className="px-2 py-0.5 rounded-md bg-zinc-800 text-amber-400 font-bold text-[10px]">
+                            {r.discipline}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-zinc-400 line-through">{r.name}</td>
+                        <td className="py-2.5 px-3 text-emerald-400 font-bold">{r.standardName}</td>
+                        <td className="py-2.5 px-3">
+                          <div className="flex items-center gap-1.5 font-sans">
+                            <span
+                              className="w-3 h-3 rounded-full border border-zinc-700"
+                              style={{ backgroundColor: r.colorHex }}
+                            />
+                            <span className="text-[11px] text-zinc-300">Mã {r.colorNumber}</span>
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 text-zinc-300 tabular-nums">
+                          {r.entityCount} entities
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-sans font-semibold">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Đã Chuẩn Hóa
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Phân đoạn 2.2: Bác Sĩ Font Chữ Tiếng Việt (Font Doctor & Ký Hiệu CAD) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+              {/* Left Column: Interactive Font Converter */}
+              <div className="lg:col-span-7 p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
+                <div className="space-y-1">
+                  <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-100 flex items-center gap-2">
+                    <FileCheck className="w-4 h-4 text-amber-400" />
+                    Trình Chữa Lành Font Chữ Tiếng Việt & Ký Hiệu Kỹ Thuật (Font Doctor)
+                  </h2>
+                  <p className="text-xs text-zinc-400">
+                    Chuyển đổi bảng mã font nhị phân .shx, VNI-Windows và TCVN3-ABC bị vỡ font sang
+                    Unicode UTF-8 chuẩn xác, bảo toàn trọn vẹn số liệu cao độ, đường kính
+                    $\varnothing$ và dung sai $\pm$.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-zinc-300">
+                    Văn bản CAD nguồn (Lỗi font / Bảng mã cũ):
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={legacyInput}
+                    onChange={(e) => setLegacyInput(e.target.value)}
+                    placeholder="Dán text hoặc cao độ từ bản vẽ CAD vào đây..."
+                    className="w-full p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-mono text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleConvertFont()}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-sm transition"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>Chuyển Đổi Sang Unicode UTF-8</span>
+                  </button>
+                </div>
+
+                {convertedText && (
+                  <div className="p-3.5 rounded-xl bg-zinc-950 border border-emerald-500/30 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-semibold text-emerald-400">
+                      <span>Kết quả chuẩn hóa Unicode:</span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(convertedText);
+                          showToast("Đã copy text UTF-8!");
+                        }}
+                        className="p-1 hover:text-white transition flex items-center gap-1 text-[11px]"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>Copy</span>
+                      </button>
+                    </div>
+                    <p className="text-sm font-medium text-zinc-100 font-sans">{convertedText}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Right Column: Sample Snippets & Technical Symbols */}
+              <div className="lg:col-span-5 p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-200 flex items-center gap-2">
+                  <HelpCircle className="w-4 h-4 text-sky-400" />
+                  Mẫu Text Thường Gặp & Thử Nghiệm Nhanh
+                </h3>
+
+                <div className="space-y-2 pt-1">
+                  {sampleFontSnippets.map((s, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => {
+                        setLegacyInput(s.source);
+                        handleConvertFont(s.source);
+                      }}
+                      className="p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800 hover:border-amber-500/50 cursor-pointer transition space-y-1 group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-semibold text-zinc-300">{s.label}</span>
+                        <span className="text-[10px] text-amber-400 group-hover:underline">
+                          Thử ngay →
+                        </span>
+                      </div>
+                      <div className="text-[11px] font-mono text-zinc-400 line-through">
+                        {s.source}
+                      </div>
+                      <div className="text-xs font-medium text-emerald-400 font-sans">
+                        {s.expected}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Next Step CTA */}
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
+              <div className="text-xs text-zinc-300">
+                <span className="font-bold text-amber-300">Bước tiếp theo:</span> Trích xuất Block
+                sang BOQ Dự toán, rà soát Dim ảo và thiết lập bảng nét in CTB.
+              </div>
+              <button
+                onClick={() => setActiveTab("step3_boq_dim_ctb")}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs transition"
+              >
+                <span>Chuyển Sang Bước 3: Block BOQ, Dim & Nét In</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            BƯỚC 3: BÓC TÁCH THIẾT BỊ BOQ, BÁC SĨ DIM ẢO & BẢNG NÉT IN CTB
+        ══════════════════════════════════════════════════════════════════════ */}
+        {activePhase === "phase1_cad" && activeTab === "step3_boq_dim_ctb" && (
+          <div className="space-y-5">
+            {/* Phân đoạn 3.1: Trích Xuất Block Sang BOQ Dự Toán */}
+            <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+                <div className="space-y-1">
+                  <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-100 flex items-center gap-2">
+                    <Boxes className="w-4 h-4 text-amber-400" />
+                    Trích Xuất Thuộc Tính Block Thiết Bị sang Family BIM & BOQ
+                  </h2>
+                  <p className="text-xs text-zinc-400">
+                    Bóc tách tự động tên block, thuộc tính công suất, lưu lượng, kích thước và ánh
+                    xạ sang Revit BIM Family Components LOD 300.
+                  </p>
+                </div>
+
+                <button
+                  onClick={fetchBlockCatalogs}
+                  disabled={loadingBlocks}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700 transition shrink-0"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingBlocks ? "animate-spin" : ""}`} />
+                  <span>Cập Nhật Block</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {blockCatalogs.map((b, i) => (
+                  <div
+                    key={i}
+                    className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2.5 shadow-xs hover:border-zinc-700 transition"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-bold">
+                        {b.discipline}
+                      </span>
+                      <span className="text-[10px] font-mono text-zinc-400">
+                        {b.mapped_boq_code || "Chưa map BOQ"}
+                      </span>
+                    </div>
+
+                    <div className="space-y-0.5">
+                      <h4 className="text-xs font-bold text-zinc-100 font-mono">{b.block_name}</h4>
+                      <p className="text-[11px] text-zinc-400">{b.category}</p>
+                    </div>
+
+                    <div className="p-2 rounded-lg bg-zinc-900 border border-zinc-800/80 space-y-1 font-mono text-[10px]">
+                      {Object.entries(b.attribute_schema).map(([k, v]) => (
+                        <div key={k} className="flex items-center justify-between text-zinc-300">
+                          <span className="text-zinc-500">{k}:</span>
+                          <span className="text-zinc-200 font-medium">{String(v)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Phân đoạn 3.2: Dim Override Doctor (Chống Gian Lận Kích Thước) */}
             <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
                 <div className="space-y-0.5">
@@ -2912,11 +2487,11 @@ export default function ChuanHoaBanVePage() {
                           <td className="py-2 px-3 font-sans">
                             {dim.isFake && !dim.fixed ? (
                               <span className="inline-flex items-center gap-1 text-[11px] text-rose-400 font-semibold">
-                                <AlertTriangle className="w-3 h-3" /> Dim Ảo / Bị Sửa Số
+                                <AlertTriangle className="w-3.5 h-3.5" /> Dim Ảo / Bị Sửa Số
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-semibold">
-                                <CheckCircle2 className="w-3 h-3" /> Đạt Chuẩn
+                                <CheckCircle2 className="w-3.5 h-3.5" /> Đạt Chuẩn
                               </span>
                             )}
                           </td>
@@ -2942,7 +2517,7 @@ export default function ChuanHoaBanVePage() {
               </div>
             </div>
 
-            {/* Section 2: Bảng Cấu Hình Độ Dày Nét In CTB */}
+            {/* Phân đoạn 3.3: Bảng Cấu Hình Độ Dày Nét In CTB */}
             <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
                 <div className="space-y-0.5">
@@ -3002,15 +2577,14 @@ export default function ChuanHoaBanVePage() {
             {/* Next Step CTA */}
             <div className="flex items-center justify-between p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
               <div className="text-xs text-zinc-300">
-                <span className="font-bold text-amber-300">Bước tiếp theo:</span> Kiểm tra cây liên
-                kết XREF (External References), hàn gắn đường dẫn gãy và tùy chỉnh chế độ Gộp (Bind)
-                / Tham chiếu (Overlay).
+                <span className="font-bold text-amber-300">Bước tiếp theo:</span> Quản lý cây liên
+                kết XREF, so sánh chênh lệch phiên bản (Diff) và sinh mã AutoLISP.
               </div>
               <button
-                onClick={() => setActiveTab("xref_manager")}
+                onClick={() => setActiveTab("step4_xref_diff_lisp")}
                 className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs transition"
               >
-                <span>Chuyển Sang Bước 1.9: Cây Liên Kết XREF</span>
+                <span>Chuyển Sang Bước 4: Cây XREF, Diff & LISP</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -3018,11 +2592,11 @@ export default function ChuanHoaBanVePage() {
         )}
 
         {/* ══════════════════════════════════════════════════════════════════════
-            TAB 1.9: CÂY LIÊN KẾT XREF & PHỤC HỒI ĐƯỜNG DẪN (XREF DOCTOR)
+            BƯỚC 4: CÂY LIÊN KẾT XREF, SO SÁNH PHIÊN BẢN DIFF & AUTOLISP
         ══════════════════════════════════════════════════════════════════════ */}
-        {activePhase === "phase1_cad" && activeTab === "xref_manager" && (
-          <div className="space-y-4">
-            {/* Header Box */}
+        {activePhase === "phase1_cad" && activeTab === "step4_xref_diff_lisp" && (
+          <div className="space-y-5">
+            {/* Phân đoạn 4.1: Cây Liên Kết XREF & Phục Hồi Đường Dẫn Gãy */}
             <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
                 <div className="space-y-0.5">
@@ -3122,41 +2696,300 @@ export default function ChuanHoaBanVePage() {
               </div>
             </div>
 
-            {/* Smart XREF Assistant Card */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 rounded-xl bg-zinc-900/90 border border-zinc-800 space-y-1.5">
-                <div className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Tự Động Khắc Phục Lỗi Gãy Đường Dẫn</span>
+            {/* Phân đoạn 4.2: So Sánh Phiên Bản (CAD Vector Diff) */}
+            <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+                <div className="space-y-1">
+                  <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-100 flex items-center gap-2">
+                    <FileDiff className="w-4 h-4 text-amber-400" />
+                    So Sánh Phiên Bản Bản Vẽ CAD (Vector Geometry Diffing)
+                  </h2>
+                  <p className="text-xs text-zinc-400">
+                    Thuật toán so khớp tọa độ Hausdorff & Centroid Distance phát hiện chính xác các
+                    tuyến ống, miệng gió bị di dời, thêm mới hoặc xóa bỏ giữa các Revision.
+                  </p>
                 </div>
-                <p className="text-[11px] text-zinc-400 leading-relaxed">
-                  Khi người dùng tải lên nguyên thư mục dự án, động cơ XREF Doctor sẽ tự động ánh xạ
-                  lại tên file tham chiếu kể cả khi đường dẫn tuyệt đối{" "}
-                  <code className="text-zinc-300">D:\CongTrinh\...</code> trong máy khác bị gãy.
-                </p>
+
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono font-bold">
+                    +{diffResult?.summary?.added ?? 1} Mới
+                  </span>
+                  <span className="px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-mono font-bold">
+                    -{diffResult?.summary?.removed ?? 0} Xóa
+                  </span>
+                  <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-mono font-bold">
+                    ~{diffResult?.summary?.modified ?? 1} Dời
+                  </span>
+                </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-zinc-900/90 border border-zinc-800 space-y-1.5">
-                <div className="text-xs font-bold text-sky-400 flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>Chống Lặp Vòng XREF (Circular Guard)</span>
+              {/* Action and Refresh */}
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-zinc-400">
+                  Phân tích so khớp giữa bản vẽ Thiết kế Cơ sở (Rev A) và Bản vẽ Shopdrawing thi
+                  công (Rev B).
                 </div>
-                <p className="text-[11px] text-zinc-400 leading-relaxed">
-                  Tự động phát hiện và ngắt mạch tham chiếu vòng tròn lồng nhau (File A gọi File B,
-                  File B gọi lại File A) để ngăn ngừa tràn bộ nhớ và treo trình duyệt.
-                </p>
+                <button
+                  onClick={runDiffAnalysis}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700 transition"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Chạy Lại So Khớp Diff</span>
+                </button>
               </div>
 
-              <div className="p-4 rounded-xl bg-zinc-900/90 border border-zinc-800 space-y-1.5">
-                <div className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
-                  <Boxes className="w-4 h-4" />
-                  <span>Tách Biệt Bóc Tách Dự Toán BOQ</span>
+              {/* Changes Detailed Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-zinc-800 bg-zinc-950/60 text-zinc-400 font-semibold">
+                      <th className="py-2.5 px-3">Loại Thay Đổi</th>
+                      <th className="py-2.5 px-3">Mã Thực Thể</th>
+                      <th className="py-2.5 px-3">Layer</th>
+                      <th className="py-2.5 px-3">Chi Tiết Sai Khác Tọa Độ / Kích Thước</th>
+                      <th className="py-2.5 px-3 text-right">Độ Sai Lệch</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/60 font-mono">
+                    {(diffResult?.differences || []).map((c, i) => (
+                      <tr key={i} className="hover:bg-zinc-800/40 transition">
+                        <td className="py-2.5 px-3 font-sans">
+                          {c.diffStatus === "added" && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 font-semibold text-[10px]">
+                              <Plus className="w-3 h-3" /> Thêm Mới
+                            </span>
+                          )}
+                          {c.diffStatus === "removed" && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 font-semibold text-[10px]">
+                              <Minus className="w-3 h-3" /> Đã Xóa
+                            </span>
+                          )}
+                          {c.diffStatus === "modified" && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 font-semibold text-[10px]">
+                              <RefreshCw className="w-3 h-3" /> Dời Tọa Độ
+                            </span>
+                          )}
+                          {c.diffStatus === "unchanged" && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-400 font-semibold text-[10px]">
+                              Trùng Khớp
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-zinc-300 font-bold">{c.entityId}</td>
+                        <td className="py-2.5 px-3 text-zinc-400">{c.layer}</td>
+                        <td className="py-2.5 px-3 text-zinc-200 font-sans">
+                          {c.changeDescription}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-sans">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400">
+                            {c.type}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Phân đoạn 4.3: AutoLISP Sinh Chi Tiết Thi Công */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+              {/* Cột Trái: Thông số đầu vào */}
+              <div className="lg:col-span-5 p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
+                <div className="space-y-1 border-b border-zinc-800 pb-3">
+                  <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-100 flex items-center gap-2">
+                    <Code className="w-4 h-4 text-amber-400" />
+                    Trình Sinh Mã AutoLISP Chi Tiết Kỹ Thuật
+                  </h2>
+                  <p className="text-xs text-zinc-400">
+                    Tự động tạo lệnh LISP tham số hóa để vẽ nhanh giá treo Trapeze, lỗ mở xuyên dầm
+                    và côn thu ống gió ngay trong AutoCAD.
+                  </p>
                 </div>
-                <p className="text-[11px] text-zinc-400 leading-relaxed">
-                  Các khối XREF dạng <code className="text-zinc-300">Overlay</code> chỉ phục vụ kiểm
-                  tra tĩnh không đáy dầm và va chạm không gian, tuyệt đối không tính trùng lặp vào
-                  khối lượng BOQ của phân hệ chính.
-                </p>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-[11px] font-semibold text-zinc-400 block mb-1">
+                      Loại Chi Tiết Cần Sinh Script:
+                    </label>
+                    <select
+                      value={lispType}
+                      onChange={(e) => setLispType(e.target.value as any)}
+                      className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-amber-500"
+                    >
+                      <option value="hanger">Giá Treo Đa Tầng Trapeze Hanger (Unistrut)</option>
+                      <option value="sleeve">Lỗ Mở Xuyên Dầm (Sleeve/Opening Builder)</option>
+                      <option value="duct_transition">
+                        Côn Chuyển Ống Gió (Eccentric Reducer)
+                      </option>
+                    </select>
+                  </div>
+
+                  {lispType === "hanger" && (
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <label className="text-[11px] text-zinc-400 block mb-1">
+                          Bề Rộng Giá Treo (mm)
+                        </label>
+                        <input
+                          type="number"
+                          value={hangerWidth}
+                          onChange={(e) => setHangerWidth(Number(e.target.value))}
+                          className="w-full px-3 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-200"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-zinc-400 block mb-1">
+                          Chiều Cao Ty Treo (mm)
+                        </label>
+                        <input
+                          type="number"
+                          value={hangerHeight}
+                          onChange={(e) => setHangerHeight(Number(e.target.value))}
+                          className="w-full px-3 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-200"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-[11px] text-zinc-400 block mb-1">
+                          Đường Kính Ty Treo (mm)
+                        </label>
+                        <select
+                          value={rodDiameter}
+                          onChange={(e) => setRodDiameter(Number(e.target.value))}
+                          className="w-full px-3 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-200"
+                        >
+                          <option value={10}>Ty Treo M10 (10mm)</option>
+                          <option value={12}>Ty Treo M12 (12mm)</option>
+                          <option value={16}>Ty Treo M16 (16mm)</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
+                  {lispType === "sleeve" && (
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <label className="text-[11px] text-zinc-400 block mb-1">
+                          Đường Kính Lỗ Mở (mm)
+                        </label>
+                        <input
+                          type="number"
+                          value={sleeveDiameter}
+                          onChange={(e) => setSleeveDiameter(Number(e.target.value))}
+                          className="w-full px-3 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-200"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-zinc-400 block mb-1">
+                          Mã Ký Hiệu Lỗ
+                        </label>
+                        <input
+                          type="text"
+                          value={sleeveTag}
+                          onChange={(e) => setSleeveTag(e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-200"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {lispType === "duct_transition" && (
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <label className="text-[11px] text-zinc-400 block mb-1">
+                          Miệng Vào (WxH mm)
+                        </label>
+                        <div className="flex gap-1">
+                          <input
+                            type="number"
+                            value={inletWidth}
+                            onChange={(e) => setInletWidth(Number(e.target.value))}
+                            className="w-1/2 px-2 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-200"
+                          />
+                          <input
+                            type="number"
+                            value={inletHeight}
+                            onChange={(e) => setInletHeight(Number(e.target.value))}
+                            className="w-1/2 px-2 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-200"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-zinc-400 block mb-1">
+                          Miệng Ra (WxH mm)
+                        </label>
+                        <div className="flex gap-1">
+                          <input
+                            type="number"
+                            value={outletWidth}
+                            onChange={(e) => setOutletWidth(Number(e.target.value))}
+                            className="w-1/2 px-2 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-200"
+                          />
+                          <input
+                            type="number"
+                            value={outletHeight}
+                            onChange={(e) => setOutletHeight(Number(e.target.value))}
+                            className="w-1/2 px-2 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-200"
+                          />
+                        </div>
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-[11px] text-zinc-400 block mb-1">
+                          Chiều Dài Côn Thu (Length mm)
+                        </label>
+                        <input
+                          type="number"
+                          value={transitionLength}
+                          onChange={(e) => setTransitionLength(Number(e.target.value))}
+                          className="w-full px-3 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-200"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleGenerateLisp}
+                    className="w-full py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs shadow-sm transition flex items-center justify-center gap-1.5"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Tạo Kịch Bản AutoLISP Mới</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Cột Phải: Xem và Tải Script */}
+              <div className="lg:col-span-7 p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-3">
+                <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5">
+                  <span className="text-xs font-mono text-amber-400 font-bold">
+                    xboss_{lispType}.lsp (AutoCAD LISP Program)
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleCopyCode}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs transition"
+                    >
+                      {copied ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                      <span>{copied ? "Đã copy" : "Sao chép"}</span>
+                    </button>
+                    <button
+                      onClick={handleDownloadLisp}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Tải về .LSP</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="relative">
+                  <pre className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 font-mono text-xs text-amber-300/90 overflow-x-auto max-h-[420px] leading-relaxed">
+                    {generatedLispCode || ";; Đang sinh mã LISP..."}
+                  </pre>
+                </div>
               </div>
             </div>
 
@@ -3164,13 +2997,13 @@ export default function ChuanHoaBanVePage() {
             <div className="flex items-center justify-between p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
               <div className="text-xs text-zinc-300">
                 <span className="font-bold text-amber-300">Bước tiếp theo:</span> Chuyển sang Cổng
-                Review & Sửa Tay 2D để rà soát tổng thể và Ký Duyệt Hồ Sơ.
+                Review & Sửa Tay 2D để rà soát tổng thể và Ký Duyệt Hồ Sơ Gate 0.
               </div>
               <button
-                onClick={() => setActiveTab("review_manual")}
+                onClick={() => setActiveTab("step5_review_approval")}
                 className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs transition"
               >
-                <span>Chuyển Sang Bước 1.10: Cổng Review & Sửa Tay 2D</span>
+                <span>Chuyển Sang Bước 5: Cổng Review & Ký Duyệt (Gate 0)</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -3178,10 +3011,10 @@ export default function ChuanHoaBanVePage() {
         )}
 
         {/* ══════════════════════════════════════════════════════════════════════
-            TAB 1.10: CỔNG REVIEW & SỬA TAY BẢN VẼ 2D (MANUAL REVIEW & OVERRIDE)
+            BƯỚC 5: CỔNG REVIEW & SỬA TAY 2D TRƯỚC KHI PHÊ DUYỆT SANG 3D (GATE 0)
         ══════════════════════════════════════════════════════════════════════ */}
-        {activePhase === "phase1_cad" && activeTab === "review_manual" && (
-          <div className="space-y-4">
+        {activePhase === "phase1_cad" && activeTab === "step5_review_approval" && (
+          <div className="space-y-5">
             {/* Header & Review Status Box */}
             <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
@@ -3215,7 +3048,7 @@ export default function ChuanHoaBanVePage() {
                       setActivePhase("phase2_3d");
                       setActiveTab("spatial_bim");
                     }}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 font-bold text-xs shadow-sm transition"
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 font-bold text-xs shadow-md transition"
                   >
                     <Check className="w-3.5 h-3.5" />
                     <span>Ký Duyệt & Chuyển Sang Cổng 3D</span>
@@ -3581,7 +3414,7 @@ export default function ChuanHoaBanVePage() {
               <button
                 onClick={() => {
                   setActivePhase("phase1_cad");
-                  setActiveTab("diagnostic");
+                  setActiveTab("step1_diagnostic_purge");
                 }}
                 className="w-full sm:w-auto px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700 transition"
               >
