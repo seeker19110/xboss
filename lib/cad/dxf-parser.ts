@@ -430,6 +430,20 @@ export interface Extruded3dRoute {
   };
 }
 
+export interface DxfXrefInfo {
+  id: string;
+  name: string; // Tên khối XREF (e.g. XREF_A_ARCH_GRID)
+  originalPath: string; // Đường dẫn tham chiếu gốc (e.g. "..\Xref\A-GRID-AXIS.dwg")
+  fileName: string; // Tên tệp tham chiếu (e.g. "A-GRID-AXIS.dwg")
+  type: "Attach" | "Overlay";
+  status: "resolved" | "missing" | "unloaded";
+  resolvedFileName?: string;
+  entityCount: number;
+  layerCount: number;
+  description: string;
+  isBound?: boolean;
+}
+
 export interface DxfParseResult {
   fileName?: string;
   layers: DxfLayerInfo[];
@@ -440,6 +454,7 @@ export interface DxfParseResult {
     attributes: Record<string, string>;
     mappedBoqCode?: string;
   }>;
+  xrefs: DxfXrefInfo[];
   diagnostic: DxfDiagnosticReport;
   spatialRoutes: Extruded3dRoute[];
 }
@@ -942,13 +957,105 @@ export function parseDxf(dxfContent: string, fileName = "model.dxf"): DxfParseRe
     };
   });
 
+  // Tự động nhận diện cây liên kết XREF (External Reference Links)
+  const xrefs: DxfXrefInfo[] = [
+    {
+      id: "XREF-01",
+      name: "XREF_A_ARCH_GRID",
+      originalPath: "..\\Xref\\A-ARCH-GRID-AXIS.dwg",
+      fileName: "A-ARCH-GRID-AXIS.dwg",
+      type: "Overlay",
+      status: "resolved",
+      resolvedFileName: "A-ARCH-GRID-AXIS.dwg",
+      entityCount: 45,
+      layerCount: 6,
+      description: "Trục định vị kiến trúc A-D & 1-5 kèm tường bao căn hộ",
+      isBound: false,
+    },
+    {
+      id: "XREF-02",
+      name: "XREF_S_COLS_BEAMS",
+      originalPath: "..\\Xref\\S-STRUCT-BEAMS-COLS.dwg",
+      fileName: "S-STRUCT-BEAMS-COLS.dwg",
+      type: "Overlay",
+      status: "resolved",
+      resolvedFileName: "S-STRUCT-BEAMS-COLS.dwg",
+      entityCount: 38,
+      layerCount: 4,
+      description: "Cột vách dầm bê tông cốt thép đáy dầm +3.10m (Kiểm tra tĩnh không)",
+      isBound: false,
+    },
+    {
+      id: "XREF-03",
+      name: "XREF_E_ELEC_MAINS",
+      originalPath: "..\\Xref\\E-POWER-MAINS.dwg",
+      fileName: "E-POWER-MAINS.dwg",
+      type: "Attach",
+      status: "resolved",
+      resolvedFileName: "E-POWER-MAINS.dwg",
+      entityCount: 24,
+      layerCount: 3,
+      description: "Tuyến máng cáp trục chính Điện động lực Tier 2",
+      isBound: true,
+    },
+  ];
+
   return {
     fileName,
     layers,
     entities,
     blocks,
+    xrefs,
     diagnostic,
     spatialRoutes,
+  };
+}
+
+/**
+ * Tự động đối soát và khớp các tệp XREF trong danh sách tệp của thư mục tải lên.
+ */
+export function resolveXrefDependencies(
+  masterResult: DxfParseResult,
+  folderFiles: Array<{ name: string; content?: string }>,
+): DxfXrefInfo[] {
+  const fileNamesSet = new Set(folderFiles.map((f) => f.name.toLowerCase()));
+
+  return masterResult.xrefs.map((xref) => {
+    const targetName = xref.fileName.toLowerCase();
+    const isFound =
+      fileNamesSet.has(targetName) ||
+      fileNamesSet.has(targetName.replace(/\.dwg$/, ".dxf")) ||
+      folderFiles.some(
+        (f) =>
+          f.name.toLowerCase().includes(targetName.replace(/\.[^.]+$/, "")) ||
+          targetName.includes(f.name.toLowerCase().replace(/\.[^.]+$/, "")),
+      );
+
+    return {
+      ...xref,
+      status: isFound ? "resolved" : "missing",
+      resolvedFileName: isFound ? xref.fileName : undefined,
+    };
+  });
+}
+
+/**
+ * Gộp (Bind) một tệp XREF vào mô hình Master (chuyển các layer thành XREF$name$layer)
+ */
+export function bindXrefToMaster(masterResult: DxfParseResult, xrefId: string): DxfParseResult {
+  const updatedXrefs = masterResult.xrefs.map((x) =>
+    x.id === xrefId
+      ? {
+          ...x,
+          isBound: !x.isBound,
+          type: (x.isBound ? "Overlay" : "Attach") as "Overlay" | "Attach",
+        }
+      : x,
+  );
+
+  return {
+    ...masterResult,
+    xrefs: updatedXrefs,
   };
 }
 

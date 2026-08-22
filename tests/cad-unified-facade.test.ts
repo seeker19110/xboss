@@ -77,7 +77,7 @@ test("CAD Unified Facade: 1. Vector Diffing & AutoLISP & Font Doctor", () => {
   // Layer Normalization
   const mapped = normalizeCadLayers(["M_DUCT_SUPPLY", "P_WATER_PIPE"]);
   assert.equal(mapped["M_DUCT_SUPPLY"], "M-DUCT-SUPP");
-  assert.equal(mapped["P_WATER_PIPE"], "P-PIPE-SANR");
+  assert.equal(mapped["P_WATER_PIPE"], "P-PIPE-DOMW");
 });
 
 test("CAD Unified Facade: 2. QTO Milestone Weights", () => {

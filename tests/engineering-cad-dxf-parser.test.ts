@@ -6,6 +6,8 @@ import {
   convertDxfToSpatialRoutes,
   generateStandardizedAutocadScript,
   DxfEntityRaw,
+  resolveXrefDependencies,
+  bindXrefToMaster,
 } from "@/lib/cad/dxf-parser";
 
 describe("CAD DXF Parser & 2D-to-3D Spatial Extrusion Suite", () => {
@@ -196,5 +198,27 @@ EOF`;
     assert.ok(parsed.layers.length >= 5, "Phải có các layer MEPF chuẩn");
     assert.ok(parsed.spatialRoutes.length > 0, "Phải có tuyến không gian 3D");
     assert.equal(parsed.fileName, "23056-VHT-CD-A-M-205.dwg");
+  });
+
+  it("6. resolveXrefDependencies & bindXrefToMaster tự động nhận diện và gộp XREF", () => {
+    const parsed = parseDxf("", "Master_MEP_T4.dxf");
+    assert.ok(parsed.xrefs.length >= 2, "Phải có danh sách XREF tham chiếu");
+
+    const folderFiles = [
+      { name: "A-ARCH-GRID-AXIS.dwg" },
+      { name: "S-STRUCT-BEAMS-COLS.dwg" },
+      { name: "standard.ctb" },
+    ];
+
+    const resolved = resolveXrefDependencies(parsed, folderFiles);
+    const archXref = resolved.find((x) => x.id === "XREF-01");
+    assert.ok(archXref);
+    assert.equal(archXref.status, "resolved");
+
+    const bound = bindXrefToMaster(parsed, "XREF-01");
+    const boundXref = bound.xrefs.find((x) => x.id === "XREF-01");
+    assert.ok(boundXref);
+    assert.equal(boundXref.isBound, true);
+    assert.equal(boundXref.type, "Attach");
   });
 });

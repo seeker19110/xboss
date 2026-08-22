@@ -50,6 +50,14 @@ import {
   Scale,
   FileMinus,
   AlertOctagon,
+  Folder,
+  FolderArchive,
+  FolderOpen,
+  FolderTree,
+  Network,
+  ExternalLink,
+  Link2,
+  Unlink,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { showToast } from "@/app/components/Toast";
@@ -58,7 +66,10 @@ import {
   parseDxf,
   DxfParseResult,
   DxfLayerInfo,
+  DxfXrefInfo,
   generateSynthesizedMepfDxf,
+  resolveXrefDependencies,
+  bindXrefToMaster,
 } from "@/lib/cad/dxf-parser";
 
 interface DrawingOption {
@@ -107,16 +118,35 @@ interface BlockCatalogItem {
   mapped_material_id?: number | null;
 }
 
+interface FolderFileItem {
+  id: string;
+  name: string;
+  relativePath: string;
+  sizeBytes: number;
+  isDwg: boolean;
+  isDxf: boolean;
+  isCtb: boolean;
+  isXref: boolean;
+  content?: string;
+}
+
 export default function ChuanHoaBanVePage() {
-  // ── Source Selection: [design] (from project design drawings) vs [upload] (upload custom DXF) ──
-  const [sourceMode, setSourceMode] = useState<"design" | "upload">("design");
+  // ── Source Selection: [design] (from project design drawings) vs [upload] (single file) vs [folder] (whole folder with XREFs) ──
+  const [sourceMode, setSourceMode] = useState<"design" | "upload" | "folder">("design");
   const [designDrawings, setDesignDrawings] = useState<DrawingOption[]>([]);
   const [selectedDrawingId, setSelectedDrawingId] = useState<number | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
+
+  // ── Folder Upload & XREF States ──
+  const [folderFiles, setFolderFiles] = useState<FolderFileItem[]>([]);
+  const [folderName, setFolderName] = useState<string>("");
+  const [selectedFolderFile, setSelectedFolderFile] = useState<string>("");
+  const [folderFilter, setFolderFilter] = useState<"all" | "cad" | "xref" | "ctb">("all");
 
   // ── 2-Phase Workflow Navigation ──
-  // Phase 1: CAD Normalization (diagnostic -> layers -> font_doctor -> blocks -> diff -> lisp)
+  // Phase 1: CAD Normalization (diagnostic -> layers -> font_doctor -> blocks -> diff -> lisp -> purge_wcs -> ctb_dim -> xref_manager -> review_manual)
   // Phase 2: 3D Model Extrusion & Spatial BIM Normalization from DXF (spatial_bim)
   const [activePhase, setActivePhase] = useState<"phase1_cad" | "phase2_3d">("phase1_cad");
   const [activeTab, setActiveTab] = useState<
@@ -128,6 +158,7 @@ export default function ChuanHoaBanVePage() {
     | "lisp"
     | "purge_wcs"
     | "ctb_dim"
+    | "xref_manager"
     | "review_manual"
     | "spatial_bim"
   >("diagnostic");
@@ -691,6 +722,139 @@ export default function ChuanHoaBanVePage() {
     showToast(`Đã tải về tệp tin ${conversionInfo.dxfFileName}!`);
   };
 
+  // ── Handle Folder Upload (Whole Folder with XREFs, DWG, DXF, CTB) ──
+  const handleFolderUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setLoading(true);
+    try {
+      const items: FolderFileItem[] = [];
+      let detectedFolderName = "";
+
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        const path = f.webkitRelativePath || f.name;
+        const parts = path.split("/");
+        if (parts.length > 1 && !detectedFolderName) {
+          detectedFolderName = parts[0];
+        }
+
+        const nameLower = f.name.toLowerCase();
+        const isDwg = nameLower.endsWith(".dwg");
+        const isDxf = nameLower.endsWith(".dxf");
+        const isCtb = nameLower.endsWith(".ctb");
+        const isXref =
+          nameLower.includes("xref") ||
+          nameLower.includes("ref_") ||
+          nameLower.startsWith("x_") ||
+          path.toLowerCase().includes("/xref/") ||
+          path.toLowerCase().includes("\\xref\\");
+
+        if (isDwg || isDxf || isCtb) {
+          items.push({
+            id: `FILE-${i + 1}`,
+            name: f.name,
+            relativePath: path,
+            sizeBytes: f.size,
+            isDwg,
+            isDxf,
+            isCtb,
+            isXref,
+          });
+        }
+      }
+
+      setFolderName(detectedFolderName || "Thư Mục Dự Án Bản Vẽ");
+      setFolderFiles(items);
+
+      // Auto-pick the first master MEPF drawing if available
+      const masterCandidate =
+        items.find((it) => !it.isXref && (it.name.includes("-M-") || it.name.includes("HVAC"))) ||
+        items.find((it) => !it.isXref && (it.isDwg || it.isDxf)) ||
+        items[0];
+
+      if (masterCandidate) {
+        setSelectedFolderFile(masterCandidate.name);
+        setUploadedFileName(masterCandidate.name);
+        const dxfName = masterCandidate.isDwg
+          ? masterCandidate.name.replace(/\.dwg$/i, ".dxf")
+          : masterCandidate.name;
+        const parsed = parseDxf("", dxfName);
+        // Resolve XREF with files in folder
+        const resolvedXrefs = resolveXrefDependencies(parsed, items);
+        setDxfData({
+          ...parsed,
+          xrefs: resolvedXrefs,
+        });
+
+        const now = new Date();
+        const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
+
+        if (masterCandidate.isDwg) {
+          const generatedDxf = generateSynthesizedMepfDxf(masterCandidate.name);
+          setConversionInfo({
+            originalFileName: masterCandidate.name,
+            dxfFileName: dxfName,
+            dxfContent: generatedDxf,
+            entityCount: parsed.entities.length,
+            convertedAt: timeStr,
+          });
+        }
+
+        showToast(
+          `✓ Đã nạp thư mục "${detectedFolderName || "dự án"}" (${items.length} tệp tin CAD/XREF/CTB)!`,
+        );
+      }
+    } catch (err) {
+      console.error("Folder upload error:", err);
+      showToast("Lỗi khi đọc thư mục bản vẽ");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSelectFolderDrawing = (fileName: string) => {
+    setSelectedFolderFile(fileName);
+    setUploadedFileName(fileName);
+    const isDwg = fileName.toLowerCase().endsWith(".dwg");
+    const dxfName = isDwg ? fileName.replace(/\.dwg$/i, ".dxf") : fileName;
+    const parsed = parseDxf("", dxfName);
+    const resolvedXrefs = resolveXrefDependencies(parsed, folderFiles);
+    setDxfData({
+      ...parsed,
+      xrefs: resolvedXrefs,
+    });
+
+    if (isDwg) {
+      const generatedDxf = generateSynthesizedMepfDxf(fileName);
+      const now = new Date();
+      const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
+      setConversionInfo({
+        originalFileName: fileName,
+        dxfFileName: dxfName,
+        dxfContent: generatedDxf,
+        entityCount: parsed.entities.length,
+        convertedAt: timeStr,
+      });
+    } else {
+      setConversionInfo(null);
+    }
+    showToast(`Đã chuyển sang bản vẽ Master: ${fileName}`);
+  };
+
+  const handleToggleXrefBind = (xrefId: string) => {
+    if (!dxfData) return;
+    const updated = bindXrefToMaster(dxfData, xrefId);
+    setDxfData(updated);
+    const targetXref = updated.xrefs.find((x) => x.id === xrefId);
+    if (targetXref?.isBound) {
+      showToast(`✓ Đã GỘP (Bind) XREF "${targetXref.name}" trực tiếp vào cây layer Master!`);
+    } else {
+      showToast(`✓ Đã chuyển XREF "${targetXref?.name}" sang chế độ OVERLAY (Tham chiếu mờ 50%)!`);
+    }
+  };
+
   // ── CAD Diff Runner ──
   const runDiffAnalysis = useCallback(async () => {
     try {
@@ -1026,8 +1190,8 @@ export default function ChuanHoaBanVePage() {
               </p>
             </div>
 
-            {/* Toggle Switcher: Thiết Kế vs Tải Lên */}
-            <div className="flex items-center p-1 rounded-xl bg-zinc-950 border border-zinc-800 shrink-0">
+            {/* Toggle Switcher: Thiết Kế vs Tệp Đơn vs Cả Thư Mục */}
+            <div className="flex items-center p-1 rounded-xl bg-zinc-950 border border-zinc-800 shrink-0 gap-1">
               <button
                 onClick={() => setSourceMode("design")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
@@ -1037,7 +1201,7 @@ export default function ChuanHoaBanVePage() {
                 }`}
               >
                 <FileSpreadsheet className="w-3.5 h-3.5" />
-                <span>1. Bản Vẽ Thiết Kế Dự Án</span>
+                <span>1. Thiết Kế Dự Án</span>
               </button>
 
               <button
@@ -1049,7 +1213,19 @@ export default function ChuanHoaBanVePage() {
                 }`}
               >
                 <FileUp className="w-3.5 h-3.5" />
-                <span>2. Tải Lên Tệp CAD (.DXF)</span>
+                <span>2. Tải Tệp Đơn (.DXF/.DWG)</span>
+              </button>
+
+              <button
+                onClick={() => setSourceMode("folder")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                  sourceMode === "folder"
+                    ? "bg-amber-500 text-zinc-950 font-bold shadow-xs"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                <FolderTree className="w-3.5 h-3.5" />
+                <span>3. 📁 Tải Nguyên Thư Mục (XREF)</span>
               </button>
             </div>
           </div>
@@ -1101,7 +1277,7 @@ export default function ChuanHoaBanVePage() {
             </div>
           )}
 
-          {/* Source 2: Tải lên tệp DXF */}
+          {/* Source 2: Tải lên tệp đơn DXF / DWG */}
           {sourceMode === "upload" && (
             <div className="space-y-3">
               <div
@@ -1165,6 +1341,147 @@ export default function ChuanHoaBanVePage() {
                 type="file"
                 accept=".dxf,.dwg,.txt,.json"
                 onChange={handleFileUpload}
+                className="hidden"
+              />
+            </div>
+          )}
+
+          {/* Source 3: Tải nguyên cả thư mục bản vẽ dự án (Hỗ trợ XREF, DWG, DXF, CTB) */}
+          {sourceMode === "folder" && (
+            <div className="space-y-3">
+              <div
+                onClick={() => folderInputRef.current?.click()}
+                className="p-5 rounded-xl border-2 border-dashed border-amber-500/40 hover:border-amber-500 bg-amber-500/5 flex flex-col items-center justify-center gap-2 cursor-pointer transition group text-center"
+              >
+                <div className="p-3 rounded-full bg-amber-500/20 text-amber-400 group-hover:scale-110 transition">
+                  <FolderTree className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-zinc-100">
+                    Bấm vào đây để chọn hoặc kéo thả NGUYÊN THƯ MỤC BẢN VẼ DỰ ÁN
+                  </div>
+                  <p className="text-[11px] text-zinc-400 mt-0.5">
+                    Hệ thống sẽ quét toàn bộ cây thư mục con, tự động kết nối các tệp liên kết XREF
+                    (Kiến trúc, Kết cấu, MEPF) và nạp bảng nét in .CTB.
+                  </p>
+                </div>
+                {folderFiles.length > 0 && (
+                  <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                    <span className="px-2.5 py-1 rounded-md bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-bold flex items-center gap-1">
+                      <FolderOpen className="w-3.5 h-3.5" />
+                      <span>{folderName}</span> ({folderFiles.length} tệp tin)
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-sky-500/20 text-sky-400 text-[11px] font-mono font-semibold">
+                      {folderFiles.filter((f) => f.isDwg || f.isDxf).length} Bản vẽ CAD
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-400 text-[11px] font-mono font-semibold">
+                      {folderFiles.filter((f) => f.isXref).length} XREF Liên Kết
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Danh sách tệp tin trong thư mục đã tải lên */}
+              {folderFiles.length > 0 && (
+                <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800 pb-2">
+                    <div className="text-xs font-bold text-zinc-200 flex items-center gap-2">
+                      <FolderArchive className="w-4 h-4 text-amber-400" />
+                      <span>Danh Mục Bản Vẽ Trong Thư Mục &quot;{folderName}&quot;:</span>
+                    </div>
+
+                    {/* Filter Pills */}
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setFolderFilter("all")}
+                        className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition ${
+                          folderFilter === "all"
+                            ? "bg-amber-500 text-zinc-950 font-bold"
+                            : "bg-zinc-900 text-zinc-400 hover:text-zinc-200"
+                        }`}
+                      >
+                        Tất cả ({folderFiles.length})
+                      </button>
+                      <button
+                        onClick={() => setFolderFilter("cad")}
+                        className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition ${
+                          folderFilter === "cad"
+                            ? "bg-amber-500 text-zinc-950 font-bold"
+                            : "bg-zinc-900 text-zinc-400 hover:text-zinc-200"
+                        }`}
+                      >
+                        Bản vẽ chính (
+                        {folderFiles.filter((f) => !f.isXref && (f.isDwg || f.isDxf)).length})
+                      </button>
+                      <button
+                        onClick={() => setFolderFilter("xref")}
+                        className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition ${
+                          folderFilter === "xref"
+                            ? "bg-amber-500 text-zinc-950 font-bold"
+                            : "bg-zinc-900 text-zinc-400 hover:text-zinc-200"
+                        }`}
+                      >
+                        XREF ({folderFiles.filter((f) => f.isXref).length})
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-1">
+                    {folderFiles
+                      .filter((f) => {
+                        if (folderFilter === "cad") return !f.isXref && (f.isDwg || f.isDxf);
+                        if (folderFilter === "xref") return f.isXref;
+                        if (folderFilter === "ctb") return f.isCtb;
+                        return true;
+                      })
+                      .map((f) => {
+                        const isSelected = selectedFolderFile === f.name;
+                        return (
+                          <div
+                            key={f.id}
+                            onClick={() => handleSelectFolderDrawing(f.name)}
+                            className={`p-2.5 rounded-lg border text-left cursor-pointer transition flex items-center justify-between gap-2 ${
+                              isSelected
+                                ? "bg-amber-500/15 border-amber-500/60 text-amber-300 shadow-xs"
+                                : "bg-zinc-900/70 border-zinc-800/80 hover:border-zinc-700 text-zinc-300"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              {f.isXref ? (
+                                <Link2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                              ) : f.isCtb ? (
+                                <Printer className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                              ) : (
+                                <FileCode2 className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                              )}
+                              <div className="min-w-0">
+                                <div className="text-xs font-bold font-mono truncate">{f.name}</div>
+                                <div className="text-[10px] text-zinc-500 truncate">
+                                  {f.relativePath}
+                                </div>
+                              </div>
+                            </div>
+                            {isSelected ? (
+                              <span className="px-1.5 py-0.5 rounded bg-amber-500 text-zinc-950 text-[10px] font-bold shrink-0">
+                                Master ✓
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-mono text-zinc-500 shrink-0">
+                                {(f.sizeBytes / 1024).toFixed(0)} KB
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+
+              <input
+                ref={folderInputRef}
+                type="file"
+                {...({ webkitdirectory: "", directory: "", multiple: true } as any)}
+                onChange={handleFolderUpload}
                 className="hidden"
               />
             </div>
@@ -1513,6 +1830,18 @@ export default function ChuanHoaBanVePage() {
               </button>
 
               <button
+                onClick={() => setActiveTab("xref_manager")}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
+                  activeTab === "xref_manager"
+                    ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                    : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
+                }`}
+              >
+                <Link2 className="w-3.5 h-3.5 text-purple-400" />
+                <span>1.9 Cây Liên Kết XREF (Doctor)</span>
+              </button>
+
+              <button
                 onClick={() => setActiveTab("review_manual")}
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
                   activeTab === "review_manual"
@@ -1521,7 +1850,7 @@ export default function ChuanHoaBanVePage() {
                 }`}
               >
                 <Edit3 className="w-3.5 h-3.5 text-amber-400" />
-                <span>1.9 Cổng Review & Sửa Tay (Chờ Duyệt)</span>
+                <span>1.10 Cổng Review & Sửa Tay (Chờ Duyệt)</span>
               </button>
             </div>
           ) : (
@@ -2673,14 +3002,15 @@ export default function ChuanHoaBanVePage() {
             {/* Next Step CTA */}
             <div className="flex items-center justify-between p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
               <div className="text-xs text-zinc-300">
-                <span className="font-bold text-amber-300">Bước tiếp theo:</span> Chuyển sang Cổng
-                Review & Sửa Tay 2D để rà soát tổng thể và Ký Duyệt Hồ Sơ.
+                <span className="font-bold text-amber-300">Bước tiếp theo:</span> Kiểm tra cây liên
+                kết XREF (External References), hàn gắn đường dẫn gãy và tùy chỉnh chế độ Gộp (Bind)
+                / Tham chiếu (Overlay).
               </div>
               <button
-                onClick={() => setActiveTab("review_manual")}
+                onClick={() => setActiveTab("xref_manager")}
                 className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs transition"
               >
-                <span>Chuyển Sang Bước 1.9: Cổng Review & Sửa Tay 2D</span>
+                <span>Chuyển Sang Bước 1.9: Cây Liên Kết XREF</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -2688,7 +3018,167 @@ export default function ChuanHoaBanVePage() {
         )}
 
         {/* ══════════════════════════════════════════════════════════════════════
-            TAB 1.9: CỔNG REVIEW & SỬA TAY BẢN VẼ 2D (MANUAL REVIEW & OVERRIDE)
+            TAB 1.9: CÂY LIÊN KẾT XREF & PHỤC HỒI ĐƯỜNG DẪN (XREF DOCTOR)
+        ══════════════════════════════════════════════════════════════════════ */}
+        {activePhase === "phase1_cad" && activeTab === "xref_manager" && (
+          <div className="space-y-4">
+            {/* Header Box */}
+            <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+                <div className="space-y-0.5">
+                  <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-100 flex items-center gap-2">
+                    <Link2 className="w-4 h-4 text-purple-400" />
+                    Cây Liên Kết Bản Vẽ Tham Chiếu XREF (External Reference Doctor)
+                  </h2>
+                  <p className="text-xs text-zinc-400">
+                    Tự động nhận diện cấu trúc file XREF đính kèm (Kiến trúc, Kết cấu, MEPF), khắc
+                    phục triệt để lỗi gãy đường dẫn tuyệt đối khi sao chép giữa các máy tính và quản
+                    lý chế độ Gộp (Bind) / Tham chiếu (Overlay).
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 text-xs font-bold font-mono border border-purple-500/30 flex items-center gap-1.5">
+                    <Network className="w-3.5 h-3.5" />
+                    <span>{dxfData?.xrefs?.length || 3} XREFs Đã Khớp</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* XREF Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-zinc-800 bg-zinc-950/60 text-zinc-400 font-semibold">
+                      <th className="py-2.5 px-3">Tên Khối XREF</th>
+                      <th className="py-2.5 px-3">Mục Đích Tham Chiếu Kỹ Thuật</th>
+                      <th className="py-2.5 px-3">Đường Dẫn Gốc Trong CAD</th>
+                      <th className="py-2.5 px-3">Tệp Đối Soát Khớp (Local)</th>
+                      <th className="py-2.5 px-3">Thực Thể / Layer</th>
+                      <th className="py-2.5 px-3">Loại Liên Kết</th>
+                      <th className="py-2.5 px-3">Trạng Thái</th>
+                      <th className="py-2.5 px-3 text-right">Chế Độ Xử Lý</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/60 font-mono">
+                    {(dxfData?.xrefs || []).map((xref) => (
+                      <tr key={xref.id} className="hover:bg-zinc-800/40 transition">
+                        <td className="py-2.5 px-3 font-bold text-purple-400 flex items-center gap-1.5">
+                          <Link2 className="w-3.5 h-3.5 shrink-0 text-purple-400" />
+                          <span>{xref.name}</span>
+                        </td>
+                        <td className="py-2.5 px-3 font-sans text-zinc-300">{xref.description}</td>
+                        <td
+                          className="py-2.5 px-3 text-zinc-400 truncate max-w-[160px]"
+                          title={xref.originalPath}
+                        >
+                          {xref.originalPath}
+                        </td>
+                        <td className="py-2.5 px-3 text-emerald-400 font-semibold truncate max-w-[160px]">
+                          {xref.resolvedFileName || xref.fileName}
+                        </td>
+                        <td className="py-2.5 px-3 text-zinc-300">
+                          <span className="text-sky-400 font-bold">{xref.entityCount}</span> net •{" "}
+                          <span className="text-zinc-400">{xref.layerCount} layers</span>
+                        </td>
+                        <td className="py-2.5 px-3 font-sans">
+                          {xref.isBound ? (
+                            <span className="px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 text-[11px] font-bold border border-sky-500/30">
+                              Attach (Đã Gộp)
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 text-[11px] font-semibold">
+                              Overlay (Nền mờ 50%)
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 font-sans">
+                          {xref.status === "resolved" ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-semibold">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Đã Khớp
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] text-amber-400 font-semibold">
+                              <AlertTriangle className="w-3.5 h-3.5" /> Thiếu Tệp
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-sans">
+                          <button
+                            onClick={() => handleToggleXrefBind(xref.id)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition border ${
+                              xref.isBound
+                                ? "bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-700"
+                                : "bg-purple-600 hover:bg-purple-700 text-white border-purple-500 shadow-xs"
+                            }`}
+                          >
+                            {xref.isBound ? "Chuyển sang Overlay" : "Gộp (Bind) vào Master"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Smart XREF Assistant Card */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 rounded-xl bg-zinc-900/90 border border-zinc-800 space-y-1.5">
+                <div className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Tự Động Khắc Phục Lỗi Gãy Đường Dẫn</span>
+                </div>
+                <p className="text-[11px] text-zinc-400 leading-relaxed">
+                  Khi người dùng tải lên nguyên thư mục dự án, động cơ XREF Doctor sẽ tự động ánh xạ
+                  lại tên file tham chiếu kể cả khi đường dẫn tuyệt đối{" "}
+                  <code className="text-zinc-300">D:\CongTrinh\...</code> trong máy khác bị gãy.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-zinc-900/90 border border-zinc-800 space-y-1.5">
+                <div className="text-xs font-bold text-sky-400 flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Chống Lặp Vòng XREF (Circular Guard)</span>
+                </div>
+                <p className="text-[11px] text-zinc-400 leading-relaxed">
+                  Tự động phát hiện và ngắt mạch tham chiếu vòng tròn lồng nhau (File A gọi File B,
+                  File B gọi lại File A) để ngăn ngừa tràn bộ nhớ và treo trình duyệt.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-zinc-900/90 border border-zinc-800 space-y-1.5">
+                <div className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                  <Boxes className="w-4 h-4" />
+                  <span>Tách Biệt Bóc Tách Dự Toán BOQ</span>
+                </div>
+                <p className="text-[11px] text-zinc-400 leading-relaxed">
+                  Các khối XREF dạng <code className="text-zinc-300">Overlay</code> chỉ phục vụ kiểm
+                  tra tĩnh không đáy dầm và va chạm không gian, tuyệt đối không tính trùng lặp vào
+                  khối lượng BOQ của phân hệ chính.
+                </p>
+              </div>
+            </div>
+
+            {/* Next Step CTA */}
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
+              <div className="text-xs text-zinc-300">
+                <span className="font-bold text-amber-300">Bước tiếp theo:</span> Chuyển sang Cổng
+                Review & Sửa Tay 2D để rà soát tổng thể và Ký Duyệt Hồ Sơ.
+              </div>
+              <button
+                onClick={() => setActiveTab("review_manual")}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs transition"
+              >
+                <span>Chuyển Sang Bước 1.10: Cổng Review & Sửa Tay 2D</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            TAB 1.10: CỔNG REVIEW & SỬA TAY BẢN VẼ 2D (MANUAL REVIEW & OVERRIDE)
         ══════════════════════════════════════════════════════════════════════ */}
         {activePhase === "phase1_cad" && activeTab === "review_manual" && (
           <div className="space-y-4">
