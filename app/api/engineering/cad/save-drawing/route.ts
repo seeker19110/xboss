@@ -59,9 +59,9 @@ export async function POST(req: NextRequest) {
     } = body;
 
     const approved = isApproved === true;
-    // Phê duyệt Gate 0 nhạy cảm hơn hẳn việc lưu tạm — chỉ Admin/PM, như đổi trạng
-    // thái revision trong sổ bản vẽ.
-    if (approved && !CAN.decideDrawingRevision(user.role)) {
+    // Ký duyệt Gate 0 là quyết định kỹ thuật của Kỹ sư trưởng — dùng quyền gate
+    // kỹ thuật (Admin/PM/engineer), không phải quyền duyệt revision của sổ bản vẽ.
+    if (approved && !CAN.approveEngineeringGate(user.role)) {
       return NextResponse.json({ error: "Không có quyền phê duyệt bản vẽ" }, { status: 403 });
     }
 

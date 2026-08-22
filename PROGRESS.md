@@ -22,8 +22,8 @@ rejected|superseded`) → mọi lần "Lưu tạm chờ duyệt" đều 500. S�
 - **Lỗ hổng phân quyền, đã sửa:** route chỉ kiểm `getCurrentUser()`, nên mọi vai trò kể cả
   chỉ-xem (`viewer`/`cdt`) ghi được file vào `drawings/` lẫn `data/uploads/drawings/` và tự
   đặt `isApproved: true` để "Ký duyệt Gate 0". Nay ghi bản vẽ đòi `CAN.manageDrawings`
-  (Admin/PM/engineer) và phê duyệt đòi `CAN.decideDrawingRevision` (Admin/PM) — đồng bộ với
-  sổ bản vẽ M8.
+  (Admin/PM/engineer) và ký duyệt Gate 0 đòi `CAN.approveEngineeringGate` (Admin/PM/engineer
+  — Kỹ sư trưởng ký được, đúng vai trò trên UI).
 - **Path traversal, đã sửa:** `kind` nhận thẳng từ body chỉ qua `.toLowerCase()` rồi ghép vào
   tên file (`kindTag`), nên `kind: "../../x"` đẩy `writeFileSync` ra ngoài thư mục bản vẽ
   (và ném 500 khi `kind` không phải chuỗi). Nay `systems`/`kind`/`subFolder` đều làm sạch +
