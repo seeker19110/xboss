@@ -25,20 +25,45 @@
   `engineering-*` (auto-routing, bidding-matrix, cashflow, esignature, hse-vision,
   qr-logistics, spatial-pinning, zalo-copilot, autonomy đã có sẵn) — trước đây mặc định
   `readOnly:true` tự khoá transaction của chính mình trước khi ghi.
-- **Bug test có sẵn, đã sửa:** 8 file test tích hợp `engineering-*` hard-code `projectId = 1`
-  (2 file thêm `userId = 1`) giả định hàng đã tồn tại thay vì tự `INSERT INTO
-projects/users` như quy ước còn lại của repo — DB test trống nên insert lỗi FK. Sửa theo
-  đúng pattern `insertId(...)`.
-- **Còn tồn đọng, CHƯA sửa (ngoài phạm vi commit này, cần đánh giá riêng vì đụng schema/logic
-  nghiệp vụ — rủi ro cao hơn):** schema drift (cột thiếu/đổi tên) ở `engineering-fidic-claim`,
-  `engineering-graph`, `engineering-predictions`, `engineering-prescriptive`,
-  `engineering-twin`, `engineering-twin-pinnacle`; bug số lượng tham số bind ở
-  `audit-chain`/`lib/merkle-audit-ledger.ts` và `engineering-pinnacle-synergy`; thiếu setup FK
-  ở `engineering-site-bot`/`engineering-task-queue`/`engineering-worker-bridge`; assertion cũ
-  lệch route/nhãn ở `approvals-task-proposal`/`diary`; lỗi validate `NODE_ENV` ở `auth.test.ts`
-  (nghi do cấu hình CI, chưa xác nhận); logic "Deny by default" trả sai kỳ vọng ở
-  `engineering-autonomy` (không phải bug transaction — đã verify riêng); và bộ e2e (`npm run
-test` job `e2e`) fail trên diện rộng từ trước, cần điều tra riêng.
+- **Bug test có sẵn, đã sửa:** 10 file test tích hợp `engineering-*` (`auto-routing`,
+  `bidding-matrix`, `cashflow`, `esignature`, `hse-vision`, `qr-logistics`, `spatial-pinning`,
+  `zalo-copilot`, `site-bot`, `task-queue`, `worker-bridge`, `pinnacle-synergy`) hard-code
+  `projectId = 1`/`userId = 1` giả định hàng đã tồn tại thay vì tự `INSERT INTO projects/users`
+  như quy ước còn lại của repo — DB test trống nên insert lỗi FK. Sửa theo đúng pattern
+  `insertId(...)`; `engineering-worker-bridge` còn thiếu bước `claimNextAsyncTask()` để chuyển
+  task `pending → processing` trước khi `completeAsyncTask` (chỉ update được task đang
+  `processing`).
+- **Bug bind-param thật, đã sửa:** `query()`/`queryOne()` là hàm variadic `(sql, ...params)`,
+  không phải `(sql, params[])` — `lib/merkle-audit-ledger.ts::verifyAuditChain` và 7 chỗ trong
+  `lib/engineering-pinnacle-synergy.ts` (4 truy vấn tính Apex Pulse metrics + insert
+  `recordApexSystemPulse` + select `getLatestApexSystemPulse` + insert command-log) truyền
+  mảng thay vì spread — với Pinnacle Synergy, do bọc try/catch fallback giá trị mặc định nên
+  **production luôn trả metrics mặc định, chưa từng tính từ dữ liệu thật**. Đã sửa toàn bộ
+  sang spread tham số.
+- **Bug logic thật, đã sửa:** `lib/engineering-autonomy.ts::executeExecutionRequest` quên
+  truyền `userRole` khi re-check `checkAutonomyAllowance` lúc thực thi (chỉ nhận qua tham số
+  thứ 4 mới thêm) — khiến việc re-check Kill Switch/deny-by-default lúc EXECUTE không đánh giá
+  đúng theo vai trò người dùng. Đã cập nhật chữ ký hàm, route
+  `app/api/engineering/autonomy/requests/[id]/execute/route.ts` truyền `user.role`, và test.
+- **Assertion cũ lệch code, đã sửa:** `approvals-task-proposal.test.ts` (link thông báo PM đổi
+  từ `/proposals` sang `/commercial?tab=ipc-payments&sub=proposals`), `diary.test.ts` (tên hệ
+  đổi từ "Điện T5" sang "Điện & Điện nhẹ (ELV) T5").
+- **Bug ô nhiễm state giữa test, đã sửa:** `auth.test.ts` gán `process.env.NODE_ENV = undefined`
+  trong `finally` để khôi phục — JS stringify thành chuỗi `"undefined"` thay vì xoá key, làm
+  validate zod `NODE_ENV` ở `lib/env.ts` lỗi cho các test chạy sau trong cùng process (CI không
+  set `NODE_ENV` nên giá trị gốc luôn là `undefined`). Sửa bằng helper xoá key đúng cách khi gốc
+  là `undefined`.
+- **Còn tồn đọng, CHƯA sửa (ngoài phạm vi commit này — đụng schema/thiết kế tính năng, cần spec
+  gốc mới sửa đúng, không đoán theo LUẬT CỨNG):** `engineering-fidic-claim` (INSERT nhắm cột
+  không tồn tại trên `engineering_fidic_claims`, ví dụ `title`/`executive_summary` — bảng thật
+  là `event_title`/không có `executive_summary`; thiếu cả `event_date`/`notice_date` NOT NULL);
+  `engineering-graph`/`engineering-twin` (cột `revision_name` không tồn tại trên
+  `engineering_source_revisions`, không có cột nào khớp ngữ nghĩa "tên hiển thị"); tương tự ở
+  `engineering-predictions`/`engineering-prescriptive`/`engineering-twin-pinnacle` (nhắm
+  `tasks.project_id`, `engineering_objects.metadata`, `engineering_objects.code` — đều không có
+  thật trong schema). Và bộ e2e (`npm test` job `e2e`) fail trên diện rộng, xác nhận có từ
+  trước trên nhiều commit `main` không liên quan — cần điều tra riêng, ngoài phạm vi PR
+  health-check.
 
 ## Kiểm tra trạng thái hoạt động (health check) cho Admin (2026-08-22)
 
