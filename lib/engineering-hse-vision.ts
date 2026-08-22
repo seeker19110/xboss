@@ -70,30 +70,14 @@ export function calculateHseSafetyScore(hazards: DetectedHazardItem[]): {
 export function analyzeSiteSafetyImageEngine(params: {
   scanName: string;
   imageUrl: string;
+  detectedHazards?: DetectedHazardItem[];
   mockHazards?: DetectedHazardItem[];
+  customHazards?: DetectedHazardItem[];
 }): HseScanResult {
-  const { scanName, imageUrl, mockHazards } = params;
+  const { scanName, imageUrl, detectedHazards, mockHazards, customHazards } = params;
 
-  const hazards: DetectedHazardItem[] = mockHazards || [
-    {
-      hazardType: "NO_HELMET",
-      severity: "HIGH",
-      confidence: 96.5,
-      boundingBox: [120, 80, 60, 60],
-      description: "Công nhân không đội mũ bảo hộ lao động tại khu vực lắp dựng giàn giáo.",
-      standardViolation: "QCVN 18:2021/BXD Điều 2.1.3 (An toàn trong thi công xây dựng)",
-      fineAmountVnd: 500000,
-    },
-    {
-      hazardType: "UNGUARDED_EDGE",
-      severity: "CRITICAL",
-      confidence: 94.0,
-      boundingBox: [300, 200, 180, 100],
-      description: "Mép sàn tầng 8 không có lan can chắn tạm thời và lưới an toàn.",
-      standardViolation: "TCVN 5308:1991 (Quy chuẩn kỹ thuật an toàn trong xây dựng)",
-      fineAmountVnd: 2000000,
-    },
-  ];
+  // Chỉ ghi nhận mối nguy hiểm thực tế được phát hiện hoặc chuyển vào, không tự tạo báo cáo vi phạm giả
+  const hazards: DetectedHazardItem[] = detectedHazards || customHazards || mockHazards || [];
 
   const evaluation = calculateHseSafetyScore(hazards);
 

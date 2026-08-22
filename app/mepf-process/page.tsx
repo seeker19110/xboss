@@ -1174,33 +1174,48 @@ export default function CleanMepfProcessPage() {
   }, [steps]);
 
   // Sign-off Gate Handler
-  function handleApprove(stepId: string) {
+  async function handleApprove(stepId: string) {
     setIsSubmitting(true);
-    setTimeout(() => {
-      setSteps((prev) => {
-        const next = [...prev];
-        const idx = next.findIndex((s) => s.id === stepId);
-        if (idx !== -1) {
-          next[idx] = {
-            ...next[idx],
-            gateStatus: "approved",
-            approvedBy: me?.name ? `${me.name} (Kỹ sư TVGS)` : "Kỹ sư Giám Sát TVGS",
-            approvedAt: new Date().toISOString().replace("T", " ").slice(0, 16),
-            hashSignature: `SHA256:${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`,
-          };
+    const approver = me?.name ? `${me.name} (Kỹ sư TVGS)` : "Kỹ sư Giám Sát TVGS";
+    const approvedAt = new Date().toISOString().replace("T", " ").slice(0, 16);
 
-          // Unlock next step
-          if (idx + 1 < next.length && next[idx + 1].gateStatus === "locked") {
-            next[idx + 1] = {
-              ...next[idx + 1],
-              gateStatus: "pending",
-            };
-          }
+    let hashSignature = `SHA256:AUTHENTICATED`;
+    if (typeof window !== "undefined" && window.crypto?.subtle) {
+      try {
+        const payload = `GATE:${stepId}:${approver}:${approvedAt}:${me?.id ?? 0}`;
+        const msgBuffer = new TextEncoder().encode(payload);
+        const hashBuffer = await window.crypto.subtle.digest("SHA-256", msgBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+        hashSignature = `SHA256:${hex.slice(0, 16).toUpperCase()}`;
+      } catch {
+        // Fallback standard marker
+      }
+    }
+
+    setSteps((prev) => {
+      const next = [...prev];
+      const idx = next.findIndex((s) => s.id === stepId);
+      if (idx !== -1) {
+        next[idx] = {
+          ...next[idx],
+          gateStatus: "approved",
+          approvedBy: approver,
+          approvedAt,
+          hashSignature,
+        };
+
+        // Unlock next step
+        if (idx + 1 < next.length && next[idx + 1].gateStatus === "locked") {
+          next[idx + 1] = {
+            ...next[idx + 1],
+            gateStatus: "pending",
+          };
         }
-        return next;
-      });
-      setIsSubmitting(false);
-    }, 300);
+      }
+      return next;
+    });
+    setIsSubmitting(false);
   }
 
   // Reject / NCR Handler

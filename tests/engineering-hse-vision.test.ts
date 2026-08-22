@@ -31,12 +31,32 @@ test("M87: HSE Vision Safety Scoring & Risk Tiering", () => {
   assert.equal(dangerEval.score, 65);
   assert.equal(dangerEval.riskTier, "DANGER");
 
-  const engineResult = analyzeSiteSafetyImageEngine({
-    scanName: "Test Image",
-    imageUrl: "https://example.com/site.jpg",
+  const cleanResult = analyzeSiteSafetyImageEngine({
+    scanName: "Ảnh Hiện Trường Chuẩn An Toàn",
+    imageUrl: "https://example.com/clean-site.jpg",
   });
-  assert.ok(engineResult.hazards.length > 0);
-  assert.ok(engineResult.siteSafetyScore >= 0);
+  assert.equal(cleanResult.hazards.length, 0);
+  assert.equal(cleanResult.siteSafetyScore, 100);
+  assert.equal(cleanResult.riskTier, "SAFE");
+
+  const hazardResult = analyzeSiteSafetyImageEngine({
+    scanName: "Ảnh Có Vi Phạm",
+    imageUrl: "https://example.com/hazard-site.jpg",
+    detectedHazards: [
+      {
+        hazardType: "NO_HELMET",
+        severity: "HIGH",
+        confidence: 96.5,
+        boundingBox: [120, 80, 60, 60],
+        description: "Không đội mũ bảo hộ",
+        standardViolation: "QCVN 18:2021",
+        fineAmountVnd: 500000,
+      },
+    ],
+  });
+  assert.equal(hazardResult.hazards.length, 1);
+  assert.equal(hazardResult.siteSafetyScore, 80);
+  assert.equal(hazardResult.riskTier, "WARNING");
 });
 
 test("M87: HSE Vision DB Lifecycle & Action Tickets", { skip: !HAS_DB }, async () => {
@@ -48,6 +68,17 @@ test("M87: HSE Vision DB Lifecycle & Action Tickets", { skip: !HAS_DB }, async (
     scanName: "Quét An Toàn Test DB",
     imageUrl: "https://example.com/test.jpg",
     assignedSubcon: "Thầu Phụ Test",
+    customHazards: [
+      {
+        hazardType: "NO_HELMET",
+        severity: "HIGH",
+        confidence: 95.0,
+        boundingBox: [100, 100, 50, 50],
+        description: "Không đội nón bảo hộ",
+        standardViolation: "QCVN 18:2021",
+        fineAmountVnd: 500000,
+      },
+    ],
   });
 
   assert.ok(result.scan.id);

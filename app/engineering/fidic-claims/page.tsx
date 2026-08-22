@@ -43,7 +43,7 @@ export default function FidicClaimsPage() {
 
   // Form State
   const [form, setForm] = useState({
-    claimCode: `CLM-EOT-2026-${Math.floor(100 + Math.random() * 900)}`,
+    claimCode: "CLM-EOT-2026-001",
     contractType: "FIDIC_RED_1999" as const,
     eventType: "ACCESS_DELAY" as const,
     eventTitle: "Chậm bàn giao mặt bằng trục A1-A6 tầng hầm B1",

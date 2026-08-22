@@ -22,35 +22,21 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const rawPoints: PointCloudPoint[] = body.points || [];
+    const points: PointCloudPoint[] = body.points || [];
+    if (!Array.isArray(points) || points.length === 0) {
+      return NextResponse.json(
+        { error: "Vui lòng cung cấp danh sách toạ độ điểm quét LiDAR thực tế (points)" },
+        { status: 400 },
+      );
+    }
 
-    // Nếu không truyền điểm, sinh 200 điểm giả lập quét 3D LiDAR thực địa
-    const points: PointCloudPoint[] =
-      rawPoints.length > 0
-        ? rawPoints
-        : Array.from({ length: 150 }, (_, i) => {
-            const isDefect = i % 15 === 0;
-            const noise = (Math.random() - 0.5) * (isDefect ? 80 : 10);
-            return {
-              x: Math.round(-100 + (i % 10) * 20 + noise),
-              y: Math.round(-50 + Math.floor(i / 10) * 30 + noise),
-              z: Math.round(50 + noise),
-              intensity: Math.round(Math.random() * 255),
-            };
-          });
-
-    const elements: GodTierElementData[] = body.elements || [
-      {
-        id: "elem-1",
-        guid: "GUID-DUCT-SUPP-101",
-        elementType: "DUCT_STRAIGHT",
-        systemType: "HVAC_SUPPLY",
-        name: "Ống gió cấp AHU-01 (800x500)",
-        position: { x: -100, y: -50, z: 50 },
-        dimensions: { width: 800, height: 500, length: 6000 },
-        boundingBox: { min: [-400, -200, 0], max: [400, 6000, 300] },
-      },
-    ];
+    const elements: GodTierElementData[] = body.elements || [];
+    if (!Array.isArray(elements) || elements.length === 0) {
+      return NextResponse.json(
+        { error: "Vui lòng cung cấp danh sách cấu kiện BIM cần so khớp sai lệch (elements)" },
+        { status: 400 },
+      );
+    }
 
     const result = analyzePointCloudDeviation(points, elements);
     return NextResponse.json({ success: true, result });
