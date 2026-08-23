@@ -4,8 +4,10 @@
   "layerMap": {
     "source": "lib/cad/dxf-parser.ts :: normalizeCadLayers()",
     "standard": "AIA / BS1192 / ISO 13567",
-    "matching": "uppercase-substring",
+    "matching": "token-boundary",
+    "matchingNote": "So khớp theo RANH GIỚI TOKEN, không phải substring thô. Một từ khóa chỉ khớp khi ký tự liền trước/sau nó (nếu có) không phải [A-Z0-9] — tương đương hàm `hasToken()`/`LAYER_WORD_CHAR = /[A-Z0-9]/` trong lib/cad/dxf-parser.ts (Việc 7.6, 2026-08-23). Ví dụ: layer 'THOAT' không được xem là khớp từ khóa 'OA' dù chứa substring 'OA' (trong 'TH-OA-T'), vì 'OA' không đứng độc lập giữa 2 ranh giới không-phải-chữ/số. Plugin AutoCAD .NET PHẢI cài lại đúng thuật toán này (không dùng String.Contains thô) để không trôi khỏi rule pack.",
     "strategy": "first-match-ordered",
+    "orderNote": "Thứ tự nhóm trong `groups` PHẢI giữ nguyên: HVAC → ELECTRICAL → ELV → PIPING → FIREFIGHTING → STRUCTURAL → ANNOTATION (đúng thứ tự các nhánh if/else if trong normalizeCadLayers()). Điện/ELV phải kiểm TRƯỚC ống nước vì 'CAP' là token hợp lệ ở cả 2 nghĩa: 'cấp nước' (PIPING) và 'cáp điện' (trong 'MANG_CAP_DIEN', ELECTRICAL) — đổi thứ tự sẽ làm layer điện bị nhận nhầm thành ống nước.",
     "fallback": "keep-original",
     "knownIssues": [
       "Không idempotent: áp lại lên tên đã chuẩn hóa cho kết quả khác đi (vd 'M-CHW-PIPE' chứa 'PIPE' nên rơi vào nhóm PIPING). Nợ kỹ thuật đã biết — xem PROGRESS.md 'Việc 7.6'.",
@@ -22,6 +24,19 @@
         ]
       },
       {
+        "id": "ELECTRICAL",
+        "matchAny": ["ELEC", "TRAY", "DIEN", "PWR", "LTG"],
+        "branches": [
+          { "matchAny": ["LTG", "CHIEU", "SANG"], "target": "E-LTNG-CKTS" },
+          { "default": true, "target": "E-TRAY-PWRR" }
+        ]
+      },
+      {
+        "id": "ELV",
+        "matchAny": ["ELV", "TEL", "DATA", "LAN", "CCTV", "BMS"],
+        "branches": [{ "default": true, "target": "ELV-CABL-TRAY" }]
+      },
+      {
         "id": "PIPING",
         "matchAny": ["PIPE", "NUOC", "SAN", "CAP", "THOAT", "CHILLER", "CW"],
         "branches": [
@@ -31,22 +46,9 @@
         ]
       },
       {
-        "id": "ELECTRICAL",
-        "matchAny": ["ELEC", "TRAY", "DIEN", "PWR", "LTG"],
-        "branches": [
-          { "matchAny": ["LTG", "CHIEU", "SANG"], "target": "E-LTNG-CKTS" },
-          { "default": true, "target": "E-TRAY-PWRR" }
-        ]
-      },
-      {
         "id": "FIREFIGHTING",
         "matchAny": ["FIRE", "PCCC", "SPK", "HYDRANT"],
         "branches": [{ "default": true, "target": "F-SPRN-PIPE" }]
-      },
-      {
-        "id": "ELV",
-        "matchAny": ["ELV", "TEL", "DATA", "LAN", "CCTV", "BMS"],
-        "branches": [{ "default": true, "target": "ELV-CABL-TRAY" }]
       },
       {
         "id": "STRUCTURAL",

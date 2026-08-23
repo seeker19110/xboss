@@ -37,7 +37,18 @@ Cập nhật phiên bản mới: `git pull` rồi `docker compose up -d --build`
 
 ---
 
-## Cách B — Không Docker (Node ≥ 24 + pm2 + Supabase)
+## Cách B — Không Docker (Node ≥ 24 + pm2 + Postgres tự host hoặc Supabase)
+
+Nếu Postgres cũng chạy trên chính VPS này (không dùng Supabase), cài trước:
+
+```bash
+sudo apt update && sudo apt install -y postgresql postgresql-contrib
+sudo -u postgres psql -c "CREATE USER xboss WITH PASSWORD 'mật-khẩu-mạnh';"
+sudo -u postgres psql -c "CREATE DATABASE xboss OWNER xboss;"
+```
+
+Để Postgres chỉ nghe `localhost` (không sửa `listen_addresses` ra `*`) — app và DB cùng máy
+nên không cần mở cổng 5432 ra ngoài, bớt một bề mặt tấn công.
 
 ```bash
 cd xboss
@@ -45,6 +56,7 @@ npm install
 
 # Tạo file môi trường
 cp .env.example .env.local       # điền DATABASE_URL + XBOSS_SECRET
+# DATABASE_URL=postgresql://xboss:mật-khẩu-mạnh@localhost:5432/xboss  (nếu tự host Postgres)
 
 npm run build
 npm run db:seed                  # nạp dữ liệu lần đầu từ Excel
@@ -56,6 +68,10 @@ pm2 save && pm2 startup          # tự khởi động lại khi reboot
 ```
 
 Mặc định lắng nghe cổng 3000. Đổi cổng: `PORT=8080 pm2 start ...`.
+
+> Postgres tự host trên cùng VPS **không có backup tự động** như Supabase — bắt buộc thiết lập
+> `pg_dump` định kỳ trước khi đưa vào production, xem [Sao lưu & phục hồi DB](#sao-lưu--phục-hồi-db)
+> và [`docs/ops/backup.md`](./docs/ops/backup.md). Mất VPS đồng nghĩa mất cả app lẫn DB cùng lúc.
 
 ### Script một lệnh cho các lần cập nhật sau: `deploy.sh`
 
@@ -92,22 +108,20 @@ chạy chỉ bị dọn (`rm -rf .next-old`) khi health-check pass.
 - **Staging** (tập dượt migration/deploy đụng dữ liệu trước khi lên production, `deploy.sh
 --staging`): xem [`docs/ops/staging.md`](./docs/ops/staging.md).
 
----
+### Cron trên VPS (không dùng `vercel.json`)
 
-## Cách C — Vercel + Supabase (không cần server)
+Khi chạy hẳn trên VPS (không Vercel), **tất cả** cron đều gọi qua crontab hệ thống (không có
+cơ chế cron nội bộ nào khác) — kể cả báo cáo ngày/tuần trước đây chỉ khai trong `vercel.json`:
 
-1. Push repo lên GitHub.
-2. Vercel → New Project → import repo.
-3. Environment Variables: thêm `DATABASE_URL` (Supabase) + `XBOSS_SECRET`.
-4. Deploy. Seed dữ liệu chạy từ máy local: `npm run db:seed` (trỏ cùng DATABASE_URL).
+```
+0 8 * * *   curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://<APP_URL>/api/cron/daily-report
+0 8 * * 1   curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://<APP_URL>/api/cron/weekly-report
+```
 
-**Giới hạn Cron trên gói Hobby:** Vercel Hobby chỉ cho phép cron chạy **tối đa 1 lần/ngày**
-— `vercel.json` chỉ khai 2 cron phù hợp (`daily-report`, `weekly-report`). Các cron tần suất
-cao hơn (`deliver-webhooks` mỗi 5 phút, `sync-sheets`/`sync-integrations` hàng giờ,
-`refresh-views` mỗi 15 phút) **không khai trong `vercel.json`** vì sẽ làm deploy fail
-(`Hobby accounts are limited to daily cron jobs`) — gọi bằng dịch vụ cron ngoài miễn phí
-(vd cron-job.org, GitHub Actions `schedule`) trỏ tới URL kèm header
-`Authorization: Bearer $CRON_SECRET`, hoặc nâng gói Pro để khai thẳng trong `vercel.json`.
+Các cron còn lại (`sync-sheets`, `retention`, `deliver-webhooks`, `health-check`) xem lịch cụ
+thể ở mục [Đồng bộ hai chiều bảng vật tư ↔ Google Sheet](#đồng-bộ-hai-chiều-bảng-vật-tư--google-sheet-tuỳ-chọn)
+bên dưới — không còn giới hạn "tối đa 1 lần/ngày" như Vercel Hobby nên có thể chạy đúng tần suất
+khai trong tài liệu (hàng giờ/5 phút/...).
 
 ---
 

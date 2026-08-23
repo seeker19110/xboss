@@ -4,6 +4,15 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Hạ tầng: chốt VPS + pm2 là production chính, bỏ Vercel (2026-08-23)
+
+Người dùng chốt production chạy hẳn trên VPS tự host (Postgres cùng máy, quản lý process bằng
+pm2, cập nhật qua `deploy.sh`) — không còn dùng Vercel. Đã xoá `vercel.json` (chỉ có tác dụng khi
+deploy Vercel) và mục "Cách C — Vercel + Supabase" trong `DEPLOY.md`; bổ sung crontab
+`daily-report`/`weekly-report` (trước đây chỉ khai qua `vercel.json`) vào mục cron của Cách B.
+Các dòng nợ kỹ thuật cũ nhắc "`vercel.json` chỉ khai N/6 cron" hoặc "ảnh hưởng nếu deploy Cách
+C/Vercel" ở log bên dưới nay không còn áp dụng — giữ nguyên nội dung log lịch sử, không sửa lại.
+
 ## Nợ kỹ thuật — 8 file test tích hợp fail thật trên DB sạch (2026-08-23, cập nhật cùng ngày)
 
 Phát hiện khi chạy `npm test -- --release-gate` **1 lần trên Postgres 16 vừa migrate sạch**
