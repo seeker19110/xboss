@@ -24,7 +24,6 @@ import type { HoveredCadEntity, PurgeState } from "../types";
 
 interface CadViewportStudioProps {
   isAutoHealing: boolean;
-  healProgress: number;
   dxfData: DxfParseResult | null;
   canvasZoom: number;
   setCanvasZoom: Dispatch<SetStateAction<number>>;
@@ -59,7 +58,6 @@ interface CadViewportStudioProps {
 
 export default function CadViewportStudio({
   isAutoHealing,
-  healProgress,
   dxfData,
   canvasZoom,
   setCanvasZoom,
@@ -172,7 +170,7 @@ export default function CadViewportStudio({
             {isAutoHealing ? (
               <>
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>Đang Chuẩn Hóa {healProgress}%...</span>
+                <span>Đang Chuẩn Hóa...</span>
               </>
             ) : (
               <>

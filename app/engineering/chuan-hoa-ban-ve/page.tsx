@@ -204,7 +204,6 @@ export default function ChuanHoaBanVePage() {
         ══════════════════════════════════════════════════════════════════════ */}
         <CadViewportStudio
           isAutoHealing={autoHeal.isAutoHealing}
-          healProgress={autoHeal.healProgress}
           dxfData={source.dxfData}
           canvasZoom={viewport.canvasZoom}
           setCanvasZoom={viewport.setCanvasZoom}
@@ -242,8 +241,6 @@ export default function ChuanHoaBanVePage() {
           step1SubTab={step1SubTab}
           setStep1SubTab={setStep1SubTab}
           isAutoHealing={autoHeal.isAutoHealing}
-          healProgress={autoHeal.healProgress}
-          healStatusMessage={autoHeal.healStatusMessage}
           healCompleted={autoHeal.healCompleted}
           saveConfig={naming.saveConfig}
           totalHealthScore={health.totalHealthScore}
