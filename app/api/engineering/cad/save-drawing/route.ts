@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { queryOne, insertId, run } from "@/lib/db";
+import { validateDxf } from "@/lib/cad/dxf-parser";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,19 @@ export async function POST(req: NextRequest) {
       approverName = "Kỹ Sư Trưởng MEPF",
       approvalNotes = "Bản vẽ đã qua chuẩn hóa CAD 2D và kiểm tra chất lượng Gate 0.",
     } = body;
+
+    // Kiểm định cấu trúc DXF TRƯỚC mọi tác dụng phụ: sai cấu trúc thì không ghi tệp,
+    // không tạo bản ghi drawings/drawing_revisions (guardrail M98 §2).
+    const validation = validateDxf(typeof fileContent === "string" ? fileContent : "");
+    if (!validation.valid) {
+      return NextResponse.json(
+        {
+          error: "Nội dung DXF không hợp lệ — không lưu bản vẽ",
+          errors: validation.errors,
+        },
+        { status: 422 },
+      );
+    }
 
     const projectId = inputProjectId || (await getCurrentProjectId(user)) || 1;
 
