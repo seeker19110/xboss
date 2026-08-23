@@ -4,6 +4,12 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Gộp submodule mepf-worker vào XBoss (2026-08-23)
+
+- **Đã làm:** `mepf-worker/` chuyển từ **git submodule** (repo rời `MEPF-Agents`) thành **thư mục thường trong XBoss** — gộp phẳng (giữ nguyên trạng thái hiện tại tại commit `2144fc2`, không mang theo lịch sử 393 commit riêng của `MEPF-Agents`, repo gốc vẫn còn trên GitHub nếu cần tra lại). Đã xoá `.gitmodules`. `.gitignore` lồng sẵn trong `mepf-worker/.gitignore` vẫn hoạt động bình thường (loại `.venv/`, `__pycache__/`, dữ liệu chạy...).
+- **Lý do:** submodule khiến CI build Docker (`docker-build.yml`) **build với `mepf-worker/` rỗng** vì bước `actions/checkout@v4` không có `submodules: true` — gộp phẳng sửa luôn lỗi này, đồng thời cho phép PR chạm cả code XBoss lẫn `mepf-worker` đi trong **1 commit duy nhất** thay vì phải commit 2 repo + bump con trỏ submodule.
+- **Không đổi:** `Dockerfile.mepf-worker` (`COPY mepf-worker/ ./mepf-agent/`) hoạt động y nguyên, chỉ khác nguồn dữ liệu giờ nằm thẳng trong working tree XBoss thay vì phải `git submodule update --init` trước.
+
 ## Giai đoạn hiện tại
 
 - **GĐ 4–5 — Vận hành có kiểm soát & nâng chất lượng.** Sản phẩm đã chạy thật (v0.2.1, tự host VPS). Track Engineering OS nền tảng (ENG-1→ENG-4) đã hoàn tất về code, migration, API/UI và test; chưa có traffic thật từ MEPF-Agents nên chưa mở các tầng Digital Twin/Predictive OS/Controlled Autonomy.

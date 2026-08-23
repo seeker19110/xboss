@@ -312,6 +312,22 @@ def _run_cad_analyze(task: dict, report: Callable[[float], None]) -> dict:
         return _dry_run_handler(task, report)
 
 
+def _run_cad_export_r2000(task: dict, report: Callable[[float], None]) -> dict:
+    """Handler xuất bản vẽ DXF R2000 (AC1015) từ hợp đồng DrawingPayloadV1 bằng ezdxf."""
+    try:
+        sys.path.insert(0, "/app/mepf-agent/src")
+        from src.cad_export_r2000 import export_dxf_r2000  # type: ignore
+        payload = task.get("payload", {})
+
+        result = export_dxf_r2000(payload)
+        report(90.0)
+
+        return {**result, "worker_id": WORKER_ID}
+    except ImportError:
+        log.warning("MEPF-Agents cad_export_r2000 chưa cài — chạy dry_run.")
+        return _dry_run_handler(task, report)
+
+
 def _run_bim_clash(task: dict, report: Callable[[float], None]) -> dict:
     """Handler kiểm tra xung đột BIM/IFC."""
     try:
@@ -444,6 +460,7 @@ def _run_agent(task: dict, report: Callable[[float], None]) -> dict:
 TASK_HANDLERS: dict[str, Callable[[dict, Callable[[float], None]], dict]] = {
     "mepf.hvac.calc": _run_hvac_calc,
     "mepf.cad.analyze": _run_cad_analyze,
+    "mepf.cad.export_r2000": _run_cad_export_r2000,
     "mepf.bim.clash.detect": _run_bim_clash,
     "mepf.qs.takeoff": _run_qs_takeoff,
     "mepf.ff.hydraulics": _run_ff_hydraulics,

@@ -390,6 +390,8 @@ export interface DxfEntityRaw {
     points?: Array<[number, number, number]>;
     center?: [number, number, number];
     radius?: number;
+    startAngle?: number; // độ, dùng cho ARC
+    endAngle?: number; // độ, dùng cho ARC
   };
   textValue?: string;
   decodedText?: string;
