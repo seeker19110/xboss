@@ -4,15 +4,17 @@ import assert from "node:assert";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { CAN } from "@/lib/auth";
+import { DRAWING_SYSTEMS, drawingRoots, ensureAllDrawingTrees } from "@/lib/cad/drawing-tree";
 
 describe("CAD Standardized Drawing Storage & Directory Structure Suite", () => {
   it("1. Thư mục quy chuẩn drawings/ và data/uploads/drawings/ chứa đầy đủ các phân hệ, nhóm con và thư mục tạm (temp/)", () => {
-    const basePaths = [
-      join(process.cwd(), "drawings"),
-      join(process.cwd(), "data", "uploads", "drawings"),
-    ];
+    // Cây thư mục KHÔNG nằm trong git (drawings/ không track file nào, data/uploads/ bị
+    // .gitignore) nên checkout sạch không có sẵn — hệ thống phải tự dựng được. Gọi đúng
+    // helper mà route save-drawing dùng, rồi mới kiểm cấu trúc.
+    ensureAllDrawingTrees();
 
-    const systems = ["HVAC", "PLUMBING", "ELECTRICAL", "FIREFIGHTING", "ELV"];
+    const basePaths = drawingRoots();
+    const systems = DRAWING_SYSTEMS;
 
     for (const base of basePaths) {
       for (const sys of systems) {

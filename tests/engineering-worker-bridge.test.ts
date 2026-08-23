@@ -77,7 +77,10 @@ test(
     assert.ok(bridgeRes.sourceRevisionId, "Phải sinh sourceRevisionId");
     assert.equal(bridgeRes.createdObjectIds.length, 2, "Phải sinh đúng 2 objects");
     assert.ok(bridgeRes.suggestionId, "Phải sinh suggestionId");
-    assert.ok(bridgeRes.workflowId, "Phải sinh workflowId");
+    // Gate 0 (§8) cấm lập workflow từ đề xuất chưa được chấp nhận — đề xuất do worker sinh
+    // ra luôn ở trạng thái chờ duyệt, nên bridge KHÔNG tạo workflow ở bước này. Workflow
+    // được lập sau, khi người duyệt chấp nhận đề xuất (ENG-2).
+    assert.equal(bridgeRes.workflowId, null, "Chưa được lập workflow khi đề xuất chưa chấp nhận");
     assert.ok(bridgeRes.summary.includes("thành công"));
   },
 );

@@ -13,9 +13,53 @@ deploy Vercel) và mục "Cách C — Vercel + Supabase" trong `DEPLOY.md`; bổ
 Các dòng nợ kỹ thuật cũ nhắc "`vercel.json` chỉ khai N/6 cron" hoặc "ảnh hưởng nếu deploy Cách
 C/Vercel" ở log bên dưới nay không còn áp dụng — giữ nguyên nội dung log lịch sử, không sửa lại.
 
-## Nợ kỹ thuật mới phát hiện — 8 file test tích hợp fail thật trên DB sạch (2026-08-23)
+## ĐÃ SỬA — 8 file test tích hợp fail trên DB sạch (2026-08-23)
 
-**Chưa sửa, cố ý — người dùng chốt "tạo task riêng, chưa sửa ngay".** Phát hiện khi chạy
+**Trạng thái: đã đóng.** Cả 8 file đã sửa và verify xanh (24/24 ca) trên Postgres 16 sạch, kèm
+`npm run lint` + `npm run typecheck` xanh.
+
+**Nguyên nhân gốc chung:** các module track "Vision Complete" (`engineering-graph`,
+`engineering-twin`, `engineering-predictions`, `engineering-prescriptive`,
+`engineering-twin-pinnacle`) truy vấn **cột không tồn tại trong schema thật** — tức các hàm này
+**chưa từng chạy thành công** kể từ khi viết (không phải "test viết trước cho schema dự kiến"
+như nghi vấn ban đầu). Hướng đã chọn: **bám schema thật, KHÔNG thêm migration** — các hàm chưa
+có dữ liệu phụ thuộc, thêm cột mới chỉ tạo cột NULL vô dụng trên production.
+
+Ánh xạ đã áp dụng:
+
+- `engineering_source_revisions`: không có `revision_name` → dựng nhãn từ `revision_no` thật
+  (giữ nguyên hợp đồng kiểu `revisionName: string | null` mà UI đang dùng).
+- `engineering_objects`: không có `code`/`metadata` → dùng `external_key`/`properties`.
+- `engineering_suggestions`: khoá object là `object_id` (không phải `target_object_id`); mức rủi
+  ro dùng `severity` (không có `risk_level`).
+- `engineering_workflows`: **không tham chiếu object trực tiếp** → nối qua `suggestion_id`.
+- `tasks`: **không có `project_id`** → nối qua `work_packages → sheet_types → towers`;
+  `progress_percent` là tỷ lệ **[0,1]** (ràng buộc `chk_tasks_progress`), không phải phần trăm;
+  trạng thái trễ là slug `tre`, không phải `delayed`.
+- `engineering_fidic_claims` (M79): sửa `title`/`executive_summary`/`eot_days_requested`/
+  `cost_claim_amount`/`dossier_markdown` → `event_title`/`eot_days_claimed`/`cost_claimed_vnd`/
+  `dossier_content`; bổ sung 2 cột NOT NULL bị bỏ sót (`event_date`, `notice_date`); sửa
+  `ON CONFLICT (project_id, claim_code)` → `ON CONFLICT (claim_code)` (UNIQUE đơn). Kèm **lỗi
+  bind-param** cùng lớp đã ghi nhận trước đây: `query`/`queryOne` là variadic `(sql, ...params)`
+  nhưng 3 chỗ trong `lib/contracts-fidic.ts` truyền mảng — đã sửa sang spread.
+- `engineering-worker-bridge` ("Gate 0 không đạt"): **người dùng chốt giữ nguyên Gate 0.** Bridge
+  KHÔNG tự tạo workflow và KHÔNG tự `accept` thay người (làm vậy là vô hiệu hoá chốt kiểm soát
+  ENG-2 — §8 quy định "đề xuất chưa ai đồng ý thì không được lập approval request"). Bridge nay
+  trả `workflowId = null` kèm thông điệp rõ; workflow chỉ lập khi người duyệt chấp nhận đề xuất.
+- `engineering-cad-save-drawing`: test kiểm cây thư mục tĩnh, nhưng `drawings/` **không được git
+  track dòng nào** và `data/uploads/` nằm trong `.gitignore` → checkout sạch không thể có sẵn
+  (thêm `.gitkeep` cũng không cứu được nhánh `data/uploads/`). Sửa bằng nguồn khai báo duy nhất
+  `lib/cad/drawing-tree.ts` (`DRAWING_SYSTEMS`/`DRAWING_SUBDIRS`/`ensureAllDrawingTrees`); route
+  `save-drawing` gọi để cây chuẩn luôn tồn tại khi chạy thật, test gọi đúng helper đó trước khi kiểm.
+
+Dọn kèm: bỏ hard-code `projectId = 1` còn sót trong `engineering-fidic-claim.test.ts` (cùng lớp
+lỗi đã sửa cho 10 file khác ở đợt 2026-08-22); bổ sung dọn chuỗi WBS trong
+`engineering-predictions.test.ts` vì `towers.project_id` không có `ON DELETE CASCADE`.
+
+<details>
+<summary>Ghi nhận gốc lúc mới phát hiện (giữ nguyên để đối chiếu)</summary>
+
+**Phát hiện khi chạy
 `npm test -- --release-gate` **1 lần trên Postgres 16 vừa migrate sạch** (không phải môi trường
 tích luỹ dữ liệu cũ) để xác nhận migration `0089`/`0091`/`0092`, đối chiếu thêm bằng log CI thật
 của PR #370 trên GitHub Actions (cùng kết quả, không phải lỗi máy cục bộ). Không file nào thuộc
@@ -44,6 +88,11 @@ Draft/conditional) — có khả năng test được viết trước cho schema 
 đã đổi tên cột sau đó mà không cập nhật lại test/code liên quan, hoặc ngược lại. Cần đọc lại
 migration liên quan (`0084`–`0087` và các bản OS-* nếu có) đối chiếu với code/test trước khi sửa,
 không đoán hướng nào đúng.
+
+_Kết luận sau khi điều tra: nghi vấn trên **sai** — không có migration nào từng định nghĩa các
+cột đó, tức code lib mới là bên lệch, không phải test viết trước cho schema tương lai._
+
+</details>
 
 ## M99 PR1 — Rule pack chuẩn hóa CAD v1 + endpoint (2026-08-23)
 

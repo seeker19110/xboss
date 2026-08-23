@@ -89,8 +89,10 @@ test("M79: Time Impact Analysis (TIA) & Sinh Văn Bản Hồ Sơ Khiếu Nại F
 });
 
 test("M79: Vòng đời FIDIC Claim trong DB", { skip: !HAS_DB }, async () => {
-  const projectId = 1;
-  const claimCode = "CLM-DB-TEST-01";
+  const { insertId, run } = await import("@/lib/db");
+  // Không hard-code projectId = 1 — DB test sạch chưa có dòng nào (quy ước chung của repo).
+  const projectId = await insertId(`INSERT INTO projects (name) VALUES ('FIDIC Claim Proj')`);
+  const claimCode = `CLM-DB-TEST-${projectId}`;
 
   const claim = await createFidicClaim({
     projectId,
@@ -112,4 +114,6 @@ test("M79: Vòng đời FIDIC Claim trong DB", { skip: !HAS_DB }, async () => {
 
   const list = await listFidicClaims(projectId);
   assert.ok(list.length >= 1);
+
+  await run(`DELETE FROM projects WHERE id = ?`, projectId);
 });

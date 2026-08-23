@@ -267,9 +267,23 @@ export async function bridgeTaskResultToEngineering(params: {
         }
       }
 
-      // 5. Khởi tạo Workflow Phê Duyệt Gate 0 (ENG-3)
+      // 5. Khởi tạo Workflow Phê Duyệt Gate 0 (ENG-3).
+      // Gate 0 (§8) cấm lập workflow từ đề xuất chưa ai chấp nhận: ENG-2 quyết định trước,
+      // ENG-3 mới lập kế hoạch thực hiện. Đề xuất do worker sinh ra luôn ở trạng thái chờ
+      // duyệt, nên bridge KHÔNG tự tạo workflow ở đây (và không tự accept thay người —
+      // làm vậy là vô hiệu hoá chốt kiểm soát). Workflow sẽ được lập khi người duyệt
+      // chấp nhận đề xuất.
       let workflowId: string | null = null;
-      if (suggestionId) {
+      const suggestionAccepted = suggestionId
+        ? (
+            await queryOne<{ status: string }>(
+              `SELECT status FROM engineering_suggestions WHERE id = ? AND project_id = ?`,
+              suggestionId,
+              projectId,
+            )
+          )?.status === "accepted"
+        : false;
+      if (suggestionId && suggestionAccepted) {
         const workflow = await createWorkflow(projectId, userId, {
           suggestionId,
           title: `Phê duyệt kết quả ${taskType} [${task.id.slice(0, 8)}]`,
@@ -317,7 +331,9 @@ export async function bridgeTaskResultToEngineering(params: {
         createdObjectIds,
         suggestionId,
         workflowId,
-        summary: `Đã chuyển đổi thành công ${createdObjectIds.length} đối tượng kỹ thuật, 1 đề xuất ENG-2 và luồng duyệt Gate 0 (${workflowId || "N/A"}).`,
+        summary: workflowId
+          ? `Đã chuyển đổi thành công ${createdObjectIds.length} đối tượng kỹ thuật, 1 đề xuất ENG-2 và luồng duyệt Gate 0 (${workflowId}).`
+          : `Đã chuyển đổi thành công ${createdObjectIds.length} đối tượng kỹ thuật và 1 đề xuất ENG-2. Chưa lập luồng duyệt — đề xuất cần được chấp nhận (ENG-2) trước.`,
       };
     },
     { readOnly: false },

@@ -5,6 +5,7 @@ import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { queryOne, insertId, run } from "@/lib/db";
 import { validateDxf } from "@/lib/cad/dxf-parser";
+import { ensureAllDrawingTrees } from "@/lib/cad/drawing-tree";
 
 export const dynamic = "force-dynamic";
 
@@ -101,6 +102,10 @@ export async function POST(req: NextRequest) {
         relativeSubPath = join(cSys, "design", "iso");
       }
     }
+
+    // Đảm bảo cây thư mục quy chuẩn tồn tại đầy đủ (idempotent) — không chỉ nhánh đang ghi,
+    // để cấu trúc ISO 19650 nhất quán trên mọi môi trường. Xem lib/cad/drawing-tree.ts.
+    ensureAllDrawingTrees();
 
     // 1. Ghi tệp vào data/uploads/drawings/
     const dataUploadsDir = join(process.cwd(), "data", "uploads", "drawings", relativeSubPath);
