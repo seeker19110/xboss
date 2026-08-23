@@ -179,7 +179,7 @@ export async function POST(req: NextRequest) {
     );
 
     let revisionId = existingRev?.id;
-    const revStatus = isApproved ? "approved" : "pending";
+    const revStatus = isApproved ? "approved" : "submitted";
     const noteText = isApproved
       ? `[Phê duyệt Gate 0 - ${approverName}]: ${approvalNotes}`
       : `[Lưu Tạm Thời Chờ Duyệt - ${user.name || "Kỹ Sư"}]: ${approvalNotes}`;

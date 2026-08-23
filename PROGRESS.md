@@ -43,11 +43,45 @@
 
 - **Ghi chú:** chặng ngắn hạn trước M99, các đặc tả `M98`/`M99` trong `docs/nang-cap/` vẫn ở trạng thái **Draft**, chưa đóng.
 
-**Nợ kỹ thuật phát hiện (chưa sửa):**
+**Việc 7.5 — Sửa `drawing_revisions.status = 'pending'` vi phạm CHECK (2026-08-23).** Đổi
+`revStatus = isApproved ? "approved" : "pending"` → `"submitted"` (giá trị đã hợp lệ trong CHECK,
+đúng nghĩa "đã nộp, chờ duyệt"), không cần migration. **Đính chính:** phát hiện trước đó về
+`drawings.kind = 'design'` vi phạm CHECK là **false positive** — `migrations/0048_drawing_kind_design.sql`
+đã nới constraint này từ trước, chỉ đúng phần `drawing_revisions.status` là bug thật. Thêm test tích
+hợp trên `TEST_DATABASE_URL` thật trong `tests/engineering-cad-save-drawing.test.ts`: xác nhận
+insert `status='submitted'` thành công + test hồi quy xác nhận `status='pending'` vẫn bị Postgres bác
+(mã lỗi CHECK `23514`) nếu ai lỡ sửa lại.
 
-1. `app/api/engineering/cad/save-drawing/route.ts` insert `drawing_revisions.status = 'pending'` nhưng ràng buộc DB `CHECK` chỉ nhận `submitted|commented|approved|approved_with_comments|rejected|superseded` → lưu bản vẽ chưa duyệt bị **500** sau khi đã ghi file và tạo dòng `drawings` (dữ liệu mồ côi). Đã kiểm chứng trên DB thật, chưa sửa.
-2. `normalizeCadLayers` trong `lib/cad/dxf-parser.ts` khớp chuỗi con quá rộng: layer chứa "CÁP" (cáp điện) rơi nhầm vào nhánh ống nước vì từ khoá `"CAP"` (ý là "cấp nước") — vd `MANG_CAP_DIEN` → `P-PIPE-DOMW` thay vì `E-TRAY-PWRR`; tương tự `ONG_THOAT_SAN` → `M-DUCT-SUPP` vì `"THOAT"` chứa `"OA"`. Cần siết theo ranh giới token và cho nhánh điện/ELV chạy trước nhánh ống nước.
+**Việc 7.6 — Siết `normalizeCadLayers` theo ranh giới token (2026-08-23).** Thay `String.includes()`
+thô bằng `hasToken`/`hasAnyToken` (khớp có ranh giới 2 phía, ký tự trong từ = chữ hoặc số, phân tách
+bằng `_`/`-`/khoảng trắng/dấu chấm) trong `lib/cad/dxf-parser.ts`; đổi thứ tự nhánh thành
+`DUCT → ELEC → ELV → PIPE → FIRE → STRUCT → ANNO` (đưa `ELEC`/`ELV` lên trước `PIPE`) — sửa đúng 2 ca
+xác nhận sai (`MANG_CAP_DIEN` từng → `P-PIPE-DOMW` do khớp nhầm `"CAP"`, `ONG_THOAT_SAN` từng →
+`M-DUCT-SUPP` do `"THOAT"` chứa `"OA"`), không đổi từ khoá/tên layer đích nào. Kiểm chứng qua đường
+thật `parseDxf()` + đối chứng cũ↔mới trên corpus ~1.900 chuỗi layer thực tế.
+
+- **Hồi quy phát sinh do siết ranh giới (chưa sửa, cần quyết định riêng):** một số layer trước đây
+  khớp **nhờ khớp tiền tố/hậu tố** (vd `CHILLER` khớp nhờ chứa tiền tố `CHILL`, `ELECTRICAL` nhờ tiền
+  tố `ELEC`, `ANNOTATION`/`DIMENSION` nhờ `ANNO`/`DIM`, `COLUMN`/`BEAMS` nhờ `COL`/`BEAM`, layer có số
+  dính liền như `DUCT1`/`SA1`) nay **không còn khớp** (rơi về "chưa chuẩn hoá", không sai hệ — trừ
+  nhóm `CHILLER*` đổi hẳn từ `M-CHW-PIPE` (đúng) sang `P-PIPE-DOMW` (sai hệ), là ca nặng nhất). Sửa
+  cần bổ sung biến thể vào danh sách từ khoá hoặc nới quy tắc "tiền tố ≥ 4 ký tự" — cả hai đều vượt
+  ranh giới đã chốt của Việc 7.6 (cấm đổi danh sách từ khoá), nên chưa làm.
+- **Sai có sẵn, không do Việc 7.6 gây ra, chưa sửa:** `FIRE_PIPE`/`PIPE_PCCC` rơi vào nhánh `PIPE` vì
+  đứng trước `FIRE`; `ELV-CABL-TRAY` rơi vào nhánh `ELEC` vì `TRAY` đứng trước `ELV`; hàm **không
+  idempotent** (áp lại lên tên đã chuẩn hoá cho kết quả khác, vd `P-PIPE-SANR → P-PIPE-DOMW`); bộ đếm
+  chẩn đoán trong `parseDxf` (`hvacCount`/`elecCount`/...) vẫn dùng `includes()` thô, nay lệch luật so
+  với bảng ánh xạ layer.
+- **7 file test có sẵn fail khi chạy trên DB thật lệch migration** (`engineering-fidic-claim`,
+  `engineering-graph`, `engineering-predictions`, `engineering-prescriptive`,
+  `engineering-twin-pinnacle`, `engineering-twin`, `engineering-worker-bridge`) — không liên quan CAD
+  (đã xác nhận không file nào import `lib/cad/*`), đòi cột DB chưa có migration nào định nghĩa (vd
+  `title`, `revision_name`, `metadata` trên vài bảng `engineering_*`). Không thuộc phạm vi Việc 7.
+
 3. Test cho RBAC của `save-drawing` hiện chỉ kiểm bảng `CAN`, chưa gọi được route handler thật để khẳng định status 403 — do `getCurrentUser()` gọi `headers()` của `next/headers`, không chạy được ngoài request scope, và repo chưa bật `--experimental-test-module-mocks` trong `scripts/run-tests.mjs`.
+
+- **Verify (7.5+7.6):** `npm run lint` + `npm run typecheck` + `npm run build` xanh; `npm test` 209
+  file, 0 fail (chạy không DB — test tích hợp tự skip; đã verify riêng trên DB thật ở từng việc).
 
 ## Giai đoạn hiện tại
 

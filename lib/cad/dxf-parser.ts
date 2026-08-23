@@ -264,85 +264,74 @@ export function convertVniToUnicode(text: string): string {
   return result;
 }
 
+/** Ký tự cấu thành một "từ" trong tên layer CAD; mọi ký tự khác (`_`, `-`, khoảng trắng, dấu chấm…)
+ *  đều được coi là ranh giới token. */
+const LAYER_WORD_CHAR = /[A-Z0-9]/;
+
+/**
+ * Khớp từ khóa theo ranh giới token thay vì `includes()` thô: từ khóa phải đứng riêng (ở đầu/cuối
+ * tên layer hoặc kẹp giữa ký tự phân tách). Tránh bắt nhầm chuỗi con nằm giữa một từ khác nghĩa —
+ * vd `"OA"` (outside air) là chuỗi con của `"THOAT"` (ống thoát).
+ * Tên layer truyền vào phải đã upper-case.
+ */
+function hasToken(l: string, token: string): boolean {
+  let from = 0;
+  for (;;) {
+    const at = l.indexOf(token, from);
+    if (at < 0) return false;
+    const before = at > 0 ? (l[at - 1] ?? "") : "";
+    const after = l[at + token.length] ?? "";
+    if (!LAYER_WORD_CHAR.test(before) && !LAYER_WORD_CHAR.test(after)) return true;
+    from = at + 1;
+  }
+}
+
+/** Đúng khi tên layer chứa ít nhất một trong các từ khóa (theo ranh giới token). */
+function hasAnyToken(l: string, tokens: readonly string[]): boolean {
+  return tokens.some((token) => hasToken(l, token));
+}
+
 /**
  * Chuẩn hóa tên layer AutoCAD về chuẩn AIA / BS1192 / ISO 13567 cho 5 phân hệ MEPF.
+ *
+ * Thứ tự nhánh: gió → điện nặng → ELV → ống nước → PCCC → kết cấu → ghi chú. Điện/ELV phải kiểm
+ * TRƯỚC ống nước vì `"CAP"` (ý định: nước cấp) cũng là một token hợp lệ trong `"MANG_CAP_DIEN"` /
+ * `"MANG_CAP_ELV"`, nơi nó mang nghĩa "cáp" chứ không phải "cấp".
  */
 export function normalizeCadLayers(layers: string[]): Record<string, string> {
   const mapping: Record<string, string> = {};
 
   for (const layer of layers) {
     const l = layer.toUpperCase();
-    if (
-      l.includes("DUCT") ||
-      l.includes("GIO") ||
-      l.includes("AHU") ||
-      l.includes("FCU") ||
-      l.includes("SA") ||
-      l.includes("RA") ||
-      l.includes("EA") ||
-      l.includes("OA")
-    ) {
-      if (l.includes("RETN") || l.includes("HOI") || l.includes("RA")) {
+    if (hasAnyToken(l, ["DUCT", "GIO", "AHU", "FCU", "SA", "RA", "EA", "OA"])) {
+      if (hasAnyToken(l, ["RETN", "HOI", "RA"])) {
         mapping[layer] = "M-DUCT-RETN";
-      } else if (l.includes("EXHAUST") || l.includes("THAI") || l.includes("EA")) {
+      } else if (hasAnyToken(l, ["EXHAUST", "THAI", "EA"])) {
         mapping[layer] = "M-DUCT-EXHT";
       } else {
         mapping[layer] = "M-DUCT-SUPP";
       }
-    } else if (
-      l.includes("PIPE") ||
-      l.includes("NUOC") ||
-      l.includes("SAN") ||
-      l.includes("CAP") ||
-      l.includes("THOAT") ||
-      l.includes("CHILLER") ||
-      l.includes("CW")
-    ) {
-      if (l.includes("DRAIN") || l.includes("THOAT") || l.includes("SAN")) {
-        mapping[layer] = "P-PIPE-SANR";
-      } else if (l.includes("CHILL") || l.includes("CHW") || l.includes("LANH")) {
-        mapping[layer] = "M-CHW-PIPE";
-      } else {
-        mapping[layer] = "P-PIPE-DOMW";
-      }
-    } else if (
-      l.includes("ELEC") ||
-      l.includes("TRAY") ||
-      l.includes("DIEN") ||
-      l.includes("PWR") ||
-      l.includes("LTG")
-    ) {
-      if (l.includes("LTG") || l.includes("CHIEU") || l.includes("SANG")) {
+    } else if (hasAnyToken(l, ["ELEC", "TRAY", "DIEN", "PWR", "LTG"])) {
+      if (hasAnyToken(l, ["LTG", "CHIEU", "SANG"])) {
         mapping[layer] = "E-LTNG-CKTS";
       } else {
         mapping[layer] = "E-TRAY-PWRR";
       }
-    } else if (
-      l.includes("FIRE") ||
-      l.includes("PCCC") ||
-      l.includes("SPK") ||
-      l.includes("HYDRANT")
-    ) {
-      mapping[layer] = "F-SPRN-PIPE";
-    } else if (
-      l.includes("ELV") ||
-      l.includes("TEL") ||
-      l.includes("DATA") ||
-      l.includes("LAN") ||
-      l.includes("CCTV") ||
-      l.includes("BMS")
-    ) {
+    } else if (hasAnyToken(l, ["ELV", "TEL", "DATA", "LAN", "CCTV", "BMS"])) {
       mapping[layer] = "ELV-CABL-TRAY";
-    } else if (
-      l.includes("GRID") ||
-      l.includes("TRUC") ||
-      l.includes("DAM") ||
-      l.includes("COT") ||
-      l.includes("BEAM") ||
-      l.includes("COL")
-    ) {
+    } else if (hasAnyToken(l, ["PIPE", "NUOC", "SAN", "CAP", "THOAT", "CHILLER", "CW"])) {
+      if (hasAnyToken(l, ["DRAIN", "THOAT", "SAN"])) {
+        mapping[layer] = "P-PIPE-SANR";
+      } else if (hasAnyToken(l, ["CHILL", "CHW", "LANH"])) {
+        mapping[layer] = "M-CHW-PIPE";
+      } else {
+        mapping[layer] = "P-PIPE-DOMW";
+      }
+    } else if (hasAnyToken(l, ["FIRE", "PCCC", "SPK", "HYDRANT"])) {
+      mapping[layer] = "F-SPRN-PIPE";
+    } else if (hasAnyToken(l, ["GRID", "TRUC", "DAM", "COT", "BEAM", "COL"])) {
       mapping[layer] = "S-GRID-COLS";
-    } else if (l.includes("TEXT") || l.includes("DIM") || l.includes("GHI") || l.includes("ANNO")) {
+    } else if (hasAnyToken(l, ["TEXT", "DIM", "GHI", "ANNO"])) {
       mapping[layer] = "G-ANNO-TEXT";
     } else {
       mapping[layer] = layer;

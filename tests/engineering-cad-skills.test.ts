@@ -119,9 +119,19 @@ test("M65: normalizeCadLayers ánh xạ chuẩn hóa layer theo chuẩn AIA/MEPF
   assert.equal(mapping["ONG_GIO_THAI_WC"], "M-DUCT-EXHT");
   // Ống nước lạnh vào nhánh chiller thay vì gộp chung với ống thoát như bản trùng lặp cũ
   assert.equal(mapping["ONG_NUOC_LANH"], "M-CHW-PIPE");
-  // Hạn chế đã biết của nguồn chuẩn: từ khóa "CAP" khớp nhánh ống nước trước nhánh điện
-  assert.equal(mapping["MANG_CAP_DIEN"], "P-PIPE-DOMW");
+  // Máng cáp điện vào nhánh điện: nhánh điện được kiểm trước nhánh ống nước (xem test dưới)
+  assert.equal(mapping["MANG_CAP_DIEN"], "E-TRAY-PWRR");
   assert.equal(mapping["DUONG_ONG_PCCC_SPK"], "F-SPRN-PIPE");
+});
+
+test("M99: normalizeCadLayers khớp từ khóa theo ranh giới token, không bắt nhầm chuỗi con", () => {
+  const mapping = normalizeCadLayers(["MANG_CAP_DIEN", "ONG_THOAT_SAN"]);
+
+  // "CAP" (ý định: nước cấp) cũng là token của "MANG_CAP_DIEN" nhưng ở đây nghĩa là "cáp" →
+  // nhánh điện phải được kiểm trước nhánh ống nước
+  assert.equal(mapping["MANG_CAP_DIEN"], "E-TRAY-PWRR");
+  // "OA" (outside air) chỉ là chuỗi con giữa từ "THOAT", không phải token → không rơi vào nhánh gió
+  assert.equal(mapping["ONG_THOAT_SAN"], "P-PIPE-SANR");
 });
 
 test("M65: extrude2dPolylineTo3d đùn khối 3D Bounding Box từ polyline và cao độ", () => {
