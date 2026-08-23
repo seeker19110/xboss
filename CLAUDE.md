@@ -96,6 +96,11 @@ chéo nhau nhưng **không được tạo chu trình**. `npm run check:lib-layer
 | 4    | `lib/hien-truong/` | hse, diary, hr, subcontractors, meetings, handover, warranty, risks…                                       |
 | 4    | `lib/ky-thuat/`    | toàn bộ `engineering-*`, `bim/`, `cad/`, drawings, qaqc, tech                                              |
 | 4    | `lib/van-hanh/`    | alerts, push, notification-prefs, health                                                                   |
+| 5    | `lib/dich-vu/`     | Logic **phối hợp từ 2 miền trở lên** (ADR-0008) — không phải sọt rác cho code khó xếp                      |
+
+**Route handler chỉ là ranh giới HTTP** (ADR-0008): kiểm phiên/quyền, đọc tham số, gọi dịch vụ,
+bọc `NextResponse`. Logic nghiệp vụ nằm ở `lib/<miền>/`; logic cần **từ 2 miền trở lên** nằm ở
+`lib/dich-vu/` và **không được biết gì về HTTP** (trả dữ liệu thuần, không trả `NextResponse`).
 
 **Thêm module mới:** đặt vào đúng miền theo _nó nói về cái gì_, không theo _nó là loại gì_
 (đừng tạo `utils/`). Cần dùng chung giữa nhiều miền → đẩy **xuống** `nen/` (nếu thuần) hoặc

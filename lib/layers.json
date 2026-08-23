@@ -1,5 +1,7 @@
 {
-  "_": "Bản đồ tầng của lib/ — nguồn sự thật cho scripts/check-lib-layers.ts và docs/adr/0007-lib-theo-mien.md. Số tầng nhỏ hơn = nền hơn. Một thư mục CHỈ được import xuống tầng thấp hơn mình; riêng các miền nghiệp vụ (cùng tầng 4) được import chéo nhau, miễn không tạo chu trình.",
+  "_": "Bản đồ tầng của lib/ — nguồn sự thật cho scripts/check-lib-layers.ts và docs/adr/0007-lib-theo-mien.md. Số tầng nhỏ hơn = nền hơn. Một thư mục CHỈ được import xuống tầng thấp hơn mình; riêng các miền nghiệp vụ (cùng tầng 4) được import chéo nhau, miễn không tạo chu trình. Tầng 5 dich-vu/ là nơi đặt các hàm PHỐI HỢP nhiều miền — xem ADR-0008.",
+  "_cross_layer": 4,
+  "_cross_layer_note": "Tầng mà các thư mục cùng tầng được phép import chéo nhau (các miền nghiệp vụ) — vẫn cấm chu trình. Mọi tầng khác: chỉ import xuống tầng thấp hơn.",
   "nen": 0,
   "db": 1,
   "ha-tang": 2,
@@ -11,6 +13,5 @@
   "vat-tu": 4,
   "hien-truong": 4,
   "ky-thuat": 4,
-  "_baseline_cycles": ["hien-truong <-> tai-chinh"],
-  "_baseline_note": "Chu trình còn tồn đọng, ĐÃ BIẾT, chỉ để CI không đỏ vì nợ cũ — cổng vẫn chặn chu trình MỚI. Nguyên nhân: lib/tai-chinh/finance.ts gọi attendanceSummary (hien-truong/hr) để tính lương, trong khi hien-truong/subcontractors.ts + documents-hub.ts gọi ngược sang tai-chinh/contracts + vo. Phá đúng cách là đảo hướng bằng một service cấp trên phối hợp cả hai miền (Đợt 3 — tách tầng service), không phải chuyển file. Khi Đợt 3 xử lý xong thì XOÁ mục này."
+  "dich-vu": 5
 }

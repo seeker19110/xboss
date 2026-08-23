@@ -5,12 +5,12 @@
 // lib/contracts.ts, KHÔNG lặp công thức). Xem docs/nang-cap/M27-tai-chinh-ke-toan.md.
 import { query, queryOne } from "@/lib/db";
 import { listContracts } from "@/lib/tai-chinh/contracts";
-import { attendanceSummary } from "@/lib/hien-truong/hr";
 import { daysFromTodayISO } from "@/lib/nen/date";
 import { parseMoney, moneyToNumber } from "@/lib/nen/money";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const PERIOD_RE = /^\d{4}-\d{2}$/;
+// Định dạng kỳ lương "YYYY-MM" — export để lib/dich-vu/luong.ts dùng chung một luật.
+export const PERIOD_RE = /^\d{4}-\d{2}$/;
 
 // --- Dòng tiền thực tế (quỹ tiền mặt + petty cash) ---------------------------------
 
@@ -301,27 +301,9 @@ export async function payrollTotals(period: string, projectId?: number): Promise
 
 export type PayrollSuggestion = { personnelId: number; personnelName: string; workdays: number };
 
-// Gợi ý công/lương từ chấm công (M24 attendance) theo kỳ 'YYYY-MM' — chỉ gộp chấm công
-// theo NGƯỜI (personnel_id NOT NULL, tái dùng attendanceSummary lib/hr.ts); chấm công
-// theo tổ (headcount gộp) không tách được người cụ thể nên không đưa vào gợi ý — người
-// dùng nhập tay các trường hợp này (đúng tinh thần "nhập tay nếu cần" của đặc tả).
-// KHÔNG ghi vào bảng payroll — chỉ trả gợi ý để người dùng xác nhận/chỉnh trước khi lưu.
-export async function payrollFromAttendance(
-  period: string,
-  projectId?: number,
-): Promise<PayrollSuggestion[]> {
-  if (!PERIOD_RE.test(period)) throw new Error("Kỳ lương phải đúng định dạng YYYY-MM");
-  const [y, m] = period.split("-").map(Number);
-  const from = `${period}-01`;
-  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  const to = `${period}-${String(lastDay).padStart(2, "0")}`;
-  const rows = await attendanceSummary(projectId, from, to);
-  return rows.map((r) => ({
-    personnelId: r.personnelId,
-    personnelName: r.personnelName,
-    workdays: r.daysPresent,
-  }));
-}
+// payrollFromAttendance() đã chuyển sang lib/dich-vu/luong.ts (ADR-0008): nó phối hợp
+// chấm công (miền hien-truong) với quy tắc kỳ lương (miền này), nên để ở đây thì miền
+// tài chính phải biết về miền hiện trường — tạo phụ thuộc vòng giữa hai miền.
 
 // --- Thông báo tạm ứng quá hạn hoàn ứng ---------------------------------------------
 

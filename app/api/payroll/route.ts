@@ -2,12 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { insertId, query, queryOne, withProjectScope } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
-import {
-  parsePayrollBody,
-  validatePayrollInput,
-  payrollFromAttendance,
-  type PayrollInput,
-} from "@/lib/tai-chinh/finance";
+import { parsePayrollBody, validatePayrollInput, type PayrollInput } from "@/lib/tai-chinh/finance";
+import { payrollFromAttendance } from "@/lib/dich-vu/luong";
 import { stripSensitive } from "@/lib/bao-mat/sensitive-fields";
 
 export const dynamic = "force-dynamic";

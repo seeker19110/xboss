@@ -96,3 +96,19 @@ là thiếu lớp thuần để test đơn vị vẫn còn đó).
 
 \* Đợt 2 rủi ro _logic_ thấp (chỉ đổi vị trí file + đường import, không đổi hành vi)
 nhưng diff rất rộng — phải verify bằng lint + typecheck + build + toàn bộ test.
+
+## 6. Kết quả Đợt 3
+
+- `lib/dich-vu/luong.ts` ← `payrollFromAttendance()`: **chu trình `hien-truong ↔ tai-chinh`
+  đã bị phá thật**, `_baseline_cycles` trong `lib/layers.json` đã xoá. Cổng CI nay xanh mà
+  **không còn miễn trừ nào** — đây là bằng chứng, không phải khai báo.
+- `lib/dich-vu/thong-bao.ts` ← `syncAndListNotifications()` (~1.080 dòng, import hơn 20 miền):
+  `app/api/notifications/route.ts` từ **1.166 → 47 dòng**, chỉ còn kiểm phiên + gọi dịch vụ +
+  bọc `NextResponse`.
+
+Verify Đợt 3: lint + typecheck + build xanh; **1084 ca pass / 0 fail** trên Postgres 16 sạch;
+cổng `check:lib-layers` và `check:dead-code` xanh.
+
+**Còn lại (Đợt 4, chưa mở):** 24 file > 1000 LOC và phần lớn trong ~500 route vẫn còn nghiệp
+vụ nằm trong handler. Khuôn mẫu đã có (ADR-0008) và đã chạy thật trên 2 ca; việc còn lại là
+lặp lại nó — nhưng đó là công việc nhiều tuần, không nên gộp vào một PR.

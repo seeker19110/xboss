@@ -22,11 +22,13 @@ const raw = JSON.parse(readFileSync(join(root, "lib/layers.json"), "utf8")) as R
   unknown
 >;
 /** Chu trình nợ cũ đã biết, dạng "a <-> b" — chỉ miễn cho đúng những cặp này (xem lib/layers.json). */
+/** Chu trình nợ cũ đã biết, dạng "a <-> b" — để trống là không còn nợ nào (xem lib/layers.json). */
 const baseline = new Set((raw._baseline_cycles as string[] | undefined) ?? []);
 const layers: Record<string, number> = Object.fromEntries(
   Object.entries(raw).filter(([k, v]) => !k.startsWith("_") && typeof v === "number"),
 ) as Record<string, number>;
-const TOP = Math.max(...Object.values(layers).filter((v) => typeof v === "number"));
+/** Tầng mà các thư mục cùng tầng được phép import chéo nhau (các miền nghiệp vụ). */
+const CROSS = (raw._cross_layer as number | undefined) ?? -1;
 
 /** Mọi file .ts/.tsx trong lib/, kèm miền (thư mục cấp 1) của nó. */
 function walk(dir: string): string[] {
@@ -54,12 +56,13 @@ for (const f of files) {
     const to = m[1].split("/")[0];
     if (!(to in layers) || to === from) continue;
     const [a, b] = [layers[from], layers[to]];
-    if (b >= a && !(a === TOP && b === TOP)) {
+    if (b >= a && !(a === CROSS && b === CROSS)) {
       violations.push(
         `${f} (miền ${from}, tầng ${a}) → @/lib/${m[1]} (miền ${to}, tầng ${b}) — import ngược/ngang tầng`,
       );
     }
-    if (a === TOP && b === TOP) crossEdges.set(from, (crossEdges.get(from) ?? new Set()).add(to));
+    if (a === CROSS && b === CROSS)
+      crossEdges.set(from, (crossEdges.get(from) ?? new Set()).add(to));
   }
 }
 

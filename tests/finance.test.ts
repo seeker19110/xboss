@@ -538,7 +538,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { payrollFromAttendance } = await import("@/lib/tai-chinh/finance");
+    const { payrollFromAttendance } = await import("@/lib/dich-vu/luong");
 
     const p1 = await insertId(
       `INSERT INTO projects (name, code) VALUES ('DA LUONG 1', 'PJT-LUONG1')`,

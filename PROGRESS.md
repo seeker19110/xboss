@@ -8,7 +8,7 @@
 
 Rà toàn bộ cấu trúc code (không phải nội dung nghiệp vụ) rồi tái cấu trúc. Số liệu và
 kết luận đầy đủ trong **`docs/audit-kien-truc.md`**; quyết định kiến trúc trong
-**`docs/adr/0007-lib-theo-mien.md`**.
+**`docs/adr/0007-lib-theo-mien.md` và `docs/adr/0008-tang-dich-vu.md`**.
 
 **Kết luận rà soát — ghi lại để đợt sau đừng sửa nhầm chỗ đang lành:** dự án KHÔNG thiếu
 kỷ luật (480/498 route gọi `getCurrentUser()`, 18 route còn lại đều có cơ chế xác thực
@@ -32,13 +32,21 @@ xanh ngay, không kèm danh sách miễn trừ dài vốn sẽ làm cổng mất
 Verify: typecheck + lint + build + **1084 ca pass / 0 fail trên Postgres 16 thật** +
 **9/9 cổng mutation** vẫn canh đúng bất biến sau khi đổi đường dẫn.
 
+**Đợt 3 — tầng dịch vụ `lib/dich-vu/` (ADR-0008).** Cổng CI của Đợt 2 lộ ra một lớp vấn đề
+trước đó không ai thấy: **có hàm không thuộc về miền nào**. `payrollFromAttendance()` cần cả
+tài chính lẫn hiện trường; `syncAndListNotifications()` (~1.080 dòng, import hơn 20 miền) lại
+nằm trong route nên nằm ngoài mọi ranh giới vừa dựng. Thêm tầng 5 `lib/dich-vu/` cho logic
+phối hợp **từ 2 miền trở lên**, và route chỉ còn là ranh giới HTTP (dịch vụ trả dữ liệu thuần,
+không biết gì về HTTP; `getCurrentUser()` vẫn ở route đúng như quy ước).
+
+Kết quả đo được: **chu trình `hien-truong ↔ tai-chinh` đã bị phá thật** — `_baseline_cycles`
+đã xoá khỏi `lib/layers.json`, cổng xanh mà không còn miễn trừ nào. `app/api/notifications/route.ts`
+từ **1.166 → 47 dòng**. Verify: 1084 ca pass / 0 fail trên Postgres 16 sạch, build + lint +
+typecheck xanh.
+
 ### Nợ kỹ thuật mở ra từ đợt này
 
-- **Chu trình `hien-truong` ↔ `tai-chinh`** còn tồn đọng, khai minh bạch trong
-  `_baseline_cycles` của `lib/layers.json`. `tai-chinh/finance.ts` gọi `attendanceSummary`
-  (hien-truong/hr) trong khi `hien-truong/subcontractors.ts` + `documents-hub.ts` gọi ngược
-  sang `tai-chinh/contracts` + `vo`. Phá đúng cách là đảo hướng bằng service cấp trên
-  (Đợt 3), không phải chuyển file. Xong thì xoá mục baseline đó.
+- ~~Chu trình `hien-truong` ↔ `tai-chinh`~~ — **đã xử lý ở Đợt 3** bằng `lib/dich-vu/luong.ts`.
 - **77 symbol chết**, trong đó nhiều cái là **tính năng ship dở chứ không phải rác**:
   `generateSignerOtp` (ký số), `reclaimStaleTasks` (hàng đợi), `daysSinceLastIncident` (HSE),
   và `MaskedValue` nói trên. Cần người quyết từng cái: gắn dây hay bỏ.
