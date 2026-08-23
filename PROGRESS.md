@@ -16,6 +16,13 @@
   - **Kèm theo:** gom 9 lần lặp `sys.path.insert(0, "/app/mepf-agent/src")` (chuỗi ma thuật hard-code) thành helper `_ensure_agent_src_on_path()` + hằng `AGENT_SRC`/`AGENT_ROOT`, cho phép override qua biến môi trường **`MEPF_AGENT_SRC`** để chạy worker ngoài Docker (trước đây đường dẫn Docker cứng nên không chạy local được).
   - **Dọn kèm:** `docs/nang-cap/README.md` có **dấu xung đột merge `<<<<<<< HEAD` bị commit thẳng vào `main`** (mục `ENG-5`, từ nhánh `codex/eng5-integration-contract-pilot`) — đã gỡ, giữ nhánh HEAD vì đúng thực tế (`migrations/0088_engineering_ingest_contract.sql` tồn tại thật). Sửa chú thích lỗi thời "submodule" trong `eslint.config.mjs`.
   - **Verify:** `npm run lint`/`typecheck`/`build` xanh; `npm test` 209 file / 0 fail; `python -m py_compile` sạch. **Chưa verify được:** chạy worker thật trong Docker (cần image build + `ANTHROPIC_API_KEY`/`OPENAI_API_KEY`) — 3 lỗi trên chứng minh bằng phân tích tĩnh + thực nghiệm phân giải module, chưa qua end-to-end.
+- **Ghi chú vận hành phiên (2026-08-23):** trong lúc phiên chính đang tách `page.tsx` (mục dưới), `origin/main` phân kỳ thêm 1 commit độc lập (`7c66d2a` — vá vòng lặp bóc khối lượng CAD→Spool→BOQ M66, không trùng file) — nhiều khả năng từ một phiên Claude Code khác chạy song song trên cùng máy. Đã `git merge origin/main --no-edit` (auto-merge sạch, chỉ cộng dồn `PROGRESS.md`), verify lại toàn bộ (lint/typecheck/test 209 file 0 fail), rồi `git push origin main` → `0833da7`. Không có xung đột file với `mepf-worker`/`chuan-hoa-ban-ve`/`lib/cad`.
+
+## Tách nhỏ `app/engineering/chuan-hoa-ban-ve/page.tsx` (2026-08-23)
+
+- **Đã làm:** component React duy nhất 5.112 dòng, 80 hook → còn **1.685 dòng**, tách JSX render thuần ra 8 component con trong `app/engineering/chuan-hoa-ban-ve/components/` (`UploadAndBrowsePanel`, `CadViewportStudio`, `StepTabsNav`, `DiagnosticPurgePanel` [Bước 1.1], `LayersFontPanel` [Bước 1.2], `BoqDimCtbPanel` [Bước 1.3], `XrefDiffLispPanel` [Bước 1.4], `Step2NamingPanel` [Bước 2]) + `types.ts` gom interface dùng chung. Chiến lược **lift-state-up**: toàn bộ `useState`/`useEffect`/handler/gọi API vẫn nằm nguyên trong `page.tsx`, component con chỉ nhận props — không đổi hành vi/UI/API.
+- **Verify:** diff JSX đối chiếu token-level khớp bản gốc; lint/typecheck/`next build --webpack` xanh; `npm test` 209 file 0 fail.
+- **Còn lại (nợ kỹ thuật):** `page.tsx` vẫn còn ~1.685 dòng state/logic tập trung — nếu cần tách sâu hơn thì phải chuyển sang custom hook, phạm vi lớn hơn "chỉ tách JSX" nên chưa làm ở đợt này.
 
 ## Giai đoạn hiện tại
 
@@ -177,7 +184,7 @@
   `lib/db`) — mọi câu lệnh trong file (list/update/upsert/gen phiếu nghiệm thu) sẽ lỗi bind
   param khi chạy thật. `app/api/engineering/cad-qto/variance/route.ts` SELECT cột
   `b.unit_rate` không tồn tại (schema thật `boq_items.unit_price`, `migrations/0005_boq.sql`)
-  + cùng bug tham số mảng.
+  - cùng bug tham số mảng.
 - **Thiếu, đã bổ sung:** không có đường nào tạo `engineering_cad_spools` từ kết quả
   `parse-dxf` — thêm `createCadSpoolsBatch()` (tính `calculated_qty` qua
   `calculateDuctQtoM2`/`calculatePipeQtoM`, resolve `boq_item_id` theo mã BOQCODE có sẵn
