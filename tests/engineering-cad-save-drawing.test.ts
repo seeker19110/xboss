@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { CAN } from "@/lib/auth";
 
 describe("CAD Standardized Drawing Storage & Directory Structure Suite", () => {
   it("1. Thư mục quy chuẩn drawings/ và data/uploads/drawings/ chứa đầy đủ các phân hệ, nhóm con và thư mục tạm (temp/)", () => {
@@ -85,5 +86,15 @@ describe("CAD Standardized Drawing Storage & Directory Structure Suite", () => {
     // Khi kỹ sư trưởng đã duyệt Gate 0
     const approvedPath = getRelativePath(true).replace(/\\/g, "/");
     assert.strictEqual(approvedPath, "HVAC/design/iso");
+  });
+
+  it("4. Chỉ Admin/PM/Kỹ sư được lưu bản vẽ — subcon/bch/viewer bị chặn 403", () => {
+    // Route POST /api/engineering/cad/save-drawing kiểm quyền qua CAN.manageDrawings
+    for (const role of ["subcon", "bch", "viewer", "cdt"] as const) {
+      assert.strictEqual(CAN.manageDrawings(role), false, `Vai trò ${role} không được lưu bản vẽ`);
+    }
+    for (const role of ["admin", "pm", "engineer"] as const) {
+      assert.strictEqual(CAN.manageDrawings(role), true, `Vai trò ${role} phải được lưu bản vẽ`);
+    }
   });
 });

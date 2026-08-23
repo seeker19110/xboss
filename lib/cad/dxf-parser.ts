@@ -1401,9 +1401,11 @@ export function generateStandardizedAutocadScript(layers: DxfLayerInfo[]): strin
 }
 
 /**
- * Xuất dữ liệu đối tượng bản vẽ (DxfParseResult) thành chuỗi ASCII DXF hoàn chỉnh theo chuẩn Autodesk AutoCAD R2000 (AC1015) / AC1027.
+ * Xuất dữ liệu đối tượng bản vẽ (DxfParseResult) thành chuỗi ASCII DXF hoàn chỉnh theo chuẩn Autodesk AutoCAD R12 (AC1009).
  * Bao gồm đầy đủ các phần: HEADER, TABLES (VPORT, LTYPE, LAYER, STYLE, APPID, BLOCK_RECORD), BLOCKS, ENTITIES và EOF.
- * Đảm bảo tương thích 100% khi mở trực tiếp trong AutoCAD mà không bị lỗi hoặc rơi về bản vẽ trắng Drawing1.
+ * Cấu trúc ghi ra không có handle và không có section OBJECTS nên chỉ hợp lệ ở mức R12 — khai đúng
+ * AC1009 để AutoCAD không kỳ vọng cấu trúc R2000 (xem M98 §1(b)). Đánh đổi: DIMENSION hạ thành LINE + TEXT.
+ * Đảm bảo tương thích khi mở trực tiếp trong AutoCAD mà không bị lỗi hoặc rơi về bản vẽ trắng Drawing1.
  */
 export function exportDxf(
   parsed: DxfParseResult,
@@ -1438,7 +1440,7 @@ export function exportDxf(
 
   // 1. SECTION HEADER
   dxf += "0\r\nSECTION\r\n2\r\nHEADER\r\n";
-  dxf += "9\r\n$ACADVER\r\n1\r\nAC1015\r\n";
+  dxf += "9\r\n$ACADVER\r\n1\r\nAC1009\r\n"; // R12 — đúng cấu trúc thực sự ghi ra bên dưới
   dxf += "9\r\n$INSUNITS\r\n70\r\n4\r\n"; // 4 = Millimeters (Hệ mét xây dựng MEPF)
   dxf += "9\r\n$MEASUREMENT\r\n70\r\n1\r\n"; // 1 = Metric
   if (parsed.diagnostic?.boundingDimensions) {
@@ -1579,26 +1581,46 @@ export function exportDxf(
         dxf += `0\r\nINSERT\r\n8\r\n${lyr}\r\n${colStr}2\r\n${bName}\r\n`;
         dxf += `10\r\n${cx}\r\n20\r\n${cy}\r\n30\r\n${cz}\r\n41\r\n1.0\r\n42\r\n1.0\r\n43\r\n1.0\r\n50\r\n0.0\r\n`;
       } else if (ent.type === "DIMENSION") {
-        const cx = ent.coordinates.center
-          ? ent.coordinates.center[0]
-          : ent.coordinates.start
-            ? ent.coordinates.start[0]
-            : 0;
-        const cy = ent.coordinates.center
-          ? ent.coordinates.center[1]
-          : ent.coordinates.start
-            ? ent.coordinates.start[1]
-            : 0;
-        const cz = ent.coordinates.center
-          ? ent.coordinates.center[2] || 0
-          : ent.coordinates.start
-            ? ent.coordinates.start[2] || 0
-            : 0;
-        const textVal = ent.decodedText || ent.textValue || "<>";
-        dxf += `0\r\nDIMENSION\r\n8\r\n${lyr}\r\n${colStr}10\r\n${cx}\r\n20\r\n${cy}\r\n30\r\n${cz}\r\n1\r\n${textVal}\r\n70\r\n0\r\n`;
-        if (ent.coordinates.start && ent.coordinates.end) {
-          dxf += `13\r\n${ent.coordinates.start[0]}\r\n23\r\n${ent.coordinates.start[1]}\r\n33\r\n${ent.coordinates.start[2] || 0}\r\n`;
-          dxf += `14\r\n${ent.coordinates.end[0]}\r\n24\r\n${ent.coordinates.end[1]}\r\n34\r\n${ent.coordinates.end[2] || 0}\r\n`;
+        // R12 (AC1009) đòi mỗi DIMENSION phải kèm block hình học `*D<n>` mới hợp lệ — bộ ghi này
+        // không sinh block đó, nên hạ kích thước thành LINE (đường kích thước) + TEXT (giá trị đo)
+        // đúng theo quyết định đã chốt ở M98 §1(b), thay vì emit DIMENSION thô mở ra là lỗi.
+        const start = ent.coordinates.start;
+        const end = ent.coordinates.end;
+        const hasDimLine = Boolean(start && end);
+        let tx = 0;
+        let ty = 0;
+        let tz = 0;
+
+        if (start && end) {
+          dxf += `0\r\nLINE\r\n8\r\n${lyr}\r\n${colStr}`;
+          dxf += `10\r\n${start[0]}\r\n20\r\n${start[1]}\r\n30\r\n${start[2] || 0}\r\n`;
+          dxf += `11\r\n${end[0]}\r\n21\r\n${end[1]}\r\n31\r\n${end[2] || 0}\r\n`;
+          // Chữ đặt tại trung điểm đoạn kích thước
+          tx = (start[0] + end[0]) / 2;
+          ty = (start[1] + end[1]) / 2;
+          tz = ((start[2] || 0) + (end[2] || 0)) / 2;
+        } else {
+          const anchor = ent.coordinates.center || start || end;
+          tx = anchor ? anchor[0] : 0;
+          ty = anchor ? anchor[1] : 0;
+          tz = anchor ? anchor[2] || 0 : 0;
+        }
+
+        // Bỏ TEXT khi chuỗi đo rỗng: bản cũ ghi placeholder `<>` (ký hiệu "lấy giá trị đo được"
+        // của DIMENSION thật) — sau khi hạ cấp thành TEXT thì nó hiện đúng 2 ký tự `<>` trên bản
+        // vẽ, tức chữ rác. Cũng không tự tính khoảng cách start→end để điền vào: mã nhóm 10/11
+        // của DIMENSION là điểm đặt đường/chữ kích thước, không phải 2 đầu đo, nên số tính ra
+        // sẽ là số đo bịa (vi phạm nguyên tắc không bịa dữ liệu của M98/M99).
+        const textVal = ent.decodedText || ent.textValue || "";
+        if (textVal) {
+          dxf += `0\r\nTEXT\r\n8\r\n${lyr}\r\n${colStr}`;
+          dxf += `10\r\n${tx}\r\n20\r\n${ty}\r\n30\r\n${tz}\r\n40\r\n250.0\r\n1\r\n${textVal}\r\n7\r\nSTANDARD\r\n`;
+        } else if (!hasDimLine) {
+          // Kích thước không có cả toạ độ đường lẫn chữ đo: vẫn phải để lại dấu vết, tuyệt đối
+          // không nuốt mất thực thể im lặng. Ghi POINT (thực thể R12 hợp lệ, tối giản) tại điểm
+          // neo — giữ đúng vị trí đã biết mà không bịa thêm nét hay số đo nào.
+          dxf += `0\r\nPOINT\r\n8\r\n${lyr}\r\n${colStr}`;
+          dxf += `10\r\n${tx}\r\n20\r\n${ty}\r\n30\r\n${tz}\r\n`;
         }
       }
     }
@@ -1683,5 +1705,100 @@ export function exportDxf(
  */
 export function generateStandard2dDxf(title = "Ban_Ve_CAD_2D", system = "HVAC"): string {
   const sysUpper = (system || "HVAC").toUpperCase();
-  return `0\r\nSECTION\r\n2\r\nHEADER\r\n9\r\n$ACADVER\r\n1\r\nAC1015\r\n9\r\n$INSUNITS\r\n70\r\n4\r\n9\r\n$MEASUREMENT\r\n70\r\n1\r\n0\r\nENDSEC\r\n0\r\nSECTION\r\n2\r\nTABLES\r\n0\r\nTABLE\r\n2\r\nVPORT\r\n70\r\n1\r\n0\r\nVPORT\r\n2\r\n*ACTIVE\r\n70\r\n0\r\n10\r\n0.0\r\n20\r\n0.0\r\n11\r\n1.0\r\n21\r\n1.0\r\n12\r\n0.0\r\n22\r\n0.0\r\n40\r\n1000.0\r\n41\r\n1.5\r\n0\r\nENDTAB\r\n0\r\nTABLE\r\n2\r\nLAYER\r\n70\r\n8\r\n0\r\nLAYER\r\n2\r\n0\r\n70\r\n0\r\n62\r\n7\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nM-DUCT-SUPP\r\n70\r\n0\r\n62\r\n4\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nM-DUCT-RETN\r\n70\r\n0\r\n62\r\n6\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nP-PIPE-SANR\r\n70\r\n0\r\n62\r\n3\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nE-CABL-TRAY\r\n70\r\n0\r\n62\r\n1\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nF-SPRN-PIPE\r\n70\r\n0\r\n62\r\n1\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nA-WALL-GRID\r\n70\r\n0\r\n62\r\n8\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nG-ANNO-TEXT\r\n70\r\n0\r\n62\r\n7\r\n6\r\nCONTINUOUS\r\n0\r\nENDTAB\r\n0\r\nENDSEC\r\n0\r\nSECTION\r\n2\r\nBLOCKS\r\n0\r\nENDSEC\r\n0\r\nSECTION\r\n2\r\nENTITIES\r\n0\r\nLINE\r\n8\r\nA-WALL-GRID\r\n10\r\n0.0\r\n20\r\n0.0\r\n30\r\n0.0\r\n11\r\n36000.0\r\n21\r\n0.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nA-WALL-GRID\r\n10\r\n36000.0\r\n20\r\n0.0\r\n30\r\n0.0\r\n11\r\n36000.0\r\n21\r\n18000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nA-WALL-GRID\r\n10\r\n36000.0\r\n20\r\n18000.0\r\n30\r\n0.0\r\n11\r\n0.0\r\n21\r\n18000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nA-WALL-GRID\r\n10\r\n0.0\r\n20\r\n18000.0\r\n30\r\n0.0\r\n11\r\n0.0\r\n21\r\n0.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nM-DUCT-SUPP\r\n10\r\n3000.0\r\n20\r\n9000.0\r\n30\r\n0.0\r\n11\r\n33000.0\r\n21\r\n9000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nM-DUCT-RETN\r\n10\r\n3000.0\r\n20\r\n12000.0\r\n30\r\n0.0\r\n11\r\n33000.0\r\n21\r\n12000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nP-PIPE-SANR\r\n10\r\n3000.0\r\n20\r\n6000.0\r\n30\r\n0.0\r\n11\r\n33000.0\r\n21\r\n6000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nE-CABL-TRAY\r\n10\r\n3000.0\r\n20\r\n15000.0\r\n30\r\n0.0\r\n11\r\n33000.0\r\n21\r\n15000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nF-SPRN-PIPE\r\n10\r\n3000.0\r\n20\r\n3000.0\r\n30\r\n0.0\r\n11\r\n33000.0\r\n21\r\n3000.0\r\n31\r\n0.0\r\n0\r\nTEXT\r\n8\r\nG-ANNO-TEXT\r\n10\r\n18000.0\r\n20\r\n9500.0\r\n30\r\n0.0\r\n40\r\n300.0\r\n1\r\nống gió cấp lạnh AHU-01 800x500\r\n0\r\nTEXT\r\n8\r\nG-ANNO-TEXT\r\n10\r\n18000.0\r\n20\r\n12500.0\r\n30\r\n0.0\r\n40\r\n300.0\r\n1\r\nống gió hồi 700x400\r\n0\r\nTEXT\r\n8\r\nG-ANNO-TEXT\r\n10\r\n18000.0\r\n20\r\n6500.0\r\n30\r\n0.0\r\n40\r\n300.0\r\n1\r\nống thoát nước D114 dốc i=1.5% BOP=+2850\r\n0\r\nTEXT\r\n8\r\nG-ANNO-TEXT\r\n10\r\n18000.0\r\n20\r\n15500.0\r\n30\r\n0.0\r\n40\r\n300.0\r\n1\r\nMáng cáp điện Trunking 400x100\r\n0\r\nTEXT\r\n8\r\nG-ANNO-TEXT\r\n10\r\n18000.0\r\n20\r\n3500.0\r\n30\r\n0.0\r\n40\r\n300.0\r\n1\r\nĐầu phun PCCC Sprinkler 68°C\r\n0\r\nENDSEC\r\n0\r\nEOF\r\n`;
+  return `0\r\nSECTION\r\n2\r\nHEADER\r\n9\r\n$ACADVER\r\n1\r\nAC1009\r\n9\r\n$INSUNITS\r\n70\r\n4\r\n9\r\n$MEASUREMENT\r\n70\r\n1\r\n0\r\nENDSEC\r\n0\r\nSECTION\r\n2\r\nTABLES\r\n0\r\nTABLE\r\n2\r\nVPORT\r\n70\r\n1\r\n0\r\nVPORT\r\n2\r\n*ACTIVE\r\n70\r\n0\r\n10\r\n0.0\r\n20\r\n0.0\r\n11\r\n1.0\r\n21\r\n1.0\r\n12\r\n0.0\r\n22\r\n0.0\r\n40\r\n1000.0\r\n41\r\n1.5\r\n0\r\nENDTAB\r\n0\r\nTABLE\r\n2\r\nLAYER\r\n70\r\n8\r\n0\r\nLAYER\r\n2\r\n0\r\n70\r\n0\r\n62\r\n7\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nM-DUCT-SUPP\r\n70\r\n0\r\n62\r\n4\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nM-DUCT-RETN\r\n70\r\n0\r\n62\r\n6\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nP-PIPE-SANR\r\n70\r\n0\r\n62\r\n3\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nE-CABL-TRAY\r\n70\r\n0\r\n62\r\n1\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nF-SPRN-PIPE\r\n70\r\n0\r\n62\r\n1\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nA-WALL-GRID\r\n70\r\n0\r\n62\r\n8\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nG-ANNO-TEXT\r\n70\r\n0\r\n62\r\n7\r\n6\r\nCONTINUOUS\r\n0\r\nENDTAB\r\n0\r\nENDSEC\r\n0\r\nSECTION\r\n2\r\nBLOCKS\r\n0\r\nENDSEC\r\n0\r\nSECTION\r\n2\r\nENTITIES\r\n0\r\nLINE\r\n8\r\nA-WALL-GRID\r\n10\r\n0.0\r\n20\r\n0.0\r\n30\r\n0.0\r\n11\r\n36000.0\r\n21\r\n0.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nA-WALL-GRID\r\n10\r\n36000.0\r\n20\r\n0.0\r\n30\r\n0.0\r\n11\r\n36000.0\r\n21\r\n18000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nA-WALL-GRID\r\n10\r\n36000.0\r\n20\r\n18000.0\r\n30\r\n0.0\r\n11\r\n0.0\r\n21\r\n18000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nA-WALL-GRID\r\n10\r\n0.0\r\n20\r\n18000.0\r\n30\r\n0.0\r\n11\r\n0.0\r\n21\r\n0.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nM-DUCT-SUPP\r\n10\r\n3000.0\r\n20\r\n9000.0\r\n30\r\n0.0\r\n11\r\n33000.0\r\n21\r\n9000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nM-DUCT-RETN\r\n10\r\n3000.0\r\n20\r\n12000.0\r\n30\r\n0.0\r\n11\r\n33000.0\r\n21\r\n12000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nP-PIPE-SANR\r\n10\r\n3000.0\r\n20\r\n6000.0\r\n30\r\n0.0\r\n11\r\n33000.0\r\n21\r\n6000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nE-CABL-TRAY\r\n10\r\n3000.0\r\n20\r\n15000.0\r\n30\r\n0.0\r\n11\r\n33000.0\r\n21\r\n15000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nF-SPRN-PIPE\r\n10\r\n3000.0\r\n20\r\n3000.0\r\n30\r\n0.0\r\n11\r\n33000.0\r\n21\r\n3000.0\r\n31\r\n0.0\r\n0\r\nTEXT\r\n8\r\nG-ANNO-TEXT\r\n10\r\n18000.0\r\n20\r\n9500.0\r\n30\r\n0.0\r\n40\r\n300.0\r\n1\r\nống gió cấp lạnh AHU-01 800x500\r\n0\r\nTEXT\r\n8\r\nG-ANNO-TEXT\r\n10\r\n18000.0\r\n20\r\n12500.0\r\n30\r\n0.0\r\n40\r\n300.0\r\n1\r\nống gió hồi 700x400\r\n0\r\nTEXT\r\n8\r\nG-ANNO-TEXT\r\n10\r\n18000.0\r\n20\r\n6500.0\r\n30\r\n0.0\r\n40\r\n300.0\r\n1\r\nống thoát nước D114 dốc i=1.5% BOP=+2850\r\n0\r\nTEXT\r\n8\r\nG-ANNO-TEXT\r\n10\r\n18000.0\r\n20\r\n15500.0\r\n30\r\n0.0\r\n40\r\n300.0\r\n1\r\nMáng cáp điện Trunking 400x100\r\n0\r\nTEXT\r\n8\r\nG-ANNO-TEXT\r\n10\r\n18000.0\r\n20\r\n3500.0\r\n30\r\n0.0\r\n40\r\n300.0\r\n1\r\nĐầu phun PCCC Sprinkler 68°C\r\n0\r\nENDSEC\r\n0\r\nEOF\r\n`;
+}
+
+/** Bốn section bắt buộc phải có trong một tệp DXF ASCII do XBoss phát hành */
+const REQUIRED_DXF_SECTIONS = ["HEADER", "TABLES", "BLOCKS", "ENTITIES"];
+
+/**
+ * Kiểm định tối thiểu cấu trúc một chuỗi DXF ASCII trước khi ghi ra đĩa — lưới an toàn chặn ghi
+ * tệp rác (nội dung rỗng, thiếu section, cụt giữa chừng), KHÔNG phải bộ đọc DXF đầy đủ.
+ * Năm điều kiện bắt buộc: nội dung không rỗng, đọc được thành cặp (mã nhóm, giá trị) không lệch
+ * nhịp, cặp SECTION/ENDSEC cân bằng, có đủ 4 section HEADER/TABLES/BLOCKS/ENTITIES và kết thúc
+ * bằng cặp mã `0` + `EOF`.
+ */
+export function validateDxf(content: string): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  if (!content || content.trim().length === 0) {
+    return { valid: false, errors: ["Nội dung DXF rỗng — không có dữ liệu để lưu."] };
+  }
+
+  // DXF ASCII là chuỗi cặp dòng (mã nhóm, giá trị) — duyệt theo cặp để giá trị rỗng hợp lệ
+  // (vd mã 4 của bảng STYLE) không làm lệch nhịp đọc. Trước khi ghép cặp phải bỏ BOM UTF-8 và
+  // các dòng trống dẫn đầu/kết đuôi, nếu không nhịp cặp lệch 1 dòng và mọi kiểm tra sau đều sai.
+  const lines = content.replace(/^\uFEFF/, "").split(/\r\n|\r|\n/);
+
+  let firstIdx = 0;
+  while (firstIdx < lines.length && lines[firstIdx].trim() === "") firstIdx++;
+  let lastIdx = lines.length - 1;
+  while (lastIdx >= firstIdx && lines[lastIdx].trim() === "") lastIdx--;
+  const body = lines.slice(firstIdx, lastIdx + 1);
+
+  const foundSections = new Set<string>();
+  let openSections = 0;
+  let strayEndsec = 0;
+  let expectingSectionName = false;
+  // Số dòng (đếm từ 1) nơi phát hiện nhịp cặp bị lệch — 0 nghĩa là đọc trôi chảy
+  let misalignedLine = 0;
+
+  for (let i = 0; i + 1 < body.length; i += 2) {
+    const code = body[i].trim();
+    const value = body[i + 1].trim();
+
+    // Vị trí chẵn bắt buộc là mã nhóm (số nguyên). Không phải số → tệp lệch nhịp cặp,
+    // mọi suy luận phía sau vô nghĩa nên dừng và báo lỗi thay vì đoán bừa.
+    if (!/^-?\d+$/.test(code)) {
+      misalignedLine = firstIdx + i + 1;
+      break;
+    }
+
+    if (code === "0") {
+      if (value === "SECTION") {
+        openSections++;
+        expectingSectionName = true;
+      } else {
+        if (value === "ENDSEC") {
+          if (openSections === 0) strayEndsec++;
+          else openSections--;
+        }
+        expectingSectionName = false;
+      }
+    } else if (code === "2" && expectingSectionName) {
+      foundSections.add(value.toUpperCase());
+      expectingSectionName = false;
+    }
+  }
+
+  // Số dòng lẻ = có mã nhóm cuối cùng không kèm giá trị
+  if (!misalignedLine && body.length % 2 !== 0) {
+    misalignedLine = firstIdx + body.length;
+  }
+
+  if (misalignedLine) {
+    errors.push(
+      `Cấu trúc DXF lệch nhịp cặp (mã nhóm, giá trị) tại dòng ${misalignedLine} — không đọc được như DXF ASCII.`,
+    );
+  } else {
+    if (openSections > 0) {
+      errors.push(`Thiếu ${openSections} thẻ ENDSEC đóng SECTION — tệp DXF bị cụt.`);
+    }
+    if (strayEndsec > 0) {
+      errors.push(`Có ${strayEndsec} thẻ ENDSEC thừa không khớp SECTION nào.`);
+    }
+
+    const missingSections = REQUIRED_DXF_SECTIONS.filter((s) => !foundSections.has(s));
+    if (missingSections.length > 0) {
+      errors.push(`Thiếu section bắt buộc: ${missingSections.join(", ")}.`);
+    }
+
+    const meaningfulLines = body.map((l) => l.trim()).filter((l) => l.length > 0);
+    const n = meaningfulLines.length;
+    if (n < 2 || meaningfulLines[n - 1] !== "EOF" || meaningfulLines[n - 2] !== "0") {
+      errors.push('Tệp DXF phải kết thúc bằng cặp mã "0" + "EOF".');
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
 }

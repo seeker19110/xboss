@@ -49,9 +49,12 @@ Hệ quả nghiêm trọng hơn tệp hỏng: luồng `POST /api/engineering/cad
 `parseDwgBinary` → `exportDxf` → trả về một tệp DXF **mở được, trông hợp lệ, nhưng nội dung là bịa**
 (chữ thật của bản vẽ đặt trên một lưới toạ độ tự chế). Kỹ sư không có cách nào nhận ra bằng mắt.
 
-**(b) Xuất DXF hiện ở R12.** Sau bản sửa 2026-08-22, bộ ghi `lib/cad/dxf-writer.ts` xuất R12
-(AC1009) — mở được trên mọi AutoCAD, `ezdxf.Auditor` 0 lỗi. Đánh đổi đã chấp nhận: `DIMENSION` hạ
-thành `LINE` + `TEXT` (R12 đòi block hình học `*D<n>` mới hợp lệ), `MTEXT` hạ thành `TEXT`.
+**(b) Xuất DXF hiện ở R12.** Bộ ghi **không nằm ở `lib/cad/dxf-writer.ts` — file đó chưa từng tồn
+tại**; logic ghi nằm trong `lib/cad/dxf-parser.ts` (`exportDxf`, `generateStandard2dDxf`), kèm hàm
+kiểm định `validateDxf`. Cấu trúc ghi ra vốn là R12 (không handle, không section `OBJECTS`) nhưng
+tới 2026-08-23 vẫn khai sai `$ACADVER = AC1015`; bản sửa 2026-08-23 hạ khai báo về đúng **R12
+(AC1009)** — mở được trên mọi AutoCAD. Đánh đổi đã chấp nhận: `DIMENSION` hạ thành `LINE` + `TEXT`
+(R12 đòi block hình học `*D<n>` mới hợp lệ), `MTEXT` hạ thành `TEXT`.
 
 ## 2. Outcome, metric và guardrail
 
