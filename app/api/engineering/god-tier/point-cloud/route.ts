@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   analyzePointCloudDeviation,
   PointCloudPoint,
   GodTierElementData,
-} from "@/lib/engineering-god-tier";
+} from "@/lib/ky-thuat/engineering-god-tier";
 
 export const dynamic = "force-dynamic";
 

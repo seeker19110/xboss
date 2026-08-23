@@ -4,7 +4,7 @@ import {
   generatePatternFingerprint,
   computePatternSimilarity,
   KnowledgePatternRecord,
-} from "@/lib/engineering-memory-bank";
+} from "@/lib/ky-thuat/engineering-memory-bank";
 
 test("PIN-4: generatePatternFingerprint sinh mã băm SHA-256 bất biến không phụ thuộc thứ tự key", () => {
   const hash1 = generatePatternFingerprint("material_waste_rate", "HVAC Ductwork", {

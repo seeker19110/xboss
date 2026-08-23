@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { Skeleton } from "@/app/components/Skeleton";
 import { showToast } from "@/app/components/Toast";
-import { formatDateVN } from "@/lib/date";
+import { formatDateVN } from "@/lib/nen/date";
 
 export default function HseSafetyTab() {
   const [incidents, setIncidents] = useState<any[]>([]);

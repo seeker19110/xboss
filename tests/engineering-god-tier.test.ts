@@ -8,8 +8,11 @@ import {
   calculateMerkleRootHex,
   generateAsBuiltStamp,
   GodTierElementData,
-} from "@/lib/engineering-god-tier";
-import { diagnoseCadBimDefects, generateAutoLispTrapeze } from "@/lib/engineering-local-ai";
+} from "@/lib/ky-thuat/engineering-god-tier";
+import {
+  diagnoseCadBimDefects,
+  generateAutoLispTrapeze,
+} from "@/lib/ky-thuat/engineering-local-ai";
 
 test("God-Tier: generateInstancedMeshGroups gom nhóm phần tử thành các Batch GPU Draw Calls", () => {
   const elements: GodTierElementData[] = [

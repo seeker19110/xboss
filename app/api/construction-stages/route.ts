@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { listStages, createStage } from "@/lib/constructionStages";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { listStages, createStage } from "@/lib/tien-do/constructionStages";
 
 export const dynamic = "force-dynamic";
 

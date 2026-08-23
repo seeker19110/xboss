@@ -1,9 +1,13 @@
 "use client";
 import { useMemo, useState } from "react";
 import { ChevronRight, ExternalLink } from "lucide-react";
-import { formatDateVN, daysOverdue } from "@/lib/date";
-import { DELAY_REASON_LABEL } from "@/lib/delay";
-import { groupDelayedTasks, type DelayedTaskLike, type ReasonCount } from "@/lib/delayed-groups";
+import { formatDateVN, daysOverdue } from "@/lib/nen/date";
+import { DELAY_REASON_LABEL } from "@/lib/tien-do/delay";
+import {
+  groupDelayedTasks,
+  type DelayedTaskLike,
+  type ReasonCount,
+} from "@/lib/tien-do/delayed-groups";
 
 // Công tác trễ tối thiểu để bảng render được (mở rộng từ DelayedTaskLike).
 type TaskRow = DelayedTaskLike & {

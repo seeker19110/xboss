@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { ShieldAlert, FilePlus2, MapPinned, Inbox } from "lucide-react";
 import EditableText from "@/app/components/EditableText";
-import { systemColorClasses } from "@/lib/systemColors";
+import { systemColorClasses } from "@/lib/nen/systemColors";
 
 export type QualityBlock = {
   ncrOpen: number;

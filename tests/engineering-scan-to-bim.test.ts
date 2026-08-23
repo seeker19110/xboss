@@ -5,7 +5,7 @@ import {
   findNearestScannedPoint,
   BimSpoolModel,
   ScannedPoint3D,
-} from "@/lib/engineering-scan-to-bim";
+} from "@/lib/ky-thuat/engineering-scan-to-bim";
 
 test("M70/M89: findNearestScannedPoint tìm chính xác điểm scan gần nhất trong không gian 3D", () => {
   const points: ScannedPoint3D[] = [

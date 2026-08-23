@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { evaluateTelemetryStatus, computeEnergySummary } from "@/lib/engineering-iot-telemetry";
+import {
+  evaluateTelemetryStatus,
+  computeEnergySummary,
+} from "@/lib/ky-thuat/engineering-iot-telemetry";
 
 test("M83: evaluateTelemetryStatus đánh giá đúng chuẩn QCVN cho Bụi PM2.5", () => {
   // Bình thường (< 50)

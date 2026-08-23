@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { bridgeTaskResultToEngineering } from "@/lib/engineering-worker-bridge";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { bridgeTaskResultToEngineering } from "@/lib/ky-thuat/engineering-worker-bridge";
 
 export const dynamic = "force-dynamic";
 

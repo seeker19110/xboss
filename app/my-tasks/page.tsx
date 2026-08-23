@@ -23,15 +23,15 @@ import {
   Share2,
   DollarSign,
 } from "lucide-react";
-import { slugFromCode } from "@/lib/sheets";
-import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
-import { formatDateVN } from "@/lib/date";
-import { PAYMENT_VIEW_ROLES, type Role } from "@/lib/roles";
+import { slugFromCode } from "@/lib/nen/sheets";
+import { STATUS_LABEL, type StatusSlug } from "@/lib/tien-do/status";
+import { formatDateVN } from "@/lib/nen/date";
+import { PAYMENT_VIEW_ROLES, type Role } from "@/lib/nen/roles";
 import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import AppHeader from "@/app/components/AppHeader";
 import { PageSkeleton } from "@/app/components/Skeleton";
-import { DELAY_REASON_LABEL } from "@/lib/delay";
-import type { PrefKey, Prefs } from "@/lib/notification-prefs";
+import { DELAY_REASON_LABEL } from "@/lib/tien-do/delay";
+import type { PrefKey, Prefs } from "@/lib/van-hanh/notification-prefs";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

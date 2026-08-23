@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { BarChart2, TrendingUp, AlertTriangle, Package, Clock, UserX } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { fetchMe } from "@/app/lib/me";
-import { formatDateVN, formatDateTimeVN } from "@/lib/date";
+import { formatDateVN, formatDateTimeVN } from "@/lib/nen/date";
 
 type StockSummary = {
   sheetCode: string;

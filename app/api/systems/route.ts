@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { listSystems } from "@/lib/systems";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { listSystems } from "@/lib/tien-do/systems";
 
 export const dynamic = "force-dynamic";
 

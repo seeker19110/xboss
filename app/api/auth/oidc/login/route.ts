@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import * as oidc from "openid-client";
-import { ssoEnabled, getOidcConfig, redirectUri, OIDC_TMP_COOKIE } from "@/lib/oidc";
-import { log } from "@/lib/log";
+import { ssoEnabled, getOidcConfig, redirectUri, OIDC_TMP_COOKIE } from "@/lib/bao-mat/oidc";
+import { log } from "@/lib/nen/log";
 
 export const dynamic = "force-dynamic";
 

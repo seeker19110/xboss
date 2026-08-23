@@ -11,7 +11,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import crypto from "node:crypto";
-import { createTimeTravelSnapshot } from "@/lib/user-error-healer";
+import { createTimeTravelSnapshot } from "@/lib/nen/user-error-healer";
 
 console.log("================================================================================");
 console.log("🚀 XBOSS C2 PILOT: MEPF-AGENTS CONNECTOR & END-TO-END PILOT DRILL");

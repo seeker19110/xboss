@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCostSettings, updateCostSettings } from "@/lib/cost";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCostSettings, updateCostSettings } from "@/lib/tai-chinh/cost";
 
 export const dynamic = "force-dynamic";
 

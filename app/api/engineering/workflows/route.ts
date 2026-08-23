@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   workflowInputSchema,
   createWorkflow,
   listWorkflows,
   Gate0FailedError,
-} from "@/lib/engineering-workflow";
+} from "@/lib/ky-thuat/engineering-workflow";
 
 export const dynamic = "force-dynamic";
 

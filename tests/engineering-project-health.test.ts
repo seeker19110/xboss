@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   calculateEngineeringHealthIndex,
   ProjectHealthMetricsInput,
-} from "@/lib/engineering-project-health";
+} from "@/lib/ky-thuat/engineering-project-health";
 
 test("M72: calculateEngineeringHealthIndex tính đúng EHI % và phân loại sức khỏe dự án", () => {
   const input: ProjectHealthMetricsInput = {

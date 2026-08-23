@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { queryOne, insertId, run } from "@/lib/db";
-import { getCurrentUser, type Role } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { assertModuleEnabled } from "@/lib/feature-flags";
-import { isContentTooLarge } from "@/lib/photos";
+import { getCurrentUser, type Role } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import { isContentTooLarge } from "@/lib/nen/photos";
 
 export const dynamic = "force-dynamic";
 

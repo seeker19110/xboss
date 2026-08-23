@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withProjectScope } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   getCert,
   certTotals,
@@ -9,9 +9,9 @@ import {
   checkCertLinesBelongToContract,
   saveCertItems,
   type CertLineInput,
-} from "@/lib/paymentcerts";
-import { getEntityApprovalStatus } from "@/lib/approvals";
-import { stripSensitive } from "@/lib/sensitive-fields";
+} from "@/lib/tai-chinh/paymentcerts";
+import { getEntityApprovalStatus } from "@/lib/tien-do/approvals";
+import { stripSensitive } from "@/lib/bao-mat/sensitive-fields";
 
 export const dynamic = "force-dynamic";
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { run } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   canEditProposal,
   canSeeAllProposals,
@@ -9,7 +9,7 @@ import {
   getProposal,
   parseProposalBody,
   validateProposalInput,
-} from "@/lib/proposals";
+} from "@/lib/tai-chinh/proposals";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +35,7 @@ export async function GET(
   // Cảnh báo cấp phát vượt định mức (import động — chỉ trả cho vai trò được xem định mức).
   let overNorm = null;
   if (proposal.kind === "allocation" && proposal.materialId != null) {
-    const { allocationOverNorm } = await import("@/lib/proposals");
+    const { allocationOverNorm } = await import("@/lib/tai-chinh/proposals");
     overNorm = await allocationOverNorm(id);
   }
 

@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 test("PIN-2: calculateParetoFrontier lọc chính xác các phương án không bị chi phối (Non-dominated Sorting)", async () => {
-  const { calculateParetoFrontier } = await import("@/lib/engineering-prescriptive");
+  const { calculateParetoFrontier } = await import("@/lib/ky-thuat/engineering-prescriptive");
 
   const options = [
     {
@@ -59,7 +59,7 @@ test("PIN-2: calculateParetoFrontier lọc chính xác các phương án không 
 });
 
 test("PIN-2: evaluateElementCompliance kiểm tra chính xác các điều khoản QCVN 06, NFPA 13 và TCVN 9385", async () => {
-  const { evaluateElementCompliance } = await import("@/lib/engineering-prescriptive");
+  const { evaluateElementCompliance } = await import("@/lib/ky-thuat/engineering-prescriptive");
 
   const qcvnRule = {
     id: "rule-qcvn",
@@ -129,7 +129,7 @@ test(
       auditEngineeringElement,
       scanAllElementsCompliance,
       getComplianceAudits,
-    } = await import("@/lib/engineering-prescriptive");
+    } = await import("@/lib/ky-thuat/engineering-prescriptive");
 
     const projId = await insertId(
       `INSERT INTO projects (name) VALUES ('Prescriptive Test Project')`,

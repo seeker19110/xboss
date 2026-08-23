@@ -2,7 +2,7 @@
 
 import { Dispatch, SetStateAction } from "react";
 import { Download, ArrowRight, CheckCircle2, Activity, Trash2, Crosshair } from "lucide-react";
-import { DxfParseResult } from "@/lib/cad/dxf-parser";
+import { DxfParseResult } from "@/lib/ky-thuat/cad/dxf-parser";
 import type { ManualLayerItem, PurgeState, Step1SubTab, WcsConfig } from "../types";
 
 // BƯỚC 1.1 — Chẩn đoán dị tật, dọn rác sâu (Purge/Overkill) & gốc tọa độ WCS 2D.

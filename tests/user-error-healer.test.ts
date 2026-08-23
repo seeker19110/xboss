@@ -17,7 +17,7 @@ import {
   parseComplexFieldCommandWithContext,
   createTimeTravelSnapshot,
   reconstructMatrixHierarchy,
-} from "@/lib/user-error-healer";
+} from "@/lib/nen/user-error-healer";
 
 test("1. healVietnameseEncoding: Chuyển đổi sạch TCVN3, VNI và dọn sạch ký tự tàng hình", () => {
   const tcvn3Text = "B\xB8ng ti\xCA ti\xBA n \u0111\xF4";

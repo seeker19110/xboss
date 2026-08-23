@@ -5,16 +5,19 @@ import assert from "node:assert/strict";
 import {
   solve3DGenerativeRoute,
   GenerativeRoutingInput,
-} from "../lib/engineering-generative-routing";
+} from "@/lib/ky-thuat/engineering-generative-routing";
 
 import {
   auditPrePourRebarGrid,
   PrePourRebarAuditInput,
-} from "../lib/engineering-edge-vision-tracking";
+} from "@/lib/ky-thuat/engineering-edge-vision-tracking";
 
-import { processSmartIpcRelease, SmartIpcCalculationInput } from "../lib/engineering-smart-ipc";
+import {
+  processSmartIpcRelease,
+  SmartIpcCalculationInput,
+} from "@/lib/ky-thuat/engineering-smart-ipc";
 
-import { analyzeFidicTiaClaim, FidicTiaInput } from "../lib/engineering-fidic-tia-claim";
+import { analyzeFidicTiaClaim, FidicTiaInput } from "@/lib/ky-thuat/engineering-fidic-tia-claim";
 
 test("1. 3D A* Generative Spatial Router — Drainage slope & Beam L/3 penetration", () => {
   const input: GenerativeRoutingInput = {

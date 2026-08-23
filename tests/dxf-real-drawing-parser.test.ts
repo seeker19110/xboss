@@ -8,7 +8,7 @@ import {
   generateStandard2dDxf,
   generateStandardizedAutocadScript,
   validateDxf,
-} from "@/lib/cad/dxf-parser";
+} from "@/lib/ky-thuat/cad/dxf-parser";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 

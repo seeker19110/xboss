@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { systemColorClasses } from "@/lib/systemColors";
+import { systemColorClasses } from "@/lib/nen/systemColors";
 
 test("systemColorClasses: trả đúng bộ class cho từng khoá màu đã biết", () => {
   assert.deepEqual(systemColorClasses("zinc"), {

@@ -9,9 +9,9 @@ import {
   recordOidcCallbackFailure,
   type SsoClaims,
   OIDC_TMP_COOKIE,
-} from "@/lib/oidc";
-import { makeToken, isSecureCookie, COOKIE, COOKIE_MAX_AGE } from "@/lib/auth";
-import { log } from "@/lib/log";
+} from "@/lib/bao-mat/oidc";
+import { makeToken, isSecureCookie, COOKIE, COOKIE_MAX_AGE } from "@/lib/bao-mat/auth";
+import { log } from "@/lib/nen/log";
 
 export const dynamic = "force-dynamic";
 

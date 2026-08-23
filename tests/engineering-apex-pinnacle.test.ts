@@ -1,9 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import "@/tests/setup";
-import { computeApexScore } from "@/lib/engineering-pinnacle-synergy";
-import { detectClashesWithSpatialGrid, findRoutePath3D } from "@/lib/engineering-bim-routing";
-import type { BimElementRecord } from "@/lib/engineering-bim-cad";
+import { computeApexScore } from "@/lib/ky-thuat/engineering-pinnacle-synergy";
+import {
+  detectClashesWithSpatialGrid,
+  findRoutePath3D,
+} from "@/lib/ky-thuat/engineering-bim-routing";
+import type { BimElementRecord } from "@/lib/ky-thuat/engineering-bim-cad";
 import { DASHBOARD_TREE, findActiveNav } from "@/app/lib/dashboardTree";
 
 test("Apex Synergy: computeApexScore tính đúng trọng số 5 trục và phân hạng statusTier", () => {

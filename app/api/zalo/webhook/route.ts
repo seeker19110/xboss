@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { processIncomingZaloMessage } from "@/lib/engineering-zalo-copilot";
+import { processIncomingZaloMessage } from "@/lib/ky-thuat/engineering-zalo-copilot";
 
 export const dynamic = "force-dynamic";
 

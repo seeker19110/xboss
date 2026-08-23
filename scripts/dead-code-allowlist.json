@@ -1,0 +1,6 @@
+[
+  {
+    "file": "app/components/MaskedValue.tsx",
+    "lyDo": "Nửa UI của M50 PR2 (che trường tiền theo quyền): backend đã ship (lib/sensitive-fields.ts, 8 route dùng stripSensitive) nhưng chưa page nào gắn component này. Giữ lại để gắn vào các bảng tiền, KHÔNG xoá — xoá là mất cách hiển thị '•••' đúng a11y."
+  }
+]

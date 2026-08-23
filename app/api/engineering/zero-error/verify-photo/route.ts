@@ -1,12 +1,12 @@
 // app/api/engineering/zero-error/verify-photo/route.ts — Xác thực ảnh hiện trường chống gian lận & ảo giác
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   verifyFieldProofChallenge,
   validateGeofenceLocation,
   calibrateAIConfidence,
-} from "@/lib/engineering-zero-error-tracker";
+} from "@/lib/ky-thuat/engineering-zero-error-tracker";
 
 export const dynamic = "force-dynamic";
 

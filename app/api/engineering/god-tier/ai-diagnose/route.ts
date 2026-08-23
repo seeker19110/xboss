@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { diagnoseCadBimDefects, generateAutoLispTrapeze } from "@/lib/engineering-local-ai";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import {
+  diagnoseCadBimDefects,
+  generateAutoLispTrapeze,
+} from "@/lib/ky-thuat/engineering-local-ai";
 
 export const dynamic = "force-dynamic";
 

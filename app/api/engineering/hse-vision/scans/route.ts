@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { listHseVisionScans } from "@/lib/engineering-hse-vision";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { listHseVisionScans } from "@/lib/ky-thuat/engineering-hse-vision";
 
 export const dynamic = "force-dynamic";
 

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   solve3DGenerativeRoute,
   saveGenerativeRoutingRun,
   listGenerativeRoutingRuns,
   GenerativeRoutingInput,
-} from "@/lib/engineering-generative-routing";
+} from "@/lib/ky-thuat/engineering-generative-routing";
 
 export const dynamic = "force-dynamic";
 

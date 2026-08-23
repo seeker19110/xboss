@@ -9,7 +9,7 @@ import {
   filterElementsPropertySet,
   BimElement,
   WbsTaskSnapshot,
-} from "@/lib/engineering-bim-viewer";
+} from "@/lib/ky-thuat/engineering-bim-viewer";
 
 test("M80/M89: generateParametricMepfMesh sinh lưới hình trụ cho PIPE", () => {
   const mesh = generateParametricMepfMesh("PIPE_STRAIGHT", { diameter: 100, length: 2000 });

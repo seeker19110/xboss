@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { calculateAssetReliabilityAndRul, MepfAssetInput } from "@/lib/engineering-mepf-predictive";
+import {
+  calculateAssetReliabilityAndRul,
+  MepfAssetInput,
+} from "@/lib/ky-thuat/engineering-mepf-predictive";
 
 test("M71: calculateAssetReliabilityAndRul tính toán chính xác MTBF, RUL và Health Score theo Weibull", () => {
   const asset: MepfAssetInput = {

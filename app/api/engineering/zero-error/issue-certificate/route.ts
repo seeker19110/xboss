@@ -1,11 +1,11 @@
 // app/api/engineering/zero-error/issue-certificate/route.ts — Cấp Chứng chỉ Kiểm toán Bất biến Zero-Error
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   generateZeroErrorAuditCertificate,
   type ZeroErrorAuditPayload,
-} from "@/lib/engineering-zero-error-tracker";
+} from "@/lib/ky-thuat/engineering-zero-error-tracker";
 
 export const dynamic = "force-dynamic";
 

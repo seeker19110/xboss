@@ -10,7 +10,7 @@ import {
   DiffuserSpecInput,
   DuctJointInput,
   DuctAccessoryInput,
-} from "@/lib/engineering-duct-diffuser-alignment";
+} from "@/lib/ky-thuat/engineering-duct-diffuser-alignment";
 
 describe("M75 / M91: Căn Chỉnh Độ Dài Ống Gió, Bù Trừ Tim Miệng Gió & Dung Sai Gót Hộp Gió +10mm", () => {
   // ==========================================================================

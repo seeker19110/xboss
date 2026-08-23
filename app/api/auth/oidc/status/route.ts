@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ssoEnabled } from "@/lib/oidc";
+import { ssoEnabled } from "@/lib/bao-mat/oidc";
 
 export const dynamic = "force-dynamic";
 

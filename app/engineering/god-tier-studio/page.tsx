@@ -32,8 +32,8 @@ import {
   CncGCodeResult,
   PipeSpoolCutItem,
   generateAsBuiltStamp,
-} from "@/lib/engineering-god-tier";
-import { DefectDiagnosticReport } from "@/lib/engineering-local-ai";
+} from "@/lib/ky-thuat/engineering-god-tier";
+import { DefectDiagnosticReport } from "@/lib/ky-thuat/engineering-local-ai";
 
 type StudioTab = "viewport" | "clashes" | "ai" | "esign" | "lidar" | "bcf" | "cnc";
 

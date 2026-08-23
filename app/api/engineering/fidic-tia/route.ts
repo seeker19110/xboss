@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   analyzeFidicTiaClaim,
   saveFidicTiaClaim,
   listFidicTiaClaims,
   FidicTiaInput,
-} from "@/lib/engineering-fidic-tia-claim";
+} from "@/lib/ky-thuat/engineering-fidic-tia-claim";
 
 export const dynamic = "force-dynamic";
 

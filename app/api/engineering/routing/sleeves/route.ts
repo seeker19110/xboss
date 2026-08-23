@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { createSleeveSchedule, listSleeveSchedules } from "@/lib/engineering-auto-routing";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { createSleeveSchedule, listSleeveSchedules } from "@/lib/ky-thuat/engineering-auto-routing";
 
 export const dynamic = "force-dynamic";
 

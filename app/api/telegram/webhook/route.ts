@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { processIncomingTelegramMessage } from "@/lib/engineering-site-bot";
+import { processIncomingTelegramMessage } from "@/lib/ky-thuat/engineering-site-bot";
 
 export const dynamic = "force-dynamic";
 

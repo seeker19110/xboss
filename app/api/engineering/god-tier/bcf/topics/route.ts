@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { listGodTierClashes } from "@/lib/engineering-god-tier-db";
-import { createBcfTopicFromClash, BcfTopic } from "@/lib/engineering-god-tier";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { listGodTierClashes } from "@/lib/ky-thuat/engineering-god-tier-db";
+import { createBcfTopicFromClash, BcfTopic } from "@/lib/ky-thuat/engineering-god-tier";
 
 export const dynamic = "force-dynamic";
 

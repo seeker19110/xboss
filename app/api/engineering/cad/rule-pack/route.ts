@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentRulePack, getRulePackEtag, matchesEtag } from "@/lib/cad/rule-pack";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentRulePack, getRulePackEtag, matchesEtag } from "@/lib/ky-thuat/cad/rule-pack";
 
 export const dynamic = "force-dynamic";
 

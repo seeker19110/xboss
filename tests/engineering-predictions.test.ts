@@ -8,7 +8,7 @@ test(
   async () => {
     const { insertId, run } = await import("@/lib/db");
     const { listPredictionModels, runPredictionPipeline, listPredictions, decidePrediction } =
-      await import("@/lib/engineering-predictions");
+      await import("@/lib/ky-thuat/engineering-predictions");
 
     const projId = await insertId(`INSERT INTO projects (name) VALUES ('Predictive Proj A')`);
     const userId = await insertId(

@@ -2,7 +2,7 @@
 import { readdirSync, statSync, readFileSync } from "node:fs";
 import { join, extname, basename } from "node:path";
 import { createHash } from "node:crypto";
-import { query, queryOne, run, getPool } from "../lib/db";
+import { query, queryOne, run, getPool } from "@/lib/db";
 
 const DRAWINGS_DIR = join(process.cwd(), "data", "uploads", "drawings");
 

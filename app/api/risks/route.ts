@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { withUniqueRetry } from "@/lib/seqcode";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { withUniqueRetry } from "@/lib/ha-tang/seqcode";
 import {
   RISK_STATUSES,
   listRisks,
@@ -10,7 +10,7 @@ import {
   parseRiskBody,
   validateRiskInput,
   type RiskStatus,
-} from "@/lib/risks";
+} from "@/lib/hien-truong/risks";
 
 export const dynamic = "force-dynamic";
 

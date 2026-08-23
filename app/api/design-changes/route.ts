@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { withUniqueRetry } from "@/lib/seqcode";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { withUniqueRetry } from "@/lib/ha-tang/seqcode";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   DESIGN_CHANGE_STATUSES,
   checkDesignChangeRefs,
@@ -11,7 +11,7 @@ import {
   parseDesignChangeBody,
   validateDesignChangeInput,
   type DesignChangeStatus,
-} from "@/lib/designchanges";
+} from "@/lib/ky-thuat/designchanges";
 
 export const dynamic = "force-dynamic";
 

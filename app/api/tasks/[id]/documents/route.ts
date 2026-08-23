@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storagePut } from "@/lib/storage";
+import { storagePut } from "@/lib/nen/storage";
 import { query, queryOne, insertId } from "@/lib/db";
-import { getCurrentUser, canTouchTask, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { assertModuleEnabled } from "@/lib/feature-flags";
+import { getCurrentUser, canTouchTask, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import {
   extForDocMime,
   verifyFileMime,
@@ -11,9 +11,9 @@ import {
   MAX_DOC_BYTES,
   sha256Hex,
   isContentTooLarge,
-} from "@/lib/photos";
-import { DOC_CATEGORIES, type DocCategory } from "@/lib/qaqc";
-import { extractPdfText } from "@/lib/pdf-extract";
+} from "@/lib/nen/photos";
+import { DOC_CATEGORIES, type DocCategory } from "@/lib/ky-thuat/qaqc";
+import { extractPdfText } from "@/lib/nen/pdf-extract";
 
 export const dynamic = "force-dynamic";
 

@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("validateCommissioningItems: đủ ca hợp lệ/không hợp lệ", async () => {
-  const { validateCommissioningItems } = await import("@/lib/handover");
+  const { validateCommissioningItems } = await import("@/lib/hien-truong/handover");
 
   assert.equal(validateCommissioningItems([]), true);
   assert.equal(validateCommissioningItems([{ label: "Chạy thử bơm", type: "pass_fail" }]), true);
@@ -31,7 +31,7 @@ test("validateCommissioningInput/validateHandoverItemInput/validatePunchInput: �
     validatePunchInput,
     validateDemobInput,
     validateLessonInput,
-  } = await import("@/lib/handover");
+  } = await import("@/lib/hien-truong/handover");
 
   assert.equal(
     validateCommissioningInput({
@@ -157,7 +157,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { handoverProgress } = await import("@/lib/handover");
+    const { handoverProgress } = await import("@/lib/hien-truong/handover");
 
     const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA HG 1', 'PJT-HG1')`);
     const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA HG 2', 'PJT-HG2')`);
@@ -246,8 +246,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { overduePunch } = await import("@/lib/handover");
-    const { daysFromTodayISO } = await import("@/lib/date");
+    const { overduePunch } = await import("@/lib/hien-truong/handover");
+    const { daysFromTodayISO } = await import("@/lib/nen/date");
 
     const userId = await insertId(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('Test Punch User', 'punchuser@test.local', 'x', 'engineer')`,

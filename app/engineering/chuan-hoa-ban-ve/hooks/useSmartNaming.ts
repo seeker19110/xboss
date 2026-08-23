@@ -2,7 +2,12 @@
 
 import { useCallback, useState } from "react";
 import { showToast } from "@/app/components/Toast";
-import { parseDxf, exportDxf, DxfParseResult, generateStandard2dDxf } from "@/lib/cad/dxf-parser";
+import {
+  parseDxf,
+  exportDxf,
+  DxfParseResult,
+  generateStandard2dDxf,
+} from "@/lib/ky-thuat/cad/dxf-parser";
 import type { ConversionInfo, SaveConfig, SavedResult } from "../types";
 
 // Chuẩn hóa từng thành phần tên tệp về ASCII an toàn cho hệ thống tệp.

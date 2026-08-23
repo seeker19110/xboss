@@ -1,7 +1,7 @@
 // Script reset mật khẩu tài khoản mặc định và dọn rate-limit trên DB.
 import "./env";
-import { run } from "../lib/db";
-import { hashPassword, type Role } from "../lib/auth";
+import { run } from "@/lib/db";
+import { hashPassword, type Role } from "@/lib/bao-mat/auth";
 
 const DEFAULTS: { name: string; email: string; pw: string; role: Role }[] = [
   {

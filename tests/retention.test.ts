@@ -11,7 +11,7 @@ import assert from "node:assert/strict";
 const S = { skip: !HAS_TEST_DB };
 
 test("Registry: audit_log KHÔNG được nằm trong danh sách xoá", async () => {
-  const { RETENTION_TARGETS, AUDIT_LOG_KHONG_XOA } = await import("@/lib/retention");
+  const { RETENTION_TARGETS, AUDIT_LOG_KHONG_XOA } = await import("@/lib/ha-tang/retention");
   assert.ok(
     !RETENTION_TARGETS.some((t) => t.table === "audit_log"),
     "audit_log dùng chuỗi băm móc xích — không được xoá bằng DELETE",
@@ -20,7 +20,7 @@ test("Registry: audit_log KHÔNG được nằm trong danh sách xoá", async ()
 });
 
 test("Registry: target đụng dữ liệu nghiệp vụ phải TẮT sẵn, chờ chủ sở hữu chốt", async () => {
-  const { RETENTION_TARGETS } = await import("@/lib/retention");
+  const { RETENTION_TARGETS } = await import("@/lib/ha-tang/retention");
   for (const key of ["engineering_source_revisions", "engineering_objects_rejected"]) {
     const t = RETENTION_TARGETS.find((x) => x.key === key);
     assert.ok(t, `phải khai báo sẵn ${key} để người sau thấy câu hỏi còn treo`);
@@ -30,7 +30,7 @@ test("Registry: target đụng dữ liệu nghiệp vụ phải TẮT sẵn, ch�
 });
 
 test("whereOf: dựng đúng mệnh đề cho cả 2 chế độ và có kèm keepWhile", async () => {
-  const { whereOf } = await import("@/lib/retention");
+  const { whereOf } = await import("@/lib/ha-tang/retention");
   assert.equal(
     whereOf({
       key: "k",
@@ -70,7 +70,7 @@ test("whereOf: dựng đúng mệnh đề cho cả 2 chế độ và có kèm ke
 });
 
 test("whereOf: mode 'age' thiếu days phải NÉM LỖI, không dựng ra INTERVAL 'NaN days'", async () => {
-  const { whereOf, hasPeriod } = await import("@/lib/retention");
+  const { whereOf, hasPeriod } = await import("@/lib/ha-tang/retention");
   const chuaChot = {
     key: "k",
     table: "t",
@@ -89,7 +89,7 @@ test("whereOf: mode 'age' thiếu days phải NÉM LỖI, không dựng ra INTER
 });
 
 test("Dry-run (mặc định) đếm được nhưng KHÔNG xoá dòng nào", S, async () => {
-  const { runRetention } = await import("@/lib/retention");
+  const { runRetention } = await import("@/lib/ha-tang/retention");
   const { run, queryOne, insertId } = await import("@/lib/db");
 
   const projId = await insertId(`INSERT INTO projects (name) VALUES ('Retention DR')`);
@@ -118,7 +118,7 @@ test("Dry-run (mặc định) đếm được nhưng KHÔNG xoá dòng nào", S,
 });
 
 test("apply=true xoá dòng HẾT HẠN nhưng giữ dòng CHƯA hết hạn", S, async () => {
-  const { runRetention } = await import("@/lib/retention");
+  const { runRetention } = await import("@/lib/ha-tang/retention");
   const { run, queryOne, insertId } = await import("@/lib/db");
 
   const projId = await insertId(`INSERT INTO projects (name) VALUES ('Retention AP')`);
@@ -153,7 +153,7 @@ test("apply=true xoá dòng HẾT HẠN nhưng giữ dòng CHƯA hết hạn", S
 });
 
 test("keepWhile: webhook 'pending' đang chờ retry KHÔNG bị dọn dù đã quá hạn", S, async () => {
-  const { runRetention } = await import("@/lib/retention");
+  const { runRetention } = await import("@/lib/ha-tang/retention");
   const { run, queryOne, insertId } = await import("@/lib/db");
 
   const userId = await insertId(
@@ -201,7 +201,7 @@ test("keepWhile: webhook 'pending' đang chờ retry KHÔNG bị dọn dù đã 
 });
 
 test("Target TẮT không bị xoá kể cả khi apply=true", S, async () => {
-  const { runRetention } = await import("@/lib/retention");
+  const { runRetention } = await import("@/lib/ha-tang/retention");
   const rows = await runRetention(true);
   for (const r of rows.filter((x) => !x.enabled)) {
     assert.equal(r.deleted, 0, `${r.key} đang tắt — apply cũng không được xoá`);

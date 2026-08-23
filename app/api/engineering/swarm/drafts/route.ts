@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { generateAutonomousTechnicalDraft } from "@/lib/engineering-swarm";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { generateAutonomousTechnicalDraft } from "@/lib/ky-thuat/engineering-swarm";
 
 export const dynamic = "force-dynamic";
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import type { DxfEntityRaw, DxfLayerInfo } from "@/lib/cad/dxf-parser";
+import type { DxfEntityRaw, DxfLayerInfo } from "@/lib/ky-thuat/cad/dxf-parser";
 import type { HoveredCadEntity } from "../types";
 
 // Khung nhìn vector CAD 2D: zoom/pan, con trỏ WCS, thực thể đang chọn/hover

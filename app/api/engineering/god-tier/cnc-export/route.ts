@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { generateCncGCodeForDuct, generatePipeSpoolCutList } from "@/lib/engineering-god-tier";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import {
+  generateCncGCodeForDuct,
+  generatePipeSpoolCutList,
+} from "@/lib/ky-thuat/engineering-god-tier";
 
 export const dynamic = "force-dynamic";
 

@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { Skeleton } from "@/app/components/Skeleton";
 import { showToast } from "@/app/components/Toast";
-import { formatDateVN } from "@/lib/date";
+import { formatDateVN } from "@/lib/nen/date";
 
 export default function FinanceCashflowTab() {
   const [summary, setSummary] = useState<any | null>(null);

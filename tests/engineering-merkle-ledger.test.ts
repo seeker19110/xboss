@@ -7,7 +7,7 @@ import {
   buildMerkleTree,
   generateMerkleProof,
   verifyMerkleProof,
-} from "@/lib/engineering-merkle-ledger";
+} from "@/lib/ky-thuat/engineering-merkle-ledger";
 
 test("M73: buildMerkleTree xây dựng cây nhị phân và tính chính xác Root Hash", () => {
   const records = [

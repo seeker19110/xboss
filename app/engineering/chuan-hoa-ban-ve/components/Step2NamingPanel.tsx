@@ -16,7 +16,7 @@ import {
   Folder,
   FolderTree,
 } from "lucide-react";
-import { DxfLayerInfo } from "@/lib/cad/dxf-parser";
+import { DxfLayerInfo } from "@/lib/ky-thuat/cad/dxf-parser";
 import type {
   Cad2dApprovalStatus,
   ManualBlockItem,

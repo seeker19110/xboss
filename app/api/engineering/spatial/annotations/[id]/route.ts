@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { updateAnnotationStatus, linkAnnotationToEntity } from "@/lib/engineering-spatial-pinning";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import {
+  updateAnnotationStatus,
+  linkAnnotationToEntity,
+} from "@/lib/ky-thuat/engineering-spatial-pinning";
 import { query, withProjectScope } from "@/lib/db";
 
 export const dynamic = "force-dynamic";

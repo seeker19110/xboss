@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { enqueueAsyncTask, listAsyncTasks } from "@/lib/engineering-task-queue";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { enqueueAsyncTask, listAsyncTasks } from "@/lib/ky-thuat/engineering-task-queue";
 
 export const dynamic = "force-dynamic";
 

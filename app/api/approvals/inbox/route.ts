@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { assertModuleEnabled } from "@/lib/feature-flags";
-import { pendingForUserDisplay } from "@/lib/approvals";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import { pendingForUserDisplay } from "@/lib/tien-do/approvals";
 
 export const dynamic = "force-dynamic";
 

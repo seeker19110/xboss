@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { query } from "@/lib/db";
-import { evaluateTelemetryStatus, IotDeviceType } from "@/lib/engineering-iot-telemetry";
+import { evaluateTelemetryStatus, IotDeviceType } from "@/lib/ky-thuat/engineering-iot-telemetry";
 
 export const dynamic = "force-dynamic";
 

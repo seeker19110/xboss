@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   calculateEmbodiedCarbonLCA,
   saveCarbonLcaReport,
   listCarbonLcaReports,
   MaterialLcaItem,
-} from "@/lib/engineering-carbon-lca";
+} from "@/lib/ky-thuat/engineering-carbon-lca";
 
 export const dynamic = "force-dynamic";
 

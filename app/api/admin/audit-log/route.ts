@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { buildAuditFilter } from "@/lib/audit";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { buildAuditFilter } from "@/lib/bao-mat/audit";
 
 export const dynamic = "force-dynamic";
 

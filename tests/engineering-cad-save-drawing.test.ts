@@ -3,8 +3,12 @@ import { describe, it } from "node:test";
 import assert from "node:assert";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { CAN } from "@/lib/auth";
-import { DRAWING_SYSTEMS, drawingRoots, ensureAllDrawingTrees } from "@/lib/cad/drawing-tree";
+import { CAN } from "@/lib/bao-mat/auth";
+import {
+  DRAWING_SYSTEMS,
+  drawingRoots,
+  ensureAllDrawingTrees,
+} from "@/lib/ky-thuat/cad/drawing-tree";
 
 describe("CAD Standardized Drawing Storage & Directory Structure Suite", () => {
   it("1. Thư mục quy chuẩn drawings/ và data/uploads/drawings/ chứa đầy đủ các phân hệ, nhóm con và thư mục tạm (temp/)", () => {

@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { run } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   checkDesignChangeRefs,
   getDesignChange,
   markDrawingUpdated,
   parseDesignChangeBody,
   validateDesignChangeInput,
-} from "@/lib/designchanges";
+} from "@/lib/ky-thuat/designchanges";
 
 export const dynamic = "force-dynamic";
 

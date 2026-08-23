@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
-import { hitRateLimit } from "@/lib/ratelimit";
+import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
 import {
   getCurrentUser,
   hashPassword,
@@ -11,7 +11,7 @@ import {
   isSecureCookie,
   COOKIE,
   COOKIE_MAX_AGE,
-} from "@/lib/auth";
+} from "@/lib/bao-mat/auth";
 
 export const dynamic = "force-dynamic";
 

@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("validateDesignChangeInput: title/reason bắt buộc", async () => {
-  const { validateDesignChangeInput } = await import("@/lib/designchanges");
+  const { validateDesignChangeInput } = await import("@/lib/ky-thuat/designchanges");
 
   const base = {
     title: "Đổi cao độ trần kỹ thuật tầng 5",
@@ -28,7 +28,7 @@ test("validateDesignChangeInput: title/reason bắt buộc", async () => {
 
 test("nextDesignChangeCode: sinh mã DC-000N tuần tự", { skip: !HAS_TEST_DB }, async () => {
   const { run, insertId } = await import("@/lib/db");
-  const { nextDesignChangeCode } = await import("@/lib/designchanges");
+  const { nextDesignChangeCode } = await import("@/lib/ky-thuat/designchanges");
 
   const code1 = await nextDesignChangeCode();
   assert.match(code1, /^DC-\d{4}$/);
@@ -48,7 +48,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { pendingDesignChanges } = await import("@/lib/designchanges");
+    const { pendingDesignChanges } = await import("@/lib/ky-thuat/designchanges");
 
     const p1 = await insertId(
       `INSERT INTO projects (name, code) VALUES ('DA test DC 1', 'PJT-DC1')`,
@@ -120,7 +120,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { decideDesignChange, markDrawingUpdated } = await import("@/lib/designchanges");
+    const { decideDesignChange, markDrawingUpdated } = await import("@/lib/ky-thuat/designchanges");
 
     const pmId = await insertId(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('PM DC Test', 'dc-pm@xboss.vn', 'x', 'pm')`,
@@ -200,7 +200,7 @@ test(
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
     const { getDesignChange, decideDesignChange, markDrawingUpdated } =
-      await import("@/lib/designchanges");
+      await import("@/lib/ky-thuat/designchanges");
 
     const p1 = await insertId(
       `INSERT INTO projects (name, code) VALUES ('DA test DC scoping 1', 'PJT-DCS1')`,

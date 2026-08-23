@@ -12,7 +12,7 @@ import {
   DxfLayerInfo,
   resolveXrefDependencies,
   bindXrefToMaster,
-} from "@/lib/cad/dxf-parser";
+} from "@/lib/ky-thuat/cad/dxf-parser";
 import type {
   ConversionInfo,
   DrawingOption,

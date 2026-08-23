@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Star, LayoutGrid, Search } from "lucide-react";
-import { systemColorClasses } from "@/lib/systemColors";
-import type { ProjectListItem } from "@/lib/projects";
+import { systemColorClasses } from "@/lib/nen/systemColors";
+import type { ProjectListItem } from "@/lib/ha-tang/projects";
 
 const PINNED_KEY = "xboss_pinned";
 const FILTER_THRESHOLD = 7;

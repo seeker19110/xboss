@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { TrendingUp } from "lucide-react";
-import { formatDateVN } from "@/lib/date";
+import { formatDateVN } from "@/lib/nen/date";
 
 type Forecast = {
   sheetType: string;

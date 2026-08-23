@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { listQcChecklists, validateChecklistItems } from "@/lib/qaqc";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { listQcChecklists, validateChecklistItems } from "@/lib/ky-thuat/qaqc";
 
 export const dynamic = "force-dynamic";
 

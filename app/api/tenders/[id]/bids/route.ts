@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId, run, withTransaction } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { validateBidPrices, type BidPriceInput } from "@/lib/tender";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { validateBidPrices, type BidPriceInput } from "@/lib/tai-chinh/tender";
 
 export const dynamic = "force-dynamic";
 

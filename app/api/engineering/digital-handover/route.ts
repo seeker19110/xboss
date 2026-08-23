@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   bundleDigitalHandoverPassport,
   saveDigitalHandoverPassport,
   listDigitalHandoverPassports,
   HandoverSummaryInput,
-} from "@/lib/engineering-digital-handover";
+} from "@/lib/ky-thuat/engineering-digital-handover";
 
 export const dynamic = "force-dynamic";
 

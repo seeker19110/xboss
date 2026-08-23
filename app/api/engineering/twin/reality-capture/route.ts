@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { ingestRealityCapture } from "@/lib/engineering-twin-pinnacle";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { ingestRealityCapture } from "@/lib/ky-thuat/engineering-twin-pinnacle";
 import { query } from "@/lib/db";
 
 export const dynamic = "force-dynamic";

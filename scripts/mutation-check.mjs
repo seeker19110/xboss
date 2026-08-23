@@ -33,7 +33,7 @@ const tsxLoader = "./" + join("node_modules", "tsx", "dist", "loader.mjs");
 const MUTATIONS = [
   {
     key: "progress: 199/200 không được thành 100%",
-    file: "lib/recompute.ts",
+    file: "lib/tien-do/recompute.ts",
     find: "Math.min(0.99, Math.round((checked / total) * 100) / 100)",
     replace: "Math.round((checked / total) * 100) / 100",
     tests: ["tests/recompute.test.ts"],
@@ -41,7 +41,7 @@ const MUTATIONS = [
   },
   {
     key: "delayed: quá hạn mà chưa xong phải là 'tre'",
-    file: "lib/recompute.ts",
+    file: "lib/tien-do/recompute.ts",
     find: 'if (endDate && endDate < todayISO()) return "tre";',
     replace: 'if (endDate && endDate < todayISO()) return "dang_thi_cong";',
     tests: ["tests/recompute.test.ts"],
@@ -49,7 +49,7 @@ const MUTATIONS = [
   },
   {
     key: "nghiệm thu không bao giờ bị hạ cấp tự động",
-    file: "lib/recompute.ts",
+    file: "lib/tien-do/recompute.ts",
     find: 'if (current === "nghiem_thu") return "nghiem_thu";',
     replace: 'if (false) return "nghiem_thu";',
     tests: ["tests/recompute.test.ts"],
@@ -57,7 +57,7 @@ const MUTATIONS = [
   },
   {
     key: "RBAC: chỉ Admin/PM được duyệt nghiệm thu",
-    file: "lib/auth.ts",
+    file: "lib/bao-mat/auth.ts",
     find: 'approve: (r?: Role) => r === "admin" || r === "pm",',
     replace: 'approve: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",',
     // Bất biến này được canh ở permissions.test.ts (map `CAN` + override theo vai trò),
@@ -69,7 +69,7 @@ const MUTATIONS = [
   },
   {
     key: "risk: an toàn là tuyệt đối (critical bất kể yếu tố khác)",
-    file: "lib/engineering-workflow.ts",
+    file: "lib/ky-thuat/engineering-workflow.ts",
     find: 'if (i.safetyRisk) return "critical";',
     replace: 'if (i.safetyRisk) return "high";',
     tests: ["tests/engineering-workflow.test.ts"],
@@ -77,7 +77,7 @@ const MUTATIONS = [
   },
   {
     key: "gates: profile C phải có đủ 2 gate",
-    file: "lib/engineering-workflow.ts",
+    file: "lib/ky-thuat/engineering-workflow.ts",
     find: "      return [GATE_1, GATE_2];",
     replace: "      return [GATE_1];",
     tests: ["tests/engineering-workflow.test.ts"],
@@ -101,7 +101,7 @@ const MUTATIONS = [
   },
   {
     key: "money: nhân hệ số phải làm tròn nửa lên",
-    file: "lib/money.ts",
+    file: "lib/nen/money.ts",
     find: "return roundHalfUpNum(Number(v) * rate);",
     replace: "return BigInt(Math.floor(Number(v) * rate));",
     tests: ["tests/money.test.ts"],

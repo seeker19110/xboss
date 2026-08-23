@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId } from "@/lib/db";
-import { getCurrentUser, canViewSubcontractor, type Role } from "@/lib/auth";
-import { isUniqueViolation } from "@/lib/seqcode";
+import { getCurrentUser, canViewSubcontractor, type Role } from "@/lib/bao-mat/auth";
+import { isUniqueViolation } from "@/lib/ha-tang/seqcode";
 import {
   listEvaluations,
   validateEvaluationInput,
   type EvaluationInput,
-} from "@/lib/subcontractors";
+} from "@/lib/hien-truong/subcontractors";
 
 export const dynamic = "force-dynamic";
 

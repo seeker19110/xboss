@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { FONT_REGULAR, FONT_BOLD, registerVietnameseFonts } from "@/lib/pdf-fonts";
+import { FONT_REGULAR, FONT_BOLD, registerVietnameseFonts } from "@/lib/nen/pdf-fonts";
 
 test("Tên font cố định đúng như khai báo", () => {
   assert.equal(FONT_REGULAR, "DejaVu");

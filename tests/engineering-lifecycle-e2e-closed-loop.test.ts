@@ -11,22 +11,31 @@ import {
   generateElectronicBbntDocument,
   type SpoolStatus,
   type CadSpoolRecord,
-} from "@/lib/engineering-cad-qto";
+} from "@/lib/ky-thuat/engineering-cad-qto";
 
 // Stage 4: 3-Way e-Signature Protocol
-import { createDocumentEnvelopeHash, generateCertificateCode } from "@/lib/engineering-esignature";
+import {
+  createDocumentEnvelopeHash,
+  generateCertificateCode,
+} from "@/lib/ky-thuat/engineering-esignature";
 
 // Stage 5: Governance, HSE Vision, FIDIC
-import { calculateHseSafetyScore, type DetectedHazardItem } from "@/lib/engineering-hse-vision";
-import { mapDelayEventToFidicClause, checkNoticeCompliance } from "@/lib/engineering-fidic-claim";
+import {
+  calculateHseSafetyScore,
+  type DetectedHazardItem,
+} from "@/lib/ky-thuat/engineering-hse-vision";
+import {
+  mapDelayEventToFidicClause,
+  checkNoticeCompliance,
+} from "@/lib/ky-thuat/engineering-fidic-claim";
 
 // Stage 6: Scan-to-BIM & LOD 500 Digital Handover Passport
 import {
   analyzeScanVsBimDeviations,
   type BimSpoolModel,
   type ScannedPoint3D,
-} from "@/lib/engineering-scan-to-bim";
-import { bundleDigitalHandoverPassport } from "@/lib/engineering-digital-handover";
+} from "@/lib/ky-thuat/engineering-scan-to-bim";
+import { bundleDigitalHandoverPassport } from "@/lib/ky-thuat/engineering-digital-handover";
 
 test("XBOSS E2E LIFECYCLE: Khép kín toàn chuỗi từ CAD Thô -> QTO -> Tracking -> Nghiệm thu -> Kiểm soát -> Hoàn công", () => {
   // GIAI ĐOẠN 1: BẢN CAD THÔ & BÓC TÁCH KHỐI LƯỢNG 5D (AUTO-QTO)

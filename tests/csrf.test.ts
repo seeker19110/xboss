@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
-import { isSameOrigin, needsSameOriginCheck } from "@/lib/csrf";
+import { isSameOrigin, needsSameOriginCheck } from "@/lib/bao-mat/csrf";
 
 // Unit thuần — không chạm DB, không cần tests/setup.ts.
 

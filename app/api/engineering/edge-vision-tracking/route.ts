@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   auditPrePourRebarGrid,
   savePrePourRebarAudit,
@@ -9,7 +9,7 @@ import {
   listEdgeVisionDetections,
   PrePourRebarAuditInput,
   EdgeVisionDetectionInput,
-} from "@/lib/engineering-edge-vision-tracking";
+} from "@/lib/ky-thuat/engineering-edge-vision-tracking";
 
 export const dynamic = "force-dynamic";
 

@@ -16,7 +16,7 @@ import {
   MousePointer,
   Loader2,
 } from "lucide-react";
-import { ACI_TO_HEX, DxfEntityRaw, DxfParseResult } from "@/lib/cad/dxf-parser";
+import { ACI_TO_HEX, DxfEntityRaw, DxfParseResult } from "@/lib/ky-thuat/cad/dxf-parser";
 import type { HoveredCadEntity, PurgeState } from "../types";
 
 // Studio đồ họa vector CAD 2D: khung nhìn tương tác (zoom/pan/hover),

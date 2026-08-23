@@ -7,7 +7,7 @@ import {
   recordApexSystemPulse,
   getLatestApexSystemPulse,
   dispatchApexCommandAction,
-} from "@/lib/engineering-pinnacle-synergy";
+} from "@/lib/ky-thuat/engineering-pinnacle-synergy";
 
 const HAS_DB = Boolean(process.env.TEST_DATABASE_URL || process.env.DATABASE_URL);
 

@@ -6,7 +6,7 @@ test(
   "OS-1: Taxonomy registry trả về đầy đủ loại đối tượng & quan hệ MEP chuẩn",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { getTaxonomy } = await import("@/lib/engineering-graph");
+    const { getTaxonomy } = await import("@/lib/ky-thuat/engineering-graph");
     const taxonomy = await getTaxonomy();
 
     assert.ok(taxonomy.objectTypes.length >= 7, "Phải có ít nhất 7 loại đối tượng chuẩn");
@@ -34,7 +34,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, run, queryOne } = await import("@/lib/db");
-    const { traverseGraph } = await import("@/lib/engineering-graph");
+    const { traverseGraph } = await import("@/lib/ky-thuat/engineering-graph");
 
     // Dựng 2 dự án A và B
     const projA = await insertId(`INSERT INTO projects (name) VALUES ('Graph Proj A')`);
@@ -159,7 +159,8 @@ test(
 
 test("OS-1: Lineage & Impact Analysis cho đối tượng kỹ thuật", { skip: !HAS_TEST_DB }, async () => {
   const { insertId, run, queryOne } = await import("@/lib/db");
-  const { getObjectLineage, analyzeObjectImpact } = await import("@/lib/engineering-graph");
+  const { getObjectLineage, analyzeObjectImpact } =
+    await import("@/lib/ky-thuat/engineering-graph");
 
   const projId = await insertId(`INSERT INTO projects (name) VALUES ('Lineage Proj')`);
   const userId = await insertId(
@@ -271,7 +272,7 @@ test("OS-1: Lineage & Impact Analysis cho đối tượng kỹ thuật", { skip:
 test("OS-1: Data Quality Issue Scanner & Resolver", { skip: !HAS_TEST_DB }, async () => {
   const { insertId, run, queryOne } = await import("@/lib/db");
   const { detectDataQualityIssues, resolveDataQualityIssue } =
-    await import("@/lib/engineering-graph");
+    await import("@/lib/ky-thuat/engineering-graph");
 
   const projId = await insertId(`INSERT INTO projects (name) VALUES ('DQ Proj')`);
   const userId = await insertId(

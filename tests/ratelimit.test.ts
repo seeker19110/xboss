@@ -3,7 +3,11 @@ import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE
 // Cần Postgres riêng qua TEST_DATABASE_URL, không có thì tự skip (xem tests/setup.ts).
 import test from "node:test";
 import assert from "node:assert/strict";
-import { loginBlockedSeconds, recordLoginFailure, recordLoginSuccess } from "../lib/ratelimit";
+import {
+  loginBlockedSeconds,
+  recordLoginFailure,
+  recordLoginSuccess,
+} from "@/lib/bao-mat/ratelimit";
 
 test("ratelimit: dưới 5 lần sai thì chưa khoá", { skip: !HAS_TEST_DB }, async () => {
   const ip = "10.0.0.1",

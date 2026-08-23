@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId, queryOne } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   HANDOVER_ITEM_STATUSES,
   listHandoverItems,
   parseHandoverItemBody,
   validateHandoverItemInput,
   type HandoverItemStatus,
-} from "@/lib/handover";
+} from "@/lib/hien-truong/handover";
 
 export const dynamic = "force-dynamic";
 

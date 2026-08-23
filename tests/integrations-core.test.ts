@@ -2,7 +2,7 @@ import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE
 import { test } from "node:test";
 import assert from "node:assert/strict";
 // import type bị xoá lúc biên dịch (không kéo lib/db) — an toàn ở đầu file.
-import type { Row, PushResult } from "@/lib/integrations/core";
+import type { Row, PushResult } from "@/lib/ha-tang/integrations/core";
 
 // Test khung tích hợp chung (M48 PR1, lib/integrations/core.ts). Dùng adapter GIẢ in-memory
 // (không phụ thuộc nhà cung cấp thật nào) + tích hợp thật với TEST_DATABASE_URL. Tự skip nếu
@@ -28,7 +28,7 @@ test(
   "runSync: provider chưa đăng ký → lỗi rõ ràng, không throw",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { runSync } = await import("@/lib/integrations/core");
+    const { runSync } = await import("@/lib/ha-tang/integrations/core");
     const res = await runSync("khong-ton-tai-provider", 999999);
     assert.equal(res.ok, false);
     assert.match(res.error ?? "", /adapter/i);
@@ -53,7 +53,7 @@ test(
   "runSync (1): chạy lần đầu — cursor tiến tới id dòng cuối, remote_links đủ, run status ok",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { registerAdapter, runSync } = await import("@/lib/integrations/core");
+    const { registerAdapter, runSync } = await import("@/lib/ha-tang/integrations/core");
     const { queryOne, query } = await import("@/lib/db");
 
     const provider = "fake_ok";
@@ -110,7 +110,7 @@ test(
   "runSync (2): chạy lại không có dòng mới — không tạo remote_links trùng, pushed=0",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { registerAdapter, runSync } = await import("@/lib/integrations/core");
+    const { registerAdapter, runSync } = await import("@/lib/ha-tang/integrations/core");
     const { queryOne } = await import("@/lib/db");
 
     const provider = "fake_rerun";
@@ -150,7 +150,7 @@ test(
   "runSync (3): 1 dòng giữa batch lỗi — dòng lỗi + các dòng sau không vào remote_links, cursor không vượt qua",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { registerAdapter, runSync } = await import("@/lib/integrations/core");
+    const { registerAdapter, runSync } = await import("@/lib/ha-tang/integrations/core");
     const { queryOne, query } = await import("@/lib/db");
 
     const provider = "fake_err";
@@ -204,7 +204,7 @@ test(
   "runSync (4): 2 lệnh gọi đồng thời cùng (provider, projectId) — 1 cái bị khoá trả ok:false",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { registerAdapter, runSync } = await import("@/lib/integrations/core");
+    const { registerAdapter, runSync } = await import("@/lib/ha-tang/integrations/core");
 
     const provider = "fake_lock";
     const { projectId } = await setupIntegration(provider);

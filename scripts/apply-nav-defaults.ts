@@ -1,6 +1,6 @@
 import "./env";
-import { queryOne } from "../lib/db";
-import { setNavEnabled, isKnownNodeKey } from "../lib/nav-settings";
+import { queryOne } from "@/lib/db";
+import { setNavEnabled, isKnownNodeKey } from "@/lib/ha-tang/nav-settings";
 
 // Tắt mặc định (toàn hệ thống, project_id NULL) các mục AppShell chưa cần thiết cho
 // trọng tâm "quản lý thi công tại công trường" — theo quyết định 2026-07 (chat với PM):

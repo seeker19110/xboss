@@ -27,8 +27,8 @@ import {
   type DashNode,
   type DashCluster,
 } from "@/app/lib/dashboardTree";
-import { MODULES } from "@/lib/modules";
-import { ROLE_LABELS, type Role } from "@/lib/roles";
+import { MODULES } from "@/lib/nen/modules";
+import { ROLE_LABELS, type Role } from "@/lib/nen/roles";
 
 type Me = { id: number; name: string; email: string; role: string };
 

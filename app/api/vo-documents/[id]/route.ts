@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storageGet, storageDelete } from "@/lib/storage";
+import { storageGet, storageDelete } from "@/lib/nen/storage";
 import { queryOne, run } from "@/lib/db";
-import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/auth";
-import { sha256Hex } from "@/lib/photos";
+import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/bao-mat/auth";
+import { sha256Hex } from "@/lib/nen/photos";
 
 export const dynamic = "force-dynamic";
 

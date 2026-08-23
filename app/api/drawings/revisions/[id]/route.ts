@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   REVISION_STATUSES,
   getRevisionDrawingProject,
   setRevisionStatus,
   type RevisionStatus,
-} from "@/lib/drawings";
-import { sendPushToUsers } from "@/lib/push";
+} from "@/lib/ky-thuat/drawings";
+import { sendPushToUsers } from "@/lib/van-hanh/push";
 
 export const dynamic = "force-dynamic";
 

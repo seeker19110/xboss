@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN, checkCronSecret } from "@/lib/auth";
-import { runMaterialSync } from "@/lib/material-sync";
-import { log } from "@/lib/log";
+import { getCurrentUser, CAN, checkCronSecret } from "@/lib/bao-mat/auth";
+import { runMaterialSync } from "@/lib/vat-tu/material-sync";
+import { log } from "@/lib/nen/log";
 
 export const dynamic = "force-dynamic";
 

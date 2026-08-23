@@ -8,7 +8,7 @@ import {
   generateFidicClaimDossier,
   createFidicClaim,
   listFidicClaims,
-} from "@/lib/engineering-fidic-claim";
+} from "@/lib/ky-thuat/engineering-fidic-claim";
 
 const HAS_DB = Boolean(process.env.TEST_DATABASE_URL || process.env.DATABASE_URL);
 

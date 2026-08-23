@@ -12,8 +12,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne, daysFromTodayISO } = await import("@/lib/db");
-    const { computeCpm } = await import("@/lib/cpm");
-    const { getScheduleControlData } = await import("@/lib/schedule-control");
+    const { computeCpm } = await import("@/lib/tien-do/cpm");
+    const { getScheduleControlData } = await import("@/lib/tien-do/schedule-control");
 
     const ketCau = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'ket_cau'`);
     const xayTo = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'xay_to'`);
@@ -182,8 +182,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne, daysFromTodayISO } = await import("@/lib/db");
-    const { getScheduleControlData } = await import("@/lib/schedule-control");
-    const { getCpmData } = await import("@/lib/gantt-data");
+    const { getScheduleControlData } = await import("@/lib/tien-do/schedule-control");
+    const { getCpmData } = await import("@/lib/tien-do/gantt-data");
 
     const ketCau = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'ket_cau'`);
     assert.ok(ketCau, "cần system ket_cau seed sẵn");

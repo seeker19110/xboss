@@ -38,7 +38,7 @@ import {
   Workflow,
 } from "lucide-react";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { ROLE_LABELS, type Role } from "@/lib/roles";
+import { ROLE_LABELS, type Role } from "@/lib/nen/roles";
 
 const NAV_COLLAPSED_KEY = "xboss_eng_nav_collapsed";
 const NAV_ROLE_FILTER_KEY = "xboss_eng_nav_role_filter";

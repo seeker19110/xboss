@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { getPrescriptiveScenarios } from "@/lib/engineering-prescriptive";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { getPrescriptiveScenarios } from "@/lib/ky-thuat/engineering-prescriptive";
 
 export const dynamic = "force-dynamic";
 

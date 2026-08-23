@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { Printer } from "lucide-react";
 import { fetchMe, redirectToLogin } from "@/app/lib/me";
-import { formatDateDMY } from "@/lib/date";
+import { formatDateDMY } from "@/lib/nen/date";
 import { showToast } from "@/app/components/Toast";
 
 // ── Types ──────────────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 "use client";
 
-import type { DxfParseResult } from "@/lib/cad/dxf-parser";
+import type { DxfParseResult } from "@/lib/ky-thuat/cad/dxf-parser";
 import type {
   DimOverrideItem,
   ManualBlockItem,

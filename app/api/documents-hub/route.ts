@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { DOCUMENT_SOURCES, listAllDocuments, type DocumentSource } from "@/lib/documents-hub";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import {
+  DOCUMENT_SOURCES,
+  listAllDocuments,
+  type DocumentSource,
+} from "@/lib/hien-truong/documents-hub";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
 

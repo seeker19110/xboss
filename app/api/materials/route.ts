@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, insertId, run } from "@/lib/db";
-import { getCurrentUser, type Role } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { assertModuleEnabled } from "@/lib/feature-flags";
-import { boqTakenBy } from "@/lib/boq";
-import { log } from "@/lib/log";
+import { getCurrentUser, type Role } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import { boqTakenBy } from "@/lib/khoi-luong/boq";
+import { log } from "@/lib/nen/log";
 
 export const dynamic = "force-dynamic";
 

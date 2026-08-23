@@ -11,8 +11,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, run, query, withTransaction } = await import("@/lib/db");
-    const { runWithRequestContext } = await import("@/lib/request-context");
-    const { verifyAuditChain } = await import("@/lib/audit-chain");
+    const { runWithRequestContext } = await import("@/lib/nen/request-context");
+    const { verifyAuditChain } = await import("@/lib/bao-mat/audit-chain");
 
     const uid = await insertId(
       `INSERT INTO users (name, email, role, password_hash) VALUES ('Chain Tester', ?, 'admin', 'x')`,
@@ -61,8 +61,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, run, query, withTransaction } = await import("@/lib/db");
-    const { runWithRequestContext } = await import("@/lib/request-context");
-    const { verifyAuditChain } = await import("@/lib/audit-chain");
+    const { runWithRequestContext } = await import("@/lib/nen/request-context");
+    const { verifyAuditChain } = await import("@/lib/bao-mat/audit-chain");
 
     const cid = await insertId(
       `INSERT INTO contracts (code, kind, title, value) VALUES (?, 'nhan_thau', 'HĐ tamper', 100)`,

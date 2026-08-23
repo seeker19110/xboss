@@ -9,7 +9,7 @@ import {
   resolveXrefDependencies,
   bindXrefToMaster,
   DwgUnsupportedError,
-} from "@/lib/cad/dxf-parser";
+} from "@/lib/ky-thuat/cad/dxf-parser";
 
 describe("CAD DXF Parser & 2D-to-3D Spatial Extrusion Suite", () => {
   const sampleDxfContent = `0

@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("isForwardTransition: chỉ cho phép đi tới hoặc đứng yên", async () => {
-  const { isForwardTransition } = await import("@/lib/workfronts");
+  const { isForwardTransition } = await import("@/lib/tien-do/workfronts");
 
   assert.equal(isForwardTransition("pending", "handed_over"), true);
   assert.equal(isForwardTransition("pending", "in_progress"), true);
@@ -15,7 +15,7 @@ test("isForwardTransition: chỉ cho phép đi tới hoặc đứng yên", async
 });
 
 test("validateWorkFrontUpdate: trạng thái không hợp lệ bị chặn", async () => {
-  const { validateWorkFrontUpdate } = await import("@/lib/workfronts");
+  const { validateWorkFrontUpdate } = await import("@/lib/tien-do/workfronts");
 
   assert.equal(
     validateWorkFrontUpdate({
@@ -46,7 +46,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { updateWorkFrontStatus } = await import("@/lib/workfronts");
+    const { updateWorkFrontStatus } = await import("@/lib/tien-do/workfronts");
 
     const sheetId = await insertId(
       `INSERT INTO sheet_types (code, name, slug) VALUES ('WF-TEST', 'Sheet Test WF', 'wf-test')`,
@@ -108,8 +108,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { frontMissingList } = await import("@/lib/workfronts");
-    const { todayISO } = await import("@/lib/date");
+    const { frontMissingList } = await import("@/lib/tien-do/workfronts");
+    const { todayISO } = await import("@/lib/nen/date");
 
     const sheetId = await insertId(
       `INSERT INTO sheet_types (code, name, slug) VALUES ('WF-TEST2', 'Sheet Test WF2', 'wf-test2')`,

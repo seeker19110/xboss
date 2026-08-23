@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { updateSpoolProgressStage, SpoolStatus } from "@/lib/engineering-cad-qto";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { updateSpoolProgressStage, SpoolStatus } from "@/lib/ky-thuat/engineering-cad-qto";
 
 export const dynamic = "force-dynamic";
 

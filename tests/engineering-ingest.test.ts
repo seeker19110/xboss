@@ -74,7 +74,7 @@ function payload(suffix: string, relations = true) {
 before(async () => {
   if (!HAS_TEST_DB) return;
   const { insertId } = await import("@/lib/db");
-  const { generateApiKey, hashApiKey } = await import("@/lib/api-keys");
+  const { generateApiKey, hashApiKey } = await import("@/lib/bao-mat/api-keys");
 
   U = await insertId(
     `INSERT INTO users (name, email, role, password_hash) VALUES ('Eng5','eng5-test@x.vn','admin','x')`,
@@ -375,7 +375,7 @@ test(
 
 test("(10) key sai scope không vào được ingest", S, async () => {
   const { insertId, run } = await import("@/lib/db");
-  const { generateApiKey, hashApiKey } = await import("@/lib/api-keys");
+  const { generateApiKey, hashApiKey } = await import("@/lib/bao-mat/api-keys");
   const readKey = generateApiKey();
   await insertId(
     `INSERT INTO api_keys (name, key_hash, project_id, scopes, created_by) VALUES ('E5read', ?, ?, ?, ?)`,

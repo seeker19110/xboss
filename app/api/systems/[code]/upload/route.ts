@@ -1,11 +1,11 @@
 // app/api/systems/[code]/upload/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { resolveSystemId } from "@/lib/systems";
-import { getCurrentProjectId } from "@/lib/projects";
-import { parsePlanUpload, parseTrackingUpload } from "@/lib/system-upload";
-import { isContentTooLarge, newSystemUploadFileName } from "@/lib/photos";
-import { storagePut } from "@/lib/storage";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { resolveSystemId } from "@/lib/tien-do/systems";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { parsePlanUpload, parseTrackingUpload } from "@/lib/tien-do/system-upload";
+import { isContentTooLarge, newSystemUploadFileName } from "@/lib/nen/photos";
+import { storagePut } from "@/lib/nen/storage";
 import { query } from "@/lib/db";
 
 export const dynamic = "force-dynamic";

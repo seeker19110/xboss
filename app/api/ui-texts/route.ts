@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -12,10 +12,13 @@ export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
-  const row = await queryOne<{ ui_texts: string | null }>(
-    `SELECT ui_texts FROM projects LIMIT 1`);
+  const row = await queryOne<{ ui_texts: string | null }>(`SELECT ui_texts FROM projects LIMIT 1`);
   let texts: Record<string, string> = {};
-  try { texts = JSON.parse(row?.ui_texts ?? "{}") ?? {}; } catch { /* dùng mặc định */ }
+  try {
+    texts = JSON.parse(row?.ui_texts ?? "{}") ?? {};
+  } catch {
+    /* dùng mặc định */
+  }
   return NextResponse.json({ texts });
 }
 
@@ -32,15 +35,20 @@ export async function PATCH(req: NextRequest) {
   const value = typeof body.value === "string" ? body.value.trim() : "";
   if (!key) return NextResponse.json({ error: "Thiếu key" }, { status: 400 });
 
-  const row = await queryOne<{ ui_texts: string | null }>(
-    `SELECT ui_texts FROM projects LIMIT 1`);
+  const row = await queryOne<{ ui_texts: string | null }>(`SELECT ui_texts FROM projects LIMIT 1`);
   let texts: Record<string, string> = {};
-  try { texts = JSON.parse(row?.ui_texts ?? "{}") ?? {}; } catch { /* reset */ }
+  try {
+    texts = JSON.parse(row?.ui_texts ?? "{}") ?? {};
+  } catch {
+    /* reset */
+  }
 
   if (value) texts[key] = value;
   else delete texts[key];
 
-  await run(`UPDATE projects SET ui_texts = ? WHERE id = (SELECT id FROM projects LIMIT 1)`,
-    JSON.stringify(texts));
+  await run(
+    `UPDATE projects SET ui_texts = ? WHERE id = (SELECT id FROM projects LIMIT 1)`,
+    JSON.stringify(texts),
+  );
   return NextResponse.json({ ok: true, texts });
 }

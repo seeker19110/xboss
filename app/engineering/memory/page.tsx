@@ -25,7 +25,7 @@ import type {
   CrossProjectLessonRecord,
   LessonTransferResult,
   PatternType,
-} from "@/lib/engineering-memory-bank";
+} from "@/lib/ky-thuat/engineering-memory-bank";
 
 export default function MemoryBankEngineeringPage() {
   const [patterns, setPatterns] = useState<KnowledgePatternRecord[]>([]);

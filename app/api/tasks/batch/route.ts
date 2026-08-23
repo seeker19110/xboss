@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { assertModuleEnabled } from "@/lib/feature-flags";
-import { boqTakenBy } from "@/lib/boq";
-import { recomputeTask } from "@/lib/recompute";
-import { assignTask } from "@/lib/assignments";
-import { log } from "@/lib/log";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import { boqTakenBy } from "@/lib/khoi-luong/boq";
+import { recomputeTask } from "@/lib/tien-do/recompute";
+import { assignTask } from "@/lib/tien-do/assignments";
+import { log } from "@/lib/nen/log";
 
 export const dynamic = "force-dynamic";
 

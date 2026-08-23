@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storagePut } from "@/lib/storage";
+import { storagePut } from "@/lib/nen/storage";
 import { query, queryOne, insertId } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   extForMime,
   verifyFileMime,
   newHseFileName,
   MAX_PHOTO_BYTES,
   isContentTooLarge,
-} from "@/lib/photos";
+} from "@/lib/nen/photos";
 
 export const dynamic = "force-dynamic";
 

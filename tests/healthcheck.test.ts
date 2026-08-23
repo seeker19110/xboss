@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // Test tính năng kiểm tra trạng thái hoạt động (health check) — lib/healthcheck.ts.
 
 test("runHealthChecks: shape đúng — 9 hạng mục, tính đúng failCount/warnCount", async () => {
-  const { runHealthChecks } = await import("@/lib/healthcheck");
+  const { runHealthChecks } = await import("@/lib/van-hanh/healthcheck");
   const report = await runHealthChecks();
   assert.equal(report.items.length, 9);
   const keys = report.items.map((i) => i.key).sort();
@@ -32,7 +32,7 @@ test(
   "runHealthChecks: có DB test thật → hạng mục 'database' ok",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { runHealthChecks } = await import("@/lib/healthcheck");
+    const { runHealthChecks } = await import("@/lib/van-hanh/healthcheck");
     const report = await runHealthChecks();
     const db = report.items.find((i) => i.key === "database");
     assert.equal(db?.status, "ok", db?.detail);

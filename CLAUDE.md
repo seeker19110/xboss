@@ -11,7 +11,7 @@ XBoss — web app quản lý tiến độ thi công MEP/ACMV (dự án TT AVIO T
 - `PROJECT.md` — _cái gì_ cần xây (vấn đề, MVP, schema, kiến trúc, DoD), viết ngược từ code. **Đọc trước việc liên quan tính năng/thiết kế.**
 - `PROGRESS.md` — đang ở giai đoạn nào, đã xong/đang làm/tiếp theo, **nợ kỹ thuật**. Cập nhật sau mỗi mốc.
 - `docs/adr/` — các quyết định kỹ thuật. **Đọc trước khi đề xuất thay đổi kiến trúc lớn** (vd đừng đề xuất thêm Supabase/ORM/vitest — đã có ADR giải thích lý do giữ hiện trạng).
-- `docs/audit.md` — **tiêu chuẩn audit toàn diện của XBoss** (bảo mật/phân quyền, logic nghiệp vụ & toàn vẹn dữ liệu, UI/UX & a11y) — checklist đúc kết từ các lớp lỗi thật đã lặp lại nhiều lần trong dự án. **Đọc trước khi tự audit/review diện rộng**, và bắt buộc rà theo mục "Vùng rủi ro cao" khi PR chạm `lib/recompute.ts`, `lib/auth.ts`, `lib/material-sync.ts`, `lib/boq.ts` hoặc route tài chính/nghiệm thu.
+- `docs/audit.md` — **tiêu chuẩn audit toàn diện của XBoss** (bảo mật/phân quyền, logic nghiệp vụ & toàn vẹn dữ liệu, UI/UX & a11y) — checklist đúc kết từ các lớp lỗi thật đã lặp lại nhiều lần trong dự án. **Đọc trước khi tự audit/review diện rộng**, và bắt buộc rà theo mục "Vùng rủi ro cao" khi PR chạm `lib/tien-do/recompute.ts`, `lib/bao-mat/auth.ts`, `lib/vat-tu/material-sync.ts`, `lib/khoi-luong/boq.ts` hoặc route tài chính/nghiệm thu.
 - `docs/framework/` — bộ khung quy trình/chất lượng (tham khảo dài, đọc đúng phần cần). Áp dụng brownfield theo `AP-DUNG-vao-du-an-co-san.md`.
 - `docs/ops/` — vận hành sự cố production (`incident-response.md`).
 
@@ -40,7 +40,7 @@ Làm việc với vai trò **kỹ sư full-stack senior kiêm chuyên gia thiế
   | `mechanical` | Cơ học: sửa lint/typecheck theo thông báo, đổi tên hàng loạt, format, CRUD/route bám mẫu có sẵn, cập nhật test theo signature đã đổi                                                          | `mechanical-worker`   | Haiku           |
   - `coordinator` (Opus · low, xem `.claude/agents/coordinator.md`) và `reviewer` (Sonnet, xem `.claude/agents/reviewer.md`) không nằm trong bảng route — coordinator là tầng điều phối, reviewer là bước hậu kiểm sau khi worker code xong, trước khi phiên chính duyệt cuối.
   - **Brief trong PLAN.md phải đầy đủ ngữ cảnh** — đường dẫn file cụ thể, quy ước dự án liên quan, tiêu chí chấp nhận rõ ràng, và (với `complex`) ranh giới quyết định được phép. Coordinator lẫn worker KHÔNG thấy được hội thoại trước đó trong phiên, chỉ thấy đúng những gì viết trong kế hoạch/brief.
-  - Phân vân giữa 2 route → chọn route **rẻ hơn** nếu đặc tả kín, route **đắt hơn** nếu việc chạm vùng rủi ro cao trong `docs/audit.md` (`lib/recompute.ts`, `lib/auth.ts`, `lib/material-sync.ts`, `lib/boq.ts`, route tài chính/nghiệm thu).
+  - Phân vân giữa 2 route → chọn route **rẻ hơn** nếu đặc tả kín, route **đắt hơn** nếu việc chạm vùng rủi ro cao trong `docs/audit.md` (`lib/tien-do/recompute.ts`, `lib/bao-mat/auth.ts`, `lib/vat-tu/material-sync.ts`, `lib/khoi-luong/boq.ts`, route tài chính/nghiệm thu).
 
 - **Trước khi code (đặc biệt khi dispatch subagent/worktree song song): luôn đồng bộ nhánh trước.** `git fetch origin` + đảm bảo base (`main` cục bộ hoặc nhánh làm việc) khớp `origin/main` mới nhất trước khi tạo worktree/nhánh mới — nhánh cục bộ lỗi thời khiến agent code chồng số migration/bỏ lỡ thay đổi mới, gây conflict phải dọn tay lúc tích hợp (đã xảy ra thật ở đợt M32/M33/M34, xem `PROGRESS.md`). Mỗi việc song song code trên nhánh/worktree riêng của nó, không chia sẻ working tree, để tránh xung đột file giữa các agent.
 
@@ -55,6 +55,8 @@ npm test             # node:test qua tsx — hơn 100 file trong tests/ (không 
 npm test -- --release-gate   # như trên, nhưng ca bị SKIP = LỖI (trừ file có lý do trong scripts/test-skip-allowlist.json). CI dùng cờ này.
 npm run test:mutation        # C4 §4 — cố ý phá 9 bất biến (progress/delayed/nghiệm thu/RBAC/risk/gates/idempotency/RLS/tiền) rồi ĐÒI test phải đỏ. Cần TEST_DATABASE_URL.
 npx tsx --test tests/status.test.ts   # chạy 1 file test
+npm run check:lib-layers     # ADR-0007 — ranh giới miền lib/: chặn import ngược tầng + chu trình mới
+npm run check:dead-code      # dò module không ai với tới được (đồ thị import toàn repo)
 npm run db:seed      # import Excel gốc trong attachments/ vào DB
 ```
 
@@ -69,11 +71,41 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy lint + typecheck + test +
 - `XBOSS_ADMIN_PASSWORD` — production + DB trống chỉ tạo 1 admin với mật khẩu này (không seed 4 tài khoản demo như dev).
 - `CRON_SECRET` — bảo vệ `/api/cron/daily-report`, chỉ nhận qua header `Authorization: Bearer` (không qua query param).
 - `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` — (tuỳ chọn) gửi báo cáo trễ hạn hằng ngày qua Telegram, song song với email SMTP.
-- `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` — (tuỳ chọn) Web Push; sinh key bằng `npx web-push generate-vapid-keys`. Thiếu key → nút bật push tự ẩn, mọi hàm gửi trong `lib/push.ts` là no-op.
-- `GOOGLE_SERVICE_ACCOUNT_JSON` (hoặc cặp `GOOGLE_SA_EMAIL` + `GOOGLE_SA_PRIVATE_KEY`) + `GOOGLE_SHEET_ID` + `GOOGLE_SHEET_TAB` — (tuỳ chọn) đồng bộ hai chiều bảng vật tư ↔ Google Sheet. Thiếu cấu hình → `lib/google-sheets.ts` throw fail-fast khi gọi sync (build vẫn chạy).
+- `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` — (tuỳ chọn) Web Push; sinh key bằng `npx web-push generate-vapid-keys`. Thiếu key → nút bật push tự ẩn, mọi hàm gửi trong `lib/van-hanh/push.ts` là no-op.
+- `GOOGLE_SERVICE_ACCOUNT_JSON` (hoặc cặp `GOOGLE_SA_EMAIL` + `GOOGLE_SA_PRIVATE_KEY`) + `GOOGLE_SHEET_ID` + `GOOGLE_SHEET_TAB` — (tuỳ chọn) đồng bộ hai chiều bảng vật tư ↔ Google Sheet. Thiếu cấu hình → `lib/vat-tu/google-sheets.ts` throw fail-fast khi gọi sync (build vẫn chạy).
 - `SENTRY_DSN` — (tuỳ chọn) theo dõi lỗi production qua Sentry (`instrumentation.ts` + `sentry.server.config.ts`/`sentry.edge.config.ts`, xem `docs/audit.md` §10). Thiếu → SDK tự `enabled: false`, không gửi gì, không ảnh hưởng build/dev.
 
 ## Kiến trúc
+
+### Cấu trúc `lib/` theo miền (ADR-0007 — BẮT BUỘC tuân thủ)
+
+`lib/` chia theo **miền nghiệp vụ**, mỗi thư mục mang một **số tầng** khai trong `lib/layers.json`.
+Luật: **chỉ được import xuống tầng thấp hơn**; riêng các miền nghiệp vụ (cùng tầng 4) được import
+chéo nhau nhưng **không được tạo chu trình**. `npm run check:lib-layers` canh việc này trong CI.
+
+| Tầng | Thư mục            | Chứa gì                                                                                                    |
+| ---- | ------------------ | ---------------------------------------------------------------------------------------------------------- |
+| 0    | `lib/nen/`         | Tiện ích **thuần, không chạm DB**: date, money, roles, sheets, log, env, storage, photos…                  |
+| 1    | `lib/db/`          | Lớp truy cập DB + migrate                                                                                  |
+| 2    | `lib/ha-tang/`     | Dịch vụ hạ tầng **có** chạm DB: projects, feature-flags, code-lists, custom-fields, retention, sync-locks… |
+| 3    | `lib/bao-mat/`     | auth, permissions, sod, csrf, totp, oidc, ratelimit, audit…                                                |
+| 4    | `lib/tien-do/`     | recompute, status, grid, cpm, evm, gantt, report, import, approvals…                                       |
+| 4    | `lib/khoi-luong/`  | boq, boq-import, norms                                                                                     |
+| 4    | `lib/tai-chinh/`   | finance, cost, contracts, claims, vo, paymentcerts, procurement, tender…                                   |
+| 4    | `lib/vat-tu/`      | material-sync, google-sheets, resources, equipment                                                         |
+| 4    | `lib/hien-truong/` | hse, diary, hr, subcontractors, meetings, handover, warranty, risks…                                       |
+| 4    | `lib/ky-thuat/`    | toàn bộ `engineering-*`, `bim/`, `cad/`, drawings, qaqc, tech                                              |
+| 4    | `lib/van-hanh/`    | alerts, push, notification-prefs, health                                                                   |
+| 5    | `lib/dich-vu/`     | Logic **phối hợp từ 2 miền trở lên** (ADR-0008) — không phải sọt rác cho code khó xếp                      |
+
+**Route handler chỉ là ranh giới HTTP** (ADR-0008): kiểm phiên/quyền, đọc tham số, gọi dịch vụ,
+bọc `NextResponse`. Logic nghiệp vụ nằm ở `lib/<miền>/`; logic cần **từ 2 miền trở lên** nằm ở
+`lib/dich-vu/` và **không được biết gì về HTTP** (trả dữ liệu thuần, không trả `NextResponse`).
+
+**Thêm module mới:** đặt vào đúng miền theo _nó nói về cái gì_, không theo _nó là loại gì_
+(đừng tạo `utils/`). Cần dùng chung giữa nhiều miền → đẩy **xuống** `nen/` (nếu thuần) hoặc
+`ha-tang/` (nếu chạm DB), **không** để tầng thấp import ngược lên. Import nội bộ `lib/` luôn
+dùng alias `@/lib/<miền>/<module>`, không dùng đường dẫn tương đối.
 
 ### Lớp DB (`lib/db/index.ts`)
 
@@ -81,11 +113,11 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy lint + typecheck + test +
 - **Schema qua hệ migrate SQL nhẹ** (`migrations/*.sql` đánh số + bảng `schema_migrations` + runner `lib/db/migrate.ts`, xem ADR-0003): `ensureSchema()` tự áp migration chưa chạy khi query đầu tiên (advisory lock chống chạy chồng), hoặc chủ động qua `npm run db:migrate`. **Đổi schema = thêm file `migrations/000N_*.sql` mới** (append-only, không sửa file đã áp production); vẫn idempotent (`IF NOT EXISTS`). Backfill dữ liệu phức tạp vẫn có thể viết script trong `scripts/` (xem `backfill-boq.ts`, `backfill-dims.ts`).
 - Type parser tuỳ chỉnh: cột `DATE` giữ nguyên **chuỗi** `'YYYY-MM-DD'` — toàn bộ code so sánh ngày bằng so sánh chuỗi (vd `end_date < todayISO()`). BIGINT/NUMERIC parse thành number.
 
-### Auth (`lib/auth.ts`)
+### Auth (`lib/bao-mat/auth.ts`)
 
 - Phiên stateless: cookie `xboss_session` = `userId.exp.HMAC` — không có bảng session.
-- Login có rate limit lưu Postgres (`lib/ratelimit.ts`, bảng `login_rate_limits`): 5 lần sai/15 phút theo IP+email, 20/IP → 429 + `Retry-After`. Upsert atomic qua `ON CONFLICT` nên đúng khi chạy nhiều instance.
-- 7 vai trò (`lib/roles.ts`): `admin | pm | engineer | subcon` (thao tác) + `bch | cdt | viewer` (chỉ-xem + bình luận, `VIEW_ONLY_ROLES`). Quyền tập trung trong map `CAN`; subcon chỉ thao tác task được gán (`canTouchTask`); `bch` thêm được xem các trang tài chính (`PAYMENT_VIEW_ROLES` = `admin/pm/bch`).
+- Login có rate limit lưu Postgres (`lib/bao-mat/ratelimit.ts`, bảng `login_rate_limits`): 5 lần sai/15 phút theo IP+email, 20/IP → 429 + `Retry-After`. Upsert atomic qua `ON CONFLICT` nên đúng khi chạy nhiều instance.
+- 7 vai trò (`lib/nen/roles.ts`): `admin | pm | engineer | subcon` (thao tác) + `bch | cdt | viewer` (chỉ-xem + bình luận, `VIEW_ONLY_ROLES`). Quyền tập trung trong map `CAN`; subcon chỉ thao tác task được gán (`canTouchTask`); `bch` thêm được xem các trang tài chính (`PAYMENT_VIEW_ROLES` = `admin/pm/bch`).
 - **Các trang chỉ redirect client-side khi 401 — API route là ranh giới bảo mật duy nhất.** Mọi route handler mới phải gọi `getCurrentUser()` và trả 401 khi chưa đăng nhập (pattern xem `app/api/dashboard/route.ts`).
 
 ### Mô hình dữ liệu (WBS)
@@ -94,15 +126,15 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy lint + typecheck + test +
 Project → Tower → SheetType (5 sheet) → WorkPackage → Task → ProgressDimension
 ```
 
-- Sheet (trang tracking) **động**: slug URL lưu ở cột `sheet_types.slug` (unique). Tạo sheet mới qua `POST /api/sheets`, đổi tên/mã/slug qua `PATCH /api/sheets/:id` (Admin/PM), xoá kèm toàn bộ dữ liệu qua `DELETE` (chỉ Admin). Mapping tĩnh trong `lib/sheets.ts` chỉ còn dùng để backfill 5 sheet gốc (`ogtd`, `oghl`, `ogch`, `odnn1`, `odnn2`) và làm fallback client. ODNN Zone 1/2 dùng chung mã hàng `A{n}` — phân biệt bằng sheet.
+- Sheet (trang tracking) **động**: slug URL lưu ở cột `sheet_types.slug` (unique). Tạo sheet mới qua `POST /api/sheets`, đổi tên/mã/slug qua `PATCH /api/sheets/:id` (Admin/PM), xoá kèm toàn bộ dữ liệu qua `DELETE` (chỉ Admin). Mapping tĩnh trong `lib/nen/sheets.ts` chỉ còn dùng để backfill 5 sheet gốc (`ogtd`, `oghl`, `ogch`, `odnn1`, `odnn2`) và làm fallback client. ODNN Zone 1/2 dùng chung mã hàng `A{n}` — phân biệt bằng sheet.
 - `ProgressDimension` = ô checkbox trong lưới tracking (mỗi kích thước ống hoặc mỗi căn hộ).
-- BOQCODE (`lib/boq.ts`): mã duy nhất **toàn hệ thống trên tasks, work_packages lẫn materials** — khi sửa/tạo phải check `boqTakenBy` trước.
+- BOQCODE (`lib/khoi-luong/boq.ts`): mã duy nhất **toàn hệ thống trên tasks, work_packages lẫn materials** — khi sửa/tạo phải check `boqTakenBy` trước.
 - Vật tư: mọi thay đổi `qty_used` ghi vào `material_transactions` (delta ±, người ghi) — qua `POST /api/materials/:id/transactions` hoặc tự động khi PATCH `qtyUsed` trực tiếp.
-- **Đồng bộ Google Sheet (`lib/material-sync.ts` + `lib/google-sheets.ts`):** đồng bộ **hai chiều** `materials` ↔ một Google Sheet bằng Service Account. Khớp dòng theo cột `ID`; 3-way merge dựa snapshot bảng `material_sync` (chỉ DB đổi → đẩy ra Sheet, chỉ Sheet đổi → kéo vào DB, cả hai đổi → xung đột, **DB ưu tiên** qua `CONFLICT_POLICY`). Chỉ các trường định nghĩa (`SYNCED_FIELDS`: boqCode/name/unit/qtyBoq/qtyPlanned/status/note) là hai chiều; `qty_used`/`qty_stock`/`min_stock_level` chỉ DB→Sheet (giữ nguyên audit). Chống chạy chồng bằng bảng khoá `sync_locks`. Điểm vào: `POST /api/materials/sync` (nút Admin/PM trên `/materials`) và `GET /api/cron/sync-sheets` (cron, xác thực `CRON_SECRET` Bearer hoặc session Admin/PM). Logic merge thuần `decideMerge` test ở `tests/material-sync.test.ts`.
+- **Đồng bộ Google Sheet (`lib/vat-tu/material-sync.ts` + `lib/vat-tu/google-sheets.ts`):** đồng bộ **hai chiều** `materials` ↔ một Google Sheet bằng Service Account. Khớp dòng theo cột `ID`; 3-way merge dựa snapshot bảng `material_sync` (chỉ DB đổi → đẩy ra Sheet, chỉ Sheet đổi → kéo vào DB, cả hai đổi → xung đột, **DB ưu tiên** qua `CONFLICT_POLICY`). Chỉ các trường định nghĩa (`SYNCED_FIELDS`: boqCode/name/unit/qtyBoq/qtyPlanned/status/note) là hai chiều; `qty_used`/`qty_stock`/`min_stock_level` chỉ DB→Sheet (giữ nguyên audit). Chống chạy chồng bằng bảng khoá `sync_locks`. Điểm vào: `POST /api/materials/sync` (nút Admin/PM trên `/materials`) và `GET /api/cron/sync-sheets` (cron, xác thực `CRON_SECRET` Bearer hoặc session Admin/PM). Logic merge thuần `decideMerge` test ở `tests/material-sync.test.ts`.
 
-### Chuỗi tính toán tiến độ (`lib/recompute.ts`)
+### Chuỗi tính toán tiến độ (`lib/tien-do/recompute.ts`)
 
-Tick checkbox dimension → `recomputeTask` (% = số ô checked / tổng ô) → `deriveStatus` → `recomputePackage` (% nhóm = trung bình các task) → ghi `task_history` nếu % đổi. Status là enum slug trong `lib/status.ts` (`chuan_bi | dang_thi_cong | hoan_thanh | tre | nghiem_thu`); `toStatusSlug` map mọi biến thể tiếng Việt có dấu/không dấu từ Excel. Quy tắc: `nghiem_thu` không bao giờ bị hạ cấp tự động; `tre` suy ra từ `end_date < hôm nay && progress < 1`.
+Tick checkbox dimension → `recomputeTask` (% = số ô checked / tổng ô) → `deriveStatus` → `recomputePackage` (% nhóm = trung bình các task) → ghi `task_history` nếu % đổi. Status là enum slug trong `lib/tien-do/status.ts` (`chuan_bi | dang_thi_cong | hoan_thanh | tre | nghiem_thu`); `toStatusSlug` map mọi biến thể tiếng Việt có dấu/không dấu từ Excel. Quy tắc: `nghiem_thu` không bao giờ bị hạ cấp tự động; `tre` suy ra từ `end_date < hôm nay && progress < 1`.
 
 **Nghiệm thu 2 bước:** `nghiem_thu` chỉ đặt/huỷ được qua `POST/DELETE /api/tasks/:id/approve` (quyền `CAN.approve` = Admin/PM, task phải đạt 100%, ghi audit vào `task_history`). PATCH task thường chặn `status=nghiem_thu`. Duyệt theo lô qua `POST /api/approvals { taskIds }` (cùng quy tắc); trang `/approvals` liệt kê task chờ duyệt + đã duyệt, kèm upload **biên bản nghiệm thu** (bảng `task_documents`, PDF/ảnh max 20MB, route `/api/tasks/:id/documents` + `/api/documents/:id`, file chung thư mục `data/uploads/`).
 
@@ -110,15 +142,15 @@ Tick checkbox dimension → `recomputeTask` (% = số ô checked / tổng ô) �
 
 ### Tính năng kèm theo task
 
-- **Ảnh hiện trường** (`task_photos`): file lưu `data/uploads/` (ngoài git), tên file do server sinh (`lib/photos.ts`), chỉ nhận mime ảnh, max 10MB. Route: `/api/tasks/:id/photos`, `/api/photos/:id`.
+- **Ảnh hiện trường** (`task_photos`): file lưu `data/uploads/` (ngoài git), tên file do server sinh (`lib/nen/photos.ts`), chỉ nhận mime ảnh, max 10MB. Route: `/api/tasks/:id/photos`, `/api/photos/:id`.
 - **Bình luận** (`task_comments`): `/api/tasks/:id/comments` — bình luận mới upsert notification type `comment` cho người được giao + người từng bình luận.
 - **Thông báo** (`/api/notifications`): đồng bộ on-fetch 4 loại — `delayed`, `due_soon` (hạn ≤3 ngày, progress <70%), `comment`, `material_over` (vật tư vượt định mức, dedup theo cột `material_id` + unique index một phần). Loại nào hết điều kiện thì tự dọn bản ghi chưa đọc.
-- **Web Push** (`lib/push.ts` + bảng `push_subscriptions`): đăng ký per thiết bị qua `/api/push/subscribe` (upsert theo `endpoint`), nút bật/tắt trong chuông thông báo. Điểm gửi: bình luận mới (tới người liên quan) + cron báo cáo ngày (tóm tắt tới mọi thiết bị). Subscription chết (404/410) tự xoá khi gửi.
+- **Web Push** (`lib/van-hanh/push.ts` + bảng `push_subscriptions`): đăng ký per thiết bị qua `/api/push/subscribe` (upsert theo `endpoint`), nút bật/tắt trong chuông thông báo. Điểm gửi: bình luận mới (tới người liên quan) + cron báo cáo ngày (tóm tắt tới mọi thiết bị). Subscription chết (404/410) tự xoá khi gửi.
 - **Tìm kiếm toàn cục** (`/api/search?q=` + `GlobalSearch` trên header Dashboard): ILIKE trên mã Excel/BOQCODE/tên của cả tasks lẫn work_packages, kết quả nhảy tới sheet + filter tầng.
 
 ### Nguyên nhân trễ & kế hoạch ngắn hạn
 
-- Cột `tasks.delay_reason/delay_note` — danh mục 6 lý do trong `lib/delay.ts`; gán qua `POST /api/tasks/:id/delay-reason` (mọi vai trò sửa tiến độ, subcon chỉ task được giao). Dashboard có panel Pareto bấm để lọc bảng trễ.
+- Cột `tasks.delay_reason/delay_note` — danh mục 6 lý do trong `lib/tien-do/delay.ts`; gán qua `POST /api/tasks/:id/delay-reason` (mọi vai trò sửa tiến độ, subcon chỉ task được giao). Dashboard có panel Pareto bấm để lọc bảng trễ.
 - `/lookahead` (+ `/api/lookahead?days=`): trang in kế hoạch 7/14/21 ngày — task sắp bắt đầu + đến hạn, nhóm theo hệ.
 - Lưới tracking (Admin/PM): sửa ngày BĐ/KT qua modal (PATCH ngày xong gọi `recomputeTask` để cập nhật trạng thái trễ); checkbox chọn nhiều task → gán người/đặt ngày hàng loạt.
 
@@ -149,7 +181,7 @@ Làm việc với vai trò **chuyên gia thiết kế** — giao diện phải �
 
 - **Dark-first**: viết class Tailwind theo chế độ tối; chế độ sáng **tự đảo màu** qua override biến CSS trong `app/globals.css` (`html.light`). **Không dùng biến thể `dark:` và không hardcode mã hex** trong component — nếu không sẽ vỡ cơ chế đảo màu.
 - Dùng thang **`zinc`** cho nền/chữ/viền và màu nhấn ở mức **`-300`/`-400`** (emerald/sky/amber/violet/rose/red...); light mode đã làm đậm các mức này cho đủ tương phản.
-- Màu trạng thái nhất quán theo enum `lib/status.ts` (vd `tre` = cam, `hoan_thanh`/`nghiem_thu` = xanh) — dùng cùng bảng màu ở mọi nơi (badge, biểu đồ, heatmap).
+- Màu trạng thái nhất quán theo enum `lib/tien-do/status.ts` (vd `tre` = cam, `hoan_thanh`/`nghiem_thu` = xanh) — dùng cùng bảng màu ở mọi nơi (badge, biểu đồ, heatmap).
 - Theme lưu ở `localStorage('xboss_theme')`, chuyển bằng `ThemeToggle`.
 
 **Thư viện & component:**
@@ -169,7 +201,7 @@ Làm việc với vai trò **chuyên gia thiết kế** — giao diện phải �
 - Trang in (`/report`) phải sạch khi `window.print()` → PDF (ẩn nav/nút, layout vừa khổ giấy).
 - Mọi nhãn, thông báo, tooltip bằng **tiếng Việt**.
 
-### Import Excel (`lib/import.ts`)
+### Import Excel (`lib/tien-do/import.ts`)
 
 Parse file tracking gốc (sheet OGTĐ/OGHL/OGCH/ODNN) thành WBS — chứa logic nhận diện hàng nhóm vs sub-task theo pattern mã (`A1` vs `A1,01`), chuyển serial Excel → ISO date, parse % tiến độ lẫn chuỗi trạng thái. Đường vào: `/api/import/excel` (upload) hoặc `npm run db:seed` (file trong `attachments/`).
 
@@ -179,7 +211,7 @@ Parse file tracking gốc (sheet OGTĐ/OGHL/OGCH/ODNN) thành WBS — chứa log
 - Khi thêm API route mới: luôn có check auth + `export const dynamic = "force-dynamic"`.
 - TypeScript strict, import nội bộ qua alias `@/*`, tránh `any` tuỳ tiện.
 - SQL luôn dùng helper `lib/db` với placeholder `?` — **không nối chuỗi để chèn giá trị**.
-- **Tiền tệ (M45 PR1):** parser oid 1700 (`lib/db/index.ts`) chuyển NUMERIC → `parseFloat` nên **cấm cộng/nhân tiền trên float JS**. Mọi tổng/tích tiền (`SUM`, `* rate`) làm **trong SQL**; JS chỉ hiển thị. Khi buộc phải tính tiếp ở JS (vd tỷ lệ VAT/tạm ứng/giữ lại), cast cột tiền `::text` trong SELECT rồi đưa qua `lib/money.ts` (`parseMoney`/`addMoney`/`mulRate`/`formatVnd` — làm việc trên bigint đơn vị nhỏ = đồng×100).
+- **Tiền tệ (M45 PR1):** parser oid 1700 (`lib/db/index.ts`) chuyển NUMERIC → `parseFloat` nên **cấm cộng/nhân tiền trên float JS**. Mọi tổng/tích tiền (`SUM`, `* rate`) làm **trong SQL**; JS chỉ hiển thị. Khi buộc phải tính tiếp ở JS (vd tỷ lệ VAT/tạm ứng/giữ lại), cast cột tiền `::text` trong SELECT rồi đưa qua `lib/nen/money.ts` (`parseMoney`/`addMoney`/`mulRate`/`formatVnd` — làm việc trên bigint đơn vị nhỏ = đồng×100).
 
 ## Quy trình & Definition of Done
 

@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 const RUN = Date.now().toString(36);
 
 test("plannedRatio: nội suy tuyến tính clamp 0..1, ngày KT ≤ ngày BĐ coi là mốc", async () => {
-  const { plannedRatio } = await import("@/lib/evm");
+  const { plannedRatio } = await import("@/lib/tien-do/evm");
   const ms = (iso: string) => new Date(iso + "T00:00:00Z").getTime();
   // Giữa kỳ 10 ngày → 0.5
   assert.equal(plannedRatio("2026-01-01", "2026-01-11", ms("2026-01-06")), 0.5);
@@ -26,8 +26,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, run } = await import("@/lib/db");
-    const { getEvmSeries } = await import("@/lib/evm");
-    const { daysFromTodayISO } = await import("@/lib/date");
+    const { getEvmSeries } = await import("@/lib/tien-do/evm");
+    const { daysFromTodayISO } = await import("@/lib/nen/date");
 
     let projectId = 0;
     let towerId = 0;
@@ -162,8 +162,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, run } = await import("@/lib/db");
-    const { getEvmSeries } = await import("@/lib/evm");
-    const { daysFromTodayISO } = await import("@/lib/date");
+    const { getEvmSeries } = await import("@/lib/tien-do/evm");
+    const { daysFromTodayISO } = await import("@/lib/nen/date");
 
     let projectId = 0;
     let towerId = 0;

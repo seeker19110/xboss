@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("validatePersonnelInput: đủ ca hợp lệ/không hợp lệ", async () => {
-  const { validatePersonnelInput } = await import("@/lib/hr");
+  const { validatePersonnelInput } = await import("@/lib/hien-truong/hr");
 
   const base = {
     code: "NS-001",
@@ -24,7 +24,7 @@ test("validatePersonnelInput: đủ ca hợp lệ/không hợp lệ", async () =
 });
 
 test("validateCrewInput: đủ ca hợp lệ/không hợp lệ", async () => {
-  const { validateCrewInput } = await import("@/lib/hr");
+  const { validateCrewInput } = await import("@/lib/hien-truong/hr");
 
   const base = { name: "Tổ điện 1", systemId: null, supplierId: null, leaderId: null };
   assert.equal(validateCrewInput(base), null);
@@ -32,7 +32,7 @@ test("validateCrewInput: đủ ca hợp lệ/không hợp lệ", async () => {
 });
 
 test("validateAttendanceInput: chấm gộp vs chấm theo người", async () => {
-  const { validateAttendanceInput } = await import("@/lib/hr");
+  const { validateAttendanceInput } = await import("@/lib/hien-truong/hr");
 
   // Thiếu cả tổ đội lẫn nhân sự.
   assert.match(
@@ -130,7 +130,7 @@ test("validateAttendanceInput: chấm gộp vs chấm theo người", async () =
 });
 
 test("maskIdNumber: ẩn CCCD khi không phải admin/pm", async () => {
-  const { maskIdNumber } = await import("@/lib/hr");
+  const { maskIdNumber } = await import("@/lib/hien-truong/hr");
 
   const rows = [{ id: 1, idNumber: "001099001234" }];
   assert.equal(maskIdNumber(rows, true)[0].idNumber, "001099001234");
@@ -144,7 +144,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { attendanceByDate } = await import("@/lib/hr");
+    const { attendanceByDate } = await import("@/lib/hien-truong/hr");
 
     const projectId = await insertId(
       `INSERT INTO projects (name, code) VALUES ('DA HR Attendance', 'PJT-HR1')`,
@@ -220,8 +220,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { expiringCertifications } = await import("@/lib/hr");
-    const { daysFromTodayISO } = await import("@/lib/date");
+    const { expiringCertifications } = await import("@/lib/hien-truong/hr");
+    const { daysFromTodayISO } = await import("@/lib/nen/date");
 
     const userId = await insertId(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('Test Notif Cert', 'notifcert@test.local', 'x', 'admin')`,

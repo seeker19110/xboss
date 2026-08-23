@@ -8,7 +8,7 @@ import {
   analyzeCeilingPlenumClearance,
   PreliminarySegment,
   StructuralBeam,
-} from "@/lib/engineering-shopdrawing-omnipotent";
+} from "@/lib/ky-thuat/engineering-shopdrawing-omnipotent";
 
 test("M69: convertToLod400Dfma phân đoạn Spool <= 5.8m, áp dụng dốc 2% và chèn mặt bích", () => {
   const segments: PreliminarySegment[] = [

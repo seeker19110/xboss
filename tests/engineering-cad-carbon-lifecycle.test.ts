@@ -6,8 +6,11 @@ import {
   evaluateAssetHealthAndRul,
   exportDigitalTwinPassport,
   EMBODIED_CARBON_FACTORS,
-} from "@/lib/engineering-cad-carbon-lifecycle";
-import { fitCylinderRansac, generateAsBuiltRedlineAndStamp } from "@/lib/engineering-scan-to-bim";
+} from "@/lib/ky-thuat/engineering-cad-carbon-lifecycle";
+import {
+  fitCylinderRansac,
+  generateAsBuiltRedlineAndStamp,
+} from "@/lib/ky-thuat/engineering-scan-to-bim";
 
 test("M76: calculate6dCarbonLca tính toán phát thải carbon ẩn theo ISO 14040/14044", () => {
   const elements = [

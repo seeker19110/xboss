@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { solve1dCuttingStock, RequiredPiece } from "@/lib/engineering-mepf-nesting";
+import { solve1dCuttingStock, RequiredPiece } from "@/lib/ky-thuat/engineering-mepf-nesting";
 
 test("M68: solve1dCuttingStock tối ưu hóa xếp cây ống 6m và hạ phế liệu phôi thừa", () => {
   const pieces: RequiredPiece[] = [

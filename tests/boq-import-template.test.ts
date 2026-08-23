@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import path from "node:path";
 import * as XLSX from "xlsx";
-import { parseBoqWorkbook } from "@/lib/boq-import";
+import { parseBoqWorkbook } from "@/lib/khoi-luong/boq-import";
 
 test("parseBoqWorkbook: parse file mẫu MAU-KHOI-LUONG-BOQ.xlsx trích xuất chính xác", () => {
   const filePath = path.join(process.cwd(), "attachments", "MAU-KHOI-LUONG-BOQ.xlsx");
@@ -31,7 +31,7 @@ test(
   "previewBoqImport: ưu tiên giữ nguyên mã BOQ có sẵn trong file mẫu",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { previewBoqImport } = await import("@/lib/boq-import");
+    const { previewBoqImport } = await import("@/lib/khoi-luong/boq-import");
     const sampleRows = [
       {
         rowIndex: 10,
@@ -70,7 +70,7 @@ test(
   "previewBoqImport: phát hiện mã trùng lặp trong cùng 1 file",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { previewBoqImport } = await import("@/lib/boq-import");
+    const { previewBoqImport } = await import("@/lib/khoi-luong/boq-import");
     const duplicateRows = [
       {
         rowIndex: 10,

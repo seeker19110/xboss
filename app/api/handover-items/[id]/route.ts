@@ -1,20 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storagePut, storageDelete } from "@/lib/storage";
+import { storagePut, storageDelete } from "@/lib/nen/storage";
 import { queryOne, run, withTransaction } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   extForDocMime,
   verifyFileMime,
   newHandoverMinutesFileName,
   MAX_DOC_BYTES,
   isContentTooLarge,
-} from "@/lib/photos";
+} from "@/lib/nen/photos";
 import {
   parseHandoverItemBody,
   validateHandoverItemInput,
   type HandoverItemInput,
-} from "@/lib/handover";
+} from "@/lib/hien-truong/handover";
 
 export const dynamic = "force-dynamic";
 

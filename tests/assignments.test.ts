@@ -49,7 +49,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { assignSheetManager } = await import("@/lib/assignments");
+    const { assignSheetManager } = await import("@/lib/tien-do/assignments");
 
     const ids = await seedProject();
     const userA = await insertId(
@@ -128,7 +128,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { assignPackage } = await import("@/lib/assignments");
+    const { assignPackage } = await import("@/lib/tien-do/assignments");
 
     const ids = await seedProject();
     const manager = await insertId(
@@ -182,7 +182,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { assignTask, inheritedAssigneeFor } = await import("@/lib/assignments");
+    const { assignTask, inheritedAssigneeFor } = await import("@/lib/tien-do/assignments");
 
     const ids = await seedProject();
     const pkgOwner = await insertId(
@@ -232,7 +232,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { userWorkloads } = await import("@/lib/assignments");
+    const { userWorkloads } = await import("@/lib/tien-do/assignments");
 
     const ids = await seedProject();
     const worker = await insertId(

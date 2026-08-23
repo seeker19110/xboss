@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("validateEquipmentInput: đủ ca hợp lệ/không hợp lệ", async () => {
-  const { validateEquipmentInput } = await import("@/lib/equipment");
+  const { validateEquipmentInput } = await import("@/lib/vat-tu/equipment");
 
   const base = {
     code: "TB-0001",
@@ -31,7 +31,7 @@ test("validateEquipmentInput: đủ ca hợp lệ/không hợp lệ", async () =
 });
 
 test("validateEquipmentLogInput: issue/move cần vị trí hoặc tổ đội", async () => {
-  const { validateEquipmentLogInput } = await import("@/lib/equipment");
+  const { validateEquipmentLogInput } = await import("@/lib/vat-tu/equipment");
 
   assert.match(
     validateEquipmentLogInput({ action: "issue", toLocation: null, toCrew: null, note: null })!,
@@ -63,7 +63,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { addEquipmentLog } = await import("@/lib/equipment");
+    const { addEquipmentLog } = await import("@/lib/vat-tu/equipment");
 
     const userId = await insertId(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('EQ Test', 'eq-test@xboss.vn', 'x', 'admin')`,
@@ -133,8 +133,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { calibrationDueList } = await import("@/lib/equipment");
-    const { daysFromTodayISO } = await import("@/lib/date");
+    const { calibrationDueList } = await import("@/lib/vat-tu/equipment");
+    const { daysFromTodayISO } = await import("@/lib/nen/date");
 
     const soonId = await insertId(
       `INSERT INTO equipment (code, name, kind, calibration_due) VALUES ('TB-TEST-SOON', 'Thiết bị sắp hết hạn', 'May do', ?)`,
@@ -165,7 +165,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { listEquipment } = await import("@/lib/equipment");
+    const { listEquipment } = await import("@/lib/vat-tu/equipment");
 
     const p1 = await insertId(
       `INSERT INTO projects (name, code) VALUES ('DA Thiết bị 1', 'PJT-EQ1')`,

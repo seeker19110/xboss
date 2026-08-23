@@ -9,7 +9,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { listAllDocuments } = await import("@/lib/documents-hub");
+    const { listAllDocuments } = await import("@/lib/hien-truong/documents-hub");
 
     const dien = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'dien'`);
     assert.ok(dien, "system 'dien' phải có sẵn từ migration 0005_boq.sql");
@@ -153,7 +153,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { listAllDocuments } = await import("@/lib/documents-hub");
+    const { listAllDocuments } = await import("@/lib/hien-truong/documents-hub");
 
     const drawingId = await insertId(
       `INSERT INTO drawings (code, name, kind) VALUES ('DWG-HUB-TEST', 'Bản vẽ test hub', 'shop')`,
@@ -183,7 +183,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { listAllDocuments } = await import("@/lib/documents-hub");
+    const { listAllDocuments } = await import("@/lib/hien-truong/documents-hub");
 
     const dien = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'dien'`);
     assert.ok(dien, "system 'dien' phải có sẵn từ migration 0005_boq.sql");

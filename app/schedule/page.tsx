@@ -29,8 +29,8 @@ import SCurveChart from "@/app/components/SCurveChart";
 import ProgressMap from "@/app/components/ProgressMap";
 import { LookaheadTable } from "@/app/components/LookaheadTable";
 import SystemFilter from "@/app/components/SystemFilter";
-import { formatDateVN } from "@/lib/date";
-import type { CriticalRow } from "@/lib/schedule-control";
+import { formatDateVN } from "@/lib/nen/date";
+import type { CriticalRow } from "@/lib/tien-do/schedule-control";
 
 export default function ScheduleControlHubPage() {
   return (

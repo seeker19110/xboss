@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   processSmartIpcRelease,
   saveSmartIpcRecord,
   listSmartIpcRecords,
   SmartIpcCalculationInput,
-} from "@/lib/engineering-smart-ipc";
+} from "@/lib/ky-thuat/engineering-smart-ipc";
 
 export const dynamic = "force-dynamic";
 

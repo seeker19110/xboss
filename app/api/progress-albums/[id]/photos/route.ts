@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storagePut } from "@/lib/storage";
+import { storagePut } from "@/lib/nen/storage";
 import { queryOne, insertId } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   extForMime,
   verifyFileMime,
   newAlbumPhotoFileName,
   MAX_PHOTO_BYTES,
   isContentTooLarge,
-} from "@/lib/photos";
-import { listAlbumPhotos } from "@/lib/tech";
+} from "@/lib/nen/photos";
+import { listAlbumPhotos } from "@/lib/ky-thuat/tech";
 
 export const dynamic = "force-dynamic";
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { createEsignEnvelope, listEsignEnvelopes } from "@/lib/engineering-esignature";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { createEsignEnvelope, listEsignEnvelopes } from "@/lib/ky-thuat/engineering-esignature";
 
 export const dynamic = "force-dynamic";
 

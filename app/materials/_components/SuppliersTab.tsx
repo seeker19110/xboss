@@ -14,7 +14,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { appConfirm } from "@/app/components/dialogs";
-import { formatDateVN } from "@/lib/date";
+import { formatDateVN } from "@/lib/nen/date";
 
 export type Supplier = {
   id: number;

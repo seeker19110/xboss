@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { scanReceiveQrTag, reconcileShipmentReceiving } from "@/lib/engineering-qr-logistics";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import {
+  scanReceiveQrTag,
+  reconcileShipmentReceiving,
+} from "@/lib/ky-thuat/engineering-qr-logistics";
 
 export const dynamic = "force-dynamic";
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, withProjectScope } from "@/lib/db";
-import { requireApiKey } from "@/lib/api-keys";
+import { requireApiKey } from "@/lib/bao-mat/api-keys";
 
 export const dynamic = "force-dynamic";
 

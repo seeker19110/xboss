@@ -15,8 +15,9 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne, todayISO } = await import("@/lib/db");
-    const { addDaysISO } = await import("@/lib/date");
-    const { workloadByWeek, manpowerByWeek, assignmentConflicts } = await import("@/lib/resources");
+    const { addDaysISO } = await import("@/lib/nen/date");
+    const { workloadByWeek, manpowerByWeek, assignmentConflicts } =
+      await import("@/lib/vat-tu/resources");
 
     const ketCau = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'ket_cau'`);
     const xayTo = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'xay_to'`);

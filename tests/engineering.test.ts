@@ -32,7 +32,7 @@ function reqOf(path: string, key: string, body?: unknown): NextRequest {
 before(async () => {
   if (!HAS_TEST_DB) return;
   const { insertId } = await import("@/lib/db");
-  const { generateApiKey, hashApiKey } = await import("@/lib/api-keys");
+  const { generateApiKey, hashApiKey } = await import("@/lib/bao-mat/api-keys");
 
   U = await insertId(
     `INSERT INTO users (name, email, role, password_hash) VALUES ('EngTest','eng-test@x.vn','admin','x')`,
@@ -84,7 +84,7 @@ after(async () => {
 
 test("upsertEngineeringObjectFromExternal: tạo mới rồi upsert cùng externalKey", S, async () => {
   const { upsertEngineeringObjectFromExternal, engineeringObjectExternalInputSchema } =
-    await import("@/lib/engineering-kernel");
+    await import("@/lib/ky-thuat/engineering-kernel");
   const input = engineeringObjectExternalInputSchema.parse({
     projectId: pA,
     objectType: "AHU",
@@ -123,7 +123,7 @@ test("reviewEngineeringObject: duyệt rồi upsert lại KHÔNG reset status", 
     upsertEngineeringObjectFromExternal,
     reviewEngineeringObject,
     engineeringObjectExternalInputSchema,
-  } = await import("@/lib/engineering-kernel");
+  } = await import("@/lib/ky-thuat/engineering-kernel");
   const input = engineeringObjectExternalInputSchema.parse({
     projectId: pA,
     objectType: "pipe_segment",
@@ -167,7 +167,7 @@ test("reviewEngineeringObject: object thuộc dự án khác → ném lỗi", S,
     upsertEngineeringObjectFromExternal,
     reviewEngineeringObject,
     engineeringObjectExternalInputSchema,
-  } = await import("@/lib/engineering-kernel");
+  } = await import("@/lib/ky-thuat/engineering-kernel");
   const { id } = await upsertEngineeringObjectFromExternal(
     engineeringObjectExternalInputSchema.parse({
       projectId: pA,
@@ -186,7 +186,7 @@ test("listEngineeringObjects: cách ly đa dự án", S, async () => {
     upsertEngineeringObjectFromExternal,
     listEngineeringObjects,
     engineeringObjectExternalInputSchema,
-  } = await import("@/lib/engineering-kernel");
+  } = await import("@/lib/ky-thuat/engineering-kernel");
   await upsertEngineeringObjectFromExternal(
     engineeringObjectExternalInputSchema.parse({
       projectId: pA,
@@ -243,7 +243,7 @@ test("POST /api/v1/engineering/ingest: scope read → 403, scope engineering →
   assert.equal(body.objects.length, 2);
   assert.ok(body.objects.every((o) => o.created));
 
-  const { listEngineeringObjects } = await import("@/lib/engineering-kernel");
+  const { listEngineeringObjects } = await import("@/lib/ky-thuat/engineering-kernel");
   const list = await listEngineeringObjects(pA, { status: "pending_review" });
   assert.ok(list.some((o) => (o as { externalKey: string }).externalKey === "ahu:ingest-a"));
 });

@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("validateEvaluationInput: đủ ca hợp lệ/không hợp lệ", async () => {
-  const { validateEvaluationInput } = await import("@/lib/subcontractors");
+  const { validateEvaluationInput } = await import("@/lib/hien-truong/subcontractors");
 
   assert.equal(
     validateEvaluationInput({
@@ -93,7 +93,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { listSubcontractors, upsertSubcontractorProfile } = await import("@/lib/subcontractors");
+    const { listSubcontractors, upsertSubcontractorProfile } =
+      await import("@/lib/hien-truong/subcontractors");
 
     const dien = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'dien'`);
     assert.ok(dien, "systems seed phải có sẵn từ migration 0005_boq.sql");
@@ -166,7 +167,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { getSubcontractor } = await import("@/lib/subcontractors");
+    const { getSubcontractor } = await import("@/lib/hien-truong/subcontractors");
 
     const supplierId = await insertId(`INSERT INTO suppliers (name) VALUES ('NTP Công Nợ Test')`);
     const contractId = await insertId(
@@ -217,7 +218,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { canViewSubcontractor } = await import("@/lib/auth");
+    const { canViewSubcontractor } = await import("@/lib/bao-mat/auth");
 
     const supplierAId = await insertId(`INSERT INTO suppliers (name) VALUES ('NTP A Test')`);
     const supplierBId = await insertId(`INSERT INTO suppliers (name) VALUES ('NTP B Test')`);

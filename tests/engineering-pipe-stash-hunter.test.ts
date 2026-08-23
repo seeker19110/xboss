@@ -7,7 +7,7 @@ import {
   evaluatePhantomInstallationBreaker,
   calculateJitReorderPoint,
   MassBalanceInput,
-} from "../lib/engineering-pipe-stash-hunter";
+} from "@/lib/ky-thuat/engineering-pipe-stash-hunter";
 
 test("1. 5-Way Mass-Balance — Clean balanced state (Δ = 0)", () => {
   const input: MassBalanceInput = {

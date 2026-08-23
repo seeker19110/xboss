@@ -7,7 +7,7 @@ import {
   recommendClashResolution,
   createSleeveSchedule,
   listSleeveSchedules,
-} from "@/lib/engineering-auto-routing";
+} from "@/lib/ky-thuat/engineering-auto-routing";
 
 const HAS_DB = Boolean(process.env.TEST_DATABASE_URL || process.env.DATABASE_URL);
 

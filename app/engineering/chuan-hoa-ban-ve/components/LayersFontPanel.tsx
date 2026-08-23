@@ -12,7 +12,7 @@ import {
   CheckCircle2,
   HelpCircle,
 } from "lucide-react";
-import { DxfLayerInfo } from "@/lib/cad/dxf-parser";
+import { DxfLayerInfo } from "@/lib/ky-thuat/cad/dxf-parser";
 import { showToast } from "@/app/components/Toast";
 import type { FontSnippet, Step1SubTab } from "../types";
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   generateSpoolIsometricDrawing,
   optimizeGeneticNestingWithRemnants,
@@ -10,7 +10,7 @@ import {
   listModularSkids,
   SpoolIsometricInput,
   RemnantItem,
-} from "@/lib/engineering-cad-dfma-isometric";
+} from "@/lib/ky-thuat/engineering-cad-dfma-isometric";
 
 export const dynamic = "force-dynamic";
 

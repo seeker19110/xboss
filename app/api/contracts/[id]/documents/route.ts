@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storagePut } from "@/lib/storage";
+import { storagePut } from "@/lib/nen/storage";
 import { query, queryOne, insertId, withProjectScope } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   extForDocMime,
   verifyFileMime,
@@ -10,8 +10,8 @@ import {
   MAX_DOC_BYTES,
   sha256Hex,
   isContentTooLarge,
-} from "@/lib/photos";
-import { extractPdfText } from "@/lib/pdf-extract";
+} from "@/lib/nen/photos";
+import { extractPdfText } from "@/lib/nen/pdf-extract";
 
 export const dynamic = "force-dynamic";
 

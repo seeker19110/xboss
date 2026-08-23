@@ -3,10 +3,10 @@
 // placeholder viết dạng `?` và được chuyển tự động sang $1..$n.
 import { AsyncLocalStorage } from "node:async_hooks";
 import { Pool, PoolClient, types } from "pg";
-import { getServerEnv } from "@/lib/env";
-import { getRequestContext } from "@/lib/request-context";
-import { log } from "@/lib/log";
-import { runMigrations } from "./migrate";
+import { getServerEnv } from "@/lib/nen/env";
+import { getRequestContext } from "@/lib/nen/request-context";
+import { log } from "@/lib/nen/log";
+import { runMigrations } from "@/lib/db/migrate";
 
 // DATE (oid 1082) → giữ nguyên chuỗi 'YYYY-MM-DD' (code so sánh ngày dạng chuỗi).
 types.setTypeParser(1082, (v) => v);
@@ -238,4 +238,4 @@ export async function withProjectScope<T>(
 
 // todayISO/daysFromTodayISO chuyển sang lib/date.ts (thuần, không phụ thuộc pg)
 // để dùng lại được ở client — re-export ở đây cho code server hiện có.
-export { todayISO, daysFromTodayISO } from "@/lib/date";
+export { todayISO, daysFromTodayISO } from "@/lib/nen/date";

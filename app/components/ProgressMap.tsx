@@ -12,7 +12,7 @@ import {
   Check,
   X,
 } from "lucide-react";
-import { slugFromCode } from "@/lib/sheets";
+import { slugFromCode } from "@/lib/nen/sheets";
 import { fetchMe } from "@/app/lib/me";
 import { appAlert, appConfirm } from "@/app/components/dialogs";
 

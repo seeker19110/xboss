@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
 import { query } from "@/lib/db";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   BimElement,
   filterElementsPropertySet,
   compute3DSectionCut,
-} from "@/lib/engineering-bim-viewer";
+} from "@/lib/ky-thuat/engineering-bim-viewer";
 
 export const dynamic = "force-dynamic";
 

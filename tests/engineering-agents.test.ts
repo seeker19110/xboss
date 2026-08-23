@@ -11,7 +11,7 @@ import {
   computeConsensus,
   VoteNotAllowedError,
   type ClaimLike,
-} from "@/lib/engineering-agents";
+} from "@/lib/ky-thuat/engineering-agents";
 
 const S = { skip: !HAS_TEST_DB };
 
@@ -246,7 +246,7 @@ function reqOf(path: string, key: string, body?: unknown): NextRequest {
 before(async () => {
   if (!HAS_TEST_DB) return;
   const { insertId } = await import("@/lib/db");
-  const { generateApiKey, hashApiKey } = await import("@/lib/api-keys");
+  const { generateApiKey, hashApiKey } = await import("@/lib/bao-mat/api-keys");
   U = await insertId(
     `INSERT INTO users (name, email, role, password_hash) VALUES ('AgentTest','agent-test@x.vn','admin','x')`,
   );
@@ -336,7 +336,7 @@ test(
   S,
   async () => {
     const { openAgentSession, addClaims, agentSessionInputSchema } =
-      await import("@/lib/engineering-agents");
+      await import("@/lib/ky-thuat/engineering-agents");
     const opened = await openAgentSession(
       pA,
       null,
@@ -388,7 +388,7 @@ test("resolveConflict: ghi phương pháp + người chốt; vote sai chỗ bị
     resolveConflict,
     agentSessionInputSchema,
     VoteNotAllowedError: VErr,
-  } = await import("@/lib/engineering-agents");
+  } = await import("@/lib/ky-thuat/engineering-agents");
 
   const opened = await openAgentSession(
     pA,
@@ -425,7 +425,7 @@ test("resolveConflict: ghi phương pháp + người chốt; vote sai chỗ bị
 
 test("Cách ly đa dự án + scope read bị chặn", S, async () => {
   const { openAgentSession, getAgentSession, agentSessionInputSchema } =
-    await import("@/lib/engineering-agents");
+    await import("@/lib/ky-thuat/engineering-agents");
   const opened = await openAgentSession(
     pA,
     null,
@@ -444,7 +444,8 @@ test("Cách ly đa dự án + scope read bị chặn", S, async () => {
 });
 
 test("Bất biến ranh giới: ENG-4 không bao giờ tự gắn workflow_id", S, async () => {
-  const { openAgentSession, agentSessionInputSchema } = await import("@/lib/engineering-agents");
+  const { openAgentSession, agentSessionInputSchema } =
+    await import("@/lib/ky-thuat/engineering-agents");
   const { queryOne } = await import("@/lib/db");
   const opened = await openAgentSession(
     pA,

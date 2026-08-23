@@ -5,7 +5,7 @@ import {
   calculateHydraulicLoss,
   calculateHangerLoadAndSpacing,
   runMepfHydraulicAnalysis,
-} from "@/lib/engineering-mepf-hydraulic";
+} from "@/lib/ky-thuat/engineering-mepf-hydraulic";
 
 test("M68: autoSizePipeDiameter chọn chính xác cỡ ống tối ưu vận tốc", () => {
   // Lưu lượng 25 m3/h -> Chọn DN65 hoặc DN80 để vận tốc <= 1.5 m/s

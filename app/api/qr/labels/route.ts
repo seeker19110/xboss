@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   isQrKind,
   resolveManyForLabels,
@@ -9,7 +9,7 @@ import {
   qrSvg,
   escapeHtml,
   type QrKind,
-} from "@/lib/qr";
+} from "@/lib/ha-tang/qr";
 
 export const dynamic = "force-dynamic";
 

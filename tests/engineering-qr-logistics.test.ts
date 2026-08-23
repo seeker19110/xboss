@@ -8,7 +8,7 @@ import {
   createMaterialShipment,
   listMaterialShipments,
   scanReceiveQrTag,
-} from "@/lib/engineering-qr-logistics";
+} from "@/lib/ky-thuat/engineering-qr-logistics";
 
 const HAS_DB = Boolean(process.env.TEST_DATABASE_URL || process.env.DATABASE_URL);
 

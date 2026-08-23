@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, daysFromTodayISO } from "@/lib/db";
-import { getCurrentUser, isAdminOrPm } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, isAdminOrPm } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import ReactPDF, { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
-import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/pdf-fonts";
+import { registerVietnameseFonts, FONT_REGULAR, FONT_BOLD } from "@/lib/nen/pdf-fonts";
 
 export const dynamic = "force-dynamic";
 registerVietnameseFonts();

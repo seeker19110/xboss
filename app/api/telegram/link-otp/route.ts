@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { generateTelegramLinkOtp } from "@/lib/engineering-site-bot";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { generateTelegramLinkOtp } from "@/lib/ky-thuat/engineering-site-bot";
 
 export const dynamic = "force-dynamic";
 

@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storagePut } from "@/lib/storage";
+import { storagePut } from "@/lib/nen/storage";
 import { queryOne, insertId } from "@/lib/db";
-import { getCurrentUser, canViewSubcontractor, CAN } from "@/lib/auth";
+import { getCurrentUser, canViewSubcontractor, CAN } from "@/lib/bao-mat/auth";
 import {
   extForDocMime,
   verifyFileMime,
   newSubconDocFileName,
   MAX_DOC_BYTES,
   isContentTooLarge,
-} from "@/lib/photos";
-import { listSubconDocuments } from "@/lib/subcontractors";
+} from "@/lib/nen/photos";
+import { listSubconDocuments } from "@/lib/hien-truong/subcontractors";
 
 export const dynamic = "force-dynamic";
 

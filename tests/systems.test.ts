@@ -12,7 +12,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { getSystemSummary } = await import("@/lib/systems");
+    const { getSystemSummary } = await import("@/lib/tien-do/systems");
 
     const dien = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'dien'`);
     const nuoc = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'nuoc'`);
@@ -111,7 +111,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { getSystemSummary } = await import("@/lib/systems");
+    const { getSystemSummary } = await import("@/lib/tien-do/systems");
 
     const pccc = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'pccc'`);
     assert.ok(pccc);

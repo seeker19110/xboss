@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   generateInstancedMeshGroups,
   calculateMerkleRootHex,
   GodTierElementData,
-} from "@/lib/engineering-god-tier";
-import { listGodTierModels, saveGodTierModel } from "@/lib/engineering-god-tier-db";
+} from "@/lib/ky-thuat/engineering-god-tier";
+import { listGodTierModels, saveGodTierModel } from "@/lib/ky-thuat/engineering-god-tier-db";
 
 export const dynamic = "force-dynamic";
 

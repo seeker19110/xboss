@@ -6,7 +6,7 @@ import {
   generateZaloLinkOtp,
   verifyZaloLinkOtp,
   processIncomingZaloMessage,
-} from "@/lib/engineering-zalo-copilot";
+} from "@/lib/ky-thuat/engineering-zalo-copilot";
 
 const HAS_DB = Boolean(process.env.TEST_DATABASE_URL || process.env.DATABASE_URL);
 

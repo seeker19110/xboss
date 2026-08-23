@@ -23,9 +23,9 @@ import {
 import AppHeader from "@/app/components/AppHeader";
 import { appConfirm } from "@/app/components/dialogs";
 import { fetchMe } from "@/app/lib/me";
-import { ROLE_LABELS } from "@/lib/roles";
+import { ROLE_LABELS } from "@/lib/nen/roles";
 import { DASHBOARD_TREE, dashboardStatus } from "@/app/lib/dashboardTree";
-import { systemColorClasses } from "@/lib/systemColors";
+import { systemColorClasses } from "@/lib/nen/systemColors";
 
 type User = { id: number; name: string; role: string };
 type Sheet = {

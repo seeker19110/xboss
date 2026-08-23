@@ -1,4 +1,4 @@
-import type { DxfLayerInfo } from "@/lib/cad/dxf-parser";
+import type { DxfLayerInfo } from "@/lib/ky-thuat/cad/dxf-parser";
 
 // ── Kiểu dữ liệu dùng chung giữa trang chuẩn hóa bản vẽ và các panel con ──
 
