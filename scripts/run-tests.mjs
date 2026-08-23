@@ -51,8 +51,13 @@ try {
 }
 
 // TAP tóm tắt của node:test in ra các dòng "# pass 12" / "# fail 0" / "# skipped 3".
+// node:test đổi reporter mặc định theo phiên bản: reporter `tap` in "# pass 11", còn
+// reporter `spec` (mặc định từ Node 20+ khi stdout không phải TTY) in "ℹ pass 11". Trước
+// đây hàm này chỉ khớp dạng TAP nên trên Node 24 KHÔNG khớp dòng nào — total.pass/fail/
+// skipped luôn = 0, và cổng release-gate (chặn dựa trên total.skipped > 0) chưa từng
+// kích hoạt. Khớp cả hai dạng để cổng hoạt động thật.
 function tapCount(out, label) {
-  const m = out.match(new RegExp(`^# ${label} (\\d+)$`, "m"));
+  const m = out.match(new RegExp(`^(?:#|ℹ) ${label} (\\d+)$`, "m"));
   return m ? Number(m[1]) : 0;
 }
 
