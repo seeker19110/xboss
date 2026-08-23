@@ -362,116 +362,15 @@ export function generateAutoLispDetailScript(
 }
 
 // ============================================================================
-// 3. BỘ SỬA LỖI FONT TIẾNG VIỆT (CAD FONT DOCTOR: VNI / TCVN3 -> UNICODE)
+// 3-4. FONT TIẾNG VIỆT & CHUẨN HÓA LAYER — nguồn chuẩn: lib/cad/dxf-parser.ts
 // ============================================================================
 
-const TCVN3_MAP: Record<string, string> = {
-  "¸": "á",
-  µ: "à",
-  "¶": "ả",
-  "·": "ã",
-  "¹": "ạ",
-  "¨": "ă",
-  "¾": "ắ",
-  "»": "ằ",
-  "¼": "ẳ",
-  "½": "ẵ",
-  Æ: "ặ",
-  "©": "â",
-  Ê: "ấ",
-  Ç: "ầ",
-  È: "ẩ",
-  É: "ẫ",
-  Ë: "ậ",
-  Ð: "đ",
-  "®": "đ",
-  Ì: "í",
-  Í: "ì",
-  Î: "ỉ",
-  Ï: "ĩ",
-  Ñ: "ị",
-  Õ: "ế",
-  Ò: "ề",
-  Ó: "ể",
-  Ö: "ệ",
-  Ô: "ễ",
-  ã: "ó",
-  ß: "ò",
-  á: "ỏ",
-  â: "õ",
-  ä: "ọ",
-  "«": "ô",
-  è: "ố",
-  å: "ồ",
-  æ: "ổ",
-  ç: "ỗ",
-  é: "ộ",
-  "¬": "ơ",
-  í: "ớ",
-  ì: "ờ",
-  î: "ở",
-  ï: "ỡ",
-  ñ: "ợ",
-  ó: "ú",
-  ò: "ù",
-  ỏ: "ủ",
-  õ: "ũ",
-  ô: "ụ",
-  "­": "ư",
-  ø: "ứ",
-  ö: "ừ",
-  "÷": "ử",
-  ù: "ữ",
-  ú: "ự",
-  Ý: "ý",
-  ỳ: "ỳ",
-  ỷ: "ỷ",
-  ỹ: "ỹ",
-  ỵ: "ỵ",
-  "¡": "Ă",
-  "¢": "Â",
-  "£": "Ê",
-  "¤": "Ô",
-  "¥": "Ơ",
-  "¦": "Ư",
-  "§": "Đ",
-};
-
-export function convertTcvn3ToUnicode(text: string): string {
-  let result = "";
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    result += TCVN3_MAP[ch] || ch;
-  }
-  return result;
-}
-
-// ============================================================================
-// 4. CHUẨN HÓA LAYER THEO TIÊU CHUẨN AIA / QUY CHUẨN MEPF
-// ============================================================================
-
-export function normalizeCadLayers(layers: string[]): Record<string, string> {
-  const mapping: Record<string, string> = {};
-
-  for (const layer of layers) {
-    const l = layer.toUpperCase();
-    if (l.includes("DUCT") || l.includes("GIO") || l.includes("SA") || l.includes("RA")) {
-      mapping[layer] = "M-DUCT-SUPP";
-    } else if (l.includes("PIPE") || l.includes("NUOC") || l.includes("SAN")) {
-      mapping[layer] = "P-PIPE-SANR";
-    } else if (l.includes("ELEC") || l.includes("TRAY") || l.includes("DIEN")) {
-      mapping[layer] = "E-TRAY-PWRR";
-    } else if (l.includes("FIRE") || l.includes("PCCC") || l.includes("SPK")) {
-      mapping[layer] = "F-SPRN-PIPE";
-    } else if (l.includes("TEXT") || l.includes("DIM") || l.includes("GHI")) {
-      mapping[layer] = "G-ANNO-TEXT";
-    } else {
-      mapping[layer] = layer;
-    }
-  }
-
-  return mapping;
-}
+// Hai hàm này từng được định nghĩa trùng lặp ở cả đây lẫn `lib/cad/dxf-parser.ts`;
+// bản trong dxf-parser đầy đủ hơn (phân biệt gió cấp/hồi/thải, nước lạnh/cấp/thoát,
+// điện động lực/chiếu sáng, ELV, kết cấu) nên được chọn làm nguồn duy nhất.
+// Re-export đúng tên cũ để mọi nơi đang import từ "@/lib/engineering-cad-skills"
+// không phải sửa gì.
+export { convertTcvn3ToUnicode, normalizeCadLayers } from "@/lib/cad/dxf-parser";
 
 // ============================================================================
 // 5. 2D-TO-3D SPATIAL EXTRUSION ENGINE
