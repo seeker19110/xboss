@@ -205,10 +205,85 @@ nhưng thực chất toàn bộ xử lý xảy ra trong 1 lần gọi hàm ở c
 browser/dev server) vẫn cho ra đúng kết quả chuẩn hóa như trước (điểm số, layer, text), không còn
 thanh % chạy giả; không còn `Math.random()` trong luồng auto-heal.
 
-### Sau khi cả 4 việc xong
+### Việc 7.5 — Sửa `drawing_revisions.status = 'pending'` vi phạm CHECK constraint (`route: standard`)
 
-Cập nhật `PROGRESS.md` (mục "Đã làm") tóm tắt Việc 7.1–7.4, ghi rõ đây là chặng ngắn hạn trước M99 —
-không đóng mục `M99`/`M98` trong `docs/nang-cap/README.md` (2 đặc tả đó vẫn Draft, chưa động tới).
+**Vấn đề đã xác minh trên Postgres thật (không phải suy đoán):** `app/api/engineering/cad/save-drawing/route.ts:182`
+gán `const revStatus = isApproved ? "approved" : "pending";` rồi insert vào `drawing_revisions.status`.
+Constraint gốc ở `migrations/0016_drawings.sql:29-30`:
+`CHECK (status IN ('submitted','commented','approved','approved_with_comments','rejected','superseded'))`
+— **chưa từng được nới** ở bất kỳ migration sau nào (đã `grep` toàn bộ `migrations/*.sql`, chỉ có
+`0016` định nghĩa cột này). `'pending'` không nằm trong danh sách → mọi lần lưu bản vẽ **chưa duyệt**
+(`isApproved=false`, tức luồng "lưu tạm" mặc định của trang) làm INSERT vào `drawing_revisions` ném
+lỗi CHECK → route trả 500, **nhưng file đã ghi ra đĩa và dòng `drawings` đã được tạo/insertId trước
+đó** → dữ liệu mồ côi (có file + có `drawings` row, không có `drawing_revisions` row tương ứng).
+
+**Đính chính:** `drawings.kind = 'design'` (giá trị dùng khi lưu Bước 2) **không phải bug** —
+`migrations/0048_drawing_kind_design.sql` đã nới CHECK của `drawings.kind` gồm `'design'` từ trước.
+Chỉ sửa đúng `drawing_revisions.status`, không đụng gì tới `drawings.kind`.
+
+**Đặc tả kín — không cần migration, chỉ sửa giá trị ứng dụng:**
+
+- Trong `app/api/engineering/cad/save-drawing/route.ts`, đổi dòng gán `revStatus`:
+  ```ts
+  const revStatus = isApproved ? "approved" : "submitted";
+  ```
+  Lý do chọn `"submitted"` thay vì thêm `'pending'` vào CHECK: `'submitted'` đã có sẵn trong enum và
+  đúng nghĩa "đã nộp, chờ quyết định" cho một revision chưa được duyệt — khớp domain hiện có, không
+  cần migration/staging, không có rủi ro nới CHECK ảnh hưởng chỗ khác. Đã `grep` toàn repo xác nhận
+  `'pending'` cho `drawing_revisions` chỉ dùng đúng 1 chỗ này, không nơi nào khác đọc/so sánh giá trị
+  `'pending'` của cột này nên đổi an toàn.
+- Kiểm tra toàn bộ file có nhánh nào khác so sánh `revStatus === "pending"` hay đọc lại `status` từ
+  DB rồi so `"pending"` không (hiện chưa thấy, nhưng worker phải tự grep lại trong đúng file này để
+  chắc chắn không bỏ sót nhánh nào trước khi coi là xong).
+- Thêm test trong `tests/engineering-cad-save-drawing.test.ts` (file đã có từ Việc 7.2): case gọi
+  `POST /api/engineering/cad/save-drawing` với `isApproved: false` (mặc định) bằng vai trò hợp lệ
+  (`admin`/`pm`/`engineer`) trên `TEST_DATABASE_URL` thật → phải trả **200/201** (không còn 500), và
+  dòng `drawing_revisions` tạo ra có `status = 'submitted'`.
+
+**Tiêu chí đạt:** `npm run typecheck` xanh; test mới pass trên `TEST_DATABASE_URL`; test cũ của
+7.1/7.2 trong cùng file không đổi hành vi.
+
+### Việc 7.6 — Siết `normalizeCadLayers` theo ranh giới token, sửa hồi quy layer điện/ống nước (`route: complex`)
+
+**Vấn đề đã xác minh (kết quả chạy thật, không phải suy đoán):** hàm `normalizeCadLayers` trong
+`lib/cad/dxf-parser.ts` (nguồn chuẩn duy nhất sau Việc 7.3) dùng `String.includes()` trên toàn chuỗi
+layer đã upper-case, không có ranh giới từ, nên bắt nhầm chuỗi con nằm giữa từ khác nghĩa. 2 case đã
+xác nhận cho ra kết quả sai:
+
+- `"MANG_CAP_DIEN"` (máng cáp điện) → nhánh `PIPE` được kiểm tra **trước** nhánh `ELEC`, và nhánh
+  `PIPE` có điều kiện `l.includes("CAP")` (ý định: "cấp nước") → khớp nhầm vì `"CAP"` cũng là chuỗi
+  con của `"MANG_CAP_DIEN"` (bản thân nó là "cáp điện", không phải "nước cấp") → kết quả sai:
+  `P-PIPE-DOMW`, đúng ra phải là `E-TRAY-PWRR`.
+- `"ONG_THOAT_SAN"` (ống thoát sàn) → nhánh `DUCT` được kiểm tra **trước** nhánh `PIPE`, và nhánh
+  `DUCT` có điều kiện `l.includes("OA")` (ý định: outside air) → khớp nhầm vì `"OA"` là chuỗi con của
+  `"THOAT"` (T-H-**O-A**-T) → kết quả sai: `M-DUCT-SUPP`, đúng ra phải là `P-PIPE-SANR`.
+
+**Đặc tả — sửa cách khớp, giữ nguyên toàn bộ danh sách từ khóa và tên layer đích đã có:**
+
+- Thay mọi `l.includes(X)` bằng khớp có ranh giới từ thật sự — dùng regex `new RegExp("(^|[^A-Z0-9])" + X + "($|[^A-Z0-9])")` (layer CAD thường phân tách bằng `_`/`-`/khoảng trắng, không phải chữ-số liền nhau) hoặc viết 1 helper `hasToken(l: string, token: string): boolean` dùng chung cho toàn hàm — **không đổi bất kỳ token/danh sách từ khóa nào đang có**, chỉ đổi cách so khớp.
+- Đổi thứ tự ưu tiên nhánh: kiểm nhánh `ELEC`/`ELV` (điện nhẹ/nặng) **trước** nhánh `PIPE`, và có thể
+  cần đặt `PIPE` trước `DUCT` hoặc ngược lại tuỳ để 2 case trên ra đúng — worker tự xác định thứ tự
+  đúng bằng cách chạy lại 2 case xác nhận ở trên làm tiêu chí, cộng thêm chạy lại **toàn bộ** input
+  mẫu đang có trong `tests/engineering-cad-dxf-parser.test.ts` / `tests/engineering-cad-skills.test.ts`
+  liên quan tới `normalizeCadLayers` để đảm bảo không có case đang đúng bị đổi thành sai.
+- Thêm test case mới trực tiếp cho `normalizeCadLayers` (đặt cạnh test hiện có của hàm này) đúng 2
+  case đã xác nhận sai ở trên: `"MANG_CAP_DIEN"` → phải chứa `E-TRAY-PWRR`, `"ONG_THOAT_SAN"` → phải
+  chứa `P-PIPE-SANR`.
+
+**Ranh giới quyết định được phép (route: complex):** được tự chọn cách viết helper ranh giới từ
+(regex hay tách chuỗi thủ công), được tự quyết thứ tự nhánh miễn thoả cả 2 case xác nhận lẫn mọi test
+cũ đang pass. **Không được** thêm/bớt/đổi bất kỳ từ khóa hay tên layer đích (`M-DUCT-*`, `P-PIPE-*`,
+`E-*`, `F-SPRN-PIPE`, `ELV-CABL-TRAY`, `S-GRID-COLS`, `G-ANNO-TEXT`) nào ngoài việc sửa cách khớp và
+thứ tự nhánh; không đụng `convertTcvn3ToUnicode`/`TCVN3_MAP`/phần còn lại của `dxf-parser.ts`.
+
+**Tiêu chí đạt:** `npm run lint` + `npm run typecheck` + `npm test` xanh; 2 test case mới pass; không
+có test cũ nào liên quan `normalizeCadLayers` chuyển từ pass → fail.
+
+### Sau khi cả 6 việc xong
+
+Cập nhật `PROGRESS.md` (mục "Đã làm") tóm tắt thêm Việc 7.5–7.6 vào đúng mục Việc 7 đã có, đính chính
+rõ phát hiện `drawings.kind='design'` ở báo cáo trước là false positive (đã có migration `0048` từ
+trước). Không đóng mục `M99`/`M98` trong `docs/nang-cap/README.md`.
 
 ## Cổng mở rộng sau đó
 
