@@ -1,3 +1,4 @@
+import "@/tests/setup";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -5,8 +6,15 @@ import {
   calculatePipeQtoM,
   calculatePhysicalEarnedValue,
   compute3WayVariance,
+  createCadSpoolsBatch,
+  listCadSpools,
+  updateSpoolProgressStage,
+  upsertQtoVariance,
+  generateInspectionRequestForSpools,
   SpoolStatus,
 } from "@/lib/engineering-cad-qto";
+
+const HAS_DB = Boolean(process.env.TEST_DATABASE_URL || process.env.DATABASE_URL);
 
 test("M66: calculateDuctQtoM2 tính toán chính xác diện tích tôn ống gió kèm hệ số bù bích", () => {
   // 600x400 mm, dài 4.2m, 5% buffer -> 2*(0.6+0.4)*4.2*1.05 = 8.82 m2
@@ -102,3 +110,92 @@ test("M66: generateElectronicBbntDocument sinh biên bản nghiệm thu điện 
   assert.ok(bbnt.cryptographicSignatureToken.includes("SIG-A2"));
   assert.equal(bbnt.spoolAppendix.length, 1);
 });
+
+test(
+  "M66: createCadSpoolsBatch tạo Spool thật từ dữ liệu bóc CAD, gán đúng boq_item_id, " +
+    "bỏ qua item không có BOQCODE khớp — rồi chấm tiến độ & sinh phiếu nghiệm thu qua DB thật",
+  { skip: !HAS_DB },
+  async () => {
+    const { insertId, queryOne } = await import("@/lib/db");
+
+    const userId = await insertId(
+      `INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)`,
+      "Kỹ Sư Test CAD QTO",
+      `cadqto-${Date.now()}@test.local`,
+      "x",
+      "pm",
+    );
+    const projectId = await insertId(`INSERT INTO projects (name) VALUES ('CAD QTO Test Proj')`);
+    const boqCode = `TEST-DUCT-${Date.now()}`;
+    const boqId = await insertId(
+      `INSERT INTO boq_items (code, name, unit, qty_contract, unit_price, project_id)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      boqCode,
+      "Ống gió cấp lạnh test",
+      "m2",
+      100,
+      500000,
+      projectId,
+    );
+
+    const result = await createCadSpoolsBatch(projectId, null, "Tầng 4", [
+      {
+        discipline: "hvac",
+        systemCode: "DUCT",
+        dimensionSpec: "600x400",
+        widthMm: 600,
+        heightMm: 400,
+        lengthM: 4.2,
+        kind: "duct",
+        boqCode,
+      },
+      {
+        discipline: "hvac",
+        systemCode: "DUCT",
+        dimensionSpec: "300x200",
+        widthMm: 300,
+        heightMm: 200,
+        lengthM: 2,
+        kind: "duct",
+        boqCode: "MA-BOQ-KHONG-TON-TAI",
+      },
+    ]);
+
+    assert.equal(result.created.length, 1);
+    assert.equal(result.skipped.length, 1);
+    assert.ok(result.skipped[0].reason.includes("Không tìm thấy"));
+
+    const spool = result.created[0];
+    assert.equal(spool.boq_item_id, boqId);
+    assert.equal(Number(spool.calculated_qty), 8.82); // 2*(0.6+0.4)*4.2*1.05
+    assert.equal(spool.unit, "m2");
+    assert.ok(spool.spool_code.startsWith("SP-DUCT-"));
+
+    const spoolsInProject = await listCadSpools(projectId);
+    assert.equal(spoolsInProject.length, 1);
+
+    const updated = await updateSpoolProgressStage(projectId, spool.id, "installed");
+    assert.equal(updated?.status, "installed");
+
+    await upsertQtoVariance(projectId, boqId, 100, 8.82, 8.82, 0, 0, "normal");
+    const varianceRow = await queryOne<{ status: string }>(
+      `SELECT status FROM engineering_cad_qto_variances WHERE project_id = ? AND boq_item_id = ?`,
+      projectId,
+      boqId,
+    );
+    assert.equal(varianceRow?.status, "normal");
+
+    const ins = await generateInspectionRequestForSpools(
+      projectId,
+      [spool.id],
+      userId,
+      "Test nghiệm thu Spool CAD",
+    );
+    assert.equal(ins.spoolCount, 1);
+    assert.equal(Number(ins.totalQty), 8.82);
+
+    const qcPassed = await listCadSpools(projectId, { status: "qc_passed" });
+    assert.equal(qcPassed.length, 1);
+    assert.equal(qcPassed[0].inspection_request_id, ins.inspectionRequestId);
+  },
+);

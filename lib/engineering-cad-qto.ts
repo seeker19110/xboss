@@ -1,5 +1,6 @@
 // lib/engineering-cad-qto.ts — Closed-Loop CAD-QTO-Tracking Engine (M66 / M89)
-import { query, queryOne, run } from "@/lib/db";
+import { query, queryOne, run, withTransaction } from "@/lib/db";
+import { nextSeqCode, withUniqueRetry } from "@/lib/seqcode";
 import { createHash } from "crypto";
 
 export type SpoolStatus = "fabricated" | "delivered" | "installed" | "qc_passed" | "bbnt_approved";
@@ -176,7 +177,7 @@ export async function listCadSpools(
   }
 
   sql += ` ORDER BY spool_code ASC`;
-  return await query<CadSpoolRecord>(sql, params);
+  return await query<CadSpoolRecord>(sql, ...params);
 }
 
 export async function updateSpoolProgressStage(
@@ -185,18 +186,149 @@ export async function updateSpoolProgressStage(
   newStatus: SpoolStatus,
 ): Promise<CadSpoolRecord | null> {
   await run(
-    `UPDATE engineering_cad_spools 
-     SET status = ?, updated_at = NOW() 
+    `UPDATE engineering_cad_spools
+     SET status = ?, updated_at = NOW()
      WHERE id = ? AND project_id = ?`,
-    [newStatus, spoolId, projectId],
+    newStatus,
+    spoolId,
+    projectId,
   );
 
   const spool = await queryOne<CadSpoolRecord>(
     `SELECT * FROM engineering_cad_spools WHERE id = ? AND project_id = ?`,
-    [spoolId, projectId],
+    spoolId,
+    projectId,
   );
 
   return spool || null;
+}
+
+export type SpoolDiscipline =
+  | "hvac"
+  | "plumbing"
+  | "electrical"
+  | "firefighting"
+  | "structure"
+  | "architecture";
+
+// Đầu vào tạo Spool sau khi kỹ sư đã soát & gán mã BOQCODE thủ công cho từng tuyến
+// bóc được từ bản vẽ (spatialRoutes của parseDxf) — xem app/engineering/cad-tracking.
+export interface CadSpoolCreateInput {
+  routeId?: string;
+  discipline: SpoolDiscipline;
+  systemCode: string;
+  zoneLabel?: string;
+  dimensionSpec: string;
+  widthMm?: number;
+  heightMm?: number;
+  lengthM: number;
+  kind: "duct" | "linear"; // duct -> diện tích tôn m2, linear -> mét dài ống/máng/cáp
+  boqCode: string;
+}
+
+export interface CadSpoolCreateSkip {
+  item: CadSpoolCreateInput;
+  reason: string;
+}
+
+export interface CadSpoolCreateResult {
+  created: CadSpoolRecord[];
+  skipped: CadSpoolCreateSkip[];
+}
+
+// Sinh mã Spool duy nhất trong dự án theo mẫu "SP-{HỆ}-{TẦNG}-{STT}" (vd SP-DUCT-L4-001).
+async function nextSpoolCode(projectId: number, systemCode: string, floorLabel: string) {
+  const prefix = `SP-${systemCode.toUpperCase().replace(/[^A-Z0-9]/g, "")}-${floorLabel
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")}`;
+  const countRow = await queryOne<{ n: string | number }>(
+    `SELECT COUNT(*) AS n FROM engineering_cad_spools WHERE project_id = ? AND spool_code LIKE ?`,
+    projectId,
+    `${prefix}-%`,
+  );
+  const seq = Number(countRow?.n || 0) + 1;
+  return `${prefix}-${String(seq).padStart(3, "0")}`;
+}
+
+// Tạo hàng loạt Spool từ kết quả bóc tách CAD (Auto-QTO) đã được kỹ sư xác nhận mapping
+// BOQCODE — mỗi item bắt buộc gắn với 1 dòng boq_items có sẵn trong dự án (không tự tạo
+// boq_items mới ở đây). Bỏ qua (skip, không throw) các item thiếu mã hoặc không tìm thấy
+// dòng BOQ tương ứng để không chặn cả lô vì 1 dòng lỗi.
+export async function createCadSpoolsBatch(
+  projectId: number,
+  drawingId: number | null,
+  floorLabel: string,
+  items: CadSpoolCreateInput[],
+): Promise<CadSpoolCreateResult> {
+  const created: CadSpoolRecord[] = [];
+  const skipped: CadSpoolCreateSkip[] = [];
+
+  for (const item of items) {
+    const boqCode = item.boqCode?.trim();
+    if (!boqCode) {
+      skipped.push({ item, reason: "Thiếu mã BOQCODE để gán khối lượng" });
+      continue;
+    }
+
+    const boqRow = await queryOne<{ id: number }>(
+      `SELECT id FROM boq_items WHERE project_id = ? AND lower(code) = lower(?)`,
+      projectId,
+      boqCode,
+    );
+    if (!boqRow) {
+      skipped.push({ item, reason: `Không tìm thấy dòng BOQ có mã "${boqCode}" trong dự án` });
+      continue;
+    }
+
+    const lengthM = Math.max(0, Number(item.lengthM) || 0);
+    const calculatedQty =
+      item.kind === "duct"
+        ? calculateDuctQtoM2(Number(item.widthMm) || 0, Number(item.heightMm) || 0, lengthM)
+        : calculatePipeQtoM(lengthM);
+    const unit = item.kind === "duct" ? "m2" : "m";
+
+    if (calculatedQty <= 0) {
+      skipped.push({
+        item,
+        reason: "Kích thước/chiều dài không hợp lệ, khối lượng tính được bằng 0",
+      });
+      continue;
+    }
+
+    let row: CadSpoolRecord | undefined;
+    for (let attempt = 0; attempt < 3 && !row; attempt++) {
+      const spoolCode = await nextSpoolCode(projectId, item.systemCode, floorLabel);
+      try {
+        row = await queryOne<CadSpoolRecord>(
+          `INSERT INTO engineering_cad_spools (
+            project_id, drawing_id, spool_code, discipline, system_code, floor_label,
+            zone_label, dimension_spec, length_m, calculated_qty, unit, boq_item_id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          RETURNING *`,
+          projectId,
+          drawingId,
+          spoolCode,
+          item.discipline,
+          item.systemCode,
+          floorLabel,
+          item.zoneLabel || "Main",
+          item.dimensionSpec,
+          lengthM,
+          calculatedQty,
+          unit,
+          boqRow.id,
+        );
+      } catch (err) {
+        if ((err as { code?: string }).code !== "23505") throw err;
+        // Đụng độ mã Spool hiếm gặp (chạy song song) — thử lại với STT kế tiếp.
+      }
+    }
+
+    if (row) created.push(row);
+    else skipped.push({ item, reason: "Không sinh được mã Spool duy nhất, thử lại sau" });
+  }
+
+  return { created, skipped };
 }
 
 export async function upsertQtoVariance(
@@ -224,16 +356,14 @@ export async function upsertQtoVariance(
       qty_approved_bbnt = EXCLUDED.qty_approved_bbnt,
       estimated_vo_vnd = EXCLUDED.estimated_vo_vnd,
       status = EXCLUDED.status`,
-    [
-      projectId,
-      boqItemId,
-      qtyContract,
-      qtyShopCad,
-      qtyInstalled,
-      qtyApprovedBbnt,
-      estimatedVoVnd,
-      status,
-    ],
+    projectId,
+    boqItemId,
+    qtyContract,
+    qtyShopCad,
+    qtyInstalled,
+    qtyApprovedBbnt,
+    estimatedVoVnd,
+    status,
   );
 }
 
@@ -247,32 +377,42 @@ export async function generateInspectionRequestForSpools(
     throw new Error("Cần chọn ít nhất 1 Spool để lập yêu cầu nghiệm thu.");
   }
 
-  // 1. Tạo mã YCNT mới
-  const code = `YCNT-CAD-${Date.now().toString().slice(-6)}`;
+  // 1. Tạo mã YCNT mới — dùng chung bộ đếm tuần tự nextSeqCode() với
+  // app/api/inspection-requests/route.ts (KHÔNG tự chế định dạng riêng: một mã không khớp
+  // /^YCNT-\d+$/ trong bảng inspection_requests sẽ làm hỏng parseInt() của nextSeqCode() cho
+  // MỌI phiếu YCNT tạo sau đó, kể cả phiếu không liên quan CAD).
   const scheduledAt = new Date().toISOString();
-
-  const insertRow = await queryOne<{ id: number }>(
-    `INSERT INTO inspection_requests (code, scheduled_at, status, note, created_by)
-     VALUES (?, ?, 'sent', ?, ?)
-     RETURNING id`,
-    [code, scheduledAt, note || "Nghiệm thu khối lượng phân đoạn CAD Spools", userId],
+  const { insId, code } = await withUniqueRetry(() =>
+    withTransaction(async () => {
+      const code = await nextSeqCode("inspection_requests", "code", "YCNT-", 4);
+      const insertRow = await queryOne<{ id: number }>(
+        `INSERT INTO inspection_requests (code, scheduled_at, status, note, created_by)
+         VALUES (?, ?, 'sent', ?, ?)
+         RETURNING id`,
+        code,
+        scheduledAt,
+        note || "Nghiệm thu khối lượng phân đoạn CAD Spools",
+        userId,
+      );
+      return { insId: Number(insertRow?.id || 0), code };
+    }),
   );
-
-  const insId = Number(insertRow?.id || 0);
 
   // 2. Gán inspection_request_id cho các spools và chuyển trạng thái sang qc_passed
   for (const sId of spoolIds) {
     await run(
-      `UPDATE engineering_cad_spools 
-       SET inspection_request_id = ?, status = 'qc_passed', updated_at = NOW() 
+      `UPDATE engineering_cad_spools
+       SET inspection_request_id = ?, status = 'qc_passed', updated_at = NOW()
        WHERE id = ? AND project_id = ?`,
-      [insId, sId, projectId],
+      insId,
+      sId,
+      projectId,
     );
   }
 
   const sumRes = await queryOne<{ total: string | number }>(
     `SELECT COALESCE(SUM(calculated_qty), 0) as total FROM engineering_cad_spools WHERE inspection_request_id = ?`,
-    [insId],
+    insId,
   );
 
   return {

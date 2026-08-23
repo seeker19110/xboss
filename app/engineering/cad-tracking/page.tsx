@@ -17,14 +17,70 @@ import {
   ShieldAlert,
   Sliders,
   DollarSign,
+  ScanLine,
+  Ruler,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EngineeringNav from "@/app/components/EngineeringNav";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
+import { showToast } from "@/app/components/Toast";
 import { redirectToLogin } from "@/app/lib/me";
+import type { DxfParseResult, DxfEntityRaw, Extruded3dRoute } from "@/lib/cad/dxf-parser";
 
 type SpoolStatus = "fabricated" | "delivered" | "installed" | "qc_passed" | "bbnt_approved";
+type SpoolDbDiscipline =
+  | "hvac"
+  | "plumbing"
+  | "electrical"
+  | "firefighting"
+  | "structure"
+  | "architecture";
+
+interface DrawingOption {
+  id: number;
+  code: string;
+  name: string;
+  floorLabel: string | null;
+  systemGroup: string | null;
+}
+
+interface TakeoffRow {
+  routeId: string;
+  include: boolean;
+  layer: string;
+  name: string;
+  discipline: SpoolDbDiscipline;
+  systemCode: string;
+  dimensionSpec: string;
+  widthMm?: number;
+  heightMm?: number;
+  lengthM: number;
+  kind: "duct" | "linear";
+  boqCode: string;
+}
+
+// Ánh xạ hệ thống bóc được từ tuyến 3D trong parseDxf sang enum discipline của
+// engineering_cad_spools (CHECK constraint migration 0100) — ELV/OTHER không có nhánh
+// riêng trong bảng nên fallback về electrical/structure, kỹ sư có thể sửa tay trước khi tạo.
+const ROUTE_SYSTEM_TO_DISCIPLINE: Record<Extruded3dRoute["system"], SpoolDbDiscipline> = {
+  HVAC: "hvac",
+  WATER: "plumbing",
+  ELECTRICAL: "electrical",
+  FIRE: "firefighting",
+  ELV: "electrical",
+  OTHER: "structure",
+};
+
+function previewCalculatedQty(row: TakeoffRow): { qty: number; unit: string } {
+  if (row.kind === "duct") {
+    if (!row.widthMm || !row.heightMm || row.lengthM <= 0) return { qty: 0, unit: "m2" };
+    const perimeterM = (2 * (row.widthMm + row.heightMm)) / 1000;
+    const qty = Math.round(perimeterM * row.lengthM * 1.05 * 1000) / 1000;
+    return { qty, unit: "m2" };
+  }
+  return { qty: Math.max(0, Math.round(row.lengthM * 1000) / 1000), unit: "m" };
+}
 
 interface CadSpoolItem {
   id: string;
@@ -74,13 +130,159 @@ const STATUS_COLORS: Record<SpoolStatus, string> = {
 };
 
 export default function CadQtoTrackingPage() {
-  const [activeTab, setActiveTab] = useState<"floorplan" | "variance" | "bbnt">("floorplan");
+  const [activeTab, setActiveTab] = useState<"takeoff" | "floorplan" | "variance" | "bbnt">(
+    "takeoff",
+  );
   const [loading, setLoading] = useState(false);
   const [spools, setSpools] = useState<CadSpoolItem[]>([]);
   const [variances, setVariances] = useState<QtoVarianceItem[]>([]);
   const [selectedSpool, setSelectedSpool] = useState<CadSpoolItem | null>(null);
   const [selectedForBbnt, setSelectedForBbnt] = useState<Set<string>>(new Set());
   const [bbntSuccessMsg, setBbntSuccessMsg] = useState("");
+
+  // ── TAB 0: Bóc khối lượng từ CAD (Auto-QTO) ──
+  const [drawings, setDrawings] = useState<DrawingOption[]>([]);
+  const [selectedDrawingId, setSelectedDrawingId] = useState<number | null>(null);
+  const [floorLabel, setFloorLabel] = useState("");
+  const [parsing, setParsing] = useState(false);
+  const [dxfData, setDxfData] = useState<DxfParseResult | null>(null);
+  const [reviewRows, setReviewRows] = useState<TakeoffRow[]>([]);
+  const [boqOptions, setBoqOptions] = useState<Array<{ code: string; name: string }>>([]);
+  const [creatingSpools, setCreatingSpools] = useState(false);
+  const [createResult, setCreateResult] = useState<{
+    createdCount: number;
+    skippedCount: number;
+    skipped: Array<{ item: { boqCode: string; systemCode: string }; reason: string }>;
+  } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/drawings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.drawings) setDrawings(d.drawings);
+      })
+      .catch(() => {});
+
+    fetch("/api/boq")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (Array.isArray(d?.items))
+          setBoqOptions(d.items.map((i: { code: string; name: string }) => ({
+            code: i.code,
+            name: i.name,
+          })));
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleAnalyzeDrawing = async () => {
+    if (!selectedDrawingId) {
+      showToast("Vui lòng chọn 1 bản vẽ để phân tích");
+      return;
+    }
+    setParsing(true);
+    setCreateResult(null);
+    try {
+      const res = await fetch("/api/engineering/cad/parse-dxf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ drawingId: selectedDrawingId }),
+      });
+      if (res.status === 401) {
+        redirectToLogin();
+        return;
+      }
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast(json.error || "Lỗi khi phân tích bản vẽ CAD");
+        return;
+      }
+      const data: DxfParseResult = json.data;
+      setDxfData(data);
+      const routes = data.spatialRoutes || [];
+      setReviewRows(
+        routes.map((r) => ({
+          routeId: r.id,
+          include: true,
+          layer: r.layer,
+          name: r.name,
+          discipline: ROUTE_SYSTEM_TO_DISCIPLINE[r.system] || "structure",
+          systemCode: r.system,
+          dimensionSpec: r.sectionDimensions || `${r.widthMm}x${r.heightOrDiaMm}`,
+          widthMm: r.widthMm,
+          heightMm: r.heightOrDiaMm,
+          lengthM: Math.max(0, (r.lengthMm || 0) / 1000),
+          kind: r.system === "HVAC" ? "duct" : "linear",
+          boqCode: "",
+        })),
+      );
+      if (routes.length === 0) {
+        showToast("Bản vẽ không có tuyến hình học nào để bóc khối lượng (spatialRoutes rỗng)");
+      }
+    } catch {
+      showToast("Lỗi kết nối khi phân tích bản vẽ");
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  const updateReviewRow = (routeId: string, patch: Partial<TakeoffRow>) => {
+    setReviewRows((prev) => prev.map((r) => (r.routeId === routeId ? { ...r, ...patch } : r)));
+  };
+
+  const handleCreateSpoolsFromReview = async () => {
+    const floor = floorLabel.trim();
+    if (!floor) {
+      showToast("Nhập tên tầng (vd Tầng 4) trước khi tạo Spool");
+      return;
+    }
+    const items = reviewRows
+      .filter((r) => r.include)
+      .map((r) => ({
+        routeId: r.routeId,
+        discipline: r.discipline,
+        systemCode: r.systemCode,
+        dimensionSpec: r.dimensionSpec,
+        widthMm: r.widthMm,
+        heightMm: r.heightMm,
+        lengthM: r.lengthM,
+        kind: r.kind,
+        boqCode: r.boqCode,
+      }));
+    if (items.length === 0) {
+      showToast("Chưa chọn tuyến nào để tạo Spool");
+      return;
+    }
+    setCreatingSpools(true);
+    try {
+      const res = await fetch("/api/engineering/cad-qto/spools", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ drawingId: selectedDrawingId, floorLabel: floor, items }),
+      });
+      if (res.status === 401) {
+        redirectToLogin();
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast(data.error || "Lỗi khi tạo Spool");
+        return;
+      }
+      setCreateResult(data);
+      showToast(
+        `Đã tạo ${data.createdCount} Spool CAD${
+          data.skippedCount > 0 ? `, bỏ qua ${data.skippedCount} tuyến thiếu/sai mã BOQ` : ""
+        }.`,
+      );
+      loadData();
+      if (data.createdCount > 0) setActiveTab("floorplan");
+    } catch {
+      showToast("Lỗi kết nối khi tạo Spool");
+    } finally {
+      setCreatingSpools(false);
+    }
+  };
   const [previewBbntDoc, setPreviewBbntDoc] = useState<{
     bbntNumber: string;
     projectName: string;
@@ -234,7 +436,18 @@ export default function CadQtoTrackingPage() {
             </p>
           </div>
 
-          <div className="flex rounded-lg border border-zinc-800 bg-zinc-900 p-1">
+          <div className="flex flex-wrap rounded-lg border border-zinc-800 bg-zinc-900 p-1">
+            <button
+              onClick={() => setActiveTab("takeoff")}
+              className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold ${
+                activeTab === "takeoff"
+                  ? "bg-amber-500 text-zinc-950"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              <ScanLine size={14} />
+              Bóc Khối Lượng Từ CAD
+            </button>
             <button
               onClick={() => setActiveTab("floorplan")}
               className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold ${
@@ -306,6 +519,208 @@ export default function CadQtoTrackingPage() {
             </div>
           </div>
         </div>
+
+        {/* TAB 0: Bóc Khối Lượng Từ CAD (Auto-QTO) — parse-dxf -> review -> tạo Spool */}
+        {activeTab === "takeoff" && (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 backdrop-blur lg:col-span-5">
+              <h2 className="flex items-center gap-2 border-b border-zinc-800 pb-3 text-base font-bold text-zinc-200">
+                <ScanLine size={18} className="text-amber-400" />
+                1. Chọn bản vẽ & phân tích hình học
+              </h2>
+
+              <div className="mt-4 space-y-3">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase text-zinc-400">
+                    Bản vẽ (đã chuẩn hóa/lưu trong hệ thống)
+                  </label>
+                  <select
+                    value={selectedDrawingId ?? ""}
+                    onChange={(e) => setSelectedDrawingId(e.target.value ? Number(e.target.value) : null)}
+                    className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+                  >
+                    <option value="">— Chọn bản vẽ —</option>
+                    {drawings.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.code} — {d.name}
+                        {d.floorLabel ? ` (${d.floorLabel})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  {drawings.length === 0 && (
+                    <p className="mt-1 text-[11px] text-zinc-500">
+                      Chưa có bản vẽ nào — chuẩn hóa & lưu bản vẽ trước tại{" "}
+                      <span className="text-amber-400">/engineering/chuan-hoa-ban-ve</span>.
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase text-zinc-400">
+                    Tầng (floor_label của Spool, vd &quot;Tầng 4&quot;)
+                  </label>
+                  <input
+                    type="text"
+                    value={floorLabel}
+                    onChange={(e) => setFloorLabel(e.target.value)}
+                    placeholder="Tầng 4"
+                    className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+                  />
+                </div>
+
+                <button
+                  onClick={handleAnalyzeDrawing}
+                  disabled={parsing || !selectedDrawingId}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-zinc-950 transition-colors hover:bg-amber-400 disabled:opacity-50"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${parsing ? "animate-spin" : ""}`} />
+                  {parsing ? "Đang phân tích..." : "Phân Tích Bản Vẽ (Auto-QTO)"}
+                </button>
+              </div>
+
+              {dxfData && dxfData.entities.length > 0 && (
+                <div className="mt-4">
+                  <h3 className="mb-2 text-xs font-semibold uppercase text-zinc-400">
+                    Xem trước hình học ({dxfData.entities.length} thực thể, {dxfData.layers.length}{" "}
+                    layer)
+                  </h3>
+                  <CadMiniPreview data={dxfData} />
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 backdrop-blur lg:col-span-7">
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                <h2 className="flex items-center gap-2 text-base font-bold text-zinc-200">
+                  <Ruler size={18} className="text-amber-400" />
+                  2. Soát & gán mã BOQ cho từng tuyến
+                </h2>
+                <button
+                  onClick={handleCreateSpoolsFromReview}
+                  disabled={creatingSpools || reviewRows.length === 0}
+                  className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-emerald-500 disabled:opacity-50"
+                >
+                  <CheckCircle2 size={14} />
+                  {creatingSpools ? "Đang tạo..." : "Tạo Spool CAD"}
+                </button>
+              </div>
+
+              {reviewRows.length === 0 ? (
+                <div className="flex h-64 flex-col items-center justify-center text-center text-xs text-zinc-500">
+                  <ScanLine size={32} className="mb-2 opacity-40" />
+                  Chọn bản vẽ và bấm &quot;Phân Tích Bản Vẽ&quot; để bóc tách các tuyến hình học
+                  (ống gió, đường ống, máng cáp...) và gán mã BOQ trước khi tạo Spool.
+                </div>
+              ) : (
+                <div className="mt-3 overflow-x-auto">
+                  <table className="w-full text-left text-xs text-zinc-300">
+                    <thead className="border-b border-zinc-800 bg-zinc-950 font-semibold uppercase tracking-wider text-zinc-400">
+                      <tr>
+                        <th className="p-2 w-8"></th>
+                        <th className="p-2">Layer / Tên tuyến</th>
+                        <th className="p-2">Bộ môn</th>
+                        <th className="p-2">Quy cách</th>
+                        <th className="p-2">Dài (m)</th>
+                        <th className="p-2">KL bóc tách</th>
+                        <th className="p-2 min-w-[160px]">Mã BOQ (bắt buộc)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800/60">
+                      {reviewRows.map((row) => {
+                        const preview = previewCalculatedQty(row);
+                        return (
+                          <tr
+                            key={row.routeId}
+                            className={`hover:bg-zinc-800/40 ${!row.include ? "opacity-40" : ""}`}
+                          >
+                            <td className="p-2">
+                              <input
+                                type="checkbox"
+                                checked={row.include}
+                                onChange={(e) =>
+                                  updateReviewRow(row.routeId, { include: e.target.checked })
+                                }
+                                className="rounded border-zinc-700 bg-zinc-900 text-amber-500"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <div className="font-mono text-[11px] font-bold text-zinc-100">
+                                {row.layer}
+                              </div>
+                              <div className="text-[10px] text-zinc-500">{row.name}</div>
+                            </td>
+                            <td className="p-2">
+                              <select
+                                value={row.discipline}
+                                onChange={(e) =>
+                                  updateReviewRow(row.routeId, {
+                                    discipline: e.target.value as SpoolDbDiscipline,
+                                  })
+                                }
+                                className="rounded border border-zinc-700 bg-zinc-950 px-1.5 py-1 text-[11px] text-zinc-200"
+                              >
+                                <option value="hvac">HVAC</option>
+                                <option value="plumbing">Cấp thoát nước</option>
+                                <option value="electrical">Điện</option>
+                                <option value="firefighting">PCCC</option>
+                                <option value="structure">Kết cấu</option>
+                                <option value="architecture">Kiến trúc</option>
+                              </select>
+                            </td>
+                            <td className="p-2 font-mono">{row.dimensionSpec}</td>
+                            <td className="p-2 font-mono">{row.lengthM.toFixed(2)}</td>
+                            <td className="p-2 font-mono font-bold text-emerald-400">
+                              {preview.qty} {preview.unit}
+                            </td>
+                            <td className="p-2">
+                              <input
+                                type="text"
+                                list="boq-code-options"
+                                value={row.boqCode}
+                                onChange={(e) =>
+                                  updateReviewRow(row.routeId, { boqCode: e.target.value })
+                                }
+                                placeholder="vd OGTD-A1"
+                                className={`w-full rounded border px-2 py-1 font-mono text-[11px] text-zinc-100 ${
+                                  row.boqCode
+                                    ? "border-zinc-700 bg-zinc-950"
+                                    : "border-amber-700/60 bg-amber-950/20"
+                                }`}
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  <datalist id="boq-code-options">
+                    {boqOptions.map((b) => (
+                      <option key={b.code} value={b.code}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </datalist>
+                </div>
+              )}
+
+              {createResult && createResult.skipped.length > 0 && (
+                <div className="mt-4 rounded-lg border border-amber-800/40 bg-amber-950/20 p-3 text-[11px] text-amber-300">
+                  <div className="mb-1 flex items-center gap-1.5 font-semibold">
+                    <AlertTriangle size={13} />
+                    Đã bỏ qua {createResult.skippedCount} tuyến khi tạo Spool:
+                  </div>
+                  <ul className="list-inside list-disc space-y-0.5">
+                    {createResult.skipped.map((s, idx) => (
+                      <li key={idx}>
+                        {s.item.systemCode} ({s.item.boqCode || "(trống)"}): {s.reason}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* TAB 1: Visual CAD Floorplan & Spool Pinning */}
         {activeTab === "floorplan" && (
@@ -840,6 +1255,63 @@ export default function CadQtoTrackingPage() {
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+// Xem trước nhanh hình học thật của bản vẽ (không thay renderer đầy đủ của
+// /engineering/chuan-hoa-ban-ve) — chỉ để kỹ sư đối chiếu tuyến đang bóc khối lượng.
+function CadMiniPreview({ data }: { data: DxfParseResult }) {
+  const b = data.diagnostic.boundingDimensions;
+  const width = Math.max(1, b.maxX - b.minX);
+  const height = Math.max(1, b.maxY - b.minY);
+  const strokeWidth = Math.max(width, height) / 600;
+
+  const layerColor: Record<string, string> = {};
+  data.layers.forEach((l) => {
+    layerColor[l.name] = l.colorHex || "#a1a1aa";
+  });
+
+  const toSvgX = (x: number) => x - b.minX;
+  const toSvgY = (y: number) => height - (y - b.minY);
+
+  const renderable = data.entities.filter(
+    (e: DxfEntityRaw) =>
+      (e.type === "LINE" && e.coordinates.start && e.coordinates.end) ||
+      ((e.type === "LWPOLYLINE" || e.type === "POLYLINE") &&
+        e.coordinates.points &&
+        e.coordinates.points.length >= 2),
+  );
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950">
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-64 w-full" preserveAspectRatio="xMidYMid meet">
+        {renderable.map((e) => {
+          const color = layerColor[e.layer] || "#71717a";
+          if (e.type === "LINE" && e.coordinates.start && e.coordinates.end) {
+            const [x1, y1] = e.coordinates.start;
+            const [x2, y2] = e.coordinates.end;
+            return (
+              <line
+                key={e.id}
+                x1={toSvgX(x1)}
+                y1={toSvgY(y1)}
+                x2={toSvgX(x2)}
+                y2={toSvgY(y2)}
+                stroke={color}
+                strokeWidth={strokeWidth}
+              />
+            );
+          }
+          if (e.coordinates.points) {
+            const pts = e.coordinates.points.map(([x, y]) => `${toSvgX(x)},${toSvgY(y)}`).join(" ");
+            return (
+              <polyline key={e.id} points={pts} fill="none" stroke={color} strokeWidth={strokeWidth} />
+            );
+          }
+          return null;
+        })}
+      </svg>
     </div>
   );
 }

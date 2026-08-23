@@ -25,25 +25,25 @@ export async function GET() {
       name: string;
       unit: string;
       qty_contract: number;
-      unit_rate: number;
+      unit_price: number;
       shop_qty_sum: string | number;
       installed_qty_sum: string | number;
       approved_qty_sum: string | number;
     }>(
-      `SELECT 
-        b.id, b.code, b.name, b.unit, 
+      `SELECT
+        b.id, b.code, b.name, b.unit,
         COALESCE(b.qty_contract, 0) as qty_contract,
-        COALESCE(b.unit_rate, 500000) as unit_rate,
+        COALESCE(b.unit_price, 500000) as unit_price,
         COALESCE(SUM(s.calculated_qty), 0) as shop_qty_sum,
         COALESCE(SUM(CASE WHEN s.status IN ('installed', 'qc_passed', 'bbnt_approved') THEN s.calculated_qty ELSE 0 END), 0) as installed_qty_sum,
         COALESCE(SUM(CASE WHEN s.status = 'bbnt_approved' THEN s.calculated_qty ELSE 0 END), 0) as approved_qty_sum
        FROM boq_items b
        LEFT JOIN engineering_cad_spools s ON s.boq_item_id = b.id AND s.project_id = b.project_id
        WHERE b.project_id = ?
-       GROUP BY b.id, b.code, b.name, b.unit, b.qty_contract, b.unit_rate
+       GROUP BY b.id, b.code, b.name, b.unit, b.qty_contract, b.unit_price
        ORDER BY b.code ASC
        LIMIT 50`,
-      [projectId],
+      projectId,
     );
 
     const summaries: QtoVarianceSummary[] = rows.map((r) => {
@@ -51,7 +51,7 @@ export async function GET() {
       const shopQty = Number(r.shop_qty_sum) || 0;
       const installedQty = Number(r.installed_qty_sum) || 0;
       const approvedQty = Number(r.approved_qty_sum) || 0;
-      const unitRate = Number(r.unit_rate) || 500000;
+      const unitRate = Number(r.unit_price) || 500000;
 
       const v = compute3WayVariance(contractQty, shopQty, installedQty, approvedQty, unitRate);
 
