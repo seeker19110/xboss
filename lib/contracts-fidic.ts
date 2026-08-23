@@ -446,29 +446,30 @@ export async function createFidicClaim(
     const dossierMd = generateFidicClaimDossier(input);
     const row = await queryOne<{ id: string }>(
       `INSERT INTO engineering_fidic_claims (
-        project_id, claim_code, title, executive_summary,
-        eot_days_requested, cost_claim_amount, dossier_markdown, created_by
+        project_id, claim_code, event_title, event_date, notice_date,
+        eot_days_claimed, cost_claimed_vnd, dossier_content, created_by
       ) VALUES (
-        ?, ?, ?, ?,
+        ?, ?, ?, ?, ?,
         ?, ?, ?, ?
       )
-      ON CONFLICT (project_id, claim_code) DO UPDATE SET
-        title = EXCLUDED.title,
-        executive_summary = EXCLUDED.executive_summary,
-        eot_days_requested = EXCLUDED.eot_days_requested,
-        cost_claim_amount = EXCLUDED.cost_claim_amount,
-        dossier_markdown = EXCLUDED.dossier_markdown
+      ON CONFLICT (claim_code) DO UPDATE SET
+        event_title = EXCLUDED.event_title,
+        event_date = EXCLUDED.event_date,
+        notice_date = EXCLUDED.notice_date,
+        eot_days_claimed = EXCLUDED.eot_days_claimed,
+        cost_claimed_vnd = EXCLUDED.cost_claimed_vnd,
+        dossier_content = EXCLUDED.dossier_content,
+        updated_at = CURRENT_TIMESTAMP
       RETURNING id`,
-      [
-        input.projectId,
-        input.claimCode,
-        input.eventTitle || `Khiếu nại ${input.claimCode}`,
-        `Đề nghị gia hạn ${input.eotDaysClaimed || 0} ngày và bồi thường ${input.costClaimedVnd || 0} VNĐ`,
-        input.eotDaysClaimed || 0,
-        input.costClaimedVnd || 0,
-        dossierMd,
-        input.userId ?? null,
-      ],
+      input.projectId,
+      input.claimCode,
+      input.eventTitle || `Khiếu nại ${input.claimCode}`,
+      input.eventDate,
+      input.noticeDate,
+      input.eotDaysClaimed || 0,
+      input.costClaimedVnd || 0,
+      dossierMd,
+      input.userId ?? input.createdBy ?? null,
     );
     if (!row) throw new Error("Failed to save FIDIC claim");
     return { ...row, claimCode: input.claimCode };
@@ -477,33 +478,35 @@ export async function createFidicClaim(
   const projectId = inputOrProjectId;
   const claimCode = claimCodeArg!;
   const dossier = dossierArg;
+  const today = new Date().toISOString().slice(0, 10);
   const row = await queryOne<{ id: string }>(
     `INSERT INTO engineering_fidic_claims (
-      project_id, claim_code, title, executive_summary,
-      eot_days_requested, cost_claim_amount, dossier_markdown, created_by
+      project_id, claim_code, event_title, event_date, notice_date,
+      eot_days_claimed, cost_claimed_vnd, dossier_content, created_by
     ) VALUES (
-      ?, ?, ?, ?,
+      ?, ?, ?, ?, ?,
       ?, ?, ?, ?
     )
-    ON CONFLICT (project_id, claim_code) DO UPDATE SET
-      title = EXCLUDED.title,
-      executive_summary = EXCLUDED.executive_summary,
-      eot_days_requested = EXCLUDED.eot_days_requested,
-      cost_claim_amount = EXCLUDED.cost_claim_amount,
-      dossier_markdown = EXCLUDED.dossier_markdown
+    ON CONFLICT (claim_code) DO UPDATE SET
+      event_title = EXCLUDED.event_title,
+      event_date = EXCLUDED.event_date,
+      notice_date = EXCLUDED.notice_date,
+      eot_days_claimed = EXCLUDED.eot_days_claimed,
+      cost_claimed_vnd = EXCLUDED.cost_claimed_vnd,
+      dossier_content = EXCLUDED.dossier_content,
+      updated_at = CURRENT_TIMESTAMP
     RETURNING id`,
-    [
-      projectId,
-      claimCode,
-      typeof dossier === "string"
-        ? `Hồ sơ Khiếu nại ${claimCode}`
-        : dossier.documentTitle || `Hồ sơ ${claimCode}`,
-      typeof dossier === "string" ? `Hồ sơ Khiếu nại ${claimCode}` : dossier.executiveSummary || "",
-      typeof dossier === "string" ? 0 : dossier.totalEotDaysRequested || 0,
-      typeof dossier === "string" ? 0 : dossier.totalCostClaimVnd || 0,
-      typeof dossier === "string" ? dossier : dossier.claimDossierMarkdown || "",
-      userIdArg ?? null,
-    ],
+    projectId,
+    claimCode,
+    typeof dossier === "string"
+      ? `Hồ sơ Khiếu nại ${claimCode}`
+      : dossier.documentTitle || `Hồ sơ ${claimCode}`,
+    today,
+    today,
+    typeof dossier === "string" ? 0 : dossier.totalEotDaysRequested || 0,
+    typeof dossier === "string" ? 0 : dossier.totalCostClaimVnd || 0,
+    typeof dossier === "string" ? dossier : dossier.claimDossierMarkdown || "",
+    userIdArg ?? null,
   );
   if (!row) throw new Error("Failed to save FIDIC claim");
   return { ...row, claimCode };
@@ -512,6 +515,6 @@ export async function createFidicClaim(
 export async function listFidicClaims(projectId: number): Promise<Array<Record<string, unknown>>> {
   return await query(
     `SELECT * FROM engineering_fidic_claims WHERE project_id = ? ORDER BY created_at DESC LIMIT 50`,
-    [projectId],
+    projectId,
   );
 }

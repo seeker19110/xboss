@@ -81,18 +81,22 @@ export async function runPredictionPipeline(
           status: string;
           progress: number;
         }>(
-          `SELECT id, name, status, progress
-           FROM tasks
-           WHERE project_id = ? AND (status = 'delayed' OR (progress < 80 AND end_date < NOW() + INTERVAL '7 days'))
+          `SELECT t.id, t.name, t.status, t.progress_percent AS progress
+           FROM tasks t
+           JOIN work_packages wp ON t.package_id = wp.id
+           JOIN sheet_types st ON wp.sheet_type_id = st.id
+           JOIN towers tw ON st.tower_id = tw.id
+           WHERE tw.project_id = ?
+             AND (t.status = 'tre' OR (t.progress_percent < 0.8 AND t.end_date < NOW() + INTERVAL '7 days'))
            LIMIT 20`,
           projectId,
         );
 
         for (const t of delayedTasks) {
-          const score = t.status === "delayed" ? 0.92 : 0.76;
-          const prob = t.status === "delayed" ? 0.88 : 0.72;
+          const score = t.status === "tre" ? 0.92 : 0.76;
+          const prob = t.status === "tre" ? 0.88 : 0.72;
           const uncertainty: UncertaintyBin = "low";
-          const explanation = `Công việc [${t.name}] đang ở tiến độ ${t.progress}%, có xác suất trễ hạn cao theo phân tích Critical Path.`;
+          const explanation = `Công việc [${t.name}] đang ở tiến độ ${Math.round(t.progress * 100)}%, có xác suất trễ hạn cao theo phân tích Critical Path.`;
 
           // Auto create suggestion in ENG-2
           const pkg =

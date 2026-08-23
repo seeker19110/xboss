@@ -4,37 +4,60 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
-## Nợ kỹ thuật mới phát hiện — 8 file test tích hợp fail thật trên DB sạch (2026-08-23)
+## Nợ kỹ thuật — 8 file test tích hợp fail thật trên DB sạch (2026-08-23, cập nhật cùng ngày)
 
-**Chưa sửa, cố ý — người dùng chốt "tạo task riêng, chưa sửa ngay".** Phát hiện khi chạy
-`npm test -- --release-gate` **1 lần trên Postgres 16 vừa migrate sạch** (không phải môi trường
-tích luỹ dữ liệu cũ) để xác nhận migration `0089`/`0091`/`0092`, đối chiếu thêm bằng log CI thật
-của PR #370 trên GitHub Actions (cùng kết quả, không phải lỗi máy cục bộ). Không file nào thuộc
-`lib/cad`/`chuan-hoa-ban-ve` — không liên quan Việc 7 hay M99.
+Phát hiện khi chạy `npm test -- --release-gate` **1 lần trên Postgres 16 vừa migrate sạch**
+(không phải môi trường tích luỹ dữ liệu cũ), đối chiếu thêm bằng log CI thật của PR #370 trên
+GitHub Actions. Không file nào thuộc `lib/cad`/`chuan-hoa-ban-ve` — không liên quan Việc 7 hay M99.
 
-- **`tests/engineering-fidic-claim.test.ts` (M79):** `lib/contracts-fidic.ts:447`
-  (`createFidicClaim`, nhánh nhận object) INSERT vào `engineering_fidic_claims` với tên cột
-  `title`/`executive_summary`/`eot_days_requested`/`cost_claim_amount`/`dossier_markdown` —
-  schema thật (`migrations/0113_fidic_delay_claims.sql`) đặt tên khác:
-  `event_title`/`eot_days_claimed`/`cost_claimed_vnd`/`dossier_content` (không có cột
-  `executive_summary`). `ON CONFLICT (project_id, claim_code)` cũng sai vì `claim_code` chỉ
-  UNIQUE đơn (không phải composite `(project_id, claim_code)`). Nhánh code này có khả năng
-  **chưa từng chạy thành công** kể từ khi viết.
-- **OS-1/OS-2** (`tests/*os1*`, `tests/*os2*`): `column "revision_name" of relation
-"engineering_source_revisions" does not exist` (OS-2 dùng alias `sr.revision_name`).
-- **OS-3** (`tests/*os3*`): `column "project_id" of relation "tasks" does not exist`.
-- **PIN-1** (`tests/*pin1*`): `column o.code does not exist`.
-- **PIN-2** (`tests/*pin2*`): `column "metadata" of relation "engineering_objects" does not
-exist`.
+**Đã sửa, verify bằng Postgres thật (`TEST_DATABASE_URL`), không đoán hướng — đọc kỹ chỗ gọi/schema trước khi quyết định sửa code hay thêm migration:**
+
+- **`tests/engineering-fidic-claim.test.ts` (M79):** `lib/contracts-fidic.ts` (`createFidicClaim`,
+  cả 2 nhánh overload) sửa đúng tên cột schema thật (`event_title`/`eot_days_claimed`/
+  `cost_claimed_vnd`/`dossier_content`), thêm `event_date`/`notice_date` còn thiếu trong INSERT,
+  sửa `ON CONFLICT (project_id, claim_code)` → `ON CONFLICT (claim_code)` (UNIQUE đơn thật). Bỏ
+  hẳn field `executive_summary` — không có ý nghĩa nghiệp vụ lưu riêng (chỉ là chuỗi tổng hợp tạm
+  sinh tại chỗ từ `eotDaysClaimed`/`costClaimedVnd`, không nơi nào đọc lại từ DB). **Phát hiện thêm
+  bug ẩn nghiêm trọng**: `createFidicClaim`/`listFidicClaims` gọi `query`/`queryOne` với tham số
+  truyền dạng **mảng literal thay vì spread** (`[a,b,c]` thay vì `a,b,c,...`) — `lib/db` nhận
+  `unknown[]` biến đổi (variadic) nên TypeScript không bắt được, khiến pg nhận 1 tham số thay vì 9
+  → luôn lỗi runtime `bind message supplies 1 parameters, but prepared statement requires 9`. Đã
+  sửa cả 2 chỗ. **Khuyến nghị: audit rộng hơn các lệnh gọi `query`/`queryOne`/`run` khác trong repo
+  xem có truyền mảng thay vì spread tương tự không** (lỗi này không hiện ở compile-time).
+- **OS-2** (`tests/engineering-twin.test.ts`, alias `sr.revision_name`) và phần OS-1 liên quan
+  cùng cột: cột `revision_name` **chưa từng tồn tại** trong `engineering_source_revisions`
+  (`migrations/0084_engineering_core.sql`) — không phải sai tên, code/test đã đúng nhưng thiếu
+  migration. Thêm `migrations/0132_engineering_source_revision_name.sql`
+  (`ALTER TABLE ... ADD COLUMN IF NOT EXISTS revision_name TEXT` — thêm cột thuần, không đụng dữ
+  liệu, đủ điều kiện đi thẳng production). OS-2 pass 3/3.
+- **OS-3** (`tests/engineering-predictions.test.ts`): bug ở `lib/engineering-predictions.ts`
+  (`runPredictionPipeline`), không chỉ ở test — `SELECT ... FROM tasks WHERE project_id = ?` sai
+  vì `tasks` không có cột `project_id` (chỉ có `package_id`); sửa thành JOIN đúng chuỗi WBS thật
+  `tasks.package_id → work_packages.sheet_type_id → sheet_types.tower_id → towers.project_id`.
+  Kèm 2 lỗi ăn theo: cột tiến độ thật là `progress_percent` thang **0–1** (không phải `progress`
+  thang 0–100), và slug trạng thái trễ thật là `'tre'` (`lib/status.ts`), không phải `'delayed'`.
+  Sửa cả `lib/engineering-predictions.ts` và `tests/engineering-predictions.test.ts` (dựng đúng
+  chuỗi WBS thay vì chèn thẳng `project_id` vào `tasks`, dọn dẹp FK đúng thứ tự). Pass 1/1.
+- **PIN-1** (`lib/engineering-twin-pinnacle.ts`): `engineering_objects` không có cột `code`, chỉ
+  có `external_key` (mã tự do dùng làm định danh) — sửa `o.code as object_code` →
+  `o.external_key as object_code` (2 chỗ).
+- **PIN-2** (`lib/engineering-prescriptive.ts` + `tests/engineering-prescriptive.test.ts`):
+  `engineering_objects` không có cột `metadata`, cột tương đương thật là `properties JSONB` — sửa
+  `SELECT`/`INSERT` dùng `properties` (alias `as metadata` trong SELECT để không phải sửa logic JS
+  đang dùng tên biến `metadata`). Pass 5/5 (cùng PIN-1, chạy chung file test).
+
+**Còn mở, KHÔNG thuộc phạm vi đợt sửa này — cần task riêng:**
+
 - **`tests/engineering-cad-save-drawing.test.ts`:** "Thiếu thư mục tạm HVAC/temp" — fail **cả
   trên GitHub Actions thật** (không chỉ do worktree cục bộ thiếu cây `drawings/`), cần điều tra
   riêng xem route/test có đang giả định thư mục tồn tại sẵn hay thiếu bước tự tạo.
-
-**Nghi vấn:** các bảng OS-_/PIN-_ thuộc track "Vision Complete" (`docs/nang-cap/OS-*.md`, còn
-Draft/conditional) — có khả năng test được viết trước cho schema dự kiến nhưng migration thật
-đã đổi tên cột sau đó mà không cập nhật lại test/code liên quan, hoặc ngược lại. Cần đọc lại
-migration liên quan (`0084`–`0087` và các bản OS-* nếu có) đối chiếu với code/test trước khi sửa,
-không đoán hướng nào đúng.
+- **`tests/engineering-graph.test.ts` — ca "OS-1: Lineage & Impact Analysis cho đối tượng kỹ
+  thuật"** (phát sinh mới khi verify OS-1/OS-2, KHÔNG liên quan `revision_name`): lỗi
+  `null value in column "object_type" of relation "engineering_object_revisions" violates
+not-null constraint` khi tạo revision không truyền `object_type`. Cần đọc lại chỗ gọi tạo
+  revision trong `lib/engineering-graph.ts`/test để xác định `object_type` nên lấy từ đâu (kế
+  thừa từ `engineering_objects.object_type` của revision trước, hay bắt buộc truyền tường minh)
+  trước khi sửa — chưa xử lý trong đợt này.
 
 ## M99 PR1 — Rule pack chuẩn hóa CAD v1 + endpoint (2026-08-23)
 

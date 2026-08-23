@@ -16,17 +16,34 @@ test(
       `predict-test-${projId}@test.local`,
     );
 
+    let towerId: number | undefined;
+    let sheetTypeId: number | undefined;
+    let packageId: number | undefined;
+
     try {
       // 1. Catalog models
       const models = await listPredictionModels();
       assert.ok(models.length >= 3, "Phải có ít nhất 3 model chuẩn (schedule, cost, clash)");
       assert.ok(models.some((m) => m.useCase === "schedule_risk"));
 
-      // 2. Tạo task trễ hạn để test schedule_risk pipeline
-      await insertId(
-        `INSERT INTO tasks (project_id, name, status, progress, start_date, end_date)
-       VALUES (?, 'Lắp đặt AHU-01', 'delayed', 45, '2026-08-01', '2026-08-10')`,
+      // 2. Tạo task trễ hạn để test schedule_risk pipeline (đi qua đúng chuỗi WBS
+      // Project → Tower → SheetType → WorkPackage → Task — tasks không có cột project_id)
+      towerId = await insertId(
+        `INSERT INTO towers (project_id, name) VALUES (?, 'Tháp A')`,
         projId,
+      );
+      sheetTypeId = await insertId(
+        `INSERT INTO sheet_types (tower_id, code, name) VALUES (?, 'ogtd', 'OGTĐ')`,
+        towerId,
+      );
+      packageId = await insertId(
+        `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'A1', 'Hệ ống gió')`,
+        sheetTypeId,
+      );
+      await insertId(
+        `INSERT INTO tasks (package_id, code, name, status, progress_percent, start_date, end_date)
+       VALUES (?, 'A1,01', 'Lắp đặt AHU-01', 'tre', 0.45, '2026-08-01', '2026-08-10')`,
+        packageId,
       );
 
       // 3. Chạy pipeline dự báo
@@ -54,6 +71,10 @@ test(
       assert.equal(updatedList.length, 1);
       assert.equal(updatedList[0].status, "accepted");
     } finally {
+      if (packageId) await run(`DELETE FROM tasks WHERE package_id = ?`, packageId);
+      if (packageId) await run(`DELETE FROM work_packages WHERE id = ?`, packageId);
+      if (sheetTypeId) await run(`DELETE FROM sheet_types WHERE id = ?`, sheetTypeId);
+      if (towerId) await run(`DELETE FROM towers WHERE id = ?`, towerId);
       await run(`DELETE FROM projects WHERE id = ?`, projId);
       await run(`DELETE FROM users WHERE id = ?`, userId);
     }
