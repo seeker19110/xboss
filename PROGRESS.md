@@ -31,6 +31,24 @@
 - **Ranh giới đã chọn (để tránh phụ thuộc vòng giữa các hook):** hook không tự đọc state của hook khác — hook cha truyền **callback ổn định** (`onLayersParsed`, `onFontSampleDetected`, `onDrawingFileNameDetected`) hoặc setter xuống hook con, và thứ tự gọi hook trong `page.tsx` giữ đúng thứ tự chạy 3 `useEffect` như bản gốc (đồng bộ `dxfData` → dọn interval auto-heal → effect khởi động).
 - **Verify:** `npm run lint`/`typecheck`/`build` xanh; `npm test` 209 file, 674 ca pass — **đúng bằng baseline trước khi sửa** (1 ca fail sẵn có do worktree thiếu cây thư mục `drawings/`). Ngoài ra chạy **đối chứng trên trình duyệt thật** (Postgres ephemeral + `npm run start` + Playwright): đăng nhập → mở `/engineering/chuan-hoa-ban-ve` → nạp tệp DXF thật → duyệt 4 tab Bước 1 + Bước 2, so output bản trước và bản sau khi tách — **giống hệt từng dòng** (điểm sức khỏe, bảng layer, ô Bác Sĩ Font tự điền, tên tệp chuẩn sinh ra), 0 lỗi runtime, không có vòng lặp fetch phát sinh.
 
+## Chuẩn hóa bản vẽ CAD 2D — Việc 7: vá lỗ hổng thật trong studio TS hiện tại (2026-08-23)
+
+- **Đã làm:** 4 việc con, đã merge vào `main`:
+  - **7.1 — Bộ ghi DXF R12 hợp lệ + kiểm định server-side trước khi lưu.** `lib/cad/dxf-parser.ts`: sửa `$ACADVER` từ `AC1015` (khai sai là R2000) về `AC1009` đúng R12 đang thực sự ghi ra, trong cả `exportDxf()` lẫn `generateStandard2dDxf()`; hạ nhánh `DIMENSION` thô thành `LINE` + `TEXT` (theo quyết định đã chốt ở M98 §1(b)), có nhánh dự phòng ghi `POINT` để không bao giờ nuốt mất entity; thêm hàm `validateDxf()` kiểm cấu trúc tối thiểu (cân bằng SECTION/ENDSEC, đủ 4 section bắt buộc, kết thúc `0`+`EOF`, chống lệch nhịp cặp mã nhóm/giá trị, bỏ BOM). `app/api/engineering/cad/save-drawing/route.ts` trả **422** khi DXF không hợp lệ, trước mọi tác dụng phụ (không ghi file, không tạo `drawings`/`drawing_revisions`). Sửa `docs/nang-cap/M98-dxf-r2000-va-dwg.md` §1(b) (bỏ nhắc file `lib/cad/dxf-writer.ts` không tồn tại). Bổ sung test trong `tests/dxf-real-drawing-parser.test.ts` (11 → 14 ca).
+  - **7.2 — Chặn quyền ghi bản vẽ trái phép.** `app/api/engineering/cad/save-drawing/route.ts` trước đây chỉ kiểm `getCurrentUser()` (401) mà không có `CAN.*` nào — mọi vai trò đã đăng nhập (kể cả `subcon`/`bch`/`viewer`) đều ghi được bản vẽ chính thức. Nay thêm `CAN.manageDrawings` (admin/pm/engineer) → 403, áp cho toàn bộ `POST`.
+  - **7.3 — Gom quy tắc chuẩn hóa layer/font CAD về một nguồn.** Xoá bản trùng lặp `normalizeCadLayers`/`convertTcvn3ToUnicode`/`TCVN3_MAP` trong `lib/engineering-cad-skills.ts` (2 bản `normalizeCadLayers` trước đây cho kết quả KHÁC nhau trên cùng input), re-export từ nguồn chuẩn `lib/cad/dxf-parser.ts`. `POST /api/engineering/cad/normalize` nay phân biệt được gió hồi/thải.
+  - **7.4 — Auto-heal Bước 1: bỏ thanh tiến độ giả.** Bỏ `setInterval` tăng % ngẫu nhiên (`Math.random()`) + 5 message cố định vốn không phản ánh xử lý thật (xử lý thật chạy đồng bộ, tức thời); thay bằng trạng thái loading tĩnh "Đang xử lý…". Sửa ở `app/engineering/chuan-hoa-ban-ve/hooks/useAutoHealEngine.ts`, `components/StepTabsNav.tsx`, `components/CadViewportStudio.tsx`, `page.tsx`.
+
+- **Verify:** `npm run lint` + `npm run typecheck` xanh; `npm test` 209 file, 0 fail.
+
+- **Ghi chú:** chặng ngắn hạn trước M99, các đặc tả `M98`/`M99` trong `docs/nang-cap/` vẫn ở trạng thái **Draft**, chưa đóng.
+
+**Nợ kỹ thuật phát hiện (chưa sửa):**
+
+1. `app/api/engineering/cad/save-drawing/route.ts` insert `drawing_revisions.status = 'pending'` nhưng ràng buộc DB `CHECK` chỉ nhận `submitted|commented|approved|approved_with_comments|rejected|superseded` → lưu bản vẽ chưa duyệt bị **500** sau khi đã ghi file và tạo dòng `drawings` (dữ liệu mồ côi). Đã kiểm chứng trên DB thật, chưa sửa.
+2. `normalizeCadLayers` trong `lib/cad/dxf-parser.ts` khớp chuỗi con quá rộng: layer chứa "CÁP" (cáp điện) rơi nhầm vào nhánh ống nước vì từ khoá `"CAP"` (ý là "cấp nước") — vd `MANG_CAP_DIEN` → `P-PIPE-DOMW` thay vì `E-TRAY-PWRR`; tương tự `ONG_THOAT_SAN` → `M-DUCT-SUPP` vì `"THOAT"` chứa `"OA"`. Cần siết theo ranh giới token và cho nhánh điện/ELV chạy trước nhánh ống nước.
+3. Test cho RBAC của `save-drawing` hiện chỉ kiểm bảng `CAN`, chưa gọi được route handler thật để khẳng định status 403 — do `getCurrentUser()` gọi `headers()` của `next/headers`, không chạy được ngoài request scope, và repo chưa bật `--experimental-test-module-mocks` trong `scripts/run-tests.mjs`.
+
 ## Giai đoạn hiện tại
 
 - **GĐ 4–5 — Vận hành có kiểm soát & nâng chất lượng.** Sản phẩm đã chạy thật (v0.2.1, tự host VPS). Track Engineering OS nền tảng (ENG-1→ENG-4) đã hoàn tất về code, migration, API/UI và test; chưa có traffic thật từ MEPF-Agents nên chưa mở các tầng Digital Twin/Predictive OS/Controlled Autonomy.
