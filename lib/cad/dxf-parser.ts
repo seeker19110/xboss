@@ -1792,12 +1792,12 @@ export function validateDxf(content: string): { valid: boolean; errors: string[]
     if (missingSections.length > 0) {
       errors.push(`Thiếu section bắt buộc: ${missingSections.join(", ")}.`);
     }
-  }
 
-  const meaningfulLines = body.map((l) => l.trim()).filter((l) => l.length > 0);
-  const n = meaningfulLines.length;
-  if (n < 2 || meaningfulLines[n - 1] !== "EOF" || meaningfulLines[n - 2] !== "0") {
-    errors.push('Tệp DXF phải kết thúc bằng cặp mã "0" + "EOF".');
+    const meaningfulLines = body.map((l) => l.trim()).filter((l) => l.length > 0);
+    const n = meaningfulLines.length;
+    if (n < 2 || meaningfulLines[n - 1] !== "EOF" || meaningfulLines[n - 2] !== "0") {
+      errors.push('Tệp DXF phải kết thúc bằng cặp mã "0" + "EOF".');
+    }
   }
 
   return { valid: errors.length === 0, errors };
