@@ -1,0 +1,200 @@
+// M99 PR1 — Kiểm contract rule pack chuẩn hóa CAD.
+// Route GET /api/engineering/cad/rule-pack gọi getCurrentUser() (next/headers) nên không gọi
+// handler trực tiếp ngoài request scope thật của Next (đúng quy ước đã ghi ở tests/qr-resolve.test.ts,
+// tests/permissions.test.ts) — kiểm 2 lớp:
+//   (1) lib/cad/rule-pack.ts: cấu trúc field, ETag + If-None-Match — hàm thuần, không cần DB;
+//   (2) lớp mỏng của route (auth 401/403, force-dynamic, 304) kiểm qua mã nguồn route.
+// Kèm lớp (3) quan trọng nhất: đối chiếu rule pack với QUY TẮC CODE THẬT trong lib/cad/dxf-parser.ts —
+// sai lệch ở đây nghĩa là plugin AutoCAD và web trôi khỏi nhau (ADR-0006 nguyên tắc 1).
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import {
+  getCurrentRulePack,
+  getRulePackEtag,
+  matchesEtag,
+  CURRENT_RULE_PACK_VERSION,
+} from "@/lib/cad/rule-pack";
+import {
+  normalizeCadLayers,
+  convertTcvn3ToUnicode,
+  convertVniToUnicode,
+} from "@/lib/cad/dxf-parser";
+
+// ===== (1) Cấu trúc & ETag =====
+
+test("rule pack: đủ 6 field theo API contract M99 §10, version = v1", () => {
+  const pack = getCurrentRulePack();
+  for (const field of [
+    "version",
+    "layerMap",
+    "fontMap",
+    "purgePolicy",
+    "lineweightMap",
+    "flattenPolicy",
+  ]) {
+    assert.ok(field in pack, `Thiếu field ${field}`);
+  }
+  assert.equal(pack.version, "v1");
+  assert.equal(CURRENT_RULE_PACK_VERSION, "v1");
+});
+
+test("getRulePackEtag: ổn định giữa 2 lần gọi và có chứa version", () => {
+  const a = getRulePackEtag();
+  const b = getRulePackEtag();
+  assert.equal(a, b);
+  assert.match(a, /^"v1-[0-9a-f]{32}"$/);
+});
+
+test("matchesEtag: khớp đúng ETag, chấp nhận W/ và *, từ chối ETag lạ/rỗng", () => {
+  const etag = getRulePackEtag();
+  assert.equal(matchesEtag(etag, etag), true);
+  assert.equal(matchesEtag(`W/${etag}`, etag), true);
+  assert.equal(matchesEtag(`"v0-abc", ${etag}`, etag), true);
+  assert.equal(matchesEtag("*", etag), true);
+  assert.equal(matchesEtag('"v1-khongkhop"', etag), false);
+  assert.equal(matchesEtag(null, etag), false);
+  assert.equal(matchesEtag("", etag), false);
+});
+
+// ===== (2) Lớp mỏng của route =====
+
+test("route rule-pack: có force-dynamic, chặn 401/403 và trả 304 theo If-None-Match", () => {
+  const src = readFileSync(
+    join(process.cwd(), "app", "api", "engineering", "cad", "rule-pack", "route.ts"),
+    "utf8",
+  );
+  assert.match(src, /export const dynamic = "force-dynamic"/);
+  assert.match(src, /getCurrentUser\(\)/);
+  assert.match(src, /status: 401/);
+  assert.match(src, /CAN\.viewEngineeringGraph/);
+  assert.match(src, /status: 403/);
+  assert.match(src, /if-none-match/);
+  assert.match(src, /status: 304/);
+  for (const field of [
+    "version:",
+    "layerMap:",
+    "fontMap:",
+    "purgePolicy:",
+    "lineweightMap:",
+    "flattenPolicy:",
+  ]) {
+    assert.ok(src.includes(field), `Response thiếu ${field}`);
+  }
+});
+
+// ===== (3) Đối chiếu với quy tắc code thật =====
+
+type LayerBranch = { target: string; matchAny?: string[]; default?: boolean };
+
+/** Nhánh mặc định không có `matchAny` → trả undefined. */
+function branchKeys(branch: LayerBranch): string[] | undefined {
+  return branch.matchAny;
+}
+
+/**
+ * Bộ diễn giải tham chiếu của layerMap — chính là thứ plugin AutoCAD .NET sẽ cài lại.
+ * Nếu nó lệch normalizeCadLayers() thì rule pack đã trôi khỏi code thật.
+ */
+function applyLayerMap(layer: string): string {
+  const { groups, fallback } = getCurrentRulePack().layerMap;
+  const l = layer.toUpperCase();
+  const hit = (keys: readonly string[]) => keys.some((k) => l.includes(k));
+  for (const g of groups) {
+    if (!hit(g.matchAny)) continue;
+    for (const branch of g.branches) {
+      const keys = branchKeys(branch);
+      if (!keys || hit(keys)) return branch.target;
+    }
+  }
+  assert.equal(fallback, "keep-original");
+  return layer;
+}
+
+test("layerMap: diễn giải rule pack cho kết quả y hệt normalizeCadLayers() trên corpus rộng", () => {
+  const { groups } = getCurrentRulePack().layerMap;
+  const keywords = groups.flatMap((g) => [
+    ...g.matchAny,
+    ...g.branches.flatMap((b) => branchKeys(b) ?? []),
+  ]);
+
+  const samples = new Set<string>([
+    // Tên layer thật từ bản vẽ mẫu MEPF trong lib/cad/dxf-parser.ts
+    "01_M_ONG_GIO_CAP_CHINH",
+    "02_M_ONG_GIO_HOI_AHU",
+    "03_P_ONG_NUOC_LANH_CHW",
+    "04_P_CAP_THOAT_NUOC_THAI",
+    "05_E_DIEN_MANG_CAP_PWR",
+    "06_F_PCCC_SPRINKLER",
+    "07_S_TRUC_COT_KET_CAU",
+    "08_G_GHI_CHU_DIM_TEXT",
+    "0",
+    "ZZZ_KHONG_KHOP_GI",
+  ]);
+  // Mỗi từ khóa đứng một mình + ghép đôi để phủ cả thứ tự nhóm lẫn thứ tự nhánh.
+  for (const a of keywords) {
+    samples.add(`XX_${a}_01`);
+    for (const b of keywords) samples.add(`XX_${a}_${b}_01`);
+  }
+
+  const names = [...samples];
+  const mapping = normalizeCadLayers(names);
+  for (const name of names) {
+    assert.equal(applyLayerMap(name), mapping[name], `Layer "${name}" ánh xạ lệch rule pack`);
+  }
+});
+
+test("layerMap: fallback giữ nguyên tên khi không khớp nhóm nào", () => {
+  assert.equal(getCurrentRulePack().layerMap.fallback, "keep-original");
+  const mapping = normalizeCadLayers(["ZZZ_KHONG_KHOP_GI"]);
+  assert.equal(mapping["ZZZ_KHONG_KHOP_GI"], "ZZZ_KHONG_KHOP_GI");
+});
+
+test("fontMap.tcvn3: mọi ký tự khớp đúng convertTcvn3ToUnicode()", () => {
+  const chars = getCurrentRulePack().fontMap.tcvn3.chars as Record<string, string>;
+  const entries = Object.entries(chars);
+  assert.ok(entries.length > 60, "Bảng TCVN3 quá ít mục — nghi trích thiếu");
+  for (const [legacy, unicode] of entries) {
+    assert.equal(convertTcvn3ToUnicode(legacy), unicode, `TCVN3 "${legacy}" lệch`);
+  }
+});
+
+test("fontMap.vni: mọi cặp khớp đúng convertVniToUnicode()", () => {
+  const pairs = getCurrentRulePack().fontMap.vni.pairs;
+  assert.ok(pairs.length > 100, "Bảng VNI quá ít mục — nghi trích thiếu");
+  for (const [legacy, unicode] of pairs) {
+    assert.equal(convertVniToUnicode(legacy), unicode, `VNI "${legacy}" lệch`);
+  }
+});
+
+test("purgePolicy: đúng các lệnh purge/audit đang sinh trong kịch bản .SCR", () => {
+  const p = getCurrentRulePack().purgePolicy;
+  assert.deepEqual(p.autocadCommands, ["-PURGE LA * N", "-PURGE B * N", "AUDIT Y"]);
+  assert.equal(p.keepReferenced, true);
+  assert.equal(p.deepPurge.zeroLengthToleranceMm, 1);
+});
+
+test("lineweightMap: bảng CTB theo ACI, màu khớp ACI_TO_HEX", async () => {
+  const { ACI_TO_HEX } = await import("@/lib/cad/dxf-parser");
+  const lw = getCurrentRulePack().lineweightMap;
+  assert.equal(lw.unit, "mm");
+  assert.deepEqual(
+    lw.byAci.map((c) => c.aci),
+    [1, 2, 3, 4, 7, 8],
+  );
+  for (const c of lw.byAci) {
+    assert.equal(c.colorHex, ACI_TO_HEX[c.aci], `Màu ACI ${c.aci} lệch ACI_TO_HEX`);
+    assert.ok(c.lineweightMm > 0);
+  }
+});
+
+test("flattenPolicy: ép Z về 0 trong WCS, giữ nguyên hình chiếu XY (AC3)", () => {
+  const f = getCurrentRulePack().flattenPolicy;
+  assert.equal(f.targetElevation, 0);
+  assert.equal(f.preserveXyProjection, true);
+  assert.equal(f.coordinateSystem, "WCS");
+  // Ghi rõ đây là chuẩn đích cho plugin, chưa có triển khai ép Z phía server.
+  assert.match(f.note, /CHƯA CHẮC/);
+});

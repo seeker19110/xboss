@@ -4,6 +4,20 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## M99 PR1 — Rule pack chuẩn hóa CAD v1 + endpoint (2026-08-23)
+
+- **Đã làm (đúng phạm vi PR1 của `docs/nang-cap/M99-plugin-autocad-chuan-hoa.md`, không đụng PR2+):**
+  - `lib/cad/rule-packs/v1.json` — rule pack version `v1`, **trích nguyên trạng** quy tắc đang chạy: `layerMap` (7 nhóm hệ + nhánh con, lấy từ `normalizeCadLayers()` trong `lib/cad/dxf-parser.ts`), `fontMap` (TCVN3 per-character + VNI ordered pairs + ký hiệu `%%c/%%p/%%d` + NFC), `purgePolicy` (`-PURGE LA * N`, `-PURGE B * N`, `AUDIT Y` từ `generateStandardizedAutocadScript()` + deep purge nét 0mm/nét trùng đè trong `app/engineering/chuan-hoa-ban-ve/page.tsx`), `lineweightMap` (bảng CTB theo ACI 1/2/3/4/7/8, màu đối chiếu `ACI_TO_HEX`), `flattenPolicy`.
+  - `lib/cad/rule-pack.ts` — `getCurrentRulePack()`, `getRulePackEtag()` (SHA-256 nội dung, dạng `"v1-<hash>"`), `matchesEtag()`, hằng `CURRENT_RULE_PACK_VERSION`.
+  - `app/api/engineering/cad/rule-pack/route.ts` — `GET`, `force-dynamic`, `getCurrentUser()` → 401, `CAN.viewEngineeringGraph` → 403 (bám đúng route CAD đọc dữ liệu cùng thư mục `diff`), trả 6 field theo API contract M99 §10, hỗ trợ `ETag` + `If-None-Match` → 304.
+  - `tests/engineering-cad-rule-pack.test.ts` — 11 ca: cấu trúc field, ETag/`If-None-Match` (kể cả `W/` và `*`), lớp mỏng route (force-dynamic/401/403/304), và **đối chiếu fidelity với code thật**: bộ diễn giải `layerMap` chạy trên corpus ~1.400 tên layer sinh từ mọi từ khóa phải cho kết quả y hệt `normalizeCadLayers()`; từng mục TCVN3/VNI phải khớp `convertTcvn3ToUnicode()`/`convertVniToUnicode()`.
+- **Ghi chú "chưa chắc" (ghi thẳng vào rule pack, không đoán):**
+  - `flattenPolicy.note` — **chưa có triển khai ép Z→0 nào phía server**: `exportDxf` giữ nguyên Z thực thể (chỉ `$EXTMIN/$EXTMAX` ghi Z=0), UI chuẩn hóa mới dừng ở việc đánh dấu `wcsConfig.isAligned`. Chính sách trong rule pack là **chuẩn đích theo AC3/FR4** cho plugin (PR4) và tầng 3, không phải mô tả code hiện có.
+  - `layerMap.knownIssues` — ghi lại đúng 2 nợ kỹ thuật đã biết của `normalizeCadLayers()` (không idempotent; thứ tự nhóm khiến vài từ khóa khớp sai hệ). **Không sửa ở PR1** theo yêu cầu — rule pack phản ánh code thật, sửa quy tắc = phát hành version mới.
+  - `lineweightMap.note` — các ACI khác (9/10/30/40/70/140/150/170/210) chỉ có màu trong `ACI_TO_HEX`, **không có lineweight quy định**; không bịa thêm.
+  - Brief việc có nhắc `app/engineering/chuan-hoa-ban-ve/hooks/useCadStandardization.ts` — file này **không tồn tại**; logic purge thật nằm trong `page.tsx` (`handleRunDeepPurge`, `handleAutoHealAll`) và đã trích từ đó.
+- **Verify:** `npm run lint`, `npm run typecheck`, `npm run build` xanh (route hiện dưới dạng `ƒ /api/engineering/cad/rule-pack`); `npm test` 210 file — chỉ `tests/engineering-cad-save-drawing.test.ts` fail, **lỗi sẵn có của môi trường worktree** (thiếu cây thư mục `drawings/` vốn nằm ngoài git), không liên quan thay đổi này.
+
 ## Gộp submodule mepf-worker vào XBoss (2026-08-23)
 
 - **Đã làm:** `mepf-worker/` chuyển từ **git submodule** (repo rời `MEPF-Agents`) thành **thư mục thường trong XBoss** — gộp phẳng (giữ nguyên trạng thái hiện tại tại commit `2144fc2`, không mang theo lịch sử 393 commit riêng của `MEPF-Agents`, repo gốc vẫn còn trên GitHub nếu cần tra lại). Đã xoá `.gitmodules`. `.gitignore` lồng sẵn trong `mepf-worker/.gitignore` vẫn hoạt động bình thường (loại `.venv/`, `__pycache__/`, dữ liệu chạy...).
