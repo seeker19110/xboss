@@ -67,37 +67,46 @@ const skippedByFile = {};
 
 let failed = 0;
 const coverageMaps = [];
-for (const file of files) {
-  process.stdout.write(`\n=== ${file} ===\n`);
-  let res;
-  if (coverageMode) {
-    // dùng `node --import=tsx-loader --test` thay vì binary `tsx` để truyền được cờ coverage;
-    // bắt stdout để vừa in lại vừa trích bảng coverage, giữ stderr/stdin inherit như cũ.
-    res = spawnSync(
-      process.execPath,
-      ["--experimental-test-coverage", `--import=${tsxLoader}`, "--test", file],
-      { stdio: ["inherit", "pipe", "inherit"], encoding: "utf8" },
-    );
-    process.stdout.write(res.stdout ?? "");
-    if (res.stdout) coverageMaps.push(parseCoverageTable(res.stdout));
-  } else {
-    // Bắt stdout để đếm được pass/fail/skip rồi in lại NGUYÊN VẸN — người xem log vẫn thấy
-    // đúng những gì trước đây thấy, chỉ thêm phần tổng kết ở cuối.
-    res = spawnSync(process.execPath, [`--import=${tsxLoader}`, "--test", file], {
-      stdio: ["inherit", "pipe", "inherit"],
-      encoding: "utf8",
-    });
-    process.stdout.write(res.stdout ?? "");
-  }
-  if (res.status !== 0) failed++;
 
-  const out = res.stdout ?? "";
-  total.pass += tapCount(out, "pass");
-  total.fail += tapCount(out, "fail");
-  total.todo += tapCount(out, "todo");
-  const skipped = tapCount(out, "skipped");
+/** Cộng dồn kết quả 1 lần chạy vào bảng tổng. */
+function thuKetQua(nhan, out, status) {
+  process.stdout.write(`\n=== ${nhan} ===\n`);
+  process.stdout.write(out ?? "");
+  if (status !== 0) failed++;
+  const o = out ?? "";
+  total.pass += tapCount(o, "pass");
+  total.fail += tapCount(o, "fail");
+  total.todo += tapCount(o, "todo");
+  const skipped = tapCount(o, "skipped");
   total.skipped += skipped;
-  if (skipped > 0) skippedByFile[file] = skipped;
+  if (skipped > 0) skippedByFile[nhan] = skipped;
+}
+
+function chayDongBo(args, env) {
+  const res = spawnSync(process.execPath, args, {
+    stdio: ["inherit", "pipe", "inherit"],
+    encoding: "utf8",
+    env: { ...process.env, ...env },
+  });
+  return { out: res.stdout ?? "", status: res.status };
+}
+
+if (coverageMode) {
+  // Chế độ coverage giữ nguyên đường cũ: tuần tự, 1 process/file. Coverage cần gộp bảng
+  // theo từng tiến trình nên không song song hoá ở đây (chạy thủ công, không nằm trên CI).
+  for (const file of files) {
+    const { out, status } = chayDongBo([
+      "--experimental-test-coverage",
+      `--import=${tsxLoader}`,
+      "--test",
+      file,
+    ]);
+    if (out) coverageMaps.push(parseCoverageTable(out));
+    thuKetQua(file, out, status);
+  }
+} else {
+  const { chayNhanh } = await import("./run-tests-parallel.mjs");
+  await chayNhanh({ files, tsxLoader, chayDongBo, thuKetQua });
 }
 
 process.stdout.write(
