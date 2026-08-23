@@ -168,7 +168,7 @@ test(
 
       // 4. Tạo đối tượng và rà soát Quy chuẩn
       const obj = await queryOne<{ id: string }>(
-        `INSERT INTO engineering_objects (project_id, external_key, object_type, name, discipline, status, metadata, created_by, updated_by)
+        `INSERT INTO engineering_objects (project_id, external_key, object_type, name, discipline, status, properties, created_by, updated_by)
          VALUES (?, 'SPRINKLER-Z1', 'element', 'Hệ thống đầu phun Zone 1', 'fire', 'approved', '{"sprinkler_spacing_mm": 5200, "pipe_diameter_mm": 20}'::jsonb, ?, ?)
          RETURNING id`,
         projId,

@@ -222,7 +222,7 @@ export async function getSpatialDeviations(
   filters?: { severity?: string; remediationStatus?: string; limit?: number },
 ): Promise<SpatialDeviationRecord[]> {
   let sql = `
-    SELECT d.*, c.capture_code, c.capture_type, c.spatial_zone, o.name as object_name, o.code as object_code
+    SELECT d.*, c.capture_code, c.capture_type, c.spatial_zone, o.name as object_name, o.external_key as object_code
     FROM engineering_twin_spatial_deviations d
     JOIN engineering_twin_reality_captures c ON d.capture_id = c.id
     JOIN engineering_objects o ON d.object_id = o.id
@@ -320,7 +320,7 @@ export async function ingestSensorTelemetry(
  */
 export async function getSensorStreams(projectId: number): Promise<SensorStreamRecord[]> {
   const rows = await query<SensorStreamRecord>(
-    `SELECT s.*, o.name as object_name, o.code as object_code
+    `SELECT s.*, o.name as object_name, o.external_key as object_code
      FROM engineering_twin_sensor_streams s
      LEFT JOIN engineering_objects o ON s.object_id = o.id
      WHERE s.project_id = ?

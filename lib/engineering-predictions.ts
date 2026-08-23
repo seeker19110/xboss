@@ -75,24 +75,31 @@ export async function runPredictionPipeline(
 
       if (useCase === "schedule_risk") {
         // Tìm các tasks đang trễ hoặc có nguy cơ trễ cao
+        // tasks không có project_id — quan hệ tới dự án đi qua chuỗi WBS
+        // tasks → work_packages → sheet_types → towers → projects.
         const delayedTasks = await query<{
           id: number;
           name: string;
           status: string;
           progress: number;
         }>(
-          `SELECT id, name, status, progress
-           FROM tasks
-           WHERE project_id = ? AND (status = 'delayed' OR (progress < 80 AND end_date < NOW() + INTERVAL '7 days'))
+          `SELECT t.id, t.name, t.status, t.progress_percent AS progress
+           FROM tasks t
+           JOIN work_packages wp ON wp.id = t.package_id
+           JOIN sheet_types st ON st.id = wp.sheet_type_id
+           JOIN towers tw ON tw.id = st.tower_id
+           WHERE tw.project_id = ?
+             AND (t.status = 'tre' OR (t.progress_percent < 0.8 AND t.end_date < NOW() + INTERVAL '7 days'))
            LIMIT 20`,
           projectId,
         );
 
         for (const t of delayedTasks) {
-          const score = t.status === "delayed" ? 0.92 : 0.76;
-          const prob = t.status === "delayed" ? 0.88 : 0.72;
+          const score = t.status === "tre" ? 0.92 : 0.76;
+          const prob = t.status === "tre" ? 0.88 : 0.72;
           const uncertainty: UncertaintyBin = "low";
-          const explanation = `Công việc [${t.name}] đang ở tiến độ ${t.progress}%, có xác suất trễ hạn cao theo phân tích Critical Path.`;
+          // progress_percent lưu dạng tỷ lệ [0,1] — quy ra % khi hiển thị.
+          const explanation = `Công việc [${t.name}] đang ở tiến độ ${Math.round(t.progress * 100)}%, có xác suất trễ hạn cao theo phân tích Critical Path.`;
 
           // Auto create suggestion in ENG-2
           const pkg =

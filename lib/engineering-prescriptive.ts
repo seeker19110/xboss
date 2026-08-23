@@ -542,7 +542,7 @@ export async function auditEngineeringElement(
     discipline: string;
     metadata: Record<string, unknown>;
   }>(
-    `SELECT id, name, discipline, metadata FROM engineering_objects WHERE id = ? AND project_id = ?`,
+    `SELECT id, name, discipline, properties AS metadata FROM engineering_objects WHERE id = ? AND project_id = ?`,
     objectId,
     projectId,
   );
@@ -593,7 +593,7 @@ export async function scanAllElementsCompliance(projectId: number): Promise<{
     discipline: string;
     metadata: Record<string, unknown>;
   }>(
-    `SELECT id, name, discipline, metadata FROM engineering_objects WHERE project_id = ?`,
+    `SELECT id, name, discipline, properties AS metadata FROM engineering_objects WHERE project_id = ?`,
     projectId,
   );
 
@@ -660,7 +660,7 @@ export async function getComplianceAudits(
 ): Promise<ComplianceAuditRecord[]> {
   let sql = `
     SELECT a.*,
-           o.name as object_name, o.code as object_code, o.discipline as object_discipline,
+           o.name as object_name, o.external_key as object_code, o.discipline as object_discipline,
            r.standard_code, r.standard_title, r.section_clause, r.severity as rule_severity, r.domain as rule_domain
     FROM engineering_compliance_audits a
     JOIN engineering_objects o ON a.object_id = o.id

@@ -108,7 +108,8 @@ export async function getTwinSnapshot(
     }>(
       `SELECT o.geometry_ref AS "geometryRef",
               s.id AS "srcId", s.source_type AS "srcType",
-              s.external_key AS "srcExternalKey", sr.revision_name AS "srcRevName"
+              -- Không có cột tên bản sửa đổi; nhãn dựng từ revision_no thật (xem engineering-graph.ts).
+              s.external_key AS "srcExternalKey", ('Rev ' || sr.revision_no) AS "srcRevName"
        FROM engineering_objects o
        LEFT JOIN engineering_source_revisions sr ON o.source_revision_id = sr.id
        LEFT JOIN engineering_sources s ON sr.source_id = s.id

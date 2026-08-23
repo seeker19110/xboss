@@ -176,8 +176,8 @@ test("OS-1: Lineage & Impact Analysis cho đối tượng kỹ thuật", { skip:
       userId,
     );
     const srcRev = await queryOne<{ id: string }>(
-      `INSERT INTO engineering_source_revisions (source_id, project_id, revision_no, revision_name, created_by)
-       VALUES (?, ?, 1, 'Rev 1.0 IFC', ?) RETURNING id`,
+      `INSERT INTO engineering_source_revisions (source_id, project_id, revision_no, created_by)
+       VALUES (?, ?, 1, ?) RETURNING id`,
       src!.id,
       projId,
       userId,
@@ -193,15 +193,15 @@ test("OS-1: Lineage & Impact Analysis cho đối tượng kỹ thuật", { skip:
       userId,
     );
     await run(
-      `INSERT INTO engineering_object_revisions (object_id, project_id, revision_no, status, change_reason, created_by)
-       VALUES (?, ?, 1, 'approved', 'Khởi tạo từ DWG-M-01', ?)`,
+      `INSERT INTO engineering_object_revisions (object_id, project_id, revision_no, object_type, status, change_reason, created_by)
+       VALUES (?, ?, 1, 'equipment', 'approved', 'Khởi tạo từ DWG-M-01', ?)`,
       obj!.id,
       projId,
       userId,
     );
     await run(
-      `INSERT INTO engineering_object_revisions (object_id, project_id, revision_no, status, change_reason, created_by)
-       VALUES (?, ?, 2, 'approved', 'Cập nhật công suất bơm 15kW', ?)`,
+      `INSERT INTO engineering_object_revisions (object_id, project_id, revision_no, object_type, status, change_reason, created_by)
+       VALUES (?, ?, 2, 'equipment', 'approved', 'Cập nhật công suất bơm 15kW', ?)`,
       obj!.id,
       projId,
       userId,
@@ -230,18 +230,20 @@ test("OS-1: Lineage & Impact Analysis cho đối tượng kỹ thuật", { skip:
        VALUES (?, 'Kiểm tra lưu lượng') RETURNING id`,
       projId,
     );
-    await run(
-      `INSERT INTO engineering_suggestions (project_id, package_id, target_object_id, suggestion_class, title, priority, status)
-       VALUES (?, ?, ?, 'mep', 'Tăng đường kính ống hút', 'quality', 'accepted')`,
+    // engineering_suggestions liên kết object qua object_id (không phải target_object_id).
+    const sug = await queryOne<{ id: string }>(
+      `INSERT INTO engineering_suggestions (project_id, package_id, object_id, suggestion_class, title, priority, status)
+       VALUES (?, ?, ?, 'mep', 'Tăng đường kính ống hút', 'quality', 'accepted') RETURNING id`,
       projId,
       pkg!.id,
       obj!.id,
     );
+    // engineering_workflows không có cột object — nối tới object qua suggestion_id.
     await run(
-      `INSERT INTO engineering_workflows (project_id, target_object_id, title, profile, risk_class, state, created_by)
+      `INSERT INTO engineering_workflows (project_id, suggestion_id, title, profile, risk_class, state, created_by)
        VALUES (?, ?, 'Phê duyệt thay đổi bơm', 'B', 'medium', 'completed', ?)`,
       projId,
-      obj!.id,
+      sug!.id,
       userId,
     );
 

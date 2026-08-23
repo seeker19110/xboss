@@ -22,11 +22,24 @@ test(
       assert.ok(models.length >= 3, "Phải có ít nhất 3 model chuẩn (schedule, cost, clash)");
       assert.ok(models.some((m) => m.useCase === "schedule_risk"));
 
-      // 2. Tạo task trễ hạn để test schedule_risk pipeline
-      await insertId(
-        `INSERT INTO tasks (project_id, name, status, progress, start_date, end_date)
-       VALUES (?, 'Lắp đặt AHU-01', 'delayed', 45, '2026-08-01', '2026-08-10')`,
+      // 2. Tạo task trễ hạn để test schedule_risk pipeline. tasks không có project_id —
+      // phải dựng đủ chuỗi WBS: projects → towers → sheet_types → work_packages → tasks.
+      const towerId = await insertId(
+        `INSERT INTO towers (project_id, name) VALUES (?, 'Tháp A')`,
         projId,
+      );
+      const sheetTypeId = await insertId(
+        `INSERT INTO sheet_types (tower_id, code, name) VALUES (?, 'OGTD', 'Ống gió tầng điển hình')`,
+        towerId,
+      );
+      const packageId = await insertId(
+        `INSERT INTO work_packages (sheet_type_id, code, name) VALUES (?, 'A1', 'Nhóm AHU')`,
+        sheetTypeId,
+      );
+      await insertId(
+        `INSERT INTO tasks (package_id, code, name, status, progress_percent, start_date, end_date)
+       VALUES (?, 'A1,01', 'Lắp đặt AHU-01', 'tre', 0.45, '2026-08-01', '2026-08-10')`,
+        packageId,
       );
 
       // 3. Chạy pipeline dự báo
@@ -54,6 +67,28 @@ test(
       assert.equal(updatedList.length, 1);
       assert.equal(updatedList[0].status, "accepted");
     } finally {
+      // towers.project_id không có ON DELETE CASCADE — phải dọn chuỗi WBS ngược từ dưới lên
+      // trước khi xoá project (các bảng engineering_* đã cascade theo project_id).
+      await run(
+        `DELETE FROM tasks WHERE package_id IN (
+           SELECT wp.id FROM work_packages wp
+           JOIN sheet_types st ON st.id = wp.sheet_type_id
+           JOIN towers tw ON tw.id = st.tower_id
+           WHERE tw.project_id = ?)`,
+        projId,
+      );
+      await run(
+        `DELETE FROM work_packages WHERE sheet_type_id IN (
+           SELECT st.id FROM sheet_types st
+           JOIN towers tw ON tw.id = st.tower_id
+           WHERE tw.project_id = ?)`,
+        projId,
+      );
+      await run(
+        `DELETE FROM sheet_types WHERE tower_id IN (SELECT id FROM towers WHERE project_id = ?)`,
+        projId,
+      );
+      await run(`DELETE FROM towers WHERE project_id = ?`, projId);
       await run(`DELETE FROM projects WHERE id = ?`, projId);
       await run(`DELETE FROM users WHERE id = ?`, userId);
     }

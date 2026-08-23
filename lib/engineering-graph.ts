@@ -279,7 +279,9 @@ export async function getObjectLineage(
       createdAt: string;
     }>(
       `SELECT s.id, s.source_type AS "sourceType", s.external_key AS "externalKey",
-              sr.revision_name AS "revisionName", s.created_at AS "createdAt"
+              -- engineering_source_revisions chỉ có revision_no (INTEGER), không có cột tên —
+              -- dựng nhãn hiển thị từ số hiệu thật thay vì cột không tồn tại.
+              ('Rev ' || sr.revision_no) AS "revisionName", s.created_at AS "createdAt"
        FROM engineering_objects o
        JOIN engineering_source_revisions sr ON o.source_revision_id = sr.id
        JOIN engineering_sources s ON sr.source_id = s.id
@@ -354,9 +356,10 @@ export async function getObjectLineage(
       status: string;
       riskLevel: string;
     }>(
-      `SELECT id, title, status, risk_level AS "riskLevel"
+      // Cột thật là object_id (không phải target_object_id); mức rủi ro dùng severity.
+      `SELECT id, title, status, severity AS "riskLevel"
        FROM engineering_suggestions
-       WHERE target_object_id = ? AND project_id = ?`,
+       WHERE object_id = ? AND project_id = ?`,
       objectId,
       projectId,
     );
@@ -368,9 +371,11 @@ export async function getObjectLineage(
       state: string;
       riskClass: string;
     }>(
-      `SELECT id, title, state, risk_class AS "riskClass"
-       FROM engineering_workflows
-       WHERE target_object_id = ? AND project_id = ?`,
+      // engineering_workflows không tham chiếu object trực tiếp — nối qua suggestion.
+      `SELECT w.id, w.title, w.state, w.risk_class AS "riskClass"
+       FROM engineering_workflows w
+       JOIN engineering_suggestions s ON s.id = w.suggestion_id
+       WHERE s.object_id = ? AND w.project_id = ?`,
       objectId,
       projectId,
     );
