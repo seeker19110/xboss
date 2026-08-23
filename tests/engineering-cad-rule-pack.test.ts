@@ -94,6 +94,28 @@ function branchKeys(branch: LayerBranch): string[] | undefined {
   return branch.matchAny;
 }
 
+/** Ký tự được coi là "trong từ" — khớp đúng `LAYER_WORD_CHAR` trong `lib/cad/dxf-parser.ts`. */
+const LAYER_WORD_CHAR = /[A-Z0-9]/;
+
+/**
+ * Khớp `token` trong `l` theo RANH GIỚI TOKEN (không phải substring thô) — bản sao chính xác
+ * của `hasToken()` trong `lib/cad/dxf-parser.ts`. Bắt buộc dùng đúng thuật toán này, không phải
+ * `String.includes()`: layer như "04_P_CAP_THOAT_NUOC_THAI" chứa substring "OA" (trong "THOAT")
+ * và "THAI" nguyên vẹn — nếu khớp thô, "OA"/"THAI" sẽ trúng nhầm nhóm HVAC (EA/OA/THAI) thay vì
+ * đúng nhóm PIPING (THOAT là 1 token riêng). Đây chính là lỗi Việc 7.6 đã sửa trong code thật.
+ */
+function hasToken(l: string, token: string): boolean {
+  let from = 0;
+  for (;;) {
+    const at = l.indexOf(token, from);
+    if (at < 0) return false;
+    const before = at > 0 ? (l[at - 1] ?? "") : "";
+    const after = l[at + token.length] ?? "";
+    if (!LAYER_WORD_CHAR.test(before) && !LAYER_WORD_CHAR.test(after)) return true;
+    from = at + 1;
+  }
+}
+
 /**
  * Bộ diễn giải tham chiếu của layerMap — chính là thứ plugin AutoCAD .NET sẽ cài lại.
  * Nếu nó lệch normalizeCadLayers() thì rule pack đã trôi khỏi code thật.
@@ -101,7 +123,7 @@ function branchKeys(branch: LayerBranch): string[] | undefined {
 function applyLayerMap(layer: string): string {
   const { groups, fallback } = getCurrentRulePack().layerMap;
   const l = layer.toUpperCase();
-  const hit = (keys: readonly string[]) => keys.some((k) => l.includes(k));
+  const hit = (keys: readonly string[]) => keys.some((k) => hasToken(l, k));
   for (const g of groups) {
     if (!hit(g.matchAny)) continue;
     for (const branch of g.branches) {
