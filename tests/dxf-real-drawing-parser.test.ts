@@ -209,8 +209,84 @@ test("validateDxf: Từ chối nội dung rỗng, tệp cụt và tệp không k
     "Phải báo thiếu EOF",
   );
 
-  // Rác hoàn toàn (vd nội dung DWG/nhị phân đổi đuôi): thiếu cả 4 section
+  // Rác hoàn toàn (vd nội dung DWG/nhị phân đổi đuôi): không đọc được thành cặp mã nhóm
   const rac = validateDxf("day khong phai DXF\r\nchi la van ban thuong\r\n");
   assert.equal(rac.valid, false);
-  assert.ok(rac.errors.some((e) => e.includes("HEADER")));
+  assert.ok(
+    rac.errors.some((e) => e.includes("lệch nhịp")),
+    "Văn bản thường phải bị bắt là lệch nhịp cặp mã nhóm",
+  );
+});
+
+test("validateDxf: Bỏ qua BOM và dòng trống dẫn đầu, nhưng bắt được tệp lệch nhịp cặp", () => {
+  const than = `0\r\nSECTION\r\n2\r\nHEADER\r\n9\r\n$ACADVER\r\n1\r\nAC1009\r\n0\r\nENDSEC\r\n0\r\nSECTION\r\n2\r\nTABLES\r\n0\r\nENDSEC\r\n0\r\nSECTION\r\n2\r\nBLOCKS\r\n0\r\nENDSEC\r\n0\r\nSECTION\r\n2\r\nENTITIES\r\n0\r\nENDSEC\r\n0\r\nEOF\r\n`;
+
+  // BOM UTF-8 dẫn đầu không được làm lệch nhịp cặp (mã nhóm, giá trị)
+  const coBom = validateDxf("﻿" + than);
+  assert.deepEqual(coBom, { valid: true, errors: [] }, "BOM không được làm DXF hợp lệ bị chặn");
+
+  // Dòng trống thừa ở đầu và cuối tệp cũng vậy
+  const coDongTrong = validateDxf("\r\n\r\n" + than + "\r\n\r\n");
+  assert.deepEqual(
+    coDongTrong,
+    { valid: true, errors: [] },
+    "Dòng trống dẫn đầu/kết đuôi không được làm DXF hợp lệ bị chặn",
+  );
+
+  // Chèn 1 dòng lạ giữa tệp → lệch pha cặp từ đó trở đi, phải bị bắt thay vì đoán bừa
+  const lech = than.replace(
+    "0\r\nSECTION\r\n2\r\nENTITIES",
+    "GHI CHU LA\r\n0\r\nSECTION\r\n2\r\nENTITIES",
+  );
+  const resLech = validateDxf(lech);
+  assert.equal(resLech.valid, false, "Tệp lệch nhịp cặp phải bị từ chối");
+  assert.ok(
+    resLech.errors.some((e) => e.includes("lệch nhịp")),
+    "Phải nêu rõ lỗi lệch nhịp cặp mã nhóm/giá trị",
+  );
+});
+
+// DXF mẫu dùng chung cho 2 ca biên của DIMENSION: 1 LINE thật (để bộ ghi không chèn hình học
+// minh hoạ) + 1 DIMENSION trên layer M-DIMS
+const DXF_CO_KICH_THUOC = `0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n0\nLAYER\n2\nM-DIMS\n62\n7\n6\nCONTINUOUS\n0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n0\nLINE\n8\nM-DIMS\n10\n0\n20\n0\n30\n0\n11\n1000\n21\n0\n31\n0\n0\nDIMENSION\n8\nM-DIMS\n10\n1000\n20\n2000\n30\n0\n11\n5000\n21\n2000\n31\n0\n1\n4000\n0\nENDSEC\n0\nEOF`;
+
+test("exportDxf: DIMENSION không có chữ đo thì chỉ ra LINE, không ghi TEXT rỗng hay `<>`", () => {
+  const parsed = parseDxf(DXF_CO_KICH_THUOC, "khong_chu.dxf");
+  const dim = parsed.entities.find((e) => e.type === "DIMENSION");
+  assert.ok(dim, "Bản vẽ mẫu phải có DIMENSION");
+  dim.textValue = "";
+  dim.decodedText = "";
+
+  const exported = exportDxf(parsed, { applyStandardLayers: false });
+
+  assert.ok(
+    exported.includes(
+      "0\r\nLINE\r\n8\r\nM-DIMS\r\n10\r\n1000\r\n20\r\n2000\r\n30\r\n0\r\n11\r\n5000\r\n21\r\n2000\r\n31\r\n0\r\n",
+    ),
+    "Vẫn phải giữ đường kích thước dưới dạng LINE",
+  );
+  assert.ok(!exported.includes("0\r\nTEXT\r\n"), "Không được ghi TEXT khi chuỗi đo rỗng");
+  assert.ok(!exported.includes("<>"), "Không được ghi placeholder `<>` thành chữ trên bản vẽ");
+});
+
+test("exportDxf: DIMENSION không có toạ độ đường lẫn chữ đo vẫn để lại POINT, không bị nuốt mất", () => {
+  const parsed = parseDxf(DXF_CO_KICH_THUOC, "chi_co_diem_neo.dxf");
+  const dim = parsed.entities.find((e) => e.type === "DIMENSION");
+  assert.ok(dim, "Bản vẽ mẫu phải có DIMENSION");
+  dim.textValue = "";
+  dim.decodedText = "";
+  dim.coordinates = { center: [7000, 8000, 0] };
+
+  const exported = exportDxf(parsed, { applyStandardLayers: false });
+
+  assert.ok(
+    exported.includes("0\r\nPOINT\r\n8\r\nM-DIMS\r\n10\r\n7000\r\n20\r\n8000\r\n30\r\n0\r\n"),
+    "Phải ghi POINT tại điểm neo thay vì bỏ hẳn thực thể",
+  );
+
+  // Không được im lặng mất thực thể: số thực thể ghi ra vẫn bằng số thực thể đầu vào
+  const soThucTheGhiRa = (
+    exported.match(/\r\n0\r\n(LINE|TEXT|POINT|CIRCLE|ARC|LWPOLYLINE|INSERT)\r\n/g) || []
+  ).length;
+  assert.equal(soThucTheGhiRa, parsed.entities.length, "1 LINE + 1 DIMENSION → 2 thực thể ghi ra");
 });

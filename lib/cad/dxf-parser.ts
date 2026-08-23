@@ -1586,6 +1586,7 @@ export function exportDxf(
         // đúng theo quyết định đã chốt ở M98 §1(b), thay vì emit DIMENSION thô mở ra là lỗi.
         const start = ent.coordinates.start;
         const end = ent.coordinates.end;
+        const hasDimLine = Boolean(start && end);
         let tx = 0;
         let ty = 0;
         let tz = 0;
@@ -1605,11 +1606,21 @@ export function exportDxf(
           tz = anchor ? anchor[2] || 0 : 0;
         }
 
-        // Chỉ ghi TEXT khi có nội dung thật — không bịa giá trị đo cho kích thước không có chữ
+        // Bỏ TEXT khi chuỗi đo rỗng: bản cũ ghi placeholder `<>` (ký hiệu "lấy giá trị đo được"
+        // của DIMENSION thật) — sau khi hạ cấp thành TEXT thì nó hiện đúng 2 ký tự `<>` trên bản
+        // vẽ, tức chữ rác. Cũng không tự tính khoảng cách start→end để điền vào: mã nhóm 10/11
+        // của DIMENSION là điểm đặt đường/chữ kích thước, không phải 2 đầu đo, nên số tính ra
+        // sẽ là số đo bịa (vi phạm nguyên tắc không bịa dữ liệu của M98/M99).
         const textVal = ent.decodedText || ent.textValue || "";
         if (textVal) {
           dxf += `0\r\nTEXT\r\n8\r\n${lyr}\r\n${colStr}`;
           dxf += `10\r\n${tx}\r\n20\r\n${ty}\r\n30\r\n${tz}\r\n40\r\n250.0\r\n1\r\n${textVal}\r\n7\r\nSTANDARD\r\n`;
+        } else if (!hasDimLine) {
+          // Kích thước không có cả toạ độ đường lẫn chữ đo: vẫn phải để lại dấu vết, tuyệt đối
+          // không nuốt mất thực thể im lặng. Ghi POINT (thực thể R12 hợp lệ, tối giản) tại điểm
+          // neo — giữ đúng vị trí đã biết mà không bịa thêm nét hay số đo nào.
+          dxf += `0\r\nPOINT\r\n8\r\n${lyr}\r\n${colStr}`;
+          dxf += `10\r\n${tx}\r\n20\r\n${ty}\r\n30\r\n${tz}\r\n`;
         }
       }
     }
@@ -1703,8 +1714,9 @@ const REQUIRED_DXF_SECTIONS = ["HEADER", "TABLES", "BLOCKS", "ENTITIES"];
 /**
  * Kiểm định tối thiểu cấu trúc một chuỗi DXF ASCII trước khi ghi ra đĩa — lưới an toàn chặn ghi
  * tệp rác (nội dung rỗng, thiếu section, cụt giữa chừng), KHÔNG phải bộ đọc DXF đầy đủ.
- * Bốn điều kiện bắt buộc: nội dung không rỗng, cặp SECTION/ENDSEC cân bằng, có đủ 4 section
- * HEADER/TABLES/BLOCKS/ENTITIES và kết thúc bằng cặp mã `0` + `EOF`.
+ * Năm điều kiện bắt buộc: nội dung không rỗng, đọc được thành cặp (mã nhóm, giá trị) không lệch
+ * nhịp, cặp SECTION/ENDSEC cân bằng, có đủ 4 section HEADER/TABLES/BLOCKS/ENTITIES và kết thúc
+ * bằng cặp mã `0` + `EOF`.
  */
 export function validateDxf(content: string): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
@@ -1714,16 +1726,33 @@ export function validateDxf(content: string): { valid: boolean; errors: string[]
   }
 
   // DXF ASCII là chuỗi cặp dòng (mã nhóm, giá trị) — duyệt theo cặp để giá trị rỗng hợp lệ
-  // (vd mã 4 của bảng STYLE) không làm lệch nhịp đọc.
-  const lines = content.split(/\r\n|\r|\n/);
+  // (vd mã 4 của bảng STYLE) không làm lệch nhịp đọc. Trước khi ghép cặp phải bỏ BOM UTF-8 và
+  // các dòng trống dẫn đầu/kết đuôi, nếu không nhịp cặp lệch 1 dòng và mọi kiểm tra sau đều sai.
+  const lines = content.replace(/^\uFEFF/, "").split(/\r\n|\r|\n/);
+
+  let firstIdx = 0;
+  while (firstIdx < lines.length && lines[firstIdx].trim() === "") firstIdx++;
+  let lastIdx = lines.length - 1;
+  while (lastIdx >= firstIdx && lines[lastIdx].trim() === "") lastIdx--;
+  const body = lines.slice(firstIdx, lastIdx + 1);
+
   const foundSections = new Set<string>();
   let openSections = 0;
   let strayEndsec = 0;
   let expectingSectionName = false;
+  // Số dòng (đếm từ 1) nơi phát hiện nhịp cặp bị lệch — 0 nghĩa là đọc trôi chảy
+  let misalignedLine = 0;
 
-  for (let i = 0; i + 1 < lines.length; i += 2) {
-    const code = lines[i].trim();
-    const value = lines[i + 1].trim();
+  for (let i = 0; i + 1 < body.length; i += 2) {
+    const code = body[i].trim();
+    const value = body[i + 1].trim();
+
+    // Vị trí chẵn bắt buộc là mã nhóm (số nguyên). Không phải số → tệp lệch nhịp cặp,
+    // mọi suy luận phía sau vô nghĩa nên dừng và báo lỗi thay vì đoán bừa.
+    if (!/^-?\d+$/.test(code)) {
+      misalignedLine = firstIdx + i + 1;
+      break;
+    }
 
     if (code === "0") {
       if (value === "SECTION") {
@@ -1742,19 +1771,30 @@ export function validateDxf(content: string): { valid: boolean; errors: string[]
     }
   }
 
-  if (openSections > 0) {
-    errors.push(`Thiếu ${openSections} thẻ ENDSEC đóng SECTION — tệp DXF bị cụt.`);
-  }
-  if (strayEndsec > 0) {
-    errors.push(`Có ${strayEndsec} thẻ ENDSEC thừa không khớp SECTION nào.`);
+  // Số dòng lẻ = có mã nhóm cuối cùng không kèm giá trị
+  if (!misalignedLine && body.length % 2 !== 0) {
+    misalignedLine = firstIdx + body.length;
   }
 
-  const missingSections = REQUIRED_DXF_SECTIONS.filter((s) => !foundSections.has(s));
-  if (missingSections.length > 0) {
-    errors.push(`Thiếu section bắt buộc: ${missingSections.join(", ")}.`);
+  if (misalignedLine) {
+    errors.push(
+      `Cấu trúc DXF lệch nhịp cặp (mã nhóm, giá trị) tại dòng ${misalignedLine} — không đọc được như DXF ASCII.`,
+    );
+  } else {
+    if (openSections > 0) {
+      errors.push(`Thiếu ${openSections} thẻ ENDSEC đóng SECTION — tệp DXF bị cụt.`);
+    }
+    if (strayEndsec > 0) {
+      errors.push(`Có ${strayEndsec} thẻ ENDSEC thừa không khớp SECTION nào.`);
+    }
+
+    const missingSections = REQUIRED_DXF_SECTIONS.filter((s) => !foundSections.has(s));
+    if (missingSections.length > 0) {
+      errors.push(`Thiếu section bắt buộc: ${missingSections.join(", ")}.`);
+    }
   }
 
-  const meaningfulLines = lines.map((l) => l.trim()).filter((l) => l.length > 0);
+  const meaningfulLines = body.map((l) => l.trim()).filter((l) => l.length > 0);
   const n = meaningfulLines.length;
   if (n < 2 || meaningfulLines[n - 1] !== "EOF" || meaningfulLines[n - 2] !== "0") {
     errors.push('Tệp DXF phải kết thúc bằng cặp mã "0" + "EOF".');
