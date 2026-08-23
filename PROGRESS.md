@@ -4,6 +4,20 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## docs/ERD.md lệch schema 110 bảng — lộ ra sau khi sửa 8 file test (2026-08-23)
+
+`docs/ERD.md` sinh tự động từ schema thật (M45 PR3) và CI có bước `Kiểm ERD khớp schema`
+(`gen:erd` + `git diff --exit-code`). Nhưng bước đó nằm **sau** bước test trong `ci.yml`, mà
+test luôn đỏ vì 8 file ở mục dưới → **bước kiểm ERD chưa từng chạy tới** trong suốt thời gian
+đó. Sửa xong test, nó chạy lần đầu và lộ ra sai lệch tích luỹ: **158 → 268 bảng** (thiếu
+`materials.system_id` của migration 0130 và ~110 bảng `engineering_*` từ các migration gần
+đây). Không mất nội dung nào — phần "xoá" trong diff chỉ là generator sắp xếp lại thứ tự.
+
+**Bài học về thứ tự bước CI:** một bước kiểm đặt sau bước hay đỏ thì im lặng vô hiệu hoá, và
+không ai biết vì log chỉ báo "bước trước fail". Cùng lớp vấn đề với release-gate đếm mù: cả
+hai đều là cổng kiểm **tưởng đang canh nhưng thực ra không chạy**. Khi thêm cổng kiểm mới,
+cần tự hỏi "nếu bước trước đỏ dài ngày thì cổng này có bị bỏ qua không".
+
 ## Hạ tầng: chốt VPS + pm2 là production chính, bỏ Vercel (2026-08-23)
 
 Người dùng chốt production chạy hẳn trên VPS tự host (Postgres cùng máy, quản lý process bằng
