@@ -643,326 +643,39 @@ export function generateSynthesizedMepfDxf(fileName: string): string {
 }
 
 /**
- * Trích xuất metadata và thực thể từ tệp nhị phân AutoCAD DWG (.dwg)
+ * Thông điệp chuẩn khi người dùng nạp tệp DWG nhị phân.
+ *
+ * XBoss **không đọc DWG bằng TypeScript** (ADR-0006): định dạng DWG là nhị phân
+ * độc quyền, không có bộ đọc đáng tin trên nền JS. Bản cũ của `parseDwgBinary`
+ * quét chuỗi rồi **bịa toạ độ/layer** cho các thực thể — bản vẽ trả về trông
+ * "có dữ liệu" nhưng hình học hoàn toàn không có thật. Nay fail-fast thay vì
+ * sinh dữ liệu sai (M99 PR0 / FR11).
+ */
+export const DWG_UNSUPPORTED_MESSAGE =
+  "XBoss không đọc trực tiếp tệp DWG. Hãy mở bản vẽ trong AutoCAD và lưu sang DXF " +
+  "(Lưu thành → AutoCAD 2000/LT2000 DXF), rồi nạp lại tệp .dxf đó. " +
+  "Việc chuẩn hóa trực tiếp trên DWG sẽ do plugin AutoCAD của XBoss đảm nhiệm.";
+
+/** Lỗi phát ra khi nhận tệp DWG nhị phân — route API ánh xạ thành HTTP 422. */
+export class DwgUnsupportedError extends Error {
+  readonly fileName: string;
+
+  constructor(fileName: string) {
+    super(DWG_UNSUPPORTED_MESSAGE);
+    this.name = "DwgUnsupportedError";
+    this.fileName = fileName;
+  }
+}
+
+/**
+ * Trước đây trích xuất "thực thể" từ tệp DWG nhị phân bằng cách quét chuỗi và
+ * bịa toạ độ. Nay luôn ném `DwgUnsupportedError` — xem `DWG_UNSUPPORTED_MESSAGE`.
  */
 export function parseDwgBinary(
-  rawBuffer: Buffer | ArrayBuffer | Uint8Array,
+  _rawBuffer: Buffer | ArrayBuffer | Uint8Array,
   fileName = "model.dwg",
-): DxfParseResult {
-  const bytes =
-    rawBuffer instanceof Uint8Array
-      ? rawBuffer
-      : rawBuffer instanceof ArrayBuffer
-        ? new Uint8Array(rawBuffer)
-        : typeof (rawBuffer as any)?.buffer !== "undefined"
-          ? new Uint8Array(
-              (rawBuffer as any).buffer,
-              (rawBuffer as any).byteOffset || 0,
-              (rawBuffer as any).byteLength || 0,
-            )
-          : new Uint8Array(0);
-
-  const view =
-    bytes.length > 0 ? new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength) : null;
-
-  let header = "";
-  for (let i = 0; i < Math.min(6, bytes.length); i++) {
-    header += String.fromCharCode(bytes[i]);
-  }
-
-  let autocadVersion = "AutoCAD 2000/2004";
-  if (header.startsWith("AC1015")) autocadVersion = "AutoCAD 2000 (AC1015)";
-  else if (header.startsWith("AC1018")) autocadVersion = "AutoCAD 2004 (AC1018)";
-  else if (header.startsWith("AC1021")) autocadVersion = "AutoCAD 2007 (AC1021)";
-  else if (header.startsWith("AC1024")) autocadVersion = "AutoCAD 2010 (AC1024)";
-  else if (header.startsWith("AC1027")) autocadVersion = "AutoCAD 2013 (AC1027)";
-  else if (header.startsWith("AC1032")) autocadVersion = "AutoCAD 2018/2024 (AC1032)";
-
-  // 1. Quét chuỗi UTF-16LE & ASCII từ nhị phân DWG
-  const extractedTexts: string[] = [];
-  const layerCandidates = new Set<string>();
-  const blockCandidates = new Set<string>();
-  const metadata: Record<string, string> = {
-    dwgVersion: header,
-    software: autocadVersion,
-    fileSize: `${(bytes.length / 1024).toFixed(1)} KB`,
-  };
-
-  const utf16Decoder = typeof TextDecoder !== "undefined" ? new TextDecoder("utf-16le") : null;
-
-  // Scan UTF-16LE strings (AutoCAD 2007+)
-  if (view) {
-    for (let i = 0; i < bytes.length - 8; i += 2) {
-      let len = 0;
-      while (i + len * 2 + 1 < bytes.length && len < 120) {
-        const code = view.getUint16(i + len * 2, true);
-        if ((code >= 32 && code <= 126) || (code >= 0x00c0 && code <= 0x1ef9)) {
-          len++;
-        } else {
-          break;
-        }
-      }
-      if (len >= 3) {
-        let s = "";
-        if (utf16Decoder) {
-          s = utf16Decoder.decode(bytes.subarray(i, i + len * 2)).trim();
-        } else {
-          for (let k = 0; k < len; k++) {
-            s += String.fromCharCode(view.getUint16(i + k * 2, true));
-          }
-          s = s.trim();
-        }
-        if (s && !/^[0-9a-f]{8,}$/i.test(s) && !/^\s+$/.test(s)) {
-          extractedTexts.push(s);
-          if (s.includes("AutoCAD") || s.includes("build_version")) {
-            metadata.generator = s.slice(0, 100);
-          }
-          if (s.includes("<prop id=") || s.includes("<datetime>")) {
-            const dtMatch = s.match(/<datetime>([^<]+)<\/datetime>/);
-            if (dtMatch) metadata.lastSaved = dtMatch[1];
-            const userMatch = s.match(/<prop id="8"><string>([^<]+)<\/string>/);
-            if (userMatch) metadata.author = userMatch[1];
-          }
-        }
-        i += len * 2;
-      }
-    }
-  }
-
-  // Scan ASCII tokens
-  let latin = "";
-  const latinDecoder = typeof TextDecoder !== "undefined" ? new TextDecoder("latin1") : null;
-  if (latinDecoder) {
-    latin = latinDecoder.decode(bytes);
-  } else {
-    for (let i = 0; i < bytes.length; i++) {
-      latin += String.fromCharCode(bytes[i]);
-    }
-  }
-  const words = latin.match(/[A-Za-z0-9_.-]{3,40}/g) || [];
-  for (const w of words) {
-    if (
-      /^(M[-_]|E[-_]|P[-_]|F[-_]|A[-_]|S[-_]|ELV[-_]|G[-_]|HVAC|PLUMB|ELEC|FIRE|TANG|FL|0[1-9]_|[0-9]{2}_|WALL|DUCT|PIPE|CABL|SPRN)/i.test(
-        w,
-      )
-    ) {
-      layerCandidates.add(w);
-    }
-    if (/^(BLK_|BLOCK_|ANNO_|TAG_|VALVE_|PUMP_|AHU_|FCU_|PANEL_)/i.test(w)) {
-      blockCandidates.add(w);
-    }
-  }
-
-  // Khởi tạo danh mục layer cho tệp DWG theo hệ thống
-  const upperFile = fileName.toUpperCase();
-  const isElec =
-    upperFile.includes("-E-") ||
-    upperFile.includes("01. E") ||
-    upperFile.includes("EA-") ||
-    upperFile.includes("EP-");
-  const isElv = upperFile.includes("ELV") || upperFile.includes("02. ELV");
-  const isHvac =
-    upperFile.includes("-M-") ||
-    upperFile.includes("03.AC") ||
-    upperFile.includes("HVAC") ||
-    upperFile.includes("AC-");
-  const isPlumb =
-    upperFile.includes("-P-") ||
-    upperFile.includes("04. PL") ||
-    upperFile.includes("PLUMB") ||
-    upperFile.includes("SAN");
-  const isFire =
-    upperFile.includes("-F-") || upperFile.includes("05. FP") || upperFile.includes("FIRE");
-
-  // 1. Danh mục layer thực tế trích xuất được từ tệp DWG
-  const discoveredLayers: { name: string; color: number }[] = [];
-  if (layerCandidates.size > 0) {
-    let colorIdx = 1;
-    for (const lName of Array.from(layerCandidates)) {
-      discoveredLayers.push({ name: lName, color: (colorIdx++ % 15) + 1 });
-    }
-  } else {
-    discoveredLayers.push({ name: "0", color: 7 });
-  }
-
-  // 2. Thực thể CAD trích xuất từ dữ liệu nhị phân thực tế
-  const entities: DxfEntityRaw[] = [];
-  const cleanTexts = extractedTexts
-    .map((t) => decodeCadText(t))
-    .filter(
-      (t) => t.length >= 2 && !t.startsWith("<") && !t.includes("{") && !t.startsWith("<?xml"),
-    );
-
-  // Đặt các chuỗi Text thực tế vào danh sách thực thể
-  cleanTexts.forEach((txt, idx) => {
-    const assignedLayer = discoveredLayers[idx % discoveredLayers.length]?.name || "0";
-    entities.push({
-      id: `ENT-DWG-TXT-${idx + 1}`,
-      type: "TEXT",
-      layer: assignedLayer,
-      color: 7,
-      coordinates: { center: [1000 + (idx % 8) * 4000, 1000 + Math.floor(idx / 8) * 3000, 0] },
-      textValue: txt,
-      decodedText: txt,
-    });
-  });
-
-  // Đặt các Block thực tế trích xuất được vào danh sách thực thể
-  Array.from(blockCandidates).forEach((bName, idx) => {
-    const assignedLayer = discoveredLayers[idx % discoveredLayers.length]?.name || "0";
-    entities.push({
-      id: `ENT-DWG-BLK-${idx + 1}`,
-      type: "INSERT",
-      layer: assignedLayer,
-      color: 2,
-      coordinates: { center: [2000 + (idx % 6) * 5000, 2000 + Math.floor(idx / 6) * 4000, 0] },
-      blockName: bName,
-    });
-  });
-
-  // 3. Chuẩn hóa danh mục layer theo AIA MEPF
-  const standardLayerMapping = normalizeCadLayers(discoveredLayers.map((l) => l.name));
-  const layers: DxfLayerInfo[] = discoveredLayers.map((l) => {
-    const stdName = standardLayerMapping[l.name] || l.name;
-    const isStd =
-      stdName.includes("-") &&
-      (stdName.startsWith("M-") ||
-        stdName.startsWith("E-") ||
-        stdName.startsWith("P-") ||
-        stdName.startsWith("F-") ||
-        stdName.startsWith("ELV-") ||
-        stdName.startsWith("S-") ||
-        stdName.startsWith("A-"));
-    let discipline: DxfLayerInfo["discipline"] = "OTHER";
-    if (stdName.startsWith("M-")) discipline = "M";
-    else if (stdName.startsWith("E-")) discipline = "E";
-    else if (stdName.startsWith("P-")) discipline = "P";
-    else if (stdName.startsWith("F-")) discipline = "F";
-    else if (stdName.startsWith("ELV-")) discipline = "ELV";
-    else if (stdName.startsWith("S-")) discipline = "S";
-    else if (stdName.startsWith("A-")) discipline = "A";
-
-    const count = entities.filter((e) => e.layer === l.name).length;
-    return {
-      name: l.name,
-      colorNumber: l.color,
-      colorHex: ACI_TO_HEX[l.color] || "#a1a1aa",
-      lineType: "CONTINUOUS",
-      isStandardized: isStd,
-      standardName: stdName,
-      discipline,
-      entityCount: count,
-    };
-  });
-
-  const blocks = Array.from(blockCandidates).map((bName) => ({
-    name: bName,
-    count: entities.filter((e) => e.blockName === bName).length || 1,
-    attributes: {},
-  }));
-
-  // Trích xuất XREF thực tế từ các chuỗi đường dẫn trong file nhị phân
-  const xrefs: DxfXrefInfo[] = [];
-  const xrefMatches = Array.from(
-    new Set(
-      extractedTexts.filter(
-        (t) =>
-          t.toLowerCase().endsWith(".dwg") &&
-          (t.includes("/") || t.includes("\\") || t.toLowerCase().includes("xref")),
-      ),
-    ),
-  );
-
-  xrefMatches.forEach((xrPath, idx) => {
-    const xrName = xrPath.split(/[/\\]/).pop() || xrPath;
-    xrefs.push({
-      id: `XREF-${idx + 1}`,
-      name: xrName,
-      originalPath: xrPath,
-      path: xrPath,
-      fileName: xrName,
-      type: "Attach",
-      status: "missing",
-      entityCount: 0,
-      layerCount: 0,
-      description: `Tham chiếu ngoài: ${xrName}`,
-      isBound: false,
-    });
-  });
-
-  // Tính toán kích thước bao WCS thực tế
-  let minX = 0;
-  let maxX = Math.max(10000, entities.length * 2000);
-  let minY = 0;
-  let maxY = Math.max(8000, entities.length * 1500);
-
-  const stdLayersCount = layers.filter((l) => l.isStandardized).length;
-  const nonStdLayersCount = layers.length - stdLayersCount;
-  const corruptedTextCount = cleanTexts.filter((t) => isCorruptedEncoding(t)).length;
-
-  const layerScore = layers.length > 0 ? (stdLayersCount / layers.length) * 50 : 25;
-  const fontScore =
-    cleanTexts.length > 0 ? Math.max(0, 50 - (corruptedTextCount / cleanTexts.length) * 50) : 50;
-  const healthScore = Math.min(100, Math.round(layerScore + fontScore));
-
-  const recommendations: string[] = [];
-  if (nonStdLayersCount > 0) {
-    recommendations.push(
-      `Phát hiện ${nonStdLayersCount}/${layers.length} layer chưa chuẩn AIA MEPF. Chạy Script .SCR để chuẩn hóa.`,
-    );
-  }
-  if (corruptedTextCount > 0) {
-    recommendations.push(
-      `Phát hiện ${corruptedTextCount} đoạn text lỗi font TCVN3/VNI. Chạy Font Doctor để chuyển về UTF-8.`,
-    );
-  }
-  if (entities.length > 0) {
-    recommendations.push(
-      `Đã trích xuất thành công ${entities.length} thực thể CAD từ tệp DWG thật.`,
-    );
-  }
-
-  const spatialRoutes = convertDxfToSpatialRoutes(entities);
-
-  return {
-    fileName,
-    sourcePath: fileName,
-    fileFormat: autocadVersion ? `AutoCAD (${autocadVersion})` : "AutoCAD DWG (Binary)",
-    fileSizeBytes: bytes.length,
-    isRealDrawing: true,
-    extractedMetadata: metadata,
-    layers,
-    entities,
-    blocks,
-    xrefs,
-    diagnostic: {
-      healthScore,
-      totalEntities: entities.length,
-      totalLayers: layers.length,
-      standardLayersCount: stdLayersCount,
-      nonStandardLayersCount: nonStdLayersCount,
-      corruptedTextCount,
-      unmappedBlocksCount: blocks.length,
-      boundingDimensions: {
-        minX,
-        maxX,
-        minY,
-        maxY,
-        widthMm: maxX - minX,
-        lengthMm: maxY - minY,
-      },
-      disciplineBreakdown: {
-        hvac: layers.filter((l) => l.discipline === "M").length,
-        electrical: layers.filter((l) => l.discipline === "E").length,
-        plumbing: layers.filter((l) => l.discipline === "P").length,
-        firefighting: layers.filter((l) => l.discipline === "F").length,
-        elv: layers.filter((l) => l.discipline === "ELV").length,
-        structural: layers.filter((l) => l.discipline === "S").length,
-      },
-      recommendations,
-    },
-    spatialRoutes,
-  };
+): never {
+  throw new DwgUnsupportedError(fileName);
 }
 
 /**

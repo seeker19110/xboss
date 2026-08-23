@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { readdirSync, statSync, readFileSync, existsSync } from "node:fs";
 import { join, basename, extname } from "node:path";
 import { getCurrentUser, CAN } from "@/lib/auth";
-import { parseDxf, parseDwgBinary, generateStandardizedAutocadScript } from "@/lib/cad/dxf-parser";
+import {
+  parseDxf,
+  parseDwgBinary,
+  generateStandardizedAutocadScript,
+  DwgUnsupportedError,
+} from "@/lib/cad/dxf-parser";
 import { queryOne } from "@/lib/db";
 import { storageGet } from "@/lib/storage";
 
@@ -590,6 +595,9 @@ export async function POST(req: Request) {
       sourcePath,
     });
   } catch (err: unknown) {
+    if (err instanceof DwgUnsupportedError) {
+      return NextResponse.json({ error: err.message }, { status: 422 });
+    }
     const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
