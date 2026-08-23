@@ -1,5 +1,6 @@
 // lib/engineering-cad-qto.ts — Closed-Loop CAD-QTO-Tracking Engine (M66 / M89)
-import { query, queryOne, run } from "@/lib/db";
+import { query, queryOne, run, withTransaction } from "@/lib/db";
+import { nextSeqCode, withUniqueRetry } from "@/lib/seqcode";
 import { createHash } from "crypto";
 
 export type SpoolStatus = "fabricated" | "delivered" | "installed" | "qc_passed" | "bbnt_approved";
@@ -376,21 +377,26 @@ export async function generateInspectionRequestForSpools(
     throw new Error("Cần chọn ít nhất 1 Spool để lập yêu cầu nghiệm thu.");
   }
 
-  // 1. Tạo mã YCNT mới
-  const code = `YCNT-CAD-${Date.now().toString().slice(-6)}`;
+  // 1. Tạo mã YCNT mới — dùng chung bộ đếm tuần tự nextSeqCode() với
+  // app/api/inspection-requests/route.ts (KHÔNG tự chế định dạng riêng: một mã không khớp
+  // /^YCNT-\d+$/ trong bảng inspection_requests sẽ làm hỏng parseInt() của nextSeqCode() cho
+  // MỌI phiếu YCNT tạo sau đó, kể cả phiếu không liên quan CAD).
   const scheduledAt = new Date().toISOString();
-
-  const insertRow = await queryOne<{ id: number }>(
-    `INSERT INTO inspection_requests (code, scheduled_at, status, note, created_by)
-     VALUES (?, ?, 'sent', ?, ?)
-     RETURNING id`,
-    code,
-    scheduledAt,
-    note || "Nghiệm thu khối lượng phân đoạn CAD Spools",
-    userId,
+  const { insId, code } = await withUniqueRetry(() =>
+    withTransaction(async () => {
+      const code = await nextSeqCode("inspection_requests", "code", "YCNT-", 4);
+      const insertRow = await queryOne<{ id: number }>(
+        `INSERT INTO inspection_requests (code, scheduled_at, status, note, created_by)
+         VALUES (?, ?, 'sent', ?, ?)
+         RETURNING id`,
+        code,
+        scheduledAt,
+        note || "Nghiệm thu khối lượng phân đoạn CAD Spools",
+        userId,
+      );
+      return { insId: Number(insertRow?.id || 0), code };
+    }),
   );
-
-  const insId = Number(insertRow?.id || 0);
 
   // 2. Gán inspection_request_id cho các spools và chuyển trạng thái sang qc_passed
   for (const sId of spoolIds) {

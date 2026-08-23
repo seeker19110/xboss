@@ -117,6 +117,22 @@
   (Payment Certification Feed, phần 5 trong spec); trang `/engineering/chuan-hoa-ban-ve`
   (chuẩn hóa bản vẽ) và luồng QTO/Spool mới này vẫn là 2 trang riêng, chưa hợp nhất 1
   workflow duy nhất.
+- **Bug thật thứ 2 phát hiện qua CI PR #368, đã sửa:** `generateInspectionRequestForSpools`
+  tự chế mã `YCNT-CAD-${Date.now()...}` thay vì dùng chung bộ đếm tuần tự `nextSeqCode()`
+  (`lib/seqcode.ts`) mà `app/api/inspection-requests/route.ts` dùng cho mọi phiếu YCNT khác.
+  Một mã không khớp `/^YCNT-\d+$/` lọt vào bảng `inspection_requests` làm hỏng
+  `parseInt()` trong `nextSeqCode()` cho **mọi phiếu YCNT tạo sau đó** (kể cả không liên
+  quan CAD) — tái hiện được ở CI thật (`tests/qaqc.test.ts` nhận mã `"YCNT-0NaN"`, kéo theo
+  `tests/qc-project-scope.test.ts` lỗi `duplicate key`). Đây là bug production thật, không
+  chỉ ô nhiễm test — đã sửa để dùng `nextSeqCode` + `withUniqueRetry` + `withTransaction`
+  giống route chính thức. Đã re-verify: chạy tuần tự đúng cách `npm test` chạy thật (từng
+  file 1 process riêng, xem `scripts/run-tests.mjs`) cho
+  `engineering-cad-qto`/`qaqc`/`qc-project-scope` → xanh cả 3.
+- **CI PR #368 (2026-08-22, tham chiếu):** job `ci` fail do đúng 2 bug trên (đã sửa, re-run
+  local xanh). Job `e2e` fail 193 spec diện rộng (a11y/timeout ở nhiều trang không liên quan
+  CAD như Chấm công/Hợp đồng/Chi phí/Dashboard...) — **xác nhận lại** đây là lỗi có từ trước
+  trên `main`, đã ghi nhận ở mục "Sửa bug CI có sẵn trên main" bên dưới, ngoài phạm vi PR
+  này.
 
 ## Kiểm tra trạng thái hoạt động (health check) cho Admin (2026-08-22)
 
