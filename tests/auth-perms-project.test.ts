@@ -15,17 +15,27 @@ async function asAdmin(fn: () => Promise<void>): Promise<void> {
   await runWithRequestContext({ userId: 1, role: "admin" }, fn);
 }
 
+// Helper: tạo dự án test theo mã CỐ ĐỊNH, dọn trước bản còn sót từ lần chạy cũ.
+// `projects.code` là UNIQUE nên nếu lần chạy trước không dọn (hoặc chết giữa chừng),
+// lần sau sẽ đụng khoá trùng và fail giả — che mất lỗi thật. Dọn ở ĐẦU thay vì chỉ ở
+// cuối để chịu được cả trường hợp lần trước dừng đột ngột.
+async function freshProject(name: string, code: string): Promise<number> {
+  const { insertId, run } = await import("@/lib/db");
+  await run(`DELETE FROM projects WHERE code = ?`, code);
+  return insertId(`INSERT INTO projects (name, code) VALUES (?, ?)`, name, code);
+}
+
 test(
   "perm-project: getPermissionOverride đúng thứ tự 3 tầng (dự án > toàn hệ > undefined)",
   S,
   async () => {
-    const { insertId, run } = await import("@/lib/db");
+    const { run } = await import("@/lib/db");
     const { setPermissionOverride, getPermissionOverride, invalidatePermissionCache } =
       await import("@/lib/permissions");
 
     await run(`DELETE FROM role_permissions`);
-    const a = await insertId(`INSERT INTO projects (name, code) VALUES ('DA Perm A', 'PJT-PMA')`);
-    const b = await insertId(`INSERT INTO projects (name, code) VALUES ('DA Perm B', 'PJT-PMB')`);
+    const a = await freshProject("DA Perm A", "PJT-PMA");
+    const b = await freshProject("DA Perm B", "PJT-PMB");
 
     await asAdmin(async () => {
       // engineer/editProgress: chỉ có override THEO DỰ ÁN A (không có toàn hệ).
@@ -74,12 +84,12 @@ test(
   "perm-project: hasProjectOverrides false khi chỉ có override toàn hệ, true khi có dòng dự án",
   S,
   async () => {
-    const { insertId, run } = await import("@/lib/db");
+    const { run } = await import("@/lib/db");
     const { setPermissionOverride, hasProjectOverrides, invalidatePermissionCache } =
       await import("@/lib/permissions");
 
     await run(`DELETE FROM role_permissions`);
-    const a = await insertId(`INSERT INTO projects (name, code) VALUES ('DA HPO', 'PJT-HPO')`);
+    const a = await freshProject("DA HPO", "PJT-HPO");
 
     // Chỉ override toàn hệ → hasProjectOverrides false.
     await asAdmin(async () => {
@@ -105,14 +115,14 @@ test(
   "perm-project: CAN qua request-context — siết ở dự án A không ảnh hưởng B/không-context",
   S,
   async () => {
-    const { insertId, run } = await import("@/lib/db");
+    const { run } = await import("@/lib/db");
     const { runWithRequestContext } = await import("@/lib/request-context");
     const { CAN } = await import("@/lib/auth");
     const { setPermissionOverride, invalidatePermissionCache } = await import("@/lib/permissions");
 
     await run(`DELETE FROM role_permissions`);
-    const a = await insertId(`INSERT INTO projects (name, code) VALUES ('DA CAN A', 'PJT-CANA')`);
-    const b = await insertId(`INSERT INTO projects (name, code) VALUES ('DA CAN B', 'PJT-CANB')`);
+    const a = await freshProject("DA CAN A", "PJT-CANA");
+    const b = await freshProject("DA CAN B", "PJT-CANB");
 
     // Siết editProgress của engineer CHỈ ở dự án A.
     await asAdmin(async () => {
@@ -183,11 +193,11 @@ test(
 );
 
 test("perm-project: xoá dự án → override theo dự án tự mất (CASCADE)", S, async () => {
-  const { insertId, run, query } = await import("@/lib/db");
+  const { run, query } = await import("@/lib/db");
   const { setPermissionOverride, invalidatePermissionCache } = await import("@/lib/permissions");
 
   await run(`DELETE FROM role_permissions`);
-  const a = await insertId(`INSERT INTO projects (name, code) VALUES ('DA Cascade', 'PJT-CAS')`);
+  const a = await freshProject("DA Cascade", "PJT-CAS");
 
   await asAdmin(async () => {
     await setPermissionOverride("engineer", "editProgress", false, 1, 1, a);
@@ -217,12 +227,12 @@ test("perm-project: xoá dự án → override theo dự án tự mất (CASCADE
 });
 
 test("perm-project: invalidatePermissionCache nạp dòng theo dự án ngay", S, async () => {
-  const { insertId, run } = await import("@/lib/db");
+  const { run } = await import("@/lib/db");
   const { getPermissionOverride, invalidatePermissionCache, _resetPermissionCacheForTests } =
     await import("@/lib/permissions");
 
   await run(`DELETE FROM role_permissions`);
-  const a = await insertId(`INSERT INTO projects (name, code) VALUES ('DA Invalidate', 'PJT-INV')`);
+  const a = await freshProject("DA Invalidate", "PJT-INV");
 
   // Ghi thẳng DB (không qua setPermissionOverride) rồi invalidate → cache thấy ngay.
   await run(

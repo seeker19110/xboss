@@ -42,31 +42,41 @@ test("M76: NLP Intent Parser — Nhận diện Ghi Nhật Ký Thi Công & Tra C�
 });
 
 test("M76: Vòng đời OTP & Telegram Message Gateway trong DB", { skip: !HAS_DB }, async () => {
-  const { insertId } = await import("@/lib/db");
+  const { insertId, run } = await import("@/lib/db");
+  const chatId = 99998888;
+  // telegram_user_bindings.telegram_chat_id là UNIQUE và chatId ở đây cố định — dọn bản
+  // còn sót từ lần chạy trước (kể cả lần chạy dừng giữa chừng) để test chạy lại được.
+  await run(`DELETE FROM telegram_user_bindings WHERE telegram_chat_id = ?`, chatId);
+
   const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Site Bot Proj')`);
   const userId = await insertId(
     `INSERT INTO users (name, email, password_hash, role) VALUES ('Site Bot Tester', ?, 'x', 'admin')`,
     `site-bot-test-${projectId}@x.vn`,
   );
-  const chatId = 99998888;
 
-  // 1. Sinh OTP
-  const otp = await generateTelegramLinkOtp(userId);
-  assert.ok(otp.length === 6, "OTP phải gồm 6 chữ số");
+  try {
+    // 1. Sinh OTP
+    const otp = await generateTelegramLinkOtp(userId);
+    assert.ok(otp.length === 6, "OTP phải gồm 6 chữ số");
 
-  // 2. Xác minh OTP từ Telegram
-  const verified = await verifyTelegramLinkOtp({ chatId, otpCode: otp });
-  assert.equal(verified.success, true);
-  assert.equal(verified.userId, userId);
+    // 2. Xác minh OTP từ Telegram
+    const verified = await verifyTelegramLinkOtp({ chatId, otpCode: otp });
+    assert.equal(verified.success, true);
+    assert.equal(verified.userId, userId);
 
-  // 3. Xử lý tin nhắn thực tế từ kỹ sư
-  const msgRes = await processIncomingTelegramMessage({
-    chatId,
-    rawText: "Cập nhật tiến độ task A2.01 đạt 90%",
-    projectId,
-  });
+    // 3. Xử lý tin nhắn thực tế từ kỹ sư
+    const msgRes = await processIncomingTelegramMessage({
+      chatId,
+      rawText: "Cập nhật tiến độ task A2.01 đạt 90%",
+      projectId,
+    });
 
-  assert.equal(msgRes.actionTaken, true);
-  assert.equal(msgRes.parsedIntent, "PROGRESS_UPDATE");
-  assert.ok(msgRes.replyText.includes("90%"));
+    assert.equal(msgRes.actionTaken, true);
+    assert.equal(msgRes.parsedIntent, "PROGRESS_UPDATE");
+    assert.ok(msgRes.replyText.includes("90%"));
+  } finally {
+    await run(`DELETE FROM telegram_user_bindings WHERE telegram_chat_id = ?`, chatId);
+    await run(`DELETE FROM projects WHERE id = ?`, projectId);
+    await run(`DELETE FROM users WHERE id = ?`, userId);
+  }
 });
