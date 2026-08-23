@@ -16,6 +16,8 @@ Biến môi trường:
   MEPF_POLL_INTERVAL    — Giây giữa mỗi lần poll (mặc định: 3)
   ANTHROPIC_API_KEY     — API key Anthropic Claude (tuỳ chọn)
   OPENAI_API_KEY        — API key OpenAI (tuỳ chọn)
+  MEPF_AGENT_SRC        — Đường dẫn thư mục src của MEPF-Agents
+                          (mặc định: /app/mepf-agent/src — khớp Dockerfile.mepf-worker)
 """
 
 from __future__ import annotations
@@ -44,10 +46,35 @@ POLL_INTERVAL: float = float(os.environ.get("MEPF_POLL_INTERVAL", "3"))
 LEASE_MINUTES: int = int(os.environ.get("MEPF_LEASE_MINUTES", "10"))
 HEARTBEAT_INTERVAL: float = float(os.environ.get("MEPF_HEARTBEAT_INTERVAL", "30"))
 
-# Task types MEPF worker xử lý
+# Thư mục src của MEPF-Agents (gộp phẳng vào repo tại `mepf-worker/`, Dockerfile COPY sang
+# /app/mepf-agent/).
+AGENT_SRC: str = os.environ.get("MEPF_AGENT_SRC", "/app/mepf-agent/src")
+# Thư mục CHA của src — bắt buộc phải có trên sys.path: các module MEPF-Agents tự import
+# lẫn nhau bằng tiền tố gói `src.` (vd `agents.py`: `from src.state import ...`), chỉ phân
+# giải được khi thư mục cha nằm trên path (`src` là namespace package, không có __init__.py).
+# Thiếu nó thì mọi handler gọi vào `agents`/`tools` ném ModuleNotFoundError và bị nuốt bởi
+# `except ImportError` → âm thầm chạy dry-run thay vì báo lỗi.
+AGENT_ROOT: str = os.path.dirname(AGENT_SRC)
+
+
+def _ensure_agent_src_on_path() -> None:
+    """Đưa src của MEPF-Agents và thư mục cha lên đầu sys.path (lũy đẳng).
+
+    Cần CẢ HAI để hỗ trợ 2 kiểu import cùng tồn tại trong MEPF-Agents:
+    `from cad_export_r2000 import ...` (phẳng) và `from src.state import ...` (có gói).
+    """
+    for path in (AGENT_ROOT, AGENT_SRC):
+        if path and path not in sys.path:
+            sys.path.insert(0, path)
+
+
+# Task types MEPF worker xử lý — PHẢI khớp khoá của TASK_HANDLERS bên dưới, vì
+# claim_task() lọc hàng đợi bằng `task_type = ANY(SUPPORTED_TASK_TYPES)`: thiếu ở đây
+# thì task không bao giờ được nhận dù đã có handler.
 SUPPORTED_TASK_TYPES = [
     "mepf.hvac.calc",
     "mepf.cad.analyze",
+    "mepf.cad.export_r2000",
     "mepf.bim.clash.detect",
     "mepf.qs.takeoff",
     "mepf.ff.hydraulics",
@@ -263,7 +290,7 @@ def _run_hvac_calc(task: dict, report: Callable[[float], None]) -> dict:
     """Handler tính toán HVAC (Hazen-Williams, tải lạnh, ống gió...)."""
     try:
         # Import MEPF-Agents tools
-        sys.path.insert(0, "/app/mepf-agent/src")
+        _ensure_agent_src_on_path()
         from hvac_tools import calc_cooling_load_detailed, calc_duct_total_pressure_loss  # type: ignore
         payload = task.get("payload", {})
         report(20.0)
@@ -286,7 +313,7 @@ def _run_hvac_calc(task: dict, report: Callable[[float], None]) -> dict:
 def _run_cad_analyze(task: dict, report: Callable[[float], None]) -> dict:
     """Handler phân tích bản vẽ CAD DXF."""
     try:
-        sys.path.insert(0, "/app/mepf-agent/src")
+        _ensure_agent_src_on_path()
         from cad_loader import load_cad  # type: ignore
         from cad_geometry import extract_pipe_network  # type: ignore
         payload = task.get("payload", {})
@@ -315,8 +342,8 @@ def _run_cad_analyze(task: dict, report: Callable[[float], None]) -> dict:
 def _run_cad_export_r2000(task: dict, report: Callable[[float], None]) -> dict:
     """Handler xuất bản vẽ DXF R2000 (AC1015) từ hợp đồng DrawingPayloadV1 bằng ezdxf."""
     try:
-        sys.path.insert(0, "/app/mepf-agent/src")
-        from src.cad_export_r2000 import export_dxf_r2000  # type: ignore
+        _ensure_agent_src_on_path()
+        from cad_export_r2000 import export_dxf_r2000  # type: ignore
         payload = task.get("payload", {})
 
         result = export_dxf_r2000(payload)
@@ -331,7 +358,7 @@ def _run_cad_export_r2000(task: dict, report: Callable[[float], None]) -> dict:
 def _run_bim_clash(task: dict, report: Callable[[float], None]) -> dict:
     """Handler kiểm tra xung đột BIM/IFC."""
     try:
-        sys.path.insert(0, "/app/mepf-agent/src")
+        _ensure_agent_src_on_path()
         from bim_tools import detect_clashes  # type: ignore
         payload = task.get("payload", {})
         report(20.0)
@@ -352,7 +379,7 @@ def _run_bim_clash(task: dict, report: Callable[[float], None]) -> dict:
 def _run_qs_takeoff(task: dict, report: Callable[[float], None]) -> dict:
     """Handler bóc tách khối lượng và lập dự toán."""
     try:
-        sys.path.insert(0, "/app/mepf-agent/src")
+        _ensure_agent_src_on_path()
         from qs_tools import auto_quantity_takeoff, calc_boq_cost  # type: ignore
         payload = task.get("payload", {})
         report(20.0)
@@ -375,7 +402,7 @@ def _run_qs_takeoff(task: dict, report: Callable[[float], None]) -> dict:
 def _run_ff_hydraulics(task: dict, report: Callable[[float], None]) -> dict:
     """Handler tính toán thủy lực PCCC."""
     try:
-        sys.path.insert(0, "/app/mepf-agent/src")
+        _ensure_agent_src_on_path()
         from ff_tools import calc_sprinkler_hydraulics, calc_fire_pump  # type: ignore
         payload = task.get("payload", {})
         report(20.0)
@@ -396,7 +423,7 @@ def _run_ff_hydraulics(task: dict, report: Callable[[float], None]) -> dict:
 def _run_electrical_calc(task: dict, report: Callable[[float], None]) -> dict:
     """Handler tính toán điện (cáp, sụt áp, ngắn mạch...)."""
     try:
-        sys.path.insert(0, "/app/mepf-agent/src")
+        _ensure_agent_src_on_path()
         from elec_tools import calc_cable_size, calc_voltage_drop, calc_total_load  # type: ignore
         payload = task.get("payload", {})
         report(20.0)
@@ -420,7 +447,7 @@ def _run_electrical_calc(task: dict, report: Callable[[float], None]) -> dict:
 def _run_plumbing_calc(task: dict, report: Callable[[float], None]) -> dict:
     """Handler tính toán cấp thoát nước."""
     try:
-        sys.path.insert(0, "/app/mepf-agent/src")
+        _ensure_agent_src_on_path()
         from plumb_tools import calc_water_pipe, calc_plumbing_pump_head  # type: ignore
         payload = task.get("payload", {})
         report(20.0)
@@ -441,7 +468,7 @@ def _run_plumbing_calc(task: dict, report: Callable[[float], None]) -> dict:
 def _run_agent(task: dict, report: Callable[[float], None]) -> dict:
     """Handler chạy full LangGraph agent với prompt tự do."""
     try:
-        sys.path.insert(0, "/app/mepf-agent/src")
+        _ensure_agent_src_on_path()
         from agents import run_agent_sync  # type: ignore  # noqa: F401
         payload = task.get("payload", {})
         prompt = payload.get("prompt", "")

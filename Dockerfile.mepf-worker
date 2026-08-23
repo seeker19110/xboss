@@ -58,8 +58,11 @@ COPY mepf-worker/ ./mepf-agent/
 COPY scripts/mepf/worker_entry.py ./worker_entry.py
 
 # Biến môi trường mặc định (override qua docker-compose env)
+# PYTHONPATH phải có CẢ /app/mepf-agent (cho import kiểu `src.x` mà MEPF-Agents tự dùng)
+# LẪN /app/mepf-agent/src (cho import phẳng `x`) — thiếu thư mục cha thì `from src.state`
+# ném ModuleNotFoundError và worker âm thầm rơi về dry-run.
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app/mepf-agent/src:/app \
+    PYTHONPATH=/app/mepf-agent:/app/mepf-agent/src:/app \
     MEPF_WORKER_CONCURRENCY=2 \
     MEPF_DRY_RUN=false \
     MEPF_POLL_INTERVAL=3 \
