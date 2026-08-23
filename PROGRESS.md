@@ -4,6 +4,38 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Nợ kỹ thuật mới phát hiện — 8 file test tích hợp fail thật trên DB sạch (2026-08-23)
+
+**Chưa sửa, cố ý — người dùng chốt "tạo task riêng, chưa sửa ngay".** Phát hiện khi chạy
+`npm test -- --release-gate` **1 lần trên Postgres 16 vừa migrate sạch** (không phải môi trường
+tích luỹ dữ liệu cũ) để xác nhận migration `0089`/`0091`/`0092`, đối chiếu thêm bằng log CI thật
+của PR #370 trên GitHub Actions (cùng kết quả, không phải lỗi máy cục bộ). Không file nào thuộc
+`lib/cad`/`chuan-hoa-ban-ve` — không liên quan Việc 7 hay M99.
+
+- **`tests/engineering-fidic-claim.test.ts` (M79):** `lib/contracts-fidic.ts:447`
+  (`createFidicClaim`, nhánh nhận object) INSERT vào `engineering_fidic_claims` với tên cột
+  `title`/`executive_summary`/`eot_days_requested`/`cost_claim_amount`/`dossier_markdown` —
+  schema thật (`migrations/0113_fidic_delay_claims.sql`) đặt tên khác:
+  `event_title`/`eot_days_claimed`/`cost_claimed_vnd`/`dossier_content` (không có cột
+  `executive_summary`). `ON CONFLICT (project_id, claim_code)` cũng sai vì `claim_code` chỉ
+  UNIQUE đơn (không phải composite `(project_id, claim_code)`). Nhánh code này có khả năng
+  **chưa từng chạy thành công** kể từ khi viết.
+- **OS-1/OS-2** (`tests/*os1*`, `tests/*os2*`): `column "revision_name" of relation
+"engineering_source_revisions" does not exist` (OS-2 dùng alias `sr.revision_name`).
+- **OS-3** (`tests/*os3*`): `column "project_id" of relation "tasks" does not exist`.
+- **PIN-1** (`tests/*pin1*`): `column o.code does not exist`.
+- **PIN-2** (`tests/*pin2*`): `column "metadata" of relation "engineering_objects" does not
+exist`.
+- **`tests/engineering-cad-save-drawing.test.ts`:** "Thiếu thư mục tạm HVAC/temp" — fail **cả
+  trên GitHub Actions thật** (không chỉ do worktree cục bộ thiếu cây `drawings/`), cần điều tra
+  riêng xem route/test có đang giả định thư mục tồn tại sẵn hay thiếu bước tự tạo.
+
+**Nghi vấn:** các bảng OS-_/PIN-_ thuộc track "Vision Complete" (`docs/nang-cap/OS-*.md`, còn
+Draft/conditional) — có khả năng test được viết trước cho schema dự kiến nhưng migration thật
+đã đổi tên cột sau đó mà không cập nhật lại test/code liên quan, hoặc ngược lại. Cần đọc lại
+migration liên quan (`0084`–`0087` và các bản OS-* nếu có) đối chiếu với code/test trước khi sửa,
+không đoán hướng nào đúng.
+
 ## M99 PR1 — Rule pack chuẩn hóa CAD v1 + endpoint (2026-08-23)
 
 - **Đã làm (đúng phạm vi PR1 của `docs/nang-cap/M99-plugin-autocad-chuan-hoa.md`, không đụng PR2+):**
