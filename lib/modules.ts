@@ -122,7 +122,16 @@ export const MODULES: ModuleDef[] = [
     // Quản lý vật tư — BOQ, kho vật tư, đơn đặt hàng (gồm cảnh báo vượt định mức).
     key: "materials",
     nav: [
-      { group: "Quản lý vật tư", label: "BOQ", href: "/boq", icon: "Calculator" },
+      // href PHẢI khớp đúng entry tương ứng trong DASHBOARD_TREE (`dash.boq`), vì
+      // AppHeader ẩn nav của module bị tắt bằng cách so khớp CHÍNH XÁC theo href.
+      // Trước đây để `/boq` (trang cũ vẫn tồn tại nhưng đã rời khỏi sidebar) nên khớp
+      // trượt → tắt module `materials` KHÔNG ẩn được mục này khỏi sidebar.
+      {
+        group: "Quản lý vật tư",
+        label: "Định mức BOQ",
+        href: "/procurement?tab=boq",
+        icon: "Calculator",
+      },
       {
         group: "Quản lý vật tư",
         label: "Vật tư",
