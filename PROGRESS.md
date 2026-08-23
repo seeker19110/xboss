@@ -4,6 +4,43 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Tăng tốc bộ test: ~30 phút → 1 phút 53 giây (2026-08-23)
+
+Đo trên Postgres 16 sạch, 210 file, **kết quả không đổi: 1083 ca pass, 0 fail, 1 skip
+(allowlist)** — tốc độ không đánh đổi bằng việc bỏ sót test.
+
+**Cách tìm ra:** đo từng lớp thay vì đoán. Giả thuyết ban đầu (transpile TypeScript là nút
+thắt) **sai** — bật/tắt cache `tsx` chênh 0,6% (10.713ms vs 10.647ms), cache vốn đã bật mặc
+định và đang ấm. Ba nguyên nhân thật, xếp theo mức đóng góp:
+
+1. **Pool `pg` giữ event loop sống 10 giây sau khi test xong** — chi phí lớn nhất và hoàn
+   toàn vô ích. `lib/db` không đặt `idleTimeoutMillis` nên `pg` dùng mặc định 10s. Đo trên
+   file probe tối thiểu: thân test 117ms, cả tiến trình 10.368ms. Nhân ~127 file chạm DB
+   là **~21 phút chờ rỗng mỗi lần chạy**. Sửa: bật `allowExitOnIdle` qua biến
+   `XBOSS_PG_ALLOW_EXIT_ON_IDLE`, chỉ đặt trong `tests/setup.ts`; production giữ nguyên
+   (server chạy dài hạn thì giữ connection rỗi là điều mong muốn).
+   _Đã cân nhắc và BỎ phương án gọi `pool.end()` trong hook `after()`_: nhiều file có
+   `after()` riêng còn chạm DB, mà hook của `setup.ts` đăng ký trước nên chạy trước — vừa
+   không cứu được các file đó (`api-keys` vẫn 10,7s), vừa có nguy cơ làm chúng đỏ vì dùng
+   pool đã đóng.
+2. **`lib/import.ts` ghi `progress_dimensions` từng ô một** (lỗi N+1 khi ghi). File tracking
+   thật ~2.000 task × ~16 ô = ~32.000 round-trip DB mỗi lần import; `import-real.test.ts`
+   gọi `importWorkbook` 5 lần → ~160.000 lượt. Sửa: gộp cả lưới của một task thành **một
+   câu INSERT nhiều dòng**. `import-real` 630s → 147s. **Người dùng import Excel thật cũng
+   nhanh lên tương ứng** — đây là sửa mã production, không phải làm đẹp số đo test.
+3. **210 file chạy tuần tự.** Nay: 83 file không chạm DB gộp vào 1 tiến trình; 127 file
+   chạm DB chạy song song 16 worker (`TEST_WORKERS`, mặc định `min(16, cpu−2)` nên CI 4 nhân
+   tự hạ xuống 2), **mỗi worker một database riêng** tạo bằng `CREATE DATABASE ... TEMPLATE`.
+   Vẫn giữ **1 tiến trình / 1 file** cho nhóm DB nên ngữ nghĩa cô lập không đổi — chính
+   database riêng mới là thứ cho phép song song, không phải nới lỏng cô lập. Template được
+   migrate một lần nên bỏ luôn chi phí `ensureSchema()` lặp lại.
+   Ràng buộc kèm theo: 16 worker × pool 10 = 160 kết nối > `max_connections` mặc định 100,
+   nên runner ghim `XBOSS_PG_POOL_MAX=3` cho mỗi worker.
+
+**Bài học đo đạc:** mọi con số trung gian trong đợt này (11m35s, 14m46s) đều **bị nhiễu** do
+chạy phép đo khác song song; chỉ số cuối 1m53s là lần chạy sạch, không có gì chạy cùng. Khi
+đo hiệu năng phải chạy một mình, nếu không sẽ tự lừa mình.
+
 ## docs/ERD.md lệch schema 110 bảng — lộ ra sau khi sửa 8 file test (2026-08-23)
 
 `docs/ERD.md` sinh tự động từ schema thật (M45 PR3) và CI có bước `Kiểm ERD khớp schema`

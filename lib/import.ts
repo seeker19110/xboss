@@ -579,18 +579,24 @@ export async function importWorkbook(
             await run(`DELETE FROM progress_dimensions WHERE task_id = ?`, taskId);
           }
 
-          if (hasGrid) {
+          if (hasGrid && rowDims.length) {
+            // Ghi cả lưới bằng MỘT câu INSERT nhiều dòng thay vì mỗi ô một round-trip.
+            // File tracking thật có ~2.000 task × ~16 ô = ~32.000 lượt gọi DB cho mỗi lần
+            // import — đó là lý do import mất hàng phút. Gộp lại giữ nguyên kết quả, chỉ
+            // đổi số lần đi/về mạng.
+            const values: unknown[] = [];
+            const cho: string[] = [];
             for (const d of rowDims) {
               const checked = isChecked(row[d.col]) ? 1 : 0;
-              await run(
-                `INSERT INTO progress_dimensions (task_id, dimension_label, installed, value) VALUES (?, ?, ?, ?)`,
-                taskId,
-                d.label,
-                checked,
-                checked,
-              );
+              cho.push(`(?, ?, ?, ?)`);
+              values.push(taskId, d.label, checked, checked);
               stats.dimensions++;
             }
+            await run(
+              `INSERT INTO progress_dimensions (task_id, dimension_label, installed, value)
+               VALUES ${cho.join(", ")}`,
+              ...values,
+            );
           }
         }
       } catch (err) {

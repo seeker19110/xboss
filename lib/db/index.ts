@@ -51,6 +51,11 @@ export function getPool(): Pool {
       connectionString: url,
       max,
       connectionTimeoutMillis: 10_000,
+      // Chỉ bật trong test (tests/setup.ts đặt biến này). Mặc định `pg` giữ connection rỗi
+      // thêm 10s, khiến mỗi tiến trình test treo ~10 giây sau khi đã chạy xong — nhân với
+      // ~127 file chạm DB là ~21 phút chờ rỗng mỗi lần chạy full suite. Production KHÔNG
+      // đặt biến này: server chạy dài hạn, giữ connection rỗi lại là điều mong muốn.
+      allowExitOnIdle: process.env.XBOSS_PG_ALLOW_EXIT_ON_IDLE === "1",
       options: `-c statement_timeout=${stmtTimeoutMs} -c idle_in_transaction_session_timeout=15000`,
     });
   }
