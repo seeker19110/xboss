@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { listSwarmDebates, createSwarmDebate, SwarmAgentRole } from "@/lib/engineering-swarm";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import {
+  listSwarmDebates,
+  createSwarmDebate,
+  SwarmAgentRole,
+} from "@/lib/ky-thuat/engineering-swarm";
 
 export const dynamic = "force-dynamic";
 

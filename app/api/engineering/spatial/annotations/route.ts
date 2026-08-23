@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { createSpatialAnnotation, listSpatialAnnotations } from "@/lib/engineering-spatial-pinning";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import {
+  createSpatialAnnotation,
+  listSpatialAnnotations,
+} from "@/lib/ky-thuat/engineering-spatial-pinning";
 
 export const dynamic = "force-dynamic";
 

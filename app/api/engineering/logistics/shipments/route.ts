@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { createMaterialShipment, listMaterialShipments } from "@/lib/engineering-qr-logistics";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import {
+  createMaterialShipment,
+  listMaterialShipments,
+} from "@/lib/ky-thuat/engineering-qr-logistics";
 
 export const dynamic = "force-dynamic";
 

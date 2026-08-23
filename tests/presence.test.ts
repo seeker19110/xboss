@@ -1,6 +1,6 @@
 import { test, mock } from "node:test";
 import assert from "node:assert/strict";
-import { heartbeat, getOnlineUsers } from "@/lib/presence";
+import { heartbeat, getOnlineUsers } from "@/lib/hien-truong/presence";
 
 function clearPresenceStore(): void {
   (globalThis as unknown as { __xbossPresence?: Map<number, unknown> }).__xbossPresence?.clear();

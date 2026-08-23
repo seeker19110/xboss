@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { parseMeetingActionBody, validateMeetingActionInput } from "@/lib/meetings";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { parseMeetingActionBody, validateMeetingActionInput } from "@/lib/hien-truong/meetings";
 
 export const dynamic = "force-dynamic";
 

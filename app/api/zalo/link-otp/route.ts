@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { generateZaloLinkOtp, verifyZaloLinkOtp } from "@/lib/engineering-zalo-copilot";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { generateZaloLinkOtp, verifyZaloLinkOtp } from "@/lib/ky-thuat/engineering-zalo-copilot";
 
 export const dynamic = "force-dynamic";
 

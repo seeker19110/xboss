@@ -7,8 +7,8 @@
 ## 1. Vấn đề & Người dùng
 
 - **Vấn đề:** quản lý dự án xây dựng cho dự án **TT AVIO Tháp A**, khởi đầu từ tiến độ thi công MEP/ACMV đang dựa trên file Excel tracking — khó đồng bộ nhiều người, không có lịch sử thay đổi, không cảnh báo trễ hạn, không dùng tốt trên điện thoại tại công trường.
-- **Người dùng mục tiêu:** 7 vai trò (`lib/roles.ts`) — `admin`/`pm` (quản trị/QLDA, toàn quyền nghiệp vụ), `engineer` (kỹ sư hiện trường), `subcon` (thầu phụ, chỉ thao tác task được giao), `bch`/`cdt`/`viewer` (chỉ xem + bình luận, phạm vi thương mại khác nhau — xem `spec.md` §4). Kỹ sư/thầu phụ dùng chủ yếu trên **điện thoại tại công trường**; PM xem dashboard trên máy tính.
-- **Bằng chứng nhu cầu:** thay thế trực tiếp file Excel tracking đang dùng thật (import được file gốc OGTĐ/OGHL/OGCH/ODNN qua `lib/import.ts`).
+- **Người dùng mục tiêu:** 7 vai trò (`lib/nen/roles.ts`) — `admin`/`pm` (quản trị/QLDA, toàn quyền nghiệp vụ), `engineer` (kỹ sư hiện trường), `subcon` (thầu phụ, chỉ thao tác task được giao), `bch`/`cdt`/`viewer` (chỉ xem + bình luận, phạm vi thương mại khác nhau — xem `spec.md` §4). Kỹ sư/thầu phụ dùng chủ yếu trên **điện thoại tại công trường**; PM xem dashboard trên máy tính.
+- **Bằng chứng nhu cầu:** thay thế trực tiếp file Excel tracking đang dùng thật (import được file gốc OGTĐ/OGHL/OGCH/ODNN qua `lib/tien-do/import.ts`).
 - **Khác biệt:** đồng bộ đa người dùng thời gian thực, lịch sử tiến độ, cảnh báo trễ/đến hạn, nghiệm thu 2 bước có gate QA&QC, đồng bộ 2 chiều Google Sheet, PWA offline, đa dự án song song — những thứ Excel không có.
 
 ## 2. Phạm vi (đã hoàn thành — mở rộng từ MVP tracking sang toàn chuỗi qua M0–M42)
@@ -27,10 +27,10 @@
 
 ## 4. Tech stack, thiết kế dữ liệu & kiến trúc
 
-Xem đầy đủ ở `spec.md` §3 (schema/migrate), §9 (tech stack) và `docs/ERD.md` (bảng/cột/FK) — không lặp lại ở đây để tránh 2 nguồn trôi khỏi nhau. Tóm tắt: Next.js 16.2 + React 19.2 + TypeScript strict + Tailwind 4.3, PostgreSQL qua `pg` raw SQL với hệ migrate nhẹ (ADR-0003, **không** auto-init/ORM/Supabase), **119 nhóm route** trong `app/api/*` (361 file `route.ts`), kiểm soát quyền ở tầng API (`CAN`/`canTouchTask`, `lib/auth.ts`) **cộng RLS Postgres làm phòng tuyến thứ 2** trên các bảng tài chính/tổ chức **và `engineering_*`** (ADR-0005, `lib/db/index.ts::withProjectScope`).
+Xem đầy đủ ở `spec.md` §3 (schema/migrate), §9 (tech stack) và `docs/ERD.md` (bảng/cột/FK) — không lặp lại ở đây để tránh 2 nguồn trôi khỏi nhau. Tóm tắt: Next.js 16.2 + React 19.2 + TypeScript strict + Tailwind 4.3, PostgreSQL qua `pg` raw SQL với hệ migrate nhẹ (ADR-0003, **không** auto-init/ORM/Supabase), **119 nhóm route** trong `app/api/*` (361 file `route.ts`), kiểm soát quyền ở tầng API (`CAN`/`canTouchTask`, `lib/bao-mat/auth.ts`) **cộng RLS Postgres làm phòng tuyến thứ 2** trên các bảng tài chính/tổ chức **và `engineering_*`** (ADR-0005, `lib/db/index.ts::withProjectScope`).
 
 - **Luồng:** client (`'use client'`) → `/api/*` (route handler, `force-dynamic`) → `lib/*` → `lib/db` → Postgres.
-- **Chuỗi tính toán:** tick dimension → `recomputeTask` → `deriveStatus` → `recomputePackage` → ghi `task_history` (`lib/recompute.ts`, xem `spec.md` §7).
+- **Chuỗi tính toán:** tick dimension → `recomputeTask` → `deriveStatus` → `recomputePackage` → ghi `task_history` (`lib/tien-do/recompute.ts`, xem `spec.md` §7).
 - **Đồng bộ real-time:** SSE `/api/events?sheet=` (watermark `sheetVersion`), fallback poll `/api/tasks/version`.
 
 ## 5. Luồng người dùng chính

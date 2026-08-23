@@ -10,7 +10,7 @@ const S = { skip: !HAS_TEST_DB };
 
 test("feature-flags: bảng rỗng → mọi module coi như bật (mặc định)", S, async () => {
   const { insertId, run } = await import("@/lib/db");
-  const ff = await import("@/lib/feature-flags");
+  const ff = await import("@/lib/ha-tang/feature-flags");
 
   const p = await insertId(`INSERT INTO projects (name, code) VALUES ('DA FF1', 'PJT-FF1')`);
   try {
@@ -32,7 +32,7 @@ test(
   S,
   async () => {
     const { insertId, run } = await import("@/lib/db");
-    const ff = await import("@/lib/feature-flags");
+    const ff = await import("@/lib/ha-tang/feature-flags");
 
     const p = await insertId(`INSERT INTO projects (name, code) VALUES ('DA FF2', 'PJT-FF2')`);
     const u = await insertId(
@@ -66,7 +66,7 @@ test(
   S,
   async () => {
     const { insertId, run } = await import("@/lib/db");
-    const ff = await import("@/lib/feature-flags");
+    const ff = await import("@/lib/ha-tang/feature-flags");
 
     const p = await insertId(`INSERT INTO projects (name, code) VALUES ('DA FF3', 'PJT-FF3')`);
     const u = await insertId(
@@ -100,7 +100,7 @@ test(
 );
 
 test("feature-flags: findModuleByRoute khớp đúng tiền tố dài nhất", S, async () => {
-  const ff = await import("@/lib/feature-flags");
+  const ff = await import("@/lib/ha-tang/feature-flags");
   assert.equal(ff.findModuleByRoute("/api/project-documents/5"), "documents");
   assert.equal(ff.findModuleByRoute("/api/tasks?sheet=ogtd"), "tracking");
   assert.equal(ff.findModuleByRoute("/api/khong-ton-tai"), undefined);

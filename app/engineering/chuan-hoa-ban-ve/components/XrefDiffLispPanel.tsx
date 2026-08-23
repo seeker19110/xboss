@@ -17,7 +17,7 @@ import {
   Plus,
   Minus,
 } from "lucide-react";
-import { DxfParseResult } from "@/lib/cad/dxf-parser";
+import { DxfParseResult } from "@/lib/ky-thuat/cad/dxf-parser";
 import type { CadDiffResult, LispTemplateType } from "../types";
 
 // BƯỚC 1.4 — Cây liên kết XREF, so sánh phiên bản Diff & sinh mã AutoLISP 2D.

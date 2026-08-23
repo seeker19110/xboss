@@ -25,7 +25,7 @@ test("dashboardStatus/flattenDashboards: mọi dashboard cấp 3 có id, không 
 });
 
 test("isKnownNodeKey: chặn node_key lạ, chấp nhận id có thật trong cây", async () => {
-  const { isKnownNodeKey } = await import("@/lib/nav-settings");
+  const { isKnownNodeKey } = await import("@/lib/ha-tang/nav-settings");
   const { flattenDashboards } = await import("@/app/lib/dashboardTree");
 
   const realId = flattenDashboards()[0].dashboard.id!;
@@ -79,7 +79,7 @@ test(
   "getNavSettings: mặc định BẬT cho mọi dashboard khi chưa có bản ghi (kể cả coming-soon — giữ đúng hành vi 'bản đồ lộ trình sống' đã có từ PR1, nav_settings chỉ dùng để TẮT bớt)",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { getNavSettings } = await import("@/lib/nav-settings");
+    const { getNavSettings } = await import("@/lib/ha-tang/nav-settings");
     const { flattenDashboards } = await import("@/app/lib/dashboardTree");
 
     const settings = await getNavSettings();
@@ -95,7 +95,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, query, insertId } = await import("@/lib/db");
-    const { setNavEnabled } = await import("@/lib/nav-settings");
+    const { setNavEnabled } = await import("@/lib/ha-tang/nav-settings");
 
     const adminId = await insertId(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('Admin NavTest', 'nav-admin@xboss.vn', 'x', 'admin')`,
@@ -130,7 +130,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { getNavSettings, setNavEnabled } = await import("@/lib/nav-settings");
+    const { getNavSettings, setNavEnabled } = await import("@/lib/ha-tang/nav-settings");
 
     const adminId = await insertId(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('Admin NavProj', 'nav-proj-admin@xboss.vn', 'x', 'admin')`,

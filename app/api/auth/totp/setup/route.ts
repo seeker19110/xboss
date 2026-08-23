@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, hashPassword } from "@/lib/auth";
+import { getCurrentUser, hashPassword } from "@/lib/bao-mat/auth";
 import { run } from "@/lib/db";
-import { encryptTotpSecret, generateNewTotpSecret, generateRecoveryCodes, totpAuthUri } from "@/lib/totp";
+import {
+  encryptTotpSecret,
+  generateNewTotpSecret,
+  generateRecoveryCodes,
+  totpAuthUri,
+} from "@/lib/bao-mat/totp";
 
 export const dynamic = "force-dynamic";
 

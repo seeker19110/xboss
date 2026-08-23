@@ -1,21 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { SLUG_RE } from "@/lib/sheets";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { SLUG_RE } from "@/lib/nen/sheets";
 
 export const dynamic = "force-dynamic";
 
-type Sheet = { id: number; code: string; name: string; responsible: string | null; slug: string; managerId: number | null };
+type Sheet = {
+  id: number;
+  code: string;
+  name: string;
+  responsible: string | null;
+  slug: string;
+  managerId: number | null;
+};
 
 // PATCH /api/sheets/:id — đổi tên / mã / đường dẫn / người phụ trách (Admin/PM).
-export async function PATCH(req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+export async function PATCH(
+  req: NextRequest,
+  { params: paramsP }: { params: Promise<{ id: string }> },
+) {
   const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.editStructure(user.role)) return NextResponse.json({ error: "Bạn không có quyền sửa sheet (chỉ Admin/PM)" }, { status: 403 });
+  if (!CAN.editStructure(user.role))
+    return NextResponse.json(
+      { error: "Bạn không có quyền sửa sheet (chỉ Admin/PM)" },
+      { status: 403 },
+    );
 
   const id = Number(params.id);
-  const st = await queryOne<Sheet>(`SELECT id, code, name, responsible, slug, manager_id AS "managerId" FROM sheet_types WHERE id = ?`, id);
+  const st = await queryOne<Sheet>(
+    `SELECT id, code, name, responsible, slug, manager_id AS "managerId" FROM sheet_types WHERE id = ?`,
+    id,
+  );
   if (!st) return NextResponse.json({ error: "Không tìm thấy sheet" }, { status: 404 });
 
   const body = await req.json().catch(() => null);
@@ -27,44 +44,66 @@ export async function PATCH(req: NextRequest, { params: paramsP }: { params: Pro
   if (body.name !== undefined) {
     const name = String(body.name).trim();
     if (!name) return NextResponse.json({ error: "Tên sheet không được rỗng" }, { status: 400 });
-    sets.push("name = ?"); vals.push(name);
+    sets.push("name = ?");
+    vals.push(name);
   }
   if (body.code !== undefined) {
     const code = String(body.code).trim();
     if (!code) return NextResponse.json({ error: "Mã sheet không được rỗng" }, { status: 400 });
-    if (code !== st.code && await queryOne(`SELECT id FROM sheet_types WHERE code = ? AND id <> ?`, code, id))
+    if (
+      code !== st.code &&
+      (await queryOne(`SELECT id FROM sheet_types WHERE code = ? AND id <> ?`, code, id))
+    )
       return NextResponse.json({ error: `Mã sheet "${code}" đã tồn tại` }, { status: 409 });
-    sets.push("code = ?"); vals.push(code);
+    sets.push("code = ?");
+    vals.push(code);
   }
   if (body.slug !== undefined) {
     const slug = String(body.slug).trim();
-    if (!SLUG_RE.test(slug)) return NextResponse.json({ error: "Đường dẫn không hợp lệ — chỉ dùng chữ thường a-z, số và gạch nối" }, { status: 400 });
-    if (slug !== st.slug && await queryOne(`SELECT id FROM sheet_types WHERE slug = ? AND id <> ?`, slug, id))
+    if (!SLUG_RE.test(slug))
+      return NextResponse.json(
+        { error: "Đường dẫn không hợp lệ — chỉ dùng chữ thường a-z, số và gạch nối" },
+        { status: 400 },
+      );
+    if (
+      slug !== st.slug &&
+      (await queryOne(`SELECT id FROM sheet_types WHERE slug = ? AND id <> ?`, slug, id))
+    )
       return NextResponse.json({ error: `Đường dẫn "${slug}" đã được dùng` }, { status: 409 });
-    sets.push("slug = ?"); vals.push(slug);
+    sets.push("slug = ?");
+    vals.push(slug);
   }
   if (body.responsible !== undefined) {
-    sets.push("responsible = ?"); vals.push(String(body.responsible).trim() || null);
+    sets.push("responsible = ?");
+    vals.push(String(body.responsible).trim() || null);
   }
   if (body.managerId !== undefined) {
     const mid = body.managerId === null ? null : Number(body.managerId);
-    if (mid !== null && (isNaN(mid) || !await queryOne(`SELECT id FROM users WHERE id = ?`, mid)))
+    if (mid !== null && (isNaN(mid) || !(await queryOne(`SELECT id FROM users WHERE id = ?`, mid))))
       return NextResponse.json({ error: "Người dùng không tồn tại" }, { status: 400 });
-    sets.push("manager_id = ?"); vals.push(mid);
+    sets.push("manager_id = ?");
+    vals.push(mid);
   }
   if (!sets.length) return NextResponse.json({ error: "Không có gì để cập nhật" }, { status: 400 });
 
   await run(`UPDATE sheet_types SET ${sets.join(", ")} WHERE id = ?`, ...vals, id);
-  const updated = await queryOne<Sheet>(`SELECT id, code, name, responsible, slug, manager_id AS "managerId" FROM sheet_types WHERE id = ?`, id);
+  const updated = await queryOne<Sheet>(
+    `SELECT id, code, name, responsible, slug, manager_id AS "managerId" FROM sheet_types WHERE id = ?`,
+    id,
+  );
   return NextResponse.json({ sheet: updated });
 }
 
 // DELETE /api/sheets/:id — xoá sheet kèm toàn bộ nhóm/task/dimension/vật tư (chỉ Admin).
-export async function DELETE(_req: NextRequest, { params: paramsP }: { params: Promise<{ id: string }> }) {
+export async function DELETE(
+  _req: NextRequest,
+  { params: paramsP }: { params: Promise<{ id: string }> },
+) {
   const params = await paramsP;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
-  if (!CAN.editStructure(user.role)) return NextResponse.json({ error: "Chỉ Admin/PM được xoá sheet" }, { status: 403 });
+  if (!CAN.editStructure(user.role))
+    return NextResponse.json({ error: "Chỉ Admin/PM được xoá sheet" }, { status: 403 });
 
   const id = Number(params.id);
   if (Number.isNaN(id)) return NextResponse.json({ error: "ID không hợp lệ" }, { status: 400 });
@@ -77,14 +116,30 @@ export async function DELETE(_req: NextRequest, { params: paramsP }: { params: P
   // toàn bộ để không để lại dữ liệu mồ côi (orphan).
   const taskIdsSql = `SELECT t.id FROM tasks t JOIN work_packages wp ON t.package_id = wp.id WHERE wp.sheet_type_id = ?`;
   await withTransaction(async () => {
-    for (const tbl of ["progress_dimensions", "task_history", "task_photos", "task_comments", "task_documents", "baseline_tasks"]) {
+    for (const tbl of [
+      "progress_dimensions",
+      "task_history",
+      "task_photos",
+      "task_comments",
+      "task_documents",
+      "baseline_tasks",
+    ]) {
       await run(`DELETE FROM ${tbl} WHERE task_id IN (${taskIdsSql})`, id);
     }
     await run(`DELETE FROM notifications WHERE task_id IN (${taskIdsSql})`, id);
-    await run(`DELETE FROM notifications WHERE material_id IN (SELECT id FROM materials WHERE sheet_type_id = ?)`, id);
-    await run(`DELETE FROM material_transactions WHERE material_id IN (SELECT id FROM materials WHERE sheet_type_id = ?)`, id);
+    await run(
+      `DELETE FROM notifications WHERE material_id IN (SELECT id FROM materials WHERE sheet_type_id = ?)`,
+      id,
+    );
+    await run(
+      `DELETE FROM material_transactions WHERE material_id IN (SELECT id FROM materials WHERE sheet_type_id = ?)`,
+      id,
+    );
     await run(`DELETE FROM materials WHERE sheet_type_id = ?`, id);
-    await run(`DELETE FROM tasks WHERE package_id IN (SELECT id FROM work_packages WHERE sheet_type_id = ?)`, id);
+    await run(
+      `DELETE FROM tasks WHERE package_id IN (SELECT id FROM work_packages WHERE sheet_type_id = ?)`,
+      id,
+    );
     await run(`DELETE FROM work_packages WHERE sheet_type_id = ?`, id);
     await run(`DELETE FROM sheet_types WHERE id = ?`, id);
   });

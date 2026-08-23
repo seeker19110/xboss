@@ -14,8 +14,8 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { ROLES, ROLE_LABELS, type Role } from "@/lib/roles";
-import { formatVnd } from "@/lib/money";
+import { ROLES, ROLE_LABELS, type Role } from "@/lib/nen/roles";
+import { formatVnd } from "@/lib/nen/money";
 
 type ApprovalEntityType = "variation" | "payment_cert" | "proposal" | "task_acceptance";
 

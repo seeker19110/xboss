@@ -31,7 +31,7 @@ import type {
   AutonomousTechnicalDraft,
   SwarmAgentRole,
   DebateStance,
-} from "@/lib/engineering-swarm";
+} from "@/lib/ky-thuat/engineering-swarm";
 
 export default function SwarmEngineeringPage() {
   const [debates, setDebates] = useState<SwarmDebateRecord[]>([]);

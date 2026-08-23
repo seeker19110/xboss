@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   processMepfAutoTakeoff,
   saveMepfTakeoffRun,
@@ -8,7 +8,7 @@ import {
   MepfDiscipline,
   MepfSymbolDetection,
   MepfSegment,
-} from "@/lib/engineering-mepf-takeoff";
+} from "@/lib/ky-thuat/engineering-mepf-takeoff";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     if (body.action === "generative_route") {
-      const { solveGenerativeMepfRoute } = await import("@/lib/engineering-mepf-takeoff");
+      const { solveGenerativeMepfRoute } = await import("@/lib/ky-thuat/engineering-mepf-takeoff");
       if (!body.startPoint || !body.endPoint) {
         return NextResponse.json(
           { error: "Vui lòng cung cấp tọa độ điểm đầu (startPoint) và điểm cuối (endPoint)" },

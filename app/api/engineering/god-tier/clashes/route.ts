@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { detectGodTierClashes, GodTierElementData } from "@/lib/engineering-god-tier";
-import { listGodTierClashes, resolveGodTierClash } from "@/lib/engineering-god-tier-db";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { detectGodTierClashes, GodTierElementData } from "@/lib/ky-thuat/engineering-god-tier";
+import { listGodTierClashes, resolveGodTierClash } from "@/lib/ky-thuat/engineering-god-tier-db";
 
 export const dynamic = "force-dynamic";
 

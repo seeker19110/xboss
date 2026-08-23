@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   calculate6dCarbonLca,
   evaluateAssetHealthAndRul,
@@ -9,7 +9,7 @@ import {
   listCarbonLifecycleRecords,
   MaterialCarbonCategory,
   Asset7DLifeCycleRecord,
-} from "@/lib/engineering-cad-carbon-lifecycle";
+} from "@/lib/ky-thuat/engineering-cad-carbon-lifecycle";
 
 export const dynamic = "force-dynamic";
 

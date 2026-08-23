@@ -11,7 +11,7 @@ const S = { skip: !HAS_TEST_DB };
 
 // Helper: chạy write override trong ngữ cảnh admin (để trigger audit M43 ghi actor).
 async function asAdmin(fn: () => Promise<void>): Promise<void> {
-  const { runWithRequestContext } = await import("@/lib/request-context");
+  const { runWithRequestContext } = await import("@/lib/nen/request-context");
   await runWithRequestContext({ userId: 1, role: "admin" }, fn);
 }
 
@@ -31,7 +31,7 @@ test(
   async () => {
     const { run } = await import("@/lib/db");
     const { setPermissionOverride, getPermissionOverride, invalidatePermissionCache } =
-      await import("@/lib/permissions");
+      await import("@/lib/bao-mat/permissions");
 
     await run(`DELETE FROM role_permissions`);
     const a = await freshProject("DA Perm A", "PJT-PMA");
@@ -86,7 +86,7 @@ test(
   async () => {
     const { run } = await import("@/lib/db");
     const { setPermissionOverride, hasProjectOverrides, invalidatePermissionCache } =
-      await import("@/lib/permissions");
+      await import("@/lib/bao-mat/permissions");
 
     await run(`DELETE FROM role_permissions`);
     const a = await freshProject("DA HPO", "PJT-HPO");
@@ -116,9 +116,10 @@ test(
   S,
   async () => {
     const { run } = await import("@/lib/db");
-    const { runWithRequestContext } = await import("@/lib/request-context");
-    const { CAN } = await import("@/lib/auth");
-    const { setPermissionOverride, invalidatePermissionCache } = await import("@/lib/permissions");
+    const { runWithRequestContext } = await import("@/lib/nen/request-context");
+    const { CAN } = await import("@/lib/bao-mat/auth");
+    const { setPermissionOverride, invalidatePermissionCache } =
+      await import("@/lib/bao-mat/permissions");
 
     await run(`DELETE FROM role_permissions`);
     const a = await freshProject("DA CAN A", "PJT-CANA");
@@ -175,7 +176,8 @@ test(
   S,
   async () => {
     const { run, query } = await import("@/lib/db");
-    const { setPermissionOverride, invalidatePermissionCache } = await import("@/lib/permissions");
+    const { setPermissionOverride, invalidatePermissionCache } =
+      await import("@/lib/bao-mat/permissions");
 
     await run(`DELETE FROM role_permissions`);
     await asAdmin(async () => {
@@ -194,7 +196,8 @@ test(
 
 test("perm-project: xoá dự án → override theo dự án tự mất (CASCADE)", S, async () => {
   const { run, query } = await import("@/lib/db");
-  const { setPermissionOverride, invalidatePermissionCache } = await import("@/lib/permissions");
+  const { setPermissionOverride, invalidatePermissionCache } =
+    await import("@/lib/bao-mat/permissions");
 
   await run(`DELETE FROM role_permissions`);
   const a = await freshProject("DA Cascade", "PJT-CAS");
@@ -229,7 +232,7 @@ test("perm-project: xoá dự án → override theo dự án tự mất (CASCADE
 test("perm-project: invalidatePermissionCache nạp dòng theo dự án ngay", S, async () => {
   const { run } = await import("@/lib/db");
   const { getPermissionOverride, invalidatePermissionCache, _resetPermissionCacheForTests } =
-    await import("@/lib/permissions");
+    await import("@/lib/bao-mat/permissions");
 
   await run(`DELETE FROM role_permissions`);
   const a = await freshProject("DA Invalidate", "PJT-INV");

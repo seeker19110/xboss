@@ -8,8 +8,8 @@ import {
   PERM_KEYS,
   permDefaultsMatrix,
   type PermKey,
-} from "@/lib/auth";
-import { listPermissionOverrides } from "@/lib/permissions";
+} from "@/lib/bao-mat/auth";
+import { listPermissionOverrides } from "@/lib/bao-mat/permissions";
 
 export const dynamic = "force-dynamic";
 

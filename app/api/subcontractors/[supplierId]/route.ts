@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, canViewSubcontractor } from "@/lib/auth";
-import { getSubcontractor } from "@/lib/subcontractors";
+import { getCurrentUser, canViewSubcontractor } from "@/lib/bao-mat/auth";
+import { getSubcontractor } from "@/lib/hien-truong/subcontractors";
 
 export const dynamic = "force-dynamic";
 

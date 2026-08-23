@@ -22,7 +22,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, queryOne, run } = await import("@/lib/db");
-    const { openApproval, advanceApproval, decideNext } = await import("@/lib/approvals");
+    const { openApproval, advanceApproval, decideNext } = await import("@/lib/tien-do/approvals");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES (?)`, `TASK-APRV ${S}`);
     const mk = (role: string) =>
@@ -54,7 +54,7 @@ test(
       // Bulk floor route (app/api/approvals) chỉ cho phép duyệt hàng loạt khi flow có ĐÚNG
       // 1 bước hiệu lực — xác nhận decideNext không còn bước kế sau bước đầu.
       const flow = (await (
-        await import("@/lib/approvals")
+        await import("@/lib/tien-do/approvals")
       ).getActiveFlow("task_acceptance", projectId))!;
       const first = decideNext(flow.steps, null, 0);
       assert.equal(first?.role, "pm");
@@ -113,7 +113,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, queryOne, run } = await import("@/lib/db");
-    const { openApproval, advanceApproval } = await import("@/lib/approvals");
+    const { openApproval, advanceApproval } = await import("@/lib/tien-do/approvals");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES (?)`, `TASK2-APRV ${S}`);
     const mk = (label: string, role: string) =>
@@ -191,7 +191,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, queryOne, run } = await import("@/lib/db");
-    const { openApproval, advanceApproval } = await import("@/lib/approvals");
+    const { openApproval, advanceApproval } = await import("@/lib/tien-do/approvals");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES (?)`, `DX-APRV ${S}`);
     const mk = (label: string, role: string) =>
@@ -275,7 +275,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, run } = await import("@/lib/db");
-    const { openApproval, pendingForUserDisplay } = await import("@/lib/approvals");
+    const { openApproval, pendingForUserDisplay } = await import("@/lib/tien-do/approvals");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES (?)`, `DX-DISP ${S}`);
     const mk = (label: string, role: string) =>

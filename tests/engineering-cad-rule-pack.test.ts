@@ -16,12 +16,12 @@ import {
   getRulePackEtag,
   matchesEtag,
   CURRENT_RULE_PACK_VERSION,
-} from "@/lib/cad/rule-pack";
+} from "@/lib/ky-thuat/cad/rule-pack";
 import {
   normalizeCadLayers,
   convertTcvn3ToUnicode,
   convertVniToUnicode,
-} from "@/lib/cad/dxf-parser";
+} from "@/lib/ky-thuat/cad/dxf-parser";
 
 // ===== (1) Cấu trúc & ETag =====
 
@@ -199,7 +199,7 @@ test("purgePolicy: đúng các lệnh purge/audit đang sinh trong kịch bản 
 });
 
 test("lineweightMap: bảng CTB theo ACI, màu khớp ACI_TO_HEX", async () => {
-  const { ACI_TO_HEX } = await import("@/lib/cad/dxf-parser");
+  const { ACI_TO_HEX } = await import("@/lib/ky-thuat/cad/dxf-parser");
   const lw = getCurrentRulePack().lineweightMap;
   assert.equal(lw.unit, "mm");
   assert.deepEqual(

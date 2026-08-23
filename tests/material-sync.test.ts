@@ -6,7 +6,7 @@ import {
   normalizeFields,
   sheetRowToFieldsChecked,
   type MaterialFields,
-} from "@/lib/material-sync";
+} from "@/lib/vat-tu/material-sync";
 
 // Tạo bộ trường vật tư đã chuẩn hoá từ giá trị một phần (mặc định khác nhau theo tên).
 const F = (over: Partial<MaterialFields> = {}): MaterialFields =>

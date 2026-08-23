@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
-import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   findPersonnelById,
   maskIdNumber,
   parsePersonnelBody,
   validatePersonnelInput,
   type PersonnelInput,
-} from "@/lib/hr";
+} from "@/lib/hien-truong/hr";
 
 export const dynamic = "force-dynamic";
 

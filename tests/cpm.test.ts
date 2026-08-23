@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { computeCpm, type CpmNode, type CpmEdge } from "@/lib/cpm";
+import { computeCpm, type CpmNode, type CpmEdge } from "@/lib/tien-do/cpm";
 
 // Chuỗi A(3)→B(2)→D(4) = 9 ngày vs nhánh C(1) song song → đường găng là A,B,D.
 test("computeCpm: đường găng là chuỗi dài nhất, nhánh ngắn có float", () => {
@@ -25,15 +25,27 @@ test("computeCpm: đường găng là chuỗi dài nhất, nhánh ngắn có flo
 });
 
 test("computeCpm: không có phụ thuộc → không có đường găng", () => {
-  const r = computeCpm([{ id: 1, duration: 5 }, { id: 2, duration: 3 }], []);
+  const r = computeCpm(
+    [
+      { id: 1, duration: 5 },
+      { id: 2, duration: 3 },
+    ],
+    [],
+  );
   assert.equal(r.criticalNodes.size, 0);
   assert.equal(r.criticalEdges.size, 0);
 });
 
 test("computeCpm: bỏ qua cạnh trỏ tới nút không tồn tại", () => {
-  const r = computeCpm([{ id: 1, duration: 2 }, { id: 2, duration: 2 }], [
-    { id: 10, predecessorId: 1, successorId: 2 },
-    { id: 11, predecessorId: 2, successorId: 99 }, // 99 không tồn tại
-  ]);
+  const r = computeCpm(
+    [
+      { id: 1, duration: 2 },
+      { id: 2, duration: 2 },
+    ],
+    [
+      { id: 10, predecessorId: 1, successorId: 2 },
+      { id: 11, predecessorId: 2, successorId: 99 }, // 99 không tồn tại
+    ],
+  );
   assert.deepEqual([...r.criticalNodes].sort(), [1, 2]);
 });

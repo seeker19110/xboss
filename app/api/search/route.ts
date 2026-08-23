@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { ftsExpr, searchSources, type DocHit } from "@/lib/search";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { ftsExpr, searchSources, type DocHit } from "@/lib/tien-do/search";
 
 export const dynamic = "force-dynamic";
 

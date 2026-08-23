@@ -1,12 +1,12 @@
 import "@/tests/setup";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { bridgeTaskResultToEngineering } from "@/lib/engineering-worker-bridge";
+import { bridgeTaskResultToEngineering } from "@/lib/ky-thuat/engineering-worker-bridge";
 import {
   enqueueAsyncTask,
   claimNextAsyncTask,
   completeAsyncTask,
-} from "@/lib/engineering-task-queue";
+} from "@/lib/ky-thuat/engineering-task-queue";
 
 const HAS_DB = Boolean(process.env.TEST_DATABASE_URL || process.env.DATABASE_URL);
 

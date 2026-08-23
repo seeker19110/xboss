@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storagePut } from "@/lib/storage";
+import { storagePut } from "@/lib/nen/storage";
 import { query, queryOne, insertId } from "@/lib/db";
-import { getCurrentUser, canTouchTask, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { assertModuleEnabled } from "@/lib/feature-flags";
+import { getCurrentUser, canTouchTask, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import {
   extForMime,
   verifyFileMime,
@@ -11,7 +11,7 @@ import {
   MAX_PHOTO_BYTES,
   isContentTooLarge,
   sha256Hex,
-} from "@/lib/photos";
+} from "@/lib/nen/photos";
 
 export const dynamic = "force-dynamic";
 

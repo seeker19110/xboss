@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { runBiddingAnalysis } from "@/lib/engineering-bidding-matrix";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { runBiddingAnalysis } from "@/lib/ky-thuat/engineering-bidding-matrix";
 
 export const dynamic = "force-dynamic";
 

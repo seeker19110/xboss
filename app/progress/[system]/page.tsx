@@ -13,7 +13,7 @@ import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal } from "@/app/components/dialogs";
 import { fetchMe, redirectToLogin, type Me } from "@/app/lib/me";
-import { toSlug } from "@/lib/sheets";
+import { toSlug } from "@/lib/nen/sheets";
 import SCurveChart from "@/app/components/SCurveChart";
 import ProgressMap from "@/app/components/ProgressMap";
 import SpiCards from "@/app/components/SpiCards";

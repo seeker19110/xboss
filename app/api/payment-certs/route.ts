@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId, withTransaction, withProjectScope } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { isUniqueViolation, withUniqueRetry } from "@/lib/seqcode";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { isUniqueViolation, withUniqueRetry } from "@/lib/ha-tang/seqcode";
 import {
   listCertsByContract,
   nextCertCode,
@@ -10,9 +10,9 @@ import {
   suggestQtyForContract,
   saveCertItems,
   certTotals,
-} from "@/lib/paymentcerts";
-import { openApproval } from "@/lib/approvals";
-import { stripSensitive } from "@/lib/sensitive-fields";
+} from "@/lib/tai-chinh/paymentcerts";
+import { openApproval } from "@/lib/tien-do/approvals";
+import { stripSensitive } from "@/lib/bao-mat/sensitive-fields";
 
 export const dynamic = "force-dynamic";
 

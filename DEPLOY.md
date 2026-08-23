@@ -190,7 +190,7 @@ pm2 start npm -i 2 --name xboss -- start
   tải sẽ đưa request cron tới đúng 1 instance mỗi lần gọi, không tự nhân đôi. Các endpoint
   `sync-sheets`/`sync-integrations` đã có khoá `sync_locks`; `deliver-webhooks` dùng
   `SELECT ... FOR UPDATE SKIP LOCKED`; `daily-report`/`weekly-report` đã thêm khoá ngắn hạn
-  (M53 PR4, `lib/sync-locks.ts`) chống gửi email/Telegram trùng nếu 2 request chạm gần như
+  (M53 PR4, `lib/ha-tang/sync-locks.ts`) chống gửi email/Telegram trùng nếu 2 request chạm gần như
   đồng thời; `refresh-views` tự an toàn vì Postgres chặn `REFRESH CONCURRENTLY` trùng view.
 
 **Giới hạn đã biết khi chạy nhiều instance (chấp nhận ở quy mô hiện tại, xem `PROGRESS.md`
@@ -265,7 +265,7 @@ liệt kê trong kết quả). Cột `Đã dùng`/`Tồn kho`/`Ngưỡng tối t
   (hoặc khai báo trong `vercel.json` nếu deploy Vercel).
 
 - **Dọn dữ liệu hết hạn (mỗi ngày, C3 §6):** xoá bản ghi kỹ thuật đã quá hạn theo chính
-  sách khai báo trong `lib/retention.ts` — sổ lũy đẳng ingest (`expires_at`, mặc định 30
+  sách khai báo trong `lib/ha-tang/retention.ts` — sổ lũy đẳng ingest (`expires_at`, mặc định 30
   ngày) và nhật ký giao webhook đã kết thúc (30 ngày). **Mặc định chỉ CHẠY THỬ**, phải thêm
   `?apply=1` mới xoá thật:
 

@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 test("PIN-1: calculateGeometricDeviation tính toán chính xác sai lệch 3D và xếp hạng mức độ", async () => {
-  const { calculateGeometricDeviation } = await import("@/lib/engineering-twin-pinnacle");
+  const { calculateGeometricDeviation } = await import("@/lib/ky-thuat/engineering-twin-pinnacle");
 
   // 1. Trùng khớp hoàn hảo (0 mm)
   const dev0 = calculateGeometricDeviation(
@@ -63,7 +63,7 @@ test(
       updateDeviationRemediation,
       ingestSensorTelemetry,
       getSensorStreams,
-    } = await import("@/lib/engineering-twin-pinnacle");
+    } = await import("@/lib/ky-thuat/engineering-twin-pinnacle");
 
     const projId = await insertId(`INSERT INTO projects (name) VALUES ('Living Twin Project A')`);
     const userId = await insertId(

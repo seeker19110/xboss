@@ -11,7 +11,7 @@
 // để giữ cơ chế đảo màu sáng/tối trong globals.css.
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, ChevronUp, ChevronDown, ListFilter } from "lucide-react";
-import { serializeTSV, parseTSV, normalizeRect, spreadPaste, type Rect } from "@/lib/grid";
+import { serializeTSV, parseTSV, normalizeRect, spreadPaste, type Rect } from "@/lib/tien-do/grid";
 import { Modal } from "@/app/components/dialogs";
 
 export type GridColumn<Row> = {

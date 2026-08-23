@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("validateRiskInput: title/category bắt buộc, probability/impact 1–5", async () => {
-  const { validateRiskInput } = await import("@/lib/risks");
+  const { validateRiskInput } = await import("@/lib/hien-truong/risks");
 
   const base = {
     title: "Chậm bàn giao mặt bằng",
@@ -33,7 +33,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { listRisks, nextRiskCode } = await import("@/lib/risks");
+    const { listRisks, nextRiskCode } = await import("@/lib/hien-truong/risks");
 
     const code1 = await nextRiskCode();
     const id1 = await insertId(
@@ -69,7 +69,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { listRisks } = await import("@/lib/risks");
+    const { listRisks } = await import("@/lib/hien-truong/risks");
 
     const p1 = await insertId(
       `INSERT INTO projects (name, code) VALUES ('DA Rủi ro 1', 'PJT-RK1')`,

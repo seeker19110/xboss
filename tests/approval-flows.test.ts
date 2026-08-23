@@ -10,7 +10,7 @@ const S = Date.now().toString(36); // hậu tố duy nhất chống đụng UNIQ
 // ── Unit: validateFlowSteps / validateFlowInput (thuần, không chạm DB) ─────────
 
 test("validateFlowSteps: seq có khoảng trống/trùng → lỗi", async () => {
-  const { validateFlowSteps } = await import("@/lib/approvals");
+  const { validateFlowSteps } = await import("@/lib/tien-do/approvals");
   assert.match(
     validateFlowSteps([
       { seq: 1, role: "pm", minAmount: null, slaDays: null },
@@ -28,7 +28,7 @@ test("validateFlowSteps: seq có khoảng trống/trùng → lỗi", async () =>
 });
 
 test("validateFlowSteps: role không hợp lệ (bch/viewer/chuỗi rác) → lỗi, role cdt hợp lệ", async () => {
-  const { validateFlowSteps } = await import("@/lib/approvals");
+  const { validateFlowSteps } = await import("@/lib/tien-do/approvals");
   assert.match(
     validateFlowSteps([{ seq: 1, role: "bch", minAmount: null, slaDays: null }]) ?? "",
     /không hợp lệ/,
@@ -45,7 +45,7 @@ test("validateFlowSteps: role không hợp lệ (bch/viewer/chuỗi rác) → l�
 });
 
 test("validateFlowSteps: minAmount âm → lỗi", async () => {
-  const { validateFlowSteps } = await import("@/lib/approvals");
+  const { validateFlowSteps } = await import("@/lib/tien-do/approvals");
   assert.match(
     validateFlowSteps([{ seq: 1, role: "pm", minAmount: -1, slaDays: null }]) ?? "",
     /min_amount/,
@@ -53,7 +53,7 @@ test("validateFlowSteps: minAmount âm → lỗi", async () => {
 });
 
 test("validateFlowSteps: slaDays không nguyên hoặc <1 → lỗi", async () => {
-  const { validateFlowSteps } = await import("@/lib/approvals");
+  const { validateFlowSteps } = await import("@/lib/tien-do/approvals");
   assert.match(
     validateFlowSteps([{ seq: 1, role: "pm", minAmount: null, slaDays: 0 }]) ?? "",
     /SLA/,
@@ -65,7 +65,7 @@ test("validateFlowSteps: slaDays không nguyên hoặc <1 → lỗi", async () =
 });
 
 test("validateFlowSteps: input hợp lệ đủ field → trả null", async () => {
-  const { validateFlowSteps } = await import("@/lib/approvals");
+  const { validateFlowSteps } = await import("@/lib/tien-do/approvals");
   assert.equal(
     validateFlowSteps([
       { seq: 1, role: "pm", minAmount: 0, slaDays: 3 },
@@ -76,7 +76,7 @@ test("validateFlowSteps: input hợp lệ đủ field → trả null", async () 
 });
 
 test("validateFlowInput: loại thực thể không hợp lệ / thiếu tên → lỗi; hợp lệ → null", async () => {
-  const { validateFlowInput } = await import("@/lib/approvals");
+  const { validateFlowInput } = await import("@/lib/tien-do/approvals");
   assert.match(
     validateFlowInput({
       entityType: "khong-ton-tai",
@@ -122,7 +122,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, query } = await import("@/lib/db");
-    const { createApprovalFlow } = await import("@/lib/approvals");
+    const { createApprovalFlow } = await import("@/lib/tien-do/approvals");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES (?)`, `CRUD-FLOW ${S}`);
     let flowId: number | undefined;
@@ -161,7 +161,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId } = await import("@/lib/db");
-    const { createApprovalFlow } = await import("@/lib/approvals");
+    const { createApprovalFlow } = await import("@/lib/tien-do/approvals");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES (?)`, `DUP-FLOW ${S}`);
     let flowId: number | undefined;
@@ -196,7 +196,7 @@ test(
   async () => {
     const { insertId, run } = await import("@/lib/db");
     const { createApprovalFlow, updateApprovalFlow, openApproval } =
-      await import("@/lib/approvals");
+      await import("@/lib/tien-do/approvals");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES (?)`, `UPD-PEND ${S}`);
     const userId = await insertId(
@@ -246,7 +246,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, queryOne, query } = await import("@/lib/db");
-    const { createApprovalFlow, updateApprovalFlow } = await import("@/lib/approvals");
+    const { createApprovalFlow, updateApprovalFlow } = await import("@/lib/tien-do/approvals");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES (?)`, `UPD-OK ${S}`);
     let flowId: number | undefined;
@@ -296,7 +296,7 @@ test(
   async () => {
     const { insertId, run } = await import("@/lib/db");
     const { createApprovalFlow, deleteApprovalFlow, openApproval, advanceApproval } =
-      await import("@/lib/approvals");
+      await import("@/lib/tien-do/approvals");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES (?)`, `DEL-HIST ${S}`);
     const creator = await insertId(
@@ -360,7 +360,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, queryOne } = await import("@/lib/db");
-    const { createApprovalFlow, deleteApprovalFlow } = await import("@/lib/approvals");
+    const { createApprovalFlow, deleteApprovalFlow } = await import("@/lib/tien-do/approvals");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES (?)`, `DEL-OK ${S}`);
     let flowId: number | undefined;
@@ -394,7 +394,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, run } = await import("@/lib/db");
-    const { createApprovalFlow, listApprovalFlows } = await import("@/lib/approvals");
+    const { createApprovalFlow, listApprovalFlows } = await import("@/lib/tien-do/approvals");
 
     const p1 = await insertId(`INSERT INTO projects (name) VALUES (?)`, `SCOPE-FLOW P1 ${S}`);
     const p2 = await insertId(`INSERT INTO projects (name) VALUES (?)`, `SCOPE-FLOW P2 ${S}`);

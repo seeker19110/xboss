@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storagePut, storageDelete } from "@/lib/storage";
+import { storagePut, storageDelete } from "@/lib/nen/storage";
 import { queryOne, run } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   extForDocMime,
   verifyFileMime,
   newLegalDocFileName,
   MAX_DOC_BYTES,
   isContentTooLarge,
-} from "@/lib/photos";
-import { parseLegalBody, validateLegalInput, type LegalInput } from "@/lib/kickoff";
+} from "@/lib/nen/photos";
+import { parseLegalBody, validateLegalInput, type LegalInput } from "@/lib/hien-truong/kickoff";
 
 export const dynamic = "force-dynamic";
 

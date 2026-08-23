@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { deleteApprovalFlow, updateApprovalFlow } from "@/lib/approvals";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { deleteApprovalFlow, updateApprovalFlow } from "@/lib/tien-do/approvals";
 
 export const dynamic = "force-dynamic";
 

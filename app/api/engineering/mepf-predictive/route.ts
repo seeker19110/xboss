@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   calculateAssetReliabilityAndRul,
   savePredictiveAsset,
   listPredictiveAssets,
   MepfAssetInput,
-} from "@/lib/engineering-mepf-predictive";
+} from "@/lib/ky-thuat/engineering-mepf-predictive";
 
 export const dynamic = "force-dynamic";
 

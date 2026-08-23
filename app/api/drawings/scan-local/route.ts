@@ -4,8 +4,8 @@ import { readdirSync, statSync, readFileSync, existsSync } from "node:fs";
 import { join, extname, basename } from "node:path";
 import { createHash } from "node:crypto";
 import { query, queryOne, run } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 
 export const dynamic = "force-dynamic";
 

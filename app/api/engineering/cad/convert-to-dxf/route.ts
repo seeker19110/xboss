@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { DWG_UNSUPPORTED_MESSAGE } from "@/lib/cad/dxf-parser";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { DWG_UNSUPPORTED_MESSAGE } from "@/lib/ky-thuat/cad/dxf-parser";
 
 export const dynamic = "force-dynamic";
 

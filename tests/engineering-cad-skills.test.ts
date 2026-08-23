@@ -7,7 +7,7 @@ import {
   normalizeCadLayers,
   extrude2dPolylineTo3d,
   CadEntity,
-} from "@/lib/engineering-cad-skills";
+} from "@/lib/ky-thuat/engineering-cad-skills";
 
 test("M65: computeCadVectorDiff phát hiện chính xác các thực thể thêm/xóa/sửa và ước lượng VO", () => {
   const baseEntities: CadEntity[] = [

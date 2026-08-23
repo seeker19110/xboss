@@ -1,7 +1,7 @@
 import "./setup";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { validateConfig, listSourcesFor, getSource } from "@/lib/reports";
+import { validateConfig, listSourcesFor, getSource } from "@/lib/tien-do/reports";
 
 test("validateConfig: nguồn ngoài whitelist bị từ chối", () => {
   assert.throws(() => validateConfig("__khong_ton_tai__", {}), /không hợp lệ/);

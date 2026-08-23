@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   addEquipmentLog,
   getEquipment,
   listEquipmentLogs,
   parseEquipmentLogBody,
   validateEquipmentLogInput,
-} from "@/lib/equipment";
+} from "@/lib/vat-tu/equipment";
 
 export const dynamic = "force-dynamic";
 

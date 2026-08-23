@@ -14,7 +14,7 @@ const S = { skip: !HAS_TEST_DB };
 // ===== Unit: hàm thuần trong lib/qr.ts =====
 
 test("isQrKind: chỉ chấp nhận đúng 4 giá trị whitelist", async () => {
-  const { isQrKind } = await import("@/lib/qr");
+  const { isQrKind } = await import("@/lib/ha-tang/qr");
   assert.equal(isQrKind("eq"), true);
   assert.equal(isQrKind("mt"), true);
   assert.equal(isQrKind("wf"), true);
@@ -24,13 +24,13 @@ test("isQrKind: chỉ chấp nhận đúng 4 giá trị whitelist", async () => 
 });
 
 test("qrTargetPath: dựng đúng /r/:kind/:id, encode id có ký tự đặc biệt", async () => {
-  const { qrTargetPath } = await import("@/lib/qr");
+  const { qrTargetPath } = await import("@/lib/ha-tang/qr");
   assert.equal(qrTargetPath("eq", 12), "/r/eq/12");
   assert.equal(qrTargetPath("wf", "Tầng 5"), "/r/wf/T%E1%BA%A7ng%205");
 });
 
 test("absoluteUrl: ưu tiên APP_URL, bỏ dấu / thừa ở cuối", async () => {
-  const { absoluteUrl } = await import("@/lib/qr");
+  const { absoluteUrl } = await import("@/lib/ha-tang/qr");
   const prevAppUrl = process.env.APP_URL;
   process.env.APP_URL = "https://xboss.example.com/";
   try {
@@ -43,7 +43,7 @@ test("absoluteUrl: ưu tiên APP_URL, bỏ dấu / thừa ở cuối", async () 
 });
 
 test("absoluteUrl: không có APP_URL → suy từ header host + x-forwarded-proto", async () => {
-  const { absoluteUrl } = await import("@/lib/qr");
+  const { absoluteUrl } = await import("@/lib/ha-tang/qr");
   const prevAppUrl = process.env.APP_URL;
   delete process.env.APP_URL;
   try {
@@ -56,7 +56,7 @@ test("absoluteUrl: không có APP_URL → suy từ header host + x-forwarded-pro
 });
 
 test("escapeHtml: escape đủ 5 ký tự nguy hiểm, chống XSS trong tên vật tư/thiết bị", async () => {
-  const { escapeHtml } = await import("@/lib/qr");
+  const { escapeHtml } = await import("@/lib/ha-tang/qr");
   assert.equal(
     escapeHtml(`<script>alert('x')</script> & "quote"`),
     "&lt;script&gt;alert(&#39;x&#39;)&lt;/script&gt; &amp; &quot;quote&quot;",
@@ -70,7 +70,7 @@ test(
   S,
   async () => {
     const { insertId, run } = await import("@/lib/db");
-    const { resolveQr } = await import("@/lib/qr");
+    const { resolveQr } = await import("@/lib/ha-tang/qr");
 
     const suffix = Date.now().toString(36);
 
@@ -192,7 +192,7 @@ test(
 
 test("resolveManyForLabels: bỏ qua id không tồn tại/dự án khác, không throw", S, async () => {
   const { insertId, run } = await import("@/lib/db");
-  const { resolveManyForLabels } = await import("@/lib/qr");
+  const { resolveManyForLabels } = await import("@/lib/ha-tang/qr");
 
   const suffix = Date.now().toString(36);
   const projectId = await insertId(

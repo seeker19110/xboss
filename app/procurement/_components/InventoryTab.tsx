@@ -37,7 +37,7 @@ import { Modal, appConfirm, appPrompt } from "@/app/components/dialogs";
 import { Skeleton } from "@/app/components/Skeleton";
 import SpreadsheetGrid, { type GridColumn, type GridEdit } from "@/app/components/SpreadsheetGrid";
 import CustomFieldsSection from "@/app/components/CustomFieldsSection";
-import { formatDateTimeVN } from "@/lib/date";
+import { formatDateTimeVN } from "@/lib/nen/date";
 
 export type Material = {
   id: number;

@@ -5,7 +5,7 @@ import { UserPlus, Trash2, KeyRound, Users, LogOut } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { appConfirm, appPrompt } from "@/app/components/dialogs";
 import { fetchMe } from "@/app/lib/me";
-import { ROLE_LABELS } from "@/lib/roles";
+import { ROLE_LABELS } from "@/lib/nen/roles";
 
 type User = { id: number; name: string; email: string; role: string; createdAt: string };
 const ROLE_LABEL: Record<string, string> = ROLE_LABELS;

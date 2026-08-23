@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { listBimElements } from "@/lib/engineering-bim-cad";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { listBimElements } from "@/lib/ky-thuat/engineering-bim-cad";
 
 export const dynamic = "force-dynamic";
 

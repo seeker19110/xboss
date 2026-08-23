@@ -12,7 +12,7 @@ import {
   upsertQtoVariance,
   generateInspectionRequestForSpools,
   SpoolStatus,
-} from "@/lib/engineering-cad-qto";
+} from "@/lib/ky-thuat/engineering-cad-qto";
 
 const HAS_DB = Boolean(process.env.TEST_DATABASE_URL || process.env.DATABASE_URL);
 
@@ -73,7 +73,7 @@ test("M66: compute3WayVariance phân loại chính xác các ngưỡng rủi ro 
 });
 
 test("M66: generateElectronicBbntDocument sinh biên bản nghiệm thu điện tử chuẩn Nghị định 06 kèm chữ ký mã hoá", async () => {
-  const { generateElectronicBbntDocument } = await import("@/lib/engineering-cad-qto");
+  const { generateElectronicBbntDocument } = await import("@/lib/ky-thuat/engineering-cad-qto");
 
   const mockSpools = [
     {

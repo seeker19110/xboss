@@ -18,7 +18,7 @@ import EmptyState from "@/app/components/EmptyState";
 import { Skeleton, PageSkeleton } from "@/app/components/Skeleton";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { ROLE_LABELS, type Role } from "@/lib/roles";
+import { ROLE_LABELS, type Role } from "@/lib/nen/roles";
 import { PERM_GROUP_ORDER, permMeta } from "@/app/lib/permissionMeta";
 
 type ProjectOption = { id: number; name: string };

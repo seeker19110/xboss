@@ -6,7 +6,7 @@ import {
   generateTelegramLinkOtp,
   verifyTelegramLinkOtp,
   processIncomingTelegramMessage,
-} from "@/lib/engineering-site-bot";
+} from "@/lib/ky-thuat/engineering-site-bot";
 
 const HAS_DB = Boolean(process.env.TEST_DATABASE_URL || process.env.DATABASE_URL);
 

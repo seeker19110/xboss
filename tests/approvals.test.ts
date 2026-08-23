@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // Unit test M46 PR1 — decideNext (logic thuần chọn bước duyệt kế tiếp theo ngưỡng tiền).
 
 test("decideNext: min_amount NULL luôn hiệu lực, lấy bước đầu khi currentSeq=0", async () => {
-  const { decideNext } = await import("@/lib/approvals");
+  const { decideNext } = await import("@/lib/tien-do/approvals");
   const steps = [
     { seq: 1, role: "pm" as const, minAmount: null, slaDays: null },
     { seq: 2, role: "cdt" as const, minAmount: null, slaDays: null },
@@ -16,7 +16,7 @@ test("decideNext: min_amount NULL luôn hiệu lực, lấy bước đầu khi c
 });
 
 test("decideNext: ngưỡng min_amount lọc bước theo amount", async () => {
-  const { decideNext } = await import("@/lib/approvals");
+  const { decideNext } = await import("@/lib/tien-do/approvals");
   const steps = [
     { seq: 1, role: "pm" as const, minAmount: null, slaDays: null },
     { seq: 2, role: "bch" as const, minAmount: 100, slaDays: null },
@@ -34,14 +34,14 @@ test("decideNext: ngưỡng min_amount lọc bước theo amount", async () => {
 });
 
 test("decideNext: biên min_amount (amount == ngưỡng) tính là hiệu lực", async () => {
-  const { decideNext } = await import("@/lib/approvals");
+  const { decideNext } = await import("@/lib/tien-do/approvals");
   const steps = [{ seq: 1, role: "bch" as const, minAmount: 100, slaDays: null }];
   assert.equal(decideNext(steps, 100, 0)?.seq, 1); // >= nên đúng ngưỡng vẫn kích hoạt
   assert.equal(decideNext(steps, 99, 0), null);
 });
 
 test("decideNext: amount NULL loại mọi bước có min_amount", async () => {
-  const { decideNext } = await import("@/lib/approvals");
+  const { decideNext } = await import("@/lib/tien-do/approvals");
   const steps = [
     { seq: 1, role: "pm" as const, minAmount: null, slaDays: null },
     { seq: 2, role: "cdt" as const, minAmount: 100, slaDays: null },
@@ -51,7 +51,7 @@ test("decideNext: amount NULL loại mọi bước có min_amount", async () => 
 });
 
 test("decideNext: steps không theo thứ tự vẫn chọn đúng theo seq", async () => {
-  const { decideNext } = await import("@/lib/approvals");
+  const { decideNext } = await import("@/lib/tien-do/approvals");
   const steps = [
     { seq: 3, role: "cdt" as const, minAmount: null, slaDays: null },
     { seq: 1, role: "pm" as const, minAmount: null, slaDays: null },
@@ -123,7 +123,7 @@ async function seed2(entityType: string, slaDays: number | null = null) {
 }
 
 test("getEntityApprovalStatus: null khi chưa có request nào", { skip: !HAS_TEST_DB }, async () => {
-  const { getEntityApprovalStatus } = await import("@/lib/approvals");
+  const { getEntityApprovalStatus } = await import("@/lib/tien-do/approvals");
   const status = await getEntityApprovalStatus("variation", EID2 * 10 + 999);
   assert.equal(status, null);
 });
@@ -133,7 +133,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { openApproval, advanceApproval, getEntityApprovalStatus } =
-      await import("@/lib/approvals");
+      await import("@/lib/tien-do/approvals");
     const { projectId, creator, pm, cdt, flowId } = await seed2("variation");
     const entityId = EID2 * 10 + 1;
     try {
@@ -191,7 +191,8 @@ test(
   "overdueApprovals: xuất hiện khi quá SLA, biến mất khi đã duyệt hoặc chưa quá hạn",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { openApproval, advanceApproval, overdueApprovals } = await import("@/lib/approvals");
+    const { openApproval, advanceApproval, overdueApprovals } =
+      await import("@/lib/tien-do/approvals");
     const { run } = await import("@/lib/db");
     const { projectId, creator, pm, cdt, flowId } = await seed2("payment_cert", 3); // SLA 3 ngày
     const entityId = EID2 * 10 + 2;
@@ -246,7 +247,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, run } = await import("@/lib/db");
-    const { openApproval, advanceApproval, overdueApprovals } = await import("@/lib/approvals");
+    const { openApproval, advanceApproval, overdueApprovals } =
+      await import("@/lib/tien-do/approvals");
     const { projectId, creator, pm, cdt, flowId } = await seed2("proposal", 3); // bước 1 SLA 3 ngày
     // seed2 tạo sẵn bước 2 (cdt) với sla_days NULL — sửa thành 3 ngày để có SLA thật ở bước 2.
     await run(`UPDATE approval_steps SET sla_days = 3 WHERE flow_id = ? AND seq = 2`, flowId);

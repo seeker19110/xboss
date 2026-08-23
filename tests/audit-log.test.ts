@@ -11,7 +11,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, run, query, withTransaction } = await import("@/lib/db");
-    const { runWithRequestContext } = await import("@/lib/request-context");
+    const { runWithRequestContext } = await import("@/lib/nen/request-context");
 
     const uid = await insertId(
       `INSERT INTO users (name, email, role, password_hash) VALUES ('Audit Tester', ?, 'admin', 'x')`,
@@ -52,7 +52,7 @@ test(
 
 test("UPDATE không đổi giá trị nào → không ghi audit_log", { skip: !HAS_TEST_DB }, async () => {
   const { insertId, run, query, withTransaction } = await import("@/lib/db");
-  const { runWithRequestContext } = await import("@/lib/request-context");
+  const { runWithRequestContext } = await import("@/lib/nen/request-context");
 
   const cid = await insertId(
     `INSERT INTO contracts (code, kind, title) VALUES (?, 'nhan_thau', 'HĐ noop')`,
@@ -78,7 +78,7 @@ test("UPDATE không đổi giá trị nào → không ghi audit_log", { skip: !H
 
 test("DELETE → audit_log ghi snapshot đầy đủ hàng", { skip: !HAS_TEST_DB }, async () => {
   const { insertId, run, query, withTransaction } = await import("@/lib/db");
-  const { runWithRequestContext } = await import("@/lib/request-context");
+  const { runWithRequestContext } = await import("@/lib/nen/request-context");
 
   const code = `AUD-D-${S}`;
   const cid = await insertId(

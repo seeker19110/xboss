@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { createFidicClaim, listFidicClaims } from "@/lib/engineering-fidic-claim";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { createFidicClaim, listFidicClaims } from "@/lib/ky-thuat/engineering-fidic-claim";
 
 export const dynamic = "force-dynamic";
 

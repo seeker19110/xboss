@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import { readdirSync, statSync, readFileSync, existsSync } from "node:fs";
 import { join, basename, extname } from "node:path";
-import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import {
   parseDxf,
   parseDwgBinary,
   generateStandardizedAutocadScript,
   DwgUnsupportedError,
-} from "@/lib/cad/dxf-parser";
+} from "@/lib/ky-thuat/cad/dxf-parser";
 import { queryOne } from "@/lib/db";
-import { storageGet } from "@/lib/storage";
+import { storageGet } from "@/lib/nen/storage";
 
 export const dynamic = "force-dynamic";
 

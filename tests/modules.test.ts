@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { MODULES } from "@/lib/modules";
-import { isPermKey } from "@/lib/auth";
+import { MODULES } from "@/lib/nen/modules";
+import { isPermKey } from "@/lib/bao-mat/auth";
 
 // Unit thuần trên bảng khai báo lib/modules.ts — KHÔNG chạm DB (không cần tests/setup.ts).
 //

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isContentTooLarge } from "@/lib/photos";
+import { isContentTooLarge } from "@/lib/nen/photos";
 
 const MAX = 20 * 1024 * 1024; // 20MB, dùng mốc giống MAX_DOC_BYTES để test dễ đọc
 

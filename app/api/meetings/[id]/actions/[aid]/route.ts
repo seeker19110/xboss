@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
-import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN, isAdminOrPm } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   MEETING_ACTION_STATUSES,
   getMeetingAction,
@@ -9,7 +9,7 @@ import {
   setMeetingActionStatus,
   validateMeetingActionInput,
   type MeetingActionStatus,
-} from "@/lib/meetings";
+} from "@/lib/hien-truong/meetings";
 
 export const dynamic = "force-dynamic";
 

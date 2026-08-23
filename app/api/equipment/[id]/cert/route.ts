@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { getEquipment } from "@/lib/equipment";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { getEquipment } from "@/lib/vat-tu/equipment";
 import {
   extForDocMime,
   verifyFileMime,
   newEquipmentCertFileName,
   MAX_DOC_BYTES,
   isContentTooLarge,
-} from "@/lib/photos";
-import { storagePut, storageGet, storageDelete } from "@/lib/storage";
+} from "@/lib/nen/photos";
+import { storagePut, storageGet, storageDelete } from "@/lib/nen/storage";
 
 export const dynamic = "force-dynamic";
 

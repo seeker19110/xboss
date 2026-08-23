@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import {
   listKnowledgePatterns,
   upsertKnowledgePattern,
   PatternType,
-} from "@/lib/engineering-memory-bank";
+} from "@/lib/ky-thuat/engineering-memory-bank";
 
 export const dynamic = "force-dynamic";
 

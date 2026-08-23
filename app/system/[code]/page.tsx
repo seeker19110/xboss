@@ -4,7 +4,7 @@ import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { systemColorClasses, type SystemColorClasses } from "@/lib/systemColors";
+import { systemColorClasses, type SystemColorClasses } from "@/lib/nen/systemColors";
 
 type Sheet = {
   id: number;

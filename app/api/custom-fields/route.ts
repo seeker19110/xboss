@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { getDefs, isCustomEntityType } from "@/lib/custom-fields";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { getDefs, isCustomEntityType } from "@/lib/ha-tang/custom-fields";
 
 export const dynamic = "force-dynamic";
 

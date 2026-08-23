@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   reverseBreakdownUnitRate,
   explodeMultiLevelBOM,
   generateFidicClaimDefense,
   saveQsBomExplosion,
   listQsBomExplosions,
-} from "@/lib/engineering-qs-omnipotent";
+} from "@/lib/ky-thuat/engineering-qs-omnipotent";
 
 export const dynamic = "force-dynamic";
 

@@ -26,7 +26,7 @@ import EngineeringNav from "@/app/components/EngineeringNav";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { redirectToLogin } from "@/app/lib/me";
-import type { ApexPulseRecord } from "@/lib/engineering-pinnacle-synergy";
+import type { ApexPulseRecord } from "@/lib/ky-thuat/engineering-pinnacle-synergy";
 
 type EngObject = {
   id: string;

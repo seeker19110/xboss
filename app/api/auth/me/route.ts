@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { getCurrentUser, ensureDefaultUsers, COOKIE, parseToken } from "@/lib/auth";
+import { getCurrentUser, ensureDefaultUsers, COOKIE, parseToken } from "@/lib/bao-mat/auth";
 
 export const dynamic = "force-dynamic";
 

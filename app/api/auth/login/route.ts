@@ -11,8 +11,12 @@ import {
   COOKIE,
   COOKIE_MAX_AGE,
   type Role,
-} from "@/lib/auth";
-import { loginBlockedSeconds, recordLoginFailure, recordLoginSuccess } from "@/lib/ratelimit";
+} from "@/lib/bao-mat/auth";
+import {
+  loginBlockedSeconds,
+  recordLoginFailure,
+  recordLoginSuccess,
+} from "@/lib/bao-mat/ratelimit";
 
 export const dynamic = "force-dynamic";
 

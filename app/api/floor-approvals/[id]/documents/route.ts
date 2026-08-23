@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storagePut } from "@/lib/storage";
+import { storagePut } from "@/lib/nen/storage";
 import { query, queryOne, insertId } from "@/lib/db";
-import { getCurrentUser, CAN, canTouchFloor } from "@/lib/auth";
+import { getCurrentUser, CAN, canTouchFloor } from "@/lib/bao-mat/auth";
 import {
   extForDocMime,
   verifyFileMime,
@@ -9,7 +9,7 @@ import {
   MAX_DOC_BYTES,
   sha256Hex,
   isContentTooLarge,
-} from "@/lib/photos";
+} from "@/lib/nen/photos";
 
 export const dynamic = "force-dynamic";
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { buildSodReport } from "@/lib/sod";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { buildSodReport } from "@/lib/bao-mat/sod";
 
 export const dynamic = "force-dynamic";
 

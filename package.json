@@ -27,7 +27,8 @@
     "changelog": "node scripts/gen-changelog.mjs",
     "prepare": "husky || true",
     "test:mutation": "node scripts/mutation-check.mjs",
-    "check:dead-code": "tsx scripts/check-dead-code.ts"
+    "check:dead-code": "tsx scripts/check-dead-code.ts",
+    "check:lib-layers": "tsx scripts/check-lib-layers.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1106.0",

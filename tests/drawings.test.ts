@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("validateDrawingInput: đủ ca hợp lệ/không hợp lệ", async () => {
-  const { validateDrawingInput } = await import("@/lib/drawings");
+  const { validateDrawingInput } = await import("@/lib/ky-thuat/drawings");
 
   const base = {
     code: "ACMV-SD-T05-001",
@@ -23,7 +23,7 @@ test("validateDrawingInput: đủ ca hợp lệ/không hợp lệ", async () => 
 });
 
 test("parseDrawingBody: chuẩn hoá field, mặc định kind='shop', chuỗi rỗng → null", async () => {
-  const { parseDrawingBody } = await import("@/lib/drawings");
+  const { parseDrawingBody } = await import("@/lib/ky-thuat/drawings");
 
   const parsed = parseDrawingBody({ code: " ACMV-001 ", name: "Bản vẽ", systemGroup: "  " });
   assert.equal(parsed.code, "ACMV-001");
@@ -42,7 +42,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { listDrawings } = await import("@/lib/drawings");
+    const { listDrawings } = await import("@/lib/ky-thuat/drawings");
 
     const drawingId = await insertId(
       `INSERT INTO drawings (code, name, kind) VALUES ('DWG-TEST-001', 'Bản vẽ test', 'shop')`,
@@ -80,7 +80,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { setRevisionStatus } = await import("@/lib/drawings");
+    const { setRevisionStatus } = await import("@/lib/ky-thuat/drawings");
 
     const drawingId = await insertId(
       `INSERT INTO drawings (code, name, kind) VALUES ('DWG-TEST-SUPERSEDE', 'Bản vẽ test', 'shop')`,
@@ -143,7 +143,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { isUniqueViolation } = await import("@/lib/seqcode");
+    const { isUniqueViolation } = await import("@/lib/ha-tang/seqcode");
 
     const drawingId = await insertId(
       `INSERT INTO drawings (code, name, kind) VALUES ('DWG-TEST-DUP', 'Bản vẽ test', 'shop')`,
@@ -169,7 +169,7 @@ test(
 
 test("UNIQUE code bản vẽ chống trùng số bản vẽ toàn hệ thống", { skip: !HAS_TEST_DB }, async () => {
   const { run, insertId } = await import("@/lib/db");
-  const { isUniqueViolation } = await import("@/lib/seqcode");
+  const { isUniqueViolation } = await import("@/lib/ha-tang/seqcode");
 
   const id = await insertId(
     `INSERT INTO drawings (code, name, kind) VALUES ('DWG-TEST-CODE', 'Bản vẽ test', 'shop')`,
@@ -190,7 +190,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { listDrawings, getDrawing } = await import("@/lib/drawings");
+    const { listDrawings, getDrawing } = await import("@/lib/ky-thuat/drawings");
 
     const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA BV 1', 'PJT-DWG1')`);
     const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA BV 2', 'PJT-DWG2')`);

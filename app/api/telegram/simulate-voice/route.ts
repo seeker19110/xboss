@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
 import {
   processIncomingTelegramMessage,
   listTelegramMessageLogs,
-} from "@/lib/engineering-site-bot";
+} from "@/lib/ky-thuat/engineering-site-bot";
 
 export const dynamic = "force-dynamic";
 

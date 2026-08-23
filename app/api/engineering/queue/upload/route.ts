@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { enqueueAsyncTask } from "@/lib/engineering-task-queue";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { enqueueAsyncTask } from "@/lib/ky-thuat/engineering-task-queue";
 import { createHash } from "crypto";
 import { promises as fs } from "fs";
 import path from "path";

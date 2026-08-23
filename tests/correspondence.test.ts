@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("validateCorrespondenceInput: đủ ca hợp lệ/không hợp lệ", async () => {
-  const { validateCorrespondenceInput } = await import("@/lib/correspondence");
+  const { validateCorrespondenceInput } = await import("@/lib/hien-truong/correspondence");
 
   const base = {
     code: "CV-001",
@@ -44,7 +44,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { createReply, getReplyChain } = await import("@/lib/correspondence");
+    const { createReply, getReplyChain } = await import("@/lib/hien-truong/correspondence");
 
     const adminId = await insertId(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('Test Admin CV', 'admincv-test@test.local', 'x', 'admin')`,
@@ -134,7 +134,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { listCorrespondences, getCorrespondence } = await import("@/lib/correspondence");
+    const { listCorrespondences, getCorrespondence } =
+      await import("@/lib/hien-truong/correspondence");
 
     const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA CV 1', 'PJT-CV2')`);
     const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA CV 2', 'PJT-CV3')`);
@@ -166,8 +167,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { dueCorrespondences } = await import("@/lib/correspondence");
-    const { daysFromTodayISO } = await import("@/lib/date");
+    const { dueCorrespondences } = await import("@/lib/hien-truong/correspondence");
+    const { daysFromTodayISO } = await import("@/lib/nen/date");
 
     const overdueId = await insertId(
       `INSERT INTO correspondences (code, direction, kind, counterparty, subject, sent_date, due_date, status)
@@ -207,7 +208,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { listCorrespondences } = await import("@/lib/correspondence");
+    const { listCorrespondences } = await import("@/lib/hien-truong/correspondence");
 
     const rfiId = await insertId(
       `INSERT INTO correspondences (code, direction, kind, counterparty, subject, sent_date, status)

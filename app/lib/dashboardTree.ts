@@ -87,7 +87,7 @@ import {
   TrendingUp,
   Layers,
 } from "lucide-react";
-import type { Role } from "@/lib/roles";
+import type { Role } from "@/lib/nen/roles";
 
 export type NavStatus = "available" | "coming-soon";
 

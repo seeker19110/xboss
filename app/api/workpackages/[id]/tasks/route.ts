@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, insertId, run } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { boqTakenBy } from "@/lib/boq";
-import { inheritedAssigneeFor } from "@/lib/assignments";
-import { recomputePackage } from "@/lib/recompute";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { boqTakenBy } from "@/lib/khoi-luong/boq";
+import { inheritedAssigneeFor } from "@/lib/tien-do/assignments";
+import { recomputePackage } from "@/lib/tien-do/recompute";
 
 export const dynamic = "force-dynamic";
 

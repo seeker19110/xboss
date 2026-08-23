@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { query, insertId } from "@/lib/db";
-import { getCurrentUser, CAN, checkCronSecret } from "@/lib/auth";
-import { sendTelegram } from "@/lib/report";
-import { runHealthChecks, type HealthCheckReport } from "@/lib/healthcheck";
-import { acquireSyncLock, releaseSyncLock } from "@/lib/sync-locks";
+import { getCurrentUser, CAN, checkCronSecret } from "@/lib/bao-mat/auth";
+import { sendTelegram } from "@/lib/tien-do/report";
+import { runHealthChecks, type HealthCheckReport } from "@/lib/van-hanh/healthcheck";
+import { acquireSyncLock, releaseSyncLock } from "@/lib/ha-tang/sync-locks";
 
 export const dynamic = "force-dynamic";
 

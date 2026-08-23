@@ -21,16 +21,16 @@ import {
   Landmark,
   ArrowUpRight,
 } from "lucide-react";
-import { slugFromCode, toSlug } from "@/lib/sheets";
+import { slugFromCode, toSlug } from "@/lib/nen/sheets";
 import AppHeader from "@/app/components/AppHeader";
 import { Modal, appAlert, appConfirm } from "@/app/components/dialogs";
 import { PageSkeleton, Skeleton } from "@/app/components/Skeleton";
 import EditableText from "@/app/components/EditableText";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { sortFloorsDesc } from "@/lib/floors";
+import { sortFloorsDesc } from "@/lib/tien-do/floors";
 import DelayedGroupsTable from "@/app/components/DelayedGroupsTable";
-import { systemColorClasses } from "@/lib/systemColors";
-import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
+import { systemColorClasses } from "@/lib/nen/systemColors";
+import { STATUS_LABEL, type StatusSlug } from "@/lib/tien-do/status";
 import type {
   QualityBlock,
   VoBlock,

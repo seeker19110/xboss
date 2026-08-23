@@ -11,8 +11,8 @@
 import "./env";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import { getPool } from "../lib/db";
-import { verifyAuditChain } from "../lib/audit-chain";
+import { getPool } from "@/lib/db";
+import { verifyAuditChain } from "@/lib/bao-mat/audit-chain";
 
 interface CheckResult {
   name: string;

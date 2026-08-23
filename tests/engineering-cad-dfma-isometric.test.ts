@@ -5,7 +5,7 @@ import {
   generateSpoolIsometricDrawing,
   optimizeGeneticNestingWithRemnants,
   project3DtoIsometric2D,
-} from "@/lib/engineering-cad-dfma-isometric";
+} from "@/lib/ky-thuat/engineering-cad-dfma-isometric";
 
 test("M76: project3DtoIsometric2D chiếu chuẩn góc 30° axonometric", () => {
   const pOrigin = { x: 0, y: 0, z: 0 };

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { calculateGodTier4DSimulation, GodTierElementData } from "@/lib/engineering-god-tier";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import {
+  calculateGodTier4DSimulation,
+  GodTierElementData,
+} from "@/lib/ky-thuat/engineering-god-tier";
 
 export const dynamic = "force-dynamic";
 

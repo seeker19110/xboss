@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   parseVoiceInspectionText,
   calculateProductivityIndex,
   saveVoiceLog,
   listVoiceLogs,
-} from "@/lib/engineering-mepf-voice";
+} from "@/lib/ky-thuat/engineering-mepf-voice";
 
 export const dynamic = "force-dynamic";
 

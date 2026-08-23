@@ -32,8 +32,8 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { slugFromCode } from "@/lib/sheets";
-import { STATUS_LABEL, type StatusSlug } from "@/lib/status";
+import { slugFromCode } from "@/lib/nen/sheets";
+import { STATUS_LABEL, type StatusSlug } from "@/lib/tien-do/status";
 
 // Hit của task/nhóm (shape SearchHit cũ — KHÔNG đổi).
 type WbsHit = {

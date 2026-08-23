@@ -48,7 +48,7 @@ các quy ước đúng nhưng không còn ranh giới nào chia 222k LOC thành 
   - `lib/engineering-spatial-routing.ts` (132 LOC) — đã bị `engineering-generative-routing.ts`
     - `engineering-bim-cad.ts` thay thế. **Đã xoá** trong đợt này.
   - `app/components/MaskedValue.tsx` — **KHÔNG xoá**. Đây là nửa UI của M50 PR2
-    (che trường tiền theo quyền): backend đã ship (`lib/sensitive-fields.ts`, 8 route
+    (che trường tiền theo quyền): backend đã ship (`lib/bao-mat/sensitive-fields.ts`, 8 route
     dùng `stripSensitive`) nhưng chưa page nào gắn component. Đây là **tính năng dở dang,
     không phải rác** — xoá đi là mất cách hiển thị `•••` đúng a11y. Đã ghi vào
     `scripts/dead-code-allowlist.json` kèm lý do.
@@ -67,7 +67,7 @@ quyết định xoá tính năng dở dang phải là của người, không đ�
 ### 4.1 `lib/` phẳng 175 module — không còn ranh giới miền
 
 `ls lib/` không cho ai biết hệ thống gồm những gì. Không có quy tắc hướng phụ thuộc,
-nên bất kỳ module nào cũng import được bất kỳ module nào; không có gì ngăn `lib/auth.ts`
+nên bất kỳ module nào cũng import được bất kỳ module nào; không có gì ngăn `lib/bao-mat/auth.ts`
 một ngày nào đó phụ thuộc ngược vào một module nghiệp vụ. Riêng cụm `engineering-*` đã
 là 70 file / 24.665 LOC nằm chung một mặt phẳng với `date.ts` và `money.ts`.
 
@@ -75,7 +75,7 @@ là 70 file / 24.665 LOC nằm chung một mặt phẳng với `date.ts` và `mo
 
 24 file > 1000 LOC, 4 file > 2000. Nặng nhất: `TrackingGrid.tsx` (94KB),
 `mepf-process/page.tsx` (90KB), `engineering/mepf-lifecycle/page.tsx` (88KB),
-`lib/engineering-pipe-spooling-qto.ts` (69KB). Ở kích thước này không review được diff,
+`lib/ky-thuat/engineering-pipe-spooling-qto.ts` (69KB). Ở kích thước này không review được diff,
 không test được từng phần, và mọi thay đổi đều có bán kính ảnh hưởng không đoán nổi.
 
 ### 4.3 Không có tầng service

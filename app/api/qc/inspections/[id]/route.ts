@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, run, withTransaction } from "@/lib/db";
-import { getCurrentUser, CAN, canTouchTask, canTouchPackage } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { taskInProject, validateInspectionResults, workPackageInProject } from "@/lib/qaqc";
+import { getCurrentUser, CAN, canTouchTask, canTouchPackage } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import {
+  taskInProject,
+  validateInspectionResults,
+  workPackageInProject,
+} from "@/lib/ky-thuat/qaqc";
 
 export const dynamic = "force-dynamic";
 

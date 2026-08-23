@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("resolveProjectId: cookie hợp lệ → dùng; cookie lạ/rỗng → mặc định dự án đầu; rỗng → null", async () => {
-  const { resolveProjectId } = await import("@/lib/projects");
+  const { resolveProjectId } = await import("@/lib/ha-tang/projects");
 
   assert.equal(resolveProjectId([1, 2, 3], "2"), 2);
   assert.equal(
@@ -25,7 +25,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, run } = await import("@/lib/db");
-    const { visibleProjectIds } = await import("@/lib/projects");
+    const { visibleProjectIds } = await import("@/lib/ha-tang/projects");
 
     const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA test 1', 'PJT-T1')`);
     const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA test 2', 'PJT-T2')`);
@@ -60,7 +60,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { listProjects, portfolioKpi } = await import("@/lib/projects");
+    const { listProjects, portfolioKpi } = await import("@/lib/ha-tang/projects");
 
     const YESTERDAY = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
 
@@ -134,7 +134,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { listProjects, listOrganizations } = await import("@/lib/projects");
+    const { listProjects, listOrganizations } = await import("@/lib/ha-tang/projects");
 
     const o1 = await insertId(
       `INSERT INTO organizations (name, tax_code) VALUES ('Tổ chức A', '0100000001')`,

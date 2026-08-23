@@ -11,7 +11,7 @@ test(
   "acquireSyncLock: giữ khoá thành công lần đầu, lần thứ 2 cùng tên thất bại tới khi release",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { acquireSyncLock, releaseSyncLock } = await import("@/lib/sync-locks");
+    const { acquireSyncLock, releaseSyncLock } = await import("@/lib/ha-tang/sync-locks");
     const name = `test:sync-lock:${Date.now()}`;
 
     assert.equal(await acquireSyncLock(name), true, "lần đầu phải giữ được khoá");
@@ -28,7 +28,7 @@ test(
   "acquireSyncLock: khoá quá hạn staleMinutes tự coi như hết hạn, giữ lại được dù chưa release",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { acquireSyncLock, releaseSyncLock } = await import("@/lib/sync-locks");
+    const { acquireSyncLock, releaseSyncLock } = await import("@/lib/ha-tang/sync-locks");
     const { run } = await import("@/lib/db");
     const name = `test:sync-lock-stale:${Date.now()}`;
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   createBcfIssue,
   listBcfIssues,
@@ -12,9 +12,9 @@ import {
   CreateBcfIssueInput,
   RoutingPoint3D,
   RoutingConstraint,
-} from "@/lib/engineering-bim-routing";
-import { BimElementRecord } from "@/lib/engineering-bim-cad";
-import { BoundingBox3D } from "@/lib/engineering-bim-cad";
+} from "@/lib/ky-thuat/engineering-bim-routing";
+import { BimElementRecord } from "@/lib/ky-thuat/engineering-bim-cad";
+import { BoundingBox3D } from "@/lib/ky-thuat/engineering-bim-cad";
 
 export const dynamic = "force-dynamic";
 

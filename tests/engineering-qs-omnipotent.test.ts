@@ -4,7 +4,7 @@ import {
   reverseBreakdownUnitRate,
   explodeMultiLevelBOM,
   generateFidicClaimDefense,
-} from "@/lib/engineering-qs-omnipotent";
+} from "@/lib/ky-thuat/engineering-qs-omnipotent";
 
 test("M69: reverseBreakdownUnitRate giải mã ngược đơn giá thầu thành 5 thành phần gốc", () => {
   const res = reverseBreakdownUnitRate("BOQ-01", "Ống Thép DN100", "m", 500000, "pipe_steel");

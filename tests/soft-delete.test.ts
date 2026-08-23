@@ -14,7 +14,7 @@ test(
   },
   async () => {
     const { insertId, run } = await import("@/lib/db");
-    const { listContracts } = await import("@/lib/contracts");
+    const { listContracts } = await import("@/lib/tai-chinh/contracts");
 
     const pid = await insertId(`INSERT INTO projects (name) VALUES (?)`, `SD Proj ${S}`);
     const cid = await insertId(
@@ -64,7 +64,7 @@ test(
 
 test("listClaims: mặc định loại claim đã soft-delete", { skip: !HAS_TEST_DB }, async () => {
   const { insertId, run } = await import("@/lib/db");
-  const { listClaims } = await import("@/lib/claims");
+  const { listClaims } = await import("@/lib/tai-chinh/claims");
 
   const pid = await insertId(`INSERT INTO projects (name) VALUES (?)`, `SD Claim Proj ${S}`);
   const clid = await insertId(

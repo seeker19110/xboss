@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   HSE_KINDS,
   checkHseRefs,
@@ -9,7 +9,7 @@ import {
   parseHseBody,
   validateHseInput,
   type HseKind,
-} from "@/lib/hse";
+} from "@/lib/hien-truong/hse";
 
 export const dynamic = "force-dynamic";
 

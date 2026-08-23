@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import {
   calculatePinnacleApexMetrics,
   recordApexSystemPulse,
   getLatestApexSystemPulse,
   dispatchApexCommandAction,
-} from "@/lib/engineering-pinnacle-synergy";
+} from "@/lib/ky-thuat/engineering-pinnacle-synergy";
 
 export const dynamic = "force-dynamic";
 

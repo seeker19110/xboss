@@ -6,7 +6,7 @@ import {
   computeCashflowSimulationEngine,
   runAndSaveCashflowForecast,
   listCashflowForecasts,
-} from "@/lib/engineering-cashflow";
+} from "@/lib/ky-thuat/engineering-cashflow";
 
 const HAS_DB = Boolean(process.env.TEST_DATABASE_URL || process.env.DATABASE_URL);
 

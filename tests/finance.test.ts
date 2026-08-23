@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("validateCashTransactionInput: đủ ca hợp lệ/không hợp lệ", async () => {
-  const { validateCashTransactionInput } = await import("@/lib/finance");
+  const { validateCashTransactionInput } = await import("@/lib/tai-chinh/finance");
 
   assert.equal(
     validateCashTransactionInput({
@@ -66,7 +66,7 @@ test("validateCashTransactionInput: đủ ca hợp lệ/không hợp lệ", asyn
 });
 
 test("validateAdvanceInput: đủ ca hợp lệ/không hợp lệ", async () => {
-  const { validateAdvanceInput } = await import("@/lib/finance");
+  const { validateAdvanceInput } = await import("@/lib/tai-chinh/finance");
 
   assert.equal(
     validateAdvanceInput({
@@ -115,7 +115,7 @@ test("validateAdvanceInput: đủ ca hợp lệ/không hợp lệ", async () => 
 });
 
 test("deriveAdvanceStatus: open/partially_settled/settled", async () => {
-  const { deriveAdvanceStatus } = await import("@/lib/finance");
+  const { deriveAdvanceStatus } = await import("@/lib/tai-chinh/finance");
 
   assert.equal(deriveAdvanceStatus(1000, 0), "open");
   assert.equal(deriveAdvanceStatus(1000, 400), "partially_settled");
@@ -124,7 +124,7 @@ test("deriveAdvanceStatus: open/partially_settled/settled", async () => {
 });
 
 test("validateInvoiceInput: đủ ca hợp lệ/không hợp lệ", async () => {
-  const { validateInvoiceInput } = await import("@/lib/finance");
+  const { validateInvoiceInput } = await import("@/lib/tai-chinh/finance");
 
   assert.equal(
     validateInvoiceInput({
@@ -185,7 +185,7 @@ test("validateInvoiceInput: đủ ca hợp lệ/không hợp lệ", async () => 
 });
 
 test("validatePayrollInput: đủ ca hợp lệ/không hợp lệ", async () => {
-  const { validatePayrollInput } = await import("@/lib/finance");
+  const { validatePayrollInput } = await import("@/lib/tai-chinh/finance");
 
   assert.equal(
     validatePayrollInput({
@@ -252,7 +252,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { cashflowActual } = await import("@/lib/finance");
+    const { cashflowActual } = await import("@/lib/tai-chinh/finance");
 
     const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA TC 1', 'PJT-TC1')`);
     const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA TC 2', 'PJT-TC2')`);
@@ -298,7 +298,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { receivables, payables } = await import("@/lib/finance");
+    const { receivables, payables } = await import("@/lib/tai-chinh/finance");
 
     const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA CN 1', 'PJT-CN1')`);
     const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA CN 2', 'PJT-CN2')`);
@@ -372,7 +372,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { deriveAdvanceStatus, advanceOutstanding } = await import("@/lib/finance");
+    const { deriveAdvanceStatus, advanceOutstanding } = await import("@/lib/tai-chinh/finance");
 
     const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA TU 1', 'PJT-TU1')`);
     const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA TU 2', 'PJT-TU2')`);
@@ -437,7 +437,7 @@ test(
 );
 
 test("parseInvoiceBody: đọc body JSON thành InvoiceInput", async () => {
-  const { parseInvoiceBody } = await import("@/lib/finance");
+  const { parseInvoiceBody } = await import("@/lib/tai-chinh/finance");
 
   const input = parseInvoiceBody({
     invoiceNo: " HD001 ",
@@ -463,7 +463,7 @@ test("parseInvoiceBody: đọc body JSON thành InvoiceInput", async () => {
 });
 
 test("parsePayrollBody: đọc body JSON thành PayrollInput", async () => {
-  const { parsePayrollBody } = await import("@/lib/finance");
+  const { parsePayrollBody } = await import("@/lib/tai-chinh/finance");
 
   const input = parsePayrollBody({
     period: "2026-07",
@@ -491,7 +491,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { vatSummary } = await import("@/lib/finance");
+    const { vatSummary } = await import("@/lib/tai-chinh/finance");
 
     const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA VAT 1', 'PJT-VAT1')`);
     const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA VAT 2', 'PJT-VAT2')`);
@@ -538,7 +538,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { payrollFromAttendance } = await import("@/lib/finance");
+    const { payrollFromAttendance } = await import("@/lib/tai-chinh/finance");
 
     const p1 = await insertId(
       `INSERT INTO projects (name, code) VALUES ('DA LUONG 1', 'PJT-LUONG1')`,
@@ -592,7 +592,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { advanceOverdueList } = await import("@/lib/finance");
+    const { advanceOverdueList } = await import("@/lib/tai-chinh/finance");
 
     const p1 = await insertId(
       `INSERT INTO projects (name, code) VALUES ('DA TUQH 1', 'PJT-TUQH1')`,

@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { conductMultiAgentDebate, DebateTopicInput } from "@/lib/engineering-multi-agent-copilot";
+import {
+  conductMultiAgentDebate,
+  DebateTopicInput,
+} from "@/lib/ky-thuat/engineering-multi-agent-copilot";
 
 test("M72: conductMultiAgentDebate tổ chức thành công phiên phản biện đa Agent và đạt đồng thuận", () => {
   const input: DebateTopicInput = {

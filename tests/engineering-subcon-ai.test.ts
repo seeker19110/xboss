@@ -6,7 +6,7 @@ import {
   recommendShortlistForPackage,
   SubconProfile,
   SubconEvaluationResult,
-} from "@/lib/engineering-subcon-ai";
+} from "@/lib/ky-thuat/engineering-subcon-ai";
 
 test("M82: computeSubcontractorTrustScore tính đúng điểm tín nhiệm tổng hợp 5 trục", () => {
   // Nhà thầu hoàn hảo: 100% tiến độ, 100% BBNT, 0 NCR, 100 HSE, 0% cost variance

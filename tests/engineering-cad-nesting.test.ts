@@ -9,7 +9,7 @@ import {
   calcDarcyWeisbach,
   validateVelocityLimit,
   sizeDuctByVelocity,
-} from "@/lib/engineering-cad-nesting";
+} from "@/lib/ky-thuat/engineering-cad-nesting";
 
 test("M89: 1D Pipe Nesting FFD xếp phôi tối ưu vào cây tiêu chuẩn 6.0m", () => {
   const segments = [

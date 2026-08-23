@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { writeFileSync, mkdirSync, existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { queryOne, insertId, run } from "@/lib/db";
-import { validateDxf } from "@/lib/cad/dxf-parser";
-import { ensureAllDrawingTrees } from "@/lib/cad/drawing-tree";
+import { validateDxf } from "@/lib/ky-thuat/cad/dxf-parser";
+import { ensureAllDrawingTrees } from "@/lib/ky-thuat/cad/drawing-tree";
 
 export const dynamic = "force-dynamic";
 

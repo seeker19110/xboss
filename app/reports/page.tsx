@@ -1,8 +1,8 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { BookMarked, Play, Download, Trash2, Plus, Share2, Lock, X, RefreshCw } from "lucide-react";
-import { formatVnd } from "@/lib/money";
-import { formatDateVN } from "@/lib/date";
+import { formatVnd } from "@/lib/nen/money";
+import { formatDateVN } from "@/lib/nen/date";
 import { fetchMe, redirectToLogin } from "@/app/lib/me";
 import AppHeader from "@/app/components/AppHeader";
 import { PageSkeleton } from "@/app/components/Skeleton";

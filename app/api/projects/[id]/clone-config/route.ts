@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { cloneProjectConfig } from "@/lib/clone-config";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { cloneProjectConfig } from "@/lib/tien-do/clone-config";
 
 export const dynamic = "force-dynamic";
 

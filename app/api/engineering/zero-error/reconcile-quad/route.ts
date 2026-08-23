@@ -1,11 +1,11 @@
 // app/api/engineering/zero-error/reconcile-quad/route.ts — API Đối soát định lượng 4 chiều
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   reconcileQuadQuantity,
   type QuadReconcileParams,
-} from "@/lib/engineering-zero-error-tracker";
+} from "@/lib/ky-thuat/engineering-zero-error-tracker";
 
 export const dynamic = "force-dynamic";
 

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   solve1dCuttingStock,
   saveNestingPlan,
   listNestingPlans,
   RequiredPiece,
-} from "@/lib/engineering-mepf-nesting";
+} from "@/lib/ky-thuat/engineering-mepf-nesting";
 
 export const dynamic = "force-dynamic";
 

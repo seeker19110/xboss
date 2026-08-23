@@ -2,7 +2,7 @@ import "./setup"; // phải đứng đầu: trỏ DB sang :memory: trước khi 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as XLSX from "xlsx";
-import { toISO, analyzeWorkbook, isChecked } from "@/lib/import";
+import { toISO, analyzeWorkbook, isChecked } from "@/lib/tien-do/import";
 
 // Dựng workbook giả lập đúng layout cột file WBS tracking gốc (HEADER_ROW=2,
 // DATA_START=5): [0]=mã, [1]=STT, [2]=tên, [3]=ghi chú/trạng thái, [4]=ngày BĐ,

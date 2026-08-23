@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { query } from "@/lib/db";
 import {
   recommendShortlistForPackage,
@@ -8,7 +8,7 @@ import {
   SubconProfile,
   SubconEvaluationResult,
   SubconTier,
-} from "@/lib/engineering-subcon-ai";
+} from "@/lib/ky-thuat/engineering-subcon-ai";
 
 export const dynamic = "force-dynamic";
 

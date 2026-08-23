@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   syncSpoolToWbsAndPayment,
   listClosedLoopSyncLogs,
-} from "@/lib/engineering-closed-loop-sync";
+} from "@/lib/ky-thuat/engineering-closed-loop-sync";
 
 export const dynamic = "force-dynamic";
 

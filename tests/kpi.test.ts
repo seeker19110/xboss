@@ -111,7 +111,7 @@ test(
   "sheetProgressKpi: lọc đúng dự án, % TB = trung bình task của sheet",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { sheetProgressKpi } = await import("@/lib/kpi");
+    const { sheetProgressKpi } = await import("@/lib/tien-do/kpi");
     const s = await seed();
     try {
       const rows = await sheetProgressKpi({ projectId: s.projectId });
@@ -133,7 +133,7 @@ test(
   "sheetProgressKpi: lọc theo systemId chỉ giữ sheet gắn hệ đó",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { sheetProgressKpi } = await import("@/lib/kpi");
+    const { sheetProgressKpi } = await import("@/lib/tien-do/kpi");
     const s = await seed();
     try {
       const rows = await sheetProgressKpi({ projectId: s.projectId, systemId: s.systemId });
@@ -146,7 +146,7 @@ test(
 );
 
 test("taskStatusCounts: đếm theo trạng thái trong đúng dự án", { skip: !HAS_TEST_DB }, async () => {
-  const { taskStatusCounts } = await import("@/lib/kpi");
+  const { taskStatusCounts } = await import("@/lib/tien-do/kpi");
   const s = await seed();
   try {
     const rows = await taskStatusCounts(s.projectId);
@@ -164,8 +164,8 @@ test(
   "getGroupProgressMap: khoá theo (sheet, tầng), % TB toàn hạng mục",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { getGroupProgressMap } = await import("@/lib/group-progress");
-    const { delayedGroupKey } = await import("@/lib/delayed-groups");
+    const { getGroupProgressMap } = await import("@/lib/tien-do/group-progress");
+    const { delayedGroupKey } = await import("@/lib/tien-do/delayed-groups");
     const s = await seed();
     try {
       const map = await getGroupProgressMap({ projectId: s.projectId });
@@ -183,8 +183,8 @@ test(
   "getGroupProgressMap: lọc systemId chỉ giữ hạng mục thuộc hệ đó",
   { skip: !HAS_TEST_DB },
   async () => {
-    const { getGroupProgressMap } = await import("@/lib/group-progress");
-    const { delayedGroupKey } = await import("@/lib/delayed-groups");
+    const { getGroupProgressMap } = await import("@/lib/tien-do/group-progress");
+    const { delayedGroupKey } = await import("@/lib/tien-do/delayed-groups");
     const s = await seed();
     try {
       const map = await getGroupProgressMap({ projectId: s.projectId, systemId: s.systemId });

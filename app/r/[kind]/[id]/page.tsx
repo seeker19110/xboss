@@ -7,7 +7,7 @@ import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { PageSkeleton } from "@/app/components/Skeleton";
-import type { QrResolveResult } from "@/lib/qr";
+import type { QrResolveResult } from "@/lib/ha-tang/qr";
 
 function targetUrl(data: QrResolveResult): string {
   switch (data.kind) {

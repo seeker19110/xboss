@@ -6,10 +6,13 @@ import {
   calculatePipeQtoM,
   calculatePhysicalEarnedValue,
   compute3WayVariance,
-} from "@/lib/engineering-cad-qto";
-import { inferFittingsFromSegments, auditMepfCompliance } from "@/lib/engineering-mepf-takeoff";
-import { computeElementQto, checkAabbIntersection } from "@/lib/engineering-bim-cad";
-import { nestPipeSegments1D, calcHazenWilliams } from "@/lib/engineering-cad-nesting";
+} from "@/lib/ky-thuat/engineering-cad-qto";
+import {
+  inferFittingsFromSegments,
+  auditMepfCompliance,
+} from "@/lib/ky-thuat/engineering-mepf-takeoff";
+import { computeElementQto, checkAabbIntersection } from "@/lib/ky-thuat/engineering-bim-cad";
+import { nestPipeSegments1D, calcHazenWilliams } from "@/lib/ky-thuat/engineering-cad-nesting";
 
 test("Zero Hallucination - CAD Duct QTO produces exact geometric area without fake additions", () => {
   // Width 500mm, Height 300mm, Length 10m, flange buffer 5%

@@ -1,8 +1,11 @@
 // tests/engineering-bim-routing.test.ts — Unit tests for BCF & 3D Auto-Routing (M89)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { detectClashesWithSpatialGrid, findRoutePath3D } from "@/lib/engineering-bim-routing";
-import { BimElementRecord } from "@/lib/engineering-bim-cad";
+import {
+  detectClashesWithSpatialGrid,
+  findRoutePath3D,
+} from "@/lib/ky-thuat/engineering-bim-routing";
+import { BimElementRecord } from "@/lib/ky-thuat/engineering-bim-cad";
 
 test("M89: detectClashesWithSpatialGrid phát hiện va chạm cứng O(n log n)", () => {
   const elements: BimElementRecord[] = [

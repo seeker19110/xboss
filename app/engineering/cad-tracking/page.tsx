@@ -26,16 +26,11 @@ import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { showToast } from "@/app/components/Toast";
 import { redirectToLogin } from "@/app/lib/me";
-import type { DxfParseResult, DxfEntityRaw, Extruded3dRoute } from "@/lib/cad/dxf-parser";
+import type { DxfParseResult, DxfEntityRaw, Extruded3dRoute } from "@/lib/ky-thuat/cad/dxf-parser";
 
 type SpoolStatus = "fabricated" | "delivered" | "installed" | "qc_passed" | "bbnt_approved";
 type SpoolDbDiscipline =
-  | "hvac"
-  | "plumbing"
-  | "electrical"
-  | "firefighting"
-  | "structure"
-  | "architecture";
+  "hvac" | "plumbing" | "electrical" | "firefighting" | "structure" | "architecture";
 
 interface DrawingOption {
   id: number;
@@ -167,10 +162,12 @@ export default function CadQtoTrackingPage() {
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (Array.isArray(d?.items))
-          setBoqOptions(d.items.map((i: { code: string; name: string }) => ({
-            code: i.code,
-            name: i.name,
-          })));
+          setBoqOptions(
+            d.items.map((i: { code: string; name: string }) => ({
+              code: i.code,
+              name: i.name,
+            })),
+          );
       })
       .catch(() => {});
   }, []);
@@ -536,7 +533,9 @@ export default function CadQtoTrackingPage() {
                   </label>
                   <select
                     value={selectedDrawingId ?? ""}
-                    onChange={(e) => setSelectedDrawingId(e.target.value ? Number(e.target.value) : null)}
+                    onChange={(e) =>
+                      setSelectedDrawingId(e.target.value ? Number(e.target.value) : null)
+                    }
                     className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
                   >
                     <option value="">— Chọn bản vẽ —</option>
@@ -1285,7 +1284,11 @@ function CadMiniPreview({ data }: { data: DxfParseResult }) {
 
   return (
     <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950">
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-64 w-full" preserveAspectRatio="xMidYMid meet">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="h-64 w-full"
+        preserveAspectRatio="xMidYMid meet"
+      >
         {renderable.map((e) => {
           const color = layerColor[e.layer] || "#71717a";
           if (e.type === "LINE" && e.coordinates.start && e.coordinates.end) {
@@ -1306,7 +1309,13 @@ function CadMiniPreview({ data }: { data: DxfParseResult }) {
           if (e.coordinates.points) {
             const pts = e.coordinates.points.map(([x, y]) => `${toSvgX(x)},${toSvgY(y)}`).join(" ");
             return (
-              <polyline key={e.id} points={pts} fill="none" stroke={color} strokeWidth={strokeWidth} />
+              <polyline
+                key={e.id}
+                points={pts}
+                fill="none"
+                stroke={color}
+                strokeWidth={strokeWidth}
+              />
             );
           }
           return null;

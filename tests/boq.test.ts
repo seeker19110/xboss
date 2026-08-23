@@ -2,8 +2,8 @@ import { HAS_TEST_DB } from "./setup"; // phải đứng đầu: chặn DATABASE
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as XLSX from "xlsx";
-import { makeBoq } from "@/lib/boq";
-import { parseBoqWorkbook } from "@/lib/boq-import";
+import { makeBoq } from "@/lib/khoi-luong/boq";
+import { parseBoqWorkbook } from "@/lib/khoi-luong/boq-import";
 
 // Dựng workbook giả lập đúng cấu trúc file "Bảng khối lượng thanh toán" thật (3 dòng
 // tiêu đề gộp ô, cột STT phân cấp La Mã/chữ/số, không có cột mã riêng) — không dùng
@@ -90,7 +90,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, query, queryOne, insertId } = await import("@/lib/db");
-    const { previewBoqImport, commitBoqImport } = await import("@/lib/boq-import");
+    const { previewBoqImport, commitBoqImport } = await import("@/lib/khoi-luong/boq-import");
 
     const system = await queryOne<{ id: number }>(`SELECT id FROM systems WHERE code = 'acmv'`);
     const systemId = system!.id;
@@ -168,7 +168,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { boqTakenBy } = await import("@/lib/boq");
+    const { boqTakenBy } = await import("@/lib/khoi-luong/boq");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test boq')`);
     const towerId = await insertId(
@@ -230,7 +230,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { boqTakenBy } = await import("@/lib/boq");
+    const { boqTakenBy } = await import("@/lib/khoi-luong/boq");
 
     const boqId = await insertId(
       `INSERT INTO boq_items (code, name, unit) VALUES ('BOQ-ITEM-01', 'Ống gió D200', 'm')`,
@@ -249,7 +249,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { boqExecutedQty } = await import("@/lib/boq");
+    const { boqExecutedQty } = await import("@/lib/khoi-luong/boq");
 
     const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Test boq exec')`);
     const towerId = await insertId(

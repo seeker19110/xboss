@@ -33,17 +33,17 @@ import type {
   CorridorLayoutResult,
   TrapezeHangerCalcResult,
   CorridorSystemAssignment,
-} from "@/lib/engineering-cad-corridor";
-import type { HydraulicNetworkResult } from "@/lib/engineering-cad-hydraulic-network";
+} from "@/lib/ky-thuat/engineering-cad-corridor";
+import type { HydraulicNetworkResult } from "@/lib/ky-thuat/engineering-cad-hydraulic-network";
 import type {
   SpoolIsometricResult,
   GeneticNestingResult,
-} from "@/lib/engineering-cad-dfma-isometric";
+} from "@/lib/ky-thuat/engineering-cad-dfma-isometric";
 import type {
   CarbonLcaSummary,
   LivingDigitalTwinPassport,
   evaluateAssetHealthAndRul,
-} from "@/lib/engineering-cad-carbon-lifecycle";
+} from "@/lib/ky-thuat/engineering-cad-carbon-lifecycle";
 
 export default function CadCorridorApexStudioPage() {
   const [activeTab, setActiveTab] = useState<

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { DOC_CATEGORIES, type DocCategory } from "@/lib/qaqc";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { DOC_CATEGORIES, type DocCategory } from "@/lib/ky-thuat/qaqc";
 
 export const dynamic = "force-dynamic";
 

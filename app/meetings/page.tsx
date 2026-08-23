@@ -19,7 +19,7 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { formatDateVN, todayISO } from "@/lib/date";
+import { formatDateVN, todayISO } from "@/lib/nen/date";
 
 // Nhân bản label từ lib/meetings.ts — không import trực tiếp vì lib đó kéo theo
 // lib/db (chỉ chạy server), giống pattern trang HSE.

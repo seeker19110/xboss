@@ -35,7 +35,7 @@ import {
   calculate6dCarbonLca,
   evaluateAssetHealthAndRul,
   exportDigitalTwinPassport,
-} from "@/lib/cad";
+} from "@/lib/ky-thuat/cad";
 
 test("CAD Unified Facade: 1. Vector Diffing & AutoLISP & Font Doctor", () => {
   // Vector Diffing

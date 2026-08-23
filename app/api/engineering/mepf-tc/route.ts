@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   createTcMatrix,
   addTcLog,
@@ -9,7 +9,7 @@ import {
   evaluatePressureHoldTest,
   evaluateFireInterlockMatrix,
   TcTestType,
-} from "@/lib/engineering-mepf-tc";
+} from "@/lib/ky-thuat/engineering-mepf-tc";
 
 export const dynamic = "force-dynamic";
 

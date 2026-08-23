@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { assertModuleEnabled } from "@/lib/feature-flags";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import {
   parseWorkFrontUpdateBody,
   updateWorkFrontStatus,
   validateWorkFrontUpdate,
-} from "@/lib/workfronts";
+} from "@/lib/tien-do/workfronts";
 
 export const dynamic = "force-dynamic";
 

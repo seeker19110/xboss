@@ -10,14 +10,14 @@ import assert from "node:assert/strict";
 // SQL route dùng (buildAuditFilter + LIMIT/OFFSET) để kiểm lọc entity+entityId và phân trang.
 
 test("buildAuditFilter: rỗng khi không có param nào", async () => {
-  const { buildAuditFilter } = await import("@/lib/audit");
+  const { buildAuditFilter } = await import("@/lib/bao-mat/audit");
   const { where, params } = buildAuditFilter(new URLSearchParams());
   assert.equal(where, "");
   assert.deepEqual(params, []);
 });
 
 test("buildAuditFilter: chỉ áp điều kiện cho param có mặt, giữ đúng thứ tự params", async () => {
-  const { buildAuditFilter } = await import("@/lib/audit");
+  const { buildAuditFilter } = await import("@/lib/bao-mat/audit");
   const { where, params } = buildAuditFilter(
     new URLSearchParams({ entity: "contracts", entityId: "5", from: "2026-01-01" }),
   );
@@ -26,21 +26,21 @@ test("buildAuditFilter: chỉ áp điều kiện cho param có mặt, giữ đú
 });
 
 test("buildAuditFilter: bỏ qua entityId/actorId không phải số", async () => {
-  const { buildAuditFilter } = await import("@/lib/audit");
+  const { buildAuditFilter } = await import("@/lib/bao-mat/audit");
   const { where, params } = buildAuditFilter(new URLSearchParams({ entityId: "abc" }));
   assert.equal(where, "");
   assert.deepEqual(params, []);
 });
 
 test("buildAuditFilter: projectId != null → giới hạn dự án + bản ghi toàn cục (đứng đầu)", async () => {
-  const { buildAuditFilter } = await import("@/lib/audit");
+  const { buildAuditFilter } = await import("@/lib/bao-mat/audit");
   const { where, params } = buildAuditFilter(new URLSearchParams({ entity: "contracts" }), 7);
   assert.equal(where, "WHERE (al.project_id = ? OR al.project_id IS NULL) AND al.entity_type = ?");
   assert.deepEqual(params, [7, "contracts"]);
 });
 
 test("buildAuditFilter: projectId null → không thêm điều kiện dự án (tương thích ngược)", async () => {
-  const { buildAuditFilter } = await import("@/lib/audit");
+  const { buildAuditFilter } = await import("@/lib/bao-mat/audit");
   const { where, params } = buildAuditFilter(new URLSearchParams(), null);
   assert.equal(where, "");
   assert.deepEqual(params, []);
@@ -54,8 +54,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, run, query, withTransaction } = await import("@/lib/db");
-    const { runWithRequestContext } = await import("@/lib/request-context");
-    const { buildAuditFilter } = await import("@/lib/audit");
+    const { runWithRequestContext } = await import("@/lib/nen/request-context");
+    const { buildAuditFilter } = await import("@/lib/bao-mat/audit");
 
     const cidA = await insertId(
       `INSERT INTO contracts (code, kind, title) VALUES (?, 'nhan_thau', 'HĐ A')`,
@@ -96,7 +96,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { insertId, run, query, withTransaction } = await import("@/lib/db");
-    const { runWithRequestContext } = await import("@/lib/request-context");
+    const { runWithRequestContext } = await import("@/lib/nen/request-context");
 
     // Sinh > PAGE_SIZE dòng audit_log cho 1 contract riêng (mỗi UPDATE 1 dòng vì title đổi).
     const N = PAGE_SIZE + 5;

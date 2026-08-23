@@ -9,8 +9,8 @@ import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton, Skeleton } from "@/app/components/Skeleton";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { ROLE_LABELS } from "@/lib/roles";
-import { AUDIT_ENTITY_TYPES } from "@/lib/audit";
+import { ROLE_LABELS } from "@/lib/nen/roles";
+import { AUDIT_ENTITY_TYPES } from "@/lib/bao-mat/audit";
 
 type AuditAction = "INSERT" | "UPDATE" | "DELETE";
 

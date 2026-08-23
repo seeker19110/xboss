@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, todayISO, daysFromTodayISO } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { resolveSystemId } from "@/lib/systems";
-import { progressAtDate } from "@/lib/report";
-import { getCurrentProjectId } from "@/lib/projects";
-import { getGroupProgressMap } from "@/lib/group-progress";
-import { sheetProgressKpi } from "@/lib/kpi";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { resolveSystemId } from "@/lib/tien-do/systems";
+import { progressAtDate } from "@/lib/tien-do/report";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { getGroupProgressMap } from "@/lib/tien-do/group-progress";
+import { sheetProgressKpi } from "@/lib/tien-do/kpi";
 import {
   qualityBlock,
   procurementBlock,
@@ -13,7 +13,7 @@ import {
   voBlock,
   bySystemBlock,
   approvalsBlock,
-} from "@/lib/dashboardext";
+} from "@/lib/tien-do/dashboardext";
 
 export const dynamic = "force-dynamic";
 

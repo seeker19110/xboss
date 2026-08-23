@@ -2,7 +2,7 @@
 
 import { Dispatch, SetStateAction, useEffect, useState } from "react";
 import { showToast } from "@/app/components/Toast";
-import type { DxfParseResult } from "@/lib/cad/dxf-parser";
+import type { DxfParseResult } from "@/lib/ky-thuat/cad/dxf-parser";
 import type {
   CtbMapping,
   DimOverrideItem,

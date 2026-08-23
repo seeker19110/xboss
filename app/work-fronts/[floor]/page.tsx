@@ -8,7 +8,7 @@ import { showToast } from "@/app/components/Toast";
 import { appConfirm } from "@/app/components/dialogs";
 import { fetchMe, type Me } from "@/app/lib/me";
 import { compressImageToWebp } from "@/app/lib/compressImage";
-import { formatDateVN } from "@/lib/date";
+import { formatDateVN } from "@/lib/nen/date";
 
 type Stage = { id: number; name: string; sortOrder: number; active: boolean; durationDays: number };
 type Supplier = { id: number; name: string };

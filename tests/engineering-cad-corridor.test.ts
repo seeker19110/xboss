@@ -6,7 +6,7 @@ import {
   calculateTrapezeHangerStructure,
   UNISTRUT_CATALOG,
   THREADED_ROD_CAPACITY,
-} from "@/lib/engineering-cad-corridor";
+} from "@/lib/ky-thuat/engineering-cad-corridor";
 
 test("M76: planMultiTierCorridor quy hoạch ma trận cao độ 3 tầng chuẩn Invariant", () => {
   const input = {

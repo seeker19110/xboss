@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getTaxonomy } from "@/lib/engineering-graph";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getTaxonomy } from "@/lib/ky-thuat/engineering-graph";
 
 export const dynamic = "force-dynamic";
 

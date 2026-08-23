@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   workloadByWeek,
   manpowerByWeek,
   equipmentUsageByWeek,
   assignmentConflicts,
   defaultResourceWindow,
-} from "@/lib/resources";
+} from "@/lib/vat-tu/resources";
 
 export const dynamic = "force-dynamic";
 

@@ -10,7 +10,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, query } = await import("@/lib/db");
-    const { visibleProjectIds } = await import("@/lib/projects");
+    const { visibleProjectIds } = await import("@/lib/ha-tang/projects");
 
     const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA Tháp 1', 'PJT-TW1')`);
     const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA Tháp 2', 'PJT-TW2')`);
@@ -44,7 +44,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { resolveProjectId, visibleProjectIds } = await import("@/lib/projects");
+    const { resolveProjectId, visibleProjectIds } = await import("@/lib/ha-tang/projects");
 
     const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA Tháp A', 'PJT-TWA')`);
     const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA Tháp B', 'PJT-TWB')`);

@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, makeToken, isSecureCookie, COOKIE, COOKIE_MAX_AGE } from "@/lib/auth";
+import {
+  getCurrentUser,
+  makeToken,
+  isSecureCookie,
+  COOKIE,
+  COOKIE_MAX_AGE,
+} from "@/lib/bao-mat/auth";
 import { queryOne, run } from "@/lib/db";
-import { decryptTotpSecret, verifyTotpCode } from "@/lib/totp";
+import { decryptTotpSecret, verifyTotpCode } from "@/lib/bao-mat/totp";
 
 export const dynamic = "force-dynamic";
 

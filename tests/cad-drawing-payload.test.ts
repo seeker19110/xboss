@@ -4,8 +4,8 @@ import {
   DRAWING_PAYLOAD_VERSION,
   buildDrawingPayload,
   validateDrawingPayload,
-} from "@/lib/cad/drawing-payload";
-import type { DxfParseResult, DxfEntityRaw, DxfLayerInfo } from "@/lib/cad/dxf-parser";
+} from "@/lib/ky-thuat/cad/drawing-payload";
+import type { DxfParseResult, DxfEntityRaw, DxfLayerInfo } from "@/lib/ky-thuat/cad/dxf-parser";
 
 const layerMau: DxfLayerInfo = {
   name: "M-SAD",

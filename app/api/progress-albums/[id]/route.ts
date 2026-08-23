@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, run } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { parseAlbumBody, validateAlbumInput, listAlbumPhotos, type AlbumInput } from "@/lib/tech";
-import { storageDelete } from "@/lib/storage";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import {
+  parseAlbumBody,
+  validateAlbumInput,
+  listAlbumPhotos,
+  type AlbumInput,
+} from "@/lib/ky-thuat/tech";
+import { storageDelete } from "@/lib/nen/storage";
 
 export const dynamic = "force-dynamic";
 

@@ -44,7 +44,7 @@ import {
   generateCncGCodeForDuct,
   generatePipeSpoolCutList,
   type GodTierElementData,
-} from "@/lib/bim";
+} from "@/lib/ky-thuat/bim";
 
 test("BIM Unified Facade: 1. Parametric 3D Mesh & 4D Simulation & Section Cuts", () => {
   // Parametric Cylinder Mesh

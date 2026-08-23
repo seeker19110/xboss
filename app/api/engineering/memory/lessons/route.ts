@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { listCrossProjectLessons, addCrossProjectLesson } from "@/lib/engineering-memory-bank";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import {
+  listCrossProjectLessons,
+  addCrossProjectLesson,
+} from "@/lib/ky-thuat/engineering-memory-bank";
 
 export const dynamic = "force-dynamic";
 

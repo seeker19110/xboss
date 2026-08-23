@@ -6,7 +6,7 @@ import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal } from "@/app/components/dialogs";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { systemColorClasses } from "@/lib/systemColors";
+import { systemColorClasses } from "@/lib/nen/systemColors";
 
 type DocumentSource = "task" | "contract" | "vo" | "drawing" | "project";
 

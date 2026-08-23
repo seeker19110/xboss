@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { queryOne } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { listSubcontractors, avgEvaluationScore, subcontractorDebt } from "@/lib/subcontractors";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import {
+  listSubcontractors,
+  avgEvaluationScore,
+  subcontractorDebt,
+} from "@/lib/hien-truong/subcontractors";
 
 export const dynamic = "force-dynamic";
 

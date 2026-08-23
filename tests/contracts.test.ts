@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("validateContractInput: đủ ca hợp lệ/không hợp lệ", async () => {
-  const { validateContractInput } = await import("@/lib/contracts");
+  const { validateContractInput } = await import("@/lib/tai-chinh/contracts");
 
   const base = {
     code: "HD-001",
@@ -63,7 +63,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { listContracts, contractLinkCounts } = await import("@/lib/contracts");
+    const { listContracts, contractLinkCounts } = await import("@/lib/tai-chinh/contracts");
 
     const supplierId = await insertId(`INSERT INTO suppliers (name) VALUES ('NCC Test HĐ')`);
     const contractId = await insertId(
@@ -123,8 +123,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { expiringContracts } = await import("@/lib/contracts");
-    const { todayISO, daysFromTodayISO } = await import("@/lib/date");
+    const { expiringContracts } = await import("@/lib/tai-chinh/contracts");
+    const { todayISO, daysFromTodayISO } = await import("@/lib/nen/date");
 
     const soonId = await insertId(
       `INSERT INTO contracts (code, kind, party_name, title, value, status, valid_to)
@@ -169,7 +169,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { isUniqueViolation } = await import("@/lib/seqcode");
+    const { isUniqueViolation } = await import("@/lib/ha-tang/seqcode");
 
     const contractId = await insertId(
       `INSERT INTO contracts (code, kind, party_name, title, value, status)
@@ -205,7 +205,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { listContracts } = await import("@/lib/contracts");
+    const { listContracts } = await import("@/lib/tai-chinh/contracts");
 
     const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA HĐ 1', 'PJT-HD1')`);
     const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA HĐ 2', 'PJT-HD2')`);

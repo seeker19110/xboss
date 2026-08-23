@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("validateTenderInput: đủ ca hợp lệ/không hợp lệ", async () => {
-  const { validateTenderInput } = await import("@/lib/tender");
+  const { validateTenderInput } = await import("@/lib/tai-chinh/tender");
 
   assert.equal(validateTenderInput({ name: "Gói 1", items: [{ boqItemId: 1, qty: 10 }] }), null);
   assert.match(
@@ -30,7 +30,7 @@ test("validateTenderInput: đủ ca hợp lệ/không hợp lệ", async () => {
 });
 
 test("validateBidPrices: đủ ca hợp lệ/không hợp lệ", async () => {
-  const { validateBidPrices } = await import("@/lib/tender");
+  const { validateBidPrices } = await import("@/lib/tai-chinh/tender");
 
   assert.equal(validateBidPrices([{ boqItemId: 1, unitPrice: 1000 }]), null);
   assert.equal(validateBidPrices([]), null); // cho phép chào rỗng (chỉ lump sum)
@@ -75,7 +75,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { comparisonTable } = await import("@/lib/tender");
+    const { comparisonTable } = await import("@/lib/tai-chinh/tender");
     const { supplierAId, supplierBId, boqId1, boqId2, tenderId } = await setupTenderWithBoq();
 
     // NCC A chào đủ 2 dòng: 100*1000 + 50*2000 = 200,000.
@@ -126,7 +126,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { awardTender } = await import("@/lib/tender");
+    const { awardTender } = await import("@/lib/tai-chinh/tender");
     const { supplierAId, boqId1, boqId2, tenderId } = await setupTenderWithBoq();
 
     // userId thật (không hardcode 1 — id đó không đảm bảo tồn tại, phụ thuộc thứ tự
@@ -191,7 +191,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { listTenders, getTender } = await import("@/lib/tender");
+    const { listTenders, getTender } = await import("@/lib/tai-chinh/tender");
 
     const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA Thầu 1', 'PJT-GT1')`);
     const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA Thầu 2', 'PJT-GT2')`);

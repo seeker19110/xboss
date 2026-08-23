@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("validateInsuranceInput: đủ ca hợp lệ/không hợp lệ", async () => {
-  const { validateInsuranceInput } = await import("@/lib/insurance");
+  const { validateInsuranceInput } = await import("@/lib/tai-chinh/insurance");
 
   const base = {
     contractId: null,
@@ -43,8 +43,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { expiringInsuranceBonds } = await import("@/lib/insurance");
-    const { todayISO, daysFromTodayISO } = await import("@/lib/date");
+    const { expiringInsuranceBonds } = await import("@/lib/tai-chinh/insurance");
+    const { todayISO, daysFromTodayISO } = await import("@/lib/nen/date");
 
     const soonId = await insertId(
       `INSERT INTO insurance_bonds (kind, title, status, expiry_date)
@@ -111,8 +111,8 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { expiringInsuranceBonds } = await import("@/lib/insurance");
-    const { daysFromTodayISO } = await import("@/lib/date");
+    const { expiringInsuranceBonds } = await import("@/lib/tai-chinh/insurance");
+    const { daysFromTodayISO } = await import("@/lib/nen/date");
 
     const userId = await insertId(
       `INSERT INTO users (name, email, password_hash, role) VALUES ('Test Notif Insurance', 'notifinsurance@test.local', 'x', 'admin')`,
@@ -156,7 +156,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { checkInsuranceContractRef } = await import("@/lib/insurance");
+    const { checkInsuranceContractRef } = await import("@/lib/tai-chinh/insurance");
 
     const p1 = await insertId(
       `INSERT INTO projects (name, code) VALUES ('DA Insurance 1', 'PJT-INS1')`,

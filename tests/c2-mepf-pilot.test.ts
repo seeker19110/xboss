@@ -7,7 +7,7 @@ import {
   createTimeTravelSnapshot,
   detectInputAnomalies,
   parseComplexFieldCommandWithContext,
-} from "@/lib/user-error-healer";
+} from "@/lib/nen/user-error-healer";
 
 const FIXTURE_DIR = join(process.cwd(), "tests", "fixtures", "engineering-ingest");
 

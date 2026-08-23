@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { listNcrs } from "@/lib/qaqc";
-import { nextSeqCode, withUniqueRetry } from "@/lib/seqcode";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { listNcrs } from "@/lib/ky-thuat/qaqc";
+import { nextSeqCode, withUniqueRetry } from "@/lib/ha-tang/seqcode";
 
 export const dynamic = "force-dynamic";
 

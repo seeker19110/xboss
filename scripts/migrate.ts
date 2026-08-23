@@ -3,7 +3,7 @@
 // `npm run db:migrate -- --dry-run` (M44 PR4): chỉ IN danh sách migration SẼ áp, không chạy
 // gì — dùng kiểm tra trước deploy/staging (xem docs/ops/staging.md, CLAUDE.md mục Quy ước).
 import "./env";
-import { runMigrations, pendingMigrations, getMigrationPool } from "../lib/db/migrate";
+import { runMigrations, pendingMigrations, getMigrationPool } from "@/lib/db/migrate";
 
 async function main() {
   const dryRun = process.argv.includes("--dry-run");

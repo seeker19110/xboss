@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
-import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { query, insertId } from "@/lib/db";
-import { WEBHOOK_EVENTS, validateWebhookUrl } from "@/lib/webhooks";
+import { WEBHOOK_EVENTS, validateWebhookUrl } from "@/lib/bao-mat/webhooks";
 
 export const dynamic = "force-dynamic";
 

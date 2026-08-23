@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 // ===== Test thuần (không cần DB) =====
 
 test("validateNormInput: đủ ca hợp lệ/không hợp lệ", async () => {
-  const { validateNormInput } = await import("@/lib/norms");
+  const { validateNormInput } = await import("@/lib/khoi-luong/norms");
 
   const material = {
     resourceType: "material" as const,
@@ -43,7 +43,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { normUsage } = await import("@/lib/norms");
+    const { normUsage } = await import("@/lib/khoi-luong/norms");
 
     const sheetId = await insertId(
       `INSERT INTO sheet_types (code, name, slug) VALUES ('NM-TEST', 'Sheet Test Norms', 'nm-test')`,
@@ -116,7 +116,7 @@ test(
 
 test("overNormItems: xuất hiện/biến mất đúng ngưỡng", { skip: !HAS_TEST_DB }, async () => {
   const { run, insertId } = await import("@/lib/db");
-  const { overNormItems } = await import("@/lib/norms");
+  const { overNormItems } = await import("@/lib/khoi-luong/norms");
 
   const boqId = await insertId(
     `INSERT INTO boq_items (code, name, unit, qty_contract) VALUES ('BOQ-OVER', 'Dòng BOQ over', 'm', 10)`,
@@ -175,7 +175,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { overNormItems } = await import("@/lib/norms");
+    const { overNormItems } = await import("@/lib/khoi-luong/norms");
 
     const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA Over 1', 'PJT-OV1')`);
     const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA Over 2', 'PJT-OV2')`);
@@ -260,7 +260,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId, queryOne } = await import("@/lib/db");
-    const { getNorm } = await import("@/lib/norms");
+    const { getNorm } = await import("@/lib/khoi-luong/norms");
 
     const p1 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA Norm 1', 'PJT-NM1')`);
     const p2 = await insertId(`INSERT INTO projects (name, code) VALUES ('DA Norm 2', 'PJT-NM2')`);

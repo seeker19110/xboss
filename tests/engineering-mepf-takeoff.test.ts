@@ -6,7 +6,7 @@ import {
   processMepfAutoTakeoff,
   MepfSegment,
   MepfSymbolDetection,
-} from "@/lib/engineering-mepf-takeoff";
+} from "@/lib/ky-thuat/engineering-mepf-takeoff";
 
 test("M67: inferFittingsFromSegments suy diễn chính xác cút 90 độ và tê từ mạng topo ống", () => {
   const segments: MepfSegment[] = [
@@ -185,7 +185,7 @@ test("M67: processMepfAutoTakeoff tính toán khối lượng tổng hợp và p
 });
 
 test("M67: solveGenerativeMepfRoute sinh 3 phương án nắn tuyến 3D tối ưu Pareto và phát hiện va chạm", async () => {
-  const { solveGenerativeMepfRoute } = await import("@/lib/engineering-mepf-takeoff");
+  const { solveGenerativeMepfRoute } = await import("@/lib/ky-thuat/engineering-mepf-takeoff");
 
   const startPoint: [number, number, number] = [0, 0, 2600];
   const endPoint: [number, number, number] = [10000, 5000, 2600];

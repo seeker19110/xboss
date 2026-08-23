@@ -6,7 +6,7 @@ import {
   detectAabbVoxelClashes,
   optimize2dSheetNesting,
   hashComputeInput,
-} from "@/lib/engineering-spatial-wasm";
+} from "@/lib/ky-thuat/engineering-spatial-wasm";
 
 test("M73: computePolylineSweepVolume tính chính xác độ dài 3D và thể tích không gian", () => {
   const points = [

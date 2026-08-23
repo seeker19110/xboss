@@ -1,8 +1,8 @@
 // Dữ liệu mẫu mô phỏng cấu trúc Excel AVIO Tháp A (chạy khi chưa có file Excel thật).
 import "./env";
-import { run, insertId, queryOne, todayISO } from "../lib/db";
-import type { StatusSlug } from "../lib/status";
-import { slugFromCode, toSlug } from "../lib/sheets";
+import { run, insertId, queryOne, todayISO } from "@/lib/db";
+import type { StatusSlug } from "@/lib/tien-do/status";
+import { slugFromCode, toSlug } from "@/lib/nen/sheets";
 
 const SHEETS = [
   {

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertId } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { listDemob, parseDemobBody, validateDemobInput } from "@/lib/handover";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { listDemob, parseDemobBody, validateDemobInput } from "@/lib/hien-truong/handover";
 
 export const dynamic = "force-dynamic";
 

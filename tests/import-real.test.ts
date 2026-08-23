@@ -32,7 +32,7 @@ test(
   { skip: SKIP },
   async () => {
     const { query } = await import("@/lib/db");
-    const { importWorkbook } = await import("@/lib/import");
+    const { importWorkbook } = await import("@/lib/tien-do/import");
     await resetWbs();
 
     const wb = XLSX.readFile(XLSX_FILE, { cellDates: true });
@@ -70,7 +70,7 @@ test(
   { skip: SKIP },
   async () => {
     const { queryOne } = await import("@/lib/db");
-    const { importWorkbook } = await import("@/lib/import");
+    const { importWorkbook } = await import("@/lib/tien-do/import");
     const wb = XLSX.readFile(XLSX_FILE, { cellDates: true });
 
     // Cùng file, import ở 2 múi giờ trái dấu → ngày ghi xuống DB phải y hệt. Trước đây

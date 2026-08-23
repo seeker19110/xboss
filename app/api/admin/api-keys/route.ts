@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { query, queryOne, insertId } from "@/lib/db";
-import { generateApiKey, hashApiKey } from "@/lib/api-keys";
+import { generateApiKey, hashApiKey } from "@/lib/bao-mat/api-keys";
 
 export const dynamic = "force-dynamic";
 

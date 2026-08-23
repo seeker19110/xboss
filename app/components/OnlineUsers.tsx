@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Wifi } from "lucide-react";
-import { ROLE_LABELS } from "@/lib/roles";
+import { ROLE_LABELS } from "@/lib/nen/roles";
 
 type PresenceEntry = { userId: number; name: string; role: string; lastSeen: number };
 

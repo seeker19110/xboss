@@ -8,7 +8,7 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, redirectToLogin, type Me } from "@/app/lib/me";
-import { formatDateVN, todayISO } from "@/lib/date";
+import { formatDateVN, todayISO } from "@/lib/nen/date";
 
 type Personnel = {
   id: number;

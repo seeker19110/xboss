@@ -11,7 +11,7 @@ test(
   { skip: !HAS_TEST_DB },
   async () => {
     const { run, insertId } = await import("@/lib/db");
-    const { getClaim } = await import("@/lib/claims");
+    const { getClaim } = await import("@/lib/tai-chinh/claims");
 
     const projA = await insertId(`INSERT INTO projects (name) VALUES ('Dự án claim-doc A')`);
     const projB = await insertId(`INSERT INTO projects (name) VALUES ('Dự án claim-doc B')`);

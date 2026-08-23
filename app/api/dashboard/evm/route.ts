@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { resolveSystemId } from "@/lib/systems";
-import { getCurrentProjectId } from "@/lib/projects";
-import { getEvmSeries, type EvmSource } from "@/lib/evm";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { resolveSystemId } from "@/lib/tien-do/systems";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { getEvmSeries, type EvmSource } from "@/lib/tien-do/evm";
 
 export const dynamic = "force-dynamic";
 

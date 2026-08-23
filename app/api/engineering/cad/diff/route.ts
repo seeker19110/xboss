@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   computeCadVectorDiff,
   listCadDiffSessions,
   saveCadDiffSession,
   CadEntity,
-} from "@/lib/engineering-cad-skills";
+} from "@/lib/ky-thuat/engineering-cad-skills";
 
 export const dynamic = "force-dynamic";
 

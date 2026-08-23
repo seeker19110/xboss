@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { systemStatus } from "@/lib/tech";
+import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { systemStatus } from "@/lib/ky-thuat/tech";
 
 export const dynamic = "force-dynamic";
 

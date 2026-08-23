@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, insertId, withProjectScope } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
-import { assertModuleEnabled } from "@/lib/feature-flags";
-import { boqTakenBy } from "@/lib/boq";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
+import { boqTakenBy } from "@/lib/khoi-luong/boq";
 
 export const dynamic = "force-dynamic";
 

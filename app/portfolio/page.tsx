@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
-import { systemColorClasses } from "@/lib/systemColors";
-import type { ProjectListItem, PortfolioKpi, OrganizationItem } from "@/lib/projects";
+import { systemColorClasses } from "@/lib/nen/systemColors";
+import type { ProjectListItem, PortfolioKpi, OrganizationItem } from "@/lib/ha-tang/projects";
 
 const STATUS_LABEL: Record<string, string> = {
   active: "Đang thi công",

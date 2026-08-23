@@ -28,7 +28,7 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { formatDateVN } from "@/lib/date";
+import { formatDateVN } from "@/lib/nen/date";
 
 type TechCategory = "bim" | "schedule" | "camera" | "drone" | "other";
 const CATEGORY_LABEL: Record<TechCategory, string> = {

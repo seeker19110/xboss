@@ -1,21 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { storagePut, storageDelete } from "@/lib/storage";
+import { storagePut, storageDelete } from "@/lib/nen/storage";
 import { queryOne, run, withProjectScope } from "@/lib/db";
-import { getCurrentUser, CAN } from "@/lib/auth";
-import { getCurrentProjectId } from "@/lib/projects";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   extForDocMime,
   verifyFileMime,
   newInsuranceDocFileName,
   MAX_DOC_BYTES,
   isContentTooLarge,
-} from "@/lib/photos";
+} from "@/lib/nen/photos";
 import {
   checkInsuranceContractRef,
   parseInsuranceBody,
   validateInsuranceInput,
   type InsuranceInput,
-} from "@/lib/insurance";
+} from "@/lib/tai-chinh/insurance";
 
 export const dynamic = "force-dynamic";
 
