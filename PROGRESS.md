@@ -17,6 +17,30 @@ test luôn đỏ vì 8 file ở mục dưới → **bước kiểm ERD chưa t�
 không ai biết vì log chỉ báo "bước trước fail". Cùng lớp vấn đề với release-gate đếm mù: cả
 hai đều là cổng kiểm **tưởng đang canh nhưng thực ra không chạy**. Khi thêm cổng kiểm mới,
 cần tự hỏi "nếu bước trước đỏ dài ngày thì cổng này có bị bỏ qua không".
+## Vệ sinh test: 3 file không tự dọn dữ liệu → fail giả khi chạy lại (2026-08-23, PR #373)
+
+**Phát hiện khi verify đợt sửa 8 file test ở mục dưới.** Chạy full suite trên DB cục bộ đã tích
+luỹ dữ liệu qua nhiều lần chạy cho ra 4 file đỏ, nhưng **cùng 4 file đó xanh trên DB sạch** — tức
+không phải hồi quy mà là test tạo bản ghi có **khoá UNIQUE cố định** rồi không dọn, nên lần chạy
+thứ hai đụng khoá trùng. CI né được vì mỗi lần chạy dựng container Postgres mới, nhưng ai chạy
+test cục bộ nhiều lần liên tiếp sẽ gặp — và **fail giả kiểu này che mất lỗi thật**.
+
+- `tests/feature-flags.test.ts`: tạo `projects` mã cố định `PJT-FF1/2/3` + `users` email cố định,
+  chỉ xoá `feature_flags` → thêm `try/finally` xoá cả project lẫn user.
+- `tests/auth-perms-project.test.ts`: 7 chỗ tạo `projects` mã cố định, chỉ xoá `role_permissions`
+  → thêm helper `freshProject()` dọn bản còn sót **trước** khi tạo.
+- `tests/engineering-site-bot.test.ts`: `telegram_chat_id = 99998888` là UNIQUE, không dọn gì →
+  dọn binding ở đầu **và** `try/finally` xoá binding/project/user ở cuối.
+
+Hai cách dọn là có chủ đích: dọn ở **đầu** chịu được lần chạy trước chết giữa chừng; dọn ở **cuối**
+không để rác lại cho file khác. `site-bot` dùng cả hai.
+
+`tests/auth.test.ts` **không sửa** — chạy lặp 3 lần đều xanh, nó chỉ là nạn nhân nhiễu chéo từ 3
+file trên.
+
+**Quy ước rút ra:** test tích hợp tạo bản ghi có khoá UNIQUE phải tự dọn được — hoặc dùng khoá
+sinh theo `insertId` (như phần lớn test trong repo), hoặc dọn theo khoá cố định ở đầu lẫn cuối.
+Đừng dựa vào "CI luôn có DB sạch": nó làm lớp lỗi này vô hình cho tới khi ai đó chạy cục bộ.
 
 ## Hạ tầng: chốt VPS + pm2 là production chính, bỏ Vercel (2026-08-23)
 
