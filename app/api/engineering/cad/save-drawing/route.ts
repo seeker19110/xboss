@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { writeFileSync, mkdirSync, existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, CAN } from "@/lib/auth";
 import { getCurrentProjectId } from "@/lib/projects";
 import { queryOne, insertId, run } from "@/lib/db";
 import { validateDxf } from "@/lib/cad/dxf-parser";
@@ -19,6 +19,10 @@ export async function POST(req: NextRequest) {
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+    }
+
+    if (!CAN.manageDrawings(user.role)) {
+      return NextResponse.json({ error: "Không có quyền lưu bản vẽ" }, { status: 403 });
     }
 
     const body = await req.json();
