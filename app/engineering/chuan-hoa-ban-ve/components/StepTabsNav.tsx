@@ -7,14 +7,15 @@ import type { SaveConfig, Step1SubTab } from "../types";
 // Thanh điều hướng 2 bước (Bước 1 Studio chuẩn hóa / Bước 2 Đặt tên ISO 19650)
 // kèm 4 sub-tab của Bước 1.
 
+// Nhãn hiển thị chung khi đang xử lý chuẩn hóa (không còn thanh % giả lập)
+const HEALING_LABEL = "Đang xử lý…";
+
 interface StepTabsNavProps {
   activeStep: 1 | 2;
   setActiveStep: Dispatch<SetStateAction<1 | 2>>;
   step1SubTab: Step1SubTab;
   setStep1SubTab: Dispatch<SetStateAction<Step1SubTab>>;
   isAutoHealing: boolean;
-  healProgress: number;
-  healStatusMessage: string;
   healCompleted: boolean;
   saveConfig: SaveConfig;
   totalHealthScore: number;
@@ -27,8 +28,6 @@ export default function StepTabsNav({
   step1SubTab,
   setStep1SubTab,
   isAutoHealing,
-  healProgress,
-  healStatusMessage,
   healCompleted,
   saveConfig,
   totalHealthScore,
@@ -93,7 +92,7 @@ export default function StepTabsNav({
                     {isAutoHealing ? (
                       <>
                         <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                        <span>Đang chạy {healProgress}%</span>
+                        <span>{HEALING_LABEL}</span>
                       </>
                     ) : (
                       <>
@@ -107,7 +106,7 @@ export default function StepTabsNav({
                   {isAutoHealing ? (
                     <span className="text-amber-400 font-medium flex items-center gap-1.5">
                       <Sparkles className="w-3 h-3 animate-spin shrink-0" />
-                      {healStatusMessage}
+                      {HEALING_LABEL}
                     </span>
                   ) : (
                     "Tự động dọn rác, WCS 2D (X,Y), sửa font UTF-8, layer AIA, sửa Dim đo thực & Block BOQ"
@@ -119,7 +118,7 @@ export default function StepTabsNav({
               {isAutoHealing ? (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/40 text-xs font-mono font-bold animate-pulse">
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>{healProgress}%</span>
+                  <span>{HEALING_LABEL}</span>
                 </div>
               ) : (
                 <span
@@ -137,22 +136,13 @@ export default function StepTabsNav({
             </div>
           </div>
 
-          {/* Thanh chạy tiến độ % ngay phía dưới */}
+          {/* Trạng thái đang xử lý ngay phía dưới (không còn thanh % giả lập) */}
           {isAutoHealing && (
-            <div className="mt-3 pt-2.5 border-t border-amber-500/20 space-y-1.5 animate-in fade-in duration-200">
-              <div className="flex items-center justify-between text-[11px] font-mono">
-                <span className="text-amber-300 font-medium flex items-center gap-1.5 truncate">
-                  <Sparkles className="w-3 h-3 text-amber-400 animate-spin shrink-0" />
-                  {healStatusMessage}
-                </span>
-                <span className="text-amber-400 font-bold ml-2 shrink-0">{healProgress}%</span>
-              </div>
-              <div className="w-full h-2 rounded-full bg-zinc-950/80 overflow-hidden relative border border-amber-500/30">
-                <div
-                  className="h-full bg-gradient-to-r from-amber-500 via-amber-400 to-emerald-400 rounded-full transition-all duration-100 ease-out shadow-[0_0_12px_rgba(245,158,11,0.6)]"
-                  style={{ width: `${healProgress}%` }}
-                />
-              </div>
+            <div className="mt-3 pt-2.5 border-t border-amber-500/20 animate-in fade-in duration-200">
+              <span className="text-amber-300 font-medium flex items-center gap-1.5 text-[11px] font-mono">
+                <Sparkles className="w-3 h-3 text-amber-400 animate-spin shrink-0" />
+                {HEALING_LABEL}
+              </span>
             </div>
           )}
 

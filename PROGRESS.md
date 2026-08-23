@@ -22,7 +22,66 @@
 
 - **Đã làm:** component React duy nhất 5.112 dòng, 80 hook → còn **1.685 dòng**, tách JSX render thuần ra 8 component con trong `app/engineering/chuan-hoa-ban-ve/components/` (`UploadAndBrowsePanel`, `CadViewportStudio`, `StepTabsNav`, `DiagnosticPurgePanel` [Bước 1.1], `LayersFontPanel` [Bước 1.2], `BoqDimCtbPanel` [Bước 1.3], `XrefDiffLispPanel` [Bước 1.4], `Step2NamingPanel` [Bước 2]) + `types.ts` gom interface dùng chung. Chiến lược **lift-state-up**: toàn bộ `useState`/`useEffect`/handler/gọi API vẫn nằm nguyên trong `page.tsx`, component con chỉ nhận props — không đổi hành vi/UI/API.
 - **Verify:** diff JSX đối chiếu token-level khớp bản gốc; lint/typecheck/`next build --webpack` xanh; `npm test` 209 file 0 fail.
-- **Còn lại (nợ kỹ thuật):** `page.tsx` vẫn còn ~1.685 dòng state/logic tập trung — nếu cần tách sâu hơn thì phải chuyển sang custom hook, phạm vi lớn hơn "chỉ tách JSX" nên chưa làm ở đợt này.
+- **Nợ kỹ thuật của đợt này (đã đóng):** phần state/logic còn tập trung trong `page.tsx` đã được tách sang custom hook — xem mục kế tiếp.
+
+## Tách state/logic `chuan-hoa-ban-ve` sang custom hook (2026-08-23)
+
+- **Đã làm:** tiếp nối đợt tách JSX ở trên, chuyển toàn bộ `useState`/`useEffect`/`useCallback` và handler gọi API từ `page.tsx` sang **12 custom hook** trong `app/engineering/chuan-hoa-ban-ve/hooks/`. `page.tsx` **1.685 → 384 dòng**, chỉ còn: 2 state điều hướng bước (`activeStep`/`step1SubTab`), chuỗi gọi hook, effect khởi động và JSX truyền props xuống 8 component con. Không đổi hành vi/UI/API, không đổi props của component con, không đổi `types.ts`.
+- **Danh sách hook:** `useCadViewport` (khung nhìn vector 2D + bảng hiển thị layer), `useFontDoctor`, `useCadReviewApproval` (rà soát + ký duyệt Gate 0), `useCadDiff`, `useBlockCatalog`, `useAutoLispGenerator`, `useCadSource` (nguồn bản vẽ: thư viện thiết kế / tệp đơn / cả thư mục kèm XREF + model DXF đã parse), `useSmartNaming` (đặt tên ISO 19650 + lưu trữ), `useCadStandardization` (đồng bộ model thật từ `dxfData`: layer/text/block/Dim/purge/WCS/CTB + bộ lọc layer), `useCadHealthScore`, `useAutoHealEngine`, `useCadExporters`.
+- **Ranh giới đã chọn (để tránh phụ thuộc vòng giữa các hook):** hook không tự đọc state của hook khác — hook cha truyền **callback ổn định** (`onLayersParsed`, `onFontSampleDetected`, `onDrawingFileNameDetected`) hoặc setter xuống hook con, và thứ tự gọi hook trong `page.tsx` giữ đúng thứ tự chạy 3 `useEffect` như bản gốc (đồng bộ `dxfData` → dọn interval auto-heal → effect khởi động).
+- **Verify:** `npm run lint`/`typecheck`/`build` xanh; `npm test` 209 file, 674 ca pass — **đúng bằng baseline trước khi sửa** (1 ca fail sẵn có do worktree thiếu cây thư mục `drawings/`). Ngoài ra chạy **đối chứng trên trình duyệt thật** (Postgres ephemeral + `npm run start` + Playwright): đăng nhập → mở `/engineering/chuan-hoa-ban-ve` → nạp tệp DXF thật → duyệt 4 tab Bước 1 + Bước 2, so output bản trước và bản sau khi tách — **giống hệt từng dòng** (điểm sức khỏe, bảng layer, ô Bác Sĩ Font tự điền, tên tệp chuẩn sinh ra), 0 lỗi runtime, không có vòng lặp fetch phát sinh.
+
+## Chuẩn hóa bản vẽ CAD 2D — Việc 7: vá lỗ hổng thật trong studio TS hiện tại (2026-08-23)
+
+- **Đã làm:** 4 việc con, đã merge vào `main`:
+  - **7.1 — Bộ ghi DXF R12 hợp lệ + kiểm định server-side trước khi lưu.** `lib/cad/dxf-parser.ts`: sửa `$ACADVER` từ `AC1015` (khai sai là R2000) về `AC1009` đúng R12 đang thực sự ghi ra, trong cả `exportDxf()` lẫn `generateStandard2dDxf()`; hạ nhánh `DIMENSION` thô thành `LINE` + `TEXT` (theo quyết định đã chốt ở M98 §1(b)), có nhánh dự phòng ghi `POINT` để không bao giờ nuốt mất entity; thêm hàm `validateDxf()` kiểm cấu trúc tối thiểu (cân bằng SECTION/ENDSEC, đủ 4 section bắt buộc, kết thúc `0`+`EOF`, chống lệch nhịp cặp mã nhóm/giá trị, bỏ BOM). `app/api/engineering/cad/save-drawing/route.ts` trả **422** khi DXF không hợp lệ, trước mọi tác dụng phụ (không ghi file, không tạo `drawings`/`drawing_revisions`). Sửa `docs/nang-cap/M98-dxf-r2000-va-dwg.md` §1(b) (bỏ nhắc file `lib/cad/dxf-writer.ts` không tồn tại). Bổ sung test trong `tests/dxf-real-drawing-parser.test.ts` (11 → 14 ca).
+  - **7.2 — Chặn quyền ghi bản vẽ trái phép.** `app/api/engineering/cad/save-drawing/route.ts` trước đây chỉ kiểm `getCurrentUser()` (401) mà không có `CAN.*` nào — mọi vai trò đã đăng nhập (kể cả `subcon`/`bch`/`viewer`) đều ghi được bản vẽ chính thức. Nay thêm `CAN.manageDrawings` (admin/pm/engineer) → 403, áp cho toàn bộ `POST`.
+  - **7.3 — Gom quy tắc chuẩn hóa layer/font CAD về một nguồn.** Xoá bản trùng lặp `normalizeCadLayers`/`convertTcvn3ToUnicode`/`TCVN3_MAP` trong `lib/engineering-cad-skills.ts` (2 bản `normalizeCadLayers` trước đây cho kết quả KHÁC nhau trên cùng input), re-export từ nguồn chuẩn `lib/cad/dxf-parser.ts`. `POST /api/engineering/cad/normalize` nay phân biệt được gió hồi/thải.
+  - **7.4 — Auto-heal Bước 1: bỏ thanh tiến độ giả.** Bỏ `setInterval` tăng % ngẫu nhiên (`Math.random()`) + 5 message cố định vốn không phản ánh xử lý thật (xử lý thật chạy đồng bộ, tức thời); thay bằng trạng thái loading tĩnh "Đang xử lý…". Sửa ở `app/engineering/chuan-hoa-ban-ve/hooks/useAutoHealEngine.ts`, `components/StepTabsNav.tsx`, `components/CadViewportStudio.tsx`, `page.tsx`.
+
+- **Verify:** `npm run lint` + `npm run typecheck` xanh; `npm test` 209 file, 0 fail.
+
+- **Ghi chú:** chặng ngắn hạn trước M99, các đặc tả `M98`/`M99` trong `docs/nang-cap/` vẫn ở trạng thái **Draft**, chưa đóng.
+
+**Việc 7.5 — Sửa `drawing_revisions.status = 'pending'` vi phạm CHECK (2026-08-23).** Đổi
+`revStatus = isApproved ? "approved" : "pending"` → `"submitted"` (giá trị đã hợp lệ trong CHECK,
+đúng nghĩa "đã nộp, chờ duyệt"), không cần migration. **Đính chính:** phát hiện trước đó về
+`drawings.kind = 'design'` vi phạm CHECK là **false positive** — `migrations/0048_drawing_kind_design.sql`
+đã nới constraint này từ trước, chỉ đúng phần `drawing_revisions.status` là bug thật. Thêm test tích
+hợp trên `TEST_DATABASE_URL` thật trong `tests/engineering-cad-save-drawing.test.ts`: xác nhận
+insert `status='submitted'` thành công + test hồi quy xác nhận `status='pending'` vẫn bị Postgres bác
+(mã lỗi CHECK `23514`) nếu ai lỡ sửa lại.
+
+**Việc 7.6 — Siết `normalizeCadLayers` theo ranh giới token (2026-08-23).** Thay `String.includes()`
+thô bằng `hasToken`/`hasAnyToken` (khớp có ranh giới 2 phía, ký tự trong từ = chữ hoặc số, phân tách
+bằng `_`/`-`/khoảng trắng/dấu chấm) trong `lib/cad/dxf-parser.ts`; đổi thứ tự nhánh thành
+`DUCT → ELEC → ELV → PIPE → FIRE → STRUCT → ANNO` (đưa `ELEC`/`ELV` lên trước `PIPE`) — sửa đúng 2 ca
+xác nhận sai (`MANG_CAP_DIEN` từng → `P-PIPE-DOMW` do khớp nhầm `"CAP"`, `ONG_THOAT_SAN` từng →
+`M-DUCT-SUPP` do `"THOAT"` chứa `"OA"`), không đổi từ khoá/tên layer đích nào. Kiểm chứng qua đường
+thật `parseDxf()` + đối chứng cũ↔mới trên corpus ~1.900 chuỗi layer thực tế.
+
+- **Hồi quy phát sinh do siết ranh giới (chưa sửa, cần quyết định riêng):** một số layer trước đây
+  khớp **nhờ khớp tiền tố/hậu tố** (vd `CHILLER` khớp nhờ chứa tiền tố `CHILL`, `ELECTRICAL` nhờ tiền
+  tố `ELEC`, `ANNOTATION`/`DIMENSION` nhờ `ANNO`/`DIM`, `COLUMN`/`BEAMS` nhờ `COL`/`BEAM`, layer có số
+  dính liền như `DUCT1`/`SA1`) nay **không còn khớp** (rơi về "chưa chuẩn hoá", không sai hệ — trừ
+  nhóm `CHILLER*` đổi hẳn từ `M-CHW-PIPE` (đúng) sang `P-PIPE-DOMW` (sai hệ), là ca nặng nhất). Sửa
+  cần bổ sung biến thể vào danh sách từ khoá hoặc nới quy tắc "tiền tố ≥ 4 ký tự" — cả hai đều vượt
+  ranh giới đã chốt của Việc 7.6 (cấm đổi danh sách từ khoá), nên chưa làm.
+- **Sai có sẵn, không do Việc 7.6 gây ra, chưa sửa:** `FIRE_PIPE`/`PIPE_PCCC` rơi vào nhánh `PIPE` vì
+  đứng trước `FIRE`; `ELV-CABL-TRAY` rơi vào nhánh `ELEC` vì `TRAY` đứng trước `ELV`; hàm **không
+  idempotent** (áp lại lên tên đã chuẩn hoá cho kết quả khác, vd `P-PIPE-SANR → P-PIPE-DOMW`); bộ đếm
+  chẩn đoán trong `parseDxf` (`hvacCount`/`elecCount`/...) vẫn dùng `includes()` thô, nay lệch luật so
+  với bảng ánh xạ layer.
+- **7 file test có sẵn fail khi chạy trên DB thật lệch migration** (`engineering-fidic-claim`,
+  `engineering-graph`, `engineering-predictions`, `engineering-prescriptive`,
+  `engineering-twin-pinnacle`, `engineering-twin`, `engineering-worker-bridge`) — không liên quan CAD
+  (đã xác nhận không file nào import `lib/cad/*`), đòi cột DB chưa có migration nào định nghĩa (vd
+  `title`, `revision_name`, `metadata` trên vài bảng `engineering_*`). Không thuộc phạm vi Việc 7.
+
+3. Test cho RBAC của `save-drawing` hiện chỉ kiểm bảng `CAN`, chưa gọi được route handler thật để khẳng định status 403 — do `getCurrentUser()` gọi `headers()` của `next/headers`, không chạy được ngoài request scope, và repo chưa bật `--experimental-test-module-mocks` trong `scripts/run-tests.mjs`.
+
+- **Verify (7.5+7.6):** `npm run lint` + `npm run typecheck` + `npm run build` xanh; `npm test` 209
+  file, 0 fail (chạy không DB — test tích hợp tự skip; đã verify riêng trên DB thật ở từng việc).
 
 ## Giai đoạn hiện tại
 
