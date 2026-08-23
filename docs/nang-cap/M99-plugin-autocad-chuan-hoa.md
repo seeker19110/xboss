@@ -1,13 +1,13 @@
 # M99 — Đặc tả: Plugin AutoCAD chuẩn hóa bản vẽ (tầng 2)
 
-| Thuộc tính       | Giá trị                                                                                              |
-| ---------------- | ---------------------------------------------------------------------------------------------------- |
-| Issue / Goal     | Chuẩn hóa bản vẽ bằng chính API AutoCAD trên máy kỹ sư, thay cho việc tự đọc/ghi DXF bằng TypeScript |
-| Spec owner       | (chờ gán)                                                                                            |
-| State            | **Draft** — chờ duyệt                                                                                |
-| Người/ngày duyệt |                                                                                                      |
-| Cập nhật         | 2026-08-22                                                                                           |
-| Quyết định nền   | `docs/adr/0006-plugin-autocad-va-pipeline-server.md`                                                 |
+| Thuộc tính       | Giá trị                                                                                                                          |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Issue / Goal     | Chuẩn hóa bản vẽ bằng chính API AutoCAD trên máy kỹ sư, thay cho việc tự đọc/ghi DXF bằng TypeScript                             |
+| Spec owner       | (chờ gán)                                                                                                                        |
+| State            | **Approved for implementation** — PR0 (đã merge) + PR1 (rule pack v1); PR2+ (api_tokens, plugin C#) chờ điều kiện ngoài (mục 18) |
+| Người/ngày duyệt | Seeker (liendv@live.com), 2026-08-23 — duyệt qua phiên chat ("duyệt luôn cả 3, làm tiếp")                                        |
+| Cập nhật         | 2026-08-22                                                                                                                       |
+| Quyết định nền   | `docs/adr/0006-plugin-autocad-va-pipeline-server.md`                                                                             |
 
 > Không code khi chưa **Approved for implementation**.
 
