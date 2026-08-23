@@ -13,12 +13,18 @@ test("feature-flags: bảng rỗng → mọi module coi như bật (mặc địn
   const ff = await import("@/lib/feature-flags");
 
   const p = await insertId(`INSERT INTO projects (name, code) VALUES ('DA FF1', 'PJT-FF1')`);
-  await run(`DELETE FROM feature_flags WHERE project_id = ?`, p);
-  ff.bumpFeatureFlagsVersion();
+  try {
+    await run(`DELETE FROM feature_flags WHERE project_id = ?`, p);
+    ff.bumpFeatureFlagsVersion();
 
-  assert.equal(await ff.isModuleEnabled("documents", p), true);
-  const flags = await ff.getModuleFlags(p);
-  for (const enabled of flags.values()) assert.equal(enabled, true);
+    assert.equal(await ff.isModuleEnabled("documents", p), true);
+    const flags = await ff.getModuleFlags(p);
+    for (const enabled of flags.values()) assert.equal(enabled, true);
+  } finally {
+    // projects.code là UNIQUE — không dọn thì lần chạy sau đụng khoá trùng (fail giả).
+    await run(`DELETE FROM feature_flags WHERE project_id = ?`, p);
+    await run(`DELETE FROM projects WHERE id = ?`, p);
+  }
 });
 
 test(
@@ -32,19 +38,26 @@ test(
     const u = await insertId(
       `INSERT INTO users (name, email, role, password_hash) VALUES ('FFTest','ff-test@x.vn','admin','x')`,
     );
-    await run(`DELETE FROM feature_flags WHERE project_id = ?`, p);
-    ff.bumpFeatureFlagsVersion();
+    try {
+      await run(`DELETE FROM feature_flags WHERE project_id = ?`, p);
+      ff.bumpFeatureFlagsVersion();
 
-    assert.equal(await ff.isModuleEnabled("documents", p), true);
+      assert.equal(await ff.isModuleEnabled("documents", p), true);
 
-    await ff.setFlag("documents", p, false, u, 1);
-    assert.equal(await ff.isModuleEnabled("documents", p), false);
+      await ff.setFlag("documents", p, false, u, 1);
+      assert.equal(await ff.isModuleEnabled("documents", p), false);
 
-    await ff.setFlag("documents", p, true, u, 1);
-    assert.equal(await ff.isModuleEnabled("documents", p), true);
+      await ff.setFlag("documents", p, true, u, 1);
+      assert.equal(await ff.isModuleEnabled("documents", p), true);
 
-    // Module khác không bị ảnh hưởng bởi override của module này.
-    assert.equal(await ff.isModuleEnabled("tracking", p), true);
+      // Module khác không bị ảnh hưởng bởi override của module này.
+      assert.equal(await ff.isModuleEnabled("tracking", p), true);
+    } finally {
+      // projects.code và users.email đều UNIQUE — phải dọn để chạy lại được.
+      await run(`DELETE FROM feature_flags WHERE project_id = ?`, p);
+      await run(`DELETE FROM projects WHERE id = ?`, p);
+      await run(`DELETE FROM users WHERE id = ?`, u);
+    }
   },
 );
 
@@ -59,24 +72,30 @@ test(
     const u = await insertId(
       `INSERT INTO users (name, email, role, password_hash) VALUES ('FFTest2','ff-test2@x.vn','admin','x')`,
     );
-    await run(`DELETE FROM feature_flags WHERE project_id = ?`, p);
-    ff.bumpFeatureFlagsVersion();
+    try {
+      await run(`DELETE FROM feature_flags WHERE project_id = ?`, p);
+      ff.bumpFeatureFlagsVersion();
 
-    // projectId null (chưa xác định được dự án) → không chặn, để route tự xử lý theo logic riêng.
-    assert.equal(await ff.assertModuleEnabled("documents", null), null);
+      // projectId null (chưa xác định được dự án) → không chặn, để route tự xử lý theo logic riêng.
+      assert.equal(await ff.assertModuleEnabled("documents", null), null);
 
-    // Module bật (mặc định) → không chặn.
-    assert.equal(await ff.assertModuleEnabled("documents", p), null);
+      // Module bật (mặc định) → không chặn.
+      assert.equal(await ff.assertModuleEnabled("documents", p), null);
 
-    // Tắt module → 404.
-    await ff.setFlag("documents", p, false, u, 1);
-    const blocked = await ff.assertModuleEnabled("documents", p);
-    assert.ok(blocked, "phải trả về response chặn");
-    assert.equal(blocked!.status, 404);
+      // Tắt module → 404.
+      await ff.setFlag("documents", p, false, u, 1);
+      const blocked = await ff.assertModuleEnabled("documents", p);
+      assert.ok(blocked, "phải trả về response chặn");
+      assert.equal(blocked!.status, 404);
 
-    // Bật lại → không chặn nữa.
-    await ff.setFlag("documents", p, true, u, 1);
-    assert.equal(await ff.assertModuleEnabled("documents", p), null);
+      // Bật lại → không chặn nữa.
+      await ff.setFlag("documents", p, true, u, 1);
+      assert.equal(await ff.assertModuleEnabled("documents", p), null);
+    } finally {
+      await run(`DELETE FROM feature_flags WHERE project_id = ?`, p);
+      await run(`DELETE FROM projects WHERE id = ?`, p);
+      await run(`DELETE FROM users WHERE id = ?`, u);
+    }
   },
 );
 
