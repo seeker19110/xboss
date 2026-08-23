@@ -4,6 +4,26 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## E2E cho route mới `/engineering/chuan-hoa-ban-ve` (2026-08-23)
+
+Route hợp nhất `/engineering/cad` cũ vào `/engineering/chuan-hoa-ban-ve` (commit `ee4c100`)
+chưa có spec E2E nào. Bổ sung `e2e/authed/chuan-hoa-ban-ve.spec.ts` theo đúng khuôn các spec
+sẵn có (render + a11y axe), gồm 4 ca: render nội dung chính & 2 bước quy trình, chuyển 4
+sub-tab của Bước 1, mở Bước 2 (đặt tên ISO 19650), và axe. Chạy thật trên Postgres 16 cục bộ:
+**9/9 pass** (desktop + mobile).
+
+Trong lúc chạy axe phát hiện và sửa luôn 3 lớp vi phạm a11y **nghiêm trọng của chính route
+này**: `select` đơn vị vẽ/tỷ lệ và 3 `input` gốc tọa độ WCS trong `DiagnosticPurgePanel`
+không có nhãn liên kết (thẻ `<label>` chỉ đặt cạnh, không `htmlFor`/không bọc), và nút
+mở/thu gọn hệ trong `UploadAndBrowsePanel` chỉ có icon — đều thêm `aria-label` tiếng Việt.
+
+**Nợ kỹ thuật ghi nhận (không sửa ở đợt này):** quy tắc `color-contrast` bị tắt trong spec vì
+đây là nợ **chung toàn app ở chế độ sáng** — cặp `bg-amber-500 text-zinc-950` (61 chỗ trong
+`app/`) bị `html.light` đảo `zinc-950` → gần trắng nên tương phản chỉ ~2:1. Spec axe của các
+trang cũ (vd `dashboard.spec.ts`) cũng đỏ vì đúng nguyên nhân này. Cần một đợt dọn theme
+riêng: dùng token chữ **cố định** trên nền màu đặc (`--on-accent` hoặc token tối tương ứng)
+thay vì thang `zinc` bị đảo.
+
 ## Tăng tốc bộ test: ~30 phút → 1 phút 53 giây (2026-08-23)
 
 Đo trên Postgres 16 sạch, 210 file, **kết quả không đổi: 1083 ca pass, 0 fail, 1 skip
@@ -54,6 +74,7 @@ test luôn đỏ vì 8 file ở mục dưới → **bước kiểm ERD chưa t�
 không ai biết vì log chỉ báo "bước trước fail". Cùng lớp vấn đề với release-gate đếm mù: cả
 hai đều là cổng kiểm **tưởng đang canh nhưng thực ra không chạy**. Khi thêm cổng kiểm mới,
 cần tự hỏi "nếu bước trước đỏ dài ngày thì cổng này có bị bỏ qua không".
+
 ## Vệ sinh test: 3 file không tự dọn dữ liệu → fail giả khi chạy lại (2026-08-23, PR #373)
 
 **Phát hiện khi verify đợt sửa 8 file test ở mục dưới.** Chạy full suite trên DB cục bộ đã tích
