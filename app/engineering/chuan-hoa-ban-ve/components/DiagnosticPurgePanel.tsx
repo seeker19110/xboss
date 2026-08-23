@@ -271,6 +271,7 @@ export default function DiagnosticPurgePanel({
               </label>
               <input
                 type="text"
+                aria-label="Mốc tim trục tọa độ gốc công trình"
                 value={wcsConfig.gridAxisReference}
                 onChange={(e) =>
                   setWcsConfig((prev) => ({ ...prev, gridAxisReference: e.target.value }))
@@ -284,6 +285,7 @@ export default function DiagnosticPurgePanel({
                 <label className="text-[11px] text-zinc-400 block mb-1">Tọa Độ Gốc X (mm)</label>
                 <input
                   type="number"
+                  aria-label="Tọa độ gốc X (mm)"
                   value={wcsConfig.originX}
                   onChange={(e) =>
                     setWcsConfig((prev) => ({ ...prev, originX: Number(e.target.value) }))
@@ -295,6 +297,7 @@ export default function DiagnosticPurgePanel({
                 <label className="text-[11px] text-zinc-400 block mb-1">Tọa Độ Gốc Y (mm)</label>
                 <input
                   type="number"
+                  aria-label="Tọa độ gốc Y (mm)"
                   value={wcsConfig.originY}
                   onChange={(e) =>
                     setWcsConfig((prev) => ({ ...prev, originY: Number(e.target.value) }))
@@ -308,6 +311,7 @@ export default function DiagnosticPurgePanel({
               <div>
                 <label className="text-[11px] text-zinc-400 block mb-1">Đơn Vị Vẽ (Units):</label>
                 <select
+                  aria-label="Đơn vị vẽ"
                   value={wcsConfig.unit}
                   onChange={(e) =>
                     setWcsConfig((prev) => ({ ...prev, unit: e.target.value as any }))
@@ -322,6 +326,7 @@ export default function DiagnosticPurgePanel({
               <div>
                 <label className="text-[11px] text-zinc-400 block mb-1">Tỷ Lệ Model/Layout:</label>
                 <select
+                  aria-label="Tỷ lệ model/layout"
                   value={wcsConfig.scale}
                   onChange={(e) =>
                     setWcsConfig((prev) => ({ ...prev, scale: e.target.value as any }))
