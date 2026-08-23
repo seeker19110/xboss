@@ -103,12 +103,24 @@ test("M65: convertTcvn3ToUnicode giải mã chính xác chuỗi ký tự font TC
 });
 
 test("M65: normalizeCadLayers ánh xạ chuẩn hóa layer theo chuẩn AIA/MEPF", () => {
-  const raw = ["ONG_GIO_CAP_LV4", "ONG_NUOC_LANH", "MANG_CAP_DIEN", "DUONG_ONG_PCCC_SPK"];
+  const raw = [
+    "ONG_GIO_CAP_LV4",
+    "ONG_GIO_HOI_LV4",
+    "ONG_GIO_THAI_WC",
+    "ONG_NUOC_LANH",
+    "MANG_CAP_DIEN",
+    "DUONG_ONG_PCCC_SPK",
+  ];
   const mapping = normalizeCadLayers(raw);
 
+  // Nguồn chuẩn (lib/cad/dxf-parser) phân biệt được gió cấp / hồi / thải
   assert.equal(mapping["ONG_GIO_CAP_LV4"], "M-DUCT-SUPP");
-  assert.equal(mapping["ONG_NUOC_LANH"], "P-PIPE-SANR");
-  assert.equal(mapping["MANG_CAP_DIEN"], "E-TRAY-PWRR");
+  assert.equal(mapping["ONG_GIO_HOI_LV4"], "M-DUCT-RETN");
+  assert.equal(mapping["ONG_GIO_THAI_WC"], "M-DUCT-EXHT");
+  // Ống nước lạnh vào nhánh chiller thay vì gộp chung với ống thoát như bản trùng lặp cũ
+  assert.equal(mapping["ONG_NUOC_LANH"], "M-CHW-PIPE");
+  // Hạn chế đã biết của nguồn chuẩn: từ khóa "CAP" khớp nhánh ống nước trước nhánh điện
+  assert.equal(mapping["MANG_CAP_DIEN"], "P-PIPE-DOMW");
   assert.equal(mapping["DUONG_ONG_PCCC_SPK"], "F-SPRN-PIPE");
 });
 
