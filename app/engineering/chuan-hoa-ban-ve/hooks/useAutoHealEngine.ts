@@ -23,7 +23,7 @@ interface UseAutoHealEngineOptions {
 }
 
 // Bộ máy chuẩn hóa 1-chạm: dọn rác, giải mã font, chuẩn hóa layer AIA và
-// khôi phục Dim — kèm bộ chạy tiến độ % hiển thị từng bước cho người dùng.
+// khôi phục Dim — chạy xử lý thật ngay, không còn thanh % giả lập.
 export function useAutoHealEngine({
   dxfData,
   setDxfData,
@@ -35,10 +35,9 @@ export function useAutoHealEngine({
   setIsReviewDone,
 }: UseAutoHealEngineOptions) {
   const [isAutoHealing, setIsAutoHealing] = useState(false);
-  const [healProgress, setHealProgress] = useState(0);
-  const [healStatusMessage, setHealStatusMessage] = useState("");
   const [healCompleted, setHealCompleted] = useState(false);
-  const healIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const healTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef(true);
 
   // ── Áp dụng trực tiếp lên dữ liệu thật ──
   const handleAutoHealAll = useCallback(() => {
@@ -120,7 +119,7 @@ export function useAutoHealEngine({
     setIsReviewDone,
   ]);
 
-  // ── Bộ chạy tiến độ % mượt mà từng bước ──
+  // ── Kích hoạt chuẩn hóa thật, không còn thanh % giả lập ──
   const triggerAutoHealWithProgress = useCallback(() => {
     if (isAutoHealing) return;
 
@@ -131,55 +130,38 @@ export function useAutoHealEngine({
 
     setIsAutoHealing(true);
     setHealCompleted(false);
-    setHealProgress(0);
-    setHealStatusMessage("🧹 Đang dọn rác WCS 2D & xóa nét trùng đè...");
 
-    let currentPct = 0;
-    if (healIntervalRef.current) {
-      clearInterval(healIntervalRef.current);
+    if (healTimeoutRef.current) {
+      clearTimeout(healTimeoutRef.current);
     }
 
-    healIntervalRef.current = setInterval(() => {
-      const stepIncrement = Math.floor(Math.random() * 8) + 6; // 6% - 13%
-      currentPct = Math.min(100, currentPct + stepIncrement);
-      setHealProgress(currentPct);
-
-      if (currentPct < 25) {
-        setHealStatusMessage("🧹 Đang dọn rác WCS 2D, xóa nét 0mm & nét trùng đè...");
-      } else if (currentPct < 55) {
-        setHealStatusMessage("🔤 Đang giải mã font TCVN3/VNI sang Unicode UTF-8...");
-      } else if (currentPct < 80) {
-        setHealStatusMessage("📐 Đang chuẩn hóa hệ thống Layer theo tiêu chuẩn AIA...");
-      } else if (currentPct < 98) {
-        setHealStatusMessage("🎯 Đang sửa Dim ảo & rà soát liên kết XREF...");
-      } else {
-        setHealStatusMessage("✨ Hoàn tất tự động chuẩn hóa CAD 2D 100%!");
-      }
-
-      if (currentPct >= 100) {
-        if (healIntervalRef.current) {
-          clearInterval(healIntervalRef.current);
-          healIntervalRef.current = null;
-        }
-        setIsAutoHealing(false);
-        setHealCompleted(true);
+    // Trễ 1 tick để UI kịp render trạng thái loading trước khi block main thread
+    // bằng xử lý thật (dọn rác/font/layer/dim/block chạy đồng bộ).
+    healTimeoutRef.current = setTimeout(() => {
+      healTimeoutRef.current = null;
+      try {
         handleAutoHealAll();
+      } finally {
+        if (isMountedRef.current) {
+          setIsAutoHealing(false);
+          setHealCompleted(true);
+        }
       }
-    }, 110);
+    }, 0);
   }, [dxfData, isAutoHealing, handleAutoHealAll]);
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
-      if (healIntervalRef.current) {
-        clearInterval(healIntervalRef.current);
+      isMountedRef.current = false;
+      if (healTimeoutRef.current) {
+        clearTimeout(healTimeoutRef.current);
       }
     };
   }, []);
 
   return {
     isAutoHealing,
-    healProgress,
-    healStatusMessage,
     healCompleted,
     handleAutoHealAll,
     triggerAutoHealWithProgress,
