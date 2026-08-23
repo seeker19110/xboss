@@ -22,7 +22,14 @@
 
 - **Đã làm:** component React duy nhất 5.112 dòng, 80 hook → còn **1.685 dòng**, tách JSX render thuần ra 8 component con trong `app/engineering/chuan-hoa-ban-ve/components/` (`UploadAndBrowsePanel`, `CadViewportStudio`, `StepTabsNav`, `DiagnosticPurgePanel` [Bước 1.1], `LayersFontPanel` [Bước 1.2], `BoqDimCtbPanel` [Bước 1.3], `XrefDiffLispPanel` [Bước 1.4], `Step2NamingPanel` [Bước 2]) + `types.ts` gom interface dùng chung. Chiến lược **lift-state-up**: toàn bộ `useState`/`useEffect`/handler/gọi API vẫn nằm nguyên trong `page.tsx`, component con chỉ nhận props — không đổi hành vi/UI/API.
 - **Verify:** diff JSX đối chiếu token-level khớp bản gốc; lint/typecheck/`next build --webpack` xanh; `npm test` 209 file 0 fail.
-- **Còn lại (nợ kỹ thuật):** `page.tsx` vẫn còn ~1.685 dòng state/logic tập trung — nếu cần tách sâu hơn thì phải chuyển sang custom hook, phạm vi lớn hơn "chỉ tách JSX" nên chưa làm ở đợt này.
+- **Nợ kỹ thuật của đợt này (đã đóng):** phần state/logic còn tập trung trong `page.tsx` đã được tách sang custom hook — xem mục kế tiếp.
+
+## Tách state/logic `chuan-hoa-ban-ve` sang custom hook (2026-08-23)
+
+- **Đã làm:** tiếp nối đợt tách JSX ở trên, chuyển toàn bộ `useState`/`useEffect`/`useCallback` và handler gọi API từ `page.tsx` sang **12 custom hook** trong `app/engineering/chuan-hoa-ban-ve/hooks/`. `page.tsx` **1.685 → 384 dòng**, chỉ còn: 2 state điều hướng bước (`activeStep`/`step1SubTab`), chuỗi gọi hook, effect khởi động và JSX truyền props xuống 8 component con. Không đổi hành vi/UI/API, không đổi props của component con, không đổi `types.ts`.
+- **Danh sách hook:** `useCadViewport` (khung nhìn vector 2D + bảng hiển thị layer), `useFontDoctor`, `useCadReviewApproval` (rà soát + ký duyệt Gate 0), `useCadDiff`, `useBlockCatalog`, `useAutoLispGenerator`, `useCadSource` (nguồn bản vẽ: thư viện thiết kế / tệp đơn / cả thư mục kèm XREF + model DXF đã parse), `useSmartNaming` (đặt tên ISO 19650 + lưu trữ), `useCadStandardization` (đồng bộ model thật từ `dxfData`: layer/text/block/Dim/purge/WCS/CTB + bộ lọc layer), `useCadHealthScore`, `useAutoHealEngine`, `useCadExporters`.
+- **Ranh giới đã chọn (để tránh phụ thuộc vòng giữa các hook):** hook không tự đọc state của hook khác — hook cha truyền **callback ổn định** (`onLayersParsed`, `onFontSampleDetected`, `onDrawingFileNameDetected`) hoặc setter xuống hook con, và thứ tự gọi hook trong `page.tsx` giữ đúng thứ tự chạy 3 `useEffect` như bản gốc (đồng bộ `dxfData` → dọn interval auto-heal → effect khởi động).
+- **Verify:** `npm run lint`/`typecheck`/`build` xanh; `npm test` 209 file, 674 ca pass — **đúng bằng baseline trước khi sửa** (1 ca fail sẵn có do worktree thiếu cây thư mục `drawings/`). Ngoài ra chạy **đối chứng trên trình duyệt thật** (Postgres ephemeral + `npm run start` + Playwright): đăng nhập → mở `/engineering/chuan-hoa-ban-ve` → nạp tệp DXF thật → duyệt 4 tab Bước 1 + Bước 2, so output bản trước và bản sau khi tách — **giống hệt từng dòng** (điểm sức khỏe, bảng layer, ô Bác Sĩ Font tự điền, tên tệp chuẩn sinh ra), 0 lỗi runtime, không có vòng lặp fetch phát sinh.
 
 ## Giai đoạn hiện tại
 
