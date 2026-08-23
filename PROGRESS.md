@@ -53,6 +53,25 @@ typecheck xanh.
 - **45 map nhãn `*_LABEL` không được import ở đâu** trong khi UI lặp lại nhãn tại chỗ —
   lỗi trùng lặp, sửa bằng cách cho UI dùng map, không phải xoá map.
 - **24 file > 1000 LOC** (nặng nhất `TrackingGrid.tsx` 94KB) — Đợt 4, chưa mở.
+## E2E cho route mới `/engineering/chuan-hoa-ban-ve` (2026-08-23)
+
+Route hợp nhất `/engineering/cad` cũ vào `/engineering/chuan-hoa-ban-ve` (commit `ee4c100`)
+chưa có spec E2E nào. Bổ sung `e2e/authed/chuan-hoa-ban-ve.spec.ts` theo đúng khuôn các spec
+sẵn có (render + a11y axe), gồm 4 ca: render nội dung chính & 2 bước quy trình, chuyển 4
+sub-tab của Bước 1, mở Bước 2 (đặt tên ISO 19650), và axe. Chạy thật trên Postgres 16 cục bộ:
+**9/9 pass** (desktop + mobile).
+
+Trong lúc chạy axe phát hiện và sửa luôn 3 lớp vi phạm a11y **nghiêm trọng của chính route
+này**: `select` đơn vị vẽ/tỷ lệ và 3 `input` gốc tọa độ WCS trong `DiagnosticPurgePanel`
+không có nhãn liên kết (thẻ `<label>` chỉ đặt cạnh, không `htmlFor`/không bọc), và nút
+mở/thu gọn hệ trong `UploadAndBrowsePanel` chỉ có icon — đều thêm `aria-label` tiếng Việt.
+
+**Nợ kỹ thuật ghi nhận (không sửa ở đợt này):** quy tắc `color-contrast` bị tắt trong spec vì
+đây là nợ **chung toàn app ở chế độ sáng** — cặp `bg-amber-500 text-zinc-950` (61 chỗ trong
+`app/`) bị `html.light` đảo `zinc-950` → gần trắng nên tương phản chỉ ~2:1. Spec axe của các
+trang cũ (vd `dashboard.spec.ts`) cũng đỏ vì đúng nguyên nhân này. Cần một đợt dọn theme
+riêng: dùng token chữ **cố định** trên nền màu đặc (`--on-accent` hoặc token tối tương ứng)
+thay vì thang `zinc` bị đảo.
 
 ## Tăng tốc bộ test: ~30 phút → 1 phút 53 giây (2026-08-23)
 
