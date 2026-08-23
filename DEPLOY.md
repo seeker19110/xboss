@@ -37,7 +37,18 @@ Cập nhật phiên bản mới: `git pull` rồi `docker compose up -d --build`
 
 ---
 
-## Cách B — Không Docker (Node ≥ 24 + pm2 + Supabase)
+## Cách B — Không Docker (Node ≥ 24 + pm2 + Postgres tự host hoặc Supabase)
+
+Nếu Postgres cũng chạy trên chính VPS này (không dùng Supabase), cài trước:
+
+```bash
+sudo apt update && sudo apt install -y postgresql postgresql-contrib
+sudo -u postgres psql -c "CREATE USER xboss WITH PASSWORD 'mật-khẩu-mạnh';"
+sudo -u postgres psql -c "CREATE DATABASE xboss OWNER xboss;"
+```
+
+Để Postgres chỉ nghe `localhost` (không sửa `listen_addresses` ra `*`) — app và DB cùng máy
+nên không cần mở cổng 5432 ra ngoài, bớt một bề mặt tấn công.
 
 ```bash
 cd xboss
@@ -45,6 +56,7 @@ npm install
 
 # Tạo file môi trường
 cp .env.example .env.local       # điền DATABASE_URL + XBOSS_SECRET
+# DATABASE_URL=postgresql://xboss:mật-khẩu-mạnh@localhost:5432/xboss  (nếu tự host Postgres)
 
 npm run build
 npm run db:seed                  # nạp dữ liệu lần đầu từ Excel
@@ -56,6 +68,10 @@ pm2 save && pm2 startup          # tự khởi động lại khi reboot
 ```
 
 Mặc định lắng nghe cổng 3000. Đổi cổng: `PORT=8080 pm2 start ...`.
+
+> Postgres tự host trên cùng VPS **không có backup tự động** như Supabase — bắt buộc thiết lập
+> `pg_dump` định kỳ trước khi đưa vào production, xem [Sao lưu & phục hồi DB](#sao-lưu--phục-hồi-db)
+> và [`docs/ops/backup.md`](./docs/ops/backup.md). Mất VPS đồng nghĩa mất cả app lẫn DB cùng lúc.
 
 ### Script một lệnh cho các lần cập nhật sau: `deploy.sh`
 
