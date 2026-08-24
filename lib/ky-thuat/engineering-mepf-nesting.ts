@@ -29,16 +29,15 @@ export async function saveNestingPlan(
       scrap_waste_percent = EXCLUDED.scrap_waste_percent,
       cutting_patterns = EXCLUDED.cutting_patterns
     RETURNING id`,
-    [
-      projectId,
-      res.planCode,
-      res.materialType,
-      res.stockLengthM,
-      res.totalRequiredPieces,
-      res.totalStockBarsNeeded,
-      res.overallScrapWastePercent,
-      JSON.stringify(res.patterns),
-    ],
+
+    projectId,
+    res.planCode,
+    res.materialType,
+    res.stockLengthM,
+    res.totalRequiredPieces,
+    res.totalStockBarsNeeded,
+    res.overallScrapWastePercent,
+    JSON.stringify(res.patterns),
   );
 
   if (!row) throw new Error("Failed to save nesting plan");

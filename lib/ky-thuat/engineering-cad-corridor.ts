@@ -419,18 +419,17 @@ export async function saveCorridorLayout(
       status = EXCLUDED.status,
       updated_at = NOW()
     RETURNING id`,
-    [
-      projectId,
-      result.corridorCode,
-      `Quy hoạch hành lang ${result.corridorCode}`,
-      result.corridorWidthMm,
-      result.corridorClearHeightMm,
-      result.availableServiceDepthMm,
-      JSON.stringify(result.tierAllocations),
-      JSON.stringify(result.assignedSystems),
-      result.isCompliant ? "optimized" : "clashed",
-      userId ?? null,
-    ],
+
+    projectId,
+    result.corridorCode,
+    `Quy hoạch hành lang ${result.corridorCode}`,
+    result.corridorWidthMm,
+    result.corridorClearHeightMm,
+    result.availableServiceDepthMm,
+    JSON.stringify(result.tierAllocations),
+    JSON.stringify(result.assignedSystems),
+    result.isCompliant ? "optimized" : "clashed",
+    userId ?? null,
   );
 
   if (!row) throw new Error("Failed to save corridor layout");
@@ -440,7 +439,7 @@ export async function saveCorridorLayout(
 export async function listCorridorLayouts(projectId: number) {
   return await query(
     `SELECT * FROM engineering_corridor_layouts WHERE project_id = ? ORDER BY created_at DESC LIMIT 50`,
-    [projectId],
+    projectId,
   );
 }
 
@@ -476,25 +475,24 @@ export async function saveTrapezeHanger(
       lisp_script = EXCLUDED.lisp_script,
       updated_at = NOW()
     RETURNING id`,
-    [
-      projectId,
-      calc.hangerCode,
-      corridorLayoutId ?? null,
-      calc.spanWidthMm,
-      calc.dropLengthMm,
-      calc.totalServiceLoadKg,
-      calc.factoredLoadN,
-      calc.selectedUnistrut.name,
-      calc.actualBendingStressMpa,
-      calc.allowableBendingStressMpa,
-      calc.maxDeflectionMm,
-      calc.allowableDeflectionMm,
-      calc.selectedRodDiameterMm,
-      calc.rodTensileStressMpa,
-      calc.safetyStatus,
-      calc.autoLispScript,
-      userId ?? null,
-    ],
+
+    projectId,
+    calc.hangerCode,
+    corridorLayoutId ?? null,
+    calc.spanWidthMm,
+    calc.dropLengthMm,
+    calc.totalServiceLoadKg,
+    calc.factoredLoadN,
+    calc.selectedUnistrut.name,
+    calc.actualBendingStressMpa,
+    calc.allowableBendingStressMpa,
+    calc.maxDeflectionMm,
+    calc.allowableDeflectionMm,
+    calc.selectedRodDiameterMm,
+    calc.rodTensileStressMpa,
+    calc.safetyStatus,
+    calc.autoLispScript,
+    userId ?? null,
   );
 
   if (!row) throw new Error("Failed to save trapeze hanger");
@@ -504,6 +502,6 @@ export async function saveTrapezeHanger(
 export async function listTrapezeHangers(projectId: number) {
   return await query(
     `SELECT * FROM engineering_trapeze_hangers WHERE project_id = ? ORDER BY created_at DESC LIMIT 50`,
-    [projectId],
+    projectId,
   );
 }

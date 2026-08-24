@@ -26,7 +26,7 @@ export async function GET(req: Request) {
     // 1. Kiểm tra và auto-seed 4 hồ sơ thầu phụ mẫu nếu chưa có
     const existing = await query(
       `SELECT COUNT(*)::int as count FROM engineering_subcon_profiles WHERE project_id = $1`,
-      [projectId],
+      projectId,
     );
 
     if (existing[0]?.count === 0) {
@@ -37,13 +37,13 @@ export async function GET(req: Request) {
          ($1, 'Công ty TNHH Kỹ Thuật Điện Quang Minh', '0319876543', 'ELECTRICAL', '["Trạm biến áp 22kV", "Tủ MSB", "Busway"]'::jsonb, 30, '["Máy ép cốt thủy lực", "Thiết bị đo Megomet"]'::jsonb, '["Chứng chỉ xây dựng Hạng 2"]'::jsonb),
          ($1, 'Công ty CP PCCC & Cấp Thoát Nước Thăng Long', '0105678901', 'FIRE_FIGHTING', '["Hệ thống Sprinkler", "Bơm chữa cháy", "Khí FM200"]'::jsonb, 25, '["Máy ren ống", "Máy tạo rãnh Victaulic"]'::jsonb, '["Giấy xác nhận đủ điều kiện PCCC"]'::jsonb),
          ($1, 'Công ty TNHH Dịch Vụ MEP Toàn Cầu', '0309998888', 'PLUMBING', '["Cấp thoát nước trục đứng", "Bơm chìm", "Xử lý nước thải"]'::jsonb, 15, '["Máy hàn nhiệt PPR", "Máy nội soi đường ống"]'::jsonb, '["Chứng chỉ Hạng 3"]'::jsonb)`,
-        [projectId],
+        projectId,
       );
 
       // Seed chỉ số đánh giá tương ứng
       const newProfiles = await query<any>(
         `SELECT id, company_name as "company_name" FROM engineering_subcon_profiles WHERE project_id = $1 ORDER BY company_name ASC`,
-        [projectId],
+        projectId,
       );
 
       for (const p of newProfiles) {
@@ -77,18 +77,17 @@ export async function GET(req: Request) {
           `INSERT INTO engineering_subcon_performance_metrics 
            (project_id, profile_id, evaluation_period, on_time_completion_rate, bbnt_pass_rate, ncr_incident_count, hse_safety_score, cost_variance_rate, trust_score, tier_grade, ai_analysis_summary)
            VALUES ($1, $2, '2026-08', $3, $4, $5, $6, $7, $8, $9, $10)`,
-          [
-            projectId,
-            p.id,
-            metrics.onTimeCompletionRate,
-            metrics.bbntPassRate,
-            metrics.ncrIncidentCount,
-            metrics.hseSafetyScore,
-            metrics.costVarianceRate,
-            evalRes.trustScore,
-            evalRes.tierGrade,
-            evalRes.summary,
-          ],
+
+          projectId,
+          p.id,
+          metrics.onTimeCompletionRate,
+          metrics.bbntPassRate,
+          metrics.ncrIncidentCount,
+          metrics.hseSafetyScore,
+          metrics.costVarianceRate,
+          evalRes.trustScore,
+          evalRes.tierGrade,
+          evalRes.summary,
         );
       }
     }
@@ -113,7 +112,7 @@ export async function GET(req: Request) {
        ) m ON true
        WHERE p.project_id = $1
        ORDER BY m.trust_score DESC NULLS LAST, p.company_name ASC`,
-      [projectId],
+      projectId,
     );
 
     return NextResponse.json({

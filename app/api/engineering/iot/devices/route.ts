@@ -21,7 +21,7 @@ export async function GET(req: Request) {
     // Tự động seed 5 cảm biến mẫu nếu dự án chưa có thiết bị IoT
     const existing = await query(
       `SELECT COUNT(*)::int as count FROM engineering_iot_devices WHERE project_id = $1`,
-      [projectId],
+      projectId,
     );
 
     if (existing[0]?.count === 0) {
@@ -34,7 +34,7 @@ export async function GET(req: Request) {
          ($1, 'NOISE-T5-01', 'Cảm biến Tiếng ồn Khu Thi Công Ống Gió Tầng 5', 'NOISE', 'Tầng 5 - Tháp A', true, 0, 70.0, 'dBA'),
          ($1, 'TEMP-HUM-T5', 'Cảm biến Vi khí hậu Nhiệt độ & Độ ẩm', 'TEMPERATURE_HUMIDITY', 'Tầng 5 - Khu vực hành lang chính', true, 18, 38.0, 'degC'),
          ($1, 'METER-MSB-01', 'Đồng hồ Năng lượng Điện Tủ Phân Phối Chính MSB', 'ENERGY_METER', 'Phòng điện tổng tầng 1', true, 0, 250.0, 'kW')`,
-        [projectId],
+        projectId,
       );
     }
 
@@ -57,7 +57,7 @@ export async function GET(req: Request) {
        ) l ON true
        WHERE d.project_id = $1
        ORDER BY d.created_at ASC`,
-      [projectId],
+      projectId,
     );
 
     return NextResponse.json({

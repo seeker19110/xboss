@@ -15,7 +15,7 @@ export async function listGodTierModels(projectId: number): Promise<GodTierModel
     `SELECT * FROM engineering_god_tier_models
      WHERE project_id = ?
      ORDER BY created_at DESC`,
-    [projectId],
+    projectId,
   );
 }
 
@@ -26,7 +26,9 @@ export async function getGodTierModel(
   const row = await queryOne<GodTierModelRecord>(
     `SELECT * FROM engineering_god_tier_models
      WHERE project_id = ? AND (id::text = ? OR model_code = ?)`,
-    [projectId, modelId, modelId],
+    projectId,
+    modelId,
+    modelId,
   );
   return row || null;
 }
@@ -60,19 +62,18 @@ export async function saveGodTierModel(
          merkle_root_hash = EXCLUDED.merkle_root_hash,
          updated_at = NOW()
      RETURNING id`,
-    [
-      projectId,
-      data.model_code,
-      data.name,
-      data.discipline || "combined",
-      data.lod_level || "LOD_400",
-      data.total_elements,
-      data.instanced_mesh_url || null,
-      JSON.stringify(data.spatial_octree_data || {}),
-      JSON.stringify(data.bounding_box || { min: [0, 0, 0], max: [0, 0, 0] }),
-      data.merkle_root_hash || null,
-      data.created_by || null,
-    ],
+
+    projectId,
+    data.model_code,
+    data.name,
+    data.discipline || "combined",
+    data.lod_level || "LOD_400",
+    data.total_elements,
+    data.instanced_mesh_url || null,
+    JSON.stringify(data.spatial_octree_data || {}),
+    JSON.stringify(data.bounding_box || { min: [0, 0, 0], max: [0, 0, 0] }),
+    data.merkle_root_hash || null,
+    data.created_by || null,
   );
 
   return row ? row.id : "";
@@ -87,14 +88,16 @@ export async function listGodTierClashes(
       `SELECT * FROM engineering_god_tier_clashes
        WHERE project_id = ? AND (model_id::text = ? OR model_id IN (SELECT id FROM engineering_god_tier_models WHERE model_code = ?))
        ORDER BY created_at DESC`,
-      [projectId, modelId, modelId],
+      projectId,
+      modelId,
+      modelId,
     );
   }
   return query<GodTierClashRecord>(
     `SELECT * FROM engineering_god_tier_clashes
      WHERE project_id = ?
      ORDER BY created_at DESC`,
-    [projectId],
+    projectId,
   );
 }
 
@@ -108,7 +111,11 @@ export async function resolveGodTierClash(
     `UPDATE engineering_god_tier_clashes
      SET status = ?, resolved_by = ?, resolved_at = NOW(), updated_at = NOW()
      WHERE project_id = ? AND (id::text = ? OR clash_code = ?)`,
-    [status, userId, projectId, clashId, clashId],
+    status,
+    userId,
+    projectId,
+    clashId,
+    clashId,
   );
   return res.changes > 0;
 }

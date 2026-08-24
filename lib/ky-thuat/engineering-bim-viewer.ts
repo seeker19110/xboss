@@ -565,7 +565,13 @@ export async function save4dSimulation(
     ) VALUES (
       ?, ?, ?, ?, ?, ?::jsonb, ?
     ) RETURNING id`,
-    [projectId, modelId, title, startDate, endDate, JSON.stringify(settings), userId ?? null],
+    projectId,
+    modelId,
+    title,
+    startDate,
+    endDate,
+    JSON.stringify(settings),
+    userId ?? null,
   );
 
   if (!row) throw new Error("Failed to save 4D simulation");
@@ -580,7 +586,8 @@ export async function load4dSimulation(
     `SELECT * FROM engineering_bim_4d_simulations 
      WHERE project_id = ? AND model_id = ? 
      ORDER BY created_at DESC LIMIT 1`,
-    [projectId, modelId],
+    projectId,
+    modelId,
   );
   return row ?? null;
 }
@@ -590,20 +597,21 @@ export async function list4dSimulations(projectId: number): Promise<BimSimulatio
     `SELECT * FROM engineering_bim_4d_simulations 
      WHERE project_id = ? 
      ORDER BY created_at DESC LIMIT 50`,
-    [projectId],
+    projectId,
   );
 }
 
 export async function listBimModels(projectId: number): Promise<BimModel[]> {
   return await query<BimModel>(
     `SELECT * FROM engineering_bim_models WHERE project_id = ? ORDER BY created_at DESC`,
-    [projectId],
+    projectId,
   );
 }
 
 export async function listBimElements(projectId: number, modelId: string): Promise<BimElement[]> {
   return await query<BimElement>(
     `SELECT * FROM engineering_bim_elements WHERE project_id = ? AND model_id = ?`,
-    [projectId, modelId],
+    projectId,
+    modelId,
   );
 }

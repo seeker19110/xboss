@@ -305,14 +305,13 @@ export async function saveCarbonLcaReport(
       leed_points_estimated = EXCLUDED.leed_points_estimated,
       carbon_breakdown = EXCLUDED.carbon_breakdown
     RETURNING id`,
-    [
-      projectId,
-      res.reportCode,
-      res.totalEmbodiedCarbonKgCo2e,
-      res.carbonIntensityKgCo2ePerM2,
-      res.leedPointsEstimated,
-      JSON.stringify(res.breakdown),
-    ],
+
+    projectId,
+    res.reportCode,
+    res.totalEmbodiedCarbonKgCo2e,
+    res.carbonIntensityKgCo2ePerM2,
+    res.leedPointsEstimated,
+    JSON.stringify(res.breakdown),
   );
 
   if (!row) throw new Error("Failed to save Carbon LCA report");

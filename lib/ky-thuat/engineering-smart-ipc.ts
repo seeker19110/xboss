@@ -47,8 +47,7 @@ export interface SmartIpcCalculationInput {
 // ============================================================================
 
 export type SmartIpcValidationResult =
-  | { ok: true; value: SmartIpcCalculationInput }
-  | { ok: false; error: string };
+  { ok: true; value: SmartIpcCalculationInput } | { ok: false; error: string };
 
 /**
  * Validate + chuẩn hoá body POST /api/engineering/smart-ipc. Trước đây `Number(...)` trên các
@@ -197,14 +196,16 @@ async function fetchGate3Context(
   windowHours?: number,
 ): Promise<SmartIpcGateContext["gate3"]> {
   const requiredHours = windowHours && windowHours > 0 ? windowHours : 2.0;
-  if (!deviceId) return { available: false, pressureDropBar: null, durationHours: null, requiredHours };
+  if (!deviceId)
+    return { available: false, pressureDropBar: null, durationHours: null, requiredHours };
 
   const device = await queryOne<{ id: string }>(
     `SELECT id FROM engineering_iot_devices WHERE id = ? AND project_id = ?`,
     deviceId,
     projectId,
   );
-  if (!device) return { available: false, pressureDropBar: null, durationHours: null, requiredHours };
+  if (!device)
+    return { available: false, pressureDropBar: null, durationHours: null, requiredHours };
 
   const logs = await query<{ metricValue: string; measuredAt: string }>(
     `SELECT metric_value::text AS "metricValue", measured_at AS "measuredAt"
@@ -236,7 +237,12 @@ async function fetchGate4Context(
   claimedQty: number | undefined,
 ): Promise<SmartIpcGateContext["gate4"]> {
   if (!boqCode || claimedQty == null || !Number.isFinite(claimedQty)) {
-    return { available: false, claimedQty: claimedQty ?? null, approvedBoqQty: null, warehouseUsedQty: null };
+    return {
+      available: false,
+      claimedQty: claimedQty ?? null,
+      approvedBoqQty: null,
+      warehouseUsedQty: null,
+    };
   }
 
   const boq = await queryOne<{ qtyContract: string }>(
@@ -494,25 +500,24 @@ export async function saveSmartIpcRecord(
       payment_status = EXCLUDED.payment_status,
       merkle_seal_hash = EXCLUDED.merkle_seal_hash
     RETURNING id`,
-    [
-      projectId,
-      result.ipcNumber,
-      result.periodMonth,
-      result.contractorName,
-      result.grossClaimedVnd,
-      result.netPayableVnd,
-      result.retentionAmountVnd,
-      result.gate1GeometryPassed,
-      result.gate2BbntSignedPassed,
-      result.gate3HydroIotPassed,
-      result.gate4QuadReconcilePassed,
-      result.allGatesCleared,
-      result.merkleSealHash,
-      JSON.stringify(result.bankingPaymentPayload),
-      result.paymentStatus,
-      result.releasedAt,
-      userId || null,
-    ],
+
+    projectId,
+    result.ipcNumber,
+    result.periodMonth,
+    result.contractorName,
+    result.grossClaimedVnd,
+    result.netPayableVnd,
+    result.retentionAmountVnd,
+    result.gate1GeometryPassed,
+    result.gate2BbntSignedPassed,
+    result.gate3HydroIotPassed,
+    result.gate4QuadReconcilePassed,
+    result.allGatesCleared,
+    result.merkleSealHash,
+    JSON.stringify(result.bankingPaymentPayload),
+    result.paymentStatus,
+    result.releasedAt,
+    userId || null,
   );
 
   if (!row) throw new Error("Failed to save smart IPC record");

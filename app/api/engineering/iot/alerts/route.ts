@@ -35,7 +35,7 @@ export async function GET(req: Request) {
        JOIN engineering_iot_devices d ON a.device_id = d.id
        WHERE a.project_id = $1
        ORDER BY a.is_resolved ASC, a.created_at DESC`,
-      [projectId],
+      projectId,
     );
 
     return NextResponse.json({
@@ -59,7 +59,10 @@ export async function PATCH(req: Request) {
   }
 
   if (!CAN.manageEngineeringIot(user.role)) {
-    return NextResponse.json({ error: "Không có quyền thao tác cảnh báo ngưỡng IoT" }, { status: 403 });
+    return NextResponse.json(
+      { error: "Không có quyền thao tác cảnh báo ngưỡng IoT" },
+      { status: 403 },
+    );
   }
 
   const projectId = await getCurrentProjectId(user);
@@ -82,7 +85,10 @@ export async function PATCH(req: Request) {
            resolved_by = CASE WHEN $1 THEN $2 ELSE NULL END
        WHERE id = $3 AND project_id = $4
        RETURNING *`,
-      [isResolved ?? true, user.id, alertId, projectId],
+      isResolved ?? true,
+      user.id,
+      alertId,
+      projectId,
     );
 
     if (rows.length === 0) {

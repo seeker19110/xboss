@@ -18,7 +18,10 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
   }
 
   if (!CAN.manageEngineeringBim(user.role)) {
-    return NextResponse.json({ error: "Không có quyền thao tác mô phỏng 4D mô hình BIM" }, { status: 403 });
+    return NextResponse.json(
+      { error: "Không có quyền thao tác mô phỏng 4D mô hình BIM" },
+      { status: 403 },
+    );
   }
 
   const projectId = await getCurrentProjectId(user);
@@ -38,7 +41,8 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
               geometry_data, properties, wbs_task_id
        FROM engineering_bim_elements
        WHERE model_id = ? AND project_id = ?`,
-      [modelId, projectId],
+      modelId,
+      projectId,
     );
 
     const elements: BimElement[] = rawElements.map((row) => ({
@@ -65,7 +69,8 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
         `SELECT id, start_date, end_date, progress, status, approved_at
          FROM tasks
          WHERE id IN (${placeholders}) AND project_id = ?`,
-        [...taskIds, projectId],
+        ...taskIds,
+        projectId,
       );
 
       for (const t of tasks) {

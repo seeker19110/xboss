@@ -12,7 +12,10 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
   }
 
   if (!CAN.manageEngineeringBim(user.role)) {
-    return NextResponse.json({ error: "Không có quyền thao tác liên kết WBS của mô hình BIM" }, { status: 403 });
+    return NextResponse.json(
+      { error: "Không có quyền thao tác liên kết WBS của mô hình BIM" },
+      { status: 403 },
+    );
   }
 
   const projectId = await getCurrentProjectId(user);
@@ -40,7 +43,10 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
           `UPDATE engineering_bim_elements
            SET wbs_task_id = ?
            WHERE id = ? AND model_id = ? AND project_id = ?`,
-          [link.wbsTaskId, link.elementId, modelId, projectId],
+          link.wbsTaskId,
+          link.elementId,
+          modelId,
+          projectId,
         );
         updatedCount += res.changes;
       } else if (link.guid) {
@@ -48,7 +54,10 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
           `UPDATE engineering_bim_elements
            SET wbs_task_id = ?
            WHERE guid = ? AND model_id = ? AND project_id = ?`,
-          [link.wbsTaskId, link.guid, modelId, projectId],
+          link.wbsTaskId,
+          link.guid,
+          modelId,
+          projectId,
         );
         updatedCount += res.changes;
       }

@@ -100,17 +100,16 @@ export async function saveDigitalHandoverPassport(
       provenance_master_hash = EXCLUDED.provenance_master_hash,
       digital_certificate_token = EXCLUDED.digital_certificate_token
     RETURNING id`,
-    [
-      projectId,
-      res.passportCode,
-      res.projectTitle,
-      res.handoverDate,
-      res.totalSpoolsCount,
-      res.totalBbntCount,
-      res.totalTcTestsPassed,
-      res.provenanceMasterHash,
-      res.digitalCertificateToken,
-    ],
+
+    projectId,
+    res.passportCode,
+    res.projectTitle,
+    res.handoverDate,
+    res.totalSpoolsCount,
+    res.totalBbntCount,
+    res.totalTcTestsPassed,
+    res.provenanceMasterHash,
+    res.digitalCertificateToken,
   );
 
   if (!row) throw new Error("Failed to save Digital Handover passport");

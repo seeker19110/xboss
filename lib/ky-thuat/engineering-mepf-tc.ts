@@ -176,22 +176,21 @@ export async function createTcMatrix(
       interlock_logic = EXCLUDED.interlock_logic,
       updated_at = NOW()
     RETURNING id`,
-    [
-      projectId,
-      data.matrixCode,
-      data.title,
-      data.testType,
-      data.systemCode,
-      data.floorLabel,
-      data.zoneLabel || "Main",
-      data.testPackageName,
-      data.designPressureBar ?? null,
-      data.testPressureBar ?? null,
-      data.holdingDurationMinutes ?? 120,
-      data.allowableDropBar ?? 0.2,
-      JSON.stringify(data.interlockLogic || []),
-      userId,
-    ],
+
+    projectId,
+    data.matrixCode,
+    data.title,
+    data.testType,
+    data.systemCode,
+    data.floorLabel,
+    data.zoneLabel || "Main",
+    data.testPackageName,
+    data.designPressureBar ?? null,
+    data.testPressureBar ?? null,
+    data.holdingDurationMinutes ?? 120,
+    data.allowableDropBar ?? 0.2,
+    JSON.stringify(data.interlockLogic || []),
+    userId,
   );
 
   if (!row) throw new Error("Failed to create MEPF T&C matrix");
@@ -219,17 +218,16 @@ export async function addTcLog(
       $1, $2, $3, $4, $5,
       $6, $7, $8, $9
     ) RETURNING id`,
-    [
-      projectId,
-      matrixId,
-      data.sensorCode || null,
-      data.recordedValue,
-      data.unit,
-      data.ambientTempC ?? null,
-      data.notes || null,
-      data.isAnomaly ?? false,
-      userId,
-    ],
+
+    projectId,
+    matrixId,
+    data.sensorCode || null,
+    data.recordedValue,
+    data.unit,
+    data.ambientTempC ?? null,
+    data.notes || null,
+    data.isAnomaly ?? false,
+    userId,
   );
 
   if (!row) throw new Error("Failed to insert MEPF T&C log");
@@ -239,13 +237,14 @@ export async function addTcLog(
 export async function listTcMatrices(projectId: number): Promise<TcMatrixRecord[]> {
   return query<TcMatrixRecord>(
     `SELECT * FROM engineering_mepf_tc_matrices WHERE project_id = $1 ORDER BY created_at DESC LIMIT 50`,
-    [projectId],
+    projectId,
   );
 }
 
 export async function listTcLogs(projectId: number, matrixId: string): Promise<TcLogRecord[]> {
   return query<TcLogRecord>(
     `SELECT * FROM engineering_mepf_tc_logs WHERE project_id = $1 AND matrix_id = $2 ORDER BY reading_time ASC`,
-    [projectId, matrixId],
+    projectId,
+    matrixId,
   );
 }

@@ -20,7 +20,10 @@ export async function POST(req: Request) {
   }
 
   if (!CAN.manageEngineeringSubconAi(user.role)) {
-    return NextResponse.json({ error: "Không có quyền thao tác đề xuất mời thầu" }, { status: 403 });
+    return NextResponse.json(
+      { error: "Không có quyền thao tác đề xuất mời thầu" },
+      { status: 403 },
+    );
   }
 
   const projectId = await getCurrentProjectId(user);
@@ -45,7 +48,7 @@ export async function POST(req: Request) {
          equipment_assets as "equipmentAssets", certifications
        FROM engineering_subcon_profiles
        WHERE project_id = $1`,
-      [projectId],
+      projectId,
     );
 
     const profiles: SubconProfile[] = profilesRows.map((r: any) => ({
@@ -70,7 +73,7 @@ export async function POST(req: Request) {
        FROM engineering_subcon_performance_metrics
        WHERE project_id = $1
        ORDER BY profile_id, evaluated_at DESC`,
-      [projectId],
+      projectId,
     );
 
     const metricsMap = new Map<string, SubconEvaluationResult>();
@@ -107,15 +110,14 @@ export async function POST(req: Request) {
       `INSERT INTO engineering_subcon_bidding_recommendations
        (project_id, package_name, discipline, estimated_budget, required_capacity, recommended_profiles, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [
-        projectId,
-        packageName,
-        discipline,
-        estimatedBudget || 0,
-        requiredCapacity || 10,
-        JSON.stringify(candidates),
-        user.id,
-      ],
+
+      projectId,
+      packageName,
+      discipline,
+      estimatedBudget || 0,
+      requiredCapacity || 10,
+      JSON.stringify(candidates),
+      user.id,
     );
 
     return NextResponse.json({

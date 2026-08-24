@@ -270,21 +270,20 @@ export async function saveHydraulicNetwork(
       status = EXCLUDED.status,
       updated_at = NOW()
     RETURNING id`,
-    [
-      projectId,
-      result.networkCode,
-      result.systemType,
-      `Mạng lưới thủy lực ${result.networkCode}`,
-      JSON.stringify(result.nodes),
-      JSON.stringify(result.edges),
-      result.totalFlowRateLps,
-      JSON.stringify(result.criticalRunPath),
-      result.criticalPressureDropPa,
-      result.criticalPressureDropBar,
-      JSON.stringify(result.balancingValves),
-      result.hydraulicStatus,
-      userId ?? null,
-    ],
+
+    projectId,
+    result.networkCode,
+    result.systemType,
+    `Mạng lưới thủy lực ${result.networkCode}`,
+    JSON.stringify(result.nodes),
+    JSON.stringify(result.edges),
+    result.totalFlowRateLps,
+    JSON.stringify(result.criticalRunPath),
+    result.criticalPressureDropPa,
+    result.criticalPressureDropBar,
+    JSON.stringify(result.balancingValves),
+    result.hydraulicStatus,
+    userId ?? null,
   );
 
   if (!row) throw new Error("Failed to save hydraulic network");
@@ -294,6 +293,6 @@ export async function saveHydraulicNetwork(
 export async function listHydraulicNetworks(projectId: number) {
   return await query(
     `SELECT * FROM engineering_hydraulic_networks WHERE project_id = ? ORDER BY created_at DESC LIMIT 50`,
-    [projectId],
+    projectId,
   );
 }

@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
      FROM engineering_bim_models
      WHERE project_id = ?
      ORDER BY created_at DESC`,
-    [projectId],
+    projectId,
   );
 
   return NextResponse.json({ models });

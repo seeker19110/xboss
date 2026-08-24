@@ -424,23 +424,22 @@ export async function saveSpoolIsometric(
       svg_isometric_vector = EXCLUDED.svg_isometric_vector,
       updated_at = NOW()
     RETURNING id`,
-    [
-      projectId,
-      res.spoolCode,
-      "MEPF",
-      res.systemCode,
-      res.nominalDiameterMm,
-      res.pipeMaterial,
-      res.centerlineLengthMm,
-      res.cutLengthMm,
-      res.socketInsertionDeductionMm,
-      res.fieldFitAllowanceMm,
-      JSON.stringify(res.bubbleTags),
-      JSON.stringify(res.microBom),
-      res.svgIsometricVector,
-      res.qrPayload.qrData,
-      userId ?? null,
-    ],
+
+    projectId,
+    res.spoolCode,
+    "MEPF",
+    res.systemCode,
+    res.nominalDiameterMm,
+    res.pipeMaterial,
+    res.centerlineLengthMm,
+    res.cutLengthMm,
+    res.socketInsertionDeductionMm,
+    res.fieldFitAllowanceMm,
+    JSON.stringify(res.bubbleTags),
+    JSON.stringify(res.microBom),
+    res.svgIsometricVector,
+    res.qrPayload.qrData,
+    userId ?? null,
   );
 
   if (!row) throw new Error("Failed to save spool isometric");
@@ -450,7 +449,7 @@ export async function saveSpoolIsometric(
 export async function listSpoolIsometrics(projectId: number) {
   return await query(
     `SELECT * FROM engineering_spool_isometrics WHERE project_id = ? ORDER BY created_at DESC LIMIT 50`,
-    [projectId],
+    projectId,
   );
 }
 
@@ -487,21 +486,20 @@ export async function saveModularSkid(
       included_spools = EXCLUDED.included_spools,
       updated_at = NOW()
     RETURNING id`,
-    [
-      projectId,
-      skid.skidCode,
-      skid.skidType,
-      skid.title,
-      skid.frameDimensionsMm[0],
-      skid.frameDimensionsMm[1],
-      skid.frameDimensionsMm[2],
-      skid.weightKg,
-      JSON.stringify(skid.equipment),
-      JSON.stringify(skid.spools),
-      skid.kwRating || 0,
-      `XBOSS|SKID:${skid.skidCode}|TYPE:${skid.skidType}`,
-      userId ?? null,
-    ],
+
+    projectId,
+    skid.skidCode,
+    skid.skidType,
+    skid.title,
+    skid.frameDimensionsMm[0],
+    skid.frameDimensionsMm[1],
+    skid.frameDimensionsMm[2],
+    skid.weightKg,
+    JSON.stringify(skid.equipment),
+    JSON.stringify(skid.spools),
+    skid.kwRating || 0,
+    `XBOSS|SKID:${skid.skidCode}|TYPE:${skid.skidType}`,
+    userId ?? null,
   );
 
   if (!row) throw new Error("Failed to save modular skid");
@@ -511,6 +509,6 @@ export async function saveModularSkid(
 export async function listModularSkids(projectId: number) {
   return await query(
     `SELECT * FROM engineering_modular_skids WHERE project_id = ? ORDER BY created_at DESC LIMIT 50`,
-    [projectId],
+    projectId,
   );
 }

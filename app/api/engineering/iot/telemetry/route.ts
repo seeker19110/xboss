@@ -89,7 +89,8 @@ export async function POST(req: Request) {
     // Lấy thông tin thiết bị
     const devRows = await query<any>(
       `SELECT device_type, threshold_max, unit, device_name FROM engineering_iot_devices WHERE id = $1 AND project_id = $2`,
-      [deviceId, projectId],
+      deviceId,
+      projectId,
     );
 
     if (devRows.length === 0) {
@@ -111,7 +112,11 @@ export async function POST(req: Request) {
       `INSERT INTO engineering_iot_telemetry_logs (project_id, device_id, metric_value, status, raw_payload)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [projectId, deviceId, val, evalRes.status, JSON.stringify(rawPayload || {})],
+      projectId,
+      deviceId,
+      val,
+      evalRes.status,
+      JSON.stringify(rawPayload || {}),
     );
 
     // Nếu vi phạm ngưỡng cảnh báo, tự động tạo Alert.
@@ -127,15 +132,14 @@ export async function POST(req: Request) {
          VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (device_id) WHERE is_resolved = false DO NOTHING
          RETURNING *`,
-        [
-          projectId,
-          deviceId,
-          evalRes.status,
-          evalRes.alertTitle,
-          evalRes.alertMessage || "",
-          evalRes.standardReference || null,
-          val,
-        ],
+
+        projectId,
+        deviceId,
+        evalRes.status,
+        evalRes.alertTitle,
+        evalRes.alertMessage || "",
+        evalRes.standardReference || null,
+        val,
       );
       // Rỗng = đã có cảnh báo đang mở cho thiết bị này (bị dedup), không tạo thêm.
       alertCreated = alertRows[0] ?? null;

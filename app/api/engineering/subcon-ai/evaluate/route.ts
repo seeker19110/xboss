@@ -15,7 +15,10 @@ export async function POST(req: Request) {
   }
 
   if (!CAN.manageEngineeringSubconAi(user.role)) {
-    return NextResponse.json({ error: "Không có quyền thao tác chấm điểm thầu phụ" }, { status: 403 });
+    return NextResponse.json(
+      { error: "Không có quyền thao tác chấm điểm thầu phụ" },
+      { status: 403 },
+    );
   }
 
   const projectId = await getCurrentProjectId(user);
@@ -73,19 +76,18 @@ export async function POST(req: Request) {
        (project_id, profile_id, evaluation_period, on_time_completion_rate, bbnt_pass_rate, ncr_incident_count, hse_safety_score, cost_variance_rate, trust_score, tier_grade, ai_analysis_summary)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
-      [
-        projectId,
-        profileId,
-        period,
-        chiSo.onTimeCompletionRate,
-        chiSo.bbntPassRate,
-        chiSo.ncrIncidentCount,
-        chiSo.hseSafetyScore,
-        chiSo.costVarianceRate,
-        evalRes.trustScore,
-        evalRes.tierGrade,
-        evalRes.summary,
-      ],
+
+      projectId,
+      profileId,
+      period,
+      chiSo.onTimeCompletionRate,
+      chiSo.bbntPassRate,
+      chiSo.ncrIncidentCount,
+      chiSo.hseSafetyScore,
+      chiSo.costVarianceRate,
+      evalRes.trustScore,
+      evalRes.tierGrade,
+      evalRes.summary,
     );
 
     return NextResponse.json({

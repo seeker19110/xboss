@@ -352,20 +352,19 @@ export async function saveQsBomExplosion(
       target_subcon_rate_vnd = EXCLUDED.target_subcon_rate_vnd,
       bom_level_items = EXCLUDED.bom_level_items
     RETURNING id`,
-    [
-      projectId,
-      res.itemCode,
-      res.itemDescription,
-      res.unit,
-      res.contractRateVnd,
-      res.breakdown.materialMainVnd,
-      res.breakdown.materialAuxVnd,
-      res.breakdown.laborDirectVnd,
-      res.breakdown.machineryToolsVnd,
-      res.breakdown.subconMarginVnd,
-      res.targetSubconRateVnd,
-      JSON.stringify(bom.items),
-    ],
+
+    projectId,
+    res.itemCode,
+    res.itemDescription,
+    res.unit,
+    res.contractRateVnd,
+    res.breakdown.materialMainVnd,
+    res.breakdown.materialAuxVnd,
+    res.breakdown.laborDirectVnd,
+    res.breakdown.machineryToolsVnd,
+    res.breakdown.subconMarginVnd,
+    res.targetSubconRateVnd,
+    JSON.stringify(bom.items),
   );
 
   if (!row) throw new Error("Failed to save QS BOM explosion");

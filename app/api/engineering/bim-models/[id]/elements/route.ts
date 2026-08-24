@@ -39,7 +39,8 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
      LEFT JOIN tasks t ON e.wbs_task_id = t.id
      WHERE e.model_id = ? AND e.project_id = ?
      ORDER BY e.created_at ASC`,
-    [modelId, projectId],
+    modelId,
+    projectId,
   );
 
   let elements: BimElement[] = rawElements.map(

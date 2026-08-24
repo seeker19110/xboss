@@ -84,27 +84,26 @@ export async function createBcfIssue(
       ?, ?, ?, ?,
       ?, ?, ?::jsonb, ?
     ) RETURNING *`,
-    [
-      projectId,
-      bcfCode,
-      input.title,
-      input.description ?? null,
-      input.discipline || "combined",
-      input.issueType || "clash",
-      input.severity || "medium",
-      input.cameraViewpoint?.position ? JSON.stringify(input.cameraViewpoint.position) : null,
-      input.cameraViewpoint?.direction ? JSON.stringify(input.cameraViewpoint.direction) : null,
-      input.cameraViewpoint?.up ? JSON.stringify(input.cameraViewpoint.up) : null,
-      input.cameraViewpoint?.fovDeg ?? 60.0,
-      input.clashElementAGuid ?? null,
-      input.clashElementBGuid ?? null,
-      input.linkedClashCode ?? null,
-      input.linkedSpoolCode ?? null,
-      input.assignedTo ?? null,
-      input.dueDate ?? null,
-      JSON.stringify(input.attachments || []),
-      userId ?? null,
-    ],
+
+    projectId,
+    bcfCode,
+    input.title,
+    input.description ?? null,
+    input.discipline || "combined",
+    input.issueType || "clash",
+    input.severity || "medium",
+    input.cameraViewpoint?.position ? JSON.stringify(input.cameraViewpoint.position) : null,
+    input.cameraViewpoint?.direction ? JSON.stringify(input.cameraViewpoint.direction) : null,
+    input.cameraViewpoint?.up ? JSON.stringify(input.cameraViewpoint.up) : null,
+    input.cameraViewpoint?.fovDeg ?? 60.0,
+    input.clashElementAGuid ?? null,
+    input.clashElementBGuid ?? null,
+    input.linkedClashCode ?? null,
+    input.linkedSpoolCode ?? null,
+    input.assignedTo ?? null,
+    input.dueDate ?? null,
+    JSON.stringify(input.attachments || []),
+    userId ?? null,
   );
 
   if (!row) throw new Error("Failed to create BCF Issue");
@@ -158,12 +157,16 @@ export async function resolveBcfIssue(
          resolved_at = NOW(),
          updated_at = NOW()
      WHERE id = ? AND project_id = ?`,
-    [resolutionNote, resolvedByUserId, bcfId, projectId],
+    resolutionNote,
+    resolvedByUserId,
+    bcfId,
+    projectId,
   );
 
   const row = await queryOne<BcfIssueRecord>(
     `SELECT * FROM engineering_bcf_issues WHERE id = ? AND project_id = ?`,
-    [bcfId, projectId],
+    bcfId,
+    projectId,
   );
   return row ?? null;
 }
@@ -436,24 +439,23 @@ export async function saveRoutingRun(
       total_length_m = EXCLUDED.total_length_m,
       routing_status = EXCLUDED.routing_status
     RETURNING id`,
-    [
-      projectId,
-      result.routingCode,
-      discipline,
-      systemCode ?? null,
-      JSON.stringify(result.startPoint),
-      JSON.stringify(result.endPoint),
-      JSON.stringify(result.pathPoints),
-      result.totalLengthM,
-      result.elbowCount,
-      JSON.stringify(result.warnings),
-      result.violatesGravitySlope,
-      result.violatesStructuralZone,
-      result.routingStatus,
-      linkedSpoolCode ?? null,
-      bcfIssueId ?? null,
-      userId ?? null,
-    ],
+
+    projectId,
+    result.routingCode,
+    discipline,
+    systemCode ?? null,
+    JSON.stringify(result.startPoint),
+    JSON.stringify(result.endPoint),
+    JSON.stringify(result.pathPoints),
+    result.totalLengthM,
+    result.elbowCount,
+    JSON.stringify(result.warnings),
+    result.violatesGravitySlope,
+    result.violatesStructuralZone,
+    result.routingStatus,
+    linkedSpoolCode ?? null,
+    bcfIssueId ?? null,
+    userId ?? null,
   );
 
   if (!row) throw new Error("Failed to save BIM routing run");
@@ -463,6 +465,6 @@ export async function saveRoutingRun(
 export async function listRoutingRuns(projectId: number): Promise<BimRoutingRunRecord[]> {
   return await query<BimRoutingRunRecord>(
     `SELECT * FROM engineering_bim_routing_runs WHERE project_id = ? ORDER BY created_at DESC LIMIT 50`,
-    [projectId],
+    projectId,
   );
 }
