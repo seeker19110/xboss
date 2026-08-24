@@ -399,6 +399,7 @@ export interface DxfEntityRaw {
     | "IMAGE"
     | "SHAPE"
     | "TOLERANCE"
+    | "VIEWPORT"
     // ATTRIB không nằm trong PARSED_ENTITY_TYPES vì nó luôn là con của INSERT, không đứng riêng
     | "ATTRIB";
   layer: string;
@@ -417,6 +418,8 @@ export interface DxfEntityRaw {
     elevation?: number;
     /** Polyline khép kín (cờ 70 bit 1) */
     closed?: boolean;
+    /** Đa tuyến 3D (cờ 70 bit 8) — đỉnh có cao độ khác nhau, không ép về đa tuyến phẳng được */
+    is3d?: boolean;
     /** Điểm canh chữ thứ hai của TEXT (mã 11/21/31) */
     alignPoint?: [number, number, number];
     /** Điểm đặt chữ kích thước của DIMENSION (mã 11/21/31) */
@@ -440,12 +443,10 @@ export interface DxfEntityRaw {
     /** Tham số bắt đầu / kết thúc của ELLIPSE (mã 41/42) — cung ellipse chứ không phải ellipse đủ */
     startParam?: number;
     endParam?: number;
+    /** Từng đường dẫn riêng của MULTILEADER (một chú thích có thể có nhiều nhánh) */
+    leaderLines?: Array<Array<[number, number, number]>>;
     /** Các đường bao vùng tô của HATCH (mã 91/92/93) */
-    boundaryPaths?: Array<{
-      points: Array<[number, number, number]>;
-      bulges: number[];
-      closed: boolean;
-    }>;
+    boundaryPaths?: HatchBoundaryPath[];
   };
   textValue?: string;
   decodedText?: string;
@@ -485,6 +486,44 @@ export interface DxfEntityRaw {
   }>;
   /** Các ATTRIB đi kèm INSERT, giữ nguyên vị trí và cỡ chữ để ghi lại đúng chỗ */
   attribEntities?: DxfEntityRaw[];
+  /** Cấu trúc đỉnh đầy đủ của MLINE, giữ để ghi lại nguyên bản thay vì hạ thành đa tuyến */
+  mlineVertices?: Array<{
+    point: [number, number, number];
+    direction?: [number, number, number];
+    miter?: [number, number, number];
+    elements: number[][];
+  }>;
+  /** Tỷ lệ (mã 40) và kiểu canh (mã 71) của MLINE */
+  mlineScale?: number;
+  mlineJustification?: number;
+  /** Khung nhìn của không gian giấy (VIEWPORT) — quyết định bố cục in thấy phần nào của bản vẽ */
+  viewport?: {
+    width: number;
+    height: number;
+    viewCenter?: [number, number];
+    viewHeight?: number;
+    status: number;
+    id: number;
+    twistAngle?: number;
+  };
+  /** Handle của IMAGEDEF mà IMAGE/WIPEOUT trỏ tới (mã 340) */
+  imageDefHandle?: string;
+  /** Vector cạnh U và V của ảnh chèn (mã 11/21/31 và 12/22/32) — quyết định cỡ và hướng ảnh */
+  imageUVector?: [number, number, number];
+  imageVVector?: [number, number, number];
+  /** Kích thước ảnh tính bằng điểm ảnh (mã 13/23) */
+  imageSizePx?: [number, number];
+  /** Độ sáng / tương phản / độ mờ của ảnh (mã 281/282/283) */
+  imageDisplay?: { brightness: number; contrast: number; fade: number; flags: number };
+  /** Dữ liệu nhánh dẫn của MULTILEADER, giữ để ghi lại nguyên bản thay vì hạ cấp */
+  mleaderContext?: {
+    leaders: Array<{
+      lastPoint?: [number, number, number];
+      doglegVector?: [number, number, number];
+      doglegLength?: number;
+    }>;
+    textStyleHandle?: string;
+  };
   /** Thực thể nằm ở không gian giấy — khung tên, khung in (mã 67 = 1) */
   isPaperSpace?: boolean;
   /** Bề dày đùn của thực thể 2D (mã 39) */
@@ -593,6 +632,18 @@ export interface DxfParseResult {
     extMin?: [number, number, number];
     extMax?: [number, number, number];
   };
+  /**
+   * Định nghĩa ảnh chèn đọc từ section OBJECTS (`IMAGEDEF`) — thực thể IMAGE/WIPEOUT chỉ mang
+   * handle trỏ tới đây, nên không đọc OBJECTS thì mất đường dẫn ảnh và kích thước gốc.
+   */
+  imageDefs?: Array<{
+    handle: string;
+    path: string;
+    /** Kích thước ảnh tính bằng điểm ảnh (mã 10/20) */
+    sizePx?: [number, number];
+    /** Kích thước một điểm ảnh theo đơn vị vẽ (mã 11/21) */
+    pixelSize?: [number, number];
+  }>;
   blocks: Array<{
     name: string;
     count: number;
@@ -960,6 +1011,7 @@ const PARSED_ENTITY_TYPES = new Set<DxfEntityRaw["type"]>([
   "IMAGE",
   "SHAPE",
   "TOLERANCE",
+  "VIEWPORT",
 ]);
 
 /** Đọc số thực; giá trị không đọc được trả `undefined` để chỗ gọi tự quyết, không mặc định 0. */
@@ -997,6 +1049,43 @@ function pointOf(
   return [x, y, z ?? 0];
 }
 
+/**
+ * Một cạnh của đường bao vùng tô HATCH. Giữ đúng KIỂU cạnh (đoạn thẳng / cung / cung ellipse /
+ * spline) thay vì bẻ hết thành đoạn thẳng, để tệp ghi ra dựng lại đúng vùng tô cong.
+ */
+export type HatchEdge =
+  | { type: "line"; start: [number, number, number]; end: [number, number, number] }
+  | {
+      type: "arc";
+      center: [number, number, number];
+      radius: number;
+      startAngle: number;
+      endAngle: number;
+      ccw: boolean;
+    }
+  | {
+      type: "ellipse";
+      center: [number, number, number];
+      majorAxis: [number, number, number];
+      ratio: number;
+      startAngle?: number;
+      endAngle?: number;
+      points: Array<[number, number, number]>;
+    }
+  | { type: "spline"; points: Array<[number, number, number]>; degree?: number };
+
+/** Một đường bao vùng tô: hoặc là đa tuyến, hoặc là chuỗi cạnh có kiểu. */
+export interface HatchBoundaryPath {
+  /** Chuỗi đỉnh đã rời rạc hoá — để tính khung bao và cho bên tiêu thụ không quan tâm kiểu cạnh */
+  points: Array<[number, number, number]>;
+  bulges: number[];
+  closed: boolean;
+  /** Đường bao khai dưới dạng đa tuyến (mã 92 bit 2) */
+  isPolyline?: boolean;
+  /** Các cạnh có kiểu, chỉ có khi đường bao KHÔNG phải đa tuyến */
+  edges?: HatchEdge[];
+}
+
 /** Rời rạc hoá một cung tròn thành chuỗi đỉnh — dùng cho cạnh cung trong ranh giới HATCH. */
 function arcToPoints(
   cx: number,
@@ -1026,52 +1115,53 @@ function arcToPoints(
  * đường bao xuất ra dưới dạng đa tuyến; các loại cạnh ellipse/spline lấy theo đỉnh điều khiển.
  */
 function parseHatchBoundaries(group: DxfPair[]): {
-  paths: Array<{ points: Array<[number, number, number]>; bulges: number[]; closed: boolean }>;
+  paths: HatchBoundaryPath[];
   seeds: Array<[number, number, number]>;
   patternLines: NonNullable<DxfEntityRaw["hatchPatternLines"]>;
 } {
-  const paths: Array<{
-    points: Array<[number, number, number]>;
-    bulges: number[];
-    closed: boolean;
-  }> = [];
+  const paths: HatchBoundaryPath[] = [];
   const seeds: Array<[number, number, number]> = [];
   // Định nghĩa các nét gạch của mẫu tô (mã 78 số dòng; mỗi dòng 53/43/44/45/46/79 + 49 lặp lại).
-  // Thiếu phần này thì tệp R2000 ghi ra có HATCH nhưng AutoCAD tô rỗng — nhìn như mất vùng tô.
+  // Thiếu phần này thì tệp ghi ra có HATCH nhưng AutoCAD tô rỗng — nhìn như mất vùng tô.
   const patternLines: NonNullable<DxfEntityRaw["hatchPatternLines"]> = [];
   let patternLine: NonNullable<DxfEntityRaw["hatchPatternLines"]>[number] | null = null;
 
   let inBoundary = false;
   let inSeeds = false;
-  let isPolylinePath = false;
-  let edgeType = 0;
-  let current: {
-    points: Array<[number, number, number]>;
-    bulges: number[];
-    closed: boolean;
-  } | null = null;
-  // Bộ đệm cho cạnh cung (mã 10/20 là tâm, 40 bán kính, 50/51 hai góc)
-  let arcCx: number | undefined;
-  let arcCy: number | undefined;
-  let arcR: number | undefined;
-  let arcA0: number | undefined;
+  let current: HatchBoundaryPath | null = null;
+  let edge: HatchEdge | null = null;
 
-  const flushArc = () => {
-    if (
-      current &&
-      edgeType === 2 &&
-      arcCx !== undefined &&
-      arcCy !== undefined &&
-      arcR !== undefined &&
-      arcA0 !== undefined
-    ) {
-      const pts = arcToPoints(arcCx, arcCy, arcR, arcA0, arcA0);
-      pts.forEach((pt) => {
+  /** Kết thúc cạnh đang đọc dở: bổ sung điểm rời rạc để tính khung bao và cho bên tiêu thụ cũ. */
+  const closeEdge = () => {
+    if (!current || !edge) return;
+    if (edge.type === "line") {
+      current.points.push(edge.start, edge.end);
+      current.bulges.push(0, 0);
+    } else if (edge.type === "arc") {
+      arcToPoints(
+        edge.center[0],
+        edge.center[1],
+        edge.radius,
+        edge.startAngle,
+        edge.endAngle,
+      ).forEach((pt) => {
+        current!.points.push(pt);
+        current!.bulges.push(0);
+      });
+    } else if (edge.type === "ellipse" || edge.type === "spline") {
+      edge.points.forEach((pt) => {
         current!.points.push(pt);
         current!.bulges.push(0);
       });
     }
-    arcCx = arcCy = arcR = arcA0 = undefined;
+    current.edges!.push(edge);
+    edge = null;
+  };
+
+  const closePath = () => {
+    closeEdge();
+    if (current && current.points.length > 0) paths.push(current);
+    current = null;
   };
 
   for (const { code, value } of group) {
@@ -1110,18 +1200,14 @@ function parseHatchBoundaries(group: DxfPair[]): {
     }
     if (code === 98) {
       // Kết thúc phần ranh giới, sang danh sách điểm gieo mẫu tô
-      flushArc();
-      if (current && current.points.length > 0) paths.push(current);
-      current = null;
+      closePath();
       inBoundary = false;
       inSeeds = true;
       continue;
     }
     if (code === 75 || code === 76 || code === 47) {
       // Các mã kiểu/tỷ lệ mẫu tô nằm sau phần ranh giới
-      flushArc();
-      if (current && current.points.length > 0) paths.push(current);
-      current = null;
+      closePath();
       inBoundary = false;
       continue;
     }
@@ -1135,81 +1221,171 @@ function parseHatchBoundaries(group: DxfPair[]): {
     if (!inBoundary) continue;
 
     if (code === 92) {
-      flushArc();
-      if (current && current.points.length > 0) paths.push(current);
+      closePath();
       const flags = num(value);
-      isPolylinePath = Boolean(flags & 2);
-      edgeType = 0;
-      current = { points: [], bulges: [], closed: false };
+      // Bit 2 = đường bao là một đa tuyến; không có bit này thì đường bao gồm các CẠNH có kiểu
+      current = {
+        points: [],
+        bulges: [],
+        closed: false,
+        isPolyline: Boolean(flags & 2),
+        edges: Boolean(flags & 2) ? undefined : [],
+      };
       continue;
     }
     if (!current) continue;
 
-    if (code === 72) {
-      // Đường bao đa tuyến: 72 là cờ "có độ cong"; đường bao theo cạnh: 72 là kiểu cạnh
-      if (!isPolylinePath) {
-        flushArc();
-        edgeType = num(value);
+    // ── Đường bao dạng đa tuyến ──
+    if (current.isPolyline) {
+      if (code === 73) {
+        current.closed = num(value) === 1;
+        continue;
       }
-      continue;
-    }
-    if (code === 73) {
-      if (isPolylinePath) current.closed = num(value) === 1;
-      continue;
-    }
-    if (code === 10) {
-      if (!isPolylinePath && edgeType === 2) {
-        flushArc();
-        arcCx = num(value);
-      } else {
+      if (code === 10) {
         current.points.push([num(value), 0, 0]);
         current.bulges.push(0);
+        continue;
+      }
+      if (code === 20 && current.points.length > 0) {
+        current.points[current.points.length - 1][1] = num(value);
+        continue;
+      }
+      if (code === 42 && current.points.length > 0) {
+        current.bulges[current.points.length - 1] = num(value);
+        continue;
       }
       continue;
     }
-    if (code === 20) {
-      if (!isPolylinePath && edgeType === 2) arcCy = num(value);
-      else if (current.points.length > 0) current.points[current.points.length - 1][1] = num(value);
+
+    // ── Đường bao theo cạnh có kiểu: 1 = đoạn thẳng, 2 = cung, 3 = cung ellipse, 4 = spline ──
+    if (code === 72) {
+      closeEdge();
+      const t = num(value);
+      if (t === 1) edge = { type: "line", start: [0, 0, 0], end: [0, 0, 0] };
+      else if (t === 2)
+        edge = {
+          type: "arc",
+          center: [0, 0, 0],
+          radius: 0,
+          startAngle: 0,
+          endAngle: 360,
+          ccw: true,
+        };
+      else if (t === 3)
+        edge = { type: "ellipse", center: [0, 0, 0], majorAxis: [0, 0, 0], ratio: 1, points: [] };
+      else edge = { type: "spline", points: [] };
       continue;
     }
-    if (code === 11 && !isPolylinePath && edgeType === 1) {
-      current.points.push([num(value), 0, 0]);
-      current.bulges.push(0);
+    if (!edge) continue;
+
+    if (edge.type === "line") {
+      if (code === 10) edge.start[0] = num(value);
+      else if (code === 20) edge.start[1] = num(value);
+      else if (code === 11) edge.end[0] = num(value);
+      else if (code === 21) edge.end[1] = num(value);
       continue;
     }
-    if (code === 21 && !isPolylinePath && edgeType === 1 && current.points.length > 0) {
-      current.points[current.points.length - 1][1] = num(value);
+    if (edge.type === "arc") {
+      if (code === 10) edge.center[0] = num(value);
+      else if (code === 20) edge.center[1] = num(value);
+      else if (code === 40) edge.radius = num(value);
+      else if (code === 50) edge.startAngle = num(value);
+      else if (code === 51) edge.endAngle = num(value);
+      else if (code === 73) edge.ccw = num(value) === 1;
       continue;
     }
-    if (code === 40 && !isPolylinePath && edgeType === 2) {
-      arcR = num(value);
+    if (edge.type === "ellipse") {
+      if (code === 10) edge.center[0] = num(value);
+      else if (code === 20) edge.center[1] = num(value);
+      else if (code === 11) edge.majorAxis[0] = num(value);
+      else if (code === 21) edge.majorAxis[1] = num(value);
+      else if (code === 40) edge.ratio = num(value);
+      else if (code === 50) edge.startAngle = num(value);
+      else if (code === 51) edge.endAngle = num(value);
       continue;
     }
-    if (code === 50 && !isPolylinePath && edgeType === 2) {
-      arcA0 = num(value);
-      continue;
-    }
-    if (code === 51 && !isPolylinePath && edgeType === 2) {
-      if (arcCx !== undefined && arcCy !== undefined && arcR !== undefined && arcA0 !== undefined) {
-        arcToPoints(arcCx, arcCy, arcR, arcA0, num(value)).forEach((pt) => {
-          current!.points.push(pt);
-          current!.bulges.push(0);
-        });
-      }
-      arcCx = arcCy = arcR = arcA0 = undefined;
-      continue;
-    }
-    if (code === 42 && isPolylinePath && current.points.length > 0) {
-      current.bulges[current.points.length - 1] = num(value);
+    if (edge.type === "spline") {
+      if (code === 10) edge.points.push([num(value), 0, 0]);
+      else if (code === 20 && edge.points.length > 0)
+        edge.points[edge.points.length - 1][1] = num(value);
+      else if (code === 94) edge.degree = num(value);
       continue;
     }
   }
 
-  flushArc();
-  if (current && current.points.length > 0) paths.push(current);
+  closePath();
   if (patternLine) patternLines.push(patternLine);
 
   return { paths, seeds, patternLines };
+}
+
+/**
+ * Đọc cấu trúc đỉnh của MLINE (đường nhiều nét).
+ *
+ * Mỗi đỉnh gồm ba vector — vị trí (11/21/31), hướng đoạn (12/22/32) và hướng vát mối nối
+ * (13/23/33) — kèm tham số của từng nét thành phần (74 số tham số + 41 giá trị, 75/42 cho phần tô).
+ * Giữ nguyên cả ba mới ghi lại được MLINE thật; chỉ giữ vị trí thì phải hạ cấp thành đa tuyến,
+ * mất phần nét kép và mối nối vát.
+ */
+function parseMlineVertices(group: DxfPair[]): Array<{
+  point: [number, number, number];
+  direction?: [number, number, number];
+  miter?: [number, number, number];
+  elements: number[][];
+}> {
+  const verts: Array<{
+    point: [number, number, number];
+    direction?: [number, number, number];
+    miter?: [number, number, number];
+    elements: number[][];
+  }> = [];
+  let element: number[] | null = null;
+
+  const last = () => verts[verts.length - 1];
+
+  for (const { code, value } of group) {
+    switch (code) {
+      case 11:
+        verts.push({ point: [num(value), 0, 0], elements: [] });
+        element = null;
+        break;
+      case 21:
+        if (verts.length) last().point[1] = num(value);
+        break;
+      case 31:
+        if (verts.length) last().point[2] = num(value);
+        break;
+      case 12:
+        if (verts.length) last().direction = [num(value), 0, 0];
+        break;
+      case 22:
+        if (verts.length && last().direction) last().direction![1] = num(value);
+        break;
+      case 32:
+        if (verts.length && last().direction) last().direction![2] = num(value);
+        break;
+      case 13:
+        if (verts.length) last().miter = [num(value), 0, 0];
+        break;
+      case 23:
+        if (verts.length && last().miter) last().miter![1] = num(value);
+        break;
+      case 33:
+        if (verts.length && last().miter) last().miter![2] = num(value);
+        break;
+      case 74:
+        if (verts.length) {
+          element = [];
+          last().elements.push(element);
+        }
+        break;
+      case 41:
+        if (element) element.push(num(value));
+        break;
+    }
+  }
+
+  return verts;
 }
 
 /**
@@ -1222,38 +1398,90 @@ function parseHatchBoundaries(group: DxfPair[]): {
 function parseMultiLeader(group: DxfPair[]): {
   text: string;
   textPoint?: [number, number, number];
-  leaderPoints: Array<[number, number, number]>;
+  /** Mỗi đường dẫn là một chuỗi đỉnh — một chú thích có thể có nhiều đường dẫn toả ra */
+  leaderLines: Array<Array<[number, number, number]>>;
   textHeight?: number;
+  textRotation?: number;
+  textStyleHandle?: string;
+  /** Điểm cuối đường dẫn và vector gấp khúc của từng nhánh (mã 10/11 trong khối LEADER) */
+  leaders: Array<{
+    lastPoint?: [number, number, number];
+    doglegVector?: [number, number, number];
+    doglegLength?: number;
+  }>;
 } {
   let text = "";
   let textPoint: [number, number, number] | undefined;
   let textHeight: number | undefined;
-  const leaderPoints: Array<[number, number, number]> = [];
+  let textRotation: number | undefined;
+  let textStyleHandle: string | undefined;
+  const leaderLines: Array<Array<[number, number, number]>> = [];
+  const leaders: Array<{
+    lastPoint?: [number, number, number];
+    doglegVector?: [number, number, number];
+    doglegLength?: number;
+  }> = [];
 
+  // Ba mức lồng nhau, mở/đóng bằng cặp mã riêng:
+  //   300 CONTEXT_DATA{ … 301 }
+  //     302 LEADER{ … 303 }
+  //       304 LEADER_LINE{ … 305 }
+  // Mã 304 mang HAI nghĩa tuỳ mức: ở mức ngữ cảnh là chữ chú thích, ở trong LEADER{ là thẻ mở
+  // LEADER_LINE{. Phân biệt bằng mức lồng — không thể phân biệt bằng riêng mã nhóm.
   let inContext = false;
+  let inLeader = false;
   let inLeaderLine = false;
+  let current: Array<[number, number, number]> | null = null;
   let sawContextPoint = false;
+
+  /** Đặt một thành phần toạ độ cho điểm đang đọc dở, đúng theo mức lồng hiện tại. */
+  const setOrdinate = (idx: 0 | 1 | 2, v: number) => {
+    if (inLeaderLine && current && current.length > 0) current[current.length - 1][idx] = v;
+    else if (inLeader && leaders.length > 0 && leaders[leaders.length - 1].lastPoint)
+      leaders[leaders.length - 1].lastPoint![idx] = v;
+    else if (inContext && textPoint && sawContextPoint) textPoint[idx] = v;
+  };
 
   for (const { code, value } of group) {
     if (code === 300) {
       inContext = value.includes("CONTEXT_DATA");
-      inLeaderLine = false;
+      continue;
+    }
+    if (code === 301) {
+      inContext = false;
       continue;
     }
     if (code === 302) {
-      inLeaderLine = value.includes("LEADER_LINE");
+      inLeader = true;
+      leaders.push({});
+      continue;
+    }
+    if (code === 303) {
+      inLeader = false;
       continue;
     }
     if (code === 304) {
-      text += value;
+      if (inLeader) {
+        // Thẻ mở một đường dẫn mới
+        inLeaderLine = true;
+        current = [];
+        leaderLines.push(current);
+      } else {
+        // Ở mức ngữ cảnh, mã 304 là chữ chú thích
+        text += value;
+      }
       continue;
     }
-    if (code === 40 && inContext && textHeight === undefined) {
-      textHeight = numOrUndef(value);
+    if (code === 305) {
+      inLeaderLine = false;
+      current = null;
       continue;
     }
+
     if (code === 10) {
-      if (inLeaderLine) leaderPoints.push([num(value), 0, 0]);
+      if (inLeaderLine && current) current.push([num(value), 0, 0]);
+      else if (inLeader && leaders.length > 0)
+        leaders[leaders.length - 1].lastPoint = [num(value), 0, 0];
       else if (inContext && !sawContextPoint) {
         textPoint = [num(value), 0, 0];
         sawContextPoint = true;
@@ -1261,20 +1489,46 @@ function parseMultiLeader(group: DxfPair[]): {
       continue;
     }
     if (code === 20) {
-      if (inLeaderLine && leaderPoints.length > 0)
-        leaderPoints[leaderPoints.length - 1][1] = num(value);
-      else if (textPoint && sawContextPoint) textPoint[1] = num(value);
+      setOrdinate(1, num(value));
       continue;
     }
     if (code === 30) {
-      if (inLeaderLine && leaderPoints.length > 0)
-        leaderPoints[leaderPoints.length - 1][2] = num(value);
-      else if (textPoint && sawContextPoint) textPoint[2] = num(value);
+      setOrdinate(2, num(value));
+      continue;
+    }
+    if (code === 11 && inLeader && leaders.length > 0) {
+      leaders[leaders.length - 1].doglegVector = [num(value), 0, 0];
+      continue;
+    }
+    if (code === 21 && inLeader && leaders.length > 0 && leaders[leaders.length - 1].doglegVector) {
+      leaders[leaders.length - 1].doglegVector![1] = num(value);
+      continue;
+    }
+    if (code === 31 && inLeader && leaders.length > 0 && leaders[leaders.length - 1].doglegVector) {
+      leaders[leaders.length - 1].doglegVector![2] = num(value);
+      continue;
+    }
+    if (code === 40) {
+      if (inLeader && leaders.length > 0)
+        leaders[leaders.length - 1].doglegLength = numOrUndef(value);
+      continue;
+    }
+    if (code === 41 && inContext && textHeight === undefined) {
+      // Mã 41 trong ngữ cảnh là CHIỀU CAO CHỮ (mã 40 là tỷ lệ nội dung, khác nghĩa)
+      textHeight = numOrUndef(value);
+      continue;
+    }
+    if (code === 42 && inContext && textRotation === undefined) {
+      textRotation = numOrUndef(value);
+      continue;
+    }
+    if (code === 340 && inContext && !textStyleHandle) {
+      textStyleHandle = value.trim();
       continue;
     }
   }
 
-  return { text, textPoint, leaderPoints, textHeight };
+  return { text, textPoint, leaderLines, leaders, textHeight, textRotation, textStyleHandle };
 }
 
 /**
@@ -1309,7 +1563,7 @@ function buildEntity(type: DxfEntityRaw["type"], group: DxfPair[], id: string): 
   let val42: number | undefined; // số đo thật của DIMENSION / tỷ lệ Y của INSERT
   let val43: number | undefined; // tỷ lệ Z của INSERT
   let val44: number | undefined; // bước lặp theo cột của MINSERT
-  let val45: number | undefined; // bước lặp theo hàng của MINSERT
+  let val45: number | undefined; // bước lặp theo hàng của MINSERT / chiều cao vùng nhìn VIEWPORT
   let val50: number | undefined; // góc xoay / góc bắt đầu cung
   let val51: number | undefined; // góc kết thúc cung
   let flags70: number | undefined;
@@ -1328,6 +1582,17 @@ function buildEntity(type: DxfEntityRaw["type"], group: DxfPair[], id: string): 
   let val52: number | undefined; // góc mẫu tô của HATCH
   let hatchPatternLines: DxfEntityRaw["hatchPatternLines"];
   let dimStyle: string | undefined;
+  let imageDefHandle: string | undefined;
+  let x12: number | undefined;
+  let y22: number | undefined;
+  let z32: number | undefined;
+  let val281: number | undefined;
+  let val282: number | undefined;
+  let val283: number | undefined;
+  let val68: number | undefined;
+  let val69: number | undefined;
+  let mleader: ReturnType<typeof parseMultiLeader> | undefined;
+  let mlineVertices: ReturnType<typeof parseMlineVertices> | undefined;
 
   const points: Array<[number, number, number]> = [];
   const bulges: number[] = [];
@@ -1416,12 +1681,27 @@ function buildEntity(type: DxfEntityRaw["type"], group: DxfPair[], id: string): 
         break;
       case 12:
         if (isCornerLike) corners.push([num(value), 0, 0]);
+        else x12 = numOrUndef(value);
         break;
       case 22:
         if (isCornerLike && corners.length > 0) corners[corners.length - 1][1] = num(value);
+        else y22 = numOrUndef(value);
         break;
       case 32:
         if (isCornerLike && corners.length > 0) corners[corners.length - 1][2] = num(value);
+        else z32 = numOrUndef(value);
+        break;
+      case 281:
+        val281 = numOrUndef(value);
+        break;
+      case 282:
+        val282 = numOrUndef(value);
+        break;
+      case 283:
+        val283 = numOrUndef(value);
+        break;
+      case 340:
+        if (isRaster) imageDefHandle = value.trim();
         break;
       case 13:
         if (type === "SOLID" || type === "3DFACE") corners.push([num(value), 0, 0]);
@@ -1468,6 +1748,12 @@ function buildEntity(type: DxfEntityRaw["type"], group: DxfPair[], id: string): 
         break;
       case 43:
         val43 = numOrUndef(value);
+        break;
+      case 68:
+        val68 = numOrUndef(value);
+        break;
+      case 69:
+        val69 = numOrUndef(value);
         break;
       case 50:
         val50 = numOrUndef(value);
@@ -1538,6 +1824,8 @@ function buildEntity(type: DxfEntityRaw["type"], group: DxfPair[], id: string): 
     // các VERTEX theo sau, `readEntityAt` sẽ điền vào. Không lấy điểm giả này làm toạ độ thực thể.
     coordinates.points = [];
     coordinates.closed = Boolean(flags70 !== undefined && flags70 & 1);
+    // Cờ 70 bit 8 = đa tuyến 3D: các đỉnh có cao độ khác nhau, KHÔNG được ép về LWPOLYLINE phẳng
+    coordinates.is3d = Boolean(flags70 !== undefined && flags70 & 8);
     if (z30 !== undefined) coordinates.elevation = z30;
   } else if (type === "SPLINE") {
     // Đường cong SPLINE dùng điểm khớp (11/21/31) nếu có, không có thì dùng điểm điều khiển.
@@ -1575,10 +1863,12 @@ function buildEntity(type: DxfEntityRaw["type"], group: DxfPair[], id: string): 
     coordinates.start = pointOf(x10, y20, z30);
     coordinates.direction = pointOf(x11, y21, z31);
   } else if (isMline) {
-    coordinates.points = fitPoints;
+    mlineVertices = parseMlineVertices(group);
+    coordinates.points = mlineVertices.map((v) => v.point);
     coordinates.closed = Boolean(flags70 !== undefined && flags70 & 2);
   } else if (isRaster) {
-    // Ảnh chèn / vùng che: giữ điểm chèn và đường bao cắt (nếu bản vẽ có khai)
+    // Ảnh chèn / vùng che: điểm chèn (10), hai vector cạnh U và V (11/12) quyết định cỡ và hướng,
+    // kích thước điểm ảnh (13), và đường bao cắt (14/24 lặp lại).
     coordinates.center = pointOf(x10, y20, z30);
     if (points.length > 0) {
       coordinates.points = points;
@@ -1596,14 +1886,18 @@ function buildEntity(type: DxfEntityRaw["type"], group: DxfPair[], id: string): 
     }
   } else if (type === "MULTILEADER") {
     const ml = parseMultiLeader(group);
-    coordinates.points = ml.leaderPoints;
+    const gop = ml.leaderLines.flat();
+    coordinates.points = gop;
+    coordinates.leaderLines = ml.leaderLines;
     coordinates.center = ml.textPoint || pointOf(x10, y20, z30);
-    if (ml.leaderPoints.length > 0) {
-      coordinates.start = ml.leaderPoints[0];
-      coordinates.end = ml.leaderPoints[ml.leaderPoints.length - 1];
+    if (gop.length > 0) {
+      coordinates.start = gop[0];
+      coordinates.end = gop[gop.length - 1];
     }
     if (ml.text) text = ml.text;
     if (ml.textHeight !== undefined) val40 = ml.textHeight;
+    if (ml.textRotation !== undefined) val50 = ml.textRotation;
+    mleader = ml;
   } else if (type === "DIMENSION") {
     // Mã 10 là điểm đặt đường kích thước, KHÔNG phải hai đầu đo. Hai đầu đo thật nằm ở
     // 13/23/33 và 14/24/34; số đo thật nằm ở mã 42 do AutoCAD ghi sẵn.
@@ -1639,6 +1933,17 @@ function buildEntity(type: DxfEntityRaw["type"], group: DxfPair[], id: string): 
   if (textStyle) entity.textStyle = textStyle;
   if (patternName) entity.patternName = patternName;
   if (dimStyle) entity.dimStyle = dimStyle;
+  if (mlineVertices && mlineVertices.length > 0) {
+    entity.mlineVertices = mlineVertices;
+    if (val40 !== undefined) entity.mlineScale = val40;
+    if (val71 !== undefined) entity.mlineJustification = val71;
+  }
+  if (mleader) {
+    entity.mleaderContext = {
+      leaders: mleader.leaders,
+      textStyleHandle: mleader.textStyleHandle,
+    };
+  }
 
   if (
     type === "TEXT" ||
@@ -1689,6 +1994,29 @@ function buildEntity(type: DxfEntityRaw["type"], group: DxfPair[], id: string): 
   } else if (type === "DIMENSION") {
     if (val42 !== undefined) entity.measurement = val42;
     if (val50 !== undefined) entity.rotation = val50;
+  } else if (type === "VIEWPORT") {
+    // Khung nhìn trên không gian giấy: tâm và cỡ khung (10/40/41), rồi tâm và chiều cao của
+    // phần model space mà nó nhìn vào (12/22 và 45).
+    entity.viewport = {
+      width: val40 ?? 0,
+      height: val41 ?? 0,
+      viewCenter: x12 !== undefined && y22 !== undefined ? [x12, y22] : undefined,
+      viewHeight: val45,
+      status: val68 ?? 1,
+      id: val69 ?? 2,
+      twistAngle: val51,
+    };
+  } else if (type === "WIPEOUT" || type === "IMAGE") {
+    entity.imageUVector = pointOf(x11, y21, z31);
+    entity.imageVVector = pointOf(x12, y22, z32);
+    if (x13 !== undefined && y23 !== undefined) entity.imageSizePx = [x13, y23];
+    if (imageDefHandle) entity.imageDefHandle = imageDefHandle;
+    entity.imageDisplay = {
+      flags: flags70 ?? 7,
+      brightness: val281 ?? 50,
+      contrast: val282 ?? 50,
+      fade: val283 ?? 0,
+    };
   } else if (type === "HATCH") {
     entity.isSolidFill = Boolean(flags70 !== undefined && flags70 & 1);
     if (val52 !== undefined) entity.hatchAngle = val52;
@@ -1946,6 +2274,7 @@ export function parseDxf(
     }
   >();
   const header: NonNullable<DxfParseResult["header"]> = {};
+  const imageDefs: NonNullable<DxfParseResult["imageDefs"]> = [];
 
   let section = "";
   let tableName = "";
@@ -2034,6 +2363,40 @@ export function parseDxf(
           isOff: rawColor < 0,
           lineWeight,
         });
+        i = next;
+        continue;
+      }
+      i = readGroup(pairs, i + 1).next;
+      continue;
+    }
+
+    if (section === "OBJECTS") {
+      // Chỉ quan tâm IMAGEDEF: thực thể IMAGE/WIPEOUT chỉ mang handle trỏ tới đây, đường dẫn ảnh
+      // và kích thước gốc nằm trong đối tượng này.
+      if (marker === "IMAGEDEF") {
+        const { group, next } = readGroup(pairs, i + 1);
+        let handle = "";
+        let duongDan = "";
+        let sx: number | undefined;
+        let sy: number | undefined;
+        let px: number | undefined;
+        let py: number | undefined;
+        for (const { code, value } of group) {
+          if (code === 5) handle = value.trim();
+          else if (code === 1) duongDan = value;
+          else if (code === 10) sx = numOrUndef(value);
+          else if (code === 20) sy = numOrUndef(value);
+          else if (code === 11) px = numOrUndef(value);
+          else if (code === 21) py = numOrUndef(value);
+        }
+        if (handle) {
+          imageDefs.push({
+            handle,
+            path: duongDan,
+            sizePx: sx !== undefined && sy !== undefined ? [sx, sy] : undefined,
+            pixelSize: px !== undefined && py !== undefined ? [px, py] : undefined,
+          });
+        }
         i = next;
         continue;
       }
@@ -2355,6 +2718,7 @@ export function parseDxf(
     fileFormat,
     fileSizeBytes: sourceBytes,
     header,
+    imageDefs: imageDefs.length > 0 ? imageDefs : undefined,
     layers,
     entities,
     blocks,
@@ -2647,6 +3011,119 @@ function real(v: number | undefined, fallback = 0): string {
   return Number.isInteger(n) ? `${n}.0` : String(n);
 }
 
+/** Hàm cơ sở B-spline theo công thức truy hồi Cox–de Boor. */
+function basisFunction(i: number, p: number, u: number, knots: number[]): number {
+  if (p === 0) {
+    // Đoạn cuối phải bao gồm cả biên phải, nếu không điểm cuối rơi ra ngoài mọi đoạn
+    const cuoi = knots[knots.length - 1];
+    if (u === cuoi) return knots[i] <= u && u <= knots[i + 1] && knots[i] < knots[i + 1] ? 1 : 0;
+    return knots[i] <= u && u < knots[i + 1] ? 1 : 0;
+  }
+  let trai = 0;
+  const mauTrai = knots[i + p] - knots[i];
+  if (mauTrai !== 0) trai = ((u - knots[i]) / mauTrai) * basisFunction(i, p - 1, u, knots);
+  let phai = 0;
+  const mauPhai = knots[i + p + 1] - knots[i + 1];
+  if (mauPhai !== 0)
+    phai = ((knots[i + p + 1] - u) / mauPhai) * basisFunction(i + 1, p - 1, u, knots);
+  return trai + phai;
+}
+
+/** Giải hệ tuyến tính A·x = b bằng khử Gauss có chọn trụ. Trả `null` nếu hệ suy biến. */
+function solveLinearSystem(A: number[][], b: number[][]): number[][] | null {
+  const n = A.length;
+  const M = A.map((row, i) => [...row, ...b[i]]);
+  const soCot = b[0].length;
+
+  for (let col = 0; col < n; col++) {
+    let tru = col;
+    for (let r = col + 1; r < n; r++) if (Math.abs(M[r][col]) > Math.abs(M[tru][col])) tru = r;
+    if (Math.abs(M[tru][col]) < 1e-12) return null;
+    [M[col], M[tru]] = [M[tru], M[col]];
+    for (let r = 0; r < n; r++) {
+      if (r === col) continue;
+      const he = M[r][col] / M[col][col];
+      if (he === 0) continue;
+      for (let c = col; c < n + soCot; c++) M[r][c] -= he * M[col][c];
+    }
+  }
+
+  // Sau khử Gauss–Jordan, hàng r chỉ còn trụ ở đúng cột r
+  return M.map((row, r) => {
+    const out: number[] = [];
+    for (let c = 0; c < soCot; c++) out.push(row[n + c] / row[r]);
+    return out;
+  });
+}
+
+/**
+ * Nội suy toàn cục một đường cong B-spline **đi qua đúng** các điểm khớp cho trước
+ * (Piegl & Tiller, "The NURBS Book", thuật toán A9.1 dạng hệ vuông).
+ *
+ * Dùng khi bản vẽ nguồn chỉ khai điểm khớp mà không kèm vector knot: ghi ra một SPLINE thiếu knot
+ * là tạo thực thể hỏng, còn hạ xuống đa tuyến là bẻ đường cong thành đoạn thẳng. Nội suy cho ra
+ * đúng đường cong đi qua từng điểm khớp — giữ được hình, không bịa thêm dữ liệu nào.
+ */
+function interpolateSpline(
+  fitPoints: Array<[number, number, number]>,
+  degreeMongMuon = 3,
+): { degree: number; knots: number[]; controlPoints: Array<[number, number, number]> } | null {
+  const n = fitPoints.length - 1;
+  if (n < 1) return null;
+  const p = Math.min(degreeMongMuon, n);
+
+  // Tham số hoá theo căn bậc hai độ dài dây cung (centripetal) — ổn định hơn dây cung thuần
+  const khoang: number[] = [];
+  let tong = 0;
+  for (let k = 1; k <= n; k++) {
+    const d = Math.hypot(
+      fitPoints[k][0] - fitPoints[k - 1][0],
+      fitPoints[k][1] - fitPoints[k - 1][1],
+      fitPoints[k][2] - fitPoints[k - 1][2],
+    );
+    const c = Math.sqrt(d);
+    khoang.push(c);
+    tong += c;
+  }
+  if (tong === 0) return null;
+
+  const u: number[] = [0];
+  let luy = 0;
+  for (let k = 0; k < n; k++) {
+    luy += khoang[k];
+    u.push(luy / tong);
+  }
+  u[n] = 1;
+
+  // Vector knot kẹp hai đầu, các knot trong lấy trung bình trượt của tham số
+  const knots: number[] = [];
+  for (let i = 0; i <= p; i++) knots.push(0);
+  for (let j = 1; j <= n - p; j++) {
+    let s = 0;
+    for (let i = j; i <= j + p - 1; i++) s += u[i];
+    knots.push(s / p);
+  }
+  for (let i = 0; i <= p; i++) knots.push(1);
+
+  // Hệ N·P = Q với N[k][i] = N_{i,p}(u_k)
+  const N: number[][] = [];
+  for (let k = 0; k <= n; k++) {
+    const row: number[] = [];
+    for (let i = 0; i <= n; i++) row.push(basisFunction(i, p, u[k], knots));
+    N.push(row);
+  }
+  const Q = fitPoints.map((pt) => [pt[0], pt[1], pt[2]]);
+
+  const P = solveLinearSystem(N, Q);
+  if (!P) return null;
+
+  return {
+    degree: p,
+    knots,
+    controlPoints: P.map((row) => [row[0], row[1], row[2]] as [number, number, number]),
+  };
+}
+
 /**
  * Ghi một thực thể đã phân tích thành khối mã nhóm DXF **R2000 (AC1015)**.
  *
@@ -2667,6 +3144,14 @@ function writeEntityR2000(
   owner: string,
   /** Khối `*D<n>` chứa hình của DIMENSION, do chỗ gọi cấp phát trước */
   dimBlockName?: string,
+  /** Handle của kiểu chữ STANDARD và kiểu chú thích dẫn Standard, để MULTILEADER trỏ tới */
+  textStyleHandle = "0",
+  mleaderStyleHandle = "0",
+  /** Handle của kiểu đường nhiều nét Standard, để MLINE trỏ tới */
+  mlineStyleHandle = "0",
+  /** Handle của IMAGEDEF (đã ánh xạ sang handle mới) và của IMAGEDEF_REACTOR đi kèm */
+  imageDefHandle?: string,
+  imageReactorHandle = "0",
 ): string {
   const c = ent.coordinates;
   const handle = handles.take();
@@ -2763,15 +3248,76 @@ function writeEntityR2000(
       return out;
     }
 
+    case "MLINE": {
+      // R13 trở lên có MLINE thật — giữ nguyên nét kép và mối nối vát thay vì hạ thành đa tuyến
+      const verts = ent.mlineVertices;
+      if (!verts || verts.length < 2) {
+        const pts = c.points || [];
+        if (pts.length < 2) return pointTrace();
+        let fallback = head("LWPOLYLINE", "AcDbPolyline");
+        fallback += `90\r\n${pts.length}\r\n70\r\n${c.closed ? 1 : 0}\r\n`;
+        pts.forEach((p) => {
+          fallback += `10\r\n${real(p[0])}\r\n20\r\n${real(p[1])}\r\n`;
+        });
+        return fallback + extr();
+      }
+      const soNet = Math.max(1, ...verts.map((v) => v.elements.length));
+      let out = head("MLINE", "AcDbMline");
+      out += `2\r\n${ent.blockName || "STANDARD"}\r\n340\r\n${mlineStyleHandle}\r\n`;
+      out += `40\r\n${real(ent.mlineScale ?? 1)}\r\n`;
+      out += `70\r\n${ent.mlineJustification ?? 0}\r\n`;
+      out += `71\r\n${c.closed ? 2 : 1}\r\n`;
+      out += `72\r\n${verts.length}\r\n73\r\n${soNet}\r\n`;
+      out += pt(10, verts[0].point);
+      out += `210\r\n${real(ent.extrusion?.[0] ?? 0)}\r\n220\r\n${real(ent.extrusion?.[1] ?? 0)}\r\n230\r\n${real(ent.extrusion?.[2] ?? 1)}\r\n`;
+      verts.forEach((v, idx) => {
+        out += pt(11, v.point);
+        // Hướng đoạn và hướng vát: giữ nguyên của tệp gốc; tệp không khai thì suy từ chính đỉnh
+        // liền kề (đây là hình học xác định, không phải số liệu bịa).
+        const ke = verts[idx + 1] ?? verts[idx - 1] ?? v;
+        const dx = ke.point[0] - v.point[0];
+        const dy = ke.point[1] - v.point[1];
+        const len = Math.hypot(dx, dy) || 1;
+        const dir = v.direction ?? [dx / len, dy / len, 0];
+        const miter = v.miter ?? [-dir[1], dir[0], 0];
+        out += `12\r\n${real(dir[0])}\r\n22\r\n${real(dir[1])}\r\n32\r\n${real(dir[2])}\r\n`;
+        out += `13\r\n${real(miter[0])}\r\n23\r\n${real(miter[1])}\r\n33\r\n${real(miter[2])}\r\n`;
+        for (let n = 0; n < soNet; n++) {
+          const params = v.elements[n] ?? [];
+          out += `74\r\n${params.length}\r\n`;
+          for (const par of params) out += `41\r\n${real(par)}\r\n`;
+          out += `75\r\n0\r\n`;
+        }
+      });
+      return out;
+    }
+
     case "LWPOLYLINE":
     case "POLYLINE":
-    case "MLINE":
     case "LEADER": {
       // R2000 có LWPOLYLINE thật — không phải dựng POLYLINE/VERTEX/SEQEND như R12, và độ cong
-      // từng đoạn ghi thẳng bằng mã 42.
+      // từng đoạn ghi thẳng bằng mã 42. Đa tuyến kiểu cũ được hiện đại hoá sang LWPOLYLINE,
+      // đúng việc mà lệnh CONVERTPOLY của AutoCAD làm — giữ nguyên đỉnh, độ cong và cao độ.
       const pts = c.points || [];
       if (pts.length === 0) return pointTrace();
       if (pts.length === 1) return head("POINT", "AcDbPoint") + pt(10, pts[0]) + extr();
+
+      // NGOẠI LỆ: đa tuyến 3D có cao độ khác nhau từng đỉnh — LWPOLYLINE là thực thể phẳng nên
+      // chuyển sang đó sẽ ép bẹp tuyến ống về một cao độ. Giữ nguyên POLYLINE/VERTEX/SEQEND.
+      const coCaoDoKhacNhau = pts.some((p) => p[2] !== pts[0][2]);
+      if (c.is3d || coCaoDoKhacNhau) {
+        let out = head("POLYLINE", "AcDb3dPolyline");
+        out += `66\r\n1\r\n70\r\n${8 | (c.closed ? 1 : 0)}\r\n`;
+        out += pt(10, [0, 0, dxfNum(pts[0][2])]);
+        for (const p of pts) {
+          out += `0\r\nVERTEX\r\n5\r\n${handles.take()}\r\n330\r\n${owner}\r\n`;
+          out += `100\r\nAcDbEntity\r\n8\r\n${layer}\r\n100\r\nAcDbVertex\r\n100\r\nAcDb3dPolylineVertex\r\n`;
+          out += pt(10, p);
+          out += `70\r\n32\r\n`;
+        }
+        out += `0\r\nSEQEND\r\n5\r\n${handles.take()}\r\n330\r\n${owner}\r\n100\r\nAcDbEntity\r\n8\r\n${layer}\r\n`;
+        return out;
+      }
       let out = head("LWPOLYLINE", "AcDbPolyline");
       out += `90\r\n${pts.length}\r\n70\r\n${c.closed ? 1 : 0}\r\n`;
       if (c.elevation !== undefined) out += `38\r\n${real(c.elevation)}\r\n`;
@@ -2800,6 +3346,22 @@ function writeEntityR2000(
         return out;
       }
       if (fit.length < 2) return pointTrace();
+
+      // Bản vẽ chỉ khai điểm khớp: nội suy ra điểm điều khiển + vector knot để vẫn ghi được
+      // SPLINE thật đi qua đúng từng điểm khớp, thay vì bẻ đường cong thành đoạn thẳng.
+      const noiSuy = interpolateSpline(fit, c.degree ?? 3);
+      if (noiSuy) {
+        let out = head("SPLINE", "AcDbSpline");
+        out += extr();
+        out += `70\r\n${(c.closed ? 1 : 0) | 8}\r\n71\r\n${noiSuy.degree}\r\n`;
+        out += `72\r\n${noiSuy.knots.length}\r\n73\r\n${noiSuy.controlPoints.length}\r\n74\r\n${fit.length}\r\n`;
+        for (const k of noiSuy.knots) out += `40\r\n${real(k)}\r\n`;
+        for (const p of noiSuy.controlPoints) out += pt(10, p);
+        for (const p of fit) out += pt(11, p);
+        return out;
+      }
+
+      // Nội suy thất bại (điểm trùng nhau, hệ suy biến) — hạ về đa tuyến còn hơn ghi SPLINE hỏng
       let out = head("LWPOLYLINE", "AcDbPolyline");
       out += `90\r\n${fit.length}\r\n70\r\n${c.closed ? 1 : 0}\r\n`;
       fit.forEach((p) => {
@@ -2968,6 +3530,36 @@ function writeEntityR2000(
       out += `2\r\n${ent.patternName || "SOLID"}\r\n70\r\n${solid}\r\n71\r\n0\r\n`;
       out += `91\r\n${paths.length}\r\n`;
       for (const path of paths) {
+        // Đường bao có cạnh CÓ KIỂU thì ghi lại đúng kiểu — cung vẫn là cung, không bẻ thành
+        // chuỗi đoạn thẳng như bản trước (vùng bảo ôn, vùng cắt qua cong sẽ méo nếu bẻ).
+        if (path.edges && path.edges.length > 0) {
+          out += `92\r\n1\r\n93\r\n${path.edges.length}\r\n`;
+          for (const canh of path.edges) {
+            if (canh.type === "line") {
+              out += `72\r\n1\r\n`;
+              out += `10\r\n${real(canh.start[0])}\r\n20\r\n${real(canh.start[1])}\r\n`;
+              out += `11\r\n${real(canh.end[0])}\r\n21\r\n${real(canh.end[1])}\r\n`;
+            } else if (canh.type === "arc") {
+              out += `72\r\n2\r\n`;
+              out += `10\r\n${real(canh.center[0])}\r\n20\r\n${real(canh.center[1])}\r\n`;
+              out += `40\r\n${real(canh.radius)}\r\n50\r\n${real(canh.startAngle)}\r\n51\r\n${real(canh.endAngle)}\r\n`;
+              out += `73\r\n${canh.ccw ? 1 : 0}\r\n`;
+            } else if (canh.type === "ellipse") {
+              out += `72\r\n3\r\n`;
+              out += `10\r\n${real(canh.center[0])}\r\n20\r\n${real(canh.center[1])}\r\n`;
+              out += `11\r\n${real(canh.majorAxis[0])}\r\n21\r\n${real(canh.majorAxis[1])}\r\n`;
+              out += `40\r\n${real(canh.ratio)}\r\n50\r\n${real(canh.startAngle ?? 0)}\r\n51\r\n${real(canh.endAngle ?? 360)}\r\n`;
+              out += `73\r\n1\r\n`;
+            } else {
+              out += `72\r\n4\r\n94\r\n${canh.degree ?? 3}\r\n73\r\n0\r\n74\r\n0\r\n`;
+              out += `95\r\n0\r\n96\r\n${canh.points.length}\r\n`;
+              for (const p of canh.points) out += `10\r\n${real(p[0])}\r\n20\r\n${real(p[1])}\r\n`;
+            }
+          }
+          out += `97\r\n0\r\n`;
+          continue;
+        }
+
         const coBulge = path.bulges.some((b) => b !== 0) ? 1 : 0;
         // Mã 92: bit 1 = đường bao ngoài, bit 2 = đường bao dạng đa tuyến
         out += `92\r\n3\r\n72\r\n${coBulge}\r\n73\r\n1\r\n93\r\n${path.points.length}\r\n`;
@@ -3013,33 +3605,134 @@ function writeEntityR2000(
     }
 
     case "MULTILEADER": {
-      // MULTILEADER là thực thể của R2007 trở lên, R2000 chưa có: hạ thành đường dẫn (đa tuyến) +
-      // chữ chú thích (MTEXT). Đây là bước hạ cấp DUY NHẤT còn lại của bộ ghi.
-      let out = "";
-      const pts = c.points || [];
-      if (pts.length >= 2) {
-        out += head("LWPOLYLINE", "AcDbPolyline");
-        out += `90\r\n${pts.length}\r\n70\r\n0\r\n`;
-        pts.forEach((p) => {
-          out += `10\r\n${real(p[0])}\r\n20\r\n${real(p[1])}\r\n`;
-        });
-      }
+      // R2007 (AC1021) có MULTILEADER thật — không còn phải tách thành đa tuyến + MTEXT.
+      // Cấu trúc lồng ba mức: 300 CONTEXT_DATA{ … 301 } chứa 302 LEADER{ … 303 }, mỗi nhánh
+      // chứa 304 LEADER_LINE{ … 305 }. Mã 304 mang hai nghĩa tuỳ mức lồng (chữ chú thích ở mức
+      // ngữ cảnh, thẻ mở đường dẫn ở trong nhánh) — ghi sai mức là AutoCAD đọc nhầm chữ.
+      const lines =
+        c.leaderLines && c.leaderLines.length > 0 ? c.leaderLines : c.points ? [c.points] : [];
       const value = ent.decodedText || ent.textValue || "";
-      if (value) {
-        const h2 = handles.take();
-        out += `0\r\nMTEXT\r\n5\r\n${h2}\r\n330\r\n${owner}\r\n100\r\nAcDbEntity\r\n`;
-        if (ent.isPaperSpace) out += `67\r\n1\r\n`;
-        out += `8\r\n${layer}\r\n100\r\nAcDbMText\r\n`;
-        out += pt(10, c.center || pts[pts.length - 1]);
-        out += `40\r\n${real(dxfNum(ent.textHeight, defaultTextHeight) || defaultTextHeight)}\r\n`;
-        out += `71\r\n1\r\n72\r\n5\r\n1\r\n${value}\r\n7\r\n${ent.textStyle || "STANDARD"}\r\n`;
+      if (lines.length === 0 && !value) return pointTrace();
+
+      const cao = dxfNum(ent.textHeight, defaultTextHeight) || defaultTextHeight;
+      const diemChu = ptXYZ(c.center || lines[0]?.[lines[0].length - 1]);
+      const leaders = ent.mleaderContext?.leaders ?? [];
+
+      let out = head("MULTILEADER", "AcDbMLeader");
+      out += `270\r\n2\r\n`;
+      out += `300\r\nCONTEXT_DATA{\r\n`;
+      out += `40\r\n1.0\r\n`;
+      out += pt(10, diemChu);
+      out += `41\r\n${real(cao)}\r\n`;
+      out += `140\r\n${real(cao * 0.72)}\r\n145\r\n${real(cao * 0.08)}\r\n`;
+      out += `290\r\n${value ? 1 : 0}\r\n`;
+      if (value) out += `304\r\n${value}\r\n`;
+      out += `11\r\n0.0\r\n21\r\n0.0\r\n31\r\n1.0\r\n`;
+      out += `340\r\n${textStyleHandle}\r\n`;
+      out += pt(12, diemChu);
+      out += `13\r\n1.0\r\n23\r\n0.0\r\n33\r\n0.0\r\n`;
+      out += `42\r\n${real(ent.rotation)}\r\n43\r\n0.0\r\n44\r\n0.0\r\n45\r\n1.0\r\n`;
+      out += `170\r\n1\r\n90\r\n-1056964608\r\n171\r\n1\r\n172\r\n0\r\n`;
+      out += `91\r\n-1056964608\r\n141\r\n1.0\r\n92\r\n0\r\n291\r\n0\r\n292\r\n0\r\n`;
+      out += `173\r\n0\r\n293\r\n0\r\n142\r\n0.0\r\n143\r\n0.0\r\n294\r\n0\r\n295\r\n0\r\n296\r\n0\r\n`;
+      out += pt(110, diemChu);
+      out += `111\r\n1.0\r\n121\r\n0.0\r\n131\r\n0.0\r\n`;
+      out += `112\r\n0.0\r\n122\r\n1.0\r\n132\r\n0.0\r\n`;
+      out += `297\r\n0\r\n`;
+
+      lines.forEach((duong, idx) => {
+        const nhanh = leaders[idx] ?? {};
+        out += `302\r\nLEADER{\r\n`;
+        out += `290\r\n1\r\n291\r\n1\r\n`;
+        out += pt(10, nhanh.lastPoint ?? duong[duong.length - 1] ?? diemChu);
+        const dogleg = nhanh.doglegVector ?? [1, 0, 0];
+        out += `11\r\n${real(dogleg[0])}\r\n21\r\n${real(dogleg[1])}\r\n31\r\n${real(dogleg[2])}\r\n`;
+        out += `90\r\n${idx}\r\n40\r\n${real(nhanh.doglegLength ?? cao * 2)}\r\n`;
+        out += `304\r\nLEADER_LINE{\r\n`;
+        for (const v of duong) out += pt(10, v);
+        out += `91\r\n${idx}\r\n305\r\n}\r\n`;
+        out += `271\r\n0\r\n303\r\n}\r\n`;
+      });
+
+      out += `301\r\n}\r\n`;
+      out += `340\r\n${mleaderStyleHandle}\r\n`;
+      out += `90\r\n0\r\n170\r\n1\r\n91\r\n-1056964608\r\n341\r\n0\r\n171\r\n-2\r\n`;
+      out += `290\r\n1\r\n291\r\n1\r\n41\r\n${real(cao * 0.72)}\r\n42\r\n${real(cao * 0.08)}\r\n`;
+      out += `172\r\n0\r\n343\r\n${textStyleHandle}\r\n173\r\n1\r\n95\r\n1\r\n`;
+      out += `174\r\n1\r\n175\r\n0\r\n92\r\n-1056964608\r\n292\r\n0\r\n`;
+      out += `93\r\n-1056964608\r\n10\r\n1.0\r\n20\r\n1.0\r\n30\r\n1.0\r\n`;
+      out += `43\r\n0.0\r\n176\r\n0\r\n293\r\n0\r\n294\r\n0\r\n178\r\n0\r\n179\r\n1\r\n`;
+      out += `45\r\n1.0\r\n271\r\n0\r\n272\r\n9\r\n273\r\n9\r\n295\r\n0\r\n`;
+      return out;
+    }
+
+    case "VIEWPORT": {
+      // Khung nhìn chỉ có nghĩa trên không gian giấy; bộ ghi dựng cả bố cục in nên giữ được
+      if (!c.center) return pointTrace();
+      const vp = ent.viewport;
+      let out = `0\r\nVIEWPORT\r\n5\r\n${handle}\r\n330\r\n${owner}\r\n100\r\nAcDbEntity\r\n`;
+      out += `67\r\n1\r\n8\r\n${layer}\r\n100\r\nAcDbViewport\r\n`;
+      out += pt(10, c.center);
+      out += `40\r\n${real(vp?.width ?? 0)}\r\n41\r\n${real(vp?.height ?? 0)}\r\n`;
+      out += `68\r\n${vp?.status ?? 1}\r\n69\r\n${vp?.id ?? 2}\r\n`;
+      out += `12\r\n${real(vp?.viewCenter?.[0] ?? 0)}\r\n22\r\n${real(vp?.viewCenter?.[1] ?? 0)}\r\n`;
+      out += `13\r\n0.0\r\n23\r\n0.0\r\n14\r\n10.0\r\n24\r\n10.0\r\n15\r\n10.0\r\n25\r\n10.0\r\n`;
+      out += `16\r\n0.0\r\n26\r\n0.0\r\n36\r\n1.0\r\n17\r\n0.0\r\n27\r\n0.0\r\n37\r\n0.0\r\n`;
+      out += `42\r\n50.0\r\n43\r\n0.0\r\n44\r\n0.0\r\n`;
+      out += `45\r\n${real(vp?.viewHeight ?? vp?.height ?? 0)}\r\n`;
+      out += `50\r\n0.0\r\n51\r\n${real(vp?.twistAngle ?? 0)}\r\n72\r\n1000\r\n`;
+      out += `90\r\n32864\r\n281\r\n0\r\n71\r\n1\r\n74\r\n0\r\n`;
+      out += `110\r\n0.0\r\n120\r\n0.0\r\n130\r\n0.0\r\n`;
+      out += `111\r\n1.0\r\n121\r\n0.0\r\n131\r\n0.0\r\n`;
+      out += `112\r\n0.0\r\n122\r\n1.0\r\n132\r\n0.0\r\n`;
+      out += `79\r\n0\r\n146\r\n0.0\r\n170\r\n0\r\n`;
+      return out;
+    }
+
+    case "IMAGE":
+    case "WIPEOUT": {
+      // Ảnh chèn và vùng che giữ nguyên bản: thực thể trỏ tới IMAGEDEF (mã 340) trong section
+      // OBJECTS — bộ ghi dựng lại cả đối tượng đó. Hạ xuống đa tuyến như trước là SAI về mặt
+      // hiển thị: vùng che có nhiệm vụ CHE nền, còn đa tuyến lại vẽ ra một khung nhìn thấy được.
+      const def = imageDefHandle;
+      if (!c.center || !def) {
+        if (c.points && c.points.length >= 2) {
+          let fb = head("LWPOLYLINE", "AcDbPolyline");
+          fb += `90\r\n${c.points.length}\r\n70\r\n${c.closed ? 1 : 0}\r\n`;
+          c.points.forEach((p) => {
+            fb += `10\r\n${real(p[0])}\r\n20\r\n${real(p[1])}\r\n`;
+          });
+          return fb + extr();
+        }
+        return pointTrace();
       }
-      return out || pointTrace();
+
+      const sub = ent.type === "WIPEOUT" ? "AcDbWipeout" : "AcDbRasterImage";
+      const u = ent.imageUVector ?? [1, 0, 0];
+      const v = ent.imageVVector ?? [0, 1, 0];
+      const px = ent.imageSizePx ?? [1, 1];
+      const hienThi = ent.imageDisplay ?? { flags: 7, brightness: 50, contrast: 50, fade: 0 };
+
+      let out = head(ent.type, sub);
+      out += `90\r\n0\r\n`;
+      out += pt(10, c.center);
+      out += `11\r\n${real(u[0])}\r\n21\r\n${real(u[1])}\r\n31\r\n${real(u[2])}\r\n`;
+      out += `12\r\n${real(v[0])}\r\n22\r\n${real(v[1])}\r\n32\r\n${real(v[2])}\r\n`;
+      out += `13\r\n${real(px[0])}\r\n23\r\n${real(px[1])}\r\n`;
+      out += `340\r\n${def}\r\n`;
+      out += `70\r\n${hienThi.flags}\r\n280\r\n${c.points && c.points.length >= 3 ? 1 : 0}\r\n`;
+      out += `281\r\n${hienThi.brightness}\r\n282\r\n${hienThi.contrast}\r\n283\r\n${hienThi.fade}\r\n`;
+      out += `360\r\n${imageReactorHandle}\r\n`;
+      // Đường bao cắt: 71 = 2 nghĩa là đa giác (0/1 là hình chữ nhật 2 điểm)
+      const bao = c.points ?? [];
+      out += `71\r\n${bao.length > 2 ? 2 : 1}\r\n`;
+      out += `91\r\n${bao.length}\r\n`;
+      for (const p of bao) out += `14\r\n${real(p[0])}\r\n24\r\n${real(p[1])}\r\n`;
+      return out;
     }
 
     default:
-      // WIPEOUT / IMAGE: ảnh raster cần đối tượng IMAGEDEF kèm dữ liệu ảnh mà bản vẽ nguồn không
-      // mang theo. Có đường bao cắt thì giữ đường bao, không thì để lại POINT ở điểm neo.
+      // Loại không dựng lại được hình: có đường bao thì giữ đường bao, không thì để lại POINT.
       if (c.points && c.points.length >= 2) {
         let out = head("LWPOLYLINE", "AcDbPolyline");
         out += `90\r\n${c.points.length}\r\n70\r\n${c.closed ? 1 : 0}\r\n`;
@@ -3102,6 +3795,28 @@ export function exportDxf(
   const dimBlockNames = new Map<DxfEntityRaw, string>();
   dimEntities.forEach((e, idx) => dimBlockNames.set(e, `*D${idx + 1}`));
 
+  // Handle của các đối tượng trong section OBJECTS, cấp TRƯỚC vì thực thể phải trỏ tới chúng
+  const hRootDict = handles.take();
+  const hGroupDict = handles.take();
+  const hMLeaderStyleDict = handles.take();
+  const hMLeaderStyle = handles.take();
+  const hMLineStyleDict = handles.take();
+  const hMLineStyle = handles.take();
+  const hLayoutDict = handles.take();
+  const hLayoutModel = handles.take();
+  const hLayoutPaper = handles.take();
+
+  // Ảnh chèn: mỗi IMAGEDEF của bản vẽ gốc được cấp handle mới, kèm một IMAGEDEF_REACTOR.
+  // Handle trong tệp mới khác tệp gốc (bộ cấp phát đánh số lại từ đầu) nên phải ánh xạ.
+  const imageDefs = parsed.imageDefs ?? [];
+  const hImageDict = imageDefs.length > 0 ? handles.take() : "0";
+  const imageDefHandles = new Map<string, string>();
+  const imageReactorHandles = new Map<string, string>();
+  for (const def of imageDefs) {
+    imageDefHandles.set(def.handle, handles.take());
+    imageReactorHandles.set(def.handle, handles.take());
+  }
+
   const hModelSpace = handles.take();
   const hPaperSpace = handles.take();
   const blockRecordHandles = new Map<string, string>();
@@ -3113,7 +3828,9 @@ export function exportDxf(
   // ── 1. HEADER ──
   const bao = parsed.diagnostic?.boundingDimensions;
   let header = "0\r\nSECTION\r\n2\r\nHEADER\r\n";
-  header += "9\r\n$ACADVER\r\n1\r\nAC1015\r\n";
+  // AC1021 = AutoCAD 2007, phiên bản đầu tiên có MULTILEADER. Khai thấp hơn thì chú thích dẫn
+  // buộc phải hạ cấp thành đa tuyến + chữ.
+  header += "9\r\n$ACADVER\r\n1\r\nAC1021\r\n";
   header += `9\r\n$INSUNITS\r\n70\r\n${parsed.header?.insUnits ?? 4}\r\n`;
   header += `9\r\n$MEASUREMENT\r\n70\r\n${parsed.header?.measurement ?? 1}\r\n`;
   if (parsed.header?.ltScale !== undefined)
@@ -3125,8 +3842,30 @@ export function exportDxf(
     header += `9\r\n$LIMMAX\r\n10\r\n${real(bao.maxX)}\r\n20\r\n${real(bao.maxY)}\r\n`;
   }
 
-  // ── 2. CLASSES (rỗng: bản vẽ chỉ dùng thực thể chuẩn, không có lớp tự định nghĩa) ──
-  let than = "0\r\nSECTION\r\n2\r\nCLASSES\r\n0\r\nENDSEC\r\n";
+  // ── 2. CLASSES — khai các lớp KHÔNG thuộc lõi DXF mà tệp này có dùng.
+  // Thiếu khai báo thì AutoCAD coi thực thể tương ứng là đối tượng lạ và bỏ qua khi mở tệp.
+  const dungLoai = new Set(entities.map((e) => e.type));
+  (parsed.blocks || []).forEach((b) => b.entities?.forEach((e) => dungLoai.add(e.type)));
+  const lopCanKhai: Array<[string, string, string, number]> = [];
+  if (dungLoai.has("MULTILEADER")) {
+    lopCanKhai.push(["MULTILEADER", "AcDbMLeader", "ACDB_MLEADER_CLASS", 1]);
+    lopCanKhai.push(["MLEADERSTYLE", "AcDbMLeaderStyle", "ACDB_MLEADERSTYLE_CLASS", 0]);
+  }
+  if (dungLoai.has("IMAGE")) {
+    lopCanKhai.push(["IMAGE", "AcDbRasterImage", "ISM", 1]);
+    lopCanKhai.push(["IMAGEDEF", "AcDbRasterImageDef", "ISM", 0]);
+    lopCanKhai.push(["IMAGEDEF_REACTOR", "AcDbRasterImageDefReactor", "ISM", 0]);
+  }
+  if (dungLoai.has("WIPEOUT")) {
+    lopCanKhai.push(["WIPEOUT", "AcDbWipeout", "WipeOut|Product Desc", 1]);
+  }
+
+  let than = "0\r\nSECTION\r\n2\r\nCLASSES\r\n";
+  for (const [ten, lopCpp, ungDung, laThucThe] of lopCanKhai) {
+    than += `0\r\nCLASS\r\n1\r\n${ten}\r\n2\r\n${lopCpp}\r\n3\r\n${ungDung}\r\n`;
+    than += `90\r\n${laThucThe ? 1153 : 1152}\r\n91\r\n0\r\n280\r\n0\r\n281\r\n${laThucThe}\r\n`;
+  }
+  than += "0\r\nENDSEC\r\n";
 
   // ── 3. TABLES ──
   than += "0\r\nSECTION\r\n2\r\nTABLES\r\n";
@@ -3185,8 +3924,11 @@ export function exportDxf(
     if (e.textStyle) styleNames.add(e.textStyle);
   });
   than += openTable("STYLE", hStyleTab, styleNames.size);
+  const styleHandles = new Map<string, string>();
   styleNames.forEach((name) => {
-    than += tableRecordHead("STYLE", handles.take(), hStyleTab, "AcDbTextStyleTableRecord");
+    const hStyle = handles.take();
+    styleHandles.set(name, hStyle);
+    than += tableRecordHead("STYLE", hStyle, hStyleTab, "AcDbTextStyleTableRecord");
     than += `2\r\n${name}\r\n70\r\n0\r\n40\r\n0.0\r\n41\r\n1.0\r\n50\r\n0.0\r\n71\r\n0\r\n`;
     than += `42\r\n${real(defaultTextHeight)}\r\n3\r\ntxt\r\n4\r\n\r\n`;
   });
@@ -3208,11 +3950,17 @@ export function exportDxf(
   than += "0\r\nENDTAB\r\n";
 
   than += openTable("BLOCK_RECORD", hBlkRecTab, blockRecordHandles.size + 2);
-  const blockRecord = (name: string, handle: string): string =>
-    tableRecordHead("BLOCK_RECORD", handle, hBlkRecTab, "AcDbBlockTableRecord") +
-    `2\r\n${name}\r\n70\r\n0\r\n280\r\n1\r\n281\r\n0\r\n`;
-  than += blockRecord("*Model_Space", hModelSpace);
-  than += blockRecord("*Paper_Space", hPaperSpace);
+  const blockRecord = (name: string, handle: string, layoutHandle?: string): string => {
+    let out =
+      tableRecordHead("BLOCK_RECORD", handle, hBlkRecTab, "AcDbBlockTableRecord") +
+      `2\r\n${name}\r\n70\r\n0\r\n280\r\n1\r\n281\r\n0\r\n`;
+    // Hai không gian trỏ ngược về đối tượng bố cục của mình (mã 340) — mối liên kết hai chiều
+    // này là thứ cho AutoCAD biết thẻ Model / Layout1 gắn với khối nào.
+    if (layoutHandle) out += `340\r\n${layoutHandle}\r\n`;
+    return out;
+  };
+  than += blockRecord("*Model_Space", hModelSpace, hLayoutModel);
+  than += blockRecord("*Paper_Space", hPaperSpace, hLayoutPaper);
   blockRecordHandles.forEach((handle, name) => {
     than += blockRecord(name, handle);
   });
@@ -3252,7 +4000,19 @@ export function exportDxf(
     const def = blockDefById.get(name);
     let body = "";
     for (const sub of def?.entities || []) {
-      body += writeEntityR2000(sub, getLayer(sub.layer), defaultTextHeight, handles, handle);
+      body += writeEntityR2000(
+        sub,
+        getLayer(sub.layer),
+        defaultTextHeight,
+        handles,
+        handle,
+        undefined,
+        styleHandles.get(sub.textStyle || "STANDARD") || "0",
+        hMLeaderStyle,
+        hMLineStyle,
+        sub.imageDefHandle ? imageDefHandles.get(sub.imageDefHandle) : undefined,
+        sub.imageDefHandle ? (imageReactorHandles.get(sub.imageDefHandle) ?? "0") : "0",
+      );
     }
     than += writeBlock(name, handle, def?.basePoint ?? [0, 0, 0], body);
   });
@@ -3328,17 +4088,94 @@ export function exportDxf(
       handles,
       owner,
       dimBlockNames.get(ent),
+      styleHandles.get(ent.textStyle || "STANDARD") || "0",
+      hMLeaderStyle,
+      hMLineStyle,
+      ent.imageDefHandle ? imageDefHandles.get(ent.imageDefHandle) : undefined,
+      ent.imageDefHandle ? (imageReactorHandles.get(ent.imageDefHandle) ?? "0") : "0",
     );
   }
   than += "0\r\nENDSEC\r\n";
 
   // ── 6. OBJECTS — từ điển gốc, thứ R12 hoàn toàn không có ──
-  const hRootDict = handles.take();
-  const hGroupDict = handles.take();
   than += "0\r\nSECTION\r\n2\r\nOBJECTS\r\n";
   than += `0\r\nDICTIONARY\r\n5\r\n${hRootDict}\r\n330\r\n0\r\n100\r\nAcDbDictionary\r\n`;
   than += `3\r\nACAD_GROUP\r\n350\r\n${hGroupDict}\r\n`;
+  than += `3\r\nACAD_MLEADERSTYLE\r\n350\r\n${hMLeaderStyleDict}\r\n`;
+  than += `3\r\nACAD_MLINESTYLE\r\n350\r\n${hMLineStyleDict}\r\n`;
+  if (imageDefs.length > 0) than += `3\r\nACAD_IMAGE_DICT\r\n350\r\n${hImageDict}\r\n`;
+  than += `3\r\nACAD_LAYOUT\r\n350\r\n${hLayoutDict}\r\n`;
   than += `0\r\nDICTIONARY\r\n5\r\n${hGroupDict}\r\n330\r\n${hRootDict}\r\n100\r\nAcDbDictionary\r\n`;
+
+  // MULTILEADER bắt buộc trỏ tới một kiểu chú thích dẫn; thiếu đối tượng này thì AutoCAD
+  // không dựng được chú thích dù thực thể ghi đúng.
+  than += `0\r\nDICTIONARY\r\n5\r\n${hMLeaderStyleDict}\r\n330\r\n${hRootDict}\r\n100\r\nAcDbDictionary\r\n`;
+  than += `3\r\nStandard\r\n350\r\n${hMLeaderStyle}\r\n`;
+  const hStandardStyle = styleHandles.get("STANDARD") || "0";
+  than += `0\r\nMLEADERSTYLE\r\n5\r\n${hMLeaderStyle}\r\n330\r\n${hMLeaderStyleDict}\r\n100\r\nAcDbMLeaderStyle\r\n`;
+  than += `179\r\n2\r\n170\r\n2\r\n171\r\n1\r\n172\r\n0\r\n90\r\n2\r\n40\r\n0.0\r\n41\r\n0.0\r\n`;
+  than += `173\r\n1\r\n91\r\n-1056964608\r\n340\r\n0\r\n92\r\n-2\r\n`;
+  than += `290\r\n1\r\n42\r\n${real(defaultTextHeight * 0.72)}\r\n`;
+  than += `291\r\n1\r\n43\r\n${real(defaultTextHeight * 2)}\r\n3\r\nStandard\r\n`;
+  than += `341\r\n${hStandardStyle}\r\n44\r\n${real(defaultTextHeight * 0.08)}\r\n`;
+  than += `300\r\n\r\n342\r\n0\r\n174\r\n1\r\n178\r\n1\r\n175\r\n1\r\n176\r\n0\r\n`;
+  than += `93\r\n-1056964608\r\n45\r\n${real(defaultTextHeight)}\r\n292\r\n0\r\n`;
+  than += `297\r\n0\r\n46\r\n1.0\r\n294\r\n0\r\n295\r\n0\r\n296\r\n0\r\n`;
+  than += `143\r\n${real(defaultTextHeight * 0.09)}\r\n271\r\n0\r\n272\r\n9\r\n273\r\n9\r\n`;
+  // MLINE bắt buộc trỏ tới một kiểu đường nhiều nét; thiếu đối tượng này AutoCAD không dựng được
+  than += `0\r\nDICTIONARY\r\n5\r\n${hMLineStyleDict}\r\n330\r\n${hRootDict}\r\n100\r\nAcDbDictionary\r\n`;
+  than += `3\r\nStandard\r\n350\r\n${hMLineStyle}\r\n`;
+  than += `0\r\nMLINESTYLE\r\n5\r\n${hMLineStyle}\r\n330\r\n${hMLineStyleDict}\r\n100\r\nAcDbMlineStyle\r\n`;
+  than += `2\r\nSTANDARD\r\n70\r\n0\r\n3\r\n\r\n62\r\n256\r\n51\r\n90.0\r\n52\r\n90.0\r\n`;
+  than += `71\r\n2\r\n49\r\n0.5\r\n62\r\n256\r\n6\r\nBYLAYER\r\n49\r\n-0.5\r\n62\r\n256\r\n6\r\nBYLAYER\r\n`;
+  // Bố cục in: thiếu đối tượng LAYOUT thì không gian giấy (khung tên, khung in, khung nhìn)
+  // không có chỗ bám — AutoCAD mở tệp ra chỉ thấy model space.
+  than += `0\r\nDICTIONARY\r\n5\r\n${hLayoutDict}\r\n330\r\n${hRootDict}\r\n100\r\nAcDbDictionary\r\n`;
+  than += `3\r\nModel\r\n350\r\n${hLayoutModel}\r\n3\r\nLayout1\r\n350\r\n${hLayoutPaper}\r\n`;
+
+  const layoutObject = (
+    handle: string,
+    ten: string,
+    thuTuTab: number,
+    blockRecord: string,
+  ): string => {
+    let out = `0\r\nLAYOUT\r\n5\r\n${handle}\r\n330\r\n${hLayoutDict}\r\n100\r\nAcDbPlotSettings\r\n`;
+    out += `1\r\n\r\n2\r\n\r\n4\r\nISO_A3_(420.00_x_297.00_MM)\r\n6\r\n\r\n`;
+    out += `40\r\n7.5\r\n41\r\n20.0\r\n42\r\n7.5\r\n43\r\n20.0\r\n44\r\n420.0\r\n45\r\n297.0\r\n`;
+    out += `46\r\n0.0\r\n47\r\n0.0\r\n48\r\n0.0\r\n49\r\n0.0\r\n140\r\n0.0\r\n141\r\n0.0\r\n`;
+    out += `142\r\n1.0\r\n143\r\n1.0\r\n70\r\n688\r\n72\r\n1\r\n73\r\n0\r\n74\r\n5\r\n`;
+    out += `7\r\n\r\n75\r\n16\r\n147\r\n1.0\r\n148\r\n0.0\r\n149\r\n0.0\r\n`;
+    out += `100\r\nAcDbLayout\r\n1\r\n${ten}\r\n70\r\n1\r\n71\r\n${thuTuTab}\r\n`;
+    out += `10\r\n0.0\r\n20\r\n0.0\r\n11\r\n420.0\r\n21\r\n297.0\r\n`;
+    out += `12\r\n0.0\r\n22\r\n0.0\r\n32\r\n0.0\r\n`;
+    out += `14\r\n${real(bao?.minX ?? 0)}\r\n24\r\n${real(bao?.minY ?? 0)}\r\n34\r\n0.0\r\n`;
+    out += `15\r\n${real(bao?.maxX ?? 0)}\r\n25\r\n${real(bao?.maxY ?? 0)}\r\n35\r\n0.0\r\n`;
+    out += `146\r\n0.0\r\n13\r\n0.0\r\n23\r\n0.0\r\n33\r\n0.0\r\n`;
+    out += `16\r\n1.0\r\n26\r\n0.0\r\n36\r\n0.0\r\n17\r\n0.0\r\n27\r\n1.0\r\n37\r\n0.0\r\n`;
+    out += `76\r\n0\r\n330\r\n${blockRecord}\r\n`;
+    return out;
+  };
+  than += layoutObject(hLayoutModel, "Model", 0, hModelSpace);
+  than += layoutObject(hLayoutPaper, "Layout1", 1, hPaperSpace);
+
+  // Ảnh chèn / vùng che: dựng lại từ điển ảnh, từng IMAGEDEF và IMAGEDEF_REACTOR đi kèm
+  if (imageDefs.length > 0) {
+    than += `0\r\nDICTIONARY\r\n5\r\n${hImageDict}\r\n330\r\n${hRootDict}\r\n100\r\nAcDbDictionary\r\n`;
+    imageDefs.forEach((def, idx) => {
+      than += `3\r\nAnh_${idx + 1}\r\n350\r\n${imageDefHandles.get(def.handle)}\r\n`;
+    });
+    for (const def of imageDefs) {
+      const h = imageDefHandles.get(def.handle)!;
+      const hReactor = imageReactorHandles.get(def.handle)!;
+      than += `0\r\nIMAGEDEF\r\n5\r\n${h}\r\n330\r\n${hImageDict}\r\n100\r\nAcDbRasterImageDef\r\n`;
+      than += `90\r\n0\r\n1\r\n${def.path}\r\n`;
+      than += `10\r\n${real(def.sizePx?.[0] ?? 1)}\r\n20\r\n${real(def.sizePx?.[1] ?? 1)}\r\n`;
+      than += `11\r\n${real(def.pixelSize?.[0] ?? 1)}\r\n21\r\n${real(def.pixelSize?.[1] ?? 1)}\r\n`;
+      than += `280\r\n1\r\n281\r\n0\r\n`;
+      than += `0\r\nIMAGEDEF_REACTOR\r\n5\r\n${hReactor}\r\n330\r\n${h}\r\n100\r\nAcDbRasterImageDefReactor\r\n90\r\n2\r\n330\r\n${h}\r\n`;
+    }
+  }
+
   than += "0\r\nENDSEC\r\n";
 
   // $HANDSEED phải lớn hơn mọi handle đã cấp — nên chốt sau cùng

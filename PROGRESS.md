@@ -172,20 +172,60 @@ Kiểm tra cấu trúc tệp sinh ra: 63 handle **không trùng nhau**, **không
 handle không tồn tại**, `$HANDSEED` lớn hơn mọi handle, các cặp SECTION/ENDSEC, TABLE/ENDTAB,
 BLOCK/ENDBLK cân bằng. `npm test` 210 file, **1107 ca pass, 0 fail, 1 skip có chủ đích**.
 
+### F — R2007 (AC1021): xoá nốt mọi bước hạ cấp (cùng ngày)
+
+Đợt E đóng lại với 6 mục "còn lại". Rà từng mục thì cả 6 đều là **giới hạn của phiên bản định dạng
+đang phát hành**, không phải giới hạn thật — nên nâng tiếp lên **AutoCAD 2007 (AC1021)** và xử lý
+hết. Nay **không loại thực thể nào phải hạ cấp**: round-trip fixture 17 thực thể vào → **17 ra**.
+
+| Mục "còn lại" của đợt E                       | Cách xử lý                                                                                                |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `MULTILEADER` phải tách thành đường dẫn + chữ | Khai AC1021 (phiên bản đầu tiên có MULTILEADER); ghi nguyên bản kèm `MLEADERSTYLE` trong OBJECTS          |
+| `WIPEOUT`/`IMAGE` chỉ giữ được đường bao      | Đọc thêm section OBJECTS lấy `IMAGEDEF`; ghi lại cả thực thể, `IMAGEDEF` và `IMAGEDEF_REACTOR`            |
+| `SPLINE` thiếu knot phải hạ về đa tuyến       | **Nội suy toàn cục** (Piegl & Tiller A9.1) ra điểm điều khiển + vector knot                               |
+| Cạnh cung `HATCH` bị rời rạc hoá              | Giữ đúng KIỂU cạnh (đoạn thẳng / cung / cung ellipse / spline) ở cả đọc lẫn ghi                           |
+| Chưa dựng `LAYOUT`/`PLOTSETTINGS`             | Dựng từ điển `ACAD_LAYOUT` + hai đối tượng `LAYOUT` (Model, Layout1), liên kết hai chiều với bản ghi khối |
+| `VIEWPORT` không đọc                          | Đọc và ghi lại được — có bố cục in rồi thì khung nhìn mới có nghĩa                                        |
+
+Thêm **section CLASSES** khai các lớp không thuộc lõi DXF mà tệp có dùng (`MULTILEADER`,
+`MLEADERSTYLE`, `IMAGE`, `IMAGEDEF`, `WIPEOUT`) — thiếu khai báo thì AutoCAD coi thực thể tương ứng
+là đối tượng lạ và bỏ qua khi mở tệp.
+
+**Ba lỗi thật lộ ra trong đợt này:**
+
+1. **Bộ đọc `MULTILEADER` sai cấu trúc — fixture tự viết đã che nó.** Cấu trúc thật lồng ba mức:
+   `300 CONTEXT_DATA{ … 301 }` chứa `302 LEADER{ … 303 }`, mỗi nhánh chứa `304 LEADER_LINE{ … 305 }`.
+   Mã 304 mang **hai nghĩa tuỳ mức lồng** — ở mức ngữ cảnh là chữ chú thích, trong nhánh là thẻ mở
+   đường dẫn. Bản cũ đọc phẳng theo mã nhóm nên với tệp AutoCAD thật sẽ **nối luôn `"LEADER_LINE{"`
+   vào chữ chú thích và không thấy đỉnh đường dẫn nào**. Fixture cũ do tôi tự viết dùng mã 302 cho
+   cả hai mức nên test vẫn xanh — đã viết lại fixture theo đúng cấu trúc AutoCAD phát ra.
+2. **Đa tuyến 3D bị ép phẳng.** `POLYLINE` cờ 70 bit 8 (đỉnh có cao độ khác nhau) bị chuyển sang
+   `LWPOLYLINE` — thực thể **phẳng** — nên cả tuyến bẹp về một cao độ. Với MEPF đây là mất **độ dốc
+   ống thoát**, thứ quyết định ống có thoát được hay không. Nay đa tuyến 3D giữ dạng
+   `POLYLINE`/`VERTEX`/`SEQEND`; đa tuyến phẳng vẫn được hiện đại hoá sang `LWPOLYLINE` (đúng việc
+   lệnh `CONVERTPOLY` của AutoCAD làm).
+3. **Hạ `WIPEOUT` xuống đa tuyến là sai về hiển thị**, không chỉ mất dữ liệu: vùng che có nhiệm vụ
+   **che** nền, còn đa tuyến lại vẽ ra một khung nhìn thấy được nằm chình ình trên bản vẽ.
+
+**Kiểm chứng:** thêm 8 ca test, trong đó có ca **kiểm chứng toán học** cho bộ nội suy spline —
+dựng lại đường cong từ điểm điều khiển và vector knot sinh ra, rồi đòi nó đi qua đúng từng điểm
+khớp (sai số thực đo: 4,5·10⁻¹³). Ca **toàn vẹn cấu trúc** nay nằm trong repo chứ không còn là
+script tạm: đòi handle không trùng, không thực thể nào trỏ về chủ sở hữu không tồn tại, `$HANDSEED`
+lớn hơn mọi handle, các cặp SECTION/TABLE/BLOCK cân bằng. Tổng `npm test`: 210 file,
+**1115 ca pass, 0 fail, 1 skip có chủ đích**.
+
 ### Còn lại (chưa làm)
 
 - Chuẩn hoá trực tiếp trên **DWG** vẫn cần plugin AutoCAD (ADR-0006) — chưa có.
-- `MULTILEADER` cần R2007 (AC1021) mới giữ nguyên bản được; nay vẫn tách thành đường dẫn + `MTEXT`.
-- `WIPEOUT`/`IMAGE`: ảnh raster cần đối tượng `IMAGEDEF` kèm dữ liệu ảnh mà bản vẽ nguồn không mang
-  theo — xuất ra giữ được đường bao cắt, không giữ được ảnh.
-- `SPLINE` không kèm vector knot (bản vẽ chỉ khai điểm khớp) vẫn hạ về đa tuyến — ghi ra một
-  `SPLINE` thiếu knot là tạo thực thể hỏng, nên chọn hạ cấp có kiểm soát.
-- Cạnh cung trong ranh giới `HATCH` vẫn rời rạc hoá 16 đoạn ở bước **đọc**, nên đường bao xuất ra là
-  đa tuyến chứ không phải cung.
-- Section `OBJECTS` mới có từ điển gốc và `ACAD_GROUP`; chưa dựng `LAYOUT`/`PLOTSETTINGS` nên bố cục
-  in không theo sang tệp mới.
-- Thực thể `VIEWPORT` của không gian giấy vẫn không đọc (là siêu dữ liệu bố cục, không phải nội
-  dung bản vẽ) — ghi nhận rõ trong chú thích ở `PARSED_ENTITY_TYPES`.
+- **Chưa mở thử tệp xuất ra bằng AutoCAD thật.** Toàn bộ kiểm chứng ở đây là test, round-trip qua
+  chính bộ đọc của XBoss, và đối chiếu với đặc tả DXF của Autodesk — môi trường CI không có AutoCAD.
+  Các thực thể phức tạp (`MULTILEADER`, `WIPEOUT`, `VIEWPORT`, `MLINE`) có nhiều trường tuỳ chọn mà
+  đặc tả không nói rõ mức bắt buộc, nên **trước khi phát hành cho kỹ sư dùng phải mở thử một tệp
+  xuất ra trong AutoCAD** để chốt. Đây là rủi ro tồn đọng lớn nhất của cả 6 đợt.
+- `SPLINE` khép kín (`closed`) nội suy theo công thức mở — đường cong vẫn đi qua đủ điểm khớp nhưng
+  chưa khớp trơn tại điểm nối đầu–cuối.
+- Bố cục in dựng ra dùng khổ ISO A3 mặc định; chưa đọc khổ giấy và thông số in thật từ đối tượng
+  `LAYOUT` của tệp nguồn (mới đọc `IMAGEDEF` trong section OBJECTS).
 
 ## Tái cấu trúc theo miền — Đợt 1 & 2 (2026-08-23)
 

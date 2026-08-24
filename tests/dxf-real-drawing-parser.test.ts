@@ -109,10 +109,14 @@ test("exportDxf: Xuất chuỗi DXF ASCII chuẩn AutoCAD đầy đủ HEADER, T
   assert.ok(exportedDxf.includes("HEADER"), "DXF xuất phải có HEADER");
   assert.ok(exportedDxf.includes("$ACADVER"), "DXF xuất phải có $ACADVER");
   assert.ok(
-    exportedDxf.includes("AC1015"),
-    "DXF xuất phải khai R2000 (AC1015) — bộ ghi nay phát hành đúng cấu trúc có handle và OBJECTS",
+    exportedDxf.includes("AC1021"),
+    "DXF xuất phải khai R2007 (AC1021) — phiên bản đầu tiên có MULTILEADER, nên không loại thực thể nào phải hạ cấp",
   );
   assert.ok(!exportedDxf.includes("AC1009"), "Không được khai lùi về R12 nữa");
+  assert.ok(
+    exportedDxf.includes("100\r\nAcDbLayout\r\n1\r\nModel\r\n"),
+    "Phải dựng bố cục in — thiếu LAYOUT thì không gian giấy không có chỗ bám",
+  );
   assert.ok(exportedDxf.includes("$HANDSEED"), "R2000 bắt buộc khai $HANDSEED");
   assert.ok(exportedDxf.includes("2\r\nCLASSES"), "DXF xuất phải có section CLASSES");
   assert.ok(exportedDxf.includes("2\r\nOBJECTS"), "DXF xuất phải có section OBJECTS");
@@ -602,14 +606,22 @@ test("exportDxf: vòng round-trip giữ nguyên số thực thể, khung bao và
 
   const lai = parseDxf(exported, "roundtrip.dxf");
 
-  // 17 thực thể vào → 18 ra. Bước hạ cấp DUY NHẤT còn lại là MULTILEADER (thực thể của R2007)
-  // tách thành đa tuyến đường dẫn + MTEXT chú thích. Mọi loại khác giữ nguyên bản.
+  // 17 vào → 17 ra: KHÔNG còn loại thực thể nào phải hạ cấp, không thực thể nào tách đôi
   assert.equal(goc.entities.length, 17);
-  assert.equal(lai.entities.length, 18);
-  for (const loai of ["LWPOLYLINE", "ELLIPSE", "HATCH", "MTEXT", "DIMENSION", "XLINE"] as const) {
+  assert.equal(lai.entities.length, 17);
+  for (const loai of [
+    "LWPOLYLINE",
+    "ELLIPSE",
+    "HATCH",
+    "MTEXT",
+    "DIMENSION",
+    "XLINE",
+    "MLINE",
+    "MULTILEADER",
+  ] as const) {
     assert.ok(
       lai.entities.some((e) => e.type === loai),
-      `${loai} phải giữ nguyên loại sau vòng xuất – nạp lại (R12 trước đây phải hạ cấp)`,
+      `${loai} phải giữ nguyên loại sau vòng xuất – nạp lại (bản ghi R12 trước đây phải hạ cấp)`,
     );
   }
   assert.deepEqual(
@@ -862,4 +874,280 @@ test("exportDxf: giữ thuộc tính chung — không gian giấy, bề dày, t�
     [500, 600, 0],
     "Canh lề giữ nguyên nên chữ không nhảy chỗ",
   );
+});
+
+test("parseDxf: MULTILEADER đọc đúng cấu trúc lồng thật của AutoCAD (300/301, 302/303, 304/305)", () => {
+  const r = parseDxf(FIXTURE_MEPF, "mepf-thap-a.dxf");
+  const ml = r.entities.find((e) => e.type === "MULTILEADER");
+  assert.ok(ml, "Phải đọc ra MULTILEADER");
+
+  // Mã 304 mang HAI nghĩa tuỳ mức lồng: ở mức ngữ cảnh là chữ chú thích, trong khối LEADER{ là
+  // thẻ mở LEADER_LINE{. Đọc phẳng theo mã nhóm sẽ nối luôn "LEADER_LINE{" vào chữ chú thích.
+  assert.equal(ml.decodedText, "Van chan VCD 400x300", "Chữ chú thích không được lẫn thẻ mở khối");
+  assert.equal(ml.textHeight, 250, "Chiều cao chữ nằm ở mã 41 trong ngữ cảnh, không phải mã 40");
+  assert.deepEqual(ml.coordinates.leaderLines, [
+    [
+      [8000, 3000, 0],
+      [9000, 4000, 0],
+    ],
+  ]);
+  assert.equal(ml.mleaderContext?.leaders.length, 1);
+  assert.equal(ml.mleaderContext?.leaders[0].doglegLength, 500);
+
+  // Xuất ra vẫn là MULTILEADER nguyên bản, kèm kiểu chú thích dẫn trong OBJECTS
+  const exported = exportDxf(r, { applyStandardLayers: false });
+  assert.ok(exported.includes("100\r\nAcDbMLeader\r\n"), "Phải ghi MULTILEADER nguyên bản");
+  assert.ok(
+    exported.includes("100\r\nAcDbMLeaderStyle\r\n"),
+    "Phải kèm kiểu chú thích dẫn — thiếu nó AutoCAD không dựng được chú thích",
+  );
+  assert.ok(
+    exported.includes("1\r\nMULTILEADER\r\n2\r\nAcDbMLeader\r\n"),
+    "Lớp không thuộc lõi DXF phải được khai trong section CLASSES",
+  );
+
+  const lai = parseDxf(exported, "rt.dxf");
+  const ml2 = lai.entities.find((e) => e.type === "MULTILEADER");
+  assert.ok(ml2);
+  assert.equal(ml2.decodedText, "Van chan VCD 400x300");
+  assert.deepEqual(ml2.coordinates.leaderLines, ml.coordinates.leaderLines);
+});
+
+test("exportDxf: MLINE giữ nguyên nét kép, không hạ thành đa tuyến trục", () => {
+  const goc = parseDxf(FIXTURE_MEPF, "mepf-thap-a.dxf");
+  const mline = goc.entities.find((e) => e.type === "MLINE");
+  assert.ok(mline);
+  assert.equal(mline.mlineVertices?.length, 3, "Phải đọc đủ cấu trúc đỉnh của MLINE");
+
+  const exported = exportDxf(goc, { applyStandardLayers: false });
+  assert.ok(exported.includes("100\r\nAcDbMline\r\n"), "Phải ghi MLINE nguyên bản");
+  assert.ok(
+    exported.includes("100\r\nAcDbMlineStyle\r\n"),
+    "Phải kèm kiểu đường nhiều nét — thiếu nó AutoCAD không dựng được",
+  );
+
+  const lai = parseDxf(exported, "rt.dxf");
+  const mline2 = lai.entities.find((e) => e.type === "MLINE");
+  assert.ok(mline2, "Đọc lại vẫn phải là MLINE");
+  assert.deepEqual(mline2.coordinates.points, mline.coordinates.points);
+});
+
+test("exportDxf: đa tuyến 3D giữ nguyên cao độ từng đỉnh, không bị ép phẳng", () => {
+  // Tuyến ống thoát dốc i=1.5%: ba đỉnh ba cao độ. LWPOLYLINE là thực thể PHẲNG nên chuyển sang
+  // đó sẽ bẹp cả tuyến về một cao độ — mất luôn độ dốc, thứ quyết định ống có thoát được không.
+  const dxf = `0\nSECTION\n2\nENTITIES\n0\nPOLYLINE\n8\nP-PIPE-SANR\n66\n1\n70\n8\n10\n0\n20\n0\n30\n0\n0\nVERTEX\n8\nP-PIPE-SANR\n10\n0\n20\n0\n30\n2850\n0\nVERTEX\n8\nP-PIPE-SANR\n10\n5000\n20\n0\n30\n2775\n0\nVERTEX\n8\nP-PIPE-SANR\n10\n10000\n20\n0\n30\n2700\n0\nSEQEND\n8\nP-PIPE-SANR\n0\nENDSEC\n0\nEOF`;
+
+  const goc = parseDxf(dxf, "ong_doc.dxf");
+  assert.equal(goc.entities[0].coordinates.is3d, true, "Cờ 70 bit 8 = đa tuyến 3D");
+
+  const lai = parseDxf(exportDxf(goc, { applyStandardLayers: false }), "rt.dxf");
+  assert.equal(lai.entities[0].type, "POLYLINE", "Đa tuyến 3D phải giữ dạng POLYLINE/VERTEX");
+  assert.deepEqual(
+    lai.entities[0].coordinates.points,
+    [
+      [0, 0, 2850],
+      [5000, 0, 2775],
+      [10000, 0, 2700],
+    ],
+    "Cao độ từng đỉnh phải nguyên vẹn",
+  );
+
+  // Còn đa tuyến phẳng thì được hiện đại hoá sang LWPOLYLINE (đúng việc lệnh CONVERTPOLY làm)
+  const phang = `0\nSECTION\n2\nENTITIES\n0\nPOLYLINE\n8\n0\n66\n1\n70\n0\n10\n0\n20\n0\n30\n0\n0\nVERTEX\n8\n0\n10\n0\n20\n0\n30\n0\n0\nVERTEX\n8\n0\n10\n100\n20\n0\n30\n0\n0\nSEQEND\n8\n0\n0\nENDSEC\n0\nEOF`;
+  const laiPhang = parseDxf(exportDxf(parseDxf(phang, "p.dxf"), {}), "rt2.dxf");
+  assert.equal(laiPhang.entities[0].type, "LWPOLYLINE");
+});
+
+test("exportDxf: HATCH giữ CẠNH CUNG là cung, không bẻ thành chuỗi đoạn thẳng", () => {
+  // Vùng tô có biên cong (vùng bảo ôn, vùng cắt qua ống tròn) — bẻ cung thành đoạn thẳng là méo biên
+  const dxf = `0\nSECTION\n2\nENTITIES\n0\nHATCH\n8\nM-INSU\n10\n0\n20\n0\n30\n0\n2\nANSI31\n70\n0\n71\n0\n91\n1\n92\n1\n93\n2\n72\n1\n10\n0\n20\n0\n11\n1000\n21\n0\n72\n2\n10\n500\n20\n0\n40\n500\n50\n0\n51\n180\n73\n1\n97\n0\n75\n1\n76\n1\n52\n0\n41\n1\n77\n0\n78\n1\n53\n45\n43\n0\n44\n0\n45\n-2.5\n46\n2.5\n79\n0\n47\n1\n98\n0\n0\nENDSEC\n0\nEOF`;
+
+  const goc = parseDxf(dxf, "tô_cong.dxf");
+  const canh = goc.entities[0].coordinates.boundaryPaths?.[0].edges;
+  assert.equal(canh?.length, 2, "Phải đọc ra 2 cạnh có kiểu");
+  assert.equal(canh?.[1].type, "arc", "Cạnh thứ hai phải là CUNG, không phải chuỗi đoạn thẳng");
+
+  const lai = parseDxf(exportDxf(goc, { applyStandardLayers: false }), "rt.dxf");
+  assert.deepEqual(
+    lai.entities[0].coordinates.boundaryPaths?.[0].edges,
+    canh,
+    "Cạnh cung phải qua vòng xuất – nạp lại mà không đổi",
+  );
+});
+
+test("exportDxf: SPLINE chỉ có điểm khớp được nội suy thành đường cong ĐI QUA đúng các điểm đó", () => {
+  const fit: Array<[number, number, number]> = [
+    [0, 0, 0],
+    [1000, 800, 0],
+    [2000, -400, 0],
+    [3000, 600, 0],
+    [4000, 0, 0],
+  ];
+  const dxf =
+    `0\nSECTION\n2\nENTITIES\n0\nSPLINE\n8\nM-DUCT-SUPP\n70\n8\n71\n3\n74\n5\n` +
+    fit.map((p) => `11\n${p[0]}\n21\n${p[1]}\n31\n${p[2]}`).join("\n") +
+    `\n0\nENDSEC\n0\nEOF`;
+
+  const goc = parseDxf(dxf, "cong.dxf");
+  assert.equal(goc.entities[0].coordinates.knots, undefined, "Bản vẽ nguồn không khai vector knot");
+
+  const lai = parseDxf(exportDxf(goc, { applyStandardLayers: false }), "rt.dxf");
+  const sp = lai.entities[0];
+  assert.equal(sp.type, "SPLINE", "Phải giữ là SPLINE, không hạ xuống đa tuyến");
+  assert.equal(sp.coordinates.degree, 3);
+  assert.equal(sp.coordinates.controlPoints?.length, 5);
+  assert.equal(sp.coordinates.knots?.length, 9, "Vector knot kẹp hai đầu: n + p + 2 = 9");
+  assert.deepEqual(sp.coordinates.points, fit, "Điểm khớp phải giữ nguyên");
+
+  // Kiểm chứng toán: đường cong dựng từ điểm điều khiển phải ĐI QUA đúng từng điểm khớp
+  const knots = sp.coordinates.knots!;
+  const P = sp.coordinates.controlPoints!;
+  const p = sp.coordinates.degree!;
+  const N = (i: number, d: number, u: number): number => {
+    if (d === 0) {
+      const cuoi = knots[knots.length - 1];
+      if (u === cuoi) return knots[i] <= u && u <= knots[i + 1] && knots[i] < knots[i + 1] ? 1 : 0;
+      return knots[i] <= u && u < knots[i + 1] ? 1 : 0;
+    }
+    let a = 0;
+    const dl = knots[i + d] - knots[i];
+    if (dl !== 0) a = ((u - knots[i]) / dl) * N(i, d - 1, u);
+    let b = 0;
+    const dr = knots[i + d + 1] - knots[i + 1];
+    if (dr !== 0) b = ((knots[i + d + 1] - u) / dr) * N(i + 1, d - 1, u);
+    return a + b;
+  };
+  const doDai = fit
+    .slice(1)
+    .map((q, k) => Math.sqrt(Math.hypot(q[0] - fit[k][0], q[1] - fit[k][1])));
+  const tong = doDai.reduce((a, b) => a + b, 0);
+  let luy = 0;
+  const us = [0, ...doDai.map((v) => (luy += v) / tong)];
+  us[us.length - 1] = 1;
+
+  us.forEach((u, k) => {
+    let x = 0;
+    let y = 0;
+    for (let i = 0; i < P.length; i++) {
+      const n = N(i, p, u);
+      x += n * P[i][0];
+      y += n * P[i][1];
+    }
+    assert.ok(
+      Math.hypot(x - fit[k][0], y - fit[k][1]) < 1e-6,
+      `Đường cong phải đi qua điểm khớp ${k} (${fit[k][0]}, ${fit[k][1]}), thực tế (${x}, ${y})`,
+    );
+  });
+});
+
+test("exportDxf: WIPEOUT giữ nguyên bản kèm định nghĩa ảnh trong OBJECTS", () => {
+  // Vùng che có nhiệm vụ CHE nền. Hạ nó xuống đa tuyến như bản trước là sai về hiển thị:
+  // vùng che biến thành một khung nhìn thấy được nằm chình ình trên bản vẽ.
+  const dxf = `0\nSECTION\n2\nENTITIES\n0\nWIPEOUT\n8\nG-ANNO-TEXT\n90\n0\n10\n1000\n20\n2000\n30\n0\n11\n0.5\n21\n0\n31\n0\n12\n0\n22\n0.5\n32\n0\n13\n100\n23\n50\n340\n1A2\n70\n7\n280\n1\n281\n50\n282\n50\n283\n0\n71\n2\n91\n4\n14\n-0.5\n24\n-0.5\n14\n0.5\n24\n-0.5\n14\n0.5\n24\n0.5\n14\n-0.5\n24\n0.5\n0\nENDSEC\n0\nSECTION\n2\nOBJECTS\n0\nIMAGEDEF\n5\n1A2\n100\nAcDbRasterImageDef\n90\n0\n1\nmat_bang_tang_4.png\n10\n1024\n20\n768\n11\n1.0\n21\n1.0\n280\n1\n281\n0\n0\nENDSEC\n0\nEOF`;
+
+  const goc = parseDxf(dxf, "che.dxf");
+  assert.equal(
+    goc.entities[0].imageDefHandle,
+    "1A2",
+    "Thực thể phải giữ handle trỏ tới định nghĩa",
+  );
+  assert.deepEqual(goc.imageDefs?.[0], {
+    handle: "1A2",
+    path: "mat_bang_tang_4.png",
+    sizePx: [1024, 768],
+    pixelSize: [1, 1],
+  });
+
+  const exported = exportDxf(goc, { applyStandardLayers: false });
+  assert.ok(exported.includes("100\r\nAcDbWipeout\r\n"), "Phải ghi WIPEOUT nguyên bản");
+  assert.ok(exported.includes("100\r\nAcDbRasterImageDef\r\n"), "Phải dựng lại IMAGEDEF");
+  assert.ok(
+    exported.includes("1\r\nWIPEOUT\r\n2\r\nAcDbWipeout\r\n"),
+    "WIPEOUT không thuộc lõi DXF nên phải khai trong CLASSES",
+  );
+
+  const lai = parseDxf(exported, "rt.dxf");
+  assert.equal(lai.entities[0].type, "WIPEOUT");
+  assert.equal(lai.entities[0].coordinates.points?.length, 4, "Đường bao cắt phải nguyên vẹn");
+  assert.equal(lai.imageDefs?.[0].path, "mat_bang_tang_4.png", "Đường dẫn ảnh phải theo sang");
+});
+
+test("exportDxf: khung nhìn và bố cục in của không gian giấy sống sót qua vòng xuất – nạp lại", () => {
+  const dxf = `0\nSECTION\n2\nENTITIES\n0\nLINE\n8\n0\n10\n0\n20\n0\n30\n0\n11\n1000\n21\n0\n31\n0\n0\nVIEWPORT\n8\nG-KHUNG\n67\n1\n10\n210\n20\n148\n30\n0\n40\n380\n41\n250\n68\n2\n69\n2\n12\n5000\n22\n5000\n45\n12000\n51\n0\n0\nENDSEC\n0\nEOF`;
+
+  const goc = parseDxf(dxf, "bo_cuc.dxf");
+  const vp = goc.entities.find((e) => e.type === "VIEWPORT");
+  assert.ok(vp, "Khung nhìn phải được đọc, không còn bị bỏ qua im lặng");
+  assert.equal(vp.isPaperSpace, true);
+  assert.equal(vp.viewport?.viewHeight, 12000, "Chiều cao vùng nhìn quyết định tỷ lệ in");
+
+  const exported = exportDxf(goc, { applyStandardLayers: false });
+  assert.ok(
+    exported.includes("100\r\nAcDbLayout\r\n1\r\nLayout1\r\n"),
+    "Phải dựng bố cục Layout1 để không gian giấy có chỗ bám",
+  );
+
+  const lai = parseDxf(exported, "rt.dxf");
+  const vp2 = lai.entities.find((e) => e.type === "VIEWPORT");
+  assert.ok(vp2, "Khung nhìn phải còn sau vòng xuất – nạp lại");
+  assert.deepEqual(vp2.viewport, vp.viewport, "Toàn bộ thông số khung nhìn phải nguyên vẹn");
+  assert.equal(vp2.isPaperSpace, true, "Vẫn phải nằm ở không gian giấy");
+});
+
+test("exportDxf: toàn vẹn cấu trúc R2007 — handle duy nhất, chủ sở hữu tồn tại, $HANDSEED hợp lệ", () => {
+  // Handle và quan hệ chủ sở hữu là thứ R12 hoàn toàn không có và cũng là chỗ dễ sai nhất khi
+  // sinh tệp: trùng handle hoặc trỏ vào handle không tồn tại thì AutoCAD báo tệp hỏng.
+  const exported = exportDxf(parseDxf(FIXTURE_MEPF, "mepf-thap-a.dxf"), {
+    applyStandardLayers: true,
+  });
+  const dong = exported.split("\r\n");
+
+  const handles = new Map<string, string>();
+  const chuSoHuu: Array<{ owner: string; loai: string }> = [];
+  let loai = "";
+  let trongHeader = false;
+  const trung: string[] = [];
+
+  for (let i = 0; i + 1 < dong.length; i += 2) {
+    const ma = dong[i];
+    const giaTri = dong[i + 1];
+    if (ma === "0") {
+      loai = giaTri;
+      if (giaTri === "ENDSEC") trongHeader = false;
+    } else if (ma === "2" && loai === "SECTION") {
+      trongHeader = giaTri === "HEADER";
+    } else if (ma === "5" && !trongHeader) {
+      // Trong HEADER, mã 5 là giá trị của biến $HANDSEED chứ không phải handle của thực thể
+      if (handles.has(giaTri)) trung.push(`${giaTri} (${loai} và ${handles.get(giaTri)})`);
+      handles.set(giaTri, loai);
+    } else if (ma === "330" && !trongHeader) {
+      chuSoHuu.push({ owner: giaTri, loai });
+    }
+  }
+
+  assert.deepEqual(trung, [], "Không handle nào được cấp hai lần");
+  assert.ok(handles.size > 50, `Tệp phải có đủ handle (đang có ${handles.size})`);
+
+  const mocoi = chuSoHuu.filter((o) => o.owner !== "0" && !handles.has(o.owner));
+  assert.deepEqual(
+    mocoi.map((o) => `${o.loai} → ${o.owner}`),
+    [],
+    "Không thực thể nào được trỏ về một chủ sở hữu không tồn tại",
+  );
+
+  const seed = /\$HANDSEED\r\n\s*5\r\n(\w+)/.exec(exported)?.[1];
+  assert.ok(seed, "Tệp R2007 bắt buộc khai $HANDSEED");
+  const lonNhat = Math.max(...[...handles.keys()].map((h) => parseInt(h, 16)));
+  assert.ok(
+    parseInt(seed, 16) > lonNhat,
+    `$HANDSEED (${seed}) phải lớn hơn mọi handle đã cấp (lớn nhất ${lonNhat.toString(16).toUpperCase()})`,
+  );
+
+  // Các cặp mở/đóng phải cân bằng
+  const dem = (t: string) =>
+    (exported.match(new RegExp(`\\r\\n0\\r\\n${t}\\r\\n`, "g")) || []).length;
+  // SECTION đầu tiên nằm ngay đầu chuỗi nên không có \r\n dẫn trước — cộng bù 1
+  assert.equal(dem("SECTION") + 1, dem("ENDSEC"), "Mỗi SECTION phải có đúng một ENDSEC");
+  assert.equal(dem("TABLE"), dem("ENDTAB"), "Mỗi TABLE phải có đúng một ENDTAB");
+  assert.equal(dem("BLOCK"), dem("ENDBLK"), "Mỗi BLOCK phải có đúng một ENDBLK");
 });
