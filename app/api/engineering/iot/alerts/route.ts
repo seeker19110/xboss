@@ -82,7 +82,7 @@ export async function PATCH(req: Request) {
       `UPDATE engineering_iot_threshold_alerts
        SET is_resolved = $1,
            resolved_at = CASE WHEN $1 THEN NOW() ELSE NULL END,
-           resolved_by = CASE WHEN $1 THEN $2 ELSE NULL END
+           resolved_by = CASE WHEN $1 THEN $2::bigint ELSE NULL END
        WHERE id = $3 AND project_id = $4
        RETURNING *`,
       isResolved ?? true,

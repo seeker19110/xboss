@@ -94,7 +94,16 @@ export function timLoiGoiSaiKieu(goc = GOC, thuMuc = THU_MUC_QUET): LoiGoiSaiKie
         const dong = timDauDong(src, mo);
         if (dong < 0) continue;
         const ben = src.slice(mo + 1, dong);
-        const dau = ben.trimStart();
+        // Bỏ khoảng trắng VÀ comment mở đầu (nhiều lời gọi có comment giải thích ngay trước
+        // chuỗi SQL) — không bỏ thì bộ quét mù đúng với những chỗ đó.
+        let dau = ben;
+        for (;;) {
+          const truoc = dau;
+          dau = dau.trimStart();
+          if (dau.startsWith("//")) dau = dau.slice(dau.indexOf("\n") + 1);
+          else if (dau.startsWith("/*")) dau = dau.slice(dau.indexOf("*/") + 2);
+          if (dau === truoc) break;
+        }
         // Tham số đầu phải là SQL dạng literal — loại các hàm trùng tên nhận đối tượng/biến.
         if (!dau.startsWith("`") && !dau.startsWith('"') && !dau.startsWith("'")) continue;
         // Nhảy qua literal SQL để tìm dấu phẩy ngăn tham số thứ hai.
@@ -152,10 +161,11 @@ test("bộ quét bắt được mẫu sai (tự kiểm chứng trên fixture tro
       join(goc, "lib", "sai.ts"),
       "const a = await query(`SELECT 1 FROM t WHERE id = $1`, [projectId]);\n" +
         "const b = await run(`UPDATE t SET x = ? WHERE id = ?`, x, id);\n" +
-        "const c = await client.query(`SELECT 1`, [id]);\n",
+        "const c = await client.query(`SELECT 1`, [id]);\n" +
+        "const d = await query(\n  // chú thích chen giữa\n  `SELECT 2 FROM t WHERE id = $1`,\n  [id],\n);\n",
     );
     const viPham = timLoiGoiSaiKieu(goc, ["lib"]);
-    assert.equal(viPham.length, 1, "phải bắt đúng 1 vi phạm");
+    assert.equal(viPham.length, 2, "phải bắt đúng 2 vi phạm (kể cả lời gọi có comment chen giữa)");
     assert.equal(viPham[0].tep, join("lib", "sai.ts"));
     assert.equal(viPham[0].ham, "query");
   } finally {

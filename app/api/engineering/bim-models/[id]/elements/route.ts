@@ -34,7 +34,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     `SELECT e.id, e.model_id, e.project_id, e.guid, e.element_type, e.system_type, e.name,
             e.geometry_data, e.properties, e.wbs_task_id, e.created_at,
             t.name as wbs_task_name, t.start_date as wbs_start_date, t.end_date as wbs_end_date,
-            t.progress as wbs_progress, t.status as wbs_status
+            t.progress_percent as wbs_progress, t.status as wbs_status
      FROM engineering_bim_elements e
      LEFT JOIN tasks t ON e.wbs_task_id = t.id
      WHERE e.model_id = ? AND e.project_id = ?
