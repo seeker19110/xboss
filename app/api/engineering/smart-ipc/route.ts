@@ -6,7 +6,7 @@ import {
   fetchSmartIpcGatingContext,
   saveSmartIpcRecord,
   listSmartIpcRecords,
-  SmartIpcCalculationInput,
+  validateSmartIpcPostBody,
 } from "@/lib/ky-thuat/engineering-smart-ipc";
 
 export const dynamic = "force-dynamic";
@@ -51,38 +51,14 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    // grossClaimedVnd trước đây có default 500.000.000 khi client bỏ trống — nay bắt buộc,
-    // thiếu → 422 (không tự bịa số tiền xin thanh toán).
-    if (body.grossClaimedVnd == null || String(body.grossClaimedVnd).trim() === "") {
-      return NextResponse.json(
-        { error: "Thiếu grossClaimedVnd — không thể tự động điền giá trị mặc định" },
-        { status: 422 },
-      );
+    // Validate + chuẩn hoá toàn bộ body (kể cả retentionPercent/iotWindowHours/claimedQty —
+    // trước đây `Number(...)` không kiểm biên nên chuỗi rác ra NaN, chảy thẳng vào tính tiền/
+    // khoảng thời gian) — hàm thuần trong lib, route chỉ đọc kết quả và trả 422.
+    const validated = validateSmartIpcPostBody(body);
+    if (!validated.ok) {
+      return NextResponse.json({ error: validated.error }, { status: 422 });
     }
-    if (!body.ipcNumber || !body.periodMonth || !body.contractorName) {
-      return NextResponse.json(
-        { error: "Thiếu ipcNumber/periodMonth/contractorName" },
-        { status: 422 },
-      );
-    }
-
-    const input: SmartIpcCalculationInput = {
-      ipcNumber: String(body.ipcNumber),
-      periodMonth: String(body.periodMonth),
-      contractorName: String(body.contractorName),
-      grossClaimedVnd: String(body.grossClaimedVnd),
-      retentionPercent:
-        body.retentionPercent != null ? Number(body.retentionPercent) : undefined,
-      refs: {
-        scanCode: body.refs?.scanCode ? String(body.refs.scanCode) : undefined,
-        bbntEnvelopeId: body.refs?.bbntEnvelopeId ? String(body.refs.bbntEnvelopeId) : undefined,
-        iotDeviceId: body.refs?.iotDeviceId ? String(body.refs.iotDeviceId) : undefined,
-        iotWindowHours:
-          body.refs?.iotWindowHours != null ? Number(body.refs.iotWindowHours) : undefined,
-        boqCode: body.refs?.boqCode ? String(body.refs.boqCode) : undefined,
-        claimedQty: body.refs?.claimedQty != null ? Number(body.refs.claimedQty) : undefined,
-      },
-    };
+    const input = validated.value;
 
     // Mọi cổng gating đọc từ nguồn thật (esign envelope, log IoT, BOQ/kho) — client chỉ khai
     // định danh tham chiếu, không tự khai kết quả đạt/không đạt. Thiếu tham chiếu → cổng đó

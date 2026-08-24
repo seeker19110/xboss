@@ -43,6 +43,86 @@ export interface SmartIpcCalculationInput {
 }
 
 // ============================================================================
+// 1b. VALIDATE BODY POST — HÀM THUẦN (route chỉ gọi + trả 422, không tự parse rải rác)
+// ============================================================================
+
+export type SmartIpcValidationResult =
+  | { ok: true; value: SmartIpcCalculationInput }
+  | { ok: false; error: string };
+
+/**
+ * Validate + chuẩn hoá body POST /api/engineering/smart-ipc. Trước đây `Number(...)` trên các
+ * trường số (retentionPercent/iotWindowHours/claimedQty) không kiểm biên → chuỗi rác thành
+ * `NaN` chảy thẳng vào tính tiền/khoảng thời gian thay vì báo lỗi rõ ràng. Hàm thuần để test
+ * không cần DB/session.
+ */
+export function validateSmartIpcPostBody(body: unknown): SmartIpcValidationResult {
+  const b = (body ?? {}) as Record<string, unknown>;
+
+  // grossClaimedVnd trước đây có default 500.000.000 khi client bỏ trống — nay bắt buộc,
+  // thiếu → lỗi rõ ràng (không tự bịa số tiền xin thanh toán).
+  if (b.grossClaimedVnd == null || String(b.grossClaimedVnd).trim() === "") {
+    return { ok: false, error: "Thiếu grossClaimedVnd — không thể tự động điền giá trị mặc định" };
+  }
+  const grossClaimedVndText = String(b.grossClaimedVnd).trim();
+  if (!/^-?\d+(\.\d+)?$/.test(grossClaimedVndText)) {
+    return {
+      ok: false,
+      error: 'grossClaimedVnd phải là chuỗi số hợp lệ (vd "1000000" hoặc "1000000.50")',
+    };
+  }
+
+  if (!b.ipcNumber || !b.periodMonth || !b.contractorName) {
+    return { ok: false, error: "Thiếu ipcNumber/periodMonth/contractorName" };
+  }
+
+  let retentionPercent: number | undefined;
+  if (b.retentionPercent != null) {
+    retentionPercent = Number(b.retentionPercent);
+    if (!Number.isFinite(retentionPercent) || retentionPercent < 0 || retentionPercent > 100) {
+      return { ok: false, error: "retentionPercent phải là số hữu hạn trong khoảng 0–100" };
+    }
+  }
+
+  const refsRaw = (b.refs ?? {}) as Record<string, unknown>;
+
+  let iotWindowHours: number | undefined;
+  if (refsRaw.iotWindowHours != null) {
+    iotWindowHours = Number(refsRaw.iotWindowHours);
+    if (!Number.isFinite(iotWindowHours) || iotWindowHours <= 0) {
+      return { ok: false, error: "refs.iotWindowHours phải là số hữu hạn lớn hơn 0" };
+    }
+  }
+
+  let claimedQty: number | undefined;
+  if (refsRaw.claimedQty != null) {
+    claimedQty = Number(refsRaw.claimedQty);
+    if (!Number.isFinite(claimedQty) || claimedQty < 0) {
+      return { ok: false, error: "refs.claimedQty phải là số hữu hạn không âm" };
+    }
+  }
+
+  return {
+    ok: true,
+    value: {
+      ipcNumber: String(b.ipcNumber),
+      periodMonth: String(b.periodMonth),
+      contractorName: String(b.contractorName),
+      grossClaimedVnd: grossClaimedVndText,
+      retentionPercent,
+      refs: {
+        scanCode: refsRaw.scanCode ? String(refsRaw.scanCode) : undefined,
+        bbntEnvelopeId: refsRaw.bbntEnvelopeId ? String(refsRaw.bbntEnvelopeId) : undefined,
+        iotDeviceId: refsRaw.iotDeviceId ? String(refsRaw.iotDeviceId) : undefined,
+        iotWindowHours,
+        boqCode: refsRaw.boqCode ? String(refsRaw.boqCode) : undefined,
+        claimedQty,
+      },
+    },
+  };
+}
+
+// ============================================================================
 // 2. BỐI CẢNH CỔNG — DỮ LIỆU THẬT ĐỌC TỪ DB (không lẫn logic thẩm định)
 // ============================================================================
 
@@ -160,8 +240,10 @@ async function fetchGate4Context(
   }
 
   const boq = await queryOne<{ qtyContract: string }>(
-    `SELECT qty_contract::text AS "qtyContract" FROM boq_items WHERE lower(code) = lower(?)`,
+    `SELECT qty_contract::text AS "qtyContract" FROM boq_items
+     WHERE lower(code) = lower(?) AND project_id = ?`,
     boqCode,
+    projectId,
   );
   if (!boq) {
     return { available: false, claimedQty, approvedBoqQty: null, warehouseUsedQty: null };
