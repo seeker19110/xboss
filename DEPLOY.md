@@ -8,38 +8,16 @@ khởi động lần đầu**, hoặc chủ động chạy `npm run db:migrate` 
 
 ---
 
-## Cách A — Docker Compose (khuyến nghị, kèm Postgres)
+## Cài đặt lần đầu (Node ≥ 24 + PM2 + Postgres tự host hoặc Supabase)
 
-`docker-compose.yml` đã gồm sẵn service Postgres 17 + volume bền.
+> **XBoss chạy bằng PM2, không dùng Docker.** Trước đây tài liệu này có song song hai đường
+> (Docker Compose và PM2); nay chỉ còn PM2 — bớt một bộ artefact phải bảo trì và bớt một lớp
+> trừu tượng nằm giữa lỗi production với người phải sửa. Mọi tiến trình khai trong
+> [`ecosystem.config.js`](./ecosystem.config.js).
 
-```bash
-# 1. Tải mã nguồn lên server (git clone hoặc scp), rồi vào thư mục
-cd xboss
+### 1. Postgres
 
-# 2. Mở docker-compose.yml:
-#    - ĐỔI XBOSS_SECRET thành chuỗi ngẫu nhiên dài (openssl rand -hex 32)
-#    - ĐỔI POSTGRES_PASSWORD (và cập nhật DATABASE_URL tương ứng)
-#    - Nếu dùng Supabase: thay DATABASE_URL bằng chuỗi Supabase, xoá service db
-
-# 3. Build + chạy nền
-docker compose up -d --build
-
-# 4. Nạp dữ liệu lần đầu từ file Excel (đặt trong attachments/)
-docker compose exec xboss npm run db:seed
-
-# 5. Xem log
-docker compose logs -f xboss
-```
-
-Truy cập: `http://<IP-server>:3000`
-
-Cập nhật phiên bản mới: `git pull` rồi `docker compose up -d --build` (dữ liệu giữ nguyên trong volume `xboss-pgdata`).
-
----
-
-## Cách B — Không Docker (Node ≥ 24 + pm2 + Postgres tự host hoặc Supabase)
-
-Nếu Postgres cũng chạy trên chính VPS này (không dùng Supabase), cài trước:
+Nếu Postgres chạy trên chính VPS này (không dùng Supabase):
 
 ```bash
 sudo apt update && sudo apt install -y postgresql postgresql-contrib
@@ -50,28 +28,72 @@ sudo -u postgres psql -c "CREATE DATABASE xboss OWNER xboss;"
 Để Postgres chỉ nghe `localhost` (không sửa `listen_addresses` ra `*`) — app và DB cùng máy
 nên không cần mở cổng 5432 ra ngoài, bớt một bề mặt tấn công.
 
+> Postgres tự host trên cùng VPS **không có backup tự động** như Supabase — bắt buộc thiết lập
+> `pg_dump` định kỳ trước khi đưa vào production, xem [Sao lưu & phục hồi DB](#sao-lưu--phục-hồi-db)
+> và [`docs/ops/backup.md`](./docs/ops/backup.md). Mất VPS đồng nghĩa mất cả app lẫn DB cùng lúc.
+
+### 2. App
+
 ```bash
 cd xboss
-npm install
+npm ci
 
 # Tạo file môi trường
 cp .env.example .env.local       # điền DATABASE_URL + XBOSS_SECRET
 # DATABASE_URL=postgresql://xboss:mật-khẩu-mạnh@localhost:5432/xboss  (nếu tự host Postgres)
 
 npm run build
-npm run db:seed                  # nạp dữ liệu lần đầu từ Excel
+npm run db:seed                  # nạp dữ liệu lần đầu từ Excel trong attachments/
 
-# Chạy nền bằng pm2
+# Chạy nền bằng PM2
 npm install -g pm2
-pm2 start npm --name xboss -- start
+pm2 start ecosystem.config.js --only xboss
 pm2 save && pm2 startup          # tự khởi động lại khi reboot
 ```
 
-Mặc định lắng nghe cổng 3000. Đổi cổng: `PORT=8080 pm2 start ...`.
+Truy cập: `http://<IP-server>:3000`. Đổi cổng bằng biến `PORT` trong `.env.local`.
 
-> Postgres tự host trên cùng VPS **không có backup tự động** như Supabase — bắt buộc thiết lập
-> `pg_dump` định kỳ trước khi đưa vào production, xem [Sao lưu & phục hồi DB](#sao-lưu--phục-hồi-db)
-> và [`docs/ops/backup.md`](./docs/ops/backup.md). Mất VPS đồng nghĩa mất cả app lẫn DB cùng lúc.
+### 3. MEPF worker (tuỳ chọn — chỉ khi dùng tác vụ AI kỹ thuật)
+
+Daemon Python poll hàng đợi `engineering_async_tasks`. VPS không cần tính năng này thì bỏ qua
+hẳn phần dưới (app chạy độc lập, chỉ các tác vụ AI nằm chờ trong hàng đợi).
+
+```bash
+sudo apt install -y python3 python3-pip
+pip3 install -r scripts/mepf/requirements-worker.txt
+pip3 install ./mepf-worker           # MEPF-Agents + ezdxf, LangGraph…
+
+pm2 start ecosystem.config.js --only mepf-worker
+pm2 save
+```
+
+Khai `ANTHROPIC_API_KEY` hoặc `OPENAI_API_KEY` trong `.env.local` để worker gọi agent thật;
+thiếu cả hai thì worker tự chạy dry-run (trả kết quả giả lập, không gọi LLM).
+
+> `scripts/mepf/worker_entry.py` đọc thẳng `os.environ["DATABASE_URL"]` và **thoát ngay nếu
+> thiếu** — `ecosystem.config.js` tự nạp biến từ `.env.local`/`.env` rồi truyền vào, nên đừng
+> khởi động worker bằng `pm2 start scripts/mepf/worker_entry.py` trực tiếp (sẽ thiếu biến, và
+> thiếu cả `PYTHONPATH` khiến worker âm thầm rơi về dry-run).
+
+### Chuyển từ bản cài Docker hoặc PM2 kiểu cũ sang `ecosystem.config.js`
+
+VPS đang chạy Docker Compose:
+
+```bash
+docker compose down                       # dừng container (volume dữ liệu vẫn còn)
+# Dump dữ liệu ra rồi nạp vào Postgres cài thẳng trên máy, xem mục Sao lưu & phục hồi DB
+```
+
+VPS đang chạy PM2 kiểu cũ (`pm2 start npm --name xboss -- start`) — process cũ gọi qua `npm`,
+cần khai lại một lần để PM2 quản đúng tiến trình Node thật:
+
+```bash
+pm2 delete xboss
+pm2 start ecosystem.config.js --only xboss
+pm2 save
+```
+
+Các lần cập nhật sau không cần lặp lại — `deploy.sh` chỉ `pm2 reload` theo tên process.
 
 ### Script một lệnh cho các lần cập nhật sau: `deploy.sh`
 
@@ -209,7 +231,7 @@ mục Nợ kỹ thuật nếu cần nâng cấp):**
 
 - [ ] Đổi `XBOSS_SECRET` thành chuỗi ngẫu nhiên dài (bảo mật cookie đăng nhập).
 - [ ] Đổi mật khẩu 4 tài khoản demo (admin/pm/engineer/subcon).
-- [ ] Đổi `POSTGRES_PASSWORD` nếu dùng Postgres trong compose.
+- [ ] Đổi mật khẩu role Postgres `xboss` khỏi giá trị mẫu nếu tự host DB.
 - [ ] Sao lưu định kỳ DB (Supabase tự backup; Postgres tự host: `pg_dump`).
 
 ### Tài khoản mặc định
@@ -223,11 +245,14 @@ Khi DB chưa có user nào, hệ thống tự tạo: `admin@xboss.vn/admin123`, 
 ## Sao lưu & phục hồi DB
 
 ```bash
-# Postgres trong Docker compose
-docker compose exec db pg_dump -U xboss xboss > backup-$(date +%F).sql
+# Postgres tự host trên VPS
+pg_dump "$DATABASE_URL" > backup-$(date +%F).sql
 
 # Supabase: Dashboard → Database → Backups (tự động hằng ngày trên free tier)
 ```
+
+Sao lưu định kỳ + kiểm chứng phục hồi đã có script sẵn: `scripts/ops/backup.sh` và
+`scripts/ops/restore-check.sh`, xem [`docs/ops/backup.md`](./docs/ops/backup.md).
 
 ---
 
@@ -317,9 +342,12 @@ liệt kê trong kết quả). Cột `Đã dùng`/`Tồn kho`/`Ngưỡng tối t
 Metabase self-host đọc dữ liệu qua schema `bi` (view whitelist chỉ-đọc, KHÔNG đọc `public`) qua
 role Postgres riêng `xboss_bi`. Mật khẩu role này tạo **tay** lúc deploy bằng `CREATE ROLE xboss_bi
 LOGIN PASSWORD '...'` — đây là mật khẩu **Postgres role**, không phải biến môi trường app, nên
-**không đưa vào `.env`/`.env.local`/Git**. Hướng dẫn dựng đầy đủ (docker-compose, thứ tự tạo role
-trước migration, Nginx/HTTPS, backup, cập nhật phiên bản): xem
+**không đưa vào `.env`/`.env.local`/Git**. Hướng dẫn dựng đầy đủ (thứ tự tạo role trước
+migration, Nginx/HTTPS, backup, cập nhật phiên bản): xem
 [`docs/ops/metabase.md`](./docs/ops/metabase.md).
+
+> Metabase là phần mềm BI của bên thứ ba, dựng **tách rời** XBoss và có cách đóng gói riêng —
+> nó không nằm trong phạm vi "XBoss chạy bằng PM2, không dùng Docker" ở đầu tài liệu này.
 
 ## Đăng nhập bằng tài khoản công ty — SSO OIDC (tuỳ chọn)
 

@@ -56,7 +56,7 @@ Nếu VPS hiện tại không đủ (ví dụ VPS 2-4GB đang chạy sát app + 
 > công — xem lệnh ở cuối mục này.
 
 Kết nối vào Postgres XBoss bằng user quản trị (superuser hoặc owner database `xboss`), ví dụ
-qua `psql "$DATABASE_URL"` hoặc `docker compose exec db psql -U xboss xboss`:
+qua `psql "$DATABASE_URL"`:
 
 ```sql
 -- Sinh mật khẩu ngẫu nhiên mạnh trước (vd: openssl rand -base64 24), KHÔNG lưu trong Git/.env
