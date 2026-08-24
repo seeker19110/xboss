@@ -245,7 +245,7 @@ export default function EngineeringGraphPage() {
           </form>
 
           {error && (
-            <div className="mt-3 flex items-center gap-2 rounded-lg border border-rose-800 bg-rose-950/40 p-3 text-xs text-rose-300">
+            <div className="mt-3 flex items-center gap-2 rounded-lg border border-rose-800 bg-rose-400/10 p-3 text-xs text-rose-300">
               <AlertTriangle size={15} />
               <span>{error}</span>
             </div>

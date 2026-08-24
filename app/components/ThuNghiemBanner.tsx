@@ -52,7 +52,7 @@ export default function ThuNghiemBanner({ moduleKey }: { moduleKey: string }) {
   return (
     <div
       role="note"
-      className="mb-4 flex items-start gap-2.5 rounded-lg border border-amber-800 bg-amber-950 px-3.5 py-2.5 text-sm text-amber-300"
+      className="mb-4 flex items-start gap-2.5 rounded-lg border border-amber-400/40 bg-amber-400/10 px-3.5 py-2.5 text-sm text-amber-300"
     >
       <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" strokeWidth={1.75} aria-hidden="true" />
       <span>{message}</span>
