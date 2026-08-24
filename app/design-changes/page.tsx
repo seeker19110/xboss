@@ -608,8 +608,13 @@ export default function DesignChangesPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <AppHeader>
-        {
+      {/* Nút hành động riêng của trang đặt ở bottomActions (khuôn mẫu chung, xem
+          app/equipment/page.tsx): đặt trong children thì trên mobile nó chen vào hàng
+          header vốn đã chật (chuông, theme, online, avatar) và không bấm được. */}
+      <AppHeader
+        title="Thay đổi thiết kế"
+        subtitle="Đề xuất thay đổi thiết kế (M32) — trình, đánh giá, duyệt, cập nhật bản vẽ"
+        bottomActions={
           <button
             onClick={() => setAddOpen(true)}
             aria-label="Thêm thay đổi thiết kế"
@@ -618,7 +623,7 @@ export default function DesignChangesPage() {
             <Pencil className="w-4 h-4" /> <span>Thêm thay đổi thiết kế</span>
           </button>
         }
-      </AppHeader>
+      />
       <main className="flex-1 p-4 sm:p-6 max-w-7xl mx-auto w-full">
         {loading ? (
           <PageSkeleton />
