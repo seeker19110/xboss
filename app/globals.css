@@ -160,7 +160,13 @@ html.light {
      KHÔNG cần đảo nền vì cả nền lẫn chữ cùng giữ nguyên giá trị ở mọi theme. Badge/chip
      dùng chữ -300/-400 (ĐÃ đảo đậm cho mục đích "chữ thường trên nền trang") phải đổi
      sang -200 (không đảo, luôn sáng) khi ghép với nền chip cùng màu — xem các chỗ dùng
-     bg-{màu}-950/900/800 + text-{màu}-300/400 đã đổi thành text-{màu}-200 trong JSX. */
+     bg-{màu}-950/900/800 + text-{màu}-300/400 đã đổi thành text-{màu}-200 trong JSX.
+     NGOẠI LỆ QUAN TRỌNG của (2): quy tắc "chip tối + chữ -200" chỉ đúng khi nền ĐẶC.
+     Với nền MỜ (bg-{màu}-950/20, /40...) thì ở chế độ sáng, 20-40% màu tối phủ trên nền
+     trang sáng cho ra màu NHẠT, mà chữ -200 lại cố định sáng → tương phản sụp còn
+     1,2-1,9:1. Nền mờ phải dùng shade KHÔNG bị đảo làm nền (bg-{màu}-500/10) ghép với
+     chữ -300 (tự đảo): đạt ~7:1 ở chế độ sáng và ~10:1 ở chế độ tối. Xem
+     app/materials/import/page.tsx. */
 }
 
 body {
