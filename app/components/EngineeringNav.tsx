@@ -191,7 +191,7 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["admin", "pm", "engineer", "bch"],
   },
   {
-    href: "/engineering/thiet-bi-plugin",
+    href: "/engineering/thiet-bi-cad",
     label: "Thiết bị plugin AutoCAD",
     category: "spatial",
     icon: Code,

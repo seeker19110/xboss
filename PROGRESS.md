@@ -4,6 +4,113 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Đợt gộp tính năng trùng lặp (2026-08-24)
+
+Người dùng: "quét tính năng trùng lặp gộp chúng lại cho gọn — trùng lặp hoặc thuộc về 1 bộ tính
+năng thì gộp lại". Nhánh `claude/duplicate-features-h3fva1`, **PR #390**. Quét bằng bộ dò clone tự
+viết (chuẩn hoá dòng + hash cửa sổ trượt) trên toàn `lib/`, `app/`, `scripts/`, cộng đối chiếu tên
+export trùng.
+
+**Tổng: 7 cụm đã gộp, −1.585 dòng** (692 thêm / 2.277 bớt, 37 file) qua 2 đợt bên dưới.
+
+**Kiểm chứng sau khi hợp nhất `origin/main` (M99 PR2):** dựng Postgres 16 thật rồi chạy đúng bộ
+cổng của CI — `lint`, `typecheck`, `build`, `npm test -- --release-gate` (**1.212 ca: 1.211 xanh,
+0 đỏ, 1 skip có lý do trong allowlist**), `check:route-perms`, `check:project-scope`,
+`check:db-params`, `check:dead-code`, `check:lib-layers`, `check:mau-accent`, `check:sw-exclude`.
+`check:migrations` ĐỎ nhưng **đỏ sẵn trên `origin/main`** — xem mục nợ kỹ thuật ngay dưới.
+**Chưa chạy `npm run test:e2e`** (cần trình duyệt + server chạy thật; ca e2e mới cho chuyển hướng
+`/notifications` chưa được thực thi).
+
+### Đợt 1 — 5 cụm đã gộp (−1.482 dòng, mọi cổng xanh)
+
+| Cụm                        | Trùng gì                                                                                                                                                                                                                                    | Cách gộp                                                                                                                                 |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Quét bản vẽ                | `app/api/drawings/scan-local/route.ts` và `scripts/scan-drawings.ts` chép nguyên si ~200 dòng (`parseDrawingInfo`, duyệt thư mục đệ quy, vòng lặp INSERT)                                                                                   | Tách `lib/ky-thuat/drawings-scan.ts` dùng chung; route còn 35 dòng ranh giới HTTP thuần (ADR-0008), script còn vỏ CLI                    |
+| Trang thông báo            | `app/notifications/page.tsx` (825 dòng) là bản sao của tab "Thông báo" trong `/my-tasks` — cùng `/api/notifications/feed` + `/prefs`, **không có mục nav nào trỏ tới**                                                                      | Xoá bản sao, `/notifications` chỉ còn chuyển hướng sang `/my-tasks?tab=notifications`; thêm deep-link `?tab=` + ca e2e canh chuyển hướng |
+| Facade FIDIC               | `engineering-fidic-claim.ts` + `engineering-fidic-tia-claim.ts` — hai facade cùng trỏ về `lib/tai-chinh/contracts-fidic.ts`                                                                                                                 | Gộp làm một `engineering-fidic-claim.ts`                                                                                                 |
+| Bảng ống tiêu chuẩn        | `engineering-cad-hydraulic-network.ts` giữ bảng DN chép tay riêng (đường kính trong lệch bảng gốc: DN25 27,2 vs 26,6mm…) song song `STANDARD_STEEL_PIPES`                                                                                   | `autoSizePipeDiameter` gọi lại overload sẵn có của `engineering-hydraulic-engine`; còn một nguồn sự thật                                 |
+| Thuỷ lực chết trong engine | `engineering-hydraulic-engine.ts` chứa `calcDarcyWeisbach`, `validateVelocityLimit`, `solveHydraulicNetwork` **không nơi nào import**, đều trùng bản đang chạy thật ở `engineering-cad-nesting.ts` / `engineering-cad-hydraulic-network.ts` | Bỏ 3 hàm + type chết kèm; engine 529 → 335 dòng                                                                                          |
+
+**Lỗi thật lộ ra khi gộp:** `scripts/scan-drawings.ts` chèn vào `drawing_revisions` các cột
+`file_size_bytes`/`file_sha256`/`created_by` — **không cột nào tồn tại** (schema thật:
+`size_bytes`/`original_name`/`mime_type`/`uploaded_by`, `mime_type` còn NOT NULL). Script chết ngay
+câu INSERT đầu; dùng chung với route (bản đúng) là hết. Đúng lớp lỗi "code viết mà chưa từng chạy
+thử" mà GĐ2 đã dựng cổng CI để chặn.
+
+### Không gộp (đã cân nhắc, cố ý bỏ qua)
+
+- `warranty.listClaims/getClaim/parseClaimBody/validateClaimInput` vs `tai-chinh/claims.*` — trùng
+  **tên**, khác miền hoàn toàn (khiếu nại bảo hành vs khiếu nại hợp đồng, hai bảng khác nhau).
+- `listBimElements` ở `engineering-bim-cad` vs `engineering-bim-viewer` — khác bảng
+  (`engineering_objects` vs `engineering_bim_elements`), khác tính năng.
+- `app/environment/page.tsx` ↔ `app/kickoff/page.tsx` (311 dòng trùng) — là **khung form lặp**
+  (label + input class), không phải tính năng trùng; mẫu class đó có ở 32 file `.tsx`, tách riêng
+  cho 2 trang sẽ lệch phần còn lại. Việc đúng là một đợt riêng tách component form dùng chung.
+- ~10 bảng `*_documents` tách riêng theo thực thể — `migrations/0019_project_documents.sql` đã ghi
+  rõ quyết định không di trú về một bảng.
+
+### Đợt 2 — pipeline upload + sinh tên tệp (−769 dòng ở `app/api`)
+
+| Cụm                      | Trùng gì                                                                                                                                                 | Cách gộp                                                                                                                                                                                                                                                        |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pipeline kiểm tệp upload | **23 route** lặp nguyên si chuỗi: chặn sớm theo `Content-Length` → `formData()` → whitelist mime → chặn theo `file.size` → dò magic byte. ~30 dòng/route | Thêm `parseUploadedFile()` (route upload chuyên dụng) và `checkUploadedFile()` (route PATCH có tệp tuỳ chọn) vào `lib/nen/photos.ts`. Trả **kết quả thuần** `{ok,status,error}`, KHÔNG trả `NextResponse` — `lib/nen` là tầng 0 không biết HTTP (ADR-0007/0008) |
+| Sinh tên tệp             | **24 hàm `newXxxFileName`** chỉ khác tiền tố, cùng khuôn `${prefix}${id}-${Date.now()}-${hex}${ext}`                                                     | Một `newUploadFileName(prefix, mime, accept)`; 24 hàm còn 1 dòng gọi lại nó (giữ nguyên tên + call site). Chỉ 2 hàm giữ khuôn riêng vì phần mở rộng đặc thù (`newStandardizedDrawingFileName` .dxf, `newSystemUploadFileName` .xlsx)                            |
+
+**Thay đổi hành vi duy nhất (cố ý):** `/api/drawings/:id/revisions` trước trả 415 kèm thông báo
+`"Chỉ nhận PDF hoặc ảnh, nhận được: ..."`, nay dùng thông báo chuẩn có kê định dạng
+`"Chỉ nhận PDF hoặc ảnh (jpg/png/webp/gif/heic), nhận được: ..."` — cùng mã trạng thái, thông tin
+đầy đủ hơn, không test/e2e nào bám chuỗi cũ. Ngoài ra `newPhotoFileName`/`newAlbumPhotoFileName`
+nay có fallback `.bin` khi mime lạ thay vì ghép `undefined` vào tên tệp (mọi call site đều đã
+chặn mime từ trước nên không đổi thực tế).
+
+**5 route KHÔNG gộp được, cố ý giữ nguyên:** `materials/import` + `boq/import` (nhận .xlsx, khuôn
+kiểm khác hẳn), `workpackages/:id/bbnt` + `workpackages/:id/drawing` + `floor-approvals/:id/documents`
+(không theo khuôn `form?.get("file")` chuẩn).
+
+### Còn lại
+
+- **Công thức Hazen-Williams còn 2 bản** khác quy ước đơn vị (L/s ở `engineering-cad-nesting.ts`
+  vs m³/h ở `engineering-hydraulic-engine.ts`) và khác hằng số cột nước (9806,65 vs 9810 Pa/m).
+  Gộp được nhưng **đổi số liệu kỹ thuật** → cần người dùng chốt bản nào là chuẩn.
+- **Khung form lặp ở 32 file `.tsx`** (`label` + `input` cùng chuỗi class, rõ nhất ở cặp
+  `app/environment/page.tsx` ↔ `app/kickoff/page.tsx`, 311 dòng trùng). Là đợt tách component form
+  dùng chung riêng, không phải gộp tính năng.
+
+### Nợ kỹ thuật ghi nhận khi hợp nhất — TRÙNG SỐ MIGRATION 0133 (chưa sửa)
+
+`npm run check:migrations` đang **ĐỎ trên chính `origin/main`**, không phải do nhánh này:
+
+```
+[LỖI] Nhiều file migration cùng số thứ tự:
+  - 0133: 0133_cad_device_pairing.sql, 0133_webhook_otp_hardening.sql
+```
+
+Hai file cùng số đến từ hai PR song song đều đã merge vào `main`:
+`0133_webhook_otp_hardening.sql` (#387, `9a1908fe`) và `0133_cad_device_pairing.sql`
+(#386, `6b5b5694`). Đã kiểm chứng bằng cách chạy cổng trên worktree `origin/main` sạch — đỏ y hệt
+khi chưa có commit nào của nhánh gộp trùng lặp.
+
+**Chưa sửa ở PR gộp trùng lặp** vì đây là lỗi của `main`, sửa ở đây sẽ nới phạm vi PR refactor sang
+vùng migration/DDL. Hướng xử lý (cần người dùng chốt, vì chạm file có thể đã áp production):
+đổi `0133_cad_device_pairing.sql` → `0135_cad_device_pairing.sql` (0134 đã dùng, số trống kế tiếp là
+0135). DDL của file này là `CREATE TABLE IF NOT EXISTS`/`ADD COLUMN IF NOT EXISTS` nên idempotent —
+đủ điều kiện đổi tên theo đúng ghi chú của chính cổng. Lưu ý bảng `schema_migrations` ở môi trường
+đã chạy 0133 sẽ cần chèn bổ sung dòng cho tên mới, nếu không migration sẽ chạy lại (vẫn an toàn nhờ
+idempotent, nhưng nên dọn cho sạch).
+
+## M99 PR2 — Ghép thiết bị AutoCAD + token scope 'cad' + XBOSS_LOGIN (2026-08-24)
+
+Vùng rủi ro cao (chạm auth) — đã rà theo `docs/audit.md` §3/§8. Nhánh `claude/m99-pr2-api-tokens`.
+
+- **Điểm lệch spec có chủ đích (ghi vào M99 §11): KHÔNG tạo bảng `api_tokens` mới — tái dùng `api_keys`** (0061: hash sha256, thu hồi, rate limit cả nhánh fail, audit trigger, org_id, admin UI sẵn) — DDL nháp trong spec viết trước khi rà hiện trạng; bảng song song vi phạm "tái dùng trước khi viết mới".
+- **`migrations/0133_cad_device_pairing.sql`** (thêm thuần → đi thẳng production theo DoD): `api_keys` + `expires_at`/`device_name`; bảng `cad_device_pairings` (device flow: `user_code` XXXX-XXXX bảng chữ không nhập nhằng cho người gõ, `device_code` bí mật 256-bit chỉ lưu sha256, TTL 10 phút, status pending/confirmed/claimed/denied) + audit trigger như 0061. `docs/ERD.md` đã regen từ schema thật.
+- **`lib/bao-mat/cad-devices.ts`**: createPairing/confirmPairing/claimPairing (key scope `{cad}` SINH TẠI THỜI ĐIỂM CLAIM — key thô không bao giờ nằm trong DB, trả đúng 1 lần, claim atomic `UPDATE ... WHERE status='confirmed'` chống double-claim trong `withTransaction`), createCadToken (hạn 90 ngày, quy về người duyệt → quyền đi qua `CAN` như phiên thường), getCadTokenUser (Bearer → User). **Vá `verifyApiKey`** chặn key hết hạn (`expires_at` — key đọc-only cũ NULL = vô hạn, hành vi không đổi).
+- **Routes**: `POST /api/devices/pair` (public + rate limit `cad-pair` 10/15'/IP), `/confirm` (session + `CAN.manageDrawings`), `/claim` (rate limit 300/15'/IP, deviceCode trong body POST không lên URL/access log, validate regex); `GET/POST /api/tokens` + `DELETE /api/tokens/:id` (chủ token hoặc Admin thu hồi, list không SELECT key_hash); route rule-pack nhận thêm **Bearer cad** (kiểm Bearer TRƯỚC cookies — nhanh cho plugin + test gọi handler trực tiếp được).
+- **Web**: trang `/engineering/thiet-bi-cad` (duyệt/từ chối mã ghép, danh sách + thu hồi token, tạo thủ công trả key 1 lần) + `e2e/authed/thiet-bi-cad.spec.ts` (render + axe — cổng merge trang mới theo audit.md). PR6 sẽ gộp vào bảng điều khiển chuẩn hóa.
+- **Plugin**: `XBoss.Cad.Core/Api/XBossApiClient.cs` (pair/claim-poll/rule-pack ETag, delay bơm từ ngoài để test không chờ thật) + 8 test xunit bằng HttpMessageHandler giả (tổng 78 ca C#); `XBoss.Cad.Acad`: lệnh `XBOSS_LOGIN` (async — không chặn UI AutoCAD, chỉ nhận https/loopback) + `CredentialStore` (P/Invoke advapi32, token vào Windows Credential Manager — NFR4, không tệp phẳng, không thêm NuGet) + tự tải rule pack sau ghép.
+- **Test TS `tests/cad-devices.test.ts`**: 12 ca — unit mã ghép (format/entropy), route-source (force-dynamic/auth/rate-limit/không lộ hash), integration trên Postgres thật (lifecycle pair→confirm→claim→Bearer gọi rule-pack 200 đủ 8 field; key đúng-1-lần; từ chối; hết hạn mã; AC7 thu hồi/hết hạn token → null; scope `read` không dùng được đường cad). Đã chạy thật 12/12 với TEST_DATABASE_URL (migration 0133 tự áp qua ensureSchema).
+- **Chưa làm (giữ trình tự M99)**: PR5 upload + kiểm định ezdxf (+ cột drawing_revisions), PR6 batch + bảng điều khiển + bỏ tầng 1, PR7 test tích hợp accoreconsole (chặn bởi runner Windows).
+
 ## Đợt "nâng tầm dự án" GĐ2 — cổng máy thay checklist người (2026-08-24) — TỔNG HỢP
 
 Người dùng duyệt "làm tiếp giai đoạn 2". Kế hoạch `PLAN.md`, 6 việc W1–W6, mỗi việc 1 worktree
@@ -385,18 +492,25 @@ dùng duyệt hướng xử lý.
 - **KHÔNG nên làm:** thêm module `engineering/*`/OS-phase mới, C2 pilot, hạ tầng mới, nâng major
   M60, bật SSO production, hay tuyên bố thêm mốc "Complete" nào bằng tài liệu.
 
-## M99 PR2 — Token thiết bị + ghép thiết bị plugin AutoCAD (`XBOSS_LOGIN`) (2026-08-24)
+## M99 PR2 — hợp nhất với bản đã merge #386, gỡ bản trùng + sửa trùng số migration 0133 (2026-08-24)
 
-Người dùng yêu cầu "làm tiếp PR2". **Vùng rủi ro cao (chạm lớp auth) — đã rà theo `docs/audit.md`.** Cùng nhánh `claude/plugin-upgrade-m8z0hx` với PR-B.
+Nhánh `claude/plugin-upgrade-m8z0hx` từng cài PR2 độc lập (bảng `api_tokens` mới + poll endpoint +
+trang `/engineering/thiet-bi-plugin`) đúng lúc nhánh song song `claude/m99-pr2-api-tokens` (PR #386,
+thiết kế tái-dùng `api_keys` — điểm lệch spec có chủ đích, xem mục trên) được merge vào `main` trước.
+Xử lý khi merge `main` vào nhánh:
 
-- **Migration `0135_api_tokens.sql`** (thêm thuần, không đụng dữ liệu): `api_tokens` (đúng DDL M99 §11 — chỉ lưu **hash sha256**, scope `cad`, hạn/thu hồi/last_used_at) + `device_pairings` (mã ghép 8 ký tự + **secret_hash** chống poll trộm, TTL 10 phút, status pending→confirmed→consumed) + 3 cột `drawing_revisions` khai sẵn cho PR5. ERD tự sinh lại.
-- **`lib/bao-mat/api-tokens.ts`:** luồng ghép 3 bước — plugin xin mã (`POST /api/devices/pair`, public + rate limit 10/15ph/IP) → kỹ sư duyệt trên web (`POST /api/devices/pair/confirm`, session + `CAN.manageDrawings`, UPDATE atomic chống duyệt đôi) → plugin poll (`POST /api/devices/pair/poll`, public + rate limit; **token chỉ sinh tại lần poll đầu sau confirmed**, trả thô đúng 1 lần, không bao giờ nằm trong DB kể cả tạm; secret sai/mã hết hạn đều 404 đồng nhất — không lộ mã tồn tại). `verifyDeviceToken` nạp user thật từ token — **token hành xử đúng bằng quyền user chủ token**, mọi route vẫn kiểm CAN như phiên; last_used_at throttle 60s như api_keys. Poll endpoint là bổ sung so với bảng API §10 (ghi chú deviation trong spec).
-- **`GET/POST /api/tokens` + `DELETE /api/tokens/:id`:** user thấy/thu hồi token của mình, Admin toàn org; POST tạo token thủ công (hiện 1 lần, `CAN.manageDrawings`); DELETE đặt `revoked_at` idempotent (AC7: plugin nhận 401 → ghép lại). Không bao giờ trả token thô/hash trong GET. CSRF/2FA gate toàn cục ở `proxy.ts` phủ sẵn các route mới (plugin không gửi Origin/cookie → qua đúng thiết kế sameSite-lax).
-- **Rule pack route nhận Bearer `xbt_`:** `GET /api/engineering/cad/rule-pack` thêm đường token thiết bị song song phiên web — cùng check `CAN.viewEngineeringGraph`.
-- **Trang `/engineering/thiet-bi-plugin`** (+ mục EngineeringNav, roles admin/pm/engineer): duyệt mã ghép, tạo token thủ công (hiện 1 lần + nút chép), bảng token với thu hồi.
-- **Plugin AutoCAD:** `XBOSS_LOGIN` (nhớ URL server ở `%APPDATA%\XBoss\server.json`; token có sẵn thì chỉ refresh rule pack, 401 mới ghép lại; pairing hiện mã + hướng dẫn + vòng KiemTra/Huy không chặn UI) + `XBOSS_LOGOUT`; token lưu **Windows Credential Manager** qua P/Invoke advapi32 (`CredentialStore` — NFR4, không ghi tệp phẳng); `XBossApiClient` (HttpClient, pair/poll/tải rule pack); `RulePackStore.ImportNoiDung` — một điểm kiểm/cache duy nhất cho rule pack từ tệp lẫn API.
-- **Kiểm chứng:** `tests/api-tokens.test.ts` (integration Postgres): vòng đời pairing đầy đủ (token phát đúng 1 lần, poll lần 2 = not_found), secret sai/hết hạn, verify token thu hồi/hết hạn/tiền tố `xbk_` lạ → null, token map đúng user+role. **Toàn suite 221 file / 1202 ca pass, 0 fail** với Postgres 16 thật trong container; lint + typecheck + build xanh; `check:migrations`/`check:lib-layers` OK; thêm `tokens` vào whitelist project-scope (token theo user/org, không theo dự án).
-- **Chưa làm:** PR5 upload + kiểm định ezdxf (`XBOSS_UPLOAD`), phần web PR6, PR7 test tích hợp (runner Windows). UAT máy thật: xác minh Credential Manager + luồng ghép end-to-end cùng đợt UAT PR-A/PR-B.
+- **Bỏ toàn bộ bản PR2 trùng** (migration `0135_api_tokens.sql`, `lib/bao-mat/api-tokens.ts`,
+  route poll, trang `thiet-bi-plugin`, `tests/api-tokens.test.ts`, `XBossApiClient` bản Adapter,
+  lệnh `XBOSS_LOGIN/XBOSS_LOGOUT` trùng trong `XBossCommands`) — giữ nguyên bản đã duyệt ở `main`
+  (`cad-devices.ts`, `/api/devices/pair|confirm|claim`, trang `/engineering/thiet-bi-cad`,
+  `XBossLoginCommand` + `XBossApiClient` trong Core). Bài học: 2 phiên cùng làm 1 mục spec song
+  song → luôn `git fetch origin` đối chiếu main trước khi nhận việc lớn.
+- **Sửa cổng `check:migrations` đang làm CI main đỏ:** đổi `0133_cad_device_pairing.sql` →
+  `0135_cad_device_pairing.sql` (trùng số với `0133_webhook_otp_hardening.sql` do 2 PR song song;
+  DDL toàn bộ idempotent nên chạy lại dưới tên mới vô hại — đúng ghi chú "Nợ kỹ thuật" phía trên).
+  Môi trường đã áp 0133 cũ: chèn bổ sung dòng `schema_migrations` cho tên mới để khỏi chạy lại.
+- **Giữ lại phần bổ sung không trùng:** mục nav "Thiết bị plugin AutoCAD" trỏ về trang
+  `/engineering/thiet-bi-cad` (trang có sẵn nhưng chưa có link trên EngineeringNav).
 
 ## M99 PR-B — Nâng cấp plugin AutoCAD: 9 phép kiểm, JSON 2 chế độ, SUBTOTAL Excel, XBOSS_BATCH (2026-08-24)
 

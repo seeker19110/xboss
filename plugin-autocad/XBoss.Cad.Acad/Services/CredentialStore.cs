@@ -5,23 +5,25 @@ using System.Text;
 namespace XBoss.Cad.Acad.Services;
 
 /// <summary>
-/// Lưu token thiết bị trong Windows Credential Manager (M99 NFR4 — KHÔNG ghi token ra
-/// tệp phẳng). P/Invoke advapi32 CredRead/CredWrite/CredDelete, loại GENERIC.
+/// Cất token thiết bị vào Windows Credential Manager (M99 NFR4 — KHÔNG ghi token ra tệp
+/// phẳng). P/Invoke advapi32 trực tiếp để không thêm phụ thuộc NuGet nào cho Adapter.
+/// Target đặt theo server URL nên nhiều server (staging/production) giữ token riêng.
 /// </summary>
 internal static class CredentialStore
 {
-    private const string Target = "XBoss.Cad.PluginToken";
-    private const uint CredTypeGeneric = 1;
-    private const uint CredPersistLocalMachine = 2;
+    private const int CRED_TYPE_GENERIC = 1;
+    private const int CRED_PERSIST_LOCAL_MACHINE = 2;
+
+    private static string Target(string serverUrl) => $"XBoss.Cad:{serverUrl.TrimEnd('/')}";
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-    private struct NativeCredential
+    private struct CREDENTIALW
     {
         public uint Flags;
         public uint Type;
         public string TargetName;
         public string? Comment;
-        public System.Runtime.InteropServices.ComTypes.FILETIME LastWritten;
+        public long LastWritten;
         public uint CredentialBlobSize;
         public IntPtr CredentialBlob;
         public uint Persist;
@@ -31,62 +33,59 @@ internal static class CredentialStore
         public string? UserName;
     }
 
-    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "CredWriteW")]
-    private static extern bool CredWrite(ref NativeCredential credential, uint flags);
+    [DllImport("advapi32", EntryPoint = "CredWriteW", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool CredWrite(ref CREDENTIALW credential, uint flags);
 
-    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "CredReadW")]
-    private static extern bool CredRead(string target, uint type, uint flags, out IntPtr credentialPtr);
+    [DllImport("advapi32", EntryPoint = "CredReadW", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool CredRead(string target, uint type, uint flags, out IntPtr credential);
 
-    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "CredDeleteW")]
+    [DllImport("advapi32", EntryPoint = "CredDeleteW", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool CredDelete(string target, uint type, uint flags);
 
-    [DllImport("advapi32.dll")]
-    private static extern void CredFree(IntPtr credentialPtr);
+    [DllImport("advapi32", EntryPoint = "CredFree")]
+    private static extern void CredFree(IntPtr buffer);
 
-    /// <summary>Ghi token (đè bản cũ nếu có). Ném Win32Exception khi Credential Manager từ chối.</summary>
-    internal static void GhiToken(string token)
+    internal static void LuuToken(string serverUrl, string token)
     {
-        var blob = Encoding.UTF8.GetBytes(token);
-        var unmanaged = Marshal.AllocHGlobal(blob.Length);
+        var blob = Encoding.Unicode.GetBytes(token);
+        var pBlob = Marshal.AllocHGlobal(blob.Length);
         try
         {
-            Marshal.Copy(blob, 0, unmanaged, blob.Length);
-            var cred = new NativeCredential
+            Marshal.Copy(blob, 0, pBlob, blob.Length);
+            var cred = new CREDENTIALW
             {
-                Type = CredTypeGeneric,
-                TargetName = Target,
-                CredentialBlobSize = (uint)blob.Length,
-                CredentialBlob = unmanaged,
-                Persist = CredPersistLocalMachine,
+                Type = CRED_TYPE_GENERIC,
+                TargetName = Target(serverUrl),
                 UserName = Environment.UserName,
+                CredentialBlob = pBlob,
+                CredentialBlobSize = (uint)blob.Length,
+                Persist = CRED_PERSIST_LOCAL_MACHINE,
             };
             if (!CredWrite(ref cred, 0))
-                throw new Win32Exception(Marshal.GetLastWin32Error(), "Không ghi được token vào Windows Credential Manager");
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "Không ghi được token vào Credential Manager");
         }
         finally
         {
-            Marshal.FreeHGlobal(unmanaged);
+            Marshal.FreeHGlobal(pBlob);
         }
     }
 
-    /// <summary>Đọc token đã lưu; null nếu chưa ghép thiết bị.</summary>
-    internal static string? DocToken()
+    /// <summary>Token đã lưu cho server này, hoặc null khi chưa ghép.</summary>
+    internal static string? DocToken(string serverUrl)
     {
-        if (!CredRead(Target, CredTypeGeneric, 0, out var ptr)) return null;
+        if (!CredRead(Target(serverUrl), CRED_TYPE_GENERIC, 0, out var pCred)) return null;
         try
         {
-            var cred = Marshal.PtrToStructure<NativeCredential>(ptr);
+            var cred = Marshal.PtrToStructure<CREDENTIALW>(pCred);
             if (cred.CredentialBlobSize == 0 || cred.CredentialBlob == IntPtr.Zero) return null;
-            var blob = new byte[cred.CredentialBlobSize];
-            Marshal.Copy(cred.CredentialBlob, blob, 0, blob.Length);
-            return Encoding.UTF8.GetString(blob);
+            return Marshal.PtrToStringUni(cred.CredentialBlob, (int)cred.CredentialBlobSize / 2);
         }
         finally
         {
-            CredFree(ptr);
+            CredFree(pCred);
         }
     }
 
-    /// <summary>Xoá token (XBOSS_LOGOUT). Trả false nếu vốn không có gì để xoá.</summary>
-    internal static bool XoaToken() => CredDelete(Target, CredTypeGeneric, 0);
+    internal static void XoaToken(string serverUrl) =>
+        CredDelete(Target(serverUrl), CRED_TYPE_GENERIC, 0);
 }

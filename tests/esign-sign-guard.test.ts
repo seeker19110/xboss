@@ -79,10 +79,7 @@ describe("e-Sign: siết quyền ký", () => {
       src.includes("chotProjectIdChoGhi"),
       "route phải đối chiếu projectId với visibleProjectIds",
     );
-    assert.ok(
-      !/Number\(body\.projectId/.test(src),
-      "route không được lấy thẳng projectId từ body",
-    );
+    assert.ok(!/Number\(body\.projectId/.test(src), "route không được lấy thẳng projectId từ body");
     assert.ok(
       src.includes("CAN.signEngineeringEsign"),
       "route phải gate bằng quyền KÝ, không phải quyền XEM",

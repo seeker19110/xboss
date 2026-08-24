@@ -409,6 +409,13 @@ export default function MyTasksPage() {
     });
   }
 
+  // Deep-link: /my-tasks?tab=notifications mở thẳng tab Thông báo (route /notifications
+  // cũ đã gộp vào đây, chỉ còn chuyển hướng sang URL này).
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (tab === "notifications") setSegment("notifications");
+  }, []);
+
   useEffect(() => {
     fetch("/api/my-tasks")
       .then(async (r) => {

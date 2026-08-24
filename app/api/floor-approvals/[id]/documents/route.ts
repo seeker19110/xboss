@@ -2,14 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { storagePut } from "@/lib/nen/storage";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN, canTouchFloor } from "@/lib/bao-mat/auth";
-import {
-  extForDocMime,
-  verifyFileMime,
-  newFloorDocFileName,
-  MAX_DOC_BYTES,
-  sha256Hex,
-  isContentTooLarge,
-} from "@/lib/nen/photos";
+import { newFloorDocFileName, MAX_DOC_BYTES, sha256Hex, parseUploadedFile } from "@/lib/nen/photos";
 
 export const dynamic = "force-dynamic";
 
@@ -98,38 +91,13 @@ export async function POST(
   }
 
   // --- Upload file ---
-  if (isContentTooLarge(req.headers.get("content-length"), MAX_DOC_BYTES))
-    return NextResponse.json(
-      { error: `File quá lớn (tối đa ${MAX_DOC_BYTES / 1024 / 1024}MB)` },
-      { status: 413 },
-    );
-
-  const form = await req.formData().catch(() => null);
-  const file = form?.get("file");
-  if (!form || !(file instanceof File))
-    return NextResponse.json(
-      { error: "Thiếu file (field 'file') hoặc JSON { url }" },
-      { status: 400 },
-    );
-
-  const ext = extForDocMime(file.type);
-  if (!ext)
-    return NextResponse.json(
-      { error: `Chỉ nhận PDF hoặc ảnh, nhận được: ${file.type || "không rõ"}` },
-      { status: 415 },
-    );
-  if (file.size > MAX_DOC_BYTES)
-    return NextResponse.json(
-      { error: `File quá lớn (tối đa ${MAX_DOC_BYTES / 1024 / 1024}MB)` },
-      { status: 413 },
-    );
-
-  const fileBuf = Buffer.from(await file.arrayBuffer());
-  if (!verifyFileMime(fileBuf, file.type))
-    return NextResponse.json(
-      { error: "Nội dung file không khớp định dạng khai báo (Content-Type giả mạo?)" },
-      { status: 415 },
-    );
+  const up = await parseUploadedFile(req, {
+    accept: "document",
+    maxBytes: MAX_DOC_BYTES,
+    missingError: "Thiếu file (field 'file') hoặc JSON { url }",
+  });
+  if (!up.ok) return NextResponse.json({ error: up.error }, { status: up.status });
+  const { form, file, buf: fileBuf } = up;
 
   const caption = String(form.get("caption") ?? "").trim() || null;
   const fileName = newFloorDocFileName(approvalId, file.type);

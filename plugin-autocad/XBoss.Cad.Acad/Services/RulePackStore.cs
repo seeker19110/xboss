@@ -35,11 +35,10 @@ internal static class RulePackStore
     }
 
     /// <summary>Nạp tệp mới: kiểm chặt TRƯỚC, hợp lệ mới ghi đè cache.</summary>
-    internal static CadRulePack Import(string duongDanTep) => ImportNoiDung(File.ReadAllText(duongDanTep));
+    internal static CadRulePack Import(string duongDanTep) => ImportJson(File.ReadAllText(duongDanTep));
 
-    /// <summary>Nạp từ chuỗi JSON (XBOSS_LOGIN tải qua API — M99 PR2): cùng đường kiểm/cache
-    /// với nạp tệp — một điểm vào duy nhất cho mọi nguồn rule pack.</summary>
-    internal static CadRulePack ImportNoiDung(string noiDung)
+    /// <summary>Nạp từ chuỗi JSON (XBOSS_LOGIN tải qua API — M99 PR2): cùng đường kiểm chặt.</summary>
+    internal static CadRulePack ImportJson(string noiDung)
     {
         var pack = RulePackLoader.Load(noiDung); // ném RulePackException nếu không hợp lệ
         Directory.CreateDirectory(Path.GetDirectoryName(CachePath)!);
@@ -47,4 +46,7 @@ internal static class RulePackStore
         _cached = pack;
         return pack;
     }
+
+    /// <summary>ETag của lần tải rule pack gần nhất (cache HTTP — không phải bí mật).</summary>
+    internal static string EtagPath => CachePath + ".etag";
 }

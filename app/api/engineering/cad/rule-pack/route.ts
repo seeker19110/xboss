@@ -1,28 +1,19 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
-import { verifyDeviceToken } from "@/lib/bao-mat/api-tokens";
+import { getCadTokenUser } from "@/lib/bao-mat/cad-devices";
 import { getCurrentRulePack, getRulePackEtag, matchesEtag } from "@/lib/ky-thuat/cad/rule-pack";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/engineering/cad/rule-pack — Bộ quy tắc chuẩn hóa + bóc tách CAD đang phát hành
-// (M99 PR1/PR-A). Nhận 2 đường xác thực: phiên web thường HOẶC token thiết bị plugin
-// (`Authorization: Bearer xbt_...`, M99 PR2 — XBOSS_LOGIN tải rule pack trực tiếp).
-// Token hành xử đúng bằng quyền user chủ token — cùng check CAN như phiên.
+// (M99 PR1/PR-A). PR2: nhận thêm Bearer token scope 'cad' của plugin AutoCAD (XBOSS_LOGIN) —
+// token quy về người đã duyệt thiết bị, quyền vẫn đi qua CAN như phiên thường.
 export async function GET(req: Request) {
-  const bearer = req.headers.get("authorization");
-  const user = bearer?.trim().startsWith("Bearer xbt_")
-    ? ((await verifyDeviceToken(bearer))?.user ?? null)
-    : await getCurrentUser();
-  if (!user) {
-    return NextResponse.json(
-      {
-        error:
-          "Chưa đăng nhập hoặc token thiết bị không hợp lệ/đã thu hồi — chạy XBOSS_LOGIN ghép lại",
-      },
-      { status: 401 },
-    );
-  }
+  // Bearer kiểm TRƯỚC: request của plugin không đụng cookies() (nhanh hơn + gọi được handler
+  // trực tiếp trong test tích hợp); không có/sai header mới rơi về phiên đăng nhập web.
+  const user =
+    (await getCadTokenUser(req.headers.get("authorization"))) ?? (await getCurrentUser());
+  if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   if (!CAN.viewEngineeringGraph(user.role)) {
     return NextResponse.json(
       { error: "Không có quyền xem quy tắc chuẩn hóa CAD" },

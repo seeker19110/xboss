@@ -4,7 +4,7 @@
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Issue / Goal     | Chuẩn hóa bản vẽ + bóc tách khối lượng bằng chính API AutoCAD trên máy kỹ sư, thay cho việc tự đọc/ghi DXF bằng TypeScript                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Spec owner       | (chờ gán)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| State            | **Approved for implementation** — PR0 (đã merge) + PR1 (rule pack v1, đã merge); PR-A (rule pack v2 + khung plugin + KIEMTRA/CHUANHOA/BOCKL/Excel — nhánh `claude/autocad-csharp-plugin-ypi9nb`); PR-B (9 phép kiểm + JSON kiểm tra + SUBTOTAL Excel + sidecar JSON + `XBOSS_BATCH`) + **PR2 (api_tokens + ghép thiết bị + `XBOSS_LOGIN`/`XBOSS_LOGOUT` + trang quản lý token — cùng nhánh `claude/plugin-upgrade-m8z0hx`)**; PR5 chờ điều kiện ngoài (§18)                                                                                                           |
+| State            | **Approved for implementation** — PR0 (đã merge) + PR1 (rule pack v1, đã merge); PR-A (rule pack v2 + khung plugin + KIEMTRA/CHUANHOA/BOCKL/Excel — nhánh `claude/autocad-csharp-plugin-ypi9nb`); PR2 (ghép thiết bị + token scope cad + `XBOSS_LOGIN` — **đã merge #386**, tái dùng `api_keys`, xem §10/§11); PR-B (9 phép kiểm + JSON kiểm tra + SUBTOTAL Excel + sidecar JSON + `XBOSS_BATCH` — nhánh `claude/plugin-upgrade-m8z0hx`); PR5 chờ điều kiện ngoài (§18)                                                                                               |
 | Người/ngày duyệt | Seeker (liendv@live.com), 2026-08-23 ("duyệt luôn cả 3, làm tiếp"); 2026-08-24 yêu cầu bổ sung BOCKL + xuất Excel ClosedXML và triển khai ngay ("mọi quyết định đều ưu tiên chất lượng cao nhất")                                                                                                                                                                                                                                                                                                                                                                     |
 | Cập nhật         | 2026-08-24 — bản mở rộng: thêm bóc tách khối lượng (`XBOSS_BOCKL`) + xuất Excel theo mẫu công ty (ClosedXML); siết đặc tả chuẩn hóa (pipeline thứ tự cố định, kiểm tra highlight, đơn vị bản vẽ)                                                                                                                                                                                                                                                                                                                                                                      |
 | Cập nhật (PR-B)  | 2026-08-24 — nâng cấp trọn khối: 2 phép kiểm mới theo `purgePolicy.deepPurge` (layer rỗng `reportEmptyLayers`, block nặc danh `reportAnonymousBlocks` — v2 khai sẵn nhưng PR-A chưa cài); `XBOSS_KIEMTRA` xuất báo cáo JSON cạnh DWG (đủ FR8 cho cả 2 chế độ); Excel bóc tách thêm tổng nhóm hệ + TỔNG CỘNG bằng công thức `SUBTOTAL` sống; sidecar JSON kết quả bóc cạnh Excel (chuẩn bị PR5); `XBOSS_BATCH` (journey 7 — phần plugin của PR6): xử lý hàng loạt thư mục qua side database, bản gốc giữ nguyên, kết quả vào `da-chuan-hoa/`, nhật ký + bỏ qua tệp lỗi |
@@ -185,7 +185,7 @@ Máy kỹ sư (Windows + AutoCAD 2026)           Server XBoss (Linux, tự host)
 
 Thư mục: `plugin-autocad/` — `XBoss.Cad.sln`, `XBoss.Cad.Core/` (net8.0; phụ thuộc duy nhất: ClosedXML), `XBoss.Cad.Acad/` (net8.0-windows; tham chiếu ObjectARX 2026 qua thuộc tính MSBuild `AcadSdkDir`, `CopyLocal=false`; **không build trong CI**), `XBoss.Cad.Tests/` (xunit, chỉ tham chiếu Core), `bundle/PackageContents.xml`, `README.md` (build/cài đặt/xác minh runtime §9.1).
 
-File server: `lib/ky-thuat/cad/rule-pack.ts` + `rule-packs/v2.json` (PR-A); `app/api/engineering/cad/plugin-upload/route.ts`, `lib/bao-mat/api-tokens.ts`, `app/api/tokens/*` (PR2/PR5).
+File server: `lib/ky-thuat/cad/rule-pack.ts` + `rule-packs/v2.json` (PR-A); `app/api/engineering/cad/plugin-upload/route.ts`, `lib/bao-mat/cad-devices.ts`, `app/api/devices/pair/*`, `app/api/tokens/*`, trang `/engineering/thiet-bi-cad` (PR2 — đã làm); plugin-upload (PR5).
 
 ### 9.1 Đời AutoCAD mục tiêu — **ĐÃ CHỐT: AutoCAD 2026, một nền duy nhất**
 
@@ -222,36 +222,51 @@ Lý do chọn 2026:
 
 ## 10. API contract
 
-| Endpoint                                        | Nội dung                                                                                                                                                                         |
-| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /api/devices/pair`                        | Plugin xin mã ghép → `{ deviceCode, expiresIn }` (PR2)                                                                                                                           |
-| `POST /api/devices/pair/confirm`                | Người dùng duyệt trên web (session thường) → phát token (PR2)                                                                                                                    |
-| `POST /api/devices/pair/poll`                   | **(PR2 bổ sung so với bản đặc tả)** plugin poll `{deviceCode, deviceSecret}` → token sinh TẠI ĐÂY sau khi confirmed, trả thô đúng 1 lần (không lưu token thô trong DB kể cả tạm) |
-| `GET /api/engineering/cad/rule-pack`            | **v2**: `{ version, layerMap, fontMap, purgePolicy, lineweightMap, flattenPolicy, takeoff, inspectionPolicy }`; hỗ trợ `ETag`                                                    |
-| `POST /api/engineering/cad/plugin-upload`       | multipart: `dwg`, `dxf`, `report.json`, `rulePackVersion` → `202 { jobId }` (PR5)                                                                                                |
-| `GET /api/engineering/cad/plugin-upload/:jobId` | `{ status, validation, revisionId? }` (PR5)                                                                                                                                      |
-| `GET/POST/DELETE /api/tokens`                   | Quản lý + **thu hồi** token (web, PR2)                                                                                                                                           |
+| Endpoint                                          | Nội dung                                                                                                                                                                                                                       |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `POST /api/devices/pair`                          | Plugin xin mã ghép → `{ userCode, deviceCode, expiresIn, confirmPath }` — device flow: `userCode` ngắn cho người gõ vào web, `deviceCode` bí mật 256-bit chỉ plugin giữ (DB lưu hash). Public + rate limit IP (PR2 — đã làm)   |
+| `POST /api/devices/pair/confirm`                  | Kỹ sư duyệt/từ chối `userCode` trên web (session + `CAN.manageDrawings`) (PR2 — đã làm)                                                                                                                                        |
+| `POST /api/devices/pair/claim`                    | Plugin poll bằng `deviceCode` (body POST, không URL): 202 chờ · 200 `{ key, expiresAt }` — key sinh TẠI ĐÂY, trả đúng 1 lần, claim atomic · 410 hết hạn · 403 từ chối (PR2 — đã làm; endpoint bổ sung so với bản đặc tả trước) |
+| `GET /api/engineering/cad/rule-pack`              | **v2**: `{ version, layerMap, fontMap, purgePolicy, lineweightMap, flattenPolicy, takeoff, inspectionPolicy }`; hỗ trợ `ETag`                                                                                                  |
+| `POST /api/engineering/cad/plugin-upload`         | multipart: `dwg`, `dxf`, `report.json`, `rulePackVersion` → `202 { jobId }` (PR5)                                                                                                                                              |
+| `GET /api/engineering/cad/plugin-upload/:jobId`   | `{ status, validation, revisionId? }` (PR5)                                                                                                                                                                                    |
+| `GET/POST /api/tokens` + `DELETE /api/tokens/:id` | Kỹ sư tự quản token thiết bị của mình (list không lộ key/hash · tạo thủ công trả key 1 lần · thu hồi = revoked_at, chủ token hoặc Admin; Admin thấy mọi key ở /api/admin/api-keys sẵn có) (PR2 — đã làm)                       |
 
 Auth: token Bearer cho mọi endpoint plugin; quyền `CAN.manageDrawings`; kiểm project scope. Idempotent theo hash nội dung DWG. Giới hạn kích thước tệp; rate limit theo token. Rule pack v2 là **mở rộng thuần** (chỉ thêm field) — client v1 (nếu có) không vỡ.
 
 ## 11. Data contract và DDL
 
-Migration **append-only** (PR2, giữ nguyên như bản trước):
+**ĐIỂM LỆCH SO VỚI BẢN NHÁP (quyết định PR2, 2026-08-24): KHÔNG tạo bảng `api_tokens` mới —
+tái dùng `api_keys` sẵn có** (0061: hash sha256, thu hồi, rate limit, audit trigger, org_id từ
+0078, admin UI) — DDL nháp `api_tokens` trong bản trước được viết khi chưa rà hiện trạng; tạo
+bảng song song là vi phạm "tái dùng trước khi viết mới" và nhân đôi bề mặt audit. Đã thi hành
+trong `migrations/0133_cad_device_pairing.sql` (thêm thuần):
 
 ```sql
-CREATE TABLE IF NOT EXISTS api_tokens (
-  id SERIAL PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  token_hash TEXT NOT NULL UNIQUE,      -- chỉ lưu hash, không lưu token gốc
-  scopes TEXT NOT NULL DEFAULT 'cad',
-  expires_at TIMESTAMPTZ,
-  revoked_at TIMESTAMPTZ,
-  last_used_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_api_tokens_user ON api_tokens(user_id);
+-- Token thiết bị có hạn + tên thiết bị (key đọc-only cũ expires_at NULL = vô hạn, không đổi hành vi)
+ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS device_name TEXT;
+-- scope mới 'cad' trong api_keys.scopes; token quy về người duyệt (created_by) → quyền qua CAN
 
+CREATE TABLE IF NOT EXISTS cad_device_pairings (
+  id SERIAL PRIMARY KEY,
+  user_code TEXT NOT NULL UNIQUE,          -- mã ngắn (XXXX-XXXX, bảng chữ không nhập nhằng)
+  device_code_hash TEXT NOT NULL UNIQUE,   -- sha256 của bí mật 256-bit plugin giữ
+  device_name TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending','confirmed','claimed','denied')),
+  confirmed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  api_key_id INTEGER REFERENCES api_keys(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  expires_at TIMESTAMPTZ NOT NULL          -- mã ghép sống 10 phút
+);
+-- + audit trigger như 0061. Key thô KHÔNG BAO GIỜ nằm trong DB: sinh tại thời điểm claim,
+-- trả đúng 1 lần; token hạn 90 ngày (CAD_TOKEN_TTL_DAYS).
+```
+
+Phần `drawing_revisions` giữ nguyên kế hoạch, thi hành ở PR5:
+
+```sql
 ALTER TABLE drawing_revisions ADD COLUMN IF NOT EXISTS rule_pack_version TEXT;
 ALTER TABLE drawing_revisions ADD COLUMN IF NOT EXISTS standardize_report JSONB;
 ALTER TABLE drawing_revisions ADD COLUMN IF NOT EXISTS source_tool TEXT;  -- 'plugin' | 'server'

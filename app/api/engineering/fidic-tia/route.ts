@@ -7,7 +7,7 @@ import {
   saveFidicTiaClaim,
   listFidicTiaClaims,
   FidicTiaInput,
-} from "@/lib/ky-thuat/engineering-fidic-tia-claim";
+} from "@/lib/ky-thuat/engineering-fidic-claim";
 
 export const dynamic = "force-dynamic";
 

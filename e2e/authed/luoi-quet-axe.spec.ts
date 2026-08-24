@@ -175,7 +175,7 @@ test.describe("Lưới quét axe — các trang chưa phủ (sau đăng nhập)"
       path: "/engineering/cad-nesting",
       name: "Xếp hình CAD (nesting)",
       violations:
-        "aria-prohibited-attr x1 (div[aria-label=\"Đang tải\"] — PageSkeleton dùng aria-label trên div không có role hợp lệ, xem app/components/Skeleton.tsx) — color-contrast (badge EngineeringNav) đã hết sau khi sửa.",
+        'aria-prohibited-attr x1 (div[aria-label="Đang tải"] — PageSkeleton dùng aria-label trên div không có role hợp lệ, xem app/components/Skeleton.tsx) — color-contrast (badge EngineeringNav) đã hết sau khi sửa.',
     },
     {
       path: "/engineering/cad-tracking",
