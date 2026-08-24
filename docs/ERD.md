@@ -4959,6 +4959,7 @@
 
 **Index:**
 - `engineering_iot_threshold_alerts_pkey`: UNIQUE INDEX engineering_iot_threshold_alerts_pkey ON public.engineering_iot_threshold_alerts USING btree (id)
+- `uq_iot_alert_dang_mo`: UNIQUE INDEX uq_iot_alert_dang_mo ON public.engineering_iot_threshold_alerts USING btree (device_id) WHERE (is_resolved = false)
 
 ### engineering_knowledge_patterns
 
@@ -6778,6 +6779,7 @@
 - `idx_telegram_user_chat`: INDEX idx_telegram_user_chat ON public.telegram_user_bindings USING btree (telegram_chat_id, is_verified)
 - `telegram_user_bindings_pkey`: UNIQUE INDEX telegram_user_bindings_pkey ON public.telegram_user_bindings USING btree (id)
 - `telegram_user_bindings_telegram_chat_id_key`: UNIQUE INDEX telegram_user_bindings_telegram_chat_id_key ON public.telegram_user_bindings USING btree (telegram_chat_id)
+- `uq_telegram_user_bindings_cho_lien_ket`: UNIQUE INDEX uq_telegram_user_bindings_cho_lien_ket ON public.telegram_user_bindings USING btree (user_id) WHERE (is_verified = false)
 
 ### totp_recovery_codes
 
@@ -6904,5 +6906,6 @@
 **Index:**
 - `idx_zalo_user_bindings_project`: INDEX idx_zalo_user_bindings_project ON public.zalo_user_bindings USING btree (project_id)
 - `idx_zalo_user_bindings_zid`: INDEX idx_zalo_user_bindings_zid ON public.zalo_user_bindings USING btree (zalo_user_id)
+- `uq_zalo_user_bindings_project_zid`: UNIQUE INDEX uq_zalo_user_bindings_project_zid ON public.zalo_user_bindings USING btree (project_id, zalo_user_id)
 - `zalo_user_bindings_pkey`: UNIQUE INDEX zalo_user_bindings_pkey ON public.zalo_user_bindings USING btree (id)
 
