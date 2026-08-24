@@ -2649,6 +2649,10 @@
 | uploaded_by | integer | ✓ |  |
 | created_at | timestamptz | ✓ | `now()` |
 | iso_path | text | ✓ |  |
+| rule_pack_version | text | ✓ |  |
+| standardize_report | jsonb | ✓ |  |
+| source_tool | text | ✓ |  |
+| content_sha256 | text | ✓ |  |
 
 **Khóa ngoại:**
 - `drawing_id` → `drawings(id)`
@@ -2658,6 +2662,7 @@
 - `drawing_revisions_drawing_id_rev_key`: UNIQUE INDEX drawing_revisions_drawing_id_rev_key ON public.drawing_revisions USING btree (drawing_id, rev)
 - `drawing_revisions_pkey`: UNIQUE INDEX drawing_revisions_pkey ON public.drawing_revisions USING btree (id)
 - `idx_drawing_revisions_drawing`: INDEX idx_drawing_revisions_drawing ON public.drawing_revisions USING btree (drawing_id)
+- `idx_drawing_revisions_hash`: INDEX idx_drawing_revisions_hash ON public.drawing_revisions USING btree (drawing_id, content_sha256)
 
 ### design_changes
 

@@ -492,6 +492,17 @@ dùng duyệt hướng xử lý.
 - **KHÔNG nên làm:** thêm module `engineering/*`/OS-phase mới, C2 pilot, hạ tầng mới, nâng major
   M60, bật SSO production, hay tuyên bố thêm mốc "Complete" nào bằng tài liệu.
 
+## M99 PR5 — plugin-upload + kiểm định server + `XBOSS_UPLOAD` (2026-08-25)
+
+Người dùng "tiếp tục" sau khi #389 merge — PR2 (#386) đã mở khoá PR5. Nhánh `claude/plugin-upgrade-m8z0hx` (khởi động lại từ main sau squash-merge).
+
+- **Migration `0136_plugin_upload_revisions.sql`** (thêm thuần): `drawing_revisions` + `rule_pack_version`/`standardize_report JSONB`/`source_tool` (khối DDL M99 §11 mà #386 chưa cần) + `content_sha256` + index — idempotency theo hash nội dung DWG (M99 §12).
+- **`lib/ky-thuat/cad/plugin-upload.ts`:** `kiemDinhPluginUpload` (thuần — đối chiếu version rule pack đang phát hành, AC8 phía server; `validateDxf`+`parseDxf` của chính parser tầng 3 thay cho worker ezdxf — điểm lệch có chủ đích ghi ở M99 §10: một parser duy nhất cho cả hai tầng) + `xuLyPluginUpload` (idempotent theo sha256 → trả revision cũ; cùng rev khác nội dung → rev-conflict 409; đạt → lưu DWG + DXF sidecar qua `storagePut`, tạo revision `submitted`, `source_tool='plugin'`, báo cáo client + `serverValidation` vào `standardize_report`).
+- **Route `POST /api/engineering/cad/plugin-upload`:** auth Bearer cad (`getCadTokenUser`) hoặc phiên; `CAN.manageDrawings`; rate limit 30/15ph/user; trần 150MB (`GIOI_HAN_TEP_CAD`); bản vẽ đích theo `drawingCode`/`drawingId` + scope dự án qua `chotProjectIdChoGhi`; job ghi `engineering_async_tasks` (type `cad.plugin-upload`) — kiểm định chạy ngay trong request: đạt → 202 `{jobId}`, fail → **422 + KHÔNG tạo revision (AC5)**, trùng rev khác nội dung → 409. `GET /:jobId` trả `{status, validation, revisionId, idempotent}` — chỉ người tạo job đọc được (+ whitelist project-scope).
+- **Plugin:** Core `XBossApiClient.UploadAsync` (multipart 6 field, 422 trả danh sách lỗi thay vì ném, 401 → hướng dẫn XBOSS_LOGIN — AC7) + `FetchUploadJobAsync`; Adapter `XBOSS_UPLOAD` (đòi DWG đã lưu + DBMOD=0, `DxfOut` sidecar ra tệp tạm, đính `<dwg>.xboss-report.json` nếu có, async không chặn UI, in đủ lỗi 422 ngay trong AutoCAD).
+- **Kiểm chứng:** C# 84 → **89 ca** (5 ca UploadAsync/FetchUploadJob qua fake handler); TS mới `tests/cad-plugin-upload.test.ts` 3 ca (AC5 không tạo revision, rule pack cũ bị chặn, idempotent + rev-conflict trên Postgres thật); toàn suite **222 file / 1214 ca pass**; lint/typecheck/build/5 gate xanh; ERD regen (+4 cột).
+- **Chưa làm:** PR6 (bảng điều khiển web + bỏ tầng 1), PR7 (chặn bởi runner Windows); UAT máy thật `XBOSS_UPLOAD` end-to-end cùng đợt với LOGIN/BATCH.
+
 ## M99 PR2 — hợp nhất với bản đã merge #386, gỡ bản trùng + sửa trùng số migration 0133 (2026-08-24)
 
 Nhánh `claude/plugin-upgrade-m8z0hx` từng cài PR2 độc lập (bảng `api_tokens` mới + poll endpoint +
