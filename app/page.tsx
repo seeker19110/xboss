@@ -414,7 +414,7 @@ export default function Dashboard() {
                 desc: "PO 6 bước • QR GRN Cổng",
                 href: "/procurement",
                 status: "100% Khớp",
-                color: "text-blue-400",
+                color: "text-blue-300",
                 bg: "bg-blue-500/10",
                 border: "border-blue-500/30",
               },
@@ -667,9 +667,9 @@ export default function Dashboard() {
           {(data?.totalDelayed ?? 0) > 0 && (
             <a
               href="#delayed-table"
-              className="flex items-center gap-4 bg-orange-950/25 border border-orange-900/60 rounded-2xl px-5 py-4 mb-4 hover:bg-orange-950/35 hover:border-orange-800/80 transition-all shadow-sm group"
+              className="flex items-center gap-4 bg-orange-500/10 border border-orange-500/30 rounded-2xl px-5 py-4 mb-4 hover:bg-orange-500/15 hover:border-orange-500/50 transition-all shadow-sm group"
             >
-              <div className="p-3 bg-orange-900/40 border border-orange-800/60 rounded-xl shrink-0 text-orange-400 group-hover:scale-105 transition-transform">
+              <div className="p-3 bg-orange-500/15 border border-orange-500/30 rounded-xl shrink-0 text-orange-300 group-hover:scale-105 transition-transform">
                 <TrendingDown className="w-6 h-6" />
               </div>
               <div className="flex-1 min-w-0">
@@ -683,7 +683,7 @@ export default function Dashboard() {
                   <span className="text-xs text-orange-300 font-medium">cần xử lý ngay</span>
                 </div>
               </div>
-              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-900/30 border border-orange-800/40 text-xs font-semibold text-orange-200 group-hover:bg-orange-900/50 transition shrink-0">
+              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500/15 border border-orange-500/30 text-xs font-semibold text-orange-300 group-hover:bg-orange-500/25 transition shrink-0">
                 Xem phân tích trễ <ChevronRight className="w-3.5 h-3.5" />
               </span>
             </a>
@@ -704,7 +704,7 @@ export default function Dashboard() {
                     {hasDelay && (
                       <span
                         title={`${k.delayed} hạng mục đang trễ`}
-                        className="flex items-center gap-1 text-[10px] text-orange-200 bg-orange-950/80 border border-orange-800/70 px-2 py-0.5 rounded-full shrink-0 font-semibold"
+                        className="flex items-center gap-1 text-[10px] text-orange-300 bg-orange-500/15 border border-orange-500/30 px-2 py-0.5 rounded-full shrink-0 font-semibold"
                       >
                         <AlertTriangle className="w-2.5 h-2.5 text-orange-400" /> {k.delayed}
                       </span>

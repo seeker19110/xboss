@@ -78,7 +78,7 @@ export default function LayersFontPanel({
 
             <button
               onClick={handleDownloadScr}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs shadow-sm transition"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-on-accent-dark font-bold text-xs shadow-sm transition"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Xuất Kịch Bản .SCR</span>
@@ -256,7 +256,7 @@ export default function LayersFontPanel({
         </div>
         <button
           onClick={() => setStep1SubTab("boq_dim_ctb")}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs transition"
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-on-accent-dark font-bold text-xs transition"
         >
           <span>Chuyển Sang Mục 3: Block BOQ, Dim & Nét In</span>
           <ArrowRight className="w-3.5 h-3.5" />

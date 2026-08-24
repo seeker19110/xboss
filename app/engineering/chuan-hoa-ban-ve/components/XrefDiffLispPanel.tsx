@@ -457,7 +457,7 @@ export default function XrefDiffLispPanel({
 
             <button
               onClick={handleGenerateLisp}
-              className="w-full py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs shadow-sm transition flex items-center justify-center gap-1.5"
+              className="w-full py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-on-accent-dark font-bold text-xs shadow-sm transition flex items-center justify-center gap-1.5"
             >
               <Sparkles className="w-3.5 h-3.5" />
               <span>Tạo Kịch Bản AutoLISP Mới</span>
@@ -515,7 +515,7 @@ export default function XrefDiffLispPanel({
         </div>
         <button
           onClick={() => setActiveStep(2)}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 font-bold text-xs shadow-md transition shrink-0"
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-on-accent-dark font-bold text-xs shadow-md transition shrink-0"
         >
           <span>Chuyển Sang Bước 2: Đặt Tên & Lưu Trữ</span>
           <ArrowRight className="w-4 h-4" />

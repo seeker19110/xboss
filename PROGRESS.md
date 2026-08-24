@@ -4,6 +4,56 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Audit đợt hợp nhất Hub — vì sao e2e đỏ trên main (2026-08-24)
+
+Điều tra job `e2e` đỏ liên tục trên `main` hàng chục commit. **Nguyên nhân ghi trước đây
+("nợ color-contrast chế độ sáng") không phải lý do** — rule `color-contrast` vốn đã bị tắt
+trong spec. Chi tiết đầy đủ: **`docs/audit-hop-nhat-hub.md`**.
+
+**Nguyên nhân thật:** 84/193 ca `authed-desktop` đỏ (đo cục bộ trên Postgres 16 sạch). Ca đỏ
+đầu tiên là `/attendance` trả **404**. Đối chiếu 72 đường dẫn e2e với route thật: **19 route
+đã bị xoá** khi gom vào hub, bộ e2e chưa từng cập nhật theo. Nó đang canh một ứng dụng
+không còn tồn tại.
+
+**Phát hiện nghiêm trọng hơn — hai hub mất toàn bộ khả năng nhập liệu.** Đếm lời gọi ghi
+trong tab hub: `/site` 5 tab / **0** lời gọi POST-PATCH-DELETE, `/commercial` 5 tab / **0**,
+trong khi `/procurement` 5 tab / **14** (miền này chuyển đúng). Hai hub kia nay chỉ là bảng
+tóm tắt chỉ-đọc; API vẫn còn đủ nên dữ liệu chỉ ghi được qua API, **không còn đường nào trên
+giao diện**. 11 thao tác biến mất khỏi toàn bộ `app/`: chọn ngày chấm công, ghi nhận HSE,
+ghi nhận rủi ro, lưu nháp nhật ký, thêm bảo hiểm/bảo lãnh, thêm checklist, thêm hoá đơn,
+thêm hợp đồng, thêm phát sinh, thêm thiết bị, tạo đề xuất — đúng các thao tác hằng ngày của
+kỹ sư hiện trường và QS.
+
+**Chưa sửa gì** — `docs/audit-hop-nhat-hub.md` §3 là bảng quyết định theo từng miền, cần
+người chốt "hub thế là đủ" hay "phải khôi phục". Viết lại spec bám hub là cách nhanh nhất để
+e2e xanh, nhưng nếu đợt gom lỡ làm mất tính năng thật thì nó xoá luôn tín hiệu duy nhất còn
+báo điều đó.
+
+**Kết quả (2026-08-24):** e2e `authed-desktop` từ **84 ca đỏ → 0**. Khôi phục 20 trang
+(13.770 dòng) từ git + route `/design-changes`; vá nợ tương phản (113 chuỗi class qua token
+`--on-accent-dark` mới, đối xứng với `--on-accent` sẵn có, cộng 7 chỗ nền mờ màu tối); sửa 9
+spec bám nhãn đã đổi. Ba nguồn hồi quy khác nhau đã tách bạch — xem bảng §7 trong
+`docs/audit-hop-nhat-hub.md`.
+
+**Còn nợ, CỐ Ý chưa làm:** 229 chỗ trong 74 file dùng `bg-{màu}-900|950/{mờ}` + chữ
+`-200/-300/-400`. Không quét hàng loạt vì ở chế độ tối đó là chip đậm, đổi sang nền mờ nhạt
+là thay đổi ngôn ngữ thiết kế chứ không phải vá a11y; và không phải chỗ nào cũng vỡ (phụ
+thuộc nền phía sau, không xác định được bằng phân tích tĩnh). Cần người chốt quy ước chip
+trước khi codemod.
+
+### Nợ kèm theo, đã định lượng
+
+- **Tương phản màu hai chiều** (không phải chỉ chế độ sáng như ghi nhận cũ): 113 chỗ nền màu
+  đặc + `text-zinc-950`. 92 chỗ `bg-*-500/600` vỡ ở chế độ sáng (2,0–3,5:1); **21 chỗ
+  `bg-*-700` vỡ ở chế độ TỐI (3,0–4,0:1) — chế độ mặc định của app**. Sửa đúng là dùng token
+  không đảo theo theme, chọn màu chữ theo độ sáng của nền.
+- **Nhiễu log CI**: `pg_isready -U ci` thiếu `-d` nên spam `FATAL: database "ci" does not
+exist` mỗi 5 giây suốt job e2e.
+- **Số liệu bịa**: `app/site/page.tsx` khởi tạo state bằng số cứng ("14 Task", "96/100"…)
+  rồi mới fetch đè — API lỗi/rỗng thì hiển thị số bịa như thật.
+- **Papercut**: `E2E_SECRET` mặc định trong `e2e/constants.ts` chỉ 23 ký tự, dưới ngưỡng 32
+  của production → chạy e2e cục bộ không đặt biến thì luôn đỏ ở bước đăng nhập.
+
 ## Tái cấu trúc theo miền — Đợt 1 & 2 (2026-08-23)
 
 Rà toàn bộ cấu trúc code (không phải nội dung nghiệp vụ) rồi tái cấu trúc. Số liệu và
@@ -53,6 +103,7 @@ typecheck xanh.
 - **45 map nhãn `*_LABEL` không được import ở đâu** trong khi UI lặp lại nhãn tại chỗ —
   lỗi trùng lặp, sửa bằng cách cho UI dùng map, không phải xoá map.
 - **24 file > 1000 LOC** (nặng nhất `TrackingGrid.tsx` 94KB) — Đợt 4, chưa mở.
+
 ## E2E cho route mới `/engineering/chuan-hoa-ban-ve` (2026-08-23)
 
 Route hợp nhất `/engineering/cad` cũ vào `/engineering/chuan-hoa-ban-ve` (commit `ee4c100`)

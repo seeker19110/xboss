@@ -172,7 +172,7 @@ function GovernanceContent() {
           </div>
           <a
             href="/documents"
-            className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-zinc-950 font-semibold text-xs transition-colors inline-flex items-center gap-1.5 shadow"
+            className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-on-accent-dark font-semibold text-xs transition-colors inline-flex items-center gap-1.5 shadow"
           >
             <FolderOpen className="w-3.5 h-3.5" /> Mở Kho Hồ Sơ CDE
           </a>
@@ -287,7 +287,7 @@ function GovernanceContent() {
           <div className="flex items-center gap-2">
             <a
               href="/users"
-              className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-zinc-950 font-semibold text-xs transition-colors flex items-center gap-1.5 shadow"
+              className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-on-accent-dark font-semibold text-xs transition-colors flex items-center gap-1.5 shadow"
             >
               <Users className="w-3.5 h-3.5" /> Quản Lý Tài Khoản
             </a>

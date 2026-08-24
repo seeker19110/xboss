@@ -5,10 +5,13 @@ import AxeBuilder from "@axe-core/playwright";
 // chọn vật tư, nhập số lượng, ghi chú.
 
 async function gotoOrderForm(page: Page) {
-  await page.goto("/materials/order-form");
+  // Miền vật tư đã chuyển ĐÚNG sang hub /procurement ở đợt gom "7 Unified Hubs"
+  // (tab vẫn giữ đủ khả năng tạo/sửa, khác /site và /commercial). Neo vào tab của hub —
+  // phần tử ổn định — thay cho tiêu đề trang cũ đã không còn.
+  await page.goto("/procurement?tab=orders");
   // OrderContent component render với heading "Đơn đặt hàng" (không phải h1,
   // mà là <span> trong toolbar). Chờ text "Đơn đặt hàng" để xác nhận component đã load.
-  await expect(page.getByText("Đơn đặt hàng", { exact: true })).toBeVisible({
+  await expect(page.getByRole("tab", { name: /Đơn Hàng & PR/ })).toBeVisible({
     timeout: 15_000,
   });
 }

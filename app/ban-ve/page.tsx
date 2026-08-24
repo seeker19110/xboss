@@ -483,7 +483,7 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
               onClick={() => setViewTab("all")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition shrink-0 min-h-[38px] ${
                 viewTab === "all"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                  ? "bg-amber-500 text-on-accent-dark font-bold shadow-sm"
                   : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
               }`}
             >
@@ -503,7 +503,7 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
               onClick={() => setViewTab("design")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition shrink-0 min-h-[38px] ${
                 viewTab === "design"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                  ? "bg-amber-500 text-on-accent-dark font-bold shadow-sm"
                   : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
               }`}
             >
@@ -525,7 +525,7 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
               onClick={() => setViewTab("approved")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition shrink-0 min-h-[38px] ${
                 viewTab === "approved"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                  ? "bg-amber-500 text-on-accent-dark font-bold shadow-sm"
                   : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
               }`}
             >
@@ -547,7 +547,7 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
               onClick={() => setViewTab("submitted")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition shrink-0 min-h-[38px] ${
                 viewTab === "submitted"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                  ? "bg-amber-500 text-on-accent-dark font-bold shadow-sm"
                   : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
               }`}
             >
@@ -569,7 +569,7 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
               onClick={() => setViewTab("unapproved")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition shrink-0 min-h-[38px] ${
                 viewTab === "unapproved"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                  ? "bg-amber-500 text-on-accent-dark font-bold shadow-sm"
                   : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
               }`}
             >
@@ -591,7 +591,7 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
               onClick={() => setViewTab("rejected")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition shrink-0 min-h-[38px] ${
                 viewTab === "rejected"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                  ? "bg-amber-500 text-on-accent-dark font-bold shadow-sm"
                   : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
               }`}
             >

@@ -421,7 +421,7 @@ export default function CombinePage() {
             </Link>
             <button
               onClick={handleExportBcf}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs shadow-sm transition"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-on-accent-dark font-bold text-xs shadow-sm transition"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Xuất BCF 3.0</span>
@@ -475,7 +475,7 @@ export default function CombinePage() {
               onClick={() => setActiveTab("clash_solver")}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
                 activeTab === "clash_solver"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                  ? "bg-amber-500 text-on-accent-dark font-bold shadow-sm"
                   : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
               }`}
             >
@@ -487,7 +487,7 @@ export default function CombinePage() {
               onClick={() => setActiveTab("corridor")}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
                 activeTab === "corridor"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                  ? "bg-amber-500 text-on-accent-dark font-bold shadow-sm"
                   : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
               }`}
             >
@@ -499,7 +499,7 @@ export default function CombinePage() {
               onClick={() => setActiveTab("auto_routing")}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
                 activeTab === "auto_routing"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                  ? "bg-amber-500 text-on-accent-dark font-bold shadow-sm"
                   : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
               }`}
             >
@@ -511,7 +511,7 @@ export default function CombinePage() {
               onClick={() => setActiveTab("beam_sleeves")}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition shrink-0 min-h-[40px] ${
                 activeTab === "beam_sleeves"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-sm"
+                  ? "bg-amber-500 text-on-accent-dark font-bold shadow-sm"
                   : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
               }`}
             >

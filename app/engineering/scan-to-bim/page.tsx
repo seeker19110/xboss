@@ -183,7 +183,7 @@ export default function ScanToBimStudioPage() {
               onClick={() => setActiveTab("deviations")}
               className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold ${
                 activeTab === "deviations"
-                  ? "bg-cyan-500 text-zinc-950"
+                  ? "bg-cyan-500 text-on-accent-dark"
                   : "text-zinc-400 hover:text-zinc-200"
               }`}
             >
@@ -194,7 +194,7 @@ export default function ScanToBimStudioPage() {
               onClick={() => setActiveTab("scan_run")}
               className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold ${
                 activeTab === "scan_run"
-                  ? "bg-cyan-500 text-zinc-950"
+                  ? "bg-cyan-500 text-on-accent-dark"
                   : "text-zinc-400 hover:text-zinc-200"
               }`}
             >
@@ -205,7 +205,7 @@ export default function ScanToBimStudioPage() {
               onClick={() => setActiveTab("closed_loop")}
               className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold ${
                 activeTab === "closed_loop"
-                  ? "bg-cyan-500 text-zinc-950"
+                  ? "bg-cyan-500 text-on-accent-dark"
                   : "text-zinc-400 hover:text-zinc-200"
               }`}
             >
@@ -444,7 +444,7 @@ export default function ScanToBimStudioPage() {
 
                   <button
                     onClick={runSampleScanAnalysis}
-                    className="flex items-center justify-center gap-2 rounded-lg bg-cyan-500 py-2.5 px-4 text-xs font-bold text-zinc-950 hover:bg-cyan-400"
+                    className="flex items-center justify-center gap-2 rounded-lg bg-cyan-500 py-2.5 px-4 text-xs font-bold text-on-accent-dark hover:bg-cyan-400"
                   >
                     <RefreshCw size={14} />
                     Chạy Phân tích Sai lệch Toàn diện

@@ -163,8 +163,8 @@ export default function CadViewportStudio({
             disabled={isAutoHealing}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs shadow-sm transition ${
               isAutoHealing
-                ? "bg-amber-500 text-zinc-950 opacity-90 cursor-wait animate-pulse"
-                : "bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-zinc-950"
+                ? "bg-amber-500 text-on-accent-dark opacity-90 cursor-wait animate-pulse"
+                : "bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-on-accent-dark"
             }`}
           >
             {isAutoHealing ? (

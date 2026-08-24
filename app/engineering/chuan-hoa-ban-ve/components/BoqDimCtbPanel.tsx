@@ -121,7 +121,7 @@ export default function BoqDimCtbPanel({
           {dimOverrides.length > 0 && (
             <button
               onClick={handleFixAllDims}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 font-bold text-xs shadow-sm transition shrink-0"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-on-accent-dark font-bold text-xs shadow-sm transition shrink-0"
             >
               <Check className="w-3.5 h-3.5" />
               <span>Khôi Phục Tất Cả Về Đo Thực Tế</span>
@@ -266,7 +266,7 @@ export default function BoqDimCtbPanel({
         </div>
         <button
           onClick={() => setStep1SubTab("xref_diff_lisp")}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs transition"
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-on-accent-dark font-bold text-xs transition"
         >
           <span>Chuyển Sang Mục 4: Cây XREF, Diff & AutoLISP 2D</span>
           <ArrowRight className="w-3.5 h-3.5" />

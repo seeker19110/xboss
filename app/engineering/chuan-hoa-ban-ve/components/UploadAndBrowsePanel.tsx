@@ -116,7 +116,7 @@ export default function UploadAndBrowsePanel({
             onClick={() => setSourceMode("design")}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
               sourceMode === "design"
-                ? "bg-amber-500 text-zinc-950 font-bold shadow-xs"
+                ? "bg-amber-500 text-on-accent-dark font-bold shadow-xs"
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
@@ -128,7 +128,7 @@ export default function UploadAndBrowsePanel({
             onClick={() => setSourceMode("upload")}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
               sourceMode === "upload"
-                ? "bg-amber-500 text-zinc-950 font-bold shadow-xs"
+                ? "bg-amber-500 text-on-accent-dark font-bold shadow-xs"
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
@@ -140,7 +140,7 @@ export default function UploadAndBrowsePanel({
             onClick={() => setSourceMode("folder")}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
               sourceMode === "folder"
-                ? "bg-amber-500 text-zinc-950 font-bold shadow-xs"
+                ? "bg-amber-500 text-on-accent-dark font-bold shadow-xs"
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
@@ -425,7 +425,7 @@ export default function UploadAndBrowsePanel({
                           <div
                             className={`p-2 rounded-lg shrink-0 ${
                               isSelected
-                                ? "bg-amber-500 text-zinc-950"
+                                ? "bg-amber-500 text-on-accent-dark"
                                 : "bg-zinc-800 text-zinc-300"
                             }`}
                           >
@@ -632,7 +632,7 @@ export default function UploadAndBrowsePanel({
                     onClick={() => setFolderFilter("all")}
                     className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition ${
                       folderFilter === "all"
-                        ? "bg-amber-500 text-zinc-950 font-bold"
+                        ? "bg-amber-500 text-on-accent-dark font-bold"
                         : "bg-zinc-900 text-zinc-400 hover:text-zinc-200"
                     }`}
                   >
@@ -642,7 +642,7 @@ export default function UploadAndBrowsePanel({
                     onClick={() => setFolderFilter("cad")}
                     className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition ${
                       folderFilter === "cad"
-                        ? "bg-amber-500 text-zinc-950 font-bold"
+                        ? "bg-amber-500 text-on-accent-dark font-bold"
                         : "bg-zinc-900 text-zinc-400 hover:text-zinc-200"
                     }`}
                   >
@@ -653,7 +653,7 @@ export default function UploadAndBrowsePanel({
                     onClick={() => setFolderFilter("xref")}
                     className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition ${
                       folderFilter === "xref"
-                        ? "bg-amber-500 text-zinc-950 font-bold"
+                        ? "bg-amber-500 text-on-accent-dark font-bold"
                         : "bg-zinc-900 text-zinc-400 hover:text-zinc-200"
                     }`}
                   >
@@ -698,7 +698,7 @@ export default function UploadAndBrowsePanel({
                           </div>
                         </div>
                         {isSelected ? (
-                          <span className="px-1.5 py-0.5 rounded bg-amber-500 text-zinc-950 text-[10px] font-bold shrink-0">
+                          <span className="px-1.5 py-0.5 rounded bg-amber-500 text-on-accent-dark text-[10px] font-bold shrink-0">
                             Master ✓
                           </span>
                         ) : (

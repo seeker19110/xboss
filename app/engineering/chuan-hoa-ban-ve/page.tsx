@@ -155,7 +155,7 @@ export default function ChuanHoaBanVePage() {
             </Link>
             <button
               onClick={exporters.handleDownloadConvertedDxf}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs shadow-sm transition"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-on-accent-dark font-bold text-xs shadow-sm transition"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Xuất Tệp DXF 2D</span>

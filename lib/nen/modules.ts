@@ -103,13 +103,13 @@ export const MODULES: ModuleDef[] = [
       {
         group: "Thi công hiện trường",
         label: "Nhật ký",
-        href: "/site?tab=tasks-diary&sub=diary",
+        href: "/diary",
         icon: "NotebookPen",
       },
       {
         group: "Thi công hiện trường",
         label: "Mặt bằng",
-        href: "/site?tab=work-fronts",
+        href: "/work-fronts",
         icon: "LandPlot",
       },
     ],

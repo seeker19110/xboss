@@ -265,7 +265,7 @@ export default function SwarmEngineeringPage() {
             </button>
             <button
               onClick={() => setShowNewDebateModal(true)}
-              className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-zinc-950 transition-colors hover:bg-amber-400"
+              className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-on-accent-dark transition-colors hover:bg-amber-400"
             >
               <Plus size={16} />
               Khởi tạo Tranh biện Swarm
@@ -458,7 +458,7 @@ export default function SwarmEngineeringPage() {
                           </span>
                         </div>
                       </div>
-                      <span className="rounded bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-zinc-950 uppercase">
+                      <span className="rounded bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-on-accent-dark uppercase">
                         SẴN SÀNG KÝ DUYỆT
                       </span>
                     </div>
@@ -541,7 +541,7 @@ export default function SwarmEngineeringPage() {
                   </button>
                   <button
                     type="submit"
-                    className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-zinc-950 hover:bg-amber-400"
+                    className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-on-accent-dark hover:bg-amber-400"
                   >
                     Bắt đầu Tranh biện
                   </button>
