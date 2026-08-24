@@ -14,16 +14,17 @@ quy tắc tải từ XBoss dưới dạng **rule pack** có version (không nhú
 
 ## Lệnh trong AutoCAD
 
-| Lệnh               | Chức năng                                                                                                                                                                                                          |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `XBOSS_RULEPACK`   | Nạp tệp rule pack JSON (tải từ trang XBoss `/engineering/chuan-hoa-ban-ve` khi đăng nhập) — cache `%APPDATA%\XBoss\rule-pack.json`. **Bắt buộc chạy trước tiên**; chưa nạp thì mọi lệnh khác từ chối chạy          |
-| `XBOSS_KIEMTRA`    | Chỉ kiểm, không sửa: layer sai chuẩn, lệch Z, polyline hở/gần kín, font TCVN3/VNI, lineweight lệch CTB, dim override, rác hình học — khoanh tròn vị trí lỗi trên layer tạm `XBOSS_KIEMTRA_MARK` (không in, tự dọn) |
-| `XBOSS_CHUANHOA`   | Pipeline thứ tự cố định: Audit → layer mapping → font → flatten Z=0 → overkill → purge → lineweight/CTB + gỡ dim override. Xem trước diff, xác nhận, **1 lần UNDO hoàn tác toàn bộ**; báo cáo JSON ghi cạnh DWG    |
-| `XBOSS_BOCKL`      | Bóc khối lượng theo rule pack (`takeoff`): đo chiều dài/diện tích/đếm block theo layer mapping, quy đổi INSUNITS, tô màu vùng đã bóc + XData chống bóc trùng                                                       |
-| `XBOSS_BOCKL_XOA`  | Gỡ đánh dấu bóc (trả đúng màu trước khi bóc, xoá XData) — toàn bộ hoặc theo vùng chọn                                                                                                                              |
-| `XBOSS_BOCKL_XUAT` | Xuất Excel **đúng mẫu công ty** (`attachments/MAU-KHOI-LUONG-BOQ.xlsx`, sheet `Data-BOQ`, cột A–K + công thức H/J/K sống) từ trạng thái bóc đang lưu trong DWG — đóng/mở lại bản vẽ vẫn xuất được                  |
+| Lệnh               | Chức năng                                                                                                                                                                                                                    |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `XBOSS_LOGIN`      | Ghép thiết bị với server XBoss (M99 PR2): xin mã → duyệt trên trang web `/engineering/thiet-bi-cad` → nhận token (cất **Windows Credential Manager**, hạn 90 ngày, thu hồi được trên web) → tự tải rule pack mới nhất (ETag) |
+| `XBOSS_RULEPACK`   | Nạp tệp rule pack JSON bằng tay (đường dự phòng offline) — cache `%APPDATA%\XBoss\rule-pack.json`. Chưa có rule pack (qua LOGIN hoặc lệnh này) thì mọi lệnh khác từ chối chạy                                                |
+| `XBOSS_KIEMTRA`    | Chỉ kiểm, không sửa: layer sai chuẩn, lệch Z, polyline hở/gần kín, font TCVN3/VNI, lineweight lệch CTB, dim override, rác hình học — khoanh tròn vị trí lỗi trên layer tạm `XBOSS_KIEMTRA_MARK` (không in, tự dọn)           |
+| `XBOSS_CHUANHOA`   | Pipeline thứ tự cố định: Audit → layer mapping → font → flatten Z=0 → overkill → purge → lineweight/CTB + gỡ dim override. Xem trước diff, xác nhận, **1 lần UNDO hoàn tác toàn bộ**; báo cáo JSON ghi cạnh DWG              |
+| `XBOSS_BOCKL`      | Bóc khối lượng theo rule pack (`takeoff`): đo chiều dài/diện tích/đếm block theo layer mapping, quy đổi INSUNITS, tô màu vùng đã bóc + XData chống bóc trùng                                                                 |
+| `XBOSS_BOCKL_XOA`  | Gỡ đánh dấu bóc (trả đúng màu trước khi bóc, xoá XData) — toàn bộ hoặc theo vùng chọn                                                                                                                                        |
+| `XBOSS_BOCKL_XUAT` | Xuất Excel **đúng mẫu công ty** (`attachments/MAU-KHOI-LUONG-BOQ.xlsx`, sheet `Data-BOQ`, cột A–K + công thức H/J/K sống) từ trạng thái bóc đang lưu trong DWG — đóng/mở lại bản vẽ vẫn xuất được                            |
 
-(`XBOSS_LOGIN`/`XBOSS_UPLOAD`/`XBOSS_BATCH` thuộc PR2/PR5/PR6 — chưa có trong bản này.)
+(`XBOSS_UPLOAD`/`XBOSS_BATCH` thuộc PR5/PR6 — chưa có trong bản này.)
 
 ## Build
 
@@ -74,7 +75,7 @@ Gỡ cài đặt = xoá thư mục `XBoss.bundle` (M99 §17).
 
 ## Luồng làm việc chuẩn của kỹ sư
 
-1. `XBOSS_RULEPACK` (lần đầu, hoặc khi XBoss phát hành rule pack mới).
+1. `XBOSS_LOGIN` (lần đầu / khi token hết hạn) — ghép thiết bị + tự tải rule pack. Không có mạng thì dùng `XBOSS_RULEPACK` nạp tệp tay.
 2. Mở bản vẽ nhận từ CĐT/TVTK → `XBOSS_KIEMTRA` xem mức lệch chuẩn.
 3. `XBOSS_CHUANHOA` → kiểm tra kết quả (sai thì UNDO 1 lần) → QSAVE.
 4. Làm shop drawing như bình thường.

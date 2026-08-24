@@ -4,6 +4,19 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## M99 PR2 — Ghép thiết bị AutoCAD + token scope 'cad' + XBOSS_LOGIN (2026-08-24)
+
+Vùng rủi ro cao (chạm auth) — đã rà theo `docs/audit.md` §3/§8. Nhánh `claude/m99-pr2-api-tokens`.
+
+- **Điểm lệch spec có chủ đích (ghi vào M99 §11): KHÔNG tạo bảng `api_tokens` mới — tái dùng `api_keys`** (0061: hash sha256, thu hồi, rate limit cả nhánh fail, audit trigger, org_id, admin UI sẵn) — DDL nháp trong spec viết trước khi rà hiện trạng; bảng song song vi phạm "tái dùng trước khi viết mới".
+- **`migrations/0133_cad_device_pairing.sql`** (thêm thuần → đi thẳng production theo DoD): `api_keys` + `expires_at`/`device_name`; bảng `cad_device_pairings` (device flow: `user_code` XXXX-XXXX bảng chữ không nhập nhằng cho người gõ, `device_code` bí mật 256-bit chỉ lưu sha256, TTL 10 phút, status pending/confirmed/claimed/denied) + audit trigger như 0061. `docs/ERD.md` đã regen từ schema thật.
+- **`lib/bao-mat/cad-devices.ts`**: createPairing/confirmPairing/claimPairing (key scope `{cad}` SINH TẠI THỜI ĐIỂM CLAIM — key thô không bao giờ nằm trong DB, trả đúng 1 lần, claim atomic `UPDATE ... WHERE status='confirmed'` chống double-claim trong `withTransaction`), createCadToken (hạn 90 ngày, quy về người duyệt → quyền đi qua `CAN` như phiên thường), getCadTokenUser (Bearer → User). **Vá `verifyApiKey`** chặn key hết hạn (`expires_at` — key đọc-only cũ NULL = vô hạn, hành vi không đổi).
+- **Routes**: `POST /api/devices/pair` (public + rate limit `cad-pair` 10/15'/IP), `/confirm` (session + `CAN.manageDrawings`), `/claim` (rate limit 300/15'/IP, deviceCode trong body POST không lên URL/access log, validate regex); `GET/POST /api/tokens` + `DELETE /api/tokens/:id` (chủ token hoặc Admin thu hồi, list không SELECT key_hash); route rule-pack nhận thêm **Bearer cad** (kiểm Bearer TRƯỚC cookies — nhanh cho plugin + test gọi handler trực tiếp được).
+- **Web**: trang `/engineering/thiet-bi-cad` (duyệt/từ chối mã ghép, danh sách + thu hồi token, tạo thủ công trả key 1 lần) + `e2e/authed/thiet-bi-cad.spec.ts` (render + axe — cổng merge trang mới theo audit.md). PR6 sẽ gộp vào bảng điều khiển chuẩn hóa.
+- **Plugin**: `XBoss.Cad.Core/Api/XBossApiClient.cs` (pair/claim-poll/rule-pack ETag, delay bơm từ ngoài để test không chờ thật) + 8 test xunit bằng HttpMessageHandler giả (tổng 78 ca C#); `XBoss.Cad.Acad`: lệnh `XBOSS_LOGIN` (async — không chặn UI AutoCAD, chỉ nhận https/loopback) + `CredentialStore` (P/Invoke advapi32, token vào Windows Credential Manager — NFR4, không tệp phẳng, không thêm NuGet) + tự tải rule pack sau ghép.
+- **Test TS `tests/cad-devices.test.ts`**: 12 ca — unit mã ghép (format/entropy), route-source (force-dynamic/auth/rate-limit/không lộ hash), integration trên Postgres thật (lifecycle pair→confirm→claim→Bearer gọi rule-pack 200 đủ 8 field; key đúng-1-lần; từ chối; hết hạn mã; AC7 thu hồi/hết hạn token → null; scope `read` không dùng được đường cad). Đã chạy thật 12/12 với TEST_DATABASE_URL (migration 0133 tự áp qua ensureSchema).
+- **Chưa làm (giữ trình tự M99)**: PR5 upload + kiểm định ezdxf (+ cột drawing_revisions), PR6 batch + bảng điều khiển + bỏ tầng 1, PR7 test tích hợp accoreconsole (chặn bởi runner Windows).
+
 ## M99 PR-A — Plugin AutoCAD C# (chuẩn hóa + bóc tách khối lượng) + rule pack v2 (2026-08-24)
 
 Người dùng yêu cầu (2026-08-24): bổ sung **BOCKL (bóc tách khối lượng) + xuất Excel ClosedXML** vào đặc tả M99 rồi triển khai trọn gói, "mọi quyết định đều ưu tiên chất lượng cao nhất". Nhánh `claude/autocad-csharp-plugin-ypi9nb`.

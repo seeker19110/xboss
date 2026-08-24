@@ -3273,6 +3273,8 @@
 | last_used_at | timestamptz | ✓ |  |
 | revoked_at | timestamptz | ✓ |  |
 | org_id | integer |  | `1` |
+| expires_at | timestamptz | ✓ |  |
+| device_name | text | ✓ |  |
 
 **Khóa ngoại:**
 - `created_by` → `users(id)`
@@ -3282,6 +3284,29 @@
 **Index:**
 - `api_keys_key_hash_key`: UNIQUE INDEX api_keys_key_hash_key ON public.api_keys USING btree (key_hash)
 - `api_keys_pkey`: UNIQUE INDEX api_keys_pkey ON public.api_keys USING btree (id)
+
+### cad_device_pairings
+
+| Cột | Kiểu | Null | Default |
+| --- | --- | --- | --- |
+| id | integer |  | `nextval('cad_device_pairings_id_seq'::regclass)` |
+| user_code | text |  |  |
+| device_code_hash | text |  |  |
+| device_name | text |  |  |
+| status | text |  | `'pending'::text` |
+| confirmed_by | integer | ✓ |  |
+| api_key_id | integer | ✓ |  |
+| created_at | timestamptz | ✓ | `now()` |
+| expires_at | timestamptz |  |  |
+
+**Khóa ngoại:**
+- `api_key_id` → `api_keys(id)`
+- `confirmed_by` → `users(id)`
+
+**Index:**
+- `cad_device_pairings_device_code_hash_key`: UNIQUE INDEX cad_device_pairings_device_code_hash_key ON public.cad_device_pairings USING btree (device_code_hash)
+- `cad_device_pairings_pkey`: UNIQUE INDEX cad_device_pairings_pkey ON public.cad_device_pairings USING btree (id)
+- `cad_device_pairings_user_code_key`: UNIQUE INDEX cad_device_pairings_user_code_key ON public.cad_device_pairings USING btree (user_code)
 
 ### custom_field_defs
 

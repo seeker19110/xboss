@@ -25,6 +25,8 @@ const WHITELIST: Record<string, string> = {
   projects: "danh sách dự án — bản thân là nguồn của project_id",
   users: "danh bạ người dùng dùng chung mọi dự án",
   "auth/totp": "trạng thái 2FA của user hiện tại (theo user_id, không theo dự án)",
+  tokens:
+    "token thiết bị AutoCAD của chính user (M99 PR2 — scope theo created_by + org_id, không theo dự án)",
   suppliers: "danh mục NCC dùng chung mọi dự án",
   "ui-texts": "nhãn UI cấu hình toàn hệ",
   "notifications/prefs": "tuỳ chọn thông báo theo người dùng, không theo dự án",
