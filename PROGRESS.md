@@ -63,12 +63,25 @@ nhận ra layer **đã đúng tiền tố quy ước** (VD `P-PIPE-3`, `M-EQPM`)
 trong từ điển — báo sai 0% cho layer thực ra đã chuẩn; và mẫu số điểm hình học ban đầu dùng tổng
 số thực thể thay vì tổng số đoạn (cùng lớp lỗi với bản TS ở trên).
 
-**Nợ kỹ thuật phát hiện, chưa xử lý:** `next.config.mjs` gắn `Cache-Control: immutable, max-age=1
+**Nợ kỹ thuật phát hiện, đã sửa luôn:** `next.config.mjs` gắn `Cache-Control: immutable, max-age=1
 năm` cho `/_next/static/*` không phân biệt dev/production — đúng cảnh báo Next.js tự in ra lúc
 khởi động (`Custom Cache-Control headers detected... can break Next.js development behavior`).
 Xác nhận thật: sửa code nhiều vòng, xoá cả `.next`, trình duyệt vẫn phục vụ bundle JS từ trước khi
 sửa (Turbopack dev đặt tên chunk ổn định theo đường dẫn, không hash theo nội dung như production).
 Đã sửa: header immutable giờ chỉ áp dụng khi `NODE_ENV === "production"`.
+
+**Vòng 2 cùng ngày — bản vá STYLE/LTYPE/DIMSTYLE ở trên tự sinh ra lỗi MỚI, nặng hơn.** Người dùng
+gửi file xuất từ code đã vá cho AutoCAD thật mở thử: `Skipping duplicate definition of Continuous
+in LTYPE Table` rồi `Invalid or incomplete DXF input -- drawing discarded`. Nguyên nhân: bản vá so
+khớp tên linetype/style/dimstyle **phân biệt hoa/thường**, trong khi AutoCAD **không** — layer
+dùng `Continuous` (đúng cách AutoCAD ghi tên linetype dựng sẵn) bị coi khác với `CONTINUOUS` (mảng
+cứng viết toàn hoa trong code), tạo 2 bản ghi LTYPE trùng tên khác hoa/thường. AutoCAD tự bỏ bớt
+bản ghi trùng lúc mở → **số bản ghi thật ít hơn số khai ở header bảng** (mã 70) → lệch nhịp đọc →
+hỏng lây bảng LAYER đọc ngay sau đó → huỷ cả bản vẽ. Sửa: so khớp cả 3 bảng (STYLE/LTYPE/DIMSTYLE)
+đều không phân biệt hoa/thường (so trên bản `.toUpperCase()`, giữ nguyên chữ hoa/thường gốc khi
+ghi ra bảng). Thêm test hồi quy riêng cho đúng cơ chế này — đối chiếu số bản ghi LTYPE thật với số
+khai ở header, không chỉ kiểm tên có mặt hay không (bài học: test trước chỉ kiểm "có khai tên" là
+chưa đủ, phải kiểm cả _số lượng bản ghi khớp header_ mới bắt được lớp lỗi lệch nhịp đọc này).
 
 ## Bảng mã 8 bit ở ĐƯỜNG CLIENT — chữ tiếng Việt mất ngay bước đọc tệp (2026-08-24)
 

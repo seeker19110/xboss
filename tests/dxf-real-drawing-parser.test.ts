@@ -1352,6 +1352,114 @@ test("exportDxf: STYLE/LTYPE/DIMSTYLE khai đủ tên mà thực thể tham chi�
   assert.equal(lai.entities.length, parsed.entities.length);
 });
 
+test("exportDxf: layer dùng tên linetype/style/dimstyle khác HOA/THƯỜNG so với tên dựng sẵn không tạo bản ghi trùng", () => {
+  // Hồi quy thật, người dùng báo 2026-08-24 — nặng hơn cả lỗi trước: AutoCAD báo
+  // "Skipping duplicate definition of Continuous in LTYPE Table" rồi "Invalid or incomplete DXF
+  // input -- drawing discarded". Nguyên nhân: bản vá STYLE/LTYPE/DIMSTYLE ở test phía trên so
+  // khớp PHÂN BIỆT hoa/thường, trong khi tên linetype/style trong AutoCAD KHÔNG phân biệt —
+  // layer dùng "Continuous" (hoa/thường như AutoCAD ghi thật) bị coi khác với "CONTINUOUS" (mảng
+  // dựng sẵn ở đây), tạo 2 bản ghi LTYPE cùng tên khác hoa/thường. AutoCAD tự bỏ bớt bản ghi
+  // trùng khi mở, khiến SỐ BẢN GHI THẬT ít hơn số khai trong header bảng (mã 70) — lệch nhịp đọc,
+  // làm hỏng lây bảng LAYER đọc ngay sau LTYPE, và AutoCAD huỷ cả bản vẽ.
+  const dxf = [
+    "0",
+    "SECTION",
+    "2",
+    "TABLES",
+    "0",
+    "TABLE",
+    "2",
+    "LAYER",
+    "0",
+    "LAYER",
+    "2",
+    "M-DUCT",
+    "62",
+    "3",
+    "6",
+    "Continuous",
+    "0",
+    "ENDTAB",
+    "0",
+    "ENDSEC",
+    "0",
+    "SECTION",
+    "2",
+    "ENTITIES",
+    "0",
+    "LINE",
+    "8",
+    "M-DUCT",
+    "6",
+    "continuous",
+    "10",
+    "0",
+    "20",
+    "0",
+    "30",
+    "0",
+    "11",
+    "1000",
+    "21",
+    "0",
+    "31",
+    "0",
+    "0",
+    "TEXT",
+    "8",
+    "M-DUCT",
+    "10",
+    "0",
+    "20",
+    "0",
+    "30",
+    "0",
+    "40",
+    "250",
+    "7",
+    "Standard",
+    "1",
+    "AHU-01",
+    "0",
+    "ENDSEC",
+    "0",
+    "EOF",
+  ].join("\n");
+
+  const parsed = parseDxf(dxf, "hoa_thuong.dxf");
+  const exported = exportDxf(parsed, { applyStandardLayers: false });
+
+  const demBanGhi = (bang: string, ten: string) => {
+    const start = exported.indexOf(`0\r\nTABLE\r\n2\r\n${bang}\r\n`);
+    const end = exported.indexOf(`0\r\nENDTAB`, start);
+    const than = exported.slice(start, end);
+    return (than.match(new RegExp(`2\\r\\n${ten}\\r\\n`, "gi")) || []).length;
+  };
+
+  assert.equal(
+    demBanGhi("LTYPE", "CONTINUOUS"),
+    1,
+    "Layer dùng 'Continuous' phải KHỚP linetype dựng sẵn 'CONTINUOUS', không tạo bản ghi trùng khác hoa/thường",
+  );
+  assert.equal(
+    demBanGhi("STYLE", "STANDARD"),
+    1,
+    "TEXT dùng style 'Standard' phải KHỚP style dựng sẵn 'STANDARD', không tạo bản ghi trùng khác hoa/thường",
+  );
+
+  // Số bản ghi thật trong bảng LTYPE phải khớp đúng số khai ở header (mã 70) — lệch số này chính
+  // là cơ chế gây hỏng bảng LAYER đọc ngay sau, dẫn tới AutoCAD huỷ cả bản vẽ.
+  const ltypeHeaderMatch = /0\r\nTABLE\r\n2\r\nLTYPE\r\n(?:(?!0\r\nTABLE).)*?70\r\n(\d+)\r\n/s.exec(
+    exported,
+  );
+  assert.ok(ltypeHeaderMatch, "Phải đọc được header bảng LTYPE");
+  const soKhaiBao = Number(ltypeHeaderMatch![1]);
+  const start = exported.indexOf("0\r\nTABLE\r\n2\r\nLTYPE\r\n");
+  const end = exported.indexOf("0\r\nENDTAB", start);
+  const soBanGhiThat = (exported.slice(start, end).match(/0\r\nLTYPE\r\n/g) || []).length;
+  assert.equal(soBanGhiThat, soKhaiBao, "Số bản ghi LTYPE thật phải khớp đúng số khai ở header");
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Khung nhìn lúc mở tệp (VPORT "*ACTIVE" + $VIEWCTR/$VIEWSIZE).
 //

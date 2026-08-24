@@ -3997,10 +3997,20 @@ export function exportDxf(
   // định nghĩa gốc của chúng nên dựng bằng nét liền (CONTINUOUS) làm hình mẫu, còn hơn để lại
   // tham chiếu treo (AutoCAD từ chối mở tệp có LAYER/thực thể trỏ tới LTYPE chưa khai báo, cùng
   // lớp lỗi với bảng STYLE thiếu kiểu chữ — xem ghi chú styleNames phía trên).
-  const knownLineTypeNames = new Set(lineTypes.map(([name]) => name));
-  const extraLineTypeNames = new Set<string>();
+  //
+  // So khớp KHÔNG PHÂN BIỆT HOA/THƯỜNG: tên linetype trong AutoCAD không phân biệt hoa/thường
+  // (bản ghi gốc thường là "Continuous", mảng dựng sẵn ở đây viết "CONTINUOUS" toàn hoa) — so
+  // khớp phân biệt hoa/thường từng làm AutoCAD tự "Skipping duplicate definition of Continuous"
+  // lúc mở, khiến số bản ghi THẬT ít hơn số khai trong header bảng LTYPE, lệch nhịp đọc và làm
+  // hỏng lây bảng LAYER ngay sau đó ("drawing discarded" — xác nhận thật bằng AutoCAD 2026-08-24).
+  const knownLineTypeNamesUpper = new Set(lineTypes.map(([name]) => name.toUpperCase()));
+  const extraLineTypeNames = new Map<string, string>(); // key hoa toàn bộ → tên gốc giữ lại
   const collectLineType = (name?: string) => {
-    if (name && !knownLineTypeNames.has(name)) extraLineTypeNames.add(name);
+    if (!name) return;
+    const key = name.toUpperCase();
+    if (!knownLineTypeNamesUpper.has(key) && !extraLineTypeNames.has(key)) {
+      extraLineTypeNames.set(key, name);
+    }
   };
   layers.forEach((l) => collectLineType(l.lineType));
   entities.forEach((e) => collectLineType(e.lineType));
@@ -4049,14 +4059,22 @@ export function exportDxf(
   // mở tệp (dangling reference), trong khi `ezdxf` chỉ âm thầm xoá tham chiếu lỗi nên không lộ
   // ra khi kiểm bằng ezdxf. Xác nhận thật trên bản vẽ MEPF 65MB: thiếu 20+ style, AutoCAD không
   // mở lên được cho tới khi vá bằng đúng dòng quét thêm này.
+  // So khớp không phân biệt hoa/thường — cùng lý do đã sửa ở LTYPE phía trên (tên style trong
+  // AutoCAD cũng không phân biệt hoa/thường; định nghĩa trùng dù khác hoa/thường vẫn làm lệch
+  // nhịp đọc bảng theo đúng cơ chế đã xác nhận thật).
+  const styleNamesUpperSeen = new Set<string>(["STANDARD"]);
   const styleNames = new Set<string>(["STANDARD"]);
-  entities.forEach((e) => {
-    if (e.textStyle) styleNames.add(e.textStyle);
-  });
+  const addStyleName = (name?: string) => {
+    if (!name) return;
+    const key = name.toUpperCase();
+    if (!styleNamesUpperSeen.has(key)) {
+      styleNamesUpperSeen.add(key);
+      styleNames.add(name);
+    }
+  };
+  entities.forEach((e) => addStyleName(e.textStyle));
   (parsed.blocks || []).forEach((b) => {
-    b.entities?.forEach((e) => {
-      if (e.textStyle) styleNames.add(e.textStyle);
-    });
+    b.entities?.forEach((e) => addStyleName(e.textStyle));
   });
   than += openTable("STYLE", hStyleTab, styleNames.size);
   const styleHandles = new Map<string, string>();
@@ -4081,9 +4099,16 @@ export function exportDxf(
   // Bảng DIMSTYLE khai lớp riêng (AcDbDimStyleTable) và đếm bằng mã 71 — cùng lỗi "tham chiếu
   // treo" như STYLE/LTYPE ở trên: DIMENSION/LEADER (mã 3) có thể trỏ tới dimstyle khác STANDARD
   // (VD dimstyle riêng do Revit xuất), phải khai đủ thay vì chỉ mỗi STANDARD.
+  // Cũng so khớp không phân biệt hoa/thường — cùng lý do đã sửa ở STYLE/LTYPE phía trên.
+  const dimStyleNamesUpperSeen = new Set<string>(["STANDARD"]);
   const dimStyleNames = new Set<string>(["STANDARD"]);
   const collectDimStyle = (name?: string) => {
-    if (name) dimStyleNames.add(name);
+    if (!name) return;
+    const key = name.toUpperCase();
+    if (!dimStyleNamesUpperSeen.has(key)) {
+      dimStyleNamesUpperSeen.add(key);
+      dimStyleNames.add(name);
+    }
   };
   entities.forEach((e) => collectDimStyle(e.dimStyle));
   (parsed.blocks || []).forEach((b) => b.entities?.forEach((e) => collectDimStyle(e.dimStyle)));
