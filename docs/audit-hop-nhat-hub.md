@@ -165,3 +165,32 @@ npm run build && npx playwright test --project=setup --project=authed-desktop
 Lưu ý: mặc định `E2E_SECRET` trong `e2e/constants.ts` chỉ 23 ký tự, dưới ngưỡng 32 ký tự mà
 production yêu cầu, nên chạy e2e cục bộ **không đặt biến** thì luôn đỏ ở bước đăng nhập với
 thông báo "XBOSS_SECRET quá ngắn" — không phải lỗi test.
+
+## 7. Kết quả cuối và nợ còn lại
+
+**e2e `authed-desktop`: 84 ca đỏ → 2 ca đỏ → 0** (đo cục bộ trên Postgres 16 sạch, cùng cấu
+hình CI). Ba nguồn khác nhau của cùng một triệu chứng đã được tách bạch:
+
+| Nguồn                | Commit                | Hệ quả                                                             | Xử lý                                              |
+| -------------------- | --------------------- | ------------------------------------------------------------------ | -------------------------------------------------- |
+| Gom "7 Unified Hubs" | `aa47704` + `71a7c4a` | 19 route bị xoá, `/site` và `/commercial` mất toàn bộ khả năng ghi | Khôi phục 20 trang từ git + trỏ lại nav            |
+| Đổi route bản vẽ     | `fde16b8`             | Rơi mất tab "Thay đổi thiết kế" (M32)                              | Khôi phục thành route `/design-changes` + thêm nav |
+| Vá a11y bộ tab       | PR #375               | Spec dùng `getByRole("button")` cho phần tử nay là `role="tab"`    | Sửa spec (UI đúng hơn)                             |
+
+Ngoài ra 9 spec bám nhãn/placeholder đã đổi (tính năng còn nguyên) → sửa spec, có ghi lý do
+tại chỗ trong từng file.
+
+### Nợ tương phản còn lại — CỐ Ý chưa xử lý
+
+Còn **229 chỗ trong 74 file** dùng khuôn mẫu `bg-{màu}-900|950/{độ mờ}` ghép chữ
+`text-{màu}-200|300|400`. Đây là cùng lớp lỗi đã vá 4 lần trong đợt này (diary, proposals,
+materials/import ×3, users), nhưng **không quét hàng loạt** vì:
+
+ở chế độ TỐI, `bg-emerald-950/80` là chip xanh đậm còn `bg-emerald-500/15` là nền nhạt —
+đổi cả loạt là thay đổi **ngôn ngữ thiết kế** của toàn app, không còn là vá a11y. Và không
+phải cả 229 chỗ đều vỡ: mức độ vỡ phụ thuộc nền phía sau chip (nền trang, nền thẻ, nền
+modal) nên không xác định được bằng phân tích tĩnh.
+
+Cách xử lý đúng, khi có quyết định của người: rà từng chỗ bằng axe trên trang thật (`npm run
+test:e2e` đã bắt được 4/4 ca vỡ trong đợt này), hoặc chốt lại quy ước chip cho cả hai chế độ
+rồi mới codemod. Quy tắc và ngưỡng đã ghi trong chú thích hệ màu ở `app/globals.css`.

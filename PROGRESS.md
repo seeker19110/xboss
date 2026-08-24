@@ -29,6 +29,18 @@ người chốt "hub thế là đủ" hay "phải khôi phục". Viết lại sp
 e2e xanh, nhưng nếu đợt gom lỡ làm mất tính năng thật thì nó xoá luôn tín hiệu duy nhất còn
 báo điều đó.
 
+**Kết quả (2026-08-24):** e2e `authed-desktop` từ **84 ca đỏ → 0**. Khôi phục 20 trang
+(13.770 dòng) từ git + route `/design-changes`; vá nợ tương phản (113 chuỗi class qua token
+`--on-accent-dark` mới, đối xứng với `--on-accent` sẵn có, cộng 7 chỗ nền mờ màu tối); sửa 9
+spec bám nhãn đã đổi. Ba nguồn hồi quy khác nhau đã tách bạch — xem bảng §7 trong
+`docs/audit-hop-nhat-hub.md`.
+
+**Còn nợ, CỐ Ý chưa làm:** 229 chỗ trong 74 file dùng `bg-{màu}-900|950/{mờ}` + chữ
+`-200/-300/-400`. Không quét hàng loạt vì ở chế độ tối đó là chip đậm, đổi sang nền mờ nhạt
+là thay đổi ngôn ngữ thiết kế chứ không phải vá a11y; và không phải chỗ nào cũng vỡ (phụ
+thuộc nền phía sau, không xác định được bằng phân tích tĩnh). Cần người chốt quy ước chip
+trước khi codemod.
+
 ### Nợ kèm theo, đã định lượng
 
 - **Tương phản màu hai chiều** (không phải chỉ chế độ sáng như ghi nhận cũ): 113 chỗ nền màu

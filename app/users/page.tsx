@@ -226,7 +226,7 @@ export default function UsersPage() {
                   <td className="p-3.5 font-medium text-zinc-200">
                     {u.name}
                     {me?.id === u.id && (
-                      <span className="ml-2 text-[10px] font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-800/60 px-1.5 py-0.5 rounded-md">
+                      <span className="ml-2 text-[10px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded-md">
                         (bạn)
                       </span>
                     )}
