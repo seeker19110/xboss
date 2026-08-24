@@ -3,6 +3,7 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   processSmartIpcRelease,
+  fetchSmartIpcGatingContext,
   saveSmartIpcRecord,
   listSmartIpcRecords,
   SmartIpcCalculationInput,
@@ -33,7 +34,7 @@ export async function GET() {
   }
 }
 
-// POST /api/engineering/smart-ipc — Thẩm định 4 cổng và phát hành Smart IPC
+// POST /api/engineering/smart-ipc — Thẩm định 4 cổng (đọc dữ liệu thật) và phát hành Smart IPC
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -49,24 +50,45 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
+
+    // grossClaimedVnd trước đây có default 500.000.000 khi client bỏ trống — nay bắt buộc,
+    // thiếu → 422 (không tự bịa số tiền xin thanh toán).
+    if (body.grossClaimedVnd == null || String(body.grossClaimedVnd).trim() === "") {
+      return NextResponse.json(
+        { error: "Thiếu grossClaimedVnd — không thể tự động điền giá trị mặc định" },
+        { status: 422 },
+      );
+    }
+    if (!body.ipcNumber || !body.periodMonth || !body.contractorName) {
+      return NextResponse.json(
+        { error: "Thiếu ipcNumber/periodMonth/contractorName" },
+        { status: 422 },
+      );
+    }
+
     const input: SmartIpcCalculationInput = {
-      ipcNumber: body.ipcNumber || `IPC-AUTO-${Date.now().toString(36).toUpperCase()}`,
-      periodMonth: body.periodMonth || "2026-08",
-      contractorName: body.contractorName || "Tổng Thầu MEPF Chuyên Nghiệp",
-      grossClaimedVnd: parseFloat(body.grossClaimedVnd) || 500000000.0,
-      retentionPercent: parseFloat(body.retentionPercent) || 5.0,
-      gating: {
-        scanToBimMaxDevMm: parseFloat(body.gating?.scanToBimMaxDevMm ?? 12.0),
-        bbntSigned3Parties: body.gating?.bbntSigned3Parties !== false,
-        iotPressureDropBar: parseFloat(body.gating?.iotPressureDropBar ?? 0.0),
-        iotTestDurationHours: parseFloat(body.gating?.iotTestDurationHours ?? 2.5),
-        claimedQty: parseFloat(body.gating?.claimedQty ?? 100),
-        approvedBoqQty: parseFloat(body.gating?.approvedBoqQty ?? 100),
-        warehouseUsedQty: parseFloat(body.gating?.warehouseUsedQty ?? 120),
+      ipcNumber: String(body.ipcNumber),
+      periodMonth: String(body.periodMonth),
+      contractorName: String(body.contractorName),
+      grossClaimedVnd: String(body.grossClaimedVnd),
+      retentionPercent:
+        body.retentionPercent != null ? Number(body.retentionPercent) : undefined,
+      refs: {
+        scanCode: body.refs?.scanCode ? String(body.refs.scanCode) : undefined,
+        bbntEnvelopeId: body.refs?.bbntEnvelopeId ? String(body.refs.bbntEnvelopeId) : undefined,
+        iotDeviceId: body.refs?.iotDeviceId ? String(body.refs.iotDeviceId) : undefined,
+        iotWindowHours:
+          body.refs?.iotWindowHours != null ? Number(body.refs.iotWindowHours) : undefined,
+        boqCode: body.refs?.boqCode ? String(body.refs.boqCode) : undefined,
+        claimedQty: body.refs?.claimedQty != null ? Number(body.refs.claimedQty) : undefined,
       },
     };
 
-    const result = processSmartIpcRelease(input);
+    // Mọi cổng gating đọc từ nguồn thật (esign envelope, log IoT, BOQ/kho) — client chỉ khai
+    // định danh tham chiếu, không tự khai kết quả đạt/không đạt. Thiếu tham chiếu → cổng đó
+    // trả `khong_du_du_lieu` và chặn giải ngân (xem evaluateSmartIpcGates).
+    const gateCtx = await fetchSmartIpcGatingContext(projectId, input.refs);
+    const result = processSmartIpcRelease(input, gateCtx);
     const saved = await saveSmartIpcRecord(projectId, result, user.id);
 
     return NextResponse.json({

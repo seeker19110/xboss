@@ -1,5 +1,17 @@
 import { query, queryOne, withProjectScope, withTransaction } from "@/lib/db";
 
+/**
+ * ⚠️ TRẠNG THÁI THỬ NGHIỆM (V5 — trung thực hoá dữ liệu hiển thị, 2026-08-24):
+ * Copilot Zalo hiện **chỉ ghi log tin nhắn** vào `zalo_site_message_logs`/
+ * `zalo_field_action_dispatches`, KHÔNG ghi vào `tasks`/`ncrs`/`materials`/e-Sign hay bất kỳ
+ * bảng nghiệp vụ nào. Mọi reply bên dưới phải phản ánh đúng thực tế này — không được ngụ ý
+ * "đã cập nhật WBS"/"đã tạo NCR"/"đã gửi TVGS" nếu chưa thật sự làm vậy. Việc nối dữ liệu thật
+ * là tính năng riêng, cần đặc tả sau (xem PLAN.md việc V5, quyết định đã chốt: không wire
+ * trong đợt này).
+ */
+
+const GHI_CHU_THU_NGHIEM = "⚠️ Bot đang ở chế độ thử nghiệm";
+
 export type ZaloIntentType =
   | "PROGRESS_UPDATE"
   | "CREATE_NCR"
@@ -172,22 +184,22 @@ export async function processIncomingZaloMessage(params: {
 
   switch (parsed.intent) {
     case "PROGRESS_UPDATE":
-      replyText = `✅ Đã ghi nhận sản lượng: ${parsed.summary} Dữ liệu đã được cập nhật vào tiến độ WBS dự án!`;
+      replyText = `Đã ghi nhận yêu cầu báo sản lượng: ${parsed.summary} Yêu cầu đang chờ xử lý, **chưa** cập nhật vào tiến độ WBS dự án. Vui lòng cập nhật trên ứng dụng XBoss để ghi nhận chính thức.\n${GHI_CHU_THU_NGHIEM}`;
       actionDispatched = true;
       break;
 
     case "CREATE_NCR":
-      replyText = `⚠️ Đã tạo Phiếu ghi nhận sự cố / Không phù hợp (NCR) mức độ [${parsed.entities.severity}]. Kỹ sư QA/QC sẽ thẩm tra trong 2 giờ.`;
+      replyText = `Đã ghi nhận yêu cầu báo lỗi thi công mức độ [${parsed.entities.severity}]. Yêu cầu đang chờ xử lý, **chưa** tạo Phiếu NCR và QA/QC **chưa** được thông báo. Vui lòng lập NCR trên ứng dụng XBoss.\n${GHI_CHU_THU_NGHIEM}`;
       actionDispatched = true;
       break;
 
     case "CHECK_MATERIAL_STOCK":
-      replyText = `📦 Tồn kho [${parsed.entities.materialCode}]: Hiện còn 180 đơn vị tại Kho Tổng A. Sẵn sàng cấp phát thi công.`;
+      replyText = `Tính năng tra cứu vật tư qua bot đang thử nghiệm, chưa nối dữ liệu tồn kho thật — vui lòng tra trên ứng dụng XBoss.\n${GHI_CHU_THU_NGHIEM}`;
       actionDispatched = true;
       break;
 
     case "REQUEST_BBNT":
-      replyText = `📋 Đã lập Phiếu yêu cầu nghiệm thu (RFA). Thông báo đã được gửi tới TVGS và Kỹ sư trưởng qua hệ thống ký số e-Sign!`;
+      replyText = `Đã ghi nhận yêu cầu mở đợt nghiệm thu (RFA). Yêu cầu đang chờ xử lý, **chưa** lập phiếu và TVGS/Kỹ sư trưởng **chưa** được thông báo. Vui lòng lập yêu cầu nghiệm thu trên ứng dụng XBoss.\n${GHI_CHU_THU_NGHIEM}`;
       actionDispatched = true;
       break;
 
