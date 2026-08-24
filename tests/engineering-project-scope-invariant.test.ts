@@ -14,9 +14,14 @@ import { join } from "node:path";
 // /api/engineering/cad/save-drawing.
 //
 // Heuristic TĨNH (đọc source, không cần DB): file route trong `app/api/engineering/**` chứa
-// `body.projectId` hoặc `formData.get("projectId")` PHẢI đồng thời tham chiếu
-// `chotProjectIdChoGhi` (hàm đối chiếu với `visibleProjectIds`), hoặc nằm trong WHITELIST
-// dưới kèm lý do. Route MỚI viết lại mẫu cũ mà không giải trình → test đỏ.
+// `body.projectId`, `formData.get("projectId")` hoặc `searchParams.get("projectId")` PHẢI
+// đồng thời chốt giá trị đó qua `chotProjectIdChoGhi` (hàm đối chiếu với `visibleProjectIds`),
+// hoặc nằm trong WHITELIST dưới kèm lý do. Route MỚI viết lại mẫu cũ mà không giải trình → đỏ.
+//
+// Vòng vá 2 (reviewer bắt): bản đầu của test này CHỈ soi body/formData nên mù hoàn toàn với
+// query string — `hse-vision/scans` và `cashflow/forecasts` vẫn đọc chéo dự án được bằng
+// `GET ...?projectId=<dự án khác>` (IDOR) mà `timRouteViPham()` vẫn trả `[]`. Đúng lớp lỗi B1,
+// chỉ đổi kênh nhập liệu — nên bộ kiểm phải phủ cả ba kênh client gửi vào.
 
 // Đường dẫn tương đối app/api/engineering/<key>/route.ts. Mỗi mục kèm lý do cụ thể.
 const WHITELIST: Record<string, string> = {
@@ -48,12 +53,14 @@ const GOC = join(process.cwd(), "app", "api", "engineering");
  * Không chỉ kiểm "file có nhắc tới chotProjectIdChoGhi" — như thế một dòng import hoặc một
  * comment còn sót lại cũng đủ làm test mù. Thay vào đó: cắt bỏ nguyên các câu lệnh gọi
  * `chotProjectIdChoGhi(...)` (giá trị client là tham số của nó = đã được đối chiếu quyền),
- * phần còn lại mà vẫn còn `body.projectId`/`formData.get("projectId")` là dùng trần.
+ * phần còn lại mà vẫn còn một trong ba kênh dưới là dùng trần.
  */
 function conNhanProjectIdTran(src: string): boolean {
   const conLai = src.replace(/chotProjectIdChoGhi\([\s\S]*?\);/g, "");
   return (
-    /\bbody\.projectId\b/.test(conLai) || /formData\.get\(\s*["']projectId["']\s*\)/.test(conLai)
+    /\bbody\.projectId\b/.test(conLai) ||
+    /formData\.get\(\s*["']projectId["']\s*\)/.test(conLai) ||
+    /searchParams\.get\(\s*["']projectId["']\s*\)/.test(conLai)
   );
 }
 
@@ -73,7 +80,7 @@ test("route engineering không được tin projectId client gửi", () => {
   assert.deepEqual(
     timRouteViPham(),
     [],
-    "Route lấy projectId từ body/formData mà không chốt qua chotProjectIdChoGhi " +
+    "Route lấy projectId từ body/formData/query mà không chốt qua chotProjectIdChoGhi " +
       "(xem lib/ha-tang/projects.ts) — sửa route hoặc bổ sung WHITELIST kèm lý do",
   );
 });
