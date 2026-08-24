@@ -415,7 +415,7 @@ export default function AutoRoutingPage() {
                     type="button"
                     onClick={handleRunSpatialClash}
                     disabled={spatialClashLoading}
-                    className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1 text-xs font-medium text-white hover:bg-sky-500 disabled:opacity-50"
+                    className="flex items-center gap-1.5 rounded-lg bg-sky-700 px-3 py-1 text-xs font-medium text-on-accent hover:bg-sky-500 disabled:opacity-50"
                   >
                     <Play size={11} />
                     {spatialClashLoading ? "Đang quét..." : "Quét Va Chạm O(n log n)"}
@@ -540,7 +540,7 @@ export default function AutoRoutingPage() {
 
               <button
                 type="submit"
-                className="w-full rounded-lg bg-emerald-600 py-1.5 text-xs font-medium text-white hover:bg-emerald-500"
+                className="w-full rounded-lg bg-emerald-700 py-1.5 text-xs font-medium text-on-accent hover:bg-emerald-500"
               >
                 Kiểm Chuẩn & Thêm Vào Bảng Sleeve
               </button>

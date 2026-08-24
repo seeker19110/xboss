@@ -382,7 +382,7 @@ export default function IotTelemetryPage() {
                 <button
                   type="submit"
                   disabled={simulating}
-                  className="mt-2 flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-teal-700 hover:bg-teal-600 font-semibold text-white transition shadow-lg shadow-teal-900/30"
+                  className="mt-2 flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-teal-700 hover:bg-teal-600 font-semibold text-on-accent transition shadow-lg shadow-teal-900/30"
                 >
                   <PlusCircle className={`w-4 h-4 ${simulating ? "animate-spin" : ""}`} />
                   {simulating ? "Đang gửi..." : "Gửi Telemetry Mới"}

@@ -583,7 +583,7 @@ export default function EngineeringNav() {
                     onClick={() => setSelectedCategory(cat.key)}
                     className={`min-h-[36px] whitespace-nowrap rounded-xl px-3 py-1.5 text-xs font-medium transition-all flex items-center gap-1.5 ${
                       selectedCategory === cat.key
-                        ? "bg-emerald-600 text-white shadow-sm font-semibold"
+                        ? "bg-emerald-700 text-on-accent shadow-sm font-semibold"
                         : "bg-zinc-900/90 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 border border-zinc-800/80"
                     }`}
                   >

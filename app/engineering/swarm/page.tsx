@@ -373,7 +373,7 @@ export default function SwarmEngineeringPage() {
                     </div>
                     <button
                       onClick={handleGenerateDraft}
-                      className="flex items-center gap-2 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-emerald-500"
+                      className="flex items-center gap-2 rounded-lg bg-emerald-700 px-3.5 py-1.5 text-xs font-bold text-on-accent transition-colors hover:bg-emerald-500"
                     >
                       <FileCheck size={14} />
                       Soạn thảo RFI / Hồ sơ Trình duyệt Tự động

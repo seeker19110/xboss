@@ -471,7 +471,7 @@ function ScheduleControlContent() {
             </button>
             <button
               onClick={() => alert("Đang xuất file Excel báo cáo tiến độ...")}
-              className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow transition flex items-center gap-1.5"
+              className="px-3.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-on-accent text-xs font-semibold shadow transition flex items-center gap-1.5"
             >
               <Download className="w-3.5 h-3.5" /> Xuất Excel Đa Tab
             </button>

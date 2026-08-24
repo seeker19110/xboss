@@ -291,7 +291,7 @@ export default function DigitalTwinPage() {
             <button
               type="submit"
               disabled={loading || !searchKey.trim()}
-              className="flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500 disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-on-accent hover:bg-amber-500 disabled:opacity-50"
             >
               <Cpu size={16} />
               <span>{loading ? "Đang tra cứu..." : "Xem Digital Twin"}</span>
@@ -367,7 +367,7 @@ export default function DigitalTwinPage() {
                   <button
                     type="button"
                     onClick={() => setOpenAddState(true)}
-                    className="flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-600"
+                    className="flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-medium text-on-accent hover:bg-emerald-600"
                   >
                     <Activity size={13} /> Ghi trạng thái L3
                   </button>
@@ -704,7 +704,7 @@ export default function DigitalTwinPage() {
                   type="button"
                   disabled={savingState || !stateTypeInput.trim()}
                   onClick={handleSaveState}
-                  className="rounded-lg bg-emerald-700 px-3 py-1.5 font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
+                  className="rounded-lg bg-emerald-700 px-3 py-1.5 font-medium text-on-accent hover:bg-emerald-600 disabled:opacity-50"
                 >
                   {savingState ? "Đang lưu..." : "Lưu snapshot"}
                 </button>
@@ -769,7 +769,7 @@ export default function DigitalTwinPage() {
                   type="button"
                   disabled={savingBinding || !bindingKeyInput.trim()}
                   onClick={handleSaveBinding}
-                  className="rounded-lg bg-amber-600 px-3 py-1.5 font-medium text-white hover:bg-amber-500 disabled:opacity-50"
+                  className="rounded-lg bg-amber-700 px-3 py-1.5 font-medium text-on-accent hover:bg-amber-500 disabled:opacity-50"
                 >
                   {savingBinding ? "Đang gán..." : "Gán liên kết"}
                 </button>

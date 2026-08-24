@@ -159,7 +159,7 @@ export default function PredictionsPage() {
                 type="button"
                 onClick={handleRunPrediction}
                 disabled={running}
-                className="flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-xs font-semibold text-white hover:bg-amber-500 disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-lg bg-amber-700 px-4 py-2 text-xs font-semibold text-on-accent hover:bg-amber-500 disabled:opacity-50"
               >
                 <Play size={14} />
                 <span>{running ? "Đang suy luận..." : "Chạy dự báo mới"}</span>
@@ -247,7 +247,7 @@ export default function PredictionsPage() {
                           <button
                             type="button"
                             onClick={() => handleDecide(p.id, "accepted")}
-                            className="flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-600"
+                            className="flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-medium text-on-accent hover:bg-emerald-600"
                           >
                             <CheckCircle2 size={13} /> Tiếp nhận
                           </button>

@@ -278,7 +278,7 @@ export default function NextGenApexEngineeringPage() {
             onClick={() => setActiveTab("smart_ipc")}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
               activeTab === "smart_ipc"
-                ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/30"
+                ? "bg-emerald-700 text-on-accent shadow-lg shadow-emerald-600/30"
                 : "bg-zinc-900 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850"
             }`}
           >
@@ -288,7 +288,7 @@ export default function NextGenApexEngineeringPage() {
             onClick={() => setActiveTab("fidic_tia")}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
               activeTab === "fidic_tia"
-                ? "bg-amber-600 text-white shadow-lg shadow-amber-600/30"
+                ? "bg-amber-700 text-on-accent shadow-lg shadow-amber-600/30"
                 : "bg-zinc-900 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850"
             }`}
           >
@@ -659,7 +659,7 @@ export default function NextGenApexEngineeringPage() {
               <button
                 onClick={handleProcessIpc}
                 disabled={isProcessingIpc}
-                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition-all disabled:opacity-50"
+                className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-500 text-on-accent font-bold rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition-all disabled:opacity-50"
               >
                 {isProcessingIpc ? (
                   <RotateCcw className="w-4 h-4 animate-spin" />
@@ -827,7 +827,7 @@ export default function NextGenApexEngineeringPage() {
               <button
                 onClick={handleAnalyzeTia}
                 disabled={isAnalyzingTia}
-                className="w-full py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-amber-600/30 transition-all disabled:opacity-50"
+                className="w-full py-2.5 bg-amber-700 hover:bg-amber-500 text-on-accent font-bold rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-amber-600/30 transition-all disabled:opacity-50"
               >
                 {isAnalyzingTia ? (
                   <RotateCcw className="w-4 h-4 animate-spin" />
