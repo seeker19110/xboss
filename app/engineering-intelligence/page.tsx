@@ -157,7 +157,7 @@ function EngineeringIntelligenceContent() {
           <div className="flex items-center gap-2">
             <Link
               href="/engineering/workflows"
-              className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-on-accent-dark font-semibold text-xs transition-colors flex items-center gap-1.5 shadow"
+              className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-on-accent-dark font-semibold text-xs transition-colors flex items-center gap-1.5 shadow"
             >
               <Workflow className="w-3.5 h-3.5" /> Luồng Phê Duyệt Gate 0
             </Link>
@@ -290,7 +290,7 @@ function EngineeringIntelligenceContent() {
           <div className="pt-2">
             <Link
               href="/engineering/autonomy"
-              className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-on-accent-dark font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
+              className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-on-accent-dark font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
             >
               <Sliders className="w-3.5 h-3.5" /> Bảng Điều Khiển Tự Trị (OS-4)
             </Link>
@@ -348,7 +348,7 @@ function EngineeringIntelligenceContent() {
           <div className="flex items-center gap-2">
             <Link
               href="/engineering/iot-telemetry"
-              className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-on-accent-dark font-semibold text-xs transition-colors flex items-center gap-1.5 shadow"
+              className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-on-accent-dark font-semibold text-xs transition-colors flex items-center gap-1.5 shadow"
             >
               <Activity className="w-3.5 h-3.5" /> IoT Telemetry (M83)
             </Link>
