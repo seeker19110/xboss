@@ -26,6 +26,9 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     await expect(sidebar.getByRole("link", { name: "Dashboard" })).toBeVisible({
       timeout: 15_000,
     });
+    // Mục "Tất cả bản vẽ" (/ban-ve) đã bỏ khỏi sidebar ở đợt gom hub: nhóm này nay liệt
+    // kê TỪNG LOẠI bản vẽ theo route riêng (/ban-ve-thiet-ke, /shopdrawings,
+    // /bien-phap-thi-cong, /ban-ve-hoan-cong) thay cho deep-link /drawings?kind=.
     // Ba nhãn dưới đây đổi ở đợt gom hub và nhãn mới rõ nghĩa hơn nhãn cũ
     // ("Chất lượng (QA/QC)", "Kho & Tồn kho", "Đơn hàng PO & PR") — sửa spec theo UI,
     // không đổi UI để chiều test.
@@ -36,7 +39,6 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
       "Định mức BOQ",
       "Chất lượng (QA/QC)",
       "Nhật ký",
-      "Tất cả bản vẽ",
       "Thiết kế",
       "Mô hình BIM",
       "Shop drawing",
@@ -98,9 +100,9 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
   });
 
   // Cụm "Thiết Kế-BIM-Shopdrawings" (gộp cụm "Bản vẽ (BIM-Shop)" cũ, nhãn hiển thị
-  // đổi từ "Thiết kế & BPTC"): "Tất cả bản vẽ" + 5 loại bản vẽ deep-link /drawings?kind=
-  // — sidebar là nơi duy nhất chọn loại, trang /drawings đã bỏ hàng chip lọc loại
-  // (chỉ còn chip trạng thái).
+  // đổi từ "Thiết kế & BPTC"): mỗi loại bản vẽ là một route riêng (/ban-ve-thiet-ke,
+  // /shopdrawings, /bien-phap-thi-cong, /ban-ve-hoan-cong) — thay cho deep-link
+  // /drawings?kind= và mục "Tất cả bản vẽ" đã bỏ. Trang bản vẽ không còn chip lọc loại.
   test("cụm 'Thiết Kế-BIM-Shopdrawings': link loại bản vẽ deep-link ?kind=, trang hết chip loại, mục đang xem sáng active", async ({
     page,
     isMobile,
@@ -117,20 +119,18 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     await expect(page).toHaveURL(/\/bien-phap-thi-cong$/);
 
     // Topbar hiển thị đúng loại đang xem; hàng chip lọc loại đã bỏ khỏi trang.
+    // Trang bản vẽ tự đặt title riêng (không lấy từ DASHBOARD_TREE): "QUẢN LÝ BẢN VẼ: <LOẠI>".
     await expect(
-      page.locator("header").getByText("Biện pháp thi công", { exact: true }),
+      page.locator("header").getByText("QUẢN LÝ BẢN VẼ: BIỆN PHÁP THI CÔNG", { exact: true }),
     ).toBeVisible();
     const main = page.getByRole("main");
     await expect(main.getByRole("button", { name: "Tất cả loại" })).toHaveCount(0);
 
-    // Link đúng loại sáng active (so khớp cả query), "Tất cả bản vẽ" không sáng chung.
+    // Link đúng loại sáng active.
     const sidebarAfter = await openSidebar(page, isMobile);
     await expect(
       sidebarAfter.getByRole("link", { name: "Biện pháp thi công", exact: true }),
     ).toHaveAttribute("aria-current", "page");
-    await expect(
-      sidebarAfter.getByRole("link", { name: "Tất cả bản vẽ", exact: true }),
-    ).not.toHaveAttribute("aria-current", "page");
   });
 
   test("dashboard nhóm gập/mở được, nhớ trạng thái sau khi tải lại (mặc định mở)", async ({
@@ -186,7 +186,9 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     // "Tổng quan" xuất hiện ở mọi nhóm — thu hẹp về đúng cụm "Thi công hiện trường" (div bọc ngoài button).
     const hienTruongGroup = toggle.locator("xpath=..");
 
-    await hienTruongGroup.getByRole("link", { name: "Tổng quan" }).click();
+    // Cụm này nay có nhiều nhóm con, mỗi nhóm một link "Tổng quan" → lấy link đầu tiên
+    // (của chính cụm) thay vì để strict mode báo khớp nhiều phần tử.
+    await hienTruongGroup.getByRole("link", { name: "Tổng quan" }).first().click();
     await expect(page).toHaveURL(/\/hub\/dash\.hien-truong$/);
     await expect(page.locator("header").getByText("Hiện trường", { exact: true })).toBeVisible();
     const hub = page.getByRole("main");
@@ -222,11 +224,16 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     const topbar = page.locator("header");
     await expect(topbar.getByText("Dashboard", { exact: true })).toBeVisible({ timeout: 15_000 });
 
-    await page.goto("/materials");
-    await expect(topbar.getByText("Vật tư", { exact: true })).toBeVisible({ timeout: 15_000 });
+    // Không dùng trang hub để kiểm title: hub tự dựng banner riêng (HubShell) chứ không
+    // lấy nhãn từ DASHBOARD_TREE. Dùng /my-tasks — trang render <AppHeader /> không truyền
+    // title nên title đến từ đúng cây điều hướng, tức là thứ test này muốn kiểm.
+    await page.goto("/my-tasks");
+    await expect(topbar.getByText("Việc của tôi", { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
     // Breadcrumb nhóm chỉ hiện từ sm trở lên (ẩn trên mobile để nhường chỗ cho hamburger).
     if (!isMobile) {
-      await expect(topbar.getByText("Quản lý vật tư")).toBeVisible();
+      await expect(topbar.getByText("Thi công hiện trường")).toBeVisible();
     }
   });
 
@@ -277,7 +284,11 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
 
     await page.getByRole("button", { name: "Mở menu" }).click();
     await expect(page.locator("#app-sidebar-mobile")).toBeInViewport();
-    await expect(page.getByRole("link", { name: "Vật tư" })).toBeVisible();
+    // Giới hạn trong drawer: nhãn nav cũng xuất hiện ở các thẻ hub trên dashboard nên
+    // selector không giới hạn sẽ khớp nhiều phần tử (strict mode violation).
+    await expect(
+      page.locator("#app-sidebar-mobile").getByRole("link", { name: "Kho & Tồn kho" }),
+    ).toBeVisible();
 
     await page.getByRole("button", { name: "Đóng menu" }).click();
     await expect(page.locator("#app-sidebar-mobile")).toHaveCount(0);

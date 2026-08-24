@@ -133,8 +133,10 @@ html.light {
   --color-red-400: #dc2626;
   --color-blue-300: #1d4ed8;
   --color-blue-400: #2563eb;
-  --color-orange-300: #c2410c;
-  --color-orange-400: #c2410c;
+  /* orange-800 thay vì -700: trên nền mờ cùng tông (bg-orange-500/10) shade -700 chỉ đạt
+     3,8-4,4:1, dưới ngưỡng AA. -800 đưa lên 5,3-6,2:1. Không dùng làm nền ở đâu nên an toàn. */
+  --color-orange-300: #9a3412;
+  --color-orange-400: #9a3412;
   --color-yellow-300: #a16207;
   --color-yellow-400: #a16207;
   --color-cyan-300: #0e7490;
