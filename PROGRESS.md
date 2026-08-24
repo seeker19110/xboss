@@ -105,6 +105,12 @@ tự ghi (1.521 HATCH trong tệp xuất đều được kiểm thẳng trên ch
 hành vi AutoCAD thật vênh nhau, **tin AutoCAD thật** — và bản vẽ nguồn (do AutoCAD ghi) chính là
 "đáp án mẫu" tốt nhất để đối chiếu từng mã nhóm.
 
+**✅ KẾT QUẢ CHỐT (2026-08-24, sau vòng 6): người dùng mở tệp xuất bằng AutoCAD thật — MỞ ĐƯỢC.**
+Đây là lần ĐẦU TIÊN bản vẽ MEPF thật (40.703 thực thể, 65,8 MB) đi trọn vòng: nạp vào XBoss →
+chuẩn hoá → xuất DXF → mở thành công trong AutoCAD. Mối lo ghi ở PR #384 ("Vẫn chưa ai mở tệp ĐÃ
+SỬA bằng AutoCAD") coi như đã trả xong nợ — bằng 6 bản vá nối tiếp, mỗi bản đều có test hồi quy
+chứng minh bắt được lỗi cũ.
+
 **Bài học rút ra sau 6 vòng cùng một triệu chứng "drawing discarded":** `ezdxf.audit()` không bắt
 được lỗi NÀO trong cả sáu (0 errors mỗi lần) — công cụ kiểm hợp lệ không thay được việc mở thử
 bằng chính AutoCAD thật, và tệ hơn: ezdxf còn TỰ CẤP bản ghi mặc định ảo khi đọc (ByBlock/ByLayer)
