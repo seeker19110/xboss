@@ -70,11 +70,18 @@ if (!process.env.TEST_DATABASE_URL) {
 const res = spawnSync(
   process.execPath,
   ["--experimental-test-coverage", join(root, "scripts", "run-tests.mjs")],
-  { cwd: root, encoding: "utf8", env: process.env },
+  // maxBuffer: mặc định spawnSync chỉ 1MiB — output coverage của 200+ file test đã ~0,8MB
+  // và VƯỢT trần trên runner CI (child bị kill ENOBUFS, output cụt giữa dòng, cổng đỏ oan
+  // dù mọi test xanh — đã xảy ra thật trên main + PR #389). Nới hẳn 64MiB.
+  { cwd: root, encoding: "utf8", env: process.env, maxBuffer: 64 * 1024 * 1024 },
 );
 const out = (res.stdout ?? "") + (res.stderr ?? "");
 process.stdout.write(out);
 
+if (res.error) {
+  console.error(`\n[LỖI] Không chạy được tiến trình đo coverage: ${res.error.message}`);
+  process.exit(1);
+}
 if (res.status !== 0) {
   console.error(
     "\n[LỖI] Bộ test không xanh (xem log ở trên) — không đo coverage trên một bộ test đang hỏng.",
