@@ -6,9 +6,12 @@ import AxeBuilder from "@axe-core/playwright";
 // (nhiều nút, select, cột) vẫn render — nơi thường có lỗi a11y (nút icon-only, tương phản).
 
 async function gotoMaterials(page: Page) {
-  await page.goto("/materials");
+  // Miền vật tư đã chuyển ĐÚNG sang hub /procurement ở đợt gom "7 Unified Hubs"
+  // (tab vẫn giữ đủ khả năng tạo/sửa, khác /site và /commercial). Neo vào tab của hub —
+  // phần tử ổn định — thay cho tiêu đề trang cũ đã không còn.
+  await page.goto("/procurement?tab=inventory");
   // Tab "Định Mức BOQ" render khi trang đã nạp xong.
-  await expect(page.getByRole("button", { name: /Định Mức BOQ/ })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("tab", { name: /Kho & Định Mức/ })).toBeVisible({ timeout: 15_000 });
 }
 
 test.describe("Vật tư (sau đăng nhập)", () => {

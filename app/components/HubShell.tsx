@@ -186,7 +186,11 @@ export default function HubShell({
                     <span
                       className={`rounded-full px-2 py-0.5 text-[10px] font-mono font-bold tabular-nums ${
                         isSelected
-                          ? "bg-amber-400/20 text-amber-300 border border-amber-400/30"
+                          ? // Nền chip dùng amber-500 (KHÔNG bị html.light đảo) thay vì amber-400:
+                            // shade -300/-400 đều bị đảo sang nâu đậm ở chế độ sáng nên nền mờ và
+                            // chữ hoá cùng một màu, tương phản sụp còn 4,08:1 (axe serious). Với
+                            // amber-500 làm nền, chữ -300 vẫn tự đảo: 5,71:1 (sáng) / 9,41:1 (tối).
+                            "bg-amber-500/15 text-amber-300 border border-amber-500/30"
                           : "bg-zinc-800/80 text-zinc-400 border border-zinc-700/50"
                       }`}
                     >
