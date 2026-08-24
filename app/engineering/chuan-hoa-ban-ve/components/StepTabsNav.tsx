@@ -63,11 +63,11 @@ export default function StepTabsNav({
               <span
                 className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black transition-all shrink-0 ${
                   isAutoHealing
-                    ? "bg-amber-500 text-zinc-950 shadow-md animate-pulse"
+                    ? "bg-amber-500 text-on-accent-dark shadow-md animate-pulse"
                     : healCompleted || totalHealthScore >= 90
-                      ? "bg-emerald-500 text-zinc-950 shadow-sm"
+                      ? "bg-emerald-500 text-on-accent-dark shadow-sm"
                       : activeStep === 1
-                        ? "bg-amber-500 text-zinc-950 shadow-sm"
+                        ? "bg-amber-500 text-on-accent-dark shadow-sm"
                         : "bg-zinc-800 text-zinc-300"
                 }`}
               >
@@ -85,7 +85,7 @@ export default function StepTabsNav({
                   <span
                     className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold flex items-center gap-1 transition ${
                       isAutoHealing
-                        ? "bg-amber-500 text-zinc-950 shadow-sm animate-pulse"
+                        ? "bg-amber-500 text-on-accent-dark shadow-sm animate-pulse"
                         : "bg-amber-500/20 text-amber-400 group-hover:bg-amber-500/30"
                     }`}
                   >
@@ -165,7 +165,7 @@ export default function StepTabsNav({
             <span
               className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black ${
                 activeStep === 2
-                  ? "bg-emerald-500 text-zinc-950 shadow-sm"
+                  ? "bg-emerald-500 text-on-accent-dark shadow-sm"
                   : "bg-zinc-800 text-zinc-300"
               }`}
             >
@@ -199,7 +199,7 @@ export default function StepTabsNav({
               onClick={() => setStep1SubTab("diagnostic_purge")}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition shrink-0 ${
                 step1SubTab === "diagnostic_purge"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-xs"
+                  ? "bg-amber-500 text-on-accent-dark font-bold shadow-xs"
                   : "bg-zinc-800/70 text-zinc-300 hover:text-white"
               }`}
             >
@@ -211,7 +211,7 @@ export default function StepTabsNav({
               onClick={() => setStep1SubTab("layers_font")}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition shrink-0 ${
                 step1SubTab === "layers_font"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-xs"
+                  ? "bg-amber-500 text-on-accent-dark font-bold shadow-xs"
                   : "bg-zinc-800/70 text-zinc-300 hover:text-white"
               }`}
             >
@@ -223,7 +223,7 @@ export default function StepTabsNav({
               onClick={() => setStep1SubTab("boq_dim_ctb")}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition shrink-0 ${
                 step1SubTab === "boq_dim_ctb"
-                  ? "bg-amber-500 text-zinc-950 font-bold shadow-xs"
+                  ? "bg-amber-500 text-on-accent-dark font-bold shadow-xs"
                   : "bg-zinc-800/70 text-zinc-300 hover:text-white"
               }`}
             >
@@ -235,7 +235,7 @@ export default function StepTabsNav({
               onClick={() => setStep1SubTab("xref_diff_lisp")}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition shrink-0 ${
                 step1SubTab === "xref_diff_lisp"
-                  ? "bg-sky-500 text-zinc-950 font-bold shadow-xs"
+                  ? "bg-sky-500 text-on-accent-dark font-bold shadow-xs"
                   : "bg-zinc-800/70 text-zinc-300 hover:text-white"
               }`}
             >

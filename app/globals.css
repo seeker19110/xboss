@@ -8,12 +8,21 @@
      chỉ đúng khi text nằm trên nền zinc cũng tự đảo cùng lúc, vd bg-zinc-950 text-white).
      Không khai báo lại trong bất kỳ html.<theme> nào — phải luôn là #ffffff. */
   --on-accent: #ffffff;
+  /* Đối xứng với --on-accent, dùng cho nền màu nhấn SÁNG (-500/-600 của amber, emerald,
+     cyan, sky, lime, yellow...). Ở các nền đó chữ trắng chỉ đạt 2,2-3,7:1 — dưới ngưỡng
+     WCAG AA — còn chữ gần đen đạt 5,4-9,3:1. Không dùng text-zinc-950 vì html.light ĐẢO
+     thang zinc: chữ sẽ hoá gần trắng ở chế độ sáng và tương phản sụp còn 2,0-3,2:1.
+     Cũng không khai báo lại trong bất kỳ html.<theme> nào — phải luôn là #09090b.
+     Chọn chữ theo ĐỘ SÁNG CỦA NỀN, không theo một luật chung: nền -700 trở lên (và
+     red-600) thì ngược lại, phải dùng --on-accent (trắng). */
+  --on-accent-dark: #09090b;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-on-accent: var(--on-accent);
+  --color-on-accent-dark: var(--on-accent-dark);
 }
 
 /* Chế độ tối (mặc định) — script trong layout gắn class theo localStorage('xboss_theme') */
@@ -124,8 +133,10 @@ html.light {
   --color-red-400: #dc2626;
   --color-blue-300: #1d4ed8;
   --color-blue-400: #2563eb;
-  --color-orange-300: #c2410c;
-  --color-orange-400: #c2410c;
+  /* orange-800 thay vì -700: trên nền mờ cùng tông (bg-orange-500/10) shade -700 chỉ đạt
+     3,8-4,4:1, dưới ngưỡng AA. -800 đưa lên 5,3-6,2:1. Không dùng làm nền ở đâu nên an toàn. */
+  --color-orange-300: #9a3412;
+  --color-orange-400: #9a3412;
   --color-yellow-300: #a16207;
   --color-yellow-400: #a16207;
   --color-cyan-300: #0e7490;
@@ -151,7 +162,13 @@ html.light {
      KHÔNG cần đảo nền vì cả nền lẫn chữ cùng giữ nguyên giá trị ở mọi theme. Badge/chip
      dùng chữ -300/-400 (ĐÃ đảo đậm cho mục đích "chữ thường trên nền trang") phải đổi
      sang -200 (không đảo, luôn sáng) khi ghép với nền chip cùng màu — xem các chỗ dùng
-     bg-{màu}-950/900/800 + text-{màu}-300/400 đã đổi thành text-{màu}-200 trong JSX. */
+     bg-{màu}-950/900/800 + text-{màu}-300/400 đã đổi thành text-{màu}-200 trong JSX.
+     NGOẠI LỆ QUAN TRỌNG của (2): quy tắc "chip tối + chữ -200" chỉ đúng khi nền ĐẶC.
+     Với nền MỜ (bg-{màu}-950/20, /40...) thì ở chế độ sáng, 20-40% màu tối phủ trên nền
+     trang sáng cho ra màu NHẠT, mà chữ -200 lại cố định sáng → tương phản sụp còn
+     1,2-1,9:1. Nền mờ phải dùng shade KHÔNG bị đảo làm nền (bg-{màu}-500/10) ghép với
+     chữ -300 (tự đảo): đạt ~7:1 ở chế độ sáng và ~10:1 ở chế độ tối. Xem
+     app/materials/import/page.tsx. */
 }
 
 body {

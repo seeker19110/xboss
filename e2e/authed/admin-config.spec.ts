@@ -16,6 +16,8 @@ async function checkAxeNoSerious(page: import("@playwright/test").Page) {
   expect(serious, JSON.stringify(serious, null, 2)).toEqual([]);
 }
 
+// Bộ tab /admin/permissions đã đổi từ <button> thường sang role="tab" ở đợt vá a11y
+// (axe báo aria-required-children: tablist chứa button thường) — spec dùng getByRole("tab").
 test.describe("Trang cấu hình /admin/* (sau đăng nhập)", () => {
   test("/admin/permissions — tab Ma trận quyền không vi phạm a11y nghiêm trọng (axe)", async ({
     page,
@@ -24,7 +26,7 @@ test.describe("Trang cấu hình /admin/* (sau đăng nhập)", () => {
     await expect(page.locator("header").getByText("Phân quyền", { exact: true })).toBeVisible({
       timeout: 15_000,
     });
-    await expect(page.getByRole("button", { name: "Ma trận quyền" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Ma trận quyền" })).toBeVisible();
     await checkAxeNoSerious(page);
   });
 
@@ -32,7 +34,7 @@ test.describe("Trang cấu hình /admin/* (sau đăng nhập)", () => {
     page,
   }) => {
     await page.goto("/admin/permissions");
-    const sodTab = page.getByRole("button", { name: "Báo cáo SoD" });
+    const sodTab = page.getByRole("tab", { name: "Báo cáo SoD" });
     await expect(sodTab).toBeVisible({ timeout: 15_000 });
     await sodTab.click();
     await checkAxeNoSerious(page);

@@ -316,7 +316,7 @@ export default function PrescriptiveAndCompliancePage() {
             </button>
             <button
               onClick={() => setShowSimModal(true)}
-              className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-zinc-950 hover:bg-amber-400"
+              className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-on-accent-dark hover:bg-amber-400"
             >
               <Plus size={16} />
               Mô phỏng Kịch bản What-If
@@ -717,7 +717,7 @@ export default function PrescriptiveAndCompliancePage() {
                 <button
                   disabled={scanning}
                   onClick={handleBatchScan}
-                  className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-zinc-950 hover:bg-amber-400"
+                  className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-on-accent-dark hover:bg-amber-400"
                 >
                   <Play size={16} />
                   {scanning ? "Đang quét..." : "Quét tuân thủ toàn dự án"}
@@ -968,7 +968,7 @@ export default function PrescriptiveAndCompliancePage() {
                   <button
                     type="submit"
                     disabled={simulating}
-                    className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-zinc-950 hover:bg-amber-400"
+                    className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-on-accent-dark hover:bg-amber-400"
                   >
                     {simulating ? "Đang giải..." : "Chạy mô phỏng Pareto"}
                   </button>

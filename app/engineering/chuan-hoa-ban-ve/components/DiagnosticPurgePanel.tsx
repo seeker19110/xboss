@@ -53,7 +53,7 @@ export default function DiagnosticPurgePanel({
           <div className="flex items-center gap-2">
             <button
               onClick={handleDownloadScr}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs shadow-sm transition"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-on-accent-dark font-bold text-xs shadow-sm transition"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Xuất Kịch Bản .SCR</span>
@@ -233,7 +233,7 @@ export default function DiagnosticPurgePanel({
 
           <button
             onClick={handleRunDeepPurge}
-            className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs shadow-sm transition flex items-center justify-center gap-1.5"
+            className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-on-accent-dark font-bold text-xs shadow-sm transition flex items-center justify-center gap-1.5"
           >
             <Trash2 className="w-3.5 h-3.5" />
             <span>Kích Hoạt Thuật Toán Deep Purge & Overkill</span>
@@ -359,7 +359,7 @@ export default function DiagnosticPurgePanel({
         </div>
         <button
           onClick={() => setStep1SubTab("layers_font")}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs transition"
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-on-accent-dark font-bold text-xs transition"
         >
           <span>Chuyển Sang Mục 2: Layer AIA & Bác Sĩ Font</span>
           <ArrowRight className="w-3.5 h-3.5" />
