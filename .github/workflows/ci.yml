@@ -9,26 +9,19 @@ on:
 permissions:
   contents: read
 
+# Đẩy commit mới lên cùng 1 PR thì huỷ ngay lượt CI cũ để trả runner về cho lượt mới
+# (trước đây lượt cũ chạy hết 7 phút vô ích, còn lượt mới phải xếp hàng chờ runner).
+# CỐ Ý chỉ huỷ trên PR: trên main, deploy.yml chờ `workflow_run` của workflow "CI" thành
+# công — huỷ lượt CI của một commit trên main là commit đó KHÔNG BAO GIỜ được deploy.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
-  ci:
+  # ── Nhóm kiểm tĩnh: không cần DB, không cần build ──
+  static:
+    name: static (lint, typecheck, check)
     runs-on: ubuntu-latest
-
-    # Postgres riêng cho test tích hợp (recompute.test.ts cần TEST_DATABASE_URL).
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: ci
-          POSTGRES_PASSWORD: ci
-          POSTGRES_DB: xboss_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U ci"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -37,7 +30,19 @@ jobs:
           node-version: 24
           cache: npm
 
+      # Cache thẳng node_modules (không chỉ ~/.npm): `npm ci` xoá rồi dựng lại toàn bộ cây
+      # thư mục nên vẫn tốn ~20s dù tarball đã nằm sẵn trong cache npm. Khoá theo
+      # package-lock.json + phiên bản Node → đổi thư viện là tự miss, không có rủi ro dùng
+      # nhầm cây phụ thuộc cũ.
+      - name: Cache node_modules
+        id: cache-node-modules
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: node_modules
+          key: node24-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
       - name: Cài dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Kiểm tra lỗ hổng dependencies (production)
@@ -68,9 +73,49 @@ jobs:
       - name: Kiểm ranh giới miền lib/
         run: npm run check:lib-layers
 
-      # "npm test" chạy từng file test trong 1 process Node riêng, tuần tự (xem
-      # scripts/run-tests.mjs) — cô lập để nhiều file cùng chạm 1 Postgres CI không đụng
-      # nhau gây fail ngẫu nhiên. Cùng lệnh với chạy test cục bộ (local === CI).
+  # ── Test đơn vị + tích hợp trên Postgres thật ──
+  test:
+    name: test (Postgres)
+    runs-on: ubuntu-latest
+
+    # Postgres riêng cho test tích hợp (recompute.test.ts cần TEST_DATABASE_URL).
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: xboss_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Cache node_modules
+        id: cache-node-modules
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: node_modules
+          key: node24-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Cài dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+
+      # "npm test" gọi scripts/run-tests.mjs: file KHÔNG chạm DB gộp chung 1 tiến trình,
+      # file chạm DB chạy song song mỗi worker MỘT database riêng (CREATE DATABASE ...
+      # TEMPLATE) nên song song mà vẫn cô lập. Cùng lệnh với chạy cục bộ (local === CI).
       # `--release-gate` (C4 §2): in số pass/fail/skip tới từng CA, và coi ca bị SKIP là LỖI
       # trừ khi file có lý do trong scripts/test-skip-allowlist.json. Trước đây runner chỉ
       # đếm SỐ FILE fail — chạy thiếu TEST_DATABASE_URL thì 358/698 ca tự skip mà bản tóm tắt
@@ -89,18 +134,52 @@ jobs:
         env:
           DATABASE_URL: postgres://ci:ci@localhost:5432/xboss_test
 
+  # ── Build production ──
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Cache node_modules
+        id: cache-node-modules
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: node_modules
+          key: node24-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Cài dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+
       - name: Build
         run: npm run build
         env:
           # Build không kết nối DB (Pool khởi tạo lazy) — chỉ cần biến tồn tại.
           DATABASE_URL: postgres://ci:ci@localhost:5432/xboss_test
 
-  # Gộp chung workflow "CI" với job `ci` ở trên (thay vì workflow "E2E" riêng) để
-  # deploy.yml (workflow_run: workflows: ["CI"]) chỉ coi là success khi CẢ HAI job
-  # đều pass — trước đây E2E là workflow độc lập chạy song song, deploy có thể
-  # trigger ngay cả khi E2E đang fail/chưa xong (đã bắt được ở đợt audit 2026-07-12).
-  e2e:
+  # ── E2E, chia 3 shard chạy song song ──
+  #
+  # Vì sao shard: đo trên run 1210, bước `npm run test:e2e` một mình chiếm 4 phút 48 giây
+  # trong tổng 7 phút của cả CI — đây là đường găng thật. Playwright chia đều spec theo
+  # `--shard=i/N` nên 3 runner song song rút bước này còn ~1/3. Mỗi shard có container
+  # Postgres RIÊNG (khai trong `services` bên dưới, GitHub dựng một bộ cho mỗi job của
+  # matrix) nên các shard không dùng chung dữ liệu, không cần đồng bộ gì với nhau.
+  e2e_shard:
+    name: e2e ${{ matrix.shard }}/3
     runs-on: ubuntu-latest
+
+    strategy:
+      # Một shard đỏ thì vẫn chạy nốt các shard còn lại — cần thấy ĐỦ ca hỏng trong một
+      # lượt, không phải sửa từng cái rồi chờ lượt sau lộ ra cái tiếp theo.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
 
     # Postgres test cho nhánh sau-auth (seed dữ liệu mẫu + tạo admin khi login).
     services:
@@ -136,8 +215,26 @@ jobs:
           node-version: 24
           cache: npm
 
+      - name: Cache node_modules
+        id: cache-node-modules
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: node_modules
+          key: node24-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
       - name: Cài dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: npm ci
+
+      # Cache bản Chromium Playwright tải về (~/.cache/ms-playwright). Khoá theo
+      # package-lock.json vì phiên bản trình duyệt gắn với phiên bản @playwright/test.
+      # Lệnh `playwright install` vẫn chạy dù cache trúng: nó cần cài thêm gói hệ thống
+      # (--with-deps) và tự nhận ra trình duyệt đã có sẵn nên không tải lại.
+      - name: Cache trình duyệt Playwright
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       - name: Cài trình duyệt Chromium
         run: npx playwright install --with-deps chromium
@@ -146,12 +243,45 @@ jobs:
         run: npm run build
 
       - name: Chạy E2E (desktop + mobile, gồm nhánh sau đăng nhập)
-        run: npm run test:e2e
+        run: npm run test:e2e -- --shard=${{ matrix.shard }}/3
 
       - name: Lưu báo cáo khi lỗi
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: playwright-report
+          name: playwright-report-shard-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 7
+
+  # ── Hai job tổng hợp: giữ nguyên TÊN check "ci" và "e2e" ──
+  #
+  # Vì sao cần: deploy.yml chờ workflow "CI" thành công, và branch protection (nếu bật) khai
+  # required check theo TÊN JOB. Tách `ci` thành static/test/build và `e2e` thành 3 shard là
+  # đổi tên job — required check cũ sẽ treo "Expected" mãi mãi và PR không bao giờ merge
+  # được. Hai job rỗng dưới đây tồn tại đúng để giữ lại hai cái tên đó.
+  #
+  # `needs` chỉ đỏ khi job phụ thuộc FAIL, còn khi bị SKIP thì job này vẫn xanh — nên phải
+  # kiểm tường minh `result == 'success'`, không dựa vào hành vi mặc định.
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    needs: [static, test, build]
+    if: always()
+    steps:
+      - name: Tổng hợp kết quả
+        run: |
+          echo "static=${{ needs.static.result }} test=${{ needs.test.result }} build=${{ needs.build.result }}"
+          [ "${{ needs.static.result }}" = "success" ] || exit 1
+          [ "${{ needs.test.result }}" = "success" ] || exit 1
+          [ "${{ needs.build.result }}" = "success" ] || exit 1
+
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    needs: [e2e_shard]
+    if: always()
+    steps:
+      - name: Tổng hợp kết quả
+        run: |
+          echo "e2e_shard=${{ needs.e2e_shard.result }}"
+          [ "${{ needs.e2e_shard.result }}" = "success" ] || exit 1

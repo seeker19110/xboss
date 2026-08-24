@@ -4,6 +4,50 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Rút thời gian CI từ 7 phút xuống ~3 phút 45 (2026-08-24)
+
+Đo trước khi sửa (run 1210, cả hai job xanh) để biết thời gian nằm ở đâu thay vì đoán:
+
+| Job   | Tổng     | Chi tiết đáng kể                                                                  |
+| ----- | -------- | --------------------------------------------------------------------------------- |
+| `e2e` | **7m01** | `npm run test:e2e` **4m48** · build 50s · `playwright install` 28s · `npm ci` 25s |
+| `ci`  | 4m30     | `npm test` 1m28 · build 50s · lint 42s · typecheck 26s · `npm ci` 21s             |
+
+Đường găng là `e2e`, và trong đó một mình bước chạy Playwright chiếm 4m48. `npm test` **đã**
+song song hoá từ trước (`run-tests-parallel.mjs`, mỗi worker một database riêng) nên 1116 ca chỉ
+mất 88s — chỗ đó không còn gì để vắt.
+
+**Bốn thay đổi trong `.github/workflows/ci.yml`:**
+
+1. **Chia `e2e` thành 3 shard** (`--shard=i/3`, `strategy.matrix`). Đây là đòn duy nhất chạm được
+   vào 4m48. Mỗi shard là một runner riêng kèm container Postgres riêng nên không dùng chung dữ
+   liệu, không cần đồng bộ gì với nhau.
+2. **Tách `ci` thành 3 job song song** — `static` (lint + typecheck + 4 check tĩnh), `test`
+   (Postgres + ERD), `build`. Cần làm cùng lúc với (1): sau khi `e2e` xuống ~3m25 thì `ci` 4m30
+   trở thành đường găng mới.
+3. **Cache `node_modules` và trình duyệt Playwright** — repo trước đó **không dùng `actions/cache`
+   ở đâu cả**. `npm ci` xoá rồi dựng lại toàn bộ cây thư mục nên vẫn tốn ~20s dù `setup-node` đã
+   cache sẵn tarball; khoá cache theo `package-lock.json` nên đổi thư viện là tự miss.
+4. **`concurrency` + `cancel-in-progress`** — đẩy commit mới lên cùng một PR thì huỷ ngay lượt cũ
+   để trả runner về. **Cố ý chỉ huỷ trên PR**: `deploy.yml` chờ `workflow_run` của workflow "CI"
+   thành công, huỷ lượt CI của một commit trên `main` là commit đó không bao giờ được deploy.
+
+**Hai job rỗng `ci` và `e2e`** (`needs` + kiểm `result == 'success'`) giữ nguyên hai tên check cũ.
+Không có chúng thì required status check khai theo tên job sẽ treo "Expected" vĩnh viễn và PR không
+bao giờ merge được — tách job là đổi tên job. Giá phải trả ~25s cho một lần dựng runner, chấp nhận
+được so với rủi ro khoá cứng luồng merge.
+
+**Kiểm chứng — chạy thật, không chỉ đọc cấu hình:** dựng Postgres 16 cục bộ rồi chạy
+`npm run test:e2e -- --shard=1/3` với `CI=1`: **148 ca pass trong 1m40**, đúng con số ước tính
+(4m48 ÷ 3). `--list` cho thấy 443 ca chia 148/148/147 và **mỗi shard đều có project `setup`**
+(đăng nhập lưu `storageState`) — đây là rủi ro thật của việc shard, vì `authed-*` phụ thuộc
+`setup`; nếu Playwright không đưa dependency vào từng shard thì hai shard sau sẽ đỏ toàn bộ.
+`globalSetup` seed dữ liệu mẫu cũng chạy lại đúng ở mỗi shard.
+
+**Chưa làm — và lý do:** không cache `.next/cache`. Thư mục này ở máy đo là **673 MB**; tải lên
+tải xuống mất nhiều thời gian hơn chính 50s build mà nó định tiết kiệm. Cũng không dựng `build`
+một lần rồi truyền `.next` (250 MB) sang các shard qua artifact, vì cùng lý do.
+
 ## Hoàn thiện đường ống DXF cho trang chuẩn hoá bản vẽ (2026-08-24)
 
 Đợt này chỉ làm **DXF** (DWG vẫn từ chối theo ADR-0006 — chuẩn hoá thẳng trên DWG là việc của
