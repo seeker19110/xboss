@@ -24,16 +24,13 @@ import { join } from "node:path";
 // chỉ đổi kênh nhập liệu — nên bộ kiểm phải phủ cả ba kênh client gửi vào.
 
 // Đường dẫn tương đối app/api/engineering/<key>/route.ts. Mỗi mục kèm lý do cụ thể.
-const WHITELIST: Record<string, string> = {
-  // Việc V2 cùng đợt đang siết quyền ký e-Sign, trong đó có phần chốt projectId qua
-  // chotProjectIdChoGhi (PLAN.md V2 mục 5). File thuộc phạm vi V2 nên V4 không được sửa —
-  // gỡ khỏi whitelist sau khi tích hợp V2.
-  "esign/sign": "đang xử lý ở việc V2, gỡ khỏi whitelist sau khi tích hợp",
-  "esign/envelopes": "đang xử lý ở việc V2, gỡ khỏi whitelist sau khi tích hợp",
-  // Route upload multipart đang thuộc phạm vi việc V8 (thêm chặn content-length). V4 không
-  // sửa file của việc khác — projectId lấy từ formData vẫn cần chốt lại sau khi V8 tích hợp.
-  "queue/upload": "đang xử lý ở việc V8, projectId từ formData chờ chốt sau khi tích hợp",
-};
+// Whitelist RỖNG sau khi tích hợp: cả 3 mục hoãn của vòng 1 (esign/sign, esign/envelopes,
+// queue/upload) đều đã được chốt projectId thật — esign/sign ở việc V2, còn esign/envelopes
+// và queue/upload vá lúc tích hợp (chúng chỉ được hoãn để tránh 2 worktree cùng sửa 1 file,
+// không phải vì có lý do chính đáng để tin client). Thêm mục mới vào đây phải kèm lý do cụ
+// thể và một mốc gỡ rõ ràng — ca "WHITELIST không có mục thừa" bên dưới sẽ báo đỏ khi lý do
+// hết hiệu lực, đúng như nó đã bắt được `esign/sign` ngay lần chạy đầu sau tích hợp.
+const WHITELIST: Record<string, string> = {};
 
 function walkRoutes(dir: string, base = ""): string[] {
   const out: string[] = [];

@@ -22,11 +22,108 @@ Vá lỗ hổng **Cao A1 + A2** và phát hiện **Trung B9** của đợt audit
   chưa liên kết → **403**, không ghi log tin nhắn/điều phối hành động.
 - **`migrations/0133_webhook_otp_hardening.sql`** — dọn dòng binding trùng do bug `ON CONFLICT (id)`
   cũ, thêm unique index `(project_id, zalo_user_id)` + unique **từng phần** `user_id WHERE
-  is_verified = false` cho Telegram, NULL hoá OTP bản rõ còn tồn. **Migration đụng dữ liệu → bắt
+is_verified = false` cho Telegram, NULL hoá OTP bản rõ còn tồn. **Migration đụng dữ liệu → bắt
   buộc qua staging trước.**
 - **Kiểm chứng bằng DB thật** (Postgres 16 ephemeral): `tests/webhook-inbound.test.ts` (mới) +
   4 ca mở rộng trong 2 file test bot. Đã chứng minh test bắt lỗi cũ: trả từng phần code về bản
   cũ → đỏ đúng ca tương ứng; khôi phục → xanh.
+
+## Đợt "nâng tầm dự án" GĐ1 — thi hành 8 việc vá lỗ bảo mật + trung thực hoá dữ liệu (2026-08-24)
+
+Người dùng duyệt "triển khai theo hướng tốt nhất" sau báo cáo audit (mục ngay dưới). Kế hoạch
+`PLAN.md`, thi hành qua mô hình 3 tầng — mỗi việc 1 worktree riêng, `reviewer` soát diff trước khi
+tích hợp. Nhánh `claude/nang-tam-du-an-5yexhe`.
+
+**Hai quyết định người dùng uỷ quyền, phiên chính chốt:** (1) module vượt gate → **đóng băng bằng
+feature flag ở GĐ2, KHÔNG gỡ code** (đảo ngược được); (2) bot hiện trường → **đổi thông điệp trung
+thực + đánh dấu thử nghiệm**, không wire thật vào WBS/NCR/vật tư (là tính năng riêng, cần đặc tả).
+
+### 8 việc đã làm
+
+- **V1 (`route: complex`)** — xác thực webhook inbound + chuẩn hoá OTP. `lib/bao-mat/webhook-inbound.ts`
+  - `lib/bao-mat/otp.ts` (mới); Telegram kiểm `X-Telegram-Bot-Api-Secret-Token`, Zalo kiểm chữ ký HMAC
+    raw body; OTP lưu **hash**, rate-limit 5/15 phút theo chatId/zaloUserId, Zalo thêm điều kiện còn hạn
+    (trước đây SELECT `otp_expires_at` mà **không bao giờ so sánh**); Zalo **bỏ hẳn `body.projectId`**,
+    suy projectId từ binding đã xác thực; `migrations/0133_webhook_otp_hardening.sql` (dọn binding trùng
+  - unique index — **đụng dữ liệu, BẮT BUỘC qua staging**).
+- **V2 (`route: spec`)** — siết quyền ký e-Sign. Thêm `CAN.signEngineeringEsign` (loại `bch` và mọi
+  `VIEW_ONLY_ROLES`) thay cho `CAN.viewEngineeringGraph` — quyền **xem** đang gate hành vi **ký**;
+  ràng buộc `signatory.user_id === user.id` (trước đây 1 user ký thay được cả 3 bên); OTP **bắt buộc**
+  khi tồn tại (trước đây chỉ kiểm nếu client tự nguyện gửi); kiểm `status='ready'`; projectId qua
+  `chotProjectIdChoGhi`. Thêm `EsignSignError` để mã 403/409/422 thoát được khỏi tầng lib.
+- **V3 (`route: spec`)** — phân quyền 14 file route engineering ghi dữ liệu (trước: 14 file không
+  tham chiếu `CAN.` nào → `viewer`/`cdt` ghi đè mô hình BIM, giả telemetry IoT sinh cảnh báo HSE
+  CRITICAL thật, thầu phụ tự chấm điểm mình). Thêm 4 cặp `viewEngineering*`/`manageEngineering*`;
+  metrics subcon-ai tính từ `subcon_evaluations` thật, thiếu nguồn → `null` + lý do (**không** số mặc
+  định đẹp); `bim-models` cap 10k phần tử + batch insert trong transaction;
+  `migrations/0134_iot_alert_dedup.sql` (**đụng dữ liệu, qua staging**).
+- **V4 (`route: spec`)** — 15 route lấy `projectId` từ phiên thay vì body/query. Test bất biến
+  `tests/engineering-project-scope-invariant.test.ts` phủ **cả 3 kênh** client gửi vào.
+- **V5 (`route: standard`)** — trung thực hoá dữ liệu. Bot bỏ mọi khẳng định "đã đồng bộ vào WBS"/"đã
+  tạo NCR" và **số bịa cứng** (450/180 đơn vị, "Kho Tổng A"); Smart IPC 4 cổng gating nối nguồn thật
+  (e-Sign/IoT/BOQ/kho), thiếu dữ liệu → `khong_du_du_lieu` và **chặn**, không pass mặc định; tiền qua
+  `lib/nen/money.ts`; xoá số tài khoản hardcode.
+- **V6 (`route: standard`)** — client CAD hiện đúng lỗi 409 (modal chọn bản vẽ, **không tự chọn hộ**)
+  và 413; trước đây chỉ xử lý `res.ok`/`401` nên bản vá chống-nhầm-bản-vẽ đợt trước **cụt ở client**.
+- **V7 (`route: mechanical`)** — 57 file chữ trắng trên nền accent `-600` (FAIL WCAG, gồm nút "Thử lại"
+  của `ErrorState.tsx` dùng chung toàn app) → công thức nhà `app/globals.css:158`.
+- **V8 (`route: mechanical`)** — pin SHA `actions/github-script` (dòng `uses:` duy nhất còn tag nổi);
+  sửa `CLAUDE.md` mô tả sai offline queue (IndexedDB, không phải localStorage) + service worker
+  (stale-while-revalidate, không phải network-first); hạ 2 manifest từ "Product/Vision Complete" xuống
+  **draft chưa đạt gate** + sửa số migration 93/97 → **132** thật.
+
+### Lỗi reviewer bắt được (đều đã vá, phiên chính tự xác minh lại trên code trước khi giao)
+
+- **[Cao] V5** — `fetchGate4Context` đọc `boq_items` **thiếu lọc `project_id`** trong khi truy vấn
+  `materials` ngay dưới thì có → cổng thẩm định giải ngân đối chiếu khối lượng với **dự án khác**.
+- **[Cao] V4** — `hse-vision/scans` và `cashflow/forecasts` đọc `projectId` từ **query string** → IDOR
+  đọc chéo dự án. **Lỗi ở đặc tả của phiên chính**: bất biến viết chỉ cấm `body`/`formData`, quên query.
+  Worker đã báo đúng và dừng đúng phạm vi; heuristic test cũng mù với kênh này, nay phủ đủ 3 kênh.
+- **[Cao] V7** — 6 nút hover **vô hiệu** (nền hover trùng nền gốc). Nguyên nhân: cách (b) nền sáng +
+  chữ tối thì hover phải đi về phía **sáng hơn** (`-500`), ngược chiều với cách (a).
+- **[Thấp] V2** — so sánh OTP short-circuit theo độ dài, giảm ý nghĩa `timingSafeEqual`.
+
+### Vá thêm lúc tích hợp (không thuộc việc nào)
+
+Test "WHITELIST không có mục thừa" của V4 **báo đỏ ngay lần chạy đầu sau tích hợp**, đúng mục
+`esign/sign` (V2 đã vá nên lý do hoãn hết hiệu lực). Kiểm 2 mục còn lại thì phát hiện **chúng chưa
+hề được vá**: `esign/envelopes` vẫn tin client ở cả GET (query) lẫn POST (body), `queue/upload` vẫn
+tin `formData` — chúng chỉ được hoãn để tránh 2 worktree cùng sửa 1 file, **không phải vì có lý do
+chính đáng để tin client**. Đã vá cả hai và dọn whitelist về **rỗng**.
+
+### 🔴 Phát hiện ngoài kế hoạch, CHƯA VÁ — nợ kỹ thuật mới
+
+**11 file route engineering (27 lời gọi) truyền tham số SQL sai kiểu → chết ngay ở câu truy vấn đầu
+tiên.** `lib/db` khai `query(sql, ...params)` (biến thiên) nhưng các route này gọi `query(sql, [a, b])`
+— truyền một **mảng** làm tham số duy nhất, Postgres nhận `{"1"}` thay vì `1` →
+`invalid input syntax for type integer`. V3 đã kiểm chứng trên Postgres thật.
+
+File: `bim-models/{route,[id]/elements,[id]/link-wbs,[id]/simulate-4d}`, `iot/{devices,alerts,telemetry}`,
+`subcon-ai/{scores,evaluate,recommend-shortlist}`, `cad/parse-dxf`.
+
+**Nghĩa là các tính năng BIM/IoT/subcon-ai chưa từng chạy được lần nào** — khớp chính xác kết luận
+"demo-ware" của đợt audit, và là bằng chứng cụ thể nhất cho việc 2 manifest tuyên bố "Production
+Ready" là sai. V3 cố ý không tự vá diện rộng (ngoài phạm vi) và báo cáo trung thực rằng nó **không
+chứng minh được** dedup IoT qua đường route vì chính route đó đang hỏng. Xử lý ở GĐ2.
+
+### Kiểm chứng
+
+Cổng chạy trên nhánh tích hợp **với Postgres 16 thật** (dựng ephemeral trong phiên — trước đó mọi
+worker đều báo 386 ca skip vì tưởng máy không có Postgres; binary có sẵn tại
+`/usr/lib/postgresql/16/bin/`, chỉ cần chạy dưới user không đặc quyền): lint · typecheck ·
+check:lib-layers · check:migrations · build xanh.
+
+Mỗi bản vá bảo mật/logic đều **chứng minh test bắt được lỗi cũ** (trả code về bản cũ → đỏ; khôi phục
+→ xanh), không chỉ viết test rồi thấy nó xanh. V1 chứng minh ở 3 mức lùi khác nhau; V2 lùi cả khung
+lẫn lùi riêng logic để cô lập đúng ca đỏ.
+
+### GĐ2 — chưa thi hành
+
+Vá 27 lời gọi SQL sai kiểu ở trên; cổng CI `check:route-perms` + `check:project-scope`; rule lint cấm
+chữ trắng trên nền accent sáng; lưới quét axe ~45 route chưa phủ; coverage ratchet thành cổng CI;
+đóng băng module vượt gate bằng feature flag; retention cho 2 bảng log webhook; idempotency-key cho
+ảnh offline; loại `/api/tasks/version` khỏi cache SW; `recommend-shortlist` còn default `?? 80` khi
+đọc metrics từ DB.
 
 ## Đợt audit toàn diện "nâng tầm dự án" (2026-08-24) — BÁO CÁO, CHƯA SỬA
 

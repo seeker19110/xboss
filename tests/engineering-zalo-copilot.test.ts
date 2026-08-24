@@ -53,7 +53,12 @@ test("M86: Zalo OTP & Message Processing DB Lifecycle", { skip: !HAS_DB }, async
 
   assert.equal(response.intent, "PROGRESS_UPDATE");
   assert.equal(response.actionDispatched, true);
-  assert.ok(response.replyText.includes("Đã ghi nhận sản lượng"));
+  // V5 — bot KHÔNG được nói đã ghi vào hệ thống khi thực tế chỉ ghi log tin nhắn.
+  // Khoá cả hai chiều: phải nêu rõ "chưa" cập nhật WBS, và tuyệt đối không được
+  // khẳng định đã đồng bộ (đây chính là câu chữ cũ đã gây hiểu nhầm cho kỹ sư hiện trường).
+  assert.ok(response.replyText.includes("chưa"));
+  assert.ok(response.replyText.includes("XBoss"));
+  assert.ok(!/đã đồng bộ|đã cập nhật vào WBS/i.test(response.replyText));
 });
 
 // ===== V1 — siết OTP liên kết Zalo (phát hiện Trung B9) =====
@@ -117,52 +122,56 @@ test("V1: OTP Zalo — lưu hash, upsert 1 dòng, hết hạn thì từ chối",
   }
 });
 
-test("V1: OTP Zalo — rate-limit dò mã & chưa liên kết thì không ghi log", { skip: !HAS_DB }, async () => {
-  const { insertId, query, run, withProjectScope } = await import("@/lib/db");
-  const { THONG_DIEP_CHUA_LIEN_KET } = await import("@/lib/ky-thuat/engineering-zalo-copilot");
-  const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Zalo Guard Proj')`);
-  const zaloUserId = `ZID_GUARD_${projectId}`;
-  await run(`DELETE FROM login_rate_limits WHERE key = ?`, `zalo_otp:${zaloUserId}`);
-
-  try {
-    // 1. Zalo ID chưa liên kết → không xử lý, không ghi log tin nhắn/điều phối hành động.
-    const res = await processIncomingZaloMessage({
-      projectId,
-      zaloUserId,
-      rawText: "Tầng 7 lắp xong 120 m2 ống gió",
-    });
-    assert.equal(res.actionDispatched, false);
-    assert.equal(res.intent, "UNKNOWN");
-    assert.equal(res.replyText, THONG_DIEP_CHUA_LIEN_KET);
-
-    const dem = await withProjectScope(projectId, async () => ({
-      logs: (
-        await query<{ n: number }>(
-          `SELECT COUNT(*)::int AS n FROM zalo_site_message_logs WHERE project_id = ?`,
-          projectId,
-        )
-      )[0].n,
-      dispatch: (
-        await query<{ n: number }>(
-          `SELECT COUNT(*)::int AS n FROM zalo_field_action_dispatches WHERE project_id = ?`,
-          projectId,
-        )
-      )[0].n,
-    }));
-    assert.equal(dem.logs, 0, "chưa liên kết thì không được ghi log tin nhắn");
-    assert.equal(dem.dispatch, 0, "chưa liên kết thì không được điều phối hành động");
-
-    // 2. Dò mã: quá 5 lần trong cửa sổ → chặn (không còn tra DB nữa).
-    for (let i = 0; i < 6; i++) {
-      assert.equal(await verifyZaloLinkOtp(zaloUserId, "000000"), false);
-    }
-    const dem2 = await query<{ count: number }>(
-      `SELECT count FROM login_rate_limits WHERE key = ?`,
-      `zalo_otp:${zaloUserId}`,
-    );
-    assert.ok(dem2[0] && dem2[0].count > 5, "phải đếm được số lần thử để chặn dò mã");
-  } finally {
+test(
+  "V1: OTP Zalo — rate-limit dò mã & chưa liên kết thì không ghi log",
+  { skip: !HAS_DB },
+  async () => {
+    const { insertId, query, run, withProjectScope } = await import("@/lib/db");
+    const { THONG_DIEP_CHUA_LIEN_KET } = await import("@/lib/ky-thuat/engineering-zalo-copilot");
+    const projectId = await insertId(`INSERT INTO projects (name) VALUES ('Zalo Guard Proj')`);
+    const zaloUserId = `ZID_GUARD_${projectId}`;
     await run(`DELETE FROM login_rate_limits WHERE key = ?`, `zalo_otp:${zaloUserId}`);
-    await run(`DELETE FROM projects WHERE id = ?`, projectId);
-  }
-});
+
+    try {
+      // 1. Zalo ID chưa liên kết → không xử lý, không ghi log tin nhắn/điều phối hành động.
+      const res = await processIncomingZaloMessage({
+        projectId,
+        zaloUserId,
+        rawText: "Tầng 7 lắp xong 120 m2 ống gió",
+      });
+      assert.equal(res.actionDispatched, false);
+      assert.equal(res.intent, "UNKNOWN");
+      assert.equal(res.replyText, THONG_DIEP_CHUA_LIEN_KET);
+
+      const dem = await withProjectScope(projectId, async () => ({
+        logs: (
+          await query<{ n: number }>(
+            `SELECT COUNT(*)::int AS n FROM zalo_site_message_logs WHERE project_id = ?`,
+            projectId,
+          )
+        )[0].n,
+        dispatch: (
+          await query<{ n: number }>(
+            `SELECT COUNT(*)::int AS n FROM zalo_field_action_dispatches WHERE project_id = ?`,
+            projectId,
+          )
+        )[0].n,
+      }));
+      assert.equal(dem.logs, 0, "chưa liên kết thì không được ghi log tin nhắn");
+      assert.equal(dem.dispatch, 0, "chưa liên kết thì không được điều phối hành động");
+
+      // 2. Dò mã: quá 5 lần trong cửa sổ → chặn (không còn tra DB nữa).
+      for (let i = 0; i < 6; i++) {
+        assert.equal(await verifyZaloLinkOtp(zaloUserId, "000000"), false);
+      }
+      const dem2 = await query<{ count: number }>(
+        `SELECT count FROM login_rate_limits WHERE key = ?`,
+        `zalo_otp:${zaloUserId}`,
+      );
+      assert.ok(dem2[0] && dem2[0].count > 5, "phải đếm được số lần thử để chặn dò mã");
+    } finally {
+      await run(`DELETE FROM login_rate_limits WHERE key = ?`, `zalo_otp:${zaloUserId}`);
+      await run(`DELETE FROM projects WHERE id = ?`, projectId);
+    }
+  },
+);

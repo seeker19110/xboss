@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { chotProjectIdChoGhi, getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { enqueueAsyncTask } from "@/lib/ky-thuat/engineering-task-queue";
 import { GIOI_HAN_TEP_CAD } from "@/lib/ky-thuat/cad/gioi-han";
 import { isContentTooLarge } from "@/lib/nen/photos";
@@ -34,7 +35,21 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const taskType = (formData.get("taskType") as string) || "mepf.cad.analyze";
-    const projectId = Number(formData.get("projectId") || (user as any).projectId || 1);
+
+    // Chốt projectId theo phiên; chỉ chấp nhận dự án client chỉ định nếu nằm trong danh sách
+    // dự án người dùng được phép thấy (chặn đẩy tác vụ vào dự án không thuộc quyền).
+    const chot = await chotProjectIdChoGhi(
+      user,
+      formData.get("projectId"),
+      (await getCurrentProjectId(user)) || 1,
+    );
+    if (!chot.ok) {
+      return NextResponse.json(
+        { error: "Không có quyền thao tác trên dự án này" },
+        { status: 403 },
+      );
+    }
+    const projectId = chot.projectId;
 
     if (!file) {
       return NextResponse.json({ error: "Vui lòng chọn tệp tin cần tải lên" }, { status: 400 });
