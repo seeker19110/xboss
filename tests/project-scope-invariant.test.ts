@@ -28,6 +28,7 @@ const WHITELIST: Record<string, string> = {
   suppliers: "danh mục NCC dùng chung mọi dự án",
   "ui-texts": "nhãn UI cấu hình toàn hệ",
   "notifications/prefs": "tuỳ chọn thông báo theo người dùng, không theo dự án",
+  tokens: "token thiết bị plugin theo NGƯỜI DÙNG/org (M99 PR2), không theo dự án",
 
   // --- Cron (xác thực CRON_SECRET; tự lặp theo từng dự án trong logic) ---
   "cron/daily-report": "cron báo cáo ngày, quét mọi dự án nội bộ",

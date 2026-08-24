@@ -385,6 +385,19 @@ dùng duyệt hướng xử lý.
 - **KHÔNG nên làm:** thêm module `engineering/*`/OS-phase mới, C2 pilot, hạ tầng mới, nâng major
   M60, bật SSO production, hay tuyên bố thêm mốc "Complete" nào bằng tài liệu.
 
+## M99 PR2 — Token thiết bị + ghép thiết bị plugin AutoCAD (`XBOSS_LOGIN`) (2026-08-24)
+
+Người dùng yêu cầu "làm tiếp PR2". **Vùng rủi ro cao (chạm lớp auth) — đã rà theo `docs/audit.md`.** Cùng nhánh `claude/plugin-upgrade-m8z0hx` với PR-B.
+
+- **Migration `0135_api_tokens.sql`** (thêm thuần, không đụng dữ liệu): `api_tokens` (đúng DDL M99 §11 — chỉ lưu **hash sha256**, scope `cad`, hạn/thu hồi/last_used_at) + `device_pairings` (mã ghép 8 ký tự + **secret_hash** chống poll trộm, TTL 10 phút, status pending→confirmed→consumed) + 3 cột `drawing_revisions` khai sẵn cho PR5. ERD tự sinh lại.
+- **`lib/bao-mat/api-tokens.ts`:** luồng ghép 3 bước — plugin xin mã (`POST /api/devices/pair`, public + rate limit 10/15ph/IP) → kỹ sư duyệt trên web (`POST /api/devices/pair/confirm`, session + `CAN.manageDrawings`, UPDATE atomic chống duyệt đôi) → plugin poll (`POST /api/devices/pair/poll`, public + rate limit; **token chỉ sinh tại lần poll đầu sau confirmed**, trả thô đúng 1 lần, không bao giờ nằm trong DB kể cả tạm; secret sai/mã hết hạn đều 404 đồng nhất — không lộ mã tồn tại). `verifyDeviceToken` nạp user thật từ token — **token hành xử đúng bằng quyền user chủ token**, mọi route vẫn kiểm CAN như phiên; last_used_at throttle 60s như api_keys. Poll endpoint là bổ sung so với bảng API §10 (ghi chú deviation trong spec).
+- **`GET/POST /api/tokens` + `DELETE /api/tokens/:id`:** user thấy/thu hồi token của mình, Admin toàn org; POST tạo token thủ công (hiện 1 lần, `CAN.manageDrawings`); DELETE đặt `revoked_at` idempotent (AC7: plugin nhận 401 → ghép lại). Không bao giờ trả token thô/hash trong GET. CSRF/2FA gate toàn cục ở `proxy.ts` phủ sẵn các route mới (plugin không gửi Origin/cookie → qua đúng thiết kế sameSite-lax).
+- **Rule pack route nhận Bearer `xbt_`:** `GET /api/engineering/cad/rule-pack` thêm đường token thiết bị song song phiên web — cùng check `CAN.viewEngineeringGraph`.
+- **Trang `/engineering/thiet-bi-plugin`** (+ mục EngineeringNav, roles admin/pm/engineer): duyệt mã ghép, tạo token thủ công (hiện 1 lần + nút chép), bảng token với thu hồi.
+- **Plugin AutoCAD:** `XBOSS_LOGIN` (nhớ URL server ở `%APPDATA%\XBoss\server.json`; token có sẵn thì chỉ refresh rule pack, 401 mới ghép lại; pairing hiện mã + hướng dẫn + vòng KiemTra/Huy không chặn UI) + `XBOSS_LOGOUT`; token lưu **Windows Credential Manager** qua P/Invoke advapi32 (`CredentialStore` — NFR4, không ghi tệp phẳng); `XBossApiClient` (HttpClient, pair/poll/tải rule pack); `RulePackStore.ImportNoiDung` — một điểm kiểm/cache duy nhất cho rule pack từ tệp lẫn API.
+- **Kiểm chứng:** `tests/api-tokens.test.ts` (integration Postgres): vòng đời pairing đầy đủ (token phát đúng 1 lần, poll lần 2 = not_found), secret sai/hết hạn, verify token thu hồi/hết hạn/tiền tố `xbk_` lạ → null, token map đúng user+role. **Toàn suite 221 file / 1202 ca pass, 0 fail** với Postgres 16 thật trong container; lint + typecheck + build xanh; `check:migrations`/`check:lib-layers` OK; thêm `tokens` vào whitelist project-scope (token theo user/org, không theo dự án).
+- **Chưa làm:** PR5 upload + kiểm định ezdxf (`XBOSS_UPLOAD`), phần web PR6, PR7 test tích hợp (runner Windows). UAT máy thật: xác minh Credential Manager + luồng ghép end-to-end cùng đợt UAT PR-A/PR-B.
+
 ## M99 PR-B — Nâng cấp plugin AutoCAD: 9 phép kiểm, JSON 2 chế độ, SUBTOTAL Excel, XBOSS_BATCH (2026-08-24)
 
 Người dùng yêu cầu (2026-08-24): "nghiên cứu plugin hiện tại, nâng lên tầng cao mới đầy đủ và tính năng đẳng cấp từ chuẩn hoá đến bóc tách khối lượng". Nhánh `claude/plugin-upgrade-m8z0hx`. Toàn bộ nằm trong khung M99 đã duyệt, không cần đổi rule pack (v2 giữ nguyên) hay server.
