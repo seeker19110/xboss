@@ -1,303 +1,509 @@
-# PLAN.md — Hoàn thành XBoss v1.0, rồi mở Engineering OS theo gate
-
-**Cập nhật:** 2026-08-15
-**Nguồn trạng thái:** `PROGRESS.md` và các commit `cdecf55`, `a6f98da`, `f14ea21`, `1186efb`.
-
-**Đặc tả tổng:** `docs/nang-cap/PROJECT-COMPLETION-ROADMAP.md` — C0→C6 để đạt Product Complete v1.0; O1→O5 là lộ trình Engineering OS có điều kiện.
-
-Mỗi phase đã có file đặc tả thi hành riêng trong `docs/nang-cap/` (index tại mục 3 của roadmap tổng); worker không thi hành từ đoạn tóm tắt trong `PLAN.md`.
-
-## Trạng thái kế hoạch trước đó
-
-M64 — Upload kế hoạch & tracking theo hệ đã hoàn tất ngày 2026-08-09 (migration `0082`, API/UI/test và CI). Không còn là công việc đang thực hiện; không lập lại triển khai M64 trừ khi có lỗi hoặc yêu cầu nghiệp vụ mới được xác nhận.
-
-## Mục tiêu giai đoạn
-
-Đưa nền tảng Engineering OS ENG-1→ENG-4 vừa hoàn tất từ trạng thái **đã có code** sang **đã được xác minh có kiểm soát trong vận hành**. Không triển khai Digital Twin, Predictive OS hoặc autonomy trước các cổng bên dưới.
-
-**Đặc tả dẫn đường:** `docs/nang-cap/ENG-5-integration-contract-pilot.md` chốt hợp đồng ingest, idempotency, cách ly dự án, observability và pilot trước khi kết nối traffic thật.
-
-## Việc 1 — Xác minh phát hành ENG-1→ENG-4 (`route: verification`)
-
-- **Phạm vi:** staging trước production cho migrations `0084_engineering_core.sql` đến `0087_engineering_agents.sql`; chạy đầy đủ integration test với `TEST_DATABASE_URL`, E2E, build và kiểm tra rollback/backup theo quy trình deploy.
-- **Tiêu chí đạt:** migration append-only chạy sạch trên bản sao dữ liệu; không lỗi RLS/quyền/API key; các luồng ingest → suggestion → workflow → agent session hoạt động đúng phân quyền; không có thay đổi tự động vào task/BOQ/thanh toán.
-- **Điểm dừng:** bất kỳ lỗi migration, cách ly dự án/tổ chức, hoặc Gate/SoD sai phải được sửa và kiểm thử lại trước production.
-
-## Việc 2 — Pilot tích hợp MEPF-Agents (`route: integration`)
-
-- **Repository đối tác:** [seeker19110/MEPF-Agents](https://github.com/seeker19110/MEPF-Agents) — hệ Multi-Agent tư vấn MEPF (HVAC, điện, nước, PCCC, QS, CAD/BIM và reviewer). Đây là nguồn tích hợp chính thức; chưa cần clone, vendor hoặc chia sẻ database.
-- **Phạm vi:** cấp API key scope `engineering` theo từng dự án, gửi dữ liệu mẫu có `external_key` ổn định, kiểm thử ingest lặp lại, evidence/provenance, claims và conflict resolution.
-- **Tiêu chí đạt:** idempotency xác nhận bằng gửi lại cùng payload; object và suggestion không lẫn dự án; người có quyền duyệt được nội dung/evidence; conflict có cách phân xử và người chốt rõ ràng.
-- **Ranh giới cứng:** XBoss là bên điều phối/lưu vết. Agent không có quyền tự ghi task, BOQ, payment hoặc tự duyệt workflow.
-
-## Việc 3 — Khắc phục dữ liệu ngày Excel cũ (`route: operations`)
-
-- **Phạm vi:** sao lưu, chạy `scripts/backfill-import-dates.ts` ở chế độ preview trên staging; đối chiếu danh sách dòng dự kiến sửa với file Excel nguồn; chỉ khi được xác nhận mới chạy `--apply` trên production.
-- **Tiêu chí đạt:** dữ liệu chỉ thay đổi khi có đúng dấu vết lệch ngày; các dòng đã người dùng sửa tay được giữ nguyên; script chạy lại không tạo thay đổi mới.
-- **Điểm dừng:** có mã task trùng đa dự án/chênh nguồn không giải thích được thì dừng và chọn `--project=<id>` hoặc xử lý thủ công.
-
-## Việc 4 — Lập kế hoạch riêng cho audit UUID (`route: specification`)
-
-- **Phạm vi:** thiết kế migration tương thích ngược để audit các thực thể UUID `engineering_*`, bao gồm dữ liệu lịch sử, index, truy vấn UI, rollback và tải trên bảng `audit_log`.
-- **Tiêu chí đạt:** đặc tả + proof-of-concept trên staging; không sửa migration cũ hay chạy trực tiếp trên production khi chưa có kế hoạch triển khai được phê duyệt.
-
-## Việc 5 — Quality/Security/DR release gate (`route: verification`)
-
-- **Phạm vi:** C3→C4 của đặc tả tổng — audit UUID, RLS engineering, backfill ngày, integration/E2E trên DB thật, load/security/restore drill.
-- **Tiêu chí đạt:** lỗi P0/P1 bằng 0; cách ly project/org được kiểm bằng negative test; SLO và RPO/RTO đã được owner ký; restore staging thành công.
-
-## Việc 6 — UAT, rollout và đóng v1.0 (`route: operations`)
-
-- **Phạm vi:** C5→C6 — UAT theo 7 vai trò, đối soát Excel/MEPF fixtures, canary production, tài liệu vận hành/đào tạo/ownership và release sign-off.
-- **Tiêu chí đạt:** Product Complete theo mục 10 của đặc tả tổng; chỉ sau đó mới tag `v1.0.0`.
-
-## Việc 7 — Chuẩn hóa bản vẽ CAD 2D: vá lỗ hổng thật trong studio TS hiện tại (2026-08-23, chặng ngắn hạn trước M99)
-
-**Bối cảnh:** `docs/adr/0006-plugin-autocad-va-pipeline-server.md` (Đã chấp nhận) đã quyết định đường
-chính chuẩn hóa bản vẽ chuyển sang plugin AutoCAD .NET (`docs/nang-cap/M99-plugin-autocad-chuan-hoa.md`,
-còn **Draft — chờ duyệt**, không code phần đó). Trong lúc chờ duyệt M99, đã rà lại
-`app/engineering/chuan-hoa-ban-ve/page.tsx` + các component/route liên quan và phát hiện 3 lỗ hổng
-thật trong studio TypeScript hiện tại (không thuộc phạm vi cần chờ duyệt — đều là bug fix/RBAC/dọn
-trùng lặp trên kiến trúc đang chạy). Không worker nào được đổi phạm vi sang xây dựng bảng điều khiển
-kiểu M99 — đó là việc của giai đoạn sau khi M99 được duyệt.
-
-### Việc 7.1 — Bộ ghi DXF R12 hợp lệ + kiểm định server-side trước khi lưu (`route: complex`)
-
-**Vấn đề đã xác minh trong code (không phải suy đoán):**
-
-1. `exportDxf()` và `generateStandard2dDxf()` trong `lib/cad/dxf-parser.ts` (dòng ~1441, ~1686) khai
-   `$ACADVER = AC1015` (R2000) nhưng cấu trúc ghi ra thực chất là R12 (không handle, không section
-   `OBJECTS`) — đúng lỗi gốc mà ADR-0006 nêu ra. `docs/nang-cap/M98-dxf-r2000-va-dwg.md` §1(b) khẳng
-   định "sau bản sửa 2026-08-22 đã hạ xuống R12 (AC1009)" và có file `lib/cad/dxf-writer.ts` — file
-   đó **không tồn tại**, thực chất logic vẫn nằm trong `dxf-parser.ts` và header vẫn sai là `AC1015`.
-2. Nhánh ghi `DIMENSION` (dòng ~1581 `lib/cad/dxf-parser.ts`) emit thẳng entity `DIMENSION` thô
-   (group code 1/10/20/13/14...) — **không đúng cả 2 phương án**: không phải R2000 hợp lệ (thiếu
-   block `*D<n>`, thiếu dimstyle ref nhóm 3, thiếu subclass marker) và cũng không phải phương án đã
-   chốt ở M98 §1(b) ("DIMENSION hạ thành LINE + TEXT"). Đây là bug thật, không phải scope mới.
-3. Không có hàm kiểm định cấu trúc DXF (`validateDxf` mà M98 nhắc tới) ở đâu trong repo.
-4. `tests/dxf-real-drawing-parser.test.ts:109` đang `assert.ok(exportedDxf.includes("AC1015"))` —
-   xác nhận đúng cái sai.
-
-**Phạm vi sửa (đóng khung — không mở rộng sang R2000 thật):**
-
-- Đổi `$ACADVER` trong cả `exportDxf()` và `generateStandard2dDxf()` (`lib/cad/dxf-parser.ts`) từ
-  `AC1015` → `AC1009` (đúng R12 đang thực sự ghi ra).
-- Sửa nhánh `DIMENSION`: hạ thành 1 entity `LINE` nối `coordinates.start`→`coordinates.end` (nếu có
-  cả 2, dùng layer gốc của entity) **+** 1 entity `TEXT` hiển thị `decodedText || textValue` đặt tại
-  trung điểm start/end (hoặc tại `coordinates.center` nếu không có start/end) — đúng theo quyết định
-  đã chốt ở M98 §1(b), không tự sáng tạo cấu trúc DIMENSION mới.
-- Thêm hàm mới `export function validateDxf(content: string): { valid: boolean; errors: string[] }`
-  trong `lib/cad/dxf-parser.ts`: kiểm tối thiểu — có cặp `SECTION`/`ENDSEC` cân bằng, có đủ 4 section
-  bắt buộc `HEADER`/`TABLES`/`BLOCKS`/`ENTITIES`, kết thúc bằng `0\r\nEOF` (hoặc `0\nEOF`), nội dung
-  không rỗng. Không cần parse đầy đủ DXF thật — chỉ là lưới an toàn tối thiểu chặn ghi rác.
-- Trong `app/api/engineering/cad/save-drawing/route.ts`: gọi `validateDxf(fileContent)` trước bước
-  `writeFileSync` — nếu `valid === false` → trả `422` kèm `errors`, **không ghi file, không tạo
-  `drawings`/`drawing_revisions`**.
-- Sửa `tests/dxf-real-drawing-parser.test.ts:109` cho khớp `AC1009`; thêm test cho `validateDxf`
-  (case hợp lệ, case thiếu ENTITIES, case rỗng) và test cho nhánh DIMENSION mới xuất ra LINE+TEXT
-  thay vì DIMENSION thô.
-- Sửa `docs/nang-cap/M98-dxf-r2000-va-dwg.md` §1(b): bỏ nhắc tới file `lib/cad/dxf-writer.ts` không
-  tồn tại, ghi đúng là logic nằm trong `lib/cad/dxf-parser.ts`.
-
-**Ranh giới quyết định được phép (route: complex):** được tự quyết cách tính điểm giữa (midpoint)
-cho TEXT của DIMENSION hạ cấp, cách format thông báo lỗi tiếng Việt của `validateDxf`, và thứ tự
-kiểm tra bên trong `validateDxf`. **Không được** thêm thư viện parse DXF ngoài, không được đổi
-`applyStandardLayers`/format group code khác ngoài phạm vi trên, không được đụng `parseDwgBinary`
-(đã đúng theo PR0/M99, không sửa).
-
-**Tiêu chí đạt:** `npm run typecheck` + `npm test` xanh; test cũ + test mới đều pass; `save-drawing`
-trả 422 khi nhận DXF rác (không có `ENTITIES`); DXF do `exportDxf` sinh ra khai đúng `AC1009`.
-
-### Việc 7.2 — Chặn quyền ghi bản vẽ "chính thức" trái phép (`route: spec`)
-
-**Vấn đề đã xác minh:** `app/api/engineering/cad/save-drawing/route.ts` chỉ kiểm `getCurrentUser()`
-(401 khi chưa đăng nhập) — **không có bất kỳ `CAN.*` nào**. Bất kỳ vai trò nào đã đăng nhập (kể cả
-`subcon`/`bch`/`viewer`) đều gọi được endpoint này với `isApproved: true` để ghi file vào vị trí
-chính thức (`drawings/{systems}/{kind}/...`) và tạo `drawings`/`drawing_revisions` — trong khi
-comment đầu file mô tả đây là hành động của "Kỹ Sư Trưởng phê duyệt Gate 0". Các route CAD khác
-trong cùng thư mục (`normalize`, `diff`, `convert-to-dxf`) đều đã có `CAN.manageEngineeringTwin`
-hoặc `CAN.viewEngineeringGraph` — route này bị bỏ sót.
-
-**Đặc tả kín — chỉ thi hành đúng, không tự quyết:**
-
-- Trong `app/api/engineering/cad/save-drawing/route.ts`, ngay sau khối kiểm `getCurrentUser()`, thêm:
-  ```ts
-  if (!CAN.manageDrawings(user.role)) {
-    return NextResponse.json({ error: "Không có quyền lưu bản vẽ" }, { status: 403 });
-  }
-  ```
-  (import `CAN` từ `@/lib/auth` cùng dòng đang import `getCurrentUser`). Lý do chọn đúng permission
-  này: `CAN.manageDrawings` (`lib/auth.ts:232`, `admin|pm|engineer`) đã là permission chuẩn cho quản
-  lý bản vẽ trong dự án — khớp với đặc tả M99 §12 dự kiến dùng lại chính permission này cho token
-  desktop; không tạo permission mới.
-- Áp dụng cho toàn bộ `POST` (cả khi `isApproved=false` lưu tạm lẫn `true` lưu chính thức) — không
-  tách 2 mức quyền khác nhau, giữ đơn giản đúng theo permission sẵn có.
-- Thêm test trong file test CAD liên quan (hoặc file test mới `tests/cad-save-drawing.test.ts` nếu
-  chưa có test cho route này) cho case: role `subcon`/`bch`/`viewer` gọi → 403; role
-  `admin`/`pm`/`engineer` → không bị chặn bởi thay đổi này (test hiện có nếu có phải vẫn pass).
-
-**Tiêu chí đạt:** `npm run typecheck` xanh; test 403 mới pass; các test cũ liên quan `save-drawing`
-(nếu có) không đổi hành vi cho vai trò admin/pm/engineer.
-
-**Phụ thuộc:** không phụ thuộc Việc 7.1 nhưng **cùng chạm** `save-drawing/route.ts` — coordinator
-dispatch Việc 7.1 và 7.2 **tuần tự trên cùng 1 nhánh/worktree** (không song song), để tránh xung đột
-merge hai patch cùng file.
-
-### Việc 7.3 — Gom quy tắc chuẩn hóa layer/font CAD về một nguồn (`route: complex`)
-
-**Vấn đề đã xác minh — 2 bản triển khai khác hành vi thật cho cùng một việc:**
-
-- `normalizeCadLayers()` trong `lib/cad/dxf-parser.ts` (dòng ~270): phân biệt `M-DUCT-RETN` (hồi),
-  `M-DUCT-EXHT` (thải), `M-DUCT-SUPP` (cấp) theo từ khóa `RETN/HOI/RA`, `EXHAUST/THAI/EA`, mặc định
-  supply — đầy đủ hơn.
-- `normalizeCadLayers()` trong `lib/engineering-cad-skills.ts` (dòng ~453, dùng bởi
-  `POST /api/engineering/cad/normalize`): mọi layer chứa `DUCT/GIO/SA/RA` đều gộp về `M-DUCT-SUPP`
-  — **không phân biệt hồi/thải**, khác kết quả thật với bản kia trên cùng input.
-- `convertTcvn3ToUnicode()` + `TCVN3_MAP` ở 2 file **giống hệt nhau** (đã diff xác nhận) — thuần
-  trùng lặp, không lệch hành vi.
-
-**Đặc tả — bản `dxf-parser.ts` là nguồn chuẩn (đầy đủ hơn, đúng nghiệp vụ MEPF hơn):**
-
-- Xoá định nghĩa `normalizeCadLayers`, `convertTcvn3ToUnicode`, `TCVN3_MAP`, `convertVniToUnicode`
-  (nếu trùng) trong `lib/engineering-cad-skills.ts`; thay bằng `import { normalizeCadLayers,
-convertTcvn3ToUnicode } from "@/lib/cad/dxf-parser"` và re-export lại đúng tên cũ (`export {
-normalizeCadLayers, convertTcvn3ToUnicode }`) để mọi nơi đang `import ... from
-"@/lib/engineering-cad-skills"` không phải sửa gì thêm.
-- Rà toàn bộ nơi gọi `normalizeCadLayers` xuất phát từ `engineering-cad-skills.ts` (đặc biệt
-  `POST /api/engineering/cad/normalize`) — hành vi trả về sẽ **chính xác hơn** (phân biệt được
-  hồi/thải) chứ không phải hành vi mới tuỳ tiện; nếu có test đang assert theo mapping cũ (gộp hết về
-  SUPP), cập nhật test đó theo mapping đúng của bản chuẩn.
-- Không đổi chữ ký hàm, không đổi route/API contract, không đổi UI.
-
-**Ranh giới quyết định được phép (route: complex):** được tự quyết cách tổ chức re-export (named
-export thẳng hay wrapper function mỏng), được cập nhật test cũ nếu chúng assert đúng hành vi cũ sai;
-**không được** đổi mapping trong `dxf-parser.ts` (đó là bản giữ nguyên, không sửa logic của nó),
-không được gộp thêm các hàm CAD khác ngoài 2 hàm + map nêu trên.
-
-**Tiêu chí đạt:** `npm run lint` + `npm run typecheck` + `npm test` xanh; không còn định nghĩa
-`normalizeCadLayers`/`convertTcvn3ToUnicode`/`TCVN3_MAP` trùng lặp trong repo (`grep -rn` chỉ còn 1
-nơi định nghĩa mỗi cái).
-
-### Việc 7.4 — Auto-heal Bước 1: bỏ thanh tiến độ giả (`route: standard`)
-
-**Vấn đề đã xác minh:** `triggerAutoHealWithProgress()` trong
-`app/engineering/chuan-hoa-ban-ve/page.tsx` (dòng ~811-857) chạy `setInterval` tăng % ngẫu nhiên
-(`Math.floor(Math.random() * 8) + 6` mỗi 110ms) kèm 5 message cố định đổi theo ngưỡng %, rồi khi
-chạm 100% mới gọi `handleAutoHealAll()` — hàm xử lý thật chạy đồng bộ, tức thời. Thanh tiến độ này
-**không phản ánh xử lý thật đang diễn ra** — kỹ sư nhìn tưởng hệ thống đang tính toán nhiều bước
-nhưng thực chất toàn bộ xử lý xảy ra trong 1 lần gọi hàm ở cuối.
-
-**Yêu cầu:**
-
-- Bỏ cơ chế `setInterval` random-percent + message theo ngưỡng % giả.
-- Thay bằng: khi bấm Bước 1 / nút Auto, set `isAutoHealing = true` (giữ nguyên state này vì
-  `StepTabsNav` đang dùng để hiện icon loading), gọi `handleAutoHealAll()` ngay (bọc trong
-  `requestAnimationFrame` hoặc `setTimeout(fn, 0)` nếu cần để UI kịp render trạng thái loading trước
-  khi block main thread), rồi set `isAutoHealing = false`, `healCompleted = true` khi xong.
-- Bỏ hẳn `healProgress` (số %) và `healStatusMessage` (5 message cố định) khỏi state nếu không còn
-  dùng ở đâu khác — kiểm `StepTabsNav.tsx` đang render cả 2 prop này, cập nhật UI ở đó cho phù hợp
-  (vd: hiện "Đang xử lý…" tĩnh thay vì % + message, hoặc bỏ hẳn khối hiển thị % nếu không còn ý
-  nghĩa). Giữ nguyên toàn bộ layout/màu sắc còn lại của `StepTabsNav`, không thiết kế lại giao diện.
-- Không đổi hành vi thật của `handleAutoHealAll()` (logic dọn rác/font/layer/dim/block) — chỉ bỏ lớp
-  UI giả lập tiến độ bọc ngoài nó.
-
-**Tiêu chí đạt:** `npm run lint` + `npm run typecheck` xanh; bấm Auto-heal trên UI (kiểm bằng
-browser/dev server) vẫn cho ra đúng kết quả chuẩn hóa như trước (điểm số, layer, text), không còn
-thanh % chạy giả; không còn `Math.random()` trong luồng auto-heal.
-
-### Việc 7.5 — Sửa `drawing_revisions.status = 'pending'` vi phạm CHECK constraint (`route: standard`)
-
-**Vấn đề đã xác minh trên Postgres thật (không phải suy đoán):** `app/api/engineering/cad/save-drawing/route.ts:182`
-gán `const revStatus = isApproved ? "approved" : "pending";` rồi insert vào `drawing_revisions.status`.
-Constraint gốc ở `migrations/0016_drawings.sql:29-30`:
-`CHECK (status IN ('submitted','commented','approved','approved_with_comments','rejected','superseded'))`
-— **chưa từng được nới** ở bất kỳ migration sau nào (đã `grep` toàn bộ `migrations/*.sql`, chỉ có
-`0016` định nghĩa cột này). `'pending'` không nằm trong danh sách → mọi lần lưu bản vẽ **chưa duyệt**
-(`isApproved=false`, tức luồng "lưu tạm" mặc định của trang) làm INSERT vào `drawing_revisions` ném
-lỗi CHECK → route trả 500, **nhưng file đã ghi ra đĩa và dòng `drawings` đã được tạo/insertId trước
-đó** → dữ liệu mồ côi (có file + có `drawings` row, không có `drawing_revisions` row tương ứng).
-
-**Đính chính:** `drawings.kind = 'design'` (giá trị dùng khi lưu Bước 2) **không phải bug** —
-`migrations/0048_drawing_kind_design.sql` đã nới CHECK của `drawings.kind` gồm `'design'` từ trước.
-Chỉ sửa đúng `drawing_revisions.status`, không đụng gì tới `drawings.kind`.
-
-**Đặc tả kín — không cần migration, chỉ sửa giá trị ứng dụng:**
-
-- Trong `app/api/engineering/cad/save-drawing/route.ts`, đổi dòng gán `revStatus`:
-  ```ts
-  const revStatus = isApproved ? "approved" : "submitted";
-  ```
-  Lý do chọn `"submitted"` thay vì thêm `'pending'` vào CHECK: `'submitted'` đã có sẵn trong enum và
-  đúng nghĩa "đã nộp, chờ quyết định" cho một revision chưa được duyệt — khớp domain hiện có, không
-  cần migration/staging, không có rủi ro nới CHECK ảnh hưởng chỗ khác. Đã `grep` toàn repo xác nhận
-  `'pending'` cho `drawing_revisions` chỉ dùng đúng 1 chỗ này, không nơi nào khác đọc/so sánh giá trị
-  `'pending'` của cột này nên đổi an toàn.
-- Kiểm tra toàn bộ file có nhánh nào khác so sánh `revStatus === "pending"` hay đọc lại `status` từ
-  DB rồi so `"pending"` không (hiện chưa thấy, nhưng worker phải tự grep lại trong đúng file này để
-  chắc chắn không bỏ sót nhánh nào trước khi coi là xong).
-- Thêm test trong `tests/engineering-cad-save-drawing.test.ts` (file đã có từ Việc 7.2): case gọi
-  `POST /api/engineering/cad/save-drawing` với `isApproved: false` (mặc định) bằng vai trò hợp lệ
-  (`admin`/`pm`/`engineer`) trên `TEST_DATABASE_URL` thật → phải trả **200/201** (không còn 500), và
-  dòng `drawing_revisions` tạo ra có `status = 'submitted'`.
-
-**Tiêu chí đạt:** `npm run typecheck` xanh; test mới pass trên `TEST_DATABASE_URL`; test cũ của
-7.1/7.2 trong cùng file không đổi hành vi.
-
-### Việc 7.6 — Siết `normalizeCadLayers` theo ranh giới token, sửa hồi quy layer điện/ống nước (`route: complex`)
-
-**Vấn đề đã xác minh (kết quả chạy thật, không phải suy đoán):** hàm `normalizeCadLayers` trong
-`lib/cad/dxf-parser.ts` (nguồn chuẩn duy nhất sau Việc 7.3) dùng `String.includes()` trên toàn chuỗi
-layer đã upper-case, không có ranh giới từ, nên bắt nhầm chuỗi con nằm giữa từ khác nghĩa. 2 case đã
-xác nhận cho ra kết quả sai:
-
-- `"MANG_CAP_DIEN"` (máng cáp điện) → nhánh `PIPE` được kiểm tra **trước** nhánh `ELEC`, và nhánh
-  `PIPE` có điều kiện `l.includes("CAP")` (ý định: "cấp nước") → khớp nhầm vì `"CAP"` cũng là chuỗi
-  con của `"MANG_CAP_DIEN"` (bản thân nó là "cáp điện", không phải "nước cấp") → kết quả sai:
-  `P-PIPE-DOMW`, đúng ra phải là `E-TRAY-PWRR`.
-- `"ONG_THOAT_SAN"` (ống thoát sàn) → nhánh `DUCT` được kiểm tra **trước** nhánh `PIPE`, và nhánh
-  `DUCT` có điều kiện `l.includes("OA")` (ý định: outside air) → khớp nhầm vì `"OA"` là chuỗi con của
-  `"THOAT"` (T-H-**O-A**-T) → kết quả sai: `M-DUCT-SUPP`, đúng ra phải là `P-PIPE-SANR`.
-
-**Đặc tả — sửa cách khớp, giữ nguyên toàn bộ danh sách từ khóa và tên layer đích đã có:**
-
-- Thay mọi `l.includes(X)` bằng khớp có ranh giới từ thật sự — dùng regex `new RegExp("(^|[^A-Z0-9])" + X + "($|[^A-Z0-9])")` (layer CAD thường phân tách bằng `_`/`-`/khoảng trắng, không phải chữ-số liền nhau) hoặc viết 1 helper `hasToken(l: string, token: string): boolean` dùng chung cho toàn hàm — **không đổi bất kỳ token/danh sách từ khóa nào đang có**, chỉ đổi cách so khớp.
-- Đổi thứ tự ưu tiên nhánh: kiểm nhánh `ELEC`/`ELV` (điện nhẹ/nặng) **trước** nhánh `PIPE`, và có thể
-  cần đặt `PIPE` trước `DUCT` hoặc ngược lại tuỳ để 2 case trên ra đúng — worker tự xác định thứ tự
-  đúng bằng cách chạy lại 2 case xác nhận ở trên làm tiêu chí, cộng thêm chạy lại **toàn bộ** input
-  mẫu đang có trong `tests/engineering-cad-dxf-parser.test.ts` / `tests/engineering-cad-skills.test.ts`
-  liên quan tới `normalizeCadLayers` để đảm bảo không có case đang đúng bị đổi thành sai.
-- Thêm test case mới trực tiếp cho `normalizeCadLayers` (đặt cạnh test hiện có của hàm này) đúng 2
-  case đã xác nhận sai ở trên: `"MANG_CAP_DIEN"` → phải chứa `E-TRAY-PWRR`, `"ONG_THOAT_SAN"` → phải
-  chứa `P-PIPE-SANR`.
-
-**Ranh giới quyết định được phép (route: complex):** được tự chọn cách viết helper ranh giới từ
-(regex hay tách chuỗi thủ công), được tự quyết thứ tự nhánh miễn thoả cả 2 case xác nhận lẫn mọi test
-cũ đang pass. **Không được** thêm/bớt/đổi bất kỳ từ khóa hay tên layer đích (`M-DUCT-*`, `P-PIPE-*`,
-`E-*`, `F-SPRN-PIPE`, `ELV-CABL-TRAY`, `S-GRID-COLS`, `G-ANNO-TEXT`) nào ngoài việc sửa cách khớp và
-thứ tự nhánh; không đụng `convertTcvn3ToUnicode`/`TCVN3_MAP`/phần còn lại của `dxf-parser.ts`.
-
-**Tiêu chí đạt:** `npm run lint` + `npm run typecheck` + `npm test` xanh; 2 test case mới pass; không
-có test cũ nào liên quan `normalizeCadLayers` chuyển từ pass → fail.
-
-### Sau khi cả 6 việc xong
-
-Cập nhật `PROGRESS.md` (mục "Đã làm") tóm tắt thêm Việc 7.5–7.6 vào đúng mục Việc 7 đã có, đính chính
-rõ phát hiện `drawings.kind='design'` ở báo cáo trước là false positive (đã có migration `0048` từ
-trước). Không đóng mục `M99`/`M98` trong `docs/nang-cap/README.md`.
-
-## Cổng mở rộng sau đó
-
-Chỉ cân nhắc Engineering OS nâng cao, Digital Twin, Predictive OS hoặc Controlled Autonomy khi đồng thời đạt:
-
-1. ENG-1→ENG-4 có traffic thật từ MEPF-Agents và pilot qua ít nhất một chu kỳ vận hành.
-2. UAT của PM/QA xác nhận Gate 0, risk profile, SoD và cơ chế `no_consensus` hoạt động phù hợp.
-3. Monitoring, audit và quy trình xử lý sự cố đủ cho dữ liệu kỹ thuật thật.
-4. Có owner nghiệp vụ, phạm vi side effect và cơ chế rollback được phê duyệt bằng workflow.
-
-Sau cổng này, thi hành tuần tự O1 System of Record → O2 Digital Twin → O3 Predictive OS → O4 Controlled Autonomy → O5 closeout. A3+ cần người dùng phê duyệt riêng theo từng workflow type; không suy ra quyền từ việc O1–O3 đã hoàn thành.
-
-## Loại khỏi giai đoạn này
-
-- Không thêm mô hình AI/LLM tự quyết hoặc cơ chế majority vote.
-- Không tự động thực thi thay đổi nghiệp vụ.
-- Không mở rộng module mới chỉ vì đã có khung dữ liệu kỹ thuật.
+# PLAN.md — Đợt "nâng tầm dự án" GĐ1: bịt lỗ bảo mật + trung thực hoá dữ liệu
+
+**Cập nhật:** 2026-08-24
+**Nguồn:** `docs/audit-2026-08-24-nang-tam.md` (báo cáo audit 4 miền, commit `872697f`)
+**Nhánh nền:** `claude/nang-tam-du-an-5yexhe` (đã khớp `origin/main` = `5e42b8d`)
+
+## Bối cảnh — vì sao đợt này
+
+Đợt audit 2026-08-24 kết luận: **lõi nghiệp vụ không hồi quy**, nhưng lớp module `engineering/*`
+thêm gần đây (M76–M99) mang **4 lỗ hổng mức Cao** và một loạt vấn đề toàn vẹn dữ liệu, do lớp này
+được xây vượt cổng của chính roadmap và chưa từng đi qua checklist `docs/audit.md`.
+
+Người dùng duyệt "triển khai theo hướng tốt nhất" (2026-08-24) và chốt 2 quyết định treo:
+
+- **Module vượt gate:** đóng băng bằng feature flag (đảo ngược được), **không** gỡ code → GĐ2.
+- **Bot hiện trường:** đổi sang thông điệp trung thực + đánh dấu thử nghiệm; **không** wire thật
+  vào WBS/NCR/vật tư trong đợt này (là tính năng riêng, cần đặc tả sau).
+
+**Phạm vi GĐ1 (kế hoạch này):** V1–V8 — vá 4 lỗ Cao, chặn ghi chéo dự án, trung thực hoá dữ liệu
+hiển thị, dọn doc drift. **GĐ2 (kế hoạch sau, không thi hành trong đợt này):** cổng CI
+`check:route-perms`/`check:project-scope`, lưới quét axe ~45 route, coverage ratchet, đóng băng
+module vượt gate bằng flag.
+
+## Quy ước bắt buộc cho MỌI việc trong kế hoạch này
+
+Worker không thấy hội thoại trước đó — mọi thứ cần biết nằm trong brief của việc đó và các mục
+dưới đây.
+
+- **Đọc trước khi sửa:** `CLAUDE.md` (mục Auth, Kiến trúc `lib/` theo miền ADR-0007, Quy ước) và
+  `docs/audit.md` §3/§4 (checklist bảo mật + toàn vẹn dữ liệu). Việc chạm `lib/bao-mat/*` bắt buộc
+  rà thêm §8 "Vùng rủi ro cao".
+- **Ranh giới kiến trúc (ADR-0007/0008):** route handler **chỉ** là ranh giới HTTP (kiểm phiên/
+  quyền, đọc tham số, gọi dịch vụ, bọc `NextResponse`); logic nghiệp vụ nằm ở `lib/<miền>/`. Import
+  nội bộ luôn dùng alias `@/lib/<miền>/<module>`. Chạy `npm run check:lib-layers` trước khi báo xong.
+- **SQL:** luôn qua helper `lib/db` với placeholder `?`, **không nối chuỗi chèn giá trị**.
+- **Tiếng Việt:** toàn bộ UI, comment code, commit message. Commit theo conventional prefix
+  (`fix:`/`feat:`/`chore:`/`docs:`) + mô tả tiếng Việt.
+- **Migration:** số kế tiếp là **`0133`** — nhưng **bắt buộc chạy `ls migrations | sort -V | tail -3`
+  ngay trước khi tạo file** để lấy số thật (bài học PR #265/#266 trùng số `0071` chặn CI). Append-only,
+  idempotent (`IF NOT EXISTS`). Chạy `npm run gen:erd` cùng PR nếu đổi schema.
+- **Test:** file test chạm DB **phải** `import "./setup"` (hoặc `tests/setup.ts`) ở **dòng đầu tiên**.
+  Test mới phải thêm vào lệnh `npm test` trong `package.json` nếu runner không tự quét.
+- **Cổng trước khi báo xong:** `npm run lint` + `npm run typecheck` + `npm test` + `npm run build`
+  xanh. Không có Postgres thì integration test tự skip — ghi rõ trong báo cáo, không coi là pass.
+- **Chứng minh test bắt được lỗi cũ:** với mỗi bản vá bảo mật/logic, tạm trả code về bản cũ, chạy
+  test mới → phải **đỏ**; khôi phục → **xanh**. Ghi kết quả này vào báo cáo. Không chỉ viết test rồi
+  thấy nó xanh là xong.
+- **Không mở rộng phạm vi:** không refactor ngoài vùng được giao, không nâng dependency, không đổi
+  kiến trúc, không tự thêm module mới.
+
+---
+
+## Việc V1 — Xác thực webhook inbound + chuẩn hoá OTP liên kết (`route: complex`)
+
+**Vá lỗ hổng Cao A1 + A2 + phát hiện Trung B9.** Chạm `lib/bao-mat/*` → vùng rủi ro cao.
+
+### Vấn đề thật (đã xác minh trên code)
+
+1. `app/api/telegram/webhook/route.ts` — POST công khai, **không kiểm secret token nào** (grep toàn
+   repo không có `TELEGRAM_WEBHOOK_SECRET`/`Secret-Token`). Ai cũng POST giả tin nhắn được.
+2. `lib/ky-thuat/engineering-site-bot.ts:190` — `verifyTelegramLinkOtp` tra
+   `WHERE otp_code = ? AND otp_expires_at > CURRENT_TIMESTAMP AND is_verified = false`: **có** kiểm
+   hạn nhưng **không gắn `chatId`/`userId`**, không rate-limit, không đếm số lần sai → dò mã 6 số là
+   chiếm được binding của **user bất kỳ đang chờ liên kết**.
+3. `app/api/zalo/webhook/route.ts:17` — POST công khai không chữ ký;
+   `const projectId = Number(body.projectId || 1)` lấy thẳng từ body rồi dùng chính giá trị đó cho
+   `withProjectScope` → **RLS bị hợp thức hoá bằng giá trị attacker đưa vào**.
+4. `lib/ky-thuat/engineering-zalo-copilot.ts:141` — `verifyZaloLinkOtp` **SELECT `otp_expires_at`
+   nhưng không bao giờ so sánh** → OTP hết hạn vẫn verify được. `processIncomingZaloMessage` không
+   kiểm `zalo_user_bindings.is_verified`.
+5. Cả 2 luồng sinh OTP dùng `ON CONFLICT (id)` trên UUID tự sinh → **không bao giờ conflict** → mỗi
+   lần generate thêm 1 dòng binding trùng. OTP lưu **plaintext**.
+
+### Việc phải làm
+
+**(a) Module dùng chung `lib/bao-mat/webhook-inbound.ts` (mới):**
+
+- `xacThucWebhookTelegram(req: NextRequest): boolean` — so sánh header
+  `X-Telegram-Bot-Api-Secret-Token` với `process.env.TELEGRAM_WEBHOOK_SECRET` bằng
+  `crypto.timingSafeEqual` (bọc try/catch cho độ dài lệch). **Fail-fast**: thiếu biến env →
+  `throw` với thông điệp tiếng Việt rõ ràng (cùng pattern `CRON_SECRET`, xem `lib/nen/env.ts` style).
+  Route trả **401** khi không khớp.
+- `xacThucWebhookZalo(req, rawBody): boolean` — xác thực chữ ký Zalo OA theo `ZALO_OA_SECRET`
+  (HMAC-SHA256 của raw body, so `timingSafeEqual`). Thiếu env → throw fail-fast.
+- **Ranh giới được phép quyết:** cách đọc raw body cho Zalo (Next App Router cần `req.text()` rồi
+  `JSON.parse` thay vì `req.json()` để HMAC đúng byte gốc) — chọn cách tối thiểu, ghi comment lý do.
+
+**(b) Module dùng chung `lib/bao-mat/otp.ts` (mới)** — gom 2 (hiện là 3, tính cả e-Sign ở V2) chỗ tự
+chế OTP đang dính 3 kiểu lỗi khác nhau:
+
+- `sinhOtp(): string` — 6 chữ số ngẫu nhiên bằng `crypto.randomInt`.
+- `hashOtp(otp: string): string` — SHA-256 hex (không cần bcrypt: OTP sống ngắn, có rate-limit).
+- `kiemOtp(otpNhap: string, hashLuu: string | null): boolean` — so `timingSafeEqual` trên hash.
+- **Không** tự truy vấn DB — chỉ hàm thuần, để test được không cần Postgres (đặt ở tầng
+  `lib/bao-mat/` = tầng 3, chỉ import từ `lib/nen/`).
+
+**(c) Áp vào Telegram:**
+
+- Route kiểm secret token **ngay dòng đầu handler**, trước cả `req.json()`.
+- `verifyTelegramLinkOtp(chatId, otpCode)` — thêm tham số `chatId`, điều kiện WHERE phải gồm
+  `telegram_chat_id IS NULL OR telegram_chat_id = ?` (chỉ nhận binding chưa gắn chat khác), so OTP
+  bằng hash qua `kiemOtp`, và **rate-limit theo chatId**: `hitRateLimit(\`tg_otp:\${chatId}\`, 5, 15)`(chữ ký thật:`hitRateLimit(key: string, max: number, windowMinutes: number): Promise<boolean>`từ`lib/bao-mat/ratelimit.ts`— trả`true` khi **còn được phép**, kiểm lại chiều trả về trước khi dùng).
+  Vượt ngưỡng → trả về false, không tra DB.
+- Sinh OTP: lưu **hash** vào `otp_code`, upsert theo `user_id` (không phải `id`).
+
+**(d) Áp vào Zalo:**
+
+- Route kiểm chữ ký ngay đầu handler → 401 khi sai.
+- **Bỏ hẳn `body.projectId`.** `projectId` **suy từ binding**: tra
+  `zalo_user_bindings WHERE zalo_user_id = ? AND is_verified = true` → lấy `project_id` của dòng đó.
+  Không có binding verified → trả 403 kèm thông điệp tiếng Việt hướng dẫn liên kết trước, **không**
+  xử lý tin nhắn, **không** ghi log message.
+- `verifyZaloLinkOtp`: thêm `AND otp_expires_at > CURRENT_TIMESTAMP`, so OTP qua hash, rate-limit
+  theo `zaloUserId` như Telegram.
+- Sinh OTP: lưu hash, upsert theo `(project_id, zalo_user_id)`.
+
+**(e) Migration `0133_webhook_otp_hardening.sql`** (xác nhận số thật trước):
+
+- `CREATE UNIQUE INDEX IF NOT EXISTS` trên `zalo_user_bindings(project_id, zalo_user_id)` —
+  **lưu ý:** dữ liệu hiện có thể đã trùng do bug (e); migration phải **dọn trùng trước** (giữ dòng
+  `is_verified = true` nếu có, ngược lại giữ dòng mới nhất theo `created_at`) rồi mới tạo unique index.
+  Viết idempotent, chạy lại không lỗi.
+- Đây là migration **đụng dữ liệu** (DELETE dòng trùng) → ghi rõ trong PR là **bắt buộc qua staging
+  trước** theo DoD `CLAUDE.md`, kiểm trước bằng `npm run db:migrate -- --dry-run`.
+
+**(f) Biến môi trường:** thêm `TELEGRAM_WEBHOOK_SECRET`, `ZALO_OA_SECRET` vào `lib/nen/env.ts`
+(danh sách liệt kê) + `.env.example` + mục "Biến môi trường quan trọng" trong `CLAUDE.md`, ghi rõ
+thiếu biến → throw fail-fast khi gọi webhook (build vẫn chạy).
+
+### Tiêu chí chấp nhận
+
+- POST vào 2 route webhook **không kèm secret/chữ ký hợp lệ** → 401, không ghi bất kỳ dòng DB nào.
+- Zalo: `projectId` trong body bị **bỏ qua hoàn toàn**; user chưa có binding verified → 403, không
+  ghi log.
+- Dò OTP: quá 5 lần sai trong 15 phút cho cùng chatId/zaloUserId → bị chặn.
+- OTP hết hạn (Zalo) → verify thất bại.
+- Sinh OTP 2 lần liên tiếp cho cùng user → **1 dòng binding**, không phải 2.
+- `tests/webhook-inbound.test.ts` (mới) + mở rộng test OTP: unit thuần cho `otp.ts` và hàm xác thực
+  chữ ký (không cần DB); integration cho luồng binding (tự skip khi thiếu `TEST_DATABASE_URL`).
+- **Chứng minh test bắt lỗi cũ** theo quy ước chung ở trên.
+
+---
+
+## Việc V2 — Siết quyền ký e-Sign (`route: spec`)
+
+**Vá lỗ hổng Cao A3.** Đặc tả kín, chỉ cần thi hành chính xác.
+
+### Vấn đề thật (đã xác minh trên code)
+
+`app/api/engineering/esign/sign/route.ts:11` gate bằng `CAN.viewEngineeringGraph` — đọc
+`lib/bao-mat/auth.ts:359` thấy hàm này trả true cho `admin | pm | engineer | **bch**`, tức **quyền
+XEM, bao gồm vai trò chỉ-xem `bch`**, lại dùng để gate hành vi **ký**. Cộng thêm:
+
+- `signatoryId` do client chọn, không ràng buộc gì với tài khoản đang đăng nhập → **1 user ký được
+  cả 3 bên** (CĐT/TVGS/Nhà thầu).
+- `lib/ky-thuat/engineering-esignature.ts:204` — `if (signatory.otpCode && otpCode)`: chỉ kiểm OTP
+  khi client **tự nguyện gửi** trường `otpCode`; bỏ trường đi là qua mặt hoàn toàn.
+- Không kiểm `status === 'ready'` (chỉ chặn `'signed'`) → ký sai thứ tự được.
+- `projectId` từ body không đối chiếu `visibleProjectIds`.
+
+**Không cần migration:** bảng `engineering_esign_signatories` (`migrations/0117_*.sql:20`) **đã có**
+cột `user_id BIGINT REFERENCES users(id)` — hiện đang nullable và không được dùng để kiểm.
+
+### Việc phải làm
+
+1. **Quyền:** thêm `CAN.signEngineeringEsign` vào map `CAN` trong `lib/bao-mat/auth.ts` —
+   `(r?: Role) => r === "admin" || r === "pm" || r === "engineer"` (loại `bch` và mọi
+   `VIEW_ONLY_ROLES`). Route đổi sang dùng quyền này. **Không** check role rải rác ngoài map `CAN`.
+2. **Ràng buộc người ký:** trong `executeSignEnvelope`, sau khi tải signatory:
+   - `signatory.user_id == null` → trả lỗi 422 "Người ký chưa được gắn tài khoản hệ thống".
+   - `Number(signatory.user_id) !== user.id` → trả lỗi **403** "Bạn không phải người ký của mục này".
+   - Hàm nhận `user.id` qua **tham số** (không tự gọi `getCurrentUser()` bên trong — giữ hàm test
+     được ngoài phạm vi request, đúng tiền lệ `chotProjectIdChoGhi`).
+3. **OTP bắt buộc:** đổi `if (signatory.otpCode && otpCode)` thành: nếu `signatory.otp_code` tồn tại
+   thì **bắt buộc** phải có `otpCode` hợp lệ và **còn hạn** (`otp_expires_at > NOW()`), thiếu/sai → 422. So OTP qua `kiemOtp` của `lib/bao-mat/otp.ts` (module do V1 tạo — **nếu V1 chưa tích hợp,
+   dùng so sánh `timingSafeEqual` tại chỗ và ghi chú TODO gộp về `otp.ts`; không tự tạo module trùng tên**).
+4. **Thứ tự ký:** yêu cầu `signatory.status === 'ready'`; khác → 409 kèm thông điệp tiếng Việt nêu
+   trạng thái hiện tại.
+5. **Project scope:** `projectId` qua
+   `chotProjectIdChoGhi(user, body.projectId, await getCurrentProjectId(user, user.orgId))` từ
+   `lib/ha-tang/projects.ts` (chữ ký thật:
+   `(user: {id, role}, inputProjectId: unknown, projectHienTai: number) => Promise<{ok:true,projectId}|{ok:false}>`);
+   `ok:false` → 403.
+6. **Tài liệu:** trong `PROGRESS.md`, **mở lại** nợ "ký số PAdES" — ghi rõ module M84 chưa đạt mức
+   "chống chối bỏ" như mô tả, nêu 4 điểm đã vá ở việc này và phần còn thiếu (PAdES thật/USB token/HSM
+   vẫn chờ nhu cầu pháp lý, đúng mục "Việc tạm hoãn").
+
+### Tiêu chí chấp nhận
+
+- Vai trò `bch`/`cdt`/`viewer`/`subcon` gọi POST sign → **403**.
+- User A cố ký signatory gắn user B → **403**.
+- Signatory có `otp_code` mà request **không** gửi `otpCode` → **422** (trước đây: ký thành công).
+- Signatory `status='waiting'` → **409**.
+- `projectId` trỏ dự án ngoài `visibleProjectIds` → **403**.
+- `tests/esign-sign-guard.test.ts` (mới) phủ đủ 5 ca trên; chứng minh test đỏ khi trả về code cũ.
+
+---
+
+## Việc V3 — Phân quyền 14 route engineering ghi dữ liệu (`route: spec`)
+
+**Vá lỗ hổng Cao A4.**
+
+### Vấn đề thật (đã xác minh: phiên chính tự đếm)
+
+14 file trong `app/api/engineering/` có `POST|PATCH|DELETE` mà **không tham chiếu `CAN.` nào**
+(chỉ có `getCurrentUser`), tức vai trò chỉ-xem và subcon ghi được:
+
+```
+subcon-ai/evaluate            subcon-ai/recommend-shortlist
+bim-models/                   bim-models/[id]/link-wbs        bim-models/[id]/simulate-4d
+god-tier/bcf/topics           god-tier/point-cloud            god-tier/ai-diagnose
+god-tier/clashes              god-tier/models                 god-tier/cnc-export
+god-tier/simulate-4d          iot/telemetry                   iot/alerts
+```
+
+Hệ quả cụ thể: `viewer`/`cdt` tạo/ghi đè mô hình BIM và gắn `wbs_task_id`; POST `iot/telemetry` giả
+số đo → **tự sinh cảnh báo an toàn HSE CRITICAL thật** (`route.ts:111-128`); PATCH `iot/alerts` ack
+tắt cảnh báo an toàn; POST `subcon-ai/evaluate` — **thầu phụ tự chấm điểm tín nhiệm của chính mình**
+với metrics tự khai từ body (`onTimeRate ?? 90`, `bbntPassRate ?? 95`).
+
+### Việc phải làm
+
+1. **Thêm 4 cặp quyền vào map `CAN`** (`lib/bao-mat/auth.ts`, bám đúng pattern các cặp
+   `viewEngineering*`/`manageEngineering*` đã có ở dòng 337–379):
+   - `viewEngineeringBim` / `manageEngineeringBim`
+   - `viewEngineeringIot` / `manageEngineeringIot`
+   - `viewEngineeringSubconAi` / `manageEngineeringSubconAi`
+   - `viewEngineeringGodTier` / `manageEngineeringGodTier`
+
+   Quy tắc chung: `view*` = `admin | pm | engineer | bch`; `manage*` = `admin | pm | engineer`
+   (**loại toàn bộ `VIEW_ONLY_ROLES` và `subcon`**). Ngoại lệ bắt buộc:
+   `manageEngineeringSubconAi` = `admin | pm` (chấm điểm nhà thầu là việc quản lý, **subcon và
+   engineer không được tự chấm**).
+
+2. **Áp vào 14 file:** mọi handler `GET` dùng `view*`, mọi `POST|PATCH|DELETE` dùng `manage*`; trả
+   **403** kèm thông điệp tiếng Việt khi không đủ quyền, **401** khi chưa đăng nhập (giữ nguyên
+   `getCurrentUser` sẵn có). Bám đúng pattern route engineering đã làm đúng (tham chiếu:
+   `app/api/engineering/twin/**` hoặc route bất kỳ đang dùng cặp `viewEngineeringTwin`/`manageEngineeringTwin`).
+
+3. **Chặn metrics tự khai của `subcon-ai/evaluate`:** bỏ mọi default kiểu `onTimeRate ?? 90` nhận từ
+   body. Metrics phải **tính từ dữ liệu hệ thống**. Nếu nguồn dữ liệu thật chưa sẵn cho một chỉ số
+   nào thì **trả `null` + ghi rõ "chưa đủ dữ liệu"**, tuyệt đối **không** thay bằng số mặc định đẹp.
+   Đặt logic tính ở `lib/hien-truong/` hoặc `lib/ky-thuat/` theo đúng miền của nguồn dữ liệu (không
+   để trong route — ADR-0008).
+
+4. **Kèm 2 sửa nhỏ cùng vùng file (phát hiện Thấp):**
+   - `bim-models/route.ts:76-92` — chèn element **từng dòng trong vòng lặp, không transaction, không
+     cap số lượng**: đổi sang batch insert (multi-row `VALUES` hoặc `UNNEST`), bọc `withTransaction`,
+     cap `elements.length` (đề xuất 10 000) → **422** khi vượt.
+   - `iot/telemetry/route.ts:111-128` — alert **không dedup**: trước khi insert, kiểm alert đang mở
+     cho cùng `device_id`; hoặc partial unique index `(device_id) WHERE resolved_at IS NULL`. Bám
+     đúng cơ chế dedup notification của dự án. Cần migration → dùng số thật, idempotent.
+
+### Tiêu chí chấp nhận
+
+- Chạy lại phép đếm của audit: `for f in $(grep -rln "export async function \(POST\|PATCH\|DELETE\)" app/api/engineering/); do grep -q "CAN\." "$f" || echo "$f"; done`
+  → **0 file** (hoặc chỉ còn file có lý do ghi rõ trong báo cáo).
+- `viewer`/`cdt`/`subcon` POST vào 14 route → **403**.
+- `engineer` POST `subcon-ai/evaluate` → **403** (chỉ `admin`/`pm`).
+- `subcon-ai/evaluate` không còn nhận bất kỳ chỉ số nào từ body.
+- POST `bim-models` với 20 000 element → **422**; với số hợp lệ mà lỗi giữa chừng → **không** để lại
+  model mồ côi.
+- Test mới phủ ma trận quyền 7 vai trò cho ít nhất 1 route đại diện mỗi nhóm (bim/iot/subcon-ai/god-tier).
+
+---
+
+## Việc V4 — `projectId` phải lấy từ phiên, không từ body (`route: spec`)
+
+**Vá phát hiện Trung B1.**
+
+### Vấn đề thật
+
+~15 route engineering dùng mẫu `Number(body.projectId || (user as any).projectId || 1)` —
+`user.projectId` **không tồn tại** trên kiểu `User` nên biểu thức rơi về **giá trị client gửi**, hoặc
+`1`. Nhiều chỗ còn dùng chính giá trị đó cho `withProjectScope` nên RLS không chặn. Trái quy ước ghi
+ngay trong `lib/ha-tang/projects.ts:1-3`: _"Route KHÔNG tin project_id client gửi qua body/query"_.
+Cùng lớp lỗi đã xảy ra thật với `/api/payment-certs` và `save-drawing` (đã vá đợt trước).
+
+**Danh sách khoanh vùng** (worker tự grep `body.projectId` trong `app/api/engineering/` + `app/api/zalo/`
+để lấy danh sách đầy đủ, không tin danh sách này là đủ):
+`bidding` (×3), `fidic/claims`, `routing/sleeves`, `queue/tasks/[id]/bridge`, `spatial/annotations` (×2),
+`logistics` (×2), `pinnacle/pulse`, `esign` (×2 — **phối hợp V2**), `cashflow/simulate`, `hse-vision/scan`.
+
+### Việc phải làm
+
+1. Thay toàn bộ mẫu trên bằng `chotProjectIdChoGhi(user, body.projectId, projectHienTai)` từ
+   `lib/ha-tang/projects.ts` (chữ ký thật ghi ở V2 mục 5), `ok:false` → **403**. Với route **chỉ đọc**,
+   dùng `getCurrentProjectId(user, user.orgId)` và bỏ hẳn `body.projectId`.
+2. **Không** đụng các route đã đúng; không refactor gì khác trong file.
+3. **Mở rộng bất biến thành test cưỡng chế:** dựa trên `tests/cad-project-scope.test.ts` (đã có mẫu
+   cho nhóm CAD) và `tests/project-scope-invariant.test.ts`, viết/mở rộng test **thuần fs** quét toàn
+   bộ `app/api/engineering/**`: cấm mẫu `body.projectId`/`formData.get("projectId")` trừ khi file đó
+   cũng tham chiếu `chotProjectIdChoGhi`. Whitelist phải kèm **lý do từng mục** (đúng tiền lệ
+   `tests/org-scope-invariant.test.ts` 24 mục).
+
+### Tiêu chí chấp nhận
+
+- Grep `body.projectId` trong `app/api/engineering/` → mọi kết quả còn lại đều đi qua
+  `chotProjectIdChoGhi`, hoặc nằm trong whitelist có lý do.
+- User thuộc dự án A gửi `projectId` của dự án B (ngoài `visibleProjectIds`) → **403**, không ghi dòng nào.
+- Test bất biến mới **đỏ** nếu thêm lại một route dùng `body.projectId` trần.
+
+---
+
+## Việc V5 — Trung thực hoá dữ liệu hiển thị: bot hiện trường + Smart IPC (`route: standard`)
+
+**Vá phát hiện Trung B2 + B3.** Đây là lỗi **toàn vẹn dữ liệu** dù code "chạy đúng".
+
+### Vấn đề thật (đã xác minh trên code)
+
+**(a) Bot trả lời GIẢ** — `lib/ky-thuat/engineering-site-bot.ts:265,280` và
+`lib/ky-thuat/engineering-zalo-copilot.ts:185`:
+
+- `PROGRESS_UPDATE` → _"Hệ thống đã đồng bộ vào WBS"_
+- `ISSUE_REPORT` → _"Đã tạo Phiếu NCR… BCH đã nhận thông báo"_
+- `QUERY_STOCK` → _"Tồn kho khả dụng 450 đơn vị"_ / _"Hiện còn 180 đơn vị tại Kho Tổng A"_ —
+  **số bịa cứng trong code**
+
+Thực tế **chỉ ghi log tin nhắn**, không đụng `tasks`/`ncrs`/`materials`. Kỹ sư ngoài công trường tin
+là tiến độ/NCR đã vào hệ thống → mất dữ liệu thật; số tồn kho giả có thể dẫn tới quyết định cấp phát sai.
+
+**(b) Smart IPC (M94)** — `app/api/engineering/smart-ipc/route.ts:51-61` +
+`lib/ky-thuat/engineering-smart-ipc.ts:47-120`: toàn bộ `gating` ("BBNT 3 bên", "thử áp IoT", "đối
+soát BOQ/kho") lấy từ body với default **pass hết** (`bbntSigned3Parties !== false`);
+`grossClaimedVnd` default 500.000.000; tiền tính `parseFloat` + `Math.round(gross * rate)` trên
+**float JS** (trái quy ước M45); payload "lệnh chuyển khoản" chứa **số tài khoản hardcode**
+`98877665544`.
+
+### Việc phải làm
+
+**(a) Bot — quyết định đã chốt: đổi thông điệp, KHÔNG wire thật trong đợt này.**
+
+- Mọi reply hàm ý "đã ghi vào hệ thống" đổi thành thông điệp trung thực, ví dụ:
+  _"Đã ghi nhận yêu cầu cập nhật tiến độ [MÃ] → [X]%. Yêu cầu đang chờ xử lý, **chưa** cập nhật vào
+  WBS. Vui lòng cập nhật trên ứng dụng XBoss để ghi nhận chính thức."_
+- **Xoá hoàn toàn mọi số liệu bịa** (450/180 đơn vị, "Kho Tổng A", "DWG-M-01/02"). Intent tra cứu
+  trả: _"Tính năng tra cứu qua bot đang thử nghiệm, chưa nối dữ liệu thật — vui lòng tra trên ứng dụng."_
+- Thêm hậu tố `⚠️ Bot đang ở chế độ thử nghiệm` vào reply của mọi intent chưa nối dữ liệu thật.
+- **Không** xoá code, **không** đổi schema log — chỉ đổi nội dung reply + comment giải thích rõ trạng
+  thái thử nghiệm ngay đầu 2 file lib.
+
+**(b) Smart IPC:**
+
+- Bỏ mọi default "pass hết": mỗi cổng gating **phải** truy vấn nguồn thật
+  (`engineering_esign_envelopes` cho BBNT, log IoT cho thử áp, `boq_items`/kho cho đối soát). Nguồn
+  chưa sẵn → cổng đó trả trạng thái **`khong_du_du_lieu`** và **chặn** giải ngân, **không** mặc định pass.
+- Bỏ default `grossClaimedVnd = 500_000_000`; thiếu → **422**.
+- **Tiền:** mọi tổng/tích làm **trong SQL**; nếu buộc tính ở JS thì cast cột tiền `::text` trong
+  SELECT rồi dùng `lib/nen/money.ts` (`parseMoney`/`addMoney`/`mulRate`/`formatVnd` — làm việc trên
+  bigint đơn vị đồng×100). **Cấm `parseFloat` + `*` trên tiền.**
+- **Xoá số tài khoản hardcode**; nếu payload cần thông tin ngân hàng thì đọc từ dữ liệu nhà thầu
+  trong DB, không có thì để trống + ghi rõ "chưa cấu hình".
+
+### Tiêu chí chấp nhận
+
+- Grep toàn repo: **không còn** chuỗi `450 đơn vị`, `180 đơn vị`, `Kho Tổng A`, `98877665544`.
+- Không còn reply nào khẳng định đã ghi vào WBS/NCR khi thực tế chỉ ghi log.
+- Smart IPC: request thiếu dữ liệu gating → **chặn**, không "pass mặc định".
+- Test tiền: một ca chứng minh kết quả tính qua `lib/nen/money.ts` **khác** kết quả `parseFloat` cũ ở
+  ca biên (chứng minh bug float là thật), và giá trị mới là đúng.
+
+---
+
+## Việc V6 — CAD client hiển thị đúng lỗi + toast đúng ngữ nghĩa (`route: standard`)
+
+**Vá phát hiện Trung B4 + B6 và 1 phát hiện Thấp.**
+
+### Vấn đề thật (đã xác minh trên code)
+
+1. `app/engineering/chuan-hoa-ban-ve/hooks/useCadSource.ts:157-175` — `runDxfAnalysis` **chỉ** xử lý
+   `res.ok` và `401`; mọi mã khác bị bỏ qua hoàn toàn (spinner tắt, không toast, không error state).
+   Nghĩa là **409** (nhiều bản vẽ trùng tên — chính contract mới của `tim-ban-ve.ts` vừa vá đợt
+   trước) và **413** (quá giới hạn `GIOI_HAN_TEP_CAD`) **không tới được người dùng** → bản vá
+   chống-nhầm-bản-vẽ thành ra cụt ở client.
+2. `app/components/Toast.tsx:18` — `showToast(message, kind = "success")`; ~10 chỗ trong hooks CAD
+   gọi báo lỗi mà **không truyền kind** (`useSmartNaming.ts`, `useCadSource.ts:220`) → thông điệp lỗi
+   hiện nền emerald + icon ✓. Màu "nói dối", và `role="status"` cũng không phân biệt cho screen reader.
+3. `app/api/engineering/cad/save-drawing/route.ts:178,184` — 2 `catch {}` **rỗng** nuốt lỗi
+   (`unlinkSync` dọn bản tạm), trái `docs/audit.md` §7. Đây là 2 catch rỗng **duy nhất** trong `lib/`
+   - `app/api/`.
+
+### Việc phải làm
+
+1. `runDxfAnalysis`: thêm nhánh `!res.ok` → đọc `json.error`, hiện `showToast(msg, "error")` **và**
+   set error state để UI hiển thị (không chỉ toast thoáng qua). Giữ nguyên nhánh `401 → redirectToLogin()`.
+2. **Riêng 409:** response mang danh sách ứng viên bản vẽ — hiện **modal cho người dùng chọn đích
+   danh** (tái dùng `app/components/dialogs.tsx`, **không** tạo component mới nếu tránh được), chọn
+   xong gọi lại phân tích với `drawingId` cụ thể. Tuyệt đối **không** tự chọn hộ.
+3. Grep `showToast(` trong `app/engineering/chuan-hoa-ban-ve/` — mọi nhánh báo lỗi truyền `"error"`.
+4. 2 `catch {}` rỗng → thêm `console.error` kèm ngữ cảnh tiếng Việt.
+5. **UI theo chuẩn dự án:** dark-first, **không** dùng biến thể `dark:`, **không** hardcode hex; thẻ
+   `bg-zinc-900 border border-zinc-800 rounded-xl`; nút `rounded-lg`; nút icon-only có `aria-label`
+   tiếng Việt; modal có trạng thái loading/lỗi rõ ràng.
+
+### Tiêu chí chấp nhận
+
+- Server trả 409 → người dùng thấy modal chọn bản vẽ; chọn xong phân tích đúng bản đã chọn.
+- Server trả 413 → người dùng thấy thông điệp giới hạn dung lượng kèm hướng dẫn tách bản vẽ.
+- Không còn `showToast` báo lỗi nào hiển thị style success.
+- Không còn `catch {}` rỗng trong `app/api/engineering/cad/`.
+
+---
+
+## Việc V7 — Tương phản màu: chữ trắng trên nền accent sáng (`route: mechanical`)
+
+**Vá phát hiện Trung B5.** Việc cơ học, bám quy tắc đã tính sẵn — **không** tự tính lại tương phản.
+
+### Vấn đề thật
+
+**57 file** dùng `text-white` trên `bg-{emerald,sky,amber,green,teal,cyan}-600` — nhóm **FAIL** theo
+bảng đã tính sẵn ở `docs/audit.md` §13.3 (emerald-600 + trắng = 3,77:1 < 4,5 AA). Nghiêm trọng nhất:
+`app/components/ErrorState.tsx:24` — **nút "Thử lại" của màn hình lỗi dùng chung toàn app**.
+
+Vi phạm đúng quy tắc đã chốt trong `app/globals.css:11-18` ("nền -500/-600 sáng phải dùng
+`text-on-accent-dark`; -700 trở lên mới dùng trắng").
+
+### Việc phải làm
+
+1. Lấy danh sách thật:
+   `grep -rlE 'bg-(emerald|sky|amber|green|teal|cyan)-600[^"]*text-white|text-white[^"]*bg-(emerald|sky|amber|green|teal|cyan)-600' app/ --include=*.tsx`
+2. Với **mỗi** chỗ, chọn 1 trong 2 cách (theo `docs/audit.md` §13.3):
+   - nâng nền lên `-700` + `text-on-accent` (mặc định an toàn, mọi accent ≥ 5,0:1), **hoặc**
+   - giữ nền `-600` + đổi chữ sang `text-on-accent-dark`.
+     Chọn cách **giữ nguyên cảm giác thị giác của từng chỗ**; ưu tiên cách (a) cho nút CTA đặc, cách
+     (b) cho chip/tab active.
+3. **Bắt đầu từ `app/components/ErrorState.tsx`** (phủ toàn app) rồi tới `app/approvals/page.tsx`,
+   các tab hub `app/site/_components/`, `app/commercial/_components/`, và 5 panel CAD.
+4. **Không** đụng: state hover/idle của icon, code chỉ chạy dev (`NODE_ENV === 'development'`), và
+   nhóm accent **PASS** (`blue`/`violet`/`rose`/`red`/`indigo`-600 với chữ trắng đều ≥ 4,7:1 — để nguyên).
+5. **Không** đụng lớp `text-zinc-500/600` (399 ứng viên) — đó là **nợ khác đã ghi nhận**, ngoài phạm
+   vi việc này.
+
+### Tiêu chí chấp nhận
+
+- Lệnh grep ở mục 1 trả **0 file** (hoặc chỉ còn ca có lý do ghi rõ).
+- `npm run lint` + `npm run build` xanh; giao diện không vỡ layout (đổi màu thuần, không đổi cấu trúc).
+- Ghi rõ trong báo cáo: số file đã đổi, cách chọn (a)/(b) cho từng nhóm.
+
+---
+
+## Việc V8 — Dọn doc drift + pin SHA + hạ tuyên bố vượt bằng chứng (`route: mechanical`)
+
+**Vá phát hiện Trung B8 + các phát hiện Thấp về tài liệu.** Đây là việc **tài liệu + 1 dòng YAML**,
+nhưng quan trọng: lớp lỗi "tài liệu lệch code" là lớp lặp lại nhiều nhất trong lịch sử dự án.
+
+### Việc phải làm
+
+1. **`.github/workflows/pr-policy.yml:16`** — `uses: actions/github-script@v9` là dòng `uses:` **duy
+   nhất toàn repo** dùng tag nổi (nghi do Dependabot PR #362 merge 2026-08-23 thay pin SHA khi nâng
+   major). Pin lại **SHA đầy đủ** của release v9 mới nhất + comment version, bám đúng định dạng các
+   dòng `uses:` khác trong cùng thư mục.
+2. **`CLAUDE.md` mục Offline (PWA)** — đang ghi sai 2 điểm, khiến agent/PR sau thiết kế sai giả định:
+   - "hàng đợi tick trong **localStorage** (`app/components/offlineQueue.ts`)" → thực tế là
+     **IndexedDB** trong thư mục `app/components/offlineQueue/` (M58 PR2, 3 loại op: tick/photo/diary).
+   - "API GET **network-first**" → thực tế `public/sw.js` là **stale-while-revalidate** (chính file
+     sw.js dòng 1 tự ghi đúng).
+3. **`docs/audit.md` §6** — bỏ chú thích lỗi thời _"(Chưa có script `test:coverage`/ngưỡng CI cứng)"_:
+   script **đã có** trong `package.json` và mốc ratchet **đã đo** (87,12% lines — xem `PROGRESS.md`).
+   Sửa câu đó trỏ về mốc thật.
+4. **Hạ 2 tuyên bố vượt bằng chứng** — `docs/ops/release-manifest-v1.0.md` ("v1.0.0 Product
+   Complete") và `docs/ops/engineering-os-manifest-v1.0.md` ("Vision Complete… Production Ready"):
+   - Đổi trạng thái thành **draft/dự thảo chưa đạt gate**, thêm mục "Điều kiện chưa đạt" liệt kê:
+     chưa có traffic thật từ MEPF-Agents; `0089`/`0091` chờ staging; C0→C6 chưa thi hành; UAT người
+     thật chưa diễn ra.
+   - Sửa số migration sai (**manifest ghi 93, thực tế 132** — xác nhận lại bằng `ls migrations | wc -l`).
+   - **Không xoá file**, không đổi kết luận kỹ thuật khác — chỉ hạ nhãn trạng thái + nêu điều kiện
+     còn thiếu, đúng luật spec C0 ("không đánh dấu xong chỉ dựa trên tài liệu; phải có bằng chứng
+     command/CI/DB").
+5. **`app/api/engineering/queue/upload/route.ts`** — route multipart **duy nhất** thiếu
+   `isContentTooLarge` chặn sớm (29 route khác đều có, quy ước PR #205): thêm check header
+   `content-length` ở đầu handler, bám đúng pattern route multipart khác.
+
+### Tiêu chí chấp nhận
+
+- `grep -n "uses:" .github/workflows/*.yml | grep -vE "[0-9a-f]{40}"` → **rỗng**.
+- `CLAUDE.md` mô tả đúng IndexedDB + stale-while-revalidate.
+- 2 manifest không còn tự tuyên bố "Complete"; số migration khớp thực tế.
+- `npm run lint` xanh (prettier hook sẽ format lại markdown — bình thường).
+
+---
+
+## Thứ tự thi hành & phụ thuộc
+
+- **Chạy song song được ngay (worktree riêng mỗi việc):** V1, V2, V5, V6, V7, V8.
+- **V3 trước V4** — cả hai chạm nhiều file trong `app/api/engineering/`; V3 thêm quyền, V4 đổi
+  `projectId`. Chạy tuần tự để tránh xung đột nặng; nếu coordinator thấy giao file ít thì có thể song
+  song nhưng phải tích hợp V3 trước.
+- **V2 tham chiếu `lib/bao-mat/otp.ts` của V1** — V2 có lối thoát ghi rõ trong brief nếu V1 chưa xong,
+  **không chặn**.
+- **Không việc nào được phép sửa file của việc khác.** Vướng thì dừng, ghi vào báo cáo.
+
+## Việc reviewer
+
+Sau khi mỗi worker báo xong, gọi `reviewer` soát diff (skill `code-review`). Ưu tiên soát kỹ V1, V2,
+V3, V4 (đều là vùng rủi ro cao theo `docs/audit.md` §8). Lỗi reviewer tìm ra phải vá **trước** khi
+tích hợp, không tin báo cáo worker suông.
+
+## Báo cáo về phiên chính
+
+Coordinator tổng hợp: việc nào xong/không xong, tiêu chí chấp nhận nào đạt/không đạt, lỗi reviewer
+bắt được, migration thực tế đã dùng số nào, và mọi chỗ worker vướng đặc tả sai/thiếu (dừng việc đó,
+**không tự chế đặc tả**).
+
+## Ngoài phạm vi đợt này (GĐ2 — không thi hành)
+
+Cổng CI `check:route-perms` + `check:project-scope`; rule lint cấm `text-white` trên nền accent sáng;
+spec axe "lưới quét" ~45 route chưa phủ; coverage ratchet thành cổng CI; đóng băng module vượt gate
+bằng feature flag; retention cho 2 bảng log webhook; idempotency-key cho ảnh offline; loại
+`/api/tasks/version` khỏi cache SW.
