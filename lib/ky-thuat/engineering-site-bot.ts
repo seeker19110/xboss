@@ -2,6 +2,17 @@ import { query, queryOne, run, withTransaction } from "@/lib/db";
 import { hashOtp, sinhOtp, OTP_HAN_PHUT } from "@/lib/bao-mat/otp";
 import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
 
+/**
+ * ⚠️ TRẠNG THÁI THỬ NGHIỆM (V5 — trung thực hoá dữ liệu hiển thị, 2026-08-24):
+ * Bot Site Copilot (Telegram) hiện **chỉ ghi log tin nhắn** vào `telegram_bot_message_logs`,
+ * KHÔNG ghi vào `tasks`/`ncrs`/`materials` hay bất kỳ bảng nghiệp vụ nào. Mọi reply bên dưới
+ * phải phản ánh đúng thực tế này — không được ngụ ý "đã đồng bộ vào WBS"/"đã tạo NCR" nếu
+ * chưa thật sự làm vậy. Việc nối dữ liệu thật (wire vào WBS/NCR/vật tư) là tính năng riêng,
+ * cần đặc tả sau (xem PLAN.md việc V5, quyết định đã chốt: không wire trong đợt này).
+ */
+
+const GHI_CHU_THU_NGHIEM = "⚠️ Bot đang ở chế độ thử nghiệm";
+
 export type FieldIntent =
   "PROGRESS_UPDATE" | "ISSUE_REPORT" | "DIARY_LOG" | "QUERY_STOCK" | "UNKNOWN";
 
@@ -307,22 +318,22 @@ export async function processIncomingTelegramMessage(params: {
 
   switch (parsed.intent) {
     case "PROGRESS_UPDATE":
-      replyText = `Đã ghi nhận yêu cầu cập nhật tiến độ công việc [${parsed.entities.taskCode}] lên ${parsed.entities.progressPercent}%. Hệ thống đã đồng bộ vào WBS.`;
+      replyText = `Đã ghi nhận yêu cầu cập nhật tiến độ công việc [${parsed.entities.taskCode}] lên ${parsed.entities.progressPercent}%. Yêu cầu đang chờ xử lý, **chưa** cập nhật vào WBS. Vui lòng cập nhật trên ứng dụng XBoss để ghi nhận chính thức.\n${GHI_CHU_THU_NGHIEM}`;
       actionTaken = true;
       break;
 
     case "ISSUE_REPORT":
-      replyText = `Đã tạo Phiếu Sự Cố / NCR trên hệ thống: "${parsed.entities.issueTitle}" (Mức độ: ${parsed.entities.severity}). Ban Chỉ Huy dự án đã nhận được thông báo.`;
+      replyText = `Đã ghi nhận yêu cầu báo sự cố: "${parsed.entities.issueTitle}" (Mức độ: ${parsed.entities.severity}). Yêu cầu đang chờ xử lý, **chưa** tạo Phiếu NCR và Ban Chỉ Huy **chưa** được thông báo. Vui lòng báo cáo trên ứng dụng XBoss để được xử lý chính thức.\n${GHI_CHU_THU_NGHIEM}`;
       actionTaken = true;
       break;
 
     case "DIARY_LOG":
-      replyText = `Đã lưu vào Nhật Ký Thi Công ngày: "${parsed.entities.diaryNote}".`;
+      replyText = `Đã ghi nhận nội dung nhật ký thi công: "${parsed.entities.diaryNote}". Yêu cầu đang chờ xử lý, **chưa** lưu vào Nhật Ký Thi Công chính thức. Vui lòng ghi nhật ký trên ứng dụng XBoss.\n${GHI_CHU_THU_NGHIEM}`;
       actionTaken = true;
       break;
 
     case "QUERY_STOCK":
-      replyText = `Kết quả tra cứu nhanh cho từ khoá [${parsed.entities.queryKeyword}]:\n- Bản vẽ: 2 bản vẽ liên quan (DWG-M-01, DWG-M-02)\n- Vật tư: Tồn kho khả dụng 450 đơn vị.`;
+      replyText = `Tính năng tra cứu qua bot đang thử nghiệm, chưa nối dữ liệu thật — vui lòng tra trên ứng dụng XBoss.\n${GHI_CHU_THU_NGHIEM}`;
       actionTaken = true;
       break;
 
