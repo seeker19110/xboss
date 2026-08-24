@@ -1102,6 +1102,44 @@ test("exportDxf: khung nhìn và bố cục in của không gian giấy sống s
   assert.equal(vp2.isPaperSpace, true, "Vẫn phải nằm ở không gian giấy");
 });
 
+test("exportDxf: kiểu chú thích dẫn và đường nhiều nét khai đúng mã nhóm bắt buộc", () => {
+  // Hai lỗi này chỉ lộ ra khi kiểm định bằng thư viện DXF độc lập (ezdxf Auditor), test round-trip
+  // qua chính bộ đọc của XBoss không bắt được vì bộ đọc bỏ qua các mã nhóm đó.
+  const exported = exportDxf(parseDxf(FIXTURE_MEPF, "mepf-thap-a.dxf"), {
+    applyStandardLayers: true,
+  });
+
+  // MLEADERSTYLE: 340 = kiểu nét dẫn, 341 = đầu mũi tên, 342 = KIỂU CHỮ, 343 = khối.
+  // Đặt kiểu chữ nhầm vào mã 341 thì trình đọc thấy kiểu chữ = 0 và phải tự vá.
+  // Cắt tới thực thể kế tiếp — mốc là cặp `0` + TÊN LOẠI, không thể dùng chuỗi "\r\n0\r\n" trần
+  // vì nó khớp cả vào giá trị 0 của những mã như `170\r\n0`.
+  const denThucTheKe = (khoi: string) =>
+    khoi.slice(0, khoi.search(/\r\n0\r\n[A-Z]/) + 2 || undefined);
+  const kieuDan = exported.slice(exported.indexOf("100\r\nAcDbMLeaderStyle\r\n"));
+  const than = denThucTheKe(kieuDan);
+  const kieuChuHandle = /342\r\n(\w+)\r\n/.exec(than)?.[1];
+  assert.ok(kieuChuHandle && kieuChuHandle !== "0", "Mã 342 phải trỏ tới kiểu chữ THẬT");
+  assert.ok(
+    exported.includes(`0\r\nSTYLE\r\n5\r\n${kieuChuHandle}\r\n`),
+    "Handle kiểu chữ của MLEADERSTYLE phải là một bản ghi STYLE có thật trong bảng",
+  );
+
+  // MLINE: số nhóm tham số mỗi đỉnh phải bằng số nét của kiểu đường (mã 71 của MLINESTYLE),
+  // lệch số là trình đọc coi đỉnh hỏng và dựng lại toàn bộ hình học.
+  const kieuNet = exported.slice(exported.indexOf("100\r\nAcDbMlineStyle\r\n"));
+  const soNetKieu = Number(/71\r\n(\d+)\r\n/.exec(kieuNet)?.[1]);
+  const mline = exported.slice(exported.indexOf("100\r\nAcDbMline\r\n"));
+  const thanMline = denThucTheKe(mline);
+  const soDinh = Number(/72\r\n(\d+)\r\n/.exec(thanMline)?.[1]);
+  const soNhomThamSo = (thanMline.match(/\r\n74\r\n/g) || []).length;
+  assert.equal(soNetKieu, 2, "Kiểu đường Standard bộ ghi phát ra có 2 nét");
+  assert.equal(
+    soNhomThamSo,
+    soDinh * soNetKieu,
+    `Mỗi đỉnh phải có đúng ${soNetKieu} nhóm tham số (${soDinh} đỉnh → ${soDinh * soNetKieu} nhóm)`,
+  );
+});
+
 test("exportDxf: toàn vẹn cấu trúc — handle duy nhất, mọi tham chiếu tồn tại, $HANDSEED hợp lệ", () => {
   // Handle và quan hệ chủ sở hữu là thứ R12 hoàn toàn không có và cũng là chỗ dễ sai nhất khi
   // sinh tệp: trùng handle hoặc trỏ vào handle không tồn tại thì AutoCAD báo tệp hỏng.

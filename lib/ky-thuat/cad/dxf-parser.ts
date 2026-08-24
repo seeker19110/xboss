@@ -2997,6 +2997,9 @@ class HandleAllocator {
   }
 }
 
+/** Số nét của kiểu đường nhiều nét `Standard` mà bộ ghi phát ra (offset +0.5 và −0.5). */
+const MLINE_STYLE_ELEMENT_COUNT = 2;
+
 /** Khối mã nhóm mở đầu chung của mọi bản ghi trong bảng ký hiệu (SYMBOL TABLE) R2000. */
 function tableRecordHead(type: string, handle: string, owner: string, subClass: string): string {
   return (
@@ -3261,7 +3264,10 @@ function writeEntityR2000(
         });
         return fallback + extr();
       }
-      const soNet = Math.max(1, ...verts.map((v) => v.elements.length));
+      // Kiểu đường nhiều nét Standard mà bộ ghi phát ra có 2 nét (offset +0.5 / −0.5). Mỗi đỉnh
+      // phải mang ĐÚNG chừng ấy nhóm tham số, kể cả nhóm rỗng — lệch số là trình đọc coi đỉnh
+      // hỏng và tự dựng lại hình học, tức mất mối nối vát gốc.
+      const soNet = Math.max(MLINE_STYLE_ELEMENT_COUNT, ...verts.map((v) => v.elements.length));
       let out = head("MLINE", "AcDbMline");
       out += `2\r\n${ent.blockName || "STANDARD"}\r\n340\r\n${mlineStyleHandle}\r\n`;
       out += `40\r\n${real(ent.mlineScale ?? 1)}\r\n`;
@@ -4173,8 +4179,9 @@ export function exportDxf(
   than += `173\r\n1\r\n91\r\n-1056964608\r\n340\r\n0\r\n92\r\n-2\r\n`;
   than += `290\r\n1\r\n42\r\n${real(defaultTextHeight * 0.72)}\r\n`;
   than += `291\r\n1\r\n43\r\n${real(defaultTextHeight * 2)}\r\n3\r\nStandard\r\n`;
-  than += `341\r\n${hStandardStyle}\r\n44\r\n${real(defaultTextHeight * 0.08)}\r\n`;
-  than += `300\r\n\r\n342\r\n0\r\n174\r\n1\r\n178\r\n1\r\n175\r\n1\r\n176\r\n0\r\n`;
+  // Thứ tự mã nhóm của MLEADERSTYLE: 340 kiểu nét dẫn, 341 đầu mũi tên, 342 KIỂU CHỮ, 343 khối.
+  than += `341\r\n0\r\n44\r\n${real(defaultTextHeight * 0.08)}\r\n`;
+  than += `300\r\n\r\n342\r\n${hStandardStyle}\r\n174\r\n1\r\n178\r\n1\r\n175\r\n1\r\n176\r\n0\r\n`;
   than += `93\r\n-1056964608\r\n45\r\n${real(defaultTextHeight)}\r\n292\r\n0\r\n`;
   than += `297\r\n0\r\n46\r\n1.0\r\n294\r\n0\r\n295\r\n0\r\n296\r\n0\r\n`;
   than += `143\r\n${real(defaultTextHeight * 0.09)}\r\n271\r\n0\r\n272\r\n9\r\n273\r\n9\r\n`;

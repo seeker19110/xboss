@@ -262,9 +262,60 @@ Nhãn trên giao diện nói đúng phiên bản đang phát hành: "Tệp xuấ
 được bằng AutoCAD 2007 cho tới bản mới nhất." (Trước đó hai nhãn còn ghi "AutoCAD 2000" do sót lại
 từ đợt E — đã sửa.)
 
+### H — Kiểm định độc lập bằng `ezdxf` (cùng ngày) — đóng rủi ro lớn nhất
+
+Rủi ro tồn đọng suốt các đợt trước là **"chưa mở thử tệp bằng phần mềm CAD thật"** — toàn bộ kiểm
+chứng đều chạy qua chính bộ đọc của XBoss, tức tự chấm bài mình. Nay đã kiểm định bằng **`ezdxf`
+1.4.4** (đúng bản `mepf-worker/pyproject.toml` ghim), là một bộ đọc/kiểm DXF độc lập.
+
+Chạy đúng tiêu chí **AC1 của đặc tả M98** (`ezdxf.readfile` + `Auditor` → 0 lỗi 0 fix) lên tệp do
+bộ ghi TypeScript sinh ra từ fixture:
+
+```
+phiên bản đọc được: AC1021 | R2007
+LỖI: 0 | ĐÃ SỬA: 0
+```
+
+Kiểm cả **nội dung**, không chỉ cấu trúc — `ezdxf` đọc lại đúng: `DIMENSION` là kích thước thật
+(số đo 30000, có `dimstyle`), chữ tiếng Việt `"ống gió cấp lạnh AHU-01 800x500 Ø150"` (cao 300, xoay
+45°), `MTEXT` ghép đủ mảnh, `HATCH` mẫu `ANSI31` kèm nét gạch, `MULTILEADER` đúng chữ và 1 nhánh dẫn
+2 đỉnh, `MLINE` 3 đỉnh, `INSERT` tỷ lệ 2×2 xoay 90° kèm thuộc tính `KICH_THUOC=800x400`, `ELLIPSE`
+tỷ lệ trục 0.5, `XLINE` đúng gốc và hướng, layer giữ nguyên trạng thái tắt/đóng băng/khoá/bề rộng
+nét, và chữ khung tên nằm đúng **không gian giấy**.
+
+**Hai lỗi thật chỉ lộ ra nhờ kiểm định độc lập** — test round-trip qua bộ đọc của XBoss không bắt
+được vì chính bộ đọc bỏ qua các mã nhóm đó:
+
+1. **`MLEADERSTYLE` đặt kiểu chữ sai mã nhóm.** Thứ tự đúng là 340 = kiểu nét dẫn, 341 = đầu mũi
+   tên, **342 = kiểu chữ**, 343 = khối. Bản trước đặt kiểu chữ vào 341, nên trình đọc thấy kiểu chữ
+   = 0 không hợp lệ và phải tự vá.
+2. **`MLINE` lệch số nhóm tham số.** Mỗi đỉnh phải mang đúng số nhóm bằng số nét của kiểu đường
+   (2), lệch số là trình đọc coi đỉnh hỏng và **dựng lại toàn bộ hình học**, tức mất mối nối vát gốc.
+
+Cả hai đã sửa và có ca test chặn hồi quy trong `tests/dxf-real-drawing-parser.test.ts`.
+
+**Cách chạy lại kiểm định** (không nằm trong `npm test` vì cần Python + `ezdxf`, mà repo app là
+TypeScript thuần — `mepf-worker/` mới là nơi có sẵn phụ thuộc này):
+
+```bash
+pip install ezdxf
+npx tsx -e 'import {parseDxf,exportDxf} from "@/lib/ky-thuat/cad/dxf-parser";
+  import {readFileSync,writeFileSync} from "node:fs";
+  writeFileSync("/tmp/x.dxf", exportDxf(parseDxf(readFileSync("tests/fixtures/cad/mepf-thap-a.dxf","utf8"),"f.dxf"),{applyStandardLayers:true}))'
+python3 -c "import ezdxf; from ezdxf.audit import Auditor;
+  d=ezdxf.readfile('/tmp/x.dxf'); a=Auditor(d); a.run();
+  print('LỖI:',len(a.errors),'FIX:',len(a.fixes))"
+```
+
 ### Còn lại (chưa làm)
 
 - Chuẩn hoá trực tiếp trên **DWG** vẫn cần plugin AutoCAD (ADR-0006) — chưa có.
+- **Vẫn chưa mở bằng chính AutoCAD.** `ezdxf` là bộ kiểm độc lập tốt và đã bắt được 2 lỗi thật,
+  nhưng không phải AutoCAD. Trước khi phát hành cho kỹ sư dùng vẫn nên mở thử một tệp.
+- **Trùng lặp đường xuất R2000 với `mepf-worker`.** Đặc tả M98 §4(b) đã **loại** phương án tự viết
+  bộ ghi bằng TypeScript và **chọn** uỷ thác cho `ezdxf` trong worker; `mepf-worker/src/cad_export_r2000.py`
+  đã tồn tại (M98 PR2) nhưng app **chưa hề gọi**. Nay tồn tại hai bản cho cùng một việc — cần chủ
+  spec quyết giữ bản nào (xem phần đối chiếu trong mô tả PR).
 - Nếu về sau cần nộp hồ sơ theo đúng định dạng 2018, nâng `$ACADVER` lên `AC1032` trong
   `lib/ky-thuat/cad/dxf-parser.ts` và khai lại `$REQUIREDVERSIONS` là đủ — phần cấu trúc còn lại
   bản 2018 đòi thì tệp đã có sẵn. Đổi lại, tệp sẽ không mở được bằng AutoCAD 2017 trở về trước.
