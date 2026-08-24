@@ -3996,7 +3996,14 @@ export function exportDxf(
   than += `12\r\n${real(tamX)}\r\n22\r\n${real(tamY)}\r\n40\r\n${real(caoKhungNhin)}\r\n41\r\n${real(TY_LE_KHUNG_NHIN)}\r\n`;
   than += "0\r\nENDTAB\r\n";
 
+  // Hai bản ghi đầu BẮT BUỘC theo spec R2000: "ByBlock" và "ByLayer" — không phải linetype vẽ
+  // được mà là mục đặc biệt AutoCAD đòi phải TỒN TẠI TRONG TỆP. ezdxf đánh lừa ở đúng chỗ này:
+  // nó tự cấp 2 bản ghi ảo khi đọc (liệt kê "ByBlock"/"ByLayer" như thể có trong tệp, audit 0
+  // lỗi) nên kiểm bằng ezdxf không phát hiện thiếu; AutoCAD thật thì báo thẳng "Missing Default
+  // entry ByLayer in SymbolTable:LTYPE" rồi huỷ cả bản vẽ — xác nhận thật 2026-08-24.
   const lineTypes: Array<[string, string, number[]]> = [
+    ["ByBlock", "", []],
+    ["ByLayer", "", []],
     ["CONTINUOUS", "Solid line", []],
     ["CENTER", "Center ____ _ ____ _ ____", [30, -5, 10, -5]],
     ["HIDDEN", "Hidden __ __ __ __", [5, -5]],

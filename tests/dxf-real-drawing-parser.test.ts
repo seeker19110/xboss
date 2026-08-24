@@ -1342,6 +1342,12 @@ test("exportDxf: STYLE/LTYPE/DIMSTYLE khai đủ tên mà thực thể tham chi�
     trongBang("LTYPE", "GRID_LINE_TU_XREF"),
     "Bảng LTYPE phải khai linetype mà layer dùng, kể cả tên không thuộc 4 loại dựng sẵn",
   );
+  // Hồi quy thật (vòng 5 cùng chuỗi "drawing discarded", 2026-08-24): bảng LTYPE phải chứa 2
+  // bản ghi đặc biệt bắt buộc "ByBlock" và "ByLayer" theo spec R2000 — thiếu thì AutoCAD báo
+  // "Missing Default entry ByLayer in SymbolTable:LTYPE" rồi huỷ cả bản vẽ. ezdxf KHÔNG phát
+  // hiện được vì nó tự cấp 2 bản ghi ảo này khi đọc (audit vẫn 0 lỗi trên tệp thiếu).
+  assert.ok(trongBang("LTYPE", "ByBlock"), "Bảng LTYPE phải có bản ghi đặc biệt ByBlock");
+  assert.ok(trongBang("LTYPE", "ByLayer"), "Bảng LTYPE phải có bản ghi đặc biệt ByLayer");
   assert.ok(
     trongBang("DIMSTYLE", "DIMSTYLE_Rieng"),
     "Bảng DIMSTYLE phải khai dimstyle mà DIMENSION dùng, không chỉ mỗi STANDARD",

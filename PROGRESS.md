@@ -89,13 +89,22 @@ chung mã 5 cho mọi bảng nên AutoCAD không nhận ra handle của record, 
 bảng DIMSTYLE → "already in use" → huỷ bản vẽ. Sửa: `tableRecordHead` phát mã 105 riêng cho
 DIMSTYLE. Test hồi quy kiểm mọi bản ghi DIMSTYLE phải mở đầu bằng mã 105.
 
-**Bài học rút ra sau 4 vòng cùng một triệu chứng "drawing discarded":** `ezdxf.audit()` không bắt
-được lỗi NÀO trong cả bốn (0 errors mỗi lần) — công cụ kiểm hợp lệ không thay được việc mở thử
-bằng chính AutoCAD thật. Từ nay mọi thay đổi ở `exportDxf` phải kèm bằng chứng đối chiếu SỐ BẢN
-GHI header vs thực tế cho mọi bảng (không chỉ bảng vừa sửa), và nghi ngờ trước tiên (a) các
-"layer/style/linetype đặc biệt do chính AutoCAD định nghĩa" (Defpoints, Standard, Continuous,
-ByLayer, ByBlock...) — quy ước bất thành văn với nhóm tên này khắt khe hơn hẳn tên người dùng tự
-đặt; và (b) các ngoại lệ mã nhóm per-bảng của spec DXF (DIMSTYLE handle = 105 là ví dụ điển hình).
+**Vòng 5 cùng ngày — "Missing Default entry ByLayer in SymbolTable:LTYPE".** Bảng LTYPE phải mở
+đầu bằng 2 bản ghi đặc biệt bắt buộc `ByBlock` và `ByLayer` theo spec R2000 — mảng linetype dựng
+sẵn chỉ có CONTINUOUS/CENTER/HIDDEN/DASHED. Điểm đáng ghi nhất: **ezdxf đánh lừa ở đúng chỗ này**
+— lần kiểm vòng 2 nó liệt kê `ByBlock`/`ByLayer` trong `doc.linetypes` như thể có trong tệp, nhưng
+đó là bản ghi ẢO ezdxf tự cấp khi đọc; tệp thật không có, audit vẫn 0 lỗi. Sửa: thêm 2 bản ghi vào
+đầu mảng dựng sẵn; test hồi quy + script kiểm nay đối chiếu THẲNG trên chuỗi tệp thay vì tin ezdxf.
+
+**Bài học rút ra sau 5 vòng cùng một triệu chứng "drawing discarded":** `ezdxf.audit()` không bắt
+được lỗi NÀO trong cả năm (0 errors mỗi lần) — công cụ kiểm hợp lệ không thay được việc mở thử
+bằng chính AutoCAD thật, và tệ hơn: ezdxf còn TỰ CẤP bản ghi mặc định ảo khi đọc (ByBlock/ByLayer)
+khiến kiểm qua nó dương tính giả. Từ nay mọi thay đổi ở `exportDxf` phải kèm bằng chứng đối chiếu
+SỐ BẢN GHI header vs thực tế cho mọi bảng ĐỌC THẲNG TRÊN CHUỖI TỆP (không qua ezdxf), và nghi ngờ
+trước tiên (a) các "layer/style/linetype đặc biệt do chính AutoCAD định nghĩa" (Defpoints,
+Standard, Continuous, ByLayer, ByBlock...) — nhóm này vừa có quy ước khắt khe hơn (Defpoints cần
+mã 290 tường minh) vừa có mục BẮT BUỘC PHẢI TỒN TẠI (ByBlock/ByLayer trong LTYPE); và (b) các
+ngoại lệ mã nhóm per-bảng của spec DXF (DIMSTYLE handle = 105 là ví dụ điển hình).
 
 **Vòng 2 (xảy ra trước vòng 3) cùng ngày — bản vá STYLE/LTYPE/DIMSTYLE ở trên tự sinh lỗi MỚI, nặng hơn.** Người dùng
 gửi file xuất từ code đã vá cho AutoCAD thật mở thử: `Skipping duplicate definition of Continuous
