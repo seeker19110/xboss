@@ -359,6 +359,10 @@ const CAN_DEFAULT = {
   viewEngineeringGraph: (r?: Role) =>
     r === "admin" || r === "pm" || r === "engineer" || r === "bch",
   manageEngineeringDataQuality: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  // M84 e-Sign — KÝ là hành vi ghi có giá trị pháp lý, không được dùng chung quyền XEM
+  // (`viewEngineeringGraph` cho cả `bch` — vai trò chỉ-xem — nên ký được, audit 2026-08-24).
+  // Loại toàn bộ VIEW_ONLY_ROLES (bch/cdt/viewer) và subcon.
+  signEngineeringEsign: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
   // OS-2 Digital Twin theo cấp độ L0–L3 (docs/nang-cap/OS-2-digital-twin.md)
   viewEngineeringTwin: (r?: Role) => r === "admin" || r === "pm" || r === "engineer" || r === "bch",
   manageEngineeringTwin: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
