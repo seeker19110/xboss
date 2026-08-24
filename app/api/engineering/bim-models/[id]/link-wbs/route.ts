@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { run, queryOne } from "@/lib/db";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 
@@ -9,6 +9,10 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  }
+
+  if (!CAN.manageEngineeringBim(user.role)) {
+    return NextResponse.json({ error: "Không có quyền thao tác liên kết WBS của mô hình BIM" }, { status: 403 });
   }
 
   const projectId = await getCurrentProjectId(user);

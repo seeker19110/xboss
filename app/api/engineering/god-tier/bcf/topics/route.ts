@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { listGodTierClashes } from "@/lib/ky-thuat/engineering-god-tier-db";
 import { createBcfTopicFromClash, BcfTopic } from "@/lib/ky-thuat/engineering-god-tier";
@@ -11,6 +11,10 @@ export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  }
+
+  if (!CAN.viewEngineeringGodTier(user.role)) {
+    return NextResponse.json({ error: "Không có quyền xem chủ đề BCF" }, { status: 403 });
   }
 
   const projectId = await getCurrentProjectId(user);
@@ -31,6 +35,10 @@ export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  }
+
+  if (!CAN.manageEngineeringGodTier(user.role)) {
+    return NextResponse.json({ error: "Không có quyền thao tác chủ đề BCF" }, { status: 403 });
   }
 
   const projectId = await getCurrentProjectId(user);

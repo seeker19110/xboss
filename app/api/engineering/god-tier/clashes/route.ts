@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { detectGodTierClashes, GodTierElementData } from "@/lib/ky-thuat/engineering-god-tier";
 import { listGodTierClashes, resolveGodTierClash } from "@/lib/ky-thuat/engineering-god-tier-db";
@@ -10,6 +10,10 @@ export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  }
+
+  if (!CAN.viewEngineeringGodTier(user.role)) {
+    return NextResponse.json({ error: "Không có quyền xem va chạm mô hình" }, { status: 403 });
   }
 
   const projectId = await getCurrentProjectId(user);
@@ -28,6 +32,10 @@ export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  }
+
+  if (!CAN.manageEngineeringGodTier(user.role)) {
+    return NextResponse.json({ error: "Không có quyền thao tác va chạm mô hình" }, { status: 403 });
   }
 
   const projectId = await getCurrentProjectId(user);

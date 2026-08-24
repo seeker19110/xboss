@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { query } from "@/lib/db";
 import {
@@ -17,6 +17,10 @@ export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  }
+
+  if (!CAN.manageEngineeringSubconAi(user.role)) {
+    return NextResponse.json({ error: "Không có quyền thao tác đề xuất mời thầu" }, { status: 403 });
   }
 
   const projectId = await getCurrentProjectId(user);
