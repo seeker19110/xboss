@@ -4,6 +4,7 @@ import {
   updateAnnotationStatus,
   linkAnnotationToEntity,
 } from "@/lib/ky-thuat/engineering-spatial-pinning";
+import { chotProjectIdChoGhi, getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { query, withProjectScope } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +29,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   try {
     const body = await req.json();
-    const projectId = Number(body.projectId || (user as any).projectId || 1);
+    // Không tin project_id client gửi — đối chiếu danh sách dự án user được thấy
+    // (xem chotProjectIdChoGhi trong lib/ha-tang/projects.ts).
+    const chotDuAn = await chotProjectIdChoGhi(
+      user,
+      body.projectId,
+      (await getCurrentProjectId(user)) || 1,
+    );
+    if (!chotDuAn.ok) {
+      return NextResponse.json({ error: "Không có quyền thao tác trên dự án này" }, { status: 403 });
+    }
+    const projectId = chotDuAn.projectId;
 
     if (body.status) {
       await updateAnnotationStatus(projectId, id, body.status, body.resolutionNote);
@@ -60,8 +71,17 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   }
 
   const { id } = await params;
+  // Xoá là thao tác GHI: không tin projectId client gửi qua query, đối chiếu dự án user được thấy.
   const { searchParams } = new URL(req.url);
-  const projectId = Number(searchParams.get("projectId") || (user as any).projectId || 1);
+  const chotDuAn = await chotProjectIdChoGhi(
+    user,
+    searchParams.get("projectId"),
+    (await getCurrentProjectId(user)) || 1,
+  );
+  if (!chotDuAn.ok) {
+    return NextResponse.json({ error: "Không có quyền thao tác trên dự án này" }, { status: 403 });
+  }
+  const projectId = chotDuAn.projectId;
 
   try {
     await withProjectScope(projectId, async () => {
