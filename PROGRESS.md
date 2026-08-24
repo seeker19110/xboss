@@ -4,6 +4,72 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## STYLE/LTYPE/DIMSTYLE thiếu tên bên trong BLOCK — tệp xuất ra AutoCAD từ chối mở (2026-08-24)
+
+Người dùng tự test trang `/engineering/chuan-hoa-ban-ve` với bản vẽ MEPF thật (`TMDV 3F.dxf`,
+40.703 thực thể, 65,8 MB): bấm "Tải về file .DXF" xong **AutoCAD không mở được** — nặng hơn lỗi
+màn hình trắng đã sửa ở PR #384 (lần đó AutoCAD vẫn mở được, chỉ là khung nhìn cắm cứng).
+
+**Nguyên nhân:** `exportDxf` dựng 3 bảng STYLE/LTYPE/DIMSTYLE bằng cách quét `parsed.entities`
+(chỉ thực thể ở CẤP MODEL SPACE) để gom tên kiểu chữ/linetype/dimstyle cần khai báo. Block thiết
+bị (thường xuất từ Revit, VD `VHT_Tag_T...`) mang MTEXT **nội bộ bên trong định nghĩa BLOCK**
+dùng style riêng (`Arial_2`, `RomanS`...) — không nằm trong `parsed.entities`, nên không bao giờ
+được thêm vào bảng STYLE. Tương tự, layer/DIMENSION có thể dùng linetype/dimstyle ngoài 4 loại
+dựng sẵn (VD linetype nhập từ XREF). Kết quả: BLOCKS section ghi thực thể **tham chiếu tới
+STYLE/LTYPE/DIMSTYLE chưa từng khai báo trong bảng** — dangling reference, AutoCAD từ chối mở.
+
+**Vì sao lọt qua cả `ezdxf`:** `ezdxf.audit()` không báo lỗi (`errors: 0`) mà chỉ âm thầm "vá"
+bằng cách xoá tham chiếu hỏng (`fixes: 455` trên file thật, toàn bộ là
+`Removed undefined text style "..." from MTEXT(...)`) — đúng bài học đã ghi nhận ở PR #384:
+"Hợp lệ (theo ezdxf) ≠ dùng được (mở lên trong AutoCAD)".
+
+**Sửa:** cả 3 bảng nay quét thêm `parsed.blocks[].entities` (không chỉ `parsed.entities`); LTYPE
+còn quét thêm `layers[].lineType` và `entities[].lineType` (linetype có thể gắn trực tiếp lên
+thực thể, không chỉ qua layer). Xác nhận bằng `ezdxf.audit()` trên file thật: **455 fix → 0**.
+Test hồi quy `exportDxf: STYLE/LTYPE/DIMSTYLE khai đủ tên mà thực thể tham chiếu, kể cả bên trong
+BLOCK` — đỏ khi lùi về code cũ, xanh sau khi vá.
+
+**Nhân tiện đợt này (do người dùng yêu cầu xác thực chéo bằng ezdxf), sửa thêm 4 lỗi correctness
+tìm được khi review trang chuẩn hoá bản vẽ:**
+
+- `useCadStandardization.ts`: block đồng bộ từ `dxfData.blocks` gán cứng `mappedBoqCode: ""` thay
+  vì dùng giá trị `dxf-parser.ts` đã tự suy luận — điểm "Định Danh Block BOQ" luôn ra 0% dù parser
+  nhận diện được block.
+- `CadViewportStudio.tsx`: `purgeState.overlappingCount || 142` — fallback số giả khi giá trị thật
+  là 0 (dùng `||` thay vì kiểm tra rõ ràng).
+- Thuật toán "Nét Trùng Đè"/"Nét 0mm" trước đây chỉ quét entity `LINE`, bỏ qua hoàn toàn đoạn con
+  của `LWPOLYLINE`/`POLYLINE` (chiếm đa số hình học bản vẽ MEPF thật) — nay quét đủ, với ngưỡng
+  "0mm" khác nhau giữa LINE đứng riêng (thật là rác) và đoạn polyline (tessellation cung tròn bình
+  thường, đo thật thấy ~43% đoạn polyline < 1mm không phải rác).
+- Công thức điểm hình học phạt cố định 5 điểm/lỗi, không chuẩn hoá theo tổng số đoạn — bản vẽ vài
+  chục nghìn thực thể chỉ cần ~16 lỗi (dưới 0,1%) đã rơi thẳng xuống sàn. Nay phạt theo tỷ lệ trên
+  tổng số ĐOẠN (không phải tổng số thực thể — 1 polyline nhiều đỉnh là 1 thực thể nhưng hàng chục
+  đoạn).
+
+**Xác thực chéo bằng ezdxf ở server (mepf-worker):** module mới `mepf-worker/src/cad_health_check.py`
+tính điểm sức khỏe 6D bằng `ezdxf` thật (đọc file qua `cad_loader.load_drawing`, tái dùng
+`cad_standards.match_layer`/`match_block`), chạy qua hàng đợi task có sẵn
+(`engineering_async_tasks`, task type mới `mepf.cad.health_check`, đăng ký cả trong
+`SUPPORTED_TASK_TYPES` lẫn `TASK_HANDLERS` của `scripts/mepf/worker_entry.py`) — không cần route
+Next.js mới, tái dùng đúng `POST /api/engineering/queue/upload` + `GET .../tasks/[id]/progress`
+đã có sẵn. Nút "Xác Thực Bằng ezdxf (Server)" mới trong `DiagnosticPurgePanel.tsx`
+(`useCadServerVerification.ts`). Trần dung lượng route upload chung nâng lên
+`GIOI_HAN_TEP_CAD` (150MB) riêng cho task loại `mepf.cad.*` — file MEPF thật đo được 65MB, vượt
+trần 50MB mặc định cũ của route.
+
+Test trên file thật phát hiện thêm 2 lỗi trong chính module Python mới (sửa ngay, không đợi PR
+sau): `_layer_score` chỉ so khớp layer với từ điển từ khoá cố định của `cad_standards.py`, không
+nhận ra layer **đã đúng tiền tố quy ước** (VD `P-PIPE-3`, `M-EQPM`) nếu tên cụ thể không nằm sẵn
+trong từ điển — báo sai 0% cho layer thực ra đã chuẩn; và mẫu số điểm hình học ban đầu dùng tổng
+số thực thể thay vì tổng số đoạn (cùng lớp lỗi với bản TS ở trên).
+
+**Nợ kỹ thuật phát hiện, chưa xử lý:** `next.config.mjs` gắn `Cache-Control: immutable, max-age=1
+năm` cho `/_next/static/*` không phân biệt dev/production — đúng cảnh báo Next.js tự in ra lúc
+khởi động (`Custom Cache-Control headers detected... can break Next.js development behavior`).
+Xác nhận thật: sửa code nhiều vòng, xoá cả `.next`, trình duyệt vẫn phục vụ bundle JS từ trước khi
+sửa (Turbopack dev đặt tên chunk ổn định theo đường dẫn, không hash theo nội dung như production).
+Đã sửa: header immutable giờ chỉ áp dụng khi `NODE_ENV === "production"`.
+
 ## Bảng mã 8 bit ở ĐƯỜNG CLIENT — chữ tiếng Việt mất ngay bước đọc tệp (2026-08-24)
 
 Truy tiếp vì sao bản vẽ 50 MB của người dùng xuất ra không mở được, và tìm ra một lỗi khác hẳn giả

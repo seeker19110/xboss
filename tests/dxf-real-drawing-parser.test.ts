@@ -1210,6 +1210,148 @@ test("exportDxf: toàn vẹn cấu trúc — handle duy nhất, mọi tham chi�
   assert.equal(dem("BLOCK"), dem("ENDBLK"), "Mỗi BLOCK phải có đúng một ENDBLK");
 });
 
+test("exportDxf: STYLE/LTYPE/DIMSTYLE khai đủ tên mà thực thể tham chiếu, kể cả bên trong BLOCK", () => {
+  // Hồi quy thật, người dùng báo 2026-08-24: bấm "Tải về file .DXF" xong AutoCAD KHÔNG MỞ ĐƯỢC
+  // tệp — nặng hơn lỗi màn hình trắng trước đó. Nguyên nhân: block thiết bị (thường xuất từ
+  // Revit, VD "VHT_Tag_T...") mang MTEXT nội bộ dùng style riêng (Arial_2, RomanS...), còn layer/
+  // DIMENSION có thể dùng linetype/dimstyle ngoài 4 loại dựng sẵn — nhưng bộ ghi cũ chỉ quét
+  // entity ở CẤP MODEL SPACE khi dựng 3 bảng STYLE/LTYPE/DIMSTYLE, bỏ sót toàn bộ entity nằm
+  // trong định nghĩa BLOCK. Kết quả: BLOCKS section ghi thực thể trỏ tới STYLE/LTYPE/DIMSTYLE
+  // chưa từng khai báo — AutoCAD từ chối mở (dangling reference), trong khi `ezdxf` (khoan dung
+  // hơn) chỉ âm thầm xoá tham chiếu lỗi khi audit nên không lộ ra qua kiểm `ezdxf`.
+  const dxf = [
+    "0",
+    "SECTION",
+    "2",
+    "TABLES",
+    "0",
+    "TABLE",
+    "2",
+    "LAYER",
+    "0",
+    "LAYER",
+    "2",
+    "M-DUCT",
+    "62",
+    "3",
+    "6",
+    "GRID_LINE_TU_XREF",
+    "0",
+    "ENDTAB",
+    "0",
+    "ENDSEC",
+    "0",
+    "SECTION",
+    "2",
+    "BLOCKS",
+    "0",
+    "BLOCK",
+    "2",
+    "EQUIP_TAG",
+    "70",
+    "0",
+    "10",
+    "0.0",
+    "20",
+    "0.0",
+    "30",
+    "0.0",
+    "0",
+    "MTEXT",
+    "8",
+    "M-DUCT",
+    "10",
+    "0.0",
+    "20",
+    "0.0",
+    "30",
+    "0.0",
+    "40",
+    "250.0",
+    "50",
+    "0.0",
+    "7",
+    "RomanS_Trong_Block",
+    "1",
+    "AHU-01",
+    "0",
+    "ENDBLK",
+    "0",
+    "ENDSEC",
+    "0",
+    "SECTION",
+    "2",
+    "ENTITIES",
+    "0",
+    "DIMENSION",
+    "8",
+    "M-DUCT",
+    "10",
+    "3000",
+    "20",
+    "2500",
+    "30",
+    "0",
+    "11",
+    "3000",
+    "21",
+    "2600",
+    "31",
+    "0",
+    "13",
+    "1000",
+    "23",
+    "2000",
+    "33",
+    "0",
+    "14",
+    "5000",
+    "24",
+    "2000",
+    "34",
+    "0",
+    "42",
+    "4000.0",
+    "70",
+    "0",
+    "3",
+    "DIMSTYLE_Rieng",
+    "0",
+    "ENDSEC",
+    "0",
+    "EOF",
+  ].join("\n");
+
+  const parsed = parseDxf(dxf, "block_font_rieng.dxf");
+  const exported = exportDxf(parsed, { applyStandardLayers: false });
+
+  const trongBang = (ten: string, giaTri: string) =>
+    exported.includes(`2\r\n${giaTri}\r\n`) &&
+    exported
+      .slice(
+        exported.indexOf(`0\r\nTABLE\r\n2\r\n${ten}\r\n`),
+        exported.indexOf(`0\r\nENDSEC`, exported.indexOf(`0\r\nTABLE\r\n2\r\n${ten}\r\n`)),
+      )
+      .includes(`2\r\n${giaTri}\r\n`);
+
+  assert.ok(
+    trongBang("STYLE", "RomanS_Trong_Block"),
+    "Bảng STYLE phải khai kiểu chữ mà MTEXT bên TRONG block dùng, không chỉ chữ ở model space",
+  );
+  assert.ok(
+    trongBang("LTYPE", "GRID_LINE_TU_XREF"),
+    "Bảng LTYPE phải khai linetype mà layer dùng, kể cả tên không thuộc 4 loại dựng sẵn",
+  );
+  assert.ok(
+    trongBang("DIMSTYLE", "DIMSTYLE_Rieng"),
+    "Bảng DIMSTYLE phải khai dimstyle mà DIMENSION dùng, không chỉ mỗi STANDARD",
+  );
+
+  // Đọc lại bằng chính parser của mình phải vẫn ra đúng bản vẽ — không rơi rớt gì thêm
+  const lai = parseDxf(exported, "rt.dxf");
+  assert.equal(lai.entities.length, parsed.entities.length);
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Khung nhìn lúc mở tệp (VPORT "*ACTIVE" + $VIEWCTR/$VIEWSIZE).
 //

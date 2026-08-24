@@ -3992,6 +3992,21 @@ export function exportDxf(
     ["HIDDEN", "Hidden __ __ __ __", [5, -5]],
     ["DASHED", "Dashed __ __ __ __", [15, -5]],
   ];
+  // Layer/thực thể có thể tham chiếu linetype ngoài 4 loại dựng sẵn (VD linetype nhập từ XREF
+  // như "Grid Line", "IMPORT-xref-..."). PHẢI khai thêm các tên đó vào bảng LTYPE — không có
+  // định nghĩa gốc của chúng nên dựng bằng nét liền (CONTINUOUS) làm hình mẫu, còn hơn để lại
+  // tham chiếu treo (AutoCAD từ chối mở tệp có LAYER/thực thể trỏ tới LTYPE chưa khai báo, cùng
+  // lớp lỗi với bảng STYLE thiếu kiểu chữ — xem ghi chú styleNames phía trên).
+  const knownLineTypeNames = new Set(lineTypes.map(([name]) => name));
+  const extraLineTypeNames = new Set<string>();
+  const collectLineType = (name?: string) => {
+    if (name && !knownLineTypeNames.has(name)) extraLineTypeNames.add(name);
+  };
+  layers.forEach((l) => collectLineType(l.lineType));
+  entities.forEach((e) => collectLineType(e.lineType));
+  (parsed.blocks || []).forEach((b) => b.entities?.forEach((e) => collectLineType(e.lineType)));
+  extraLineTypeNames.forEach((name) => lineTypes.push([name, name, []]));
+
   than += openTable("LTYPE", hLtypeTab, lineTypes.length);
   for (const [name, desc, dashes] of lineTypes) {
     than += tableRecordHead("LTYPE", handles.take(), hLtypeTab, "AcDbLinetypeTableRecord");
@@ -4026,10 +4041,22 @@ export function exportDxf(
   });
   than += "0\r\nENDTAB\r\n";
 
-  // Bảng STYLE — gom đủ kiểu chữ mà bản vẽ thật sự dùng, không chỉ mỗi STANDARD
+  // Bảng STYLE — gom đủ kiểu chữ mà bản vẽ thật sự dùng, không chỉ mỗi STANDARD.
+  // PHẢI quét cả entity bên trong định nghĩa BLOCK, không chỉ entity cấp model-space: block
+  // thiết bị (thường xuất từ Revit, VD "VHT_Tag_T...") mang theo MTEXT nội bộ dùng style riêng
+  // (Arial_2, RomanS...) không hề xuất hiện trong `entities`. Bỏ sót bước này khiến BLOCKS
+  // section ghi thực thể tham chiếu tới STYLE chưa từng khai báo trong bảng — AutoCAD từ chối
+  // mở tệp (dangling reference), trong khi `ezdxf` chỉ âm thầm xoá tham chiếu lỗi nên không lộ
+  // ra khi kiểm bằng ezdxf. Xác nhận thật trên bản vẽ MEPF 65MB: thiếu 20+ style, AutoCAD không
+  // mở lên được cho tới khi vá bằng đúng dòng quét thêm này.
   const styleNames = new Set<string>(["STANDARD"]);
   entities.forEach((e) => {
     if (e.textStyle) styleNames.add(e.textStyle);
+  });
+  (parsed.blocks || []).forEach((b) => {
+    b.entities?.forEach((e) => {
+      if (e.textStyle) styleNames.add(e.textStyle);
+    });
   });
   than += openTable("STYLE", hStyleTab, styleNames.size);
   const styleHandles = new Map<string, string>();
@@ -4051,10 +4078,21 @@ export function exportDxf(
   than += "2\r\nACAD\r\n70\r\n0\r\n";
   than += "0\r\nENDTAB\r\n";
 
-  // Bảng DIMSTYLE khai lớp riêng (AcDbDimStyleTable) và đếm bằng mã 71
-  than += `0\r\nTABLE\r\n2\r\nDIMSTYLE\r\n5\r\n${hDimTab}\r\n330\r\n0\r\n100\r\nAcDbSymbolTable\r\n70\r\n1\r\n100\r\nAcDbDimStyleTable\r\n71\r\n1\r\n`;
-  than += tableRecordHead("DIMSTYLE", handles.take(), hDimTab, "AcDbDimStyleTableRecord");
-  than += `2\r\nSTANDARD\r\n70\r\n0\r\n40\r\n1.0\r\n140\r\n${real(defaultTextHeight)}\r\n`;
+  // Bảng DIMSTYLE khai lớp riêng (AcDbDimStyleTable) và đếm bằng mã 71 — cùng lỗi "tham chiếu
+  // treo" như STYLE/LTYPE ở trên: DIMENSION/LEADER (mã 3) có thể trỏ tới dimstyle khác STANDARD
+  // (VD dimstyle riêng do Revit xuất), phải khai đủ thay vì chỉ mỗi STANDARD.
+  const dimStyleNames = new Set<string>(["STANDARD"]);
+  const collectDimStyle = (name?: string) => {
+    if (name) dimStyleNames.add(name);
+  };
+  entities.forEach((e) => collectDimStyle(e.dimStyle));
+  (parsed.blocks || []).forEach((b) => b.entities?.forEach((e) => collectDimStyle(e.dimStyle)));
+
+  than += `0\r\nTABLE\r\n2\r\nDIMSTYLE\r\n5\r\n${hDimTab}\r\n330\r\n0\r\n100\r\nAcDbSymbolTable\r\n70\r\n1\r\n100\r\nAcDbDimStyleTable\r\n71\r\n${dimStyleNames.size}\r\n`;
+  dimStyleNames.forEach((name) => {
+    than += tableRecordHead("DIMSTYLE", handles.take(), hDimTab, "AcDbDimStyleTableRecord");
+    than += `2\r\n${name}\r\n70\r\n0\r\n40\r\n1.0\r\n140\r\n${real(defaultTextHeight)}\r\n`;
+  });
   than += "0\r\nENDTAB\r\n";
 
   than += openTable("BLOCK_RECORD", hBlkRecTab, blockRecordHandles.size + 2);
