@@ -119,7 +119,7 @@ Mỗi module có đặc tả tự chứa trong `docs/nang-cap/G<nn>-*.md` (schem
 
 ## 9. Tech Stack (xác minh `package.json`)
 
-Next.js **16.2** App Router (React **19.2**) · TypeScript **6.0** strict · Tailwind **4.3** (`@theme inline`, không `tailwind.config`, dark-first đảo màu qua `app/globals.css`) · PostgreSQL qua `pg` **8.22** (raw SQL, migrate nhẹ ADR-0003, không ORM/Supabase SDK) · Auth HMAC cookie tự chế · SSE realtime · Recharts · `@tanstack/react-table` + `react-virtual` · `exceljs`/`@e965/xlsx` · `@react-pdf/renderer` (+ `lib/nen/pdf-fonts.ts` font tiếng Việt) · `web-push` · Nodemailer · Service Worker PWA · Sentry (tuỳ chọn) · Test: `node:test` qua `tsx` (ADR-0002) + Playwright e2e. CI: GitHub Actions (`npm audit` → lint → typecheck → test Postgres 16 → build). **Deploy: tự host VPS** (Docker Compose hoặc pm2 + reverse proxy, `DEPLOY.md`) — **không Vercel** (SSE + cron tự host không hợp serverless).
+Next.js **16.2** App Router (React **19.2**) · TypeScript **6.0** strict · Tailwind **4.3** (`@theme inline`, không `tailwind.config`, dark-first đảo màu qua `app/globals.css`) · PostgreSQL qua `pg` **8.22** (raw SQL, migrate nhẹ ADR-0003, không ORM/Supabase SDK) · Auth HMAC cookie tự chế · SSE realtime · Recharts · `@tanstack/react-table` + `react-virtual` · `exceljs`/`@e965/xlsx` · `@react-pdf/renderer` (+ `lib/nen/pdf-fonts.ts` font tiếng Việt) · `web-push` · Nodemailer · Service Worker PWA · Sentry (tuỳ chọn) · Test: `node:test` qua `tsx` (ADR-0002) + Playwright e2e. CI: GitHub Actions (`npm audit` → lint → typecheck → test Postgres 16 → build). **Deploy: tự host VPS** (PM2 + reverse proxy, `ecosystem.config.js` + `DEPLOY.md`; **không Docker**) — **không Vercel** (SSE + cron tự host không hợp serverless).
 
 ---
 

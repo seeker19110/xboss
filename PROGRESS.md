@@ -4,6 +4,51 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Bỏ Docker, chỉ còn PM2 (2026-08-24)
+
+Trước đây có **song song hai đường triển khai** cho cùng một việc: Docker Compose (`Dockerfile`,
+`Dockerfile.mepf-worker`, `docker-compose.yml`, workflow `docker-build.yml` đẩy image lên GHCR) và
+PM2 (`deploy.sh` + `DEPLOY.md` Cách B). Thực tế production chạy PM2 — đường Docker chỉ tốn công bảo
+trì và thêm một lớp trừu tượng nằm giữa lỗi production với người phải sửa. Nay bỏ hẳn Docker.
+
+**Đã gỡ:** `Dockerfile`, `Dockerfile.mepf-worker`, `docker-compose.yml`, `.dockerignore`,
+`.github/workflows/docker-build.yml` (kéo theo check "Build & Verify Docker Images" trên mọi PR).
+
+**Đã thêm — `ecosystem.config.js`:** nguồn sự thật duy nhất về cách chạy tiến trình trên VPS, khai
+cả app Next.js lẫn daemon Python `mepf-worker`. `deploy.sh` reload thêm worker sau khi reload app
+(bỏ qua im lặng nếu VPS đó không chạy worker); staging cố ý KHÔNG đụng worker để không tranh chấp
+hàng đợi với production.
+
+**Ba cái bẫy chỉ lộ ra khi chạy thật, không phải khi đọc cấu hình:**
+
+1. **Worker chết ngay khi khởi động.** `scripts/mepf/worker_entry.py` đọc thẳng
+   `os.environ["DATABASE_URL"]` và **không** tự nạp `.env.local`. Docker Compose trước đây truyền
+   biến vào container nên không ai thấy; chuyển sang PM2 là worker `KeyError` rồi thoát. Nay
+   `ecosystem.config.js` tự đọc `.env.local`/`.env` và truyền vào tận nơi.
+2. **`next start` không đọc `PORT` từ `.env.local`.** Khai `PORT=3310` trong `.env.local` thì app
+   **vẫn nghe cổng 3000** — Next chỉ lấy cổng từ biến môi trường thật của tiến trình. Đây là bẫy im
+   lặng nguy hiểm: `deploy.sh` đọc `PORT` từ chính `.env.local` để dựng URL health-check, nên lệch
+   cổng là health-check trượt và deploy **tự rollback dù app chạy hoàn toàn bình thường**. Nay
+   `ecosystem.config.js` nạp `PORT` vào env của tiến trình app.
+3. **`MEPF_AGENT_SRC` mặc định trỏ vào đường dẫn container.** Giá trị mặc định cũ là
+   `/app/mepf-agent/src` — khớp `Dockerfile.mepf-worker` nhưng không tồn tại khi chạy thẳng trên
+   máy, và hệ quả là worker **âm thầm rơi về dry-run** (mọi tác vụ AI trả kết quả giả, không báo
+   lỗi). Nay mặc định suy từ vị trí chính file đó → `<repo>/mepf-worker/src`.
+
+**Kiểm chứng — chạy thật, không chỉ đọc cấu hình:** cài PM2 7.0.3, dựng Postgres 16 + DB trống,
+`pm2 start ecosystem.config.js` → cả hai tiến trình `online`, **0 restart**; `/api/health` trả
+`{"status":"ok","db":true,"migration":"0132_..."}` trên **đúng cổng khai trong `.env.local`**;
+`pm2 reload xboss` và `pm2 reload mepf-worker` (đúng thao tác `deploy.sh` làm) đều graceful, app
+khoẻ lại ngay sau reload; logic đọc `PORT` của `deploy.sh` khớp đúng cổng app đang nghe.
+
+Ghi nhận thêm: trên DB **hoàn toàn mới**, worker có thể log một nhịp `relation
+"engineering_async_tasks" does not exist` vì nó poll trước khi app kịp áp migration (migration chạy
+lười ở query đầu tiên của app). Vòng poll tự phục hồi, không restart — hành vi này có sẵn từ trước,
+không phải do bỏ Docker.
+
+**Metabase** vẫn dựng bằng Docker Compose riêng (`docs/ops/metabase.md`) — đó là phần mềm BI của
+bên thứ ba, dựng tách rời XBoss, không nằm trong phạm vi "XBoss chạy bằng PM2".
+
 ## Audit đợt hợp nhất Hub — vì sao e2e đỏ trên main (2026-08-24)
 
 Điều tra job `e2e` đỏ liên tục trên `main` hàng chục commit. **Nguyên nhân ghi trước đây

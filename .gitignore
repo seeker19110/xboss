@@ -55,3 +55,6 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
+
+# Log do PM2 sinh (ecosystem.config.js)
+logs/
