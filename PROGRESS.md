@@ -19,7 +19,7 @@ tắt qua DB cho từng dự án là mong manh (dự án mới tự bật lại)
     `engineering-iot-telemetry`, `engineering-subcon-ai`, `engineering-god-tier-studio`,
     `engineering-quantum-hub`, `engineering-swarm`, `engineering-nextgen-apex`.
   - `engineering-quantum-hub` cố ý `routePrefix: []` — API của trang này (`/api/engineering/
-    queue`, `/ledger`, `/spatial`) dùng CHUNG với `mepf-studio`/`chuan-hoa-ban-ve`/
+queue`, `/ledger`, `/spatial`) dùng CHUNG với `mepf-studio`/`chuan-hoa-ban-ve`/
     `spatial-viewer` (module thật, không đánh dấu) → không có tiền tố an toàn để gate riêng.
   - `engineering-bim-models` KHÔNG gate `/api/engineering/bim-routing` (dùng chung với
     `auto-routing`, module thật).
@@ -43,13 +43,40 @@ tắt qua DB cho từng dự án là mong manh (dự án mới tự bật lại)
   `assertModuleEnabled` 404/null — đúng 2 dòng mà 48 route gọi) + sửa ca cũ (không còn đúng khi
   có module mặc định tắt) + ca `findModuleByRoute` khớp module con thay vì rơi về "engineering"
   cha. **Kiểm chứng thêm bằng gọi API thật qua dev server thật** (dự án mới tạo `POST
-  /api/projects` → `GET /api/engineering/autonomy/policies`/`graph`/`bim-models` → 404 "Tính năng
+/api/projects` → `GET /api/engineering/autonomy/policies`/`graph`/`bim-models` → 404 "Tính năng
   đang bị tắt cho dự án này"; `PATCH /api/admin/feature-flags` bật `engineering-autonomy` → gọi
   lại → 200 dữ liệu thật; module lõi `engineering-suggestions` và API dùng chung
   `/api/engineering/queue/tasks` của `quantum-hub` không bị ảnh hưởng). `npm test` (1197 ca),
   `lint`, `typecheck`, `check:lib-layers`, `check:sw-exclude`, `build` đều xanh.
 - Không có route handler nào trong `app/api/engineering/**` bị đụng ngoài đúng 48 route thuộc
   11 `routePrefix` đã đánh dấu — đã kiểm bằng `git status` sau khi wire.
+
+## GĐ2/W6 — Retention log webhook + coverage ratchet thành cổng CI (2026-08-24)
+
+`PLAN.md` việc W6. Hai phần độc lập.
+
+- **W6.1 — Retention 2 bảng log webhook công khai:** thêm `zalo_site_message_logs` và
+  `telegram_bot_message_logs` vào `RETENTION_TARGETS` (`lib/ha-tang/retention.ts`) — cả hai nhận
+  ghi từ nguồn công khai (webhook) và trước đây không có giới hạn tuổi. Giữ **180 ngày** (`mode:
+"age"`, cột `created_at`), `enabled: true` — log vận hành bot thuần kỹ thuật, không phải chứng
+  cứ nghiệm thu/hợp đồng. Kiểm chứng bằng DB thật: chèn dòng cũ 200 ngày + dòng mới, dry-run đếm
+  đúng, `apply=true` chỉ xoá dòng cũ, giữ dòng mới. `tests/retention.test.ts` (8 ca sẵn có) vẫn
+  xanh không cần sửa.
+- **W6.2 — Coverage ratchet thành cổng CI:** mốc lưu ở `coverage-baseline.json` (gốc repo, 4 số +
+  ngày đo). `scripts/check-coverage.ts` (`npm run check:coverage`) chạy lại `test:coverage` thật,
+  so với mốc, fail khi tụt quá ngưỡng đệm 1 điểm % (chặn nhiễu đo làm đỏ oan); vượt mốc thì chỉ in
+  gợi ý cập nhật, không tự ghi đè file. Nối vào job `test` của CI (sau bước "Test", cần Postgres
+  thật). **Đo lại thật trên nhánh này** (Postgres 16 cục bộ cổng 55506, không chép số cũ từ
+  PROGRESS.md vì GĐ1 đã thêm nhiều test): **202 file** trong phạm vi `lib/**`+`app/api/**`, `lines`
+  **86.46%**, `branches` **83.55%**, `funcs` **81.36%** — tăng khá nhiều so với mốc 2026-08-10 (108
+  file, 87.12/84.11/79.46) chủ yếu vì số file trong phạm vi tăng gần gấp đôi (nhiều module GĐ1 +
+  các đợt trước thêm `lib/*`/`app/api/*` mới có test tương ứng), không phải tụt coverage thật.
+  **Chứng minh cổng đỏ→xanh:** hạ mốc `lines` lên `95.0` (cao hơn thực tế 86.46% hơn 1%) → cổng đỏ
+  đúng dòng `lines: 95% → 86.46% (tụt 8.54 điểm %, vượt ngưỡng đệm 1%)`; trả `lines` về `86.46` →
+  xanh `[OK] Coverage không tụt quá ngưỡng đệm 1% so với mốc`. Toàn bộ `npm test -- --release-gate`
+  219/219 file pass, 0 fail (1 skip cố ý, đúng chủ đích) trên cùng Postgres.
+- Verify: `npm run lint`/`typecheck`/`check:lib-layers` xanh; không có migration nào trong việc
+  này (chỉ thêm dữ liệu registry `RETENTION_TARGETS` + script CI).
 
 ## GĐ1/V1 — Xác thực webhook đi vào + chuẩn hoá OTP liên kết (2026-08-24)
 

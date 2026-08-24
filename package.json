@@ -30,6 +30,7 @@
     "check:dead-code": "tsx scripts/check-dead-code.ts",
     "check:lib-layers": "tsx scripts/check-lib-layers.ts",
     "check:mau-accent": "tsx scripts/check-mau-accent.ts",
+    "check:coverage": "tsx scripts/check-coverage.ts",
     "setup:drawing-tree": "tsx scripts/ensure-drawing-tree.ts"
   },
   "dependencies": {
