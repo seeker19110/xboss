@@ -398,7 +398,9 @@ export interface DxfEntityRaw {
     | "WIPEOUT"
     | "IMAGE"
     | "SHAPE"
-    | "TOLERANCE";
+    | "TOLERANCE"
+    // ATTRIB không nằm trong PARSED_ENTITY_TYPES vì nó luôn là con của INSERT, không đứng riêng
+    | "ATTRIB";
   layer: string;
   color?: number;
   coordinates: {
@@ -429,6 +431,15 @@ export interface DxfEntityRaw {
     corners?: Array<[number, number, number]>;
     /** Vector hướng đơn vị của đường dựng hình XLINE / RAY (mã 11/21/31) */
     direction?: [number, number, number];
+    /** Vector knot của SPLINE (mã 40 lặp lại) — thiếu nó thì không dựng lại được đúng đường cong */
+    knots?: number[];
+    /** Bậc của SPLINE (mã 71) */
+    degree?: number;
+    /** Các điểm điều khiển của SPLINE (mã 10/20/30) khi bản vẽ khai cả điểm khớp lẫn điểm điều khiển */
+    controlPoints?: Array<[number, number, number]>;
+    /** Tham số bắt đầu / kết thúc của ELLIPSE (mã 41/42) — cung ellipse chứ không phải ellipse đủ */
+    startParam?: number;
+    endParam?: number;
     /** Các đường bao vùng tô của HATCH (mã 91/92/93) */
     boundaryPaths?: Array<{
       points: Array<[number, number, number]>;
@@ -456,8 +467,24 @@ export interface DxfEntityRaw {
   measurement?: number;
   /** Tên mẫu tô của HATCH (mã 2) */
   patternName?: string;
+  /** Tên KIỂU kích thước của DIMENSION / LEADER / TOLERANCE (mã 3) — khác kiểu chữ (mã 7) */
+  dimStyle?: string;
   /** HATCH tô đặc (cờ 70 bit 1) */
   isSolidFill?: boolean;
+  /** Góc và tỷ lệ mẫu tô của HATCH (mã 52/41) */
+  hatchAngle?: number;
+  hatchScale?: number;
+  /** Định nghĩa các nét gạch của mẫu tô (mã 53/43/44/45/46/79/49) — thiếu thì AutoCAD tô rỗng */
+  hatchPatternLines?: Array<{
+    angle: number;
+    baseX: number;
+    baseY: number;
+    offsetX: number;
+    offsetY: number;
+    dashes: number[];
+  }>;
+  /** Các ATTRIB đi kèm INSERT, giữ nguyên vị trí và cỡ chữ để ghi lại đúng chỗ */
+  attribEntities?: DxfEntityRaw[];
   /** Thực thể nằm ở không gian giấy — khung tên, khung in (mã 67 = 1) */
   isPaperSpace?: boolean;
   /** Bề dày đùn của thực thể 2D (mã 39) */
@@ -904,7 +931,7 @@ function readDxfPairs(content: string): DxfPair[] {
  * — nên thêm loại mới vào đây là cách duy nhất để nó không biến mất im lặng khỏi bản vẽ.
  *
  * Cố ý không có: `VIEWPORT` (khung nhìn của không gian giấy) là siêu dữ liệu bố cục in, không phải
- * nội dung bản vẽ; dựng lại nó đòi cả bố cục R12 mà bộ ghi này không tái tạo.
+ * nội dung bản vẽ; dựng lại nó đòi cả bố cục in (LAYOUT) mà bộ ghi này không tái tạo.
  */
 const PARSED_ENTITY_TYPES = new Set<DxfEntityRaw["type"]>([
   "LINE",
@@ -1001,6 +1028,7 @@ function arcToPoints(
 function parseHatchBoundaries(group: DxfPair[]): {
   paths: Array<{ points: Array<[number, number, number]>; bulges: number[]; closed: boolean }>;
   seeds: Array<[number, number, number]>;
+  patternLines: NonNullable<DxfEntityRaw["hatchPatternLines"]>;
 } {
   const paths: Array<{
     points: Array<[number, number, number]>;
@@ -1008,6 +1036,10 @@ function parseHatchBoundaries(group: DxfPair[]): {
     closed: boolean;
   }> = [];
   const seeds: Array<[number, number, number]> = [];
+  // Định nghĩa các nét gạch của mẫu tô (mã 78 số dòng; mỗi dòng 53/43/44/45/46/79 + 49 lặp lại).
+  // Thiếu phần này thì tệp R2000 ghi ra có HATCH nhưng AutoCAD tô rỗng — nhìn như mất vùng tô.
+  const patternLines: NonNullable<DxfEntityRaw["hatchPatternLines"]> = [];
+  let patternLine: NonNullable<DxfEntityRaw["hatchPatternLines"]>[number] | null = null;
 
   let inBoundary = false;
   let inSeeds = false;
@@ -1043,6 +1075,35 @@ function parseHatchBoundaries(group: DxfPair[]): {
   };
 
   for (const { code, value } of group) {
+    // ── Định nghĩa nét gạch mẫu tô ──
+    if (code === 53) {
+      if (patternLine) patternLines.push(patternLine);
+      patternLine = { angle: num(value), baseX: 0, baseY: 0, offsetX: 0, offsetY: 0, dashes: [] };
+      continue;
+    }
+    if (patternLine) {
+      if (code === 43) {
+        patternLine.baseX = num(value);
+        continue;
+      }
+      if (code === 44) {
+        patternLine.baseY = num(value);
+        continue;
+      }
+      if (code === 45) {
+        patternLine.offsetX = num(value);
+        continue;
+      }
+      if (code === 46) {
+        patternLine.offsetY = num(value);
+        continue;
+      }
+      if (code === 49) {
+        patternLine.dashes.push(num(value));
+        continue;
+      }
+    }
+
     if (code === 91) {
       inBoundary = true;
       continue;
@@ -1146,8 +1207,9 @@ function parseHatchBoundaries(group: DxfPair[]): {
 
   flushArc();
   if (current && current.points.length > 0) paths.push(current);
+  if (patternLine) patternLines.push(patternLine);
 
-  return { paths, seeds };
+  return { paths, seeds, patternLines };
 }
 
 /**
@@ -1263,9 +1325,13 @@ function buildEntity(type: DxfEntityRaw["type"], group: DxfPair[], id: string): 
   let ey220: number | undefined;
   let ez230: number | undefined;
   let attributePrompt: string | undefined;
+  let val52: number | undefined; // góc mẫu tô của HATCH
+  let hatchPatternLines: DxfEntityRaw["hatchPatternLines"];
+  let dimStyle: string | undefined;
 
   const points: Array<[number, number, number]> = [];
   const bulges: number[] = [];
+  const knots: number[] = [];
   const fitPoints: Array<[number, number, number]> = [];
   const corners: Array<[number, number, number]> = [];
 
@@ -1290,9 +1356,14 @@ function buildEntity(type: DxfEntityRaw["type"], group: DxfPair[], id: string): 
         break;
       }
       case 3:
-        // MTEXT chia chữ dài thành nhiều mảnh mã 3 rồi kết bằng mã 1; còn ở ATTDEF mã 3 là câu
-        // nhắc nhập liệu, không phải nội dung chữ trên bản vẽ.
+        // Mã 3 mang nghĩa khác nhau tuỳ loại thực thể — gộp hết vào nội dung chữ như trước làm
+        // chữ kích thước "4000" hoá "4000STANDARD" (tên kiểu kích thước bị nối vào số đo):
+        //   MTEXT            → một mảnh của chữ dài (kết thúc bằng mã 1)
+        //   ATTDEF           → câu nhắc nhập liệu
+        //   DIMENSION/LEADER/TOLERANCE → TÊN KIỂU kích thước
         if (type === "ATTDEF") attributePrompt = value.trim();
+        else if (type === "DIMENSION" || type === "LEADER" || type === "TOLERANCE")
+          dimStyle = value.trim();
         else text += value;
         break;
       case 1:
@@ -1383,7 +1454,9 @@ function buildEntity(type: DxfEntityRaw["type"], group: DxfPair[], id: string): 
         elevation38 = numOrUndef(value);
         break;
       case 40:
-        val40 = numOrUndef(value);
+        // Ở SPLINE, mã 40 lặp lại là VECTOR KNOT — không có nó thì không dựng lại đúng đường cong
+        if (type === "SPLINE") knots.push(num(value));
+        else val40 = numOrUndef(value);
         break;
       case 41:
         val41 = numOrUndef(value);
@@ -1398,6 +1471,9 @@ function buildEntity(type: DxfEntityRaw["type"], group: DxfPair[], id: string): 
         break;
       case 50:
         val50 = numOrUndef(value);
+        break;
+      case 52:
+        val52 = numOrUndef(value);
         break;
       case 51:
         val51 = numOrUndef(value);
@@ -1467,6 +1543,9 @@ function buildEntity(type: DxfEntityRaw["type"], group: DxfPair[], id: string): 
     // Đường cong SPLINE dùng điểm khớp (11/21/31) nếu có, không có thì dùng điểm điều khiển.
     coordinates.points = fitPoints.length > 0 ? fitPoints : points;
     coordinates.closed = Boolean(flags70 !== undefined && flags70 & 1);
+    if (points.length > 0) coordinates.controlPoints = points;
+    if (knots.length > 0) coordinates.knots = knots;
+    if (val71 !== undefined) coordinates.degree = val71;
   } else if (type === "LEADER") {
     coordinates.points = points;
     if (points.length > 0) {
@@ -1485,6 +1564,9 @@ function buildEntity(type: DxfEntityRaw["type"], group: DxfPair[], id: string): 
     coordinates.center = pointOf(x10, y20, z30);
     coordinates.majorAxis = pointOf(x11, y21, z31);
     if (val40 !== undefined) coordinates.axisRatio = val40;
+    // Mã 41/42 là tham số bắt đầu/kết thúc — khác 0…2π nghĩa là CUNG ellipse, không phải ellipse đủ
+    if (val41 !== undefined) coordinates.startParam = val41;
+    if (val42 !== undefined) coordinates.endParam = val42;
   } else if (isCornerLike) {
     coordinates.corners = corners;
     if (corners.length > 0) coordinates.center = corners[0];
@@ -1503,7 +1585,8 @@ function buildEntity(type: DxfEntityRaw["type"], group: DxfPair[], id: string): 
       coordinates.closed = true;
     }
   } else if (type === "HATCH") {
-    const { paths, seeds } = parseHatchBoundaries(group);
+    const { paths, seeds, patternLines } = parseHatchBoundaries(group);
+    if (patternLines.length > 0) hatchPatternLines = patternLines;
     coordinates.boundaryPaths = paths;
     coordinates.center = pointOf(x10, y20, z30) || seeds[0];
     if (paths.length > 0) {
@@ -1555,10 +1638,18 @@ function buildEntity(type: DxfEntityRaw["type"], group: DxfPair[], id: string): 
   if (blockName) entity.blockName = blockName;
   if (textStyle) entity.textStyle = textStyle;
   if (patternName) entity.patternName = patternName;
+  if (dimStyle) entity.dimStyle = dimStyle;
 
-  if (type === "TEXT" || type === "MTEXT" || type === "ATTDEF" || type === "MULTILEADER") {
+  if (
+    type === "TEXT" ||
+    type === "MTEXT" ||
+    type === "ATTDEF" ||
+    type === "ATTRIB" ||
+    type === "MULTILEADER"
+  ) {
     if (val40 !== undefined) entity.textHeight = val40;
-    if (val41 !== undefined && (type === "TEXT" || type === "ATTDEF")) entity.widthFactor = val41;
+    if (val41 !== undefined && (type === "TEXT" || type === "ATTDEF" || type === "ATTRIB"))
+      entity.widthFactor = val41;
     if (val50 !== undefined) entity.rotation = val50;
     if (type === "ATTDEF") {
       // Ở ATTDEF, mã 2 là THẺ thuộc tính chứ không phải tên khối
@@ -1567,7 +1658,10 @@ function buildEntity(type: DxfEntityRaw["type"], group: DxfPair[], id: string): 
       if (attributePrompt) entity.attributePrompt = attributePrompt;
     }
     // TEXT có canh lề (mã 72/73 khác 0) thì điểm đặt thật là mã 11, không phải mã 10
-    if ((type === "TEXT" || type === "ATTDEF") && ((val72 ?? 0) !== 0 || (val73 ?? 0) !== 0)) {
+    if (
+      (type === "TEXT" || type === "ATTDEF" || type === "ATTRIB") &&
+      ((val72 ?? 0) !== 0 || (val73 ?? 0) !== 0)
+    ) {
       const align = pointOf(x11, y21, z31);
       if (align) {
         entity.coordinates.alignPoint = entity.coordinates.center;
@@ -1597,6 +1691,9 @@ function buildEntity(type: DxfEntityRaw["type"], group: DxfPair[], id: string): 
     if (val50 !== undefined) entity.rotation = val50;
   } else if (type === "HATCH") {
     entity.isSolidFill = Boolean(flags70 !== undefined && flags70 & 1);
+    if (val52 !== undefined) entity.hatchAngle = val52;
+    if (val41 !== undefined) entity.hatchScale = val41;
+    if (hatchPatternLines) entity.hatchPatternLines = hatchPatternLines;
   }
 
   // Thuộc tính chung mọi thực thể — trước đây bị bỏ hết nên xuất tệp là mất
@@ -1662,18 +1759,20 @@ function readEntityAt(
   } else if (type === "INSERT") {
     // INSERT có mã 66=1 thì các ATTRIB theo sau mang giá trị thuộc tính thật của khối.
     const attributes: Record<string, string> = {};
+    const attribEntities: DxfEntityRaw[] = [];
     while (i < pairs.length && pairs[i].code === 0) {
       const sub = pairs[i].value.trim();
       if (sub === "ATTRIB") {
-        const { group: ag, next: an } = readGroup(pairs, i + 1);
-        let tag = "";
-        let value = "";
-        for (const p of ag) {
-          if (p.code === 2) tag = p.value.trim();
-          else if (p.code === 1) value += p.value;
+        const attrib = readEntityAt(pairs, i, `${id}-ATT${attribEntities.length + 1}`);
+        // ATTRIB dùng chung bộ mã nhóm với TEXT: mã 2 là thẻ, mã 1 là giá trị
+        const tag = attrib.entity.blockName;
+        if (tag) {
+          attrib.entity.attributeTag = tag;
+          attrib.entity.blockName = undefined;
+          attributes[tag] = attrib.entity.decodedText || "";
         }
-        if (tag) attributes[tag] = decodeCadText(value);
-        i = an;
+        attribEntities.push(attrib.entity);
+        i = attrib.next;
       } else if (sub === "SEQEND") {
         i = readGroup(pairs, i + 1).next;
         break;
@@ -1682,6 +1781,7 @@ function readEntityAt(
       }
     }
     if (Object.keys(attributes).length > 0) entity.attributes = attributes;
+    if (attribEntities.length > 0) entity.attribEntities = attribEntities;
   }
 
   return { entity, next: i };
@@ -2503,7 +2603,7 @@ function formatMeasurement(v: number): string {
 }
 
 /**
- * Chiều cao chữ dùng khi thực thể nguồn không khai mã nhóm 40 — R12 bắt buộc TEXT phải có mã này.
+ * Chiều cao chữ dùng khi thực thể nguồn không khai mã nhóm 40 — TEXT bắt buộc phải có mã này.
  * Lấy **trung vị chiều cao chữ thật của chính bản vẽ** để chữ bổ khuyết không lạc cỡ; bản vẽ không
  * có chữ nào khai chiều cao thì mới dùng 250 (cỡ chữ ghi chú thường gặp của bản vẽ MEPF hệ mm).
  */
@@ -2516,442 +2616,452 @@ function resolveDefaultTextHeight(entities: DxfEntityRaw[]): number {
   return heights[Math.floor(heights.length / 2)];
 }
 
-/** Rời rạc hoá ELLIPSE thành đa tuyến — R12 không có thực thể ELLIPSE. */
-function ellipseToPoints(
-  center: [number, number, number],
-  majorAxis: [number, number, number],
-  ratio: number,
-  segments = 48,
-): Array<[number, number, number]> {
-  const majorLen = Math.hypot(majorAxis[0], majorAxis[1]);
-  if (majorLen === 0) return [];
-  const rot = Math.atan2(majorAxis[1], majorAxis[0]);
-  const minorLen = majorLen * (ratio > 0 ? ratio : 1);
-  const pts: Array<[number, number, number]> = [];
-  for (let s = 0; s <= segments; s++) {
-    const t = (s / segments) * Math.PI * 2;
-    const ex = majorLen * Math.cos(t);
-    const ey = minorLen * Math.sin(t);
-    pts.push([
-      center[0] + ex * Math.cos(rot) - ey * Math.sin(rot),
-      center[1] + ex * Math.sin(rot) + ey * Math.cos(rot),
-      center[2],
-    ]);
-  }
-  return pts;
-}
-
 /**
- * Ghi một đa tuyến theo cấu trúc R12: POLYLINE + các VERTEX + SEQEND.
- *
- * R12 **không có** thực thể LWPOLYLINE (mãi R14 mới có), nên bản ghi trước đây vừa khai AC1009 vừa
- * ghi LWPOLYLINE là tự mâu thuẫn. Độ cong từng đoạn (mã 42) được VERTEX của R12 hỗ trợ sẵn nên
- * cung tròn trong đa tuyến giữ nguyên hình, không phải bẻ thành đoạn thẳng.
+ * Bộ cấp phát **handle** — mỗi thực thể, bản ghi bảng, khối và đối tượng trong tệp DXF R2000 phải
+ * mang một handle duy nhất (mã 5) và trỏ về chủ sở hữu của nó (mã 330). Đây chính là thứ mà cấu
+ * trúc R12 không có, và cũng là lý do bản ghi cũ phải khai AC1009.
  */
-function writePolylineR12(
-  layer: string,
-  colStr: string,
-  points: Array<[number, number, number]>,
-  bulges: number[] | undefined,
-  closed: boolean,
-): string {
-  let out = `0\r\nPOLYLINE\r\n8\r\n${layer}\r\n${colStr}66\r\n1\r\n70\r\n${closed ? 1 : 0}\r\n`;
-  out += `10\r\n0.0\r\n20\r\n0.0\r\n30\r\n${dxfNum(points[0]?.[2])}\r\n`;
-  points.forEach((pt, idx) => {
-    out += `0\r\nVERTEX\r\n8\r\n${layer}\r\n10\r\n${dxfNum(pt[0])}\r\n20\r\n${dxfNum(pt[1])}\r\n30\r\n${dxfNum(pt[2])}\r\n`;
-    const b = bulges?.[idx];
-    if (typeof b === "number" && b !== 0) out += `42\r\n${b}\r\n`;
-  });
-  out += `0\r\nSEQEND\r\n8\r\n${layer}\r\n`;
-  return out;
+class HandleAllocator {
+  private next = 0x100;
+  take(): string {
+    const h = this.next.toString(16).toUpperCase();
+    this.next += 1;
+    return h;
+  }
+  get seed(): string {
+    return this.next.toString(16).toUpperCase();
+  }
 }
 
-/** Ghi một TEXT R12 kèm chiều cao / góc xoay / kiểu chữ thật của thực thể nguồn. */
-function writeTextR12(
-  layer: string,
-  colStr: string,
-  pos: [number, number, number],
-  value: string,
-  opts: {
-    height: number;
-    rotation?: number;
-    widthFactor?: number;
-    style?: string;
-    /** Canh lề (mã 72/73) kèm điểm canh thứ nhất (mã 10) — thiếu thì chữ nhảy vị trí khi mở lại */
-    align?: { horizontal: number; vertical: number };
-    firstPoint?: [number, number, number];
-  },
-): string {
-  // Chữ có canh lề: mã 10 là điểm canh thứ nhất, mã 11 mới là điểm đặt thật
-  const p10 = opts.align && opts.firstPoint ? opts.firstPoint : pos;
-  let out = `0\r\nTEXT\r\n8\r\n${layer}\r\n${colStr}`;
-  out += `10\r\n${p10[0]}\r\n20\r\n${p10[1]}\r\n30\r\n${p10[2]}\r\n40\r\n${opts.height}\r\n1\r\n${value}\r\n`;
-  if (opts.align) {
-    out += `72\r\n${opts.align.horizontal}\r\n73\r\n${opts.align.vertical}\r\n`;
-    out += `11\r\n${pos[0]}\r\n21\r\n${pos[1]}\r\n31\r\n${pos[2]}\r\n`;
-  }
-  if (typeof opts.rotation === "number" && opts.rotation !== 0) out += `50\r\n${opts.rotation}\r\n`;
-  if (typeof opts.widthFactor === "number" && opts.widthFactor > 0 && opts.widthFactor !== 1)
-    out += `41\r\n${opts.widthFactor}\r\n`;
-  out += `7\r\n${opts.style || "STANDARD"}\r\n`;
-  return out;
+/** Khối mã nhóm mở đầu chung của mọi bản ghi trong bảng ký hiệu (SYMBOL TABLE) R2000. */
+function tableRecordHead(type: string, handle: string, owner: string, subClass: string): string {
+  return (
+    `0\r\n${type}\r\n5\r\n${handle}\r\n330\r\n${owner}\r\n` +
+    `100\r\nAcDbSymbolTableRecord\r\n100\r\n${subClass}\r\n`
+  );
+}
+
+/** Số thực ghi ra tệp DXF: luôn có phần thập phân để AutoCAD đọc đúng kiểu double. */
+function real(v: number | undefined, fallback = 0): string {
+  const n = typeof v === "number" && Number.isFinite(v) ? v : fallback;
+  return Number.isInteger(n) ? `${n}.0` : String(n);
 }
 
 /**
- * Ghi một thực thể đã phân tích thành khối mã nhóm DXF R12.
+ * Ghi một thực thể đã phân tích thành khối mã nhóm DXF **R2000 (AC1015)**.
  *
- * Hai cam kết:
+ * Khác bản ghi R12 trước đây ở chỗ **không còn bước hạ cấp nào**: LWPOLYLINE, ELLIPSE, SPLINE,
+ * HATCH, MTEXT, XLINE, RAY, MLINE, TOLERANCE, DIMENSION đều là thực thể hợp lệ của R2000 nên ghi
+ * nguyên bản. Đường cong không còn bị bẻ thành đoạn thẳng, kích thước không còn bị tách thành
+ * LINE + TEXT, chữ nhiều dòng không còn bị ép thành một dòng.
+ *
+ * Hai cam kết giữ nguyên từ trước:
  * 1. **Không bịa dữ liệu** — thiếu toạ độ/bán kính/góc thì không tự chế giá trị thay thế.
- * 2. **Không nuốt mất thực thể** — loại hình R12 không có (HATCH, MULTILEADER) hoặc thiếu dữ liệu
- *    để dựng hình vẫn để lại POINT tại điểm neo đã biết, đúng tiền lệ đã chốt cho DIMENSION ở M98.
+ * 2. **Không nuốt mất thực thể** — loại không dựng lại được vẫn để lại POINT tại điểm neo.
  */
-/** Khung bao bản vẽ, dùng để cắt đường dựng hình dài vô hạn. */
-interface DrawingBox {
-  minX: number;
-  maxX: number;
-  minY: number;
-  maxY: number;
-}
-
-/**
- * Cắt một đường dài vô hạn (XLINE: cả hai phía; RAY: một phía) theo khung bao bản vẽ, bằng thuật
- * toán slab. Trả `null` khi đường không cắt qua khung bao.
- *
- * Cắt theo khung bao chứ không kéo dài theo đường chéo: kéo dài làm khung bao bản vẽ phình ra khỏi
- * phạm vi thật, kéo theo `$EXTMIN/$EXTMAX` sai và lệnh ZOOM EXTENTS trong AutoCAD nhảy ra xa.
- */
-function clipInfiniteLine(
-  base: [number, number, number],
-  dir: [number, number, number],
-  box: DrawingBox,
-  onlyForward: boolean,
-): [[number, number, number], [number, number, number]] | null {
-  let tMin = onlyForward ? 0 : -Infinity;
-  let tMax = Infinity;
-
-  const slab = (p: number, q: number): boolean => {
-    if (p === 0) return q >= 0; // song song với cặp cạnh này
-    const t = q / p;
-    if (p < 0) {
-      if (t > tMax) return false;
-      if (t > tMin) tMin = t;
-    } else {
-      if (t < tMin) return false;
-      if (t < tMax) tMax = t;
-    }
-    return true;
-  };
-
-  if (!slab(-dir[0], base[0] - box.minX)) return null;
-  if (!slab(dir[0], box.maxX - base[0])) return null;
-  if (!slab(-dir[1], base[1] - box.minY)) return null;
-  if (!slab(dir[1], box.maxY - base[1])) return null;
-  if (!Number.isFinite(tMin) || !Number.isFinite(tMax) || tMax <= tMin) return null;
-
-  return [
-    [base[0] + dir[0] * tMin, base[1] + dir[1] * tMin, base[2]],
-    [base[0] + dir[0] * tMax, base[1] + dir[1] * tMax, base[2]],
-  ];
-}
-
-function writeEntityR12(
+function writeEntityR2000(
   ent: DxfEntityRaw,
   layer: string,
   defaultTextHeight: number,
-  drawingBox?: DrawingBox,
+  handles: HandleAllocator,
+  owner: string,
+  /** Khối `*D<n>` chứa hình của DIMENSION, do chỗ gọi cấp phát trước */
+  dimBlockName?: string,
 ): string {
-  // Thuộc tính chung phải bám theo MỌI thực thể ghi ra, nếu không xuất tệp là mất: màu riêng,
-  // kiểu nét riêng, bề dày đùn, tỷ lệ nét đứt, cờ ẩn, không gian giấy và hướng đùn (bản vẽ lật
-  // gương có hướng đùn (0,0,-1) — mất nó là hình bị lật ngược khi mở lại).
-  let colStr = ent.color ? `62\r\n${ent.color}\r\n` : "";
-  if (ent.lineType) colStr += `6\r\n${ent.lineType}\r\n`;
-  if (ent.isPaperSpace) colStr += `67\r\n1\r\n`;
-  if (typeof ent.thickness === "number" && ent.thickness !== 0)
-    colStr += `39\r\n${ent.thickness}\r\n`;
-  if (typeof ent.lineTypeScale === "number" && ent.lineTypeScale !== 1)
-    colStr += `48\r\n${ent.lineTypeScale}\r\n`;
-  if (ent.isInvisible) colStr += `60\r\n1\r\n`;
-  // Hướng đùn nằm chung trong khối thuộc tính: nhánh POLYLINE ghi nó vào chính nhóm POLYLINE
-  // (trước các VERTEX), nếu tách ra ghi ở cuối thì nó rơi nhầm sang thực thể SEQEND.
-  if (ent.extrusion) {
-    colStr += `210\r\n${ent.extrusion[0]}\r\n220\r\n${ent.extrusion[1]}\r\n230\r\n${ent.extrusion[2]}\r\n`;
-  }
   const c = ent.coordinates;
+  const handle = handles.take();
+
+  /** Khối mở đầu chung của mọi thực thể: handle, chủ sở hữu, lớp cơ sở AcDbEntity và thuộc tính chung. */
+  const head = (type: string, subClass: string, h = handle): string => {
+    let out = `0\r\n${type}\r\n5\r\n${h}\r\n330\r\n${owner}\r\n100\r\nAcDbEntity\r\n`;
+    if (ent.isPaperSpace) out += `67\r\n1\r\n`;
+    out += `8\r\n${layer}\r\n`;
+    if (ent.lineType) out += `6\r\n${ent.lineType}\r\n`;
+    if (ent.color) out += `62\r\n${ent.color}\r\n`;
+    if (typeof ent.lineTypeScale === "number" && ent.lineTypeScale !== 1)
+      out += `48\r\n${real(ent.lineTypeScale)}\r\n`;
+    if (ent.isInvisible) out += `60\r\n1\r\n`;
+    out += `100\r\n${subClass}\r\n`;
+    if (typeof ent.thickness === "number" && ent.thickness !== 0)
+      out += `39\r\n${real(ent.thickness)}\r\n`;
+    return out;
+  };
+
+  /** Hướng đùn — ghi ở cuối nhóm thực thể theo đúng thứ tự đặc tả. */
+  const extr = (): string =>
+    ent.extrusion
+      ? `210\r\n${real(ent.extrusion[0])}\r\n220\r\n${real(ent.extrusion[1])}\r\n230\r\n${real(ent.extrusion[2])}\r\n`
+      : "";
+
+  const pt = (codeBase: number, p?: [number, number, number]): string => {
+    const [x, y, z] = ptXYZ(p);
+    return `${codeBase}\r\n${real(x)}\r\n${codeBase + 10}\r\n${real(y)}\r\n${codeBase + 20}\r\n${real(z)}\r\n`;
+  };
 
   /** Dấu vết tối giản tại điểm neo — thực thể không dựng được hình vẫn không biến mất im lặng. */
   const pointTrace = (): string => {
     const anchor = c.center || c.start || c.end || c.points?.[0] || c.corners?.[0];
     if (!anchor) return "";
-    const [x, y, z] = ptXYZ(anchor);
-    return `0\r\nPOINT\r\n8\r\n${layer}\r\n${colStr}10\r\n${x}\r\n20\r\n${y}\r\n30\r\n${z}\r\n`;
+    return head("POINT", "AcDbPoint") + pt(10, anchor) + extr();
+  };
+
+  const textBody = (
+    type: "TEXT" | "ATTDEF" | "ATTRIB",
+    value: string,
+    pos: [number, number, number],
+  ): string => {
+    const align = ent.textAlign;
+    const first = align && c.alignPoint ? c.alignPoint : pos;
+    let out = head(type, "AcDbText");
+    out += pt(10, first);
+    out += `40\r\n${real(dxfNum(ent.textHeight, defaultTextHeight) || defaultTextHeight)}\r\n`;
+    out += `1\r\n${value}\r\n`;
+    if (typeof ent.rotation === "number" && ent.rotation !== 0)
+      out += `50\r\n${real(ent.rotation)}\r\n`;
+    if (typeof ent.widthFactor === "number" && ent.widthFactor > 0 && ent.widthFactor !== 1)
+      out += `41\r\n${real(ent.widthFactor)}\r\n`;
+    out += `7\r\n${ent.textStyle || "STANDARD"}\r\n`;
+    if (align) {
+      out += `72\r\n${align.horizontal}\r\n`;
+      out += pt(11, pos);
+    }
+    out += extr();
+    // Quirk của đặc tả: TEXT/ATTDEF/ATTRIB khai lại lớp AcDbText lần hai trước mã 73
+    if (type === "TEXT") {
+      out += `100\r\nAcDbText\r\n`;
+      if (align) out += `73\r\n${align.vertical}\r\n`;
+    }
+    return out;
   };
 
   switch (ent.type) {
     case "LINE": {
       if (!c.start || !c.end) return pointTrace();
-      const [sx, sy, sz] = ptXYZ(c.start);
-      const [ex, ey, ez] = ptXYZ(c.end);
-      return (
-        `0\r\nLINE\r\n8\r\n${layer}\r\n${colStr}` +
-        `10\r\n${sx}\r\n20\r\n${sy}\r\n30\r\n${sz}\r\n` +
-        `11\r\n${ex}\r\n21\r\n${ey}\r\n31\r\n${ez}\r\n`
-      );
-    }
-
-    case "LWPOLYLINE":
-    case "POLYLINE":
-    case "SPLINE":
-    case "LEADER": {
-      const pts = c.points || [];
-      if (pts.length === 0) return pointTrace();
-      if (pts.length === 1) {
-        const [x, y, z] = ptXYZ(pts[0]);
-        return `0\r\nPOINT\r\n8\r\n${layer}\r\n${colStr}10\r\n${x}\r\n20\r\n${y}\r\n30\r\n${z}\r\n`;
-      }
-      return writePolylineR12(layer, colStr, pts, c.bulges, Boolean(c.closed));
-    }
-
-    case "CIRCLE": {
-      if (!c.center || !c.radius) return pointTrace();
-      const [x, y, z] = ptXYZ(c.center);
-      return (
-        `0\r\nCIRCLE\r\n8\r\n${layer}\r\n${colStr}` +
-        `10\r\n${x}\r\n20\r\n${y}\r\n30\r\n${z}\r\n40\r\n${c.radius}\r\n`
-      );
-    }
-
-    case "ARC": {
-      // Cung tròn R12 bắt buộc có cả bán kính lẫn 2 góc; thiếu thì không tự đặt 0°–180° như bản cũ
-      if (!c.center || !c.radius || c.startAngle === undefined || c.endAngle === undefined) {
-        return pointTrace();
-      }
-      const [x, y, z] = ptXYZ(c.center);
-      return (
-        `0\r\nARC\r\n8\r\n${layer}\r\n${colStr}` +
-        `10\r\n${x}\r\n20\r\n${y}\r\n30\r\n${z}\r\n40\r\n${c.radius}\r\n` +
-        `50\r\n${c.startAngle}\r\n51\r\n${c.endAngle}\r\n`
-      );
-    }
-
-    case "ELLIPSE": {
-      // R12 không có ELLIPSE — rời rạc hoá thành đa tuyến từ chính tâm/bán trục/tỷ lệ của tệp gốc
-      if (!c.center || !c.majorAxis) return pointTrace();
-      const pts = ellipseToPoints(ptXYZ(c.center), ptXYZ(c.majorAxis), c.axisRatio ?? 1);
-      if (pts.length < 2) return pointTrace();
-      return writePolylineR12(layer, colStr, pts, undefined, true);
-    }
-
-    case "SOLID":
-    case "3DFACE": {
-      const corners = c.corners || [];
-      if (corners.length < 3) return pointTrace();
-      const [p1, p2, p3] = [ptXYZ(corners[0]), ptXYZ(corners[1]), ptXYZ(corners[2])];
-      const p4 = ptXYZ(corners[3] || corners[2]);
-      return (
-        `0\r\n${ent.type}\r\n8\r\n${layer}\r\n${colStr}` +
-        `10\r\n${p1[0]}\r\n20\r\n${p1[1]}\r\n30\r\n${p1[2]}\r\n` +
-        `11\r\n${p2[0]}\r\n21\r\n${p2[1]}\r\n31\r\n${p2[2]}\r\n` +
-        `12\r\n${p3[0]}\r\n22\r\n${p3[1]}\r\n32\r\n${p3[2]}\r\n` +
-        `13\r\n${p4[0]}\r\n23\r\n${p4[1]}\r\n33\r\n${p4[2]}\r\n`
-      );
+      return head("LINE", "AcDbLine") + pt(10, c.start) + pt(11, c.end) + extr();
     }
 
     case "POINT": {
       if (!c.center) return "";
-      const [x, y, z] = ptXYZ(c.center);
-      return `0\r\nPOINT\r\n8\r\n${layer}\r\n${colStr}10\r\n${x}\r\n20\r\n${y}\r\n30\r\n${z}\r\n`;
+      return head("POINT", "AcDbPoint") + pt(10, c.center) + extr();
+    }
+
+    case "CIRCLE": {
+      if (!c.center || !c.radius) return pointTrace();
+      return (
+        head("CIRCLE", "AcDbCircle") + pt(10, c.center) + `40\r\n${real(c.radius)}\r\n` + extr()
+      );
+    }
+
+    case "ARC": {
+      // Cung tròn bắt buộc có cả bán kính lẫn hai góc — thiếu thì không tự đặt 0°–180°
+      if (!c.center || !c.radius || c.startAngle === undefined || c.endAngle === undefined) {
+        return pointTrace();
+      }
+      let out = head("ARC", "AcDbCircle") + pt(10, c.center) + `40\r\n${real(c.radius)}\r\n`;
+      out += extr();
+      out += `100\r\nAcDbArc\r\n50\r\n${real(c.startAngle)}\r\n51\r\n${real(c.endAngle)}\r\n`;
+      return out;
+    }
+
+    case "LWPOLYLINE":
+    case "POLYLINE":
+    case "MLINE":
+    case "LEADER": {
+      // R2000 có LWPOLYLINE thật — không phải dựng POLYLINE/VERTEX/SEQEND như R12, và độ cong
+      // từng đoạn ghi thẳng bằng mã 42.
+      const pts = c.points || [];
+      if (pts.length === 0) return pointTrace();
+      if (pts.length === 1) return head("POINT", "AcDbPoint") + pt(10, pts[0]) + extr();
+      let out = head("LWPOLYLINE", "AcDbPolyline");
+      out += `90\r\n${pts.length}\r\n70\r\n${c.closed ? 1 : 0}\r\n`;
+      if (c.elevation !== undefined) out += `38\r\n${real(c.elevation)}\r\n`;
+      pts.forEach((p, idx) => {
+        out += `10\r\n${real(p[0])}\r\n20\r\n${real(p[1])}\r\n`;
+        const b = c.bulges?.[idx];
+        if (typeof b === "number" && b !== 0) out += `42\r\n${real(b)}\r\n`;
+      });
+      return out + extr();
+    }
+
+    case "SPLINE": {
+      const ctrl = c.controlPoints || [];
+      const fit = c.points || [];
+      // SPLINE nguyên bản cần vector knot; có đủ knot + điểm điều khiển thì ghi đúng đường cong,
+      // thiếu thì hạ về đa tuyến qua các điểm khớp thay vì ghi ra một SPLINE hỏng.
+      if (ctrl.length >= 2 && (c.knots?.length ?? 0) > 0) {
+        const degree = c.degree ?? 3;
+        let out = head("SPLINE", "AcDbSpline");
+        out += extr();
+        out += `70\r\n${(c.closed ? 1 : 0) | 8}\r\n71\r\n${degree}\r\n`;
+        out += `72\r\n${c.knots!.length}\r\n73\r\n${ctrl.length}\r\n74\r\n${fit.length}\r\n`;
+        for (const k of c.knots!) out += `40\r\n${real(k)}\r\n`;
+        for (const p of ctrl) out += pt(10, p);
+        for (const p of fit) out += pt(11, p);
+        return out;
+      }
+      if (fit.length < 2) return pointTrace();
+      let out = head("LWPOLYLINE", "AcDbPolyline");
+      out += `90\r\n${fit.length}\r\n70\r\n${c.closed ? 1 : 0}\r\n`;
+      fit.forEach((p) => {
+        out += `10\r\n${real(p[0])}\r\n20\r\n${real(p[1])}\r\n`;
+      });
+      return out + extr();
+    }
+
+    case "ELLIPSE": {
+      // R2000 có ELLIPSE thật — không còn phải bẻ thành 48 đoạn thẳng như R12
+      if (!c.center || !c.majorAxis) return pointTrace();
+      let out = head("ELLIPSE", "AcDbEllipse") + pt(10, c.center);
+      out += extr();
+      out += pt(11, c.majorAxis);
+      out += `40\r\n${real(c.axisRatio ?? 1)}\r\n`;
+      out += `41\r\n${real(c.startParam ?? 0)}\r\n42\r\n${real(c.endParam ?? Math.PI * 2)}\r\n`;
+      return out;
+    }
+
+    case "SOLID":
+    case "TRACE":
+    case "3DFACE": {
+      const corners = c.corners || [];
+      if (corners.length < 3) return pointTrace();
+      const sub = ent.type === "3DFACE" ? "AcDbFace" : "AcDbTrace";
+      let out = head(ent.type, sub);
+      out += pt(10, corners[0]) + pt(11, corners[1]) + pt(12, corners[2]);
+      out += pt(13, corners[3] || corners[2]);
+      return out + extr();
+    }
+
+    case "XLINE":
+    case "RAY": {
+      // R2000 có XLINE/RAY thật — không còn phải cắt theo khung bao thành LINE hữu hạn
+      if (!c.start || !c.direction) return pointTrace();
+      const sub = ent.type === "XLINE" ? "AcDbXline" : "AcDbRay";
+      return head(ent.type, sub) + pt(10, c.start) + pt(11, c.direction);
     }
 
     case "TEXT":
+      return ent.decodedText || ent.textValue
+        ? textBody("TEXT", ent.decodedText || ent.textValue || "", ptXYZ(c.center || c.alignPoint))
+        : pointTrace();
+
+    case "ATTDEF": {
+      const pos = ptXYZ(c.center);
+      let out = textBody("ATTDEF", ent.decodedText || ent.textValue || "", pos);
+      out += `100\r\nAcDbAttributeDefinition\r\n`;
+      out += `3\r\n${ent.attributePrompt || ent.attributeTag || ""}\r\n`;
+      out += `2\r\n${ent.attributeTag || "TAG"}\r\n70\r\n0\r\n`;
+      return out;
+    }
+
+    case "ATTRIB": {
+      const pos = ptXYZ(c.center);
+      let out = textBody("ATTRIB", ent.decodedText || ent.textValue || "", pos);
+      out += `100\r\nAcDbAttribute\r\n2\r\n${ent.attributeTag || "TAG"}\r\n70\r\n0\r\n`;
+      return out;
+    }
+
     case "MTEXT": {
-      // R12 không có MTEXT — hạ thành TEXT, giữ nguyên chiều cao / góc xoay / kiểu chữ thật
+      // R2000 có MTEXT thật — chữ nhiều dòng giữ nguyên dạng thay vì ép xuống một dòng TEXT
       const value = ent.decodedText || ent.textValue || "";
       if (!value) return pointTrace();
-      const pos = ptXYZ(c.center || c.alignPoint);
-      return writeTextR12(layer, colStr, pos, value, {
-        height: dxfNum(ent.textHeight, defaultTextHeight) || defaultTextHeight,
-        rotation: ent.rotation,
-        widthFactor: ent.widthFactor,
-        style: ent.textStyle,
-        align: ent.textAlign,
-        firstPoint: ent.coordinates.alignPoint,
-      });
+      let out = head("MTEXT", "AcDbMText") + pt(10, c.center);
+      out += `40\r\n${real(dxfNum(ent.textHeight, defaultTextHeight) || defaultTextHeight)}\r\n`;
+      out += `71\r\n1\r\n72\r\n5\r\n`;
+      out += `1\r\n${value}\r\n7\r\n${ent.textStyle || "STANDARD"}\r\n`;
+      out += extr();
+      if (typeof ent.rotation === "number") out += `50\r\n${real(ent.rotation)}\r\n`;
+      return out;
     }
 
     case "INSERT": {
       const bName = ent.blockName;
       if (!bName || !c.center) return pointTrace();
-      const [x, y, z] = ptXYZ(c.center);
+      const kem = ent.attribEntities && ent.attribEntities.length > 0;
+      let out = head("INSERT", "AcDbBlockReference");
+      if (kem) out += `66\r\n1\r\n`;
+      out += `2\r\n${bName}\r\n` + pt(10, c.center);
       const [sx, sy, sz] = ent.scale ?? [1, 1, 1];
-      let out = `0\r\nINSERT\r\n8\r\n${layer}\r\n${colStr}2\r\n${bName}\r\n`;
-      out += `10\r\n${x}\r\n20\r\n${y}\r\n30\r\n${z}\r\n`;
-      out += `41\r\n${dxfNum(sx, 1)}\r\n42\r\n${dxfNum(sy, 1)}\r\n43\r\n${dxfNum(sz, 1)}\r\n`;
-      out += `50\r\n${dxfNum(ent.rotation)}\r\n`;
+      out += `41\r\n${real(sx, 1)}\r\n42\r\n${real(sy, 1)}\r\n43\r\n${real(sz, 1)}\r\n`;
+      out += `50\r\n${real(ent.rotation)}\r\n`;
+      if (ent.insertArray) {
+        out += `70\r\n${ent.insertArray.columns}\r\n71\r\n${ent.insertArray.rows}\r\n`;
+        out += `44\r\n${real(ent.insertArray.columnSpacing)}\r\n45\r\n${real(ent.insertArray.rowSpacing)}\r\n`;
+      }
+      out += extr();
+      // Thuộc tính khối: giữ nguyên vị trí và cỡ chữ của từng ATTRIB, đóng bằng SEQEND
+      if (kem) {
+        for (const att of ent.attribEntities!) {
+          out += writeEntityR2000(att, layer, defaultTextHeight, handles, owner);
+        }
+        out += `0\r\nSEQEND\r\n5\r\n${handles.take()}\r\n330\r\n${owner}\r\n100\r\nAcDbEntity\r\n8\r\n${layer}\r\n`;
+      }
       return out;
     }
 
     case "DIMENSION": {
-      // R12 đòi mỗi DIMENSION kèm block hình học `*D<n>`; bộ ghi này không sinh block đó nên hạ
-      // kích thước thành LINE (nối đúng HAI ĐẦU ĐO ở mã 13/14) + TEXT (số đo). Mã 10 là điểm đặt
-      // đường kích thước, KHÔNG phải đầu đo — không dùng nó để vẽ đường đo (M98 §1(b)).
-      let out = "";
+      // R2000 có DIMENSION thật. Kích thước tham chiếu tới một khối `*D<n>` chứa hình của nó —
+      // khối này do chỗ gọi dựng sẵn từ chính đường đo và chữ đo, nên bản vẽ mở ra thấy đúng
+      // kích thước chứ không phải hai thực thể rời như bản ghi R12 trước đây.
       const measure = c.measurePoints;
+      const label = (() => {
+        const override = ent.decodedText || ent.textValue || "";
+        if (override && override !== "<>") return override;
+        return typeof ent.measurement === "number" ? formatMeasurement(ent.measurement) : "";
+      })();
+      const anchor =
+        c.textMidPoint ||
+        (measure
+          ? ([
+              (measure[0][0] + measure[1][0]) / 2,
+              (measure[0][1] + measure[1][1]) / 2,
+              (measure[0][2] + measure[1][2]) / 2,
+            ] as [number, number, number])
+          : c.center || c.start);
+      // Không có hai đầu đo thì không dựng được kích thước thật — ghi ra một DIMENSION rỗng chỉ
+      // tạo thực thể hỏng. Còn chữ ghi đè thì giữ lại chữ, không thì để POINT ở điểm neo.
+      if (!measure) {
+        if (label && anchor) {
+          return writeEntityR2000(
+            {
+              id: `${ent.id}-TEXT`,
+              type: "TEXT",
+              layer: ent.layer,
+              color: ent.color,
+              coordinates: { center: anchor },
+              decodedText: label,
+              textHeight: ent.textHeight,
+              textStyle: ent.textStyle,
+            },
+            layer,
+            defaultTextHeight,
+            handles,
+            owner,
+          );
+        }
+        return pointTrace();
+      }
+
+      let out = head("DIMENSION", "AcDbDimension");
+      out += `2\r\n${dimBlockName || "*D1"}\r\n`;
+      out += pt(10, c.center || anchor);
+      out += pt(11, anchor);
+      // Mã 70: bit 0-2 = kiểu kích thước (1 = thẳng hàng), bit 32 = khối do máy sinh
+      out += `70\r\n${1 | 32}\r\n71\r\n5\r\n`;
+      if (label) out += `1\r\n${label}\r\n`;
+      out += `3\r\n${ent.dimStyle || "STANDARD"}\r\n`;
       if (measure) {
-        const [a, b] = [ptXYZ(measure[0]), ptXYZ(measure[1])];
-        out +=
-          `0\r\nLINE\r\n8\r\n${layer}\r\n${colStr}` +
-          `10\r\n${a[0]}\r\n20\r\n${a[1]}\r\n30\r\n${a[2]}\r\n` +
-          `11\r\n${b[0]}\r\n21\r\n${b[1]}\r\n31\r\n${b[2]}\r\n`;
+        out += `100\r\nAcDbAlignedDimension\r\n`;
+        out += pt(13, measure[0]);
+        out += pt(14, measure[1]);
       }
-
-      // Chữ kích thước: ưu tiên chữ ghi đè của người vẽ, không có thì dùng số đo thật ở mã 42.
-      // Không tự tính khoảng cách để điền vào khi tệp không khai số đo — đó là số bịa.
-      const override = ent.decodedText || ent.textValue || "";
-      const label =
-        override && override !== "<>"
-          ? override
-          : typeof ent.measurement === "number"
-            ? formatMeasurement(ent.measurement)
-            : "";
-
-      if (label) {
-        const anchor =
-          c.textMidPoint ||
-          (measure
-            ? ([
-                (measure[0][0] + measure[1][0]) / 2,
-                (measure[0][1] + measure[1][1]) / 2,
-                (measure[0][2] + measure[1][2]) / 2,
-              ] as [number, number, number])
-            : c.center || c.start);
-        out += writeTextR12(layer, colStr, ptXYZ(anchor), label, {
-          height: dxfNum(ent.textHeight, defaultTextHeight) || defaultTextHeight,
-          rotation: ent.rotation,
-          style: ent.textStyle,
-        });
-      }
-
-      return out || pointTrace();
-    }
-
-    case "ATTDEF": {
-      // ATTDEF là thực thể hợp lệ của R12 — giữ nguyên thẻ và câu nhắc để khối còn bóc được
-      // thuộc tính (mã hiệu thiết bị, kích thước) về sau.
-      const pos = ptXYZ(c.center);
-      let out = `0\r\nATTDEF\r\n8\r\n${layer}\r\n${colStr}`;
-      out += `10\r\n${pos[0]}\r\n20\r\n${pos[1]}\r\n30\r\n${pos[2]}\r\n`;
-      out += `40\r\n${dxfNum(ent.textHeight, defaultTextHeight) || defaultTextHeight}\r\n`;
-      out += `1\r\n${ent.decodedText || ent.textValue || ""}\r\n`;
-      out += `3\r\n${ent.attributePrompt || ent.attributeTag || ""}\r\n`;
-      out += `2\r\n${ent.attributeTag || "TAG"}\r\n70\r\n0\r\n`;
-      if (typeof ent.rotation === "number" && ent.rotation !== 0)
-        out += `50\r\n${ent.rotation}\r\n`;
-      out += `7\r\n${ent.textStyle || "STANDARD"}\r\n`;
       return out;
-    }
-
-    case "SHAPE": {
-      // SHAPE cũng là thực thể R12 hợp lệ
-      if (!c.center || !ent.blockName) return pointTrace();
-      const [x, y, z] = ptXYZ(c.center);
-      let out = `0\r\nSHAPE\r\n8\r\n${layer}\r\n${colStr}`;
-      out += `10\r\n${x}\r\n20\r\n${y}\r\n30\r\n${z}\r\n`;
-      out += `40\r\n${dxfNum(ent.textHeight, defaultTextHeight)}\r\n2\r\n${ent.blockName}\r\n`;
-      if (typeof ent.rotation === "number" && ent.rotation !== 0)
-        out += `50\r\n${ent.rotation}\r\n`;
-      return out;
-    }
-
-    case "XLINE":
-    case "RAY": {
-      // Đường dựng hình dài vô hạn: R12 không có XLINE/RAY. Cắt theo khung bao bản vẽ thành LINE
-      // hữu hạn — giữ đúng vị trí và phương của đường gốc, chỉ giới hạn chiều dài.
-      if (!c.start || !c.direction || !drawingBox) return pointTrace();
-      const base = ptXYZ(c.start);
-      const dir = ptXYZ(c.direction);
-      if (Math.hypot(dir[0], dir[1]) === 0) return pointTrace();
-      // RAY chỉ chạy về một phía kể từ điểm gốc; XLINE chạy cả hai phía
-      const doan = clipInfiniteLine(base, dir, drawingBox, ent.type === "RAY");
-      if (!doan) return pointTrace();
-      const [a, z] = doan;
-      return (
-        `0\r\nLINE\r\n8\r\n${layer}\r\n${colStr}` +
-        `10\r\n${a[0]}\r\n20\r\n${a[1]}\r\n30\r\n${a[2]}\r\n` +
-        `11\r\n${z[0]}\r\n21\r\n${z[1]}\r\n31\r\n${z[2]}\r\n`
-      );
-    }
-
-    case "MLINE": {
-      // MLINE (R13+) hạ thành đa tuyến đi theo trục — giữ đúng tuyến, mất phần nét kép hai bên
-      const pts = c.points || [];
-      if (pts.length < 2) return pointTrace();
-      return writePolylineR12(layer, colStr, pts, undefined, Boolean(c.closed));
-    }
-
-    case "TRACE": {
-      const corners = c.corners || [];
-      if (corners.length < 4) return pointTrace();
-      const [p1, p2, p3, p4] = corners.map(ptXYZ);
-      return (
-        `0\r\nTRACE\r\n8\r\n${layer}\r\n${colStr}` +
-        `10\r\n${p1[0]}\r\n20\r\n${p1[1]}\r\n30\r\n${p1[2]}\r\n` +
-        `11\r\n${p2[0]}\r\n21\r\n${p2[1]}\r\n31\r\n${p2[2]}\r\n` +
-        `12\r\n${p3[0]}\r\n22\r\n${p3[1]}\r\n32\r\n${p3[2]}\r\n` +
-        `13\r\n${p4[0]}\r\n23\r\n${p4[1]}\r\n33\r\n${p4[2]}\r\n`
-      );
     }
 
     case "HATCH": {
-      // R12 không có HATCH. Ghi lại ĐƯỜNG BAO vùng tô dưới dạng đa tuyến khép kín — giữ đúng
-      // phạm vi vùng tô (vùng bảo ôn, vùng cắt qua…), chỉ mất phần nét gạch bên trong.
-      const paths = c.boundaryPaths || [];
+      // R2000 có HATCH thật — giữ cả vùng tô lẫn mẫu tô, không chỉ còn đường bao như R12
+      const paths = (c.boundaryPaths || []).filter((p) => p.points.length >= 2);
       if (paths.length === 0) return pointTrace();
-      let out = "";
+      const solid = ent.isSolidFill ? 1 : 0;
+      let out = head("HATCH", "AcDbHatch");
+      out += `10\r\n0.0\r\n20\r\n0.0\r\n30\r\n${real(c.elevation ?? 0)}\r\n`;
+      out += `210\r\n0.0\r\n220\r\n0.0\r\n230\r\n1.0\r\n`;
+      out += `2\r\n${ent.patternName || "SOLID"}\r\n70\r\n${solid}\r\n71\r\n0\r\n`;
+      out += `91\r\n${paths.length}\r\n`;
       for (const path of paths) {
-        if (path.points.length < 2) continue;
-        out += writePolylineR12(layer, colStr, path.points, path.bulges, true);
+        const coBulge = path.bulges.some((b) => b !== 0) ? 1 : 0;
+        // Mã 92: bit 1 = đường bao ngoài, bit 2 = đường bao dạng đa tuyến
+        out += `92\r\n3\r\n72\r\n${coBulge}\r\n73\r\n1\r\n93\r\n${path.points.length}\r\n`;
+        path.points.forEach((p, idx) => {
+          out += `10\r\n${real(p[0])}\r\n20\r\n${real(p[1])}\r\n`;
+          if (coBulge) out += `42\r\n${real(path.bulges[idx] ?? 0)}\r\n`;
+        });
+        out += `97\r\n0\r\n`;
       }
-      return out || pointTrace();
+      out += `75\r\n1\r\n76\r\n1\r\n`;
+      if (!solid) {
+        out += `52\r\n${real(ent.hatchAngle ?? 0)}\r\n41\r\n${real(ent.hatchScale ?? 1)}\r\n77\r\n0\r\n`;
+        const lines = ent.hatchPatternLines || [];
+        out += `78\r\n${lines.length}\r\n`;
+        for (const l of lines) {
+          out += `53\r\n${real(l.angle)}\r\n43\r\n${real(l.baseX)}\r\n44\r\n${real(l.baseY)}\r\n`;
+          out += `45\r\n${real(l.offsetX)}\r\n46\r\n${real(l.offsetY)}\r\n79\r\n${l.dashes.length}\r\n`;
+          for (const d of l.dashes) out += `49\r\n${real(d)}\r\n`;
+        }
+      }
+      out += `47\r\n1.0\r\n98\r\n0\r\n`;
+      return out;
+    }
+
+    case "TOLERANCE": {
+      if (!c.center) return pointTrace();
+      let out = head("TOLERANCE", "AcDbFcf");
+      out += `3\r\n${ent.dimStyle || "STANDARD"}\r\n`;
+      out += pt(10, c.center);
+      out += `1\r\n${ent.decodedText || ent.textValue || ""}\r\n`;
+      return out + extr();
+    }
+
+    case "SHAPE": {
+      if (!c.center || !ent.blockName) return pointTrace();
+      let out = head("SHAPE", "AcDbShape");
+      out += `40\r\n${real(dxfNum(ent.textHeight, defaultTextHeight))}\r\n`;
+      out += pt(10, c.center);
+      out += `2\r\n${ent.blockName}\r\n`;
+      if (typeof ent.rotation === "number" && ent.rotation !== 0)
+        out += `50\r\n${real(ent.rotation)}\r\n`;
+      return out + extr();
     }
 
     case "MULTILEADER": {
-      // R12 không có MULTILEADER: hạ thành đường dẫn (đa tuyến) + chữ chú thích tại điểm đặt chữ
+      // MULTILEADER là thực thể của R2007 trở lên, R2000 chưa có: hạ thành đường dẫn (đa tuyến) +
+      // chữ chú thích (MTEXT). Đây là bước hạ cấp DUY NHẤT còn lại của bộ ghi.
       let out = "";
       const pts = c.points || [];
-      if (pts.length >= 2) out += writePolylineR12(layer, colStr, pts, undefined, false);
+      if (pts.length >= 2) {
+        out += head("LWPOLYLINE", "AcDbPolyline");
+        out += `90\r\n${pts.length}\r\n70\r\n0\r\n`;
+        pts.forEach((p) => {
+          out += `10\r\n${real(p[0])}\r\n20\r\n${real(p[1])}\r\n`;
+        });
+      }
       const value = ent.decodedText || ent.textValue || "";
       if (value) {
-        out += writeTextR12(layer, colStr, ptXYZ(c.center || pts[pts.length - 1]), value, {
-          height: dxfNum(ent.textHeight, defaultTextHeight) || defaultTextHeight,
-          rotation: ent.rotation,
-          style: ent.textStyle,
-        });
+        const h2 = handles.take();
+        out += `0\r\nMTEXT\r\n5\r\n${h2}\r\n330\r\n${owner}\r\n100\r\nAcDbEntity\r\n`;
+        if (ent.isPaperSpace) out += `67\r\n1\r\n`;
+        out += `8\r\n${layer}\r\n100\r\nAcDbMText\r\n`;
+        out += pt(10, c.center || pts[pts.length - 1]);
+        out += `40\r\n${real(dxfNum(ent.textHeight, defaultTextHeight) || defaultTextHeight)}\r\n`;
+        out += `71\r\n1\r\n72\r\n5\r\n1\r\n${value}\r\n7\r\n${ent.textStyle || "STANDARD"}\r\n`;
       }
       return out || pointTrace();
     }
 
     default:
-      // WIPEOUT / IMAGE / TOLERANCE: R12 không có, và nội dung (ảnh raster, khung dung sai) không
-      // dựng lại được bằng thực thể R12. Có đường bao cắt thì giữ đường bao, không thì để lại
-      // POINT tại điểm neo — không thực thể nào biến mất im lặng.
+      // WIPEOUT / IMAGE: ảnh raster cần đối tượng IMAGEDEF kèm dữ liệu ảnh mà bản vẽ nguồn không
+      // mang theo. Có đường bao cắt thì giữ đường bao, không thì để lại POINT ở điểm neo.
       if (c.points && c.points.length >= 2) {
-        return writePolylineR12(layer, colStr, c.points, undefined, Boolean(c.closed));
+        let out = head("LWPOLYLINE", "AcDbPolyline");
+        out += `90\r\n${c.points.length}\r\n70\r\n${c.closed ? 1 : 0}\r\n`;
+        c.points.forEach((p) => {
+          out += `10\r\n${real(p[0])}\r\n20\r\n${real(p[1])}\r\n`;
+        });
+        return out + extr();
       }
       return pointTrace();
   }
 }
 
 /**
- * Xuất `DxfParseResult` thành chuỗi DXF ASCII hoàn chỉnh chuẩn AutoCAD R12 (AC1009), đủ các phần
- * HEADER, TABLES (VPORT, LTYPE, LAYER, STYLE, APPID, BLOCK_RECORD), BLOCKS, ENTITIES, EOF.
+ * Xuất `DxfParseResult` thành chuỗi DXF ASCII hoàn chỉnh chuẩn **AutoCAD 2000 (AC1015)**, đủ các
+ * phần HEADER, CLASSES, TABLES, BLOCKS, ENTITIES, OBJECTS và EOF.
  *
- * Cấu trúc ghi ra không có handle và không có section OBJECTS nên chỉ hợp lệ ở mức R12 — khai đúng
- * AC1009 để AutoCAD không kỳ vọng cấu trúc R2000 (M98 §1(b)). Kéo theo: DIMENSION hạ thành
- * LINE + TEXT, MTEXT hạ thành TEXT, đa tuyến ghi bằng POLYLINE/VERTEX (R12 chưa có LWPOLYLINE).
+ * Trước đây bộ ghi phát hành R12 (AC1009) — định dạng năm 1992 không có handle, không có section
+ * OBJECTS và thiếu hẳn nhiều thực thể — nên mọi thứ R12 không biểu diễn được đều phải hạ cấp:
+ * đường cong bẻ thành đoạn thẳng, kích thước tách thành LINE + TEXT, chữ nhiều dòng ép xuống một
+ * dòng. Bản R2000 giữ nguyên bản tất cả những thứ đó.
  *
- * **Không bịa dữ liệu:** bản vẽ không có nét thì tệp xuất ra cũng không có nét — bản cũ chèn sẵn
- * một bộ hình học MEPF "minh hoạ" (trục lưới, ống gió, máng cáp, sprinkler) và định nghĩa khối hình
- * chữ thập; cả hai đều là hình do máy chế ra, nay đã bỏ.
+ * **Không bịa dữ liệu:** bản vẽ không có nét thì tệp xuất ra cũng không có nét.
  */
 export function exportDxf(
   parsed: DxfParseResult,
@@ -2960,156 +3070,294 @@ export function exportDxf(
   const useStandardLayers = options?.applyStandardLayers ?? true;
   const layers = parsed.layers && parsed.layers.length > 0 ? parsed.layers : [];
 
-  // Ánh xạ tên layer theo tùy chọn chuẩn hóa
   const layerMap = new Map<string, string>();
   layers.forEach((l) => {
     layerMap.set(l.name, useStandardLayers && l.standardName ? l.standardName : l.name);
   });
-
   const getLayer = (name: string) => layerMap.get(name) || name || "0";
+
   const entities = parsed.entities || [];
   const defaultTextHeight = resolveDefaultTextHeight(entities);
-  // Khung bao bản vẽ — dùng để cắt đường dựng hình dài vô hạn (XLINE/RAY) thành LINE hữu hạn
-  const bao = parsed.diagnostic?.boundingDimensions;
-  const drawingBox: DrawingBox | undefined =
-    bao && (bao.maxX > bao.minX || bao.maxY > bao.minY)
-      ? { minX: bao.minX, maxX: bao.maxX, minY: bao.minY, maxY: bao.maxY }
-      : undefined;
+  const handles = new HandleAllocator();
+
+  // ── Handle của các bảng, phải cấp trước vì mọi bản ghi đều trỏ về bảng chủ ──
+  const hVportTab = handles.take();
+  const hLtypeTab = handles.take();
+  const hLayerTab = handles.take();
+  const hStyleTab = handles.take();
+  const hViewTab = handles.take();
+  const hUcsTab = handles.take();
+  const hAppidTab = handles.take();
+  const hDimTab = handles.take();
+  const hBlkRecTab = handles.take();
+
+  // ── Khối: *Model_Space, *Paper_Space và các khối của bản vẽ ──
+  const blockNames = new Set<string>();
+  (parsed.blocks || []).forEach((b) => blockNames.add(b.name));
+  entities.forEach((e) => {
+    if (e.type === "INSERT" && e.blockName) blockNames.add(e.blockName);
+  });
+  // Mỗi DIMENSION cần một khối ẩn `*D<n>` chứa hình của nó
+  const dimEntities = entities.filter((e) => e.type === "DIMENSION");
+  const dimBlockNames = new Map<DxfEntityRaw, string>();
+  dimEntities.forEach((e, idx) => dimBlockNames.set(e, `*D${idx + 1}`));
+
+  const hModelSpace = handles.take();
+  const hPaperSpace = handles.take();
+  const blockRecordHandles = new Map<string, string>();
+  blockNames.forEach((n) => blockRecordHandles.set(n, handles.take()));
+  dimBlockNames.forEach((n) => blockRecordHandles.set(n, handles.take()));
 
   let dxf = "";
 
-  // 1. SECTION HEADER
-  dxf += "0\r\nSECTION\r\n2\r\nHEADER\r\n";
-  dxf += "9\r\n$ACADVER\r\n1\r\nAC1009\r\n"; // R12 — đúng cấu trúc thực sự ghi ra bên dưới
-  // Đơn vị vẽ giữ nguyên của bản vẽ gốc; tệp gốc không khai thì mới mặc định hệ mét MEPF (mm)
-  dxf += `9\r\n$INSUNITS\r\n70\r\n${parsed.header?.insUnits ?? 4}\r\n`;
-  dxf += `9\r\n$MEASUREMENT\r\n70\r\n${parsed.header?.measurement ?? 1}\r\n`;
-  if (parsed.diagnostic?.boundingDimensions) {
-    const b = parsed.diagnostic.boundingDimensions;
-    dxf += `9\r\n$EXTMIN\r\n10\r\n${dxfNum(b.minX)}\r\n20\r\n${dxfNum(b.minY)}\r\n30\r\n0.0\r\n`;
-    dxf += `9\r\n$EXTMAX\r\n10\r\n${dxfNum(b.maxX)}\r\n20\r\n${dxfNum(b.maxY)}\r\n30\r\n0.0\r\n`;
-    dxf += `9\r\n$LIMMIN\r\n10\r\n${dxfNum(b.minX)}\r\n20\r\n${dxfNum(b.minY)}\r\n`;
-    dxf += `9\r\n$LIMMAX\r\n10\r\n${dxfNum(b.maxX)}\r\n20\r\n${dxfNum(b.maxY)}\r\n`;
+  // ── 1. HEADER ──
+  const bao = parsed.diagnostic?.boundingDimensions;
+  let header = "0\r\nSECTION\r\n2\r\nHEADER\r\n";
+  header += "9\r\n$ACADVER\r\n1\r\nAC1015\r\n";
+  header += `9\r\n$INSUNITS\r\n70\r\n${parsed.header?.insUnits ?? 4}\r\n`;
+  header += `9\r\n$MEASUREMENT\r\n70\r\n${parsed.header?.measurement ?? 1}\r\n`;
+  if (parsed.header?.ltScale !== undefined)
+    header += `9\r\n$LTSCALE\r\n40\r\n${real(parsed.header.ltScale)}\r\n`;
+  if (bao) {
+    header += `9\r\n$EXTMIN\r\n10\r\n${real(bao.minX)}\r\n20\r\n${real(bao.minY)}\r\n30\r\n0.0\r\n`;
+    header += `9\r\n$EXTMAX\r\n10\r\n${real(bao.maxX)}\r\n20\r\n${real(bao.maxY)}\r\n30\r\n0.0\r\n`;
+    header += `9\r\n$LIMMIN\r\n10\r\n${real(bao.minX)}\r\n20\r\n${real(bao.minY)}\r\n`;
+    header += `9\r\n$LIMMAX\r\n10\r\n${real(bao.maxX)}\r\n20\r\n${real(bao.maxY)}\r\n`;
   }
-  dxf += "0\r\nENDSEC\r\n";
 
-  // 2. SECTION TABLES
-  dxf += "0\r\nSECTION\r\n2\r\nTABLES\r\n";
+  // ── 2. CLASSES (rỗng: bản vẽ chỉ dùng thực thể chuẩn, không có lớp tự định nghĩa) ──
+  let than = "0\r\nSECTION\r\n2\r\nCLASSES\r\n0\r\nENDSEC\r\n";
 
-  // VPORT Table
-  dxf += "0\r\nTABLE\r\n2\r\nVPORT\r\n70\r\n1\r\n";
-  dxf +=
-    "0\r\nVPORT\r\n2\r\n*ACTIVE\r\n70\r\n0\r\n10\r\n0.0\r\n20\r\n0.0\r\n11\r\n1.0\r\n21\r\n1.0\r\n12\r\n0.0\r\n22\r\n0.0\r\n40\r\n1000.0\r\n41\r\n1.5\r\n";
-  dxf += "0\r\nENDTAB\r\n";
+  // ── 3. TABLES ──
+  than += "0\r\nSECTION\r\n2\r\nTABLES\r\n";
 
-  // LTYPE Table (Các kiểu đường nét CAD cơ bản)
-  dxf += "0\r\nTABLE\r\n2\r\nLTYPE\r\n70\r\n4\r\n";
-  dxf +=
-    "0\r\nLTYPE\r\n2\r\nCONTINUOUS\r\n70\r\n0\r\n3\r\nSolid line\r\n72\r\n65\r\n73\r\n0\r\n40\r\n0.0\r\n";
-  dxf +=
-    "0\r\nLTYPE\r\n2\r\nCENTER\r\n70\r\n0\r\n3\r\nCenter ____ _ ____ _ ____\r\n72\r\n65\r\n73\r\n4\r\n40\r\n50.0\r\n49\r\n30.0\r\n49\r\n-5.0\r\n49\r\n10.0\r\n49\r\n-5.0\r\n";
-  dxf +=
-    "0\r\nLTYPE\r\n2\r\nHIDDEN\r\n70\r\n0\r\n3\r\nHidden __ __ __ __\r\n72\r\n65\r\n73\r\n2\r\n40\r\n10.0\r\n49\r\n5.0\r\n49\r\n-5.0\r\n";
-  dxf +=
-    "0\r\nLTYPE\r\n2\r\nDASHED\r\n70\r\n0\r\n3\r\nDashed __ __ __ __\r\n72\r\n65\r\n73\r\n2\r\n40\r\n20.0\r\n49\r\n15.0\r\n49\r\n-5.0\r\n";
-  dxf += "0\r\nENDTAB\r\n";
+  const openTable = (name: string, handle: string, count: number, extra = ""): string =>
+    `0\r\nTABLE\r\n2\r\n${name}\r\n5\r\n${handle}\r\n330\r\n0\r\n100\r\nAcDbSymbolTable\r\n70\r\n${count}\r\n${extra}`;
 
-  // LAYER Table — giữ nguyên trạng thái thật của từng layer (đóng băng / tắt / khoá / bề rộng nét)
-  const uniqueLayerEntries = new Map<
+  than += openTable("VPORT", hVportTab, 1);
+  than += tableRecordHead("VPORT", handles.take(), hVportTab, "AcDbViewportTableRecord");
+  than += "2\r\n*ACTIVE\r\n70\r\n0\r\n10\r\n0.0\r\n20\r\n0.0\r\n11\r\n1.0\r\n21\r\n1.0\r\n";
+  than += "12\r\n0.0\r\n22\r\n0.0\r\n40\r\n1000.0\r\n41\r\n1.5\r\n";
+  than += "0\r\nENDTAB\r\n";
+
+  const lineTypes: Array<[string, string, number[]]> = [
+    ["CONTINUOUS", "Solid line", []],
+    ["CENTER", "Center ____ _ ____ _ ____", [30, -5, 10, -5]],
+    ["HIDDEN", "Hidden __ __ __ __", [5, -5]],
+    ["DASHED", "Dashed __ __ __ __", [15, -5]],
+  ];
+  than += openTable("LTYPE", hLtypeTab, lineTypes.length);
+  for (const [name, desc, dashes] of lineTypes) {
+    than += tableRecordHead("LTYPE", handles.take(), hLtypeTab, "AcDbLinetypeTableRecord");
+    than += `2\r\n${name}\r\n70\r\n0\r\n3\r\n${desc}\r\n72\r\n65\r\n73\r\n${dashes.length}\r\n`;
+    than += `40\r\n${real(dashes.reduce((a, d) => a + Math.abs(d), 0))}\r\n`;
+    for (const d of dashes) than += `49\r\n${real(d)}\r\n74\r\n0\r\n`;
+  }
+  than += "0\r\nENDTAB\r\n";
+
+  // Bảng LAYER — giữ nguyên trạng thái thật: đóng băng, khoá, tắt (mã 62 âm), bề rộng nét
+  const uniqueLayers = new Map<
     string,
     { color: number; lineType: string; flags: number; lineWeight?: number }
   >();
-  uniqueLayerEntries.set("0", { color: 7, lineType: "CONTINUOUS", flags: 0 });
+  uniqueLayers.set("0", { color: 7, lineType: "CONTINUOUS", flags: 0 });
   layers.forEach((l) => {
     const finalName = useStandardLayers && l.standardName ? l.standardName : l.name;
-    uniqueLayerEntries.set(finalName, {
-      // Mã 62 âm là quy ước DXF cho layer đang tắt — giữ đúng trạng thái người vẽ đã đặt
+    uniqueLayers.set(finalName, {
       color: l.isOff ? -Math.abs(l.colorNumber || 7) : l.colorNumber || 7,
       lineType: l.lineType || "CONTINUOUS",
       flags: (l.isFrozen ? 1 : 0) | (l.isLocked ? 4 : 0),
       lineWeight: l.lineWeight,
     });
   });
-
-  dxf += `0\r\nTABLE\r\n2\r\nLAYER\r\n70\r\n${uniqueLayerEntries.size}\r\n`;
-  uniqueLayerEntries.forEach((val, name) => {
-    dxf += `0\r\nLAYER\r\n2\r\n${name}\r\n70\r\n${val.flags}\r\n62\r\n${val.color}\r\n6\r\n${val.lineType}\r\n`;
-    if (typeof val.lineWeight === "number") dxf += `370\r\n${val.lineWeight}\r\n`;
+  than += openTable("LAYER", hLayerTab, uniqueLayers.size);
+  uniqueLayers.forEach((val, name) => {
+    than += tableRecordHead("LAYER", handles.take(), hLayerTab, "AcDbLayerTableRecord");
+    than += `2\r\n${name}\r\n70\r\n${val.flags}\r\n62\r\n${val.color}\r\n6\r\n${val.lineType}\r\n`;
+    than += `370\r\n${typeof val.lineWeight === "number" ? val.lineWeight : -3}\r\n`;
+    than += `390\r\nF\r\n`;
   });
-  dxf += "0\r\nENDTAB\r\n";
+  than += "0\r\nENDTAB\r\n";
 
-  // STYLE Table (Font chữ tiêu chuẩn)
-  dxf += "0\r\nTABLE\r\n2\r\nSTYLE\r\n70\r\n1\r\n";
-  dxf +=
-    "0\r\nSTYLE\r\n2\r\nSTANDARD\r\n70\r\n0\r\n40\r\n0.0\r\n41\r\n1.0\r\n50\r\n0.0\r\n71\r\n0\r\n42\r\n250.0\r\n3\r\ntxt\r\n4\r\n\r\n";
-  dxf += "0\r\nENDTAB\r\n";
-
-  // APPID Table
-  dxf += "0\r\nTABLE\r\n2\r\nAPPID\r\n70\r\n1\r\n";
-  dxf += "0\r\nAPPID\r\n2\r\nACAD\r\n70\r\n0\r\n";
-  dxf += "0\r\nENDTAB\r\n";
-
-  // BLOCK_RECORD Table
-  const blockNames = new Set<string>(["*MODEL_SPACE", "*PAPER_SPACE"]);
-  if (parsed.blocks) {
-    parsed.blocks.forEach((b) => blockNames.add(b.name));
-  }
+  // Bảng STYLE — gom đủ kiểu chữ mà bản vẽ thật sự dùng, không chỉ mỗi STANDARD
+  const styleNames = new Set<string>(["STANDARD"]);
   entities.forEach((e) => {
-    if (e.type === "INSERT" && e.blockName) blockNames.add(e.blockName);
+    if (e.textStyle) styleNames.add(e.textStyle);
   });
-
-  dxf += `0\r\nTABLE\r\n2\r\nBLOCK_RECORD\r\n70\r\n${blockNames.size}\r\n`;
-  blockNames.forEach((bName) => {
-    dxf += `0\r\nBLOCK_RECORD\r\n2\r\n${bName}\r\n70\r\n0\r\n`;
+  than += openTable("STYLE", hStyleTab, styleNames.size);
+  styleNames.forEach((name) => {
+    than += tableRecordHead("STYLE", handles.take(), hStyleTab, "AcDbTextStyleTableRecord");
+    than += `2\r\n${name}\r\n70\r\n0\r\n40\r\n0.0\r\n41\r\n1.0\r\n50\r\n0.0\r\n71\r\n0\r\n`;
+    than += `42\r\n${real(defaultTextHeight)}\r\n3\r\ntxt\r\n4\r\n\r\n`;
   });
-  dxf += "0\r\nENDTAB\r\n";
+  than += "0\r\nENDTAB\r\n";
 
-  dxf += "0\r\nENDSEC\r\n";
+  than += openTable("VIEW", hViewTab, 0) + "0\r\nENDTAB\r\n";
 
-  // 3. SECTION BLOCKS — ghi lại ĐÚNG hình học của từng khối đọc được từ tệp gốc.
-  // Khối không có định nghĩa hình học (vd chỉ thấy qua INSERT) thì ghi khối rỗng hợp lệ, KHÔNG
-  // chèn hình chữ thập "đại diện" như bản cũ — đó là nét do máy bịa ra trên bản vẽ người dùng.
-  dxf += "0\r\nSECTION\r\n2\r\nBLOCKS\r\n";
-  dxf +=
-    "0\r\nBLOCK\r\n2\r\n*MODEL_SPACE\r\n70\r\n0\r\n10\r\n0.0\r\n20\r\n0.0\r\n30\r\n0.0\r\n0\r\nENDBLK\r\n";
-  dxf +=
-    "0\r\nBLOCK\r\n2\r\n*PAPER_SPACE\r\n70\r\n0\r\n10\r\n0.0\r\n20\r\n0.0\r\n30\r\n0.0\r\n0\r\nENDBLK\r\n";
+  than += openTable("UCS", hUcsTab, 0) + "0\r\nENDTAB\r\n";
+
+  than += openTable("APPID", hAppidTab, 1);
+  than += tableRecordHead("APPID", handles.take(), hAppidTab, "AcDbRegAppTableRecord");
+  than += "2\r\nACAD\r\n70\r\n0\r\n";
+  than += "0\r\nENDTAB\r\n";
+
+  // Bảng DIMSTYLE khai lớp riêng (AcDbDimStyleTable) và đếm bằng mã 71
+  than += `0\r\nTABLE\r\n2\r\nDIMSTYLE\r\n5\r\n${hDimTab}\r\n330\r\n0\r\n100\r\nAcDbSymbolTable\r\n70\r\n1\r\n100\r\nAcDbDimStyleTable\r\n71\r\n1\r\n`;
+  than += tableRecordHead("DIMSTYLE", handles.take(), hDimTab, "AcDbDimStyleTableRecord");
+  than += `2\r\nSTANDARD\r\n70\r\n0\r\n40\r\n1.0\r\n140\r\n${real(defaultTextHeight)}\r\n`;
+  than += "0\r\nENDTAB\r\n";
+
+  than += openTable("BLOCK_RECORD", hBlkRecTab, blockRecordHandles.size + 2);
+  const blockRecord = (name: string, handle: string): string =>
+    tableRecordHead("BLOCK_RECORD", handle, hBlkRecTab, "AcDbBlockTableRecord") +
+    `2\r\n${name}\r\n70\r\n0\r\n280\r\n1\r\n281\r\n0\r\n`;
+  than += blockRecord("*Model_Space", hModelSpace);
+  than += blockRecord("*Paper_Space", hPaperSpace);
+  blockRecordHandles.forEach((handle, name) => {
+    than += blockRecord(name, handle);
+  });
+  than += "0\r\nENDTAB\r\n0\r\nENDSEC\r\n";
+
+  // ── 4. BLOCKS ──
+  than += "0\r\nSECTION\r\n2\r\nBLOCKS\r\n";
   const blockDefById = new Map((parsed.blocks || []).map((b) => [b.name, b]));
-  blockNames.forEach((bName) => {
-    if (bName === "*MODEL_SPACE" || bName === "*PAPER_SPACE") return;
-    const def = blockDefById.get(bName);
-    const base = ptXYZ(def?.basePoint);
-    dxf += `0\r\nBLOCK\r\n2\r\n${bName}\r\n70\r\n0\r\n10\r\n${base[0]}\r\n20\r\n${base[1]}\r\n30\r\n${base[2]}\r\n`;
+
+  /** Một cặp BLOCK … ENDBLK đầy đủ handle/chủ sở hữu/lớp con của R2000. */
+  const writeBlock = (
+    name: string,
+    ownerHandle: string,
+    basePoint: [number, number, number],
+    body: string,
+    paperSpace = false,
+  ): string => {
+    let out = `0\r\nBLOCK\r\n5\r\n${handles.take()}\r\n330\r\n${ownerHandle}\r\n100\r\nAcDbEntity\r\n`;
+    if (paperSpace) out += `67\r\n1\r\n`;
+    out += `8\r\n0\r\n100\r\nAcDbBlockBegin\r\n2\r\n${name}\r\n70\r\n0\r\n`;
+    out += `10\r\n${real(basePoint[0])}\r\n20\r\n${real(basePoint[1])}\r\n30\r\n${real(basePoint[2])}\r\n`;
+    out += `3\r\n${name}\r\n1\r\n\r\n`;
+    out += body;
+    out += `0\r\nENDBLK\r\n5\r\n${handles.take()}\r\n330\r\n${ownerHandle}\r\n100\r\nAcDbEntity\r\n`;
+    if (paperSpace) out += `67\r\n1\r\n`;
+    out += `8\r\n0\r\n100\r\nAcDbBlockEnd\r\n`;
+    return out;
+  };
+
+  than += writeBlock("*Model_Space", hModelSpace, [0, 0, 0], "");
+  than += writeBlock("*Paper_Space", hPaperSpace, [0, 0, 0], "", true);
+
+  // Khối của bản vẽ — ghi lại ĐÚNG hình học đọc được; khối không có định nghĩa thì để rỗng,
+  // tuyệt đối không chèn hình "đại diện" do máy vẽ.
+  blockNames.forEach((name) => {
+    const handle = blockRecordHandles.get(name)!;
+    const def = blockDefById.get(name);
+    let body = "";
     for (const sub of def?.entities || []) {
-      dxf += writeEntityR12(sub, getLayer(sub.layer), defaultTextHeight, drawingBox);
+      body += writeEntityR2000(sub, getLayer(sub.layer), defaultTextHeight, handles, handle);
     }
-    dxf += "0\r\nENDBLK\r\n";
+    than += writeBlock(name, handle, def?.basePoint ?? [0, 0, 0], body);
   });
-  dxf += "0\r\nENDSEC\r\n";
 
-  // 4. SECTION ENTITIES
-  dxf += "0\r\nSECTION\r\n2\r\nENTITIES\r\n";
+  // Khối ẩn của kích thước: chứa đường đo và chữ đo để AutoCAD hiển thị đúng kích thước
+  dimBlockNames.forEach((blockName, dim) => {
+    const handle = blockRecordHandles.get(blockName)!;
+    const layer = getLayer(dim.layer);
+    let body = "";
+    const measure = dim.coordinates.measurePoints;
+    if (measure) {
+      body += writeEntityR2000(
+        {
+          id: `${dim.id}-LINE`,
+          type: "LINE",
+          layer: dim.layer,
+          color: dim.color,
+          coordinates: { start: measure[0], end: measure[1] },
+        },
+        layer,
+        defaultTextHeight,
+        handles,
+        handle,
+      );
+    }
+    const override = dim.decodedText || dim.textValue || "";
+    const label =
+      override && override !== "<>"
+        ? override
+        : typeof dim.measurement === "number"
+          ? formatMeasurement(dim.measurement)
+          : "";
+    if (label) {
+      const anchor =
+        dim.coordinates.textMidPoint ||
+        (measure
+          ? ([
+              (measure[0][0] + measure[1][0]) / 2,
+              (measure[0][1] + measure[1][1]) / 2,
+              (measure[0][2] + measure[1][2]) / 2,
+            ] as [number, number, number])
+          : dim.coordinates.center);
+      body += writeEntityR2000(
+        {
+          id: `${dim.id}-TEXT`,
+          type: "TEXT",
+          layer: dim.layer,
+          color: dim.color,
+          coordinates: { center: anchor },
+          decodedText: label,
+          textHeight: dim.textHeight,
+          textStyle: dim.textStyle,
+        },
+        layer,
+        defaultTextHeight,
+        handles,
+        handle,
+      );
+    }
+    than += writeBlock(blockName, handle, [0, 0, 0], body);
+  });
+
+  than += "0\r\nENDSEC\r\n";
+
+  // ── 5. ENTITIES ──
+  than += "0\r\nSECTION\r\n2\r\nENTITIES\r\n";
   for (const ent of entities) {
-    dxf += writeEntityR12(ent, getLayer(ent.layer), defaultTextHeight, drawingBox);
+    const owner = ent.isPaperSpace ? hPaperSpace : hModelSpace;
+    than += writeEntityR2000(
+      ent,
+      getLayer(ent.layer),
+      defaultTextHeight,
+      handles,
+      owner,
+      dimBlockNames.get(ent),
+    );
   }
-  dxf += "0\r\nENDSEC\r\n";
+  than += "0\r\nENDSEC\r\n";
 
-  // 5. EOF
-  dxf += "0\r\nEOF\r\n";
+  // ── 6. OBJECTS — từ điển gốc, thứ R12 hoàn toàn không có ──
+  const hRootDict = handles.take();
+  const hGroupDict = handles.take();
+  than += "0\r\nSECTION\r\n2\r\nOBJECTS\r\n";
+  than += `0\r\nDICTIONARY\r\n5\r\n${hRootDict}\r\n330\r\n0\r\n100\r\nAcDbDictionary\r\n`;
+  than += `3\r\nACAD_GROUP\r\n350\r\n${hGroupDict}\r\n`;
+  than += `0\r\nDICTIONARY\r\n5\r\n${hGroupDict}\r\n330\r\n${hRootDict}\r\n100\r\nAcDbDictionary\r\n`;
+  than += "0\r\nENDSEC\r\n";
 
+  // $HANDSEED phải lớn hơn mọi handle đã cấp — nên chốt sau cùng
+  header += `9\r\n$HANDSEED\r\n5\r\n${handles.seed}\r\n`;
+  header += "0\r\nENDSEC\r\n";
+
+  dxf = header + than + "0\r\nEOF\r\n";
   return dxf;
 }
 
-/**
- * Sinh cấu trúc file AutoCAD 2D ASCII DXF chuẩn với đầy đủ các phân hệ MEPF và trục toạ độ (X, Y).
- */
-export function generateStandard2dDxf(title = "Ban_Ve_CAD_2D", system = "HVAC"): string {
-  const sysUpper = (system || "HVAC").toUpperCase();
-  return `0\r\nSECTION\r\n2\r\nHEADER\r\n9\r\n$ACADVER\r\n1\r\nAC1009\r\n9\r\n$INSUNITS\r\n70\r\n4\r\n9\r\n$MEASUREMENT\r\n70\r\n1\r\n0\r\nENDSEC\r\n0\r\nSECTION\r\n2\r\nTABLES\r\n0\r\nTABLE\r\n2\r\nVPORT\r\n70\r\n1\r\n0\r\nVPORT\r\n2\r\n*ACTIVE\r\n70\r\n0\r\n10\r\n0.0\r\n20\r\n0.0\r\n11\r\n1.0\r\n21\r\n1.0\r\n12\r\n0.0\r\n22\r\n0.0\r\n40\r\n1000.0\r\n41\r\n1.5\r\n0\r\nENDTAB\r\n0\r\nTABLE\r\n2\r\nLAYER\r\n70\r\n8\r\n0\r\nLAYER\r\n2\r\n0\r\n70\r\n0\r\n62\r\n7\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nM-DUCT-SUPP\r\n70\r\n0\r\n62\r\n4\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nM-DUCT-RETN\r\n70\r\n0\r\n62\r\n6\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nP-PIPE-SANR\r\n70\r\n0\r\n62\r\n3\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nE-CABL-TRAY\r\n70\r\n0\r\n62\r\n1\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nF-SPRN-PIPE\r\n70\r\n0\r\n62\r\n1\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nA-WALL-GRID\r\n70\r\n0\r\n62\r\n8\r\n6\r\nCONTINUOUS\r\n0\r\nLAYER\r\n2\r\nG-ANNO-TEXT\r\n70\r\n0\r\n62\r\n7\r\n6\r\nCONTINUOUS\r\n0\r\nENDTAB\r\n0\r\nENDSEC\r\n0\r\nSECTION\r\n2\r\nBLOCKS\r\n0\r\nENDSEC\r\n0\r\nSECTION\r\n2\r\nENTITIES\r\n0\r\nLINE\r\n8\r\nA-WALL-GRID\r\n10\r\n0.0\r\n20\r\n0.0\r\n30\r\n0.0\r\n11\r\n36000.0\r\n21\r\n0.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nA-WALL-GRID\r\n10\r\n36000.0\r\n20\r\n0.0\r\n30\r\n0.0\r\n11\r\n36000.0\r\n21\r\n18000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nA-WALL-GRID\r\n10\r\n36000.0\r\n20\r\n18000.0\r\n30\r\n0.0\r\n11\r\n0.0\r\n21\r\n18000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nA-WALL-GRID\r\n10\r\n0.0\r\n20\r\n18000.0\r\n30\r\n0.0\r\n11\r\n0.0\r\n21\r\n0.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nM-DUCT-SUPP\r\n10\r\n3000.0\r\n20\r\n9000.0\r\n30\r\n0.0\r\n11\r\n33000.0\r\n21\r\n9000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nM-DUCT-RETN\r\n10\r\n3000.0\r\n20\r\n12000.0\r\n30\r\n0.0\r\n11\r\n33000.0\r\n21\r\n12000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nP-PIPE-SANR\r\n10\r\n3000.0\r\n20\r\n6000.0\r\n30\r\n0.0\r\n11\r\n33000.0\r\n21\r\n6000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nE-CABL-TRAY\r\n10\r\n3000.0\r\n20\r\n15000.0\r\n30\r\n0.0\r\n11\r\n33000.0\r\n21\r\n15000.0\r\n31\r\n0.0\r\n0\r\nLINE\r\n8\r\nF-SPRN-PIPE\r\n10\r\n3000.0\r\n20\r\n3000.0\r\n30\r\n0.0\r\n11\r\n33000.0\r\n21\r\n3000.0\r\n31\r\n0.0\r\n0\r\nTEXT\r\n8\r\nG-ANNO-TEXT\r\n10\r\n18000.0\r\n20\r\n9500.0\r\n30\r\n0.0\r\n40\r\n300.0\r\n1\r\nống gió cấp lạnh AHU-01 800x500\r\n0\r\nTEXT\r\n8\r\nG-ANNO-TEXT\r\n10\r\n18000.0\r\n20\r\n12500.0\r\n30\r\n0.0\r\n40\r\n300.0\r\n1\r\nống gió hồi 700x400\r\n0\r\nTEXT\r\n8\r\nG-ANNO-TEXT\r\n10\r\n18000.0\r\n20\r\n6500.0\r\n30\r\n0.0\r\n40\r\n300.0\r\n1\r\nống thoát nước D114 dốc i=1.5% BOP=+2850\r\n0\r\nTEXT\r\n8\r\nG-ANNO-TEXT\r\n10\r\n18000.0\r\n20\r\n15500.0\r\n30\r\n0.0\r\n40\r\n300.0\r\n1\r\nMáng cáp điện Trunking 400x100\r\n0\r\nTEXT\r\n8\r\nG-ANNO-TEXT\r\n10\r\n18000.0\r\n20\r\n3500.0\r\n30\r\n0.0\r\n40\r\n300.0\r\n1\r\nĐầu phun PCCC Sprinkler 68°C\r\n0\r\nENDSEC\r\n0\r\nEOF\r\n`;
-}
-
-/** Bốn section bắt buộc phải có trong một tệp DXF ASCII do XBoss phát hành */
+/** Bốn section bắt buộc trong mọi tệp DXF ASCII, ở bất kỳ phiên bản nào */
 const REQUIRED_DXF_SECTIONS = ["HEADER", "TABLES", "BLOCKS", "ENTITIES"];
+
+/**
+ * Section bắt buộc thêm khi tệp khai R2000 (AC1015) trở lên: OBJECTS chứa từ điển gốc, thiếu nó
+ * AutoCAD báo tệp hỏng. Không áp cho tệp khai phiên bản cũ hơn — tệp R12 hợp lệ vẫn không có
+ * OBJECTS, và người dùng vẫn có quyền tải lên tệp cũ.
+ */
+const OBJECTS_SECTION_FROM = "AC1015";
 
 /**
  * Kiểm định tối thiểu cấu trúc một chuỗi DXF ASCII trước khi ghi ra đĩa — lưới an toàn chặn ghi
@@ -3191,6 +3439,12 @@ export function validateDxf(content: string): { valid: boolean; errors: string[]
     const missingSections = REQUIRED_DXF_SECTIONS.filter((s) => !foundSections.has(s));
     if (missingSections.length > 0) {
       errors.push(`Thiếu section bắt buộc: ${missingSections.join(", ")}.`);
+    }
+
+    // Tệp khai R2000 trở lên mà thiếu OBJECTS là tệp hỏng — AutoCAD không mở được
+    const acadVer = /\$ACADVER\r?\n\s*1\r?\n\s*(AC\d{4})/.exec(content)?.[1];
+    if (acadVer && acadVer >= OBJECTS_SECTION_FROM && !foundSections.has("OBJECTS")) {
+      errors.push(`Tệp khai ${acadVer} (R2000 trở lên) nhưng thiếu section OBJECTS.`);
     }
 
     const meaningfulLines = body.map((l) => l.trim()).filter((l) => l.length > 0);

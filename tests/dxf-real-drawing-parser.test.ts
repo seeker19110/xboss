@@ -5,7 +5,6 @@ import {
   parseDwgBinary,
   DwgUnsupportedError,
   exportDxf,
-  generateStandard2dDxf,
   generateStandardizedAutocadScript,
   validateDxf,
   decodeCadText,
@@ -110,10 +109,18 @@ test("exportDxf: Xuất chuỗi DXF ASCII chuẩn AutoCAD đầy đủ HEADER, T
   assert.ok(exportedDxf.includes("HEADER"), "DXF xuất phải có HEADER");
   assert.ok(exportedDxf.includes("$ACADVER"), "DXF xuất phải có $ACADVER");
   assert.ok(
-    exportedDxf.includes("AC1009"),
-    "DXF xuất phải khai đúng R12 (AC1009) — cấu trúc ghi ra không có handle/OBJECTS nên không phải R2000",
+    exportedDxf.includes("AC1015"),
+    "DXF xuất phải khai R2000 (AC1015) — bộ ghi nay phát hành đúng cấu trúc có handle và OBJECTS",
   );
-  assert.ok(!exportedDxf.includes("AC1015"), "Không được khai AC1015 khi thực chất ghi R12");
+  assert.ok(!exportedDxf.includes("AC1009"), "Không được khai lùi về R12 nữa");
+  assert.ok(exportedDxf.includes("$HANDSEED"), "R2000 bắt buộc khai $HANDSEED");
+  assert.ok(exportedDxf.includes("2\r\nCLASSES"), "DXF xuất phải có section CLASSES");
+  assert.ok(exportedDxf.includes("2\r\nOBJECTS"), "DXF xuất phải có section OBJECTS");
+  assert.ok(exportedDxf.includes("AcDbEntity"), "Mỗi thực thể R2000 phải khai lớp con AcDbEntity");
+  assert.ok(
+    exportedDxf.includes("100\r\nAcDbBlockTableRecord"),
+    "Bảng BLOCK_RECORD phải khai đúng lớp con",
+  );
   assert.ok(exportedDxf.includes("TABLES"), "DXF xuất phải có TABLES");
   assert.ok(exportedDxf.includes("LAYER"), "DXF xuất phải có bảng LAYER");
   assert.ok(exportedDxf.includes("BLOCKS"), "DXF xuất phải có BLOCKS");
@@ -156,53 +163,64 @@ test("parseDxf: DIMENSION lấy đầu đo ở mã 13/14 và số đo thật ở
   );
 });
 
-test("exportDxf: DIMENSION hạ cấp thành LINE nối đúng hai đầu đo + TEXT số đo thật", () => {
+test("exportDxf: DIMENSION giữ nguyên là DIMENSION, kèm khối *D<n> chứa đường đo và chữ đo", () => {
   const sampleDxf = `0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n0\nLAYER\n2\nM-DIMS\n62\n7\n6\nCONTINUOUS\n0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n0\nDIMENSION\n8\nM-DIMS\n10\n3000\n20\n2500\n30\n0\n11\n3000\n21\n2600\n31\n0\n13\n1000\n23\n2000\n33\n0\n14\n5000\n24\n2000\n34\n0\n42\n4000.0\n70\n0\n0\nENDSEC\n0\nEOF`;
   const parsed = parseDxf(sampleDxf, "co_kich_thuoc.dxf");
   const exported = exportDxf(parsed, { applyStandardLayers: false });
 
-  assert.ok(
-    !exported.includes("\r\nDIMENSION\r\n"),
-    "Không được xuất DIMENSION thô — R12 sẽ báo lỗi vì thiếu block hình học *D<n>",
-  );
+  // R2000 có DIMENSION thật — không còn phải tách thành LINE + TEXT rời như bản ghi R12 cũ
+  assert.ok(exported.includes("0\r\nDIMENSION\r\n"), "Kích thước phải giữ nguyên là DIMENSION");
+  assert.ok(exported.includes("100\r\nAcDbAlignedDimension\r\n"), "Phải khai đúng lớp con");
+  assert.ok(exported.includes("2\r\n*D1\r\n"), "DIMENSION phải trỏ tới khối hình của nó");
 
-  // Đường đo nối HAI ĐẦU ĐO thật (13/14), không phải điểm đặt đường kích thước (mã 10)
+  // Khối *D1 mang đường đo nối hai đầu đo thật và chữ số đo
+  const khoi = exported.slice(exported.indexOf("100\r\nAcDbBlockBegin\r\n2\r\n*D1\r\n"));
+  const thanKhoi = khoi.slice(0, khoi.indexOf("0\r\nENDBLK"));
+  assert.ok(thanKhoi.includes("0\r\nLINE\r\n"), "Khối kích thước phải chứa đường đo");
   assert.ok(
-    exported.includes(
-      "0\r\nLINE\r\n8\r\nM-DIMS\r\n10\r\n1000\r\n20\r\n2000\r\n30\r\n0\r\n11\r\n5000\r\n21\r\n2000\r\n31\r\n0\r\n",
-    ),
-    "Phải có LINE nối hai đầu đo 13/14 của kích thước",
+    thanKhoi.includes("10\r\n1000.0\r\n20\r\n2000.0\r\n") &&
+      thanKhoi.includes("11\r\n5000.0\r\n21\r\n2000.0\r\n"),
+    "Đường đo phải nối đúng hai đầu đo 13/14",
   );
+  assert.ok(thanKhoi.includes("1\r\n4000\r\n"), "Chữ đo phải mang số đo thật 4000 từ mã 42");
 
-  // Chữ đo đặt đúng điểm đặt chữ khai trong tệp (mã 11/21), giá trị lấy từ mã 42
-  assert.ok(
-    exported.includes("0\r\nTEXT\r\n8\r\nM-DIMS\r\n10\r\n3000\r\n20\r\n2600\r\n30\r\n0\r\n"),
-    "Phải có TEXT giá trị đo đặt tại điểm đặt chữ của kích thước",
-  );
-  assert.ok(exported.includes("\r\n1\r\n4000\r\n"), "TEXT phải mang số đo thật 4000 từ mã 42");
-
-  const reParsed = parseDxf(exported, "exported.dxf");
-  assert.equal(
-    reParsed.entities.filter((e) => e.type === "DIMENSION").length,
-    0,
-    "Đọc lại tệp xuất ra không còn thực thể DIMENSION nào",
-  );
-  assert.ok(
-    reParsed.entities.some((e) => e.type === "TEXT" && (e.decodedText || e.textValue) === "4000"),
-    "Đọc lại tệp xuất ra phải thấy chữ kích thước dưới dạng TEXT",
-  );
+  // Đọc lại: vẫn là kích thước, giữ nguyên hai đầu đo và số đo
+  const lai = parseDxf(exported, "exported.dxf");
+  const dim = lai.entities.find((e) => e.type === "DIMENSION");
+  assert.ok(dim, "Đọc lại tệp xuất ra vẫn phải thấy DIMENSION");
+  assert.deepEqual(dim.coordinates.measurePoints, [
+    [1000, 2000, 0],
+    [5000, 2000, 0],
+  ]);
+  assert.equal(dim.decodedText, "4000");
 });
 
-test("validateDxf: Chấp nhận tệp DXF do XBoss sinh ra (exportDxf và generateStandard2dDxf)", () => {
+test("validateDxf: Chấp nhận tệp DXF do exportDxf sinh ra, từ chối tệp R2000 thiếu OBJECTS", () => {
   const sampleDxf = `0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n0\nLAYER\n2\n01_ONG_GIO_CAP\n62\n140\n6\nCONTINUOUS\n0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n0\nLINE\n8\n01_ONG_GIO_CAP\n10\n1000\n20\n2000\n30\n0\n11\n5000\n21\n2000\n31\n0\n0\nENDSEC\n0\nEOF`;
   const exported = exportDxf(parseDxf(sampleDxf, "original.dxf"), { applyStandardLayers: true });
 
-  const okExport = validateDxf(exported);
-  assert.deepEqual(okExport, { valid: true, errors: [] }, "DXF từ exportDxf phải hợp lệ");
+  assert.deepEqual(
+    validateDxf(exported),
+    { valid: true, errors: [] },
+    "DXF từ exportDxf phải hợp lệ",
+  );
 
-  const okTemplate = validateDxf(generateStandard2dDxf("Ban_Ve_Mau", "HVAC"));
-  assert.equal(okTemplate.valid, true, "DXF mẫu 2D phải hợp lệ");
-  assert.deepEqual(okTemplate.errors, []);
+  // Tệp khai R2000 mà thiếu OBJECTS là tệp hỏng — AutoCAD không mở được
+  const thieuObjects = exported.replace(
+    /0\r\nSECTION\r\n2\r\nOBJECTS\r\n[\s\S]*?0\r\nENDSEC\r\n/,
+    "",
+  );
+  const res = validateDxf(thieuObjects);
+  assert.equal(res.valid, false, "Thiếu OBJECTS trong tệp R2000 phải bị chặn trước khi ghi ra đĩa");
+  assert.ok(res.errors.some((e) => e.includes("OBJECTS")));
+
+  // Nhưng tệp khai phiên bản cũ thì không đòi OBJECTS — người dùng vẫn tải lên tệp R12 được
+  const r12 = `0\r\nSECTION\r\n2\r\nHEADER\r\n9\r\n$ACADVER\r\n1\r\nAC1009\r\n0\r\nENDSEC\r\n0\r\nSECTION\r\n2\r\nTABLES\r\n0\r\nENDSEC\r\n0\r\nSECTION\r\n2\r\nBLOCKS\r\n0\r\nENDSEC\r\n0\r\nSECTION\r\n2\r\nENTITIES\r\n0\r\nENDSEC\r\n0\r\nEOF\r\n`;
+  assert.deepEqual(
+    validateDxf(r12),
+    { valid: true, errors: [] },
+    "Tệp R12 hợp lệ vẫn phải được nhận",
+  );
 });
 
 test("validateDxf: Từ chối DXF thiếu section ENTITIES", () => {
@@ -276,7 +294,7 @@ test("validateDxf: Bỏ qua BOM và dòng trống dẫn đầu, nhưng bắt đ�
 // có hai đầu đo (13/14) nhưng KHÔNG có chữ ghi đè lẫn số đo mã 42
 const DXF_CO_KICH_THUOC = `0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n0\nLAYER\n2\nM-DIMS\n62\n7\n6\nCONTINUOUS\n0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n0\nLINE\n8\nM-DIMS\n10\n0\n20\n0\n30\n0\n11\n1000\n21\n0\n31\n0\n0\nDIMENSION\n8\nM-DIMS\n10\n3000\n20\n2500\n30\n0\n13\n1000\n23\n2000\n33\n0\n14\n5000\n24\n2000\n34\n0\n70\n0\n0\nENDSEC\n0\nEOF`;
 
-test("exportDxf: DIMENSION không có chữ ghi đè lẫn mã 42 thì chỉ ra LINE, không ghi TEXT rỗng hay `<>`", () => {
+test("exportDxf: DIMENSION không có chữ ghi đè lẫn mã 42 thì khối hình chỉ có đường đo, không có chữ", () => {
   const parsed = parseDxf(DXF_CO_KICH_THUOC, "khong_chu.dxf");
   const dim = parsed.entities.find((e) => e.type === "DIMENSION");
   assert.ok(dim, "Bản vẽ mẫu phải có DIMENSION");
@@ -284,14 +302,15 @@ test("exportDxf: DIMENSION không có chữ ghi đè lẫn mã 42 thì chỉ ra 
   assert.equal(dim.textValue, undefined, "Tệp không khai chữ ghi đè thì không được bịa chữ");
 
   const exported = exportDxf(parsed, { applyStandardLayers: false });
+  const khoi = exported.slice(exported.indexOf("100\r\nAcDbBlockBegin\r\n2\r\n*D1\r\n"));
+  const thanKhoi = khoi.slice(0, khoi.indexOf("0\r\nENDBLK"));
 
   assert.ok(
-    exported.includes(
-      "0\r\nLINE\r\n8\r\nM-DIMS\r\n10\r\n1000\r\n20\r\n2000\r\n30\r\n0\r\n11\r\n5000\r\n21\r\n2000\r\n31\r\n0\r\n",
-    ),
-    "Vẫn phải giữ đường đo nối hai đầu đo dưới dạng LINE",
+    thanKhoi.includes("10\r\n1000.0\r\n20\r\n2000.0\r\n") &&
+      thanKhoi.includes("11\r\n5000.0\r\n21\r\n2000.0\r\n"),
+    "Vẫn phải giữ đường đo nối hai đầu đo",
   );
-  assert.ok(!exported.includes("0\r\nTEXT\r\n"), "Không được ghi TEXT khi không có chữ lẫn số đo");
+  assert.ok(!thanKhoi.includes("0\r\nTEXT\r\n"), "Không được ghi chữ khi không có chữ lẫn số đo");
   assert.ok(!exported.includes("<>"), "Không được ghi placeholder `<>` thành chữ trên bản vẽ");
 });
 
@@ -307,15 +326,31 @@ test("exportDxf: DIMENSION không có toạ độ đường lẫn chữ đo vẫ
   const exported = exportDxf(parsed, { applyStandardLayers: false });
 
   assert.ok(
-    exported.includes("0\r\nPOINT\r\n8\r\nM-DIMS\r\n10\r\n7000\r\n20\r\n8000\r\n30\r\n0\r\n"),
+    exported.includes("0\r\nPOINT\r\n") && exported.includes("10\r\n7000.0\r\n20\r\n8000.0\r\n"),
     "Phải ghi POINT tại điểm neo thay vì bỏ hẳn thực thể",
   );
 
-  // Không được im lặng mất thực thể: số thực thể ghi ra vẫn bằng số thực thể đầu vào
-  const soThucTheGhiRa = (
-    exported.match(/\r\n0\r\n(LINE|TEXT|POINT|CIRCLE|ARC|POLYLINE|INSERT)\r\n/g) || []
-  ).length;
-  assert.equal(soThucTheGhiRa, parsed.entities.length, "1 LINE + 1 DIMENSION → 2 thực thể ghi ra");
+  // Không được im lặng mất thực thể: số thực thể đọc lại vẫn bằng số thực thể đầu vào
+  const lai = parseDxf(exported, "exported.dxf");
+  assert.equal(lai.entities.length, parsed.entities.length, "1 LINE + 1 DIMENSION → 2 thực thể");
+
+  // Còn khi thực thể không có BẤT KỲ toạ độ nào thì không được bịa ra vị trí (0,0) để ghi POINT
+  const rong = parseDxf(DXF_CO_KICH_THUOC, "khong_toa_do.dxf");
+  const dimRong = rong.entities.find((e) => e.type === "DIMENSION")!;
+  dimRong.textValue = "";
+  dimRong.decodedText = "";
+  dimRong.measurement = undefined;
+  dimRong.coordinates = {};
+  const exRong = exportDxf(rong, { applyStandardLayers: false });
+  assert.ok(
+    !exRong.includes("0\r\nDIMENSION\r\n"),
+    "Kích thước không còn dữ liệu hình học nào thì không ghi ra DIMENSION rỗng",
+  );
+  assert.equal(
+    parseDxf(exRong, "rt.dxf").entities.length,
+    1,
+    "Chỉ còn lại LINE thật — không bịa POINT ở gốc toạ độ cho thực thể không có vị trí",
+  );
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -529,15 +564,15 @@ test("exportDxf: định nghĩa khối ghi lại hình học thật, không chè
     exported.indexOf("2\r\nBLOCKS"),
     exported.indexOf("2\r\nENTITIES"),
   );
-  const vavPart = blockPart.slice(blockPart.indexOf("2\r\nVAV_BOX_01"));
+  const vavPart = blockPart.slice(blockPart.indexOf("AcDbBlockBegin\r\n2\r\nVAV_BOX_01"));
 
   assert.ok(
-    vavPart.includes("10\r\n-400\r\n20\r\n-200\r\n"),
+    vavPart.includes("10\r\n-400.0\r\n20\r\n-200.0\r\n"),
     "Phải ghi lại đúng nét thật của khối VAV_BOX_01",
   );
   assert.ok(vavPart.includes("0\r\nCIRCLE\r\n"), "Phải giữ đường tròn thật trong khối");
   assert.ok(
-    !vavPart.includes("10\r\n-100\r\n20\r\n0\r\n30\r\n0\r\n11\r\n100\r\n"),
+    !vavPart.includes("10\r\n-100.0\r\n20\r\n0.0\r\n30\r\n0.0\r\n11\r\n100.0\r\n"),
     "Không được chèn hình chữ thập ±100 đơn vị làm hình đại diện cho khối",
   );
 
@@ -547,7 +582,10 @@ test("exportDxf: định nghĩa khối ghi lại hình học thật, không chè
     "khoi_la.dxf",
   );
   const ex2 = exportDxf(chiCoInsert, { applyStandardLayers: false });
-  const blk2 = ex2.slice(ex2.indexOf("2\r\nKHOI_LA"), ex2.indexOf("2\r\nENTITIES"));
+  const blk2 = ex2.slice(
+    ex2.indexOf("AcDbBlockBegin\r\n2\r\nKHOI_LA"),
+    ex2.indexOf("2\r\nENTITIES"),
+  );
   assert.ok(blk2.includes("0\r\nENDBLK\r\n"), "Khối không có định nghĩa vẫn phải đóng hợp lệ");
   assert.ok(!blk2.includes("0\r\nLINE\r\n"), "Không được bịa nét cho khối không có định nghĩa");
 });
@@ -558,16 +596,22 @@ test("exportDxf: vòng round-trip giữ nguyên số thực thể, khung bao và
 
   assert.deepEqual(validateDxf(exported), { valid: true, errors: [] }, "Tệp xuất ra phải hợp lệ");
   assert.ok(
-    !exported.includes("0\r\nLWPOLYLINE\r\n"),
-    "Khai AC1009 thì không được ghi LWPOLYLINE — R12 chưa có thực thể này",
+    exported.includes("0\r\nLWPOLYLINE\r\n"),
+    "Khai AC1015 thì ghi LWPOLYLINE nguyên bản, không phải dựng POLYLINE/VERTEX như R12",
   );
 
   const lai = parseDxf(exported, "roundtrip.dxf");
 
-  // 17 thực thể vào → 19 ra: DIMENSION hạ cấp thành LINE (đường đo) + TEXT (số đo), MULTILEADER
-  // hạ cấp thành đa tuyến đường dẫn + TEXT chú thích. Không thực thể nào biến mất.
+  // 17 thực thể vào → 18 ra. Bước hạ cấp DUY NHẤT còn lại là MULTILEADER (thực thể của R2007)
+  // tách thành đa tuyến đường dẫn + MTEXT chú thích. Mọi loại khác giữ nguyên bản.
   assert.equal(goc.entities.length, 17);
-  assert.equal(lai.entities.length, 19);
+  assert.equal(lai.entities.length, 18);
+  for (const loai of ["LWPOLYLINE", "ELLIPSE", "HATCH", "MTEXT", "DIMENSION", "XLINE"] as const) {
+    assert.ok(
+      lai.entities.some((e) => e.type === loai),
+      `${loai} phải giữ nguyên loại sau vòng xuất – nạp lại (R12 trước đây phải hạ cấp)`,
+    );
+  }
   assert.deepEqual(
     lai.diagnostic.boundingDimensions,
     goc.diagnostic.boundingDimensions,
@@ -585,7 +629,7 @@ test("exportDxf: vòng round-trip giữ nguyên số thực thể, khung bao và
   assert.equal(lai.layers.find((l) => l.name === "M-DUCT-SUPP")?.lineWeight, 25);
 
   // Đa tuyến giữ đúng đỉnh và độ cong
-  const poly = lai.entities.filter((e) => e.type === "POLYLINE");
+  const poly = lai.entities.filter((e) => e.type === "LWPOLYLINE");
   assert.ok(poly.some((p) => p.coordinates.bulges?.includes(0.5)));
   assert.ok(poly.some((p) => p.coordinates.bulges?.includes(-0.25)));
 
@@ -701,12 +745,13 @@ test("decodeCadText: không phá mã hiệu kiểu A3 / Zone1 khi giải mã VNI
   assert.equal(decodeCadText("d9u7o72ng o1ng"), "đường óng");
 });
 
-test("parseDxf: HATCH giữ ranh giới vùng tô, xuất ra thành đường bao khép kín", () => {
+test("parseDxf: HATCH giữ ranh giới và mẫu tô, xuất ra vẫn là HATCH nguyên bản", () => {
   const r = parseDxf(FIXTURE_MEPF, "mepf-thap-a.dxf");
   const hatch = r.entities.find((e) => e.type === "HATCH");
   assert.ok(hatch, "Phải đọc ra HATCH");
 
   assert.equal(hatch.patternName, "ANSI31", "Tên mẫu tô đọc từ mã 2");
+  assert.equal(hatch.hatchAngle, 45, "Góc mẫu tô đọc từ mã 52");
   assert.equal(hatch.coordinates.boundaryPaths?.length, 1, "Phải đọc ra 1 đường bao");
   assert.deepEqual(
     hatch.coordinates.boundaryPaths?.[0].points,
@@ -718,16 +763,23 @@ test("parseDxf: HATCH giữ ranh giới vùng tô, xuất ra thành đường ba
     ],
     "Đỉnh đường bao lấy từ mã 10/20 bên trong khối ranh giới",
   );
+  assert.equal(
+    hatch.hatchPatternLines?.length,
+    1,
+    "Định nghĩa nét gạch của mẫu tô phải đọc được — thiếu nó thì AutoCAD tô rỗng",
+  );
 
-  const exported = exportDxf(r, { applyStandardLayers: false });
-  const lai = parseDxf(exported, "rt.dxf");
-  const bao = lai.entities.filter(
-    (e) => e.type === "POLYLINE" && e.coordinates.points?.length === 4,
+  // R2000 có HATCH thật: vùng tô giữ nguyên cả mẫu tô, không chỉ còn đường bao như bản ghi R12
+  const lai = parseDxf(exportDxf(r, { applyStandardLayers: false }), "rt.dxf");
+  const hatch2 = lai.entities.find((e) => e.type === "HATCH");
+  assert.ok(hatch2, "Đọc lại tệp xuất ra vẫn phải thấy HATCH");
+  assert.equal(hatch2.patternName, "ANSI31");
+  assert.deepEqual(
+    hatch2.coordinates.boundaryPaths?.[0].points,
+    hatch.coordinates.boundaryPaths?.[0].points,
+    "Ranh giới vùng tô không được xê dịch",
   );
-  assert.ok(
-    bao.some((p) => p.coordinates.points?.[0][0] === 1000 && p.coordinates.points?.[0][1] === 5000),
-    "Vùng tô phải còn nguyên phạm vi dưới dạng đường bao khép kín sau khi xuất tệp",
-  );
+  assert.equal(hatch2.hatchPatternLines?.length, 1, "Mẫu tô phải theo sang tệp mới");
 });
 
 test("parseDxf: MULTILEADER giữ chữ chú thích và đường dẫn", () => {
@@ -769,24 +821,22 @@ test("parseDxf: XLINE và MLINE — hai loại trước đây bị bỏ qua hoà
   ]);
 });
 
-test("exportDxf: XLINE cắt theo khung bao bản vẽ, không kéo dài làm phình $EXTMAX", () => {
+test("exportDxf: XLINE giữ nguyên là XLINE, khung bao bản vẽ không xê dịch", () => {
   const goc = parseDxf(FIXTURE_MEPF, "mepf-thap-a.dxf");
-  const lai = parseDxf(exportDxf(goc, { applyStandardLayers: false }), "rt.dxf");
+  const exported = exportDxf(goc, { applyStandardLayers: false });
+  const lai = parseDxf(exported, "rt.dxf");
+
+  // R2000 có XLINE thật — không còn phải cắt thành LINE hữu hạn theo khung bao như R12
+  const xline = lai.entities.find((e) => e.type === "XLINE");
+  assert.ok(xline, "Đường dựng hình phải giữ nguyên loại");
+  assert.deepEqual(xline.coordinates.start, [15000, 10000, 0]);
+  assert.deepEqual(xline.coordinates.direction, [1, 0, 0]);
 
   assert.deepEqual(
     lai.diagnostic.boundingDimensions,
     goc.diagnostic.boundingDimensions,
     "Đường dựng hình dài vô hạn không được làm khung bao bản vẽ nở ra",
   );
-
-  // Đường dựng hình nằm ngang y=10000 phải thành đoạn chạy hết bề ngang bản vẽ
-  const doan = lai.entities.find(
-    (e) =>
-      e.type === "LINE" && e.coordinates.start?.[1] === 10000 && e.coordinates.end?.[1] === 10000,
-  );
-  assert.ok(doan, "XLINE phải hạ thành LINE hữu hạn");
-  assert.equal(doan.coordinates.start?.[0], goc.diagnostic.boundingDimensions.minX);
-  assert.equal(doan.coordinates.end?.[0], goc.diagnostic.boundingDimensions.maxX);
 });
 
 test("exportDxf: giữ thuộc tính chung — không gian giấy, bề dày, tỷ lệ nét, hướng đùn, canh lề chữ", () => {

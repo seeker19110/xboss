@@ -123,14 +123,67 @@ tên ở không gian giấy có đủ bề dày/tỷ lệ nét/hướng đùn/ca
 (DIMENSION và MULTILEADER mỗi cái hạ thành 2 thực thể), khung bao **không xê dịch**. Thêm 8 ca test.
 Tổng `npm test`: 210 file, **1107 ca pass, 0 fail, 1 skip có chủ đích**.
 
+### E — Nâng bộ ghi lên R2000 / AC1015 (cùng ngày)
+
+Mọi hạn chế "còn lại" của đợt D bên trên đều không phải việc bỏ dở, mà là **giới hạn của định dạng
+R12 (AC1009) mà bộ ghi đang phát hành** — định dạng năm 1992 không có handle, không có section
+OBJECTS và thiếu hẳn nhiều thực thể. Đợt này thay bộ ghi bằng **AutoCAD 2000 (AC1015)** nên các
+giới hạn đó biến mất luôn.
+
+Bộ ghi mới phát hành đủ 6 section (HEADER / CLASSES / TABLES / BLOCKS / ENTITIES / OBJECTS), mỗi
+thực thể, bản ghi bảng, khối và đối tượng mang **handle** (mã 5) riêng, trỏ về **chủ sở hữu**
+(mã 330) và khai **lớp con** (`AcDbEntity`, `AcDbLine`, `AcDbPolyline`…); `$HANDSEED` chốt sau cùng
+để luôn lớn hơn mọi handle đã cấp. Bảng đầy đủ 9 bảng, `BLOCK_RECORD` có `*Model_Space` và
+`*Paper_Space` làm chủ sở hữu của thực thể theo đúng không gian.
+
+**Không còn bước hạ cấp nào** (trước đây R12 buộc phải):
+
+| Thực thể        | Bộ ghi R12 (cũ)                   | Bộ ghi R2000 (nay)                                     |
+| --------------- | --------------------------------- | ------------------------------------------------------ |
+| Đa tuyến        | dựng `POLYLINE`/`VERTEX`/`SEQEND` | `LWPOLYLINE` nguyên bản                                |
+| `ELLIPSE`       | bẻ thành đa tuyến 48 đoạn         | `ELLIPSE` nguyên bản, giữ cả tham số cung              |
+| `SPLINE`        | đa tuyến nối điểm khớp            | `SPLINE` nguyên bản khi tệp có vector knot             |
+| `HATCH`         | chỉ còn đường bao                 | `HATCH` nguyên bản, giữ cả mẫu tô và nét gạch          |
+| `MTEXT`         | ép xuống một dòng `TEXT`          | `MTEXT` nguyên bản                                     |
+| `DIMENSION`     | tách thành `LINE` + `TEXT` rời    | `DIMENSION` thật + khối `*D<n>` chứa hình của nó       |
+| `XLINE`/`RAY`   | cắt theo khung bao thành `LINE`   | nguyên bản                                             |
+| `TOLERANCE`     | chỉ còn `POINT`                   | `TOLERANCE` nguyên bản                                 |
+| Thuộc tính khối | `ATTRIB` bị bỏ                    | `ATTRIB` ghi lại đủ vị trí, cỡ chữ, đóng bằng `SEQEND` |
+
+Bước hạ cấp **duy nhất** còn lại là `MULTILEADER` — thực thể của R2007, R2000 chưa có — tách thành
+đa tuyến đường dẫn + `MTEXT` chú thích.
+
+Phần parser bổ sung theo để ghi lại được trung thực: vector knot và bậc của `SPLINE` (mã 40/71),
+tham số cung của `ELLIPSE` (41/42), **định nghĩa nét gạch mẫu tô** của `HATCH` (78 + 53/43/44/45/46/79/49
+— thiếu phần này thì tệp R2000 có `HATCH` nhưng AutoCAD tô rỗng), và `ATTRIB` giữ nguyên thực thể.
+
+**Lỗi thật lộ ra khi viết test:** mã nhóm 3 mang nghĩa khác nhau tuỳ loại thực thể, bản cũ gộp hết
+vào nội dung chữ nên chữ kích thước `4000` hoá **`4000STANDARD`** (tên kiểu kích thước bị nối vào số
+đo). Nay tách đúng: `MTEXT` → mảnh chữ, `ATTDEF` → câu nhắc, `DIMENSION`/`LEADER`/`TOLERANCE` → tên
+kiểu kích thước.
+
+`validateDxf` siết thêm: tệp khai AC1015 trở lên mà thiếu `OBJECTS` bị chặn trước khi ghi ra đĩa
+(tệp R12 người dùng tải lên vẫn được nhận). Xoá `generateStandard2dDxf()` — bộ sinh bản vẽ MEPF mẫu
+này chỉ còn test của chính nó gọi sau khi các nhánh bịa dữ liệu bị gỡ ở đợt A.
+
+**Kiểm chứng:** round-trip fixture 17 thực thể → **18** (chỉ `MULTILEADER` tách đôi), khung bao
+không xê dịch, và `LWPOLYLINE`/`ELLIPSE`/`HATCH`/`MTEXT`/`DIMENSION`/`XLINE` đều giữ nguyên loại.
+Kiểm tra cấu trúc tệp sinh ra: 63 handle **không trùng nhau**, **không chủ sở hữu nào trỏ vào
+handle không tồn tại**, `$HANDSEED` lớn hơn mọi handle, các cặp SECTION/ENDSEC, TABLE/ENDTAB,
+BLOCK/ENDBLK cân bằng. `npm test` 210 file, **1107 ca pass, 0 fail, 1 skip có chủ đích**.
+
 ### Còn lại (chưa làm)
 
 - Chuẩn hoá trực tiếp trên **DWG** vẫn cần plugin AutoCAD (ADR-0006) — chưa có.
-- `WIPEOUT`/`IMAGE` giữ được điểm chèn và đường bao cắt, nhưng **ảnh raster không dựng lại được**
-  bằng thực thể R12 — xuất ra chỉ còn đường bao (hoặc POINT nếu bản vẽ không khai đường bao).
-- `TOLERANCE` (khung dung sai GD&T) mới để lại điểm neo, chưa dựng lại khung.
-- `SPLINE` xuất ra là đa tuyến nối các điểm khớp — R12 không có SPLINE, nên đường cong bị xấp xỉ
-  bằng đoạn thẳng. Tương tự `ELLIPSE` (48 đoạn) và cạnh cung trong ranh giới `HATCH` (16 đoạn).
+- `MULTILEADER` cần R2007 (AC1021) mới giữ nguyên bản được; nay vẫn tách thành đường dẫn + `MTEXT`.
+- `WIPEOUT`/`IMAGE`: ảnh raster cần đối tượng `IMAGEDEF` kèm dữ liệu ảnh mà bản vẽ nguồn không mang
+  theo — xuất ra giữ được đường bao cắt, không giữ được ảnh.
+- `SPLINE` không kèm vector knot (bản vẽ chỉ khai điểm khớp) vẫn hạ về đa tuyến — ghi ra một
+  `SPLINE` thiếu knot là tạo thực thể hỏng, nên chọn hạ cấp có kiểm soát.
+- Cạnh cung trong ranh giới `HATCH` vẫn rời rạc hoá 16 đoạn ở bước **đọc**, nên đường bao xuất ra là
+  đa tuyến chứ không phải cung.
+- Section `OBJECTS` mới có từ điển gốc và `ACAD_GROUP`; chưa dựng `LAYOUT`/`PLOTSETTINGS` nên bố cục
+  in không theo sang tệp mới.
 - Thực thể `VIEWPORT` của không gian giấy vẫn không đọc (là siêu dữ liệu bố cục, không phải nội
   dung bản vẽ) — ghi nhận rõ trong chú thích ở `PARSED_ENTITY_TYPES`.
 

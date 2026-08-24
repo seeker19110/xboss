@@ -643,7 +643,8 @@ export default function CadViewportStudio({
                           fontSize="10"
                           fontFamily="monospace"
                         >
-                          Hỗ trợ: AutoCAD 2000–2025 (.dwg), DXF R12–R2025, PDF
+                          Nhận: DXF mọi phiên bản (ASCII lẫn nhị phân), PDF — xuất ra DXF chuẩn
+                          AutoCAD 2000
                         </text>
                       </g>
                     )}
