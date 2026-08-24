@@ -2648,6 +2648,7 @@
 | decision_note | text | ✓ |  |
 | uploaded_by | integer | ✓ |  |
 | created_at | timestamptz | ✓ | `now()` |
+| iso_path | text | ✓ |  |
 
 **Khóa ngoại:**
 - `drawing_id` → `drawings(id)`
