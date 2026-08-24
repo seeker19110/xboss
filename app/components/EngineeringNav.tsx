@@ -191,6 +191,13 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["admin", "pm", "engineer", "bch"],
   },
   {
+    href: "/engineering/thiet-bi-cad",
+    label: "Thiết bị plugin AutoCAD",
+    category: "spatial",
+    icon: Code,
+    roles: ["admin", "pm", "engineer"],
+  },
+  {
     href: "/engineering/mepf-lifecycle",
     label: "Vòng đời thiết bị MEPF",
     category: "spatial",

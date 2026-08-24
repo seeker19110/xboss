@@ -35,11 +35,30 @@ internal static class DrawingSnapshotBuilder
             ThuThap(tr, ent, entities);
         }
 
+        // Layer đang dùng trên TOÀN bản vẽ + block nặc danh (phép kiểm 8/9 —
+        // purgePolicy.deepPurge.reportEmptyLayers/reportAnonymousBlocks). Quét mọi block
+        // table record để không báo oan layer chỉ dùng ở paper space/trong block.
+        var layerDangDung = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var blockNacDanh = new List<string>();
+        var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
+        foreach (ObjectId btrId in bt)
+        {
+            var btr = (BlockTableRecord)tr.GetObject(btrId, OpenMode.ForRead);
+            if (btr.IsFromExternalReference || btr.IsFromOverlayReference) continue;
+            if (btr.IsAnonymous && !btr.IsLayout) blockNacDanh.Add(btr.Name);
+            foreach (ObjectId entId in btr)
+            {
+                if (tr.GetObject(entId, OpenMode.ForRead) is Entity ent) layerDangDung.Add(ent.Layer);
+            }
+        }
+
         return new DrawingSnapshot
         {
             Layers = layers,
             Entities = entities,
             InsUnits = (int)db.Insunits,
+            UsedLayerNames = layerDangDung,
+            AnonymousBlockNames = blockNacDanh,
         };
     }
 

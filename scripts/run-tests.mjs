@@ -155,4 +155,9 @@ if (coverageMode) {
   }
 }
 
-process.exit(failed > 0 ? 1 : 0);
+// KHÔNG dùng process.exit(): khi stdout là PIPE (CI, spawnSync của check-coverage.ts),
+// write() là bất đồng bộ — exit() vứt bỏ phần output còn xếp hàng, làm cụt đúng khối
+// tổng kết coverage in cuối cùng ("Số file trong phạm vi"/"lines:"...) mà cổng ratchet
+// cần đọc (đã xảy ra thật trên CI PR #389: test xanh, exit 0, nhưng summary biến mất).
+// Đặt exitCode rồi để process tự thoát → Node drain hết stdout trước khi chết.
+process.exitCode = failed > 0 ? 1 : 0;

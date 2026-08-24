@@ -373,6 +373,9 @@ function PrefRow({
       <button
         onClick={() => onToggle(prefKey, !enabled)}
         disabled={saving}
+        role="switch"
+        aria-checked={enabled}
+        aria-label={label}
         className={`relative shrink-0 w-11 h-6 rounded-full transition-colors disabled:opacity-60 ${enabled ? "bg-emerald-600" : "bg-zinc-700"}`}
       >
         <span

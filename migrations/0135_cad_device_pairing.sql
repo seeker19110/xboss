@@ -1,4 +1,6 @@
--- 0133_cad_device_pairing.sql — M99 PR2: ghép thiết bị plugin AutoCAD + token scope 'cad'.
+-- 0135_cad_device_pairing.sql — M99 PR2: ghép thiết bị plugin AutoCAD + token scope 'cad'.
+-- (Đổi tên từ 0133_cad_device_pairing.sql: trùng số với 0133_webhook_otp_hardening.sql do 2 PR
+--  song song — DDL toàn bộ idempotent nên chạy lại dưới tên mới vô hại; gate check:migrations.)
 --
 -- TÁI DÙNG bảng api_keys sẵn có (0061 — hash sha256, thu hồi, audit trigger, org_id từ 0078)
 -- thay vì bảng api_tokens mới như DDL nháp trong M99 §11 — điểm lệch spec có chủ đích, đã ghi

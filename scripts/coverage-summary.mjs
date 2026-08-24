@@ -10,7 +10,13 @@
 // không trọng số trên các file trong phạm vi. Đây là mốc đo tương đối (ratchet), KHÔNG phải số
 // tuyệt đối chính xác kiểu c8 merge nhiều tiến trình — đủ dùng để theo dõi xu hướng tăng/giảm.
 
-const COVERAGE_ROW_RE = /^# ( *)(\S.*?)\s+\|\s*([\d.]*)\s*\|\s*([\d.]*)\s*\|\s*([\d.]*)\s*\|(.*)$/;
+// Tiền tố reporter đổi theo phiên bản Node (cùng bài học với tapCount trong run-tests.mjs):
+// reporter `tap` in "# ...", reporter `spec` (mặc định khi stdout không phải TTY từ Node 24)
+// in "ℹ ..." — Node 22 trên container dev in "#", Node 24 trên runner CI in "ℹ". Chỉ khớp
+// "#" là toàn bộ bảng coverage bị bỏ qua trên CI → aggregate() trả null → cổng ratchet đỏ
+// "không thu được số liệu" dù 1211 ca test xanh (đã xảy ra thật, PR #389).
+const COVERAGE_ROW_RE =
+  /^(?:#|ℹ) ( *)(\S.*?)\s+\|\s*([\d.]*)\s*\|\s*([\d.]*)\s*\|\s*([\d.]*)\s*\|(.*)$/;
 
 const SCOPE_PREFIXES = ["lib/", "app/api/"];
 
@@ -31,8 +37,8 @@ export function parseCoverageTable(output) {
       continue;
     }
     if (!inTable) continue;
-    if (/^# -+$/.test(raw)) continue;
-    if (/^# {3}file\s+\|/.test(raw)) continue; // dòng tiêu đề bảng
+    if (/^(?:#|ℹ) -+$/.test(raw)) continue;
+    if (/^(?:#|ℹ) +file\s+\|/.test(raw)) continue; // dòng tiêu đề bảng
 
     const m = COVERAGE_ROW_RE.exec(raw);
     if (!m) continue;

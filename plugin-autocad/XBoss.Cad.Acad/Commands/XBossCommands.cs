@@ -111,6 +111,21 @@ public sealed class XBossCommands
         }
         ed.WriteMessage($"[XBoss] Vị trí lỗi được khoanh tròn trên layer {KiemTraMarker.TenLayer} (không in, tự dọn khi chạy lại/chuẩn hóa).\n");
         ed.WriteMessage("[XBoss] Chạy XBOSS_CHUANHOA để sửa theo rule pack.\n");
+
+        // Báo cáo JSON có cấu trúc (FR8/FR12) — cùng cơ chế với XBOSS_CHUANHOA, PR5 gửi kèm upload.
+        if (!string.IsNullOrEmpty(db.Filename))
+        {
+            var duongDan = db.Filename + ".xboss-kiemtra.json";
+            try
+            {
+                File.WriteAllText(duongDan, baoCao.DongDau(Path.GetFileName(db.Filename), HomNayIso()).ToJson());
+                ed.WriteMessage($"[XBoss] Báo cáo JSON: {duongDan}\n");
+            }
+            catch (IOException e)
+            {
+                ed.WriteMessage($"[XBoss] ⚠ Không ghi được báo cáo JSON: {e.Message}\n");
+            }
+        }
     }
 
     // ===== XBOSS_CHUANHOA =====
@@ -397,6 +412,65 @@ public sealed class XBossCommands
         }
         ed.WriteMessage($"\n[XBoss] Đã xuất Excel đúng mẫu công ty: {dlg.Filename}\n");
         ed.WriteMessage("[XBoss] Cột G = khối lượng bóc từ bản vẽ; QS điền cột F (KL BOQ hợp đồng) — cột H/J/K tự tính.\n");
+
+        // Sidecar JSON máy-đọc-được cạnh tệp Excel — PR5 gửi kèm khi upload, kiểm chéo được với Excel.
+        var duongDanJson = Path.ChangeExtension(dlg.Filename, ".json");
+        try
+        {
+            File.WriteAllText(duongDanJson, TakeoffJsonReport.TuKetQua(ketQua, meta).ToJson());
+            ed.WriteMessage($"[XBoss] Sidecar JSON: {duongDanJson}\n");
+        }
+        catch (IOException e)
+        {
+            ed.WriteMessage($"[XBoss] ⚠ Không ghi được sidecar JSON: {e.Message}\n");
+        }
+    }
+
+    // ===== XBOSS_BATCH =====
+
+    [CommandMethod("XBOSS_BATCH")]
+    public void XuLyHangLoat()
+    {
+        if (SanSang() is not (var doc, var ed)) return;
+        if (CanRulePack(ed) is not { } pack) return;
+
+        var hoi = new PromptKeywordOptions("\n[XBoss] Xử lý hàng loạt cả thư mục — chế độ nào?") { AllowNone = false };
+        hoi.Keywords.Add("KiemTra", "KiemTra", "Chỉ kiểm (an toàn, không sửa)");
+        hoi.Keywords.Add("ChuanHoa", "ChuanHoa", "Chuẩn hóa (bản gốc giữ nguyên, kết quả vào thư mục con)");
+        hoi.Keywords.Default = "KiemTra";
+        var traLoi = ed.GetKeywords(hoi);
+        if (traLoi.Status != PromptStatus.OK) return;
+        var chuanHoa = traLoi.StringResult == "ChuanHoa";
+
+        using var chonThuMuc = new System.Windows.Forms.FolderBrowserDialog
+        {
+            Description = "Chọn thư mục chứa các tệp .dwg cần xử lý",
+            ShowNewFolderButton = false,
+        };
+        if (chonThuMuc.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
+        var thuMuc = chonThuMuc.SelectedPath;
+
+        // Không xử lý tệp đang mở trong phiên (side database sẽ đụng khóa tệp).
+        var dangMo = AcadApp.DocumentManager
+            .Cast<Document>()
+            .Select(d => d.Database.Filename)
+            .Where(f => !string.IsNullOrEmpty(f))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var trungTepMo = Directory.GetFiles(thuMuc, "*.dwg", SearchOption.TopDirectoryOnly)
+            .Count(f => dangMo.Contains(f));
+        if (trungTepMo > 0)
+            ed.WriteMessage($"\n[XBoss] ⚠ {trungTepMo} tệp trong thư mục đang mở trong AutoCAD — các tệp đó sẽ báo lỗi và bị bỏ qua (đóng tệp rồi chạy lại nếu cần).\n");
+
+        ed.WriteMessage($"\n[XBoss] ===== BATCH {(chuanHoa ? "CHUẨN HÓA" : "KIỂM TRA")} — rule pack {pack.Version} — {thuMuc} =====\n");
+        if (chuanHoa)
+            ed.WriteMessage($"[XBoss] Bản gốc GIỮ NGUYÊN — kết quả lưu vào thư mục con \"{BatchProcessor.ThuMucKetQua}\".\n");
+
+        var ketQua = BatchProcessor.Chay(thuMuc, pack, chuanHoa, HomNayIso(),
+            ten => ed.WriteMessage($"[XBoss] … {ten}\n"));
+
+        foreach (var t in ketQua.Tep)
+            ed.WriteMessage($"[XBoss] {(t.ThanhCong ? "✔" : "✘")} {t.TenTep}: {t.TomTat}\n");
+        ed.WriteMessage($"[XBoss] Xong: {ketQua.Tep.Count} tệp — {ketQua.SoThanhCong} thành công, {ketQua.SoLoi} lỗi. Nhật ký: {ketQua.DuongDanNhatKy}\n");
     }
 
     // ===== Trợ giúp hiển thị =====

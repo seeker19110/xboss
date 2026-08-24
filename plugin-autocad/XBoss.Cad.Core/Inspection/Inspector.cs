@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using XBoss.Cad.Core.Fonts;
 using XBoss.Cad.Core.Geometry;
 using XBoss.Cad.Core.Layers;
@@ -9,20 +11,44 @@ namespace XBoss.Cad.Core.Inspection;
 /// <summary>Một nhóm phát hiện của XBOSS_KIEMTRA (M99 §6.4 — 7 phép kiểm).</summary>
 public sealed record InspectionFinding
 {
-    /// <summary>Slug ổn định cho báo cáo JSON: layer-sai / lech-z / polyline-ho / font-cu /
-    /// lineweight-lech / dim-override / rac-hinh-hoc.</summary>
-    public required string Id { get; init; }
-    public required string Ten { get; init; }
-    public required IReadOnlyList<string> Handles { get; init; }
-    public required IReadOnlyList<string> ChiTiet { get; init; }
+    /// <summary>Slug ổn định cho báo cáo JSON: layer-sai / lech-z / polyline-ho / polyline-gan-kin /
+    /// font-cu / lineweight-lech / dim-override / rac-hinh-hoc / layer-rong / block-nac-danh.</summary>
+    [JsonPropertyName("id")] public required string Id { get; init; }
+    [JsonPropertyName("ten")] public required string Ten { get; init; }
+    [JsonPropertyName("handles")] public required IReadOnlyList<string> Handles { get; init; }
+    [JsonPropertyName("chiTiet")] public required IReadOnlyList<string> ChiTiet { get; init; }
 }
 
 public sealed class InspectionReport
 {
-    public required string RulePackVersion { get; init; }
-    public required IReadOnlyList<InspectionFinding> Findings { get; init; }
-    public required IReadOnlyList<string> CanhBao { get; init; }
-    public int TongSoLoi => Findings.Sum(f => Math.Max(f.Handles.Count, f.ChiTiet.Count));
+    [JsonPropertyName("rulePackVersion")] public required string RulePackVersion { get; init; }
+    [JsonPropertyName("findings")] public required IReadOnlyList<InspectionFinding> Findings { get; init; }
+    [JsonPropertyName("canhBao")] public required IReadOnlyList<string> CanhBao { get; init; }
+    /// <summary>Tên tệp bản vẽ — caller gán trước khi xuất báo cáo (Core không biết môi trường).</summary>
+    [JsonPropertyName("tenBanVe")] public string TenBanVe { get; init; } = "";
+    /// <summary>Ngày kiểm yyyy-MM-dd — caller đóng dấu (Core không tự lấy giờ hệ thống).</summary>
+    [JsonPropertyName("ngayIso")] public string NgayIso { get; init; } = "";
+    [JsonPropertyName("cheDo")] public string CheDo => "chi-kiem";
+    [JsonPropertyName("tongSoLoi")] public int TongSoLoi => Findings.Sum(f => Math.Max(f.Handles.Count, f.ChiTiet.Count));
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
+    /// <summary>Báo cáo JSON có cấu trúc (FR8/FR12) — ghi cạnh DWG, PR5 gửi kèm khi upload.</summary>
+    public string ToJson() => JsonSerializer.Serialize(this, JsonOptions);
+
+    /// <summary>Bản sao báo cáo có đóng dấu tên bản vẽ + ngày (record-with cho class thường).</summary>
+    public InspectionReport DongDau(string tenBanVe, string ngayIso) => new()
+    {
+        RulePackVersion = RulePackVersion,
+        Findings = Findings,
+        CanhBao = CanhBao,
+        TenBanVe = tenBanVe,
+        NgayIso = ngayIso,
+    };
 }
 
 /// <summary>
@@ -127,6 +153,34 @@ public sealed class Inspector
                 Ten = "Rác hình học (zero-length / trùng chồng)",
                 Handles = rac,
                 ChiTiet = [$"zero-length: {zero.Count}", $"trùng chồng: {trung.Count}"],
+            });
+        }
+
+        // (8) Layer rỗng — không có thực thể nào trên TOÀN bản vẽ (purge sẽ dọn được).
+        // Chỉ chạy khi Adapter cung cấp UsedLayerNames (quét mọi block table record);
+        // suy từ Entities (chỉ model space) sẽ báo oan layer đang dùng ở paper space/block.
+        if (dp.ReportEmptyLayers && snapshot.UsedLayerNames is { } dangDung)
+        {
+            var dungHoa = new HashSet<string>(dangDung, StringComparer.OrdinalIgnoreCase);
+            var layerRong = snapshot.Layers
+                .Where(l => l.Name is not ("0" or "Defpoints") &&
+                            !l.Name.StartsWith("XBOSS_", StringComparison.OrdinalIgnoreCase) &&
+                            !dungHoa.Contains(l.Name))
+                .Select(l => l.Name)
+                .ToList();
+            if (layerRong.Count > 0)
+                findings.Add(new InspectionFinding { Id = "layer-rong", Ten = "Layer rỗng (không có thực thể — purge sẽ dọn)", Handles = [], ChiTiet = layerRong });
+        }
+
+        // (9) Block nặc danh (*U…/*D…) — dấu hiệu explode/copy bừa, làm phình bản vẽ.
+        if (dp.ReportAnonymousBlocks && snapshot.AnonymousBlockNames.Count > 0)
+        {
+            findings.Add(new InspectionFinding
+            {
+                Id = "block-nac-danh",
+                Ten = "Block nặc danh (anonymous — nghi explode/copy bừa)",
+                Handles = [],
+                ChiTiet = snapshot.AnonymousBlockNames.ToList(),
             });
         }
 

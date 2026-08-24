@@ -237,7 +237,7 @@ export default function LivingTwinRealityPage() {
         </div>
 
         {error && (
-          <div className="mb-6 rounded-lg border border-rose-900/50 bg-rose-950/40 p-4 text-sm text-rose-300">
+          <div className="mb-6 rounded-lg border border-rose-900/50 bg-rose-400/10 p-4 text-sm text-rose-300">
             {error}
           </div>
         )}

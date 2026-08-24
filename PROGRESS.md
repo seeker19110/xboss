@@ -492,6 +492,38 @@ dùng duyệt hướng xử lý.
 - **KHÔNG nên làm:** thêm module `engineering/*`/OS-phase mới, C2 pilot, hạ tầng mới, nâng major
   M60, bật SSO production, hay tuyên bố thêm mốc "Complete" nào bằng tài liệu.
 
+## M99 PR2 — hợp nhất với bản đã merge #386, gỡ bản trùng + sửa trùng số migration 0133 (2026-08-24)
+
+Nhánh `claude/plugin-upgrade-m8z0hx` từng cài PR2 độc lập (bảng `api_tokens` mới + poll endpoint +
+trang `/engineering/thiet-bi-plugin`) đúng lúc nhánh song song `claude/m99-pr2-api-tokens` (PR #386,
+thiết kế tái-dùng `api_keys` — điểm lệch spec có chủ đích, xem mục trên) được merge vào `main` trước.
+Xử lý khi merge `main` vào nhánh:
+
+- **Bỏ toàn bộ bản PR2 trùng** (migration `0135_api_tokens.sql`, `lib/bao-mat/api-tokens.ts`,
+  route poll, trang `thiet-bi-plugin`, `tests/api-tokens.test.ts`, `XBossApiClient` bản Adapter,
+  lệnh `XBOSS_LOGIN/XBOSS_LOGOUT` trùng trong `XBossCommands`) — giữ nguyên bản đã duyệt ở `main`
+  (`cad-devices.ts`, `/api/devices/pair|confirm|claim`, trang `/engineering/thiet-bi-cad`,
+  `XBossLoginCommand` + `XBossApiClient` trong Core). Bài học: 2 phiên cùng làm 1 mục spec song
+  song → luôn `git fetch origin` đối chiếu main trước khi nhận việc lớn.
+- **Sửa cổng `check:migrations` đang làm CI main đỏ:** đổi `0133_cad_device_pairing.sql` →
+  `0135_cad_device_pairing.sql` (trùng số với `0133_webhook_otp_hardening.sql` do 2 PR song song;
+  DDL toàn bộ idempotent nên chạy lại dưới tên mới vô hại — đúng ghi chú "Nợ kỹ thuật" phía trên).
+  Môi trường đã áp 0133 cũ: chèn bổ sung dòng `schema_migrations` cho tên mới để khỏi chạy lại.
+- **Giữ lại phần bổ sung không trùng:** mục nav "Thiết bị plugin AutoCAD" trỏ về trang
+  `/engineering/thiet-bi-cad` (trang có sẵn nhưng chưa có link trên EngineeringNav).
+
+## M99 PR-B — Nâng cấp plugin AutoCAD: 9 phép kiểm, JSON 2 chế độ, SUBTOTAL Excel, XBOSS_BATCH (2026-08-24)
+
+Người dùng yêu cầu (2026-08-24): "nghiên cứu plugin hiện tại, nâng lên tầng cao mới đầy đủ và tính năng đẳng cấp từ chuẩn hoá đến bóc tách khối lượng". Nhánh `claude/plugin-upgrade-m8z0hx`. Toàn bộ nằm trong khung M99 đã duyệt, không cần đổi rule pack (v2 giữ nguyên) hay server.
+
+- **2 phép kiểm mới (8/9) trong `Inspector`** — cài nốt 2 cờ v2 đã khai sẵn nhưng PR-A bỏ trống: `reportEmptyLayers` (layer rỗng — Adapter quét MỌI block table record cấp `UsedLayerNames`, không suy từ model space kẻo báo oan; bỏ qua `0`/`Defpoints`/`XBOSS_*`; null = bỏ phép kiểm) + `reportAnonymousBlocks` (block `*U…`/`*D…` không phải layout/xref — nghi explode/copy bừa). Snapshot thêm `UsedLayerNames`/`AnonymousBlockNames` (mở rộng thuần, test cũ không đổi).
+- **`XBOSS_KIEMTRA` xuất báo cáo JSON** `<tệp>.dwg.xboss-kiemtra.json` cạnh DWG — `InspectionReport` có `ToJson()`/`DongDau()` (đóng dấu tên bản vẽ + ngày, `cheDo: "chi-kiem"`), FR8 giờ phủ cả 2 chế độ như CHUANHOA, PR5 gửi kèm khi upload.
+- **Excel bóc tách: tổng nhóm hệ + TỔNG CỘNG bằng công thức `SUBTOTAL(9,…)` SỐNG** trên cột F/G/H — hàng nhóm cộng vùng item của nhóm, hàng TỔNG CỘNG cộng thẳng cả vùng (SUBTOTAL bỏ qua SUBTOTAL lồng nên không đếm trùng); QS sửa cột F thì tổng tự chạy theo. Layout A–K/mẫu công ty giữ nguyên.
+- **Sidecar JSON kết quả bóc** (`TakeoffJsonReport` trong Core) ghi cạnh tệp Excel khi `XBOSS_BOCKL_XUAT` — máy đọc được (itemId/boqCode/khối lượng/handles/cảnh báo + meta), cùng nguồn dữ liệu với Excel, chuẩn bị cho PR5.
+- **`XBOSS_BATCH` (journey 7 — phần plugin của PR6):** xử lý hàng loạt cả thư mục `.dwg` qua **side database** (không mở lên editor), 2 chế độ chỉ-kiểm (mặc định an toàn)/chuẩn hóa; **bản gốc giữ nguyên** — kết quả chuẩn hóa lưu thư mục con `da-chuan-hoa/` kèm báo cáo JSON từng tệp; tệp lỗi/đang khóa bỏ qua và ghi nhật ký `xboss-batch-log.txt`; hoán đổi `WorkingDatabase` có trả lại nguyên trạng (Audit/Purge đòi hỏi); cảnh báo trước các tệp đang mở trong phiên.
+- **Test:** 70 → **76 ca xanh** (layer rỗng theo used-layers toàn bản vẽ + không báo oan khi Adapter không cung cấp, block nặc danh, JSON kiểm tra đủ field, SUBTOTAL nhóm/TỔNG CỘNG round-trip ClosedXML, sidecar JSON bóc tách). README plugin + M99 (§ header, §6.4, State) cập nhật theo.
+- **Chưa làm (giữ trình tự M99):** PR2 `api_tokens`/`XBOSS_LOGIN`, PR5 upload + ezdxf, phần web của PR6 (bảng điều khiển + bỏ tầng 1), PR7 test tích hợp (chặn bởi runner Windows có license).
+
 ## M99 PR-A — Plugin AutoCAD C# (chuẩn hóa + bóc tách khối lượng) + rule pack v2 (2026-08-24)
 
 Người dùng yêu cầu (2026-08-24): bổ sung **BOCKL (bóc tách khối lượng) + xuất Excel ClosedXML** vào đặc tả M99 rồi triển khai trọn gói, "mọi quyết định đều ưu tiên chất lượng cao nhất". Nhánh `claude/autocad-csharp-plugin-ypi9nb`.

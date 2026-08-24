@@ -86,6 +86,7 @@ public static class BoqExcelWriter
         foreach (var nhom in nhomThuTu)
         {
             sttNhom++;
+            var hangNhom = hang;
             ws.Cell(hang, 2).Value = SoLaMa(sttNhom);
             ws.Cell(hang, 3).Value = TenNhom(nhom.Key);
             ws.Range(hang, 1, hang, Header.Length).Style
@@ -115,6 +116,29 @@ public static class BoqExcelWriter
                     $"\"Vượt dự toán \"&ABS(H{hang})&\" \"&E{hang}&\" (QS giải trình & duyệt sửa BOQ)\")),\"\")";
                 hang++;
             }
+
+            // Tổng nhóm hệ (công thức SỐNG trên hàng nhóm): SUBTOTAL(9,…) để hàng TỔNG CỘNG
+            // cuối bảng cộng thẳng cả vùng mà không đếm trùng các hàng nhóm.
+            foreach (var cot in new[] { 6, 7, 8 }) // F, G, H
+            {
+                ws.Cell(hangNhom, cot).FormulaA1 =
+                    $"SUBTOTAL(9,{CotChu(cot)}{hangNhom + 1}:{CotChu(cot)}{hang - 1})";
+            }
+        }
+
+        // ----- Hàng TỔNG CỘNG toàn bảng (SUBTOTAL bỏ qua các SUBTOTAL nhóm — không đếm trùng) -----
+        if (ketQua.Lines.Count > 0)
+        {
+            ws.Cell(hang, 3).Value = "TỔNG CỘNG";
+            foreach (var cot in new[] { 6, 7, 8 }) // F, G, H
+            {
+                ws.Cell(hang, cot).FormulaA1 =
+                    $"SUBTOTAL(9,{CotChu(cot)}{HangHeader + 1}:{CotChu(cot)}{hang - 1})";
+            }
+            ws.Range(hang, 1, hang, Header.Length).Style
+                .Font.SetBold()
+                .Fill.SetBackgroundColor(XLColor.FromHtml("#D9E2F3"));
+            hang++;
         }
         var hangCuoi = hang - 1;
 
@@ -174,6 +198,9 @@ public static class BoqExcelWriter
         "ELV" => "HỆ ĐIỆN NHẸ (ELV)",
         _ => groupId,
     };
+
+    /// <summary>Chữ cái cột A1 cho chỉ số cột 1-based (chỉ cần A–K).</summary>
+    private static char CotChu(int cot) => (char)('A' + cot - 1);
 
     internal static string SoLaMa(int n)
     {

@@ -52,4 +52,14 @@ public sealed class DrawingSnapshot
     public required IReadOnlyList<LayerInfo> Layers { get; init; }
     public required IReadOnlyList<EntityInfo> Entities { get; init; }
     public required int InsUnits { get; init; }
+
+    /// <summary>Tên các layer đang ĐƯỢC DÙNG bởi ít nhất 1 thực thể trên TOÀN bản vẽ
+    /// (mọi block table record, kể cả paper space) — phép kiểm 8 (layer rỗng,
+    /// purgePolicy.deepPurge.reportEmptyLayers). Null = Adapter không cung cấp → bỏ phép kiểm
+    /// (không được suy từ Entities vì snapshot chỉ chứa model space, sẽ báo oan).</summary>
+    public IReadOnlyCollection<string>? UsedLayerNames { get; init; }
+
+    /// <summary>Tên các block NẶC DANH (anonymous, "*U…"/"*D…") không phải layout/xref —
+    /// phép kiểm 9 (purgePolicy.deepPurge.reportAnonymousBlocks). Rỗng = không có/không quét.</summary>
+    public IReadOnlyList<string> AnonymousBlockNames { get; init; } = [];
 }
