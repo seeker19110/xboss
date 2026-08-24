@@ -143,6 +143,24 @@ EOF`;
     assert.ok(decoded.includes("°C"));
   });
 
+  it("2b. decodeCadText idempotent — giải mã lần hai không được làm hỏng chữ đã đúng Unicode", () => {
+    // Vòng đời thật: nạp bản vẽ TCVN3 → chuẩn hoá → xuất DXF → nạp lại tệp đã chuẩn hoá.
+    // Bảng TCVN3 ánh xạ chồng lên chữ Latin-1 hợp lệ (`ó` → `ú`, `ã` → `ó`) nên nếu giải mã lần
+    // hai thì "ống gió" hoá "ống giú" ngay trên bản vẽ đã phát hành.
+    const tcvn3 = "èng giã cÊp l¹nh AHU-01 800x500";
+    const lan1 = decodeCadText(tcvn3);
+    assert.match(lan1, /gió/, "Lần đầu phải giải mã đúng TCVN3");
+
+    const lan2 = decodeCadText(lan1);
+    assert.equal(lan2, lan1, "Giải mã lại chuỗi đã đúng Unicode phải trả về nguyên văn");
+
+    // Chữ Việt Unicode nằm gọn trong khoảng Latin-1 cũng không được đụng vào
+    assert.equal(decodeCadText("ống gió hồi 700x400"), "ống gió hồi 700x400");
+
+    // Ký hiệu kỹ thuật vẫn được xử lý ở lần chạy nào cũng vậy
+    assert.equal(decodeCadText("Ø150 ±0.000"), "Ø150 ±0.000");
+  });
+
   it("3. convertDxfToSpatialRoutes đùn tuyến 2D thành bao không gian 3D Bounding Envelope và phân tầng đúng", () => {
     const entities: DxfEntityRaw[] = [
       {

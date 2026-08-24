@@ -4,6 +4,331 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Hoàn thiện đường ống DXF cho trang chuẩn hoá bản vẽ (2026-08-24)
+
+Đợt này chỉ làm **DXF** (DWG vẫn từ chối theo ADR-0006 — chuẩn hoá thẳng trên DWG là việc của
+plugin AutoCAD). Ba nhóm việc, đều nằm ở `lib/ky-thuat/cad/dxf-parser.ts` và đường lưu trữ quanh nó.
+
+### A — Dọn dữ liệu bịa (nghiêm trọng nhất, kỹ sư đang nhận về nét do máy vẽ)
+
+- **XREF bịa sẵn.** Mọi tệp DXF nạp vào đều nhận đúng 3 XREF cứng (`A-ARCH-GRID-AXIS.dwg`,
+  `S-STRUCT-BEAMS-COLS.dwg`, `E-POWER-MAINS.dwg`) kèm số thực thể/số layer bịa. Nay đọc **thật**
+  từ section BLOCKS: khối mang cờ 70 bit 4 là XREF, bit 8 là kiểu Overlay, đường dẫn ở mã 1.
+  Bản vẽ không có XREF thì danh sách **rỗng**. Trạng thái để `unloaded` vì bản thân tệp DXF không
+  biết tệp tham chiếu có tồn tại hay không — `resolveXrefDependencies()` mới là chỗ đối soát.
+- **Hình học MEPF mẫu khi xuất tệp.** `exportDxf()` thấy bản vẽ không có nét vector thì tự chèn
+  cả một bộ trục lưới + ống gió + máng cáp + ống nước + sprinkler. Đã bỏ. Kèm đó bỏ luôn hàm
+  `generateSynthesizedMepfDxf()` (không còn ai gọi).
+- **Hình chữ thập "đại diện" cho mọi định nghĩa khối.** Nay ghi lại đúng hình học thật của khối
+  đọc từ BLOCKS; khối không có định nghĩa thì ghi khối rỗng hợp lệ.
+- **Toạ độ LINE bịa.** `end = [endX || startX + 1000, endY || startY, …]` — thiếu mã 11 thì tự đặt
+  điểm cuối lệch 1000 đơn vị. Nay thiếu thì để trống, xuất tệp để lại POINT tại điểm đã biết.
+- **Khung bao bịa.** Bản vẽ không có toạ độ nào thì `maxX/maxY` mặc định 15000 × 10000. Nay là 0.
+- **Bản vẽ mẫu đội lốt bản vẽ thật.** `POST /api/engineering/cad/parse-dxf` không tìm thấy tệp thì
+  sinh bản vẽ MEPF mẫu **rồi gắn `isRealDrawing = true`**. Nay trả 404 kèm hướng dẫn tiếng Việt;
+  `isRealDrawing` suy từ việc có parse ra thực thể hay không. Hai nút tải tệp và nút lưu lên máy
+  chủ dự án (`useCadExporters`, `useSmartNaming`) cũng bỏ nhánh rơi về bản vẽ mẫu — trước đây bấm
+  lưu khi chưa nạp bản vẽ là **ghi bản vẽ do máy chế ra vào kho hồ sơ dự án dưới tên chuẩn ISO 19650**.
+
+### B — Bộ đọc/ghi bám đúng đặc tả DXF
+
+Bộ đọc cũ quét phẳng cả tệp nên bảng LAYER lẫn với thực thể và hình học trong định nghĩa BLOCK bị
+đếm vào model space. Nay đọc **theo section** (HEADER / TABLES / BLOCKS / ENTITIES). Bổ sung:
+
+- `POLYLINE` kiểu cũ: hình học lấy từ các `VERTEX` theo sau (trước đây luôn rỗng — đa tuyến kiểu
+  cũ hoàn toàn không hiển thị được).
+- `LWPOLYLINE`: độ cong từng đoạn (mã 42), cao độ (38), cờ khép kín (70).
+- `INSERT`: tỷ lệ chèn (41/42/43), góc xoay (50) và **giá trị ATTRIB thật** của khối (trước đây
+  `attributes` luôn rỗng).
+- `TEXT`/`MTEXT`: chiều cao (40), góc xoay (50), hệ số bề rộng (41), kiểu chữ (7); MTEXT dài chia
+  nhiều mảnh mã 3 nay ghép đủ theo thứ tự.
+- `DIMENSION`: **hai đầu đo thật ở mã 13/14** và số đo ở mã 42. Mã 10/11 (điểm đặt đường kích thước
+  và điểm đặt chữ) trước đây bị dùng nhầm làm hai đầu đo — chính comment trong code đã ghi nhận là
+  sai nhưng chưa sửa.
+- `ARC` giữ hai góc thật (50/51) thay vì mặc định 0°–180°; `ELLIPSE`, `SOLID`/`3DFACE`, `SPLINE`,
+  `LEADER`, `POINT` đọc/ghi được.
+- HEADER: `$INSUNITS` (kèm nhãn tiếng Việt), `$MEASUREMENT`, `$LTSCALE`, `$EXTMIN`/`$EXTMAX`.
+- Bảng LAYER: layer đóng băng (70 bit 1), khoá (bit 4), **tắt** (mã 62 âm), bề rộng nét (370) —
+  đọc và ghi lại đúng trạng thái người vẽ đã đặt.
+- Bộ ghi: khai `AC1009` thì ghi đúng cấu trúc R12 — đa tuyến dùng `POLYLINE`/`VERTEX`/`SEQEND` chứ
+  không phải `LWPOLYLINE` (R14 mới có); `ELLIPSE` rời rạc hoá thành đa tuyến; loại R12 không có
+  (`HATCH`, `MULTILEADER`) để lại POINT tại điểm neo — **không thực thể nào biến mất im lặng**.
+
+**Lỗi phát sinh trong lúc kiểm chứng, đã sửa:** `decodeCadText()` **không idempotent**. Bảng TCVN3
+ánh xạ chồng lên chữ Latin-1 hợp lệ (`ó` → `ú`, `ã` → `ó`), nên vòng đời thật "nạp bản vẽ TCVN3 →
+chuẩn hoá → xuất DXF → nạp lại" giải mã lần hai và làm hỏng chữ đã đúng (`ống gió` → `ống giú`) ngay
+trên bản vẽ đã phát hành. Nay chỉ giải mã TCVN3 khi chuỗi còn ký tự chữ ký của bảng mã cũ, và chỉ
+giải mã VNI khi chuỗi là ASCII thuần (văn bản VNI luôn là ASCII).
+
+### C — Lưu và đọc lại bản DXF đã chuẩn hoá
+
+Hoá ra route lưu đã có sẵn (`POST /api/engineering/cad/save-drawing`) và đã ghi nội dung DXF thật,
+nhưng **đọc lại thì hỏng**: route ghi thẳng bằng `fs` vào cây ISO 19650 rồi lưu chính đường dẫn cây
+vào `drawing_revisions.file_name`, trong khi `storageGet()` chặn tên chứa `/` (chống path traversal)
+→ chọn lại bản vẽ đã lưu từ CSDL là ném lỗi; và triển khai dùng S3/MinIO thì tệp không hề có trong
+kho lưu trữ. Nay: ghi thêm qua `storagePut()` với **tên phẳng** do máy chủ sinh
+(`newStandardizedDrawingFileName`), `file_name` giữ tên phẳng đó, đường dẫn cây chuyển sang cột mới
+`iso_path` (`migrations/0132_drawing_revisions_iso_path.sql` — thêm cột thuần tuý, đi thẳng
+production được). `parse-dxf` đọc lại theo 3 đường: lớp storage → `data/uploads/` phẳng → cây
+`data/uploads/drawings/<iso_path>`; bản ghi cũ (file_name dạng đường dẫn) vẫn đọc được.
+
+**Kiểm chứng:** fixture `tests/fixtures/cad/mepf-thap-a.dxf` — bản vẽ DXF thật đủ mặt tính năng
+(HEADER, 5 layer với đủ trạng thái, 2 XREF, 1 khối có hình học và ATTRIB, 12 thực thể gồm cả
+POLYLINE-VERTEX kiểu cũ, LWPOLYLINE có độ cong, DIMENSION có hai đầu đo, LINE khuyết điểm cuối).
+15 ca test mới trong `tests/dxf-real-drawing-parser.test.ts`, `tests/engineering-cad-dxf-parser.test.ts`,
+`tests/engineering-cad-save-drawing.test.ts`, gồm ca **round-trip** (xuất rồi nạp lại giữ nguyên số
+thực thể, khung bao, tỷ lệ khối, góc cung, độ cong đa tuyến, trạng thái layer và chữ Unicode).
+Toàn bộ: `npm test` 210 file — **1098 ca pass, 0 fail, 1 skip có chủ đích**; lint / typecheck /
+build / `check:lib-layers` / `check:dead-code` xanh; `db:migrate --dry-run` sạch trên Postgres 16.
+
+**Hai ca test cũ đã sửa lại (không phải nới lỏng):** hai ca DIMENSION trong
+`dxf-real-drawing-parser.test.ts` vốn khẳng định mã 10/11 là hai đầu đo — đúng theo hành vi sai của
+bản cũ. Nay chúng kiểm đúng đặc tả (đầu đo ở 13/14, số đo ở 42), kèm ca mới cho trường hợp tệp
+không khai số đo thì tuyệt đối không tự tính.
+
+### D — Đợt bổ sung nốt phần còn thiếu (cùng ngày)
+
+Rà lại toàn bộ đường ống thì còn 4 khoảng trống nữa, hai trong đó nặng hơn hai mục đã ghi nhận:
+
+- **Tệp DXF nhị phân bị nhầm thành DWG.** Mọi buffer đều bị coi là DWG và từ chối kèm hướng dẫn
+  sai ("hãy lưu sang DXF" — trong khi người dùng _đang_ đưa tệp DXF). "Save As → DXF nhị phân" của
+  AutoCAD ra đúng loại tệp này. Nay đọc được: nhận theo chuỗi 22 byte mở đầu, giải mã cặp mã nhóm
+  theo kiểu giá trị (double/int16/int32/int64/bool/chuỗi) rồi dùng chung phần phân tích với ASCII.
+- **Bảng mã 8 bit đọc sai ngay ở bước đọc tệp.** Route ép `fileBuffer.toString("utf8")`, trong khi
+  bản vẽ Việt Nam đời cũ ghi bằng TCVN3/VNI/CP1258 — mọi chữ có dấu thành ký tự thay thế `\uFFFD`
+  và **Bác Sĩ Font hết đường cứu** vì thông tin gốc đã mất. Nay `parseDxf` nhận thẳng buffer, thử
+  UTF-8 nghiêm ngặt rồi rơi về Latin-1 — đúng dạng đầu vào bảng TCVN3 chờ.
+- **Giải mã VNI phá mã hiệu.** Bảng VNI biến mọi cặp "nguyên âm + chữ số" thành chữ có dấu, mà bản
+  vẽ MEPF đầy mã hiệu đúng dạng đó: `KHUNG TEN A3` hoá `KHUNG TEN Ả`, trục định vị `A3`, `Zone1`,
+  `AHU01`. Nay giải mã theo từng từ và bỏ qua từ có dạng mã hiệu (chữ số nằm ở cuối từ); chữ VNI
+  thật luôn có chữ số nằm giữa từ nên vẫn giải mã được.
+- **Chín loại thực thể bị bỏ qua im lặng** — không đọc, không đếm, không xuất: `ATTDEF`, `XLINE`,
+  `RAY`, `MLINE`, `TRACE`, `WIPEOUT`, `IMAGE`, `SHAPE`, `TOLERANCE`. Nay đọc và ghi được cả chín.
+- **Thuộc tính chung của thực thể bị mất khi xuất tệp:** không gian giấy (mã 67 — khung tên, khung
+  in), bề dày đùn (39), tỷ lệ nét đứt riêng (48), cờ ẩn (60) và **hướng đùn (210/220/230)** — mất
+  hướng đùn thì bản vẽ lật gương mở lại bị lật ngược. Kèm đó: chữ có **canh lề** (mã 72/73) trước
+  đây mất cả canh lề lẫn điểm canh thứ nhất nên nhảy chỗ khi mở lại.
+- **`HATCH`** nay đọc ranh giới tô thật (mã 91/92/93, cạnh thẳng và cạnh cung), xuất ra thành đường
+  bao khép kín — giữ đúng phạm vi vùng tô (vùng bảo ôn, vùng cắt qua), chỉ mất phần nét gạch.
+- **`MULTILEADER`** nay đọc chữ chú thích (mã 304), điểm đặt chữ và các đỉnh đường dẫn trong khối
+  `CONTEXT_DATA{ … LEADER_LINE{ … }`; xuất thành đa tuyến đường dẫn + TEXT.
+- **`MINSERT`** (khối chèn lặp theo lưới cột × hàng) đọc được số cột/hàng và bước lặp.
+
+Một lỗi nữa lộ ra khi kiểm chứng: `XLINE` cắt theo đường chéo làm **khung bao bản vẽ phình ra**
+(`$EXTMIN/$EXTMAX` sai, ZOOM EXTENTS trong AutoCAD nhảy ra xa). Nay cắt đúng theo khung bao bằng
+thuật toán slab.
+
+Fixture mở rộng lên **17 thực thể** (thêm HATCH có ranh giới, MULTILEADER, XLINE, MLINE, chữ khung
+tên ở không gian giấy có đủ bề dày/tỷ lệ nét/hướng đùn/canh lề). Round-trip: 17 vào → 19 ra
+(DIMENSION và MULTILEADER mỗi cái hạ thành 2 thực thể), khung bao **không xê dịch**. Thêm 8 ca test.
+Tổng `npm test`: 210 file, **1107 ca pass, 0 fail, 1 skip có chủ đích**.
+
+### E — Nâng bộ ghi lên R2000 / AC1015 (cùng ngày)
+
+Mọi hạn chế "còn lại" của đợt D bên trên đều không phải việc bỏ dở, mà là **giới hạn của định dạng
+R12 (AC1009) mà bộ ghi đang phát hành** — định dạng năm 1992 không có handle, không có section
+OBJECTS và thiếu hẳn nhiều thực thể. Đợt này thay bộ ghi bằng **AutoCAD 2000 (AC1015)** nên các
+giới hạn đó biến mất luôn.
+
+Bộ ghi mới phát hành đủ 6 section (HEADER / CLASSES / TABLES / BLOCKS / ENTITIES / OBJECTS), mỗi
+thực thể, bản ghi bảng, khối và đối tượng mang **handle** (mã 5) riêng, trỏ về **chủ sở hữu**
+(mã 330) và khai **lớp con** (`AcDbEntity`, `AcDbLine`, `AcDbPolyline`…); `$HANDSEED` chốt sau cùng
+để luôn lớn hơn mọi handle đã cấp. Bảng đầy đủ 9 bảng, `BLOCK_RECORD` có `*Model_Space` và
+`*Paper_Space` làm chủ sở hữu của thực thể theo đúng không gian.
+
+**Không còn bước hạ cấp nào** (trước đây R12 buộc phải):
+
+| Thực thể        | Bộ ghi R12 (cũ)                   | Bộ ghi R2000 (nay)                                     |
+| --------------- | --------------------------------- | ------------------------------------------------------ |
+| Đa tuyến        | dựng `POLYLINE`/`VERTEX`/`SEQEND` | `LWPOLYLINE` nguyên bản                                |
+| `ELLIPSE`       | bẻ thành đa tuyến 48 đoạn         | `ELLIPSE` nguyên bản, giữ cả tham số cung              |
+| `SPLINE`        | đa tuyến nối điểm khớp            | `SPLINE` nguyên bản khi tệp có vector knot             |
+| `HATCH`         | chỉ còn đường bao                 | `HATCH` nguyên bản, giữ cả mẫu tô và nét gạch          |
+| `MTEXT`         | ép xuống một dòng `TEXT`          | `MTEXT` nguyên bản                                     |
+| `DIMENSION`     | tách thành `LINE` + `TEXT` rời    | `DIMENSION` thật + khối `*D<n>` chứa hình của nó       |
+| `XLINE`/`RAY`   | cắt theo khung bao thành `LINE`   | nguyên bản                                             |
+| `TOLERANCE`     | chỉ còn `POINT`                   | `TOLERANCE` nguyên bản                                 |
+| Thuộc tính khối | `ATTRIB` bị bỏ                    | `ATTRIB` ghi lại đủ vị trí, cỡ chữ, đóng bằng `SEQEND` |
+
+Bước hạ cấp **duy nhất** còn lại là `MULTILEADER` — thực thể của R2007, R2000 chưa có — tách thành
+đa tuyến đường dẫn + `MTEXT` chú thích.
+
+Phần parser bổ sung theo để ghi lại được trung thực: vector knot và bậc của `SPLINE` (mã 40/71),
+tham số cung của `ELLIPSE` (41/42), **định nghĩa nét gạch mẫu tô** của `HATCH` (78 + 53/43/44/45/46/79/49
+— thiếu phần này thì tệp R2000 có `HATCH` nhưng AutoCAD tô rỗng), và `ATTRIB` giữ nguyên thực thể.
+
+**Lỗi thật lộ ra khi viết test:** mã nhóm 3 mang nghĩa khác nhau tuỳ loại thực thể, bản cũ gộp hết
+vào nội dung chữ nên chữ kích thước `4000` hoá **`4000STANDARD`** (tên kiểu kích thước bị nối vào số
+đo). Nay tách đúng: `MTEXT` → mảnh chữ, `ATTDEF` → câu nhắc, `DIMENSION`/`LEADER`/`TOLERANCE` → tên
+kiểu kích thước.
+
+`validateDxf` siết thêm: tệp khai AC1015 trở lên mà thiếu `OBJECTS` bị chặn trước khi ghi ra đĩa
+(tệp R12 người dùng tải lên vẫn được nhận). Xoá `generateStandard2dDxf()` — bộ sinh bản vẽ MEPF mẫu
+này chỉ còn test của chính nó gọi sau khi các nhánh bịa dữ liệu bị gỡ ở đợt A.
+
+**Kiểm chứng:** round-trip fixture 17 thực thể → **18** (chỉ `MULTILEADER` tách đôi), khung bao
+không xê dịch, và `LWPOLYLINE`/`ELLIPSE`/`HATCH`/`MTEXT`/`DIMENSION`/`XLINE` đều giữ nguyên loại.
+Kiểm tra cấu trúc tệp sinh ra: 63 handle **không trùng nhau**, **không chủ sở hữu nào trỏ vào
+handle không tồn tại**, `$HANDSEED` lớn hơn mọi handle, các cặp SECTION/ENDSEC, TABLE/ENDTAB,
+BLOCK/ENDBLK cân bằng. `npm test` 210 file, **1107 ca pass, 0 fail, 1 skip có chủ đích**.
+
+### F — R2007 (AC1021): xoá nốt mọi bước hạ cấp (cùng ngày)
+
+Đợt E đóng lại với 6 mục "còn lại". Rà từng mục thì cả 6 đều là **giới hạn của phiên bản định dạng
+đang phát hành**, không phải giới hạn thật — nên nâng tiếp lên **AutoCAD 2007 (AC1021)** và xử lý
+hết. Nay **không loại thực thể nào phải hạ cấp**: round-trip fixture 17 thực thể vào → **17 ra**.
+
+| Mục "còn lại" của đợt E                       | Cách xử lý                                                                                                |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `MULTILEADER` phải tách thành đường dẫn + chữ | Khai AC1021 (phiên bản đầu tiên có MULTILEADER); ghi nguyên bản kèm `MLEADERSTYLE` trong OBJECTS          |
+| `WIPEOUT`/`IMAGE` chỉ giữ được đường bao      | Đọc thêm section OBJECTS lấy `IMAGEDEF`; ghi lại cả thực thể, `IMAGEDEF` và `IMAGEDEF_REACTOR`            |
+| `SPLINE` thiếu knot phải hạ về đa tuyến       | **Nội suy toàn cục** (Piegl & Tiller A9.1) ra điểm điều khiển + vector knot                               |
+| Cạnh cung `HATCH` bị rời rạc hoá              | Giữ đúng KIỂU cạnh (đoạn thẳng / cung / cung ellipse / spline) ở cả đọc lẫn ghi                           |
+| Chưa dựng `LAYOUT`/`PLOTSETTINGS`             | Dựng từ điển `ACAD_LAYOUT` + hai đối tượng `LAYOUT` (Model, Layout1), liên kết hai chiều với bản ghi khối |
+| `VIEWPORT` không đọc                          | Đọc và ghi lại được — có bố cục in rồi thì khung nhìn mới có nghĩa                                        |
+
+Thêm **section CLASSES** khai các lớp không thuộc lõi DXF mà tệp có dùng (`MULTILEADER`,
+`MLEADERSTYLE`, `IMAGE`, `IMAGEDEF`, `WIPEOUT`) — thiếu khai báo thì AutoCAD coi thực thể tương ứng
+là đối tượng lạ và bỏ qua khi mở tệp.
+
+**Ba lỗi thật lộ ra trong đợt này:**
+
+1. **Bộ đọc `MULTILEADER` sai cấu trúc — fixture tự viết đã che nó.** Cấu trúc thật lồng ba mức:
+   `300 CONTEXT_DATA{ … 301 }` chứa `302 LEADER{ … 303 }`, mỗi nhánh chứa `304 LEADER_LINE{ … 305 }`.
+   Mã 304 mang **hai nghĩa tuỳ mức lồng** — ở mức ngữ cảnh là chữ chú thích, trong nhánh là thẻ mở
+   đường dẫn. Bản cũ đọc phẳng theo mã nhóm nên với tệp AutoCAD thật sẽ **nối luôn `"LEADER_LINE{"`
+   vào chữ chú thích và không thấy đỉnh đường dẫn nào**. Fixture cũ do tôi tự viết dùng mã 302 cho
+   cả hai mức nên test vẫn xanh — đã viết lại fixture theo đúng cấu trúc AutoCAD phát ra.
+2. **Đa tuyến 3D bị ép phẳng.** `POLYLINE` cờ 70 bit 8 (đỉnh có cao độ khác nhau) bị chuyển sang
+   `LWPOLYLINE` — thực thể **phẳng** — nên cả tuyến bẹp về một cao độ. Với MEPF đây là mất **độ dốc
+   ống thoát**, thứ quyết định ống có thoát được hay không. Nay đa tuyến 3D giữ dạng
+   `POLYLINE`/`VERTEX`/`SEQEND`; đa tuyến phẳng vẫn được hiện đại hoá sang `LWPOLYLINE` (đúng việc
+   lệnh `CONVERTPOLY` của AutoCAD làm).
+3. **Hạ `WIPEOUT` xuống đa tuyến là sai về hiển thị**, không chỉ mất dữ liệu: vùng che có nhiệm vụ
+   **che** nền, còn đa tuyến lại vẽ ra một khung nhìn thấy được nằm chình ình trên bản vẽ.
+
+**Kiểm chứng:** thêm 8 ca test, trong đó có ca **kiểm chứng toán học** cho bộ nội suy spline —
+dựng lại đường cong từ điểm điều khiển và vector knot sinh ra, rồi đòi nó đi qua đúng từng điểm
+khớp (sai số thực đo: 4,5·10⁻¹³). Ca **toàn vẹn cấu trúc** nay nằm trong repo chứ không còn là
+script tạm: đòi handle không trùng, không thực thể nào trỏ về chủ sở hữu không tồn tại, `$HANDSEED`
+lớn hơn mọi handle, các cặp SECTION/TABLE/BLOCK cân bằng. Tổng `npm test`: 210 file,
+**1115 ca pass, 0 fail, 1 skip có chủ đích**.
+
+### G — Phiên bản định dạng: thử AC1032 rồi chốt lại AC1021 (cùng ngày)
+
+**Chốt cuối: `AC1021` (AutoCAD 2007) — bản mới nhất XÉT RIÊNG BẢN VẼ 2D.** Đường đi tới quyết định
+này ghi lại đủ để sau khỏi bàn lại:
+
+1. Người dùng yêu cầu "nâng lên bản cao nhất để đáp ứng dài hạn" → đã nâng lên `AC1032`
+   (AutoCAD 2018, bản định dạng DXF mới nhất, dùng chung 2018→2026) kèm toàn bộ cấu trúc bản 2018
+   kỳ vọng thêm.
+2. Sau khi đối chiếu lại: từ 2007 trở đi **không bản nào thêm loại thực thể 2D** dùng được cho bản
+   vẽ MEPF (2010 thêm `MESH` 3D, 2013 thêm đối tượng mặt cắt), trong khi DXF tương thích **xuôi chứ
+   không ngược** — tệp `AC1032` thì AutoCAD 2017 trở về trước không mở được, mà máy đời cũ ở công
+   trường không hiếm. Người dùng chốt lấy `AC1021`.
+
+**Phần cấu trúc thêm ở bước 1 được GIỮ LẠI gần như trọn vẹn**, vì đều hợp lệ ở R2007 và phần lớn là
+sửa lỗi thật chứ không phải yêu cầu riêng của bản 2018. Chỉ gỡ đúng `$REQUIREDVERSIONS` — biến chỉ
+có từ bản 2013.
+
+Bảng phiên bản: `AC1015` = 2000, `AC1018` = 2004, **`AC1021` = 2007 ← đang dùng**, `AC1024` = 2010,
+`AC1027` = 2013, `AC1032` = 2018 → 2026 (định dạng đứng yên từ 2018, bản 2026 vẫn ghi `AC1032`).
+
+Đã bổ sung và giữ lại:
+
+- **Bộ biến hệ thống trong HEADER** (`$ACADMAINTVER`, `$CLAYER`, `$CELTYPE`,
+  `$CECOLOR`, `$CELTSCALE`, `$CELWEIGHT`, `$PSLTSCALE`, `$TILEMODE`, `$TEXTSTYLE`, `$DIMSTYLE`,
+  `$CMLSTYLE`/`$CMLJUST`/`$CMLSCALE`, `$PDMODE`/`$PDSIZE`, `$SPLINESEGS`, `$DIMASSOC`, bộ `$UCS*`).
+  Thiếu chúng thì AutoCAD tự điền mặc định **của máy đang mở**, nên cùng một tệp mở ở hai máy có
+  thể ra hai kiểu hiển thị khác nhau.
+- **Bộ từ điển chuẩn trong OBJECTS** mà tệp bản 2004 trở lên nào cũng mang: `ACAD_PLOTSTYLENAME`
+  (từ điển có mặc định + `ACDBPLACEHOLDER`), `ACAD_MATERIAL` (ByLayer/ByBlock/Global),
+  `ACAD_SCALELIST` (tỷ lệ 1:1), cùng `ACAD_COLOR`, `ACAD_PLOTSETTINGS`, `ACAD_TABLESTYLE`,
+  `ACAD_VISUALSTYLE`.
+- **CLASSES** khai thêm 6 lớp chuẩn (`ACDBDICTIONARYWDFLT`, `ACDBPLACEHOLDER`, `LAYOUT`,
+  `MATERIAL`, `SCALE`, `VISUALSTYLE`).
+
+**Lỗi thật lộ ra:** mỗi bản ghi LAYER trỏ về kiểu in bằng mã 390, và bản trước ghi **cứng handle
+`"F"` vốn không tồn tại trong tệp** — một tham chiếu treo có từ đợt E mà không ca test nào bắt được,
+vì ca toàn vẹn cấu trúc lúc đó chỉ kiểm mã 330. Nay mã 390 trỏ về `ACDBPLACEHOLDER` thật, và ca
+toàn vẹn mở rộng kiểm cả **340 / 347 / 350 / 390** chứ không riêng 330.
+
+**Lỗi trong chính ca test, cũng đã sửa:** thêm `$DIMSTYLE` (mã 2) vào HEADER làm lộ ra cách nhận
+diện section của ca toàn vẹn quá lỏng — nó coi mọi mã 2 là tên section, nên từ `$DIMSTYLE` trở đi
+cả phần HEADER bị tính nhầm thành thân tệp và `$HANDSEED` bị đếm như một handle. Nay chỉ nhận mã 2
+là tên section khi nó đứng ngay sau cặp `0 SECTION`, đúng cách `validateDxf` vẫn làm.
+
+Nhãn trên giao diện nói đúng phiên bản đang phát hành: "Tệp xuất ra theo chuẩn AutoCAD 2007 — mở
+được bằng AutoCAD 2007 cho tới bản mới nhất." (Trước đó hai nhãn còn ghi "AutoCAD 2000" do sót lại
+từ đợt E — đã sửa.)
+
+### H — Kiểm định độc lập bằng `ezdxf` (cùng ngày) — đóng rủi ro lớn nhất
+
+Rủi ro tồn đọng suốt các đợt trước là **"chưa mở thử tệp bằng phần mềm CAD thật"** — toàn bộ kiểm
+chứng đều chạy qua chính bộ đọc của XBoss, tức tự chấm bài mình. Nay đã kiểm định bằng **`ezdxf`
+1.4.4** (đúng bản `mepf-worker/pyproject.toml` ghim), là một bộ đọc/kiểm DXF độc lập.
+
+Chạy đúng tiêu chí **AC1 của đặc tả M98** (`ezdxf.readfile` + `Auditor` → 0 lỗi 0 fix) lên tệp do
+bộ ghi TypeScript sinh ra từ fixture:
+
+```
+phiên bản đọc được: AC1021 | R2007
+LỖI: 0 | ĐÃ SỬA: 0
+```
+
+Kiểm cả **nội dung**, không chỉ cấu trúc — `ezdxf` đọc lại đúng: `DIMENSION` là kích thước thật
+(số đo 30000, có `dimstyle`), chữ tiếng Việt `"ống gió cấp lạnh AHU-01 800x500 Ø150"` (cao 300, xoay
+45°), `MTEXT` ghép đủ mảnh, `HATCH` mẫu `ANSI31` kèm nét gạch, `MULTILEADER` đúng chữ và 1 nhánh dẫn
+2 đỉnh, `MLINE` 3 đỉnh, `INSERT` tỷ lệ 2×2 xoay 90° kèm thuộc tính `KICH_THUOC=800x400`, `ELLIPSE`
+tỷ lệ trục 0.5, `XLINE` đúng gốc và hướng, layer giữ nguyên trạng thái tắt/đóng băng/khoá/bề rộng
+nét, và chữ khung tên nằm đúng **không gian giấy**.
+
+**Hai lỗi thật chỉ lộ ra nhờ kiểm định độc lập** — test round-trip qua bộ đọc của XBoss không bắt
+được vì chính bộ đọc bỏ qua các mã nhóm đó:
+
+1. **`MLEADERSTYLE` đặt kiểu chữ sai mã nhóm.** Thứ tự đúng là 340 = kiểu nét dẫn, 341 = đầu mũi
+   tên, **342 = kiểu chữ**, 343 = khối. Bản trước đặt kiểu chữ vào 341, nên trình đọc thấy kiểu chữ
+   = 0 không hợp lệ và phải tự vá.
+2. **`MLINE` lệch số nhóm tham số.** Mỗi đỉnh phải mang đúng số nhóm bằng số nét của kiểu đường
+   (2), lệch số là trình đọc coi đỉnh hỏng và **dựng lại toàn bộ hình học**, tức mất mối nối vát gốc.
+
+Cả hai đã sửa và có ca test chặn hồi quy trong `tests/dxf-real-drawing-parser.test.ts`.
+
+**Cách chạy lại kiểm định** (không nằm trong `npm test` vì cần Python + `ezdxf`, mà repo app là
+TypeScript thuần — `mepf-worker/` mới là nơi có sẵn phụ thuộc này):
+
+```bash
+pip install ezdxf
+npx tsx -e 'import {parseDxf,exportDxf} from "@/lib/ky-thuat/cad/dxf-parser";
+  import {readFileSync,writeFileSync} from "node:fs";
+  writeFileSync("/tmp/x.dxf", exportDxf(parseDxf(readFileSync("tests/fixtures/cad/mepf-thap-a.dxf","utf8"),"f.dxf"),{applyStandardLayers:true}))'
+python3 -c "import ezdxf; from ezdxf.audit import Auditor;
+  d=ezdxf.readfile('/tmp/x.dxf'); a=Auditor(d); a.run();
+  print('LỖI:',len(a.errors),'FIX:',len(a.fixes))"
+```
+
+### Còn lại (chưa làm)
+
+- Chuẩn hoá trực tiếp trên **DWG** vẫn cần plugin AutoCAD (ADR-0006) — chưa có.
+- **Vẫn chưa mở bằng chính AutoCAD.** `ezdxf` là bộ kiểm độc lập tốt và đã bắt được 2 lỗi thật,
+  nhưng không phải AutoCAD. Trước khi phát hành cho kỹ sư dùng vẫn nên mở thử một tệp.
+- **Trùng lặp đường xuất R2000 với `mepf-worker`.** Đặc tả M98 §4(b) đã **loại** phương án tự viết
+  bộ ghi bằng TypeScript và **chọn** uỷ thác cho `ezdxf` trong worker; `mepf-worker/src/cad_export_r2000.py`
+  đã tồn tại (M98 PR2) nhưng app **chưa hề gọi**. Nay tồn tại hai bản cho cùng một việc — cần chủ
+  spec quyết giữ bản nào (xem phần đối chiếu trong mô tả PR).
+- Nếu về sau cần nộp hồ sơ theo đúng định dạng 2018, nâng `$ACADVER` lên `AC1032` trong
+  `lib/ky-thuat/cad/dxf-parser.ts` và khai lại `$REQUIREDVERSIONS` là đủ — phần cấu trúc còn lại
+  bản 2018 đòi thì tệp đã có sẵn. Đổi lại, tệp sẽ không mở được bằng AutoCAD 2017 trở về trước.
+- **Chưa mở thử tệp xuất ra bằng AutoCAD thật.** Toàn bộ kiểm chứng ở đây là test, round-trip qua
+  chính bộ đọc của XBoss, và đối chiếu với đặc tả DXF của Autodesk — môi trường CI không có AutoCAD.
+  Các thực thể phức tạp (`MULTILEADER`, `WIPEOUT`, `VIEWPORT`, `MLINE`) có nhiều trường tuỳ chọn mà
+  đặc tả không nói rõ mức bắt buộc, nên **trước khi phát hành cho kỹ sư dùng phải mở thử một tệp
+  xuất ra trong AutoCAD** để chốt. Đây là rủi ro tồn đọng lớn nhất của cả 6 đợt.
+- `SPLINE` khép kín (`closed`) nội suy theo công thức mở — đường cong vẫn đi qua đủ điểm khớp nhưng
+  chưa khớp trơn tại điểm nối đầu–cuối.
+- Bố cục in dựng ra dùng khổ ISO A3 mặc định; chưa đọc khổ giấy và thông số in thật từ đối tượng
+  `LAYOUT` của tệp nguồn (mới đọc `IMAGEDEF` trong section OBJECTS).
+
 ## Bỏ Docker, chỉ còn PM2 (2026-08-24)
 
 Trước đây có **song song hai đường triển khai** cho cùng một việc: Docker Compose (`Dockerfile`,

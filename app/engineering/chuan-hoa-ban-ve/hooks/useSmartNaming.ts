@@ -2,12 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { showToast } from "@/app/components/Toast";
-import {
-  parseDxf,
-  exportDxf,
-  DxfParseResult,
-  generateStandard2dDxf,
-} from "@/lib/ky-thuat/cad/dxf-parser";
+import { exportDxf, DxfParseResult } from "@/lib/ky-thuat/cad/dxf-parser";
 import type { ConversionInfo, SaveConfig, SavedResult } from "../types";
 
 // Chuẩn hóa từng thành phần tên tệp về ASCII an toàn cho hệ thống tệp.
@@ -74,15 +69,16 @@ export function useSmartNaming({
     const finalApproved = overrideApproved !== undefined ? overrideApproved : is2dApproved;
     setSavingToServer(true);
     try {
-      let realDxf = dxfData
+      const realDxf = dxfData
         ? exportDxf(dxfData, { applyStandardLayers: true })
         : conversionInfo?.dxfContent;
+      // Chưa nạp bản vẽ thì dừng: lưu bản vẽ mẫu do máy sinh vào kho bản vẽ dự án dưới tên tệp
+      // chuẩn ISO 19650 là đưa dữ liệu bịa vào hồ sơ nghiệm thu (M98/M99).
       if (!realDxf || realDxf.length < 50) {
-        const sampleParsed = parseDxf(
-          generateStandard2dDxf(saveConfig.name, saveConfig.systems),
-          generatedFileName,
+        showToast(
+          "⚠️ Chưa có bản vẽ nào được nạp — hãy tải lên tệp DXF trước khi lưu lên máy chủ.",
         );
-        realDxf = exportDxf(sampleParsed, { applyStandardLayers: true });
+        return;
       }
       const res = await fetch("/api/engineering/cad/save-drawing", {
         method: "POST",

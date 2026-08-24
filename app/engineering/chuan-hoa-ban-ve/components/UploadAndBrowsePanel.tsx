@@ -528,8 +528,8 @@ export default function UploadAndBrowsePanel({
                 Kéo thả hoặc bấm để tải lên tệp tin bản vẽ CAD (.DXF / .DWG)
               </div>
               <p className="text-[11px] text-zinc-400 mt-0.5">
-                Hỗ trợ tệp ASCII DXF phiên bản AutoCAD R12/2000/2018 (Chẩn đoán dị tật & đùn khối
-                tức thì)
+                Nhận tệp DXF (ASCII lẫn nhị phân) mọi phiên bản AutoCAD. Tệp xuất ra theo chuẩn
+                AutoCAD 2007 — mở được bằng AutoCAD 2007 cho tới bản mới nhất.
               </p>
             </div>
             {uploadedFileName && (

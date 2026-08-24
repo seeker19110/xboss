@@ -66,405 +66,6 @@ function findRealFileOnDisk(
   return null;
 }
 
-function generateStandard2dDxf(title: string, system: string): string {
-  return `0
-SECTION
-2
-HEADER
-9
-$INSUNITS
-70
-4
-0
-ENDSEC
-0
-SECTION
-2
-TABLES
-0
-TABLE
-2
-LAYER
-0
-LAYER
-2
-M-DUCT-SUPP
-70
-0
-62
-4
-6
-CONTINUOUS
-0
-LAYER
-2
-M-DUCT-RETN
-70
-0
-62
-6
-6
-CONTINUOUS
-0
-LAYER
-2
-P-PIPE-SANR
-70
-0
-62
-3
-6
-CONTINUOUS
-0
-LAYER
-2
-E-CABL-TRAY
-70
-0
-62
-1
-6
-CONTINUOUS
-0
-LAYER
-2
-F-SPRN-PIPE
-70
-0
-62
-1
-6
-CONTINUOUS
-0
-LAYER
-2
-A-WALL-GRID
-70
-0
-62
-8
-6
-CONTINUOUS
-0
-LAYER
-2
-G-ANNO-TEXT
-70
-0
-62
-7
-6
-CONTINUOUS
-0
-LAYER
-2
-G-ANNO-DIMS
-70
-0
-62
-2
-6
-CONTINUOUS
-0
-ENDTAB
-0
-ENDSEC
-0
-SECTION
-2
-BLOCKS
-0
-ENDSEC
-0
-SECTION
-2
-ENTITIES
-0
-LINE
-8
-A-WALL-GRID
-10
-0.0
-20
-0.0
-30
-0.0
-11
-36000.0
-21
-0.0
-31
-0.0
-0
-LINE
-8
-A-WALL-GRID
-10
-36000.0
-20
-0.0
-30
-0.0
-11
-36000.0
-21
-18000.0
-31
-0.0
-0
-LINE
-8
-A-WALL-GRID
-10
-36000.0
-20
-18000.0
-30
-0.0
-11
-0.0
-21
-18000.0
-31
-0.0
-0
-LINE
-8
-A-WALL-GRID
-10
-0.0
-20
-18000.0
-30
-0.0
-11
-0.0
-21
-0.0
-31
-0.0
-0
-LINE
-8
-M-DUCT-SUPP
-10
-3000.0
-20
-9000.0
-30
-0.0
-11
-33000.0
-21
-9000.0
-31
-0.0
-0
-LINE
-8
-M-DUCT-RETN
-10
-3000.0
-20
-12000.0
-30
-0.0
-11
-33000.0
-21
-12000.0
-31
-0.0
-0
-LINE
-8
-P-PIPE-SANR
-10
-3000.0
-20
-6000.0
-30
-0.0
-11
-33000.0
-21
-6000.0
-31
-0.0
-0
-LINE
-8
-E-CABL-TRAY
-10
-3000.0
-20
-15000.0
-30
-0.0
-11
-33000.0
-21
-15000.0
-31
-0.0
-0
-LINE
-8
-F-SPRN-PIPE
-10
-3000.0
-20
-3000.0
-30
-0.0
-11
-33000.0
-21
-3000.0
-31
-0.0
-0
-TEXT
-8
-G-ANNO-TEXT
-10
-18000.0
-20
-9500.0
-30
-0.0
-40
-300.0
-1
-èng giã cÊp l¹nh AHU-01 800x500
-0
-TEXT
-8
-G-ANNO-TEXT
-10
-18000.0
-20
-12500.0
-30
-0.0
-40
-300.0
-1
-èng giã håi 700x400
-0
-TEXT
-8
-G-ANNO-TEXT
-10
-18000.0
-20
-6500.0
-30
-0.0
-40
-300.0
-1
-èng thót n−íc D114 dèc i=1.5% BOP=+2850
-0
-TEXT
-8
-G-ANNO-TEXT
-10
-18000.0
-20
-15500.0
-30
-0.0
-40
-300.0
-1
-M¸ng c¸p ®iÖn Trunking 400x100
-0
-TEXT
-8
-G-ANNO-TEXT
-10
-18000.0
-20
-3500.0
-30
-0.0
-40
-300.0
-1
-§Çu phun PCCC Sprinkler 68øC quay xuèng
-0
-INSERT
-8
-M-DUCT-SUPP
-2
-VAV_BOX_01
-10
-12000.0
-20
-9000.0
-30
-0.0
-0
-INSERT
-8
-M-DUCT-SUPP
-2
-VAV_BOX_02
-10
-24000.0
-20
-9000.0
-30
-0.0
-0
-INSERT
-8
-F-SPRN-PIPE
-2
-SPRN_HEAD_68C
-10
-10000.0
-20
-3000.0
-30
-0.0
-0
-INSERT
-8
-F-SPRN-PIPE
-2
-SPRN_HEAD_68C
-10
-20000.0
-20
-3000.0
-30
-0.0
-0
-DIMENSION
-8
-G-ANNO-DIMS
-10
-3000.0
-20
-9000.0
-30
-0.0
-11
-33000.0
-21
-9000.0
-31
-0.0
-1
-30000
-0
-ENDSEC
-0
-EOF`;
-}
-
 // POST /api/engineering/cad/parse-dxf — Phân tích tệp CAD thật (DXF/DWG/PDF) hoặc nội dung tải lên
 export async function POST(req: Request) {
   const user = await getCurrentUser();
@@ -513,26 +114,45 @@ export async function POST(req: Request) {
       if (drawing) {
         fileName = `${drawing.code}.dwg`;
         // Kiểm tra trong drawing_revisions
-        const rev = await queryOne<{ file_name: string; original_name: string | null }>(
-          `SELECT file_name, original_name FROM drawing_revisions WHERE drawing_id = ? ORDER BY id DESC LIMIT 1`,
+        const rev = await queryOne<{
+          file_name: string;
+          iso_path: string | null;
+          original_name: string | null;
+        }>(
+          `SELECT file_name, iso_path, original_name FROM drawing_revisions WHERE drawing_id = ? ORDER BY id DESC LIMIT 1`,
           [drawing.id],
         );
 
         if (rev?.file_name) {
-          const revBuf = await storageGet(user.orgId, rev.file_name);
+          // Lớp storage nhận tên tệp PHẲNG (chặn path traversal). Bản ghi cũ lưu đường dẫn cây
+          // ISO 19650 (`HVAC/design/iso/....dxf`) thì bỏ qua storage, đọc thẳng theo cây thư mục
+          // bên dưới — không thì storageGet ném lỗi và cả route hỏng.
+          const revBuf = rev.file_name.includes("/")
+            ? null
+            : await storageGet(user.orgId, rev.file_name);
           if (revBuf) {
             fileBuffer = Buffer.from(revBuf);
             fileName = rev.original_name || rev.file_name;
             sourcePath = rev.file_name;
             realFileFound = true;
           } else {
-            // Thử đọc trực tiếp từ thư mục data/uploads trên đĩa cục bộ
-            const localFile = join(process.cwd(), "data", "uploads", rev.file_name);
-            if (existsSync(localFile) && statSync(localFile).isFile()) {
-              fileBuffer = readFileSync(localFile);
-              fileName = rev.original_name || basename(localFile);
-              sourcePath = rev.file_name;
-              realFileFound = true;
+            // Thử đọc trực tiếp trên đĩa cục bộ: bản tải lên thường nằm phẳng trong
+            // data/uploads/, còn bản chuẩn hoá do save-drawing ghi nằm trong cây
+            // data/uploads/drawings/<hệ>/<loại>/…
+            const diskCandidates = [
+              join(process.cwd(), "data", "uploads", rev.file_name),
+              join(DRAWINGS_DIR, rev.file_name),
+            ];
+            // Bản chuẩn hoá lưu qua lớp storage: đường dẫn theo cây ISO 19650 nằm ở cột iso_path
+            if (rev.iso_path) diskCandidates.push(join(DRAWINGS_DIR, rev.iso_path));
+            for (const localFile of diskCandidates) {
+              if (existsSync(localFile) && statSync(localFile).isFile()) {
+                fileBuffer = readFileSync(localFile);
+                fileName = rev.original_name || basename(localFile);
+                sourcePath = rev.file_name;
+                realFileFound = true;
+                break;
+              }
             }
           }
         }
@@ -561,10 +181,17 @@ export async function POST(req: Request) {
       }
     }
 
+    // Không tìm thấy tệp thật thì báo thẳng, KHÔNG sinh bản vẽ mẫu rồi gắn cờ isRealDrawing:
+    // trước đây trang chuẩn hoá hiển thị một bản vẽ MEPF do máy chế ra như thể là bản vẽ của
+    // người dùng (M98/M99 — không bịa dữ liệu).
     if (!fileBuffer && !dxfContent) {
-      dxfContent = generateStandard2dDxf(fileName, "MEPF");
-      sourcePath = `sample/${fileName}`;
-      realFileFound = false;
+      return NextResponse.json(
+        {
+          error:
+            "Không tìm thấy tệp bản vẽ tương ứng trên máy chủ. Hãy tải lên tệp DXF, hoặc chọn bản vẽ đã có bản phát hành đính kèm.",
+        },
+        { status: 404 },
+      );
     }
 
     let result;
@@ -573,14 +200,19 @@ export async function POST(req: Request) {
       if (ext === ".dwg" || fileBuffer.subarray(0, 4).toString("ascii").startsWith("AC10")) {
         result = parseDwgBinary(fileBuffer, fileName);
       } else {
-        result = parseDxf(fileBuffer.toString("utf8"), fileName);
+        // Truyền thẳng buffer: parseDxf tự nhận DXF nhị phân và tự chọn bảng mã. Ép sẵn
+        // `toString("utf8")` như trước làm hỏng mọi bản vẽ ghi bằng TCVN3/VNI/CP1258 — chữ có dấu
+        // biến thành ký tự thay thế ngay ở bước đọc tệp, Bác Sĩ Font không còn gì để cứu.
+        result = parseDxf(fileBuffer, fileName);
       }
-      result.isRealDrawing = true;
+      result.isRealDrawing = result.entities.length > 0;
       result.sourcePath = sourcePath;
       result.fileSizeBytes = fileBuffer.length;
     } else {
       result = parseDxf(dxfContent, fileName);
-      result.isRealDrawing = true;
+      // Nội dung do client gửi lên vẫn là bản vẽ thật của người dùng, nhưng chỉ đánh dấu khi
+      // parse ra được thực thể — tệp rác không được coi là bản vẽ hợp lệ.
+      result.isRealDrawing = result.entities.length > 0;
       result.sourcePath = sourcePath;
       result.fileSizeBytes = dxfContent.length;
     }
