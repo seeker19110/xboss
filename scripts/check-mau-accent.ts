@@ -30,7 +30,11 @@ const violations: Violation[] = [];
 function walk(dir: string): string[] {
   try {
     return readdirSync(join(root, dir), { withFileTypes: true }).flatMap((e) =>
-      e.isDirectory() ? walk(`${dir}/${e.name}`) : /\.tsx?$/.test(e.name) ? [`${dir}/${e.name}`] : [],
+      e.isDirectory()
+        ? walk(`${dir}/${e.name}`)
+        : /\.tsx?$/.test(e.name)
+          ? [`${dir}/${e.name}`]
+          : [],
     );
   } catch {
     return [];

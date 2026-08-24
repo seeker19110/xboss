@@ -32,21 +32,20 @@ export default function ThuNghiemBanner({ moduleKey }: { moduleKey: string }) {
   const message =
     enabled === false ? (
       <>
-        <strong className="font-semibold">Đang TẮT</strong> cho dự án này — đây là module thử
-        nghiệm chưa kiểm chứng trên dữ liệu thật. Liên hệ Admin (mục &quot;Cờ tính năng&quot;) để bật
-        thủ công nếu thật sự cần dùng.
+        <strong className="font-semibold">Đang TẮT</strong> cho dự án này — đây là module thử nghiệm
+        chưa kiểm chứng trên dữ liệu thật. Liên hệ Admin (mục &quot;Cờ tính năng&quot;) để bật thủ
+        công nếu thật sự cần dùng.
       </>
     ) : enabled === true ? (
       <>
-        <strong className="font-semibold">Thử nghiệm — đang BẬT thủ công.</strong> Module chưa
-        kiểm chứng trên dữ liệu thật; không dùng số liệu/kết quả ở đây làm căn cứ nghiệp vụ chính
-        thức.
+        <strong className="font-semibold">Thử nghiệm — đang BẬT thủ công.</strong> Module chưa kiểm
+        chứng trên dữ liệu thật; không dùng số liệu/kết quả ở đây làm căn cứ nghiệp vụ chính thức.
       </>
     ) : (
       <>
         <strong className="font-semibold">Thử nghiệm</strong> — module này chưa kiểm chứng trên dữ
-        liệu thật, tắt mặc định cho mọi dự án. Không dùng số liệu/kết quả ở đây làm căn cứ nghiệp
-        vụ chính thức.
+        liệu thật, tắt mặc định cho mọi dự án. Không dùng số liệu/kết quả ở đây làm căn cứ nghiệp vụ
+        chính thức.
       </>
     );
 

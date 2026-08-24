@@ -8,27 +8,32 @@ import assert from "node:assert/strict";
 
 const S = { skip: !HAS_TEST_DB };
 
-test("feature-flags: bảng rỗng → module thường mặc định bật, module thuNghiem mặc định tắt", S, async () => {
-  const { insertId, run } = await import("@/lib/db");
-  const ff = await import("@/lib/ha-tang/feature-flags");
-  const { MODULES } = await import("@/lib/nen/modules");
+test(
+  "feature-flags: bảng rỗng → module thường mặc định bật, module thuNghiem mặc định tắt",
+  S,
+  async () => {
+    const { insertId, run } = await import("@/lib/db");
+    const ff = await import("@/lib/ha-tang/feature-flags");
+    const { MODULES } = await import("@/lib/nen/modules");
 
-  const p = await insertId(`INSERT INTO projects (name, code) VALUES ('DA FF1', 'PJT-FF1')`);
-  try {
-    await run(`DELETE FROM feature_flags WHERE project_id = ?`, p);
-    ff.bumpFeatureFlagsVersion();
+    const p = await insertId(`INSERT INTO projects (name, code) VALUES ('DA FF1', 'PJT-FF1')`);
+    try {
+      await run(`DELETE FROM feature_flags WHERE project_id = ?`, p);
+      ff.bumpFeatureFlagsVersion();
 
-    assert.equal(await ff.isModuleEnabled("documents", p), true);
-    // W3: dự án mới (chưa có dòng override nào) → module thuNghiem TẮT, module lõi BẬT.
-    assert.equal(await ff.isModuleEnabled("engineering-autonomy", p), false);
-    const flags = await ff.getModuleFlags(p);
-    for (const m of MODULES) assert.equal(flags.get(m.key), !m.thuNghiem, `sai mặc định: ${m.key}`);
-  } finally {
-    // projects.code là UNIQUE — không dọn thì lần chạy sau đụng khoá trùng (fail giả).
-    await run(`DELETE FROM feature_flags WHERE project_id = ?`, p);
-    await run(`DELETE FROM projects WHERE id = ?`, p);
-  }
-});
+      assert.equal(await ff.isModuleEnabled("documents", p), true);
+      // W3: dự án mới (chưa có dòng override nào) → module thuNghiem TẮT, module lõi BẬT.
+      assert.equal(await ff.isModuleEnabled("engineering-autonomy", p), false);
+      const flags = await ff.getModuleFlags(p);
+      for (const m of MODULES)
+        assert.equal(flags.get(m.key), !m.thuNghiem, `sai mặc định: ${m.key}`);
+    } finally {
+      // projects.code là UNIQUE — không dọn thì lần chạy sau đụng khoá trùng (fail giả).
+      await run(`DELETE FROM feature_flags WHERE project_id = ?`, p);
+      await run(`DELETE FROM projects WHERE id = ?`, p);
+    }
+  },
+);
 
 test(
   "feature-flags: setFlag tắt/bật → cache tự vô hiệu, isModuleEnabled đọc đúng ngay",
@@ -110,7 +115,10 @@ test("feature-flags: findModuleByRoute khớp đúng tiền tố dài nhất", S
   // W3: route con của module thuNghiem phải khớp đúng module con (prefix dài hơn),
   // KHÔNG rơi về module "engineering" chung — nếu không, override tắt riêng module con
   // sẽ không có tác dụng gì (khớp nhầm sang module cha luôn bật).
-  assert.equal(ff.findModuleByRoute("/api/engineering/autonomy/kill-switch"), "engineering-autonomy");
+  assert.equal(
+    ff.findModuleByRoute("/api/engineering/autonomy/kill-switch"),
+    "engineering-autonomy",
+  );
   assert.equal(ff.findModuleByRoute("/api/engineering/suggestions"), "engineering");
 });
 

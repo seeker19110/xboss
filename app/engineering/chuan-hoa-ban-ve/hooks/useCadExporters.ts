@@ -64,7 +64,10 @@ export function useCadExporters({
     // Chưa nạp bản vẽ thì báo rõ, KHÔNG tải về bản vẽ MEPF mẫu do máy sinh dưới tên tệp của
     // người dùng (M98/M99 — không bịa dữ liệu).
     if (!content || content.length < 50) {
-      showToast("⚠️ Chưa có bản vẽ nào được nạp — hãy tải lên tệp DXF trước khi xuất tệp.", "warning");
+      showToast(
+        "⚠️ Chưa có bản vẽ nào được nạp — hãy tải lên tệp DXF trước khi xuất tệp.",
+        "warning",
+      );
       return;
     }
     const targetFileName = conversionInfo?.dxfFileName || generatedFileName;
@@ -74,7 +77,10 @@ export function useCadExporters({
 
   const handleDownloadStandardizedNamedDxf = () => {
     if (!dxfData || !dxfData.entities || dxfData.entities.length === 0) {
-      showToast("⚠️ Chưa có bản vẽ nào được nạp — hãy tải lên tệp DXF trước khi xuất tệp.", "warning");
+      showToast(
+        "⚠️ Chưa có bản vẽ nào được nạp — hãy tải lên tệp DXF trước khi xuất tệp.",
+        "warning",
+      );
       return;
     }
     const content = exportDxf(dxfData, { applyStandardLayers: true });
