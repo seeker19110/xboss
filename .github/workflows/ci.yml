@@ -73,6 +73,11 @@ jobs:
       - name: Kiểm ranh giới miền lib/
         run: npm run check:lib-layers
 
+      # Chặn chữ trắng trên nền accent sáng (a11y): text-white + bg-{emerald|sky|amber|green|teal|cyan}-500/600,
+      # và hover no-op (bg-{c}-N + hover:bg-{c}-N cùng opacity). Lỗi lặp lần ≥3 ở GĐ1. Static.
+      - name: Kiểm màu accent (text-white trên nền sáng)
+        run: npm run check:mau-accent
+
   # ── Test đơn vị + tích hợp trên Postgres thật ──
   test:
     name: test (Postgres)

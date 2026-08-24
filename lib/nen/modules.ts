@@ -86,7 +86,7 @@ export const MODULES: ModuleDef[] = [
     ],
     permKeys: ["editProgress", "editStructure", "assign"],
     notificationTypes: ["delayed", "due_soon"],
-    swExclude: ["/api/events", "/api/system-uploads/", "/api/systems/"],
+    swExclude: ["/api/events", "/api/tasks/version", "/api/system-uploads/", "/api/systems/"],
     routePrefix: [
       "/api/tasks",
       "/api/dimensions",
