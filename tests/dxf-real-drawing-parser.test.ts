@@ -8,6 +8,7 @@ import {
   generateStandard2dDxf,
   generateStandardizedAutocadScript,
   validateDxf,
+  decodeCadText,
 } from "@/lib/ky-thuat/cad/dxf-parser";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
@@ -563,9 +564,10 @@ test("exportDxf: vòng round-trip giữ nguyên số thực thể, khung bao và
 
   const lai = parseDxf(exported, "roundtrip.dxf");
 
-  // 12 thực thể vào → 13 ra: DIMENSION hạ cấp thành LINE (đường đo) + TEXT (số đo)
-  assert.equal(goc.entities.length, 12);
-  assert.equal(lai.entities.length, 13);
+  // 17 thực thể vào → 19 ra: DIMENSION hạ cấp thành LINE (đường đo) + TEXT (số đo), MULTILEADER
+  // hạ cấp thành đa tuyến đường dẫn + TEXT chú thích. Không thực thể nào biến mất.
+  assert.equal(goc.entities.length, 17);
+  assert.equal(lai.entities.length, 19);
   assert.deepEqual(
     lai.diagnostic.boundingDimensions,
     goc.diagnostic.boundingDimensions,
@@ -599,4 +601,215 @@ test("exportDxf: vòng round-trip giữ nguyên số thực thể, khung bao và
   const txt = lai.entities.find((e) => e.textHeight === 300);
   assert.equal(txt?.rotation, 45);
   assert.match(txt?.decodedText || "", /ống gió cấp lạnh/);
+});
+
+test("parseDxf: đọc được tệp DXF NHỊ PHÂN thay vì nhầm thành DWG rồi từ chối", () => {
+  // "Save As → DXF nhị phân" của AutoCAD ra loại tệp này. Trước đây mọi buffer đều bị coi là DWG
+  // và bị từ chối kèm hướng dẫn sai ("hãy lưu sang DXF" — trong khi người dùng ĐANG đưa tệp DXF).
+  const ascii = parseDxf(FIXTURE_MEPF, "goc.dxf");
+
+  // Dựng tệp DXF nhị phân từ chính các cặp mã của bản ASCII
+  const parts: Buffer[] = [Buffer.from("AutoCAD Binary DXF\r\n\x1a\x00", "binary")];
+  const dong = FIXTURE_MEPF.trim().split(/\r?\n/);
+  for (let i = 0; i + 1 < dong.length; i += 2) {
+    const ma = parseInt(dong[i].trim(), 10);
+    const giaTri = dong[i + 1];
+    const head = Buffer.from([ma]);
+    if (ma <= 9) {
+      parts.push(head, Buffer.from(giaTri, "binary"), Buffer.from([0]));
+    } else if (ma <= 59) {
+      const b = Buffer.alloc(8);
+      b.writeDoubleLE(parseFloat(giaTri) || 0);
+      parts.push(head, b);
+    } else if (ma <= 79) {
+      const b = Buffer.alloc(2);
+      b.writeInt16LE(parseInt(giaTri, 10) || 0);
+      parts.push(head, b);
+    } else if (ma <= 99) {
+      const b = Buffer.alloc(4);
+      b.writeInt32LE(parseInt(giaTri, 10) || 0);
+      parts.push(head, b);
+    } else if (ma >= 210 && ma <= 239) {
+      const b = Buffer.alloc(8);
+      b.writeDoubleLE(parseFloat(giaTri) || 0);
+      parts.push(head, b);
+    } else if (ma >= 300 && ma <= 369) {
+      // Mã ≥ 255 ghi bằng byte đánh dấu 255 + 2 byte little-endian
+      const h = Buffer.alloc(3);
+      h.writeUInt8(255, 0);
+      h.writeUInt16LE(ma, 1);
+      parts.push(h, Buffer.from(giaTri, "binary"), Buffer.from([0]));
+    } else if (ma >= 370 && ma <= 389) {
+      const h = Buffer.alloc(3);
+      h.writeUInt8(255, 0);
+      h.writeUInt16LE(ma, 1);
+      const b = Buffer.alloc(2);
+      b.writeInt16LE(parseInt(giaTri, 10) || 0);
+      parts.push(h, b);
+    } else {
+      const h = Buffer.alloc(3);
+      h.writeUInt8(255, 0);
+      h.writeUInt16LE(ma, 1);
+      parts.push(h, Buffer.from(giaTri, "binary"), Buffer.from([0]));
+    }
+  }
+
+  const nhiPhan = parseDxf(Buffer.concat(parts), "nhi-phan.dxf");
+
+  assert.equal(
+    nhiPhan.fileFormat,
+    "DXF nhị phân",
+    "Phải nhận đúng là DXF nhị phân, không phải DWG",
+  );
+  assert.equal(
+    nhiPhan.entities.length,
+    ascii.entities.length,
+    "Đọc ra đúng bằng số thực thể của bản ASCII cùng nội dung",
+  );
+  assert.deepEqual(nhiPhan.diagnostic.boundingDimensions, ascii.diagnostic.boundingDimensions);
+  assert.equal(nhiPhan.header?.insUnits, 4);
+  assert.equal(nhiPhan.xrefs.length, 2);
+});
+
+test("parseDxf: bản vẽ ghi bằng bảng mã 8 bit (TCVN3) vẫn đọc đúng chữ tiếng Việt", () => {
+  // Tệp DXF của AutoCAD đời cũ là byte 8 bit, không phải UTF-8. Ép đọc UTF-8 như trước làm mọi ký
+  // tự có dấu thành ký tự thay thế NGAY Ở BƯỚC ĐỌC TỆP — Bác Sĩ Font không còn gì để cứu.
+  const bytes8bit = Buffer.from(FIXTURE_MEPF, "latin1");
+
+  const dung = parseDxf(bytes8bit, "ban_ve_cu.dxf");
+  const chu = dung.entities.find((e) => e.type === "TEXT");
+  assert.match(chu?.decodedText || "", /ống gió cấp lạnh AHU-01/);
+  assert.ok(!(chu?.decodedText || "").includes("�"), "Không được còn ký tự thay thế nào");
+
+  // Đối chứng: cách đọc cũ (ép UTF-8) làm mất thông tin không cứu được
+  const hong = parseDxf(bytes8bit.toString("utf8"), "ban_ve_cu.dxf");
+  assert.ok(
+    (hong.entities.find((e) => e.type === "TEXT")?.decodedText || "").includes("�"),
+    "Ép UTF-8 phải cho thấy đúng lỗi cũ — đây là lý do phải tự chọn bảng mã",
+  );
+});
+
+test("decodeCadText: không phá mã hiệu kiểu A3 / Zone1 khi giải mã VNI", () => {
+  // Bảng VNI biến mọi cặp "nguyên âm + chữ số" thành chữ có dấu, mà bản vẽ MEPF đầy mã hiệu đúng
+  // dạng đó: trục định vị A3, khổ giấy A3, Zone1, AHU01…
+  assert.equal(decodeCadText("KHUNG TEN A3"), "KHUNG TEN A3");
+  assert.equal(decodeCadText("TRUC A3 - Zone1"), "TRUC A3 - Zone1");
+  assert.equal(decodeCadText("AHU01 800x500 DN150"), "AHU01 800x500 DN150");
+
+  // Nhưng chữ VNI thật (chữ số nằm giữa từ) vẫn phải giải mã được
+  // d9→đ, u7→ư, o72→ờ  ⇒ "d9u7o72ng" = "đường"; o1→ó ⇒ "o1ng" = "óng"
+  assert.equal(decodeCadText("d9u7o72ng o1ng"), "đường óng");
+});
+
+test("parseDxf: HATCH giữ ranh giới vùng tô, xuất ra thành đường bao khép kín", () => {
+  const r = parseDxf(FIXTURE_MEPF, "mepf-thap-a.dxf");
+  const hatch = r.entities.find((e) => e.type === "HATCH");
+  assert.ok(hatch, "Phải đọc ra HATCH");
+
+  assert.equal(hatch.patternName, "ANSI31", "Tên mẫu tô đọc từ mã 2");
+  assert.equal(hatch.coordinates.boundaryPaths?.length, 1, "Phải đọc ra 1 đường bao");
+  assert.deepEqual(
+    hatch.coordinates.boundaryPaths?.[0].points,
+    [
+      [1000, 5000, 0],
+      [3000, 5000, 0],
+      [3000, 7000, 0],
+      [1000, 7000, 0],
+    ],
+    "Đỉnh đường bao lấy từ mã 10/20 bên trong khối ranh giới",
+  );
+
+  const exported = exportDxf(r, { applyStandardLayers: false });
+  const lai = parseDxf(exported, "rt.dxf");
+  const bao = lai.entities.filter(
+    (e) => e.type === "POLYLINE" && e.coordinates.points?.length === 4,
+  );
+  assert.ok(
+    bao.some((p) => p.coordinates.points?.[0][0] === 1000 && p.coordinates.points?.[0][1] === 5000),
+    "Vùng tô phải còn nguyên phạm vi dưới dạng đường bao khép kín sau khi xuất tệp",
+  );
+});
+
+test("parseDxf: MULTILEADER giữ chữ chú thích và đường dẫn", () => {
+  const r = parseDxf(FIXTURE_MEPF, "mepf-thap-a.dxf");
+  const ml = r.entities.find((e) => e.type === "MULTILEADER");
+  assert.ok(ml, "Phải đọc ra MULTILEADER");
+
+  assert.equal(ml.decodedText, "Van chan VCD 400x300", "Chữ chú thích đọc từ mã 304");
+  assert.equal(ml.textHeight, 250);
+  assert.deepEqual(
+    ml.coordinates.points,
+    [
+      [8000, 3000, 0],
+      [9000, 4000, 0],
+    ],
+    "Đỉnh đường dẫn lấy từ mã 10 bên trong khối LEADER_LINE",
+  );
+  assert.deepEqual(ml.coordinates.center, [9000, 4000, 0], "Điểm đặt chữ lấy từ khối CONTEXT_DATA");
+});
+
+test("parseDxf: XLINE và MLINE — hai loại trước đây bị bỏ qua hoàn toàn", () => {
+  const r = parseDxf(FIXTURE_MEPF, "mepf-thap-a.dxf");
+
+  const xline = r.entities.find((e) => e.type === "XLINE");
+  assert.ok(xline, "Đường dựng hình phải được đọc");
+  assert.deepEqual(xline.coordinates.start, [15000, 10000, 0]);
+  assert.deepEqual(
+    xline.coordinates.direction,
+    [1, 0, 0],
+    "Mã 11 của XLINE là VECTOR hướng, không phải điểm thứ hai",
+  );
+
+  const mline = r.entities.find((e) => e.type === "MLINE");
+  assert.ok(mline, "MLINE phải được đọc");
+  assert.deepEqual(mline.coordinates.points, [
+    [1000, 100, 0],
+    [4000, 100, 0],
+    [4000, 900, 0],
+  ]);
+});
+
+test("exportDxf: XLINE cắt theo khung bao bản vẽ, không kéo dài làm phình $EXTMAX", () => {
+  const goc = parseDxf(FIXTURE_MEPF, "mepf-thap-a.dxf");
+  const lai = parseDxf(exportDxf(goc, { applyStandardLayers: false }), "rt.dxf");
+
+  assert.deepEqual(
+    lai.diagnostic.boundingDimensions,
+    goc.diagnostic.boundingDimensions,
+    "Đường dựng hình dài vô hạn không được làm khung bao bản vẽ nở ra",
+  );
+
+  // Đường dựng hình nằm ngang y=10000 phải thành đoạn chạy hết bề ngang bản vẽ
+  const doan = lai.entities.find(
+    (e) =>
+      e.type === "LINE" && e.coordinates.start?.[1] === 10000 && e.coordinates.end?.[1] === 10000,
+  );
+  assert.ok(doan, "XLINE phải hạ thành LINE hữu hạn");
+  assert.equal(doan.coordinates.start?.[0], goc.diagnostic.boundingDimensions.minX);
+  assert.equal(doan.coordinates.end?.[0], goc.diagnostic.boundingDimensions.maxX);
+});
+
+test("exportDxf: giữ thuộc tính chung — không gian giấy, bề dày, tỷ lệ nét, hướng đùn, canh lề chữ", () => {
+  const goc = parseDxf(FIXTURE_MEPF, "mepf-thap-a.dxf");
+  const khung = goc.entities.find((e) => e.decodedText === "KHUNG TEN A3");
+  assert.ok(khung, "Bản vẽ mẫu phải có chữ khung tên ở không gian giấy");
+  assert.equal(khung.isPaperSpace, true, "Mã 67 = 1 là không gian giấy");
+  assert.equal(khung.thickness, 50, "Bề dày đùn đọc từ mã 39");
+  assert.equal(khung.lineTypeScale, 2, "Tỷ lệ nét đứt riêng đọc từ mã 48");
+  assert.deepEqual(khung.extrusion, [0, 0, -1], "Hướng đùn lật gương đọc từ mã 210/220/230");
+  assert.deepEqual(khung.coordinates.center, [500, 600, 0], "Chữ có canh lề thì điểm đặt là mã 11");
+  assert.deepEqual(khung.textAlign, { horizontal: 1, vertical: 2 });
+
+  const lai = parseDxf(exportDxf(goc, { applyStandardLayers: false }), "rt.dxf");
+  const khung2 = lai.entities.find((e) => e.decodedText === "KHUNG TEN A3");
+  assert.ok(khung2, "Chữ khung tên phải còn sau vòng xuất – nạp lại");
+  assert.equal(khung2.isPaperSpace, true);
+  assert.equal(khung2.thickness, 50);
+  assert.equal(khung2.lineTypeScale, 2);
+  assert.deepEqual(khung2.extrusion, [0, 0, -1]);
+  assert.deepEqual(
+    khung2.coordinates.center,
+    [500, 600, 0],
+    "Canh lề giữ nguyên nên chữ không nhảy chỗ",
+  );
 });

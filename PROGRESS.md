@@ -86,12 +86,53 @@ build / `check:lib-layers` / `check:dead-code` xanh; `db:migrate --dry-run` sạ
 bản cũ. Nay chúng kiểm đúng đặc tả (đầu đo ở 13/14, số đo ở 42), kèm ca mới cho trường hợp tệp
 không khai số đo thì tuyệt đối không tự tính.
 
+### D — Đợt bổ sung nốt phần còn thiếu (cùng ngày)
+
+Rà lại toàn bộ đường ống thì còn 4 khoảng trống nữa, hai trong đó nặng hơn hai mục đã ghi nhận:
+
+- **Tệp DXF nhị phân bị nhầm thành DWG.** Mọi buffer đều bị coi là DWG và từ chối kèm hướng dẫn
+  sai ("hãy lưu sang DXF" — trong khi người dùng _đang_ đưa tệp DXF). "Save As → DXF nhị phân" của
+  AutoCAD ra đúng loại tệp này. Nay đọc được: nhận theo chuỗi 22 byte mở đầu, giải mã cặp mã nhóm
+  theo kiểu giá trị (double/int16/int32/int64/bool/chuỗi) rồi dùng chung phần phân tích với ASCII.
+- **Bảng mã 8 bit đọc sai ngay ở bước đọc tệp.** Route ép `fileBuffer.toString("utf8")`, trong khi
+  bản vẽ Việt Nam đời cũ ghi bằng TCVN3/VNI/CP1258 — mọi chữ có dấu thành ký tự thay thế `\uFFFD`
+  và **Bác Sĩ Font hết đường cứu** vì thông tin gốc đã mất. Nay `parseDxf` nhận thẳng buffer, thử
+  UTF-8 nghiêm ngặt rồi rơi về Latin-1 — đúng dạng đầu vào bảng TCVN3 chờ.
+- **Giải mã VNI phá mã hiệu.** Bảng VNI biến mọi cặp "nguyên âm + chữ số" thành chữ có dấu, mà bản
+  vẽ MEPF đầy mã hiệu đúng dạng đó: `KHUNG TEN A3` hoá `KHUNG TEN Ả`, trục định vị `A3`, `Zone1`,
+  `AHU01`. Nay giải mã theo từng từ và bỏ qua từ có dạng mã hiệu (chữ số nằm ở cuối từ); chữ VNI
+  thật luôn có chữ số nằm giữa từ nên vẫn giải mã được.
+- **Chín loại thực thể bị bỏ qua im lặng** — không đọc, không đếm, không xuất: `ATTDEF`, `XLINE`,
+  `RAY`, `MLINE`, `TRACE`, `WIPEOUT`, `IMAGE`, `SHAPE`, `TOLERANCE`. Nay đọc và ghi được cả chín.
+- **Thuộc tính chung của thực thể bị mất khi xuất tệp:** không gian giấy (mã 67 — khung tên, khung
+  in), bề dày đùn (39), tỷ lệ nét đứt riêng (48), cờ ẩn (60) và **hướng đùn (210/220/230)** — mất
+  hướng đùn thì bản vẽ lật gương mở lại bị lật ngược. Kèm đó: chữ có **canh lề** (mã 72/73) trước
+  đây mất cả canh lề lẫn điểm canh thứ nhất nên nhảy chỗ khi mở lại.
+- **`HATCH`** nay đọc ranh giới tô thật (mã 91/92/93, cạnh thẳng và cạnh cung), xuất ra thành đường
+  bao khép kín — giữ đúng phạm vi vùng tô (vùng bảo ôn, vùng cắt qua), chỉ mất phần nét gạch.
+- **`MULTILEADER`** nay đọc chữ chú thích (mã 304), điểm đặt chữ và các đỉnh đường dẫn trong khối
+  `CONTEXT_DATA{ … LEADER_LINE{ … }`; xuất thành đa tuyến đường dẫn + TEXT.
+- **`MINSERT`** (khối chèn lặp theo lưới cột × hàng) đọc được số cột/hàng và bước lặp.
+
+Một lỗi nữa lộ ra khi kiểm chứng: `XLINE` cắt theo đường chéo làm **khung bao bản vẽ phình ra**
+(`$EXTMIN/$EXTMAX` sai, ZOOM EXTENTS trong AutoCAD nhảy ra xa). Nay cắt đúng theo khung bao bằng
+thuật toán slab.
+
+Fixture mở rộng lên **17 thực thể** (thêm HATCH có ranh giới, MULTILEADER, XLINE, MLINE, chữ khung
+tên ở không gian giấy có đủ bề dày/tỷ lệ nét/hướng đùn/canh lề). Round-trip: 17 vào → 19 ra
+(DIMENSION và MULTILEADER mỗi cái hạ thành 2 thực thể), khung bao **không xê dịch**. Thêm 8 ca test.
+Tổng `npm test`: 210 file, **1107 ca pass, 0 fail, 1 skip có chủ đích**.
+
 ### Còn lại (chưa làm)
 
 - Chuẩn hoá trực tiếp trên **DWG** vẫn cần plugin AutoCAD (ADR-0006) — chưa có.
-- `HATCH` mới giữ tên mẫu tô và điểm neo, **chưa phân tích ranh giới tô** (mã 91/92/93); xuất ra là
-  POINT. Cần thì mở việc riêng.
-- `MULTILEADER` tương tự: chưa dựng lại được hình, chỉ để lại điểm neo.
+- `WIPEOUT`/`IMAGE` giữ được điểm chèn và đường bao cắt, nhưng **ảnh raster không dựng lại được**
+  bằng thực thể R12 — xuất ra chỉ còn đường bao (hoặc POINT nếu bản vẽ không khai đường bao).
+- `TOLERANCE` (khung dung sai GD&T) mới để lại điểm neo, chưa dựng lại khung.
+- `SPLINE` xuất ra là đa tuyến nối các điểm khớp — R12 không có SPLINE, nên đường cong bị xấp xỉ
+  bằng đoạn thẳng. Tương tự `ELLIPSE` (48 đoạn) và cạnh cung trong ranh giới `HATCH` (16 đoạn).
+- Thực thể `VIEWPORT` của không gian giấy vẫn không đọc (là siêu dữ liệu bố cục, không phải nội
+  dung bản vẽ) — ghi nhận rõ trong chú thích ở `PARSED_ENTITY_TYPES`.
 
 ## Tái cấu trúc theo miền — Đợt 1 & 2 (2026-08-23)
 

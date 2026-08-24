@@ -200,7 +200,10 @@ export async function POST(req: Request) {
       if (ext === ".dwg" || fileBuffer.subarray(0, 4).toString("ascii").startsWith("AC10")) {
         result = parseDwgBinary(fileBuffer, fileName);
       } else {
-        result = parseDxf(fileBuffer.toString("utf8"), fileName);
+        // Truyền thẳng buffer: parseDxf tự nhận DXF nhị phân và tự chọn bảng mã. Ép sẵn
+        // `toString("utf8")` như trước làm hỏng mọi bản vẽ ghi bằng TCVN3/VNI/CP1258 — chữ có dấu
+        // biến thành ký tự thay thế ngay ở bước đọc tệp, Bác Sĩ Font không còn gì để cứu.
+        result = parseDxf(fileBuffer, fileName);
       }
       result.isRealDrawing = result.entities.length > 0;
       result.sourcePath = sourcePath;
