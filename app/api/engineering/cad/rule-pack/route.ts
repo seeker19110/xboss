@@ -4,7 +4,7 @@ import { getCurrentRulePack, getRulePackEtag, matchesEtag } from "@/lib/ky-thuat
 
 export const dynamic = "force-dynamic";
 
-// GET /api/engineering/cad/rule-pack — Bộ quy tắc chuẩn hóa CAD đang phát hành (M99 PR1)
+// GET /api/engineering/cad/rule-pack — Bộ quy tắc chuẩn hóa + bóc tách CAD đang phát hành (M99 PR1/PR-A)
 export async function GET(req: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
@@ -31,6 +31,8 @@ export async function GET(req: Request) {
       purgePolicy: pack.purgePolicy,
       lineweightMap: pack.lineweightMap,
       flattenPolicy: pack.flattenPolicy,
+      takeoff: pack.takeoff,
+      inspectionPolicy: pack.inspectionPolicy,
     },
     { headers: { ETag: etag } },
   );

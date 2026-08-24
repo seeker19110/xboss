@@ -58,3 +58,7 @@ __pycache__/
 
 # Log do PM2 sinh (ecosystem.config.js)
 logs/
+
+# .NET build output của plugin AutoCAD (plugin-autocad/)
+plugin-autocad/**/bin/
+plugin-autocad/**/obj/

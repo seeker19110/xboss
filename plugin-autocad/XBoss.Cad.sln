@@ -1,0 +1,32 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XBoss.Cad.Core", "XBoss.Cad.Core\XBoss.Cad.Core.csproj", "{1CB8DEF0-5408-4B92-81B4-25AABA0720E0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XBoss.Cad.Tests", "XBoss.Cad.Tests\XBoss.Cad.Tests.csproj", "{773251E1-56BC-4715-8EE3-EB6FC19C4335}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XBoss.Cad.Acad", "XBoss.Cad.Acad\XBoss.Cad.Acad.csproj", "{8A4C11E7-2F0D-4E7B-9C3A-5D2B6E1F9A40}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1CB8DEF0-5408-4B92-81B4-25AABA0720E0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1CB8DEF0-5408-4B92-81B4-25AABA0720E0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1CB8DEF0-5408-4B92-81B4-25AABA0720E0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1CB8DEF0-5408-4B92-81B4-25AABA0720E0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{773251E1-56BC-4715-8EE3-EB6FC19C4335}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{773251E1-56BC-4715-8EE3-EB6FC19C4335}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{773251E1-56BC-4715-8EE3-EB6FC19C4335}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{773251E1-56BC-4715-8EE3-EB6FC19C4335}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8A4C11E7-2F0D-4E7B-9C3A-5D2B6E1F9A40}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8A4C11E7-2F0D-4E7B-9C3A-5D2B6E1F9A40}.Release|Any CPU.ActiveCfg = Release|Any CPU
+	EndGlobalSection
+EndGlobal

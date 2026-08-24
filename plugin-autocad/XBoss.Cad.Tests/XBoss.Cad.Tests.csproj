@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Unit test cho XBoss.Cad.Core — chạy trên CI Linux, KHÔNG cần AutoCAD (M99 FR17/§15).
+    Rule pack thật (lib/ky-thuat/cad/rule-packs/v2.json) được nạp trực tiếp từ repo
+    (RepoPaths tự dò gốc repo) để test C# và test TS dùng CÙNG một nguồn quy tắc.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../XBoss.Cad.Core/XBoss.Cad.Core.csproj" />
+  </ItemGroup>
+
+</Project>

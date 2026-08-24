@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    XBoss.Cad.Acad — Adapter AutoCAD (M99 §9): dịch giữa API AutoCAD và XBoss.Cad.Core.
+    Chỉ build được trên Windows có ObjectARX SDK 2026 (không build trong CI — CI chỉ
+    build/test Core). Truyền đường dẫn SDK qua:
+      dotnet build -p:AcadSdkDir="C:\ObjectARX2026\inc-x64"
+    hoặc đặt biến môi trường AcadSdkDir. Xem plugin-autocad/README.md.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>XBoss.Cad.Acad</RootNamespace>
+    <!-- Nạp trong process AutoCAD — không copy runtime assembly của AutoCAD đi kèm. -->
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <!-- Hộp thoại chọn/lưu tệp của Autodesk.AutoCAD.Windows trả DialogResult của WinForms. -->
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+
+  <Target Name="KiemAcadSdkDir" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="'$(AcadSdkDir)' == '' OR !Exists('$(AcadSdkDir)\acdbmgd.dll')"
+      Text="Thiếu ObjectARX SDK 2026: đặt -p:AcadSdkDir=&quot;đường dẫn chứa acdbmgd.dll/acmgd.dll/accoremgd.dll&quot; (thư mục inc-x64 của SDK, hoặc thư mục cài AutoCAD 2026). Dự án này KHÔNG build trong CI — xem plugin-autocad/README.md." />
+  </Target>
+
+  <ItemGroup>
+    <!-- Managed API của AutoCAD 2026 — CopyLocal=false (M99 §9.1): AutoCAD cung cấp lúc chạy. -->
+    <Reference Include="acdbmgd">
+      <HintPath>$(AcadSdkDir)\acdbmgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="acmgd">
+      <HintPath>$(AcadSdkDir)\acmgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="accoremgd">
+      <HintPath>$(AcadSdkDir)\accoremgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../XBoss.Cad.Core/XBoss.Cad.Core.csproj" />
+  </ItemGroup>
+
+</Project>
