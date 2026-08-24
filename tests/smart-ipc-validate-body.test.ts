@@ -51,10 +51,7 @@ test("validateSmartIpcPostBody: retentionPercent hợp lệ trong khoảng → o
 });
 
 test("validateSmartIpcPostBody: refs.iotWindowHours không hữu hạn hoặc <=0 → lỗi", () => {
-  assert.equal(
-    validateSmartIpcPostBody(bodyHopLe({ refs: { iotWindowHours: "xyz" } })).ok,
-    false,
-  );
+  assert.equal(validateSmartIpcPostBody(bodyHopLe({ refs: { iotWindowHours: "xyz" } })).ok, false);
   assert.equal(validateSmartIpcPostBody(bodyHopLe({ refs: { iotWindowHours: 0 } })).ok, false);
   assert.equal(validateSmartIpcPostBody(bodyHopLe({ refs: { iotWindowHours: -2 } })).ok, false);
 });

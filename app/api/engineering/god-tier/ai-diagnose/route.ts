@@ -16,7 +16,10 @@ export async function POST(req: NextRequest) {
   }
 
   if (!CAN.manageEngineeringGodTier(user.role)) {
-    return NextResponse.json({ error: "Không có quyền thao tác chẩn đoán AI mô hình" }, { status: 403 });
+    return NextResponse.json(
+      { error: "Không có quyền thao tác chẩn đoán AI mô hình" },
+      { status: 403 },
+    );
   }
 
   const projectId = await getCurrentProjectId(user);

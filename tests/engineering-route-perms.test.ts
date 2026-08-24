@@ -63,7 +63,10 @@ test("4 route đại diện (bim/iot/subcon-ai/god-tier) gọi đúng cặp quy�
     "bim-models/route.ts": { view: "viewEngineeringBim", manage: "manageEngineeringBim" },
     "iot/telemetry/route.ts": { view: "viewEngineeringIot", manage: "manageEngineeringIot" },
     "subcon-ai/evaluate/route.ts": { manage: "manageEngineeringSubconAi" },
-    "god-tier/models/route.ts": { view: "viewEngineeringGodTier", manage: "manageEngineeringGodTier" },
+    "god-tier/models/route.ts": {
+      view: "viewEngineeringGodTier",
+      manage: "manageEngineeringGodTier",
+    },
   };
 
   for (const [tuongDoi, quyen] of Object.entries(daiDien)) {

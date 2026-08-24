@@ -371,7 +371,14 @@ export const MODULES: ModuleDef[] = [
     // (b) — 3D BIM & 4D Sim: W1 xác nhận `/api/engineering/bim-models/**` (3 route) sai
     // tham số SQL, chưa từng chạy được lần nào trước khi W1 vá.
     key: "engineering-bim-models",
-    nav: [{ group: "Hệ thống", label: "3D BIM & 4D Sim", href: "/engineering/bim-viewer", icon: "Building2" }],
+    nav: [
+      {
+        group: "Hệ thống",
+        label: "3D BIM & 4D Sim",
+        href: "/engineering/bim-viewer",
+        icon: "Building2",
+      },
+    ],
     permKeys: [],
     routePrefix: ["/api/engineering/bim-models"],
     thuNghiem: true,
@@ -414,7 +421,12 @@ export const MODULES: ModuleDef[] = [
     // xem ghi chú đầu nhóm W3: API của trang này dùng chung với các trang thật khác.
     key: "engineering-quantum-hub",
     nav: [
-      { group: "Hệ thống", label: "Quantum & Merkle", href: "/engineering/quantum-hub", icon: "Zap" },
+      {
+        group: "Hệ thống",
+        label: "Quantum & Merkle",
+        href: "/engineering/quantum-hub",
+        icon: "Zap",
+      },
     ],
     permKeys: [],
     routePrefix: [],

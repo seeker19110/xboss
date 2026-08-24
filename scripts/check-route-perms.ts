@@ -21,6 +21,15 @@ const WHITELIST: Record<string, string> = {
   "auth/totp/confirm:POST": "Xác nhận mã 2FA cho chính tài khoản đang đăng nhập.",
   "auth/totp:DELETE": "Tắt 2FA cho chính tài khoản đang đăng nhập.",
 
+  // ── Ghép thiết bị AutoCAD (M99 PR2 — OAuth device flow): 2 bước TIỀN-xác-thực của plugin,
+  // theo thiết kế không có phiên/token nào để kiểm (như auth/login). Bảo vệ bằng rate limit
+  // theo IP (hitRateLimit) + bí mật device_code 256-bit chỉ lưu hash; quyền thật sự kiểm ở
+  // bước confirm (session + CAN.manageDrawings) — không duyệt thì claim không bao giờ ra key.
+  "devices/pair:POST": "Plugin xin mã ghép — chưa có gì để xác thực; rate limit IP 10/15'.",
+  "devices/pair/claim:POST":
+    "Plugin poll bằng device_code bí mật (DB chỉ giữ sha256) — key chỉ sinh SAU khi kỹ sư " +
+    "duyệt qua confirm (CAN.manageDrawings); rate limit IP 300/15'.",
+
   // ── Webhook công khai: xác thực bằng secret/chữ ký riêng, không đi qua phiên đăng nhập
   // (đúng tiền lệ whitelist của tests/engineering-project-scope-invariant.test.ts).
   "telegram/webhook:POST":

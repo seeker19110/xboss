@@ -189,10 +189,7 @@ test("V1/Route: POST /api/zalo/webhook sai chữ ký → 401; body.projectId b�
 
   // Bất biến tĩnh: route Zalo không được đọc projectId từ body dưới bất kỳ hình thức nào.
   const { readFileSync } = await import("node:fs");
-  const nguon = readFileSync(
-    new URL("../app/api/zalo/webhook/route.ts", import.meta.url),
-    "utf8",
-  );
+  const nguon = readFileSync(new URL("../app/api/zalo/webhook/route.ts", import.meta.url), "utf8");
   assert.ok(
     !/body\.projectId/.test(nguon),
     "route Zalo không được lấy projectId từ body — phải suy từ binding đã xác thực",

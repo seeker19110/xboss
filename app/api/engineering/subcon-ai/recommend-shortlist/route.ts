@@ -96,8 +96,7 @@ export async function POST(req: Request) {
 
       if (reasons.length > 0) {
         const profileName =
-          profiles.find((p) => p.id === m.profileId)?.companyName ||
-          `Hồ sơ ${m.profileId}`;
+          profiles.find((p) => p.id === m.profileId)?.companyName || `Hồ sơ ${m.profileId}`;
         hoSoThieuDuLieu.push({
           profileId: m.profileId,
           companyName: profileName,

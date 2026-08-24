@@ -38,7 +38,9 @@ function clientIp(req: NextRequest): string {
 }
 
 // Đọc header `Authorization: Bearer xbk_...` → tra key_hash (sha256 của input), check
-// revoked_at IS NULL. Trả null khi sai/thiếu/revoked. So khớp bằng lookup UNIQUE key_hash
+// revoked_at IS NULL + chưa hết hạn (expires_at — M99 PR2: token thiết bị AutoCAD có hạn
+// 90 ngày; key đọc-only cũ expires_at NULL = vô hạn, hành vi không đổi).
+// Trả null khi sai/thiếu/revoked/hết hạn. So khớp bằng lookup UNIQUE key_hash
 // (input đã qua sha256 — không cần constant-time so chuỗi). Cập nhật last_used_at có
 // throttle: chỉ ghi khi chưa từng dùng hoặc cách hiện tại > 60s (tránh ghi mỗi request).
 export async function verifyApiKey(authHeader: string | null): Promise<ApiKeyAuth | null> {
@@ -53,7 +55,9 @@ export async function verifyApiKey(authHeader: string | null): Promise<ApiKeyAut
     createdBy: number;
   }>(
     `SELECT id, project_id AS "projectId", scopes, created_by AS "createdBy"
-       FROM api_keys WHERE key_hash = ? AND revoked_at IS NULL`,
+       FROM api_keys
+      WHERE key_hash = ? AND revoked_at IS NULL
+        AND (expires_at IS NULL OR expires_at > now())`,
     hash,
   );
   if (!row) return null;
