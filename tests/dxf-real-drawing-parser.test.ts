@@ -109,8 +109,12 @@ test("exportDxf: Xuất chuỗi DXF ASCII chuẩn AutoCAD đầy đủ HEADER, T
   assert.ok(exportedDxf.includes("HEADER"), "DXF xuất phải có HEADER");
   assert.ok(exportedDxf.includes("$ACADVER"), "DXF xuất phải có $ACADVER");
   assert.ok(
-    exportedDxf.includes("AC1021"),
-    "DXF xuất phải khai R2007 (AC1021) — phiên bản đầu tiên có MULTILEADER, nên không loại thực thể nào phải hạ cấp",
+    exportedDxf.includes("AC1032"),
+    "DXF xuất phải khai R2018 (AC1032) — phiên bản định dạng DXF mới nhất, dùng chung cho AutoCAD 2018–2026",
+  );
+  assert.ok(
+    exportedDxf.includes("0\r\nACDBPLACEHOLDER\r\n"),
+    "Bản 2018 đòi kiểu in thật cho layer — không được để mã 390 trỏ vào handle không tồn tại",
   );
   assert.ok(!exportedDxf.includes("AC1009"), "Không được khai lùi về R12 nữa");
   assert.ok(
@@ -1094,7 +1098,7 @@ test("exportDxf: khung nhìn và bố cục in của không gian giấy sống s
   assert.equal(vp2.isPaperSpace, true, "Vẫn phải nằm ở không gian giấy");
 });
 
-test("exportDxf: toàn vẹn cấu trúc R2007 — handle duy nhất, chủ sở hữu tồn tại, $HANDSEED hợp lệ", () => {
+test("exportDxf: toàn vẹn cấu trúc R2018 — handle duy nhất, mọi tham chiếu tồn tại, $HANDSEED hợp lệ", () => {
   // Handle và quan hệ chủ sở hữu là thứ R12 hoàn toàn không có và cũng là chỗ dễ sai nhất khi
   // sinh tệp: trùng handle hoặc trỏ vào handle không tồn tại thì AutoCAD báo tệp hỏng.
   const exported = exportDxf(parseDxf(FIXTURE_MEPF, "mepf-thap-a.dxf"), {
@@ -1106,6 +1110,10 @@ test("exportDxf: toàn vẹn cấu trúc R2007 — handle duy nhất, chủ sở
   const chuSoHuu: Array<{ owner: string; loai: string }> = [];
   let loai = "";
   let trongHeader = false;
+  // Mã 2 chỉ là TÊN SECTION khi nó đứng ngay sau cặp `0 SECTION`. Trong thân HEADER, mã 2 là giá
+  // trị của biến hệ thống ($DIMSTYLE, $CMLSTYLE) — nhận nhầm là tên section thì mọi kiểm tra sau
+  // đó lệch hết.
+  let dangChoTenSection = false;
   const trung: string[] = [];
 
   for (let i = 0; i + 1 < dong.length; i += 2) {
@@ -1113,14 +1121,21 @@ test("exportDxf: toàn vẹn cấu trúc R2007 — handle duy nhất, chủ sở
     const giaTri = dong[i + 1];
     if (ma === "0") {
       loai = giaTri;
+      dangChoTenSection = giaTri === "SECTION";
       if (giaTri === "ENDSEC") trongHeader = false;
-    } else if (ma === "2" && loai === "SECTION") {
+    } else if (ma === "2" && dangChoTenSection) {
       trongHeader = giaTri === "HEADER";
+      dangChoTenSection = false;
     } else if (ma === "5" && !trongHeader) {
       // Trong HEADER, mã 5 là giá trị của biến $HANDSEED chứ không phải handle của thực thể
       if (handles.has(giaTri)) trung.push(`${giaTri} (${loai} và ${handles.get(giaTri)})`);
       handles.set(giaTri, loai);
-    } else if (ma === "330" && !trongHeader) {
+    } else if (
+      (ma === "330" || ma === "340" || ma === "347" || ma === "350" || ma === "390") &&
+      !trongHeader
+    ) {
+      // Không chỉ chủ sở hữu (330): kiểu in của layer (390), vật liệu (347), mục từ điển (350) và
+      // liên kết bố cục (340) cũng là handle — trỏ vào chỗ không tồn tại là tệp hỏng.
       chuSoHuu.push({ owner: giaTri, loai });
     }
   }
@@ -1136,7 +1151,7 @@ test("exportDxf: toàn vẹn cấu trúc R2007 — handle duy nhất, chủ sở
   );
 
   const seed = /\$HANDSEED\r\n\s*5\r\n(\w+)/.exec(exported)?.[1];
-  assert.ok(seed, "Tệp R2007 bắt buộc khai $HANDSEED");
+  assert.ok(seed, "Tệp R2018 bắt buộc khai $HANDSEED");
   const lonNhat = Math.max(...[...handles.keys()].map((h) => parseInt(h, 16)));
   assert.ok(
     parseInt(seed, 16) > lonNhat,

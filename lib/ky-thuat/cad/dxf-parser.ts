@@ -3805,6 +3805,21 @@ export function exportDxf(
   const hLayoutDict = handles.take();
   const hLayoutModel = handles.take();
   const hLayoutPaper = handles.take();
+  // Bộ đối tượng chuẩn mà tệp AutoCAD 2004 trở lên nào cũng mang theo. Riêng ACAD_PLOTSTYLENAME
+  // là bắt buộc thật: mỗi bản ghi LAYER trỏ về một kiểu in bằng mã 390 — bản trước ghi cứng
+  // handle "F" vốn không tồn tại trong tệp, tức một tham chiếu treo.
+  const hPlotStyleDict = handles.take();
+  const hPlaceholder = handles.take();
+  const hMaterialDict = handles.take();
+  const hMaterialByLayer = handles.take();
+  const hMaterialByBlock = handles.take();
+  const hMaterialGlobal = handles.take();
+  const hScaleListDict = handles.take();
+  const hScale11 = handles.take();
+  const hVisualStyleDict = handles.take();
+  const hTableStyleDict = handles.take();
+  const hPlotSettingsDict = handles.take();
+  const hColorDict = handles.take();
 
   // Ảnh chèn: mỗi IMAGEDEF của bản vẽ gốc được cấp handle mới, kèm một IMAGEDEF_REACTOR.
   // Handle trong tệp mới khác tệp gốc (bộ cấp phát đánh số lại từ đầu) nên phải ánh xạ.
@@ -3828,13 +3843,37 @@ export function exportDxf(
   // ── 1. HEADER ──
   const bao = parsed.diagnostic?.boundingDimensions;
   let header = "0\r\nSECTION\r\n2\r\nHEADER\r\n";
-  // AC1021 = AutoCAD 2007, phiên bản đầu tiên có MULTILEADER. Khai thấp hơn thì chú thích dẫn
-  // buộc phải hạ cấp thành đa tuyến + chữ.
-  header += "9\r\n$ACADVER\r\n1\r\nAC1021\r\n";
+  // AC1032 = AutoCAD 2018, phiên bản định dạng DXF mới nhất (2018 → 2026 dùng chung).
+  // Mọi thực thể của bản vẽ 2D MEPF đã giữ được nguyên bản từ AC1021; khai 2018 là để hồ sơ nộp
+  // theo định dạng hiện hành, ĐỔI LẠI tệp không mở được bằng AutoCAD 2017 trở về trước.
+  header += "9\r\n$ACADVER\r\n1\r\nAC1032\r\n";
+  header += "9\r\n$ACADMAINTVER\r\n70\r\n0\r\n";
+  // Bản 2013 trở lên đọc mã 160 để biết tệp đòi phiên bản tối thiểu nào; 0 = không ràng buộc
+  header += "9\r\n$REQUIREDVERSIONS\r\n160\r\n0\r\n";
   header += `9\r\n$INSUNITS\r\n70\r\n${parsed.header?.insUnits ?? 4}\r\n`;
   header += `9\r\n$MEASUREMENT\r\n70\r\n${parsed.header?.measurement ?? 1}\r\n`;
-  if (parsed.header?.ltScale !== undefined)
-    header += `9\r\n$LTSCALE\r\n40\r\n${real(parsed.header.ltScale)}\r\n`;
+  header += `9\r\n$LTSCALE\r\n40\r\n${real(parsed.header?.ltScale ?? 1)}\r\n`;
+  // Bộ biến hệ thống mà tệp thật nào cũng mang: thiếu thì AutoCAD tự điền mặc định của MÁY ĐANG
+  // MỞ, nên cùng một tệp mở ở hai máy có thể ra hai kiểu hiển thị khác nhau.
+  header += "9\r\n$CLAYER\r\n8\r\n0\r\n";
+  header += "9\r\n$CELTYPE\r\n6\r\nByLayer\r\n";
+  header += "9\r\n$CECOLOR\r\n62\r\n256\r\n";
+  header += "9\r\n$CELTSCALE\r\n40\r\n1.0\r\n";
+  header += "9\r\n$CELWEIGHT\r\n370\r\n-1\r\n";
+  header += "9\r\n$PSLTSCALE\r\n70\r\n1\r\n";
+  header += "9\r\n$TILEMODE\r\n70\r\n1\r\n";
+  header += "9\r\n$TEXTSTYLE\r\n7\r\nSTANDARD\r\n";
+  header += "9\r\n$DIMSTYLE\r\n2\r\nSTANDARD\r\n";
+  header += "9\r\n$CMLSTYLE\r\n2\r\nSTANDARD\r\n";
+  header += "9\r\n$CMLJUST\r\n70\r\n0\r\n";
+  header += "9\r\n$CMLSCALE\r\n40\r\n1.0\r\n";
+  header += "9\r\n$PDMODE\r\n70\r\n0\r\n";
+  header += "9\r\n$PDSIZE\r\n40\r\n0.0\r\n";
+  header += "9\r\n$SPLINESEGS\r\n70\r\n8\r\n";
+  header += "9\r\n$DIMASSOC\r\n280\r\n2\r\n";
+  header += "9\r\n$UCSORG\r\n10\r\n0.0\r\n20\r\n0.0\r\n30\r\n0.0\r\n";
+  header += "9\r\n$UCSXDIR\r\n10\r\n1.0\r\n20\r\n0.0\r\n30\r\n0.0\r\n";
+  header += "9\r\n$UCSYDIR\r\n10\r\n0.0\r\n20\r\n1.0\r\n30\r\n0.0\r\n";
   if (bao) {
     header += `9\r\n$EXTMIN\r\n10\r\n${real(bao.minX)}\r\n20\r\n${real(bao.minY)}\r\n30\r\n0.0\r\n`;
     header += `9\r\n$EXTMAX\r\n10\r\n${real(bao.maxX)}\r\n20\r\n${real(bao.maxY)}\r\n30\r\n0.0\r\n`;
@@ -3846,7 +3885,15 @@ export function exportDxf(
   // Thiếu khai báo thì AutoCAD coi thực thể tương ứng là đối tượng lạ và bỏ qua khi mở tệp.
   const dungLoai = new Set(entities.map((e) => e.type));
   (parsed.blocks || []).forEach((b) => b.entities?.forEach((e) => dungLoai.add(e.type)));
-  const lopCanKhai: Array<[string, string, string, number]> = [];
+  // Các lớp luôn có mặt trong tệp bản 2004 trở lên vì bộ ghi phát ra đúng những đối tượng này
+  const lopCanKhai: Array<[string, string, string, number]> = [
+    ["ACDBDICTIONARYWDFLT", "AcDbDictionaryWithDefault", "ObjectDBX Classes", 0],
+    ["ACDBPLACEHOLDER", "AcDbPlaceHolder", "ObjectDBX Classes", 0],
+    ["LAYOUT", "AcDbLayout", "ObjectDBX Classes", 0],
+    ["MATERIAL", "AcDbMaterial", "ObjectDBX Classes", 0],
+    ["SCALE", "AcDbScale", "ObjectDBX Classes", 0],
+    ["VISUALSTYLE", "AcDbVisualStyle", "ObjectDBX Classes", 0],
+  ];
   if (dungLoai.has("MULTILEADER")) {
     lopCanKhai.push(["MULTILEADER", "AcDbMLeader", "ACDB_MLEADER_CLASS", 1]);
     lopCanKhai.push(["MLEADERSTYLE", "AcDbMLeaderStyle", "ACDB_MLEADERSTYLE_CLASS", 0]);
@@ -3914,7 +3961,8 @@ export function exportDxf(
     than += tableRecordHead("LAYER", handles.take(), hLayerTab, "AcDbLayerTableRecord");
     than += `2\r\n${name}\r\n70\r\n${val.flags}\r\n62\r\n${val.color}\r\n6\r\n${val.lineType}\r\n`;
     than += `370\r\n${typeof val.lineWeight === "number" ? val.lineWeight : -3}\r\n`;
-    than += `390\r\nF\r\n`;
+    than += `390\r\n${hPlaceholder}\r\n`;
+    than += `347\r\n${hMaterialByLayer}\r\n`;
   });
   than += "0\r\nENDTAB\r\n";
 
@@ -4105,6 +4153,13 @@ export function exportDxf(
   than += `3\r\nACAD_MLINESTYLE\r\n350\r\n${hMLineStyleDict}\r\n`;
   if (imageDefs.length > 0) than += `3\r\nACAD_IMAGE_DICT\r\n350\r\n${hImageDict}\r\n`;
   than += `3\r\nACAD_LAYOUT\r\n350\r\n${hLayoutDict}\r\n`;
+  than += `3\r\nACAD_COLOR\r\n350\r\n${hColorDict}\r\n`;
+  than += `3\r\nACAD_MATERIAL\r\n350\r\n${hMaterialDict}\r\n`;
+  than += `3\r\nACAD_PLOTSETTINGS\r\n350\r\n${hPlotSettingsDict}\r\n`;
+  than += `3\r\nACAD_PLOTSTYLENAME\r\n350\r\n${hPlotStyleDict}\r\n`;
+  than += `3\r\nACAD_SCALELIST\r\n350\r\n${hScaleListDict}\r\n`;
+  than += `3\r\nACAD_TABLESTYLE\r\n350\r\n${hTableStyleDict}\r\n`;
+  than += `3\r\nACAD_VISUALSTYLE\r\n350\r\n${hVisualStyleDict}\r\n`;
   than += `0\r\nDICTIONARY\r\n5\r\n${hGroupDict}\r\n330\r\n${hRootDict}\r\n100\r\nAcDbDictionary\r\n`;
 
   // MULTILEADER bắt buộc trỏ tới một kiểu chú thích dẫn; thiếu đối tượng này thì AutoCAD
@@ -4128,6 +4183,37 @@ export function exportDxf(
   than += `0\r\nMLINESTYLE\r\n5\r\n${hMLineStyle}\r\n330\r\n${hMLineStyleDict}\r\n100\r\nAcDbMlineStyle\r\n`;
   than += `2\r\nSTANDARD\r\n70\r\n0\r\n3\r\n\r\n62\r\n256\r\n51\r\n90.0\r\n52\r\n90.0\r\n`;
   than += `71\r\n2\r\n49\r\n0.5\r\n62\r\n256\r\n6\r\nBYLAYER\r\n49\r\n-0.5\r\n62\r\n256\r\n6\r\nBYLAYER\r\n`;
+  // Kiểu in: ACAD_PLOTSTYLENAME là từ điển CÓ MẶC ĐỊNH (ACDBDICTIONARYWDFLT), mục "Normal" trỏ
+  // tới một ACDBPLACEHOLDER — chính là thứ mã 390 của mỗi layer tham chiếu tới.
+  than += `0\r\nACDBDICTIONARYWDFLT\r\n5\r\n${hPlotStyleDict}\r\n330\r\n${hRootDict}\r\n100\r\nAcDbDictionary\r\n`;
+  than += `281\r\n1\r\n3\r\nNormal\r\n350\r\n${hPlaceholder}\r\n`;
+  than += `100\r\nAcDbDictionaryWithDefault\r\n340\r\n${hPlaceholder}\r\n`;
+  than += `0\r\nACDBPLACEHOLDER\r\n5\r\n${hPlaceholder}\r\n330\r\n${hPlotStyleDict}\r\n`;
+
+  // Vật liệu: mỗi layer trỏ về ByLayer qua mã 347
+  than += `0\r\nDICTIONARY\r\n5\r\n${hMaterialDict}\r\n330\r\n${hRootDict}\r\n100\r\nAcDbDictionary\r\n`;
+  than += `3\r\nByBlock\r\n350\r\n${hMaterialByBlock}\r\n3\r\nByLayer\r\n350\r\n${hMaterialByLayer}\r\n`;
+  than += `3\r\nGlobal\r\n350\r\n${hMaterialGlobal}\r\n`;
+  for (const [h, ten] of [
+    [hMaterialByBlock, "ByBlock"],
+    [hMaterialByLayer, "ByLayer"],
+    [hMaterialGlobal, "Global"],
+  ] as const) {
+    than += `0\r\nMATERIAL\r\n5\r\n${h}\r\n330\r\n${hMaterialDict}\r\n100\r\nAcDbMaterial\r\n`;
+    than += `1\r\n${ten}\r\n2\r\n\r\n`;
+  }
+
+  // Danh sách tỷ lệ chú thích: bản 2008 trở lên đọc từ đây khi in theo tỷ lệ
+  than += `0\r\nDICTIONARY\r\n5\r\n${hScaleListDict}\r\n330\r\n${hRootDict}\r\n100\r\nAcDbDictionary\r\n`;
+  than += `281\r\n1\r\n3\r\nA0\r\n350\r\n${hScale11}\r\n`;
+  than += `0\r\nSCALE\r\n5\r\n${hScale11}\r\n330\r\n${hScaleListDict}\r\n100\r\nAcDbScale\r\n`;
+  than += `70\r\n0\r\n300\r\n1:1\r\n140\r\n1.0\r\n141\r\n1.0\r\n290\r\n1\r\n`;
+
+  // Bốn từ điển còn lại luôn có mặt trong tệp thật, để rỗng là hợp lệ
+  for (const h of [hVisualStyleDict, hTableStyleDict, hPlotSettingsDict, hColorDict]) {
+    than += `0\r\nDICTIONARY\r\n5\r\n${h}\r\n330\r\n${hRootDict}\r\n100\r\nAcDbDictionary\r\n281\r\n1\r\n`;
+  }
+
   // Bố cục in: thiếu đối tượng LAYOUT thì không gian giấy (khung tên, khung in, khung nhìn)
   // không có chỗ bám — AutoCAD mở tệp ra chỉ thấy model space.
   than += `0\r\nDICTIONARY\r\n5\r\n${hLayoutDict}\r\n330\r\n${hRootDict}\r\n100\r\nAcDbDictionary\r\n`;

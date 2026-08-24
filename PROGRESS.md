@@ -214,9 +214,52 @@ script tạm: đòi handle không trùng, không thực thể nào trỏ về ch
 lớn hơn mọi handle, các cặp SECTION/TABLE/BLOCK cân bằng. Tổng `npm test`: 210 file,
 **1115 ca pass, 0 fail, 1 skip có chủ đích**.
 
+### G — Khai bản định dạng mới nhất: AutoCAD 2018 / AC1032 (cùng ngày)
+
+**Quyết định của người dùng, ngược với khuyến nghị của tôi — ghi lại cả hai để sau này còn đối
+chiếu.** Tôi đề xuất giữ AC1021 vì: (a) mọi thực thể 2D MEPF đã giữ nguyên bản từ AC1021, các bản
+sau không thêm loại thực thể 2D nào dùng được cho bản vẽ MEPF (2010 thêm `MESH` 3D, 2013 thêm đối
+tượng mặt cắt); (b) DXF tương thích **xuôi chứ không ngược** — tệp AC1021 mở được ở AutoCAD 2007
+cho tới 2026, còn tệp AC1032 thì **AutoCAD 2017 trở về trước không mở được**, mà máy đời cũ ở công
+trường không hiếm. Người dùng chọn AC1032 để hồ sơ nộp theo định dạng hiện hành — đã thực hiện đầy
+đủ, kể cả phần cấu trúc mà bản 2018 kỳ vọng thêm chứ không chỉ đổi chuỗi phiên bản.
+
+Bảng phiên bản: `AC1015` = 2000, `AC1018` = 2004, `AC1021` = 2007, `AC1024` = 2010, `AC1027` = 2013,
+**`AC1032` = 2018 → 2026** (định dạng đứng yên từ 2018, bản 2026 vẫn ghi `AC1032`).
+
+Đã bổ sung theo:
+
+- **Bộ biến hệ thống trong HEADER** (`$ACADMAINTVER`, `$REQUIREDVERSIONS`, `$CLAYER`, `$CELTYPE`,
+  `$CECOLOR`, `$CELTSCALE`, `$CELWEIGHT`, `$PSLTSCALE`, `$TILEMODE`, `$TEXTSTYLE`, `$DIMSTYLE`,
+  `$CMLSTYLE`/`$CMLJUST`/`$CMLSCALE`, `$PDMODE`/`$PDSIZE`, `$SPLINESEGS`, `$DIMASSOC`, bộ `$UCS*`).
+  Thiếu chúng thì AutoCAD tự điền mặc định **của máy đang mở**, nên cùng một tệp mở ở hai máy có
+  thể ra hai kiểu hiển thị khác nhau.
+- **Bộ từ điển chuẩn trong OBJECTS** mà tệp bản 2004 trở lên nào cũng mang: `ACAD_PLOTSTYLENAME`
+  (từ điển có mặc định + `ACDBPLACEHOLDER`), `ACAD_MATERIAL` (ByLayer/ByBlock/Global),
+  `ACAD_SCALELIST` (tỷ lệ 1:1), cùng `ACAD_COLOR`, `ACAD_PLOTSETTINGS`, `ACAD_TABLESTYLE`,
+  `ACAD_VISUALSTYLE`.
+- **CLASSES** khai thêm 6 lớp chuẩn (`ACDBDICTIONARYWDFLT`, `ACDBPLACEHOLDER`, `LAYOUT`,
+  `MATERIAL`, `SCALE`, `VISUALSTYLE`).
+
+**Lỗi thật lộ ra:** mỗi bản ghi LAYER trỏ về kiểu in bằng mã 390, và bản trước ghi **cứng handle
+`"F"` vốn không tồn tại trong tệp** — một tham chiếu treo có từ đợt E mà không ca test nào bắt được,
+vì ca toàn vẹn cấu trúc lúc đó chỉ kiểm mã 330. Nay mã 390 trỏ về `ACDBPLACEHOLDER` thật, và ca
+toàn vẹn mở rộng kiểm cả **340 / 347 / 350 / 390** chứ không riêng 330.
+
+**Lỗi trong chính ca test, cũng đã sửa:** thêm `$DIMSTYLE` (mã 2) vào HEADER làm lộ ra cách nhận
+diện section của ca toàn vẹn quá lỏng — nó coi mọi mã 2 là tên section, nên từ `$DIMSTYLE` trở đi
+cả phần HEADER bị tính nhầm thành thân tệp và `$HANDSEED` bị đếm như một handle. Nay chỉ nhận mã 2
+là tên section khi nó đứng ngay sau cặp `0 SECTION`, đúng cách `validateDxf` vẫn làm.
+
+Nhãn trên giao diện nói rõ ràng buộc: "Tệp xuất ra theo chuẩn AutoCAD 2018 — cần AutoCAD 2018 trở
+lên để mở." (Trước đó hai nhãn còn ghi "AutoCAD 2000" do sót lại từ đợt E — đã sửa.)
+
 ### Còn lại (chưa làm)
 
 - Chuẩn hoá trực tiếp trên **DWG** vẫn cần plugin AutoCAD (ADR-0006) — chưa có.
+- **Tệp xuất ra không mở được bằng AutoCAD 2017 trở về trước** — hệ quả đã biết và đã chấp nhận của
+  việc khai AC1032. Nếu công trường có máy đời cũ, hạ `$ACADVER` về `AC1021` trong
+  `lib/ky-thuat/cad/dxf-parser.ts` là đủ; toàn bộ thực thể vẫn giữ nguyên bản ở mức đó.
 - **Chưa mở thử tệp xuất ra bằng AutoCAD thật.** Toàn bộ kiểm chứng ở đây là test, round-trip qua
   chính bộ đọc của XBoss, và đối chiếu với đặc tả DXF của Autodesk — môi trường CI không có AutoCAD.
   Các thực thể phức tạp (`MULTILEADER`, `WIPEOUT`, `VIEWPORT`, `MLINE`) có nhiều trường tuỳ chọn mà

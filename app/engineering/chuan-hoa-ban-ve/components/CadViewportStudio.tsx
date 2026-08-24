@@ -644,7 +644,7 @@ export default function CadViewportStudio({
                           fontFamily="monospace"
                         >
                           Nhận: DXF mọi phiên bản (ASCII lẫn nhị phân), PDF — xuất ra DXF chuẩn
-                          AutoCAD 2007
+                          AutoCAD 2018 (cần bản 2018 trở lên để mở)
                         </text>
                       </g>
                     )}
