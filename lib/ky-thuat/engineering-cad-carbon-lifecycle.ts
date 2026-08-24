@@ -127,21 +127,20 @@ export async function saveCarbonLifecycleRecord(
       mtbf_hours = EXCLUDED.mtbf_hours,
       updated_at = NOW()
     RETURNING id`,
-    [
-      projectId,
-      record.recordCode,
-      record.elementType,
-      record.systemCode,
-      record.materialCategory,
-      record.weightKg,
-      factor,
-      record.embodiedCarbonKgCo2e,
-      record.assetGuid ?? null,
-      record.equipmentSerial ?? null,
-      record.mtbfHours || 20000,
-      record.expectedLifespanYears || 15,
-      userId ?? null,
-    ],
+
+    projectId,
+    record.recordCode,
+    record.elementType,
+    record.systemCode,
+    record.materialCategory,
+    record.weightKg,
+    factor,
+    record.embodiedCarbonKgCo2e,
+    record.assetGuid ?? null,
+    record.equipmentSerial ?? null,
+    record.mtbfHours || 20000,
+    record.expectedLifespanYears || 15,
+    userId ?? null,
   );
 
   if (!row) throw new Error("Failed to save carbon lifecycle record");
@@ -151,6 +150,6 @@ export async function saveCarbonLifecycleRecord(
 export async function listCarbonLifecycleRecords(projectId: number) {
   return await query(
     `SELECT * FROM engineering_carbon_lifecycle_records WHERE project_id = ? ORDER BY created_at DESC LIMIT 100`,
-    [projectId],
+    projectId,
   );
 }

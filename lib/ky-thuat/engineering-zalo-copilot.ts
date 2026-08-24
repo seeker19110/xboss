@@ -1,4 +1,18 @@
-import { query, queryOne, withProjectScope, withTransaction } from "@/lib/db";
+import { query, queryOne, run, withProjectScope, withTransaction } from "@/lib/db";
+import { hashOtp, kiemOtp, sinhOtp, OTP_HAN_PHUT } from "@/lib/bao-mat/otp";
+import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
+
+/**
+ * ⚠️ TRẠNG THÁI THỬ NGHIỆM (V5 — trung thực hoá dữ liệu hiển thị, 2026-08-24):
+ * Copilot Zalo hiện **chỉ ghi log tin nhắn** vào `zalo_site_message_logs`/
+ * `zalo_field_action_dispatches`, KHÔNG ghi vào `tasks`/`ncrs`/`materials`/e-Sign hay bất kỳ
+ * bảng nghiệp vụ nào. Mọi reply bên dưới phải phản ánh đúng thực tế này — không được ngụ ý
+ * "đã cập nhật WBS"/"đã tạo NCR"/"đã gửi TVGS" nếu chưa thật sự làm vậy. Việc nối dữ liệu thật
+ * là tính năng riêng, cần đặc tả sau (xem PLAN.md việc V5, quyết định đã chốt: không wire
+ * trong đợt này).
+ */
+
+const GHI_CHU_THU_NGHIEM = "⚠️ Bot đang ở chế độ thử nghiệm";
 
 export type ZaloIntentType =
   | "PROGRESS_UPDATE"
@@ -108,55 +122,131 @@ export function parseVietnameseConstructionIntent(text: string): ParsedZaloInten
   };
 }
 
+// Số lần thử OTP tối đa cho mỗi Zalo user trong một cửa sổ OTP_HAN_PHUT phút.
+const SO_LAN_THU_OTP = 5;
+
+/** Thông điệp lỗi khi Zalo ID đã thuộc về tài khoản XBoss khác — route dịch sang HTTP 409. */
+export const LOI_ZALO_DA_LIEN_KET = "Zalo ID này đã được liên kết với một tài khoản XBoss khác.";
+
+/** Thông điệp trả về khi tin nhắn đến từ Zalo ID chưa liên kết (chưa xác thực OTP). */
+export const THONG_DIEP_CHUA_LIEN_KET =
+  "Tài khoản Zalo của bạn chưa được liên kết với XBoss. " +
+  "Vui lòng mở ứng dụng XBoss → Zalo Copilot để lấy mã OTP và xác thực liên kết trước khi gửi lệnh.";
+
+export type BindingZalo = { id: string; projectId: number; userId: number | null };
+
+/**
+ * Tra dòng liên kết Zalo ĐÃ XÁC THỰC của một Zalo ID.
+ *
+ * Bỏ `projectId` → tra liên dự án bằng ngữ cảnh RLS '*': webhook đi vào KHÔNG có phiên đăng
+ * nhập nên không thể biết dự án trước; chính dòng binding mới là nguồn sự thật của `project_id`
+ * (trước đây route lấy `projectId` thẳng từ body attacker gửi rồi đưa vào withProjectScope,
+ * tức tự hợp thức hoá RLS bằng giá trị của kẻ tấn công).
+ */
+export async function timBindingZaloDaXacThuc(
+  zaloUserId: string,
+  projectId?: number,
+): Promise<BindingZalo | null> {
+  if (!zaloUserId) return null;
+  const row = await withProjectScope(projectId ?? "*", async () =>
+    queryOne<BindingZalo>(
+      `SELECT id, project_id AS "projectId", user_id AS "userId"
+         FROM zalo_user_bindings
+        WHERE zalo_user_id = ? AND is_verified = true
+        ORDER BY created_at DESC
+        LIMIT 1`,
+      zaloUserId,
+    ),
+  );
+  return row ?? null;
+}
+
+/**
+ * Sinh OTP liên kết Zalo — lưu HASH, upsert theo khoá nghiệp vụ `(project_id, zalo_user_id)`.
+ *
+ * Trước đây `ON CONFLICT (id)` chạy trên khoá chính UUID tự sinh nên không bao giờ va chạm:
+ * mỗi lần lấy mã lại thêm một dòng binding trùng. Chỉ số duy nhất tương ứng nằm ở migration 0133.
+ * Điều kiện `WHERE` trên nhánh DO UPDATE giữ nguyên liên kết đã xác thực của người khác — không
+ * cho một tài khoản bất kỳ chiếm Zalo ID đang thuộc tài khoản khác chỉ bằng cách xin mã mới.
+ */
 export async function generateZaloLinkOtp(
   projectId: number,
   userId: number,
   zaloUserId: string,
   displayName = "Thầu phụ",
 ): Promise<string> {
-  const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+  const otpCode = sinhOtp();
+  const expiresAt = new Date(Date.now() + OTP_HAN_PHUT * 60 * 1000).toISOString();
 
-  await withProjectScope(
+  const ghiDuoc = await withProjectScope(
     projectId,
     async () => {
-      await query(
+      const rows = await query<{ id: string }>(
         `INSERT INTO zalo_user_bindings (project_id, user_id, zalo_user_id, zalo_display_name, verification_otp, otp_expires_at, is_verified)
        VALUES (?, ?, ?, ?, ?, ?, false)
-       ON CONFLICT (id) DO NOTHING`,
+       ON CONFLICT (project_id, zalo_user_id)
+       DO UPDATE SET user_id = EXCLUDED.user_id,
+                     zalo_display_name = EXCLUDED.zalo_display_name,
+                     verification_otp = EXCLUDED.verification_otp,
+                     otp_expires_at = EXCLUDED.otp_expires_at
+       WHERE zalo_user_bindings.is_verified = false OR zalo_user_bindings.user_id = ?
+       RETURNING id`,
         projectId,
         userId,
         zaloUserId,
         displayName,
-        otpCode,
+        hashOtp(otpCode),
         expiresAt,
+        userId,
       );
+      return rows.length > 0;
     },
     { readOnly: false },
   );
 
+  if (!ghiDuoc) throw new Error(LOI_ZALO_DA_LIEN_KET);
+
   return otpCode;
 }
 
+/**
+ * Xác minh OTP liên kết Zalo. So bằng hash + BẮT BUỘC còn hạn (trước đây có SELECT cột
+ * `otp_expires_at` nhưng không bao giờ so, nên OTP hết hạn vẫn liên kết được) + rate-limit
+ * theo Zalo ID để không dò được mã 6 số.
+ */
 export async function verifyZaloLinkOtp(zaloUserId: string, otpCode: string): Promise<boolean> {
-  const row = await queryOne<any>(
-    `SELECT id, otp_expires_at AS "otpExpiresAt"
-     FROM zalo_user_bindings
-     WHERE zalo_user_id = ? AND verification_otp = ? AND is_verified = false`,
-    zaloUserId,
-    otpCode,
+  if (!zaloUserId || !otpCode) return false;
+
+  // true = ĐÃ VƯỢT giới hạn (xem lib/bao-mat/ratelimit.ts) → chặn, không tra DB.
+  if (await hitRateLimit(`zalo_otp:${zaloUserId}`, SO_LAN_THU_OTP, OTP_HAN_PHUT)) return false;
+
+  return withProjectScope(
+    "*",
+    async () => {
+      // Một Zalo ID có thể đang chờ liên kết ở nhiều dự án → lấy mọi dòng còn hạn rồi so hash
+      // theo kiểu constant-time, thay vì để SQL so trực tiếp.
+      const rows = await query<{ id: string; verification_otp: string | null }>(
+        `SELECT id, verification_otp
+           FROM zalo_user_bindings
+          WHERE zalo_user_id = ? AND is_verified = false
+            AND otp_expires_at IS NOT NULL AND otp_expires_at > CURRENT_TIMESTAMP`,
+        zaloUserId,
+      );
+
+      const khop = rows.find((r) => kiemOtp(otpCode, r.verification_otp));
+      if (!khop) return false;
+
+      await run(
+        `UPDATE zalo_user_bindings
+          SET is_verified = true, verification_otp = NULL, otp_expires_at = NULL
+        WHERE id = ?`,
+        khop.id,
+      );
+
+      return true;
+    },
+    { readOnly: false },
   );
-
-  if (!row) return false;
-
-  await query(
-    `UPDATE zalo_user_bindings
-     SET is_verified = true, verification_otp = NULL
-     WHERE id = ?`,
-    row.id,
-  );
-
-  return true;
 }
 
 export async function processIncomingZaloMessage(params: {
@@ -165,6 +255,19 @@ export async function processIncomingZaloMessage(params: {
   rawText: string;
 }): Promise<{ replyText: string; intent: ZaloIntentType; actionDispatched: boolean }> {
   const { projectId, zaloUserId, rawText } = params;
+
+  // Lưới an toàn tầng nghiệp vụ: chỉ xử lý tin nhắn của Zalo ID đã liên kết & đã xác thực.
+  // Route webhook đã chặn sẵn (trả 403) — kiểm lại ở đây để mọi đường gọi khác (giả lập, cron,
+  // test) không thể ghi log/điều phối hành động nhân danh một Zalo ID lạ.
+  const binding = await timBindingZaloDaXacThuc(zaloUserId, projectId);
+  if (!binding) {
+    return {
+      replyText: THONG_DIEP_CHUA_LIEN_KET,
+      intent: "UNKNOWN",
+      actionDispatched: false,
+    };
+  }
+
   const parsed = parseVietnameseConstructionIntent(rawText);
 
   let replyText = "";
@@ -172,22 +275,22 @@ export async function processIncomingZaloMessage(params: {
 
   switch (parsed.intent) {
     case "PROGRESS_UPDATE":
-      replyText = `✅ Đã ghi nhận sản lượng: ${parsed.summary} Dữ liệu đã được cập nhật vào tiến độ WBS dự án!`;
+      replyText = `Đã ghi nhận yêu cầu báo sản lượng: ${parsed.summary} Yêu cầu đang chờ xử lý, **chưa** cập nhật vào tiến độ WBS dự án. Vui lòng cập nhật trên ứng dụng XBoss để ghi nhận chính thức.\n${GHI_CHU_THU_NGHIEM}`;
       actionDispatched = true;
       break;
 
     case "CREATE_NCR":
-      replyText = `⚠️ Đã tạo Phiếu ghi nhận sự cố / Không phù hợp (NCR) mức độ [${parsed.entities.severity}]. Kỹ sư QA/QC sẽ thẩm tra trong 2 giờ.`;
+      replyText = `Đã ghi nhận yêu cầu báo lỗi thi công mức độ [${parsed.entities.severity}]. Yêu cầu đang chờ xử lý, **chưa** tạo Phiếu NCR và QA/QC **chưa** được thông báo. Vui lòng lập NCR trên ứng dụng XBoss.\n${GHI_CHU_THU_NGHIEM}`;
       actionDispatched = true;
       break;
 
     case "CHECK_MATERIAL_STOCK":
-      replyText = `📦 Tồn kho [${parsed.entities.materialCode}]: Hiện còn 180 đơn vị tại Kho Tổng A. Sẵn sàng cấp phát thi công.`;
+      replyText = `Tính năng tra cứu vật tư qua bot đang thử nghiệm, chưa nối dữ liệu tồn kho thật — vui lòng tra trên ứng dụng XBoss.\n${GHI_CHU_THU_NGHIEM}`;
       actionDispatched = true;
       break;
 
     case "REQUEST_BBNT":
-      replyText = `📋 Đã lập Phiếu yêu cầu nghiệm thu (RFA). Thông báo đã được gửi tới TVGS và Kỹ sư trưởng qua hệ thống ký số e-Sign!`;
+      replyText = `Đã ghi nhận yêu cầu mở đợt nghiệm thu (RFA). Yêu cầu đang chờ xử lý, **chưa** lập phiếu và TVGS/Kỹ sư trưởng **chưa** được thông báo. Vui lòng lập yêu cầu nghiệm thu trên ứng dụng XBoss.\n${GHI_CHU_THU_NGHIEM}`;
       actionDispatched = true;
       break;
 

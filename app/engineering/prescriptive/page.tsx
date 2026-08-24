@@ -26,6 +26,7 @@ import {
   Cell,
 } from "recharts";
 import AppHeader from "@/app/components/AppHeader";
+import ThuNghiemBanner from "@/app/components/ThuNghiemBanner";
 import EngineeringNav from "@/app/components/EngineeringNav";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
@@ -262,6 +263,7 @@ export default function PrescriptiveAndCompliancePage() {
       <div className="min-h-screen bg-zinc-950 text-zinc-100">
         <AppHeader />
         <main className="mx-auto max-w-7xl px-4 py-8">
+          <ThuNghiemBanner moduleKey="engineering-prescriptive" />
           <EngineeringNav />
           <PageSkeleton />
         </main>
@@ -292,6 +294,7 @@ export default function PrescriptiveAndCompliancePage() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <AppHeader />
       <main className="mx-auto max-w-7xl px-4 py-8">
+        <ThuNghiemBanner moduleKey="engineering-prescriptive" />
         <EngineeringNav />
 
         {/* Title and Action Bar */}
@@ -443,7 +446,7 @@ export default function PrescriptiveAndCompliancePage() {
                         <button
                           disabled={approvingId === selectedScenario.id}
                           onClick={() => handleApprove(selectedScenario.id)}
-                          className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500"
+                          className="flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-xs font-semibold text-on-accent hover:bg-emerald-500"
                         >
                           <CheckCircle2 size={16} />
                           Phê duyệt phương án đề xuất

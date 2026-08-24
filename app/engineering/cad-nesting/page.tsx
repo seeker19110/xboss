@@ -378,7 +378,7 @@ export default function CadNestingHydraulicStudioPage() {
                               <div
                                 key={cIdx}
                                 style={{ width: `${widthPct}%` }}
-                                className="relative flex items-center justify-center border-r border-zinc-950 bg-emerald-600/80 px-1 text-[11px] font-bold text-white transition-all hover:bg-emerald-500"
+                                className="relative flex items-center justify-center border-r border-zinc-950 bg-emerald-700/80 px-1 text-[11px] font-bold text-on-accent transition-all hover:bg-emerald-500"
                                 title={`${cut.spoolCode}: ${cut.lengthMm}mm`}
                               >
                                 <span className="truncate">

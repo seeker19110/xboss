@@ -15,6 +15,7 @@ import {
 import {
   processSmartIpcRelease,
   SmartIpcCalculationInput,
+  type SmartIpcGateContext,
 } from "@/lib/ky-thuat/engineering-smart-ipc";
 
 import { analyzeFidicTiaClaim, FidicTiaInput } from "@/lib/ky-thuat/engineering-fidic-tia-claim";
@@ -116,24 +117,24 @@ test("4. Pre-Pour Rebar CV Audit — Locked Circuit Open when pitch deviation ex
 });
 
 test("5. Instant Smart IPC — All 4 Gates cleared with 5% retention release", () => {
+  // V5: gating không còn nhận trực tiếp từ input — phải đọc từ bối cảnh DB thật
+  // (`fetchSmartIpcGatingContext`). Test thuần dựng sẵn bối cảnh "đủ dữ liệu, đạt cả 4 cổng".
+  const gateCtx: SmartIpcGateContext = {
+    gate1: { available: true, maxDeviationMm: 12.0, scanCode: "SCAN-01" }, // <= 15mm (Gate 1 Pass)
+    gate2: { available: true, signedCount: 3, totalCount: 3 }, // (Gate 2 Pass)
+    gate3: { available: true, pressureDropBar: 0.0, durationHours: 2.5, requiredHours: 2.0 }, // (Gate 3 Pass)
+    gate4: { available: true, claimedQty: 100, approvedBoqQty: 100, warehouseUsedQty: 120 }, // (Gate 4 Pass)
+  };
   const input: SmartIpcCalculationInput = {
     ipcNumber: "IPC-TEST-01",
     periodMonth: "2026-08",
     contractorName: "Nhà Thầu Cơ Điện Chuẩn XBoss",
-    grossClaimedVnd: 1000000000,
+    grossClaimedVnd: "1000000000",
     retentionPercent: 5.0,
-    gating: {
-      scanToBimMaxDevMm: 12.0, // <= 15mm (Gate 1 Pass)
-      bbntSigned3Parties: true, // (Gate 2 Pass)
-      iotPressureDropBar: 0.0, // (Gate 3 Pass)
-      iotTestDurationHours: 2.5, // >= 2h (Gate 3 Pass)
-      claimedQty: 100,
-      approvedBoqQty: 100,
-      warehouseUsedQty: 120, // (Gate 4 Pass)
-    },
+    refs: {},
   };
 
-  const result = processSmartIpcRelease(input);
+  const result = processSmartIpcRelease(input, gateCtx);
 
   assert.equal(result.allGatesCleared, true);
   assert.equal(result.paymentStatus, "released");
@@ -144,28 +145,52 @@ test("5. Instant Smart IPC — All 4 Gates cleared with 5% retention release", (
 });
 
 test("6. Instant Smart IPC — Blocked when Scan-to-BIM deviation > 15mm or unsigned BBNT", () => {
+  const gateCtx: SmartIpcGateContext = {
+    gate1: { available: true, maxDeviationMm: 28.0, scanCode: "SCAN-02" }, // > 15mm (Gate 1 Fail)
+    gate2: { available: true, signedCount: 1, totalCount: 3 }, // (Gate 2 Fail)
+    gate3: { available: true, pressureDropBar: 0.0, durationHours: 2.0, requiredHours: 2.0 },
+    gate4: { available: true, claimedQty: 100, approvedBoqQty: 100, warehouseUsedQty: 100 },
+  };
   const input: SmartIpcCalculationInput = {
     ipcNumber: "IPC-TEST-02",
     periodMonth: "2026-08",
     contractorName: "Nhà Thầu Cơ Điện Lệch Tuyến",
-    grossClaimedVnd: 500000000,
-    gating: {
-      scanToBimMaxDevMm: 28.0, // > 15mm (Gate 1 Fail)
-      bbntSigned3Parties: false, // (Gate 2 Fail)
-      iotPressureDropBar: 0.0,
-      iotTestDurationHours: 2.0,
-      claimedQty: 100,
-      approvedBoqQty: 100,
-      warehouseUsedQty: 100,
-    },
+    grossClaimedVnd: "500000000",
+    refs: {},
   };
 
-  const result = processSmartIpcRelease(input);
+  const result = processSmartIpcRelease(input, gateCtx);
 
   assert.equal(result.allGatesCleared, false);
   assert.equal(result.paymentStatus, "held_by_gates");
   assert.equal(result.netPayableVnd, 0);
   assert.equal(result.blockedGateReasons.length, 2);
+});
+
+test("6b. Instant Smart IPC — thiếu dữ liệu tham chiếu (không phải input body) → chặn, không mặc định pass", () => {
+  const gateCtx: SmartIpcGateContext = {
+    gate1: { available: false, maxDeviationMm: null },
+    gate2: { available: false, signedCount: 0, totalCount: 0 },
+    gate3: { available: false, pressureDropBar: null, durationHours: null, requiredHours: 2.0 },
+    gate4: { available: false, claimedQty: null, approvedBoqQty: null, warehouseUsedQty: null },
+  };
+  const input: SmartIpcCalculationInput = {
+    ipcNumber: "IPC-TEST-03",
+    periodMonth: "2026-08",
+    contractorName: "Nhà Thầu Thiếu Hồ Sơ",
+    grossClaimedVnd: "500000000",
+    refs: {},
+  };
+
+  const result = processSmartIpcRelease(input, gateCtx);
+
+  assert.equal(result.allGatesCleared, false);
+  assert.equal(result.paymentStatus, "held_by_gates");
+  assert.equal(result.blockedGateReasons.length, 4);
+  assert.equal(result.gateStatuses.gate1, "khong_du_du_lieu");
+  assert.equal(result.gateStatuses.gate2, "khong_du_du_lieu");
+  assert.equal(result.gateStatuses.gate3, "khong_du_du_lieu");
+  assert.equal(result.gateStatuses.gate4, "khong_du_du_lieu");
 });
 
 test("7. Autonomous FIDIC TIA Claims — CPM Fragnet EOT & 28-day Notice generator", () => {

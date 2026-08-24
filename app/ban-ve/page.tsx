@@ -466,7 +466,7 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
             <button
               onClick={() => setAddOpen(true)}
               aria-label="Thêm bản vẽ"
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-white shadow-sm h-10 min-h-[44px]"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 active:scale-[0.98] px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 text-on-accent shadow-sm h-10 min-h-[44px]"
             >
               <Plus className="w-4 h-4" /> <span>Thêm bản vẽ</span>
             </button>
@@ -1069,7 +1069,7 @@ function DrawingWorkspaceDetail({
         <button
           onClick={() => drawing.approvedRevisionId && viewFile(drawing.approvedRevisionId)}
           disabled={!drawing.approvedRevisionId}
-          className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition text-white shadow-md min-h-[44px]"
+          className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition text-on-accent shadow-md min-h-[44px]"
         >
           <ExternalLink className="w-4 h-4" />
           {drawing.approvedRevisionId
@@ -1223,7 +1223,7 @@ function DrawingWorkspaceDetail({
                       <button
                         disabled={isBusy}
                         onClick={() => decide(r, "approved")}
-                        className="flex items-center gap-1 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg transition min-h-[38px]"
+                        className="flex items-center gap-1 text-xs font-bold bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-on-accent px-3 py-1.5 rounded-lg transition min-h-[38px]"
                       >
                         <CheckCircle2 className="w-3.5 h-3.5" /> Duyệt
                       </button>
@@ -1428,7 +1428,7 @@ function DrawingFormModal({
           <button
             onClick={submit}
             disabled={!canSubmit || saving}
-            className="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-xl font-bold text-white shadow-sm min-h-[44px]"
+            className="px-4 py-2 text-sm bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 rounded-xl font-bold text-on-accent shadow-sm min-h-[44px]"
           >
             {saving ? "Đang lưu..." : "Lưu"}
           </button>

@@ -175,13 +175,19 @@ export async function POST(req: NextRequest) {
       if (existsSync(tempPathData)) {
         try {
           unlinkSync(tempPathData);
-        } catch {}
+        } catch (err) {
+          // Không chặn luồng lưu bản vẽ chính thức chỉ vì dọn tạm thất bại (vd đang bị khoá) —
+          // nhưng vẫn phải ghi log để biết còn rác trong thư mục temp/, không nuốt lỗi im lặng.
+          console.error("Không xoá được bản sao tạm (data/uploads/drawings):", tempPathData, err);
+        }
       }
       const tempPathRoot = join(process.cwd(), "drawings", cSys, "temp", standardFileName);
       if (existsSync(tempPathRoot)) {
         try {
           unlinkSync(tempPathRoot);
-        } catch {}
+        } catch (err) {
+          console.error("Không xoá được bản sao tạm (drawings/):", tempPathRoot, err);
+        }
       }
     }
 

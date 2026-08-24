@@ -14,6 +14,7 @@ import {
   Sliders,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
+import ThuNghiemBanner from "@/app/components/ThuNghiemBanner";
 import EngineeringNav from "@/app/components/EngineeringNav";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
@@ -228,6 +229,7 @@ export default function ControlledAutonomyPage() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <AppHeader title="Controlled Autonomy (Tự động hóa an toàn A0–A2)" />
       <main className="mx-auto max-w-7xl px-4 py-6">
+        <ThuNghiemBanner moduleKey="engineering-autonomy" />
         <EngineeringNav />
 
         {/* Top Autonomy Control Banner */}
@@ -265,7 +267,7 @@ export default function ControlledAutonomyPage() {
                 type="button"
                 onClick={() => setOpenCreateModal(true)}
                 disabled={killSwitchActive}
-                className="flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-xs font-semibold text-white hover:bg-amber-500 disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-lg bg-amber-700 px-4 py-2 text-xs font-semibold text-on-accent hover:bg-amber-500 disabled:opacity-50"
               >
                 <Play size={14} />
                 <span>Tạo yêu cầu mới</span>
@@ -374,7 +376,7 @@ export default function ControlledAutonomyPage() {
                           type="button"
                           onClick={() => handleExecute(r.id)}
                           disabled={killSwitchActive}
-                          className="flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 disabled:opacity-50"
+                          className="flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-on-accent hover:bg-emerald-600 disabled:opacity-50"
                         >
                           <Zap size={13} /> Thực thi có kiểm soát
                         </button>
@@ -457,7 +459,7 @@ export default function ControlledAutonomyPage() {
                   type="button"
                   disabled={creating || !intentInput.trim()}
                   onClick={handleCreateRequest}
-                  className="rounded-lg bg-amber-600 px-3 py-1.5 font-medium text-white hover:bg-amber-500 disabled:opacity-50"
+                  className="rounded-lg bg-amber-700 px-3 py-1.5 font-medium text-on-accent hover:bg-amber-500 disabled:opacity-50"
                 >
                   {creating ? "Đang tạo..." : "Tạo & Chạy Dry-run"}
                 </button>

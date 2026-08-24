@@ -275,7 +275,7 @@ export default function ImportMaterialsPage() {
                     onClick={() => setSelectedExcelSheet(sName)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition border ${
                       selectedExcelSheet === sName
-                        ? "bg-emerald-600 border-emerald-500 text-white shadow-sm"
+                        ? "bg-emerald-700 border-emerald-500 text-on-accent shadow-sm"
                         : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-600"
                     }`}
                   >
@@ -374,7 +374,7 @@ export default function ImportMaterialsPage() {
             <button
               onClick={doImport}
               disabled={!file || !systemId || busy}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-white rounded-xl px-6 py-2.5 text-sm font-semibold transition shadow-md shadow-emerald-950"
+              className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-on-accent rounded-xl px-6 py-2.5 text-sm font-semibold transition shadow-md shadow-emerald-950"
             >
               <Upload className="w-4 h-4" />
               {busy ? "Đang xử lý import..." : "Bắt đầu import"}

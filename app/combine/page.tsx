@@ -623,7 +623,7 @@ export default function CombinePage() {
                         ) : (
                           <button
                             onClick={() => handleResolveClash(clash.id)}
-                            className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition"
+                            className="px-2.5 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-on-accent text-xs font-semibold shadow-xs transition"
                           >
                             Duyệt Phương Án Tối Ưu
                           </button>

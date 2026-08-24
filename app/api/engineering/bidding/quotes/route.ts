@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { chotProjectIdChoGhi, getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { createVendorQuote, listVendorQuotes } from "@/lib/ky-thuat/engineering-bidding-matrix";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +14,8 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = new URL(req.url);
-  const projectId = Number(searchParams.get("projectId") || (user as any).projectId || 1);
+  // Route chỉ đọc: dự án suy từ phiên (cookie xboss_project), không nhận từ query.
+  const projectId = (await getCurrentProjectId(user)) || 1;
   const packageId = searchParams.get("packageId");
 
   if (!packageId) {
@@ -39,7 +41,20 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const projectId = Number(body.projectId || (user as any).projectId || 1);
+    // Không tin project_id client gửi — đối chiếu danh sách dự án user được thấy
+    // (xem chotProjectIdChoGhi trong lib/ha-tang/projects.ts).
+    const chotDuAn = await chotProjectIdChoGhi(
+      user,
+      body.projectId,
+      (await getCurrentProjectId(user)) || 1,
+    );
+    if (!chotDuAn.ok) {
+      return NextResponse.json(
+        { error: "Không có quyền thao tác trên dự án này" },
+        { status: 403 },
+      );
+    }
+    const projectId = chotDuAn.projectId;
 
     if (
       !body.packageId ||

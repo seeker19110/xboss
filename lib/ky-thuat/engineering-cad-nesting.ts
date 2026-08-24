@@ -269,21 +269,20 @@ export async function saveNestingRun(
       waste_percent = EXCLUDED.waste_percent,
       nesting_plan = EXCLUDED.nesting_plan
     RETURNING id`,
-    [
-      projectId,
-      result.runCode,
-      discipline,
-      result.stockLengthMm,
-      result.kerfMm,
-      result.totalSegments,
-      result.totalBarsUsed,
-      result.totalUsedLengthMm,
-      result.totalWasteMm,
-      result.wastePercent,
-      result.efficiencyGrade,
-      JSON.stringify(result.bars),
-      userId ?? null,
-    ],
+
+    projectId,
+    result.runCode,
+    discipline,
+    result.stockLengthMm,
+    result.kerfMm,
+    result.totalSegments,
+    result.totalBarsUsed,
+    result.totalUsedLengthMm,
+    result.totalWasteMm,
+    result.wastePercent,
+    result.efficiencyGrade,
+    JSON.stringify(result.bars),
+    userId ?? null,
   );
 
   if (!row) throw new Error("Failed to save pipe nesting run");
@@ -293,7 +292,7 @@ export async function saveNestingRun(
 export async function listNestingRuns(projectId: number): Promise<NestingRunRecord[]> {
   return await query<NestingRunRecord>(
     `SELECT * FROM engineering_pipe_nesting_runs WHERE project_id = ? ORDER BY created_at DESC LIMIT 50`,
-    [projectId],
+    projectId,
   );
 }
 
@@ -342,32 +341,31 @@ export async function saveHydraulicCheck(
       ?, ?, ?, ?,
       ?, ?, ?::jsonb, ?, ?, ?
     ) RETURNING id`,
-    [
-      projectId,
-      checkCode,
-      input.systemType,
-      input.formulaUsed,
-      input.flowRateLps ?? null,
-      input.pipeDiameterMm ?? null,
-      input.pipeLengthM ?? null,
-      input.roughnessMm ?? null,
-      input.fluidTempC ?? 25.0,
-      result.velocityMs ?? null,
-      result.reynoldsNumber ?? null,
-      result.frictionFactor ?? null,
-      result.headLossPerMPa ?? null,
-      result.totalHeadLossPa ?? null,
-      result.pressureDropBar ?? null,
-      input.airflowCfm ?? null,
-      input.ductWidthMm ?? null,
-      input.ductHeightMm ?? null,
-      result.velocityLimitMs ?? null,
-      result.velocityOk ?? true,
-      JSON.stringify(result.warnings || []),
-      result.status || "pass",
-      input.linkedSpoolCode ?? null,
-      userId ?? null,
-    ],
+
+    projectId,
+    checkCode,
+    input.systemType,
+    input.formulaUsed,
+    input.flowRateLps ?? null,
+    input.pipeDiameterMm ?? null,
+    input.pipeLengthM ?? null,
+    input.roughnessMm ?? null,
+    input.fluidTempC ?? 25.0,
+    result.velocityMs ?? null,
+    result.reynoldsNumber ?? null,
+    result.frictionFactor ?? null,
+    result.headLossPerMPa ?? null,
+    result.totalHeadLossPa ?? null,
+    result.pressureDropBar ?? null,
+    input.airflowCfm ?? null,
+    input.ductWidthMm ?? null,
+    input.ductHeightMm ?? null,
+    result.velocityLimitMs ?? null,
+    result.velocityOk ?? true,
+    JSON.stringify(result.warnings || []),
+    result.status || "pass",
+    input.linkedSpoolCode ?? null,
+    userId ?? null,
   );
 
   if (!row) throw new Error("Failed to save hydraulic check");
@@ -377,6 +375,6 @@ export async function saveHydraulicCheck(
 export async function listHydraulicChecks(projectId: number): Promise<HydraulicCheckRecord[]> {
   return await query<HydraulicCheckRecord>(
     `SELECT * FROM engineering_hydraulic_checks WHERE project_id = ? ORDER BY created_at DESC LIMIT 50`,
-    [projectId],
+    projectId,
   );
 }

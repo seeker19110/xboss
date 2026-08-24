@@ -106,7 +106,7 @@ function EngineeringIntelligenceContent() {
           <div className="pt-2">
             <Link
               href="/engineering/zalo-copilot"
-              className="px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
+              className="px-3.5 py-2 rounded-xl bg-sky-700 hover:bg-sky-600 text-on-accent font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
             >
               <MessageSquare className="w-3.5 h-3.5" /> Mở Zalo Copilot Hub (M86)
             </Link>
@@ -157,7 +157,7 @@ function EngineeringIntelligenceContent() {
           <div className="flex items-center gap-2">
             <Link
               href="/engineering/workflows"
-              className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-on-accent-dark font-semibold text-xs transition-colors flex items-center gap-1.5 shadow"
+              className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-on-accent-dark font-semibold text-xs transition-colors flex items-center gap-1.5 shadow"
             >
               <Workflow className="w-3.5 h-3.5" /> Luồng Phê Duyệt Gate 0
             </Link>
@@ -220,7 +220,7 @@ function EngineeringIntelligenceContent() {
           <div className="flex items-center gap-2 pt-2">
             <Link
               href="/engineering/swarm"
-              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
+              className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-on-accent font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
             >
               <Network className="w-3.5 h-3.5" /> Swarm Debates (PIN-3)
             </Link>
@@ -290,7 +290,7 @@ function EngineeringIntelligenceContent() {
           <div className="pt-2">
             <Link
               href="/engineering/autonomy"
-              className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-on-accent-dark font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
+              className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-on-accent-dark font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
             >
               <Sliders className="w-3.5 h-3.5" /> Bảng Điều Khiển Tự Trị (OS-4)
             </Link>
@@ -348,7 +348,7 @@ function EngineeringIntelligenceContent() {
           <div className="flex items-center gap-2">
             <Link
               href="/engineering/iot-telemetry"
-              className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-on-accent-dark font-semibold text-xs transition-colors flex items-center gap-1.5 shadow"
+              className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-on-accent-dark font-semibold text-xs transition-colors flex items-center gap-1.5 shadow"
             >
               <Activity className="w-3.5 h-3.5" /> IoT Telemetry (M83)
             </Link>

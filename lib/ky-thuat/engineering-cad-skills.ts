@@ -424,17 +424,16 @@ export async function saveCadDiffSession(
       ?::jsonb, ?::jsonb, ?::jsonb,
       ?
     ) RETURNING id`,
-    [
-      projectId,
-      baseDrawingId,
-      compareDrawingId,
-      result.totalBase,
-      result.totalCompare,
-      JSON.stringify(result.summary),
-      JSON.stringify(result.differences),
-      JSON.stringify(result.potentialVoImpact),
-      userId ?? null,
-    ],
+
+    projectId,
+    baseDrawingId,
+    compareDrawingId,
+    result.totalBase,
+    result.totalCompare,
+    JSON.stringify(result.summary),
+    JSON.stringify(result.differences),
+    JSON.stringify(result.potentialVoImpact),
+    userId ?? null,
   );
 
   if (!row) throw new Error("Failed to save CAD Diff session");
@@ -444,14 +443,14 @@ export async function saveCadDiffSession(
 export async function listCadDiffSessions(projectId: number) {
   return await query(
     `SELECT * FROM engineering_cad_diff_sessions WHERE project_id = ? ORDER BY created_at DESC LIMIT 50`,
-    [projectId],
+    projectId,
   );
 }
 
 export async function listCadBlockCatalogs(projectId: number) {
   return await query<CadBlockCatalogRecord>(
     `SELECT * FROM engineering_cad_block_catalogs WHERE project_id = ? ORDER BY block_name ASC`,
-    [projectId],
+    projectId,
   );
 }
 

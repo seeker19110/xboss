@@ -174,16 +174,15 @@ export async function saveVoiceLog(
       $4, $5, $6,
       $7, $8
     ) RETURNING id`,
-    [
-      projectId,
-      parsed.rawText,
-      parsed.extractedLocation,
-      parsed.extractedSpoolCode,
-      parsed.detectedStatus,
-      parsed.hasDefect,
-      parsed.defectDescription,
-      userId,
-    ],
+
+    projectId,
+    parsed.rawText,
+    parsed.extractedLocation,
+    parsed.extractedSpoolCode,
+    parsed.detectedStatus,
+    parsed.hasDefect,
+    parsed.defectDescription,
+    userId,
   );
 
   if (!row) throw new Error("Failed to save voice log");

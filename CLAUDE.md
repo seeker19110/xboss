@@ -71,6 +71,7 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy lint + typecheck + test +
 - `XBOSS_ADMIN_PASSWORD` — production + DB trống chỉ tạo 1 admin với mật khẩu này (không seed 4 tài khoản demo như dev).
 - `CRON_SECRET` — bảo vệ `/api/cron/daily-report`, chỉ nhận qua header `Authorization: Bearer` (không qua query param).
 - `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` — (tuỳ chọn) gửi báo cáo trễ hạn hằng ngày qua Telegram, song song với email SMTP.
+- `TELEGRAM_WEBHOOK_SECRET` / `ZALO_OA_SECRET` — xác thực webhook **đi vào** của bot hiện trường (`lib/bao-mat/webhook-inbound.ts`). Telegram so header `X-Telegram-Bot-Api-Secret-Token`; Zalo kiểm HMAC-SHA256 trên raw body (`X-ZEvent-Signature`). Sai/thiếu chữ ký → **401**, không ghi dòng DB nào. Thiếu biến → **throw fail-fast** ngay khi webhook được gọi (build/dev vẫn chạy bình thường).
 - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` — (tuỳ chọn) Web Push; sinh key bằng `npx web-push generate-vapid-keys`. Thiếu key → nút bật push tự ẩn, mọi hàm gửi trong `lib/van-hanh/push.ts` là no-op.
 - `GOOGLE_SERVICE_ACCOUNT_JSON` (hoặc cặp `GOOGLE_SA_EMAIL` + `GOOGLE_SA_PRIVATE_KEY`) + `GOOGLE_SHEET_ID` + `GOOGLE_SHEET_TAB` — (tuỳ chọn) đồng bộ hai chiều bảng vật tư ↔ Google Sheet. Thiếu cấu hình → `lib/vat-tu/google-sheets.ts` throw fail-fast khi gọi sync (build vẫn chạy).
 - `SENTRY_DSN` — (tuỳ chọn) theo dõi lỗi production qua Sentry (`instrumentation.ts` + `sentry.server.config.ts`/`sentry.edge.config.ts`, xem `docs/audit.md` §10). Thiếu → SDK tự `enabled: false`, không gửi gì, không ảnh hưởng build/dev.
@@ -165,7 +166,7 @@ Tick checkbox dimension → `recomputeTask` (% = số ô checked / tổng ô) �
 
 ### Offline (PWA)
 
-`public/sw.js`: API GET network-first + fallback cache (trừ `/api/photos/`). Tick checkbox khi mất mạng được xếp hàng trong localStorage (`app/components/offlineQueue.ts` — `useOfflineTickQueue`) và tự PATCH lại khi online; 4xx bị bỏ để không kẹt hàng đợi. **App Shell**: `SHELL_URLS` precache `/offline` + manifest/icon lúc cài đặt SW; điều hướng HTML mất mạng mà chưa có trong cache (chưa từng ghé) rơi về trang `/offline` (`app/offline/page.tsx`) thay vì lỗi mạng mặc định của trình duyệt. Đổi logic cache nhớ tăng version `CACHE` trong sw.js.
+`public/sw.js`: API GET stale-while-revalidate + cache (trừ `/api/photos/`). Tick checkbox khi mất mạng được xếp hàng trong IndexedDB (`app/components/offlineQueue/` — `useOfflineTickQueue`, 3 loại op: tick/photo/diary) và tự PATCH lại khi online; 4xx bị bỏ để không kẹt hàng đợi. **App Shell**: `SHELL_URLS` precache `/offline` + manifest/icon lúc cài đặt SW; điều hướng HTML mất mạng mà chưa có trong cache (chưa từng ghé) rơi về trang `/offline` (`app/offline/page.tsx`) thay vì lỗi mạng mặc định của trình duyệt. Đổi logic cache nhớ tăng version `CACHE` trong sw.js.
 
 ### Frontend
 

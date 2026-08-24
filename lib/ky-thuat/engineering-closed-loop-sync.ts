@@ -45,7 +45,8 @@ export async function syncSpoolToWbsAndPayment(
         status = CASE WHEN progress + 10 >= 100 THEN 'done' ELSE 'in_progress' END,
         updated_at = NOW()
        WHERE id = $1 AND project_id = $2`,
-      [payload.wbsTaskId, projectId],
+      payload.wbsTaskId,
+      projectId,
     );
   }
 
@@ -58,15 +59,14 @@ export async function syncSpoolToWbsAndPayment(
       $1, $2, $3, $4,
       $5, $6, $7
     )`,
-    [
-      projectId,
-      syncCode,
-      payload.spoolId,
-      payload.wbsTaskId || null,
-      payload.calculatedQty,
-      totalAmountVnd,
-      provenanceToken,
-    ],
+
+    projectId,
+    syncCode,
+    payload.spoolId,
+    payload.wbsTaskId || null,
+    payload.calculatedQty,
+    totalAmountVnd,
+    provenanceToken,
   );
 
   return {

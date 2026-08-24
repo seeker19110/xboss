@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import {
   listSwarmDebates,
   createSwarmDebate,
@@ -22,6 +23,8 @@ export async function GET() {
 
   const projectId = await getCurrentProjectId(user);
   if (!projectId) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+  const blocked = await assertModuleEnabled("engineering-swarm", projectId);
+  if (blocked) return blocked;
 
   try {
     const debates = await listSwarmDebates(projectId);
@@ -42,6 +45,8 @@ export async function POST(req: Request) {
 
   const projectId = await getCurrentProjectId(user);
   if (!projectId) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+  const blocked = await assertModuleEnabled("engineering-swarm", projectId);
+  if (blocked) return blocked;
 
   try {
     const body = await req.json();

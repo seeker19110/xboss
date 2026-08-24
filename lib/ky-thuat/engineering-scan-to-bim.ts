@@ -426,7 +426,13 @@ export async function closedLoopSyncSpoolToWbs(
       (project_id, sync_code, spool_id, wbs_task_id, synced_qty, synced_amount_vnd, provenance_token)
      VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (project_id, sync_code) DO NOTHING`,
-    [projectId, syncCode, spoolId, wbsTaskId, syncedQty, syncedAmountVnd, provenanceToken],
+    projectId,
+    syncCode,
+    spoolId,
+    wbsTaskId,
+    syncedQty,
+    syncedAmountVnd,
+    provenanceToken,
   );
 
   return provenanceToken;
@@ -456,17 +462,16 @@ export async function saveScanToBimRun(
       defects_count = EXCLUDED.defects_count,
       deviation_details = EXCLUDED.deviation_details
     RETURNING id`,
-    [
-      projectId,
-      res.scanCode,
-      res.pointCloudSource,
-      res.totalPointsScanned,
-      res.spoolsAnalyzedCount,
-      res.passRatePercent,
-      res.maxDeviationMm,
-      res.defectsCount,
-      JSON.stringify(res.deviations),
-    ],
+
+    projectId,
+    res.scanCode,
+    res.pointCloudSource,
+    res.totalPointsScanned,
+    res.spoolsAnalyzedCount,
+    res.passRatePercent,
+    res.maxDeviationMm,
+    res.defectsCount,
+    JSON.stringify(res.deviations),
   );
 
   if (!row) throw new Error("Failed to save Scan-to-BIM run");

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import {
   updateDeviationRemediation,
   RemediationStatus,
@@ -19,6 +20,8 @@ export async function POST(req: Request, props: { params: Promise<{ id: string }
 
   const projectId = await getCurrentProjectId(user);
   if (!projectId) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+  const blocked = await assertModuleEnabled("engineering-twin", projectId);
+  if (blocked) return blocked;
 
   try {
     const body = await req.json();

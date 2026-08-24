@@ -352,17 +352,16 @@ export async function saveLod400Run(
       sleeves_count = EXCLUDED.sleeves_count,
       sleeve_details = EXCLUDED.sleeve_details
     RETURNING id`,
-    [
-      projectId,
-      res.runCode,
-      res.drawingName,
-      res.totalSpoolsGenerated,
-      res.slopeAppliedPercent,
-      res.flangePairsInserted,
-      res.insulationSpec,
-      res.sleevesCount,
-      JSON.stringify(res.sleeveDetails),
-    ],
+
+    projectId,
+    res.runCode,
+    res.drawingName,
+    res.totalSpoolsGenerated,
+    res.slopeAppliedPercent,
+    res.flangePairsInserted,
+    res.insulationSpec,
+    res.sleevesCount,
+    JSON.stringify(res.sleeveDetails),
   );
 
   if (!row) throw new Error("Failed to save LOD400 run");

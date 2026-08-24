@@ -73,6 +73,26 @@ jobs:
       - name: Kiểm ranh giới miền lib/
         run: npm run check:lib-layers
 
+      # Chặn chữ trắng trên nền accent sáng (a11y): text-white + bg-{emerald|sky|amber|green|teal|cyan}-500/600,
+      # và hover no-op (bg-{c}-N + hover:bg-{c}-N cùng opacity). Lỗi lặp lần ≥3 ở GĐ1. Static.
+      - name: Kiểm màu accent (text-white trên nền sáng)
+        run: npm run check:mau-accent
+
+      # W2.1 (đợt "nâng tầm dự án" GĐ2): chặn route ghi (POST/PATCH/PUT/DELETE) quên kiểm
+      # quyền — lớp lỗi đã lặp ≥3 đợt audit. Static, không cần DB.
+      - name: Kiểm route ghi có kiểm quyền
+        run: npm run check:route-perms
+
+      # W2.2: chặn route lấy project_id thẳng từ CLIENT (body/formData/query) mà không chốt
+      # qua chotProjectIdChoGhi — toàn bộ app/api/**, không chỉ engineering/. Static, không cần DB.
+      - name: Kiểm route không tin projectId client gửi trần
+        run: npm run check:project-scope
+
+      # W2.3: chặn tái phát lỗi truyền MẢNG cho helper lib/db (query/queryOne/run/insertId) —
+      # 43 file từng chết ngay câu SQL đầu tiên vì lỗi này. Static, không cần DB.
+      - name: Kiểm tham số lib/db (chặn query(sql, [a, b]))
+        run: npm run check:db-params
+
   # ── Test đơn vị + tích hợp trên Postgres thật ──
   test:
     name: test (Postgres)
@@ -122,6 +142,14 @@ jobs:
       # vẫn báo "0 file fail", trông y hệt một lần chạy xanh thật.
       - name: Test (kèm test tích hợp trên Postgres)
         run: npm test -- --release-gate
+        env:
+          TEST_DATABASE_URL: postgres://ci:ci@localhost:5432/xboss_test
+
+      # Ratchet coverage (W6.2): chặn tụt coverage âm thầm so với coverage-baseline.json.
+      # Chạy lại toàn bộ test có --experimental-test-coverage (script tự đo, không phụ
+      # thuộc bước Test ở trên) — cần Postgres thật nên đặt ở job `test`, không phải `static`.
+      - name: Kiểm coverage không tụt quá ngưỡng đệm so với mốc
+        run: npm run check:coverage
         env:
           TEST_DATABASE_URL: postgres://ci:ci@localhost:5432/xboss_test
 

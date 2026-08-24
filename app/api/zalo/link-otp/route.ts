@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/bao-mat/auth";
-import { generateZaloLinkOtp, verifyZaloLinkOtp } from "@/lib/ky-thuat/engineering-zalo-copilot";
+import { chotProjectIdChoGhi, getCurrentProjectId } from "@/lib/ha-tang/projects";
+import {
+  generateZaloLinkOtp,
+  verifyZaloLinkOtp,
+  LOI_ZALO_DA_LIEN_KET,
+} from "@/lib/ky-thuat/engineering-zalo-copilot";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +16,19 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const projectId = Number(body.projectId || (user as any).projectId || 1);
+    // Không tin project_id client gửi — trước đây `(user as any).projectId` không tồn tại
+    // trên kiểu User nên biểu thức luôn rơi về giá trị client gửi (bơm OTP vào dự án khác).
+    const chotDuAn = await chotProjectIdChoGhi(
+      user,
+      body.projectId,
+      (await getCurrentProjectId(user)) || 1,
+    );
+    if (!chotDuAn.ok)
+      return NextResponse.json(
+        { error: "Không có quyền thao tác trên dự án này" },
+        { status: 403 },
+      );
+    const projectId = chotDuAn.projectId;
     const action = body.action || "generate"; // generate | verify
 
     if (action === "generate") {
@@ -44,6 +61,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Hành động không hợp lệ" }, { status: 400 });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
+    // Zalo ID đang thuộc tài khoản XBoss khác → xung đột tài nguyên, không phải lỗi máy chủ.
+    if (msg === LOI_ZALO_DA_LIEN_KET) return NextResponse.json({ error: msg }, { status: 409 });
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

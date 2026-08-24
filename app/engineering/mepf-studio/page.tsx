@@ -288,7 +288,7 @@ function TaskCard({
             <button
               onClick={() => onBridge(task.id)}
               disabled={bridging}
-              className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-lg bg-emerald-700 px-2.5 py-1.5 text-xs font-medium text-on-accent transition hover:bg-emerald-500 disabled:opacity-50"
             >
               {bridging ? <Loader2 size={13} className="animate-spin" /> : <Layers size={13} />}
               Chuyển thành Đối tượng Kỹ thuật & Trình Duyệt Gate 0
@@ -680,7 +680,7 @@ export default function MepfStudioPage() {
               <h2 className="text-sm font-semibold text-zinc-200">
                 Hàng đợi MEPF
                 {activeTasks.length > 0 && (
-                  <span className="ml-2 rounded-full bg-sky-600 px-2 py-0.5 text-[10px] text-white">
+                  <span className="ml-2 rounded-full bg-sky-700 px-2 py-0.5 text-[10px] text-on-accent">
                     {activeTasks.length} đang chạy
                   </span>
                 )}
