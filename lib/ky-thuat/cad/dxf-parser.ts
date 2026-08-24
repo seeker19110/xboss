@@ -863,10 +863,33 @@ function isDwgBuffer(buf: Buffer): boolean {
  * thì rơi về Latin-1 — mỗi byte thành đúng một ký tự U+00xx, đúng dạng đầu vào mà bảng TCVN3 chờ.
  */
 export function decodeDxfBytes(buf: Buffer): string {
+  return giaiMaByteDxf(buf);
+}
+
+/**
+ * Bản chạy được ở CẢ máy chủ lẫn TRÌNH DUYỆT của `decodeDxfBytes` — không phụ thuộc `Buffer`.
+ *
+ * Vì sao cần: trang chuẩn hoá đọc tệp bằng `FileReader.readAsText()`, mà `readAsText` không có
+ * tham số bảng mã thì **mặc định UTF-8**. Bản vẽ Việt Nam đời cũ ghi bằng TCVN3/ABC, VNI hay
+ * CP1258 sẽ mất sạch chữ có dấu thành `\uFFFD` ngay ở bước đọc tệp — **không thể khôi phục**, vì
+ * byte gốc đã bị trình duyệt vứt đi trước khi Bác Sĩ Font kịp nhìn thấy. Máy chủ xử lý đúng chuyện
+ * này từ lâu (`parse-dxf/route.ts` truyền thẳng Buffer), client thì chưa bao giờ (audit 2026-08-24).
+ *
+ * Nhánh dự phòng cố ý **tự map byte → mã điểm** thay vì `new TextDecoder("latin1")`: nhãn
+ * "latin1" của WHATWG thực chất là windows-1252, khác latin1 thật ở dải 0x80–0x9F — đúng dải mà
+ * bảng mã VNI dùng. Dùng nhầm là hỏng đúng thứ đang muốn cứu.
+ */
+export function giaiMaByteDxf(bytes: Uint8Array): string {
   try {
-    return new TextDecoder("utf-8", { fatal: true }).decode(buf);
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   } catch {
-    return buf.toString("latin1");
+    // Ghép theo khối để không vượt giới hạn số tham số của String.fromCharCode với tệp lớn.
+    const KHOI = 0x2000;
+    let ket = "";
+    for (let i = 0; i < bytes.length; i += KHOI) {
+      ket += String.fromCharCode(...bytes.subarray(i, Math.min(i + KHOI, bytes.length)));
+    }
+    return ket;
   }
 }
 

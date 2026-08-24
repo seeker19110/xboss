@@ -8,6 +8,7 @@ import {
   DwgUnsupportedError,
   DWG_UNSUPPORTED_MESSAGE,
   generateStandardizedAutocadScript,
+  giaiMaByteDxf,
   DxfParseResult,
   DxfLayerInfo,
   resolveXrefDependencies,
@@ -267,7 +268,7 @@ export function useCadSource({ onLayersParsed }: UseCadSourceOptions) {
       // Bản trước làm cùng một bản vẽ tới BỐN lượt nặng, và với bản vẽ MEPF thật (người dùng báo
       // tệp gần/vượt 150 MB, 2026-08-24) thì tab trình duyệt không chịu nổi:
       //
-      //   1. readAsText  → chuỗi JS (UTF-16, gấp đôi cỡ tệp)
+      //   1. đọc tệp   → chuỗi JS
       //   2. parseDxf    → cây thực thể
       //   3. exportDxf   → CHUỖI XUẤT ĐẦY ĐỦ, dựng ngay lúc nạp dù chưa ai bấm tải về
       //   4. runDxfAnalysis({ customDxfContent: content })
@@ -285,7 +286,11 @@ export function useCadSource({ onLayersParsed }: UseCadSourceOptions) {
       //     đặt tại chỗ, cùng công thức máy chủ dùng.
       const reader = new FileReader();
       reader.onload = async (event) => {
-        const content = (event.target?.result as string) || "";
+        // Đọc BYTE rồi tự giải mã, KHÔNG dùng readAsText: readAsText không có tham số bảng mã thì
+        // mặc định UTF-8, nên bản vẽ ghi bằng TCVN3/VNI/CP1258 mất sạch chữ có dấu ngay tại đây và
+        // không cách nào khôi phục. `giaiMaByteDxf` là đúng logic máy chủ vẫn dùng.
+        const bytes = new Uint8Array((event.target?.result as ArrayBuffer) || new ArrayBuffer(0));
+        const content = giaiMaByteDxf(bytes);
         try {
           setLoading(true);
           const parsed = parseDxf(content, dxfName);
@@ -318,7 +323,7 @@ export function useCadSource({ onLayersParsed }: UseCadSourceOptions) {
           setLoading(false);
         }
       };
-      reader.readAsText(file);
+      reader.readAsArrayBuffer(file);
     }
   };
 

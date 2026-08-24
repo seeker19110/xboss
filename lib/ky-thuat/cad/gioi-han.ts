@@ -9,12 +9,11 @@
  * Đối chiếu phần còn lại của hệ thống: ảnh hiện trường 10 MB, biên bản nghiệm thu 20 MB; riêng
  * CAD — loại tệp lớn nhất trong cả app — thì bỏ ngỏ (audit 2026-08-24).
  *
- * Chọn 300 MB: bản vẽ MEPF toàn tầng của dự án này ở dạng DXF ASCII đã gần/vượt 150 MB (người
- * dùng xác nhận 2026-08-24), nên trần 150 MB đặt lúc đầu là chặn đúng người dùng thật. Đây là van
- * an toàn chống tràn bộ nhớ máy chủ, không phải chính sách nghiệp vụ — con số này chưa có căn cứ
- * từ đặc tả, cần chủ spec chốt lại.
+ * Chọn 150 MB: bản vẽ MEPF thật của dự án đo được **~50 MB** (người dùng xác nhận 2026-08-24), nên
+ * trần này để 3× dư địa. Đây là van an toàn chống tràn bộ nhớ máy chủ, không phải chính sách
+ * nghiệp vụ — con số chưa có căn cứ từ đặc tả, cần chủ spec chốt lại.
  */
-export const GIOI_HAN_TEP_CAD = 300 * 1024 * 1024;
+export const GIOI_HAN_TEP_CAD = 150 * 1024 * 1024;
 
 /**
  * Ước lượng số byte thật của một chuỗi base64 mà KHÔNG giải mã nó.

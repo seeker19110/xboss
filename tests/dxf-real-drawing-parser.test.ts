@@ -8,6 +8,7 @@ import {
   generateStandardizedAutocadScript,
   validateDxf,
   decodeCadText,
+  giaiMaByteDxf,
 } from "@/lib/ky-thuat/cad/dxf-parser";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
@@ -1268,4 +1269,62 @@ test("exportDxf: bản vẽ rỗng không làm chiều cao khung nhìn thành 0 
     Number.isFinite(cao) && cao > 0,
     `chiều cao khung nhìn phải dương hữu hạn, nhận ${cao}`,
   );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bảng mã 8 bit ở ĐƯỜNG CLIENT (audit 2026-08-24).
+//
+// Máy chủ xử lý đúng chuyện này từ lâu (route truyền thẳng Buffer cho parseDxf), nhưng trang
+// chuẩn hoá đọc tệp bằng `FileReader.readAsText()` — không truyền tham số bảng mã thì mặc định
+// UTF-8, nên bản vẽ ghi bằng TCVN3/VNI/CP1258 mất sạch chữ có dấu thành `�` NGAY Ở BƯỚC ĐỌC
+// TỆP. Mất ở đó là mất vĩnh viễn: Bác Sĩ Font chạy sau, không còn byte gốc để suy ra chữ đúng.
+//
+// `giaiMaByteDxf` là bản không phụ thuộc `Buffer` (chạy được cả ở trình duyệt) của
+// `decodeDxfBytes`, để client dùng đúng logic máy chủ vẫn dùng.
+// ─────────────────────────────────────────────────────────────────────────────
+test("giaiMaByteDxf: giữ nguyên byte của bảng mã 8 bit, không biến thành ký tự thay thế", () => {
+  // 0xE8/0xE3/0xE5/0xE1 — dải byte TCVN3 dùng cho chữ có dấu. Không phải UTF-8 hợp lệ.
+  const byte = Buffer.from("èng giã cåp lánh", "latin1");
+  assert.ok(
+    byte.some((b) => b > 127),
+    "fixture phải có byte trên 127 mới tái hiện được lỗi",
+  );
+
+  const raRoi = giaiMaByteDxf(new Uint8Array(byte));
+  assert.ok(!raRoi.includes("�"), "không được có ký tự thay thế");
+  assert.equal(raRoi.charCodeAt(0), 0xe8, "byte đầu phải giữ nguyên giá trị 0xE8");
+  assert.equal(raRoi, "èng giã cåp lánh");
+
+  // Đối chiếu: đúng cách readAsText làm — ép UTF-8, không đường lui.
+  const nhuReadAsText = new TextDecoder("utf-8").decode(byte);
+  assert.ok(nhuReadAsText.includes("�"), "đường cũ PHẢI hỏng, nếu không thì test vô nghĩa");
+});
+
+test("giaiMaByteDxf: tệp UTF-8 thật vẫn giải mã đúng, không rơi nhầm sang nhánh dự phòng", () => {
+  const utf8 = Buffer.from("ống gió cấp lạnh AHU-01 Ø150", "utf8");
+  assert.equal(giaiMaByteDxf(new Uint8Array(utf8)), "ống gió cấp lạnh AHU-01 Ø150");
+});
+
+test("giaiMaByteDxf: chạy được trên chuỗi byte dài, không vượt giới hạn tham số", () => {
+  // Nhánh dự phòng ghép bằng String.fromCharCode theo khối — tệp lớn phải không nổ.
+  const dai = Buffer.alloc(500_000, 0xe8);
+  const ra = giaiMaByteDxf(new Uint8Array(dai));
+  assert.equal(ra.length, 500_000);
+  assert.equal(ra.charCodeAt(499_999), 0xe8);
+});
+
+test("parseDxf: bản vẽ TCVN3 đọc qua byte giữ được chữ, đọc qua UTF-8 thì mất", () => {
+  const mau =
+    "0\nSECTION\n2\nENTITIES\n0\nTEXT\n8\n0\n10\n0\n20\n0\n30\n0\n40\n300\n" +
+    "1\nèng giã cåp lánh\n0\nENDSEC\n0\nEOF";
+  const byte = Buffer.from(mau, "latin1");
+
+  const chu = (noiDung: string) => {
+    const e = parseDxf(noiDung, "t.dxf").entities.find((x) => x.type === "TEXT") as
+      { textValue?: string } | undefined;
+    return e?.textValue ?? "";
+  };
+
+  assert.ok(chu(new TextDecoder("utf-8").decode(byte)).includes("�"), "đường cũ phải hỏng");
+  assert.equal(chu(giaiMaByteDxf(new Uint8Array(byte))), "èng giã cåp lánh");
 });

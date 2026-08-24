@@ -4,9 +4,51 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Bảng mã 8 bit ở ĐƯỜNG CLIENT — chữ tiếng Việt mất ngay bước đọc tệp (2026-08-24)
+
+Truy tiếp vì sao bản vẽ 50 MB của người dùng xuất ra không mở được, và tìm ra một lỗi khác hẳn giả
+thuyết bộ nhớ.
+
+**Máy chủ** xử lý bảng mã cũ rất cẩn thận: route truyền thẳng `Buffer` cho `parseDxf`, `parseDxf`
+gọi `decodeDxfBytes` (UTF-8 nghiêm ngặt, hỏng thì lui về latin1 thuần), rồi Bác Sĩ Font suy ra
+TCVN3/VNI. Đây chính là lỗi đã sửa ở đợt trước.
+
+**Client thì chưa bao giờ.** Trang chuẩn hoá đọc tệp bằng `FileReader.readAsText()` — hàm này
+không truyền tham số bảng mã thì **mặc định UTF-8**, và byte không hợp lệ bị thay bằng `\uFFFD`
+**không thể khôi phục**. Bản vẽ Việt Nam đời cũ mất sạch chữ có dấu ngay tại đây, trước khi Bác Sĩ
+Font kịp nhìn thấy byte gốc.
+
+Và **thay đổi tối ưu ngay trước đó của tôi làm lỗi này nặng hơn**: sau khi bỏ lượt POST lên máy
+chủ, đường client trở thành đường **duy nhất** cho tệp DXF nạp cục bộ — tức mất luôn đường lui vô
+tình che lỗi này bấy lâu.
+
+**Chứng minh, không suy đoán.** Dựng DXF hợp lệ có dòng TEXT ghi bằng byte TCVN3 (0xE8, 0xE3, 0xE5,
+0xE1):
+
+| Đường                                       | Chữ đọc được                                        |
+| ------------------------------------------- | --------------------------------------------------- |
+| Cũ (`readAsText` → ép UTF-8)                | `"�ng gi� c�p l�nh"` — byte gốc bị vứt              |
+| Mới (`readAsArrayBuffer` → `giaiMaByteDxf`) | `"èng giã cåp lánh"` — byte gốc `U+00E8` giữ nguyên |
+
+**Sửa:** thêm `giaiMaByteDxf(bytes: Uint8Array)` — bản **không phụ thuộc `Buffer`** của
+`decodeDxfBytes`, chạy được cả ở trình duyệt; `decodeDxfBytes` nay chỉ là lớp mỏng gọi nó. Client
+đổi sang `readAsArrayBuffer` rồi giải mã bằng chính hàm đó.
+
+Nhánh dự phòng **cố ý tự map byte → mã điểm** thay vì `new TextDecoder("latin1")`: nhãn `"latin1"`
+của WHATWG thực chất là windows-1252, khác latin1 thật ở dải 0x80–0x9F — **đúng dải bảng mã VNI
+dùng**. Dùng nhầm là hỏng đúng thứ đang muốn cứu.
+
+**Lưu ý về phạm vi bản vá:** nó bảo đảm **byte gốc còn nguyên** để Bác Sĩ Font có nguyên liệu làm
+việc — điều kiện cần. Việc Bác Sĩ Font có tự nhận ra TCVN3 hay không lại do cổng `TCVN3_SIGNATURE`
+quyết (thêm có chủ đích ở đợt trước để giữ tính idempotent), và cổng đó không mở với mọi chuỗi.
+Đó là chuyện khác, chưa động tới.
+
+4 ca test hồi quy, gồm một ca đối chiếu **bắt buộc đường cũ phải hỏng** — nếu không thì bài test vô
+nghĩa.
+
 ## Nạp bản vẽ lớn: bỏ 3 trong 4 lượt xử lý thừa lúc nạp (2026-08-24)
 
-Người dùng xác nhận bản vẽ MEPF thật của dự án **gần/vượt 150 MB**. Đo lại đường nạp tệp DXF cục
+Người dùng ban đầu nói tệp gần/vượt 150 MB, sau đó **đính chính: bản vẽ thật ~50 MB**. Đo lại đường nạp tệp DXF cục
 bộ thì thấy cùng một bản vẽ bị xử lý **bốn lượt nặng**, ba trong đó không ai dùng tới:
 
 | Lượt | Việc                                                                                                                    | Có cần không |
@@ -35,10 +77,11 @@ Tỉ lệ gần tuyến tính, hệ số phình ~20× cho riêng bước parse v
 **Kết quả:** bỏ lượt 3 và 4 cắt khoảng **một nửa** bộ nhớ đỉnh, và bỏ hẳn cú POST vài trăm MB.
 Trần dung lượng nâng 150 → **300 MB** cho khớp cỡ bản vẽ thật của dự án.
 
-**Nói thẳng: chưa chắc đủ.** Riêng bước `parseDxf` với tệp 150 MB vẫn ngoại suy ra ~3,1 GB, cộng
-thêm ~300 MB cho chính chuỗi `readAsText`. Một tab trình duyệt thường không trụ nổi mức đó. Bản vá
-này là cải thiện thật và đo được, **không phải lời hứa rằng tệp 150 MB sẽ chạy**. Muốn chắc thì
-phải đổi kiến trúc — xem nợ kỹ thuật.
+**Đính chính một kết luận vội của chính tôi.** Khi còn tưởng tệp là 150 MB, tôi ngoại suy ra ~3,1 GB
+và kết luận "tab trình duyệt không trụ nổi". Đo thẳng ở **50,5 MB** — cỡ thật — thì đường cũ chỉ
+tốn **1,4 GB**, mức một tab Chrome vẫn chịu được. Nên **bộ nhớ nhiều khả năng KHÔNG phải nguyên
+nhân** khiến tệp của người dùng hỏng. Việc tối ưu vẫn đáng làm (bỏ 3 lượt thừa, nhanh hơn ~3× lúc
+nạp), nhưng nó **không** phải bản vá cho lỗi đang gặp. Nguyên nhân thật, xem mục dưới.
 
 ### Nợ kỹ thuật — hướng xử lý triệt để, cần người dùng chốt
 
