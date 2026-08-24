@@ -14,6 +14,7 @@
 // Cây append-only: mỗi module M<x> hoàn thành chỉ đổi `status`/thêm `href` đúng node.
 import type { LucideIcon } from "lucide-react";
 import {
+  PenLine,
   LayoutDashboard,
   FileText,
   BookMarked,
@@ -382,6 +383,12 @@ export const DASHBOARD_TREE: DashCluster[] = [
         href: "/bien-phap-thi-cong",
         label: "Biện pháp thi công",
         icon: HardHat,
+      },
+      {
+        id: "dash.design-changes",
+        href: "/design-changes",
+        label: "Thay đổi thiết kế",
+        icon: PenLine,
       },
       {
         id: "dash.as-built",
