@@ -42,7 +42,7 @@ export function useAutoHealEngine({
   // ── Áp dụng trực tiếp lên dữ liệu thật ──
   const handleAutoHealAll = useCallback(() => {
     if (!dxfData) {
-      showToast("Chưa nạp bản vẽ để thực hiện chuẩn hóa.");
+      showToast("Chưa nạp bản vẽ để thực hiện chuẩn hóa.", "warning");
       return;
     }
 
@@ -124,7 +124,7 @@ export function useAutoHealEngine({
     if (isAutoHealing) return;
 
     if (!dxfData) {
-      showToast("⚠️ Vui lòng chọn hoặc nạp một bản vẽ CAD để tự động chuẩn hóa.");
+      showToast("⚠️ Vui lòng chọn hoặc nạp một bản vẽ CAD để tự động chuẩn hóa.", "warning");
       return;
     }
 

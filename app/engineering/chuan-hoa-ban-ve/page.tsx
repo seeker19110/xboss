@@ -197,6 +197,10 @@ export default function ChuanHoaBanVePage() {
           handleDownloadConvertedDxf={exporters.handleDownloadConvertedDxf}
           handleFolderUpload={source.handleFolderUpload}
           handleSelectFolderDrawing={source.handleSelectFolderDrawing}
+          analysisError={source.analysisError}
+          ambiguousCandidates={source.ambiguousCandidates}
+          resolveAmbiguousCandidate={source.resolveAmbiguousCandidate}
+          cancelAmbiguousCandidates={source.cancelAmbiguousCandidates}
         />
 
         {/* ══════════════════════════════════════════════════════════════════════
