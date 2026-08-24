@@ -17,13 +17,14 @@ quy tắc tải từ XBoss dưới dạng **rule pack** có version (không nhú
 | Lệnh               | Chức năng                                                                                                                                                                                                          |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `XBOSS_RULEPACK`   | Nạp tệp rule pack JSON (tải từ trang XBoss `/engineering/chuan-hoa-ban-ve` khi đăng nhập) — cache `%APPDATA%\XBoss\rule-pack.json`. **Bắt buộc chạy trước tiên**; chưa nạp thì mọi lệnh khác từ chối chạy          |
-| `XBOSS_KIEMTRA`    | Chỉ kiểm, không sửa: layer sai chuẩn, lệch Z, polyline hở/gần kín, font TCVN3/VNI, lineweight lệch CTB, dim override, rác hình học — khoanh tròn vị trí lỗi trên layer tạm `XBOSS_KIEMTRA_MARK` (không in, tự dọn) |
+| `XBOSS_KIEMTRA`    | Chỉ kiểm, không sửa — 9 phép kiểm: layer sai chuẩn, lệch Z, polyline hở/gần kín, font TCVN3/VNI, lineweight lệch CTB, dim override, rác hình học, layer rỗng, block nặc danh — khoanh tròn vị trí lỗi trên layer tạm `XBOSS_KIEMTRA_MARK` (không in, tự dọn) + báo cáo JSON `<tệp>.dwg.xboss-kiemtra.json` cạnh DWG |
 | `XBOSS_CHUANHOA`   | Pipeline thứ tự cố định: Audit → layer mapping → font → flatten Z=0 → overkill → purge → lineweight/CTB + gỡ dim override. Xem trước diff, xác nhận, **1 lần UNDO hoàn tác toàn bộ**; báo cáo JSON ghi cạnh DWG    |
 | `XBOSS_BOCKL`      | Bóc khối lượng theo rule pack (`takeoff`): đo chiều dài/diện tích/đếm block theo layer mapping, quy đổi INSUNITS, tô màu vùng đã bóc + XData chống bóc trùng                                                       |
 | `XBOSS_BOCKL_XOA`  | Gỡ đánh dấu bóc (trả đúng màu trước khi bóc, xoá XData) — toàn bộ hoặc theo vùng chọn                                                                                                                              |
-| `XBOSS_BOCKL_XUAT` | Xuất Excel **đúng mẫu công ty** (`attachments/MAU-KHOI-LUONG-BOQ.xlsx`, sheet `Data-BOQ`, cột A–K + công thức H/J/K sống) từ trạng thái bóc đang lưu trong DWG — đóng/mở lại bản vẽ vẫn xuất được                  |
+| `XBOSS_BOCKL_XUAT` | Xuất Excel **đúng mẫu công ty** (`attachments/MAU-KHOI-LUONG-BOQ.xlsx`, sheet `Data-BOQ`, cột A–K + công thức H/J/K sống, tổng nhóm hệ + TỔNG CỘNG bằng `SUBTOTAL` sống) từ trạng thái bóc đang lưu trong DWG — đóng/mở lại bản vẽ vẫn xuất được; kèm sidecar JSON máy-đọc-được cạnh tệp Excel |
+| `XBOSS_BATCH`      | Xử lý hàng loạt cả thư mục `.dwg` qua side database (không mở lên editor): chế độ chỉ-kiểm (mặc định) hoặc chuẩn hóa — **bản gốc giữ nguyên**, kết quả vào thư mục con `da-chuan-hoa/`, tệp lỗi bỏ qua, nhật ký `xboss-batch-log.txt` + báo cáo JSON từng tệp |
 
-(`XBOSS_LOGIN`/`XBOSS_UPLOAD`/`XBOSS_BATCH` thuộc PR2/PR5/PR6 — chưa có trong bản này.)
+(`XBOSS_LOGIN`/`XBOSS_UPLOAD` thuộc PR2/PR5 — chưa có trong bản này.)
 
 ## Build
 

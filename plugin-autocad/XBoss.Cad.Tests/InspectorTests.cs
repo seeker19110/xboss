@@ -109,4 +109,68 @@ public class InspectorTests
         Assert.Single(bc.CanhBao, c => c.Contains("INSUNITS=6"));
         Assert.Empty(Bo.Run(Snapshot()).CanhBao);
     }
+
+    [Fact]
+    public void Phat_hien_layer_rong_theo_used_layers_toan_ban_ve()
+    {
+        // reportEmptyLayers=true trong v2: layer không được dùng ở ĐÂU (kể cả paper space/block)
+        // → báo; "0"/"Defpoints"/layer XBOSS_* không bao giờ báo.
+        var bc = Bo.Run(new DrawingSnapshot
+        {
+            Layers =
+            [
+                new LayerInfo { Name = "M-DUCT-SUPP" },
+                new LayerInfo { Name = "LAYER_BO_HOANG" },
+                new LayerInfo { Name = "0" },
+                new LayerInfo { Name = "Defpoints" },
+                new LayerInfo { Name = "XBOSS_KIEMTRA_MARK" },
+            ],
+            Entities = [],
+            InsUnits = 4,
+            UsedLayerNames = ["m-duct-supp"], // so không phân biệt hoa/thường
+        });
+        var f = Tim(bc, "layer-rong");
+        Assert.NotNull(f);
+        Assert.Equal(["LAYER_BO_HOANG"], f.ChiTiet);
+    }
+
+    [Fact]
+    public void Khong_bao_layer_rong_khi_adapter_khong_cung_cap_used_layers()
+    {
+        // UsedLayerNames null = không có dữ liệu toàn bản vẽ — bỏ phép kiểm thay vì báo oan
+        // (snapshot Entities chỉ chứa model space).
+        var bc = Bo.Run(Snapshot(layers: [new LayerInfo { Name = "LAYER_BO_HOANG" }]));
+        Assert.Null(Tim(bc, "layer-rong"));
+    }
+
+    [Fact]
+    public void Phat_hien_block_nac_danh()
+    {
+        var bc = Bo.Run(new DrawingSnapshot
+        {
+            Layers = [],
+            Entities = [],
+            InsUnits = 4,
+            AnonymousBlockNames = ["*U12", "*D7"],
+        });
+        Assert.Equal(["*U12", "*D7"], Tim(bc, "block-nac-danh")!.ChiTiet);
+        Assert.Null(Tim(Bo.Run(Snapshot()), "block-nac-danh"));
+    }
+
+    [Fact]
+    public void FR8_bao_cao_kiem_tra_xuat_JSON_co_cau_truc()
+    {
+        var lech = new EntityInfo { Handle = "Z1", Layer = "0", Kind = EntityKind.Curve, MaxAbsZ = 5, RawLength = 100 };
+        var bc = Bo.Run(Snapshot([lech])).DongDau("MB-TANG-05.dwg", "2026-08-24");
+        var json = System.Text.Json.JsonDocument.Parse(bc.ToJson());
+        var root = json.RootElement;
+        Assert.Equal("v2", root.GetProperty("rulePackVersion").GetString());
+        Assert.Equal("MB-TANG-05.dwg", root.GetProperty("tenBanVe").GetString());
+        Assert.Equal("2026-08-24", root.GetProperty("ngayIso").GetString());
+        Assert.Equal("chi-kiem", root.GetProperty("cheDo").GetString());
+        Assert.Equal(1, root.GetProperty("tongSoLoi").GetInt32());
+        var finding = root.GetProperty("findings")[0];
+        Assert.Equal("lech-z", finding.GetProperty("id").GetString());
+        Assert.Equal("Z1", finding.GetProperty("handles")[0].GetString());
+    }
 }

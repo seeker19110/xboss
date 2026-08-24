@@ -115,6 +115,25 @@ public class BoqExcelWriterTests
     }
 
     [Fact]
+    public void Tong_nhom_he_va_tong_cong_bang_cong_thuc_SUBTOTAL_song()
+    {
+        var kq = KetQuaMau();
+        var ws = GhiRoiDocLai(kq, out var wb);
+        using (wb)
+        {
+            // Hàng 7 = nhóm HVAC (2 item ở hàng 8-9) → G7 = SUBTOTAL trên G8:G9.
+            Assert.Equal("SUBTOTAL(9,G8:G9)", ws.Cell(7, 7).FormulaA1);
+            Assert.Equal("SUBTOTAL(9,F8:F9)", ws.Cell(7, 6).FormulaA1);
+            // Hàng 10 = nhóm PIPING (1 item hàng 11) → G10 = SUBTOTAL trên G11:G11.
+            Assert.Equal("SUBTOTAL(9,G11:G11)", ws.Cell(10, 7).FormulaA1);
+            // Hàng 12 = TỔNG CỘNG toàn bảng — SUBTOTAL bỏ qua các SUBTOTAL nhóm nên không đếm trùng.
+            Assert.Equal("TỔNG CỘNG", ws.Cell(12, 3).GetString());
+            Assert.Equal("SUBTOTAL(9,G7:G11)", ws.Cell(12, 7).FormulaA1);
+            Assert.Equal("SUBTOTAL(9,H7:H11)", ws.Cell(12, 8).FormulaA1);
+        }
+    }
+
+    [Fact]
     public void So_la_ma_cho_stt_nhom()
     {
         Assert.Equal("I", BoqExcelWriter.SoLaMa(1));
