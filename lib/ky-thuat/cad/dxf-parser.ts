@@ -3619,7 +3619,12 @@ function writeEntityR2000(
           for (const d of l.dashes) out += `49\r\n${real(d)}\r\n`;
         }
       }
-      out += `47\r\n1.0\r\n98\r\n0\r\n`;
+      // KHÔNG ghi mã 47 (pixel size) — spec liệt kê nó là tuỳ chọn trước mã 98, nhưng AutoCAD
+      // thật từ chối thẳng: "in HATCH... Error: expected group code 98" rồi huỷ cả bản vẽ (xác
+      // nhận 2026-08-24, vòng 6 chuỗi "drawing discarded"). Đối chiếu HATCH gốc do chính AutoCAD
+      // R2018 ghi trong bản vẽ MEPF thật: không hề có mã 47, kết thúc bằng 98/1 + seed point
+      // (0,0) ngay sau mã 76 — bắt chước đúng như vậy.
+      out += `98\r\n1\r\n10\r\n0.0\r\n20\r\n0.0\r\n`;
       return out;
     }
 

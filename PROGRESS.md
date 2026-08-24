@@ -96,8 +96,17 @@ sẵn chỉ có CONTINUOUS/CENTER/HIDDEN/DASHED. Điểm đáng ghi nhất: **ez
 đó là bản ghi ẢO ezdxf tự cấp khi đọc; tệp thật không có, audit vẫn 0 lỗi. Sửa: thêm 2 bản ghi vào
 đầu mảng dựng sẵn; test hồi quy + script kiểm nay đối chiếu THẲNG trên chuỗi tệp thay vì tin ezdxf.
 
-**Bài học rút ra sau 5 vòng cùng một triệu chứng "drawing discarded":** `ezdxf.audit()` không bắt
-được lỗi NÀO trong cả năm (0 errors mỗi lần) — công cụ kiểm hợp lệ không thay được việc mở thử
+**Vòng 6 cùng ngày — qua HẾT các bảng TABLES, chết ở entity HATCH: "expected group code 98".**
+Bộ ghi phát mã 47 (pixel size) trước mã 98 (số seed point) — spec liệt kê 47 là TUỲ CHỌN ở đúng vị
+trí đó, nhưng AutoCAD thật từ chối thẳng. Cách tìm ra: đối chiếu HATCH lỗi trong tệp xuất với
+HATCH GỐC cùng toạ độ do chính AutoCAD R2018 ghi trong bản vẽ nguồn — bản gốc không hề có mã 47,
+kết thúc bằng `98/1` + seed point (0,0) ngay sau mã 76. Sửa: bỏ mã 47, bắt chước đúng cách AutoCAD
+tự ghi (1.521 HATCH trong tệp xuất đều được kiểm thẳng trên chuỗi). Bài học bổ sung: khi spec và
+hành vi AutoCAD thật vênh nhau, **tin AutoCAD thật** — và bản vẽ nguồn (do AutoCAD ghi) chính là
+"đáp án mẫu" tốt nhất để đối chiếu từng mã nhóm.
+
+**Bài học rút ra sau 6 vòng cùng một triệu chứng "drawing discarded":** `ezdxf.audit()` không bắt
+được lỗi NÀO trong cả sáu (0 errors mỗi lần) — công cụ kiểm hợp lệ không thay được việc mở thử
 bằng chính AutoCAD thật, và tệ hơn: ezdxf còn TỰ CẤP bản ghi mặc định ảo khi đọc (ByBlock/ByLayer)
 khiến kiểm qua nó dương tính giả. Từ nay mọi thay đổi ở `exportDxf` phải kèm bằng chứng đối chiếu
 SỐ BẢN GHI header vs thực tế cho mọi bảng ĐỌC THẲNG TRÊN CHUỖI TỆP (không qua ezdxf), và nghi ngờ

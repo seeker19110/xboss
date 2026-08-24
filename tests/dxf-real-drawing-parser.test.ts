@@ -801,6 +801,23 @@ test("parseDxf: HATCH giữ ranh giới và mẫu tô, xuất ra vẫn là HATCH
     "Ranh giới vùng tô không được xê dịch",
   );
   assert.equal(hatch2.hatchPatternLines?.length, 1, "Mẫu tô phải theo sang tệp mới");
+
+  // Hồi quy thật (vòng 6 chuỗi "drawing discarded", 2026-08-24): AutoCAD từ chối HATCH có mã 47
+  // (pixel size) đứng trước mã 98 — "expected group code 98" rồi huỷ cả bản vẽ, dù spec liệt kê
+  // 47 là tuỳ chọn ở đúng vị trí đó. HATCH gốc do chính AutoCAD R2018 ghi không hề có mã 47 và
+  // kết thúc bằng 98 + seed point ngay sau phần mẫu tô — bộ ghi phải bắt chước đúng như vậy.
+  const exported = exportDxf(r, { applyStandardLayers: false });
+  const hatchStart = exported.indexOf("100\r\nAcDbHatch\r\n");
+  // Thân HATCH kết thúc ở mã 98 + seed point — cắt một cửa sổ đủ rộng qua điểm đó để kiểm.
+  const thanHatch = exported.slice(hatchStart, hatchStart + 6000);
+  assert.ok(
+    !thanHatch.includes("\r\n47\r\n1.0\r\n"),
+    "HATCH xuất ra không được chứa mã 47 (pixel size) — AutoCAD thật từ chối và huỷ cả bản vẽ",
+  );
+  assert.ok(
+    thanHatch.includes("\r\n98\r\n1\r\n10\r\n0.0\r\n20\r\n0.0\r\n"),
+    "HATCH phải kết thúc bằng 98/1 + seed point (0,0) như chính AutoCAD ghi",
+  );
 });
 
 test("parseDxf: MULTILEADER giữ chữ chú thích và đường dẫn", () => {
