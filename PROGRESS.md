@@ -4,6 +4,56 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Nạp bản vẽ lớn: bỏ 3 trong 4 lượt xử lý thừa lúc nạp (2026-08-24)
+
+Người dùng xác nhận bản vẽ MEPF thật của dự án **gần/vượt 150 MB**. Đo lại đường nạp tệp DXF cục
+bộ thì thấy cùng một bản vẽ bị xử lý **bốn lượt nặng**, ba trong đó không ai dùng tới:
+
+| Lượt | Việc                                                                                                                    | Có cần không |
+| ---- | ----------------------------------------------------------------------------------------------------------------------- | ------------ |
+| 1    | `readAsText` → chuỗi JS (UTF-16, gấp đôi cỡ tệp)                                                                        | cần          |
+| 2    | `parseDxf` → cây thực thể                                                                                               | cần          |
+| 3    | `exportDxf` → dựng **toàn bộ chuỗi xuất** ngay lúc nạp                                                                  | **không**    |
+| 4    | `JSON.stringify` cả chuỗi gốc rồi POST lên máy chủ, máy chủ `parseDxf` **lại**, kết quả **ghi đè** `dxfData` của lượt 2 | **không**    |
+
+Lượt 4 khiến lượt 2 thành ra chỉ để phục vụ lượt 3. Kiểm từng chỗ tiêu thụ trước khi bỏ:
+`conversionInfo.dxfContent` chỉ là **đường lui** khi `dxfData` rỗng (cả `useCadExporters.ts:62`
+lẫn `useSmartNaming.ts:74` đều ưu tiên `exportDxf(dxfData)`), mà nạp cục bộ thì `dxfData` luôn có;
+`scrScript` máy chủ trả về chỉ là `generateStandardizedAutocadScript(layers)` — hàm thuần, chạy
+thẳng ở client được; `isRealDrawing`/`fileSizeBytes` đặt tại chỗ theo đúng công thức máy chủ dùng.
+
+**Đo thật** (dựng bản vẽ N nét, chạy trên Node, `heapUsed`):
+
+| Cỡ tệp     | Chỉ `parseDxf`            | Cả đường cũ (parse + export + JSON body) |
+| ---------- | ------------------------- | ---------------------------------------- |
+| 12,2 MB    | 261 MB                    | 365 MB                                   |
+| 36,9 MB    | 754 MB                    | 1 536 MB                                 |
+| **150 MB** | **~3,1 GB** _(ngoại suy)_ | **~6,2 GB** _(ngoại suy)_                |
+
+Tỉ lệ gần tuyến tính, hệ số phình ~20× cho riêng bước parse và ~42× cho cả đường cũ.
+
+**Kết quả:** bỏ lượt 3 và 4 cắt khoảng **một nửa** bộ nhớ đỉnh, và bỏ hẳn cú POST vài trăm MB.
+Trần dung lượng nâng 150 → **300 MB** cho khớp cỡ bản vẽ thật của dự án.
+
+**Nói thẳng: chưa chắc đủ.** Riêng bước `parseDxf` với tệp 150 MB vẫn ngoại suy ra ~3,1 GB, cộng
+thêm ~300 MB cho chính chuỗi `readAsText`. Một tab trình duyệt thường không trụ nổi mức đó. Bản vá
+này là cải thiện thật và đo được, **không phải lời hứa rằng tệp 150 MB sẽ chạy**. Muốn chắc thì
+phải đổi kiến trúc — xem nợ kỹ thuật.
+
+### Nợ kỹ thuật — hướng xử lý triệt để, cần người dùng chốt
+
+Ba hướng, chưa làm vì đều là quyết định kiến trúc:
+
+1. **Parse theo luồng (streaming), không giữ cả tệp trong bộ nhớ.** Đọc tệp theo khối, sinh thực
+   thể dần. Sửa sâu trong `parseDxf`, nhưng giữ nguyên mọi thứ khác.
+2. **Đẩy parse về máy chủ**, tải lên dạng nhị phân (multipart) thay vì base64/JSON. Máy chủ khoẻ
+   hơn tab trình duyệt, nhưng vẫn cần streaming nếu không muốn ngốn 3 GB RAM VPS.
+3. **Không parse cả bản vẽ ở client**: máy chủ trả về bản tóm tắt (layer, khung bao, thống kê) để
+   hiển thị, chỉ nạp hình học khi thật sự cần vẽ.
+
+Ngoài ra `save-drawing` vẫn nhận `fileContent` qua **body JSON** — lưu một bản vẽ lớn lên máy chủ
+vẫn là cú POST vài trăm MB. Nên chuyển sang multipart nhị phân cùng đợt với hướng nào được chọn.
+
 ## Đợt audit quy trình chuẩn hoá bản vẽ 2D (2026-08-24)
 
 Rà theo `docs/audit.md` toàn bộ đường chuẩn hoá bản vẽ 2D: 8 route `app/api/engineering/cad/*`,

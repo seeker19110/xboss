@@ -7,7 +7,7 @@ import {
   parseDxf,
   DwgUnsupportedError,
   DWG_UNSUPPORTED_MESSAGE,
-  exportDxf,
+  generateStandardizedAutocadScript,
   DxfParseResult,
   DxfLayerInfo,
   resolveXrefDependencies,
@@ -262,22 +262,48 @@ export function useCadSource({ onLayersParsed }: UseCadSourceOptions) {
       };
       reader.readAsArrayBuffer(file);
     } else {
+      // ═══ NẠP TỆP DXF CỤC BỘ — LÀM TRỌN Ở TRÌNH DUYỆT, KHÔNG GỬI LÊN MÁY CHỦ ═══
+      //
+      // Bản trước làm cùng một bản vẽ tới BỐN lượt nặng, và với bản vẽ MEPF thật (người dùng báo
+      // tệp gần/vượt 150 MB, 2026-08-24) thì tab trình duyệt không chịu nổi:
+      //
+      //   1. readAsText  → chuỗi JS (UTF-16, gấp đôi cỡ tệp)
+      //   2. parseDxf    → cây thực thể
+      //   3. exportDxf   → CHUỖI XUẤT ĐẦY ĐỦ, dựng ngay lúc nạp dù chưa ai bấm tải về
+      //   4. runDxfAnalysis({ customDxfContent: content })
+      //                  → JSON.stringify cả chuỗi gốc rồi POST lên máy chủ, máy chủ parse LẠI,
+      //                    và kết quả đó GHI ĐÈ luôn `dxfData` vừa parse ở bước 2 — tức bước 2
+      //                    chỉ để phục vụ bước 3.
+      //
+      // Bỏ bước 3 và 4. Kiểm từng chỗ tiêu thụ trước khi bỏ:
+      //   · `conversionInfo.dxfContent` chỉ là ĐƯỜNG LUI khi `dxfData` rỗng — cả
+      //     `useCadExporters.ts:62` lẫn `useSmartNaming.ts:74` đều ưu tiên `exportDxf(dxfData)`.
+      //     Nạp cục bộ thì `dxfData` luôn có, nên chuỗi tính sẵn chưa từng được dùng tới.
+      //   · `scrScript` do máy chủ trả về chỉ là `generateStandardizedAutocadScript(layers)` —
+      //     hàm thuần, chạy thẳng ở client được.
+      //   · `isRealDrawing` / `fileSizeBytes` (hiện ở CadViewportStudio và useCadStandardization)
+      //     đặt tại chỗ, cùng công thức máy chủ dùng.
       const reader = new FileReader();
       reader.onload = async (event) => {
         const content = (event.target?.result as string) || "";
         try {
           setLoading(true);
           const parsed = parseDxf(content, dxfName);
+          parsed.isRealDrawing = parsed.entities.length > 0;
+          parsed.sourcePath = dxfName;
+          parsed.fileSizeBytes = file.size;
           setDxfData(parsed);
+          setScrScript(generateStandardizedAutocadScript(parsed.layers));
+          if (parsed.layers.length > 0) onLayersParsed(parsed.layers as DxfLayerInfo[]);
 
           const now = new Date();
           const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
-          const exportedInitialDxf = exportDxf(parsed, { applyStandardLayers: true });
 
           setConversionInfo({
             originalFileName: file.name,
             dxfFileName: dxfName,
-            dxfContent: exportedInitialDxf,
+            // Cố ý để rỗng: bản xuất dựng khi người dùng thật sự bấm tải về, không dựng lúc nạp.
+            dxfContent: "",
             entityCount: parsed.entities.length,
             convertedAt: timeStr,
           });
@@ -285,7 +311,6 @@ export function useCadSource({ onLayersParsed }: UseCadSourceOptions) {
           showToast(
             `✓ Đã nạp và chuẩn hóa tệp DXF ${file.name} (${parsed.entities.length} thực thể)!`,
           );
-          await runDxfAnalysis({ customDxfContent: content, name: dxfName });
         } catch (err) {
           console.error("Local parse error:", err);
           showToast("Lỗi khi đọc file CAD");
