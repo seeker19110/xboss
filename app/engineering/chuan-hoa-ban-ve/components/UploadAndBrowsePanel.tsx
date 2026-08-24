@@ -529,7 +529,7 @@ export default function UploadAndBrowsePanel({
               </div>
               <p className="text-[11px] text-zinc-400 mt-0.5">
                 Nhận tệp DXF (ASCII lẫn nhị phân) mọi phiên bản AutoCAD. Tệp xuất ra theo chuẩn
-                AutoCAD 2018 — cần AutoCAD 2018 trở lên để mở.
+                AutoCAD 2007 — mở được bằng AutoCAD 2007 cho tới bản mới nhất.
               </p>
             </div>
             {uploadedFileName && (

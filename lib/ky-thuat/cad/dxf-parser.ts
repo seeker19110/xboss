@@ -3843,13 +3843,14 @@ export function exportDxf(
   // ── 1. HEADER ──
   const bao = parsed.diagnostic?.boundingDimensions;
   let header = "0\r\nSECTION\r\n2\r\nHEADER\r\n";
-  // AC1032 = AutoCAD 2018, phiên bản định dạng DXF mới nhất (2018 → 2026 dùng chung).
-  // Mọi thực thể của bản vẽ 2D MEPF đã giữ được nguyên bản từ AC1021; khai 2018 là để hồ sơ nộp
-  // theo định dạng hiện hành, ĐỔI LẠI tệp không mở được bằng AutoCAD 2017 trở về trước.
-  header += "9\r\n$ACADVER\r\n1\r\nAC1032\r\n";
+  // AC1021 = AutoCAD 2007 — phiên bản mới nhất XÉT RIÊNG BẢN VẼ 2D. Từ 2007 trở đi không bản nào
+  // thêm loại thực thể 2D dùng được cho bản vẽ MEPF (2010 thêm MESH 3D, 2013 thêm đối tượng mặt
+  // cắt), nên khai cao hơn không giữ thêm được gì.
+  //
+  // DXF tương thích XUÔI chứ không ngược: tệp AC1021 mở được từ AutoCAD 2007 cho tới 2026, kể cả
+  // máy đời cũ ở công trường; còn tệp AC1032 (2018) thì bản 2017 trở về trước không mở được.
+  header += "9\r\n$ACADVER\r\n1\r\nAC1021\r\n";
   header += "9\r\n$ACADMAINTVER\r\n70\r\n0\r\n";
-  // Bản 2013 trở lên đọc mã 160 để biết tệp đòi phiên bản tối thiểu nào; 0 = không ràng buộc
-  header += "9\r\n$REQUIREDVERSIONS\r\n160\r\n0\r\n";
   header += `9\r\n$INSUNITS\r\n70\r\n${parsed.header?.insUnits ?? 4}\r\n`;
   header += `9\r\n$MEASUREMENT\r\n70\r\n${parsed.header?.measurement ?? 1}\r\n`;
   header += `9\r\n$LTSCALE\r\n40\r\n${real(parsed.header?.ltScale ?? 1)}\r\n`;

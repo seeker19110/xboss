@@ -214,22 +214,29 @@ script tạm: đòi handle không trùng, không thực thể nào trỏ về ch
 lớn hơn mọi handle, các cặp SECTION/TABLE/BLOCK cân bằng. Tổng `npm test`: 210 file,
 **1115 ca pass, 0 fail, 1 skip có chủ đích**.
 
-### G — Khai bản định dạng mới nhất: AutoCAD 2018 / AC1032 (cùng ngày)
+### G — Phiên bản định dạng: thử AC1032 rồi chốt lại AC1021 (cùng ngày)
 
-**Quyết định của người dùng, ngược với khuyến nghị của tôi — ghi lại cả hai để sau này còn đối
-chiếu.** Tôi đề xuất giữ AC1021 vì: (a) mọi thực thể 2D MEPF đã giữ nguyên bản từ AC1021, các bản
-sau không thêm loại thực thể 2D nào dùng được cho bản vẽ MEPF (2010 thêm `MESH` 3D, 2013 thêm đối
-tượng mặt cắt); (b) DXF tương thích **xuôi chứ không ngược** — tệp AC1021 mở được ở AutoCAD 2007
-cho tới 2026, còn tệp AC1032 thì **AutoCAD 2017 trở về trước không mở được**, mà máy đời cũ ở công
-trường không hiếm. Người dùng chọn AC1032 để hồ sơ nộp theo định dạng hiện hành — đã thực hiện đầy
-đủ, kể cả phần cấu trúc mà bản 2018 kỳ vọng thêm chứ không chỉ đổi chuỗi phiên bản.
+**Chốt cuối: `AC1021` (AutoCAD 2007) — bản mới nhất XÉT RIÊNG BẢN VẼ 2D.** Đường đi tới quyết định
+này ghi lại đủ để sau khỏi bàn lại:
 
-Bảng phiên bản: `AC1015` = 2000, `AC1018` = 2004, `AC1021` = 2007, `AC1024` = 2010, `AC1027` = 2013,
-**`AC1032` = 2018 → 2026** (định dạng đứng yên từ 2018, bản 2026 vẫn ghi `AC1032`).
+1. Người dùng yêu cầu "nâng lên bản cao nhất để đáp ứng dài hạn" → đã nâng lên `AC1032`
+   (AutoCAD 2018, bản định dạng DXF mới nhất, dùng chung 2018→2026) kèm toàn bộ cấu trúc bản 2018
+   kỳ vọng thêm.
+2. Sau khi đối chiếu lại: từ 2007 trở đi **không bản nào thêm loại thực thể 2D** dùng được cho bản
+   vẽ MEPF (2010 thêm `MESH` 3D, 2013 thêm đối tượng mặt cắt), trong khi DXF tương thích **xuôi chứ
+   không ngược** — tệp `AC1032` thì AutoCAD 2017 trở về trước không mở được, mà máy đời cũ ở công
+   trường không hiếm. Người dùng chốt lấy `AC1021`.
 
-Đã bổ sung theo:
+**Phần cấu trúc thêm ở bước 1 được GIỮ LẠI gần như trọn vẹn**, vì đều hợp lệ ở R2007 và phần lớn là
+sửa lỗi thật chứ không phải yêu cầu riêng của bản 2018. Chỉ gỡ đúng `$REQUIREDVERSIONS` — biến chỉ
+có từ bản 2013.
 
-- **Bộ biến hệ thống trong HEADER** (`$ACADMAINTVER`, `$REQUIREDVERSIONS`, `$CLAYER`, `$CELTYPE`,
+Bảng phiên bản: `AC1015` = 2000, `AC1018` = 2004, **`AC1021` = 2007 ← đang dùng**, `AC1024` = 2010,
+`AC1027` = 2013, `AC1032` = 2018 → 2026 (định dạng đứng yên từ 2018, bản 2026 vẫn ghi `AC1032`).
+
+Đã bổ sung và giữ lại:
+
+- **Bộ biến hệ thống trong HEADER** (`$ACADMAINTVER`, `$CLAYER`, `$CELTYPE`,
   `$CECOLOR`, `$CELTSCALE`, `$CELWEIGHT`, `$PSLTSCALE`, `$TILEMODE`, `$TEXTSTYLE`, `$DIMSTYLE`,
   `$CMLSTYLE`/`$CMLJUST`/`$CMLSCALE`, `$PDMODE`/`$PDSIZE`, `$SPLINESEGS`, `$DIMASSOC`, bộ `$UCS*`).
   Thiếu chúng thì AutoCAD tự điền mặc định **của máy đang mở**, nên cùng một tệp mở ở hai máy có
@@ -251,15 +258,16 @@ diện section của ca toàn vẹn quá lỏng — nó coi mọi mã 2 là tên
 cả phần HEADER bị tính nhầm thành thân tệp và `$HANDSEED` bị đếm như một handle. Nay chỉ nhận mã 2
 là tên section khi nó đứng ngay sau cặp `0 SECTION`, đúng cách `validateDxf` vẫn làm.
 
-Nhãn trên giao diện nói rõ ràng buộc: "Tệp xuất ra theo chuẩn AutoCAD 2018 — cần AutoCAD 2018 trở
-lên để mở." (Trước đó hai nhãn còn ghi "AutoCAD 2000" do sót lại từ đợt E — đã sửa.)
+Nhãn trên giao diện nói đúng phiên bản đang phát hành: "Tệp xuất ra theo chuẩn AutoCAD 2007 — mở
+được bằng AutoCAD 2007 cho tới bản mới nhất." (Trước đó hai nhãn còn ghi "AutoCAD 2000" do sót lại
+từ đợt E — đã sửa.)
 
 ### Còn lại (chưa làm)
 
 - Chuẩn hoá trực tiếp trên **DWG** vẫn cần plugin AutoCAD (ADR-0006) — chưa có.
-- **Tệp xuất ra không mở được bằng AutoCAD 2017 trở về trước** — hệ quả đã biết và đã chấp nhận của
-  việc khai AC1032. Nếu công trường có máy đời cũ, hạ `$ACADVER` về `AC1021` trong
-  `lib/ky-thuat/cad/dxf-parser.ts` là đủ; toàn bộ thực thể vẫn giữ nguyên bản ở mức đó.
+- Nếu về sau cần nộp hồ sơ theo đúng định dạng 2018, nâng `$ACADVER` lên `AC1032` trong
+  `lib/ky-thuat/cad/dxf-parser.ts` và khai lại `$REQUIREDVERSIONS` là đủ — phần cấu trúc còn lại
+  bản 2018 đòi thì tệp đã có sẵn. Đổi lại, tệp sẽ không mở được bằng AutoCAD 2017 trở về trước.
 - **Chưa mở thử tệp xuất ra bằng AutoCAD thật.** Toàn bộ kiểm chứng ở đây là test, round-trip qua
   chính bộ đọc của XBoss, và đối chiếu với đặc tả DXF của Autodesk — môi trường CI không có AutoCAD.
   Các thực thể phức tạp (`MULTILEADER`, `WIPEOUT`, `VIEWPORT`, `MLINE`) có nhiều trường tuỳ chọn mà

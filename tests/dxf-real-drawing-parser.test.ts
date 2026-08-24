@@ -109,12 +109,16 @@ test("exportDxf: Xuất chuỗi DXF ASCII chuẩn AutoCAD đầy đủ HEADER, T
   assert.ok(exportedDxf.includes("HEADER"), "DXF xuất phải có HEADER");
   assert.ok(exportedDxf.includes("$ACADVER"), "DXF xuất phải có $ACADVER");
   assert.ok(
-    exportedDxf.includes("AC1032"),
-    "DXF xuất phải khai R2018 (AC1032) — phiên bản định dạng DXF mới nhất, dùng chung cho AutoCAD 2018–2026",
+    exportedDxf.includes("AC1021"),
+    "DXF xuất phải khai R2007 (AC1021) — phiên bản mới nhất xét riêng 2D, và mở được từ AutoCAD 2007 tới 2026",
+  );
+  assert.ok(
+    !exportedDxf.includes("$REQUIREDVERSIONS"),
+    "Không được khai biến chỉ có từ bản 2013 trong tệp khai AC1021",
   );
   assert.ok(
     exportedDxf.includes("0\r\nACDBPLACEHOLDER\r\n"),
-    "Bản 2018 đòi kiểu in thật cho layer — không được để mã 390 trỏ vào handle không tồn tại",
+    "Layer phải trỏ tới kiểu in THẬT — không được để mã 390 trỏ vào handle không tồn tại",
   );
   assert.ok(!exportedDxf.includes("AC1009"), "Không được khai lùi về R12 nữa");
   assert.ok(
@@ -1098,7 +1102,7 @@ test("exportDxf: khung nhìn và bố cục in của không gian giấy sống s
   assert.equal(vp2.isPaperSpace, true, "Vẫn phải nằm ở không gian giấy");
 });
 
-test("exportDxf: toàn vẹn cấu trúc R2018 — handle duy nhất, mọi tham chiếu tồn tại, $HANDSEED hợp lệ", () => {
+test("exportDxf: toàn vẹn cấu trúc — handle duy nhất, mọi tham chiếu tồn tại, $HANDSEED hợp lệ", () => {
   // Handle và quan hệ chủ sở hữu là thứ R12 hoàn toàn không có và cũng là chỗ dễ sai nhất khi
   // sinh tệp: trùng handle hoặc trỏ vào handle không tồn tại thì AutoCAD báo tệp hỏng.
   const exported = exportDxf(parseDxf(FIXTURE_MEPF, "mepf-thap-a.dxf"), {
@@ -1151,7 +1155,7 @@ test("exportDxf: toàn vẹn cấu trúc R2018 — handle duy nhất, mọi tham
   );
 
   const seed = /\$HANDSEED\r\n\s*5\r\n(\w+)/.exec(exported)?.[1];
-  assert.ok(seed, "Tệp R2018 bắt buộc khai $HANDSEED");
+  assert.ok(seed, "Tệp R2007 bắt buộc khai $HANDSEED");
   const lonNhat = Math.max(...[...handles.keys()].map((h) => parseInt(h, 16)));
   assert.ok(
     parseInt(seed, 16) > lonNhat,
