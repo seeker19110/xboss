@@ -74,20 +74,30 @@ export async function POST(req: Request) {
     );
 
     const metricsMap = new Map<string, SubconEvaluationResult>();
-    const missingMetrics: { profileId: string; reasons: string[] }[] = [];
+    const hoSoThieuDuLieu: { profileId: string; companyName: string; reason: string }[] = [];
 
     for (const m of metricsRows) {
       const reasons: string[] = [];
 
       // Kiểm từng metric, nếu thiếu ghi vào lý do.
-      if (m.onTimeRate == null) reasons.push("onTimeRate (% công việc đúng hạn)");
-      if (m.bbntPassRate == null) reasons.push("bbntPassRate (% nghiệm thu đạt)");
-      if (m.hseScore == null) reasons.push("hseScore (điểm an toàn HSE)");
-      if (m.costVarianceRate == null) reasons.push("costVarianceRate (% phát sinh chi phí)");
+      if (m.onTimeRate == null) reasons.push("onTimeRate");
+      if (m.bbntPassRate == null) reasons.push("bbntPassRate");
+      if (m.hseScore == null) reasons.push("hseScore");
+      // ncrCount không có nguồn dữ liệu (chưa liên kết NCR với nhà thầu phụ)
+      if (m.ncrCount == null) reasons.push("ncrCount");
+      // costVarianceRate không có nguồn dữ liệu (chưa liên kết chi phí với nhà thầu phụ)
+      if (m.costVarianceRate == null) reasons.push("costVarianceRate");
 
       if (reasons.length > 0) {
-        missingMetrics.push({ profileId: m.profileId, reasons });
-        continue; // Bỏ qua profile này, không tạo mặc định
+        const profileName =
+          profiles.find((p) => p.id === m.profileId)?.companyName ||
+          `Hồ sơ ${m.profileId}`;
+        hoSoThieuDuLieu.push({
+          profileId: m.profileId,
+          companyName: profileName,
+          reason: `Thiếu dữ liệu: ${reasons.join(", ")}`,
+        });
+        continue; // Loại khỏi danh sách chấm điểm
       }
 
       metricsMap.set(m.profileId, {
@@ -96,7 +106,7 @@ export async function POST(req: Request) {
         componentScores: {
           scheduleScore: Number(m.onTimeRate),
           qualityScore: Number(m.bbntPassRate),
-          ncrPenaltyScore: Math.max(0, 100 - Number(m.ncrCount ?? 0) * 15),
+          ncrPenaltyScore: Math.max(0, 100 - Number(m.ncrCount) * 15),
           hseScore: Number(m.hseScore),
           costControlScore: Math.max(0, 100 - Math.max(0, Number(m.costVarianceRate)) * 3),
         },
@@ -104,15 +114,16 @@ export async function POST(req: Request) {
       });
     }
 
-    // Nếu có profile bị thiếu metric, báo lại.
-    if (missingMetrics.length > 0) {
+    // Nếu toàn bộ hồ sơ bị loại (không có hồ sơ đủ dữ liệu), báo lại.
+    if (metricsMap.size === 0 && hoSoThieuDuLieu.length > 0) {
       return NextResponse.json(
         {
-          error: "Dữ liệu đánh giá nhà thầu phụ chưa đủ",
-          missingMetrics: missingMetrics.map((item) => ({
-            profileId: item.profileId,
-            reason: `Thiếu: ${item.reasons.join(", ")}`,
-          })),
+          error: "Không có hồ sơ nào đủ dữ liệu để xếp hạng",
+          reason:
+            "Các metric cần thiết (tiến độ, chất lượng, HSE, chi phí, NCR) chưa có đủ dữ liệu. " +
+            "Nguyên nhân có thể: (a) hệ thống chưa ghi nhận chi phí/NCR cho nhà thầu phụ, " +
+            "(b) chưa có đánh giá định kỳ, (c) hồ sơ chưa được gắn supplier_id.",
+          hoSoThieuDuLieu,
         },
         { status: 400 },
       );
@@ -152,6 +163,7 @@ export async function POST(req: Request) {
       data: {
         package: { packageName, discipline, estimatedBudget, requiredCapacity },
         candidates,
+        hoSoThieuDuLieu,
       },
     });
   } catch (error: any) {
