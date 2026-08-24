@@ -4,6 +4,54 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Đợt audit toàn diện "nâng tầm dự án" (2026-08-24) — BÁO CÁO, CHƯA SỬA
+
+Người dùng yêu cầu "nâng tầm dự án" → chọn hướng **audit toàn diện rồi đề xuất**. Chạy theo
+`docs/audit.md` §2 mục "Audit nâng cấp chuyên nghiệp hoá": 4 miền song song (A bảo mật+logic,
+B UI/UX+vận hành, C hiệu năng+CI/CD, D chiến lược sản phẩm). Nhánh `claude/nang-tam-du-an-5yexhe`,
+base `5e42b8d`.
+
+**Báo cáo đầy đủ: `docs/audit-2026-08-24-nang-tam.md`** (phát hiện + lộ trình đề xuất 3 đợt).
+Đúng nguyên tắc §1 "audit = ĐỌC + BÁO CÁO trước, SỬA sau" — đợt này **không sửa code**, chờ người
+dùng duyệt hướng xử lý.
+
+- **Cổng tự động xanh toàn bộ:** lint · typecheck · `check:lib-layers` · build · `npm audit`
+  (0 vulnerabilities). `npm test`: 1146 ca, 760 pass, **0 fail**, 386 skip (môi trường không có
+  Postgres nên integration tự skip). _Lưu ý: lần chạy đầu đỏ hết là do `node_modules` cài hỏng
+  (thiếu symlink `.bin/next`), không phải lỗi code — `rm -rf node_modules && npm ci` rồi chạy lại
+  mới ra kết quả thật._
+- **🔴 4 phát hiện Cao, tất cả trong lớp module `engineering/*` mới (M76–M99)** — phiên chính đã
+  **xác minh lại độc lập từng mục** trên code thật, không chỉ tin báo cáo subagent: (1) webhook
+  Telegram công khai không xác thực + brute-force OTP liên kết tài khoản; (2) webhook Zalo công
+  khai ghi chéo dự án theo `projectId` client tự chọn (+ `verifyZaloLinkOtp` SELECT `otp_expires_at`
+  nhưng không bao giờ so sánh); (3) e-Sign M84 gate bằng `CAN.viewEngineeringGraph` (quyền **xem**,
+  gồm cả vai trò chỉ-xem `bch`) + `signatoryId` client tự chọn + OTP chỉ kiểm khi client tự nguyện
+  gửi → ký thay được cả 3 bên; (4) **14 file route** engineering có `POST/PATCH/DELETE` mà không
+  tham chiếu `CAN.` nào (viewer/cdt ghi mô hình BIM, giả telemetry IoT sinh cảnh báo HSE CRITICAL
+  thật, thầu phụ tự chấm điểm tín nhiệm của chính mình).
+- **⚠️ Nợ "ký số PAdES" phải MỞ LẠI** — đang ghi là đã đóng bởi M84, nhưng theo phát hiện (3) module
+  này chưa đạt mức "chống chối bỏ" như mô tả.
+- **🟡 9 phát hiện Trung** — nổi bật: ~15 route engineering nhận `projectId` từ body; bot hiện
+  trường trả lời **giả** ("đã đồng bộ vào WBS", "đã tạo NCR", tồn kho bịa cứng 450/180 đơn vị) trong
+  khi chỉ ghi log; Smart IPC M94 gate giải ngân tự khai + tiền tính float JS + số tài khoản
+  hardcode; client `useCadSource.ts` nuốt im lặng 409/413 khiến bản vá chống-nhầm-bản-vẽ đợt trước
+  **không tới được người dùng**; 57 file `text-white` trên nền accent-600 (gồm `ErrorState.tsx`
+  dùng chung toàn app); toast báo lỗi hiển thị style thành công; ~35 trang engineering chưa có spec
+  axe; `pr-policy.yml` dùng tag nổi `@v9` thay vì pin SHA.
+- **🔵 Vấn đề nền tảng (nặng hơn mọi bug đơn lẻ):** `docs/ops/release-manifest-v1.0.md` tuyên bố
+  "v1.0.0 Product Complete" và `engineering-os-manifest-v1.0.md` tuyên bố "Vision Complete,
+  Production Ready" — trong khi chưa có traffic MEPF-Agents nào, `0089`/`0091` còn chờ staging,
+  C0→C6 "chờ duyệt chưa code", UAT chưa diễn ra; manifest ghi "93 migration" trong khi thực tế
+  **132**. Chính spec C0 cấm điều này ("không đánh dấu xong chỉ dựa trên tài liệu"). 4 lỗ hổng Cao ở
+  trên chính là hoá đơn của việc code vượt gate.
+- **Đề xuất 3 đợt:** (1) bịt lỗ Cao + hạ tuyên bố sai + dọn doc drift; (2) biến checklist thành
+  **cổng CI** (`check:route-perms`, `check:project-scope`, lint cấm `text-white` trên nền sáng, lưới
+  quét axe ~45 route, coverage ratchet, khung webhook/OTP dùng chung) vì lớp lỗi "route mới quên
+  kiểm quyền" đã lặp ≥3 đợt và checklist người không theo kịp tốc độ thêm module; (3) chạy thật
+  (staging → migration → đối soát Excel → UAT → tag v1.0.0 thật).
+- **KHÔNG nên làm:** thêm module `engineering/*`/OS-phase mới, C2 pilot, hạ tầng mới, nâng major
+  M60, bật SSO production, hay tuyên bố thêm mốc "Complete" nào bằng tài liệu.
+
 ## M99 PR-A — Plugin AutoCAD C# (chuẩn hóa + bóc tách khối lượng) + rule pack v2 (2026-08-24)
 
 Người dùng yêu cầu (2026-08-24): bổ sung **BOCKL (bóc tách khối lượng) + xuất Excel ClosedXML** vào đặc tả M99 rồi triển khai trọn gói, "mọi quyết định đều ưu tiên chất lượng cao nhất". Nhánh `claude/autocad-csharp-plugin-ypi9nb`.
