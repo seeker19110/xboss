@@ -5,6 +5,7 @@ import {
   type NetworkNode,
   type NetworkEdge,
   type BalancingValveScheduleItem,
+  autoSizePipeDiameter as sizeByVelocity,
 } from "@/lib/ky-thuat/engineering-hydraulic-engine";
 
 export { type NetworkNode, type NetworkEdge, type BalancingValveScheduleItem };
@@ -25,45 +26,21 @@ export interface HydraulicNetworkResult {
   warnings: string[];
 }
 
+/**
+ * Chọn cỡ ống tiêu chuẩn nhỏ nhất giữ vận tốc ≤ ngưỡng.
+ * Dùng chung bảng ống thép tiêu chuẩn `STANDARD_STEEL_PIPES` của
+ * `engineering-hydraulic-engine` (trước đây module này giữ một bảng DN chép tay
+ * riêng với đường kính trong lệch bảng gốc — đã bỏ, chỉ còn một nguồn sự thật).
+ */
 export function autoSizePipeDiameter(
   flowRateLps: number,
   targetMaxVelocityMs = 1.8,
 ): { diameterMm: number; standardDn: string; actualVelocityMs: number } {
-  const STANDARD_PIPES = [
-    { dn: "DN15", innerDiaMm: 16.0 },
-    { dn: "DN20", innerDiaMm: 21.6 },
-    { dn: "DN25", innerDiaMm: 27.2 },
-    { dn: "DN32", innerDiaMm: 35.9 },
-    { dn: "DN40", innerDiaMm: 41.8 },
-    { dn: "DN50", innerDiaMm: 53.0 },
-    { dn: "DN65", innerDiaMm: 68.8 },
-    { dn: "DN80", innerDiaMm: 80.8 },
-    { dn: "DN100", innerDiaMm: 105.3 },
-    { dn: "DN125", innerDiaMm: 130.0 },
-    { dn: "DN150", innerDiaMm: 155.4 },
-    { dn: "DN200", innerDiaMm: 204.7 },
-  ];
-
-  const qM3s = flowRateLps / 1000;
-
-  for (const p of STANDARD_PIPES) {
-    const areaM2 = (Math.PI * Math.pow(p.innerDiaMm / 1000, 2)) / 4;
-    const vel = areaM2 > 0 ? qM3s / areaM2 : 0;
-    if (vel <= targetMaxVelocityMs) {
-      return {
-        diameterMm: p.innerDiaMm,
-        standardDn: p.dn,
-        actualVelocityMs: Math.round(vel * 100) / 100,
-      };
-    }
-  }
-
-  const largest = STANDARD_PIPES[STANDARD_PIPES.length - 1];
-  const areaM2 = (Math.PI * Math.pow(largest.innerDiaMm / 1000, 2)) / 4;
+  const sized = sizeByVelocity(flowRateLps, targetMaxVelocityMs);
   return {
-    diameterMm: largest.innerDiaMm,
-    standardDn: largest.dn,
-    actualVelocityMs: Math.round((qM3s / areaM2) * 100) / 100,
+    diameterMm: sized.nominalDiameterMm,
+    standardDn: sized.standardDn,
+    actualVelocityMs: Math.round(sized.actualVelocityMs * 100) / 100,
   };
 }
 

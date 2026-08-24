@@ -3,13 +3,7 @@ import { storagePut } from "@/lib/nen/storage";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
-import {
-  extForMime,
-  verifyFileMime,
-  newHseFileName,
-  MAX_PHOTO_BYTES,
-  isContentTooLarge,
-} from "@/lib/nen/photos";
+import { newHseFileName, MAX_PHOTO_BYTES, parseUploadedFile } from "@/lib/nen/photos";
 
 export const dynamic = "force-dynamic";
 
@@ -70,35 +64,9 @@ export async function POST(
       : undefined;
   if (!record) return NextResponse.json({ error: "Không tìm thấy ghi nhận" }, { status: 404 });
 
-  if (isContentTooLarge(req.headers.get("content-length"), MAX_PHOTO_BYTES))
-    return NextResponse.json(
-      { error: `Ảnh quá lớn (tối đa ${MAX_PHOTO_BYTES / 1024 / 1024}MB)` },
-      { status: 413 },
-    );
-
-  const form = await req.formData().catch(() => null);
-  const file = form?.get("file");
-  if (!form || !(file instanceof File))
-    return NextResponse.json({ error: "Thiếu file ảnh (field 'file')" }, { status: 400 });
-
-  const ext = extForMime(file.type);
-  if (!ext)
-    return NextResponse.json(
-      { error: `Chỉ nhận file ảnh (jpg/png/webp/gif/heic), nhận được: ${file.type || "không rõ"}` },
-      { status: 415 },
-    );
-  if (file.size > MAX_PHOTO_BYTES)
-    return NextResponse.json(
-      { error: `Ảnh quá lớn (tối đa ${MAX_PHOTO_BYTES / 1024 / 1024}MB)` },
-      { status: 413 },
-    );
-
-  const fileBuf = Buffer.from(await file.arrayBuffer());
-  if (!verifyFileMime(fileBuf, file.type))
-    return NextResponse.json(
-      { error: "Nội dung file không khớp định dạng khai báo (Content-Type giả mạo?)" },
-      { status: 415 },
-    );
+  const up = await parseUploadedFile(req, { accept: "image", maxBytes: MAX_PHOTO_BYTES });
+  if (!up.ok) return NextResponse.json({ error: up.error }, { status: up.status });
+  const { file, buf: fileBuf } = up;
 
   const fileName = newHseFileName(recordId, file.type);
   await storagePut(user.orgId, fileName, fileBuf);

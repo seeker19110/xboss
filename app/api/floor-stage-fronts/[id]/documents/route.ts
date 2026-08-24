@@ -2,13 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { storagePut } from "@/lib/nen/storage";
 import { query, queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
-import {
-  extForDocMime,
-  verifyFileMime,
-  newFloorStageFrontFileName,
-  MAX_DOC_BYTES,
-  isContentTooLarge,
-} from "@/lib/nen/photos";
+import { newFloorStageFrontFileName, MAX_DOC_BYTES, parseUploadedFile } from "@/lib/nen/photos";
 
 export const dynamic = "force-dynamic";
 
@@ -61,41 +55,15 @@ export async function POST(
   );
   if (!front) return NextResponse.json({ error: "Không tìm thấy mặt bằng" }, { status: 404 });
 
-  if (isContentTooLarge(req.headers.get("content-length"), MAX_DOC_BYTES))
-    return NextResponse.json(
-      { error: `File quá lớn (tối đa ${MAX_DOC_BYTES / 1024 / 1024}MB)` },
-      { status: 413 },
-    );
-
-  const form = await req.formData().catch(() => null);
-  const file = form?.get("file");
-  if (!form || !(file instanceof File))
-    return NextResponse.json({ error: "Thiếu file (field 'file')" }, { status: 400 });
+  const up = await parseUploadedFile(req, { accept: "document", maxBytes: MAX_DOC_BYTES });
+  if (!up.ok) return NextResponse.json({ error: up.error }, { status: up.status });
+  const { form, file, buf: fileBuf } = up;
 
   const kindRaw = form.get("kind");
   const docKind: DocKind =
     typeof kindRaw === "string" && (DOC_KINDS as readonly string[]).includes(kindRaw)
       ? (kindRaw as DocKind)
       : "other";
-
-  const ext = extForDocMime(file.type);
-  if (!ext)
-    return NextResponse.json(
-      { error: `Chỉ nhận PDF hoặc ảnh, nhận được: ${file.type || "không rõ"}` },
-      { status: 415 },
-    );
-  if (file.size > MAX_DOC_BYTES)
-    return NextResponse.json(
-      { error: `File quá lớn (tối đa ${MAX_DOC_BYTES / 1024 / 1024}MB)` },
-      { status: 413 },
-    );
-
-  const fileBuf = Buffer.from(await file.arrayBuffer());
-  if (!verifyFileMime(fileBuf, file.type))
-    return NextResponse.json(
-      { error: "Nội dung file không khớp định dạng khai báo (Content-Type giả mạo?)" },
-      { status: 415 },
-    );
 
   const fileName = newFloorStageFrontFileName(frontId, file.type);
   await storagePut(user.orgId, fileName, fileBuf);
