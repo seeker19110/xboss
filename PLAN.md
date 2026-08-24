@@ -1,509 +1,353 @@
-# PLAN.md — Đợt "nâng tầm dự án" GĐ1: bịt lỗ bảo mật + trung thực hoá dữ liệu
+# PLAN.md — Đợt "nâng tầm dự án" GĐ2: cổng máy thay checklist người
 
 **Cập nhật:** 2026-08-24
-**Nguồn:** `docs/audit-2026-08-24-nang-tam.md` (báo cáo audit 4 miền, commit `872697f`)
-**Nhánh nền:** `claude/nang-tam-du-an-5yexhe` (đã khớp `origin/main` = `5e42b8d`)
+**Nguồn:** `docs/audit-2026-08-24-nang-tam.md` + kết quả GĐ1 (xem `PROGRESS.md` mục đầu)
+**Nhánh nền:** `claude/nang-tam-du-an-5yexhe` (GĐ1 đã tích hợp, cổng xanh với Postgres thật)
 
 ## Bối cảnh — vì sao đợt này
 
-Đợt audit 2026-08-24 kết luận: **lõi nghiệp vụ không hồi quy**, nhưng lớp module `engineering/*`
-thêm gần đây (M76–M99) mang **4 lỗ hổng mức Cao** và một loạt vấn đề toàn vẹn dữ liệu, do lớp này
-được xây vượt cổng của chính roadmap và chưa từng đi qua checklist `docs/audit.md`.
+GĐ1 đã bịt 4 lỗ hổng Cao và trung thực hoá dữ liệu. Nhưng bài học lớn nhất của GĐ1 là:
+**checklist con người không theo kịp tốc độ thêm module của dự án này.**
 
-Người dùng duyệt "triển khai theo hướng tốt nhất" (2026-08-24) và chốt 2 quyết định treo:
+- Lớp lỗi "route mới quên kiểm quyền" đã lặp ≥3 đợt audit, lần này lặp thêm **14 file**.
+- Lớp lỗi "tin `projectId` client gửi" lặp ở **17 route**, và chính đặc tả GĐ1 của phiên chính
+  cũng viết hẹp (quên kênh query string) → reviewer phải bắt lại.
+- Lớp lỗi "chữ trắng trên nền accent sáng" lặp lần ≥3 (54b3e03 → ee8fce1 → 57 file).
+- Và nặng nhất: **11 file route chết ngay ở câu SQL đầu tiên** suốt nhiều tháng mà không ai biết.
 
-- **Module vượt gate:** đóng băng bằng feature flag (đảo ngược được), **không** gỡ code → GĐ2.
-- **Bot hiện trường:** đổi sang thông điệp trung thực + đánh dấu thử nghiệm; **không** wire thật
-  vào WBS/NCR/vật tư trong đợt này (là tính năng riêng, cần đặc tả sau).
+GĐ2 biến các checklist đó thành **cổng máy chạy trong CI**, cộng vá nốt lỗi SQL đã phát hiện.
 
-**Phạm vi GĐ1 (kế hoạch này):** V1–V8 — vá 4 lỗ Cao, chặn ghi chéo dự án, trung thực hoá dữ liệu
-hiển thị, dọn doc drift. **GĐ2 (kế hoạch sau, không thi hành trong đợt này):** cổng CI
-`check:route-perms`/`check:project-scope`, lưới quét axe ~45 route, coverage ratchet, đóng băng
-module vượt gate bằng flag.
+**Phạm vi:** W1–W6 dưới đây. **Ngoài phạm vi (đã kiểm, không phải việc):** idempotency ảnh offline —
+`migrations/0075_task_photos_hash.sql` + `POST /api/tasks/:id/photos` **đã dedup theo hash nội dung
+trong 24h**; phát hiện của agent audit về mục này là **sai**, gửi lại cùng ảnh không tạo bản trùng.
 
-## Quy ước bắt buộc cho MỌI việc trong kế hoạch này
+## Quy ước bắt buộc cho MỌI việc (worker không thấy hội thoại trước — mọi thứ cần biết ở đây)
 
-Worker không thấy hội thoại trước đó — mọi thứ cần biết nằm trong brief của việc đó và các mục
-dưới đây.
-
-- **Đọc trước khi sửa:** `CLAUDE.md` (mục Auth, Kiến trúc `lib/` theo miền ADR-0007, Quy ước) và
-  `docs/audit.md` §3/§4 (checklist bảo mật + toàn vẹn dữ liệu). Việc chạm `lib/bao-mat/*` bắt buộc
-  rà thêm §8 "Vùng rủi ro cao".
-- **Ranh giới kiến trúc (ADR-0007/0008):** route handler **chỉ** là ranh giới HTTP (kiểm phiên/
-  quyền, đọc tham số, gọi dịch vụ, bọc `NextResponse`); logic nghiệp vụ nằm ở `lib/<miền>/`. Import
-  nội bộ luôn dùng alias `@/lib/<miền>/<module>`. Chạy `npm run check:lib-layers` trước khi báo xong.
-- **SQL:** luôn qua helper `lib/db` với placeholder `?`, **không nối chuỗi chèn giá trị**.
-- **Tiếng Việt:** toàn bộ UI, comment code, commit message. Commit theo conventional prefix
-  (`fix:`/`feat:`/`chore:`/`docs:`) + mô tả tiếng Việt.
-- **Migration:** số kế tiếp là **`0133`** — nhưng **bắt buộc chạy `ls migrations | sort -V | tail -3`
-  ngay trước khi tạo file** để lấy số thật (bài học PR #265/#266 trùng số `0071` chặn CI). Append-only,
-  idempotent (`IF NOT EXISTS`). Chạy `npm run gen:erd` cùng PR nếu đổi schema.
-- **Test:** file test chạm DB **phải** `import "./setup"` (hoặc `tests/setup.ts`) ở **dòng đầu tiên**.
-  Test mới phải thêm vào lệnh `npm test` trong `package.json` nếu runner không tự quét.
-- **Cổng trước khi báo xong:** `npm run lint` + `npm run typecheck` + `npm test` + `npm run build`
-  xanh. Không có Postgres thì integration test tự skip — ghi rõ trong báo cáo, không coi là pass.
-- **Chứng minh test bắt được lỗi cũ:** với mỗi bản vá bảo mật/logic, tạm trả code về bản cũ, chạy
-  test mới → phải **đỏ**; khôi phục → **xanh**. Ghi kết quả này vào báo cáo. Không chỉ viết test rồi
-  thấy nó xanh là xong.
-- **Không mở rộng phạm vi:** không refactor ngoài vùng được giao, không nâng dependency, không đổi
-  kiến trúc, không tự thêm module mới.
-
----
-
-## Việc V1 — Xác thực webhook inbound + chuẩn hoá OTP liên kết (`route: complex`)
-
-**Vá lỗ hổng Cao A1 + A2 + phát hiện Trung B9.** Chạm `lib/bao-mat/*` → vùng rủi ro cao.
-
-### Vấn đề thật (đã xác minh trên code)
-
-1. `app/api/telegram/webhook/route.ts` — POST công khai, **không kiểm secret token nào** (grep toàn
-   repo không có `TELEGRAM_WEBHOOK_SECRET`/`Secret-Token`). Ai cũng POST giả tin nhắn được.
-2. `lib/ky-thuat/engineering-site-bot.ts:190` — `verifyTelegramLinkOtp` tra
-   `WHERE otp_code = ? AND otp_expires_at > CURRENT_TIMESTAMP AND is_verified = false`: **có** kiểm
-   hạn nhưng **không gắn `chatId`/`userId`**, không rate-limit, không đếm số lần sai → dò mã 6 số là
-   chiếm được binding của **user bất kỳ đang chờ liên kết**.
-3. `app/api/zalo/webhook/route.ts:17` — POST công khai không chữ ký;
-   `const projectId = Number(body.projectId || 1)` lấy thẳng từ body rồi dùng chính giá trị đó cho
-   `withProjectScope` → **RLS bị hợp thức hoá bằng giá trị attacker đưa vào**.
-4. `lib/ky-thuat/engineering-zalo-copilot.ts:141` — `verifyZaloLinkOtp` **SELECT `otp_expires_at`
-   nhưng không bao giờ so sánh** → OTP hết hạn vẫn verify được. `processIncomingZaloMessage` không
-   kiểm `zalo_user_bindings.is_verified`.
-5. Cả 2 luồng sinh OTP dùng `ON CONFLICT (id)` trên UUID tự sinh → **không bao giờ conflict** → mỗi
-   lần generate thêm 1 dòng binding trùng. OTP lưu **plaintext**.
-
-### Việc phải làm
-
-**(a) Module dùng chung `lib/bao-mat/webhook-inbound.ts` (mới):**
-
-- `xacThucWebhookTelegram(req: NextRequest): boolean` — so sánh header
-  `X-Telegram-Bot-Api-Secret-Token` với `process.env.TELEGRAM_WEBHOOK_SECRET` bằng
-  `crypto.timingSafeEqual` (bọc try/catch cho độ dài lệch). **Fail-fast**: thiếu biến env →
-  `throw` với thông điệp tiếng Việt rõ ràng (cùng pattern `CRON_SECRET`, xem `lib/nen/env.ts` style).
-  Route trả **401** khi không khớp.
-- `xacThucWebhookZalo(req, rawBody): boolean` — xác thực chữ ký Zalo OA theo `ZALO_OA_SECRET`
-  (HMAC-SHA256 của raw body, so `timingSafeEqual`). Thiếu env → throw fail-fast.
-- **Ranh giới được phép quyết:** cách đọc raw body cho Zalo (Next App Router cần `req.text()` rồi
-  `JSON.parse` thay vì `req.json()` để HMAC đúng byte gốc) — chọn cách tối thiểu, ghi comment lý do.
-
-**(b) Module dùng chung `lib/bao-mat/otp.ts` (mới)** — gom 2 (hiện là 3, tính cả e-Sign ở V2) chỗ tự
-chế OTP đang dính 3 kiểu lỗi khác nhau:
-
-- `sinhOtp(): string` — 6 chữ số ngẫu nhiên bằng `crypto.randomInt`.
-- `hashOtp(otp: string): string` — SHA-256 hex (không cần bcrypt: OTP sống ngắn, có rate-limit).
-- `kiemOtp(otpNhap: string, hashLuu: string | null): boolean` — so `timingSafeEqual` trên hash.
-- **Không** tự truy vấn DB — chỉ hàm thuần, để test được không cần Postgres (đặt ở tầng
-  `lib/bao-mat/` = tầng 3, chỉ import từ `lib/nen/`).
-
-**(c) Áp vào Telegram:**
-
-- Route kiểm secret token **ngay dòng đầu handler**, trước cả `req.json()`.
-- `verifyTelegramLinkOtp(chatId, otpCode)` — thêm tham số `chatId`, điều kiện WHERE phải gồm
-  `telegram_chat_id IS NULL OR telegram_chat_id = ?` (chỉ nhận binding chưa gắn chat khác), so OTP
-  bằng hash qua `kiemOtp`, và **rate-limit theo chatId**: `hitRateLimit(\`tg_otp:\${chatId}\`, 5, 15)`(chữ ký thật:`hitRateLimit(key: string, max: number, windowMinutes: number): Promise<boolean>`từ`lib/bao-mat/ratelimit.ts`— trả`true` khi **còn được phép**, kiểm lại chiều trả về trước khi dùng).
-  Vượt ngưỡng → trả về false, không tra DB.
-- Sinh OTP: lưu **hash** vào `otp_code`, upsert theo `user_id` (không phải `id`).
-
-**(d) Áp vào Zalo:**
-
-- Route kiểm chữ ký ngay đầu handler → 401 khi sai.
-- **Bỏ hẳn `body.projectId`.** `projectId` **suy từ binding**: tra
-  `zalo_user_bindings WHERE zalo_user_id = ? AND is_verified = true` → lấy `project_id` của dòng đó.
-  Không có binding verified → trả 403 kèm thông điệp tiếng Việt hướng dẫn liên kết trước, **không**
-  xử lý tin nhắn, **không** ghi log message.
-- `verifyZaloLinkOtp`: thêm `AND otp_expires_at > CURRENT_TIMESTAMP`, so OTP qua hash, rate-limit
-  theo `zaloUserId` như Telegram.
-- Sinh OTP: lưu hash, upsert theo `(project_id, zalo_user_id)`.
-
-**(e) Migration `0133_webhook_otp_hardening.sql`** (xác nhận số thật trước):
-
-- `CREATE UNIQUE INDEX IF NOT EXISTS` trên `zalo_user_bindings(project_id, zalo_user_id)` —
-  **lưu ý:** dữ liệu hiện có thể đã trùng do bug (e); migration phải **dọn trùng trước** (giữ dòng
-  `is_verified = true` nếu có, ngược lại giữ dòng mới nhất theo `created_at`) rồi mới tạo unique index.
-  Viết idempotent, chạy lại không lỗi.
-- Đây là migration **đụng dữ liệu** (DELETE dòng trùng) → ghi rõ trong PR là **bắt buộc qua staging
-  trước** theo DoD `CLAUDE.md`, kiểm trước bằng `npm run db:migrate -- --dry-run`.
-
-**(f) Biến môi trường:** thêm `TELEGRAM_WEBHOOK_SECRET`, `ZALO_OA_SECRET` vào `lib/nen/env.ts`
-(danh sách liệt kê) + `.env.example` + mục "Biến môi trường quan trọng" trong `CLAUDE.md`, ghi rõ
-thiếu biến → throw fail-fast khi gọi webhook (build vẫn chạy).
-
-### Tiêu chí chấp nhận
-
-- POST vào 2 route webhook **không kèm secret/chữ ký hợp lệ** → 401, không ghi bất kỳ dòng DB nào.
-- Zalo: `projectId` trong body bị **bỏ qua hoàn toàn**; user chưa có binding verified → 403, không
-  ghi log.
-- Dò OTP: quá 5 lần sai trong 15 phút cho cùng chatId/zaloUserId → bị chặn.
-- OTP hết hạn (Zalo) → verify thất bại.
-- Sinh OTP 2 lần liên tiếp cho cùng user → **1 dòng binding**, không phải 2.
-- `tests/webhook-inbound.test.ts` (mới) + mở rộng test OTP: unit thuần cho `otp.ts` và hàm xác thực
-  chữ ký (không cần DB); integration cho luồng binding (tự skip khi thiếu `TEST_DATABASE_URL`).
-- **Chứng minh test bắt lỗi cũ** theo quy ước chung ở trên.
+- **Đọc trước khi sửa:** `CLAUDE.md` (Auth, ADR-0007 ranh giới `lib/`, Quy ước) và `docs/audit.md`.
+- **Ranh giới kiến trúc (ADR-0007/0008):** route chỉ là ranh giới HTTP; logic nghiệp vụ ở
+  `lib/<miền>/`; import nội bộ dùng alias `@/lib/<miền>/<module>`. Chạy `npm run check:lib-layers`.
+- **SQL:** qua helper `lib/db`, placeholder `?`, **không nối chuỗi chèn giá trị**.
+- **Tiếng Việt:** toàn bộ UI, comment, commit message. Commit conventional prefix + mô tả tiếng Việt.
+- **Migration:** GĐ2 **dự kiến không cần migration nào**. Nếu việc của bạn thật sự cần, chạy
+  `ls migrations | sort -V | tail -3` lấy số thật (đừng tin số trong kế hoạch) và **báo lại** —
+  đừng lặng lẽ thêm.
+- **Test:** file chạm DB `import "@/tests/setup"` ở **dòng đầu tiên**.
+- **Postgres CÓ SẴN trong môi trường** (bài học GĐ1: nhiều worker tưởng không có rồi để 386 ca skip).
+  Binary ở `/usr/lib/postgresql/16/bin/`, **không chạy được dưới root** — dựng bằng user không đặc
+  quyền, ví dụ:
+  ```bash
+  useradd -m pgtest 2>/dev/null; PGD=/home/pgtest/pgdata_<ten-viec>
+  su pgtest -c "/usr/lib/postgresql/16/bin/initdb -D $PGD -U postgres --auth=trust -E UTF8"
+  su pgtest -c "/usr/lib/postgresql/16/bin/pg_ctl -D $PGD -o '-p <cong-rieng> -k /tmp' -l $PGD/log start"
+  psql "postgresql://postgres@127.0.0.1:<cong-rieng>/postgres" -c "CREATE DATABASE xboss_test;"
+  export TEST_DATABASE_URL="postgresql://postgres@127.0.0.1:<cong-rieng>/xboss_test"
+  ```
+  **Dùng cổng riêng cho mỗi việc** (W1=55501, W2=55502, ... W6=55506) vì các việc chạy song song.
+  ⚠️ `TEST_DATABASE_URL` **phải là URL TCP** — dạng Unix-socket (`?host=/tmp`) làm
+  `scripts/run-tests-parallel.mjs` crash ở `new URL()` (đã dính thật ở GĐ1). Tắt cluster khi xong.
+- **Cổng trước khi báo xong:** `npm run lint && npm run typecheck && npm test && npm run check:lib-layers
+&& npm run build` xanh, **với `TEST_DATABASE_URL` đã đặt**. Ca skip KHÔNG tính là pass.
+- **Chứng minh cổng/test bắt được lỗi:** mỗi cổng CI mới phải chứng minh **báo đỏ** khi cố tình
+  đưa vào một vi phạm, rồi **xanh** khi gỡ ra. Ghi kết quả vào báo cáo. Đây là yêu cầu cứng —
+  GĐ1 đã có ca một test bất biến trông có vẻ đúng nhưng **mù hoàn toàn** với lỗi nó phải bắt.
+- **Không mở rộng phạm vi:** không refactor ngoài vùng được giao, không nâng dependency.
 
 ---
 
-## Việc V2 — Siết quyền ký e-Sign (`route: spec`)
+## Việc W1 — Vá 27 lời gọi SQL sai kiểu (`route: spec`)
 
-**Vá lỗ hổng Cao A3.** Đặc tả kín, chỉ cần thi hành chính xác.
+**Nợ kỹ thuật nghiêm trọng nhất phát hiện ở GĐ1. Các tính năng này chưa từng chạy được lần nào.**
 
-### Vấn đề thật (đã xác minh trên code)
+### Vấn đề thật (đã kiểm chứng trên Postgres thật ở GĐ1)
 
-`app/api/engineering/esign/sign/route.ts:11` gate bằng `CAN.viewEngineeringGraph` — đọc
-`lib/bao-mat/auth.ts:359` thấy hàm này trả true cho `admin | pm | engineer | **bch**`, tức **quyền
-XEM, bao gồm vai trò chỉ-xem `bch`**, lại dùng để gate hành vi **ký**. Cộng thêm:
+`lib/db` khai `query(sql, ...params)` / `queryOne` / `run` nhận tham số **biến thiên**. Nhưng 11 file
+route gọi kiểu `query(sql, [projectId])` — truyền một **mảng** làm tham số duy nhất. Hệ quả:
+`pg.query(pgSql, [[projectId]])` → Postgres nhận `{"1"}` thay vì `1` →
+`invalid input syntax for type integer: "{"1"}"` **ngay câu truy vấn đầu tiên**.
 
-- `signatoryId` do client chọn, không ràng buộc gì với tài khoản đang đăng nhập → **1 user ký được
-  cả 3 bên** (CĐT/TVGS/Nhà thầu).
-- `lib/ky-thuat/engineering-esignature.ts:204` — `if (signatory.otpCode && otpCode)`: chỉ kiểm OTP
-  khi client **tự nguyện gửi** trường `otpCode`; bỏ trường đi là qua mặt hoàn toàn.
-- Không kiểm `status === 'ready'` (chỉ chặn `'signed'`) → ký sai thứ tự được.
-- `projectId` từ body không đối chiếu `visibleProjectIds`.
-
-**Không cần migration:** bảng `engineering_esign_signatories` (`migrations/0117_*.sql:20`) **đã có**
-cột `user_id BIGINT REFERENCES users(id)` — hiện đang nullable và không được dùng để kiểm.
-
-### Việc phải làm
-
-1. **Quyền:** thêm `CAN.signEngineeringEsign` vào map `CAN` trong `lib/bao-mat/auth.ts` —
-   `(r?: Role) => r === "admin" || r === "pm" || r === "engineer"` (loại `bch` và mọi
-   `VIEW_ONLY_ROLES`). Route đổi sang dùng quyền này. **Không** check role rải rác ngoài map `CAN`.
-2. **Ràng buộc người ký:** trong `executeSignEnvelope`, sau khi tải signatory:
-   - `signatory.user_id == null` → trả lỗi 422 "Người ký chưa được gắn tài khoản hệ thống".
-   - `Number(signatory.user_id) !== user.id` → trả lỗi **403** "Bạn không phải người ký của mục này".
-   - Hàm nhận `user.id` qua **tham số** (không tự gọi `getCurrentUser()` bên trong — giữ hàm test
-     được ngoài phạm vi request, đúng tiền lệ `chotProjectIdChoGhi`).
-3. **OTP bắt buộc:** đổi `if (signatory.otpCode && otpCode)` thành: nếu `signatory.otp_code` tồn tại
-   thì **bắt buộc** phải có `otpCode` hợp lệ và **còn hạn** (`otp_expires_at > NOW()`), thiếu/sai → 422. So OTP qua `kiemOtp` của `lib/bao-mat/otp.ts` (module do V1 tạo — **nếu V1 chưa tích hợp,
-   dùng so sánh `timingSafeEqual` tại chỗ và ghi chú TODO gộp về `otp.ts`; không tự tạo module trùng tên**).
-4. **Thứ tự ký:** yêu cầu `signatory.status === 'ready'`; khác → 409 kèm thông điệp tiếng Việt nêu
-   trạng thái hiện tại.
-5. **Project scope:** `projectId` qua
-   `chotProjectIdChoGhi(user, body.projectId, await getCurrentProjectId(user, user.orgId))` từ
-   `lib/ha-tang/projects.ts` (chữ ký thật:
-   `(user: {id, role}, inputProjectId: unknown, projectHienTai: number) => Promise<{ok:true,projectId}|{ok:false}>`);
-   `ok:false` → 403.
-6. **Tài liệu:** trong `PROGRESS.md`, **mở lại** nợ "ký số PAdES" — ghi rõ module M84 chưa đạt mức
-   "chống chối bỏ" như mô tả, nêu 4 điểm đã vá ở việc này và phần còn thiếu (PAdES thật/USB token/HSM
-   vẫn chờ nhu cầu pháp lý, đúng mục "Việc tạm hoãn").
-
-### Tiêu chí chấp nhận
-
-- Vai trò `bch`/`cdt`/`viewer`/`subcon` gọi POST sign → **403**.
-- User A cố ký signatory gắn user B → **403**.
-- Signatory có `otp_code` mà request **không** gửi `otpCode` → **422** (trước đây: ký thành công).
-- Signatory `status='waiting'` → **409**.
-- `projectId` trỏ dự án ngoài `visibleProjectIds` → **403**.
-- `tests/esign-sign-guard.test.ts` (mới) phủ đủ 5 ca trên; chứng minh test đỏ khi trả về code cũ.
-
----
-
-## Việc V3 — Phân quyền 14 route engineering ghi dữ liệu (`route: spec`)
-
-**Vá lỗ hổng Cao A4.**
-
-### Vấn đề thật (đã xác minh: phiên chính tự đếm)
-
-14 file trong `app/api/engineering/` có `POST|PATCH|DELETE` mà **không tham chiếu `CAN.` nào**
-(chỉ có `getCurrentUser`), tức vai trò chỉ-xem và subcon ghi được:
+**11 file, 27 lời gọi:**
 
 ```
-subcon-ai/evaluate            subcon-ai/recommend-shortlist
-bim-models/                   bim-models/[id]/link-wbs        bim-models/[id]/simulate-4d
-god-tier/bcf/topics           god-tier/point-cloud            god-tier/ai-diagnose
-god-tier/clashes              god-tier/models                 god-tier/cnc-export
-god-tier/simulate-4d          iot/telemetry                   iot/alerts
+app/api/engineering/bim-models/route.ts                      (3)
+app/api/engineering/bim-models/[id]/elements/route.ts        (1)
+app/api/engineering/bim-models/[id]/link-wbs/route.ts        (2)
+app/api/engineering/bim-models/[id]/simulate-4d/route.ts     (2)
+app/api/engineering/iot/devices/route.ts                     (3)
+app/api/engineering/iot/alerts/route.ts                      (2)
+app/api/engineering/iot/telemetry/route.ts                   (3)
+app/api/engineering/subcon-ai/scores/route.ts                (5)
+app/api/engineering/subcon-ai/evaluate/route.ts              (1)
+app/api/engineering/subcon-ai/recommend-shortlist/route.ts   (3)
+app/api/engineering/cad/parse-dxf/route.ts                   (2)
 ```
 
-Hệ quả cụ thể: `viewer`/`cdt` tạo/ghi đè mô hình BIM và gắn `wbs_task_id`; POST `iot/telemetry` giả
-số đo → **tự sinh cảnh báo an toàn HSE CRITICAL thật** (`route.ts:111-128`); PATCH `iot/alerts` ack
-tắt cảnh báo an toàn; POST `subcon-ai/evaluate` — **thầu phụ tự chấm điểm tín nhiệm của chính mình**
-với metrics tự khai từ body (`onTimeRate ?? 90`, `bbntPassRate ?? 95`).
+Tự chạy lệnh sau để lấy danh sách thật, đừng tin danh sách trên là đủ:
 
-### Việc phải làm
+```bash
+grep -rPzo '(?s)await (query|queryOne|run)(<[^>]*>)?\(\s*`[^`]*`,\s*\[' app/api/ --include=*.ts
+```
 
-1. **Thêm 4 cặp quyền vào map `CAN`** (`lib/bao-mat/auth.ts`, bám đúng pattern các cặp
-   `viewEngineering*`/`manageEngineering*` đã có ở dòng 337–379):
-   - `viewEngineeringBim` / `manageEngineeringBim`
-   - `viewEngineeringIot` / `manageEngineeringIot`
-   - `viewEngineeringSubconAi` / `manageEngineeringSubconAi`
-   - `viewEngineeringGodTier` / `manageEngineeringGodTier`
+(hoặc dùng công cụ tìm kiếm multiline của bạn — **rà cả `app/api/` chứ không chỉ `engineering/`**.)
 
-   Quy tắc chung: `view*` = `admin | pm | engineer | bch`; `manage*` = `admin | pm | engineer`
-   (**loại toàn bộ `VIEW_ONLY_ROLES` và `subcon`**). Ngoại lệ bắt buộc:
-   `manageEngineeringSubconAi` = `admin | pm` (chấm điểm nhà thầu là việc quản lý, **subcon và
-   engineer không được tự chấm**).
+### Cách vá — đọc kỹ, có một cái bẫy
 
-2. **Áp vào 14 file:** mọi handler `GET` dùng `view*`, mọi `POST|PATCH|DELETE` dùng `manage*`; trả
-   **403** kèm thông điệp tiếng Việt khi không đủ quyền, **401** khi chưa đăng nhập (giữ nguyên
-   `getCurrentUser` sẵn có). Bám đúng pattern route engineering đã làm đúng (tham chiếu:
-   `app/api/engineering/twin/**` hoặc route bất kỳ đang dùng cặp `viewEngineeringTwin`/`manageEngineeringTwin`).
+**Vá tối thiểu: bỏ dấu ngoặc vuông, truyền tham số rời** — `query(sql, a, b)` thay vì
+`query(sql, [a, b])`. **GIỮ NGUYÊN placeholder `$1`/`$2` trong chuỗi SQL.**
 
-3. **Chặn metrics tự khai của `subcon-ai/evaluate`:** bỏ mọi default kiểu `onTimeRate ?? 90` nhận từ
-   body. Metrics phải **tính từ dữ liệu hệ thống**. Nếu nguồn dữ liệu thật chưa sẵn cho một chỉ số
-   nào thì **trả `null` + ghi rõ "chưa đủ dữ liệu"**, tuyệt đối **không** thay bằng số mặc định đẹp.
-   Đặt logic tính ở `lib/hien-truong/` hoặc `lib/ky-thuat/` theo đúng miền của nguồn dữ liệu (không
-   để trong route — ADR-0008).
+**Vì sao KHÔNG chuyển `$n` sang `?`** (dù `?` là quy ước dự án): `toPg` (`lib/db/index.ts:114`) chỉ
+thay `?` → `$n` theo thứ tự xuất hiện, nên SQL viết sẵn `$n` vẫn chạy đúng khi tham số truyền rời.
+Quan trọng hơn: **có chỗ dùng lại cùng một `$1` nhiều lần** — ví dụ
+`app/api/engineering/iot/devices/route.ts` INSERT 5 dòng VALUES đều tham chiếu `$1`. Chuyển sang `?`
+sẽ cần **5 tham số lặp** thay vì 1, tức phải viết lại lời gọi — rủi ro sai cao mà không được gì.
+Nếu bạn thấy chỗ nào bắt buộc phải đổi placeholder, **báo lại thay vì tự đổi**.
 
-4. **Kèm 2 sửa nhỏ cùng vùng file (phát hiện Thấp):**
-   - `bim-models/route.ts:76-92` — chèn element **từng dòng trong vòng lặp, không transaction, không
-     cap số lượng**: đổi sang batch insert (multi-row `VALUES` hoặc `UNNEST`), bọc `withTransaction`,
-     cap `elements.length` (đề xuất 10 000) → **422** khi vượt.
-   - `iot/telemetry/route.ts:111-128` — alert **không dedup**: trước khi insert, kiểm alert đang mở
-     cho cùng `device_id`; hoặc partial unique index `(device_id) WHERE resolved_at IS NULL`. Bám
-     đúng cơ chế dedup notification của dự án. Cần migration → dùng số thật, idempotent.
+### Kiểm chứng bắt buộc
 
-### Tiêu chí chấp nhận
+Vá xong mà không chạy thật thì không biết có đúng không — chính vì không ai chạy thử mà lỗi này
+sống sót nhiều tháng. Bắt buộc:
 
-- Chạy lại phép đếm của audit: `for f in $(grep -rln "export async function \(POST\|PATCH\|DELETE\)" app/api/engineering/); do grep -q "CAN\." "$f" || echo "$f"; done`
-  → **0 file** (hoặc chỉ còn file có lý do ghi rõ trong báo cáo).
-- `viewer`/`cdt`/`subcon` POST vào 14 route → **403**.
-- `engineer` POST `subcon-ai/evaluate` → **403** (chỉ `admin`/`pm`).
-- `subcon-ai/evaluate` không còn nhận bất kỳ chỉ số nào từ body.
-- POST `bim-models` với 20 000 element → **422**; với số hợp lệ mà lỗi giữa chừng → **không** để lại
-  model mồ côi.
-- Test mới phủ ma trận quyền 7 vai trò cho ít nhất 1 route đại diện mỗi nhóm (bim/iot/subcon-ai/god-tier).
+1. Dựng Postgres theo hướng dẫn ở mục Quy ước (cổng **55501**), chạy `npm run db:migrate`.
+2. Với **mỗi** trong 11 file, gọi thật hàm/route đó (hoặc tối thiểu chạy đúng câu SQL đã vá với tham
+   số thật qua `lib/db`) và xác nhận **không** còn `invalid input syntax`. Ghi vào báo cáo file nào
+   đã chứng minh chạy được bằng cách nào.
+3. Viết `tests/db-params-invariant.test.ts` — test **thuần fs** quét toàn bộ `app/api/**` và `lib/**`
+   tìm mẫu truyền mảng cho `query`/`queryOne`/`run`, danh sách vi phạm phải **rỗng**.
+4. **Chứng minh test bắt được lỗi:** trả 1 file về mẫu cũ → test **ĐỎ** chỉ đích danh file đó;
+   khôi phục → **XANH**. Dán kết quả vào báo cáo.
+
+**Lưu ý:** một số route trong danh sách vừa được GĐ1 sửa (thêm `CAN.`, `chotProjectIdChoGhi`) — đọc
+code hiện tại trên nhánh, đừng giả định nội dung cũ.
 
 ---
 
-## Việc V4 — `projectId` phải lấy từ phiên, không từ body (`route: spec`)
+## Việc W2 — Ba cổng CI chặn lớp lỗi route tái phát (`route: standard`)
 
-**Vá phát hiện Trung B1.**
+**Biến 3 checklist đã lặp nhiều đợt thành cổng máy.** Bám đúng khuôn các cổng sẵn có
+(`scripts/check-lib-layers.ts`, `check-sw-exclude.ts`, `check-migration-numbers.ts`): script `tsx`
+độc lập, in vi phạm bằng tiếng Việt, `process.exit(1)` khi có vi phạm.
 
-### Vấn đề thật
+### W2.1 — `scripts/check-route-perms.ts` → `npm run check:route-perms`
 
-~15 route engineering dùng mẫu `Number(body.projectId || (user as any).projectId || 1)` —
-`user.projectId` **không tồn tại** trên kiểu `User` nên biểu thức rơi về **giá trị client gửi**, hoặc
-`1`. Nhiều chỗ còn dùng chính giá trị đó cho `withProjectScope` nên RLS không chặn. Trái quy ước ghi
-ngay trong `lib/ha-tang/projects.ts:1-3`: _"Route KHÔNG tin project_id client gửi qua body/query"_.
-Cùng lớp lỗi đã xảy ra thật với `/api/payment-certs` và `save-drawing` (đã vá đợt trước).
+Quét mọi `app/api/**/route.ts` có `export async function POST|PATCH|PUT|DELETE`. Mỗi handler ghi
+**phải** tham chiếu ít nhất một trong: `CAN.`, `canTouchTask`, `canTouchPackage`, `requireApiKey`.
+Vi phạm → liệt kê file + method.
 
-**Danh sách khoanh vùng** (worker tự grep `body.projectId` trong `app/api/engineering/` + `app/api/zalo/`
-để lấy danh sách đầy đủ, không tin danh sách này là đủ):
-`bidding` (×3), `fidic/claims`, `routing/sleeves`, `queue/tasks/[id]/bridge`, `spatial/annotations` (×2),
-`logistics` (×2), `pinnacle/pulse`, `esign` (×2 — **phối hợp V2**), `cashflow/simulate`, `hse-vision/scan`.
+**WHITELIST bắt buộc kèm lý do từng mục** (theo tiền lệ `tests/org-scope-invariant.test.ts`): các
+route auth (`app/api/auth/**` — chính là nơi cấp quyền), webhook có xác thực riêng
+(`app/api/telegram/webhook`, `app/api/zalo/webhook` — đã kiểm secret/chữ ký ở GĐ1), cron
+(`app/api/cron/**` — bảo vệ bằng `CRON_SECRET`). Tự rà và bổ sung mục thật sự cần, **mỗi mục một lý
+do cụ thể**, không whitelist cho tiện.
 
-### Việc phải làm
+### W2.2 — `scripts/check-project-scope.ts` → `npm run check:project-scope`
 
-1. Thay toàn bộ mẫu trên bằng `chotProjectIdChoGhi(user, body.projectId, projectHienTai)` từ
-   `lib/ha-tang/projects.ts` (chữ ký thật ghi ở V2 mục 5), `ok:false` → **403**. Với route **chỉ đọc**,
-   dùng `getCurrentProjectId(user, user.orgId)` và bỏ hẳn `body.projectId`.
-2. **Không** đụng các route đã đúng; không refactor gì khác trong file.
-3. **Mở rộng bất biến thành test cưỡng chế:** dựa trên `tests/cad-project-scope.test.ts` (đã có mẫu
-   cho nhóm CAD) và `tests/project-scope-invariant.test.ts`, viết/mở rộng test **thuần fs** quét toàn
-   bộ `app/api/engineering/**`: cấm mẫu `body.projectId`/`formData.get("projectId")` trừ khi file đó
-   cũng tham chiếu `chotProjectIdChoGhi`. Whitelist phải kèm **lý do từng mục** (đúng tiền lệ
-   `tests/org-scope-invariant.test.ts` 24 mục).
+Nâng `tests/engineering-project-scope-invariant.test.ts` (GĐ1 viết, hiện chỉ quét
+`app/api/engineering/**`) thành cổng quét **toàn bộ `app/api/**`**. Cấm mẫu `body.projectId`,
+`formData.get("projectId")`, `searchParams.get("projectId")` **dùng trần** — phải là tham số của
+`chotProjectIdChoGhi`.
+
+**Quan trọng — tái dùng đúng heuristic đã được kiểm chứng:** bản đầu của test GĐ1 **mù** vì chỉ cần
+một dòng `import` còn sót là nó coi file hợp lệ. Bản hiện tại cắt bỏ nguyên câu lệnh
+`chotProjectIdChoGhi(...)` rồi mới soi phần còn lại. **Giữ nguyên cách đó**, đừng viết lại từ đầu.
+Mở rộng ra toàn `app/api/` gần như chắc chắn lộ thêm route vi phạm ngoài `engineering/` — **liệt kê
+chúng vào báo cáo**; sửa những route bạn chắc chắn và đơn giản, còn lại whitelist kèm lý do + đề
+xuất việc riêng. **Không tự sửa diện rộng** ngoài tầm kiểm soát.
+
+Sau khi cổng này chạy toàn repo, cân nhắc gộp/bỏ test cũ để không kiểm trùng hai nơi (nếu bỏ, ghi rõ
+lý do trong báo cáo).
+
+### W2.3 — `scripts/check-db-params.ts` → `npm run check:db-params`
+
+Chặn tái phát chính lỗi W1: cấm truyền **mảng** cho `query`/`queryOne`/`run`/`insertId` của
+`lib/db`. Quét `app/api/**` + `lib/**`. **Phối hợp với W1:** W1 viết
+`tests/db-params-invariant.test.ts`; nếu logic quét trùng nhau thì cổng này **import lại** hàm quét
+đó thay vì chép code (DRY) — hoặc nếu W1 chưa tích hợp thì viết độc lập và ghi chú để gộp sau.
+
+### Nối vào CI
+
+Thêm cả 3 vào job `static` của `.github/workflows/ci.yml`, đặt cạnh các bước `check:*` hiện có (dòng
+~60-74), đúng định dạng bước sẵn có. **Không** đụng job khác.
 
 ### Tiêu chí chấp nhận
 
-- Grep `body.projectId` trong `app/api/engineering/` → mọi kết quả còn lại đều đi qua
-  `chotProjectIdChoGhi`, hoặc nằm trong whitelist có lý do.
-- User thuộc dự án A gửi `projectId` của dự án B (ngoài `visibleProjectIds`) → **403**, không ghi dòng nào.
-- Test bất biến mới **đỏ** nếu thêm lại một route dùng `body.projectId` trần.
+- 3 lệnh `npm run check:*` chạy xanh trên nhánh hiện tại.
+- **Mỗi cổng chứng minh báo đỏ**: cố tình thêm 1 vi phạm (route ghi bỏ `CAN.`, route đọc
+  `body.projectId` trần, lời gọi `query(sql, [x])`) → cổng đỏ **chỉ đích danh** chỗ đó; gỡ ra → xanh.
+  Dán output cả 3 vào báo cáo.
+- CI có đủ 3 bước mới trong job `static`.
 
 ---
 
-## Việc V5 — Trung thực hoá dữ liệu hiển thị: bot hiện trường + Smart IPC (`route: standard`)
+## Việc W3 — Đóng băng module vượt gate bằng feature flag (`route: standard`)
 
-**Vá phát hiện Trung B2 + B3.** Đây là lỗi **toàn vẹn dữ liệu** dù code "chạy đúng".
+**Quyết định của người dùng (2026-08-24): đóng băng, KHÔNG gỡ code — đảo ngược được.**
 
-### Vấn đề thật (đã xác minh trên code)
+### Vấn đề
 
-**(a) Bot trả lời GIẢ** — `lib/ky-thuat/engineering-site-bot.ts:265,280` và
-`lib/ky-thuat/engineering-zalo-copilot.ts:185`:
+Đợt audit kết luận nhiều module `engineering/*` được xây **vượt cổng của chính roadmap**
+(`ENG-0` nguyên tắc #10: giai đoạn `OS-<n>` chỉ được code sau khi ENG-1..4 có traffic thật từ
+MEPF-Agents — hiện **chưa có request nào**), và W1 chứng minh một số trong đó **chưa từng chạy được**.
+Chúng đang đứng cạnh dữ liệu production như tính năng thật.
 
-- `PROGRESS_UPDATE` → _"Hệ thống đã đồng bộ vào WBS"_
-- `ISSUE_REPORT` → _"Đã tạo Phiếu NCR… BCH đã nhận thông báo"_
-- `QUERY_STOCK` → _"Tồn kho khả dụng 450 đơn vị"_ / _"Hiện còn 180 đơn vị tại Kho Tổng A"_ —
-  **số bịa cứng trong code**
+### Cái bẫy phải xử lý trước
 
-Thực tế **chỉ ghi log tin nhắn**, không đụng `tasks`/`ncrs`/`materials`. Kỹ sư ngoài công trường tin
-là tiến độ/NCR đã vào hệ thống → mất dữ liệu thật; số tồn kho giả có thể dẫn tới quyết định cấp phát sai.
+`isModuleEnabled` (`lib/ha-tang/feature-flags.ts:41`) trả `overrides.get(moduleKey) ?? **true**` —
+**mặc định BẬT**. Nên chèn dòng DB tắt cho từng dự án là mong manh: **dự án mới tạo sẽ tự bật lại**.
 
-**(b) Smart IPC (M94)** — `app/api/engineering/smart-ipc/route.ts:51-61` +
-`lib/ky-thuat/engineering-smart-ipc.ts:47-120`: toàn bộ `gating` ("BBNT 3 bên", "thử áp IoT", "đối
-soát BOQ/kho") lấy từ body với default **pass hết** (`bbntSigned3Parties !== false`);
-`grossClaimedVnd` default 500.000.000; tiền tính `parseFloat` + `Math.round(gross * rate)` trên
-**float JS** (trái quy ước M45); payload "lệnh chuyển khoản" chứa **số tài khoản hardcode**
-`98877665544`.
+**Cách đúng:** thêm cờ mặc-định-tắt ở tầng **registry code**, không phải dữ liệu.
 
-### Việc phải làm
-
-**(a) Bot — quyết định đã chốt: đổi thông điệp, KHÔNG wire thật trong đợt này.**
-
-- Mọi reply hàm ý "đã ghi vào hệ thống" đổi thành thông điệp trung thực, ví dụ:
-  _"Đã ghi nhận yêu cầu cập nhật tiến độ [MÃ] → [X]%. Yêu cầu đang chờ xử lý, **chưa** cập nhật vào
-  WBS. Vui lòng cập nhật trên ứng dụng XBoss để ghi nhận chính thức."_
-- **Xoá hoàn toàn mọi số liệu bịa** (450/180 đơn vị, "Kho Tổng A", "DWG-M-01/02"). Intent tra cứu
-  trả: _"Tính năng tra cứu qua bot đang thử nghiệm, chưa nối dữ liệu thật — vui lòng tra trên ứng dụng."_
-- Thêm hậu tố `⚠️ Bot đang ở chế độ thử nghiệm` vào reply của mọi intent chưa nối dữ liệu thật.
-- **Không** xoá code, **không** đổi schema log — chỉ đổi nội dung reply + comment giải thích rõ trạng
-  thái thử nghiệm ngay đầu 2 file lib.
-
-**(b) Smart IPC:**
-
-- Bỏ mọi default "pass hết": mỗi cổng gating **phải** truy vấn nguồn thật
-  (`engineering_esign_envelopes` cho BBNT, log IoT cho thử áp, `boq_items`/kho cho đối soát). Nguồn
-  chưa sẵn → cổng đó trả trạng thái **`khong_du_du_lieu`** và **chặn** giải ngân, **không** mặc định pass.
-- Bỏ default `grossClaimedVnd = 500_000_000`; thiếu → **422**.
-- **Tiền:** mọi tổng/tích làm **trong SQL**; nếu buộc tính ở JS thì cast cột tiền `::text` trong
-  SELECT rồi dùng `lib/nen/money.ts` (`parseMoney`/`addMoney`/`mulRate`/`formatVnd` — làm việc trên
-  bigint đơn vị đồng×100). **Cấm `parseFloat` + `*` trên tiền.**
-- **Xoá số tài khoản hardcode**; nếu payload cần thông tin ngân hàng thì đọc từ dữ liệu nhà thầu
-  trong DB, không có thì để trống + ghi rõ "chưa cấu hình".
+1. `lib/nen/modules.ts` — `ModuleDef` thêm trường optional `thuNghiem?: boolean` (kèm comment giải
+   thích: module chưa đạt cổng kiểm chứng, mặc định TẮT cho mọi dự án, Admin bật thủ công được).
+2. `isModuleEnabled` đổi thành `overrides.get(moduleKey) ?? (def?.thuNghiem ? false : true)`.
+   `getModuleFlags` sửa tương ứng. **Giữ nguyên** khả năng Admin bật/tắt per-project qua `setFlag` —
+   override tường minh trong DB luôn thắng mặc định.
+3. Đánh dấu `thuNghiem: true` cho các module thoả **một trong hai** tiêu chí, ghi rõ tiêu chí nào
+   cho từng module trong comment:
+   - **(a) Vượt cổng roadmap** — nhóm OS-phase: autonomy, twin, predictions, graph, prescriptive.
+     Riêng **autonomy** bắt buộc phải có (OS-4 đòi phê duyệt riêng từng workflow A3+ từ người dùng).
+   - **(b) Chưa từng chạy được** (lỗi SQL W1) hoặc là mô phỏng rõ rệt: bim-models/bim-viewer,
+     iot-telemetry, subcon-ai, god-tier-studio, quantum-hub, swarm, nextgen-apex.
+     Module nào bạn **không chắc** thuộc tiêu chí nào → **để nguyên (không đánh dấu)** và ghi vào báo
+     cáo để phiên chính quyết. Thà bỏ sót còn hơn tắt nhầm tính năng đang dùng thật.
+4. **Tuyệt đối KHÔNG đánh dấu** các module nghiệp vụ lõi đang dùng thật: tracking, dashboard,
+   materials, approvals, payments, contracts, boq, hse, diary, reports, notifications, admin...
+5. UI: trang/nav của module `thuNghiem` khi **được bật thủ công** nên có nhãn cảnh báo
+   "⚠️ Thử nghiệm — chưa kiểm chứng trên dữ liệu thật" (tái dùng component sẵn có, theo chuẩn UI
+   dark-first, không `dark:`, không hex).
 
 ### Tiêu chí chấp nhận
 
-- Grep toàn repo: **không còn** chuỗi `450 đơn vị`, `180 đơn vị`, `Kho Tổng A`, `98877665544`.
-- Không còn reply nào khẳng định đã ghi vào WBS/NCR khi thực tế chỉ ghi log.
-- Smart IPC: request thiếu dữ liệu gating → **chặn**, không "pass mặc định".
-- Test tiền: một ca chứng minh kết quả tính qua `lib/nen/money.ts` **khác** kết quả `parseFloat` cũ ở
-  ca biên (chứng minh bug float là thật), và giá trị mới là đúng.
+- Dự án **mới tạo** (không có dòng override nào) → module `thuNghiem` trả `isModuleEnabled = false`;
+  module lõi trả `true`. Có test chứng minh (cần DB — dùng cổng **55503**).
+- Admin `setFlag(key, projectId, true, ...)` vẫn bật được module `thuNghiem` → `true` (override thắng).
+- `npm run check:sw-exclude` vẫn xanh (registry là nguồn của cổng này).
+- Báo cáo liệt kê **đầy đủ** module đã đánh dấu + tiêu chí (a)/(b) cho từng cái, và danh sách module
+  bạn không chắc.
 
 ---
 
-## Việc V6 — CAD client hiển thị đúng lỗi + toast đúng ngữ nghĩa (`route: standard`)
+## Việc W4 — Lưới quét axe cho các trang chưa phủ (`route: standard`)
 
-**Vá phát hiện Trung B4 + B6 và 1 phát hiện Thấp.**
+### Vấn đề
 
-### Vấn đề thật (đã xác minh trên code)
+`docs/audit.md` §5 tuyên bố spec axe là **cổng merge**, nhưng ~35 trang `app/engineering/*` cùng hub
+`site`/`commercial` và vài trang khác **không có spec axe nào**. Đây đúng là nơi tập trung nhiều
+nhất vi phạm màu mà GĐ1 phải sửa (57 file) — không ngẫu nhiên: chưa có trọng tài.
 
-1. `app/engineering/chuan-hoa-ban-ve/hooks/useCadSource.ts:157-175` — `runDxfAnalysis` **chỉ** xử lý
-   `res.ok` và `401`; mọi mã khác bị bỏ qua hoàn toàn (spinner tắt, không toast, không error state).
-   Nghĩa là **409** (nhiều bản vẽ trùng tên — chính contract mới của `tim-ban-ve.ts` vừa vá đợt
-   trước) và **413** (quá giới hạn `GIOI_HAN_TEP_CAD`) **không tới được người dùng** → bản vá
-   chống-nhầm-bản-vẽ thành ra cụt ở client.
-2. `app/components/Toast.tsx:18` — `showToast(message, kind = "success")`; ~10 chỗ trong hooks CAD
-   gọi báo lỗi mà **không truyền kind** (`useSmartNaming.ts`, `useCadSource.ts:220`) → thông điệp lỗi
-   hiện nền emerald + icon ✓. Màu "nói dối", và `role="status"` cũng không phân biệt cho screen reader.
-3. `app/api/engineering/cad/save-drawing/route.ts:178,184` — 2 `catch {}` **rỗng** nuốt lỗi
-   (`unlinkSync` dọn bản tạm), trái `docs/audit.md` §7. Đây là 2 catch rỗng **duy nhất** trong `lib/`
-   - `app/api/`.
+Viết 45 spec thủ công là không khả thi. Làm **1 spec tham số hoá** quét theo danh sách route.
 
 ### Việc phải làm
 
-1. `runDxfAnalysis`: thêm nhánh `!res.ok` → đọc `json.error`, hiện `showToast(msg, "error")` **và**
-   set error state để UI hiển thị (không chỉ toast thoáng qua). Giữ nguyên nhánh `401 → redirectToLogin()`.
-2. **Riêng 409:** response mang danh sách ứng viên bản vẽ — hiện **modal cho người dùng chọn đích
-   danh** (tái dùng `app/components/dialogs.tsx`, **không** tạo component mới nếu tránh được), chọn
-   xong gọi lại phân tích với `drawingId` cụ thể. Tuyệt đối **không** tự chọn hộ.
-3. Grep `showToast(` trong `app/engineering/chuan-hoa-ban-ve/` — mọi nhánh báo lỗi truyền `"error"`.
-4. 2 `catch {}` rỗng → thêm `console.error` kèm ngữ cảnh tiếng Việt.
-5. **UI theo chuẩn dự án:** dark-first, **không** dùng biến thể `dark:`, **không** hardcode hex; thẻ
-   `bg-zinc-900 border border-zinc-800 rounded-xl`; nút `rounded-lg`; nút icon-only có `aria-label`
-   tiếng Việt; modal có trạng thái loading/lỗi rõ ràng.
+1. `e2e/authed/luoi-quet-axe.spec.ts` — mảng route (mỗi mục: đường dẫn + tên tiếng Việt), loop:
+   `goto` → chờ nội dung chính render (đừng chỉ chờ `networkidle` — trang rỗng cũng "idle") →
+   `AxeBuilder().withTags([...]).analyze()` → assert **không** vi phạm `serious`/`critical`.
+   Bám đúng pattern spec sẵn có (`e2e/authed/my-tasks.spec.ts`, `admin.spec.ts`) — cùng cách lấy
+   `storageState`, cùng bộ tag WCAG.
+2. Lấy danh sách route bằng cách đối chiếu thư mục `app/**/page.tsx` với các `goto()` đã có trong
+   `e2e/**`. Route động (`[id]`, `[sheet]`...) cần dữ liệu seed — nếu seed hiện có không đủ thì
+   **bỏ qua route đó và ghi vào báo cáo**, đừng bịa id.
+3. Chạy thật `npm run test:e2e` (hoặc lệnh e2e của dự án) cho spec mới. **Vi phạm axe tìm được thì
+   ghi vào báo cáo, KHÔNG tự sửa diện rộng** — sửa a11y ở ~45 trang là việc riêng, ngoài phạm vi.
+   Nếu quá nhiều trang đỏ khiến spec không thể xanh, đánh dấu các trang đó `test.fixme()` kèm lý do
+   - danh sách vi phạm, để spec vẫn vào được CI và làm mốc so sánh.
 
 ### Tiêu chí chấp nhận
 
-- Server trả 409 → người dùng thấy modal chọn bản vẽ; chọn xong phân tích đúng bản đã chọn.
-- Server trả 413 → người dùng thấy thông điệp giới hạn dung lượng kèm hướng dẫn tách bản vẽ.
-- Không còn `showToast` báo lỗi nào hiển thị style success.
-- Không còn `catch {}` rỗng trong `app/api/engineering/cad/`.
+- Spec mới chạy được thật (không phải chỉ đúng cú pháp), phủ **cả desktop + mobile** theo cấu hình
+  `playwright.config.ts` sẵn có.
+- Báo cáo liệt kê: số trang phủ thêm, trang nào xanh, trang nào đỏ (kèm vi phạm cụ thể), trang nào
+  bỏ qua và vì sao.
 
 ---
 
-## Việc V7 — Tương phản màu: chữ trắng trên nền accent sáng (`route: mechanical`)
+## Việc W5 — Ba việc cơ học độc lập (`route: mechanical`)
 
-**Vá phát hiện Trung B5.** Việc cơ học, bám quy tắc đã tính sẵn — **không** tự tính lại tương phản.
+### W5.1 — Rule lint chặn chữ trắng trên nền accent sáng
 
-### Vấn đề thật
+Lớp lỗi này lặp lần ≥3 (54b3e03 → ee8fce1 → 57 file ở GĐ1). Làm script
+`scripts/check-mau-accent.ts` → `npm run check:mau-accent` (khuôn giống các `check:*` khác, KHÔNG
+cần viết ESLint plugin — script đơn giản hơn và đủ dùng):
 
-**57 file** dùng `text-white` trên `bg-{emerald,sky,amber,green,teal,cyan}-600` — nhóm **FAIL** theo
-bảng đã tính sẵn ở `docs/audit.md` §13.3 (emerald-600 + trắng = 3,77:1 < 4,5 AA). Nghiêm trọng nhất:
-`app/components/ErrorState.tsx:24` — **nút "Thử lại" của màn hình lỗi dùng chung toàn app**.
+- **Cấm:** `text-white` cùng `bg-{emerald|sky|amber|green|teal|cyan}-500|600` trên cùng một chuỗi class.
+- **Cấm:** hover no-op — `bg-{c}-N` đi cùng `hover:bg-{c}-N` **cùng số N**. ⚠️ Loại dương tính giả:
+  `bg-emerald-600/20` vs `hover:bg-emerald-600/30` khác **opacity** nên KHÔNG phải no-op.
+- **KHÔNG cấm** nhóm accent PASS (`blue`/`violet`/`rose`/`red`/`indigo`) — chữ trắng trên `-600` của
+  nhóm này đạt ≥4,7:1, xem bảng `docs/audit.md` §13.3. **Đừng tính lại tương phản**, bảng có sẵn.
+- Thêm vào job `static` của CI.
+- **Chứng minh cổng đỏ** khi thêm 1 vi phạm mỗi loại, rồi xanh khi gỡ.
 
-Vi phạm đúng quy tắc đã chốt trong `app/globals.css:11-18` ("nền -500/-600 sáng phải dùng
-`text-on-accent-dark`; -700 trở lên mới dùng trắng").
+### W5.2 — Loại `/api/tasks/version` khỏi cache service worker
 
-### Việc phải làm
+`public/sw.js` (khoảng dòng 107-115) stale-while-revalidate phủ luôn endpoint watermark
+`/api/tasks/version`. Khi SSE rớt và trang tracking rơi về poll 10s, mỗi lượt poll nhận **bản cũ từ
+cache** → độ trễ đồng bộ thực tế 10–20s thay vì 10s. Thêm `/api/tasks/version` (và
+`/api/engineering/queue/tasks/` nếu cùng cơ chế poll tiến độ) vào danh sách loại trừ cạnh
+`/api/events`, `/api/photos/`.
 
-1. Lấy danh sách thật:
-   `grep -rlE 'bg-(emerald|sky|amber|green|teal|cyan)-600[^"]*text-white|text-white[^"]*bg-(emerald|sky|amber|green|teal|cyan)-600' app/ --include=*.tsx`
-2. Với **mỗi** chỗ, chọn 1 trong 2 cách (theo `docs/audit.md` §13.3):
-   - nâng nền lên `-700` + `text-on-accent` (mặc định an toàn, mọi accent ≥ 5,0:1), **hoặc**
-   - giữ nền `-600` + đổi chữ sang `text-on-accent-dark`.
-     Chọn cách **giữ nguyên cảm giác thị giác của từng chỗ**; ưu tiên cách (a) cho nút CTA đặc, cách
-     (b) cho chip/tab active.
-3. **Bắt đầu từ `app/components/ErrorState.tsx`** (phủ toàn app) rồi tới `app/approvals/page.tsx`,
-   các tab hub `app/site/_components/`, `app/commercial/_components/`, và 5 panel CAD.
-4. **Không** đụng: state hover/idle của icon, code chỉ chạy dev (`NODE_ENV === 'development'`), và
-   nhóm accent **PASS** (`blue`/`violet`/`rose`/`red`/`indigo`-600 với chữ trắng đều ≥ 4,7:1 — để nguyên).
-5. **Không** đụng lớp `text-zinc-500/600` (399 ứng viên) — đó là **nợ khác đã ghi nhận**, ngoài phạm
-   vi việc này.
+**Bắt buộc:** tăng version hằng `CACHE` trong `sw.js` — không tăng thì thiết bị cũ kẹt cache cũ vĩnh
+viễn. Khai `swExclude` tương ứng trong registry `lib/nen/modules.ts` nếu cần và chạy
+`npm run check:sw-exclude` (cổng CI kiểm khớp hai nơi).
 
-### Tiêu chí chấp nhận
+### W5.3 — `recommend-shortlist` còn default `?? 80`
 
-- Lệnh grep ở mục 1 trả **0 file** (hoặc chỉ còn ca có lý do ghi rõ).
-- `npm run lint` + `npm run build` xanh; giao diện không vỡ layout (đổi màu thuần, không đổi cấu trúc).
-- Ghi rõ trong báo cáo: số file đã đổi, cách chọn (a)/(b) cho từng nhóm.
+`app/api/engineering/subcon-ai/recommend-shortlist/route.ts` đọc metrics **từ DB** nhưng còn mặc
+định `?? 80` khi thiếu. Cùng lớp "số mặc định đẹp" mà GĐ1 đã bỏ ở `evaluate`. Thiếu dữ liệu →
+**`null` + lý do**, không thay bằng số. Bám đúng cách `lib/hien-truong/subcon-metrics.ts` (do GĐ1
+tạo) đã làm; tái dùng hàm đó nếu phù hợp thay vì viết lại.
+
+⚠️ File này nằm trong danh sách W1 — **W5.3 chỉ đụng phần giá trị mặc định**, không đụng cách truyền
+tham số SQL (đó là W1). Nếu thấy trùng dòng, ưu tiên giữ nguyên phần W1 và báo lại.
 
 ---
 
-## Việc V8 — Dọn doc drift + pin SHA + hạ tuyên bố vượt bằng chứng (`route: mechanical`)
+## Việc W6 — Retention cho log webhook + coverage ratchet thành cổng CI (`route: standard`)
 
-**Vá phát hiện Trung B8 + các phát hiện Thấp về tài liệu.** Đây là việc **tài liệu + 1 dòng YAML**,
-nhưng quan trọng: lớp lỗi "tài liệu lệch code" là lớp lặp lại nhiều nhất trong lịch sử dự án.
+### W6.1 — Retention 2 bảng log webhook
 
-### Việc phải làm
+`zalo_site_message_logs` và `telegram_bot_message_logs` nhận ghi từ **nguồn công khai** (webhook) và
+hiện **không có giới hạn tuổi** → phình vô hạn. Thêm 2 mục vào `RETENTION_TARGETS`
+(`lib/ha-tang/retention.ts:70`) theo đúng khuôn các mục sẵn có, **kèm lý do bằng tiếng Việt** như
+file đó yêu cầu. Thời hạn đề xuất **180 ngày** (log vận hành bot, không phải chứng cứ nghiệp vụ) —
+nếu bạn thấy khuôn hiện tại đòi owner chốt thời hạn thì ghi rõ và để phiên chính quyết.
+**Không** đụng `AUDIT_LOG_KHONG_XOA`.
 
-1. **`.github/workflows/pr-policy.yml:16`** — `uses: actions/github-script@v9` là dòng `uses:` **duy
-   nhất toàn repo** dùng tag nổi (nghi do Dependabot PR #362 merge 2026-08-23 thay pin SHA khi nâng
-   major). Pin lại **SHA đầy đủ** của release v9 mới nhất + comment version, bám đúng định dạng các
-   dòng `uses:` khác trong cùng thư mục.
-2. **`CLAUDE.md` mục Offline (PWA)** — đang ghi sai 2 điểm, khiến agent/PR sau thiết kế sai giả định:
-   - "hàng đợi tick trong **localStorage** (`app/components/offlineQueue.ts`)" → thực tế là
-     **IndexedDB** trong thư mục `app/components/offlineQueue/` (M58 PR2, 3 loại op: tick/photo/diary).
-   - "API GET **network-first**" → thực tế `public/sw.js` là **stale-while-revalidate** (chính file
-     sw.js dòng 1 tự ghi đúng).
-3. **`docs/audit.md` §6** — bỏ chú thích lỗi thời _"(Chưa có script `test:coverage`/ngưỡng CI cứng)"_:
-   script **đã có** trong `package.json` và mốc ratchet **đã đo** (87,12% lines — xem `PROGRESS.md`).
-   Sửa câu đó trỏ về mốc thật.
-4. **Hạ 2 tuyên bố vượt bằng chứng** — `docs/ops/release-manifest-v1.0.md` ("v1.0.0 Product
-   Complete") và `docs/ops/engineering-os-manifest-v1.0.md` ("Vision Complete… Production Ready"):
-   - Đổi trạng thái thành **draft/dự thảo chưa đạt gate**, thêm mục "Điều kiện chưa đạt" liệt kê:
-     chưa có traffic thật từ MEPF-Agents; `0089`/`0091` chờ staging; C0→C6 chưa thi hành; UAT người
-     thật chưa diễn ra.
-   - Sửa số migration sai (**manifest ghi 93, thực tế 132** — xác nhận lại bằng `ls migrations | wc -l`).
-   - **Không xoá file**, không đổi kết luận kỹ thuật khác — chỉ hạ nhãn trạng thái + nêu điều kiện
-     còn thiếu, đúng luật spec C0 ("không đánh dấu xong chỉ dựa trên tài liệu; phải có bằng chứng
-     command/CI/DB").
-5. **`app/api/engineering/queue/upload/route.ts`** — route multipart **duy nhất** thiếu
-   `isContentTooLarge` chặn sớm (29 route khác đều có, quy ước PR #205): thêm check header
-   `content-length` ở đầu handler, bám đúng pattern route multipart khác.
+### W6.2 — Coverage ratchet thành cổng CI
+
+`npm run test:coverage` đã có; mốc gần nhất ghi trong `PROGRESS.md` (lines 87,12% / branches 84,11%
+/ funcs 79,46%). Nhưng ratchet hiện dựa vào **người nhớ cập nhật tài liệu**.
+
+- Lưu mốc vào file JSON nhỏ (đề xuất `coverage-baseline.json` ở gốc repo) — chỉ 4 số + ngày đo.
+- `scripts/check-coverage.ts` → `npm run check:coverage`: chạy đo, so với mốc, **fail khi tụt quá
+  ngưỡng đệm 1%** (đệm để nhiễu đo không làm đỏ oan). Vượt mốc thì in gợi ý cập nhật mốc, **không**
+  tự ghi đè file (tránh commit tự động ngoài ý muốn).
+- Nối vào CI ở job **`test`** (không phải `static` — cần Postgres service container).
+- Đo mốc thật **trên nhánh hiện tại với Postgres thật** (cổng **55506**) và ghi số đó vào
+  `coverage-baseline.json`; **đừng chép số cũ từ `PROGRESS.md`** vì GĐ1 đã thêm nhiều test.
 
 ### Tiêu chí chấp nhận
 
-- `grep -n "uses:" .github/workflows/*.yml | grep -vE "[0-9a-f]{40}"` → **rỗng**.
-- `CLAUDE.md` mô tả đúng IndexedDB + stale-while-revalidate.
-- 2 manifest không còn tự tuyên bố "Complete"; số migration khớp thực tế.
-- `npm run lint` xanh (prettier hook sẽ format lại markdown — bình thường).
+- `npm run check:coverage` xanh trên nhánh hiện tại với mốc vừa đo.
+- **Chứng minh đỏ:** hạ tay mốc trong JSON lên cao hơn thực tế >1% → cổng đỏ; trả lại → xanh.
+- 2 mục retention mới xuất hiện đúng trong `RETENTION_TARGETS`, có lý do tiếng Việt; test/cron
+  retention sẵn có vẫn xanh.
 
 ---
 
 ## Thứ tự thi hành & phụ thuộc
 
-- **Chạy song song được ngay (worktree riêng mỗi việc):** V1, V2, V5, V6, V7, V8.
-- **V3 trước V4** — cả hai chạm nhiều file trong `app/api/engineering/`; V3 thêm quyền, V4 đổi
-  `projectId`. Chạy tuần tự để tránh xung đột nặng; nếu coordinator thấy giao file ít thì có thể song
-  song nhưng phải tích hợp V3 trước.
-- **V2 tham chiếu `lib/bao-mat/otp.ts` của V1** — V2 có lối thoát ghi rõ trong brief nếu V1 chưa xong,
-  **không chặn**.
-- **Không việc nào được phép sửa file của việc khác.** Vướng thì dừng, ghi vào báo cáo.
+- **Song song được ngay:** W1, W3, W4, W5, W6.
+- **W2 sau W1** — W2.3 (`check:db-params`) muốn tái dùng hàm quét của W1; W2.2 tái dùng heuristic
+  của test GĐ1 đã có sẵn trên nhánh. Nếu chạy song song thì W2 viết độc lập và ghi chú để gộp.
+- **W5.3 và W1 cùng chạm** `subcon-ai/recommend-shortlist/route.ts` — ranh giới đã ghi rõ trong brief
+  từng việc (W1: cách truyền tham số SQL; W5.3: giá trị mặc định).
+- **Không việc nào được sửa file của việc khác.** Vướng thì dừng và báo.
 
 ## Việc reviewer
 
-Sau khi mỗi worker báo xong, gọi `reviewer` soát diff (skill `code-review`). Ưu tiên soát kỹ V1, V2,
-V3, V4 (đều là vùng rủi ro cao theo `docs/audit.md` §8). Lỗi reviewer tìm ra phải vá **trước** khi
-tích hợp, không tin báo cáo worker suông.
+Sau khi worker báo xong, gọi `reviewer` soát diff. Ưu tiên W1 (chạm 11 route, dễ sai lệch tham số),
+W2 và W5.1 (cổng CI viết sai thì **mù** — GĐ1 đã có tiền lệ test bất biến trông đúng mà mù hoàn
+toàn), W3 (tắt nhầm module đang dùng thật là hồi quy nặng).
 
 ## Báo cáo về phiên chính
 
-Coordinator tổng hợp: việc nào xong/không xong, tiêu chí chấp nhận nào đạt/không đạt, lỗi reviewer
-bắt được, migration thực tế đã dùng số nào, và mọi chỗ worker vướng đặc tả sai/thiếu (dừng việc đó,
-**không tự chế đặc tả**).
-
-## Ngoài phạm vi đợt này (GĐ2 — không thi hành)
-
-Cổng CI `check:route-perms` + `check:project-scope`; rule lint cấm `text-white` trên nền accent sáng;
-spec axe "lưới quét" ~45 route chưa phủ; coverage ratchet thành cổng CI; đóng băng module vượt gate
-bằng feature flag; retention cho 2 bảng log webhook; idempotency-key cho ảnh offline; loại
-`/api/tasks/version` khỏi cache SW.
+Việc nào xong/không xong, tiêu chí nào đạt/không đạt, **output thật của phần chứng minh cổng-báo-đỏ**,
+lỗi reviewer bắt được, và mọi chỗ đặc tả sai/thiếu (dừng việc đó, không tự chế đặc tả).
