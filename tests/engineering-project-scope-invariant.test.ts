@@ -1,7 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+  conNhanProjectIdTran,
+  timRouteViPhamProjectScope,
+} from "../scripts/lib/project-scope-scan";
 
 // V4 (đợt "nâng tầm dự án" GĐ1) — Test bất biến chặn lớp lỗi B1: route engineering lấy
 // `project_id` thẳng từ CLIENT.
@@ -22,6 +26,12 @@ import { join } from "node:path";
 // query string — `hse-vision/scans` và `cashflow/forecasts` vẫn đọc chéo dự án được bằng
 // `GET ...?projectId=<dự án khác>` (IDOR) mà `timRouteViPham()` vẫn trả `[]`. Đúng lớp lỗi B1,
 // chỉ đổi kênh nhập liệu — nên bộ kiểm phải phủ cả ba kênh client gửi vào.
+//
+// W2.2 (GĐ2): heuristic dùng chung (walkRoutes/conNhanProjectIdTran) đã tách sang
+// `scripts/lib/project-scope-scan.ts` để cổng CI `check:project-scope` (quét TOÀN BỘ
+// `app/api/**`) dùng lại thay vì chép logic lần 2 (DRY). Test này GIỮ NGUYÊN phạm vi hẹp
+// `app/api/engineering/**` với WHITELIST riêng — không gộp vào cổng CI vì whitelist toàn repo
+// dài hơn nhiều, để lẫn sẽ khó soát riêng nhóm engineering.
 
 // Đường dẫn tương đối app/api/engineering/<key>/route.ts. Mỗi mục kèm lý do cụ thể.
 // Whitelist RỖNG sau khi tích hợp: cả 3 mục hoãn của vòng 1 (esign/sign, esign/envelopes,
@@ -32,45 +42,11 @@ import { join } from "node:path";
 // hết hiệu lực, đúng như nó đã bắt được `esign/sign` ngay lần chạy đầu sau tích hợp.
 const WHITELIST: Record<string, string> = {};
 
-function walkRoutes(dir: string, base = ""): string[] {
-  const out: string[] = [];
-  for (const ent of readdirSync(dir, { withFileTypes: true })) {
-    const rel = base ? `${base}/${ent.name}` : ent.name;
-    if (ent.isDirectory()) out.push(...walkRoutes(join(dir, ent.name), rel));
-    else if (ent.name === "route.ts") out.push(base);
-  }
-  return out;
-}
-
 const GOC = join(process.cwd(), "app", "api", "engineering");
-
-/**
- * File có nhận projectId từ client ở chỗ KHÔNG đi qua chotProjectIdChoGhi hay không.
- *
- * Không chỉ kiểm "file có nhắc tới chotProjectIdChoGhi" — như thế một dòng import hoặc một
- * comment còn sót lại cũng đủ làm test mù. Thay vào đó: cắt bỏ nguyên các câu lệnh gọi
- * `chotProjectIdChoGhi(...)` (giá trị client là tham số của nó = đã được đối chiếu quyền),
- * phần còn lại mà vẫn còn một trong ba kênh dưới là dùng trần.
- */
-function conNhanProjectIdTran(src: string): boolean {
-  const conLai = src.replace(/chotProjectIdChoGhi\([\s\S]*?\);/g, "");
-  return (
-    /\bbody\.projectId\b/.test(conLai) ||
-    /formData\.get\(\s*["']projectId["']\s*\)/.test(conLai) ||
-    /searchParams\.get\(\s*["']projectId["']\s*\)/.test(conLai)
-  );
-}
 
 /** Route engineering nhận projectId từ client mà KHÔNG chốt qua chotProjectIdChoGhi. */
 export function timRouteViPham(): string[] {
-  const viPham: string[] = [];
-  for (const key of walkRoutes(GOC)) {
-    const src = readFileSync(join(GOC, key, "route.ts"), "utf8");
-    if (!conNhanProjectIdTran(src)) continue;
-    if (key in WHITELIST) continue;
-    viPham.push(key);
-  }
-  return viPham;
+  return timRouteViPhamProjectScope(GOC, WHITELIST);
 }
 
 test("route engineering không được tin projectId client gửi", () => {

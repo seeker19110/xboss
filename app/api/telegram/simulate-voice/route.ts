@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { chotProjectIdChoGhi, getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   processIncomingTelegramMessage,
   listTelegramMessageLogs,
@@ -13,7 +14,16 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
-  const projectId = Number(searchParams.get("projectId") || (user as any).projectId || 1);
+  // Không tin project_id client gửi — trước đây `(user as any).projectId` không tồn tại trên
+  // kiểu User nên biểu thức luôn rơi về giá trị client gửi qua query string (đọc chéo dự án).
+  const chotDuAn = await chotProjectIdChoGhi(
+    user,
+    searchParams.get("projectId"),
+    (await getCurrentProjectId(user)) || 1,
+  );
+  if (!chotDuAn.ok)
+    return NextResponse.json({ error: "Không có quyền xem dự án này" }, { status: 403 });
+  const projectId = chotDuAn.projectId;
 
   try {
     const logs = await listTelegramMessageLogs(projectId, 50);
@@ -33,7 +43,18 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const rawText = body.text || "";
-    const projectId = Number(body.projectId || (user as any).projectId || 1);
+    // Không tin project_id client gửi (cùng lỗi B1 như GET ở trên).
+    const chotDuAn = await chotProjectIdChoGhi(
+      user,
+      body.projectId,
+      (await getCurrentProjectId(user)) || 1,
+    );
+    if (!chotDuAn.ok)
+      return NextResponse.json(
+        { error: "Không có quyền thao tác trên dự án này" },
+        { status: 403 },
+      );
+    const projectId = chotDuAn.projectId;
     const mockChatId = 88880000 + user.id;
 
     // Tự động đảm bảo binding cho user đang test
