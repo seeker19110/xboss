@@ -25,7 +25,7 @@ quy tắc tải từ XBoss dưới dạng **rule pack** có version (không nhú
 | `XBOSS_BOCKL_XUAT` | Xuất Excel **đúng mẫu công ty** (`attachments/MAU-KHOI-LUONG-BOQ.xlsx`, sheet `Data-BOQ`, cột A–K + công thức H/J/K sống, tổng nhóm hệ + TỔNG CỘNG bằng `SUBTOTAL` sống) từ trạng thái bóc đang lưu trong DWG — đóng/mở lại bản vẽ vẫn xuất được; kèm sidecar JSON máy-đọc-được cạnh tệp Excel                      |
 | `XBOSS_BATCH`      | Xử lý hàng loạt cả thư mục `.dwg` qua side database (không mở lên editor): chế độ chỉ-kiểm (mặc định) hoặc chuẩn hóa — **bản gốc giữ nguyên**, kết quả vào thư mục con `da-chuan-hoa/`, tệp lỗi bỏ qua, nhật ký `xboss-batch-log.txt` + báo cáo JSON từng tệp                                                       |
 
-(`XBOSS_UPLOAD` thuộc PR5 — chưa có trong bản này.)
+| `XBOSS_UPLOAD` | Gửi DWG đã lưu + DXF sidecar + báo cáo chuẩn hóa + version rule pack lên server (M99 PR5): server kiểm định lại DXF + rule pack — đạt thì tạo `drawing_revision` trạng thái `submitted`, fail thì hiện đủ lỗi trong AutoCAD, KHÔNG tạo revision. Idempotent theo hash DWG (gửi lại cùng tệp không tạo bản đôi) |
 
 ## Build
 

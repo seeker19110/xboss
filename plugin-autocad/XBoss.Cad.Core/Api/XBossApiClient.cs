@@ -123,6 +123,88 @@ public sealed class XBossApiClient
         return (json, res.Headers.ETag?.ToString());
     }
 
+    // ===== XBOSS_UPLOAD (M99 PR5) =====
+
+    public sealed record UploadKetQua
+    {
+        [JsonPropertyName("jobId")] public string JobId { get; init; } = "";
+        /// <summary>Danh sách lỗi kiểm định khi server trả 422 (AC5) — rỗng khi được nhận.</summary>
+        public IReadOnlyList<string> LoiKiemDinh { get; init; } = [];
+        public bool DuocNhan => LoiKiemDinh.Count == 0;
+    }
+
+    public sealed record JobTrangThai
+    {
+        [JsonPropertyName("status")] public string Status { get; init; } = "";
+        [JsonPropertyName("revisionId")] public long? RevisionId { get; init; }
+        [JsonPropertyName("idempotent")] public bool Idempotent { get; init; }
+        [JsonPropertyName("validation")] public JobValidation? Validation { get; init; }
+    }
+
+    public sealed record JobValidation
+    {
+        [JsonPropertyName("ok")] public bool Ok { get; init; }
+        [JsonPropertyName("errors")] public IReadOnlyList<string> Errors { get; init; } = [];
+        [JsonPropertyName("warnings")] public IReadOnlyList<string> Warnings { get; init; } = [];
+    }
+
+    private sealed record UploadTraVe(
+        [property: JsonPropertyName("jobId")] string? JobId,
+        [property: JsonPropertyName("validation")] JobValidation? Validation,
+        [property: JsonPropertyName("error")] string? Error);
+
+    /// <summary>POST /api/engineering/cad/plugin-upload — DWG + DXF sidecar + báo cáo +
+    /// rulePackVersion (FR9). 202 = server nhận, poll job; 422 = kiểm định fail (AC5) —
+    /// trả danh sách lỗi thay vì ném để command hiện đủ cho kỹ sư.</summary>
+    public async Task<UploadKetQua> UploadAsync(
+        string token, string drawingCode, string rev, string rulePackVersion,
+        string dwgFileName, byte[] dwgBytes, byte[] dxfBytes, string? reportJson,
+        CancellationToken ct = default)
+    {
+        using var form = new MultipartFormDataContent();
+        form.Add(new ByteArrayContent(dwgBytes), "dwg", dwgFileName);
+        form.Add(new ByteArrayContent(dxfBytes), "dxf", Path.ChangeExtension(dwgFileName, ".dxf"));
+        if (reportJson is not null)
+            form.Add(new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(reportJson)), "report", "report.json");
+        form.Add(new StringContent(drawingCode), "drawingCode");
+        form.Add(new StringContent(rev), "rev");
+        form.Add(new StringContent(rulePackVersion), "rulePackVersion");
+
+        using var req = new HttpRequestMessage(HttpMethod.Post, "api/engineering/cad/plugin-upload")
+        {
+            Content = form,
+        };
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var res = await _http.SendAsync(req, ct);
+        if (res.StatusCode == HttpStatusCode.Unauthorized)
+            throw new XBossApiException("Token đã bị thu hồi hoặc hết hạn — chạy lại XBOSS_LOGIN (AC7).");
+        if (res.StatusCode == HttpStatusCode.UnprocessableEntity)
+        {
+            var tu = await res.Content.ReadFromJsonAsync<UploadTraVe>(ct);
+            return new UploadKetQua
+            {
+                JobId = tu?.JobId ?? "",
+                LoiKiemDinh = tu?.Validation?.Errors is { Count: > 0 } e ? e : ["Server từ chối kiểm định."],
+            };
+        }
+        if (!res.IsSuccessStatusCode) throw await LoiTuServer(res, ct);
+        var ok = await res.Content.ReadFromJsonAsync<UploadTraVe>(ct);
+        if (ok?.JobId is not { Length: > 0 } jobId)
+            throw new XBossApiException("Server trả response thiếu jobId.");
+        return new UploadKetQua { JobId = jobId };
+    }
+
+    /// <summary>GET /api/engineering/cad/plugin-upload/:jobId — trạng thái + revisionId.</summary>
+    public async Task<JobTrangThai> FetchUploadJobAsync(string token, string jobId, CancellationToken ct = default)
+    {
+        using var req = new HttpRequestMessage(HttpMethod.Get, $"api/engineering/cad/plugin-upload/{jobId}");
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var res = await _http.SendAsync(req, ct);
+        if (!res.IsSuccessStatusCode) throw await LoiTuServer(res, ct);
+        return await res.Content.ReadFromJsonAsync<JobTrangThai>(ct)
+            ?? throw new XBossApiException("Server trả response rỗng khi hỏi trạng thái job.");
+    }
+
     private static async Task<string?> DocLoi(HttpResponseMessage res, CancellationToken ct)
     {
         try

@@ -23,7 +23,7 @@ public sealed class XBossLoginCommand
     private static string ServerConfigPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "XBoss", "server.json");
 
-    private static string? DocServerUrl()
+    internal static string? DocServerUrl()
     {
         try
         {
