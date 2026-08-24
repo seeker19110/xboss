@@ -76,9 +76,9 @@ kiểm khác hẳn), `workpackages/:id/bbnt` + `workpackages/:id/drawing` + `flo
   `app/environment/page.tsx` ↔ `app/kickoff/page.tsx`, 311 dòng trùng). Là đợt tách component form
   dùng chung riêng, không phải gộp tính năng.
 
-### Nợ kỹ thuật ghi nhận khi hợp nhất — TRÙNG SỐ MIGRATION 0133 (chưa sửa)
+### Trùng số migration 0133 — ĐÃ SỬA (2026-08-24)
 
-`npm run check:migrations` đang **ĐỎ trên chính `origin/main`**, không phải do nhánh này:
+`npm run check:migrations` từng **ĐỎ trên chính `origin/main`**, không phải do đợt gộp trùng lặp:
 
 ```
 [LỖI] Nhiều file migration cùng số thứ tự:
@@ -87,23 +87,41 @@ kiểm khác hẳn), `workpackages/:id/bbnt` + `workpackages/:id/drawing` + `flo
 
 Hai file cùng số đến từ hai PR song song đều đã merge vào `main`:
 `0133_webhook_otp_hardening.sql` (#387, `9a1908fe`) và `0133_cad_device_pairing.sql`
-(#386, `6b5b5694`). Đã kiểm chứng bằng cách chạy cổng trên worktree `origin/main` sạch — đỏ y hệt
-khi chưa có commit nào của nhánh gộp trùng lặp.
+(#386, `6b5b5694`). Đúng lớp lỗi mà chính cổng này được dựng ra để chặn (đã xảy ra trước đó với
+cặp `0060_code_lists.sql` / `0060_webhooks.sql`): mỗi nhánh tự lấy số kế tiếp lúc phân nhánh.
 
-**Chưa sửa ở PR gộp trùng lặp** vì đây là lỗi của `main`, sửa ở đây sẽ nới phạm vi PR refactor sang
-vùng migration/DDL. Hướng xử lý (cần người dùng chốt, vì chạm file có thể đã áp production):
-đổi `0133_cad_device_pairing.sql` → `0135_cad_device_pairing.sql` (0134 đã dùng, số trống kế tiếp là
-0135). DDL của file này là `CREATE TABLE IF NOT EXISTS`/`ADD COLUMN IF NOT EXISTS` nên idempotent —
-đủ điều kiện đổi tên theo đúng ghi chú của chính cổng. Lưu ý bảng `schema_migrations` ở môi trường
-đã chạy 0133 sẽ cần chèn bổ sung dòng cho tên mới, nếu không migration sẽ chạy lại (vẫn an toàn nhờ
-idempotent, nhưng nên dọn cho sạch).
+**Cách sửa:** đổi tên `0133_cad_device_pairing.sql` → **`0135_cad_device_pairing.sql`** (0134 đã
+dùng). Chọn đổi file NÀY vì nó `thêm thuần` và idempotent hoàn toàn (`ADD COLUMN IF NOT EXISTS`,
+`CREATE TABLE IF NOT EXISTS`, `DROP TRIGGER IF EXISTS` trước `CREATE TRIGGER`) nên chạy lại vô hại;
+file 0133 còn lại **ĐỤNG DỮ LIỆU** (`DELETE`/`UPDATE` dòng binding + OTP) nên không được động vào.
+
+**Xử lý bookkeeping:** runner (`lib/db/migrate.ts`) theo dõi migration **bằng tên file** trong
+`schema_migrations`, nên môi trường đã chạy `0133_cad_device_pairing.sql` sẽ coi tên mới là chưa áp
+và chạy lại. File `0135` mở đầu bằng
+`DELETE FROM schema_migrations WHERE name = '0133_cad_device_pairing.sql';` — nằm **cùng
+transaction** với phần DDL và với câu `INSERT` tên mới của runner, nên hoặc ăn trọn hoặc không đổi
+gì, và không để lại dòng mồ côi trỏ tới file không còn tồn tại. Cố ý **không** dùng `UPDATE ... SET
+name = ...`: runner đọc danh sách đã-áp **một lần trước vòng lặp**, nên đổi tên dòng cũ sẽ khiến câu
+`INSERT` cuối file đụng khoá chính và migration đổ.
+
+**Lưu ý vận hành:** phần DDL vẫn `thêm thuần`, nhưng file nay có câu `DELETE` (trên
+`schema_migrations`) nên theo DoD phải **chạy qua staging trước** rồi mới lên production, dù không
+đụng dữ liệu nghiệp vụ. `npm run db:migrate -- --dry-run` đã kiểm: trên DB giống production cũ báo
+đúng 1 file `0135_cad_device_pairing.sql` sẽ áp; trên DB đã nâng cấp báo không còn gì để áp.
+
+**Kiểm chứng thật trên Postgres 16, cả hai đường:**
+
+| Đường                       | Cách dựng                                                                                                                             | Kết quả                                                                                                                                                                                                                                      |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Nâng cấp (giống production) | Dựng DB bằng trạng thái `main` cũ (đã áp `0133_cad_device_pairing.sql`), chèn dữ liệu mồi vào `cad_device_pairings`, rồi áp nhánh mới | Áp đúng 1 migration `0135`; dòng `0133_cad_device_pairing.sql` biến mất, có `0135_...`; **dữ liệu mồi còn nguyên**; trigger `audit_cad_device_pairings` còn sống; 2 cột `api_keys.expires_at`/`device_name` còn đủ; chạy lại lần nữa = no-op |
+| DB mới tinh                 | Áp toàn bộ 135 migration từ đầu                                                                                                       | Bảng, trigger, 2 cột dựng đủ; `schema_migrations` chỉ có `0133_webhook…`/`0134`/`0135`; chạy lại = no-op                                                                                                                                     |
 
 ## M99 PR2 — Ghép thiết bị AutoCAD + token scope 'cad' + XBOSS_LOGIN (2026-08-24)
 
 Vùng rủi ro cao (chạm auth) — đã rà theo `docs/audit.md` §3/§8. Nhánh `claude/m99-pr2-api-tokens`.
 
 - **Điểm lệch spec có chủ đích (ghi vào M99 §11): KHÔNG tạo bảng `api_tokens` mới — tái dùng `api_keys`** (0061: hash sha256, thu hồi, rate limit cả nhánh fail, audit trigger, org_id, admin UI sẵn) — DDL nháp trong spec viết trước khi rà hiện trạng; bảng song song vi phạm "tái dùng trước khi viết mới".
-- **`migrations/0133_cad_device_pairing.sql`** (thêm thuần → đi thẳng production theo DoD): `api_keys` + `expires_at`/`device_name`; bảng `cad_device_pairings` (device flow: `user_code` XXXX-XXXX bảng chữ không nhập nhằng cho người gõ, `device_code` bí mật 256-bit chỉ lưu sha256, TTL 10 phút, status pending/confirmed/claimed/denied) + audit trigger như 0061. `docs/ERD.md` đã regen từ schema thật.
+- **`migrations/0135_cad_device_pairing.sql`** (đổi tên từ `0133_...` ngày 2026-08-24 vì đụng số với #387 — xem mục riêng ở trên; thêm thuần → đi thẳng production theo DoD): `api_keys` + `expires_at`/`device_name`; bảng `cad_device_pairings` (device flow: `user_code` XXXX-XXXX bảng chữ không nhập nhằng cho người gõ, `device_code` bí mật 256-bit chỉ lưu sha256, TTL 10 phút, status pending/confirmed/claimed/denied) + audit trigger như 0061. `docs/ERD.md` đã regen từ schema thật.
 - **`lib/bao-mat/cad-devices.ts`**: createPairing/confirmPairing/claimPairing (key scope `{cad}` SINH TẠI THỜI ĐIỂM CLAIM — key thô không bao giờ nằm trong DB, trả đúng 1 lần, claim atomic `UPDATE ... WHERE status='confirmed'` chống double-claim trong `withTransaction`), createCadToken (hạn 90 ngày, quy về người duyệt → quyền đi qua `CAN` như phiên thường), getCadTokenUser (Bearer → User). **Vá `verifyApiKey`** chặn key hết hạn (`expires_at` — key đọc-only cũ NULL = vô hạn, hành vi không đổi).
 - **Routes**: `POST /api/devices/pair` (public + rate limit `cad-pair` 10/15'/IP), `/confirm` (session + `CAN.manageDrawings`), `/claim` (rate limit 300/15'/IP, deviceCode trong body POST không lên URL/access log, validate regex); `GET/POST /api/tokens` + `DELETE /api/tokens/:id` (chủ token hoặc Admin thu hồi, list không SELECT key_hash); route rule-pack nhận thêm **Bearer cad** (kiểm Bearer TRƯỚC cookies — nhanh cho plugin + test gọi handler trực tiếp được).
 - **Web**: trang `/engineering/thiet-bi-cad` (duyệt/từ chối mã ghép, danh sách + thu hồi token, tạo thủ công trả key 1 lần) + `e2e/authed/thiet-bi-cad.spec.ts` (render + axe — cổng merge trang mới theo audit.md). PR6 sẽ gộp vào bảng điều khiển chuẩn hóa.

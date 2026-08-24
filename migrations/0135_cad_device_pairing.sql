@@ -1,4 +1,18 @@
--- 0133_cad_device_pairing.sql — M99 PR2: ghép thiết bị plugin AutoCAD + token scope 'cad'.
+-- 0135_cad_device_pairing.sql — M99 PR2: ghép thiết bị plugin AutoCAD + token scope 'cad'.
+--
+-- ĐỔI TÊN TỪ `0133_cad_device_pairing.sql` (2026-08-24). Lý do: PR #386 (file này) và PR #387
+-- (`0133_webhook_otp_hardening.sql`) phát triển song song, mỗi nhánh tự lấy số kế tiếp lúc phân
+-- nhánh nên merge xong đụng cùng số 0133 → `npm run check:migrations` đỏ trên `main`. Đổi file
+-- NÀY vì nó `thêm thuần` và idempotent hoàn toàn (ADD COLUMN/CREATE TABLE IF NOT EXISTS,
+-- DROP TRIGGER IF EXISTS trước CREATE TRIGGER) nên chạy lại vô hại; file 0133 còn lại ĐỤNG DỮ
+-- LIỆU (DELETE/UPDATE) nên không được động vào. Đúng hướng xử lý mà chính cổng khuyến nghị:
+-- "File đã áp production chỉ đổi tên khi DDL idempotent và có ghi chú".
+--
+-- Runner (lib/db/migrate.ts) theo dõi migration BẰNG TÊN FILE trong `schema_migrations`, nên
+-- môi trường đã chạy `0133_cad_device_pairing.sql` sẽ thấy tên mới là chưa áp và chạy lại.
+-- Câu DELETE ngay dưới dọn dòng cũ để không còn bản ghi mồ côi trỏ tới file không còn tồn tại;
+-- nó nằm CÙNG transaction với phần DDL bên dưới và với câu INSERT tên mới của runner, nên hoặc
+-- ăn trọn hoặc không đổi gì. DB mới tinh: DELETE không khớp dòng nào, vô hại.
 --
 -- TÁI DÙNG bảng api_keys sẵn có (0061 — hash sha256, thu hồi, audit trigger, org_id từ 0078)
 -- thay vì bảng api_tokens mới như DDL nháp trong M99 §11 — điểm lệch spec có chủ đích, đã ghi
@@ -10,7 +24,14 @@
 --   CAN.manageDrawings) → plugin poll /api/devices/pair/claim bằng device_code → server SINH
 --   api key TẠI THỜI ĐIỂM CLAIM (key thô không bao giờ nằm trong DB), trả đúng 1 lần.
 --
--- Thêm thuần (ADD COLUMN / CREATE TABLE / CREATE INDEX) — đi thẳng production theo DoD.
+-- VẬN HÀNH: phần DDL vẫn là `thêm thuần` (ADD COLUMN / CREATE TABLE / CREATE INDEX), NHƯNG file
+-- này có thêm câu DELETE trên `schema_migrations` ở dưới. Theo DoD trong CLAUDE.md, migration có
+-- DELETE/UPDATE phải **chạy qua staging trước** (`bash deploy.sh --staging`, xem docs/ops/staging.md)
+-- rồi mới lên production — dù ở đây chỉ là dọn bookkeeping chứ không đụng dữ liệu nghiệp vụ.
+-- Kiểm trước bằng `npm run db:migrate -- --dry-run`: phải thấy đúng 1 file `0135_...` sẽ áp.
+
+-- Dọn bản ghi theo dõi của tên file cũ (xem ghi chú đổi tên ở đầu file).
+DELETE FROM schema_migrations WHERE name = '0133_cad_device_pairing.sql';
 
 -- Token thiết bị có hạn dùng + tên thiết bị (api key đọc-only cũ giữ expires_at NULL = vô hạn,
 -- verifyApiKey chỉ chặn khi expires_at NOT NULL và đã qua — không đổi hành vi key hiện có).

@@ -230,7 +230,8 @@ Auth: token Bearer cho mọi endpoint plugin; quyền `CAN.manageDrawings`; ki�
 tái dùng `api_keys` sẵn có** (0061: hash sha256, thu hồi, rate limit, audit trigger, org_id từ
 0078, admin UI) — DDL nháp `api_tokens` trong bản trước được viết khi chưa rà hiện trạng; tạo
 bảng song song là vi phạm "tái dùng trước khi viết mới" và nhân đôi bề mặt audit. Đã thi hành
-trong `migrations/0133_cad_device_pairing.sql` (thêm thuần):
+trong `migrations/0135_cad_device_pairing.sql` (thêm thuần; đổi tên từ `0133_...` ngày
+2026-08-24 vì đụng số migration với PR #387 — xem `PROGRESS.md`):
 
 ```sql
 -- Token thiết bị có hạn + tên thiết bị (key đọc-only cũ expires_at NULL = vô hạn, không đổi hành vi)
