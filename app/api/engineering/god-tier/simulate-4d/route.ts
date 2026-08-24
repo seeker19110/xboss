@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import {
   calculateGodTier4DSimulation,
   GodTierElementData,
@@ -14,7 +15,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   }
 
+  if (!CAN.manageEngineeringGodTier(user.role)) {
+    return NextResponse.json({ error: "Không có quyền thao tác mô phỏng 4D God-Tier" }, { status: 403 });
+  }
+
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("engineering-god-tier-studio", projectId);
+  if (blocked) return blocked;
   if (!projectId) {
     return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
   }

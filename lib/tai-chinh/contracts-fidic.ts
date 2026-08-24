@@ -395,24 +395,23 @@ export async function saveFidicTiaClaim(
       merkle_proof_hash = EXCLUDED.merkle_proof_hash,
       updated_at = NOW()
     RETURNING id`,
-    [
-      projectId,
-      result.claimCode,
-      result.delayEventTitle,
-      result.eventCategory,
-      result.fidicSubClause,
-      result.delayStartDate,
-      result.delayEndDate,
-      result.fragnetDurationDays,
-      result.calculatedEotDays,
-      result.dailyOverheadCostVnd,
-      result.totalProlongationCostVnd,
-      JSON.stringify(result.impactedCriticalTasks),
-      result.noticeLetterMarkdown,
-      result.timeBarDeadlineDate,
-      result.merkleProofHash,
-      userId || null,
-    ],
+
+    projectId,
+    result.claimCode,
+    result.delayEventTitle,
+    result.eventCategory,
+    result.fidicSubClause,
+    result.delayStartDate,
+    result.delayEndDate,
+    result.fragnetDurationDays,
+    result.calculatedEotDays,
+    result.dailyOverheadCostVnd,
+    result.totalProlongationCostVnd,
+    JSON.stringify(result.impactedCriticalTasks),
+    result.noticeLetterMarkdown,
+    result.timeBarDeadlineDate,
+    result.merkleProofHash,
+    userId || null,
   );
 
   if (!row) throw new Error("Failed to save FIDIC TIA claim");
@@ -497,18 +496,17 @@ export async function createFidicClaim(
       cost_claim_amount = EXCLUDED.cost_claim_amount,
       dossier_markdown = EXCLUDED.dossier_markdown
     RETURNING id`,
-    [
-      projectId,
-      claimCode,
-      typeof dossier === "string"
-        ? `Hồ sơ Khiếu nại ${claimCode}`
-        : dossier.documentTitle || `Hồ sơ ${claimCode}`,
-      typeof dossier === "string" ? `Hồ sơ Khiếu nại ${claimCode}` : dossier.executiveSummary || "",
-      typeof dossier === "string" ? 0 : dossier.totalEotDaysRequested || 0,
-      typeof dossier === "string" ? 0 : dossier.totalCostClaimVnd || 0,
-      typeof dossier === "string" ? dossier : dossier.claimDossierMarkdown || "",
-      userIdArg ?? null,
-    ],
+
+    projectId,
+    claimCode,
+    typeof dossier === "string"
+      ? `Hồ sơ Khiếu nại ${claimCode}`
+      : dossier.documentTitle || `Hồ sơ ${claimCode}`,
+    typeof dossier === "string" ? `Hồ sơ Khiếu nại ${claimCode}` : dossier.executiveSummary || "",
+    typeof dossier === "string" ? 0 : dossier.totalEotDaysRequested || 0,
+    typeof dossier === "string" ? 0 : dossier.totalCostClaimVnd || 0,
+    typeof dossier === "string" ? dossier : dossier.claimDossierMarkdown || "",
+    userIdArg ?? null,
   );
   if (!row) throw new Error("Failed to save FIDIC claim");
   return { ...row, claimCode };

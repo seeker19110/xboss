@@ -77,6 +77,7 @@ export function useSmartNaming({
       if (!realDxf || realDxf.length < 50) {
         showToast(
           "⚠️ Chưa có bản vẽ nào được nạp — hãy tải lên tệp DXF trước khi lưu lên máy chủ.",
+          "warning",
         );
         return;
       }
@@ -109,10 +110,10 @@ export function useSmartNaming({
         );
       } else {
         const err = await res.json();
-        showToast(`❌ Lỗi: ${err.error || "Không thể lưu"}`);
+        showToast(`❌ Lỗi: ${err.error || "Không thể lưu"}`, "error");
       }
     } catch (e: any) {
-      showToast(`❌ Lỗi kết nối: ${e.message}`);
+      showToast(`❌ Lỗi kết nối: ${e.message}`, "error");
     } finally {
       setSavingToServer(false);
     }

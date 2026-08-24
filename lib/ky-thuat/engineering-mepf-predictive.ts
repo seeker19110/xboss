@@ -113,19 +113,18 @@ export async function savePredictiveAsset(
       next_maintenance_date = EXCLUDED.next_maintenance_date,
       maintenance_action_recommended = EXCLUDED.maintenance_action_recommended
     RETURNING id`,
-    [
-      projectId,
-      res.assetCode,
-      res.assetName,
-      res.systemType,
-      res.installationDate,
-      res.operatingHoursTotal,
-      res.mtbfHours,
-      res.remainingUsefulLifeDays,
-      res.healthScorePercent,
-      res.nextMaintenanceDate,
-      res.maintenanceActionRecommended,
-    ],
+
+    projectId,
+    res.assetCode,
+    res.assetName,
+    res.systemType,
+    res.installationDate,
+    res.operatingHoursTotal,
+    res.mtbfHours,
+    res.remainingUsefulLifeDays,
+    res.healthScorePercent,
+    res.nextMaintenanceDate,
+    res.maintenanceActionRecommended,
   );
 
   if (!row) throw new Error("Failed to save predictive asset");

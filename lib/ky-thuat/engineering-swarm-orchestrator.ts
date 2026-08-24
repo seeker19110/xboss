@@ -243,7 +243,7 @@ export function generateAutonomousTechnicalDraft(
 export async function listSwarmDebates(projectId: number): Promise<SwarmDebateRecord[]> {
   return await query<SwarmDebateRecord>(
     `SELECT * FROM engineering_swarm_debates WHERE project_id = ? ORDER BY created_at DESC LIMIT 50`,
-    [projectId],
+    projectId,
   );
 }
 
@@ -253,14 +253,15 @@ export async function getSwarmDebateById(
 ): Promise<SwarmDebateRecord | null> {
   const debate = await queryOne<SwarmDebateRecord>(
     `SELECT * FROM engineering_swarm_debates WHERE project_id = ? AND id = ?`,
-    [projectId, debateId],
+    projectId,
+    debateId,
   );
 
   if (!debate) return null;
 
   const args = await query<SwarmArgumentRecord>(
     `SELECT * FROM engineering_swarm_arguments WHERE debate_id = ? ORDER BY created_at ASC`,
-    [debateId],
+    debateId,
   );
 
   return {
@@ -285,7 +286,10 @@ export async function createSwarmDebate(
     `INSERT INTO engineering_swarm_debates (project_id, debate_topic, trigger_event, participating_agents, status)
      VALUES (?, ?, ?, ?::jsonb, 'open')
      RETURNING *`,
-    [projectId, topic, triggerEvent, JSON.stringify(agents)],
+    projectId,
+    topic,
+    triggerEvent,
+    JSON.stringify(agents),
   );
   return created;
 }
@@ -309,17 +313,16 @@ export async function addSwarmArgument(
     `INSERT INTO engineering_swarm_arguments (debate_id, agent_role, stance, authority_weight, argument_text, cited_clauses, impact_assessment)
      VALUES (?, ?, ?, ?, ?, ?::jsonb, ?::jsonb)
      RETURNING *`,
-    [
-      debateId,
-      arg.agent_role,
-      arg.stance,
-      weight,
-      arg.argument_text,
-      JSON.stringify(arg.cited_clauses || []),
-      JSON.stringify(
-        arg.impact_assessment || { cost_delta_vnd: 0, schedule_delta_days: 0, risk_score: 0 },
-      ),
-    ],
+
+    debateId,
+    arg.agent_role,
+    arg.stance,
+    weight,
+    arg.argument_text,
+    JSON.stringify(arg.cited_clauses || []),
+    JSON.stringify(
+      arg.impact_assessment || { cost_delta_vnd: 0, schedule_delta_days: 0, risk_score: 0 },
+    ),
   );
   return created;
 }
@@ -343,7 +346,10 @@ export async function synthesizeSwarmDebate(
          updated_at = NOW()
      WHERE project_id = ? AND id = ?
      RETURNING *`,
-    [consensus.synthesisSummary, consensus.consensusLevel, projectId, debateId],
+    consensus.synthesisSummary,
+    consensus.consensusLevel,
+    projectId,
+    debateId,
   );
 
   return updated;

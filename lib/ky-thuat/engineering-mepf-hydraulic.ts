@@ -49,18 +49,17 @@ export async function saveHydraulicCalculation(
       recommended_hanger_spacing_m = EXCLUDED.recommended_hanger_spacing_m,
       recommended_rod_size = EXCLUDED.recommended_rod_size
     RETURNING id`,
-    [
-      projectId,
-      res.calcCode,
-      res.systemType,
-      res.flowRateM3h,
-      res.pipeLengthM ?? res.totalLengthM,
-      res.selectedDiameterSpec,
-      res.fluidVelocityMs,
-      res.headLossBar ?? res.totalPressureLossBar,
-      res.recommendedHangerSpacingM,
-      res.recommendedRodSize,
-    ],
+
+    projectId,
+    res.calcCode,
+    res.systemType,
+    res.flowRateM3h,
+    res.pipeLengthM ?? res.totalLengthM,
+    res.selectedDiameterSpec,
+    res.fluidVelocityMs,
+    res.headLossBar ?? res.totalPressureLossBar,
+    res.recommendedHangerSpacingM,
+    res.recommendedRodSize,
   );
 
   if (!row) throw new Error("Failed to save hydraulic calculation");

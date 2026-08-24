@@ -8,9 +8,10 @@ import assert from "node:assert/strict";
 
 const S = { skip: !HAS_TEST_DB };
 
-test("feature-flags: bảng rỗng → mọi module coi như bật (mặc định)", S, async () => {
+test("feature-flags: bảng rỗng → module thường mặc định bật, module thuNghiem mặc định tắt", S, async () => {
   const { insertId, run } = await import("@/lib/db");
   const ff = await import("@/lib/ha-tang/feature-flags");
+  const { MODULES } = await import("@/lib/nen/modules");
 
   const p = await insertId(`INSERT INTO projects (name, code) VALUES ('DA FF1', 'PJT-FF1')`);
   try {
@@ -18,8 +19,10 @@ test("feature-flags: bảng rỗng → mọi module coi như bật (mặc địn
     ff.bumpFeatureFlagsVersion();
 
     assert.equal(await ff.isModuleEnabled("documents", p), true);
+    // W3: dự án mới (chưa có dòng override nào) → module thuNghiem TẮT, module lõi BẬT.
+    assert.equal(await ff.isModuleEnabled("engineering-autonomy", p), false);
     const flags = await ff.getModuleFlags(p);
-    for (const enabled of flags.values()) assert.equal(enabled, true);
+    for (const m of MODULES) assert.equal(flags.get(m.key), !m.thuNghiem, `sai mặc định: ${m.key}`);
   } finally {
     // projects.code là UNIQUE — không dọn thì lần chạy sau đụng khoá trùng (fail giả).
     await run(`DELETE FROM feature_flags WHERE project_id = ?`, p);
@@ -104,4 +107,55 @@ test("feature-flags: findModuleByRoute khớp đúng tiền tố dài nhất", S
   assert.equal(ff.findModuleByRoute("/api/project-documents/5"), "documents");
   assert.equal(ff.findModuleByRoute("/api/tasks?sheet=ogtd"), "tracking");
   assert.equal(ff.findModuleByRoute("/api/khong-ton-tai"), undefined);
+  // W3: route con của module thuNghiem phải khớp đúng module con (prefix dài hơn),
+  // KHÔNG rơi về module "engineering" chung — nếu không, override tắt riêng module con
+  // sẽ không có tác dụng gì (khớp nhầm sang module cha luôn bật).
+  assert.equal(ff.findModuleByRoute("/api/engineering/autonomy/kill-switch"), "engineering-autonomy");
+  assert.equal(ff.findModuleByRoute("/api/engineering/suggestions"), "engineering");
 });
+
+test(
+  "feature-flags (W3): dự án mới → module thuNghiem tắt; Admin setFlag vẫn bật được (override thắng)",
+  S,
+  async () => {
+    const { insertId, run } = await import("@/lib/db");
+    const ff = await import("@/lib/ha-tang/feature-flags");
+
+    const p = await insertId(`INSERT INTO projects (name, code) VALUES ('DA FF4', 'PJT-FF4')`);
+    const u = await insertId(
+      `INSERT INTO users (name, email, role, password_hash) VALUES ('FFTest3','ff-test3@x.vn','admin','x')`,
+    );
+    try {
+      await run(`DELETE FROM feature_flags WHERE project_id = ?`, p);
+      ff.bumpFeatureFlagsVersion();
+
+      // Dự án mới (chưa có override) → module thuNghiem TẮT, module lõi BẬT.
+      assert.equal(await ff.isModuleEnabled("engineering-autonomy", p), false);
+      assert.equal(await ff.isModuleEnabled("tracking", p), true);
+
+      // Admin bật thủ công per-project → override thắng mặc định thuNghiem.
+      await ff.setFlag("engineering-autonomy", p, true, u, 1);
+      assert.equal(await ff.isModuleEnabled("engineering-autonomy", p), true);
+
+      // Tắt lại → về đúng trạng thái override (không rơi về mặc định).
+      await ff.setFlag("engineering-autonomy", p, false, u, 1);
+      assert.equal(await ff.isModuleEnabled("engineering-autonomy", p), false);
+
+      // assertModuleEnabled — chính 2 dòng mà 48 route con của 11 module thuNghiem
+      // (autonomy/twin/predictions/graph/prescriptive/bim-models/iot-telemetry/subcon-ai/
+      // god-tier-studio/swarm/nextgen-apex, trừ quantum-hub routePrefix rỗng) gọi trước khi
+      // chạm dữ liệu — phải trả 404 khi tắt (mặc định, dự án mới), null (không chặn) khi
+      // Admin bật thủ công. Đã xác nhận thêm bằng gọi API thật qua dev server (xem báo cáo).
+      const blockedDefault = await ff.assertModuleEnabled("engineering-autonomy", p);
+      assert.ok(blockedDefault, "module thuNghiem mặc định phải bị chặn");
+      assert.equal(blockedDefault!.status, 404);
+
+      await ff.setFlag("engineering-autonomy", p, true, u, 1);
+      assert.equal(await ff.assertModuleEnabled("engineering-autonomy", p), null);
+    } finally {
+      await run(`DELETE FROM feature_flags WHERE project_id = ?`, p);
+      await run(`DELETE FROM projects WHERE id = ?`, p);
+      await run(`DELETE FROM users WHERE id = ?`, u);
+    }
+  },
+);

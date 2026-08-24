@@ -90,7 +90,7 @@ export function TrackingToolbar({
         {showAddPkg && (
           <button
             onClick={onAddPkg}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white shadow-sm transition h-10"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-emerald-700 hover:bg-emerald-600 active:scale-[0.98] text-on-accent shadow-sm transition h-10"
           >
             <Plus className="w-4 h-4 shrink-0" />
             <span>Thêm hạng mục</span>

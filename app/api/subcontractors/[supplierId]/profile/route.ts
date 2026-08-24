@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { chotProjectIdChoGhi, getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { upsertSubcontractorProfile } from "@/lib/hien-truong/subcontractors";
 
 export const dynamic = "force-dynamic";
@@ -30,8 +31,29 @@ export async function PATCH(
   const body = await req.json().catch(() => ({}));
   const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
 
+  // Không tin project_id client gửi — đối chiếu danh sách dự án user được thấy (PM không
+  // phải global như Admin, xem chotProjectIdChoGhi trong lib/ha-tang/projects.ts). Giữ nguyên
+  // ngữ nghĩa cũ: bỏ trống/null = hồ sơ không gắn dự án (không mặc định về dự án hiện tại) —
+  // đọc vào biến riêng (không truy cập trường projectId trong body trần thêm lần nào ngoài
+  // lời gọi chotProjectIdChoGhi) để cổng check:project-scope nhận diện đúng đây là đã chốt quyền.
+  const { projectId: projectIdTuBody } = body as { projectId?: unknown };
+  let projectId: number | null = null;
+  if (projectIdTuBody != null && projectIdTuBody !== "") {
+    const chotDuAn = await chotProjectIdChoGhi(
+      user,
+      projectIdTuBody,
+      (await getCurrentProjectId(user)) || 1,
+    );
+    if (!chotDuAn.ok)
+      return NextResponse.json(
+        { error: "Không có quyền thao tác trên dự án này" },
+        { status: 403 },
+      );
+    projectId = chotDuAn.projectId;
+  }
+
   await upsertSubcontractorProfile(supplierId, {
-    projectId: body.projectId != null ? Number(body.projectId) : null,
+    projectId,
     orgChartNote: str(body.orgChartNote),
     siteRepName: str(body.siteRepName),
     siteRepPhone: str(body.siteRepPhone),

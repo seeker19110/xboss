@@ -94,9 +94,7 @@ export async function POST(req: Request) {
         code: string;
         name: string;
         system_group: string | null;
-      }>(`SELECT id, code, name, system_group FROM drawings WHERE id = ?`, [
-        Number(body.drawingId),
-      ]);
+      }>(`SELECT id, code, name, system_group FROM drawings WHERE id = ?`, Number(body.drawingId));
 
       if (drawing) {
         fileName = `${drawing.code}.dwg`;
@@ -107,7 +105,7 @@ export async function POST(req: Request) {
           original_name: string | null;
         }>(
           `SELECT file_name, iso_path, original_name FROM drawing_revisions WHERE drawing_id = ? ORDER BY id DESC LIMIT 1`,
-          [drawing.id],
+          drawing.id,
         );
 
         if (rev?.file_name) {

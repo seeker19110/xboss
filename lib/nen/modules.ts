@@ -31,6 +31,17 @@ export type ModuleDef = {
   swExclude?: string[];
   /** Tiền tố route API của module — M52 PR4 dùng để chặn route khi module bị tắt. */
   routePrefix: string[];
+  /**
+   * (W3 — đợt "nâng tầm dự án" GĐ2, docs/audit-2026-08-24-nang-tam.md) Module chưa đạt
+   * cổng kiểm chứng: xây **vượt cổng roadmap** (ENG-0 nguyên tắc #10 — giai đoạn OS-<n>
+   * chỉ được code sau khi ENG-1..4 có traffic thật, hiện chưa có) hoặc **chưa từng chạy
+   * được** (lỗi tham số SQL, W1) / là mô phỏng rõ rệt chưa dùng dữ liệu thật.
+   * `true` → `isModuleEnabled` mặc định TẮT cho MỌI dự án (kể cả dự án mới tạo, không
+   * cần dòng override); Admin vẫn bật thủ công per-project qua `setFlag`/`/admin/features`
+   * — override tường minh trong DB luôn thắng mặc định này. Không khai (undefined) = mặc
+   * định BẬT như trước (hành vi cũ, tương thích ngược).
+   */
+  thuNghiem?: boolean;
 };
 
 // Ghi chú độ phủ (tính đến M52 PR3):
@@ -75,7 +86,7 @@ export const MODULES: ModuleDef[] = [
     ],
     permKeys: ["editProgress", "editStructure", "assign"],
     notificationTypes: ["delayed", "due_soon"],
-    swExclude: ["/api/events", "/api/system-uploads/", "/api/systems/"],
+    swExclude: ["/api/events", "/api/tasks/version", "/api/system-uploads/", "/api/systems/"],
     routePrefix: [
       "/api/tasks",
       "/api/dimensions",
@@ -288,5 +299,147 @@ export const MODULES: ModuleDef[] = [
     ],
     notificationTypes: [],
     routePrefix: ["/api/engineering", "/api/v1/engineering"],
+  },
+
+  // ── W3 (đợt "nâng tầm dự án" GĐ2) — 12 module con của app/api/engineering/** đóng
+  // băng bằng `thuNghiem: true`. Registry gốc chỉ có 1 module "engineering" phủ CẢ
+  // `/api/engineering/**` (routePrefix rộng) — các entry dưới đây có prefix DÀI HƠN nên
+  // `findModuleByRoute` (khớp tiền tố dài nhất) ưu tiên chọn chúng thay vì "engineering"
+  // khi route khớp, mà KHÔNG đổi `routePrefix` của "engineering" (không ảnh hưởng phần
+  // còn lại: ingest ENG-1, review objects, suggestions, workflows, agent-sessions...).
+  //
+  // Tiêu chí (a) — vượt cổng roadmap, nhóm OS-phase (ENG-0 #10): autonomy/twin/
+  // predictions/graph/prescriptive. Tiêu chí (b) — chưa từng chạy được (lỗi tham số SQL,
+  // W1) hoặc mô phỏng rõ rệt: bim-models(-viewer)/iot-telemetry/subcon-ai/god-tier-studio/
+  // quantum-hub/swarm/nextgen-apex.
+  //
+  // KHÔNG gán routePrefix cho routes DÙNG CHUNG với trang khác chưa bị đánh dấu (đọc kỹ
+  // trước khi mở rộng prefix — tắt nhầm route đang phục vụ tính năng thật là hồi quy
+  // nặng, xem PLAN.md việc W3):
+  //   - `/api/engineering/bim-routing` dùng chung bởi `bim-viewer` (thuộc (b), dưới đây)
+  //     LẪN `auto-routing` (module thật, KHÔNG đánh dấu) → cố tình KHÔNG đưa vào
+  //     `engineering-bim-models`, chỉ gate `/api/engineering/bim-models`.
+  //   - Trang `quantum-hub` gọi `/api/engineering/queue`, `/api/engineering/ledger`,
+  //     `/api/engineering/spatial` — cả 3 tiền tố này dùng chung với `mepf-studio`,
+  //     `chuan-hoa-ban-ve`, `spatial-viewer` (đều là module thật, KHÔNG đánh dấu) →
+  //     KHÔNG có tiền tố API nào an toàn để gate riêng `quantum-hub`; `routePrefix: []`
+  //     có chủ đích (module vẫn `thuNghiem: true` cho mục đích cờ mặc định/nav/cảnh báo
+  //     UI, nhưng không chặn API vì sẽ tắt nhầm 3 trang thật kể trên).
+  {
+    // OS-4 (a) — Controlled Autonomy: thực thi workflow A0–A2 tự động; OS-4 đòi phê duyệt
+    // riêng từng workflow A3+ từ người dùng nên module này BẮT BUỘC phải đóng băng.
+    key: "engineering-autonomy",
+    nav: [],
+    permKeys: [],
+    routePrefix: ["/api/engineering/autonomy"],
+    thuNghiem: true,
+  },
+  {
+    // OS-phase (a) — Digital Twin L0–L3, gồm cả trang "reality" (reality-capture/
+    // deviations/sensors đều nằm dưới tiền tố /api/engineering/twin).
+    key: "engineering-twin",
+    nav: [],
+    permKeys: [],
+    routePrefix: ["/api/engineering/twin"],
+    thuNghiem: true,
+  },
+  {
+    // OS-phase (a) — Predictive OS: dự báo rủi ro tự động, chưa có traffic thật ENG-1..4.
+    key: "engineering-predictions",
+    nav: [],
+    permKeys: [],
+    routePrefix: ["/api/engineering/predictions"],
+    thuNghiem: true,
+  },
+  {
+    // OS-phase (a) — Knowledge Graph & phả hệ kỹ thuật.
+    key: "engineering-graph",
+    nav: [],
+    permKeys: [],
+    routePrefix: ["/api/engineering/graph"],
+    thuNghiem: true,
+  },
+  {
+    // OS-phase (a) — Prescriptive: mô phỏng phương án + đề xuất quyết định tự động.
+    key: "engineering-prescriptive",
+    nav: [],
+    permKeys: [],
+    routePrefix: ["/api/engineering/prescriptive"],
+    thuNghiem: true,
+  },
+  {
+    // (b) — 3D BIM & 4D Sim: W1 xác nhận `/api/engineering/bim-models/**` (3 route) sai
+    // tham số SQL, chưa từng chạy được lần nào trước khi W1 vá.
+    key: "engineering-bim-models",
+    nav: [{ group: "Hệ thống", label: "3D BIM & 4D Sim", href: "/engineering/bim-viewer", icon: "Building2" }],
+    permKeys: [],
+    routePrefix: ["/api/engineering/bim-models"],
+    thuNghiem: true,
+  },
+  {
+    // (b) — IoT Telemetry: W1 xác nhận cả 3 route devices/alerts/telemetry sai tham số SQL.
+    key: "engineering-iot-telemetry",
+    nav: [],
+    permKeys: [],
+    routePrefix: ["/api/engineering/iot"],
+    thuNghiem: true,
+  },
+  {
+    // (b) — Subcon AI Scoring: W1 xác nhận cả 3 route (scores/evaluate/recommend-shortlist)
+    // sai tham số SQL, chưa từng chạy được.
+    key: "engineering-subcon-ai",
+    nav: [],
+    permKeys: [],
+    routePrefix: ["/api/engineering/subcon-ai"],
+    thuNghiem: true,
+  },
+  {
+    // (b) — MEPF CAD/BIM Studio: mô phỏng rõ rệt (AI diagnose/CNC export/point-cloud),
+    // chưa dùng dữ liệu thật.
+    key: "engineering-god-tier-studio",
+    nav: [
+      {
+        group: "Hệ thống",
+        label: "MEPF CAD/BIM Studio",
+        href: "/engineering/god-tier-studio",
+        icon: "Sparkles",
+      },
+    ],
+    permKeys: [],
+    routePrefix: ["/api/engineering/god-tier"],
+    thuNghiem: true,
+  },
+  {
+    // (b) — Quantum & Merkle: mô phỏng rõ rệt (WASM giả lập). routePrefix CỐ Ý rỗng —
+    // xem ghi chú đầu nhóm W3: API của trang này dùng chung với các trang thật khác.
+    key: "engineering-quantum-hub",
+    nav: [
+      { group: "Hệ thống", label: "Quantum & Merkle", href: "/engineering/quantum-hub", icon: "Zap" },
+    ],
+    permKeys: [],
+    routePrefix: [],
+    thuNghiem: true,
+  },
+  {
+    // (b) — Swarm debate/synthesize giữa các AI agent: mô phỏng rõ rệt.
+    key: "engineering-swarm",
+    nav: [],
+    permKeys: [],
+    routePrefix: ["/api/engineering/swarm"],
+    thuNghiem: true,
+  },
+  {
+    // (b) — Nextgen Apex: generative-routing/edge-vision-tracking/smart-ipc/fidic-tia,
+    // 4 tiền tố API chỉ dùng riêng bởi trang này (đã kiểm không dùng chung).
+    key: "engineering-nextgen-apex",
+    nav: [],
+    permKeys: [],
+    routePrefix: [
+      "/api/engineering/generative-routing",
+      "/api/engineering/edge-vision-tracking",
+      "/api/engineering/smart-ipc",
+      "/api/engineering/fidic-tia",
+    ],
+    thuNghiem: true,
   },
 ];

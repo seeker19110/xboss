@@ -115,18 +115,17 @@ export async function saveProjectHealthSnapshot(
       $10::jsonb
     )
     RETURNING id`,
-    [
-      projectId,
-      res.snapshotDate,
-      res.healthIndexPercent,
-      res.spiIndex,
-      res.cpiIndex,
-      res.qualityPassRatePercent,
-      res.projectedCompletionP50,
-      res.projectedCompletionP80,
-      res.projectedCompletionP95,
-      JSON.stringify(res.riskDrivers),
-    ],
+
+    projectId,
+    res.snapshotDate,
+    res.healthIndexPercent,
+    res.spiIndex,
+    res.cpiIndex,
+    res.qualityPassRatePercent,
+    res.projectedCompletionP50,
+    res.projectedCompletionP80,
+    res.projectedCompletionP95,
+    JSON.stringify(res.riskDrivers),
   );
 
   if (!row) throw new Error("Failed to save project health snapshot");

@@ -131,14 +131,13 @@ export async function upsertKnowledgePattern(params: {
       lesson_learned = EXCLUDED.lesson_learned,
       updated_at = NOW()
     RETURNING *`,
-    [
-      params.pattern_type,
-      params.category,
-      hash,
-      JSON.stringify(params.pattern_metrics),
-      params.confidence_score,
-      params.lesson_learned,
-    ],
+
+    params.pattern_type,
+    params.category,
+    hash,
+    JSON.stringify(params.pattern_metrics),
+    params.confidence_score,
+    params.lesson_learned,
   );
 
   return row;
@@ -183,15 +182,14 @@ export async function addCrossProjectLesson(lesson: {
       source_project_id, pattern_id, work_package_code, observed_problem, root_cause, prescribed_preventative_action, effectiveness_score
     ) VALUES (?, ?, ?, ?, ?, ?, ?)
     RETURNING *`,
-    [
-      lesson.source_project_id || null,
-      lesson.pattern_id || null,
-      lesson.work_package_code || null,
-      lesson.observed_problem,
-      lesson.root_cause,
-      lesson.prescribed_preventative_action,
-      lesson.effectiveness_score || 1.0,
-    ],
+
+    lesson.source_project_id || null,
+    lesson.pattern_id || null,
+    lesson.work_package_code || null,
+    lesson.observed_problem,
+    lesson.root_cause,
+    lesson.prescribed_preventative_action,
+    lesson.effectiveness_score || 1.0,
   );
   return created;
 }

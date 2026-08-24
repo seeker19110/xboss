@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { query } from "@/lib/db";
 import { evaluateTelemetryStatus, IotDeviceType } from "@/lib/ky-thuat/engineering-iot-telemetry";
 
@@ -13,7 +14,13 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   }
 
+  if (!CAN.viewEngineeringIot(user.role)) {
+    return NextResponse.json({ error: "Không có quyền xem telemetry IoT" }, { status: 403 });
+  }
+
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("engineering-iot-telemetry", projectId);
+  if (blocked) return blocked;
   if (!projectId) {
     return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
   }
@@ -65,7 +72,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   }
 
+  if (!CAN.manageEngineeringIot(user.role)) {
+    return NextResponse.json({ error: "Không có quyền thao tác telemetry IoT" }, { status: 403 });
+  }
+
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("engineering-iot-telemetry", projectId);
+  if (blocked) return blocked;
   if (!projectId) {
     return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
   }
@@ -81,7 +94,8 @@ export async function POST(req: Request) {
     // Lấy thông tin thiết bị
     const devRows = await query<any>(
       `SELECT device_type, threshold_max, unit, device_name FROM engineering_iot_devices WHERE id = $1 AND project_id = $2`,
-      [deviceId, projectId],
+      deviceId,
+      projectId,
     );
 
     if (devRows.length === 0) {
@@ -103,28 +117,37 @@ export async function POST(req: Request) {
       `INSERT INTO engineering_iot_telemetry_logs (project_id, device_id, metric_value, status, raw_payload)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [projectId, deviceId, val, evalRes.status, JSON.stringify(rawPayload || {})],
+      projectId,
+      deviceId,
+      val,
+      evalRes.status,
+      JSON.stringify(rawPayload || {}),
     );
 
-    // Nếu vi phạm ngưỡng cảnh báo, tự động tạo Alert
+    // Nếu vi phạm ngưỡng cảnh báo, tự động tạo Alert.
+    // Dedup (V3): mỗi thiết bị chỉ giữ 1 cảnh báo ĐANG MỞ — thiết bị lỗi liên tục không
+    // sinh hàng loạt cảnh báo HSE trùng nhau. Chốt bằng unique index một phần
+    // (migration 0134, cùng cơ chế dedup notifications); ON CONFLICT DO NOTHING nên
+    // chạy nhiều instance song song vẫn đúng.
     let alertCreated = null;
     if (evalRes.status !== "NORMAL" && evalRes.alertTitle) {
       const alertRows = await query(
         `INSERT INTO engineering_iot_threshold_alerts
          (project_id, device_id, severity, alert_title, alert_message, standard_reference, triggered_value)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (device_id) WHERE is_resolved = false DO NOTHING
          RETURNING *`,
-        [
-          projectId,
-          deviceId,
-          evalRes.status,
-          evalRes.alertTitle,
-          evalRes.alertMessage || "",
-          evalRes.standardReference || null,
-          val,
-        ],
+
+        projectId,
+        deviceId,
+        evalRes.status,
+        evalRes.alertTitle,
+        evalRes.alertMessage || "",
+        evalRes.standardReference || null,
+        val,
       );
-      alertCreated = alertRows[0];
+      // Rỗng = đã có cảnh báo đang mở cho thiết bị này (bị dedup), không tạo thêm.
+      alertCreated = alertRows[0] ?? null;
     }
 
     return NextResponse.json({

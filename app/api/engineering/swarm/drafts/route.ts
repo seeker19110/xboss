@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
+import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { generateAutonomousTechnicalDraft } from "@/lib/ky-thuat/engineering-swarm";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +13,10 @@ export async function POST(req: Request) {
   if (!CAN.viewEngineeringAgentSessions(user.role)) {
     return NextResponse.json({ error: "Không có quyền soạn thảo hồ sơ kỹ thuật" }, { status: 403 });
   }
+
+  const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("engineering-swarm", projectId);
+  if (blocked) return blocked;
 
   try {
     const body = await req.json();

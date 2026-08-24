@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { query } from "@/lib/db";
 import {
   createExecutionRequest,
@@ -21,6 +22,8 @@ export async function GET() {
 
   const projectId = await getCurrentProjectId(user);
   if (!projectId) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+  const blocked = await assertModuleEnabled("engineering-autonomy", projectId);
+  if (blocked) return blocked;
 
   try {
     const requests = await query<ExecutionRequest>(
@@ -51,6 +54,8 @@ export async function POST(req: Request) {
 
   const projectId = await getCurrentProjectId(user);
   if (!projectId) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+  const blocked = await assertModuleEnabled("engineering-autonomy", projectId);
+  if (blocked) return blocked;
 
   const body = await req.json().catch(() => ({}));
   const capabilityKey = typeof body?.capabilityKey === "string" ? body.capabilityKey.trim() : "";

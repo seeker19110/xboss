@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import AppHeader from "@/app/components/AppHeader";
+import ThuNghiemBanner from "@/app/components/ThuNghiemBanner";
 import {
   Layers,
   Sparkles,
@@ -451,6 +452,7 @@ export default function GodTierStudioPage() {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+        <ThuNghiemBanner moduleKey="engineering-god-tier-studio" />
         {/* Top Header Card */}
         <div className="bg-zinc-900/90 border border-zinc-800 rounded-xl p-5 shadow-lg backdrop-blur-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="space-y-1">
@@ -490,7 +492,7 @@ export default function GodTierStudioPage() {
             </button>
             <button
               onClick={() => setActiveTab("esign")}
-              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg shadow-sm transition flex items-center gap-1.5"
+              className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-500 text-on-accent text-xs font-semibold rounded-lg shadow-sm transition flex items-center gap-1.5"
             >
               <FileCheck2 className="w-4 h-4" /> Ký Số Hoàn Công (NĐ 06)
             </button>
@@ -639,7 +641,7 @@ export default function GodTierStudioPage() {
                         onClick={() => setTimelineSpeed(spd)}
                         className={`px-2 py-1 text-xs font-mono rounded ${
                           timelineSpeed === spd
-                            ? "bg-sky-600 text-white font-bold"
+                            ? "bg-sky-700 text-on-accent font-bold"
                             : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
                         }`}
                       >
@@ -725,7 +727,7 @@ export default function GodTierStudioPage() {
                   <button
                     disabled={isScanningLidar}
                     onClick={handleRunLidarScan}
-                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 text-white text-xs font-semibold rounded-lg transition flex items-center gap-1.5"
+                    className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-500 disabled:bg-zinc-800 text-on-accent text-xs font-semibold rounded-lg transition flex items-center gap-1.5"
                   >
                     <Scan className="w-4 h-4" />{" "}
                     {isScanningLidar ? "Đang quét..." : "Quét Lại Đám Mây Điểm"}
@@ -1152,7 +1154,7 @@ export default function GodTierStudioPage() {
 
               <button
                 onClick={handleGenerateAutoLisp}
-                className="w-full py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs rounded-lg transition"
+                className="w-full py-2.5 bg-sky-700 hover:bg-sky-500 text-on-accent font-semibold text-xs rounded-lg transition"
               >
                 Sinh Mã AutoCAD LISP Cục Bộ
               </button>
@@ -1253,7 +1255,7 @@ export default function GodTierStudioPage() {
                   onClick={() =>
                     alert("Đã ký số 3 bên và niêm phong mã băm Merkle Tree thành công!")
                   }
-                  className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white font-semibold text-xs rounded-lg shadow-sm transition"
+                  className="flex-1 py-2 bg-emerald-700 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-on-accent font-semibold text-xs rounded-lg shadow-sm transition"
                 >
                   Niêm Phong Mật Mã & Bàn Giao LOD 500
                 </button>

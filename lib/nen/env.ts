@@ -38,6 +38,14 @@ const serverSchema = z
     TELEGRAM_BOT_TOKEN: z.string().optional(),
     TELEGRAM_CHAT_ID: z.string().optional(),
 
+    // Bí mật xác thực webhook ĐI VÀO (V1). Optional ở đây như mọi biến tích hợp khác — nhưng
+    // lib/bao-mat/webhook-inbound.ts THROW fail-fast khi route webhook được gọi mà thiếu biến
+    // (webhook không xác thực được thì phải chết chứ không được xử lý), build vẫn chạy bình thường.
+    // - TELEGRAM_WEBHOOK_SECRET: chuỗi đăng ký kèm setWebhook(secret_token=...) của Telegram Bot API.
+    // - ZALO_OA_SECRET: khoá bí mật OA để kiểm HMAC-SHA256 trên raw body webhook Zalo.
+    TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
+    ZALO_OA_SECRET: z.string().optional(),
+
     // Web Push (VAPID) — thiếu thì nút bật push tự ẩn, lib/push là no-op
     VAPID_PUBLIC_KEY: z.string().optional(),
     VAPID_PRIVATE_KEY: z.string().optional(),

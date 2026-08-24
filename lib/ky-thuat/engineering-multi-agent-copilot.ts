@@ -117,16 +117,15 @@ export async function saveAgentDebateSession(
       recommended_actions = EXCLUDED.recommended_actions,
       consensus_token = EXCLUDED.consensus_token
     RETURNING id`,
-    [
-      projectId,
-      res.sessionCode,
-      res.topicTitle,
-      res.issueDescription,
-      JSON.stringify(res.perspectives),
-      res.consensusVerdict,
-      JSON.stringify(res.recommendedActions),
-      res.consensusToken,
-    ],
+
+    projectId,
+    res.sessionCode,
+    res.topicTitle,
+    res.issueDescription,
+    JSON.stringify(res.perspectives),
+    res.consensusVerdict,
+    JSON.stringify(res.recommendedActions),
+    res.consensusToken,
   );
 
   if (!row) throw new Error("Failed to save agent debate session");

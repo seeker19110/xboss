@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { query } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +13,13 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   }
 
+  if (!CAN.viewEngineeringIot(user.role)) {
+    return NextResponse.json({ error: "Không có quyền xem cảnh báo ngưỡng IoT" }, { status: 403 });
+  }
+
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("engineering-iot-telemetry", projectId);
+  if (blocked) return blocked;
   if (!projectId) {
     return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
   }
@@ -31,7 +38,7 @@ export async function GET(req: Request) {
        JOIN engineering_iot_devices d ON a.device_id = d.id
        WHERE a.project_id = $1
        ORDER BY a.is_resolved ASC, a.created_at DESC`,
-      [projectId],
+      projectId,
     );
 
     return NextResponse.json({
@@ -54,7 +61,16 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   }
 
+  if (!CAN.manageEngineeringIot(user.role)) {
+    return NextResponse.json(
+      { error: "Không có quyền thao tác cảnh báo ngưỡng IoT" },
+      { status: 403 },
+    );
+  }
+
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("engineering-iot-telemetry", projectId);
+  if (blocked) return blocked;
   if (!projectId) {
     return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
   }
@@ -71,10 +87,13 @@ export async function PATCH(req: Request) {
       `UPDATE engineering_iot_threshold_alerts
        SET is_resolved = $1,
            resolved_at = CASE WHEN $1 THEN NOW() ELSE NULL END,
-           resolved_by = CASE WHEN $1 THEN $2 ELSE NULL END
+           resolved_by = CASE WHEN $1 THEN $2::bigint ELSE NULL END
        WHERE id = $3 AND project_id = $4
        RETURNING *`,
-      [isResolved ?? true, user.id, alertId, projectId],
+      isResolved ?? true,
+      user.id,
+      alertId,
+      projectId,
     );
 
     if (rows.length === 0) {
