@@ -3,7 +3,7 @@
 // Mất mạng (hầm, tầng kỹ thuật) vẫn xem được dữ liệu tracking đã tải lần cuối.
 // App Shell: precache /offline + asset tĩnh cốt lõi lúc cài đặt (M0) — trang HTML chưa
 // từng ghé mà mất mạng hoàn toàn sẽ thấy /offline thay vì lỗi mạng mặc định của trình duyệt.
-const CACHE = "xboss-v13";
+const CACHE = "xboss-v14";
 const SHELL_URLS = [
   "/offline",
   "/manifest.webmanifest",
@@ -113,6 +113,7 @@ self.addEventListener("fetch", (e) => {
       url.pathname.startsWith("/api/photos/") ||
       url.pathname.startsWith("/api/documents/") ||
       url.pathname.startsWith("/api/events") ||
+      url.pathname.startsWith("/api/tasks/version") ||
       url.pathname.startsWith("/api/health") ||
       url.pathname.startsWith("/api/r/") ||
       url.pathname.startsWith("/api/qr/") ||

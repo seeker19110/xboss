@@ -74,19 +74,48 @@ export async function POST(req: Request) {
     );
 
     const metricsMap = new Map<string, SubconEvaluationResult>();
+    const missingMetrics: { profileId: string; reasons: string[] }[] = [];
+
     for (const m of metricsRows) {
+      const reasons: string[] = [];
+
+      // Kiểm từng metric, nếu thiếu ghi vào lý do.
+      if (m.onTimeRate == null) reasons.push("onTimeRate (% công việc đúng hạn)");
+      if (m.bbntPassRate == null) reasons.push("bbntPassRate (% nghiệm thu đạt)");
+      if (m.hseScore == null) reasons.push("hseScore (điểm an toàn HSE)");
+      if (m.costVarianceRate == null) reasons.push("costVarianceRate (% phát sinh chi phí)");
+
+      if (reasons.length > 0) {
+        missingMetrics.push({ profileId: m.profileId, reasons });
+        continue; // Bỏ qua profile này, không tạo mặc định
+      }
+
       metricsMap.set(m.profileId, {
         trustScore: Number(m.trustScore),
         tierGrade: m.tierGrade as SubconTier,
         componentScores: {
-          scheduleScore: Number(m.onTimeRate ?? 80),
-          qualityScore: Number(m.bbntPassRate ?? 80),
+          scheduleScore: Number(m.onTimeRate),
+          qualityScore: Number(m.bbntPassRate),
           ncrPenaltyScore: Math.max(0, 100 - Number(m.ncrCount ?? 0) * 15),
-          hseScore: Number(m.hseScore ?? 80),
-          costControlScore: Math.max(0, 100 - Math.max(0, Number(m.costVarianceRate ?? 0)) * 3),
+          hseScore: Number(m.hseScore),
+          costControlScore: Math.max(0, 100 - Math.max(0, Number(m.costVarianceRate)) * 3),
         },
         summary: m.summary || "",
       });
+    }
+
+    // Nếu có profile bị thiếu metric, báo lại.
+    if (missingMetrics.length > 0) {
+      return NextResponse.json(
+        {
+          error: "Dữ liệu đánh giá nhà thầu phụ chưa đủ",
+          missingMetrics: missingMetrics.map((item) => ({
+            profileId: item.profileId,
+            reason: `Thiếu: ${item.reasons.join(", ")}`,
+          })),
+        },
+        { status: 400 },
+      );
     }
 
     // 3. Chạy Matchmaker AI
