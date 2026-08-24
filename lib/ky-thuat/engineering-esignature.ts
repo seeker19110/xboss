@@ -161,8 +161,80 @@ export async function generateSignerOtp(
   return otpCode;
 }
 
+// Lỗi ký có mã HTTP kèm theo để route trả đúng 403/409/422 thay vì gộp hết về 500.
+export class EsignSignError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "EsignSignError";
+  }
+}
+
+// So mã OTP theo thời gian hằng số.
+// TODO: gộp về `lib/bao-mat/otp.ts` (module dùng chung do việc V1 tạo) khi V1 đã tích hợp.
+function soKhopOtp(nhap: string, luu: string): boolean {
+  const a = Buffer.from(nhap, "utf8");
+  const b = Buffer.from(luu, "utf8");
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
+export interface EsignSignatoryGuardRow {
+  userId: number | null;
+  status: string;
+  otpCode?: string | null;
+  otpExpiresAt?: string | null;
+}
+
+/**
+ * Điều kiện được phép ký một signatory — hàm THUẦN để test được không cần Postgres.
+ *
+ * Vá 3 lỗ hổng (audit 2026-08-24): (1) `signatoryId` do client chọn nên một user ký được cả 3
+ * bên; (2) OTP chỉ kiểm khi client tự nguyện gửi `otpCode` — bỏ trường đi là qua mặt; (3) chỉ
+ * chặn `status='signed'` nên ký sai thứ tự được.
+ */
+export function kiemDieuKienKy(
+  signatory: EsignSignatoryGuardRow,
+  userId: number,
+  otpCode?: string,
+  bayGio: number = Date.now(),
+): { ok: true } | { ok: false; status: number; message: string } {
+  if (signatory.userId == null) {
+    return { ok: false, status: 422, message: "Người ký chưa được gắn tài khoản hệ thống" };
+  }
+  if (Number(signatory.userId) !== userId) {
+    return { ok: false, status: 403, message: "Bạn không phải người ký của mục này" };
+  }
+  if (signatory.status === "signed") {
+    return { ok: false, status: 409, message: "Người này đã hoàn tất ký trước đó" };
+  }
+  if (signatory.status !== "ready") {
+    return {
+      ok: false,
+      status: 409,
+      message: `Chưa tới lượt ký của mục này (trạng thái hiện tại: ${signatory.status})`,
+    };
+  }
+  // OTP đã phát thì BẮT BUỘC, không phụ thuộc việc client có gửi hay không.
+  if (signatory.otpCode) {
+    if (!otpCode) {
+      return { ok: false, status: 422, message: "Thiếu mã OTP xác thực người ký" };
+    }
+    if (!soKhopOtp(otpCode, signatory.otpCode)) {
+      return { ok: false, status: 422, message: "Mã OTP xác thực không chính xác" };
+    }
+    if (!signatory.otpExpiresAt || new Date(signatory.otpExpiresAt).getTime() < bayGio) {
+      return { ok: false, status: 422, message: "Mã OTP xác thực đã hết hạn" };
+    }
+  }
+  return { ok: true };
+}
+
 export async function executeSignEnvelope(params: {
   projectId: number;
+  userId: number;
   envelopeId: string;
   signatoryId: string;
   signatureData: string;
@@ -172,6 +244,7 @@ export async function executeSignEnvelope(params: {
 }): Promise<{ success: boolean; isEnvelopeComplete: boolean; certificateCode?: string }> {
   const {
     projectId,
+    userId,
     envelopeId,
     signatoryId,
     signatureData,
@@ -185,7 +258,7 @@ export async function executeSignEnvelope(params: {
     async () => {
       return withTransaction(async () => {
         const signatory = await queryOne<any>(
-          `SELECT id, signing_order AS "signingOrder", status, otp_code AS "otpCode", otp_expires_at AS "otpExpiresAt", signer_name AS "signerName", signer_role AS "signerRole"
+          `SELECT id, user_id AS "userId", signing_order AS "signingOrder", status, otp_code AS "otpCode", otp_expires_at AS "otpExpiresAt", signer_name AS "signerName", signer_role AS "signerRole"
          FROM engineering_esign_signatories
          WHERE id = ? AND envelope_id = ? AND project_id = ?`,
           signatoryId,
@@ -194,20 +267,12 @@ export async function executeSignEnvelope(params: {
         );
 
         if (!signatory) {
-          throw new Error("Không tìm thấy người ký trong hồ sơ");
+          throw new EsignSignError("Không tìm thấy người ký trong hồ sơ", 404);
         }
 
-        if (signatory.status === "signed") {
-          throw new Error("Người này đã hoàn tất ký trước đó");
-        }
-
-        if (signatory.otpCode && otpCode) {
-          if (signatory.otpCode !== otpCode) {
-            throw new Error("Mã OTP xác thực không chính xác");
-          }
-          if (signatory.otpExpiresAt && new Date(signatory.otpExpiresAt).getTime() < Date.now()) {
-            throw new Error("Mã OTP xác thực đã hết hạn");
-          }
+        const kiem = kiemDieuKienKy(signatory, userId, otpCode);
+        if (!kiem.ok) {
+          throw new EsignSignError(kiem.message, kiem.status);
         }
 
         const signedAt = new Date().toISOString();
