@@ -70,7 +70,25 @@ Xác nhận thật: sửa code nhiều vòng, xoá cả `.next`, trình duyệt 
 sửa (Turbopack dev đặt tên chunk ổn định theo đường dẫn, không hash theo nội dung như production).
 Đã sửa: header immutable giờ chỉ áp dụng khi `NODE_ENV === "production"`.
 
-**Vòng 2 cùng ngày — bản vá STYLE/LTYPE/DIMSTYLE ở trên tự sinh ra lỗi MỚI, nặng hơn.** Người dùng
+**Vòng 3 cùng ngày — vẫn "drawing discarded" sau vòng 2, nguyên nhân khác hẳn.** Trước khi đoán
+tiếp, đối chiếu số bản ghi khai ở header với số bản ghi thật của **mọi** bảng trong TABLES section
+(VPORT/LTYPE/LAYER/STYLE/VIEW/UCS/APPID/DIMSTYLE/BLOCK_RECORD) — tất cả khớp, chứng minh vòng 2
+không phải nguyên nhân của lỗi lần này (dù vẫn là bản vá đúng, cần thiết). Đọc kỹ vị trí dòng
+AutoCAD báo lỗi trong tệp thật: dòng đó là **bản ghi LAYER kế tiếp**, không phải bên trong
+Defpoints — tức AutoCAD đọc XONG record Defpoints rồi mới hồi tố báo record đó thiếu trường bắt
+buộc. Nguyên nhân: mã 290 (cờ in) vốn TUỲ CHỌN với layer thường (thiếu thì mặc định có in), nhưng
+AutoCAD đòi hỏi TƯỜNG MINH cho layer đặc biệt `Defpoints` (do chính AutoCAD tự tạo, quy ước luôn
+không in) — bộ ghi trước đây không ghi mã 290 cho bất kỳ layer nào. Sửa: mọi layer nay khai tường
+minh mã 290 (`Defpoints` = 0, còn lại = 1).
+
+**Bài học rút ra sau 3 vòng cùng một triệu chứng "drawing discarded":** `ezdxf.audit()` không bắt
+được CẢ BA lỗi này (0 errors mỗi lần) — công cụ kiểm hợp lệ không thay được việc mở thử bằng chính
+AutoCAD thật. Từ nay mọi thay đổi ở `exportDxf` phải kèm bằng chứng đối chiếu SỐ BẢN GHI header vs
+thực tế cho mọi bảng (không chỉ bảng vừa sửa), và nghi ngờ trước tiên các "layer/style/linetype
+đặc biệt do chính AutoCAD định nghĩa" (Defpoints, Standard, Continuous, ByLayer, ByBlock...) — quy
+ước bất thành văn của AutoCAD với nhóm tên này khắt khe hơn hẳn layer/style do người dùng đặt tuỳ ý.
+
+**Vòng 2 (xảy ra trước vòng 3) cùng ngày — bản vá STYLE/LTYPE/DIMSTYLE ở trên tự sinh lỗi MỚI, nặng hơn.** Người dùng
 gửi file xuất từ code đã vá cho AutoCAD thật mở thử: `Skipping duplicate definition of Continuous
 in LTYPE Table` rồi `Invalid or incomplete DXF input -- drawing discarded`. Nguyên nhân: bản vá so
 khớp tên linetype/style/dimstyle **phân biệt hoa/thường**, trong khi AutoCAD **không** — layer

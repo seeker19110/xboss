@@ -1460,6 +1460,39 @@ test("exportDxf: layer dùng tên linetype/style/dimstyle khác HOA/THƯỜNG so
   assert.equal(soBanGhiThat, soKhaiBao, "Số bản ghi LTYPE thật phải khớp đúng số khai ở header");
 });
 
+test("exportDxf: layer 'Defpoints' phải có mã 290 (cờ in) tường minh, nếu không AutoCAD huỷ cả bản vẽ", () => {
+  // Hồi quy thật, người dùng báo 2026-08-24 — vòng thứ 3 cùng một triệu chứng "drawing
+  // discarded". Hai bản vá trước (bảng STYLE/LTYPE/DIMSTYLE thiếu tên, rồi so khớp phân biệt
+  // hoa/thường) đều đúng và cần thiết, nhưng KHÔNG PHẢI nguyên nhân của lỗi này — xác minh bằng
+  // cách đối chiếu số bản ghi khai ở header với số bản ghi thật của MỌI bảng trong TABLES section:
+  // tất cả đều khớp, không lệch nhịp đọc nào cả.
+  //
+  // AutoCAD báo "Invalid AcDbLayerTableRecord plot flag for DEFPOINTS layer" ngay tại dòng bắt
+  // đầu bản ghi LAYER kế tiếp — tức nó đọc XONG record Defpoints rồi mới hồi tố báo record đó
+  // thiếu trường bắt buộc. Mã 290 (cờ in) vốn TUỲ CHỌN với layer thường (thiếu thì mặc định có
+  // in), nhưng AutoCAD đòi hỏi TƯỜNG MINH cho layer đặc biệt "Defpoints" (do chính AutoCAD tự
+  // tạo, quy ước luôn không in) — bộ ghi trước đây không ghi mã 290 cho bất kỳ layer nào.
+  const dxf = `0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n0\nLAYER\n2\nDefpoints\n62\n7\n6\nCONTINUOUS\n0\nLAYER\n2\nM-DUCT\n62\n3\n6\nCONTINUOUS\n0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n0\nLINE\n8\nM-DUCT\n10\n0\n20\n0\n30\n0\n11\n1000\n21\n0\n31\n0\n0\nENDSEC\n0\nEOF`;
+
+  const parsed = parseDxf(dxf, "co_defpoints.dxf");
+  const exported = exportDxf(parsed, { applyStandardLayers: false });
+
+  const layerBlock = (ten: string) => {
+    const start = exported.indexOf(`2\r\n${ten}\r\n`);
+    const end = exported.indexOf("0\r\nLAYER", start + 1);
+    return exported.slice(start, end === -1 ? exported.indexOf("0\r\nENDTAB", start) : end);
+  };
+
+  assert.ok(
+    layerBlock("Defpoints").includes("290\r\n0\r\n"),
+    "Layer Defpoints phải khai tường minh mã 290 = 0 (không in) — AutoCAD từ chối mở nếu thiếu",
+  );
+  assert.ok(
+    layerBlock("M-DUCT").includes("290\r\n1\r\n"),
+    "Layer thường cũng nên khai tường minh mã 290 = 1 (có in) cho nhất quán",
+  );
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Khung nhìn lúc mở tệp (VPORT "*ACTIVE" + $VIEWCTR/$VIEWSIZE).
 //

@@ -4045,6 +4045,12 @@ export function exportDxf(
   uniqueLayers.forEach((val, name) => {
     than += tableRecordHead("LAYER", handles.take(), hLayerTab, "AcDbLayerTableRecord");
     than += `2\r\n${name}\r\n70\r\n${val.flags}\r\n62\r\n${val.color}\r\n6\r\n${val.lineType}\r\n`;
+    // Mã 290 (cờ in/plot) — AutoCAD chấp nhận thiếu mã này ở layer thường (mặc định coi là có
+    // in), nhưng đòi hỏi TƯỜNG MINH ở layer đặc biệt "Defpoints" (do chính AutoCAD tự quản lý,
+    // luôn không in). Thiếu mã này riêng cho Defpoints khiến AutoCAD báo "Invalid
+    // AcDbLayerTableRecord plot flag" ngay khi đọc xong record rồi huỷ cả bản vẽ — xác nhận thật
+    // 2026-08-24 bằng chính AutoCAD của người dùng.
+    than += `290\r\n${name.toUpperCase() === "DEFPOINTS" ? 0 : 1}\r\n`;
     than += `370\r\n${typeof val.lineWeight === "number" ? val.lineWeight : -3}\r\n`;
     than += `390\r\n${hPlaceholder}\r\n`;
     than += `347\r\n${hMaterialByLayer}\r\n`;
