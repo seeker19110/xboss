@@ -863,10 +863,33 @@ function isDwgBuffer(buf: Buffer): boolean {
  * thì rơi về Latin-1 — mỗi byte thành đúng một ký tự U+00xx, đúng dạng đầu vào mà bảng TCVN3 chờ.
  */
 export function decodeDxfBytes(buf: Buffer): string {
+  return giaiMaByteDxf(buf);
+}
+
+/**
+ * Bản chạy được ở CẢ máy chủ lẫn TRÌNH DUYỆT của `decodeDxfBytes` — không phụ thuộc `Buffer`.
+ *
+ * Vì sao cần: trang chuẩn hoá đọc tệp bằng `FileReader.readAsText()`, mà `readAsText` không có
+ * tham số bảng mã thì **mặc định UTF-8**. Bản vẽ Việt Nam đời cũ ghi bằng TCVN3/ABC, VNI hay
+ * CP1258 sẽ mất sạch chữ có dấu thành `\uFFFD` ngay ở bước đọc tệp — **không thể khôi phục**, vì
+ * byte gốc đã bị trình duyệt vứt đi trước khi Bác Sĩ Font kịp nhìn thấy. Máy chủ xử lý đúng chuyện
+ * này từ lâu (`parse-dxf/route.ts` truyền thẳng Buffer), client thì chưa bao giờ (audit 2026-08-24).
+ *
+ * Nhánh dự phòng cố ý **tự map byte → mã điểm** thay vì `new TextDecoder("latin1")`: nhãn
+ * "latin1" của WHATWG thực chất là windows-1252, khác latin1 thật ở dải 0x80–0x9F — đúng dải mà
+ * bảng mã VNI dùng. Dùng nhầm là hỏng đúng thứ đang muốn cứu.
+ */
+export function giaiMaByteDxf(bytes: Uint8Array): string {
   try {
-    return new TextDecoder("utf-8", { fatal: true }).decode(buf);
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   } catch {
-    return buf.toString("latin1");
+    // Ghép theo khối để không vượt giới hạn số tham số của String.fromCharCode với tệp lớn.
+    const KHOI = 0x2000;
+    let ket = "";
+    for (let i = 0; i < bytes.length; i += KHOI) {
+      ket += String.fromCharCode(...bytes.subarray(i, Math.min(i + KHOI, bytes.length)));
+    }
+    return ket;
   }
 }
 
@@ -3000,10 +3023,20 @@ class HandleAllocator {
 /** Số nét của kiểu đường nhiều nét `Standard` mà bộ ghi phát ra (offset +0.5 và −0.5). */
 const MLINE_STYLE_ELEMENT_COUNT = 2;
 
-/** Khối mã nhóm mở đầu chung của mọi bản ghi trong bảng ký hiệu (SYMBOL TABLE) R2000. */
+/**
+ * Khối mã nhóm mở đầu chung của mọi bản ghi trong bảng ký hiệu (SYMBOL TABLE) R2000.
+ *
+ * NGOẠI LỆ DIMSTYLE — quirk kinh điển của định dạng DXF: bản ghi DIMSTYLE là loại DUY NHẤT
+ * dùng mã nhóm **105** cho handle thay vì mã 5 (di sản lịch sử: mã 5 trong ngữ cảnh DIMSTYLE
+ * từng mang nghĩa khác từ đời DXF cũ). Ghi mã 5 thì AutoCAD không nhận ra handle của record,
+ * lẫn sang handle của chính bảng DIMSTYLE và báo "Bad handle ...: already in use — Error in
+ * DIMSTYLE Table — eHandleInUse" rồi huỷ cả bản vẽ — xác nhận thật 2026-08-24 bằng AutoCAD
+ * của người dùng trên bản vẽ MEPF 65MB.
+ */
 function tableRecordHead(type: string, handle: string, owner: string, subClass: string): string {
+  const handleCode = type === "DIMSTYLE" ? 105 : 5;
   return (
-    `0\r\n${type}\r\n5\r\n${handle}\r\n330\r\n${owner}\r\n` +
+    `0\r\n${type}\r\n${handleCode}\r\n${handle}\r\n330\r\n${owner}\r\n` +
     `100\r\nAcDbSymbolTableRecord\r\n100\r\n${subClass}\r\n`
   );
 }
@@ -3586,7 +3619,12 @@ function writeEntityR2000(
           for (const d of l.dashes) out += `49\r\n${real(d)}\r\n`;
         }
       }
-      out += `47\r\n1.0\r\n98\r\n0\r\n`;
+      // KHÔNG ghi mã 47 (pixel size) — spec liệt kê nó là tuỳ chọn trước mã 98, nhưng AutoCAD
+      // thật từ chối thẳng: "in HATCH... Error: expected group code 98" rồi huỷ cả bản vẽ (xác
+      // nhận 2026-08-24, vòng 6 chuỗi "drawing discarded"). Đối chiếu HATCH gốc do chính AutoCAD
+      // R2018 ghi trong bản vẽ MEPF thật: không hề có mã 47, kết thúc bằng 98/1 + seed point
+      // (0,0) ngay sau mã 76 — bắt chước đúng như vậy.
+      out += `98\r\n1\r\n10\r\n0.0\r\n20\r\n0.0\r\n`;
       return out;
     }
 
@@ -3848,6 +3886,21 @@ export function exportDxf(
 
   // ── 1. HEADER ──
   const bao = parsed.diagnostic?.boundingDimensions;
+
+  const TY_LE_KHUNG_NHIN = 1.5;
+  let tamX = 0;
+  let tamY = 0;
+  let caoKhungNhin = 1000;
+  if (bao) {
+    const rong = bao.maxX - bao.minX;
+    const cao = bao.maxY - bao.minY;
+    tamX = (bao.minX + bao.maxX) / 2;
+    tamY = (bao.minY + bao.maxY) / 2;
+    // Bản vẽ rỗng hoặc suy biến thành một điểm/đường thẳng → giữ mặc định, không chia cho 0.
+    const canCao = Math.max(cao, rong / TY_LE_KHUNG_NHIN);
+    if (canCao > 0) caoKhungNhin = canCao * 1.1;
+  }
+
   let header = "0\r\nSECTION\r\n2\r\nHEADER\r\n";
   // AC1021 = AutoCAD 2007 — phiên bản mới nhất XÉT RIÊNG BẢN VẼ 2D. Từ 2007 trở đi không bản nào
   // thêm loại thực thể 2D dùng được cho bản vẽ MEPF (2010 thêm MESH 3D, 2013 thêm đối tượng mặt
@@ -3887,6 +3940,10 @@ export function exportDxf(
     header += `9\r\n$LIMMIN\r\n10\r\n${real(bao.minX)}\r\n20\r\n${real(bao.minY)}\r\n`;
     header += `9\r\n$LIMMAX\r\n10\r\n${real(bao.maxX)}\r\n20\r\n${real(bao.maxY)}\r\n`;
   }
+  // $VIEWCTR/$VIEWSIZE lặp lại khung nhìn của VPORT "*ACTIVE" ở HEADER — AutoCAD đọc cả hai chỗ,
+  // để lệch nhau thì khung nhìn lúc mở phụ thuộc vào chỗ nào được đọc sau.
+  header += `9\r\n$VIEWCTR\r\n10\r\n${real(tamX)}\r\n20\r\n${real(tamY)}\r\n`;
+  header += `9\r\n$VIEWSIZE\r\n40\r\n${real(caoKhungNhin)}\r\n`;
 
   // ── 2. CLASSES — khai các lớp KHÔNG thuộc lõi DXF mà tệp này có dùng.
   // Thiếu khai báo thì AutoCAD coi thực thể tương ứng là đối tượng lạ và bỏ qua khi mở tệp.
@@ -3927,18 +3984,61 @@ export function exportDxf(
   const openTable = (name: string, handle: string, count: number, extra = ""): string =>
     `0\r\nTABLE\r\n2\r\n${name}\r\n5\r\n${handle}\r\n330\r\n0\r\n100\r\nAcDbSymbolTable\r\n70\r\n${count}\r\n${extra}`;
 
+  // Khung nhìn lúc mở tệp — PHẢI bám khung bao thật của bản vẽ.
+  //
+  // Vì sao đây là chỗ dễ sai mà không công cụ nào bắt được: AutoCAD khôi phục đúng khung nhìn
+  // ghi ở bản ghi VPORT "*ACTIVE" khi mở tệp. Bản trước cắm cứng tâm (0,0) cao 1000 — với bản vẽ
+  // MEPF trải 0…33000 × 0…17000 thì khung đó rơi vào một mẩu trống cạnh gốc toạ độ, người dùng
+  // mở lên thấy **màn hình trắng trơn** dù 16 thực thể vẫn nằm nguyên trong tệp. `ezdxf` Auditor
+  // báo 0 lỗi 0 fix vì tệp hoàn toàn hợp lệ — nó không quan tâm khung nhìn. Lỗi này chỉ lộ ra khi
+  // mở bằng chính AutoCAD (người dùng báo, 2026-08-24).
+  //
+  // Mã 12/22 = tâm khung nhìn, 40 = chiều cao khung nhìn, 41 = tỷ lệ rộng/cao. Chiều cao phải đủ
+  // phủ CẢ chiều cao lẫn chiều rộng khung bao (chiều rộng thấy được = cao × tỷ lệ), cộng 10% lề.
   than += openTable("VPORT", hVportTab, 1);
   than += tableRecordHead("VPORT", handles.take(), hVportTab, "AcDbViewportTableRecord");
   than += "2\r\n*ACTIVE\r\n70\r\n0\r\n10\r\n0.0\r\n20\r\n0.0\r\n11\r\n1.0\r\n21\r\n1.0\r\n";
-  than += "12\r\n0.0\r\n22\r\n0.0\r\n40\r\n1000.0\r\n41\r\n1.5\r\n";
+  than += `12\r\n${real(tamX)}\r\n22\r\n${real(tamY)}\r\n40\r\n${real(caoKhungNhin)}\r\n41\r\n${real(TY_LE_KHUNG_NHIN)}\r\n`;
   than += "0\r\nENDTAB\r\n";
 
+  // Hai bản ghi đầu BẮT BUỘC theo spec R2000: "ByBlock" và "ByLayer" — không phải linetype vẽ
+  // được mà là mục đặc biệt AutoCAD đòi phải TỒN TẠI TRONG TỆP. ezdxf đánh lừa ở đúng chỗ này:
+  // nó tự cấp 2 bản ghi ảo khi đọc (liệt kê "ByBlock"/"ByLayer" như thể có trong tệp, audit 0
+  // lỗi) nên kiểm bằng ezdxf không phát hiện thiếu; AutoCAD thật thì báo thẳng "Missing Default
+  // entry ByLayer in SymbolTable:LTYPE" rồi huỷ cả bản vẽ — xác nhận thật 2026-08-24.
   const lineTypes: Array<[string, string, number[]]> = [
+    ["ByBlock", "", []],
+    ["ByLayer", "", []],
     ["CONTINUOUS", "Solid line", []],
     ["CENTER", "Center ____ _ ____ _ ____", [30, -5, 10, -5]],
     ["HIDDEN", "Hidden __ __ __ __", [5, -5]],
     ["DASHED", "Dashed __ __ __ __", [15, -5]],
   ];
+  // Layer/thực thể có thể tham chiếu linetype ngoài 4 loại dựng sẵn (VD linetype nhập từ XREF
+  // như "Grid Line", "IMPORT-xref-..."). PHẢI khai thêm các tên đó vào bảng LTYPE — không có
+  // định nghĩa gốc của chúng nên dựng bằng nét liền (CONTINUOUS) làm hình mẫu, còn hơn để lại
+  // tham chiếu treo (AutoCAD từ chối mở tệp có LAYER/thực thể trỏ tới LTYPE chưa khai báo, cùng
+  // lớp lỗi với bảng STYLE thiếu kiểu chữ — xem ghi chú styleNames phía trên).
+  //
+  // So khớp KHÔNG PHÂN BIỆT HOA/THƯỜNG: tên linetype trong AutoCAD không phân biệt hoa/thường
+  // (bản ghi gốc thường là "Continuous", mảng dựng sẵn ở đây viết "CONTINUOUS" toàn hoa) — so
+  // khớp phân biệt hoa/thường từng làm AutoCAD tự "Skipping duplicate definition of Continuous"
+  // lúc mở, khiến số bản ghi THẬT ít hơn số khai trong header bảng LTYPE, lệch nhịp đọc và làm
+  // hỏng lây bảng LAYER ngay sau đó ("drawing discarded" — xác nhận thật bằng AutoCAD 2026-08-24).
+  const knownLineTypeNamesUpper = new Set(lineTypes.map(([name]) => name.toUpperCase()));
+  const extraLineTypeNames = new Map<string, string>(); // key hoa toàn bộ → tên gốc giữ lại
+  const collectLineType = (name?: string) => {
+    if (!name) return;
+    const key = name.toUpperCase();
+    if (!knownLineTypeNamesUpper.has(key) && !extraLineTypeNames.has(key)) {
+      extraLineTypeNames.set(key, name);
+    }
+  };
+  layers.forEach((l) => collectLineType(l.lineType));
+  entities.forEach((e) => collectLineType(e.lineType));
+  (parsed.blocks || []).forEach((b) => b.entities?.forEach((e) => collectLineType(e.lineType)));
+  extraLineTypeNames.forEach((name) => lineTypes.push([name, name, []]));
+
   than += openTable("LTYPE", hLtypeTab, lineTypes.length);
   for (const [name, desc, dashes] of lineTypes) {
     than += tableRecordHead("LTYPE", handles.take(), hLtypeTab, "AcDbLinetypeTableRecord");
@@ -3967,16 +4067,42 @@ export function exportDxf(
   uniqueLayers.forEach((val, name) => {
     than += tableRecordHead("LAYER", handles.take(), hLayerTab, "AcDbLayerTableRecord");
     than += `2\r\n${name}\r\n70\r\n${val.flags}\r\n62\r\n${val.color}\r\n6\r\n${val.lineType}\r\n`;
+    // Mã 290 (cờ in/plot) — AutoCAD chấp nhận thiếu mã này ở layer thường (mặc định coi là có
+    // in), nhưng đòi hỏi TƯỜNG MINH ở layer đặc biệt "Defpoints" (do chính AutoCAD tự quản lý,
+    // luôn không in). Thiếu mã này riêng cho Defpoints khiến AutoCAD báo "Invalid
+    // AcDbLayerTableRecord plot flag" ngay khi đọc xong record rồi huỷ cả bản vẽ — xác nhận thật
+    // 2026-08-24 bằng chính AutoCAD của người dùng.
+    than += `290\r\n${name.toUpperCase() === "DEFPOINTS" ? 0 : 1}\r\n`;
     than += `370\r\n${typeof val.lineWeight === "number" ? val.lineWeight : -3}\r\n`;
     than += `390\r\n${hPlaceholder}\r\n`;
     than += `347\r\n${hMaterialByLayer}\r\n`;
   });
   than += "0\r\nENDTAB\r\n";
 
-  // Bảng STYLE — gom đủ kiểu chữ mà bản vẽ thật sự dùng, không chỉ mỗi STANDARD
+  // Bảng STYLE — gom đủ kiểu chữ mà bản vẽ thật sự dùng, không chỉ mỗi STANDARD.
+  // PHẢI quét cả entity bên trong định nghĩa BLOCK, không chỉ entity cấp model-space: block
+  // thiết bị (thường xuất từ Revit, VD "VHT_Tag_T...") mang theo MTEXT nội bộ dùng style riêng
+  // (Arial_2, RomanS...) không hề xuất hiện trong `entities`. Bỏ sót bước này khiến BLOCKS
+  // section ghi thực thể tham chiếu tới STYLE chưa từng khai báo trong bảng — AutoCAD từ chối
+  // mở tệp (dangling reference), trong khi `ezdxf` chỉ âm thầm xoá tham chiếu lỗi nên không lộ
+  // ra khi kiểm bằng ezdxf. Xác nhận thật trên bản vẽ MEPF 65MB: thiếu 20+ style, AutoCAD không
+  // mở lên được cho tới khi vá bằng đúng dòng quét thêm này.
+  // So khớp không phân biệt hoa/thường — cùng lý do đã sửa ở LTYPE phía trên (tên style trong
+  // AutoCAD cũng không phân biệt hoa/thường; định nghĩa trùng dù khác hoa/thường vẫn làm lệch
+  // nhịp đọc bảng theo đúng cơ chế đã xác nhận thật).
+  const styleNamesUpperSeen = new Set<string>(["STANDARD"]);
   const styleNames = new Set<string>(["STANDARD"]);
-  entities.forEach((e) => {
-    if (e.textStyle) styleNames.add(e.textStyle);
+  const addStyleName = (name?: string) => {
+    if (!name) return;
+    const key = name.toUpperCase();
+    if (!styleNamesUpperSeen.has(key)) {
+      styleNamesUpperSeen.add(key);
+      styleNames.add(name);
+    }
+  };
+  entities.forEach((e) => addStyleName(e.textStyle));
+  (parsed.blocks || []).forEach((b) => {
+    b.entities?.forEach((e) => addStyleName(e.textStyle));
   });
   than += openTable("STYLE", hStyleTab, styleNames.size);
   const styleHandles = new Map<string, string>();
@@ -3998,10 +4124,28 @@ export function exportDxf(
   than += "2\r\nACAD\r\n70\r\n0\r\n";
   than += "0\r\nENDTAB\r\n";
 
-  // Bảng DIMSTYLE khai lớp riêng (AcDbDimStyleTable) và đếm bằng mã 71
-  than += `0\r\nTABLE\r\n2\r\nDIMSTYLE\r\n5\r\n${hDimTab}\r\n330\r\n0\r\n100\r\nAcDbSymbolTable\r\n70\r\n1\r\n100\r\nAcDbDimStyleTable\r\n71\r\n1\r\n`;
-  than += tableRecordHead("DIMSTYLE", handles.take(), hDimTab, "AcDbDimStyleTableRecord");
-  than += `2\r\nSTANDARD\r\n70\r\n0\r\n40\r\n1.0\r\n140\r\n${real(defaultTextHeight)}\r\n`;
+  // Bảng DIMSTYLE khai lớp riêng (AcDbDimStyleTable) và đếm bằng mã 71 — cùng lỗi "tham chiếu
+  // treo" như STYLE/LTYPE ở trên: DIMENSION/LEADER (mã 3) có thể trỏ tới dimstyle khác STANDARD
+  // (VD dimstyle riêng do Revit xuất), phải khai đủ thay vì chỉ mỗi STANDARD.
+  // Cũng so khớp không phân biệt hoa/thường — cùng lý do đã sửa ở STYLE/LTYPE phía trên.
+  const dimStyleNamesUpperSeen = new Set<string>(["STANDARD"]);
+  const dimStyleNames = new Set<string>(["STANDARD"]);
+  const collectDimStyle = (name?: string) => {
+    if (!name) return;
+    const key = name.toUpperCase();
+    if (!dimStyleNamesUpperSeen.has(key)) {
+      dimStyleNamesUpperSeen.add(key);
+      dimStyleNames.add(name);
+    }
+  };
+  entities.forEach((e) => collectDimStyle(e.dimStyle));
+  (parsed.blocks || []).forEach((b) => b.entities?.forEach((e) => collectDimStyle(e.dimStyle)));
+
+  than += `0\r\nTABLE\r\n2\r\nDIMSTYLE\r\n5\r\n${hDimTab}\r\n330\r\n0\r\n100\r\nAcDbSymbolTable\r\n70\r\n1\r\n100\r\nAcDbDimStyleTable\r\n71\r\n${dimStyleNames.size}\r\n`;
+  dimStyleNames.forEach((name) => {
+    than += tableRecordHead("DIMSTYLE", handles.take(), hDimTab, "AcDbDimStyleTableRecord");
+    than += `2\r\n${name}\r\n70\r\n0\r\n40\r\n1.0\r\n140\r\n${real(defaultTextHeight)}\r\n`;
+  });
   than += "0\r\nENDTAB\r\n";
 
   than += openTable("BLOCK_RECORD", hBlkRecTab, blockRecordHandles.size + 2);

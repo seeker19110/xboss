@@ -81,6 +81,13 @@ echo "==> 4/7 Áp migration DB còn thiếu (idempotent, dừng deploy nếu l�
 # npm run db:migrate -- --dry-run
 npm run db:migrate
 
+echo "==> 4.7/7 Dựng cây thư mục bản vẽ quy chuẩn ISO 19650 (idempotent)"
+# Việc cấp phát môi trường, làm một lần lúc triển khai — KHÔNG làm trong route lúc người dùng
+# bấm Lưu. Để nó trong đồ thị import của route khiến Turbopack phải trace toàn bộ dự án khi
+# build ("Dynamic filesystem access causes tracing of the whole project"), mà build trên VPS
+# vốn đã 20-23 phút. Xem scripts/ensure-drawing-tree.ts.
+npm run setup:drawing-tree
+
 echo "==> 5/7 Build app vào thư mục tạm ($BUILD_DIR) — không đụng \".next\" đang phục vụ"
 rm -rf "$BUILD_DIR"
 NEXT_DIST_DIR="$BUILD_DIR" npm run build

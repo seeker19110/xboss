@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { readdirSync, statSync, readFileSync, existsSync } from "node:fs";
-import { join, basename, extname } from "node:path";
+import { join, basename, extname, normalize, sep, resolve } from "node:path";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import {
   parseDxf,
@@ -10,60 +10,33 @@ import {
 } from "@/lib/ky-thuat/cad/dxf-parser";
 import { queryOne } from "@/lib/db";
 import { storageGet } from "@/lib/nen/storage";
+import { GIOI_HAN_TEP_CAD, uocLuongByteTuBase64 } from "@/lib/ky-thuat/cad/gioi-han";
+import {
+  timTepBanVeTrenDia,
+  chonTepDuyNhat,
+  duongDanAnToan,
+  type TepUngVien,
+} from "@/lib/ky-thuat/cad/tim-ban-ve";
 
 export const dynamic = "force-dynamic";
 
-const DRAWINGS_DIR = join(process.cwd(), "data", "uploads", "drawings");
+const UPLOADS_DIR = join(process.cwd(), "data", "uploads");
+const DRAWINGS_DIR = join(UPLOADS_DIR, "drawings");
 
 /**
- * Tìm kiếm đệ quy tệp trong thư mục data/uploads/drawings
+ * Nhiều tệp cùng khớp → trả 409 kèm danh sách để người dùng chỉ đích danh qua `filePath`.
+ * Tuyệt đối không tự chọn hộ: chọn nhầm nghĩa là kỹ sư thi công theo bản vẽ của hệ khác.
  */
-function findRealFileOnDisk(
-  queryStr: string,
-): { fullPath: string; relativePath: string; fileName: string } | null {
-  if (!existsSync(DRAWINGS_DIR)) return null;
-
-  const cleanQuery = queryStr
-    .trim()
-    .toLowerCase()
-    .replace(/\.(dwg|dxf|pdf|bak)$/i, "");
-  const stack: string[] = [""];
-
-  while (stack.length > 0) {
-    const currentRel = stack.pop()!;
-    const currentFull = join(DRAWINGS_DIR, currentRel);
-    try {
-      const entries = readdirSync(currentFull, { withFileTypes: true });
-      for (const entry of entries) {
-        const relPath = currentRel ? `${currentRel}/${entry.name}` : entry.name;
-        if (entry.isDirectory()) {
-          stack.push(relPath);
-        } else if (entry.isFile()) {
-          const ext = extname(entry.name).toLowerCase();
-          if ([".dwg", ".dxf", ".pdf"].includes(ext)) {
-            const entryBase = basename(entry.name, ext).toLowerCase();
-            if (
-              entryBase === cleanQuery ||
-              entry.name.toLowerCase() === queryStr.toLowerCase() ||
-              entryBase.includes(cleanQuery) ||
-              cleanQuery.includes(entryBase) ||
-              relPath.toLowerCase().includes(queryStr.toLowerCase())
-            ) {
-              return {
-                fullPath: join(currentFull, entry.name),
-                relativePath: relPath,
-                fileName: entry.name,
-              };
-            }
-          }
-        }
-      }
-    } catch {
-      // skip unreadable directories
-    }
-  }
-
-  return null;
+function traLoiNhapNhang(danhSach: TepUngVien[]): NextResponse {
+  return NextResponse.json(
+    {
+      error:
+        `Tìm thấy ${danhSach.length} tệp cùng khớp — không thể tự chọn vì chọn nhầm nghĩa là ` +
+        `thi công theo bản vẽ sai. Hãy chỉ rõ tệp cần dùng.`,
+      candidates: danhSach.map((u) => u.relativePath),
+    },
+    { status: 409 },
+  );
 }
 
 // POST /api/engineering/cad/parse-dxf — Phân tích tệp CAD thật (DXF/DWG/PDF) hoặc nội dung tải lên
@@ -85,14 +58,28 @@ export async function POST(req: Request) {
 
     // 1. Nếu client truyền tệp Base64 (upload tệp nhị phân DWG / PDF / DXF trực tiếp)
     if (fileBase64) {
+      // Ước lượng kích thước thật TỪ CHUỖI base64 trước khi giải mã — giải mã rồi mới đo thì
+      // đã tốn đúng số bộ nhớ đang muốn tránh.
+      const uocLuong = uocLuongByteTuBase64(fileBase64);
+      if (uocLuong > GIOI_HAN_TEP_CAD) {
+        return NextResponse.json(
+          {
+            error:
+              `Tệp lớn hơn giới hạn ${Math.round(GIOI_HAN_TEP_CAD / 1024 / 1024)} MB ` +
+              `(tệp của bạn khoảng ${Math.round(uocLuong / 1024 / 1024)} MB). Hãy tách bản vẽ ` +
+              `theo tầng/hệ rồi chuẩn hoá từng phần.`,
+          },
+          { status: 413 },
+        );
+      }
       fileBuffer = Buffer.from(fileBase64, "base64");
       realFileFound = true;
     }
 
     // 2. Nếu truyền đường dẫn tệp cụ thể trên đĩa (filePath)
     if (!fileBuffer && body.filePath) {
-      const explicitPath = join(DRAWINGS_DIR, body.filePath);
-      if (existsSync(explicitPath) && statSync(explicitPath).isFile()) {
+      const explicitPath = duongDanAnToan(DRAWINGS_DIR, body.filePath);
+      if (explicitPath && existsSync(explicitPath) && statSync(explicitPath).isFile()) {
         fileBuffer = readFileSync(explicitPath);
         fileName = basename(explicitPath);
         sourcePath = body.filePath;
@@ -139,12 +126,17 @@ export async function POST(req: Request) {
             // Thử đọc trực tiếp trên đĩa cục bộ: bản tải lên thường nằm phẳng trong
             // data/uploads/, còn bản chuẩn hoá do save-drawing ghi nằm trong cây
             // data/uploads/drawings/<hệ>/<loại>/…
+            // Giá trị lấy từ DB nên rủi ro thấp hơn body client, nhưng vẫn đi qua cùng một cửa
+            // chặn thoát thư mục — phòng khi bản ghi cũ (trước khi save-drawing lọc tên) mang
+            // đường dẫn lạ.
+            // Bản tải lên nằm phẳng trong data/uploads/, bản chuẩn hoá nằm trong cây
+            // data/uploads/drawings/<hệ>/<loại>/… — hai thư mục gốc khác nhau nên kiểm theo
+            // đúng gốc của từng ứng viên, không gộp làm một.
             const diskCandidates = [
-              join(process.cwd(), "data", "uploads", rev.file_name),
-              join(DRAWINGS_DIR, rev.file_name),
-            ];
-            // Bản chuẩn hoá lưu qua lớp storage: đường dẫn theo cây ISO 19650 nằm ở cột iso_path
-            if (rev.iso_path) diskCandidates.push(join(DRAWINGS_DIR, rev.iso_path));
+              duongDanAnToan(UPLOADS_DIR, rev.file_name),
+              duongDanAnToan(DRAWINGS_DIR, rev.file_name),
+              rev.iso_path ? duongDanAnToan(DRAWINGS_DIR, rev.iso_path) : null,
+            ].filter((x): x is string => x !== null);
             for (const localFile of diskCandidates) {
               if (existsSync(localFile) && statSync(localFile).isFile()) {
                 fileBuffer = readFileSync(localFile);
@@ -159,11 +151,17 @@ export async function POST(req: Request) {
 
         // Nếu chưa có trong storage, tìm kiếm đệ quy trong thư mục data/uploads/drawings
         if (!fileBuffer) {
-          const diskMatch = findRealFileOnDisk(drawing.code) || findRealFileOnDisk(drawing.name);
-          if (diskMatch) {
-            fileBuffer = readFileSync(diskMatch.fullPath);
-            fileName = diskMatch.fileName;
-            sourcePath = diskMatch.relativePath;
+          // Tìm theo MÃ bản vẽ trước; chỉ khi mã không ra gì mới thử theo tên. Nhập nhằng ở
+          // bước nào thì dừng ngay ở bước đó — không rơi xuống bước sau để "may ra ra một cái",
+          // vì như thế là quay lại đúng kiểu đoán bừa vừa bỏ.
+          let ungVien = timTepBanVeTrenDia(DRAWINGS_DIR, drawing.code);
+          if (ungVien.length === 0) ungVien = timTepBanVeTrenDia(DRAWINGS_DIR, drawing.name);
+          const chon = chonTepDuyNhat(ungVien);
+          if (chon.loai === "nhap_nhang") return traLoiNhapNhang(chon.danhSach);
+          if (chon.loai === "duy_nhat") {
+            fileBuffer = readFileSync(chon.tep.fullPath);
+            fileName = chon.tep.fileName;
+            sourcePath = chon.tep.relativePath;
             realFileFound = true;
           }
         }
@@ -172,11 +170,12 @@ export async function POST(req: Request) {
 
     // 4. Nếu truyền fileName hoặc chưa tìm thấy, thử tìm trên đĩa theo fileName
     if (!fileBuffer && !dxfContent && fileName) {
-      const diskMatch = findRealFileOnDisk(fileName);
-      if (diskMatch) {
-        fileBuffer = readFileSync(diskMatch.fullPath);
-        fileName = diskMatch.fileName;
-        sourcePath = diskMatch.relativePath;
+      const chon = chonTepDuyNhat(timTepBanVeTrenDia(DRAWINGS_DIR, fileName));
+      if (chon.loai === "nhap_nhang") return traLoiNhapNhang(chon.danhSach);
+      if (chon.loai === "duy_nhat") {
+        fileBuffer = readFileSync(chon.tep.fullPath);
+        fileName = chon.tep.fileName;
+        sourcePath = chon.tep.relativePath;
         realFileFound = true;
       }
     }

@@ -13,6 +13,70 @@ import type {
   WcsConfig,
 } from "../types";
 
+// Trích các đoạn thẳng thật từ LINE lẫn từng cặp đỉnh liên tiếp của LWPOLYLINE/POLYLINE —
+// trước đây chỉ quét LINE nên bỏ sót phần lớn hình học (đa tuyến chiếm đa số bản vẽ MEPF thật).
+// `isLine=false` đánh dấu đoạn con của polyline — ngưỡng "0mm" của nó khác LINE đứng riêng lẻ,
+// xem lý do trong countZeroLengthAndOverlapping. Export để useCadHealthScore.ts dùng lại tổng
+// số đoạn làm mẫu số điểm hình học (không phải tổng số thực thể — 1 polyline = nhiều đoạn).
+export function extractLineSegments(
+  entities: DxfParseResult["entities"],
+): Array<{ x1: number; y1: number; x2: number; y2: number; isLine: boolean }> {
+  const segments: Array<{ x1: number; y1: number; x2: number; y2: number; isLine: boolean }> = [];
+  for (const e of entities) {
+    if (e.type === "LINE" && e.coordinates.start && e.coordinates.end) {
+      const [x1, y1] = e.coordinates.start;
+      const [x2, y2] = e.coordinates.end;
+      segments.push({ x1, y1, x2, y2, isLine: true });
+    } else if (
+      (e.type === "LWPOLYLINE" || e.type === "POLYLINE") &&
+      e.coordinates.points &&
+      e.coordinates.points.length >= 2
+    ) {
+      const pts = e.coordinates.points;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const [x1, y1] = pts[i];
+        const [x2, y2] = pts[i + 1];
+        segments.push({ x1, y1, x2, y2, isLine: false });
+      }
+    }
+  }
+  return segments;
+}
+
+// Đếm nét 0mm và nét trùng đè (khớp toạ độ đầu/cuối chính xác, không phân biệt chiều vẽ)
+// từ toàn bộ đoạn thẳng thật (LINE + đoạn con của polyline).
+//
+// Ngưỡng "0mm" khác nhau giữa LINE và đoạn con polyline: đo thật trên bản vẽ MEPF 65MB
+// cho thấy ~43% đoạn con polyline ngắn hơn 1mm — đó là tessellation bình thường của cung
+// tròn (nhiều đỉnh sát nhau), không phải rác. LINE đứng riêng lẻ dài <1mm mới coi là rác
+// thật; đoạn polyline chỉ coi là 0mm khi 2 đỉnh liên tiếp trùng gần như tuyệt đối.
+function countZeroLengthAndOverlapping(entities: DxfParseResult["entities"]): {
+  zeroLength: number;
+  overlapping: number;
+} {
+  const segments = extractLineSegments(entities);
+  const seen = new Map<string, number>();
+  let zeroLength = 0;
+  let overlapping = 0;
+
+  for (const { x1, y1, x2, y2, isLine } of segments) {
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    if (len < (isLine ? 1 : 0.01)) {
+      zeroLength++;
+      continue;
+    }
+    const key = `${Math.round(x1)},${Math.round(y1)}-${Math.round(x2)},${Math.round(y2)}`;
+    const revKey = `${Math.round(x2)},${Math.round(y2)}-${Math.round(x1)},${Math.round(y1)}`;
+    if (seen.has(key) || seen.has(revKey)) {
+      overlapping++;
+    } else {
+      seen.set(key, 1);
+    }
+  }
+
+  return { zeroLength, overlapping };
+}
+
 const emptyPurgeState = (): PurgeState => ({
   isPurged: false,
   overlappingCount: 0,
@@ -148,12 +212,13 @@ export function useCadStandardization({
       onFontSampleDetected(mTexts[0].raw, mTexts[0].decoded);
     }
 
-    // 3. Đồng bộ Blocks thật
+    // 3. Đồng bộ Blocks thật — giữ nguyên mappedBoqCode mà dxf-parser đã tự suy luận
+    // (map theo tên DIFFUSER/VAV/SPRINKLER/VALVE/PANEL...), không gán cứng rỗng.
     const mBlocks = (dxfData.blocks || []).map((b, idx) => ({
       id: `BLK-${idx + 1}`,
       name: b.name,
       count: b.count,
-      mappedBoqCode: "",
+      mappedBoqCode: b.mappedBoqCode || "",
       customName: b.name,
     }));
     setManualBlocks(mBlocks);
@@ -171,25 +236,7 @@ export function useCadStandardization({
     setDimOverrides(mDims);
 
     // 5. Tính toán metrics dọn rác (Purge) thật
-    let zeroLen = 0;
-    let overlapping = 0;
-    const lineMap = new Map<string, number>();
-
-    dxfData.entities.forEach((e) => {
-      if (e.type === "LINE" && e.coordinates.start && e.coordinates.end) {
-        const [x1, y1] = e.coordinates.start;
-        const [x2, y2] = e.coordinates.end;
-        const len = Math.hypot(x2 - x1, y2 - y1);
-        if (len < 1) zeroLen++;
-        const key = `${Math.round(x1)},${Math.round(y1)}-${Math.round(x2)},${Math.round(y2)}`;
-        const revKey = `${Math.round(x2)},${Math.round(y2)}-${Math.round(x1)},${Math.round(y1)}`;
-        if (lineMap.has(key) || lineMap.has(revKey)) {
-          overlapping++;
-        } else {
-          lineMap.set(key, 1);
-        }
-      }
-    });
+    const { zeroLength: zeroLen, overlapping } = countZeroLengthAndOverlapping(dxfData.entities);
 
     const emptyLayers = (dxfData.layers || []).filter((l) => l.entityCount === 0).length;
     const anonBlocks = (dxfData.blocks || []).filter(
@@ -250,17 +297,40 @@ export function useCadStandardization({
         const revKey = `${Math.round(x2)},${Math.round(y2)}-${Math.round(x1)},${Math.round(y1)}`;
         if (seenLines.has(key) || seenLines.has(revKey)) return false;
         seenLines.add(key);
+      } else if (
+        (e.type === "LWPOLYLINE" || e.type === "POLYLINE") &&
+        e.coordinates.points &&
+        e.coordinates.points.length >= 2
+      ) {
+        // Đa tuyến suy biến hoàn toàn về 1 điểm (mọi đoạn con < 1mm) — rác thật, loại bỏ cả
+        // thực thể. Đa tuyến chỉ trùng đè MỘT PHẦN với đoạn khác không xoá tự động ở đây (xoá
+        // nhầm sẽ làm mất hình học hợp lệ) — vẫn còn trong overlappingCount sau khi dọn.
+        const pts = e.coordinates.points;
+        const totalLen = pts
+          .slice(1)
+          .reduce((sum, [x2, y2], i) => sum + Math.hypot(x2 - pts[i][0], y2 - pts[i][1]), 0);
+        if (totalLen < 1) return false;
       }
       return true;
     });
 
     const removed = dxfData.entities.length - cleanedEntities.length;
+    const remaining = countZeroLengthAndOverlapping(cleanedEntities);
     setDxfData({
       ...dxfData,
       entities: cleanedEntities,
     });
-    setPurgeState((prev) => ({ ...prev, isPurged: true, overlappingCount: 0, zeroLengthCount: 0 }));
-    showToast(`✓ Đã dọn sạch ${removed} thực thể rác (nét trùng đè & nét 0mm)!`);
+    setPurgeState((prev) => ({
+      ...prev,
+      isPurged: true,
+      overlappingCount: remaining.overlapping,
+      zeroLengthCount: remaining.zeroLength,
+    }));
+    showToast(
+      remaining.overlapping > 0
+        ? `✓ Đã dọn ${removed} thực thể rác. Còn ${remaining.overlapping} đoạn đa tuyến trùng đè một phần cần kiểm tra thủ công.`
+        : `✓ Đã dọn sạch ${removed} thực thể rác (nét trùng đè & nét 0mm)!`,
+    );
   };
 
   const handleAlignWcsOrigin = () => {

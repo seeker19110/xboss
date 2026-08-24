@@ -670,7 +670,7 @@ export default function CadViewportStudio({
                           textAnchor="middle"
                           fontWeight="bold"
                         >
-                          ⚠ Nét Trùng Đè ({purgeState.overlappingCount || 142})
+                          ⚠ Nét Trùng Đè ({purgeState.overlappingCount})
                         </text>
                       </g>
                     )}

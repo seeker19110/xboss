@@ -17,6 +17,364 @@ Người dùng yêu cầu (2026-08-24): bổ sung **BOCKL (bóc tách khối lư
 - **CI:** job mới `plugin (dotnet Core/Tests)` — gate TargetFramework `net8.0*` (M99 §9.1) + `dotnet test` Core trên ubuntu (SDK 8 có sẵn trên runner); gộp vào check tổng `ci`.
 - **Chưa làm (giữ trình tự M99):** PR2 `api_tokens`/`XBOSS_LOGIN` (vùng rủi ro cao, rà `docs/audit.md` khi làm), PR5 upload + kiểm định ezdxf, PR6 batch + bảng điều khiển web + bỏ tầng 1, PR7 test tích hợp `accoreconsole` (chặn bởi runner Windows có license — M99 §18). **Việc phải làm trước bản cài đầu tiên:** xác minh runtime `acmgd.dll` 2026 + `ACADVER` trên máy thật (M99 §9.1).
 
+## STYLE/LTYPE/DIMSTYLE thiếu tên bên trong BLOCK — tệp xuất ra AutoCAD từ chối mở (2026-08-24)
+
+Người dùng tự test trang `/engineering/chuan-hoa-ban-ve` với bản vẽ MEPF thật (`TMDV 3F.dxf`,
+40.703 thực thể, 65,8 MB): bấm "Tải về file .DXF" xong **AutoCAD không mở được** — nặng hơn lỗi
+màn hình trắng đã sửa ở PR #384 (lần đó AutoCAD vẫn mở được, chỉ là khung nhìn cắm cứng).
+
+**Nguyên nhân:** `exportDxf` dựng 3 bảng STYLE/LTYPE/DIMSTYLE bằng cách quét `parsed.entities`
+(chỉ thực thể ở CẤP MODEL SPACE) để gom tên kiểu chữ/linetype/dimstyle cần khai báo. Block thiết
+bị (thường xuất từ Revit, VD `VHT_Tag_T...`) mang MTEXT **nội bộ bên trong định nghĩa BLOCK**
+dùng style riêng (`Arial_2`, `RomanS`...) — không nằm trong `parsed.entities`, nên không bao giờ
+được thêm vào bảng STYLE. Tương tự, layer/DIMENSION có thể dùng linetype/dimstyle ngoài 4 loại
+dựng sẵn (VD linetype nhập từ XREF). Kết quả: BLOCKS section ghi thực thể **tham chiếu tới
+STYLE/LTYPE/DIMSTYLE chưa từng khai báo trong bảng** — dangling reference, AutoCAD từ chối mở.
+
+**Vì sao lọt qua cả `ezdxf`:** `ezdxf.audit()` không báo lỗi (`errors: 0`) mà chỉ âm thầm "vá"
+bằng cách xoá tham chiếu hỏng (`fixes: 455` trên file thật, toàn bộ là
+`Removed undefined text style "..." from MTEXT(...)`) — đúng bài học đã ghi nhận ở PR #384:
+"Hợp lệ (theo ezdxf) ≠ dùng được (mở lên trong AutoCAD)".
+
+**Sửa:** cả 3 bảng nay quét thêm `parsed.blocks[].entities` (không chỉ `parsed.entities`); LTYPE
+còn quét thêm `layers[].lineType` và `entities[].lineType` (linetype có thể gắn trực tiếp lên
+thực thể, không chỉ qua layer). Xác nhận bằng `ezdxf.audit()` trên file thật: **455 fix → 0**.
+Test hồi quy `exportDxf: STYLE/LTYPE/DIMSTYLE khai đủ tên mà thực thể tham chiếu, kể cả bên trong
+BLOCK` — đỏ khi lùi về code cũ, xanh sau khi vá.
+
+**Nhân tiện đợt này (do người dùng yêu cầu xác thực chéo bằng ezdxf), sửa thêm 4 lỗi correctness
+tìm được khi review trang chuẩn hoá bản vẽ:**
+
+- `useCadStandardization.ts`: block đồng bộ từ `dxfData.blocks` gán cứng `mappedBoqCode: ""` thay
+  vì dùng giá trị `dxf-parser.ts` đã tự suy luận — điểm "Định Danh Block BOQ" luôn ra 0% dù parser
+  nhận diện được block.
+- `CadViewportStudio.tsx`: `purgeState.overlappingCount || 142` — fallback số giả khi giá trị thật
+  là 0 (dùng `||` thay vì kiểm tra rõ ràng).
+- Thuật toán "Nét Trùng Đè"/"Nét 0mm" trước đây chỉ quét entity `LINE`, bỏ qua hoàn toàn đoạn con
+  của `LWPOLYLINE`/`POLYLINE` (chiếm đa số hình học bản vẽ MEPF thật) — nay quét đủ, với ngưỡng
+  "0mm" khác nhau giữa LINE đứng riêng (thật là rác) và đoạn polyline (tessellation cung tròn bình
+  thường, đo thật thấy ~43% đoạn polyline < 1mm không phải rác).
+- Công thức điểm hình học phạt cố định 5 điểm/lỗi, không chuẩn hoá theo tổng số đoạn — bản vẽ vài
+  chục nghìn thực thể chỉ cần ~16 lỗi (dưới 0,1%) đã rơi thẳng xuống sàn. Nay phạt theo tỷ lệ trên
+  tổng số ĐOẠN (không phải tổng số thực thể — 1 polyline nhiều đỉnh là 1 thực thể nhưng hàng chục
+  đoạn).
+
+**Xác thực chéo bằng ezdxf ở server (mepf-worker):** module mới `mepf-worker/src/cad_health_check.py`
+tính điểm sức khỏe 6D bằng `ezdxf` thật (đọc file qua `cad_loader.load_drawing`, tái dùng
+`cad_standards.match_layer`/`match_block`), chạy qua hàng đợi task có sẵn
+(`engineering_async_tasks`, task type mới `mepf.cad.health_check`, đăng ký cả trong
+`SUPPORTED_TASK_TYPES` lẫn `TASK_HANDLERS` của `scripts/mepf/worker_entry.py`) — không cần route
+Next.js mới, tái dùng đúng `POST /api/engineering/queue/upload` + `GET .../tasks/[id]/progress`
+đã có sẵn. Nút "Xác Thực Bằng ezdxf (Server)" mới trong `DiagnosticPurgePanel.tsx`
+(`useCadServerVerification.ts`). Trần dung lượng route upload chung nâng lên
+`GIOI_HAN_TEP_CAD` (150MB) riêng cho task loại `mepf.cad.*` — file MEPF thật đo được 65MB, vượt
+trần 50MB mặc định cũ của route.
+
+Test trên file thật phát hiện thêm 2 lỗi trong chính module Python mới (sửa ngay, không đợi PR
+sau): `_layer_score` chỉ so khớp layer với từ điển từ khoá cố định của `cad_standards.py`, không
+nhận ra layer **đã đúng tiền tố quy ước** (VD `P-PIPE-3`, `M-EQPM`) nếu tên cụ thể không nằm sẵn
+trong từ điển — báo sai 0% cho layer thực ra đã chuẩn; và mẫu số điểm hình học ban đầu dùng tổng
+số thực thể thay vì tổng số đoạn (cùng lớp lỗi với bản TS ở trên).
+
+**Nợ kỹ thuật phát hiện, đã sửa luôn:** `next.config.mjs` gắn `Cache-Control: immutable, max-age=1
+năm` cho `/_next/static/*` không phân biệt dev/production — đúng cảnh báo Next.js tự in ra lúc
+khởi động (`Custom Cache-Control headers detected... can break Next.js development behavior`).
+Xác nhận thật: sửa code nhiều vòng, xoá cả `.next`, trình duyệt vẫn phục vụ bundle JS từ trước khi
+sửa (Turbopack dev đặt tên chunk ổn định theo đường dẫn, không hash theo nội dung như production).
+Đã sửa: header immutable giờ chỉ áp dụng khi `NODE_ENV === "production"`.
+
+**Vòng 3 cùng ngày — vẫn "drawing discarded" sau vòng 2, nguyên nhân khác hẳn.** Trước khi đoán
+tiếp, đối chiếu số bản ghi khai ở header với số bản ghi thật của **mọi** bảng trong TABLES section
+(VPORT/LTYPE/LAYER/STYLE/VIEW/UCS/APPID/DIMSTYLE/BLOCK_RECORD) — tất cả khớp, chứng minh vòng 2
+không phải nguyên nhân của lỗi lần này (dù vẫn là bản vá đúng, cần thiết). Đọc kỹ vị trí dòng
+AutoCAD báo lỗi trong tệp thật: dòng đó là **bản ghi LAYER kế tiếp**, không phải bên trong
+Defpoints — tức AutoCAD đọc XONG record Defpoints rồi mới hồi tố báo record đó thiếu trường bắt
+buộc. Nguyên nhân: mã 290 (cờ in) vốn TUỲ CHỌN với layer thường (thiếu thì mặc định có in), nhưng
+AutoCAD đòi hỏi TƯỜNG MINH cho layer đặc biệt `Defpoints` (do chính AutoCAD tự tạo, quy ước luôn
+không in) — bộ ghi trước đây không ghi mã 290 cho bất kỳ layer nào. Sửa: mọi layer nay khai tường
+minh mã 290 (`Defpoints` = 0, còn lại = 1).
+
+**Vòng 4 cùng ngày — qua được LAYER, chết ở DIMSTYLE: "Bad handle 107: already in use —
+eHandleInUse".** Đọc tệp tại đúng dòng lỗi: bản ghi DIMSTYLE mở đầu bằng `5\n979` — nhưng bản ghi
+DIMSTYLE là loại DUY NHẤT trong DXF dùng mã nhóm **105** cho handle thay vì mã 5 (quirk kinh điển,
+di sản từ đời DXF cũ khi mã 5 trong ngữ cảnh DIMSTYLE mang nghĩa khác). `tableRecordHead` dùng
+chung mã 5 cho mọi bảng nên AutoCAD không nhận ra handle của record, lẫn sang handle 107 của chính
+bảng DIMSTYLE → "already in use" → huỷ bản vẽ. Sửa: `tableRecordHead` phát mã 105 riêng cho
+DIMSTYLE. Test hồi quy kiểm mọi bản ghi DIMSTYLE phải mở đầu bằng mã 105.
+
+**Vòng 5 cùng ngày — "Missing Default entry ByLayer in SymbolTable:LTYPE".** Bảng LTYPE phải mở
+đầu bằng 2 bản ghi đặc biệt bắt buộc `ByBlock` và `ByLayer` theo spec R2000 — mảng linetype dựng
+sẵn chỉ có CONTINUOUS/CENTER/HIDDEN/DASHED. Điểm đáng ghi nhất: **ezdxf đánh lừa ở đúng chỗ này**
+— lần kiểm vòng 2 nó liệt kê `ByBlock`/`ByLayer` trong `doc.linetypes` như thể có trong tệp, nhưng
+đó là bản ghi ẢO ezdxf tự cấp khi đọc; tệp thật không có, audit vẫn 0 lỗi. Sửa: thêm 2 bản ghi vào
+đầu mảng dựng sẵn; test hồi quy + script kiểm nay đối chiếu THẲNG trên chuỗi tệp thay vì tin ezdxf.
+
+**Vòng 6 cùng ngày — qua HẾT các bảng TABLES, chết ở entity HATCH: "expected group code 98".**
+Bộ ghi phát mã 47 (pixel size) trước mã 98 (số seed point) — spec liệt kê 47 là TUỲ CHỌN ở đúng vị
+trí đó, nhưng AutoCAD thật từ chối thẳng. Cách tìm ra: đối chiếu HATCH lỗi trong tệp xuất với
+HATCH GỐC cùng toạ độ do chính AutoCAD R2018 ghi trong bản vẽ nguồn — bản gốc không hề có mã 47,
+kết thúc bằng `98/1` + seed point (0,0) ngay sau mã 76. Sửa: bỏ mã 47, bắt chước đúng cách AutoCAD
+tự ghi (1.521 HATCH trong tệp xuất đều được kiểm thẳng trên chuỗi). Bài học bổ sung: khi spec và
+hành vi AutoCAD thật vênh nhau, **tin AutoCAD thật** — và bản vẽ nguồn (do AutoCAD ghi) chính là
+"đáp án mẫu" tốt nhất để đối chiếu từng mã nhóm.
+
+**✅ KẾT QUẢ CHỐT (2026-08-24, sau vòng 6): người dùng mở tệp xuất bằng AutoCAD thật — MỞ ĐƯỢC.**
+Đây là lần ĐẦU TIÊN bản vẽ MEPF thật (40.703 thực thể, 65,8 MB) đi trọn vòng: nạp vào XBoss →
+chuẩn hoá → xuất DXF → mở thành công trong AutoCAD. Mối lo ghi ở PR #384 ("Vẫn chưa ai mở tệp ĐÃ
+SỬA bằng AutoCAD") coi như đã trả xong nợ — bằng 6 bản vá nối tiếp, mỗi bản đều có test hồi quy
+chứng minh bắt được lỗi cũ.
+
+**Bài học rút ra sau 6 vòng cùng một triệu chứng "drawing discarded":** `ezdxf.audit()` không bắt
+được lỗi NÀO trong cả sáu (0 errors mỗi lần) — công cụ kiểm hợp lệ không thay được việc mở thử
+bằng chính AutoCAD thật, và tệ hơn: ezdxf còn TỰ CẤP bản ghi mặc định ảo khi đọc (ByBlock/ByLayer)
+khiến kiểm qua nó dương tính giả. Từ nay mọi thay đổi ở `exportDxf` phải kèm bằng chứng đối chiếu
+SỐ BẢN GHI header vs thực tế cho mọi bảng ĐỌC THẲNG TRÊN CHUỖI TỆP (không qua ezdxf), và nghi ngờ
+trước tiên (a) các "layer/style/linetype đặc biệt do chính AutoCAD định nghĩa" (Defpoints,
+Standard, Continuous, ByLayer, ByBlock...) — nhóm này vừa có quy ước khắt khe hơn (Defpoints cần
+mã 290 tường minh) vừa có mục BẮT BUỘC PHẢI TỒN TẠI (ByBlock/ByLayer trong LTYPE); và (b) các
+ngoại lệ mã nhóm per-bảng của spec DXF (DIMSTYLE handle = 105 là ví dụ điển hình).
+
+**Vòng 2 (xảy ra trước vòng 3) cùng ngày — bản vá STYLE/LTYPE/DIMSTYLE ở trên tự sinh lỗi MỚI, nặng hơn.** Người dùng
+gửi file xuất từ code đã vá cho AutoCAD thật mở thử: `Skipping duplicate definition of Continuous
+in LTYPE Table` rồi `Invalid or incomplete DXF input -- drawing discarded`. Nguyên nhân: bản vá so
+khớp tên linetype/style/dimstyle **phân biệt hoa/thường**, trong khi AutoCAD **không** — layer
+dùng `Continuous` (đúng cách AutoCAD ghi tên linetype dựng sẵn) bị coi khác với `CONTINUOUS` (mảng
+cứng viết toàn hoa trong code), tạo 2 bản ghi LTYPE trùng tên khác hoa/thường. AutoCAD tự bỏ bớt
+bản ghi trùng lúc mở → **số bản ghi thật ít hơn số khai ở header bảng** (mã 70) → lệch nhịp đọc →
+hỏng lây bảng LAYER đọc ngay sau đó → huỷ cả bản vẽ. Sửa: so khớp cả 3 bảng (STYLE/LTYPE/DIMSTYLE)
+đều không phân biệt hoa/thường (so trên bản `.toUpperCase()`, giữ nguyên chữ hoa/thường gốc khi
+ghi ra bảng). Thêm test hồi quy riêng cho đúng cơ chế này — đối chiếu số bản ghi LTYPE thật với số
+khai ở header, không chỉ kiểm tên có mặt hay không (bài học: test trước chỉ kiểm "có khai tên" là
+chưa đủ, phải kiểm cả _số lượng bản ghi khớp header_ mới bắt được lớp lỗi lệch nhịp đọc này).
+
+## Bảng mã 8 bit ở ĐƯỜNG CLIENT — chữ tiếng Việt mất ngay bước đọc tệp (2026-08-24)
+
+Truy tiếp vì sao bản vẽ 50 MB của người dùng xuất ra không mở được, và tìm ra một lỗi khác hẳn giả
+thuyết bộ nhớ.
+
+**Máy chủ** xử lý bảng mã cũ rất cẩn thận: route truyền thẳng `Buffer` cho `parseDxf`, `parseDxf`
+gọi `decodeDxfBytes` (UTF-8 nghiêm ngặt, hỏng thì lui về latin1 thuần), rồi Bác Sĩ Font suy ra
+TCVN3/VNI. Đây chính là lỗi đã sửa ở đợt trước.
+
+**Client thì chưa bao giờ.** Trang chuẩn hoá đọc tệp bằng `FileReader.readAsText()` — hàm này
+không truyền tham số bảng mã thì **mặc định UTF-8**, và byte không hợp lệ bị thay bằng `\uFFFD`
+**không thể khôi phục**. Bản vẽ Việt Nam đời cũ mất sạch chữ có dấu ngay tại đây, trước khi Bác Sĩ
+Font kịp nhìn thấy byte gốc.
+
+Và **thay đổi tối ưu ngay trước đó của tôi làm lỗi này nặng hơn**: sau khi bỏ lượt POST lên máy
+chủ, đường client trở thành đường **duy nhất** cho tệp DXF nạp cục bộ — tức mất luôn đường lui vô
+tình che lỗi này bấy lâu.
+
+**Chứng minh, không suy đoán.** Dựng DXF hợp lệ có dòng TEXT ghi bằng byte TCVN3 (0xE8, 0xE3, 0xE5,
+0xE1):
+
+| Đường                                       | Chữ đọc được                                        |
+| ------------------------------------------- | --------------------------------------------------- |
+| Cũ (`readAsText` → ép UTF-8)                | `"�ng gi� c�p l�nh"` — byte gốc bị vứt              |
+| Mới (`readAsArrayBuffer` → `giaiMaByteDxf`) | `"èng giã cåp lánh"` — byte gốc `U+00E8` giữ nguyên |
+
+**Sửa:** thêm `giaiMaByteDxf(bytes: Uint8Array)` — bản **không phụ thuộc `Buffer`** của
+`decodeDxfBytes`, chạy được cả ở trình duyệt; `decodeDxfBytes` nay chỉ là lớp mỏng gọi nó. Client
+đổi sang `readAsArrayBuffer` rồi giải mã bằng chính hàm đó.
+
+Nhánh dự phòng **cố ý tự map byte → mã điểm** thay vì `new TextDecoder("latin1")`: nhãn `"latin1"`
+của WHATWG thực chất là windows-1252, khác latin1 thật ở dải 0x80–0x9F — **đúng dải bảng mã VNI
+dùng**. Dùng nhầm là hỏng đúng thứ đang muốn cứu.
+
+**Lưu ý về phạm vi bản vá:** nó bảo đảm **byte gốc còn nguyên** để Bác Sĩ Font có nguyên liệu làm
+việc — điều kiện cần. Việc Bác Sĩ Font có tự nhận ra TCVN3 hay không lại do cổng `TCVN3_SIGNATURE`
+quyết (thêm có chủ đích ở đợt trước để giữ tính idempotent), và cổng đó không mở với mọi chuỗi.
+Đó là chuyện khác, chưa động tới.
+
+4 ca test hồi quy, gồm một ca đối chiếu **bắt buộc đường cũ phải hỏng** — nếu không thì bài test vô
+nghĩa.
+
+## Nạp bản vẽ lớn: bỏ 3 trong 4 lượt xử lý thừa lúc nạp (2026-08-24)
+
+Người dùng ban đầu nói tệp gần/vượt 150 MB, sau đó **đính chính: bản vẽ thật ~50 MB**. Đo lại đường nạp tệp DXF cục
+bộ thì thấy cùng một bản vẽ bị xử lý **bốn lượt nặng**, ba trong đó không ai dùng tới:
+
+| Lượt | Việc                                                                                                                    | Có cần không |
+| ---- | ----------------------------------------------------------------------------------------------------------------------- | ------------ |
+| 1    | `readAsText` → chuỗi JS (UTF-16, gấp đôi cỡ tệp)                                                                        | cần          |
+| 2    | `parseDxf` → cây thực thể                                                                                               | cần          |
+| 3    | `exportDxf` → dựng **toàn bộ chuỗi xuất** ngay lúc nạp                                                                  | **không**    |
+| 4    | `JSON.stringify` cả chuỗi gốc rồi POST lên máy chủ, máy chủ `parseDxf` **lại**, kết quả **ghi đè** `dxfData` của lượt 2 | **không**    |
+
+Lượt 4 khiến lượt 2 thành ra chỉ để phục vụ lượt 3. Kiểm từng chỗ tiêu thụ trước khi bỏ:
+`conversionInfo.dxfContent` chỉ là **đường lui** khi `dxfData` rỗng (cả `useCadExporters.ts:62`
+lẫn `useSmartNaming.ts:74` đều ưu tiên `exportDxf(dxfData)`), mà nạp cục bộ thì `dxfData` luôn có;
+`scrScript` máy chủ trả về chỉ là `generateStandardizedAutocadScript(layers)` — hàm thuần, chạy
+thẳng ở client được; `isRealDrawing`/`fileSizeBytes` đặt tại chỗ theo đúng công thức máy chủ dùng.
+
+**Đo thật** (dựng bản vẽ N nét, chạy trên Node, `heapUsed`):
+
+| Cỡ tệp     | Chỉ `parseDxf`            | Cả đường cũ (parse + export + JSON body) |
+| ---------- | ------------------------- | ---------------------------------------- |
+| 12,2 MB    | 261 MB                    | 365 MB                                   |
+| 36,9 MB    | 754 MB                    | 1 536 MB                                 |
+| **150 MB** | **~3,1 GB** _(ngoại suy)_ | **~6,2 GB** _(ngoại suy)_                |
+
+Tỉ lệ gần tuyến tính, hệ số phình ~20× cho riêng bước parse và ~42× cho cả đường cũ.
+
+**Kết quả:** bỏ lượt 3 và 4 cắt khoảng **một nửa** bộ nhớ đỉnh, và bỏ hẳn cú POST vài trăm MB.
+Trần dung lượng nâng 150 → **300 MB** cho khớp cỡ bản vẽ thật của dự án.
+
+**Đính chính một kết luận vội của chính tôi.** Khi còn tưởng tệp là 150 MB, tôi ngoại suy ra ~3,1 GB
+và kết luận "tab trình duyệt không trụ nổi". Đo thẳng ở **50,5 MB** — cỡ thật — thì đường cũ chỉ
+tốn **1,4 GB**, mức một tab Chrome vẫn chịu được. Nên **bộ nhớ nhiều khả năng KHÔNG phải nguyên
+nhân** khiến tệp của người dùng hỏng. Việc tối ưu vẫn đáng làm (bỏ 3 lượt thừa, nhanh hơn ~3× lúc
+nạp), nhưng nó **không** phải bản vá cho lỗi đang gặp. Nguyên nhân thật, xem mục dưới.
+
+### Nợ kỹ thuật — hướng xử lý triệt để, cần người dùng chốt
+
+Ba hướng, chưa làm vì đều là quyết định kiến trúc:
+
+1. **Parse theo luồng (streaming), không giữ cả tệp trong bộ nhớ.** Đọc tệp theo khối, sinh thực
+   thể dần. Sửa sâu trong `parseDxf`, nhưng giữ nguyên mọi thứ khác.
+2. **Đẩy parse về máy chủ**, tải lên dạng nhị phân (multipart) thay vì base64/JSON. Máy chủ khoẻ
+   hơn tab trình duyệt, nhưng vẫn cần streaming nếu không muốn ngốn 3 GB RAM VPS.
+3. **Không parse cả bản vẽ ở client**: máy chủ trả về bản tóm tắt (layer, khung bao, thống kê) để
+   hiển thị, chỉ nạp hình học khi thật sự cần vẽ.
+
+Ngoài ra `save-drawing` vẫn nhận `fileContent` qua **body JSON** — lưu một bản vẽ lớn lên máy chủ
+vẫn là cú POST vài trăm MB. Nên chuyển sang multipart nhị phân cùng đợt với hướng nào được chọn.
+
+## Đợt audit quy trình chuẩn hoá bản vẽ 2D (2026-08-24)
+
+Rà theo `docs/audit.md` toàn bộ đường chuẩn hoá bản vẽ 2D: 8 route `app/api/engineering/cad/*`,
+`lib/ky-thuat/cad/*`, trang `/engineering/chuan-hoa-ban-ve`. **Mọi phát hiện đều xác nhận bằng cách
+chạy thử**, không phải đọc code rồi suy đoán.
+
+### 🔴 Cao — chọn bản vẽ A, hệ thống trả về bản vẽ B, âm thầm
+
+`findRealFileOnDisk` (cũ, trong `parse-dxf/route.ts`) khớp tên bằng 5 điều kiện OR, trong đó
+`cleanQuery.includes(entryBase)` — "mã bản vẽ có chứa tên tệp" — khiến **mọi tệp tên ngắn khớp mọi
+mã**. Tái hiện thật:
+
+```
+tìm "HVAC-01" ↔ A.dxf   => KHỚP   (tên 1 ký tự, hệ PCCC)
+tìm "HVAC-01" ↔ V.dxf   => KHỚP   (tên 1 ký tự, hệ điện)
+tìm "HVAC-01" ↔ 0.dxf   => KHỚP   (tệp nháp)
+```
+
+Hàm còn duyệt bằng ngăn xếp LIFO và trả **ứng viên đầu tiên gặp**, nên kết quả phụ thuộc thứ tự
+đọc thư mục. Kết quả nhận về mang cờ `isRealDrawing: true`, không cảnh báo gì. Với app thi công
+MEPF, đó là lắp sai theo bản vẽ sai — **cùng lớp hậu quả với đợt "bỏ dữ liệu bịa"**, chỉ khác cơ
+chế: trước là máy vẽ ra nét không có thật, giờ là máy đưa nhầm bản vẽ có thật của hệ khác.
+
+**Sửa:** viết lại thành `lib/ky-thuat/cad/tim-ban-ve.ts`, chỉ chấp nhận hai kiểu khớp và **không
+bao giờ** khớp theo chiều "mã chứa tên tệp": `chinh_xac` (trùng khít) và `tien_to` (mã + dấu phân
+cách, chỉ khi mã dài ≥ 4 ký tự). Trả **mọi** ứng viên thay vì dừng ở cái đầu; nhiều ứng viên cùng
+hạng → route trả **409 kèm danh sách** để người dùng chỉ đích danh, tuyệt đối không tự chọn.
+
+### 🟡 Đọc tệp tuỳ ý ngoài thư mục bản vẽ
+
+`join(DRAWINGS_DIR, body.filePath)` với `filePath` lấy nguyên từ body JSON. Xác nhận:
+`join('/app/data/uploads/drawings', '../../../../etc/passwd')` → `/etc/passwd`.
+
+**Đo mức rò rỉ thật thay vì báo động chung chung:** cho parser đọc một tệp `.env` giả chứa
+`DATABASE_URL`/`XBOSS_SECRET`/`CRON_SECRET` rồi tìm các chuỗi đó trong JSON trả về — **không chuỗi
+nào lọt ra**. Nên đây không phải lỗ hổng đọc trộm secret, mà là (a) oracle dò sự tồn tại + kích
+thước mọi tệp trên đĩa qua `fileSizeBytes`/`sourcePath`, và (b) đọc được nội dung nếu tệp đích
+tình cờ là DXF.
+
+**Sửa:** `duongDanAnToan(thuMucGoc, duongDanTuongDoi)` — dùng lại đúng mẫu đã có ở
+`lib/nen/storage.ts:42-49` (chuẩn hoá + đòi kết quả nằm trong gốc). Áp cho cả đường dẫn lấy từ DB
+(`file_name`, `iso_path`), phòng bản ghi cũ mang đường dẫn lạ.
+
+### 🟡 Tin `project_id` client gửi — trái quy ước ghi trong chính repo
+
+`save-drawing/route.ts` viết `inputProjectId || getCurrentProjectId(user) || 1`, tức lấy giá trị
+client gửi **trước tiên**. `lib/ha-tang/projects.ts:1-3` nói rõ: _"Route KHÔNG tin project_id client
+gửi qua body/query"_. Chỉ cần sửa một con số trong request là ghi được bản vẽ vào dự án mình không
+thuộc. Cùng lớp lỗi đã xảy ra thật với `/api/payment-certs`.
+
+**Sửa:** thêm `chotProjectIdChoGhi()` vào `lib/ha-tang/projects.ts` — vẫn cho phép chỉ định dự án
+nhưng đối chiếu `visibleProjectIds`. Nhận `projectHienTai` qua **tham số** chứ không gọi
+`getCurrentProjectId()` bên trong, vì hàm đó đọc `cookies()` của Next nên chỉ chạy trong phạm vi
+một request — để nguyên thì phần quyết định phân quyền không viết test được.
+
+### 🟡 Không có giới hạn dung lượng ở bất kỳ đâu trên đường CAD
+
+Client đọc trọn tệp → base64 (phình 1,33×) → một body JSON → `Buffer.from` trên máy chủ. Đối chiếu:
+ảnh hiện trường 10 MB, biên bản nghiệm thu 20 MB; riêng CAD — loại tệp lớn nhất trong cả app — bỏ
+ngỏ hoàn toàn.
+
+**Sửa:** `GIOI_HAN_TEP_CAD = 150 MB` trong `lib/ky-thuat/cad/gioi-han.ts`, áp cho cả route nạp lên
+lẫn route lưu, trả **413** kèm hướng dẫn tách bản vẽ theo tầng/hệ. Chọn 150 MB chứ không nhỏ hơn vì
+bản vẽ MEPF toàn tầng dạng DXF ASCII thường 50–120 MB — đặt trần sát quá là chặn đúng người dùng
+thật. Đo bằng `uocLuongByteTuBase64()` **trước khi giải mã**; giải mã rồi mới đo thì đã tốn đúng số
+bộ nhớ đang muốn tránh.
+
+### Kiến trúc — hệ quả phụ đáng giá
+
+Ba khối logic nghiệp vụ đang nằm trong route handler (trái ADR-0008: _route chỉ là ranh giới HTTP_)
+được đẩy xuống `lib/`: `tim-ban-ve.ts`, `gioi-han.ts`, `chotProjectIdChoGhi`. Đây không phải dọn dẹp
+cho đẹp — chính việc nằm trong route là **lý do chúng chưa từng có test**: `parse-dxf/route.ts` tính
+`DRAWINGS_DIR` từ `process.cwd()` lúc nạp module, nên không cách nào trỏ vào thư mục tạm để kiểm.
+
+### Kiểm chứng
+
+`lint` · `typecheck` · `check:lib-layers` · `check:dead-code` · `check:sw-exclude` ·
+`check:migrations` · `build` — xanh. `npm test -- --release-gate` trên Postgres 16 dựng thật:
+**212 file, 1142 ca pass, 0 fail** (trước đợt này 1116 ca — thêm 26 ca). E2E trang chuẩn hoá:
+9/9 pass.
+
+**Mỗi bản vá đều chứng minh test bắt được lỗi cũ**, bằng cách tạm trả code về bản cũ rồi chạy lại:
+khớp tên lỏng → 6 ca đỏ; tin `project_id` client → 1 ca đỏ. Khôi phục thì xanh. Không chỉ viết test
+rồi thấy nó xanh là xong.
+
+### Nợ kỹ thuật ghi nhận
+
+- **`tests/projects.test.ts` không tự dọn `user_projects`** — lỗi có sẵn, không phải do đợt này.
+  Xanh trên database mới, đỏ trên database dùng lại, vì nó phá vỡ chính quy tắc mình kiểm ("bảng
+  rỗng = mọi user thấy mọi dự án"). Bộ chạy test hiện cấp cho mỗi worker một DB tạo bằng
+  `TEMPLATE` nên CI không lộ, nhưng chạy tay lặp lại thì đỏ oan. Test mới của đợt này đã dọn ở
+  `finally` — file cũ thì chưa.
+- **Bộ ghi DXF chạy trong trình duyệt** (`useCadExporters.ts:80`), dựng chuỗi bằng `+=`. Với bản vẽ
+  thật hàng trăm nghìn thực thể, tab phải giữ cùng lúc buffer gốc + base64 + cây `DxfParseResult` +
+  chuỗi DXF đang dựng. Đây là **ứng viên hàng đầu** cho hiện tượng người dùng báo ngày 2026-08-24
+  ("dung lượng lớn nhưng không mở được" = tệp bị cắt cụt). Chưa kết luận được vì chưa có tệp thật
+  để đối chiếu.
+- **`mepf-worker/src/cad_export_r2000.py`** vẫn tồn tại và vẫn không ai gọi; M98 vẫn Draft, chưa có
+  chủ spec. Cả hai là quyết định của người dùng, không phải bug.
+
+## Bản vẽ xuất ra mở bằng AutoCAD là màn hình trắng — khung nhìn cắm cứng (2026-08-24)
+
+Người dùng mở tệp DXF do XBoss xuất bằng **AutoCAD thật** và báo: mở lên trắng trơn. Đây đúng là
+rủi ro tồn đọng lớn nhất đã ghi ở mục F đợt trước ("trước khi phát hành cho kỹ sư dùng phải mở thử
+một tệp xuất ra trong AutoCAD") — và nó có thật.
+
+**Nguyên nhân:** bản ghi `VPORT` tên `*ACTIVE` trong bảng TABLES cắm cứng tâm `(0,0)` chiều cao
+`1000`. AutoCAD khôi phục đúng khung nhìn đó khi mở tệp. Bản vẽ MEPF trải `0…33000 × 0…17000` nên
+khung nhìn rơi vào một mẩu trống cạnh gốc toạ độ: **16 thực thể vẫn nằm nguyên trong tệp**, chỉ là
+không có cái nào lọt vào màn hình. Người dùng phải tự `ZOOM` → `EXTENTS` mới thấy — mà không ai
+đoán được là phải làm vậy.
+
+**Vì sao cả ba lớp kiểm chứng của đợt trước đều mù:**
+
+| Lớp kiểm                    | Vì sao không bắt được                                                                               |
+| --------------------------- | --------------------------------------------------------------------------------------------------- |
+| `ezdxf` Auditor             | Báo 0 lỗi 0 fix — tệp **hợp lệ** hoàn toàn. Auditor kiểm tính đúng cấu trúc, không kiểm khung nhìn. |
+| Round-trip qua bộ đọc XBoss | 17 thực thể vào, 17 ra, khung bao không xê dịch. Bộ đọc không đọc VPORT nên không thấy gì sai.      |
+| Test toàn vẹn cấu trúc      | Handle, owner pointer, `$HANDSEED`, cân bằng SECTION/TABLE/BLOCK — đều đúng.                        |
+
+Bài học: **hợp lệ ≠ dùng được.** Cả ba lớp trên đều đo tính hợp lệ. Không lớp nào trả lời câu hỏi
+"mở ra thì người ta có thấy gì không". Chỉ mở bằng chính AutoCAD mới trả lời được.
+
+**Đã sửa:** tính tâm và chiều cao khung nhìn từ khung bao thật, cộng 10% lề, và chiều cao phải phủ
+cả chiều rộng (chiều rộng thấy được = cao × tỷ lệ 1.5). Ghi thêm `$VIEWCTR`/`$VIEWSIZE` ở HEADER
+khớp với VPORT — AutoCAD đọc cả hai chỗ, để lệch nhau thì khung nhìn tuỳ thuộc chỗ nào đọc sau.
+Bản vẽ rỗng hoặc suy biến thành một điểm/đường thẳng giữ mặc định `1000`, không chia cho 0.
+
+Kiểm lại trên chính fixture: tâm `(16500, 8500)`, cao `24200` → khung nhìn `x −1650…34650`,
+`y −3600…20600`, phủ trọn khung bao `0…33000 × 0…17000`.
+
+**Hai ca test chặn hồi quy**, và đã chứng minh chúng thật sự bắt được lỗi bằng cách tạm trả bộ ghi
+về bản cũ rồi chạy lại (đỏ đúng ca mong đợi, khôi phục thì xanh) — chứ không chỉ viết test rồi thấy
+nó xanh.
+
 ## Rút thời gian CI từ 7m01 xuống 4m22 (2026-08-24)
 
 Đo trước khi sửa (run 1210, cả hai job xanh) để biết thời gian nằm ở đâu thay vì đoán:

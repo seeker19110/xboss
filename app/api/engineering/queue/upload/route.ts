@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { enqueueAsyncTask } from "@/lib/ky-thuat/engineering-task-queue";
+import { GIOI_HAN_TEP_CAD } from "@/lib/ky-thuat/cad/gioi-han";
 import { createHash } from "crypto";
 import { promises as fs } from "fs";
 import path from "path";
@@ -28,11 +29,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Vui lòng chọn tệp tin cần tải lên" }, { status: 400 });
     }
 
-    // Giới hạn kích thước 50MB
-    const MAX_SIZE = 50 * 1024 * 1024;
-    if (file.size > MAX_SIZE) {
+    // Tác vụ CAD dùng chung trần dung lượng với các route CAD khác (150MB, xem
+    // lib/ky-thuat/cad/gioi-han.ts) — bản vẽ MEPF thật đo được tới ~65MB, vượt trần 50MB
+    // mặc định của route này. Tác vụ không phải CAD giữ nguyên trần 50MB cũ.
+    const isCadTask = taskType.startsWith("mepf.cad.");
+    const maxSize = isCadTask ? GIOI_HAN_TEP_CAD : 50 * 1024 * 1024;
+    if (file.size > maxSize) {
       return NextResponse.json(
-        { error: "Tệp tin vượt quá dung lượng tối đa cho phép (50MB)" },
+        {
+          error: `Tệp tin vượt quá dung lượng tối đa cho phép (${Math.floor(maxSize / (1024 * 1024))}MB)`,
+        },
         { status: 413 },
       );
     }

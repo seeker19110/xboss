@@ -1,6 +1,7 @@
 "use client";
 
 import type { DxfParseResult } from "@/lib/ky-thuat/cad/dxf-parser";
+import { extractLineSegments } from "./useCadStandardization";
 import type {
   DimOverrideItem,
   ManualBlockItem,
@@ -61,10 +62,18 @@ export function useCadHealthScore({
         ? 100
         : 0;
 
+  // Phạt theo TỶ LỆ lỗi trên tổng số ĐOẠN (không phải tổng số thực thể — 1 polyline nhiều
+  // đỉnh là 1 thực thể nhưng hàng chục đoạn, dùng entity count làm mẫu số phạt sai đơn vị,
+  // đã đo thấy trên bản vẽ MEPF thật) thay vì số điểm cố định/lỗi — công thức cũ trừ cứng
+  // 5 điểm mỗi lỗi nên bản vẽ vài chục nghìn thực thể chỉ cần ~16 lỗi (dưới 0.1%) đã rơi
+  // thẳng xuống sàn, không phân biệt được "hơi bẩn" với "rất bẩn". `isPurged` không còn ép
+  // cứng về 100 vì đa tuyến trùng đè một phần có thể vẫn còn sau khi dọn (xem handleRunDeepPurge).
+  const totalSegmentCount = dxfData ? extractLineSegments(dxfData.entities).length : 0;
+  const dirtyCount = purgeState.overlappingCount + purgeState.zeroLengthCount;
   const geometryScore = hasRealData
-    ? purgeState.isPurged
-      ? 100
-      : Math.max(20, 100 - (purgeState.overlappingCount + purgeState.zeroLengthCount) * 5)
+    ? totalSegmentCount > 0
+      ? Math.max(0, Math.round(100 - (dirtyCount / totalSegmentCount) * 100 * 20))
+      : 100
     : 0;
 
   const dimScore =
