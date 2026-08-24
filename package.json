@@ -29,6 +29,9 @@
     "test:mutation": "node scripts/mutation-check.mjs",
     "check:dead-code": "tsx scripts/check-dead-code.ts",
     "check:lib-layers": "tsx scripts/check-lib-layers.ts",
+    "check:route-perms": "tsx scripts/check-route-perms.ts",
+    "check:project-scope": "tsx scripts/check-project-scope.ts",
+    "check:db-params": "tsx scripts/check-db-params.ts",
     "setup:drawing-tree": "tsx scripts/ensure-drawing-tree.ts"
   },
   "dependencies": {

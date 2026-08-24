@@ -73,6 +73,21 @@ jobs:
       - name: Kiểm ranh giới miền lib/
         run: npm run check:lib-layers
 
+      # W2.1 (đợt "nâng tầm dự án" GĐ2): chặn route ghi (POST/PATCH/PUT/DELETE) quên kiểm
+      # quyền — lớp lỗi đã lặp ≥3 đợt audit. Static, không cần DB.
+      - name: Kiểm route ghi có kiểm quyền
+        run: npm run check:route-perms
+
+      # W2.2: chặn route lấy project_id thẳng từ CLIENT (body/formData/query) mà không chốt
+      # qua chotProjectIdChoGhi — toàn bộ app/api/**, không chỉ engineering/. Static, không cần DB.
+      - name: Kiểm route không tin projectId client gửi trần
+        run: npm run check:project-scope
+
+      # W2.3: chặn tái phát lỗi truyền MẢNG cho helper lib/db (query/queryOne/run/insertId) —
+      # 43 file từng chết ngay câu SQL đầu tiên vì lỗi này. Static, không cần DB.
+      - name: Kiểm tham số lib/db (chặn query(sql, [a, b]))
+        run: npm run check:db-params
+
   # ── Test đơn vị + tích hợp trên Postgres thật ──
   test:
     name: test (Postgres)
