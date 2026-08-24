@@ -162,3 +162,34 @@ export async function portfolioKpi(user: { id: number; role: Role }): Promise<Po
     avgProgress,
   };
 }
+
+/**
+ * Chốt `project_id` cho một thao tác GHI khi route có nhận `projectId` từ body.
+ *
+ * Quy ước ở đầu file này là "route KHÔNG tin project_id client gửi". Thực tế vẫn có route cần cho
+ * phép chỉ định dự án (vd lưu bản vẽ vào dự án khác dự án đang chọn), nên thay vì tin hoặc cấm
+ * hẳn, hàm này đối chiếu với `visibleProjectIds` — đúng danh sách user được thấy.
+ *
+ * Lỗi thật đã gặp hai lần: `/api/payment-certs` quên scope hoàn toàn, và
+ * `/api/engineering/cad/save-drawing` viết `inputProjectId || getCurrentProjectId(user)` nên chỉ
+ * cần sửa một con số trong request là ghi được vào dự án mình không thuộc (audit 2026-08-24).
+ *
+ * `projectHienTai` truyền vào qua tham số chứ không gọi `getCurrentProjectId()` bên trong: hàm đó
+ * đọc `cookies()` của Next nên chỉ chạy được trong phạm vi một request, khiến phần QUYẾT ĐỊNH
+ * phân quyền — thứ đáng test nhất ở đây — không viết test được.
+ */
+export async function chotProjectIdChoGhi(
+  user: { id: number; role: Role },
+  inputProjectId: unknown,
+  projectHienTai: number,
+): Promise<{ ok: true; projectId: number } | { ok: false }> {
+  const hienTai = projectHienTai || 1;
+  if (inputProjectId == null || inputProjectId === "") return { ok: true, projectId: hienTai };
+
+  const muonDung = Number(inputProjectId);
+  if (!Number.isInteger(muonDung) || muonDung <= 0) return { ok: false };
+  if (muonDung === hienTai) return { ok: true, projectId: hienTai };
+
+  const duocPhep = await visibleProjectIds(user);
+  return duocPhep.includes(muonDung) ? { ok: true, projectId: muonDung } : { ok: false };
+}

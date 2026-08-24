@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { writeFileSync, mkdirSync, existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
-import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { chotProjectIdChoGhi, getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { GIOI_HAN_TEP_CAD } from "@/lib/ky-thuat/cad/gioi-han";
 import { queryOne, insertId, run } from "@/lib/db";
 import { validateDxf } from "@/lib/ky-thuat/cad/dxf-parser";
 import { storagePut } from "@/lib/nen/storage";
@@ -49,6 +50,20 @@ export async function POST(req: NextRequest) {
 
     // Kiểm định cấu trúc DXF TRƯỚC mọi tác dụng phụ: sai cấu trúc thì không ghi tệp,
     // không tạo bản ghi drawings/drawing_revisions (guardrail M98 §2).
+    // Cùng trần với đường nạp lên (xem GIOI_HAN_TEP_CAD). Đo trước validateDxf vì validateDxf
+    // tách cả tệp thành mảng dòng — với tệp khổng lồ thì chính bước kiểm đã làm tràn bộ nhớ.
+    const coCharPhepDo = typeof fileContent === "string" ? fileContent.length : 0;
+    if (coCharPhepDo > GIOI_HAN_TEP_CAD) {
+      return NextResponse.json(
+        {
+          error:
+            `Nội dung DXF lớn hơn giới hạn ${Math.round(GIOI_HAN_TEP_CAD / 1024 / 1024)} MB — ` +
+            `không lưu. Hãy tách bản vẽ theo tầng/hệ rồi lưu từng phần.`,
+        },
+        { status: 413 },
+      );
+    }
+
     const validation = validateDxf(typeof fileContent === "string" ? fileContent : "");
     if (!validation.valid) {
       return NextResponse.json(
@@ -60,7 +75,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const projectId = inputProjectId || (await getCurrentProjectId(user)) || 1;
+    // Không tin project_id client gửi — đối chiếu danh sách dự án user được thấy.
+    // Xem chotProjectIdChoGhi() để biết vì sao (lib/ha-tang/projects.ts).
+    const chotDuAn = await chotProjectIdChoGhi(
+      user,
+      inputProjectId,
+      (await getCurrentProjectId(user)) || 1,
+    );
+    if (!chotDuAn.ok) {
+      return NextResponse.json(
+        { error: "Không có quyền lưu bản vẽ vào dự án này" },
+        { status: 403 },
+      );
+    }
+    const projectId = chotDuAn.projectId;
 
     // Chuẩn hóa chuỗi an toàn cho tên file (không khoảng trắng, ký tự đặc biệt)
     const cleanStr = (s: string) =>

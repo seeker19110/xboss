@@ -4,6 +4,106 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Đợt audit quy trình chuẩn hoá bản vẽ 2D (2026-08-24)
+
+Rà theo `docs/audit.md` toàn bộ đường chuẩn hoá bản vẽ 2D: 8 route `app/api/engineering/cad/*`,
+`lib/ky-thuat/cad/*`, trang `/engineering/chuan-hoa-ban-ve`. **Mọi phát hiện đều xác nhận bằng cách
+chạy thử**, không phải đọc code rồi suy đoán.
+
+### 🔴 Cao — chọn bản vẽ A, hệ thống trả về bản vẽ B, âm thầm
+
+`findRealFileOnDisk` (cũ, trong `parse-dxf/route.ts`) khớp tên bằng 5 điều kiện OR, trong đó
+`cleanQuery.includes(entryBase)` — "mã bản vẽ có chứa tên tệp" — khiến **mọi tệp tên ngắn khớp mọi
+mã**. Tái hiện thật:
+
+```
+tìm "HVAC-01" ↔ A.dxf   => KHỚP   (tên 1 ký tự, hệ PCCC)
+tìm "HVAC-01" ↔ V.dxf   => KHỚP   (tên 1 ký tự, hệ điện)
+tìm "HVAC-01" ↔ 0.dxf   => KHỚP   (tệp nháp)
+```
+
+Hàm còn duyệt bằng ngăn xếp LIFO và trả **ứng viên đầu tiên gặp**, nên kết quả phụ thuộc thứ tự
+đọc thư mục. Kết quả nhận về mang cờ `isRealDrawing: true`, không cảnh báo gì. Với app thi công
+MEPF, đó là lắp sai theo bản vẽ sai — **cùng lớp hậu quả với đợt "bỏ dữ liệu bịa"**, chỉ khác cơ
+chế: trước là máy vẽ ra nét không có thật, giờ là máy đưa nhầm bản vẽ có thật của hệ khác.
+
+**Sửa:** viết lại thành `lib/ky-thuat/cad/tim-ban-ve.ts`, chỉ chấp nhận hai kiểu khớp và **không
+bao giờ** khớp theo chiều "mã chứa tên tệp": `chinh_xac` (trùng khít) và `tien_to` (mã + dấu phân
+cách, chỉ khi mã dài ≥ 4 ký tự). Trả **mọi** ứng viên thay vì dừng ở cái đầu; nhiều ứng viên cùng
+hạng → route trả **409 kèm danh sách** để người dùng chỉ đích danh, tuyệt đối không tự chọn.
+
+### 🟡 Đọc tệp tuỳ ý ngoài thư mục bản vẽ
+
+`join(DRAWINGS_DIR, body.filePath)` với `filePath` lấy nguyên từ body JSON. Xác nhận:
+`join('/app/data/uploads/drawings', '../../../../etc/passwd')` → `/etc/passwd`.
+
+**Đo mức rò rỉ thật thay vì báo động chung chung:** cho parser đọc một tệp `.env` giả chứa
+`DATABASE_URL`/`XBOSS_SECRET`/`CRON_SECRET` rồi tìm các chuỗi đó trong JSON trả về — **không chuỗi
+nào lọt ra**. Nên đây không phải lỗ hổng đọc trộm secret, mà là (a) oracle dò sự tồn tại + kích
+thước mọi tệp trên đĩa qua `fileSizeBytes`/`sourcePath`, và (b) đọc được nội dung nếu tệp đích
+tình cờ là DXF.
+
+**Sửa:** `duongDanAnToan(thuMucGoc, duongDanTuongDoi)` — dùng lại đúng mẫu đã có ở
+`lib/nen/storage.ts:42-49` (chuẩn hoá + đòi kết quả nằm trong gốc). Áp cho cả đường dẫn lấy từ DB
+(`file_name`, `iso_path`), phòng bản ghi cũ mang đường dẫn lạ.
+
+### 🟡 Tin `project_id` client gửi — trái quy ước ghi trong chính repo
+
+`save-drawing/route.ts` viết `inputProjectId || getCurrentProjectId(user) || 1`, tức lấy giá trị
+client gửi **trước tiên**. `lib/ha-tang/projects.ts:1-3` nói rõ: _"Route KHÔNG tin project_id client
+gửi qua body/query"_. Chỉ cần sửa một con số trong request là ghi được bản vẽ vào dự án mình không
+thuộc. Cùng lớp lỗi đã xảy ra thật với `/api/payment-certs`.
+
+**Sửa:** thêm `chotProjectIdChoGhi()` vào `lib/ha-tang/projects.ts` — vẫn cho phép chỉ định dự án
+nhưng đối chiếu `visibleProjectIds`. Nhận `projectHienTai` qua **tham số** chứ không gọi
+`getCurrentProjectId()` bên trong, vì hàm đó đọc `cookies()` của Next nên chỉ chạy trong phạm vi
+một request — để nguyên thì phần quyết định phân quyền không viết test được.
+
+### 🟡 Không có giới hạn dung lượng ở bất kỳ đâu trên đường CAD
+
+Client đọc trọn tệp → base64 (phình 1,33×) → một body JSON → `Buffer.from` trên máy chủ. Đối chiếu:
+ảnh hiện trường 10 MB, biên bản nghiệm thu 20 MB; riêng CAD — loại tệp lớn nhất trong cả app — bỏ
+ngỏ hoàn toàn.
+
+**Sửa:** `GIOI_HAN_TEP_CAD = 150 MB` trong `lib/ky-thuat/cad/gioi-han.ts`, áp cho cả route nạp lên
+lẫn route lưu, trả **413** kèm hướng dẫn tách bản vẽ theo tầng/hệ. Chọn 150 MB chứ không nhỏ hơn vì
+bản vẽ MEPF toàn tầng dạng DXF ASCII thường 50–120 MB — đặt trần sát quá là chặn đúng người dùng
+thật. Đo bằng `uocLuongByteTuBase64()` **trước khi giải mã**; giải mã rồi mới đo thì đã tốn đúng số
+bộ nhớ đang muốn tránh.
+
+### Kiến trúc — hệ quả phụ đáng giá
+
+Ba khối logic nghiệp vụ đang nằm trong route handler (trái ADR-0008: _route chỉ là ranh giới HTTP_)
+được đẩy xuống `lib/`: `tim-ban-ve.ts`, `gioi-han.ts`, `chotProjectIdChoGhi`. Đây không phải dọn dẹp
+cho đẹp — chính việc nằm trong route là **lý do chúng chưa từng có test**: `parse-dxf/route.ts` tính
+`DRAWINGS_DIR` từ `process.cwd()` lúc nạp module, nên không cách nào trỏ vào thư mục tạm để kiểm.
+
+### Kiểm chứng
+
+`lint` · `typecheck` · `check:lib-layers` · `check:dead-code` · `check:sw-exclude` ·
+`check:migrations` · `build` — xanh. `npm test -- --release-gate` trên Postgres 16 dựng thật:
+**212 file, 1142 ca pass, 0 fail** (trước đợt này 1116 ca — thêm 26 ca). E2E trang chuẩn hoá:
+9/9 pass.
+
+**Mỗi bản vá đều chứng minh test bắt được lỗi cũ**, bằng cách tạm trả code về bản cũ rồi chạy lại:
+khớp tên lỏng → 6 ca đỏ; tin `project_id` client → 1 ca đỏ. Khôi phục thì xanh. Không chỉ viết test
+rồi thấy nó xanh là xong.
+
+### Nợ kỹ thuật ghi nhận
+
+- **`tests/projects.test.ts` không tự dọn `user_projects`** — lỗi có sẵn, không phải do đợt này.
+  Xanh trên database mới, đỏ trên database dùng lại, vì nó phá vỡ chính quy tắc mình kiểm ("bảng
+  rỗng = mọi user thấy mọi dự án"). Bộ chạy test hiện cấp cho mỗi worker một DB tạo bằng
+  `TEMPLATE` nên CI không lộ, nhưng chạy tay lặp lại thì đỏ oan. Test mới của đợt này đã dọn ở
+  `finally` — file cũ thì chưa.
+- **Bộ ghi DXF chạy trong trình duyệt** (`useCadExporters.ts:80`), dựng chuỗi bằng `+=`. Với bản vẽ
+  thật hàng trăm nghìn thực thể, tab phải giữ cùng lúc buffer gốc + base64 + cây `DxfParseResult` +
+  chuỗi DXF đang dựng. Đây là **ứng viên hàng đầu** cho hiện tượng người dùng báo ngày 2026-08-24
+  ("dung lượng lớn nhưng không mở được" = tệp bị cắt cụt). Chưa kết luận được vì chưa có tệp thật
+  để đối chiếu.
+- **`mepf-worker/src/cad_export_r2000.py`** vẫn tồn tại và vẫn không ai gọi; M98 vẫn Draft, chưa có
+  chủ spec. Cả hai là quyết định của người dùng, không phải bug.
+
 ## Bản vẽ xuất ra mở bằng AutoCAD là màn hình trắng — khung nhìn cắm cứng (2026-08-24)
 
 Người dùng mở tệp DXF do XBoss xuất bằng **AutoCAD thật** và báo: mở lên trắng trơn. Đây đúng là
