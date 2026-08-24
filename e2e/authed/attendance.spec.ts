@@ -21,7 +21,9 @@ test.describe("Chấm công (sau đăng nhập)", () => {
   test("render date picker + tổng nhân công + EmptyState chưa có tổ đội", async ({ page }) => {
     await gotoAttendance(page);
     await expect(page.getByLabel("Chọn ngày chấm công")).toBeVisible();
-    await expect(page.getByText("Tổng nhân công ngày này", { exact: false })).toBeVisible();
+    // Nhãn đổi ở đợt tái thiết Bento Grid 2.0 (3908fc6): "Tổng nhân công ngày này" →
+    // "Tổng quân số hôm nay". Cùng một ô, cùng ý nghĩa — chỉ đổi chữ, không mất tính năng.
+    await expect(page.getByText("Tổng quân số hôm nay", { exact: false })).toBeVisible();
     await expect(page.getByText("Chưa có tổ đội", { exact: false })).toBeVisible();
   });
 
