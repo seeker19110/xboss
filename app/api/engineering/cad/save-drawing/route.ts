@@ -8,7 +8,6 @@ import { queryOne, insertId, run } from "@/lib/db";
 import { validateDxf } from "@/lib/ky-thuat/cad/dxf-parser";
 import { storagePut } from "@/lib/nen/storage";
 import { newStandardizedDrawingFileName } from "@/lib/nen/photos";
-import { ensureAllDrawingTrees } from "@/lib/ky-thuat/cad/drawing-tree";
 
 export const dynamic = "force-dynamic";
 
@@ -135,9 +134,10 @@ export async function POST(req: NextRequest) {
 
     const isoRelativePath = join(relativeSubPath, standardFileName).replace(/\\/g, "/");
 
-    // Đảm bảo cây thư mục quy chuẩn tồn tại đầy đủ (idempotent) — không chỉ nhánh đang ghi,
-    // để cấu trúc ISO 19650 nhất quán trên mọi môi trường. Xem lib/cad/drawing-tree.ts.
-    ensureAllDrawingTrees();
+    // Cây thư mục quy chuẩn ISO 19650 dựng bằng `npm run setup:drawing-tree` lúc triển khai,
+    // KHÔNG dựng lại ở mỗi request: đó là việc cấp phát môi trường, và giữ nó trong đồ thị
+    // import của route khiến Turbopack phải trace toàn bộ dự án (xem scripts/ensure-drawing-tree.ts).
+    // Route vẫn tự tạo đúng nhánh nó ghi ở ngay dưới, nên không phụ thuộc script đó.
 
     // 1. Ghi tệp vào data/uploads/drawings/
     const dataUploadsDir = join(process.cwd(), "data", "uploads", "drawings", relativeSubPath);
