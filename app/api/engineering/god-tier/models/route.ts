@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   generateInstancedMeshGroups,
@@ -16,6 +16,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   }
 
+  if (!CAN.viewEngineeringGodTier(user.role)) {
+    return NextResponse.json({ error: "Không có quyền xem mô hình God-Tier" }, { status: 403 });
+  }
+
   const projectId = await getCurrentProjectId(user);
   if (!projectId) {
     return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
@@ -29,6 +33,10 @@ export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  }
+
+  if (!CAN.manageEngineeringGodTier(user.role)) {
+    return NextResponse.json({ error: "Không có quyền thao tác mô hình God-Tier" }, { status: 403 });
   }
 
   const projectId = await getCurrentProjectId(user);

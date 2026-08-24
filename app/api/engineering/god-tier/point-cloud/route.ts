@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
   analyzePointCloudDeviation,
@@ -13,6 +13,10 @@ export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  }
+
+  if (!CAN.manageEngineeringGodTier(user.role)) {
+    return NextResponse.json({ error: "Không có quyền thao tác đám mây điểm" }, { status: 403 });
   }
 
   const projectId = await getCurrentProjectId(user);

@@ -381,6 +381,22 @@ const CAN_DEFAULT = {
   viewEngineeringCompliance: (r?: Role) =>
     r === "admin" || r === "pm" || r === "engineer" || r === "bch" || r === "cdt" || r === "viewer",
   manageEngineeringCompliance: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  // V3 (audit 2026-08-24, lỗ hổng Cao A4) — 4 nhóm route engineering ghi dữ liệu trước
+  // đây chỉ kiểm đăng nhập, không kiểm quyền: BIM viewer/4D, IoT telemetry & cảnh báo
+  // HSE, chấm điểm thầu phụ (M82) và nhóm God-Tier (BCF/point-cloud/clash/CNC).
+  // Quy tắc: view* mở tới BCH (theo dõi), manage* loại toàn bộ VIEW_ONLY_ROLES + subcon.
+  viewEngineeringBim: (r?: Role) => r === "admin" || r === "pm" || r === "engineer" || r === "bch",
+  manageEngineeringBim: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  viewEngineeringIot: (r?: Role) => r === "admin" || r === "pm" || r === "engineer" || r === "bch",
+  manageEngineeringIot: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
+  viewEngineeringSubconAi: (r?: Role) =>
+    r === "admin" || r === "pm" || r === "engineer" || r === "bch",
+  // Ngoại lệ: chấm điểm tín nhiệm nhà thầu phụ là việc quản lý — subcon KHÔNG được tự
+  // chấm điểm mình, engineer cũng không (điểm này đi thẳng vào shortlist mời thầu).
+  manageEngineeringSubconAi: (r?: Role) => r === "admin" || r === "pm",
+  viewEngineeringGodTier: (r?: Role) =>
+    r === "admin" || r === "pm" || r === "engineer" || r === "bch",
+  manageEngineeringGodTier: (r?: Role) => r === "admin" || r === "pm" || r === "engineer",
 };
 
 // ===== M50 PR1 — Override quyền trong DB =====

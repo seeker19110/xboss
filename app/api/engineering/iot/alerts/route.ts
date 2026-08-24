@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/bao-mat/auth";
+import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { query } from "@/lib/db";
 
@@ -10,6 +10,10 @@ export async function GET(req: Request) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  }
+
+  if (!CAN.viewEngineeringIot(user.role)) {
+    return NextResponse.json({ error: "Không có quyền xem cảnh báo ngưỡng IoT" }, { status: 403 });
   }
 
   const projectId = await getCurrentProjectId(user);
@@ -52,6 +56,10 @@ export async function PATCH(req: Request) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
+  }
+
+  if (!CAN.manageEngineeringIot(user.role)) {
+    return NextResponse.json({ error: "Không có quyền thao tác cảnh báo ngưỡng IoT" }, { status: 403 });
   }
 
   const projectId = await getCurrentProjectId(user);
