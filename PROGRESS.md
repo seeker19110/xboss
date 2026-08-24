@@ -81,12 +81,21 @@ AutoCAD đòi hỏi TƯỜNG MINH cho layer đặc biệt `Defpoints` (do chính
 không in) — bộ ghi trước đây không ghi mã 290 cho bất kỳ layer nào. Sửa: mọi layer nay khai tường
 minh mã 290 (`Defpoints` = 0, còn lại = 1).
 
-**Bài học rút ra sau 3 vòng cùng một triệu chứng "drawing discarded":** `ezdxf.audit()` không bắt
-được CẢ BA lỗi này (0 errors mỗi lần) — công cụ kiểm hợp lệ không thay được việc mở thử bằng chính
-AutoCAD thật. Từ nay mọi thay đổi ở `exportDxf` phải kèm bằng chứng đối chiếu SỐ BẢN GHI header vs
-thực tế cho mọi bảng (không chỉ bảng vừa sửa), và nghi ngờ trước tiên các "layer/style/linetype
-đặc biệt do chính AutoCAD định nghĩa" (Defpoints, Standard, Continuous, ByLayer, ByBlock...) — quy
-ước bất thành văn của AutoCAD với nhóm tên này khắt khe hơn hẳn layer/style do người dùng đặt tuỳ ý.
+**Vòng 4 cùng ngày — qua được LAYER, chết ở DIMSTYLE: "Bad handle 107: already in use —
+eHandleInUse".** Đọc tệp tại đúng dòng lỗi: bản ghi DIMSTYLE mở đầu bằng `5\n979` — nhưng bản ghi
+DIMSTYLE là loại DUY NHẤT trong DXF dùng mã nhóm **105** cho handle thay vì mã 5 (quirk kinh điển,
+di sản từ đời DXF cũ khi mã 5 trong ngữ cảnh DIMSTYLE mang nghĩa khác). `tableRecordHead` dùng
+chung mã 5 cho mọi bảng nên AutoCAD không nhận ra handle của record, lẫn sang handle 107 của chính
+bảng DIMSTYLE → "already in use" → huỷ bản vẽ. Sửa: `tableRecordHead` phát mã 105 riêng cho
+DIMSTYLE. Test hồi quy kiểm mọi bản ghi DIMSTYLE phải mở đầu bằng mã 105.
+
+**Bài học rút ra sau 4 vòng cùng một triệu chứng "drawing discarded":** `ezdxf.audit()` không bắt
+được lỗi NÀO trong cả bốn (0 errors mỗi lần) — công cụ kiểm hợp lệ không thay được việc mở thử
+bằng chính AutoCAD thật. Từ nay mọi thay đổi ở `exportDxf` phải kèm bằng chứng đối chiếu SỐ BẢN
+GHI header vs thực tế cho mọi bảng (không chỉ bảng vừa sửa), và nghi ngờ trước tiên (a) các
+"layer/style/linetype đặc biệt do chính AutoCAD định nghĩa" (Defpoints, Standard, Continuous,
+ByLayer, ByBlock...) — quy ước bất thành văn với nhóm tên này khắt khe hơn hẳn tên người dùng tự
+đặt; và (b) các ngoại lệ mã nhóm per-bảng của spec DXF (DIMSTYLE handle = 105 là ví dụ điển hình).
 
 **Vòng 2 (xảy ra trước vòng 3) cùng ngày — bản vá STYLE/LTYPE/DIMSTYLE ở trên tự sinh lỗi MỚI, nặng hơn.** Người dùng
 gửi file xuất từ code đã vá cho AutoCAD thật mở thử: `Skipping duplicate definition of Continuous

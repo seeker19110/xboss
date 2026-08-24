@@ -3023,10 +3023,20 @@ class HandleAllocator {
 /** Số nét của kiểu đường nhiều nét `Standard` mà bộ ghi phát ra (offset +0.5 và −0.5). */
 const MLINE_STYLE_ELEMENT_COUNT = 2;
 
-/** Khối mã nhóm mở đầu chung của mọi bản ghi trong bảng ký hiệu (SYMBOL TABLE) R2000. */
+/**
+ * Khối mã nhóm mở đầu chung của mọi bản ghi trong bảng ký hiệu (SYMBOL TABLE) R2000.
+ *
+ * NGOẠI LỆ DIMSTYLE — quirk kinh điển của định dạng DXF: bản ghi DIMSTYLE là loại DUY NHẤT
+ * dùng mã nhóm **105** cho handle thay vì mã 5 (di sản lịch sử: mã 5 trong ngữ cảnh DIMSTYLE
+ * từng mang nghĩa khác từ đời DXF cũ). Ghi mã 5 thì AutoCAD không nhận ra handle của record,
+ * lẫn sang handle của chính bảng DIMSTYLE và báo "Bad handle ...: already in use — Error in
+ * DIMSTYLE Table — eHandleInUse" rồi huỷ cả bản vẽ — xác nhận thật 2026-08-24 bằng AutoCAD
+ * của người dùng trên bản vẽ MEPF 65MB.
+ */
 function tableRecordHead(type: string, handle: string, owner: string, subClass: string): string {
+  const handleCode = type === "DIMSTYLE" ? 105 : 5;
   return (
-    `0\r\n${type}\r\n5\r\n${handle}\r\n330\r\n${owner}\r\n` +
+    `0\r\n${type}\r\n${handleCode}\r\n${handle}\r\n330\r\n${owner}\r\n` +
     `100\r\nAcDbSymbolTableRecord\r\n100\r\n${subClass}\r\n`
   );
 }

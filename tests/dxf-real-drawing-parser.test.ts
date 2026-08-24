@@ -1347,6 +1347,22 @@ test("exportDxf: STYLE/LTYPE/DIMSTYLE khai đủ tên mà thực thể tham chi�
     "Bảng DIMSTYLE phải khai dimstyle mà DIMENSION dùng, không chỉ mỗi STANDARD",
   );
 
+  // Hồi quy thật (vòng 4 cùng chuỗi "drawing discarded", 2026-08-24): bản ghi DIMSTYLE là loại
+  // DUY NHẤT trong DXF dùng mã nhóm 105 cho handle thay vì mã 5 — ghi mã 5 thì AutoCAD báo
+  // "Bad handle ...: already in use — Error in DIMSTYLE Table — eHandleInUse" rồi huỷ cả bản vẽ.
+  const dimTabStart = exported.indexOf("0\r\nTABLE\r\n2\r\nDIMSTYLE\r\n");
+  const dimTabEnd = exported.indexOf("0\r\nENDTAB", dimTabStart);
+  const thanBangDim = exported.slice(dimTabStart, dimTabEnd);
+  const banGhiDim = thanBangDim.split("0\r\nDIMSTYLE\r\n").slice(1);
+  assert.ok(banGhiDim.length >= 2, "Bảng DIMSTYLE phải có ít nhất STANDARD + dimstyle riêng");
+  for (const banGhi of banGhiDim) {
+    assert.match(
+      banGhi,
+      /^105\r\n/,
+      "Bản ghi DIMSTYLE phải mở đầu bằng mã 105 (handle riêng của DIMSTYLE), không phải mã 5",
+    );
+  }
+
   // Đọc lại bằng chính parser của mình phải vẫn ra đúng bản vẽ — không rơi rớt gì thêm
   const lai = parseDxf(exported, "rt.dxf");
   assert.equal(lai.entities.length, parsed.entities.length);
