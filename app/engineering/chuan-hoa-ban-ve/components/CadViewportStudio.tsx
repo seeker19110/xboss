@@ -644,7 +644,7 @@ export default function CadViewportStudio({
                           fontFamily="monospace"
                         >
                           Nhận: DXF mọi phiên bản (ASCII lẫn nhị phân), PDF — xuất ra DXF chuẩn
-                          AutoCAD 2000
+                          AutoCAD 2007
                         </text>
                       </g>
                     )}
