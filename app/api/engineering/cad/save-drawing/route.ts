@@ -5,6 +5,8 @@ import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import { queryOne, insertId, run } from "@/lib/db";
 import { validateDxf } from "@/lib/ky-thuat/cad/dxf-parser";
+import { storagePut } from "@/lib/nen/storage";
+import { newStandardizedDrawingFileName } from "@/lib/nen/photos";
 import { ensureAllDrawingTrees } from "@/lib/ky-thuat/cad/drawing-tree";
 
 export const dynamic = "force-dynamic";
@@ -103,6 +105,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const isoRelativePath = join(relativeSubPath, standardFileName).replace(/\\/g, "/");
+
     // Đảm bảo cây thư mục quy chuẩn tồn tại đầy đủ (idempotent) — không chỉ nhánh đang ghi,
     // để cấu trúc ISO 19650 nhất quán trên mọi môi trường. Xem lib/cad/drawing-tree.ts.
     ensureAllDrawingTrees();
@@ -123,7 +127,13 @@ export async function POST(req: NextRequest) {
     const fullRootPath = join(rootDrawingsDir, standardFileName);
     writeFileSync(fullRootPath, fileContent || ";; Standardized CAD Drawing by XBoss\n", "utf8");
 
-    // 3. Nếu đã phê duyệt chính thức, dọn sạch bản sao tạm trong thư mục temp (nếu có)
+    // 3. Ghi vào lớp lưu trữ dùng chung (S3/MinIO khi có cấu hình, không thì data/uploads/).
+    // Đây mới là bản đọc lại được bằng storageGet() ở route parse-dxf — hai bản ghi theo cây thư
+    // mục bên trên chỉ phục vụ bàn giao hồ sơ theo ISO 19650 và triển khai một máy chủ.
+    const storageFileName = newStandardizedDrawingFileName(cExt);
+    await storagePut(user.orgId, storageFileName, Buffer.from(fileContent || "", "utf8"));
+
+    // 4. Nếu đã phê duyệt chính thức, dọn sạch bản sao tạm trong thư mục temp (nếu có)
     if (isApproved) {
       const tempPathData = join(
         process.cwd(),
@@ -147,7 +157,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 4. Ghi nhận vào Cơ sở dữ liệu bảng drawings & drawing_revisions
+    // 5. Ghi nhận vào Cơ sở dữ liệu bảng drawings & drawing_revisions
     const drawingCode = `${cSys}-${kindTag}-${cRev}-${cDate.slice(-4)}`;
     const drawingTitle = `${name} (${kindTag} - ${cRev})`;
 
@@ -192,12 +202,13 @@ export async function POST(req: NextRequest) {
     if (!revisionId && drawingId) {
       revisionId = await insertId(
         `INSERT INTO drawing_revisions (
-          drawing_id, rev, file_name, original_name, mime_type, size_bytes,
+          drawing_id, rev, file_name, iso_path, original_name, mime_type, size_bytes,
           status, submitted_at, decided_at, decision_note, uploaded_by, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_DATE, ${isApproved ? "CURRENT_DATE" : "NULL"}, ?, ?, NOW())`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_DATE, ${isApproved ? "CURRENT_DATE" : "NULL"}, ?, ?, NOW())`,
         drawingId,
         cRev,
-        join(relativeSubPath, standardFileName).replace(/\\/g, "/"),
+        storageFileName,
+        isoRelativePath,
         standardFileName,
         cExt === "dxf" ? "application/dxf" : "application/octet-stream",
         Buffer.byteLength(fileContent || "", "utf8"),
@@ -208,10 +219,11 @@ export async function POST(req: NextRequest) {
     } else if (revisionId) {
       await run(
         `UPDATE drawing_revisions 
-         SET status = ?, file_name = ?, decision_note = ?, decided_at = ${isApproved ? "CURRENT_DATE" : "NULL"}
+         SET status = ?, file_name = ?, iso_path = ?, decision_note = ?, decided_at = ${isApproved ? "CURRENT_DATE" : "NULL"}
          WHERE id = ?`,
         revStatus,
-        join(relativeSubPath, standardFileName).replace(/\\/g, "/"),
+        storageFileName,
+        isoRelativePath,
         noteText,
         revisionId,
       );
@@ -221,6 +233,8 @@ export async function POST(req: NextRequest) {
       success: true,
       isApproved,
       standardFileName,
+      storageFileName,
+      isoPath: isoRelativePath,
       relativeDirectory: join("drawings", relativeSubPath).replace(/\\/g, "/"),
       fullUploadPath: `data/uploads/drawings/${relativeSubPath}/${standardFileName}`.replace(
         /\\/g,

@@ -144,6 +144,13 @@ export function newCorrespondenceFileName(correspondenceId: number, mime: string
   return `cv${correspondenceId}-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime]}`;
 }
 
+// Bản vẽ CAD đã chuẩn hoá lưu qua lớp storage (M99): tên PHẲNG do máy chủ sinh để storageGet()
+// đọc lại được; đường dẫn theo cây ISO 19650 lưu riêng ở cột `drawing_revisions.iso_path`.
+export function newStandardizedDrawingFileName(ext = "dxf"): string {
+  const safeExt = (ext || "dxf").toLowerCase().replace(/[^a-z0-9]/g, "") || "dxf";
+  return `cad-${Date.now()}-${randomBytes(4).toString("hex")}.${safeExt}`;
+}
+
 export function newProjectDocFileName(mime: string): string {
   return `pd-${Date.now()}-${randomBytes(4).toString("hex")}${DOC_MIME_EXT[mime]}`;
 }

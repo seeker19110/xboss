@@ -1,12 +1,7 @@
 "use client";
 
 import { showToast } from "@/app/components/Toast";
-import {
-  parseDxf,
-  exportDxf,
-  DxfParseResult,
-  generateStandard2dDxf,
-} from "@/lib/ky-thuat/cad/dxf-parser";
+import { exportDxf, DxfParseResult } from "@/lib/ky-thuat/cad/dxf-parser";
 import type { ConversionInfo, SaveConfig, WcsConfig } from "../types";
 import { cleanVal } from "./useSmartNaming";
 
@@ -63,15 +58,14 @@ export function useCadExporters({
   counts,
 }: UseCadExportersOptions) {
   const handleDownloadConvertedDxf = () => {
-    let content =
+    const content =
       (dxfData ? exportDxf(dxfData, { applyStandardLayers: true }) : conversionInfo?.dxfContent) ||
       "";
+    // Chưa nạp bản vẽ thì báo rõ, KHÔNG tải về bản vẽ MEPF mẫu do máy sinh dưới tên tệp của
+    // người dùng (M98/M99 — không bịa dữ liệu).
     if (!content || content.length < 50) {
-      const sampleParsed = parseDxf(
-        generateStandard2dDxf(saveConfig.name, saveConfig.systems),
-        generatedFileName,
-      );
-      content = exportDxf(sampleParsed, { applyStandardLayers: true });
+      showToast("⚠️ Chưa có bản vẽ nào được nạp — hãy tải lên tệp DXF trước khi xuất tệp.");
+      return;
     }
     const targetFileName = conversionInfo?.dxfFileName || generatedFileName;
     downloadTextFile(content, targetFileName, "application/dxf;charset=utf-8");
@@ -79,16 +73,11 @@ export function useCadExporters({
   };
 
   const handleDownloadStandardizedNamedDxf = () => {
-    let content = "";
-    if (dxfData && dxfData.entities && dxfData.entities.length > 0) {
-      content = exportDxf(dxfData, { applyStandardLayers: true });
-    } else {
-      const sampleParsed = parseDxf(
-        generateStandard2dDxf(saveConfig.name, saveConfig.systems),
-        generatedFileName,
-      );
-      content = exportDxf(sampleParsed, { applyStandardLayers: true });
+    if (!dxfData || !dxfData.entities || dxfData.entities.length === 0) {
+      showToast("⚠️ Chưa có bản vẽ nào được nạp — hãy tải lên tệp DXF trước khi xuất tệp.");
+      return;
     }
+    const content = exportDxf(dxfData, { applyStandardLayers: true });
     downloadTextFile(content, generatedFileName, "application/dxf;charset=utf-8");
     showToast(`✓ Đã tải xuống file AutoCAD DXF: ${generatedFileName}`);
   };

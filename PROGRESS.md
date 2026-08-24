@@ -4,6 +4,95 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Hoàn thiện đường ống DXF cho trang chuẩn hoá bản vẽ (2026-08-24)
+
+Đợt này chỉ làm **DXF** (DWG vẫn từ chối theo ADR-0006 — chuẩn hoá thẳng trên DWG là việc của
+plugin AutoCAD). Ba nhóm việc, đều nằm ở `lib/ky-thuat/cad/dxf-parser.ts` và đường lưu trữ quanh nó.
+
+### A — Dọn dữ liệu bịa (nghiêm trọng nhất, kỹ sư đang nhận về nét do máy vẽ)
+
+- **XREF bịa sẵn.** Mọi tệp DXF nạp vào đều nhận đúng 3 XREF cứng (`A-ARCH-GRID-AXIS.dwg`,
+  `S-STRUCT-BEAMS-COLS.dwg`, `E-POWER-MAINS.dwg`) kèm số thực thể/số layer bịa. Nay đọc **thật**
+  từ section BLOCKS: khối mang cờ 70 bit 4 là XREF, bit 8 là kiểu Overlay, đường dẫn ở mã 1.
+  Bản vẽ không có XREF thì danh sách **rỗng**. Trạng thái để `unloaded` vì bản thân tệp DXF không
+  biết tệp tham chiếu có tồn tại hay không — `resolveXrefDependencies()` mới là chỗ đối soát.
+- **Hình học MEPF mẫu khi xuất tệp.** `exportDxf()` thấy bản vẽ không có nét vector thì tự chèn
+  cả một bộ trục lưới + ống gió + máng cáp + ống nước + sprinkler. Đã bỏ. Kèm đó bỏ luôn hàm
+  `generateSynthesizedMepfDxf()` (không còn ai gọi).
+- **Hình chữ thập "đại diện" cho mọi định nghĩa khối.** Nay ghi lại đúng hình học thật của khối
+  đọc từ BLOCKS; khối không có định nghĩa thì ghi khối rỗng hợp lệ.
+- **Toạ độ LINE bịa.** `end = [endX || startX + 1000, endY || startY, …]` — thiếu mã 11 thì tự đặt
+  điểm cuối lệch 1000 đơn vị. Nay thiếu thì để trống, xuất tệp để lại POINT tại điểm đã biết.
+- **Khung bao bịa.** Bản vẽ không có toạ độ nào thì `maxX/maxY` mặc định 15000 × 10000. Nay là 0.
+- **Bản vẽ mẫu đội lốt bản vẽ thật.** `POST /api/engineering/cad/parse-dxf` không tìm thấy tệp thì
+  sinh bản vẽ MEPF mẫu **rồi gắn `isRealDrawing = true`**. Nay trả 404 kèm hướng dẫn tiếng Việt;
+  `isRealDrawing` suy từ việc có parse ra thực thể hay không. Hai nút tải tệp và nút lưu lên máy
+  chủ dự án (`useCadExporters`, `useSmartNaming`) cũng bỏ nhánh rơi về bản vẽ mẫu — trước đây bấm
+  lưu khi chưa nạp bản vẽ là **ghi bản vẽ do máy chế ra vào kho hồ sơ dự án dưới tên chuẩn ISO 19650**.
+
+### B — Bộ đọc/ghi bám đúng đặc tả DXF
+
+Bộ đọc cũ quét phẳng cả tệp nên bảng LAYER lẫn với thực thể và hình học trong định nghĩa BLOCK bị
+đếm vào model space. Nay đọc **theo section** (HEADER / TABLES / BLOCKS / ENTITIES). Bổ sung:
+
+- `POLYLINE` kiểu cũ: hình học lấy từ các `VERTEX` theo sau (trước đây luôn rỗng — đa tuyến kiểu
+  cũ hoàn toàn không hiển thị được).
+- `LWPOLYLINE`: độ cong từng đoạn (mã 42), cao độ (38), cờ khép kín (70).
+- `INSERT`: tỷ lệ chèn (41/42/43), góc xoay (50) và **giá trị ATTRIB thật** của khối (trước đây
+  `attributes` luôn rỗng).
+- `TEXT`/`MTEXT`: chiều cao (40), góc xoay (50), hệ số bề rộng (41), kiểu chữ (7); MTEXT dài chia
+  nhiều mảnh mã 3 nay ghép đủ theo thứ tự.
+- `DIMENSION`: **hai đầu đo thật ở mã 13/14** và số đo ở mã 42. Mã 10/11 (điểm đặt đường kích thước
+  và điểm đặt chữ) trước đây bị dùng nhầm làm hai đầu đo — chính comment trong code đã ghi nhận là
+  sai nhưng chưa sửa.
+- `ARC` giữ hai góc thật (50/51) thay vì mặc định 0°–180°; `ELLIPSE`, `SOLID`/`3DFACE`, `SPLINE`,
+  `LEADER`, `POINT` đọc/ghi được.
+- HEADER: `$INSUNITS` (kèm nhãn tiếng Việt), `$MEASUREMENT`, `$LTSCALE`, `$EXTMIN`/`$EXTMAX`.
+- Bảng LAYER: layer đóng băng (70 bit 1), khoá (bit 4), **tắt** (mã 62 âm), bề rộng nét (370) —
+  đọc và ghi lại đúng trạng thái người vẽ đã đặt.
+- Bộ ghi: khai `AC1009` thì ghi đúng cấu trúc R12 — đa tuyến dùng `POLYLINE`/`VERTEX`/`SEQEND` chứ
+  không phải `LWPOLYLINE` (R14 mới có); `ELLIPSE` rời rạc hoá thành đa tuyến; loại R12 không có
+  (`HATCH`, `MULTILEADER`) để lại POINT tại điểm neo — **không thực thể nào biến mất im lặng**.
+
+**Lỗi phát sinh trong lúc kiểm chứng, đã sửa:** `decodeCadText()` **không idempotent**. Bảng TCVN3
+ánh xạ chồng lên chữ Latin-1 hợp lệ (`ó` → `ú`, `ã` → `ó`), nên vòng đời thật "nạp bản vẽ TCVN3 →
+chuẩn hoá → xuất DXF → nạp lại" giải mã lần hai và làm hỏng chữ đã đúng (`ống gió` → `ống giú`) ngay
+trên bản vẽ đã phát hành. Nay chỉ giải mã TCVN3 khi chuỗi còn ký tự chữ ký của bảng mã cũ, và chỉ
+giải mã VNI khi chuỗi là ASCII thuần (văn bản VNI luôn là ASCII).
+
+### C — Lưu và đọc lại bản DXF đã chuẩn hoá
+
+Hoá ra route lưu đã có sẵn (`POST /api/engineering/cad/save-drawing`) và đã ghi nội dung DXF thật,
+nhưng **đọc lại thì hỏng**: route ghi thẳng bằng `fs` vào cây ISO 19650 rồi lưu chính đường dẫn cây
+vào `drawing_revisions.file_name`, trong khi `storageGet()` chặn tên chứa `/` (chống path traversal)
+→ chọn lại bản vẽ đã lưu từ CSDL là ném lỗi; và triển khai dùng S3/MinIO thì tệp không hề có trong
+kho lưu trữ. Nay: ghi thêm qua `storagePut()` với **tên phẳng** do máy chủ sinh
+(`newStandardizedDrawingFileName`), `file_name` giữ tên phẳng đó, đường dẫn cây chuyển sang cột mới
+`iso_path` (`migrations/0132_drawing_revisions_iso_path.sql` — thêm cột thuần tuý, đi thẳng
+production được). `parse-dxf` đọc lại theo 3 đường: lớp storage → `data/uploads/` phẳng → cây
+`data/uploads/drawings/<iso_path>`; bản ghi cũ (file_name dạng đường dẫn) vẫn đọc được.
+
+**Kiểm chứng:** fixture `tests/fixtures/cad/mepf-thap-a.dxf` — bản vẽ DXF thật đủ mặt tính năng
+(HEADER, 5 layer với đủ trạng thái, 2 XREF, 1 khối có hình học và ATTRIB, 12 thực thể gồm cả
+POLYLINE-VERTEX kiểu cũ, LWPOLYLINE có độ cong, DIMENSION có hai đầu đo, LINE khuyết điểm cuối).
+15 ca test mới trong `tests/dxf-real-drawing-parser.test.ts`, `tests/engineering-cad-dxf-parser.test.ts`,
+`tests/engineering-cad-save-drawing.test.ts`, gồm ca **round-trip** (xuất rồi nạp lại giữ nguyên số
+thực thể, khung bao, tỷ lệ khối, góc cung, độ cong đa tuyến, trạng thái layer và chữ Unicode).
+Toàn bộ: `npm test` 210 file — **1098 ca pass, 0 fail, 1 skip có chủ đích**; lint / typecheck /
+build / `check:lib-layers` / `check:dead-code` xanh; `db:migrate --dry-run` sạch trên Postgres 16.
+
+**Hai ca test cũ đã sửa lại (không phải nới lỏng):** hai ca DIMENSION trong
+`dxf-real-drawing-parser.test.ts` vốn khẳng định mã 10/11 là hai đầu đo — đúng theo hành vi sai của
+bản cũ. Nay chúng kiểm đúng đặc tả (đầu đo ở 13/14, số đo ở 42), kèm ca mới cho trường hợp tệp
+không khai số đo thì tuyệt đối không tự tính.
+
+### Còn lại (chưa làm)
+
+- Chuẩn hoá trực tiếp trên **DWG** vẫn cần plugin AutoCAD (ADR-0006) — chưa có.
+- `HATCH` mới giữ tên mẫu tô và điểm neo, **chưa phân tích ranh giới tô** (mã 91/92/93); xuất ra là
+  POINT. Cần thì mở việc riêng.
+- `MULTILEADER` tương tự: chưa dựng lại được hình, chỉ để lại điểm neo.
+
 ## Tái cấu trúc theo miền — Đợt 1 & 2 (2026-08-23)
 
 Rà toàn bộ cấu trúc code (không phải nội dung nghiệp vụ) rồi tái cấu trúc. Số liệu và
@@ -53,6 +142,7 @@ typecheck xanh.
 - **45 map nhãn `*_LABEL` không được import ở đâu** trong khi UI lặp lại nhãn tại chỗ —
   lỗi trùng lặp, sửa bằng cách cho UI dùng map, không phải xoá map.
 - **24 file > 1000 LOC** (nặng nhất `TrackingGrid.tsx` 94KB) — Đợt 4, chưa mở.
+
 ## E2E cho route mới `/engineering/chuan-hoa-ban-ve` (2026-08-23)
 
 Route hợp nhất `/engineering/cad` cũ vào `/engineering/chuan-hoa-ban-ve` (commit `ee4c100`)

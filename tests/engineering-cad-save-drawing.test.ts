@@ -9,6 +9,12 @@ import {
   drawingRoots,
   ensureAllDrawingTrees,
 } from "@/lib/ky-thuat/cad/drawing-tree";
+import { parseDxf, exportDxf } from "@/lib/ky-thuat/cad/dxf-parser";
+import { newStandardizedDrawingFileName } from "@/lib/nen/photos";
+import { storagePut, storageGet, storageDelete } from "@/lib/nen/storage";
+
+// Bản vẽ tối giản dùng cho ca lưu trữ: đúng 1 nét thật, không cần Postgres
+const MAU_DXF = `0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n0\nLAYER\n2\n01_ONG_GIO_CAP\n62\n4\n6\nCONTINUOUS\n0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n0\nLINE\n8\n01_ONG_GIO_CAP\n10\n0\n20\n0\n30\n0\n11\n1000\n21\n0\n31\n0\n0\nENDSEC\n0\nEOF`;
 
 describe("CAD Standardized Drawing Storage & Directory Structure Suite", () => {
   it("1. Thư mục quy chuẩn drawings/ và data/uploads/drawings/ chứa đầy đủ các phân hệ, nhóm con và thư mục tạm (temp/)", () => {
@@ -173,4 +179,47 @@ describe("CAD Standardized Drawing Storage & Directory Structure Suite", () => {
       }
     },
   );
+
+  it("5. Bản DXF đã chuẩn hoá lưu qua lớp storage và đọc lại được (tên tệp phẳng, không phải đường dẫn cây)", async () => {
+    // Lỗi đã sửa (M99): route save-drawing ghi thẳng bằng fs vào cây ISO 19650 rồi lưu chính
+    // đường dẫn cây đó vào `drawing_revisions.file_name`. Lớp storage chặn tên chứa "/" để
+    // chống path traversal, nên parse-dxf đọc lại bản đã lưu là ném lỗi — và trên triển khai
+    // dùng S3/MinIO thì tệp còn không có trong kho lưu trữ.
+    const fileName = newStandardizedDrawingFileName("dxf");
+
+    assert.ok(!fileName.includes("/"), "Tên tệp lưu trữ phải PHẲNG để storageGet đọc được");
+    assert.ok(!fileName.includes("\\"), "Không được chứa dấu tách thư mục Windows");
+    assert.match(
+      fileName,
+      /^cad-\d+-[0-9a-f]{8}\.dxf$/,
+      "Tên tệp do máy chủ sinh, không lấy theo tên người dùng nhập",
+    );
+    assert.notEqual(
+      fileName,
+      newStandardizedDrawingFileName("dxf"),
+      "Hai lần gọi không được trùng tên",
+    );
+
+    const noiDung = Buffer.from(exportDxf(parseDxf(MAU_DXF, "mau.dxf")), "utf8");
+    try {
+      await storagePut(1, fileName, noiDung);
+      const docLai = await storageGet(1, fileName);
+      assert.ok(docLai, "Phải đọc lại được bản vẽ vừa lưu");
+      assert.equal(docLai.toString("utf8"), noiDung.toString("utf8"), "Nội dung phải nguyên vẹn");
+
+      // Và nội dung đọc lại vẫn là DXF hợp lệ, parse ra đúng thực thể đã lưu
+      const lai = parseDxf(docLai.toString("utf8"), fileName);
+      assert.equal(lai.entities.length, 1);
+      assert.equal(lai.entities[0].type, "LINE");
+    } finally {
+      await storageDelete(1, fileName);
+    }
+
+    // Đường dẫn theo cây ISO 19650 (cột iso_path) tuyệt đối không được đưa qua lớp storage
+    await assert.rejects(
+      () => storageGet(1, "HVAC/design/iso/PRJ01_WP_HVAC_DESIGN-ISO_Ban_Ve_20260824_Rev01.dxf"),
+      /path traversal/,
+      "Tên dạng đường dẫn phải bị lớp storage từ chối — đó là lý do phải tách sang cột iso_path",
+    );
+  });
 });

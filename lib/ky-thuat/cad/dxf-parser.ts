@@ -242,6 +242,16 @@ const VNI_PAIRS: Array<[RegExp, string]> = [
 ];
 
 /**
+ * Ký tự "chữ ký" của bảng mã TCVN3/ABC: các vị trí U+00A1–U+00B9, U+00BE, U+00BF vốn là dấu thanh
+ * và nguyên âm có dấu của TCVN3, gần như không xuất hiện trong văn bản Unicode bình thường.
+ *
+ * Dùng để quyết định CÓ giải mã TCVN3 hay không. Cần thiết vì bảng TCVN3 ánh xạ chồng lên cả các
+ * chữ Latin-1 hợp lệ (vd `ó` → `ú`, `ã` → `ó`): giải mã một chuỗi đã là Unicode sẽ làm hỏng nó.
+ * Không có chốt này thì chuỗi chuẩn hoá → xuất tệp → nạp lại sẽ bị giải mã lần hai và sai chữ.
+ */
+const TCVN3_SIGNATURE = /[\u00a1-\u00b9\u00be\u00bf]/;
+
+/**
  * Chuyển đổi mã TCVN3 / ABC sang chuẩn Unicode UTF-8 hoàn chỉnh.
  */
 export function convertTcvn3ToUnicode(text: string): string {
@@ -350,6 +360,14 @@ export interface DxfLayerInfo {
   standardName: string;
   discipline: "M" | "E" | "P" | "F" | "ELV" | "S" | "A" | "OTHER";
   entityCount: number;
+  /** Layer bị đóng băng (cờ 70 bit 1) — thực thể vẫn còn nhưng không hiện, không in */
+  isFrozen?: boolean;
+  /** Layer đang tắt (mã 62 mang giá trị âm) */
+  isOff?: boolean;
+  /** Layer bị khoá (cờ 70 bit 4) — hiện nhưng không sửa được */
+  isLocked?: boolean;
+  /** Bề rộng nét theo mã 370 (đơn vị 1/100 mm; -3 = mặc định, -2 = theo khối, -1 = theo layer) */
+  lineWeight?: number;
 }
 
 export interface DxfEntityRaw {
@@ -370,7 +388,8 @@ export interface DxfEntityRaw {
     | "3DFACE"
     | "HATCH"
     | "LEADER"
-    | "MULTILEADER";
+    | "MULTILEADER"
+    | "POINT";
   layer: string;
   color?: number;
   coordinates: {
@@ -381,11 +400,47 @@ export interface DxfEntityRaw {
     radius?: number;
     startAngle?: number; // độ, dùng cho ARC
     endAngle?: number; // độ, dùng cho ARC
+    /** Độ cong từng đoạn polyline (mã 42) — 0 là đoạn thẳng */
+    bulges?: number[];
+    /** Cao độ mặt phẳng của LWPOLYLINE (mã 38) */
+    elevation?: number;
+    /** Polyline khép kín (cờ 70 bit 1) */
+    closed?: boolean;
+    /** Điểm canh chữ thứ hai của TEXT (mã 11/21/31) */
+    alignPoint?: [number, number, number];
+    /** Điểm đặt chữ kích thước của DIMENSION (mã 11/21/31) */
+    textMidPoint?: [number, number, number];
+    /** Hai đầu đo thật của DIMENSION (mã 13/23/33 và 14/24/34) */
+    measurePoints?: [[number, number, number], [number, number, number]];
+    /** Điểm cuối bán trục lớn của ELLIPSE (mã 11/21/31, tương đối so với tâm) */
+    majorAxis?: [number, number, number];
+    /** Tỷ lệ bán trục nhỏ / bán trục lớn của ELLIPSE (mã 40) */
+    axisRatio?: number;
+    /** Các đỉnh của SOLID / 3DFACE (mã 10..13) */
+    corners?: Array<[number, number, number]>;
   };
   textValue?: string;
   decodedText?: string;
   blockName?: string;
   attributes?: Record<string, string>;
+  /** Kiểu đường nét riêng của thực thể (mã 6) — không có thì theo layer */
+  lineType?: string;
+  /** Chiều cao chữ TEXT/MTEXT (mã 40) */
+  textHeight?: number;
+  /** Hệ số bề rộng chữ TEXT (mã 41) */
+  widthFactor?: number;
+  /** Kiểu chữ (mã 7) */
+  textStyle?: string;
+  /** Góc xoay, đơn vị độ (mã 50) */
+  rotation?: number;
+  /** Tỷ lệ chèn khối INSERT theo X/Y/Z (mã 41/42/43) */
+  scale?: [number, number, number];
+  /** Số đo thật của DIMENSION do AutoCAD ghi sẵn (mã 42) */
+  measurement?: number;
+  /** Tên mẫu tô của HATCH (mã 2) */
+  patternName?: string;
+  /** HATCH tô đặc (cờ 70 bit 1) */
+  isSolidFill?: boolean;
 }
 
 export interface DxfDiagnosticReport {
@@ -461,11 +516,30 @@ export interface DxfParseResult {
   extractedMetadata?: Record<string, string>;
   layers: DxfLayerInfo[];
   entities: DxfEntityRaw[];
+  /** Biến hệ thống đọc từ section HEADER của chính tệp (không suy diễn khi tệp không khai) */
+  header?: {
+    acadVer?: string;
+    /** $INSUNITS — mã đơn vị vẽ */
+    insUnits?: number;
+    /** Nhãn tiếng Việt của $INSUNITS */
+    insUnitsLabel?: string;
+    /** $MEASUREMENT — 0 = hệ Anh, 1 = hệ mét */
+    measurement?: number;
+    /** $LTSCALE — tỷ lệ nét đứt toàn cục */
+    ltScale?: number;
+    /** $EXTMIN / $EXTMAX — khung bao do AutoCAD ghi trong tệp */
+    extMin?: [number, number, number];
+    extMax?: [number, number, number];
+  };
   blocks: Array<{
     name: string;
     count: number;
     attributes: Record<string, string>;
     mappedBoqCode?: string;
+    /** Điểm gốc chèn khối (mã 10/20/30 của BLOCK) */
+    basePoint?: [number, number, number];
+    /** Hình học bên trong định nghĩa khối, đọc từ section BLOCKS */
+    entities?: DxfEntityRaw[];
   }>;
   xrefs: DxfXrefInfo[];
   diagnostic: DxfDiagnosticReport;
@@ -528,11 +602,18 @@ export function decodeCadText(rawText: string): string {
     .replace(/\\S([^;^]+)\^([^;]+);/g, "$1/$2")
     .replace(/\\S([^;]+);/g, "$1");
 
-  // Convert TCVN3 / ABC fonts
-  clean = convertTcvn3ToUnicode(clean);
+  // Giải mã TCVN3/ABC — chỉ khi chuỗi còn mang ký tự chữ ký của bảng mã cũ. Chuỗi đã là Unicode
+  // thì để nguyên, nếu không hàm này không idempotent và vòng "chuẩn hoá → xuất DXF → nạp lại"
+  // sẽ giải mã chồng lần hai (vd `gió` hoá `giú`).
+  if (TCVN3_SIGNATURE.test(clean)) {
+    clean = convertTcvn3ToUnicode(clean);
+  }
 
-  // Convert VNI fonts if any pairs remain
-  clean = convertVniToUnicode(clean);
+  // Giải mã VNI — văn bản VNI luôn là ASCII thuần (dấu viết bằng chữ số), nên chuỗi đã có ký tự
+  // có dấu chắc chắn không phải VNI và không được đụng vào.
+  if (/^[\u0000-\u007f]*$/.test(clean)) {
+    clean = convertVniToUnicode(clean);
+  }
 
   // Normalize Unicode NFC canonical composition
   try {
@@ -553,84 +634,6 @@ export function isCorruptedEncoding(text: string): boolean {
   if (/[\u00b8\u00b5\u00b6\u00b7\u00b9\u00be\u00bf\u00a1-\u00a9]/i.test(text)) return true;
   const decoded = decodeCadText(text);
   return decoded !== text;
-}
-
-/**
- * Tự động tạo cấu trúc thực thể CAD MEPF chuẩn xác khi nạp tệp bản vẽ DWG nhị phân hoặc DXF rút gọn.
- */
-export function generateSynthesizedMepfDxf(fileName: string): string {
-  const upper = fileName.toUpperCase();
-  const isHvac =
-    upper.includes("-M-") ||
-    upper.includes("HVAC") ||
-    upper.includes("GIO") ||
-    (!upper.includes("-E-") && !upper.includes("-P-") && !upper.includes("-F-"));
-  const isPlumb =
-    upper.includes("-P-") ||
-    upper.includes("PLUMB") ||
-    upper.includes("NUOC") ||
-    upper.includes("SAN");
-  const isElec = upper.includes("-E-") || upper.includes("ELEC") || upper.includes("DIEN");
-  const isFire = upper.includes("-F-") || upper.includes("FIRE") || upper.includes("PCCC");
-
-  let dxf = `0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n`;
-
-  // Layers definition
-  dxf += `0\nLAYER\n2\n01_M_ONG_GIO_CAP_CHINH\n62\n140\n6\nCONTINUOUS\n`;
-  dxf += `0\nLAYER\n2\n02_M_ONG_GIO_HOI_AHU\n62\n150\n6\nCONTINUOUS\n`;
-  dxf += `0\nLAYER\n2\n03_P_ONG_NUOC_LANH_CHW\n62\n70\n6\nCONTINUOUS\n`;
-  dxf += `0\nLAYER\n2\n04_P_CAP_THOAT_NUOC_THAI\n62\n170\n6\nCONTINUOUS\n`;
-  dxf += `0\nLAYER\n2\n05_E_DIEN_MANG_CAP_PWR\n62\n40\n6\nCONTINUOUS\n`;
-  dxf += `0\nLAYER\n2\n06_F_PCCC_SPRINKLER\n62\n10\n6\nCONTINUOUS\n`;
-  dxf += `0\nLAYER\n2\n07_S_TRUC_COT_KET_CAU\n62\n8\n6\nCENTER\n`;
-  dxf += `0\nLAYER\n2\n08_G_GHI_CHU_DIM_TEXT\n62\n7\n6\nCONTINUOUS\n`;
-  dxf += `0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n`;
-
-  // 1. Trục lưới kết cấu (Grid A, B, C & 1, 2, 3, 4)
-  for (let gridX = 1000; gridX <= 16000; gridX += 5000) {
-    dxf += `0\nLINE\n8\n07_S_TRUC_COT_KET_CAU\n10\n${gridX}\n20\n1000\n30\n0\n11\n${gridX}\n7000\n31\n0\n`;
-  }
-  for (let gridY = 1000; gridY <= 7000; gridY += 3000) {
-    dxf += `0\nLINE\n8\n07_S_TRUC_COT_KET_CAU\n10\n1000\n20\n${gridY}\n30\n0\n11\n16000\n21\n${gridY}\n31\n0\n`;
-  }
-
-  // 2. Tuyến ống gió cấp chính & ống gió hồi (HVAC Ducts)
-  dxf += `0\nLINE\n8\n01_M_ONG_GIO_CAP_CHINH\n10\n1500\n20\n2500\n30\n3100\n11\n15500\n21\n2500\n31\n3100\n`;
-  dxf += `0\nLINE\n8\n01_M_ONG_GIO_CAP_CHINH\n10\n6000\n20\n2500\n30\n3100\n11\n6000\n20\n4500\n31\n3100\n`;
-  dxf += `0\nLINE\n8\n01_M_ONG_GIO_CAP_CHINH\n10\n11000\n20\n2500\n30\n3100\n11\n11000\n20\n4500\n31\n3100\n`;
-  dxf += `0\nLINE\n8\n02_M_ONG_GIO_HOI_AHU\n10\n1500\n20\n1800\n30\n3100\n11\n15500\n21\n1800\n31\n3100\n`;
-
-  // 3. Khối Block miệng gió & van chặn lửa VCD
-  dxf += `0\nINSERT\n8\n01_M_ONG_GIO_CAP_CHINH\n2\nBLK_DIFFUSER_600x600\n10\n4000\n20\n2500\n30\n2800\n`;
-  dxf += `0\nINSERT\n8\n01_M_ONG_GIO_CAP_CHINH\n2\nBLK_DIFFUSER_600x600\n10\n8500\n20\n2500\n30\n2800\n`;
-  dxf += `0\nINSERT\n8\n01_M_ONG_GIO_CAP_CHINH\n2\nBLK_DIFFUSER_600x600\n10\n13500\n20\n2500\n30\n2800\n`;
-  dxf += `0\nINSERT\n8\n01_M_ONG_GIO_CAP_CHINH\n2\nBLK_VCD_600x400\n10\n2200\n20\n2500\n30\n3100\n`;
-
-  // 4. Tuyến máng cáp điện động lực & chiếu sáng (Cable Trays)
-  dxf += `0\nLINE\n8\n05_E_DIEN_MANG_CAP_PWR\n10\n1500\n20\n3400\n30\n2900\n11\n15500\n21\n3400\n31\n2900\n`;
-  dxf += `0\nINSERT\n8\n05_E_DIEN_MANG_CAP_PWR\n2\nBLK_ELEC_PANEL_DB\n10\n1500\n20\n3400\n30\n2000\n`;
-
-  // 5. Tuyến ống nước Chiller & Thoát nước trọng lực (Piping)
-  dxf += `0\nLINE\n8\n03_P_ONG_NUOC_LANH_CHW\n10\n1500\n20\n4000\n30\n2600\n11\n15500\n21\n4000\n31\n2600\n`;
-  dxf += `0\nINSERT\n8\n03_P_ONG_NUOC_LANH_CHW\n2\nBLK_GATE_VALVE_DN100\n10\n3000\n20\n4000\n30\n2600\n`;
-  dxf += `0\nLINE\n8\n04_P_CAP_THOAT_NUOC_THAI\n10\n1500\n20\n4800\n30\n2550\n11\n15500\n21\n4800\n31\n2340\n`;
-
-  // 6. Tuyến PCCC Sprinkler
-  dxf += `0\nLINE\n8\n06_F_PCCC_SPRINKLER\n10\n1500\n20\n5400\n30\n2700\n11\n15500\n21\n5400\n31\n2700\n`;
-  dxf += `0\nINSERT\n8\n06_F_PCCC_SPRINKLER\n2\nBLK_SPRINKLER_68C\n10\n3500\n20\n5400\n30\n2700\n`;
-  dxf += `0\nINSERT\n8\n06_F_PCCC_SPRINKLER\n2\nBLK_SPRINKLER_68C\n10\n7500\n20\n5400\n30\n2700\n`;
-  dxf += `0\nINSERT\n8\n06_F_PCCC_SPRINKLER\n2\nBLK_SPRINKLER_68C\n10\n11500\n20\n5400\n30\n2700\n`;
-
-  // 7. Ghi chú kỹ thuật Text & Kích thước (Vietnamese TCVN3 / CAD notation)
-  dxf += `0\nTEXT\n8\n08_G_GHI_CHU_DIM_TEXT\n10\n3000\n20\n2600\n30\n3100\n1\nèng giã cÊp l¹nh AHU-01 800x500 BOP=+2.85m\n`;
-  dxf += `0\nTEXT\n8\n08_G_GHI_CHU_DIM_TEXT\n10\n7000\n20\n3500\n30\n2900\n1\nM¸ng c¸p 400x100 ®éng lùc h¹ thÕ\n`;
-  dxf += `0\nTEXT\n8\n08_G_GHI_CHU_DIM_TEXT\n10\n5000\n20\n4100\n30\n2600\n1\nèng n−íc l¹nh Chiller DN150 %%c168\n`;
-  dxf += `0\nTEXT\n8\n08_G_GHI_CHU_DIM_TEXT\n10\n8000\n20\n4900\n30\n2450\n1\nèng thãt n−íc D114 dèc i=1.5% BOP=+2250\n`;
-  dxf += `0\nTEXT\n8\n08_G_GHI_CHU_DIM_TEXT\n10\n4000\n20\n5500\n30\n2700\n1\n§Çu phun PCCC Sprinkler 68øC quay xuèng\n`;
-  dxf += `0\nTEXT\n8\n08_G_GHI_CHU_DIM_TEXT\n10\n1000\n20\n800\n30\n0\n1\nTrôc A giao Trôc 1 cao ®é %%p0.000\n`;
-
-  dxf += `0\nENDSEC\n0\nEOF\n`;
-  return dxf;
 }
 
 /**
@@ -669,14 +672,526 @@ export function parseDwgBinary(
   throw new DwgUnsupportedError(fileName);
 }
 
+/** Nhãn tiếng Việt cho biến HEADER `$INSUNITS` (đơn vị vẽ của bản vẽ). */
+export const INSUNITS_LABELS: Record<number, string> = {
+  0: "Không quy định",
+  1: "Inch",
+  2: "Foot",
+  3: "Dặm",
+  4: "Milimét",
+  5: "Xentimét",
+  6: "Mét",
+  7: "Kilômét",
+  8: "Microinch",
+  9: "Mil",
+  10: "Yard",
+  11: "Angstrom",
+  12: "Nanomét",
+  13: "Micron",
+  14: "Decimét",
+  15: "Decamét",
+  16: "Hectomét",
+  17: "Gigamét",
+  18: "Đơn vị thiên văn",
+  19: "Năm ánh sáng",
+  20: "Parsec",
+};
+
+/** Một cặp (mã nhóm, giá trị) của tệp DXF ASCII. */
+interface DxfPair {
+  code: number;
+  value: string;
+}
+
 /**
- * Phân tích tệp ASCII DXF hoặc nhị phân DWG thành cấu trúc đối tượng hình học & kỹ thuật.
+ * Tách nội dung DXF ASCII thành dãy cặp (mã nhóm, giá trị).
+ *
+ * Giá trị **không** bị trim: mã nhóm 1/3 là nội dung chữ trên bản vẽ, khoảng trắng đầu/cuối là
+ * dữ liệu thật của người vẽ. Gặp dòng lệch nhịp (không phải số ở vị trí mã nhóm) thì lùi 1 dòng
+ * để bắt lại nhịp thay vì đọc sai toàn bộ phần còn lại — `validateDxf` mới là nơi báo lỗi cấu trúc.
+ */
+function readDxfPairs(content: string): DxfPair[] {
+  const lines = content.replace(/^﻿/, "").split(/\r\n|\r|\n/);
+  const pairs: DxfPair[] = [];
+
+  for (let i = 0; i + 1 < lines.length; i += 2) {
+    const codeRaw = lines[i].trim();
+    if (!/^-?\d+$/.test(codeRaw)) {
+      i -= 1; // bắt lại nhịp cặp
+      continue;
+    }
+    pairs.push({ code: parseInt(codeRaw, 10), value: lines[i + 1] });
+  }
+
+  return pairs;
+}
+
+/** Các loại thực thể bộ đọc hiểu được (khớp union `DxfEntityRaw["type"]`). */
+const PARSED_ENTITY_TYPES = new Set<DxfEntityRaw["type"]>([
+  "LINE",
+  "LWPOLYLINE",
+  "POLYLINE",
+  "CIRCLE",
+  "ARC",
+  "TEXT",
+  "MTEXT",
+  "INSERT",
+  "DIMENSION",
+  "SPLINE",
+  "ELLIPSE",
+  "SOLID",
+  "3DFACE",
+  "HATCH",
+  "LEADER",
+  "MULTILEADER",
+  "POINT",
+]);
+
+/** Đọc số thực; giá trị không đọc được trả `undefined` để chỗ gọi tự quyết, không mặc định 0. */
+function numOrUndef(v: string): number | undefined {
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function num(v: string, fallback = 0): number {
+  return numOrUndef(v) ?? fallback;
+}
+
+/**
+ * Gom toàn bộ cặp của một nhóm (thực thể / bản ghi bảng), tính từ ngay sau cặp `0/<TÊN>` cho tới
+ * ngay trước cặp mã 0 kế tiếp. Giữ nguyên thứ tự vì nhiều mã nhóm lặp lại (10/20 của LWPOLYLINE,
+ * 42 độ cong từng đoạn, 3 các mảnh chữ MTEXT).
+ */
+function readGroup(pairs: DxfPair[], start: number): { group: DxfPair[]; next: number } {
+  const group: DxfPair[] = [];
+  let i = start;
+  while (i < pairs.length && pairs[i].code !== 0) {
+    group.push(pairs[i]);
+    i += 1;
+  }
+  return { group, next: i };
+}
+
+/** Điểm 3D dựng từ 3 mã nhóm toạ độ; thiếu X hoặc Y thì coi như không có điểm. */
+function pointOf(
+  x: number | undefined,
+  y: number | undefined,
+  z: number | undefined,
+): [number, number, number] | undefined {
+  if (x === undefined || y === undefined) return undefined;
+  return [x, y, z ?? 0];
+}
+
+/**
+ * Dựng một `DxfEntityRaw` từ nhóm cặp mã đã gom, theo đúng mã nhóm mà đặc tả DXF quy định cho
+ * từng loại thực thể. Không có mã nhóm nào thì trường tương ứng để trống — không bịa giá trị.
+ */
+function buildEntity(type: DxfEntityRaw["type"], group: DxfPair[], id: string): DxfEntityRaw {
+  let layer = "0";
+  let color: number | undefined;
+  let lineType: string | undefined;
+  let text = "";
+  let blockName: string | undefined;
+  let textStyle: string | undefined;
+  let patternName: string | undefined;
+
+  // Bộ toạ độ cơ bản
+  let x10: number | undefined;
+  let y20: number | undefined;
+  let z30: number | undefined;
+  let x11: number | undefined;
+  let y21: number | undefined;
+  let z31: number | undefined;
+  let x13: number | undefined;
+  let y23: number | undefined;
+  let z33: number | undefined;
+  let x14: number | undefined;
+  let y24: number | undefined;
+  let z34: number | undefined;
+
+  let val40: number | undefined; // bán kính / chiều cao chữ / tỷ lệ trục ELLIPSE
+  let val41: number | undefined; // hệ số bề rộng chữ / tỷ lệ X của INSERT
+  let val42: number | undefined; // số đo thật của DIMENSION / tỷ lệ Y của INSERT
+  let val43: number | undefined; // tỷ lệ Z của INSERT
+  let val50: number | undefined; // góc xoay / góc bắt đầu cung
+  let val51: number | undefined; // góc kết thúc cung
+  let flags70: number | undefined;
+  let elevation38: number | undefined;
+
+  const points: Array<[number, number, number]> = [];
+  const bulges: number[] = [];
+  const fitPoints: Array<[number, number, number]> = [];
+  const corners: Array<[number, number, number]> = [];
+
+  const isPolyLike = type === "LWPOLYLINE" || type === "SPLINE" || type === "LEADER";
+  const isCornerLike = type === "SOLID" || type === "3DFACE";
+
+  for (const { code, value } of group) {
+    switch (code) {
+      case 8:
+        layer = value.trim();
+        break;
+      case 6:
+        lineType = value.trim();
+        break;
+      case 62: {
+        const c = numOrUndef(value);
+        if (c !== undefined) color = Math.abs(c);
+        break;
+      }
+      case 1:
+      case 3:
+        // MTEXT chia chữ dài thành nhiều mảnh mã 3 rồi kết bằng mã 1 — nối theo đúng thứ tự tệp.
+        text += value;
+        break;
+      case 2:
+        if (type === "HATCH") patternName = value.trim();
+        else blockName = value.trim();
+        break;
+      case 7:
+        textStyle = value.trim();
+        break;
+      case 10:
+        if (isPolyLike) {
+          points.push([num(value), 0, 0]);
+          bulges.push(0);
+        } else if (isCornerLike) {
+          // SOLID / 3DFACE: đỉnh thứ nhất nằm ở 10/20/30, ba đỉnh còn lại ở 11..13
+          corners.push([num(value), 0, 0]);
+        } else {
+          x10 = numOrUndef(value);
+        }
+        break;
+      case 20:
+        if (isPolyLike && points.length > 0) points[points.length - 1][1] = num(value);
+        else if (isCornerLike && corners.length > 0) corners[corners.length - 1][1] = num(value);
+        else y20 = numOrUndef(value);
+        break;
+      case 30:
+        if (isPolyLike && points.length > 0) points[points.length - 1][2] = num(value);
+        else if (isCornerLike && corners.length > 0) corners[corners.length - 1][2] = num(value);
+        else z30 = numOrUndef(value);
+        break;
+      case 11:
+        if (type === "SPLINE") fitPoints.push([num(value), 0, 0]);
+        else if (isCornerLike) corners.push([num(value), 0, 0]);
+        else x11 = numOrUndef(value);
+        break;
+      case 21:
+        if (type === "SPLINE" && fitPoints.length > 0)
+          fitPoints[fitPoints.length - 1][1] = num(value);
+        else if (isCornerLike && corners.length > 0) corners[corners.length - 1][1] = num(value);
+        else y21 = numOrUndef(value);
+        break;
+      case 31:
+        if (type === "SPLINE" && fitPoints.length > 0)
+          fitPoints[fitPoints.length - 1][2] = num(value);
+        else if (isCornerLike && corners.length > 0) corners[corners.length - 1][2] = num(value);
+        else z31 = numOrUndef(value);
+        break;
+      case 12:
+        if (isCornerLike) corners.push([num(value), 0, 0]);
+        break;
+      case 22:
+        if (isCornerLike && corners.length > 0) corners[corners.length - 1][1] = num(value);
+        break;
+      case 32:
+        if (isCornerLike && corners.length > 0) corners[corners.length - 1][2] = num(value);
+        break;
+      case 13:
+        if (type === "SOLID" || type === "3DFACE") corners.push([num(value), 0, 0]);
+        else x13 = numOrUndef(value);
+        break;
+      case 23:
+        if ((type === "SOLID" || type === "3DFACE") && corners.length > 0)
+          corners[corners.length - 1][1] = num(value);
+        else y23 = numOrUndef(value);
+        break;
+      case 33:
+        if ((type === "SOLID" || type === "3DFACE") && corners.length > 0)
+          corners[corners.length - 1][2] = num(value);
+        else z33 = numOrUndef(value);
+        break;
+      case 14:
+        x14 = numOrUndef(value);
+        break;
+      case 24:
+        y24 = numOrUndef(value);
+        break;
+      case 34:
+        z34 = numOrUndef(value);
+        break;
+      case 38:
+        elevation38 = numOrUndef(value);
+        break;
+      case 40:
+        val40 = numOrUndef(value);
+        break;
+      case 41:
+        val41 = numOrUndef(value);
+        break;
+      case 42:
+        // LWPOLYLINE: độ cong của đoạn nối từ đỉnh vừa đọc; các loại khác: số đo/tỷ lệ.
+        if (type === "LWPOLYLINE" && points.length > 0) bulges[points.length - 1] = num(value);
+        else val42 = numOrUndef(value);
+        break;
+      case 43:
+        val43 = numOrUndef(value);
+        break;
+      case 50:
+        val50 = numOrUndef(value);
+        break;
+      case 51:
+        val51 = numOrUndef(value);
+        break;
+      case 70:
+        flags70 = numOrUndef(value);
+        break;
+    }
+  }
+
+  const coordinates: DxfEntityRaw["coordinates"] = {};
+
+  if (type === "LINE") {
+    coordinates.start = pointOf(x10, y20, z30);
+    coordinates.end = pointOf(x11, y21, z31);
+  } else if (type === "LWPOLYLINE") {
+    if (elevation38 !== undefined) {
+      points.forEach((p) => (p[2] = elevation38));
+      coordinates.elevation = elevation38;
+    }
+    coordinates.points = points;
+    if (bulges.some((b) => b !== 0)) coordinates.bulges = bulges;
+    coordinates.closed = Boolean(flags70 !== undefined && flags70 & 1);
+  } else if (type === "POLYLINE") {
+    // POLYLINE kiểu cũ: mã 10/20/30 của chính nó là điểm giả (luôn 0,0,cao-độ) — hình học nằm ở
+    // các VERTEX theo sau, `readEntityAt` sẽ điền vào. Không lấy điểm giả này làm toạ độ thực thể.
+    coordinates.points = [];
+    coordinates.closed = Boolean(flags70 !== undefined && flags70 & 1);
+    if (z30 !== undefined) coordinates.elevation = z30;
+  } else if (type === "SPLINE") {
+    // Đường cong SPLINE dùng điểm khớp (11/21/31) nếu có, không có thì dùng điểm điều khiển.
+    coordinates.points = fitPoints.length > 0 ? fitPoints : points;
+    coordinates.closed = Boolean(flags70 !== undefined && flags70 & 1);
+  } else if (type === "LEADER") {
+    coordinates.points = points;
+    if (points.length > 0) {
+      coordinates.start = points[0];
+      coordinates.end = points[points.length - 1];
+    }
+  } else if (type === "CIRCLE") {
+    coordinates.center = pointOf(x10, y20, z30);
+    if (val40 !== undefined) coordinates.radius = val40;
+  } else if (type === "ARC") {
+    coordinates.center = pointOf(x10, y20, z30);
+    if (val40 !== undefined) coordinates.radius = val40;
+    if (val50 !== undefined) coordinates.startAngle = val50;
+    if (val51 !== undefined) coordinates.endAngle = val51;
+  } else if (type === "ELLIPSE") {
+    coordinates.center = pointOf(x10, y20, z30);
+    coordinates.majorAxis = pointOf(x11, y21, z31);
+    if (val40 !== undefined) coordinates.axisRatio = val40;
+  } else if (type === "SOLID" || type === "3DFACE") {
+    coordinates.corners = corners;
+    if (corners.length > 0) coordinates.center = corners[0];
+  } else if (type === "DIMENSION") {
+    // Mã 10 là điểm đặt đường kích thước, KHÔNG phải hai đầu đo. Hai đầu đo thật nằm ở
+    // 13/23/33 và 14/24/34; số đo thật nằm ở mã 42 do AutoCAD ghi sẵn.
+    const p13 = pointOf(x13, y23, z33);
+    const p14 = pointOf(x14, y24, z34);
+    if (p13 && p14) coordinates.measurePoints = [p13, p14];
+    coordinates.start = p13 ?? pointOf(x10, y20, z30);
+    coordinates.end = p14;
+    coordinates.center = pointOf(x10, y20, z30);
+    coordinates.textMidPoint = pointOf(x11, y21, z31);
+  } else {
+    // TEXT / MTEXT / INSERT / HATCH / MULTILEADER: điểm chèn nằm ở 10/20/30
+    coordinates.center = pointOf(x10, y20, z30);
+    if (type === "TEXT" && (x11 !== undefined || y21 !== undefined)) {
+      coordinates.alignPoint = pointOf(x11, y21, z31);
+    }
+  }
+
+  const entity: DxfEntityRaw = {
+    id,
+    type,
+    layer,
+    color,
+    coordinates,
+  };
+
+  if (lineType) entity.lineType = lineType;
+  if (text) {
+    entity.textValue = text;
+    entity.decodedText = decodeCadText(text);
+  }
+  if (blockName) entity.blockName = blockName;
+  if (textStyle) entity.textStyle = textStyle;
+  if (patternName) entity.patternName = patternName;
+
+  if (type === "TEXT" || type === "MTEXT") {
+    if (val40 !== undefined) entity.textHeight = val40;
+    if (val41 !== undefined && type === "TEXT") entity.widthFactor = val41;
+    if (val50 !== undefined) entity.rotation = val50;
+  } else if (type === "INSERT") {
+    entity.scale = [val41 ?? 1, val42 ?? 1, val43 ?? 1];
+    if (val50 !== undefined) entity.rotation = val50;
+  } else if (type === "DIMENSION") {
+    if (val42 !== undefined) entity.measurement = val42;
+    if (val50 !== undefined) entity.rotation = val50;
+  } else if (type === "HATCH") {
+    entity.isSolidFill = Boolean(flags70 !== undefined && flags70 & 1);
+  }
+
+  return entity;
+}
+
+/**
+ * Đọc một thực thể tại vị trí `start` (trỏ vào cặp `0/<TÊN>`), gồm cả các nhóm con đi kèm:
+ * VERTEX của POLYLINE cũ và ATTRIB của INSERT có thuộc tính.
+ */
+function readEntityAt(
+  pairs: DxfPair[],
+  start: number,
+  id: string,
+): { entity: DxfEntityRaw; next: number } {
+  const type = pairs[start].value.trim() as DxfEntityRaw["type"];
+  const { group, next } = readGroup(pairs, start + 1);
+  const entity = buildEntity(type, group, id);
+  let i = next;
+
+  if (type === "POLYLINE") {
+    // POLYLINE kiểu cũ: hình học nằm ở các thực thể VERTEX theo sau, kết bằng SEQEND.
+    const verts: Array<[number, number, number]> = [];
+    const vertBulges: number[] = [];
+    while (i < pairs.length && pairs[i].code === 0) {
+      const sub = pairs[i].value.trim();
+      if (sub === "VERTEX") {
+        const { group: vg, next: vn } = readGroup(pairs, i + 1);
+        let vx: number | undefined;
+        let vy: number | undefined;
+        let vz = 0;
+        let vb = 0;
+        for (const { code, value } of vg) {
+          if (code === 10) vx = numOrUndef(value);
+          else if (code === 20) vy = numOrUndef(value);
+          else if (code === 30) vz = num(value);
+          else if (code === 42) vb = num(value);
+        }
+        if (vx !== undefined && vy !== undefined) {
+          verts.push([vx, vy, vz]);
+          vertBulges.push(vb);
+        }
+        i = vn;
+      } else if (sub === "SEQEND") {
+        i = readGroup(pairs, i + 1).next;
+        break;
+      } else {
+        break;
+      }
+    }
+    entity.coordinates.points = verts;
+    if (vertBulges.some((b) => b !== 0)) entity.coordinates.bulges = vertBulges;
+  } else if (type === "INSERT") {
+    // INSERT có mã 66=1 thì các ATTRIB theo sau mang giá trị thuộc tính thật của khối.
+    const attributes: Record<string, string> = {};
+    while (i < pairs.length && pairs[i].code === 0) {
+      const sub = pairs[i].value.trim();
+      if (sub === "ATTRIB") {
+        const { group: ag, next: an } = readGroup(pairs, i + 1);
+        let tag = "";
+        let value = "";
+        for (const p of ag) {
+          if (p.code === 2) tag = p.value.trim();
+          else if (p.code === 1) value += p.value;
+        }
+        if (tag) attributes[tag] = decodeCadText(value);
+        i = an;
+      } else if (sub === "SEQEND") {
+        i = readGroup(pairs, i + 1).next;
+        break;
+      } else {
+        break;
+      }
+    }
+    if (Object.keys(attributes).length > 0) entity.attributes = attributes;
+  }
+
+  return { entity, next: i };
+}
+
+/** Mọi toạ độ thật của một thực thể, dùng để tính khung bao bản vẽ. */
+function entityPoints(e: DxfEntityRaw): Array<[number, number, number]> {
+  const c = e.coordinates;
+  const pts: Array<[number, number, number]> = [];
+  if (c.start) pts.push(c.start);
+  if (c.end) pts.push(c.end);
+  if (c.center) pts.push(c.center);
+  if (c.alignPoint) pts.push(c.alignPoint);
+  if (c.textMidPoint) pts.push(c.textMidPoint);
+  if (c.points) pts.push(...c.points);
+  if (c.corners) pts.push(...c.corners);
+  if (c.measurePoints) pts.push(...c.measurePoints);
+  // Đường tròn/cung: lấy khung bao theo bán kính quanh tâm
+  if (c.center && c.radius !== undefined && c.radius > 0) {
+    pts.push([c.center[0] - c.radius, c.center[1] - c.radius, c.center[2]]);
+    pts.push([c.center[0] + c.radius, c.center[1] + c.radius, c.center[2]]);
+  }
+  return pts;
+}
+
+/** Kết quả rỗng trung thực khi không đọc được bản vẽ — không sinh layer/thực thể giả. */
+function emptyParseResult(fileName: string, fileSizeBytes: number, lyDo: string): DxfParseResult {
+  return {
+    fileName,
+    sourcePath: fileName,
+    fileFormat: "Unknown / Empty",
+    fileSizeBytes,
+    isRealDrawing: false,
+    layers: [],
+    entities: [],
+    blocks: [],
+    xrefs: [],
+    spatialRoutes: [],
+    diagnostic: {
+      healthScore: 0,
+      totalEntities: 0,
+      totalLayers: 0,
+      standardLayersCount: 0,
+      nonStandardLayersCount: 0,
+      corruptedTextCount: 0,
+      unmappedBlocksCount: 0,
+      boundingDimensions: { minX: 0, maxX: 0, minY: 0, maxY: 0, widthMm: 0, lengthMm: 0 },
+      disciplineBreakdown: {
+        hvac: 0,
+        electrical: 0,
+        plumbing: 0,
+        firefighting: 0,
+        elv: 0,
+        structural: 0,
+      },
+      recommendations: [lyDo],
+    },
+  };
+}
+
+/**
+ * Phân tích tệp DXF ASCII thành cấu trúc hình học & kỹ thuật (tệp DWG nhị phân bị từ chối,
+ * xem `DWG_UNSUPPORTED_MESSAGE`).
+ *
+ * Bộ đọc bám **theo section** (HEADER / TABLES / BLOCKS / ENTITIES) đúng đặc tả DXF của Autodesk
+ * thay vì quét phẳng cả tệp. Nhờ vậy: bảng LAYER không lẫn với thực thể, hình học bên trong định
+ * nghĩa BLOCK không bị đếm nhầm vào model space, và XREF đọc được từ chính bản vẽ (BLOCK có cờ 70
+ * bit 4 kèm đường dẫn mã 1).
+ *
+ * Nguyên tắc xuyên suốt (M98/M99): **thiếu dữ liệu thì để trống** — không suy diễn toạ độ, khung
+ * bao, số đo hay danh sách tệp tham chiếu.
  */
 export function parseDxf(
   dxfContent: string | Buffer | ArrayBuffer | Uint8Array,
   fileName = "model.dxf",
 ): DxfParseResult {
-  // Nếu là Buffer/Uint8Array/ArrayBuffer hoặc fileName là .dwg hoặc chuỗi nhị phân AC10
+  // Buffer/Uint8Array/ArrayBuffer, đuôi .dwg hoặc chữ ký AC10 đều là DWG nhị phân
   const isBinary =
     (typeof Buffer !== "undefined" && Buffer.isBuffer(dxfContent)) ||
     dxfContent instanceof ArrayBuffer ||
@@ -687,290 +1202,265 @@ export function parseDxf(
         fileName.toLowerCase().endsWith(".dwg")));
 
   if (isBinary) {
-    return parseDwgBinary(dxfContent as any, fileName);
+    return parseDwgBinary(dxfContent as Buffer, fileName);
   }
 
   const contentToParse = String(dxfContent || "").trim();
   if (!contentToParse || !contentToParse.includes("SECTION")) {
-    return {
+    return emptyParseResult(
       fileName,
-      sourcePath: fileName,
-      fileFormat: "Unknown / Empty",
-      fileSizeBytes: typeof dxfContent === "string" ? dxfContent.length : 0,
-      isRealDrawing: false,
-      layers: [],
-      entities: [],
-      blocks: [],
-      xrefs: [],
-      spatialRoutes: [],
-      diagnostic: {
-        healthScore: 0,
-        totalEntities: 0,
-        totalLayers: 0,
-        standardLayersCount: 0,
-        nonStandardLayersCount: 0,
-        corruptedTextCount: 0,
-        unmappedBlocksCount: 0,
-        boundingDimensions: {
-          minX: 0,
-          maxX: 0,
-          minY: 0,
-          maxY: 0,
-          widthMm: 0,
-          lengthMm: 0,
-        },
-        disciplineBreakdown: {
-          hvac: 0,
-          electrical: 0,
-          plumbing: 0,
-          firefighting: 0,
-          elv: 0,
-          structural: 0,
-        },
-        recommendations: [
-          "Chưa nạp bản vẽ hoặc tệp tin không đúng cấu trúc CAD. Vui lòng tải lên file DWG/DXF hợp lệ.",
-        ],
-      },
-    };
+      typeof dxfContent === "string" ? dxfContent.length : 0,
+      "Chưa nạp bản vẽ hoặc tệp tin không đúng cấu trúc CAD. Vui lòng tải lên file DXF hợp lệ.",
+    );
   }
 
-  const lines = contentToParse.split(/\r?\n/);
-  const layerMap = new Map<string, { color: number; lineType: string; count: number }>();
-  const entities: DxfEntityRaw[] = [];
-  const blockMap = new Map<string, { count: number; attributes: Record<string, string> }>();
+  const pairs = readDxfPairs(contentToParse);
 
+  const layerMap = new Map<
+    string,
+    {
+      color: number;
+      lineType: string;
+      count: number;
+      isFrozen: boolean;
+      isOff: boolean;
+      isLocked: boolean;
+      lineWeight?: number;
+    }
+  >();
+  const entities: DxfEntityRaw[] = [];
+  const insertCounts = new Map<string, { count: number; attributes: Record<string, string> }>();
+  const blockDefs = new Map<
+    string,
+    {
+      name: string;
+      basePoint: [number, number, number];
+      isXref: boolean;
+      isOverlay: boolean;
+      xrefPath?: string;
+      entities: DxfEntityRaw[];
+      layerNames: Set<string>;
+    }
+  >();
+  const header: NonNullable<DxfParseResult["header"]> = {};
+
+  let section = "";
+  let tableName = "";
+  let currentBlock: ReturnType<typeof blockDefs.get> | undefined;
   let i = 0;
+
+  /** Ghi nhận layer được thực thể tham chiếu (kể cả layer không khai trong bảng LAYER). */
+  const touchLayer = (name: string, color?: number) => {
+    const info = layerMap.get(name) || {
+      color: color ?? 7,
+      lineType: "CONTINUOUS",
+      count: 0,
+      isFrozen: false,
+      isOff: false,
+      isLocked: false,
+    };
+    info.count += 1;
+    layerMap.set(name, info);
+  };
+
+  while (i < pairs.length) {
+    const p = pairs[i];
+
+    if (p.code !== 0) {
+      i += 1;
+      continue;
+    }
+
+    const marker = p.value.trim();
+
+    if (marker === "SECTION") {
+      const { group, next } = readGroup(pairs, i + 1);
+      section = (group.find((g) => g.code === 2)?.value || "").trim().toUpperCase();
+      tableName = "";
+      i = next;
+      continue;
+    }
+
+    if (marker === "ENDSEC") {
+      section = "";
+      tableName = "";
+      currentBlock = undefined;
+      i = readGroup(pairs, i + 1).next;
+      continue;
+    }
+
+    if (section === "HEADER") {
+      i = readGroup(pairs, i + 1).next;
+      continue;
+    }
+
+    if (section === "TABLES") {
+      if (marker === "TABLE") {
+        const { group, next } = readGroup(pairs, i + 1);
+        tableName = (group.find((g) => g.code === 2)?.value || "").trim().toUpperCase();
+        i = next;
+        continue;
+      }
+      if (marker === "ENDTAB") {
+        tableName = "";
+        i = readGroup(pairs, i + 1).next;
+        continue;
+      }
+      if (marker === "LAYER" && tableName === "LAYER") {
+        const { group, next } = readGroup(pairs, i + 1);
+        let name = "0";
+        let rawColor = 7;
+        let lineType = "CONTINUOUS";
+        let flags = 0;
+        let lineWeight: number | undefined;
+        for (const { code, value } of group) {
+          if (code === 2) name = value.trim();
+          else if (code === 62) rawColor = num(value, 7);
+          else if (code === 6) lineType = value.trim();
+          else if (code === 70) flags = num(value);
+          else if (code === 370) lineWeight = numOrUndef(value);
+        }
+        const existing = layerMap.get(name);
+        layerMap.set(name, {
+          // Mã 62 âm = layer đang TẮT (giá trị tuyệt đối vẫn là màu ACI)
+          color: Math.abs(rawColor) || 7,
+          lineType,
+          count: existing?.count ?? 0,
+          isFrozen: Boolean(flags & 1),
+          isLocked: Boolean(flags & 4),
+          isOff: rawColor < 0,
+          lineWeight,
+        });
+        i = next;
+        continue;
+      }
+      i = readGroup(pairs, i + 1).next;
+      continue;
+    }
+
+    if (section === "BLOCKS") {
+      if (marker === "BLOCK") {
+        const { group, next } = readGroup(pairs, i + 1);
+        let name = "";
+        let flags = 0;
+        let xrefPath: string | undefined;
+        let bx = 0;
+        let by = 0;
+        let bz = 0;
+        for (const { code, value } of group) {
+          if (code === 2) name = value.trim();
+          else if (code === 1) xrefPath = value.trim();
+          else if (code === 70) flags = num(value);
+          else if (code === 10) bx = num(value);
+          else if (code === 20) by = num(value);
+          else if (code === 30) bz = num(value);
+        }
+        currentBlock = {
+          name,
+          basePoint: [bx, by, bz],
+          // Cờ 70: bit 4 = khối là XREF, bit 8 = XREF kiểu overlay
+          isXref: Boolean(flags & 4),
+          isOverlay: Boolean(flags & 8),
+          xrefPath: xrefPath || undefined,
+          entities: [],
+          layerNames: new Set<string>(),
+        };
+        if (name) blockDefs.set(name, currentBlock);
+        i = next;
+        continue;
+      }
+      if (marker === "ENDBLK") {
+        currentBlock = undefined;
+        i = readGroup(pairs, i + 1).next;
+        continue;
+      }
+      if (PARSED_ENTITY_TYPES.has(marker as DxfEntityRaw["type"]) && currentBlock) {
+        const { entity, next } = readEntityAt(
+          pairs,
+          i,
+          `BLK-${currentBlock.name}-${currentBlock.entities.length + 1}`,
+        );
+        currentBlock.entities.push(entity);
+        currentBlock.layerNames.add(entity.layer);
+        i = next;
+        continue;
+      }
+      i = readGroup(pairs, i + 1).next;
+      continue;
+    }
+
+    if (section === "ENTITIES" && PARSED_ENTITY_TYPES.has(marker as DxfEntityRaw["type"])) {
+      const { entity, next } = readEntityAt(pairs, i, `ENT-${entities.length + 1}`);
+      entities.push(entity);
+      touchLayer(entity.layer, entity.color);
+      if (entity.type === "INSERT" && entity.blockName) {
+        const b = insertCounts.get(entity.blockName) || { count: 0, attributes: {} };
+        b.count += 1;
+        if (entity.attributes) Object.assign(b.attributes, entity.attributes);
+        insertCounts.set(entity.blockName, b);
+      }
+      i = next;
+      continue;
+    }
+
+    i = readGroup(pairs, i + 1).next;
+  }
+
+  // ── HEADER: đọc riêng theo cặp mã 9/<tên biến> ──
+  for (let h = 0; h + 1 < pairs.length; h += 1) {
+    if (pairs[h].code !== 9) continue;
+    const varName = pairs[h].value.trim().toUpperCase();
+    const rest = pairs.slice(h + 1, h + 5).filter((q) => q.code !== 9 && q.code !== 0);
+    const first = rest[0];
+    if (!first) continue;
+    if (varName === "$ACADVER") header.acadVer = first.value.trim();
+    else if (varName === "$INSUNITS") {
+      const u = numOrUndef(first.value);
+      if (u !== undefined) {
+        header.insUnits = u;
+        header.insUnitsLabel = INSUNITS_LABELS[u] || "Không rõ";
+      }
+    } else if (varName === "$MEASUREMENT") header.measurement = numOrUndef(first.value);
+    else if (varName === "$LTSCALE") header.ltScale = numOrUndef(first.value);
+    else if (varName === "$EXTMIN" || varName === "$EXTMAX") {
+      const x = rest.find((q) => q.code === 10);
+      const y = rest.find((q) => q.code === 20);
+      const z = rest.find((q) => q.code === 30);
+      const pt = pointOf(
+        x ? numOrUndef(x.value) : undefined,
+        y ? numOrUndef(y.value) : undefined,
+        z ? numOrUndef(z.value) : undefined,
+      );
+      if (pt) {
+        if (varName === "$EXTMIN") header.extMin = pt;
+        else header.extMax = pt;
+      }
+    }
+  }
+
+  // ── Khung bao: tính từ toạ độ THẬT của thực thể; bản vẽ không có toạ độ nào thì để 0 ──
   let minX = Infinity;
   let maxX = -Infinity;
   let minY = Infinity;
   let maxY = -Infinity;
-
-  function updateBounds(x: number, y: number) {
-    if (isNaN(x) || isNaN(y)) return;
-    minX = Math.min(minX, x);
-    maxX = Math.max(maxX, x);
-    minY = Math.min(minY, y);
-    maxY = Math.max(maxY, y);
-  }
-
-  // Quick scanner for entities & layers
-  while (i < lines.length - 1) {
-    const code = lines[i]?.trim();
-    const val = lines[i + 1]?.trim();
-    i += 2;
-
-    if (code === "0" && val === "LAYER") {
-      // Table Layer Record
-      let layerName = "0";
-      let layerColor = 7;
-      let lineType = "CONTINUOUS";
-      while (i < lines.length - 1) {
-        const c = lines[i]?.trim();
-        const v = lines[i + 1]?.trim();
-        if (c === "0") {
-          i -= 2;
-          break;
-        }
-        if (c === "2") layerName = v;
-        if (c === "62") layerColor = Math.abs(parseInt(v, 10) || 7);
-        if (c === "6") lineType = v;
-        i += 2;
-      }
-      if (!layerMap.has(layerName)) {
-        layerMap.set(layerName, { color: layerColor, lineType, count: 0 });
-      }
-    } else if (
-      code === "0" &&
-      [
-        "LINE",
-        "LWPOLYLINE",
-        "POLYLINE",
-        "CIRCLE",
-        "ARC",
-        "TEXT",
-        "MTEXT",
-        "INSERT",
-        "DIMENSION",
-        "SPLINE",
-        "ELLIPSE",
-        "SOLID",
-        "3DFACE",
-        "HATCH",
-        "LEADER",
-        "MULTILEADER",
-      ].includes(val)
-    ) {
-      const entityType = val as DxfEntityRaw["type"];
-      let currentLayer = "0";
-      let entityColor: number | undefined;
-      let textContent = "";
-      let blockName = "";
-      const coords: DxfEntityRaw["coordinates"] = {};
-      const polyPoints: Array<[number, number, number]> = [];
-
-      let startX = 0,
-        startY = 0,
-        startZ = 0;
-      let endX = 0,
-        endY = 0,
-        endZ = 0;
-      let centerX = 0,
-        centerY = 0,
-        centerZ = 0;
-      let radius = 0;
-
-      while (i < lines.length - 1) {
-        const c = lines[i]?.trim();
-        const v = lines[i + 1]?.trim();
-        if (c === "0") {
-          // Finished entity
-          i -= 2;
-          break;
-        }
-
-        switch (c) {
-          case "8":
-            currentLayer = v;
-            break;
-          case "62":
-            entityColor = Math.abs(parseInt(v, 10) || 7);
-            break;
-          case "1":
-          case "3":
-            textContent += v;
-            break;
-          case "2":
-            blockName = v;
-            break;
-          case "10":
-            if (entityType === "LWPOLYLINE" || entityType === "SPLINE") {
-              polyPoints.push([parseFloat(v) || 0, 0, 0]);
-            } else if (
-              entityType === "LINE" ||
-              entityType === "DIMENSION" ||
-              entityType === "LEADER"
-            ) {
-              startX = parseFloat(v) || 0;
-              centerX = startX;
-            } else {
-              centerX = parseFloat(v) || 0;
-            }
-            break;
-          case "20":
-            if ((entityType === "LWPOLYLINE" || entityType === "SPLINE") && polyPoints.length > 0) {
-              polyPoints[polyPoints.length - 1][1] = parseFloat(v) || 0;
-            } else if (
-              entityType === "LINE" ||
-              entityType === "DIMENSION" ||
-              entityType === "LEADER"
-            ) {
-              startY = parseFloat(v) || 0;
-              centerY = startY;
-            } else {
-              centerY = parseFloat(v) || 0;
-            }
-            break;
-          case "30":
-            if ((entityType === "LWPOLYLINE" || entityType === "SPLINE") && polyPoints.length > 0) {
-              polyPoints[polyPoints.length - 1][2] = parseFloat(v) || 0;
-            } else if (
-              entityType === "LINE" ||
-              entityType === "DIMENSION" ||
-              entityType === "LEADER"
-            ) {
-              startZ = parseFloat(v) || 0;
-              centerZ = startZ;
-            } else {
-              centerZ = parseFloat(v) || 0;
-            }
-            break;
-          case "11":
-            endX = parseFloat(v) || 0;
-            break;
-          case "21":
-            endY = parseFloat(v) || 0;
-            break;
-          case "31":
-            endZ = parseFloat(v) || 0;
-            break;
-          case "40":
-            radius = parseFloat(v) || 0;
-            break;
-        }
-        i += 2;
-      }
-
-      // Record entity coordinates
-      if (entityType === "LINE" || entityType === "DIMENSION" || entityType === "LEADER") {
-        coords.start = [startX, startY, startZ];
-        coords.end = [endX || startX + 1000, endY || startY, endZ];
-        coords.center = [centerX, centerY, centerZ];
-        updateBounds(startX, startY);
-        updateBounds(endX || startX + 1000, endY || startY);
-      } else if (
-        entityType === "LWPOLYLINE" ||
-        entityType === "POLYLINE" ||
-        entityType === "SPLINE"
-      ) {
-        coords.points = polyPoints;
-        polyPoints.forEach((pt) => updateBounds(pt[0], pt[1]));
-      } else if (
-        [
-          "CIRCLE",
-          "ARC",
-          "INSERT",
-          "TEXT",
-          "MTEXT",
-          "ELLIPSE",
-          "SOLID",
-          "3DFACE",
-          "HATCH",
-        ].includes(entityType)
-      ) {
-        coords.center = [centerX, centerY, centerZ];
-        coords.radius = radius;
-        updateBounds(centerX, centerY);
-      }
-
-      // Update layer counts
-      const lInfo = layerMap.get(currentLayer) || {
-        color: entityColor || 7,
-        lineType: "CONTINUOUS",
-        count: 0,
-      };
-      lInfo.count += 1;
-      layerMap.set(currentLayer, lInfo);
-
-      // Decoded text
-      const decodedText = textContent ? decodeCadText(textContent) : undefined;
-
-      // Register block count
-      if (entityType === "INSERT" && blockName) {
-        const b = blockMap.get(blockName) || { count: 0, attributes: {} };
-        b.count += 1;
-        blockMap.set(blockName, b);
-      }
-
-      entities.push({
-        id: `ENT-${entities.length + 1}`,
-        type: entityType,
-        layer: currentLayer,
-        color: entityColor,
-        coordinates: coords,
-        textValue: textContent || undefined,
-        decodedText,
-        blockName: blockName || undefined,
-      });
+  for (const e of entities) {
+    for (const [x, y] of entityPoints(e)) {
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
     }
   }
+  const hasBounds = minX !== Infinity;
+  if (!hasBounds) {
+    minX = 0;
+    maxX = 0;
+    minY = 0;
+    maxY = 0;
+  }
 
-  // Fallback bounds if empty
-  if (minX === Infinity) minX = 0;
-  if (maxX === -Infinity) maxX = 15000;
-  if (minY === Infinity) minY = 0;
-  if (maxY === -Infinity) maxY = 10000;
-
-  // Process standard layer mapping
+  // ── Layer ──
   const rawLayerNames = Array.from(layerMap.keys());
   const standardLayerMapping = normalizeCadLayers(rawLayerNames);
 
@@ -1003,10 +1493,64 @@ export function parseDxf(
       standardName: stdName,
       discipline,
       entityCount: info.count,
+      isFrozen: info.isFrozen,
+      isOff: info.isOff,
+      isLocked: info.isLocked,
+      lineWeight: info.lineWeight,
     };
   });
 
-  // Calculate diagnostic breakdown
+  // ── Khối: gộp định nghĩa trong section BLOCKS với số lần chèn thật ở model space ──
+  const blockNames = new Set<string>([...blockDefs.keys(), ...insertCounts.keys()]);
+  const blocks = Array.from(blockNames)
+    // Khối XREF và khối hệ thống (*Model_Space…) không phải khối thiết bị để bóc khối lượng
+    .filter((name) => !name.startsWith("*") && !blockDefs.get(name)?.isXref)
+    .map((name) => {
+      const def = blockDefs.get(name);
+      const ins = insertCounts.get(name);
+      let mappedBoq: string | undefined;
+      const n = name.toUpperCase();
+      if (n.includes("DIFFUSER")) mappedBoq = "HVAC-DIFF-600";
+      else if (n.includes("VAV")) mappedBoq = "HVAC-VAV-BOX";
+      else if (n.includes("SPRINKLER")) mappedBoq = "FP-SPK-PENDENT";
+      else if (n.includes("VALVE")) mappedBoq = "PLUMB-VALVE-BF";
+      else if (n.includes("PANEL") || n.includes("DB")) mappedBoq = "ELEC-PANEL-DB";
+
+      return {
+        name,
+        count: ins?.count ?? 0,
+        attributes: ins?.attributes ?? {},
+        mappedBoqCode: mappedBoq,
+        basePoint: def?.basePoint,
+        entities: def?.entities,
+      };
+    });
+
+  // ── XREF: đọc thật từ các khối mang cờ tham chiếu ngoài, không có thì danh sách rỗng ──
+  const xrefs: DxfXrefInfo[] = Array.from(blockDefs.values())
+    .filter((b) => b.isXref)
+    .map((b, idx) => {
+      const path = b.xrefPath || "";
+      const baseName = path.split(/[\\/]/).pop() || `${b.name}.dwg`;
+      const insertCount = entities.filter((e) => e.blockName === b.name).length;
+      return {
+        id: `XREF-${String(idx + 1).padStart(2, "0")}`,
+        name: b.name,
+        originalPath: path,
+        path: path || undefined,
+        fileName: baseName,
+        type: b.isOverlay ? ("Overlay" as const) : ("Attach" as const),
+        // Bản thân tệp DXF không cho biết tệp tham chiếu có tồn tại hay không —
+        // `resolveXrefDependencies` mới đối soát với danh sách tệp thật của thư mục.
+        status: "unloaded" as const,
+        entityCount: insertCount,
+        layerCount: b.layerNames.size,
+        description: `Tham chiếu ngoài ${b.isOverlay ? "kiểu Overlay" : "kiểu Attach"} từ ${path || "(không ghi đường dẫn)"}`,
+        isBound: false,
+      };
+    });
+
+  // ── Chẩn đoán ──
   let hvacCount = 0;
   let elecCount = 0;
   let plumbCount = 0;
@@ -1036,7 +1580,7 @@ export function parseDxf(
 
   const stdLayersCount = layers.filter((l) => l.isStandardized).length;
   const nonStdLayersCount = layers.length - stdLayersCount;
-  const unmappedBlocksCount = Array.from(blockMap.keys()).length;
+  const unmappedBlocksCount = blocks.filter((b) => !b.mappedBoqCode).length;
 
   const recommendations: string[] = [];
   if (nonStdLayersCount > 0) {
@@ -1049,13 +1593,22 @@ export function parseDxf(
       `Phát hiện ${corruptedTextCount} đoạn text bị lỗi font TCVN3/VNI hoặc mã CAD. Chạy Font Doctor để chuyển về UTF-8.`,
     );
   }
+  if (xrefs.length > 0) {
+    recommendations.push(
+      `Bản vẽ tham chiếu ${xrefs.length} tệp ngoài (XREF). Nạp cả thư mục chứa các tệp này để đối soát và gộp trước khi phát hành.`,
+    );
+  }
   if (entities.length > 0) {
     recommendations.push(
       "Bản vẽ sẵn sàng đùn khối 3D AABB và thiết lập phân tầng hành lang kỹ thuật đa tầng (Multi-Tier Corridor).",
     );
   }
+  if (entities.length === 0) {
+    recommendations.push(
+      "Section ENTITIES của tệp không có thực thể nào đọc được — kiểm tra lại tệp gốc trước khi chuẩn hóa.",
+    );
+  }
 
-  // Health Score (0 - 100)
   const layerScore = layers.length > 0 ? (stdLayersCount / layers.length) * 40 : 20;
   const fontScore =
     entities.length > 0
@@ -1091,72 +1644,14 @@ export function parseDxf(
     recommendations,
   };
 
-  // Convert Centerlines into Extruded 3D Routes
   const spatialRoutes = convertDxfToSpatialRoutes(entities);
-
-  // Format blocks
-  const blocks = Array.from(blockMap.entries()).map(([name, data]) => {
-    let mappedBoq: string | undefined;
-    const n = name.toUpperCase();
-    if (n.includes("DIFFUSER")) mappedBoq = "HVAC-DIFF-600";
-    else if (n.includes("VAV")) mappedBoq = "HVAC-VAV-BOX";
-    else if (n.includes("SPRINKLER")) mappedBoq = "FP-SPK-PENDENT";
-    else if (n.includes("VALVE")) mappedBoq = "PLUMB-VALVE-BF";
-    else if (n.includes("PANEL") || n.includes("DB")) mappedBoq = "ELEC-PANEL-DB";
-
-    return {
-      name,
-      count: data.count,
-      attributes: data.attributes,
-      mappedBoqCode: mappedBoq,
-    };
-  });
-
-  // Tự động nhận diện cây liên kết XREF (External Reference Links)
-  const xrefs: DxfXrefInfo[] = [
-    {
-      id: "XREF-01",
-      name: "XREF_A_ARCH_GRID",
-      originalPath: "..\\Xref\\A-ARCH-GRID-AXIS.dwg",
-      fileName: "A-ARCH-GRID-AXIS.dwg",
-      type: "Overlay",
-      status: "resolved",
-      resolvedFileName: "A-ARCH-GRID-AXIS.dwg",
-      entityCount: 45,
-      layerCount: 6,
-      description: "Trục định vị kiến trúc A-D & 1-5 kèm tường bao căn hộ",
-      isBound: false,
-    },
-    {
-      id: "XREF-02",
-      name: "XREF_S_COLS_BEAMS",
-      originalPath: "..\\Xref\\S-STRUCT-BEAMS-COLS.dwg",
-      fileName: "S-STRUCT-BEAMS-COLS.dwg",
-      type: "Overlay",
-      status: "resolved",
-      resolvedFileName: "S-STRUCT-BEAMS-COLS.dwg",
-      entityCount: 38,
-      layerCount: 4,
-      description: "Cột vách dầm bê tông cốt thép đáy dầm +3.10m (Kiểm tra tĩnh không)",
-      isBound: false,
-    },
-    {
-      id: "XREF-03",
-      name: "XREF_E_ELEC_MAINS",
-      originalPath: "..\\Xref\\E-POWER-MAINS.dwg",
-      fileName: "E-POWER-MAINS.dwg",
-      type: "Attach",
-      status: "resolved",
-      resolvedFileName: "E-POWER-MAINS.dwg",
-      entityCount: 24,
-      layerCount: 3,
-      description: "Tuyến máng cáp trục chính Điện động lực Tier 2",
-      isBound: true,
-    },
-  ];
 
   return {
     fileName,
+    sourcePath: fileName,
+    fileFormat: "DXF ASCII",
+    fileSizeBytes: contentToParse.length,
+    header,
     layers,
     entities,
     blocks,
@@ -1389,33 +1884,293 @@ export function generateStandardizedAutocadScript(layers: DxfLayerInfo[]): strin
   return script;
 }
 
+/** Số thực an toàn cho tệp DXF (NaN/Infinity ghi ra sẽ làm AutoCAD báo lỗi đọc tệp). */
+function dxfNum(v: number | undefined, fallback = 0): number {
+  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
+}
+
+/** Bộ ba toạ độ của một điểm, khuyết thì 0. */
+function ptXYZ(p?: [number, number, number]): [number, number, number] {
+  return [dxfNum(p?.[0]), dxfNum(p?.[1]), dxfNum(p?.[2])];
+}
+
+/** Số đo hiển thị: bỏ đuôi 0 thừa để "4000.00" ra "4000" đúng như AutoCAD in ra. */
+function formatMeasurement(v: number): string {
+  return String(Math.round(v * 100) / 100);
+}
+
 /**
- * Xuất dữ liệu đối tượng bản vẽ (DxfParseResult) thành chuỗi ASCII DXF hoàn chỉnh theo chuẩn Autodesk AutoCAD R12 (AC1009).
- * Bao gồm đầy đủ các phần: HEADER, TABLES (VPORT, LTYPE, LAYER, STYLE, APPID, BLOCK_RECORD), BLOCKS, ENTITIES và EOF.
+ * Chiều cao chữ dùng khi thực thể nguồn không khai mã nhóm 40 — R12 bắt buộc TEXT phải có mã này.
+ * Lấy **trung vị chiều cao chữ thật của chính bản vẽ** để chữ bổ khuyết không lạc cỡ; bản vẽ không
+ * có chữ nào khai chiều cao thì mới dùng 250 (cỡ chữ ghi chú thường gặp của bản vẽ MEPF hệ mm).
+ */
+function resolveDefaultTextHeight(entities: DxfEntityRaw[]): number {
+  const heights = entities
+    .map((e) => e.textHeight)
+    .filter((h): h is number => typeof h === "number" && Number.isFinite(h) && h > 0)
+    .sort((a, b) => a - b);
+  if (heights.length === 0) return 250;
+  return heights[Math.floor(heights.length / 2)];
+}
+
+/** Rời rạc hoá ELLIPSE thành đa tuyến — R12 không có thực thể ELLIPSE. */
+function ellipseToPoints(
+  center: [number, number, number],
+  majorAxis: [number, number, number],
+  ratio: number,
+  segments = 48,
+): Array<[number, number, number]> {
+  const majorLen = Math.hypot(majorAxis[0], majorAxis[1]);
+  if (majorLen === 0) return [];
+  const rot = Math.atan2(majorAxis[1], majorAxis[0]);
+  const minorLen = majorLen * (ratio > 0 ? ratio : 1);
+  const pts: Array<[number, number, number]> = [];
+  for (let s = 0; s <= segments; s++) {
+    const t = (s / segments) * Math.PI * 2;
+    const ex = majorLen * Math.cos(t);
+    const ey = minorLen * Math.sin(t);
+    pts.push([
+      center[0] + ex * Math.cos(rot) - ey * Math.sin(rot),
+      center[1] + ex * Math.sin(rot) + ey * Math.cos(rot),
+      center[2],
+    ]);
+  }
+  return pts;
+}
+
+/**
+ * Ghi một đa tuyến theo cấu trúc R12: POLYLINE + các VERTEX + SEQEND.
+ *
+ * R12 **không có** thực thể LWPOLYLINE (mãi R14 mới có), nên bản ghi trước đây vừa khai AC1009 vừa
+ * ghi LWPOLYLINE là tự mâu thuẫn. Độ cong từng đoạn (mã 42) được VERTEX của R12 hỗ trợ sẵn nên
+ * cung tròn trong đa tuyến giữ nguyên hình, không phải bẻ thành đoạn thẳng.
+ */
+function writePolylineR12(
+  layer: string,
+  colStr: string,
+  points: Array<[number, number, number]>,
+  bulges: number[] | undefined,
+  closed: boolean,
+): string {
+  let out = `0\r\nPOLYLINE\r\n8\r\n${layer}\r\n${colStr}66\r\n1\r\n70\r\n${closed ? 1 : 0}\r\n`;
+  out += `10\r\n0.0\r\n20\r\n0.0\r\n30\r\n${dxfNum(points[0]?.[2])}\r\n`;
+  points.forEach((pt, idx) => {
+    out += `0\r\nVERTEX\r\n8\r\n${layer}\r\n10\r\n${dxfNum(pt[0])}\r\n20\r\n${dxfNum(pt[1])}\r\n30\r\n${dxfNum(pt[2])}\r\n`;
+    const b = bulges?.[idx];
+    if (typeof b === "number" && b !== 0) out += `42\r\n${b}\r\n`;
+  });
+  out += `0\r\nSEQEND\r\n8\r\n${layer}\r\n`;
+  return out;
+}
+
+/** Ghi một TEXT R12 kèm chiều cao / góc xoay / kiểu chữ thật của thực thể nguồn. */
+function writeTextR12(
+  layer: string,
+  colStr: string,
+  pos: [number, number, number],
+  value: string,
+  opts: { height: number; rotation?: number; widthFactor?: number; style?: string },
+): string {
+  let out = `0\r\nTEXT\r\n8\r\n${layer}\r\n${colStr}`;
+  out += `10\r\n${pos[0]}\r\n20\r\n${pos[1]}\r\n30\r\n${pos[2]}\r\n40\r\n${opts.height}\r\n1\r\n${value}\r\n`;
+  if (typeof opts.rotation === "number" && opts.rotation !== 0) out += `50\r\n${opts.rotation}\r\n`;
+  if (typeof opts.widthFactor === "number" && opts.widthFactor > 0 && opts.widthFactor !== 1)
+    out += `41\r\n${opts.widthFactor}\r\n`;
+  out += `7\r\n${opts.style || "STANDARD"}\r\n`;
+  return out;
+}
+
+/**
+ * Ghi một thực thể đã phân tích thành khối mã nhóm DXF R12.
+ *
+ * Hai cam kết:
+ * 1. **Không bịa dữ liệu** — thiếu toạ độ/bán kính/góc thì không tự chế giá trị thay thế.
+ * 2. **Không nuốt mất thực thể** — loại hình R12 không có (HATCH, MULTILEADER) hoặc thiếu dữ liệu
+ *    để dựng hình vẫn để lại POINT tại điểm neo đã biết, đúng tiền lệ đã chốt cho DIMENSION ở M98.
+ */
+function writeEntityR12(ent: DxfEntityRaw, layer: string, defaultTextHeight: number): string {
+  const colStr = ent.color ? `62\r\n${ent.color}\r\n` : "";
+  const c = ent.coordinates;
+
+  /** Dấu vết tối giản tại điểm neo — thực thể không dựng được hình vẫn không biến mất im lặng. */
+  const pointTrace = (): string => {
+    const anchor = c.center || c.start || c.end || c.points?.[0] || c.corners?.[0];
+    if (!anchor) return "";
+    const [x, y, z] = ptXYZ(anchor);
+    return `0\r\nPOINT\r\n8\r\n${layer}\r\n${colStr}10\r\n${x}\r\n20\r\n${y}\r\n30\r\n${z}\r\n`;
+  };
+
+  switch (ent.type) {
+    case "LINE": {
+      if (!c.start || !c.end) return pointTrace();
+      const [sx, sy, sz] = ptXYZ(c.start);
+      const [ex, ey, ez] = ptXYZ(c.end);
+      return (
+        `0\r\nLINE\r\n8\r\n${layer}\r\n${colStr}` +
+        `10\r\n${sx}\r\n20\r\n${sy}\r\n30\r\n${sz}\r\n` +
+        `11\r\n${ex}\r\n21\r\n${ey}\r\n31\r\n${ez}\r\n`
+      );
+    }
+
+    case "LWPOLYLINE":
+    case "POLYLINE":
+    case "SPLINE":
+    case "LEADER": {
+      const pts = c.points || [];
+      if (pts.length === 0) return pointTrace();
+      if (pts.length === 1) {
+        const [x, y, z] = ptXYZ(pts[0]);
+        return `0\r\nPOINT\r\n8\r\n${layer}\r\n${colStr}10\r\n${x}\r\n20\r\n${y}\r\n30\r\n${z}\r\n`;
+      }
+      return writePolylineR12(layer, colStr, pts, c.bulges, Boolean(c.closed));
+    }
+
+    case "CIRCLE": {
+      if (!c.center || !c.radius) return pointTrace();
+      const [x, y, z] = ptXYZ(c.center);
+      return (
+        `0\r\nCIRCLE\r\n8\r\n${layer}\r\n${colStr}` +
+        `10\r\n${x}\r\n20\r\n${y}\r\n30\r\n${z}\r\n40\r\n${c.radius}\r\n`
+      );
+    }
+
+    case "ARC": {
+      // Cung tròn R12 bắt buộc có cả bán kính lẫn 2 góc; thiếu thì không tự đặt 0°–180° như bản cũ
+      if (!c.center || !c.radius || c.startAngle === undefined || c.endAngle === undefined) {
+        return pointTrace();
+      }
+      const [x, y, z] = ptXYZ(c.center);
+      return (
+        `0\r\nARC\r\n8\r\n${layer}\r\n${colStr}` +
+        `10\r\n${x}\r\n20\r\n${y}\r\n30\r\n${z}\r\n40\r\n${c.radius}\r\n` +
+        `50\r\n${c.startAngle}\r\n51\r\n${c.endAngle}\r\n`
+      );
+    }
+
+    case "ELLIPSE": {
+      // R12 không có ELLIPSE — rời rạc hoá thành đa tuyến từ chính tâm/bán trục/tỷ lệ của tệp gốc
+      if (!c.center || !c.majorAxis) return pointTrace();
+      const pts = ellipseToPoints(ptXYZ(c.center), ptXYZ(c.majorAxis), c.axisRatio ?? 1);
+      if (pts.length < 2) return pointTrace();
+      return writePolylineR12(layer, colStr, pts, undefined, true);
+    }
+
+    case "SOLID":
+    case "3DFACE": {
+      const corners = c.corners || [];
+      if (corners.length < 3) return pointTrace();
+      const [p1, p2, p3] = [ptXYZ(corners[0]), ptXYZ(corners[1]), ptXYZ(corners[2])];
+      const p4 = ptXYZ(corners[3] || corners[2]);
+      return (
+        `0\r\n${ent.type}\r\n8\r\n${layer}\r\n${colStr}` +
+        `10\r\n${p1[0]}\r\n20\r\n${p1[1]}\r\n30\r\n${p1[2]}\r\n` +
+        `11\r\n${p2[0]}\r\n21\r\n${p2[1]}\r\n31\r\n${p2[2]}\r\n` +
+        `12\r\n${p3[0]}\r\n22\r\n${p3[1]}\r\n32\r\n${p3[2]}\r\n` +
+        `13\r\n${p4[0]}\r\n23\r\n${p4[1]}\r\n33\r\n${p4[2]}\r\n`
+      );
+    }
+
+    case "POINT": {
+      if (!c.center) return "";
+      const [x, y, z] = ptXYZ(c.center);
+      return `0\r\nPOINT\r\n8\r\n${layer}\r\n${colStr}10\r\n${x}\r\n20\r\n${y}\r\n30\r\n${z}\r\n`;
+    }
+
+    case "TEXT":
+    case "MTEXT": {
+      // R12 không có MTEXT — hạ thành TEXT, giữ nguyên chiều cao / góc xoay / kiểu chữ thật
+      const value = ent.decodedText || ent.textValue || "";
+      if (!value) return pointTrace();
+      const pos = ptXYZ(c.center || c.alignPoint);
+      return writeTextR12(layer, colStr, pos, value, {
+        height: dxfNum(ent.textHeight, defaultTextHeight) || defaultTextHeight,
+        rotation: ent.rotation,
+        widthFactor: ent.widthFactor,
+        style: ent.textStyle,
+      });
+    }
+
+    case "INSERT": {
+      const bName = ent.blockName;
+      if (!bName || !c.center) return pointTrace();
+      const [x, y, z] = ptXYZ(c.center);
+      const [sx, sy, sz] = ent.scale ?? [1, 1, 1];
+      let out = `0\r\nINSERT\r\n8\r\n${layer}\r\n${colStr}2\r\n${bName}\r\n`;
+      out += `10\r\n${x}\r\n20\r\n${y}\r\n30\r\n${z}\r\n`;
+      out += `41\r\n${dxfNum(sx, 1)}\r\n42\r\n${dxfNum(sy, 1)}\r\n43\r\n${dxfNum(sz, 1)}\r\n`;
+      out += `50\r\n${dxfNum(ent.rotation)}\r\n`;
+      return out;
+    }
+
+    case "DIMENSION": {
+      // R12 đòi mỗi DIMENSION kèm block hình học `*D<n>`; bộ ghi này không sinh block đó nên hạ
+      // kích thước thành LINE (nối đúng HAI ĐẦU ĐO ở mã 13/14) + TEXT (số đo). Mã 10 là điểm đặt
+      // đường kích thước, KHÔNG phải đầu đo — không dùng nó để vẽ đường đo (M98 §1(b)).
+      let out = "";
+      const measure = c.measurePoints;
+      if (measure) {
+        const [a, b] = [ptXYZ(measure[0]), ptXYZ(measure[1])];
+        out +=
+          `0\r\nLINE\r\n8\r\n${layer}\r\n${colStr}` +
+          `10\r\n${a[0]}\r\n20\r\n${a[1]}\r\n30\r\n${a[2]}\r\n` +
+          `11\r\n${b[0]}\r\n21\r\n${b[1]}\r\n31\r\n${b[2]}\r\n`;
+      }
+
+      // Chữ kích thước: ưu tiên chữ ghi đè của người vẽ, không có thì dùng số đo thật ở mã 42.
+      // Không tự tính khoảng cách để điền vào khi tệp không khai số đo — đó là số bịa.
+      const override = ent.decodedText || ent.textValue || "";
+      const label =
+        override && override !== "<>"
+          ? override
+          : typeof ent.measurement === "number"
+            ? formatMeasurement(ent.measurement)
+            : "";
+
+      if (label) {
+        const anchor =
+          c.textMidPoint ||
+          (measure
+            ? ([
+                (measure[0][0] + measure[1][0]) / 2,
+                (measure[0][1] + measure[1][1]) / 2,
+                (measure[0][2] + measure[1][2]) / 2,
+              ] as [number, number, number])
+            : c.center || c.start);
+        out += writeTextR12(layer, colStr, ptXYZ(anchor), label, {
+          height: dxfNum(ent.textHeight, defaultTextHeight) || defaultTextHeight,
+          rotation: ent.rotation,
+          style: ent.textStyle,
+        });
+      }
+
+      return out || pointTrace();
+    }
+
+    default:
+      // HATCH / MULTILEADER: R12 không có, và ranh giới tô chưa được phân tích nên không dựng lại
+      // được hình. Vẫn để lại POINT tại điểm neo để thực thể không biến mất im lặng.
+      return pointTrace();
+  }
+}
+
+/**
+ * Xuất `DxfParseResult` thành chuỗi DXF ASCII hoàn chỉnh chuẩn AutoCAD R12 (AC1009), đủ các phần
+ * HEADER, TABLES (VPORT, LTYPE, LAYER, STYLE, APPID, BLOCK_RECORD), BLOCKS, ENTITIES, EOF.
+ *
  * Cấu trúc ghi ra không có handle và không có section OBJECTS nên chỉ hợp lệ ở mức R12 — khai đúng
- * AC1009 để AutoCAD không kỳ vọng cấu trúc R2000 (xem M98 §1(b)). Đánh đổi: DIMENSION hạ thành LINE + TEXT.
- * Đảm bảo tương thích khi mở trực tiếp trong AutoCAD mà không bị lỗi hoặc rơi về bản vẽ trắng Drawing1.
+ * AC1009 để AutoCAD không kỳ vọng cấu trúc R2000 (M98 §1(b)). Kéo theo: DIMENSION hạ thành
+ * LINE + TEXT, MTEXT hạ thành TEXT, đa tuyến ghi bằng POLYLINE/VERTEX (R12 chưa có LWPOLYLINE).
+ *
+ * **Không bịa dữ liệu:** bản vẽ không có nét thì tệp xuất ra cũng không có nét — bản cũ chèn sẵn
+ * một bộ hình học MEPF "minh hoạ" (trục lưới, ống gió, máng cáp, sprinkler) và định nghĩa khối hình
+ * chữ thập; cả hai đều là hình do máy chế ra, nay đã bỏ.
  */
 export function exportDxf(
   parsed: DxfParseResult,
   options?: { applyStandardLayers?: boolean; decodeUnicodeText?: boolean },
 ): string {
   const useStandardLayers = options?.applyStandardLayers ?? true;
-  const layers =
-    parsed.layers && parsed.layers.length > 0
-      ? parsed.layers
-      : [
-          {
-            name: "0",
-            standardName: "0",
-            colorNumber: 7,
-            colorHex: "#ffffff",
-            lineType: "CONTINUOUS",
-            isStandardized: true,
-            discipline: "OTHER" as const,
-            entityCount: 0,
-          },
-        ];
+  const layers = parsed.layers && parsed.layers.length > 0 ? parsed.layers : [];
 
   // Ánh xạ tên layer theo tùy chọn chuẩn hóa
   const layerMap = new Map<string, string>();
@@ -1424,20 +2179,23 @@ export function exportDxf(
   });
 
   const getLayer = (name: string) => layerMap.get(name) || name || "0";
+  const entities = parsed.entities || [];
+  const defaultTextHeight = resolveDefaultTextHeight(entities);
 
   let dxf = "";
 
   // 1. SECTION HEADER
   dxf += "0\r\nSECTION\r\n2\r\nHEADER\r\n";
   dxf += "9\r\n$ACADVER\r\n1\r\nAC1009\r\n"; // R12 — đúng cấu trúc thực sự ghi ra bên dưới
-  dxf += "9\r\n$INSUNITS\r\n70\r\n4\r\n"; // 4 = Millimeters (Hệ mét xây dựng MEPF)
-  dxf += "9\r\n$MEASUREMENT\r\n70\r\n1\r\n"; // 1 = Metric
+  // Đơn vị vẽ giữ nguyên của bản vẽ gốc; tệp gốc không khai thì mới mặc định hệ mét MEPF (mm)
+  dxf += `9\r\n$INSUNITS\r\n70\r\n${parsed.header?.insUnits ?? 4}\r\n`;
+  dxf += `9\r\n$MEASUREMENT\r\n70\r\n${parsed.header?.measurement ?? 1}\r\n`;
   if (parsed.diagnostic?.boundingDimensions) {
     const b = parsed.diagnostic.boundingDimensions;
-    dxf += `9\r\n$EXTMIN\r\n10\r\n${b.minX || 0}\r\n20\r\n${b.minY || 0}\r\n30\r\n0.0\r\n`;
-    dxf += `9\r\n$EXTMAX\r\n10\r\n${b.maxX || 10000}\r\n20\r\n${b.maxY || 10000}\r\n30\r\n0.0\r\n`;
-    dxf += `9\r\n$LIMMIN\r\n10\r\n${b.minX || 0}\r\n20\r\n${b.minY || 0}\r\n`;
-    dxf += `9\r\n$LIMMAX\r\n10\r\n${b.maxX || 10000}\r\n20\r\n${b.maxY || 10000}\r\n`;
+    dxf += `9\r\n$EXTMIN\r\n10\r\n${dxfNum(b.minX)}\r\n20\r\n${dxfNum(b.minY)}\r\n30\r\n0.0\r\n`;
+    dxf += `9\r\n$EXTMAX\r\n10\r\n${dxfNum(b.maxX)}\r\n20\r\n${dxfNum(b.maxY)}\r\n30\r\n0.0\r\n`;
+    dxf += `9\r\n$LIMMIN\r\n10\r\n${dxfNum(b.minX)}\r\n20\r\n${dxfNum(b.minY)}\r\n`;
+    dxf += `9\r\n$LIMMAX\r\n10\r\n${dxfNum(b.maxX)}\r\n20\r\n${dxfNum(b.maxY)}\r\n`;
   }
   dxf += "0\r\nENDSEC\r\n";
 
@@ -1462,20 +2220,27 @@ export function exportDxf(
     "0\r\nLTYPE\r\n2\r\nDASHED\r\n70\r\n0\r\n3\r\nDashed __ __ __ __\r\n72\r\n65\r\n73\r\n2\r\n40\r\n20.0\r\n49\r\n15.0\r\n49\r\n-5.0\r\n";
   dxf += "0\r\nENDTAB\r\n";
 
-  // LAYER Table (Danh mục layer chuẩn hóa)
-  const uniqueLayerEntries = new Map<string, { color: number; lineType: string }>();
-  uniqueLayerEntries.set("0", { color: 7, lineType: "CONTINUOUS" });
+  // LAYER Table — giữ nguyên trạng thái thật của từng layer (đóng băng / tắt / khoá / bề rộng nét)
+  const uniqueLayerEntries = new Map<
+    string,
+    { color: number; lineType: string; flags: number; lineWeight?: number }
+  >();
+  uniqueLayerEntries.set("0", { color: 7, lineType: "CONTINUOUS", flags: 0 });
   layers.forEach((l) => {
     const finalName = useStandardLayers && l.standardName ? l.standardName : l.name;
     uniqueLayerEntries.set(finalName, {
-      color: l.colorNumber || 7,
+      // Mã 62 âm là quy ước DXF cho layer đang tắt — giữ đúng trạng thái người vẽ đã đặt
+      color: l.isOff ? -Math.abs(l.colorNumber || 7) : l.colorNumber || 7,
       lineType: l.lineType || "CONTINUOUS",
+      flags: (l.isFrozen ? 1 : 0) | (l.isLocked ? 4 : 0),
+      lineWeight: l.lineWeight,
     });
   });
 
   dxf += `0\r\nTABLE\r\n2\r\nLAYER\r\n70\r\n${uniqueLayerEntries.size}\r\n`;
   uniqueLayerEntries.forEach((val, name) => {
-    dxf += `0\r\nLAYER\r\n2\r\n${name}\r\n70\r\n0\r\n62\r\n${val.color}\r\n6\r\n${val.lineType}\r\n`;
+    dxf += `0\r\nLAYER\r\n2\r\n${name}\r\n70\r\n${val.flags}\r\n62\r\n${val.color}\r\n6\r\n${val.lineType}\r\n`;
+    if (typeof val.lineWeight === "number") dxf += `370\r\n${val.lineWeight}\r\n`;
   });
   dxf += "0\r\nENDTAB\r\n";
 
@@ -1495,11 +2260,9 @@ export function exportDxf(
   if (parsed.blocks) {
     parsed.blocks.forEach((b) => blockNames.add(b.name));
   }
-  if (parsed.entities) {
-    parsed.entities.forEach((e) => {
-      if (e.type === "INSERT" && e.blockName) blockNames.add(e.blockName);
-    });
-  }
+  entities.forEach((e) => {
+    if (e.type === "INSERT" && e.blockName) blockNames.add(e.blockName);
+  });
 
   dxf += `0\r\nTABLE\r\n2\r\nBLOCK_RECORD\r\n70\r\n${blockNames.size}\r\n`;
   blockNames.forEach((bName) => {
@@ -1509,178 +2272,32 @@ export function exportDxf(
 
   dxf += "0\r\nENDSEC\r\n";
 
-  // 3. SECTION BLOCKS
+  // 3. SECTION BLOCKS — ghi lại ĐÚNG hình học của từng khối đọc được từ tệp gốc.
+  // Khối không có định nghĩa hình học (vd chỉ thấy qua INSERT) thì ghi khối rỗng hợp lệ, KHÔNG
+  // chèn hình chữ thập "đại diện" như bản cũ — đó là nét do máy bịa ra trên bản vẽ người dùng.
   dxf += "0\r\nSECTION\r\n2\r\nBLOCKS\r\n";
   dxf +=
     "0\r\nBLOCK\r\n2\r\n*MODEL_SPACE\r\n70\r\n0\r\n10\r\n0.0\r\n20\r\n0.0\r\n30\r\n0.0\r\n0\r\nENDBLK\r\n";
   dxf +=
     "0\r\nBLOCK\r\n2\r\n*PAPER_SPACE\r\n70\r\n0\r\n10\r\n0.0\r\n20\r\n0.0\r\n30\r\n0.0\r\n0\r\nENDBLK\r\n";
+  const blockDefById = new Map((parsed.blocks || []).map((b) => [b.name, b]));
   blockNames.forEach((bName) => {
-    if (bName !== "*MODEL_SPACE" && bName !== "*PAPER_SPACE") {
-      dxf += `0\r\nBLOCK\r\n2\r\n${bName}\r\n70\r\n0\r\n10\r\n0.0\r\n20\r\n0.0\r\n30\r\n0.0\r\n`;
-      // Định nghĩa hình học mẫu đại diện cho khối block trong AutoCAD
-      dxf += `0\r\nLINE\r\n8\r\n0\r\n10\r\n-100\r\n20\r\n0\r\n30\r\n0\r\n11\r\n100\r\n21\r\n0\r\n31\r\n0\r\n`;
-      dxf += `0\r\nLINE\r\n8\r\n0\r\n10\r\n0\r\n20\r\n-100\r\n30\r\n0\r\n11\r\n0\r\n21\r\n100\r\n31\r\n0\r\n`;
-      dxf += "0\r\nENDBLK\r\n";
+    if (bName === "*MODEL_SPACE" || bName === "*PAPER_SPACE") return;
+    const def = blockDefById.get(bName);
+    const base = ptXYZ(def?.basePoint);
+    dxf += `0\r\nBLOCK\r\n2\r\n${bName}\r\n70\r\n0\r\n10\r\n${base[0]}\r\n20\r\n${base[1]}\r\n30\r\n${base[2]}\r\n`;
+    for (const sub of def?.entities || []) {
+      dxf += writeEntityR12(sub, getLayer(sub.layer), defaultTextHeight);
     }
+    dxf += "0\r\nENDBLK\r\n";
   });
   dxf += "0\r\nENDSEC\r\n";
 
   // 4. SECTION ENTITIES
   dxf += "0\r\nSECTION\r\n2\r\nENTITIES\r\n";
-
-  if (parsed.entities && parsed.entities.length > 0) {
-    for (const ent of parsed.entities) {
-      const lyr = getLayer(ent.layer);
-      const colStr = ent.color ? `62\r\n${ent.color}\r\n` : "";
-
-      if (ent.type === "LINE" && ent.coordinates.start && ent.coordinates.end) {
-        dxf += `0\r\nLINE\r\n8\r\n${lyr}\r\n${colStr}`;
-        dxf += `10\r\n${ent.coordinates.start[0]}\r\n20\r\n${ent.coordinates.start[1]}\r\n30\r\n${ent.coordinates.start[2] || 0}\r\n`;
-        dxf += `11\r\n${ent.coordinates.end[0]}\r\n21\r\n${ent.coordinates.end[1]}\r\n31\r\n${ent.coordinates.end[2] || 0}\r\n`;
-      } else if (
-        (ent.type === "LWPOLYLINE" || ent.type === "POLYLINE") &&
-        ent.coordinates.points &&
-        ent.coordinates.points.length > 0
-      ) {
-        dxf += `0\r\nLWPOLYLINE\r\n8\r\n${lyr}\r\n${colStr}90\r\n${ent.coordinates.points.length}\r\n70\r\n0\r\n`;
-        for (const pt of ent.coordinates.points) {
-          dxf += `10\r\n${pt[0]}\r\n20\r\n${pt[1]}\r\n`;
-        }
-      } else if (ent.type === "CIRCLE" && ent.coordinates.center) {
-        dxf += `0\r\nCIRCLE\r\n8\r\n${lyr}\r\n${colStr}`;
-        dxf += `10\r\n${ent.coordinates.center[0]}\r\n20\r\n${ent.coordinates.center[1]}\r\n30\r\n${ent.coordinates.center[2] || 0}\r\n`;
-        dxf += `40\r\n${ent.coordinates.radius || 100}\r\n`;
-      } else if (ent.type === "ARC" && ent.coordinates.center) {
-        dxf += `0\r\nARC\r\n8\r\n${lyr}\r\n${colStr}`;
-        dxf += `10\r\n${ent.coordinates.center[0]}\r\n20\r\n${ent.coordinates.center[1]}\r\n30\r\n${ent.coordinates.center[2] || 0}\r\n`;
-        dxf += `40\r\n${ent.coordinates.radius || 100}\r\n50\r\n0.0\r\n51\r\n180.0\r\n`;
-      } else if (ent.type === "TEXT" || ent.type === "MTEXT") {
-        const textVal = ent.decodedText || ent.textValue || "";
-        const cx = ent.coordinates.center ? ent.coordinates.center[0] : 0;
-        const cy = ent.coordinates.center ? ent.coordinates.center[1] : 0;
-        const cz = ent.coordinates.center ? ent.coordinates.center[2] || 0 : 0;
-        dxf += `0\r\nTEXT\r\n8\r\n${lyr}\r\n${colStr}`;
-        dxf += `10\r\n${cx}\r\n20\r\n${cy}\r\n30\r\n${cz}\r\n40\r\n250.0\r\n1\r\n${textVal}\r\n7\r\nSTANDARD\r\n`;
-      } else if (ent.type === "INSERT") {
-        const bName = ent.blockName || "BLOCK_DEFAULT";
-        const cx = ent.coordinates.center ? ent.coordinates.center[0] : 0;
-        const cy = ent.coordinates.center ? ent.coordinates.center[1] : 0;
-        const cz = ent.coordinates.center ? ent.coordinates.center[2] || 0 : 0;
-        dxf += `0\r\nINSERT\r\n8\r\n${lyr}\r\n${colStr}2\r\n${bName}\r\n`;
-        dxf += `10\r\n${cx}\r\n20\r\n${cy}\r\n30\r\n${cz}\r\n41\r\n1.0\r\n42\r\n1.0\r\n43\r\n1.0\r\n50\r\n0.0\r\n`;
-      } else if (ent.type === "DIMENSION") {
-        // R12 (AC1009) đòi mỗi DIMENSION phải kèm block hình học `*D<n>` mới hợp lệ — bộ ghi này
-        // không sinh block đó, nên hạ kích thước thành LINE (đường kích thước) + TEXT (giá trị đo)
-        // đúng theo quyết định đã chốt ở M98 §1(b), thay vì emit DIMENSION thô mở ra là lỗi.
-        const start = ent.coordinates.start;
-        const end = ent.coordinates.end;
-        const hasDimLine = Boolean(start && end);
-        let tx = 0;
-        let ty = 0;
-        let tz = 0;
-
-        if (start && end) {
-          dxf += `0\r\nLINE\r\n8\r\n${lyr}\r\n${colStr}`;
-          dxf += `10\r\n${start[0]}\r\n20\r\n${start[1]}\r\n30\r\n${start[2] || 0}\r\n`;
-          dxf += `11\r\n${end[0]}\r\n21\r\n${end[1]}\r\n31\r\n${end[2] || 0}\r\n`;
-          // Chữ đặt tại trung điểm đoạn kích thước
-          tx = (start[0] + end[0]) / 2;
-          ty = (start[1] + end[1]) / 2;
-          tz = ((start[2] || 0) + (end[2] || 0)) / 2;
-        } else {
-          const anchor = ent.coordinates.center || start || end;
-          tx = anchor ? anchor[0] : 0;
-          ty = anchor ? anchor[1] : 0;
-          tz = anchor ? anchor[2] || 0 : 0;
-        }
-
-        // Bỏ TEXT khi chuỗi đo rỗng: bản cũ ghi placeholder `<>` (ký hiệu "lấy giá trị đo được"
-        // của DIMENSION thật) — sau khi hạ cấp thành TEXT thì nó hiện đúng 2 ký tự `<>` trên bản
-        // vẽ, tức chữ rác. Cũng không tự tính khoảng cách start→end để điền vào: mã nhóm 10/11
-        // của DIMENSION là điểm đặt đường/chữ kích thước, không phải 2 đầu đo, nên số tính ra
-        // sẽ là số đo bịa (vi phạm nguyên tắc không bịa dữ liệu của M98/M99).
-        const textVal = ent.decodedText || ent.textValue || "";
-        if (textVal) {
-          dxf += `0\r\nTEXT\r\n8\r\n${lyr}\r\n${colStr}`;
-          dxf += `10\r\n${tx}\r\n20\r\n${ty}\r\n30\r\n${tz}\r\n40\r\n250.0\r\n1\r\n${textVal}\r\n7\r\nSTANDARD\r\n`;
-        } else if (!hasDimLine) {
-          // Kích thước không có cả toạ độ đường lẫn chữ đo: vẫn phải để lại dấu vết, tuyệt đối
-          // không nuốt mất thực thể im lặng. Ghi POINT (thực thể R12 hợp lệ, tối giản) tại điểm
-          // neo — giữ đúng vị trí đã biết mà không bịa thêm nét hay số đo nào.
-          dxf += `0\r\nPOINT\r\n8\r\n${lyr}\r\n${colStr}`;
-          dxf += `10\r\n${tx}\r\n20\r\n${ty}\r\n30\r\n${tz}\r\n`;
-        }
-      }
-    }
+  for (const ent of entities) {
+    dxf += writeEntityR12(ent, getLayer(ent.layer), defaultTextHeight);
   }
-
-  // Nếu bản vẽ chỉ có text trích xuất từ DWG (chưa có đường nét hình học CAD), tự động bổ sung hình học mẫu MEPF
-  const hasVectors =
-    parsed.entities &&
-    parsed.entities.some(
-      (e) =>
-        e.type === "LINE" ||
-        e.type === "LWPOLYLINE" ||
-        e.type === "POLYLINE" ||
-        e.type === "CIRCLE" ||
-        e.type === "ARC",
-    );
-
-  if (!hasVectors) {
-    const hvacLyr =
-      layers.find((l) => l.discipline === "M")?.standardName ||
-      layers.find((l) => l.discipline === "M")?.name ||
-      "M-DUCT-SUPP";
-    const elecLyr =
-      layers.find((l) => l.discipline === "E")?.standardName ||
-      layers.find((l) => l.discipline === "E")?.name ||
-      "E-TRAY-PWRR";
-    const plumbLyr =
-      layers.find((l) => l.discipline === "P")?.standardName ||
-      layers.find((l) => l.discipline === "P")?.name ||
-      "P-PIPE-SANR";
-    const fireLyr =
-      layers.find((l) => l.discipline === "F")?.standardName ||
-      layers.find((l) => l.discipline === "F")?.name ||
-      "F-SPRN-PIPE";
-    const gridLyr =
-      layers.find((l) => l.discipline === "S" || l.discipline === "A")?.standardName ||
-      layers.find((l) => l.discipline === "S" || l.discipline === "A")?.name ||
-      "S-GRID-COLS";
-
-    // 1. Trục lưới kết cấu định vị (Grid Axis 1-4 & A-C)
-    for (let gx = 1000; gx <= 16000; gx += 5000) {
-      dxf += `0\r\nLINE\r\n8\r\n${gridLyr}\r\n10\r\n${gx}\r\n20\r\n1000\r\n30\r\n0.0\r\n11\r\n${gx}\r\n7000\r\n31\r\n0.0\r\n`;
-    }
-    for (let gy = 1000; gy <= 7000; gy += 3000) {
-      dxf += `0\r\nLINE\r\n8\r\n${gridLyr}\r\n10\r\n1000\r\n20\r\n${gy}\r\n30\r\n0.0\r\n11\r\n16000\r\n21\r\n${gy}\r\n31\r\n0.0\r\n`;
-    }
-
-    // 2. Tuyến ống gió cấp lạnh chính & hồi (HVAC Ducts)
-    dxf += `0\r\nLINE\r\n8\r\n${hvacLyr}\r\n10\r\n1500\r\n20\r\n2500\r\n30\r\n3100.0\r\n11\r\n15500\r\n21\r\n2500\r\n31\r\n3100.0\r\n`;
-    dxf += `0\r\nLINE\r\n8\r\n${hvacLyr}\r\n10\r\n6000\r\n20\r\n2500\r\n30\r\n3100.0\r\n11\r\n6000\r\n21\r\n4500\r\n31\r\n3100.0\r\n`;
-    dxf += `0\r\nLINE\r\n8\r\n${hvacLyr}\r\n10\r\n11000\r\n20\r\n2500\r\n30\r\n3100.0\r\n11\r\n11000\r\n21\r\n4500\r\n31\r\n3100.0\r\n`;
-
-    // 3. Khối miệng gió Diffuser
-    dxf += `0\r\nINSERT\r\n8\r\n${hvacLyr}\r\n2\r\nBLK_DIFFUSER_600x600\r\n10\r\n4000\r\n20\r\n2500\r\n30\r\n2800.0\r\n41\r\n1.0\r\n42\r\n1.0\r\n43\r\n1.0\r\n50\r\n0.0\r\n`;
-    dxf += `0\r\nINSERT\r\n8\r\n${hvacLyr}\r\n2\r\nBLK_DIFFUSER_600x600\r\n10\r\n8500\r\n20\r\n2500\r\n30\r\n2800.0\r\n41\r\n1.0\r\n42\r\n1.0\r\n43\r\n1.0\r\n50\r\n0.0\r\n`;
-    dxf += `0\r\nINSERT\r\n8\r\n${hvacLyr}\r\n2\r\nBLK_DIFFUSER_600x600\r\n10\r\n13500\r\n20\r\n2500\r\n30\r\n2800.0\r\n41\r\n1.0\r\n42\r\n1.0\r\n43\r\n1.0\r\n50\r\n0.0\r\n`;
-
-    // 4. Tuyến máng cáp điện động lực (Cable Tray)
-    dxf += `0\r\nLINE\r\n8\r\n${elecLyr}\r\n10\r\n1500\r\n20\r\n3400\r\n30\r\n2900.0\r\n11\r\n15500\r\n21\r\n3400\r\n31\r\n2900.0\r\n`;
-
-    // 5. Tuyến ống nước Chiller & thoát nước
-    dxf += `0\r\nLINE\r\n8\r\n${plumbLyr}\r\n10\r\n1500\r\n20\r\n4000\r\n30\r\n2600.0\r\n11\r\n15500\r\n21\r\n4000\r\n31\r\n2600.0\r\n`;
-    dxf += `0\r\nLINE\r\n8\r\n${plumbLyr}\r\n10\r\n1500\r\n20\r\n4800\r\n30\r\n2550.0\r\n11\r\n15500\r\n21\r\n4800\r\n31\r\n2340.0\r\n`;
-
-    // 6. Tuyến ống PCCC Sprinkler
-    dxf += `0\r\nLINE\r\n8\r\n${fireLyr}\r\n10\r\n1500\r\n20\r\n5400\r\n30\r\n2700.0\r\n11\r\n15500\r\n21\r\n5400\r\n31\r\n2700.0\r\n`;
-    dxf += `0\r\nINSERT\r\n8\r\n${fireLyr}\r\n2\r\nBLK_SPRINKLER_68C\r\n10\r\n3500\r\n20\r\n5400\r\n30\r\n2700.0\r\n41\r\n1.0\r\n42\r\n1.0\r\n43\r\n1.0\r\n50\r\n0.0\r\n`;
-    dxf += `0\r\nINSERT\r\n8\r\n${fireLyr}\r\n2\r\nBLK_SPRINKLER_68C\r\n10\r\n7500\r\n20\r\n5400\r\n30\r\n2700.0\r\n41\r\n1.0\r\n42\r\n1.0\r\n43\r\n1.0\r\n50\r\n0.0\r\n`;
-    dxf += `0\r\nINSERT\r\n8\r\n${fireLyr}\r\n2\r\nBLK_SPRINKLER_68C\r\n10\r\n11500\r\n20\r\n5400\r\n30\r\n2700.0\r\n41\r\n1.0\r\n42\r\n1.0\r\n43\r\n1.0\r\n50\r\n0.0\r\n`;
-  }
-
   dxf += "0\r\nENDSEC\r\n";
 
   // 5. EOF
