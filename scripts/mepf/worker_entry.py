@@ -81,6 +81,7 @@ SUPPORTED_TASK_TYPES = [
     "mepf.hvac.calc",
     "mepf.cad.analyze",
     "mepf.cad.export_r2000",
+    "mepf.cad.health_check",
     "mepf.bim.clash.detect",
     "mepf.qs.takeoff",
     "mepf.ff.hydraulics",
@@ -361,6 +362,27 @@ def _run_cad_export_r2000(task: dict, report: Callable[[float], None]) -> dict:
         return _dry_run_handler(task, report)
 
 
+def _run_cad_health_check(task: dict, report: Callable[[float], None]) -> dict:
+    """Handler chẩn đoán sức khỏe 6D bản vẽ DXF bằng ezdxf (xác thực điểm số client)."""
+    try:
+        _ensure_agent_src_on_path()
+        from cad_health_check import compute_cad_health  # type: ignore
+        payload = task.get("payload", {})
+        report(10.0)
+
+        dxf_path = payload.get("filePath") or payload.get("dxf_path")
+        if not dxf_path:
+            return {"error": "Thiếu filePath trong payload"}
+
+        result = compute_cad_health(dxf_path)
+        report(90.0)
+
+        return {**result, "worker_id": WORKER_ID}
+    except ImportError:
+        log.warning("MEPF-Agents cad_health_check chưa cài — chạy dry_run.")
+        return _dry_run_handler(task, report)
+
+
 def _run_bim_clash(task: dict, report: Callable[[float], None]) -> dict:
     """Handler kiểm tra xung đột BIM/IFC."""
     try:
@@ -494,6 +516,7 @@ TASK_HANDLERS: dict[str, Callable[[dict, Callable[[float], None]], dict]] = {
     "mepf.hvac.calc": _run_hvac_calc,
     "mepf.cad.analyze": _run_cad_analyze,
     "mepf.cad.export_r2000": _run_cad_export_r2000,
+    "mepf.cad.health_check": _run_cad_health_check,
     "mepf.bim.clash.detect": _run_bim_clash,
     "mepf.qs.takeoff": _run_qs_takeoff,
     "mepf.ff.hydraulics": _run_ff_hydraulics,

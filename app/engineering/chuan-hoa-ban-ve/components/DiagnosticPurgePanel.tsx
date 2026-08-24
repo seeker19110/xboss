@@ -1,8 +1,18 @@
 "use client";
 
-import { Dispatch, SetStateAction } from "react";
-import { Download, ArrowRight, CheckCircle2, Activity, Trash2, Crosshair } from "lucide-react";
+import { Dispatch, SetStateAction, useEffect, useRef } from "react";
+import {
+  Download,
+  ArrowRight,
+  CheckCircle2,
+  Activity,
+  Trash2,
+  Crosshair,
+  ShieldCheck,
+  Loader2,
+} from "lucide-react";
 import { DxfParseResult } from "@/lib/ky-thuat/cad/dxf-parser";
+import { useCadServerVerification } from "../hooks/useCadServerVerification";
 import type { ManualLayerItem, PurgeState, Step1SubTab, WcsConfig } from "../types";
 
 // BƯỚC 1.1 — Chẩn đoán dị tật, dọn rác sâu (Purge/Overkill) & gốc tọa độ WCS 2D.
@@ -34,6 +44,29 @@ export default function DiagnosticPurgePanel({
   totalHealthScore,
   handleDownloadScr,
 }: DiagnosticPurgePanelProps) {
+  const serverVerifyInputRef = useRef<HTMLInputElement | null>(null);
+  const {
+    phase: verifyPhase,
+    result: verifyResult,
+    errorMessage: verifyError,
+    verifyWithServer,
+    showComparisonToast,
+  } = useCadServerVerification();
+
+  const handleServerVerifyFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    await verifyWithServer(file);
+  };
+
+  useEffect(() => {
+    if (verifyPhase === "done") {
+      showComparisonToast(totalHealthScore);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verifyPhase]);
+
   return (
     <div className="space-y-5">
       {/* Phân đoạn 1.1: Chẩn đoán & Health Score */}
@@ -51,6 +84,32 @@ export default function DiagnosticPurgePanel({
           </div>
 
           <div className="flex items-center gap-2">
+            <input
+              ref={serverVerifyInputRef}
+              type="file"
+              accept=".dxf,.dwg"
+              className="hidden"
+              onChange={handleServerVerifyFileChange}
+            />
+            <button
+              onClick={() => serverVerifyInputRef.current?.click()}
+              disabled={verifyPhase === "uploading" || verifyPhase === "processing"}
+              title="Gửi file lên mepf-worker, tính điểm sức khỏe bằng ezdxf thật — đối chiếu độc lập với điểm tính ngay trên trình duyệt"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-xs shadow-sm transition"
+            >
+              {verifyPhase === "uploading" || verifyPhase === "processing" ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <ShieldCheck className="w-3.5 h-3.5" />
+              )}
+              <span>
+                {verifyPhase === "uploading"
+                  ? "Đang gửi..."
+                  : verifyPhase === "processing"
+                    ? "Server đang chẩn đoán (ezdxf)..."
+                    : "Xác Thực Bằng ezdxf (Server)"}
+              </span>
+            </button>
             <button
               onClick={handleDownloadScr}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-on-accent-dark font-bold text-xs shadow-sm transition"
@@ -60,6 +119,35 @@ export default function DiagnosticPurgePanel({
             </button>
           </div>
         </div>
+
+        {(verifyResult || verifyError) && (
+          <div
+            className={`p-3.5 rounded-xl border text-xs space-y-1.5 ${
+              verifyError
+                ? "bg-rose-500/10 border-rose-500/30 text-rose-300"
+                : "bg-sky-500/10 border-sky-500/30 text-sky-200"
+            }`}
+          >
+            {verifyError ? (
+              <p>⚠ Xác thực ezdxf thất bại: {verifyError}</p>
+            ) : verifyResult?.status === "error" ? (
+              <p>⚠ mepf-worker báo lỗi: {verifyResult.error}</p>
+            ) : (
+              <>
+                <p className="font-bold">
+                  Kết quả ezdxf (server): {verifyResult?.totalHealthScore ?? 0}/100 — client:{" "}
+                  {totalHealthScore}/100
+                </p>
+                <p className="text-[11px] text-sky-300/80">
+                  Layer {verifyResult?.layerScore}% · Font {verifyResult?.fontScore}% · Hình học{" "}
+                  {verifyResult?.geometryScore}% · Dim {verifyResult?.dimScore}% · Block{" "}
+                  {verifyResult?.blockScore}% · XREF {verifyResult?.xrefScore}% · (
+                  {verifyResult?.entityCount} thực thể)
+                </p>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Health Score & Key Metrics */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">

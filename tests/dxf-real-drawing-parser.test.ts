@@ -8,6 +8,7 @@ import {
   generateStandardizedAutocadScript,
   validateDxf,
   decodeCadText,
+  giaiMaByteDxf,
 } from "@/lib/ky-thuat/cad/dxf-parser";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
@@ -800,6 +801,23 @@ test("parseDxf: HATCH giữ ranh giới và mẫu tô, xuất ra vẫn là HATCH
     "Ranh giới vùng tô không được xê dịch",
   );
   assert.equal(hatch2.hatchPatternLines?.length, 1, "Mẫu tô phải theo sang tệp mới");
+
+  // Hồi quy thật (vòng 6 chuỗi "drawing discarded", 2026-08-24): AutoCAD từ chối HATCH có mã 47
+  // (pixel size) đứng trước mã 98 — "expected group code 98" rồi huỷ cả bản vẽ, dù spec liệt kê
+  // 47 là tuỳ chọn ở đúng vị trí đó. HATCH gốc do chính AutoCAD R2018 ghi không hề có mã 47 và
+  // kết thúc bằng 98 + seed point ngay sau phần mẫu tô — bộ ghi phải bắt chước đúng như vậy.
+  const exported = exportDxf(r, { applyStandardLayers: false });
+  const hatchStart = exported.indexOf("100\r\nAcDbHatch\r\n");
+  // Thân HATCH kết thúc ở mã 98 + seed point — cắt một cửa sổ đủ rộng qua điểm đó để kiểm.
+  const thanHatch = exported.slice(hatchStart, hatchStart + 6000);
+  assert.ok(
+    !thanHatch.includes("\r\n47\r\n1.0\r\n"),
+    "HATCH xuất ra không được chứa mã 47 (pixel size) — AutoCAD thật từ chối và huỷ cả bản vẽ",
+  );
+  assert.ok(
+    thanHatch.includes("\r\n98\r\n1\r\n10\r\n0.0\r\n20\r\n0.0\r\n"),
+    "HATCH phải kết thúc bằng 98/1 + seed point (0,0) như chính AutoCAD ghi",
+  );
 });
 
 test("parseDxf: MULTILEADER giữ chữ chú thích và đường dẫn", () => {
@@ -1207,4 +1225,428 @@ test("exportDxf: toàn vẹn cấu trúc — handle duy nhất, mọi tham chi�
   assert.equal(dem("SECTION") + 1, dem("ENDSEC"), "Mỗi SECTION phải có đúng một ENDSEC");
   assert.equal(dem("TABLE"), dem("ENDTAB"), "Mỗi TABLE phải có đúng một ENDTAB");
   assert.equal(dem("BLOCK"), dem("ENDBLK"), "Mỗi BLOCK phải có đúng một ENDBLK");
+});
+
+test("exportDxf: STYLE/LTYPE/DIMSTYLE khai đủ tên mà thực thể tham chiếu, kể cả bên trong BLOCK", () => {
+  // Hồi quy thật, người dùng báo 2026-08-24: bấm "Tải về file .DXF" xong AutoCAD KHÔNG MỞ ĐƯỢC
+  // tệp — nặng hơn lỗi màn hình trắng trước đó. Nguyên nhân: block thiết bị (thường xuất từ
+  // Revit, VD "VHT_Tag_T...") mang MTEXT nội bộ dùng style riêng (Arial_2, RomanS...), còn layer/
+  // DIMENSION có thể dùng linetype/dimstyle ngoài 4 loại dựng sẵn — nhưng bộ ghi cũ chỉ quét
+  // entity ở CẤP MODEL SPACE khi dựng 3 bảng STYLE/LTYPE/DIMSTYLE, bỏ sót toàn bộ entity nằm
+  // trong định nghĩa BLOCK. Kết quả: BLOCKS section ghi thực thể trỏ tới STYLE/LTYPE/DIMSTYLE
+  // chưa từng khai báo — AutoCAD từ chối mở (dangling reference), trong khi `ezdxf` (khoan dung
+  // hơn) chỉ âm thầm xoá tham chiếu lỗi khi audit nên không lộ ra qua kiểm `ezdxf`.
+  const dxf = [
+    "0",
+    "SECTION",
+    "2",
+    "TABLES",
+    "0",
+    "TABLE",
+    "2",
+    "LAYER",
+    "0",
+    "LAYER",
+    "2",
+    "M-DUCT",
+    "62",
+    "3",
+    "6",
+    "GRID_LINE_TU_XREF",
+    "0",
+    "ENDTAB",
+    "0",
+    "ENDSEC",
+    "0",
+    "SECTION",
+    "2",
+    "BLOCKS",
+    "0",
+    "BLOCK",
+    "2",
+    "EQUIP_TAG",
+    "70",
+    "0",
+    "10",
+    "0.0",
+    "20",
+    "0.0",
+    "30",
+    "0.0",
+    "0",
+    "MTEXT",
+    "8",
+    "M-DUCT",
+    "10",
+    "0.0",
+    "20",
+    "0.0",
+    "30",
+    "0.0",
+    "40",
+    "250.0",
+    "50",
+    "0.0",
+    "7",
+    "RomanS_Trong_Block",
+    "1",
+    "AHU-01",
+    "0",
+    "ENDBLK",
+    "0",
+    "ENDSEC",
+    "0",
+    "SECTION",
+    "2",
+    "ENTITIES",
+    "0",
+    "DIMENSION",
+    "8",
+    "M-DUCT",
+    "10",
+    "3000",
+    "20",
+    "2500",
+    "30",
+    "0",
+    "11",
+    "3000",
+    "21",
+    "2600",
+    "31",
+    "0",
+    "13",
+    "1000",
+    "23",
+    "2000",
+    "33",
+    "0",
+    "14",
+    "5000",
+    "24",
+    "2000",
+    "34",
+    "0",
+    "42",
+    "4000.0",
+    "70",
+    "0",
+    "3",
+    "DIMSTYLE_Rieng",
+    "0",
+    "ENDSEC",
+    "0",
+    "EOF",
+  ].join("\n");
+
+  const parsed = parseDxf(dxf, "block_font_rieng.dxf");
+  const exported = exportDxf(parsed, { applyStandardLayers: false });
+
+  const trongBang = (ten: string, giaTri: string) =>
+    exported.includes(`2\r\n${giaTri}\r\n`) &&
+    exported
+      .slice(
+        exported.indexOf(`0\r\nTABLE\r\n2\r\n${ten}\r\n`),
+        exported.indexOf(`0\r\nENDSEC`, exported.indexOf(`0\r\nTABLE\r\n2\r\n${ten}\r\n`)),
+      )
+      .includes(`2\r\n${giaTri}\r\n`);
+
+  assert.ok(
+    trongBang("STYLE", "RomanS_Trong_Block"),
+    "Bảng STYLE phải khai kiểu chữ mà MTEXT bên TRONG block dùng, không chỉ chữ ở model space",
+  );
+  assert.ok(
+    trongBang("LTYPE", "GRID_LINE_TU_XREF"),
+    "Bảng LTYPE phải khai linetype mà layer dùng, kể cả tên không thuộc 4 loại dựng sẵn",
+  );
+  // Hồi quy thật (vòng 5 cùng chuỗi "drawing discarded", 2026-08-24): bảng LTYPE phải chứa 2
+  // bản ghi đặc biệt bắt buộc "ByBlock" và "ByLayer" theo spec R2000 — thiếu thì AutoCAD báo
+  // "Missing Default entry ByLayer in SymbolTable:LTYPE" rồi huỷ cả bản vẽ. ezdxf KHÔNG phát
+  // hiện được vì nó tự cấp 2 bản ghi ảo này khi đọc (audit vẫn 0 lỗi trên tệp thiếu).
+  assert.ok(trongBang("LTYPE", "ByBlock"), "Bảng LTYPE phải có bản ghi đặc biệt ByBlock");
+  assert.ok(trongBang("LTYPE", "ByLayer"), "Bảng LTYPE phải có bản ghi đặc biệt ByLayer");
+  assert.ok(
+    trongBang("DIMSTYLE", "DIMSTYLE_Rieng"),
+    "Bảng DIMSTYLE phải khai dimstyle mà DIMENSION dùng, không chỉ mỗi STANDARD",
+  );
+
+  // Hồi quy thật (vòng 4 cùng chuỗi "drawing discarded", 2026-08-24): bản ghi DIMSTYLE là loại
+  // DUY NHẤT trong DXF dùng mã nhóm 105 cho handle thay vì mã 5 — ghi mã 5 thì AutoCAD báo
+  // "Bad handle ...: already in use — Error in DIMSTYLE Table — eHandleInUse" rồi huỷ cả bản vẽ.
+  const dimTabStart = exported.indexOf("0\r\nTABLE\r\n2\r\nDIMSTYLE\r\n");
+  const dimTabEnd = exported.indexOf("0\r\nENDTAB", dimTabStart);
+  const thanBangDim = exported.slice(dimTabStart, dimTabEnd);
+  const banGhiDim = thanBangDim.split("0\r\nDIMSTYLE\r\n").slice(1);
+  assert.ok(banGhiDim.length >= 2, "Bảng DIMSTYLE phải có ít nhất STANDARD + dimstyle riêng");
+  for (const banGhi of banGhiDim) {
+    assert.match(
+      banGhi,
+      /^105\r\n/,
+      "Bản ghi DIMSTYLE phải mở đầu bằng mã 105 (handle riêng của DIMSTYLE), không phải mã 5",
+    );
+  }
+
+  // Đọc lại bằng chính parser của mình phải vẫn ra đúng bản vẽ — không rơi rớt gì thêm
+  const lai = parseDxf(exported, "rt.dxf");
+  assert.equal(lai.entities.length, parsed.entities.length);
+});
+
+test("exportDxf: layer dùng tên linetype/style/dimstyle khác HOA/THƯỜNG so với tên dựng sẵn không tạo bản ghi trùng", () => {
+  // Hồi quy thật, người dùng báo 2026-08-24 — nặng hơn cả lỗi trước: AutoCAD báo
+  // "Skipping duplicate definition of Continuous in LTYPE Table" rồi "Invalid or incomplete DXF
+  // input -- drawing discarded". Nguyên nhân: bản vá STYLE/LTYPE/DIMSTYLE ở test phía trên so
+  // khớp PHÂN BIỆT hoa/thường, trong khi tên linetype/style trong AutoCAD KHÔNG phân biệt —
+  // layer dùng "Continuous" (hoa/thường như AutoCAD ghi thật) bị coi khác với "CONTINUOUS" (mảng
+  // dựng sẵn ở đây), tạo 2 bản ghi LTYPE cùng tên khác hoa/thường. AutoCAD tự bỏ bớt bản ghi
+  // trùng khi mở, khiến SỐ BẢN GHI THẬT ít hơn số khai trong header bảng (mã 70) — lệch nhịp đọc,
+  // làm hỏng lây bảng LAYER đọc ngay sau LTYPE, và AutoCAD huỷ cả bản vẽ.
+  const dxf = [
+    "0",
+    "SECTION",
+    "2",
+    "TABLES",
+    "0",
+    "TABLE",
+    "2",
+    "LAYER",
+    "0",
+    "LAYER",
+    "2",
+    "M-DUCT",
+    "62",
+    "3",
+    "6",
+    "Continuous",
+    "0",
+    "ENDTAB",
+    "0",
+    "ENDSEC",
+    "0",
+    "SECTION",
+    "2",
+    "ENTITIES",
+    "0",
+    "LINE",
+    "8",
+    "M-DUCT",
+    "6",
+    "continuous",
+    "10",
+    "0",
+    "20",
+    "0",
+    "30",
+    "0",
+    "11",
+    "1000",
+    "21",
+    "0",
+    "31",
+    "0",
+    "0",
+    "TEXT",
+    "8",
+    "M-DUCT",
+    "10",
+    "0",
+    "20",
+    "0",
+    "30",
+    "0",
+    "40",
+    "250",
+    "7",
+    "Standard",
+    "1",
+    "AHU-01",
+    "0",
+    "ENDSEC",
+    "0",
+    "EOF",
+  ].join("\n");
+
+  const parsed = parseDxf(dxf, "hoa_thuong.dxf");
+  const exported = exportDxf(parsed, { applyStandardLayers: false });
+
+  const demBanGhi = (bang: string, ten: string) => {
+    const start = exported.indexOf(`0\r\nTABLE\r\n2\r\n${bang}\r\n`);
+    const end = exported.indexOf(`0\r\nENDTAB`, start);
+    const than = exported.slice(start, end);
+    return (than.match(new RegExp(`2\\r\\n${ten}\\r\\n`, "gi")) || []).length;
+  };
+
+  assert.equal(
+    demBanGhi("LTYPE", "CONTINUOUS"),
+    1,
+    "Layer dùng 'Continuous' phải KHỚP linetype dựng sẵn 'CONTINUOUS', không tạo bản ghi trùng khác hoa/thường",
+  );
+  assert.equal(
+    demBanGhi("STYLE", "STANDARD"),
+    1,
+    "TEXT dùng style 'Standard' phải KHỚP style dựng sẵn 'STANDARD', không tạo bản ghi trùng khác hoa/thường",
+  );
+
+  // Số bản ghi thật trong bảng LTYPE phải khớp đúng số khai ở header (mã 70) — lệch số này chính
+  // là cơ chế gây hỏng bảng LAYER đọc ngay sau, dẫn tới AutoCAD huỷ cả bản vẽ.
+  const ltypeHeaderMatch = /0\r\nTABLE\r\n2\r\nLTYPE\r\n(?:(?!0\r\nTABLE).)*?70\r\n(\d+)\r\n/s.exec(
+    exported,
+  );
+  assert.ok(ltypeHeaderMatch, "Phải đọc được header bảng LTYPE");
+  const soKhaiBao = Number(ltypeHeaderMatch![1]);
+  const start = exported.indexOf("0\r\nTABLE\r\n2\r\nLTYPE\r\n");
+  const end = exported.indexOf("0\r\nENDTAB", start);
+  const soBanGhiThat = (exported.slice(start, end).match(/0\r\nLTYPE\r\n/g) || []).length;
+  assert.equal(soBanGhiThat, soKhaiBao, "Số bản ghi LTYPE thật phải khớp đúng số khai ở header");
+});
+
+test("exportDxf: layer 'Defpoints' phải có mã 290 (cờ in) tường minh, nếu không AutoCAD huỷ cả bản vẽ", () => {
+  // Hồi quy thật, người dùng báo 2026-08-24 — vòng thứ 3 cùng một triệu chứng "drawing
+  // discarded". Hai bản vá trước (bảng STYLE/LTYPE/DIMSTYLE thiếu tên, rồi so khớp phân biệt
+  // hoa/thường) đều đúng và cần thiết, nhưng KHÔNG PHẢI nguyên nhân của lỗi này — xác minh bằng
+  // cách đối chiếu số bản ghi khai ở header với số bản ghi thật của MỌI bảng trong TABLES section:
+  // tất cả đều khớp, không lệch nhịp đọc nào cả.
+  //
+  // AutoCAD báo "Invalid AcDbLayerTableRecord plot flag for DEFPOINTS layer" ngay tại dòng bắt
+  // đầu bản ghi LAYER kế tiếp — tức nó đọc XONG record Defpoints rồi mới hồi tố báo record đó
+  // thiếu trường bắt buộc. Mã 290 (cờ in) vốn TUỲ CHỌN với layer thường (thiếu thì mặc định có
+  // in), nhưng AutoCAD đòi hỏi TƯỜNG MINH cho layer đặc biệt "Defpoints" (do chính AutoCAD tự
+  // tạo, quy ước luôn không in) — bộ ghi trước đây không ghi mã 290 cho bất kỳ layer nào.
+  const dxf = `0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n0\nLAYER\n2\nDefpoints\n62\n7\n6\nCONTINUOUS\n0\nLAYER\n2\nM-DUCT\n62\n3\n6\nCONTINUOUS\n0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n0\nLINE\n8\nM-DUCT\n10\n0\n20\n0\n30\n0\n11\n1000\n21\n0\n31\n0\n0\nENDSEC\n0\nEOF`;
+
+  const parsed = parseDxf(dxf, "co_defpoints.dxf");
+  const exported = exportDxf(parsed, { applyStandardLayers: false });
+
+  const layerBlock = (ten: string) => {
+    const start = exported.indexOf(`2\r\n${ten}\r\n`);
+    const end = exported.indexOf("0\r\nLAYER", start + 1);
+    return exported.slice(start, end === -1 ? exported.indexOf("0\r\nENDTAB", start) : end);
+  };
+
+  assert.ok(
+    layerBlock("Defpoints").includes("290\r\n0\r\n"),
+    "Layer Defpoints phải khai tường minh mã 290 = 0 (không in) — AutoCAD từ chối mở nếu thiếu",
+  );
+  assert.ok(
+    layerBlock("M-DUCT").includes("290\r\n1\r\n"),
+    "Layer thường cũng nên khai tường minh mã 290 = 1 (có in) cho nhất quán",
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Khung nhìn lúc mở tệp (VPORT "*ACTIVE" + $VIEWCTR/$VIEWSIZE).
+//
+// Hồi quy thật, người dùng báo 2026-08-24: bộ ghi cắm cứng tâm (0,0) cao 1000, nên bản vẽ MEPF
+// trải 0…33000 × 0…17000 mở ra trong AutoCAD là **màn hình trắng trơn** — khung nhìn rơi vào mẩu
+// trống cạnh gốc toạ độ trong khi mọi thực thể nằm cách đó hàng chục nghìn đơn vị.
+//
+// Vì sao không bộ kiểm nào bắt được trước đó: tệp hoàn toàn HỢP LỆ (ezdxf Auditor 0 lỗi 0 fix),
+// round-trip qua chính bộ đọc cũng đủ 17 thực thể. Khung nhìn không phải tính hợp lệ, nó là tính
+// dùng được — chỉ lộ ra khi mở bằng AutoCAD thật.
+// ─────────────────────────────────────────────────────────────────────────────
+test("exportDxf: khung nhìn lúc mở phải phủ hết khung bao bản vẽ, không cắm cứng gốc toạ độ", () => {
+  const parsed = parseDxf(FIXTURE_MEPF, "mepf-thap-a.dxf");
+  const out = exportDxf(parsed);
+
+  const bao = parsed.diagnostic?.boundingDimensions;
+  assert.ok(bao, "fixture phải có khung bao để bài test này có nghĩa");
+  assert.ok(bao.maxX > 1000, "khung bao phải đủ xa gốc toạ độ mới tái hiện được lỗi");
+
+  // Bản ghi VPORT "*ACTIVE": mã 12/22 = tâm khung nhìn, 40 = chiều cao, 41 = tỷ lệ rộng/cao.
+  const khoi = out.slice(out.indexOf("*ACTIVE"), out.indexOf("*ACTIVE") + 400);
+  const doc = (ma: string): number => {
+    const m = khoi.match(new RegExp(`\\r\\n${ma}\\r\\n(-?[\\d.]+)\\r\\n`));
+    assert.ok(m, `VPORT *ACTIVE thiếu mã nhóm ${ma}`);
+    return Number(m[1]);
+  };
+  const tamX = doc("12");
+  const tamY = doc("22");
+  const cao = doc("40");
+  const tyLe = doc("41");
+
+  const nua = { x: (cao * tyLe) / 2, y: cao / 2 };
+  assert.ok(tamX - nua.x <= bao.minX, "mép trái khung nhìn phải nằm ngoài khung bao");
+  assert.ok(tamX + nua.x >= bao.maxX, "mép phải khung nhìn phải nằm ngoài khung bao");
+  assert.ok(tamY - nua.y <= bao.minY, "mép dưới khung nhìn phải nằm ngoài khung bao");
+  assert.ok(tamY + nua.y >= bao.maxY, "mép trên khung nhìn phải nằm ngoài khung bao");
+
+  // $VIEWCTR/$VIEWSIZE ở HEADER phải khớp VPORT — lệch nhau thì khung nhìn lúc mở tuỳ thuộc
+  // AutoCAD đọc chỗ nào sau.
+  const ctr = out.match(/\$VIEWCTR\r\n10\r\n(-?[\d.]+)\r\n20\r\n(-?[\d.]+)\r\n/);
+  const size = out.match(/\$VIEWSIZE\r\n40\r\n(-?[\d.]+)\r\n/);
+  assert.ok(ctr, "HEADER thiếu $VIEWCTR");
+  assert.ok(size, "HEADER thiếu $VIEWSIZE");
+  assert.equal(Number(ctr[1]), tamX, "$VIEWCTR X phải khớp tâm VPORT");
+  assert.equal(Number(ctr[2]), tamY, "$VIEWCTR Y phải khớp tâm VPORT");
+  assert.equal(Number(size[1]), cao, "$VIEWSIZE phải khớp chiều cao VPORT");
+});
+
+test("exportDxf: bản vẽ rỗng không làm chiều cao khung nhìn thành 0 hay NaN", () => {
+  const rong = parseDxf("0\nSECTION\n2\nENTITIES\n0\nENDSEC\n0\nEOF", "rong.dxf");
+  const out = exportDxf(rong);
+  const khoi = out.slice(out.indexOf("*ACTIVE"), out.indexOf("*ACTIVE") + 400);
+  const m = khoi.match(/\r\n40\r\n(-?[\d.]+)\r\n/);
+  assert.ok(m, "VPORT *ACTIVE thiếu mã nhóm 40");
+  const cao = Number(m[1]);
+  assert.ok(
+    Number.isFinite(cao) && cao > 0,
+    `chiều cao khung nhìn phải dương hữu hạn, nhận ${cao}`,
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bảng mã 8 bit ở ĐƯỜNG CLIENT (audit 2026-08-24).
+//
+// Máy chủ xử lý đúng chuyện này từ lâu (route truyền thẳng Buffer cho parseDxf), nhưng trang
+// chuẩn hoá đọc tệp bằng `FileReader.readAsText()` — không truyền tham số bảng mã thì mặc định
+// UTF-8, nên bản vẽ ghi bằng TCVN3/VNI/CP1258 mất sạch chữ có dấu thành `�` NGAY Ở BƯỚC ĐỌC
+// TỆP. Mất ở đó là mất vĩnh viễn: Bác Sĩ Font chạy sau, không còn byte gốc để suy ra chữ đúng.
+//
+// `giaiMaByteDxf` là bản không phụ thuộc `Buffer` (chạy được cả ở trình duyệt) của
+// `decodeDxfBytes`, để client dùng đúng logic máy chủ vẫn dùng.
+// ─────────────────────────────────────────────────────────────────────────────
+test("giaiMaByteDxf: giữ nguyên byte của bảng mã 8 bit, không biến thành ký tự thay thế", () => {
+  // 0xE8/0xE3/0xE5/0xE1 — dải byte TCVN3 dùng cho chữ có dấu. Không phải UTF-8 hợp lệ.
+  const byte = Buffer.from("èng giã cåp lánh", "latin1");
+  assert.ok(
+    byte.some((b) => b > 127),
+    "fixture phải có byte trên 127 mới tái hiện được lỗi",
+  );
+
+  const raRoi = giaiMaByteDxf(new Uint8Array(byte));
+  assert.ok(!raRoi.includes("�"), "không được có ký tự thay thế");
+  assert.equal(raRoi.charCodeAt(0), 0xe8, "byte đầu phải giữ nguyên giá trị 0xE8");
+  assert.equal(raRoi, "èng giã cåp lánh");
+
+  // Đối chiếu: đúng cách readAsText làm — ép UTF-8, không đường lui.
+  const nhuReadAsText = new TextDecoder("utf-8").decode(byte);
+  assert.ok(nhuReadAsText.includes("�"), "đường cũ PHẢI hỏng, nếu không thì test vô nghĩa");
+});
+
+test("giaiMaByteDxf: tệp UTF-8 thật vẫn giải mã đúng, không rơi nhầm sang nhánh dự phòng", () => {
+  const utf8 = Buffer.from("ống gió cấp lạnh AHU-01 Ø150", "utf8");
+  assert.equal(giaiMaByteDxf(new Uint8Array(utf8)), "ống gió cấp lạnh AHU-01 Ø150");
+});
+
+test("giaiMaByteDxf: chạy được trên chuỗi byte dài, không vượt giới hạn tham số", () => {
+  // Nhánh dự phòng ghép bằng String.fromCharCode theo khối — tệp lớn phải không nổ.
+  const dai = Buffer.alloc(500_000, 0xe8);
+  const ra = giaiMaByteDxf(new Uint8Array(dai));
+  assert.equal(ra.length, 500_000);
+  assert.equal(ra.charCodeAt(499_999), 0xe8);
+});
+
+test("parseDxf: bản vẽ TCVN3 đọc qua byte giữ được chữ, đọc qua UTF-8 thì mất", () => {
+  const mau =
+    "0\nSECTION\n2\nENTITIES\n0\nTEXT\n8\n0\n10\n0\n20\n0\n30\n0\n40\n300\n" +
+    "1\nèng giã cåp lánh\n0\nENDSEC\n0\nEOF";
+  const byte = Buffer.from(mau, "latin1");
+
+  const chu = (noiDung: string) => {
+    const e = parseDxf(noiDung, "t.dxf").entities.find((x) => x.type === "TEXT") as
+      { textValue?: string } | undefined;
+    return e?.textValue ?? "";
+  };
+
+  assert.ok(chu(new TextDecoder("utf-8").decode(byte)).includes("�"), "đường cũ phải hỏng");
+  assert.equal(chu(giaiMaByteDxf(new Uint8Array(byte))), "èng giã cåp lánh");
 });
