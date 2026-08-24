@@ -7,9 +7,19 @@
 ## Đợt gộp tính năng trùng lặp (2026-08-24)
 
 Người dùng: "quét tính năng trùng lặp gộp chúng lại cho gọn — trùng lặp hoặc thuộc về 1 bộ tính
-năng thì gộp lại". Nhánh `claude/duplicate-features-h3fva1`. Quét bằng bộ dò clone tự viết
-(chuẩn hoá dòng + hash cửa sổ trượt) trên toàn `lib/`, `app/`, `scripts/`, cộng đối chiếu tên
+năng thì gộp lại". Nhánh `claude/duplicate-features-h3fva1`, **PR #390**. Quét bằng bộ dò clone tự
+viết (chuẩn hoá dòng + hash cửa sổ trượt) trên toàn `lib/`, `app/`, `scripts/`, cộng đối chiếu tên
 export trùng.
+
+**Tổng: 7 cụm đã gộp, −1.585 dòng** (692 thêm / 2.277 bớt, 37 file) qua 2 đợt bên dưới.
+
+**Kiểm chứng sau khi hợp nhất `origin/main` (M99 PR2):** dựng Postgres 16 thật rồi chạy đúng bộ
+cổng của CI — `lint`, `typecheck`, `build`, `npm test -- --release-gate` (**1.212 ca: 1.211 xanh,
+0 đỏ, 1 skip có lý do trong allowlist**), `check:route-perms`, `check:project-scope`,
+`check:db-params`, `check:dead-code`, `check:lib-layers`, `check:mau-accent`, `check:sw-exclude`.
+`check:migrations` ĐỎ nhưng **đỏ sẵn trên `origin/main`** — xem mục nợ kỹ thuật ngay dưới.
+**Chưa chạy `npm run test:e2e`** (cần trình duyệt + server chạy thật; ca e2e mới cho chuyển hướng
+`/notifications` chưa được thực thi).
 
 ### Đợt 1 — 5 cụm đã gộp (−1.482 dòng, mọi cổng xanh)
 
@@ -65,6 +75,28 @@ kiểm khác hẳn), `workpackages/:id/bbnt` + `workpackages/:id/drawing` + `flo
 - **Khung form lặp ở 32 file `.tsx`** (`label` + `input` cùng chuỗi class, rõ nhất ở cặp
   `app/environment/page.tsx` ↔ `app/kickoff/page.tsx`, 311 dòng trùng). Là đợt tách component form
   dùng chung riêng, không phải gộp tính năng.
+
+### Nợ kỹ thuật ghi nhận khi hợp nhất — TRÙNG SỐ MIGRATION 0133 (chưa sửa)
+
+`npm run check:migrations` đang **ĐỎ trên chính `origin/main`**, không phải do nhánh này:
+
+```
+[LỖI] Nhiều file migration cùng số thứ tự:
+  - 0133: 0133_cad_device_pairing.sql, 0133_webhook_otp_hardening.sql
+```
+
+Hai file cùng số đến từ hai PR song song đều đã merge vào `main`:
+`0133_webhook_otp_hardening.sql` (#387, `9a1908fe`) và `0133_cad_device_pairing.sql`
+(#386, `6b5b5694`). Đã kiểm chứng bằng cách chạy cổng trên worktree `origin/main` sạch — đỏ y hệt
+khi chưa có commit nào của nhánh gộp trùng lặp.
+
+**Chưa sửa ở PR gộp trùng lặp** vì đây là lỗi của `main`, sửa ở đây sẽ nới phạm vi PR refactor sang
+vùng migration/DDL. Hướng xử lý (cần người dùng chốt, vì chạm file có thể đã áp production):
+đổi `0133_cad_device_pairing.sql` → `0135_cad_device_pairing.sql` (0134 đã dùng, số trống kế tiếp là
+0135). DDL của file này là `CREATE TABLE IF NOT EXISTS`/`ADD COLUMN IF NOT EXISTS` nên idempotent —
+đủ điều kiện đổi tên theo đúng ghi chú của chính cổng. Lưu ý bảng `schema_migrations` ở môi trường
+đã chạy 0133 sẽ cần chèn bổ sung dòng cho tên mới, nếu không migration sẽ chạy lại (vẫn an toàn nhờ
+idempotent, nhưng nên dọn cho sạch).
 
 ## M99 PR2 — Ghép thiết bị AutoCAD + token scope 'cad' + XBOSS_LOGIN (2026-08-24)
 
