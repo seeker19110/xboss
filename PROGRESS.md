@@ -4,6 +4,52 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Đợt gộp tính năng trùng lặp (2026-08-24) — ĐANG LÀM
+
+Người dùng: "quét tính năng trùng lặp gộp chúng lại cho gọn — trùng lặp hoặc thuộc về 1 bộ tính
+năng thì gộp lại". Nhánh `claude/duplicate-features-h3fva1`. Quét bằng bộ dò clone tự viết
+(chuẩn hoá dòng + hash cửa sổ trượt) trên toàn `lib/`, `app/`, `scripts/`, cộng đối chiếu tên
+export trùng.
+
+### Đợt 1 — 5 cụm đã gộp (−1.482 dòng, mọi cổng xanh)
+
+| Cụm                        | Trùng gì                                                                                                                                                                                                                                    | Cách gộp                                                                                                                                 |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Quét bản vẽ                | `app/api/drawings/scan-local/route.ts` và `scripts/scan-drawings.ts` chép nguyên si ~200 dòng (`parseDrawingInfo`, duyệt thư mục đệ quy, vòng lặp INSERT)                                                                                   | Tách `lib/ky-thuat/drawings-scan.ts` dùng chung; route còn 35 dòng ranh giới HTTP thuần (ADR-0008), script còn vỏ CLI                    |
+| Trang thông báo            | `app/notifications/page.tsx` (825 dòng) là bản sao của tab "Thông báo" trong `/my-tasks` — cùng `/api/notifications/feed` + `/prefs`, **không có mục nav nào trỏ tới**                                                                      | Xoá bản sao, `/notifications` chỉ còn chuyển hướng sang `/my-tasks?tab=notifications`; thêm deep-link `?tab=` + ca e2e canh chuyển hướng |
+| Facade FIDIC               | `engineering-fidic-claim.ts` + `engineering-fidic-tia-claim.ts` — hai facade cùng trỏ về `lib/tai-chinh/contracts-fidic.ts`                                                                                                                 | Gộp làm một `engineering-fidic-claim.ts`                                                                                                 |
+| Bảng ống tiêu chuẩn        | `engineering-cad-hydraulic-network.ts` giữ bảng DN chép tay riêng (đường kính trong lệch bảng gốc: DN25 27,2 vs 26,6mm…) song song `STANDARD_STEEL_PIPES`                                                                                   | `autoSizePipeDiameter` gọi lại overload sẵn có của `engineering-hydraulic-engine`; còn một nguồn sự thật                                 |
+| Thuỷ lực chết trong engine | `engineering-hydraulic-engine.ts` chứa `calcDarcyWeisbach`, `validateVelocityLimit`, `solveHydraulicNetwork` **không nơi nào import**, đều trùng bản đang chạy thật ở `engineering-cad-nesting.ts` / `engineering-cad-hydraulic-network.ts` | Bỏ 3 hàm + type chết kèm; engine 529 → 335 dòng                                                                                          |
+
+**Lỗi thật lộ ra khi gộp:** `scripts/scan-drawings.ts` chèn vào `drawing_revisions` các cột
+`file_size_bytes`/`file_sha256`/`created_by` — **không cột nào tồn tại** (schema thật:
+`size_bytes`/`original_name`/`mime_type`/`uploaded_by`, `mime_type` còn NOT NULL). Script chết ngay
+câu INSERT đầu; dùng chung với route (bản đúng) là hết. Đúng lớp lỗi "code viết mà chưa từng chạy
+thử" mà GĐ2 đã dựng cổng CI để chặn.
+
+### Không gộp (đã cân nhắc, cố ý bỏ qua)
+
+- `warranty.listClaims/getClaim/parseClaimBody/validateClaimInput` vs `tai-chinh/claims.*` — trùng
+  **tên**, khác miền hoàn toàn (khiếu nại bảo hành vs khiếu nại hợp đồng, hai bảng khác nhau).
+- `listBimElements` ở `engineering-bim-cad` vs `engineering-bim-viewer` — khác bảng
+  (`engineering_objects` vs `engineering_bim_elements`), khác tính năng.
+- `app/environment/page.tsx` ↔ `app/kickoff/page.tsx` (311 dòng trùng) — là **khung form lặp**
+  (label + input class), không phải tính năng trùng; mẫu class đó có ở 32 file `.tsx`, tách riêng
+  cho 2 trang sẽ lệch phần còn lại. Việc đúng là một đợt riêng tách component form dùng chung.
+- ~10 bảng `*_documents` tách riêng theo thực thể — `migrations/0019_project_documents.sql` đã ghi
+  rõ quyết định không di trú về một bảng.
+
+### Còn lại (đợt 2)
+
+- **Pipeline upload lặp ở 25 route** (`verifyFileMime`): cùng một chuỗi kiểm
+  Content-Length → `formData()` → `extFor*Mime` → `file.size` → magic bytes → caption, chép ~30 dòng
+  mỗi route. Tách helper thuần trong `lib/nen/photos.ts`.
+- **20 hàm `newXxxFileName`** trong `lib/nen/photos.ts` chỉ khác tiền tố:
+  `${prefix}${id}-${Date.now()}-${hex}${ext}`.
+- **Công thức Hazen-Williams còn 2 bản** khác quy ước đơn vị (L/s ở `engineering-cad-nesting.ts`
+  vs m³/h ở `engineering-hydraulic-engine.ts`) và khác hằng số cột nước (9806,65 vs 9810 Pa/m).
+  Gộp được nhưng **đổi số liệu kỹ thuật** → cần người dùng chốt bản nào là chuẩn.
+
 ## Đợt "nâng tầm dự án" GĐ2 — cổng máy thay checklist người (2026-08-24) — TỔNG HỢP
 
 Người dùng duyệt "làm tiếp giai đoạn 2". Kế hoạch `PLAN.md`, 6 việc W1–W6, mỗi việc 1 worktree

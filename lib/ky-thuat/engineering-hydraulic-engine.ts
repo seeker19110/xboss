@@ -136,47 +136,8 @@ export const STANDARD_STEEL_PIPES: PipeStandardSize[] = [
 // 2. CÔNG THỨC THỦY LỰC CƠ BẢN (DARCY-WEISBACH, HAZEN-WILLIAMS, SWAMEE-JAIN)
 // ============================================================================
 
-export function calcDarcyWeisbach(
-  flowRateLps: number,
-  diameterMm: number,
-  lengthM: number,
-  roughnessMm: number = 0.045,
-): {
-  velocityMs: number;
-  reynolds: number;
-  frictionFactor: number;
-  headLossPa: number;
-  headLossM: number;
-} {
-  const dM = diameterMm / 1000;
-  const areaM2 = (Math.PI * Math.pow(dM, 2)) / 4;
-  const flowM3s = flowRateLps / 1000;
-  const velocityMs = flowM3s / areaM2;
-
-  const nu = 1.004e-6; // Độ nhớt động học nước ở 20°C (m2/s)
-  const reynolds = (velocityMs * dM) / nu;
-
-  let f = 0.02;
-  if (reynolds > 4000) {
-    const e_D = roughnessMm / diameterMm;
-    f = 0.25 / Math.pow(Math.log10(e_D / 3.7 + 5.74 / Math.pow(reynolds, 0.9)), 2);
-  } else if (reynolds > 0) {
-    f = 64 / Math.max(reynolds, 1);
-  }
-
-  const rho = 998.2;
-  const g = 9.81;
-  const headLossPa = (f * (lengthM / dM) * (rho * Math.pow(velocityMs, 2))) / 2;
-  const headLossM = headLossPa / (rho * g);
-
-  return {
-    velocityMs: Math.round(velocityMs * 1000) / 1000,
-    reynolds: Math.round(reynolds),
-    frictionFactor: Math.round(f * 10000) / 10000,
-    headLossPa: Math.round(headLossPa),
-    headLossM: Math.round(headLossM * 1000) / 1000,
-  };
-}
+// calcDarcyWeisbach đã gộp về engineering-cad-nesting.ts (bản M89 có bù nhiệt độ chất lỏng)
+// — bản cố định 20°C ở đây không nơi nào import, đã bỏ để tránh hai công thức song song.
 
 export function calcHazenWilliams(
   flowRateM3h: number,
@@ -200,25 +161,8 @@ export function calcHazenWilliams(
   };
 }
 
-export function validateVelocityLimit(
-  systemType: HydraulicSystemType | string,
-  velocityMs: number,
-): { isAllowed: boolean; limitMs: number; message: string } {
-  let limitMs = 2.0;
-  if (systemType === "domestic_water" || systemType === "chilled_water") limitMs = 1.8;
-  if (systemType === "condenser_water") limitMs = 2.2;
-  if (systemType === "firefighting_sprinkler") limitMs = 3.5;
-  if (systemType === "air_duct") limitMs = 6.0;
-
-  const isAllowed = velocityMs <= limitMs;
-  return {
-    isAllowed,
-    limitMs,
-    message: isAllowed
-      ? `Vận tốc ${velocityMs} m/s đạt chuẩn (ngưỡng max ${limitMs} m/s).`
-      : `CẢNH BÁO: Vận tốc ${velocityMs} m/s vượt ngưỡng giới hạn ${limitMs} m/s gây ồn và xói mòn.`,
-  };
-}
+// validateVelocityLimit đã gộp về engineering-cad-nesting.ts (bảng VELOCITY_LIMITS có cả
+// ngưỡng min/max + trích dẫn tiêu chuẩn) — bản if-chain ở đây không nơi nào import, đã bỏ.
 
 // ============================================================================
 // 3. TÍNH TOÁN GIÁ ĐỠ & CHỌN CỠ ỐNG AUTO-SIZING
@@ -385,145 +329,6 @@ export interface BalancingValveScheduleItem {
   valveSettingPresetPercent: number;
 }
 
-export interface HydraulicNetworkSolveResult {
-  networkCode: string;
-  sourceNodeId: string;
-  totalSystemFlowLps: number;
-  totalSystemFlowM3h: number;
-  criticalIndexEdgeId: string;
-  criticalPathLossBar: number;
-  nodes: NetworkNode[];
-  edges: NetworkEdge[];
-  balancingSchedule: BalancingValveScheduleItem[];
-  isHydraulicallyBalanced: boolean;
-}
-
-export function solveHydraulicNetwork(
-  networkCode: string,
-  nodes: NetworkNode[],
-  rawEdges: Array<{
-    id: string;
-    fromNodeId: string;
-    toNodeId: string;
-    lengthM: number;
-    nominalDiameterMm?: number;
-  }>,
-): HydraulicNetworkSolveResult {
-  const nodeMap = new Map<string, NetworkNode>();
-  for (const n of nodes) nodeMap.set(n.id, { ...n });
-
-  const childrenMap = new Map<
-    string,
-    Array<{ edgeId: string; toNodeId: string; lengthM: number }>
-  >();
-  for (const e of rawEdges) {
-    if (!childrenMap.has(e.fromNodeId)) childrenMap.set(e.fromNodeId, []);
-    childrenMap.get(e.fromNodeId)!.push({ edgeId: e.id, toNodeId: e.toNodeId, lengthM: e.lengthM });
-  }
-
-  const computedEdges: NetworkEdge[] = [];
-  const edgeCumulativeLossMap = new Map<string, number>();
-
-  function calculateSubtreeFlow(nodeId: string): number {
-    const node = nodeMap.get(nodeId);
-    let totalFlow = node ? node.demandFlowLps : 0;
-    const branches = childrenMap.get(nodeId) || [];
-
-    for (const b of branches) {
-      const childFlow = calculateSubtreeFlow(b.toNodeId);
-      totalFlow += childFlow;
-
-      const rawE = rawEdges.find((x) => x.id === b.edgeId)!;
-      let dn: number = rawE.nominalDiameterMm || 0;
-      if (!dn || dn <= 0) {
-        const sizing = autoSizePipeDiameter(childFlow, 1.8);
-        dn = (sizing as any).nominalDiameterMm || 25;
-      }
-
-      const loss = calcDarcyWeisbach(childFlow, dn, b.lengthM);
-      const pressureDropBar = loss.headLossPa / 100000;
-
-      computedEdges.push({
-        id: b.edgeId,
-        fromNodeId: nodeId,
-        toNodeId: b.toNodeId,
-        lengthM: b.lengthM,
-        nominalDiameterMm: dn,
-        flowRateLps: Math.round(childFlow * 1000) / 1000,
-        velocityMs: loss.velocityMs,
-        headLossPa: loss.headLossPa,
-        pressureDropBar: Math.round(pressureDropBar * 10000) / 10000,
-        fittingLossFactorSum: 1.5,
-        isCriticalPath: false,
-      });
-    }
-    return totalFlow;
-  }
-
-  const sourceNode = nodes.find((n) => n.type === "source") || nodes[0];
-  const totalFlowLps = calculateSubtreeFlow(sourceNode.id);
-
-  function accumulatePathLoss(nodeId: string, currentLossBar: number) {
-    const branches = computedEdges.filter((e) => e.fromNodeId === nodeId);
-    for (const b of branches) {
-      const cumLoss = currentLossBar + b.pressureDropBar;
-      edgeCumulativeLossMap.set(b.id, cumLoss);
-      accumulatePathLoss(b.toNodeId, cumLoss);
-    }
-  }
-  accumulatePathLoss(sourceNode.id, 0);
-
-  let maxLossBar = 0;
-  let criticalEdgeId = "";
-  for (const [edgeId, cumLoss] of edgeCumulativeLossMap.entries()) {
-    if (cumLoss > maxLossBar) {
-      maxLossBar = cumLoss;
-      criticalEdgeId = edgeId;
-    }
-  }
-
-  for (const e of computedEdges) {
-    if (e.id === criticalEdgeId) e.isCriticalPath = true;
-  }
-
-  const balancingSchedule: BalancingValveScheduleItem[] = [];
-  let valveSeq = 1;
-  const terminalNodes = nodes.filter((n) => n.type === "terminal" || n.demandFlowLps > 0);
-
-  for (const t of terminalNodes) {
-    const incomingEdge = computedEdges.find((e) => e.toNodeId === t.id);
-    if (incomingEdge) {
-      const branchLoss = edgeCumulativeLossMap.get(incomingEdge.id) || incomingEdge.pressureDropBar;
-      const deltaPNeededBar = Math.max(0, maxLossBar - branchLoss);
-
-      if (deltaPNeededBar > 0.005) {
-        const flowM3h = (t.demandFlowLps * 3600) / 1000;
-        const requiredKv = Math.round((flowM3h / Math.sqrt(deltaPNeededBar)) * 100) / 100;
-        const presetPercent = Math.min(100, Math.max(10, Math.round((requiredKv / 15.0) * 100)));
-
-        balancingSchedule.push({
-          valveCode: `BV-${String(valveSeq++).padStart(2, "0")}`,
-          edgeId: incomingEdge.id,
-          locationNode: t.id,
-          designFlowLps: t.demandFlowLps,
-          targetPressureDropBar: Math.round(deltaPNeededBar * 10000) / 10000,
-          requiredKvCoefficient: requiredKv,
-          valveSettingPresetPercent: presetPercent,
-        });
-      }
-    }
-  }
-
-  return {
-    networkCode,
-    sourceNodeId: sourceNode.id,
-    totalSystemFlowLps: Math.round(totalFlowLps * 1000) / 1000,
-    totalSystemFlowM3h: Math.round(((totalFlowLps * 3600) / 1000) * 100) / 100,
-    criticalIndexEdgeId: criticalEdgeId,
-    criticalPathLossBar: Math.round(maxLossBar * 10000) / 10000,
-    nodes,
-    edges: computedEdges,
-    balancingSchedule,
-    isHydraulicallyBalanced: balancingSchedule.length > 0 || computedEdges.length <= 1,
-  };
-}
+// solveHydraulicNetwork đã gộp về engineering-cad-hydraulic-network.ts — đó là bản đang chạy
+// thật (route /api/engineering/cad-corridor dùng), có thêm phân loại hệ, kiểm vận tốc và lưu DB.
+// Bản rút gọn ở đây không nơi nào import, đã bỏ; các type mạng lưới bên trên vẫn dùng chung.

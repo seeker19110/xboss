@@ -18,7 +18,7 @@ import {
   type SmartIpcGateContext,
 } from "@/lib/ky-thuat/engineering-smart-ipc";
 
-import { analyzeFidicTiaClaim, FidicTiaInput } from "@/lib/ky-thuat/engineering-fidic-tia-claim";
+import { analyzeFidicTiaClaim, FidicTiaInput } from "@/lib/ky-thuat/engineering-fidic-claim";
 
 test("1. 3D A* Generative Spatial Router — Drainage slope & Beam L/3 penetration", () => {
   const input: GenerativeRoutingInput = {
