@@ -312,14 +312,14 @@ export const DASHBOARD_TREE: DashCluster[] = [
         children: [
           { href: "/my-tasks", label: "Việc của tôi", icon: ClipboardList },
           { href: "/approvals", label: "Nghiệm thu", icon: CheckSquare },
-          { href: "/site?tab=tasks-diary&sub=diary", label: "Nhật ký", icon: NotebookPen },
-          { href: "/site?tab=work-fronts", label: "Mặt bằng", icon: LandPlot },
+          { href: "/diary", label: "Nhật ký", icon: NotebookPen },
+          { href: "/work-fronts", label: "Mặt bằng", icon: LandPlot },
           { href: "/site?tab=tasks-diary&sub=resources", label: "Tài nguyên", icon: Users },
         ],
       },
       {
         id: "dash.chat-luong",
-        href: "/site?tab=approvals-qc&sub=ncr",
+        href: "/quality",
         label: "Chất lượng (QA/QC)",
         icon: ClipboardCheck,
       },
@@ -329,13 +329,13 @@ export const DASHBOARD_TREE: DashCluster[] = [
         icon: ShieldAlert,
         children: [
           {
-            href: "/site?tab=hse-safety",
+            href: "/hse",
             label: "HSE",
             icon: ShieldAlert,
             roles: ["admin", "pm", "engineer", "subcon"],
           },
           {
-            href: "/site?tab=hse-safety",
+            href: "/hse",
             label: "Rủi ro",
             icon: AlertTriangle,
             roles: ["admin", "pm", "engineer", "bch", "cdt", "viewer"],
@@ -347,8 +347,8 @@ export const DASHBOARD_TREE: DashCluster[] = [
         label: "Thiết bị & Máy móc",
         icon: Wrench,
         children: [
-          { href: "/site?tab=equipment&sub=equipment", label: "Thiết bị", icon: Wrench },
-          { href: "/site?tab=equipment&sub=vehicles", label: "Xe ra vào", icon: CarFront },
+          { href: "/equipment", label: "Thiết bị", icon: Wrench },
+          { href: "/vehicles", label: "Xe ra vào", icon: CarFront },
         ],
       },
     ],
@@ -446,25 +446,25 @@ export const DASHBOARD_TREE: DashCluster[] = [
         icon: Coins,
         children: [
           {
-            href: "/commercial?tab=ipc-payments&sub=proposals",
+            href: "/proposals",
             label: "Đề xuất & duyệt",
             icon: FileCheck2,
           },
-          { href: "/commercial?tab=ipc-payments&sub=payments", label: "Thanh toán", icon: Wallet },
+          { href: "/payments", label: "Thanh toán", icon: Wallet },
           {
-            href: "/commercial?tab=contracts&sub=costs",
+            href: "/costs",
             label: "Chi phí",
             icon: Coins,
             roles: ["admin", "pm", "bch"],
           },
           {
-            href: "/commercial?tab=contracts",
+            href: "/contracts",
             label: "Hợp đồng",
             icon: FileSignature,
             roles: ["admin", "pm", "bch"],
           },
           {
-            href: "/commercial?tab=ipc-payments&sub=ipc",
+            href: "/payment-certs",
             label: "Thanh toán KL",
             icon: Receipt,
             roles: ["admin", "pm", "bch"],
@@ -473,7 +473,7 @@ export const DASHBOARD_TREE: DashCluster[] = [
       },
       {
         id: "dash.tai-chinh-ke-toan",
-        href: "/commercial?tab=cashflow-esign",
+        href: "/finance",
         label: "Tài chính – Kế toán",
         icon: Banknote,
         roles: ["admin", "pm", "bch"],
@@ -484,13 +484,13 @@ export const DASHBOARD_TREE: DashCluster[] = [
         icon: Scale,
         children: [
           {
-            href: "/commercial?tab=vo-variations",
+            href: "/variations",
             label: "Phát sinh",
             icon: FilePlus2,
             roles: ["admin", "pm", "engineer", "bch"],
           },
           {
-            href: "/commercial?tab=fidic-claims",
+            href: "/claims",
             label: "Claim chi phí",
             icon: Scale,
             roles: ["admin", "pm", "engineer", "bch"],
@@ -499,7 +499,7 @@ export const DASHBOARD_TREE: DashCluster[] = [
       },
       {
         id: "dash.bao-hiem-bao-lanh",
-        href: "/commercial?tab=contracts&sub=insurance",
+        href: "/insurance",
         label: "Bảo hiểm & Bảo lãnh",
         icon: Umbrella,
         roles: ["admin", "pm", "bch"],
@@ -562,7 +562,7 @@ export const DASHBOARD_TREE: DashCluster[] = [
         children: [
           { href: "/users", label: "Tài khoản", icon: Users, roles: ["admin"] },
           { href: "/admin", label: "Phân công", icon: ShieldCheck, roles: ["admin", "pm"] },
-          { href: "/site?tab=tasks-diary&sub=attendance", label: "Chấm công", icon: CalendarCheck },
+          { href: "/attendance", label: "Chấm công", icon: CalendarCheck },
           { href: "/personnel", label: "Nhân sự", icon: UserCog },
           { href: "/org", label: "Sơ đồ tổ chức", icon: Network },
         ],

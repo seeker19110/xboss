@@ -70,7 +70,55 @@ tra riêng: `admin-config` (12/12), `appshell` (18/19), `dashboard`, `notificati
 `project-switcher`, `correspondences`, `drawings`, `system`, `design-changes`. Nguyên nhân
 quan sát được gồm strict-mode violation (locator khớp 2 phần tử) và timeout khi click.
 
-## 4. Vì sao không tự ý sửa
+## 4. Quyết định đã chốt và đã thi hành
+
+Người dùng giao quyền quyết định ("xử lý theo hướng tốt nhất"). Hướng đã chọn:
+**khôi phục nguyên trạng các trang từ git, giữ nguyên kiến trúc thông tin hub.**
+
+Lý do chọn hướng này thay vì hai hướng còn lại:
+
+- **Không viết lại spec bám hub.** Đó là cách nhanh nhất để e2e xanh, nhưng nó xoá luôn
+  tín hiệu duy nhất còn báo rằng 11 thao tác nhập liệu đã biến mất. Bộ e2e đang làm đúng
+  việc của nó — vấn đề nằm ở mã nguồn, không nằm ở test.
+- **Không viết lại giao diện từ đầu.** Không cần: `git show aa47704^:app/<x>/page.tsx` cho
+  lại **13.770 dòng** giao diện nguyên vẹn, đã từng được chính bộ e2e này kiểm. Khôi phục
+  vừa rẻ hơn nhiều lần, vừa lấy lại đúng hành vi cũ thay vì một phiên bản tôi tự nghĩ ra.
+
+Hub **không bị đụng tới**: nó vẫn là cổng vào dạng bảng tóm tắt; các màn hình thao tác sâu
+quay lại làm route riêng. Đây là khuôn mẫu bình thường (hub = tổng quan, trang = tác nghiệp),
+không phải đảo ngược đợt gom.
+
+Đã khôi phục **20 trang** trong 2 commit:
+
+- **Cụm `/site`** (a9a6fd3): attendance (+ AttendanceChart), diary (+ DiaryEditorModal,
+  ManpowerChart), hse, equipment, vehicles, work-fronts.
+- **Cụm `/commercial` + còn lại** (e2dcd4a): contracts, claims, insurance, costs, proposals,
+  variations, payment-certs, payments, finance, risks, quality, timeline, scurve,
+  schedule-control.
+
+Việc phải làm tay khi khôi phục chỉ là **sửa đường import** cho khớp `lib/` theo miền
+(ADR-0007) — bằng chứng rằng phần còn lại của mã nguồn vẫn tương thích với các trang này.
+
+### Ba ca phải xử lý riêng (không phải mất tính năng)
+
+1. `e2e/authed/attendance.spec.ts` — nhãn đổi ở đợt Bento Grid 2.0 (`3908fc6`):
+   "Tổng nhân công ngày này" → "Tổng quân số hôm nay". Cùng ô, cùng ý nghĩa → **sửa spec**.
+2. `e2e/authed/claims.spec.ts` — thẻ KPI là "Claim EOT gia hạn đang mở", spec tìm chuỗi con
+   "Claim EOT đang mở" nên trượt → **sửa spec**.
+3. Hai lỗi tương phản thật trong trang khôi phục (`app/diary`, `app/proposals`): nền
+   `bg-sky-950/*` không được `html.light` đảo nên ở chế độ sáng thành xám-xanh trung tính →
+   1,86:1 và 1,01:1. Đổi sang `bg-sky-500/10` + shade `-300` (tự đảo theo theme) → 6,84:1
+   (sáng) / 9,29:1 (tối). Ở `proposals` lần sửa đầu vẫn 4,39:1 vì span đếm số có
+   `opacity-80` làm nhạt chữ — chi tiết bị bỏ sót khi tính lần đầu, đã bỏ `opacity-80`.
+
+### Đính chính một kết luận ở §1
+
+Nhận định ban đầu "rule `color-contrast` đã bị tắt trong spec nên không thể là lý do đỏ"
+**chỉ đúng với spec mới** (`chuan-hoa-ban-ve.spec.ts`). Các spec cũ như `diary`, `proposals`
+**không** tắt rule này, nên nợ tương phản ở §5 **có** góp phần làm e2e đỏ — dù không phải
+nguyên nhân chính (nguyên nhân chính vẫn là 19 route trả 404).
+
+## 4b. Ba hướng đã cân nhắc
 
 Có ba cách xử lý, dẫn tới kết quả rất khác nhau, nên **phải người quyết từng miền**:
 

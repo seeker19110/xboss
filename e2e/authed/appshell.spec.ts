@@ -26,12 +26,15 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
     await expect(sidebar.getByRole("link", { name: "Dashboard" })).toBeVisible({
       timeout: 15_000,
     });
+    // Ba nhãn dưới đây đổi ở đợt gom hub và nhãn mới rõ nghĩa hơn nhãn cũ
+    // ("Chất lượng (QA/QC)", "Kho & Tồn kho", "Đơn hàng PO & PR") — sửa spec theo UI,
+    // không đổi UI để chiều test.
     for (const label of [
       "Báo cáo",
       "Việc của tôi",
       "Nghiệm thu",
       "Định mức BOQ",
-      "Chất lượng",
+      "Chất lượng (QA/QC)",
       "Nhật ký",
       "Tất cả bản vẽ",
       "Thiết kế",
@@ -43,8 +46,8 @@ test.describe("AppShell — sidebar & topbar (sau đăng nhập)", () => {
       "Hồ sơ dự án",
       "Mặt bằng",
       "HSE",
-      "Vật tư",
-      "Đơn đặt hàng",
+      "Kho & Tồn kho",
+      "Đơn hàng PO & PR",
       "Xe ra vào",
       "Thiết bị",
       "Thanh toán",
