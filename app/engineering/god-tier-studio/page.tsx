@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import AppHeader from "@/app/components/AppHeader";
+import ThuNghiemBanner from "@/app/components/ThuNghiemBanner";
 import {
   Layers,
   Sparkles,
@@ -451,6 +452,7 @@ export default function GodTierStudioPage() {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+        <ThuNghiemBanner />
         {/* Top Header Card */}
         <div className="bg-zinc-900/90 border border-zinc-800 rounded-xl p-5 shadow-lg backdrop-blur-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="space-y-1">

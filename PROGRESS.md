@@ -4,6 +4,43 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## GĐ2/W3 — Đóng băng 12 module engineering vượt gate bằng feature flag (2026-08-24)
+
+Quyết định người dùng: **đóng băng, KHÔNG gỡ code** (`PLAN.md` việc W3). `isModuleEnabled`/
+`getModuleFlags` trước đây mặc định BẬT cho mọi module chưa có dòng override — chèn override
+tắt qua DB cho từng dự án là mong manh (dự án mới tự bật lại).
+
+- **`lib/nen/modules.ts`** — `ModuleDef` thêm `thuNghiem?: boolean`. Thêm **12 entry con** mới
+  (`routePrefix` dài hơn "engineering" nên `findModuleByRoute` ưu tiên khớp đúng module con):
+  - **Tiêu chí (a) vượt cổng roadmap** (ENG-0 #10, OS-phase): `engineering-autonomy`,
+    `engineering-twin`, `engineering-predictions`, `engineering-graph`,
+    `engineering-prescriptive`.
+  - **Tiêu chí (b) chưa từng chạy được (W1)/mô phỏng rõ rệt**: `engineering-bim-models`,
+    `engineering-iot-telemetry`, `engineering-subcon-ai`, `engineering-god-tier-studio`,
+    `engineering-quantum-hub`, `engineering-swarm`, `engineering-nextgen-apex`.
+  - `engineering-quantum-hub` cố ý `routePrefix: []` — API của trang này (`/api/engineering/
+    queue`, `/ledger`, `/spatial`) dùng CHUNG với `mepf-studio`/`chuan-hoa-ban-ve`/
+    `spatial-viewer` (module thật, không đánh dấu) → không có tiền tố an toàn để gate riêng.
+  - `engineering-bim-models` KHÔNG gate `/api/engineering/bim-routing` (dùng chung với
+    `auto-routing`, module thật).
+- **`lib/ha-tang/feature-flags.ts`** — `isModuleEnabled`/`getModuleFlags` đổi mặc định thành
+  `overrides.get(key) ?? !def?.thuNghiem` — module thường vẫn mặc định bật (tương thích ngược),
+  module `thuNghiem` mặc định **TẮT cho mọi dự án kể cả dự án mới tạo**; Admin vẫn bật thủ công
+  qua `setFlag`/`/admin/features` (override luôn thắng).
+- **UI cảnh báo:** `app/components/ThuNghiemBanner.tsx` (mới) — chèn vào đầu 12 trang
+  `app/engineering/{autonomy,twin,predictions,graph,prescriptive,bim-viewer,iot-telemetry,
+  subcon-ai,swarm,quantum-hub,nextgen-apex,god-tier-studio}/page.tsx`.
+- **Kiểm chứng bằng Postgres thật** (cổng 55503): `tests/feature-flags.test.ts` thêm ca
+  "dự án mới → module thuNghiem tắt; Admin setFlag vẫn bật được" + sửa ca cũ (không còn đúng
+  khi có module mặc định tắt) + ca `findModuleByRoute` khớp module con thay vì rơi về
+  "engineering" cha. `npm test` (1197 ca), `lint`, `typecheck`, `check:lib-layers`,
+  `check:sw-exclude`, `build` đều xanh.
+- **Chưa làm (báo cáo cho phiên chính quyết):** các route `/api/engineering/**` hiện KHÔNG có
+  route nào gọi `assertModuleEnabled` (khác với `tracking`/`field`/`documents`...) — đánh dấu
+  `thuNghiem` mới đổi được mặc định cờ + ẩn được nav (khi có) + banner cảnh báo trên trang, CHƯA
+  tự động chặn API 404 khi module tắt. Muốn chặn API thật cần thêm `assertModuleEnabled` vào
+  từng route con — việc riêng, ngoài phạm vi W3 (brief không yêu cầu bước này).
+
 ## GĐ1/V1 — Xác thực webhook đi vào + chuẩn hoá OTP liên kết (2026-08-24)
 
 Vá lỗ hổng **Cao A1 + A2** và phát hiện **Trung B9** của đợt audit ngay bên dưới (`PLAN.md`, việc V1).

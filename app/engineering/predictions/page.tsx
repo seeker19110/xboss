@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import AppHeader from "@/app/components/AppHeader";
+import ThuNghiemBanner from "@/app/components/ThuNghiemBanner";
 import EngineeringNav from "@/app/components/EngineeringNav";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
@@ -126,6 +127,7 @@ export default function PredictionsPage() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <AppHeader title="Predictive OS (Dự báo rủi ro có kiểm soát)" />
       <main className="mx-auto max-w-7xl px-4 py-6">
+        <ThuNghiemBanner />
         <EngineeringNav />
 
         {/* Action Header & Model Trigger */}

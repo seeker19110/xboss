@@ -26,6 +26,7 @@ import {
   Cell,
 } from "recharts";
 import AppHeader from "@/app/components/AppHeader";
+import ThuNghiemBanner from "@/app/components/ThuNghiemBanner";
 import EngineeringNav from "@/app/components/EngineeringNav";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
@@ -262,6 +263,7 @@ export default function PrescriptiveAndCompliancePage() {
       <div className="min-h-screen bg-zinc-950 text-zinc-100">
         <AppHeader />
         <main className="mx-auto max-w-7xl px-4 py-8">
+          <ThuNghiemBanner />
           <EngineeringNav />
           <PageSkeleton />
         </main>
@@ -292,6 +294,7 @@ export default function PrescriptiveAndCompliancePage() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <AppHeader />
       <main className="mx-auto max-w-7xl px-4 py-8">
+        <ThuNghiemBanner />
         <EngineeringNav />
 
         {/* Title and Action Bar */}

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import AppHeader from "@/app/components/AppHeader";
+import ThuNghiemBanner from "@/app/components/ThuNghiemBanner";
 import EngineeringNav from "@/app/components/EngineeringNav";
 import { ComponentErrorBoundary } from "@/app/components/ComponentErrorBoundary";
 import {
@@ -140,6 +141,7 @@ export default function IotTelemetryPage() {
       <EngineeringNav />
 
       <main className="flex-1 max-w-7xl mx-auto w-full p-4 lg:p-6 flex flex-col gap-6">
+        <ThuNghiemBanner />
         {/* Header Title */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-zinc-800 pb-4">
           <div className="flex items-center gap-3">
