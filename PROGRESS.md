@@ -67,10 +67,27 @@ Bước chạy Playwright: **4m48 → 1m25–2m01 mỗi shard**, đúng thiết 
 `--shard` chia đều theo SỐ CA chứ không theo thời gian chạy — chấp nhận được, không đáng đổi sang
 cơ chế cân bằng phức tạp hơn.
 
-**Ước tính ban đầu là ~3m45, thực tế 4m22 — lệch 37 giây.** Lý do: lượt này **cache còn rỗng**,
-chưa có gì để khôi phục, nên `npm ci` vẫn chạy đủ 20–26s ở cả 6 job và `playwright install` vẫn
-tải Chromium 22s. Các bước `Post Cache` đều thành công nên từ lượt sau hai khoản đó biến mất; con
-số ~3m45 là mức kỳ vọng khi cache đã ấm, không phải mức đã đạt được.
+**Ước tính ban đầu là ~3m45, thực tế 4m22 — lệch 37 giây.** Lúc đó tôi cho rằng vì lượt này cache
+còn rỗng nên `npm ci` vẫn chạy đủ 20–26s ở cả 6 job, và từ lượt sau khoản đó sẽ biến mất.
+
+**Lượt sau đã chứng minh dự đoán đó SAI** (run 32692437518, PR #383, cache đã ấm — bước "Cài
+dependencies" bị `skipped` ở cả 6 job): đường găng **4m20**, tức chỉ nhanh hơn **2 giây**.
+
+Lý do, đọc từ log từng bước của job dài nhất (`e2e 1/3`):
+
+| Bước                            | Cache rỗng               | Cache ấm                                          |
+| ------------------------------- | ------------------------ | ------------------------------------------------- |
+| Khôi phục cache + cài phụ thuộc | `npm ci` 25s             | khôi phục `node_modules` **18s**, `npm ci` bỏ qua |
+| Cache + cài Chromium            | `playwright install` 22s | khôi phục 6s + `install` 18s = **24s**            |
+
+**Cache `node_modules` gần như vô dụng ở dự án này**: giải nén một cây `node_modules` lớn tốn gần
+bằng chính `npm ci` khi cache npm của `setup-node` đã ấm sẵn — đổi 25s lấy 18s. Cache trình duyệt
+Playwright còn tệ hơn, tổng cộng **chậm hơn** vài giây vì `playwright install` vẫn mất 18s dù không
+phải tải gì. Nói cách khác, **đòn bẩy số 3 trong bốn đòn bẩy trên hầu như không đóng góp gì**; toàn
+bộ 2m39 tiết kiệm được đến từ đòn 1 (shard) và đòn 2 (tách job).
+
+Nợ kỹ thuật để lại: nên cân nhắc **gỡ bỏ hai bước cache** đó cho cấu hình gọn lại, vì chúng thêm
+độ phức tạp mà không đổi lấy thời gian. Chưa gỡ trong đợt này để tránh đổi thêm thứ chưa đo kỹ.
 
 **Ba thứ chỉ runner thật mới chứng minh được** (kiểm chứng cục bộ ở trên không thay thế được):
 `strategy.matrix` chia đúng 3 shard, biểu thức `needs.*.result` trong hai job tổng hợp chạy đúng
