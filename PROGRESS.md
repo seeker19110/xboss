@@ -4,7 +4,7 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
-## Rút thời gian CI từ 7 phút xuống ~3 phút 45 (2026-08-24)
+## Rút thời gian CI từ 7m01 xuống 4m22 (2026-08-24)
 
 Đo trước khi sửa (run 1210, cả hai job xanh) để biết thời gian nằm ở đâu thay vì đoán:
 
@@ -47,6 +47,51 @@ bao giờ merge được — tách job là đổi tên job. Giá phải trả ~2
 **Chưa làm — và lý do:** không cache `.next/cache`. Thư mục này ở máy đo là **673 MB**; tải lên
 tải xuống mất nhiều thời gian hơn chính 50s build mà nó định tiết kiệm. Cũng không dựng `build`
 một lần rồi truyền `.next` (250 MB) sang các shard qua artifact, vì cùng lý do.
+
+### Số đo THẬT sau khi merge (PR #382, run 32691921193, commit `ee71d45`)
+
+Đường găng **7m01 → 4m22** (nhanh hơn 2m39, tức 37%). Toàn bộ 8 job xanh.
+
+| Job                               | Thời gian | Bước nặng nhất           |
+| --------------------------------- | --------- | ------------------------ |
+| `build`                           | 1m25      | build 48s                |
+| `static (lint, typecheck, check)` | 1m49      | lint 40s · typecheck 27s |
+| `test (Postgres)`                 | 2m24      | `npm test` 1m27          |
+| **`ci`** (tổng hợp)               | 2m30      | xong lúc 05:01:07        |
+| `e2e 3/3`                         | 3m26      | chạy Playwright 1m25     |
+| `e2e 2/3`                         | 3m54      | chạy Playwright 1m49     |
+| `e2e 1/3`                         | 4m16      | chạy Playwright 2m01     |
+| **`e2e`** (tổng hợp)              | 4m22      | xong lúc 05:02:59        |
+
+Bước chạy Playwright: **4m48 → 1m25–2m01 mỗi shard**, đúng thiết kế. Ba shard lệch nhau ~36s vì
+`--shard` chia đều theo SỐ CA chứ không theo thời gian chạy — chấp nhận được, không đáng đổi sang
+cơ chế cân bằng phức tạp hơn.
+
+**Ước tính ban đầu là ~3m45, thực tế 4m22 — lệch 37 giây.** Lúc đó tôi cho rằng vì lượt này cache
+còn rỗng nên `npm ci` vẫn chạy đủ 20–26s ở cả 6 job, và từ lượt sau khoản đó sẽ biến mất.
+
+**Lượt sau đã chứng minh dự đoán đó SAI** (run 32692437518, PR #383, cache đã ấm — bước "Cài
+dependencies" bị `skipped` ở cả 6 job): đường găng **4m20**, tức chỉ nhanh hơn **2 giây**.
+
+Lý do, đọc từ log từng bước của job dài nhất (`e2e 1/3`):
+
+| Bước                            | Cache rỗng               | Cache ấm                                          |
+| ------------------------------- | ------------------------ | ------------------------------------------------- |
+| Khôi phục cache + cài phụ thuộc | `npm ci` 25s             | khôi phục `node_modules` **18s**, `npm ci` bỏ qua |
+| Cache + cài Chromium            | `playwright install` 22s | khôi phục 6s + `install` 18s = **24s**            |
+
+**Cache `node_modules` gần như vô dụng ở dự án này**: giải nén một cây `node_modules` lớn tốn gần
+bằng chính `npm ci` khi cache npm của `setup-node` đã ấm sẵn — đổi 25s lấy 18s. Cache trình duyệt
+Playwright còn tệ hơn, tổng cộng **chậm hơn** vài giây vì `playwright install` vẫn mất 18s dù không
+phải tải gì. Nói cách khác, **đòn bẩy số 3 trong bốn đòn bẩy trên hầu như không đóng góp gì**; toàn
+bộ 2m39 tiết kiệm được đến từ đòn 1 (shard) và đòn 2 (tách job).
+
+Nợ kỹ thuật để lại: nên cân nhắc **gỡ bỏ hai bước cache** đó cho cấu hình gọn lại, vì chúng thêm
+độ phức tạp mà không đổi lấy thời gian. Chưa gỡ trong đợt này để tránh đổi thêm thứ chưa đo kỹ.
+
+**Ba thứ chỉ runner thật mới chứng minh được** (kiểm chứng cục bộ ở trên không thay thế được):
+`strategy.matrix` chia đúng 3 shard, biểu thức `needs.*.result` trong hai job tổng hợp chạy đúng
+(cả `ci` lẫn `e2e` đều chờ đủ dependency rồi mới xanh), và `actions/cache` ghi được cache.
 
 ## Hoàn thiện đường ống DXF cho trang chuẩn hoá bản vẽ (2026-08-24)
 
