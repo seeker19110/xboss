@@ -174,7 +174,7 @@ export default function EngineeringGraphPage() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <AppHeader title="Knowledge Graph & Phả hệ kỹ thuật" />
       <main className="mx-auto max-w-7xl px-4 py-6">
-        <ThuNghiemBanner />
+        <ThuNghiemBanner moduleKey="engineering-graph" />
         <EngineeringNav />
 
         {/* Search & Filter Bar */}

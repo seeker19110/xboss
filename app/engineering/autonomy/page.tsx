@@ -229,7 +229,7 @@ export default function ControlledAutonomyPage() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <AppHeader title="Controlled Autonomy (Tự động hóa an toàn A0–A2)" />
       <main className="mx-auto max-w-7xl px-4 py-6">
-        <ThuNghiemBanner />
+        <ThuNghiemBanner moduleKey="engineering-autonomy" />
         <EngineeringNav />
 
         {/* Top Autonomy Control Banner */}

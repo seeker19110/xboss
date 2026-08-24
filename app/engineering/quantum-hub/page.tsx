@@ -199,7 +199,7 @@ export default function QuantumHubPage() {
       <AppHeader title="Quantum Core & Merkle Ledger (M73)" />
       <div className="mx-auto max-w-7xl px-4 py-6">
         <EngineeringNav />
-        <ThuNghiemBanner />
+        <ThuNghiemBanner moduleKey="engineering-quantum-hub" />
 
         {/* Tab Navigation */}
         <div className="mb-6 flex space-x-2 border-b border-zinc-800 pb-2">

@@ -264,7 +264,7 @@ export default function DigitalTwinPage() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <AppHeader title="Digital Twin (Cấp độ L0–L3)" />
       <main className="mx-auto max-w-7xl px-4 py-6">
-        <ThuNghiemBanner />
+        <ThuNghiemBanner moduleKey="engineering-twin" />
         <EngineeringNav />
 
         {/* Search Header */}

@@ -140,6 +140,18 @@ test(
       // Tắt lại → về đúng trạng thái override (không rơi về mặc định).
       await ff.setFlag("engineering-autonomy", p, false, u, 1);
       assert.equal(await ff.isModuleEnabled("engineering-autonomy", p), false);
+
+      // assertModuleEnabled — chính 2 dòng mà 48 route con của 11 module thuNghiem
+      // (autonomy/twin/predictions/graph/prescriptive/bim-models/iot-telemetry/subcon-ai/
+      // god-tier-studio/swarm/nextgen-apex, trừ quantum-hub routePrefix rỗng) gọi trước khi
+      // chạm dữ liệu — phải trả 404 khi tắt (mặc định, dự án mới), null (không chặn) khi
+      // Admin bật thủ công. Đã xác nhận thêm bằng gọi API thật qua dev server (xem báo cáo).
+      const blockedDefault = await ff.assertModuleEnabled("engineering-autonomy", p);
+      assert.ok(blockedDefault, "module thuNghiem mặc định phải bị chặn");
+      assert.equal(blockedDefault!.status, 404);
+
+      await ff.setFlag("engineering-autonomy", p, true, u, 1);
+      assert.equal(await ff.assertModuleEnabled("engineering-autonomy", p), null);
     } finally {
       await run(`DELETE FROM feature_flags WHERE project_id = ?`, p);
       await run(`DELETE FROM projects WHERE id = ?`, p);

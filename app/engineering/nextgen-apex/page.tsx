@@ -228,7 +228,7 @@ export default function NextGenApexEngineeringPage() {
       <EngineeringNav />
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
-        <ThuNghiemBanner />
+        <ThuNghiemBanner moduleKey="engineering-nextgen-apex" />
         {/* Header Hero */}
         <div className="bg-gradient-to-r from-zinc-900 via-zinc-900/90 to-blue-950/40 border border-zinc-800 rounded-xl p-6 relative overflow-hidden shadow-2xl">
           <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { ingestRealityCapture } from "@/lib/ky-thuat/engineering-twin-pinnacle";
 import { query } from "@/lib/db";
 
@@ -16,6 +17,8 @@ export async function GET() {
 
   const projectId = await getCurrentProjectId(user);
   if (!projectId) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+  const blocked = await assertModuleEnabled("engineering-twin", projectId);
+  if (blocked) return blocked;
 
   try {
     const rows = await query(
@@ -41,6 +44,8 @@ export async function POST(req: Request) {
 
   const projectId = await getCurrentProjectId(user);
   if (!projectId) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+  const blocked = await assertModuleEnabled("engineering-twin", projectId);
+  if (blocked) return blocked;
 
   try {
     const body = await req.json();

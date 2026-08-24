@@ -263,7 +263,7 @@ export default function PrescriptiveAndCompliancePage() {
       <div className="min-h-screen bg-zinc-950 text-zinc-100">
         <AppHeader />
         <main className="mx-auto max-w-7xl px-4 py-8">
-          <ThuNghiemBanner />
+          <ThuNghiemBanner moduleKey="engineering-prescriptive" />
           <EngineeringNav />
           <PageSkeleton />
         </main>
@@ -294,7 +294,7 @@ export default function PrescriptiveAndCompliancePage() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <AppHeader />
       <main className="mx-auto max-w-7xl px-4 py-8">
-        <ThuNghiemBanner />
+        <ThuNghiemBanner moduleKey="engineering-prescriptive" />
         <EngineeringNav />
 
         {/* Title and Action Bar */}
