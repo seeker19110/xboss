@@ -163,6 +163,36 @@ jobs:
           # Build không kết nối DB (Pool khởi tạo lazy) — chỉ cần biến tồn tại.
           DATABASE_URL: postgres://ci:ci@localhost:5432/xboss_test
 
+  # ── Plugin AutoCAD (M99 PR-A): XBoss.Cad.Core + Tests thuần .NET 8 ──
+  #
+  # CHỈ build/test Core (không tham chiếu AutoCAD — FR17); XBoss.Cad.Acad cần ObjectARX
+  # SDK 2026 trên Windows nên KHÔNG build trong CI (M99 §9.1). Test nạp rule pack thật từ
+  # lib/ky-thuat/cad/rule-packs/v2.json — trôi quy tắc giữa 2 tầng là đỏ ở đây.
+  # Runner ubuntu-latest có sẵn .NET SDK 8 — không cần bước setup riêng.
+  plugin:
+    name: plugin (dotnet Core/Tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Cổng M99 §9.1: chặn ai đó vô tình hạ nền khỏi net8.0*.
+      - name: Kiểm TargetFramework net8.0*
+        run: |
+          sai=$(grep -rLE '<TargetFramework>net8\.0' plugin-autocad --include='*.csproj' || true)
+          if [ -n "$sai" ]; then
+            echo "::error::csproj không phải nền net8.0 (M99 §9.1): $sai"
+            exit 1
+          fi
+
+      - name: Cache gói NuGet
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('plugin-autocad/**/*.csproj') }}
+
+      - name: Test XBoss.Cad.Core (xunit)
+        run: dotnet test plugin-autocad/XBoss.Cad.Tests/XBoss.Cad.Tests.csproj -c Release
+
   # ── E2E, chia 3 shard chạy song song ──
   #
   # Vì sao shard: đo trên run 1210, bước `npm run test:e2e` một mình chiếm 4 phút 48 giây
@@ -265,15 +295,16 @@ jobs:
   ci:
     name: ci
     runs-on: ubuntu-latest
-    needs: [static, test, build]
+    needs: [static, test, build, plugin]
     if: always()
     steps:
       - name: Tổng hợp kết quả
         run: |
-          echo "static=${{ needs.static.result }} test=${{ needs.test.result }} build=${{ needs.build.result }}"
+          echo "static=${{ needs.static.result }} test=${{ needs.test.result }} build=${{ needs.build.result }} plugin=${{ needs.plugin.result }}"
           [ "${{ needs.static.result }}" = "success" ] || exit 1
           [ "${{ needs.test.result }}" = "success" ] || exit 1
           [ "${{ needs.build.result }}" = "success" ] || exit 1
+          [ "${{ needs.plugin.result }}" = "success" ] || exit 1
 
   e2e:
     name: e2e

@@ -25,7 +25,7 @@ import {
 
 // ===== (1) Cấu trúc & ETag =====
 
-test("rule pack: đủ 6 field theo API contract M99 §10, version = v1", () => {
+test("rule pack: đủ 8 field theo API contract M99 §10, version = v2", () => {
   const pack = getCurrentRulePack();
   for (const field of [
     "version",
@@ -34,18 +34,38 @@ test("rule pack: đủ 6 field theo API contract M99 §10, version = v1", () => 
     "purgePolicy",
     "lineweightMap",
     "flattenPolicy",
+    "takeoff",
+    "inspectionPolicy",
   ]) {
     assert.ok(field in pack, `Thiếu field ${field}`);
   }
-  assert.equal(pack.version, "v1");
-  assert.equal(CURRENT_RULE_PACK_VERSION, "v1");
+  assert.equal(pack.version, "v2");
+  assert.equal(CURRENT_RULE_PACK_VERSION, "v2");
+});
+
+test("rule pack v2 là mở rộng thuần của v1: 6 field cũ giữ nguyên nội dung", async () => {
+  const v1 = (await import("@/lib/ky-thuat/cad/rule-packs/v1.json")).default;
+  const v2 = getCurrentRulePack();
+  for (const field of [
+    "layerMap",
+    "fontMap",
+    "purgePolicy",
+    "lineweightMap",
+    "flattenPolicy",
+  ] as const) {
+    assert.deepEqual(
+      v2[field],
+      v1[field],
+      `Field ${field} của v2 lệch v1 — v2 phải là mở rộng thuần`,
+    );
+  }
 });
 
 test("getRulePackEtag: ổn định giữa 2 lần gọi và có chứa version", () => {
   const a = getRulePackEtag();
   const b = getRulePackEtag();
   assert.equal(a, b);
-  assert.match(a, /^"v1-[0-9a-f]{32}"$/);
+  assert.match(a, /^"v2-[0-9a-f]{32}"$/);
 });
 
 test("matchesEtag: khớp đúng ETag, chấp nhận W/ và *, từ chối ETag lạ/rỗng", () => {
@@ -80,6 +100,8 @@ test("route rule-pack: có force-dynamic, chặn 401/403 và trả 304 theo If-N
     "purgePolicy:",
     "lineweightMap:",
     "flattenPolicy:",
+    "takeoff:",
+    "inspectionPolicy:",
   ]) {
     assert.ok(src.includes(field), `Response thiếu ${field}`);
   }
@@ -210,6 +232,60 @@ test("lineweightMap: bảng CTB theo ACI, màu khớp ACI_TO_HEX", async () => {
     assert.equal(c.colorHex, ACI_TO_HEX[c.aci], `Màu ACI ${c.aci} lệch ACI_TO_HEX`);
     assert.ok(c.lineweightMm > 0);
   }
+});
+
+// ===== (4) v2 — takeoff + inspectionPolicy (M99 PR-A) =====
+
+test("takeoff: cấu trúc đúng M99 §11 — items hợp lệ, layer đích tồn tại trong layerMap", () => {
+  const pack = getCurrentRulePack();
+  const t = pack.takeoff;
+  assert.equal(t.drawingUnitAssumption, "mm");
+  assert.equal(t.xdataAppName, "XBOSS_BOCKL");
+  assert.ok(t.markColorAci >= 1 && t.markColorAci <= 255, "markColorAci phải là ACI hợp lệ");
+  for (const k of ["length", "area", "count"] as const) {
+    assert.equal(typeof t.rounding[k], "number", `rounding.${k} thiếu`);
+  }
+  // Mọi layer target chuẩn hóa được tham chiếu bởi item length phải là target thật của layerMap.
+  const targets = new Set(pack.layerMap.groups.flatMap((g) => g.branches.map((b) => b.target)));
+  assert.ok(t.items.length > 0, "takeoff.items rỗng");
+  const ids = new Set<string>();
+  for (const item of t.items) {
+    assert.ok(!ids.has(item.id), `takeoff item id trùng: ${item.id}`);
+    ids.add(item.id);
+    assert.ok(["length", "area", "count"].includes(item.measure), `measure lạ: ${item.measure}`);
+    assert.ok(item.factor > 0, `factor phải dương (${item.id})`);
+    assert.ok(item.unit.length > 0 && item.name.length > 0, `item ${item.id} thiếu tên/đơn vị`);
+    if (item.measure === "length") {
+      assert.equal(item.factor, 0.001, `item length ${item.id}: bản vẽ mm → m phải factor 0.001`);
+      for (const layer of item.layerMatchAny) {
+        assert.ok(
+          targets.has(layer),
+          `item ${item.id} tham chiếu layer "${layer}" không phải target của layerMap`,
+        );
+      }
+    }
+    if (item.layerMatchAny.length === 0) {
+      // layerMatchAny rỗng = mọi layer — chỉ hợp lệ cho count theo block.
+      assert.equal(
+        item.measure,
+        "count",
+        `item ${item.id}: layerMatchAny rỗng chỉ dành cho measure=count`,
+      );
+      assert.ok(
+        (item as { blockNameMatchAny?: string[] }).blockNameMatchAny?.length,
+        `item ${item.id}: layerMatchAny rỗng thì phải có blockNameMatchAny`,
+      );
+    }
+  }
+});
+
+test("inspectionPolicy: dung sai Z + chính sách polyline hở đúng M99 §6.4", () => {
+  const p = getCurrentRulePack().inspectionPolicy;
+  assert.ok(p.zToleranceMm > 0 && p.zToleranceMm < 1);
+  assert.equal(p.openPolyline.checkLayersFromAreaTakeoff, true);
+  assert.ok(p.openPolyline.nearGapToleranceMm > 0);
+  assert.equal(p.openPolyline.reportNearClosedOnAllLayers, true);
+  assert.ok(Array.isArray(p.openPolyline.extraLayersMatchAny));
 });
 
 test("flattenPolicy: ép Z về 0 trong WCS, giữ nguyên hình chiếu XY (AC3)", () => {

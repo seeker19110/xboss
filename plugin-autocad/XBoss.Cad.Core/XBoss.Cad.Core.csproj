@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    XBoss.Cad.Core — toàn bộ quy tắc THUẦN của plugin (M99 FR17):
+    matcher token-boundary, ánh xạ layer, giải mã font TCVN3/VNI, kiểm tra,
+    gộp khối lượng bóc tách, ghi Excel theo mẫu công ty, model báo cáo.
+    KHÔNG được tham chiếu acmgd.dll/acdbmgd.dll — nhờ vậy unit test chạy trên CI Linux.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>XBoss.Cad.Core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Phụ thuộc NuGet duy nhất của Core (M99 §4: ClosedXML, MIT) -->
+    <PackageReference Include="ClosedXML" Version="0.105.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="XBoss.Cad.Tests" />
+  </ItemGroup>
+
+</Project>
