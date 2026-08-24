@@ -2,13 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { storagePut } from "@/lib/nen/storage";
 import { queryOne, insertId } from "@/lib/db";
 import { getCurrentUser, canViewSubcontractor, CAN } from "@/lib/bao-mat/auth";
-import {
-  extForDocMime,
-  verifyFileMime,
-  newSubconDocFileName,
-  MAX_DOC_BYTES,
-  isContentTooLarge,
-} from "@/lib/nen/photos";
+import { newSubconDocFileName, MAX_DOC_BYTES, parseUploadedFile } from "@/lib/nen/photos";
 import { listSubconDocuments } from "@/lib/hien-truong/subcontractors";
 
 export const dynamic = "force-dynamic";
@@ -57,40 +51,12 @@ export async function POST(
   if (!supplier)
     return NextResponse.json({ error: "Không tìm thấy nhà cung cấp" }, { status: 404 });
 
-  if (isContentTooLarge(req.headers.get("content-length"), MAX_DOC_BYTES))
-    return NextResponse.json(
-      { error: `File quá lớn (tối đa ${MAX_DOC_BYTES / 1024 / 1024}MB)` },
-      { status: 413 },
-    );
-
-  const form = await req.formData().catch(() => null);
-  const file = form?.get("file");
-  if (!form || !(file instanceof File))
-    return NextResponse.json({ error: "Thiếu file (field 'file')" }, { status: 400 });
+  const up = await parseUploadedFile(req, { accept: "document", maxBytes: MAX_DOC_BYTES });
+  if (!up.ok) return NextResponse.json({ error: up.error }, { status: up.status });
+  const { form, file, buf: fileBuf } = up;
 
   const title = String(form.get("title") ?? "").trim();
   if (!title) return NextResponse.json({ error: "Thiếu tên hồ sơ" }, { status: 422 });
-
-  const ext = extForDocMime(file.type);
-  if (!ext)
-    return NextResponse.json(
-      {
-        error: `Chỉ nhận PDF hoặc ảnh (jpg/png/webp/gif/heic), nhận được: ${file.type || "không rõ"}`,
-      },
-      { status: 415 },
-    );
-  if (file.size > MAX_DOC_BYTES)
-    return NextResponse.json(
-      { error: `File quá lớn (tối đa ${MAX_DOC_BYTES / 1024 / 1024}MB)` },
-      { status: 413 },
-    );
-
-  const fileBuf = Buffer.from(await file.arrayBuffer());
-  if (!verifyFileMime(fileBuf, file.type))
-    return NextResponse.json(
-      { error: "Nội dung file không khớp định dạng khai báo (Content-Type giả mạo?)" },
-      { status: 415 },
-    );
 
   const docKind = String(form.get("docKind") ?? "").trim() || null;
   const fileName = newSubconDocFileName(supplierId, file.type);

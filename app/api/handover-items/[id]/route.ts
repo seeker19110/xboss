@@ -4,11 +4,10 @@ import { queryOne, run, withTransaction } from "@/lib/db";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
 import {
-  extForDocMime,
-  verifyFileMime,
   newHandoverMinutesFileName,
   MAX_DOC_BYTES,
   isContentTooLarge,
+  checkUploadedFile,
 } from "@/lib/nen/photos";
 import {
   parseHandoverItemBody,
@@ -146,24 +145,9 @@ export async function PATCH(
 
   let minutesFile: string | null = existing.minutesFile;
   if (file) {
-    const ext = extForDocMime(file.type);
-    if (!ext)
-      return NextResponse.json(
-        { error: `Chỉ nhận PDF hoặc ảnh, nhận được: ${file.type || "không rõ"}` },
-        { status: 415 },
-      );
-    if (file.size > MAX_DOC_BYTES)
-      return NextResponse.json(
-        { error: `File quá lớn (tối đa ${MAX_DOC_BYTES / 1024 / 1024}MB)` },
-        { status: 413 },
-      );
-
-    const fileBuf = Buffer.from(await file.arrayBuffer());
-    if (!verifyFileMime(fileBuf, file.type))
-      return NextResponse.json(
-        { error: "Nội dung file không khớp định dạng khai báo (Content-Type giả mạo?)" },
-        { status: 415 },
-      );
+    const checked = await checkUploadedFile(file, { accept: "document", maxBytes: MAX_DOC_BYTES });
+    if (!checked.ok) return NextResponse.json({ error: checked.error }, { status: checked.status });
+    const fileBuf = checked.buf;
 
     if (existing.minutesFile) await storageDelete(user.orgId, existing.minutesFile);
     minutesFile = newHandoverMinutesFileName(id, file.type);

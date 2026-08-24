@@ -4,7 +4,7 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
-## Đợt gộp tính năng trùng lặp (2026-08-24) — ĐANG LÀM
+## Đợt gộp tính năng trùng lặp (2026-08-24)
 
 Người dùng: "quét tính năng trùng lặp gộp chúng lại cho gọn — trùng lặp hoặc thuộc về 1 bộ tính
 năng thì gộp lại". Nhánh `claude/duplicate-features-h3fva1`. Quét bằng bộ dò clone tự viết
@@ -39,16 +39,32 @@ thử" mà GĐ2 đã dựng cổng CI để chặn.
 - ~10 bảng `*_documents` tách riêng theo thực thể — `migrations/0019_project_documents.sql` đã ghi
   rõ quyết định không di trú về một bảng.
 
-### Còn lại (đợt 2)
+### Đợt 2 — pipeline upload + sinh tên tệp (−769 dòng ở `app/api`)
 
-- **Pipeline upload lặp ở 25 route** (`verifyFileMime`): cùng một chuỗi kiểm
-  Content-Length → `formData()` → `extFor*Mime` → `file.size` → magic bytes → caption, chép ~30 dòng
-  mỗi route. Tách helper thuần trong `lib/nen/photos.ts`.
-- **20 hàm `newXxxFileName`** trong `lib/nen/photos.ts` chỉ khác tiền tố:
-  `${prefix}${id}-${Date.now()}-${hex}${ext}`.
+| Cụm                      | Trùng gì                                                                                                                                                 | Cách gộp                                                                                                                                                                                                                                                        |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pipeline kiểm tệp upload | **23 route** lặp nguyên si chuỗi: chặn sớm theo `Content-Length` → `formData()` → whitelist mime → chặn theo `file.size` → dò magic byte. ~30 dòng/route | Thêm `parseUploadedFile()` (route upload chuyên dụng) và `checkUploadedFile()` (route PATCH có tệp tuỳ chọn) vào `lib/nen/photos.ts`. Trả **kết quả thuần** `{ok,status,error}`, KHÔNG trả `NextResponse` — `lib/nen` là tầng 0 không biết HTTP (ADR-0007/0008) |
+| Sinh tên tệp             | **24 hàm `newXxxFileName`** chỉ khác tiền tố, cùng khuôn `${prefix}${id}-${Date.now()}-${hex}${ext}`                                                     | Một `newUploadFileName(prefix, mime, accept)`; 24 hàm còn 1 dòng gọi lại nó (giữ nguyên tên + call site). Chỉ 2 hàm giữ khuôn riêng vì phần mở rộng đặc thù (`newStandardizedDrawingFileName` .dxf, `newSystemUploadFileName` .xlsx)                            |
+
+**Thay đổi hành vi duy nhất (cố ý):** `/api/drawings/:id/revisions` trước trả 415 kèm thông báo
+`"Chỉ nhận PDF hoặc ảnh, nhận được: ..."`, nay dùng thông báo chuẩn có kê định dạng
+`"Chỉ nhận PDF hoặc ảnh (jpg/png/webp/gif/heic), nhận được: ..."` — cùng mã trạng thái, thông tin
+đầy đủ hơn, không test/e2e nào bám chuỗi cũ. Ngoài ra `newPhotoFileName`/`newAlbumPhotoFileName`
+nay có fallback `.bin` khi mime lạ thay vì ghép `undefined` vào tên tệp (mọi call site đều đã
+chặn mime từ trước nên không đổi thực tế).
+
+**5 route KHÔNG gộp được, cố ý giữ nguyên:** `materials/import` + `boq/import` (nhận .xlsx, khuôn
+kiểm khác hẳn), `workpackages/:id/bbnt` + `workpackages/:id/drawing` + `floor-approvals/:id/documents`
+(không theo khuôn `form?.get("file")` chuẩn).
+
+### Còn lại
+
 - **Công thức Hazen-Williams còn 2 bản** khác quy ước đơn vị (L/s ở `engineering-cad-nesting.ts`
   vs m³/h ở `engineering-hydraulic-engine.ts`) và khác hằng số cột nước (9806,65 vs 9810 Pa/m).
   Gộp được nhưng **đổi số liệu kỹ thuật** → cần người dùng chốt bản nào là chuẩn.
+- **Khung form lặp ở 32 file `.tsx`** (`label` + `input` cùng chuỗi class, rõ nhất ở cặp
+  `app/environment/page.tsx` ↔ `app/kickoff/page.tsx`, 311 dòng trùng). Là đợt tách component form
+  dùng chung riêng, không phải gộp tính năng.
 
 ## Đợt "nâng tầm dự án" GĐ2 — cổng máy thay checklist người (2026-08-24) — TỔNG HỢP
 
