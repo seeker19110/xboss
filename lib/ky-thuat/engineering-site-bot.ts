@@ -1,4 +1,6 @@
-import { query, queryOne, withTransaction } from "@/lib/db";
+import { query, queryOne, run, withTransaction } from "@/lib/db";
+import { hashOtp, sinhOtp, OTP_HAN_PHUT } from "@/lib/bao-mat/otp";
+import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
 
 export type FieldIntent =
   "PROGRESS_UPDATE" | "ISSUE_REPORT" | "DIARY_LOG" | "QUERY_STOCK" | "UNKNOWN";
@@ -145,37 +147,42 @@ export function parseVietnameseFieldIntent(rawText: string): ParsedFieldCommand 
   };
 }
 
+// Số lần thử OTP tối đa cho mỗi chat Telegram trong một cửa sổ OTP_HAN_PHUT phút.
+// Mã chỉ có 6 chữ số (10^6 khả năng) nên không chặn số lần thử là dò được trong vài phút.
+const SO_LAN_THU_OTP = 5;
+
 /**
- * Sinh mã OTP 6 số để liên kết tài khoản Telegram của Kỹ sư
+ * Sinh mã OTP 6 số để liên kết tài khoản Telegram của Kỹ sư.
+ *
+ * Lưu HASH (SHA-256) chứ không lưu bản rõ, và upsert theo `user_id` — trước đây upsert ghi
+ * `ON CONFLICT (telegram_chat_id)` trong khi dòng mới có chat_id NULL (NULL không bao giờ va
+ * chạm khoá duy nhất) nên mỗi lần lấy mã lại đẻ thêm một dòng chờ liên kết. Chỉ số duy nhất
+ * từng phần `uq_telegram_user_bindings_cho_lien_ket` (migration 0133) canh bất biến này.
  */
 export async function generateTelegramLinkOtp(userId: number): Promise<string> {
-  const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 phút
+  const otpCode = sinhOtp();
+  const expiresAt = new Date(Date.now() + OTP_HAN_PHUT * 60 * 1000).toISOString();
 
-  await query(
+  await run(
     `INSERT INTO telegram_user_bindings (user_id, is_verified, otp_code, otp_expires_at)
      VALUES (?, false, ?, ?)
-     ON CONFLICT (telegram_chat_id) DO NOTHING`,
+     ON CONFLICT (user_id) WHERE is_verified = false
+     DO UPDATE SET otp_code = EXCLUDED.otp_code,
+                   otp_expires_at = EXCLUDED.otp_expires_at,
+                   updated_at = CURRENT_TIMESTAMP`,
     userId,
-    otpCode,
-    expiresAt.toISOString(),
-  );
-
-  // Cập nhật lại OTP nếu đã có bản ghi
-  await query(
-    `UPDATE telegram_user_bindings
-     SET otp_code = ?, otp_expires_at = ?, updated_at = CURRENT_TIMESTAMP
-     WHERE user_id = ? AND is_verified = false`,
-    otpCode,
-    expiresAt.toISOString(),
-    userId,
+    hashOtp(otpCode),
+    expiresAt,
   );
 
   return otpCode;
 }
 
 /**
- * Xác minh mã OTP và liên kết Chat ID Telegram với User ID
+ * Xác minh mã OTP và liên kết Chat ID Telegram với User ID.
+ *
+ * Ba lớp chặn dò mã (trước đợt này không có lớp nào): (1) rate-limit theo chatId, (2) chỉ nhận
+ * dòng chờ chưa gắn chat khác, (3) so bằng hash nên bản rõ không nằm trong DB.
  */
 export async function verifyTelegramLinkOtp(params: {
   chatId: number;
@@ -184,15 +191,53 @@ export async function verifyTelegramLinkOtp(params: {
 }): Promise<{ success: boolean; message: string; userId?: number }> {
   const { chatId, username = null, otpCode } = params;
 
+  // Đếm-trước-chặn-sau theo chatId, TRƯỚC khi chạm DB binding: vượt ngưỡng thì không tra cứu
+  // gì cả. Lưu ý chiều trả về của hitRateLimit — true nghĩa là ĐÃ VƯỢT giới hạn.
+  const vuotNguong = await hitRateLimit(`tg_otp:${chatId}`, SO_LAN_THU_OTP, OTP_HAN_PHUT);
+  if (vuotNguong) {
+    return {
+      success: false,
+      message: `Bạn đã nhập sai mã OTP quá nhiều lần. Vui lòng thử lại sau ${OTP_HAN_PHUT} phút.`,
+    };
+  }
+
   return withTransaction(async () => {
+    // Tra theo HASH của mã (mã bản rõ không còn nằm trong DB). Điều kiện chat: chỉ nhận dòng
+    // chờ chưa gắn chat nào, hoặc gắn đúng chat đang gửi — chặn kiểu dò mã 6 số để chiếm
+    // binding của người khác đang chờ liên kết.
     const binding = await queryOne<{ id: string; user_id: number }>(
       `SELECT id, user_id FROM telegram_user_bindings
-       WHERE otp_code = ? AND otp_expires_at > CURRENT_TIMESTAMP AND is_verified = false`,
-      otpCode.trim(),
+       WHERE otp_code = ? AND otp_expires_at > CURRENT_TIMESTAMP AND is_verified = false
+         AND (telegram_chat_id IS NULL OR telegram_chat_id = ?)`,
+      hashOtp(otpCode),
+      chatId,
     );
 
     if (!binding) {
       return { success: false, message: "Mã OTP không hợp lệ hoặc đã hết hạn." };
+    }
+
+    // telegram_chat_id là UNIQUE (migration 0110): nếu chat này đã liên kết sẵn thì UPDATE bên
+    // dưới sẽ vi phạm khoá duy nhất → xử lý tường minh thay vì để lỗi 500 rơi ra ngoài.
+    const daGan = await queryOne<{ user_id: number }>(
+      `SELECT user_id FROM telegram_user_bindings
+       WHERE telegram_chat_id = ? AND is_verified = true`,
+      chatId,
+    );
+    if (daGan) {
+      if (Number(daGan.user_id) !== Number(binding.user_id)) {
+        return {
+          success: false,
+          message: "Tài khoản Telegram này đã được liên kết với một tài khoản XBoss khác.",
+        };
+      }
+      // Đã liên kết đúng tài khoản này rồi — dọn dòng chờ thừa, coi như thành công.
+      await run(`DELETE FROM telegram_user_bindings WHERE id = ?`, binding.id);
+      return {
+        success: true,
+        message: "Tài khoản Telegram của bạn đã được liên kết với XBoss.",
+        userId: binding.user_id,
+      };
     }
 
     await query(

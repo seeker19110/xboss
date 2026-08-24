@@ -4,6 +4,30 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## GĐ1/V1 — Xác thực webhook đi vào + chuẩn hoá OTP liên kết (2026-08-24)
+
+Vá lỗ hổng **Cao A1 + A2** và phát hiện **Trung B9** của đợt audit ngay bên dưới (`PLAN.md`, việc V1).
+
+- **Mới `lib/bao-mat/webhook-inbound.ts`** — `xacThucWebhookTelegram` (so header
+  `X-Telegram-Bot-Api-Secret-Token` với `TELEGRAM_WEBHOOK_SECRET`) và `xacThucWebhookZalo`
+  (HMAC-SHA256 raw body với `ZALO_OA_SECRET`), đều `timingSafeEqual`; thiếu biến env → throw
+  fail-fast. Hai route webhook kiểm ngay dòng đầu → **401**, không đọc body, không chạm DB.
+- **Mới `lib/bao-mat/otp.ts`** — `sinhOtp` (`crypto.randomInt`, bỏ `Math.random`), `hashOtp`
+  (SHA-256), `kiemOtp` (constant-time). Hàm thuần, không chạm DB (tầng 3, ADR-0007).
+- **Telegram:** OTP lưu **hash**, upsert theo `user_id`, WHERE gắn `chatId`, rate-limit
+  `tg_otp:<chatId>` 5 lần/15 phút. **Zalo:** thêm điều kiện **còn hạn** (trước đây SELECT
+  `otp_expires_at` nhưng không bao giờ so), so hash, rate-limit `zalo_otp:<zaloUserId>`,
+  upsert theo `(project_id, zalo_user_id)`.
+- **Zalo webhook không còn nhận `projectId` từ body** — suy từ dòng binding **đã xác thực**;
+  chưa liên kết → **403**, không ghi log tin nhắn/điều phối hành động.
+- **`migrations/0133_webhook_otp_hardening.sql`** — dọn dòng binding trùng do bug `ON CONFLICT (id)`
+  cũ, thêm unique index `(project_id, zalo_user_id)` + unique **từng phần** `user_id WHERE
+  is_verified = false` cho Telegram, NULL hoá OTP bản rõ còn tồn. **Migration đụng dữ liệu → bắt
+  buộc qua staging trước.**
+- **Kiểm chứng bằng DB thật** (Postgres 16 ephemeral): `tests/webhook-inbound.test.ts` (mới) +
+  4 ca mở rộng trong 2 file test bot. Đã chứng minh test bắt lỗi cũ: trả từng phần code về bản
+  cũ → đỏ đúng ca tương ứng; khôi phục → xanh.
+
 ## Đợt audit toàn diện "nâng tầm dự án" (2026-08-24) — BÁO CÁO, CHƯA SỬA
 
 Người dùng yêu cầu "nâng tầm dự án" → chọn hướng **audit toàn diện rồi đề xuất**. Chạy theo

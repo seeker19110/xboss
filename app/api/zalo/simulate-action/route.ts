@@ -19,6 +19,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Nội dung tin nhắn không được để trống" }, { status: 400 });
     }
 
+    // processIncomingZaloMessage nay chỉ xử lý tin nhắn của Zalo ID ĐÃ liên kết & xác thực
+    // (V1 — chặn giả mạo qua webhook). Trang giả lập chạy dưới phiên đăng nhập thật nên tự
+    // bảo đảm binding cho chính người đang thử — cùng cách route giả lập Telegram vẫn làm.
+    const { query, withProjectScope } = await import("@/lib/db");
+    await withProjectScope(
+      projectId,
+      async () => {
+        await query(
+          `INSERT INTO zalo_user_bindings (project_id, user_id, zalo_user_id, zalo_display_name, is_verified)
+           VALUES (?, ?, ?, ?, true)
+           ON CONFLICT (project_id, zalo_user_id)
+           DO UPDATE SET is_verified = true, user_id = EXCLUDED.user_id
+           WHERE zalo_user_bindings.user_id = EXCLUDED.user_id OR zalo_user_bindings.is_verified = false`,
+          projectId,
+          user.id,
+          zaloUserId,
+          user.name,
+        );
+      },
+      { readOnly: false },
+    );
+
     const result = await processIncomingZaloMessage({
       projectId,
       zaloUserId,
