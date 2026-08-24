@@ -256,7 +256,7 @@ export default function BimCadEngineeringPage() {
                 onClick={() => setActiveTab("viewer3d")}
                 className={`flex items-center gap-1.5 rounded px-3 py-1 text-xs font-semibold ${
                   activeTab === "viewer3d"
-                    ? "bg-amber-500 text-zinc-950"
+                    ? "bg-amber-500 text-on-accent-dark"
                     : "text-zinc-400 hover:text-zinc-200"
                 }`}
               >
@@ -267,7 +267,7 @@ export default function BimCadEngineeringPage() {
                 onClick={() => setActiveTab("clashes")}
                 className={`flex items-center gap-1.5 rounded px-3 py-1 text-xs font-semibold ${
                   activeTab === "clashes"
-                    ? "bg-amber-500 text-zinc-950"
+                    ? "bg-amber-500 text-on-accent-dark"
                     : "text-zinc-400 hover:text-zinc-200"
                 }`}
               >
@@ -278,7 +278,7 @@ export default function BimCadEngineeringPage() {
                 onClick={() => setActiveTab("qto5d")}
                 className={`flex items-center gap-1.5 rounded px-3 py-1 text-xs font-semibold ${
                   activeTab === "qto5d"
-                    ? "bg-amber-500 text-zinc-950"
+                    ? "bg-amber-500 text-on-accent-dark"
                     : "text-zinc-400 hover:text-zinc-200"
                 }`}
               >
@@ -652,7 +652,7 @@ export default function BimCadEngineeringPage() {
                         <div className="flex items-center justify-between">
                           <h4 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
                             {idx === selectedClash.prescriptive_solution?.recommendedIndex && (
-                              <span className="rounded bg-emerald-500 px-1.5 py-0.5 text-[10px] font-bold text-zinc-950">
+                              <span className="rounded bg-emerald-500 px-1.5 py-0.5 text-[10px] font-bold text-on-accent-dark">
                                 KHUYẾN NGHỊ
                               </span>
                             )}

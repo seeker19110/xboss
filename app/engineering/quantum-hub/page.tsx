@@ -286,7 +286,7 @@ export default function QuantumHubPage() {
                 <button
                   onClick={handleRunSpatialCompute}
                   disabled={spatialLoading}
-                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-xs font-semibold text-zinc-950 hover:bg-amber-400 disabled:opacity-50"
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-xs font-semibold text-on-accent-dark hover:bg-amber-400 disabled:opacity-50"
                 >
                   <Play size={14} />
                   <span>{spatialLoading ? "Đang Tính Toán..." : "Kích Hoạt Siêu Tính Toán"}</span>
@@ -388,7 +388,7 @@ export default function QuantumHubPage() {
                 <button
                   onClick={() => handleEnqueueTask("batch_spatial_clash_analysis")}
                   disabled={creatingTask}
-                  className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-medium text-zinc-950 hover:bg-amber-400 disabled:opacity-50"
+                  className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-medium text-on-accent-dark hover:bg-amber-400 disabled:opacity-50"
                 >
                   + Tác Vụ Soát Va Chạm Lô
                 </button>
@@ -510,7 +510,7 @@ export default function QuantumHubPage() {
                 <button
                   onClick={handleSealMerkleBatch}
                   disabled={sealingBatch}
-                  className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-zinc-950 hover:bg-emerald-400 disabled:opacity-50"
+                  className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-on-accent-dark hover:bg-emerald-400 disabled:opacity-50"
                 >
                   <ShieldCheck size={14} />
                   <span>{sealingBatch ? "Đang Niêm Phong..." : "Niêm Phong Batch Mới"}</span>

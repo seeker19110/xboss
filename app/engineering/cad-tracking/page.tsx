@@ -438,7 +438,7 @@ export default function CadQtoTrackingPage() {
               onClick={() => setActiveTab("takeoff")}
               className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold ${
                 activeTab === "takeoff"
-                  ? "bg-amber-500 text-zinc-950"
+                  ? "bg-amber-500 text-on-accent-dark"
                   : "text-zinc-400 hover:text-zinc-200"
               }`}
             >
@@ -449,7 +449,7 @@ export default function CadQtoTrackingPage() {
               onClick={() => setActiveTab("floorplan")}
               className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold ${
                 activeTab === "floorplan"
-                  ? "bg-amber-500 text-zinc-950"
+                  ? "bg-amber-500 text-on-accent-dark"
                   : "text-zinc-400 hover:text-zinc-200"
               }`}
             >
@@ -460,7 +460,7 @@ export default function CadQtoTrackingPage() {
               onClick={() => setActiveTab("variance")}
               className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold ${
                 activeTab === "variance"
-                  ? "bg-amber-500 text-zinc-950"
+                  ? "bg-amber-500 text-on-accent-dark"
                   : "text-zinc-400 hover:text-zinc-200"
               }`}
             >
@@ -471,7 +471,7 @@ export default function CadQtoTrackingPage() {
               onClick={() => setActiveTab("bbnt")}
               className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold ${
                 activeTab === "bbnt"
-                  ? "bg-amber-500 text-zinc-950"
+                  ? "bg-amber-500 text-on-accent-dark"
                   : "text-zinc-400 hover:text-zinc-200"
               }`}
             >
@@ -570,7 +570,7 @@ export default function CadQtoTrackingPage() {
                 <button
                   onClick={handleAnalyzeDrawing}
                   disabled={parsing || !selectedDrawingId}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-zinc-950 transition-colors hover:bg-amber-400 disabled:opacity-50"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-on-accent-dark transition-colors hover:bg-amber-400 disabled:opacity-50"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${parsing ? "animate-spin" : ""}`} />
                   {parsing ? "Đang phân tích..." : "Phân Tích Bản Vẽ (Auto-QTO)"}

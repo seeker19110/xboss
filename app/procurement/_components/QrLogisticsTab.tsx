@@ -232,7 +232,7 @@ export default function QrLogisticsTab() {
             {shipments.length === 0 && (
               <button
                 onClick={handleCreateSampleShipment}
-                className="flex items-center gap-1.5 rounded-xl bg-amber-600 px-3 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-amber-700 shadow"
+                className="flex items-center gap-1.5 rounded-xl bg-amber-600 px-3 py-1.5 text-xs font-semibold text-on-accent-dark hover:bg-amber-700 shadow"
               >
                 <Plus size={14} /> Tạo Lô Hàng Mẫu
               </button>
@@ -304,7 +304,7 @@ export default function QrLogisticsTab() {
                   <button
                     type="submit"
                     disabled={scanning || !scanInput.trim()}
-                    className="absolute right-1.5 top-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-emerald-500 disabled:opacity-50"
+                    className="absolute right-1.5 top-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-on-accent-dark transition hover:bg-emerald-500 disabled:opacity-50"
                   >
                     {scanning ? "Đang xử lý..." : "Xác Nhận"}
                   </button>
@@ -438,7 +438,7 @@ export default function QrLogisticsTab() {
 
             <button
               onClick={handleGenerate}
-              className="w-full rounded-xl bg-amber-600 py-2 text-xs font-semibold text-zinc-950 transition hover:bg-amber-500 shadow"
+              className="w-full rounded-xl bg-amber-600 py-2 text-xs font-semibold text-on-accent-dark transition hover:bg-amber-500 shadow"
             >
               Sinh Chuỗi QR Payload & Mã Băm Bảo Mật
             </button>

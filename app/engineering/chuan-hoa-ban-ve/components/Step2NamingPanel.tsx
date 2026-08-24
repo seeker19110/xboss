@@ -140,7 +140,7 @@ export default function Step2NamingPanel({
                   handleApprove2d();
                   handleSaveToProjectServer(true);
                 }}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 font-bold text-xs shadow-md transition"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-on-accent-dark font-bold text-xs shadow-md transition"
               >
                 <BadgeCheck className="w-4 h-4" />
                 <span>Ký Duyệt & Lưu Chính Thức Ngay</span>
@@ -408,7 +408,7 @@ export default function Step2NamingPanel({
               <button
                 onClick={() => handleSaveToProjectServer(false)}
                 disabled={savingToServer}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-zinc-950 font-bold text-xs shadow-sm transition disabled:opacity-50"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-on-accent-dark font-bold text-xs shadow-sm transition disabled:opacity-50"
               >
                 <Clock className="w-3.5 h-3.5" />
                 <span>{savingToServer ? "Đang Lưu..." : "Lưu Vào Thư Mục Tạm"}</span>
@@ -422,7 +422,7 @@ export default function Step2NamingPanel({
                 handleSaveToProjectServer(true);
               }}
               disabled={savingToServer}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 font-bold text-xs shadow-md transition disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-on-accent-dark font-bold text-xs shadow-md transition disabled:opacity-50"
             >
               <Check className="w-3.5 h-3.5" />
               <span>

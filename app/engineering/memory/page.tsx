@@ -140,7 +140,7 @@ export default function MemoryBankEngineeringPage() {
                 onClick={() => setActiveTab("patterns")}
                 className={`rounded px-3 py-1 text-xs font-semibold ${
                   activeTab === "patterns"
-                    ? "bg-amber-500 text-zinc-950"
+                    ? "bg-amber-500 text-on-accent-dark"
                     : "text-zinc-400 hover:text-zinc-200"
                 }`}
               >
@@ -150,7 +150,7 @@ export default function MemoryBankEngineeringPage() {
                 onClick={() => setActiveTab("lessons")}
                 className={`rounded px-3 py-1 text-xs font-semibold ${
                   activeTab === "lessons"
-                    ? "bg-amber-500 text-zinc-950"
+                    ? "bg-amber-500 text-on-accent-dark"
                     : "text-zinc-400 hover:text-zinc-200"
                 }`}
               >
@@ -160,7 +160,7 @@ export default function MemoryBankEngineeringPage() {
                 onClick={() => setActiveTab("transfer")}
                 className={`rounded px-3 py-1 text-xs font-semibold ${
                   activeTab === "transfer"
-                    ? "bg-amber-500 text-zinc-950"
+                    ? "bg-amber-500 text-on-accent-dark"
                     : "text-zinc-400 hover:text-zinc-200"
                 }`}
               >
@@ -290,7 +290,7 @@ export default function MemoryBankEngineeringPage() {
                 <button
                   type="submit"
                   disabled={isTransferring}
-                  className="flex items-center gap-2 rounded-lg bg-amber-500 px-5 py-2 text-sm font-bold text-zinc-950 hover:bg-amber-400"
+                  className="flex items-center gap-2 rounded-lg bg-amber-500 px-5 py-2 text-sm font-bold text-on-accent-dark hover:bg-amber-400"
                 >
                   <Search size={16} />
                   Tra cứu Tri thức

@@ -352,7 +352,7 @@ function ScheduleControlContent() {
                 onClick={() => setLookaheadDays(d)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition ${
                   lookaheadDays === d
-                    ? "bg-amber-500 text-zinc-950 shadow-sm"
+                    ? "bg-amber-500 text-on-accent-dark shadow-sm"
                     : "bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800"
                 }`}
               >

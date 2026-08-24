@@ -1283,7 +1283,7 @@ export default function CleanMepfProcessPage() {
               onClick={() => setActiveView("workspace")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
                 activeView === "workspace"
-                  ? "bg-amber-500 text-zinc-950 shadow-sm"
+                  ? "bg-amber-500 text-on-accent-dark shadow-sm"
                   : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
               }`}
             >
@@ -1294,7 +1294,7 @@ export default function CleanMepfProcessPage() {
               onClick={() => setActiveView("matrix")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
                 activeView === "matrix"
-                  ? "bg-amber-500 text-zinc-950 shadow-sm"
+                  ? "bg-amber-500 text-on-accent-dark shadow-sm"
                   : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
               }`}
             >
@@ -1305,7 +1305,7 @@ export default function CleanMepfProcessPage() {
               onClick={() => setActiveView("cockpits")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
                 activeView === "cockpits"
-                  ? "bg-amber-500 text-zinc-950 shadow-sm"
+                  ? "bg-amber-500 text-on-accent-dark shadow-sm"
                   : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
               }`}
             >
@@ -1315,7 +1315,7 @@ export default function CleanMepfProcessPage() {
               onClick={() => setActiveView("audit")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
                 activeView === "audit"
-                  ? "bg-amber-500 text-zinc-950 shadow-sm"
+                  ? "bg-amber-500 text-on-accent-dark shadow-sm"
                   : "bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60"
               }`}
             >
