@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processIncomingTelegramMessage } from "@/lib/ky-thuat/engineering-site-bot";
+import { TELEGRAM_SECRET_HEADER, checkTelegramWebhook } from "@/lib/bao-mat/webhook-auth";
 
 export const dynamic = "force-dynamic";
 
 // POST /api/telegram/webhook
-// Endpoint nhận webhook trực tiếp từ Telegram Bot API
+// Endpoint nhận webhook trực tiếp từ Telegram Bot API.
+// Xác thực: header secret_token đã khai lúc setWebhook (xem lib/bao-mat/webhook-auth.ts).
+// Không có secret hợp lệ thì không xử lý — endpoint này ghi DB và thao tác thay người dùng
+// đã liên kết, để mở sẽ cho phép giả mạo chat_id bất kỳ.
 export async function POST(req: NextRequest) {
+  const auth = checkTelegramWebhook(req.headers.get(TELEGRAM_SECRET_HEADER));
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
   try {
     const body = await req.json();
     const message = body.message || body.channel_post;
@@ -48,7 +55,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, data: res });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    // Không trả err.message ra ngoài (lộ chi tiết nội bộ cho caller ẩn danh) — chỉ ghi log.
+    console.error("[telegram/webhook] lỗi xử lý tin nhắn:", err);
+    return NextResponse.json({ error: "Lỗi xử lý tin nhắn" }, { status: 500 });
   }
 }

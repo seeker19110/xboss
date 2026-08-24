@@ -1,4 +1,6 @@
+import { randomInt } from "node:crypto";
 import { query, queryOne, withTransaction } from "@/lib/db";
+import { hitRateLimit } from "@/lib/bao-mat/ratelimit";
 
 export type FieldIntent =
   "PROGRESS_UPDATE" | "ISSUE_REPORT" | "DIARY_LOG" | "QUERY_STOCK" | "UNKNOWN";
@@ -145,11 +147,16 @@ export function parseVietnameseFieldIntent(rawText: string): ParsedFieldCommand 
   };
 }
 
+// Ngưỡng thử OTP cho mỗi chat Telegram (cùng cửa sổ 15 phút với hạn dùng của OTP).
+const MAX_OTP_ATTEMPTS = 5;
+const OTP_WINDOW_MINUTES = 15;
+
 /**
  * Sinh mã OTP 6 số để liên kết tài khoản Telegram của Kỹ sư
  */
 export async function generateTelegramLinkOtp(userId: number): Promise<string> {
-  const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+  // randomInt (CSPRNG) thay Math.random: OTP đoán được = liên kết được tài khoản người khác.
+  const otpCode = randomInt(100000, 1000000).toString();
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 phút
 
   await query(
@@ -183,6 +190,12 @@ export async function verifyTelegramLinkOtp(params: {
   otpCode: string;
 }): Promise<{ success: boolean; message: string; userId?: number }> {
   const { chatId, username = null, otpCode } = params;
+
+  // Chặn dò OTP: bảng chỉ tra theo otp_code (không gắn với chatId gọi tới) nên không
+  // giới hạn thì một chat lạ có thể thử hết dải 6 số để chiếm liên kết của người khác.
+  if (await hitRateLimit(`tg-otp:${chatId}`, MAX_OTP_ATTEMPTS, OTP_WINDOW_MINUTES)) {
+    return { success: false, message: "Bạn đã thử quá nhiều lần. Vui lòng thử lại sau 15 phút." };
+  }
 
   return withTransaction(async () => {
     const binding = await queryOne<{ id: string; user_id: number }>(

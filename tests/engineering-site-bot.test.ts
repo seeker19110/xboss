@@ -80,3 +80,28 @@ test("M76: Vòng đời OTP & Telegram Message Gateway trong DB", { skip: !HAS_D
     await run(`DELETE FROM users WHERE id = ?`, userId);
   }
 });
+
+// Audit 2026-08-23: /api/telegram/webhook có thể gọi ẩn danh, mà verifyTelegramLinkOtp tra
+// OTP theo otp_code trên TOÀN BẢNG (không gắn với chatId gọi tới). Không giới hạn số lần
+// thử thì một chat lạ dò hết dải 6 số là chiếm được liên kết tài khoản người khác.
+test("M76: dò OTP bị chặn sau 5 lần sai trong cửa sổ 15 phút", { skip: !HAS_DB }, async () => {
+  const { run } = await import("@/lib/db");
+  const chatId = 778899001;
+
+  try {
+    // 5 lần sai đầu: được phép thử, trả về "không hợp lệ".
+    for (let i = 0; i < 5; i++) {
+      const r = await verifyTelegramLinkOtp({ chatId, otpCode: "000000" });
+      assert.equal(r.success, false);
+      assert.match(r.message, /không hợp lệ|hết hạn/i);
+    }
+
+    // Lần thứ 6: bị chặn bởi rate limit, thông điệp khác hẳn (không còn tra DB nữa).
+    const chan = await verifyTelegramLinkOtp({ chatId, otpCode: "000000" });
+    assert.equal(chan.success, false);
+    assert.match(chan.message, /quá nhiều lần/i);
+  } finally {
+    await run(`DELETE FROM login_rate_limits WHERE key = ?`, `tg-otp:${chatId}`);
+    await run(`DELETE FROM telegram_user_bindings WHERE telegram_chat_id = ?`, chatId);
+  }
+});

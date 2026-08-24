@@ -4,6 +4,55 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Đợt audit toàn dự án lần 11 (2026-08-23) — webhook mở toang, dò OTP, XSS lưu trữ qua SVG
+
+Audit theo `docs/audit.md` §3–§7 trên nhánh `claude/feature-audit-and-fixes-x1lauc`, chạy
+thật trên Postgres 16 cục bộ (không chỉ đọc code). **Cổng tự động xanh sẵn từ đầu**
+(lint, typecheck, 210 file/1084 ca pass, build, `npm audit` 0 lỗ hổng, ERD khớp schema,
+lib-layers, dead-code, migrations, sw-exclude, **9/9 mutation**) — nên phát hiện đợt này
+đều nằm ở chỗ cổng tự động **không** với tới được: 3 route ngoài luồng `getCurrentUser()`.
+
+**Bối cảnh:** đợt tái cấu trúc trước đã ghi nhận "18 route không gọi `getCurrentUser()`
+đều có cơ chế xác thực riêng đúng chủ đích". Rà lại từng route thì **2 trong 18 route đó
+thực tế không có cơ chế nào** — kết luận cũ đúng với 16/18, sai với 2 webhook.
+
+| #   | Mức     | Lỗi                                                                                                                                                                                                                                                                                                      | Sửa                                                                                                         |
+| --- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| 1   | 🔴 Cao  | `POST /api/zalo/webhook` **không xác thực gì**: ai cũng ghi được `zalo_site_message_logs` + `zalo_field_action_dispatches` với `projectId` tự chọn trong body → bơm dữ liệu giả vào **dự án bất kỳ**, vượt phạm vi RLS.                                                                                  | Bắt buộc header secret dùng chung (`lib/bao-mat/webhook-auth.ts`); validate `projectId` là số nguyên dương. |
+| 2   | 🔴 Cao  | `POST /api/telegram/webhook` không kiểm `X-Telegram-Bot-Api-Secret-Token` → giả mạo được `chat_id` bất kỳ, thao tác thay kỹ sư đã liên kết.                                                                                                                                                              | Bắt buộc secret_token đã khai lúc `setWebhook`.                                                             |
+| 3   | 🔴 Cao  | Dò OTP liên kết Telegram: `verifyTelegramLinkOtp` tra `otp_code` trên **toàn bảng** (không gắn với `chatId` gọi tới), không giới hạn số lần, gọi được ẩn danh qua webhook ở #2 → dò hết dải 6 số là chiếm liên kết tài khoản người khác.                                                                 | `hitRateLimit` 5 lần/15 phút theo `tg-otp:<chatId>` (upsert atomic, đúng §3).                               |
+| 4   | 🟡 TB   | OTP sinh bằng `Math.random()` (không phải CSPRNG) → đoán trước được.                                                                                                                                                                                                                                     | `randomInt` của `node:crypto`.                                                                              |
+| 5   | 🟡 TB   | **XSS lưu trữ**: `model_code`/`spoolCode` do người dùng nhập (chỉ kiểm rỗng) được nhúng thô vào chuỗi SVG rồi render bằng `dangerouslySetInnerHTML` — attribute sự kiện chèn qua `innerHTML` **có chạy**. 3 module: `engineering-god-tier`, `engineering-cad-dfma-isometric`, `engineering-scan-to-bim`. | `escapeXml` tại mọi điểm nội suy.                                                                           |
+| 6   | 🟢 Thấp | 2 webhook trả `err.message` cho caller ẩn danh (lộ chi tiết nội bộ).                                                                                                                                                                                                                                     | Trả thông điệp chung, chi tiết chỉ vào `console.error`.                                                     |
+
+**Nguyên tắc chọn cách sửa — mặc định an toàn:** thiếu biến secret → webhook **tắt**
+(503), không mở toang. Cùng tinh thần fail-fast của `CRON_SECRET`/`XBOSS_SECRET`, khác
+với `VAPID_*` (thiếu key → no-op) vì ở đây "no-op" nghĩa là để cửa mở.
+
+**DRY:** `escapeHtml` vốn nằm ở `lib/ha-tang/qr.ts` (tầng 2) nhưng là hàm thuần và giờ
+cần cho cả `lib/ky-thuat/*` → hạ xuống `lib/nen/escape.ts` (tầng 0) đúng luật ADR-0007,
+`qr.ts` re-export giữ nguyên tên cũ cho chỗ đang dùng.
+
+**Test hồi quy** (`docs/audit.md` §1 "audit không thay thế test"): `tests/webhook-auth.test.ts`
+(5 ca) + 1 ca dò OTP trong `tests/engineering-site-bot.test.ts`. Đã **xác minh test thật sự
+đỏ khi gỡ bản sửa** (bỏ `escapeXml` → ca XSS fail ngay), không phải test xanh-mọi-lúc.
+
+Verify: lint + typecheck + build xanh · **211 file / 1090 ca pass, 0 fail** trên Postgres
+16 · **9/9 mutation** · lib-layers/dead-code/ERD/npm audit xanh.
+
+### Nợ kỹ thuật ghi nhận đợt này
+
+- **Test dùng lại DB cũ giữa nhiều lần chạy có thể đỏ giả.** Chạy full suite **lần thứ hai**
+  trên cùng một DB thì `tests/auth.test.ts` (`ensureDefaultUsers`) đỏ do
+  `notifications_user_id_fkey` — dữ liệu sót lại từ lần chạy trước, **không phải lỗi code**
+  (DB mới: 0 fail). CI luôn dựng Postgres service container mới nên xanh, nhưng chạy cục bộ
+  dễ hiểu nhầm. Hướng xử lý: cho test tự dọn `notifications` theo `user_id` trước khi xoá
+  `users`. Chưa sửa trong đợt này vì nằm ngoài phạm vi audit bảo mật.
+- **`/api/zalo/webhook` không có bảng liên kết người dùng** như Telegram
+  (`telegram_user_bindings`): sau khi qua secret, `zaloUserId` vẫn do caller tự khai nên
+  không truy được về user XBoss thật. Secret chặn được người ngoài, chưa phân biệt được
+  người trong. Cần đặc tả nghiệp vụ trước khi làm — chưa đủ thông tin để tự quyết.
+
 ## Tái cấu trúc theo miền — Đợt 1 & 2 (2026-08-23)
 
 Rà toàn bộ cấu trúc code (không phải nội dung nghiệp vụ) rồi tái cấu trúc. Số liệu và
@@ -53,6 +102,7 @@ typecheck xanh.
 - **45 map nhãn `*_LABEL` không được import ở đâu** trong khi UI lặp lại nhãn tại chỗ —
   lỗi trùng lặp, sửa bằng cách cho UI dùng map, không phải xoá map.
 - **24 file > 1000 LOC** (nặng nhất `TrackingGrid.tsx` 94KB) — Đợt 4, chưa mở.
+
 ## E2E cho route mới `/engineering/chuan-hoa-ban-ve` (2026-08-23)
 
 Route hợp nhất `/engineering/cad` cũ vào `/engineering/chuan-hoa-ban-ve` (commit `ee4c100`)

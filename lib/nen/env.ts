@@ -37,6 +37,8 @@ const serverSchema = z
     // Telegram (báo cáo song song email)
     TELEGRAM_BOT_TOKEN: z.string().optional(),
     TELEGRAM_CHAT_ID: z.string().optional(),
+    TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
+    ZALO_WEBHOOK_SECRET: z.string().optional(),
 
     // Web Push (VAPID) — thiếu thì nút bật push tự ẩn, lib/push là no-op
     VAPID_PUBLIC_KEY: z.string().optional(),

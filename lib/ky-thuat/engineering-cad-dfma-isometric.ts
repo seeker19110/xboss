@@ -1,6 +1,7 @@
 // lib/engineering-cad-dfma-isometric.ts — DfMA Spool Isometric Drawing, Modular Skids & Genetic Nesting (M76 / M92)
 import { query, queryOne, run } from "@/lib/db";
 import { generateSpoolQrPayload, NestingStockBar } from "@/lib/ky-thuat/engineering-cad-nesting";
+import { escapeXml } from "@/lib/nen/escape";
 
 export interface SpoolIsometricPoint3D {
   x: number; // mm
@@ -217,18 +218,18 @@ export function generateSpoolIsometricDrawing(input: SpoolIsometricInput): Spool
         (
           b,
         ) => `<circle cx="${b.x2d}" cy="${b.y2d}" r="10" fill="#18181b" stroke="#f59e0b" stroke-width="1.5" />
-    <text x="${b.x2d}" y="${b.y2d + 3.5}" fill="#fbbf24" font-size="9" text-anchor="middle" font-weight="bold">${b.tagNumber}</text>`,
+    <text x="${b.x2d}" y="${b.y2d + 3.5}" fill="#fbbf24" font-size="9" text-anchor="middle" font-weight="bold">${escapeXml(b.tagNumber)}</text>`,
       )
       .join("\n    ")}
   </g>
   <!-- Khung Tên Bản Vẽ Xưởng DfMA -->
   <g id="titleBlock" transform="translate(360, 290)">
     <rect width="220" height="90" fill="#18181b" stroke="#3f3f46" rx="4" />
-    <text x="10" y="20" fill="#38bdf8" font-size="11" font-weight="bold">${input.spoolCode}</text>
-    <text x="10" y="36" fill="#a1a1aa" font-size="9">Quy cách: DN${input.nominalDiameterMm} | L_cut: ${cutLength}mm</text>
+    <text x="10" y="20" fill="#38bdf8" font-size="11" font-weight="bold">${escapeXml(input.spoolCode)}</text>
+    <text x="10" y="36" fill="#a1a1aa" font-size="9">Quy cách: DN${escapeXml(input.nominalDiameterMm)} | L_cut: ${cutLength}mm</text>
     <text x="10" y="52" fill="#a1a1aa" font-size="9">Khấu trừ phụ kiện: -${totalDeductionMm}mm</text>
     <text x="10" y="68" fill="#34d399" font-size="9">Dung sai hiện trường: +${fieldAllowance}mm</text>
-    <text x="10" y="84" fill="#fbbf24" font-size="8">QR: ${qrPayload.displayLabel}</text>
+    <text x="10" y="84" fill="#fbbf24" font-size="8">QR: ${escapeXml(qrPayload.displayLabel)}</text>
   </g>
 </svg>`;
 
