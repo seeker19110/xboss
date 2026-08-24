@@ -238,7 +238,7 @@ function GovernanceContent() {
           <div className="pt-2">
             <a
               href="/environment"
-              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
+              className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-on-accent font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
             >
               Hồ Sơ Môi Trường (M25)
             </a>

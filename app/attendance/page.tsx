@@ -215,7 +215,7 @@ export default function AttendancePage() {
                         onClick={() => bumpCrew(c.id, 1)}
                         disabled={busyCrewId === c.id}
                         aria-label={`Tăng số người tổ ${c.name}`}
-                        className="w-9 h-9 flex items-center justify-center rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 disabled:opacity-30 text-white transition shadow-xs"
+                        className="w-9 h-9 flex items-center justify-center rounded-xl bg-emerald-700 hover:bg-emerald-600 active:scale-95 disabled:opacity-30 text-on-accent transition shadow-xs"
                       >
                         <Plus className="w-4 h-4" />
                       </button>

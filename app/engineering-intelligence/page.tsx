@@ -106,7 +106,7 @@ function EngineeringIntelligenceContent() {
           <div className="pt-2">
             <Link
               href="/engineering/zalo-copilot"
-              className="px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
+              className="px-3.5 py-2 rounded-xl bg-sky-700 hover:bg-sky-600 text-on-accent font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
             >
               <MessageSquare className="w-3.5 h-3.5" /> Mở Zalo Copilot Hub (M86)
             </Link>
@@ -220,7 +220,7 @@ function EngineeringIntelligenceContent() {
           <div className="flex items-center gap-2 pt-2">
             <Link
               href="/engineering/swarm"
-              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
+              className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-on-accent font-semibold text-xs transition-colors inline-flex items-center gap-2 shadow"
             >
               <Network className="w-3.5 h-3.5" /> Swarm Debates (PIN-3)
             </Link>

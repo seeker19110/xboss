@@ -241,7 +241,7 @@ export default function ZeroErrorEngineeringPage() {
             <div className="flex items-center gap-3">
               <button
                 onClick={fetchChallenge}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow-lg transition-all"
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-500 text-on-accent rounded-xl text-xs font-semibold shadow-lg transition-all"
               >
                 <RefreshCw className="w-4 h-4" />
                 Làm mới Challenge
@@ -467,7 +467,7 @@ export default function ZeroErrorEngineeringPage() {
                 <button
                   onClick={handleVerifyPhoto}
                   disabled={isVerifyingPhoto}
-                  className="w-full mt-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold shadow-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                  className="w-full mt-4 py-2.5 bg-emerald-700 hover:bg-emerald-500 text-on-accent rounded-xl text-sm font-bold shadow-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                 >
                   {isVerifyingPhoto ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
@@ -825,7 +825,7 @@ export default function ZeroErrorEngineeringPage() {
               <button
                 onClick={handleIssueCertificate}
                 disabled={isIssuingCert}
-                className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold shadow-lg flex items-center gap-2 transition-all disabled:opacity-50"
+                className="px-4 py-2 bg-cyan-700 hover:bg-cyan-500 text-on-accent rounded-xl text-xs font-bold shadow-lg flex items-center gap-2 transition-all disabled:opacity-50"
               >
                 {isIssuingCert ? (
                   <RefreshCw className="w-4 h-4 animate-spin" />

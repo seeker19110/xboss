@@ -938,7 +938,7 @@ export default function MepfLifecyclePage() {
                     <button
                       onClick={handleRunLod400Dfma}
                       disabled={runningLod400}
-                      className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold transition shadow flex items-center gap-2"
+                      className="px-4 py-2 bg-cyan-700 hover:bg-cyan-500 text-on-accent rounded-lg text-xs font-bold transition shadow flex items-center gap-2"
                     >
                       <Sparkles className={`w-3.5 h-3.5 ${runningLod400 ? "animate-spin" : ""}`} />
                       {runningLod400
@@ -1102,7 +1102,7 @@ export default function MepfLifecyclePage() {
                       <button
                         onClick={handleRunBomExplosion}
                         disabled={runningBomExplosion}
-                        className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold transition shadow flex items-center gap-2"
+                        className="px-4 py-2 bg-amber-700 hover:bg-amber-500 text-on-accent rounded-lg text-xs font-bold transition shadow flex items-center gap-2"
                       >
                         <Sparkles
                           className={`w-3.5 h-3.5 ${runningBomExplosion ? "animate-spin" : ""}`}
@@ -1314,7 +1314,7 @@ export default function MepfLifecyclePage() {
                       <button
                         onClick={handleRunHydraulic}
                         disabled={runningHydraulic}
-                        className="w-full py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded text-xs font-bold transition shadow flex items-center justify-center gap-2"
+                        className="w-full py-2.5 bg-sky-700 hover:bg-sky-500 text-on-accent rounded text-xs font-bold transition shadow flex items-center justify-center gap-2"
                       >
                         <Sparkles className={`w-4 h-4 ${runningHydraulic ? "animate-spin" : ""}`} />
                         {runningHydraulic
@@ -1520,7 +1520,7 @@ export default function MepfLifecyclePage() {
                     <button
                       onClick={handleRunVoiceInspection}
                       disabled={runningVoice}
-                      className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-bold transition shadow flex items-center justify-center gap-2"
+                      className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-500 text-on-accent rounded text-xs font-bold transition shadow flex items-center justify-center gap-2"
                     >
                       <Volume2 className={`w-4 h-4 ${runningVoice ? "animate-spin" : ""}`} />
                       {runningVoice ? "Đang Bóc Tách Thực Thể..." : "Phân Tích Ngữ Nghĩa Giọng Nói"}
@@ -1844,7 +1844,7 @@ export default function MepfLifecyclePage() {
                     <button
                       onClick={handleEvaluateHydrostatic}
                       disabled={runningTcEval}
-                      className="w-full py-2 bg-sky-600 hover:bg-sky-500 text-white rounded text-xs font-medium transition"
+                      className="w-full py-2 bg-sky-700 hover:bg-sky-500 text-on-accent rounded text-xs font-medium transition"
                     >
                       {runningTcEval ? "Đang Phân Tích..." : "Chạy Thuật Toán Đánh Giá Áp Lực"}
                     </button>

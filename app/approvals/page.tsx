@@ -503,7 +503,7 @@ function ApprovalsPageInner() {
                 <button
                   onClick={() => approveFloor(g)}
                   disabled={isBusy}
-                  className="flex items-center gap-1 text-xs bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] disabled:opacity-50 text-white rounded-xl px-3 py-2 transition font-semibold shadow-xs"
+                  className="flex items-center gap-1 text-xs bg-emerald-700 hover:bg-emerald-600 active:scale-[0.98] disabled:opacity-50 text-on-accent rounded-xl px-3 py-2 transition font-semibold shadow-xs"
                 >
                   <CheckSquare className="w-3.5 h-3.5" /> Duyệt nghiệm thu
                 </button>
@@ -609,7 +609,7 @@ function ApprovalsPageInner() {
             <button
               onClick={() => approveFloor(g)}
               disabled={isBusy}
-              className="w-full flex items-center justify-center gap-2 text-sm bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] disabled:opacity-50 text-white rounded-xl py-3 font-semibold transition min-h-[44px] shadow-sm"
+              className="w-full flex items-center justify-center gap-2 text-sm bg-emerald-700 hover:bg-emerald-600 active:scale-[0.98] disabled:opacity-50 text-on-accent rounded-xl py-3 font-semibold transition min-h-[44px] shadow-sm"
             >
               <CheckSquare className="w-4 h-4" /> Duyệt nghiệm thu
             </button>
@@ -709,7 +709,7 @@ function ApprovalsPageInner() {
                       <button
                         onClick={() => decideInboxItem(it, true)}
                         disabled={isBusy}
-                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs font-semibold shadow-sm transition disabled:opacity-50 min-h-[38px]"
+                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 active:scale-[0.98] text-on-accent text-xs font-semibold shadow-sm transition disabled:opacity-50 min-h-[38px]"
                       >
                         <ThumbsUp className="w-3.5 h-3.5" /> Duyệt
                       </button>

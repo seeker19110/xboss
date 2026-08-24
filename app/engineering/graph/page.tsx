@@ -235,7 +235,7 @@ export default function EngineeringGraphPage() {
             <button
               type="submit"
               disabled={loading || !searchKey.trim()}
-              className="flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500 disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-on-accent hover:bg-amber-500 disabled:opacity-50"
             >
               <Network size={16} />
               <span>{loading ? "Đang tra cứu..." : "Truy vấn Graph"}</span>
