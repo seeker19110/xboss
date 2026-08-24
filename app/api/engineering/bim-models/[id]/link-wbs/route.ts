@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { run, queryOne } from "@/lib/db";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,8 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
   }
 
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("engineering-bim-models", projectId);
+  if (blocked) return blocked;
   if (!projectId) {
     return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
   }

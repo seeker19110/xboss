@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import {
   auditPrePourRebarGrid,
   savePrePourRebarAudit,
@@ -23,6 +24,8 @@ export async function GET(req: NextRequest) {
 
   const projectId = await getCurrentProjectId(user);
   if (!projectId) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+  const blocked = await assertModuleEnabled("engineering-nextgen-apex", projectId);
+  if (blocked) return blocked;
 
   const url = new URL(req.url);
   const type = url.searchParams.get("type") || "rebar";
@@ -55,6 +58,8 @@ export async function POST(req: NextRequest) {
 
   const projectId = await getCurrentProjectId(user);
   if (!projectId) return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
+  const blocked = await assertModuleEnabled("engineering-nextgen-apex", projectId);
+  if (blocked) return blocked;
 
   try {
     const body = await req.json();

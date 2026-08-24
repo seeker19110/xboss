@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { query } from "@/lib/db";
 import {
   computeSubcontractorTrustScore,
@@ -18,6 +19,8 @@ export async function GET(req: Request) {
   }
 
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("engineering-subcon-ai", projectId);
+  if (blocked) return blocked;
   if (!projectId) {
     return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
   }

@@ -4,6 +4,53 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## GĐ2/W3 — Đóng băng 12 module engineering vượt gate bằng feature flag (2026-08-24)
+
+Quyết định người dùng: **đóng băng, KHÔNG gỡ code** (`PLAN.md` việc W3). `isModuleEnabled`/
+`getModuleFlags` trước đây mặc định BẬT cho mọi module chưa có dòng override — chèn override
+tắt qua DB cho từng dự án là mong manh (dự án mới tự bật lại).
+
+- **`lib/nen/modules.ts`** — `ModuleDef` thêm `thuNghiem?: boolean`. Thêm **12 entry con** mới
+  (`routePrefix` dài hơn "engineering" nên `findModuleByRoute` ưu tiên khớp đúng module con):
+  - **Tiêu chí (a) vượt cổng roadmap** (ENG-0 #10, OS-phase): `engineering-autonomy`,
+    `engineering-twin`, `engineering-predictions`, `engineering-graph`,
+    `engineering-prescriptive`.
+  - **Tiêu chí (b) chưa từng chạy được (W1)/mô phỏng rõ rệt**: `engineering-bim-models`,
+    `engineering-iot-telemetry`, `engineering-subcon-ai`, `engineering-god-tier-studio`,
+    `engineering-quantum-hub`, `engineering-swarm`, `engineering-nextgen-apex`.
+  - `engineering-quantum-hub` cố ý `routePrefix: []` — API của trang này (`/api/engineering/
+    queue`, `/ledger`, `/spatial`) dùng CHUNG với `mepf-studio`/`chuan-hoa-ban-ve`/
+    `spatial-viewer` (module thật, không đánh dấu) → không có tiền tố an toàn để gate riêng.
+  - `engineering-bim-models` KHÔNG gate `/api/engineering/bim-routing` (dùng chung với
+    `auto-routing`, module thật).
+- **`lib/ha-tang/feature-flags.ts`** — `isModuleEnabled`/`getModuleFlags` đổi mặc định thành
+  `overrides.get(key) ?? !def?.thuNghiem` — module thường vẫn mặc định bật (tương thích ngược),
+  module `thuNghiem` mặc định **TẮT cho mọi dự án kể cả dự án mới tạo**; Admin vẫn bật thủ công
+  qua `setFlag`/`/admin/features` (override luôn thắng).
+- **Chặn API thật (bổ sung theo yêu cầu coordinator sau báo cáo đầu):** wire
+  `assertModuleEnabled` vào **48 route.ts** — toàn bộ route con của 11 module `thuNghiem` có
+  `routePrefix` khác rỗng (autonomy 5, twin 10, predictions 3, graph 1, prescriptive 3,
+  bim-models 4, iot-telemetry 3, subcon-ai 3, god-tier-studio 7, swarm 5, nextgen-apex 4). Gọi
+  ngay sau `getCurrentProjectId`/kiểm quyền, trước khi chạm dữ liệu — bám đúng pattern 52 route
+  sẵn có (`app/api/materials/route.ts`...). **Cố ý bỏ qua** (đúng quyết định đã ghi ở trên, giữ
+  nguyên): `engineering-quantum-hub` (routePrefix rỗng — API dùng chung 3 module thật) và
+  `/api/engineering/bim-routing` (dùng chung `auto-routing`).
+- **Banner phản ánh trạng thái thật:** `ThuNghiemBanner` nhận `moduleKey`, đọc `/api/feature-flags`
+  (cùng nguồn AppHeader) để phân biệt 3 thông điệp: chưa xác định (tĩnh trung lập) / TẮT (nói rõ
+  liên hệ Admin) / BẬT thủ công (cảnh báo dữ liệu chưa kiểm chứng).
+- **Kiểm chứng bằng Postgres thật** (cổng 55503): `tests/feature-flags.test.ts` thêm ca
+  "dự án mới → module thuNghiem tắt; Admin setFlag vẫn bật được" (mở rộng thêm cặp
+  `assertModuleEnabled` 404/null — đúng 2 dòng mà 48 route gọi) + sửa ca cũ (không còn đúng khi
+  có module mặc định tắt) + ca `findModuleByRoute` khớp module con thay vì rơi về "engineering"
+  cha. **Kiểm chứng thêm bằng gọi API thật qua dev server thật** (dự án mới tạo `POST
+  /api/projects` → `GET /api/engineering/autonomy/policies`/`graph`/`bim-models` → 404 "Tính năng
+  đang bị tắt cho dự án này"; `PATCH /api/admin/feature-flags` bật `engineering-autonomy` → gọi
+  lại → 200 dữ liệu thật; module lõi `engineering-suggestions` và API dùng chung
+  `/api/engineering/queue/tasks` của `quantum-hub` không bị ảnh hưởng). `npm test` (1197 ca),
+  `lint`, `typecheck`, `check:lib-layers`, `check:sw-exclude`, `build` đều xanh.
+- Không có route handler nào trong `app/api/engineering/**` bị đụng ngoài đúng 48 route thuộc
+  11 `routePrefix` đã đánh dấu — đã kiểm bằng `git status` sau khi wire.
+
 ## GĐ1/V1 — Xác thực webhook đi vào + chuẩn hoá OTP liên kết (2026-08-24)
 
 Vá lỗ hổng **Cao A1 + A2** và phát hiện **Trung B9** của đợt audit ngay bên dưới (`PLAN.md`, việc V1).

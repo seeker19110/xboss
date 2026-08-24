@@ -21,6 +21,7 @@ import {
   FileCheck,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
+import ThuNghiemBanner from "@/app/components/ThuNghiemBanner";
 import EngineeringNav from "@/app/components/EngineeringNav";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
@@ -229,6 +230,7 @@ export default function SwarmEngineeringPage() {
       <div className="min-h-screen bg-zinc-950 text-zinc-100">
         <AppHeader />
         <main className="container mx-auto p-4 md:p-6">
+          <ThuNghiemBanner moduleKey="engineering-swarm" />
           <EngineeringNav />
           <PageSkeleton />
         </main>
@@ -240,6 +242,7 @@ export default function SwarmEngineeringPage() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <AppHeader />
       <main className="container mx-auto p-4 md:p-6">
+        <ThuNghiemBanner moduleKey="engineering-swarm" />
         <EngineeringNav />
 
         {/* Header */}

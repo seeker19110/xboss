@@ -35,18 +35,22 @@ async function getOverrides(projectId: number): Promise<Map<string, boolean>> {
   return overrides;
 }
 
-/** true nếu module đang bật cho dự án (chưa có dòng ghi đè = bật). */
+/** true nếu module đang bật cho dự án. Chưa có dòng ghi đè: module thường mặc định BẬT
+ *  (tương thích ngược); module đánh dấu `thuNghiem` (W3, xem lib/nen/modules.ts) mặc
+ *  định TẮT cho MỌI dự án — kể cả dự án mới tạo — vì chưa qua cổng kiểm chứng. Override
+ *  tường minh trong DB (qua `setFlag`) luôn thắng mặc định này ở cả 2 chiều. */
 export async function isModuleEnabled(moduleKey: string, projectId: number): Promise<boolean> {
   const overrides = await getOverrides(projectId);
-  return overrides.get(moduleKey) ?? true;
+  const def = MODULES.find((m) => m.key === moduleKey);
+  return overrides.get(moduleKey) ?? !def?.thuNghiem;
 }
 
-/** Toàn bộ module × trạng thái cho 1 dự án (đã merge mặc định bật) — dùng cho UI ma trận
- *  và sidebar (ẩn nav của module tắt). */
+/** Toàn bộ module × trạng thái cho 1 dự án (đã merge mặc định bật/tắt theo `thuNghiem`)
+ *  — dùng cho UI ma trận và sidebar (ẩn nav của module tắt). */
 export async function getModuleFlags(projectId: number): Promise<Map<string, boolean>> {
   const overrides = await getOverrides(projectId);
   const map = new Map<string, boolean>();
-  for (const m of MODULES) map.set(m.key, overrides.get(m.key) ?? true);
+  for (const m of MODULES) map.set(m.key, overrides.get(m.key) ?? !m.thuNghiem);
   return map;
 }
 

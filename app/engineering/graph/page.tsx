@@ -16,6 +16,7 @@ import {
   Eye,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
+import ThuNghiemBanner from "@/app/components/ThuNghiemBanner";
 import EngineeringNav from "@/app/components/EngineeringNav";
 import EmptyState from "@/app/components/EmptyState";
 import { PageSkeleton } from "@/app/components/Skeleton";
@@ -173,6 +174,7 @@ export default function EngineeringGraphPage() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <AppHeader title="Knowledge Graph & Phả hệ kỹ thuật" />
       <main className="mx-auto max-w-7xl px-4 py-6">
+        <ThuNghiemBanner moduleKey="engineering-graph" />
         <EngineeringNav />
 
         {/* Search & Filter Bar */}

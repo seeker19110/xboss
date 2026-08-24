@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import {
   generateInstancedMeshGroups,
   calculateMerkleRootHex,
@@ -21,6 +22,8 @@ export async function GET(req: NextRequest) {
   }
 
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("engineering-god-tier-studio", projectId);
+  if (blocked) return blocked;
   if (!projectId) {
     return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
   }
@@ -40,6 +43,8 @@ export async function POST(req: NextRequest) {
   }
 
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("engineering-god-tier-studio", projectId);
+  if (blocked) return blocked;
   if (!projectId) {
     return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
   }

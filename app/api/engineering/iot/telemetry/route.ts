@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { getCurrentProjectId } from "@/lib/ha-tang/projects";
+import { assertModuleEnabled } from "@/lib/ha-tang/feature-flags";
 import { query } from "@/lib/db";
 import { evaluateTelemetryStatus, IotDeviceType } from "@/lib/ky-thuat/engineering-iot-telemetry";
 
@@ -18,6 +19,8 @@ export async function GET(req: Request) {
   }
 
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("engineering-iot-telemetry", projectId);
+  if (blocked) return blocked;
   if (!projectId) {
     return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
   }
@@ -74,6 +77,8 @@ export async function POST(req: Request) {
   }
 
   const projectId = await getCurrentProjectId(user);
+  const blocked = await assertModuleEnabled("engineering-iot-telemetry", projectId);
+  if (blocked) return blocked;
   if (!projectId) {
     return NextResponse.json({ error: "Chưa chọn dự án" }, { status: 400 });
   }
