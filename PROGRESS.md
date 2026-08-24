@@ -4,6 +4,33 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## GĐ2/W6 — Retention log webhook + coverage ratchet thành cổng CI (2026-08-24)
+
+`PLAN.md` việc W6. Hai phần độc lập.
+
+- **W6.1 — Retention 2 bảng log webhook công khai:** thêm `zalo_site_message_logs` và
+  `telegram_bot_message_logs` vào `RETENTION_TARGETS` (`lib/ha-tang/retention.ts`) — cả hai nhận
+  ghi từ nguồn công khai (webhook) và trước đây không có giới hạn tuổi. Giữ **180 ngày** (`mode:
+  "age"`, cột `created_at`), `enabled: true` — log vận hành bot thuần kỹ thuật, không phải chứng
+  cứ nghiệm thu/hợp đồng. Kiểm chứng bằng DB thật: chèn dòng cũ 200 ngày + dòng mới, dry-run đếm
+  đúng, `apply=true` chỉ xoá dòng cũ, giữ dòng mới. `tests/retention.test.ts` (8 ca sẵn có) vẫn
+  xanh không cần sửa.
+- **W6.2 — Coverage ratchet thành cổng CI:** mốc lưu ở `coverage-baseline.json` (gốc repo, 4 số +
+  ngày đo). `scripts/check-coverage.ts` (`npm run check:coverage`) chạy lại `test:coverage` thật,
+  so với mốc, fail khi tụt quá ngưỡng đệm 1 điểm % (chặn nhiễu đo làm đỏ oan); vượt mốc thì chỉ in
+  gợi ý cập nhật, không tự ghi đè file. Nối vào job `test` của CI (sau bước "Test", cần Postgres
+  thật). **Đo lại thật trên nhánh này** (Postgres 16 cục bộ cổng 55506, không chép số cũ từ
+  PROGRESS.md vì GĐ1 đã thêm nhiều test): **202 file** trong phạm vi `lib/**`+`app/api/**`, `lines`
+  **86.46%**, `branches` **83.55%**, `funcs` **81.36%** — tăng khá nhiều so với mốc 2026-08-10 (108
+  file, 87.12/84.11/79.46) chủ yếu vì số file trong phạm vi tăng gần gấp đôi (nhiều module GĐ1 +
+  các đợt trước thêm `lib/*`/`app/api/*` mới có test tương ứng), không phải tụt coverage thật.
+  **Chứng minh cổng đỏ→xanh:** hạ mốc `lines` lên `95.0` (cao hơn thực tế 86.46% hơn 1%) → cổng đỏ
+  đúng dòng `lines: 95% → 86.46% (tụt 8.54 điểm %, vượt ngưỡng đệm 1%)`; trả `lines` về `86.46` →
+  xanh `[OK] Coverage không tụt quá ngưỡng đệm 1% so với mốc`. Toàn bộ `npm test -- --release-gate`
+  219/219 file pass, 0 fail (1 skip cố ý, đúng chủ đích) trên cùng Postgres.
+- Verify: `npm run lint`/`typecheck`/`check:lib-layers` xanh; không có migration nào trong việc
+  này (chỉ thêm dữ liệu registry `RETENTION_TARGETS` + script CI).
+
 ## GĐ1/V1 — Xác thực webhook đi vào + chuẩn hoá OTP liên kết (2026-08-24)
 
 Vá lỗ hổng **Cao A1 + A2** và phát hiện **Trung B9** của đợt audit ngay bên dưới (`PLAN.md`, việc V1).

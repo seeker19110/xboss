@@ -125,6 +125,14 @@ jobs:
         env:
           TEST_DATABASE_URL: postgres://ci:ci@localhost:5432/xboss_test
 
+      # Ratchet coverage (W6.2): chặn tụt coverage âm thầm so với coverage-baseline.json.
+      # Chạy lại toàn bộ test có --experimental-test-coverage (script tự đo, không phụ
+      # thuộc bước Test ở trên) — cần Postgres thật nên đặt ở job `test`, không phải `static`.
+      - name: Kiểm coverage không tụt quá ngưỡng đệm so với mốc
+        run: npm run check:coverage
+        env:
+          TEST_DATABASE_URL: postgres://ci:ci@localhost:5432/xboss_test
+
       # ERD sinh tự động từ schema thật (M45 PR3): Postgres CI đã có đủ schema sau
       # bước Test (ensureSchema áp mọi migration). Lệch docs/ERD.md → CI đỏ.
       - name: Kiểm ERD khớp schema

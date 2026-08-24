@@ -110,6 +110,26 @@ export const RETENTION_TARGETS: RetentionTarget[] = [
     reason:
       "CHỜ CHỦ SỞ HỮU CHỐT (C3 §6). Object bị từ chối vẫn là bằng chứng 'đã từng đề xuất và bị loại' — có giá trị khi tranh chấp. Chỉ xoá khi chủ sở hữu chốt thời hạn.",
   },
+  {
+    key: "zalo_site_message_logs",
+    table: "zalo_site_message_logs",
+    mode: "age",
+    column: "created_at",
+    days: 180,
+    enabled: true,
+    reason:
+      "Log webhook Zalo (migrations/0119) nhận ghi từ nguồn công khai, không có giới hạn tuổi nên phình vô hạn. Đây là nhật ký vận hành bot (raw_text/intent để debug), không phải chứng cứ nghiệm thu/hợp đồng — giữ 180 ngày đủ để tra cứu sự cố tích hợp, sau đó xoá.",
+  },
+  {
+    key: "telegram_bot_message_logs",
+    table: "telegram_bot_message_logs",
+    mode: "age",
+    column: "created_at",
+    days: 180,
+    enabled: true,
+    reason:
+      "Log webhook Telegram (migrations/0110) nhận ghi từ nguồn công khai, không có giới hạn tuổi nên phình vô hạn. Cùng bản chất log vận hành bot như zalo_site_message_logs — giữ 180 ngày rồi xoá, không phải dữ liệu nghiệp vụ cần lưu vĩnh viễn.",
+  },
 ];
 
 export type PurgePlanRow = {
