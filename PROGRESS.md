@@ -4,6 +4,41 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Bản vẽ xuất ra mở bằng AutoCAD là màn hình trắng — khung nhìn cắm cứng (2026-08-24)
+
+Người dùng mở tệp DXF do XBoss xuất bằng **AutoCAD thật** và báo: mở lên trắng trơn. Đây đúng là
+rủi ro tồn đọng lớn nhất đã ghi ở mục F đợt trước ("trước khi phát hành cho kỹ sư dùng phải mở thử
+một tệp xuất ra trong AutoCAD") — và nó có thật.
+
+**Nguyên nhân:** bản ghi `VPORT` tên `*ACTIVE` trong bảng TABLES cắm cứng tâm `(0,0)` chiều cao
+`1000`. AutoCAD khôi phục đúng khung nhìn đó khi mở tệp. Bản vẽ MEPF trải `0…33000 × 0…17000` nên
+khung nhìn rơi vào một mẩu trống cạnh gốc toạ độ: **16 thực thể vẫn nằm nguyên trong tệp**, chỉ là
+không có cái nào lọt vào màn hình. Người dùng phải tự `ZOOM` → `EXTENTS` mới thấy — mà không ai
+đoán được là phải làm vậy.
+
+**Vì sao cả ba lớp kiểm chứng của đợt trước đều mù:**
+
+| Lớp kiểm                    | Vì sao không bắt được                                                                               |
+| --------------------------- | --------------------------------------------------------------------------------------------------- |
+| `ezdxf` Auditor             | Báo 0 lỗi 0 fix — tệp **hợp lệ** hoàn toàn. Auditor kiểm tính đúng cấu trúc, không kiểm khung nhìn. |
+| Round-trip qua bộ đọc XBoss | 17 thực thể vào, 17 ra, khung bao không xê dịch. Bộ đọc không đọc VPORT nên không thấy gì sai.      |
+| Test toàn vẹn cấu trúc      | Handle, owner pointer, `$HANDSEED`, cân bằng SECTION/TABLE/BLOCK — đều đúng.                        |
+
+Bài học: **hợp lệ ≠ dùng được.** Cả ba lớp trên đều đo tính hợp lệ. Không lớp nào trả lời câu hỏi
+"mở ra thì người ta có thấy gì không". Chỉ mở bằng chính AutoCAD mới trả lời được.
+
+**Đã sửa:** tính tâm và chiều cao khung nhìn từ khung bao thật, cộng 10% lề, và chiều cao phải phủ
+cả chiều rộng (chiều rộng thấy được = cao × tỷ lệ 1.5). Ghi thêm `$VIEWCTR`/`$VIEWSIZE` ở HEADER
+khớp với VPORT — AutoCAD đọc cả hai chỗ, để lệch nhau thì khung nhìn tuỳ thuộc chỗ nào đọc sau.
+Bản vẽ rỗng hoặc suy biến thành một điểm/đường thẳng giữ mặc định `1000`, không chia cho 0.
+
+Kiểm lại trên chính fixture: tâm `(16500, 8500)`, cao `24200` → khung nhìn `x −1650…34650`,
+`y −3600…20600`, phủ trọn khung bao `0…33000 × 0…17000`.
+
+**Hai ca test chặn hồi quy**, và đã chứng minh chúng thật sự bắt được lỗi bằng cách tạm trả bộ ghi
+về bản cũ rồi chạy lại (đỏ đúng ca mong đợi, khôi phục thì xanh) — chứ không chỉ viết test rồi thấy
+nó xanh.
+
 ## Rút thời gian CI từ 7m01 xuống 4m22 (2026-08-24)
 
 Đo trước khi sửa (run 1210, cả hai job xanh) để biết thời gian nằm ở đâu thay vì đoán:

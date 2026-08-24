@@ -1208,3 +1208,64 @@ test("exportDxf: toàn vẹn cấu trúc — handle duy nhất, mọi tham chi�
   assert.equal(dem("TABLE"), dem("ENDTAB"), "Mỗi TABLE phải có đúng một ENDTAB");
   assert.equal(dem("BLOCK"), dem("ENDBLK"), "Mỗi BLOCK phải có đúng một ENDBLK");
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Khung nhìn lúc mở tệp (VPORT "*ACTIVE" + $VIEWCTR/$VIEWSIZE).
+//
+// Hồi quy thật, người dùng báo 2026-08-24: bộ ghi cắm cứng tâm (0,0) cao 1000, nên bản vẽ MEPF
+// trải 0…33000 × 0…17000 mở ra trong AutoCAD là **màn hình trắng trơn** — khung nhìn rơi vào mẩu
+// trống cạnh gốc toạ độ trong khi mọi thực thể nằm cách đó hàng chục nghìn đơn vị.
+//
+// Vì sao không bộ kiểm nào bắt được trước đó: tệp hoàn toàn HỢP LỆ (ezdxf Auditor 0 lỗi 0 fix),
+// round-trip qua chính bộ đọc cũng đủ 17 thực thể. Khung nhìn không phải tính hợp lệ, nó là tính
+// dùng được — chỉ lộ ra khi mở bằng AutoCAD thật.
+// ─────────────────────────────────────────────────────────────────────────────
+test("exportDxf: khung nhìn lúc mở phải phủ hết khung bao bản vẽ, không cắm cứng gốc toạ độ", () => {
+  const parsed = parseDxf(FIXTURE_MEPF, "mepf-thap-a.dxf");
+  const out = exportDxf(parsed);
+
+  const bao = parsed.diagnostic?.boundingDimensions;
+  assert.ok(bao, "fixture phải có khung bao để bài test này có nghĩa");
+  assert.ok(bao.maxX > 1000, "khung bao phải đủ xa gốc toạ độ mới tái hiện được lỗi");
+
+  // Bản ghi VPORT "*ACTIVE": mã 12/22 = tâm khung nhìn, 40 = chiều cao, 41 = tỷ lệ rộng/cao.
+  const khoi = out.slice(out.indexOf("*ACTIVE"), out.indexOf("*ACTIVE") + 400);
+  const doc = (ma: string): number => {
+    const m = khoi.match(new RegExp(`\\r\\n${ma}\\r\\n(-?[\\d.]+)\\r\\n`));
+    assert.ok(m, `VPORT *ACTIVE thiếu mã nhóm ${ma}`);
+    return Number(m[1]);
+  };
+  const tamX = doc("12");
+  const tamY = doc("22");
+  const cao = doc("40");
+  const tyLe = doc("41");
+
+  const nua = { x: (cao * tyLe) / 2, y: cao / 2 };
+  assert.ok(tamX - nua.x <= bao.minX, "mép trái khung nhìn phải nằm ngoài khung bao");
+  assert.ok(tamX + nua.x >= bao.maxX, "mép phải khung nhìn phải nằm ngoài khung bao");
+  assert.ok(tamY - nua.y <= bao.minY, "mép dưới khung nhìn phải nằm ngoài khung bao");
+  assert.ok(tamY + nua.y >= bao.maxY, "mép trên khung nhìn phải nằm ngoài khung bao");
+
+  // $VIEWCTR/$VIEWSIZE ở HEADER phải khớp VPORT — lệch nhau thì khung nhìn lúc mở tuỳ thuộc
+  // AutoCAD đọc chỗ nào sau.
+  const ctr = out.match(/\$VIEWCTR\r\n10\r\n(-?[\d.]+)\r\n20\r\n(-?[\d.]+)\r\n/);
+  const size = out.match(/\$VIEWSIZE\r\n40\r\n(-?[\d.]+)\r\n/);
+  assert.ok(ctr, "HEADER thiếu $VIEWCTR");
+  assert.ok(size, "HEADER thiếu $VIEWSIZE");
+  assert.equal(Number(ctr[1]), tamX, "$VIEWCTR X phải khớp tâm VPORT");
+  assert.equal(Number(ctr[2]), tamY, "$VIEWCTR Y phải khớp tâm VPORT");
+  assert.equal(Number(size[1]), cao, "$VIEWSIZE phải khớp chiều cao VPORT");
+});
+
+test("exportDxf: bản vẽ rỗng không làm chiều cao khung nhìn thành 0 hay NaN", () => {
+  const rong = parseDxf("0\nSECTION\n2\nENTITIES\n0\nENDSEC\n0\nEOF", "rong.dxf");
+  const out = exportDxf(rong);
+  const khoi = out.slice(out.indexOf("*ACTIVE"), out.indexOf("*ACTIVE") + 400);
+  const m = khoi.match(/\r\n40\r\n(-?[\d.]+)\r\n/);
+  assert.ok(m, "VPORT *ACTIVE thiếu mã nhóm 40");
+  const cao = Number(m[1]);
+  assert.ok(
+    Number.isFinite(cao) && cao > 0,
+    `chiều cao khung nhìn phải dương hữu hạn, nhận ${cao}`,
+  );
+});

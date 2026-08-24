@@ -3848,6 +3848,21 @@ export function exportDxf(
 
   // ── 1. HEADER ──
   const bao = parsed.diagnostic?.boundingDimensions;
+
+  const TY_LE_KHUNG_NHIN = 1.5;
+  let tamX = 0;
+  let tamY = 0;
+  let caoKhungNhin = 1000;
+  if (bao) {
+    const rong = bao.maxX - bao.minX;
+    const cao = bao.maxY - bao.minY;
+    tamX = (bao.minX + bao.maxX) / 2;
+    tamY = (bao.minY + bao.maxY) / 2;
+    // Bản vẽ rỗng hoặc suy biến thành một điểm/đường thẳng → giữ mặc định, không chia cho 0.
+    const canCao = Math.max(cao, rong / TY_LE_KHUNG_NHIN);
+    if (canCao > 0) caoKhungNhin = canCao * 1.1;
+  }
+
   let header = "0\r\nSECTION\r\n2\r\nHEADER\r\n";
   // AC1021 = AutoCAD 2007 — phiên bản mới nhất XÉT RIÊNG BẢN VẼ 2D. Từ 2007 trở đi không bản nào
   // thêm loại thực thể 2D dùng được cho bản vẽ MEPF (2010 thêm MESH 3D, 2013 thêm đối tượng mặt
@@ -3887,6 +3902,10 @@ export function exportDxf(
     header += `9\r\n$LIMMIN\r\n10\r\n${real(bao.minX)}\r\n20\r\n${real(bao.minY)}\r\n`;
     header += `9\r\n$LIMMAX\r\n10\r\n${real(bao.maxX)}\r\n20\r\n${real(bao.maxY)}\r\n`;
   }
+  // $VIEWCTR/$VIEWSIZE lặp lại khung nhìn của VPORT "*ACTIVE" ở HEADER — AutoCAD đọc cả hai chỗ,
+  // để lệch nhau thì khung nhìn lúc mở phụ thuộc vào chỗ nào được đọc sau.
+  header += `9\r\n$VIEWCTR\r\n10\r\n${real(tamX)}\r\n20\r\n${real(tamY)}\r\n`;
+  header += `9\r\n$VIEWSIZE\r\n40\r\n${real(caoKhungNhin)}\r\n`;
 
   // ── 2. CLASSES — khai các lớp KHÔNG thuộc lõi DXF mà tệp này có dùng.
   // Thiếu khai báo thì AutoCAD coi thực thể tương ứng là đối tượng lạ và bỏ qua khi mở tệp.
@@ -3927,10 +3946,21 @@ export function exportDxf(
   const openTable = (name: string, handle: string, count: number, extra = ""): string =>
     `0\r\nTABLE\r\n2\r\n${name}\r\n5\r\n${handle}\r\n330\r\n0\r\n100\r\nAcDbSymbolTable\r\n70\r\n${count}\r\n${extra}`;
 
+  // Khung nhìn lúc mở tệp — PHẢI bám khung bao thật của bản vẽ.
+  //
+  // Vì sao đây là chỗ dễ sai mà không công cụ nào bắt được: AutoCAD khôi phục đúng khung nhìn
+  // ghi ở bản ghi VPORT "*ACTIVE" khi mở tệp. Bản trước cắm cứng tâm (0,0) cao 1000 — với bản vẽ
+  // MEPF trải 0…33000 × 0…17000 thì khung đó rơi vào một mẩu trống cạnh gốc toạ độ, người dùng
+  // mở lên thấy **màn hình trắng trơn** dù 16 thực thể vẫn nằm nguyên trong tệp. `ezdxf` Auditor
+  // báo 0 lỗi 0 fix vì tệp hoàn toàn hợp lệ — nó không quan tâm khung nhìn. Lỗi này chỉ lộ ra khi
+  // mở bằng chính AutoCAD (người dùng báo, 2026-08-24).
+  //
+  // Mã 12/22 = tâm khung nhìn, 40 = chiều cao khung nhìn, 41 = tỷ lệ rộng/cao. Chiều cao phải đủ
+  // phủ CẢ chiều cao lẫn chiều rộng khung bao (chiều rộng thấy được = cao × tỷ lệ), cộng 10% lề.
   than += openTable("VPORT", hVportTab, 1);
   than += tableRecordHead("VPORT", handles.take(), hVportTab, "AcDbViewportTableRecord");
   than += "2\r\n*ACTIVE\r\n70\r\n0\r\n10\r\n0.0\r\n20\r\n0.0\r\n11\r\n1.0\r\n21\r\n1.0\r\n";
-  than += "12\r\n0.0\r\n22\r\n0.0\r\n40\r\n1000.0\r\n41\r\n1.5\r\n";
+  than += `12\r\n${real(tamX)}\r\n22\r\n${real(tamY)}\r\n40\r\n${real(caoKhungNhin)}\r\n41\r\n${real(TY_LE_KHUNG_NHIN)}\r\n`;
   than += "0\r\nENDTAB\r\n";
 
   const lineTypes: Array<[string, string, number[]]> = [
