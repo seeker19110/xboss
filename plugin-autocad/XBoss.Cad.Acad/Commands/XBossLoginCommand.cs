@@ -23,6 +23,9 @@ public sealed class XBossLoginCommand
     private static string ServerConfigPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "XBoss", "server.json");
 
+    /// <summary>Server đã ghép gần nhất — XBOSS_UPLOAD dùng chung (kèm token trong Credential Manager).</summary>
+    internal static string? ServerUrlDaLuu() => DocServerUrl();
+
     private static string? DocServerUrl()
     {
         try

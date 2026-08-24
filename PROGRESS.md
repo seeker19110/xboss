@@ -4,6 +4,19 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## M99 PR5 — plugin-upload: nộp DWG + DXF sidecar vào sổ bản vẽ + XBOSS_UPLOAD (2026-08-24)
+
+Nhánh `claude/m99-pr5-plugin-upload` (nối tiếp PR2 #386).
+
+- **Kiểm định 2 cổng — điểm lệch FR10 có chủ đích (ghi M99 §10):** cổng 1 đồng bộ `validateDxf` (TS) trên DXF sidecar — sai cấu trúc → 422, KHÔNG tạo bản ghi nào (AC5); qua cổng 1 → `drawing_revisions` tạo `submitted` NGAY + enqueue task `mepf.cad.plugin_validate` (cổng 2, ezdxf) — worker báo fail → revision **tự chuyển `rejected`** kèm lý do tại đường đọc job (không cần cron). Lý do lệch: worker bất đồng bộ có thể vắng mặt, không được chặn kỹ sư nộp; sổ vẫn sạch vì revision rejected không đi tiếp vòng duyệt.
+- **`migrations/0134_plugin_upload.sql`** (thuần thêm): `drawing_revisions` + `rule_pack_version`/`standardize_report`/`source_tool` (đúng kế hoạch M99 §11) + `content_sha256` (idempotency — tải lại cùng DWG trong cùng dự án trả revision cũ, kể cả khi đổi code/rev) + `dxf_file_name` (sidecar trong storage). ERD regen.
+- **`lib/ky-thuat/cad/plugin-upload.ts`** (ADR-0008 — route chỉ là ranh giới HTTP): `nhanPluginUpload` (validate → AC8 chặn rule pack lỗi thời 409 → idempotency sha256 → upsert drawings theo code+project, rev trùng → 409 → storagePut DWG+DXF + bản DXF trên đĩa `data/uploads/mepf` cho worker → insert revision + enqueue); `layPluginUploadJob` (chủ job hoặc Admin/PM; completed+invalid → UPDATE rejected 1 lần; completed+valid → ghi kết quả vào `standardize_report.serverValidation`).
+- **Routes**: `POST /api/engineering/cad/plugin-upload` (Bearer cad trước cookies, `CAN.manageDrawings`, rate limit `cad-upload` 30/15'/user, trần DWG 80MB / DXF 150MB, project chốt qua `chotProjectIdChoGhi`) + `GET .../:jobId`.
+- **Worker**: `mepf-worker/src/cad_plugin_validate.py` — ezdxf `recover.readfile` + audit; VALID = mở được + audit 0 lỗi + fix âm thầm ≤ 20 (bài học PR #384: 455 fix mà "errors: 0") + ≥60% layer khớp `cad_standards.match_layer` (một chuẩn với `cad_health_check`).
+- **Plugin**: Core `UploadAsync` (multipart đủ 8 field) + `PollUploadJobAsync` — 6 test fake-handler (tổng **84 ca C#**); Acad `XBOSS_UPLOAD`: đòi QSAVE + token + rule pack, **DXF sidecar do chính AutoCAD xuất** (`db.DxfOut` — không tự chế bộ ghi, ADR-0006), đọc report cạnh DWG, poll kết quả và hiện lý do từ chối ngay trong AutoCAD.
+- **Test `tests/cad-plugin-upload.test.ts`**: 7 ca (2 route-source + 5 integration Postgres thật: AC5/AC8/idempotency/rev-trùng/quyền xem job/giả lập worker fail→rejected/pass→submitted+report).
+- **Còn lại M99**: PR6 (batch + bảng điều khiển + bỏ tầng 1), PR7 (test tích hợp accoreconsole — chặn bởi runner Windows).
+
 ## M99 PR2 — Ghép thiết bị AutoCAD + token scope 'cad' + XBOSS_LOGIN (2026-08-24)
 
 Vùng rủi ro cao (chạm auth) — đã rà theo `docs/audit.md` §3/§8. Nhánh `claude/m99-pr2-api-tokens`.

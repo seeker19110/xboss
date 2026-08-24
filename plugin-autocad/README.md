@@ -24,7 +24,9 @@ quy tắc tải từ XBoss dưới dạng **rule pack** có version (không nhú
 | `XBOSS_BOCKL_XOA`  | Gỡ đánh dấu bóc (trả đúng màu trước khi bóc, xoá XData) — toàn bộ hoặc theo vùng chọn                                                                                                                                        |
 | `XBOSS_BOCKL_XUAT` | Xuất Excel **đúng mẫu công ty** (`attachments/MAU-KHOI-LUONG-BOQ.xlsx`, sheet `Data-BOQ`, cột A–K + công thức H/J/K sống) từ trạng thái bóc đang lưu trong DWG — đóng/mở lại bản vẽ vẫn xuất được                            |
 
-(`XBOSS_UPLOAD`/`XBOSS_BATCH` thuộc PR5/PR6 — chưa có trong bản này.)
+| `XBOSS_UPLOAD` | Nộp bản vẽ lên sổ XBoss (M99 PR5): DWG + **DXF sidecar do AutoCAD tự xuất** (server kiểm bằng ezdxf, không đọc DWG) + báo cáo chuẩn hóa + version rule pack → 202 job → poll kết quả kiểm định; fail hiện lý do ngay trong AutoCAD |
+
+(`XBOSS_BATCH` thuộc PR6 — chưa có trong bản này.)
 
 ## Build
 
