@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
 import { enqueueAsyncTask } from "@/lib/ky-thuat/engineering-task-queue";
 import { GIOI_HAN_TEP_CAD } from "@/lib/ky-thuat/cad/gioi-han";
+import { isContentTooLarge } from "@/lib/nen/photos";
 import { createHash } from "crypto";
 import { promises as fs } from "fs";
 import path from "path";
@@ -17,6 +18,16 @@ export async function POST(req: NextRequest) {
   }
   if (!CAN.viewEngineeringGraph(user.role)) {
     return NextResponse.json({ error: "Không có quyền gửi tác vụ kỹ thuật" }, { status: 403 });
+  }
+
+  // Chặn sớm các file vượt giới hạn dung lượng ở mức header, trước khi đọc body
+  if (isContentTooLarge(req.headers.get("content-length"), GIOI_HAN_TEP_CAD)) {
+    return NextResponse.json(
+      {
+        error: `Tệp tin vượt quá dung lượng tối đa cho phép (${Math.floor(GIOI_HAN_TEP_CAD / (1024 * 1024))}MB)`,
+      },
+      { status: 413 },
+    );
   }
 
   try {
