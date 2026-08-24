@@ -84,6 +84,14 @@ export function useCadSource({ onLayersParsed }: UseCadSourceOptions) {
   const [scrScript, setScrScript] = useState<string>("");
   const [conversionInfo, setConversionInfo] = useState<ConversionInfo | null>(null);
 
+  // ── Lỗi phân tích bản vẽ hiển thị bền (không chỉ toast thoáng qua) ──
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  // ── 409: nhiều tệp cùng khớp trên máy chủ — bắt người dùng chỉ đích danh, không tự chọn hộ ──
+  const [ambiguousCandidates, setAmbiguousCandidates] = useState<string[]>([]);
+  // Ghi lại tham số của lần gọi phân tích gần nhất để gọi lại đúng ngữ cảnh khi người dùng
+  // chọn 1 ứng viên cụ thể trong modal.
+  const pendingRetryOptionsRef = useRef<RunDxfAnalysisOptions | undefined>(undefined);
+
   const toggleSystemExpand = (sys: string) => {
     setExpandedSystems((prev) =>
       prev.includes(sys) ? prev.filter((s) => s !== sys) : [...prev, sys],
@@ -136,6 +144,10 @@ export function useCadSource({ onLayersParsed }: UseCadSourceOptions) {
       }
 
       setLoading(true);
+      setAnalysisError(null);
+      // Nhớ lại tham số gọi lần này — cần để gọi lại đúng ngữ cảnh khi người dùng chọn 1 ứng
+      // viên cụ thể trong modal 409 (chỉ thêm `filePath`, giữ nguyên phần còn lại).
+      pendingRetryOptionsRef.current = options;
       try {
         const res = await fetch("/api/engineering/cad/parse-dxf", {
           method: "POST",
@@ -160,6 +172,7 @@ export function useCadSource({ onLayersParsed }: UseCadSourceOptions) {
 
         if (res.ok) {
           const json = await res.json();
+          setAmbiguousCandidates([]);
           if (json.data) {
             setDxfData(json.data);
             setScrScript(json.scrScript || "");
@@ -169,15 +182,57 @@ export function useCadSource({ onLayersParsed }: UseCadSourceOptions) {
               onLayersParsed(json.data.layers as DxfLayerInfo[]);
             }
           }
+          return;
         }
+
+        // Máy chủ trả lỗi — đọc thông điệp thật thay vì để spinner tắt trong im lặng
+        // (409/413 từng bị nuốt do trước đây chỉ xử lý res.ok và 401).
+        const json = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          candidates?: string[];
+        };
+
+        if (res.status === 409 && Array.isArray(json.candidates) && json.candidates.length > 0) {
+          // Nhiều bản vẽ cùng khớp trên máy chủ — KHÔNG tự chọn hộ (đúng contract vá đợt trước
+          // của tim-ban-ve.ts), bắt người dùng chỉ đích danh qua modal.
+          setAmbiguousCandidates(json.candidates);
+          setAnalysisError(
+            json.error || `Tìm thấy ${json.candidates.length} tệp cùng khớp — hãy chọn 1 tệp.`,
+          );
+          return;
+        }
+
+        const msg =
+          res.status === 413
+            ? json.error ||
+              "Tệp vượt giới hạn dung lượng cho phép — hãy tách bản vẽ theo tầng/hệ rồi chuẩn hoá từng phần."
+            : json.error || `Không phân tích được bản vẽ (mã lỗi ${res.status}).`;
+        setAnalysisError(msg);
+        showToast(msg, "error");
       } catch (e) {
         console.error("Parse DXF error:", e);
+        const msg = "Lỗi kết nối máy chủ khi phân tích bản vẽ CAD.";
+        setAnalysisError(msg);
+        showToast(msg, "error");
       } finally {
         setLoading(false);
       }
     },
     [selectedDrawingId, uploadedFileName, onLayersParsed],
   );
+
+  // ── Người dùng chọn đích danh 1 ứng viên trong modal 409 — gọi lại phân tích đúng bản đã chọn ──
+  const resolveAmbiguousCandidate = useCallback(
+    (relativePath: string) => {
+      setAmbiguousCandidates([]);
+      runDxfAnalysis({ ...pendingRetryOptionsRef.current, filePath: relativePath });
+    },
+    [runDxfAnalysis],
+  );
+
+  const cancelAmbiguousCandidates = useCallback(() => {
+    setAmbiguousCandidates([]);
+  }, []);
 
   // ── Nạp danh sách bản vẽ thiết kế của dự án ──
   const fetchDesignDrawings = useCallback(async () => {
@@ -217,11 +272,11 @@ export function useCadSource({ onLayersParsed }: UseCadSourceOptions) {
         showToast(`✓ ${json.message || "Đã đồng bộ bản vẽ từ máy chủ"}`);
         await fetchDesignDrawings();
       } else {
-        showToast(json.error || `Lỗi khi đồng bộ bản vẽ (${res.status})`);
+        showToast(json.error || `Lỗi khi đồng bộ bản vẽ (${res.status})`, "error");
       }
     } catch (err) {
       console.error(err);
-      showToast("Lỗi kết nối máy chủ khi đồng bộ bản vẽ");
+      showToast("Lỗi kết nối máy chủ khi đồng bộ bản vẽ", "error");
     } finally {
       setLoading(false);
     }
@@ -240,7 +295,7 @@ export function useCadSource({ onLayersParsed }: UseCadSourceOptions) {
     if (isDwg) {
       // XBoss không đọc DWG bằng TypeScript (ADR-0006/M99 PR0) — bịa hình học là rủi ro
       // đã xảy ra thật. Yêu cầu người dùng lưu sang DXF trong AutoCAD trước.
-      showToast(DWG_UNSUPPORTED_MESSAGE);
+      showToast(DWG_UNSUPPORTED_MESSAGE, "error");
       return;
     }
 
@@ -256,7 +311,7 @@ export function useCadSource({ onLayersParsed }: UseCadSourceOptions) {
           }
         } catch (err) {
           console.error("Local parse error:", err);
-          showToast("Lỗi khi đọc file CAD");
+          showToast("Lỗi khi đọc file CAD", "error");
         } finally {
           setLoading(false);
         }
@@ -318,7 +373,7 @@ export function useCadSource({ onLayersParsed }: UseCadSourceOptions) {
           );
         } catch (err) {
           console.error("Local parse error:", err);
-          showToast("Lỗi khi đọc file CAD");
+          showToast("Lỗi khi đọc file CAD", "error");
         } finally {
           setLoading(false);
         }
@@ -394,7 +449,7 @@ export function useCadSource({ onLayersParsed }: UseCadSourceOptions) {
         if (masterRealFile) {
           if (masterCandidate.isDwg) {
             // XBoss không đọc DWG bằng TypeScript (ADR-0006/M99 PR0)
-            showToast(DWG_UNSUPPORTED_MESSAGE);
+            showToast(DWG_UNSUPPORTED_MESSAGE, "error");
           } else {
             const text = await masterRealFile.text();
             const localParsed = parseDxf(text, masterRealFile.name);
@@ -412,6 +467,7 @@ export function useCadSource({ onLayersParsed }: UseCadSourceOptions) {
       console.error("Folder upload error:", err);
       showToast(
         err instanceof DwgUnsupportedError ? DWG_UNSUPPORTED_MESSAGE : "Lỗi khi đọc thư mục bản vẽ",
+        "error",
       );
     } finally {
       setLoading(false);
@@ -427,7 +483,7 @@ export function useCadSource({ onLayersParsed }: UseCadSourceOptions) {
     try {
       if (isDwg) {
         // XBoss không đọc DWG bằng TypeScript (ADR-0006/M99 PR0)
-        showToast(DWG_UNSUPPORTED_MESSAGE);
+        showToast(DWG_UNSUPPORTED_MESSAGE, "error");
         return;
       }
       if (targetFile) {
@@ -444,6 +500,7 @@ export function useCadSource({ onLayersParsed }: UseCadSourceOptions) {
       console.error("Select folder drawing error:", err);
       showToast(
         err instanceof DwgUnsupportedError ? DWG_UNSUPPORTED_MESSAGE : "Lỗi khi đọc file CAD",
+        "error",
       );
     }
   };
@@ -499,6 +556,10 @@ export function useCadSource({ onLayersParsed }: UseCadSourceOptions) {
     setDxfData,
     scrScript,
     conversionInfo,
+    analysisError,
+    ambiguousCandidates,
+    resolveAmbiguousCandidate,
+    cancelAmbiguousCandidates,
     runDxfAnalysis,
     fetchDesignDrawings,
     handleSyncServerDrawings,

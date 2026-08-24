@@ -22,7 +22,10 @@ import {
   Link2,
   Plus,
   Minus,
+  AlertTriangle,
+  FileQuestion,
 } from "lucide-react";
+import { Modal } from "@/app/components/dialogs";
 import type {
   ConversionInfo,
   DrawingOption,
@@ -64,6 +67,12 @@ interface UploadAndBrowsePanelProps {
   handleDownloadConvertedDxf: () => void;
   handleFolderUpload: (e: React.ChangeEvent<HTMLInputElement>) => void | Promise<void>;
   handleSelectFolderDrawing: (fileName: string) => void | Promise<void>;
+  /** Lỗi phân tích bản vẽ gần nhất — hiển thị bền, không chỉ toast thoáng qua. */
+  analysisError: string | null;
+  /** 409: nhiều tệp cùng khớp trên máy chủ — người dùng phải chỉ đích danh, không tự chọn hộ. */
+  ambiguousCandidates: string[];
+  resolveAmbiguousCandidate: (relativePath: string) => void;
+  cancelAmbiguousCandidates: () => void;
 }
 
 export default function UploadAndBrowsePanel({
@@ -95,6 +104,10 @@ export default function UploadAndBrowsePanel({
   handleDownloadConvertedDxf,
   handleFolderUpload,
   handleSelectFolderDrawing,
+  analysisError,
+  ambiguousCandidates,
+  resolveAmbiguousCandidate,
+  cancelAmbiguousCandidates,
 }: UploadAndBrowsePanelProps) {
   return (
     <div className="p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-sm space-y-3">
@@ -149,6 +162,53 @@ export default function UploadAndBrowsePanel({
           </button>
         </div>
       </div>
+
+      {/* Lỗi phân tích bản vẽ gần nhất — hiển thị bền (không chỉ toast thoáng qua rồi mất). */}
+      {analysisError && ambiguousCandidates.length === 0 && (
+        <div
+          role="alert"
+          className="flex items-start gap-2.5 p-3 rounded-xl bg-red-950/40 border border-red-800/60 text-red-300 text-xs"
+        >
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>{analysisError}</span>
+        </div>
+      )}
+
+      {/* 409: nhiều bản vẽ cùng khớp trên máy chủ — bắt người dùng chỉ đích danh, không tự chọn hộ
+          (chống lỗi "chọn bản vẽ A, hệ thống trả bản vẽ B"). */}
+      {ambiguousCandidates.length > 0 && (
+        <Modal onClose={cancelAmbiguousCandidates} className="max-w-lg">
+          <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2">
+            <FileQuestion className="w-4 h-4 text-amber-400 shrink-0" />
+            <h3 className="font-semibold text-sm flex-1 text-zinc-100">
+              Chọn đúng bản vẽ cần phân tích
+            </h3>
+          </div>
+          <div className="p-4 space-y-3">
+            <p className="text-xs text-zinc-400">{analysisError}</p>
+            <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+              {ambiguousCandidates.map((path) => (
+                <button
+                  key={path}
+                  onClick={() => resolveAmbiguousCandidate(path)}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-750 border border-zinc-700 text-left text-xs font-mono text-zinc-200 transition min-h-[40px]"
+                >
+                  <FileCode2 className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span className="truncate">{path}</span>
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-end pt-1">
+              <button
+                onClick={cancelAmbiguousCandidates}
+                className="px-4 py-2 text-sm bg-zinc-800 hover:bg-zinc-750 text-zinc-300 rounded-xl transition font-medium min-h-[40px]"
+              >
+                Huỷ
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* Source 1: Trình Duyệt Cây Thư Mục & Danh Sách Bản Vẽ (2 Cột File Explorer) */}
       {sourceMode === "design" && (
