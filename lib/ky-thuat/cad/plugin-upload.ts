@@ -82,6 +82,10 @@ export async function xuLyPluginUpload(input: {
   dwgName: string;
   dxfText: string;
   report: Record<string, unknown> | null;
+  /** M101 §6.4 (PR5): sidecar JSON kết quả bóc khối lượng (TakeoffJsonReport), TÙY CHỌN — lưu
+   * nguyên vào standardize_report khối "takeoff". KHÔNG BAO GIỜ ghi vào bảng BOQ (đường ghi sổ
+   * duy nhất giữ nguyên); upload không kèm khối này vẫn chạy y hệt trước PR5. */
+  takeoff?: Record<string, unknown> | null;
 }): Promise<PluginUploadKetQua> {
   const validation = kiemDinhPluginUpload(input.dxfText, input.rulePackVersion);
   if (!validation.ok) return { status: "invalid", validation };
@@ -126,7 +130,11 @@ export async function xuLyPluginUpload(input: {
     input.dwg.length,
     input.userId,
     input.rulePackVersion,
-    JSON.stringify({ ...(input.report ?? {}), serverValidation: validation }),
+    JSON.stringify({
+      ...(input.report ?? {}),
+      ...(input.takeoff ? { takeoff: input.takeoff } : {}),
+      serverValidation: validation,
+    }),
     hash,
   );
   return { status: "created", validation, revisionId };
