@@ -92,6 +92,8 @@ Chọn các đoạn tim → chọn hệ/loại/size mới → plugin đổi laye
 
 Chọn các đoạn tim (hoặc cả hệ) → plugin đặt block giá đỡ (manifest kind `support`, chọn theo loại tuyến) **cách đều theo khoảng cách chuẩn** `drawTools.systems[].lines[].supportSpacingMm` (theo size — vd ống gió 2400, CHW DN50 2000), tự xoay vuông góc tuyến, đúng layer hệ; điểm đầu/cuối và tại phụ kiện nặng (van, thiết bị) luôn có giá đỡ. Chạy lại trên tuyến đã có → chỉ bổ sung đoạn thiếu (XData liên kết tim↔giá đỡ, không đặt trùng). Giá đỡ là block đếm được → khai item takeoff `measure: count` tương ứng — **`XBOSS_BOCKL` đếm được số giá đỡ** (hạng mục đang ước tay). Kỹ sư dời/xóa từng cái tự do sau khi đặt.
 
+`supportSpacingMm` là **ngưỡng TỐI ĐA** của tiêu chuẩn treo đỡ (vượt là rủi ro võng/gãy ống) — mặc định plugin chia sao cho bước thật KHÔNG BAO GIỜ vượt ngưỡng này (làm tròn số khoảng lên), có tuỳ chọn cho kỹ sư chấp nhận chia gần đúng nhất (ít giá đỡ hơn, bước có thể vượt chuẩn vài %) kèm cảnh báo rõ ràng trên dòng lệnh khi chọn tuỳ chọn đó.
+
 ### 6.8 `XBOSS_VE_LOCHO` — sleeve/lỗ chờ xuyên tường-sàn-dầm + bảng builder's work
 
 Bấm điểm tuyến xuyên kết cấu (hoặc để plugin dò giao tim × đối tượng trên layer kết cấu `S-GRID-COLS` rồi xác nhận từng điểm) → chèn block sleeve (kind `sleeve`) đúng tâm tuyến, size = size ống + khe hở `sleeveClearanceMm` (rule pack, theo loại tuyến), XData `[tuyến, size ống, size sleeve, loại kết cấu]`. `XBOSS_VE_LOCHO` chế độ xuất: **bảng lỗ chờ** (builder's work) — Table trong bản vẽ + tệp Excel đơn giản (STT, vị trí theo trục gần nhất, cao độ nhập tay, size, hệ) gửi bên kết cấu/xây dựng. Sleeve cũng đếm được qua takeoff.
@@ -153,7 +155,7 @@ Bấm điểm tuyến xuyên kết cấu (hoặc để plugin dò giao tim × đ
 - **AC8** _Given_ thư viện version mới phát hành trên web, _when_ máy kỹ sư `XBOSS_LOGIN`, _then_ tự tải bản mới (ETag) và manifest hash khớp tệp.
 - **AC10** _Given_ `XBOSS_VE_TRANGIN` khổ A1 tỉ lệ 1:50, _then_ layout có viewport khóa đúng 1:50 (đo 1000mm model = 20mm giấy), khung tên đủ attribute, và in PDF ra nét đúng CTB.
 - **AC11** _Given_ tuyến cắt qua 3 tuyến (ống gió 300x200, CHW DN50, máng 200x100), _when_ `XBOSS_VE_MATCAT`, _then_ hình cắt có đúng 3 ký hiệu đúng loại/kích thước, khoảng cách ngang khớp khoảng cách thật giữa các tim, nhãn size đúng XData.
-- **AC12** _Given_ tuyến ống gió 10m size 300x200 (`supportSpacingMm`=2400), _when_ `XBOSS_VE_GIADO`, _then_ đặt đúng 5 giá đỡ (2 đầu + chia đều ≤2400), chạy lại không thêm cái nào, và `XBOSS_BOCKL` đếm ra 5.
+- **AC12** _Given_ tuyến ống gió 10m size 300x200 (`supportSpacingMm`=2400), _when_ `XBOSS_VE_GIADO`, _then_ đặt đúng **6** giá đỡ (2 đầu + chia đều, mỗi bước 2000mm ≤2400), chạy lại không thêm cái nào, và `XBOSS_BOCKL` đếm ra 6. _(Ghi chú: bản đặc tả đầu ghi "5 giá đỡ" cho ca này là sai số học — 5 giá đỡ = 4 khoảng × 2500, VƯỢT chuẩn 2400; không có cách chia nào vừa ra đúng 5 vừa giữ mọi bước ≤2400. Đã sửa lại số 2026-08-25, xem §6.7.)_
 - **AC13** _Given_ 3 điểm xuyên tường đã chèn sleeve, _when_ xuất bảng lỗ chờ, _then_ Table + Excel có đúng 3 dòng, size sleeve = size ống + khe hở rule pack.
 - **AC14** _Given_ 2 FCU trùng tag, _when_ `XBOSS_VE_TAG` quét, _then_ báo đúng 2 đối tượng; đánh lại tuần tự thì hết trùng và tag khóa giữ nguyên.
 - **AC9** _Given_ rule pack v4 nạp vào plugin M99 hiện tại (chưa có M100), _then_ mọi lệnh M99 chạy bình thường (mở rộng thuần).

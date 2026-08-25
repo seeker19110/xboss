@@ -15,22 +15,31 @@ public class SupportSpacingTests
     // ===== AC12 =====
 
     [Fact]
-    public void AC12_tuyen_10m_khoang_cach_2400_ra_dung_5_gia_do_hai_dau()
+    public void AC12_tuyen_10m_khoang_cach_2400_mac_dinh_KHONGVUOT_ra_dung_6_gia_do()
     {
+        // Đặc tả M100 gốc ghi "5 giá đỡ" cho ca này là sai số học (5 giá đỡ = 4 khoảng × 2500,
+        // VƯỢT 2400 ~4%) — đã sửa đặc tả + đổi mặc định sang KHONGVUOT 2026-08-25 (xem
+        // SupportSpacing.cs, ghi chú AC12). Mặc định nay ra 6 giá đỡ, bước 2000 ≤ 2400, 0 cảnh báo.
         var kq = SupportSpacing.Tinh(Thang(10_000), khoangCach: 2400);
 
-        Assert.Equal(5, kq.CanDat.Count);
+        Assert.Equal(6, kq.CanDat.Count);
         Assert.Empty(kq.DaCo);
-        Assert.Equal(new double[] { 0, 2500, 5000, 7500, 10_000 }, kq.CanDat.Select(v => v.KhoangCachDoc));
-        Assert.Equal(2500, kq.BuocThat, 9);
+        Assert.Equal(
+            new double[] { 0, 2000, 4000, 6000, 8000, 10_000 }, kq.CanDat.Select(v => v.KhoangCachDoc));
+        Assert.Equal(2000, kq.BuocThat, 9);
+        Assert.Empty(kq.CanhBao);
         Assert.Equal(VaiTroViTriGiaDo.DauCuoi, kq.CanDat[0].VaiTro);
         Assert.Equal(VaiTroViTriGiaDo.DauCuoi, kq.CanDat[^1].VaiTro);
     }
 
     [Fact]
-    public void AC12_buoc_that_vuot_chuan_thi_phai_canh_bao_khong_im_lang()
+    public void AC12_che_do_GANNHAT_ra_5_gia_do_buoc_2500_va_phai_canh_bao_vuot_chuan()
     {
-        var kq = SupportSpacing.Tinh(Thang(10_000), khoangCach: 2400);
+        var kq = SupportSpacing.Tinh(Thang(10_000), khoangCach: 2400, cheDo: CheDoChiaGiaDo.GanNhat);
+
+        Assert.Equal(5, kq.CanDat.Count);
+        Assert.Equal(new double[] { 0, 2500, 5000, 7500, 10_000 }, kq.CanDat.Select(v => v.KhoangCachDoc));
+        Assert.Equal(2500, kq.BuocThat, 9);
 
         // 5 giá đỡ ⇒ 4 khoảng × 2500 > 2400: sự thật này phải hiện ra dòng lệnh, không giấu.
         Assert.Single(kq.CanhBao);
@@ -42,30 +51,20 @@ public class SupportSpacingTests
     public void AC12_chay_lai_tren_tuyen_da_co_gia_do_thi_khong_them_cai_nao()
     {
         var kq = SupportSpacing.Tinh(
-            Thang(10_000), khoangCach: 2400, daCoDoc: [0, 2500, 5000, 7500, 10_000]);
+            Thang(10_000), khoangCach: 2400, daCoDoc: [0, 2000, 4000, 6000, 8000, 10_000]);
 
         Assert.Empty(kq.CanDat);
-        Assert.Equal(5, kq.DaCo.Count);
-        Assert.Equal(5, kq.TongViTri);
+        Assert.Equal(6, kq.DaCo.Count);
+        Assert.Equal(6, kq.TongViTri);
     }
 
     [Fact]
     public void Chay_lai_khi_moi_co_mot_nua_thi_chi_bo_sung_doan_thieu()
     {
-        var kq = SupportSpacing.Tinh(Thang(10_000), khoangCach: 2400, daCoDoc: [0, 2500]);
+        var kq = SupportSpacing.Tinh(Thang(10_000), khoangCach: 2400, daCoDoc: [0, 2000]);
 
-        Assert.Equal(new double[] { 5000, 7500, 10_000 }, kq.CanDat.Select(v => v.KhoangCachDoc));
+        Assert.Equal(new double[] { 4000, 6000, 8000, 10_000 }, kq.CanDat.Select(v => v.KhoangCachDoc));
         Assert.Equal(2, kq.DaCo.Count);
-    }
-
-    [Fact]
-    public void Che_do_KHONGVUOT_ra_6_gia_do_buoc_2000_va_khong_canh_bao()
-    {
-        var kq = SupportSpacing.Tinh(Thang(10_000), 2400, cheDo: CheDoChiaGiaDo.KhongVuot);
-
-        Assert.Equal(6, kq.CanDat.Count);
-        Assert.Equal(2000, kq.BuocThat, 9);
-        Assert.Empty(kq.CanhBao);
     }
 
     // ===== Chia đều =====
@@ -122,8 +121,9 @@ public class SupportSpacingTests
     [Fact]
     public void Phu_kien_nang_sat_vi_tri_chia_deu_thi_khong_dat_hai_cai_canh_nhau()
     {
-        // dung sai mặc định = 1/4 bước (2500/4 = 625) ⇒ 5200 nuốt vị trí chia đều 5000.
-        var kq = SupportSpacing.Tinh(Thang(10_000), 2400, phuKienDoc: [5200]);
+        // Chế độ GANNHAT (bước 2500) để khớp đúng dung sai mặc định 1/4 bước dùng trong ca này:
+        // dung sai = 2500/4 = 625 ⇒ 5200 nuốt vị trí chia đều 5000.
+        var kq = SupportSpacing.Tinh(Thang(10_000), 2400, phuKienDoc: [5200], cheDo: CheDoChiaGiaDo.GanNhat);
 
         Assert.Equal(5, kq.CanDat.Count);
         Assert.DoesNotContain(kq.CanDat, v => Math.Abs(v.KhoangCachDoc - 5000) < 1e-9);
@@ -139,7 +139,7 @@ public class SupportSpacingTests
 
         Assert.Equal(0, kq.CanDat[1].GocTiepTuyen, 9);
         Assert.Equal(Math.PI / 2, kq.CanDat[1].GocVuongGoc, 9);
-        Assert.Equal(2500, kq.CanDat[1].Diem.X, 6);
+        Assert.Equal(2000, kq.CanDat[1].Diem.X, 6);
         Assert.Equal(0, kq.CanDat[1].Diem.Y, 6);
     }
 
