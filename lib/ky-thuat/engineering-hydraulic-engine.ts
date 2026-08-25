@@ -139,6 +139,19 @@ export const STANDARD_STEEL_PIPES: PipeStandardSize[] = [
 // calcDarcyWeisbach đã gộp về engineering-cad-nesting.ts (bản M89 có bù nhiệt độ chất lỏng)
 // — bản cố định 20°C ở đây không nơi nào import, đã bỏ để tránh hai công thức song song.
 
+/**
+ * Hazen-Williams — QUY ƯỚC M68: lưu lượng **m³/h**, thứ tự `(lưu lượng, CHIỀU DÀI, ĐƯỜNG KÍNH)`.
+ *
+ * ⚠️ CÓ HAI BẢN `calcHazenWilliams` TRONG DỰ ÁN VÀ ĐÂY LÀ CHỦ Ý — quyết định của chủ dự án
+ * (2026-08-25): giữ cả hai quy ước, KHÔNG gộp. Bản kia ở `engineering-cad-nesting.ts` dùng
+ * **L/s** và **hoán đổi vị trí tham số 2 với 3** (xem bảng đối chiếu trong chú thích của bản đó).
+ *
+ * Cả hai đều nhận 4 `number` nên TypeScript KHÔNG bắt được nếu gọi nhầm. Bản NÀY cố ý không
+ * re-export ở facade nào — chỉ dùng nội bộ trong `calculateHydraulicLoss` — để không có chỗ nào
+ * import thấy cả hai cùng lúc. **Giữ nguyên như vậy khi thêm export mới.**
+ *
+ * Hằng số cột nước ở bản này là 9810 Pa/m (bản M89 dùng 9806,65) — cũng là chủ ý.
+ */
 export function calcHazenWilliams(
   flowRateM3h: number,
   lengthM: number,

@@ -128,8 +128,26 @@ và `localISO` của import Excel (cố ý).
 - **Khung form lặp 271 lần ở 32 file `.tsx`** (rõ nhất `app/environment/page.tsx` ↔
   `app/kickoff/page.tsx`). Đợt này đã lấy phần LOGIC (hạn hiệu lực) ra; phần còn lại là markup
   form/bảng — boilerplate UI thuần, nên là đợt tách component dùng chung riêng, có e2e a11y đi kèm.
-- **`calcHazenWilliams` còn 2 bản** khác quy ước đơn vị (L/s vs m³/h) và hằng số cột nước
-  (9806,65 vs 9810 Pa/m). Gộp được nhưng **đổi số liệu kỹ thuật** → cần người dùng chốt bản chuẩn.
+- ~~**`calcHazenWilliams` còn 2 bản**~~ → **ĐÃ CHỐT (2026-08-25): GIỮ CẢ HAI QUY ƯỚC, KHÔNG GỘP** —
+  quyết định của chủ dự án. Xem mục riêng ngay dưới.
+
+### `calcHazenWilliams` — CHỐT GIỮ CẢ HAI QUY ƯỚC (2026-08-25)
+
+Chủ dự án chốt: **giữ cả hai, không gộp.** Ghi lại để lần sau không ai "dọn" nhầm.
+
+| Bản                                     | vị trí 1           | vị trí 2          | vị trí 3          | hằng số cột nước |
+| --------------------------------------- | ------------------ | ----------------- | ----------------- | ---------------- |
+| `engineering-cad-nesting.ts` (M89)      | lưu lượng **L/s**  | **đường kính** mm | **chiều dài** m   | 9806,65 Pa/m     |
+| `engineering-hydraulic-engine.ts` (M68) | lưu lượng **m³/h** | **chiều dài** m   | **đường kính** mm | 9810 Pa/m        |
+
+**Rủi ro còn lại và cách đã chặn:** hai hàm **cùng tên**, cùng nhận 4 `number`, và **vị trí tham số
+2 với 3 hoán đổi** — TypeScript KHÔNG bắt được nếu gọi nhầm, gọi sai vẫn ra số trông hợp lý. Đã xử
+lý bằng hai việc:
+
+1. Chú thích đầy đủ ở **cả hai** hàm, kèm bảng đối chiếu, nói rõ đây là chủ ý chứ không phải lệch
+   do sơ suất (kể cả hằng số cột nước khác nhau).
+2. Bản M68 **không được re-export ở facade nào** — chỉ dùng nội bộ trong `calculateHydraulicLoss` —
+   nên không chỗ nào import thấy cả hai cùng lúc. Chú thích đã dặn giữ nguyên vậy khi thêm export.
 
 ## Đợt gộp tính năng trùng lặp (2026-08-24)
 

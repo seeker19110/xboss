@@ -15,6 +15,25 @@ export {
   generateSpoolQrPayload,
 } from "@/lib/ky-thuat/engineering-dfma-spooling";
 
+/**
+ * Hazen-Williams — QUY ƯỚC M89: lưu lượng **L/s**, thứ tự `(lưu lượng, ĐƯỜNG KÍNH, CHIỀU DÀI)`.
+ *
+ * ⚠️ CÓ HAI BẢN `calcHazenWilliams` TRONG DỰ ÁN VÀ ĐÂY LÀ CHỦ Ý — quyết định của chủ dự án
+ * (2026-08-25): giữ cả hai quy ước, KHÔNG gộp. Bản kia ở `engineering-hydraulic-engine.ts`
+ * dùng **m³/h** và **hoán đổi vị trí tham số 2 với 3**:
+ *
+ * | | vị trí 1 | vị trí 2 | vị trí 3 |
+ * | --- | --- | --- | --- |
+ * | bản này (M89) | lưu lượng **L/s** | **đường kính** mm | **chiều dài** m |
+ * | hydraulic-engine (M68) | lưu lượng **m³/h** | **chiều dài** m | **đường kính** mm |
+ *
+ * Cả hai đều nhận 4 `number` nên TypeScript KHÔNG bắt được nếu gọi nhầm — gọi sai vẫn ra số
+ * trông hợp lý. Bản M68 hiện không được re-export ở facade nào (chỉ dùng nội bộ trong
+ * `calculateHydraulicLoss`), nên không có chỗ nào import thấy cả hai cùng lúc.
+ *
+ * Hằng số cột nước ở bản này là 9806,65 Pa/m (bản M68 dùng 9810) — cũng là chủ ý, không phải
+ * lệch do sơ suất.
+ */
 export function calcHazenWilliams(
   flowRateLps: number,
   pipeDiameterMm: number,
