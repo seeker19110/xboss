@@ -1,0 +1,186 @@
+[
+  {
+    "route": "/api/cron/deliver-webhooks",
+    "ly_do": "Cron ngoài gọi (Bearer CRON_SECRET) — không có caller trong repo là đúng thiết kế."
+  },
+  {
+    "route": "/api/cron/retention",
+    "ly_do": "Cron ngoài gọi (Bearer CRON_SECRET) — dọn dữ liệu theo chính sách lưu trữ."
+  },
+  {
+    "route": "/api/cron/sync-integrations",
+    "ly_do": "Cron ngoài gọi (Bearer CRON_SECRET) — đồng bộ hệ ngoài định kỳ."
+  },
+  {
+    "route": "/api/cron/weekly-report",
+    "ly_do": "Cron sáng thứ Hai gọi (Bearer CRON_SECRET) — báo cáo tuần qua email/Telegram."
+  },
+  {
+    "route": "/api/cron/refresh-views",
+    "ly_do": "Cron ngoài gọi (Bearer CRON_SECRET) — làm mới materialized view."
+  },
+  {
+    "route": "/api/v1/materials",
+    "ly_do": "API mở cho hệ ngoài (M49, xác thực bằng API key) — người gọi nằm ngoài repo."
+  },
+  {
+    "route": "/api/v1/packages",
+    "ly_do": "API mở cho hệ ngoài (M49, xác thực bằng API key) — người gọi nằm ngoài repo."
+  },
+  {
+    "route": "/api/tasks/batch",
+    "ly_do": "Sửa hàng loạt ô lưới tracking (cùng họ với /api/materials/batch đang dùng ở InventoryTab). Còn giữ vì lưới tracking sẽ gắn vào; có kiểm quyền + test. Xoá hay gắn UI: chờ chốt (audit 2026-08-25 §3.5)."
+  },
+  {
+    "route": "/api/dimensions/batch",
+    "ly_do": "Tick hàng loạt ô dimension — cùng lý do /api/tasks/batch."
+  },
+  {
+    "route": "/api/import/batches",
+    "ly_do": "Lịch sử lô import (migration 0093 + tests/import-batches.test.ts) — backend đã xong, UI chưa gắn."
+  },
+  {
+    "route": "/api/materials/allocation-meta",
+    "ly_do": "Metadata cấu hình phân bổ vật tư, không theo dự án (xem tests/project-scope-invariant.test.ts)."
+  },
+  {
+    "route": "/api/engineering/digital-handover",
+    "ly_do": "Lớp Engineering OS xây vượt cổng roadmap (ENG-0 nguyên tắc #10) — backend xong, UI chưa gắn. Giữ, chờ chốt hướng ở đề xuất #6 của audit 2026-08-25."
+  },
+  {
+    "route": "/api/engineering/project-health",
+    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn (xem lý do /api/engineering/digital-handover)."
+  },
+  {
+    "route": "/api/engineering/multi-agent-copilot",
+    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
+  },
+  {
+    "route": "/api/engineering/compliance/audit-element",
+    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
+  },
+  {
+    "route": "/api/engineering/bim-models/[id]/link-wbs",
+    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
+  },
+  {
+    "route": "/api/engineering/god-tier/simulate-4d",
+    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
+  },
+  {
+    "route": "/api/engineering/closed-loop-sync",
+    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
+  },
+  {
+    "route": "/api/engineering/mepf-predictive",
+    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
+  },
+  {
+    "route": "/api/engineering/pipe-spool-tracking",
+    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
+  },
+  {
+    "route": "/api/engineering/cad/convert-to-dxf",
+    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
+  },
+  {
+    "route": "/api/engineering/cad/diff",
+    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
+  },
+  {
+    "route": "/api/engineering/carbon-lca",
+    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
+  },
+  {
+    "route": "/api/engineering/taxonomy",
+    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
+  },
+  {
+    "route": "/api/engineering/zero-error/pour-permits",
+    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
+  },
+  {
+    "route": "/api/construction-stages/[id]",
+    "ly_do": "PATCH giai đoạn thi công — UI /work-fronts chỉ gọi route danh sách, chưa gắn sửa từng giai đoạn."
+  },
+  {
+    "route": "/api/v1/engineering/agent-sessions/[id]/claims",
+    "ly_do": "API mở /v1 cho hệ ngoài (API key) — người gọi nằm ngoài repo."
+  },
+  {
+    "route": "/api/materials/[id]/transactions",
+    "ly_do": "Sổ nhật ký ± qty_used (CLAUDE.md mô tả) — UI hiện ghi qua PATCH qtyUsed, chưa gắn màn hình sổ giao dịch."
+  },
+  {
+    "route": "/api/materials/[id]/move",
+    "ly_do": "Chuyển kho — backend xong, UI kho chưa gắn."
+  },
+  {
+    "route": "/api/materials/[id]/issue",
+    "ly_do": "Xuất kho — backend xong, UI kho chưa gắn."
+  },
+  {
+    "route": "/api/materials/[id]/return",
+    "ly_do": "Nhập trả kho — backend xong, UI kho chưa gắn."
+  },
+  {
+    "route": "/api/hse-photos/[id]",
+    "ly_do": "Xem/xoá ảnh HSE — UI mới gắn phần upload, chưa gắn xem/xoá."
+  },
+  {
+    "route": "/api/cash-transactions/[id]",
+    "ly_do": "Chi tiết/sửa/xoá giao dịch quỹ — UI tài chính mới gắn danh sách."
+  },
+  {
+    "route": "/api/tasks/[id]/progress",
+    "ly_do": "Đặt % tiến độ trực tiếp — UI tick theo ô dimension nên không dùng; giữ cho tích hợp ngoài."
+  },
+  {
+    "route": "/api/tasks/[id]/dimensions",
+    "ly_do": "Đọc danh sách ô dimension của task — lưới tracking đọc theo gói, chưa dùng route này."
+  },
+  {
+    "route": "/api/work-front-documents/[id]",
+    "ly_do": "Xem/xoá tài liệu mặt bằng — UI mới gắn phần tải lên."
+  },
+  {
+    "route": "/api/baselines/[id]",
+    "ly_do": "Xoá baseline — UI mới gắn tạo và chọn baseline."
+  },
+  {
+    "route": "/api/crews/[id]/members",
+    "ly_do": "Thêm/bớt thành viên tổ đội — UI nhân sự chưa gắn."
+  },
+  {
+    "route": "/api/engineering/workflows/[id]/transition",
+    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
+  },
+  {
+    "route": "/api/engineering/swarm/debates/[id]/arguments",
+    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
+  },
+  {
+    "route": "/api/engineering/swarm/debates/[id]/synthesize",
+    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
+  },
+  {
+    "route": "/api/engineering/bim/clashes/[id]/reroute",
+    "ly_do": "Lớp Engineering OS — backend xong, UI chưa gắn."
+  },
+  {
+    "route": "/api/advances/[id]",
+    "ly_do": "Chi tiết/sửa/xoá tạm ứng — UI tài chính mới gắn danh sách."
+  },
+  {
+    "route": "/api/work-fronts/[id]/documents",
+    "ly_do": "Hồ sơ theo mặt bằng — UI chưa gắn."
+  },
+  {
+    "route": "/api/workpackages/[id]/tasks",
+    "ly_do": "Tạo task trong gói qua API — UI tạo task đi đường khác."
+  },
+  {
+    "route": "/api/workpackages/[id]/dimensions/column/move",
+    "ly_do": "Đổi thứ tự cột dimension — UI lưới chưa gắn thao tác này."
+  }
+]

@@ -125,3 +125,67 @@ export async function tinhChiSoThauPhu(
     soKyDanhGia,
   };
 }
+
+/** Chuyên ngành chính của hồ sơ thầu phụ M82 — khớp chú thích cột trong migration 0115. */
+export const CHUYEN_NGANH_THAU_PHU = [
+  "HVAC",
+  "PLUMBING",
+  "ELECTRICAL",
+  "FIRE_FIGHTING",
+  "EXTRA_LOW_VOLTAGE",
+  "GENERAL_MEPF",
+] as const;
+export type ChuyenNganhThauPhu = (typeof CHUYEN_NGANH_THAU_PHU)[number];
+
+export type KetQuaTaoHoSo =
+  { ok: true; id: string } | { ok: false; status: 404 | 409 | 422; error: string };
+
+/**
+ * Tạo hồ sơ thầu phụ M82 **từ một nhà cung cấp đã có** trong `suppliers`.
+ *
+ * VÌ SAO bắt buộc `supplierId` (audit 2026-08-25 §3.3): `engineering_subcon_profiles` từng
+ * tự giữ `company_name`/`tax_code` với `supplier_id` chỉ là FK tuỳ chọn, nên cùng một nhà
+ * thầu phụ có thể tồn tại hai bản ghi lệch tên/lệch mã số thuế giữa bảng này và
+ * `subcontractor_profiles` (khoá chính là `supplier_id`) mà không cơ chế nào bắt được.
+ * Nay danh tính chỉ có MỘT nguồn: `suppliers`. Tên công ty chép từ đó, không nhận từ client.
+ */
+export async function taoHoSoThauPhu(
+  projectId: number,
+  input: { supplierId: number; primaryDiscipline: string; taxCode?: string | null },
+): Promise<KetQuaTaoHoSo> {
+  const discipline = String(input.primaryDiscipline ?? "").trim();
+  if (!CHUYEN_NGANH_THAU_PHU.includes(discipline as ChuyenNganhThauPhu)) {
+    return {
+      ok: false,
+      status: 422,
+      error: `Chuyên ngành không hợp lệ (nhận: ${CHUYEN_NGANH_THAU_PHU.join(", ")})`,
+    };
+  }
+
+  const supplier = await queryOne<{ name: string }>(
+    `SELECT name FROM suppliers WHERE id = ?`,
+    input.supplierId,
+  );
+  if (!supplier) return { ok: false, status: 404, error: "Không tìm thấy nhà cung cấp" };
+
+  const trung = await queryOne<{ id: string }>(
+    `SELECT id FROM engineering_subcon_profiles WHERE project_id = ? AND supplier_id = ?`,
+    projectId,
+    input.supplierId,
+  );
+  if (trung)
+    return { ok: false, status: 409, error: "Nhà cung cấp này đã có hồ sơ thầu phụ trong dự án" };
+
+  const row = await queryOne<{ id: string }>(
+    `INSERT INTO engineering_subcon_profiles
+       (project_id, supplier_id, company_name, tax_code, primary_discipline)
+     VALUES (?, ?, ?, ?, ?)
+     RETURNING id`,
+    projectId,
+    input.supplierId,
+    supplier.name,
+    input.taxCode?.trim() || null,
+    discipline,
+  );
+  return { ok: true, id: row!.id };
+}
