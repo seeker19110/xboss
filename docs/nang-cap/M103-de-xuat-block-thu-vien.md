@@ -1,10 +1,10 @@
 # M103 — Đề xuất block vào thư viện từ AutoCAD (hàng chờ + duyệt)
 
-| Mục            | Nội dung                                                                                                                                                                                       |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| State          | **Approved for implementation** — người dùng chốt 2026-08-25: đường thêm = TỪ AUTOCAD; quy trình = HÀNG CHỜ + DUYỆT; quyền đề xuất = engineer trở lên; metadata BẮT BUỘC ĐỦ, trùng tên TỪ CHỐI |
-| Phụ thuộc      | M100 PR2 (thư viện block `cad_block_libs`), M99 PR2 (token thiết bị `cad`), M102 (`XBOSS_BANG`)                                                                                                |
-| Nguyên tắc nền | Thư viện block vẫn là **dữ liệu phát hành có version toàn cục** (M100 §18) — đề xuất KHÔNG sửa thư viện trực tiếp; duyệt mới sinh version mới. AC7 giữ nguyên: không ghi đè âm thầm.           |
+| Mục            | Nội dung                                                                                                                                                                                         |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| State          | ✅ **Đã triển khai XONG (2026-08-25)** — server + web đã xong 2026-08-25, plugin lệnh `XBOSS_VE_DEXUAT` xong cùng ngày; quy trình HÀNG CHỜ + DUYỆT, quyền engineer trở lên, metadata bắt buộc đủ |
+| Phụ thuộc      | M100 PR2 (thư viện block `cad_block_libs`), M99 PR2 (token thiết bị `cad`), M102 (`XBOSS_BANG`)                                                                                                  |
+| Nguyên tắc nền | Thư viện block vẫn là **dữ liệu phát hành có version toàn cục** (M100 §18) — đề xuất KHÔNG sửa thư viện trực tiếp; duyệt mới sinh version mới. AC7 giữ nguyên: không ghi đè âm thầm.             |
 
 ## 1. Kiến trúc "thư viện ứng viên" (quyết định tầng 1 — KHÔNG đổi)
 

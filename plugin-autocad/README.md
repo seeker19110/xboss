@@ -42,6 +42,7 @@ Xem đặc tả `docs/nang-cap/M102-plugin-ui.md`.
 | `XBOSS_BATCH`      | Xử lý hàng loạt cả thư mục `.dwg` qua side database (không mở lên editor): chế độ chỉ-kiểm (mặc định) hoặc chuẩn hóa — **bản gốc giữ nguyên**, kết quả vào thư mục con `da-chuan-hoa/`, tệp lỗi bỏ qua, nhật ký `xboss-batch-log.txt` + báo cáo JSON từng tệp                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
 | `XBOSS_UPLOAD` | Gửi DWG đã lưu + DXF sidecar + báo cáo chuẩn hóa + version rule pack lên server (M99 PR5): server kiểm định lại DXF + rule pack — đạt thì tạo `drawing_revision` trạng thái `submitted`, fail thì hiện đủ lỗi trong AutoCAD, KHÔNG tạo revision. Idempotent theo hash DWG (gửi lại cùng tệp không tạo bản đôi) |
+| `XBOSS_VE_DEXUAT` | **Đề xuất block vào thư viện (M103):** chọn BlockReference trên bản vẽ → dialog nhập metadata (tên/loại/hệ/item/ghi chú) → gửi ứng viên lên hàng chờ duyệt (Admin/PM duyệt trên web thành version thư viện mới). Yêu cầu `XBOSS_LOGIN` trước |
 
 ### Bộ lệnh VẼ shop drawing (M100 — 14 lệnh)
 

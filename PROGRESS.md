@@ -19,8 +19,15 @@ blocks.dwg + manifest hoàn chỉnh, duyệt trên web chỉ là thao tác dữ 
     song, đo meta theo byte UTF-8).
 - **Web (đã xong):** mục "Đề Xuất Chờ Duyệt" trong `ThuVienBlockPanel` — preview SVG nhúng an
   toàn qua data URI, nút Duyệt/Từ chối theo `laNguoiDuyet` server trả về.
-- **Plugin (đang làm):** lệnh `XBOSS_VE_DEXUAT` + dialog + nút trên `XBOSS_BANG` — cập nhật mục
-  này khi đóng.
+- **Plugin (đã xong):** lệnh `XBOSS_VE_DEXUAT` (Commands/VeDeXuatCommands.cs), dialog `Ui/DeXuatBlockDialog.cs`, builder `Services/BlockUngVienBuilder.cs`; khối "Thư viện block" mới trên `XBOSS_BANG`, 491→524 test dotnet xanh; vá multipart WHATWG cho cả `UploadAsync` (M99).
+
+## M104 — Thêm block trực tiếp từ web (2026-08-25)
+
+Mở rộng mô hình thư viện từ M103: entry manifest thêm 2 trường tuỳ chọn `fileKey`/`fileSha256` lưu tệp DWG lẻ trong `data/uploads/` (tương thích ngược 100%: entry cũ không `fileKey` vẫn khớp nằm trong `blocks.dwg` nền). Đặc tả: `docs/nang-cap/M104-them-block-truc-tiep-tu-web.md`.
+
+- **Server (đã xong):** route `POST /api/engineering/cad/block-lib/blocks` (phiên web, admin/pm/engineer, kèm advisory lock chống đua); mở rộng `GET /api/engineering/cad/block-lib?file=<fileKey>` lấy tệp lẻ (kiểm fileKey thuộc manifest); khớp metadata/trùng tên với M103 validator; 15 ca test `tests/cad-block-lib-blocks.test.ts` + hồi quy thư viện cũ. Audit `published_by`.
+- **Web (đã xong):** nút "Thêm Block Từ Web" trong `ThuVienBlockPanel`, form kéo-thả DWG+DXF, metadata như M103, version sinh NGAY.
+- **Plugin (đang làm nốt cùng ngày):** cache `block-lib\files\<fileKey>`, kiểm sha256, `WblockClone` từng tệp; đề xuất AutoCAD (M103) dựng ứng viên trên nền đa tệp.
 
 ## Audit "kịch trần CAD 2D" + đóng doc drift M101 PR5 (2026-08-25)
 
