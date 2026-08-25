@@ -12,7 +12,6 @@ import {
   SlidersHorizontal,
   RefreshCw,
   Copy,
-  Download,
   Check,
   Plus,
   Trash2,
@@ -28,6 +27,7 @@ import {
   Zap,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
+import ThuNghiemBanner from "@/app/components/ThuNghiemBanner";
 import { showToast } from "@/app/components/Toast";
 import { redirectToLogin } from "@/app/lib/me";
 
@@ -372,11 +372,7 @@ export default function CombinePage() {
 
   const handleResolveClash = (clashId: string) => {
     setClashList((prev) => prev.map((c) => (c.id === clashId ? { ...c, status: "resolved" } : c)));
-    showToast("Đã phê duyệt phương án né va chạm tối ưu thành công!");
-  };
-
-  const handleExportBcf = () => {
-    showToast("Đã xuất tệp openBIM BCF 3.0 Issue Report (.bcfzip)!");
+    showToast("Đã đánh dấu trên bản mô phỏng này (không ghi vào hồ sơ dự án).");
   };
 
   return (
@@ -419,18 +415,12 @@ export default function CombinePage() {
               <Layers className="w-3.5 h-3.5 text-amber-400" />
               <span>Chuẩn Hóa Bản Vẽ</span>
             </Link>
-            <button
-              onClick={handleExportBcf}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-on-accent-dark font-bold text-xs shadow-sm transition"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Xuất BCF 3.0</span>
-            </button>
           </div>
         }
       />
 
       <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 py-4 space-y-4">
+        <ThuNghiemBanner moduleKey="combine" />
         {/* ── METRICS SUMMARY CARDS ── */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <div className="p-3.5 rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-1">
@@ -625,7 +615,7 @@ export default function CombinePage() {
                             onClick={() => handleResolveClash(clash.id)}
                             className="px-2.5 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-on-accent text-xs font-semibold shadow-xs transition"
                           >
-                            Duyệt Phương Án Tối Ưu
+                            Đánh Dấu Đã Xem
                           </button>
                         )}
                       </div>

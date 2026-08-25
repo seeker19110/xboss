@@ -454,4 +454,18 @@ export const MODULES: ModuleDef[] = [
     ],
     thuNghiem: true,
   },
+  {
+    // (audit 2026-08-25 §3.6) Trang "Combine" là BẢN MÔ PHỎNG: danh sách va chạm, phương án
+    // nắn tuyến và các chỉ số đều cắm cứng trong JSX, không đọc DB, không ghi đâu cả. Đưa
+    // vào registry với `thuNghiem: true` để mặc định TẮT cho mọi dự án (ẩn khỏi sidebar) —
+    // Admin bật thủ công qua /admin/features thì trang tự hiện ThuNghiemBanner. Không có
+    // route API riêng nên `routePrefix` rỗng.
+    key: "combine",
+    nav: [
+      { group: "Thiết Kế-BIM-Shopdrawings", label: "Combine", href: "/combine", icon: "Split" },
+    ],
+    permKeys: [],
+    routePrefix: [],
+    thuNghiem: true,
+  },
 ];
