@@ -105,6 +105,11 @@ jobs:
       - name: Kiểm tham số lib/db (chặn query(sql, [a, b]))
         run: npm run check:db-params
 
+      # Gói cài plugin AutoCAD (Windows-only, job `plugin`/`plugin_shim` không đụng tới):
+      # PackageContents.xml well-formed + dong-goi.ps1 giữ đúng BOM UTF-8 bắt buộc.
+      - name: Kiểm gói cài plugin AutoCAD (manifest + BOM dong-goi.ps1)
+        run: npm run check:plugin-bundle
+
       # M99 AC6: kết quả đối chứng 2 tầng phải được sinh lại sau mỗi lần đổi quy tắc chuẩn hóa —
       # tệp lệch nghĩa là quy tắc tầng 3 đã đổi mà chưa đối chiếu lại với plugin (job `plugin`).
       - name: Kiểm kết quả đối chứng 2 tầng CAD
