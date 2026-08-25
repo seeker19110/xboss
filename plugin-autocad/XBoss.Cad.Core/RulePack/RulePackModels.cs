@@ -11,6 +11,14 @@ namespace XBoss.Cad.Core.RulePack;
 public sealed class CadRulePack
 {
     [JsonPropertyName("version")] public string Version { get; init; } = "";
+
+    /// <summary>
+    /// M101 PR4: dự án mà bản pack này đã gán mã BOQ (<c>takeoff.items[].boqCode</c>). CHỈ có mặt
+    /// khi plugin hỏi kèm <c>?project=</c>; <c>null</c> = bản toàn cục (mã BOQ như trong tệp gốc).
+    /// Đây là DẤU của máy chủ, dùng làm khoá cất cache — plugin không tự gán theo cái nó hỏi.
+    /// </summary>
+    [JsonPropertyName("projectId")] public long? ProjectId { get; init; }
+
     [JsonPropertyName("layerMap")] public LayerMapSection LayerMap { get; init; } = new();
     [JsonPropertyName("fontMap")] public FontMapSection FontMap { get; init; } = new();
     [JsonPropertyName("purgePolicy")] public PurgePolicySection PurgePolicy { get; init; } = new();

@@ -64,7 +64,8 @@ internal static class TrangThaiGom
             LoiDeXuat = _loiDeXuat,
             // Có cache mà không nạp được = cache hỏng → hiện đúng lý do; chưa có cache
             // ("chưa nạp") thì để model tự hiện thông điệp chuẩn của nó.
-            LoiRulePack = pack is null && File.Exists(RulePackStore.CachePath) ? loiRulePack : null,
+            // Tệp đang có hiệu lực (M101 PR4 — có thể là bản theo dự án), không cố định rule-pack.json.
+            LoiRulePack = pack is null && File.Exists(RulePackStore.DuongDanHienHanh) ? loiRulePack : null,
             TenBanVe = string.IsNullOrEmpty(tenTepDwg) ? null : Path.GetFileName(tenTepDwg),
             KetQuaGanNhat = ketQua,
         };
