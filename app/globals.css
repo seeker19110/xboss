@@ -261,6 +261,13 @@ body {
   }
 }
 
+/* Neo trong trang (href="#id") phải chừa chiều cao topbar dính (h-12) + chút thở, nếu
+   không phần tử được nhảy tới sẽ nằm khuất ngay dưới topbar. Áp dụng toàn cục cho mọi
+   phần tử là đích của hash — không phải thêm class ở từng trang. */
+:target {
+  scroll-margin-top: 4.5rem;
+}
+
 /* Ẩn scrollbar trên nav cuộn ngang (iOS/Android) */
 .scrollbar-none {
   scrollbar-width: none;
