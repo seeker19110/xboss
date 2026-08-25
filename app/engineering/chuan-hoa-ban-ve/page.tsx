@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Layers, Download, FileSpreadsheet } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import PluginControlPanel from "./components/PluginControlPanel";
+import ThuVienBlockPanel from "./components/ThuVienBlockPanel";
 import UploadAndBrowsePanel from "./components/UploadAndBrowsePanel";
 import CadViewportStudio from "./components/CadViewportStudio";
 import StepTabsNav from "./components/StepTabsNav";
@@ -159,6 +160,11 @@ export default function ChuanHoaBanVePage() {
             BẢNG ĐIỀU KHIỂN PLUGIN AUTOCAD (M99 PR6) — rule pack, gói cài, lịch sử upload
         ══════════════════════════════════════════════════════════════════════ */}
         <PluginControlPanel />
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            THƯ VIỆN BLOCK CHUẨN (M100 PR2) — version hiện hành, lịch sử, phát hành
+        ══════════════════════════════════════════════════════════════════════ */}
+        <ThuVienBlockPanel />
 
         {/* ══════════════════════════════════════════════════════════════════════
             TOP BAR: CHỌN NGUỒN CAD (TỪ THIẾT KẾ HOẶC TẢI LÊN FILE .DXF)

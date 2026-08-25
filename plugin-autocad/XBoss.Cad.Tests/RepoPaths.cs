@@ -25,6 +25,18 @@ public static class RepoPaths
         }
     }
 
+    /// <summary>plugin-autocad/doi-chung/ — bộ dữ liệu đối chứng dùng chung cho cả tầng 2 lẫn tầng 3.</summary>
+    public static string DoiChungDir
+    {
+        get
+        {
+            // <gốc>/lib/ky-thuat/cad/rule-packs/<tệp> → lùi 4 cấp thư mục về gốc repo.
+            var rulePacks = new FileInfo(RulePackPath).Directory!;
+            var goc = rulePacks.Parent!.Parent!.Parent!.Parent!;
+            return Path.Combine(goc.FullName, "plugin-autocad", "doi-chung");
+        }
+    }
+
     private static CadRulePack? _cached;
 
     public static CadRulePack LoadRulePack() =>

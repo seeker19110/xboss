@@ -284,7 +284,7 @@ const LAYER_WORD_CHAR = /[A-Z0-9]/;
  * vd `"OA"` (outside air) là chuỗi con của `"THOAT"` (ống thoát).
  * Tên layer truyền vào phải đã upper-case.
  */
-function hasToken(l: string, token: string): boolean {
+export function hasToken(l: string, token: string): boolean {
   let from = 0;
   for (;;) {
     const at = l.indexOf(token, from);
@@ -296,8 +296,15 @@ function hasToken(l: string, token: string): boolean {
   }
 }
 
-/** Đúng khi tên layer chứa ít nhất một trong các từ khóa (theo ranh giới token). */
-function hasAnyToken(l: string, tokens: readonly string[]): boolean {
+/**
+ * Đúng khi tên layer chứa ít nhất một trong các từ khóa (theo ranh giới token).
+ *
+ * Xuất ra ngoài để **mọi** chỗ khớp theo quy tắc rule pack (`layerMap`, `takeoff.layerMatchAny`,
+ * `takeoff.blockNameMatchAny`) dùng chung MỘT bộ khớp — đúng cam kết trong
+ * `layerMap.matchingNote` và bản C# `XBoss.Cad.Core/Matching/TokenMatcher.cs`. Chuỗi và từ khóa
+ * truyền vào phải đã chữ hoa.
+ */
+export function hasAnyToken(l: string, tokens: readonly string[]): boolean {
   return tokens.some((token) => hasToken(l, token));
 }
 
