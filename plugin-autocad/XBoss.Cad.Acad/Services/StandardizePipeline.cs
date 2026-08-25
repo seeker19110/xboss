@@ -1,4 +1,5 @@
 using Autodesk.AutoCAD.DatabaseServices;
+using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Geometry;
 using XBoss.Cad.Core.Fonts;
 using XBoss.Cad.Core.Inspection;
@@ -9,9 +10,10 @@ using XBoss.Cad.Core.RulePack;
 namespace XBoss.Cad.Acad.Services;
 
 /// <summary>
-/// Pipeline chuẩn hóa thứ tự cố định (M99 §6.6) — chạy TRONG MỘT transaction của
-/// một lệnh duy nhất nên toàn bộ hoàn tác bằng 1 lần UNDO (FR7):
+/// Pipeline chuẩn hóa thứ tự cố định (M99 §6.6):
 /// 1 AUDIT → 2 layer mapping → 3 font → 4 flatten → 5 overkill → 6 purge → 7 lineweight/CTB + dim override.
+/// Bước 1 là LỆNH AutoCAD nên chạy riêng trước (<see cref="Buoc1Audit"/>); bước 2–7 chạy TRONG
+/// MỘT transaction của một lệnh duy nhất nên toàn bộ hoàn tác bằng 1 lần UNDO (FR7).
 /// Mỗi bước ghi StepDiff vào báo cáo (FR8).
 /// </summary>
 internal sealed class StandardizePipeline(CadRulePack pack)
@@ -24,9 +26,29 @@ internal sealed class StandardizePipeline(CadRulePack pack)
     internal IReadOnlyList<StepDiff> Steps => _steps;
     internal IReadOnlyList<string> CanhBao => _canhBao;
 
+    /// <summary>
+    /// Bước 1 — AUDIT. Tách khỏi <see cref="Run"/> vì AUDIT là LỆNH của AutoCAD, không phải API
+    /// của <see cref="Database"/> (managed API không mở <c>Database.Audit</c>): phải chạy trên
+    /// dòng lệnh của bản vẽ đang mở, TRƯỚC khi mở transaction. Gọi ngay trước <see cref="Run"/>.
+    /// </summary>
+    internal void Buoc1Audit(Editor? ed)
+    {
+        if (!pack.PurgePolicy.Audit) return;
+        if (ed is null)
+        {
+            // Chế độ hàng loạt dùng side database — không có dòng lệnh để chạy AUDIT.
+            _canhBao.Add(
+                "Bỏ qua bước AUDIT: xử lý hàng loạt đọc bản vẽ qua side database, không có dòng lệnh " +
+                "AutoCAD. Mở tệp kết quả rồi chạy AUDIT (hoặc RECOVER) nếu nghi lỗi cấu trúc.");
+            return;
+        }
+        // "_Y" = trả lời "Fix any errors detected?" → sửa lỗi cấu trúc trước khi đụng nội dung.
+        ed.Command("_.AUDIT", "_Y");
+        _steps.Add(new StepDiff { Buoc = "1. Audit", HangMuc = "Cấu trúc bản vẽ", Truoc = "-", Sau = "đã audit", SoLuong = 1 });
+    }
+
     internal void Run(Database db, Transaction tr)
     {
-        Buoc1Audit(db);
         Buoc2LayerMapping(db, tr);
         Buoc3Font(db, tr);
         var snapshot = DrawingSnapshotBuilder.Build(db, tr); // sau layer/font để số liệu Z/rác phản ánh hiện trạng
@@ -34,18 +56,6 @@ internal sealed class StandardizePipeline(CadRulePack pack)
         Buoc5Overkill(db, tr, snapshot);
         Buoc6Purge(db, tr);
         Buoc7LineweightVaDimOverride(db, tr);
-    }
-
-    private void Buoc1Audit(Database db)
-    {
-        if (!pack.PurgePolicy.Audit) return;
-        // Sửa lỗi cấu trúc trước khi đụng nội dung (tương đương lệnh AUDIT Y).
-        using (var auditInfo = new AuditInfo())
-        {
-            auditInfo.FixErrors = true;
-            db.Audit(auditInfo);
-        }
-        _steps.Add(new StepDiff { Buoc = "1. Audit", HangMuc = "Cấu trúc bản vẽ", Truoc = "-", Sau = "đã audit", SoLuong = 1 });
     }
 
     private void Buoc2LayerMapping(Database db, Transaction tr)

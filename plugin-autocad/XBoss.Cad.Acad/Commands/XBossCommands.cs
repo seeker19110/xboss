@@ -176,6 +176,8 @@ public sealed class XBossCommands
 
         // ----- Thực thi: 1 transaction = 1 nhóm UNDO (FR7) -----
         var pipeline = new StandardizePipeline(pack);
+        // AUDIT chạy trước, ngoài transaction (là lệnh AutoCAD, không phải API Database).
+        pipeline.Buoc1Audit(ed);
         using (var khoa = doc.LockDocument())
         using (var tr = db.TransactionManager.StartTransaction())
         {
@@ -388,7 +390,7 @@ public sealed class XBossCommands
         var goiY = Path.ChangeExtension(tenBanVe, null) + "-boc-khoi-luong.xlsx";
         var dlg = new Autodesk.AutoCAD.Windows.SaveFileDialog(
             "Lưu bảng bóc khối lượng (mẫu công ty)", goiY, "xlsx", "XBossBocKL",
-            Autodesk.AutoCAD.Windows.SaveFileDialog.SaveFileDialogFlags.Default);
+            Autodesk.AutoCAD.Windows.SaveFileDialog.SaveFileDialogFlags.NoFlags);
         if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
 
         var meta = new BoqExcelMeta
