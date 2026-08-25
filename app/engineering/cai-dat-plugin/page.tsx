@@ -6,8 +6,12 @@
 // build/đóng gói dành cho người phát hành — xem README.md trong repo). Link tới trang này
 // từ khối "Bảng Điều Khiển Plugin AutoCAD" trên /engineering/chuan-hoa-ban-ve.
 //
-// Trang tĩnh, không gọi API — không cần Skeleton/rỗng/lỗi.
+// P8: gọi GET /api/engineering/cad/plugin-package để lộ version (đọc từ
+// plugin-autocad/Directory.Build.props) + sha256 (biến môi trường XBOSS_PLUGIN_SHA256, tuỳ
+// chọn) — kỹ sư tự đối chiếu gói đã tải về đúng bản trước khi cài. Thiếu nguồn nào thì ẩn mục
+// đó, không bịa số.
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Download,
@@ -16,9 +20,17 @@ import {
   LayoutList,
   AlertTriangle,
   MonitorSmartphone,
+  ShieldCheck,
 } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import { Section } from "@/app/components/ui";
+import { Skeleton } from "@/app/components/Skeleton";
+import { redirectToLogin } from "@/app/lib/me";
+
+type ThongTinGoiCai = {
+  version: string | null;
+  sha256: string | null;
+};
 
 const LENH_CHINH: { lenh: string; mo_ta: string }[] = [
   { lenh: "XBOSS_LOGIN", mo_ta: "Ghép thiết bị lần đầu / xin token mới" },
@@ -49,6 +61,34 @@ const LENH_CHINH: { lenh: string; mo_ta: string }[] = [
 ];
 
 export default function CaiDatPluginPage() {
+  const [thongTin, setThongTin] = useState<ThongTinGoiCai | null>(null);
+  const [dangTai, setDangTai] = useState(true);
+  const [loi, setLoi] = useState<string | null>(null);
+
+  useEffect(() => {
+    let huy = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/engineering/cad/plugin-package");
+        if (res.status === 401) return redirectToLogin();
+        const data = await res.json();
+        if (huy) return;
+        if (!res.ok) {
+          setLoi(data.error || "Không tải được thông tin gói cài.");
+        } else {
+          setThongTin(data);
+        }
+      } catch {
+        if (!huy) setLoi("Lỗi mạng — không tải được thông tin gói cài.");
+      } finally {
+        if (!huy) setDangTai(false);
+      }
+    })();
+    return () => {
+      huy = true;
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <AppHeader
@@ -96,6 +136,62 @@ export default function CaiDatPluginPage() {
               Nếu chỗ đó hiện hướng dẫn thay vì nút tải, nghĩa là quản trị chưa khai đường tải gói
               cài — hỏi quản trị hệ thống, đừng tự tải gói từ nguồn khác.
             </p>
+
+            <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-3 space-y-2">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-200 uppercase tracking-wide">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
+                Xác Minh Gói Đã Tải
+              </div>
+              {dangTai ? (
+                <Skeleton className="h-10 w-full" />
+              ) : loi ? (
+                <p className="text-xs text-amber-300 flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                  {loi}
+                </p>
+              ) : (
+                <div className="space-y-1.5 text-xs">
+                  {thongTin?.version ? (
+                    <p className="text-zinc-300">
+                      Phiên bản hiện hành:{" "}
+                      <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 font-mono font-bold text-emerald-300">
+                        {thongTin.version}
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="text-zinc-500">
+                      Chưa xác định được phiên bản gói cài hiện hành.
+                    </p>
+                  )}
+                  {thongTin?.sha256 ? (
+                    <div className="text-zinc-300 space-y-1">
+                      <p>
+                        SHA-256:{" "}
+                        <code className="px-1 rounded bg-zinc-950 border border-zinc-800 text-[11px] break-all">
+                          {thongTin.sha256}
+                        </code>
+                      </p>
+                      <p className="text-zinc-500">
+                        Đối chiếu trên Windows (PowerShell):{" "}
+                        <code className="px-1 rounded bg-zinc-950 border border-zinc-800 text-[11px]">
+                          Get-FileHash .\XBoss.bundle-{thongTin.version ?? "<version>"}.zip
+                          -Algorithm SHA256
+                        </code>
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-zinc-500">
+                      Quản trị chưa khai checksum SHA-256 cho gói cài. Muốn tự kiểm vẫn được: hỏi
+                      quản trị hệ thống lấy mã sha256 gốc rồi so bằng{" "}
+                      <code className="px-1 rounded bg-zinc-950 border border-zinc-800 text-[11px]">
+                        Get-FileHash -Algorithm SHA256
+                      </code>{" "}
+                      trên PowerShell.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </Section>
 
