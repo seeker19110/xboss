@@ -142,17 +142,16 @@ export const STANDARD_STEEL_PIPES: PipeStandardSize[] = [
 /**
  * Hazen-Williams — QUY ƯỚC M68: lưu lượng **m³/h**, thứ tự `(lưu lượng, CHIỀU DÀI, ĐƯỜNG KÍNH)`.
  *
- * ⚠️ CÓ HAI BẢN `calcHazenWilliams` TRONG DỰ ÁN VÀ ĐÂY LÀ CHỦ Ý — quyết định của chủ dự án
- * (2026-08-25): giữ cả hai quy ước, KHÔNG gộp. Bản kia ở `engineering-cad-nesting.ts` dùng
- * **L/s** và **hoán đổi vị trí tham số 2 với 3** (xem bảng đối chiếu trong chú thích của bản đó).
+ * Khác quy ước với `calcHazenWilliams` trong `engineering-cad-nesting.ts` (lưu lượng **L/s**,
+ * vị trí 2 và 3 hoán đổi). Chủ dự án chốt (2026-08-25) giữ cả hai quy ước đơn vị; để không gọi
+ * nhầm, hàm này mang tên riêng có đơn vị và **cố ý không export** — chỉ `calculateHydraulicLoss`
+ * dùng. Giữ nguyên hai điều đó khi sửa file này.
  *
- * Cả hai đều nhận 4 `number` nên TypeScript KHÔNG bắt được nếu gọi nhầm. Bản NÀY cố ý không
- * re-export ở facade nào — chỉ dùng nội bộ trong `calculateHydraulicLoss` — để không có chỗ nào
- * import thấy cả hai cùng lúc. **Giữ nguyên như vậy khi thêm export mới.**
+ * 1 L/s = 3,6 m³/h: đưa số L/s vào đây sẽ ra tổn thất thấp hơn thực tế rất nhiều.
  *
- * Hằng số cột nước ở bản này là 9810 Pa/m (bản M89 dùng 9806,65) — cũng là chủ ý.
+ * Hằng số cột nước ở bản này là 9810 Pa/m (bản M89 dùng 9806,65) — chênh 0,03%, là chủ ý.
  */
-export function calcHazenWilliams(
+function calcHazenWilliamsM3h(
   flowRateM3h: number,
   lengthM: number,
   innerDiameterMm: number,
@@ -242,7 +241,7 @@ export function calculateHydraulicLoss(
   innerDiameterMm: number,
   cFactor: number = 120,
 ) {
-  return calcHazenWilliams(flowRateM3h, pipeLengthM, innerDiameterMm, cFactor);
+  return calcHazenWilliamsM3h(flowRateM3h, pipeLengthM, innerDiameterMm, cFactor);
 }
 
 export function calculateHangerLoadAndSpacing(
