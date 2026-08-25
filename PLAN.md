@@ -55,3 +55,21 @@
 ## Thứ tự & phụ thuộc
 
 V3 → (V4 ∥ V5) → V6 → V7. Mỗi việc worktree riêng; các file Commands/Core đặt tên như trên để không đụng nhau; `XBoss.Cad.Acad.csproj` dùng glob compile mặc định SDK-style nên thêm file không sửa csproj. Reviewer soát từng việc; tích hợp tuần tự vào nhánh nền, KHÔNG push.
+
+---
+
+# Pha 3 — M101 (nâng trần KIEMTRA/CHUANHOA/BOCKL)
+
+**Đặc tả:** `docs/nang-cap/M101-plugin-nang-tran.md` (Approved). Ràng buộc chung giống Pha 2 (Core thuần test được, Adapter không build trên Linux, tiếng Việt, 1 UNDO, không đụng hành vi M99).
+
+## Việc W1 — Rule pack v5 + 7 phép kiểm mới (M101 PR1) — `route: complex`
+
+Đặc tả M101 §6.1 (bảng 7 phép kiểm 10–16), §7 FR1/FR2, §15, §18.
+
+- `lib/ky-thuat/cad/rule-packs/v5.json` — append-only từ v4 (v1–v4 KHÔNG đổi 1 byte). Mở rộng khối `inspectionPolicy` (xem v2/v3 hiện có): mỗi phép kiểm mới 1 mục có `enabled` riêng, **mặc định `false`** (M101 §6.2/§7 FR1: nạp plugin cũ không đổi hành vi), kèm tham số: `overlapToleranceMm`/`overlapMinLengthMm` (phép 10), `clashPairs` (phép 11, mảng cặp hệ, mặc định rỗng), `titleblockNameMatchAny` (phép 12 — dùng khi manifest M100 chưa có), `scales` cho phép 13 (tái dùng `sheetSetup.scales` nếu có, khai fallback), `styleMap` (phép 14: textstyle/dimstyle chuẩn — đây cũng là dữ liệu bước chuẩn hóa 8 của PR2, khai một lần dùng chung), `strayDistanceFactor` (phép 16). Mô tả tiếng Việt từng khóa như phong cách v3/v4.
+- `XBoss.Cad.Core/Inspection/` — thêm 7 phép kiểm THUẦN theo đúng khung `Inspector` hiện có (ĐỌC code hiện trạng trước, giữ nguyên kiểu dữ liệu báo cáo/marker): 10 chồng lấn cùng hệ, 11 clash 2D (nhãn cảnh báo cố định "(mặt bằng) — không thay được clash 3D"), 12 khung tên thiếu trường, 13 viewport không khóa/tỉ lệ lạ, 14 text/dim style lệch, 15 nhãn size lệch XData (thiếu dữ liệu M100 → **tự tắt**, không báo oan), 16 đối tượng ngoài khung. Dữ liệu hình học/viewport/attribute do Adapter cung cấp — **định nghĩa DTO đầu vào trong Core**, Adapter điền ở PR sau (PR này KHÔNG sửa `XBoss.Cad.Acad`).
+- Báo cáo JSON: thêm các phép mới vào cùng cấu trúc `checks[]` hiện có, không phá khung cũ.
+- Test: mỗi phép 1 ca dương + 1 ca âm (không báo oan), + ca "v5 mặc định tắt hết phép mới → kết quả y hệt v4", + ca "v4 vẫn nạp được sau khi phát hành v5".
+- `lib/ky-thuat/cad/rule-pack.ts` + route: phát hành v5 là bản hiện hành (như V1 đã làm với v4).
+
+**Tiêu chí chấp nhận:** dotnet test xanh toàn bộ (119 hiện tại + mới); test node liên quan xanh; v1–v4 không đổi; chứng minh mutation (bật 1 phép + dữ liệu vi phạm → đỏ; gỡ → xanh).
