@@ -25,7 +25,7 @@ import {
 
 // ===== (1) Cấu trúc & ETag =====
 
-test("rule pack: đủ 8 field theo API contract M99 §10, version = v3", () => {
+test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4, version = v4", () => {
   const pack = getCurrentRulePack();
   for (const field of [
     "version",
@@ -39,8 +39,11 @@ test("rule pack: đủ 8 field theo API contract M99 §10, version = v3", () => 
   ]) {
     assert.ok(field in pack, `Thiếu field ${field}`);
   }
-  assert.equal(pack.version, "v3");
-  assert.equal(CURRENT_RULE_PACK_VERSION, "v3");
+  for (const field of ["drawTools", "sheetSetup"]) {
+    assert.ok(field in pack, `Thiếu field v4 ${field}`);
+  }
+  assert.equal(pack.version, "v4");
+  assert.equal(CURRENT_RULE_PACK_VERSION, "v4");
 });
 
 test("rule pack v2 là mở rộng thuần của v1: 5 field cũ giữ nguyên nội dung", async () => {
@@ -63,7 +66,7 @@ test("rule pack v2 là mở rộng thuần của v1: 5 field cũ giữ nguyên n
 
 test("rule pack v3 là mở rộng thuần của v2: chỉ thêm fontMap.targetFont", async () => {
   const v2 = (await import("@/lib/ky-thuat/cad/rule-packs/v2.json")).default;
-  const v3 = getCurrentRulePack();
+  const v3 = (await import("@/lib/ky-thuat/cad/rule-packs/v3.json")).default;
 
   for (const field of [
     "layerMap",
@@ -85,6 +88,102 @@ test("rule pack v3 là mở rộng thuần của v2: chỉ thêm fontMap.targetF
   assert.deepEqual(conLai, v2.fontMap, "fontMap của v3 đổi nhiều hơn mỗi targetFont");
   assert.equal(targetFont.typeFace, "Arial");
   assert.ok(targetFont.note.length > 0, "targetFont phải có ghi chú giải thích vì sao tồn tại");
+});
+
+test("rule pack v4 là mở rộng thuần của v3: chỉ thêm drawTools + sheetSetup (M100 AC9)", async () => {
+  const v3 = (await import("@/lib/ky-thuat/cad/rule-packs/v3.json")).default;
+  const v4 = getCurrentRulePack();
+
+  for (const field of [
+    "layerMap",
+    "fontMap",
+    "purgePolicy",
+    "lineweightMap",
+    "flattenPolicy",
+    "takeoff",
+    "inspectionPolicy",
+  ] as const) {
+    assert.deepEqual(
+      v4[field],
+      v3[field],
+      `Field ${field} của v4 lệch v3 — v4 phải là mở rộng thuần (lệnh M99 chạy với v4 không đổi hành vi)`,
+    );
+  }
+  assert.deepEqual(
+    Object.keys(v4).filter((k) => !(k in v3)),
+    ["drawTools", "sheetSetup"],
+    "v4 thêm nhiều hơn đúng 2 khối drawTools + sheetSetup",
+  );
+});
+
+// ===== (5) v4 — drawTools + sheetSetup (M100 §11, FR1/FR4) =====
+
+test("drawTools: hệ khớp layerMap.groups, layer khớp branch target đúng nhóm, itemId có thật", () => {
+  const pack = getCurrentRulePack();
+  const dt = pack.drawTools;
+  assert.ok(dt.baseFadePct > 0 && dt.baseFadePct <= 100);
+  assert.equal(dt.labelStyle.layer, "G-ANNO-TEXT");
+  const itemIds = new Set(pack.takeoff.items.map((i) => i.id));
+  assert.ok(dt.systems.length >= 5, "phải khai đủ 5 hệ thao tác");
+  for (const sys of dt.systems) {
+    const group = pack.layerMap.groups.find((g) => g.id === sys.id);
+    assert.ok(group, `hệ ${sys.id} không có nhóm layerMap tương ứng`);
+    const targets = new Set(group.branches.map((b) => b.target));
+    assert.ok(sys.lines.length > 0, `hệ ${sys.id} không khai tuyến nào`);
+    for (const line of sys.lines) {
+      assert.ok(targets.has(line.layer), `hệ ${sys.id}: layer ${line.layer} không thuộc nhóm này`);
+      assert.ok(
+        itemIds.has(line.itemId),
+        `hệ ${sys.id}: itemId ${line.itemId} không có trong takeoff`,
+      );
+      assert.ok(["double", "none"].includes(line.edgeStyle), `edgeStyle lạ: ${line.edgeStyle}`);
+      assert.ok(line.sizes.length > 0, `hệ ${sys.id}: ${line.itemId} không có size nào`);
+    }
+  }
+});
+
+test("drawTools: layer nét biên KHÔNG khớp takeoff.layerMatchAny nào (FR4 — chống bóc trùng)", () => {
+  const pack = getCurrentRulePack();
+  const suffix = pack.drawTools.edgeLayerSuffix;
+  for (const sys of pack.drawTools.systems) {
+    for (const line of sys.lines) {
+      const bien = (line.layer + suffix).toUpperCase();
+      for (const item of pack.takeoff.items) {
+        for (const key of item.layerMatchAny) {
+          assert.ok(
+            !hasToken(bien, key.toUpperCase()),
+            `Layer biên ${bien} khớp takeoff ${item.id} (${key}) — nét biên sẽ bị bóc trùng`,
+          );
+        }
+      }
+    }
+  }
+});
+
+test("drawTools: thiết bị mỗi hệ là item takeoff measure=count có blockNameMatchAny", () => {
+  const pack = getCurrentRulePack();
+  for (const sys of pack.drawTools.systems) {
+    for (const id of sys.equipment) {
+      const item = pack.takeoff.items.find((i) => i.id === id);
+      assert.ok(item, `hệ ${sys.id}: thiết bị ${id} không có trong takeoff.items`);
+      assert.equal(item.measure, "count", `thiết bị ${id} phải là item count`);
+      assert.ok(
+        (item as { blockNameMatchAny?: string[] }).blockNameMatchAny?.length,
+        `thiết bị ${id} thiếu blockNameMatchAny`,
+      );
+    }
+  }
+});
+
+test("sheetSetup: đủ tham số trang in/mặt cắt/tag/bảng/slope theo M100 §11", () => {
+  const s = getCurrentRulePack().sheetSetup;
+  assert.ok(s.paperSizes.length > 0 && s.scales.length > 0);
+  assert.match(s.layoutNamePattern, /\{system\}/);
+  assert.ok(s.titleblockId.trim().length > 0);
+  assert.ok(s.defaultElevations.length > 0);
+  assert.match(s.tagPattern, /\{seq\}/);
+  assert.ok(s.tableStyle.textHeightMm > 0);
+  assert.ok(s.slopes.length > 0);
 });
 
 test("getRulePackEtag: ổn định giữa 2 lần gọi và có chứa version", () => {

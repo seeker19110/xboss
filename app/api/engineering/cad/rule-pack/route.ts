@@ -39,6 +39,9 @@ export async function GET(req: Request) {
       flattenPolicy: pack.flattenPolicy,
       takeoff: pack.takeoff,
       inspectionPolicy: pack.inspectionPolicy,
+      // v4 (M100 §11): tham số bộ lệnh vẽ XBOSS_VE_* — plugin M99 cũ bỏ qua field không biết.
+      drawTools: pack.drawTools,
+      sheetSetup: pack.sheetSetup,
     },
     { headers: { ETag: etag } },
   );
