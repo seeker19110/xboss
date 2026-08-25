@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { todayISO } from "@/lib/nen/date";
 import { Plus, X, Trash2, Paperclip, FileDown, Gavel } from "lucide-react";
 import AppHeader from "@/app/components/AppHeader";
 import EmptyState from "@/app/components/EmptyState";
@@ -41,9 +42,6 @@ type Supplier = { id: number; name: string };
 function fmtVND(n: number) {
   if (!n) return "—";
   return Math.round(n).toLocaleString("vi-VN") + " đ";
-}
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
 }
 
 export default function TendersPage() {

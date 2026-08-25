@@ -67,6 +67,40 @@ chứng chỉ nhân sự.
 Kèm `tests/han-hieu-luc.test.ts` — **5 ca, trước đây logic này KHÔNG có test nào** vì nằm rải
 trong file `.tsx`. Có ca biên canh đúng lỗi trên.
 
+### Quét múi giờ toàn repo — 5 bản `todayISO()` chép sai + 8 chỗ khác
+
+Người dùng chốt: **"theo múi giờ +7"**. Quét toàn bộ `lib/`, `app/`, `scripts/` tìm mọi chỗ tính
+ngày bằng UTC thuần thay vì đi qua helper `lib/nen/date.ts`.
+
+**Phát hiện nặng nhất: 5 trang tự định nghĩa `todayISO()` riêng**, che mất bản đúng trong
+`lib/nen/date.ts` và đều thiếu offset +7 — `correspondences`, `tenders`, `equipment`, `hse`,
+`contracts`. Không phải chỗ hiển thị suông mà là **so sánh và mặc định thật**:
+
+| Trang                  | Dùng làm gì                                                                                   | Hậu quả trong khung 0h–7h sáng                          |
+| ---------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `hse` (7 chỗ)          | số ngày từ sự cố gần nhất, hành động quá hạn, `?month=` của báo cáo tháng, ngày mặc định form | đếm lệch 1 ngày; ngày 1 hàng tháng lấy nhầm tháng trước |
+| `correspondences`      | công văn quá hạn, ngày gửi/hồi đáp mặc định                                                   | quá hạn nhận diện sai 1 ngày                            |
+| `equipment`            | hạn kiểm định                                                                                 | như trên                                                |
+| `tenders`, `contracts` | mốc so ngày                                                                                   | như trên                                                |
+
+Đã gỡ cả 5, dùng `todayISO` từ `lib/nen/date.ts`.
+
+**Các chỗ khác đã quy về helper:** `equipment` (hạn kiểm định 30 ngày tính bằng UTC thuần → dùng
+`daysFromTodayISO(EXPIRY_WARN_DAYS)`); `warranty` (đã đúng +7 nhưng lặp biểu thức 2 lần → dùng
+helper); `schedule` + `payments/print` (ngày lập/ngày bill hiển thị); `engineering-project-health`
+(`snapshotDate`), `digital-handover` + `fidic-tia` (ngày mặc định **ghi vào DB**); và 4 chỗ sinh
+tem ngày trong mã/tên tệp (`qr-logistics`, `esignature`, `cad/save-drawing` ×2, `useSmartNaming`).
+
+**Cố ý KHÔNG đổi, có lý do:**
+
+- `bim-models/[id]/simulate-4d`: `Date.now() ± 30 ngày` là **cửa sổ trượt** cho mô phỏng
+  time-lapse, không so với `todayISO()` — lệch vài giờ ở biên không đổi ý nghĩa.
+- `scripts/check-coverage.ts` (`measuredAt`): metadata của công cụ dev, chạy trên runner CI theo
+  UTC, không ai so nó với ngày VN.
+
+Sau đợt này, `grep` toàn repo không còn `new Date().toISOString().slice(0,10)` hay
+`Date.now() + N*86400_000` nào trong `app/` — trừ hai ngoại lệ có lý do ở trên.
+
 ### Còn lại (chưa làm)
 
 - **Họ ~8 route `<thực thể>-documents/[id]`** giống 55–71% (`claim`/`contract`/`vo`/`subcon`/

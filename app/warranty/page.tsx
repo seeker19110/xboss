@@ -18,7 +18,8 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal, appConfirm } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { formatDateVN, todayISO } from "@/lib/nen/date";
+import { formatDateVN, todayISO, daysFromTodayISO } from "@/lib/nen/date";
+import { EXPIRY_WARN_DAYS } from "@/lib/nen/han-hieu-luc";
 
 // ===== Kiểu dữ liệu (client) — mirror lib/warranty.ts =====
 
@@ -188,7 +189,7 @@ export default function WarrantyPage() {
   // kickoffReadiness/handoverProgress: không thêm route riêng).
   const kpi = useMemo(() => {
     const today = todayISO();
-    const limit = new Date(Date.now() + 7 * 3600_000 + 30 * 86400_000).toISOString().slice(0, 10);
+    const limit = daysFromTodayISO(EXPIRY_WARN_DAYS);
     const expiringSoon = items.filter((it) => {
       if (it.status !== "active") return false;
       const expiry = warrantyExpiryClient(it);
@@ -441,8 +442,7 @@ function WarrantyTab({
                 it.status === "active" &&
                 !overdue &&
                 expiry != null &&
-                expiry <=
-                  new Date(Date.now() + 7 * 3600_000 + 30 * 86400_000).toISOString().slice(0, 10);
+                expiry <= daysFromTodayISO(EXPIRY_WARN_DAYS);
               return (
                 <tr key={it.id} className="border-b border-zinc-800/60 last:border-0">
                   <td className="p-3">

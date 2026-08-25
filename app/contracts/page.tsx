@@ -1,5 +1,6 @@
 "use client";
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { todayISO } from "@/lib/nen/date";
 import {
   Plus,
   ChevronDown,
@@ -74,10 +75,6 @@ type SystemOption = { id: number; code: string; name: string };
 function fmtVND(n: number) {
   if (!n) return "—";
   return Math.round(n).toLocaleString("vi-VN") + " đ";
-}
-function todayISO() {
-  const iso = new Date().toISOString().slice(0, 10);
-  return iso;
 }
 
 export default function ContractsPage() {

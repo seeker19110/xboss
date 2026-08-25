@@ -7,7 +7,7 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { formatDateVN, formatDateTimeVN } from "@/lib/nen/date";
+import { formatDateVN, formatDateTimeVN, todayISO } from "@/lib/nen/date";
 
 type HseKind = "inspection" | "toolbox" | "incident" | "near_miss" | "permit";
 const HSE_KIND_LABEL: Record<HseKind, string> = {
@@ -56,10 +56,6 @@ type HseRecord = {
   actionDue: string | null;
   actionStatus: "none" | "open" | "closed";
 };
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 export default function HsePage() {
   const [me, setMe] = useState<Me | null>(null);

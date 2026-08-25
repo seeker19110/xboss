@@ -7,7 +7,8 @@ import { PageSkeleton } from "@/app/components/Skeleton";
 import { Modal } from "@/app/components/dialogs";
 import { showToast } from "@/app/components/Toast";
 import { fetchMe, type Me } from "@/app/lib/me";
-import { formatDateVN, formatDateTimeVN } from "@/lib/nen/date";
+import { formatDateVN, formatDateTimeVN, todayISO, daysFromTodayISO } from "@/lib/nen/date";
+import { EXPIRY_WARN_DAYS } from "@/lib/nen/han-hieu-luc";
 
 type EquipmentCondition = "good" | "maintenance" | "broken" | "retired";
 const EQUIPMENT_CONDITION_LABEL: Record<EquipmentCondition, string> = {
@@ -46,10 +47,6 @@ type Equipment = {
   currentCrew: string | null;
   note: string | null;
 };
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 export default function EquipmentPage() {
   const [me, setMe] = useState<Me | null>(null);
@@ -214,8 +211,7 @@ export default function EquipmentPage() {
                     const soon =
                       !overdue &&
                       e.calibrationDue != null &&
-                      e.calibrationDue <=
-                        new Date(Date.now() + 30 * 86400_000).toISOString().slice(0, 10);
+                      e.calibrationDue <= daysFromTodayISO(EXPIRY_WARN_DAYS);
                     return (
                       <tr
                         key={e.id}

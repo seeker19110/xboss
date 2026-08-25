@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { todayISO } from "@/lib/nen/date";
 import { writeFileSync, mkdirSync, existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { getCurrentUser, CAN } from "@/lib/bao-mat/auth";
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
       kind = "design", // 'design' | 'bim' | 'shop' | 'asbuilt'
       subFolder = "iso", // 'origin' | 'iso' (for design)
       name = "Bản_Vẽ_Chuẩn_Hóa",
-      date = new Date().toISOString().slice(0, 10).replace(/-/g, ""),
+      date = todayISO().replace(/-/g, ""),
       drawingVersions = "Rev01",
       fileContent = "",
       fileExtension = "dxf",
@@ -104,7 +105,7 @@ export async function POST(req: NextRequest) {
     const cKind = kind.toLowerCase();
     const cSub = cKind === "design" ? cleanStr(subFolder || "iso").toLowerCase() : "";
     const cName = cleanStr(name || "Ban_Ve");
-    const cDate = cleanStr(date || new Date().toISOString().slice(0, 10).replace(/-/g, ""));
+    const cDate = cleanStr(date || todayISO().replace(/-/g, ""));
     const cRev = cleanStr(drawingVersions || "Rev01");
     const cExt = cleanStr(fileExtension || "dxf").toLowerCase();
 
