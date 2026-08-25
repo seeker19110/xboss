@@ -327,7 +327,17 @@ namespace Autodesk.AutoCAD.DatabaseServices
     {
         public double Area => 0;
         public double Elevation { get; set; }
+        /// <summary>Tên mẫu hatch hiện tại (vd "ANSI31", "SOLID") — đổi qua SetHatchPattern, không gán trực tiếp.</summary>
+        public string PatternName { get; set; }
+        public double PatternScale { get; set; }
+        /// <summary>true nếu hatch là tô gradient (không phải mẫu line pattern thường).</summary>
+        public bool IsGradient { get; set; }
+        public void SetHatchPattern(HatchPatternType patternType, string patternName) { }
+        /// <summary>Dựng lại hình học hatch theo mẫu/tỉ lệ hiện tại; underestimateArea=true tính nhanh, kém chính xác.</summary>
+        public void EvaluateHatch(bool underestimateArea) { }
     }
+
+    public enum HatchPatternType { UserDefined, PreDefined, CustomDefined }
 
     /// <summary>Lớp cha của mọi loại dimension (RotatedDimension, AlignedDimension…).</summary>
     public class Dimension : Entity
@@ -411,13 +421,21 @@ namespace Autodesk.AutoCAD.DatabaseServices
         public Autodesk.AutoCAD.GraphicsInterface.FontDescriptor Font { get; set; }
         /// <summary>Tên tệp font SHX (vd ".vntime.shx").</summary>
         public string FileName { get; set; }
+        /// <summary>Chiều cao chữ cố định (0 = chữ có thể đổi chiều cao khi đặt text/dimension).</summary>
+        public double TextSize { get; set; }
+        /// <summary>Hệ số rộng (width factor).</summary>
+        public double XScale { get; set; }
     }
+
+    public class TextStyleTable : SymbolTable { }
 
     public class DimStyleTableRecord : SymbolTableRecord
     {
         /// <summary>Biến DIMTXSTY — ObjectId của TextStyleTableRecord mà dimension dùng.</summary>
         public ObjectId Dimtxsty { get; set; }
     }
+
+    public class DimStyleTable : SymbolTable { }
 
     public class BlockTableRecord : SymbolTableRecord, IEnumerable<ObjectId>
     {
@@ -426,10 +444,16 @@ namespace Autodesk.AutoCAD.DatabaseServices
         public bool IsLayout => false;
         public bool IsFromExternalReference => false;
         public bool IsFromOverlayReference => false;
+        /// <summary>Đường dẫn lưu của khối xref (chỉ có nghĩa khi IsFromExternalReference). Đọc/ghi được (relocate path).</summary>
+        public string PathName { get; set; }
+        /// <summary>Trạng thái nạp của xref — Resolved khi tệp tham chiếu tìm thấy và nạp được (chỉ đọc trên API thật).</summary>
+        public XrefStatus XrefStatus => XrefStatus.Resolved;
         public ObjectId AppendEntity(Entity e) => new ObjectId();
         public IEnumerator<ObjectId> GetEnumerator() => new List<ObjectId>().GetEnumerator();
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
+
+    public enum XrefStatus { NotAnXref, Resolved, Unresolved, FileNotFound, Unreferenced, Unloaded }
 
     public class SymbolTable : DBObject, IEnumerable<ObjectId>
     {
@@ -551,6 +575,7 @@ namespace Autodesk.AutoCAD.DatabaseServices
         public ObjectId CreateLayout(string name) => new ObjectId();
         public ObjectId CreateAndMakeLayoutCurrent(string name) => new ObjectId();
         public void DeleteLayout(string name) { }
+        public void RenameLayout(string oldName, string newName) { }
         public bool LayoutExists(string name) => false;
         public ObjectId GetLayoutId(string name) => new ObjectId();
         public string CurrentLayout { get; set; }
@@ -612,6 +637,10 @@ namespace Autodesk.AutoCAD.DatabaseServices
         public ObjectId RegAppTableId => new ObjectId();
         public ObjectId NamedObjectsDictionaryId => new ObjectId();
         public ObjectId LayoutDictionaryId => new ObjectId();
+        public ObjectId TextStyleTableId => new ObjectId();
+        public ObjectId DimStyleTableId => new ObjectId();
+        /// <summary>Nhập nội dung xref vào bản vẽ (insertBind=true dùng tiền tố "$0$", false dùng kiểu bind truyền thống).</summary>
+        public void BindXrefs(ObjectIdCollection xrefIds, bool insertBind) { }
         public ObjectId Insert(string blockName, Database source, bool preserveSourceDatabase) => new ObjectId();
         public ObjectId Insert(string destinationBlockName, string sourceBlockName, Database source, bool preserveSourceDatabase) => new ObjectId();
         public ObjectId Clayer { get; set; }
