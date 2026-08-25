@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import AppHeader from "@/app/components/AppHeader";
+import { useCanvasHiDPI } from "@/app/components/useCanvasHiDPI";
 import EngineeringNav from "@/app/components/EngineeringNav";
 import { Skeleton } from "@/app/components/Skeleton";
 import {
@@ -91,6 +92,13 @@ export default function SpatialViewerPage() {
   });
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // Canvas theo devicePixelRatio + co giãn theo container; `toCanvasCoords` đổi toạ độ
+  // chuột sang toạ độ logic — trước đây bấm để cắm ghim tính thẳng từ getBoundingClientRect
+  // nên ghim lệch chỗ mọi khi bề rộng hiển thị khác 900px (audit 2026-08-25 §3.7).
+  const { size: canvasSize, toCanvasCoords } = useCanvasHiDPI(canvasRef, {
+    width: 900,
+    height: 560,
+  });
 
   const fetchAnnotations = useCallback(async () => {
     try {
@@ -120,7 +128,7 @@ export default function SpatialViewerPage() {
     if (!ctx) return;
 
     // Reset & Fill Background
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
     ctx.save();
 
     // Áp dụng Pan & Zoom
@@ -253,16 +261,16 @@ export default function SpatialViewerPage() {
     }
 
     ctx.restore();
-  }, [pan, zoom, layers, annotations, viewMode, newPinCoord]);
+  }, [pan, zoom, layers, annotations, viewMode, newPinCoord, canvasSize]);
 
   // Xử lý Mouse Events cho Canvas
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (isAddingPin) {
-      const rect = canvasRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const clickX = (e.clientX - rect.left - pan.x) / zoom;
-      const clickY = (e.clientY - rect.top - pan.y) / zoom;
-      setNewPinCoord({ x: Math.round(clickX), y: Math.round(clickY) });
+      const diem = toCanvasCoords(e);
+      setNewPinCoord({
+        x: Math.round((diem.x - pan.x) / zoom),
+        y: Math.round((diem.y - pan.y) / zoom),
+      });
       return;
     }
 
@@ -271,12 +279,11 @@ export default function SpatialViewerPage() {
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (rect) {
-      const curX = Math.round((e.clientX - rect.left - pan.x) / zoom);
-      const curY = Math.round((e.clientY - rect.top - pan.y) / zoom);
-      setMouseCoord({ x: curX, y: curY });
-    }
+    const diem = toCanvasCoords(e);
+    setMouseCoord({
+      x: Math.round((diem.x - pan.x) / zoom),
+      y: Math.round((diem.y - pan.y) / zoom),
+    });
 
     if (!isDragging) return;
     setPan({
@@ -533,13 +540,11 @@ export default function SpatialViewerPage() {
                 <>
                   <canvas
                     ref={canvasRef}
-                    width={900}
-                    height={560}
                     onMouseDown={handleMouseDown}
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
                     onWheel={handleWheel}
-                    className="h-full w-full cursor-crosshair"
+                    className="cursor-crosshair"
                   />
 
                   {/* Coordinate Badge */}

@@ -353,7 +353,7 @@ export async function listBimElements(
 
   sql += ` ORDER BY o.created_at DESC LIMIT 1000`;
 
-  const rows = await query<BimElementRecord>(sql, params);
+  const rows = await query<BimElementRecord>(sql, ...params);
   return rows;
 }
 

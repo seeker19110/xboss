@@ -271,8 +271,10 @@ export default function ZeroErrorEngineeringPage() {
             </div>
             <div>
               <div className="text-xs text-slate-400 font-medium">Geofence Proximity</div>
-              <div className="text-lg font-bold text-emerald-300">Trong Bán Kính 5m</div>
-              <div className="text-[11px] text-slate-500">TT AVIO Tháp A (10.7769, 106.7009)</div>
+              {/* Trước đây khẳng định cứng "Trong Bán Kính 5m" + toạ độ một dự án cụ thể,
+                  không đọc từ dữ liệu nào (audit 2026-08-25 §3.2). */}
+              <div className="text-lg font-bold text-slate-300">—</div>
+              <div className="text-[11px] text-slate-500">Chưa có nguồn định vị</div>
             </div>
           </div>
 

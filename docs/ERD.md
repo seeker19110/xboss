@@ -3699,14 +3699,17 @@
 | metadata | jsonb |  | `'{}'::jsonb` |
 | created_by | integer | ✓ |  |
 | created_at | timestamptz |  | `CURRENT_TIMESTAMP` |
+| supplier_id | integer | ✓ |  |
 
 **Khóa ngoại:**
 - `created_by` → `users(id)`
 - `package_id` → `engineering_bidding_packages(id)`
 - `project_id` → `projects(id)`
+- `supplier_id` → `suppliers(id)`
 
 **Index:**
 - `engineering_bidding_vendor_quotes_pkey`: UNIQUE INDEX engineering_bidding_vendor_quotes_pkey ON public.engineering_bidding_vendor_quotes USING btree (id)
+- `engineering_bidding_vendor_quotes_supplier_idx`: INDEX engineering_bidding_vendor_quotes_supplier_idx ON public.engineering_bidding_vendor_quotes USING btree (supplier_id)
 - `idx_bidding_quotes_pkg`: INDEX idx_bidding_quotes_pkg ON public.engineering_bidding_vendor_quotes USING btree (project_id, package_id, status)
 
 ### engineering_bim_4d_simulations
@@ -5075,13 +5078,16 @@
 | created_by | integer | ✓ |  |
 | created_at | timestamptz |  | `CURRENT_TIMESTAMP` |
 | updated_at | timestamptz |  | `CURRENT_TIMESTAMP` |
+| supplier_id | integer | ✓ |  |
 
 **Khóa ngoại:**
 - `created_by` → `users(id)`
 - `project_id` → `projects(id)`
+- `supplier_id` → `suppliers(id)`
 
 **Index:**
 - `engineering_material_shipments_pkey`: UNIQUE INDEX engineering_material_shipments_pkey ON public.engineering_material_shipments USING btree (id)
+- `engineering_material_shipments_supplier_idx`: INDEX engineering_material_shipments_supplier_idx ON public.engineering_material_shipments USING btree (supplier_id)
 - `idx_shipments_proj_code`: INDEX idx_shipments_proj_code ON public.engineering_material_shipments USING btree (project_id, shipment_code, status)
 
 ### engineering_mepf_hydraulic_calculations
@@ -6024,14 +6030,17 @@
 | released_at | timestamptz |  | `now()` |
 | created_by | bigint | ✓ |  |
 | created_at | timestamptz |  | `now()` |
+| supplier_id | integer | ✓ |  |
 
 **Khóa ngoại:**
 - `created_by` → `users(id)`
 - `project_id` → `projects(id)`
+- `supplier_id` → `suppliers(id)`
 
 **Index:**
 - `engineering_smart_ipc_records_pkey`: UNIQUE INDEX engineering_smart_ipc_records_pkey ON public.engineering_smart_ipc_records USING btree (id)
 - `engineering_smart_ipc_records_project_id_ipc_number_key`: UNIQUE INDEX engineering_smart_ipc_records_project_id_ipc_number_key ON public.engineering_smart_ipc_records USING btree (project_id, ipc_number)
+- `engineering_smart_ipc_records_supplier_idx`: INDEX engineering_smart_ipc_records_supplier_idx ON public.engineering_smart_ipc_records USING btree (supplier_id)
 - `idx_smart_ipc_project`: INDEX idx_smart_ipc_project ON public.engineering_smart_ipc_records USING btree (project_id, created_at DESC)
 - `idx_smart_ipc_status`: INDEX idx_smart_ipc_status ON public.engineering_smart_ipc_records USING btree (project_id, payment_status)
 
@@ -6248,6 +6257,7 @@
 
 **Index:**
 - `engineering_subcon_profiles_pkey`: UNIQUE INDEX engineering_subcon_profiles_pkey ON public.engineering_subcon_profiles USING btree (id)
+- `engineering_subcon_profiles_project_supplier_uniq`: UNIQUE INDEX engineering_subcon_profiles_project_supplier_uniq ON public.engineering_subcon_profiles USING btree (project_id, supplier_id) WHERE (supplier_id IS NOT NULL)
 
 ### engineering_suggestions
 

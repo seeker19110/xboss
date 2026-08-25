@@ -450,9 +450,6 @@ function DrawingsPageInner({ fixedKind }: { fixedKind?: DrawingKind }) {
                 <span className="font-bold tracking-tight text-zinc-100 text-sm sm:text-base uppercase">
                   {pageTitle}
                 </span>
-                <span className="rounded-md bg-emerald-500/10 px-2 py-0.5 text-[10px] font-mono font-bold text-emerald-400 border border-emerald-500/20">
-                  LOD 400 • TT AVIO
-                </span>
               </div>
               <span className="text-[11px] text-zinc-400 line-clamp-1">
                 Tiến độ: <b className="text-zinc-200">{stats.pct}%</b> ({stats.approved}/

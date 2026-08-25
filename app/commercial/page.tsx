@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect } from "react";
 import { Coins, FileSignature, Receipt, Scale, TrendingUp, FilePlus2 } from "lucide-react";
 import HubShell, { type HubTab, type HubStat } from "@/app/components/HubShell";
 import { Skeleton } from "@/app/components/Skeleton";
+import { addMoney, formatVnd, parseMoney } from "@/lib/nen/money";
 import ContractsTab from "./_components/ContractsTab";
 import IpcPaymentsTab from "./_components/IpcPaymentsTab";
 import VariationsTab from "./_components/VariationsTab";
@@ -33,87 +34,66 @@ function CommercialSkeleton() {
 }
 
 function CommercialContent() {
+  // Dải KPI: khởi tạo "—", chỉ đổi khi API trả thật. Trước đây khởi tạo bằng GIÁ TRỊ TIỀN
+  // cắm cứng ("48.5 Tỷ", "24.2 Tỷ", "3.8 Tỷ") — API lỗi/dự án rỗng là số tiền bịa đứng
+  // nguyên trên màn hình (audit 2026-08-25 §3.2). Cùng đợt sửa 3 lỗi đọc sai dữ liệu:
+  //  - `voData.variations` / `clmData.claims`: API trả khoá `items` → hai ô luôn rỗng.
+  //  - `v.totalApproved`: trường không tồn tại (đúng tên là `approvedValue`) → luôn 0.
+  //  - Tổng tiền hợp đồng cộng trên float JS; nay cộng qua lib/nen/money.ts trên cột
+  //    `valueText` (`::text`) đúng quy ước tiền tệ M45 PR1.
   const [stats, setStats] = useState<HubStat[]>([
-    {
-      label: "Giá Trị Hợp Đồng A-B",
-      value: "48.5 Tỷ",
-      change: "100% Ký kết",
-      isPositive: true,
-      icon: FileSignature,
-    },
-    {
-      label: "Lũy Kế IPC Đã Duyệt",
-      value: "24.2 Tỷ",
-      change: "6 Kỳ (49.8%)",
-      isPositive: true,
-      icon: Receipt,
-    },
-    {
-      label: "Phát Sinh VO & Claims",
-      value: "3.8 Tỷ",
-      change: "4 VO / 2 Claims",
-      isPositive: true,
-      icon: Scale,
-    },
-    {
-      label: "Dự Báo Dòng Tiền",
-      value: "Thặng Dư",
-      change: "Vốn an toàn 90N",
-      isPositive: true,
-      icon: TrendingUp,
-    },
+    { label: "Giá Trị Hợp Đồng A-B", value: "—", icon: FileSignature },
+    { label: "Chứng Chỉ IPC Đã Duyệt", value: "—", icon: Receipt },
+    { label: "Phát Sinh VO Đã Duyệt", value: "—", icon: Scale },
+    { label: "Sổ Khiếu Nại Claims", value: "—", icon: TrendingUp },
   ]);
 
   useEffect(() => {
+    const get = (url: string) =>
+      fetch(url)
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
+
     Promise.all([
-      fetch("/api/contracts").then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/payment-certs").then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/variations").then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/claims").then((r) => (r.ok ? r.json() : null)),
+      get("/api/contracts"),
+      get("/api/payment-certs"),
+      get("/api/variations"),
+      get("/api/claims"),
     ]).then(([cData, certData, voData, clmData]) => {
-      const cList = cData?.contracts || [];
-      const certList = certData?.certs || [];
-      const voList = voData?.variations || [];
-      const clmList = clmData?.claims || [];
+      const cList: { valueText?: string }[] | null = cData?.contracts ?? null;
+      const certList: { status?: string }[] | null = certData?.certs ?? null;
+      const voList: { status?: string }[] | null = voData?.items ?? null;
+      const clmList: unknown[] | null = clmData?.items ?? null;
 
-      const totalContract = cList.reduce((acc: number, c: any) => acc + (Number(c.value) || 0), 0);
-      const totalVo = voList.reduce(
-        (acc: number, v: any) => acc + (Number(v.totalApproved) || 0),
-        0,
-      );
-
-      function fmtShort(n: number) {
-        if (!n) return "0 Tỷ";
-        return `${(n / 1_000_000_000).toFixed(1)} Tỷ`;
-      }
+      const contractTotal =
+        cList == null ? null : addMoney(...cList.map((c) => parseMoney(c.valueText ?? "0")));
 
       setStats([
         {
           label: "Giá Trị Hợp Đồng A-B",
-          value: fmtShort(totalContract) || "48.5 Tỷ",
-          change: `${cList.length} Hợp đồng`,
-          isPositive: true,
+          value: contractTotal == null ? "—" : formatVnd(contractTotal),
+          change: cList == null ? undefined : `${cList.length} Hợp đồng`,
           icon: FileSignature,
         },
         {
           label: "Chứng Chỉ IPC Đã Duyệt",
-          value: `${certList.filter((c: any) => c.status === "approved").length} Kỳ`,
-          change: `${certList.length} Kỳ đã lập`,
-          isPositive: true,
+          value:
+            certList == null ? "—" : `${certList.filter((c) => c.status === "approved").length} Kỳ`,
+          change: certList == null ? undefined : `${certList.length} Kỳ đã lập`,
           icon: Receipt,
         },
         {
           label: "Phát Sinh VO Đã Duyệt",
-          value: fmtShort(totalVo) || "3.8 Tỷ",
-          change: `${voList.length} Phiếu VO`,
-          isPositive: true,
+          value:
+            voList == null
+              ? "—"
+              : `${voList.filter((v) => v.status === "approved" || v.status === "partially_approved" || v.status === "contract_added").length} Phiếu`,
+          change: voList == null ? undefined : `${voList.length} Phiếu VO`,
           icon: Scale,
         },
         {
           label: "Sổ Khiếu Nại Claims",
-          value: `${clmList.length} Vụ`,
-          change: "Time-Bar 28D OK",
-          isPositive: true,
+          value: clmList == null ? "—" : `${clmList.length} Vụ`,
           icon: TrendingUp,
         },
       ]);
