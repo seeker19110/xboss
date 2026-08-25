@@ -25,7 +25,7 @@ import {
 
 // ===== (1) Cấu trúc & ETag =====
 
-test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5, version = v5", () => {
+test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5, version = v6", () => {
   const pack = getCurrentRulePack();
   for (const field of [
     "version",
@@ -43,8 +43,8 @@ test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleM
     assert.ok(field in pack, `Thiếu field v4 ${field}`);
   }
   assert.ok("styleMap" in pack, "Thiếu field v5 styleMap");
-  assert.equal(pack.version, "v5");
-  assert.equal(CURRENT_RULE_PACK_VERSION, "v5");
+  assert.equal(pack.version, "v6");
+  assert.equal(CURRENT_RULE_PACK_VERSION, "v6");
 });
 
 test("rule pack v2 là mở rộng thuần của v1: 5 field cũ giữ nguyên nội dung", async () => {
@@ -119,7 +119,7 @@ test("rule pack v4 là mở rộng thuần của v3: chỉ thêm drawTools + she
 
 test("rule pack v5 là mở rộng thuần của v4: chỉ thêm styleMap + khóa mới trong inspectionPolicy (M101 FR1)", async () => {
   const v4 = (await import("@/lib/ky-thuat/cad/rule-packs/v4.json")).default;
-  const v5 = getCurrentRulePack();
+  const v5 = (await import("@/lib/ky-thuat/cad/rule-packs/v5.json")).default;
 
   for (const field of [
     "layerMap",
@@ -152,7 +152,74 @@ test("rule pack v5 là mở rộng thuần của v4: chỉ thêm styleMap + khó
   }
 });
 
-test("v5: 7 phép kiểm mới đều có enabled và đều TẮT mặc định (M101 AC(a))", () => {
+test("rule pack v6 là mở rộng thuần của v5: chỉ thêm ghi chú khóa mới trong takeoff (M101 §6.3 FR4)", async () => {
+  const v5 = (await import("@/lib/ky-thuat/cad/rule-packs/v5.json")).default;
+  const v6 = getCurrentRulePack();
+
+  for (const field of [
+    "layerMap",
+    "fontMap",
+    "purgePolicy",
+    "lineweightMap",
+    "flattenPolicy",
+    "inspectionPolicy",
+    "styleMap",
+    "drawTools",
+    "sheetSetup",
+  ] as const) {
+    assert.deepEqual(
+      v6[field],
+      v5[field],
+      `Field ${field} của v6 lệch v5 — v6 phải là mở rộng thuần (lệnh M99/M100/M101 chạy với v6 không đổi hành vi)`,
+    );
+  }
+  assert.deepEqual(
+    Object.keys(v6).filter((k) => !(k in v5)),
+    [],
+    "v6 không được thêm khối mới ở cấp gốc",
+  );
+  // takeoff: chỉ ĐƯỢC THÊM khóa mô tả; danh sách items (thứ tự + nội dung) không đổi một byte.
+  assert.deepEqual(
+    Object.keys(v6.takeoff).filter((k) => !(k in v5.takeoff)),
+    ["itemOptionsV6"],
+    "v6 thêm nhiều hơn đúng 1 khóa mô tả itemOptionsV6 trong takeoff",
+  );
+  assert.deepEqual(v6.takeoff.items, v5.takeoff.items, "items của v6 lệch v5 — bóc sẽ ra số khác");
+});
+
+test("v6: không item nào bật khóa bóc nâng cao (bóc bằng v6 = bóc bằng v5)", () => {
+  const items = getCurrentRulePack().takeoff.items as unknown as Record<string, unknown>[];
+  for (const item of items) {
+    for (const khoa of [
+      "groupBySize",
+      "sizeFromNearbyText",
+      "wastagePct",
+      "perCountAdd",
+      "derivedFrom",
+      "formula",
+    ]) {
+      assert.equal(
+        khoa in item,
+        false,
+        `item ${String(item.id)} khai sẵn "${khoa}" — v6 phải trung tính, hệ số do dự án chốt ở version sau`,
+      );
+    }
+  }
+  // Bộ khóa mới phải được tài liệu hóa tiếng Việt ngay trong rule pack (M101 §18 chống phình khó bảo trì).
+  const doc = getCurrentRulePack().takeoff.itemOptionsV6 as Record<string, string>;
+  for (const khoa of [
+    "groupBySize",
+    "sizeFromNearbyText",
+    "wastagePct",
+    "perCountAdd",
+    "derivedFrom",
+    "formula",
+  ]) {
+    assert.ok((doc[khoa] ?? "").length > 0, `itemOptionsV6 thiếu mô tả cho ${khoa}`);
+  }
+});
+
+test("v6 (kế thừa v5): 7 phép kiểm mới đều có enabled và đều TẮT mặc định (M101 AC(a))", () => {
   const ip = getCurrentRulePack().inspectionPolicy;
   const phepKiemMoi = [
     "overlapSameSystem",
@@ -178,7 +245,7 @@ test("v5: 7 phép kiểm mới đều có enabled và đều TẮT mặc định
   assert.ok(ip.strayObjects.minEntitiesForExtents >= 4);
 });
 
-test("v5: viewportScale.scales khớp sheetSetup.scales (một bộ tỉ lệ duy nhất, chống trôi)", () => {
+test("v6 (kế thừa v5): viewportScale.scales khớp sheetSetup.scales (một bộ tỉ lệ duy nhất, chống trôi)", () => {
   const pack = getCurrentRulePack();
   assert.deepEqual(
     [...pack.inspectionPolicy.viewportScale.scales].sort((a, b) => a - b),
@@ -187,7 +254,7 @@ test("v5: viewportScale.scales khớp sheetSetup.scales (một bộ tỉ lệ du
   );
 });
 
-test("v5: styleMap khai bộ style chuẩn dùng chung cho phép kiểm 14 và bước chuẩn hóa 8", () => {
+test("v6 (kế thừa v5): styleMap khai bộ style chuẩn dùng chung cho phép kiểm 14 và bước chuẩn hóa 8", () => {
   const sm = getCurrentRulePack().styleMap;
   assert.ok(sm.textStyle.name.length > 0 && sm.textStyle.fontFile.length > 0);
   assert.ok(sm.dimStyle.name.length > 0);

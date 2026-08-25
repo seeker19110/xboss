@@ -92,13 +92,16 @@ public static class RulePackLoader
                 throw new RulePackException($"takeoff item \"{item.Id}\": factor phải dương.");
             if (string.IsNullOrWhiteSpace(item.Name) || string.IsNullOrWhiteSpace(item.Unit))
                 throw new RulePackException($"takeoff item \"{item.Id}\" thiếu tên hoặc đơn vị.");
-            if (item.LayerMatchAny.Count == 0 &&
+            // Item dẫn xuất (v6) không quét bản vẽ nên không cần layer/tên block.
+            if (!item.LaDanXuat && item.LayerMatchAny.Count == 0 &&
                 (item.MeasureKind != TakeoffMeasure.Count || item.BlockNameMatchAny is not { Count: > 0 }))
             {
                 throw new RulePackException(
                     $"takeoff item \"{item.Id}\": layerMatchAny rỗng chỉ dành cho measure=count có blockNameMatchAny.");
             }
         }
+
+        ValidateBocKlV6(t);
 
         // inspectionPolicy (v2)
         if (pack.InspectionPolicy.ZToleranceMm <= 0)
@@ -107,6 +110,98 @@ public static class RulePackLoader
             throw new RulePackException("inspectionPolicy.openPolyline.nearGapToleranceMm phải dương.");
 
         ValidatePhepKiemV5(pack);
+    }
+
+    /// <summary>
+    /// Kiểm các khóa bóc tách nâng cao của v6 (M101 §6.3). Rule pack ≤ v5 không khai khóa nào →
+    /// mọi giá trị mặc định (tắt/0) → không ném gì. Nguyên tắc: khóa ĐANG BẬT mà khai thiếu/vô
+    /// nghĩa thì chặn ngay — bóc sai khối lượng nguy hiểm hơn nhiều so với không nạp được rule pack.
+    /// </summary>
+    private static void ValidateBocKlV6(TakeoffSection t)
+    {
+        var theoId = t.Items.ToDictionary(i => i.Id, StringComparer.Ordinal);
+
+        foreach (var item in t.Items)
+        {
+            if (item.WastagePct < 0)
+                throw new RulePackException($"takeoff item \"{item.Id}\": wastagePct không được âm.");
+            if (item.PerCountAdd < 0)
+                throw new RulePackException($"takeoff item \"{item.Id}\": perCountAdd không được âm.");
+            if (item.PerCountAdd > 0 && item.MeasureKind != TakeoffMeasure.Count)
+            {
+                throw new RulePackException(
+                    $"takeoff item \"{item.Id}\": perCountAdd chỉ dành cho measure=count (item đo dài/diện tích dùng wastagePct).");
+            }
+            if (item.WastagePct > 0 && item.MeasureKind == TakeoffMeasure.Count)
+            {
+                throw new RulePackException(
+                    $"takeoff item \"{item.Id}\": wastagePct không dùng được cho measure=count (dùng perCountAdd).");
+            }
+            if (item.GroupBySize && item.MeasureKind == TakeoffMeasure.Count)
+            {
+                throw new RulePackException(
+                    $"takeoff item \"{item.Id}\": groupBySize không dùng được cho measure=count (size sống trên tuyến, không trên block).");
+            }
+
+            if (item.SizeFromNearbyText is { Enabled: true } nhan)
+            {
+                if (!item.GroupBySize)
+                {
+                    throw new RulePackException(
+                        $"takeoff item \"{item.Id}\": sizeFromNearbyText bật nhưng groupBySize tắt — đọc size xong không dùng vào đâu.");
+                }
+                if (nhan.MaxDistanceMm <= 0)
+                    throw new RulePackException($"takeoff item \"{item.Id}\": sizeFromNearbyText.maxDistanceMm phải dương.");
+                if (nhan.SizePatterns.Count == 0)
+                    throw new RulePackException($"takeoff item \"{item.Id}\": sizeFromNearbyText.sizePatterns rỗng.");
+                foreach (var mau in nhan.SizePatterns)
+                {
+                    try
+                    {
+                        _ = new System.Text.RegularExpressions.Regex(mau);
+                    }
+                    catch (ArgumentException e)
+                    {
+                        throw new RulePackException(
+                            $"takeoff item \"{item.Id}\": sizePatterns có regex sai \"{mau}\" — {e.Message}");
+                    }
+                }
+            }
+
+            if (!item.LaDanXuat)
+            {
+                if (!string.IsNullOrWhiteSpace(item.Formula))
+                    throw new RulePackException($"takeoff item \"{item.Id}\": khai formula nhưng thiếu derivedFrom.");
+                continue;
+            }
+
+            _ = item.FormulaKind; // ném RulePackException nếu formula lạ/rỗng
+            if (item.MeasureKind != TakeoffMeasure.Area)
+            {
+                throw new RulePackException(
+                    $"takeoff item \"{item.Id}\": item dẫn xuất (derivedFrom) phải có measure=area — cách nhiệt tính ra m².");
+            }
+            if (!theoId.TryGetValue(item.DerivedFrom, out var nguon))
+            {
+                throw new RulePackException(
+                    $"takeoff item \"{item.Id}\": derivedFrom trỏ item \"{item.DerivedFrom}\" không có trong takeoff.items.");
+            }
+            if (nguon.LaDanXuat)
+            {
+                throw new RulePackException(
+                    $"takeoff item \"{item.Id}\": derivedFrom trỏ vào item cũng là dẫn xuất (\"{nguon.Id}\") — không hỗ trợ chuỗi dẫn xuất.");
+            }
+            if (nguon.MeasureKind != TakeoffMeasure.Length)
+            {
+                throw new RulePackException(
+                    $"takeoff item \"{item.Id}\": item nguồn \"{nguon.Id}\" phải có measure=length (công thức cần chiều dài).");
+            }
+            if (!nguon.GroupBySize)
+            {
+                throw new RulePackException(
+                    $"takeoff item \"{item.Id}\": item nguồn \"{nguon.Id}\" phải bật groupBySize — không có size thì không tính được cách nhiệt.");
+            }
+        }
     }
 
     /// <summary>

@@ -24,7 +24,10 @@ export const CURRENT_RULE_PACK_VERSION = RULE_PACK_HIEN_HANH.version;
  * plugin M99 đọc v4 chạy y hệt v3);
  * v5 = v4 + 7 phép kiểm mới của XBOSS_KIEMTRA (M101 §6.1, số 10–16) + khối styleMap dùng chung với
  * bước chuẩn hóa 8 (M101 §6.2). Mọi phép kiểm mới mặc định `enabled: false` nên plugin cũ lẫn mới
- * nạp v5 đều cho kết quả kiểm y hệt v4 (M101 §7 FR1).
+ * nạp v5 đều cho kết quả kiểm y hệt v4 (M101 §7 FR1);
+ * v6 = v5 + các khóa TÙY CHỌN của bóc tách nâng cao XBOSS_BOCKL (M101 §6.3: groupBySize,
+ * sizeFromNearbyText, wastagePct, perCountAdd, derivedFrom+formula). Không item nào trong v6 khai
+ * khóa mới nên bóc bằng v6 cho kết quả y hệt v5 — công ty bật hệ số theo dự án bằng version kế tiếp.
  */
 export function getCurrentRulePack(): CadRulePack {
   return RULE_PACK_HIEN_HANH;

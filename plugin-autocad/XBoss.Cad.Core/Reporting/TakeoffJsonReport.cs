@@ -15,8 +15,22 @@ public sealed record TakeoffJsonLine
     [JsonPropertyName("quyCach")] public required string QuyCach { get; init; }
     [JsonPropertyName("donVi")] public required string DonVi { get; init; }
     [JsonPropertyName("soDoiTuong")] public required int SoDoiTuong { get; init; }
+    /// <summary>KL ĐO trên bản vẽ — không bao giờ gồm hao hụt/phụ kiện (M101 §18).</summary>
     [JsonPropertyName("khoiLuong")] public required double KhoiLuong { get; init; }
     [JsonPropertyName("handles")] public required IReadOnlyList<string> Handles { get; init; }
+
+    // ===== v6 (M101 §6.3) — rỗng/0 khi rule pack chưa bật khóa nào =====
+
+    [JsonPropertyName("size")] public string Size { get; init; } = "";
+    /// <summary>Nguồn size: "XData" (chắc chắn) hay "đọc từ nhãn" (bán tự động, cần soát).</summary>
+    [JsonPropertyName("nguonSize")] public string NguonSize { get; init; } = "";
+    [JsonPropertyName("vung")] public string Vung { get; init; } = "";
+    [JsonPropertyName("heSoQuyDoi")] public double HeSoQuyDoi { get; init; }
+    [JsonPropertyName("moTaQuyDoi")] public string MoTaQuyDoi { get; init; } = "";
+    /// <summary>KL QUY ĐỔI — cột riêng, chỉ có khi rule pack khai hệ số.</summary>
+    [JsonPropertyName("klQuyDoi")] public double KlQuyDoi { get; init; }
+    /// <summary>Dòng tính ra từ item khác (cách nhiệt) chứ không đo trực tiếp.</summary>
+    [JsonPropertyName("danXuat")] public bool DanXuat { get; init; }
 }
 
 /// <summary>
@@ -63,6 +77,13 @@ public sealed class TakeoffJsonReport
             SoDoiTuong = l.ObjectCount,
             KhoiLuong = l.Quantity,
             Handles = l.Handles,
+            Size = l.Size,
+            NguonSize = TakeoffSize.MoTaNguon(l.NguonSize),
+            Vung = l.Vung,
+            HeSoQuyDoi = l.HeSoQuyDoi,
+            MoTaQuyDoi = l.MoTaQuyDoi,
+            KlQuyDoi = l.KlQuyDoi,
+            DanXuat = l.LaDanXuat,
         }).ToList(),
         CanhBao = ketQua.Warnings.Select(w => w.ThongDiep).ToList(),
     };
