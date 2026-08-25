@@ -16,7 +16,7 @@ import {
 import { Button, ButtonLink, Chip } from "@/app/components/ui";
 import type { ChipTone } from "@/app/components/ui/Chip";
 import { Skeleton } from "@/app/components/Skeleton";
-import { redirectToLogin, fetchMe } from "@/app/lib/me";
+import { redirectToLogin } from "@/app/lib/me";
 import { useBlockProposals } from "../hooks/useBlockProposals";
 import type { BlockProposal, BlockProposalKind, BlockProposalStatus } from "../types";
 
@@ -88,11 +88,11 @@ function BlockProposalRow({
   return (
     <li className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 flex flex-col sm:flex-row gap-3">
       <div className="shrink-0 w-16 h-16 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden">
-        {item.preview_svg ? (
+        {item.previewSvg ? (
           // eslint-disable-next-line @next/next/no-img-element -- data URL cục bộ, không phải ảnh từ xa
           <img
-            src={anhXemTruoc(item.preview_svg)}
-            alt={`Xem trước block ${item.block_name}`}
+            src={anhXemTruoc(item.previewSvg)}
+            alt={`Xem trước block ${item.blockName}`}
             className="w-full h-full object-contain"
           />
         ) : (
@@ -103,29 +103,29 @@ function BlockProposalRow({
       <div className="flex-1 min-w-0 space-y-1.5">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-mono font-bold text-sm text-zinc-100 truncate">
-            {item.block_name}
+            {item.blockName}
           </span>
           <Chip tone="accent">{NHAN_LOAI[item.kind]}</Chip>
           <Chip tone={trangThai.tone}>{trangThai.nhan}</Chip>
         </div>
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-zinc-400">
-          {item.system_id && <span>Hệ: {item.system_id}</span>}
-          {item.takeoff_item_id && <span>Hạng mục bóc tách: {item.takeoff_item_id}</span>}
-          {item.paper_size && <span>Khổ giấy: {item.paper_size}</span>}
-          <span>Base version: {item.base_lib_version}</span>
+          {item.systemId && <span>Hệ: {item.systemId}</span>}
+          {item.takeoffItemId && <span>Hạng mục bóc tách: {item.takeoffItemId}</span>}
+          {item.paperSize && <span>Khổ giấy: {item.paperSize}</span>}
+          <span>Base version: {item.baseLibVersion}</span>
         </div>
         {item.note && <p className="text-xs text-zinc-400">{item.note}</p>}
         <p className="text-[11px] text-zinc-500">
-          Đề xuất bởi <span className="text-zinc-300">{item.proposed_by_name}</span> —{" "}
-          {ngay(item.created_at)}
+          Đề xuất bởi <span className="text-zinc-300">{item.nguoiDeXuat}</span> —{" "}
+          {ngay(item.createdAt)}
         </p>
-        {item.status === "rejected" && item.reject_reason && (
-          <p className="text-xs text-red-300">Lý do từ chối: {item.reject_reason}</p>
+        {item.status === "rejected" && item.rejectReason && (
+          <p className="text-xs text-red-300">Lý do từ chối: {item.rejectReason}</p>
         )}
         {item.status === "approved" && (
           <p className="text-xs text-emerald-300">
-            Đã phát hành version {item.published_version ?? "—"}
-            {item.decided_by_name ? ` — duyệt bởi ${item.decided_by_name}` : ""}
+            Đã phát hành version {item.publishedVersion ?? "—"}
+            {item.nguoiQuyetDinh ? ` — duyệt bởi ${item.nguoiQuyetDinh}` : ""}
           </p>
         )}
       </div>
@@ -138,7 +138,7 @@ function BlockProposalRow({
             icon={Check}
             disabled={dangXuLy}
             onClick={() => onDuyet(item)}
-            aria-label={`Duyệt và phát hành block ${item.block_name}`}
+            aria-label={`Duyệt và phát hành block ${item.blockName}`}
           >
             Duyệt & Phát Hành
           </Button>
@@ -148,7 +148,7 @@ function BlockProposalRow({
             icon={X}
             disabled={dangXuLy}
             onClick={() => onTuChoi(item)}
-            aria-label={`Từ chối đề xuất block ${item.block_name}`}
+            aria-label={`Từ chối đề xuất block ${item.blockName}`}
           >
             Từ Chối
           </Button>
@@ -166,10 +166,11 @@ export default function ThuVienBlockPanel() {
   const [thanhCong, setThanhCong] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
-  // M103 — Đề xuất block chờ duyệt: chỉ Admin/PM thấy nút Duyệt/Từ chối.
-  const [coQuyenDuyet, setCoQuyenDuyet] = useState(false);
+  // M103 — Đề xuất block chờ duyệt: quyền duyệt do server trả về (laNguoiDuyet = Admin/PM).
   const [loiHanhDongDeXuat, setLoiHanhDongDeXuat] = useState<string | null>(null);
-  const { deXuat, loiDeXuat, dangXuLyId, taiDeXuat, duyet, tuChoi } = useBlockProposals();
+  const { deXuat, laNguoiDuyet, loiDeXuat, dangXuLyId, taiDeXuat, duyet, tuChoi } =
+    useBlockProposals();
+  const coQuyenDuyet = laNguoiDuyet;
 
   const tai = useCallback(async () => {
     try {
@@ -190,14 +191,13 @@ export default function ThuVienBlockPanel() {
   useEffect(() => {
     void tai();
     void taiDeXuat();
-    void fetchMe().then((me) => setCoQuyenDuyet(me?.role === "admin" || me?.role === "pm"));
   }, [tai, taiDeXuat]);
 
   async function xuLyDuyet(item: BlockProposal) {
     setLoiHanhDongDeXuat(null);
     if (
       !window.confirm(
-        `Duyệt và phát hành block "${item.block_name}"? Thư viện block hiện hành sẽ có version mới ngay lập tức (không thể hoàn tác).`,
+        `Duyệt và phát hành block "${item.blockName}"? Thư viện block hiện hành sẽ có version mới ngay lập tức (không thể hoàn tác).`,
       )
     ) {
       return;
@@ -213,7 +213,7 @@ export default function ThuVienBlockPanel() {
 
   async function xuLyTuChoi(item: BlockProposal) {
     setLoiHanhDongDeXuat(null);
-    const ly_do = window.prompt(`Nhập lý do từ chối đề xuất "${item.block_name}":`, "");
+    const ly_do = window.prompt(`Nhập lý do từ chối đề xuất "${item.blockName}":`, "");
     if (ly_do === null) return; // huỷ
     const lyDo = ly_do.trim();
     if (!lyDo) {

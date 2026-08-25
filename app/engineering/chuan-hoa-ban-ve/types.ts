@@ -198,21 +198,23 @@ export type BlockProposalStatus = "pending" | "approved" | "rejected" | "stale";
 
 export interface BlockProposal {
   id: number;
-  block_name: string;
+  blockName: string;
   kind: BlockProposalKind;
-  system_id: string | null;
-  takeoff_item_id: string | null;
-  paper_size: string | null;
+  kindNhan: string;
+  systemId: string | null;
+  takeoffItemId: string | null;
+  paperSize: string | null;
   note: string | null;
-  base_lib_version: string;
-  preview_svg: string | null;
+  baseLibVersion: string;
+  previewSvg: string | null;
   status: BlockProposalStatus;
-  reject_reason: string | null;
-  published_version: string | null;
-  proposed_by_name: string;
-  decided_by_name: string | null;
-  decided_at: string | null;
-  created_at: string;
+  statusNhan: string;
+  rejectReason: string | null;
+  publishedVersion: string | null;
+  nguoiDeXuat: string;
+  nguoiQuyetDinh: string | null;
+  decidedAt: string | null;
+  createdAt: string;
 }
 
 export interface RunDxfAnalysisOptions {

@@ -11,6 +11,7 @@ export function useBlockProposals() {
   const [deXuat, setDeXuat] = useState<BlockProposal[] | null>(null);
   const [loiDeXuat, setLoiDeXuat] = useState<string | null>(null);
   const [dangXuLyId, setDangXuLyId] = useState<number | null>(null);
+  const [laNguoiDuyet, setLaNguoiDuyet] = useState(false);
 
   const taiDeXuat = useCallback(async () => {
     try {
@@ -22,12 +23,8 @@ export function useBlockProposals() {
         return;
       }
       setLoiDeXuat(null);
-      const items: BlockProposal[] = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.items)
-          ? data.items
-          : [];
-      setDeXuat(items);
+      setDeXuat(Array.isArray(data?.deXuat) ? (data.deXuat as BlockProposal[]) : []);
+      setLaNguoiDuyet(Boolean(data?.laNguoiDuyet));
     } catch {
       setLoiDeXuat("Lỗi mạng — không tải được danh sách đề xuất block.");
     }
@@ -93,5 +90,5 @@ export function useBlockProposals() {
     [taiDeXuat],
   );
 
-  return { deXuat, loiDeXuat, dangXuLyId, taiDeXuat, duyet, tuChoi };
+  return { deXuat, laNguoiDuyet, loiDeXuat, dangXuLyId, taiDeXuat, duyet, tuChoi };
 }
