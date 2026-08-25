@@ -73,3 +73,17 @@ V3 → (V4 ∥ V5) → V6 → V7. Mỗi việc worktree riêng; các file Comman
 - `lib/ky-thuat/cad/rule-pack.ts` + route: phát hành v5 là bản hiện hành (như V1 đã làm với v4).
 
 **Tiêu chí chấp nhận:** dotnet test xanh toàn bộ (119 hiện tại + mới); test node liên quan xanh; v1–v4 không đổi; chứng minh mutation (bật 1 phép + dữ liệu vi phạm → đỏ; gỡ → xanh).
+
+## Việc W3 — Bóc theo size + theo vùng + cách nhiệt + hệ số quy đổi (M101 PR3) — `route: complex`
+
+Đặc tả M101 §6.3 (bảng 6 nâng cấp — làm 4 mục đầu ở PR này, `boqCode` per-project + đối chiếu BOQ để PR4), §7 FR4/FR6, §8 (c)(d), §15, §18.
+
+**Nền có sẵn:** rule pack v5 (hiện hành), `XBoss.Cad.Core/Takeoff/` (bóc hiện tại), `Excel/` (ClosedXML, mẫu công ty §13.2 M99 — **hợp đồng layout, cột/sheet mới chỉ được CỘNG THÊM**), `Draw/VeXData.cs` (đọc XData `XBOSS_VE` do M100 ghi: hệ/item/size/slope), `Matching/TokenMatcher.cs`.
+
+1. **Rule pack v6** (append-only, v1–v5 không đổi 1 byte): `takeoff.items[]` thêm khóa tùy chọn `groupBySize` (bool), `sizeFromNearbyText` (`{enabled, maxDistanceMm, sizePatterns[]}`), `wastagePct` (số, mặc định 0), `perCountAdd` (số, mặc định 0), và item dẫn xuất `derivedFrom` + `formula` (`"perimeter*length"` | `"pi*dn*length"`). Mọi khóa mới **mặc định vắng/0** → v6 cho kết quả y hệt v5 (ca test bắt buộc).
+2. **Core `Takeoff/`**: bóc tách dòng theo size khi `groupBySize` — nguồn size ưu tiên XData `XBOSS_VE`, thiếu thì đọc nhãn gần tuyến theo `sizePatterns` (ghi rõ **nguồn** "XData" / "đọc từ nhãn" vào kết quả từng dòng); item dẫn xuất tính từ size đã tách (thiếu size → bỏ qua + đếm mét chưa tính, KHÔNG đoán); `wastagePct`/`perCountAdd` tính thành cột RIÊNG, không trộn vào KL đo.
+3. **Core `Zoning/` (MỚI, thuần)**: clip polyline theo ranh giới (polyline kín) — trả phần nằm trong + chiều dài từng phần, cắt đúng tại giao điểm; đoạn cung xử lý đúng. Kết quả bóc gắn tên vùng.
+4. **Excel**: thêm cột "Vùng", tách cột "KL đo" / "KL quy đổi" (công thức sống), subtotal theo vùng; giữ nguyên cột A–K + công thức H/J/K + SUBTOTAL tổng của mẫu công ty. Sidecar JSON thêm size/vùng/nguồn size.
+5. **Adapter**: chỉ phần tối thiểu để truyền vùng chọn + nhãn gần tuyến vào Core (dùng stub `/tmp/claude-0/-home-user-xboss/3f35183b-b0e6-57b0-a97e-118b57e3f070/scratchpad/acad-shim/` để biên dịch thử). Nếu phần Adapter quá rủi ro khi code mù → làm Core + test trọn vẹn, để Adapter tối thiểu và GHI RÕ trong báo cáo.
+
+**Tiêu chí chấp nhận:** AC (c) tuyến 10m cắt ranh giới 6/4 → vùng A 6.00m, vùng B 4.00m; AC (d) cách nhiệt ống gió 300x200 dài 10m → 10×(0.3+0.2)×2 = 10.00 m²; v6 mặc định = v5; Excel mở được, mẫu cũ không vỡ (test round-trip ClosedXML như M99 đã có).
