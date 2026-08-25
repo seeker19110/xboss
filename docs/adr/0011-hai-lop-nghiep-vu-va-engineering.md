@@ -89,6 +89,26 @@ cố ý không quyết thay. Điều kiện để quyết:
 2. Đối chiếu với 12 module đang `thuNghiem: true` trong `lib/nen/modules.ts` — toàn bộ nằm
    ở lớp này, tức đã tắt mặc định cho mọi dự án.
 
+**Công cụ đo (điều kiện 1):** `npm run dem:engineering` — script CHỈ ĐỌC, an toàn chạy thẳng
+trên production:
+
+```bash
+DATABASE_URL=<chuỗi kết nối production> npm run dem:engineering
+DATABASE_URL=<...> npm run dem:engineering -- --tat-ca   # liệt kê cả 119 bảng
+```
+
+Script in ra, cho từng cặp, số dòng bảng gốc ↔ số dòng lớp engineering kèm **kết luận gợi ý**
+theo đúng quy tắc của ADR này:
+
+| Kết quả đo                    | Kết luận                                                     |
+| ----------------------------- | ------------------------------------------------------------ |
+| Lớp eng. = 0 dòng             | **Xoá** lớp engineering của cặp đó — rẻ hơn gộp nhiều bậc    |
+| Lớp eng. < 1/10 bảng gốc      | Gần như không ai dùng → **nghiêng về xoá**, xác nhận với PM  |
+| Cả hai đều có dữ liệu đáng kể | **Phải gộp thật** — cần kế hoạch di trú riêng, không làm vội |
+| Chỉ lớp eng. có dữ liệu       | Xem lại: nghiệp vụ gốc chưa được dùng? Quyết cùng PM         |
+
+Ghi số đo được vào chính mục này rồi mới quyết từng cặp — **không quyết bằng suy đoán**.
+
 Trong lúc chờ, quy tắc danh tính ở trên **vẫn áp cho mọi bảng mới** — cổng CI không cho tập
 vi phạm phình thêm.
 
