@@ -4,6 +4,46 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## M101 PR4 — `boqCode` theo dự án + đối chiếu BOQ chỉ-đọc (2026-08-25)
+
+Đóng 2 dòng cuối bảng `docs/nang-cap/M101-plugin-nang-tran.md` §6.3: QS không phải gõ tay cột A của
+Excel bóc tách, và so được KL bóc với KL BOQ hợp đồng ngay trong tệp Excel.
+
+- **Migration `0140_cad_boq_code_map.sql`** (thêm thuần: `CREATE TABLE`/`INDEX` + RLS, không đụng
+  dòng dữ liệu nào): bảng `cad_takeoff_boq_map (project_id, takeoff_item_id) → boq_code`, unique theo
+  cặp nên ghi lại là `ON CONFLICT DO UPDATE` (idempotent). **RLS theo khuôn NGHIÊM NGẶT 2 nhánh của
+  0077/0092** (không có nhánh chuyển tiếp "GUC rỗng → cho qua" của 0069) vì bảng mới hoàn toàn, mọi
+  đường đọc/ghi đều bọc `withProjectScope`. `boq_code` là THAM CHIẾU tới mã đã có (thường là
+  `boq_items.code`), **không** đăng ký vào sổ `boq_codes` (0029) — đăng ký sẽ đụng chính dòng BOQ
+  đang sở hữu mã đó, phá bất biến "một mã một chủ".
+- **`lib/ky-thuat/cad/boq-map.ts`**: đọc/ghi map + `ganMaBoqVaoItems` (thuần, KHÔNG sửa tại chỗ
+  singleton rule pack — sửa tại chỗ là rò mã BOQ của dự án này sang request của dự án khác). Ghi chỉ
+  nhận id hạng mục có thật trong rule pack đang phát hành; mã rỗng = gỡ dòng.
+- **`lib/dich-vu/cad-boq-snapshot.ts`** (tầng dịch vụ, ADR-0008 — phối hợp miền `ky-thuat` +
+  `khoi-luong`): ghép map với `boq_items` theo `lower(code)` **trong phạm vi dự án**. Chỉ lấy KHỐI
+  LƯỢNG (`qty_contract`), không SELECT cột tiền nào (M101 §7 FR5 + quy ước M45). Chưa khớp dòng BOQ
+  → `qtyContract: null`, không suy ra 0.
+- **API**: `GET /api/engineering/cad/rule-pack?project=<id>` trả rule pack có `takeoff.items[].boqCode`
+  đã gán (không có `?project=` → hành vi cũ y nguyên, kể cả ETag); `GET /api/engineering/cad/boq-snapshot`
+  (MỚI, **chỉ đọc** — tệp route cố ý chỉ export `GET`, có test chặn thêm POST/PUT/PATCH/DELETE:
+  đường ghi sổ khối lượng duy nhất vẫn là upload có kiểm định); `GET/PUT /api/engineering/cad/boq-map`
+  cho web (PUT chỉ Admin/PM, không nhận token thiết bị).
+- **Không tin `?project=` client gửi**: thêm `chotProjectIdChoDoc` (`lib/ha-tang/projects.ts`) —
+  đối chiếu `visibleProjectIds` **và** org của user (admin thấy dự án xuyên org nhưng không được nhảy
+  org qua query), không đọc `cookies()` nên plugin (Bearer token) dùng được; thuộc nhiều dự án mà
+  không chỉ định → 409 kèm danh sách để chọn, KHÔNG tự đoán một dự án.
+- **Web**: mục "Mã BOQ Theo Dự Án" trên `/engineering/chuan-hoa-ban-ve` — bảng hạng mục + ô nhập mã,
+  hiện luôn dòng BOQ khớp được (tên + KL hợp đồng) hoặc cảnh báo "chưa có dòng BOQ nào mang mã này".
+- **Plugin**: `XBossApiClient.FetchBoqSnapshotAsync` (chỉ GET); `BoqExcelWriter.Write` nhận thêm tham
+  số **tùy chọn** `doiChieu` → sheet phụ `Doi-chieu` (KL hợp đồng cạnh KL bóc, KL bóc là `SUMIF` sống
+  về `Data-BOQ`, chênh lệch/% là công thức) — `Data-BOQ` (mẫu công ty) và `Tong-hop-vung` (PR3) không
+  đổi một ô nào (có test so từng ô). `XBOSS_BOCKL_XUAT` hỏi "kéo KL BOQ hợp đồng?" mặc định **Không**;
+  chưa `XBOSS_LOGIN`/mất mạng/token hết hạn chỉ cảnh báo rồi xuất Excel như thường (không chặn xuất).
+- **Verify**: `tests/cad-boq-map.test.ts` (10 ca — gồm rò rỉ chéo dự án: dự án A gán mã của dự án B thì
+  `qtyContract` phải là `null` chứ không phải KL của B; `?project=` dự án không được gán → 403; RLS
+  chạy bằng role `xboss_app` NOBYPASSRLS: GUC rỗng trả rỗng, `WITH CHECK` chặn ghi chéo dự án);
+  `dotnet test` 423 → **435 ca xanh**; lint/typecheck/check:lib-layers xanh.
+
 ## Cổng CI mới — biên dịch thử Adapter AutoCAD bằng stub API, chạy trên Linux (2026-08-25)
 
 Đưa bộ stub API AutoCAD (trước đây dựng tạm **ngoài repo**) vào repo và biến thành **cổng CI thật**.

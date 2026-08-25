@@ -3,6 +3,7 @@ using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Runtime;
 using XBoss.Cad.Acad.Services;
+using XBoss.Cad.Core.Api;
 using XBoss.Cad.Core.Excel;
 using XBoss.Cad.Core.Geometry;
 using XBoss.Cad.Core.Inspection;
@@ -423,7 +424,14 @@ public sealed class XBossCommands
         if (tenDuAn is null) return;
         var goiThau = HoiChuoi(ed, "Gói thầu", luu.GoiThau);
         if (goiThau is null) return;
-        ExcelMetaStore.Ghi(new ExcelMetaStore.MetaLuu(tenDuAn, goiThau));
+
+        // M101 PR4 — tùy chọn kéo KL BOQ hợp đồng từ máy chủ để dựng sheet phụ "Doi-chieu".
+        // Mặc định KHÔNG kéo: chỉ Enter là hành vi y hệt trước PR4. Mọi trục trặc (chưa LOGIN,
+        // mất mạng, token hết hạn, máy chủ lỗi) chỉ CẢNH BÁO rồi xuất Excel như thường — không
+        // bao giờ chặn việc xuất bảng bóc.
+        var duAnId = luu.DuAnId;
+        var doiChieu = HoiDoiChieuBoq(ed, ref duAnId);
+        ExcelMetaStore.Ghi(new ExcelMetaStore.MetaLuu(tenDuAn, goiThau, duAnId));
 
         var tenBanVe = Path.GetFileName(db.Filename);
         var goiY = Path.ChangeExtension(tenBanVe, null) + "-boc-khoi-luong.xlsx";
@@ -447,7 +455,7 @@ public sealed class XBossCommands
         try
         {
             using var f = File.Create(dlg.Filename);
-            BoqExcelWriter.Write(ketQua, meta, f);
+            BoqExcelWriter.Write(ketQua, meta, f, doiChieu);
         }
         catch (IOException e)
         {
@@ -456,6 +464,10 @@ public sealed class XBossCommands
         }
         ed.WriteMessage($"\n[XBoss] Đã xuất Excel đúng mẫu công ty: {dlg.Filename}\n");
         ed.WriteMessage("[XBoss] Cột G = khối lượng bóc từ bản vẽ; QS điền cột F (KL BOQ hợp đồng) — cột H/J/K tự tính.\n");
+        if (doiChieu is { Dong.Count: > 0 })
+            ed.WriteMessage(
+                $"[XBoss] Sheet \"{BoqExcelWriter.SheetDoiChieu}\": {doiChieu.Dong.Count} hạng mục có KL BOQ hợp đồng " +
+                $"(dự án #{doiChieu.ProjectId}, chụp lúc {doiChieu.ChupLuc}) — chênh lệch là công thức sống.\n");
 
         // Sidecar JSON máy-đọc-được cạnh tệp Excel — PR5 gửi kèm khi upload, kiểm chéo được với Excel.
         var duongDanJson = Path.ChangeExtension(dlg.Filename, ".json");
@@ -556,6 +568,94 @@ public sealed class XBossCommands
         var (toMm, _, _) = DrawingUnits.TuInsUnits((int)db.Insunits);
         return new TakeoffScanner.BoiCanhBoc(
             chonVung.Vung, TakeoffScanner.QuetNhan(db, tr), nguongMm / toMm, chonVung.HandleRanhGioi);
+    }
+
+    // ===== Đối chiếu BOQ (M101 PR4) =====
+
+    /// <summary>
+    /// Hỏi có kéo KL BOQ hợp đồng từ máy chủ không, rồi tải về (chỉ ĐỌC). Trả null = không dựng
+    /// sheet <c>Doi-chieu</c> — dùng cho cả "kỹ sư chọn Không" lẫn mọi trục trặc mạng/token: lệnh
+    /// vẫn xuất Excel bình thường (M101 §6.3 — không mạng thì bỏ qua kèm thông báo, KHÔNG chặn).
+    /// <paramref name="duAnId"/> vào là dự án đã chọn lần trước, ra là dự án thực sự dùng (nhớ cho
+    /// lần sau).
+    /// </summary>
+    private static BoqSnapshot? HoiDoiChieuBoq(Editor ed, ref long? duAnId)
+    {
+        var hoi = new PromptKeywordOptions(
+            "\n[XBoss] Kéo KL BOQ hợp đồng từ máy chủ để dựng sheet \"Doi-chieu\"?")
+        { AllowNone = false };
+        hoi.Keywords.Add("Khong", "Khong", "Không (chỉ bảng bóc như cũ)");
+        hoi.Keywords.Add("Co", "Co", "Có (cần mạng + đã chạy XBOSS_LOGIN)");
+        hoi.Keywords.Default = "Khong";
+        var traLoi = ed.GetKeywords(hoi);
+        if (traLoi.Status != PromptStatus.OK || traLoi.StringResult != "Co") return null;
+
+        var baseUrl = XBossLoginCommand.DocServerUrl();
+        if (baseUrl is null)
+        {
+            ed.WriteMessage("\n[XBoss] ⚠ Chưa cấu hình server XBoss — bỏ qua sheet đối chiếu (chạy XBOSS_LOGIN nếu cần).\n");
+            return null;
+        }
+        if (CredentialStore.DocToken(baseUrl) is not { } token)
+        {
+            ed.WriteMessage($"\n[XBoss] ⚠ Máy chưa ghép thiết bị với {baseUrl} — bỏ qua sheet đối chiếu (chạy XBOSS_LOGIN).\n");
+            return null;
+        }
+
+        var client = new XBossApiClient(baseUrl);
+        ed.WriteMessage($"\n[XBoss] Đang lấy KL BOQ hợp đồng từ {baseUrl}…\n");
+        try
+        {
+            try
+            {
+                return TaiSnapshotBoq(client, token, duAnId);
+            }
+            catch (XBossCanChonDuAnException e)
+            {
+                // Người dùng thuộc nhiều dự án: danh sách do MÁY CHỦ cấp, chọn xong máy chủ vẫn
+                // kiểm lại quyền ở lần gọi sau — plugin không tự đoán dự án nào.
+                if (e.DuAn.Count == 0)
+                {
+                    ed.WriteMessage($"[XBoss] ⚠ {e.Message} — bỏ qua sheet đối chiếu.\n");
+                    return null;
+                }
+                ed.WriteMessage("[XBoss] Tài khoản thuộc nhiều dự án — chọn dự án lấy KL BOQ:\n");
+                foreach (var d in e.DuAn) ed.WriteMessage($"[XBoss]   {d.Id} — {d.Name}\n");
+                var nhap = HoiChuoi(ed, "Mã số dự án", e.DuAn[0].Id.ToString());
+                if (nhap is null || !long.TryParse(nhap.Trim(), out var chon))
+                {
+                    ed.WriteMessage("[XBoss] ⚠ Không nhận được mã số dự án — bỏ qua sheet đối chiếu.\n");
+                    return null;
+                }
+                duAnId = chon;
+                return TaiSnapshotBoq(client, token, duAnId);
+            }
+        }
+        catch (XBossApiException e)
+        {
+            ed.WriteMessage($"[XBoss] ⚠ {e.Message} — bỏ qua sheet đối chiếu, vẫn xuất bảng bóc.\n");
+        }
+        catch (HttpRequestException e)
+        {
+            ed.WriteMessage($"[XBoss] ⚠ Không nối được máy chủ ({e.Message}) — bỏ qua sheet đối chiếu.\n");
+        }
+        catch (TaskCanceledException)
+        {
+            ed.WriteMessage("[XBoss] ⚠ Máy chủ không trả lời kịp — bỏ qua sheet đối chiếu.\n");
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Gọi API bất đồng bộ từ một lệnh AutoCAD ĐỒNG BỘ. Bọc <c>Task.Run</c> rồi chờ để không
+    /// deadlock nếu ngữ cảnh lệnh có SynchronizationContext; giới hạn 20 giây để mạng công trường
+    /// chập chờn không treo AutoCAD (HttpClient còn timeout 30s của riêng nó).
+    /// </summary>
+    private static BoqSnapshot TaiSnapshotBoq(XBossApiClient client, string token, long? duAnId)
+    {
+        using var huy = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        return Task.Run(() => client.FetchBoqSnapshotAsync(token, duAnId, huy.Token), huy.Token)
+            .GetAwaiter().GetResult();
     }
 
     private static string? HoiChuoi(Editor ed, string nhan, string macDinh)

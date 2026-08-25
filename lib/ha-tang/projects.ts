@@ -193,3 +193,50 @@ export async function chotProjectIdChoGhi(
   const duocPhep = await visibleProjectIds(user);
   return duocPhep.includes(muonDung) ? { ok: true, projectId: muonDung } : { ok: false };
 }
+
+export type ChotDocKetQua =
+  | { ok: true; projectId: number }
+  | { ok: false; lyDo: "khong-thay"; duAn?: undefined }
+  | { ok: false; lyDo: "phai-chon"; duAn: { id: number; name: string }[] };
+
+/**
+ * Chốt `project_id` cho một thao tác ĐỌC khi client gửi `?project=` (M101 PR4).
+ *
+ * Khác `chotProjectIdChoGhi` ở hai điểm, đều vì đường vào khác nhau:
+ *   1. KHÔNG có "dự án đang chọn" để rơi về — plugin AutoCAD gọi bằng Bearer token thiết bị,
+ *      không mang cookie `xboss_project`. Không truyền `project` mà user chỉ thấy đúng 1 dự án
+ *      thì suy ra dự án đó; thấy nhiều dự án thì TRẢ VỀ DANH SÁCH để người dùng chọn, chứ không
+ *      tự đoán một cái (đoán = đưa nhầm khối lượng BOQ của dự án khác cho QS).
+ *   2. Có kiểm ORG: `visibleProjectIds` cho admin thấy mọi dự án XUYÊN tổ chức, nhưng ngữ cảnh
+ *      dự án của một request phải cùng org với user (đúng quy ước M54 GĐ1 PR2 ở
+ *      `getCurrentProjectId`). Bảng đối chiếu BOQ là dữ liệu thương mại — không nới quy tắc này.
+ *
+ * Không đọc `cookies()` nên gọi được cả ngoài phạm vi request (test gọi thẳng route handler).
+ */
+export async function chotProjectIdChoDoc(
+  user: { id: number; role: Role; orgId: number },
+  inputProjectId: unknown,
+): Promise<ChotDocKetQua> {
+  const visible = await visibleProjectIds(user);
+  if (visible.length === 0) return { ok: false, lyDo: "khong-thay" };
+
+  const placeholders = visible.map(() => "?").join(",");
+  const duAn = await query<{ id: number; name: string }>(
+    `SELECT id, name FROM projects WHERE id IN (${placeholders}) AND org_id = ? ORDER BY id`,
+    ...visible,
+    user.orgId,
+  );
+  if (duAn.length === 0) return { ok: false, lyDo: "khong-thay" };
+
+  if (inputProjectId == null || inputProjectId === "") {
+    return duAn.length === 1
+      ? { ok: true, projectId: duAn[0].id }
+      : { ok: false, lyDo: "phai-chon", duAn };
+  }
+
+  const muonDung = Number(inputProjectId);
+  if (!Number.isInteger(muonDung) || muonDung <= 0) return { ok: false, lyDo: "khong-thay" };
+  return duAn.some((d) => d.id === muonDung)
+    ? { ok: true, projectId: muonDung }
+    : { ok: false, lyDo: "khong-thay" };
+}
