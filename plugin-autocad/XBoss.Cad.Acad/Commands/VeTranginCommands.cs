@@ -72,7 +72,7 @@ public sealed class VeTranginCommands
         }
         var tiLeViewport = SheetSetup.TiLeViewport(tiLe, toMm);
 
-        var vung = HoiVungIn(ed);
+        var vung = HoiVungIn(ed, db);
         if (vung is not { } khungMoHinh) return;
 
         var cheDoAn = HoiCheDoAnLayer(ed);
@@ -185,11 +185,19 @@ public sealed class VeTranginCommands
 
     // ===== Hỏi đáp =====
 
-    /// <summary>Vùng mặt bằng cần in: 2 điểm đối đỉnh (WCS, ép phẳng Z=0).</summary>
-    private static (Point2d Tam, double Rong, double Cao)? HoiVungIn(Editor ed)
+    /// <summary>
+    /// Vùng mặt bằng cần in (M100 §6.3 bước 1): 2 điểm đối đỉnh HOẶC một polyline ranh giới kín
+    /// (lấy hình bao của nó). Toạ độ trả về luôn ở WCS — điểm bấm quy từ UCS, hình bao polyline
+    /// vốn đã là WCS.
+    /// </summary>
+    private static (Point2d Tam, double Rong, double Cao)? HoiVungIn(Editor ed, Database db)
     {
         var ucs = ed.CurrentUserCoordinateSystem;
-        var kq1 = ed.GetPoint(new PromptPointOptions("\n[XBoss] Góc thứ nhất của vùng cần in (ESC để hủy): "));
+        var opt1 = new PromptPointOptions(
+            "\n[XBoss] Góc thứ nhất của vùng cần in [RanhGioi] (ESC để hủy): ");
+        opt1.Keywords.Add("RanhGioi", "RanhGioi", "RanhGioi");
+        var kq1 = ed.GetPoint(opt1);
+        if (kq1.Status == PromptStatus.Keyword) return VungTheoRanhGioi(ed, db);
         if (kq1.Status != PromptStatus.OK) return null;
         var p1 = kq1.Value.TransformBy(ucs);
 
@@ -211,6 +219,65 @@ public sealed class VeTranginCommands
             return null;
         }
         return (new Point2d((p1.X + p2.X) / 2, (p1.Y + p2.Y) / 2), rong, cao);
+    }
+
+    /// <summary>
+    /// Vùng in lấy theo HÌNH BAO của một polyline ranh giới KÍN (§6.3 bước 1) — cách dùng thật của
+    /// kỹ sư: ranh giới phân khu/tầng đã có sẵn trên bản vẽ, khỏi bấm lại 2 góc cho từng trang in
+    /// và mọi trang in cùng một khu ra đúng một khung.
+    /// Ranh giới HỞ bị từ chối: hình bao của polyline hở vẫn tính được nhưng "vùng in" khi đó không
+    /// phải thứ kỹ sư thấy trên màn hình — thà báo rõ còn hơn in ra thiếu một góc mặt bằng.
+    /// </summary>
+    private static (Point2d Tam, double Rong, double Cao)? VungTheoRanhGioi(Editor ed, Database db)
+    {
+        var hoi = new PromptEntityOptions("\n[XBoss] Chọn polyline ranh giới KÍN của vùng cần in: ");
+        hoi.SetRejectMessage("\n[XBoss] Chỉ nhận polyline làm ranh giới vùng in.\n");
+        hoi.AddAllowedClass(typeof(Polyline), false); // false = nhận cả lớp dẫn xuất
+        var chon = ed.GetEntity(hoi);
+        if (chon.Status != PromptStatus.OK) return null;
+
+        double rong, cao, tamX, tamY;
+        using (var tr = db.TransactionManager.StartTransaction())
+        {
+            if (tr.GetObject(chon.ObjectId, OpenMode.ForRead) is not Polyline pl)
+            {
+                tr.Commit();
+                ed.WriteMessage("\n[XBoss] Đối tượng chọn không phải polyline.\n");
+                return null;
+            }
+            if (!pl.Closed)
+            {
+                tr.Commit();
+                ed.WriteMessage(
+                    "\n[XBoss] Polyline ranh giới chưa KÍN — đóng nó lại (PEDIT → Close) rồi chạy lại, " +
+                    "hoặc bấm 2 góc vùng in.\n");
+                return null;
+            }
+            try
+            {
+                var bao = pl.GeometricExtents;
+                rong = bao.MaxPoint.X - bao.MinPoint.X;
+                cao = bao.MaxPoint.Y - bao.MinPoint.Y;
+                tamX = (bao.MaxPoint.X + bao.MinPoint.X) / 2;
+                tamY = (bao.MaxPoint.Y + bao.MinPoint.Y) / 2;
+            }
+            catch (Autodesk.AutoCAD.Runtime.Exception e)
+            {
+                tr.Abort();
+                ed.WriteMessage($"\n[XBoss] Không đọc được hình bao của ranh giới: {e.Message}\n");
+                return null;
+            }
+            tr.Commit();
+        }
+
+        if (rong <= 0 || cao <= 0)
+        {
+            ed.WriteMessage("\n[XBoss] Ranh giới suy biến (hình bao rỗng) — chưa tạo trang in.\n");
+            return null;
+        }
+        ed.WriteMessage(
+            $"[XBoss] Vùng in lấy theo hình bao ranh giới: {rong:#,##0} × {cao:#,##0} đơn vị bản vẽ.\n");
+        return (new Point2d(tamX, tamY), rong, cao);
     }
 
     /// <summary>Phạm vi VP-freeze — mặc định chỉ ẩn hệ MEP khác, giữ nền kiến trúc/trục.</summary>

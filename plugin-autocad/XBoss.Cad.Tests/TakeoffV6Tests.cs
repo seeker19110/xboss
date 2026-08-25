@@ -320,7 +320,9 @@ public class TakeoffV6Tests
     public void AC_v6_mac_dinh_cho_ket_qua_y_het_v5_tren_cung_bo_doi_tuong()
     {
         var v5 = RulePackLoader.Load(File.ReadAllText(RepoPaths.RulePackPathCua("v5.json")));
-        var v6 = RepoPaths.LoadRulePack();
+        // v6 nạp theo TÊN TỆP (không qua RepoPaths.LoadRulePack) vì bản đang phát hành đã là v7 —
+        // ca này vẫn phải chứng minh đúng điều nó nói: v6 so với v5.
+        var v6 = RulePackLoader.Load(File.ReadAllText(RepoPaths.RulePackPathCua("v6.json")));
         Assert.Equal("v6", v6.Version);
 
         // Cố ý đưa cả dữ liệu size/nhãn của M100 vào: v6 KHÔNG bật groupBySize cho item nào nên

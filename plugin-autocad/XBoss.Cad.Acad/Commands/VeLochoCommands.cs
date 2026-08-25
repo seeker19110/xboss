@@ -202,7 +202,9 @@ public sealed class VeLochoCommands
         if (!BlockLibraryService.ChenHangLoat(doc, ed, db, def0, thuVien, muc)) return;
 
         ed.WriteMessage(
-            $"\n[XBoss] Đã chèn {muc.Count} lỗ chờ {sizeSleeve.Nhan} ({def0.BlockName}) trên tuyến {xd.Size}.\n" +
+            $"\n[XBoss] Đã chèn {muc.Count} lỗ chờ {sizeSleeve.Nhan} ({def0.BlockName}) trên tuyến {xd.Size}.\n");
+        BlockLibraryService.BaoItemDem(ed, pack.RulePack, def0, "lỗ chờ");
+        ed.WriteMessage(
             "[XBoss] Xuất bảng builder's work: XBOSS_VE_LOCHO → XUATBANG · Hoàn tác: UNDO 1 lần.\n");
     }
 

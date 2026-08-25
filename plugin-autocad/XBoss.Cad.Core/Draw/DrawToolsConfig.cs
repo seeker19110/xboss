@@ -22,6 +22,22 @@ public sealed class DrawToolsSection
 
     [JsonPropertyName("labelStyle")] public LabelStyleSection LabelStyle { get; init; } = new();
     [JsonPropertyName("systems")] public IReadOnlyList<DrawSystem> Systems { get; init; } = [];
+
+    /// <summary>
+    /// Id block phụ kiện được coi là PHỤ KIỆN NẶNG — <c>XBOSS_VE_GIADO</c> luôn đặt thêm giá đỡ
+    /// ngay tại đó (M100 §6.7). Rule pack v4–v6 KHÔNG có khóa này ⇒ danh sách rỗng, lệnh giữ
+    /// nguyên đường hỏi kỹ sư (hành vi cũ không đổi). Khai từ v7.
+    /// </summary>
+    [JsonPropertyName("heavyFittingIds")] public IReadOnlyList<string> HeavyFittingIds { get; init; } = [];
+
+    /// <summary>Rule pack có khai (dù rỗng) danh sách phụ kiện nặng chưa — phân biệt "khai rỗng
+    /// = không phụ kiện nào nặng" với "chưa khai = phải hỏi kỹ sư".</summary>
+    [JsonIgnore] public bool CoKhaiPhuKienNang => HeavyFittingIds.Count > 0;
+
+    /// <summary>Block phụ kiện (theo id manifest) có phải phụ kiện nặng không.</summary>
+    public bool LaPhuKienNang(string? blockId) =>
+        blockId is { Length: > 0 } id &&
+        HeavyFittingIds.Any(h => string.Equals(h, id, StringComparison.Ordinal));
 }
 
 public sealed class LabelStyleSection
@@ -260,7 +276,23 @@ public static class DrawToolsConfig
             }
         }
 
-        // (e) titleblockId khai thì phải khác rỗng (khai nửa vời = XBOSS_VE_TRANGIN chèn khung tên rỗng).
+        // (e) phụ kiện nặng (v7) phải là id có thật trong fittings của một hệ nào đó — khai lệch
+        // thì XBOSS_VE_GIADO lặng lẽ không đặt giá đỡ ở van (đúng chỗ nguy hiểm nhất), không ai biết.
+        var moiPhuKien = new HashSet<string>(
+            drawTools.Systems.SelectMany(s => s.Fittings), StringComparer.Ordinal);
+        foreach (var id in drawTools.HeavyFittingIds)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                throw new RulePackException("drawTools.heavyFittingIds có phần tử rỗng.");
+            if (!moiPhuKien.Contains(id))
+            {
+                throw new RulePackException(
+                    $"drawTools.heavyFittingIds[\"{id}\"] không có trong fittings của hệ nào — " +
+                    "id phụ kiện đã trôi khỏi drawTools.systems[].fittings (M100 §6.7).");
+            }
+        }
+
+        // (f) titleblockId khai thì phải khác rỗng (khai nửa vời = XBOSS_VE_TRANGIN chèn khung tên rỗng).
         if (sheetSetup.TitleblockId is { } tb && string.IsNullOrWhiteSpace(tb))
             throw new RulePackException("sheetSetup.titleblockId khai rồi nhưng để rỗng.");
     }

@@ -1,3 +1,4 @@
+using Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Geometry;
@@ -111,10 +112,8 @@ public sealed class VeTuyenCommands
                 var ms = (BlockTableRecord)tr.GetObject(
                     SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
 
-                var tim = TaoPolyline(net.Dinh, net.Kin);
-                ms.AppendEntity(tim);
-                tr.AddNewlyCreatedDBObject(tim, true);
-                tim.Layer = tuyen.Layer; // đặt SAU khi vào database (xem chú thích TaoPolyline)
+                var tim = VeThucThe.TaoPolyline(net.Dinh, net.Kin);
+                VeThucThe.Them(tr, ms, tim, tuyen.Layer); // layer đặt SAU khi vào database
 
                 var handleBien = new List<string>();
                 if (beRong is { } w)
@@ -131,10 +130,8 @@ public sealed class VeTuyenCommands
                             db, tr, tenLayerBien, VeLayerStyle.AciNetBien, pack.RulePack.LineweightMap, out _);
                         foreach (var canh in new[] { kq.Trai, kq.Phai })
                         {
-                            var bien = TaoPolyline(canh, net.Kin);
-                            ms.AppendEntity(bien);
-                            tr.AddNewlyCreatedDBObject(bien, true);
-                            bien.Layer = tenLayerBien;
+                            var bien = VeThucThe.TaoPolyline(canh, net.Kin);
+                            VeThucThe.Them(tr, ms, bien, tenLayerBien);
                             VeXDataStore.Ghi(bien, new VeXDataInfo
                             {
                                 VaiTro = VaiTroVe.Bien,
@@ -205,6 +202,7 @@ public sealed class VeTuyenCommands
         VeXDataInfo? thongTin;
         Point3d viTri;
         double goc;
+        double gocTuyen;
         using (var tr = db.TransactionManager.StartTransaction())
         {
             if (tr.GetObject(chon.ObjectId, OpenMode.ForRead) is not Polyline pl)
@@ -214,7 +212,7 @@ public sealed class VeTuyenCommands
                 return;
             }
             thongTin = VeXDataStore.Doc(pl);
-            (viTri, goc) = ViTriNhan(pl, diemBam);
+            (viTri, goc, gocTuyen) = ViTriNhan(pl, diemBam);
             tr.Commit();
         }
 
@@ -235,7 +233,17 @@ public sealed class VeTuyenCommands
         var cao = pack.DrawTools.LabelStyle.TextHeightMm * tiLe / toMm;
         var noiDung = DrawSize.NhanTuyen(thongTin.Size, thongTin.DoDoc);
 
-        // (3) Tạo nhãn + liên kết XData 2 chiều trong 1 transaction = 1 nhóm UNDO.
+        // (3) Mũi tên hướng dốc chèn TRƯỚC nhãn chữ để cả hai handle cùng vào XData của tim trong
+        //     một lần ghi (FR9g). Thiếu block trong thư viện → chỉ text, không bịa ký hiệu.
+        string? handleMuiTen = null;
+        if (thongTin.DoDoc is not null)
+        {
+            handleMuiTen = ChenMuiTenDoDoc(
+                doc, ed, thongTin, chon.ObjectId.Handle.ToString(), viTri, gocTuyen, cao,
+                pack.DrawTools.LabelStyle.Layer, pack.RulePack.Version);
+        }
+
+        // (4) Tạo nhãn + liên kết XData 2 chiều trong 1 transaction = 1 nhóm UNDO.
         using (var khoa = doc.LockDocument())
         using (var tr = db.TransactionManager.StartTransaction())
         {
@@ -270,10 +278,12 @@ public sealed class VeTuyenCommands
                     HandleTim = chon.ObjectId.Handle.ToString(),
                 });
 
-                // Tim giữ danh sách nhãn của nó để XBOSS_VE_DOI cập nhật được (FR8).
+                // Tim giữ danh sách nhãn của nó (kể cả mũi tên hướng dốc) để XBOSS_VE_DOI cập
+                // nhật được (FR8).
                 if (tr.GetObject(chon.ObjectId, OpenMode.ForWrite) is Entity tim)
                 {
                     var handleNhan = thongTin.HandleNhan.ToList();
+                    if (handleMuiTen is not null) handleNhan.Add(handleMuiTen);
                     handleNhan.Add(nhan.Handle.ToString());
                     VeXDataStore.Ghi(tim, thongTin with { HandleNhan = handleNhan });
                 }
@@ -292,11 +302,6 @@ public sealed class VeTuyenCommands
         ed.WriteMessage(
             $"\n[XBoss] Đã ghi nhãn \"{noiDung}\" trên layer {pack.DrawTools.LabelStyle.Layer} " +
             $"(cao {pack.DrawTools.LabelStyle.TextHeightMm}mm giấy ở tỉ lệ 1:{tiLe:0.##}).\n");
-        if (thongTin.DoDoc is not null)
-        {
-            ed.WriteMessage(
-                "[XBoss] Mũi tên hướng dốc (block slope-arrow) chèn được sau khi có thư viện block — M100 PR4.\n");
-        }
     }
 
     // ===== Trợ giúp =====
@@ -415,43 +420,104 @@ public sealed class VeTuyenCommands
     }
 
     /// <summary>
-    /// Dựng LWPOLYLINE 2D (Z=0) từ danh sách đỉnh + bulge của Core.
-    /// KHÔNG đặt layer ở đây: tên layer chỉ tra cứu được khi thực thể ĐÃ thuộc một database
-    /// (đặt trước khi AppendEntity là nguồn lỗi eNoDatabase kinh điển) — caller đặt sau khi thêm.
-    /// Cũng KHÔNG gọi SetDatabaseDefaults: thực thể mới mặc định ByLayer, đúng chuẩn dự án
-    /// (màu/nét lấy theo layer đích, không dính CECOLOR hiện hành của kỹ sư).
-    /// </summary>
-    private static Polyline TaoPolyline(IReadOnlyList<DinhPolyline> dinh, bool kin)
-    {
-        var pl = new Polyline();
-        for (var i = 0; i < dinh.Count; i++)
-            pl.AddVertexAt(i, new Point2d(dinh[i].X, dinh[i].Y), dinh[i].Bulge, 0, 0);
-        pl.Closed = kin;
-        pl.Elevation = 0;
-        pl.Normal = Vector3d.ZAxis;
-        return pl;
-    }
-
-    /// <summary>
     /// Vị trí + góc xoay của nhãn: bám điểm bấm trên tim, xoay theo hướng tuyến tại đó (chữ luôn
-    /// đọc xuôi). Không đọc được đạo hàm (điểm suy biến) → nhãn nằm ngang tại điểm bấm.
+    /// đọc xuôi). <paramref name="GocChu"/> đã lật về nửa mặt phẳng phải để chữ đọc xuôi, còn
+    /// <paramref name="GocTuyen"/> là tiếp tuyến THẬT theo chiều vẽ (mũi tên hướng dốc cần đúng
+    /// chiều, lật ngược là chỉ sai hướng dốc). Không đọc được đạo hàm (điểm suy biến) → nhãn nằm
+    /// ngang tại điểm bấm.
     /// </summary>
-    private static (Point3d ViTri, double Goc) ViTriNhan(Polyline pl, Point3d diemBam)
+    private static (Point3d ViTri, double GocChu, double GocTuyen) ViTriNhan(Polyline pl, Point3d diemBam)
     {
         var phang = new Point3d(diemBam.X, diemBam.Y, 0);
         try
         {
             var tren = pl.GetClosestPointTo(phang, false);
             var huong = pl.GetFirstDerivative(tren);
-            var goc = Math.Atan2(huong.Y, huong.X);
+            var gocTuyen = Math.Atan2(huong.Y, huong.X);
+            var gocChu = gocTuyen;
             // Giữ chữ đọc xuôi: quay về nửa mặt phẳng phải.
-            if (goc > Math.PI / 2) goc -= Math.PI;
-            else if (goc <= -Math.PI / 2) goc += Math.PI;
-            return (new Point3d(tren.X, tren.Y, 0), goc);
+            if (gocChu > Math.PI / 2) gocChu -= Math.PI;
+            else if (gocChu <= -Math.PI / 2) gocChu += Math.PI;
+            return (new Point3d(tren.X, tren.Y, 0), gocChu, gocTuyen);
         }
         catch (Autodesk.AutoCAD.Runtime.Exception)
         {
-            return (phang, 0);
+            return (phang, 0, 0);
         }
+    }
+
+    /// <summary>
+    /// Chèn block mũi tên hướng dốc cạnh nhãn (M100 §6.9/FR9g). Thư viện chưa có block
+    /// <c>slope-arrow</c> → CHỈ ghi text kèm hướng dẫn, tuyệt đối không vẽ mũi tên tự chế:
+    /// ký hiệu hướng dốc là quy ước trình bày của công ty, plugin không được bịa.
+    /// Trả handle mũi tên vừa chèn (null = không chèn) để tim giữ liên kết như với nhãn chữ.
+    /// </summary>
+    private static string? ChenMuiTenDoDoc(
+        Document doc, Editor ed, VeXDataInfo thongTinTim, string handleTim,
+        Point3d viTri, double gocTuyen, double coChu, string layerNhan, string rulePackVersion)
+    {
+        var (thuVien, loi) = BlockLibraryService.HienHanh();
+        if (thuVien is null)
+        {
+            ed.WriteMessage($"[XBoss] Nhãn độ dốc chỉ có chữ (chưa chèn được mũi tên hướng dốc): {loi}\n");
+            return null;
+        }
+        var def = thuVien.TimTheoId(BlockManifest.IdMuiTenDoDoc);
+        if (def is null)
+        {
+            ed.WriteMessage(
+                $"[XBoss] Thư viện block {thuVien.Version} chưa có block \"{BlockManifest.IdMuiTenDoDoc}\" — " +
+                "nhãn độ dốc chỉ có chữ (plugin không tự vẽ ký hiệu thay thế).\n");
+            return null;
+        }
+
+        var xdata = new VeXDataInfo
+        {
+            VaiTro = VaiTroVe.Nhan,
+            HeId = thongTinTim.HeId,
+            ItemId = thongTinTim.ItemId,
+            Size = thongTinTim.Size,
+            RulePackVersion = rulePackVersion,
+            DoDoc = thongTinTim.DoDoc,
+            HandleTim = handleTim,
+            BlockId = def.Id,
+            ThuVienVersion = thuVien.Version,
+        };
+        // Mũi tên đặt ngay trên tim tại điểm ghi nhãn, quay theo CHIỀU VẼ tuyến (đỉnh đầu → đỉnh
+        // cuối) và cao bằng chữ nhãn (block thư viện vẽ theo kích thước danh nghĩa 1 đơn vị).
+        var muc = new List<BlockLibraryService.KhoiChoChen>
+        {
+            new(viTri, gocTuyen, coChu, layerNhan, xdata,
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)),
+        };
+        if (!BlockLibraryService.ChenHangLoat(doc, ed, doc.Database, def, thuVien, muc)) return null;
+
+        ed.WriteMessage(
+            $"[XBoss] Đã chèn mũi tên hướng dốc ({def.BlockName}) theo CHIỀU VẼ tuyến (đỉnh đầu → đỉnh cuối) — " +
+            "dốc ngược chiều vẽ thì quay 180° bằng ROTATE.\n");
+        return LayHandleMuiTen(doc.Database, handleTim, def.Id);
+    }
+
+    /// <summary>
+    /// Handle của mũi tên vừa chèn: quét lại các khối bám tim và lấy khối mang đúng blockId.
+    /// (<see cref="BlockLibraryService.ChenHangLoat"/> chèn theo lô nên không trả handle ra ngoài;
+    /// quét lại một lần ở đây rẻ hơn nhiều so với đổi chữ ký dùng chung của mọi lệnh chèn block.)
+    /// </summary>
+    private static string? LayHandleMuiTen(Database db, string handleTim, string blockId)
+    {
+        using var tr = db.TransactionManager.StartTransaction();
+        var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForRead);
+        string? ra = null;
+        foreach (ObjectId id in ms)
+        {
+            if (tr.GetObject(id, OpenMode.ForRead) is not BlockReference br) continue;
+            var xd = VeXDataStore.Doc(br);
+            if (xd is null || xd.VaiTro != VaiTroVe.Nhan) continue;
+            if (!string.Equals(xd.HandleTim, handleTim, StringComparison.Ordinal)) continue;
+            if (!string.Equals(xd.BlockId, blockId, StringComparison.Ordinal)) continue;
+            ra = br.Handle.ToString(); // lấy cái CUỐI cùng = vừa chèn
+        }
+        tr.Commit();
+        return ra;
     }
 }

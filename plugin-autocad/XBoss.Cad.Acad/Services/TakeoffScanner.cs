@@ -147,6 +147,10 @@ internal static class TakeoffScanner
             if (tr.GetObject(id, OpenMode.ForRead) is not Entity ent) continue;
             if (MarkService.ReadMark(ent, xdataAppName) is not { } mark) continue;
             if (theoHandle.TryGetValue(ent.Handle.ToString(), out var obj)) ra.Add((obj, mark.ItemId));
+        }
+        return ra;
+    }
+
     /// <summary>Nhãn text (DBText/MText) trong model space kèm điểm đặt — nguồn phụ cho size.</summary>
     internal static List<(string NoiDung, Point3d Diem)> QuetNhan(Database db, Transaction tr)
     {

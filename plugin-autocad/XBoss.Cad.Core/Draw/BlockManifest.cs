@@ -64,6 +64,13 @@ public sealed class BlockDef
 /// </summary>
 public sealed class BlockManifest
 {
+    /// <summary>
+    /// Id block mũi tên hướng dốc trong manifest thư viện (M100 §6.9/FR9g) — <c>XBOSS_VE_NHAN</c>
+    /// chèn kèm nhãn <c>i=…%</c>. Khai MỘT chỗ: id này cũng nằm trong
+    /// <c>drawTools.systems[].fittings</c> của rule pack, lệch nhau là mũi tên không bao giờ chèn được.
+    /// </summary>
+    public const string IdMuiTenDoDoc = "slope-arrow";
+
     [JsonPropertyName("version")] public string Version { get; init; } = "";
 
     /// <summary>sha256 (hex thường) của tệp .dwg thư viện — chống tráo tệp trong cache cục bộ.</summary>

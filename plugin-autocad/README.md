@@ -27,6 +27,36 @@ quy tắc tải từ XBoss dưới dạng **rule pack** có version (không nhú
 
 | `XBOSS_UPLOAD` | Gửi DWG đã lưu + DXF sidecar + báo cáo chuẩn hóa + version rule pack lên server (M99 PR5): server kiểm định lại DXF + rule pack — đạt thì tạo `drawing_revision` trạng thái `submitted`, fail thì hiện đủ lỗi trong AutoCAD, KHÔNG tạo revision. Idempotent theo hash DWG (gửi lại cùng tệp không tạo bản đôi) |
 
+### Bộ lệnh VẼ shop drawing (M100 — 14 lệnh)
+
+Vẽ đè lên bản thiết kế đã chuẩn hóa; mọi nét/block sinh ra **đã đúng chuẩn ngay từ đầu** (layer theo
+`layerMap`, block theo thư viện có version, size nằm sẵn trong XData `XBOSS_VE`) nên `XBOSS_KIEMTRA`
+pass ngay và `XBOSS_BOCKL` bóc không sót. Cần **rule pack từ v4** (khối `drawTools`) và — với các
+lệnh chèn block — thư viện block đã tải (`XBOSS_LOGIN` hoặc `XBOSS_VE_THUVIEN`).
+
+| Lệnh               | Chức năng                                                                                                                                                                                                                                                                                                                            |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `XBOSS_VE_NEN`     | Chuẩn bị nền: khóa + làm mờ (`drawTools.baseFadePct`) mọi layer hiện có, tạo sẵn layer đích của hệ (+ layer nét biên) đúng màu/lineweight; chạy lại để **hoàn nguyên** (trạng thái cũ cất trong chính bản vẽ). Không sửa/xóa đối tượng nền                                                                                           |
+| `XBOSS_VE`         | Vẽ **tuyến tim** như PLINE (có Cung/HoànTác/Đóng): chọn hệ → loại tuyến → size trong danh mục (nhập ngoài danh mục được, đánh dấu `custom`) → độ dốc nếu tuyến bắt buộc; kết thúc: tim đúng layer + XData `[hệ, item, size, version, custom?, slope?]`, `edgeStyle=double` sinh 2 nét biên trên layer `…EDGE` (không bao giờ bị bóc) |
+| `XBOSS_VE_NHAN`    | Bấm tuyến → ghi nhãn size (+ `i=…%`) **lấy từ XData, không gõ tay**, cao chữ quy theo tỉ lệ in; tuyến có độ dốc thì chèn kèm block mũi tên `slope-arrow` theo chiều vẽ tuyến — thư viện chưa có block đó thì **chỉ ghi chữ** (không tự vẽ ký hiệu thay thế)                                                                          |
+| `XBOSS_VE_PHUKIEN` | Chèn phụ kiện (co, tê, giảm, van, miệng gió…) bám tuyến tim: tự xoay theo tiếp tuyến, scale theo size khi manifest khai `scaleBySize`, đúng layer tuyến                                                                                                                                                                              |
+| `XBOSS_VE_THIETBI` | Chèn thiết bị có attribute (`TAG` bắt buộc + `MODEL`/`SIZE`), layer chọn sao cho `XBOSS_BOCKL` đếm được; cảnh báo ngay khi tên block lệch `blockNameMatchAny` của rule pack                                                                                                                                                          |
+| `XBOSS_VE_THUVIEN` | Nạp thư viện block: tải lại từ server hoặc nạp tệp tay (`manifest.json` + `.dwg` cạnh nhau) — đường dự phòng offline như `XBOSS_RULEPACK`; luôn kiểm `sha256` trước khi dùng                                                                                                                                                         |
+| `XBOSS_VE_DOI`     | **Đổi hệ/loại/size** đoạn đã vẽ: đổi layer + XData, **xóa và dựng lại nét biên** theo bề rộng mới, cập nhật nhãn (xóa mũi tên dốc nếu tuyến mới không có độ dốc), và **gỡ đánh dấu bóc** của đúng các đoạn đó kèm cảnh báo "đổi xong phải bóc lại". 1 UNDO trả nguyên trạng                                                          |
+| `XBOSS_VE_TRANGIN` | Trang in chuẩn công ty: layout + page setup (`sheetSetup.plotter`, khổ, CTB) + viewport **đúng tỉ lệ và khóa** + VP-freeze layer ngoài hệ + khung tên từ thư viện đã điền attribute. Vùng in nhận **2 điểm hoặc một polyline ranh giới kín** (lấy hình bao)                                                                          |
+| `XBOSS_VE_MATCAT`  | Mặt cắt bán tự động: kẻ tuyến cắt → dựng ký hiệu đúng loại/size từ XData, đúng khoảng cách ngang thật, tên A-A tự đánh; **cao độ nhập tay** (bản vẽ 2D không chứa cao độ thật — plugin không bịa)                                                                                                                                    |
+| `XBOSS_VE_GIADO`   | Rải giá đỡ dọc tuyến theo `supportSpacingMm` (mặc định **không bước nào vượt chuẩn**), xoay vuông góc tuyến, luôn có ở đầu/cuối và tại **phụ kiện nặng khai trong `drawTools.heavyFittingIds`** (rule pack v7; pack cũ thì lệnh hỏi kỹ sư). Chạy lại chỉ bổ sung chỗ thiếu                                                           |
+| `XBOSS_VE_LOCHO`   | Sleeve/lỗ chờ xuyên kết cấu: size = size ống + `sleeveClearanceMm`, bấm điểm hoặc dò giao tuyến × layer kết cấu; chế độ `XUATBANG` xuất **bảng builder's work** (Table trong bản vẽ + Excel riêng, không đụng mẫu BOQ)                                                                                                               |
+| `XBOSS_VE_TAG`     | Đánh tag tuần tự theo `tagPattern`, quét **trùng/nhảy số**, đánh lại giữ nguyên tag đã khóa; tầng hỏi một lần và nhớ trong chính bản vẽ                                                                                                                                                                                              |
+| `XBOSS_VE_THONGKE` | Table trong bản vẽ: bảng thiết bị (từ attribute) hoặc bảng khối lượng theo hệ (từ trạng thái bóc `XBOSS_BOCKL`, chỉ ĐỌC); chạy lại **cập nhật bảng cũ tại chỗ**, không sinh bảng đôi                                                                                                                                                 |
+| `XBOSS_VE_BAOCAO`  | **Báo cáo phiên vẽ** (M100 §14, chỉ đọc): số tuyến/block theo hệ, size ngoài danh mục đã dùng, các lần đụng độ định nghĩa block + lựa chọn của kỹ sư, version rule pack và thư viện; in ra dòng lệnh + ghi `<tệp>.dwg.xboss-ve.json` cạnh DWG                                                                                        |
+
+> **Rule pack v7 (M100 PR5)** thêm 2 item takeoff đếm được — `support-hanger` (giá đỡ) và
+> `sleeve-opening` (lỗ chờ) khớp theo TÊN BLOCK — nên `XBOSS_BOCKL` đếm được hai hạng mục trước đây
+> phải ước tay (AC12/§6.8); và khóa `drawTools.heavyFittingIds` khai **phụ kiện nào là nặng** để
+> `XBOSS_VE_GIADO` khỏi hỏi kỹ sư mỗi lần chạy. Bản vẽ không có block giá đỡ/sleeve thì bóc bằng v7
+> ra kết quả **y hệt v6** (2 item mới nằm cuối danh sách, khớp first-match).
+
 > **Rule pack v5 (M101 PR1)** khai thêm 7 phép kiểm cho `XBOSS_KIEMTRA` (chồng lấn cùng hệ, giao cắt
 > khác hệ trên mặt bằng, khung tên thiếu trường, viewport chưa khóa/tỉ lệ lạ, text-dim style lệch,
 > nhãn size lệch XData, đối tượng ngoài khung) + khối `styleMap`. Toàn bộ **mặc định TẮT** và Adapter
@@ -109,10 +139,13 @@ Gỡ cài đặt = xoá thư mục `XBoss.bundle` (M99 §17).
 
 ## Luồng làm việc chuẩn của kỹ sư
 
-1. `XBOSS_LOGIN` (lần đầu / khi token hết hạn) — ghép thiết bị + tự tải rule pack. Không có mạng thì dùng `XBOSS_RULEPACK` nạp tệp tay.
+1. `XBOSS_LOGIN` (lần đầu / khi token hết hạn) — ghép thiết bị + tự tải rule pack **và thư viện block**. Không có mạng thì dùng `XBOSS_RULEPACK` / `XBOSS_VE_THUVIEN` nạp tệp tay.
 2. Mở bản vẽ nhận từ CĐT/TVTK → `XBOSS_KIEMTRA` xem mức lệch chuẩn.
 3. `XBOSS_CHUANHOA` → kiểm tra kết quả (sai thì UNDO 1 lần) → QSAVE.
-4. Làm shop drawing như bình thường.
+4. Làm shop drawing bằng bộ lệnh vẽ: `XBOSS_VE_NEN` → `XBOSS_VE` → `XBOSS_VE_PHUKIEN` /
+   `XBOSS_VE_THIETBI` → `XBOSS_VE_NHAN` → (`XBOSS_VE_GIADO`, `XBOSS_VE_LOCHO`, `XBOSS_VE_TAG`,
+   `XBOSS_VE_THONGKE` khi cần) → `XBOSS_VE_MATCAT` / `XBOSS_VE_TRANGIN` → `XBOSS_VE_NEN` lần nữa để
+   hoàn nguyên nền. Sửa hệ/size đoạn đã vẽ bằng `XBOSS_VE_DOI` (không sửa tay), soát bằng `XBOSS_VE_BAOCAO`.
 5. `XBOSS_BOCKL` trên bản vẽ shop đã duyệt → `XBOSS_BOCKL_XUAT` → gửi tệp Excel cho QS
    (QS điền cột F — KL BOQ hợp đồng; cột H/J/K tự tính trạng thái CHẶN/OK theo mẫu công ty).
 

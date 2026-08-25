@@ -9,7 +9,7 @@ public class RulePackLoaderTests
     public void Nap_duoc_rule_pack_dang_phat_hanh_tu_repo()
     {
         var pack = RepoPaths.LoadRulePack();
-        Assert.Equal("v6", pack.Version);
+        Assert.Equal("v7", pack.Version);
         Assert.Equal(7, pack.LayerMap.Groups.Count);
         Assert.Equal("XBOSS_BOCKL", pack.Takeoff.XdataAppName);
         Assert.True(pack.Takeoff.Items.Count > 0);
@@ -140,6 +140,6 @@ public class RulePackLoaderTests
         var json = File.ReadAllText(RepoPaths.RulePackPath)
             .Replace("\"version\": \"v6\",", "\"version\": \"v6\", \"fieldTuongLai\": { \"x\": 1 },");
         var pack = RulePackLoader.Load(json);
-        Assert.Equal("v6", pack.Version);
+        Assert.Equal("v7", pack.Version);
     }
 }

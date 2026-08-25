@@ -63,8 +63,54 @@ sang máy trạm rồi gõ `XBOSS_RULEPACK` chọn tệp. Chuẩn hóa vẫn ch�
 | `XBOSS_BOCKL_XUAT` | Xuất Excel đúng mẫu công ty (công thức sống) để gửi QS                          |
 | `XBOSS_UPLOAD`     | Gửi bản vẽ đã chuẩn hóa về XBoss (server kiểm định lại rồi mới ghi sổ)          |
 | `XBOSS_BATCH`      | Xử lý hàng loạt cả thư mục; **bản gốc giữ nguyên**, kết quả vào `da-chuan-hoa/` |
+| `XBOSS_VE…`        | Bộ lệnh **vẽ shop drawing** đúng chuẩn ngay từ đầu — xem mục 4b bên dưới        |
 
 Trình tự khuyên dùng: `XBOSS_KIEMTRA` → `XBOSS_CHUANHOA` → kiểm mắt → `QSAVE` → `XBOSS_UPLOAD`.
+
+## 4b. Vẽ shop drawing bằng bộ lệnh `XBOSS_VE_*`
+
+Ý tưởng: **không vẽ tay rồi sửa chuẩn sau nữa**. Vẽ bằng bộ lệnh này thì nét/block sinh ra đã đúng
+layer, đúng block chuẩn công ty, mang sẵn size bên trong — nên `XBOSS_KIEMTRA` không báo lỗi và
+`XBOSS_BOCKL` bóc không sót, không nhầm hệ. Mọi câu hỏi hiện ngay trên dòng lệnh AutoCAD (gõ số thứ
+tự hoặc từ khóa); **ESC bất cứ lúc nào là bản vẽ nguyên trạng**, và mỗi lệnh chỉ cần **1 lần `U`
+(UNDO)** để bỏ hết những gì nó vừa tạo.
+
+**Cần có trước:** đã `XBOSS_LOGIN` (để có bộ quy tắc **và thư viện block**). Máy không ra được mạng
+thì nạp tay: `XBOSS_RULEPACK` cho bộ quy tắc, `XBOSS_VE_THUVIEN` cho thư viện block (chọn tệp
+`manifest.json`, tệp `.dwg` để cạnh nó).
+
+### Trình tự một buổi vẽ
+
+| Bước | Lệnh                            | Làm gì                                                                                                                                   |
+| ---- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | `XBOSS_VE_NEN`                  | Chọn hệ sắp vẽ → nền thiết kế bị khóa + làm mờ, layer đích được tạo sẵn. **Vẽ xong chạy lại lệnh này để trả nền về như cũ**              |
+| 2    | `XBOSS_VE`                      | Chọn loại tuyến → size → (độ dốc nếu là ống thoát) → bấm điểm như PLINE. Ống gió/máng tự có 2 nét biên đúng bề rộng                      |
+| 3    | `XBOSS_VE_PHUKIEN` / `_THIETBI` | Chèn co/tê/van/miệng gió bám tuyến (tự xoay theo tuyến) và thiết bị FCU/AHU… (nhập `TAG` ngay lúc chèn)                                  |
+| 4    | `XBOSS_VE_NHAN`                 | Bấm tuyến → nhãn size tự ghi (kèm `i=2%` + mũi tên hướng dốc nếu có). **Không gõ tay** nên nhãn không bao giờ lệch tuyến                 |
+| 5    | `XBOSS_VE_GIADO` / `_LOCHO`     | Rải giá đỡ cách đều đúng chuẩn treo đỡ; chèn lỗ chờ xuyên tường/sàn rồi `XUATBANG` để có bảng builder's work (Table + Excel) gửi kết cấu |
+| 6    | `XBOSS_VE_TAG` / `_THONGKE`     | Đánh tag tuần tự + tìm tag trùng; sinh bảng thiết bị/khối lượng ngay trong bản vẽ                                                        |
+| 7    | `XBOSS_VE_MATCAT` / `_TRANGIN`  | Dựng mặt cắt từ tuyến đã vẽ (cao độ **nhập tay**); tạo trang in đúng khổ/tỉ lệ, viewport đã khóa, khung tên điền sẵn                     |
+| 8    | `XBOSS_VE_BAOCAO`               | Xem lại cả buổi vẽ: bao nhiêu tuyến/block theo hệ, có size nào nằm ngoài danh mục không                                                  |
+
+### Ba việc hay phải làm lại
+
+- **Đổi size/hệ đoạn đã vẽ:** dùng `XBOSS_VE_DOI`, đừng sửa tay. Lệnh đổi luôn layer, nhãn và
+  **dựng lại nét biên** theo size mới; đoạn nào đã bóc khối lượng thì lệnh gỡ đánh dấu và nhắc
+  **chạy lại `XBOSS_BOCKL`** (số cũ đã sai).
+- **Vẽ nhầm hệ:** cứ `U` (UNDO) một lần cho mỗi lệnh — tim, nét biên và nhãn của một lần vẽ đi liền
+  một khối.
+- **Size không có trong danh mục:** vẫn gõ được, plugin đánh dấu là size ngoài danh mục và liệt kê
+  trong `XBOSS_VE_BAOCAO` để kỹ sư trưởng bổ sung vào bộ quy tắc bản sau.
+
+### Khi lệnh vẽ từ chối chạy
+
+| Hiện tượng                                               | Nguyên nhân & xử lý                                                                                               |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| "cần rule pack từ v4 trở lên"                            | Bộ quy tắc trên máy quá cũ → `XBOSS_LOGIN` (hoặc `XBOSS_RULEPACK` nạp tệp mới)                                    |
+| "Chưa có thư viện block trên máy"                        | `XBOSS_LOGIN` để tải, hoặc `XBOSS_VE_THUVIEN` nạp tệp tay. Riêng `XBOSS_VE` (vẽ tuyến) **không cần** thư viện     |
+| Nhãn độ dốc chỉ có chữ, không có mũi tên                 | Thư viện chưa có block `slope-arrow` — plugin **không tự vẽ ký hiệu thay thế**; báo kỹ sư trưởng bổ sung thư viện |
+| "Rule pack chưa khai supportSpacingMm/sleeveClearanceMm" | Thiếu số liệu chuẩn treo đỡ/khe hở cho loại tuyến đó — plugin không tự bịa; bổ sung ở bản quy tắc sau             |
+| Báo bản vẽ đang khóa layer                               | Đang trong chế độ nền của `XBOSS_VE_NEN` → chạy lại `XBOSS_VE_NEN` để hoàn nguyên rồi thử lại                     |
 
 ## 5. Trục trặc thường gặp
 
