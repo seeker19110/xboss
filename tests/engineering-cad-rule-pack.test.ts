@@ -25,7 +25,7 @@ import {
 
 // ===== (1) Cấu trúc & ETag =====
 
-test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5 + 3 khối v7, version = v7", () => {
+test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5 + 3 khối v7 + 2 khối v8, version = v8", () => {
   const pack = getCurrentRulePack();
   for (const field of [
     "version",
@@ -46,8 +46,11 @@ test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleM
   for (const field of ["xrefPolicy", "hatchMap", "layoutPolicy"]) {
     assert.ok(field in pack, `Thiếu field v7 ${field}`);
   }
-  assert.equal(pack.version, "v7");
-  assert.equal(CURRENT_RULE_PACK_VERSION, "v7");
+  for (const field of ["polylineClosePolicy", "blockMap"]) {
+    assert.ok(field in pack, `Thiếu field v8 ${field}`);
+  }
+  assert.equal(pack.version, "v8");
+  assert.equal(CURRENT_RULE_PACK_VERSION, "v8");
 });
 
 test("rule pack v2 là mở rộng thuần của v1: 5 field cũ giữ nguyên nội dung", async () => {
@@ -196,7 +199,8 @@ test("rule pack v7 là mở rộng thuần của v6: 3 khối chính sách chu�
   // phần M100 do test "v7 = v6 + 2 item đếm…" ở cuối file canh — nên `takeoff`/`drawTools`
   // KHÔNG nằm trong vòng deepEqual dưới đây.
   const v6 = (await import("@/lib/ky-thuat/cad/rule-packs/v6.json")).default;
-  const v7 = getCurrentRulePack();
+  // Đọc THẲNG v7.json, không qua getCurrentRulePack(): rule pack đang phát hành đã là v8 (M102).
+  const v7 = (await import("@/lib/ky-thuat/cad/rule-packs/v7.json")).default;
 
   for (const field of [
     "layerMap",
@@ -669,7 +673,8 @@ test("flattenPolicy: ép Z về 0 trong WCS, giữ nguyên hình chiếu XY (AC3
 
 test("rule pack v7 = v6 + 2 item đếm giá đỡ/lỗ chờ + heavyFittingIds (M100 AC12/§6.7)", async () => {
   const v6 = (await import("@/lib/ky-thuat/cad/rule-packs/v6.json")).default;
-  const v7 = getCurrentRulePack();
+  // Đọc THẲNG v7.json (rule pack đang phát hành đã là v8 — M102).
+  const v7 = (await import("@/lib/ky-thuat/cad/rule-packs/v7.json")).default;
 
   // v7 KHÔNG đụng 11 khối còn lại — chỉ takeoff + drawTools được phép đổi.
   for (const field of [
@@ -753,4 +758,97 @@ test("rule pack v7 = v6 + 2 item đếm giá đỡ/lỗ chờ + heavyFittingIds 
     (v7.drawTools.heavyFittingIdsNote ?? "").length > 0,
     "heavyFittingIds thiếu mô tả tiếng Việt",
   );
+});
+
+// ===== v8 (M102) — 2 khối chính sách bước chuẩn hóa 12/13 + 2 phép kiểm mới =====
+
+test("rule pack v8 là mở rộng thuần của v7: chỉ thêm polylineClosePolicy + blockMap (M102 §4)", async () => {
+  const v7 = (await import("@/lib/ky-thuat/cad/rule-packs/v7.json")).default;
+  const v8 = getCurrentRulePack();
+
+  // Mọi khối cũ giữ nguyên TRỪ layerMap (v8 sửa knownIssues — nợ đã đóng ở M101 PR2, xem test dưới)
+  // và inspectionPolicy (thêm 2 phép kiểm mới, đều tắt).
+  for (const field of [
+    "fontMap",
+    "purgePolicy",
+    "lineweightMap",
+    "flattenPolicy",
+    "takeoff",
+    "styleMap",
+    "drawTools",
+    "sheetSetup",
+    "xrefPolicy",
+    "hatchMap",
+    "layoutPolicy",
+  ] as const) {
+    assert.deepEqual(
+      v8[field],
+      v7[field],
+      `Field ${field} của v8 lệch v7 — v8 phải là mở rộng thuần (kiểm/chuẩn hóa/bóc bằng v8 không đổi hành vi)`,
+    );
+  }
+  assert.deepEqual(
+    Object.keys(v8).filter((k) => !(k in v7)),
+    ["polylineClosePolicy", "blockMap"],
+    "v8 thêm nhiều hơn đúng 2 khối chính sách của bước chuẩn hóa 12/13",
+  );
+  // layerMap: chỉ knownIssues được phép đổi — quy tắc ánh xạ layer phải y nguyên, nếu không
+  // cùng một bản vẽ chuẩn hóa bằng v8 sẽ ra layer khác v7.
+  const { knownIssues: _bo8, ...layerMap8 } = v8.layerMap;
+  const { knownIssues: _bo7, ...layerMap7 } = v7.layerMap;
+  assert.deepEqual(layerMap8, layerMap7, "v8 đụng quy tắc layerMap chứ không chỉ knownIssues");
+});
+
+test("v8: cả 2 bước chuẩn hóa mới đều TẮT mặc định, blockMap còn mặc định chỉ-báo (M102 AC7)", () => {
+  const pack = getCurrentRulePack();
+
+  assert.equal(pack.polylineClosePolicy.enabled, false);
+  assert.ok(
+    pack.polylineClosePolicy.gapCloseToleranceMm > 0,
+    "ngưỡng phải khai sẵn để bật lên là dùng được ngay",
+  );
+  assert.equal(pack.blockMap.enabled, false);
+  assert.equal(pack.blockMap.reportOnly, true, "bản đầu chỉ BÁO block lạc chuẩn, không tự thay");
+  assert.deepEqual(pack.blockMap.rules, []);
+});
+
+test("v8: 2 phép kiểm mới có enabled và đều TẮT mặc định (M102 AC7)", () => {
+  const ip = getCurrentRulePack().inspectionPolicy as unknown as Record<
+    string,
+    { enabled?: boolean }
+  >;
+  for (const phep of ["tagDuplicate", "boqCodeMissing"]) {
+    assert.ok(phep in ip, `inspectionPolicy thiếu phép kiểm mới ${phep}`);
+    assert.equal(ip[phep].enabled, false, `phép kiểm ${phep} phải tắt mặc định`);
+  }
+});
+
+test("v8: knownIssues không còn ghi nợ 'không idempotent' — nợ đã đóng ở M101 PR2", () => {
+  const known = getCurrentRulePack().layerMap.knownIssues;
+
+  assert.ok(
+    !known.some((d) => d.includes("Không idempotent")),
+    "tài liệu rule pack còn ghi nợ đã đóng — đúng lớp lỗi tài liệu lệch code",
+  );
+  assert.ok(
+    known.some((d) => d.includes("Idempotent")),
+    "phải ghi rõ hiện trạng đã idempotent để người sau không sửa lại lần nữa",
+  );
+});
+
+test("v8: ánh xạ layer idempotent — áp lại lên tên đã chuẩn không đổi gì (M102 §6.3)", () => {
+  // Bằng chứng ở mức PIPELINE (trước đây chỉ có test ở mức LayerMapper của tầng 2).
+  const goc = ["ONG_GIO_THAI", "PCCC_SPK", "CHILLER_CHW", "DIEN_CHIEU_SANG"];
+
+  const lan1 = normalizeCadLayers(goc);
+  const lan2 = normalizeCadLayers(Object.values(lan1));
+
+  // Lần 2 áp lên chính KẾT QUẢ của lần 1: mỗi tên đích phải ánh xạ về chính nó.
+  for (const dich of Object.values(lan1)) {
+    assert.equal(
+      lan2[dich],
+      dich,
+      `layer đã chuẩn "${dich}" bị ánh xạ tiếp thành "${lan2[dich]}" — chuẩn hóa lần 2 làm gộp nhầm hệ`,
+    );
+  }
 });

@@ -17,7 +17,7 @@ public class DrawToolsConfigTests
     public void Nap_duoc_drawTools_cua_rule_pack_dang_phat_hanh()
     {
         var pack = DrawToolsConfig.Load(JsonHienHanh());
-        Assert.Equal("v7", pack.RulePack.Version);
+        Assert.Equal(RepoPaths.VersionHienHanh, pack.RulePack.Version);
         Assert.Equal(5, pack.DrawTools.Systems.Count); // HVAC/PIPING/FIREFIGHTING/ELECTRICAL/ELV
         Assert.Equal("G-ANNO-TEXT", pack.DrawTools.LabelStyle.Layer);
         Assert.Equal("titleblock-a1", pack.SheetSetup.TitleblockId);
@@ -149,7 +149,7 @@ public class DrawToolsConfigTests
             .Replace(",\n            \"supportSpacingMm\": 2400,\n            \"sleeveClearanceMm\": 50", "");
         var pack = DrawToolsConfig.Load(json);
         Assert.NotNull(pack);
-        Assert.Equal("v7", pack.RulePack.Version);
+        Assert.Equal(RepoPaths.VersionHienHanh, pack.RulePack.Version);
     }
 
     // ===== v7 (M100 PR5): phụ kiện nặng khai trong rule pack thay cho hỏi kỹ sư =====

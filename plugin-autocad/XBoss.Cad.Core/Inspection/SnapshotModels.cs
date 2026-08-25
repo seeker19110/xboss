@@ -144,4 +144,22 @@ public sealed class DrawingSnapshot
     /// <summary>Nhãn size có XData M100 kèm size của tim — phép kiểm 15 (v5).
     /// Null = bản vẽ/plugin KHÔNG có dữ liệu M100 → phép kiểm 15 tự tắt (M101 §6.1).</summary>
     public IReadOnlyList<LabelLinkInfo>? NhanLienKet { get; init; }
+
+    /// <summary>
+    /// Tag do XBOSS_VE_TAG sinh (M100) — phép kiểm 17. <c>null</c> = Adapter chưa quét hoặc bản vẽ
+    /// không có XData tag nào → phép tự tắt (không báo oan nhãn vẽ tay).
+    /// </summary>
+    public IReadOnlyList<TagInfo>? Tags { get; init; }
+}
+
+/// <summary>Một tag XBOSS_VE_TAG đọc từ XData — phép kiểm 17 (tag trùng).</summary>
+public sealed record TagInfo
+{
+    public required string Handle { get; init; }
+
+    /// <summary>Chuỗi tag hiển thị (vd "T-05").</summary>
+    public required string Tag { get; init; }
+
+    /// <summary>Layer của tim liên kết — dùng làm "hệ" để so trùng trong phạm vi từng hệ.</summary>
+    public required string HeLayer { get; init; }
 }

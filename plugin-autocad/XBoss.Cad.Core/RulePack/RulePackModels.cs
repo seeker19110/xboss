@@ -39,6 +39,15 @@ public sealed class CadRulePack
     /// <summary>Bước 11 — dọn layout rỗng / đặt lại tên layout.</summary>
     [JsonPropertyName("layoutPolicy")] public LayoutPolicySection LayoutPolicy { get; init; } = new();
 
+    // ===== v8 (M102 §6.1/§6.2) — chính sách 2 bước chuẩn hóa mới 12/13.
+    // Rule pack ≤ v7 không có các khối này → mọi Enabled = false → pipeline chạy y hệt v7.
+
+    /// <summary>Bước 12 — đóng polyline gần kín (khe ≤ ngưỡng).</summary>
+    [JsonPropertyName("polylineClosePolicy")] public PolylineClosePolicySection PolylineClosePolicy { get; init; } = new();
+
+    /// <summary>Bước 13 — quy block lạc chuẩn về thư viện block (mặc định chỉ BÁO).</summary>
+    [JsonPropertyName("blockMap")] public BlockMapSection BlockMap { get; init; } = new();
+
     /// Phần <c>drawTools</c> (v4+) mà lớp ánh xạ layer cần biết. <c>null</c> với rule pack v1–v3.
     /// Model ĐẦY ĐỦ của khối này nằm ở <c>Draw/DrawToolsConfig.cs</c> (bộ lệnh vẽ M100) — ở đây
     /// chỉ đọc đúng field mà <see cref="Layers.LayerMapper"/> dùng, để nạp rule pack cũ không vỡ.
@@ -265,6 +274,11 @@ public sealed class InspectionPolicySection
     [JsonPropertyName("styleDeviation")] public ToggleCheckPolicy StyleDeviation { get; init; } = new();
     [JsonPropertyName("labelSizeMismatch")] public ToggleCheckPolicy LabelSizeMismatch { get; init; } = new();
     [JsonPropertyName("strayObjects")] public StrayCheckPolicy StrayObjects { get; init; } = new();
+
+    // v8 (M102 §6.4/§6.5) — 2 phép kiểm mới, cùng quy ước: cờ enabled riêng, mặc định false,
+    // và còn TỰ TẮT khi thiếu dữ liệu đầu vào (tag XData M100 / boqCode rule pack theo dự án).
+    [JsonPropertyName("tagDuplicate")] public ToggleCheckPolicy TagDuplicate { get; init; } = new();
+    [JsonPropertyName("boqCodeMissing")] public ToggleCheckPolicy BoqCodeMissing { get; init; } = new();
 }
 
 /// <summary>Phép kiểm chỉ có cờ bật/tắt (tham số nằm ở khối khác — vd styleMap).</summary>
@@ -384,6 +398,46 @@ public sealed class LayoutPolicySection
     [JsonPropertyName("renameLayouts")] public bool RenameLayouts { get; init; }
     /// <summary>Bắt buộc chứa <c>{seq}</c> (đánh 2 chữ số) khi <see cref="RenameLayouts"/> bật.</summary>
     [JsonPropertyName("namePattern")] public string NamePattern { get; init; } = "";
+}
+
+/// <summary>
+/// Bước chuẩn hóa 12 (v8) — đóng polyline gần kín. Khe LỚN hơn ngưỡng cố ý KHÔNG đụng tới:
+/// đó thường là thiếu hẳn một đoạn tuyến chứ không phải thiếu một cú click, đoán bừa là sai hình học
+/// (phép kiểm 3 vẫn báo như cũ để kỹ sư tự xử).
+/// </summary>
+public sealed class PolylineClosePolicySection
+{
+    [JsonPropertyName("enabled")] public bool Enabled { get; init; }
+
+    /// <summary>Khe đầu–cuối tối đa (mm) còn được tự đóng.</summary>
+    [JsonPropertyName("gapCloseToleranceMm")] public double GapCloseToleranceMm { get; init; }
+
+    /// <summary>Giới hạn theo layer (ranh giới token). Rỗng = mọi layer.</summary>
+    [JsonPropertyName("onlyOnLayersMatchAny")] public IReadOnlyList<string> OnlyOnLayersMatchAny { get; init; } = [];
+
+    /// <summary>Chỉ liệt kê vào báo cáo, không sửa entity nào.</summary>
+    [JsonPropertyName("reportOnly")] public bool ReportOnly { get; init; }
+}
+
+/// <summary>
+/// Bước chuẩn hóa 13 (v8) — quy block lạc chuẩn về thư viện block. Mặc định <see cref="ReportOnly"/>
+/// = true kể cả khi bật: thay định nghĩa block là thao tác phá hủy (attribute lệch tag, hình học
+/// khác), bản đầu chỉ BÁO để kỹ sư quyết (M102 §6.2).
+/// </summary>
+public sealed class BlockMapSection
+{
+    [JsonPropertyName("enabled")] public bool Enabled { get; init; }
+    [JsonPropertyName("reportOnly")] public bool ReportOnly { get; init; } = true;
+    [JsonPropertyName("rules")] public IReadOnlyList<BlockMapRule> Rules { get; init; } = [];
+}
+
+public sealed class BlockMapRule
+{
+    /// <summary>Tên block đích — phải là block CÓ THẬT trong thư viện đã phát hành (M100 PR2).</summary>
+    [JsonPropertyName("target")] public string Target { get; init; } = "";
+
+    /// <summary>Từ khóa tên block cũ, khớp theo ranh giới token (không substring thô).</summary>
+    [JsonPropertyName("aliasMatchAny")] public IReadOnlyList<string> AliasMatchAny { get; init; } = [];
 }
 
 public sealed class OpenPolylinePolicy

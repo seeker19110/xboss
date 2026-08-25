@@ -7,7 +7,7 @@ namespace XBoss.Cad.Tests;
 public static class RepoPaths
 {
     /// <summary>Tên tệp rule pack đang phát hành — đổi ở ĐÚNG MỘT chỗ khi phát hành version mới.</summary>
-    public const string TenTepHienHanh = "v7.json";
+    public const string TenTepHienHanh = "v8.json";
 
     /// <summary>Đường dẫn một version rule pack cũ trong repo (kiểm tương thích ngược).</summary>
     public static string RulePackPathCua(string tenTep) =>
@@ -40,6 +40,14 @@ public static class RepoPaths
             return Path.Combine(goc.FullName, "plugin-autocad", "doi-chung");
         }
     }
+
+    /// <summary>
+    /// Version của rule pack ĐANG PHÁT HÀNH, đọc từ chính tệp — test khẳng định version phải dùng
+    /// hằng này thay vì gõ "v7"/"v8" vào assert. Hard-code làm mọi lần phát hành version mới đều kéo
+    /// theo một loạt test đỏ vì lý do không liên quan gì tới thứ chúng đang kiểm (đã xảy ra ở M102).
+    /// Riêng test nạp một version CŨ để kiểm tương thích ngược thì vẫn ghi thẳng version đó.
+    /// </summary>
+    public static string VersionHienHanh => LoadRulePack().Version;
 
     private static CadRulePack? _cached;
 

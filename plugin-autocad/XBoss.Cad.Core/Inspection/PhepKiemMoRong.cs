@@ -421,6 +421,89 @@ public static class PhepKiemMoRong
         };
     }
 
+    // ===== (17) Tag trùng — M102 §6.4 =====
+
+    /// <summary>
+    /// Hai nhãn tag do XBOSS_VE_TAG sinh mang CÙNG chuỗi tag trong CÙNG hệ (layer tim liên kết):
+    /// bảng thống kê và biên bản nghiệm thu sẽ đếm lệch, mà mắt thường rất khó soi ra.
+    ///
+    /// <para>So trùng trong phạm vi TỪNG HỆ, không phải cả bản vẽ: hai hệ khác nhau đánh số riêng
+    /// từ 1 là quy ước bình thường (T-01 của gió và T-01 của nước không phải lỗi).</para>
+    ///
+    /// <para>Bản vẽ không có tag XData nào (<see cref="DrawingSnapshot.Tags"/> null) → TỰ TẮT: nhãn
+    /// vẽ tay không bị báo oan (cùng hai tầng bảo vệ với phép kiểm 15).</para>
+    /// </summary>
+    public static InspectionFinding? TagTrung(DrawingSnapshot snapshot, ToggleCheckPolicy chinhSach)
+    {
+        if (!chinhSach.Enabled || snapshot.Tags is not { } tags) return null;
+
+        var chiTiet = new List<string>();
+        var handles = new List<string>();
+        foreach (var nhomHe in tags
+                     .Where(t => !string.IsNullOrWhiteSpace(t.Tag))
+                     .GroupBy(t => t.HeLayer, StringComparer.OrdinalIgnoreCase)
+                     .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            foreach (var nhomTag in nhomHe
+                         .GroupBy(t => t.Tag.Trim(), StringComparer.OrdinalIgnoreCase)
+                         .Where(g => g.Count() > 1)
+                         .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase))
+            {
+                var ds = nhomTag.ToList();
+                chiTiet.Add(
+                    $"{nhomHe.Key}: tag \"{nhomTag.Key}\" dùng {ds.Count} lần ({string.Join(", ", ds.Select(t => t.Handle))})");
+                foreach (var t in ds) ThemHandle(handles, t.Handle);
+            }
+        }
+
+        if (chiTiet.Count == 0) return null;
+        return new InspectionFinding
+        {
+            Id = "tag-trung",
+            Ten = "Tag trùng số trong cùng hệ (XBOSS_VE_TAG)",
+            Handles = handles,
+            ChiTiet = chiTiet,
+        };
+    }
+
+    // ===== (18) Mã BOQ mồ côi — M102 §6.5 =====
+
+    /// <summary>
+    /// Hạng mục bóc tách CÓ đối tượng khớp trên bản vẽ nhưng <c>boqCode</c> rỗng → Excel bóc tách ra
+    /// cột A trống, QS phải gõ tay từng dòng. Bắt ở đây là chặn sớm, trước khi tệp tới tay QS.
+    ///
+    /// <para>Báo ở cấp HẠNG MỤC (không marker từng đối tượng): lỗi nằm ở rule pack theo dự án chứ
+    /// không ở entity nào — nên <see cref="InspectionFinding.Handles"/> để rỗng.</para>
+    ///
+    /// <para>TỰ TẮT khi rule pack không khai <c>boqCode</c> ở BẤT KỲ hạng mục nào — đó là bản toàn
+    /// cục (chưa gán mã theo dự án, M101 PR4), báo tất cả sẽ chỉ là nhiễu.</para>
+    /// </summary>
+    /// <param name="items">Hạng mục của rule pack (bản đã gán mã theo dự án nếu có).</param>
+    /// <param name="idCoDoiTuong">Id hạng mục thực sự khớp đối tượng trên bản vẽ (Adapter/bộ bóc cung cấp).</param>
+    public static InspectionFinding? MaBoqMoCoi(
+        IReadOnlyList<RulePack.TakeoffItem> items,
+        IReadOnlyCollection<string> idCoDoiTuong,
+        ToggleCheckPolicy chinhSach)
+    {
+        if (!chinhSach.Enabled || items.Count == 0 || idCoDoiTuong.Count == 0) return null;
+        if (!items.Any(i => !string.IsNullOrWhiteSpace(i.BoqCode))) return null; // rule pack toàn cục → tự tắt
+
+        var coDoiTuong = new HashSet<string>(idCoDoiTuong, StringComparer.Ordinal);
+        var chiTiet = items
+            .Where(i => coDoiTuong.Contains(i.Id) && string.IsNullOrWhiteSpace(i.BoqCode))
+            .Select(i => $"hạng mục \"{i.Id}\" ({i.Name}) có đối tượng trên bản vẽ nhưng chưa gán mã BOQ")
+            .ToList();
+
+        if (chiTiet.Count == 0) return null;
+        return new InspectionFinding
+        {
+            Id = "ma-boq-mo-coi",
+            Ten = "Hạng mục bóc tách chưa gán mã BOQ (cột A Excel sẽ trống)",
+            Handles = [],
+            ChiTiet = chiTiet,
+        };
+    }
+
     private static double TrungVi(IEnumerable<double> giaTri)
     {
         var ds = giaTri.OrderBy(v => v).ToList();
