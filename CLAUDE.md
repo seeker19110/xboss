@@ -187,6 +187,7 @@ Làm việc với vai trò **chuyên gia thiết kế** — giao diện phải �
 
 **Thư viện & component:**
 
+- **Bộ component nền `app/components/ui/`** (`Button`/`ButtonLink`, `Card`/`CardLink`, `Chip`, `Section`, `StatCard`) — **dùng trước khi tự viết nút/thẻ/chip/tiêu đề khối mới**. Quy ước hình thức chốt trong ADR-0009 (`docs/adr/0009-bo-component-ui-nen.md`): bo góc `rounded-xl` cho thẻ / `rounded-lg` cho control; mặt thẻ đúng 2 tông (`raised` = `bg-zinc-900`, `sunken` = `bg-zinc-950/70`); **emerald = đang chọn / hành động chính** ở mọi nơi, amber-đỏ chỉ dành cho cảnh báo; nút cao tối thiểu 40px kể cả cỡ `sm`.
 - Icon: **`lucide-react`** (đồng bộ `size`/`strokeWidth`). Biểu đồ: **`recharts`** (`SCurveChart`, `ForecastCards`). Tái dùng component trong `app/components/*` trước khi tạo mới (`AppHeader`, `NotificationBell`, `GlobalSearch`, `ProgressMap`, `dialogs`).
 - Loading: dùng **`Skeleton`** (`app/components/Skeleton.tsx`) thay vì màn hình trắng; trạng thái rỗng/ lỗi có thông điệp rõ ràng bằng tiếng Việt.
 

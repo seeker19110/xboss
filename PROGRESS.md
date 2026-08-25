@@ -4,6 +4,60 @@
 >
 > **Lưu ý đường dẫn cũ:** log lịch sử dưới đây trỏ tới `docs/nang-cap/M<xx>-*.md` cho từng module — các file đó đã được **gộp theo nhóm nghiệp vụ** thành `docs/nang-cap/G<nn>-*.md` sau khi tất cả module M0–M42 triển khai xong (xem `docs/nang-cap/README.md` bảng đối chiếu Mxx→Gnn). Log giữ nguyên đường dẫn gốc tại thời điểm ghi nhận — không sửa lại lịch sử.
 
+## Làm mới UI/UX — bộ component nền + khung app + Dashboard + tracking (2026-08-25)
+
+Người dùng: "thiết kế lại ui/ux hiện đại". Chốt phạm vi đợt 1 qua `AskUserQuestion`: **khung
+app + trang chính (Dashboard, lưới tracking)**, hướng **tinh gọn hiện trạng** (giữ nguyên cơ
+chế dark-first/đảo biến CSS), được phép thêm component nền mới và đổi bố cục điều hướng.
+
+**Đã làm**
+
+1. **`app/components/ui/` — bộ component nền** (`Button`/`ButtonLink`, `Card`/`CardLink`,
+   `Chip`, `Section`, `StatCard`) + **ADR-0009** chốt quy ước hình thức: bo góc `rounded-xl`
+   cho thẻ / `rounded-lg` cho control, mặt thẻ đúng 2 tông (`raised`/`sunken`), **emerald =
+   đang chọn / hành động chính** (amber-đỏ chỉ còn là màu cảnh báo), nút cao ≥40px kể cả cỡ
+   `sm`. Ghi thêm mục quy ước vào `CLAUDE.md` (phần Thiết kế giao diện).
+2. **Khung app (`AppHeader`)**: một màu nhấn duy nhất cho mục sidebar đang chọn; topbar kính
+   mờ; **ô tìm kiếm lên thẳng topbar trên desktop** — trước đây chỉ có ở thanh đáy trang chủ
+   nên mọi trang khác không có lối tìm kiếm nhìn thấy được (Ctrl+K vẫn chạy nhưng không ai
+   biết); thanh đáy chỉ-tìm-kiếm tự ẩn trên desktop.
+3. **`HubShell`**: tab đang chọn đổi từ amber sang emerald cho khớp sidebar; dải KPI dùng
+   `StatCard` chung; sửa `sticky top-14` → `top-12` (lệch 8px so với topbar `h-12`, nội dung
+   lộ ra ở khe hở khi cuộn).
+4. **Dashboard (`app/page.tsx`)**: đảo thứ tự — **số liệu thật lên đầu** (tổng quan 4 ô, tiến
+   độ theo trang, theo hệ), hai khối điều hướng cỡ lớn ("6 giai đoạn" + "7 đại trung tâm") gộp
+   thành một mục "Trung tâm điều hành" gọn hơn, đặt sau. **Bỏ các chip trạng thái cắm cứng**
+   ("100% Khớp", "LOD 400", "Quyết toán kỳ 6") và tên dự án hard-code trong JSX — số liệu giả
+   không đọc từ DB, dễ bị hiểu nhầm là tình trạng thật (đúng quy ước "không hard-code tên dự
+   án trong UI"). Thêm ô "Tiến độ tổng" tính **bình quân có trọng số** theo số công việc.
+5. **Trang tracking**: thanh lọc **dính dưới topbar** (bảng dài hàng trăm dòng, trước cuộn
+   xuống là mất bộ lọc); dùng `Button`/`Card`/`EmptyState` chung; nút bật/tắt cột khi in nâng
+   vùng chạm `py-0.5` → `py-1.5`.
+6. **`:target { scroll-margin-top: 4.5rem }`** trong `globals.css` — link neo trong trang
+   (vd `#delayed-table`) trước đây nhảy tới nơi thì tiêu đề nằm khuất dưới topbar dính.
+
+**Verify thật** (không chỉ đọc code): dựng Postgres 16 cục bộ + `.env.local`, `db:migrate` áp
+sạch 136 migration, `db:seed` import Excel gốc (2.543 tasks, 50.465 ô dimension), `npm start`
+bản production rồi chụp màn hình bằng Playwright/Chromium ở 3 cấu hình (desktop 1440 theme
+tối, desktop theme sáng, mobile 390) cho cả Dashboard lẫn `/tracking/ogtd`, đối chiếu từng
+mục. Bắt và sửa 2 lỗi chỉ lộ khi chạy thật: nút xoá trang đè lên thanh tiến độ trên mobile
+(luôn hiện, không cần hover) và nhãn "GĐ n" `text-zinc-500` không đủ tương phản ở theme tối.
+**axe-core** trên Dashboard + tracking (3 cấu hình): 6 vi phạm `color-contrast` do đợt này
+sinh ra đã hết; phần còn lại là **nợ cũ** (xem "Nợ kỹ thuật" bên dưới). `lint`/`typecheck`/
+`build` xanh, `npm test` 224 file / 0 fail, và 6 cổng kiểm nội bộ xanh (`check:mau-accent`,
+`check:lib-layers`, `check:sw-exclude`, `check:migrations`, `check:route-perms`,
+`check:db-params`, `check:dead-code`).
+
+**Tiếp theo (chưa làm)**: áp bộ component cho các nhóm trang nghiệp vụ còn lại theo từng đợt
+(tài chính, hiện trường, kỹ thuật) — đợt này cố ý không đổi hàng loạt để diff còn review được.
+
+**Nợ kỹ thuật phát hiện (chưa sửa, ngoài phạm vi đợt này)** — `text-zinc-500` dùng làm **màu
+chữ** vi phạm tương phản WCAG AA ở theme tối: axe đếm ~95 nút DOM trên riêng Dashboard (nhiều
+nhất ở `ProgressMap`, `DashboardExtCards` và các panel số liệu), cộng ~17 nút trong nhãn ô
+heatmap `ProgressMap` (`text-[9px]`) ở **cả hai** theme. Không phải do đợt này sinh ra (các
+trang đó không nằm trong diff) nhưng nên gom một đợt riêng: đổi chữ phụ sang `zinc-400` và
+nâng cỡ nhãn heatmap, hoặc chỉnh lại `--color-zinc-500` cho các theme tối.
+
 ## Quét trùng lặp lần 2 — sau khi #389/#392 vào main (2026-08-24)
 
 Người dùng: "quét tất cả". Quét lại **1.298 file** (`lib` 192, `app` 738, `tests` 223, `e2e` 74,
