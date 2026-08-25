@@ -25,7 +25,7 @@ import {
 
 // ===== (1) Cấu trúc & ETag =====
 
-test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5, version = v6", () => {
+test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleMap v5 + 3 khối v7, version = v7", () => {
   const pack = getCurrentRulePack();
   for (const field of [
     "version",
@@ -43,8 +43,11 @@ test("rule pack: đủ 8 field theo API contract M99 §10 + 2 khối v4 + styleM
     assert.ok(field in pack, `Thiếu field v4 ${field}`);
   }
   assert.ok("styleMap" in pack, "Thiếu field v5 styleMap");
-  assert.equal(pack.version, "v6");
-  assert.equal(CURRENT_RULE_PACK_VERSION, "v6");
+  for (const field of ["xrefPolicy", "hatchMap", "layoutPolicy"]) {
+    assert.ok(field in pack, `Thiếu field v7 ${field}`);
+  }
+  assert.equal(pack.version, "v7");
+  assert.equal(CURRENT_RULE_PACK_VERSION, "v7");
 });
 
 test("rule pack v2 là mở rộng thuần của v1: 5 field cũ giữ nguyên nội dung", async () => {
@@ -154,7 +157,7 @@ test("rule pack v5 là mở rộng thuần của v4: chỉ thêm styleMap + khó
 
 test("rule pack v6 là mở rộng thuần của v5: chỉ thêm ghi chú khóa mới trong takeoff (M101 §6.3 FR4)", async () => {
   const v5 = (await import("@/lib/ky-thuat/cad/rule-packs/v5.json")).default;
-  const v6 = getCurrentRulePack();
+  const v6 = (await import("@/lib/ky-thuat/cad/rule-packs/v6.json")).default;
 
   for (const field of [
     "layerMap",
@@ -187,7 +190,71 @@ test("rule pack v6 là mở rộng thuần của v5: chỉ thêm ghi chú khóa 
   assert.deepEqual(v6.takeoff.items, v5.takeoff.items, "items của v6 lệch v5 — bóc sẽ ra số khác");
 });
 
-test("v6: không item nào bật khóa bóc nâng cao (bóc bằng v6 = bóc bằng v5)", () => {
+test("rule pack v7 là mở rộng thuần của v6: chỉ thêm 3 khối chính sách chuẩn hóa (M101 §6.2 FR3)", async () => {
+  const v6 = (await import("@/lib/ky-thuat/cad/rule-packs/v6.json")).default;
+  const v7 = getCurrentRulePack();
+
+  for (const field of [
+    "layerMap",
+    "fontMap",
+    "purgePolicy",
+    "lineweightMap",
+    "flattenPolicy",
+    "takeoff",
+    "inspectionPolicy",
+    "styleMap",
+    "drawTools",
+    "sheetSetup",
+  ] as const) {
+    assert.deepEqual(
+      v7[field],
+      v6[field],
+      `Field ${field} của v7 lệch v6 — v7 phải là mở rộng thuần (chuẩn hóa bằng v7 không đổi hành vi)`,
+    );
+  }
+  assert.deepEqual(
+    Object.keys(v7).filter((k) => !(k in v6)),
+    ["xrefPolicy", "hatchMap", "layoutPolicy"],
+    "v7 thêm nhiều hơn đúng 3 khối chính sách của bước chuẩn hóa 9/10/11",
+  );
+});
+
+test("v7: cả 4 bước chuẩn hóa mới đều TẮT mặc định (M101 §6.2 — v7 mặc định = v6)", () => {
+  const pack = getCurrentRulePack();
+  assert.equal(pack.xrefPolicy.enabled, false, "bước 9 phải mặc định tắt");
+  assert.equal(pack.hatchMap.enabled, false, "bước 10 phải mặc định tắt");
+  assert.equal(pack.layoutPolicy.enabled, false, "bước 11 phải mặc định tắt");
+  // Bước 8 KHÔNG có cờ riêng (styleMap là dữ liệu, dùng chung với phép kiểm 14) — công tắc của nó
+  // là inspectionPolicy.styleDeviation.enabled, cũng đang tắt.
+  assert.equal(pack.inspectionPolicy.styleDeviation.enabled, false, "bước 8 phải mặc định tắt");
+
+  // Tham số then chốt: bật lên là dùng được ngay, không phải phát hành lại.
+  assert.equal(pack.xrefPolicy.pathPolicy, "relative");
+  assert.deepEqual(
+    pack.xrefPolicy.bindMatchAny,
+    [],
+    "bindMatchAny phải rỗng mặc định (không bind xref nào)",
+  );
+  assert.deepEqual(
+    pack.hatchMap.byLayer,
+    [],
+    "byLayer để rỗng: bộ mẫu hatch là quy ước riêng từng công ty",
+  );
+  assert.equal(pack.layoutPolicy.removeEmpty, true);
+  assert.equal(
+    pack.layoutPolicy.renameLayouts,
+    false,
+    "đổi tên layout hàng loạt phải là quyết định của cả tổ",
+  );
+  assert.match(pack.layoutPolicy.namePattern, /\{seq\}/);
+
+  // Mỗi khối mới phải tự tài liệu hóa bằng tiếng Việt ngay trong rule pack (M101 §18).
+  for (const khoi of [pack.xrefPolicy, pack.hatchMap, pack.layoutPolicy] as { note: string }[]) {
+    assert.ok(khoi.note.length > 0, "khối chính sách mới thiếu mô tả tiếng Việt");
+  }
+});
+
+test("v7 (kế thừa v6): không item nào bật khóa bóc nâng cao (bóc bằng v7 = bóc bằng v5)", () => {
   const items = getCurrentRulePack().takeoff.items as unknown as Record<string, unknown>[];
   for (const item of items) {
     for (const khoa of [
@@ -201,7 +268,7 @@ test("v6: không item nào bật khóa bóc nâng cao (bóc bằng v6 = bóc b�
       assert.equal(
         khoa in item,
         false,
-        `item ${String(item.id)} khai sẵn "${khoa}" — v6 phải trung tính, hệ số do dự án chốt ở version sau`,
+        `item ${String(item.id)} khai sẵn "${khoa}" — v7 phải trung tính, hệ số do dự án chốt ở version sau`,
       );
     }
   }
@@ -219,7 +286,7 @@ test("v6: không item nào bật khóa bóc nâng cao (bóc bằng v6 = bóc b�
   }
 });
 
-test("v6 (kế thừa v5): 7 phép kiểm mới đều có enabled và đều TẮT mặc định (M101 AC(a))", () => {
+test("v7 (kế thừa v5): 7 phép kiểm mới đều có enabled và đều TẮT mặc định (M101 AC(a))", () => {
   const ip = getCurrentRulePack().inspectionPolicy;
   const phepKiemMoi = [
     "overlapSameSystem",
@@ -245,7 +312,7 @@ test("v6 (kế thừa v5): 7 phép kiểm mới đều có enabled và đều T�
   assert.ok(ip.strayObjects.minEntitiesForExtents >= 4);
 });
 
-test("v6 (kế thừa v5): viewportScale.scales khớp sheetSetup.scales (một bộ tỉ lệ duy nhất, chống trôi)", () => {
+test("v7 (kế thừa v5): viewportScale.scales khớp sheetSetup.scales (một bộ tỉ lệ duy nhất, chống trôi)", () => {
   const pack = getCurrentRulePack();
   assert.deepEqual(
     [...pack.inspectionPolicy.viewportScale.scales].sort((a, b) => a - b),
@@ -254,7 +321,7 @@ test("v6 (kế thừa v5): viewportScale.scales khớp sheetSetup.scales (một 
   );
 });
 
-test("v6 (kế thừa v5): styleMap khai bộ style chuẩn dùng chung cho phép kiểm 14 và bước chuẩn hóa 8", () => {
+test("v7 (kế thừa v5): styleMap khai bộ style chuẩn dùng chung cho phép kiểm 14 và bước chuẩn hóa 8", () => {
   const sm = getCurrentRulePack().styleMap;
   assert.ok(sm.textStyle.name.length > 0 && sm.textStyle.fontFile.length > 0);
   assert.ok(sm.dimStyle.name.length > 0);
@@ -380,6 +447,9 @@ test("route rule-pack: có force-dynamic, chặn 401/403 và trả 304 theo If-N
     "drawTools:",
     "sheetSetup:",
     "styleMap:",
+    "xrefPolicy:",
+    "hatchMap:",
+    "layoutPolicy:",
   ]) {
     assert.ok(src.includes(field), `Response thiếu ${field}`);
   }

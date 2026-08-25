@@ -89,6 +89,8 @@ internal static class BatchProcessor
             pipeline.Run(db, tr);
             tr.Commit();
         }
+        // Side database không có tài liệu mở → bỏ qua bind xref/dọn layout kèm cảnh báo trong báo cáo.
+        pipeline.ApDungCapTaiLieu(db, coTaiLieu: false);
         db.SaveAs(tepRa, DwgVersion.Current);
         var ten = Path.GetFileName(tepVao);
         var baoCao = new StandardizeReport

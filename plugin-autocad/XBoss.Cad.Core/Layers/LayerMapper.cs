@@ -3,6 +3,16 @@ using XBoss.Cad.Core.RulePack;
 
 namespace XBoss.Cad.Core.Layers;
 
+/// <summary>Việc cần làm với một layer khi áp kế hoạch của <see cref="LayerMapper.MapAll"/>.</summary>
+public enum HanhDongLayer
+{
+    /// <summary>Chỉ đổi tên bản ghi layer — thực thể để ByLayer tự đi theo.</summary>
+    DoiTen,
+
+    /// <summary>Chuyển thực thể sang layer đích ĐÃ TỒN TẠI rồi xóa layer nguồn.</summary>
+    Gop,
+}
+
 /// <summary>
 /// Ánh xạ tên layer theo layerMap của rule pack (M99 FR2 — cơ chế tương đương LAYTRANS):
 /// first-match theo THỨ TỰ nhóm (HVAC → ELECTRICAL → … — thứ tự là hợp đồng, xem
@@ -72,6 +82,22 @@ public sealed class LayerMapper
             if (!string.Equals(target, ten, StringComparison.Ordinal)) plan[ten] = target;
         }
         return plan;
+    }
+
+    /// <summary>
+    /// Đổi tên hay gộp? Quyết định này PHẢI ở Core vì Adapter hỏi bảng layer bằng
+    /// <c>LayerTable.Has(tên đích)</c>, mà <c>Has</c> của AutoCAD KHÔNG phân biệt hoa/thường: layer
+    /// chỉ lệch hoa/thường với tên đích (vd <c>m-duct-supp</c> → <c>M-DUCT-SUPP</c>) làm
+    /// <c>Has</c> trả true, Adapter tưởng "đích đã tồn tại" nên đi nhánh GỘP rồi <c>Erase()</c>
+    /// **chính layer đang chứa thực thể** — mất dữ liệu (nợ kỹ thuật ghi ở PROGRESS.md, đóng ở M101 PR2).
+    ///
+    /// <para>Quy tắc: cũ và mới chỉ khác hoa/thường ⇒ ĐỔI TÊN, không bao giờ gộp (chúng là MỘT layer).</para>
+    /// </summary>
+    /// <param name="dichDaTonTai">Kết quả <c>LayerTable.Has(tenMoi)</c> — không phân biệt hoa/thường.</param>
+    public static HanhDongLayer QuyetDinh(string tenCu, string tenMoi, bool dichDaTonTai)
+    {
+        if (string.Equals(tenCu, tenMoi, StringComparison.OrdinalIgnoreCase)) return HanhDongLayer.DoiTen;
+        return dichDaTonTai ? HanhDongLayer.Gop : HanhDongLayer.DoiTen;
     }
 
     private static bool Khop(string layerHoa, IReadOnlyList<string> tokens)
