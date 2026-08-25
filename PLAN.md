@@ -98,3 +98,27 @@ V3 → (V4 ∥ V5) → V6 → V7. Mỗi việc worktree riêng; các file Comman
 - **Nợ phải đóng luôn trong việc này** (hazard có sẵn, ghi ở `PROGRESS.md`): `StandardizePipeline.Buoc2LayerMapping` gộp layer bằng `LayerTable.Has(tên đích)` — `Has` KHÔNG phân biệt hoa/thường, nên layer chỉ lệch hoa/thường với tên đích (vd `m-duct-supp`) rơi vào nhánh "gộp" rồi `Erase()` chính layer đang chứa thực thể. Sửa: bỏ qua khi `string.Equals(cũ, mới, OrdinalIgnoreCase)`. Kèm test.
 
 **Tiêu chí chấp nhận:** dotnet test xanh toàn bộ (hiện 365 ca); v7 mặc định = v6 (ca test); hazard hoa/thường có test chứng minh bắt được.
+
+## Việc W4 — `boqCode` per-project + đối chiếu BOQ chỉ-đọc (M101 PR4) — `route: complex`
+
+⚠️ **Vùng rủi ro cao** (`lib/khoi-luong/boq.ts`) — bắt buộc rà `docs/audit.md` mục "Vùng rủi ro cao" và mục bảo mật/phân quyền trước khi code.
+
+Đặc tả M101 §6.3 (2 dòng cuối bảng: `boqCode` theo dự án, đối chiếu BOQ trong Excel), §7 FR5/FR6, §9, §16 (PR4), §18.
+
+1. **Map `boqCode` theo dự án**: DDL thêm thuần (lấy số migration thật bằng `ls migrations | sort -V | tail -3`) — bảng map `(project_id, takeoff_item_id) → boq_code`; **có `project_id` ⇒ phải vào RLS theo đúng khuôn các bảng theo dự án hiện có** (ĐỌC migration RLS gần nhất + `lib/bao-mat/` trước). Admin/PM nhập trên web (thêm mục vào bảng điều khiển plugin `/engineering/chuan-hoa-ban-ve`).
+2. **`GET /api/engineering/cad/rule-pack?project=<id>`**: trả rule pack hiện hành có `takeoff.items[].boqCode` đã gán theo map của dự án; không có `?project=` → giữ nguyên hành vi cũ (toàn cục). Auth như route rule-pack hiện tại; **project scope phải kiểm bằng ngữ cảnh phiên/token, KHÔNG tin id client gửi** (bài học lặp lại nhiều đợt — xem `docs/audit.md`).
+3. **`GET /api/engineering/cad/boq-snapshot?project=<id>`** (MỚI, **chỉ đọc**): trả KL BOQ hợp đồng theo item để plugin đặt cạnh KL bóc. Token scope `cad` hoặc phiên; **không mở bất kỳ đường ghi nào** (đường ghi sổ duy nhất vẫn là upload có kiểm định). Cột tiền: M101 PR4 **không đụng tiền** — chỉ khối lượng; nếu buộc phải chạm cột tiền thì cast `::text` theo quy ước M45 (`lib/nen/money.ts`).
+4. **Excel**: sheet phụ `Doi-chieu` (tùy chọn khi phát lệnh) — KL BOQ hợp đồng cạnh KL bóc, chênh lệch % bằng **công thức sống**. Không đụng `Data-BOQ` (mẫu công ty) và không đụng sheet `Tong-hop-vung` của PR3.
+5. **Adapter**: `XBOSS_BOCKL_XUAT` thêm tùy chọn kéo snapshot (có mạng + token) → dựng sheet đối chiếu; không mạng → bỏ qua kèm thông báo, KHÔNG chặn xuất Excel.
+
+**Tiêu chí chấp nhận:** AC (e) — đổi KL BOQ trên server thì sheet `Doi-chieu` lần xuất sau đổi theo, bản vẽ không đổi; route mới có `getCurrentUser()` + 401 + kiểm quyền; test node phủ auth 401/403 + RLS chéo dự án; dotnet test xanh toàn bộ.
+
+## Việc W5 — `XBOSS_BATCH` bóc hàng loạt + upload kèm KL + web (M101 PR5) — `route: standard`
+
+Đặc tả M101 §6.4.
+
+1. `XBOSS_BATCH` thêm chế độ `bocl`: bóc cả thư mục `.dwg` qua side database → **1 Excel tổng** nhiều bản vẽ (thêm cột "Tệp"), bản gốc giữ nguyên, tệp lỗi bỏ qua + ghi nhật ký (bám đúng khuôn `BatchProcessor` hiện có).
+2. `XBOSS_UPLOAD` gửi kèm **sidecar JSON kết quả bóc** (đã có sẵn từ PR-B) → server lưu vào `drawing_revisions.standardize_report` khối `takeoff`. **KHÔNG ghi vào bảng BOQ** (giữ nguyên đường ghi sổ duy nhất).
+3. Web: bảng điều khiển hiện KL đã bóc theo revision (biểu đồ theo hệ/vùng) + nút tải Excel gộp.
+
+**Tiêu chí chấp nhận:** dotnet test + test node liên quan xanh; upload cũ (không kèm KL) vẫn chạy y nguyên; không có đường ghi mới nào vào bảng BOQ.
