@@ -213,17 +213,22 @@ public sealed class XBossApiClient
 
     /// <summary>POST /api/engineering/cad/plugin-upload — DWG + DXF sidecar + báo cáo +
     /// rulePackVersion (FR9). 202 = server nhận, poll job; 422 = kiểm định fail (AC5) —
-    /// trả danh sách lỗi thay vì ném để command hiện đủ cho kỹ sư.</summary>
+    /// trả danh sách lỗi thay vì ném để command hiện đủ cho kỹ sư.
+    /// <paramref name="takeoffJson"/> (M101 §6.4, PR5): sidecar JSON kết quả bóc khối lượng
+    /// (<c>TakeoffJsonReport</c>, cạnh Excel từ <c>XBOSS_BOCKL_XUAT</c>) — TÙY CHỌN, không gửi
+    /// vẫn upload y hệt trước (đường ghi sổ BOQ không đổi, server chỉ lưu để đối chiếu).</summary>
     public async Task<UploadKetQua> UploadAsync(
         string token, string drawingCode, string rev, string rulePackVersion,
         string dwgFileName, byte[] dwgBytes, byte[] dxfBytes, string? reportJson,
-        CancellationToken ct = default)
+        CancellationToken ct = default, string? takeoffJson = null)
     {
         using var form = new MultipartFormDataContent();
         form.Add(new ByteArrayContent(dwgBytes), "dwg", dwgFileName);
         form.Add(new ByteArrayContent(dxfBytes), "dxf", Path.ChangeExtension(dwgFileName, ".dxf"));
         if (reportJson is not null)
             form.Add(new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(reportJson)), "report", "report.json");
+        if (takeoffJson is not null)
+            form.Add(new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(takeoffJson)), "takeoff", "takeoff.json");
         form.Add(new StringContent(drawingCode), "drawingCode");
         form.Add(new StringContent(rev), "rev");
         form.Add(new StringContent(rulePackVersion), "rulePackVersion");

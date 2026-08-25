@@ -1,6 +1,8 @@
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.Geometry;
 using XBoss.Cad.Core.Draw;
+using XBoss.Cad.Core.Geometry;
+using XBoss.Cad.Core.RulePack;
 using XBoss.Cad.Core.Takeoff;
 using XBoss.Cad.Core.Zoning;
 
@@ -27,6 +29,22 @@ internal static class TakeoffScanner
         IReadOnlyList<(string NoiDung, Point3d Diem)> Nhan,
         double NguongNhanVe,
         IReadOnlySet<string>? HandleRanhGioi = null);
+
+    /// <summary>
+    /// Dựng bối cảnh bóc nâng cao (v6, M101 §6.3) từ vùng đã chọn: ngưỡng nhãn quy đổi theo
+    /// đơn vị bản vẽ + quét nhãn text (chỉ khi rule pack có item bật <c>sizeFromNearbyText</c>).
+    /// Dùng chung <c>XBOSS_BOCKL_XUAT</c> và <c>XBOSS_BATCH</c> chế độ <c>BocKL</c> (M101 §6.4) —
+    /// một đường dựng bối cảnh duy nhất, hai lệnh không thể lệch nhau.
+    /// </summary>
+    internal static BoiCanhBoc XayBoiCanh(
+        Database db, Transaction tr, CadRulePack pack, VungChonService.KetQuaChonVung chonVung)
+    {
+        var nguongMm = TakeoffZoning.NguongNhanLonNhatMm(pack.Takeoff);
+        if (nguongMm <= 0)
+            return new BoiCanhBoc(chonVung.Vung, [], 0, chonVung.HandleRanhGioi);
+        var (toMm, _, _) = DrawingUnits.TuInsUnits((int)db.Insunits);
+        return new BoiCanhBoc(chonVung.Vung, QuetNhan(db, tr), nguongMm / toMm, chonVung.HandleRanhGioi);
+    }
 
     /// <summary>Quét các ObjectId đã chọn (hoặc toàn model space).</summary>
     internal static (List<MeasuredObject> DoiTuong, int XrefSkipped) Scan(

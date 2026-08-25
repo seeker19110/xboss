@@ -181,6 +181,69 @@ test(
   },
 );
 
+test(
+  "upload kèm sidecar KL bóc (M101 PR5) → lưu vào standardize_report.takeoff, KHÔNG đụng bảng BOQ; " +
+    "upload cũ không kèm KL vẫn chạy y nguyên",
+  S,
+  async () => {
+    const { xuLyPluginUpload } = await import("@/lib/ky-thuat/cad/plugin-upload");
+    const { getCurrentRulePack } = await import("@/lib/ky-thuat/cad/rule-pack");
+    const { queryOne } = await import("@/lib/db");
+    const v = getCurrentRulePack().version;
+
+    // Đếm dòng bảng BOQ (work_packages/tasks có boq_code) trước — không có đường ghi mới nào vào đó.
+    const boqTruoc = await queryOne<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM tasks WHERE boq_code IS NOT NULL`,
+    );
+
+    const kq = await xuLyPluginUpload({
+      drawingId: DRAWING,
+      orgId: 1,
+      userId: U,
+      rev: "C",
+      rulePackVersion: v,
+      dwg: Buffer.from("gia-lap-noi-dung-dwg-kem-takeoff"),
+      dwgName: "T05.dwg",
+      dxfText: DXF_HOP_LE,
+      report: { cheDo: "chuan-hoa" },
+      takeoff: { rulePackVersion: v, lines: [{ itemId: "duct-supp", khoiLuong: 12.5 }] },
+    });
+    assert.equal(kq.status, "created");
+    if (kq.status !== "created") return;
+
+    const row = await queryOne<{
+      standardize_report: { cheDo?: string; takeoff?: { lines?: unknown[] } };
+    }>(`SELECT standardize_report FROM drawing_revisions WHERE id = ?`, kq.revisionId);
+    assert.equal(row?.standardize_report?.cheDo, "chuan-hoa");
+    assert.equal(row?.standardize_report?.takeoff?.lines?.length, 1);
+
+    const boqSau = await queryOne<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM tasks WHERE boq_code IS NOT NULL`,
+    );
+    assert.equal(boqSau?.n, boqTruoc?.n); // không có dòng nào ghi thêm vào bảng BOQ
+
+    // Upload cũ (không kèm takeoff) — chạy y nguyên, không có khối "takeoff" nào trong report.
+    const cu = await xuLyPluginUpload({
+      drawingId: DRAWING,
+      orgId: 1,
+      userId: U,
+      rev: "D",
+      rulePackVersion: v,
+      dwg: Buffer.from("gia-lap-noi-dung-dwg-khong-takeoff"),
+      dwgName: "T05.dwg",
+      dxfText: DXF_HOP_LE,
+      report: null,
+    });
+    assert.equal(cu.status, "created");
+    if (cu.status !== "created") return;
+    const rowCu = await queryOne<{ standardize_report: { takeoff?: unknown } }>(
+      `SELECT standardize_report FROM drawing_revisions WHERE id = ?`,
+      cu.revisionId,
+    );
+    assert.equal(rowCu?.standardize_report?.takeoff, undefined);
+  },
+);
+
 test("kiểm định fail → KHÔNG tạo revision (AC5)", S, async () => {
   const { xuLyPluginUpload } = await import("@/lib/ky-thuat/cad/plugin-upload");
   const { queryOne } = await import("@/lib/db");

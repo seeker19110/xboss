@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Plug,
@@ -10,6 +10,9 @@ import {
   CheckCircle2,
   AlertTriangle,
   FileStack,
+  ChevronDown,
+  ChevronRight,
+  Ruler,
 } from "lucide-react";
 import { Skeleton } from "@/app/components/Skeleton";
 import { redirectToLogin } from "@/app/lib/me";
@@ -24,6 +27,12 @@ type RulePackTomTat = {
   soHangMucBocTach: number;
 };
 
+type TomTatKlBoc = {
+  tongDong: number;
+  theoHe: { nhan: string; khoiLuong: number }[];
+  theoVung: { nhan: string; khoiLuong: number }[];
+};
+
 type LuotUpload = {
   revisionId: number;
   drawingCode: string;
@@ -34,7 +43,35 @@ type LuotUpload = {
   rulePackVersion: string | null;
   nguoiTaiLen: string | null;
   kiemDinh: { ok: boolean; soLoi: number; soCanhBao: number; canhBao: string[] } | null;
+  klBoc: TomTatKlBoc | null;
 };
+
+/** Biểu đồ thanh ngang tối giản (zinc/emerald, ADR-0009) — không kéo thêm recharts cho một
+ * bảng nhỏ trong panel đã có sẵn nhiều biểu đồ nặng hơn ở nơi khác. */
+function BieuDoThanhNgang({ muc }: { muc: { nhan: string; khoiLuong: number }[] }) {
+  if (muc.length === 0) return null;
+  const max = Math.max(...muc.map((m) => m.khoiLuong), 1);
+  return (
+    <div className="space-y-1">
+      {muc.map((m) => (
+        <div key={m.nhan} className="flex items-center gap-2 text-[11px]">
+          <span className="w-32 truncate text-zinc-400" title={m.nhan}>
+            {m.nhan}
+          </span>
+          <div className="flex-1 h-2 rounded-full bg-zinc-800 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-emerald-500"
+              style={{ width: `${Math.max((m.khoiLuong / max) * 100, 2)}%` }}
+            />
+          </div>
+          <span className="w-16 text-right font-mono text-zinc-300">
+            {m.khoiLuong.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const NHAN_TRANG_THAI: Record<string, string> = {
   submitted: "Chờ duyệt",
@@ -55,6 +92,7 @@ export default function PluginControlPanel() {
   const [pluginUrl, setPluginUrl] = useState<string | null>(null);
   const [lichSu, setLichSu] = useState<LuotUpload[] | null>(null);
   const [loi, setLoi] = useState<string | null>(null);
+  const [moRong, setMoRong] = useState<number | null>(null);
 
   const tai = useCallback(async () => {
     try {
@@ -181,9 +219,21 @@ export default function PluginControlPanel() {
 
       {/* Lịch sử bản vẽ plugin tải lên */}
       <div className="space-y-2">
-        <div className="text-xs font-bold text-zinc-200 uppercase tracking-wide flex items-center gap-2">
-          <FileStack className="w-3.5 h-3.5 text-sky-400" />
-          Bản Vẽ Plugin Đã Gửi Về &amp; Kết Quả Kiểm Định
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="text-xs font-bold text-zinc-200 uppercase tracking-wide flex items-center gap-2">
+            <FileStack className="w-3.5 h-3.5 text-sky-400" />
+            Bản Vẽ Plugin Đã Gửi Về &amp; Kết Quả Kiểm Định
+          </div>
+          {lichSu !== null && lichSu.some((r) => r.klBoc !== null) && (
+            <a
+              href="/api/engineering/cad/takeoff-export"
+              download="xboss-kl-boc-gop.xlsx"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-on-accent-dark font-bold text-xs shadow-sm transition"
+            >
+              <Ruler className="w-3.5 h-3.5" />
+              <span>Tải Excel Gộp KL Đã Bóc</span>
+            </a>
+          )}
         </div>
         {lichSu === null ? (
           <Skeleton className="h-24 w-full" />
@@ -196,49 +246,99 @@ export default function PluginControlPanel() {
             <table className="w-full text-xs">
               <thead className="text-zinc-400">
                 <tr className="border-b border-zinc-800">
+                  <th className="text-left font-semibold py-2 pr-3" />
                   <th className="text-left font-semibold py-2 pr-3">Bản vẽ</th>
                   <th className="text-left font-semibold py-2 pr-3">Rev</th>
                   <th className="text-left font-semibold py-2 pr-3">Ngày gửi</th>
                   <th className="text-left font-semibold py-2 pr-3">Người gửi</th>
                   <th className="text-left font-semibold py-2 pr-3">Rule pack</th>
                   <th className="text-left font-semibold py-2 pr-3">Trạng thái</th>
-                  <th className="text-left font-semibold py-2">Kiểm định</th>
+                  <th className="text-left font-semibold py-2 pr-3">Kiểm định</th>
+                  <th className="text-left font-semibold py-2">KL Bóc</th>
                 </tr>
               </thead>
               <tbody className="text-zinc-300">
-                {lichSu.map((r) => (
-                  <tr key={r.revisionId} className="border-b border-zinc-900">
-                    <td className="py-2 pr-3">
-                      <span className="font-mono font-bold text-zinc-100">{r.drawingCode}</span>
-                      <span className="text-zinc-500"> — {r.drawingName}</span>
-                    </td>
-                    <td className="py-2 pr-3 font-mono">{r.rev}</td>
-                    <td className="py-2 pr-3">{ngay(r.submittedAt)}</td>
-                    <td className="py-2 pr-3">{r.nguoiTaiLen ?? "—"}</td>
-                    <td className="py-2 pr-3 font-mono">{r.rulePackVersion ?? "—"}</td>
-                    <td className="py-2 pr-3">{NHAN_TRANG_THAI[r.status] ?? r.status}</td>
-                    <td className="py-2">
-                      {r.kiemDinh === null ? (
-                        <span className="text-zinc-500">—</span>
-                      ) : r.kiemDinh.ok && r.kiemDinh.soCanhBao === 0 ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-300">
-                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                          Đạt
-                        </span>
-                      ) : (
-                        <span
-                          className="inline-flex items-center gap-1 text-amber-300"
-                          title={r.kiemDinh.canhBao.join(" · ")}
-                        >
-                          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                          {r.kiemDinh.ok
-                            ? `Đạt, ${r.kiemDinh.soCanhBao} cảnh báo`
-                            : `${r.kiemDinh.soLoi} lỗi`}
-                        </span>
+                {lichSu.map((r) => {
+                  const dangMo = moRong === r.revisionId;
+                  return (
+                    <Fragment key={r.revisionId}>
+                      <tr
+                        className={`border-b border-zinc-900 ${r.klBoc ? "cursor-pointer hover:bg-zinc-800/40" : ""}`}
+                        onClick={() => r.klBoc && setMoRong(dangMo ? null : r.revisionId)}
+                      >
+                        <td className="py-2 pl-1 text-zinc-500">
+                          {r.klBoc &&
+                            (dangMo ? (
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            ) : (
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            ))}
+                        </td>
+                        <td className="py-2 pr-3">
+                          <span className="font-mono font-bold text-zinc-100">{r.drawingCode}</span>
+                          <span className="text-zinc-500"> — {r.drawingName}</span>
+                        </td>
+                        <td className="py-2 pr-3 font-mono">{r.rev}</td>
+                        <td className="py-2 pr-3">{ngay(r.submittedAt)}</td>
+                        <td className="py-2 pr-3">{r.nguoiTaiLen ?? "—"}</td>
+                        <td className="py-2 pr-3 font-mono">{r.rulePackVersion ?? "—"}</td>
+                        <td className="py-2 pr-3">{NHAN_TRANG_THAI[r.status] ?? r.status}</td>
+                        <td className="py-2 pr-3">
+                          {r.kiemDinh === null ? (
+                            <span className="text-zinc-500">—</span>
+                          ) : r.kiemDinh.ok && r.kiemDinh.soCanhBao === 0 ? (
+                            <span className="inline-flex items-center gap-1 text-emerald-300">
+                              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                              Đạt
+                            </span>
+                          ) : (
+                            <span
+                              className="inline-flex items-center gap-1 text-amber-300"
+                              title={r.kiemDinh.canhBao.join(" · ")}
+                            >
+                              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                              {r.kiemDinh.ok
+                                ? `Đạt, ${r.kiemDinh.soCanhBao} cảnh báo`
+                                : `${r.kiemDinh.soLoi} lỗi`}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2">
+                          {r.klBoc ? (
+                            <span className="text-zinc-400">{r.klBoc.tongDong} dòng</span>
+                          ) : (
+                            <span className="text-zinc-600">—</span>
+                          )}
+                        </td>
+                      </tr>
+                      {dangMo && r.klBoc && (
+                        <tr className="border-b border-zinc-900 bg-zinc-950/60">
+                          <td />
+                          <td colSpan={8} className="py-3 pr-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              {r.klBoc.theoHe.length > 0 && (
+                                <div className="space-y-1.5">
+                                  <div className="text-[11px] font-bold text-zinc-400 uppercase">
+                                    KL theo hệ
+                                  </div>
+                                  <BieuDoThanhNgang muc={r.klBoc.theoHe} />
+                                </div>
+                              )}
+                              {r.klBoc.theoVung.length > 0 && (
+                                <div className="space-y-1.5">
+                                  <div className="text-[11px] font-bold text-zinc-400 uppercase">
+                                    KL theo vùng
+                                  </div>
+                                  <BieuDoThanhNgang muc={r.klBoc.theoVung} />
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
                       )}
-                    </td>
-                  </tr>
-                ))}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>

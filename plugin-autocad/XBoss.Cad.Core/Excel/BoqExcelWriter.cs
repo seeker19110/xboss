@@ -76,6 +76,10 @@ public static class BoqExcelWriter
     /// <summary>Tên sheet phụ tổng hợp theo vùng (v6) — sheet mẫu công ty giữ nguyên tên/nội dung.</summary>
     public const string SheetVung = "Tong-hop-vung";
 
+    /// <summary>Một bản vẽ trong lô hàng loạt (M101 §6.4, XBOSS_BATCH chế độ BocKL): kết quả bóc
+    /// kèm tên tệp nguồn — dùng để đổ vào cột "Tệp" của Excel tổng.</summary>
+    public sealed record BatchTakeoffEntry(string TenTep, TakeoffResult KetQua);
+
     public static void Write(TakeoffResult ketQua, BoqExcelMeta meta, Stream output)
     {
         // Cột v6 chỉ xuất hiện khi có dữ liệu tương ứng — rule pack chưa bật khóa nào thì tệp
@@ -241,6 +245,194 @@ public static class BoqExcelWriter
         ws.SheetView.FreezeRows(HangHeader);
 
         if (coVung) GhiSheetVung(wb, ketQua);
+
+        wb.SaveAs(output);
+    }
+
+    /// <summary>
+    /// Excel TỔNG cho nhiều bản vẽ (M101 §6.4, <c>XBOSS_BATCH</c> chế độ <c>BocKL</c>) — hợp đồng
+    /// layout mẫu công ty (cột A–K + công thức H/J/K + SUBTOTAL) GIỮ NGUYÊN như <see cref="Write"/>;
+    /// chỉ CỘNG THÊM cột cuối "Tệp" ghi rõ dòng đó bóc từ bản vẽ nào. Các dòng cùng nhóm hệ của
+    /// NHIỀU bản vẽ được gộp chung một khối nhóm (SUBTOTAL cộng cả lô — đúng tinh thần "bóc cả
+    /// tòa nhà" của batch), không tách sheet theo từng tệp.
+    /// </summary>
+    public static void WriteBatch(IReadOnlyList<BatchTakeoffEntry> banVe, BoqExcelMeta meta, Stream output)
+    {
+        var tatCaDong = banVe
+            .SelectMany(b => b.KetQua.Lines.Select(l => (TenTep: b.TenTep, Line: l)))
+            .ToList();
+        var moRong = tatCaDong.Any(x => x.Line.Size.Length > 0 || x.Line.Vung.Length > 0 || x.Line.HeSoQuyDoi > 0);
+        var coVung = tatCaDong.Any(x => x.Line.Vung.Length > 0);
+        var soCotChinh = moRong ? Header.Length + HeaderV6.Length : Header.Length;
+        var cotTep = soCotChinh + 1;
+        var soCot = cotTep;
+
+        using var wb = new XLWorkbook();
+        var ws = wb.AddWorksheet("Data-BOQ");
+
+        // ----- Đầu trang (B1–B5) -----
+        ws.Cell("B1").Value = $"DỰ ÁN: {meta.TenDuAn}";
+        ws.Cell("B2").Value = $"BẢN VẼ: {meta.TenBanVe}";
+        ws.Cell("B3").Value = $"GÓI THẦU: {meta.GoiThau}";
+        ws.Cell("B4").Value = "BIỂU MẪU: QUẢN LÝ KHỐI LƯỢNG BOQ & ĐỊNH MỨC BÓC TÁCH BẢN VẼ (GỘP HÀNG LOẠT)";
+        ws.Cell("B5").Value =
+            $"Bóc bằng XBoss plugin — rule pack {meta.RulePackVersion} — {meta.NgayIso} — {meta.NguoiBoc} — " +
+            $"{banVe.Count} bản vẽ";
+        ws.Range("B1:B4").Style.Font.SetBold();
+        ws.Cell("B5").Style.Font.SetItalic().Font.SetFontColor(XLColor.FromHtml("#71717A"));
+
+        // ----- Header bảng (hàng 6) -----
+        for (var i = 0; i < soCot; i++)
+        {
+            var cell = ws.Cell(HangHeader, i + 1);
+            cell.Value = i < Header.Length ? Header[i]
+                : i < soCotChinh ? HeaderV6[i - Header.Length]
+                : "Tệp";
+            cell.Style
+                .Font.SetBold()
+                .Alignment.SetWrapText(true)
+                .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center)
+                .Alignment.SetVertical(XLAlignmentVerticalValues.Center)
+                .Fill.SetBackgroundColor(XLColor.FromHtml("#D9E2F3"));
+            ws.Column(i + 1).Width = i < BeRongCot.Length ? BeRongCot[i] : 26;
+        }
+        ws.Row(HangHeader).Height = 42;
+
+        // ----- Dữ liệu (hàng 7+): nhóm hệ → (tệp, item) -----
+        var hang = HangHeader + 1;
+        var nhomThuTu = tatCaDong
+            .GroupBy(x => x.Line.Item.Group)
+            .ToList(); // GroupBy giữ thứ tự xuất hiện đầu tiên trên toàn lô
+
+        var sttNhom = 0;
+        foreach (var nhom in nhomThuTu)
+        {
+            sttNhom++;
+            var hangNhom = hang;
+            ws.Cell(hang, 2).Value = SoLaMa(sttNhom);
+            ws.Cell(hang, 3).Value = TenNhom(nhom.Key);
+            ws.Range(hang, 1, hang, soCot).Style
+                .Font.SetBold()
+                .Fill.SetBackgroundColor(XLColor.FromHtml("#EFEFEF"));
+            hang++;
+
+            var sttItem = 0;
+            foreach (var (tenTep, line) in nhom)
+            {
+                sttItem++;
+                ws.Cell(hang, 1).Value = line.Item.BoqCode;
+                ws.Cell(hang, 2).Value = sttItem;
+                ws.Cell(hang, 3).Value = MoTaDong(line);
+                ws.Cell(hang, 4).Value = line.Item.Spec;
+                ws.Cell(hang, 5).Value = line.Item.Unit;
+                ws.Cell(hang, 7).Value = line.Quantity;
+                ws.Cell(hang, 8).FormulaA1 = $"IF(OR(ISNUMBER(F{hang}),ISNUMBER(G{hang})),N(F{hang})-N(G{hang}),\"\")";
+                ws.Cell(hang, 9).Value = GhiChu(line);
+                ws.Cell(hang, 10).FormulaA1 =
+                    $"IF(OR(ISNUMBER(F{hang}),ISNUMBER(G{hang})),IF(ISBLANK(G{hang}),\"⚠️ Chưa bóc tách định mức\"," +
+                    $"IF(H{hang}>=0,\"✅ OK - Cho phép đặt hàng\",\"❌ CHẶN ĐẶT HÀNG - CẦN BẢO VỆ KL\")),\"\")";
+                ws.Cell(hang, 11).FormulaA1 =
+                    $"IF(OR(ISNUMBER(F{hang}),ISNUMBER(G{hang})),IF(ISBLANK(G{hang}),\"Kỹ sư/Thầu phụ cần bóc tách KL bản vẽ\"," +
+                    $"IF(H{hang}>=0,\"Được đặt hàng tối đa \"&G{hang}&\" \"&E{hang}," +
+                    $"\"Vượt dự toán \"&ABS(H{hang})&\" \"&E{hang}&\" (QS giải trình & duyệt sửa BOQ)\")),\"\")";
+
+                if (moRong)
+                {
+                    ws.Cell(hang, CotVung).Value = coVung && line.Vung.Length == 0 ? NgoaiVung : line.Vung;
+                    ws.Cell(hang, CotSize).Value = line.Size;
+                    ws.Cell(hang, CotNguonSize).Value = Takeoff.TakeoffSize.MoTaNguon(line.NguonSize);
+                    ws.Cell(hang, CotMaItem).Value = line.Item.Id;
+                    if (line.HeSoQuyDoi > 0)
+                    {
+                        ws.Cell(hang, CotHeSo).Value = line.MoTaQuyDoi;
+                        ws.Cell(hang, CotKlQuyDoi).FormulaA1 =
+                            $"G{hang}*{line.HeSoQuyDoi.ToString(CultureInfo.InvariantCulture)}";
+                    }
+                }
+                ws.Cell(hang, cotTep).Value = tenTep;
+                hang++;
+            }
+
+            foreach (var cot in moRong ? [6, 7, 8, CotKlQuyDoi] : new[] { 6, 7, 8 })
+            {
+                ws.Cell(hangNhom, cot).FormulaA1 =
+                    $"SUBTOTAL(9,{CotChu(cot)}{hangNhom + 1}:{CotChu(cot)}{hang - 1})";
+            }
+        }
+
+        // ----- Hàng TỔNG CỘNG toàn bảng -----
+        if (tatCaDong.Count > 0)
+        {
+            ws.Cell(hang, 3).Value = "TỔNG CỘNG";
+            foreach (var cot in moRong ? [6, 7, 8, CotKlQuyDoi] : new[] { 6, 7, 8 })
+            {
+                ws.Cell(hang, cot).FormulaA1 =
+                    $"SUBTOTAL(9,{CotChu(cot)}{HangHeader + 1}:{CotChu(cot)}{hang - 1})";
+            }
+            ws.Range(hang, 1, hang, soCot).Style
+                .Font.SetBold()
+                .Fill.SetBackgroundColor(XLColor.FromHtml("#D9E2F3"));
+            hang++;
+        }
+        var hangCuoi = hang - 1;
+
+        // ----- Cảnh báo dưới bảng (gộp từ mọi bản vẽ, đánh dấu tên tệp) -----
+        if (moRong)
+        {
+            hang++;
+            ws.Cell(hang, 3).Value =
+                $"Cột G = KL ĐO trên bản vẽ (KHÔNG cộng hao hụt). Cột {CotChu(CotKlQuyDoi)} = KL QUY ĐỔI theo hệ số rule pack " +
+                $"ghi ở cột {CotChu(CotHeSo)} — hai cột tách bạch, không trộn lẫn.";
+            ws.Cell(hang, 3).Style.Font.SetItalic();
+            hang++;
+        }
+        var tongSkipped = banVe.Sum(b => b.KetQua.SkippedMarkedCount);
+        var tongXref = banVe.Sum(b => b.KetQua.XrefSkippedCount);
+        var canhBaoGop = banVe.SelectMany(b => b.KetQua.Warnings.Select(w => $"[{b.TenTep}] {w.ThongDiep}")).ToList();
+        if (canhBaoGop.Count > 0 || tongXref > 0 || tongSkipped > 0)
+        {
+            hang++;
+            foreach (var w in canhBaoGop)
+            {
+                ws.Cell(hang, 3).Value = $"⚠ {w}";
+                ws.Cell(hang, 3).Style.Font.SetFontColor(XLColor.FromHtml("#B45309"));
+                hang++;
+            }
+            if (tongSkipped > 0)
+            {
+                ws.Cell(hang, 3).Value = $"Đã bỏ qua {tongSkipped} đối tượng bóc trước đó (đánh dấu XBOSS_BOCKL), tính cả lô.";
+                hang++;
+            }
+            if (tongXref > 0)
+            {
+                ws.Cell(hang, 3).Value = $"Bỏ qua {tongXref} đối tượng nằm trong xref (không bóc xref), tính cả lô.";
+                hang++;
+            }
+        }
+
+        // ----- Định dạng chung -----
+        if (hangCuoi >= HangHeader)
+        {
+            var bang = ws.Range(HangHeader, 1, hangCuoi, soCot);
+            bang.Style.Border.SetInsideBorder(XLBorderStyleValues.Thin);
+            bang.Style.Border.SetOutsideBorder(XLBorderStyleValues.Medium);
+        }
+        ws.Range(HangHeader + 1, 6, Math.Max(hangCuoi, HangHeader + 1), 8).Style.NumberFormat.Format = "#,##0.00";
+        if (moRong)
+        {
+            ws.Range(HangHeader + 1, CotKlQuyDoi, Math.Max(hangCuoi, HangHeader + 1), CotKlQuyDoi)
+                .Style.NumberFormat.Format = "#,##0.00";
+        }
+        ws.SheetView.FreezeRows(HangHeader);
+
+        if (coVung) GhiSheetVung(wb, new TakeoffResult
+        {
+            RulePackVersion = meta.RulePackVersion,
+            Lines = tatCaDong.Select(x => x.Line).ToList(),
+            Warnings = [],
+            SkippedMarkedCount = 0,
+            XrefSkippedCount = 0,
+        });
 
         wb.SaveAs(output);
     }
